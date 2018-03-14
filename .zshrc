@@ -110,6 +110,7 @@ antigen apply
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status)
 
 source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="/Users/evar/.sdkman"
