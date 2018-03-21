@@ -11,10 +11,8 @@ export PROMPT_COMMAND='echo -ne "\033]0;${PWD/#$HOME/~}\007"'
 # Tab completion for branch names
 source ~/.git-completion.bash
 
-emacsdir=/usr/local/Cellar/emacs-mac/emacs-25.3-mac-6.8/bin
-socket=$HOME/.emacs.d/server/server
-
-export EDITOR=$emacsdir"/emacsclient -a --no-wait --socket-name="$socket
+export VISUAL=nvim
+export EDITOR="$VISUAL"
 
 # if [[ $EMACS != "" ]]; then
 #     export EDITOR=$emacsdir"/emacsclient -a --no-wait --socket-name="$socket

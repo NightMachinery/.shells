@@ -42,3 +42,4 @@ cdf ()
 }
 . /Users/evar/anaconda/etc/profile.d/conda.sh
 conda activate
+
