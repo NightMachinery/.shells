@@ -13,6 +13,7 @@ addToPATH "/usr/local/bin"
 addToPATH "$HOME/.local/bin"
 addToPATH "/Base/- Code/Resources/"
 addToPATH "/usr/local/opt/texinfo/bin"
+addToPATH "$HOME/kscripts/"
 
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
 export LDFLAGS=-L/usr/local/opt/texinfo/lib
@@ -34,12 +35,15 @@ alias ci="brew cask install"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
+ks () { kscript ~/kscripts/"$@"; }
 
 cdf ()
 {
     mkdir -p -- "$1" &&
         cd -P -- "$1"
 }
+
+function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
 . /Users/evar/anaconda/etc/profile.d/conda.sh
 conda activate
 
