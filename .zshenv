@@ -46,4 +46,4 @@ cdf ()
 function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
 . /Users/evar/anaconda/etc/profile.d/conda.sh
 conda activate
-
+set -o vi

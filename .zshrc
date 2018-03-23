@@ -115,3 +115,22 @@ source /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="/Users/evar/.sdkman"
 [[ -s "/Users/evar/.sdkman/bin/sdkman-init.sh" ]] && source "/Users/evar/.sdkman/bin/sdkman-init.sh"
+
+#This doesn't work. I have no idea why.
+bindkey -M viins ‘ii’ vi-cmd-mode
+bindkey -v
+
+#Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
+# Use colon separators#.
+#xterm-24bit|xterm with 24-bit direct color mode,
+   #use=xterm-256color,
+   #setb24=\E[48:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
+   #setf24=\E[38:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
+## Use semicolon separators.
+#xterm-24bits|xterm with 24-bit direct color mode,
+   #use=xterm-256color,
+   #setb24=\E[48;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
+   #setf24=\E[38;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
+#tic -x -o ~/.terminfo terminfo-24bit.src
+export TERM=xterm-24bits
+
