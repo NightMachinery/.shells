@@ -1,0 +1,3 @@
+inoremap ii <Esc>
+inoremap jj <BS>
+

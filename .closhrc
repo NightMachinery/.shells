@@ -1,0 +1,4 @@
+(require-macros '[closh.core :refer [sh-str]])
+
+(defn closh-prompt []
+  (sh-str powerline-shell --shell bare))

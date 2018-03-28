@@ -16,6 +16,8 @@ addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
+export VISUAL='emacsclient -t'
+export EDITOR="$VISUAL"
 export LDFLAGS=-L/usr/local/opt/texinfo/lib
 export ELM_HOME="/usr/local/bin/"
 export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`
@@ -24,17 +26,22 @@ export JAVA_HOME=$JAVA_HOME8
 addToPATH $JAVA_HOME
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
+#export PKG_CONFIG_PATH= "/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
 
+alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias et="etlas exec eta"
 alias et7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
 alias pe="pkill -SIGUSR2 Emacs"
-alias ls="ls -a"
+alias ls="ls -aG"
 alias cask="brew cask"
 alias bi="brew install"
 alias ci="brew cask install"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
+alias emc="emacsclient -t"
+alias emcg="emacsclient -c"
+
 ks () { kscript ~/kscripts/"$@"; }
 
 cdf ()
@@ -44,6 +51,6 @@ cdf ()
 }
 
 function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
-. /Users/evar/anaconda/etc/profile.d/conda.sh
+. ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
 conda activate
 set -o vi

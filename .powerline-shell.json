@@ -1,0 +1,11 @@
+{
+  "segments": [
+    "username",
+    "ssh",
+    "cwd",
+    "git",
+    "hg",
+    "jobs"
+  ],
+  "theme": "~/anaconda/lib/python3.6/site-packages/powerline_shell/themes/solarized_light.py"
+}

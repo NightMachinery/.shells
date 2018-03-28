@@ -134,3 +134,4 @@ bindkey -v
 #tic -x -o ~/.terminfo terminfo-24bit.src
 export TERM=xterm-24bits
 
+alias ls="ls -aG" #Somehow sth overrides it from .zshenv :(
