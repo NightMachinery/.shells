@@ -114,3 +114,7 @@ transfer() {
     # cleanup
     rm -f $tmpfile
 }
+
+addToPATH "/usr/local/opt/curl/bin"
+GPG_TTY=$(tty)
+export GPG_TTY
