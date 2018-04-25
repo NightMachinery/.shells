@@ -22,3 +22,4 @@ export EDITOR="$VISUAL"
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 
+[ -f /usr/local/etc/bash_completion ] && . /usr/local/etc/bash_completion
