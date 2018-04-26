@@ -135,3 +135,4 @@ bindkey -v
 export TERM=xterm-24bits
 
 alias ls="ls -aG" #Somehow sth overrides it from .zshenv :(
+alias d='fasd -d'        # directory

@@ -124,5 +124,6 @@ transfer() {
 addToPATH "/usr/local/opt/curl/bin"
 GPG_TTY=$(tty)
 export GPG_TTY
-eval $(thefuck --alias f  )
+eval $(thefuck --alias c)
+eval "$(fasd --init auto)"
 # export TERM=xterm-24bits
