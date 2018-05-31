@@ -16,8 +16,13 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 
+export corra="198.143.181.104"
+alias ccorra="echo -n $corra | pbcopy"
+export HISTSIZE=100000
+export HISTTIMEFORMAT="%m/%d/%Y %T " #I always tend to configure my machines with an large HISTSIZE value so it keeps a longer history list, as well as HISTTIMEFORMAT with the time stamp value so I can see when was the command ran.
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
 export SUDO_EDITOR="emacsclient"
+export MONO_GAC_PREFIX="/usr/local"
 export VISUAL='emacsclient -t'
 export EDITOR="$VISUAL"
 export LDFLAGS=-L/usr/local/opt/texinfo/lib
@@ -48,10 +53,13 @@ alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
 alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
+alias y="youtube-dl "
+alias image="image-to-ascii -i"
+alias h="history | grep"
 
 ks () { kscript ~/kscripts/"$@"; }
 
-cdf ()
+cdm ()
 {
     mkdir -p -- "$1" &&
         cd -P -- "$1"
@@ -128,3 +136,6 @@ export GPG_TTY
 eval $(thefuck --alias c)
 eval "$(fasd --init auto)"
 # export TERM=xterm-24bits
+unalias run-help
+autoload run-help
+

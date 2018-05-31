@@ -1,2 +1,4 @@
 set editing-mode vi
 set keymap vi
+"\e[A": history-search-backward
+"\e[B": history-search-forward

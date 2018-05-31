@@ -40,7 +40,7 @@ export ZSH=/Users/evar/.oh-my-zsh
 # DISABLE_AUTO_TITLE="true"
 
 # Uncomment the following line to enable command auto-correction.
-# ENABLE_CORRECTION="true"
+ENABLE_CORRECTION="true"
 
 # Uncomment the following line to display red dots whilst waiting for completion.
 # COMPLETION_WAITING_DOTS="true"
@@ -62,7 +62,7 @@ export ZSH=/Users/evar/.oh-my-zsh
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git zsh-autosuggestions)
+plugins=(git git-extras catimg common-aliases lein nyan osx per-directory-history pip sbt scala screen sprunge sudo vi-mode web-search yarn fasd zsh-autosuggestions)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -138,3 +138,16 @@ alias ls="ls -aG" #Somehow sth overrides it from .zshenv :(
 alias d='fasd -d'        # directory
 export GEM_HOME="$HOME/.gem"
 addToPATH "$GEM_HOME/bin:$PATH"
+
+# start typing + [Up-Arrow] - fuzzy find history forward
+if [[ "${terminfo[kcuu1]}" != "" ]]; then
+    autoload -U up-line-or-beginning-search
+    zle -N up-line-or-beginning-search
+    bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
+fi
+# start typing + [Down-Arrow] - fuzzy find history backward
+if [[ "${terminfo[kcud1]}" != "" ]]; then
+    autoload -U down-line-or-beginning-search
+    zle -N down-line-or-beginning-search
+    bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
+fi
