@@ -62,7 +62,7 @@ ENABLE_CORRECTION="true"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git git-extras catimg common-aliases lein nyan osx per-directory-history pip sbt scala screen sprunge sudo vi-mode web-search yarn fasd zsh-autosuggestions)
+plugins=(git git-extras catimg common-aliases lein nyan osx per-directory-history pip sbt scala screen sprunge sudo vi-mode web-search fasd)
 
 source $ZSH/oh-my-zsh.sh
 

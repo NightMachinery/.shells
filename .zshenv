@@ -1,12 +1,15 @@
 #I am basically using this as shared config between zsh and bash. :D
 
+source "$HOME/.privateShell"
+
 function addToPATH {
     case ":$PATH:" in
         *":$1:"*) :;; # already there
-        *) PATH="$1:$PATH";; # or PATH="$PATH:$1"
+        *) PATH="$1:$PATH";; # org/r PATH="$PATH:$1"
     esac
 }
 
+addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
 addToPATH "/usr/local/bin"
 #addToPATH "/usr/local/lib"
