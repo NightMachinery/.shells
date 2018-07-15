@@ -21,6 +21,8 @@ addToPATH "$HOME/kscripts/"
 
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
+export sgate="198.143.181.179"
+alias csgate="echo -n $sgate | pbcopy"
 export HISTSIZE=100000
 export HISTTIMEFORMAT="%m/%d/%Y %T " #I always tend to configure my machines with an large HISTSIZE value so it keeps a longer history list, as well as HISTTIMEFORMAT with the time stamp value so I can see when was the command ran.
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
@@ -39,6 +41,9 @@ export BOOT_CLOJURE_VERSION='1.9.0'
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 #export PKG_CONFIG_PATH= "/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
 
+alias wh='which'
+alias rqup='wg-quick up ~/Downloads/rq.conf'
+alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
 alias youtube-dlg="$HOME/anaconda/envs/wx3/bin/youtube-dl-gui"
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
@@ -57,6 +62,7 @@ alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils
 alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
 alias y="youtube-dl "
+alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 alias image="image-to-ascii -i"
 alias h="history | grep"
 
@@ -82,8 +88,8 @@ set -o vi
 
 curl --version 2>&1 > /dev/null
 if [ $? -ne 0 ]; then
-  echo "Could not find curl."
-  return 1
+    echo "Could not find curl."
+    return 1
 fi
 
 transfer() { 
@@ -125,7 +131,7 @@ transfer() {
         # transfer pipe
         curl --progress-bar --upload-file "-" "https://transfer.sh/$file" >> $tmpfile
     fi
-   
+    
     # cat output link
     cat $tmpfile
 
@@ -142,3 +148,43 @@ eval "$(fasd --init auto)"
 unalias run-help
 autoload run-help
 
+. /Users/evar/torch/install/bin/torch-activate
+
+function git_sparse_clone() (
+    # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
+    rurl="$1" localdir="$2" && shift 2
+
+    mkdir -p "$localdir"
+    cd "$localdir"
+
+    git init
+    git remote add -f origin "$rurl"
+
+    git config core.sparseCheckout true
+
+    # Loops over remaining args
+    for i; do
+        echo "$i" >> .git/info/sparse-checkout
+    done
+
+    git pull origin master
+)
+
+function rloop_vid() ( 
+    ffmpeg -i "$1" -filter_complex "[0:v]reverse,fifo[r];[0:v][r] concat=n=2:v=1 [v]" -map "[v]" "$1_rloop.${2:-mp4}"
+)
+
+function trr() (
+    peerflix "$1" --path ~/Downloads/Video --mpv -- --fullscreen
+)
+function ot-mp3() (
+    B=$(basename "$1"); D=$(dirname "$1");
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" "$D/${B%.*}.mp3" "${@:2}"
+)
+
+function mp3-to-mp4() (
+    B=$(basename "$1"); D=$(dirname "$1");
+    ffmpeg -loop 1 -i "$2" -i "$1" -pix_fmt yuv420p -c:v libx264 -crf 16 -preset veryslow -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2:x=0:y=0:color=black" -shortest "${3:-$D/${B%.*}}.mp4"
+    # -c:a copy -r 1
+    )
+function sleepnow() ( sleep "${1:-3}"; pmset sleepnow )
