@@ -200,9 +200,8 @@ function rm-alpha() {
 function alpha2black() (rm-alpha "$1" black)
 function alpha2white() (rm-alpha "$1" white)
 function run-on-each() {
-    argc=$#
-    argv=("$@")
-    for (( j=2; j<argc; j++ )); do
-        $1 "${argv[j]}"
+    for i in "${@:2}"
+    do
+        $1 "$i"
     done
 }
