@@ -189,3 +189,20 @@ function mp3-to-mp4() (
     # -c:a copy -r 1
     )
 function sleepnow() ( sleep "${1:-3}"; pmset sleepnow )
+silent_background() {
+    { 1>/dev/null 2>&1 3>&1 "$@"& }
+    disown &>/dev/null  # Prevent whine if job has already completed
+}
+function rm-alpha() {
+    B=$(basename "$1"); D=$(dirname "$1");
+    convert "$1" -background "$2" -alpha remove "$D/${B%.*}_$2.png"
+}
+function alpha2black() (rm-alpha "$1" black)
+function alpha2white() (rm-alpha "$1" white)
+function run-on-each() {
+    argc=$#
+    argv=("$@")
+    for (( j=2; j<argc; j++ )); do
+        $1 "${argv[j]}"
+    done
+}
