@@ -194,7 +194,7 @@ silent_background() {
     disown &>/dev/null  # Prevent whine if job has already completed
 }
 function rm-alpha() {
-    B=$(basename "$1"); D=$(dirname "$1");
+    local B=$(basename "$1"); local D=$(dirname "$1");
     convert "$1" -background "$2" -alpha remove "$D/${B%.*}_$2.png"
 }
 function alpha2black() (rm-alpha "$1" black)
@@ -202,6 +202,33 @@ function alpha2white() (rm-alpha "$1" white)
 function run-on-each() {
     for i in "${@:2}"
     do
-        $1 "$i"
+        eval "$1 $i"
     done
+}
+function combine-funcs() {
+    # Combine multiple functions into one named by $1; The result will run all functions with $@.
+    local tmp321_string="function $1() { "
+    for i in "${@:2}"
+    do
+        tmp321_string="$tmp321_string""$i "'"$@"; '
+    done
+    tmp321_string="$tmp321_string""}"
+    # echo "$tmp321_string"
+    eval "$tmp321_string"
+}
+function hi10-multilink() {
+    #zsh-only
+    local argCount=$#
+    local pArgs=()
+    for (( i=1; i<=$argCount; i+=1 ))
+    do
+        if [[ "$argv[i]" =~ 'http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
+            # echo $match[1]
+            pArgs[$i]=$match[1]
+        else
+            echo Invalid link: "$argv[i]"
+        fi
+    done
+    echo $pArgs
+    aria2c -j10 -Z --referer="$1" $pArgs 
 }
