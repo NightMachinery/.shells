@@ -41,6 +41,7 @@ export BOOT_CLOJURE_VERSION='1.9.0'
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
 #export PKG_CONFIG_PATH= "/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
 
+alias coursera='coursera-dl -n -pl --aria2 --video-resolution 720p --download-quizzes --download-notebooks -sl "en,fa" --resume'
 alias ox='zdict -dt oxford'
 alias wh='which'
 alias rqup='wg-quick up ~/Downloads/rq.conf'
@@ -222,13 +223,19 @@ function hi10-multilink() {
     local pArgs=()
     for (( i=1; i<=$argCount; i+=1 ))
     do
-        if [[ "$argv[i]" =~ 'http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
+        if [[ "$argv[i]" =~ '.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
             # echo $match[1]
             pArgs[$i]=$match[1]
         else
             echo Invalid link: "$argv[i]"
         fi
     done
-    echo $pArgs
-    aria2c -j10 -Z --referer="$1" $pArgs 
+    # echo $pArgs
+    # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
+    aria2c -j10 -Z  $pArgs 
+}
+function hi10-from-page() {
+    # You need to have persistent cookies in lynx, and have logged in.
+    hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
+    # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
 }
