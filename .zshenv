@@ -57,6 +57,7 @@ alias ocr="pngpaste - | tesseract stdin stdout | pbcopy"
 alias cask="brew cask"
 alias bi="brew install"
 alias ci="brew cask install"
+alias fplay='ffplay -autoexit -nodisp -loglevel panic'
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
@@ -181,12 +182,12 @@ function trr() (
 )
 function ot-mp3() (
     B=$(basename "$1"); D=$(dirname "$1");
-    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" "$D/${B%.*}.mp3" "${@:2}"
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a libmp3lame -qscale:a 2 "$D/${B%.*}.mp3" "${@:2}"
 )
 
 function mp3-to-mp4() (
     B=$(basename "$1"); D=$(dirname "$1");
-    ffmpeg -loop 1 -i "$2" -i "$1" -pix_fmt yuv420p -c:v libx264 -crf 16 -preset veryslow -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2:x=0:y=0:color=black" -shortest "${3:-$D/${B%.*}}.mp4"
+    ffmpeg -loop 1 -i "$2" -i "$1" -pix_fmt yuv420p -c:v libx264 -crf 16  -c:a libfdk_aac -vbr 5 -preset veryslow -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2:x=0:y=0:color=black" -shortest "${3:-$D/${B%.*}}.mp4"
     # -c:a copy -r 1
     )
 function sleepnow() ( sleep "${1:-3}"; pmset sleepnow )
