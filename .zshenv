@@ -48,12 +48,15 @@ alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
 alias youtube-dlg="$HOME/anaconda/envs/wx3/bin/youtube-dl-gui"
+alias last-created='\ls -AtU|head -n1' #macOS only
+alias last-accessed='\ls -Atu|head -n1' #macOS only
+alias last-modified='\ls -At|head -n1'
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias et="etlas exec eta"
 alias et7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
 alias pe="pkill -SIGUSR2 Emacs"
 alias ls="ls -aG"
-alias ocr="pngpaste - | tesseract stdin stdout | pbcopy"
+alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
 alias bi="brew install"
 alias ci="brew cask install"
@@ -182,17 +185,22 @@ function trr() (
 )
 function ot-mp3() (
     B=$(basename "$1"); D=$(dirname "$1");
-    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a libmp3lame -qscale:a 2 "$D/${B%.*}.mp3" "${@:2}"
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a libmp3lame -qscale:a 1 "$D/${B%.*}.mp3" "${@:2}"
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a copy "$D/${B%.*}.trimmed.wav" "${@:2}"
 )
+function ot-wav() {
+    B=$(basename "$1"); D=$(dirname "$1");
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a copy "$D/${B%.*}.trimmed.wav" "${@:2}"
+}
 
 function mp3-to-mp4() (
     B=$(basename "$1"); D=$(dirname "$1");
     ffmpeg -loop 1 -i "$2" -i "$1" -pix_fmt yuv420p -c:v libx264 -crf 16  -c:a libfdk_aac -vbr 5 -preset veryslow -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2:x=0:y=0:color=black" -shortest "${3:-$D/${B%.*}}.mp4"
     # -c:a copy -r 1
     )
-function sleepnow() ( sleep "${1:-3}"; pmset sleepnow )
+function sleepnow() ( sleep "${1:-7}"; pmset sleepnow )
 silent_background() {
-    { 1>/dev/null 2>&1 3>&1 "$@"& }
+    { 1>/dev/null 2>&1 3>&1 eval "$@"& }
     disown &>/dev/null  # Prevent whine if job has already completed
 }
 function rm-alpha() {
@@ -239,4 +247,10 @@ function hi10-from-page() {
     # You need to have persistent cookies in lynx, and have logged in.
     hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
+}
+function ls-by-added() {
+    mdls -name kMDItemFSName -name kMDItemDateAdded -raw "$(find .)" | \
+        xargs -0 -I {} echo {} | \
+        sed 'N;s/\n/ /' | \
+        sort
 }
