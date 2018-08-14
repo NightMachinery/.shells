@@ -51,6 +51,7 @@ alias wifi='osx-wifi-cli'
 alias youtube-dlg="$HOME/anaconda/envs/wx3/bin/youtube-dl-gui"
 alias last-created='\ls -AtU|head -n1' #macOS only
 alias last-accessed='\ls -Atu|head -n1' #macOS only
+alias last-added='ls-by-added |head -n1' #macOS only
 alias last-modified='\ls -At|head -n1'
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias et="etlas exec eta"
@@ -233,16 +234,16 @@ function hi10-multilink() {
     local pArgs=()
     for (( i=1; i<=$argCount; i+=1 ))
     do
-        if [[ "$argv[i]" =~ '.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
+        if [[ "$argv[i]" =~ '.*http:\/\/hi10anime(.*)' ]]; then #'.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
             # echo $match[1]
-            pArgs[$i]=$match[1]
+            pArgs[$i]='http://hi10anime'"$match[1]"
         else
             echo Invalid link: "$argv[i]"
         fi
     done
     # echo $pArgs
     # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
-    aria2c -j10 -Z  $pArgs 
+    aria2c -j10 -Z  "${(@u)pArgs}" # (u) makes the array elements unique. 
 }
 function hi10-from-page() {
     # You need to have persistent cookies in lynx, and have logged in.
@@ -250,8 +251,17 @@ function hi10-from-page() {
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
 }
 function ls-by-added() {
-    mdls -name kMDItemFSName -name kMDItemDateAdded -raw "$(find .)" | \
+    # Doesn't work well for files having '(null)' as their DateAdded, which some do.
+    mdls -name kMDItemFSName -name kMDItemDateAdded -raw -- *(D) | \
         xargs -0 -I {} echo {} | \
         sed 'N;s/\n/ /' | \
-        sort
+        sort --reverse | \
+        sed -E "s/^.*\\+0000 //" # removes the timestamps
+}
+function play-last-added() (
+    # last-added | xargs -I k greadlink -f k | xargs -I k "${1:-iina}" k
+    "${1:-iina}" "$(last-added)"
+)
+function lad() {
+    eval "$1"" '$(last-added)'"
 }
