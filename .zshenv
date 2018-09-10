@@ -18,6 +18,7 @@ addToPATH "/Base/- Code/Resources/"
 addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
+addToPATH "/usr/libexec/"
 
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
@@ -48,6 +49,7 @@ alias wh='which'
 alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
+alias pi='pip install -U'
 alias youtube-dlg="$HOME/anaconda/envs/wx3/bin/youtube-dl-gui"
 alias last-created='\ls -AtU|head -n1' #macOS only
 alias last-accessed='\ls -Atu|head -n1' #macOS only
@@ -171,6 +173,7 @@ function git_sparse_clone() (
     git config core.sparseCheckout true
 
     # Loops over remaining args
+    local i
     for i; do
         echo "$i" >> .git/info/sparse-checkout
     done
@@ -212,9 +215,10 @@ function rm-alpha() {
 function alpha2black() (rm-alpha "$1" black)
 function alpha2white() (rm-alpha "$1" white)
 function run-on-each() {
+    local i
     for i in "${@:2}"
     do
-        eval "$1 $i"
+        eval "$1 '$i'"
     done
 }
 function combine-funcs() {
@@ -228,10 +232,12 @@ function combine-funcs() {
     # echo "$tmp321_string"
     eval "$tmp321_string"
 }
+combine-funcs alpha2bw alpha2black alpha2white
 function hi10-multilink() {
     #zsh-only
     local argCount=$#
     local pArgs=()
+    local i
     for (( i=1; i<=$argCount; i+=1 ))
     do
         if [[ "$argv[i]" =~ '.*http:\/\/hi10anime(.*)' ]]; then #'.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
@@ -258,10 +264,24 @@ function ls-by-added() {
         sort --reverse | \
         sed -E "s/^.*\\+0000 //" # removes the timestamps
 }
-function play-last-added() (
-    # last-added | xargs -I k greadlink -f k | xargs -I k "${1:-iina}" k
-    "${1:-iina}" "$(last-added)"
-)
 function lad() {
     eval "$1"" '$(last-added)'"
+    # function play-last-added() (
+    # last-added | xargs -I k greadlink -f k | xargs -I k "${1:-iina}" k
+    # "${1:-iina}" "$(last-added)"
+    #)
 }
+function ppgrep() {
+    case "$(uname)" in
+        Darwin)
+            \pgrep -i "$@" | gxargs --no-run-if-empty ps -fp
+            ;;
+        Linux)
+            \pgrep "$@" | gxargs --no-run-if-empty ps -fp
+            # Linux's pgrep doesn't support -i
+            ;;
+        esac
+}
+function '$'() { eval "$@" }
+export HH_CONFIG=hicolor
+source ~/scripts/bash/load-others.bash
