@@ -1,0 +1,3 @@
+setopt HIST_SUBST_PATTERN
+setopt extendedglob
+# echo Options set successfully.
