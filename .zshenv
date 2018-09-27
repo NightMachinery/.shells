@@ -9,6 +9,8 @@ function addToPATH {
     esac
 }
 
+
+addToPATH "~/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
 addToPATH "/usr/local/bin"
@@ -255,14 +257,6 @@ function hi10-from-page() {
     # You need to have persistent cookies in lynx, and have logged in.
     hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
-}
-function ls-by-added() {
-    # Doesn't work well for files having '(null)' as their DateAdded, which some do.
-    mdls -name kMDItemFSName -name kMDItemDateAdded -raw -- *(D) | \
-        xargs -0 -I {} echo {} | \
-        sed 'N;s/\n/ /' | \
-        sort --reverse | \
-        sed -E "s/^.*\\+0000 //" # removes the timestamps
 }
 function lad() {
     eval "$1"" '$(last-added)'"
