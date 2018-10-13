@@ -37,3 +37,7 @@ function rename-ebook() {
     echo mv "$1" "${directory}/${newfilename}.${extension}"
     mv "$1" "${directory}/${newfilename}.${extension}"
 }
+function cpt() { echo -n "$@" | pbcopy; }
+function pbadd() {
+    osascript ~/'scripts/applescript/path-copy.applescript' "$@"
+}

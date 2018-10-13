@@ -1,5 +1,6 @@
-alias roe='run-on-each'
+alias re='run-on-each'
 alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'
 alias yic='youtube-dl --ignore-config'
 alias reeb='run-on-each rename-ebook'
+alias aa='aria2c --seed-time=0'

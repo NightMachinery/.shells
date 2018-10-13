@@ -10,7 +10,7 @@ function addToPATH {
 }
 
 
-addToPATH "~/.dotnet/tools"
+addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
 addToPATH "/usr/local/bin"
