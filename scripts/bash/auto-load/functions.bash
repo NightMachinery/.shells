@@ -11,10 +11,17 @@ function dl-stream() {
     #  "${2:i-iina}" ""
 }
 function cpsd() {
-    local B=$(basename "$1"); local D=$(dirname "$1");
-    local out="$D/${B%.*}.png"
-    convert "$1[0]" "$out"
-    file-to-clipboard "$out"
+    local i;
+    local counter=1;
+    local outs=();
+    for i in "$@"; do
+        local B=$(basename "$i"); local D=$(dirname "$i");
+        local out="$D/${B%.*}.png"
+        convert "$i""[0]" "$out"
+        outs[$counter]=$out
+        counter=$(($counter + 1))
+    done
+    pbadd "${(@)outs}"
 }
 function set-fk-icon-size() {
     /usr/libexec/PlistBuddy -c "set FK_DefaultIconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finderkit, i.e., dialogs.
@@ -39,5 +46,5 @@ function rename-ebook() {
 }
 function cpt() { echo -n "$@" | pbcopy; }
 function pbadd() {
-    osascript ~/'scripts/applescript/path-copy.applescript' "$@"
+    osascript ~/'scripts/applescript/path-copy.applescript' "$@" > /dev/null
 }
