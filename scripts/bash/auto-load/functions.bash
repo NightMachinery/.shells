@@ -1,3 +1,4 @@
+it2prof() { echo -e "\033]50;SetProfile=$1\a" } # Change iterm2 profile. Usage it2prof ProfileName (case sensitive)
 file-to-clipboard() {
     osascript \
         -e 'on run args' \
@@ -48,3 +49,9 @@ function cpt() { echo -n "$@" | pbcopy; }
 function pbadd() {
     osascript ~/'scripts/applescript/path-copy.applescript' "$@" > /dev/null
 }
+function sdc() {
+    it2prof Default
+    sdcv --color "$*" | less
+    it2prof 'Hotkey Window'
+}
+function sp() { ispell<<<"$*" } 
