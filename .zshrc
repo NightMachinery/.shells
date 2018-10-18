@@ -106,6 +106,7 @@ antigen theme bhilburn/powerlevel9k powerlevel9k
 # antigen theme arialdomartini/oh-my-git-themes oppa-lana-style
 antigen bundle Tarrasch/zsh-functional
 antigen bundle Tarrasch/zsh-bd
+antigen bundle Tarrasch/zsh-colors
 
 antigen apply
 
