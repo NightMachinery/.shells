@@ -276,6 +276,6 @@ function ppgrep() {
             ;;
         esac
 }
-function '$'() { eval "$@" }
+function '$'() { eval "$@" ; }
 export HH_CONFIG=hicolor
 source ~/scripts/bash/load-others.bash

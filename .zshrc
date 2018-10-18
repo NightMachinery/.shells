@@ -104,6 +104,8 @@ POWERLEVEL9K_COLOR_SCHEME='light'
 antigen theme bhilburn/powerlevel9k powerlevel9k
 # antigen bundle arialdomartini/oh-my-git
 # antigen theme arialdomartini/oh-my-git-themes oppa-lana-style
+antigen bundle Tarrasch/zsh-functional
+antigen bundle Tarrasch/zsh-bd
 
 antigen apply
 
