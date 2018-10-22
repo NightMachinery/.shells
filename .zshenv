@@ -75,7 +75,6 @@ alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
 alias y="youtube-dl "
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
-alias image="image-to-ascii -i"
 alias h="history | grep"
 
 ks () { kscript ~/kscripts/"$@"; }
