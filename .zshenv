@@ -250,7 +250,7 @@ function hi10-multilink() {
     done
     # echo $pArgs
     # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
-    aria2c -j10 -Z  "${(@u)pArgs}" # (u) makes the array elements unique. 
+    aria2c -j1 -Z  "${(@u)pArgs}" # (u) makes the array elements unique. 
 }
 function hi10-from-page() {
     # You need to have persistent cookies in lynx, and have logged in.

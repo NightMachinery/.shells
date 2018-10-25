@@ -1,3 +1,16 @@
+function github-dir() {
+    svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"  
+}
+function rename-for-podcast0() {
+    local c=1
+    local i
+    for i in "${@:3}"
+             {
+                 echo "$i to "  "$(dirname $i)/1-$(printf '%02d' $c) $2"
+                 if test $1 = 1 ; then mv "$i" "$(dirname $i)/1-$(printf '%02d' $c) $2"; fi
+                 c=$(($c + 1))
+             }
+}
 function pbadd() {
     osascript ~/'scripts/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
 }
@@ -9,7 +22,7 @@ function cpsd() {
         local B=$(basename "$i"); local D=$(dirname "$i");
         local out="$D/${B%.*}.png"
         convert "$i""[0]" "$out"
-        outs[$counter]=$out
+        outs[$counter]="$out"
         counter=$(($counter + 1))
     done
     pbadd "${(@)outs}"
