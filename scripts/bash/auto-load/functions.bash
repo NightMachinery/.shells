@@ -1,3 +1,6 @@
+function magnet2torrent() {
+    aria2c -d "${2:-.}" --bt-metadata-only=true --bt-save-metadata=true "$1"
+}
 it2prof() { echo -e "\033]50;SetProfile=$1\a" ; } # Change iterm2 profile. Usage it2prof ProfileName (case sensitive)
 file-to-clipboard() {
     osascript \

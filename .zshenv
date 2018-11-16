@@ -10,6 +10,7 @@ function addToPATH {
 }
 
 
+addToPATH ~/bin
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
@@ -153,10 +154,13 @@ transfer() {
 addToPATH "/usr/local/opt/curl/bin"
 GPG_TTY=$(tty)
 export GPG_TTY
+
 eval $(thefuck --alias c)
+alias fuck='c'
+
 eval "$(fasd --init auto)"
 # export TERM=xterm-24bits
-unalias run-help
+unalias run-help &> /dev/null
 autoload run-help
 
 . /Users/evar/torch/install/bin/torch-activate
@@ -258,7 +262,7 @@ function hi10-from-page() {
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
 }
 function lad() {
-    eval "$1"" '$(last-added)'"
+    eval "$@"" '$(last-added)'"
     # function play-last-added() (
     # last-added | xargs -I k greadlink -f k | xargs -I k "${1:-iina}" k
     # "${1:-iina}" "$(last-added)"

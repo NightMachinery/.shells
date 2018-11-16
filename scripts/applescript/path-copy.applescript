@@ -1,3 +1,4 @@
+#!/usr/bin/env osascript
 use framework "Appkit"
 use Finder : application "Finder"
 

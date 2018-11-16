@@ -18,14 +18,21 @@ function cpsd() {
     local i;
     local counter=1;
     local outs=();
-    for i in "$@"; do
-        local B=$(basename "$i"); local D=$(dirname "$i");
-        local out="$D/${B%.*}.png"
+    for i in "${@:2}"; do
+        local B=$(basename "$i"); #local D=$(dirname "$i");
+        local out="$1/${B%.*}.png"
         convert "$i""[0]" "$out"
         outs[$counter]="$out"
         counter=$(($counter + 1))
     done
     pbadd "${(@)outs}"
+}
+function cpsdi() {
+    cpsd "$(dirname "$1")" "$@"
+}
+function cpsdt() {
+    mkdir -p ~/tmp/delme
+    cpsd ~/tmp/delme "$@"
 }
 function ls-by-added() {
     # Doesn't work well for files having '(null)' as their DateAdded, which some do.

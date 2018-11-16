@@ -62,7 +62,7 @@ export ZSH=/Users/evar/.oh-my-zsh
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(zsh-autosuggestions git git-extras catimg common-aliases lein nyan osx pip sbt scala screen sprunge sudo vi-mode web-search fasd)
+plugins=(zsh-autosuggestions git git-extras catimg common-aliases lein nyan osx pip sbt scala screen sprunge sudo vi-mode fasd)
 
 source $ZSH/oh-my-zsh.sh
 
@@ -107,8 +107,13 @@ antigen theme bhilburn/powerlevel9k powerlevel9k
 antigen bundle Tarrasch/zsh-functional
 antigen bundle Tarrasch/zsh-bd
 antigen bundle Tarrasch/zsh-colors
+antigen bundle Vifon/deer
 
 antigen apply
+
+autoload -U deer
+zle -N deer
+bindkey '\ek' deer
 
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status)
 
@@ -159,3 +164,5 @@ fi
 alias imgcat=~/.iterm2/imgcat;alias imgls=~/.iterm2/imgls;alias it2attention=~/.iterm2/it2attention;alias it2check=~/.iterm2/it2check;alias it2copy=~/.iterm2/it2copy;alias it2dl=~/.iterm2/it2dl;alias it2getvar=~/.iterm2/it2getvar;alias it2setcolor=~/.iterm2/it2setcolor;alias it2setkeylabel=~/.iterm2/it2setkeylabel;alias it2ul=~/.iterm2/it2ul;alias it2universion=~/.iterm2/it2universion
 unsetopt correct_all
 source ~/scripts/zsh/load-others.zsh
+fpath=(~/.zsh.d/ $fpath)
+
