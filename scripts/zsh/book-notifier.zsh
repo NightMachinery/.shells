@@ -5,10 +5,10 @@ if ! is-online &> /dev/null ; then
     echo Not online
     exit 0
 fi
-gtimeout 10s libgen -s "$*" &> /dev/null
+(gtimeout 20s libgen -s "$*")|grep --silent 'Choose book by ID:'
 local res=$?
 # echo $res
-if [ $res -eq 124 ]; then
+if [ $res -eq 0 ]; then
     terminal-notifier -message "$*" -title "Book Has Become Available!"
     echo "$* is now available!"
 fi
