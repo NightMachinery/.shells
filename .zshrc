@@ -101,7 +101,10 @@ source "$HOME/.antigen/antigen.zsh"
 antigen use oh-my-zsh
 POWERLEVEL9K_INSTALLATION_PATH=$ANTIGEN_BUNDLES/bhilburn/powerlevel9k
 POWERLEVEL9K_COLOR_SCHEME='light'
-antigen theme bhilburn/powerlevel9k powerlevel9k
+# antigen theme bhilburn/powerlevel9k powerlevel9k
+# antigen theme https://github.com/denysdovhan/spaceship-prompt spaceship
+antigen bundle mafredri/zsh-async
+antigen bundle sindresorhus/pure
 # antigen bundle arialdomartini/oh-my-git
 # antigen theme arialdomartini/oh-my-git-themes oppa-lana-style
 antigen bundle Tarrasch/zsh-functional
