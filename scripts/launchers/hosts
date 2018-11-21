@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+export HOME=/Users/evar
+source /users/evar/.bashrc
+# source /users/evar/.zshenv
+/Users/evar/anaconda/bin/python /Base/_Code/Misc/hosts/updateHostsFile.py --auto --replace --backup &>> /Users/evar/log/hosts.out2
+# tmux new -d -s hosts "/Users/evar/anaconda/bin/python /Base/_Code/Misc/hosts/updateHostsFile.py --auto --replace --backup"
