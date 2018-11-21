@@ -37,7 +37,7 @@ function rename-ebook() {
 }
 function cpt() { echo -n "$@" | pbcopy; }
 function sdc() {
-    it2prof Default
+    it2prof dark
     sdcv --color "$*" | less
     it2prof 'Hotkey Window'
 }
