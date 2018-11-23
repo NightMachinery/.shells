@@ -43,6 +43,6 @@ function sdc() {
 }
 function sp() { ispell<<<"$*" ; }
 function fsay() {
-    say -v Fiona -r 60 "$@"
+    say -v Fiona -r 30 "$@"
     #PORTME
 }

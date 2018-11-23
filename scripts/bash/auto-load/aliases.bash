@@ -20,3 +20,4 @@ alias p='sdc $(pbpaste)'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias rsp='rsync --human-readable --xattrs --times --crtimes --delete-after --ignore-errors --force-delete --partial-dir=.rsync-partial  --info=progress2 -r'
 alias rspb='rsp --backup --backup-dir=.rsync-backup'
+alias fsayd='fsay Darkness is Paramount'
