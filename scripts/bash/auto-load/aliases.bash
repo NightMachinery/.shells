@@ -21,3 +21,12 @@ alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias rsp='rsync --human-readable --xattrs --times --crtimes --delete-after --ignore-errors --force-delete --partial-dir=.rsync-partial  --info=progress2 -r'
 alias rspb='rsp --backup --backup-dir=.rsync-backup'
 alias fsayd='fsay Darkness is Paramount'
+case "$(uname)" in
+    Darwin)
+        alias ggrep='ggrep  --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn}'
+        ;;
+    Linux)
+        alias ggrep='grep  --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn}'
+        ;;
+esac
+
