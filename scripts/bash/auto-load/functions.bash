@@ -42,3 +42,7 @@ function sdc() {
     it2prof 'Hotkey Window'
 }
 function sp() { ispell<<<"$*" ; }
+function fsay() {
+    say -v Fiona -r 60 "$@"
+    #PORTME
+}

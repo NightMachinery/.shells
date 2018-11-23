@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 echo ok
 printf '%s\n' "$*"
-\lynx -cfg=~/.lynx.cfg  --accept_all_cookies "$*"
+\lynx -cfg=~/.lynx.cfg  --accept_all_cookies "$@"
