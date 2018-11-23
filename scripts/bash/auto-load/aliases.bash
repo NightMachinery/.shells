@@ -11,5 +11,11 @@ alias powerdecay="sudo powermetrics -i 1000 --poweravg 1 | grep 'Average cumulat
 alias bu='brew upgrade'
 alias bcu='brew cask upgrade'
 alias ynow='y -f best'
+alias ddg='ddgr --unsafe -n 6'
+alias dg='ddg --noprompt'
 alias ggg='googler -n 6'
 alias gg='ggg --noprompt'
+alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
+alias p='sdc $(pbpaste)'
+alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
+alias rsp='rsync --partial  --info=progress2 -r'
