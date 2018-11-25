@@ -18,8 +18,10 @@ alias gg='ggg --noprompt'
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 alias p='sdc $(pbpaste)'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
-alias rsp='rsync --human-readable --xattrs --times --crtimes --delete-after --ignore-errors --force-delete --partial-dir=.rsync-partial  --info=progress2 -r'
+alias rsp='rsync --human-readable --xattrs --times --delete-after --ignore-errors --force-delete --partial-dir=.rsync-partial  --info=progress2 -r'
+alias rspm='rsp --crtimes'
 alias rspb='rsp --backup --backup-dir=.rsync-backup'
+alias rspbm='rspb --crtimes'
 alias fsayd='fsay Darkness is Paramount'
 case "$(uname)" in
     Darwin)

@@ -1,1 +1,1 @@
-export BROWSER="lyn"
+export BROWSER="lynx"
