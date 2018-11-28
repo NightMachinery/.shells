@@ -1,6 +1,23 @@
 #I am basically using this as shared config between zsh and bash. :D
 
-source "$HOME/.privateShell"
+function eval-darwin() 
+{ 
+case "$(uname)" in 
+    Darwin) 
+        eval "${@}" 
+        ;; 
+    Linux) 
+ 
+        ;;esac 
+} 
+function psource() 
+{ 
+    if [[ -r $1 ]]; then 
+        source $1 
+    fi 
+} 
+
+psource "$HOME/.privateShell"
 
 function addToPATH {
     case ":$PATH:" in
@@ -25,7 +42,7 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
-
+#return
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
 export sgate="198.143.181.179"
@@ -162,7 +179,6 @@ eval $(thefuck --alias c)
 alias fuck='c'
 
 eval "$(fasd --init auto)"
-# export TERM=xterm-24bits
 unalias run-help &> /dev/null
 autoload run-help
 
