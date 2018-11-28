@@ -34,6 +34,7 @@ addToPATH ~/bin
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
+addToPATH /snap/bin
 addToPATH "/usr/local/bin"
 #addToPATH "/usr/local/lib"
 addToPATH "$HOME/.local/bin"

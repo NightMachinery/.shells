@@ -96,34 +96,7 @@ source $ZSH/oh-my-zsh.sh
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
 
-psource "$HOME/.antigen/antigen.zsh"
-psource /home/linuxbrew/.linuxbrew/share/antigen/antigen.zsh
-psource /usr/share/zsh-antigen/antigen.zsh
-
-antigen use oh-my-zsh
-POWERLEVEL9K_INSTALLATION_PATH=$ANTIGEN_BUNDLES/bhilburn/powerlevel9k
-POWERLEVEL9K_COLOR_SCHEME='light'
-# antigen theme bhilburn/powerlevel9k powerlevel9k
-# antigen theme https://github.com/denysdovhan/spaceship-prompt spaceship
-antigen bundle mafredri/zsh-async
-antigen bundle sindresorhus/pure
-antigen bundle mafredri/zsh-async
-antigen bundle sindresorhus/pure
-# antigen bundle arialdomartini/oh-my-git
-# antigen theme arialdomartini/oh-my-git-themes oppa-lana-style
-antigen bundle Tarrasch/zsh-functional
-antigen bundle Tarrasch/zsh-bd
-antigen bundle Tarrasch/zsh-colors
-antigen bundle Vifon/deer
-antigen bundle zsh-users/zsh-autosuggestions
-antigen bundle zsh-users/zsh-syntax-highlighting
-
-antigen apply
-
-autoload -U deer
-zle -N deer
-bindkey '\ek' deer
-
+source <(antibody init)
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status)
 
 psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
@@ -174,4 +147,26 @@ unsetopt correct_all
 source ~/bal/aliases.bash #To make them have priority.
 source ~/scripts/zsh/load-others.zsh
 fpath=(~/.zsh.d/ $fpath)
+#antibody use oh-my-zsh
+POWERLEVEL9K_INSTALLATION_PATH=$ANTIGEN_BUNDLES/bhilburn/powerlevel9k
+POWERLEVEL9K_COLOR_SCHEME='light'
+# antibody theme bhilburn/powerlevel9k powerlevel9k
+# antibody theme https://github.com/denysdovhan/spaceship-prompt spaceship
+antibody bundle mafredri/zsh-async
+antibody bundle sindresorhus/pure
+antibody bundle mafredri/zsh-async
+antibody bundle sindresorhus/pure
+# antibody bundle arialdomartini/oh-my-git
+# antibody theme arialdomartini/oh-my-git-themes oppa-lana-style
+antibody bundle Tarrasch/zsh-functional
+antibody bundle Tarrasch/zsh-bd
+antibody bundle Tarrasch/zsh-colors
+antibody bundle Vifon/deer
+antibody bundle zsh-users/zsh-autosuggestions
+antibody bundle zsh-users/zsh-syntax-highlighting
 
+#antibody apply
+
+autoload -U deer
+zle -N deer
+bindkey '\ek' deer
