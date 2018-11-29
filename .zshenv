@@ -109,7 +109,7 @@ cdm ()
 
 function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
 . ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
-conda activate
+conda activate e2
 set -o vi
 
 #
