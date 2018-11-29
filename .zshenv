@@ -74,7 +74,6 @@ alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
 alias pi='pip install -U'
-alias youtube-dlg="$HOME/anaconda/envs/wx3/bin/youtube-dl-gui"
 alias last-created='\ls -AtU|head -n1' #macOS only
 alias last-accessed='\ls -Atu|head -n1' #macOS only
 alias last-added='ls-by-added |head -n1' #macOS only
@@ -95,9 +94,8 @@ alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
 alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
-alias y="youtube-dl "
+alias y="noglob youtube-dl "
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
-alias h="history | grep"
 
 ks () { kscript ~/kscripts/"$@"; }
 
