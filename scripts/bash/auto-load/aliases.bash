@@ -1,3 +1,6 @@
+alias ai="sudo apt install"
+alias au="sudo apt upgrade"
+alias auu="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
 alias h="history|grep"
 alias re='run-on-each'
