@@ -57,13 +57,13 @@ export VISUAL='emacsclient -t'
 export EDITOR="$VISUAL"
 export LDFLAGS=-L/usr/local/opt/texinfo/lib
 export ELM_HOME="/usr/local/bin/"
-export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`
-export JAVA_HOME9=`/usr/libexec/java_home --version 9`
-export JAVA_HOME=$JAVA_HOME8
-addToPATH $JAVA_HOME
+eval-darwin 'export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`'
+eval-darwin 'export JAVA_HOME9=`/usr/libexec/java_home --version 9`'
+eval-darwin 'export JAVA_HOME=$JAVA_HOME8'
+eval-darwin 'addToPATH $JAVA_HOME'
 export BOOT_CLOJURE_VERSION='1.9.0' 
 
-export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
+export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src" &>/dev/null
 #export PKG_CONFIG_PATH= "/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
 
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
@@ -181,7 +181,7 @@ eval "$(fasd --init auto)"
 unalias run-help &> /dev/null
 autoload run-help
 
-. /Users/evar/torch/install/bin/torch-activate
+psource ~/torch/install/bin/torch-activate
 
 function git_sparse_clone() (
     # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
