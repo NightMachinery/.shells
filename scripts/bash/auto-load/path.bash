@@ -1,2 +1,2 @@
 # This file needs aliases and functions to be already loaded.
-re addToPATH ~/scripts/**
+re addToPATH ~/scripts/** ~/code/zsh/**
