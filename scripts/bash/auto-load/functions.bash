@@ -1,3 +1,6 @@
+function ncp() {
+	cat | gnc -c localhost 2000
+}
 function magnet2torrent() {
     aria2c -d "${2:-.}" --bt-metadata-only=true --bt-save-metadata=true "$1"
 }

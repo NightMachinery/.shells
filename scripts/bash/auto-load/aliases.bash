@@ -1,3 +1,4 @@
+eval-linux 'alias gnc=nc'
 alias ai="sudo apt install"
 alias au="sudo apt upgrade"
 alias auu="sudo apt update"

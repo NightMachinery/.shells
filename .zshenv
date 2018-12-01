@@ -1,6 +1,6 @@
 #I am basically using this as shared config between zsh and bash. :D
 
-function eval-darwin() 
+ffunction eval-darwin() 
 { 
 case "$(uname)" in 
     Darwin) 
@@ -8,6 +8,16 @@ case "$(uname)" in
         ;; 
     Linux) 
  
+        ;;esac 
+} 
+function eval-linux() 
+{ 
+case "$(uname)" in 
+    Darwin) 
+
+        ;; 
+    Linux) 
+        eval "${@}" 
         ;;esac 
 } 
 function psource() 
