@@ -1,6 +1,33 @@
 #I am basically using this as shared config between zsh and bash. :D
 
-source "$HOME/.privateShell"
+ffunction eval-darwin() 
+{ 
+case "$(uname)" in 
+    Darwin) 
+        eval "${@}" 
+        ;; 
+    Linux) 
+ 
+        ;;esac 
+} 
+function eval-linux() 
+{ 
+case "$(uname)" in 
+    Darwin) 
+
+        ;; 
+    Linux) 
+        eval "${@}" 
+        ;;esac 
+} 
+function psource() 
+{ 
+    if [[ -r $1 ]]; then 
+        source $1 
+    fi 
+} 
+
+psource "$HOME/.privateShell"
 
 function addToPATH {
     case ":$PATH:" in
@@ -9,11 +36,15 @@ function addToPATH {
     esac
 }
 
+test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
+test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
 
+addToPATH ~/.local/bin
 addToPATH ~/bin
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
+addToPATH /snap/bin
 addToPATH "/usr/local/bin"
 #addToPATH "/usr/local/lib"
 addToPATH "$HOME/.local/bin"
@@ -22,7 +53,7 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
-
+#return
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
 export sgate="198.143.181.179"
@@ -36,13 +67,13 @@ export VISUAL='emacsclient -t'
 export EDITOR="$VISUAL"
 export LDFLAGS=-L/usr/local/opt/texinfo/lib
 export ELM_HOME="/usr/local/bin/"
-export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`
-export JAVA_HOME9=`/usr/libexec/java_home --version 9`
-export JAVA_HOME=$JAVA_HOME8
-addToPATH $JAVA_HOME
+eval-darwin 'export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`'
+eval-darwin 'export JAVA_HOME9=`/usr/libexec/java_home --version 9`'
+eval-darwin 'export JAVA_HOME=$JAVA_HOME8'
+eval-darwin 'addToPATH $JAVA_HOME'
 export BOOT_CLOJURE_VERSION='1.9.0' 
 
-export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src"
+export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src" &>/dev/null
 #export PKG_CONFIG_PATH= "/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
 
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
@@ -53,7 +84,6 @@ alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
 alias pi='pip install -U'
-alias youtube-dlg="$HOME/anaconda/envs/wx3/bin/youtube-dl-gui"
 alias last-created='\ls -AtU|head -n1' #macOS only
 alias last-accessed='\ls -Atu|head -n1' #macOS only
 alias last-added='ls-by-added |head -n1' #macOS only
@@ -74,9 +104,8 @@ alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
 alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
-alias y="youtube-dl "
+alias y="noglob youtube-dl"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
-alias h="history | grep"
 
 ks () { kscript ~/kscripts/"$@"; }
 
@@ -88,7 +117,7 @@ cdm ()
 
 function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
 . ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
-conda activate
+conda activate e2
 set -o vi
 
 #
@@ -159,11 +188,10 @@ eval $(thefuck --alias c)
 alias fuck='c'
 
 eval "$(fasd --init auto)"
-# export TERM=xterm-24bits
 unalias run-help &> /dev/null
 autoload run-help
 
-. /Users/evar/torch/install/bin/torch-activate
+psource ~/torch/install/bin/torch-activate
 
 function git_sparse_clone() (
     # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"

@@ -1,3 +1,9 @@
+eval-linux 'alias gnc=nc'
+alias ai="sudo apt install"
+alias au="sudo apt upgrade"
+alias auu="sudo apt update"
+alias ncs="sudo nextcloud.occ files:scan --all"
+alias h="history|grep"
 alias re='run-on-each'
 alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'

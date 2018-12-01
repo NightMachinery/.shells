@@ -4,7 +4,7 @@ DEFAULT_USER="evar"
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 
 # Path to your oh-my-zsh installation.
-export ZSH=/Users/evar/.oh-my-zsh
+export ZSH=~/.oh-my-zsh
 
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
@@ -62,8 +62,8 @@ export ZSH=/Users/evar/.oh-my-zsh
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(zsh-autosuggestions git git-extras catimg common-aliases lein nyan osx pip sbt scala screen sprunge sudo vi-mode fasd)
-
+plugins=(git git-extras catimg common-aliases lein pip sbt scala screen sprunge sudo vi-mode fasd)
+eval-darwin "plugins+=(osx)"
 source $ZSH/oh-my-zsh.sh
 
 # User configuration
@@ -96,36 +96,14 @@ source $ZSH/oh-my-zsh.sh
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
 
-source "$HOME/.antigen/antigen.zsh"
-
-antigen use oh-my-zsh
-POWERLEVEL9K_INSTALLATION_PATH=$ANTIGEN_BUNDLES/bhilburn/powerlevel9k
-POWERLEVEL9K_COLOR_SCHEME='light'
-# antigen theme bhilburn/powerlevel9k powerlevel9k
-# antigen theme https://github.com/denysdovhan/spaceship-prompt spaceship
-antigen bundle mafredri/zsh-async
-antigen bundle sindresorhus/pure
-# antigen bundle arialdomartini/oh-my-git
-# antigen theme arialdomartini/oh-my-git-themes oppa-lana-style
-antigen bundle Tarrasch/zsh-functional
-antigen bundle Tarrasch/zsh-bd
-antigen bundle Tarrasch/zsh-colors
-antigen bundle Vifon/deer
-
-antigen apply
-
-autoload -U deer
-zle -N deer
-bindkey '\ek' deer
-
+source <(antibody init)
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status)
 
-source /usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-source /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
+psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
-export SDKMAN_DIR="/Users/evar/.sdkman"
-[[ -s "/Users/evar/.sdkman/bin/sdkman-init.sh" ]] && source "/Users/evar/.sdkman/bin/sdkman-init.sh"
+export SDKMAN_DIR="$HOME/.sdkman"
+[[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
 
 #This doesn't work. I have no idea why.
 bindkey -M viins ‘ii’ vi-cmd-mode
@@ -143,7 +121,7 @@ bindkey -v
    #setb24=\E[48;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
    #setf24=\E[38;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
 #tic -x -o ~/.terminfo terminfo-24bit.src
-export TERM=xterm-24bits
+eval-darwin "export TERM=xterm-24bits"
 
 alias ls="ls -aG" #Somehow sth overrides it from .zshenv :(
 alias d='fasd -d'        # directory
@@ -169,4 +147,26 @@ unsetopt correct_all
 source ~/bal/aliases.bash #To make them have priority.
 source ~/scripts/zsh/load-others.zsh
 fpath=(~/.zsh.d/ $fpath)
+#antibody use oh-my-zsh
+POWERLEVEL9K_INSTALLATION_PATH=$ANTIGEN_BUNDLES/bhilburn/powerlevel9k
+POWERLEVEL9K_COLOR_SCHEME='light'
+# antibody theme bhilburn/powerlevel9k powerlevel9k
+# antibody theme https://github.com/denysdovhan/spaceship-prompt spaceship
+antibody bundle mafredri/zsh-async
+antibody bundle sindresorhus/pure
+antibody bundle mafredri/zsh-async
+antibody bundle sindresorhus/pure
+# antibody bundle arialdomartini/oh-my-git
+# antibody theme arialdomartini/oh-my-git-themes oppa-lana-style
+antibody bundle Tarrasch/zsh-functional
+antibody bundle Tarrasch/zsh-bd
+antibody bundle Tarrasch/zsh-colors
+antibody bundle Vifon/deer
+antibody bundle zsh-users/zsh-autosuggestions
+antibody bundle zsh-users/zsh-syntax-highlighting
 
+#antibody apply
+
+autoload -U deer
+zle -N deer
+bindkey '\ek' deer
