@@ -1,3 +1,6 @@
+function e() {
+	echo "${pipestatus[@]}" "${PIPESTATUS[@]}"
+}
 function ncp() {
 	cat | gnc -c localhost 2000
 }
