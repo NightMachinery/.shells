@@ -1,1 +1,1 @@
-. <(gr completion)
+#. <(gr completion) #buggy

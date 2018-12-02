@@ -1,6 +1,16 @@
 #I am basically using this as shared config between zsh and bash. :D
 
-ffunction eval-darwin() 
+function eval-dl() 
+{ 
+case "$(uname)" in 
+    Darwin) 
+        eval "$1" 
+        ;; 
+    Linux) 
+ 	eval "$2"
+        ;;esac 
+} 
+function eval-darwin() 
 { 
 case "$(uname)" in 
     Darwin) 

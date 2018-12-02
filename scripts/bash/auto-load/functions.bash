@@ -1,3 +1,6 @@
+function ins() {
+	eval-dl "bi $1" "ai $1"
+}
 function e() {
 	echo "${pipestatus[@]}" "${PIPESTATUS[@]}"
 }
