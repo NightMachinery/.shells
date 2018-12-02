@@ -1,5 +1,5 @@
 eval-linux 'alias gnc=nc'
-alias ai="sudo apt install"
+alias ai="sudo apt install -y"
 alias au="sudo apt upgrade"
 alias auu="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
