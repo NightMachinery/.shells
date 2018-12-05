@@ -38,17 +38,25 @@ function psource()
 } 
 
 psource "$HOME/.privateShell"
-
+typeset -Ug path
 function addToPATH {
-    case ":$PATH:" in
-        *":$1:"*) :;; # already there
-        *) PATH="$1:$PATH";; # org/r PATH="$PATH:$1"
-    esac
+   # case ":$PATH:" in
+   #     *":$1:"*) :;; # already there
+   #     *) PATH="$1:$PATH";; # org/r PATH="$PATH:$1"
+   # esac
+   #path[1,0]="$1"
+   #path=("$1" "$path[@]")
+   PATH="$1:$PATH"
+   typeset -Ug path
 }
 
+if ! (( $+commands[brew] )) ; then
 test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
 test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+fi
 
+. ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
+conda activate
 addToPATH ~/.local/bin
 addToPATH ~/bin
 addToPATH "$HOME/.dotnet/tools"
@@ -56,7 +64,6 @@ addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
 addToPATH /snap/bin
 addToPATH "/usr/local/bin"
-#addToPATH "/usr/local/lib"
 addToPATH "$HOME/.local/bin"
 addToPATH "/Base/- Code/Resources/"
 addToPATH "$HOME/go/bin"
@@ -126,8 +133,6 @@ cdm ()
 }
 
 function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
-. ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
-conda activate
 set -o vi
 
 #
