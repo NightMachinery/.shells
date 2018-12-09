@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-rsstail -l -u "$1" -n 0 | while read -r line1
+rsstail -l -u "$1" -n 0 -N | while read -r line1
 do
     read -r line2
     if ggrep -P --silent "$2" <<< "$line1" ; then
