@@ -1,3 +1,9 @@
+function retry() {
+	until "$@" ; do
+		echo Retrying \'"$*"\' "..." 1>&2
+		sleep 1
+	done
+}
 function 2mobi() {
 	ebook-convert "$1" "${1:r}.mobi"
 }

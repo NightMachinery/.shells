@@ -55,9 +55,6 @@ test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
 test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
 fi
 
-. ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
-conda activate
-addToPATH ~/.local/bin
 addToPATH ~/bin
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
@@ -70,6 +67,8 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
+. ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
+conda activate
 #return
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
