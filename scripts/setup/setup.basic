@@ -1,4 +1,6 @@
 #!/usr/bin/env
+ins cargo
+cargo install --git https://github.com/sodiumjoe/tlrl
 bi coreutils
 ins rsstail
 zargs ~/scripts/python/**/requirements.txt -- pip install -U -r
