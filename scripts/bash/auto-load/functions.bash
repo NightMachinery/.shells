@@ -1,3 +1,13 @@
+function 2mobi() {
+	ebook-convert "$1" "${1:r}.mobi"
+}
+function 22k() {
+	2mobi "$1"
+	2kindle "${1:r}.mobi"
+}
+function 2kindle() {
+	mutt -s convert -a "$1" -- "${2:-fifya@kindle.com}" <<<hi
+}
 function ins() {
 	eval-dl "bi $1" "ai $1"
 }
