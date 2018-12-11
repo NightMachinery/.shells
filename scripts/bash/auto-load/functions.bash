@@ -29,6 +29,14 @@ file-to-clipboard() {
         -e end \
         "$@"
 }
+function rep() {
+    "${@:2}" |& ggrep -iP "$1"
+}
+function y-stream() {
+    y -f best "$@" &
+    local out=$(y -f best --get-filename -o "%(title)s.%(ext)s" "$@")
+    retry mpv "$out"
+}
 function dl-stream() {
     aria2c "$1" &
     #TODO

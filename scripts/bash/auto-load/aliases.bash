@@ -1,4 +1,5 @@
 eval-linux 'alias gnc=nc'
+alias ys="y-stream"
 alias ai="sudo apt install -y"
 alias au="sudo apt upgrade"
 alias auu="sudo apt update"
