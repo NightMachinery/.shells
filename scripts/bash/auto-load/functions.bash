@@ -8,6 +8,21 @@ function setv() {
 function 265to264() {
     ffmpeg -i "$1" -map 0 -c:s copy -c:v libx264 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x264.mkv"
     #-map_metadata 0
+function retry() {
+	until "$@" ; do
+		echo Retrying \'"$*"\' "..." 1>&2
+		sleep 1
+	done
+}
+function 2mobi() {
+	ebook-convert "$1" "${1:r}.mobi"
+}
+function 22k() {
+	2mobi "$1"
+	2kindle "${1:r}.mobi"
+}
+function 2kindle() {
+	mutt -s convert -a "$1" -- "${2:-fifya@kindle.com}" <<<hi
 }
 function ins() {
 	eval-dl "bi $1" "ai $1"
