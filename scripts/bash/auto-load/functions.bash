@@ -1,3 +1,13 @@
+function cee() {
+    cat `which "$1"`
+}
+function setv() {
+    #PORTME
+    osascript -e "set volume output volume $1"
+}
+function 265to264() {
+    ffmpeg -i "$1" -map 0 -c:s copy -c:v libx264 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x264.mkv"
+    #-map_metadata 0
 function retry() {
 	until "$@" ; do
 		echo Retrying \'"$*"\' "..." 1>&2
@@ -36,6 +46,14 @@ file-to-clipboard() {
         -e 'set the clipboard to POSIX file (first item of args)' \
         -e end \
         "$@"
+}
+function rep() {
+    "${@:2}" |& ggrep -iP "$1"
+}
+function y-stream() {
+    y -f best "$@" &
+    local out=$(y -f best --get-filename -o "%(title)s.%(ext)s" "$@")
+    retry mpv "$out"
 }
 function dl-stream() {
     aria2c "$1" &
