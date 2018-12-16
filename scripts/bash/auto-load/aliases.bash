@@ -1,5 +1,6 @@
 eval-linux 'alias gnc=nc'
 alias ys="y-stream"
+alias sb="sbash; szsh"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
 alias ai="sudo apt install -y"
 alias au="sudo apt upgrade"

@@ -1,3 +1,13 @@
+function bii() {
+    brew bundle --file=/dev/stdin <<<"brew \"$1\" ${@:2}"
+}
+function whh() {
+    wh $(strip "`wh "$1"`" "$1: aliased to ")
+}
+function strip() {
+    local STRING="${1#"$2"}"
+    echo "${STRING%"$2"}"
+}
 function cee() {
     cat `which "$1"`
 }
@@ -8,6 +18,14 @@ function setv() {
 function 265to264() {
     ffmpeg -i "$1" -map 0 -c:s copy -c:v libx264 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x264.mkv"
     #-map_metadata 0
+}
+function retry-eval() {
+    retry eval "$@"
+	  # until eval "$@" ; do
+# 		    echo Retrying \'"$*"\' "..." 1>&2
+# 		    sleep 1
+# 	  done
+}
 function retry() {
 	until "$@" ; do
 		echo Retrying \'"$*"\' "..." 1>&2
@@ -48,9 +66,13 @@ function rep() {
     "${@:2}" |& ggrep -iP "$1"
 }
 function y-stream() {
-    y -f best "$@" &
-    local out=$(y -f best --get-filename -o "%(title)s.%(ext)s" "$@")
-    retry mpv "$out"
+    y -f best  -o "%(title)s.%(ext)s" "$@" &
+    local out=$(yic -f best --get-filename -o "%(title)s.%(ext)s" "$@")
+    #We need to use yic or archived videos return nothing causing mpv to play * :D
+    retry-eval "mpv --quiet '$out'* |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
+    #mpv bug here
+    # kill $!
+    # kill $! is your friend :))
 }
 function dl-stream() {
     aria2c "$1" &
