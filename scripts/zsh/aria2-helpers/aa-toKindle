@@ -1,0 +1,3 @@
+#!/usr/bin/env zsh
+2m2k "$3"
+\rm "$3"

@@ -35,9 +35,12 @@ function retry() {
 function 2mobi() {
 	ebook-convert "$1" "${1:r}.mobi"
 }
-function 22k() {
+function 2m2k() {
 	2mobi "$1"
 	2kindle "${1:r}.mobi"
+}
+function aab() {
+	aa "$@" --on-download-complete aa-toKindle
 }
 function 2kindle() {
 	mutt -s convert -a "$1" -- "${2:-fifya@kindle.com}" <<<hi
