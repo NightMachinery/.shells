@@ -1,3 +1,6 @@
+function 2ip() {
+    pbpaste|mutt -s "$1" -- "${2:-readlater.iw7kp33z6m3@instapaper.com}"
+}
 function bii() {
     brew bundle --file=/dev/stdin <<<"brew \"$1\" ${@:2}"
 }
@@ -68,14 +71,23 @@ file-to-clipboard() {
 function rep() {
     "${@:2}" |& ggrep -iP "$1"
 }
+function aas() {
+	  # aa "$@" --on-download-start aa-stream
+    local out="$(uuidgen)"
+    aa "$@" --dir "$out" --on-download-complete aa-stream &
+    retry-mpv "'$out'/*"
+}
 function y-stream() {
     y -f best  -o "%(title)s.%(ext)s" "$@" &
     local out=$(yic -f best --get-filename -o "%(title)s.%(ext)s" "$@")
     #We need to use yic or archived videos return nothing causing mpv to play * :D
-    retry-eval "mpv --quiet '$out'* |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
+    retry-mpv "'$out'*"
     #mpv bug here
     # kill $!
     # kill $! is your friend :))
+}
+function retry-mpv() {
+    retry-eval "mpv --quiet $@ |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
 }
 function dl-stream() {
     aria2c "$1" &
