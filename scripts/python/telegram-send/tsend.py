@@ -11,7 +11,7 @@ Options:
   --version     Show version.
 
 Examples:
-  tsend.py some_friend "I love you ^_^" --file="~/pics/big_heart.png"
+  tsend.py some_friend "I love you ^_^" --file ~/pics/big_heart.png
 
 Created by Fereidoon Mehri. I release my contribution to this program to the public domain (CC0).
 """
@@ -25,8 +25,8 @@ from telethon import TelegramClient, events
 arguments = docopt(__doc__, version='telegram-send 0.1')
 
 async def main():
-    os.chdir(os.path.dirname(os.path.realpath(sys.argv[0]))) #Changes pwd to real path, useful for using symlinks for the script.
-    with open('./config') as f:
+    # os.chdir(os.path.dirname(os.path.realpath(sys.argv[0]))) #Changes pwd to real path, useful for using symlinks for the script.
+    with open(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config') as f:
         api_id = f.readline()
         api_hash = f.readline()
         async with TelegramClient(

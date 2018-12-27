@@ -1,5 +1,6 @@
-function 2ip() {
-    pbpaste|mutt -s "$1" -- "${2:-readlater.iw7kp33z6m3@instapaper.com}"
+function display-off() {
+    watch -n 0.5 brightness 0
+    #macOS only probably
 }
 function bii() {
     brew bundle --file=/dev/stdin <<<"brew \"$1\" ${@:2}"
@@ -39,7 +40,7 @@ function 2mobi() {
 	ebook-convert "$1" "${1:r}.mobi"
 }
 function 2m2k() {
-	2mobi "$1"
+	if test "${1:e}" != mobi ; then 2mobi "$1" ; fi
 	2kindle "${1:r}.mobi"
 }
 function aab() {
