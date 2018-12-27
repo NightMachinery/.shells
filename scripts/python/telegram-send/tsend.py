@@ -26,11 +26,13 @@ arguments = docopt(__doc__, version='telegram-send 0.1')
 
 async def main():
     # os.chdir(os.path.dirname(os.path.realpath(sys.argv[0]))) #Changes pwd to real path, useful for using symlinks for the script.
+    # This behavior was disabled because it made sending files inconvenient.
+    
     with open(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config') as f:
         api_id = f.readline()
         api_hash = f.readline()
         async with TelegramClient(
-                    'alice_is_happy',
+                    os.path.dirname(os.path.realpath(sys.argv[0])) + '/alice_is_happy',
                     api_id,
                     api_hash) as client:
                 # print(arguments)
