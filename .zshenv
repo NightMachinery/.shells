@@ -67,6 +67,7 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
+addToPATH '/home/eva/anaconda/bin' #because conda is stupid.
 . ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
 conda activate
 #return
