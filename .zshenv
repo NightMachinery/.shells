@@ -120,7 +120,7 @@ alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
 alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
-alias y="noglob youtube-dl"
+alias y="noglob youtube-dl --no-playlist"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 
 ks () { kscript ~/kscripts/"$@"; }
@@ -233,7 +233,7 @@ function rloop_vid() (
 )
 
 function trr() (
-    peerflix "$1" --path ~/Downloads/Video --mpv -- --fullscreen
+    peerflix "$1" --path "${2:-$HOME/Downloads/Video}" --mpv -- --fullscreen
 )
 function ot-mp3() (
     B=$(basename "$1"); D=$(dirname "$1");

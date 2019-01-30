@@ -1,5 +1,8 @@
+function k2pdf() {
+    k2pdfopt "$@" -dev kv -png -bpc 2 -d -as -wrap+ -hy- -ws -0.2 -x -odpi 375
+}
 function display-off() {
-    watch -n 0.5 brightness 0
+    watch -n ${1:-1} brightness 0
     #macOS only probably
 }
 function bii() {

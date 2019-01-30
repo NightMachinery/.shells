@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """telegram-send
 Usage:
-  tsend.py <receiver> <message> [--file=<file>]
+  tsend.py <receiver> <message> [--file=<file>] [ --force-document ]
   tsend.py (-h | --help)
   tsend.py --version
 
 Options:
   -f <file> --file=<file>   Sends a file, with message as its caption.
+  --force_document Whether to send the given file as a document or not.
   -h --help     Show this screen.
   --version     Show version.
 
@@ -37,7 +38,7 @@ async def main():
                     api_hash) as client:
                 # print(arguments)
                 # if arguments['--file'] is not none:
-                await client.send_message(arguments['<receiver>'], arguments['<message>'], file=arguments['--file'])
+                await client.send_message(arguments['<receiver>'], arguments['<message>'], file=arguments['--file'], force_document=arguments['--force-document'])
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())

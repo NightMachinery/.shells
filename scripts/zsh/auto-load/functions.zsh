@@ -23,6 +23,7 @@ function cpsd() {
         local out="$1/${B%.*}.png"
         convert "$i""[0]" "$out"
         outs[$counter]="$out"
+        printf '%s\n' "$out"
         counter=$(($counter + 1))
     done
     pbadd "${(@)outs}"
@@ -33,6 +34,9 @@ function cpsdi() {
 function cpsdt() {
     mkdir -p ~/tmp/delme
     cpsd ~/tmp/delme "$@"
+}
+function psd2telg() {
+    cpsdt "$@"|xargs -I {} ensure-run.zsh 60s tsend me ' ' -f {}
 }
 function ls-by-added() {
     # Doesn't work well for files having '(null)' as their DateAdded, which some do.
