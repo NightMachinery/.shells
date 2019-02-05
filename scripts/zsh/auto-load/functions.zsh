@@ -36,7 +36,7 @@ function cpsdt() {
     cpsd ~/tmp/delme "$@"
 }
 function psd2telg() {
-    cpsdt "$@"|xargs -I {} ensure-run.zsh 60s tsend me ' ' -f {}
+    cpsdt "$@"|xargs -I {} ensure-run.zsh 60s tsend me ' ' -f {} --force-document
 }
 function ls-by-added() {
     # Doesn't work well for files having '(null)' as their DateAdded, which some do.

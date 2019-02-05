@@ -85,7 +85,7 @@ function y-stream() {
     y -f best  -o "%(title)s.%(ext)s" "$@" &
     local out=$(yic -f best --get-filename -o "%(title)s.%(ext)s" "$@")
     #We need to use yic or archived videos return nothing causing mpv to play * :D
-    retry-mpv "'$out'*"
+    retry-mpv "${out:q}*"
     #mpv bug here
     # kill $!
     # kill $! is your friend :))
