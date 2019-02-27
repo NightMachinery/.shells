@@ -18,6 +18,7 @@ Created by Fereidoon Mehri. I release my contribution to this program to the pub
 """
 from docopt import docopt
 import os, sys
+from pathlib import Path
 import asyncio
 from telethon import TelegramClient, events
 # import logging
@@ -29,16 +30,16 @@ async def main():
     # os.chdir(os.path.dirname(os.path.realpath(sys.argv[0]))) #Changes pwd to real path, useful for using symlinks for the script.
     # This behavior was disabled because it made sending files inconvenient.
     
-    with open(os.path.dirname(os.path.realpath(sys.argv[0])) + '/config') as f:
+    with open(str(Path.home()) + '/.telegram-config') as f:
         api_id = f.readline()
         api_hash = f.readline()
         async with TelegramClient(
-                    os.path.dirname(os.path.realpath(sys.argv[0])) + '/alice_is_happy',
-                    api_id,
-                    api_hash) as client:
-                # print(arguments)
-                # if arguments['--file'] is not none:
-                await client.send_message(arguments['<receiver>'], arguments['<message>'], file=arguments['--file'], force_document=arguments['--force-document'])
+                str(Path.home()) + '/alice_is_happy',
+                api_id,
+                api_hash) as client:
+            # print(arguments)
+            # if arguments['--file'] is not none:
+            await client.send_message(arguments['<receiver>'], arguments['<message>'], file=arguments['--file'], force_document=arguments['--force-document'])
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main())

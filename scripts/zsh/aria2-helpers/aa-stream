@@ -1,5 +1,4 @@
 #!/usr/bin/env zsh
-# echo "add2: $@"
-# retry-mpv "'$3'"
+#Use aas. This is the helper.
 mv "$3" "${3:h:h}"
 \rm -r "${3:h}"
