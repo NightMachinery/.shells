@@ -3,4 +3,6 @@ import random
 import pexpect
 
 if random.random() < 0.5:
-    pexpect.run("tecast.py 'https://t.me/joinchat/C6Vw2UhtHonAKvbWfDd30w' --log-chat 'Orphicality' --limit 1 --additional-receivers 'AliceNews Csmathlibrary '")
+    print(pexpect.run("tecast.py 'https://t.me/joinchat/C6Vw2UhtHonAKvbWfDd30w' --log-chat 'Orphicality' --limit 1 --additional-receivers 'AliceNews Csmathlibrary '").decode())
+else:
+    print("Not this time ;-'")
