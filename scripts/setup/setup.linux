@@ -1,0 +1,1 @@
+sudo snap set system refresh.retain=2 
