@@ -1,4 +1,5 @@
 eval-linux 'alias gnc=nc'
+alias laa="ls-by-added"
 alias ys="y-stream"
 alias sb="sbash; szsh"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
@@ -11,7 +12,7 @@ alias h="history|grep"
 alias re='run-on-each'
 alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'
-alias yic='youtube-dl --ignore-config'
+alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'
 alias reeb='run-on-each rename-ebook'
 alias aa='aria2c --seed-time=0 -Z --max-tries=0 --retry-wait=1'
 alias set-volume='setv'
