@@ -1,6 +1,9 @@
 #!/usr/bin/env
-ins cargo
-cargo install --git https://github.com/sodiumjoe/tlrl
+ln -s ~/scripts/bash/auto-load ~/bal
+ln -s ~/scripts/zsh/auto-load ~/zal
+
 bi coreutils
 ins rsstail
 zargs ~/scripts/python/**/requirements.txt -- pip install -U -r
+ins cargo
+cargo install --git https://github.com/nightmachinary/tlrl
