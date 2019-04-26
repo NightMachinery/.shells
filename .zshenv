@@ -1,5 +1,7 @@
 #I am basically using this as shared config between zsh and bash. :D
 
+autoload -U zargs #Necessary for scripts
+
 function eval-dl() 
 { 
 case "$(uname)" in 
