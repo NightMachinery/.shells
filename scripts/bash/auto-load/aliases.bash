@@ -28,7 +28,7 @@ alias dg='ddg --noprompt'
 alias ggg='googler -n 6'
 alias gg='ggg --noprompt'
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
-alias p='sdc $(pbpaste)'
+alias pdc='sdc "$(pbpaste)"'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias rsp-safe='rsync --human-readable --xattrs --times --partial-dir=.rsync-partial  --info=progress2 -r'
 alias rsp='rsp-safe --delete-after --ignore-errors --force-delete'

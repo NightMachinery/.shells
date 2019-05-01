@@ -1,3 +1,6 @@
+function p() {
+    "$@" "$(pbpaste)"
+}
 function k2pdf() {
     k2pdfopt "$@" -dev kv -png -bpc 2 -d -as -wrap+ -hy- -ws -0.2 -x -odpi 375
 }
