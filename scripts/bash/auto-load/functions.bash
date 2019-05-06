@@ -1,3 +1,11 @@
+function zir() {
+    local dest="$(removeTrailingSlashes "$1")$2".zip
+    \rm "$dest" &> /dev/null
+    zip -r "$dest" "$1"
+}
+function removeTrailingSlashes() {
+    echo "$1"|sed 's:/*$::'
+}
 function p() {
     "$@" "$(pbpaste)"
 }
