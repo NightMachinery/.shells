@@ -10,7 +10,7 @@ function p() {
     "$@" "$(pbpaste)"
 }
 function k2pdf() {
-    k2pdfopt "$@" -dev kv -png -bpc 2 -d -as -wrap+ -hy- -ws -0.2 -x -odpi 375
+    k2pdfopt "$@" -dev kv -png -bpc 2 -d -as -wrap+ -hy- -ws -0.2 -x -odpi 450 -y -ui-
 }
 function display-off() {
     watch -n ${1:-1} brightness 0
@@ -57,11 +57,21 @@ function 2m2k() {
 	if test "${1:e}" != mobi ; then 2mobi "$1" ; fi
 	2kindle "${1:r}.mobi"
 }
+function aap() {
+	  aa "$@" --on-download-complete aa-pToKindle
+}
 function aab() {
 	aa "$@" --on-download-complete aa-toKindle
 }
 function 2kindle() {
-	mutt -s convert -a "$1" -- "${2:-fifya@kindle.com}" <<<hi
+	mutt -s "${2:-convert}" -a "$1" -- "${3:-fifya@kindle.com}" <<<hi
+}
+function 2ko() {
+    2kindle "$1" "some_subject" "$2"
+}
+function 2p2k() {
+    k2pdf "$1"
+    2ko "${1:r}_k2opt.pdf"
 }
 function ins() {
 	eval-dl "bi $1" "ai $1"

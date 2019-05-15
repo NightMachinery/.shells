@@ -1,4 +1,5 @@
 eval-linux 'alias gnc=nc'
+eval-dl  'alias pk="pkill -9 -i"' 'alias pk="pkill -9"'
 alias laa="ls-by-added"
 alias ys="y-stream"
 alias sb="sbash; szsh"
