@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+2p2k "$3"
+\rm -f "$3"
+\rm -f "${3:r}_k2opt.pdf"
