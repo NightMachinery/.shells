@@ -1,4 +1,5 @@
 eval-linux 'alias gnc=nc'
+alias dlga="deluge-console add"
 alias laa="ls-by-added"
 alias ys="y-stream"
 alias sb="sbash; szsh"
