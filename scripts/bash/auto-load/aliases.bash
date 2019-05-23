@@ -1,3 +1,5 @@
+alias vi='nvim -u NONE'
+alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
 eval-linux 'alias gnc=nc'
 eval-dl  'alias pk="pkill -9 -i"' 'alias pk="pkill -9"'
 alias laa="ls-by-added"
@@ -32,7 +34,7 @@ alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 alias pdc='sdc "$(pbpaste)"'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias rsp-safe='rsync --human-readable --xattrs --times --partial-dir=.rsync-partial  --info=progress2 -r'
-alias rsp='rsp-safe --delete-after --ignore-errors --force-delete'
+alias rsp='rsp-safe --delete-after --force-delete' #--ignore-errors will delete even if there are IO errors on sender's side.
 alias rspm='rsp --crtimes'
 alias rspb='rsp --backup --backup-dir=.rsync-backup'
 alias rspbm='rspb --crtimes'

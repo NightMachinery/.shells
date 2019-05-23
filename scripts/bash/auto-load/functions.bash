@@ -7,7 +7,7 @@ function removeTrailingSlashes() {
     echo "$1"|sed 's:/*$::'
 }
 function p() {
-    "$@" "$(pbpaste)"
+    eval "$@" "'$(pbpaste)'"
 }
 function k2pdf() {
     k2pdfopt "$@" -dev kv -png -bpc 2 -d -as -wrap+ -hy- -ws -0.2 -x -odpi 450 -y -ui-
