@@ -1,3 +1,8 @@
+function ubuntu-upgrade() {
+    sudo apt update 
+    sudo apt upgrade
+    sudo apt dist-upgrade
+}
 function zir() {
     local dest="$(removeTrailingSlashes "$1")$2".zip
     \rm "$dest" &> /dev/null

@@ -2,6 +2,8 @@
 ln -s ~/scripts/bash/auto-load ~/bal
 ln -s ~/scripts/zsh/auto-load ~/zal
 
+tic -x -o ~/.terminfo ~/scripts/setup/terminfo-24bit.src
+
 brew bundle install --file=~/scripts/setup/brewables
 zargs -l 1 -- ~/scripts/python/**/requirements.txt -- pip install -U -r
 zargs -n 1 -- $(cat ~/scripts/setup/installables) -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
