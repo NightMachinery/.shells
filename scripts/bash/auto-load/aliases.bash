@@ -1,3 +1,6 @@
+alias mpv='mpv --fs'
+alias trs='trash -Fv'
+alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
 eval-linux 'alias gnc=nc'

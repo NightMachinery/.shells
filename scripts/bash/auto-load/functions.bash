@@ -168,3 +168,13 @@ function months() {
 function xlad(){
     last-added|xargs -I _ "$@"
 }
+function first-file(){
+    exa|head -n1
+}
+function las(){
+    eval "$@"" '$(first-file)'"
+}
+function play-and-trash(){
+    #aliased to pat
+    mpv "$@" && trs "$1"
+}
