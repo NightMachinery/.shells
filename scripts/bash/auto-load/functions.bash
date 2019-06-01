@@ -1,3 +1,8 @@
+function ubuntu-upgrade() {
+    sudo apt update 
+    sudo apt upgrade
+    sudo apt dist-upgrade
+}
 function zir() {
     local dest="$(removeTrailingSlashes "$1")$2".zip
     \rm "$dest" &> /dev/null
@@ -167,4 +172,14 @@ function months() {
 }
 function xlad(){
     last-added|xargs -I _ "$@"
+}
+function first-file(){
+    exa|head -n1
+}
+function las(){
+    eval "$@"" '$(first-file)'"
+}
+function play-and-trash(){
+    #aliased to pat
+    mpv "$@" && trs "$1"
 }
