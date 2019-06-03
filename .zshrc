@@ -153,9 +153,9 @@ POWERLEVEL9K_COLOR_SCHEME='light'
 # antibody theme bhilburn/powerlevel9k powerlevel9k
 # antibody theme https://github.com/denysdovhan/spaceship-prompt spaceship
 antibody bundle mafredri/zsh-async
-antibody bundle sindresorhus/pure
-antibody bundle mafredri/zsh-async
-antibody bundle sindresorhus/pure
+antibody bundle intelfx/pure
+#antibody bundle mafredri/zsh-async
+#antibody bundle sindresorhus/pure
 # antibody bundle arialdomartini/oh-my-git
 # antibody theme arialdomartini/oh-my-git-themes oppa-lana-style
 antibody bundle Tarrasch/zsh-functional
