@@ -183,3 +183,13 @@ function play-and-trash(){
     #aliased to pat
     mpv "$@" && trs "$1"
 }
+function tlrlu(){
+	tlrl "$@" -p "$1   "
+}
+function rexx(){
+	xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
+}
+function rex(){
+        zargs -i _ -- "${@:2}" -- "$=1"
+	#Using -n 1 fails somehow. Probably a zargs bug.
+}
