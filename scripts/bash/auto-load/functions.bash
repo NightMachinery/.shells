@@ -1,3 +1,6 @@
+function timer() {
+    eval "sleep $(($@)) && loop 1 fsayd"
+}
 function ubuntu-upgrade() {
     sudo apt update 
     sudo apt upgrade
