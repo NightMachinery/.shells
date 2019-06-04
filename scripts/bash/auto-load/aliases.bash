@@ -1,3 +1,4 @@
+alias set-timezone='sudo dpkg-reconfigure tzdata'
 alias timer='noglob timer-raw'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias mpv='mpv --fs'
@@ -7,7 +8,7 @@ alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
 eval-linux 'alias gnc=nc'
 alias dlga="deluge-console add"
-eval-dl  'alias pk="pkill -9 -i"' 'alias pk="pkill -9"'
+alias pk="pkill -9 -i"
 alias laa="ls-by-added"
 alias ys="y-stream"
 alias sb="sbash; szsh"

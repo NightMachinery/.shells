@@ -43,5 +43,7 @@ with open(str(Path.home()) + '/.telegram-config') as f:
                 try:
                     client.send_message(rec, msg)
                 except:  #ValueError as err:
-                    client.send_message(log_chat, traceback.format_exc())
+                    er-msg = traceback.format_exc()
+                    print(er-msg)
+                    client.send_message(log_chat, er-msg)
             msg.delete()
