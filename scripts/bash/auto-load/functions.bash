@@ -1,5 +1,6 @@
-function timer() {
-    eval "sleep $(($@)) && loop 1 fsayd"
+function timer-raw() {
+    #aliased to timer with noglob
+    eval "sleep $((($@)*60)) && loop 1 fsayd"
 }
 function ubuntu-upgrade() {
     sudo apt update 

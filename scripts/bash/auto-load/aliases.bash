@@ -1,3 +1,4 @@
+alias timer='noglob timer-raw'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias mpv='mpv --fs'
 alias trs='trash -Fv'
