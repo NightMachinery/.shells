@@ -1,4 +1,6 @@
 alias px='ruu proxychains4'
+alias imdb='imdbpy search movie --first'
+alias set-timezone='sudo dpkg-reconfigure tzdata'
 alias timer='noglob timer-raw'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias mpv='mpv --fs'
@@ -8,7 +10,7 @@ alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
 eval-linux 'alias gnc=nc'
 alias dlga="deluge-console add"
-eval-dl  'alias pk="pkill -9 -i"' 'alias pk="pkill -9"'
+alias pk="pkill -9 -i"
 alias laa="ls-by-added"
 alias ys="y-stream"
 alias sb="sbash; szsh"
@@ -24,7 +26,7 @@ alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'
 alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'
 alias reeb='run-on-each rename-ebook'
-alias aa='aria2c --seed-time=0 -Z --max-tries=0 --retry-wait=1'
+alias aa='aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included in this.
 alias set-volume='setv'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
