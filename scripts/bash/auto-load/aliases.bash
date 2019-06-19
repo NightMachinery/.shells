@@ -1,3 +1,4 @@
+alias px='ruu proxychains4'
 alias timer='noglob timer-raw'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias mpv='mpv --fs'
@@ -17,7 +18,7 @@ alias au="sudo apt upgrade"
 alias bre="brew remove"
 alias auu="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
-alias h="history|grep"
+alias his="history|grep"
 alias re='run-on-each'
 alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'
@@ -54,3 +55,4 @@ case "$(uname)" in
         ;;
 esac
 
+alias mac-mail-log="sudo log stream --predicate  '(process == "smtpd") || (process == "smtp")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp. 

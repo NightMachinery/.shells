@@ -16,7 +16,7 @@ function removeTrailingSlashes() {
     echo "$1"|sed 's:/*$::'
 }
 function p() {
-    eval "$@" "'$(pbpaste)'"
+    geval "$@" "'$(pbpaste)'"
 }
 function k2pdf() {
     k2pdfopt "$@" -dev kv -png -bpc 2 -d -as -wrap+ -hy- -ws -0.2 -x -odpi 450 -y -ui-
@@ -196,4 +196,31 @@ function rexx(){
 function rex(){
         zargs -i _ -- "${@:2}" -- "$=1"
 	#Using -n 1 fails somehow. Probably a zargs bug.
+}
+function tel(){
+    "${@:2}" "$(which "$1")"
+}
+function expand-alias {
+    if [[ -n $ZSH_VERSION ]]; then
+        # shellcheck disable=2154  # aliases referenced but not assigned
+        printf '%s\n' "${aliases[$1]}"
+    else  # bash
+        printf '%s\n' "${BASH_ALIASES[$1]}"
+    fi
+}
+function force-expand {
+    local e="$(expand-alias "$1")"
+    test -z "$e" && e="$1"
+    echo "$e"
+}
+function ruu() {
+    local a="$(force-expand "$2")"
+    a="$(strip "$a" 'noglob ')"
+    "$1" "$=a" "${@:3}"
+}
+function geval() {
+    local cmd="$@"
+    echo "$cmd"
+	  print -S -- "$cmd" #Add to history
+	  eval -- "$cmd"
 }
