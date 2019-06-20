@@ -1,3 +1,4 @@
+alias l='exa -l'
 alias px='ruu proxychains4'
 alias imdb='imdbpy search movie --first'
 alias set-timezone='sudo dpkg-reconfigure tzdata'
