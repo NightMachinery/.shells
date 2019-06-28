@@ -39,6 +39,9 @@ function strip() {
 function cee() {
     cat `which "$1"`
 }
+function ceer() {
+	geval "${@:2} $(which "$1")"
+}
 function setv() {
     #PORTME
     osascript -e "set volume output volume $1"
