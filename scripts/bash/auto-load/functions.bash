@@ -205,7 +205,7 @@ function rexa(){
 	local i
         for i in "${@:2}"
         do
-		geval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
+		eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
         done
 }
 function tel(){
