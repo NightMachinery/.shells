@@ -201,6 +201,13 @@ function rex(){
         zargs --verbose -i _ -- "${@:2}" -- "$=1"
 	#Using -n 1 fails somehow. Probably a zargs bug.
 }
+function rexa(){
+	local i
+        for i in "${@:2}"
+        do
+		geval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
+        done
+}
 function tel(){
     "${@:2}" "$(which "$1")"
 }
@@ -224,7 +231,7 @@ function ruu() {
 }
 function geval() {
     local cmd="$@"
-    echo "$cmd"
-	  print -S -- "$cmd" #Add to history
-	  eval -- "$cmd"
+    print -r "$cmd"
+    print -r -S -- "$cmd" #Add to history
+    eval -- "$cmd"
 }
