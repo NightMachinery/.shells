@@ -198,7 +198,7 @@ function rexx(){
 	xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
 }
 function rex(){
-        zargs -i _ -- "${@:2}" -- "$=1"
+        zargs --verbose -i _ -- "${@:2}" -- "$=1"
 	#Using -n 1 fails somehow. Probably a zargs bug.
 }
 function tel(){
