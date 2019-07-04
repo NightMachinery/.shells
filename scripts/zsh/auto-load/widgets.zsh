@@ -8,3 +8,7 @@ expand-aliases() {
 
 zle -N expand-aliases
 bindkey '\e^E' expand-aliases
+
+autoload insert-unicode-char
+zle -N insert-unicode-char
+bindkey '^Xi' insert-unicode-char
