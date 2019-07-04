@@ -306,13 +306,6 @@ function hi10-from-page() {
     hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
 }
-function lad() {
-    eval "$@"" '$(last-added)'"
-    # function play-last-added() (
-    # last-added | xargs -I k greadlink -f k | xargs -I k "${1:-iina}" k
-    # "${1:-iina}" "$(last-added)"
-    #)
-}
 function ppgrep() {
     case "$(uname)" in
         Darwin)

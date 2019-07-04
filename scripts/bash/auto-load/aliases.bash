@@ -31,6 +31,7 @@ alias aa='aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavo
 alias set-volume='setv'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
+alias pop='pbpaste'
 alias ch='cht.sh'
 alias powerdecay="sudo powermetrics -i 1000 --poweravg 1 | grep 'Average cumulatively decayed power score' -A 20"
 alias bu='brew upgrade'

@@ -175,6 +175,9 @@ function months() {
 11. November - 30 days
 12. December - 31 days"
 }
+function lad() {
+    eval "$@"" ${$(last-added):q}"
+}
 function xlad(){
     last-added|xargs -I _ "$@"
 }
@@ -182,7 +185,7 @@ function first-file(){
     exa|head -n1
 }
 function las(){
-    eval "$@"" '$(first-file)'"
+    eval "$@"" ${$(first-file):q}"
 }
 function play-and-trash(){
     #aliased to pat
