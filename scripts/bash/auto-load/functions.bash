@@ -242,3 +242,7 @@ function ec() {
     echo -E "$@"
     fi
 }
+function rederr() {
+	(setopt nomultios 2>/dev/null; set -o pipefail;"$@" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2)3>&1
+}
+ecerr() ec "$@" 1>&2
