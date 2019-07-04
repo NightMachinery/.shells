@@ -39,6 +39,9 @@ function strip() {
 function cee() {
     cat `which "$1"`
 }
+function ceer() {
+	geval "${@:2} $(which "$1")"
+}
 function setv() {
     #PORTME
     osascript -e "set volume output volume $1"
@@ -198,8 +201,15 @@ function rexx(){
 	xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
 }
 function rex(){
-        zargs -i _ -- "${@:2}" -- "$=1"
+        zargs --verbose -i _ -- "${@:2}" -- "$=1"
 	#Using -n 1 fails somehow. Probably a zargs bug.
+}
+function rexa(){
+	local i
+        for i in "${@:2}"
+        do
+		eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
+        done
 }
 function tel(){
     "${@:2}" "$(which "$1")"
@@ -224,7 +234,19 @@ function ruu() {
 }
 function geval() {
     local cmd="$@"
-    echo "$cmd"
-	  print -S -- "$cmd" #Add to history
-	  eval -- "$cmd"
+    ec "$cmd"
+    print -r -S -- "$cmd" #Add to history
+    eval -- "$cmd"
 }
+function ec() {
+    if [[ -n $ZSH_VERSION ]]; then
+    print -r "$@"
+    else  # bash
+    echo -E "$@"
+    fi
+}
+function rederr() {
+	(setopt nomultios 2>/dev/null; set -o pipefail;"$@" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2)3>&1
+}
+ecerr() ec "$@" 1>&2
+function rise-blood() ceer rederr.zsh source
