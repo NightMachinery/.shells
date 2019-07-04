@@ -231,7 +231,14 @@ function ruu() {
 }
 function geval() {
     local cmd="$@"
-    print -r "$cmd"
+    ec "$cmd"
     print -r -S -- "$cmd" #Add to history
     eval -- "$cmd"
+}
+function ec() {
+    if [[ -n $ZSH_VERSION ]]; then
+    print -r "$@"
+    else  # bash
+    echo -E "$@"
+    fi
 }
