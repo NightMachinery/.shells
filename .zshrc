@@ -165,6 +165,7 @@ antibody bundle Vifon/deer
 antibody bundle zsh-users/zsh-autosuggestions
 antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions
+antibody bundle arzzen/calc.plugin.zsh #adds calc and =
 
 #antibody apply
 
