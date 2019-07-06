@@ -2,7 +2,7 @@
 from PyPDF2 import PdfFileWriter, PdfFileReader
 import os, sys
 
-if len(sys.argv) < 2 or sys.argv[0]=='-h' or sys.argv[0]=='--help':
+if len(sys.argv) < 2 or sys.argv[1]=='-h' or sys.argv[1]=='--help':
     sys.exit("splitPDF.py <file> [<split-to-this-many-parts>]")
 input_add = sys.argv[1]
 input_add_base = os.path.splitext(input_add)[0] + "_p"
@@ -16,7 +16,7 @@ part_num = int(p_num / split_num) + 1
 for i in range(split_num):
     output = PdfFileWriter()
     for j in range(part_num):
-        cpn = i * part_num + j + 1
+        cpn = i * part_num + j
         if (cpn >= p_num):
             break
         output.addPage(input1.getPage(cpn))
