@@ -64,3 +64,4 @@ alias mac-mail-log="sudo log stream --predicate  '(process == "smtpd") || (proce
 alias erase-nonprintables='tr -cd "[:print:]\n"'
 alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
+alias apx='ALL_PROXY=socks5://127.0.0.1:1080'

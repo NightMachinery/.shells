@@ -258,3 +258,6 @@ increment-last () {
     local cmd=${$(fc -nl -1 -1| perl -pe "$pe")}
     geval "$cmd"
 }
+function away() {
+    nohup "$@" & disown
+}
