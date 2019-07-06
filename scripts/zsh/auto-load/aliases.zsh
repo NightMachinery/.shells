@@ -1,1 +1,0 @@
-alias tmnt='increment-episode'

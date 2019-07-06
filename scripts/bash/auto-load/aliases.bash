@@ -1,4 +1,5 @@
-alias l='exa -l'
+alias l='exa -al'
+alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
 alias px='ruu proxychains4'
 alias imdb='imdbpy search movie --first'
 alias set-timezone='sudo dpkg-reconfigure tzdata'
@@ -61,3 +62,5 @@ esac
 
 alias mac-mail-log="sudo log stream --predicate  '(process == "smtpd") || (process == "smtp")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp. 
 alias erase-nonprintables='tr -cd "[:print:]\n"'
+alias tmnte=increment-last\ \''(E)(\d+)'\'
+alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
