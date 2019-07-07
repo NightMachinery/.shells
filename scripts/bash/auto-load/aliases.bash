@@ -1,4 +1,5 @@
-alias l='exa -l'
+alias l='exa -al'
+alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
 alias px='ruu proxychains4'
 alias imdb='imdbpy search movie --first'
 alias set-timezone='sudo dpkg-reconfigure tzdata'
@@ -31,6 +32,7 @@ alias aa='aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavo
 alias set-volume='setv'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
+alias pop='pbpaste'
 alias ch='cht.sh'
 alias powerdecay="sudo powermetrics -i 1000 --poweravg 1 | grep 'Average cumulatively decayed power score' -A 20"
 alias bu='brew upgrade'
@@ -58,5 +60,8 @@ case "$(uname)" in
         ;;
 esac
 
-alias mac-mail-log="sudo log stream --predicate  '(process == "smtpd") || (process == "smtp")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp. 
+alias mac-mail-log="sudo log stream --predicate  '(process == \"smtpd\") || (process == \"smtp\")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp. 
 alias erase-nonprintables='tr -cd "[:print:]\n"'
+alias tmnte=increment-last\ \''(E)(\d+)'\'
+alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
+alias apx='ALL_PROXY=socks5://127.0.0.1:1080'

@@ -46,10 +46,10 @@ function ls-by-added() {
         sort --reverse | \
         sed -E "s/^.*\\+0000 //" # removes the timestamps
 }
-increment-episode() {
-  emulate -L zsh
-  setopt extendedglob
-  local cmd=${$(fc -nl -1 -1)/(#b)(*E)(<->)/$match[1]${(l:${#match[2]}::0:)$((match[2]+1))}}
-  # local cmd=${$(fc -nl -1 -1)/(#b)E(<->)/$E${(l:${#match[1]}::0:)$((match[1]+1))}}
-  geval "$cmd"
-}
+# increment-episode() {
+# superseded by tmnte
+#   emulate -L zsh
+#   setopt extendedglob
+#   local cmd=${$(fc -nl -1 -1)/(#b)(*E)(<->)/$match[1]${(l:${#match[2]}::0:)$((match[2]+${1:-1}))}}
+#   geval "$cmd"
+# }

@@ -178,6 +178,9 @@ function months() {
 11. November - 30 days
 12. December - 31 days"
 }
+function lad() {
+    eval "$@"" ${$(last-added):q}"
+}
 function xlad(){
     last-added|xargs -I _ "$@"
 }
@@ -185,7 +188,7 @@ function first-file(){
     exa|head -n1
 }
 function las(){
-    eval "$@"" '$(first-file)'"
+    eval "$@"" ${$(first-file):q}"
 }
 function play-and-trash(){
     #aliased to pat
@@ -247,3 +250,14 @@ function rederr() {
 }
 ecerr() ec "$@" 1>&2
 function rise-blood() ceer rederr.zsh source
+increment-last () {
+    #$1 is supplied in our alias tmnt. :D
+    local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'
+    #ec "$pe"
+    #fc might not work in bash
+    local cmd=${$(fc -nl -1 -1| perl -pe "$pe")}
+    geval "$cmd"
+}
+function away() {
+    nohup "$@" & disown
+}
