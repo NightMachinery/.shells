@@ -96,7 +96,6 @@ source $ZSH/oh-my-zsh.sh
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
 
-source <(antibody init)
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status)
 
 psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
@@ -144,8 +143,6 @@ fi
 #source ~/.iterm2_shell_integration.zsh
 alias imgcat=~/.iterm2/imgcat;alias imgls=~/.iterm2/imgls;alias it2attention=~/.iterm2/it2attention;alias it2check=~/.iterm2/it2check;alias it2copy=~/.iterm2/it2copy;alias it2dl=~/.iterm2/it2dl;alias it2getvar=~/.iterm2/it2getvar;alias it2setcolor=~/.iterm2/it2setcolor;alias it2setkeylabel=~/.iterm2/it2setkeylabel;alias it2ul=~/.iterm2/it2ul;alias it2universion=~/.iterm2/it2universion
 unsetopt correct_all
-source ~/bal/aliases.bash #To make them have priority.
-source ~/scripts/zsh/load-others.zsh
 fpath=(~/.zsh.d/ $fpath)
 #antibody use oh-my-zsh
 POWERLEVEL9K_INSTALLATION_PATH=$ANTIGEN_BUNDLES/bhilburn/powerlevel9k
@@ -163,12 +160,14 @@ antibody bundle Tarrasch/zsh-bd
 antibody bundle Tarrasch/zsh-colors
 antibody bundle Vifon/deer
 antibody bundle zsh-users/zsh-autosuggestions
+silence unalias =
 antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions
-antibody bundle arzzen/calc.plugin.zsh #adds calc and =
 
-#antibody apply
+source ~/bal/aliases.bash #To make them have priority.
+source ~/scripts/zsh/load-others.zsh
 
 autoload -U deer
 zle -N deer
 bindkey '\ek' deer
+rcLoaded='yes'

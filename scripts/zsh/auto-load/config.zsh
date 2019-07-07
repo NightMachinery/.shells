@@ -7,3 +7,4 @@ precmd_pipestatus() {
        fi
 }
 add-zsh-hook precmd precmd_pipestatus
+antibody bundle arzzen/calc.plugin.zsh #adds calc and =
