@@ -1,45 +1,7 @@
-#I am basically using this as shared config between zsh and bash. :D
-
 autoload -U zargs #Necessary for scripts
 
-function eval-dl() 
-{ 
-case "$(uname)" in 
-    Darwin) 
-        eval "$1" 
-        ;; 
-    Linux) 
- 	eval "$2"
-        ;;esac 
-} 
-function eval-darwin() 
-{ 
-case "$(uname)" in 
-    Darwin) 
-        eval "${@}" 
-        ;; 
-    Linux) 
- 
-        ;;esac 
-} 
-function eval-linux() 
-{ 
-case "$(uname)" in 
-    Darwin) 
 
-        ;; 
-    Linux) 
-        eval "${@}" 
-        ;;esac 
-} 
-function psource() 
-{ 
-    if [[ -r $1 ]]; then 
-        source $1 
-    fi 
-} 
-
-psource "$HOME/.privateShell"
+source "$HOME/scripts/bash/load-first.bash"
 typeset -Ug path
 function addToPATH {
    # case ":$PATH:" in
@@ -69,10 +31,9 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
-addToPATH '/home/eva/anaconda/bin' #because conda is stupid.
-. ~/anaconda/etc/profile.d/conda.sh #/Users/evar/anaconda/etc/profile.d/conda.sh
-conda activate
-#return
+psource ~/anaconda/etc/profile.d/conda.sh
+# export PYTHONHOME=/Users/evar/anaconda/bin/
+silence conda activate
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
 export sgate="198.143.181.179"
