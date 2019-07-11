@@ -249,7 +249,7 @@ function rederr() {
 	(setopt nomultios 2>/dev/null; set -o pipefail;"$@" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2)3>&1
 }
 ecerr() ec "$@" 1>&2
-function rise-blood() ceer rederr.zsh source
+function raise-blood() ceer rederr.zsh source
 increment-last () {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'
