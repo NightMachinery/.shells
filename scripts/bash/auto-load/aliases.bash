@@ -65,3 +65,4 @@ alias erase-nonprintables='tr -cd "[:print:]\n"'
 alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
 alias apx='ALL_PROXY=socks5://127.0.0.1:1080'
+alias xkcd="wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`"

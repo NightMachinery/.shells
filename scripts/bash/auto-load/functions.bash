@@ -262,5 +262,5 @@ function away() {
     nohup "$@" & disown
 }
 function wt1() {
-	curl -s 'wttr.in/{'"$1"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
+	curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
