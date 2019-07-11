@@ -264,3 +264,6 @@ function away() {
 function wt1() {
 	curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
+function wread() {
+	mercury-parser --format=text "$@" |jq --raw-output '.content'
+}
