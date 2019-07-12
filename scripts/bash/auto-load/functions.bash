@@ -249,7 +249,7 @@ function rederr() {
 	(setopt nomultios 2>/dev/null; set -o pipefail;"$@" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2)3>&1
 }
 ecerr() ec "$@" 1>&2
-function rise-blood() ceer rederr.zsh source
+function raise-blood() ceer rederr.zsh source
 increment-last () {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'
@@ -260,4 +260,13 @@ increment-last () {
 }
 function away() {
     nohup "$@" & disown
+}
+function wt1() {
+	curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
+}
+function wread() {
+	mercury-parser --format="${2:-text}" "$1" |jq --raw-output '.content'
+}
+function random-poemist() {
+	curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
 }

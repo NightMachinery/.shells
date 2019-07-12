@@ -1,4 +1,5 @@
 autoload -U zargs #Necessary for scripts
+source <(antibody init)
 
 
 source "$HOME/scripts/bash/load-first.bash"
