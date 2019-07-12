@@ -5,14 +5,14 @@ function eval-dl()
             eval "$1" 
             ;; 
         Linux) 
- 	          eval "$2"
+            eval "$2"
             ;;esac 
 } 
 function eval-darwin() 
 { 
     case "$(uname)" in 
         Darwin) 
-            eval "${@}" 
+            eval "${@:q}" 
             ;; 
         Linux) 
             
@@ -25,7 +25,7 @@ function eval-linux()
 
         ;; 
         Linux) 
-            eval "${@}" 
+            eval "${@:q}" 
         ;;esac 
 } 
 function psource() 
@@ -37,5 +37,5 @@ function psource()
 
 
 function silence() {
-    { "$@" } &> /dev/null
+    { eval "$@:q"  } &> /dev/null
 }
