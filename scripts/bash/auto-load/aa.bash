@@ -1,3 +1,0 @@
-function silence() {
-    { "$@" } &> /dev/null
-}

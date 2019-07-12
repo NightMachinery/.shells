@@ -1,4 +1,5 @@
 alias l='exa -al'
+alias lt='l -T'
 alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
 alias px='ruu proxychains4'
 alias imdb='imdbpy search movie --first'

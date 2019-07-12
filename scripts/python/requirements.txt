@@ -2,3 +2,8 @@ pexpect
 wikiquotes
 instaloader
 PyPDF2
+jedi
+json-rpc
+service_factory
+ipython
+yapf
