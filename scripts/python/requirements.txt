@@ -1,3 +1,4 @@
 pexpect
 wikiquotes
+instaloader
 PyPDF2
