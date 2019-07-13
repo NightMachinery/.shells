@@ -271,3 +271,5 @@ function random-poemist() {
 	curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
 }
 xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
+les() { eval "$@:q" |& less }
+lesh() les "$1" --help
