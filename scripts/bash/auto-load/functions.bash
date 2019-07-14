@@ -64,7 +64,7 @@ function retry-limited() {
 		    sleep 1
         limit=$((limit+1))
 	  done
-    test $limit -lt "$1"
+    test $limit -lt "$1" || test "$1" -eq 0
 }
 function 2mobi() {
 	ebook-convert "$1" "${1:r}.mobi"
