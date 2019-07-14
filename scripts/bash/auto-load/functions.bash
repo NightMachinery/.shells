@@ -57,16 +57,10 @@ function retry-eval() {
 # 		    sleep 1
 # 	  done
 }
-function retry() {
-	until "$@" ; do
-		echo Retrying \'"$*"\' "..." 1>&2
-		sleep 1
-	done
-}
 function retry-limited() {
     local limit=0
-	  until test $limit -ge "$1" || "${@:2}"  ; do
-		    echo Tried \'"$*"\' "..." 1>&2
+	  until {test "$1" -gt 0 && test $limit -ge "$1"} || eval "${@:2:q}"  ; do
+		    echo Tried "${@:2:q}" "..." 1>&2
 		    sleep 1
         limit=$((limit+1))
 	  done
@@ -308,7 +302,7 @@ web2epub() {
         bname="${(l(${##})(0))i} $bname.html"
         i=$((i+1))
 
-        retry-limited 300 wread "$url" html > "$bname" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
+        retry-limited "${W2E_RETRY:-300}" wread "$url" html > "$bname" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
                                                                                         ecerr "Failed $url"
                                                                                         hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
         }
