@@ -63,7 +63,7 @@ export ZSH=~/.oh-my-zsh
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git git-extras catimg common-aliases lein pip sbt scala screen sprunge sudo vi-mode fasd)
-eval-darwin "plugins+=(osx)"
+eval-darwin 'plugins+=(osx)'
 source $ZSH/oh-my-zsh.sh
 
 # User configuration
@@ -120,7 +120,7 @@ bindkey -v
    #setb24=\E[48;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
    #setf24=\E[38;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
 #tic -x -o ~/.terminfo terminfo-24bit.src
-eval-darwin "export TERM=xterm-24bits"
+eval-darwin export TERM=xterm-24bits
 
 alias ls="ls -aG" #Somehow sth overrides it from .zshenv :(
 alias d='fasd -d'        # directory

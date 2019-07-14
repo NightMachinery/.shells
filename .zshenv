@@ -50,10 +50,10 @@ export VISUAL='emacsclient -t'
 export EDITOR="$VISUAL"
 export LDFLAGS=-L/usr/local/opt/texinfo/lib
 export ELM_HOME="/usr/local/bin/"
-eval-darwin 'export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`'
-eval-darwin 'export JAVA_HOME9=`/usr/libexec/java_home --version 9`'
-eval-darwin 'export JAVA_HOME=$JAVA_HOME8'
-eval-darwin 'addToPATH $JAVA_HOME'
+eval-darwin export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`
+eval-darwin export JAVA_HOME9=`/usr/libexec/java_home --version 9`
+eval-darwin export JAVA_HOME=$JAVA_HOME8
+eval-darwin addToPATH $JAVA_HOME
 export BOOT_CLOJURE_VERSION='1.9.0' 
 
 export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src" &>/dev/null

@@ -281,3 +281,24 @@ html2epub() {
  $(cat $1)' "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 } 
 h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"
+w2e() {
+    local u="$(uuidgen)"
+    cdm "$u"
+
+    local argc="$#"
+    local i=0
+    for url in "${@:2}"
+    do
+        local bname="${url##*/}"
+        #test -z "$bname" && bname="u$i"
+        bname="${(l(${#argc})(0))i} $bname.html"
+        i=$((i+1))
+
+        wread "$url" html > "$bname"
+    done
+
+    html2epub "$1" "$2" *.html
+    mv *.epub ../
+    cd '../'
+    #\rm -r "./$u"
+}
