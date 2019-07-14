@@ -63,7 +63,7 @@ export ZSH=~/.oh-my-zsh
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git git-extras catimg common-aliases lein pip sbt scala screen sprunge sudo vi-mode fasd)
-eval-darwin 'plugins+=(osx)'
+eval-darwinq 'plugins+=(osx)'
 source $ZSH/oh-my-zsh.sh
 
 # User configuration
