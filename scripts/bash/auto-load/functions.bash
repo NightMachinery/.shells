@@ -273,3 +273,11 @@ function random-poemist() {
 xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
+html2epub() {
+    pandoc --toc -s -f html <(map '
+
+ <h1>$(strip $1 ".html")</h1>
+
+ $(cat $1)' "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+} 
+h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"

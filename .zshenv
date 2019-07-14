@@ -1,5 +1,4 @@
 autoload -U zargs #Necessary for scripts
-source <(antibody init)
 
 
 source "$HOME/scripts/bash/load-first.bash"
@@ -32,6 +31,9 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
+
+source <(antibody init)
+
 psource ~/anaconda/etc/profile.d/conda.sh
 # export PYTHONHOME=/Users/evar/anaconda/bin/
 silence conda activate
