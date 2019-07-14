@@ -274,6 +274,7 @@ xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
 html2epub() {
+    # title author htmls
     pandoc --toc -s -f html <(map '
 
  <h1>$(strip $1 ".html")</h1>
@@ -281,7 +282,8 @@ html2epub() {
  $(cat $1)' "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 } 
 h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"
-w2e() {
+web2epub() {
+    # title author urls-in-order
     local u="$1 $(uuidgen)"
     cdm "$u"
 
@@ -304,3 +306,4 @@ w2e() {
     cd '../'
     \rm -r "./$u"
 }
+w2e() web2epub "$1" "nIght is long and lonely" "${@:2}"
