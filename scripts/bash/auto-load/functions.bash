@@ -60,7 +60,7 @@ function retry-eval() {
 function retry-limited() {
     local limit=0
 	  until {test "$1" -gt 0 && test $limit -ge "$1"} || eval "${@:2:q}"  ; do
-		    echo Tried "${@:2:q}" "..." 1>&2
+		    ecerr Tried "${@:2:q}" "..."
 		    sleep 1
         limit=$((limit+1))
 	  done
