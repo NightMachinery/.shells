@@ -63,6 +63,15 @@ function retry() {
 		sleep 1
 	done
 }
+function retry-limited() {
+    local limit=0
+	  until test $limit -ge "$1" || "${@:2}"  ; do
+		    echo Tried \'"$*"\' "..." 1>&2
+		    sleep 1
+        limit=$((limit+1))
+	  done
+    test $limit -lt "$1"
+}
 function 2mobi() {
 	ebook-convert "$1" "${1:r}.mobi"
 }
@@ -291,6 +300,7 @@ web2epub() {
     cdm "$u"
 
     local i=0
+    local hasFailed=''
     for url in "${@:3}"
     do
         local bname="${url##*/}"
@@ -298,15 +308,19 @@ web2epub() {
         bname="${(l(${##})(0))i} $bname.html"
         i=$((i+1))
 
-        retry wread "$url" html > "$bname"
-        ec "Downloaded $url ..."
+        retry-limited 300 wread "$url" html > "$bname" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
+                                                                                        ecerr "Failed $url"
+                                                                                        hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
+        }
     done
 
-    ec "Converting to epub ..."
-    html2epub "$1" "$2" *.html
-    mv *.epub ../
-    ec "Book '$1' by '$2' is done."
-    cd '../'
-    \rm -r "./$u"
+    test -z "$hasFailed" && { ec "Converting to epub ..."
+                              html2epub "$1" "$2" *.html
+                              mv *.epub ../
+                              ec "Book '$1' by '$2' has been converted successfully."
+                              cd '../'
+                              \rm -r "./$u" } || ecerr "$hasFailed"
 }
-w2e() web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
+w2e() {
+    web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
+}
