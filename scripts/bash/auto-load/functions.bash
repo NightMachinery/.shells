@@ -265,7 +265,10 @@ function wt1() {
 	curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
 function wread() {
-	mercury-parser --format="${2:-markdown}" "$1" |jq --raw-output '.content'
+    (
+        set -o pipefail
+	      mercury-parser --format="${2:-markdown}" "$1" |jq -e --raw-output '.content'
+    )
 }
 function random-poemist() {
 	curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
@@ -295,14 +298,14 @@ web2epub() {
         bname="${(l(${##})(0))i} $bname.html"
         i=$((i+1))
 
-        wread "$url" html > "$bname"
+        retry wread "$url" html > "$bname"
         ec "Downloaded $url ..."
     done
 
     ec "Converting to epub ..."
     html2epub "$1" "$2" *.html
     mv *.epub ../
-    ec "Book $1 by $2 is done."
+    ec "Book '$1' by '$2' is done."
     cd '../'
     \rm -r "./$u"
 }
