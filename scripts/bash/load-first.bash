@@ -8,6 +8,16 @@ function eval-dl()
             eval "$2"
             ;;esac 
 } 
+function eval-darwinq() 
+{ 
+    case "$(uname)" in 
+        Darwin) 
+            eval "${@}" 
+            ;; 
+        Linux) 
+            
+            ;;esac 
+} 
 function eval-darwin() 
 { 
     case "$(uname)" in 
