@@ -309,4 +309,4 @@ web2epub() {
     cd '../'
     \rm -r "./$u"
 }
-w2e() web2epub "$1" "nIght is long and lonely" "${@:2}"
+w2e() web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
