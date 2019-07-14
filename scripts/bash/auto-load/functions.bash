@@ -265,7 +265,7 @@ function wt1() {
 	curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
 function wread() {
-	mercury-parser --format="${2:-text}" "$1" |jq --raw-output '.content'
+	mercury-parser --format="${2:-markdown}" "$1" |jq --raw-output '.content'
 }
 function random-poemist() {
 	curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
