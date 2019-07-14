@@ -282,23 +282,25 @@ html2epub() {
 } 
 h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"
 w2e() {
-    local u="$(uuidgen)"
+    local u="$1 $(uuidgen)"
     cdm "$u"
 
-    local argc="$#"
     local i=0
     for url in "${@:2}"
     do
         local bname="${url##*/}"
         #test -z "$bname" && bname="u$i"
-        bname="${(l(${#argc})(0))i} $bname.html"
+        bname="${(l(${##})(0))i} $bname.html"
         i=$((i+1))
 
         wread "$url" html > "$bname"
+        ec "Downloaded $url ..."
     done
 
+    ec "Converting to epub ..."
     html2epub "$1" "$2" *.html
     mv *.epub ../
+    ec "$1 done."
     cd '../'
-    #\rm -r "./$u"
+    \rm -r "./$u"
 }
