@@ -302,7 +302,7 @@ web2epub() {
         bname="${(l(${##})(0))i} $bname.html"
         i=$((i+1))
 
-        retry-limited "${W2E_RETRY:-300}" wread "$url" html > "$bname" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
+        retry-limited "${W2E_RETRY:-10}" wread "$url" html > "$bname" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
                                                                                         ecerr "Failed $url"
                                                                                         hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
         }
