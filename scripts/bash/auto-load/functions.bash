@@ -286,7 +286,7 @@ w2e() {
     cdm "$u"
 
     local i=0
-    for url in "${@:2}"
+    for url in "${@:3}"
     do
         local bname="${url##*/}"
         #test -z "$bname" && bname="u$i"
@@ -300,7 +300,7 @@ w2e() {
     ec "Converting to epub ..."
     html2epub "$1" "$2" *.html
     mv *.epub ../
-    ec "$1 done."
+    ec "Book $1 by $2 is done."
     cd '../'
     \rm -r "./$u"
 }
