@@ -329,3 +329,6 @@ w2e() {
 emn() {
     emc -e "(woman \"$*\")"
 }
+swap-audio() {
+    ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 "$3"
+}
