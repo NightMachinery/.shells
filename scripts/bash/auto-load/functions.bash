@@ -334,5 +334,5 @@ swap-audio() {
 }
 
 function vdsox() {
-    ffmpeg -i * o.wav && sox o.wav d.wav -G "$@" && swap-audio *.mp4 d.wav o.mp4 && \rm ^*.mp4
+    ffmpeg -i * o.wav && sox o.wav d.wav -G "$@" && swap-audio *.mp4 d.wav o.mp4 && \rm -- ^*.mp4
 }
