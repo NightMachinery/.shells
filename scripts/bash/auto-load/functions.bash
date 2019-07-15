@@ -351,3 +351,6 @@ function vsox() {
 	local inp=(*)
 	sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
+function sdl() {
+	spotdl -f . -s "$*"
+}
