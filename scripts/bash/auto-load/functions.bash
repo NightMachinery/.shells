@@ -51,17 +51,28 @@ function 265to264() {
     #-map_metadata 0
 }
 function retry-eval() {
-    retry eval "$@"
+    retry-limited-eval 0 "$@"
 	  # until eval "$@" ; do
 # 		    echo Retrying \'"$*"\' "..." 1>&2
 # 		    sleep 1
 # 	  done
 }
-function retry() {
-	until "$@" ; do
-		echo Retrying \'"$*"\' "..." 1>&2
-		sleep 1
-	done
+
+function retry-limited() {
+    retry-limited-eval "$1" "${@:2:q}"
+}
+function retry-limited-eval() {
+    local limit=0
+    local ecode=0
+	  until {test "$1" -gt 0 && test $limit -ge "$1"} || { eval "${@:2}" && ecode=0 }
+    do
+        ecode="$?"
+		    ecerr Tried eval "${@:2}" "..."
+		    sleep 1
+        limit=$((limit+1))
+	  done
+    # test $limit -lt "$1" || test "$1" -eq 0
+    (exit "$ecode")
 }
 function 2mobi() {
 	ebook-convert "$1" "${1:r}.mobi"
@@ -265,7 +276,10 @@ function wt1() {
 	curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
 function wread() {
-	mercury-parser --format="${2:-markdown}" "$1" |jq --raw-output '.content'
+    (
+        set -o pipefail
+	      mercury-parser --format="${2:-markdown}" "$1" |jq -e --raw-output '.content'
+    )
 }
 function random-poemist() {
 	curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
@@ -273,3 +287,48 @@ function random-poemist() {
 xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
+html2epub() {
+    # title author htmls
+    pandoc --toc -s -f html <(map '
+
+ <h1>$(strip $1 ".html")</h1>
+
+ $(cat $1)' "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+} 
+h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"
+web2epub() {
+    # title author urls-in-order
+    local u="$1 $(uuidgen)"
+    cdm "$u"
+
+    local i=0
+    local hasFailed=''
+    for url in "${@:3}"
+    do
+        local bname="${url##*/}"
+        #test -z "$bname" && bname="u$i"
+        bname="${(l(${##})(0))i} $bname.html"
+        i=$((i+1))
+
+        retry-limited-eval "${W2E_RETRY:-10}" wread "$url:q" html '>' "$bname:q" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
+                                                                                        ecerr "Failed $url"
+                                                                                        hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
+        }
+    done
+
+    test -z "$hasFailed" && { ec "Converting to epub ..."
+                              html2epub "$1" "$2" *.html
+                              mv *.epub ../
+                              ec "Book '$1' by '$2' has been converted successfully."
+                              cd '../'
+                              \rm -r "./$u" } || { ecerr "$hasFailed" && (exit 1) }
+}
+w2e() {
+    web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
+}
+emn() {
+    emc -e "(woman \"$*\")"
+}
+swap-audio() {
+    ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 "$3"
+}
