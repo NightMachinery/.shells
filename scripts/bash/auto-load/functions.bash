@@ -354,3 +354,6 @@ function vsox() {
 function sdl() {
 	spotdl -f . -s "$*"
 }
+function pdf-cover() {
+	convert "$1[0]" "$1:r.png"
+}

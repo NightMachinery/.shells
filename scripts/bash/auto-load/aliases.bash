@@ -29,7 +29,7 @@ alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'
 alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'
 alias reeb='run-on-each rename-ebook'
-alias aa='aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included in this.
+alias aa='noglob aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included in this.
 alias set-volume='setv'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
