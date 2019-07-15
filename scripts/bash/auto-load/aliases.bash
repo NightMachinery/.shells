@@ -72,3 +72,4 @@ alias cxc='noglob __calc_plugin'
 alias retry='retry-limited 0'
 alias s=silence
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
+alias summon="mv * ~/tmp/"
