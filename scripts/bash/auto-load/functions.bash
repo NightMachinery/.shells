@@ -337,7 +337,7 @@ function tsox() {
 }
 function vdsox() {
 	local inp=(*)
-	tsox "$inp" '2.wav' "$@" && swap-audio *.mp4 "${inp:r}.2.wav" "${inp:r}".mp4 && \rm -- ^*.mp4
+	tsox "$inp" '2.wav' "$@" && swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
 }
 function vasox() {
 	local inp=(*)
