@@ -69,6 +69,5 @@ alias apx='ALL_PROXY=socks5://127.0.0.1:1080'
 alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 alias sz='source ~/.zshrc &&'
 alias cxc='noglob __calc_plugin'
-alias vsox="opusdec --force-wav * - 2> /dev/null | sox - brave_new_world.mp3 -G" 
 alias retry='retry-limited 0'
 alias s=silence

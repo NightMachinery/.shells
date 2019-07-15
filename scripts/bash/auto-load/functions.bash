@@ -332,7 +332,22 @@ emn() {
 swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
-
+function tsox() {
+	ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
+}
 function vdsox() {
-    ffmpeg -i * o.wav && sox o.wav d.wav -G "$@" && swap-audio *.mp4 d.wav o.mp4 && \rm -- ^*.mp4
+	local inp=(*)
+	tsox "$inp" '2.wav' "$@" && swap-audio *.mp4 "${inp:r}.2.wav" "${inp:r}".mp4 && \rm -- ^*.mp4
+}
+function vasox() {
+	local inp=(*)
+	tsox "$inp" 'c.mp3' "$@"
+	\rm -- ^*.mp3
+}
+function vosox() {
+	opusdec --force-wav * - 2> /dev/null | sox - brave_new_world.mp3 -G "$@"
+}
+function vsox() {
+	local inp=(*)
+	sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
