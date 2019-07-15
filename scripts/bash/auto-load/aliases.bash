@@ -70,5 +70,4 @@ alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 alias sz='source ~/.zshrc &&'
 alias cxc='noglob __calc_plugin'
 alias vsox="opusdec --force-wav * - 2> /dev/null | sox - brave_new_world.mp3 -G" 
-alias vdsox="eval 'ffmpeg -i * o.wav && sox o.wav d.wav  -G pitch 700  && swap-audio *.mp4 d.wav o.mp4 && \rm ^*.mp4'"
 alias retry='retry-limited 0'

@@ -332,3 +332,7 @@ emn() {
 swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 "$3"
 }
+
+function vdsox() {
+    ffmpeg -i * o.wav && sox o.wav d.wav -G "$@" && swap-audio *.mp4 d.wav o.mp4 && \rm ^*.mp4
+}
