@@ -51,19 +51,23 @@ function 265to264() {
     #-map_metadata 0
 }
 function retry-eval() {
-    retry eval "$@"
+    retry-limited-eval 0 "$@"
 	  # until eval "$@" ; do
 # 		    echo Retrying \'"$*"\' "..." 1>&2
 # 		    sleep 1
 # 	  done
 }
+
 function retry-limited() {
+    retry-limited-eval "$1" "${@:2:q}"
+}
+function retry-limited-eval() {
     local limit=0
     local ecode=0
-	  until {test "$1" -gt 0 && test $limit -ge "$1"} || { eval "${@:2:q}" && ecode=0 }
+	  until {test "$1" -gt 0 && test $limit -ge "$1"} || { eval "${@:2}" && ecode=0 }
     do
         ecode="$?"
-		    ecerr Tried "${@:2:q}" "..."
+		    ecerr Tried eval "${@:2}" "..."
 		    sleep 1
         limit=$((limit+1))
 	  done
@@ -306,7 +310,7 @@ web2epub() {
         bname="${(l(${##})(0))i} $bname.html"
         i=$((i+1))
 
-        retry-limited "${W2E_RETRY:-10}" wread "$url" html > "$bname" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
+        retry-limited-eval "${W2E_RETRY:-10}" wread "$url:q" html '>' "$bname:q" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
                                                                                         ecerr "Failed $url"
                                                                                         hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
         }
@@ -317,7 +321,7 @@ web2epub() {
                               mv *.epub ../
                               ec "Book '$1' by '$2' has been converted successfully."
                               cd '../'
-                              \rm -r "./$u" } || ecerr "$hasFailed"
+                              \rm -r "./$u" } || { ecerr "$hasFailed" && (exit 1) }
 }
 w2e() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"

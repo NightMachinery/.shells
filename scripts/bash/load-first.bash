@@ -10,6 +10,7 @@ function eval-dl()
 } 
 function eval-darwinq() 
 { 
+    #input should be quoted.
     case "$(uname)" in 
         Darwin) 
             eval "${@}" 
