@@ -1,3 +1,4 @@
+alias c='command'
 alias l='exa -al'
 alias lt='l -T'
 alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
