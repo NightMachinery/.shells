@@ -318,10 +318,9 @@ web2epub() {
 
     test -z "$hasFailed" && { ec "Converting to epub ..."
                               html2epub "$1" "$2" *.html
-                              mv *.epub ../
+                              mv *.epub ../ && cd '../' && \rm -r "./$u"
                               ec "Book '$1' by '$2' has been converted successfully."
-                              cd '../'
-                              \rm -r "./$u" } || { ecerr "$hasFailed" && (exit 1) }
+                               } || { ecerr "$hasFailed" && (exit 1) }
 }
 w2e() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
