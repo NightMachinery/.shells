@@ -165,10 +165,6 @@ addToPATH "/usr/local/opt/curl/bin"
 GPG_TTY=$(tty)
 export GPG_TTY
 
-eval $(thefuck --alias c)
-alias fuck='c'
-
-eval "$(fasd --init auto)"
 unalias run-help &> /dev/null
 autoload run-help
 
