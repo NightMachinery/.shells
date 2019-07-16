@@ -345,7 +345,7 @@ function vasox() {
 	\rm -- ^*.mp3
 }
 function vosox() {
-	opusdec --force-wav * - 2> /dev/null | sox - brave_new_world.mp3 -G "$@"
+	opusdec --force-wav * - 2> /dev/null | sox - "$(xkcdpass).mp3" -G "$@"
 }
 function vsox() {
 	local inp=(*)
