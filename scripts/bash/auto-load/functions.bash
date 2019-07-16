@@ -288,8 +288,9 @@ xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
 html2epub-calibre() {
-	merge-html "${@:3}" > "$1.full.html"
-	ebook-convert "$1.full.html" "$1.epub" \
+	local u="$1 $(uuidgen).html"
+	merge-html "${@:3}" > "$u"
+	ebook-convert "$u" "$1.epub" \
 	--authors="$2" \
 	--level1-toc="//*[name()='h1' or name()='h2']" \
 	--level2-toc="//h:h3" \
@@ -299,6 +300,7 @@ html2epub-calibre() {
 	--toc-title="The TOC" \
 	--embed-all-fonts \
 	--title="$1" --epub-inline-toc
+	\rm "$u"
 }
 merge-html() {
 map '
