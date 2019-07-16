@@ -287,15 +287,31 @@ function random-poemist() {
 xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
-html2epub() {
-    # title author htmls
-    pandoc --toc -s -f html <(map '
+h2e-calibre() {
+	merge-html "${@:3}" > "$1.full.html"
+	ebook-convert "$1.full.html" "$1.epub" \
+	--authors="$2" \
+	--level1-toc="//*[name()='h1' or name()='h2']" \
+	--level2-toc="//h:h3" \
+	--level3-toc="//*[@class='subsection']" \
+	--page-breaks-before="//*[(name()='h1' or name()='h2') or @class='owner-name']" \
+	--use-auto-toc --toc-threshold=0 \
+	--toc-title="The TOC" \
+	--embed-all-fonts \
+	--title="$1" --epub-inline-toc
+}
+merge-html() {
+map '
 
  <h1>$(strip $1 ".html")</h1>
 
- $(cat $1)' "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+ $(cat $1)' "$@"
+ }
+html2epub() {
+    # title author htmls
+    pandoc --toc -s -f html <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 } 
-h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"
+h2e() "${h2ed:-html2epub}" "$1" "nIght is long and lonely" "${@:2}"
 web2epub() {
     # title author urls-in-order
     local u="$1 $(uuidgen)"
@@ -317,7 +333,7 @@ web2epub() {
     done
 
     test -z "$hasFailed" && { ec "Converting to epub ..."
-                              html2epub "$1" "$2" *.html
+                              "${h2ed:-html2epub}" "$1" "$2" *.html
                               mv *.epub ../ && cd '../' && \rm -r "./$u"
                               ec "Book '$1' by '$2' has been converted successfully."
                                } || { ecerr "$hasFailed" && (exit 1) }
