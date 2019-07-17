@@ -509,7 +509,7 @@ function prefix-files() {
 	done
 }
 function jpre() {
-	test -z "$jufile" || \rm "$jufile"
+	test -e "$jufile" || \rm "$jufile"
 	eval "prefix-files $1:q ${jpredicate:-*}"
 }
 function jvoice() {
