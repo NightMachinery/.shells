@@ -509,8 +509,8 @@ function prefix-files() {
 	done
 }
 function jpre() {
-	test -e "$jufile" && \rm "$jufile"
-	eval "prefix-files $1:q ${jpredicate:-*}"
+	jrm
+	eval "prefix-files $1:q ${jpredicate:-*(D.)}"
 }
 function jvoice() {
 	jpre "voicenote-"
@@ -518,3 +518,16 @@ function jvoice() {
 jvideo() jpre "videonote-"
 jdoc() jpre "fdoc-"
 jstream() jpre "streaming-"
+jmv() {
+	test -e "$jufile" && mv "$jufile" "n_$jufile"
+}
+jrm() {
+	test -e "$jufile" && \rm "$jufile"
+}
+jopus() {
+	jrm
+	local u=(*)
+	ffmpeg -i "$u" -strict -2 "${u:r}.opus"
+	\rm "$u"
+	jvoice
+}
