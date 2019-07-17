@@ -87,7 +87,7 @@ function rloop_vid() (
 )
 
 function trr() (
-    peerflix "$1" --path "${2:-$HOME/Downloads/Video}" --mpv -- --fullscreen
+    peerflix "$@" --path "${PEERFLIX_DIR:-$HOME/Downloads/Video}" --mpv -- --fullscreen
 )
 function ot-mp3() (
     B=$(basename "$1"); D=$(dirname "$1");
