@@ -72,3 +72,34 @@ alias cxc='noglob __calc_plugin'
 alias vsox="opusdec --force-wav * - 2> /dev/null | sox - brave_new_world.mp3 -G" 
 alias retry='retry-limited 0'
 alias s=silence
+alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
+alias coursera='coursera-dl -n -pl --aria2 --video-resolution 720p --download-quizzes --download-notebooks -sl "en,fa" --resume'
+alias ox='zdict -dt oxford'
+alias wh='which'
+alias rqup='wg-quick up ~/Downloads/rq.conf'
+alias rqdown='wg-quick down ~/Downloads/rq.conf'
+alias wifi='osx-wifi-cli'
+alias pi='pip install -U'
+alias last-created='\ls -AtU|head -n1' #macOS only
+alias last-accessed='\ls -Atu|head -n1' #macOS only
+alias last-added='ls-by-added |head -n1' #macOS only
+alias last-modified='\ls -At|head -n1'
+alias milli="mill mill.scalalib.GenIdeaModule/idea"
+alias eta="etlas exec eta"
+alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
+alias pe="pkill -SIGUSR2 Emacs"
+alias ls="ls -aG"
+alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
+alias cask="brew cask"
+alias bi="brew install"
+alias ci="brew cask install"
+alias fplay='ffplay -autoexit -nodisp -loglevel panic'
+alias weather="wego | less -r"
+alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
+alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
+alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
+alias emc="emacsclient -t"
+alias emcg="emacsclient -c"
+alias y="noglob youtube-dl --no-playlist"
+alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
+
