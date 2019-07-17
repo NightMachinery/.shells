@@ -1,3 +1,4 @@
+re "silence unalias" map p fd
 alias c='command'
 alias l='exa -al'
 alias lt='l -T'
@@ -25,7 +26,6 @@ alias bre="brew remove"
 alias auu="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
 alias his="history|grep"
-alias re='run-on-each'
 alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'
 alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'

@@ -483,3 +483,10 @@ function sdl() {
 function pdf-cover() {
 	convert "$1[0]" "$1:r.png"
 }
+function aget() {
+    local u="$(uuidgen)"
+    cdm "$u"
+    eval "$@" || { ecerr Exited "$e"; l }
+    cd ..
+    \rm -r "$u"
+}

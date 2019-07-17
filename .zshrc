@@ -163,7 +163,6 @@ silence unalias =
 antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions
 source ~/bal/aliases.bash #To make them have priority.
-
 autoload -U deer
 zle -N deer
 bindkey '\ek' deer

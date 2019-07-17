@@ -114,3 +114,5 @@ function ec() {
     fi
 }
 ecerr() ec "$@" 1>&2
+
+alias re='run-on-each'
