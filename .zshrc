@@ -155,7 +155,6 @@ antibody bundle intelfx/pure
 #antibody bundle sindresorhus/pure
 # antibody bundle arialdomartini/oh-my-git
 # antibody theme arialdomartini/oh-my-git-themes oppa-lana-style
-antibody bundle Tarrasch/zsh-functional
 antibody bundle Tarrasch/zsh-bd
 antibody bundle Tarrasch/zsh-colors
 antibody bundle Vifon/deer
@@ -163,11 +162,11 @@ antibody bundle zsh-users/zsh-autosuggestions
 silence unalias =
 antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions
-
 source ~/bal/aliases.bash #To make them have priority.
-source ~/scripts/zsh/load-others.zsh
 
 autoload -U deer
 zle -N deer
 bindkey '\ek' deer
 rcLoaded='yes'
+source ~/scripts/zsh/completions.zsh
+

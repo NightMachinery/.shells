@@ -459,13 +459,34 @@ function random-poemist() {
 xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
-html2epub() {
-    # title author htmls
-    pandoc --toc -s -f html <(map '
+html2epub-calibre() {
+	local u="$1 $(uuidgen).html"
+	merge-html "${@:3}" > "$u"
+	ebook-convert "$u" "$1.epub" \
+	--authors="$2" \
+	--level1-toc="//*[name()='h1' or name()='h2']" \
+	--level2-toc="//h:h3" \
+	--level3-toc="//*[@class='subsection']" \
+	--page-breaks-before="//*[(name()='h1' or name()='h2') or @class='owner-name']" \
+	--use-auto-toc --toc-threshold=0 \
+	--toc-title="The TOC" \
+	--embed-all-fonts \
+	--title="$1" --epub-inline-toc
+	\rm "$u"
+}
+merge-html() {
+map '
 
  <h1>$(strip $1 ".html")</h1>
 
- $(cat $1)' "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+ $(cat $1)' "$@"
+ }
+html2epub() {
+	"${h2ed:-html2epub-calibre}" "$@"
+}
+html2epub-pandoc() {
+    # title author htmls
+    pandoc --toc -s -f html <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 } 
 h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"
 web2epub() {
@@ -490,10 +511,9 @@ web2epub() {
 
     test -z "$hasFailed" && { ec "Converting to epub ..."
                               html2epub "$1" "$2" *.html
-                              mv *.epub ../
+                              mv *.epub ../ && cd '../' && \rm -r "./$u"
                               ec "Book '$1' by '$2' has been converted successfully."
-                              cd '../'
-                              \rm -r "./$u" } || { ecerr "$hasFailed" && (exit 1) }
+                               } || { ecerr "$hasFailed" && (exit 1) }
 }
 w2e() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
@@ -504,7 +524,28 @@ emn() {
 swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
-
+function tsox() {
+	ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
+}
 function vdsox() {
-    ffmpeg -i * o.wav && sox o.wav d.wav -G "$@" && swap-audio *.mp4 d.wav o.mp4 && \rm -- ^*.mp4
+	local inp=(*)
+	tsox "$inp" '2.wav' "$@" && swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
+}
+function vasox() {
+	local inp=(*)
+	tsox "$inp" 'c.mp3' "$@"
+	\rm -- ^*.mp3
+}
+function vosox() {
+	opusdec --force-wav * - 2> /dev/null | sox - "$(xkcdpass).mp3" -G "$@"
+}
+function vsox() {
+	local inp=(*)
+	sox "$inp" "${inp:r}_c.mp3" -G "$@"
+}
+function sdl() {
+	spotdl -f . -s "$*"
+}
+function pdf-cover() {
+	convert "$1[0]" "$1:r.png"
 }

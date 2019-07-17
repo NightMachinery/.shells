@@ -7,3 +7,5 @@ json-rpc
 service_factory
 ipython
 yapf
+spotdl
+xkcdpass

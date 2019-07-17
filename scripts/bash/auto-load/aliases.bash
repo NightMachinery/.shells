@@ -1,3 +1,4 @@
+alias c='command'
 alias l='exa -al'
 alias lt='l -T'
 alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
@@ -29,7 +30,7 @@ alias sbash='source ~/scripts/bash/load-others.bash'
 alias szsh='source ~/scripts/zsh/load-others.zsh'
 alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'
 alias reeb='run-on-each rename-ebook'
-alias aa='aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included in this.
+alias aa='noglob aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included in this.
 alias set-volume='setv'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
@@ -69,7 +70,6 @@ alias apx='ALL_PROXY=socks5://127.0.0.1:1080'
 alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 alias sz='source ~/.zshrc &&'
 alias cxc='noglob __calc_plugin'
-alias vsox="opusdec --force-wav * - 2> /dev/null | sox - brave_new_world.mp3 -G" 
 alias retry='retry-limited 0'
 alias s=silence
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
@@ -102,4 +102,5 @@ alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
 alias y="noglob youtube-dl --no-playlist"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
-
+alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
+alias summon="mv * ~/tmp/"
