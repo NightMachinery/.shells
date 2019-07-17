@@ -116,4 +116,4 @@ function ec() {
 ecerr() ec "$@" 1>&2
 
 alias re='run-on-each'
-export jufile=(*)
+silence eval 'export jufile=(*)'
