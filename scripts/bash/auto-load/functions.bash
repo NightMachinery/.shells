@@ -459,11 +459,12 @@ swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
 function tsox() {
-	ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
+	silence ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
 }
 function vdsox() {
 	local inp=(*)
-	tsox "$inp" '2.wav' "$@" && swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
+	tsox "$inp" '2.wav' "$@" && silence swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
+	silence jvideo
 }
 function vasox() {
 	local inp=(*)
@@ -471,7 +472,8 @@ function vasox() {
 	\rm -- ^*.mp3
 }
 function vosox() {
-	opusdec --force-wav * - 2> /dev/null | sox - "$(xkcdpass).mp3" -G "$@"
+	opusdec --force-wav * - 2> /dev/null | sox - "brave_n_failed.mp3" -G "$@"
+	silence jopus
 }
 function vsox() {
 	local inp=(*)
