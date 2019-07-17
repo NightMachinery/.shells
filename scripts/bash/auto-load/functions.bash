@@ -1,6 +1,161 @@
+ks () { kscript ~/kscripts/"$@"; }
+
+cdm ()
+{
+    mkdir -p -- "$1" &&
+        cd -P -- "$1"
+}
+
+function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
+
+transfer() { 
+    #
+    # Defines transfer alias and provides easy command line file and folder sharing.
+    #
+    # Authors:
+    #   Remco Verhoef <remco@dutchcoders.io>
+    #
+    # check arguments
+    if [ $# -eq 0 ]; 
+    then 
+        echo "No arguments specified. Usage:\necho transfer /tmp/test.md\ncat /tmp/test.md | transfer test.md"
+        return 1
+    fi
+
+    # get temporarily filename, output is written to this file show progress can be showed
+    tmpfile=$( mktemp -t transferXXX )
+    
+    # upload stdin or file
+    file=$1
+
+    if tty -s; 
+    then 
+        basefile=$(basename "$file" | sed -e 's/[^a-zA-Z0-9._-]/-/g') 
+
+        if [ ! -e $file ];
+        then
+            echo "File $file doesn't exists."
+            return 1
+        fi
+        
+        if [ -d $file ];
+        then
+            # zip directory and transfer
+            zipfile=$( mktemp -t transferXXX.zip )
+            cd $(dirname $file) && zip -r -q - $(basename $file) >> $zipfile
+            curl --progress-bar --upload-file "$zipfile" "https://transfer.sh/$basefile.zip" >> $tmpfile
+            rm -f $zipfile
+        else
+            # transfer file
+            curl --progress-bar --upload-file "$file" "https://transfer.sh/$basefile" >> $tmpfile
+        fi
+    else 
+        # transfer pipe
+        curl --progress-bar --upload-file "-" "https://transfer.sh/$file" >> $tmpfile
+    fi
+    
+    # cat output link
+    cat $tmpfile
+
+    # cleanup
+    rm -f $tmpfile
+}
+
+function git_sparse_clone() (
+    # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
+    rurl="$1" localdir="$2" && shift 2
+
+    mkdir -p "$localdir"
+    cd "$localdir"
+
+    git init
+    git remote add -f origin "$rurl"
+
+    git config core.sparseCheckout true
+
+    # Loops over remaining args
+    local i
+    for i; do
+        echo "$i" >> .git/info/sparse-checkout
+    done
+
+    git pull origin master
+)
+
+function rloop_vid() ( 
+    ffmpeg -i "$1" -filter_complex "[0:v]reverse,fifo[r];[0:v][r] concat=n=2:v=1 [v]" -map "[v]" "$1_rloop.${2:-mp4}"
+)
+
+function trr() (
+    peerflix "$@" --path "${PEERFLIX_DIR:-$HOME/Downloads/Video}" --mpv -- --fullscreen
+)
+function ot-mp3() (
+    B=$(basename "$1"); D=$(dirname "$1");
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a libmp3lame -qscale:a 1 "$D/${B%.*}.mp3" "${@:2}"
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a copy "$D/${B%.*}.trimmed.wav" "${@:2}"
+)
+function ot-wav() {
+    B=$(basename "$1"); D=$(dirname "$1");
+    ffmpeg -ss 1.5 -i "$1" -metadata artist="Our Apparitions" -metadata title="${B%.*}" -codec:a copy "$D/${B%.*}.trimmed.wav" "${@:2}"
+}
+
+function mp3-to-mp4() (
+    B=$(basename "$1"); D=$(dirname "$1");
+    ffmpeg -loop 1 -i "$2" -i "$1" -pix_fmt yuv420p -c:v libx264 -crf 16  -c:a libfdk_aac -vbr 5 -preset veryslow -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2:x=0:y=0:color=black" -shortest "${3:-$D/${B%.*}}.mp4"
+    # -c:a copy -r 1
+    )
+function sleepnow() ( sleep "${1:-7}"; pmset sleepnow )
+silent_background() {
+    { 1>/dev/null 2>&1 3>&1 eval "$@"& }
+    disown &>/dev/null  # Prevent whine if job has already completed
+}
+function rm-alpha() {
+    local B=$(basename "$1"); local D=$(dirname "$1");
+    convert "$1" -background "$2" -alpha remove "$D/${B%.*}_$2.png"
+}
+function alpha2black() (rm-alpha "$1" black)
+function alpha2white() (rm-alpha "$1" white)
+
+combine-funcs alpha2bw alpha2black alpha2white
+function hi10-multilink() {
+    #zsh-only
+    local argCount=$#
+    local pArgs=()
+    local i
+    for (( i=1; i<=$argCount; i+=1 ))
+    do
+        if [[ "$argv[i]" =~ '.*http:\/\/hi10anime(.*)' ]]; then #'.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
+            # echo $match[1]
+            pArgs[$i]='http://hi10anime'"$match[1]"
+        else
+            echo Invalid link: "$argv[i]"
+        fi
+    done
+    # echo $pArgs
+    # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
+    aria2c -j1 -Z  "${(@u)pArgs}" # (u) makes the array elements unique. 
+}
+function hi10-from-page() {
+    # You need to have persistent cookies in lynx, and have logged in.
+    hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
+    # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
+}
+function ppgrep() {
+    case "$(uname)" in
+        Darwin)
+            \pgrep -i "$@" | gxargs --no-run-if-empty ps -fp
+            ;;
+        Linux)
+            \pgrep "$@" | gxargs --no-run-if-empty ps -fp
+            # Linux's pgrep doesn't support -i
+            ;;
+        esac
+}
+function '$'() { eval "$@" ; }
+
 function timer-raw() {
     #aliased to timer with noglob
-    eval "sleep $((($@)*60)) && loop 1 fsayd"
+    eval "sleep $((($1)*60))" && eval "${@:2:q}"
 }
 function ubuntu-upgrade() {
     sudo apt update 
@@ -208,58 +363,9 @@ function play-and-trash(){
 function tlrlu(){
 	tlrl "$@" -p "$1   "
 }
-function rexx(){
-	xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
-}
-function rex(){
-        zargs --verbose -i _ -- "${@:2}" -- "$=1"
-	#Using -n 1 fails somehow. Probably a zargs bug.
-}
-function rexa(){
-	local i
-        for i in "${@:2}"
-        do
-		eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
-        done
-}
-function tel(){
-    "${@:2}" "$(which "$1")"
-}
-function expand-alias {
-    if [[ -n $ZSH_VERSION ]]; then
-        # shellcheck disable=2154  # aliases referenced but not assigned
-        printf '%s\n' "${aliases[$1]}"
-    else  # bash
-        printf '%s\n' "${BASH_ALIASES[$1]}"
-    fi
-}
-function force-expand {
-    local e="$(expand-alias "$1")"
-    test -z "$e" && e="$1"
-    echo "$e"
-}
-function ruu() {
-    local a="$(force-expand "$2")"
-    a="$(strip "$a" 'noglob ')"
-    "$1" "$=a" "${@:3}"
-}
-function geval() {
-    local cmd="$@"
-    ec "$cmd"
-    print -r -S -- "$cmd" #Add to history
-    eval -- "$cmd"
-}
-function ec() {
-    if [[ -n $ZSH_VERSION ]]; then
-    print -r "$@"
-    else  # bash
-    echo -E "$@"
-    fi
-}
 function rederr() {
 	(setopt nomultios 2>/dev/null; set -o pipefail; eval "$@:q" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2)3>&1
 }
-ecerr() ec "$@" 1>&2
 function raise-blood() ceer rederr.zsh source
 increment-last () {
     #$1 is supplied in our alias tmnt. :D
@@ -379,4 +485,11 @@ function pdf-cover() {
 }
 function sdlg() {
 	spotdl -f . "$@" && spotdl -f . -l *.txt
+}
+function aget() {
+    local u="$(uuidgen)"
+    cdm "$u"
+    eval "$@" || { ecerr Exited "$e"; l }
+    cd ..
+    \rm -r "$u"
 }
