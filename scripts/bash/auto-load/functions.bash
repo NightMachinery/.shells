@@ -484,7 +484,7 @@ function pdf-cover() {
 	convert "$1[0]" "$1:r.png"
 }
 function sdlg() {
-	spotdl -f . "$@" && spotdl -f . -l *.txt
+	spotdl -f . "$@" && spotdl -f . -l *.txt && \rm *.txt
 }
 function aget() {
     local u="$(uuidgen)"
