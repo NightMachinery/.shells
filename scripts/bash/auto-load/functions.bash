@@ -505,12 +505,12 @@ function junsummon() {
 function prefix-files() {
 	for file in "${@:2}"
 	do
-		mv file "${file:h}$1${file:tail}"
+		mv "$file" "${file:h}/$1${file:t}"
 	done
 }
 function jpre() {
 	\rm "$(exa --sort created |head -n1)"
-	prefix-files "$1" *
+	eval "prefix-files $1:q ${jpredicate:-*}"
 }
 function jvoice() {
 	jpre "voicenote-"
