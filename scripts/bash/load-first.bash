@@ -50,3 +50,67 @@ function psource()
 function silence() {
     { eval "$@:q"  } &> /dev/null
 }
+function run-on-each() {
+    local i
+    for i in "${@:2}"
+    do
+        eval "$1 '$i'"
+    done
+}
+function combine-funcs() {
+    # Combine multiple functions into one named by $1; The result will run all functions with $@.
+    local tmp321_string="function $1() { "
+    for i in "${@:2}"
+    do
+        tmp321_string="$tmp321_string""$i "'"$@"; '
+    done
+    tmp321_string="$tmp321_string""}"
+    # echo "$tmp321_string"
+    eval "$tmp321_string"
+}
+function rexx(){
+	  xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
+}
+function rex(){
+    zargs --verbose -i _ -- "${@:2}" -- "$=1"
+	  #Using -n 1 fails somehow. Probably a zargs bug.
+}
+function rexa(){
+	  local i
+    for i in "${@:2}"
+    do
+		    eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
+    done
+}
+function expand-alias {
+    if [[ -n $ZSH_VERSION ]]; then
+        # shellcheck disable=2154  # aliases referenced but not assigned
+        printf '%s\n' "${aliases[$1]}"
+    else  # bash
+        printf '%s\n' "${BASH_ALIASES[$1]}"
+    fi
+}
+function force-expand {
+    local e="$(expand-alias "$1")"
+    test -z "$e" && e="$1"
+    echo "$e"
+}
+function ruu() {
+    local a="$(force-expand "$2")"
+    a="$(strip "$a" 'noglob ')"
+    "$1" "$=a" "${@:3}"
+}
+function geval() {
+    local cmd="$@"
+    ec "$cmd"
+    print -r -S -- "$cmd" #Add to history
+    eval -- "$cmd"
+}
+function ec() {
+    if [[ -n $ZSH_VERSION ]]; then
+        print -r "$@"
+    else  # bash
+        echo -E "$@"
+    fi
+}
+ecerr() ec "$@" 1>&2
