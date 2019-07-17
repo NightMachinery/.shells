@@ -103,4 +103,3 @@ alias emcg="emacsclient -c"
 alias y="noglob youtube-dl --no-playlist"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
-alias summon="mv * ~/tmp/"

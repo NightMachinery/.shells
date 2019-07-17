@@ -493,3 +493,10 @@ function aget() {
     cd ..
     \rm -r "$u"
 }
+function jsummon() {
+	mkdir -p ~/julia_tmp/
+	mv * ~/julia_tmp/
+}
+function junsummon() {
+	\rm -r ~/julia_tmp
+}
