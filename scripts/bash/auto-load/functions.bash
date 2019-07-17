@@ -529,5 +529,5 @@ jopus() {
 	local u=(*)
 	ffmpeg -i "$u" -strict -2 "${u:r}.opus"
 	\rm "$u"
-	jvoice
+	jvoice #actually unnecessary as Telegram sees all opus audio as voice messages:))
 }
