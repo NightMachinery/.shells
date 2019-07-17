@@ -502,3 +502,19 @@ function jsummon() {
 function junsummon() {
 	\rm -r ~/julia_tmp
 }
+function prefix-files() {
+	for file in "${@:2}"
+	do
+		mv file "${file:h}$1${file:tail}"
+	done
+}
+function jpre() {
+	\rm "$(exa --sort created |head -n1)"
+	prefix-files "$1" *
+}
+function jvoice() {
+	jpre "voicenote-"
+}
+jvideo() jpre "videonote-"
+jdoc() jpre "fdoc-"
+jstream() jpre "streaming-"
