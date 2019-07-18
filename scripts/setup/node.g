@@ -1,3 +1,5 @@
+trash-cli
+empty-trash-cli
 chance-cli
 npmlist
 wikit

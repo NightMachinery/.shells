@@ -1,4 +1,4 @@
-re "silence unalias" map p fd
+re "silence unalias" map p fd ff
 alias c='command'
 alias l='exa -al'
 alias lt='l -T'
@@ -9,7 +9,6 @@ alias set-timezone='sudo dpkg-reconfigure tzdata'
 alias timer='noglob timer-raw'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias mpv='mpv --fs'
-alias trs='trash -Fv'
 alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
@@ -93,7 +92,7 @@ alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
 alias bi="brew install"
 alias ci="brew cask install"
-alias fplay='ffplay -autoexit -nodisp -loglevel panic'
+alias hear='mpv --keep-open=no --no-video' #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'

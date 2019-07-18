@@ -1,3 +1,59 @@
+rm-old() {
+    find "${1:-.}" -mindepth 1 -mtime "${2:-+120}" -depth -print -delete
+}
+trs() {
+    re 'ec Removing' "$@"
+    trash "$@"
+}
+songc() {
+    local f="$(fd "$1" "${music_dir:-$HOME/my-music}" |fzy )"
+    test -e "$f" && hear "${@:2}" "$f"
+}
+songd() {
+    #zsh-only
+    # Use songc to play already downloaded files.
+    # Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older than 120 days from the cache.
+
+    mkdir -p "${music_dir:=$HOME/my-music/}"
+    test -z "$PRUNE_SONGD_DAYS" || rm-old "$music_dir" "$PRUNE_SONGD_DAYS"
+    local bp
+    { test "$1" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
+        bp="$1"
+        shift
+    }
+    local q="${@: -1}"
+    local spath="$music_dir/${q:gs#/# }/"
+    test "$bp" = "-d" && {
+        trs "$(realpath "$spath")"
+        trs "$spath"
+        silence eval '\rm -r -- "$music_dir/"*(-@D)' #not really needed now  #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
+        (exit 0)
+    } || {
+    test -e "$spath" && {
+        hear "${@:1:-1}" "$spath"
+        (exit 0)
+    } || {
+        #nonexistent path
+        mkdir -p "$spath"
+        test -z "$bp" && {
+            spotdl -f "$spath" -s "$q" && { sleep 1 && songd "$@" } || {
+                    songd -d "$@"
+                }
+        } || {
+            local bp_name
+            spotdl_dir="$spath" aget sdlg "$bp" "$q:q" '&& bp_name=(./**/*.txt) ' && {
+                local bp_path="$music_dir/${bp_name:t:r:gs/[-_]/ }"
+                mkdir -p "$bp_path"
+                mv "$spath"/*(D) "$bp_path"
+                \rm -r "$spath"
+                ln -s "$bp_path" "$(removeTrailingSlashes "$spath")"
+                sleep 1 && songd "$bp" "$@"
+            } || {
+                songd -d "$@"
+            }
+            }
+    }}
+}
 killjobs () {
     local kill_list="$(jobs)"
     if [ -n "$kill_list" ]; then
@@ -186,7 +242,10 @@ function zir() {
     zip -r "$dest" "$1"
 }
 function removeTrailingSlashes() {
-    echo "$1"|sed 's:/*$::'
+    case $1 in
+        *[!/]*/) ec "$1"|sed 's:/*$::' ;; #x=${x%"${x##*[!/]}"};;
+        *[/]) ec "/";;
+    esac
 }
 function p() {
     geval "$@" ${"$(pbpaste)":q}
@@ -498,20 +557,26 @@ function vsox() {
 	sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
 function sdl() {
-	spotdl -f . -s "$*"
+	  spotdl -f "${spotdl_dir:-.}" -s "$*"
 }
 function pdf-cover() {
-	convert "$1[0]" "$1:r.png"
+	  convert "$1[0]" "$1:r.png"
 }
 function sdlg() {
-	spotdl -f . "$@" && spotdl -f . -l *.txt && \rm *.txt
+    #use with aget
+    spotdl "$@" && spotdl -f "${spotdl_dir:-.}"  -l *.txt && {
+            mkdir -p ./ghosts/
+            mv *.txt ./ghosts/
+        }
 }
 function aget() {
     local u="$(uuidgen)"
+    local err
     cdm "$u"
-    eval "$@" || { ecerr Exited "$e"; l }
-    cd ..
-    \rm -r "$u"
+    eval "$@" && {
+        cd ..
+        \rm -r "$u"
+    } || { err="$?" && ecerr aget "$@" exited "$err"; l ; cd .. ; (exit "$err") }
 }
 function jsummon() {
 	mkdir -p ~/julia_tmp/

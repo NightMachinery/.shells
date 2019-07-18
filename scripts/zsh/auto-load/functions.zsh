@@ -53,3 +53,18 @@ function ls-by-added() {
 #   local cmd=${$(fc -nl -1 -1)/(#b)(*E)(<->)/$match[1]${(l:${#match[2]}::0:)$((match[2]+${1:-1}))}}
 #   geval "$cmd"
 # }
+ins-npm() {
+    zargs -l 1 -- $(cat ~/scripts/setup/node.g) -- npm install -g
+}
+ins-pip() {
+    zargs -l 1 -- ~/scripts/python/**/requirements.txt -- pip install -U -r
+}
+ins-ins() {
+    zargs -n 1 -- $(cat ~/scripts/setup/installables) -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
+}
+ins-linux() {
+    zargs -n 1 -- $(cat ~/scripts/setup/installables-linux) -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
+}
+ins-brew() {
+    brew bundle install --file=~/scripts/setup/brewables
+}
