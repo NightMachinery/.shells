@@ -2,6 +2,10 @@
 ln -s ~/scripts/bash/auto-load ~/bal
 ln -s ~/scripts/zsh/auto-load ~/zal
 
+mkdir -p "$HOME/Downloads/Telegram Desktop/"
+mkdir -p ~/"$music_dir"
+ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
+
 tic -x -o ~/.terminfo ~/scripts/setup/terminfo-24bit.src
 
 ins-brew

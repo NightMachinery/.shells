@@ -1,6 +1,7 @@
 re "silence unalias" map p fd ff
-alias mut="music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop 'mp3|m4a|flac'"
-alias muu='songc --loop-playlist'
+alias mut="music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop '.'"
+alias muu='songc --loop "."'
+alias mup='songc --loop-playlist "."'
 alias mud='songd --loop-playlist'
 alias c='command'
 alias l='exa -al'
