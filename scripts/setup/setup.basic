@@ -4,7 +4,8 @@ ln -s ~/scripts/zsh/auto-load ~/zal
 
 mkdir -p "$HOME/Downloads/Telegram Desktop/"
 mkdir -p ~/"$music_dir"
-ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
+# ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
+ln -s "$HOME/Downloads/" ~/"$music_dir"/d
 
 tic -x -o ~/.terminfo ~/scripts/setup/terminfo-24bit.src
 

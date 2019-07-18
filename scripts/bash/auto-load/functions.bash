@@ -1,5 +1,3 @@
-rm-atime() {
-}
 trs() {
     re 'ec Removing' "$@"
     trash "$@"
@@ -11,8 +9,22 @@ songc() {
     test -z "${p##-*}" && p='.'
     # ec "$p" "${@:0:-1}" 
     # test -z "$p" && set "$@"
-    local f="$(fd --follow -e m4a -e mp3 -e flac "$p" "${music_dir:-$HOME/my-music}" |fzy )"
-    test -e "$f" && hear "${@:1:-1}" "$f"
+    local f
+    f=()
+    local f2="$(playlister "$p")"
+    f+=( ${(@f)f2} )
+    # zsh is messed up with its arrays
+    mkdir -p "${playlist_dir:-$HOME/playlists/tmp}"
+    # ec $#f
+    test $#f -gt 1 && ec "$f2" > "${playlist_dir:-$HOME/playlists/}tmp/$(date)"
+    test -z "$f" || hear "${@:1:-1}" "${(@f)f}"
+}
+playlistc() {
+    local pl="$(fd --follow -t f '.' "${playlist_dir:-$HOME/playlists/}" | fz -q "$*")"
+    test -z "$pl" || { ec "Playing playlist $pl" && hearp "$pl" }
+}
+playlister() {
+    fd --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}" | fz --history "$music_dir/.fzfhist" # -q "$1" 
 }
 songd() {
     #zsh-only
