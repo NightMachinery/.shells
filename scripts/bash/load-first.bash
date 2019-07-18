@@ -54,7 +54,7 @@ function run-on-each() {
     local i
     for i in "${@:2}"
     do
-        eval "$1 '$i'"
+        eval "$1 $i:q"
     done
 }
 function combine-funcs() {

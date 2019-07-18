@@ -1,21 +1,26 @@
-rm-old() {
-    find "${1:-.}" -mindepth 1 -mtime "${2:-+120}" -depth -print -delete
+rm-atime() {
 }
 trs() {
     re 'ec Removing' "$@"
     trash "$@"
 }
 songc() {
-    local f="$(fd "$1" "${music_dir:-$HOME/my-music}" |fzy )"
-    test -e "$f" && hear "${@:2}" "$f"
+    local p="${@: -1}"
+    test -z "${p##-*}" && p='.' ; set ''
+    local f="$(fd "$p" "${music_dir:-$HOME/my-music}" |fzy )"
+    test -e "$f" && hear "${@:1:-1}" "$f"
 }
 songd() {
     #zsh-only
     # Use songc to play already downloaded files.
-    # Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older than 120 days from the cache.
-
-    mkdir -p "${music_dir:=$HOME/my-music/}"
-    test -z "$PRUNE_SONGD_DAYS" || rm-old "$music_dir" "$PRUNE_SONGD_DAYS"
+    # Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.
+    local music_dir="${music_dir:=$HOME/my-music/}/cache"
+    mkdir -p "$music_dir"
+    test -z "$PRUNE_SONGD_DAYS" || {
+        gfind "$music_dir" -mindepth 1 -type d -atime "$PRUNE_SONGD_DAYS" -print -delete
+        # buggy https://unix.stackexchange.com/questions/530896/removing-directories-not-accessed-in-x-days
+    }
+    silence eval '\rm -r -- "$music_dir/"*(-@D)' #not really needed now  #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
     local bp
     { test "$1" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
         bp="$1"
@@ -26,7 +31,6 @@ songd() {
     test "$bp" = "-d" && {
         trs "$(realpath "$spath")"
         trs "$spath"
-        silence eval '\rm -r -- "$music_dir/"*(-@D)' #not really needed now  #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
         (exit 0)
     } || {
     test -e "$spath" && {
