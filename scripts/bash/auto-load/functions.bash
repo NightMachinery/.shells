@@ -477,11 +477,12 @@ swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
 function tsox() {
-	ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
+	silence ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
 }
 function vdsox() {
 	local inp=(*)
-	tsox "$inp" '2.wav' "$@" && swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
+	tsox "$inp" '2.wav' "$@" && silence swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
+	silence jvideo
 }
 function vasox() {
 	local inp=(*)
@@ -489,7 +490,8 @@ function vasox() {
 	\rm -- ^*.mp3
 }
 function vosox() {
-	opusdec --force-wav * - 2> /dev/null | sox - "$(xkcdpass).mp3" -G "$@"
+	opusdec --force-wav * - 2> /dev/null | sox - "brave_n_failed.mp3" -G "$@"
+	silence jopus
 }
 function vsox() {
 	local inp=(*)
@@ -501,10 +503,51 @@ function sdl() {
 function pdf-cover() {
 	convert "$1[0]" "$1:r.png"
 }
+function sdlg() {
+	spotdl -f . "$@" && spotdl -f . -l *.txt && \rm *.txt
+}
 function aget() {
     local u="$(uuidgen)"
     cdm "$u"
     eval "$@" || { ecerr Exited "$e"; l }
     cd ..
     \rm -r "$u"
+}
+function jsummon() {
+	mkdir -p ~/julia_tmp/
+	local u=(*)
+	mv "$u" ~/julia_tmp/
+	realpath ~/julia_tmp/"$u"
+}
+function junsummon() {
+	\rm -r ~/julia_tmp
+}
+function prefix-files() {
+	for file in "${@:2}"
+	do
+		mv "$file" "${file:h}/$1${file:t}"
+	done
+}
+function jpre() {
+	jrm
+	eval "prefix-files $1:q ${jpredicate:-*(D.)}"
+}
+function jvoice() {
+	jpre "voicenote-"
+}
+jvideo() jpre "videonote-"
+jdoc() jpre "fdoc-"
+jstream() jpre "streaming-"
+jmv() {
+	test -e "$jufile" && mv "$jufile" "n_$jufile"
+}
+jrm() {
+	test -e "$jufile" && \rm "$jufile"
+}
+jopus() {
+	jrm
+	local u=(*)
+	ffmpeg -i "$u" -strict -2 "${u:r}.opus"
+	\rm "$u"
+	jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }

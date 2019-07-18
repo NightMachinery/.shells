@@ -18,7 +18,7 @@ alias dlga="deluge-console add"
 alias pk="pkill -9 -i"
 alias laa="ls-by-added"
 alias ys="y-stream"
-alias sb="sbash; szsh"
+alias sb="sbash" #sbash does szsh itself
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
 alias ai="sudo apt install -y"
 alias au="sudo apt upgrade"
@@ -103,4 +103,3 @@ alias emcg="emacsclient -c"
 alias y="noglob youtube-dl --no-playlist"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
-alias summon="mv * ~/tmp/"
