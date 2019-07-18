@@ -1,3 +1,21 @@
+killjobs () {
+    local kill_list="$(jobs)"
+    if [ -n "$kill_list" ]; then
+        # this runs the shell builtin kill, not unix kill, otherwise jobspecs cannot be killed
+        # the `$@` list must not be quoted to allow one to pass any number parameters into the kill
+        # the kill list must not be quoted to allow the shell builtin kill to recognise them as jobspec parameters
+        kill $@ $(gsed --regexp-extended --quiet 's/\[([[:digit:]]+)\].*/%\1/gp' <<< "$kill_list" | tr '\n' ' ')
+    else
+        return 0
+    fi
+}
+redo() {
+    local i
+    for i in {1.."${@: -1}"}
+    do
+                 eval "${@: 1:-1:q}"
+    done
+}
 ks () { kscript ~/kscripts/"$@"; }
 
 cdm ()
