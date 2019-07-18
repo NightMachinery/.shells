@@ -7,7 +7,7 @@ trs() {
 songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
     local p="${@: -1}"
-    # test -z "${p##-*}" && set "$@ ju ." && ec gh
+    test -z "${p##-*}" && set -- "$@" '.'
     test -z "${p##-*}" && p='.'
     # ec "$p" "${@:0:-1}" 
     # test -z "$p" && set "$@"
