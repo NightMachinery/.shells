@@ -6,7 +6,10 @@ trs() {
 }
 songc() {
     local p="${@: -1}"
-    test -z "${p##-*}" && p='.' ; set ''
+    # test -z "${p##-*}" && set "$@ ju ." && ec gh
+    test -z "${p##-*}" && p='.'
+    # ec "$p" "${@:0:-1}" 
+    # test -z "$p" && set "$@"
     local f="$(fd "$p" "${music_dir:-$HOME/my-music}" |fzy )"
     test -e "$f" && hear "${@:1:-1}" "$f"
 }
