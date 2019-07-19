@@ -52,6 +52,20 @@ function psource()
 function silence() {
     { eval "$@:q"  } &> /dev/null
 }
+function nig() {
+	#silence not interactive
+	isI && eval "${@:2:q}" || "$1" "${@:2}"
+}
+sout() {
+	{ eval "$@:q" } > /dev/null
+}
+serr() {
+	{ eval "$@:q" } 2> /dev/null
+}
+alias nisout='nig sout'
+alias niserr='nig serr'
+alias nis='nig silence'
+
 function run-on-each() {
     local i
     for i in "${@:2}"
@@ -131,3 +145,4 @@ function strip() {
     # ec "${STRING%%"$2"}"
 }
 #-------------------------------
+isI() [[ $- == *i* ]] 

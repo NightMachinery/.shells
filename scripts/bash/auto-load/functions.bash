@@ -651,8 +651,8 @@ function sdl() {
         shift
     }
     test -z "$bp" && {
-	      spotdl -f "${spotdl_dir:-.}" -s "$*" } || {
-        sdlg "$bp" "$@"
+	     nisout spotdl -f "${spotdl_dir:-.}" -s "$*" } || {
+        nisout sdlg "$bp" "$@"
     }
 }
 function pdf-cover() {
