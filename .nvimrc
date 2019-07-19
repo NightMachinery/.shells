@@ -1,0 +1,1 @@
+/Users/evar/.config/nvim/init.vim
