@@ -2,9 +2,18 @@ mut() {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop "$*"
 }
 muu() songc --loop "$*"
-mub() songc --loop-playlist "$*" #alBum
+mub() {
+       songc --loop-playlist "$*" #alBum
+}
 mup() playlistc "$@"
-mud() songd --loop-playlist "$*" #Download
+mud() {
+    local bp=()
+    { test "${1}" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
+        bp+="$1"
+        shift
+    }
+    songd "$bp[@]" --loop-playlist "$*" #Download
+}
 svpl() {
     # Save Playlist save-playlist save-pl
     mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
@@ -18,13 +27,16 @@ hearp() {
     local tracks="$(map '$1
 ' "$(cat "${@}")")"
     test -z "$shuf" || tracks="$(ec "$tracks"|shuf)"
+    test -z "$NO_HEARP_TOUCH" && {
+        touch-tracks "${(@f)tracks}"
+    }
     # Don't use mpv's native --shuffle since it MIGHT use autoloaded tracks, also empty string causes a harmless error
     # k shuffles live in mpv (with MY config :D)
     hear --loop-playlist --playlist <(ec "$tracks")
 }
 trs() {
-    re 'ec Removing' "$@"
-    trash "$@"
+    re 'ec Trying to remove' "$@"
+    trash -- "$@"
 }
 songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
@@ -43,7 +55,14 @@ songc() {
     gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
     # ec $#f
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
-    test -z "$f" || hear "${@:1:-1}" "${(@f)f}"
+    test -z "$f" || { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
+}
+touch-tracks() {
+    local track
+    for track in "$@"
+    do
+        test -e "$track" && touch "$track" #"$(bottomdir "$track")"
+    done
 }
 playlistc() {
     local pl="$(fd --follow -t f '.' "${playlist_dir:-$HOME/playlists/}" | fz -q "$*")"
@@ -52,16 +71,23 @@ playlistc() {
 playlister() {
     fd --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}" | fz --history "$music_dir/.fzfhist" # -q "$1" 
 }
+ecdbg() {
+    test -z "$DEBUGME" || {
+        rederr ecerr "$@"
+    }
+}
 songd() {
     #zsh-only
     # Use songc to play already downloaded files.
     # Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.
-    # ecerr "$@"
+    ecdbg "$@"
     local music_dir="${music_dir:=$HOME/my-music/}/cache"
     mkdir -p "$music_dir"
     test -z "$PRUNE_SONGD_DAYS" || {
-        gfind "$music_dir" -mindepth 1 -type d -atime "$PRUNE_SONGD_DAYS" -print -delete
-        # buggy https://unix.stackexchange.com/questions/530896/removing-directories-not-accessed-in-x-days
+        gfind "$music_dir" -mindepth 1 -type f -mtime "$PRUNE_SONGD_DAYS" -print -delete >> "$logdir"/prune_songd 2>&1 | tee
+        # Access time itself is hard to use
+        # https://unix.stackexchange.com/questions/530896/removing-directories-not-accessed-in-x-days
+        # So we TOUCH :')
     }
     silence eval '\rm -r -- "$music_dir/"*(-@D)' #not really needed now  #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
     local bp
@@ -69,6 +95,7 @@ songd() {
         bp="$1"
         shift
     }
+    ecdbg "$@"
     local q="${@: -1}"
     local spath="$music_dir/${q:gs#/# }/"
     test "$bp" = "-d" && {
@@ -77,6 +104,9 @@ songd() {
         (exit 0)
     } || {
     test -e "$spath" && {
+        ecdbg Cache found
+        touch "$(bottomdir "$spath")"
+        touch-tracks "$spath"/*
         hear "${@:1:-1}" "$spath"
         (exit 0)
     } || {
@@ -127,7 +157,11 @@ cdm ()
         cd -P -- "$1"
 }
 
-function cdd () { [ -f "$1" ] && { cd "$(dirname "$1")"; } || { cd "$1"; } ;}
+
+function bottomdir () {
+    [ -f "$1" ] && { ec "$(dirname "$1")"; } || { ec "$1"; } ;}
+function cdd () {
+    cd "$(bottomdir "$1")" }
 
 transfer() { 
     #

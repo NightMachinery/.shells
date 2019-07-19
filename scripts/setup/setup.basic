@@ -1,4 +1,6 @@
 #!/usr/bin/env zsh
+mkdir -p "$logdir"
+
 ln -s ~/scripts/bash/auto-load ~/bal
 ln -s ~/scripts/zsh/auto-load ~/zal
 
