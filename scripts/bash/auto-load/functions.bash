@@ -87,7 +87,8 @@ songd() {
     # Use songc to play already downloaded files.
     # Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.
     ecdbg "$@"
-    local music_dir="${music_dir:=$HOME/my-music/}/cache"
+    local music_dir="${music_dir:=$HOME/my-music/}/${musiccache:-cache}"
+    local musiccache='/' #To avoid recursion. Can't be empty or it'll auto replace.
     mkdir -p "$music_dir"
     test -z "$PRUNE_SONGD_DAYS" || {
         gfind "$music_dir" -mindepth 1 -type f -mtime "$PRUNE_SONGD_DAYS" -print -delete >> "$logdir"/prune_songd 2>&1 | tee
