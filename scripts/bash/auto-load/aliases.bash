@@ -1,11 +1,6 @@
 re "silence unalias" map p fd ff
 alias fz="fzf --bind 'tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top' --color=light -1 -m"
 alias pkmu="pkill -f -- 'mpv.*--no-video'"
-alias mut="music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop"
-alias muu='songc --loop'
-alias mub='songc --loop-playlist' #alBum
-alias mup='playlistc'
-alias mud='songd --loop-playlist' #Download
 alias c='command'
 alias l='exa -al'
 alias lt='l -T'
@@ -100,7 +95,6 @@ alias cask="brew cask"
 alias bi="brew install"
 alias ci="brew cask install"
 alias hear='mpv --keep-open=no --no-video' #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
-alias hearp='hear --loop-playlist --playlist'
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'

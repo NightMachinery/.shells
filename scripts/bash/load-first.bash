@@ -108,9 +108,9 @@ function geval() {
 }
 function ec() {
     if [[ -n $ZSH_VERSION ]]; then
-        print -r "$@"
+        print -r -- "$@"
     else  # bash
-        echo -E "$@"
+        echo -E -- "$@"
     fi
 }
 ecerr() ec "$@" 1>&2

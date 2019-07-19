@@ -1,3 +1,27 @@
+mut() {
+    music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop "$*"
+}
+muu() songc --loop "$*"
+mub() songc --loop-playlist "$*" #alBum
+mup() playlistc "$@"
+mud() songd --loop-playlist "$*" #Download
+svpl() {
+    # Save Playlist save-playlist save-pl
+    mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
+}
+hearp() {
+    local shuf='--shuffle'
+    test "${1}" = '+s' && {
+        shuf=''
+        shift
+    }
+    local tracks="$(map '$1
+' "$(cat "${@}")")"
+    test -z "$shuf" || tracks="$(ec "$tracks"|shuf)"
+    # Don't use mpv's native --shuffle since it MIGHT use autoloaded tracks, also empty string causes a harmless error
+    # k shuffles live in mpv (with MY config :D)
+    hear --loop-playlist --playlist <(ec "$tracks")
+}
 trs() {
     re 'ec Removing' "$@"
     trash "$@"
@@ -14,14 +38,16 @@ songc() {
     local f2="$(playlister "$p")"
     f+=( ${(@f)f2} )
     # zsh is messed up with its arrays
-    mkdir -p "${playlist_dir:-$HOME/playlists/tmp}"
+    local autopl="${playlist_dir:-$HOME/playlists}/autopl/"
+    mkdir -p "$autopl"
+    gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
     # ec $#f
-    test $#f -gt 1 && ec "$f2" > "${playlist_dir:-$HOME/playlists/}tmp/$(date)"
+    test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
     test -z "$f" || hear "${@:1:-1}" "${(@f)f}"
 }
 playlistc() {
     local pl="$(fd --follow -t f '.' "${playlist_dir:-$HOME/playlists/}" | fz -q "$*")"
-    test -z "$pl" || { ec "Playing playlist $pl" && hearp "$pl" }
+    test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp "${(@f)pl}" }
 }
 playlister() {
     fd --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}" | fz --history "$music_dir/.fzfhist" # -q "$1" 
@@ -30,6 +56,7 @@ songd() {
     #zsh-only
     # Use songc to play already downloaded files.
     # Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.
+    # ecerr "$@"
     local music_dir="${music_dir:=$HOME/my-music/}/cache"
     mkdir -p "$music_dir"
     test -z "$PRUNE_SONGD_DAYS" || {
@@ -38,7 +65,7 @@ songd() {
     }
     silence eval '\rm -r -- "$music_dir/"*(-@D)' #not really needed now  #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
     local bp
-    { test "$1" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
+    { test "${1}" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
         bp="$1"
         shift
     }
@@ -577,7 +604,15 @@ function vsox() {
 	sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
 function sdl() {
-	  spotdl -f "${spotdl_dir:-.}" -s "$*"
+    local bp
+    { test "${1[1]}" = "-" } && { # || test "$1" = "-b" || test "$1" = "-p" } && {
+        bp="$1"
+        shift
+    }
+    test -z "$bp" && {
+	      spotdl -f "${spotdl_dir:-.}" -s "$*" } || {
+        sdlg "$bp" "$@"
+    }
 }
 function pdf-cover() {
 	  convert "$1[0]" "$1:r.png"
