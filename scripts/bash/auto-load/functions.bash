@@ -1,9 +1,3 @@
-fsaydbg() {
-    test -z "$DEBUGME" || {
-        rederr ecerr "$@"
-        fsay "$@"
-    }
-}
 mut() {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop "$*"
 }
@@ -61,6 +55,7 @@ songc() {
     gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
     # ec $#f
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
+    ecerr "${@:1:-1}" sep "${(@f)f}" 
     test -z "$f" || { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
 touch-tracks() {
@@ -76,11 +71,6 @@ playlistc() {
 }
 playlister() {
     fd --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}" | fz --history "$music_dir/.fzfhist" # -q "$1" 
-}
-ecdbg() {
-    test -z "$DEBUGME" || {
-        rederr ecerr "$@"
-    }
 }
 songd() {
     #zsh-only
@@ -528,7 +518,20 @@ function tlrlu(){
 	tlrl "$@" -p "$1   "
 }
 function rederr() {
-	(setopt nomultios 2>/dev/null; set -o pipefail; eval "$@:q" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2)3>&1
+	  (setopt nomultios 2>/dev/null; set -o pipefail;
+     # eval "$@:q" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2
+     eval "$@:q" 2>&1 1>&3|color "${errcol:-red}" 1>&2
+    )3>&1
+}
+color() {
+	  printf %s "$fg[$1]"
+	  if (( $# == 1 ))
+	  then
+		    cat
+	  else
+		    ec "${@:2}"
+	  fi
+	  printf %s "$reset_color"
 }
 function raise-blood() ceer rederr.zsh source
 function rp() ceer "$1" realpath

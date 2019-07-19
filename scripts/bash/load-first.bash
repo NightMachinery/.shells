@@ -116,7 +116,17 @@ function ec() {
     fi
 }
 ecerr() ec "$@" 1>&2
-
+ecdbg() {
+    test -z "$DEBUGME" || {
+        errcol="${debugcol:-cyan}" rederr ecerr "$@"
+    }
+}
+fsaydbg() {
+    test -z "$DEBUGME" || {
+        ecdbg "$@"
+        fsay "$@"
+    }
+}
 alias re='run-on-each'
 silence eval 'export jufile=(*)'
 #-------------------------------
