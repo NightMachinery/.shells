@@ -33,13 +33,15 @@ addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
 
 source <(antibody init)
-
+ecdbg "$path"
 psource ~/anaconda/etc/profile.d/conda.sh
 # export PYTHONHOME=/Users/evar/anaconda/bin/
-silence conda deactivate
-silence conda activate
+# silence conda deactivate
+silence conda activate base
 PS1="$(echo $PS1 | sed 's/(base) //') "
 PS1="$(strip "$PS1" ' +') "
+
+ecdbg "$path"
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
 export sgate="198.143.181.179"

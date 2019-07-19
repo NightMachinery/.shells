@@ -517,24 +517,9 @@ function play-and-trash(){
 function tlrlu(){
 	tlrl "$@" -p "$1   "
 }
-function rederr() {
-	  (setopt nomultios 2>/dev/null; set -o pipefail;
-     # eval "$@:q" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2
-     eval "$@:q" 2>&1 1>&3|color "${errcol:-red}" 1>&2
-    )3>&1
-}
-color() {
-	  printf %s "$fg[$1]"
-	  if (( $# == 1 ))
-	  then
-		    cat
-	  else
-		    ec "${@:2}"
-	  fi
-	  printf %s "$reset_color"
-}
+
 function raise-blood() ceer rederr.zsh source
-function rp() ceer "$1" realpath
+function rp() test -e "$1" && realpath "$1" || ceer "$1" realpath
 increment-last () {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'

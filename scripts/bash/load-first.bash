@@ -1,3 +1,4 @@
+# DEBUGME=y
 autoload -U regexp-replace
 
 function eval-dl() 
@@ -130,6 +131,22 @@ function ec() {
     fi
 }
 ecerr() ec "$@" 1>&2
+function rederr() {
+	  (setopt nomultios 2>/dev/null; set -o pipefail;
+     # eval "$@:q" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2
+     eval "$@:q" 2>&1 1>&3|color "${errcol:-red}" 1>&2
+    )3>&1
+}
+color() {
+	  printf %s "$fg[$1]"
+	  if (( $# == 1 ))
+	  then
+		    cat
+	  else
+		    ec "${@:2}"
+	  fi
+	  printf %s "$reset_color"
+}
 ecdbg() {
     test -z "$DEBUGME" || {
         errcol="${debugcol:-cyan}" rederr ecerr "$@"

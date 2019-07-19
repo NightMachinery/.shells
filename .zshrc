@@ -168,4 +168,3 @@ zle -N deer
 bindkey '\ek' deer
 rcLoaded='yes'
 source ~/scripts/zsh/completions.zsh
-
