@@ -5,6 +5,8 @@ PyPDF2
 jedi
 json-rpc
 service_factory
+imdbpy
+neovim
 ipython
 yapf
 spotdl

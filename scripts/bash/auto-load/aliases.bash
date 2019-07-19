@@ -1,4 +1,4 @@
-re "silence unalias" map p fd ff
+re "silence unalias" map p fd ff pip
 alias pksay='pkill speechsynthesisd say'
 alias fz="fzf --bind 'tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top' --color=light -1 -m"
 alias pkmu="pkill -f -- 'mpv.*--no-video'"
@@ -23,9 +23,10 @@ alias ys="y-stream"
 alias sb=". ~/.zshenv"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
 alias ai="sudo apt install -y"
-alias au="sudo apt upgrade"
-alias bre="brew remove"
-alias auu="sudo apt update"
+alias aug="sudo apt upgrade"
+alias brm="brew remove"
+alias bri="brew reinstall"
+alias aup="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
 alias his="history|grep"
 alias sbash='source ~/scripts/bash/load-others.bash'
@@ -81,7 +82,7 @@ alias wh='which'
 alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
-alias pi='pip install -U'
+alias pi='noglob pip install -U'
 alias last-created='\ls -AtU|head -n1' #macOS only
 alias last-accessed='\ls -Atu|head -n1' #macOS only
 alias last-added='ls-by-added |head -n1' #macOS only

@@ -355,10 +355,6 @@ function bii() {
 function whh() {
     wh $(strip "`wh "$1"`" "$1: aliased to ")
 }
-function strip() {
-    local STRING="${1#"$2"}"
-    echo "${STRING%"$2"}"
-}
 function cee() {
     cat `which "$1"`
 }
@@ -421,7 +417,7 @@ function 2p2k() {
     2ko "${1:r}_k2opt.pdf"
 }
 function ins() {
-	eval-dl "bi $1" "ai $1"
+	  eval-dl "brew install $1" "sudo apt install -y $1"
 }
 function e() {
 	echo "${pipestatus[@]}" "${PIPESTATUS[@]}"
@@ -535,6 +531,7 @@ function rederr() {
 	(setopt nomultios 2>/dev/null; set -o pipefail; eval "$@:q" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2)3>&1
 }
 function raise-blood() ceer rederr.zsh source
+function rp() ceer "$1" realpath
 increment-last () {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'
