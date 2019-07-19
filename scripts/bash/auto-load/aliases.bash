@@ -42,13 +42,14 @@ alias ch='cht.sh'
 alias powerdecay="sudo powermetrics -i 1000 --poweravg 1 | grep 'Average cumulatively decayed power score' -A 20"
 alias bu='brew upgrade'
 alias bcu='brew cask upgrade'
-alias ynow='y -f best'
+alias bcrm='brew cask remove'
+alias ynow='y -f best' #No conversion
 alias ddg='ddgr --unsafe -n 6'
 alias dg='ddg --noprompt'
 alias ggg='googler -n 6'
 alias gg='ggg --noprompt'
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
-alias pdc='sdc "$(pbpaste)"'
+alias pdc='p sdc'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias rsp-safe='rsync --human-readable --xattrs --times --partial-dir=.rsync-partial  --info=progress2 -r'
 alias rsp='rsp-safe --delete-after --force-delete' #--ignore-errors will delete even if there are IO errors on sender's side.
@@ -95,7 +96,7 @@ alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
 alias bi="brew install"
-alias ci="brew cask install"
+alias bci="brew cask install"
 alias hear='mpv --keep-open=no --no-video' #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
