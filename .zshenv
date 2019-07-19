@@ -37,6 +37,7 @@ source <(antibody init)
 psource ~/anaconda/etc/profile.d/conda.sh
 # export PYTHONHOME=/Users/evar/anaconda/bin/
 silence conda activate
+PS1="$(echo $PS1 | sed 's/(base) //') "
 export corra="198.143.181.104"
 alias ccorra="echo -n $corra | pbcopy"
 export sgate="198.143.181.179"
