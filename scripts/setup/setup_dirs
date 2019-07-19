@@ -1,0 +1,5 @@
+#!/usr/bin/env zsh
+mkdir -p "$logdir"
+mkdir -p "$HOME/Downloads/Telegram Desktop/"
+mkdir -p ~/"$music_dir"
+

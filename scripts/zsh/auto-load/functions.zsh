@@ -68,3 +68,10 @@ ins-linux() {
 ins-brew() {
     brew bundle install --file=~/scripts/setup/brewables
 }
+ins-all() {
+    ins-brew
+    ins-linux
+    ins-ins
+    ins-pip
+    ins-npm
+}

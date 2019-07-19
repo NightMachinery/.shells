@@ -1,17 +1,3 @@
 #!/usr/bin/env zsh
-mkdir -p "$logdir"
-
-ln -s ~/scripts/bash/auto-load ~/bal
-ln -s ~/scripts/zsh/auto-load ~/zal
-
-mkdir -p "$HOME/Downloads/Telegram Desktop/"
-mkdir -p ~/"$music_dir"
-# ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
-ln -s "$HOME/Downloads/" ~/"$music_dir"/d
-
-tic -x -o ~/.terminfo ~/scripts/setup/terminfo-24bit.src
-
-ins-brew
-ins-ins
-ins-npm
-ins-pip
+ins-all
+re source ./setup_dirs ./setup_links ./setup_misc ./git.config ./setup.cargo ./setup.linux

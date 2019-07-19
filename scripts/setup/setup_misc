@@ -1,0 +1,2 @@
+#!/usr/bin/env zsh
+tic -x -o ~/.terminfo ~/scripts/setup/terminfo-24bit.src
