@@ -1,3 +1,9 @@
+fsaydbg() {
+    test -z "$DEBUGME" || {
+        rederr ecerr "$@"
+        fsay "$@"
+    }
+}
 mut() {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop "$*"
 }
@@ -98,6 +104,8 @@ songd() {
     ecdbg "$@"
     local q="${@: -1}"
     local spath="$music_dir/${q:gs#/# }/"
+    ecdbg "spath: $spath"
+    ecdbg "real spath:"  "$(realpath "$spath")"    
     test "$bp" = "-d" && {
         trs "$(realpath "$spath")"
         trs "$spath"
@@ -111,6 +119,7 @@ songd() {
         (exit 0)
     } || {
         #nonexistent path
+        fsaydbg Cache NOT found
         mkdir -p "$spath"
         test -z "$bp" && {
             spotdl -f "$spath" -s "$q" && { sleep 1 && songd "$@" } || {
