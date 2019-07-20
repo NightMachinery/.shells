@@ -21,7 +21,6 @@ alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all a
 eval-linux alias gnc=nc
 alias dlga="deluge-console add"
 alias pk="pkill -9 -i"
-alias laa="ls-by-added"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
@@ -91,6 +90,10 @@ alias last-created='\ls -AtU|head -n1' #macOS only
 alias last-accessed='\ls -Atu|head -n1' #macOS only
 alias last-added='ls-by-added |head -n1' #macOS only
 alias last-modified='\ls -At|head -n1'
+alias l-c=last-created
+alias l-ac=last-accessed
+alias l-a=last-added
+alias l-m=last-modified
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias eta="etlas exec eta"
 alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
@@ -104,6 +107,10 @@ alias hear='mpv --keep-open=no --no-video' #--no-config  #'ffplay -autoexit -nod
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
+alias l-c=last-created
+alias l-ac=last-accessed
+alias l-a
+alias l-m=last-modified=last-added
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
 alias emc="emacsclient -t"
 alias emcg="emacsclient -c"

@@ -1,3 +1,12 @@
+aga() {
+    ag "$@" ~/scripts/**/alias*
+}
+agf() {
+    ag "$@" ~/scripts/**/functions*
+}
+ags() {
+    ag "$@" ~/.zshenv ~/.zshrc ~/scripts/**/*
+}
 imdb() imdbpy search movie --first "$*"
 playtmp() {
     mkdir -p ~/tmp/delme/
@@ -528,7 +537,7 @@ function months() {
 12. December - 31 days"
 }
 function onla() {
-    eval "$@:q"" ${$(last-added):q}"
+    geval "$@:q"" ${$(last-added):q}"
 }
 function onxla(){
     last-added|xargs -I _ "$@:q"
@@ -537,16 +546,16 @@ function first-file(){
     exa|head -n1
 }
 function onlac(){
-    eval "$@:q"" ${$(last-accessed):q}"
+    geval "$@:q"" ${$(last-accessed):q}"
 }
 function onlm(){
-    eval "$@:q"" ${$(last-modified):q}"
+    geval "$@:q"" ${$(last-modified):q}"
 }
 function onlc(){
-    eval "$@:q"" ${$(last-created):q}"
+    geval "$@:q"" ${$(last-created):q}"
 }
 function onff(){
-    eval "$@:q"" ${$(first-file):q}"
+    geval "$@:q"" ${$(first-file):q}"
 }
 function play-and-trash(){
     #aliased to pat
