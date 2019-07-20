@@ -1,9 +1,17 @@
+imdb() imdbpy search movie --first "$*"
+playtmp() {
+    mkdir -p ~/tmp/delme/
+    cp "$1" ~/tmp/delme/
+    color 0 200 0 Copied "$1" to tmp
+    fsay Copied to tmp
+    pat ~/tmp/delme/"$1:t"
+}
 mut() {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop "$*"
 }
 muu() songc --loop "$*"
 mub() {
-       songc --loop-playlist "$*" #alBum
+    songc --loop-playlist "$*" #alBum
 }
 mup() playlistc "$@"
 mud() {
@@ -43,7 +51,7 @@ songc() {
     local p="${@: -1}"
     test -z "${p##-*}" && set -- "$@" '.'
     test -z "${p##-*}" && p='.'
-    # ec "$p" "${@:0:-1}" 
+    # ec "$p" "${@:0:-1}"
     # test -z "$p" && set "$@"
     local f
     f=()
@@ -55,8 +63,7 @@ songc() {
     gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
     # ec $#f
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
-    ecerr "${@:1:-1}" sep "${(@f)f}" 
-    test -z "$f" || { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
+    ! test -z "$f" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
 touch-tracks() {
     local track
@@ -70,15 +77,15 @@ playlistc() {
     test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp "${(@f)pl}" }
 }
 playlister() {
-    find-music "$@" | fz --history "$music_dir/.fzfhist" # -q "$1" 
+    find-music "$@" | fz --history "$music_dir/.fzfhist" # -q "$1"
 }
 find-music() {
-    fd -c never --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}" 
+    fd -c never --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}"
 }
 songd() {
-    #zsh-only
-    # Use songc to play already downloaded files.
-    # Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.
+    doc 'zsh-only
+    Use songc to play already downloaded files.
+    Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
     ecdbg "$@"
     local music_dir="${music_dir:=$HOME/my-music/}/${musiccache:-cache}"
     local musiccache='/' #To avoid recursion. Can't be empty or it'll auto replace.
@@ -89,7 +96,7 @@ songd() {
         # https://unix.stackexchange.com/questions/530896/removing-directories-not-accessed-in-x-days
         # So we TOUCH :')
     }
-    silence eval '\rm -r -- "$music_dir/"*(-@D)' #not really needed now  #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
+    silence eval '\rm -r -- "$music_dir/"*(-@D)' #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
     local bp
     { test "${1}" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
         bp="$1"
@@ -99,46 +106,59 @@ songd() {
     local q="${@: -1}"
     local spath="$music_dir/${q:gs#/# }/"
     ecdbg "spath: $spath"
-    ecdbg "real spath:"  "$(realpath "$spath")"    
+    ecdbg "real spath:"  "$(realpath "$spath")"
     test "$bp" = "-d" && {
         trs "$(realpath "$spath")"
         trs "$spath"
         (exit 0)
     } || {
-        [[ "$q" =~ "^http" ]] || {
-            colorbg 0 0 255
-            colorfg 0 180 0
-            find-music "$q" #Printing available music   
-            resetcolor
-        }
-    test -e "$spath" && {
-        ecdbg Cache found
-        touch "$(bottomdir "$spath")"
-        touch-tracks "$spath"/*
-        hear "${@:1:-1}" "$spath"
-        (exit 0)
-    } || {
-        #nonexistent path
-        fsaydbg Cache NOT found
-        mkdir -p "$spath"
-        test -z "$bp" && {
-            spotdl -f "$spath" -s "$q" && { sleep 1 && songd "$@" } || {
-                    songd -d "$@"
-                }
+        test -e "$spath" && {
+            ecdbg Cache found
+            touch "$(bottomdir "$spath")"
+            eval 'touch-tracks "$spath"/*' || {
+                ecdbg Could not TOUCH tracks, probably no tracks are available.
+                trs "$spath"
+                (exit 1)
+            } && {
+                hear "${@:1:-1}" "$spath"
+                (exit 0) }
         } || {
-            local bp_name
-            spotdl_dir="$spath" aget sdlg "$bp" "$q:q" '&& bp_name=(./**/*.txt) ' && {
-                local bp_path="$music_dir/${bp_name:t:r:gs/[-_]/ }"
-                mkdir -p "$bp_path"
-                mv "$spath"/*(D) "$bp_path"
-                \rm -r "$spath"
-                ln -s "$bp_path" "$(removeTrailingSlashes "$spath")"
-                sleep 1 && songd "$bp" "$@"
-            } || {
-                songd -d "$@"
+            local usedCache=''
+            [[ "$q" =~ "^http" ]] || {
+                # colorbg 0 0 255
+                # colorfg 0 255 0
+                # find-music "$q" #Printing available music
+                comment 'the -1 autoselect feature of fzf can cause false positives but you can then just interrupt mpv which will make it exit non-zero.'
+                comment "songc currently feeds the query into fd, so it's not fuzzy."
+                songc "$@" && usedCache='y' && return 0
+                # I just learned about `return`, so the usedCache logic is now useless. It's also kind of buggy and returns 1 in case of success.
+                # resetcolor
             }
+            ecdbg "usedCache: $us"
+            test -z "$usedCache" && {
+                #nonexistent path
+                fsaydbg Cache NOT found
+                mkdir -p "$spath"
+                test -z "$bp" && {
+                    spotdl -f "$spath" -s "$q" && { sleep 1 && songd "$@" } || {
+                        songd -d "$@"
+                    }
+                } || {
+                    local bp_name
+                    spotdl_dir="$spath" aget sdlg "$bp" "$q:q" '&& bp_name=(./**/*.txt) ' && {
+                        local bp_path="$music_dir/${bp_name:t:r:gs/[-_]/ }"
+                        mkdir -p "$bp_path"
+                        mv "$spath"/*(D) "$bp_path"
+                        \rm -r "$spath"
+                        ln -s "$bp_path" "$(removeTrailingSlashes "$spath")"
+                        sleep 1 && songd "$bp" "$@"
+                    } || {
+                        songd -d "$@"
+                    }
+                }
             }
-    }}
+        }
+    }
 }
 killjobs () {
     local kill_list="$(jobs)"
@@ -155,7 +175,7 @@ redo() {
     local i
     for i in {1.."${@: -1}"}
     do
-                 eval "${@: 1:-1:q}"
+        eval "${@: 1:-1:q}"
     done
 }
 ks () { kscript ~/kscripts/"$@"; }
@@ -172,7 +192,7 @@ function bottomdir () {
 function cdd () {
     cd "$(bottomdir "$1")" }
 
-transfer() { 
+transfer() {
     #
     # Defines transfer alias and provides easy command line file and folder sharing.
     #
@@ -180,28 +200,28 @@ transfer() {
     #   Remco Verhoef <remco@dutchcoders.io>
     #
     # check arguments
-    if [ $# -eq 0 ]; 
-    then 
+    if [ $# -eq 0 ];
+    then
         echo "No arguments specified. Usage:\necho transfer /tmp/test.md\ncat /tmp/test.md | transfer test.md"
         return 1
     fi
 
     # get temporarily filename, output is written to this file show progress can be showed
     tmpfile=$( mktemp -t transferXXX )
-    
+
     # upload stdin or file
     file=$1
 
-    if tty -s; 
-    then 
-        basefile=$(basename "$file" | sed -e 's/[^a-zA-Z0-9._-]/-/g') 
+    if tty -s;
+    then
+        basefile=$(basename "$file" | sed -e 's/[^a-zA-Z0-9._-]/-/g')
 
         if [ ! -e $file ];
         then
             echo "File $file doesn't exists."
             return 1
         fi
-        
+
         if [ -d $file ];
         then
             # zip directory and transfer
@@ -213,11 +233,11 @@ transfer() {
             # transfer file
             curl --progress-bar --upload-file "$file" "https://transfer.sh/$basefile" >> $tmpfile
         fi
-    else 
+    else
         # transfer pipe
         curl --progress-bar --upload-file "-" "https://transfer.sh/$file" >> $tmpfile
     fi
-    
+
     # cat output link
     cat $tmpfile
 
@@ -246,7 +266,7 @@ function git_sparse_clone() (
     git pull origin master
 )
 
-function rloop_vid() ( 
+function rloop_vid() (
     ffmpeg -i "$1" -filter_complex "[0:v]reverse,fifo[r];[0:v][r] concat=n=2:v=1 [v]" -map "[v]" "$1_rloop.${2:-mp4}"
 )
 
@@ -267,7 +287,7 @@ function mp3-to-mp4() (
     B=$(basename "$1"); D=$(dirname "$1");
     ffmpeg -loop 1 -i "$2" -i "$1" -pix_fmt yuv420p -c:v libx264 -crf 16  -c:a libfdk_aac -vbr 5 -preset veryslow -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2:x=0:y=0:color=black" -shortest "${3:-$D/${B%.*}}.mp4"
     # -c:a copy -r 1
-    )
+)
 function sleepnow() ( sleep "${1:-7}"; pmset sleepnow )
 silent_background() {
     { 1>/dev/null 2>&1 3>&1 eval "$@"& }
@@ -297,7 +317,7 @@ function hi10-multilink() {
     done
     # echo $pArgs
     # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
-    aria2c -j1 -Z  "${(@u)pArgs}" # (u) makes the array elements unique. 
+    aria2c -j1 -Z  "${(@u)pArgs}" # (u) makes the array elements unique.
 }
 function hi10-from-page() {
     # You need to have persistent cookies in lynx, and have logged in.
@@ -313,7 +333,7 @@ function ppgrep() {
             \pgrep "$@" | gxargs --no-run-if-empty ps -fp
             # Linux's pgrep doesn't support -i
             ;;
-        esac
+    esac
 }
 function '$'() { eval "$@" ; }
 
@@ -322,7 +342,7 @@ function timer-raw() {
     eval "sleep $((($1)*60))" && eval "${@:2:q}"
 }
 function ubuntu-upgrade() {
-    sudo apt update 
+    sudo apt update
     sudo apt upgrade
     sudo apt dist-upgrade
 }
@@ -342,7 +362,7 @@ function p() {
 }
 function k2pdf() {
     k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi 450 -y -ui-
-    # -as 
+    # -as
 }
 function display-off() {
     watch -n ${1:-1} brightness 0
@@ -358,7 +378,7 @@ function cee() {
     cat `which "$1"`
 }
 function ceer() {
-	geval "${@:2} $(which "$1")"
+    geval "${@:2} $(which "$1")"
 }
 function setv() {
     #PORTME
@@ -370,10 +390,10 @@ function 265to264() {
 }
 function retry-eval() {
     retry-limited-eval 0 "$@"
-	  # until eval "$@" ; do
-# 		    echo Retrying \'"$*"\' "..." 1>&2
-# 		    sleep 1
-# 	  done
+    # until eval "$@" ; do
+    # 		    echo Retrying \'"$*"\' "..." 1>&2
+    # 		    sleep 1
+    # 	  done
 }
 
 function retry-limited() {
@@ -382,31 +402,31 @@ function retry-limited() {
 function retry-limited-eval() {
     local limit=0
     local ecode=0
-	  until {test "$1" -gt 0 && test $limit -ge "$1"} || { eval "${@:2}" && ecode=0 }
+    until {test "$1" -gt 0 && test $limit -ge "$1"} || { eval "${@:2}" && ecode=0 }
     do
         ecode="$?"
-		    ecerr Tried eval "${@:2}" "..."
-		    sleep 1
+        ecerr Tried eval "${@:2}" "..."
+        sleep 1
         limit=$((limit+1))
-	  done
+    done
     # test $limit -lt "$1" || test "$1" -eq 0
     (exit "$ecode")
 }
 function 2mobi() {
-	ebook-convert "$1" "${1:r}.mobi"
+    ebook-convert "$1" "${1:r}.mobi"
 }
 function 2m2k() {
-	if test "${1:e}" != mobi ; then 2mobi "$1" ; fi
-	2kindle "${1:r}.mobi"
+    if test "${1:e}" != mobi ; then 2mobi "$1" ; fi
+    2kindle "${1:r}.mobi"
 }
 function aap() {
-	  aa "$@" --on-download-complete aa-pToKindle
+    aa "$@" --on-download-complete aa-pToKindle
 }
 function aab() {
-	aa "$@" --on-download-complete aa-toKindle
+    aa "$@" --on-download-complete aa-toKindle
 }
 function 2kindle() {
-	mutt -s "${2:-convert}" -a "$1" -- "${3:-fifya@kindle.com}" <<<hi
+    mutt -s "${2:-convert}" -a "$1" -- "${3:-fifya@kindle.com}" <<<hi
 }
 function 2ko() {
     2kindle "$1" "some_subject" "$2"
@@ -416,13 +436,13 @@ function 2p2k() {
     2ko "${1:r}_k2opt.pdf"
 }
 function ins() {
-	  eval-dl "brew install $1" "sudo apt install -y $1"
+    eval-dl "brew install $1" "sudo apt install -y $1"
 }
 function e() {
-	echo "${pipestatus[@]}" "${PIPESTATUS[@]}"
+    echo "${pipestatus[@]}" "${PIPESTATUS[@]}"
 }
 function ncp() {
-	cat | gnc -c localhost 2000
+    cat | gnc -c localhost 2000
 }
 function magnet2torrent() {
     aria2c -d "${2:-.}" --bt-metadata-only=true --bt-save-metadata=true "$1"
@@ -439,7 +459,7 @@ function rep() {
     "${@:2}" |& ggrep -iP "$1"
 }
 function aas() {
-	  # aa "$@" --on-download-start aa-stream
+    # aa "$@" --on-download-start aa-stream
     local out="$(uuidgen)"
     aa "$@" --dir "$out" --on-download-complete aa-stream &
     retry-mpv "'$out'/*"
@@ -463,7 +483,7 @@ function dl-stream() {
 }
 function set-fk-icon-size() {
     /usr/libexec/PlistBuddy -c "set FK_DefaultIconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finderkit, i.e., dialogs.
-                            }
+}
 function set-finder-icon-size() {
     /usr/libexec/PlistBuddy -c "set StandardViewSettings:IconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finder itself.
 }
@@ -524,7 +544,7 @@ function play-and-trash(){
     mpv "$@" && trs "$1"
 }
 function tlrlu(){
-	tlrl "$@" -p "$1   "
+    tlrl "$@" -p "$1   "
 }
 
 function raise-blood() ceer rederr.zsh source
@@ -541,49 +561,49 @@ function away() {
     nohup "$@" & disown
 }
 function wt1() {
-	curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
+    curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
 function wread() {
     (
         set -o pipefail
-	      mercury-parser --format="${2:-markdown}" "$1" |jq -e --raw-output '.content'
+        mercury-parser --format="${2:-markdown}" "$1" |jq -e --raw-output '.content'
     )
 }
 function random-poemist() {
-	curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
+    curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
 }
 xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
 html2epub-calibre() {
-	local u="$1 $(uuidgen).html"
-	merge-html "${@:3}" > "$u"
-	ebook-convert "$u" "$1.epub" \
-	--authors="$2" \
-	--level1-toc="//*[name()='h1' or name()='h2']" \
-	--level2-toc="//h:h3" \
-	--level3-toc="//*[@class='subsection']" \
-	--page-breaks-before="//*[(name()='h1' or name()='h2') or @class='owner-name']" \
-	--use-auto-toc --toc-threshold=0 \
-	--toc-title="The TOC" \
-	--embed-all-fonts \
-	--title="$1" --epub-inline-toc
-	\rm "$u"
+    local u="$1 $(uuidgen).html"
+    merge-html "${@:3}" > "$u"
+    ebook-convert "$u" "$1.epub" \
+                  --authors="$2" \
+                  --level1-toc="//*[name()='h1' or name()='h2']" \
+                  --level2-toc="//h:h3" \
+                  --level3-toc="//*[@class='subsection']" \
+                  --page-breaks-before="//*[(name()='h1' or name()='h2') or @class='owner-name']" \
+                  --use-auto-toc --toc-threshold=0 \
+                  --toc-title="The TOC" \
+                  --embed-all-fonts \
+                  --title="$1" --epub-inline-toc
+    \rm "$u"
 }
 merge-html() {
-map '
+    map '
 
  <h1>$(strip $1 ".html")</h1>
 
  $(cat $1)' "$@"
- }
+}
 html2epub() {
-	"${h2ed:-html2epub-calibre}" "$@"
+    "${h2ed:-html2epub-calibre}" "$@"
 }
 html2epub-pandoc() {
     # title author htmls
     pandoc --toc -s -f html <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
-} 
+}
 h2e() html2epub "$1" "nIght is long and lonely" "${@:2}"
 web2epub() {
     # title author urls-in-order
@@ -600,16 +620,16 @@ web2epub() {
         i=$((i+1))
 
         retry-limited-eval "${W2E_RETRY:-10}" wread "$url:q" html '>' "$bname:q" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
-                                                                                        ecerr "Failed $url"
-                                                                                        hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
-        }
+                                                                                                                  ecerr "Failed $url"
+                                                                                                                  hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
+            }
     done
 
     test -z "$hasFailed" && { ec "Converting to epub ..."
                               html2epub "$1" "$2" *.html
                               mv *.epub ../ && cd '../' && \rm -r "./$u"
                               ec "Book '$1' by '$2' has been converted successfully."
-                               } || { ecerr "$hasFailed" && (exit 1) }
+    } || { ecerr "$hasFailed" && (exit 1) }
 }
 w2e() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
@@ -621,25 +641,25 @@ swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
 function tsox() {
-	silence ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
+    silence ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
 }
 function vdsox() {
-	local inp=(*)
-	tsox "$inp" '2.wav' "$@" && silence swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
-	silence jvideo
+    local inp=(*)
+    tsox "$inp" '2.wav' "$@" && silence swap-audio "$inp" "${inp:r}.2.wav" "${inp:r}.c.${inp:e}" && \rm -- ^*.c.${inp:e}
+    silence jvideo
 }
 function vasox() {
-	local inp=(*)
-	tsox "$inp" 'c.mp3' "$@"
-	\rm -- ^*.mp3
+    local inp=(*)
+    tsox "$inp" 'c.mp3' "$@"
+    \rm -- ^*.mp3
 }
 function vosox() {
-	opusdec --force-wav * - 2> /dev/null | sox - "brave_n_failed.mp3" -G "$@"
-	silence jopus
+    opusdec --force-wav * - 2> /dev/null | sox - "brave_n_failed.mp3" -G "$@"
+    silence jopus
 }
 function vsox() {
-	local inp=(*)
-	sox "$inp" "${inp:r}_c.mp3" -G "$@"
+    local inp=(*)
+    sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
 function sdl() {
     local bp
@@ -648,12 +668,12 @@ function sdl() {
         shift
     }
     test -z "$bp" && {
-	     nisout spotdl -f "${spotdl_dir:-.}" -s "$*" } || {
+        nisout spotdl -f "${spotdl_dir:-.}" -s "$*" } || {
         nisout sdlg "$bp" "$@"
     }
 }
 function pdf-cover() {
-	  convert "$1[0]" "$1:r.png"
+    convert "$1[0]" "$1:r.png"
 }
 function sdlg() {
     #use with aget
@@ -672,40 +692,40 @@ function aget() {
     } || { err="$?" && ecerr aget "$@" exited "$err"; l ; cd .. ; (exit "$err") }
 }
 function jsummon() {
-	mkdir -p ~/julia_tmp/
-	local u=(*)
-	mv "$u" ~/julia_tmp/
-	realpath ~/julia_tmp/"$u"
+    mkdir -p ~/julia_tmp/
+    local u=(*)
+    mv "$u" ~/julia_tmp/
+    realpath ~/julia_tmp/"$u"
 }
 function junsummon() {
-	\rm -r ~/julia_tmp
+    \rm -r ~/julia_tmp
 }
 function prefix-files() {
-	for file in "${@:2}"
-	do
-		mv "$file" "${file:h}/$1${file:t}"
-	done
+    for file in "${@:2}"
+    do
+        mv "$file" "${file:h}/$1${file:t}"
+    done
 }
 function jpre() {
-	jrm
-	eval "prefix-files $1:q ${jpredicate:-*(D.)}"
+    jrm
+    eval "prefix-files $1:q ${jpredicate:-*(D.)}"
 }
 function jvoice() {
-	jpre "voicenote-"
+    jpre "voicenote-"
 }
 jvideo() jpre "videonote-"
 jdoc() jpre "fdoc-"
 jstream() jpre "streaming-"
 jmv() {
-	test -e "$jufile" && mv "$jufile" "n_$jufile"
+    test -e "$jufile" && mv "$jufile" "n_$jufile"
 }
 jrm() {
-	test -e "$jufile" && \rm "$jufile"
+    test -e "$jufile" && \rm "$jufile"
 }
 jopus() {
-	jrm
-	local u=(*)
-	ffmpeg -i "$u" -strict -2 "${u:r}.opus"
-	\rm "$u"
-	jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
+    jrm
+    local u=(*)
+    ffmpeg -i "$u" -strict -2 "${u:r}.opus"
+    \rm "$u"
+    jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }

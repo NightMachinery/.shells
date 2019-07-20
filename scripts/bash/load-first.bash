@@ -176,6 +176,9 @@ helloworld() {
 comment() {
     
 }
+doc() {
+    #Used for documentation
+}
 printcolors() {
     printf "\x1b[${bg};2;${red};${green};${blue}m\n"
     helloworld
