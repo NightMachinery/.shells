@@ -1,5 +1,6 @@
 re "silence unalias" map p fd ff pip
 alias 2k='2kindle'
+alias zzz='sleepnow'
 alias lad=onla
 alias xlad=onxla
 alias pksay='pkill speechsynthesisd say'
