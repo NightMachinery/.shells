@@ -1,4 +1,7 @@
 re "silence unalias" map p fd ff pip
+alias 2k='2kindle'
+alias lad=onla
+alias xlad=onxla
 alias pksay='pkill speechsynthesisd say'
 alias fz="fzf --bind 'tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top' --color=light -1 -m"
 alias pkmu="pkill -f -- 'mpv.*--no-video'"

@@ -527,17 +527,26 @@ function months() {
 11. November - 30 days
 12. December - 31 days"
 }
-function lad() {
-    eval "$@"" ${$(last-added):q}"
+function onla() {
+    eval "$@:q"" ${$(last-added):q}"
 }
-function xlad(){
-    last-added|xargs -I _ "$@"
+function onxla(){
+    last-added|xargs -I _ "$@:q"
 }
 function first-file(){
     exa|head -n1
 }
-function las(){
-    eval "$@"" ${$(first-file):q}"
+function onlac(){
+    eval "$@:q"" ${$(last-accessed):q}"
+}
+function onlm(){
+    eval "$@:q"" ${$(last-modified):q}"
+}
+function onlc(){
+    eval "$@:q"" ${$(last-created):q}"
+}
+function onff(){
+    eval "$@:q"" ${$(first-file):q}"
 }
 function play-and-trash(){
     #aliased to pat
