@@ -70,7 +70,10 @@ playlistc() {
     test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp "${(@f)pl}" }
 }
 playlister() {
-    fd --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}" | fz --history "$music_dir/.fzfhist" # -q "$1" 
+    find-music "$@" | fz --history "$music_dir/.fzfhist" # -q "$1" 
+}
+find-music() {
+    fd -c never --follow -e m4a -e mp3 -e flac "$*" "${music_dir:-$HOME/my-music}" 
 }
 songd() {
     #zsh-only
@@ -102,6 +105,12 @@ songd() {
         trs "$spath"
         (exit 0)
     } || {
+        [[ "$q" =~ "^http" ]] || {
+            colorbg 0 0 255
+            colorfg 0 180 0
+            find-music "$q" #Printing available music   
+            resetcolor
+        }
     test -e "$spath" && {
         ecdbg Cache found
         touch "$(bottomdir "$spath")"
