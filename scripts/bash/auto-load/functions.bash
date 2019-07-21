@@ -425,8 +425,14 @@ function 2mobi() {
     ebook-convert "$1" "${1:r}.mobi"
 }
 function 2m2k() {
-    if test "${1:e}" != mobi ; then 2mobi "$1" ; fi
-    2kindle "${1:r}.mobi"
+    [[ "$1" =~ 'mobi.az1$' ]] && {
+    	mv "$1" "${1:r}"
+	ecdbg "az1 detected; Renaming to ${1:r}"
+	set -- "${1:r}"
+	} || if test "${1:e}" != mobi ; then 2mobi "$1"
+	set -- "${1:r}.mobi"
+	fi
+    2kindle "$1"
 }
 function aap() {
     aa "$@" --on-download-complete aa-pToKindle
