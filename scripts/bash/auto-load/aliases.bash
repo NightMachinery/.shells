@@ -107,10 +107,6 @@ alias hear='mpv --keep-open=no --no-video' #--no-config  #'ffplay -autoexit -nod
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
-alias l-c=last-created
-alias l-ac=last-accessed
-alias l-a
-alias l-m=last-modified=last-added
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
 alias emc="emacsclient -t"
 alias emcg="emacsclient -c"
