@@ -561,11 +561,14 @@ function play-and-trash(){
     #aliased to pat
     mpv "$@" && trs "$1"
 }
+url-final() {
+curl -Ls -o /dev/null -w %{url_effective} "$@"
+}
 url-tail() {
  [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
  }
 function tlrlu(){
-	tlrl "$@" -p "$(url-tail "$1") | "
+	tlrl "$@" -p "$(url-tail "$(url-final "$1")") | "
 }
 
 function raise-blood() ceer rederr.zsh source
