@@ -426,12 +426,12 @@ function 2mobi() {
 }
 function 2m2k() {
     [[ "$1" =~ 'mobi.az1$' ]] && {
-    	mv "$1" "${1:r}"
-	ecdbg "az1 detected; Renaming to ${1:r}"
-	set -- "${1:r}"
-	} || if test "${1:e}" != mobi ; then 2mobi "$1"
-	set -- "${1:r}.mobi"
-	fi
+        mv "$1" "${1:r}"
+        ecdbg "az1 detected; Renaming to ${1:r}"
+        set -- "${1:r}"
+    } || if test "${1:e}" != mobi ; then 2mobi "$1"
+                                         set -- "${1:r}.mobi"
+    fi
     2kindle "$1"
 }
 function aap() {
@@ -568,13 +568,13 @@ function play-and-trash(){
     mpv "$@" && trs "$1"
 }
 url-final() {
-curl -Ls -o /dev/null -w %{url_effective} "$@"
+    curl -Ls -o /dev/null -w %{url_effective} "$@"
 }
 url-tail() {
- [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
- }
+    [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
+}
 function tlrlu(){
-	tlrl "$@" -p "$(url-tail "$(url-final "$1")") | "
+    tlrl "$@" -p "$(url-tail "$(url-final "$1")") | "
 }
 
 function raise-blood() ceer rederr.zsh source
@@ -594,15 +594,15 @@ function wt1() {
     curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
 function wread() {
-    (
-        set -o pipefail
-	#UDO
-        mercury-parser --format="${2:-markdown}" "$1" |jq -e --raw-output '[
-    (if .title then "# "+.title else empty end),
-    (if .author then .author else empty end),
+    setopt local_options pipefail
+    local title author
+    test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
+    test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
+    mercury-parser --format="${2}" "$1" |jq -e --raw-output '[
+    (if .title then '"$title"' else empty end),
+    (if .author then '"$author"' else empty end),
     .content
 ] | join("\n\n")' #'.content'
-    )
 }
 function random-poemist() {
     curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
@@ -773,7 +773,7 @@ clean-dups() {
 }
 clean-insables() clean-dups "$insables"
 bnu() {
-# brew-no-update
-export HOMEBREW_NO_AUTO_UPDATE=1
+    # brew-no-update
+    export HOMEBREW_NO_AUTO_UPDATE=1
 }
 jclosh() clojure -Sdeps '{:deps {closh {:git/url "https://github.com/dundalek/closh.git" :tag "v0.4.0" :sha "17e62d5bceaa0cb65476e00d10a239a1017ec5b8"}}}' -m closh.zero.frontend.rebel
