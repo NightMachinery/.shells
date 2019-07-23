@@ -596,7 +596,12 @@ function wt1() {
 function wread() {
     (
         set -o pipefail
-        mercury-parser --format="${2:-markdown}" "$1" |jq -e --raw-output '.content'
+	#UDO
+        mercury-parser --format="${2:-markdown}" "$1" |jq -e --raw-output '[
+    (if .title then "# "+.title else empty end),
+    (if .author then .author else empty end),
+    .content
+] | join("\n\n")' #'.content'
     )
 }
 function random-poemist() {
@@ -767,4 +772,8 @@ clean-dups() {
     sort -u "$1" | sponge "$1"
 }
 clean-insables() clean-dups "$insables"
-
+bnu() {
+# brew-no-update
+export HOMEBREW_NO_AUTO_UPDATE=1
+}
+jclosh() clojure -Sdeps '{:deps {closh {:git/url "https://github.com/dundalek/closh.git" :tag "v0.4.0" :sha "17e62d5bceaa0cb65476e00d10a239a1017ec5b8"}}}' -m closh.zero.frontend.rebel
