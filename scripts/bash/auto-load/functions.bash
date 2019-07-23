@@ -759,3 +759,12 @@ jopus() {
     \rm "$u"
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
+insadd() {
+    ec "$1" >> "$insables"
+    ins "$1"
+}
+clean-dups() {
+    sort -u "$1" | sponge "$1"
+}
+clean-insables() clean-dups "$insables"
+
