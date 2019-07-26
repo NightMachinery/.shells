@@ -73,7 +73,7 @@ let g:syntastic_check_on_wq = 0
 syntax enable
 set background=light
 inoremap ii <Esc>
-inoremap jj <BS>
+" inoremap jj <BS>
 
 set number "Shows line numbers
 
@@ -100,3 +100,6 @@ endif
 let g:ycm_server_keep_logfiles = 1
 let g:ycm_server_log_level = 'debug'
 au FileType crontab setlocal bkc=yes
+
+map <Leader>n :NERDTreeFind<CR>
+autocmd BufEnter * lcd %:p:h "  configure Vim so that it sets the working directory to the current file's directory
