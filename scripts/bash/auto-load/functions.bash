@@ -1,11 +1,11 @@
 aga() {
-    ag "$@" ~/scripts/**/alias*
+	ag "$@" ~/scripts/**/alias*(.)
 }
 agf() {
-    ag "$@" ~/scripts/**/functions*
+	ag "$@" ~/scripts/**/functions*(.)
 }
 ags() {
-    ag "$@" ~/.zshenv ~/.zshrc ~/scripts/**/*
+	ag "$@" ~/.zshenv ~/.zshrc ~/scripts/**/*(.)
 }
 imdb() imdbpy search movie --first "$*"
 playtmp() {
@@ -667,7 +667,7 @@ web2epub() {
                               ec "Book '$1' by '$2' has been converted successfully."
     } || { ecerr "$hasFailed" && (exit 1) }
 }
-w2e() {
+w2e-raw() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
 }
 emn() {
@@ -783,4 +783,9 @@ googler -j -w 'spotify.com' --url-handler echo "${(@f)$(google-quote "$@")}"
 }
 google-quote() {
 map '"$1"' "$@"
+}
+w2e-lw-raw() {
+local l="${@:2}"
+zre l 'lesswrong\.com' greaterwrong.com
+web2epub "$1" LessWrong "$l[@]" && 2m2k "$1.epub"
 }
