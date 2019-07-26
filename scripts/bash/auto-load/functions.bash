@@ -477,8 +477,8 @@ file-to-clipboard() {
         -e end \
         "$@"
 }
-function rep() {
-    "${@:2}" |& ggrep -iP "$1"
+function frep() {
+    eval "${@:2:q}" |& ggrep -iP "$1"
 }
 function aas() {
     # aa "$@" --on-download-start aa-stream
@@ -791,7 +791,6 @@ google-quote() {
 map '"$1"' "$@"
 }
 w2e-lw-raw() {
-local l="${@:2}"
-zre l 'lesswrong\.com' greaterwrong.com
-web2epub "$1" LessWrong "$l[@]" && 2m2k "$1.epub"
+web2epub "$1" LessWrong "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
 }
+lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com 
