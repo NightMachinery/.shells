@@ -1,4 +1,4 @@
-[[ $- == *i* ]] && {
+isI && {
 	source ~/scripts/zsh/widgets.zsh
 precmd_pipestatus() {
 RPROMPT="${(j.|.)pipestatus}"

@@ -74,7 +74,7 @@ alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
 alias apx='ALL_PROXY=socks5://127.0.0.1:1080'
 alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
-alias sz='source ~/.zshrc &&'
+alias sin='export FORCE_INTERACTIVE=y ; sb ; source ~/.zshrc ; '
 alias cxc='noglob __calc_plugin'
 alias retry='retry-limited 0'
 alias s=silence

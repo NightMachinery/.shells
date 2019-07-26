@@ -233,4 +233,6 @@ function strip() {
     # ec "${STRING%%"$2"}"
 }
 #-------------------------------
-isI() [[ $- == *i* ]] 
+isI() {
+    ! test -z "$FORCE_INTERACTIVE" || [[ $- == *i* ]]
+}
