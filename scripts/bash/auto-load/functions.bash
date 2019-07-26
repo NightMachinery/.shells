@@ -18,12 +18,13 @@ playtmp() {
 mut() {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop "$*"
 }
-muu() songc --loop "$*"
+muf() songc --loop "$*"
 mub() {
     songc --loop-playlist "$*" #alBum
 }
 mup() playlistc "$@"
-mud() {
+mus() mu "$(@s "$@")"
+mu() {
     local bp=()
     { test "${1}" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
         bp+="$1"
@@ -777,3 +778,9 @@ bnu() {
     export HOMEBREW_NO_AUTO_UPDATE=1
 }
 jclosh() clojure -Sdeps '{:deps {closh {:git/url "https://github.com/dundalek/closh.git" :tag "v0.4.0" :sha "17e62d5bceaa0cb65476e00d10a239a1017ec5b8"}}}' -m closh.zero.frontend.rebel
+@s() {
+googler -j -w 'spotify.com' --url-handler echo "${(@f)$(google-quote "$@")}"
+}
+google-quote() {
+map '"$1"' "$@"
+}
