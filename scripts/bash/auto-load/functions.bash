@@ -1,3 +1,9 @@
+sin() {
+    export FORCE_INTERACTIVE=y
+    sb
+    source ~/.zshrc
+    eval "${@:q}"
+}
 aga() {
 	ag "$@" ~/scripts/**/alias*(.)
 }
