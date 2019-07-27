@@ -477,8 +477,8 @@ file-to-clipboard() {
         -e end \
         "$@"
 }
-function rep() {
-    "${@:2}" |& ggrep -iP "$1"
+function frep() {
+    eval "${@:2:q}" |& ggrep -iP "$1"
 }
 function aas() {
     # aa "$@" --on-download-start aa-stream
@@ -640,6 +640,7 @@ merge-html() {
  $(cat $1)' "$@"
 }
 html2epub() {
+    ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
     "${h2ed:-html2epub-calibre}" "$@"
 }
 html2epub-pandoc() {
@@ -668,7 +669,8 @@ web2epub() {
     done
 
     test -z "$hasFailed" && { ec "Converting to epub ..."
-                              html2epub "$1" "$2" *.html
+    				ecdbg files to send to h2ed *
+                              html2epub "$1" "$2" * #.html
                               mv *.epub ../ && cd '../' && \rm -r "./$u"
                               ec "Book '$1' by '$2' has been converted successfully."
     } || { ecerr "$hasFailed" && (exit 1) }
@@ -795,7 +797,16 @@ google-quote() {
 map '"$1"' "$@"
 }
 w2e-lw-raw() {
-local l="${@:2}"
-zre l 'lesswrong\.com' greaterwrong.com
-web2epub "$1" LessWrong "$l[@]" && 2m2k "$1.epub"
+web2epub "$1" LessWrong "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
+}
+lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com 
+html2epub-pandoc-simple () {
+ ecdbg "h2e-ps called with $@"
+ pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+}
+aa2e() {
+aget "aa -Z ${@:2:q}
+html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
+mv $1:q.epub ../"
+2m2k "$1".epub
 }

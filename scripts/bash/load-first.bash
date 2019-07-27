@@ -1,6 +1,5 @@
 # DEBUGME=y
 autoload -U regexp-replace
-
 function eval-dl() 
 { 
     case "$(uname)" in 
@@ -236,3 +235,10 @@ function strip() {
 isI() {
     ! test -z "$FORCE_INTERACTIVE" || [[ $- == *i* ]]
 }
+rgx() {
+	local a="$1"
+	zre a "$2" "$3"
+	ec "$a"
+}
+
+
