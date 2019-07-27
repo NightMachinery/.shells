@@ -787,7 +787,7 @@ npmadd() {
 }
 biadd() {
     ec "brew \"$1\"" >> "$brewables"
-    npm install -g "$1"
+    bi "$1"
 }
 piadd() {
     ec "$1" >> "$pipables"
