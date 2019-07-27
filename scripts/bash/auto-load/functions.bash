@@ -793,8 +793,7 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 '
 return
     }
-    googleimagesdownload "$@"
-    jup
+    googleimagesdownload "$@" && jup
 }
 insladd() {
     ec "$1" >> "$inslables"
