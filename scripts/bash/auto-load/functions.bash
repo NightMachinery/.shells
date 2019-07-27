@@ -778,7 +778,6 @@ jup() {
 }
 jimg() {
     test "$1" = "-h" && {
-        shift
         ec 'googleimagesdownload --keywords "Polar bears, baloons, Beaches" --limit 20
 googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 
@@ -792,6 +791,7 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 -si <image url> : To download images which are similar to the image in the image URL that you provided (Reverse Image search).
 --specific_site example.com
 '
+return
     }
     googleimagesdownload "$@"
     jup
