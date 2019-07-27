@@ -773,6 +773,29 @@ jopus() {
     \rm "$u"
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
+jup() {
+    mv ./**/*(.) ./
+}
+jimg() {
+    test "$1" = "-h" && {
+        shift
+        ec 'googleimagesdownload --keywords "Polar bears, baloons, Beaches" --limit 20
+googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
+
+--format svg
+-co red : To use color filters for the images
+-u <google images page URL> : To download images from the google images link
+--size medium --type animated
+--usage_rights labeled-for-reuse
+--color_type black-and-white
+--aspect_ratio panoramic
+-si <image url> : To download images which are similar to the image in the image URL that you provided (Reverse Image search).
+--specific_site example.com
+'
+    }
+    googleimagesdownload "$@"
+    jup
+}
 insladd() {
     ec "$1" >> "$inslables"
     ins "$1"
