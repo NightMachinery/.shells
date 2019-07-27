@@ -1,0 +1,1 @@
+insables=~/scripts/setup/installables
