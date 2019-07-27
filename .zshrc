@@ -122,10 +122,6 @@ bindkey -v
 #tic -x -o ~/.terminfo terminfo-24bit.src
 eval-darwin export TERM=xterm-24bits
 
-alias ls="ls -aG" #Somehow sth overrides it from .zshenv :(
-alias d='fasd -d'        # directory
-export GEM_HOME="$HOME/.gem"
-addToPATH "$GEM_HOME/bin:$PATH"
 
 # start typing + [Up-Arrow] - fuzzy find history forward
 if [[ "${terminfo[kcuu1]}" != "" ]]; then

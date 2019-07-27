@@ -31,6 +31,8 @@ addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
 addToPATH "$HOME/kscripts/"
 addToPATH "/usr/libexec/"
+export GEM_HOME="$HOME/.gem"
+addToPATH "$GEM_HOME/bin:$PATH"
 
 source <(antibody init)
 ecdbg "$path"

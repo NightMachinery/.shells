@@ -775,6 +775,10 @@ insadd() {
     ec "$1" >> "$insables"
     ins "$1"
 }
+piadd() {
+    ec "$1" >> "$pipables"
+    pi "$1"
+}
 clean-dups() {
     sort -u "$1" | sponge "$1"
 }
