@@ -794,3 +794,6 @@ w2e-lw-raw() {
 web2epub "$1" LessWrong "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
 }
 lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com 
+html2epub-pandoc-simple () {
+ pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+}

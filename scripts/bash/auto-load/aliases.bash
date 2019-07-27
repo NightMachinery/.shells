@@ -116,3 +116,4 @@ alias tl='noglob tlrl'
 alias w2e='noglob w2e-raw'
 alias w2e-lw='noglob w2e-lw-raw'
 alias dpandoc="h2ed='html2epub-pandoc' "
+alias dpandocs="h2ed=html2epub-pandoc-simple"
