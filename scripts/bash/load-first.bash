@@ -118,8 +118,8 @@ function ruu() {
 }
 function geval() {
     local cmd="$@"
-    ec "$cmd"
-    print -r -S -- "$cmd" #Add to history
+    test -z "$ge_no_ec" && ec "$cmd"
+    test -z "$ge_no_hist" && print -r -S -- "$cmd" #Add to history
     eval -- "$cmd"
 }
 function ec() {

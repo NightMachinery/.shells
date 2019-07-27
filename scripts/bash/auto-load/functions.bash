@@ -585,7 +585,7 @@ function tlrlu(){
 }
 
 function raise-blood() ceer rederr.zsh source
-function rp() test -e "$1" && realpath "$1" || ceer "$1" realpath
+function rp() test -e "$1" && realpath "$1" || ge_no_hist=y ceer "$1" realpath
 increment-last () {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'
@@ -773,9 +773,21 @@ jopus() {
     \rm "$u"
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
+insladd() {
+    ec "$1" >> "$inslables"
+    ins "$1"
+}
 insadd() {
     ec "$1" >> "$insables"
     ins "$1"
+}
+npmadd() {
+    ec "$1" >> "$nodables"
+    npm install -g "$1"
+}
+biadd() {
+    ec "brew \"$1\"" >> "$brewables"
+    npm install -g "$1"
 }
 piadd() {
     ec "$1" >> "$pipables"
@@ -784,7 +796,9 @@ piadd() {
 clean-dups() {
     sort -u "$1" | sponge "$1"
 }
-clean-insables() clean-dups "$insables"
+clean-deps() {
+    re clean-dups "$insables" "$inslables" "$nodables" "$brewables" "$pipables"   
+}
 bnu() {
     # brew-no-update
     export HOMEBREW_NO_AUTO_UPDATE=1

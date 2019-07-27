@@ -11,3 +11,5 @@ ipython
 yapf
 spotdl
 xkcdpass
+google_images_download
+google_images_download

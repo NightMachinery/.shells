@@ -38,7 +38,7 @@ source <(antibody init)
 ecdbg "$path"
 psource ~/anaconda/etc/profile.d/conda.sh
 # export PYTHONHOME=/Users/evar/anaconda/bin/
-# silence conda deactivate
+silence conda deactivate #this is necessary try sbing and you'll see
 silence conda activate base
 PS1="$(echo $PS1 | sed 's/(base) //') "
 PS1="$(strip "$PS1" ' +') "
