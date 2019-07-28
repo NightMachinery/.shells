@@ -6,3 +6,4 @@ export LC_ALL="en_US.UTF-8" #set locale; use sudo locale-gen to create them. upd
 music_dir="$HOME/my-music/"
 logdir="$HOME/logs/"
 PRUNE_SONGD_DAYS="+120"
+export NODE_PATH="/usr/local/lib/node_modules/:/usr/lib/nodejs:/usr/lib/node_modules:/usr/share/javascript:$NODE_PATH"
