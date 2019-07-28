@@ -267,4 +267,5 @@ function add-path {
         *":$2:"*) :;; # already there
         *) '"$1"'="$2:$p";; # org/r PATH="$PATH:$1"
     esac' }
+    eval "export $1"
 }
