@@ -112,10 +112,13 @@ function force-expand {
     echo "$e"
 }
 function ruu() {
+    local f=()
+    test -z "$1" || f+="$1"
     local a="$(force-expand "$2")"
     a="$(strip "$a" 'noglob ')"
-    "$1" "$=a" "${@:3}"
+    "$f[@]" "$=a" "${@:3}"
 }
+alias noglob='noglob ruu ""'
 function geval() {
     local cmd="$@"
     test -z "$ge_no_ec" && ec "$cmd"

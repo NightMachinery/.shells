@@ -846,3 +846,9 @@ html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
 2m2k "$1".epub
 }
+erase-ansi() {
+  gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
+}
+ea() {
+ eval "$@:q" | erase-ansi
+ }
