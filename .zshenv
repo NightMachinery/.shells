@@ -1,18 +1,5 @@
-autoload -U zargs #Necessary for scripts
-
 
 source "$HOME/scripts/bash/load-first.bash"
-typeset -Ug path
-function addToPATH {
-   # case ":$PATH:" in
-   #     *":$1:"*) :;; # already there
-   #     *) PATH="$1:$PATH";; # org/r PATH="$PATH:$1"
-   # esac
-   #path[1,0]="$1"
-   #path=("$1" "$path[@]")
-   PATH="$1:$PATH"
-   typeset -Ug path
-}
 
 if ! (( $+commands[brew] )) ; then
 test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
