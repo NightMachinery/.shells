@@ -696,7 +696,7 @@ w2e-raw() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
 }
 w2e-o() {
-    wr_force=y w2e "$1" "${(@f)$(outlinify "${@:2}")}"
+    wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 emn() {
     emc -e "(woman \"$*\")"
