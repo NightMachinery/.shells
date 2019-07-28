@@ -176,7 +176,7 @@ songd() {
         }
     }
 }
-killjobs () {
+killjobs() {
     local kill_list="$(jobs)"
     if [ -n "$kill_list" ]; then
         # this runs the shell builtin kill, not unix kill, otherwise jobspecs cannot be killed
@@ -194,18 +194,18 @@ redo() {
         eval "${@: 1:-1:q}"
     done
 }
-ks () { kscript ~/kscripts/"$@"; }
+ks() { kscript ~/kscripts/"$@"; }
 
-cdm ()
+cdm()
 {
     mkdir -p -- "$1" &&
         cd -P -- "$1"
 }
 
 
-function bottomdir () {
+function bottomdir() {
     [ -f "$1" ] && { ec "$(dirname "$1")"; } || { ec "$1"; } ;}
-function cdd () {
+function cdd() {
     cd "$(bottomdir "$1")" }
 
 transfer() {
@@ -586,7 +586,7 @@ function tlrlu(){
 
 function raise-blood() ceer rederr.zsh source
 function rp() test -e "$1" && realpath "$1" || ge_no_hist=y ceer "$1" realpath
-increment-last () {
+increment-last() {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'
     #ec "$pe"
@@ -600,16 +600,33 @@ function away() {
 function wt1() {
     curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
+outlinify() {
+    map 'https://outline.com/$1' "$@"
+}
 function wread() {
     setopt local_options pipefail
     local title author
     test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
     test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
-    mercury-parser --format="${2}" "$1" |jq -e --raw-output '[
+    { test -z "$wr_force" && mercury-parser --format="${2}" "$1" || {
+              aget "full-html $1:q ./a.html
+# l
+# cat ./a.html
+mercury-html $1:q ./a.html $2:q"
+          } } |jq -e --raw-output '[
     (if .title then '"$title"' else empty end),
     (if .author then '"$author"' else empty end),
     .content
 ] | join("\n\n")' #'.content'
+}
+function mercury-html() {
+    doc USAGE: url html-file output-mode
+    serr mercury-html.js "$@"
+}
+function full-html() {
+    doc splash should be up. https://splash.readthedocs.io
+    doc 'wait always waits the full time. Should be strictly < timeout.'
+    curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
 }
 function random-poemist() {
     curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
@@ -677,6 +694,9 @@ web2epub() {
 }
 w2e-raw() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
+}
+w2e-o() {
+    wr_force=y w2e "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 emn() {
     emc -e "(woman \"$*\")"
@@ -836,7 +856,7 @@ w2e-lw-raw() {
 web2epub "$1" LessWrong "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
 }
 lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com 
-html2epub-pandoc-simple () {
+html2epub-pandoc-simple() {
  ecdbg "h2e-ps called with $@"
  pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
