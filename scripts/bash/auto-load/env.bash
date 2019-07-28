@@ -7,5 +7,7 @@ music_dir="$HOME/my-music/"
 logdir="$HOME/logs/"
 PRUNE_SONGD_DAYS="+120"
 
-silence eval "re 'add-path NODE_PATH' /home/linuxbrew/.linuxbrew/Cellar/node/**/node_modules/"
+silence eval "node_home=(/home/linuxbrew/.linuxbrew/Cellar/node/**~node_modules)"
+node_home="$node_home/node_modules/"
+test -d "$node_home" && add-path NODE_PATH "$node_home"
 re 'add-path NODE_PATH' '/usr/local/lib/node_modules/' '/usr/lib/nodejs' '/usr/lib/node_module' '/usr/share/javascript'
