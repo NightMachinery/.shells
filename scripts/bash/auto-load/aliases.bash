@@ -4,7 +4,7 @@ alias zzz='sleepnow'
 alias lad=onla
 alias xlad=onxla
 alias pksay='pkill speechsynthesisd say'
-alias fz="fzf --bind 'tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top' --color=light -1 -m"
+alias fz="fzf-noempty --bind 'tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top' --color=light -1 -m"
 alias pkmu="pkill -f -- 'mpv.*--no-video'"
 alias c='command'
 alias l='exa -al'
