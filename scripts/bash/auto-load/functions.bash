@@ -792,7 +792,6 @@ jup() {
 }
 jimg() {
     test "$1" = "-h" && {
-        shift
         ec 'googleimagesdownload --keywords "Polar bears, baloons, Beaches" --limit 20
 googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 
@@ -806,9 +805,9 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 -si <image url> : To download images which are similar to the image in the image URL that you provided (Reverse Image search).
 --specific_site example.com
 '
+return
     }
-    googleimagesdownload "$@"
-    jup
+    googleimagesdownload "$@" && jup
 }
 insladd() {
     ec "$1" >> "$inslables"
@@ -861,3 +860,9 @@ html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
 2m2k "$1".epub
 }
+erase-ansi() {
+  gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
+}
+ea() {
+ eval "$@:q" | erase-ansi
+ }
