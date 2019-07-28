@@ -12,3 +12,4 @@ spotdl
 wikiquotes
 xkcdpass
 yapf
+git+https://github.com/wustho/epr.git

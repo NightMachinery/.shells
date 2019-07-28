@@ -600,6 +600,9 @@ function away() {
 function wt1() {
     curl -s 'wttr.in/{'"${1:-Tehran,Sabzevar,Kish,Mashhad,نمک‌آبرود,اردبیل}"'}?format="%l:+%C+%c+%t+%h+%w+%m+%M+%p"&m'
 }
+outlinify() {
+    map 'https://outline.com/$1' "$@"
+}
 function wread() {
     setopt local_options pipefail
     local title author
@@ -691,6 +694,9 @@ web2epub() {
 }
 w2e-raw() {
     web2epub "$1" "nIght is long and lonely" "${@:2}" && 2m2k "$1.epub"
+}
+w2e-o() {
+    wr_force=y w2e "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 emn() {
     emc -e "(woman \"$*\")"
