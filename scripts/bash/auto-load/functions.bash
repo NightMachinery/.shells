@@ -872,3 +872,7 @@ erase-ansi() {
 ea() {
  eval "$@:q" | erase-ansi
  }
+fzf-noempty() {
+    local in="$(</dev/stdin)"
+    test -z "$in" && (exit 130) || { ec "$in" | fzf "$@" }
+}
