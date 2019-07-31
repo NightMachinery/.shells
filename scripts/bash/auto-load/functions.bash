@@ -377,7 +377,7 @@ function p() {
     geval "$@" ${"$(pbpaste)":q}
 }
 function k2pdf() {
-    k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi 450 -y -ui-
+    nis k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi 450 -y -ui-
     # -as
 }
 function display-off() {
@@ -875,4 +875,25 @@ ea() {
 fzf-noempty() {
     local in="$(</dev/stdin)"
     test -z "$in" && (exit 130) || { ec "$in" | fzf "$@" }
+}
+tldr() nig ea command tldr "$@"
+function agr { 
+doc 'usage: from=sth to=another agr [ag-args]'
+comment -l --files-with-matches
+
+ag -0 -l "$from" "${@}" | pre-files "$from" "$to"
+}
+pre-files() {
+doc 'stdin should be null-separated list of files that need replacement; $1 the string to replace, $2 the replacement.'
+comment '-i backs up original input files with the supplied extension (leave empty for no backup; needed for in-place replacement.)(do not put whitespace between -i and its arg.)'
+comment '-r, --no-run-if-empty
+              If  the  standard input does not contain any nonblanks,
+              do not run the command.  Normally, the command  is  run
+              once  even  if there is no input.  This option is a GNU
+              extension.'
+
+AGR_FROM="$1" AGR_TO="$2" xargs -r0 perl -pi.pbak -e 's/$ENV{AGR_FROM}/$ENV{AGR_TO}/g'
+}
+pdf-count() {
+pdfinfo "$1" | grep Pages|awk '{print $2}' 
 }
