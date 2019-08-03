@@ -146,11 +146,14 @@ songd() {
                 # find-music "$q" #Printing available music
                 comment 'the -1 autoselect feature of fzf can cause false positives but you can then just interrupt mpv which will make it exit non-zero.'
                 comment "songc currently feeds the query into fd, so it's not fuzzy."
-                songc "$@" && usedCache='y' && return 0
+                # ecdbg "Calling songc with: "
+                # re 'ecdbg "arg: "' "$@"
+                # ecdbg "music_dir: $music_dir"
+                music_dir="${music_dir:h}" songc "$@" && { usedCache='y' && return 0 } || ecdbg "songc exited $?"
                 # I just learned about `return`, so the usedCache logic is now useless. It's also kind of buggy and returns 1 in case of success.
                 # resetcolor
             }
-            ecdbg "usedCache: $us"
+            ecdbg "usedCache: $usedCache"
             test -z "$usedCache" && {
                 #nonexistent path
                 fsaydbg Cache NOT found
@@ -482,9 +485,9 @@ function frep() {
 }
 function aas() {
     # aa "$@" --on-download-start aa-stream
-    local out="$(uuidgen)"
+    local out="$(md5 <<<"$1")"
     aa "$@" --dir "$out" --on-download-complete aa-stream &
-    retry-mpv "'$out'/*"
+    retry-mpv "'$out'/*" || kill %
 }
 function y-stream() {
     y -f best  -o "%(title)s.%(ext)s" "$@" &
