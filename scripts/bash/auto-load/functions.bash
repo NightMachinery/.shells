@@ -758,7 +758,7 @@ function aget() {
         ecdbg ag_f: "$ag_f"
     }
     cd "$u"
-    jufile=(./*(D))
+    test -e "$ag_f" && jufile=(./*(D))
     ecdbg jufile: "$jufile"
     eval "$@" && {
         cd ..
@@ -914,11 +914,12 @@ k2pdf-split() {
     local s=0 pc="$(pdf-count "$1")" p="${k2_pages:-100}"
     local e i=0
     e=$[s+p]
-    test $s -gt $pc || {
+    until test $s -gt $pc
+    do
         k2pdf "$@" -p "$s-$e" -o "%fp$i %b _pages ${s} to ${e}.pdf"
         e=$[s+p]
         i=$[i+1]
-    }
+    done
 }
 jaaks() {
     jee
