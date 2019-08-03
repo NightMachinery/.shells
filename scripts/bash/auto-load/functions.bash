@@ -917,6 +917,7 @@ k2pdf-split() {
     until test $s -gt $pc
     do
         k2pdf "$@" -p "$s-$e" -o "%fp$i %b _pages ${s} to ${e}.pdf"
+        s=$e
         e=$[s+p]
         i=$[i+1]
     done
