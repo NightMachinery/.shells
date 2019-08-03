@@ -380,7 +380,7 @@ function p() {
     geval "$@" ${"$(pbpaste)":q}
 }
 function k2pdf() {
-    nis k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi 450 -y -ui-
+    nis k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi "${k2_odpi:-450}" -y -ui-
     # -as
 }
 function display-off() {
@@ -400,7 +400,7 @@ function ceer() {
     geval "${@:2} $(which "$1")"
 }
 function setv() {
-    #PORTME
+    doc macOnly
     osascript -e "set volume output volume $1"
 }
 function 265to264() {
@@ -917,6 +917,7 @@ k2pdf-split() {
     until test $s -gt $pc
     do
         k2pdf "$@" -p "$s-$e" -o "%fp$i %b _pages ${s} to ${e}.pdf"
+        s=$e
         e=$[s+p]
         i=$[i+1]
     done
@@ -939,7 +940,11 @@ jks() {
     re 2ko *
 }
 ensure-ju() {
-    test -e "$jufile"
+    test -e "$jufile" || { ecerr "jufile doesn't exist"
+                           return 1 }
+    local files=(*)
+    test -e "$files" || { ecerr "jufile error: $jufile"
+                          return 1 }
 }
 ensure-empty() {
     (silence eval 'comment *(D)') && {
