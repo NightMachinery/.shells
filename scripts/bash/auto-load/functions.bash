@@ -912,11 +912,12 @@ pdfinfo "$1" | grep Pages|awk '{print $2}'
 k2pdf-split() {
     doc usage: pdf k2pdf-options
     local s=0 pc="$(pdf-count "$1")" p="${k2_pages:-100}"
-    local e
+    local e i=0
     e=$[s+p]
     test $s -gt $pc || {
-        k2pdf "$@" -p "$s-$e" -o "%s ${s} to ${e} k2opt.pdf"
+        k2pdf "$@" -p "$s-$e" -o "%f/p $i %b _pages ${s} to ${e}.pdf"
         e=$[s+p]
+        i=$[i+1]
     }
 }
 jaaks() {
