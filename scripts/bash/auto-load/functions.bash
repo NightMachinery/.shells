@@ -609,7 +609,7 @@ function wread() {
     test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
     test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
     { test -z "$wr_force" && mercury-parser --format="${2}" "$1" || {
-              aget "full-html $1:q ./a.html
+              fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html
 # l
 # cat ./a.html
 mercury-html $1:q ./a.html $2:q"
