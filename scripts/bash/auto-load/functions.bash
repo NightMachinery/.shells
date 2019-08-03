@@ -907,7 +907,7 @@ k2pdf-split() {
     e=$[s+p]
     test $s -gt $pc && {
         ecdbg Calling k2pdf "$@" -p "$s-$e"
-        k2pdf "$@" -p "$s-$e"
+        k2pdf "$@" -p "$s-$e" -o "%s_$s_to_$e_k2opt"
         e=$[s+p]
     }
 }
