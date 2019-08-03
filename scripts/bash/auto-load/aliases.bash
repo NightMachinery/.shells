@@ -1,4 +1,6 @@
 re "silence unalias" map p fd ff pip
+alias jee='ensure-empty || return 1'
+alias jej='ensure-ju || return 1'
 alias 2k='2kindle'
 alias zzz='sleepnow'
 alias lad=onla

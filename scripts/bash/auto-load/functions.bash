@@ -751,8 +751,13 @@ function sdlg() {
 }
 function aget() {
     local u="$(uuidgen)"
-    local err
-    cdm "$u"
+    local erri jufile
+    mkdir -p "$u"
+    test -e "$ag_f" && {
+        cp "$ag_f" ./"$u"/
+        jufile=(./"$u"/*(D))
+    }
+    cd "$u"
     eval "$@" && {
         cd ..
         \rm -r "$u"
@@ -910,4 +915,27 @@ k2pdf-split() {
         k2pdf "$@" -p "$s-$e" -o "%s_$s_to_$e_k2opt"
         e=$[s+p]
     }
+}
+jaaks() {
+    jee
+    aa "$@"
+    local ag_f=(*)
+    aget jks
+    jup
+}
+jks() {
+    jej
+    local orig=(*)
+    k2pdf-split "$orig"
+    \rm "$orig"
+    re 2ko *
+}
+ensure-ju() {
+    test -e "$jufile"
+}
+ensure-empty() {
+    (comment *(D)) && {
+        ecerr Directory "$(pwd)" not empty
+        return 1
+    } || return 0
 }
