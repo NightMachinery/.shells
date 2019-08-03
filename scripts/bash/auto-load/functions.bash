@@ -755,9 +755,11 @@ function aget() {
     mkdir -p "$u"
     test -e "$ag_f" && {
         cp "$ag_f" ./"$u"/
-        jufile=(./"$u"/*(D))
+        ecdbg ag_f: "$ag_f"
     }
     cd "$u"
+    jufile=(./*(D))
+    ecdbg jufile: "$jufile"
     eval "$@" && {
         cd ..
         \rm -r "$u"
@@ -802,7 +804,9 @@ jopus() {
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
 jup() {
-    mv ./**/*(.) ./
+    # ecdbg ./**(D)
+    rex "mv _ ${1:-./}" ./**/*(.D)
+    #possibly silence it
 }
 jimg() {
     test "$1" = "-h" && {
@@ -911,7 +915,6 @@ k2pdf-split() {
     local e
     e=$[s+p]
     test $s -gt $pc || {
-        ecdbg Calling k2pdf "$@" -p "$s-$e" -o "%s_$s_to_$e_k2opt.pdf"
         k2pdf "$@" -p "$s-$e" -o "%s ${s} to ${e} k2opt.pdf"
         e=$[s+p]
     }
@@ -920,13 +923,16 @@ jaaks() {
     jee
     aa "$@"
     local ag_f=(*)
-    aget jks
-    jup
+    aget 'jks ; jup ../'
 }
 jks() {
+    ecdbg entering jks with jufile "$jufile"
     jej
+    ecdbg trying to set orig
     local orig=(*)
+    ecdbg orig: "$orig"
     k2pdf-split "$orig"
+    ecdbg "trying to rm $orig"
     \rm "$orig"
     re 2ko *
 }
@@ -934,7 +940,7 @@ ensure-ju() {
     test -e "$jufile"
 }
 ensure-empty() {
-    (comment *(D)) && {
+    (silence eval 'comment *(D)') && {
         ecerr Directory "$(pwd)" not empty
         return 1
     } || return 0
