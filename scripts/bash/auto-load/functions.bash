@@ -915,7 +915,7 @@ k2pdf-split() {
     local e i=0
     e=$[s+p]
     test $s -gt $pc || {
-        k2pdf "$@" -p "$s-$e" -o "%f/p $i %b _pages ${s} to ${e}.pdf"
+        k2pdf "$@" -p "$s-$e" -o "%fp $i %b _pages ${s} to ${e}.pdf"
         e=$[s+p]
         i=$[i+1]
     }
