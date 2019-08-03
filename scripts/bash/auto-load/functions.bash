@@ -905,7 +905,7 @@ k2pdf-split() {
     local s=0 pc="$(pdf-count "$1")" p="${k2_pages:-100}"
     local e
     e=$[s+p]
-    test $s -gt $pc && {
+    test $s -gt $pc || {
         ecdbg Calling k2pdf "$@" -p "$s-$e"
         k2pdf "$@" -p "$s-$e" -o "%s_$s_to_$e_k2opt"
         e=$[s+p]
