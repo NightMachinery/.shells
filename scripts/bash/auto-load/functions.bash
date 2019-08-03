@@ -900,3 +900,14 @@ AGR_FROM="$1" AGR_TO="$2" xargs -r0 perl -pi.pbak -e 's/$ENV{AGR_FROM}/$ENV{AGR_
 pdf-count() {
 pdfinfo "$1" | grep Pages|awk '{print $2}' 
 }
+k2pdf-split() {
+    doc usage: pdf k2pdf-options
+    local s=0 pc="$(pdf-count "$1")" p="${k2_pages:-100}"
+    local e
+    e=$[s+p]
+    test $s -gt $pc && {
+        ecdbg Calling k2pdf "$@" -p "$s-$e"
+        k2pdf "$@" -p "$s-$e"
+        e=$[s+p]
+    }
+}
