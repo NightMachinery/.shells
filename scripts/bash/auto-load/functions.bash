@@ -947,3 +947,12 @@ ensure-empty() {
         return 1
     } || return 0
 }
+get-dl-link() {
+ec "${dl_base_url:-http://lilf.ir:8080/}$(realpath --relative-to ~/Downloads "$1")"
+}
+jdl() {
+jej
+mkdir -p ~/Downloads/tmp/
+mv "$jufile" ~/Downloads/tmp/
+get-dl-link ~/Downloads/tmp/"${jufile:t}"
+}
