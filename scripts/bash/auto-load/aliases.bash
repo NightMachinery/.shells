@@ -122,3 +122,4 @@ alias dcali="h2ed='html2epub-calibre' "
 alias dpan="h2ed='html2epub-pandoc' "
 alias dpans="h2ed=html2epub-pandoc-simple"
 alias carbon='carbon-now --headless --copy'
+alias glances='glances --theme-white'
