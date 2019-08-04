@@ -5,13 +5,13 @@ sin() {
     eval "${@:q}"
 }
 aga() {
-	ag "$@" ~/scripts/**/alias*(.)
+    ag "$@" ~/scripts/**/alias*(.)
 }
 agf() {
-	ag "$@" ~/scripts/**/functions*(.)
+    ag "$@" ~/scripts/**/functions*(.)
 }
 ags() {
-	ag "$@" ~/.zshenv ~/.zshrc ~/scripts/**/*(.)
+    ag "$@" ~/.zshenv ~/.zshrc ~/scripts/**/*(.)
 }
 imdb() imdbpy search movie --first "$*"
 playtmp() {
@@ -689,7 +689,7 @@ web2epub() {
     done
 
     test -z "$hasFailed" && { ec "Converting to epub ..."
-    				ecdbg files to send to h2ed *
+                              ecdbg files to send to h2ed *
                               html2epub "$1" "$2" * #.html
                               mv *.epub ../ && cd '../' && \rm -r "./$u"
                               ec "Book '$1' by '$2' has been converted successfully."
@@ -823,7 +823,7 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 -si <image url> : To download images which are similar to the image in the image URL that you provided (Reverse Image search).
 --specific_site example.com
 '
-return
+        return
     }
     googleimagesdownload "$@" && jup
 }
@@ -859,55 +859,55 @@ bnu() {
 }
 jclosh() clojure -Sdeps '{:deps {closh {:git/url "https://github.com/dundalek/closh.git" :tag "v0.4.0" :sha "17e62d5bceaa0cb65476e00d10a239a1017ec5b8"}}}' -m closh.zero.frontend.rebel
 @s() {
-googler -j -w 'spotify.com' --url-handler echo "${(@f)$(google-quote "$@")}"
+    googler -j -w 'spotify.com' --url-handler echo "${(@f)$(google-quote "$@")}"
 }
 google-quote() {
-map '"$1"' "$@"
+    map '"$1"' "$@"
 }
 w2e-lw-raw() {
-web2epub "$1" LessWrong "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
+    web2epub "$1" LessWrong "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
 }
 lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com 
 html2epub-pandoc-simple() {
- ecdbg "h2e-ps called with $@"
- pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+    ecdbg "h2e-ps called with $@"
+    pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
 aa2e() {
-aget "aa -Z ${@:2:q}
+    aget "aa -Z ${@:2:q}
 html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
-2m2k "$1".epub
+    2m2k "$1".epub
 }
 erase-ansi() {
-  gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
+    gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
 }
 ea() {
- eval "$@:q" | erase-ansi
- }
+    eval "$@:q" | erase-ansi
+}
 fzf-noempty() {
     local in="$(</dev/stdin)"
     test -z "$in" && (exit 130) || { ec "$in" | fzf "$@" }
 }
 tldr() nig ea command tldr "$@"
 function agr { 
-doc 'usage: from=sth to=another agr [ag-args]'
-comment -l --files-with-matches
+    doc 'usage: from=sth to=another agr [ag-args]'
+    comment -l --files-with-matches
 
-ag -0 -l "$from" "${@}" | pre-files "$from" "$to"
+    ag -0 -l "$from" "${@}" | pre-files "$from" "$to"
 }
 pre-files() {
-doc 'stdin should be null-separated list of files that need replacement; $1 the string to replace, $2 the replacement.'
-comment '-i backs up original input files with the supplied extension (leave empty for no backup; needed for in-place replacement.)(do not put whitespace between -i and its arg.)'
-comment '-r, --no-run-if-empty
+    doc 'stdin should be null-separated list of files that need replacement; $1 the string to replace, $2 the replacement.'
+    comment '-i backs up original input files with the supplied extension (leave empty for no backup; needed for in-place replacement.)(do not put whitespace between -i and its arg.)'
+    comment '-r, --no-run-if-empty
               If  the  standard input does not contain any nonblanks,
               do not run the command.  Normally, the command  is  run
               once  even  if there is no input.  This option is a GNU
               extension.'
 
-AGR_FROM="$1" AGR_TO="$2" xargs -r0 perl -pi.pbak -e 's/$ENV{AGR_FROM}/$ENV{AGR_TO}/g'
+    AGR_FROM="$1" AGR_TO="$2" xargs -r0 perl -pi.pbak -e 's/$ENV{AGR_FROM}/$ENV{AGR_TO}/g'
 }
 pdf-count() {
-pdfinfo "$1" | grep Pages|awk '{print $2}' 
+    pdfinfo "$1" | grep Pages|awk '{print $2}' 
 }
 k2pdf-split() {
     doc usage: pdf k2pdf-options
@@ -953,11 +953,13 @@ ensure-empty() {
     } || return 0
 }
 get-dl-link() {
-ec "${dl_base_url:-http://lilf.ir:8080/}$(realpath --relative-to ~/Downloads "$1")"
+    ec "${dl_base_url:-http://lilf.ir:8080/}$(realpath --relative-to ~/Downloads "$1")"
+}
+jdl-helper() {
+    mkdir -p ~/Downloads/tmp/
+    mv "$1" ~/Downloads/tmp/
+    get-dl-link ~/Downloads/tmp/"${1:t}"
 }
 jdl() {
-jej
-mkdir -p ~/Downloads/tmp/
-mv "$jufile" ~/Downloads/tmp/
-get-dl-link ~/Downloads/tmp/"${jufile:t}"
+    re jdl-helper *(D)
 }

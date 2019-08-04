@@ -10,3 +10,4 @@ random-word-cli
 trash-cli
 wikiquote-cli
 wikit
+carbon-now-cli
