@@ -175,6 +175,6 @@ test -d "$FZF_BASE" && {
     # ecdbg fzf loaded
     re source "$FZF_BASE"/*.zsh 
     export FZF_COMPLETION_TRIGGER=''
-    # bindkey '^T' fzf-completion
-    # bindkey '^I' $fzf_default_completion
+    bindkey '^T' fzf-completion
+    bindkey '^I' expand-or-complete
 }
