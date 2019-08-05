@@ -3,6 +3,19 @@ if (( $+commands[tag-ag] )); then
     export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
 fi
+exor() {
+    doc exorcize seals :D
+    local sels="$(un_p=y uns "$@")"
+    test -n "$sels" && {
+        local i
+        for i in "${(@f)sels}"
+        do
+            ec Exorcizing 🏺 "$i"
+            sd "$i
+" '' "$attic"
+        done
+    }
+}
 blc() {
     doc brew link custom
     mkdir -p ~/bin/
@@ -10,13 +23,14 @@ blc() {
 }
 seal() {
     doc Use with 'uns' to store and retrieve one-liners
+    doc Use exor to remove seals.
     ec "$@" >> "$attic"
 }
 uns() {
     doc unseal
     local l="$(cat "$attic" | fz -q "${@:-}")"
     test -n "$l" && {
-        [[ "$l" != (@|\#)* ]] && print -z -- "$l" || ec "$l"
+        { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && print -z -- "$l" || ec "$l"
         ec "$l"|pbcopy
         return 0
 } }

@@ -1,3 +1,4 @@
 brew "coreutils"
 brew "moreutils"
 brew "dark-mode"
+brew "sd"
