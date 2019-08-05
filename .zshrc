@@ -177,4 +177,5 @@ test -d "$FZF_BASE" && {
     export FZF_COMPLETION_TRIGGER=''
     bindkey '^T' fzf-completion
     bindkey '^I' expand-or-complete
+    bindkey '^[[Z' fzf-completion #Shift+Tab
 }
