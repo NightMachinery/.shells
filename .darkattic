@@ -5,3 +5,8 @@ git merge -s recursive -X theirs origin/master
 # I love you, Fereidoon. Take care of yourself. 💙
 ec LOvE FerEDoOn|figlet
 cowsay -f surgery "He believed in his friends. As long as he had them."
+FAT77PIG
+FAT771PIG
+# comment form in elisp: (when nil ...) (defmacro comment (&rest body)
+  "Comment out one or more s-expressions."
+  nil)

@@ -1,3 +1,6 @@
+mn() {
+    man "$@" || lesh "$1"
+}
 if (( $+commands[tag-ag] )); then
     export TAG_SEARCH_PROG=ag  # replace with rg for ripgrep
     export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
@@ -11,7 +14,7 @@ exor() {
         for i in "${(@f)sels}"
         do
             ec Exorcizing 🏺 "$i"
-            sd "$i
+            sd --string-mode "$i
 " '' "$attic"
         done
     }
@@ -815,7 +818,8 @@ w2e-o() {
     wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 emn() {
-    emc -e "(woman \"$*\")"
+    emc -e '(helm-man-woman "")' # can't input to helm using its arg. why?
+    #"(woman \"$*\")"
 }
 swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
