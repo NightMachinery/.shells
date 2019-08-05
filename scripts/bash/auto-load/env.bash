@@ -6,3 +6,4 @@ PRUNE_SONGD_DAYS="+120"
 add-path NODE_PATH "$(npm root -g)"
 fd_default=( --hidden --no-ignore )
 h2ed='html2epub-pandoc'
+attic=~/.darkattic

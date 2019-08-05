@@ -1,0 +1,4 @@
+python updateHostsFile.py --auto --replace -f #flushes dns
+git merge -s recursive -X theirs origin/master
+@test -n means nonempty string
+@test [[ $sth == *glob*works ]]

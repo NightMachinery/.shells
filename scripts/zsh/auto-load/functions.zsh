@@ -1,3 +1,10 @@
+seal() {
+    ec "$@" >> "$attic"
+}
+uns() {
+    doc unseal
+    cat "$attic" | fz -q "${@:-}"
+}
 function github-dir() {
     svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"  
 }
@@ -82,13 +89,13 @@ sin() {
     eval "${@:q}"
 }
 aga() {
-    ag "$@" "$NIGHTDIR"/**/alias*(.)
+    agm "$@" "$NIGHTDIR"/**/alias*(.)
 }
 agf() {
-    ag "$@" "$NIGHTDIR"/**/functions*(.)
+    agm "$@" "$NIGHTDIR"/**/functions*(.)
 }
 ags() {
-    ag "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.)
+    agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.)
 }
 imdb() imdbpy search movie --first "$*"
 playtmp() {
@@ -1071,3 +1078,41 @@ fr() {
     test -n "$sels" && print -z -- "$1${fr_sep:- }${sels[@]:q:q}"
 }
 f() fr "$@" --max-depth 1
+ask() {
+    doc 'This is a general-purpose function to ask Yes/No questions in Bash, either with or without a default answer. It keeps repeating the question until it gets a valid answer.'
+
+    # https://gist.github.com/davejamesmiller/1965569
+    local prompt default reply
+
+    if [ "${2:-}" = "Y" ]; then
+        prompt="Y/n"
+        default=Y
+    elif [ "${2:-}" = "N" ]; then
+        prompt="y/N"
+        default=N
+    else
+        prompt="y/n"
+        default=
+    fi
+
+    while true; do
+
+        # Ask the question (not using "read -p" as it uses stderr not stdout)
+        echo -n "$1 [$prompt] "
+
+        # Read the answer (use /dev/tty in case stdin is redirected from somewhere else)
+        read reply </dev/tty
+
+        # Default?
+        if [ -z "$reply" ]; then
+            reply=$default
+        fi
+
+        # Check if the reply is valid
+        case "$reply" in
+            Y*|y*) return 0 ;;
+            N*|n*) return 1 ;;
+        esac
+
+    done
+}

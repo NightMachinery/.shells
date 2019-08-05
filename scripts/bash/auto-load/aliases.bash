@@ -1,4 +1,6 @@
 re "silence unalias" a la map p fd ff pip fd sp
+alias sud='ruu sudo'
+alias agm='ag -C "${ag_c:-1}"'
 alias lc='l -s created'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
@@ -7,7 +9,7 @@ alias em="emc -e '(helm-recentf)'"
 alias dmy='DEBUGME=y'
 alias a=aget
 alias jee='ensure-empty || return 1'
-alias jej='ensure-ju || return 1'
+alias jej='isI && { ensure-ju || { ask "jufile is not set correctly; Are you sure you want to proceed?" N || return 1 } }'
 alias 2k='2kindle'
 alias zzz='sleepnow'
 alias lad=onla
