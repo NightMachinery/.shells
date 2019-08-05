@@ -2,3 +2,6 @@ python updateHostsFile.py --auto --replace -f #flushes dns
 git merge -s recursive -X theirs origin/master
 @test -n means nonempty string
 @test [[ $sth == *glob*works ]]
+# I love you, Fereidoon. Take care of yourself. 💙
+ec LOvE FerEDoOn|figlet
+cowsay -f surgery "He believed in his friends. As long as he had them."

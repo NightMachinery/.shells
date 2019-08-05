@@ -1,10 +1,15 @@
 seal() {
+    doc Use with 'uns' to store and retrieve one-liners
     ec "$@" >> "$attic"
 }
 uns() {
     doc unseal
-    cat "$attic" | fz -q "${@:-}"
-}
+    local l="$(cat "$attic" | fz -q "${@:-}")"
+    test -n "$l" && {
+        [[ "$l" != (@|\#)* ]] && print -z -- "$l" || ec "$l"
+        ec "$l"|pbcopy
+        return 0
+} }
 function github-dir() {
     svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"  
 }
