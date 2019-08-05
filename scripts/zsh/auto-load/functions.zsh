@@ -1,3 +1,13 @@
+if (( $+commands[tag-ag] )); then
+    export TAG_SEARCH_PROG=ag  # replace with rg for ripgrep
+    export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
+    agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
+fi
+blc() {
+    doc brew link custom
+    mkdir -p ~/bin/
+    ln -s "$(brew --cellar "$1")"/**/"$2" ~/bin/"$3"
+}
 seal() {
     doc Use with 'uns' to store and retrieve one-liners
     ec "$@" >> "$attic"
@@ -601,7 +611,7 @@ function set-fk-icon-size() {
 function set-finder-icon-size() {
     /usr/libexec/PlistBuddy -c "set StandardViewSettings:IconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finder itself.
 }
-function loop() { while true; do eval "${@:2}"; sleep ${1:-1}; done ; }
+function loop() { while true; do eval "${@}"; sleep ${lo_s:-1}; done ; }
 function rename-ebook() {
     local filename=$(basename "$1")
     local extension="${filename##*.}"
@@ -738,7 +748,7 @@ html2epub-calibre() {
                   --use-auto-toc --toc-threshold=0 \
                   --toc-title="The TOC" \
                   --embed-all-fonts \
-                  --title="$1" --epub-inline-toc
+                  --title="$1" --epub-inline-toc --enable-heuristics
     \rm "$u"
 }
 merge-html() {
