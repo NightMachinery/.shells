@@ -1,4 +1,10 @@
-re "silence unalias" a map p fd ff pip
+re "silence unalias" a la map p fd ff pip fd sp
+alias lc='l -s created'
+alias lm='l -s modified'
+alias la='ls-by-added|tac'
+alias lac='l -s accessed'
+alias em="emc -e '(helm-recentf)'"
+alias dmy='DEBUGME=y'
 alias a=aget
 alias jee='ensure-empty || return 1'
 alias jej='ensure-ju || return 1'
@@ -34,8 +40,8 @@ alias bri="brew reinstall"
 alias aup="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
 alias his="history|grep"
-alias sbash='source ~/scripts/bash/load-others.bash'
-alias szsh='source ~/scripts/zsh/load-others.zsh'
+alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
+alias szsh='source "$NIGHTDIR"/zsh/load-others.zsh'
 alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'
 alias reeb='run-on-each rename-ebook'
 alias aa='noglob aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included in this.

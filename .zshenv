@@ -1,5 +1,6 @@
-
-source "$HOME/scripts/bash/load-first.bash"
+set -o vi
+export NIGHT_PERSONAL=y
+source "$HOME/scripts/zsh/load-first.zsh"
 
 if ! (( $+commands[brew] )) ; then
 test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
@@ -21,8 +22,7 @@ addToPATH "/usr/libexec/"
 export GEM_HOME="$HOME/.gem"
 addToPATH "$GEM_HOME/bin:$PATH"
 
-source <(antibody init)
-ecdbg "$path"
+# ecdbg "$path"
 psource ~/anaconda/etc/profile.d/conda.sh
 # export PYTHONHOME=/Users/evar/anaconda/bin/
 silence conda deactivate #this is necessary try sbing and you'll see
@@ -30,18 +30,8 @@ silence conda activate base
 PS1="$(echo $PS1 | sed 's/(base) //') "
 PS1="$(strip "$PS1" ' +') "
 
-ecdbg "$path"
-export corra="198.143.181.104"
-alias ccorra="echo -n $corra | pbcopy"
-export sgate="198.143.181.179"
-alias csgate="echo -n $sgate | pbcopy"
-export HISTSIZE=100000
-export HISTTIMEFORMAT="%m/%d/%Y %T " #I always tend to configure my machines with an large HISTSIZE value so it keeps a longer history list, as well as HISTTIMEFORMAT with the time stamp value so I can see when was the command ran.
-export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
-export SUDO_EDITOR="emacsclient"
+# ecdbg "$path"
 export MONO_GAC_PREFIX="/usr/local"
-export VISUAL='emacsclient -t'
-export EDITOR="$VISUAL"
 export LDFLAGS=-L/usr/local/opt/texinfo/lib
 export ELM_HOME="/usr/local/bin/"
 eval-darwinq 'export JAVA_HOME8=`/usr/libexec/java_home --version 1.8`'
@@ -57,12 +47,11 @@ addToPATH "/usr/local/opt/curl/bin"
 GPG_TTY=$(tty)
 export GPG_TTY
 
-unalias run-help &> /dev/null
-autoload run-help
-
 psource ~/torch/install/bin/torch-activate
 
 export HH_CONFIG=hicolor
-source ~/scripts/bash/load-others.bash
+source "$NIGHTDIR"/bash/load-others.bash
 
-set -o vi
+## Ugly Stuff
+export corra="198.143.181.104"
+alias ccorra="echo -n $corra | pbcopy"

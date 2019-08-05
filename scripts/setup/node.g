@@ -11,3 +11,6 @@ trash-cli
 wikiquote-cli
 wikit
 carbon-now-cli
+emoji-finder
+oji
+dockly

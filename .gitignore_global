@@ -1,5 +1,8 @@
 # -*- mode: gitignore; -*-
 
+## My own
+*.pbak
+
 ## Emacs https://github.com/github/gitignore/blob/master/Global/Emacs.gitignore
 *~
 \#*\#

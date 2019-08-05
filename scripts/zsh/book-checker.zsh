@@ -7,6 +7,6 @@ for i in $books
 {
     if ! ggrep --silent -P '^#.*' <<<"$i"; then
         echo "$i"
-        ~/scripts/zsh/book-notifier.zsh "$i"
+        "$NIGHTDIR"/zsh/book-notifier.zsh "$i"
     fi
 }

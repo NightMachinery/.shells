@@ -1,5 +1,5 @@
-insables=~/scripts/setup/installables
-pipables=~/scripts/python/requirements.txt
-inslables=~/scripts/setup/installables-linux
-nodables=~/scripts/setup/node.g
-brewables=~/scripts/setup/brewables
+insables="$NIGHTDIR"/setup/installables
+pipables="$NIGHTDIR"/python/requirements.txt
+inslables="$NIGHTDIR"/setup/installables-linux
+nodables="$NIGHTDIR"/setup/node.g
+brewables="$NIGHTDIR"/setup/brewables

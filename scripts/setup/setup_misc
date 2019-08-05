@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-tic -x -o ~/.terminfo ~/scripts/setup/terminfo-24bit.src
+tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
 
 git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 

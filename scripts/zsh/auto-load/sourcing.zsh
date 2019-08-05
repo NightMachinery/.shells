@@ -1,3 +1,2 @@
 antibody bundle Tarrasch/zsh-functional
-
-[ -e ~/.localScripts ] && psource ~/.localScripts/**/*.zsh || :
+antibody bundle arzzen/calc.plugin.zsh #adds calc and =

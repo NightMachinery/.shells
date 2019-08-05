@@ -1,2 +1,2 @@
 #!/usr/bin/env zsh
-~/scripts/launchers/**/*
+"$NIGHTDIR"/launchers/**/*

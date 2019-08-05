@@ -1,4 +1,5 @@
 # DEBUGME=y
+export NIGHTDIR="${0:h:h}/" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
 
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
@@ -226,7 +227,6 @@ fsaydbg() {
 alias re='run-on-each'
 silence eval 'export jufile=(*)'
 #-------------------------------
-setopt re_match_pcre
 alias zre='regexp-replace' #Change to function and add bash fallback
 function strip() {
     local x="$1"
@@ -269,3 +269,5 @@ function add-path {
     esac' }
     eval "export $1"
 }
+
+re setopt re_match_pcre extendedglob

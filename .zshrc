@@ -62,7 +62,7 @@ export ZSH=~/.oh-my-zsh
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git git-extras catimg common-aliases lein pip sbt scala screen sprunge sudo vi-mode fasd)
+plugins=(git git-extras catimg common-aliases lein pip sbt scala screen sprunge sudo vi-mode)
 eval-darwinq 'plugins+=(osx)'
 source $ZSH/oh-my-zsh.sh
 
@@ -158,9 +158,23 @@ antibody bundle zsh-users/zsh-autosuggestions
 silence unalias =
 antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions
+export _ZL_ADD_ONCE=1
+export _ZL_MATCH_MODE=1
+antibody bundle skywind3000/z.lua
 source ~/bal/aliases.bash #To make them have priority.
 autoload -U deer
 zle -N deer
 bindkey '\ek' deer
 rcLoaded='yes'
-source ~/scripts/zsh/completions.zsh
+source "$NIGHTDIR"/zsh/completions.zsh
+
+# sth in .zshrc overrides these so ...
+export FZF_BASE="${$(ge_no_ec=y rp fzf):h:h}/shell"
+# ecdbg "FZF_BASE: $FZF_BASE"
+test -d "$FZF_BASE" && {
+    # ecdbg fzf loaded
+    re source "$FZF_BASE"/*.zsh 
+    export FZF_COMPLETION_TRIGGER=''
+    # bindkey '^T' fzf-completion
+    # bindkey '^I' $fzf_default_completion
+}
