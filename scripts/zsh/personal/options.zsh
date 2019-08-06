@@ -1,2 +1,3 @@
 setopt rm_star_silent
 setopt HIST_SUBST_PATTERN
+setopt NO_CASE_GLOB

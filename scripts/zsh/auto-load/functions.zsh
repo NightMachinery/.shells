@@ -1,3 +1,4 @@
+rtf2txt() { unrtf "$@" | html2text }
 mn() {
     man "$@" || lesh "$1"
 }
@@ -61,28 +62,6 @@ function ls-by-added() {
 #   local cmd=${$(fc -nl -1 -1)/(#b)(*E)(<->)/$match[1]${(l:${#match[2]}::0:)$((match[2]+${1:-1}))}}
 #   geval "$cmd"
 # }
-ins-npm() {
-    zargs -l 1 -- $(cat "$NIGHTDIR"/setup/node.g) -- npm install -g
-}
-ins-pip() {
-    zargs -l 1 -- "$NIGHTDIR"/python/**/requirements.txt -- pip install -U -r
-}
-ins-ins() {
-    zargs -n 1 -- $(cat "$NIGHTDIR"/setup/installables) -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
-}
-ins-linux() {
-    zargs -n 1 -- $(cat "$NIGHTDIR"/setup/installables-linux) -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
-}
-ins-brew() {
-    brew bundle install --file="$NIGHTDIR"/setup/brewables
-}
-ins-all() {
-    ins-brew
-    ins-linux
-    ins-ins
-    ins-pip
-    ins-npm
-}
 sin() {
     export FORCE_INTERACTIVE=y
     sb
@@ -667,35 +646,6 @@ function wt1() {
 outlinify() {
     map 'https://outline.com/$1' "$@"
 }
-function wread() {
-    setopt local_options pipefail
-    local title author
-    test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
-    test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
-    { test -z "$wr_force" && mercury-parser --format="${2}" "$1" || {
-              fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html
-# l
-# cat ./a.html
-mercury-html $1:q ./a.html $2:q"
-          } } |jq -e --raw-output '[
-    (if .title then '"$title"' else empty end),
-    (if .author then '"$author"' else empty end),
-    .content
-] | join("\n\n")' #'.content'
-}
-function mercury-html() {
-    doc USAGE: url html-file output-mode
-    serr mercury-html.js "$@"
-}
-function full-html() {
-    doc splash should be up. https://splash.readthedocs.io
-    doc 'wait always waits the full time. Should be strictly < timeout.'
-    curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
-}
-function random-poemist() {
-    curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
-}
-xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
 les() { eval "$@:q" |& less }
 lesh() les "$1" --help
 html2epub-calibre() {
@@ -811,22 +761,6 @@ function sdlg() {
             mv *.txt ./ghosts/
         }
 }
-function aget() {
-    local u="$(uuidgen)"
-    local erri jufile
-    mkdir -p "$u"
-    test -e "$ag_f" && {
-        cp "$ag_f" ./"$u"/
-        ecdbg ag_f: "$ag_f"
-    }
-    cd "$u"
-    test -e "$ag_f" && jufile=(./*(D))
-    ecdbg jufile: "$jufile"
-    eval "$@" && {
-        cd ..
-        \rm -r "$u"
-    } || { err="$?" && ecerr aget "$@" exited "$err"; l ; cd .. ; (exit "$err") }
-}
 function jsummon() {
     mkdir -p ~/julia_tmp/
     local u=(*)
@@ -889,35 +823,8 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
     }
     googleimagesdownload "$@" && jup
 }
-insladd() {
-    ec "$1" >> "$inslables"
-    ins "$1"
-}
-insadd() {
-    ec "$1" >> "$insables"
-    ins "$1"
-}
-npmadd() {
-    ec "$1" >> "$nodables"
-    npm install -g "$1"
-}
-biadd() {
-    ec "brew \"$1\"" >> "$brewables"
-    bi "$1"
-}
-piadd() {
-    ec "$1" >> "$pipables"
-    pi "$1"
-}
 clean-dups() {
     sort -u "$1" | sponge "$1"
-}
-clean-deps() {
-    re clean-dups "$insables" "$inslables" "$nodables" "$brewables" "$pipables"
-}
-bnu() {
-    # brew-no-update
-    export HOMEBREW_NO_AUTO_UPDATE=1
 }
 jclosh() clojure -Sdeps '{:deps {closh {:git/url "https://github.com/dundalek/closh.git" :tag "v0.4.0" :sha "17e62d5bceaa0cb65476e00d10a239a1017ec5b8"}}}' -m closh.zero.frontend.rebel
 @s() {
