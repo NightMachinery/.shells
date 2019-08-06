@@ -468,14 +468,16 @@ function retry-limited-eval() {
     (exit "$ecode")
 }
 function 2mobi() {
-    ebook-convert "$1" "${1:r}.mobi"
+    doc usage: FILE calibre-options
+    ebook-convert "$1" "${1:r}.mobi" "${@:2}"
 }
 function 2m2k() {
+    doc usage: FILE calibre-options
     [[ "$1" =~ 'mobi.az1$' ]] && {
         mv "$1" "${1:r}"
         ecdbg "az1 detected; Renaming to ${1:r}"
         set -- "${1:r}"
-    } || if test "${1:e}" != mobi ; then 2mobi "$1"
+    } || if test "${1:e}" != mobi ; then 2mobi "$@"
                                          set -- "${1:r}.mobi"
     fi
     2kindle "$1"
@@ -986,4 +988,8 @@ ask() {
         esac
 
     done
+}
+function pk() {
+    pgrep -i "$@"
+    pkill -9 -i "$@"
 }

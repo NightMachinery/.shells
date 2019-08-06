@@ -33,7 +33,6 @@ alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
 eval-linux alias gnc=nc
 alias dlga="deluge-console add"
-alias pk="pkill -9 -i"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
