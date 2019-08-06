@@ -1,42 +1,11 @@
 mn() {
     man "$@" || lesh "$1"
 }
-if (( $+commands[tag-ag] )); then
-    export TAG_SEARCH_PROG=ag  # replace with rg for ripgrep
-    export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
-    agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
-fi
-exor() {
-    doc exorcize seals :D
-    local sels="$(un_p=y uns "$@")"
-    test -n "$sels" && {
-        local i
-        for i in "${(@f)sels}"
-        do
-            ec Exorcizing 🏺 "$i"
-            sd --string-mode "$i
-" '' "$attic"
-        done
-    }
-}
 blc() {
     doc brew link custom
     mkdir -p ~/bin/
     ln -s "$(brew --cellar "$1")"/**/"$2" ~/bin/"$3"
 }
-seal() {
-    doc Use with 'uns' to store and retrieve one-liners
-    doc Use exor to remove seals.
-    ec "$@" >> "$attic"
-}
-uns() {
-    doc unseal
-    local l="$(cat "$attic" | fz -q "${@:-}")"
-    test -n "$l" && {
-        { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && print -z -- "$l" || ec "$l"
-        ec "$l"|pbcopy
-        return 0
-} }
 function github-dir() {
     svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"  
 }
@@ -119,15 +88,6 @@ sin() {
     sb
     source ~/.zshrc
     eval "${@:q}"
-}
-aga() {
-    agm "$@" "$NIGHTDIR"/**/alias*(.)
-}
-agf() {
-    agm "$@" "$NIGHTDIR"/**/functions*(.)
-}
-ags() {
-    agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.)
 }
 imdb() imdbpy search movie --first "$*"
 playtmp() {
@@ -656,6 +616,9 @@ function onla() {
 function onxla(){
     last-added|gxargs -I _ "$@:q"
 }
+function onxlc(){
+    last-created|gxargs -I _ "$@:q"
+}
 function first-file(){
     exa|head -n1
 }
@@ -984,17 +947,7 @@ erase-ansi() {
 ea() {
     eval "$@:q" | erase-ansi
 }
-fzf-noempty() {
-    local in="$(</dev/stdin)"
-    test -z "$in" && (exit 130) || { ec "$in" | fzf "$@" }
-}
 tldr() nig ea command tldr "$@"
-function agr {
-    doc 'usage: from=sth to=another agr [ag-args]'
-    comment -l --files-with-matches
-
-    ag -0 -l "$from" "${@}" | pre-files "$from" "$to"
-}
 pre-files() {
     doc 'stdin should be null-separated list of files that need replacement; $1 the string to replace, $2 the replacement.'
     comment '-i backs up original input files with the supplied extension (leave empty for no backup; needed for in-place replacement.)(do not put whitespace between -i and its arg.)'
@@ -1089,11 +1042,6 @@ emj() emoji-finder "$@"
 warm-zlua() {
     fc -ln 0|grep -o "^cd [~/].*"|sed -e "s|cd ||" -e "s|~|$HOME|" -e 's|\\ | |' -e "s|/$||"|sort|uniq|while read -r d; do test -d "$d" && echo "$d|1|0"; done >> ~/.zlua
 }
-fr() {
-    sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
-    test -n "$sels" && print -z -- "$1${fr_sep:- }${sels[@]:q:q}"
-}
-f() fr "$@" --max-depth 1
 ask() {
     doc 'This is a general-purpose function to ask Yes/No questions in Bash, either with or without a default answer. It keeps repeating the question until it gets a valid answer.'
 

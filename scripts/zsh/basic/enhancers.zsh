@@ -8,4 +8,4 @@ function enh-mkdest() {
 function self-enh() {
     eval "function \\$2() emd_c=$2 $1" '"$@"'
 }
-self-enh enh-mkdest 'mv'
+re 'self-enh enh-mkdest' mv cp

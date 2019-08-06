@@ -10,3 +10,4 @@ FAT771PIG
 # comment form in elisp: (when nil ...) (defmacro comment (&rest body)
   "Comment out one or more s-expressions."
   nil)
+sudo route -n flush ; sudo route -n flush ; sudo route add default 172.20.10.1

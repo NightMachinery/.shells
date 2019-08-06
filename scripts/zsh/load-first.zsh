@@ -247,8 +247,9 @@ isI() {
     ! test -z "$FORCE_INTERACTIVE" || [[ $- == *i* ]]
 }
 rgx() {
-	local a="$1"
-	zre a "$2" "$3"
+	local a
+  (( $# == 2 )) && a="$(</dev/stdin)" || { a="$1" ; shift 1 }
+	zre a "$1" "$2"
 	ec "$a"
 }
 
@@ -294,5 +295,8 @@ redo() {
         eval "${@: 1:-1:q}"
     done
 }
-
+function printz() {
+    test -n "$@" && print -z -- "$@"
+}
+## END
 run-on-each source "$NIGHTDIR"/zsh/basic/**/*(.) 
