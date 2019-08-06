@@ -3,6 +3,10 @@ export NIGHTDIR="${0:h:h}/" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
 
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
+
+alias seval='ge_ecdbg=y geval'
+
+
 function eval-dl() 
 { 
     case "$(uname)" in 
@@ -119,13 +123,15 @@ function ruu() {
     test -z "$1" || f+="$1"
     local a="$(force-expand "$2")"
     a="$(strip "$a" 'noglob ')"
-    "$f[@]" "$=a" "${@:3}"
+    seval "$f[@]" "$=a" "${@:3:q}"
 }
 alias noglob='noglob ruu ""'
 function geval() {
     local cmd="$@"
-    test -z "$ge_no_ec" && ec "$cmd"
-    test -z "$ge_no_hist" && print -r -S -- "$cmd" #Add to history
+    test -z "$ge_ecdbg" && {
+        test -z "$ge_no_ec"  && ec "$cmd"
+        test -z "$ge_no_hist" && print -r -S -- "$cmd" #Add to history
+    } || ecdbg "$cmd"
     eval -- "$cmd"
 }
 function ec() {
@@ -271,3 +277,22 @@ function add-path {
 }
 
 re setopt re_match_pcre extendedglob
+
+cdm()
+{
+    mkdir -p -- "$1" &&
+        cd -P -- "$1"
+}
+function bottomdir() {
+    { { [ -e "$1" ]  && ! [ -d "$1" ] } || [[ "$1" != */ ]] } && { ec "${1:h}"; } || { ec "$1"; } ;}
+function cdd() {
+    cd "$(bottomdir "$1")" }
+redo() {
+    local i
+    for i in {1.."${@: -1}"}
+    do
+        eval "${@: 1:-1:q}"
+    done
+}
+
+run-on-each source "$NIGHTDIR"/zsh/basic/**/*(.) 

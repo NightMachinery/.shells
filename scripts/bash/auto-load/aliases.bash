@@ -1,4 +1,5 @@
-re "silence unalias" a la map p fd ff pip fd sp
+re "silence unalias" a la map p fd ff pip fd sp mv
+alias dbg='DEBUGME=dbg'
 alias sud='ruu sudo'
 alias agm='ag -C "${ag_c:-1}"'
 alias lc='l -s created'

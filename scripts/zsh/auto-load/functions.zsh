@@ -306,26 +306,7 @@ killjobs() {
         return 0
     fi
 }
-redo() {
-    local i
-    for i in {1.."${@: -1}"}
-    do
-        eval "${@: 1:-1:q}"
-    done
-}
 ks() { kscript ~/kscripts/"$@"; }
-
-cdm()
-{
-    mkdir -p -- "$1" &&
-        cd -P -- "$1"
-}
-
-
-function bottomdir() {
-    [ -f "$1" ] && { ec "$(dirname "$1")"; } || { ec "$1"; } ;}
-function cdd() {
-    cd "$(bottomdir "$1")" }
 
 transfer() {
     #
@@ -597,6 +578,7 @@ file-to-clipboard() {
         "$@"
 }
 function frep() {
+    doc '@convenience @grep'
     eval "${@:2:q}" |& ggrep -iP "$1"
 }
 function aas() {
@@ -1079,6 +1061,7 @@ jdl-helper() {
     get-dl-link ~/Downloads/tmp/"${1:t}"
 }
 jdl() {
+    jej
     re jdl-helper *(D)
 }
 w2e-curl() {
