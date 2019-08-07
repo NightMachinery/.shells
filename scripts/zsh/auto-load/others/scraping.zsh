@@ -49,3 +49,6 @@ wayback-out() {
 wread-wayback() {
     wayback-out "$1" | wread "$@"
 }
+wayback-url() {
+    waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
+}

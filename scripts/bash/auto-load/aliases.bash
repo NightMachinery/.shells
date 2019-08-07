@@ -1,4 +1,7 @@
 re "silence unalias" a la map p fd ff pip fd sp mv cp
+alias bat='bat --theme OneHalfLight'
+alias bt='bat --style=plain'
+alias btz='bt --language zsh'
 alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
 alias dbg='DEBUGME=dbg'
 alias sud='ruu sudo'
@@ -92,7 +95,6 @@ alias s=silence
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
 alias coursera='coursera-dl -n -pl --aria2 --video-resolution 720p --download-quizzes --download-notebooks -sl "en,fa" --resume'
 alias ox='zdict -dt oxford'
-alias wh='which'
 alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'

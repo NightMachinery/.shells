@@ -1,3 +1,4 @@
+wh() { which "$@" |btz }
 rtf2txt() { unrtf "$@" | html2text }
 mn() {
     man "$@" || lesh "$1"
@@ -77,11 +78,11 @@ playtmp() {
     pat ~/tmp/delme/"$1:t"
 }
 mut() {
-    music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop "$*"
+    music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop $*
 }
-muf() songc --loop "$*"
+muf() songc --loop $*
 mub() {
-    songc --loop-playlist "$*" #alBum
+    songc --loop-playlist $* #alBum
 }
 mup() playlistc "$@"
 mus() mu "$(@s "$@")"
@@ -91,7 +92,7 @@ mu() {
         bp+="$1"
         shift
     }
-    songd "$bp[@]" --loop-playlist "$*" #Download
+    songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
 svpl() {
     # Save Playlist save-playlist save-pl
@@ -119,13 +120,14 @@ trs() {
 }
 songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
+    local f
+    f=()
+    # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
     local p="${@: -1}"
     test -z "${p##-*}" && set -- "$@" '.'
     test -z "${p##-*}" && p='.'
     # ec "$p" "${@:0:-1}"
     # test -z "$p" && set "$@"
-    local f
-    f=()
     local f2="$(playlister "$p")"
     f+=( ${(@f)f2} )
     # zsh is messed up with its arrays
@@ -134,6 +136,7 @@ songc() {
     gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
     # ec $#f
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
+    # re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
     ! test -z "$f" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
 touch-tracks() {
@@ -183,7 +186,7 @@ songd() {
         trs "$spath"
         (exit 0)
     } || {
-        test -e "$spath" && {
+        { test -n "$q" && test -e "$spath" } && {
             ecdbg Cache found
             touch "$(bottomdir "$spath")"
             eval 'touch-tracks "$spath"/*' || {
@@ -207,6 +210,7 @@ songd() {
                 music_dir="${music_dir:h}" songc "$@" && { usedCache='y' && return 0 } || ecdbg "songc exited $?"
                 # I just learned about `return`, so the usedCache logic is now useless. It's also kind of buggy and returns 1 in case of success.
                 # resetcolor
+                test -z "$q" && return 0
             }
             ecdbg "usedCache: $usedCache"
             test -z "$usedCache" && {
