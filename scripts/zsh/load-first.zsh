@@ -84,7 +84,7 @@ function run-on-each() {
     local i
     for i in "${@:2}"
     do
-        eval "$1 $i:q"
+        eval "$1 $(gq "$i")"
     done
 }
 function combine-funcs() {
@@ -299,7 +299,7 @@ redo() {
     local i
     for i in {1.."${@: -1}"}
     do
-        eval "${@: 1:-1:q}"
+        eval "$(gquote "${@: 1:-1}")"
     done
 }
 function printz() {

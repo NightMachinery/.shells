@@ -10,6 +10,7 @@ alias todos='attic="$attic_todo" un_p=y unseal'
 alias todone='attic="$attic_todo" un_p=y exor'
 alias todo-import='attic="$attic_todo" un_p=y seal-import'
 alias td=todo
+alias tds='cat "$attic_todo"'
 # alias ts=todos #CONFLICTING_NAME
 alias tn=todone
 alias tdi=todo-import
