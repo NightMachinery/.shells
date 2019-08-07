@@ -9,6 +9,6 @@ function junsummon() {
 }
 jdlc() {
     silence pushd ~/Downloads/
-    onlc get-dl-link
+    ge_ecdbg=y onlc get-dl-link
     silence popd
 }
