@@ -28,7 +28,7 @@ exor() {
             ec Exorcizing 🏺
             cat -v <<<"$i"
             # sd --string-mode "$i" '' "$attic" #--flags m 
-            FROM="$i" perl -007 -pi -e 's/(\0|\A)\Q$ENV{FROM}\E(?<sep>\0|\Z)/$+{sep}/gm' "$attic"
+            FROM="$i" perl -0777 -pi -e 's/(\0|\A)\Q$ENV{FROM}\E(?<sep>\0|\Z)/$+{sep}/gm' "$attic"
         done
         # perl -pi -e 's/\0\0+/\0/g' "$attic"
         perl -0 -pi -e 's/\A\0//' "$attic"
