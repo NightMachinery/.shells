@@ -3,13 +3,14 @@ seal() {
     doc Use exor to remove seals.
     local n=''
     ! test -e "$attic" || n=$'\0'
-    print -r -n -- "$n$@"$'\n' >> "$attic"
+    print -r -n -- "$n$(in-or-args "$@")"$'\n' >> "$attic"
 }
-uns() {
+alias uns=unseal
+unseal() {
     doc unseal
     doc in: un_fz un_p
     re 'ecdbg un_fz:'  "$un_fz[@]"
-    local l="$(cat "$attic" | fz $un_fz[@] --read0 -q "${@:-}")"
+    local l="$(cat "$attic" | fz $un_fz[@] --read0 --tac --no-sort -q "${@:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && print -z -- "$l" || ec "$l"
         ec "$l"|pbcopy
@@ -29,8 +30,20 @@ exor() {
             cat -v <<<"$i"
             # sd --string-mode "$i" '' "$attic" #--flags m 
             FROM="$i" perl -0777 -pi -e 's/(\0|\A)\Q$ENV{FROM}\E(?<sep>\0|\Z)/$+{sep}/gm' "$attic"
+            comment "This actually doesn't do the 'g' part completely. It removes some occurences, but not all."
         done
         # perl -pi -e 's/\0\0+/\0/g' "$attic"
         perl -0 -pi -e 's/\A\0//' "$attic"
     }
 }
+alias seali=seal-import
+seal-import() {
+    local inp="$(in-or-args "$@")"
+    re seal "${(@f)inp}"
+}
+
+test -z "$attic_todo" && attic_todo=~/.attic_todo
+alias todo='attic="$attic_todo" un_p=y seal'
+alias todos='attic="$attic_todo" un_p=y unseal'
+alias todone='attic="$attic_todo" un_p=y exor'
+alias todoi='attic="$attic_todo" un_p=y seal-import'

@@ -925,7 +925,7 @@ w2e-curl() {
     h2ed=html2epub-pandoc-simple we_dler=wread-curl w2e "$@"
 }
 wread-curl() {
-    curl --silent --fail --location "$1"
+    gurl "$1"
 }
 w2e-gh() {
     w2e-curl "$1" "${(@f)$(gh-to-md "${@:2}")}"

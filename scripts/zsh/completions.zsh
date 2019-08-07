@@ -1,1 +1,1 @@
-rexa "compdef _=which" cee ceer whh lesh
+rexa "compdef _=which" cee ceer wh whh lesh mn emn fmn rp
