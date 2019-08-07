@@ -8,7 +8,7 @@ function junsummon() {
     \rm -r ~/julia_tmp
 }
 jdlc() {
-    cd ~/Download/
+    pushd ~/Downloads/
     onlc get-dl-link
-    cd -
+    popd
 }
