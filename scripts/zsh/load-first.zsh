@@ -6,7 +6,14 @@ autoload -U regexp-replace
 
 alias seval='ge_ecdbg=y geval'
 
-
+function gquote() {
+    local i
+    for i in "$@"
+    do
+        test -z "$i" && print -rn "''" " " || print -rn -- "${i:q}" " "
+    done
+}
+alias gq=gquote
 function eval-dl() 
 { 
     case "$(uname)" in 

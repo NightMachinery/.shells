@@ -1,3 +1,19 @@
+## vars
+test -z "$attic_dir" && attic_dir="$cellar/attic/"
+test -z "$attic" && attic="$attic_dir/.darkattic"
+test -z "$attic_todo" && attic_todo="$attic_dir/.attic_todo"
+
+## aliases
+# todo
+alias todo='attic="$attic_todo" un_p=y seal'
+alias todos='attic="$attic_todo" un_p=y unseal'
+alias todone='attic="$attic_todo" un_p=y exor'
+alias todo-import='attic="$attic_todo" un_p=y seal-import'
+alias td=todo
+# alias ts=todos #CONFLICTING_NAME
+alias tn=todone
+alias tdi=todo-import
+## core
 seal() {
     doc Use with 'uns' to store and retrieve one-liners
     doc Use exor to remove seals.
@@ -42,8 +58,3 @@ seal-import() {
     re seal "${(@f)inp}"
 }
 
-test -z "$attic_todo" && attic_todo=~/.attic_todo
-alias todo='attic="$attic_todo" un_p=y seal'
-alias todos='attic="$attic_todo" un_p=y unseal'
-alias todone='attic="$attic_todo" un_p=y exor'
-alias todoi='attic="$attic_todo" un_p=y seal-import'
