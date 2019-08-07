@@ -767,15 +767,6 @@ function sdlg() {
             mv *.txt ./ghosts/
         }
 }
-function jsummon() {
-    mkdir -p ~/julia_tmp/
-    local u=(*)
-    mv "$u" ~/julia_tmp/
-    realpath ~/julia_tmp/"$u"
-}
-function junsummon() {
-    \rm -r ~/julia_tmp
-}
 function prefix-files() {
     for file in "${@:2}"
     do
