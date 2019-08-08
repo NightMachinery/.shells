@@ -46,11 +46,12 @@ exor() {
             ec Exorcizing 🏺
             cat -v <<<"$i"
             # sd --string-mode "$i" '' "$attic" #--flags m 
-            FROM="$i" perl -0777 -pi -e 's/(\0|\A)\Q$ENV{FROM}\E(?<sep>\0|\Z)/$+{sep}/gm' "$attic"
-            comment "This actually doesn't do the 'g' part completely. It removes some occurences, but not all."
+            # FROM="$i" perl -0777 -pi -e 's/(\0|\A)\Q$ENV{FROM}\E(?<sep>\0|\Z)/$+{sep}/gm' "$attic"
+            # comment "This actually doesn't do the 'g' part completely. It removes some occurences, but not all."
+            FROM="$i" perl -0lni -e 'print if $_ ne $ENV{FROM}' -- "$attic"
         done
         # perl -pi -e 's/\0\0+/\0/g' "$attic"
-        perl -0 -pi -e 's/\A\0//' "$attic"
+        perl -pi -e 's/\0\Z//' "$attic"
     }
 }
 alias seali=seal-import

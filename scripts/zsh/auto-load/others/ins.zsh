@@ -34,7 +34,8 @@ piadd() {
     pi "$1"
 }
 goi() {
-    go get -u "$@"
+    comment -u update -v verbose
+    go get -u -v "$@"
 }
 gmi() {
     gem install "$@"

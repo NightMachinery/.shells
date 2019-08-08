@@ -1,4 +1,4 @@
-re "silence unalias" a la map p fd ff pip fd sp mv cp
+re "silence unalias" a la map p fd ff pip fd sp # mv cp
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
 alias nn='nnn -d'

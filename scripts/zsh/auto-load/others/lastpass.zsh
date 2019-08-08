@@ -8,6 +8,8 @@ function lpassf_() {
 }
 re lpassf_ u p g
 alias lp=lpassfg
+alias lpp=lpassfp
+alias lpu=lpassfu
 lpassg() {
     lpass show --basic-regexp --expand-multi "$@"
 }
