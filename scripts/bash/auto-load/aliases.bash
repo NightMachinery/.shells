@@ -119,7 +119,6 @@ alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
 alias bi="brew install"
 alias bci="brew cask install"
-alias hear='mpv --keep-open=no --no-video' #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'

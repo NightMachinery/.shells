@@ -7,6 +7,9 @@ autoload -U regexp-replace
 alias seval='ge_ecdbg=y geval'
 
 function gquote() {
+    doc DEPRECATED Use '"{(qq)@}"'
+    ec "${(qq)@}"
+    return 0
     local i
     for i in "$@"
     do
@@ -14,67 +17,68 @@ function gquote() {
     done
 }
 alias gq=gquote
-function eval-dl() 
-{ 
-    case "$(uname)" in 
-        Darwin) 
-            eval "$1" 
-            ;; 
-        Linux) 
+function eval-dl()
+{
+    case "$(uname)" in
+        Darwin)
+            eval "$1"
+            ;;
+        Linux)
             eval "$2"
-            ;;esac 
-} 
-function eval-darwinq() 
-{ 
+            ;;esac
+}
+function eval-darwinq()
+{
     #input should be quoted.
-    case "$(uname)" in 
-        Darwin) 
-            eval "${@}" 
-            ;; 
-        Linux) 
-            
-            ;;esac 
-} 
-function eval-darwin() 
-{ 
-    case "$(uname)" in 
-        Darwin) 
-            eval "${@:q}" 
-            ;; 
-        Linux) 
-            
-            ;;esac 
-} 
-function eval-linux() 
-{ 
-    case "$(uname)" in 
-        Darwin) 
+    case "$(uname)" in
+        Darwin)
+            eval "${@}"
+            ;;
+        Linux)
 
-        ;; 
-        Linux) 
-            eval "${@:q}" 
-        ;;esac 
-} 
-function psource() 
-{ 
-    if [[ -r $1 ]]; then 
-        source $1 
-    fi 
-} 
+            ;;esac
+}
+function eval-darwin()
+{
+    case "$(uname)" in
+        Darwin)
+            eval "${@:q}"
+            ;;
+        Linux)
+
+            ;;esac
+}
+function eval-linux()
+{
+    case "$(uname)" in
+        Darwin)
+
+        ;;
+        Linux)
+            eval "${@:q}"
+        ;;esac
+}
+function psource()
+{
+    if [[ -r "$1" ]]; then
+        source "$1"
+    fi
+}
 
 
+alias silent=silence
 function silence() {
     { eval "$@:q"  } &> /dev/null
 }
 function nig() {
-	#silence not interactive
-	isI && eval "${@:2:q}" || "$1" "${@:2}"
+  #silence not interactive
+  isI && eval "${@:2:q}" || "$1" "${@:2}"
 }
 sout() {
-	{ eval "$@:q" } > /dev/null
+  { eval "$@:q" } > /dev/null
 }
 serr() {
-	{ eval "$@:q" } 2> /dev/null
+  { eval "$@:q" } 2> /dev/null
 }
 alias nisout='nig sout'
 alias niserr='nig serr'
@@ -99,17 +103,17 @@ function combine-funcs() {
     eval "$tmp321_string"
 }
 function rexx(){
-	  xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
+    xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
 }
 function rex(){
     zargs --verbose -i _ -- "${@:2}" -- "$=1"
-	  #Using -n 1 fails somehow. Probably a zargs bug.
+    #Using -n 1 fails somehow. Probably a zargs bug.
 }
 function rexa(){
-	  local i
+    local i
     for i in "${@:2}"
     do
-		    eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
+        eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
     done
 }
 function expand-alias {
@@ -129,7 +133,9 @@ function ruu() {
     local f=()
     test -z "$1" || f+="$1"
     local a="$(force-expand "$2")"
+    comment @lilbug strip-left
     a="$(strip "$a" 'noglob ')"
+    a="$(strip "$a" 'nocorrect ')"
     seval "$f[@]" "$=a" "${@:3:q}"
 }
 alias noglob='noglob ruu ""'
@@ -148,42 +154,35 @@ function ec() {
         echo -E -- "$@"
     fi
 }
-ecerr() ec "$@" 1>&2
-function rederr() {
-	  (setopt nomultios 2>/dev/null; set -o pipefail;
-     # eval "$@:q" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2
-     eval "$@:q" 2>&1 1>&3|color "${errcol:-red}" 1>&2
-    )3>&1
-}
 colorfg() printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"
 colorbg() printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m"
 colorb() {
-	  [[ "$1" =~ '^\d+$' ]] &&
+    [[ "$1" =~ '^\d+$' ]] &&
         {
             colorbg "$@"
             shift 2
         } || printf %s "$bg[$1]"
-	  if (( $# == 1 ))
-	  then
-		    cat
-	  else
-		    ec "${@:2}"
-	  fi
+    if (( $# == 1 ))
+    then
+        cat
+    else
+        ec "${@:2}"
+    fi
     resetcolor
 }
 
 color() {
-	  [[ "$1" =~ '^\d+$' ]] &&
+    [[ "$1" =~ '^\d+$' ]] &&
         {
             colorfg "$@"
             shift 2
         } || printf %s "$fg[$1]"
-	  if (( $# == 1 ))
-	  then
-		    cat
-	  else
-		    ec "${@:2}"
-	  fi
+    if (( $# == 1 ))
+    then
+        cat
+    else
+        ec "${@:2}"
+    fi
     # printf "\x1b[0m\n"
     resetcolor
 }
@@ -192,7 +191,7 @@ helloworld() {
     colorbg 0 0 255;colorfg 0 255; ec HELLO "$(colorfg 255 100)"BRAVE"$(colorfg 0 255)" $(colorbg 100 0 255)NEW$(colorbg 0 0 255) WORLD\!;resetcolor
 }
 comment() {
-    
+
 }
 doc() {
     #Used for documentation
@@ -228,7 +227,7 @@ printcolors() {
 }
 ecdbg() {
     test -z "$DEBUGME" || {
-        errcol="${debugcol:-cyan}" rederr ecerr "$@"
+        errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
     }
 }
 fsaydbg() {
@@ -254,10 +253,10 @@ isI() {
     ! test -z "$FORCE_INTERACTIVE" || [[ $- == *i* ]]
 }
 rgx() {
-	local a
+  local a
   (( $# == 2 )) && a="$(</dev/stdin)" || { a="$1" ; shift 1 }
-	zre a "$1" "$2"
-	ec "$a"
+  zre a "$1" "$2"
+  ec "$a"
 }
 
 typeset -Ug path
@@ -306,4 +305,4 @@ function printz() {
     test -n "$@" && print -z -- "$@"
 }
 ## END
-run-on-each source "$NIGHTDIR"/zsh/basic/**/*(.) 
+run-on-each source "$NIGHTDIR"/zsh/basic/**/*(.)

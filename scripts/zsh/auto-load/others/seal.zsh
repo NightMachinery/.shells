@@ -5,10 +5,11 @@ test -z "$attic_todo" && attic_todo="$attic_dir/.attic_todo"
 
 ## aliases
 # todo
-alias todo='attic="$attic_todo" un_p=y seal'
-alias todos='attic="$attic_todo" un_p=y unseal'
-alias todone='attic="$attic_todo" un_p=y exor'
-alias todo-import='attic="$attic_todo" un_p=y seal-import'
+alias attic_todo='attic="$attic_todo" un_p=y un_no_preview=y'
+alias todo='attic_todo seal'
+alias todos='attic_todo unseal'
+alias todone='attic_todo exor'
+alias todo-import='attic_todo seal-import'
 alias td=todo
 alias tds='cat "$attic_todo"'
 # alias ts=todos #CONFLICTING_NAME
@@ -27,7 +28,10 @@ unseal() {
     doc unseal
     doc in: un_fz un_p
     re 'ecdbg un_fz:'  "$un_fz[@]"
-    local l="$(cat "$attic" | fz $un_fz[@] --read0 --tac --no-sort -q "${@:-}")"
+    local other_options
+    other_options=()
+    test -n "$un_no_preview" || other_options+=(--preview '<<<{} command fold -s -w $FZF_PREVIEW_COLUMNS')
+    local l="$(cat "$attic" | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${@:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && print -z -- "$l" || ec "$l"
         ec "$l"|pbcopy
@@ -35,7 +39,7 @@ unseal() {
     } }
 exor() {
     doc exorcize seals :D
-    sels="$(un_p=y un_fz=( --print0 ) uns "$@")"
+    local sels="$(un_p=y un_fz=( --print0 ) uns "$@")"
     test -n "$sels" && {
         local i items
         ecdbg sels: "$sels"
