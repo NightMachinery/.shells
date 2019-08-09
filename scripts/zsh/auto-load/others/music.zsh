@@ -10,7 +10,6 @@ mpv-get() {
 }
 songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
-    dvar music_dir c0
     local f
     f=()
     # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
@@ -19,8 +18,9 @@ songc() {
     test -z "${p##-*}" && p='.'
     # ec "$p" "${@:0:-1}"
     # test -z "$p" && set "$@"
-    dvar music_dir c1
-    local f2="$(playlister "$p")"
+    local f2 #="$(playlister "$p")"
+    nulterm playlister "$p" |read -d '' -r f2
+    dvar f2
     f+=( ${(@f)f2} )
     # zsh is messed up with its arrays
     local autopl="${playlist_dir:-$HOME/playlists}/autopl/"
@@ -29,9 +29,7 @@ songc() {
     # ec $#f
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
     # re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
-    dvar music_dir c9
     ! test -z "$f" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
-    dvar music_dir c10
 }
 touch-tracks() {
     comment "songd dir-touches using touch-tracks, but songc does not. We can of course add an env var and dir-touch here ... Using 'mus' (so songd) might also work ..."
@@ -51,8 +49,8 @@ touch-tracks_() {
     local track
     for track in "$@"
     do
-        debugcol=(200 10 255) ecdbg "Touching $track"
-        test -e "$track" && touch "$track" #"$(bottomdir "$track")"
+        # debugcol=(200 10 255) ecdbg "Touching $track"
+        test -e "$track" && serr touch "$track" #"$(bottomdir "$track")"
     done
 }
 playlistc() {
@@ -63,7 +61,7 @@ playlister() {
     find-music "$@" | fz --history "$music_dir/.fzfhist" # -q "$1"
 }
 find-music() {
-    fd -c never --follow -e m4a -e mp3 -e flac --full-path "$*" "${music_dir:-$HOME/my-music}"
+    memoi_expire="${fm_expire:-$memoi_expire}" memoi-eval fd -c never --follow -e m4a -e mp3 -e flac --full-path "$*" "${music_dir:-$HOME/my-music}"
 }
 songd() {
     music_dir=~/my-music/ ; musiccache='' #BUG To hardcode-circumvent zsh's unset bug.
@@ -71,9 +69,7 @@ songd() {
     Use songc to play already downloaded files.
     Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
     ecdbg "$@"
-    dvar music_dir 0
     local music_dir="${music_dir}/${musiccache:-cache}"
-    dvar music_dir 1
     local musiccache='/' #To avoid recursion. Can't be empty or it'll auto replace.
     mkdir -p "$music_dir"
     test -z "$PRUNE_SONGD_DAYS" || {
@@ -119,9 +115,7 @@ songd() {
                 # ecdbg "Calling songc with: "
                 # re 'ecdbg "arg: "' "$@"
                 # ecdbg "music_dir: $music_dir"
-                dvar music_dir 5
-                music_dir="${music_dir:h}" songc "$@" && { dvar music_dir 6 ; usedCache='y' && return 0 } || ecdbg "songc exited $?"
-                dvar music_dir 7
+                music_dir="${music_dir:h}" songc "$@" && { usedCache='y' && return 0 } || ecdbg "songc exited $?"
                 # I just learned about `return`, so the usedCache logic is now useless. It's also kind of buggy and returns 1 in case of success.
                 # resetcolor
                 test -z "$q" && return 0
@@ -130,6 +124,7 @@ songd() {
             test -z "$usedCache" && {
                 #nonexistent path
                 fsaydbg Cache NOT found
+                local fm_expire=-1
                 mkdir -p "$spath"
                 test -z "$bp" && {
                     spotdl -f "$spath" -s "$q" && { sleep 1 && songd "$@" } || {

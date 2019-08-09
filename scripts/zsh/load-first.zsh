@@ -4,19 +4,14 @@ export NIGHTDIR="${0:h:h}/" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
 
+## Aliases
 alias seval='ge_ecdbg=y geval'
-
-function gquote() {
-    doc DEPRECATED Use '"{(qq)@}"'
-    ec "${(qq)@}"
-    return 0
-    local i
-    for i in "$@"
-    do
-        test -z "$i" && print -rn "''" " " || print -rn -- "${i:q}" " "
-    done
-}
 alias gq=gquote
+## Functions
+function gquote() {
+    doc Use this to control quoting centrally.
+    ec "${(q+@)@}"
+}
 function eval-dl()
 {
     case "$(uname)" in

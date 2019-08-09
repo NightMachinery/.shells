@@ -11,11 +11,14 @@ function rederr() {
 }
 dvar () {
     local debugcol
-    debugcol=("$dvar_col[@]")
-    test -z "$dvar_col" && debugcol=(255 120 0)
     # eval ecdbg "$1": '$"'"$1"'"'
     local pre=''
     test -z "$2" || pre="CODE $2 | "
+    
+    debugcol=("$dvar_col1[@]")
+    test -z "$dvar_col1" && debugcol=(255 120 0)
     ecdbg "$pre$(typeset -p "$1" 2>&1)"
+    debugcol=("$dvar_col2[@]")
+    test -z "$dvar_col2" && debugcol=(0 120 255)
     ecdbg "$pre$1 in env: $(printenv "$1")"
 }

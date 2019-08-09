@@ -50,7 +50,7 @@ export GPG_TTY
 psource ~/torch/install/bin/torch-activate
 
 export HH_CONFIG=hicolor
-source "$NIGHTDIR"/bash/load-others.bash
+test -n "$NO_AUTOLOAD_BASH" || source "$NIGHTDIR"/bash/load-others.bash
 
 ## Ugly Stuff
 export corra="198.143.181.104"
