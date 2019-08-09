@@ -9,9 +9,10 @@ function memoi-eval() {
     # typeset -Ag memoi_timestamp
     # typeset -Ag memoi_exit
     # typeset -Ag memoi_debug
-    silent redis-cli --raw ping || { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 }
     local now="$(date +%s)"
     local cmd="$(gq "$@")"
+
+    silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     { (( $(redis-cli --raw exists $cmd) )) && ecdbg ice0 && { (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && ecdbg fire0 && (( (now - $(redis-cli --raw hget $cmd timestamp)) <= memoi_expire )) && ecdbg fire1 } } && ecdbg monkey0 } && {
         dact fsay using memoi
         ecdbg Using memoi: "$cmd"

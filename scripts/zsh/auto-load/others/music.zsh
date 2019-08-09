@@ -12,7 +12,7 @@ songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
     local f
     f=()
-    # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
+    # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}"
     local p="${@: -1}"
     test -z "${p##-*}" && set -- $@ '.' #Don't quote or you'll get ''s.
     test -z "${p##-*}" && p='.'
