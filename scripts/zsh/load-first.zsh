@@ -134,14 +134,6 @@ function ruu() {
     seval "$f[@]" "$=a" "${@:3:q}"
 }
 alias noglob='noglob ruu ""'
-function geval() {
-    local cmd="$@"
-    test -z "$ge_ecdbg" && {
-        test -z "$ge_no_ec"  && ec "$cmd"
-        test -z "$ge_no_hist" && print -r -S -- "$cmd" #Add to history
-    } || ecdbg "$cmd"
-    eval -- "$cmd"
-}
 function ec() {
     if [[ -n $ZSH_VERSION ]]; then
         print -r -- "$@"

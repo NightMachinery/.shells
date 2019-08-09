@@ -28,10 +28,13 @@ unseal() {
     doc unseal
     doc in: un_fz un_p
     re 'ecdbg un_fz:'  "$un_fz[@]"
-    local other_options
+    local other_options fz_no_preview
     other_options=()
-    test -n "$un_no_preview" || other_options+=(--preview '<<<{} command fold -s -w $FZF_PREVIEW_COLUMNS')
-    local l="$(cat "$attic" | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${@:-}")"
+    test -n "$un_no_preview" || {
+        other_options+=(--preview "$FZF_SIMPLE_PREVIEW")
+        fz_no_preview=y
+        }
+    local l="$(cat "$attic" | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && print -z -- "$l" || ec "$l"
         ec "$l"|pbcopy

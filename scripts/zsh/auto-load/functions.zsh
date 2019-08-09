@@ -241,7 +241,7 @@ function '$'() { eval "$@" ; }
 
 function timer-raw() {
     #aliased to timer with noglob
-    eval "sleep $((($1)*60))" && eval "${@:2:q}"
+    eval "sleep $((($1)*60))" && eval "${(q@)@}"
 }
 function ubuntu-upgrade() {
     sudo apt update
@@ -447,7 +447,9 @@ function tlrlu(){
 }
 
 function raise-blood() ceer rederr.zsh source
-function rp() test -e "$1" && realpath "$1" || ge_no_hist=y ceer "$1" realpath
+function rp() {
+    test -e "$1" && realpath "$1" || ge_no_ec=y ge_no_hist=y ceer "$1" realpath
+}
 increment-last() {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'

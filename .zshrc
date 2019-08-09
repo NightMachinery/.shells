@@ -62,7 +62,7 @@ export ZSH=~/.oh-my-zsh
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git git-extras common-aliases lein pip sbt scala screen sprunge sudo vi-mode)
+plugins=(git git-extras common-aliases lein pip sbt scala screen sprunge sudo vi-mode redis-cli)
 eval-darwinq 'plugins+=(osx)'
 source $ZSH/oh-my-zsh.sh
 

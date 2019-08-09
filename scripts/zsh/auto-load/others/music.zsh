@@ -14,7 +14,7 @@ songc() {
     f=()
     # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
     local p="${@: -1}"
-    test -z "${p##-*}" && set -- "$@" '.'
+    test -z "${p##-*}" && set -- $@ '.' #Don't quote or you'll get ''s.
     test -z "${p##-*}" && p='.'
     # ec "$p" "${@:0:-1}"
     # test -z "$p" && set "$@"
@@ -28,7 +28,7 @@ songc() {
     gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
     # ec $#f
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
-    # re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
+    re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
     ! test -z "$f" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
 touch-tracks() {
@@ -69,6 +69,8 @@ songd() {
     Use songc to play already downloaded files.
     Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
     ecdbg "$@"
+    comment songd expects existent query
+    [[ "${@: -1}" =~ '--?.*' ]] && set -- "$@" ''
     local music_dir="${music_dir}/${musiccache:-cache}"
     local musiccache='/' #To avoid recursion. Can't be empty or it'll auto replace.
     mkdir -p "$music_dir"

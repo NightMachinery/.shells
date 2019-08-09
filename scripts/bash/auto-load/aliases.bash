@@ -33,7 +33,6 @@ alias zzz='sleepnow'
 alias lad=onla
 alias xlad=onxla
 alias pksay='pkill speechsynthesisd say'
-alias fz="fzf-noempty --bind 'tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top' --color=light --select-1 --exit-0 --multi"
 alias pkmu="pkill -f -- 'mpv.*--no-video'"
 alias c='command'
 alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
