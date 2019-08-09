@@ -1,3 +1,4 @@
+[[ -z $ZSH_VERSION ]] || source "$NIGHTDIR/zsh/saliases.zsh"
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
@@ -6,7 +7,7 @@ alias bat='bat --theme OneHalfLight'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'
 alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
-alias dbg='DEBUGME=dbg'
+alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
 alias agm='ag -C "${ag_c:-1}"'
 alias l='exa -al'

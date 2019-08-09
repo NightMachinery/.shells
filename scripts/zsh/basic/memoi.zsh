@@ -2,7 +2,7 @@
 ## Vars
 memoi_expire=$(( 3600*24*7 ))
 ## Functions
-function mem() { memoi_expire=$(( $1 * 60 )) reval "$@" }
+function meme() { memoi_expire=$(( $1 * 60 )) reval "$@" }
 function memoi-eval() {
     # typeset -Ag memoi_stdout
     # typeset -Ag memoi_stderr

@@ -4,6 +4,25 @@ export NIGHTDIR="${0:h:h}/" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
 
+
+comment() {
+
+}
+doc() {
+    #Used for documentation
+}
+function ec() {
+    if [[ -n $ZSH_VERSION ]]; then
+        print -r -- "$@"
+    else  # bash
+        echo -E -- "$@"
+    fi
+}
+function gquote() {
+    doc Use this to control quoting centrally.
+    ec "${(q+@)@}"
+}
+alias gq=gquote
 function run-on-each() {
     local i
     for i in "${@:2}"
@@ -14,6 +33,12 @@ function run-on-each() {
 alias re='run-on-each'
 run-on-each setopt re_match_pcre extendedglob
 ## Alias Module
+expand-aliases() {
+    doc 'See https://unix.stackexchange.com/questions/372811/better-understand-a-function-expanding-aliases-in-zsh'
+    unset 'functions[_expand-aliases]'
+    functions[_expand-aliases]="$@"
+    (($+functions[_expand-aliases])) && ec "${functions[_expand-aliases]#$'\t'}"
+}
 # Forked from https://blog.sebastian-daschner.com/entries/zsh-aliases
 alias-special() {
     local args="$@[2,-1]"
@@ -28,7 +53,7 @@ ialias() alias-special ialiases "$@"
 
 expand-alias-space() {
     (( $+baliases[$LBUFFER] )) ; insertBlank=$?
-    (( $+ialiases[$LBUFFER] )) || zle _expand_alias
+    (( $+ialiases[$LBUFFER] )) || zle expand-aliases-widget #_expand_alias
     zle self-insert
     if [[ "$insertBlank" = "0" ]]; then
         zle backward-delete-char
@@ -40,12 +65,7 @@ bindkey " " expand-alias-space
 bindkey -M isearch " " magic-space
 ## Aliases
 alias seval='ge_ecdbg=y geval'
-alias gq=gquote
 ## Functions
-function gquote() {
-    doc Use this to control quoting centrally.
-    ec "${(q+@)@}"
-}
 function eval-dl()
 {
     case "$(uname)" in
@@ -139,6 +159,7 @@ function rexa(){
     done
 }
 function expand-alias {
+    doc This only expands once. To expand all aliases, use 'expand-aliases'.
     if [[ -n $ZSH_VERSION ]]; then
         # shellcheck disable=2154  # aliases referenced but not assigned
         printf '%s\n' "${aliases[$1]}"
@@ -147,7 +168,7 @@ function expand-alias {
     fi
 }
 function force-expand {
-    local e="$(expand-alias "$1")"
+    local e="$(expand-aliases "$1")"
     test -z "$e" && e="$1"
     echo "$e"
 }
@@ -161,13 +182,6 @@ function ruu() {
     seval "$f[@]" "$=a" "${@:3:q}"
 }
 alias noglob='noglob ruu ""'
-function ec() {
-    if [[ -n $ZSH_VERSION ]]; then
-        print -r -- "$@"
-    else  # bash
-        echo -E -- "$@"
-    fi
-}
 colorfg() printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"
 colorbg() printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m"
 colorb() {
@@ -203,12 +217,6 @@ color() {
 resetcolor() printf %s "$reset_color"
 helloworld() {
     colorbg 0 0 255;colorfg 0 255; ec HELLO "$(colorfg 255 100)"BRAVE"$(colorfg 0 255)" $(colorbg 100 0 255)NEW$(colorbg 0 0 255) WORLD\!;resetcolor
-}
-comment() {
-
-}
-doc() {
-    #Used for documentation
 }
 printcolors() {
     printf "\x1b[${bg};2;${red};${green};${blue}m\n"
