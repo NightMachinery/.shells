@@ -4,6 +4,40 @@ export NIGHTDIR="${0:h:h}/" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
 
+function run-on-each() {
+    local i
+    for i in "${@:2}"
+    do
+        eval "$1 $(gq "$i")"
+    done
+}
+alias re='run-on-each'
+run-on-each setopt re_match_pcre extendedglob
+## Alias Module
+# Forked from https://blog.sebastian-daschner.com/entries/zsh-aliases
+alias-special() {
+    local args="$@[2,-1]"
+    alias "$args[@]"
+    [[ "$args[*]" =~ '\s*\b(.*)=.*' ]] &&
+        eval "$1[\$match[1]]=y"
+}
+typeset -Ag baliases
+typeset -Ag ialiases
+balias() alias-special baliases "$@"
+ialias() alias-special ialiases "$@"
+
+expand-alias-space() {
+    (( $+baliases[$LBUFFER] )) ; insertBlank=$?
+    (( $+ialiases[$LBUFFER] )) || zle _expand_alias
+    zle self-insert
+    if [[ "$insertBlank" = "0" ]]; then
+        zle backward-delete-char
+    fi
+}
+zle -N expand-alias-space
+
+bindkey " " expand-alias-space
+bindkey -M isearch " " magic-space
 ## Aliases
 alias seval='ge_ecdbg=y geval'
 alias gq=gquote
@@ -79,13 +113,6 @@ alias nisout='nig sout'
 alias niserr='nig serr'
 alias nis='nig silence'
 
-function run-on-each() {
-    local i
-    for i in "${@:2}"
-    do
-        eval "$1 $(gq "$i")"
-    done
-}
 function combine-funcs() {
     # Combine multiple functions into one named by $1; The result will run all functions with $@.
     local tmp321_string="function $1() { "
@@ -223,7 +250,6 @@ fsaydbg() {
         fsay "$@"
     }
 }
-alias re='run-on-each'
 silence eval 'export jufile=(*)'
 #-------------------------------
 alias zre='regexp-replace' #Change to function and add bash fallback
@@ -270,7 +296,6 @@ function add-path {
     eval "export $1"
 }
 
-re setopt re_match_pcre extendedglob
 
 cdm()
 {

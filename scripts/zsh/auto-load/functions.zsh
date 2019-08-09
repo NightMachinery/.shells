@@ -240,8 +240,9 @@ function ppgrep() {
 function '$'() { eval "$@" ; }
 
 function timer-raw() {
-    #aliased to timer with noglob
-    eval "sleep $((($1)*60))" && eval "${(q@)@}"
+    doc aliased to timer with noglob
+    defs=( loop fsayd )
+    eval "sleep $((($1)*60))" && eval "${(q+@)@[2,-1]:-$defs[@]}"
 }
 function ubuntu-upgrade() {
     sudo apt update
