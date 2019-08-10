@@ -13,38 +13,38 @@ alias bnu='HOMEBREW_NO_AUTO_UPDATE=1'
 
 insladd() {
     ec "$1" >> "$inslables"
-    test -z "$noi" ||
+    test -n "$noi" ||
         ins "$1"
 }
 insadd() {
     ec "$1" >> "$insables"
-    test -z "$noi" ||
+    test -n "$noi" ||
         ins "$1"
 }
 npmadd() {
     ec "$1" >> "$nodables"
-    test -z "$noi" ||
+    test -n "$noi" ||
         npm install -g "$1"
 }
 brew-bundle() { ec "$1 \"$2\"" >> "$brewables" }
 btadd() {
     brew-bundle tap "$1"
-    test -z "$noi" ||
+    test -n "$noi" ||
         brew tap "$1"
 }
 biadd() {
     brew-bundle brew "$1"
-    test -z "$noi" ||
+    test -n "$noi" ||
         bi "$1"
 }
 piadd() {
     ec "$1" >> "$pipables"
-    test -z "$noi" ||
+    test -n "$noi" ||
         pi "$1"
 }
 goi() {
     comment -u update -v verbose
-    test -z "$noi" ||
+    test -n "$noi" ||
         go get -u -v "$@"
 }
 gmi() {
@@ -52,12 +52,12 @@ gmi() {
 }
 gmiadd() {
     ec "$1" >> "$ins_gem"
-    test -z "$noi" ||
+    test -n "$noi" ||
         gmi "$1"
 }
 goiadd() {
     ec "$1" >> "$ins_go"
-    test -z "$noi" ||
+    test -n "$noi" ||
         goi "$1"
 }
 ins-npm() {
