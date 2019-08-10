@@ -16,5 +16,5 @@ function agr {
     doc 'usage: from=sth to=another agr [ag-args]'
     comment -l --files-with-matches
 
-    ag -0 -l "$from" "${@}" | pre-files "$from" "$to"
+    ag -0 -l --literal -- "$from" "${@}" | pre-files "$from" "$to"
 }
