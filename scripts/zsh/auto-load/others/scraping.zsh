@@ -1,18 +1,22 @@
 function wread() {
+    local file=''
+    [[ "$1" == '--file' ]] && {
+        test -e "$2" && file="$2" || return 33
+        shift 2
+    }
     setopt local_options pipefail
     local title author
     test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
     test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
-    { test -t 0 && { #stdin is HOPEFULLY not pipe
+    { test -z "$file" && { # No file, downloading
           test -z "$wr_force" && mercury-parser --format="${2}" "$1" || {
                   fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html
 # l
 # cat ./a.html
 mercury-html $1:q ./a.html $2:q"
               } } || {
-          #stdin is HOPEFULLY pipe
-          # ecdbg wread thinks input is from pipe
-          aget "cat > a.html ; mercury-html $1:q ./a.html $2:q"
+          # File supplied
+          aget "cat ${(q@)file} > a.html ; mercury-html $1:q ./a.html $2:q"
       } } |jq -e --raw-output '[
     (if .title then '"$title"' else empty end),
     (if .author then '"$author"' else empty end),
@@ -47,7 +51,7 @@ wayback-out() {
     aget "wayback ${@:q} ; cat *.html"
 }
 wread-wayback() {
-    wayback-out "$1" | wread "$@"
+    wayback-out "$1" | wread --file /dev/stdin "$@"
 }
 wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1

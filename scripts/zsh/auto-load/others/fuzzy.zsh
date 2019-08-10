@@ -14,7 +14,7 @@ fzf-noempty() {
 }
 fr() {
     sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
-    test -n "$sels" && printz -- "$1${fr_sep:- }${sels[@]:q:q}"
+    test -n "$sels" && printz "$1${fr_sep:- }${sels[@]:q:q}"
 }
 f() fr "$@" --max-depth 1
 fmn() {

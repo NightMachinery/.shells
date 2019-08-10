@@ -10,17 +10,20 @@ alias todo='attic_todo seal'
 alias todos='attic_todo unseal'
 alias todone='attic_todo exor'
 alias todo-import='attic_todo seal-import'
+alias todo-import-NUL='attic_todo seal-import-NUL'
 alias td=todo
 alias tds='cat "$attic_todo"'
 # alias ts=todos #CONFLICTING_NAME
 alias tn=todone
 alias tdi=todo-import
 ## core
+NUL2RS() sd '\x00' ''
+RS2NUL() sd '' '\x00'
 seal() {
     doc Use with 'uns' to store and retrieve one-liners
     doc Use exor to remove seals.
     local n=''
-    ! test -e "$attic" || n=$'\0'
+    ! test -e "$attic" || n=$''
     print -r -n -- "$n$(in-or-args "$@")"$'\n' >> "$attic"
 }
 alias uns=unseal
@@ -34,9 +37,9 @@ unseal() {
         other_options+=(--preview "$FZF_SIMPLE_PREVIEW")
         fz_no_preview=y
         }
-    local l="$(cat "$attic" | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
+    local l="$(<"$attic" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
-        { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz -- "$l" || ec "$l"
+        { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy
         return 0
     } }
@@ -66,4 +69,8 @@ seal-import() {
     local inp="$(in-or-args "$@")"
     re seal "${(@f)inp}"
 }
-
+seal-import-NUL() {
+    local inp="$(in-or-args "$@")"
+    # dact arger "${(@0)inp}"
+    re seal "${(@0)inp}"
+}

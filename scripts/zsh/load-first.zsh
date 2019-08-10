@@ -33,9 +33,8 @@ function run-on-each() {
 alias re='run-on-each'
 run-on-each setopt re_match_pcre extendedglob
 ## SSH Module
-if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ -n "$SSH_CONNECTION" ]] ; then
     amSSH=remote/ssh
-    # many other tests omitted
 else
     case $(ps -o comm= -p $PPID) in
         sshd|*/sshd) amSSH=remote/ssh;;
