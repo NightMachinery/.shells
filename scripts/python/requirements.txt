@@ -16,3 +16,4 @@ git+https://github.com/wustho/epr.git
 glances[action,browser,cloud,cpuinfo,docker,export,folders,gpu,graph,ip,raid,snmp,web,wifi]
 magic-wormhole
 waybackpack
+httpie
