@@ -32,6 +32,16 @@ function run-on-each() {
 }
 alias re='run-on-each'
 run-on-each setopt re_match_pcre extendedglob
+## SSH Module
+if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ]; then
+    amSSH=remote/ssh
+    # many other tests omitted
+else
+    case $(ps -o comm= -p $PPID) in
+        sshd|*/sshd) amSSH=remote/ssh;;
+    esac
+fi
+isSSH() test -n "$amSSH"
 ## Alias Module
 expand-aliases() {
     doc 'See https://unix.stackexchange.com/questions/372811/better-understand-a-function-expanding-aliases-in-zsh'
@@ -44,7 +54,7 @@ alias-special() {
     local args=("$@[2,-1]")
     # re 'ec arg:' "$args[@]"
     builtin alias "$args[@]"
-    [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*\b(.*)\b=.*' ]] &&
+    isSSH || [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*\b(.*)\b=.*' ]] &&
         {
             # ec "Setting $1 [$match[1]] to y"
             eval "$1[\$match[1]]=y"
@@ -64,10 +74,11 @@ expand-alias-space() {
     (( $+ialiases[$LBUFFER] )) || { (( $+aliases[$LBUFFER] )) && zle expand-aliases-widget } #_expand_alias
     [[ "$insertBlank" = "0" ]] || zle self-insert
 }
-zle -N expand-alias-space
-
-bindkey " " expand-alias-space
-bindkey -M isearch " " magic-space
+isSSH || {
+    zle -N expand-alias-space
+    bindkey " " expand-alias-space
+    bindkey -M isearch " " magic-space
+}
 ## Aliases
 alias seval='ge_ecdbg=y geval'
 ## Functions
