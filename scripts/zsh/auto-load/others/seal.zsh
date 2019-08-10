@@ -36,7 +36,7 @@ unseal() {
         }
     local l="$(cat "$attic" | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
-        { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && print -z -- "$l" || ec "$l"
+        { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz -- "$l" || ec "$l"
         ec "$l"|pbcopy
         return 0
     } }

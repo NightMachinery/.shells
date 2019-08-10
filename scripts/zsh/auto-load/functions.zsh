@@ -241,8 +241,7 @@ function '$'() { eval "$@" ; }
 
 function timer-raw() {
     doc aliased to timer with noglob
-    defs=( loop fsayd )
-    eval "sleep $((($1)*60))" && eval "${(q+@)@[2,-1]:-$defs[@]}"
+    eval "sleep $((($1)*60))" && eval ${(q+@)@[2,-1]:-${(z)/#/loop fsayd}}
 }
 function ubuntu-upgrade() {
     sudo apt update
@@ -263,7 +262,9 @@ function removeTrailingSlashes() {
 function p() {
     geval "$(gq "${@}")" "${"$(pbpaste)":q}"
 }
-function whz() { print -z -- "$(which "$1")" }
+function whz() {
+    printz "$(which "$1")" #"${(q-@)"$(which "$1")"}"
+}
 function k2pdf() {
     nis k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi "${k2_odpi:-450}" -y -ui-
     # -as

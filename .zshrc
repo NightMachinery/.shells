@@ -62,7 +62,7 @@ export ZSH=~/.oh-my-zsh
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git git-extras common-aliases lein pip sbt scala screen sprunge sudo vi-mode redis-cli)
+plugins=(git git-extras lein pip sbt scala screen sprunge sudo vi-mode redis-cli)
 eval-darwinq 'plugins+=(osx)'
 source $ZSH/oh-my-zsh.sh
 
@@ -166,14 +166,14 @@ autoload -U deer
 zle -N deer
 bindkey '\ek' deer
 rcLoaded='yes'
-source "$NIGHTDIR"/zsh/completions.zsh
+isI && test -n "$NIGHT_PERSONAL" && re source "$NIGHTDIR"/zsh/interactive/**/*(.)
 
 # sth in .zshrc overrides these so ...
 export FZF_BASE="${$(ge_no_ec=y rp fzf):h:h}/shell"
 # ecdbg "FZF_BASE: $FZF_BASE"
 test -d "$FZF_BASE" && {
     # ecdbg fzf loaded
-    re source "$FZF_BASE"/*.zsh 
+    re source "$FZF_BASE"/*.zsh
     export FZF_COMPLETION_TRIGGER=''
     bindkey '^T' fzf-completion
     bindkey '^I' expand-or-complete

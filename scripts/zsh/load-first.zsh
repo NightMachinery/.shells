@@ -41,23 +41,28 @@ expand-aliases() {
 }
 # Forked from https://blog.sebastian-daschner.com/entries/zsh-aliases
 alias-special() {
-    local args="$@[2,-1]"
-    alias "$args[@]"
-    [[ "$args[*]" =~ '\s*\b(.*)=.*' ]] &&
-        eval "$1[\$match[1]]=y"
+    local args=("$@[2,-1]")
+    # re 'ec arg:' "$args[@]"
+    builtin alias "$args[@]"
+    [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*\b(.*)\b=.*' ]] &&
+        {
+            # ec "Setting $1 [$match[1]] to y"
+            eval "$1[\$match[1]]=y"
+            # naliases[$match[1]]=y
+        }
 }
 typeset -Ag baliases
 typeset -Ag ialiases
+# typeset -Ag naliases #normal aliases
+
 balias() alias-special baliases "$@"
 ialias() alias-special ialiases "$@"
+# alias() alias-special naliases "$@"
 
 expand-alias-space() {
     (( $+baliases[$LBUFFER] )) ; insertBlank=$?
-    (( $+ialiases[$LBUFFER] )) || zle expand-aliases-widget #_expand_alias
-    zle self-insert
-    if [[ "$insertBlank" = "0" ]]; then
-        zle backward-delete-char
-    fi
+    (( $+ialiases[$LBUFFER] )) || { (( $+aliases[$LBUFFER] )) && zle expand-aliases-widget } #_expand_alias
+    [[ "$insertBlank" = "0" ]] || zle self-insert
 }
 zle -N expand-alias-space
 
@@ -66,6 +71,10 @@ bindkey -M isearch " " magic-space
 ## Aliases
 alias seval='ge_ecdbg=y geval'
 ## Functions
+function isDarwin() { [[ "$(uname)" == "Darwin" ]] }
+alias isD=isDarwin
+function isLinux() { [[ "$(uname)" == "Linux" ]] }
+alias isL=isLinux
 function eval-dl()
 {
     case "$(uname)" in
@@ -120,14 +129,14 @@ function silence() {
     { eval "$@:q"  } &> /dev/null
 }
 function nig() {
-  #silence not interactive
-  isI && eval "${@:2:q}" || "$1" "${@:2}"
+    #silence not interactive
+    isI && eval "${@:2:q}" || "$1" "${@:2}"
 }
 sout() {
-  { eval "$@:q" } > /dev/null
+    { eval "$@:q" } > /dev/null
 }
 serr() {
-  { eval "$@:q" } 2> /dev/null
+    { eval "$@:q" } 2> /dev/null
 }
 alias nisout='nig sout'
 alias niserr='nig serr'
@@ -274,10 +283,10 @@ isI() {
     ! test -z "$FORCE_INTERACTIVE" || [[ $- == *i* ]]
 }
 rgx() {
-  local a
-  (( $# == 2 )) && a="$(</dev/stdin)" || { a="$1" ; shift 1 }
-  zre a "$1" "$2"
-  ec "$a"
+    local a
+    (( $# == 2 )) && a="$(</dev/stdin)" || { a="$1" ; shift 1 }
+    zre a "$1" "$2"
+    ec "$a"
 }
 
 typeset -Ug path
@@ -297,16 +306,13 @@ function add-path {
     test -z "$p" && {
         eval "$1=$2:q"
     } ||
-    { eval 'case ":$p:" in
+        { eval 'case ":$p:" in
         *":$2:"*) :;; # already there
         *) '"$1"'="$2:$p";; # org/r PATH="$PATH:$1"
     esac' }
     eval "export $1"
 }
-
-
-cdm()
-{
+cdm() {
     mkdir -p -- "$1" &&
         cd -P -- "$1"
 }
@@ -322,7 +328,7 @@ redo() {
     done
 }
 function printz() {
-    test -n "$@" && print -z -- "$@"
+    test -n "$*" && print -rz -- "$@"
 }
 ## END
 run-on-each source "$NIGHTDIR"/zsh/basic/**/*(.)

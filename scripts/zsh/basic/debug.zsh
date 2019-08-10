@@ -1,3 +1,4 @@
+arger() { re 'ec arg:' "$@" }
 dact() {
     doc DEBUG Act
     test -z "$DEBUGME" || eval "$(gquote "$@")"

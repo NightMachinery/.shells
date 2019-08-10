@@ -3,8 +3,17 @@ export mpv_ipc=~/tmp/.mpvipc
 ## Aliases
 alias hear-noipc='mpv --keep-open=no --no-video'
 alias hearn='hear-noipc'
-alias hear='hear-noipc --input-ipc-server "$mpv_ipc"' #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 ## Functions
+hear() {
+    local args i
+    args=()
+    for i in "$@"
+    do
+        comment "mpv's JSON API returns relative paths."
+        test -e "$i" && args+="$(realpath "$i")" || args+="$i"
+    done
+    hear-noipc --input-ipc-server "$mpv_ipc" "$args[@]" #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
+}
 mpv-get() {
     <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "$mpv_ipc"|jq --raw-output -e .data
 }
