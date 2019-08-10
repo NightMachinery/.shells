@@ -3,7 +3,7 @@ lpassf() {
 }
 function lpassf_() {
     doc 'macro to create lpassf* functions'
-    local body="lpass$1 "'"$(lpassf "$*")"'
+    local body="re lpass$1 "'"${(@f)$(lpassf "$*")}"'
     eval "function lpassf$1() { $body }" 
 }
 re lpassf_ u p g
