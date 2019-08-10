@@ -7,6 +7,7 @@ function geval() {
     eval -- "$cmd"
 }
 function aget() {
+    doc "aget does not wait for all forked processed. Probably unsolable unless we invoke zsh -c"
     local u="$(uuidgen)"
     local erri jufile
     mkdir -p "$u" && ec "$(realpath "$u")" >> "$deleteus"

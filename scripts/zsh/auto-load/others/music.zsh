@@ -67,7 +67,7 @@ playlistc() {
     test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp "${(@f)pl}" }
 }
 playlister() {
-    find-music "$@" | fz --history "$music_dir/.fzfhist" # -q "$1"
+    find-music "$@" | fz #--history "$music_dir/.fzfhist" # -q "$1"
 }
 find-music() {
     memoi_expire="${fm_expire:-$memoi_expire}" memoi-eval fd -c never --follow -e m4a -e mp3 -e flac --full-path "$*" "${music_dir:-$HOME/my-music}"
