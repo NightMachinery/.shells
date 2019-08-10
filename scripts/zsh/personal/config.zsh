@@ -3,7 +3,7 @@ export HISTTIMEFORMAT="%m/%d/%Y %T " #I always tend to configure my machines wit
 isD && export NEDITOR='emacsclient' || export NEDITOR='nvim'
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
 export SUDO_EDITOR="$NEDITOR"
-export VISUAL='$NEDITOR'
+export VISUAL="$NEDITOR"
 export EDITOR="$VISUAL"
 unalias run-help &> /dev/null
 autoload run-help
