@@ -62,9 +62,11 @@ alias-special() {
     builtin alias "$args[@]"
     isSSH || [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]] &&
         {
-            test -z "$DEBUGME" || mhat2=("$args[@]")
+            test -z "$DEBUGME" || { mhat3=("$match[@]") ; mhat2=("$args[@]") }
             # ec "Setting $1 [$match[1]] to y"
             # ec "$match[2]"
+            unset "ialiases[${(b)match[1]}]"
+            unset "baliases[${(b)match[1]}]"
             eval "$1[\$match[1]]=y"
             doc we do not expand recursive aliases because that change behavior
             doc for an example, try 'alias arger="arger a b"' with this safety disabled
@@ -72,7 +74,10 @@ alias-special() {
             doc we could also ditch the automatic full expansion and manually expand till safety
             doc note that if the recursive alias is defined after this one, we will fail to detect it with our current brittle scheme.
             doc also note that our word-detection regex is probably off:D
-            ! { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } || ialiases[$match[1]]=y
+            ! { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } || {
+                test -z "$DEBUGME" || print -r ialiasing "$match[1]" to avoid recursion
+                ialiases[$match[1]]=y
+            }
         } || { ecerr aliasing "$args[*]" failed ; test -z "$DEBUGME" || mhat=("$args[@]") }
 }
 typeset -Ag baliases
@@ -155,7 +160,7 @@ function silence() {
 }
 function nig() {
     #silence not interactive
-    isI && eval "${@:2:q}" || "$1" "${@:2}"
+    isI && eval "$(gquote "${@:2}")" || "$1" "${@:2}"
 }
 sout() {
     { eval "$(gquote "$@")" } > /dev/null

@@ -2,7 +2,7 @@
 myInvocation="$(printf %q "${(%):-%x}")$((($#)) && printf ' %q' "$@")"
 echo "$myInvocation"
 
-eval "gtimeout $1 ${@:2:q}"
+eval "gtimeout $1 $(gquote "${@:2}")"
 res=$?
 # echo $res
 if [[ $res -eq 124 ]]; then

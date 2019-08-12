@@ -256,7 +256,7 @@ function removeTrailingSlashes() {
     esac
 }
 function p() {
-    geval "$(gq "${@}")" "${"$(pbpaste)":q}"
+    geval "$(gq "${@}")" "$(gq "$(pbpaste)")"
 }
 function whz() {
     printz "$(which "$1")" #"${(q-@)"$(which "$1")"}"
@@ -298,7 +298,7 @@ function retry-eval() {
 }
 
 function retry-limited() {
-    retry-limited-eval "$1" "${@:2:q}"
+    retry-limited-eval "$1" "$(gquote "${@:2}")"
 }
 function retry-limited-eval() {
     local limit=0
@@ -335,7 +335,7 @@ file-to-clipboard() {
 }
 function frep() {
     doc '@convenience @grep'
-    eval "${@:2:q}" |& ggrep -iP "$1"
+    eval "$(gquote "${@:2}")" |& ggrep -iP "$1"
 }
 function aas() {
     # aa "$@" --on-download-start aa-stream
@@ -405,30 +405,6 @@ function months() {
 10. October - 31 days
 11. November - 30 days
 12. December - 31 days"
-}
-function onla() {
-    geval "$(gquote "$@")"" ${$(last-added):q}"
-}
-function onxla(){
-    last-added|gxargs -I _ "$(gquote "$@")"
-}
-function onxlc(){
-    last-created|gxargs -I _ "$(gquote "$@")"
-}
-function first-file(){
-    exa|head -n1
-}
-function onlac(){
-    geval "$(gquote "$@")"" ${$(last-accessed):q}"
-}
-function onlm(){
-    geval "$(gquote "$@")"" ${$(last-modified):q}"
-}
-function onlc(){
-    geval "$(gquote "$@")"" ${$(last-created):q}"
-}
-function onff(){
-    geval "$(gquote "$@")"" ${$(first-file):q}"
 }
 function play-and-trash(){
     #aliased to pat
@@ -645,7 +621,7 @@ html2epub-pandoc-simple() {
 }
 aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
-    aget "aa -Z ${@:2:q}
+    aget "aa -Z $(gquote "${@:2}")
 html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
     2m2k "$1".epub

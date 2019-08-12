@@ -12,7 +12,8 @@ alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
 alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
 alias agm='ag -C "${ag_c:-1}"'
-alias l='exa -al'
+alias l='exa -a --oneline'
+alias ll='exa -a -l'
 alias lt='l -T'
 alias lc='l -s created'
 alias lm='l -s modified'
@@ -119,7 +120,7 @@ alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
 alias bi="brew install"
-alias bci="brew cask install"
+alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'

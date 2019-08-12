@@ -17,8 +17,6 @@ alias tds='cat "$attic_todo"'
 alias tn=todone
 alias tdi=todo-import
 ## core
-NUL2RS() sd '\x00' ''
-RS2NUL() sd '' '\x00'
 seal() {
     doc Use with 'uns' to store and retrieve one-liners
     doc Use exor to remove seals.
