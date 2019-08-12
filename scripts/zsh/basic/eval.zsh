@@ -35,8 +35,9 @@ function nulterm() {
     ec $'\0'
 }
 function ruu() {
+    doc helper function to expand aliases for commands like sudo, nohup, etc
     local f=()
-    [[ "$1" =~ '\s*' ]] || f+="$1"
+    [[ "$1" =~ '^\s*$' ]] || f+="${=1}"
     local a="$(force-expand "$2")"
     comment @lilbug strip-left
     a="$(strip "$a" 'noglob ')"

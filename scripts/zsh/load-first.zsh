@@ -7,6 +7,8 @@ autoload -U regexp-replace
 
 ## Global Aliases
 alias -g MAGIC=')"'
+## Vars
+zshword='[a-zA-Z0-9!_-]' #unused, I opted for simpler solutions
 ##
 
 comment() {
@@ -56,9 +58,11 @@ expand-aliases() {
 alias-special() {
     local args=("$@[2,-1]")
     # re 'ec arg:' "$args[@]"
+    # ec "$args[*]"
     builtin alias "$args[@]"
-    isSSH || [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*\b(.*)\b="?'"'?([a-zA-Z0-9_-]*)\s?.*'?\"?" ]] &&
+    isSSH || [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]] &&
         {
+            test -z "$DEBUGME" || mhat2=("$args[@]")
             # ec "Setting $1 [$match[1]] to y"
             # ec "$match[2]"
             eval "$1[\$match[1]]=y"
@@ -68,8 +72,8 @@ alias-special() {
             doc we could also ditch the automatic full expansion and manually expand till safety
             doc note that if the recursive alias is defined after this one, we will fail to detect it with our current brittle scheme.
             doc also note that our word-detection regex is probably off:D
-            { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } && ialiases[$match[1]]=y
-        }
+            ! { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } || ialiases[$match[1]]=y
+        } || { ecerr aliasing "$args[*]" failed ; test -z "$DEBUGME" || mhat=("$args[@]") }
 }
 typeset -Ag baliases
 typeset -Ag ialiases
@@ -81,7 +85,7 @@ alias() alias-special naliases "$@"
 
 expand-alias-space() {
     (( $+baliases[$LBUFFER] )) ; insertBlank=$?
-    (( $+ialiases[$LBUFFER] )) || { (( $+aliases[$LBUFFER] )) && zle expand-aliases-widget } #_expand_alias
+    [[ -n "$RBUFFER" ]] || (( $+ialiases[$LBUFFER] )) || { (( $+aliases[$LBUFFER] )) && zle expand-aliases-widget } #_expand_alias
     [[ "$insertBlank" = "0" ]] || zle self-insert
 }
 isSSH || {

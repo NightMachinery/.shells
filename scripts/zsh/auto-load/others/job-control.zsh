@@ -4,6 +4,6 @@ inbg() {
 }
 awaysh() inbg silent "$@"
 function away() {
-    nohup -- "$@" &
+    ruu 'nohup --' "$@" &
     disown &>/dev/null  # Prevent whine if job has already completed
 }

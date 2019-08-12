@@ -726,24 +726,6 @@ jdl() {
     jej
     re jdl-helper *(D)
 }
-w2e-curl() {
-    h2ed=html2epub-pandoc-simple we_dler=wread-curl w2e "$@"
-}
-wread-curl() {
-    gurl "$1"
-}
-w2e-gh() {
-    w2e-curl "$1" "${(@f)$(gh-to-md "${@:2}")}"
-}
-gh-to-md() {
-    local urls=() i
-    for i in "$@"
-    do
-        [[ "$i" == *.(md|rst) ]] || i="${i}/blob/master/README.md"
-        urls+="$i"
-    done
-    rex 'rgx _ blob raw' "$urls[@]"
-}
 emj-old () emoj --copy "$*"
 emj() emoji-finder "$@"
 2m2k2h() { 2m2k "$@" && { trs "$1"

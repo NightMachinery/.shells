@@ -17,11 +17,11 @@ mercury-html $1:q ./a.html $2:q"
               } } || {
           # File supplied
           aget "cat ${(q@)file} > a.html ; mercury-html $1:q ./a.html $2:q"
-      } } |jq -e --raw-output '[
+      } } |jq -e --raw-output 'if .content then [
     (if .title then '"$title"' else empty end),
     (if .author then '"$author"' else empty end),
     .content
-] | join("\n\n")' #'.content'
+] | join("\n\n") else null end'
 }
 function mercury-html() {
     doc USAGE: url html-file output-mode
@@ -55,4 +55,27 @@ wread-wayback() {
 }
 wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
+}
+w2e-curl() {
+    h2ed=html2epub-pandoc-simple we_dler=wread-curl w2e "$@"
+}
+wread-curl() {
+    gurl "$1"
+}
+w2e-gh() {
+    w2e-curl "$1" "${(@f)$(gh-to-md "${@:2}")}"
+}
+gh-to-md() {
+    local urls=() i i2
+    for i in "$@"
+    do
+        [[ "$i" == *.(md|rst) ]] || { i2="${i}/blob/master/README.md"
+                                      url-exists "$i2" || i2="${i}/blob/master/README.rst"
+                                      url-exists "$i2" || i2="${i}/blob/master/readme.md"
+                                      url-exists "$i2" || i2="${i}/blob/master/readme.rst"
+                                      i="$i2"
+        }
+        url-exists "$i" && urls+="$i" || color red "$i does not seem to exist." >&2
+    done
+    rex 'rgx _ blob raw' "$urls[@]"
 }

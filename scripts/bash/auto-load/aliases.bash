@@ -1,5 +1,6 @@
 [[ -z $ZSH_VERSION ]] || source "$NIGHTDIR/zsh/saliases.zsh"
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias url-exists='silent wget --spider'
 alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
