@@ -63,16 +63,16 @@ wread-curl() {
     gurl "$1"
 }
 w2e-gh() {
-    w2e-curl "$1" "${(@f)$(gh-to-md "${@:2}")}"
+    w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }
-gh-to-md() {
+gh-to-readme() {
     local urls=() i i2
     for i in "$@"
     do
         [[ "$i" == *.(md|rst) ]] || { i2="${i}/blob/master/README.md"
-                                      url-exists "$i2" || i2="${i}/blob/master/README.rst"
-                                      url-exists "$i2" || i2="${i}/blob/master/readme.md"
-                                      url-exists "$i2" || i2="${i}/blob/master/readme.rst"
+                                      url-exists "$i2" || { i2="${i}/blob/master/README.rst"
+                                                            url-exists "$i2" || { i2="${i}/blob/master/readme.md"
+                                                                                  url-exists "$i2" || { i2="${i}/blob/master/readme.rst" } } }
                                       i="$i2"
         }
         url-exists "$i" && urls+="$i" || color red "$i does not seem to exist." >&2

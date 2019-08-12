@@ -14,13 +14,13 @@ function memoi-eval() {
 
     silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     { (( $(redis-cli --raw exists $cmd) )) && ecdbg ice0 && { (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && ecdbg fire0 && (( (now - $(redis-cli --raw hget $cmd timestamp)) <= memoi_expire )) && ecdbg fire1 } } && ecdbg monkey0 } && {
-        dact fsay using memoi
+        # dact fsay using memoi
         ecdbg Using memoi: "$cmd"
         silent redis-cli --raw hexists $cmd stdout && ec "$(redis-cli --raw hget $cmd stdout)"
         silent redis-cli --raw hexists $cmd stderr && ec "$(redis-cli --raw hget $cmd stderr)"
         (exit 0)
    } || {
-        dact fsay memoi not fresh enough
+        # dact fsay memoi not fresh enough
         ecdbg 'Evaling (no memoi): ' "$cmd"
         local errfile="$(mktemp)"
         local out
