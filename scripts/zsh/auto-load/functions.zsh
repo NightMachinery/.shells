@@ -411,28 +411,28 @@ function months() {
 12. December - 31 days"
 }
 function onla() {
-    geval "$@:q"" ${$(last-added):q}"
+    geval "$(gquote "$@")"" ${$(last-added):q}"
 }
 function onxla(){
-    last-added|gxargs -I _ "$@:q"
+    last-added|gxargs -I _ "$(gquote "$@")"
 }
 function onxlc(){
-    last-created|gxargs -I _ "$@:q"
+    last-created|gxargs -I _ "$(gquote "$@")"
 }
 function first-file(){
     exa|head -n1
 }
 function onlac(){
-    geval "$@:q"" ${$(last-accessed):q}"
+    geval "$(gquote "$@")"" ${$(last-accessed):q}"
 }
 function onlm(){
-    geval "$@:q"" ${$(last-modified):q}"
+    geval "$(gquote "$@")"" ${$(last-modified):q}"
 }
 function onlc(){
-    geval "$@:q"" ${$(last-created):q}"
+    geval "$(gquote "$@")"" ${$(last-created):q}"
 }
 function onff(){
-    geval "$@:q"" ${$(first-file):q}"
+    geval "$(gquote "$@")"" ${$(first-file):q}"
 }
 function play-and-trash(){
     #aliased to pat
@@ -661,7 +661,7 @@ erase-ansi() {
     gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
 }
 ea() {
-    eval "$@:q" | erase-ansi
+    eval "$(gquote "$@")" | erase-ansi
 }
 tldr() nig ea command tldr "$@"
 pre-files() {

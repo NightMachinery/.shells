@@ -136,17 +136,17 @@ function psource()
 
 alias silent=silence
 function silence() {
-    { eval "$@:q"  } &> /dev/null
+    { eval "$(gquote "$@")"  } &> /dev/null
 }
 function nig() {
     #silence not interactive
     isI && eval "${@:2:q}" || "$1" "${@:2}"
 }
 sout() {
-    { eval "$@:q" } > /dev/null
+    { eval "$(gquote "$@")" } > /dev/null
 }
 serr() {
-    { eval "$@:q" } 2> /dev/null
+    { eval "$(gquote "$@")" } 2> /dev/null
 }
 alias nisout='nig sout'
 alias niserr='nig serr'
