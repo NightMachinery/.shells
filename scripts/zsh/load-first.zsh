@@ -110,7 +110,7 @@ function eval-darwin()
 {
     case "$(uname)" in
         Darwin)
-            eval "${@:q}"
+            eval "$(gquote "$@")"
             ;;
         Linux)
 
@@ -123,7 +123,7 @@ function eval-linux()
 
         ;;
         Linux)
-            eval "${@:q}"
+            eval "$(gquote "$@")"
         ;;esac
 }
 function psource()

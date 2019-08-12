@@ -3,7 +3,7 @@ re "silence unalias" a la map p fd ff pip fd sp # mv cp
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
 alias nn='nnn -d'
-alias bat='bat --theme OneHalfLight'
+alias bat='bat --theme OneHalfLight --pager="less -FRXn"'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'
 alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"

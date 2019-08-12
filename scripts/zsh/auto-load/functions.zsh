@@ -67,7 +67,7 @@ sin() {
     export FORCE_INTERACTIVE=y
     sb
     source ~/.zshrc
-    eval "${@:q}"
+    eval "$(gquote "$@")"
 }
 imdb() imdbpy search movie --first "$*"
 playtmp() {

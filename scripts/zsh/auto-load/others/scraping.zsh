@@ -48,7 +48,7 @@ wayback() {
     wayback_machine_downloader -e -t "${wa_t:-20170505152803}" -d ./ -p 1 "$@"
 }
 wayback-out() {
-    aget "wayback ${@:q} ; cat *.html"
+    aget "wayback $(gquote "$@") ; cat *.html"
 }
 wread-wayback() {
     wayback-out "$1" | wread --file /dev/stdin "$@"
