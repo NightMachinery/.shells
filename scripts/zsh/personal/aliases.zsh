@@ -6,7 +6,7 @@ ialias zb='z -b'      # quickly cd to the parent directory
 
 ialias zshrc='$=EDITOR ~/.zshrc'
 ialias zshenv='$=EDITOR ~/.zshenv'
-alias hgrep="fc -El 0 | grep"
+alias hrep="fc -El 0 | grep"
 alias grep='grep --color=auto'
 
 ialias plc=playlistc

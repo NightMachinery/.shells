@@ -12,7 +12,7 @@ if [[ -n "$XIVIEWER" ]]; then
     for ft in $_image_fts; do alias -s $ft=$XIVIEWER; done
 fi
 
-_media_fts=(ape avi flv mkv mov  mpeg mpg rm webm)
+_media_fts=(ape avi flv mp4 mkv mov  mpeg mpg rm webm)
 for ft in $_media_fts; do alias -s $ft=mpv; done
 _audio_fts=(mp3 m4a ogg flac ogm opus wav)
 for ft in $_audio_fts; do alias -s $ft=hear; done
