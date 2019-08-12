@@ -1,21 +1,11 @@
 ## Vars
-export mpv_ipc=~/tmp/.mpvipc
+export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Aliases
-alias hear-noipc='mpv --keep-open=no --no-video'
+alias hear-noipc='command mpv --keep-open=no --no-video'
 alias hearn='hear-noipc'
 ## Functions
 hear() {
-    local args i
-    args=()
-    for i in "$@"
-    do
-        comment "mpv's JSON API returns relative paths."
-        test -e "$i" && args+="$(realpath "$i")" || args+="$i"
-    done
-    hear-noipc --input-ipc-server "$mpv_ipc" "$args[@]" #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
-}
-mpv-get() {
-    <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "$mpv_ipc"|jq --raw-output -e .data
+    hear-noipc --input-ipc-server "$mpv_audio_ipc" "$(rpargs "$@")" #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 }
 songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.

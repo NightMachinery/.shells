@@ -1,7 +1,7 @@
 wh() { which "$@" |btz }
 rtf2txt() { unrtf "$@" | html2text }
 mn() {
-    man "$@" || lesh "$1"
+    man "$@" || lesh "$@"
 }
 blc() {
     doc brew link custom
@@ -466,8 +466,6 @@ function away() {
 outlinify() {
     map 'https://outline.com/$1' "$@"
 }
-les() { eval "$@:q" |& less }
-lesh() les "$1" --help
 html2epub-calibre() {
     local u="$1 $(uuidgen).html"
     merge-html "${@:3}" > "$u"
