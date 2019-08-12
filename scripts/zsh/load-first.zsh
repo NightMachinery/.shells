@@ -1,9 +1,13 @@
 # DEBUGME=y
+### Initiate the Darkness
 export NIGHTDIR="${0:h:h}/" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
 
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
 
+## Global Aliases
+alias -g MAGIC=')"'
+##
 
 comment() {
 
@@ -53,20 +57,27 @@ alias-special() {
     local args=("$@[2,-1]")
     # re 'ec arg:' "$args[@]"
     builtin alias "$args[@]"
-    isSSH || [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*\b(.*)\b=.*' ]] &&
+    isSSH || [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*\b(.*)\b="?'"'?([a-zA-Z0-9_-]*)\s?.*'?\"?" ]] &&
         {
             # ec "Setting $1 [$match[1]] to y"
+            # ec "$match[2]"
             eval "$1[\$match[1]]=y"
-            # naliases[$match[1]]=y
+            doc we do not expand recursive aliases because that change behavior
+            doc for an example, try 'alias arger="arger a b"' with this safety disabled
+            doc we can add a new class of once-exepanders that only expand once
+            doc we could also ditch the automatic full expansion and manually expand till safety
+            doc note that if the recursive alias is defined after this one, we will fail to detect it with our current brittle scheme.
+            doc also note that our word-detection regex is probably off:D
+            { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } && ialiases[$match[1]]=y
         }
 }
 typeset -Ag baliases
 typeset -Ag ialiases
-# typeset -Ag naliases #normal aliases
+typeset -Ag naliases #normal aliases #now useless
 
 balias() alias-special baliases "$@"
 ialias() alias-special ialiases "$@"
-# alias() alias-special naliases "$@"
+alias() alias-special naliases "$@"
 
 expand-alias-space() {
     (( $+baliases[$LBUFFER] )) ; insertBlank=$?
@@ -190,15 +201,6 @@ function force-expand {
     local e="$(expand-aliases "$1")"
     test -z "$e" && e="$1"
     echo "$e"
-}
-function ruu() {
-    local f=()
-    test -z "$1" || f+="$1"
-    local a="$(force-expand "$2")"
-    comment @lilbug strip-left
-    a="$(strip "$a" 'noglob ')"
-    a="$(strip "$a" 'nocorrect ')"
-    seval "$f[@]" "$=a" "${@:3:q}"
 }
 alias noglob='noglob ruu ""'
 colorfg() printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"

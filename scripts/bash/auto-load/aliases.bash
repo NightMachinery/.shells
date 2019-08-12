@@ -1,5 +1,6 @@
 [[ -z $ZSH_VERSION ]] || source "$NIGHTDIR/zsh/saliases.zsh"
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
 alias nn='nnn -d'
@@ -122,8 +123,6 @@ alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
-alias emc="emacsclient -t"
-alias emcg="emacsclient -c"
 alias y="noglob youtube-dl --no-playlist"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"

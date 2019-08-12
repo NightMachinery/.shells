@@ -34,7 +34,7 @@ unseal() {
     local other_options fz_no_preview
     other_options=()
     test -n "$un_no_preview" || {
-        other_options+=(--preview "$FZF_SIMPLE_PREVIEW")
+        other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y
         }
     local l="$(<"$attic" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"

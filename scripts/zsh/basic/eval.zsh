@@ -34,3 +34,12 @@ function nulterm() {
     reval "$@"
     ec $'\0'
 }
+function ruu() {
+    local f=()
+    [[ "$1" =~ '\s*' ]] || f+="$1"
+    local a="$(force-expand "$2")"
+    comment @lilbug strip-left
+    a="$(strip "$a" 'noglob ')"
+    a="$(strip "$a" 'nocorrect ')"
+    seval "$f[@]" "$=a" "$(gquote "${@:3:q}")"
+}

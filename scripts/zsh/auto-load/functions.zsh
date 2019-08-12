@@ -191,10 +191,6 @@ function mp3-to-mp4() (
     # -c:a copy -r 1
 )
 function sleepnow() ( sleep "${1:-7}"; pmset sleepnow )
-silent_background() {
-    { 1>/dev/null 2>&1 3>&1 eval "$@"& }
-    disown &>/dev/null  # Prevent whine if job has already completed
-}
 function rm-alpha() {
     local B=$(basename "$1"); local D=$(dirname "$1");
     convert "$1" -background "$2" -alpha remove "$D/${B%.*}_$2.png"
@@ -237,7 +233,7 @@ function ppgrep() {
             ;;
     esac
 }
-function '$'() { eval "$@" ; }
+function '$'() { eval "$(gquote "$@")" ; }
 
 function timer-raw() {
     doc aliased to timer with noglob
@@ -459,9 +455,6 @@ increment-last() {
     #fc might not work in bash
     local cmd=${$(fc -nl -1 -1| perl -pe "$pe")}
     geval "$cmd"
-}
-function away() {
-    nohup "$@" & disown
 }
 outlinify() {
     map 'https://outline.com/$1' "$@"

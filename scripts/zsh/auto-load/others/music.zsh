@@ -54,7 +54,7 @@ touch-tracks_() {
 }
 playlistc() {
     local pl="$(fd --follow -t f '.' "${playlist_dir:-$HOME/playlists/}" | fz -q "$*")"
-    test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp "${(@f)pl}" }
+    test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp +s "${(@f)pl}" }
 }
 playlister() {
     find-music "$@" | fz #--history "$music_dir/.fzfhist" # -q "$1"
@@ -64,8 +64,7 @@ find-music() {
 }
 songd() {
     music_dir=~/my-music/ ; musiccache='' #BUG To hardcode-circumvent zsh's unset bug.
-    doc 'zsh-only
-    Use songc to play already downloaded files.
+    doc 'Use songc to play already downloaded files.
     Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
     ecdbg "$@"
     comment songd expects existent query
