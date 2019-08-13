@@ -14,3 +14,7 @@ carbon-now-cli
 emoji-finder
 oji
 dockly
+terminal-image-cli
+chalk-cli
+chalk-animation
+strip-ansi-cli

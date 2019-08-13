@@ -17,3 +17,4 @@ glances[action,browser,cloud,cpuinfo,docker,export,folders,gpu,graph,ip,raid,snm
 magic-wormhole
 waybackpack
 httpie
+tqdm
