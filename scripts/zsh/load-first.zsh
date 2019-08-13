@@ -39,6 +39,7 @@ function run-on-each() {
 }
 alias re='run-on-each'
 run-on-each setopt re_match_pcre extendedglob
+source "$NIGHTDIR"/zsh/basic/debug.zsh
 ## SSH Module
 if [ -n "$SSH_CLIENT" ] || [ -n "$SSH_TTY" ] || [[ -n "$SSH_CONNECTION" ]] ; then
     amSSH=remote/ssh
@@ -69,12 +70,11 @@ alias-special() {
             unset "ialiases[${(b)match[1]}]"
             unset "baliases[${(b)match[1]}]"
             eval "$1[\$match[1]]=y"
-            doc we do not expand recursive aliases because that change behavior
+            doc we do not expand recursive aliases because that changes behavior
             doc for an example, try 'alias arger="arger a b"' with this safety disabled
             doc we can add a new class of once-exepanders that only expand once
             doc we could also ditch the automatic full expansion and manually expand till safety
             doc note that if the recursive alias is defined after this one, we will fail to detect it with our current brittle scheme.
-            doc also note that our word-detection regex is probably off:D
             ! { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } || {
                 test -z "$DEBUGME" || print -r ialiasing "$match[1]" to avoid recursion
                 ialiases[$match[1]]=y
@@ -288,4 +288,4 @@ function printz() {
     test -n "$*" && print -rz -- "$@"
 }
 ## END
-run-on-each source "$NIGHTDIR"/zsh/basic/**/*(.)
+run-on-each source "$NIGHTDIR"/zsh/basic/auto-load/**/*(.)
