@@ -366,7 +366,6 @@ function set-fk-icon-size() {
 function set-finder-icon-size() {
     /usr/libexec/PlistBuddy -c "set StandardViewSettings:IconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finder itself.
 }
-function loop() { while true; do eval "${@}"; sleep ${lo_s:-1}; done ; }
 function rename-ebook() {
     local filename=$(basename "$1")
     local extension="${filename##*.}"

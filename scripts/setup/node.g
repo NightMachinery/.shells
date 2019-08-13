@@ -14,3 +14,10 @@ carbon-now-cli
 emoji-finder
 oji
 dockly
+randomcolor
+zooqle
+emma-cli
+janeway
+seedrandom
+commander
+chalk-animation

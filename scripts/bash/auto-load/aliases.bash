@@ -1,6 +1,6 @@
 [[ -z $ZSH_VERSION ]] || source "$NIGHTDIR/zsh/saliases.zsh"
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
-alias url-exists='silent wget --spider'
+alias url-exists='curl --output /dev/null --silent -r 0-0 --fail --location' #Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
 alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
@@ -78,7 +78,6 @@ alias ddg='ddgr --unsafe -n 6'
 alias dg='ddg --noprompt'
 alias ggg='googler -n 6'
 alias gg='ggg --noprompt'
-alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 alias pdc='p sdc'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias rsp-safe='rsync --human-readable --xattrs --times --partial-dir=.rsync-partial  --info=progress2 -r'

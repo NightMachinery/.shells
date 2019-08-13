@@ -70,24 +70,27 @@ gh-to-readme() {
     for i in "$@"
     do
         ! [[ "$i" =~ 'github.com' ]] || [[ "$i" == *.(md|rst) ]] ||
-            { i2="${i}/blob/master/README.md"
-              url-exists "$i2" ||
-                  { i2="${i}/blob/master/README.rst"
-                    url-exists "$i2" ||
-                        { i2="${i}/blob/master/readme.md"
-                          url-exists "$i2" ||
-                              { i2="${i}/blob/master/readme.rst"
-                                url-exists "$i2" ||
-                                    {
-                                        for readme in "${(0@)$(permute-case readme)}"
-                                        do
-                                            i2="${i}/blob/master/${readme}.md"
-                                            url-exists "$i2" && break
-                                            i2="${i}/blob/master/${readme}.rst"
-                                            url-exists "$i2" && break
-                                        done
-                                    } } } }
-              i="$i2"
+            {    i2="${i}.md"
+                 comment we hope to handle wiki pages with method, but beware that nonexistent wiki pages trigger create a new page, not the desired not existent response.
+                 url-exists "$i2" ||
+                     { i2="${i}/blob/master/README.md"
+                       url-exists "$i2" ||
+                           { i2="${i}/blob/master/README.rst"
+                             url-exists "$i2" ||
+                                 { i2="${i}/blob/master/readme.md"
+                                   url-exists "$i2" ||
+                                       { i2="${i}/blob/master/readme.rst"
+                                         url-exists "$i2" ||
+                                             {
+                                                 for readme in "${(0@)$(permute-case readme)}"
+                                                 do
+                                                     i2="${i}/blob/master/${readme}.md"
+                                                     url-exists "$i2" && break
+                                                     i2="${i}/blob/master/${readme}.rst"
+                                                     url-exists "$i2" && break
+                                                 done
+                                             } } } } }
+                 i="$i2"
             }
         url-exists "$i" && urls+="$i" || color red "$i does not seem to exist." >&2
     done
