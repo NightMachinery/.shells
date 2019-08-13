@@ -67,6 +67,7 @@ alias-special() {
             test -z "$DEBUGME" || { mhat3=("$match[@]") ; mhat2=("$args[@]") }
             # ec "Setting $1 [$match[1]] to y"
             # ec "$match[2]"
+            test -z "$match[1]" && { ecerr Empty alias detected. Called with "$args[@]" ; return 1 }
             unset "ialiases[${(b)match[1]}]"
             unset "baliases[${(b)match[1]}]"
             eval "$1[\$match[1]]=y"
