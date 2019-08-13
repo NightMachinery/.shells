@@ -1,16 +1,19 @@
 [[ -z $ZSH_VERSION ]] || source "$NIGHTDIR/zsh/saliases.zsh"
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias url-exists='curl --output /dev/null --silent -r 0-0 --fail --location' #Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
+alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
 alias nn='nnn -d'
-alias bat='bat --theme OneHalfLight'
+alias bat='bat --theme OneHalfLight --pager="less -FRXn"'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'
 alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
 alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
 alias agm='ag -C "${ag_c:-1}"'
-alias l='exa -al'
+alias l='exa -a --oneline'
+alias ll='exa -a -l'
 alias lt='l -T'
 alias lc='l -s created'
 alias lm='l -s modified'
@@ -41,12 +44,11 @@ alias px='ruu proxychains4'
 alias set-timezone='sudo dpkg-reconfigure tzdata'
 alias timer='noglob timer-raw'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
-alias mpv='mpv --fs'
 alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
 eval-linux alias gnc=nc
-alias dlga="deluge-console add"
+alias dlga="noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
@@ -76,7 +78,6 @@ alias ddg='ddgr --unsafe -n 6'
 alias dg='ddg --noprompt'
 alias ggg='googler -n 6'
 alias gg='ggg --noprompt'
-alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 alias pdc='p sdc'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias rsp-safe='rsync --human-readable --xattrs --times --partial-dir=.rsync-partial  --info=progress2 -r'
@@ -118,13 +119,11 @@ alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
 alias bi="brew install"
-alias bci="brew cask install"
+alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
-alias emc="emacsclient -t"
-alias emcg="emacsclient -c"
 alias y="noglob youtube-dl --no-playlist"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"

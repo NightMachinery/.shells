@@ -18,3 +18,5 @@ magic-wormhole
 waybackpack
 httpie
 tqdm
+subliminal
+rotten_tomatoes_cli

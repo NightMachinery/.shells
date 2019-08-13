@@ -1,21 +1,11 @@
 ## Vars
-export mpv_ipc=~/tmp/.mpvipc
+export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Aliases
-alias hear-noipc='mpv --keep-open=no --no-video'
+alias hear-noipc='command mpv --keep-open=no --no-video'
 alias hearn='hear-noipc'
 ## Functions
 hear() {
-    local args i
-    args=()
-    for i in "$@"
-    do
-        comment "mpv's JSON API returns relative paths."
-        test -e "$i" && args+="$(realpath "$i")" || args+="$i"
-    done
-    hear-noipc --input-ipc-server "$mpv_ipc" "$args[@]" #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
-}
-mpv-get() {
-    <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "$mpv_ipc"|jq --raw-output -e .data
+    hear-noipc --input-ipc-server "$mpv_audio_ipc" "${(0@)$(rpargs "$@")}" #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 }
 songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
@@ -25,19 +15,13 @@ songc() {
     local p="${@: -1}"
     test -z "${p##-*}" && set -- $@ '.' #Don't quote or you'll get ''s.
     test -z "${p##-*}" && p='.'
-    # ec "$p" "${@:0:-1}"
-    # test -z "$p" && set "$@"
-    local f2 #="$(playlister "$p")"
-    nulterm playlister "$p" |read -d '' -r f2
-    dvar f2
+    local f2 ="$(playlister "$p")"
     f+=( ${(@f)f2} )
-    # zsh is messed up with its arrays
     local autopl="${playlist_dir:-$HOME/playlists}/autopl/"
     mkdir -p "$autopl"
     gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
-    # ec $#f
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
-    re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
+    # re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
     ! test -z "$f" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
 touch-tracks() {
@@ -64,18 +48,18 @@ touch-tracks_() {
 }
 playlistc() {
     local pl="$(fd --follow -t f '.' "${playlist_dir:-$HOME/playlists/}" | fz -q "$*")"
-    test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp "${(@f)pl}" }
+    test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp +s "${(@f)pl}" }
 }
 playlister() {
-    find-music "$@" | fz #--history "$music_dir/.fzfhist" # -q "$1"
+    find-music "$@" | fz -q "'.mp3 | '.m4a | '.flac " #--history "$music_dir/.fzfhist" # -q "$1"
+    comment By adding the extensions to the query, we force it to show paths from the end.
 }
 find-music() {
     memoi_expire="${fm_expire:-$memoi_expire}" memoi-eval fd -c never --follow -e m4a -e mp3 -e flac --full-path "$*" "${music_dir:-$HOME/my-music}"
 }
 songd() {
     music_dir=~/my-music/ ; musiccache='' #BUG To hardcode-circumvent zsh's unset bug.
-    doc 'zsh-only
-    Use songc to play already downloaded files.
+    doc 'Use songc to play already downloaded files.
     Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
     ecdbg "$@"
     comment songd expects existent query

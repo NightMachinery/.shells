@@ -7,9 +7,23 @@ function lpassf_() {
     eval "function lpassf$1() { $body }" 
 }
 re lpassf_ u p g
-alias lp=lpassfg
+alias lpg=lpassfg
 alias lpp=lpassfp
 alias lpu=lpassfu
+function lp() {
+    comment 'Empty "$@" passes the -n test -_-'
+    test -n "$*" && { ecdbg Resetting lp_last ; lp_last='' }
+    ecdbg lp_last is "$lp_last"
+    [[ -z "$lp_last" ]] && {
+        lp_last=("${(@f)$(lpassf "$*")}")
+        lpassu "$lp_last"
+        local u="$(pbpaste)"
+        ec "$u"
+    } || {
+        lpassp "$lp_last"
+        lp_last=''
+    }
+}
 lpassg() {
     lpass show --basic-regexp --expand-multi "$@"
 }

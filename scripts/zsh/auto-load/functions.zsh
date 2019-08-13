@@ -1,7 +1,7 @@
 wh() { which "$@" |btz }
 rtf2txt() { unrtf "$@" | html2text }
 mn() {
-    man "$@" || lesh "$1"
+    man "$@" || lesh "$@"
 }
 blc() {
     doc brew link custom
@@ -67,7 +67,7 @@ sin() {
     export FORCE_INTERACTIVE=y
     sb
     source ~/.zshrc
-    eval "${@:q}"
+    eval "$(gquote "$@")"
 }
 imdb() imdbpy search movie --first "$*"
 playtmp() {
@@ -191,10 +191,6 @@ function mp3-to-mp4() (
     # -c:a copy -r 1
 )
 function sleepnow() ( sleep "${1:-7}"; pmset sleepnow )
-silent_background() {
-    { 1>/dev/null 2>&1 3>&1 eval "$@"& }
-    disown &>/dev/null  # Prevent whine if job has already completed
-}
 function rm-alpha() {
     local B=$(basename "$1"); local D=$(dirname "$1");
     convert "$1" -background "$2" -alpha remove "$D/${B%.*}_$2.png"
@@ -237,7 +233,7 @@ function ppgrep() {
             ;;
     esac
 }
-function '$'() { eval "$@" ; }
+function '$'() { eval "$(gquote "$@")" ; }
 
 function timer-raw() {
     doc aliased to timer with noglob
@@ -260,7 +256,7 @@ function removeTrailingSlashes() {
     esac
 }
 function p() {
-    geval "$(gq "${@}")" "${"$(pbpaste)":q}"
+    geval "$(gq "${@}")" "$(gq "$(pbpaste)")"
 }
 function whz() {
     printz "$(which "$1")" #"${(q-@)"$(which "$1")"}"
@@ -302,7 +298,7 @@ function retry-eval() {
 }
 
 function retry-limited() {
-    retry-limited-eval "$1" "${@:2:q}"
+    retry-limited-eval "$1" "$(gquote "${@:2}")"
 }
 function retry-limited-eval() {
     local limit=0
@@ -339,7 +335,7 @@ file-to-clipboard() {
 }
 function frep() {
     doc '@convenience @grep'
-    eval "${@:2:q}" |& ggrep -iP "$1"
+    eval "$(gquote "${@:2}")" |& ggrep -iP "$1"
 }
 function aas() {
     # aa "$@" --on-download-start aa-stream
@@ -370,7 +366,6 @@ function set-fk-icon-size() {
 function set-finder-icon-size() {
     /usr/libexec/PlistBuddy -c "set StandardViewSettings:IconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finder itself.
 }
-function loop() { while true; do eval "${@}"; sleep ${lo_s:-1}; done ; }
 function rename-ebook() {
     local filename=$(basename "$1")
     local extension="${filename##*.}"
@@ -410,30 +405,6 @@ function months() {
 11. November - 30 days
 12. December - 31 days"
 }
-function onla() {
-    geval "$@:q"" ${$(last-added):q}"
-}
-function onxla(){
-    last-added|gxargs -I _ "$@:q"
-}
-function onxlc(){
-    last-created|gxargs -I _ "$@:q"
-}
-function first-file(){
-    exa|head -n1
-}
-function onlac(){
-    geval "$@:q"" ${$(last-accessed):q}"
-}
-function onlm(){
-    geval "$@:q"" ${$(last-modified):q}"
-}
-function onlc(){
-    geval "$@:q"" ${$(last-created):q}"
-}
-function onff(){
-    geval "$@:q"" ${$(first-file):q}"
-}
 function play-and-trash(){
     #aliased to pat
     mpv "$@" && trs "$1"
@@ -460,14 +431,9 @@ increment-last() {
     local cmd=${$(fc -nl -1 -1| perl -pe "$pe")}
     geval "$cmd"
 }
-function away() {
-    nohup "$@" & disown
-}
 outlinify() {
     map 'https://outline.com/$1' "$@"
 }
-les() { eval "$@:q" |& less }
-lesh() les "$1" --help
 html2epub-calibre() {
     local u="$1 $(uuidgen).html"
     merge-html "${@:3}" > "$u"
@@ -654,7 +620,7 @@ html2epub-pandoc-simple() {
 }
 aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
-    aget "aa -Z ${@:2:q}
+    aget "aa -Z $(gquote "${@:2}")
 html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
     2m2k "$1".epub
@@ -663,7 +629,7 @@ erase-ansi() {
     gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
 }
 ea() {
-    eval "$@:q" | erase-ansi
+    eval "$(gquote "$@")" | erase-ansi
 }
 tldr() nig ea command tldr "$@"
 pre-files() {
@@ -734,24 +700,6 @@ jdl-helper() {
 jdl() {
     jej
     re jdl-helper *(D)
-}
-w2e-curl() {
-    h2ed=html2epub-pandoc-simple we_dler=wread-curl w2e "$@"
-}
-wread-curl() {
-    gurl "$1"
-}
-w2e-gh() {
-    w2e-curl "$1" "${(@f)$(gh-to-md "${@:2}")}"
-}
-gh-to-md() {
-    local urls=() i
-    for i in "$@"
-    do
-        [[ "$i" == *.(md|rst) ]] || i="${i}/blob/master/README.md"
-        urls+="$i"
-    done
-    rex 'rgx _ blob raw' "$urls[@]"
 }
 emj-old () emoj --copy "$*"
 emj() emoji-finder "$@"

@@ -17,13 +17,11 @@ alias tds='cat "$attic_todo"'
 alias tn=todone
 alias tdi=todo-import
 ## core
-NUL2RS() sd '\x00' ''
-RS2NUL() sd '' '\x00'
 seal() {
     doc Use with 'uns' to store and retrieve one-liners
     doc Use exor to remove seals.
     local n=''
-    ! test -e "$attic" || n=$'\0' #$''
+    ! test -e "$attic" || n=$''
     print -r -n -- "$n$(in-or-args "$@")"$'\n' >> "$attic"
 }
 alias uns=unseal
@@ -34,10 +32,10 @@ unseal() {
     local other_options fz_no_preview
     other_options=()
     test -n "$un_no_preview" || {
-        other_options+=(--preview "$FZF_SIMPLE_PREVIEW")
+        other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y
         }
-    local l="$(<"$attic" cat | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
+    local l="$(<"$attic" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy
@@ -56,13 +54,14 @@ exor() {
             ec Exorcizing 🏺
             cat -v <<<"$i"
             # sd --string-mode "$i" '' "$attic" #--flags m 
-            # FROM="$i" perl -0777 -pi -e 's/(|\A)\Q$ENV{FROM}\E(?<sep>|\Z)/$+{sep}/gm' "$attic"
+            FROM="$i" perl -0777 -pi -e 's/(|\A)\Q$ENV{FROM}\E(?<sep>|\Z)/$+{sep}/gm' "$attic"
             # comment "This actually doesn't do the 'g' part completely. It removes some occurences, but not all."
             # comment "because each replacement eats both the NUL before and after the match, so when perl resumes searching for the next match, it won't find the immediately following match because of NUL before it missing. You'd need to use a look-ahead operator that don't eat the NULs but still check they're there."
-            FROM="$i" perl -0lni -e 'print if $_ ne $ENV{FROM}' -- "$attic"
+            # FROM="$i" perl -0lni -e 'print if $_ ne $ENV{FROM}' -- "$attic"
+            # FROM="$i" perl ni -e 'print if $_ ne $ENV{FROM}' -- "$attic"
         done
-        # perl -0777 -pi -e 's/\A//' "$attic"
-        perl -pi -e 's/\0\Z//' "$attic"
+        perl -0777 -pi -e 's/\A//' "$attic"
+        # perl -pi -e 's/\0\Z//' "$attic"
     }
 }
 alias seali=seal-import

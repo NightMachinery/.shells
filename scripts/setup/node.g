@@ -18,3 +18,10 @@ terminal-image-cli
 chalk-cli
 chalk-animation
 strip-ansi-cli
+randomcolor
+zooqle
+emma-cli
+janeway
+seedrandom
+commander
+chalk-animation
