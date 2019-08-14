@@ -5,4 +5,4 @@ import urllib.parse
 
 for line in fileinput.input():
     # print(request_uri(line))
-    print(urllib.parse.quote(line, safe='/:?=&'))
+    print(urllib.parse.quote(line.rstrip(), safe='/:?=&'))
