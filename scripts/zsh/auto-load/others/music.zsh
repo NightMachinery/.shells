@@ -179,3 +179,14 @@ svpl() {
     # Save Playlist save-playlist save-pl
     mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
 }
+function sdl() {
+    local bp
+    { test "${1[1]}" = "-" } && { # || test "$1" = "-b" || test "$1" = "-p" } && {
+        bp="$1"
+        shift
+    }
+    test -z "$bp" && {
+        nisout spotdl -f "${spotdl_dir:-.}" -s "$*" } || {
+        nisout sdlg "$bp" "$@"
+    }
+}

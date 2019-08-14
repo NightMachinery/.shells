@@ -9,4 +9,7 @@ mpv-get() {
     <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "${2:-$mpv_audio_ipc}"|jq --raw-output -e .data
 }
 mpv-getv() mpv-get "$1" "$mpv_ipc"
-
+function play-and-trash(){
+    #aliased to pat
+    mpv "$@" && trs "$1"
+}
