@@ -33,3 +33,5 @@ function 2p2k() {
 tlrl-ng() {
     #IMPL
 }
+2m2k2h() { 2m2k "$@" && { trs "$1"
+                          trs "${1:r}.mobi" } }

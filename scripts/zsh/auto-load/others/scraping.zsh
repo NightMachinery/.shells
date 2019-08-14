@@ -96,3 +96,95 @@ gh-to-readme() {
     done
     rex 'rgx _ blob raw' "$urls[@]"
 }
+url-final() {
+    curl -Ls -o /dev/null -w %{url_effective} "$@"
+}
+url-tail() {
+    [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
+}
+function tlrlu(){
+    tlrl "$@" -p "$(url-tail "$(url-final "$1")") | "
+}
+outlinify() {
+    map 'https://outline.com/$1' "$@"
+}
+html2epub-calibre() {
+    local u="$1 $(uuidgen).html"
+    merge-html "${@:3}" > "$u"
+    ebook-convert "$u" "$1.epub" \
+                  --authors="$2" \
+                  --level1-toc="//*[name()='h1' or name()='h2']" \
+                  --level2-toc="//h:h3" \
+                  --level3-toc="//*[@class='subsection']" \
+                  --page-breaks-before="//*[(name()='h1' or name()='h2') or @class='owner-name']" \
+                  --use-auto-toc --toc-threshold=0 \
+                  --toc-title="The TOC" \
+                  --embed-all-fonts \
+                  --title="$1" --epub-inline-toc --enable-heuristics
+    \rm "$u"
+}
+merge-html() {
+    map '
+
+ <h1>$(strip $1 ".html")</h1>
+
+ $(cat $1)' "$@"
+}
+html2epub() {
+    ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
+    "${h2ed:-html2epub-calibre}" "$@"
+}
+html2epub-pandoc() {
+    # title author htmls
+    pandoc --toc -s -f html <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+}
+h2e() html2epub "$1" "${h2_author:-night}" "${@:2}"
+web2epub() {
+    doc usage: 'we_retry= we_dler= we_author= title urls-in-order'
+    local u="$1 $(uuidgen)"
+    cdm "$u"
+    local author="${we_author:-night}"
+    local i=0
+    local hasFailed=''
+    for url in "${@:2}"
+    do
+        local bname="${url##*/}"
+        #test -z "$bname" && bname="u$i"
+        bname="${(l(${##})(0))i} $bname"
+        i=$((i+1))
+
+        retry-limited-eval "${we_retry:-10}" "${we_dler:-wread}" "$url:q" html '>' "$bname:q" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
+                                                                                                                               ecerr "Failed $url"
+                                                                                                                               hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
+            }
+    done
+
+    test -z "$hasFailed" && { ec "Converting to epub ..."
+                              ecdbg files to send to h2ed *
+                              html2epub "$1" "$author" * #.html
+                              mv *.epub ../ && cd '../' && \rm -r "./$u"
+                              ec "Book '$1' by '$author' has been converted successfully."
+    } || { ecerr "$hasFailed" && (exit 1) }
+}
+w2e-raw() {
+    web2epub "$1" "${@:2}" && 2m2k "$1.epub"
+}
+w2e-o() {
+    wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
+}
+w2e-lw-raw() {
+    we_author=LessWrong web2epub "$1" "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
+}
+lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com
+html2epub-pandoc-simple() {
+    ecdbg "h2e-ps called with $@"
+    pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+}
+aa2e() {
+    ecerr DEPRECATED: Use w2e-curl.
+    aget "aa -Z $(gquote "${@:2}")
+html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
+mv $1:q.epub ../"
+    2m2k "$1".epub
+}
+tldr() nig ea command tldr "$@"

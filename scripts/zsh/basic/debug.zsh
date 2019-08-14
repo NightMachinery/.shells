@@ -23,3 +23,4 @@ dvar () {
     test -z "$dvar_col2" && debugcol=(0 120 255)
     ecdbg "$pre$1 in env: $(printenv "$1")"
 }
+function raise-blood() ceer rederr.zsh source
