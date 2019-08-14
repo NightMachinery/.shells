@@ -62,8 +62,12 @@ alias-special() {
     # re 'ec arg:' "$args[@]"
     # ec "$args[*]"
     builtin alias "$args[@]"
+    unset match
     isSSH || [[ "$args[1]" == -* ]] || [[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]] &&
         {
+		[[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]]
+	    # there is a bug in either ssh or ubuntu's zsh that loses the match variable here so I just rematch it
+		# dbg dvar match
             test -z "$DEBUGME" || { mhat3=("$match[@]") ; mhat2=("$args[@]") }
             # ec "Setting $1 [$match[1]] to y"
             # ec "$match[2]"
