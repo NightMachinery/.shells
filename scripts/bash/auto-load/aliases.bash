@@ -1,4 +1,3 @@
-[[ -z $ZSH_VERSION ]] || source "$NIGHTDIR/zsh/saliases.zsh"
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
 alias url-exists='curl --output /dev/null --silent -r 0-0 --fail --location' #Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
 alias displaysleep='pmset displaysleepnow'
@@ -11,7 +10,7 @@ alias btz='bt --language zsh'
 alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
 alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
-alias agm='ag -C "${ag_c:-1}"'
+alias agm='ag -C "${ag_c:-1}" --nonumbers'
 alias l='exa -a --oneline'
 alias ll='exa -a -l'
 alias lt='l -T'

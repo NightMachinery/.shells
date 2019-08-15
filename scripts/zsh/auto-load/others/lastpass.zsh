@@ -33,3 +33,8 @@ lpassu() {
 lpassp() {
     lpassg --password "$@" |pbcopy
 }
+lpadd() {
+    mdoc "Usage: $0 <entry-name> <username> <password>" MAGIC
+    print -r -- "Username: $2
+Password: $3" | lpass add $1 --non-interactive
+}

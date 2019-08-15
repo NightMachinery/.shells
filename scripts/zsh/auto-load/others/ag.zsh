@@ -12,6 +12,10 @@ agf() {
 ags() {
     agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.)
 }
+agi() {
+    doc ag internals of zsh
+    agm "$@" ~/.oh-my-zsh/ $ANTIBODY_HOME
+}
 function agr {
     doc 'usage: from=sth to=another agr [ag-args]'
     comment -l --files-with-matches

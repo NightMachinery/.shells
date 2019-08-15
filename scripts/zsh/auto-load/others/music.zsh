@@ -15,7 +15,7 @@ songc() {
     local p="${@: -1}"
     test -z "${p##-*}" && set -- $@ '.' #Don't quote or you'll get ''s.
     test -z "${p##-*}" && p='.'
-    local f2 ="$(playlister "$p")"
+    local f2="$(playlister "$p")"
     f+=( ${(@f)f2} )
     local autopl="${playlist_dir:-$HOME/playlists}/autopl/"
     mkdir -p "$autopl"
