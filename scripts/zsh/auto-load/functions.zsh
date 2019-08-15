@@ -255,9 +255,6 @@ function removeTrailingSlashes() {
         *[/]) ec "/";;
     esac
 }
-function p() {
-    geval "$(gq "${@}")" "$(gq "$(pbpaste)")"
-}
 function whz() {
     printz "$(which "$1")" #"${(q-@)"$(which "$1")"}"
 }

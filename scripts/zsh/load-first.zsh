@@ -5,4 +5,4 @@ source-basic basic
 # malice is the alias module. :D
 re source-basic conditions args colors debug text-manipulation ssh malice enhancers redirections
 run-on-each source "$NIGHTDIR"/zsh/basic/auto-load/**/*(.)
-silence eval 'export jufile=(*)'
+silence eval 'export jufile=(*)' # For use with the Julia module.

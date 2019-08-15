@@ -35,7 +35,7 @@ unseal() {
         other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y
         }
-    local l="$(<"$attic" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
+    local l="$(<"$attic[@]" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy
