@@ -4,7 +4,8 @@ if (( $+commands[tag-ag] )); then
     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
 fi
 aga() {
-    agm "$@" "$NIGHTDIR"/**/alias*(.)
+    # agm "$@" "$NIGHTDIR"/**/*alias*(.)
+    builtin alias|ag "$@"
 }
 agf() {
     agm "$@" "$NIGHTDIR"/**/functions*(.)
