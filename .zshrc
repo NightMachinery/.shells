@@ -142,7 +142,7 @@ fpath=(~/.zsh.d/ $fpath)
 antibody bundle mafredri/zsh-async
 antibody bundle intelfx/pure
 # antibody bundle Tarrasch/zsh-bd
-antibody bundle Tarrasch/zsh-colors
+# antibody bundle Tarrasch/zsh-colors
 # antibody bundle Vifon/deer
 antibody bundle zsh-users/zsh-autosuggestions
 silence unalias =

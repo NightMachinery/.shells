@@ -62,7 +62,7 @@ alias() as_caller=$0 alias-special naliases "$@"
 
 expand-alias-space() {
     (( $+baliases[$LBUFFER] )) ; insertBlank=$?
-    [[ -n "$RBUFFER" ]] || (( $+ialiases[$LBUFFER] )) || { (( $+aliases[$LBUFFER] )) && zle expand-aliases-widget } #_expand_alias
+    [[ -n "$RBUFFER" ]] || isNotMalice || (( $+ialiases[$LBUFFER] )) || { (( $+aliases[$LBUFFER] )) && zle expand-aliases-widget } #_expand_alias
     [[ "$insertBlank" = "0" ]] || zle self-insert
 }
 isNotMalice || {
