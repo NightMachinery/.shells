@@ -8,6 +8,7 @@ Just use the alias `mdoc`.'
         ec ${(q+)3}${(q+@)@[4,-1]}|color ${mdoc_col[@]:-blue} ; return 0 }"
 }
 alias mdoc='m_doc "$*" "$0" ""'
+alias mdocu='m_doc "$*" "$0" "Usage: $0 "'
 
 mdoc-test() {
     mdoc Usage: Just do not \;\) MAGIC

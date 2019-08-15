@@ -1,4 +1,5 @@
-cc-raw() {
+calc-raw() {
     python3 -c "from math import *; print($*)"
 }
-alias cc='noglob cc-raw'
+ialias calc='noglob calc-raw'
+ialias x='noglob calc-raw'
