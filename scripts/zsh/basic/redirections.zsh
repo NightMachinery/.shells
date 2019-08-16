@@ -1,4 +1,4 @@
-alias silent=silence
+alias silent='&>/dev/null'
 function silence() {
     { eval "$(gquote "$@")"  } &> /dev/null
 }

@@ -1,1 +1,1 @@
-add-path NODE_PATH "$(npm root -g)"
+add-path NODE_PATH "$(memoi-eval npm root -g)"

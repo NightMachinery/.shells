@@ -41,7 +41,6 @@ test -n "$NIGHT_NO_EXPENSIVE" || {
     }
     export BOOT_CLOJURE_VERSION='1.9.0'
 
-    export RUST_SRC_PATH="$(rustc --print sysroot)/lib/rustlib/src/rust/src" &>/dev/null
     #export PKG_CONFIG_PATH= "/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
 
     addToPATH "/usr/local/opt/curl/bin"
