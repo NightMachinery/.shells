@@ -28,7 +28,7 @@ test -n "$NIGHT_NO_EXPENSIVE" || {
     # PS1="$(echo $PS1 | sed 's/(base) //') "
     # PS1="$(strip "$PS1" ' +') "
     addToPATH ~/anaconda/bin/
-
+    addToPATH ~/miniconda3/bin/
     export MONO_GAC_PREFIX="/usr/local"
     export ELM_HOME="/usr/local/bin/"
     export LDFLAGS=-L/usr/local/opt/texinfo/lib
