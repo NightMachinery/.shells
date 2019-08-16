@@ -90,3 +90,6 @@ ins-all() {
     ins-go
     ins-gem
 }
+function ins() {
+    isDarwin && brew install $1 || sudo apt install -y $1
+}

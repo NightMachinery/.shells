@@ -1,4 +1,5 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias fzg='fz --no-sort --filter' #Filter mode. Do not start interactive finder. When used with  --no-sort,  fzf becomes  a fuzzy-version of grep. # Just fz -f if you don't want the nosort.
 alias url-exists='curl --output /dev/null --silent -r 0-0 --fail --location' #Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
 alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
@@ -47,7 +48,6 @@ alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
-eval-linux alias gnc=nc
 alias dlga="noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"

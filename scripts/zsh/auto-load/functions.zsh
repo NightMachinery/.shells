@@ -63,12 +63,6 @@ function ls-by-added() {
 #   local cmd=${$(fc -nl -1 -1)/(#b)(*E)(<->)/$match[1]${(l:${#match[2]}::0:)$((match[2]+${1:-1}))}}
 #   geval "$cmd"
 # }
-sin() {
-    export FORCE_INTERACTIVE=y
-    sb
-    source ~/.zshrc
-    eval "$(gquote "$@")"
-}
 imdb() imdbpy search movie --first "$*"
 playtmp() {
     mkdir -p ~/tmp/delme/
@@ -309,9 +303,6 @@ function retry-limited-eval() {
     done
     # test $limit -lt "$1" || test "$1" -eq 0
     (exit "$ecode")
-}
-function ins() {
-    eval-dl "brew install $1" "sudo apt install -y $1"
 }
 function e() {
     echo "${pipestatus[@]}" "${PIPESTATUS[@]}"

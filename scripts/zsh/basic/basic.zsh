@@ -7,12 +7,14 @@ alias ec='print -r --'
 zshword='[a-zA-Z0-9!_-]' #unused, I opted for simpler solutions
 ##
 
-comment() {
+alias doc=':'
+alias comment=':'
+# comment() {
 
-}
-doc() {
-    #Used for documentation
-}
+# }
+# doc() {
+#     #Used for documentation
+# }
 function ec_bash() {
     doc deprecated. Use the alias ec.
     if [[ -n $ZSH_VERSION ]]; then
@@ -27,10 +29,11 @@ function gquote() {
 }
 alias gq=gquote
 function run-on-each() {
-    local i
-    for i in "${@:2}"
+    doc Use unusual name not to shadow actual vars
+    local i98765
+    for i98765 in "${@:2}"
     do
-        eval "$1 $(gq "$i")"
+        eval "$1 $(gq "$i98765")"
     done
 }
 alias re='run-on-each'

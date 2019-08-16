@@ -45,47 +45,6 @@ function ruu() {
     a="$(strip "$a" 'nocorrect ')"
     seval "$f[@]" "$=a" "$(gquote "${@:3}")"
 }
-function eval-dl()
-{
-    case "$(uname)" in
-        Darwin)
-            eval "$1"
-            ;;
-        Linux)
-            eval "$2"
-            ;;esac
-}
-function eval-darwinq()
-{
-    #input should be quoted.
-    case "$(uname)" in
-        Darwin)
-            eval "${@}"
-            ;;
-        Linux)
-
-            ;;esac
-}
-function eval-darwin()
-{
-    case "$(uname)" in
-        Darwin)
-            eval "$(gquote "$@")"
-            ;;
-        Linux)
-
-            ;;esac
-}
-function eval-linux()
-{
-    case "$(uname)" in
-        Darwin)
-
-        ;;
-        Linux)
-            eval "$(gquote "$@")"
-        ;;esac
-}
 function psource()
 {
     if [[ -r "$1" ]]; then
