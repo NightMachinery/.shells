@@ -10,7 +10,8 @@ alias btz='bt --language zsh'
 alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
 alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
-alias agm='ag -C "${ag_c:-1}" --nonumbers'
+alias rg='rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --auto-hybrid-regex -C ${ag_c:-1}' # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+alias agm='rg' #'ag -C "${ag_c:-1}" --nonumbers'
 alias l='exa -a --oneline'
 alias ll='exa -a -l'
 alias lt='l -T'

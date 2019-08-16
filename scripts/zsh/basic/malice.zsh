@@ -28,7 +28,7 @@ alias-special() {
     # ec "$args[*]"
     builtin alias "$args[@]"
     unset match
-    isNotMalice || [[ "$args[1]" == -* ]] || { [[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]] &&
+    isNotMalice || [[ -z "$args[*]" ]] || [[ "$args[1]" == -* ]] || { [[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]] &&
         {
 		[[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]]
 	    # there is a bug in either ssh or ubuntu's zsh that loses the match variable here so I just rematch it

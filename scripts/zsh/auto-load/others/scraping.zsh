@@ -96,7 +96,7 @@ gh-to-readme() {
     done
     gh-to-raw "$urls[@]"
 }
-gh-to-raw() rex 'rgx _ blob raw' "$@"
+gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 url-final() {
     curl -Ls -o /dev/null -w %{url_effective} "$@"
 }
@@ -205,7 +205,7 @@ w2e-code-old() {
 }
 w2e-code() {
     mdocu '<name> <url> ...' MAGIC
-    aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:3}")}")" \; pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${author:-night} </dc:creator>") -f markdown '<(code2md *)' -o ${1:q}.epub \; mv ${1:q}.epub ../
+    aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:2}")}")" \; pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${author:-night} </dc:creator>") -f markdown '<(code2md *)' -o ${1:q}.epub \; mv ${1:q}.epub ../
     2m2k ${1}.epub
 }
 code2md() {
