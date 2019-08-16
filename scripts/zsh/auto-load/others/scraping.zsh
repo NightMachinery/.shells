@@ -94,8 +94,9 @@ gh-to-readme() {
             }
         url-exists "$i" && urls+="$i" || color red "$i does not seem to exist." >&2
     done
-    rex 'rgx _ blob raw' "$urls[@]"
+    gh-to-raw "$urls[@]"
 }
+gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 url-final() {
     curl -Ls -o /dev/null -w %{url_effective} "$@"
 }
@@ -188,3 +189,35 @@ mv $1:q.epub ../"
     2m2k "$1".epub
 }
 tldr() nig ea command tldr "$@"
+code2html() {
+    mdocu '[chroma-options] file -> HTML in stdout' MAGIC
+    chroma --formatter html --html-lines --style trac "$@"
+}
+code2html-url() {
+    code2html "${@:2}" <(gurl "$1")
+}
+wread-code() {
+    code2html-url "$1"
+}
+w2e-code-old() {
+    doc DEPRECATED: The html produced is not bad but after conversion we lose newlines which just sucks.
+    we_dler=wread-code w2e "$1" "${(@f)$(gh-to-raw "${@:2}")}"
+}
+w2e-code() {
+    mdocu '<name> <url> ...' MAGIC
+    aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:2}")}")" \; pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${author:-night} </dc:creator>") -f markdown '<(code2md *)' -o ${1:q}.epub \; mv ${1:q}.epub ../
+    2m2k ${1}.epub
+}
+code2md() {
+    local i
+    for i in "$@"
+    do
+        ec "
+
+# $i
+
+"'```'"${i:e}
+ $(cat $i)
+"'```'
+    done
+}

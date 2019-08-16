@@ -12,4 +12,4 @@ alias grep='grep --color=auto'
 ialias plc=playlistc
 ialias emc="emacsclient -t"
 ialias emcg="emacsclient -c"
-
+alias b='builtin'

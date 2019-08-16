@@ -1,14 +1,14 @@
 function pbcopy() {
     local in="$(in-or-args "$@")"
-    (( $+commands[copyq] )) && {
+    (( $+commands[copyq] )) && false && {
         silent copyq copy "$in"
     } || {
-        (( $+commands[pbcopy] )) && command pbcopy "$in"
+        (( $+commands[pbcopy] )) && command pbcopy <<<"$in"
     }
 }
 function pbpaste() {
     # local in="$(in-or-args "$@")"
-    (( $+commands[copyq] )) && {
+    (( $+commands[copyq] )) && false && {
         copyq clipboard
     } || {
         (( $+commands[pbpaste] )) && command pbpaste

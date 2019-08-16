@@ -1,3 +1,6 @@
+autoload -U colors && colors
+
+## Functions
 colorfg() printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"
 colorbg() printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m"
 colorb() {
@@ -52,17 +55,4 @@ printcolors() {
 random-color() {
     randomColor.js "$@" |jq -re '.'
     # --seed "$(head -c 100 /dev/random)" 
-}
-colorfb-r() {
-    local hue="$(random-color -f hex)"
-    # hue=random
-    reval chalk -t "{$(random-color -l dark --hue "$hue").bgHex('$(random-color -f hex -l light --hue "$hue")') $*}"
-}
-cc () {
-    reval chalk -t "{hex('$(random-color -f hex -l dark)').bgHex('$(random-color-f -f hex -l light)') $*}"
-}
-random-color-test() {
-    node -e "var randomColor = require('randomcolor'); // import the script
-var color = randomColor({count: 1}); // a hex code for an attractive color
-console.log(JSON.stringify(color))"|jq -re '.[]'
 }

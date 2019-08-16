@@ -1,5 +1,5 @@
-[[ -z $ZSH_VERSION ]] || source "$NIGHTDIR/zsh/saliases.zsh"
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias fzg='fz --no-sort --filter' #Filter mode. Do not start interactive finder. When used with  --no-sort,  fzf becomes  a fuzzy-version of grep. # Just fz -f if you don't want the nosort.
 alias url-exists='curl --output /dev/null --silent -r 0-0 --fail --location' #Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
 alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
@@ -11,7 +11,8 @@ alias btz='bt --language zsh'
 alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
 alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
-alias agm='ag -C "${ag_c:-1}"'
+alias rg='rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --auto-hybrid-regex -C ${ag_c:-1}' # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+alias agm='rg' #'ag -C "${ag_c:-1}" --nonumbers'
 alias l='exa -a --oneline'
 alias ll='exa -a -l'
 alias lt='l -T'
@@ -47,7 +48,6 @@ alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
-eval-linux alias gnc=nc
 alias dlga="noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"

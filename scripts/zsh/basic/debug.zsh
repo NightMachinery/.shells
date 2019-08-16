@@ -1,4 +1,15 @@
 arger() { re 'ec arg:' "$@" }
+ecdbg() {
+    test -z "$DEBUGME" || {
+        errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
+    }
+}
+fsaydbg() {
+    test -z "$DEBUGME" || {
+        ecdbg "$@"
+        fsay "$@"
+    }
+}
 dact() {
     doc DEBUG Act
     test -z "$DEBUGME" || eval "$(gquote "$@")"

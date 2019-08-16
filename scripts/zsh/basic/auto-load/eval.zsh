@@ -1,3 +1,4 @@
+alias seval='ge_ecdbg=y geval'
 function geval() {
     local cmd="$@"
     test -z "$ge_ecdbg" && {
@@ -43,4 +44,10 @@ function ruu() {
     a="$(strip "$a" 'noglob ')"
     a="$(strip "$a" 'nocorrect ')"
     seval "$f[@]" "$=a" "$(gquote "${@:3}")"
+}
+function psource()
+{
+    if [[ -r "$1" ]]; then
+        source "$1"
+    fi
 }

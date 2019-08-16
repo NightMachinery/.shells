@@ -1,10 +1,16 @@
+### Seal Module
+# imports basics fuzzy
+# imports string.zsh
+# imports binaries sd, fzf, perl
+
 ## vars
 test -z "$attic_dir" && attic_dir="$cellar/attic/"
 test -z "$attic" && attic="$attic_dir/.darkattic"
 test -z "$attic_todo" && attic_todo="$attic_dir/.attic_todo"
+test -z "$attic_temoji" && attic_temoji="$attic_dir/.temojis"
 
-## aliases
-# todo
+### aliases
+## todo
 alias attic_todo='attic="$attic_todo" un_p=y un_no_preview=y'
 alias todo='attic_todo seal'
 alias todos='attic_todo unseal'
@@ -16,6 +22,30 @@ alias tds='cat "$attic_todo"'
 # alias ts=todos #CONFLICTING_NAME
 alias tn=todone
 alias tdi=todo-import
+## temoji
+alias attic_temoji='attic="$attic_temoji" un_p=y un_no_preview=y'
+temoji() {
+    attic_temoji unseal-split1 "$@"  |tee /dev/tty |pbcopy
+}
+alias temoji-add='attic_temoji seal'
+alias temoji-rm='attic_temoji exor'
+alias ej='temoji'
+### Extra
+unseal-split1() {
+    doc Returns the first part of a newline separated record from unseal. Skips empty lines.
+    local i flag=0 res=''
+    for i in "${(f@)$(unseal "$@")}"
+    do
+        # re dvar i flag res
+        [[ -z "$i" ]] && continue
+        flag=$((flag+1))
+        (( $flag == 1 )) && {
+            res="$res $i"
+        }
+        (( $flag == 2 )) && flag=0
+    done
+    ec "$res"
+}
 ## core
 seal() {
     doc Use with 'uns' to store and retrieve one-liners
@@ -35,7 +65,7 @@ unseal() {
         other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y
         }
-    local l="$(<"$attic" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
+    local l="$(<"$attic[@]" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy
