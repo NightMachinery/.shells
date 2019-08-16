@@ -1,5 +1,5 @@
 sin() {
-    export FORCE_INTERACTIVE=y
+    FORCE_INTERACTIVE=y
     NIGHT_NO_EXPENSIVE=''
     sb
     source ~/.zshrc
