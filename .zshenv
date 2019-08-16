@@ -20,15 +20,14 @@ test -n "$NIGHT_NO_EXPENSIVE" || {
     addToPATH "$HOME/kscripts/"
     addToPATH "/usr/libexec/"
     export GEM_HOME="$HOME/.gem"
-    addToPATH "$GEM_HOME/bin:$PATH"
+    addToPATH "$GEM_HOME/bin"
 
-    # ecdbg "$path"
-    psource ~/anaconda/etc/profile.d/conda.sh
-    # export PYTHONHOME=/Users/evar/anaconda/bin/
-    silence conda deactivate #this is necessary try sbing and you'll see
-    silence conda activate base
-    PS1="$(echo $PS1 | sed 's/(base) //') "
-    PS1="$(strip "$PS1" ' +') "
+    # psource ~/anaconda/etc/profile.d/conda.sh
+    # silence conda deactivate #this is necessary try sbing and you'll see
+    # silence conda activate base
+    # PS1="$(echo $PS1 | sed 's/(base) //') "
+    # PS1="$(strip "$PS1" ' +') "
+    addToPATH ~/anaconda/bin/
 
     export MONO_GAC_PREFIX="/usr/local"
     export ELM_HOME="/usr/local/bin/"
