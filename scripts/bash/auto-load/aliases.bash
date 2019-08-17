@@ -1,4 +1,6 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+ialias re='run-on-each' #duplicate, to make it ialias
+ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
 alias ungron="gron --ungron"
 alias fzg='fz --no-sort --filter' #Filter mode. Do not start interactive finder. When used with  --no-sort,  fzf becomes  a fuzzy-version of grep. # Just fz -f if you don't want the nosort.

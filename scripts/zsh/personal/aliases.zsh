@@ -17,3 +17,4 @@ ialias plc=playlistc
 ialias emc="emacsclient -t"
 ialias emcg="emacsclient -c"
 alias b='builtin'
+alias typ='typeset -p'

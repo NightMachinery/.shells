@@ -71,10 +71,6 @@ playtmp() {
     fsay Copied to tmp
     pat ~/tmp/delme/"$1:t"
 }
-trs() {
-    re 'ec Trying to remove' "$@"
-    trash -- "$@"
-}
 killjobs() {
     local kill_list="$(jobs)"
     if [ -n "$kill_list" ]; then
