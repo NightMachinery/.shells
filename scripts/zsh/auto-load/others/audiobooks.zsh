@@ -11,7 +11,7 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     local covers=($abdir/*cover*.(jpg|png)(N))
     (( ${#covers} )) || {
         silent fetch-ebook-metadata --title "$out" --timeout 120 --cover $abdir/cover.png
-        covers=($abdir/*cover*.(jpg|png))
+        covers=($abdir/*cover*.(jpg|png)(N))
     }
     (( ${#covers} )) && {
         covers=( --image $covers[1] )
