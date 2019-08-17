@@ -1,4 +1,5 @@
 function wread() {
+    mdoc 'Out: wr_title wr_author' MAGIC
     local file=''
     [[ "$1" == '--file' ]] && {
         test -e "$2" && file="$2" || return 33
@@ -8,7 +9,7 @@ function wread() {
     local title author
     test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
     test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
-    { test -z "$file" && { # No file, downloading
+    local merc="$({ test -z "$file" && { # No file, downloading
           test -z "$wr_force" && mercury-parser --format="${2}" "$1" || {
                   fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html
 # l
@@ -17,7 +18,10 @@ mercury-html $1:q ./a.html $2:q"
               } } || {
           # File supplied
           aget "cat ${(q@)file} > a.html ; mercury-html $1:q ./a.html $2:q"
-      } } |jq -e --raw-output 'if .content then [
+      } })"
+    wr_title="$(<<<"$merc" jq -r .title)"
+    wr_author="$(<<<"$merc" jq -r .author)"
+    <<<"$merc" jq -e --raw-output 'if .content then [
     (if .title then '"$title"' else empty end),
     (if .author then '"$author"' else empty end),
     .content
@@ -104,7 +108,24 @@ url-tail() {
     [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
 }
 function tlrlu(){
-    tlrl "$@" -p "$(url-tail "$(url-final "$1")") | "
+    tlrl-ng "$@" -p "$(url-tail "$(url-final "$1")") | "
+}
+tlrl-ng() {
+    mdoc "Usage: $0 [OPTIONS] <url> ...
+Description: Automatically infers the title and the author from the first URL, and feeds all URLs into 'w2e'.
+Options:
+-p, --prefix-title <string>    Prepends the specified string to the title of the page. (Optional)
+-v, --verbose ignored. Supported only for backwards-compatibility." MAGIC
+    local opts e
+    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p:
+    # dact typeset -p opts argv
+    silent wread "$1" html || return 33
+    # ecdbg title: "${opts[-p]}${wr_title:-$1}"
+    pushf ~/tmp-kindle
+    we_author=$wr_author w2e "${opts[-p]}${wr_title:-$1}" "$@"
+    e=$?
+    silent popd
+    return $e
 }
 outlinify() {
     map 'https://outline.com/$1' "$@"
@@ -205,7 +226,7 @@ w2e-code-old() {
 }
 w2e-code() {
     mdocu '<name> <url> ...' MAGIC
-    aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:2}")}")" \; pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${author:-night} </dc:creator>") -f markdown '<(code2md *)' -o ${1:q}.epub \; mv ${1:q}.epub ../
+    aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:2}")}")" \; code2epub "$1:q" '*' \; mv ${1:q}.epub ../
     2m2k ${1}.epub
 }
 code2md() {
@@ -214,10 +235,14 @@ code2md() {
     do
         ec "
 
-# $i
+# ${i:t}
 
 "'```'"${i:e}
  $(cat $i)
 "'```'
     done
+}
+code2epub() {
+    mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
+    pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }

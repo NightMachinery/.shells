@@ -148,15 +148,11 @@ antibody bundle zsh-users/zsh-autosuggestions
 silence unalias =
 antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions
-export _ZL_ADD_ONCE=1
-export _ZL_MATCH_MODE=1
-antibody bundle skywind3000/z.lua
 re source "$NIGHTDIR"/zsh/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
 # autoload -U deer
 # zle -N deer
 # bindkey '\ek' deer
-rcLoaded='yes'
-isI && test -n "$NIGHT_PERSONAL" && re source "$NIGHTDIR"/zsh/interactive/**/*(.)
+source-interactive-all
 
 # sth in .zshrc overrides these so ...
 export FZF_BASE="${$(ge_no_ec=y rp fzf):h:h}/shell"
@@ -169,3 +165,5 @@ test -d "$FZF_BASE" && {
     bindkey '^I' expand-or-complete
     bindkey '^[[Z' fzf-completion #Shift+Tab
 }
+
+rcLoaded='yes'

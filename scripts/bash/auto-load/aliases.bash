@@ -51,19 +51,19 @@ alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all a
 alias dlga="noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
+alias sia="sb ;source-interactive-all"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
-alias ai="sudo apt install -y"
-alias aug="sudo apt upgrade"
+alias api="sudo apt install -y"
+alias apug="sudo apt upgrade"
 alias brm="brew remove"
 alias bri="brew reinstall"
-alias aup="sudo apt update"
+alias apup="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
-alias his="history|grep"
 alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
 alias szsh='source "$NIGHTDIR"/zsh/load-others.zsh'
 alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'
 alias reeb='run-on-each rename-ebook'
-alias aa='noglob aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included in this.
+alias aa='noglob aria2c --seed-time=0 --max-tries=0 --retry-wait=1' #-Z has some unsavory sideeffects so I have not included it in this.
 alias set-volume='setv'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
@@ -103,7 +103,7 @@ alias apx='ALL_PROXY=socks5://127.0.0.1:1080'
 alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 # alias cxc='noglob __calc_plugin'
 alias retry='retry-limited 0'
-alias s=silence
+alias s=silent
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
 alias coursera='coursera-dl -n -pl --aria2 --video-resolution 720p --download-quizzes --download-notebooks -sl "en,fa" --resume'
 alias ox='zdict -dt oxford'
@@ -127,7 +127,7 @@ alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils
 alias y="noglob youtube-dl --no-playlist"
 alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
-alias tl='noglob tlrl'
+alias tl='noglob tlrl-ng'
 alias w2e='noglob w2e-raw'
 alias w2e-lw='noglob w2e-lw-raw'
 alias dcali="h2ed='html2epub-calibre' "

@@ -13,3 +13,7 @@ ensure-empty() {
         return 1
     } || return 0
 }
+pushf() {
+    mkdir -p "$1"
+    silent pushd "$1"
+}

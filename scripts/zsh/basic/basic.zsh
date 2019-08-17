@@ -7,8 +7,8 @@ alias ec='print -r --'
 zshword='[a-zA-Z0-9!_-]' #unused, I opted for simpler solutions
 ##
 
-alias doc=':'
-alias comment=':'
+alias doc='\noglob :'
+alias comment='\noglob :'
 # comment() {
 
 # }

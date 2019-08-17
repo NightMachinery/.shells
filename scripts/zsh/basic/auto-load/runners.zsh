@@ -12,10 +12,11 @@ function rexa(){
         eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
     done
 }
-redo() {
+redoq() {
     local i
     for i in {1.."${@: -1}"}
     do
-        eval "$(gquote "${@: 1:-1}")"
+        eval "${@: 1:-1}"
     done
 }
+redo() redoq "$(gquote "${@: 1:-1}")" "${@: -1}"

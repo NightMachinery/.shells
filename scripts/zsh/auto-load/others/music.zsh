@@ -5,7 +5,9 @@ alias hear-noipc='command mpv --keep-open=no --no-video'
 alias hearn='hear-noipc'
 ## Functions
 hear() {
-    hear-noipc --input-ipc-server "$mpv_audio_ipc" "${(0@)$(rpargs "$@")}" #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
+    # arger "${(0@)$(rpargs "$@")}"
+    comment '(0@) inserts empty elements with quoting'
+    hear-noipc --input-ipc-server "$mpv_audio_ipc" ${(0@)"$(rpargs "$@")"} #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 }
 songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.

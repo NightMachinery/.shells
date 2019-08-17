@@ -8,3 +8,4 @@ cellarq() {
     eval "$@"
     silent popd
 }
+alias cellarpp="cellarq 'gcam . ; gl --no-edit ; gp'"

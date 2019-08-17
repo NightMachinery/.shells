@@ -30,8 +30,5 @@ function 2p2k() {
     k2pdf "$1"
     2ko "${1:r}_k2opt.pdf"
 }
-tlrl-ng() {
-    #IMPL
-}
 2m2k2h() { 2m2k "$@" && { trs "$1"
                           trs "${1:r}.mobi" } }

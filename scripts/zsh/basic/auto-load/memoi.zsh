@@ -5,15 +5,10 @@ memoi_expire=$(( 3600*24*7 ))
 function meme() { memoi_expire=$(( $1 * 60 )) reval "$@" }
 function memoi-eval() {
     # zmodload zsh/zprof
-    # typeset -Ag memoi_stdout
-    # typeset -Ag memoi_stderr
-    # typeset -Ag memoi_timestamp
-    # typeset -Ag memoi_exit
-    # typeset -Ag memoi_debug
     local now="$(date +%s)"
     local cmd="$(gq "$@")"
 
-    # silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
+    silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     { (( $(redis-cli --raw exists $cmd) )) && { (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redis-cli --raw hget $cmd timestamp)) <= memoi_expire )) } } } && {
         # dact fsay using memoi
         # ecdbg Using memoi: "$cmd"
