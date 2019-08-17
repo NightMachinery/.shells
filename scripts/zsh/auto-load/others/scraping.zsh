@@ -124,7 +124,7 @@ Options:
     pushf ~/tmp-kindle
     we_author=$wr_author w2e "${opts[-p]}${wr_title:-$1}" "$@"
     e=$?
-    silent popd
+    popf
     return $e
 }
 outlinify() {

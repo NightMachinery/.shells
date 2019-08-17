@@ -7,5 +7,5 @@ sin() {
     eval "$(gquote "$@")"
 }
 sin-e() {
-    re source "$NIGHTDIR/zsh/exorbitant/**/*(.)"
+    re source "$NIGHTDIR"/zsh/exorbitant/**/*(.)
 }

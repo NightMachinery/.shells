@@ -38,3 +38,4 @@ function run-on-each() {
 }
 alias re='run-on-each'
 run-on-each setopt re_match_pcre extendedglob
+run-on-each unsetopt autopushd

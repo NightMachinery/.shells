@@ -64,8 +64,10 @@ export ZSH=~/.oh-my-zsh
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git git-extras lein pip sbt scala screen sprunge sudo vi-mode redis-cli)
 isDarwin && plugins+=(osx)
+ecdbg $options[autopushd]
 source $ZSH/oh-my-zsh.sh
 
+ecdbg $options[autopushd]
 # User configuration
 
 # export MANPATH="/usr/local/man:$MANPATH"

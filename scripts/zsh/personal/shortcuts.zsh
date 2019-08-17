@@ -1,11 +1,7 @@
-cellar() {
-    silent pushd "$cellar"
-    reval "$@"
-    silent popd
-}
+cellar() cellarq "$(gquote "$@")"
 cellarq() {
-    silent pushd "$cellar"
+    pushf "$cellar"
     eval "$@"
-    silent popd
+    popf
 }
-alias cellarpp="cellarq 'gcam . ; gl --no-edit ; gp'"
+alias cellp="cellarq 'gcam . ; gl --no-edit ; gp'"

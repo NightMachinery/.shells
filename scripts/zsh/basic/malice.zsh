@@ -44,7 +44,7 @@ alias-special() {
             # doc we could also ditch the automatic full expansion and manually expand till safety
             # doc note that if the recursive alias is defined after this one, we will fail to detect it with our current brittle scheme.
             ! { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } || {
-                test -z "$DEBUGME" || print -r ialiasing "$match[1]" to avoid recursion
+                # test -z "$DEBUGME" || print -r ialiasing "$match[1]" to avoid recursion
                 ialiases[$match[1]]=y
             }
         } || { ecerr aliasing "$args[*]" failed ; test -z "$DEBUGME" || mhat=("$args[@]") } }

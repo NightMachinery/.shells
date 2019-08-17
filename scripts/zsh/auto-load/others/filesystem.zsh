@@ -13,7 +13,13 @@ ensure-empty() {
         return 1
     } || return 0
 }
+typeset -ag pushf_stack
 pushf() {
-    mkdir -p "$1"
-    silent pushd "$1"
+    # mkdir -p "$1"
+    pushf_stack+="$(pwd)"
+    cdm "$1"
+}
+popf() {
+    cd "${pushf_stack[-1]}"
+    pushf_stack=("${(@)pushf_stack[1,-2]}")
 }
