@@ -1,3 +1,6 @@
+ffmpeg() {
+    isI && command ffmpeg "$@" || command ffmpeg -loglevel warning "$@"
+}
 swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
