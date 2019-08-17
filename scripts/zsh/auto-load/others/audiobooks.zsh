@@ -8,7 +8,7 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     mv $abdir/*.(${(j.|.)~audio_formats})(D) $tmp
     audio-join $abdir/$out $tmp/*(D)
     ecdbg Audio joined with $?
-    local covers=($abdir/*cover*.(jpg|png))
+    local covers=($abdir/*cover*.(jpg|png)(N))
     (( ${#covers} )) || {
         silent fetch-ebook-metadata --title "$out" --timeout 120 --cover $abdir/cover.png
         covers=($abdir/*cover*.(jpg|png))
