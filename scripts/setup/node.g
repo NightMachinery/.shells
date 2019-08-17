@@ -25,3 +25,4 @@ janeway
 seedrandom
 commander
 chalk-animation
+terminal-image-cli
