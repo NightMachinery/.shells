@@ -7,7 +7,7 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     pushf $base
     abdir="$(realpath --relative-to $base "$abdir")"
     local tmp=$abdir/tmp_dir2ab/
-    mv $abdir/*.(${(j.|.)~audio_formats})(D) $tmp
+    mv $abdir/**/*.(${(j.|.)~audio_formats})(D) $tmp
     audio-join $abdir/$out $tmp/*(D)
     ecdbg Audio joined with $?
     local covers=() metadata desc=''
@@ -20,6 +20,6 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
         covers=( --image $covers[1] )
     }
     genRSS.py -d $abdir -e "${aj_out:e}" -t "$out" -p "${desc:-The night is fair ...}" -o $abdir/feed.rss $covers[@] --host 'http://lilf.ir:8080'
-    # \rm -r $tmp #URGENTTD
+    trs $tmp
     get-dl-link $abdir/feed.rss
 }
