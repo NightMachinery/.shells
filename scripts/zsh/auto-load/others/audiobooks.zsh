@@ -6,11 +6,13 @@ dir2ab() {
     mdocu '<dir> [<output_name>]
 Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url.' MAGIC
     local abdir="$1"
-    local out="${2:-${abdir:t}}" base="$ABBase"
+    local base="$ABBase"
     #re dvar base abdir out
     #dact arger "$@"
     abdir="$(realpath --relative-to $base "$abdir")"
     pushf $base
+    local out="${2:-${abdir:t}}"
+    [[ $out == . ]] && out=dot
     [[ "$(realpath "$abdir")" == "$(realpath "$base")" ]] && {
 	>&2 color red abdir is the base. You probably do not want this. Aborting 33.
 		return 33
