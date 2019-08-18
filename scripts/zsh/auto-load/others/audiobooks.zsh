@@ -1,7 +1,7 @@
 dir2ab() {
-    mdocu '<dir> <output_name>
+    mdocu '<dir> [<output_name>]
 Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url.' MAGIC
-    local abdir="$1" out="$2" base=~/Downloads/
+    local abdir="$1" out="${2:-${abdir:t}}" base=~/Downloads/
     pushf $base
     abdir="$(realpath --relative-to $base "$abdir")"
     local tmp=$abdir/tmp_dir2ab/
@@ -12,7 +12,7 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     metadata="$(serr fetch-ebook-metadata --title "$out" --timeout 120 --cover $abdir/night6cover.png)"
     unset match
     [[ "$metadata" =~ 'Comments\s+:(.*)' ]]
-    desc="$match[1]"
+    desc="$(<<<"$match[1]" html2text)"
     [[ -e "$abdir/night6cover.png" ]] && covers+="$abdir/night6cover.png" ||         covers=($abdir/*.(jpg|png)(N))
     (( ${#covers} )) && {
         covers=( --image $covers[1] )
