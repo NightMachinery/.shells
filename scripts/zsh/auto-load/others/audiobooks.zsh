@@ -5,9 +5,14 @@ dir2ab() {
 Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url.' MAGIC
     local abdir="$1"
     local out="${2:-${abdir:t}}" base=~/Downloads/
-    # re dvar abdir out argv
-    pushf $base
+    #re dvar base abdir out
+    #dact arger "$@"
     abdir="$(realpath --relative-to $base "$abdir")"
+    pushf $base
+    [[ "$(realpath "$abdir")" == "$(realpath "$base")" ]] && {
+	>&2 color red abdir is the base. You probably do not want this. Aborting 33.
+		return 33
+    }	
     local tmp=$abdir/tmp_dir2ab/
     rename-numbered $tmp $abdir/**/*.(${(j.|.)~audio_formats})(D)
     audio-join $abdir/$out $tmp/*(D)
