@@ -12,8 +12,7 @@ if [[ -n "$XIVIEWER" ]]; then
     for ft in $_image_fts; do alias -s $ft=$XIVIEWER; done
 fi
 
-_media_fts=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
-for ft in $_media_fts; do alias -s $ft=mpv; done
+for ft in $media_formats; do alias -s $ft=mpv; done
 for ft in $audio_formats; do alias -s $ft=hear; done
 
 #list whats inside packed file

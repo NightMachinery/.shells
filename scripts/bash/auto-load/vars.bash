@@ -7,3 +7,4 @@ logdir="$HOME/logs/"
 PRUNE_SONGD_DAYS="+120"
 deleteus=~/.deleteus
 audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
+media_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
