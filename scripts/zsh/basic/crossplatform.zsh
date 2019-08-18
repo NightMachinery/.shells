@@ -1,0 +1,3 @@
+isLinux && {
+    alias gxargs='xargs'
+}

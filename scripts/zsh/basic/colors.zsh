@@ -18,7 +18,7 @@ color() {
 }
 resetcolor() {
     comment This var is seemingly coming from a plugin or sth
-    printf %s "$reset_color"
+    ! isI || printf %s "$reset_color"
 }
 helloworld() {
     colorbg 0 0 255;colorfg 0 255; ec HELLO "$(colorfg 255 100)"BRAVE"$(colorfg 0 255)" $(colorbg 100 0 255)NEW$(colorbg 0 0 255) WORLD\!;resetcolor
