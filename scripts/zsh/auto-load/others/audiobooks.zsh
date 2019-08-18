@@ -14,7 +14,7 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     metadata="$(serr fetch-ebook-metadata --title "$out" --timeout 120 --cover $abdir/night6cover.png)"
     unset match
     [[ "$metadata" =~ 'Comments\s+:(.*)' ]]
-    desc="$(<<<"$match[1]" html2text)"
+    desc="$(<<<"$match[1]" html-to-text)"
     [[ -e "$abdir/night6cover.png" ]] && covers+="$abdir/night6cover.png" ||         covers=($abdir/*.(jpg|png)(N))
     (( ${#covers} )) && {
         covers=( --image $covers[1] )
