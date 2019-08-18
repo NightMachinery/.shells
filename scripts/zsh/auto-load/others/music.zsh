@@ -150,7 +150,7 @@ hearp() {
         shuf=''
         shift
     }
-    local tracks="$(map '$1
+    local tracks="$(mapln '$1
 ' "$(cat "${@}")")"
     test -z "$shuf" || tracks="$(ec "$tracks"|shuf)"
     test -z "$NO_HEARP_TOUCH" && {

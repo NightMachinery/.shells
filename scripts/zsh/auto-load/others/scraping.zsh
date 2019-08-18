@@ -135,7 +135,7 @@ Options:
     return $e
 }
 outlinify() {
-    map 'https://outline.com/$1' "$@"
+    mapln 'https://outline.com/$1' "$@"
 }
 html2epub-calibre() {
     local u="$1 $(uuidgen).html"
@@ -151,13 +151,6 @@ html2epub-calibre() {
                   --embed-all-fonts \
                   --title="$1" --epub-inline-toc --enable-heuristics
     \rm "$u"
-}
-merge-html() {
-    map '
-
- <h1>$(strip $1 ".html")</h1>
-
- $(cat $1)' "$@"
 }
 html2epub() {
     ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
@@ -247,6 +240,16 @@ code2md() {
 "'```'"${i:e}
  $(cat $i)
 "'```'
+    done
+}
+merge-html() {
+    local i
+    for i in "$@"
+    do
+        ec "<h1>$(strip $i ".html")</h1>
+
+$(cat "$i")
+"
     done
 }
 code2epub() {
