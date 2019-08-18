@@ -11,16 +11,6 @@ blc() {
 function github-dir() {
     svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"  
 }
-function rename-for-podcast0() {
-    local c=1
-    local i
-    for i in "${@:3}"
-             {
-                 echo "$i to "  "$(dirname $i)/1-$(printf '%02d' $c) $2"
-                 if test $1 = 1 ; then mv "$i" "$(dirname $i)/1-$(printf '%02d' $c) $2"; fi
-                 c=$(($c + 1))
-             }
-}
 function pbadd() {
     osascript ~/'scripts/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
 }
