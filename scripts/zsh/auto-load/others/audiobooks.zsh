@@ -2,7 +2,7 @@ dir2ab() {
     mdocu '<dir> [<output_name>]
 Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url.' MAGIC
     local abdir="$1" out="${2:-${abdir:t}}" base=~/Downloads/
-    re dvar abdir out
+    ecdbg out: $out
     pushf $base
     abdir="$(realpath --relative-to $base "$abdir")"
     local tmp=$abdir/tmp_dir2ab/
