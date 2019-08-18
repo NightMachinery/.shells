@@ -15,11 +15,30 @@ dact() {
     test -z "$DEBUGME" || eval "$(gquote "$@")"
 }
 ecerr() ec "$@" 1>&2
-function rederr() {
-	  (setopt nomultios 2>/dev/null; set -o pipefail;
-     # eval "$(gquote "$@")" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2
-     eval "$(gquote "$@")" 2>&1 1>&3|color "${errcol[@]:-red}" 1>&2
-    )3>&1
+function rederr-old() {
+    comment Somehow just using pipes sometimes does not work and causes stdout to actually go red ...
+    local out="$(mktemp)"
+    setopt local_options nomultios pipefail;
+    {
+        # eval "$(gquote "$@")" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2
+        eval "$(gquote "$@")" 2>&1 1>&3|color "${errcol[@]:-red}" 1>&2
+    } 3>"$out"
+    cat "$out"
+    silent \rm "$out"
+}
+rederr() {
+    comment this is basically raise-blood but for just one command
+    exec 3>&2 2> >(color_err)
+    reval "$@"
+    exec 2>&3 3>&-
+}
+color_err () {
+    ## sysread & syswrite are part of zsh/system
+    while sysread std_err_color
+    do
+        # syswrite -o 2 "${fg_bold[red]}${std_err_color}${terminfo[sgr0]}"
+        color "${errcol[@]:-red}" "$std_err_color"
+    done
 }
 dvar () {
     local debugcol

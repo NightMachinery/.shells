@@ -1,3 +1,4 @@
+zmodload zsh/terminfo zsh/system
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
 ## Aliases

@@ -8,15 +8,16 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     mv $abdir/*.(${(j.|.)~audio_formats})(D) $tmp
     audio-join $abdir/$out $tmp/*(D)
     ecdbg Audio joined with $?
-    local covers=($abdir/*cover*.(jpg|png)(N))
-    (( ${#covers} )) || {
-        silent fetch-ebook-metadata --title "$out" --timeout 120 --cover $abdir/cover.png
-        covers=($abdir/*cover*.(jpg|png)(N))
-    }
+    local covers=() metadata desc=''
+    metadata="$(serr fetch-ebook-metadata --title "$out" --timeout 120 --cover $abdir/night6cover.png)"
+    unset match
+    [[ "$metadata" =~ 'Comments\s+:(.*)' ]]
+    desc="$match[1]"
+    [[ -e "$abdir/night6cover.png" ]] && covers+="$abdir/night6cover.png" ||         covers=($abdir/*.(jpg|png)(N))
     (( ${#covers} )) && {
         covers=( --image $covers[1] )
-        } 
-    genRSS.py -d $abdir -e "${aj_out:e}" -t "$out" -p "The night is fair ..." -o $abdir/feed.rss $covers[@] --host 'http://lilf.ir:8080'
+    }
+    genRSS.py -d $abdir -e "${aj_out:e}" -t "$out" -p "${desc:-The night is fair ...}" -o $abdir/feed.rss $covers[@] --host 'http://lilf.ir:8080'
     # \rm -r $tmp #URGENTTD
     get-dl-link $abdir/feed.rss
 }
