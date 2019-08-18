@@ -1,8 +1,8 @@
 autoload -U colors && colors
 
 ## Functions
-colorfg() printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"
-colorbg() printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m"
+colorfg() { ! isI || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
+colorbg() { ! isI || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
 colorb() {
     co_f=colorbg color "$@"
 }
@@ -11,7 +11,7 @@ color() {
         {
             "${co_f:-colorfg}" "$@"
             shift 2
-        } || printf %s "$fg[$1]"
+        } || { isI && printf %s "$fg[$1]" }
     print -nr -- "$(in-or-args "${@:2}")"
     resetcolor
     echo
