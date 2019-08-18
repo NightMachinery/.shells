@@ -40,7 +40,7 @@ Downloads a file, converts it to m4a and creates a podcast out of it.' MAGIC
     local dir=$base/julia/movie2ab/"$title"/
     pushf $dir
     aa "$1"
-    local dled=(**/*.${(j.|.)~media_formats})
+    local dled=(**/*.(${(j.|.)~media_formats}))
     ffmpeg -i $dled[1] out.m4a
     trs *~out.m4a
     dir2ab .
