@@ -23,3 +23,15 @@ popf() {
     cd "${pushf_stack[-1]}"
     pushf_stack=("${(@)pushf_stack[1,-2]}")
 }
+function rename-numbered() {
+    mdocu "rfp_dry=<dry-run?> <to-dir> <file> ..." MAGIC
+    local c=1
+    local i
+    for i in "${@:2}"
+             {
+                 local dest="$1/$(printf '%03d' $c) ${i:t}"
+                 echo "$i to "  $dest
+                 [[ -z "$rfp_dry" ]] && mv "$i" $dest
+                 c=$(($c + 1))
+             }
+}

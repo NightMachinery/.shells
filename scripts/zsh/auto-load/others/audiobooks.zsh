@@ -1,3 +1,5 @@
+# imports filesystem.zsh
+###
 dir2ab() {
     mdocu '<dir> [<output_name>]
 Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url.' MAGIC
@@ -7,7 +9,7 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     pushf $base
     abdir="$(realpath --relative-to $base "$abdir")"
     local tmp=$abdir/tmp_dir2ab/
-    mv $abdir/**/*.(${(j.|.)~audio_formats})(D) $tmp
+    rename-numbered $tmp $abdir/**/*.(${(j.|.)~audio_formats})(D)
     audio-join $abdir/$out $tmp/*(D)
     ecdbg Audio joined with $?
     local covers=() metadata desc=''
