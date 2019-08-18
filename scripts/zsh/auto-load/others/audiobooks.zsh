@@ -14,7 +14,7 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     [[ "$(realpath "$abdir")" == "$(realpath "$base")" ]] && {
 	>&2 color red abdir is the base. You probably do not want this. Aborting 33.
 		return 33
-    }	
+    }
     local tmp=$abdir/tmp_dir2ab/
     rename-numbered $tmp $abdir/**/*.(${(j.|.)~audio_formats})(D)
     audio-join $abdir/$out $tmp/*(D)
@@ -32,10 +32,11 @@ Joins the audio files in <dir>, removes the originals, generates a podcast feed,
     trs $tmp
     get-dl-link $abdir/feed.rss
 }
+
 movie2ab() {
     mdocu '<link> [<title>=(will be randomly generated)]
 Downloads a file, converts it to m4a and creates a podcast out of it.' MAGIC
-    local base="$ABBase" link="$1" title="${2:-$(xkcdpass)"
+    local base="$ABBase" link="$1" title="${2:-$(xkcdpass)}"
     local dir=$base/julia/movie2ab/"$title"/
     pushf $dir
     aa "$1"
