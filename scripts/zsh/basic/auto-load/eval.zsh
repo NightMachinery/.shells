@@ -28,7 +28,8 @@ function aget() {
     } || { err="$?" && ecerr aget "$@" exited "$err"; l ; cd .. ; (exit "$err") }
 }
 function reval() {
-    ecdbg revaling "$(gq "$@")"
+    # ecdbg revaling "$(gq "$@")"
+    # Don't put stuff here, reval is used in ecdbg itself!
     eval "$(gq "$@")"
 }
 function nulterm() {
