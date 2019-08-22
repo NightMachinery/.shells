@@ -35,7 +35,7 @@ touch-tracks() {
             f=( "$@" )
             for i in "$f[@]"
             do
-                tt+=( "$(bottomdir "$i")"/*(D) )
+                tt+=( "$(bottomdir "$i")"/*(DN) )
             done
             touch-tracks_ "$tt[@]"
         }

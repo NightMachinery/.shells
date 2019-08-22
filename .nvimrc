@@ -1,3 +1,4 @@
+set clipboard=unnamedplus
 nnoremap <Space> <nop>
 :let mapleader = " "
 

@@ -8,8 +8,17 @@ test -z "$attic_dir" && attic_dir="$cellar/attic/"
 test -z "$attic" && attic="$attic_dir/.darkattic"
 test -z "$attic_todo" && attic_todo="$attic_dir/.attic_todo"
 test -z "$attic_temoji" && attic_temoji="$attic_dir/.temojis"
+test -z "$attic_quotes" && attic_quotes="$attic_dir/.quotes"
 
 ### aliases
+## quotes
+alias attic_quotes='attic="$attic_quotes" un_p=y un_no_preview=y'
+alias quotes-add='attic_quotes seal'
+alias quotes='attic_quotes unseal'
+alias quotes-rm='attic_quotes exor'
+alias qadd='quotes-add'
+alias qrm='quotes-rm'
+alias qee=quotes
 ## todo
 alias attic_todo='attic="$attic_todo" un_p=y un_no_preview=y'
 alias todo='attic_todo seal'
