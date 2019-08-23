@@ -5,6 +5,9 @@ nodables="$NIGHTDIR"/setup/node.g
 brewables="$NIGHTDIR"/setup/brewables
 ins_go="$NIGHTDIR/setup/ins_go"
 ins_gem="$NIGHTDIR/setup/ins_gem"
+### Aliases
+alias bmac='brewables="$brewables"_mac '
+###
 
 clean-deps() {
     re clean-dups "$insables" "$inslables" "$nodables" "$brewables" "$pipables" "$ins_go" "$ins_gem"

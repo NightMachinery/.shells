@@ -1,3 +1,13 @@
+teec() {
+    tee /dev/tty | pbcopy
+}
+etee() {
+    mdoc 'etee; Short for `eteec`. An enhancer that copies stdout and prints it, too.
+See also: teec' MAGIC
+    local out="$(eval "$(gquote "$@")")"
+    <<<"$out" pbcopy
+    ec "$out"
+}
 function pbcopy() {
     local in="$(in-or-args "$@")"
     (( $+commands[copyq] )) && {

@@ -1,4 +1,5 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias myip='dig +short myip.opendns.com @resolver1.opendns.com'
 ialias re='run-on-each' #duplicate, to make it ialias
 ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
@@ -103,7 +104,7 @@ alias mac-mail-log="sudo log stream --predicate  '(process == \"smtpd\") || (pro
 alias erase-nonprintables='tr -cd "[:print:]\n"'
 alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
-alias apx='ALL_PROXY=socks5://127.0.0.1:1080'
+alias pxa='ALL_PROXY=socks5://127.0.0.1:1080'
 alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 # alias cxc='noglob __calc_plugin'
 alias retry='retry-limited 0'
