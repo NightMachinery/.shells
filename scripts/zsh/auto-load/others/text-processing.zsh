@@ -1,3 +1,6 @@
+### Module Text Processing
+### This module specializes in functions that touch the disk.
+###
 clean-dups() {
     sort -u "$1" | sponge "$1"
 }
