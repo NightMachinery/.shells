@@ -14,6 +14,7 @@ cin() {
     local __conda_setup="$(conda 'shell.zsh' 'hook' 2> /dev/null)"
     if [ $? -eq 0 ]; then
         eval "$__conda_setup"
+        CONDA_IS_LOADED=y
     else
         ecerr conda not loaded
     fi

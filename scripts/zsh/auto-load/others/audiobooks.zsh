@@ -19,9 +19,10 @@ dir2ab() {
 		}
 	local tmp=$abdir/tmp_dir2ab/
 	local afiles=($abdir/**/*.(${(j.|.)~audio_formats})(D))
-	(( $#afiles == 1 )) && { 
-		local aj_out=$abdir/$out.${afiles[1]:e}
-			mv $afiles[1] $aj_out
+	(( $#afiles == 1 )) && {
+		  local aj_out=${afiles[1]} #This might cause problems (i.e., genRSS might not find it)  if the orig file is in directories
+		# local aj_out=$abdir/$out.${afiles[1]:e}
+		# mv $afiles[1] $aj_out
 		} || {
 			rename-numbered $tmp $afiles[@]
 					audio-join $abdir/$out $tmp/*(D)
