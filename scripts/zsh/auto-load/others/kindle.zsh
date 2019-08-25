@@ -32,3 +32,7 @@ function 2p2k() {
 }
 2m2k2h() { 2m2k "$@" && { trs "$1"
                           trs "${1:r}.mobi" } }
+
+2epub() {
+ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
+}
