@@ -1,6 +1,7 @@
 # imports json.zsh
 ### Aliases
 alias tlc='tlrl-code'
+alias tlg='tlrl-gh'
 ###
 function wread() {
     mdoc 'Out: wr_title wr_author' MAGIC
@@ -116,6 +117,9 @@ function tlrlu(){
 }
 tlrl-code(){
     w2e-code "$(url-tail "$(url-final "$1")")" "$@"
+}
+tlrl-gh() {
+    w2e-gh "$(url-tail "$(url-final "$1")")" "$@"
 }
 tlrl-ng() {
     mdoc "Usage: $0 [OPTIONS] <url> ...

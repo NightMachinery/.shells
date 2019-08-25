@@ -169,3 +169,5 @@ test -d "$FZF_BASE" && {
 }
 
 rcLoaded='yes'
+
+

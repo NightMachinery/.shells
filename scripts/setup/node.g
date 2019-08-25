@@ -27,3 +27,4 @@ commander
 chalk-animation
 terminal-image-cli
 html-to-text
+moby

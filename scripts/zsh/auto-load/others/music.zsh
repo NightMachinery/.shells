@@ -35,7 +35,7 @@ touch-tracks() {
             f=( "$@" )
             for i in "$f[@]"
             do
-                tt+=( "$(bottomdir "$i")"/*(D) )
+                tt+=( "$(bottomdir "$i")"/*(DN) )
             done
             touch-tracks_ "$tt[@]"
         }
@@ -177,6 +177,7 @@ mu() {
     }
     songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
+muc() { fz_opts=(--no-sort) songc --loop-playlist "$@" }
 svpl() {
     # Save Playlist save-playlist save-pl
     mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
