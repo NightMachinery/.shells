@@ -1,5 +1,4 @@
 brew "coreutils"
-brew "moreutils"
 brew "dark-mode"
 brew "sd"
 brew "fd"
@@ -23,3 +22,5 @@ brew "nvim"
 brew "nnn"
 tap "TimidRobot/tap"
 brew "cmc"
+brew "slhck/moreutils/moreutils", args: ["without-parallel"]
+brew "parallel", force: true

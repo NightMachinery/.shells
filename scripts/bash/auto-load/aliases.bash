@@ -123,7 +123,7 @@ alias pe="pkill -SIGUSR2 Emacs"
 alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
-alias bi="brew install"
+alias bi="brew install --force-bottle"
 alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
