@@ -3,8 +3,8 @@
 ABBase=~/Downloads/
 ###
 dir2ab() {
-	mdocu '<dir> [<output_name>]
-	Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url.' MAGIC
+	mdoc "Usage: [da_nm=<not empty <-> no merge>] $0 <dir> [<output_name>]
+	Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url." MAGIC
 	local abdir="$(bottomdir $1)"
 	local base="$ABBase"
 	#re dvar base abdir out
@@ -19,7 +19,7 @@ dir2ab() {
 		}
 	local tmp=$abdir/tmp_dir2ab/
 	local afiles=($abdir/**/*.(${(j.|.)~audio_formats})(D))
-	(( $#afiles == 1 )) && {
+	{ [[ -n "$da_nm" ]] || (( $#afiles == 1 )) } && {
 		  local aj_out=${afiles[1]} #This might cause problems (i.e., genRSS might not find it)  if the orig file is in directories
 		# local aj_out=$abdir/$out.${afiles[1]:e}
 		# mv $afiles[1] $aj_out
