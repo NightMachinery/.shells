@@ -19,3 +19,4 @@ ialias emcg="emacsclient -c"
 alias b='builtin'
 alias typ='typeset -p'
 alias n='noglob'
+alias bs='brew search'

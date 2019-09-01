@@ -22,3 +22,5 @@ subliminal
 rotten_tomatoes_cli
 numpy
 yq
+pdfCropMargins
+ocrmypdf

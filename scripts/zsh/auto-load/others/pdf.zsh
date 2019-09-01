@@ -1,3 +1,9 @@
+function pdf-unencrypt() {
+    mdocu "<file>
+Uses ghostscript to rewrite the file without encryption." MAGIC
+    local in="$1"
+    gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="${in:r}_unencrypted.pdf" -c .setpdfwrite -f "$in"
+}
 function pdf-cover() {
     convert "$1[0]" "$1:r.png"
 }

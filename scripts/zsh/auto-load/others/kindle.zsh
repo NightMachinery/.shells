@@ -24,6 +24,9 @@ function 2kindle() {
     mutt -s "${2:-convert}" -a "$1" -- "${3:-$kindle_email}" <<<hi
 }
 function 2ko() {
+    mdoc "2kindle-original; Sends to Kindle wiytout conversion.
+Usage: $0 <file> [<kindle-email>]
+Uses 2kindle under the hood." MAGIC
     2kindle "$1" "some_subject" "$2"
 }
 function 2p2k() {

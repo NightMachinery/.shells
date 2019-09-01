@@ -17,6 +17,9 @@ agi() {
     doc ag internals of zsh
     agm "$@" ~/.oh-my-zsh/ $ANTIBODY_HOME
 }
+agcell() {
+    agm -uuu --iglob '!.git' "$@" $cellar # --binary --hidden don't work with -C somehow, so we use -uuu :D
+}
 function agr {
     doc 'usage: from=sth to=another agr [ag-args]'
     comment -l --files-with-matches
