@@ -1,5 +1,6 @@
 ### Seal Module
 # imports basics fuzzy
+# imports basics clipboard
 # imports string.zsh
 # imports binaries sd, fzf, perl
 
@@ -34,7 +35,7 @@ alias tdi=todo-import
 ## temoji
 alias attic_temoji='attic="$attic_temoji" un_p=y un_no_preview=y'
 temoji() {
-    attic_temoji unseal-split1 "$@"  |tee /dev/tty |pbcopy
+    attic_temoji unseal-split1 "$@"  | teec
 }
 alias temoji-add='attic_temoji seal'
 alias temoji-rm='attic_temoji exor'

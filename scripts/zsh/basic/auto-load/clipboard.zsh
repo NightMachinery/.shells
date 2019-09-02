@@ -1,5 +1,10 @@
 teec() {
-    tee /dev/tty | pbcopy
+    mdoc "teec; ec-and-copy; tee-copy;
+Prints and copies its stdin.
+See also: 'etee'." MAGIC
+    local out="$(</dev/stdin)"
+    <<<"$out" pbcopy
+    ec "$out"
 }
 etee() {
     mdoc 'etee; Short for `eteec`. An enhancer that copies stdout and prints it, too.
