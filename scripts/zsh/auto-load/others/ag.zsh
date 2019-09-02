@@ -3,9 +3,12 @@ if (( $+commands[tag-ag] )); then
     export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
 fi
+##
+alias agc='ec "${(F)commands}"|agm'
+##
 aga() {
     # agm "$@" "$NIGHTDIR"/**/*alias*(.)
-    builtin alias|ag "$@"
+    builtin alias|agm "$@"
 }
 agf() {
     agm "$@" "$NIGHTDIR"/**/functions*(.)

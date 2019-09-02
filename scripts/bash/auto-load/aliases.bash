@@ -1,4 +1,5 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias fiy='FORCE_INTERACTIVE=y'
 alias myip='dig +short myip.opendns.com @resolver1.opendns.com'
 ialias re='run-on-each' #duplicate, to make it ialias
 ialias ec='print -r --' #duplicate, to make it ialias
@@ -13,7 +14,6 @@ alias nn='nnn -d'
 alias bat='bat --theme OneHalfLight --pager="less -FRXn"'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'
-alias agc="ec \"\$commands\"|sd '\s' '\n'|ag"
 alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
 alias rg='rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --auto-hybrid-regex -C ${ag_c:-1}' # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
@@ -56,7 +56,7 @@ alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all a
 alias dlga="noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
-alias sia="sb ;source-interactive-all"
+alias sia="sb ; source-interactive-all"
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
 alias api="sudo apt install -y"
 alias apug="sudo apt upgrade"

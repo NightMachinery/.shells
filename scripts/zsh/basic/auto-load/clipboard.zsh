@@ -1,7 +1,7 @@
 teec() {
-    mdoc "teec; ec-and-copy; tee-copy;
+    doc "teec; ec-and-copy; tee-copy;
 Prints and copies its stdin.
-See also: 'etee'." MAGIC
+See also: 'etee'." #MAGIC
     local out="$(</dev/stdin)"
     <<<"$out" pbcopy
     ec "$out"
