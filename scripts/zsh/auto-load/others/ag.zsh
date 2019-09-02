@@ -4,8 +4,13 @@ if (( $+commands[tag-ag] )); then
     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
 fi
 ##
-alias agc='ec "${(F)commands}"|agm'
+alias agc='ec "${(F)commands}"|ag_c=0 agm'
 ##
+function rg() {
+    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --auto-hybrid-regex -C ${ag_c:-1} "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+}
+agm() rg "$@" #alias agm='rg' #'ag -C "${ag_c:-1}" --nonumbers'
+
 aga() {
     # agm "$@" "$NIGHTDIR"/**/*alias*(.)
     builtin alias|agm "$@"
