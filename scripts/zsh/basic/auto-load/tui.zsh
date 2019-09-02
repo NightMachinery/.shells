@@ -1,3 +1,5 @@
 function printz() {
-    test -n "$*" && print -rz -- "$@"
+    test -n "$*" && {
+     isI && print -rz -- "$@" || ec "$@"
+    }
 }
