@@ -7,5 +7,6 @@ re source-basic cached conditions crossplatform args colors debug text-manipulat
 run-on-each source "$NIGHTDIR"/zsh/basic/auto-load/**/*(.)
 [[ "$(pwd)" != *borg* ]] || {
     # For use with the Julia module.
-    silence eval 'export jufile=(*)' && export j="$jufile" && export jd="${jufile:h}"
+    silence eval 'export jufile=(*)' && export j="$jufile"
+    export jd="$(pwd)"
 }
