@@ -45,7 +45,7 @@ unseal-split1() {
     local i flag=0 res=''
     for i in "${(f@)$(unseal "$@")}"
     do
-        # re dvar i flag res
+        re dvar i flag res
         [[ -z "$i" ]] && continue
         flag=$((flag+1))
         (( $flag == 1 )) && {
