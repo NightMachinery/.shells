@@ -1,12 +1,26 @@
+tmux-killf() {
+    local sessions
+    sessions="$(tmux ls|fz)" || return $?
+    local i
+    for i in "${(f@)sessions}"
+    do
+        [[ $i =~ '([^:]*):.*' ]] && {
+            ec "Killing $match[1]"
+            tmux kill-session "$match[1]"
+            }
+    done
+}
 fr() {
     sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
     test -n "$sels" && printz "$1${fr_sep:- }${sels[@]:q:q}"
 }
 f() fr "$@" --max-depth 1
-fmn() {
+mnf() {
     man -k . | fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
 }
-fcm() { printz "$(agc "${@:-.}" | fz)" }
+cmf() {
+    # command finder
+    printz "$(agc "${@:-.}" | fz)" }
 chis() {
     # Forked from fzf's wiki
     # browse chrome history
