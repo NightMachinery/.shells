@@ -1,4 +1,4 @@
-tmux-killf() {
+tmuxkillf() {
     local sessions
     sessions="$(tmux ls|fz)" || return $?
     local i
