@@ -24,3 +24,4 @@ tap "TimidRobot/tap"
 brew "cmc"
 brew "slhck/moreutils/moreutils", args: ["without-parallel"]
 brew "parallel", force: true
+brew "asdf"

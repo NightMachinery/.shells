@@ -164,7 +164,16 @@ html2epub-pandoc() {
     # title author htmls
     pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
-h2e() html2epub "$1" "${h2_author:-night}" "${@:2}"
+h2e() {
+    html2epub "$1" "${h2_author:-night}" "${@:2}"
+    p2k "$1".epub
+}
+p2k() {
+    doc possibly send to kindle
+    [[ -n "$pk_no" ]] || {
+        2m2k "$1"
+    }
+}
 web2epub() {
     doc usage: 'we_retry= we_dler= we_author= title urls-in-order'
     local u="$1 $(uuidgen)"
@@ -193,13 +202,13 @@ web2epub() {
     } || { ecerr "$hasFailed" && (exit 1) }
 }
 w2e-raw() {
-    web2epub "$1" "${@:2}" && 2m2k "$1.epub"
+    web2epub "$1" "${@:2}" && p2k "$1.epub"
 }
 w2e-o() {
     wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 w2e-lw-raw() {
-    we_author=LessWrong web2epub "$1" "${(@f)$(re lw2gw "${@:2}")}" && 2m2k "$1.epub"
+    we_author=LessWrong w2e "$1" "${(@f)$(re lw2gw "${@:2}")}"
 }
 lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com
 html2epub-pandoc-simple() {
@@ -211,7 +220,7 @@ aa2e() {
     aget "aa -Z $(gquote "${@:2}")
 html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
-    2m2k "$1".epub
+    p2k "$1".epub
 }
 tldr() nig ea command tldr "$@"
 code2html() {
@@ -231,7 +240,7 @@ w2e-code-old() {
 w2e-code() {
     mdocu '<name> <url> ...' MAGIC
     aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:2}")}")" \; code2epub "$1:q" '*' \; mv ${1:q}.epub ../
-    2m2k ${1}.epub
+    p2k ${1}.epub
 }
 code2md() {
     local i

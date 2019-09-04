@@ -81,7 +81,7 @@ ins-brew() {
 ins-go() {
     zargs -n 1 -- $(< "$ins_go") -- goi #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
-ins-go() {
+ins-gem() {
     zargs -n 1 -- $(< "$ins_gem") -- gmi #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
 ins-all() {
