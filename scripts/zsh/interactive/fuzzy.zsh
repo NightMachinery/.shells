@@ -6,7 +6,7 @@ tmuxkillf() {
     do
         [[ $i =~ '([^:]*):.*' ]] && {
             ec "Killing $match[1]"
-            tmux kill-session "$match[1]"
+            tmux kill-session -t "$match[1]"
             }
     done
 }
