@@ -1,3 +1,6 @@
+vcnpp() {
+    vcsh night.sh commit -uno -am "." ; vcsh night.sh pull --no-edit ; vcsh night.sh push
+}
 inqcell() incell "$(gquote "$@")"
 incell() {
     pushf "$cellar"
