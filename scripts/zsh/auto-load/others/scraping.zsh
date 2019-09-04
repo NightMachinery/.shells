@@ -162,7 +162,7 @@ html2epub() {
 }
 html2epub-pandoc() {
     # title author htmls
-    pandoc --toc -s -f html <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+    pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
 h2e() html2epub "$1" "${h2_author:-night}" "${@:2}"
 web2epub() {

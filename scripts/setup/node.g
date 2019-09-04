@@ -28,3 +28,4 @@ chalk-animation
 terminal-image-cli
 html-to-text
 moby
+fkill-cli
