@@ -24,4 +24,5 @@ numpy
 yq
 pdfCropMargins
 ocrmypdf
-httpie
+libgen.py
+libgenapi
