@@ -28,3 +28,4 @@ brew "parallel", force: true
 brew "asdf"
 brew "asdf"
 brew "jesseduffield/lazydocker/lazydocker"
+brew "ctop"
