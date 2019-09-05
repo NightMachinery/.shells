@@ -1,3 +1,5 @@
-f [ -f ~/.bash_profile ]; then
+[ -n "$BASH_VERSION" ] && {
+if [ -f ~/.bash_profile ]; then
     . ~/.bash_profile
 fi
+}
