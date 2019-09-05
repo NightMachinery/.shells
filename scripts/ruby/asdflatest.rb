@@ -5,5 +5,6 @@ def latest(language)
   stock_versions = versions.select { |v| v.count('a-zA-Z').zero? }
   latest_version = stock_versions.max_by { |v| Gem::Version.new(v) }
   `asdf install #{language} #{latest_version}`
+  `asdf global #{language} #{latest_version}`
 end
 latest(ARGV[0])
