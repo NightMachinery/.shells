@@ -10,7 +10,7 @@ alias url-exists='curl --output /dev/null --silent -r 0-0 --fail --location' #Do
 alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
 alias gurl='curl --silent --fail --location -o /dev/stdout'
-alias nn='nnn -d'
+alias nn='LESS="-RiN" nnn -d'
 alias bat='bat --theme OneHalfLight --pager="less -FRXn"'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'

@@ -12,4 +12,4 @@ export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
 export SUDO_EDITOR="$NEDITOR"
 export VISUAL="$NEDITOR"
 export EDITOR="$VISUAL"
-
+export NODEJS_CHECK_SIGNATURES=no #for asdf's nodejs
