@@ -1,4 +1,3 @@
-echo BADAPPLE
 if [ -f ~/.bashrc ]; then
     . ~/.bashrc
 fi

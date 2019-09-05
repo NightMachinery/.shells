@@ -1,0 +1,4 @@
+#!/usr/bin/env zsh
+brew install --HEAD mosh
+brew tap moncho/dry
+brew install dry

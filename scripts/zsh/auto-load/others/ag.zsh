@@ -19,7 +19,7 @@ agf() {
     agm "$@" "$NIGHTDIR"/**/functions*(.)
 }
 ags() {
-    agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.)
+    agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.) ~/.bashrc ~/.profile ~/.bashrc ~/.bash_profile
 }
 agi() {
     doc ag internals of zsh
