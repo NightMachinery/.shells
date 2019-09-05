@@ -26,3 +26,5 @@ brew "cmc"
 brew "slhck/moreutils/moreutils", args: ["without-parallel"]
 brew "parallel", force: true
 brew "asdf"
+brew "asdf"
+brew "jesseduffield/lazydocker/lazydocker"
