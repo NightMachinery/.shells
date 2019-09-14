@@ -3,14 +3,15 @@ pipables="$NIGHTDIR"/python/requirements.txt
 inslables="$NIGHTDIR"/setup/installables-linux
 nodables="$NIGHTDIR"/setup/node.g
 brewables="$NIGHTDIR"/setup/brewables
+brewables_mac="$NIGHTDIR"/setup/brewables_mac
 ins_go="$NIGHTDIR/setup/ins_go"
 ins_gem="$NIGHTDIR/setup/ins_gem"
 ### Aliases
-alias bmac='brewables="$brewables"_mac '
+alias bmac='brewables="$brewables_mac" '
 ###
 
 clean-deps() {
-    re clean-dups "$insables" "$inslables" "$nodables" "$brewables" "$pipables" "$ins_go" "$ins_gem"
+    re clean-dups "$insables" "$inslables" "$nodables" "$brewables" "$brewables_mac" "$pipables" "$ins_go" "$ins_gem"
 }
 alias bnu='HOMEBREW_NO_AUTO_UPDATE=1'
 
