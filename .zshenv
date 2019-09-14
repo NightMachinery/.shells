@@ -7,7 +7,6 @@ isNotExpensive || {
         test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
     fi
 
-    addToPATH ~/bin
     addToPATH "$HOME/.dotnet/tools"
     addToPATH "/Library/TeX/texbin"
     addToPATH "$HOME/.cargo/bin"
@@ -21,6 +20,7 @@ isNotExpensive || {
     addToPATH "/usr/libexec/"
     export GEM_HOME="$HOME/.gem"
     addToPATH "$GEM_HOME/bin"
+    addToPATH ~/bin
 
     # psource ~/anaconda/etc/profile.d/conda.sh
     # silence conda deactivate #this is necessary try sbing and you'll see
