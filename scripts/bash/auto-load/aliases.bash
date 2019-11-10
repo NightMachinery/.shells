@@ -1,4 +1,5 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias eval-memoi='memoi-eval'
 alias fiy='FORCE_INTERACTIVE=y'
 alias myip='dig +short myip.opendns.com @resolver1.opendns.com'
 ialias re='run-on-each' #duplicate, to make it ialias

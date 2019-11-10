@@ -24,5 +24,6 @@ function ruu() {
     comment @lilbug strip-left
     a="$(strip "$a" 'noglob ')"
     a="$(strip "$a" 'nocorrect ')"
+    a="$(strip "$a" 'ruu "" ')"
     seval "$f[@]" "$=a" "$(gquote "${@:3}")"
 }
