@@ -15,3 +15,4 @@ unixodbc-dev
 unzip
 curl
 snapd
+sendmail
