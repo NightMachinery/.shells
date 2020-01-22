@@ -231,8 +231,8 @@ function zir() {
 }
 function removeTrailingSlashes() {
     case $1 in
-        *[!/]*/) ec "$1"|sed 's:/*$::' ;; #x=${x%"${x##*[!/]}"};;
-        *[/]) ec "/";;
+        *[!/]*) ec "$1"|sed 's:/*$::' ;; #x=${x%"${x##*[!/]}"};;
+        [/]*) ec "/";;
     esac
 }
 function whz() {
