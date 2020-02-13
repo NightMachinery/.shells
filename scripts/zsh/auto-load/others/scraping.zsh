@@ -273,3 +273,6 @@ code2epub() {
     mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
     pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
+getlinks() {
+	lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
+	}
