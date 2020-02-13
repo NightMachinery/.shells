@@ -1,0 +1,2 @@
+#!/usr/bin/env ipython -i
+from plumbum import *

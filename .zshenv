@@ -7,6 +7,7 @@ isNotExpensive || {
         test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
     fi
 
+    addToPATH ~/code/node/snips-alice
     addToPATH "$HOME/.dotnet/tools"
     addToPATH "/Library/TeX/texbin"
     addToPATH "$HOME/.cargo/bin"

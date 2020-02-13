@@ -42,7 +42,9 @@ with open(str(Path.home()) + '/.telegram-config') as f:
             for rec in all_recs.split():
                 try:
                     client.send_message(rec, msg)
-                except:  #ValueError as err:
+                except TypeError:
+                    pass
+                except Exception as e:  #ValueError as err:
                     er_msg = traceback.format_exc()
                     print(er_msg)
                     client.send_message(log_chat, er_msg)

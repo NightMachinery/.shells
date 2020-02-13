@@ -102,10 +102,6 @@ ecdbg $options[autopushd]
 
 psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
 
-#THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
-export SDKMAN_DIR="$HOME/.sdkman"
-[[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
-
 #This doesn't work. I have no idea why.
 bindkey -M viins ‘ii’ vi-cmd-mode
 bindkey -v

@@ -32,20 +32,6 @@ function reval() {
     # Don't put stuff here, reval is used in ecdbg itself!
     eval "$(gq "$@")"
 }
-function nulterm() {
-    reval "$@"
-    ec $'\0'
-}
-function ruu() {
-    doc helper function to expand aliases for commands like sudo, nohup, etc
-    local f=()
-    [[ "$1" =~ '^\s*$' ]] || f+="${=1}"
-    local a="$(force-expand "$2")"
-    comment @lilbug strip-left
-    a="$(strip "$a" 'noglob ')"
-    a="$(strip "$a" 'nocorrect ')"
-    seval "$f[@]" "$=a" "$(gquote "${@:3}")"
-}
 function psource()
 {
     if [[ -r "$1" ]]; then

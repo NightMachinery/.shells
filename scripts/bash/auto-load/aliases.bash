@@ -1,4 +1,5 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias eval-memoi='memoi-eval'
 alias fiy='FORCE_INTERACTIVE=y'
 alias myip='dig +short myip.opendns.com @resolver1.opendns.com'
 ialias re='run-on-each' #duplicate, to make it ialias
@@ -18,7 +19,7 @@ alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
 alias l='exa -a --oneline'
 alias ll='exa -a -l'
-alias lt='l -T'
+alias lt='exa -a -T'
 alias lc='l -s created'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
@@ -117,7 +118,7 @@ alias pi='noglob pip install -U'
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias eta="etlas exec eta"
 alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
-alias pe="pkill -SIGUSR2 Emacs"
+alias pe="pkill -SIGUSR2 -i emacs"
 alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"

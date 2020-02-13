@@ -231,8 +231,8 @@ function zir() {
 }
 function removeTrailingSlashes() {
     case $1 in
-        *[!/]*/) ec "$1"|sed 's:/*$::' ;; #x=${x%"${x##*[!/]}"};;
-        *[/]) ec "/";;
+        *[!/]*) ec "$1"|sed 's:/*$::' ;; #x=${x%"${x##*[!/]}"};;
+        [/]*) ec "/";;
     esac
 }
 function whz() {
@@ -321,7 +321,7 @@ function y-stream() {
     y -f best  -o "%(title)s.%(ext)s" "$@" &
     local out=$(yic -f best --get-filename -o "%(title)s.%(ext)s" "$@")
     #We need to use yic or archived videos return nothing causing mpv to play * :D
-    retry-mpv "${out:q}*"
+    test -n "$out" && retry-mpv "${out:q}*" || ecerr Could not get video\'s name. Aborting.
     #mpv bug here
     # kill $!
     # kill $! is your friend :))

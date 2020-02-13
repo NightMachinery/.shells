@@ -34,7 +34,7 @@ function run-on-each() {
     local i98765
     for i98765 in "${@:2}"
     do
-        eval "$1 $(gq "$i98765")"
+        eval "$1 $(gquote "$i98765")"
     done
 }
 alias re='run-on-each'
