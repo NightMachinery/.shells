@@ -1,0 +1,3 @@
+#!/usr/bin/env dash
+pdf-crop-margins "$3"
+\rm -f "$3"
