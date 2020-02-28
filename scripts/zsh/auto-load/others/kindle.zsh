@@ -15,7 +15,7 @@ function 2m2k() {
     2kindle "$1"
 }
 function mv2ko() {
-	ensure-ju
+	jej
 	mv * "$1"
 	2ko *
 }
