@@ -126,7 +126,7 @@ tlrl-ng() {
 Description: Automatically infers the title and the author from the first URL, and feeds all URLs into 'w2e'.
 Options:
 -p, --prefix-title <string>    Prepends the specified string to the title of the page. (Optional)
--e, --engine <function> Which zsh function to use for generating the book. Default is w2e. (Optional)
+-e, --engine <function> Which zsh function to use for generating the book. Default is w2e-raw. (Optional)
 -v, --verbose ignored. Supported only for backwards-compatibility." MAGIC
     local opts e
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e:
@@ -134,7 +134,7 @@ Options:
     silent wread "$1" html || return 33
     # ecdbg title: "${opts[-p]}${wr_title:-$1}"
     pushf ~/tmp-kindle
-    we_author=$wr_author "${opts[-e]:-w2e}" "${opts[-p]}${wr_title:-$1}" "$@"
+    we_author=$wr_author "${opts[-e]:-w2e-raw}" "${opts[-p]}${wr_title:-$1}" "$@"
     e=$?
     popf
     return $e
