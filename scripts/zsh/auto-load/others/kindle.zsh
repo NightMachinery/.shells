@@ -50,7 +50,7 @@ ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 jfic() {
 	ensure-empty
 	re "fanficfare --non-interactive" "$@"
-	re p2k *.epub
+	sout re p2k *.epub
 	rm *.mobi
 	# rm *.(epub|mobi)
 }
