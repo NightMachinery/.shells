@@ -48,7 +48,7 @@ function 2p2k() {
 ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 }
 jfic() {
-	ensure-empty
+	jee
 	re "fanficfare --non-interactive" "$@"
 	sout re p2k *.epub
 	rm *.mobi
