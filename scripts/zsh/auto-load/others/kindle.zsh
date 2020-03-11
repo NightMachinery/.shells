@@ -59,7 +59,7 @@ jlib() {
 	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 	local p
 	p=(*.pdf(N))
-	pdf-crop-margins "${[@]p}"
+	pdf-crop-margins "${(@)p}"
 	rm "${(@)p}"
 	mkdir tmp
 	cp *(D.) tmp/
