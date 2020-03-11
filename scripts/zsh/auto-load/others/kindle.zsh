@@ -54,3 +54,30 @@ jfic() {
 	rm *.mobi
 	# rm *.(epub|mobi)
 }
+jlib() {
+	jee
+	serr re "libgen-cli download -o ." "$@"
+	local p
+	p=(*.pdf)
+	pdf-crop-margins *.pdf
+	rm "${(@)p}"
+	mkdir tmp
+	cp *(D.) tmp/
+        re p2k *.(epub|mobi)
+	re p2ko *.pdf
+	rm *(D.)
+	# mv tmp/* .
+	jup
+}
+p2k() {
+    doc possibly send to kindle
+    [[ -n "$pk_no" ]] || {
+        sout 2m2k "$@"
+    }
+}
+p2ko() {
+    doc possibly send to kindle
+    [[ -n "$pk_no" ]] || {
+        sout 2ko "$@"
+    }
+}

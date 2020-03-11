@@ -169,12 +169,6 @@ h2e() {
     html2epub "$1" "${h2_author:-night}" "${@:2}"
     p2k "$1".epub
 }
-p2k() {
-    doc possibly send to kindle
-    [[ -n "$pk_no" ]] || {
-        2m2k "$1"
-    }
-}
 web2epub() {
     doc usage: 'we_retry= we_dler= we_author= title urls-in-order'
     local u="$1 $(uuidgen)"
