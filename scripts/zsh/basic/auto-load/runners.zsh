@@ -21,6 +21,6 @@ redoq() {
 }
 redo() redoq "$(gquote "${@: 1:-1}")" "${@: -1}"
 skipglob() {
-	test -z "${@:2}" || eval "$1 $(gq "${@:2}")"
+	test -z "${*:2}" || eval "$1 $(gq "${@:2}")"
 }
 alias skig=skipglob
