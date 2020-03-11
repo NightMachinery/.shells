@@ -59,13 +59,13 @@ jlib() {
 	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 	local p
 	p=(*.pdf(N))
-	pdf-crop-margins "${(@)p}"
-	rm "${(@)p}"
+	skipglob pdf-crop-margins "${(@)p}"
+	skig rm "${(@)p}"
 	mkdir tmp
 	cp *(D.) tmp/
-	re p2k *.(epub|mobi)(N)
-	re p2ko *.pdf(N)
-	rm *(D.N)
+	skig "re p2k" *.(epub|mobi)(N)
+	skig "re p2ko" *.pdf(N)
+	rm *(D.)
 	# mv tmp/* .
 	jup
 }
