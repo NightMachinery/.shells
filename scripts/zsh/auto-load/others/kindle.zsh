@@ -56,18 +56,21 @@ jfic() {
 }
 jlib() {
 	jee
-	serr re "libgen-cli download -o ." "$@"
+	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 	local p
-	p=(*.pdf)
-	pdf-crop-margins *.pdf
+	p=(*.pdf(N))
+	pdf-crop-margins "${[@]p}"
 	rm "${(@)p}"
 	mkdir tmp
 	cp *(D.) tmp/
-        re p2k *.(epub|mobi)
-	re p2ko *.pdf
-	rm *(D.)
+	re p2k *.(epub|mobi)(N)
+	re p2ko *.pdf(N)
+	rm *(D.N)
 	# mv tmp/* .
 	jup
+}
+libgen2md5() {
+	[[ "$1" =~ '(\w{32})\W*$' ]] && print -r -- "$match[1]"
 }
 p2k() {
     doc possibly send to kindle
