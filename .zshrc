@@ -164,6 +164,7 @@ test -d "$FZF_BASE" && {
     bindkey '^[[Z' fzf-completion #Shift+Tab
 }
 
+psource "$NIGHTDIR/zsh/last.zsh"
 rcLoaded='yes'
 
 

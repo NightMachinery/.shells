@@ -27,3 +27,10 @@ function ruu() {
     a="$(strip "$a" 'ruu "" ')"
     seval "$f[@]" "$=a" "$(gquote "${@:3}")"
 }
+noglobfn() {
+	(( ${+aliases[$1]} )) || {
+	functions[_$1]=$functions[$1]
+	unfunction "$1"
+	alias "$1"="noglob _$1"
+	}
+}
