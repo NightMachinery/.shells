@@ -7,6 +7,11 @@ function prefix-files() {
 function rp() {
     test -e "$1" && realpath "$1" || ge_no_ec=y ge_no_hist=y ceer "$1" realpath
 }
+function globexists() {
+	(silent eval ": $@")
+}
+noglobfn globexists
+
 ensure-empty() {
 	doc Use 'jee' in code.
 

@@ -69,9 +69,10 @@ jopus() {
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
 jup() {
+	globexists ./**/*(.D) || return 0
     #rex "mv _ ${1:-./}" ./**/*(.D)
     #possibly silence it
-    mv ./**/*(.DN) .
+    mv ./**/*(.D) .
 }
 jimg() {
     test "$1" = "-h" && {
