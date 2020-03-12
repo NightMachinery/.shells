@@ -10,3 +10,4 @@ source-interactive-all() {
     re source "$NIGHTDIR"/zsh/interactive/**/*(.)
     NIGHT_NO_EXPENSIVE=y
 }
+psource "$NIGHTDIR/zsh/last.zsh"
