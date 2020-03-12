@@ -1,4 +1,4 @@
 #!/usr/bin/env zsh
-2m2k "$3"
-\rm -f "$3"
-\rm -f "${3:r}.mobi"
+p2k "$3"
+# \rm -f "$3"
+# \rm -f "${3:r}.mobi"

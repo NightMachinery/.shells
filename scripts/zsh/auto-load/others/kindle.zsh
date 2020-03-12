@@ -76,6 +76,7 @@ p2k() {
     doc possibly send to kindle
     [[ -n "$pk_no" ]] || {
         sout 2m2k "$@"
+    	[[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"
     }
 }
 p2ko() {
