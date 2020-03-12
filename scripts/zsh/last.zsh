@@ -1,1 +1,1 @@
-re noglobfn jlib jfic w2e-curl
+re noglobfn jlib jfic

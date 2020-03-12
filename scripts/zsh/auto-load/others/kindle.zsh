@@ -47,14 +47,14 @@ function 2p2k() {
 2epub() {
 ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 }
-jfic() {
+"jfic"() {
 	jee
 	re "fanficfare --non-interactive" "$@"
 	sout re p2k *.epub
 	rm *.mobi
 	# rm *.(epub|mobi)
 }
-jlib() {
+"jlib"() {
 	jee
 	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 	local p
