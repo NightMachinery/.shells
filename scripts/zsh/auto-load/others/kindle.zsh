@@ -51,8 +51,6 @@ ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 	jee
 	re "fanficfare --non-interactive" "$@"
 	sout re p2k *.epub
-	rm *.mobi
-	# rm *.(epub|mobi)
 }
 "jlib"() {
 	jee
