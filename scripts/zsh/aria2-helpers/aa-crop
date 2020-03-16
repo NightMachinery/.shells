@@ -1,3 +1,7 @@
-#!/usr/bin/env dash
-pdf-crop-margins "$3"
+#!/usr/bin/env zsh
+local u="$(uuidgen)"
+pdf-crop-margins "$3" -o "$u"
 \rm -f "$3"
+\mv "$u" "$3"
+p2ko "$3"
+
