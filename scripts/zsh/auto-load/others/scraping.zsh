@@ -66,7 +66,7 @@ wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
 }
 w2e-curl() {
-    h2ed=html2epub-pandoc-simple we_dler=wread-curl w2e "$@"
+    h2ed=html2epub-pandoc we_dler=wread-curl w2e "$@"
 }
 wread-curl() {
     gurl "$1"
@@ -126,14 +126,15 @@ tlrl-ng() {
 Description: Automatically infers the title and the author from the first URL, and feeds all URLs into 'w2e'.
 Options:
 -p, --prefix-title <string>    Prepends the specified string to the title of the page. (Optional)
+-e, --engine <function> Which zsh function to use for generating the book. Default is w2e-raw. (Optional)
 -v, --verbose ignored. Supported only for backwards-compatibility." MAGIC
     local opts e
-    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p:
+    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e:
     # dact typeset -p opts argv
     silent wread "$1" html || return 33
     # ecdbg title: "${opts[-p]}${wr_title:-$1}"
     pushf ~/tmp-kindle
-    we_author=$wr_author w2e "${opts[-p]}${wr_title:-$1}" "$@"
+    we_author=$wr_author "${opts[-e]:-w2e-raw}" "${opts[-p]}${wr_title:-$1}" "$@"
     e=$?
     popf
     return $e
@@ -167,12 +168,6 @@ html2epub-pandoc() {
 h2e() {
     html2epub "$1" "${h2_author:-night}" "${@:2}"
     p2k "$1".epub
-}
-p2k() {
-    doc possibly send to kindle
-    [[ -n "$pk_no" ]] || {
-        2m2k "$1"
-    }
 }
 web2epub() {
     doc usage: 'we_retry= we_dler= we_author= title urls-in-order'
@@ -273,3 +268,6 @@ code2epub() {
     mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
     pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
+getlinks() {
+	lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
+	}

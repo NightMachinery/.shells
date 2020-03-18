@@ -27,3 +27,12 @@ function ruu() {
     a="$(strip "$a" 'ruu "" ')"
     seval "$f[@]" "$=a" "$(gquote "${@:3}")"
 }
+noglobfn() {
+	doc Prepends noglob to functions. You need to define the original function in quotes if you want to reload the function definition in the future. 
+
+	(( ${+aliases[$1]} )) || {
+	functions[_$1]=$functions[$1]
+	alias "$1"="noglob _$1"
+	}
+	unfunction "$1"
+}

@@ -37,7 +37,7 @@ dir2ab() {
 			(( ${#covers} )) && {
 				covers=( --image $covers[1] )
 			}
-		genRSS.py -d $abdir -e "${aj_out:e}" -t "$out" -p "${desc:-The night is fair ...}" -o $abdir/feed.rss $covers[@] --host 'http://lilf.ir:8080'
+		genRSS.py -d $abdir -e "${aj_out:e}" -t "$out" -p "${desc:-The night is fair ...}" -o $abdir/feed.rss $covers[@] --host "${dl_base_url:-http://lilf.ir:8080}"
 		trs $tmp
 		get-dl-link $abdir/feed.rss
 		popf

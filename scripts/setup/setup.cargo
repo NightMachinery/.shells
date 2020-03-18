@@ -1,2 +1,2 @@
 #!/usr/bin/env zsh
-cargo install --git https://github.com/nightmachinary/tlrl
+#cargo install --git https://github.com/nightmachinary/tlrl

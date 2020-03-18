@@ -12,7 +12,7 @@ function github-dir() {
     svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"  
 }
 function pbadd() {
-    osascript ~/'scripts/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
+    osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
 }
 function cpsd() {
     local i;
@@ -300,17 +300,6 @@ function magnet2torrent() {
     aria2c -d "${2:-.}" --bt-metadata-only=true --bt-save-metadata=true "$1"
 }
 it2prof() { echo -e "\033]50;SetProfile=$1\a" ; } # Change iterm2 profile. Usage it2prof ProfileName (case sensitive)
-file-to-clipboard() {
-    osascript \
-        -e 'on run args' \
-        -e 'set the clipboard to POSIX file (first item of args)' \
-        -e end \
-        "$@"
-}
-function frep() {
-    doc '@convenience @grep'
-    eval "$(gquote "${@:2}")" |& ggrep -iP "$1"
-}
 function aas() {
     # aa "$@" --on-download-start aa-stream
     local out="$(md5 <<<"$1")"
@@ -328,11 +317,6 @@ function y-stream() {
 }
 function retry-mpv() {
     retry-eval "mpv --quiet $@ |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
-}
-function dl-stream() {
-    aria2c "$1" &
-    #TODO
-    #  "${2:i-iina}" ""
 }
 function set-fk-icon-size() {
     /usr/libexec/PlistBuddy -c "set FK_DefaultIconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finderkit, i.e., dialogs.
