@@ -4,6 +4,7 @@ function 2mobi() {
 }
 function 2m2k() {
     doc usage: FILE calibre-options
+    jglob
     [[ "$1" =~ 'mobi.az1$' ]] && {
         mv "$1" "${1:r}"
         ecdbg "az1 detected; Renaming to ${1:r}"

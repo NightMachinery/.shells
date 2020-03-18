@@ -1,3 +1,4 @@
+alias jglob='test -z "$*" && set -- $jufile'
 function jsummon() {
     mkdir -p ~/julia_tmp/
     local u=(*)
