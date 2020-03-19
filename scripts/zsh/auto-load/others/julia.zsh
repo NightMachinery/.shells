@@ -9,9 +9,10 @@ function junsummon() {
     \rm -r ~/julia_tmp
 }
 jdlc() {
-    silence pushd ~/Downloads/
-    ge_ecdbg=y onlc get-dl-link
-    silence popd
+	cp "$(last-modified ~/Downloads/)" ./
+    # silence pushd ~/Downloads/
+    # ge_ecdbg=y onlm get-dl-link
+    # silence popd
 }
 jdl-helper() {
     mkdir -p ~/Downloads/tmp/

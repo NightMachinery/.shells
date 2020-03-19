@@ -25,10 +25,11 @@ alias lc='l -s created'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
 alias lac='l -s accessed'
-alias last-created='exa -as created|tail -n1' #macOS only
-alias last-accessed='exa -as accessed|tail -n1' #macOS only
+function last-exa() { ec "${2:-.}/$(exa -as "$@"|tail -n1)" }
+alias last-created='last-exa created'
+alias last-accessed='last-exa accessed'
+alias last-modified='last-exa modified'
 alias last-added='ls-by-added |head -n1' #macOS only
-alias last-modified='exa -as modified|tail -n1'
 alias l-c=last-created
 alias l-ac=last-accessed
 alias l-a=last-added

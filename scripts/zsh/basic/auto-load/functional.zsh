@@ -21,3 +21,13 @@ mapg() {
 }
 mapln() { mg_sep=$'\n' mapg "$@" }
 mapnul() { mg_sep=$'\0' mapg "$@" }
+revargs() {
+	mdoc reverse args: "$0" '<function>' arguments... MAGIC
+	# (O = reverse of the order specified in the next flag, a = normal array order).
+	eval "$1" "$(gq "${(Oa)@[2,-1]}")"
+}
+inargs() {
+	mdoc Feeds the function from stdin if no arguments supplied MAGIC
+	# An enhancer
+	eval "$1" "$(gq "$(in-or-args "${@:2}")")"
+}
