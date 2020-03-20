@@ -90,3 +90,7 @@ p2ko() {
         sout 2ko "$@"
     }
 }
+function getpdfs() {
+	zargs -i _ -- "$@" -- getlinks _ '\.pdf$' | inargsf "aacrop -Z"
+}
+noglobfn getpdfs

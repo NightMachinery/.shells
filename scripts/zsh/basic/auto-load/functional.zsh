@@ -31,3 +31,5 @@ inargs() {
 	# An enhancer
 	eval "$1" "$(gq "$(in-or-args "${@:2}")")"
 }
+inargsf() { eval "$1" "$(gq "${(f@)"$(in-or-args "${@:2}")"}")" }
+inargs0() { eval "$1" "$(gq "${(0@)"$(in-or-args "${@:2}")"}")" }

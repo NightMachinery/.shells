@@ -23,3 +23,8 @@ k2pdf-split() {
         i=$[i+1]
     done
 }
+pdf-crop-margins () {
+	command pdf-crop-margins -p 1 "$@"
+	# -p is percent retained of margins.
+}
+pdfcrop() { re pdf-crop-margins "$@" }
