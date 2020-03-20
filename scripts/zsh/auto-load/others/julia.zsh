@@ -9,7 +9,8 @@ function junsummon() {
     \rm -r ~/julia_tmp
 }
 jdlc() {
-	cp "$(last-modified ~/Downloads/)" ./
+	cp -r "$(last-modified ~/Downloads/)" ./
+	jup
     # silence pushd ~/Downloads/
     # ge_ecdbg=y onlm get-dl-link
     # silence popd

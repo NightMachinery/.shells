@@ -1,5 +1,6 @@
 function 2mobi() {
     doc usage: FILE calibre-options
+    jglob
     ebook-convert "$1" "${1:r}.mobi" "${@:2}"
 }
 function 2m2k() {
@@ -30,15 +31,18 @@ function aab() {
     aa "$@" --on-download-complete aa-toKindle
 }
 function 2kindle() {
+	jglob
     mutt -s "${2:-convert}" -a "$1" -- "${3:-$kindle_email}" <<<hi
 }
 function 2ko() {
     mdoc "2kindle-original; Sends to Kindle without conversion.
 Usage: $0 <file> [<kindle-email>]
 Uses 2kindle under the hood." MAGIC
+	jglob
     2kindle "$1" "some_subject" "$2"
 }
 function 2p2k() {
+	jglob
     k2pdf "$1"
     2ko "${1:r}_k2opt.pdf"
 }
@@ -46,6 +50,7 @@ function 2p2k() {
                           trs "${1:r}.mobi" } }
 
 2epub() {
+	jglob
 ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 }
 "jfic"() {
