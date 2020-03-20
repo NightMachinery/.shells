@@ -1,4 +1,3 @@
-alias jglob='test -z "$*" && set -- $jufile'
 function jsummon() {
     mkdir -p ~/julia_tmp/
     local u=(*)
@@ -31,15 +30,15 @@ jaaks() {
     aget 'jks ; jup ../'
 }
 jks() {
-    ecdbg entering jks with jufile "$jufile"
-    jej
-    ecdbg trying to set orig
-    local orig=(*)
-    ecdbg orig: "$orig"
+    #ecdbg entering jks with jufile "$jufile"
+    jglob  #jej
+    #ecdbg trying to set orig
+    local orig="$1" #(*)
+    #ecdbg orig: "$orig"
     k2pdf-split "$orig"
-    ecdbg "trying to rm $orig"
+    #ecdbg "trying to rm $orig"
     \rm "$orig"
-    re 2ko *
+    re p2ko *
 }
 ensure-ju() {
     test -e "$jufile" || { ecerr "jufile doesn't exist"
