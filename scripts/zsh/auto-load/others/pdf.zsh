@@ -24,7 +24,10 @@ k2pdf-split() {
     done
 }
 pdf-crop-margins () {
-	command pdf-crop-margins -p 1 "$@"
+	local u="$(uuidgen)"
+	command pdf-crop-margins -p 1 "$@" -o "$u"
 	# -p is percent retained of margins.
+	\rm "${@[-1]}"
+	\mv "$u" "${@[-1]}"
 }
 pdfcrop() { re pdf-crop-margins "$@" }

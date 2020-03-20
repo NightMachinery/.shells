@@ -123,3 +123,19 @@ function vsox() {
     local inp=(*)
     sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
+function _1jma() {
+	local u="$(uuidgen)"
+	local p=~/Downloads/"$u"/
+	mkdir "$p"
+	deluge-console add -p "$p" "$1"
+	# Usage: add [-p <save-location>] <torrent-file> [<torrent-file> ...]
+	sleep "${jm_s:-60}"
+	cp -r "$p" .
+}
+function jma() {
+	jee
+	zargs --max-procs 60 -n 1 -- "$@" -- _1jma
+	jup
+	dir2k
+}
+noglobfn jma

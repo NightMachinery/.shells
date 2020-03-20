@@ -58,20 +58,18 @@ ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 	re "fanficfare --non-interactive" "$@"
 	sout re p2k *.epub
 }
+dir2k() {
+	local dir="${1:-.}/"
+	local p
+    p=($dir/*.pdf(N))
+    skipglob "re pdf-crop-margins" "${(@)p}"
+    skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
+    skipglob "re p2ko" $dir/*.pdf(N)
+}
 "jlib"() {
 	jee
 	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
-	local p
-	p=(*.pdf(N))
-	skipglob "re pdf-crop-margins" "${(@)p}"
-	skig rm "${(@)p}"
-	mkdir tmp
-	cp *(D.) tmp/
-	skig "re p2k" *.(epub|mobi)(N)
-	skig "re p2ko" *.pdf(N)
-	rm *(D.)
-	# mv tmp/* .
-	jup
+	dir2k
 }
 libgen2md5() {
 	[[ "$1" =~ '(\w{32})\W*$' ]] && print -r -- "$match[1]"
