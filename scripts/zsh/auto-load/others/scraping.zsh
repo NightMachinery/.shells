@@ -109,6 +109,11 @@ gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 url-final() {
     curl -Ls -o /dev/null -w %{url_effective} "$@"
 }
+url-final2() {
+	doc "This one doesn't download stuff."
+	[[ "$(2>&1 wget --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]"
+}
+reify url-final url-final2
 url-tail() {
     [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
 }
