@@ -77,6 +77,7 @@ libgen2md5() {
 p2k() {
     doc possibly send to kindle
     jglob
+    silent epub-cover $1 "${1:r}".jpg
     [[ -n "$pk_no" ]] || {
         sout 2m2k "$@"
     	[[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"
@@ -84,6 +85,7 @@ p2k() {
 }
 p2ko() {
     doc possibly send to kindle
+    silent pdf-cover "$1"
     [[ -n "$pk_no" ]] || {
         sout 2ko "$@"
     }
