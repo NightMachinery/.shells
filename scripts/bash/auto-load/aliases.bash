@@ -141,3 +141,4 @@ alias carbon='carbon-now --headless --copy'
 alias glances='glances --theme-white'
 alias jglob='test -z "$*" && { test -n "$jufile" && set -- "$jufile" || { ecerr No args and no jufile supplied to $0 ; return 1 } }'
 alias sii=nig
+alias npmi=npmadd
