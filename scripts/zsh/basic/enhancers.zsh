@@ -31,9 +31,8 @@ function ruu() {
 noglobfn() {
 	doc Prepends noglob to functions. You need to define the original function in quotes if you want to reload the function definition in the future. 
 
-	#(( ${+aliases[$1]} )) || 
+	(( ${+aliases[$1]} )) && unalias "$1"
 	{
-	unalias "$1"
 	functions[_noglob_$1]=$functions[$1]
 	alias "$1"="noglob _noglob_$1"
 	}
