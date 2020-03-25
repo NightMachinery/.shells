@@ -37,9 +37,10 @@ function mercury-html() {
     serr mercury-html.js "$@"
 }
 function full-html() {
-    doc splash should be up. https://splash.readthedocs.io
-    doc 'wait always waits the full time. Should be strictly < timeout.'
-    curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
+	curlfull.js "$1" > "$2"
+    #doc splash should be up. https://splash.readthedocs.io
+    #doc 'wait always waits the full time. Should be strictly < timeout.'
+    #curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
 }
 function random-poemist() {
     curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
@@ -222,7 +223,6 @@ html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
     p2k "$1".epub
 }
-tldr() nig ea command tldr "$@"
 code2html() {
     mdocu '[chroma-options] file -> HTML in stdout' MAGIC
     chroma --formatter html --html-lines --style trac "$@"
@@ -273,6 +273,26 @@ code2epub() {
     mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
     pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
-getlinks() {
+function getlinks() {
 	lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
 	}
+function getlinksoup() {
+	getlinks.py "$1" | command rg "${@[2,-1]:-.*}"
+}
+noglobfn getlinks getlinksoup
+function getlinksfull() {
+	local u
+	u="$(uuidgen)"
+	full-html "$1" "$u"
+	getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
+	\rm "$u"
+}
+noglobfn getlinksfull
+function lwseq() {
+	mdoc "Usage: [tl options] URL ...
+	Creates an ebook out of the sequences specified." MAGIC
+	local opts
+    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e:
+	re lw2gw "$@" | inargsf re getlinksfull | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]}" -p "${opts[-p]}"
+}
+noglobfn lwseq
