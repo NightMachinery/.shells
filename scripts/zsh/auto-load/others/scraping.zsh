@@ -67,7 +67,7 @@ wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
 }
 w2e-curl() {
-    h2ed=html2epub-pandoc we_dler=wread-curl w2e "$@"
+    we_dler=wread-curl w2e "$@"
 }
 wread-curl() {
     gurl "$1"
