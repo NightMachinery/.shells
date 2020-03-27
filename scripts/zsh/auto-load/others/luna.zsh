@@ -3,6 +3,6 @@ luna() {
     lunar pmset displaysleepnow
 }
 lunas() {
-    lunar redo say "disquiet creatures of avarice have risen yet again ..." 10 
+    lunar redo say "disquiet creatures of avarice have risen yet again ..." 22 
 }
 alias lq='loop-startover ~/tmp/.luna'
