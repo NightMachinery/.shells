@@ -250,7 +250,10 @@ function bii() {
     brew bundle --file=/dev/stdin <<<"brew \"$1\" ${@:2}"
 }
 function whh() {
-    wh $(strip "`wh "$1"`" "$1: aliased to ")
+    local e i
+    e=( "()" "{" "}" '"$@"' ':' aliased to noglob run-on-each ruu proxychains4 'DEBUGME=d' ) 
+    i=( "${=$(which "$@")}" )
+    wh "${(@)i[2,-1]:|e}"
 }
 function cee() {
     cat `which "$1"`

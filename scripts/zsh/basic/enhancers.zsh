@@ -9,7 +9,8 @@ function self-enh() {
     eval "function \\$2() emd_c='command $2' $1" '"$@"'
 }
 function nig() {
-    #silence not interactive
+	doc Use alias 'sii'
+	doc Skips the first word if interactive MAGIC
     isI && eval "$(gquote "${@:2}")" || "$1" "${@:2}"
 }
 function nulterm() {
@@ -30,9 +31,21 @@ function ruu() {
 noglobfn() {
 	doc Prepends noglob to functions. You need to define the original function in quotes if you want to reload the function definition in the future. 
 
-	(( ${+aliases[$1]} )) || {
-	functions[_$1]=$functions[$1]
-	alias "$1"="noglob _$1"
+	(( ${+aliases[$1]} )) && unalias "$1"
+	{
+	functions[_noglob_$1]=$functions[$1]
+	alias "$1"="noglob _noglob_$1"
 	}
-	unfunction "$1"
+	#unfunction "$1"
+	# if anyone uses the previous version they are probably not needing a noglob so let them be
 }
+function reify() {
+	doc "Makes a single argument function work for multiple args by redifining it and using run-on-each."
+	test -n "$functions[$1]" || { ecerr "Function '$1' is empty or doesn't exist." ; return 1 }
+	 [[ "$functions[$1]" =~ '^\s*run-on-each .*' ]] || {
+		functions[_reify_$1]=$functions[$1]
+	 	functions[$1]="re _reify_$1"' "$@"'
+	 }
+}
+reify reify
+reify noglobfn

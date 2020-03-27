@@ -21,6 +21,9 @@ agf() {
 ags() {
     agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.) ~/.bashrc ~/.profile ~/.bashrc ~/.bash_profile
 }
+agsf() {
+	ags "$*"'\s*\(\)'
+}
 agi() {
     doc ag internals of zsh
     agm "$@" ~/.oh-my-zsh/ $ANTIBODY_HOME

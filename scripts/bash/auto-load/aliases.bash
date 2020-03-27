@@ -25,10 +25,11 @@ alias lc='l -s created'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
 alias lac='l -s accessed'
-alias last-created='exa -as created|tail -n1' #macOS only
-alias last-accessed='exa -as accessed|tail -n1' #macOS only
+function last-exa() { ec "${2:-.}/$(exa -as "$@"|tail -n1)" }
+alias last-created='last-exa created'
+alias last-accessed='last-exa accessed'
+alias last-modified='last-exa modified'
 alias last-added='ls-by-added |head -n1' #macOS only
-alias last-modified='exa -as modified|tail -n1'
 alias l-c=last-created
 alias l-ac=last-accessed
 alias l-a=last-added
@@ -128,9 +129,7 @@ alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
-alias emacsi="brew install emacs-plus --HEAD --with-24bit-color --with-mailutils --with-x11 --without-spacemacs-icon"
 alias y="noglob youtube-dl --no-playlist --write-sub"
-alias enhance='function ne() { sudo docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -it alexjc/neural-enhance ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
 alias tl='noglob tlrl-ng'
 alias w2e='noglob w2e-raw'
@@ -140,3 +139,7 @@ alias dpan="h2ed='html2epub-pandoc' "
 alias dpans="h2ed=html2epub-pandoc-simple"
 alias carbon='carbon-now --headless --copy'
 alias glances='glances --theme-white'
+alias jglob='test -z "$*" && { test -n "$jufile" && set -- "$jufile" || { ecerr No args and no jufile supplied to $0 ; return 1 } }'
+alias sii=nig
+alias npmi=npmadd
+alias pkno='pk_no=y '

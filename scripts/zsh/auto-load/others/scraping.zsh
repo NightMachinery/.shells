@@ -37,9 +37,10 @@ function mercury-html() {
     serr mercury-html.js "$@"
 }
 function full-html() {
-    doc splash should be up. https://splash.readthedocs.io
-    doc 'wait always waits the full time. Should be strictly < timeout.'
-    curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
+	curlfull.js "$1" > "$2"
+    #doc splash should be up. https://splash.readthedocs.io
+    #doc 'wait always waits the full time. Should be strictly < timeout.'
+    #curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
 }
 function random-poemist() {
     curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
@@ -66,7 +67,7 @@ wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
 }
 w2e-curl() {
-    h2ed=html2epub-pandoc we_dler=wread-curl w2e "$@"
+    we_dler=wread-curl w2e "$@"
 }
 wread-curl() {
     gurl "$1"
@@ -109,6 +110,11 @@ gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 url-final() {
     curl -Ls -o /dev/null -w %{url_effective} "$@"
 }
+url-final2() {
+	doc "This one doesn't download stuff."
+	[[ "$(2>&1 wget --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]"
+}
+reify url-final url-final2
 url-tail() {
     [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
 }
@@ -127,13 +133,14 @@ Description: Automatically infers the title and the author from the first URL, a
 Options:
 -p, --prefix-title <string>    Prepends the specified string to the title of the page. (Optional)
 -e, --engine <function> Which zsh function to use for generating the book. Default is w2e-raw. (Optional)
+-o, --outputdir <dir> Output directory, defaults to a tmp location. (Optional)
 -v, --verbose ignored. Supported only for backwards-compatibility." MAGIC
     local opts e
-    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e:
+    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
     # dact typeset -p opts argv
     silent wread "$1" html || return 33
     # ecdbg title: "${opts[-p]}${wr_title:-$1}"
-    pushf ~/tmp-kindle
+    pushf "${opts[-o]:-$HOME/tmp-kindle}"
     we_author=$wr_author "${opts[-e]:-w2e-raw}" "${opts[-p]}${wr_title:-$1}" "$@"
     e=$?
     popf
@@ -217,7 +224,6 @@ html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
     p2k "$1".epub
 }
-tldr() nig ea command tldr "$@"
 code2html() {
     mdocu '[chroma-options] file -> HTML in stdout' MAGIC
     chroma --formatter html --html-lines --style trac "$@"
@@ -268,6 +274,26 @@ code2epub() {
     mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
     pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
-getlinks() {
+function getlinks() {
 	lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
 	}
+function getlinksoup() {
+	getlinks.py "$1" | command rg "${@[2,-1]:-.*}"
+}
+noglobfn getlinks getlinksoup
+function getlinksfull() {
+	local u
+	u="$(uuidgen)"
+	full-html "$1" "$u"
+	getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
+	\rm "$u"
+}
+noglobfn getlinksfull
+function lwseq() {
+	mdoc "Usage: [tl options] URL ...
+	Creates an ebook out of the sequences specified." MAGIC
+	local opts
+    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
+	re lw2gw "$@" | inargsf re getlinksfull | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]}" -p "${opts[-p]}" -o "${opts[-o]}"
+}
+noglobfn lwseq

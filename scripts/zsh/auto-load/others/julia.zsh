@@ -8,9 +8,11 @@ function junsummon() {
     \rm -r ~/julia_tmp
 }
 jdlc() {
-    silence pushd ~/Downloads/
-    ge_ecdbg=y onlc get-dl-link
-    silence popd
+	cp -r "$(last-modified ~/Downloads/)" ./
+	jup
+    # silence pushd ~/Downloads/
+    # ge_ecdbg=y onlm get-dl-link
+    # silence popd
 }
 jdl-helper() {
     mkdir -p ~/Downloads/tmp/
@@ -28,15 +30,15 @@ jaaks() {
     aget 'jks ; jup ../'
 }
 jks() {
-    ecdbg entering jks with jufile "$jufile"
-    jej
-    ecdbg trying to set orig
-    local orig=(*)
-    ecdbg orig: "$orig"
+    #ecdbg entering jks with jufile "$jufile"
+    jglob  #jej
+    #ecdbg trying to set orig
+    local orig="$1" #(*)
+    #ecdbg orig: "$orig"
     k2pdf-split "$orig"
-    ecdbg "trying to rm $orig"
+    #ecdbg "trying to rm $orig"
     \rm "$orig"
-    re 2ko *
+    re p2ko *
 }
 ensure-ju() {
     test -e "$jufile" || { ecerr "jufile doesn't exist"
@@ -72,7 +74,7 @@ jup() {
 	globexists ./**/*(.D) || return 0
     #rex "mv _ ${1:-./}" ./**/*(.D)
     #possibly silence it
-    mv ./**/*(.D) .
+    mv ./**/*(.D) "${1:-./}"
 }
 jimg() {
     test "$1" = "-h" && {
@@ -121,3 +123,19 @@ function vsox() {
     local inp=(*)
     sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
+function _1jma() {
+	local u="$(uuidgen)"
+	local p=~/Downloads/"$u"/
+	mkdir "$p"
+	deluge-console add -p "$p" "$1"
+	# Usage: add [-p <save-location>] <torrent-file> [<torrent-file> ...]
+	sleep "${jm_s:-60}"
+	cp -r "$p" .
+}
+function jma() {
+	jee
+	zargs --max-procs 60 -n 1 -- "$@" -- _1jma
+	jup
+	dir2k
+}
+noglobfn jma
