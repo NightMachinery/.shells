@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
+(async () => {
+const getStdin = require('get-stdin');
 const readTimeEstimate = require('read-time-estimate');
-var fs = require('fs');
-var doc = fs.readFileSync(process.stdin.fd, 'utf-8')
+var doc = await getStdin();
 est = readTimeEstimate.default(doc, 200, 12, 500, ['img', 'Image']); // this '.default' wasn't in the original code
 const {
     humanizedDuration, // 'less than a minute'
@@ -22,3 +23,4 @@ const {
 // Custom Image tags to parse in the input string
 
 console.log(JSON.stringify(est));
+})();

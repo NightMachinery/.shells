@@ -1,3 +1,7 @@
+function k2pdfopt() {
+    isDarwin && { command k2pdfopt "$@" ; return $? }
+    command k2pdfopt_linux "$@"
+}
 function 2mobi() {
     doc usage: FILE calibre-options
     jglob

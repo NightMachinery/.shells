@@ -31,3 +31,4 @@ moby
 fkill-cli
 puppeteer
 read-time-estimate
+get-stdin

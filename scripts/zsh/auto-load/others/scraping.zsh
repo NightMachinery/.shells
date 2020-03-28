@@ -256,15 +256,23 @@ code2md() {
 "'```'
     done
 }
+function html-get-reading-estimate() {
+    local est
+    est="$(cat "$1" | readtime.js)"
+    ec "$(ec $est|jqm .humanizedDuration) ($(ec $est|jqm .totalWords) words)"
+}
 merge-html() {
     (( $# == 1 )) && {
+        ec "<p>$(html-get-reading-estimate $1)</p>
+
+"
         cat $1
         return $?
     }
     local i
     for i in "$@"
     do
-        ec "<h1>$(strip $i ".html")</h1>
+        ec "<h1>$(strip $i ".html") - $(html-get-reading-estimate $i)</h1>
 
 $(cat "$i")
 "
