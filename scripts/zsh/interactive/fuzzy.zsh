@@ -55,5 +55,5 @@ v() {
     files="$(ggrep '^>' ~/.viminfo | cut -c3- |
                 while read line; do
                     [ -f "${line/\~/$HOME}" ] && echo "$line"
-                done | fz -q "$*" -1)" && "${ve:-nvim}" ${files//\~/$HOME}
+                done | fz -q "$*" -1)" && "${ve:-vim}" ${files//\~/$HOME}
 }
