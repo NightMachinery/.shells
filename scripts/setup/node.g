@@ -30,3 +30,4 @@ html-to-text
 moby
 fkill-cli
 puppeteer
+read-time-estimate
