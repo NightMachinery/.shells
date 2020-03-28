@@ -7,7 +7,7 @@ function wread() {
     mdoc 'Out: wr_title wr_author' MAGIC
     local file=''
     [[ "$1" == '--file' ]] && {
-        test -e "$2" && file="$2" || return 33
+        test -e "$2" && file="$2" || { ecerr "wread called with nonexistent file." ; return 33 }
         shift 2
     }
     setopt local_options pipefail
@@ -138,7 +138,7 @@ Options:
     local opts e
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
     # dact typeset -p opts argv
-    silent wread "$1" html || return 33
+    silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
     local title="$( ec "${opts[-p]}${wr_title:-$1}" | sd / _ )"
     pushf "${opts[-o]:-$HOME/tmp-kindle}"
     we_author=$wr_author "${opts[-e]:-w2e-raw}" "$title" "$@"
