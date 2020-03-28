@@ -141,7 +141,7 @@ Options:
     silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
     local title="$( ec "${opts[-p]}${wr_title:-$1}" | sd / _ )"
     pushf "${opts[-o]:-$HOME/tmp-kindle}"
-    we_author=$wr_author "${opts[-e]:-w2e-raw}" "$title" "$@"
+    we_author=$wr_author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
     e=$?
     popf
     return $e
