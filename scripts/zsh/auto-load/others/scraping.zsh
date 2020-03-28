@@ -139,9 +139,9 @@ Options:
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
     # dact typeset -p opts argv
     silent wread "$1" html || return 33
-    # ecdbg title: "${opts[-p]}${wr_title:-$1}"
+    local title="$( ec "${opts[-p]}${wr_title:-$1}" | sd / _ )"
     pushf "${opts[-o]:-$HOME/tmp-kindle}"
-    we_author=$wr_author "${opts[-e]:-w2e-raw}" "${opts[-p]}${wr_title:-$1}" "$@"
+    we_author=$wr_author "${opts[-e]:-w2e-raw}" "$title" "$@"
     e=$?
     popf
     return $e
@@ -185,7 +185,7 @@ web2epub() {
     local hasFailed=''
     for url in "${@:2}"
     do
-        local bname="${url##*/}"
+	    local bname="$(url-tail "$url")"  #"${url##*/}"
         #test -z "$bname" && bname="u$i"
         bname="${(l(${##})(0))i} $bname"
         i=$((i+1))
@@ -210,7 +210,7 @@ w2e-o() {
     wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 w2e-lw-raw() {
-    we_author=LessWrong w2e "$1" "${(@f)$(re lw2gw "${@:2}")}"
+    we_author=LessWrong w2e-curl "$1" "${(@f)$(re lw2gw "${@:2}")}"
 }
 lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com
 html2epub-pandoc-simple() {

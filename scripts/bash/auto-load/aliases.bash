@@ -132,6 +132,7 @@ alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias y="noglob youtube-dl --no-playlist --write-sub"
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
 alias tl='noglob tlrl-ng'
+alias tllw='noglob tl -e w2e-lw-raw'
 alias w2e='noglob w2e-raw'
 alias w2e-lw='noglob w2e-lw-raw'
 alias dcali="h2ed='html2epub-calibre' "
