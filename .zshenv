@@ -41,7 +41,8 @@ isNotExpensive || {
     }
     export BOOT_CLOJURE_VERSION='1.9.0'
 
-    #export PKG_CONFIG_PATH= "/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
+    # needed by pdf-tools of emacs
+    export PKG_CONFIG_PATH="/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
 
     addToPATH "/usr/local/opt/curl/bin"
     export HH_CONFIG=hicolor
