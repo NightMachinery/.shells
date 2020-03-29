@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Use `tmux new -d -s name 'this script'` in cron.
+# Use `tmuxnew name 'this script'` in cron.
 zmodload zsh/mapfile
 local blist=${blist:-~/.wanted-books}
 local books=( "${(f)mapfile[$blist]}" )
