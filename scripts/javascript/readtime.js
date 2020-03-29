@@ -4,7 +4,7 @@
 const getStdin = require('get-stdin');
 const readTimeEstimate = require('read-time-estimate');
 var doc = await getStdin();
-est = readTimeEstimate.default(doc, 200, 12, 500, ['img', 'Image']); // this '.default' wasn't in the original code
+est = readTimeEstimate.default(doc, 200, 0, 0, ['img', 'Image']); // this '.default' wasn't in the original code
 const {
     humanizedDuration, // 'less than a minute'
     duration, // 0.23272727272727273

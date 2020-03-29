@@ -15,7 +15,7 @@ function wread() {
     test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
     test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
     local merc="$({ test -z "$file" && { # No file, downloading
-          test -z "$wr_force" && { mercury-parser --format="${2}" "$1" || return $? } || {
+	    test -z "$wr_force" && { mercury-parser --format="${2}" "$(urlfinalg "$1")" || return $? } || {
                   fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html
 # l
 # cat ./a.html
@@ -141,7 +141,7 @@ Options:
     silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
     local title="$( ec "${opts[-p]}${wr_title:-$1}" | sd / _ )"
     pushf "${opts[-o]:-$HOME/tmp-kindle}"
-    we_author=$wr_author "${opts[-e]:-w2e-raw}" "$title" "$@"
+    we_author=$wr_author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
     e=$?
     popf
     return $e
@@ -183,7 +183,7 @@ web2epub() {
     local author="${we_author:-night}"
     local i=0
     local hasFailed=''
-    for url in "${@:2}"
+    for url in $(urlfinalg "${@:2}")
     do
 	    local bname="$(url-tail "$url")"  #"${url##*/}"
         #test -z "$bname" && bname="u$i"
@@ -305,3 +305,15 @@ function lwseq() {
 	re lw2gw "$@" | inargsf re getlinksfull | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]}" -p "${opts[-p]}" -o "${opts[-o]}"
 }
 noglobfn lwseq
+function urlfinalg() {
+	doc supports Google redirects
+	local URL="$1"
+	local u="$URL"
+	[[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
+	u=`echo "$URL" | perl -n -e '/url=([a-zA-Z0-9%\.]*)/ && print "$1\n"'`
+	u="$(ec $u | url-decode.py)"
+	}
+	url-final2 "$u"
+}
+reify urlfinalg
+noglobfn urlfinalg
