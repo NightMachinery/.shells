@@ -183,7 +183,7 @@ web2epub() {
     local author="${we_author:-night}"
     local i=0
     local hasFailed=''
-    for url in $(urlfinalg "${@:2}")
+    for url in "${(@f)$(urlfinalg "${@:2}")}"
     do
 	    local bname="$(url-tail "$url")"  #"${url##*/}"
         #test -z "$bname" && bname="u$i"
