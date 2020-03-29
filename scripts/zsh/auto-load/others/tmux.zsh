@@ -1,4 +1,8 @@
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
+tmuxnew() {
+	silent tmux kill-session -t "$1"
+	tmux new -d -s "$@"
+}
 ivy() {
     tmux new-session -d 'zsh'
     tmux send-keys "mu "
