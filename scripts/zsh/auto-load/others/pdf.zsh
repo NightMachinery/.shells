@@ -5,7 +5,7 @@ Uses ghostscript to rewrite the file without encryption." MAGIC
     gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="${in:r}_unencrypted.pdf" -c .setpdfwrite -f "$in"
 }
 function pdf-cover() {
-    convert "$1[0]" "$1:r.png"
+    convert "pdf:$1[0]" "png:$1:r.png"
 }
 pdf-count() {
     pdfinfo "$1" | grep Pages|awk '{print $2}'
