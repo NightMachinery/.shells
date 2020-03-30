@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Usage: gl_s=selector <url> [<html-file>]
+
 from IPython import embed
 from bs4 import BeautifulSoup, SoupStrainer
 import requests, sys
