@@ -13,9 +13,10 @@ res = wikipedia.search(keywords, results=results, suggestion=True)
 c = res[0]
 if len(res) == 2:
     c.append(res[1])
-for candidate in c:
+for candidate in set(c):
+    #embed()
     try:
-        p = wikipedia.page(candidate)
+        p = wikipedia.page(candidate, auto_suggest=False)
         print(p.title)
         print()
         print(p.summary)
