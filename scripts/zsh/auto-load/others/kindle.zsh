@@ -70,9 +70,13 @@ dir2k() {
     skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
     skipglob "re p2ko" $dir/*.pdf(N)
 }
+function jlibplain() {
+	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
+}
+noglobfn jlibplain
 "jlib"() {
 	jee
-	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
+	jlibplain "$@"
 	dir2k
 }
 libgen2md5() {
