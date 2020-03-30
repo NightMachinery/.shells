@@ -317,3 +317,6 @@ function urlfinalg() {
 }
 reify urlfinalg
 noglobfn urlfinalg
+jwiki() {
+    serr jwiki.py "$*" 1
+}
