@@ -139,3 +139,10 @@ function jma() {
 	dir2k
 }
 noglobfn jma
+function jah() {
+	reval "$@" | aha > "$(<<<"$*" sd / _)".html
+}
+function jahun() {
+	# unbuffer needs expect
+	jah ruu unbuffer "$@"
+}
