@@ -16,6 +16,9 @@ alias comment='\noglob :'
 # doc() {
 #     #Used for documentation
 # }
+function uuidpy() {
+    python3 -c 'import uuid ; print(uuid.uuid4().hex)'
+}
 function ec_bash() {
     doc deprecated. Use the alias ec.
     if [[ -n $ZSH_VERSION ]]; then

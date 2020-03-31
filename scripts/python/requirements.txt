@@ -27,3 +27,5 @@ ocrmypdf
 libgen.py
 libgenapi
 wikipedia
+daudin
+gnureadline
