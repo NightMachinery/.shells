@@ -332,3 +332,9 @@ wread-man() {
 tlman() {
 	uf_idem=y we_dler="wread-man" w2e "$1" "$@"
 }
+wread-bat() {
+unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title "$(basename "$1")"
+}
+tlbat() {
+	uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
+}
