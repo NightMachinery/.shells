@@ -39,3 +39,28 @@ inargs() {
 inargsf() { reval "$@" "${(f@)"$(in-or-args)"}" }
 inargs0() { reval "$@" "${(0@)"$(in-or-args)"}" }
 inargss() { reval "$@" "${="$(in-or-args)"}" }
+fnrep() {
+    doc 'Replaces a function temporarily during <cmd>: <fn> <new body> <cmd>'
+    local fn="$1"
+    local body="$2"
+    local cmd=( "${@[3,-1]}" )
+    # local origbody="_origbody_$fn_$(uuidpy)"
+    # eval $origbody'=$functions['$fn'] || '$origbody'=""'
+    # local restore="_restore_$1_$(uuidpy)"
+    # functions[$restore]='{ test -n "$'$origbody'" && functions['$fn']=$'$origbody' || unfunction '$fn' } ; trap - INT TERM ; unfunction '$restore' ; return 1'
+    # functions[$restore]='return 1'
+    local origbody
+    origbody=$functions[$fn] || $origbody=''
+    trap false INT TERM
+    functions[$fn]=$body
+    reval "${cmd[@]}"
+    local e=$?
+    # ec Trying to restore after command execution ...
+    # geval "$restore"
+    test -n "$origbody" && functions[$fn]="$origbody" || unfunction $fn
+    trap - INT TERM
+    return $e
+}
+fnrepvc() {
+    fnrep git "vcsh $1"' "$@"' "${@[2,-1]}"
+}
