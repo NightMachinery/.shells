@@ -73,7 +73,7 @@ wread-curl() {
     gurl "$1"
 }
 w2e-gh() {
-    w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
+    h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }
 gh-to-readme() {
     local urls=() i i2 readme url
