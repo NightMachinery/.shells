@@ -49,5 +49,6 @@ isNotExpensive || {
     ## Ugly Stuff PERSONALINFO
     export corra="198.143.181.104"
     alias ccorra="echo -n $corra | pbcopy"
+    #isLinux && export TCLLIBPATH=/usr/lib/x86_64-linux-gnu
 }
 test -n "$NO_AUTOLOAD_BASH" || source "$NIGHTDIR"/bash/load-others.bash

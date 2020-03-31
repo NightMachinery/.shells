@@ -3,3 +3,4 @@
 . ./ins_asdf
 ins-all
 re source ./setup_dirs ./setup_links ./setup_misc ./git.config ./setup.cargo ./setup.linux
+conda install -c eumetsat expect

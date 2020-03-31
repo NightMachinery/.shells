@@ -116,7 +116,7 @@ url-final2() {
 }
 reify url-final url-final2
 url-tail() {
-    [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]"
+    [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]" || ec "$1"
 }
 function tlrlu(){
     tlrl-ng "$@" -p "$(url-tail "$(url-final "$1")") | "
@@ -306,8 +306,12 @@ function lwseq() {
 }
 noglobfn lwseq
 function urlfinalg() {
-	doc supports Google redirects
+	doc supports Google redirects. Set uf_idem to y to return original.
 	local URL="$1"
+	test -n "$uf_idem" && {
+	ec "$URL"
+	return 0
+	}
 	local u="$URL"
 	[[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
 	u=`echo "$URL" | perl -n -e '/url=([a-zA-Z0-9%\.]*)/ && print "$1\n"'`
@@ -319,4 +323,12 @@ reify urlfinalg
 noglobfn urlfinalg
 jwiki() {
     serr jwiki.py "$*" 1
+}
+wread-man() {
+	local m=""
+	m="$(MAN_KEEP_FORMATTING=1 COLUMNS=70 serr man "$1")" && m="$(<<<"$m" command ul)" || m="$(2>&1 "$1" --help)" || { ecerr "$0 failed for $1" ; return 1 }
+	<<<"$m" aha --title "$1"
+}
+tlman() {
+	uf_idem=y we_dler="wread-man" w2e "$1" "$@"
 }
