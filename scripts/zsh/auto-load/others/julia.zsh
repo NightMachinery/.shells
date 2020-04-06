@@ -21,7 +21,7 @@ jdl-helper() {
 }
 jdl() {
     jej
-    re jdl-helper *(D)
+    dl_base_url="http://$(myip):8080/" re jdl-helper *(D)
 }
 jaaks() {
     jee
