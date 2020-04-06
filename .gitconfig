@@ -15,7 +15,7 @@
 [push]
 	default = matching
 [core]
-	excludesfile = /Users/evar/.gitignore_global
+	excludesfile = ~/.gitignore_global
 	autocrlf = input
 	pager = delta --light --theme 'Solarized (light)'
 [color]
@@ -23,3 +23,5 @@
   diff = auto
   interactive = auto
   status = auto
+[http]
+  sslVerify = true
