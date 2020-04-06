@@ -1,4 +1,5 @@
 set -o vi
+export disable_malice=y
 export NIGHT_PERSONAL=y
 source "$HOME/scripts/zsh/load-first.zsh"
 isNotExpensive || {

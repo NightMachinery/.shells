@@ -1,3 +1,6 @@
+### Aliases
+alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
+###
 git-resolve() {
   local git=("${=gitbinary:-git}")
   STRATEGY="$1"

@@ -1,0 +1,25 @@
+[user]
+	name = NightMachinary
+	email = rudiwillalwaysloveyou@gmail.com
+[alias]
+	co = checkout
+	lol = log --graph --decorate --pretty=oneline --abbrev-commit
+	lola = log --graph --decorate --pretty=oneline --abbrev-commit --all
+[credential]
+	helper = osxkeychain
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[push]
+	default = matching
+[core]
+	excludesfile = /Users/evar/.gitignore_global
+	autocrlf = input
+	pager = delta --light --theme 'Solarized (light)'
+[color]
+  branch = auto
+  diff = auto
+  interactive = auto
+  status = auto

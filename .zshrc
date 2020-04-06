@@ -138,16 +138,7 @@ alias imgcat=~/.iterm2/imgcat;alias imgls=~/.iterm2/imgls;alias it2attention=~/.
 unsetopt correct_all
 fpath=(~/.zsh.d/ $fpath)
 antibody bundle mafredri/zsh-async
-# antibody bundle intelfx/pure
-antibody bundle sindresorhus/pure
-# antibody bundle denysdovhan/spaceship-prompt
-# antibody bundle Tarrasch/zsh-bd
-# antibody bundle Tarrasch/zsh-colors
-# antibody bundle Vifon/deer
-antibody bundle zsh-users/zsh-autosuggestions
-silence unalias =
-antibody bundle zsh-users/zsh-syntax-highlighting
-antibody bundle zsh-users/zsh-completions
+antibody bundle zdharma/zui
 re source "$NIGHTDIR"/zsh/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
 # autoload -U deer
 # zle -N deer
@@ -166,8 +157,37 @@ test -d "$FZF_BASE" && {
     bindkey '^[[Z' fzf-completion #Shift+Tab
 }
 
+psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
+# antibody bundle intelfx/pure
+antibody bundle sindresorhus/pure
+# antibody bundle denysdovhan/spaceship-prompt
+# antibody bundle Tarrasch/zsh-bd
+# antibody bundle Tarrasch/zsh-colors
+# antibody bundle Vifon/deer
+antibody bundle unixorn/git-extra-commands
+antibody bundle zdharma/zzcomplete # ^F
+antibody bundle zsh-users/zsh-autosuggestions
+silence unalias =
+# antibody bundle zsh-users/zsh-syntax-highlighting
+antibody bundle zsh-users/zsh-completions
+##
+export YSU_MESSAGE_POSITION="after"
+export YSU_MESSAGE_FORMAT="$(tput setaf 1)found %alias_type for %command: %alias$(tput sgr0)"
+export YSU_MODE=ALL #BESTMATCH or ALL
+export YSU_IGNORED_ALIASES=("g" "ll")
+antibody bundle "MichaelAquilina/zsh-you-should-use"
+##
+
+##
+# antibody bundle djui/alias-tips # incompatible with our own alias module
+# export ZSH_PLUGINS_ALIAS_TIPS_EXCLUDES="_ ll vi"
+# export ZSH_PLUGINS_ALIAS_TIPS_REVEAL_EXCLUDES=(_ ll vi)
+# alias revealaliases='export ZSH_PLUGINS_ALIAS_TIPS_REVEAL=1'
+##
+
+antibody bundle zdharma/fast-syntax-highlighting #should be last
+antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
 rcLoaded='yes'
 
 
 
-psource /Users/evar/Library/Preferences/org.dystroy.broot/launcher/bash/br
