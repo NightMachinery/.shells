@@ -138,7 +138,9 @@ alias imgcat=~/.iterm2/imgcat;alias imgls=~/.iterm2/imgls;alias it2attention=~/.
 unsetopt correct_all
 fpath=(~/.zsh.d/ $fpath)
 antibody bundle mafredri/zsh-async
-antibody bundle intelfx/pure
+# antibody bundle intelfx/pure
+antibody bundle sindresorhus/pure
+# antibody bundle denysdovhan/spaceship-prompt
 # antibody bundle Tarrasch/zsh-bd
 # antibody bundle Tarrasch/zsh-colors
 # antibody bundle Vifon/deer
@@ -167,3 +169,5 @@ test -d "$FZF_BASE" && {
 rcLoaded='yes'
 
 
+
+psource /Users/evar/Library/Preferences/org.dystroy.broot/launcher/bash/br

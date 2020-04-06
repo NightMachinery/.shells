@@ -17,3 +17,5 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
+
+source /Users/evar/Library/Preferences/org.dystroy.broot/launcher/bash/br

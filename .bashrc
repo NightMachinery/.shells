@@ -7,3 +7,5 @@
 
 
 
+
+source /Users/evar/Library/Preferences/org.dystroy.broot/launcher/bash/br
