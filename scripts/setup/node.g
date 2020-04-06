@@ -33,3 +33,4 @@ puppeteer
 read-time-estimate
 get-stdin
 wikit
+cf-warp

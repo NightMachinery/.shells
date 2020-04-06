@@ -13,3 +13,4 @@ export SUDO_EDITOR="$NEDITOR"
 export VISUAL="$NEDITOR"
 export EDITOR="$VISUAL"
 export NODEJS_CHECK_SIGNATURES=no #for asdf's nodejs
+export WG_CONF=~/.cf-warp/cf-warp.conf
