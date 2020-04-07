@@ -52,8 +52,21 @@ chis() {
 }
 v() {
     local files
-    files="$(ggrep '^>' ~/.viminfo | cut -c3- |
+    files=()
+    command rg '^>' ~/.viminfo | cut -c3- |
                 while read line; do
-                    [ -f "${line/\~/$HOME}" ] && echo "$line"
-                done | fz -q "$*" -1)" && "${ve:-vim}" ${files//\~/$HOME}
+                    [ -f "${line/\~/$HOME}" ] && files+="$line"
+                done
+    test -f ~/.emacs.d/.cache/recentf && {
+        command rg --only-matching --replace '$1' '^\s*"(.*)"$' ~/.emacs.d/.cache/recentf |
+            while read line; do
+                [ -f "$line" ] && files+="$line"
+            done
+    }
+    files="$(<<<"${(F)files}" fz --print0 --query "$*")" || return 1
+    files="${files//\~/$HOME}"
+    local ve="$ve"
+    test -z "$ve" && ! isSSH && ve=nvim
+    "${ve:-vim}" -p ${(0@)files} #Don't quote this there is always a final empty element
+    doc '-o opens in split view, -p in tabs. Use gt, gT, <num>gt to navigate tabs.'
 }

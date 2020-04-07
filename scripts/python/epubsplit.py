@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# https://github.com/JimmXinu/EpubSplit
 
 __license__   = 'GPL v3'
 __copyright__ = '2019, Jim Miller'

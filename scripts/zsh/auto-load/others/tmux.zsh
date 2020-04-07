@@ -4,10 +4,11 @@ tmuxnew() {
 	tmux new -d -s "$@"
 }
 ivy() {
+    export DISABLE_DEFER=y
     tmux new-session -d 'zsh'
     tmux send-keys "mu "
     tmux split-window -h  'zsh'
-    tmux send-keys "luna
+    tmux send-keys "lunas
 "
     # tmux split-window -v 'ipython; zsh'
     tmux split-window -v 'salice.py'
