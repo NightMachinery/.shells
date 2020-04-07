@@ -146,3 +146,9 @@ function jahun() {
 	# unbuffer needs expect
 	jah ruu unbuffer "$@"
 }
+jepubsplit() {
+	jej
+	jah dbg epubsplit $jufile
+	rm $jufile
+	dir2k
+}
