@@ -4,8 +4,9 @@ argerrainbow() {
 	for arg in "$@"
 	do
 	#	fnswap chalk 'command chalk --color 16m' colorfb-r "$arg" | tr -d '\n'
-		ecrainbow-n "$arg"
+		ecrainbow-n "${arg:-EMPTY_ELEMENT} "
 	done
+	resetcolor
 	echo
 }
 argerng() {
