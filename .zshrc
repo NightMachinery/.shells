@@ -1,4 +1,5 @@
 # export TERM="xterm-256color" #Might do a lot of damage. Added for multi-term.
+# function zsh-defer() { reval "$@" }
 DEFAULT_USER="evar"
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
@@ -64,10 +65,10 @@ export ZSH=~/.oh-my-zsh
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git git-extras lein pip sbt scala screen sprunge sudo vi-mode redis-cli)
 isDarwin && plugins+=(osx)
-ecdbg $options[autopushd]
+# ecdbg $options[autopushd]
 source $ZSH/oh-my-zsh.sh
+# ecdbg $options[autopushd]
 
-ecdbg $options[autopushd]
 # User configuration
 
 # export MANPATH="/usr/local/man:$MANPATH"
@@ -100,7 +101,7 @@ ecdbg $options[autopushd]
 
 # POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status)
 
-psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
+zsh-defer psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
 
 #This doesn't work. I have no idea why.
 bindkey -M viins ‘ii’ vi-cmd-mode
@@ -138,12 +139,13 @@ alias imgcat=~/.iterm2/imgcat;alias imgls=~/.iterm2/imgls;alias it2attention=~/.
 unsetopt correct_all
 fpath=(~/.zsh.d/ $fpath)
 antibody bundle mafredri/zsh-async
-antibody bundle zdharma/zui
+zsh-defer antibody bundle zdharma/zui
 re source "$NIGHTDIR"/zsh/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
 # autoload -U deer
 # zle -N deer
 # bindkey '\ek' deer
-source-interactive-all
+autoload -U +X bashcompinit && bashcompinit
+zsh-defer source-interactive-all
 
 # sth in .zshrc overrides these so ...
 export FZF_BASE="${$(ge_no_ec=y rp fzf):h:h}/shell"
@@ -157,25 +159,25 @@ test -d "$FZF_BASE" && {
     bindkey '^[[Z' fzf-completion #Shift+Tab
 }
 
-psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
+zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
 # antibody bundle intelfx/pure
 antibody bundle sindresorhus/pure
 # antibody bundle denysdovhan/spaceship-prompt
 # antibody bundle Tarrasch/zsh-bd
 # antibody bundle Tarrasch/zsh-colors
 # antibody bundle Vifon/deer
-antibody bundle unixorn/git-extra-commands
-antibody bundle zdharma/zzcomplete # ^F
-antibody bundle zsh-users/zsh-autosuggestions
+zsh-defer antibody bundle unixorn/git-extra-commands
+zsh-defer antibody bundle zdharma/zzcomplete # ^F
+zsh-defer antibody bundle zsh-users/zsh-autosuggestions
 silence unalias =
 # antibody bundle zsh-users/zsh-syntax-highlighting
-antibody bundle zsh-users/zsh-completions
+zsh-defer antibody bundle zsh-users/zsh-completions #undeferable
 ##
 export YSU_MESSAGE_POSITION="after"
 export YSU_MESSAGE_FORMAT="$(tput setaf 1)found %alias_type for %command: %alias$(tput sgr0)"
 export YSU_MODE=ALL #BESTMATCH or ALL
 export YSU_IGNORED_ALIASES=("g" "ll")
-antibody bundle "MichaelAquilina/zsh-you-should-use"
+zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
 ##
 
 ##
@@ -185,8 +187,8 @@ antibody bundle "MichaelAquilina/zsh-you-should-use"
 # alias revealaliases='export ZSH_PLUGINS_ALIAS_TIPS_REVEAL=1'
 ##
 
-antibody bundle zdharma/fast-syntax-highlighting #should be last
-antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
+zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
+zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
 rcLoaded='yes'
 
 

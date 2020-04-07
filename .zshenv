@@ -2,6 +2,7 @@ set -o vi
 export disable_malice=y
 export NIGHT_PERSONAL=y
 source "$HOME/scripts/zsh/load-first.zsh"
+typeset -g NIGHT_NO_EXPENSIVE
 isNotExpensive || {
     if ! (( $+commands[brew] )) ; then
         test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
@@ -51,5 +52,17 @@ isNotExpensive || {
     export corra="198.143.181.104"
     alias ccorra="echo -n $corra | pbcopy"
     #isLinux && export TCLLIBPATH=/usr/lib/x86_64-linux-gnu
+    source <(antibody init)
+    ANTIBODY_HOME="$(antibody home)"
+    # DISABLE_DEFER=y
+    test -z "$DISABLE_DEFER" && antibody bundle romkatv/zsh-defer || alias zsh-defer=''
+    source-interactive-all() {
+        run-on-each source "$NIGHTDIR"/zsh/interactive/**/*(.)
+        typeset -g NIGHT_NO_EXPENSIVE
+        NIGHT_NO_EXPENSIVE=y
+    }
+    function rp() {
+        test -e "$1" && realpath "$1" || realpath "$(which "$1")"
+    }
 }
-test -n "$NO_AUTOLOAD_BASH" || source "$NIGHTDIR"/bash/load-others.bash
+test -n "$NO_AUTOLOAD_BASH" || zsh-defer source "$NIGHTDIR"/bash/load-others.bash

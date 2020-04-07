@@ -4,9 +4,6 @@ function prefix-files() {
         mv "$file" "${file:h}/$1${file:t}"
     done
 }
-function rp() {
-    test -e "$1" && realpath "$1" || ge_no_ec=y ge_no_hist=y ceer "$1" realpath
-}
 function globexists() {
 	(silent eval ": $@")
 }
