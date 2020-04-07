@@ -189,7 +189,8 @@ zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
 
 zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
-rcLoaded='yes'
+export rcLoaded='loading'
+zsh-defer export rcLoaded='yes'
 
 
 
