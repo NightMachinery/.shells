@@ -1,8 +1,11 @@
 diraction-personal-config (){
-    # put your config here
+        #vdl  ~/Downloads/video
+	# TODO create missing (submitted issue)
     diraction-batch-create <<< "
         dl  ~/Downloads
         tmp  ~/tmp
+	jtmp ~/julia_tmp
+	ktmp ~/tmp-kindle
 "
 }
 antibody bundle "adrieankhisbe/diractions"
