@@ -293,9 +293,6 @@ function retry-limited-eval() {
     # test $limit -lt "$1" || test "$1" -eq 0
     (exit "$ecode")
 }
-function e() {
-    echo "${pipestatus[@]}" "${PIPESTATUS[@]}"
-}
 function ncp() {
     cat | gnc -c localhost 2000
 }
