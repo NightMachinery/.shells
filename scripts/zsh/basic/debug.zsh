@@ -54,3 +54,6 @@ dvar () {
     ecdbg "$pre$1 in env: $(printenv "$1")"
 }
 function raise-blood() ceer rederr.zsh source
+function e() {
+    echo $? "${pipestatus[@]}" "${PIPESTATUS[@]}"
+}
