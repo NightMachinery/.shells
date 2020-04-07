@@ -140,7 +140,7 @@ function jma() {
 }
 noglobfn jma
 function jah() {
-	jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "$(<<<"$*" sd / _)".html
+	jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "${jd:-.}/$(<<<"$*" sd / _)".html
 }
 function jahun() {
 	# unbuffer needs expect

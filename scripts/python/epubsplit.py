@@ -795,7 +795,8 @@ class SplitEpub:
                                "xmlns:opf":"http://www.idpf.org/2007/opf"})
         metadata.appendChild(newTag(contentdom,"dc:identifier",text=uniqueid,attrs={"id":"epubsplit-id"}))
         if( titleopt is None ):
-            titleopt = self.origtitle+" Split"
+            titleopt = self.origtitle #+" Split"
+        titleopt = prependopt + titleopt
         metadata.appendChild(newTag(contentdom,"dc:title",text=titleopt))
 
         if( authoropts and len(authoropts) > 0  ):
@@ -1134,8 +1135,9 @@ generate an epub with each of the "lines" given included.''')
 
     parser.add_option("-o", "--output", dest="outputopt", default="split.epub",
                       help="Set OUTPUT file, Default: split.epub", metavar="OUTPUT")
+    parser.add_option("-p", "--title-prepend", dest="prependopt", default="", help="Prepends this to the title. (Optional)", metavar="PREPEND")
     parser.add_option("-t", "--title", dest="titleopt", default=None,
-                      help="Use TITLE as the metadata title.  Default: '<original epub title> Split'", metavar="TITLE")
+                      help="Use TITLE as the metadata title.  Default: '<original epub title>'", metavar="TITLE")
     parser.add_option("-d", "--description", dest="descopt", default=None,
                       help="Use DESC as the metadata description.  Default: 'Split from <epub title> by <author>'.", metavar="DESC")
     parser.add_option("-a", "--author",
