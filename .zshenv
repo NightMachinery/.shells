@@ -55,7 +55,8 @@ isNotExpensive || {
     source <(antibody init)
     ANTIBODY_HOME="$(antibody home)"
     # DISABLE_DEFER=y
-    { isI && test -z "$DISABLE_DEFER" } && antibody bundle romkatv/zsh-defer || alias zsh-defer=''
+    # Won't defer if not interactive or disabled explicitly
+    { [[ $- == *i* ]] && test -z "$DISABLE_DEFER" } && antibody bundle romkatv/zsh-defer || alias zsh-defer=''
     source-interactive-all() {
         run-on-each source "$NIGHTDIR"/zsh/interactive/**/*(.)
         typeset -g NIGHT_NO_EXPENSIVE
