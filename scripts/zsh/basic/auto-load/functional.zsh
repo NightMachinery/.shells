@@ -61,6 +61,9 @@ fnrep() {
     trap - INT TERM
     return $e
 }
+fnswap() {
+	fnrep "$1" "$2 "'"$@"' "$@[3,-1]"
+}
 fnrepvc() {
     fnrep git "vcsh $1"' "$@"' "${@[2,-1]}"
 }

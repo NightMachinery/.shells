@@ -8,6 +8,8 @@ colorb() {
 }
 color() {
     local in
+    local noreset="$coNr"
+    local nonewline="$coN"
     comment "Note that we need to first get stdin and then print the color, otherwise we'll print the color before anything has been outputted, resulting in race conditions."
     [[ "$1" =~ '^\d+$' ]] &&
         {
@@ -18,8 +20,8 @@ color() {
             isI && printf %s "$fg[$1]"
         }
     print -nr -- "$in"
-    resetcolor
-    echo
+    test -n "$noreset" || resetcolor
+    test -n "$nonewline" || echo
 }
 resetcolor() {
     comment This var is seemingly coming from a plugin or sth
@@ -60,4 +62,25 @@ printcolors() {
 random-color() {
     randomColor.js "$@" |jq -re '.'
     # --seed "$(head -c 100 /dev/random)" 
+}
+random-color-arr() {
+	#shuf -i 0-255 -n 3
+	# subshell doesn't change OUR seed. #ec $(($RANDOM % 256)) $(($RANDOM % 256)) $(($RANDOM % 256))
+	[[ "$(randomColor.js -f rgbArray "$@")" =~ '\[(\d+),(\d+),(\d+)\]' ]] && ec "$match[@]"
+}
+ecrainbow-n() {
+	local hue="$(random-color -f hex)"
+	print -nr -- "$(colorfg $(random-color-arr -l dark --hue "$hue"))$(colorbg $(random-color-arr -l light --hue "$hue"))""$@"
+}
+ecrainbow() { ecrainbow-n "$@" ; echo }
+ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
+ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
+ecalternate() {
+	(($#)) || { resetcolor ; echo ; return 0 }
+	ecalt1 "$1"
+	shift 1
+	(($#)) || { resetcolor ; echo ; return 0 }
+	ecalt2 "$1"
+	shift 1
+	$0 "$@"	
 }

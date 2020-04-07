@@ -1,7 +1,21 @@
 arger() { re 'ec arg:' "$@" }
+argerrainbow() {
+	local arg
+	for arg in "$@"
+	do
+	#	fnswap chalk 'command chalk --color 16m' colorfb-r "$arg" | tr -d '\n'
+		ecrainbow-n "$arg"
+	done
+	echo
+}
+argerng() {
+	{ test -n "$jahmode" || isI } && ecalternate "$@" || arger "$@"
+}
 ecdbg() {
     test -z "$DEBUGME" || {
-        errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
+        local errcol=("${debugcol[@]:-cyan}")
+    	color "$errcol[@]" "$@"
+    	# errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
     }
 }
 fsaydbg() {
@@ -56,4 +70,17 @@ dvar () {
 function raise-blood() ceer rederr.zsh source
 function e() {
     echo $? "${pipestatus[@]}" "${PIPESTATUS[@]}"
+}
+function argerdbg() {
+	test -z "$DEBUGME" || {
+        local errcol=("${debugcol[@]:-cyan}")
+	coN=y coNr=y color "$errcol[@]" ''
+	argerng "$@"
+	resetcolor
+	}
+}
+function evaldbg() {
+	ecdbg "$@"
+	argerdbg "$@"
+	reval "$@"
 }

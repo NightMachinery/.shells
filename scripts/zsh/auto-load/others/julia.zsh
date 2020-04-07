@@ -20,8 +20,8 @@ jdl-helper() {
     get-dl-link ~/Downloads/tmp/"${1:t}"
 }
 jdl() {
-    jej
-    dl_base_url="http://$(myip):8080/" re jdl-helper *(D)
+    jglob
+    dl_base_url="http://$(myip):8080/" re jdl-helper "$@"
 }
 jaaks() {
     jee
@@ -140,7 +140,7 @@ function jma() {
 }
 noglobfn jma
 function jah() {
-	reval "$@" | aha > "$(<<<"$*" sd / _)".html
+	jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "$(<<<"$*" sd / _)".html
 }
 function jahun() {
 	# unbuffer needs expect

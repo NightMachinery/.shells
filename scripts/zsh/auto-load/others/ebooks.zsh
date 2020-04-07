@@ -1,8 +1,9 @@
 ebook-cover() {
-    mdocu '[<ebook>=$jufile <output>=cover.jpg]
+    mdocu '[<ebook>=$jufile <output>]
 Saves the cover of the given ebook to <output>.' MAGIC
-    local in="${1:-$jufile}" out="${2:-cover.jpg}"
-    ebook-meta --get-cover "$out" "$in"
+    local in="${1:-$jufile}" 
+    local out="${2:-${in:r}.png}"
+    sout ebook-meta --get-cover "$out" "$in"
 }
 alias jec=ebook-cover
 epubsplit() {
@@ -10,7 +11,7 @@ epubsplit() {
 	local pLn='^\s*Line Number:\s+(\d+)'
 	local p1="${esP1:-toc:\s+\['\D*(\d+).*'\]}"
 	local p2="${esP2:-id:\s+[cC]\D*(\d+)}"
-	local i=1
+	local i=0
 	local n="${esN:-3}"
 	local n1=$((n+1))
 	local hasChanged=''
@@ -20,7 +21,6 @@ epubsplit() {
 	# typeset -A splits
 	local currentSplit=0
 	local split=()
-  dact typ i
 
   ecdbg start loop
 	for line in "${(@f)$(epubsplit.py "$file")}"
@@ -45,18 +45,14 @@ epubsplit() {
 	
 		test -n "$hasChanged" && {
     ecdbg line: "$line"
-    dact typ i
 		i=$(( (i+1) % n1 ))
-    dact typ i
 		[[ "$i" == 0 ]] && {
 		i=1
-		dact arger  -o "p${currentSplit} ""$file" "$file" "${split[@]}"
-		epubsplit.py -o "p${currentSplit} ""$file" "$file" "${split[@]}"
+		evaldbg epubsplit.py -o "p${currentSplit} ""$file" "$file" "${(@)split[1,-2]}"
 		currentSplit=$((currentSplit+1))
-		split=()
+		split=( $split[-1] )
 		}
 		}
 	done
-	dact arger  -o "p${currentSplit} ""$file" "$file" "${split[@]}"
-  test -z "${split[*]}" || epubsplit.py -o "p${currentSplit} ""$file" "$file" "${split[@]}"
+  test -z "${split[*]}" || evaldbg epubsplit.py -o "p${currentSplit} ""$file" "$file" "${split[@]}"
 }
