@@ -1,2 +1,2 @@
 #!/usr/bin/env zsh
-"$NIGHTDIR"/launchers/**/*
+re "$NIGHTDIR"/launchers/**/*(*) # globs only executables

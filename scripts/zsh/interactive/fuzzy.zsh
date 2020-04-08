@@ -55,7 +55,8 @@ v() {
     files=()
     command rg '^>' ~/.viminfo | cut -c3- |
                 while read line; do
-                    [ -f "${line/\~/$HOME}" ] && files+="$line"
+                    line="${line/\~/$HOME}"
+                    [ -f "$line" ] && files+="$line"
                 done
     test -f ~/.emacs.d/.cache/recentf && {
         command rg --only-matching --replace '$1' '^\s*"(.*)"$' ~/.emacs.d/.cache/recentf |
@@ -63,10 +64,14 @@ v() {
                 [ -f "$line" ] && files+="$line"
             done
     }
-    files="$(<<<"${(F)files}" fz --print0 --query "$*")" || return 1
-    files="${files//\~/$HOME}"
+    # files=( ${(@)files//\~/$HOME} ) # emacs doesn't need this
+    # stat doesn't expand ~
+    # sort files by modification date
+    # %Y     time of last data modification, seconds since Epoch
+    files=(${(0@)"$(gstat  --printf='%040.18Y:%n\0' "$files[@]" | gsort -rz | gcut -z -d':' -f2-)"}) #Don't quote this there is always a final empty element
+    files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$*")"} ) || return 1
     local ve="$ve"
     test -z "$ve" && ! isSSH && ve=nvim
-    "${ve:-vim}" -p ${(0@)files} #Don't quote this there is always a final empty element
+    "${ve:-vim}" -p "${(@)files}"
     doc '-o opens in split view, -p in tabs. Use gt, gT, <num>gt to navigate tabs.'
 }
