@@ -1,5 +1,4 @@
 # export TERM="xterm-256color" #Might do a lot of damage. Added for multi-term.
-# function zsh-defer() { reval "$@" }
 DEFAULT_USER="evar"
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH

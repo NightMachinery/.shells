@@ -15,7 +15,7 @@ argerng() {
 ecdbg() {
     test -z "$DEBUGME" || {
         local errcol=("${debugcol[@]:-cyan}")
-    	color "$errcol[@]" "$@"
+    	color "$errcol[@]" "$@" >&2
     	# errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
     }
 }
