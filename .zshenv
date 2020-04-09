@@ -54,7 +54,7 @@ isNotExpensive || {
     #isLinux && export TCLLIBPATH=/usr/lib/x86_64-linux-gnu
     source <(antibody init)
     ANTIBODY_HOME="$(antibody home)"
-    # DISABLE_DEFER=y
+    DISABLE_DEFER=y
     # Won't defer if not interactive or disabled explicitly
     { [[ -o interactive ]] && test -z "$DISABLE_DEFER" } && antibody bundle romkatv/zsh-defer || alias zsh-defer=''
     source-interactive-all() {
