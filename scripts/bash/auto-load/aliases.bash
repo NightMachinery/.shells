@@ -1,4 +1,5 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias emcsave="emc -e '(save-some-buffers t)'"
 alias mycountry='geo.bash -o country'
 alias itunesprogress='exa -a -T -l ~/Library/iTunes/'
 alias bwg='sudo WG_QUICK_USERSPACE_IMPLEMENTATION=boringtun WG_SUDO=1 wg-quick'
