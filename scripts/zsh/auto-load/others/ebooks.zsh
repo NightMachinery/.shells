@@ -56,3 +56,19 @@ epubsplit() {
 	done
   test -z "${split[*]}" || evaldbg epubsplit.py -p "p${currentSplit} " -o "p${currentSplit} ""$file" "$file" "${split[@]}"
 }
+function rename-ebook() {
+    local filename=$(basename "$1")
+    local extension="${filename##*.}"
+    local filename="${filename%.*}"
+    local directory=$(dirname "$1")
+    local meta="$(ebook-meta $1)"
+    local title="$(<<< $meta grep -i title|read -r a a b; echo $b)"
+    test -z "$title" && title="$filename"
+    local newfilename="$title - $(<<< $meta grep -i author|read -r a a b; echo $b)"
+    #local newfilename="$(exiftool -T -UpdatedTitle "$1") - $(exiftool -T -Author "$1")"
+    #An alternative that works with EPUBs, too:
+    # ebook-meta epub|grep -i title|read -r a a b; echo $b
+    local nn="${directory}/${newfilename}.${extension}"
+    ec "$nn"
+    mv "$1" "$nn"
+}

@@ -90,6 +90,11 @@ p2k() {
         sout 2m2k "$@"
     	[[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"
     }
+    local nn="$(rename-ebook "$1")"
+    # Telegram or Telethon doesn't support filenames bigger than 64.
+    local nnt="$nn:t"
+    ecdbg "nnt: $nnt"
+    (( ${#nnt} <= 64 )) || mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trim).$nn:e"
 }
 p2ko() {
     doc possibly send to kindle

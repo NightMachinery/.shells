@@ -4,3 +4,6 @@
 dedent() {
     sd --flags m '^\s*' ''
 }
+trim() {
+	gsed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}

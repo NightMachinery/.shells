@@ -324,20 +324,6 @@ function set-fk-icon-size() {
 function set-finder-icon-size() {
     /usr/libexec/PlistBuddy -c "set StandardViewSettings:IconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finder itself.
 }
-function rename-ebook() {
-    local filename=$(basename "$1")
-    local extension="${filename##*.}"
-    local filename="${filename%.*}"
-    local directory=$(dirname "$1")
-    local meta="$(ebook-meta $1)"
-    local newfilename="$(<<< $meta grep -i title|read -r a a b; echo $b) - $(<<< $meta grep -i author|read -r a a b; echo $b)"
-    #local newfilename="$(exiftool -T -UpdatedTitle "$1") - $(exiftool -T -Author "$1")"
-    #An alternative that works with EPUBs, too:
-    # ebook-meta epub|grep -i title|read -r a a b; echo $b
-
-    echo mv "$1" "${directory}/${newfilename}.${extension}"
-    mv "$1" "${directory}/${newfilename}.${extension}"
-}
 function cpt() { echo -n "$@" | pbcopy; }
 function sdc() {
     it2prof dark
