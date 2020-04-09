@@ -1,4 +1,6 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias nohistory='unset HISTFILE' #disables history for current session
+alias cleanbuffer='printf "\ec\e[3J"' # there is a similar tool in my anaconda's bin named clear.
 alias emcsave="emc -e '(save-some-buffers t)'"
 alias mycountry='geo.bash -o country'
 alias itunesprogress='exa -a -T -l ~/Library/iTunes/'
