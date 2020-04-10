@@ -31,3 +31,4 @@ daudin
 gnureadline
 html5lib
 rsstail
+ezgmail

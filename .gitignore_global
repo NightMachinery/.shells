@@ -3,6 +3,9 @@
 ## My own
 *.pbak
 
+# python
+/.mypy_cache/
+
 ## Emacs https://github.com/github/gitignore/blob/master/Global/Emacs.gitignore
 *~
 \#*\#
