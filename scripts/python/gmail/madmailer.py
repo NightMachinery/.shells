@@ -90,7 +90,7 @@ for t in news:
         body = tempfile.NamedTemporaryFile(mode = 'w', suffix='.html')
         print(bodyhtml, file=body, flush=True)
         cmd = f"dpan h2e 'TLDR | {m.subject}' {body.name}"
-        e, out, err = zsh[f"arger {cmd}"].run()
+        e, out, err = zsh[f"{cmd}"].run()
         # embed()
         if e == 0:
             labelnews(m)
