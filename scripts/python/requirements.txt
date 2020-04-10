@@ -30,3 +30,4 @@ wikipedia
 daudin
 gnureadline
 html5lib
+rsstail

@@ -1,4 +1,6 @@
 #!/usr/bin/env zsh
+# DEPRECATED use rss-tsend
+
 local engine=("${rt_e[@]:-tl}")
 rss-notifier.zsh "$1" "$2"|& tee ~/log/rss-tsend.log |while read -d "" -r t; do
     read -d "" -r l

@@ -1,4 +1,5 @@
 #!/usr/bin/env zsh
+# DEPRECATED use ensurerun instead
 myInvocation="$(printf %q "${(%):-%x}")$((($#)) && printf ' %q' "$@")"
 echo "$myInvocation"
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env zsh
+# DEPRECATED use rss-tsend
+
 rsstail -l -u "$1" -n 0 -N | while read -r line1
 do
     read -r line2

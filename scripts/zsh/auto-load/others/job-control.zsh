@@ -1,3 +1,6 @@
+function ensurerun() {
+    ruu "retry gtimeout $1" "${@:2}"
+}
 function loop() {
     mdoc "Usage: [lo_s=<interval> lo_noinit=<skip-first-iteration> lo_p=<socket-to-startover>] $0 CMD" MAGIC
     setopt localoptions localtraps
