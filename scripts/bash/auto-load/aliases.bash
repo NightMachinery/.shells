@@ -152,3 +152,4 @@ alias jglob='test -z "$*" && { test -n "$jufile" && set -- "$jufile" || { ecerr 
 alias sii=nig
 alias npmi=npmadd
 alias pkno='pk_no=y '
+alias rmswp='command rm -i $NIGHTDIR/**/*.swp(D)'

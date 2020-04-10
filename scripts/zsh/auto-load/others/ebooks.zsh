@@ -72,3 +72,10 @@ function rename-ebook() {
     ec "$nn"
     mv "$1" "$nn"
 }
+function ebookcat() {
+	jglob
+	sout ebook-convert $1 .txt
+	local txt=${1:r}.txt
+	head -n "${2:-40}" $txt
+	sout command rm $txt
+}

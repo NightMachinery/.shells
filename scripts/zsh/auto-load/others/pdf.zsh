@@ -31,3 +31,4 @@ pdf-crop-margins () {
 	\mv "$u" "${@[-1]}"
 }
 pdfcrop() { re pdf-crop-margins "$@" }
+pdfoutline() { jglob ; mutool show "$1" outline }

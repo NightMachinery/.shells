@@ -3,6 +3,7 @@ tmuxnew() {
 	silent tmux kill-session -t "$1"
 	tmux new -d -s "$@"
 }
+tmuxnewsh() { evaldbg tmuxnew "$1" "$(gq zsh -c "${tmuxnewshenv[*]} $(gq ${@[2,-1]})")" }
 ivy() {
     export DISABLE_DEFER=y
     tmux new-session -d 'zsh'

@@ -85,3 +85,4 @@ function evaldbg() {
 	argerdbg "$@"
 	reval "$@"
 }
+echo-fin() { arger "$fin[@]" } # Useful for debugging env
