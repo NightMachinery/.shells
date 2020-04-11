@@ -1,2 +1,10 @@
 #!/usr/bin/env ipython -i
 from plumbum import *
+from IPython.core.history import HistoryAccessor
+hista = HistoryAccessor()
+from pyfzf.pyfzf import FzfPrompt
+fzf = FzfPrompt()
+def gethistf():
+    return fzf.prompt([line for n1, n2, line in hista.get_tail(2000)], "--bind 'tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,?:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top' --multi")
+def fh():
+    return 0
