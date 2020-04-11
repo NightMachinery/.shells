@@ -85,16 +85,20 @@ libgen2md5() {
 p2k() {
     doc possibly send to kindle
     jglob
-    silent ebook-cover $1 "${1:r}".jpg
+    local delOrig="${pkDel}"
     [[ -n "$pk_no" ]] || {
         sout 2m2k "$@"
     	[[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"
     }
-    local nn="$(rename-ebook "$1")"
-    # Telegram or Telethon doesn't support filenames bigger than 64.
-    local nnt="$nn:t"
-    ecdbg "nnt: $nnt"
-    (( ${#nnt} <= 64 )) || mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trim).$nn:e"
+    test -z "$delOrig" && {
+        silent ebook-cover $1 "${1:r}".jpg
+        local nn="$(rename-ebook "$1")"
+        # Telegram or Telethon doesn't support filenames bigger than 64.
+        local nnt="$nn:t"
+        ecdbg "nnt: $nnt"
+        (( ${#nnt} <= 64 )) || mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trim).$nn:e"
+        return 0
+    } || command rm "$1"
 }
 p2ko() {
     doc possibly send to kindle
