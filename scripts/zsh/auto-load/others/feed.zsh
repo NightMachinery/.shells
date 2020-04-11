@@ -12,7 +12,7 @@ local id="${rt_id:--1001293952668}"
 
 while :
 do
-    python -m rsstail --striphtml --nofail --interval $((60*15)) --format '{title}
+    python -m rsstail -n 0 --striphtml --nofail --interval $((60*15)) --format '{title}
 {link}
 ' "$@" |& tee -a $log | while read -d $'\n' -r t; do
     read -d $'\n' -r l
