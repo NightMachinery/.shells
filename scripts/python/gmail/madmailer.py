@@ -4,8 +4,11 @@ activate_ips_on_exception()
 
 from brish import z
 z('cdm ~/tmp/delme/')
+
 import datetime
 now = datetime.datetime.now()
+cutoff_date = (now - datetime.timedelta(days=7)).strftime("%Y/%m/%d")
+
 import os.path
 import traceback
 from IPython import embed
@@ -43,7 +46,7 @@ lblTest = "Label_4305264623189976109"
 
 
 def ecerr(str):
-    print(f"{date}           {str}", file=sys.stderr)
+    print(f"{now}           {str}", file=sys.stderr)
 
 
 tokenpath = local.env["HOME"] + "/.gmail.token"
@@ -99,7 +102,7 @@ def getHtml(messageObj):
 
 # unprocessed
 news = g.search(
-    "((from:tldrnewsletter.com) AND NOT label:auto/processed)", maxResults=20
+        f"after:{cutoff_date} AND ((from:tldrnewsletter.com) AND NOT label:auto/processed)", maxResults=200
 )
 
 
@@ -108,9 +111,10 @@ def labelnews(msg):
     msg.addLabel(lblProcessed)
 
 
-for t in news:
+for t in reversed(news):
     # actually these are threads not messages
     for m in t.messages:
+        print(f"Processing '{m.subject}' ...")
         bodyhtml = getHtml(m.messageObj)
         if not bodyhtml:
             ecerr(f"Couldn't extract html body of message {m.subject}")
@@ -130,12 +134,26 @@ for t in news:
         e, out, err = h2eRes.summary
         cmd = h2eRes.cmd
         
+        if e == 0:
+            labelnews(m)
+            print(f"Sent '{m.subject}' to kindle ...")
+        else:
+            ecerr("")
+            ecerr(f"h2e exited nonzero; cmd: {cmd}")
+            ecerr("Out:")
+            ecerr(out)
+            ecerr("")
+            ecerr("Err:")
+            ecerr(err)
+            ecerr("")
+            ecerr("End of current report")
+            continue
+
         s = BeautifulSoup(bodyhtml, features="lxml")
         items = s.find_all("div", {"class": "text-block"})
         try:
             tsend_cmd = ["--parse-mode", "html", "--link-preview", "https://t.me/tldrnewsletter", '']
             tsend_args = ts.parse_tsend(tsend_cmd)
-            embed()
             for n in items[1:2] + items[4:-2]:
                 for link in n.select('a'):
                     # print(link.__dict__)
@@ -149,18 +167,7 @@ for t in news:
             ecerr("")
             ecerr(traceback.format_exc())
             ecerr("")
-        if e == 0:
-            labelnews(m)
-            print(f"Processed {m.subject} ...")
-        else:
-            ecerr("")
-            ecerr(f"h2e exited nonzero; cmd: {cmd}")
-            ecerr("Out:")
-            ecerr(out)
-            ecerr("")
-            ecerr("Err:")
-            ecerr(err)
-            ecerr("")
-            ecerr("End of current report")
+        print(f"Processed '{m.subject}'!")
+
         body.close()  # This file is deleted immediately upon closing it.
 # embed()
