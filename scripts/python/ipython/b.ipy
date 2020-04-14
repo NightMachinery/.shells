@@ -1,5 +1,12 @@
 #!/usr/bin/env ipython -i
+from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
+activate_ips_on_exception()
+
+from brish import *
+
 from plumbum import *
+zsh = local['zsh']['-c']
+
 from IPython.core.history import HistoryAccessor
 hista = HistoryAccessor()
 from pyfzf.pyfzf import FzfPrompt

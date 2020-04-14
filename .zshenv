@@ -15,6 +15,7 @@ isNotExpensive || {
     addToPATH "$HOME/.cargo/bin"
     addToPATH /snap/bin
     addToPATH "/usr/local/bin"
+    addToPATH "/usr/local/sbin"
     addToPATH "$HOME/.local/bin"
     addToPATH "/Base/- Code/Resources/"
     addToPATH "$HOME/go/bin"
@@ -24,6 +25,7 @@ isNotExpensive || {
     export GEM_HOME="$HOME/.gem"
     addToPATH "$GEM_HOME/bin"
     addToPATH ~/bin
+    addToPATH "$HOME/.poetry/bin"
 
     # psource ~/anaconda/etc/profile.d/conda.sh
     # silence conda deactivate #this is necessary try sbing and you'll see

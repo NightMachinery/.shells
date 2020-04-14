@@ -1,4 +1,6 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias hear-noipc='command mpv --keep-open=no --no-video'
+alias hearinvisible='silent hear-noipc --no-terminal --load-scripts=no'
 alias nohistory='unset HISTFILE' #disables history for current session
 alias cleanbuffer='printf "\ec\e[3J"' # there is a similar tool in my anaconda's bin named clear.
 alias emcsave="emc -e '(save-some-buffers t)'"
@@ -65,7 +67,8 @@ alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all a
 alias dlga="noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
-alias sia="sb ; source-interactive-all"
+alias sbi="sb ; source-interactive-all"
+alias sbb='exec zsh'
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
 alias api="sudo apt install -y"
 alias apug="sudo apt upgrade"
