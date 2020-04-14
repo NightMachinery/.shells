@@ -7,3 +7,4 @@ isI() {
 }
 alias isExpensive='[[ -z "$NIGHT_NO_EXPENSIVE" ]]'
 alias isNotExpensive='[[ -n "$NIGHT_NO_EXPENSIVE" ]]'
+alias isDbg='test -n "$DEBUGME"'

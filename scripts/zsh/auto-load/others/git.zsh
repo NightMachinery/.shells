@@ -1,6 +1,15 @@
 ### Aliases
 alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
 ###
+_git2http() {
+    # inargse ec "$@" |
+    mdoc "Usage: git2http <git-ssh-url> ...
+cat <file-with-ssh-urls> | git2http
+
+ -> <git-https-url> ..." MAGIC
+    <<<"$@" gsed -e 's|:|/|' -e 's|git@|https://|'
+}
+alias git2http='noglob inargsfe "re _git2http"'
 git-resolve() {
   local git=("${=gitbinary:-git}")
   STRATEGY="$1"

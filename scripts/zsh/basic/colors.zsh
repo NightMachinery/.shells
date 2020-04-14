@@ -24,7 +24,7 @@ color() {
     test -n "$nonewline" || echo
 }
 resetcolor() {
-    comment This var is seemingly coming from a plugin or sth
+    comment 'This var is builtin in zsh'
     ! isI || printf %s "$reset_color"
 }
 helloworld() {

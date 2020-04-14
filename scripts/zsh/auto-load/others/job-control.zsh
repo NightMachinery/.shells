@@ -31,10 +31,33 @@ function loop() {
         # kill $neon
     done
 }
+function oneinstance-setup() {
+    ensure-redis || return 1
+    
+    local someNonce="${1}"
+    test -z "$someNonce" && { ecerr someNonce is empty. ; return 1 }
+    someNonce="nonce_${someNonce}"
+
+    (( $(redis-cli --raw exists $someNonce) )) || sout redis-cli set $someNonce 0
+    local nonce=$(( $(redis-cli --raw get $someNonce) + 1 ))
+    (( $nonce == 10000 )) && nonce=0
+    sout redis-cli set $someNonce $nonce
+    ec $nonce
+}
+oneinstance() {
+    local nonce="$2"
+    test -z "$nonce" && { ecerr nonce is empty. ; return 1 }
+
+    local someNonce="${1}"
+    test -z "$someNonce" && { ecerr someNonce is empty. ; return 1 }
+    someNonce="nonce_${someNonce}"
+
+    (( $nonce == $(redis-cli --raw get $someNonce) ))
+}
+
 _loop_trap() { ec '
 loop interrupted' ; sig2=666 }
-loop-startover() { ec "
-Starting over;${@:2}" | socat -u - unix-connect:${1} }
+loop-startover() { edPre=$'\n' ecdate "Starting over${@:2}" | socat -u - unix-connect:${1} }
 alias loops='loop-startover' #Oops :D
 inbg() {
     { eval "$(gquote "$@")" & }

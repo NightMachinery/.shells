@@ -106,6 +106,8 @@ zsh-defer psource /usr/local/opt/git-extras/share/git-extras/git-extras-completi
 bindkey -M viins ‘ii’ vi-cmd-mode
 bindkey -v
 
+bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+Return to insert a literal newline without accepting the command
+
 #Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
 # Use colon separators#.
 #xterm-24bit|xterm with 24-bit direct color mode,

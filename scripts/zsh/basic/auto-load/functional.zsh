@@ -31,8 +31,8 @@ inargse() {
 	# An enhancer
 	eval "$1" "$(gq "$(in-or-args "${@:2}")")"
 }
-inargsfe() { eval "$1" "$(gq "${(f@)"$(in-or-args "${@:2}")"}")" }
-inargs0e() { eval "$1" "$(gq "${(0@)"$(in-or-args "${@:2}")"}")" }
+inargsfe() { eval "$1" "$(gq "${(f@)"$(in-or-args-arrN "${@:2}")"}")" }
+inargs0e() { eval "$1" "$(gq "${(0@)"$(in-or-args-arr0 "${@:2}")"}")" }
 inargs() {
 	reval "$@" "$(in-or-args)"
 }

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
+activate_ips_on_exception()
+
+from brish import z
+import datetime
+now = datetime.datetime.now()
 import os.path
 import traceback
 from IPython import embed
@@ -30,14 +36,15 @@ spec.loader.exec_module(ts)
 from syncer import sync
 tsend = sync(ts.tsend)
 
-zsh = local["zsh"]["-c"]
-local.env['pkDel'] = 'y'
+# zsh = local["zsh"]["-c"]
+# local.env['pkDel'] = 'y'
+os.environ['pkDel'] = 'y'
 lblProcessed = "Label_7772537585229918833"
 lblTest = "Label_4305264623189976109"
 
 
 def ecerr(str):
-    print(str, file=sys.stderr)
+    print(f"{date}           {str}", file=sys.stderr)
 
 
 tokenpath = local.env["HOME"] + "/.gmail.token"
@@ -116,15 +123,20 @@ for t in news:
             continue
         body = tempfile.NamedTemporaryFile(mode="w", suffix=".html")
         print(bodyhtml, file=body, flush=True)
-        cmd = f"dpan h2e 'TLDR | {m.subject}' {body.name}"
-        e, out, err = zsh[f"{cmd}"].run()
+        # cmd = f"dpan h2e 'TLDR | {m.subject}' {body.name}"
+        # e, out, err = zsh[f"{cmd}"].run()
+        
         s = BeautifulSoup(bodyhtml, features="lxml")
         items = s.find_all("div", {"class": "text-block"})
         try:
             tsend_cmd = ["--parse-mode", "html", "--link-preview", "https://t.me/tldrnewsletter", '']
             tsend_args = ts.parse_tsend(tsend_cmd)
-            # embed()
-            for n in items[1:2] + items[4:-3]:
+            embed()
+            for n in items[1:2] + items[4:-2]:
+                for link in n.select('a'):
+                    # print(link.__dict__)
+                    link['href'] = z("urlfinalg {link['href']}") # (zsh["inargs urlfinalg"] << link['href'])()
+                    # print(link['href'])
                 tsend_args['<message>'] = n
                 tsend(tsend_args)
         except:
