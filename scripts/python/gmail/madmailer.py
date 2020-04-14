@@ -3,6 +3,7 @@ from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
 activate_ips_on_exception()
 
 from brish import z
+z('cdm ~/tmp/delme/')
 import datetime
 now = datetime.datetime.now()
 import os.path
@@ -37,8 +38,6 @@ from syncer import sync
 tsend = sync(ts.tsend)
 
 # zsh = local["zsh"]["-c"]
-# local.env['pkDel'] = 'y'
-os.environ['pkDel'] = 'y'
 lblProcessed = "Label_7772537585229918833"
 lblTest = "Label_4305264623189976109"
 
@@ -125,6 +124,11 @@ for t in news:
         print(bodyhtml, file=body, flush=True)
         # cmd = f"dpan h2e 'TLDR | {m.subject}' {body.name}"
         # e, out, err = zsh[f"{cmd}"].run()
+
+        # os.environ['pkDel'] = 'y'
+        h2eRes = z('''pkDel=y dpan h2e {f'TLDR | {m.subject}'} {body.name}''')
+        e, out, err = h2eRes.summary
+        cmd = h2eRes.cmd
         
         s = BeautifulSoup(bodyhtml, features="lxml")
         items = s.find_all("div", {"class": "text-block"})
@@ -135,7 +139,7 @@ for t in news:
             for n in items[1:2] + items[4:-2]:
                 for link in n.select('a'):
                     # print(link.__dict__)
-                    link['href'] = z("urlfinalg {link['href']}") # (zsh["inargs urlfinalg"] << link['href'])()
+                    link['href'] = z("urlfinalg {link['href']}").out # (zsh["inargs urlfinalg"] << link['href'])()
                     # print(link['href'])
                 tsend_args['<message>'] = n
                 tsend(tsend_args)

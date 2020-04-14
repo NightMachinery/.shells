@@ -2,12 +2,18 @@
 alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
 ###
 _git2http() {
-    # inargse ec "$@" |
     mdoc "Usage: git2http <git-ssh-url> ...
 cat <file-with-ssh-urls> | git2http
 
- -> <git-https-url> ..." MAGIC
-    <<<"$@" gsed -e 's|:|/|' -e 's|git@|https://|'
+ -> <git-https-url> ...
+This function is idempotent (it passes http URLs through)." MAGIC
+
+    if [[ "$*" =~ '^http' ]]
+    then
+        ec "$*"
+    else
+    <<<"$*" gsed -e 's|:|/|' -e 's|git@|https://|'
+    fi
 }
 alias git2http='noglob inargsfe "re _git2http"'
 git-resolve() {

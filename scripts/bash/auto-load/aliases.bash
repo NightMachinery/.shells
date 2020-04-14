@@ -156,3 +156,4 @@ alias sii=nig
 alias npmi=npmadd
 alias pkno='pk_no=y '
 alias rmswp='command rm -i $NIGHTDIR/**/*.swp(D)'
+alias rmpyc='command rm -ri $NIGHTDIR/**/__pycache__'

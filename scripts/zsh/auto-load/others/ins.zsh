@@ -98,8 +98,10 @@ function ins() {
     isDarwin && brew install $1 || sudo apt install -y $1
 }
 
-jadd() {
+jins() {
     mdoc Add Julia package MAGIC
     julia -e 'using Pkg; Pkg.add("'"$1"'"); using '"$1"
     # We import the newly installed package to precompile it.
 }
+pig() { pi "git+$(git2http "$1")" }
+reify pig
