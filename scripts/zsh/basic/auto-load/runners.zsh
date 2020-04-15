@@ -2,7 +2,7 @@ function rexx(){
     xargs -d " " -n 1 -I _ "$=1" <<< "${@:2}"
 }
 function rex(){
-    zargs --verbose -i _ -- "${@:2}" -- "$=1"
+    zargs -i _ -- "${@:2}" -- "$=1"
     #Using -n 1 fails somehow. Probably a zargs bug.
 }
 function rexa(){
@@ -20,6 +20,7 @@ redoq() {
     done
 }
 redo() redoq "$(gquote "${@: 1:-1}")" "${@: -1}"
+redo2() { redo "$@[2,-1]" "$1" }
 skipglob() {
 	test -z "${*:2}" || eval "$1 $(gq "${@:2}")"
 }
