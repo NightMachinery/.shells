@@ -7,7 +7,7 @@ function wread() {
     mdoc 'Out: wr_title wr_author' MAGIC
     local file=''
     [[ "$1" == '--file' ]] && {
-        test -e "$2" && file="$2" || { ecerr "wread called with nonexistent file." ; return 33 }
+        test -e "$2" && file="$(realpath "$2")" || { ecerr "wread called with nonexistent file." ; return 33 }
         shift 2
     }
     setopt local_options pipefail
@@ -150,10 +150,11 @@ outlinify() {
     mapln 'https://outline.com/$1' "$@"
 }
 html2epub-calibre() {
-    local u="$1 $(uuidgen).html"
+    mdoc "Usage: $0 <title> <authors> <html-file> ..." MAGIC
+    local u="$1 $(uuidgen).html" title="${1}" authors="${2:-nHight}"
     merge-html "${@:3}" > "$u"
-    ebook-convert "$u" "$1.epub" \
-                  --authors="$2" \
+    ebook-convert "$u" "$title.epub" \
+                  --authors="$authors" \
                   --level1-toc="//*[name()='h1' or name()='h2']" \
                   --level2-toc="//h:h3" \
                   --level3-toc="//*[@class='subsection']" \
@@ -161,8 +162,20 @@ html2epub-calibre() {
                   --use-auto-toc --toc-threshold=0 \
                   --toc-title="The TOC" \
                   --embed-all-fonts \
-                  --title="$1" --epub-inline-toc --enable-heuristics
+                  --title="$title" --epub-inline-toc --enable-heuristics
     \rm "$u"
+}
+txt2epub() {
+    mdoc "Usage: $0 <title> <authors> <txt-file>" MAGIC
+    local u="$3" title="${1}" authors="${2:-nTight}"
+    ebook-convert "$u" "$title.epub" \
+                  --authors="$authors" \
+                  --title="$title" --epub-inline-toc --enable-heuristics
+
+}
+t2e() {
+    txt2epub "$1" "${te_author:-night_t2e}" "${@:2}"
+    p2k "$1".epub
 }
 html2epub() {
     ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
