@@ -34,3 +34,6 @@ read-time-estimate
 get-stdin
 wikit
 cf-warp
+puppeteer-extra-plugin-stealth
+puppeteer-extra
+puppeteer-extra-plugin-stealth
