@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 try:
     from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
-    activate_ips_on_exception()
+#    activate_ips_on_exception()
 
     from brish import z
     z('cdm ~/tmp/delme/')
