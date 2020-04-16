@@ -14,6 +14,6 @@ function months() {
 }
 tldr() { 
 	#nig ea  #not needed because of piping autoremoval of color.
-	isDarwin && { command tldr "$@" ; return $? }
+	isDarwin && { command tldr "$@" || command tldr -p linux "$@" ; return $? }
 	command tldr "$@" | bt
 }
