@@ -30,10 +30,11 @@ wikipedia
 daudin
 gnureadline
 html5lib
-rsstail
+git+https://github.com/s0hv/rsstail.py
 ezgmail
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 syncer
 nest_asyncio
+git+https://github.com/NightMachinary/brish.git

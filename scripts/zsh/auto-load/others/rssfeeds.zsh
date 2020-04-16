@@ -12,11 +12,12 @@ local id="${rt_id:--1001293952668}"
 
 while :
 do
+    # Use git+https://github.com/s0hv/rsstail.py .
     python -m rsstail -n 0 --striphtml --nofail --interval $((60*15)) --format '{title}
 {link}
 ' "$@" |& tee -a $log | while read -d $'\n' -r t; do
     read -d $'\n' -r l
-    t="$(<<<"$t" recode html..utf8)"
+    t="$(<<<"$t" html2utf.py)"
     for c in $conditions[@]
     do
         reval "$c" "$l" "$t" || continue 2

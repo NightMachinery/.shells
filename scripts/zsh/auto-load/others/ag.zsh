@@ -6,10 +6,10 @@ fi
 ##
 alias agc='ec "${(F)commands}"|agC=0 agm'
 ##
-function rg() {
-    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto -C ${agC:-1} "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+function rgm() {
+    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto -C ${agC:-1} --color always "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
 }
-agm() rg "$@" #alias agm='rg' #'ag -C "${agC:-1}" --nonumbers'
+agm() rgm "$@" #alias agm='rg' #'ag -C "${agC:-1}" --nonumbers'
 
 aga() {
     # agm "$@" "$NIGHTDIR"/**/*alias*(.)

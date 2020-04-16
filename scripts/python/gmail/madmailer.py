@@ -4,7 +4,7 @@ try:
     from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
 #    activate_ips_on_exception()
 
-    from brish import z
+    from brish import z, zq, zs
     z('cdm ~/tmp/delme/')
 
     import datetime
@@ -101,16 +101,34 @@ try:
             r = frompart(messageObj["payload"])
         return r
 
-
-    # unprocessed
-    news = g.search(
-            f"after:{cutoff_date} AND ((from:tldrnewsletter.com) AND NOT label:auto/processed)", maxResults=200
-    )
-
-
-    def labelnews(msg):
+    def labelprocessed(msg):
         # msg.addLabel(lblTest)
         msg.addLabel(lblProcessed)
+
+    fics = g.search(
+        f"after:{cutoff_date} AND ((from:fanfiction) AND NOT label:auto/processed)", maxResults=3
+    )
+
+    ficnetPattern = re.compile(r".*(https://www.fanfiction.net/s/\S*)")
+    for t in reversed(fics):
+        for m in t.messages:
+            match = re.match(ficnetPattern, m.originalBody, flags=re.DOTALL)
+            if not match:
+                ecerr(f"Could not find link in\n{m.originalBody}")
+                labelprocessed(m)
+                continue
+            link = match.group(1)
+            print("Processing {link} ...")
+            kRes = z('tl -p "fic | " {link}')
+            if not kRes:
+                kRes.print(file=sys.stderr)
+                continue
+            labelprocessed(m)
+
+    news = g.search(
+        f"after:{cutoff_date} AND ((from:tldrnewsletter.com) AND NOT label:auto/processed)", maxResults=200
+    )
+
 
 
     for t in reversed(news):
@@ -124,7 +142,7 @@ try:
                 ecerr(m.messageObj)
                 ecerr("")
                 ecerr("")
-                labelnews(m)
+                labelprocessed(m)
                 continue
             s = BeautifulSoup(bodyhtml, features="lxml")
             for link in s.select('a'):
@@ -147,7 +165,7 @@ try:
             # wres = z('''h2e {f'wread TLDR | {m.subject}'}  =(wread --file {body.name} {"https://www.tldrnewsletter.com/"} html | tee ~/tmp/a.html) ''')
             # print(repr(wres))
             if e == 0:
-                labelnews(m)
+                labelprocessed(m)
                 print(f"Sent '{m.subject}' to kindle ...")
             else:
                 ecerr("")
