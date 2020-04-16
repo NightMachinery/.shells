@@ -1,6 +1,12 @@
 ### Aliases
 alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
+alias grm='git rm --cached'
 ###
+guc() {
+    mdoc "$0 [<how-many>=1]
+Undoes last commits without changing files." MAGIC
+    git reset --soft HEAD~"${1:-1}"
+}
 _git2http() {
     mdoc "Usage: git2http <git-ssh-url> ...
 cat <file-with-ssh-urls> | git2http

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+#  --noauth_local_webserver
 try:
     from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
     activate_ips_on_exception()

@@ -165,8 +165,16 @@ html2epub-calibre() {
                   --title="$title" --epub-inline-toc --enable-heuristics
     \rm "$u"
 }
-txt2epub() {
-    mdoc "Usage: $0 <title> <authors> <txt-file>" MAGIC
+txt2epub () {
+    "${t2ed:-txt2epub-pandoc}" "$@"
+}
+txt2epub-pandoc () {
+    pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+}
+txt2epub-calibre() {
+    mdoc "DEPRECATED. Outputs weird like â€™ for apostrophe. Also only accepts single input.
+Use txt2epub-pandoc.
+Usage: $0 <title> <authors> <txt-file>" MAGIC
     local u="$3" title="${1}" authors="${2:-nTight}"
     ebook-convert "$u" "$title.epub" \
                   --authors="$authors" \

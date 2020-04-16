@@ -1,26 +1,42 @@
-tmuxkillf() {
+fftmux() {
+    local engine=(tmux a -t)
+    test -n "$ftE[*]" && engine=("$ftE[@]")
     local sessions
     sessions="$(tmux ls|fz)" || return $?
     local i
     for i in "${(f@)sessions}"
     do
         [[ $i =~ '([^:]*):.*' ]] && {
-            ec "Killing $match[1]"
-            tmux kill-session -t "$match[1]"
+            ec "acting on session $match[1]"
+            reval "${engine[@]}" "$match[1]"
             }
     done
 }
+alias fft=fftmux
+fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
 fr() {
     sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
     test -n "$sels" && printz "$1${fr_sep:- }${sels[@]:q:q}"
 }
 f() fr "$@" --max-depth 1
-mnf() {
+ffman() {
+    # mnf
     man -k . | fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
 }
-cmf() {
+alias ffm=ffman
+ffaliases() {
+    # also see aga
+    for k in "${(@k)aliases}"; do
+        ec "$k=${aliases[$k]}"
+    done | fz --prompt='Aliases> '
+}
+alias ffa=ffaliases
+ffcommands() {
+    # cmf (previous name)
     # command finder
-    printz "$(agc "${@:-.}" | fz)" }
+    printz "$(agc "${@:-.}" | fz --prompt 'Commands> ')"
+}
+alias ffc=ffcommands
 chis() {
     # Forked from fzf's wiki
     # browse chrome history
@@ -50,6 +66,7 @@ chis() {
     done }
     return 0
 }
+alias ffchrome=chis
 v() {
     local files
     files=()
