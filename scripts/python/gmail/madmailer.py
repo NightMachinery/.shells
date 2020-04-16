@@ -2,7 +2,7 @@
 #  --noauth_local_webserver
 try:
     from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
-    activate_ips_on_exception()
+#    activate_ips_on_exception()
 
     from brish import z
     z('cdm ~/tmp/delme/')
@@ -135,11 +135,11 @@ try:
             bodytxt_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt")
             print(m.originalBody, file=bodytxt_file, flush=True)
             
-            # z('cp {body.name} {bodytxt_file.name} ~/tmp/')
+            z('cp {body.name} {bodytxt_file.name} ./') # DEBUG also set pkDel
 
-            # The html uses a table which doesn't reflow.
-            # kRes = z('''pkDel=y dcali h2e {f'dcali TLDR | {m.subject}'} {body.name}''')
-            kRes = z('''pkDel=y t2e {f'dcali TLDR | {m.subject}'} {bodytxt_file.name}''')
+            # The html uses a table which doesn't reflow. Calibre hangs on the input, so at least use pandoc.
+            # kRes = z('''pkDel=y dpan h2e {f'TLDR | {m.subject}'} {body.name}''')
+            kRes = z('''pkDel='' t2e {f'TLDR | {m.subject}'} {bodytxt_file.name}''')
             e, out, err = kRes.summary
             cmd = kRes.cmd
 
