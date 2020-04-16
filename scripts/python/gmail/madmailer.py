@@ -109,10 +109,10 @@ try:
         f"after:{cutoff_date} AND ((from:fanfiction) AND NOT label:auto/processed)", maxResults=3
     )
 
-    ficnetPattern = re.compile(r".*(https://www.fanfiction.net/s/\S*)")
+    ficnetPattern = re.compile(r".*(https://www.fanfiction.net/s/\S*)", flags=re.DOTALL)
     for t in reversed(fics):
         for m in t.messages:
-            match = re.match(ficnetPattern, m.originalBody, flags=re.DOTALL)
+            match = re.match(ficnetPattern, m.originalBody)
             if not match:
                 ecerr(f"Could not find link in\n{m.originalBody}")
                 labelprocessed(m)
