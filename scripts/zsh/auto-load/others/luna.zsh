@@ -10,6 +10,7 @@ lunas() {
 avarice() {
     # say "disquiet creatures of avarice have risen yet again ..."
     hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
+    ecdate "Luna iterated."
 }
 alias lq='loop-startover ~/tmp/.luna'
 function deluna() {
