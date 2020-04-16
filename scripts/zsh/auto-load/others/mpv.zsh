@@ -14,6 +14,7 @@ function play-and-trash(){
     mpv "$@" && trs "$1"
 }
 function mpv-noidle() {
+    set-volume 0
     silence mpv "$@" &
     local mympv=$!
     sleep 5

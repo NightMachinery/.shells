@@ -16,7 +16,7 @@ alias fft=fftmux
 fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
 fr() {
     sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
-    test -n "$sels" && printz "$1${fr_sep:- }${sels[@]:q:q}"
+    test -n "$sels" && printz "$1${fr_sep:- }${sels[@]:q}"
 }
 f() fr "$@" --max-depth 1
 ffman() {
