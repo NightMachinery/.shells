@@ -5,3 +5,5 @@ date = parse(os.environ["date"])
 print((datetime.datetime.now(date.tzinfo) - date).total_seconds())'
 }
 function dateshort() { date +"%b %d %H:%M:%S" }
+dateshortnum() { date +"%Y/%m/%d" }
+datej() { jalalim tojalali "$(dateshortnum)" }

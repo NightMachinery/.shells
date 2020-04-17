@@ -114,12 +114,16 @@ url-final2() {
 	doc "This one doesn't download stuff."
 	[[ "$(2>&1 wget --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
-reify url-final url-final2
+url-final3() {
+    doc 'The most reliable and expensive way.'
+    urlfinal.js "$1"
+}
+reify url-final url-final2 url-final3
 url-tail() {
     [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]" || ec "$1"
 }
 function tlrlu(){
-    tlrl-ng "$@" -p "$(url-tail "$(url-final "$1")") | "
+    tlrl-ng "$@" -p "$(url-tail "$(url-final3 "$1")") | "
 }
 tlrl-code(){
     w2e-code "$(url-tail "$(url-final "$1")")" "$@"

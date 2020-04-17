@@ -14,8 +14,12 @@ puppeteer.use(StealthPlugin());
     // use tor
     //const browser = await puppeteer.launch({args:['--proxy-server=socks5://127.0.0.1:9050']});
     const page = await browser.newPage();
-    await page.goto(url, {waitUntil: 'networkidle2'}); // load
-    await page.waitFor(5000);
+
+    // https://github.com/puppeteer/puppeteer/blob/master/docs/api.md#pagegotourl-options
+    const waittill = {timeout: 300000, waitUntil:  ['networkidle2', 'domcontentloaded']}
+    await page.goto(url, waittill);
+    // await page.waitForNavigation(waittill); // can get stuck
+    await page.waitFor(60000);
 
     // Start an interactive REPL here with the `page` instance.
     // await page.repl()
