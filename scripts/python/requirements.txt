@@ -38,3 +38,4 @@ google-auth-oauthlib
 syncer
 nest_asyncio
 git+https://github.com/NightMachinary/brish.git
+gensim
