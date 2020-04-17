@@ -1,3 +1,6 @@
+sumgensim() {
+    text="$(wread "$1" text)" word_count="${2:-350}" python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
+}
 sumym () {
     # https://pypi.org/project/sumy/
     # text-rank and kl 
@@ -33,9 +36,11 @@ do
     test -n "$notel" || ensurerun "150s" tsend -- "${id}" "$t
 $l
 
-Lex-rank: $(sumym "$l")
+gensim: $(sumgensim "$l")
 
-kl: $(sumym "$l" kl)"
+Lex-rank: $(sumym "$l")"
+
+# kl: $(sumym "$l" kl)"
     sleep 120 #because wuxia sometimes sends unupdated pages
     reval "$engine[@]" "$l" "$t"
 done
