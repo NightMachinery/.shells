@@ -1,3 +1,8 @@
+sumym () {
+    # https://pypi.org/project/sumy/
+    # text-rank and kl 
+    sumy "${2:-lex-rank}" --length=7 --url="$1"
+}
 rss-ctitle() {
     ggrep -P --silent "$rc_t" <<< "$2"
 }
@@ -26,7 +31,11 @@ do
     $l
     "
     test -n "$notel" || ensurerun "150s" tsend -- "${id}" "$t
-$l"
+$l
+
+Lex-rank: $(sumym "$l")
+
+kl: $(sumym "$l" kl)"
     sleep 120 #because wuxia sometimes sends unupdated pages
     reval "$engine[@]" "$l" "$t"
 done
