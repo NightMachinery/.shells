@@ -116,7 +116,7 @@ url-final2() {
 }
 url-final3() {
     doc 'The most reliable and expensive way.'
-    urlfinal.js "$1"
+    retry-limited 3 urlfinal.js "$1" || url-final2 "$1"
 }
 reify url-final url-final2 url-final3
 url-tail() {
