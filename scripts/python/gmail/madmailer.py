@@ -106,7 +106,7 @@ try:
         msg.addLabel(lblProcessed)
 
     fics = g.search(
-        f"after:{cutoff_date} AND ((from:fanfiction) AND NOT label:auto/processed)", maxResults=3
+        f"after:{cutoff_date} AND ((from:fanfiction) AND NOT label:auto/processed)", maxResults=200
     )
 
     ficnetPattern = re.compile(r".*(https://www.fanfiction.net/s/\S*)", flags=re.DOTALL)
@@ -118,7 +118,7 @@ try:
                 labelprocessed(m)
                 continue
             link = match.group(1)
-            print("Processing {link} ...")
+            print(f"Processing {link} ...")
             kRes = z('tl -p "fic | " {link}')
             if not kRes:
                 kRes.print(file=sys.stderr)
