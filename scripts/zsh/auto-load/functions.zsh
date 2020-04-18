@@ -322,9 +322,3 @@ function set-finder-icon-size() {
     /usr/libexec/PlistBuddy -c "set StandardViewSettings:IconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finder itself.
 }
 function cpt() { echo -n "$@" | pbcopy; }
-function sdc() {
-    it2prof dark
-    sdcv --color "$*" | less
-    it2prof 'Hotkey Window'
-}
-function sp() { ispell<<<"$*" ; }

@@ -3,14 +3,18 @@ luna() {
     lunar pmset displaysleepnow
 }
 lunas() {
-    lunar redo avarice 25 
+    lunar avaricemany
+}
+avaricemany() {
+    redo avarice 25
     # 25  1:23.87 total
     # each is about 3.5s
+
+    ecdate "Luna iterated."
 }
 avarice() {
     # say "disquiet creatures of avarice have risen yet again ..."
     hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
-    ecdate "Luna iterated."
 }
 alias lq='loop-startover ~/tmp/.luna'
 function deluna() {

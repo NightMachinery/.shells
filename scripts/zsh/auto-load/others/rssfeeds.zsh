@@ -1,5 +1,5 @@
 sumgensim() {
-    text="$(wread "$1" text)" word_count="${2:-350}" python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
+    text="$(wread "$1" text)" word_count="${2:-350}" serr python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
 }
 sumym () {
     # https://pypi.org/project/sumy/
