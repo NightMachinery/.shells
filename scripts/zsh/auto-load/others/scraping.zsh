@@ -37,7 +37,11 @@ function mercury-html() {
     serr mercury-html.js "$@"
 }
 function full-html() {
-	curlfull.js "$1" > "$2"
+    local mode="${fhMode}"
+	  test -z "$mode" && curlfull.js "$1" > "$2"
+    [[ "$mode" == 'aacookies' ]] && aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
+    [[ "$mode" == 'curl' ]] && gurl "$1" > "$2"
+
     #doc splash should be up. https://splash.readthedocs.io
     #doc 'wait always waits the full time. Should be strictly < timeout.'
     #curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
@@ -315,6 +319,9 @@ function getlinksoup() {
 }
 noglobfn getlinks getlinksoup
 function getlinksfull() {
+    mdoc "$0 <link> [ options for rg ]
+Remember that you can customize full-html by fhMode." MAGIC
+
 	local u
 	u="$(uuidgen)"
 	full-html "$1" "$u"
@@ -362,4 +369,31 @@ unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title
 }
 tlbat() {
 	uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
+}
+getlinksfull2() {
+    mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
+Uses getlinksfull (full-html) under the hood." MAGIC
+    local opts
+    zparseopts -A opts -K -E -D -M -regex:=e e:
+    local pages=("$@")
+    local regex="${opts[-e]:-.*}"
+    # re dvar pages regex
+    for page in "$pages[@]"
+    do
+        getlinksfull "$page" "$regex"
+    done
+    # zargs is buggy with its quotation
+    # zargs --verbose -i _ -- "$pages[@]" -- getlinksfull _ "$regex"
+}
+getlinks2() {
+    fhMode=curl getlinksfull2 "$@"
+}
+getlinks-c() {
+    fhMode=aacookies getlinksfull2 "$@"
+}
+aamedia() {
+    mdoc "$0 <page-url> ...
+Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
+    local formats=( ${audio_formats[@]} ${media_formats[@]} )
+    getlinks-c -e '\.('"${(j.|.)formats}"')$' "$@" | inargsf aacookies -Z
 }
