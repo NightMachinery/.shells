@@ -13,21 +13,21 @@ argerng() {
 	{ test -n "$jahmode" || isI } && ecalternate "$@" || arger "$@"
 }
 ecdbg() {
-    isdbg || {
+    isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")
     	color "$errcol[@]" "$@" >&2
     	# errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
     }
 }
 fsaydbg() {
-    isdbg || {
+    isNotDbg || {
         ecdbg "$@"
         fsay "$@"
     }
 }
 dact() {
     doc DEBUG Act
-    isdbg || eval "$(gquote "$@")"
+    isNotDbg || eval "$(gquote "$@")"
 }
 ecerr() ec "$@" 1>&2
 function rederr-old() {
@@ -73,7 +73,7 @@ function e() {
     echo $? "${pipestatus[@]}" "${PIPESTATUS[@]}"
 }
 function argerdbg() {
-	isdbg || {
+	isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")
 	coN=y coNr=y color "$errcol[@]" ''
 	argerng "$@"
