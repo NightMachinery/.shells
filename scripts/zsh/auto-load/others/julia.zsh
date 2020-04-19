@@ -48,7 +48,7 @@ ensure-ju() {
                           return 1 }
 }
 function jpre() {
-    jrm
+    # jrm
     eval "prefix-files $1:q ${jpredicate:-*(D.)}"
 }
 function jvoice() {
