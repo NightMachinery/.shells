@@ -2,7 +2,14 @@
 ### Aliases
 alias tlc='tlrl-code'
 alias tlg='tlrl-gh'
+alias gurl='curlm -o /dev/stdout'
 ###
+function wgetm() {
+    wget --header "$(cookies)" "$@"
+}
+function curlm() {
+    curl --silent --fail --location --header "$(cookies)" "$@"
+}
 function wread() {
     mdoc 'Out: wr_title wr_author' MAGIC
     local file=''
@@ -112,11 +119,11 @@ gh-to-readme() {
 }
 gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 url-final() {
-    curl -Ls -o /dev/null -w %{url_effective} "$@" || ec "$@"
+    curlm -o /dev/null -w %{url_effective} "$@" || ec "$@"
 }
 url-final2() {
 	doc "This one doesn't download stuff."
-	[[ "$(2>&1 wget --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
+	[[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 url-final3() {
     doc 'The most reliable and expensive way.'
@@ -323,7 +330,7 @@ function getlinksfull() {
 Remember that you can customize full-html by fhMode." MAGIC
 
 	local u
-	u="$(mktemp)"
+	u="$(uuidpy)"
 	full-html "$1" "$u"
 	getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
 	\rm "$u"
@@ -394,6 +401,27 @@ getlinks-c() {
 aamedia() {
     mdoc "$0 <page-url> ...
 Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
-    local formats=( ${audio_formats[@]} ${media_formats[@]} )
-    getlinks-c -e '\.('"${(j.|.)formats}"')$' "$@" | inargsf aacookies -Z
+
+    local urls=( $@ )
+
+    local formats=( ${audio_formats[@]} ${media_formats[@]} pdf )
+    local regex='\.('"${(j.|.)formats}"')$'
+    local url
+    for url in ${urls[@]}
+    do
+        url="$(urlfinalg $url)"
+        [[ "$url" =~ "$regex" ]] && ec $url || getlinks-c -e $regex "$url"
+    done | {
+        if isDbg
+        then
+            color 150 0 255 "$(cat)"
+        else
+            inargsf aacookies -Z
+        fi
+        }
+}
+aaCW() {
+    mdoc "$0 <url> ..." MAGIC
+    local theCookies=${theCookies:-"$(cookies $1)"}
+    getlinks-c -e 'resource/view\.php' "$@" | inargsf aamedia
 }

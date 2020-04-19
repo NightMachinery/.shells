@@ -7,16 +7,20 @@ aa-raw() {
 }
 aagh() { aa "${(@f)$(gh-to-raw "$@")}" }
 getcookies() {
-    mdoc "$0 <url>
-Will output in key=val;key2=val2
+    mdoc "[cookiesFile= ] $0 <url>
+Will output Chrome's cookies for the given URL in key=val;key2=val2
 See |cookies| for higher-level API." MAGIC
     local url="$1"
-    url="$url" python -c '
+    local cf="${cookiesFiles:-${HOME}/Library/Application Support/Google/Chrome/Default/Cookies}"
+
+    test -e "$cf" || { ecdbg "getcookies called with non-existent file: $cf" ; return 0 }
+    cookiesFile="$cf" url="$url" python -c '
 from pycookiecheat import chrome_cookies
 import os
 url = os.environ["url"]
 HOME = os.environ["HOME"]
-cookies = chrome_cookies(url, cookie_file=f"{HOME}/Library/Application Support/Google/Chrome/Default/Cookies")
+cookiesFile = os.environ["cookiesFile"]
+cookies = chrome_cookies(url, cookie_file=cookiesFile)
 #print(cookies)
 out = ""
 for k,v in cookies.items():
@@ -43,7 +47,7 @@ Uses |theCookies| var or else feeds first URL to |cookies|." MAGIC
     else
         c="$(cookies)"
     fi
-    aa --header=$c $@
+    aa-raw --header=$c $@
     # aria2c --load-cookies =(getcookies $url) $url
 }
 cookies() {
