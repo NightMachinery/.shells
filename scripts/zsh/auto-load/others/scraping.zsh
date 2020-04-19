@@ -425,3 +425,7 @@ aaCW() {
     local theCookies=${theCookies:-"$(cookies $1)"}
     getlinks-c -e 'resource/view\.php' "$@" | inargsf aamedia
 }
+ygen() {
+    y --force-generic-extractor "$@"
+    rename .apt .mp4 *.apt
+}
