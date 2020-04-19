@@ -35,7 +35,10 @@
   'alt-x': 'command-palette:toggle'
 'body':
   'cmd-k cmd-j': 'choose-pane:start'
+  'escape': 'notifications:clear-log'
+
 'atom-text-editor.vim-mode-plus.normal-mode':
   'space space': 'command-palette:toggle'
   'space j': 'choose-pane:start'
   'space m': 'vim-mode-plus:maximize-pane'
+  'escape': 'notifications:clear-log'

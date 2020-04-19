@@ -76,7 +76,7 @@ unseal() {
     doc in: un_fz un_p
     re 'ecdbg un_fz:'  "$un_fz[@]"
     local other_options fz_no_preview
-    other_options=()
+    other_options=(--select-1)
     test -n "$un_no_preview" || {
         other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y

@@ -10,8 +10,11 @@
   editor:
     fontSize: 17
     scrollPastEnd: true
+    softWrap: true
+    softWrapHangingIndent: 4
   "exception-reporting":
     userId: "78fba79f-8b2e-4fcb-b6f9-1b2e733ad54b"
+  "hey-pane": {}
   "julia-client":
     consoleOptions:
       cursorStyle: "bar"
