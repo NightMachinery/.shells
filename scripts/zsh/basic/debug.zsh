@@ -86,3 +86,12 @@ function evaldbg() {
 	reval "$@"
 }
 echo-fin() { arger "$fin[@]" } # Useful for debugging env
+function dbgserr() {
+    local cmd=("$@")
+    if isDbg
+    then
+        reval "${cmd[@]}"
+    else
+        reval serr "${cmd[@]}"
+    fi
+}

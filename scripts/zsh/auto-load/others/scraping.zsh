@@ -39,7 +39,7 @@ function mercury-html() {
 function full-html() {
     local mode="${fhMode}"
 	  test -z "$mode" && curlfull.js "$1" > "$2"
-    [[ "$mode" == 'aacookies' ]] && aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
+    [[ "$mode" == 'aacookies' ]] && dbgserr aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
     [[ "$mode" == 'curl' ]] && gurl "$1" > "$2"
 
     #doc splash should be up. https://splash.readthedocs.io
