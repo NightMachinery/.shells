@@ -13,10 +13,17 @@
   "exception-reporting":
     userId: "78fba79f-8b2e-4fcb-b6f9-1b2e733ad54b"
   "julia-client":
+    consoleOptions:
+      cursorStyle: "bar"
     firstBoot: false
+    juliaOptions:
+      formattingOptions:
+        whitespace_typedefs: true
     uiOptions:
       enableMenu: true
       enableToolBar: true
+      resultsDisplayMode: "console"
+      usePlotPane: false
   "tool-bar":
     position: "Left"
   "uber-juno":
