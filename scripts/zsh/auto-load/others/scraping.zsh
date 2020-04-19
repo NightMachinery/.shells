@@ -323,7 +323,7 @@ function getlinksfull() {
 Remember that you can customize full-html by fhMode." MAGIC
 
 	local u
-	u="$(uuidgen)"
+	u="$(mktemp)"
 	full-html "$1" "$u"
 	getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
 	\rm "$u"
