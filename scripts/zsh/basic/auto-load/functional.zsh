@@ -36,7 +36,11 @@ inargs0e() { eval "$1" "$(gq "${(0@)"$(in-or-args-arr0 "${@:2}")"}")" }
 inargs() {
 	reval "$@" "$(in-or-args)"
 }
-inargsf() { reval "$@" "${(f@)"$(in-or-args)"}" }
+inargsf() {
+    local args=( ${(f@)"$(in-or-args)"} )
+    (( $#args == 0 )) || reval "$@" "${args[@]}"
+    # TODO Add skip-empty to other inargs variants
+}
 inargs0() { reval "$@" "${(0@)"$(in-or-args)"}" }
 inargss() { reval "$@" "${="$(in-or-args)"}" }
 fnrep() {
