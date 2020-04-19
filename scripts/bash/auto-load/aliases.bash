@@ -77,7 +77,6 @@ alias apup="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
 alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
 alias szsh='source "$NIGHTDIR"/zsh/load-others.zsh'
-alias yic='youtube-dl --ignore-config  --external-downloader aria2c' #--external-downloader-args "-s 4"'
 alias reeb='run-on-each rename-ebook'
 alias set-volume='setv'
 alias aa='noglob aa-raw'
@@ -138,7 +137,8 @@ alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
-alias y="noglob youtube-dl --no-playlist --write-sub"
+alias y="noglob youtube-dl --no-playlist --write-sub  --external-downloader aria2c"
+alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
 alias tl='noglob tlrl-ng'
 alias tllw='noglob tl -e w2e-lw-raw'
