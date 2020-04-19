@@ -100,7 +100,7 @@ function ins() {
 
 jins() {
     mdoc Add Julia package MAGIC
-    julia -e 'using Pkg; Pkg.add("'"$1"'"); using '"$1"
+    julia --startup-file=no -e 'using Pkg; Pkg.add("'"$1"'"); using '"$1"
     # We import the newly installed package to precompile it.
 }
 pig() { pi "git+$(git2http "$1")" }
