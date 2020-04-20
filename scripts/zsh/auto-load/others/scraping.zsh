@@ -429,3 +429,4 @@ ygen() {
     y --force-generic-extractor "$@"
     rename .apt .mp4 *.apt
 }
+noglobfn ygen aaCW aamedia
