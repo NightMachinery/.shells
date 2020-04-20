@@ -368,16 +368,16 @@ wread-man() {
 	m="$(MAN_KEEP_FORMATTING=1 COLUMNS=70 serr man "$1")" && m="$(<<<"$m" command ul)" || m="$(2>&1 "$1" --help)" || { ecerr "$0 failed for $1" ; return 1 }
 	<<<"$m" aha --title "$1"
 }
-tlman() {
+function tlman() {
 	uf_idem=y we_dler="wread-man" w2e "$1" "$@"
 }
-wread-bat() {
+function wread-bat() {
 unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title "$(basename "$1")"
 }
-tlbat() {
+function tlbat() {
 	uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
 }
-getlinksfull2() {
+function getlinksfull2() {
     mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
 Uses getlinksfull (full-html) under the hood." MAGIC
     local opts
@@ -392,13 +392,13 @@ Uses getlinksfull (full-html) under the hood." MAGIC
     # zargs is buggy with its quotation
     # zargs --verbose -i _ -- "$pages[@]" -- getlinksfull _ "$regex"
 }
-getlinks2() {
+function getlinks2() {
     fhMode=curl getlinksfull2 "$@"
 }
-getlinks-c() {
+function getlinks-c() {
     fhMode=aacookies getlinksfull2 "$@"
 }
-aamedia() {
+function aamedia() {
     mdoc "$0 <page-url> ...
 Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
 
@@ -420,12 +420,12 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
         fi
         }
 }
-aaCW() {
+function aaCW() {
     mdoc "$0 <url> ..." MAGIC
     local theCookies=${theCookies:-"$(cookies $1)"}
     getlinks-c -e 'resource/view\.php' "$@" | inargsf aamedia
 }
-ygen() {
+function ygen() {
     y --force-generic-extractor "$@"
     rename .apt .mp4 *.apt
 }
