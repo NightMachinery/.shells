@@ -7,18 +7,21 @@ colorb() {
     co_f=colorbg color "$@"
 }
 color() {
-    local in
+    local in inargs
     local noreset="$coNr"
     local nonewline="$coN"
     comment "Note that we need to first get stdin and then print the color, otherwise we'll print the color before anything has been outputted, resulting in race conditions."
     [[ "$1" =~ '^\d+$' ]] &&
         {
-            in="$(in-or-args "${@[4,-1]}")"
+            # in="$(in-or-args "${@[4,-1]}")"
+            in-or-args2 "${@[4,-1]}"
             "${co_f:-colorfg}" "$@"
         } || {
-            in="$(in-or-args "${@[2,-1]}")"
+            # in="$(in-or-args "${@[2,-1]}")"
+            in-or-args2 "${@[2,-1]}"
             isI && printf %s "$fg[$1]"
         }
+    in="$inargs"
     print -nr -- "$in"
     test -n "$noreset" || resetcolor
     test -n "$nonewline" || echo

@@ -2,7 +2,7 @@ import Pkg
 # Pkg.add("OhMyREPL")
 
 # using OhMyREPL
-using BenchmarkTools
+using BenchmarkTools, Infiltrator, FreqTables
 
 more(content) = more(repr("text/plain", content))
 # using Markdown
@@ -15,19 +15,31 @@ macro d(body)
     :(more(Core.@doc($(esc(body)))))
 end
 
-# Repeat an operation n times, e.g.
-# @dotimes 100 println("hi")
-
-macro dotimes(n, body)
-  quote
-    for i = 1:$(esc(n))
-      $(esc(body))
-    end
-  end
+function sa(x)
+    show(IOContext(stdout, :limit=>false), MIME"text/plain"(), x)
+    println()
+end
+function ec(x)
+    println(x)
+end
+function sad(x)
+    # ec density
+    sa(prop(freqtable(x)))
 end
 
 ## From: good macros here https://gist.github.com/MikeInnes/8299575
 # Equivalent to @time @dotimes ... Consider using @benchmark.
+
+# Repeat an operation n times, e.g.
+# @dotimes 100 println("hi")
+
+macro dotimes(n, body)
+    quote
+        for i = 1:$(esc(n))
+            $(esc(body))
+        end
+    end
+end
 
 macro dotimed(n, body)
   :(@time @dotimes $(esc(n)) $(esc(body)))
@@ -53,7 +65,7 @@ macro defonce(typedef::Expr)
 
   typeof(name) == Expr && (name = name.args[1]) # Type hints
   
-  :(if !isdefined($(Expr(:quote, name)))
+  :(if !isdefined(@__MODULE__, $(Expr(:quote, name)))
       $(esc(typedef))
     end)
 end

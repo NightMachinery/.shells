@@ -18,6 +18,7 @@
   "julia-client":
     consoleOptions:
       cursorStyle: "bar"
+      terminal: "/Users/evar/scripts/dash/itermlaunch.dash"
     firstBoot: false
     juliaOptions:
       formattingOptions:
@@ -25,7 +26,9 @@
     uiOptions:
       enableMenu: true
       enableToolBar: true
+      errorInRepl: true
       resultsDisplayMode: "console"
+      scrollToResult: true
       usePlotPane: false
   "tool-bar":
     position: "Left"

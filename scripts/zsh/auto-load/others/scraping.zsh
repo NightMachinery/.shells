@@ -5,10 +5,71 @@ alias tlg='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
 ###
 function wgetm() {
-    wget --header "$(cookies)" "$@"
+    wget --header "$(cookies-auto "$@")" "$@"
 }
 function curlm() {
-    curl --silent --fail --location --header "$(cookies)" "$@"
+    curl --silent --fail --location --header "$(cookies-auto "$@")" "$@"
+}
+getcookies() {
+    mdoc "[cookiesFile= ] $0 <url>
+Will output Chrome's cookies for the given URL in key=val;key2=val2
+See |cookies| for higher-level API." MAGIC
+    local url="$1"
+    local cf="${cookiesFiles:-${HOME}/Library/Application Support/Google/Chrome/Default/Cookies}"
+
+    test -e "$cf" || { ecdbg "getcookies called with non-existent file: $cf" ; return 0 }
+    cookiesFile="$cf" url="$url" python -c '
+from pycookiecheat import chrome_cookies
+import os
+url = os.environ["url"]
+HOME = os.environ["HOME"]
+cookiesFile = os.environ["cookiesFile"]
+cookies = chrome_cookies(url, cookie_file=cookiesFile)
+#print(cookies)
+out = ""
+for k,v in cookies.items():
+    out += f"{k}={v};"
+print(out[:-1])
+'
+
+}
+cookies() {
+    mdoc "$0 [<cookie-or-url>=theCookies]
+Outputs in header style." MAGIC
+
+    local url="$1"
+    local env_c="$theCookies"
+    local c="Cookie:$1"
+
+    if [[ "$url" =~ '^http' ]]
+    then
+           c="Cookie:$(getcookies "$url")"
+    fi
+    test -z "$url" && c="Cookie:${env_c}"
+    ec "$c"
+}
+function cookies-auto() {
+    mdoc "Returns theCookies if present. Otherwise tries to get the cookies from the first url in args." MAGIC
+
+    test -n "$caDisableCookies" && return 0
+
+    local ci=''
+    if test -z "$theCookies"
+    then
+        local i
+        for i in $@
+        do
+            if [[ "$i" =~ '^http' ]]
+            then
+                c="$(cookies "$i")"
+                break 
+            fi
+        done
+    else
+        c="$(cookies)"
+    fi
+
+    ec "$c"
 }
 function wread() {
     mdoc 'Out: wr_title wr_author' MAGIC
@@ -368,16 +429,16 @@ wread-man() {
 	m="$(MAN_KEEP_FORMATTING=1 COLUMNS=70 serr man "$1")" && m="$(<<<"$m" command ul)" || m="$(2>&1 "$1" --help)" || { ecerr "$0 failed for $1" ; return 1 }
 	<<<"$m" aha --title "$1"
 }
-tlman() {
+function tlman() {
 	uf_idem=y we_dler="wread-man" w2e "$1" "$@"
 }
-wread-bat() {
+function wread-bat() {
 unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title "$(basename "$1")"
 }
-tlbat() {
+function tlbat() {
 	uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
 }
-getlinksfull2() {
+function getlinksfull2() {
     mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
 Uses getlinksfull (full-html) under the hood." MAGIC
     local opts
@@ -392,13 +453,13 @@ Uses getlinksfull (full-html) under the hood." MAGIC
     # zargs is buggy with its quotation
     # zargs --verbose -i _ -- "$pages[@]" -- getlinksfull _ "$regex"
 }
-getlinks2() {
+function getlinks2() {
     fhMode=curl getlinksfull2 "$@"
 }
-getlinks-c() {
+function getlinks-c() {
     fhMode=aacookies getlinksfull2 "$@"
 }
-aamedia() {
+function aamedia() {
     mdoc "$0 <page-url> ...
 Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
 
@@ -420,12 +481,61 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
         fi
         }
 }
-aaCW() {
+function aaCW() {
     mdoc "$0 <url> ..." MAGIC
     local theCookies=${theCookies:-"$(cookies $1)"}
     getlinks-c -e 'resource/view\.php' "$@" | inargsf aamedia
 }
-ygen() {
+function ygen() {
     y --force-generic-extractor "$@"
     rename .apt .mp4 *.apt
 }
+noglobfn ygen aaCW aamedia
+function hi10-jtoken() {
+    hi10jtoken.js
+
+    # doc "Doesn't work. Probably because of their custom MD5 function."
+    # local jtoken="$(head -n1 /dev/random |md5)"
+    # jtoken="${jtoken[1,5]}"
+    # local id="$(<<<"$jtoken" md5)"
+    # id="${id[1,5]}"
+    # re dvar jtoken id
+    # ec "?jtoken=${jtoken}${id}"
+}
+function hi10-ng() {
+    mdoc "$0 <url-of-hi10-page> [<regex>]" MAGIC
+    local url="$1"
+    local regex=${2:-'\.mkv$'}
+    getlinks-c "$url" -e "$regex" | inargsf hi10-multilink
+}
+function hi10-multilink() {
+    local argCount=$#
+    local pArgs=()
+    local i
+    for (( i=1; i<=$argCount; i+=1 ))
+    do
+        if [[ "$argv[i]" =~ '(https?://[^/]*hi10anime.*)' ]]; then #'.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
+            # echo $match[1]
+            pArgs[$i]="${match[1]}"
+            # pArgs[$i]='http://hi10anime'"${match[1]}$(hi10-jtoken)"
+        else
+            ecerr Invalid link: "$argv[i]"$'\n'
+        fi
+    done
+    # echo $pArgs
+    # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
+    if isDbg
+    then
+        arger "${(@u)pArgs}"
+    else
+        mapg '$i$(hi10-jtoken)' "${(@u)pArgs}" | inargsf aa -j1 -Z # (u) makes the array elements unique.
+    fi
+}
+function hi10-from-page() {
+    mdoc "DEPRECATED. Use hi10-ng" MAGIC
+
+    # You need to have persistent cookies in lynx, and have logged in.
+    hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
+    # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
+}
+

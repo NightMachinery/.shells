@@ -29,7 +29,7 @@ dact() {
     doc DEBUG Act
     isNotDbg || eval "$(gquote "$@")"
 }
-ecerr() ec "$@" 1>&2
+ecerr() { color 255 43 244 "$@" 1>&2 }
 function rederr-old() {
     comment Somehow just using pipes sometimes does not work and causes stdout to actually go red ...
     local out="$(mktemp)"
@@ -81,7 +81,7 @@ function argerdbg() {
 	}
 }
 function evaldbg() {
-	ecdbg "$@"
+	ecdbg "$(gq "$@")"
 	argerdbg "$@"
 	reval "$@"
 }

@@ -1,3 +1,6 @@
+### SEE ALSO
+# spotlight, spt, spot
+###
 fftmux() {
     local engine=(tmux a -t)
     test -n "$ftE[*]" && engine=("$ftE[@]")
@@ -56,7 +59,7 @@ chis() {
             "select substr(title, 1, $cols), url
      from urls order by last_visit_time desc" |
         awk -F $sep '{printf "%-'$cols's  \x1b[36m%s\x1b[m\n", $1, $2}' |
-        ag "${@:-.}" |fz --ansi | gsed 's#.*\(https*://\)#\1#')"
+        ag "${@:-.}" |fz --no-sort --ansi | gsed 's#.*\(https*://\)#\1#')"
     ec "$links"
     ec "$links"|pbcopy
     [[ "$o" == y ]] && { local i
