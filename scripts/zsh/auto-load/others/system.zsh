@@ -18,3 +18,10 @@ cronenable() {
 	crontab -u $user "$cronpath"
 	mv "$cronpath" "${cronpath}.bak"
 }		
+get-volume() {
+    osascript -e 'set ovol to output volume of (get volume settings)'
+}
+function setv() {
+    osascript -e "set volume output volume $1"
+}
+

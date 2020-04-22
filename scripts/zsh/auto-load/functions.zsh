@@ -155,29 +155,6 @@ function alpha2black() (rm-alpha "$1" black)
 function alpha2white() (rm-alpha "$1" white)
 
 combine-funcs alpha2bw alpha2black alpha2white
-function hi10-multilink() {
-    #zsh-only
-    local argCount=$#
-    local pArgs=()
-    local i
-    for (( i=1; i<=$argCount; i+=1 ))
-    do
-        if [[ "$argv[i]" =~ '.*http:\/\/hi10anime(.*)' ]]; then #'.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
-            # echo $match[1]
-            pArgs[$i]='http://hi10anime'"$match[1]"
-        else
-            echo Invalid link: "$argv[i]"
-        fi
-    done
-    # echo $pArgs
-    # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
-    aria2c -j1 -Z  "${(@u)pArgs}" # (u) makes the array elements unique.
-}
-function hi10-from-page() {
-    # You need to have persistent cookies in lynx, and have logged in.
-    hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
-    # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
-}
 function ppgrep() {
     case "$(uname)" in
         Darwin)
@@ -236,10 +213,6 @@ function cee() {
 }
 function ceer() {
     geval "${@:2} $(which "$1")"
-}
-function setv() {
-    doc macOnly
-    osascript -e "set volume output volume $1"
 }
 function 265to264() {
     ffmpeg -i "$1" -map 0 -c:s copy -c:v libx264 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x264.mkv"

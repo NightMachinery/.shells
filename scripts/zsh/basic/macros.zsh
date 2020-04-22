@@ -1,3 +1,4 @@
+alias -g ppp=' | inargsf '
 # alias -g MAGIC='| { eval "$(read -d "" -r -E)" }'
 alias -g MAGIC='| { eval "$(< /dev/stdin)" }'
 mdoc_col=(0 35 255)

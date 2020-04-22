@@ -30,3 +30,22 @@ function deluna() {
     done
     ec deluna exited "(nonce: $nonce)"
 }
+function nnl() {
+    mdoc "Not Now Luna!" MAGIC
+    local started="$(date +"%s")"
+    local vol="$(get-volume)"
+    local timeout=150
+    isDbg && timeout=5
+
+    set-volume 0
+
+    # No need for this much force:
+    # while (( ($(date +"%s") - $started) <= $timeout ))
+    # do
+    #     set-volume 0
+    # done
+
+    sleep $timeout
+
+    set-volume "$vol"
+}

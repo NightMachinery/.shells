@@ -1,4 +1,5 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias spt='spotlight -name'
 alias hear-noipc='command mpv --keep-open=no --no-video'
 alias hearinvisible='silent hear-noipc --no-terminal --load-scripts=no'
 alias nohistory='unset HISTFILE' #disables history for current session
@@ -79,7 +80,7 @@ alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
 alias szsh='source "$NIGHTDIR"/zsh/load-others.zsh'
 alias reeb='run-on-each rename-ebook'
 alias set-volume='setv'
-alias aa='noglob aa-raw'
+alias aa='noglob aacookies'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
 alias pop='pbpaste'
