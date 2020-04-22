@@ -18,6 +18,7 @@ jdl-helper() {
     mkdir -p ~/Downloads/tmp/
     cp "$1" ~/Downloads/tmp/
     get-dl-link ~/Downloads/tmp/"${1:t}"
+    ec $'\n'
 }
 jdl() {
     jglob
