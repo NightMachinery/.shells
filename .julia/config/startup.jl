@@ -2,7 +2,7 @@ import Pkg
 # Pkg.add("OhMyREPL")
 
 # using OhMyREPL
-using BenchmarkTools, Infiltrator, FreqTables
+using BenchmarkTools, Infiltrator, FreqTables, RDatasets
 
 more(content) = more(repr("text/plain", content))
 # using Markdown
@@ -25,6 +25,9 @@ end
 function sad(x)
     # ec density
     sa(prop(freqtable(x)))
+end
+function getdict(;kwargs...)
+    return kwargs
 end
 
 ## From: good macros here https://gist.github.com/MikeInnes/8299575

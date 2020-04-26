@@ -1,4 +1,6 @@
 re "silence unalias" a la map p fd ff pip fd sp # mv cp
+alias rgjl="rgm -t julia" #"rgm --glob '*.jl'"
+alias rgpy="rgm --glob '*.py'"
 alias spt='spotlight -name'
 alias hear-noipc='command mpv --keep-open=no --no-video'
 alias hearinvisible='silent hear-noipc --no-terminal --load-scripts=no'
@@ -28,7 +30,7 @@ alias bt='bat --style=plain'
 alias btz='bt --language zsh'
 alias dbg='DEBUGME=d'
 alias sud='ruu sudo'
-alias l='exa -a --oneline'
+alias l='exa -a' # --oneline
 alias ll='exa -a -l'
 alias lt='exa -a -T'
 alias lc='l -s created'

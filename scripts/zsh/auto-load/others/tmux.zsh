@@ -11,8 +11,8 @@ ivy() {
     tmux split-window -h  'zsh'
     tmux send-keys "lunas
 "
-    # tmux split-window -v 'ipython; zsh'
-    tmux split-window -v 'salice.py'
+    # tmux split-window -v 'zsh'
+    # tmux split-window -v 'salice.py'
     tmux select-pane -t 0
     comment order matters. Select a pane before attaching.
     comment '-2            Force tmux to assume the terminal supports 256 colours.'
