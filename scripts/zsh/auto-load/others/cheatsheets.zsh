@@ -12,8 +12,3 @@ function months() {
 11. November - 30 days
 12. December - 31 days"
 }
-tldr() { 
-	#nig ea  #not needed because of piping autoremoval of color.
-	isDarwin && { command tldr "$@" || command tldr -p linux "$@" ; return $? }
-	command tldr "$@" | bt
-}

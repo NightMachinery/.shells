@@ -9,3 +9,10 @@ isI && {
     add-zsh-hook precmd precmd_pipestatus
 }
 
+function pp() {
+    pngpaste "$1".png
+}
+function pph() {
+    local lastimg="$(l-m)"
+    mv "${1:-$(pbpaste)}" "${lastimg:r}.html"
+}
