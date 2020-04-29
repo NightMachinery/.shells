@@ -106,8 +106,12 @@ jins() {
 pig() { pi "git+$(git2http "$1")" }
 reify pig
 npmupdateg() {
-    for package in $(npm -g outdated --parseable --depth=0 | cut -d: -f3)
+    doc alt: npm-check -u -g
+
+    # npm outdated -g --depth=0 produces output according to the header → current | wanted | latest
+    # npm outdated -g --depth=0 --parseable produces output in a different order → wanted | current | latest
+    for package in $(npm -g outdated --parseable --depth=0 | cut -d: -f4)
     do
-        npm -g install "$package"
+        ec npm -g install "$package"
     done
 }
