@@ -22,5 +22,5 @@ function cpsdt() {
     cpsd ~/tmp/delme "$@"
 }
 function psd2telg() {
-    cpsdt "$@"|xargs -I {} ensure-run.zsh 60s tsend me ' ' -f {} --force-document
+    tsend ${me:-me} '' -f "$(cpsdt "$@")" --force-document
 }

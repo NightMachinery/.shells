@@ -7,7 +7,7 @@ exa() {
     local arg long=''
     for arg in "$@"
     do
-        [[ "$arg" == "-l" || "$arg" == "--long" ]] && long='y'
+        [[ "$arg" == "-l" || "$arg" == "--long" || "$arg" =~ "-(-tree|T)" ]] && long='y'
     done
     if test -z "$long"
     then
