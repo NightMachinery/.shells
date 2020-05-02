@@ -5,6 +5,15 @@
 
 # python
 /.mypy_cache/
+__pycache__
+
+# node
+/node_modules/
+
+# cljs
+/js/development/
+/js/optimized/
+/goog/
 
 ## Emacs https://github.com/github/gitignore/blob/master/Global/Emacs.gitignore
 *~

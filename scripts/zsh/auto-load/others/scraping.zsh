@@ -465,7 +465,7 @@ function aamedia() {
     mdoc "$0 <page-url> ...
 Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
 
-    local urls=( $@ )
+    local urls=( ${(u@)@} )
 
     local formats=( ${audio_formats[@]} ${media_formats[@]} pdf )
     local regex='\.('"${(j.|.)formats}"')$'
@@ -474,7 +474,7 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
     do
         url="$(urlfinalg $url)"
         [[ "$url" =~ "$regex" ]] && ec $url || getlinks-c -e $regex "$url"
-    done | {
+    done | gsort -u | {
         if isDbg
         then
             color 150 0 255 "$(cat)"

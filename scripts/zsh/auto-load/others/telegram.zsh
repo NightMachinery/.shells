@@ -1,4 +1,13 @@
-function tsendf() { tsend "$1" '' -f "${@:2}" }
+alias tsmf='tsendf $me'
+###
+function tsendf() {
+    
+    local f
+    for f in "${@:2}"
+    do
+        tsend "$1" '' -f "$f"
+    done
+}
 air() { zargs -i ___ -- "$@" -- tsendf ___ "$(mpv-get)"}
 enve() {
     mdoc 'enve; The Enveloper ^_^
