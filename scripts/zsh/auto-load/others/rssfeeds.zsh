@@ -17,6 +17,13 @@ local conditions=( ${rt_c[@]} )
 local notel="${rt_notel}"
 local c
 local id="${rt_id:--1001293952668}"
+local url
+local urls=()
+for url in "$@"
+do
+	urls+="-u"
+	urls+="$url"
+done
 
 while :
 do
@@ -26,7 +33,8 @@ do
 # ' "$@"
     # python's rsstail sucks
 
-    rsstail -l -u "$1" -n 0 -N |& tee -a $log | while read -d $'\n' -r t; do
+    # https://github.com/flok99/rsstail
+    rsstail -i 15 -l -n 0 -N "${urls[@]}" |& tee -a $log | while read -d $'\n' -r t; do
     read -d $'\n' -r l
     t="$(<<<"$t" html2utf.py)"
     for c in $conditions[@]

@@ -540,4 +540,8 @@ function hi10-from-page() {
     hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
 }
-
+function libgendl-md5() {
+	local md5="$1"
+	local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
+	getlinks-c -e '\.[^/]+$' "$url" | inargsf aa -Z
+}
