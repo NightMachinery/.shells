@@ -392,11 +392,13 @@ function getlinksfull() {
     mdoc "$0 <link> [ options for rg ]
 Remember that you can customize full-html by fhMode." MAGIC
 
-	local u
-	u="$(uuidpy)"
-	full-html "$1" "$u"
-	getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
-	\rm "$u"
+    local url="$1"
+	  local u
+	  u="$(uuidpy)"
+	  full-html "$url" "$u"
+    test -e "$u" || { ecerr "${0}: Couldn't download $url" ; return 1 }
+	  getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
+	  \rm "$u"
 }
 noglobfn getlinksfull
 function lwseq() {
@@ -540,8 +542,25 @@ function hi10-from-page() {
     hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
 }
+function libgendl-md5-main() {
+	  local md5="$1"
+    local mainmirror="http://93.174.95.29"
+	# local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
+	local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
+	getlinks-c -e '\.[^/]+$' "$urls[@]"
+}
+function libgendl-md5-bok() {
+	  local md5="$1"
+    local url="https://b-ok.cc/md5/$md5"
+    getlinks-c -e '/book/' "$url" |gsort -u|inargsf re bok.js
+    # the below sometimes work and sometimes not ...
+    #|inargsf getlinks-c -e '/dl/'
+}
 function libgendl-md5() {
-	local md5="$1"
-	local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
-	getlinks-c -e '\.[^/]+$' "$url" | inargsf aa -Z
+    local bok="$(libgendl-md5-bok $1)"
+    if test -n "$bok" ; then
+        aa "$bok"
+    else
+        libgendl-md5-main "$1" |inargsf aa -Z
+    fi
 }
