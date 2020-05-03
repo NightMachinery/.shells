@@ -1,11 +1,16 @@
-#!/usr/bin/env node --unhandled-rejections=strict
+#!/usr/bin/env node
+//#!/usr/bin/env node --unhandled-rejections=strict
+
+console.log('w0')
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
-puppeteer.use(require('puppeteer-extra-plugin-repl')())
+// puppeteer.use(require('puppeteer-extra-plugin-repl')())
 
 // add stealth plugin and use defaults (all evasion techniques)
+console.log('w1')
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
+console.log('w2')
 
 function clickToDownload(page, elementHandle, downloadPath = '/tmp', resourceType = 'xhr', filename = '') {
 
