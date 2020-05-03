@@ -71,7 +71,8 @@ dir2k() {
     skipglob "re p2ko" $dir/*.pdf(N)
 }
 function jlibplain() {
-	serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
+	  re libgendl-md5 "${(f@)$(re libgen2md5 "$@")}"
+	# serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 }
 noglobfn jlibplain
 "jlib"() {

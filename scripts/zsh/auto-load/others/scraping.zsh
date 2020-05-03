@@ -552,7 +552,7 @@ function libgendl-md5-main() {
 function libgendl-md5-bok() {
 	  local md5="$1"
     local url="https://b-ok.cc/md5/$md5"
-    getlinks-c -e '/book/' "$url" |gsort -u|inargsf re bok.js
+    getlinks-c -e '/book/' "$url" |gsort -u|inargsf re "gtimeout 15m bok.js"
     # the below sometimes work and sometimes not ...
     #|inargsf getlinks-c -e '/dl/'
 }
