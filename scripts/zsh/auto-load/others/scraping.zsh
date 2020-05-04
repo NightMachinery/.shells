@@ -550,6 +550,8 @@ function libgendl-md5-main() {
 	getlinks-c -e '\.[^/]+$' "$urls[@]"
 }
 function libgendl-md5-bok() {
+    test -n "$AUTO_WHDEEP_MODE" && return 1
+    (( ${+commands[bok.js]} )) || { ecerr 'bok.js not found.' ; return 1 }
 	  local md5="$1"
     local url="https://b-ok.cc/md5/$md5"
     getlinks-c -e '/book/' "$url" |gsort -u|inargsf re "gtimeout 15m bok.js"
@@ -564,3 +566,5 @@ function libgendl-md5() {
         libgendl-md5-main "$1" |inargsf aa -Z
     fi
 }
+reify libgendl-md5-main libgendl-md5-bok libgendl-md5
+noglobfn libgendl-md5-main libgendl-md5-bok libgendl-md5

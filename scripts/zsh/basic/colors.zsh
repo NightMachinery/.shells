@@ -7,6 +7,7 @@ colorb() {
     co_f=colorbg color "$@"
 }
 color() {
+    true colorfg colorbg # whdeep hack, altly we can split on :- too
     local in inargs
     local noreset="$coNr"
     local nonewline="$coN"

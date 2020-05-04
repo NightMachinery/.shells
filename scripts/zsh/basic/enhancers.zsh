@@ -1,3 +1,9 @@
+function enh-savename() {
+    mdoc "$0 <name of original function> <its renamed version after enhancement>" MAGIC
+
+    typeset -A -g enhSavedNames
+    test -n "${enhSavedNames[$1]}" || enhSavedNames[$1]="$2"
+}
 function enh-mkdest() {
     doc enhances commands by creating directories for destination.
     local dest="${@: -1}"
@@ -33,19 +39,26 @@ noglobfn() {
 
 	(( ${+aliases[$1]} )) && unalias "$1"
 	{
-	functions[_noglob_$1]=$functions[$1]
-	alias "$1"="noglob _noglob_$1"
+      local realname="_noglob_$1"
+      enh-savename "$1" "$realname"
+	    functions[$realname]=$functions[$1]
+	    alias "$1"="\noglob $realname"
 	}
 	#unfunction "$1"
 	# if anyone uses the previous version they are probably not needing a noglob so let them be
 }
 function reify() {
 	doc "Makes a single argument function work for multiple args by redifining it and using run-on-each."
+
 	test -n "$functions[$1]" || { ecerr "Function '$1' is empty or doesn't exist." ; return 1 }
-	 [[ "$functions[$1]" =~ '^\s*run-on-each .*' ]] || {
-		functions[_reify_$1]=$functions[$1]
-	 	functions[$1]="re _reify_$1"' "$@"'
-	 }
+
+  local realname="_reify_$1"
+  local enhanced="run-on-each $realname"' "$@"'
+	[[ "$functions[$1]" =~ '\s*\Q'"$enhanced"'\E\s*' ]] || {
+      enh-savename "$1" "$realname"
+		  functions[$realname]=$functions[$1]
+	 	  functions[$1]="$enhanced"
+	}
 }
 reify reify
 reify noglobfn

@@ -61,12 +61,12 @@ alias c='command'
 alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
 alias px='ruu proxychains4'
 alias set-timezone='sudo dpkg-reconfigure tzdata'
-alias timer='noglob timer-raw'
+alias timer='\noglob timer-raw'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
-alias dlga="noglob deluge-console add"
+alias dlga="\noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
 alias sbi="sb ; source-interactive-all"
@@ -82,7 +82,7 @@ alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
 alias szsh='source "$NIGHTDIR"/zsh/load-others.zsh'
 alias reeb='run-on-each rename-ebook'
 alias set-volume='setv'
-alias aa='noglob aacookies'
+alias aa='\noglob aacookies'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'
 alias pop='pbpaste'
@@ -118,7 +118,7 @@ alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
 alias pxa='ALL_PROXY=socks5://127.0.0.1:1080'
 alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
-# alias cxc='noglob __calc_plugin'
+# alias cxc='\noglob __calc_plugin'
 alias retry='retry-limited 0'
 alias s=silent
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
@@ -127,11 +127,11 @@ alias ox='zdict -dt oxford'
 alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
-alias pi='noglob pip install -U'
+alias pi='\noglob pip install -U'
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias eta="etlas exec eta"
 alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
-alias pe="pkill -SIGUSR2 -i emacs"
+alias pe="pkill -SIGUSR2 -i emacs ; emacsclient -e '(setq debug-on-quit nil)'"
 alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
@@ -140,13 +140,13 @@ alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
-alias y="noglob youtube-dl --no-playlist --write-sub  --external-downloader aria2c"
+alias y="\noglob youtube-dl --no-playlist --write-sub  --external-downloader aria2c"
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
-alias tl='noglob tlrl-ng'
-alias tllw='noglob tl -e w2e-lw-raw'
-alias w2e='noglob w2e-raw'
-alias w2e-lw='noglob w2e-lw-raw'
+alias tl='\noglob tlrl-ng'
+alias tllw='\noglob tl -e w2e-lw-raw'
+alias w2e='\noglob w2e-raw'
+alias w2e-lw='\noglob w2e-lw-raw'
 alias dcali="h2ed='html2epub-calibre' "
 alias dpan="h2ed='html2epub-pandoc' "
 alias dpans="h2ed=html2epub-pandoc-simple"

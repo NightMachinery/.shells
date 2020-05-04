@@ -1,8 +1,4 @@
-wh() { which "$@" |btz }
 rtf2txt() { unrtf "$@" | html2text }
-mn() {
-    man "$@" || lesh "$@"
-}
 blc() {
     doc brew link custom
     mkdir -p ~/bin/
@@ -201,18 +197,6 @@ function display-off() {
 }
 function bii() {
     brew bundle --file=/dev/stdin <<<"brew \"$1\" ${@:2}"
-}
-function whh() {
-    local e i
-    e=( "()" "{" "}" '"$@"' ':' aliased to noglob run-on-each ruu proxychains4 'DEBUGME=d' ) 
-    i=( "${=$(which "$@")}" )
-    wh "${(@)i[2,-1]:|e}"
-}
-function cee() {
-    cat `which "$1"`
-}
-function ceer() {
-    geval "${@:2} $(which "$1")"
 }
 function 265to264() {
     ffmpeg -i "$1" -map 0 -c:s copy -c:v libx264 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x264.mkv"
