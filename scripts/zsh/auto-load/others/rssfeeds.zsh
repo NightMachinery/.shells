@@ -34,7 +34,7 @@ do
     # python's rsstail sucks
 
     # https://github.com/flok99/rsstail
-    rsstail -i 15 -l -n 0 -N "${urls[@]}" |& tee -a $log | while read -d $'\n' -r t; do
+    rsstail -i 15 -l -n 0 -N "${urls[@]}" 2>> $log | tee -a $log | while read -d $'\n' -r t; do
     read -d $'\n' -r l
     t="$(<<<"$t" html2utf.py)"
     for c in $conditions[@]
