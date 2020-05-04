@@ -57,11 +57,6 @@ function 2p2k() {
 	jglob
 ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 }
-"jfic"() {
-	jee
-	re "fanficfare --non-interactive" "$@"
-	sout re p2k *.epub
-}
 dir2k() {
 	local dir="${1:-.}/"
 	local p
@@ -69,19 +64,6 @@ dir2k() {
     skipglob "re pdf-crop-margins" "${(@)p}"
     skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
     skipglob "re p2ko" $dir/*.pdf(N)
-}
-function jlibplain() {
-	  re libgendl-md5 "${(f@)$(re libgen2md5 "$@")}"
-	# serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
-}
-noglobfn jlibplain
-"jlib"() {
-	jee
-	jlibplain "$@"
-	dir2k
-}
-libgen2md5() {
-	[[ "$1" =~ '(\w{32})\W*$' ]] && print -r -- "$match[1]"
 }
 p2k() {
     doc possibly send to kindle
