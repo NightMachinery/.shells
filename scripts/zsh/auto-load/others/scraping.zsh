@@ -573,7 +573,10 @@ function libgendl-md5-old() {
 }
 function libgendl-md5() {
     local md5="$1"
-    libgendl-md5-bok "$md5" || libgendl-md5-main "$md5" | inargsf aa -Z
+    { test -z "$lgNoBok" && libgendl-md5-bok "$md5" } || {
+        ecerr "bok failed. Trying main ..."
+        libgendl-md5-main "$md5" | inargsf aa -Z
+    }
 }
 reify libgendl-md5-main libgendl-md5-bok libgendl-md5-old libgendl-md5-bok-old libgendl-md5
 function jlibplain() {
