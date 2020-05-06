@@ -40,3 +40,4 @@ nest_asyncio
 git+https://github.com/NightMachinary/brish.git
 gensim
 https://github.com/jakubroztocil/httpie/archive/master.tar.gz
+rich
