@@ -62,7 +62,7 @@ chis() {
         ag "${@:-.}" |fz --no-sort --ansi | gsed 's#.*\(https*://\)#\1#')"
     ec "$links"
     ec "$links"|pbcopy
-    [[ "$o" == y ]] && { local i
+    [[ "${o:-y}" == y ]] && { local i
     for i in "${(@f)links}"
     do
         $open "$i"

@@ -92,7 +92,7 @@ mercury-html $1:q ./a.html $2:q"
           # File supplied
           aget "cat ${(q@)file} > a.html ; mercury-html $1:q ./a.html $2:q"
       } })"
-    wr_title="$(<<<"$merc" jqm -r .title)"
+    wr_title="$(<<<"$merc" jqm -r .title | tr '\n' ' ')"
     wr_author="$(<<<"$merc" jqm -r .author)"
     <<<"$merc" jq -e --raw-output 'if .content then [
     (if .title then '"$title"' else empty end),

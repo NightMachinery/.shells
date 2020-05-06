@@ -22,11 +22,12 @@ function deluna() {
     local timeout="${1:-150}"
     while oneinstance $0 $nonce
     do
-        (( $(getidle-darwin) >= $timeout || $(getlastunlock-darwin) <= 60 )) && {
+        (( $(getidle-darwin) >= $timeout || $(getlastunlock-darwin) <= 80 )) && {
             edPre=$'\n' ecdate "$(color 255 100 255 'Deluna committed homicide!')"
             lq " via deluna"
-            { isDbg && sleep 1 } || sleep 30
+            # { isDbg && sleep 1 } || sleep 30
         }
+        sleep 30 # to avoid cpu usage
     done
     ec deluna exited "(nonce: $nonce)"
 }

@@ -34,19 +34,28 @@ isNotExpensive || {
     # PS1="$(strip "$PS1" ' +') "
     addToPATH ~/anaconda/bin/
     addToPATH ~/miniconda3/bin/
-    export MONO_GAC_PREFIX="/usr/local"
-    export ELM_HOME="/usr/local/bin/"
-    export LDFLAGS=-L/usr/local/opt/texinfo/lib
     isDarwin && {
+        export MONO_GAC_PREFIX="/usr/local"
+        export ELM_HOME="/usr/local/bin/"
+
         export JAVA_HOME8="`/usr/libexec/java_home --version 1.8`"
         export JAVA_HOME9="`/usr/libexec/java_home --version 9`"
         export JAVA_HOME=$JAVA_HOME8
         addToPATH $JAVA_HOME
+
+        addToPATH /usr/local/opt/qt/bin
+
+        export LDFLAGS='-L/usr/local/opt/texinfo/lib -L/usr/local/opt/qt/lib'
+        export CPPFLAGS="-I/usr/local/opt/qt/include"
+
+        # needed by pdf-tools of emacs
+        export PKG_CONFIG_PATH="/usr/local/opt/qt/lib/pkgconfig:/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
+
+
     }
     export BOOT_CLOJURE_VERSION='1.9.0'
 
-    # needed by pdf-tools of emacs
-    export PKG_CONFIG_PATH="/usr/local/opt/zlib/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig"
+
 
     addToPATH "/usr/local/opt/curl/bin"
     export HH_CONFIG=hicolor

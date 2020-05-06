@@ -142,7 +142,6 @@ function mp3-to-mp4() (
     ffmpeg -loop 1 -i "$2" -i "$1" -pix_fmt yuv420p -c:v libx264 -crf 16  -c:a libfdk_aac -vbr 5 -preset veryslow -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2:x=0:y=0:color=black" -shortest "${3:-$D/${B%.*}}.mp4"
     # -c:a copy -r 1
 )
-function sleepnow() ( sleep "${1:-7}"; pmset sleepnow )
 function rm-alpha() {
     local B=$(basename "$1"); local D=$(dirname "$1");
     convert "$1" -background "$2" -alpha remove "$D/${B%.*}_$2.png"
