@@ -27,7 +27,10 @@ r=re.search('href="(/dl/[^"]*)"', bookpage_content)
 #dlurl = f"https://b-ok.cc{r.group(1)}"
 dlurl = parts.scheme + '://' + parts.netloc + r.group(1)
 res = s.get(dlurl, allow_redirects=True)
-filename = get_filename_from_cd(res.headers.get('content-disposition'))
+filename = get_filename_from_cd(res.headers.get('content-disposition'), default=None)
+if not filename:
+    # quota finished
+    exit(1)
 open(filename, 'wb').write(res.content)
 print(filename)
 exit(0)
