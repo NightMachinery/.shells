@@ -1,12 +1,14 @@
 diraction-personal-config (){
 	# TODO create missing (submitted issue)
     diraction-batch-create --create-missing-dir <<< "
-        cel $cellar
-        vdl  $HOME/Downloads/video
-        dl  $HOME/Downloads
-        tmp  $HOME/tmp
-	jtmp $HOME/julia_tmp
-	ktmp $HOME/tmp-kindle
+    vdl  $HOME/Downloads/video
+    dl  $HOME/Downloads
+    tmp  $HOME/tmp
+	  jtmp $HOME/julia_tmp
+	  ktmp $HOME/tmp-kindle
+    cel $cellar
+    nt $HOME/cellar/notes/
+    jrl $HOME/cellar/notes/journal
 "
 }
 antibody bundle "adrieankhisbe/diractions"
