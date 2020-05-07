@@ -33,3 +33,9 @@ function mpv-noidle() {
             }
     done
 }
+function yta() {
+    mdoc "$0 <str> ...
+Searches Youtube and plays the result as audio." MAGIC
+
+    mpv --ytdl-format=bestaudio ytdl://ytsearch:"$*"
+}

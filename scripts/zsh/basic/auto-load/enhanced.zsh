@@ -6,7 +6,7 @@ mv () {
     local out
     args-nochromefile "$@"
     set -- "${out[@]}"
-    if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+    if [ "$#" -ne 1 ] || [ ! -e "$1" ]; then
         _mv "$@"
     else
         local newfilename="$1"
