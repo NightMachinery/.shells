@@ -29,3 +29,4 @@ alias tsm='tsend $me'
 alias kipy="pbcopy 'import os; os.kill(os.getpid(), 9)' #kill from within ipython embed"
 alias ta='tmux a -t'
 alias agsf='ags -F'
+alias rr=rgm
