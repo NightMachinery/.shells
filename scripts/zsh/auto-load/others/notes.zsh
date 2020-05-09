@@ -46,5 +46,5 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
     jglob
 
     local file="$1" desc="$2"
-    print -nr -- "![$desc](data:image/${file:e};base64,$(base64 -i "$file"))"
+    print -nr -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 -i "$file"))"
 }

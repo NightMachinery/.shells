@@ -1,8 +1,8 @@
 diraction-personal-config (){
-	# TODO create missing (submitted issue)
+    #     tdl  $HOME/Downloads/Telegram\\ Desktop
     diraction-batch-create --create-missing-dir <<< "
-    vdl  $HOME/Downloads/video
     dl  $HOME/Downloads
+    vdl  $HOME/Downloads/video
     tmp  $HOME/tmp
 	  jtmp $HOME/julia_tmp
 	  ktmp $HOME/tmp-kindle
