@@ -44,7 +44,7 @@ do
     ec "$t
     $l
     "
-    test -n "$notel" || ensurerun "150s" tsend -- "${id}" "$t
+    test -n "$notel" || ensurerun "150s" tsend --link-preview -- "${id}" "$t
 $l
 
 gensim: $(sumgensim "$l")"
