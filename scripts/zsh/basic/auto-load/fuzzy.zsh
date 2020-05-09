@@ -1,5 +1,5 @@
 ## Vars
-FZF_SIMPLE_PREVIEW='<<<{} command fold -s -w $FZF_PREVIEW_COLUMNS'
+FZF_SIMPLE_PREVIEW='printf -- {} | command fold -s -w $FZF_PREVIEW_COLUMNS' # << was bad for dash, no <<< in dash
 ## Functions
 fz() {
     local opts
@@ -11,5 +11,5 @@ fz() {
 }
 fzf-noempty() {
     local in="$(</dev/stdin)"
-    test -z "$in" && (exit 130) || { ec "$in" | fzf "$@" }
+    test -z "$in" && (exit 130) || { ec "$in" | SHELL="$(rp dash)" fzf "$@" }
 }

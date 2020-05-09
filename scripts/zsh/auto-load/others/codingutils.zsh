@@ -23,7 +23,9 @@ whichm() {
     for item in "$out[@]"
     do
         output="${aliases[$item]}" ; test -n "$output" && {
-            ec "alias $item=$(gq "$output")"
+            output="$(gq "$output")"
+            ec "alias $item=$output"
+            whichm "$output"
             continue
         }
         output="$(which -- "$item")" && ! [[ "$output" =~ '^\s*\w+: suffix aliased to' ]] && {
