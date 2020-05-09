@@ -91,7 +91,7 @@ v() {
     files=(${(0@)"$(gstat  --printf='%040.18Y:%n\0' "$files[@]" | gsort -rz | gcut -z -d':' -f2-)"}) #Don't quote this there is always a final empty element
     files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$*")"} ) || return 1
     local ve="$ve"
-    test -z "$ve" && ! isSSH && ve=nvim
-    "${ve:-vim}" -p "${(@)files}"
+    reval "${veditor:-vim}" -p "${(@)files}"
     doc '-o opens in split view, -p in tabs. Use gt, gT, <num>gt to navigate tabs.'
 }
+function vni() { fr "${veditor}" . $NIGHTDIR }

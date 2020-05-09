@@ -1,14 +1,10 @@
 ddgr
 exa
-fzy
 googler
 jq
 mosh
 mpv
-ncdu
-npm
 ranger
-rsstail
 sox
 redis
 htop
@@ -18,3 +14,5 @@ mutt
 calibre
 mutt
 xml2
+w3m
+lynx

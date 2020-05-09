@@ -2,6 +2,7 @@
 alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
 alias grm='git rm --cached'
 ###
+ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u }
 guc() {
     mdoc "$0 [<how-many>=1]
 Undoes last commits without changing files." MAGIC

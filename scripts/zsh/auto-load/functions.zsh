@@ -125,7 +125,10 @@ function rloop_vid() (
 )
 
 function trr() (
-    peerflix "$@" --path "${PEERFLIX_DIR:-$HOME/Downloads/Video}" --mpv -- --fullscreen
+    mkdir -p "${PEERFLIX_DIR:=$HOME/Downloads/video}"
+    local opts=()
+    isSSH || opts=( --mpv -- --fullscreen )
+    peerflix "$@" --path "${PEERFLIX_DIR}" --no-quit "$opts[@]"
 )
 function ot-mp3() (
     B=$(basename "$1"); D=$(dirname "$1");

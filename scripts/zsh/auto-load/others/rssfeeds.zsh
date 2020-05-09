@@ -1,5 +1,8 @@
 sumgensim() {
-    text="$(wread "$1" text)" word_count="${2:-150}" serr python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
+	# text="$(wread "$1" text)"
+	# lynx -dump -nolist
+	# elinks can be used for this too, as it also has a -dump option (and has -no-references to omit the list of links)
+     text="$(w3m -dump "$1")" word_count="${2:-150}" serr python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
 }
 sumym () {
     # https://pypi.org/project/sumy/
