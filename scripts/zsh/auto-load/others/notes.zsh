@@ -1,6 +1,8 @@
 export nightNotes="$cellar/notes/"
 export nightJournal="$nightNotes/journal"
-##
+###
+alias imd='img2md-imgur'
+###
 function vn() {
     rn "$@" || return 1
     reval "${veditor}" -p "$outFiles[@]"
@@ -50,6 +52,19 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
     convert $file -define jpeg:extent=150kb $compressed # 200kb didn't work
     file=$compressed
     doc use base64 from brew to ensure consistency
+    ## python base64 (might work in eva):
+    # encoded_string= base64.b64encode(img_file.read())
+    # print(encoded_string.decode('utf-8'))
+    
     # somehow breaks in eva_aget ...
-    print -nr -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 "$file" | tr -d '\r\n'))"
+    print -r -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 "$file" | tr -d '\r\n'))"
+}
+function img2md-imgur() {
+    mdoc "$0 <picture-file> [<description>]
+Outputs the image in markdown format, hosted on imgur." MAGIC
+
+    jglob
+    local file="$1" desc="$2" 
+
+    print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
 }
