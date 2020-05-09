@@ -49,7 +49,7 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
     local compressed="$(gmktemp --suffix .jpg)" # ".${file:e}"
     convert $file -define jpeg:extent=150kb $compressed # 200kb didn't work
     file=$compressed
-    doc needs base64 from brew
+    doc use base64 from brew to ensure consistency
     # somehow breaks in eva_aget ...
-    print -nr -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 --encode "$file"))"
+    print -nr -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 "$file" | tr -d '\r\n'))"
 }
