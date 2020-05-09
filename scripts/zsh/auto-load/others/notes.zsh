@@ -1,4 +1,7 @@
-function jt() {
+function rn() {
+    local files=()
+}
+function jrlt() {
 	local today="$(date +"%Y.%b.%d") $(datej|tr / -)"
 	local dest="$today.md"
 	test -e "$dest" || {
