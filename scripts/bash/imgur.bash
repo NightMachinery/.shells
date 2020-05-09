@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Forked from:
 # Imgur script by Bart Nagel <bart@tremby.net>
 # Improvements by Tino Sino <robottinosino@gmail.com>
 # Version 6 or more
@@ -107,10 +108,10 @@ elif [ $DISPLAY ]; then
 	elif type xclip &>/dev/null; then
 		echo -n "$clip" | xclip
 	else
-		echo "Haven't copied to the clipboard: no xsel or xclip" >&2
+		# echo "Haven't copied to the clipboard: no xsel or xclip" >&2
 	fi
 else
-	echo "Haven't copied to the clipboard: no \$DISPLAY or pbcopy" >&2
+	# echo "Haven't copied to the clipboard: no \$DISPLAY or pbcopy" >&2
 fi
 
 if $errors; then
