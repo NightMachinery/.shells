@@ -45,6 +45,9 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
 
     jglob
 
-    local file="$1" desc="$2"
+    local file="$1" desc="$2" 
+    local compressed="$(mktemp --suffix "${file:e}")"
+    convert $file -define jpeg:extent=64kb $compressed
+    file=$compressed
     print -nr -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 -i "$file"))"
 }
