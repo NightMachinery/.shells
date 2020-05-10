@@ -182,6 +182,7 @@ gh-to-readme() {
 gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 url-final() {
     curlm -o /dev/null -w %{url_effective} "$@" #|| ec "$@" # curl prints urls even if it fails ...
+    ec # to output newline
 }
 url-final2() {
 	doc "This one doesn't download stuff."
