@@ -18,6 +18,6 @@ unset __conda_setup
 # <<< conda initialize <<<
 
 
-source /Users/evar/Library/Preferences/org.dystroy.broot/launcher/bash/br
+# source /Users/evar/Library/Preferences/org.dystroy.broot/launcher/bash/br
 
-export PATH="$HOME/.poetry/bin:$PATH"
+# export PATH="$HOME/.poetry/bin:$PATH"

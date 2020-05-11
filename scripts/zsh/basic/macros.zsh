@@ -1,21 +1,36 @@
 alias -g ppp=' | inargsf '
 # alias -g MAGIC='| { eval "$(read -d "" -r -E)" }'
 alias -g MAGIC='| { eval "$(< /dev/stdin)" }'
+function magic_h() {
+    : 'Usage: magic ... ; mret'
+    : 'Does not access stdin, which makes it less buggy. E.g., "arger 1 2 3|fz |stdinmagic" hangs. https://unix.stackexchange.com/questions/585941/zsh-weird-behavior-bug-in-reading-stdin '
+
+    eval "$(reval "$@")"
+}
+alias magic='local magic_ret="" ; magic_h '
+alias mret0='magic_ret=0 ; return 0'
+alias mret='test -z "$magic_ret" || return "$magic_ret"'
+###
 mdoc_col=(0 35 255)
 function color() {
     : 'This is a placeholder for the real color function.'
-    cat
+    ec "COLOR_REP (YOU SHOULDN'T SEE THIS): $@"
 }
 function m_doc() {
     : 'Usage: m_doc <original-args> <name-of-script> <text-to-prepend-to-help> <help> ...
 Just use the alias `mdoc`.'
+
     print -r -- "! { [[ ${(q+)1} == '-h' ]] || [[ ${(q+)1} == '--help' ]] } || {
-        print -r -- ${(q+)3}${(q+@)@[4,-1]}|color ${mdoc_col[@]:-blue} ; return 0 }"
+        color ${mdoc_col[@]:-blue} ${(q+)3}${(q+@)@[4,-1]} ; mret0 }"
 }
 alias mdoc='m_doc "$*" "$0" ""'
 alias mdocu='m_doc "$*" "$0" "Usage: $0 "'
 
 mdoc-test() {
     mdoc Usage: Just do not \;\) MAGIC
+    ec no
+}
+mdoc-test2() {
+    magic mdoc Usage: Just do not \;\) ; mret
     ec no
 }
