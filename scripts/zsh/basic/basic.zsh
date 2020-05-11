@@ -3,6 +3,7 @@ autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
 ## Aliases
 alias ec='print -r --'
+alias ecn='print -rn --'
 ## Global Aliases
 ## Vars
 zshword='[a-zA-Z0-9!_-]' #unused, I opted for simpler solutions

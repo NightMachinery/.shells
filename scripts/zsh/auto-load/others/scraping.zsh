@@ -513,7 +513,7 @@ function urlmeta() {
 gets the requested metadata." MAGIC
 
     local url="$1"
-    local html="$(gurl $url)" f="$(mktemp)"
+    local html="$(eval-memoi gurl $url)" f="$(mktemp)"
     ec $html > $f # big env vars cause arg list too long
     htmlf=$f req="${2:-title}" python3 -W ignore -c "
 import metadata_parser, os, sys
@@ -521,7 +521,7 @@ page = metadata_parser.MetadataParser(html=open(os.environ['htmlf'], 'r').read()
 if os.environ.get('DEBUGME',''):
    print(page.metadata, file=sys.stderr)
    # from IPython import embed; embed()
-print(page.get_metadata(os.environ['req']))
+print(page.get_metadata(os.environ['req']) or '')
 "
     \rm -f $f
 }

@@ -68,3 +68,15 @@ Outputs the image in markdown format, hosted on imgur." MAGIC
 
     print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
 }
+function url2note() {
+    local url="$1"
+    local title="$(urlmeta $url title)"
+    local desc="$(urlmeta $url description)"
+    local img="$(urlmeta $url image)"
+
+    ec "* [${title:-$url}]($url)"
+    test -z "$desc" || ec "  * $desc"
+    test -z "$title" || ec "  * $url"
+    test -z "$img" || ec "![]($img)"
+
+}
