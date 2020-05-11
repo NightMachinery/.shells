@@ -533,9 +533,15 @@ function hi10-multilink() {
     if isDbg
     then
         arger "${(@u)pArgs}"
-    else
-        mapg '$i$(hi10-jtoken)' "${(@u)pArgs}" | inargsf aa -j1 -Z # (u) makes the array elements unique.
     fi
+    doc use fz for filtering and ordering
+    arrN "${(@u)pArgs}" | fz | tee "hi10-links.txt" | hi10-dl # (u) makes the array elements unique.
+}
+function hi10-dl() {
+    mdoc "$0 < links.txt
+Generates jtokens for links and downloads them." MAGIC
+
+    inargsf mapg '$i$(hi10-jtoken)' | inargsf rgeval aa -j2 -Z
 }
 function hi10-from-page() {
     mdoc "DEPRECATED. Use hi10-ng" MAGIC

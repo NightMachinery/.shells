@@ -1,4 +1,9 @@
-alias seval='ge_ecdbg=y geval'
+###
+alias seval='ge_ecdbg=y geval' #silent debuggable eval
+alias eval-good='geval'
+alias eval-quoted='reval'
+alias greval=rgeval
+###
 function geval() {
     local cmd="$@"
     test -z "$ge_ecdbg" && {
@@ -31,6 +36,9 @@ function reval() {
     # ecdbg revaling "$(gq "$@")"
     # Don't put stuff here, reval is used in ecdbg itself!
     eval "$(gq "$@")"
+}
+function rgeval() {
+    geval "$(gq "$@")"
 }
 function psource()
 {
