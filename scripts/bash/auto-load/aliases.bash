@@ -117,7 +117,6 @@ alias erase-nonprintables='tr -cd "[:print:]\n"'
 alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
 alias pxa='ALL_PROXY=socks5://127.0.0.1:1080'
-alias aac='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 # alias cxc='\noglob __calc_plugin'
 alias retry='retry-limited 0'
 alias s=silent
@@ -140,7 +139,9 @@ alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
-alias y="\noglob youtube-dl --no-playlist --write-sub  --external-downloader aria2c"
+alias ybase="\noglob youtube-dl --no-playlist --write-sub --prefer-ffmpeg"
+alias y="ybase --external-downloader aria2c  --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'"
+alias yarc='y --download-archive ~/.yarchive'
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
 alias tl='\noglob tlrl-ng'

@@ -1,5 +1,5 @@
 ## Vars
-FZF_SIMPLE_PREVIEW='printf -- {} | command fold -s -w $FZF_PREVIEW_COLUMNS' # << was bad for dash, no <<< in dash
+FZF_SIMPLE_PREVIEW='printf -- "%s " {} | command fold -s -w $FZF_PREVIEW_COLUMNS' # << was bad for dash, no <<< in dash
 ## Functions
 fz() {
     local opts

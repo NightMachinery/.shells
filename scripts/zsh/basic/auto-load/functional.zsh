@@ -55,14 +55,19 @@ fnrep() {
     # functions[$restore]='return 1'
     local origbody
     origbody=$functions[$fn] || $origbody=''
-    trap false INT TERM
-    functions[$fn]=$body
-    reval "${cmd[@]}"
-    local e=$?
-    # ec Trying to restore after command execution ...
-    # geval "$restore"
-    test -n "$origbody" && functions[$fn]="$origbody" || unfunction $fn
-    trap - INT TERM
+
+    local e=1
+    {
+        # trap false INT TERM
+        functions[$fn]=$body
+        reval "${cmd[@]}"
+        e=$?
+    } always {
+        # ec Trying to restore after command execution ...
+        # geval "$restore"
+        test -n "$origbody" && functions[$fn]="$origbody" || unfunction $fn
+        # trap - INT TERM
+    }
     return $e
 }
 fnswap() {
@@ -70,4 +75,8 @@ fnswap() {
 }
 fnrepvc() {
     fnrep git "vcsh $1"' "$@"' "${@[2,-1]}"
+}
+labeled() {
+    #  zip enumerate
+    ec "${@[2,-1]}: $(reval "$@")"
 }

@@ -2,14 +2,16 @@ export nightNotes="$cellar/notes/"
 export nightJournal="$nightNotes/journal"
 ###
 alias imd='img2md-imgur'
+alias unt='url2note'
+alias nts='ntsearch'
 ###
-function vn() {
-    rn "$@" || return 1
+function vnt() {
+    ntsearch "$@" || return 1
     reval "${veditor}" -p "$outFiles[@]"
 }
-function rn() {
+function ntsearch() {
     out=''
-    out=( "${(@0)$(rn_ "$@")}" ) || return 1
+    out=( "${(@0)$(ntsearch_ "$@")}" ) || return 1
     out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
     outFiles=()
     local i
@@ -19,9 +21,9 @@ function rn() {
     done
     ec "$out[@]"
 }
-function rn_() {
+function ntsearch_() {
     local pattern="$*"
-    local file files=( "${(@f)$(fd -e md ${pattern:-.} $nightNotes)}" )
+    local file files=( "${(@f)$(fd -e md -e txt -e org ${pattern:-.} $nightNotes)}" )
     local first='y'
     for file in "$files[@]"
     do

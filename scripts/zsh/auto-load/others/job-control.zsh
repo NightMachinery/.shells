@@ -55,8 +55,10 @@ oneinstance() {
     (( $nonce == $(redis-cli --raw get $someNonce) ))
 }
 
-_loop_trap() { ec '
-loop interrupted' ; sig2=666 }
+_loop_trap() {
+    ec '
+loop interrupted' ; sig2=666
+}
 loop-startover() { edPre=$'\n' ecdate "Starting over${@:2}" | socat -u - unix-connect:${1} }
 alias loops='loop-startover' #Oops :D
 inbg() {

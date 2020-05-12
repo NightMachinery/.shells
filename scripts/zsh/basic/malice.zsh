@@ -11,7 +11,7 @@ function expand-alias {
 function force-expand {
     local e="$(expand-aliases "$1")"
     test -z "$e" && e="$1"
-    echo "$e"
+    ec "$e"
 }
 isMalice() { ! isSSH && [[ -z "$disable_malice" ]] }
 isNotMalice() { ! isMalice }

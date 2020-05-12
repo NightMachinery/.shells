@@ -23,15 +23,19 @@ function nulterm() {
     reval "$@"
     ec $'\0'
 }
+function expand-alias-strip() {
+    local a="$(force-expand "$1")"
+    comment @lilbug strip-left
+    a="$(strip "$a" '\\?noglob ')"
+    a="$(strip "$a" '\\?nocorrect ')"
+    a="$(strip "$a" 'ruu "" ')"
+    ec "$a"
+}
 function ruu() {
     doc helper function to expand aliases for commands like sudo, nohup, etc
     local f=()
     [[ "$1" =~ '^\s*$' ]] || f+="${=1}"
-    local a="$(force-expand "$2")"
-    comment @lilbug strip-left
-    a="$(strip "$a" 'noglob ')"
-    a="$(strip "$a" 'nocorrect ')"
-    a="$(strip "$a" 'ruu "" ')"
+    local a="$(expand-alias-strip "$2")"
     seval "$f[@]" "$=a" "$(gquote "${@:3}")"
 }
 noglobfn() {

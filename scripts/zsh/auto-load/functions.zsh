@@ -232,24 +232,6 @@ function ncp() {
     cat | gnc -c localhost 2000
 }
 it2prof() { echo -e "\033]50;SetProfile=$1\a" ; } # Change iterm2 profile. Usage it2prof ProfileName (case sensitive)
-function aas() {
-    # aa "$@" --on-download-start aa-stream
-    local out="$(md5 <<<"$1")"
-    aa "$@" --dir "$out" --on-download-complete aa-stream &
-    retry-mpv "'$out'/*" || kill %
-}
-function y-stream() {
-    y -f best  -o "%(title)s.%(ext)s" "$@" &
-    local out=$(yic -f best --get-filename -o "%(title)s.%(ext)s" "$@")
-    #We need to use yic or archived videos return nothing causing mpv to play * :D
-    test -n "$out" && retry-mpv "${out:q}*" || ecerr Could not get video\'s name. Aborting.
-    #mpv bug here
-    # kill $!
-    # kill $! is your friend :))
-}
-function retry-mpv() {
-    retry-eval "mpv --quiet $@ |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
-}
 function set-fk-icon-size() {
     /usr/libexec/PlistBuddy -c "set FK_DefaultIconViewSettings:iconSize ${1:-128}" ~/Library/Preferences/com.apple.finder.plist # This is for Finderkit, i.e., dialogs.
 }

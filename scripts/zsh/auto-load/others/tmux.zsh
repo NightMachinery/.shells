@@ -4,6 +4,9 @@ tmuxnew() {
 	tmux new -d -s "$@"
 }
 tmuxnewsh() { evaldbg tmuxnew "$1" "$(gq zsh -c "${tmuxnewshenv[*]} $(gq ${@[2,-1]})")" }
+tmuxzombie() {
+    tmux list-panes  -s -F '#{pane_pid}' -t "$1" | inargsf serr kill
+}
 ivy() {
     export DISABLE_DEFER=y
     tmux new-session -d 'zsh'

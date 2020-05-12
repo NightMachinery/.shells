@@ -39,3 +39,26 @@ function rename-numbered() {
                  c=$(($c + 1))
              }
 }
+function filesize() {
+    magic mdocu '<file>
+returns size in bytes.' ; mret
+
+    local FILENAME="$1"
+    test -e "$FILENAME" || { ecerr "File i$FILENAME doesn't exist." ; return 1 }
+
+    local SIZE="$(gdu -sb $FILENAME | awk '{ print $1 }')"
+    ec $SIZE
+}
+function filesizereal() {
+    local file="$1"
+    test -e "$file" || { ecerr "File $file doesn't exist." ; return 1 }
+    local zerobytes
+    # zerobytes=$(( $( ggrep -aPo '\0*$' $file | wc -c ) - 1 ))
+    zerobytes="${$(trailingzeroes.rs $file)}"
+    ec $(( ${$(filesize $file):-0} - $zerobytes )) 
+}
+function check-for-partial-files() {
+    local dir="${1:-.}"
+    pushf $dir
+    { lm | serr inargsf re 'labeled trailingzeroes.rs' } always { popf }
+}

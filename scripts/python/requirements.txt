@@ -42,3 +42,5 @@ gensim
 https://github.com/jakubroztocil/httpie/archive/master.tar.gz
 rich
 metadata_parser
+pypyp
+piep
