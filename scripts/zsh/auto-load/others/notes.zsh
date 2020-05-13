@@ -2,7 +2,6 @@ export nightNotes="$cellar/notes/"
 export nightJournal="$nightNotes/journal"
 ###
 alias imd='img2md-imgur'
-alias unt='url2note'
 alias nts='ntsearch'
 ###
 function vnt() {
@@ -82,3 +81,13 @@ function url2note() {
     test -z "$img" || ec "![]($img)"
 
 }
+reify url2note
+noglobfn url2note
+function unt() {
+    local note="$(url2note "$@")"
+    ec $note
+    if isI ; then
+        pbcopy $note
+    fi
+}
+noglobfn unt

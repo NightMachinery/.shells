@@ -25,7 +25,10 @@ whichm() {
         output="${aliases[$item]}" ; test -n "$output" && {
             output="$(gq "$output")"
             ec "alias $item=$output"
-            whichm "$output"
+            local is=("$output")
+            is+=( ${$(fnswap expand-aliases expand-alias expand-alias-strip "$item")[1]} )
+            local e=( $item )
+            whichm "${(u@)is:|e}"
             continue
         }
         output="$(which -- "$item")" && ! [[ "$output" =~ '^\s*\w+: suffix aliased to' ]] && {
@@ -35,7 +38,11 @@ whichm() {
                         whdeep_gen_binaries+="$output"
                         continue
                     }
-                    output="# $output"
+                    # output="# $output"
+                    output=""
+                    for binary in "${(@f)$(where $item)}" ; do
+                        output+="# $(ll $binary)"$'\n'
+                    done
                 }
                 ec $output
             }
