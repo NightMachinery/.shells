@@ -44,3 +44,4 @@ rich
 metadata_parser
 pypyp
 piep
+metadata-parser
