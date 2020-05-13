@@ -1,4 +1,6 @@
 #!/usr/bin/env zsh
+rustup component add rust-src
+###
 #cargo install --git https://github.com/nightmachinary/tlrl
 cargo install scriptisto
 cargo install cargo-play
