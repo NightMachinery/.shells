@@ -3,6 +3,7 @@
 alias tlc='tlrl-code'
 alias tlg='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
+alias wread-c='fhMode=curl wr_force=y wread'
 ###
 function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"

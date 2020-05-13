@@ -1,6 +1,7 @@
 diraction-personal-config (){
     #     tdl  $HOME/Downloads/Telegram\\ Desktop
     diraction-batch-create --create-missing-dir <<< "
+    base $HOME/Base
     dl  $HOME/Downloads
     vdl  $HOME/Downloads/video
     tmp  $HOME/tmp

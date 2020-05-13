@@ -13,52 +13,59 @@ rss-ctitle() {
     ggrep -P --silent "$rc_t" <<< "$2"
 }
 rss-tsend() {
-mkdir -p ~/logs/
-local log=~/logs/rss-tsend.log
-local engine=("${rt_e[@]:-tl}")
-local conditions=( ${rt_c[@]} )
-local notel="${rt_notel}"
-local c
-local id="${rt_id:--1001293952668}"
-local url
-local urls=()
-for url in "$@"
-do
-	urls+="-u"
-	urls+="$url"
-done
-
-while :
-do
-    # Use git+https://github.com/s0hv/rsstail.py .
-    # python -m rsstail -n 0 --striphtml --nofail --interval $((60*15)) --format '{title}
-# {link}
-# ' "$@"
-    # python's rsstail sucks
-
-    # https://github.com/flok99/rsstail
-    rsstail -i 15 -l -n 0 -N "${urls[@]}" 2>> $log | tee -a $log | while read -d $'\n' -r t; do
-    read -d $'\n' -r l
-    t="$(<<<"$t" html2utf.py)"
-    for c in $conditions[@]
+    redis-ensure || return 1
+    mkdir -p ~/logs/
+    local log=~/logs/rss-tsend.log
+    local engine=("${rt_e[@]:-tl}")
+    local conditions=( ${rt_c[@]} )
+    local notel="${rt_notel}"
+    local c
+    local id="${rt_id:--1001293952668}"
+    local url
+    local urls=()
+    for url in "$@"
     do
-        reval "$c" "$l" "$t" || continue 2
+    urls+="-u"
+    urls+="$url"
     done
-    ec "$t
+
+    while :
+    do
+        # Use git+https://github.com/s0hv/rsstail.py .
+        # python -m rsstail -n 0 --striphtml --nofail --interval $((60*15)) --format '{title}
+    # {link}
+    # ' "$@"
+        # python's rsstail sucks
+
+        # https://github.com/flok99/rsstail
+        rsstail -i 15 -l -n 0 -N "${urls[@]}" 2>> $log | tee -a $log | while read -d $'\n' -r t; do
+        read -d $'\n' -r l
+
+        ! (( redism SISMEMBER "$l" )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
+        
+        t="$(<<<"$t" html2utf.py)"
+        for c in $conditions[@]
+        do
+            reval "$c" "$l" "$t" || continue 2
+        done
+        ec "$t
+        $l
+        "
+
+        redism SADD rssurls "$l"
+
+        test -n "$notel" || ensurerun "150s" tsend --link-preview -- "${id}" "$t
     $l
-    "
-    test -n "$notel" || ensurerun "150s" tsend --link-preview -- "${id}" "$t
-$l
 
-gensim: $(sumgensim "$l")"
+    gensim: $(sumgensim "$l")"
 
-# Lex-rank: $(sumym "$l")"
+    # Lex-rank: $(sumym "$l")"
 
-# kl: $(sumym "$l" kl)"
-    sleep 120 #because wuxia sometimes sends unupdated pages
-    reval "$engine[@]" "$l" "$t"
-done
-echo restarting "$0 $@" | tee -a $log
-sleep 1 # allows us to terminate the program
-done
+    # kl: $(sumym "$l" kl)"
+        sleep 120 #because wuxia sometimes sends unupdated pages
+        reval "$engine[@]" "$l" "$t"
+    done
+    echo restarting "$0 $@" | tee -a $log
+    sleep 1 # allows us to terminate the program
+    done
 }
