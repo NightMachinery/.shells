@@ -1,5 +1,5 @@
 export nightNotes="$cellar/notes/"
-export nightJournal="$nightNotes/journal"
+export nightJournal="$nightNotes/journal/j0/"
 ###
 alias imd='img2md-imgur'
 alias nts='ntsearch'
