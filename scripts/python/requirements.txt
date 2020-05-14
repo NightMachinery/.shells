@@ -45,3 +45,4 @@ metadata_parser
 pypyp
 piep
 metadata-parser
+iredis

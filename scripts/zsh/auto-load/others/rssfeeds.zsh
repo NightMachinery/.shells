@@ -13,7 +13,7 @@ rss-ctitle() {
     ggrep -P --silent "$rc_t" <<< "$2"
 }
 rss-tsend() {
-    redis-ensure || return 1
+    ensure-redis || return 1
     mkdir -p ~/logs/
     local log=~/logs/rss-tsend.log
     local engine=("${rt_e[@]:-tl}")
@@ -23,6 +23,7 @@ rss-tsend() {
     local id="${rt_id:--1001293952668}"
     local url
     local urls=()
+    local rssurls="rssurls $*"
     for url in "$@"
     do
     urls+="-u"
@@ -41,18 +42,16 @@ rss-tsend() {
         rsstail -i 15 -l -n 0 -N "${urls[@]}" 2>> $log | tee -a $log | while read -d $'\n' -r t; do
         read -d $'\n' -r l
 
-        ! (( redism SISMEMBER "$l" )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
+	! (( $(redism SISMEMBER $rssurls "$l") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
         
         t="$(<<<"$t" html2utf.py)"
         for c in $conditions[@]
         do
             reval "$c" "$l" "$t" || continue 2
         done
-        ec "$t
-        $l
-        "
+        ec "$t"
 
-        redism SADD rssurls "$l"
+        labeled redism SADD $rssurls "$l"
 
         test -n "$notel" || ensurerun "150s" tsend --link-preview -- "${id}" "$t
     $l
