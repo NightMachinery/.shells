@@ -22,6 +22,11 @@ whichm() {
     local item output
     for item in "$out[@]"
     do
+        (( ${+builtins[$item]} )) && {
+            ec "## $(which $item)"
+            continue
+        }
+
         output="${aliases[$item]}" ; test -n "$output" && {
             output="$(gq "$output")"
             ec "alias $item=$output"

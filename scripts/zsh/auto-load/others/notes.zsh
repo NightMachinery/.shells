@@ -6,7 +6,7 @@ alias nts='ntsearch'
 ###
 function vnt() {
     ntsearch "$@" || return 1
-    reval "${veditor}" -p "$outFiles[@]"
+    reval "${veditor[@]}" "$outFiles[@]"
 }
 function ntsearch() {
     out=''
