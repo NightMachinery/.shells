@@ -26,23 +26,53 @@ revargs() {
 	# (O = reverse of the order specified in the next flag, a = normal array order).
 	eval "$1" "$(gq "${(Oa)@[2,-1]}")"
 }
-inargse() {
-	mdoc Feeds the function from stdin if no arguments supplied MAGIC
-	# An enhancer
-	eval "$1" "$(gq "$(in-or-args "${@:2}")")"
+##
+# inargse() {
+# 	mdoc Feeds the function from stdin if no arguments supplied MAGIC
+# 	# An enhancer
+# 	eval "$1" "$(gq "$(in-or-args "${@:2}")")"
+# }
+# inargsfe() { eval "$1" "$(gq "${(f@)"$(in-or-args-arrN "${@:2}")"}")" }
+# inargs0e() { eval "$1" "$(gq "${(0@)"$(in-or-args-arr0 "${@:2}")"}")" }
+alias inargsEf="fsep=$'\n' inargsE-gen"
+alias inargsE0="fsep=$'\0' inargsE-gen"
+alias inargsEc="fsep='' inargsE-gen" # splits by char
+alias inargsEs="fsep='IFS' inargsE-gen"
+alias inargsEa="fsep='ALL' inargsE-gen"
+inargsE-gen() {
+    local cmd="$1"
+    local args=( "${@[2,-1]}" )
+    if test -z "$args[*]" ; then
+        inargs-gen "$cmd"
+    else
+        reval "$@"
+    fi
 }
-inargsfe() { eval "$1" "$(gq "${(f@)"$(in-or-args-arrN "${@:2}")"}")" }
-inargs0e() { eval "$1" "$(gq "${(0@)"$(in-or-args-arr0 "${@:2}")"}")" }
-inargs() {
-	reval "$@" "$(in-or-args)"
-}
-inargsf() {
-    local args=( ${(f@)"$(in-or-args)"} )
-    (( $#args == 0 )) || reval "$@" "${args[@]}"
+alias inargsf="fsep=$'\n' inargs-gen"
+alias inargs0="fsep=$'\0' inargs-gen"
+alias inargsc="fsep='' inargs-gen" # splits by char
+alias inargss="fsep='IFS' inargs-gen"
+alias inargsa="fsep='ALL' inargs-gen"
+inargs-gen() {
+    local sep="${fsep}"
+    local noSkipEmpty="$inargsRunEmpty"
+
+    local args
+    doc "We intentionally drop empty args"
+    args="${$(</dev/stdin ; print -n .)[1,-2]}"
+    if [[ "$sep" == IFS ]] ; then
+        args=( ${=args} )
+    elif [[ "$sep" == ALL ]] ; then
+
+    else
+        args=( ${(@ps:$sep:)"$args"} )
+    fi
+
+    # (( $#args == 0 ))
+    { test -z "$args[*]" && test -z "$noSkipEmpty" } || reval "$@" "${args[@]}"
     # TODO Add skip-empty to other inargs variants
 }
-inargs0() { reval "$@" "${(0@)"$(in-or-args)"}" }
-inargss() { reval "$@" "${="$(in-or-args)"}" }
+##
 fnrep() {
     doc 'Replaces a function temporarily during <cmd>: <fn> <new body> <cmd>'
     local fn="$1"
