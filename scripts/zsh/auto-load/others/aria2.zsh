@@ -49,7 +49,7 @@ Alt: ys.py might be more stable.' ; mret
     local dlurl="$out[1]"
     
     # '--split 6 --enable-http-pipelining --stream-piece-selector inorder'
-    evaldbg tmuxnew $tmuxname $(expand-alias-strip ybase) --external-downloader aria2c --external-downloader-args '--file-allocation falloc' --no-part -f best  -o "%(title)s.%(ext)s" "$@"
+    revaldbg tmuxnew $tmuxname $(expand-alias-strip ybase) --external-downloader aria2c --external-downloader-args '--file-allocation falloc' --no-part -f best  -o "%(title)s.%(ext)s" "$@"
     # ysid="$!" # id of the backgrounded y. You can use it to kill it or whatever.
 
     ## new2

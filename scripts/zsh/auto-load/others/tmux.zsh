@@ -3,7 +3,7 @@ tmuxnew() {
 	silent tmux kill-session -t "$1"
 	tmux new -d -s "$@"
 }
-tmuxnewsh() { evaldbg tmuxnew "$1" "$(gq zsh -c "${tmuxnewshenv[*]} $(gq ${@[2,-1]})")" }
+tmuxnewsh() { revaldbg tmuxnew "$1" "$(gq zsh -c "${tmuxnewshenv[*]} $(gq ${@[2,-1]})")" }
 tmuxzombie() {
     tmux list-panes  -s -F '#{pane_pid}' -t "$1" | inargsf serr kill
 }

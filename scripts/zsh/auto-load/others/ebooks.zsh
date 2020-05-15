@@ -48,13 +48,13 @@ epubsplit() {
 		i=$(( (i+1) % n1 ))
 		[[ "$i" == 0 ]] && {
 		i=1
-		evaldbg epubsplit.py -p "p${currentSplit} " -o "p${currentSplit} ""$file" "$file" "${(@)split[1,-2]}"
+		revaldbg epubsplit.py -p "p${currentSplit} " -o "p${currentSplit} ""$file" "$file" "${(@)split[1,-2]}"
 		currentSplit=$((currentSplit+1))
 		split=( $split[-1] )
 		}
 		}
 	done
-  test -z "${split[*]}" || evaldbg epubsplit.py -p "p${currentSplit} " -o "p${currentSplit} ""$file" "$file" "${split[@]}"
+  test -z "${split[*]}" || revaldbg epubsplit.py -p "p${currentSplit} " -o "p${currentSplit} ""$file" "$file" "${split[@]}"
 }
 function rename-ebook() {
     local filename=$(basename "$1")

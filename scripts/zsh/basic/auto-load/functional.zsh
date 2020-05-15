@@ -45,7 +45,7 @@ inargsE-gen() {
     if test -z "$args[*]" ; then
         inargs-gen "$cmd"
     else
-        reval "$@"
+        eval "$cmd $(gq "$args[@]")"
     fi
 }
 alias inargsf="fsep=$'\n' inargs-gen"
@@ -56,8 +56,9 @@ alias inargsa="fsep='ALL' inargs-gen"
 inargs-gen() {
     local sep="${fsep}"
     local noSkipEmpty="$inargsRunEmpty"
+    local cmd="$1"
+    local args args0=( "${@[2,-1]}" )
 
-    local args
     doc "We intentionally drop empty args"
     args="${$(</dev/stdin ; print -n .)[1,-2]}"
     if [[ "$sep" == IFS ]] ; then
@@ -67,22 +68,28 @@ inargs-gen() {
     else
         args=( ${(@ps:$sep:)args} )
     fi
+    args=( "${args0[@]}" ${args[@]} )
 
     # (( $#args == 0 ))
-    { test -z "$args[*]" && test -z "$noSkipEmpty" } || reval "$@" "${args[@]}"
+    { test -z "$args[*]" && test -z "$noSkipEmpty" } || eval "$cmd $(gq "$args[@]")"
+
 }
 ##
-alias filter="fsep=$'\n' filter-gen"
-alias filter0="fsep=$'\0' filter-gen"
+# test: arr0 {1..10} | filter0 '(){ (( $1 <= 3 )) }' |inargs0 arger
+alias filter="fisep=$'\n' fsep=$'\n' filterE-gen"
+alias filter0="fisep=$'\0' fsep=$'\0' filterE-gen"
+function filterE-gen() {
+    inargsE-gen "filter-gen $(gq "$1")" "${@[2,-1]}"
+}
 function filter-gen() {
     local cmd="$1"
     local items=( "$@[2,-1]" )
-    local sep="${fsep}"
+    local sep="${fisep}"
     
     local i out=()
     for i in "$items[@]"
     do
-        if reval "${=cmd}" "$i" ; then
+        if seval "${cmd} $(gq "$i")" ; then
             out+="$i"
         fi
     done

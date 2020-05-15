@@ -80,7 +80,7 @@ function argerdbg() {
 	resetcolor
 	}
 }
-function evaldbg() {
+function revaldbg() {
 	ecdbg "$(gq "$@")"
 	argerdbg "$@"
 	reval "$@"
