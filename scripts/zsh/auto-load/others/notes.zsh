@@ -3,6 +3,7 @@ export nightJournal="$nightNotes/journal/j0/"
 ###
 alias imd='img2md-imgur'
 alias nts='ntsearch'
+alias ntl='ntLines=y ntsearch'
 ###
 function vnt() {
     ntsearch "$@" || return 1
@@ -18,19 +19,34 @@ function ntsearch() {
     do
            outFiles+="$nightNotes$(<<<"$i" head -n 1)"
     done
-    ec "$out[@]"
+    ec "${(@F)out}"
 }
 function ntsearch_() {
-    local pattern="$*"
-    local file files=( "${(@f)$(fd -e md -e txt -e org ${pattern:-.} $nightNotes)}" )
+    local ntLines="$ntLines"
+    local query="${*}"
+    test -z "$query" || query="'$query"
+
+    local pattern='.'
+    local fzopts=()
+    if test -z "$ntLines" ; then
+        fzopts+='--read0'
+    fi
+    local file files=( "${(@f)$(fd -e md -e txt -e org ${pattern} $nightNotes)}" )
     local first='y'
     for file in "$files[@]"
     do
-        test -n "$first" || print -n $'\0'
+        test -f "$file" || continue
+        test -n "$first" || {
+            if test -z "$ntLines" ; then
+                print -n $'\0'
+            else
+                ec
+            fi
+        }
         first=''
         color 30 90 255 "$(realpath --relative-to $nightNotes $file)"$'\n'
         cat $file
-    done  | fz --preview-window right --preview "$FZF_SIMPLE_PREVIEW" --ansi --read0 --print0
+    done  | fz --preview-window right --preview "$FZF_SIMPLE_PREVIEW" --ansi ${fzopts[@]} --print0 --query "$query"
     # right:hidden to hide preview
     # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF'
 }
