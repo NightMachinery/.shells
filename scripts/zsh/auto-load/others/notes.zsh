@@ -74,16 +74,18 @@ function url2note() {
     local title="$(urlmeta $url title)"
     local desc="$(urlmeta $url description)"
     local img="$(urlmeta $url image)"
+    local indent="    "
 
     ec "* [${title:-$url}]($url)"
-    test -z "$desc" || ec "  * $desc"
-    test -z "$title" || ec "  * $url"
+    test -z "$desc" || ec "${indent}* $desc"
+    #test -z "$title" || ec "${indent}* $url"
     test -z "$img" || ec "![]($img)"
 
 }
 reify url2note
 noglobfn url2note
 function unt() {
+  isI && test -z "$*" && set -- "$(pbpaste)"
     local note="$(url2note "$@")"
     ec $note
     if isI ; then
