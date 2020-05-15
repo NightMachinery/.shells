@@ -1,8 +1,10 @@
 export nightNotes="$cellar/notes/"
 export nightJournal="$nightNotes/journal/j0/"
+note_formats=( txt md org )
+noteglob="*.(${(j.|.)note_formats})(D)"
 ###
 alias imd='img2md-imgur'
-alias nts='ntsearch'
+alias nts='\noglob ntsearch'
 alias ntl='ntLines=y ntsearch'
 ###
 function vnt() {
@@ -23,15 +25,19 @@ function ntsearch() {
 }
 function ntsearch_() {
     local ntLines="$ntLines"
-    local query="${*}"
-    test -z "$query" || query="'$query"
+    local glob="*${*}$noteglob"
 
-    local pattern='.'
+    local query=""
+    test -z "$query" || query="'$query"
+    # local pattern="."
+
     local fzopts=()
     if test -z "$ntLines" ; then
         fzopts+='--read0'
     fi
-    local file files=( "${(@f)$(fd -e md -e txt -e org ${pattern} $nightNotes)}" )
+    local file files
+    # files=( "${(@f)$(fd -e md -e txt -e org --full-path ${pattern} $nightNotes )}" )
+    files=($nightNotes/**/${~glob})
     local first='y'
     for file in "$files[@]"
     do
