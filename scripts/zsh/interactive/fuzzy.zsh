@@ -3,6 +3,7 @@
 ###
 alias vc='veditor=(code-insiders -r) '
 alias vv='vc v'
+alias frc='frConfirm=y '
 ###
 fftmux() {
     local engine=(tmux a -t)
@@ -21,8 +22,17 @@ fftmux() {
 alias fft=fftmux
 fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
 fr() {
+    magic mdoc "frConfirm='' $0 <cmd> [<fd args> ...]" ; mret
     sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
-    test -n "$sels" && printz "$1${fr_sep:- }${sels[@]:q}"
+    test -n "$sels" && {
+        local cmd=("$1" "${sels[@]}")
+        cmd="$(gq "$cmd[@]")"
+        if test -n "$frConfirm" ; then
+            printz $cmd
+        else
+            eval $cmd
+        fi
+        }
 }
 f() fr "$@" --max-depth 1
 ffman() {
