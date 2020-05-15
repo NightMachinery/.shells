@@ -1,5 +1,7 @@
 diraction-personal-config (){
     #     tdl  $HOME/Downloads/Telegram\\ Desktop
+    # whitespace bug in batch
+    diraction create tdl "$HOME/Downloads/Telegram Desktop" --create-missing-dirs
     diraction-batch-create --create-missing-dir <<< "
     base $HOME/Base
     dl  $HOME/Downloads
@@ -23,7 +25,7 @@ incell() {
     eval "$@"
     popf
 }
-alias cellp="incell 'gcam . ; gl --no-edit ; gp'"
+alias cellp="incell 'ga . ; gcam . ; gl --no-edit ; gp'"
 indl() {
     pushf ~/Downloads/
     eval "$@"

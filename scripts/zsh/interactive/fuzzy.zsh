@@ -1,6 +1,10 @@
 ### SEE ALSO
 # spotlight, spt, spot
 ###
+alias vc='veditor=(code-insiders -r) '
+alias vv='vc v'
+alias frc='frConfirm=y '
+###
 fftmux() {
     local engine=(tmux a -t)
     test -n "$ftE[*]" && engine=("$ftE[@]")
@@ -18,8 +22,17 @@ fftmux() {
 alias fft=fftmux
 fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
 fr() {
+    magic mdoc "frConfirm='' $0 <cmd> [<fd args> ...]" ; mret
     sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
-    test -n "$sels" && printz "$1${fr_sep:- }${sels[@]:q}"
+    test -n "$sels" && {
+        local cmd=("$1" "${sels[@]}")
+        cmd="$(gq "$cmd[@]")"
+        if test -n "$frConfirm" ; then
+            printz $cmd
+        else
+            eval $cmd
+        fi
+        }
 }
 f() fr "$@" --max-depth 1
 ffman() {
@@ -73,6 +86,18 @@ alias ffchrome=chis
 v() {
     local files
     files=()
+    local code="$HOME/Library/Application Support/Code - Insiders/storage.json"
+
+    test -f "$code" && {
+        command rg --only-matching --replace '$1' '"file://(.*)"' "$code" |
+            while read line; do
+                [ -e "$line" ] && {
+                    files+="$line"
+                    ecdbg "vscode: $line"
+                }
+            done
+    }
+
     command rg '^>' ~/.viminfo | cut -c3- |
                 while read line; do
                     line="${line/\~/$HOME}"
@@ -88,10 +113,9 @@ v() {
     # stat doesn't expand ~
     # sort files by modification date
     # %Y     time of last data modification, seconds since Epoch
-    files=(${(0@)"$(gstat  --printf='%040.18Y:%n\0' "$files[@]" | gsort -rz | gcut -z -d':' -f2-)"}) #Don't quote this there is always a final empty element
+    files=(${(0@)"$(gstat  --printf='%040.18Y:%n\0' "$files[@]" | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"}) #Don't quote this there is always a final empty element
     files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$*")"} ) || return 1
     local ve="$ve"
-    reval "${veditor:-vim}" -p "${(@)files}"
-    doc '-o opens in split view, -p in tabs. Use gt, gT, <num>gt to navigate tabs.'
+    reval "${veditor[@]}" "${(@)files}"
 }
-function vni() { fr "${veditor}" . $NIGHTDIR }
+function vni() { fr "${veditor[@]}" . $NIGHTDIR }

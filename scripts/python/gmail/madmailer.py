@@ -184,7 +184,8 @@ try:
                 try:
                     tsend_cmd = ["--parse-mode", "html", "--link-preview", "https://t.me/tldrnewsletter", '']
                     tsend_args = ts.parse_tsend(tsend_cmd)
-                    for n in items[1:2] + items[4:-2]:
+                    # items[1:2] + items[4:-2]:
+                    for n in items[5:-2]:
                         # for link in n.select('a'):
                             # link['href'] = z("urlfinalg {link['href']}").out
                         tsend_args['<message>'] = n

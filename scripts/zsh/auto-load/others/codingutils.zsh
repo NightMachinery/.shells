@@ -22,6 +22,11 @@ whichm() {
     local item output
     for item in "$out[@]"
     do
+        (( ${+builtins[$item]} )) && {
+            ec "## $(which $item)"
+            continue
+        }
+
         output="${aliases[$item]}" ; test -n "$output" && {
             output="$(gq "$output")"
             ec "alias $item=$output"
@@ -58,7 +63,7 @@ function whdeep-words() {
     out=()
     local input=("$@")
 
-    local e=( '""' {0..10} "()" "{" "}" '"$@"' ':' '\:' aliased to noglob '\noglob' 'DEBUGME=d' '||' '&&' 'return' local false true "${(@f)$(enable)}" do done esac then elif else fi for case if while 'function' 'repeat' time until select coproc nocorrect foreach end '!' '[[' declare export float integer local readonly typeset '...' alias from import '$' ) 
+    local e=( '""' {0..10} "()" "{" "}" '"$@"' ':' '\:' aliased to noglob '\noglob' 'DEBUGME=d' '||' '&&' 'return' local false true "${(@f)$(enable)}" do done esac then elif else fi for case if while 'function' 'repeat' time until select coproc nocorrect foreach end '!' '[[' declare export float integer local readonly typeset '...' alias from import '$' title ) 
     e+=( f v ) # usually false positives
     test -n "$wwNight" && e+=( run-on-each ruu proxychains4 )
     local line
