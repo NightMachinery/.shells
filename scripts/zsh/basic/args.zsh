@@ -1,19 +1,18 @@
 ###
 function in-or-args2() {
-    (( $# )) && inargs=( "$@" ) || inargs="${$(</dev/stdin ; ec .)%.}"
-    # https://unix.stackexchange.com/questions/206449/elegant-way-to-prevent-command-substitution-from-removing-trailing-newline
+    (( $# )) && inargs=( "$@" ) || inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
 }
 function in-or-args() {
-    (( $# )) && ec "$@" || ec "${$(</dev/stdin ; ec .)%.}"
+    (( $# )) && ec "$@" || print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
 }
-function arr0() { ec "${(pj.\0.)@}" }
-function arrN() { ec "${(pj.\n.)@}" }
-function in-or-args-arr0() {
-    (( $# )) && arr0 "$@" || ec "$(</dev/stdin)"
-}
-function in-or-args-arrN() {
-    (( $# )) && arrN "$@" || ec "$(</dev/stdin)"
-}
+function arr0() { print -nr -- "${(pj.\0.)@}" }
+function arrN() { print -nr -- "${(pj.\n.)@}" }
+# function in-or-args-arr0() {
+#     (( $# )) && arr0 "$@" || ec "$(</dev/stdin)"
+# }
+# function in-or-args-arrN() {
+#     (( $# )) && arrN "$@" || ec "$(</dev/stdin)"
+# }
 ###
 function args-nochromefile() {
     doc 'Converts file:/// to /. Outputs in $out'

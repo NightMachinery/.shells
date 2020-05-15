@@ -65,12 +65,28 @@ inargs-gen() {
     elif [[ "$sep" == ALL ]] ; then
 
     else
-        args=( ${(@ps:$sep:)"$args"} )
+        args=( ${(@ps:$sep:)args} )
     fi
 
     # (( $#args == 0 ))
     { test -z "$args[*]" && test -z "$noSkipEmpty" } || reval "$@" "${args[@]}"
-    # TODO Add skip-empty to other inargs variants
+}
+##
+alias filter="fsep=$'\n' filter-gen"
+alias filter0="fsep=$'\0' filter-gen"
+function filter-gen() {
+    local cmd="$1"
+    local items=( "$@[2,-1]" )
+    local sep="${fsep}"
+    
+    local i out=()
+    for i in "$items[@]"
+    do
+        if reval "${=cmd}" "$i" ; then
+            out+="$i"
+        fi
+    done
+    print -nr -- "${(pj:$sep:)out}"
 }
 ##
 fnrep() {
