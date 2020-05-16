@@ -9,7 +9,7 @@ function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"
 }
 function curlm() {
-    curl --silent --fail --location --header "$(cookies-auto "$@")" "$@"
+  curl --silent --fail --location --cookie-jar "$(mktemp)" --header "$(cookies-auto "$@")" "$@"
 }
 getcookies() {
     mdoc "[cookiesFile= ] $0 <url>
