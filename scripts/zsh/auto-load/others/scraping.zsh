@@ -721,3 +721,11 @@ function readmoz-file() {
     local rmHtml="$(< "$file")"
     readmoz "$url"
 }
+function readmoz-md() {
+    local url="$1"
+
+    local md="$(gmktemp --suffix .md)"
+    pandoc -s -f html-native_divs <(readmoz "$url") -o $md
+    < $md
+    \rm $md
+}
