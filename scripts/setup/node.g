@@ -40,4 +40,4 @@ puppeteer-extra-plugin-stealth
 puppeteer-extra-plugin-repl
 npm-check
 strip-ansi-cli
-yashha/percollate#epub
+readability-wrapper

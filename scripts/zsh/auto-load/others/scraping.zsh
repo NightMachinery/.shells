@@ -105,12 +105,16 @@ function mercury-html() {
     doc USAGE: url html-file output-mode
     serr mercury-html.js "$@"
 }
+
+function full-html2() {
+    fhMode="${fhMode:-curl}" full-html "$1" /dev/stdout
+}
 function full-html() {
-    local mode="${fhMode}"
-	  test -z "$mode" && curlfull.js "$1" > "$2"
-    [[ "$mode" == 'aacookies' ]] && dbgserr aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
-    [[ "$mode" == 'curl' ]] && gurl "$1" > "$2"
-    [[ "$mode" == 'http' ]] && http --session pink "$1" --output "$2"
+    local mode="${fhMode:-curlfull}"
+	  [[ "$mode" =~ 'curlfull' ]] && curlfull.js "$1" > "$2"
+    [[ "$mode" =~ 'aa(cookies)?' ]] && dbgserr aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
+    [[ "$mode" =~ '(c|g)url' ]] && gurl "$1" > "$2"
+    [[ "$mode" =~ 'http(ie)?' ]] && http --session pink "$1" --output "$2"
 
     #doc splash should be up. https://splash.readthedocs.io
     #doc 'wait always waits the full time. Should be strictly < timeout.'
@@ -219,10 +223,21 @@ Options:
     local opts e
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
     # dact typeset -p opts argv
-    silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
-    local title="$( ec "${opts[-p]}${wr_title:-$1}" | sd / _ )"
+
+    local title author
+    if false ; then
+        # Old API
+        silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
+        title="$( ec "${opts[-p]}${wr_title:-$1}" | sd / _ )"
+        author="$wr_author"
+    else
+        url2note "$1" none || { ecerr "tlrl-ng: url2note failed with $? on url $1" ; return 33 }
+        title="${title:-empty_title_from_url2note}"
+        author="[$readest] $author"
+    fi
+    
     pushf "${opts[-o]:-$HOME/tmp-kindle}"
-    we_author=$wr_author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
+    we_author=$author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
     e=$?
     popf
     return $e
@@ -292,9 +307,11 @@ web2epub() {
         bname="${(l(${##})(0))i} $bname"
         i=$((i+1))
 
-        retry-limited-eval "${we_retry:-10}" "${we_dler:-wread}" "$url:q" html '>' "$bname:q" && ec "Downloaded $url ..." || { ec "$url" >> failed_urls
-                                                                                                                               ecerr "Failed $url"
-                                                                                                                               hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
+        # API Change; old: "${we_dler:-wread}"
+        retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" html '>' "$bname:q" && ec "Downloaded $url ..." || {
+                ec "$url" >> failed_urls
+                ecerr "Failed $url"
+                hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
             }
     done
 
@@ -510,11 +527,11 @@ function hi10-jtoken() {
     # ec "?jtoken=${jtoken}${id}"
 }
 function urlmeta() {
-    mdoc "$0 <url> <req>
-gets the requested metadata." MAGIC
+    mdoc "[html= ] $0 <url> <req>
+gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
 
     local url="$1"
-    local html="$(eval-memoi gurl $url)" f="$(mktemp)"
+    local html="${html:-$(full-html2 "$url")}" f="$(mktemp)"
     ec $html > $f # big env vars cause arg list too long
     htmlf=$f req="${2:-title}" python3 -W ignore -c "
 import metadata_parser, os, sys
@@ -522,7 +539,15 @@ page = metadata_parser.MetadataParser(html=open(os.environ['htmlf'], 'r').read()
 if os.environ.get('DEBUGME',''):
    print(page.metadata, file=sys.stderr)
    # from IPython import embed; embed()
-print(page.get_metadata(os.environ['req']) or '')
+req=os.environ['req']
+if req == 'all' :
+    
+    print(page.get_metadata('title') or '', end='\x00')
+    print(page.get_metadata('description') or '', end='\x00')
+    print(page.get_metadata('image') or '', end='\x00')
+    print(page.get_metadata('author') or page.get_metadata('creator') or page.get_metadata('article:author') or '', end='\x00')
+else:
+    print(page.get_metadata(req) or '')
 "
     \rm -f $f
 }
@@ -627,4 +652,71 @@ function jfic() {
 	  jee
 	  re "fanficfare --non-interactive" "$@"
 	  sout re p2k *.epub
+}
+##
+function url2note() {
+    magic mdoc "[ html= cleanedhtml= ] $0 <url> [<mode>] ; outputs in global variables and stdout." ; mret
+
+    local url="$1"
+    local mode="${2:-md}"
+
+    local html="${html:-$(full-html2 "$url")}"
+    local cleanedhtml="${cleanedhtml:-$(<<<"$html" readability "$url")}"
+    
+    meta=( "${(@0)$(urlmeta $url all)}" )
+    title="$meta[1]"
+    desc="$meta[2]"
+    img="$meta[3]"
+    author="$meta[4]"
+    local indent="    "
+    readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)"
+
+    if [[ "$mode" == md ]] ; then
+        ec "* [${title:-$url}]($url)"
+        test -z "$author" || ec "${indent}* By: $author"
+        test -z "$readest" || ec "${indent}* $readest"
+        test -z "$desc" || ec "${indent}* $desc"
+        #test -z "$title" || ec "${indent}* $url"
+        test -z "$img" || ec '![]'"($img)"
+    elif [[ "$mode" == html ]] ; then
+        test -z "$title" || ec "<h1>${title}</h1>"
+        test -z "$author" || ec "<p>By: $author</p>"
+        test -z "$readest" || ec "<p>${readest}</p>"
+        test -z "$desc" || ec "<p>Description: $desc</p>"
+        test -z "$img" || ec "<img src=\"$img\" />"
+    elif [[ "$mode" == none ]] ; then
+
+    fi
+
+}
+function url2md() { url2note "$1" md }
+function url2html() { url2note "$1" html }
+reify url2md
+reify url2html
+noglobfn url2note
+noglobfn url2md
+noglobfn url2html
+##
+function readmoz() {
+    magic mdoc "[rmS= rmHtml= ] $0 <url>
+Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rmS to only print the summary." ; mret
+
+    local url="$1"
+    local summaryMode="$rmS"
+
+    local html="${rmHtml:-$(full-html2 "$url")}"
+    local cleanedhtml="$(<<<"$html" readability "$url")"
+    local prehtml="$(url2html "$url")"
+    ec "$prehtml"
+    test -n "$summaryMode" || ec "<p> --- </p> $cleanedhtml"
+}
+function readmozsum() {
+    : "Use url2html instead? No advtanges to this."
+    rmS=y readmoz "$@"
+}
+function readmoz-file() {
+    magic mdoc "$0 <file> [<url>]"
+    local file="$1" url="${2:-https://${$(basename "$file"):-empty}.google.com}"
+    local rmHtml="$(< "$file")"
+    readmoz "$url"
 }
