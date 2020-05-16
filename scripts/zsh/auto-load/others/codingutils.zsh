@@ -17,10 +17,17 @@ Update: Actually adds, not replaces. Also removes duplicates." MAGIC
     done
     out=("${(u@)itemsP}")
 }
+function whz() {
+    preEnhNames "$@"
+    local items=("$out[@]")
+
+    printz "$(which "$items[-1]")" #"${(q-@)"$(which "$1")"}"
+}
 whichm() {
     preEnhNames "$@"
+    local items=("$out[@]")
     local item output
-    for item in "$out[@]"
+    for item in "$items[@]"
     do
         (( ${+builtins[$item]} )) && ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) && {
             ec "## $(which $item)"
@@ -32,8 +39,7 @@ whichm() {
             ec "alias $item=$output"
             local is=("$output")
             is+=( ${$(fnswap expand-aliases expand-alias expand-alias-strip "$item")[1]} )
-            local e=( $item )
-            whichm "${(u@)is:|e}"
+            whichm "${(u@)is:|items}"
             continue
         }
         output="$(which -- "$item")" && ! [[ "$output" =~ '^\s*\w+: suffix aliased to' ]] && {

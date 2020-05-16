@@ -186,9 +186,6 @@ function removeTrailingSlashes() {
         [/]*) ec "/";;
     esac
 }
-function whz() {
-    printz "$(which "$1")" #"${(q-@)"$(which "$1")"}"
-}
 function k2pdf() {
     nis k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi "${k2_odpi:-450}" -y -ui-
     # -as
