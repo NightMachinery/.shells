@@ -75,9 +75,11 @@ inargs-gen() {
 
 }
 ##
-# test: arr0 {1..10} | filter0 '(){ (( $1 <= 3 )) }' |inargs0 arger
-alias filter="fisep=$'\n' fsep=$'\n' filterE-gen"
-alias filter0="fisep=$'\0' fsep=$'\0' filterE-gen"
+# test: arr0 {1..10} | filter0-unq '(){ (( $1 <= 3 )) }' |inargs0 arger
+alias filter-unq="fisep=$'\n' fsep=$'\n' filterE-gen"
+alias filter0-unq="fisep=$'\0' fsep=$'\0' filterE-gen"
+function filter() { filter-unq "$(gq "$@")" }
+function filter0() { filter0-unq "$(gq "$@")" }
 function filterE-gen() {
     inargsE-gen "filter-gen $(gq "$1")" "${@[2,-1]}"
 }
