@@ -233,6 +233,7 @@ Options:
     else
         url2note "$1" none || { ecerr "tlrl-ng: url2note failed with $? on url $1" ; return 33 }
         title="${title:-empty_title_from_url2note}"
+        : 'Note that readest is obviously only for the FIRST link.'
         author="[$readest] $author"
     fi
     
