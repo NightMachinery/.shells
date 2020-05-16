@@ -2,7 +2,7 @@ diraction-personal-config (){
     #     tdl  $HOME/Downloads/Telegram\\ Desktop
     # whitespace bug in batch
     diraction create tdl "$HOME/Downloads/Telegram Desktop" --create-missing-dirs
-    diraction-batch-create --create-missing-dir <<< "
+    fnswap alias aliassafe diraction-batch-create --create-missing-dir <<< "
     base $HOME/Base
     dl  $HOME/Downloads
     vdl  $HOME/Downloads/video

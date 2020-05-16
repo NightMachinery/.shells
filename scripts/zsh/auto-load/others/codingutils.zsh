@@ -22,7 +22,7 @@ whichm() {
     local item output
     for item in "$out[@]"
     do
-        (( ${+builtins[$item]} )) && {
+        (( ${+builtins[$item]} )) && ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) && {
             ec "## $(which $item)"
             continue
         }
