@@ -97,5 +97,5 @@ noglobfn getpdfs
 function jgetktmp() {
     local num="${1:-3}"
     ktmp
-    lm|filter "testre '\\.epub\$' " | tail -n "$num" |inargsf rexa 'cp _ $jd'
+    lm|filter testre '\.epub$' | tail -n "$num" |inargsf rexa 'cp _ $jd'
 }

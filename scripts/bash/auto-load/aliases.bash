@@ -1,4 +1,6 @@
-re "silence unalias" a la map p fd ff pip fd sp # mv cp
+# Perhaps you should use aliasfn
+###
+re "silence unalias" a la map p fd ff pip sp # mv cp
 alias rgjl="rgm -t julia" #"rgm --glob '*.jl'"
 alias rgpy="rgm --glob '*.py'"
 alias spt='spotlight -name'
