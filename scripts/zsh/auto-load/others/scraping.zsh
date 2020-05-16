@@ -715,6 +715,9 @@ function readmozsum() {
     : "Use url2html instead? No advtanges to this."
     rmS=y readmoz "$@"
 }
+function readmozsum-file() {
+    rmS=y readmoz-file "$@"
+}
 function readmoz-file() {
     magic mdoc "$0 <file> [<url>]"
     local file="$1" url="${2:-https://${$(basename "$file"):-empty}.google.com}"

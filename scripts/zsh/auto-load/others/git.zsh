@@ -22,7 +22,7 @@ This function is idempotent (it passes http URLs through)." MAGIC
     <<<"$*" gsed -e 's|:|/|' -e 's|git@|https://|'
     fi
 }
-alias git2http='noglob inargsfe "re _git2http"'
+alias git2http='noglob inargsEf "re _git2http"'
 git-resolve() {
   local git=("${=gitbinary:-git}")
   STRATEGY="$1"
