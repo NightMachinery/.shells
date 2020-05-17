@@ -2,7 +2,8 @@
 # spotlight, spt, spot
 ###
 alias vc='veditor=(code-insiders -r) '
-alias vv='vc v'
+alias ve='veditor=(emc) '
+alias vv='ve v'
 alias frc='frConfirm=y '
 ###
 fftmux() {
@@ -83,9 +84,25 @@ chis() {
     return 0
 }
 alias ffchrome=chis
-v() {
-    local files
-    files=()
+function init-vfiles() {
+    : GLOBAL vfiles
+
+    if test -z "$vfiles[1]" ; then
+        local i dirs=( $NIGHTDIR $codedir/nodejs $codedir/python $codedir/uni $codedir/rust )
+        vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex '\.(py|jl|scala|sc|kt|kotlin|java|clj|cljs|rkt|js|rs|toml|zsh|dash|bash|sh|ml|php)$' $dirs[@] )"} )
+        # for i in "$dirs[@]" ; do
+        #     vfiles+=( $i/**/*(.D^+isbinary) )
+        # done
+    fi
+
+    # --ignore-file seems not working
+}
+function v() {
+    : GLOBAL vfiles
+    init-vfiles
+
+    local files excluded=( ~/.zlua ~/.zsh_history "$HOME/.local/share/nvim/shada/main.shada" "$HOME/Library/Application Support/Code/storage.json" "$HOME/Library/Application Support/Code - Insiders/storage.json" "$HOME/Library/Application Support/Google/Chrome/Local State" )
+    files=( "$vfiles[@]" )
     local code="$HOME/Library/Application Support/Code - Insiders/storage.json"
 
     test -f "$code" && {
@@ -113,7 +130,7 @@ v() {
     # stat doesn't expand ~
     # sort files by modification date
     # %Y     time of last data modification, seconds since Epoch
-    files=(${(0@)"$(gstat  --printf='%040.18Y:%n\0' "$files[@]" | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"}) #Don't quote this there is always a final empty element
+    files=( ${(0@)"$(gstat  --printf='%040.18Y:%n\0' "${(@)files:|excluded}" | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"} ${(@)excluded} ) #Don't quote this there is always a final empty element
     files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$*")"} ) || return 1
     local ve="$ve"
     reval "${veditor[@]}" "${(@)files}"

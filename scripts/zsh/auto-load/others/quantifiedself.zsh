@@ -27,6 +27,8 @@ char-usage() {
     done | gsort | uniq -c | gsort -n
 }
 char-usage-all() {
-    # --ignore-file seems not working
-    char-usage "${(f@)$(fd --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex '\.(py|jl|scala|sc|kt|kotlin|java|clj|cljs|rkt|js|rs|toml|zsh|dash|bash|sh|ml|php)$' ~/code/ )}" $NIGHTDIR/**/*(.) | tac > "all $(dateshort).cusage"
+    : GLOBAL vfiles
+    init-vfiles
+
+    char-usage $vfiles[@]  $NIGHTDIR/**/*(.) | tac > "all $(dateshort).cusage"
 }
