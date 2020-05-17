@@ -89,9 +89,6 @@ function init-vfiles() {
 
     if test -z "$vfiles[1]" ; then
 	    local i dirs=( "${(@0)$(arr0 $NIGHTDIR $cellar $codedir/nodejs $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
-	code_formats=( py jl scala sc kt kotlin java clj cljs rkt js rs toml zsh dash bash sh ml php )
-	config_formats=( ini json cson toml )
-	text_formats=( $note_formats[@] $code_formats[@] $config_formats[@] )
         vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} )
         # for i in "$dirs[@]" ; do
         #     vfiles+=( $i/**/*(.D^+isbinary) )

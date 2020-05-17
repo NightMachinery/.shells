@@ -1,7 +1,3 @@
-export nightNotes="$cellar/notes/"
-export nightJournal="$nightNotes/journal/j0/"
-note_formats=( txt md org )
-noteglob="*.(${(j.|.)note_formats})(D)"
 ###
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'

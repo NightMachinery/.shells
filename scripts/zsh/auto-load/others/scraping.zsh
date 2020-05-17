@@ -490,7 +490,7 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
 
     local urls=( ${(u@)@} )
 
-    local formats=( ${audio_formats[@]} ${media_formats[@]} pdf )
+    local formats=( ${media_formats[@]} pdf )
     local regex='\.('"${(j.|.)formats}"')$'
     local url
     for url in ${urls[@]}

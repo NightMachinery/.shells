@@ -1,4 +1,3 @@
-audioglob="*.(${(j.|.)audio_formats})(D)"
 function isbinary() {
     # Usage: vfiles+=( $i/**/*(.D^+isbinary) )
 

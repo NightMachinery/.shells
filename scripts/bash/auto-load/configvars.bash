@@ -6,9 +6,21 @@ to_dirtouch=y
 logdir="$HOME/logs"
 PRUNE_SONGD_DAYS="+120"
 deleteus=~/.deleteus
-audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
-media_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
 codedir="$HOME/code"
+##
+export nightNotes="$cellar/notes/"
+export nightJournal="$nightNotes/journal/j0/"
+note_formats=( txt md org )
+noteglob="*.(${(j.|.)note_formats})(D)"
+##
+audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
+audioglob="*.(${(j.|.)audio_formats})(D)"
+video_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
+media_formats=( ${audio_formats[@]} ${video_formats[@]} )
+code_formats=( py jl scala sc kt kotlin java clj cljs rkt js rs toml zsh dash bash sh ml php )
+config_formats=( ini json cson toml )
+text_formats=( $note_formats[@] $code_formats[@] $config_formats[@] )
+##
 if isDarwin ; then
     veditor=(code-insiders -r)
 else

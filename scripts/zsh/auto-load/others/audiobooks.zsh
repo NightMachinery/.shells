@@ -61,7 +61,7 @@ aa2ab() {
 	pushf $dir
 	aa -Z "$links[@]"
 	test -n "$aa_2audio" && { 
-		local dled=(**/*.(${(j.|.)~media_formats}))
+		local dled=(**/*.(${(j.|.)~video_formats}))
 	local out=out.mp3
 			ffmpeg -i $dled[1] $out 
 			trs *~$~out
