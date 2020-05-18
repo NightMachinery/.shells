@@ -11,5 +11,5 @@ fz() {
 }
 fzf-noempty() {
     local in="$(</dev/stdin)"
-    test -z "$in" && (exit 130) || { ec "$in" | SHELL="$(rp dash)" fzf "$@" }
+    test -z "$in" && (exit 130) || { ec "$in" | SHELL="${FZF_SHELL:-$(rp dash)}" fzf "$@" }
 }

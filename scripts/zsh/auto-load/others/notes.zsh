@@ -15,7 +15,7 @@ function ntsearch() {
     local i
     for i in "$out[@]"
     do
-           outFiles+="$nightNotes$(<<<"$i" head -n 1)"
+        outFiles+="$nightNotes$(<<<"$i" head -n 1)"
     done
     ec "${(@F)out}"
 }
@@ -24,17 +24,34 @@ function ntsearch_() {
     local glob="*${*}$noteglob"
 
     local query=""
-    test -z "$query" || query="'$query"
+    # test -z "$query" || query="'$query"
     # local pattern="."
 
     local fzopts=()
+    local previewcode="$FZF_SIMPLE_PREVIEW"
     if test -z "$ntLines" ; then
         fzopts+='--read0'
+    else
+        fzopts+=(--delimiter : --with-nth '1,3..' --nth '..' ) # nth only works on with-nth fields
+        local FZF_SHELL='zshplain.dash'
+        # FZF_SHELL=zsh
+        previewcode=( 'ln={2} file={1} match={3..} ; fileabs="$nightNotes/$file" ;
+{ print -r -- "$file" '
+                      "\$'\\n'$(gq $(colorbg 200 255 200 ; colorfg 0 0 0))\$match$(gq $reset_color)\$'\\n\\n' ; "
+                      # 'echo ln: $ln ; '
+                      '[[ $ln == 1 ]] || gsed -n $(( i=ln-6 , i >= 1 ? i : 1 )),$(( i=ln-1 , i >= 1 ? i : 1 ))p $fileabs ; '
+                      "print -r -- $(gq $(colorbg 255 255 255 ; colorfg 255 120 0))\$match$(gq $reset_color) ; "
+
+                      '
+gsed -n $((ln+1)),$((ln+50))p $fileabs
+} |& /usr/local/Cellar/perl/5.30.1/bin/ansifold -s -w $FZF_PREVIEW_COLUMNS' )
+        # cpanm App::ansifold
+        # https://metacpan.org/pod/Text::ANSI::WideUtil
     fi
     local file files
     # files=( "${(@f)$(fd -e md -e txt -e org --full-path ${pattern} $nightNotes )}" )
     files=($nightNotes/**/${~glob})
-    local first='y'
+    local first='y' filename content line i
     for file in "$files[@]"
     do
         test -f "$file" || continue
@@ -42,23 +59,35 @@ function ntsearch_() {
             if test -z "$ntLines" ; then
                 print -n $'\0'
             else
-                ec
+
             fi
         }
         first=''
-        color 30 90 255 "$(realpath --relative-to $nightNotes $file)"$'\n'
-        cat $file
-    done  | fz --preview-window right --preview "$FZF_SIMPLE_PREVIEW" --ansi ${fzopts[@]} --print0 --query "$query"
+        filename="$(realpath --relative-to $nightNotes $file)"
+        content="$(< $file)"
+        if test -z "$ntLines" ; then
+            color 30 90 255 $filename$'\n'
+            ec $content
+        else
+            i=1
+            for line in "${(@f)content}" ; do
+                if test -n "$line" ; then
+                ec "${filename}:${i}:${line}"
+                fi
+                i=$((i+1))
+            done
+        fi
+    done  | fz --preview-window right --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"
     # right:hidden to hide preview
     # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF'
 }
 function jrlt() {
-	local today="$(date +"%Y.%b.%d") $(datej|tr / -)"
-	local dest="$nightJournal/$today.md"
-	test -e "$dest" || {
-	ec "# $today"$'\n\n'"* " >> $dest
-	}
-	! isI || $EDITOR[@] $dest
+    local today="$(date +"%Y.%b.%d") $(datej|tr / -)"
+    local dest="$nightJournal/$today.md"
+    test -e "$dest" || {
+        ec "# $today"$'\n\n'"* " >> $dest
+    }
+    ! isI || $EDITOR[@] $dest
 }
 function img2md() {
     mdoc "$0 <picture-file> [<description>]
@@ -88,7 +117,7 @@ Outputs the image in markdown format, hosted on imgur." MAGIC
     print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
 }
 function unt() {
-  isI && test -z "$*" && set -- "$(pbpaste)"
+    isI && test -z "$*" && set -- "$(pbpaste)"
     local note="$(url2md "$@")"
     ec $note
     if isI ; then

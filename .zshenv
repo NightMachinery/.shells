@@ -10,6 +10,7 @@ isNotExpensive || {
     fi
 
     addToPATH ~/code/node/snips-alice
+    addToPATH ~/.emacs.d.doom/bin/
     addToPATH "$HOME/.dotnet/tools"
     addToPATH "/Library/TeX/texbin"
     addToPATH "$HOME/.cargo/bin"

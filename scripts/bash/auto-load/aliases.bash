@@ -48,7 +48,7 @@ alias l-c=last-created
 alias l-ac=last-accessed
 alias l-a=last-added
 alias l-m=last-modified
-alias em="emc -e '(helm-recentf)'"
+alias em="emc -e '(counsel-recentf)'" # helm-recentf
 alias dmy='DEBUGME=y'
 alias a=aget
 alias jee='ensure-empty || return 1'

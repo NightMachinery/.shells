@@ -1,3 +1,3 @@
 #!/usr/bin/env dash
 export autowhdeepwarning=no
-zsh -f "$1"
+zsh -f "$@"

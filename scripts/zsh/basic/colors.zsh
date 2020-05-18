@@ -1,6 +1,12 @@
 autoload -U colors && colors
 
 ## Functions
+Bold () { print -n -- '\e[1m' }
+Underline () { print -n -- '\e[4m' }
+Flash () { print -n -- '\e[5m' } # doesn't work on my iTerm
+Invert () { print -n -- '\e[7m' }
+Invisible () { print -n -- '\e[8m' } # again doesn't work
+
 colorfg() { ! isI || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
 colorbg() { ! isI || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
 colorb() {

@@ -1,7 +1,8 @@
 ### SEE ALSO
 # spotlight, spt, spot
 ###
-alias vc='veditor=(code-insiders -r) '
+alias vc='code-insiders -r'
+alias vcode='veditor=(code-insiders -r) '
 alias ve='veditor=(emc) '
 alias vv='ve v'
 alias frc='frConfirm=y '
