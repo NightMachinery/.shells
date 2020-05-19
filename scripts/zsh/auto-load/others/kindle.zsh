@@ -21,9 +21,9 @@ function 2m2k() {
     2kindle "$1"
 }
 function mv2ko() {
-	jej
-	mv * "$1"
-	2ko *
+    jej
+    mv * "$1"
+    2ko *
 }
 function aacrop() {
     aa "$@" --on-download-complete aa-crop
@@ -35,18 +35,18 @@ function aab() {
     aa "$@" --on-download-complete aa-toKindle
 }
 function 2kindle() {
-	jglob
+    jglob
     mutt -s "${2:-convert}" -a "$1" -- "${3:-$kindle_email}" <<<hi
 }
 function 2ko() {
     mdoc "2kindle-original; Sends to Kindle without conversion.
 Usage: $0 <file> [<kindle-email>]
 Uses 2kindle under the hood." MAGIC
-	jglob
+    jglob
     2kindle "$1" "some_subject" "$2"
 }
 function 2p2k() {
-	jglob
+    jglob
     k2pdf "$1"
     2ko "${1:r}_k2opt.pdf"
 }
@@ -54,12 +54,12 @@ function 2p2k() {
                           trs "${1:r}.mobi" } }
 
 2epub() {
-	jglob
-ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
+    jglob
+    ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 }
 dir2k() {
-	local dir="${1:-.}/"
-	local p
+    local dir="${1:-.}/"
+    local p
     p=($dir/*.pdf(N))
     skipglob "re pdf-crop-margins" "${(@)p}"
     skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
@@ -71,7 +71,7 @@ p2k() {
     local delOrig="${pkDel}"
     [[ -n "$pk_no" ]] || {
         sout 2m2k "$@"
-    	[[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"
+        [[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"
     }
     test -z "$delOrig" && {
         silent ebook-cover $1 "${1:r}".jpg
@@ -91,7 +91,7 @@ p2ko() {
     }
 }
 function getpdfs() {
-	zargs -i _ -- "$@" -- getlinks _ '\.pdf$' | inargsf aacrop -Z
+    zargs -i _ -- "$@" -- getlinks _ '\.pdf$' | inargsf aacrop -Z
 }
 noglobfn getpdfs
 function jgetktmp() {
