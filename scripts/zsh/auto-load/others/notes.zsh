@@ -3,6 +3,13 @@ alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
 alias ntl='ntLines=y ntsearch'
 ###
+function ugnt() {
+    local i args=()
+    for i in "$note_formats[@]" ; do
+        args+=( -O "$i" )
+    done
+    ugm "$args[@]" "$@"
+}
 function vnt() {
     ntsearch "$@" || return 1
     reval "${veditor[@]}" "$outFiles[@]"

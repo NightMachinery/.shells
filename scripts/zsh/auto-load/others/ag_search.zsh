@@ -6,6 +6,10 @@ fi
 ##
 alias agc='ec "${(F)commands}"|agC=0 agm'
 ##
+function ugm() {
+    ugrep  --break --context=3 -Q  --recursive --smart-case "$@"
+    # --binary-files=without-match
+}
 function rgm() {
     command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto -C ${agC:-1} --color always "$@" |less # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
 }
@@ -19,7 +23,7 @@ ags() {
     agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.) ~/.bashrc ~/.profile ~/.bashrc ~/.bash_profile
 }
 agf() {
-	ags "$@"'\s*\(\)'
+    ags "$@"'\s*\(\)'
 }
 agi() {
     doc ag internals of zsh
@@ -32,6 +36,7 @@ agrdry() {
     agm -F  -- "$from" "${@}"
 }
 function agr {
+    doc 'Use https://github.com/facebookincubator/fastmod instead?'
     doc 'usage: from=sth to=another agr [ag-args]'
     comment -l --files-with-matches
 
