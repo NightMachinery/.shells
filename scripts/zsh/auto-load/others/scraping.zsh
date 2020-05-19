@@ -107,14 +107,28 @@ function mercury-html() {
 }
 
 function full-html2() {
-    fhMode="${fhMode:-curl}" full-html "$1" /dev/stdout
+    # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
+      # seems to be because the server is messed up, but whatever:
+      # http: error: Incomplete download: size=46696; downloaded=131310
+
+    #fhMode="${fhMode:-http}" full-html "$1" /dev/stdout
+
+    local mode="${fhMode:-http}"
+    local stdout=/dev/stdout
+	  [[ "$mode" =~ 'curlfull' ]] && curlfull.js "$1"
+    [[ "$mode" =~ 'aa(cookies)?' ]] && dbgserr aacookies "$1" -o "$stdout" # Note that -o accepts basenames not paths
+    [[ "$mode" =~ '(c|g)url' ]] && gurl "$1"
+    [[ "$mode" =~ 'http(ie)?' ]] && dbgserr http --session "pink$(uuidpy)" "$1" --download
 }
 function full-html() {
-    local mode="${fhMode:-curlfull}"
-	  [[ "$mode" =~ 'curlfull' ]] && curlfull.js "$1" > "$2"
-    [[ "$mode" =~ 'aa(cookies)?' ]] && dbgserr aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
-    [[ "$mode" =~ '(c|g)url' ]] && gurl "$1" > "$2"
-    [[ "$mode" =~ 'http(ie)?' ]] && http --session pink "$1" --output "$2"
+    fhMode="${fhMode:-curlfull}" full-html2 "$1" > "$2"
+    return "$?"
+
+    # local mode="${fhMode:-curlfull}"
+	  # [[ "$mode" =~ 'curlfull' ]] && curlfull.js "$1" > "$2"
+    # [[ "$mode" =~ 'aa(cookies)?' ]] && dbgserr aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
+    # [[ "$mode" =~ '(c|g)url' ]] && gurl "$1" > "$2"
+    # [[ "$mode" =~ 'http(ie)?' ]] && http --session pink "$1" --output "$2"
 
     #doc splash should be up. https://splash.readthedocs.io
     #doc 'wait always waits the full time. Should be strictly < timeout.'
@@ -228,14 +242,15 @@ Options:
     if false ; then
         # Old API
         silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
-        title="$( ec "${opts[-p]}${wr_title:-$1}" | sd / _ )"
+        title="${wr_title:-$1}"
         author="$wr_author"
     else
         url2note "$1" none || { ecerr "tlrl-ng: url2note failed with $? on url $1" ; return 33 }
-        title="${title:-empty_title_from_url2note}"
+        title="${title:-untitled $1}"
         : 'Note that readest is obviously only for the FIRST link.'
         author="[$readest] $author"
     fi
+    title="$( ec "${opts[-p]}${title}" | sd / _ )"
     
     pushf "${opts[-o]:-$HOME/tmp-kindle}"
     we_author=$author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
