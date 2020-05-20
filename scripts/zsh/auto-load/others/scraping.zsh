@@ -5,7 +5,7 @@ alias tlg='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
 alias wread-c='fhMode=curl wr_force=y wread'
 alias withchrome='fhMode=curlfullshort '
-alias w2e-chrome='withchrome fnswap urlfinalg ec w2e' # readmoz uses full-html2 under the hood.
+alias w2e-chrome='withchrome fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
 alias tlf='tl -e w2e-chrome'
 ###
 function wgetm() {
@@ -110,7 +110,7 @@ function mercury-html() {
 }
 
 function httpm() {
-    http --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
+    http --style solarized-light --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
 }
 function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
@@ -676,6 +676,10 @@ reify libgen2md5
 noglobfn libgen2md5
 function jfic() {
     jee
+    local i
+    for i in "$@" ; do
+        silent aa -- "$(urlmeta "$i" image)"
+    done
     re "fanficfare --non-interactive" "$@"
     sout re p2k *.epub
 }

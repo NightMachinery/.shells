@@ -112,7 +112,7 @@ fnrep() {
     # functions[$restore]='return 1'
     local origbody origalias
     origbody=$functions[$fn] || $origbody=''
-    origalias=$alias[$fn] || $origalias=''
+    origalias=$aliases[$fn] || $origalias=''
 
     local e=1
     {
