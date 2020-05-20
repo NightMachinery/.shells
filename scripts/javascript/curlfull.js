@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+
+const timeout = ((process.env.cfTimeout) || 600) * 1000
+
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
 // puppeteer.use(require('puppeteer-extra-plugin-repl')())
@@ -16,10 +19,10 @@ puppeteer.use(StealthPlugin());
     const page = await browser.newPage();
 
     // https://github.com/puppeteer/puppeteer/blob/master/docs/api.md#pagegotourl-options
-    const waittill = {timeout: 300000, waitUntil:  ['networkidle2', 'domcontentloaded']}
+    const waittill = { timeout: 300000, waitUntil: ['networkidle2', 'domcontentloaded'] }
     await page.goto(url, waittill);
     // await page.waitForNavigation(waittill); // can get stuck
-    await page.waitFor(60000);
+    await page.waitFor(timeout);
 
     // Start an interactive REPL here with the `page` instance.
     // await page.repl()

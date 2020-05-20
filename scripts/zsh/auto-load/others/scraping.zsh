@@ -4,12 +4,15 @@ alias tlc='tlrl-code'
 alias tlg='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
 alias wread-c='fhMode=curl wr_force=y wread'
+alias withchrome='fhMode=curlfullshort '
+alias w2e-chrome='withchrome w2e' # readmoz uses full-html2 under the hood.
+alias tlf='tl -e w2e-chrome'
 ###
 function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"
 }
 function curlm() {
-  curl --silent --fail --location --cookie-jar "$(mktemp)" --header "$(cookies-auto "$@")" "$@"
+    curl --silent --fail --location --cookie-jar "$(mktemp)" --header "$(cookies-auto "$@")" "$@"
 }
 getcookies() {
     mdoc "[cookiesFile= ] $0 <url>
@@ -44,7 +47,7 @@ Outputs in header style." MAGIC
 
     if [[ "$url" =~ '^http' ]]
     then
-           c="Cookie:$(getcookies "$url")"
+        c="Cookie:$(getcookies "$url")"
     fi
     test -z "$url" && c="Cookie:${env_c}"
     ec "$c"
@@ -84,7 +87,7 @@ function wread() {
     test "${2:=markdown}" = 'html' && title='"<h1>"+.title+"</h1>"' || title='"# "+.title'
     test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
     local merc="$({ test -z "$file" && { # No file, downloading
-	    test -z "$wr_force" && { mercury-parser --format="${2}" "$(urlfinalg "$1")" || return $? } || {
+        test -z "$wr_force" && { mercury-parser --format="${2}" "$(urlfinalg "$1")" || return $? } || {
                   fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html
 # l
 # cat ./a.html
@@ -106,26 +109,31 @@ function mercury-html() {
     serr mercury-html.js "$@"
 }
 
+function httpm() {
+    http --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
+}
 function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
-      # seems to be because the server is messed up, but whatever:
-      # http: error: Incomplete download: size=46696; downloaded=131310
+    # seems to be because the server is messed up, but whatever:
+    # http: error: Incomplete download: size=46696; downloaded=131310
 
     #fhMode="${fhMode:-http}" full-html "$1" /dev/stdout
 
     local mode="${fhMode:-http}"
     local stdout=/dev/stdout
-	  [[ "$mode" =~ 'curlfull' ]] && curlfull.js "$1"
+    [[ "$mode" =~ 'curlfullshort' ]] && cfTimeout=1 curlfull.js "$1"
+    [[ "$mode" =~ 'curlfull' ]] && cfTimeout=20 curlfull.js "$1"
+    [[ "$mode" =~ 'curlfulllong' ]] && cfTimeout=900 curlfull.js "$1"
     [[ "$mode" =~ 'aa(cookies)?' ]] && dbgserr aacookies "$1" -o "$stdout" # Note that -o accepts basenames not paths
     [[ "$mode" =~ '(c|g)url' ]] && gurl "$1"
-    [[ "$mode" =~ 'http(ie)?' ]] && dbgserr http --session "pink$(uuidpy)" "$1" --download
+    [[ "$mode" =~ 'http(ie)?' ]] && dbgserr httpm "$1"
 }
 function full-html() {
     fhMode="${fhMode:-curlfull}" full-html2 "$1" > "$2"
     return "$?"
 
     # local mode="${fhMode:-curlfull}"
-	  # [[ "$mode" =~ 'curlfull' ]] && curlfull.js "$1" > "$2"
+    # [[ "$mode" =~ 'curlfull' ]] && curlfull.js "$1" > "$2"
     # [[ "$mode" =~ 'aa(cookies)?' ]] && dbgserr aacookies "$1" -o "$2" # Note that -o accepts basenames not paths
     # [[ "$mode" =~ '(c|g)url' ]] && gurl "$1" > "$2"
     # [[ "$mode" =~ 'http(ie)?' ]] && http --session pink "$1" --output "$2"
@@ -161,8 +169,9 @@ wayback-url() {
 w2e-curl() {
     we_dler=wread-curl w2e "$@"
 }
-wread-curl() {
-    gurl "$1"
+function wread-curl() {
+    full-html2 "$1"
+    # gurl "$1"
 }
 w2e-gh() {
     h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
@@ -204,8 +213,8 @@ url-final() {
     ec # to output newline
 }
 url-final2() {
-	doc "This one doesn't download stuff."
-	[[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
+    doc "This one doesn't download stuff."
+    [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 url-final3() {
     doc 'The most reliable and expensive way.'
@@ -266,15 +275,15 @@ html2epub-calibre() {
     local u="$1 $(uuidgen).html" title="${1}" authors="${2:-nHight}"
     merge-html "${@:3}" > "$u"
     ebook-convert "$u" "$title.epub" \
-                  --authors="$authors" \
-                  --level1-toc="//*[name()='h1' or name()='h2']" \
-                  --level2-toc="//h:h3" \
-                  --level3-toc="//*[@class='subsection']" \
-                  --page-breaks-before="//*[(name()='h1' or name()='h2') or @class='owner-name']" \
-                  --use-auto-toc --toc-threshold=0 \
-                  --toc-title="The TOC" \
-                  --embed-all-fonts \
-                  --title="$title" --epub-inline-toc --enable-heuristics
+        --authors="$authors" \
+        --level1-toc="//*[name()='h1' or name()='h2']" \
+        --level2-toc="//h:h3" \
+        --level3-toc="//*[@class='subsection']" \
+        --page-breaks-before="//*[(name()='h1' or name()='h2') or @class='owner-name']" \
+        --use-auto-toc --toc-threshold=0 \
+        --toc-title="The TOC" \
+        --embed-all-fonts \
+        --title="$title" --epub-inline-toc --enable-heuristics
     \rm "$u"
 }
 txt2epub () {
@@ -289,8 +298,8 @@ Use txt2epub-pandoc.
 Usage: $0 <title> <authors> <txt-file>" MAGIC
     local u="$3" title="${1}" authors="${2:-nTight}"
     ebook-convert "$u" "$title.epub" \
-                  --authors="$authors" \
-                  --title="$title" --epub-inline-toc --enable-heuristics
+        --authors="$authors" \
+        --title="$title" --epub-inline-toc --enable-heuristics
 
 }
 t2e() {
@@ -318,7 +327,7 @@ web2epub() {
     local hasFailed=''
     for url in "${(@f)$(urlfinalg "${@:2}")}"
     do
-	    local bname="$(url-tail "$url")"  #"${url##*/}"
+        local bname="$(url-tail "$url")"  #"${url##*/}"
         #test -z "$bname" && bname="u$i"
         bname="${(l(${##})(0))i} $bname"
         i=$((i+1))
@@ -418,10 +427,10 @@ code2epub() {
     pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
 function getlinks() {
-	lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
-	}
+    lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
+}
 function getlinksoup() {
-	getlinks.py "$1" | command rg "${@[2,-1]:-.*}"
+    getlinks.py "$1" | command rg "${@[2,-1]:-.*}"
 }
 noglobfn getlinks getlinksoup
 function getlinksfull() {
@@ -429,35 +438,35 @@ function getlinksfull() {
 Remember that you can customize full-html by fhMode." MAGIC
 
     local url="$1"
-	  local u
-	  u="$(uuidpy)"
-	  full-html "$url" "$u"
+    local u
+    u="$(uuidpy)"
+    full-html "$url" "$u"
     test -e "$u" || { ecerr "${0}: Couldn't download $url" ; return 1 }
-	  getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
-	  \rm "$u"
+    getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
+    \rm "$u"
 }
 noglobfn getlinksfull
 function lwseq() {
-	mdoc "Usage: [tl options] URL ...
-	Creates an ebook out of the sequences specified." MAGIC
-	local opts
+    mdoc "Usage: [tl options] URL ...
+    Creates an ebook out of the sequences specified." MAGIC
+    local opts
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
-	re lw2gw "$@" | inargsf re getlinksfull | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]}" -p "${opts[-p]}" -o "${opts[-o]}"
+    re lw2gw "$@" | inargsf re getlinksfull | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]}" -p "${opts[-p]}" -o "${opts[-o]}"
 }
 noglobfn lwseq
 function urlfinalg() {
-	doc supports Google redirects. Set uf_idem to y to return original.
-	local URL="$1"
-	test -n "$uf_idem" && {
-	ec "$URL"
-	return 0
-	}
-	local u="$URL"
-	[[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
-	u=`echo "$URL" | perl -n -e '/url=([a-zA-Z0-9%\.]*)/ && print "$1\n"'`
-	u="$(ec $u | url-decode.py)"
-	}
-	url-final2 "$u"
+    doc supports Google redirects. Set uf_idem to y to return original.
+    local URL="$1"
+    test -n "$uf_idem" && {
+        ec "$URL"
+        return 0
+    }
+    local u="$URL"
+    [[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
+        u=`echo "$URL" | perl -n -e '/url=([a-zA-Z0-9%\.]*)/ && print "$1\n"'`
+        u="$(ec $u | url-decode.py)"
+    }
+    url-final2 "$u"
 }
 reify urlfinalg
 noglobfn urlfinalg
@@ -465,18 +474,18 @@ jwiki() {
     serr jwiki.py "$*" 1
 }
 wread-man() {
-	local m=""
-	m="$(MAN_KEEP_FORMATTING=1 COLUMNS=70 serr man "$1")" && m="$(<<<"$m" command ul)" || m="$(2>&1 "$1" --help)" || { ecerr "$0 failed for $1" ; return 1 }
-	<<<"$m" aha --title "$1"
+    local m=""
+    m="$(MAN_KEEP_FORMATTING=1 COLUMNS=70 serr man "$1")" && m="$(<<<"$m" command ul)" || m="$(2>&1 "$1" --help)" || { ecerr "$0 failed for $1" ; return 1 }
+    <<<"$m" aha --title "$1"
 }
 function tlman() {
-	uf_idem=y we_dler="wread-man" w2e "$1" "$@"
+    uf_idem=y we_dler="wread-man" w2e "$1" "$@"
 }
 function wread-bat() {
-unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title "$(basename "$1")"
+    unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title "$(basename "$1")"
 }
 function tlbat() {
-	uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
+    uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
 }
 function getlinksfull2() {
     mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
@@ -519,7 +528,7 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
         else
             inargsf aacookies -Z
         fi
-        }
+    }
 }
 function aaCW() {
     mdoc "$0 <url> ..." MAGIC
@@ -613,18 +622,18 @@ function hi10-from-page() {
     # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
 }
 function libgendl-md5-main() {
-	  local md5="$1"
+    local md5="$1"
     local mainmirror="http://93.174.95.29"
-	# local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
-	local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
-	getlinks-c -e '\.[^/]+$' "$urls[@]"
+    # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
+    local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
+    getlinks-c -e '\.[^/]+$' "$urls[@]"
 }
 function libgendl-md5-bok() {
     local outs="$(libgendl-md5-bok-helper "$1" |inargsf bok.py)"
     test -e "$outs" # we expect only a single download
 }
 function libgendl-md5-bok-helper() {
-	  local md5="$1"
+    local md5="$1"
     local url="https://b-ok.cc/md5/$md5"
     getlinks-c -e '/book/' "$url" |gsort -u
 }
@@ -649,25 +658,25 @@ function libgendl-md5() {
 }
 reify libgendl-md5-main libgendl-md5-bok libgendl-md5-old libgendl-md5-bok-old libgendl-md5
 function jlibplain() {
-	  # libgendl-md5-main "${(f@)$(re libgen2md5 "$@")}" | inargsf aa -Z
-	  libgendl-md5 "${(f@)$(libgen2md5 "$@")}"
-	  # serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
+    # libgendl-md5-main "${(f@)$(re libgen2md5 "$@")}" | inargsf aa -Z
+    libgendl-md5 "${(f@)$(libgen2md5 "$@")}"
+    # serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 }
 noglobfn jlibplain
 function jlib() {
-	  jee
-	  jlibplain "$@"
-	  dir2k
+    jee
+    jlibplain "$@"
+    dir2k
 }
 function libgen2md5() {
-	  [[ "$1" =~ '(\w{32})\W*$' ]] && print -r -- "$match[1]"
+    [[ "$1" =~ '(\w{32})\W*$' ]] && print -r -- "$match[1]"
 }
 reify libgen2md5
 noglobfn libgen2md5
 function jfic() {
-	  jee
-	  re "fanficfare --non-interactive" "$@"
-	  sout re p2k *.epub
+    jee
+    re "fanficfare --non-interactive" "$@"
+    sout re p2k *.epub
 }
 ##
 function url2note() {
@@ -724,7 +733,8 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
     local cleanedhtml="$(<<<"$html" readability "$url")"
     local prehtml="$(url2html "$url")"
     ec "$prehtml"
-    test -n "$summaryMode" || ec "<p> --- </p> $cleanedhtml"
+    # <p> --- </p>
+    test -n "$summaryMode" || ec "<hr> $cleanedhtml"
 }
 function readmozsum() {
     : "Use url2html instead? No advtanges to this."
