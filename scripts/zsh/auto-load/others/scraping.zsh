@@ -8,8 +8,13 @@ alias withchrome='fhMode=curlfullshort '
 alias w2e-chrome='withchrome fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
 alias tlf='tl -e w2e-chrome'
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
-alias tllw='tl -e w2e-curl-wayback'
 ###
+function tllw() {
+    # we can't use `alias tllw='\noglob tl -e w2e-lw-raw'` because tl won't get the correct URLs then.
+    tll "${(@f)$(wayback-url "${@:2}")}"
+}
+noglobfn tllw
+
 function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"
 }
@@ -154,7 +159,9 @@ function full-html() {
 function random-poemist() {
     curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
 }
-xkcd() wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
+xkcd() {
+    wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
+}
 wayback() {
     comment -e, --exact-url
     comment "-t, --to TIMESTAMP Should take the format YYYYMMDDhhss, though
@@ -175,9 +182,12 @@ wread-wayback() {
 wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
 }
+reify wayback-url
+noglobfn wayback-url
 w2e-curl() {
     we_dler=wread-curl w2e "$@"
 }
+noglobfn w2e-curl
 function wread-curl() {
     full-html2 "$1"
     # gurl "$1"
@@ -185,6 +195,7 @@ function wread-curl() {
 w2e-gh() {
     h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }
+noglobfn w2e-gh
 gh-to-readme() {
     local urls=() i i2 readme url
     for i in "$@"
@@ -363,13 +374,18 @@ w2e-raw() {
 w2e-o() {
     wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
 }
+noglobfn w2e-o
 w2e-wayback() {
     w2e-raw "$1" "${(@f)$(wayback-url "${@:2}")}"
 }
+noglobfn w2e-wayback
 w2e-lw-raw() {
     we_author=LessWrong w2e-curl "$1" "${(@f)$(re lw2gw "${@:2}")}"
 }
 lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com
+reify lw2gw
+noglobfn lw2gw
+
 html2epub-pandoc-simple() {
     ecdbg "h2e-ps called with $@"
     pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
@@ -386,7 +402,7 @@ code2html() {
     chroma --formatter html --html-lines --style trac "$@"
 }
 code2html-url() {
-    code2html "${@:2}" <(gurl "$1")
+    code2html "${@:2}" <(full-html2 "$1")
 }
 wread-code() {
     code2html-url "$1"
