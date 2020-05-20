@@ -4,7 +4,8 @@ if (( $+commands[tag-ag] )); then
     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
 fi
 ##
-alias agc='ec "${(F)commands}"|agC=0 agm'
+alias agc='ec "${(F)commands}"|agC=0 rgm  --color=never'
+alias agfunc='ec "${(Fk)functions}"| agC=0 rgm  --color=never'
 ##
 function ugm() {
     ugrep  --break --context=3 -Q  --recursive --smart-case "$@"

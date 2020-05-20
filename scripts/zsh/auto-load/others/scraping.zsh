@@ -7,6 +7,8 @@ alias wread-c='fhMode=curl wr_force=y wread'
 alias withchrome='fhMode=curlfullshort '
 alias w2e-chrome='withchrome fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
 alias tlf='tl -e w2e-chrome'
+alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
+alias tllw='tl -e w2e-curl-wayback'
 ###
 function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"
@@ -360,6 +362,9 @@ w2e-raw() {
 }
 w2e-o() {
     wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
+}
+w2e-wayback() {
+    w2e-raw "$1" "${(@f)$(wayback-url "${@:2}")}"
 }
 w2e-lw-raw() {
     we_author=LessWrong w2e-curl "$1" "${(@f)$(re lw2gw "${@:2}")}"

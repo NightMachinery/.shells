@@ -55,6 +55,10 @@ ffcommands() {
     printz "$(agc "${@:-.}" | fz --prompt 'Commands> ')"
 }
 alias ffc=ffcommands
+fffunctions() {
+    printz "$(agfunc "${@:-.}" | fz --prompt 'Functions> ')"
+}
+alias fff=fffunctions
 chis() {
     # Forked from fzf's wiki
     # browse chrome history
