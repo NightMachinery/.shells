@@ -22,9 +22,9 @@ mapg() {
 mapln() { mg_sep=$'\n' mapg "$@" }
 mapnul() { mg_sep=$'\0' mapg "$@" }
 revargs() {
-	mdoc reverse args: "$0" '<function>' arguments... MAGIC
-	# (O = reverse of the order specified in the next flag, a = normal array order).
-	eval "$1" "$(gq "${(Oa)@[2,-1]}")"
+    mdoc reverse args: "$0" '<function>' arguments... MAGIC
+    # (O = reverse of the order specified in the next flag, a = normal array order).
+    eval "$1" "$(gq "${(Oa)@[2,-1]}")"
 }
 ##
 # inargse() {
@@ -100,6 +100,8 @@ function filter-gen() {
 ##
 fnrep() {
     doc 'Replaces a function temporarily during <cmd>: <fn> <new body> <cmd>'
+    doc 'WARNING: Currently does not accommodate our own macro-enhancers like reify.'
+
     local fn="$1"
     local body="$2"
     local cmd=( "${@[3,-1]}" )
@@ -108,12 +110,14 @@ fnrep() {
     # local restore="_restore_$1_$(uuidpy)"
     # functions[$restore]='{ test -n "$'$origbody'" && functions['$fn']=$'$origbody' || unfunction '$fn' } ; trap - INT TERM ; unfunction '$restore' ; return 1'
     # functions[$restore]='return 1'
-    local origbody
+    local origbody origalias
     origbody=$functions[$fn] || $origbody=''
+    origalias=$alias[$fn] || $origalias=''
 
     local e=1
     {
         # trap false INT TERM
+        silent unalias $fn
         functions[$fn]=$body
         reval "${cmd[@]}"
         e=$?
@@ -121,12 +125,13 @@ fnrep() {
         # ec Trying to restore after command execution ...
         # geval "$restore"
         test -n "$origbody" && functions[$fn]="$origbody" || unfunction $fn
+        test -n "$origalias" && aliases[$fn]="$origalias"
         # trap - INT TERM
     }
     return $e
 }
 fnswap() {
-	fnrep "$1" "$2 "'"$@"' "$@[3,-1]"
+    fnrep "$1" "$2 "'"$@"' "$@[3,-1]"
 }
 fnrepvc() {
     fnrep git "vcsh $1"' "$@"' "${@[2,-1]}"

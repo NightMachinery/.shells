@@ -30,3 +30,4 @@ alias kipy="pbcopy 'import os; os.kill(os.getpid(), 9)' #kill from within ipytho
 alias ta='tmux a -t'
 alias agsf='ags -F'
 alias rr=rgm
+alias ebk='ebook-viewer'

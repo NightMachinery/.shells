@@ -18,7 +18,8 @@ avarice() {
 }
 alias lq='loop-startover ~/tmp/.luna'
 function deluna() {
-    local nonce="$(oneinstance-setup $0)" || return 1
+    local nonce
+    nonce="$(oneinstance-setup $0)" || return 1
     local timeout="${1:-150}"
     while oneinstance $0 $nonce
     do

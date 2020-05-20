@@ -10,6 +10,7 @@ alias isNotExpensive='[[ -n "$NIGHT_NO_EXPENSIVE" ]]'
 function isDbg() {
     test -n "$DEBUGME"
 }
+alias isdbg=isDbg
 function isNotDbg() {
     ! isDbg
 }

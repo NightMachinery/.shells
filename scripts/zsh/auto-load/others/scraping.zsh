@@ -5,7 +5,7 @@ alias tlg='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
 alias wread-c='fhMode=curl wr_force=y wread'
 alias withchrome='fhMode=curlfullshort '
-alias w2e-chrome='withchrome w2e' # readmoz uses full-html2 under the hood.
+alias w2e-chrome='withchrome fnswap urlfinalg ec w2e' # readmoz uses full-html2 under the hood.
 alias tlf='tl -e w2e-chrome'
 ###
 function wgetm() {
@@ -121,12 +121,12 @@ function full-html2() {
 
     local mode="${fhMode:-http}"
     local stdout=/dev/stdout
-    [[ "$mode" =~ 'curlfullshort' ]] && cfTimeout=1 curlfull.js "$1"
-    [[ "$mode" =~ 'curlfull' ]] && cfTimeout=20 curlfull.js "$1"
-    [[ "$mode" =~ 'curlfulllong' ]] && cfTimeout=900 curlfull.js "$1"
-    [[ "$mode" =~ 'aa(cookies)?' ]] && dbgserr aacookies "$1" -o "$stdout" # Note that -o accepts basenames not paths
-    [[ "$mode" =~ '(c|g)url' ]] && gurl "$1"
-    [[ "$mode" =~ 'http(ie)?' ]] && dbgserr httpm "$1"
+    [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 curlfull.js "$1" ; return $? }
+    [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 curlfull.js "$1" ; return $? }
+    [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 curlfull.js "$1" ; return $? }
+    [[ "$mode" =~ '^aa(cookies)?$' ]] && { dbgserr aacookies "$1" -o "$stdout" ; return $? } # Note that -o accepts basenames not paths
+    [[ "$mode" =~ '^(c|g)url$' ]] && { gurl "$1" ; return $? }
+    [[ "$mode" =~ '^http(ie)?$' ]] && { dbgserr httpm "$1" ; return $? }
 }
 function full-html() {
     fhMode="${fhMode:-curlfull}" full-html2 "$1" > "$2"
@@ -214,6 +214,7 @@ url-final() {
 }
 url-final2() {
     doc "This one doesn't download stuff."
+    doc 'WARNING: Can eat info. E.g., https://0bin.net/paste/5txWS7vyTdaEvNAg#QJZjwyNoWYyaV5-rqdCAcV7opxc+kyaMwoQ7wyjLjKy'
     [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 url-final3() {
@@ -343,7 +344,7 @@ web2epub() {
     test -z "$hasFailed" && { ec "Converting to epub ..."
                               ecdbg files to send to h2ed *
                               html2epub "$1" "$author" * #.html
-                              mv *.epub ../ && cd '../' && \rm -r "./$u"
+                              mv *.epub ../ && cd '../' &&  { isDbg || \rm -r "./$u" }
                               ec "Book '$1' by '$author' has been converted successfully."
     } || { ecerr "$hasFailed" && (exit 1) }
 }
@@ -729,7 +730,11 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
     local url="$1"
     local summaryMode="$rmS"
 
-    local html="${rmHtml:-$(full-html2 "$url")}"
+    local html
+    html="${rmHtml:-$(full-html2 "$url")}" || {
+        ecerr "${0}: Could not download $url; aborting."
+        return 1
+        }
     local cleanedhtml="$(<<<"$html" readability "$url")"
     local prehtml="$(url2html "$url")"
     ec "$prehtml"
