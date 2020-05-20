@@ -124,7 +124,14 @@ function full-html2() {
     [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 curlfull.js "$1" ; return $? }
     [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 curlfull.js "$1" ; return $? }
     [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 curlfull.js "$1" ; return $? }
-    [[ "$mode" =~ '^aa(cookies)?$' ]] && { dbgserr aacookies "$1" -o "$stdout" ; return $? } # Note that -o accepts basenames not paths
+    [[ "$mode" =~ '^aa(cookies)?$' ]] && {
+        local tmp="$(uuidgen)"
+        local tmpdir="$(get-tmpdir)"
+        dbgserr aacookies "$1" --dir "$tmpdir" -o "$tmp" || return $?
+        < "$tmpdir/$tmp"
+        return $?
+        # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
+    }
     [[ "$mode" =~ '^(c|g)url$' ]] && { gurl "$1" ; return $? }
     [[ "$mode" =~ '^http(ie)?$' ]] && { dbgserr httpm "$1" ; return $? }
 }

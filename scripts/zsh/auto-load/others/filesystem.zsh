@@ -1,3 +1,6 @@
+function get-tmpdir() {
+    dirname "$(gmktemp -u)"
+}
 function prefix-files() {
     for file in "${@:2}"
     do
