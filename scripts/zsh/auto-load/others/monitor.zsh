@@ -1,9 +1,15 @@
+function lsofp() {
+    ppgrep "$@" | fz --header-lines 1 | awk '{print $2}' | inargsf re "lsof -p" | less
+}
+aliasfn fflsof lsofp
+aliasfn plsof lsofp
+
 function jprocs() {
-	jah procs -c always "$@"
+    jah procs -c always "$@"
 }
 function jprocs-pic() {
-	procs "$@" | convert -page  4000x4000 -font FreeMono -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"$0 $*".png
-	jdoc
+    procs "$@" | convert -page  4000x4000 -font FreeMono -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"$0 $*".png
+    jdoc
 }
 function getidle-darwin() {
     ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'

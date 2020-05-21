@@ -27,7 +27,10 @@ alias pym='python -m'
 alias pyc='python -c'
 alias tsm='tsend $me'
 alias kipy="pbcopy 'import os; os.kill(os.getpid(), 9)' #kill from within ipython embed"
-alias ta='tmux a -t'
+# alias ta='tmux a -t' # fftmux might have made this irrelevant
 alias agsf='ags -F'
 alias rr=rgm
 alias ebk='ebook-viewer'
+##
+alias ltl='lt -l'
+##

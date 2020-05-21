@@ -1,14 +1,22 @@
 ###
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
-alias ntl='ntLines=y ntsearch'
 ###
+function ntl() {
+    local sel
+    sel="$(ntLines=y ntsearch| gcut -d: -f3-)" || return 1
+    <<<"$sel" fnswap rg rgm match-url-rg --passthru && {
+        local url="$(<<<"$sel" match-url-rg --only-matching --replace '$1')"
+        pbcopy "$url"
+    }
+    return 0
+}
 function ugnt() {
     local i args=()
     for i in "$note_formats[@]" ; do
         args+=( -O "$i" )
     done
-    ugm "$args[@]" "$@"
+    ugm "$args[@]" "$@" $nightNotes/
 }
 function vnt() {
     ntsearch "$@" || return 1
@@ -102,7 +110,7 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
 
     jglob
 
-    local file="$1" desc="$2" 
+    local file="$1" desc="$2"
     local compressed="$(gmktemp --suffix .jpg)" # ".${file:e}"
     convert $file -define jpeg:extent=150kb $compressed # 200kb didn't work
     file=$compressed
@@ -110,7 +118,7 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
     ## python base64 (might work in eva):
     # encoded_string= base64.b64encode(img_file.read())
     # print(encoded_string.decode('utf-8'))
-    
+
     # somehow breaks in eva_aget ...
     print -r -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 "$file" | tr -d '\r\n'))"
 }
@@ -119,7 +127,7 @@ function img2md-imgur() {
 Outputs the image in markdown format, hosted on imgur." MAGIC
 
     jglob
-    local file="$1" desc="$2" 
+    local file="$1" desc="$2"
 
     print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
 }

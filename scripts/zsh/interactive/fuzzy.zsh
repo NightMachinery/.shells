@@ -7,11 +7,16 @@ alias ve='veditor=(emc) '
 alias vv='ve v'
 alias frc='frConfirm=y '
 ###
+function fzinw() {
+    doc 'fz in words: allows you to select the part of the output you need from a command. (alt: smenu?)'
+    iaIFS=$' \t\n\C-@'"'"'(){}"[]' inargss arrN | fz
+}
 fftmux() {
+    local query="$*"
     local engine=(tmux a -t)
     test -n "$ftE[*]" && engine=("$ftE[@]")
     local sessions
-    sessions="$(tmux ls|fz)" || return $?
+    sessions="$(tmux ls|fz --query "$query")" || return $?
     local i
     for i in "${(f@)sessions}"
     do
@@ -27,8 +32,7 @@ fr() {
     magic mdoc "frConfirm='' $0 <cmd> [<fd args> ...]" ; mret
     sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
     test -n "$sels" && {
-        local cmd=("$1" "${sels[@]}")
-        cmd="$(gq "$cmd[@]")"
+        local cmd=("$1 $(gq "${sels[@]}")")
         if test -n "$frConfirm" ; then
             printz $cmd
         else

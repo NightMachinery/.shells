@@ -54,6 +54,8 @@ alias inargsc="fsep='' inargs-gen" # splits by char
 alias inargss="fsep='IFS' inargs-gen"
 alias inargsa="fsep='ALL' inargs-gen"
 inargs-gen() {
+    doc '[iaIFS=] for fsep=IFS supported'
+    
     local sep="${fsep}"
     local noSkipEmpty="$inargsRunEmpty"
     local cmd="$1"
@@ -62,7 +64,7 @@ inargs-gen() {
     doc "We intentionally drop empty args"
     args="${$(</dev/stdin ; print -n .)[1,-2]}"
     if [[ "$sep" == IFS ]] ; then
-        args=( ${=args} )
+        IFS="${iaIFS:-IFS}" eval 'args=( ${=args} )'
     elif [[ "$sep" == ALL ]] ; then
 
     else
