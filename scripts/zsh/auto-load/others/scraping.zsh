@@ -179,12 +179,12 @@ wayback-out() {
 wread-wayback() {
     wayback-out "$1" | wread --file /dev/stdin "$@"
 }
-wayback-url() {
+function wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
 }
 reify wayback-url
 noglobfn wayback-url
-w2e-curl() {
+function w2e-curl() {
     we_dler=wread-curl w2e "$@"
 }
 noglobfn w2e-curl
@@ -192,11 +192,11 @@ function wread-curl() {
     full-html2 "$1"
     # gurl "$1"
 }
-w2e-gh() {
+function w2e-gh() {
     h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }
 noglobfn w2e-gh
-gh-to-readme() {
+function gh-to-readme() {
     local urls=() i i2 readme url
     for i in "$@"
     do
@@ -227,36 +227,39 @@ gh-to-readme() {
     done
     gh-to-raw "$urls[@]"
 }
-gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
-url-final() {
+function gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
+function url-final() {
     curlm -o /dev/null -w %{url_effective} "$@" #|| ec "$@" # curl prints urls even if it fails ...
     ec # to output newline
 }
-url-final2() {
+function url-final2() {
     doc "This one doesn't download stuff."
     doc 'WARNING: Can eat info. E.g., https://0bin.net/paste/5txWS7vyTdaEvNAg#QJZjwyNoWYyaV5-rqdCAcV7opxc+kyaMwoQ7wyjLjKy'
     [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
-url-final3() {
+function url-final3() {
     doc 'The most reliable and expensive way.'
     # retry-limited 3 urlfinal.js "$1" || url-final2 "$1"
     # TODO Puppeteer has stopped working on eva?
     url-final2 "$1"
 }
 reify url-final url-final2 url-final3
-url-tail() {
+noglobfn url-final url-final2 url-final3
+function url-tail() {
     [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]" || ec "$1"
 }
+reify url-tail
+noglobfn url-tail
 function tlrlu(){
     tlrl-ng "$@" -p "$(url-tail "$(url-final3 "$1")") | "
 }
-tlrl-code(){
+function tlrl-code(){
     w2e-code "$(url-tail "$(url-final "$1")")" "$@"
 }
-tlrl-gh() {
+function tlrl-gh() {
     w2e-gh "$(url-tail "$(url-final "$1")")" "$@"
 }
-tlrl-ng() {
+function tlrl-ng() {
     mdoc "Usage: $0 [OPTIONS] <url> ...
 Description: Automatically infers the title and the author from the first URL, and feeds all URLs into 'w2e'.
 Options:
@@ -368,55 +371,57 @@ web2epub() {
                               ec "Book '$1' by '$author' has been converted successfully."
     } || { ecerr "$hasFailed" && (exit 1) }
 }
-w2e-raw() {
+function w2e-raw() {
     web2epub "$1" "${@:2}" && p2k "$1.epub"
 }
-w2e-o() {
+function w2e-o() {
     wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 noglobfn w2e-o
-w2e-wayback() {
+function w2e-wayback() {
     w2e-raw "$1" "${(@f)$(wayback-url "${@:2}")}"
 }
 noglobfn w2e-wayback
-w2e-lw-raw() {
+function w2e-lw-raw() {
     we_author=LessWrong w2e-curl "$1" "${(@f)$(re lw2gw "${@:2}")}"
 }
-lw2gw() rgx "$1" 'lesswrong\.com' greaterwrong.com
+function lw2gw() {
+    rgx "$1" 'lesswrong\.com' greaterwrong.com
+}
 reify lw2gw
 noglobfn lw2gw
 
-html2epub-pandoc-simple() {
+function html2epub-pandoc-simple() {
     ecdbg "h2e-ps called with $@"
     pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
-aa2e() {
+function aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
     aget "aa -Z $(gquote "${@:2}")
 html2epub-pandoc-simple $1:q ${${author:-aa2e}:q} *
 mv $1:q.epub ../"
     p2k "$1".epub
 }
-code2html() {
+function code2html() {
     mdocu '[chroma-options] file -> HTML in stdout' MAGIC
     chroma --formatter html --html-lines --style trac "$@"
 }
-code2html-url() {
+function code2html-url() {
     code2html "${@:2}" <(full-html2 "$1")
 }
-wread-code() {
+function wread-code() {
     code2html-url "$1"
 }
-w2e-code-old() {
+function w2e-code-old() {
     doc DEPRECATED: The html produced is not bad but after conversion we lose newlines which just sucks.
     we_dler=wread-code w2e "$1" "${(@f)$(gh-to-raw "${@:2}")}"
 }
-w2e-code() {
+function w2e-code() {
     mdocu '<name> <url> ...' MAGIC
     aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:2}")}")" \; code2epub "$1:q" '*' \; mv ${1:q}.epub ../
     p2k ${1}.epub
 }
-code2md() {
+function code2md() {
     local i
     for i in "$@"
     do
@@ -434,7 +439,7 @@ function html-get-reading-estimate() {
     est="$(cat "$1" | readtime.js)"
     ec "$(ec $est|jqm .humanizedDuration) ($(ec $est|jqm .totalWords) words)"
 }
-merge-html() {
+function merge-html() {
     (( $# == 1 )) && {
         ec "<p>$(html-get-reading-estimate $1)</p>
 
@@ -451,7 +456,7 @@ $(cat "$i")
 "
     done
 }
-code2epub() {
+function code2epub() {
     mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
     pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
@@ -499,10 +504,10 @@ function urlfinalg() {
 }
 reify urlfinalg
 noglobfn urlfinalg
-jwiki() {
+function jwiki() {
     serr jwiki.py "$*" 1
 }
-wread-man() {
+function wread-man() {
     local m=""
     m="$(MAN_KEEP_FORMATTING=1 COLUMNS=70 serr man "$1")" && m="$(<<<"$m" command ul)" || m="$(2>&1 "$1" --help)" || { ecerr "$0 failed for $1" ; return 1 }
     <<<"$m" aha --title "$1"

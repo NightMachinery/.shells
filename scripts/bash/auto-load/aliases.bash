@@ -141,8 +141,8 @@ alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
-alias ybase="\noglob youtube-dl --no-playlist --write-sub --prefer-ffmpeg"
-alias y="ybase --external-downloader aria2c  --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'"
+alias ybase="\noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
+alias y="ybase --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'"
 alias yarc='y --download-archive ~/.yarchive'
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"

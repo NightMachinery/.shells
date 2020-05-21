@@ -13,7 +13,7 @@ diraction-personal-config (){
     cel $cellar
     nt $HOME/cellar/notes/
     jrl $HOME/cellar/notes/journal
-    doom $DOOMDIR
+    dom $DOOMDIR
 "
 }
 antibody bundle "adrieankhisbe/diractions"

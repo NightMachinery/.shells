@@ -39,3 +39,6 @@ Searches Youtube and plays the result as audio." MAGIC
 
     mpv --ytdl-format=bestaudio ytdl://ytsearch:"$*"
 }
+function mpv-cache() {
+    mpv --force-seekable=yes --cache=yes --cache-secs=99999999 "$@"
+}

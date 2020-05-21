@@ -1,4 +1,5 @@
 alias aacert='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
+alias ysp='y-stream-pipe'
 ###
 function aaserver() {
     mkdir -p ~/Downloads/aas/
@@ -33,13 +34,35 @@ function aas() {
 function aac-getlen() {
     aac call aria2.tellStatus -P "$1" | jqm .completedLength
 }
+function y-stream-pipe() {
+    # https://github.com/mpv-player/mpv/issues/7716
+    # https://github.com/ytdl-org/youtube-dl/issues/25344
+    # https://github.com/ytdl-org/youtube-dl/issues/25345
+    
+    magic mdocu '<url>
+You can resume the partial download of this function by using |y-stream|.
+mpv breaks if you seek to undownloaded location.
+Shows you how much is downloaded at least.' ; mret
+
+    local url="$1"
+
+    local out=( "${(@f)$(ybase --get-url --no-part -f best --get-filename -o "%(title)s.%(ext)s" "$url")}" )
+
+
+    test -n "$out[1]" || { ecerr Could not get video\'s url. Aborting. ; return 1 }
+    test -n "$out[2]" || { ecerr Could not get video\'s name. Aborting. ; return 1 }
+    local name="$out[2]"
+    # local tmuxname="$(<<<$out[2] gtr -cd ' [a-zA-Z0-9]_-')"
+    # local dlurl="$out[1]"
+
+    ybase -f best "$url" -o - | tee "$name" | mpv-cache -
+}
 function y-stream() {
     magic mdoc 'y-stream <url>
-Alt: ys.py might be more stable.' ; mret
+Alt: ys.py, y-stream-pipe' ; mret
 
     
     local out=( "${(@f)$(memoi_expire=$((3600*24)) y --get-url --no-part -f best --get-filename -o "%(title)s.%(ext)s" "$@")}" )
-    #We need to use yic or archived videos return nothing causing mpv to play * :D
 
 
     test -n "$out[1]" || { ecerr Could not get video\'s url. Aborting. ; return 1 }
@@ -50,16 +73,18 @@ Alt: ys.py might be more stable.' ; mret
     
     # '--split 6 --enable-http-pipelining --stream-piece-selector inorder'
     revaldbg tmuxnew $tmuxname $(expand-alias-strip ybase) --external-downloader aria2c --external-downloader-args '--file-allocation falloc' --no-part -f best  -o "%(title)s.%(ext)s" "$@"
+    # disabling allocation doesn't really add much value. Less errors, I guess, but the play experience doesn't change and it doesn't show the downloaded amount. So we might as well preallocate.
+
     # ysid="$!" # id of the backgrounded y. You can use it to kill it or whatever.
 
     ## new2
     {
-    until (( ${$(filesizereal $name):-0} > 2000000 ))
-    do
-        ecerr Not big enough yet
-        sleep 1
-    done
-    mpv $name
+        until (( ${$(filesizereal $name):-0} > 2000000 ))
+        do
+            ecerr Not big enough yet
+            sleep 1
+        done
+        mpv "appending://$name"
     } always { tmuxzombie $tmuxname }
     return $?
 
@@ -75,13 +100,13 @@ Alt: ys.py might be more stable.' ; mret
     }
     ## old
     true || {
-    # ec Somehow stderr was being suppressed this one time ...
-    ecerr trying to start mpv
-    retry-mpv "${out:q}"
-    kill -2 -$ysid
-    # mpv bug here
-    # kill $!
-    # kill $! is your friend :))
+        # ec Somehow stderr was being suppressed this one time ...
+        ecerr trying to start mpv
+        retry-mpv "${out:q}"
+        kill -2 -$ysid
+        # mpv bug here
+        # kill $!
+        # kill $! is your friend :))
     }
 }
 function retry-mpv() {

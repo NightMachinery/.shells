@@ -18,7 +18,7 @@ fftmux() {
         [[ $i =~ '([^:]*):.*' ]] && {
             ec "acting on session $match[1]"
             reval "${engine[@]}" "$match[1]"
-            }
+        }
     done
 }
 alias fft=fftmux
@@ -34,7 +34,7 @@ fr() {
         else
             eval $cmd
         fi
-        }
+    }
 }
 f() fr "$@" --max-depth 1
 ffman() {
@@ -75,25 +75,25 @@ chis() {
     fi
     cp -f "$google_history" /tmp/h
     local links="$(sqlite3 -separator $sep /tmp/h \
-            "select substr(title, 1, $cols), url
+        "select substr(title, 1, $cols), url
      from urls order by last_visit_time desc" |
         awk -F $sep '{printf "%-'$cols's  \x1b[36m%s\x1b[m\n", $1, $2}' |
         ag "${@:-.}" |fz --no-sort --ansi | gsed 's#.*\(https*://\)#\1#')"
     ec "$links"
     ec "$links"|pbcopy
     [[ "${o:-y}" == y ]] && { local i
-    for i in "${(@f)links}"
-    do
-        $open "$i"
-    done }
+                              for i in "${(@f)links}"
+                              do
+                                  $open "$i"
+                              done }
     return 0
 }
 alias ffchrome=chis
 function init-vfiles() {
     : GLOBAL vfiles
 
-    if test -z "$vfiles[1]" ; then
-	    local i dirs=( "${(@0)$(arr0 $NIGHTDIR $cellar $codedir/nodejs $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
+    if test -n "$*" || test -z "$vfiles[1]" ; then
+        local i dirs=( "${(@0)$(arr0 $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
         vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} )
         # for i in "$dirs[@]" ; do
         #     vfiles+=( $i/**/*(.D^+isbinary) )
@@ -121,10 +121,10 @@ function v() {
     }
 
     command rg '^>' ~/.viminfo | cut -c3- |
-                while read line; do
-                    line="${line/\~/$HOME}"
-                    [ -f "$line" ] && files+="$line"
-                done
+        while read line; do
+            line="${line/\~/$HOME}"
+            [ -f "$line" ] && files+="$line"
+        done
     test -f ~/.emacs.d/.cache/recentf && {
         command rg --only-matching --replace '$1' '^\s*"(.*)"$' ~/.emacs.d/.cache/recentf |
             while read line; do
