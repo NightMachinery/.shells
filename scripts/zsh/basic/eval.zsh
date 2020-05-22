@@ -1,5 +1,6 @@
 ###
 alias seval='ge_ecdbg=y geval' #silent debuggable eval
+alias evaldbg='seval'
 alias eval-good='geval'
 alias eval-quoted='reval'
 alias greval=rgeval

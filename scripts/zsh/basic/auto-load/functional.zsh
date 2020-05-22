@@ -142,3 +142,19 @@ labeled() {
     #  zip enumerate
     ec "${@[2,-1]}: $(reval "$@")"
 }
+function transformer() {
+    magic mdoc "$0 <=transformer> <=cmd> <arg> ...
+Runs transformer on cmd's args and then execs the cmd with the transformed args." ; mret
+    # test:
+    # transformer '() { ec START $@ END }' 'arger good' 1 2 '' "a b c" k
+
+    local transformer="$1"
+    local cmd="$2"
+    local args=( "${@[3,-1]}" )
+    local targs=()
+    local i
+    for i in "$args[@]" ; do
+        targs+="$(eval "$transformer $(gq "$i")")"
+    done
+    evaldbg "$cmd $(gq "$targs[@]")"
+}

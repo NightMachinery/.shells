@@ -6,12 +6,13 @@ alias gurl='curlm -o /dev/stdout'
 alias wread-c='fhMode=curl wr_force=y wread'
 alias withchrome='fhMode=curlfullshort '
 alias w2e-chrome='withchrome fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
-alias tlchrome='tl -e w2e-chrome'
+alias tlchrome='tlrl-ng -e w2e-chrome'
 aliasfn tlf tlchrome
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
+alias tllw='tlrl-ng -e w2e-lw-raw'
 ###
-function tllw() {
-    # we can't use `alias tllw='\noglob tl -e w2e-lw-raw'` because tl won't get the correct URLs then.
+function tllwb() {
+    # we can't use an alias because tl won't get the correct URLs then.
     tll "${(@f)$(wayback-url "${@:2}")}"
 }
 noglobfn tllw
@@ -184,6 +185,7 @@ wread-wayback() {
 function wayback-url() {
     waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
 }
+enh-urlfinal wayback-url
 reify wayback-url
 noglobfn wayback-url
 function w2e-curl() {
@@ -241,8 +243,8 @@ function url-final2() {
 }
 function url-final3() {
     doc 'The most reliable and expensive way.'
+    # too expensive
     # retry-limited 3 urlfinal.js "$1" || url-final2 "$1"
-    # TODO Puppeteer has stopped working on eva?
     url-final2 "$1"
 }
 reify url-final url-final2 url-final3
@@ -259,10 +261,10 @@ function tlrl-code(){
     tlrl-ng -e w2e-code -p "|$(url-tailf "$1")| " "$@"
 }
 function url-tailf() {
-    ec "$(url-tail "$(url-final2 "$1")")"
+    ec "$(url-tail "$(urlfinalg "$1")")"
 }
 function url-tailedtitle() {
-    ec "$(urlmeta "$1" title) $(url-tail "$(url-final "$1")")"
+    ec "$(urlmeta "$1" title) $(url-tail "$(urlfinalg "$1")")"
 }
 renog url-tailedtitle
 function tlrl-gh() {
@@ -300,6 +302,7 @@ Options:
     popf
     return $e
 }
+noglobfn tlrl-ng
 outlinify() {
     mapln 'https://outline.com/$1' "$@"
 }
@@ -393,12 +396,15 @@ function w2e-wayback() {
 }
 noglobfn w2e-wayback
 function w2e-lw-raw() {
-    we_author=LessWrong w2e-curl "$1" "${(@f)$(re lw2gw "${@:2}")}"
+    w2e-curl "$1" "${(@f)$(lw2gw "${@:2}")}"
+    # transformer lw2gw "w2e-curl $(gq "$1")" "${@:2}"
+    # transformer urlfinalg "transformer lw2gw w2e-curl $(gq "$1")" "${@:2}"
 }
 function lw2gw() {
     rgx "$1" 'lesswrong\.com' greaterwrong.com
 }
 reify lw2gw
+enh-urlfinal lw2gw
 noglobfn lw2gw
 
 function html2epub-pandoc-simple() {

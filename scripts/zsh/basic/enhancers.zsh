@@ -1,4 +1,5 @@
 function enh-savename() {
+    # TODO Adding a way to keep track of all saved names would be good.
     mdoc "$0 <name of original function> <its renamed version after enhancement>" MAGIC
 
     typeset -A -g enhSavedNames
@@ -73,4 +74,17 @@ function renog() {
         reify "$i"
         noglobfn "$i"
     done
+}
+function enh-urlfinal() {
+    doc "Run urlfinalg on args on the given function automatically."
+
+    test -n "$functions[$1]" || { ecerr "Function '$1' is empty or doesn't exist." ; return 1 }
+
+    local realname="_urlfinal_$1"
+    local enhanced="transformer urlfinalg $realname"' "$@"'
+    [[ "$functions[$1]" =~ '\s*\Q'"$enhanced"'\E\s*' ]] || {
+        enh-savename "$1" "$realname"
+        functions[$realname]=$functions[$1]
+        functions[$1]="$enhanced"
+    }
 }
