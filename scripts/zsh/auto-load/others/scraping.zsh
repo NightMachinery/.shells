@@ -1,12 +1,13 @@
 # imports json.zsh
 ### Aliases
-alias tlc='tlrl-code'
-alias tlg='tlrl-gh'
+alias tlcode='tlrl-code'
+alias tlgh='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
 alias wread-c='fhMode=curl wr_force=y wread'
 alias withchrome='fhMode=curlfullshort '
 alias w2e-chrome='withchrome fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
-alias tlf='tl -e w2e-chrome'
+alias tlchrome='tl -e w2e-chrome'
+aliasfn tlf tlchrome
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
 ###
 function tllw() {
@@ -83,7 +84,8 @@ function cookies-auto() {
     ec "$c"
 }
 function wread() {
-    mdoc 'Out: wr_title wr_author' MAGIC
+    mdoc "[wr_force=] $0 [--file <file>] <url> [<output-format>]
+Global output: wr_title wr_author" MAGIC
     local file=''
     [[ "$1" == '--file' ]] && {
         test -e "$2" && file="$(realpath "$2")" || { ecerr "wread called with nonexistent file." ; return 33 }
@@ -251,13 +253,20 @@ function url-tail() {
 reify url-tail
 noglobfn url-tail
 function tlrlu(){
-    tlrl-ng "$@" -p "$(url-tail "$(url-final3 "$1")") | "
+    tlrl-ng "$@" -p "$(url-tailf "$1") | "
 }
 function tlrl-code(){
-    w2e-code "$(url-tail "$(url-final "$1")")" "$@"
+    tlrl-ng -e w2e-code -p "|$(url-tailf "$1")| " "$@"
 }
+function url-tailf() {
+    ec "$(url-tail "$(url-final2 "$1")")"
+}
+function url-tailedtitle() {
+    ec "$(urlmeta "$1" title) $(url-tail "$(url-final "$1")")"
+}
+renog url-tailedtitle
 function tlrl-gh() {
-    w2e-gh "$(url-tail "$(url-final "$1")")" "$@"
+    tlrl-ng -e w2e-gh -p "|$(url-tailf "$1")| " "$@"
 }
 function tlrl-ng() {
     mdoc "Usage: $0 [OPTIONS] <url> ...
@@ -349,6 +358,7 @@ web2epub() {
     local author="${we_author:-night}"
     local i=0
     local hasFailed=''
+    # FNSWAP: urlfinalg
     for url in "${(@f)$(urlfinalg "${@:2}")}"
     do
         local bname="$(url-tail "$url")"  #"${url##*/}"
@@ -375,7 +385,7 @@ function w2e-raw() {
     web2epub "$1" "${@:2}" && p2k "$1.epub"
 }
 function w2e-o() {
-    wr_force=y w2e-raw "$1" "${(@f)$(outlinify "${@:2}")}"
+    w2e-chrome "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 noglobfn w2e-o
 function w2e-wayback() {
@@ -771,7 +781,7 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
     html="${rmHtml:-$(full-html2 "$url")}" || {
         ecerr "${0}: Could not download $url; aborting."
         return 1
-        }
+    }
     local cleanedhtml="$(<<<"$html" readability "$url")"
     local prehtml="$(url2html "$url")"
     ec "$prehtml"
@@ -795,7 +805,9 @@ function readmoz-md() {
     local url="$1"
 
     local md="$(gmktemp --suffix .md)"
-    pandoc -s -f html-native_divs <(readmoz "$url") -o $md
+    # <() would not work with: readmoz-md https://github.com/google/python-fire/blob/master/docs/guide.md | cat
+    # zsh sure is buggy :|
+    pandoc -s -f html-native_divs =(readmoz "$url") -o $md
     < $md
     \rm $md
 }

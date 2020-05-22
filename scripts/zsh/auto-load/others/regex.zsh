@@ -10,6 +10,7 @@ function concat() {
     print -nr -- "${(j..)@}"
 }
 function match-url-rg() {
+    # FNSWAP: rg
     rg --engine pcre2 -e "$nightUrlRegex" "$@"
 }
 function match-url() {

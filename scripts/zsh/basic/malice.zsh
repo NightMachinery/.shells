@@ -9,6 +9,7 @@ function expand-alias {
     fi
 }
 function force-expand {
+    # FNSWAP: expand-aliases
     local e="$(expand-aliases "$1")"
     test -z "$e" && e="$1"
     ec "$e"
@@ -29,25 +30,25 @@ alias-special() {
     builtin alias "$args[@]"
     unset match
     isNotMalice || [[ -z "$args[*]" ]] || [[ "$args[1]" == -* ]] || { [[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]] &&
-        {
-		[[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]]
-	    # there is a bug in either ssh or ubuntu's zsh that loses the match variable here so I just rematch it
-		# dbg dvar match
-            # isNotDbg || { mhat3=("$match[@]") ; mhat2=("$args[@]") }
-            test -z "$match[1]" && { ecerr Empty alias detected. Called with "$args[@]" ; return 1 }
-            unset "ialiases[${(b)match[1]}]"
-            unset "baliases[${(b)match[1]}]"
-            eval "$1[\$match[1]]=y"
-            # doc we do not expand recursive aliases because that changes behavior
-            # doc for an example, try 'alias arger="arger a b"' with this safety disabled
-            # doc we can add a new class of once-exepanders that only expand once
-            # doc we could also ditch the automatic full expansion and manually expand till safety
-            # doc note that if the recursive alias is defined after this one, we will fail to detect it with our current brittle scheme.
-            ! { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } || {
-                # isNotDbg || print -r ialiasing "$match[1]" to avoid recursion
-                ialiases[$match[1]]=y
-            }
-        } || { ecerr aliasing "$args[*]" failed ; isNotDbg || mhat=("$args[@]") } }
+                                                                          {
+                                                                              [[ "$args[*]" =~ '\s*([^=]*)=([^\s]*)\s?.*' ]]
+                                                                              # there is a bug in either ssh or ubuntu's zsh that loses the match variable here so I just rematch it
+                                                                              # dbg dvar match
+                                                                              # isNotDbg || { mhat3=("$match[@]") ; mhat2=("$args[@]") }
+                                                                              test -z "$match[1]" && { ecerr Empty alias detected. Called with "$args[@]" ; return 1 }
+                                                                              unset "ialiases[${(b)match[1]}]"
+                                                                              unset "baliases[${(b)match[1]}]"
+                                                                              eval "$1[\$match[1]]=y"
+                                                                              # doc we do not expand recursive aliases because that changes behavior
+                                                                              # doc for an example, try 'alias arger="arger a b"' with this safety disabled
+                                                                              # doc we can add a new class of once-exepanders that only expand once
+                                                                              # doc we could also ditch the automatic full expansion and manually expand till safety
+                                                                              # doc note that if the recursive alias is defined after this one, we will fail to detect it with our current brittle scheme.
+                                                                              ! { [[ "$match[2]" == "$match[1]" ]] || (( $+ialiases[$match[2]] )) } || {
+                                                                                  # isNotDbg || print -r ialiasing "$match[1]" to avoid recursion
+                                                                                  ialiases[$match[1]]=y
+                                                                              }
+                                                                          } || { ecerr aliasing "$args[*]" failed ; isNotDbg || mhat=("$args[@]") } }
 }
 typeset -Ag baliases
 typeset -Ag ialiases

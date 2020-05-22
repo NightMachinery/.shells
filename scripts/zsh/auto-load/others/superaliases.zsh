@@ -1,2 +1,2 @@
-les() { eval "${(q+@)@}" |& less }
+les() { reval "$@" |& less }
 lesh() les "$@" --help

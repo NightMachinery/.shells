@@ -46,3 +46,4 @@ pypyp
 piep
 metadata-parser
 iredis
+fire
