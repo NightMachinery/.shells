@@ -810,11 +810,20 @@ function readmoz-file() {
 }
 function readmoz-md() {
     local url="$1"
+    local format=".${2:-md}"
 
-    local md="$(gmktemp --suffix .md)"
+    local md="$(gmktemp --suffix "$format")"
     # <() would not work with: readmoz-md https://github.com/google/python-fire/blob/master/docs/guide.md | cat
     # zsh sure is buggy :|
     pandoc -s -f html-native_divs =(readmoz "$url") -o $md
     < $md
     \rm $md
+}
+function readmoz-md2() {
+    readmoz "$1" | html2text "${@:2}" # --ignore-links
+}
+function readmoz-txt() {
+    local opts=( "${@:2}" )
+    test -n "$opts[*]" || opts=(--ignoreHref --ignoreImage --wordwrap=false --uppercaseHeadings=false)
+    readmoz "$1" | html-to-text "${opts[@]}" # returnDomByDefault
 }
