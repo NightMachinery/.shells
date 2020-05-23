@@ -6,14 +6,22 @@ fi
 ##
 alias agc='ec "${(F)commands}"|agC=0 rgm  --color=never'
 alias agfunc='ec "${(Fk)functions}"| agC=0 rgm  --color=never'
+alias rr=rgm
 alias rrn='rgm --line-number'
+aliasfn rd emcrg
 ##
+function emcrg() {
+    emc -e "(night/search-dir \"$(pwd)\")"
+}
 function ugm() {
     ugrep  --break --context=3 -Q  --recursive --smart-case "$@"
     # --binary-files=without-match
 }
+function rgbase() {
+    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto -C ${agC:-1} --color always --hidden "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+}
 function rgm() {
-    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto -C ${agC:-1} --color always --heading --hidden "$@" | less-min # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+    rgbase --heading "$@" | less-min
 }
 agm() rgm "$@" #alias agm='rg' #'ag -C "${agC:-1}" --nonumbers'
 

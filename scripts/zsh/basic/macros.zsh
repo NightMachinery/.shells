@@ -10,6 +10,7 @@ function aliasfn-classic() {
     run-on-each dvar args match
     aliasfn "$match[1]" "$match[2]"
 }
+aliasfn alifn aliasfn-classic
 function aliassafe() {
     builtin alias "$@"
     aliasfn-classic "$@"

@@ -6,6 +6,8 @@ alias vcode='veditor=(code-insiders -r) '
 alias ve='veditor=(emc) '
 alias vv='ve v'
 alias frc='frConfirm=y '
+alias cf='frc f'
+alias cfr='frc fr'
 ###
 function fzinw() {
     doc 'fz in words: allows you to select the part of the output you need from a command. (alt: smenu?)'
@@ -145,3 +147,14 @@ function v() {
     reval "${veditor[@]}" "${(@)files}"
 }
 function vni() { fr "${veditor[@]}" . $NIGHTDIR }
+function rgf() {
+    # TODO create a ripgrep parser with json
+
+    # Integration with ripgrep
+    local opts=( --delimiter ':|-|\x00' --with-nth 1,3..)
+    RG_PREFIX="$functions[rgbase] --null --line-number --no-heading -e"
+    local INITIAL_QUERY=( "$@" )
+
+    agC=4 FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq ${INITIAL_QUERY:-.})" \
+        fz-empty --reverse --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --phony --query "$INITIAL_QUERY"
+}

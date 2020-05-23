@@ -233,6 +233,7 @@ function gh-to-readme() {
 }
 function gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 function url-final() {
+    # beware curl's retries and .curlrc
     curlm -o /dev/null -w %{url_effective} "$@" #|| ec "$@" # curl prints urls even if it fails ...
     ec # to output newline
 }
@@ -736,7 +737,7 @@ function jfic() {
 function url2note() {
     magic mdoc "[ html= cleanedhtml= ] $0 <url> [<mode>] ; outputs in global variables and stdout." ; mret
 
-    local url="$1"
+    local url="$(urlfinalg "$1")"
     local mode="${2:-md}"
 
     local html="${html:-$(full-html2 "$url")}"

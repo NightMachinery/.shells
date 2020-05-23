@@ -152,6 +152,8 @@ function cee() {
 function ceer() {
     geval "${@:2} $(which "$1")"
 }
-mn() {
+function mn() {
+    local LESS=$LESSMIN
+    export LESS
     man "$@" || lesh "$@"
 }
