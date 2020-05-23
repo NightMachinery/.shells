@@ -9,13 +9,12 @@ alias w2e-chrome='withchrome fnswap urlfinalg arrN w2e' # readmoz uses full-html
 alias tlchrome='tlrl-ng -e w2e-chrome'
 aliasfn tlf tlchrome
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
-alias tllw='tlrl-ng -e w2e-lw-raw'
 ###
 function tllwb() {
     # we can't use an alias because tl won't get the correct URLs then.
-    tll "${(@f)$(wayback-url "${@:2}")}"
+    tll "${(@f)$(wayback-url "${@}")}"
 }
-noglobfn tllw
+noglobfn tllwb
 
 function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"
@@ -258,7 +257,7 @@ function tlrlu(){
     tlrl-ng "$@" -p "$(url-tailf "$1") | "
 }
 function tlrl-code(){
-    tlrl-ng -e w2e-code -p "|$(url-tailf "$1")| " "$@"
+    tlrl-ng -e w2e-code -p "[$(url-tailf "$1")] " "$@"
 }
 function url-tailf() {
     ec "$(url-tail "$(urlfinalg "$1")")"
@@ -268,7 +267,7 @@ function url-tailedtitle() {
 }
 renog url-tailedtitle
 function tlrl-gh() {
-    tlrl-ng -e w2e-gh -p "|$(url-tailf "$1")| " "$@"
+    tlrl-ng -e w2e-gh -p "[$(url-tailf "$1")] " "$@"
 }
 function tlrl-ng() {
     mdoc "Usage: $0 [OPTIONS] <url> ...
@@ -400,6 +399,11 @@ function w2e-lw-raw() {
     # transformer lw2gw "w2e-curl $(gq "$1")" "${@:2}"
     # transformer urlfinalg "transformer lw2gw w2e-curl $(gq "$1")" "${@:2}"
 }
+function tllw() {
+    # we can't use an alias because tl won't get the correct URLs then.
+    tll "${(@f)$(lw2gw "${@}")}"
+}
+noglobfn tllw
 function lw2gw() {
     rgx "$1" 'lesswrong\.com' greaterwrong.com
 }

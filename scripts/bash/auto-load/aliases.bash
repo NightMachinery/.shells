@@ -147,7 +147,6 @@ alias yarc='y --download-archive ~/.yarchive'
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
 alias tl='\noglob tlrl-ng'
-alias tllw='\noglob tl -e w2e-lw-raw'
 alias w2e='\noglob w2e-raw'
 alias w2e-lw='\noglob w2e-lw-raw'
 alias dcali="h2ed='html2epub-calibre' "
