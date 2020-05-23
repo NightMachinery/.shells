@@ -1,2 +1,2 @@
-les() { reval "$@" |& less }
-lesh() les "$@" --help
+function les() { reval "$@" |& less }
+function lesh() { les "$@" --help }

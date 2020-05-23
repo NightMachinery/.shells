@@ -2,6 +2,9 @@
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
 ###
+function emcnt() {
+    emc -e "(night/search-notes)"
+}
 function ntl() {
     local sel
     sel="$(ntLines=y ntsearch| gcut -d: -f3-)" || return 1

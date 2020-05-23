@@ -111,14 +111,14 @@ bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+R
 #Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
 # Use colon separators#.
 #xterm-24bit|xterm with 24-bit direct color mode,
-   #use=xterm-256color,
-   #setb24=\E[48:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
-   #setf24=\E[38:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
+#use=xterm-256color,
+#setb24=\E[48:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
+#setf24=\E[38:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
 ## Use semicolon separators.
 #xterm-24bits|xterm with 24-bit direct color mode,
-   #use=xterm-256color,
-   #setb24=\E[48;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
-   #setf24=\E[38;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
+#use=xterm-256color,
+#setb24=\E[48;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
+#setf24=\E[38;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
 #tic -x -o ~/.terminfo terminfo-24bit.src
 isDarwin && export TERM=xterm-24bits || true
 
@@ -190,8 +190,62 @@ zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
 
 zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
+
+##
+expand-or-complete-with-dots() {
+    # toggle line-wrapping off and back on again
+    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti rmam
+    print -Pn "%{%F{red}......%f%}"
+    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti smam
+
+    zle expand-or-complete
+    zle redisplay
+}
+zle -N expand-or-complete-with-dots
+bindkey "^I" expand-or-complete-with-dots
+##
+# antibody bundle Aloxaf/fzf-tab
+FZF_TAB_OPTS=(
+    --ansi   # Enable ANSI color support, necessary for showing groups
+    --expect='$continuous_trigger' # For continuous completion
+    # '--color=hl:$(( $#headers == 0 ? 108 : 255 ))'
+    --color=light
+    --nth=2,3 --delimiter='\x00'  # Don't search prefix
+    --layout=reverse --height='${FZF_TMUX_HEIGHT:=75%}'
+    --tiebreak=begin -m --bind=tab:down,btab:up,change:top,ctrl-space:toggle --cycle
+    '--query=$query'   # $query will be expanded to query string at runtime.
+    '--header-lines=$#headers' # $#headers will be expanded to lines of headers at runtime
+)
+function fztab() {
+    fz "$@"
+}
+FZF_TAB_COMMAND=( fztab "$FZF_TAB_OPTS[@]" )
+zstyle ':fzf-tab:*' command $FZF_TAB_COMMAND
+zstyle ':fzf-tab:*' no-group-color $'\033[38;5;24m'
+# FZF_TAB_GROUP_COLORS=(
+#     $'\033[94m' $'\033[32m' $'\033[33m' $'\033[35m' $'\033[31m' $'\033[38;5;27m' $'\033[36m' \
+#         $'\033[38;5;100m' $'\033[38;5;98m' $'\033[91m' $'\033[38;5;80m' $'\033[92m' \
+#         $'\033[38;5;214m' $'\033[38;5;165m' $'\033[38;5;124m' $'\033[38;5;120m'
+# )
+# FZF_TAB_GROUP_COLORS=()
+# for i in {1..16} ; do
+#     # FZF_TAB_GROUP_COLORS+="$(colorfg 10 255 10)"
+#     FZF_TAB_GROUP_COLORS+=$'\033[38;5;19m'
+# done
+# zstyle ':fzf-tab:*' group-colors $FZF_TAB_GROUP_COLORS
+
+antibody bundle Aloxaf/fzf-tab
+fzf-tab-partial-and-complete() {
+    if [[ $LASTWIDGET = 'fzf-tab-partial-and-complete' ]]; then
+        fzf-tab-complete
+    else
+        zle complete-word
+    fi
+}
+
+# zle -N fzf-tab-partial-and-complete
+# bindkey '^I' fzf-tab-partial-and-complete
+##
+###
 export rcLoaded='loading'
 zsh-defer export rcLoaded='yes'
-
-
-
