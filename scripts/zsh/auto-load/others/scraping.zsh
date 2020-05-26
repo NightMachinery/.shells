@@ -1,5 +1,6 @@
 # imports json.zsh
 ### Aliases
+alias withtxt="we_dler=readmoz-txt h2ed=txt2epub " # better for tables
 alias tlcode='tlrl-code'
 alias tlgh='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
@@ -329,7 +330,17 @@ txt2epub () {
     "${t2ed:-txt2epub-pandoc}" "$@"
 }
 txt2epub-pandoc () {
-    pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+# TODO turn this into general pandoc convertor by modularizing the suffix
+    magic mdocu "<title> <author> <file> ..." ; mret
+    local files=( "${@:3}" )
+    local txts=()
+    local i
+    for i in "$files[@]" ; do
+      local t="$(gmktemp --suffix .txt)"
+      cp "$i" "$t"
+      txts+="$t"
+    done
+    pandoc --toc -s "$txts[@]" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
 txt2epub-calibre() {
     mdoc "DEPRECATED. Outputs weird like â€™ for apostrophe. Also only accepts single input.
@@ -373,7 +384,7 @@ web2epub() {
         i=$((i+1))
 
         # API Change; old: "${we_dler:-wread}"
-        retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" html '>' "$bname:q" && ec "Downloaded $url ..." || {
+        retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" '>' "$bname:q" && ec "Downloaded $url ..." || {
                 ec "$url" >> failed_urls
                 ecerr "Failed $url"
                 hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
@@ -831,6 +842,6 @@ function readmoz-md2() {
 }
 function readmoz-txt() {
     local opts=( "${@:2}" )
-    test -n "$opts[*]" || opts=(--ignoreHref --ignoreImage --wordwrap=false --uppercaseHeadings=false)
+    test -n "$opts[*]" || opts=(--ignoreHref --ignoreImage --wordwrap=false --uppercaseHeadings=false --tables=true)
     readmoz "$1" | html-to-text "${opts[@]}" # returnDomByDefault
 }

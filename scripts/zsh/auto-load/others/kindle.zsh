@@ -99,3 +99,10 @@ function jgetktmp() {
     ktmp
     lm|filter testre '\.epub$' | tail -n "$num" |inargsf rexa 'cp _ $jd'
 }
+function 2pdf() {
+  jglob
+  local f="$1"
+local margin=1
+local scale="${2:-1.75}"
+ebook-convert $f ${f:r}.pdf --custom-size=$((4.6/$scale))x$((6.7/$scale)) --pdf-page-margin-left=$margin --pdf-page-margin-right=$margin --pdf-page-margin-top=$margin --pdf-page-margin-bottom=$margin
+}
