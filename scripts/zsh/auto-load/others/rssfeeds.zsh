@@ -57,6 +57,7 @@ rss-tsend() {
             ec "$t"
 
             labeled redism SADD $rssurls "$l"
+            # TODO rm these sumy debug statements
         ecdate test2 sumy start
         sumym https://github.com/LisaDziuba/Marketing-for-Engineers
         ecdate test2 sumy end
