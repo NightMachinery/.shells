@@ -2,6 +2,7 @@
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
 ###
+
 function emcnt() {
     emc -e "(night/search-notes)"
 }
@@ -90,7 +91,7 @@ gsed -n $((ln+1)),$((ln+50))p $fileabs
             i=1
             for line in "${(@f)content}" ; do
                 if test -n "$line" ; then
-                ec "${filename}:${i}:${line}"
+                    ec "${filename}:${i}:${line}"
                 fi
                 i=$((i+1))
             done
@@ -116,30 +117,30 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
     local file="$1" desc="$2"
     local compressed="$(gmktemp --suffix .jpg)" # ".${file:e}"
     convert $file -define jpeg:extent=150kb $compressed # 200kb didn't work
-    file=$compressed
-    doc use base64 from brew to ensure consistency
-    ## python base64 (might work in eva):
-    # encoded_string= base64.b64encode(img_file.read())
-    # print(encoded_string.decode('utf-8'))
+                                                        file=$compressed
+                                                        doc use base64 from brew to ensure consistency
+                                                        ## python base64 (might work in eva):
+                                                        # encoded_string= base64.b64encode(img_file.read())
+                                                        # print(encoded_string.decode('utf-8'))
 
-    # somehow breaks in eva_aget ...
-    print -r -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 "$file" | tr -d '\r\n'))"
+                                                        # somehow breaks in eva_aget ...
+                                                        print -r -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 "$file" | tr -d '\r\n'))"
 }
-function img2md-imgur() {
-    mdoc "$0 <picture-file> [<description>]
+ function img2md-imgur() {
+     mdoc "$0 <picture-file> [<description>]
 Outputs the image in markdown format, hosted on imgur." MAGIC
 
-    jglob
-    local file="$1" desc="$2"
+     jglob
+     local file="$1" desc="$2"
 
-    print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
-}
-function unt() {
-    isI && test -z "$*" && set -- "$(pbpaste)"
-    local note="$(url2md "$@")"
-    ec $note
-    if isI ; then
-        pbcopy $note
-    fi
-}
-noglobfn unt
+     print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
+ }
+ function unt() {
+     isI && test -z "$*" && set -- "$(pbpaste)"
+     local note="$(url2md "$@")"
+     ec $note
+     if isI ; then
+         pbcopy $note
+     fi
+ }
+ noglobfn unt

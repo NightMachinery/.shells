@@ -1,3 +1,6 @@
+test -z "$ZSH_PROFILEME" || zmodload zsh/zprof # use zprof -c to reset counters
+# Does not profile internals of functions well.
+
 set -o vi
 export disable_malice=y
 export NIGHT_PERSONAL=y
