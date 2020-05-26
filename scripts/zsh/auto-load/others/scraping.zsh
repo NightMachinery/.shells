@@ -119,7 +119,7 @@ function mercury-html() {
 }
 
 function httpm() {
-    http --style solarized-light --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
+    http --style solarized-light --ignore-stdin --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
 }
 function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
@@ -142,7 +142,10 @@ function full-html2() {
         # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
     }
     [[ "$mode" =~ '^(c|g)url$' ]] && { gurl "$1" ; return $? }
-    [[ "$mode" =~ '^http(ie)?$' ]] && { dbgserr httpm "$1" ; return $? }
+    [[ "$mode" =~ '^http(ie)?$' ]] && {
+        dbgserr httpm "$1"
+        return $?
+    }
 }
 function full-html() {
     fhMode="${fhMode:-curlfull}" full-html2 "$1" > "$2"

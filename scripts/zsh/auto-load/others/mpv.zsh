@@ -22,7 +22,7 @@ function mpv-noidle() {
     while true
     do
         set-volume 0
-        (( $(getidle-darwin) >= 0.7 )) &&  {
+        (( $(getidle-darwin) >= 0.2 )) &&  {
             cleanbuffer
             kill -9 -$mympv # '-' makes it kill the whole process group. It's necessary.
             # pk mpv
@@ -31,6 +31,7 @@ function mpv-noidle() {
             # sleep 10 #interferes with silencing the volume
             break
             }
+        sleep 0.1
     done
 }
 function yta() {

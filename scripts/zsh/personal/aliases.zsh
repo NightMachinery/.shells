@@ -1,6 +1,6 @@
 isNotExpensive || {
     function zimportzlua() {
-        zoxide import ~/.zlua
+        zoxide import --merge ~/.zlua
     }
     export _ZO_DATA_DIR="$HOME/.z.dir"
     mkdir -p "$_ZO_DATA_DIR"
