@@ -52,17 +52,24 @@ rss-tsend() {
             t="$(<<<"$t" html2utf.py)"
             for c in $conditions[@]
             do
-                reval "$c" "$l" "$t" || continue 2
+              reval "$c" "$l" "$t" || { ecdate "Skipping $t $l" ; continue 2 }
             done
             ec "$t"
 
             labeled redism SADD $rssurls "$l"
-
-            test -n "$notel" || ensurerun "150s" tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
+        ecdate test2 sumy start
+        sumym https://github.com/LisaDziuba/Marketing-for-Engineers
+        ecdate test2 sumy end
+            # ensurerun "150s" tsend ... 
+            ( test -n "$notel" || dbg revaldbg tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(dbg revaldbg sumym "$l")" )
             sleep 120 #because wuxia sometimes sends unupdated pages
-            reval "$engine[@]" "$l" "$t"
+            dbg revaldbg "$engine[@]" "$l" "$t"
         done
-        echo restarting "$0 $@" | tee -a $log
+        ecdate restarting "$0 $@ (exit: $?)" | tee -a $log
+        ecdate test sumy start
+        sumym https://github.com/LisaDziuba/Marketing-for-Engineers
+        ecdate test sumy end
         sleep 1 # allows us to terminate the program
     done
+    ecdate Exiting. This is a bug.
 }
