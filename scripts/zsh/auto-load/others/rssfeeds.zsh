@@ -12,7 +12,7 @@ sumym () {
     # https://pypi.org/project/sumy/
     # lex-rank, text-rank
     # kl can be crazy on CPU. It also is probably worse than lex-rank.
-    sumy "${2:-lex-rank}" --length=7 --file =(readmoz-txt "$url") --format=plaintext
+    sumy "${2:-lex-rank}" --length=4 --file =(readmoz-txt "$url") --format=plaintext
 }
 rss-ctitle() {
     ggrep -P --silent "$rc_t[@]" <<< "$2"
@@ -57,19 +57,12 @@ rss-tsend() {
             ec "$t"
 
             labeled redism SADD $rssurls "$l"
-            # TODO rm these sumy debug statements
-            ecdate test2 sumy start
-            sumym https://github.com/LisaDziuba/Marketing-for-Engineers
-            ecdate test2 sumy end
-            # ensurerun "150s" tsend ... 
+            # ensurerun "150s" tsend ...
             test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
             sleep 120 #because wuxia sometimes sends unupdated pages
             revaldbg "$engine[@]" "$l" "$t"
         done
         ecdate restarting "$0 $@ (exit: $?)" | tee -a $log
-        ecdate test sumy start
-        sumym https://github.com/LisaDziuba/Marketing-for-Engineers
-        ecdate test sumy end
         sleep 1 # allows us to terminate the program
     done
     ecdate Exiting. This is a bug.
