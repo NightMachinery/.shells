@@ -52,19 +52,19 @@ rss-tsend() {
             t="$(<<<"$t" html2utf.py)"
             for c in $conditions[@]
             do
-              reval "$c" "$l" "$t" || { ecdate "Skipping $t $l" ; continue 2 }
+                reval "$c" "$l" "$t" || { ecdate "Skipping $t $l" ; continue 2 }
             done
             ec "$t"
 
             labeled redism SADD $rssurls "$l"
             # TODO rm these sumy debug statements
-        ecdate test2 sumy start
-        sumym https://github.com/LisaDziuba/Marketing-for-Engineers
-        ecdate test2 sumy end
+            ecdate test2 sumy start
+            sumym https://github.com/LisaDziuba/Marketing-for-Engineers
+            ecdate test2 sumy end
             # ensurerun "150s" tsend ... 
-            ( test -n "$notel" || dbg revaldbg tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(dbg revaldbg sumym "$l")" )
+            test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
             sleep 120 #because wuxia sometimes sends unupdated pages
-            dbg revaldbg "$engine[@]" "$l" "$t"
+            revaldbg "$engine[@]" "$l" "$t"
         done
         ecdate restarting "$0 $@ (exit: $?)" | tee -a $log
         ecdate test sumy start

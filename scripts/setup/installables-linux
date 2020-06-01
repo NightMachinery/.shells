@@ -16,3 +16,4 @@ unzip
 curl
 snapd
 sendmail
+software-properties-common
