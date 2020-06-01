@@ -120,7 +120,6 @@ alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
 alias pxa='ALL_PROXY=socks5://127.0.0.1:1080'
 # alias cxc='\noglob __calc_plugin'
-alias retry='retry-limited 0'
 alias s=silent
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
 alias coursera='coursera-dl -n -pl --aria2 --video-resolution 720p --download-quizzes --download-notebooks -sl "en,fa" --resume'
@@ -141,9 +140,9 @@ alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
-alias ybase="\noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
-alias y="ybase --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'"
-alias yarc='y --download-archive ~/.yarchive'
+alias ybase="youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
+alias y="\noglob retry ybase --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'" # youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
+alias yarc='y --download-archive ~/.yarchive' # `-f best` to download single file
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
 alias tl='\noglob tlrl-ng'

@@ -1,3 +1,14 @@
+function ppgrep() {
+    case "$(uname)" in
+        Darwin)
+            \pgrep -i "$@" | gxargs --no-run-if-empty ps -fp
+            ;;
+        Linux)
+            \pgrep "$@" | gxargs --no-run-if-empty ps -fp
+            # Linux's pgrep doesn't support -i
+            ;;
+    esac
+}
 function lsofp() {
     ppgrep "$@" | fz --header-lines 1 | awk '{print $2}' | inargsf re "lsof -p" | less
 }

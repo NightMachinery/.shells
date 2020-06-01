@@ -24,4 +24,7 @@ get-volume() {
 function setv() {
     osascript -e "set volume output volume $1"
 }
-
+function display-off() {
+    watch -n ${1:-1} brightness 0
+    #macOS only probably
+}

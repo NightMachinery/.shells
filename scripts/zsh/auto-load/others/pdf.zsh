@@ -1,3 +1,7 @@
+function k2pdf() {
+    nis k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi "${k2_odpi:-450}" -y -ui-
+    # -as
+}
 function pdf-unencrypt() {
     mdocu "<file>
 Uses ghostscript to rewrite the file without encryption." MAGIC
@@ -23,12 +27,12 @@ k2pdf-split() {
         i=$[i+1]
     done
 }
-pdf-crop-margins () {
-	local u="$(uuidgen)"
-	command pdf-crop-margins -p 1 "$@" -o "$u"
-	# -p is percent retained of margins.
-	\rm "${@[-1]}"
-	\mv "$u" "${@[-1]}"
+function pdf-crop-margins () {
+    local u="$(uuidgen)"
+    command pdf-crop-margins -p 1 "$@" -o "$u"
+    # -p is percent retained of margins.
+    \rm "${@[-1]}"
+    \mv "$u" "${@[-1]}"
 }
 pdfcrop() { re pdf-crop-margins "$@" }
 pdfoutline() { jglob ; mutool show "$1" outline }
