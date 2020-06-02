@@ -1,0 +1,42 @@
+{
+  "downloads": { // Downloads-related settings
+    "path": "/Users/evar/Downloads/video/cliflix", // If saving them, put them here
+    "save": true // Save the downloaded torrents or delete them upon exit
+  },
+  "outputs": { // Apps-related settings
+    "available": ["Airplay", "Chromecast", "DLNA", "MPlayer", "mpv", "VLC", "IINA", "XBMC"], // Apps to list when asking for the app
+    "favorites": ["mpv"] // Favorite apps, they will be listed before the others
+  },
+  "torrents": { // Torrents-related settings
+    "limit": 30, // Number of torrents to show
+    "details": { // Extra columns to show
+      "seeders": true,
+      "leechers": true,
+      "size": true,
+      "time": true
+    },
+    "providers": { // Torrents providers-related settings
+      "available": ["1337x", "ThePirateBay", "ExtraTorrent", "Rarbg", "Torrent9", "KickassTorrents", "TorrentProject", "Torrentz2"], // Providers to list if none is active
+      "active": "1337x" // Active provider
+    }
+  },
+  "subtitles": { // Subtitles-related settings
+    "limit": 30, // Number of subtitles to show
+    "details": { // Extra columns to show
+      "downloads": true
+    },
+    "languages": { // Languages-related settings
+      "available": ["Afrikaans", "..."], // Languages to list when asking for the subtitles' language
+      "favorites": ["English", "..."] // Favorite languages, they will be listed before the others
+    },
+    "opensubtitles": { // OpenSubtitles-related settings
+      "username": null, // Your OpenSubtitles username, required for increasing your IP quota
+      "password": null, // Your OpenSubtitles password, required for increasing your IP quota
+      "ssl": true
+    }
+  },
+  "webtorrent": { // WebTorrent-related options
+    "options": [ // Custom options to always pass to WebTorrent
+    ]
+  }
+}
