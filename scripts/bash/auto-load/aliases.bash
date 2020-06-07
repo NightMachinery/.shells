@@ -141,7 +141,7 @@ alias weather="wego | less -r"
 alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
 alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias ybase="youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
-alias y="\noglob retry ybase --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'" # youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
+alias y="\noglob ybase --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'" # youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
 alias yarc='y --download-archive ~/.yarchive' # `-f best` to download single file
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/mp4'"
