@@ -11,6 +11,14 @@ alias tlchrome='tlrl-ng -e w2e-chrome'
 aliasfn tlf tlchrome
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
 ###
+function tlarc() {
+  fhMode=aa transformer to-archive-is tl "$@" 
+}
+function to-archive-is() {
+  # will fail if no snapshots exist
+  print -r -- "http://archive.is/newest/$(urlfinalg "$1")"
+  # oldest is also supported
+}
 function tllwb() {
     # we can't use an alias because tl won't get the correct URLs then.
     tll "${(@f)$(wayback-url "${@}")}"
