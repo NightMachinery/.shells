@@ -72,7 +72,7 @@ Alt: ys.py, y-stream-pipe' ; mret
     local dlurl="$out[1]"
     
     # '--split 6 --enable-http-pipelining --stream-piece-selector inorder'
-    revaldbg tmuxnew $tmuxname $(expand-alias-strip ybase) --external-downloader aria2c --external-downloader-args '--file-allocation falloc' --no-part -f best  -o "%(title)s.%(ext)s" "$@"
+    revaldbg tmuxnew $tmuxname $(expand-alias-strip ybase) --external-downloader aria2c --external-downloader-args '--file-allocation falloc' --no-part -f '(best[height<=800]/best)[protocol^=http]'  -o "%(title)s.%(ext)s" "$@"
     # disabling allocation doesn't really add much value. Less errors, I guess, but the play experience doesn't change and it doesn't show the downloaded amount. So we might as well preallocate.
 
     # ysid="$!" # id of the backgrounded y. You can use it to kill it or whatever.

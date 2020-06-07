@@ -1,3 +1,7 @@
+function trrz() {
+    # TODO config stored at ~/Library/Preferences/teevee-nodejs/
+    trr "$(teevee fetch)"
+}
 function magnet2torrent() {
     aria2c -d "${2:-.}" --bt-metadata-only=true --bt-save-metadata=true "$(hash2magnet "$1")"
 }

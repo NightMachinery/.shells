@@ -44,3 +44,4 @@ git+https://github.com/NightMachinary/readability-cli.git
 html-to-text
 bulksplash
 cliflix
+youtube-dl-interactive
