@@ -22,17 +22,18 @@ function rss-tsend() {
     mkdir -p ~/logs/
     local log=~/logs/rss-tsend.log
     local engine=("${rt_e[@]:-tl}")
+    local skip_engine="$rt_skip"
     local no_title="$rt_nt"
     local get_engine=("${rt_ge[@]}")
     test -n "$get_engine[*]" || get_engine=( rsstail -i 15 -l -n 0 -N  )
     local conditions=( ${rt_c[@]} )
-    local each_url_delay="${rt_ead:-120}"
+    local each_url_delay="${rt_eud:-120}"
     local each_iteration_delay="${rt_eid:-1}"
     local notel="${rt_notel}"
     local id="${rt_id:--1001293952668}"
     local rssurls="rssurls $*" # used for storing dup links in redis
 
-    local c
+    local c t l
     local url
     local urls=()
     for url in "$@"
@@ -43,6 +44,7 @@ function rss-tsend() {
 
     while :
     do
+        ## get_engine:
         # Use git+https://github.com/s0hv/rsstail.py .
         # python -m rsstail -n 0 --striphtml --nofail --interval $((60*15)) --format '{title}
         # {link}
@@ -50,9 +52,8 @@ function rss-tsend() {
         # python's rsstail sucks
 
         # https://github.com/flok99/rsstail
+        ##
 
-        local t l
-        
         reval "$get_engine[@]" "${urls[@]}" 2>> $log | tee -a $log | while read -d $'\n' -r t; do
             if test -n "$no_title" ; then
                 l="$t"
@@ -74,7 +75,7 @@ function rss-tsend() {
             # ensurerun "150s" tsend ...
             test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
             sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
-            revaldbg "$engine[@]" "$l" "$t"
+            test -n "$skip_engine" || revaldbg "$engine[@]" "$l" "$t"
         done
         ecdate restarting "$0 $@ (get_engine: $get_engine[*] )(exit: ${pipestatus[@]})" | tee -a $log
         sleep "$each_iteration_delay" # allows us to terminate the program
