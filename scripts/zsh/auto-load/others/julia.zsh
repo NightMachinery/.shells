@@ -128,8 +128,7 @@ function _1jma() {
 	local u="$(uuidgen)"
 	local p=~/Downloads/"$u"/
 	mkdir "$p"
-	deluge-console add -p "$p" "$1"
-	# Usage: add [-p <save-location>] <torrent-file> [<torrent-file> ...]
+	deluge-console add --move-path "$p" "$1"
 	sleep "${jm_s:-60}"
 	cp -r "$p" .
 }
@@ -153,3 +152,10 @@ jepubsplit() {
 	rm $jufile
 	dir2k
 }
+function jy() {
+  jee
+  sout y "$@"
+  jdl *
+  rm *
+}
+noglobfn jy

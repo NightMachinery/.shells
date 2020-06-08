@@ -540,7 +540,8 @@ function urlfinalg() {
     }
     local u="$URL"
     [[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
-        u=`echo "$URL" | perl -n -e '/url=([a-zA-Z0-9%\.]*)/ && print "$1\n"'`
+        #u=`echo "$URL" | perl -n -e '/url=([a-zA-Z0-9%\.]*)/ && print "$1\n"'`
+        [[ "$URL" =~ "url=([^&]*)" ]] && u="$match[1]" || { ecerr failed to decode Google url ; return 1 }
         u="$(ec $u | url-decode.py)"
     }
     url-final2 "$u"
