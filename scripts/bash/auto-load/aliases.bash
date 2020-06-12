@@ -158,6 +158,9 @@ function yf() {
     [[ "$ffull" =~ 'video only' ]] && f+="+bestaudio"
     rgeval y -f "$f" "$@"
 }
+function youtube-dl() {
+  transformer urlfinalg "command youtube-dl" "$@"
+}
 ##
 alias tl='\noglob tlrl-ng'
 alias w2e='\noglob w2e-raw'

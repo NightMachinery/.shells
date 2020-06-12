@@ -534,7 +534,7 @@ noglobfn lwseq
 function urlfinalg() {
     doc supports Google redirects. Set uf_idem to y to return original.
     local URL="$1"
-    test -n "$uf_idem" && {
+    { test -n "$uf_idem" || ! match-url "$URL" } && {
         ec "$URL"
         return 0
     }
