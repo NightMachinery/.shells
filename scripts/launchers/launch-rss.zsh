@@ -13,6 +13,8 @@ tmuxnewshenv="rt_ge=(getlinks-c -e 'radar-trends-to-watch') rt_nt=y rt_eid=$((36
 
 
 tmuxnewshenv="rt_e=true rt_id=$arista" tmuxnewsh rss-hn rss-tsend 'http://hnapp.com/rss?q=score%3E500'
-tmuxnewshenv="rt_e=true rt_id=$arista" tmuxnewsh rss-lobsters rss-tsend 'https://lobste.rs/top/rss'
+tmuxnewshenv="rt_e=true rt_id=$arista rt_eid=$((3600*24))" tmuxnewsh rss-lobsters rss-tsend 'https://lobste.rs/top/rss'
+# https://lobste.rs is blocked on eva somehow
+
 tmuxnewshenv='rt_e=tlrlu' tmuxnewsh rss-novelupdates rss-tsend 'https://www.novelupdates.com/rss.php?uid=145566&unq=5c39d8aba43cc&type=0&lid=local'
 # tmuxnewshenv="rt_c=(rss-ctitle) rc_t='Renegade Immortal' " tmuxnewsh rss-wuxia 'https://www.wuxiaworld.com/feed/chapters'

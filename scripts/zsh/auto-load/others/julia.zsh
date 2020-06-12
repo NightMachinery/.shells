@@ -153,9 +153,11 @@ jepubsplit() {
 	dir2k
 }
 function jy() {
+  local engine=("${jyE[@]:-y}")
   jee
-  sout y "$@"
+  sout "$engine[@]" "$@"
   jdl *
   rm *
 }
 noglobfn jy
+alias jys="jyE=ysmall jy"
