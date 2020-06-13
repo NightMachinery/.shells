@@ -787,6 +787,7 @@ function url2note() {
         test -z "$img" || ec '![]'"($img)"
     elif [[ "$mode" == html ]] ; then
         test -z "$title" || ec "<h1>${title}</h1>"
+        ec "<p>$url</p>"
         test -z "$author" || ec "<p>By: $author</p>"
         test -z "$readest" || ec "<p>${readest}</p>"
         test -z "$desc" || ec "<p>Description: $desc</p>"
