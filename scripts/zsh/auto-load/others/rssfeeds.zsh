@@ -25,7 +25,7 @@ function rss-tsend() {
     local skip_engine="$rt_skip"
     local no_title="$rt_nt"
     local get_engine=("${rt_ge[@]}")
-    test -n "$get_engine[*]" || get_engine=( rsstail -i 15 -l -n 0 -N  )
+    test -n "$get_engine[*]" || get_engine=( rsstail -i 15 -l -n 10 -N  )
     local conditions=( ${rt_c[@]} )
     local each_url_delay="${rt_eud:-120}"
     local each_iteration_delay="${rt_eid:-1}"
@@ -75,7 +75,7 @@ function rss-tsend() {
             # ensurerun "150s" tsend ...
             test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
             sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
-            test -n "$skip_engine" || revaldbg "$engine[@]" "$l" "$t"
+            test -n "$skip_engine" || rssTitle="$t" revaldbg "$engine[@]" "$l" # "$t"
         done
         ecdate restarting "$0 $@ (get_engine: $get_engine[*] )(exit: ${pipestatus[@]})" | tee -a $log
         sleep "$each_iteration_delay" # allows us to terminate the program
