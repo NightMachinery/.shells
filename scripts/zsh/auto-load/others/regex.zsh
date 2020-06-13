@@ -14,7 +14,7 @@ function match-url-rg() {
     rg --engine pcre2 -e "$nightUrlRegex" "$@"
 }
 function match-url() {
-    [[ "$*" =~ "$nightUrlRegex" ]]
+    [[ "$*" =~ "^$nightUrlRegex\$" ]]
 }
 function match-url-liberal() {
     # https://gist.github.com/gruber/249502
