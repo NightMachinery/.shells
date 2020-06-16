@@ -7,6 +7,8 @@ rt_skip="$rt_skip"
 #tmuxnewshenv="rt_skip='$rt_skip' " tmuxnewsh rss-royalroad rss-tsend 'https://www.royalroad.com/syndication/21322/'
 
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(tl -p 'stratechery | ')" tmuxnewsh rss-stratechery rss-tsend 'http://stratechery.com/feed/'
+# Create tlrl-host that adds the hostname of the URL to the title?
+tmuxnewshenv="rt_skip='$rt_skip'" tmuxnewsh rss-gen rss-tsend 'https://www.themoneyillusion.com/feed/'
 tmuxnewshenv="rt_skip='$rt_skip' rt_c=(rss-ctitle) rc_t=(-v 'Ansi Common Lisp') rt_e=(tl -p 'Paul Graham | ')" tmuxnewsh rss-paul rss-tsend 'http://www.aaronsw.com/2002/feeds/pgessays.rss'
 
 # alt: https://www.oreilly.com/radar/topics/radar-trends/feed/index.xml
