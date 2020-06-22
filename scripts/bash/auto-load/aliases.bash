@@ -17,7 +17,7 @@ alias wgd='bwg down "$WG_CONF"'
 alias tll="tl -e w2e-curl"
 alias eval-memoi='memoi-eval'
 alias fiy='FORCE_INTERACTIVE=y'
-alias myip='dig +short myip.opendns.com @resolver1.opendns.com'
+alias myip='curlm http://checkip.amazonaws.com' #'curlm https://ipinfo.io/ip' #'dig +short myip.opendns.com @resolver1.opendns.com'
 ialias re='run-on-each' #duplicate, to make it ialias
 ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
