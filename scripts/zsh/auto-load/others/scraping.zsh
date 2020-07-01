@@ -128,7 +128,7 @@ function mercury-html() {
 }
 
 function httpm() {
-    http --style solarized-light --ignore-stdin --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
+    http --style solarized-light --follow --ignore-stdin --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
 }
 function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
