@@ -42,5 +42,5 @@ function run-on-each() {
     done
 }
 alias re='run-on-each'
-run-on-each setopt re_match_pcre extendedglob
+run-on-each setopt re_match_pcre extendedglob pipefail
 run-on-each unsetopt autopushd

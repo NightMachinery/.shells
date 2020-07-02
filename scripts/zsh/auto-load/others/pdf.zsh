@@ -12,11 +12,14 @@ function pdf-cover() {
     convert "pdf:$1[0]" "png:$1:r.png"
 }
 pdf-count() {
-    pdfinfo "$1" | grep Pages|awk '{print $2}'
+  setopt local_options pipefail
+ { pdfinfo "$1" | grep Pages || { ecerr "$0 failed" ; return 1 } } |awk '{print $2}'
 }
 k2pdf-split() {
     doc usage: pdf k2pdf-options
-    local s=0 pc="$(pdf-count "$1")" p="${k2_pages:-100}"
+    local s=0 pc p
+    pc="$(pdf-count "$1")" || return 1
+    p="${k2_pages:-100}"
     local e i=0
     e=$[s+p]
     until test $s -gt $pc
