@@ -833,19 +833,23 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
     # <p> --- </p>
     test -n "$summaryMode" || ec "<hr> $cleanedhtml"
 }
+noglobfn readmoz
 function readmozsum() {
     : "Use url2html instead? No advtanges to this."
     rmS=y readmoz "$@"
 }
+noglobfn readmozsum
 function readmozsum-file() {
     rmS=y readmoz-file "$@"
 }
+noglobfn readmozsum-file
 function readmoz-file() {
     magic mdoc "$0 <file> [<url>]"
     local file="$1" url="${2:-https://${$(basename "$file"):-empty}.google.com}"
     local rmHtml="$(< "$file")"
     readmoz "$url"
 }
+noglobfn readmoz-file
 function readmoz-md() {
     local url="$1"
     local format=".${2:-md}"
@@ -857,14 +861,17 @@ function readmoz-md() {
     < $md
     \rm $md
 }
+noglobfn readmoz-md
 function readmoz-md2() {
     readmoz "$1" | html2text "${@:2}" # --ignore-links
 }
+noglobfn readmoz-md2
 function readmoz-txt() {
     local opts=( "${@:2}" )
     test -n "$opts[*]" || opts=(--ignoreHref --ignoreImage --wordwrap=false --uppercaseHeadings=false --tables=true)
     readmoz "$1" | html-to-text "${opts[@]}" # returnDomByDefault
 }
+noglobfn readmoz-txt
 function paulg() {
   getlinks http://www.paulgraham.com/articles.html | rg http://www.paulgraham.com | filter match-url | uniq -u 
 }
