@@ -39,7 +39,7 @@ jks() {
     k2pdf-split "$orig"
     #ecdbg "trying to rm $orig"
     \rm "$orig"
-    re p2ko *
+    re p2ko *.pdf
 }
 ensure-ju() {
     test -e "$jufile" || { ecerr "jufile doesn't exist"
