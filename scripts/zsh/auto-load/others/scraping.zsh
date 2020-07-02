@@ -128,7 +128,8 @@ function mercury-html() {
 }
 
 function httpm() {
-    http --style solarized-light --follow --ignore-stdin --session "pink$(uuidpy)" "$@" "$(cookies-auto "$@")"
+    local c="$(cookies-auto "$@")"
+    http --style solarized-light --follow --ignore-stdin --session "pink$(uuidpy)" "$@" $c
 }
 function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
@@ -243,6 +244,15 @@ function gh-to-readme() {
     gh-to-raw "$urls[@]"
 }
 function gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
+function url-final-hp() {
+local out="$(2>&1 httpm --all --follow --headers "$1" )"
+# ec $out
+local res
+
+res="$(<<<"$out" command rg --only-matching --replace '$1' 'Location: (.*)'  | tail -n1 )"
+test -n "$res" && ec $res || ec "$1"
+}
+renog url-final-hp
 function url-final() {
     # beware curl's retries and .curlrc
     curlm -o /dev/null -w %{url_effective} "$@" #|| ec "$@" # curl prints urls even if it fails ...
@@ -544,7 +554,7 @@ function urlfinalg() {
         [[ "$URL" =~ "url=([^&]*)" ]] && u="$match[1]" || { ecerr failed to decode Google url ; return 1 }
         u="$(ec $u | url-decode.py)"
     }
-    url-final2 "$u"
+    url-final-hp "$u" #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
 }
 reify urlfinalg
 noglobfn urlfinalg

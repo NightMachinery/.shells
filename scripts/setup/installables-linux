@@ -17,3 +17,4 @@ curl
 snapd
 sendmail
 software-properties-common
+transmission-cli
