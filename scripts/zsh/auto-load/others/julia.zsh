@@ -8,8 +8,8 @@ function junsummon() {
     \rm -r ~/julia_tmp
 }
 jdlc() {
-	cp -r "$(last-modified ~/Downloads/)" ./
-	jup
+    cp -r "$(last-modified ~/Downloads/)" ./
+    jup
     # silence pushd ~/Downloads/
     # ge_ecdbg=y onlm get-dl-link
     # silence popd
@@ -72,7 +72,7 @@ jopus() {
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
 jup() {
-	globexists ./**/*(.D) || return 0
+    globexists ./**/*(.D) || return 0
     #rex "mv _ ${1:-./}" ./**/*(.D)
     #possibly silence it
     mv ./**/*(.D) "${1:-./}"
@@ -125,39 +125,44 @@ function vsox() {
     sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
 function _1jma() {
-	local u="$(uuidgen)"
-	local p=~/Downloads/"$u"/
-	mkdir "$p"
-	deluge-console add --move-path "$p" "$1"
-	sleep "${jm_s:-60}"
-	cp -r "$p" .
+    local u="$(uuidgen)"
+    local p=~/Downloads/"$u"/
+    mkdir "$p"
+    deluge-console add --move-path "$p" "$1"
+    sleep "${jm_s:-60}"
+    cp -r "$p" .
 }
 function jma() {
-	jee
-	zargs --max-procs 60 -n 1 -- "$@" -- _1jma
-	jup
-	dir2k
+    jee
+    zargs --max-procs 60 -n 1 -- "$@" -- _1jma
+    jup
+    dir2k
 }
 noglobfn jma
 function jah() {
-	jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
+    jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
 }
 function jahun() {
-	# unbuffer needs expect
-	jah ruu unbuffer "$@"
+    # unbuffer needs expect
+    jah ruu unbuffer "$@"
 }
 jepubsplit() {
-	jej
-	jah dbg epubsplit $jufile
-	rm $jufile
-	dir2k
+    jej
+    jah dbg epubsplit $jufile
+    rm $jufile
+    dir2k
 }
 function jy() {
-  local engine=("${jyE[@]:-y}")
-  jee
-  sout "$engine[@]" "$@"
-  jdl *
-  rm *
+    local engine=("${jyE[@]:-y}")
+    jee
+    sout "$engine[@]" "$@"
+    jdlrc *
+    rm *
 }
 noglobfn jy
 alias jys="jyE=ysmall jy"
+function jyl() {
+    # jylist
+    ylist "$2" | jrabbit="$1" inargsf re jys
+}
+alifn jylist=jyl
