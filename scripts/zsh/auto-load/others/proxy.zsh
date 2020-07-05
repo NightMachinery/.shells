@@ -10,8 +10,8 @@ enh-pxpy() {
 }"
 }
 function pxify-auto() {
-    local initCountry="$(serr mycountry)"
-    if test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
+    # local initCountry="$(serr mycountry)"
+    if [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]] ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
         pxify
     fi
 }

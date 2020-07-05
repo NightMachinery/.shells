@@ -18,6 +18,7 @@ function exa() {
   fi
 }
 function tsend() {
+  unfunction "$0"
   pxify-auto
   tsend "$@"
 }
