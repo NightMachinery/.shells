@@ -9,3 +9,9 @@ enh-pxpy() {
     pxpy $1 \"\$@\"
 }"
 }
+function pxify-auto() {
+    local initCountry="$(serr mycountry)"
+    if test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
+        pxify
+    fi
+}

@@ -17,3 +17,7 @@ function exa() {
     command exa "$@"
   fi
 }
+function tsend() {
+  pxify-auto
+  tsend "$@"
+}
