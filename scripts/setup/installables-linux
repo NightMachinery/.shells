@@ -18,3 +18,4 @@ snapd
 sendmail
 software-properties-common
 transmission-cli
+poppler-utils
