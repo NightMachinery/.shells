@@ -34,6 +34,7 @@ function gquote() {
 }
 alias gq=gquote
 function run-on-each() {
+    doc "Note that run-on-each won't run anything at all if no arguments are supplied"
     doc Use unusual name not to shadow actual vars
     local i98765
     for i98765 in "${@:2}"
