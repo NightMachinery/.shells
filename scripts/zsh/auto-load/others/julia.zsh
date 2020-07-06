@@ -163,6 +163,6 @@ noglobfn jy
 alias jys="jyE=ysmall jy"
 function jyl() {
     # jylist
-    ylist "$2" | jrabbit="$1" inargsf re jys
+    ylist "$1" | jrabbit="${*[2,-1]}" inargsf re jys
 }
 alifn jylist=jyl
