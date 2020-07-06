@@ -43,3 +43,4 @@ alias ebk='ebook-viewer'
 ##
 alias ltl='lt -l'
 ##
+alias mail='sudo less /var/mail/$(whoami)'

@@ -1,6 +1,7 @@
 ###
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
+alias cellar-getcron='crontab -l > $cellar/notes/dev/snippets/crontabs/$(whoami)'
 ###
 
 function emcnt() {

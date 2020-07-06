@@ -33,12 +33,11 @@ function tmuxnewsh2() {
 }
 aliasfn tsh tmuxnewsh2
 function tmuxzombie-ls() {
-    tmux list-panes -a -F "#{pane_dead} #{pane_id}" | grep "^1"
+    tmux list-panes -a -F "#{pane_dead} #{pane_id}" | command grep "^1"
 }
 aliasfn tzls tmuxzombie-ls
 function tmuxzombie-kill() {
-    tmux list-panes -a -F "#{pane_dead} #{pane_id}" | \
-        gawk '/^1/ { print $2 }' | gxargs -l tmux kill-pane -t
+    tmuxzombie-ls | inargsf tmux kill-pane -t
 }
 aliasfn tzkill tmuxzombie-kill
 tmuxzombie() {

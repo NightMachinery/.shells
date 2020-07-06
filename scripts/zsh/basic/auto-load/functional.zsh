@@ -70,10 +70,11 @@ inargs-gen() {
     else
         args=( ${(@ps:$sep:)args} )
     fi
-    args=( "${args0[@]}" ${args[@]} )
-
     # (( $#args == 0 ))
-    { test -z "$args[*]" && test -z "$noSkipEmpty" } || eval "$cmd $(gq "$args[@]")"
+    { test -z "$args[*]" && test -z "$noSkipEmpty" } && return 0
+
+    args=( "${args0[@]}" ${args[@]} )
+    eval "$cmd $(gq "$args[@]")"
 
 }
 ##
