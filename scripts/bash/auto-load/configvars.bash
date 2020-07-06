@@ -23,6 +23,7 @@ text_formats=( $note_formats[@] $code_formats[@] $config_formats[@] )
 ##
 if isDarwin ; then
     veditor=(code-insiders -r)
+    cookiesFiles="${HOME}/Library/Application Support/Google/Chrome/Default/Cookies"
 else
     test -e ~/.SpaceVim && veditor=(svi -p) || veditor=(vim -p) # doc '-o opens in split view, -p in tabs. Use gt, gT, <num>gt to navigate tabs.'
 fi

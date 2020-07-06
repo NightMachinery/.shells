@@ -34,12 +34,16 @@ function curlm() {
 function cookies-copy() {
     ec "theCookies=$(cookies-auto "$@") $(gq "$@")" | pbcopy
 }
+aliasfn cook cookies-auto
+function cookies-killlock() {
+    kill "$(serr fuser "$cookiesFile")"
+}
 getcookies() {
     mdoc "[cookiesFile= ] $0 <url>
 Will output Chrome's cookies for the given URL in key=val;key2=val2
 See |cookies| for higher-level API." MAGIC
     local url="$1"
-    local cf="${cookiesFiles:-${HOME}/Library/Application Support/Google/Chrome/Default/Cookies}"
+    local cf="${cookiesFiles}"
 
     test -e "$cf" || { ecdbg "getcookies called with non-existent file: $cf" ; return 0 }
     cookiesFile="$cf" url="$url" python -c '

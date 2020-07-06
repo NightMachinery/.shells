@@ -14,7 +14,7 @@ aa-raw() {
 
     isI || opts+=(--show-console-readout false --summary-interval 0)
     test -n "$aaNoSplit" || opts+=(--enable-http-pipelining --split 6 --stream-piece-selector geom)
-    aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false $opts[@] "$@" #-Z has some unsavory sideeffects so I have not included it in this.
+    aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false  $opts[@] "$@" #-Z has some unsavory sideeffects so I have not included it in this.
 }
 aagh() { aa "${(@f)$(gh-to-raw "$@")}" }
 aacookies() {
