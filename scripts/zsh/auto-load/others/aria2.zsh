@@ -68,7 +68,7 @@ Alt: ys.py, y-stream-pipe' ; mret
     test -n "$out[1]" || { ecerr Could not get video\'s url. Aborting. ; return 1 }
     test -n "$out[2]" || { ecerr Could not get video\'s name. Aborting. ; return 1 }
     local name="$out[2]"
-    local tmuxname="$(<<<$out[2] gtr -cd ' [a-zA-Z0-9]_-')"
+    local tmuxname="$(<<<$out[2] str2tmuxname)"
     local dlurl="$out[1]"
     
     # '--split 6 --enable-http-pipelining --stream-piece-selector inorder'

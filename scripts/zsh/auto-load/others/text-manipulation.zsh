@@ -17,3 +17,6 @@ function removeTrailingSlashes() {
         [/]*) ec "/";;
     esac
 }
+function str-normalize() {
+    iconv -f utf-8 -t ascii//translit
+}

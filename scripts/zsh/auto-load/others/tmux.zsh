@@ -1,11 +1,53 @@
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 tmuxnew() {
-	silent tmux kill-session -t "$1"
-	tmux new -d -s "$@"
+    silent tmux kill-session -t "$1"
+    tmux new -d -s "$@"
 }
-tmuxnewsh() { revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${tmuxnewshenv[*]} $(gq ${@[2,-1]})")" }
+tmuxnewsh() {
+    doc "Use tsh instead."
+    
+    revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${tmuxnewshenv[*]} $(gq ${@[2,-1]})")"
+}
+function tmuxnewsh2() {
+    doc "Supports simple env vars automatically"
+
+    local name="$1"
+    shift
+    local env=()
+    local i
+    for i in "$@" ; do
+        if [[ "$i" =~ '([^=]*)=(.*)' ]] ; then
+            env+="$match[1]=$(gq "$match[2]")"
+            shift
+        else
+            break
+        fi
+    done
+    ## debug:
+    # arger "$@"
+    # ec "$env[*]"
+    # typ env
+    ##
+
+    tmuxnewshenv="${tmuxnewshenv[*]} $env[*]" tmuxnewsh "$name" "$@"
+}
+aliasfn tsh tmuxnewsh2
+function tmuxzombie-ls() {
+    tmux list-panes -a -F "#{pane_dead} #{pane_id}" | grep "^1"
+}
+aliasfn tzls tmuxzombie-ls
+function tmuxzombie-kill() {
+    tmux list-panes -a -F "#{pane_dead} #{pane_id}" | \
+        gawk '/^1/ { print $2 }' | gxargs -l tmux kill-pane -t
+}
+aliasfn tzkill tmuxzombie-kill
 tmuxzombie() {
+    # kills the pane of a session, thus turning it to a "dead pane"
     tmux list-panes  -s -F '#{pane_pid}' -t "$1" | inargsf serr kill
+}
+function str2tmuxname() {
+    # this might be too restrictive
+    gtr -cd ' [a-zA-Z0-9]_-'
 }
 ivy() {
     export DISABLE_DEFER=y

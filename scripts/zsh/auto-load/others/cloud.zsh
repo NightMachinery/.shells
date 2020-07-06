@@ -34,7 +34,7 @@ function aa-rc() {
         }
         local u="$(uuidgen)"
         pushf "$u"
-        aa-raw "$opts[@]" "$i"
+        aa-raw $opts[@] "$i"
         jdlrc *
         rm *
         popf
