@@ -6,10 +6,17 @@ See also: 'etee'." #MAGIC
     <<<"$out" pbcopy
     ec "$out"
 }
+aliasfn tee-copy teec
 etee() {
     mdoc 'etee; Short for `eteec`. An enhancer that copies stdout and prints it, too.
 See also: teec' MAGIC
     local out="$(eval "$(gquote "$@")")"
+    <<<"$out" pbcopy
+    ec "$out"
+}
+aliasfn reval-copy etee
+function eccopy() {
+    local out="$*"
     <<<"$out" pbcopy
     ec "$out"
 }

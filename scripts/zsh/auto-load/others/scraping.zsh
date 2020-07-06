@@ -32,9 +32,9 @@ function curlm() {
     curl --silent --fail --location --cookie-jar "$(mktemp)" --header "$(cookies-auto "$@")" "$@"
 }
 function cookies-copy() {
-    ec "theCookies=$(cookies-auto "$@") $(gq "$@")" | pbcopy
+    eccopy "theCookies=$(cookies-auto "$@") $(gq "$@")"
 }
-aliasfn cook cookies-auto
+aliasfn cook cookies-copy
 function cookies-killlock() {
     kill "$(serr fuser "$cookiesFile")"
 }
