@@ -20,7 +20,7 @@ alias lq='loop-startover ~/tmp/.luna'
 function deluna() {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
-    local timeout="${1:-150}"
+    local timeout="${1:-150}" # 150 is good for PC work, but 800 might be better for reading, as the screen dims in 10 minutes
     while oneinstance $0 $nonce
     do
         (( $(getidle-darwin) >= $timeout || $(getlastunlock-darwin) <= 80 )) && {
