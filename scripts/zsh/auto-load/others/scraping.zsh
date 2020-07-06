@@ -31,6 +31,9 @@ function wgetm() {
 function curlm() {
     curl --silent --fail --location --cookie-jar "$(mktemp)" --header "$(cookies-auto "$@")" "$@"
 }
+function cookies-copy() {
+    ec "theCookies=$(cookies-auto "$@") $(gq "$@")" | pbcopy
+}
 getcookies() {
     mdoc "[cookiesFile= ] $0 <url>
 Will output Chrome's cookies for the given URL in key=val;key2=val2
