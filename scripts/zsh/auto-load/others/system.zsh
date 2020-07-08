@@ -28,3 +28,6 @@ function display-off() {
     watch -n ${1:-1} brightness 0
     #macOS only probably
 }
+function resetdns-darwin() {
+	sudo dscacheutil -flushcache
+}
