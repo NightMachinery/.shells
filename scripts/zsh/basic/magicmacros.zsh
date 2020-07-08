@@ -26,11 +26,14 @@ Just use the alias `mdoc`.'
 alias mdoc='m_doc "$*" "$0" ""'
 alias mdocu='m_doc "$*" "$0" "Usage: $0 "'
 
+##
 mdoc-test() {
-    mdoc Usage: Just do not \;\) MAGIC
-    ec no
+    # uses the global alias MAGIC
+    mdoc Usage: sth MAGIC
+    echo no
 }
 mdoc-test2() {
-    magic mdoc Usage: Just do not \;\) ; mret
-    ec no
+    # without global alias
+    magic mdoc Usage: sth ; mret
+    echo no
 }
