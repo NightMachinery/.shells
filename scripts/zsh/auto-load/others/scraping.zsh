@@ -393,13 +393,15 @@ h2e() {
     html2epub "$1" "${h2_author:-night}" "${@:2}"
     p2k "$1".epub
 }
-web2epub() {
-    doc usage: 'we_retry= we_dler= we_author= title urls-in-order'
+function web2epub() {
+    doc usage: 'we_strict= we_retry= we_dler= we_author= title urls-in-order'
     local u="$1 $(uuidgen)"
     cdm "$u"
     local author="${we_author:-night}"
     local i=0
     local hasFailed=''
+    local strict="$we_strict"
+
     # FNSWAP: urlfinalg
     for url in "${(@f)$(urlfinalg "${@:2}")}"
     do
@@ -412,16 +414,22 @@ web2epub() {
         retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" '>' "$bname:q" && ec "Downloaded $url ..." || {
                 ec "$url" >> failed_urls
                 ecerr "Failed $url"
-                hasFailed='Some urls failed (stored in failed_urls). Download them yourself and create the epub manually.'
+                hasFailed='Some urls failed (stored in failed_urls).'
             }
     done
 
-    test -z "$hasFailed" && { ec "Converting to epub ..."
-                              ecdbg files to send to h2ed *
-                              html2epub "$1" "$author" * #.html
-                              mv *.epub ../ && cd '../' &&  { isDbg || \rm -r "./$u" }
-                              ec "Book '$1' by '$author' has been converted successfully."
-    } || { ecerr "$hasFailed" && (exit 1) }
+    if test -n "$hasFailed" ; then
+        ecerr "$hasFailed"
+        if test -n "$strict" ; then
+            ecerr 'Strict mode is enabled; Create the epub manually.'
+            return 1
+        fi
+    fi
+    ec "Converting to epub ..."
+    ecdbg files to send to h2ed *
+    html2epub "$1" "$author" * #.html
+    mv *.epub ../ && cd '../' &&  { isDbg || \rm -r "./$u" }
+    ec "Book '$1' by '$author' has been converted successfully."
 }
 function w2e-raw() {
     web2epub "$1" "${@:2}" && p2k "$1.epub"
@@ -841,8 +849,8 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
         ecerr "${0}: Could not download $url; aborting."
         return 1
     }
-    if isbinary =(ec "$html") ; then
-        ecerr "$url contains a binary file. Aborting."
+    if ! ishtml-file =(ec "$html") ; then
+        ecerr "$url is not an HTML file. Aborting."
         return 0 # this is not exactly an error. Returning 1 might cause useless retries.
     fi
     local cleanedhtml="$(<<<"$html" readability "$url")"
@@ -894,6 +902,19 @@ function paulg() {
     getlinks http://www.paulgraham.com/articles.html | rg http://www.paulgraham.com | filter match-url | uniq -u
 }
 ##
+function mimetype() {
+    file --brief --mime-type "$1"
+}
+function ishtml-file() {
+    local mime="$(mimetype "$1")"
+    if ! [[ "$mime" == 'text/html' ]] ; then
+        ecerr "$0: Mimetype is $mime"
+        return 1
+    fi
+}
+function ishtml-link() {
+    ishtml-file =(full-html2 "$1")
+}
 function getlinks-moz() {
     doc "You probably want to use getlinks-rec. This one is too low-level."
     
@@ -917,6 +938,6 @@ outputs: <out::array>, stdout::newlineArray"
 function tlrec() {
     # recursive tl
     local url="$1"
-    getlinks-rec | inargsf tl
+    getlinks-rec "$url" | inargsf tl
 }
 ##
