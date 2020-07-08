@@ -149,18 +149,8 @@ alias ysmall="y -f '(bestvideo[height<=800]+bestaudio/best[height<=800]/best)[pr
 alias yarc="noglob retry ysmall --download-archive ~/.yarchive"
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'"
+alias yaudio="noglob youtube-dl --no-playlist -f 'bestaudio[ext=m4a]/bestaudio'"
 # `-f best` to download single file
-function yf() {
-    # GISTME
-    local ffull="$(youtube-dl -F "$@" | fz)"
-    local f="$(<<<$ffull gawk '{print $1}')"
-    test -z "$f" && return 1
-    [[ "$ffull" =~ 'video only' ]] && f+="+bestaudio"
-    rgeval y -f "$f" "$@"
-}
-function youtube-dl() {
-  transformer urlfinalg "command youtube-dl" "$@"
-}
 ##
 alias tl='\noglob tlrl-ng'
 alias w2e='\noglob w2e-raw'
