@@ -25,7 +25,7 @@ function rss-tsend() {
     local skip_engine="$rt_skip"
     local no_title="$rt_nt"
     local get_engine=("${rt_ge[@]}")
-    test -n "$get_engine[*]" || get_engine=( rsstail -i 15 -l -n 10 -N  )
+    test -n "$get_engine[*]" || get_engine=( rsstail -i 120 -l -n 10 -N  )
     local conditions=( ${rt_c[@]} )
     local each_url_delay="${rt_eud:-120}"
     local each_iteration_delay="${rt_eid:-1}"
