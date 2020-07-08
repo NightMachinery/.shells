@@ -941,3 +941,6 @@ function tlrec() {
     getlinks-rec "$url" | inargsf tl
 }
 ##
+function getlinks-img() {
+    gl_tag=img gl_prop=src getlinks-c "$@"
+}

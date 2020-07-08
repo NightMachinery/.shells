@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-# Usage: gl_s=selector <url> [<html-file>]
+### Usage: gl_tag=<html-tag=a> gl_prop=<html-property=href> gl_s=<selector=> <url> [<html-file>]
+### Use prop WHOLE to return whole tag
 
 from IPython import embed
 from bs4 import BeautifulSoup, SoupStrainer
@@ -20,20 +21,26 @@ soup = BeautifulSoup(data, features='lxml')
 parts = urlparse(url)
 
 page_links = []
-#embed()
 sel = soup
 gl_s = local.env.get('gl_s', '')
+tag = local.env.get('gl_tag', 'a')
+prop = local.env.get('gl_prop', 'href')
 if gl_s != '':
-	sel = soup.select_one(gl_s)
+    sel = soup.select_one(gl_s)
 # We can use select to get an array of matches
-for link in [h.get('href') for h in sel.find_all('a')]:
-    if link is None:
-        continue
-    if link.startswith('http'):
-        page_links.append(link)
-    elif link.startswith('/'):
-        page_links.append(parts.scheme + '://' + parts.netloc + link)
-    else:
-        page_links.append(url + link)
+
+# embed()
+if  prop == "WHOLE":
+    page_links = sel.find_all(tag)
+else:
+    for link in [h.get(prop) for h in sel.find_all(tag)]:
+        if link is None:
+            continue
+        if link.startswith('http'):
+            page_links.append(link)
+        elif link.startswith('/'):
+            page_links.append(parts.scheme + '://' + parts.netloc + link)
+        else:
+            page_links.append(url + link)
 for link in page_links:
     print(link)
