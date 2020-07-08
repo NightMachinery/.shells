@@ -12,12 +12,12 @@ aliasfn tlf tlchrome
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
 ###
 function tlarc() {
-  fhMode=aa transformer to-archive-is tl "$@" 
+    fhMode=aa transformer to-archive-is tl "$@"
 }
 function to-archive-is() {
-  # will fail if no snapshots exist
-  print -r -- "http://archive.is/newest/$(urlfinalg "$1")"
-  # oldest is also supported
+    # will fail if no snapshots exist
+    print -r -- "http://archive.is/newest/$(urlfinalg "$1")"
+    # oldest is also supported
 }
 function tllwb() {
     # we can't use an alias because tl won't get the correct URLs then.
@@ -252,12 +252,12 @@ function gh-to-readme() {
 }
 function gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 function url-final-hp() {
-local out="$(2>&1 httpm --all --follow --headers "$1" )"
-# ec $out
-local res
+    local out="$(2>&1 httpm --all --follow --headers "$1" )"
+    # ec $out
+    local res
 
-res="$(<<<"$out" command rg --only-matching --replace '$1' 'Location: (.*)'  | tail -n1 )"
-test -n "$res" && ec $res || ec "$1"
+    res="$(<<<"$out" command rg --only-matching --replace '$1' 'Location: (.*)'  | tail -n1 )"
+    test -n "$res" && ec $res || ec "$1"
 }
 renog url-final-hp
 function url-final() {
@@ -355,15 +355,15 @@ txt2epub () {
     "${t2ed:-txt2epub-pandoc}" "$@"
 }
 txt2epub-pandoc () {
-# TODO turn this into general pandoc convertor by modularizing the suffix
+    # TODO turn this into general pandoc convertor by modularizing the suffix
     magic mdocu "<title> <author> <file> ..." ; mret
     local files=( "${@:3}" )
     local txts=()
     local i
     for i in "$files[@]" ; do
-      local t="$(gmktemp --suffix .txt)"
-      cp "$i" "$t"
-      txts+="$t"
+        local t="$(gmktemp --suffix .txt)"
+        cp "$i" "$t"
+        txts+="$t"
     done
     pandoc --toc -s "$txts[@]" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
@@ -841,6 +841,10 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
         ecerr "${0}: Could not download $url; aborting."
         return 1
     }
+    if isbinary =(ec "$html") ; then
+        ecerr "$url contains a binary file. Aborting."
+        return 0 # this is not exactly an error. Returning 1 might cause useless retries.
+    fi
     local cleanedhtml="$(<<<"$html" readability "$url")"
     local prehtml="$(url2html "$url")"
     ec "$prehtml"
@@ -887,5 +891,32 @@ function readmoz-txt() {
 }
 noglobfn readmoz-txt
 function paulg() {
-  getlinks http://www.paulgraham.com/articles.html | rg http://www.paulgraham.com | filter match-url | uniq -u 
+    getlinks http://www.paulgraham.com/articles.html | rg http://www.paulgraham.com | filter match-url | uniq -u
 }
+##
+function getlinks-moz() {
+    doc "You probably want to use getlinks-rec. This one is too low-level."
+    
+    local url="$1"
+    getlinks.py "$url" =(readmoz "$url")
+}
+function getlinks-rec0() {
+    local url="$1"
+    getlinks-moz "$url" | command rg --replace '$1' '([^#]*)(#.*)?' | command rg -v -e '.pdf$' -e '^(https?://)?(www.)?twitter.com'
+}
+function getlinks-rec() {
+    doc "$0 <url>
+Gets 'useful' links from <url> recursively. (Depth=1, includes self)
+outputs: <out::array>, stdout::newlineArray"
+
+    local url="$1"
+    local r1=( $url "${(@f)$(getlinks-rec0 "$url")}" )
+    out=( "${(@u)r1}" )
+    arrN "$out[@]"
+}
+function tlrec() {
+    # recursive tl
+    local url="$1"
+    getlinks-rec | inargsf tl
+}
+##
