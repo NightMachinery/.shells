@@ -156,7 +156,7 @@ function jy() {
     local engine=("${jyE[@]:-y}")
     jee
     sout "$engine[@]" "$@"
-    jdlrc *
+    jrabbit="talks/$jrabbit" jdlrc *
     rm *
 }
 noglobfn jy
