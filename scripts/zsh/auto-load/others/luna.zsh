@@ -6,7 +6,9 @@ lunas() {
     lunar avaricemany
 }
 avaricemany() {
-    redo avarice 25
+    setopt localtraps
+    trap "" INT
+    (redo avarice 25)
     # 25  1:23.87 total
     # each is about 3.5s
 
