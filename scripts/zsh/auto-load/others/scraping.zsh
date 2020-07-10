@@ -386,7 +386,7 @@ t2e() {
     txt2epub "$1" "${te_author:-night_t2e}" "${@:2}"
     p2k "$1".epub
 }
-html2epub() {
+function html2epub() {
     ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
     local files=( "$@[3,-1]" )
     arr0 "$files[@]" | filter0 ishtml-file | inargs0 "${h2ed:-html2epub-calibre}" "$1" "$2"
@@ -418,24 +418,24 @@ function web2epub() {
 
         # API Change; old: "${we_dler:-wread}"
         retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" '>' "$bname:q" && ec "Downloaded $url ..." || {
+                command rm "$bname" # delete partial or empty files
                 ec "$url" >> failed_urls
                 ecerr "Failed $url"
-                hasFailed='Some urls failed (stored in failed_urls).'
+                hasFailed=y
             }
     done
 
     if test -n "$hasFailed" ; then
-        ecerr "$hasFailed"
+        ecerr "Some urls failed (stored in $(pwd)/failed_urls)."
         if test -n "$strict" ; then
             ecerr 'Strict mode is enabled; Create the epub manually.'
             return 1
         fi
     fi
     ec "Converting to epub ..."
-    ecdbg files to send to h2ed *
-    html2epub "$1" "$author" *.html
-    mv *.epub ../ && cd '../' &&  { isDbg || \rm -r "./$u" }
-    ec "Book '$1' by '$author' has been converted successfully."
+    revaldbg html2epub "$1" "$author" *.html
+    mv *.epub ../ && cd '../' &&  { { isDbg || test -n "$hasFailed" } || \rm -r "./$u" }
+    ec $'\n\n'"Book '$1' by '$author' has been converted (hasFailed='${hasFailed}')."$'\n\n'
 }
 function w2e-raw() {
     web2epub "$1" "${@:2}" && p2k "$1.epub"
@@ -909,10 +909,12 @@ function paulg() {
 }
 ##
 function mimetype2() {
+    # TODO try using `github-linguist "$1"`, though it only works for text files.
     if isDarwin ; then
         # sometimes returns inaccurate results, e.g. identifying the readmoz of  https://www.greaterwrong.com/posts/L22jhyY9ocXQNLqyE/science-as-curiosity-stopper as text/plain
         file --brief --mime-type "$1"
     else
+        # uses the extension for empty files, which is not desirable for us
         command mimetype --brief "$1"
     fi
 }
