@@ -912,8 +912,8 @@ function mimetype() {
 }
 function ishtml-file() {
     local mime="$(mimetype "$1")"
-    if ! [[ "$mime" == 'text/html' ]] ; then
-        ecerr "$0: Mimetype of '$1' is '$mime'"
+    if ! [[ "$mime" =~ 'text/(html|xml)' ]] ; then
+        ecerr "$0: Mimetype is $mime"
         return 1
     fi
 }

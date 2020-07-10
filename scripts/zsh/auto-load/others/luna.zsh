@@ -6,7 +6,10 @@ lunas() {
     lunar avaricemany
 }
 avaricemany() {
-    redo avarice 25
+    setopt localtraps
+    # So I don't understand these all that well, but here is my guess:
+    trap "" INT # disables INT handling in this function, so we don't quit by INT
+    (redo avarice 25) # this is a new process so it has its own signal handling and so does quit on INT
     # 25  1:23.87 total
     # each is about 3.5s
 
