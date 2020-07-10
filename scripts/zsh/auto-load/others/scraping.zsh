@@ -252,6 +252,11 @@ function gh-to-readme() {
 }
 function gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
 function url-final-hp() {
+    # Sometimes returns wrong result:
+    # https://www.arvarik.com/the-stable-marriage-problem-and-modern-datingi:
+    # HTTP/1.1 302 Moved Temporarily
+    # Location: /the-stable-marriage-problem-and-modern-dating/
+
     local out="$(2>&1 httpm --all --follow --headers "$1" )"
     # ec $out
     local res
@@ -383,7 +388,7 @@ t2e() {
 }
 html2epub() {
     ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
-    "${h2ed:-html2epub-calibre}" "$@"
+    arr0 "$@" | filter0 ishtml-file | inargs0 "${h2ed:-html2epub-calibre}"
 }
 html2epub-pandoc() {
     # title author htmls
@@ -407,7 +412,7 @@ function web2epub() {
     do
         local bname="$(url-tail "$url")"  #"${url##*/}"
         #test -z "$bname" && bname="u$i"
-        bname="${(l(${##})(0))i} $bname"
+        bname="${(l(${##})(0))i} ${bname}.html"
         i=$((i+1))
 
         # API Change; old: "${we_dler:-wread}"
@@ -427,7 +432,7 @@ function web2epub() {
     fi
     ec "Converting to epub ..."
     ecdbg files to send to h2ed *
-    html2epub "$1" "$author" * #.html
+    html2epub "$1" "$author" *.html
     mv *.epub ../ && cd '../' &&  { isDbg || \rm -r "./$u" }
     ec "Book '$1' by '$author' has been converted successfully."
 }
@@ -569,7 +574,7 @@ function urlfinalg() {
         [[ "$URL" =~ "url=([^&]*)" ]] && u="$match[1]" || { ecerr failed to decode Google url ; return 1 }
         u="$(ec $u | url-decode.py)"
     }
-    url-final-hp "$u" #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
+    url-final "$u" #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
 }
 reify urlfinalg
 noglobfn urlfinalg
@@ -908,7 +913,7 @@ function mimetype() {
 function ishtml-file() {
     local mime="$(mimetype "$1")"
     if ! [[ "$mime" == 'text/html' ]] ; then
-        ecerr "$0: Mimetype is $mime"
+        ecerr "$0: Mimetype of '$1' is '$mime'"
         return 1
     fi
 }

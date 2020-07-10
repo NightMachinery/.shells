@@ -166,3 +166,4 @@ function jyl() {
     ylist "$1" | jrabbit="${*[2,-1]}" inargsf re jys
 }
 alifn jylist=jyl
+noglobfn jyl jylist
