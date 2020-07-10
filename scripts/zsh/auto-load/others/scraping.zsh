@@ -388,7 +388,8 @@ t2e() {
 }
 html2epub() {
     ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
-    arr0 "$@" | filter0 ishtml-file | inargs0 "${h2ed:-html2epub-calibre}"
+    local files=( "$@[3,-1]" )
+    arr0 "$files[@]" | filter0 ishtml-file | inargs0 "${h2ed:-html2epub-calibre}" "$1" "$2"
 }
 html2epub-pandoc() {
     # title author htmls
@@ -913,7 +914,7 @@ function mimetype() {
 function ishtml-file() {
     local mime="$(mimetype "$1")"
     if ! [[ "$mime" =~ 'text/(html|xml)' ]] ; then
-        ecerr "$0: Mimetype is $mime"
+        ecerr "$0: Mimetype is '$mime'"
         return 1
     fi
 }
