@@ -31,3 +31,14 @@ function display-off() {
 function resetdns-darwin() {
 	sudo dscacheutil -flushcache
 }
+##
+function logout() {
+	logout-darwin "$@"
+}
+function logout-darwin() {
+	sudo launchctl bootout user/$(id -u "${1:$(whoami)}")
+}
+function logout-darwin2() {
+	osascript -e 'tell application \"System Events\" to log out'
+}
+##
