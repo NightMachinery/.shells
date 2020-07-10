@@ -908,12 +908,17 @@ function paulg() {
     getlinks http://www.paulgraham.com/articles.html | rg http://www.paulgraham.com | filter match-url | uniq -u
 }
 ##
-function mimetype() {
-    file --brief --mime-type "$1"
+function mimetype2() {
+    if isDarwin ; then
+        # sometimes returns inaccurate results, e.g. identifying the readmoz of  https://www.greaterwrong.com/posts/L22jhyY9ocXQNLqyE/science-as-curiosity-stopper as text/plain
+        file --brief --mime-type "$1"
+    else
+        command mimetype --brief "$1"
+    fi
 }
 function ishtml-file() {
-    local mime="$(mimetype "$1")"
-    if ! [[ "$mime" =~ 'text/(html|xml)' ]] ; then
+    local mime="$(mimetype2 "$1")"
+    if ! [[ "$mime" =~ '^text/(html|xml)$' ]] ; then
         ecerr "$0: Mimetype of '$1' is '$mime'"
         return 1
     fi
