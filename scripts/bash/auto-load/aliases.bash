@@ -99,7 +99,8 @@ alias dg='ddg --noprompt'
 alias ggg='googler -n 6'
 alias gg='ggg --noprompt'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
-alias rsp-safe='rsync --human-readable --xattrs --times --partial-dir=.rsync-partial  --info=progress2 -r'
+alias rsp-file='rsync --human-readable --xattrs --times --info=progress2'
+alias rsp-safe='rsync --human-readable --xattrs --times --info=progress2 --partial-dir=.rsync-partial -r'
 alias rsp='rsp-safe --delete-after --force-delete' #--ignore-errors will delete even if there are IO errors on sender's side.
 alias rspm='rsp --crtimes'
 alias rspb='rsp --backup --backup-dir=.rsync-backup'

@@ -10,6 +10,25 @@ function rcr() {
     isI && opts+="--progress"
     RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$rudi" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$rabbit" rclone "$opts[@]" --drive-server-side-across-configs "$@"
 }
+function rclonef() {
+    # eval-memoi does not currently support env vars, so rcr is out
+    local paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24))} eval-memoi rclone lsf --recursive "${1}:" | fz)}" )
+    local i
+    ##
+    # old API design: <cmd>... <entry-of-fuzzy-paths>
+    # rexa "rclone $*[1,-2]" "$paths[@]" # rexa can't handle '/'
+    ##
+    for i in $paths[@] ; do # skip empty paths
+        revaldbg rcr copy "${1}:$i" "$2"
+    done
+
+}
+function rcrmount() {
+    # needs cask osxfuse
+    # vfs cache sucks for streaming, use mpv-cache
+    # Update: mount generally sucks bad in macOS. It causes weird hangs (probably in the kernel) that can't be sudo killed -9. Just copy.
+    rcr mount --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
+}
 function rcrget() {
     rudi="$1" rcr copy rudi: rabbit0:g/"$*[2,-1]"
 }
