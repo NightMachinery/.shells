@@ -109,6 +109,7 @@ Alt: ys.py, y-stream-pipe' ; mret
         # kill $! is your friend :))
     }
 }
+##
 function retry-mpv() {
     # retry-eval "sleep 5 ; mpv --quiet $@ |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
     retry mpv-partial "${(Q)@}"
@@ -125,4 +126,9 @@ function mpv-partial() {
         done
     }
     return 0
+}
+##
+function aaimg() {
+    # do not use aa, as it will retry bad links forever
+    getlinks-img "$@" | inargsf sout aria2c -Z
 }
