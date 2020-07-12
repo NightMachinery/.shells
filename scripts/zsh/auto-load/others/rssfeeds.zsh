@@ -1,3 +1,7 @@
+function tsend-rssln() {
+    tsend --parse-mode markdown -- "$1" "[$rssTitle]($2)"
+}
+##
 function sumgensim() {
     doc "Not recced. Doesn't respect sentence boundaries. We are also feeding it via env vars which is also really bad because env vars have a limited size."
 
@@ -14,6 +18,7 @@ function sumym () {
     # kl can be crazy on CPU. It also is probably worse than lex-rank.
     sumy "${2:-lex-rank}" --length=4 --file =(readmoz-txt "$url") --format=plaintext
 }
+##
 function rss-ctitle() {
     ggrep -P --silent "$rc_t[@]" <<< "$2"
 }

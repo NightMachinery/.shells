@@ -6,7 +6,7 @@ tmuxnew() {
 tmuxnewsh() {
     doc "Use tsh instead."
     
-    revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${tmuxnewshenv[*]} $(gq ${@[2,-1]})")"
+    revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${tmuxnewshenv[*]} $(gq "${@[2,-1]}")")"
 }
 function tmuxnewsh2() {
     doc "Supports simple env vars automatically"
