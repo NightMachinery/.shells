@@ -1,4 +1,7 @@
-alias lunar='deluna & ; lo_s=$((60*${1:-45})) lo_noinit=y lo_p=${2:-~/tmp/.luna} loop'
+function lunar() {
+    deluna ${deluna} & # timeout of deluna
+    lo_s=$((60*${lo_min:-45})) lo_noinit=y lo_p=${lo_p:-~/tmp/.luna} loop "$@"
+}
 luna() {
     lunar pmset displaysleepnow
 }
@@ -24,6 +27,7 @@ function deluna() {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
     local timeout="${1:-150}" # 150 is good for PC work, but 800 might be better for reading, as the screen dims in 10 minutes
+    ec "deluna (nonce: $nonce) started with timeout $timeout"
     while oneinstance $0 $nonce
     do
         (( $(getidle-darwin) >= $timeout || $(getlastunlock-darwin) <= 80 )) && {
