@@ -136,14 +136,12 @@ Global output: wr_title wr_author" MAGIC
     test "${2}" = 'html' && author='"<p>By: <b>"+.author+"</b></p>"' || author='"By: **"+.author+"**"'
     local merc="$({ test -z "$file" && { # No file, downloading
         test -z "$wr_force" && { mercury-parser --format="${2}" "$(urlfinalg "$1")" || return $? } || {
-                  fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html
-# l
-# cat ./a.html
-mercury-html $1:q ./a.html $2:q"
+                  fu_wait="${fu_wait:-60}" aget "full-html $1:q ./a.html ; mercury-html $1:q ./a.html $2:q"
               } } || {
           # File supplied
           aget "cat ${(q@)file} > a.html ; mercury-html $1:q ./a.html $2:q"
       } })"
+      # " LINTERBUG
     wr_title="$(<<<"$merc" jqm -r .title | tr '\n' ' ')"
     wr_author="$(<<<"$merc" jqm -r .author)"
     <<<"$merc" jq -e --raw-output 'if .content then [
@@ -225,9 +223,11 @@ wread-wayback() {
     wayback-out "$1" | wread --file /dev/stdin "$@"
 }
 function wayback-url() {
-    waybackpack --to-date "${wa_t:-2017}" --list "$@" |tail -n1
+    # --to-date "${wa_t:-2017}" --from-date 2000
+    # outputs from oldest to newest
+    waybackpack --list "$1" | sponge | head -n1
 }
-enh-urlfinal wayback-url
+# enh-urlfinal wayback-url ## old URLs often redirect to hell
 reify wayback-url
 noglobfn wayback-url
 function w2e-curl() {
