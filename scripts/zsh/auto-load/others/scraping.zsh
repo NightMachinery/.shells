@@ -12,18 +12,41 @@ aliasfn tlf tlchrome
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
 ###
 function tlarc() {
-    fhMode=aa transformer to-archive-is tl "$@"
+    fhMode=curlfullshort transformer to-archive-is tl "$@"
+}
+function tlold() {
+    arcMode=oldest transformer to-archive-is tl "$@"
 }
 function to-archive-is() {
-    # will fail if no snapshots exist
-    print -r -- "http://archive.is/newest/$(urlfinalg "$1")"
-    # oldest is also supported
+    doc "Warning: archive.is is quick to ban bot-like behavior."
+
+    # local url="$(urlfinalg "$1")"
+    local url="$1" # dead URLs have a tendency to redirect to hell
+    local mode="${arcMode:-full}"
+
+    if ! match-url2 "$url" ; then
+        ec "$url"
+        return 0
+    fi
+    if [[ "$mode" == full ]] ; then
+        # needs JS
+        ec "https://archive.vn/?run=1&url=$url"
+    elif [[ "$mode" == oldest || "$mode" == newest ]] ; then
+        # will fail if no snapshots exist
+        # might need fhMode=aa
+        ec "http://archive.is/$mode/$url"
+    else
+        ecerr "$0: Invalid mode '$mode'"
+        return 1
+    fi
 }
-function tllwb() {
+function tlwb() {
+    local opts urls
+    opts-urls "$@"
     # we can't use an alias because tl won't get the correct URLs then.
-    tll "${(@f)$(wayback-url "${@}")}"
+    tl $opts[@] "${(@f)$(wayback-url "${urls[@]}")}"
 }
-noglobfn tllwb
+noglobfn tlwb
 
 function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"
@@ -393,7 +416,10 @@ function html2epub() {
 }
 html2epub-pandoc() {
     # title author htmls
-    pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+    local title="$1"
+    local author="$2"
+
+    pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$1.epub"
 }
 h2e() {
     html2epub "$1" "${h2_author:-night}" "${@:2}"
@@ -882,6 +908,14 @@ function readmoz-file() {
     readmoz "$url"
 }
 noglobfn readmoz-file
+function readmoz-mdold() {
+    arcMode=oldest transformer to-archive-is readmoz-md "$@"
+}
+noglobfn readmoz-mdold
+function readmoz-mdarc() {
+    fhMode=curlfullshort transformer to-archive-is readmoz-md "$@"
+}
+noglobfn readmoz-mdarc
 function readmoz-md() {
     local url="$1"
     local format=".${2:-md}"
@@ -937,7 +971,11 @@ function getlinks-moz() {
 }
 function getlinks-rec0() {
     local url="$1"
+    # FNSWAP: getlinks-moz
     getlinks-moz "$url" | command rg --replace '$1' '([^#]*)(#.*)?' | command rg -v -e '.pdf$' -e '^(https?://)?(www.)?twitter.com'
+}
+function getlinks-rec-all() {
+    fnswap getlinks-moz getlinks-c getlinks-rec "$@"
 }
 function getlinks-rec() {
     doc "$0 <url>
@@ -949,10 +987,30 @@ outputs: <out::array>, stdout::newlineArray"
     out=( "${(@u)r1}" )
     arrN "$out[@]"
 }
+function opts-urls() {
+    doc "Partitions the arguments into (global variables) |urls| and |opts| (everything else)."
+    
+    opts=()
+    urls=()
+    local i
+    for i in "$@" ; do
+        if match-url2 "$i" ; then
+            urls+="$i"
+        else
+            opts+="$i"
+        fi
+    done
+}
 function tlrec() {
-    # recursive tl
-    local url="$1"
-    getlinks-rec "$url" | inargsf tl
+    doc recursive tl
+
+    local opts urls
+    opts-urls "$@"
+    if [[ "${#urls}" != 1 ]] ; then
+        ecerr "tlrec's interface supports only a single URL. (${#urls} supplied.)"
+        return 1
+    fi
+    getlinks-rec "$urls[1]" | inargsf tl $opts[@]
 }
 ##
 function getlinks-img() {
