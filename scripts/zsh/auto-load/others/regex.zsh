@@ -13,7 +13,12 @@ function match-url-rg() {
     # FNSWAP: rg
     rg --engine pcre2 -e "$nightUrlRegex" "$@"
 }
+function match-url2() {
+    # somewhat buggy since we should reject on multiline input, but whatever
+    <<<"$*" silent match-url-rg
+}
 function match-url() {
+    # sometimes errs, presumably because it runs out of memory
     [[ "$*" =~ "^$nightUrlRegex\$" ]]
 }
 function match-url-liberal() {
