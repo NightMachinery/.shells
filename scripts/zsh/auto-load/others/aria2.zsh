@@ -84,50 +84,31 @@ Alt: ys.py, y-stream-pipe' ; mret
             ecerr Not big enough yet
             sleep 1
         done
-        mpv "appending://$name"
+        mpv-stream "$name"
     } always { tmuxzombie $tmuxname }
     return $?
 
-    ## new
-    true || {
-        local gid="$(aac.add.py $dlurl $name)"
-        until (( ${$(aac-getlen $gid):-0} > 2000000 ))
-        do
-            ecerr Not big enough yet
-            sleep 1
-        done
-        mpv $name
-    }
-    ## old
-    true || {
-        # ec Somehow stderr was being suppressed this one time ...
-        ecerr trying to start mpv
-        retry-mpv "${out:q}"
-        kill -2 -$ysid
-        # mpv bug here
-        # kill $!
-        # kill $! is your friend :))
-    }
+    # ## new
+    # true || {
+    #     local gid="$(aac.add.py $dlurl $name)"
+    #     until (( ${$(aac-getlen $gid):-0} > 2000000 ))
+    #     do
+    #         ecerr Not big enough yet
+    #         sleep 1
+    #     done
+    #     mpv $name
+    # }
+    # ## old
+    # true || {
+    #     # ec Somehow stderr was being suppressed this one time ...
+    #     ecerr trying to start mpv
+    #     retry-mpv "${out:q}"
+    #     kill -2 -$ysid
+    #     # mpv bug here
+    #     # kill $!
+    #     # kill $! is your friend :))
+    # }
 }
-##
-function retry-mpv() {
-    # retry-eval "sleep 5 ; mpv --quiet $@ |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
-    retry mpv-partial "${(Q)@}"
-}
-function mpv-partial() {
-    ecerr "$0 started ..."
-    local l=''
-    # --quiet 
-    mpv "$@" |& {
-        while read -d $'\n' -r l
-        do
-            color 50 200 50 "$l" >&2
-            [[ "$l" =~ '(Cannot open file|Errors when loading file|Invalid NAL unit size)' ]] && { return 1 }
-        done
-    }
-    return 0
-}
-##
 function aaimg() {
     # do not use aa, as it will retry bad links forever
     getlinks-img "$@" | inargsf sout aria2c -Z

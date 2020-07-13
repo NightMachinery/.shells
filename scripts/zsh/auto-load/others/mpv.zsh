@@ -43,3 +43,29 @@ Searches Youtube and plays the result as audio." MAGIC
 function mpv-cache() {
     mpv --force-seekable=yes --cache=yes --cache-secs=99999999 "$@"
 }
+function mpv-stream() {
+    local file="$@[-1]"
+    local opts=( "${@[1,-2]}" )
+    # cache has been disabled in mpv.conf
+    mpv $opts[@] appending://"$file"
+}
+aliasfn mpvs mpv-stream
+##
+function retry-mpv() {
+    # retry-eval "sleep 5 ; mpv --quiet $@ |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
+    retry mpv-partial "${(Q)@}"
+}
+function mpv-partial() {
+    ecerr "$0 started ..."
+    local l=''
+    # --quiet
+    mpv "$@" |& {
+        while read -d $'\n' -r l
+        do
+            color 50 200 50 "$l" >&2
+            [[ "$l" =~ '(Cannot open file|Errors when loading file|Invalid NAL unit size)' ]] && { return 1 }
+        done
+    }
+    return 0
+}
+##

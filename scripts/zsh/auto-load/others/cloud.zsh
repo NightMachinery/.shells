@@ -12,7 +12,8 @@ function rcr() {
 }
 function rclonef() {
     # eval-memoi does not currently support env vars, so rcr is out
-    local paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24))} eval-memoi rclone lsf --recursive "${1}:" | fz)}" )
+    local paths
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24))} eval-memoi rclone lsf --recursive "${1}:" | fz)}" ) || return 1
     local i
     ##
     # old API design: <cmd>... <entry-of-fuzzy-paths>
@@ -22,6 +23,16 @@ function rclonef() {
         revaldbg rcr copy "${1}:$i" "$2"
     done
 
+}
+function r0() {
+    local cache="$HOME/base/cache/"
+    mkdir -p $cache
+    local paths
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24))} eval-memoi fd --type file . ~/r0 | fz)}" ) || return 1
+    local i
+    for i in $paths[@] ; do # skip empty paths
+        rgeval rsp-file "$i" $cache
+    done
 }
 function rcrmount() {
     # needs cask osxfuse
