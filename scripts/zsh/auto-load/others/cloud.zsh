@@ -26,11 +26,12 @@ function rclonef() {
 function rcrmount() {
     # needs cask osxfuse
     # vfs cache sucks for streaming, use mpv-cache
-    # Update: mount generally sucks bad in macOS. It causes weird hangs (probably in the kernel) that can't be sudo killed -9. Just copy.
+    # Update: mount generally sucks in macOS. It causes weird hangs (probably in the kernel) that can't be sudo killed -9. Just copy.
     rcr mount --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
 }
 function rcrget() {
-    rudi="$1" rcr copy rudi: rabbit0:g/"$*[2,-1]"
+    local id="$(url-tail "$1")"
+    rudi="$id" rcr copy rudi: rabbit0:g/"$*[2,-1]"
 }
 function jdlrc() {
     jglob
