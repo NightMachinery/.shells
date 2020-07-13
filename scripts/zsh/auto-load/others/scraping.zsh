@@ -987,20 +987,6 @@ outputs: <out::array>, stdout::newlineArray"
     out=( "${(@u)r1}" )
     arrN "$out[@]"
 }
-function opts-urls() {
-    doc "Partitions the arguments into (global variables) |urls| and |opts| (everything else)."
-    
-    opts=()
-    urls=()
-    local i
-    for i in "$@" ; do
-        if match-url2 "$i" ; then
-            urls+="$i"
-        else
-            opts+="$i"
-        fi
-    done
-}
 function tlrec() {
     doc recursive tl
 

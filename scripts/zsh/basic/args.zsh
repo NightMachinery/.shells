@@ -35,3 +35,17 @@ function rpargs() {
     out=( "${args[@]}" )
     re "printf '%s\0'" "$args[@]"
 }
+function opts-urls() {
+    doc "Partitions the arguments into (global variables) |urls| and |opts| (everything else)."
+    
+    opts=()
+    urls=()
+    local i
+    for i in "$@" ; do
+        if match-url2 "$i" ; then
+            urls+="$i"
+        else
+            opts+="$i"
+        fi
+    done
+}
