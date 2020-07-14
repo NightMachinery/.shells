@@ -22,15 +22,17 @@ function eccopy() {
 }
 function pbcopy() {
     local in="$(in-or-args "$@")"
-    (( $+commands[copyq] )) && {
+    { false && (( $+commands[copyq] )) } && {
         silent copyq copy -- "$in"
     } || {
-        (( $+commands[pbcopy] )) && command pbcopy <<<"$in"
+        (( $+commands[pbcopy] )) && {
+            print -nr -- "$in" | command pbcopy
+        }
     }
 }
 function pbpaste() {
     # local in="$(in-or-args "$@")"
-    (( $+commands[copyq] )) && {
+    { false && (( $+commands[copyq] )) } && {
         copyq clipboard
     } || {
         (( $+commands[pbpaste] )) && command pbpaste
