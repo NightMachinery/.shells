@@ -1,7 +1,5 @@
 #!/usr/bin/env zsh
 mkdir -p ~/log
-arista='-1001154785017'
-water='-1001293952668'
 rt_skip="$rt_skip"
 
 #tmuxnewshenv="rt_skip='$rt_skip' " tmuxnewsh rss-royalroad rss-tsend 'https://www.royalroad.com/syndication/21322/'
@@ -15,7 +13,7 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_c=(rss-ctitle) rc_t=(-v 'Ansi Common Lisp') 
 tmuxnewshenv="rt_skip='$rt_skip' rt_ge=(getlinks-c -e 'radar-trends-to-watch') rt_nt=y rt_eid=$((3600*24)) rt_eud=0" tmuxnewsh rss-oreillyTrends rss-tsend 'https://www.oreilly.com/radar/topics/radar-trends/'
 
 
-tmuxnewshenv="rt_skip='$rt_skip' rt_e=(tsend-rssln $arista) rt_notel=y rt_id=$arista" tmuxnewsh rss-techmeme rss-tsend 'https://www.techmeme.com/feed.xml'
+tmuxnewshenv="rt_skip='$rt_skip' rt_e=(tsend-rssln $ephemeral) rt_notel=y rt_id=$arista" tmuxnewsh rss-techmeme rss-tsend 'https://www.techmeme.com/feed.xml'
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=true rt_id=$arista" tmuxnewsh rss-hn rss-tsend 'http://hnapp.com/rss?q=score%3E500'
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=true rt_id=$arista rt_eid=$((3600*3))" tmuxnewsh rss-lobsters rss-tsend 'https://lobste.rs/top/rss'
 
