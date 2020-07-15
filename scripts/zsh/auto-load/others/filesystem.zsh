@@ -65,3 +65,13 @@ function check-for-partial-files() {
     pushf $dir
     { lm | serr inargsf re 'labeled trailingzeroes.rs' } always { popf }
 }
+function till-file() {
+    local file="$1"
+    local time="${2:-30}"
+
+    while true ; do
+        test -e "$file" && break
+        ecerr "$0: File '$file' does not yet exist ..."
+        sleep "$time" 
+    done
+}

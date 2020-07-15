@@ -20,6 +20,16 @@ alias comment='\noglob :'
 function uuidpy() {
     python3 -c 'import uuid ; print(uuid.uuid4().hex)'
 }
+function uuidm() {
+    doc "This is the official interface to create new UUIDs"
+    uuidgen | gtr -d '-' # '-' causes problems with some usages
+}
+function md5m() {
+    print -nr -- "$1" | md5sum | awk '{print $1}' || {
+        echo "Could not get md5 of '$1'" >&2
+        return 1
+    }
+}
 function ec_bash() {
     doc deprecated. Use the alias ec.
     if [[ -n $ZSH_VERSION ]]; then

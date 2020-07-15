@@ -26,7 +26,7 @@ Uses |theCookies| var or else feeds first URL to |cookies|." MAGIC
 
 function aas() {
     # aa "$@" --on-download-start aa-stream
-    local out="$(md5 <<<"$1")"
+    local out="$(md5m "$1")"
     aa "$@" --dir "$out" --on-download-complete aa-stream &
     sleep 10
     retry-mpv "'$out'/*" || kill %
