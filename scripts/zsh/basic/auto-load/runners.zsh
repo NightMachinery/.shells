@@ -21,7 +21,10 @@ redoq() {
 }
 redo() redoq "$(gquote "${@: 1:-1}")" "${@: -1}"
 redo2() { redo "$@[2,-1]" "$1" }
-skipglob() {
-	test -z "${*:2}" || eval "$1 $(gq "${@:2}")"
+function skipglob() {
+    if test -n "${*[2,-1]}" ; then
+        # ecdbg "$0: ${*[2,-1]}"
+        eval "$1 $(gq "${@:2}")"
+    fi
 }
 alias skig=skipglob
