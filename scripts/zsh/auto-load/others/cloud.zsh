@@ -41,7 +41,7 @@ function rcrmount() {
     # vfs cache sucks for streaming, use mpv-cache
     # Update: mount generally sucks in macOS. It causes weird hangs (probably in the kernel) that can't be sudo killed -9. Just copy.
     mkdir -p ~/tmp/cache
-    rcr mount --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
+    rcr mount --daemon --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
 }
 function rcrmount-up() {
     # DEPRECATED: Use aa-2drive
