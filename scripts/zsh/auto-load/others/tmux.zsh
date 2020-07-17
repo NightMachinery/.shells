@@ -37,7 +37,11 @@ function tmuxzombie-ls() {
 }
 aliasfn tzls tmuxzombie-ls
 function tmuxzombie-kill() {
-    tmuxzombie-ls | inargsf re 'tmux kill-pane -t'
+    local fd1
+    {
+        exec {fd1}>&1 # to output to the original stdout
+        tmuxzombie-ls >&$fd1 | inargsf re 'tmux kill-pane -t'
+    } always { exec {fd1}>&- }
 }
 aliasfn tzkill tmuxzombie-kill
 tmuxzombie() {

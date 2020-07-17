@@ -65,10 +65,13 @@ dir2k() {
     skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
     skipglob "re p2ko" $dir/*.pdf(N)
 }
-p2k() {
+function p2k() {
     doc possibly send to kindle
     jglob
     local delOrig="${pkDel}"
+    local pk_no="${pk_no}"
+    # local delConverted="${pkDelC}"
+
     [[ -n "$pk_no" ]] || {
         sout 2m2k "$@"
         [[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"

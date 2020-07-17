@@ -70,7 +70,10 @@ function till-file() {
     local time="${2:-30}"
 
     while true ; do
-        test -e "$file" && break
+        test -e "$file" && { 
+            command rm "$file"
+            break
+        }
         ecerr "$0: File '$file' does not yet exist ..."
         sleep "$time" 
     done

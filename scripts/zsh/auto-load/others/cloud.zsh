@@ -50,7 +50,7 @@ function rcrmount() {
     # vfs cache sucks for streaming, use mpv-cache
     # Update: mount generally sucks in macOS. It causes weird hangs (probably in the kernel) that can't be sudo killed -9. Just copy.
     mkdir -p ~/tmp/cache
-    rcr mount --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
+    rcr mount --daemon --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
 }
 function rcrmount-up() {
     # DEPRECATED: Use rcraa or rcrtrr
@@ -141,13 +141,19 @@ function rcrtrr() {
     done
 }
 function rcrb60() {
-    doc "Customize b6_0 to set destination"
+    doc "Customize b6_0 to set destination, or just use rcrtrrx"
     local torrent="$1"
+    local start="$2"
 
     test -n "$torrent" || return 1
     local name
     name="rcrb60_$(md5m $torrent)" || return 1
-    tmuxnewsh2 $name rabbit="$b6_0" rcrtrr "$torrent" 
+    tmuxnewsh2 $name rabbit="$b6_0" rcrtrr "$torrent" "$start"
     ec "Created tmux session '$name'"
 }
-renog rcrb60
+noglobfn rcrb60
+function rcrtrrx() {
+    doc "[rabbit=] torrent [start]"
+    b6_0="$rabbit" rcrb60 "$@"
+}
+noglobfn rcrtrrx
