@@ -24,11 +24,11 @@ return ":cambodia:"
 
 else if activeKbdLayout is "Persian-ISIRI 2901" then
 
-return ":iran:"
+return "🇱🇧"
 
 else if activeKbdLayout is "U.S." then
 
-return ":us:"
+return "🇺🇸"
 
 else if activeKbdLayout is "Greek" then
 

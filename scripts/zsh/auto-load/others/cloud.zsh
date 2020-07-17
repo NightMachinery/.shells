@@ -5,7 +5,8 @@ typeset -g b6_0='1cAmBna4bKr7CHtO6Kfvr56UNOWHFHuLv'
 typeset -g b7=0AG9i3iMiXl8WUk9PVA
 
 function rcr() {
-    # rclone - rudi
+    doc "rclone - rudi
+Note: rclone, as of yet, does not support resuming downloads."
 
     local opts=()
     isI && opts+="--progress"
@@ -14,7 +15,7 @@ function rcr() {
 function rclonef() {
     # eval-memoi does not currently support env vars, so rcr is out
     local paths
-    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} eval-memoi rclone lsf --recursive "${1}:" | fz)}" ) || return 1
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive "${1}:" | fz)}" ) || return 1
     local i
     ##
     # old API design: <cmd>... <entry-of-fuzzy-paths>
@@ -25,7 +26,15 @@ function rclonef() {
     done
 
 }
+function r1() {
+    local root="$1"
+
+    local cache="$HOME/base/cache/"
+    mkdir -p $cache
+    rabbit="$root" rclonef rabbit0 $cache
+}
 function r0() {
+    # Mostly DEPRECATED (this supports resume but needs a mounted drive): Use r1 (rclonef)
     local cache="$HOME/base/cache/"
     mkdir -p $cache
     local paths
@@ -44,7 +53,7 @@ function rcrmount() {
     rcr mount --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
 }
 function rcrmount-up() {
-    # DEPRECATED: Use aa-2drive
+    # DEPRECATED: Use rcraa or rcrtrr
     mkdir -p ~/tmp/cache
     rcr mount --vfs-cache-max-size 3G --vfs-cache-mode writes --cache-dir ~/tmp/cache --vfs-cache-max-age $((1))h --vfs-cache-poll-interval 1h "$@"
 }
@@ -126,7 +135,7 @@ function rcrtrr() {
     for i in {$start..$count} ; do
         local aaMark="$(uuidm)"
         aaMark=$aaMark aa --on-download-complete aa-2drive.zsh --select-file=$i --bt-remove-unselected-file=true "$torrent"
-        till-file "$aaMark"
+        till-file "$aaMark" # necessary; otherwise the next download will delete the current file.
         ec "The ${i}th file has been downloaded" >> aa.log | cat
         sleep 1 # to be able to CTRL-C. You might also want a delay here not to trigger a spam ban ...
     done
