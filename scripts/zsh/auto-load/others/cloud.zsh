@@ -34,7 +34,8 @@ function r1() {
     rabbit="$root" rclonef rabbit0 $cache
 }
 function r0() {
-    # Mostly DEPRECATED (this supports resume but needs a mounted drive): Use r1 (rclonef)
+    # this supports resume but needs a mounted drive `rcrmount rabbit0: ~/r0`
+    # ALT: r1 (rclonef)(faster, doesn't need mount)
     local cache="$HOME/base/cache/"
     mkdir -p $cache
     local paths
@@ -47,9 +48,10 @@ function r0() {
 }
 function rcrmount() {
     # needs cask osxfuse
-    # vfs cache sucks for streaming, use mpv-cache
-    # Update: mount generally sucks in macOS. It causes weird hangs (probably in the kernel) that can't be sudo killed -9. Just copy.
+    # vfs cache sucks for streaming, use r0 to copy it or mpv-cache
+    # mount (with or without cache) generally sucks in macOS. It causes weird hangs (probably in the kernel) that can't be sudo killed -9.
     mkdir -p ~/tmp/cache
+    # the daemon still leaves logs behind, though I don't know where
     rcr mount --daemon --vfs-cache-max-size 10G --vfs-cache-mode off --cache-dir ~/tmp/cache --vfs-cache-max-age $((24*14))h --vfs-cache-poll-interval 1h "$@"
 }
 function rcrmount-up() {

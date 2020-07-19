@@ -32,6 +32,16 @@ function tmuxnewsh2() {
     tmuxnewshenv="${tmuxnewshenv[*]} $env[*]" tmuxnewsh "$name" "$@"
 }
 aliasfn tsh tmuxnewsh2
+function tmuxdaemon() {
+    local key="$tdKey"
+    local cmd="$(gq "$@")"
+    local name="${tdkey}___ $cmd"
+    name="$name ___ $(md5m "$name")"
+    name="$(<<<$name str2tmuxname)"
+    # perhaps we should ask the user to confirm if a duplicate session with this name already exists?
+    silent tmux kill-session -t "$name"  && ecerr "Killed already existing session '$name' to run the new command '$cmd'" # is killing it redundant?
+    tmuxnewsh2 "$name" "$@" && ec "Created session '$name'"
+}
 function tmuxzombie-ls() {
     tmux list-panes -a -F "#{pane_dead} #{pane_id}" | awk '/^1/ { print $2 }'
 }
