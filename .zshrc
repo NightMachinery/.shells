@@ -245,6 +245,12 @@ fzf-tab-partial-and-complete() {
 
 # zle -N fzf-tab-partial-and-complete
 # bindkey '^I' fzf-tab-partial-and-complete
+zstyle ':completion:*' matcher-list '' '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'
+# See http://zsh.sourceforge.net/Doc/Release/Completion-System.html
+# These are general rules that make the completion system match better:
+# The first rule adds case-insensitivity.
+# The second (original) rule allows for partial completion before ., _ or -, e.g. f.b -> foo.bar.
+# The third rule allows for completing on the left side of the written text, e.g. bar -> foobar)
 ##
 ###
 export rcLoaded='loading'
