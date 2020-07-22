@@ -9,7 +9,7 @@ function yf() {
 function youtube-dl() {
     local opts=()
     isI || opts+=( --quiet --no-progress )
-    transformer urlfinalg "command youtube-dl $opts[@]" "$@"
+    transformer urlfinalg "command $proxycmd youtube-dl $opts[@]" "$@"
 }
 function ylist() {
     youtube-dl -j --flat-playlist "$@" | jq -r '"https://youtu.be/\(.id)"'
@@ -17,4 +17,16 @@ function ylist() {
 noglobfn ylist
 function ytitle() {
     youtube-dl --get-filename -o "%(title)s" "$@"
+}
+function ytrans() {
+    doc "youtube transcribe"
+    local url="$1"
+    local title=("${(@f)$(youtube-dl --get-filename -o "%(title)s" "$url")}")
+    # local u="$(md5m "$title")"
+    pushf "$title"
+    youtube-dl --convert-subs vtt --write-auto-sub --skip-download --sub-lang en "$1"
+    vtt2txt2.py *.vtt | gtr $'\n' ' ' > ../"$title.txt"
+    popf
+    command rm -r "$title"
+    t2e "$title.txt"
 }

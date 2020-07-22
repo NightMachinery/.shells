@@ -142,7 +142,7 @@ alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 ##
 # https://github.com/ytdl-org/youtube-dl#format-selection-examples
 alias ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
-alias y="ybase --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'"
+alias y="ybase --embed-subs --embed-thumbnail --add-metadata --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'"
 alias ysmall="y -f '(bestvideo[height<=800]+bestaudio/best[height<=800]/best)[protocol^=http]'"
 # youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
 alias yarc="noglob retry ysmall --download-archive ~/.yarchive"

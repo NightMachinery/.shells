@@ -1,4 +1,5 @@
 pxify() {
+    typeset -g proxycmd="proxychains4"
     enh-pxpy tsend
 
     # keeping the shell bare-bones seem wiser

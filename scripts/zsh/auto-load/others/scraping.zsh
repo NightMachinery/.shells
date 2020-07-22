@@ -393,7 +393,7 @@ txt2epub-pandoc () {
         cp "$i" "$t"
         txts+="$t"
     done
-    pandoc --toc -s "$txts[@]" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+    pandoc --toc -s "$txts[@]" --metadata title="$title" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
 txt2epub-calibre() {
     mdoc "DEPRECATED. Outputs weird like â€™ for apostrophe. Also only accepts single input.
@@ -493,7 +493,7 @@ noglobfn lw2gw
 
 function html2epub-pandoc-simple() {
     ecdbg "h2e-ps called with $@"
-    pandoc --toc -s "${@:3}" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+    pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
 }
 function aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
@@ -558,7 +558,7 @@ $(cat "$i")
 }
 function code2epub() {
     mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
-    pandoc -s --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
+    pandoc -s --metadata title="$title" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
 function getlinks() {
     lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
