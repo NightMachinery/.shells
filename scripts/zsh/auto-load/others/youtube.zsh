@@ -30,3 +30,4 @@ function ytrans() {
     command rm -r "$title"
     t2e "$title.txt"
 }
+renog ytrans
