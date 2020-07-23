@@ -28,6 +28,6 @@ function ytrans() {
     vtt2txt2.py *.vtt | gtr $'\n' ' ' > ../"$title.txt"
     popf
     command rm -r "$title"
-    t2e "$title.txt"
+    t2e "$title" "$title.txt"
 }
 renog ytrans
