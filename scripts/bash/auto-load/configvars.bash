@@ -1,3 +1,4 @@
+dl_base_url='https://files.lilf.ir'
 fd_default=( --hidden --no-ignore )
 h2ed='html2epub-pandoc'
 export cellar=~/cellar

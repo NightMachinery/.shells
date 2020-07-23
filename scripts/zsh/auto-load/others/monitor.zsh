@@ -27,3 +27,10 @@ function load5() {
     # 1 5 15 minutes
     sysctl -n vm.loadavg | awk '{print $3}'
 }
+function lsport() {
+    local p opts=()
+    for p in "$@" ; do
+        opts+=(-i :"$p")
+    done
+    ((${#opts})) && sudo lsof -n $opts[@]
+}

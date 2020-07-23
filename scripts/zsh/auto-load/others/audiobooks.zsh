@@ -48,7 +48,7 @@ function dir2ab-merge() {
 		covers=( --image $covers[1] )
 	}
 	# -e "${aj_out:e}"
-	genRSS.py -d $abdir -e "${(j.,.)~media_formats}" -t "$out" -p "${desc:-The night is fair ...}" -o $abdir/feed.rss $covers[@] --host "${dl_base_url:-http://lilf.ir:8080}"
+	genRSS.py -d $abdir -e "${(j.,.)~media_formats}" -t "$out" -p "${desc:-The night is fair ...}" -o $abdir/feed.rss $covers[@] --host "${dl_base_url}"
 	trs $tmp
 	get-dl-link $abdir/feed.rss
 	popf

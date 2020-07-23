@@ -9,19 +9,31 @@ alias frc='frConfirm=y '
 alias cf='frc f'
 alias cfr='frc fr'
 ###
+function ffport() {
+    doc "[fpFilter=.*] ffport <port> ..."
+
+    local ports=("$@")
+    local filter="${fpFilter:-.*}"
+
+    lsport "$ports[@]" | command rg "$filter" | fz --with-nth '1,3,5,8,9..' --header-lines 1 | awk '{print $2}'
+}
+aliasfn ffportl fpFilter=LISTEN ffport
 function ffps() {
     # ps auxww: List all running processes including the full command string
     ps auxww | fz --with-nth '11..' --header-lines 1 --query "$*" | awk '{print $2}'
 }
 function ffkill() {
-    doc "alt: fkill"
+    doc "alt: fkill; [fkEngine=ffps] ffkill ..."
+    local engine="${fkEngine:-ffps}"
     local opts=()
     if [[ "$1" =~ '-\d+' ]] ; then
         opts+="$1"
         shift
     fi
-    ffps "$*" | inargsf kill $opts[@]
+    "$engine" "$@" | inargsf kill $opts[@]
 }
+aliasfn ffportlkill fkEngine=ffportl ffkill
+aliasfn killport ffportlkill
 function lsofp() {
     ffps "$@" | inargsf re "lsof -p" | less
     # Old:
@@ -119,7 +131,7 @@ function init-vfiles() {
     : GLOBAL vfiles
 
     if test -n "$*" || test -z "$vfiles[1]" ; then
-        local i dirs=( "${(@0)$(arr0 ~/.julia/ $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
+        local i dirs=( "${(@0)$(arr0 ~/.julia/config ~/.julia/environments $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
         vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} )
         # for i in "$dirs[@]" ; do
         #     vfiles+=( $i/**/*(.D^+isbinary) )
@@ -161,6 +173,7 @@ function v() {
     # stat doesn't expand ~
     # sort files by modification date
     # %Y     time of last data modification, seconds since Epoch
+    # reing gstat is needed if the files get too numerous, but then things will be too slow
     files=( ${(0@)"$(gstat  --printf='%040.18Y:%n\0' "${(@)files:|excluded}" | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"} ${(@)excluded} ) #Don't quote this there is always a final empty element
     files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$*")"} ) || return 1
     local ve="$ve"
