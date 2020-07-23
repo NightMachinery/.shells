@@ -22,7 +22,8 @@ jdl-helper() {
 }
 jdl() {
     jglob
-    dl_base_url="http://$(myip):8080/" re jdl-helper "$@"
+    # dl_base_url="http://$(myip):8080/"
+    re jdl-helper "$@"
 }
 jaaks() {
     jee
