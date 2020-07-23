@@ -1,3 +1,5 @@
+# lots of glob vars defined in configvars
+##
 function isbinary() {
     # Usage: vfiles+=( $i/**/*(.D^+isbinary) )
 

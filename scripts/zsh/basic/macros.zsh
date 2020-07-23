@@ -23,3 +23,12 @@ function aliassafe() {
     builtin alias "$@"
     aliasfn-classic "$@"
 }
+function createglob() {
+    local from="$1"
+    local to="$2"
+    { test -z "$from" || test -z "$to" } && {
+        ecerr "$0: insuffient arguments supplied. (needs 2)"
+        return 1
+    }
+    eval $to'="*.(${(j.|.)'$from'})(.D)"'
+}
