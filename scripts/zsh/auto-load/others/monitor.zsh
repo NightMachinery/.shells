@@ -9,12 +9,6 @@ function ppgrep() {
             ;;
     esac
 }
-function lsofp() {
-    ppgrep "$@" | fz --header-lines 1 | awk '{print $2}' | inargsf re "lsof -p" | less
-}
-aliasfn fflsof lsofp
-aliasfn plsof lsofp
-
 function jprocs() {
     jah procs -c always "$@"
 }

@@ -11,15 +11,20 @@ export codedir="$HOME/code"
 export nightNotes="$cellar/notes/"
 export nightJournal="$nightNotes/journal/j0/"
 note_formats=( txt md org )
-noteglob="*.(${(j.|.)note_formats})(D)"
+createglob note_formats noteglob
 ##
 audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
-audioglob="*.(${(j.|.)audio_formats})(D)"
+createglob audio_formats audioglob
 video_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
+createglob video_formats videoglob
 media_formats=( ${audio_formats[@]} ${video_formats[@]} )
+createglob media_formats mediaglob
 code_formats=( py jl scala sc kt kotlin java clj cljs rkt js rs toml zsh dash bash sh ml php lua glsl frag )
+createglob code_formats codeglob
 config_formats=( ini json cson toml conf )
+createglob config_formats configglob
 text_formats=( $note_formats[@] $code_formats[@] $config_formats[@] )
+createglob text_formats textglob
 ##
 if isDarwin ; then
     veditor=(code-insiders -r)

@@ -9,6 +9,26 @@ alias frc='frConfirm=y '
 alias cf='frc f'
 alias cfr='frc fr'
 ###
+function ffps() {
+    # ps auxww: List all running processes including the full command string
+    ps auxww | fz --with-nth '11..' --header-lines 1 --query "$*" | awk '{print $2}'
+}
+function ffkill() {
+    doc "alt: fkill"
+    local opts=()
+    if [[ "$1" =~ '-\d+' ]] ; then
+        opts+="$1"
+        shift
+    fi
+    ffps "$*" | inargsf kill $opts[@]
+}
+function lsofp() {
+    ffps "$@" | inargsf re "lsof -p" | less
+    # Old:
+    # ppgrep "$@" | fz --header-lines 1 | awk '{print $2}' | inargsf re "lsof -p" | less
+}
+aliasfn fflsof lsofp
+aliasfn plsof lsofp
 function fzinw() {
     doc 'fz in words: allows you to select the part of the output you need from a command. (alt: smenu?)'
     iaIFS=$' \t\n\C-@'"'"'(){}"[]' inargss arrN | fz
@@ -99,7 +119,7 @@ function init-vfiles() {
     : GLOBAL vfiles
 
     if test -n "$*" || test -z "$vfiles[1]" ; then
-        local i dirs=( "${(@0)$(arr0 $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
+        local i dirs=( "${(@0)$(arr0 ~/.julia/ $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
         vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} )
         # for i in "$dirs[@]" ; do
         #     vfiles+=( $i/**/*(.D^+isbinary) )
