@@ -3,6 +3,7 @@ alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
 alias grm='git rm --cached'
 ###
 function gsync() {
+  git add .
   git commit -a -m .
   git pull
   git push
@@ -11,6 +12,7 @@ ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u }
 guc() {
   mdoc "$0 [<how-many>=1]
 Undoes last commits without changing files." MAGIC
+
   git reset --soft HEAD~"${1:-1}"
 }
 _git2http() {

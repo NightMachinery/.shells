@@ -17,8 +17,11 @@ function emcrg() {
     emc -e "(night/search-dir \"$(pwd)\")"
 }
 function ugm() {
-    ugrep  --break --context=3 -Q  --recursive --smart-case "$@"
-    # --binary-files=without-match
+    # https://github.com/Genivia/ugrep/issues/31
+    ugrep --binary-files=without-match --pretty --context=3 --recursive --smart-case --sort=best --query=1 --no-confirm  --regexp="$*"
+    # --fuzzy=3
+    #  --break  Adds a line break between results from different files.
+    #  --heading, -+ Group matches per file.  Adds a heading and a line break between results from different files.
 }
 function rgbase() {
     command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto -C ${agC:-1} --color always --hidden "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
