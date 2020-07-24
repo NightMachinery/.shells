@@ -1,0 +1,31 @@
+# doesn't work: http://localhost:8080
+# doesn't work:http://82.102.11.148:8080
+# works: http://:8080
+##
+# server listening on [:8080] is configured for HTTP and cannot natively multiplex HTTP and HTTPS
+# we also can't redirect from another http port to the https port, see https://caddy.community/t/redirect-http-to-https-on-non-80-and-443-port/5695
+# I opened this question: https://caddy.community/t/caddy-doesnt-redirect-from-http-to-https/9163
+# http://lilf.ir:8080 {
+# redir https://lilf.ir:8080{uri}
+# }
+www.lilf.ir {
+  redir https://lilf.ir{uri}
+}
+
+lilf.ir {
+  respond "You see there is nothing here. You're filled with determination."
+}
+
+files.lilf.ir, http://:8080 {
+  file_server browse
+}
+
+sg.lilf.ir {
+  reverse_proxy localhost:7080
+}
+
+##
+# doesn't work, our only bet is the forward proxy plugin
+# :8060 {
+#   reverse_proxy https://google.com
+# }

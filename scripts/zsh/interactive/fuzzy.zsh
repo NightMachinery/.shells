@@ -15,7 +15,11 @@ function ffport() {
     local ports=("$@")
     local filter="${fpFilter:-.*}"
 
-    lsport "$ports[@]" | command rg "$filter" | fz --with-nth '1,3,5,8,9..' --header-lines 1 | awk '{print $2}'
+    lsport "$ports[@]" | { local line
+                           read line
+                           ec "$line"
+                           command rg "$filter"
+    } | fz --with-nth '1,3,5,8,9..' --header-lines 1 | awk '{print $2}'
 }
 aliasfn ffportl fpFilter=LISTEN ffport
 function ffps() {
