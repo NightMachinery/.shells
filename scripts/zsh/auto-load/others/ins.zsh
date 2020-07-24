@@ -97,13 +97,13 @@ ins-all() {
 function ins() {
     isDarwin && brew install $1 || sudo apt install -y $1
 }
-
-jins() {
+function jins() {
     mdoc Add Julia package MAGIC
     julia --startup-file=no -e 'using Pkg; Pkg.add("'"$1"'"); Pkg.precompile()' # using '"$1"
     # No longer necessary: We import the newly installed package to precompile it.
 }
-pig() { pi "git+$(git2http "$1")" }
+reify jins
+function pig() { pi "git+$(git2http "$1")" }
 reify pig
 npmupdateg() {
     doc alt: npm-check -u -g
