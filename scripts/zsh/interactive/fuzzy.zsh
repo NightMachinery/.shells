@@ -1,8 +1,13 @@
 ### SEE ALSO
 # spotlight, spt, spot
 ###
-alias vc='code-insiders -r'
-alias vcode='veditor=(code-insiders -r) '
+aliasfn vc code-insiders --reuse-window
+function vcr() {
+    local p="$(<<<$1 sd "$HOME" /home/eva)"
+    code-insiders --reuse-window --remote 'ssh-remote+82.102.11.148' "$p"
+}
+alias vr='veditor=(vcr) v'
+alias vcode='veditor=(code-insiders --reuse-window) '
 alias ve='veditor=(emc) '
 alias vv='ve v'
 alias frc='frConfirm=y '
