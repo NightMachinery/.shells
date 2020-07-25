@@ -46,10 +46,8 @@ try:
     lblProcessed = "Label_7772537585229918833"
     lblTest = "Label_4305264623189976109"
 
-
     def ecerr(str):
         print(f"{now}           {str}", file=sys.stderr)
-
 
     tokenpath = local.env["HOME"] + "/.gmail.token"
     credpath = local.env["HOME"] + "/.gmail.credentials.json"
@@ -57,7 +55,6 @@ try:
 
     g.init(tokenFile=tokenpath, credentialsFile=credpath)
     service = g.SERVICE_GMAIL
-
 
     def printLabels():
         results = service.users().labels().list(userId="me").execute()
@@ -70,26 +67,27 @@ try:
             for label in labels:
                 print(label["name"] + " " + label["id"])
 
-
     def parseContentTypeHeaderForEncoding(value):
         """Helper function called by GmailMessage:__init__()."""
         mo = re.search('charset="(.*?)"', value)
         if mo is None:
-            emailEncoding = "UTF-8"  # We're going to assume UTF-8 and hope for the best. Safety not guaranteed.
+            # We're going to assume UTF-8 and hope for the best. Safety not guaranteed.
+            emailEncoding = "UTF-8"
         else:
             emailEncoding = mo.group(1)
         return emailEncoding
 
-
     def getHtml(messageObj):
-        emailEncoding = "UTF-8"  # We're going to assume UTF-8 and hope for the best. Safety not guaranteed.
+        # We're going to assume UTF-8 and hope for the best. Safety not guaranteed.
+        emailEncoding = "UTF-8"
         r = ""
 
         def frompart(part):
             if part["mimeType"].upper() == "TEXT/HTML" and "data" in part["body"]:
                 for header in part["headers"]:
                     if header["name"].upper() == "CONTENT-TYPE":
-                        emailEncoding = parseContentTypeHeaderForEncoding(header["value"])
+                        emailEncoding = parseContentTypeHeaderForEncoding(
+                            header["value"])
                 return base64.urlsafe_b64decode(part["body"]["data"]).decode(emailEncoding)
 
         if "parts" in messageObj["payload"].keys():
@@ -105,11 +103,29 @@ try:
         # msg.addLabel(lblTest)
         msg.addLabel(lblProcessed)
 
+    substack = g.search(
+        f"after:{cutoff_date} AND ((from:substack.com) AND NOT label:auto/processed)", maxResults=100
+    )
+
+    for t in reversed(substack):
+        for m in t.messages:
+            print(f"Processing '{m.subject}' ...")
+            labelprocessed(m)
+            bodyhtml = getHtml(m.messageObj)
+            if not bodyhtml:
+                ecerr(f"Couldn't extract html body of message {m.subject}")
+                ecerr("Printing its messageObj:")
+                ecerr(m.messageObj)
+                ecerr(""*2)
+                continue
+            zp("h2e {m.subject} =(ec {bodyhtml})")
+
     fics = g.search(
         f"after:{cutoff_date} AND ((from:fanfiction) AND NOT label:auto/processed)", maxResults=200
     )
 
-    ficnetPattern = re.compile(r".*(https://www.fanfiction.net/s/\S*)", flags=re.DOTALL)
+    ficnetPattern = re.compile(
+        r".*(https://www.fanfiction.net/s/\S*)", flags=re.DOTALL)
     for t in reversed(fics):
         for m in t.messages:
             match = re.match(ficnetPattern, m.originalBody)
@@ -129,8 +145,6 @@ try:
         f"after:{cutoff_date} AND ((from:tldrnewsletter.com) AND NOT label:auto/processed)", maxResults=200
     )
 
-
-
     for t in reversed(news):
         # actually these are threads not messages
         for m in t.messages:
@@ -147,17 +161,18 @@ try:
             s = BeautifulSoup(bodyhtml, features="lxml")
             for link in s.select('a'):
                 link['href'] = z("urlfinalg {link['href']}").out
-            bodyhtml = s.prettify() #( formatter="html" )
+            bodyhtml = s.prettify()  # ( formatter="html" )
             body = tempfile.NamedTemporaryFile(mode="w", suffix=".html")
             print(bodyhtml, file=body, flush=True)
             bodytxt_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt")
             print(m.originalBody, file=bodytxt_file, flush=True)
-            
+
             # z('cp {body.name} {bodytxt_file.name} ./') # DEBUG also set pkDel
 
             # The html uses a table which doesn't reflow. Calibre hangs on the input, so at least use pandoc.
             # kRes = z('''pkDel=y dpan h2e {f'TLDR | {m.subject}'} {body.name}''')
-            kRes = z('''pkDel='y' t2e {f'TLDR | {m.subject}'} {bodytxt_file.name}''')
+            kRes = z(
+                '''pkDel='y' t2e {f'TLDR | {m.subject}'} {bodytxt_file.name}''')
             e, out, err = kRes.summary
             cmd = kRes.cmd
 
@@ -182,12 +197,13 @@ try:
             if os.environ.get('mmNoTlg', '') == '':
                 items = s.find_all("div", {"class": "text-block"})
                 try:
-                    tsend_cmd = ["--parse-mode", "html", "--link-preview", "https://t.me/tldrnewsletter", '']
+                    tsend_cmd = ["--parse-mode", "html",
+                                 "--link-preview", "https://t.me/tldrnewsletter", '']
                     tsend_args = ts.parse_tsend(tsend_cmd)
                     # items[1:2] + items[4:-2]:
                     for n in items[5:-2]:
                         # for link in n.select('a'):
-                            # link['href'] = z("urlfinalg {link['href']}").out
+                        # link['href'] = z("urlfinalg {link['href']}").out
                         tsend_args['<message>'] = n
                         tsend(tsend_args)
                 except:
