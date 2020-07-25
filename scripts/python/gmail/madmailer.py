@@ -4,7 +4,7 @@ try:
     from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
 #    activate_ips_on_exception()
 
-    from brish import z, zq, zs
+    from brish import z, zq, zs, zp
     z('cdm ~/tmp/delme/')
 
     import datetime
@@ -104,7 +104,7 @@ try:
         msg.addLabel(lblProcessed)
 
     substack = g.search(
-        f"after:{cutoff_date} AND ((from:substack.com) AND NOT label:auto/processed)", maxResults=100
+            f"after:{cutoff_date} AND ((from:substack.com OR from:ben-evans.com) AND NOT label:auto/processed)", maxResults=100
     )
 
     for t in reversed(substack):
