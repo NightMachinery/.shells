@@ -19,7 +19,6 @@ waybackpack
 httpie
 tqdm
 subliminal
-rotten_tomatoes_cli
 numpy
 yq
 pdfCropMargins
@@ -47,3 +46,4 @@ piep
 metadata-parser
 iredis
 fire
+fastapi[all]
