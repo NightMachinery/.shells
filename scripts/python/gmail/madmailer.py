@@ -4,7 +4,7 @@ try:
     from ipydex import IPS, ip_syshook, ST, activate_ips_on_exception, dirsearch
 #    activate_ips_on_exception()
 
-    from brish import z, zq, zs
+    from brish import z, zq, zs, zp
     z('cdm ~/tmp/delme/')
 
     import datetime
@@ -102,9 +102,20 @@ try:
     def labelprocessed(msg):
         # msg.addLabel(lblTest)
         msg.addLabel(lblProcessed)
+    
+    text2kindle = g.search(
+            f"after:{cutoff_date} AND ((from:ben-evans.com) AND NOT label:auto/processed)", maxResults=100
+    )
+
+    for t in reversed(text2kindle):
+        for m in t.messages:
+            print(f"Processing '{m.subject}' ...")
+            labelprocessed(m)
+            zp("t2e {m.subject} =(ec {m.originalBody})")
+
 
     substack = g.search(
-        f"after:{cutoff_date} AND ((from:substack.com) AND NOT label:auto/processed)", maxResults=100
+            f"after:{cutoff_date} AND ((from:substack.com) AND NOT label:auto/processed)", maxResults=100
     )
 
     for t in reversed(substack):
