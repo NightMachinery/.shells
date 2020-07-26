@@ -13,16 +13,18 @@ Note: rclone, as of yet, does not support resuming downloads."
     RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$(url-tail "$rudi")" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$(url-tail "$rabbit")" rclone "$opts[@]" --multi-thread-streams=0 --drive-server-side-across-configs "$@"
 }
 function rclonef() {
+    doc "Warning: you need to supply exactly one / after the directory, or it won't work. Examples: 'rabbit0:' 'rabbit0:g/'"
+
     # eval-memoi does not currently support env vars, so rcr is out
     local paths
-    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${1}:" | fz)}" ) || return 1
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${1}" | fz)}" ) || return 1
     local i
     ##
     # old API design: <cmd>... <entry-of-fuzzy-paths>
     # rexa "rclone $*[1,-2]" "$paths[@]" # rexa can't handle '/'
     ##
     for i in $paths[@] ; do # skip empty paths
-        revaldbg rcr copy "${1}:$i" "$2"
+        revaldbg rcr copy "${1}$i" "$2"
     done
 
 }
@@ -31,7 +33,7 @@ function r1() {
 
     local cache="$HOME/base/cache/"
     mkdir -p $cache
-    rabbit="$root" rclonef rabbit0 $cache
+    rabbit="$root" rclonef rabbit0: $cache
 }
 function r0() {
     # this supports resume but needs a mounted drive `rcrmount rabbit0: ~/r0`
