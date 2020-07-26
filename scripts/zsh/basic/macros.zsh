@@ -5,13 +5,15 @@ function enh-savename() {
     typeset -A -g enhSavedNames
     test -n "${enhSavedNames[$1]}" || enhSavedNames[$1]="$2"
 }
-function aliasfn() {
+function _aliasfn() {
     : "ruu might be needed. Example: aliasfn hi ruu someVar=12"
     local name="$1"
     local body="$@[2,-1]"
     functions[$name]="$body "'"$@"'
     enh-savename "$name" "$2"
 }
+# enh-savename aliasfn _aliasfn # redundant, we will auto-erase noglob ourselves
+alias aliasfn='\noglob _aliasfn'
 function aliasfn-classic() {
     local args=( "$@" )
     [[ "$args[*]" =~ '\s*([^=]+)=(.*[^\s])\s*' ]] || { echo invalid alias: "$args[*]" >&2 ; return 1 }

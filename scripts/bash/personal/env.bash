@@ -12,6 +12,11 @@ export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
 export SUDO_EDITOR="$NEDITOR"
 export VISUAL="$NEDITOR"
 export EDITOR="$VISUAL"
+##
+export JULIA_EDITOR='emacsclient'
+# emacsclient opens in an already open client, vim is fast, nvim highlights but is slow
+# https://discourse.julialang.org/t/emacsclient-doesnt-work-with-edit/43673
+##
 export NODEJS_CHECK_SIGNATURES=no #for asdf's nodejs
 export WG_CONF=~/.cf-warp/cf-warp.conf
 export DOOMDIR=~/doom.d
