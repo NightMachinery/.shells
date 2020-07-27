@@ -1,6 +1,6 @@
 typeset -g GARDEN_PORT=7230
 function brishz() {
-    # local opts=()
+    local opts=()
     ## old GET
     # isDbg && opts+=(--data 'verbose=1')
     # rgeval curl --silent -G $opts[@] --data-urlencode "cmd=$(gq "$@")" http://127.0.0.1:8000/zsh/
@@ -9,11 +9,22 @@ function brishz() {
     # isDbg && opts+=(verbose=1)
     # http --body POST http://127.0.0.1:8000/zsh/ cmd="$(gq "$@")" $opts[@]
     ##
+    local endpoint="${bzEndpoint:-http://127.0.0.1:$GARDEN_PORT}"
+    if [[ "$endpoint" =~ 'garden' ]] ; then
+        opts+=(--user "Alice:$GARDEN_PASS0")
+    fi
     local v=0
     isDbg && v=1
     local req="$(jq --null-input --compact-output --arg c "$(gq "$@")" --arg v "$v" '{"cmd": $c, "verbose": $v}')"
-    local cmd=( curl --silent --header "Content-Type: application/json" --request POST --data "$req" http://127.0.0.1:$GARDEN_PORT/zsh/ )
+    local cmd=( curl $opts[@] --silent --header "Content-Type: application/json" --request POST --data "$req" $endpoint/zsh/ )
     cmd="$(gq "$cmd[@]")"
     <<<"$cmd" pbcopy
     eval "$cmd"
+}
+aliasfn brishzr bzEndpoint=https://garden.lilf.ir/api/v1 brishz
+##
+function caddypass() {
+    caddy hash-password -algorithm scrypt -salt "$GARDEN_SALT0" -plaintext "$GARDEN_PASS0"
+    # remember to base64:
+    # export GARDEN_SALT0_B64="$(print -nr -- "$GARDEN_SALT0" | base64)"
 }
