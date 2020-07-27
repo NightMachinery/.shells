@@ -35,7 +35,7 @@ function rss-tsend() {
     local each_url_delay="${rt_eud:-120}"
     local each_iteration_delay="${rt_eid:-1}"
     local notel="${rt_notel}"
-    local id="${rt_id:$water}"
+    local id="${rt_id:-$water}"
     local rssurls="rssurls $*" # used for storing dup links in redis
 
     local c t l

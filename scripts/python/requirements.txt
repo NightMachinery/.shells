@@ -19,7 +19,6 @@ waybackpack
 httpie
 tqdm
 subliminal
-rotten_tomatoes_cli
 numpy
 yq
 pdfCropMargins
@@ -50,3 +49,4 @@ fire
 python-multipart
 python-jose[cryptography]
 passlib[bcrypt,argon2,totp]
+fastapi[all]
