@@ -1,4 +1,6 @@
 #!/usr/bin/env zsh
+# Alt: You might want to use ZAlerts.
+
 export PYTHONIOENCODING=utf8
 export LANG="en_US.UTF-8"
 if ! is-online &> /dev/null ; then

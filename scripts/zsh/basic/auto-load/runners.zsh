@@ -27,4 +27,12 @@ function skipglob() {
         eval "$1 $(gq "${@:2}")"
     fi
 }
-alias skig=skipglob
+aliasfn skipemptyargs skipglob
+aliasfn skipargs skipglob
+function skipemptyin() {
+    # whitespace doesn't matter in this application, and in fact needs to be ignored
+    # local in="${$(</dev/stdin ; print -n .)[1,-2]}"
+    local in="$(</dev/stdin)"
+    test -z "$in" || { print -nr -- "$in" | reval "$@" }
+}
+aliasfn skipin skipemptyin

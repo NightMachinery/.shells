@@ -41,11 +41,12 @@ biadd() {
     test -n "$noi" ||
         bi "$1"
 }
-piadd() {
+function piadd() {
     ec "$1" >> "$pipables"
     test -n "$noi" ||
         pi "$1"
 }
+noglobfn piadd
 goi() {
     comment -u update -v verbose
     test -n "$noi" ||
@@ -104,7 +105,7 @@ function jins() {
 }
 reify jins
 function pig() { pi "git+$(git2http "$1")" }
-reify pig
+renog pig
 npmupdateg() {
     doc alt: npm-check -u -g
 

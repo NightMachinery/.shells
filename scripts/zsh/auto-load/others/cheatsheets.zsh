@@ -1,3 +1,15 @@
+function _dhint() {
+    pandoc <(curl  --silent --fail --location "https://github.com/rstacruz/cheatsheets/raw/master/$1.md")
+}
+function dhint() {
+    # devhints.io
+
+    # md.py did not render some stuff , e.g. vim, well
+    # md.py =(curlm "https://github.com/rstacruz/cheatsheets/raw/master/$1.md") | bt
+
+    # mdw but we couldn't memoi that
+    memoi_expire=9999999999 eval-memoi _dhint "$1" | skipin w3m -T text/html
+}
 function months() {
     echo "1.  January - 31 days
 2.  February - 28 days in a common year and 29 days in leap years
