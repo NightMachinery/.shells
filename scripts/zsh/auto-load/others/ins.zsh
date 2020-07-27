@@ -104,7 +104,7 @@ function jins() {
     # No longer necessary: We import the newly installed package to precompile it.
 }
 reify jins
-function pig() { pi "git+$(git2http "$1")" }
+function pig() { rgeval pi "git+$(git2http "$1")" }
 renog pig
 npmupdateg() {
     doc alt: npm-check -u -g
