@@ -1,8 +1,9 @@
 me="Arstar"
-alice='-1001179162919'
-arista='-1001154785017'
-water='-1001293952668'
-ephemeral='-1001404743282'
+export alice='-1001179162919'
+export arista='-1001154785017'
+export water='-1001293952668'
+export ephemeral='-1001404743282'
+export tlogs='-1001460496622'
 ###
 function alice() {
     tsend -- "$alice" "$*" && ec "Alicized successfully: $*" || ecerr 'Alicization failed!'
