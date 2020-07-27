@@ -8,7 +8,7 @@ function gsync() {
   git pull
   git push
 }
-ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u }
+ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat }
 guc() {
   mdoc "$0 [<how-many>=1]
 Undoes last commits without changing files." MAGIC

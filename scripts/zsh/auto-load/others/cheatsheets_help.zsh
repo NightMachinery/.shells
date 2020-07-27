@@ -1,5 +1,5 @@
 function _dhint() {
-    pandoc <(curl  --silent --fail --location "https://github.com/rstacruz/cheatsheets/raw/master/$1.md")
+    pandoc -f markdown <(curl  --silent --fail --location "https://github.com/rstacruz/cheatsheets/raw/master/$1.md")
 }
 function dhint() {
     # devhints.io
