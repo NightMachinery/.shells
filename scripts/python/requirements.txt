@@ -50,3 +50,4 @@ python-multipart
 python-jose[cryptography]
 passlib[bcrypt,argon2,totp]
 fastapi[all]
+git+https://github.com/NightMachinary/BrishGarden.git

@@ -24,6 +24,20 @@ sg.lilf.ir {
   reverse_proxy localhost:7080
 }
 
+https://garden.lilf.ir {
+#  @protected /api/*
+  basicauth /api/* bcrypt {
+	Alice JDJhJDEwJDE4aDFqNllLbmhESGhTeWxLeG5ibXVQR0VkVG1DMTk0LjFMV2lNZlVISFNtanIyUlBGaW4u nfNkIaRfXqFuqAB540iX2h2cv+ITJRkojaJfFZa9O1fPwcmE/l0BaYnE9j6L7Sh86AGMYImLEXyYnltpeoilPhfi1gGXFEA39dZMnEu6L4QWEpLOuuLy6QW2axspPVXpioOT3QmwLe9yVMrYQ18pGIi0wHxBZLWL2hoYu7WtWlw=
+  }
+  respond /api/hi/ "Hello Darkness My Old Friend!"
+  #reverse_proxy /api/v1/* localhost:7230
+  route /api/v1/* {
+	uri strip_prefix /api/v1
+	reverse_proxy localhost:7230
+  }
+  respond "pained gold spots accumulated"
+}
+
 ##
 # doesn't work, our only bet is the forward proxy plugin
 # :8060 {
