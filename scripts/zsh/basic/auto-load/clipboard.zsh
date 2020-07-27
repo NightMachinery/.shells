@@ -1,24 +1,18 @@
-teec() {
+function tee-copy() {
     doc "teec; ec-and-copy; tee-copy;
 Prints and copies its stdin.
-See also: 'etee'." #MAGIC
-    local out="$(</dev/stdin)"
-    <<<"$out" pbcopy
-    ec "$out"
+See also: 'etee'."
+
+    > >(pbcopy) | cat
 }
-aliasfn tee-copy teec
-etee() {
-    mdoc 'etee; Short for `eteec`. An enhancer that copies stdout and prints it, too.
-See also: teec' MAGIC
-    local out="$(eval "$(gquote "$@")")"
-    <<<"$out" pbcopy
-    ec "$out"
+aliasfn teec tee-copy
+function reval-copy() {
+    doc 'revals and also copies the stdout to the clipboard.'
+
+    reval "$@" > >(pbcopy) | cat
 }
-aliasfn reval-copy etee
-function eccopy() {
-    local out="$*"
-    <<<"$out" pbcopy
-    ec "$out"
+function ec-copy() {
+    reval-copy ec "$@"
 }
 function pbcopy() {
     local in="$(in-or-args "$@")"
