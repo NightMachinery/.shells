@@ -9,9 +9,10 @@ function rssln2k() {
     {
         pushf "$PURGATORY"
         local title="ephemeral"
+        mv "$acc" "$acc.bak" # move first to avoid synch issues
+        acc="$acc.bak"
         md2epub-pandoc "$title" "rssln $(datej)" "$acc"
         pkDel=y p2k "$title.epub"
-        mv "$acc" "$acc.bak"
     } always { popf }
 }
 ##
