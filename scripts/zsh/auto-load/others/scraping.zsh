@@ -382,19 +382,6 @@ html2epub-calibre() {
 txt2epub () {
     "${t2ed:-txt2epub-pandoc}" "$@"
 }
-txt2epub-pandoc () {
-    # TODO turn this into general pandoc convertor by modularizing the suffix
-    magic mdocu "<title> <author> <file> ..." ; mret
-    local files=( "${@:3}" )
-    local txts=()
-    local i
-    for i in "$files[@]" ; do
-        local t="$(gmktemp --suffix .txt)"
-        cp "$i" "$t"
-        txts+="$t"
-    done
-    pandoc --toc -s "$txts[@]" --metadata title="$title" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
-}
 txt2epub-calibre() {
     mdoc "DEPRECATED. Outputs weird like â€™ for apostrophe. Also only accepts single input.
 Use txt2epub-pandoc.
@@ -419,7 +406,8 @@ html2epub-pandoc() {
     local title="$1"
     local author="$2"
 
-    pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$1.epub"
+    PANDOC_FORMAT=html-native_divs 2epub-pandoc-byformat <(merge-html "${@:3}")
+    # pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub"
 }
 h2e() {
     html2epub "$1" "${h2_author:-night}" "${@:2}"
@@ -491,10 +479,57 @@ reify lw2gw
 enh-urlfinal lw2gw
 noglobfn lw2gw
 
-function html2epub-pandoc-simple() {
-    ecdbg "h2e-ps called with $@"
-    pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> $2 </dc:creator>") -o "$1.epub"
+function code2epub() {
+    mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
+
+    local title="$1"
+    local author="$we_author"
+
+    PANDOC_FORMAT=markdown 2epub-pandoc-byformat <(code2md "${@[2,-1]}")
 }
+function 2epub-pandoc-byformat() {
+    : "PANDOC_FORMAT= <name> <author> <file with that format> ..."
+
+    local format="$PANDOC_FORMAT"
+    local title="$1"
+    local author="$2"
+    local files=( "${@:3}" )
+
+    test -z "$format" && { 
+        ecerr "$0: Empty format supplied"
+        return 1
+    }
+
+    2epub-pandoc-simple "$title" "$author" -f "$format" "$files[@]"
+    # pandoc --toc -s --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub" -f "$format" "$files[@]"
+}
+function 2epub-pandoc-simple() {
+    : "This works for any files that have the correct extension, or if you set the format explicitly."
+    : "<name> <author> (<file with ext> OR <pandoc-opt>) ..."
+
+    local title="$(<<<$1 gtr '/' '.')"
+    local author="$(<<<$2 gtr '/' '.')"
+
+    pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub"
+}
+aliasfn html2epub-pandoc-simple 2epub-pandoc-simple
+function 2epub-pandoc-byext () {
+    magic mdocu "[PANDOC_EXT=txt] <title> <author> <file> ..." ; mret
+    local ext="{$PANDOC_EXT:-txt}"
+    local title="$1"
+    local author="$2"
+    local files=( "${@:3}" )
+    local txts=()
+    local i
+    for i in "$files[@]" ; do
+        local t="$(gmktemp --suffix ."$ext")"
+        cp "$i" "$t"
+        txts+="$t"
+    done
+    2epub-pandoc-simple "$title" "$author" "$txts[@]"
+}
+aliasfn txt2epub-pandoc PANDOC_EXT=txt 2epub-pandoc-byext
+aliasfn md2epub-pandoc PANDOC_EXT=md 2epub-pandoc-byext
 function aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
     aget "aa -Z $(gquote "${@:2}")
@@ -555,10 +590,6 @@ function merge-html() {
 $(cat "$i")
 "
     done
-}
-function code2epub() {
-    mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
-    pandoc -s --metadata title="$title" --epub-metadata <(ec "<dc:title>$1</dc:title> <dc:creator> ${we_author:-night} </dc:creator>") -f markdown <(code2md "${@[2,-1]}") -o "${1}.epub"
 }
 function getlinks() {
     lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}

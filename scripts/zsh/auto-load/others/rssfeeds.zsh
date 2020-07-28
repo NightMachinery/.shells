@@ -1,5 +1,18 @@
 function tsend-rssln() {
-    tsend --parse-mode markdown -- "$1" "[$rssTitle]($2)"
+    local item="[$rssTitle]($2)"
+    local acc="$PURGATORY/rssln.md"
+    print -nr -- "$item"$'\n\n' >> $acc
+    tsend --parse-mode markdown -- "$1" $item
+}
+function rssln2k() {
+    local acc="$PURGATORY/rssln.md"
+    {
+        pushf "$PURGATORY"
+        local title="ephemeral"
+        md2epub-pandoc "$title" "rssln $(datej)" "$acc"
+        pkDel=y p2k "$title.epub"
+        mv "$acc" "$acc.bak"
+    } always { popf }
 }
 ##
 function sumgensim() {
