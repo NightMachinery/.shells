@@ -142,7 +142,7 @@ function init-vfiles() {
 
     if test -n "$*" || test -z "$vfiles[1]" ; then
         local i dirs=( "${(@0)$(arr0 ~/.julia/config ~/.julia/environments $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
-        vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} )
+        vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} ~/.zshrc ~/.zshenv )
         # for i in "$dirs[@]" ; do
         #     vfiles+=( $i/**/*(.D^+isbinary) )
         # done
@@ -151,6 +151,8 @@ function init-vfiles() {
     # --ignore-file seems not working
 }
 function v() {
+    local emacs_root=~/.emacs.d.doom/.local # normal emacs doesn't have this .local part
+    local emacs_recent="$emacs_root/.cache/recentf"
     : GLOBAL vfiles
     init-vfiles
 
@@ -173,8 +175,8 @@ function v() {
             line="${line/\~/$HOME}"
             [ -f "$line" ] && files+="$line"
         done
-    test -f ~/.emacs.d/.cache/recentf && {
-        command rg --only-matching --replace '$1' '^\s*"(.*)"$' ~/.emacs.d/.cache/recentf |
+    test -f "$emacs_recent" && {
+        command rg --only-matching --replace '$1' '^\s*"(.*)"$' "$emacs_recent" |
             while read line; do
                 [ -f "$line" ] && files+="$line"
             done

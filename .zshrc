@@ -146,6 +146,7 @@ re source "$NIGHTDIR"/zsh/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliase
 # zle -N deer
 # bindkey '\ek' deer
 autoload -U +X bashcompinit && bashcompinit
+_comp_options+=(globdots)
 zsh-defer source-interactive-all
 
 # sth in .zshrc overrides these so ...

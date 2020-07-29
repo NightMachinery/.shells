@@ -13,6 +13,7 @@ alias rr=rgm
 alias rrn='rgm --line-number'
 aliasfn rd emcrg
 ##
+aliasfn ag. ag --unrestricted -g # search in the pathnames
 function emcrg() {
     emc -e "(night/search-dir \"$(pwd)\")"
 }
