@@ -7,6 +7,6 @@ re source-basic magicmacros macros cached conditions crossplatform args colors d
 run-on-each source "$NIGHTDIR"/zsh/basic/auto-load/**/*(.)
 [[ "$(pwd)" != *borg* ]] || {
     # For use with the Julia module.
-    silence eval 'export jufile=(*)' && export j="$jufile"
+    silence eval 'export jufile=(*)' && export j="$jufile" || export j=""
     export jd="$(pwd)"
 }
