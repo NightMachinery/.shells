@@ -188,9 +188,6 @@ zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
 # alias revealaliases='export ZSH_PLUGINS_ALIAS_TIPS_REVEAL=1'
 ##
 
-zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
-zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
-
 ##
 expand-or-complete-with-dots() {
     # toggle line-wrapping off and back on again
@@ -207,7 +204,7 @@ bindkey "^I" expand-or-complete-with-dots
 # antibody bundle Aloxaf/fzf-tab
 FZF_TAB_OPTS=(
     --ansi   # Enable ANSI color support, necessary for showing groups
-    --expect='$continuous_trigger' # For continuous completion
+    --expect='$continuous_trigger,$print_query' # For continuous completion
     # '--color=hl:$(( $#headers == 0 ? 108 : 255 ))'
     --color=light
     --nth=2,3 --delimiter='\x00'  # Don't search prefix
@@ -215,11 +212,13 @@ FZF_TAB_OPTS=(
     --tiebreak=begin -m --bind=tab:down,btab:up,change:top,ctrl-space:toggle --cycle
     '--query=$query'   # $query will be expanded to query string at runtime.
     '--header-lines=$#headers' # $#headers will be expanded to lines of headers at runtime
+    --print-query
 )
 function fztab() {
     fz "$@"
 }
 FZF_TAB_COMMAND=( fztab "$FZF_TAB_OPTS[@]" )
+# zstyle ':fzf-tab:*' print-query alt-enter # this is the default
 zstyle ':fzf-tab:*' command $FZF_TAB_COMMAND
 zstyle ':fzf-tab:*' no-group-color $'\033[38;5;24m'
 # FZF_TAB_GROUP_COLORS=(
@@ -252,6 +251,9 @@ zstyle ':completion:*' matcher-list '' '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*
 # The second (original) rule allows for partial completion before ., _ or -, e.g. f.b -> foo.bar.
 # The third rule allows for completing on the left side of the written text, e.g. bar -> foobar)
 ##
+zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
+zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
+
 ###
 export rcLoaded='loading'
 zsh-defer export rcLoaded='yes'
