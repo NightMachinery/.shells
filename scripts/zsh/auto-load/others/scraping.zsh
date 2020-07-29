@@ -406,7 +406,7 @@ html2epub-pandoc() {
     local title="$1"
     local author="$2"
 
-    PANDOC_FORMAT=html-native_divs 2epub-pandoc-byformat <(merge-html "${@:3}")
+    PANDOC_FORMAT=html-native_divs 2epub-pandoc-byformat "$title" "$author" <(merge-html "${@:3}")
     # pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub"
 }
 h2e() {
@@ -485,7 +485,7 @@ function code2epub() {
     local title="$1"
     local author="$we_author"
 
-    PANDOC_FORMAT=markdown 2epub-pandoc-byformat <(code2md "${@[2,-1]}")
+    PANDOC_FORMAT=markdown 2epub-pandoc-byformat "$title" "$author" <(code2md "${@[2,-1]}")
 }
 function 2epub-pandoc-byformat() {
     : "PANDOC_FORMAT= <name> <author> <file with that format> ..."

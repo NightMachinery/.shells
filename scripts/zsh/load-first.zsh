@@ -8,6 +8,7 @@ run-on-each source "$NIGHTDIR"/zsh/basic/auto-load/**/*(.)
 function jinit() {
     [[ "$(pwd)" != *borg* ]] || {
         # For use with the Julia module.
+        unset jufile j jd
         export jufile=""
         silence eval 'export jufile=(*)' && export j="$jufile" || export j=""
         export jd="$(pwd)"
