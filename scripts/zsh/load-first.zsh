@@ -5,8 +5,12 @@ source-basic basic
 # malice is the alias module. :D
 re source-basic magicmacros macros cached conditions crossplatform args colors debug text-manipulation ssh malice eval enhancers redirections
 run-on-each source "$NIGHTDIR"/zsh/basic/auto-load/**/*(.)
-[[ "$(pwd)" != *borg* ]] || {
-    # For use with the Julia module.
-    silence eval 'export jufile=(*)' && export j="$jufile" || export j=""
-    export jd="$(pwd)"
+function jinit() {
+    [[ "$(pwd)" != *borg* ]] || {
+        # For use with the Julia module.
+        export jufile=""
+        silence eval 'export jufile=(*)' && export j="$jufile" || export j=""
+        export jd="$(pwd)"
+    }
 }
+jinit

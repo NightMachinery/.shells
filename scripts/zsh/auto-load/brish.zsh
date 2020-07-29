@@ -16,12 +16,19 @@ function brishz() {
     local v=0
     isDbg && v=1
     local req="$(jq --null-input --compact-output --arg c "$(gq "$@")" --arg v "$v" '{"cmd": $c, "verbose": $v}')"
-    local cmd=( curl $opts[@] --silent --header "Content-Type: application/json" --request POST --data "$req" $endpoint/zsh/ )
+    local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data "$req" $endpoint/zsh/ )
     cmd="$(gq "$cmd[@]")"
     <<<"$cmd" pbcopy
     eval "$cmd"
 }
 aliasfn brishzr bzEndpoint=https://garden.lilf.ir/api/v1 brishz
+function garden-req() {
+    # We spoof our IP here, to see if the server is fooled.
+    local opts=()
+    isDbg && opts+='-v'
+    curl $opts[@] --fail --silent --location --user "Alice:$GARDEN_PASS0" 'https://garden.lilf.ir/api/v1/request/'"$1" --header "X-Forwarded-For: 1.2.3.4"
+}
+aliasfn garden-ip garden-req 'ip/'
 ##
 function caddypass() {
     caddy hash-password -algorithm scrypt -salt "$GARDEN_SALT0" -plaintext "$GARDEN_PASS0"

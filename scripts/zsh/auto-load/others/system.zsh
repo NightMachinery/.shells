@@ -2,8 +2,8 @@ crondisable() {
 	local user="${1:-$(whoami)}"
 	local cronpath="/tmp/$user.cron.tmp"
 	test -e "$cronpath" && {
-	ecerr "There is already a disabled crontab at $cronpath. Remove that manually if you want to proceed."
-	return 1
+		ecerr "There is already a disabled crontab at $cronpath. Remove that manually if you want to proceed."
+		return 1
 	}
 	crontab -l -u $user > "$cronpath"
 	crontab -r -u $user
@@ -12,21 +12,37 @@ cronenable() {
 	local user="${1:-$(whoami)}"
 	local cronpath="/tmp/$user.cron.tmp"
 	test -e "$cronpath" || {
-	ecerr "No disabled cron at $cronpath"
-	return 1
+		ecerr "No disabled cron at $cronpath"
+		return 1
 	}
 	crontab -u $user "$cronpath"
 	mv "$cronpath" "${cronpath}.bak"
 }		
-get-volume() {
-    osascript -e 'set ovol to output volume of (get volume settings)'
+function volget() {
+	osascript -e 'set ovol to output volume of (get volume settings)'
 }
-function setv() {
-    osascript -e "set volume output volume $1"
+function volset() {
+	osascript -e "set volume output volume $1"
+}
+aliasfn setv volset
+aliasfn get-volume volget
+aliasfn getv volget
+function mute-external() {
+	: "Use: lo_s=0 loop mute-external [<headphone-volume-from-100>=1]"
+	: "Note that headphones-is is expensive and takes ~0.3 seconds"
+
+	{
+		local lev="${1:-1}"
+		if headphones-is ; then
+			volset "$lev"
+		else
+			volset 0
+		fi
+	} always { volset 0 }
 }
 function display-off() {
-    watch -n ${1:-1} brightness 0
-    #macOS only probably
+	watch -n ${1:-1} brightness 0
+	#macOS only probably
 }
 function resetdns-darwin() {
 	sudo dscacheutil -flushcache

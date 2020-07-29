@@ -1,0 +1,9 @@
+#!/usr/bin/env dash
+
+if test "$1" = '-c' ; then
+   shift
+fi
+
+. ~/.privateBTT.sh
+
+curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"{ '"$*"' } &>/dev/null &","verbose":"0"}' https://garden.lilf.ir/api/v1/zsh/ --user "Alice:$GARDEN_PASS0"

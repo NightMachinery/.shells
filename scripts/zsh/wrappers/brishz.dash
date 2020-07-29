@@ -1,0 +1,7 @@
+#!/usr/bin/env dash
+
+if test "$1" = '-c' ; then
+   shift
+fi
+
+curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"'"$*"'","verbose":"0"}' http://127.0.0.1:7230/zsh/
