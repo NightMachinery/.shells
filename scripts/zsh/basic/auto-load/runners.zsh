@@ -21,6 +21,7 @@ redoq() {
 }
 redo() redoq "$(gquote "${@: 1:-1}")" "${@: -1}"
 redo2() { redo "$@[2,-1]" "$1" }
+##
 function skipglob() {
     if test -n "${*[2,-1]}" ; then
         # ecdbg "$0: ${*[2,-1]}"
@@ -36,3 +37,17 @@ function skipemptyin() {
     test -z "$in" || { print -nr -- "$in" | reval "$@" }
 }
 aliasfn skipin skipemptyin
+##
+function indir() {
+    # we are not handling the autocompletion system at all
+    local dir="$(bottomdir "$1")" cmd=("${@:2}")
+    test -d "$dir" || {
+        ecerr "$0: '$dir' is not a directory"
+        return 1
+    }
+    pushf "$dir"
+    {
+        reval "${cmd[@]}"
+    } always { popf }
+}
+aliasfn in indir # best reserved for interactive use

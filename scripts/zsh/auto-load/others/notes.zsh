@@ -1,3 +1,10 @@
+aliasfn ntl. ntLines=y nightNotes=. noteglob=$codeglob ntl
+aliasfn see ntl.
+aliasfn sees ntLines=y nightNotes=. noteglob=$codeglob ntlq
+aliasfn agsi ntLines=y nightNotes="$NIGHTDIR" noteglob=$codeglob ntlq
+function agfi() {
+    agsi "'$1 '()"
+}
 ###
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
@@ -5,6 +12,9 @@ alias nts='\noglob ntsearch'
 
 function emcnt() {
     emc -e "(night/search-notes)"
+}
+function ntlq() {
+    ntsearch_query="$*" ntl
 }
 function ntl() {
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"
@@ -41,6 +51,7 @@ function ntl() {
                 cmd+=' (recenter)'
             done
             # lower than this 1.5 delay will not work. More delay might be necessary for edge cases.
+            # The first time we use this in a zsh session, the highlight sometimes does not work. Idk why.
             cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h)"
             cmd+=')'
             emacsclient -t -e "$cmd"
@@ -92,7 +103,7 @@ function ntsearch() {
 }
 function ntsearch_() {
     : "See vnt, ntl"
-    : "GLOBAL: acceptor out"
+    : "INPUT: ntsearch_query, GLOBAL: acceptor out"
 
     dvar nightNotes
 
@@ -102,7 +113,7 @@ function ntsearch_() {
     local ntLines="$ntLines"
     local glob="*${*}$noteglob"
 
-    local query=""
+    local query="$ntsearch_query"
     # test -z "$query" || query="'$query"
     # local pattern="."
 

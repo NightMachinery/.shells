@@ -10,7 +10,10 @@ mv () {
         _mv "$@"
     else
         local newfilename="$1"
-        vared newfilename
+        vared newfilename || {
+            ecerr "$0: Canceled"
+            return 1
+        }
         # bash: read -ei "$1" newfilename
         _mv -v -- "$1" "$newfilename"
     fi
