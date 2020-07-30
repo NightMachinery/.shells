@@ -1,3 +1,4 @@
+##
 diraction-personal-config (){
     #     tdl  $HOME/Downloads/Telegram\\ Desktop
     # whitespace bug in batch
@@ -17,19 +18,13 @@ diraction-personal-config (){
 "
 }
 antibody bundle "adrieankhisbe/diractions"
+
+aliasfn cellp incell gsync
+aliasfnq incell indir "$cellar"
+aliasfnq indl indir ~/Downloads/
+aliasfnq intdl indir ~"/Downloads/Telegram Desktop"
+##
 vcnpp() {
     vcsh night.sh add ~/scripts/
     vcsh night.sh commit -uno -am "." ; vcsh night.sh pull --no-edit ; vcsh night.sh push
-}
-inqcell() incell "$(gquote "$@")"
-incell() {
-    pushf "$cellar"
-    eval "$@"
-    popf
-}
-alias cellp="incell 'ga . ; gcam . ; gl --no-edit ; gp'"
-indl() {
-    pushf ~/Downloads/
-    eval "$@"
-    popf
 }

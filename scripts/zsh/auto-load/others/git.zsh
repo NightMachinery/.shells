@@ -5,7 +5,7 @@ alias grm='git rm --cached'
 function gsync() {
   git add .
   git commit -a -m .
-  git pull
+  git pull --no-edit
   git push
 }
 ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat }

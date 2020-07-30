@@ -1,19 +1,25 @@
-function enh-savename() {
-    # TODO Adding a way to keep track of all saved names would be good.
-    mdoc "$0 <name of original function> <its renamed version after enhancement>" MAGIC
-
-    typeset -A -g enhSavedNames
-    test -n "${enhSavedNames[$1]}" || enhSavedNames[$1]="$2"
-}
+##
 function _aliasfn() {
     : "ruu might be needed. Example: aliasfn hi ruu someVar=12"
     local name="$1"
+    local goesto="$2"
     local body="$@[2,-1]"
+
     functions[$name]="$body "'"$@"'
-    enh-savename "$name" "$2"
+    enh-savename "$name" "$goesto"
 }
 # enh-savename aliasfn _aliasfn # redundant, we will auto-erase noglob ourselves
 alias aliasfn='\noglob _aliasfn'
+function _aliasfnq() {
+    local name="$1"
+    local goesto="$2"
+    local body=("$@[2,-1]")
+
+    fnswap enh-savename true _aliasfn "$name" "$(gq "${body[@]}")"
+    enh-savename "$name" "$goesto"
+}
+alias aliasfnq='\noglob _aliasfnq'
+
 function aliasfn-classic() {
     local args=( "$@" )
     [[ "$args[*]" =~ '\s*([^=]+)=(.*[^\s])\s*' ]] || { echo invalid alias: "$args[*]" >&2 ; return 1 }
@@ -25,6 +31,7 @@ function aliassafe() {
     builtin alias "$@"
     aliasfn-classic "$@"
 }
+##
 function createglob() {
     local from="$1"
     local to="$2"

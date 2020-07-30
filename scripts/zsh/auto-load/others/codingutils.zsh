@@ -1,4 +1,5 @@
 preEnhNames() {
+    unset out
     mdoc "$0 args ...
 Replaces any arg that is in enhSavedNames with its original name. Outputs in \$out.
 Update: Actually adds, not replaces. Also removes duplicates." MAGIC
@@ -24,8 +25,13 @@ function whz() {
     printz "$(which "$items[-1]")" #"${(q-@)"$(which "$1")"}"
 }
 whichm() {
-    preEnhNames "$@"
-    local items=("$out[@]")
+    ##
+    # old way, we now use nextItems # preEnhNames "$@" # outputs in $out
+    # local items=("$out[@]")
+    ##
+    local items=("$@")
+    unset out
+    local nextItems=()
     local item output
     for item in "$items[@]"
     do
@@ -33,6 +39,8 @@ whichm() {
             ec "## $(which $item)"
             continue
         }
+
+        test -z "$enhSavedNames[$item]" || nextItems+="$enhSavedNames[$item]"
 
         output="${aliases[$item]}" ; test -n "$output" && {
             output="$(gq "$output")"
@@ -58,6 +66,8 @@ whichm() {
                 ec $output
             }
     done
+
+    (( ${#nextItems} == 0 )) || $0 "$nextItems[@]"
 }
 function wh() { whichm "$@" | btz }
 function whh() {

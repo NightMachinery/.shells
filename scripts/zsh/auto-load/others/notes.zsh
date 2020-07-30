@@ -3,7 +3,8 @@ aliasfn see ntl.
 aliasfn sees ntLines=y nightNotes=. noteglob=$codeglob ntlq
 aliasfn agsi ntLines=y nightNotes="$NIGHTDIR" noteglob=$codeglob ntlq
 function agfi() {
-    agsi "'$1 '()"
+    local f="$1"
+    agsi "'$f '() | 'alias | 'alifn" # match functions or aliases
 }
 ###
 alias imd='img2md-imgur'
@@ -17,6 +18,7 @@ function ntlq() {
     ntsearch_query="$*" ntl
 }
 function ntl() {
+    : "Remember that ntsearch_ uses eval-memoi"
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"
     : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
 
@@ -105,8 +107,6 @@ function ntsearch_() {
     : "See vnt, ntl"
     : "INPUT: ntsearch_query, GLOBAL: acceptor out"
 
-    dvar nightNotes
-
     acceptor=''
     out=''
 
@@ -142,6 +142,7 @@ gsed -n $((ln+1)),$((ln+50))p $fileabs
     # files=( "${(@f)$(fd -e md -e txt -e org --full-path ${pattern} $nightNotes )}" )
     files=($nightNotes/**/${~glob})
     local first='y' filename content line i
+
     memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes" eval-memoi ntsearch_fd | fz --preview-window right --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {
         read -d $'\0' -r acceptor
         out="$(cat)"
@@ -149,6 +150,7 @@ gsed -n $((ln+1)),$((ln+50))p $fileabs
     }
     # right:hidden to hide preview
     # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF'
+
 }
 function ntsearch_fd() {
     : "INPUT VARS: files ntLines nightNotes"

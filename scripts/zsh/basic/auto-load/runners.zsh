@@ -40,9 +40,9 @@ aliasfn skipin skipemptyin
 ##
 function indir() {
     # we are not handling the autocompletion system at all
-    local dir="$(bottomdir "$1")" cmd=("${@:2}")
-    test -d "$dir" || {
-        ecerr "$0: '$dir' is not a directory"
+    local origfile="$1" dir="$(bottomdir "$1")" cmd=("${@:2}")
+    { test -e "$origfile" && test -d "$dir" } || {
+        ecerr "$0: '$origfile' is invalid (probably doesn't exist)"
         return 1
     }
     pushf "$dir"

@@ -1,3 +1,12 @@
+function enh-savename() {
+    : "<name of original function> <its renamed version after enhancement>"
+    # TODO Adding a way to keep track of all saved names would be good.
+
+    typeset -A -g enhSavedNames
+
+    test -n "${enhSavedNames[$1]}" || enhSavedNames[$1]="$2"
+}
+##
 function enh-mkdest() {
     doc enhances commands by creating directories for destination.
     local dest="${@: -1}"
