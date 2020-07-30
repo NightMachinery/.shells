@@ -40,8 +40,6 @@ whichm() {
             continue
         }
 
-        test -z "$enhSavedNames[$item]" || nextItems+="$enhSavedNames[$item]"
-
         output="${aliases[$item]}" ; test -n "$output" && {
             output="$(gq "$output")"
             ec "alias $item=$output"
@@ -50,6 +48,9 @@ whichm() {
             whichm "${(u@)is:|items}"
             continue
         }
+
+        test -z "$enhSavedNames[$item]" || nextItems+="$enhSavedNames[$item]"
+
         output="$(which -- "$item")" && ! [[ "$output" =~ '^\s*\w+: suffix aliased to' ]] && {
                 test -e "/$output" && {
                     test -n "$whdeep_gen_mode" && {
