@@ -39,8 +39,9 @@ function ntl() {
     done
 
     if [[ "$acceptor" == '' ]] ; then
-        <<<"$lines[*]" fnswap rg rgm match-url-rg --passthru && {
-            local url="$(<<<"$lines[*]" match-url-rg --only-matching --replace '$1')"
+        local sel="${(F)lines}"
+        <<<"${sel}" fnswap rg rgm match-url-rg --passthru && {
+            local url="$(<<<"${sel}" match-url-rg --only-matching --replace '$1')"
             pbcopy "$url"
         }
         return 0
@@ -113,7 +114,8 @@ function ntsearch_() {
     local ntLines="$ntLines"
     local glob="*${*}$noteglob"
 
-    local query="$ntsearch_query"
+    local query_rg="$ntsearch_query"
+    local query=""
     # test -z "$query" || query="'$query"
     # local pattern="."
 
@@ -144,7 +146,9 @@ gsed -n $((ln+1)),$((ln+50))p $fileabs
     files=($nightNotes/**/${~glob})
     local first='y' filename content line i
 
-    memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes" eval-memoi ntsearch_fd | fz --preview-window right --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {
+    # we no longer need caching, it's fast enough
+    # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
+    ntsearch_fd | fz --preview-window right --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {
         read -d $'\0' -r acceptor
         out="$(cat)"
         ec "$out"
@@ -154,34 +158,39 @@ gsed -n $((ln+1)),$((ln+50))p $fileabs
 
 }
 function ntsearch_fd() {
-    : "INPUT VARS: files ntLines nightNotes"
+    : "INPUT VARS: files ntLines nightNotes query_rg"
 
-    for file in "$files[@]"
-    do
-        test -f "$file" || continue
-        test -n "$first" || {
-            if test -z "$ntLines" ; then
-                print -n $'\0'
-            else
+    if test -n "$ntLines" ; then
+        command rg --line-number "$query_rg" "${files[@]}"  | sd $nightNotes ''
+        ## old way (uses vars now not in scope)
+        # i=1
+        # for line in "${(@f)content}" ; do
+        #     if test -n "$line" ; then
+        #         ec "${filename}:${i}:${line}"
+        #     fi
+        #     i=$((i+1))
+        # done
+        ##
+    else
 
-            fi
-        }
-        first=''
-        filename="$(realpath --relative-to $nightNotes $file)"
-        content="$(< $file)"
-        if test -z "$ntLines" ; then
+        for file in "$files[@]"
+        do
+            test -f "$file" || continue
+
+            test -n "$first" || {
+                if test -z "$ntLines" ; then
+                    print -n $'\0'
+                else
+
+                fi
+            }
+            first=''
+            filename="$(realpath --relative-to $nightNotes $file)"
+            content="$(< $file)"
             color 30 90 255 $filename$'\n'
             ec $content
-        else
-            i=1
-            for line in "${(@f)content}" ; do
-                if test -n "$line" ; then
-                    ec "${filename}:${i}:${line}"
-                fi
-                i=$((i+1))
-            done
-        fi
-    done
+        done
+    fi
 }
 function jrlt() {
     local today="$(date +"%Y.%b.%d") $(datej|tr / -)"
