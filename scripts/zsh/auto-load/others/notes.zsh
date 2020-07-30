@@ -8,6 +8,7 @@ function emcnt() {
 }
 function ntl() {
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"
+    : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
 
     outFiles=() # out and outFiles contain the same data when ntLines=y
     ntLines=y ntsearch "$@" > /dev/null  || return 1 # Beware forking here! We need the global vars outFiles and acceptor
@@ -39,6 +40,8 @@ function ntl() {
                 cmd+=" (find-file \"${files[$i]}\") (goto-line ${linenumbers[$i]}) "
                 cmd+=' (recenter)'
             done
+            # lower than this 1.5 delay will not work. More delay might be necessary for edge cases.
+            cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h)"
             cmd+=')'
             emacsclient -t -e "$cmd"
         else
