@@ -134,7 +134,8 @@ function ntsearch_() {
 
                       '
 gsed -n $((ln+1)),$((ln+50))p $fileabs
-} |& /usr/local/Cellar/perl/5.30.1/bin/ansifold -s -w $FZF_PREVIEW_COLUMNS' )
+} |& ' "$(gq "$(rp ansifold)")" '-s -w $FZF_PREVIEW_COLUMNS' )
+        # install location is at perl -V:'installbin' , link it
         # cpanm App::ansifold
         # https://metacpan.org/pod/Text::ANSI::WideUtil
     fi
