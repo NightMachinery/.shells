@@ -43,6 +43,8 @@ function ntl() {
             emacsclient -t -e "$cmd"
         else
             # should work with both emacs and vim
+            # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
+            # I don't know about opening multiple files on vscode (we can always run the command multiple times)
             local cmd="$EDITOR "
             for i in {1..$#files} ; do
                 cmd+="+${linenumbers[$i]} $(gq "${files[$i]}") "
