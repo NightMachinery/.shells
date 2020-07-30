@@ -1,7 +1,11 @@
 aliasfn ntl. ntLines=y nightNotes=. noteglob=$codeglob ntl
 aliasfn see ntl.
 aliasfn sees ntLines=y nightNotes=. noteglob=$codeglob ntlq
-aliasfn agsi ntLines=y nightNotes="$NIGHTDIR" noteglob=$codeglob ntlq
+function seev() {
+    init-vfiles
+    ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) noteglob=$codeglob ntlq "$@"
+}
+aliasfn agsi ntLines=y nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) noteglob=$codeglob ntlq
 function agfi() {
     local f="$1"
     agsi "'$f '() | 'alias | 'alifn" # match functions or aliases
@@ -10,10 +14,22 @@ function agfi() {
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
 ###
-
 function emcnt() {
     emc -e "(night/search-notes)"
 }
+function ugnt() {
+    local i args=()
+    for i in "$note_formats[@]" ; do
+        args+=( -O "$i" )
+    done
+    ugm "$args[@]" "$@" $nightNotes/
+}
+function vnt() {
+    outFiles=()
+    { ntsearch "$@" > /dev/null } || return 1
+    reval "${veditor[@]}" "$outFiles[@]"
+}
+##
 function ntlq() {
     ntsearch_query="$*" ntl
 }
@@ -70,18 +86,6 @@ function ntl() {
         fi
     fi
 }
-function ugnt() {
-    local i args=()
-    for i in "$note_formats[@]" ; do
-        args+=( -O "$i" )
-    done
-    ugm "$args[@]" "$@" $nightNotes/
-}
-function vnt() {
-    outFiles=()
-    { ntsearch "$@" > /dev/null } || return 1
-    reval "${veditor[@]}" "$outFiles[@]"
-}
 function ntsearch() {
     : "GLOBAL: out outFiles"
     
@@ -106,15 +110,28 @@ function ntsearch() {
 }
 function ntsearch_() {
     : "See vnt, ntl"
-    : "INPUT: ntsearch_query, GLOBAL: acceptor out"
+    : "INPUT: ntsearch_query, ntsearch_additional_paths, nightNotes, ntLines , GLOBAL: acceptor out"
 
     acceptor=''
     out=''
 
     local ntLines="$ntLines"
-    local glob="*${*}$noteglob"
 
-    local query_rg="$ntsearch_query"
+    local additional_paths=(${(@)ntsearch_additional_paths})
+    # Checking for existence introduces noticeable delay, but has little benefit. So we don't.
+    # local additional_paths=("${(@f)$(<<<${(F)ntsearch_additional_paths} filter test -e)}")
+
+    dvar additional_paths
+    local glob="*${*}$noteglob"
+    local files
+    # files=( "${(@f)$(fd -e md -e txt -e org --full-path ${pattern} $nightNotes )}" )
+    files=(${additional_paths[@]})
+    [[ "$nightNotes" != '/' ]] && files+=($nightNotes/**/${~glob}) # `/` means we are only interested in additional_paths, but since the machinary relies on nightNotes existing, we use `/`.
+    (( $#files == 0 )) && {
+        ecerr "$0: No valid paths supplied. Aborting."
+        return 1
+    }
+    local query_rg="${ntsearch_query:-\S+}" # removes empty lines
     local query=""
     # test -z "$query" || query="'$query"
     # local pattern="."
@@ -141,27 +158,25 @@ gsed -n $((ln+1)),$((ln+50))p $fileabs
         # cpanm App::ansifold
         # https://metacpan.org/pod/Text::ANSI::WideUtil
     fi
-    local file files
-    # files=( "${(@f)$(fd -e md -e txt -e org --full-path ${pattern} $nightNotes )}" )
-    files=($nightNotes/**/${~glob})
-    local first='y' filename content line i
 
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
-    ntsearch_fd | fz --preview-window right --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {
+    ntsearch_fd | fz --preview-window right --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
         read -d $'\0' -r acceptor
         out="$(cat)"
         ec "$out"
-    }
-    # right:hidden to hide preview
-    # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF'
+    } # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF' # to remove empty lines (I don't know why I commented this, or if it actually works. But I now use rg itself to filter empty lines out.
 
 }
 function ntsearch_fd() {
     : "INPUT VARS: files ntLines nightNotes query_rg"
 
     if test -n "$ntLines" ; then
-        command rg --line-number "$query_rg" "${files[@]}"  | sd $nightNotes ''
+        {
+            # no-messages suppresses IO errors
+            command rg --no-messages --line-number "$query_rg" "${files[@]}" || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+        } | rmprefix "$nightNotes"
+            # sd "^$nightNotes" '' # sd is doing the work of `realpath --relative-to` . TODONE this doesn't quote and so is buggy
         ## old way (uses vars now not in scope)
         # i=1
         # for line in "${(@f)content}" ; do
@@ -172,7 +187,7 @@ function ntsearch_fd() {
         # done
         ##
     else
-
+        local first='y' file filename content line i
         for file in "$files[@]"
         do
             test -f "$file" || continue
