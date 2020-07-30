@@ -4,5 +4,7 @@ blc() {
     ln -s "$(brew --cellar "$1")"/**/"$2" ~/bin/"$3"
 }
 function bii() {
-    brew bundle --file=/dev/stdin <<<"brew \"$1\" ${@:2}"
+    brew reinstall "$@"
+    ## Old: "DEPRECATED: Use brew reinstall"
+    # brew bundle --file=/dev/stdin <<<"brew \"$1\" ${@:2}"
 }

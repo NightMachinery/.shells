@@ -4,8 +4,6 @@ re "silence unalias" a la map p fd ff pip sp rd # mv cp
 alias rgjl="rgm -t julia" #"rgm --glob '*.jl'"
 alias rgpy="rgm --glob '*.py'"
 alias spt='spotlight -name'
-alias hear-noipc='command mpv --keep-open=no --no-video'
-alias hearinvisible='silent hear-noipc --no-terminal --load-scripts=no'
 alias nohistory='unset HISTFILE' #disables history for current session
 alias cleanbuffer='printf "\ec\e[3J"' # there is a similar tool in my anaconda's bin named clear.
 alias emcsave="emc -e '(save-some-buffers t)'"

@@ -22,7 +22,7 @@ function ffport() {
     local filter="${fpFilter:-.*}"
 
     lsport "$ports[@]" | { local line
-                           read line
+                           read -d $'\n' -r line
                            ec "$line"
                            command rg "$filter"
     } | fz --with-nth '1,3,5,8,9..' --header-lines 1 | awk '{print $2}'
@@ -141,7 +141,7 @@ function init-vfiles() {
     : GLOBAL vfiles
 
     if test -n "$*" || test -z "$vfiles[1]" ; then
-        local i dirs=( "${(@0)$(arr0 ~/.julia/config ~/.julia/environments $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
+        local i dirs=( "${(@0)$(arr0 ~/.julia/config ~/.julia/environments $DOOMDIR $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
         vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} ~/.zshrc ~/.zshenv )
         # for i in "$dirs[@]" ; do
         #     vfiles+=( $i/**/*(.D^+isbinary) )
@@ -162,7 +162,7 @@ function v() {
 
     test -f "$code" && {
         command rg --only-matching --replace '$1' '"file://(.*)"' "$code" |
-            while read line; do
+            while read -d $'\n' -r line; do
                 [ -e "$line" ] && {
                     files+="$line"
                     ecdbg "vscode: $line"
@@ -171,13 +171,13 @@ function v() {
     }
 
     command rg '^>' ~/.viminfo | cut -c3- |
-        while read line; do
+        while read -d $'\n' -r line; do
             line="${line/\~/$HOME}"
             [ -f "$line" ] && files+="$line"
         done
     test -f "$emacs_recent" && {
         command rg --only-matching --replace '$1' '^\s*"(.*)"$' "$emacs_recent" |
-            while read line; do
+            while read -d $'\n' -r line; do
                 [ -f "$line" ] && files+="$line"
             done
     }

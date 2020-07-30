@@ -1,5 +1,5 @@
-aliasfn ntl. ntLines=y nightNotes=. noteglob=$codeglob ntsearch
-aliasfn ntls ntLines=y nightNotes="$NIGHTDIR" noteglob=$codeglob ntsearch
+aliasfn ntl. ntLines=y nightNotes=. noteglob=$codeglob ntl
+aliasfn ntls ntLines=y nightNotes="$NIGHTDIR" noteglob=$codeglob ntl
 ##
 if (( $+commands[tag-ag] )); then
     export TAG_SEARCH_PROG=ag  # replace with rg for ripgrep

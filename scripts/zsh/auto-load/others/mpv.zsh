@@ -1,11 +1,18 @@
 ## Vars
 export mpv_ipc=~/tmp/.mpvipc
+typeset -g MPV_AUDIO_NORM=--af-add='dynaudnorm=g=5:f=250:r=0.9:p=0.5'     # audio volume normalizer. See https://github.com/mpv-player/mpv/issues/6563
+# typeset -g MPV_AUDIO_NORM=--af-add='loudnorm=I=-16:TP=-3:LRA=4' # alt
+
 
 ## Functions
 function mpv() {
-    command mpv --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(0@)$(rpargs "$@")}"
+    local isStreaming="$mpv_streaming"
+
+    local opts=()
+    test -z "$isStreaming" && opts+="$MPV_AUDIO_NORM"
+    command mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(0@)$(rpargs "$@")}"
 }
-mpv-get() {
+function mpv-get() {
     <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "${2:-$mpv_audio_ipc}"|jq --raw-output -e .data
 }
 mpv-getv() mpv-get "$1" "$mpv_ipc"
@@ -47,7 +54,7 @@ function mpv-stream() {
     local file="$@[-1]"
     local opts=( "${@[1,-2]}" )
     # cache has been disabled in mpv.conf
-    mpv $opts[@] appending://"$file"
+    mpv_streaming=y mpv $opts[@] appending://"$file"
 }
 aliasfn mpvs mpv-stream
 ##

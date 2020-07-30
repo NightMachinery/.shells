@@ -17,6 +17,8 @@ function emn() {
 # }
 ##
 function emacs-vfiles() {
+    : "Paste the result into the recentf list of emacs. You'll need to have set the max limit appropriately, as I have done."
+
     init-vfiles yes
     local i res=()
     for i in "$vfiles[@]" ; do

@@ -21,3 +21,4 @@ unset __conda_setup
 # source /Users/evar/Library/Preferences/org.dystroy.broot/launcher/bash/br
 
 # export PATH="$HOME/.poetry/bin:$PATH"
+if [ -e /Users/evar/.nix-profile/etc/profile.d/nix.sh ]; then . /Users/evar/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer

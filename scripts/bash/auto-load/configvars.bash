@@ -12,6 +12,8 @@ export deleteus=~/.deleteus
 export codedir="$HOME/code"
 ##
 export nightNotes="$cellar/notes/"
+export ZETTLE_DIR="$nightNotes/zettle"
+export ZETTLE_DIR="${ZETTLE_DIR:a}"
 export nightJournal="$nightNotes/journal/j0/"
 note_formats=( txt md org )
 createglob note_formats noteglob
