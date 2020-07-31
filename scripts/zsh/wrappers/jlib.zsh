@@ -1,3 +1,3 @@
 #!/usr/bin/env zsh
 
-lgNoBok=y pkno jlib "$1" && skipglob 2mobi *.epub(N)
+lgNoBok=y pkno jlibplain "$1" && skipglob 2mobi *.epub(N)
