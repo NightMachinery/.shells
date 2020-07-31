@@ -20,6 +20,17 @@ function _aliasfnq() {
 }
 alias aliasfnq='\noglob _aliasfnq'
 
+function _aliasfn-ng() {
+    aliasfn "$@"
+    noglobfn "$1"
+}
+alias aliasfn-ng='\noglob _aliasfn-ng'
+function _aliasfnq-ng() {
+    aliasfnq "$@"
+    noglobfn "$1"
+}
+alias aliasfnq-ng='\noglob _aliasfnq-ng'
+
 function aliasfn-classic() {
     local args=( "$@" )
     [[ "$args[*]" =~ '\s*([^=]+)=(.*[^\s])\s*' ]] || { echo invalid alias: "$args[*]" >&2 ; return 1 }

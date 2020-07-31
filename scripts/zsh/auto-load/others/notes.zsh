@@ -1,15 +1,17 @@
-aliasfn ntl. ntLines=y nightNotes=. noteglob=$codeglob ntl
-aliasfn see ntl.
-aliasfn sees ntLines=y nightNotes=. noteglob=$codeglob ntlq
+aliasfn-ng ntl. ntLines=y nightNotes=. noteglob=$codeglob ntl
+aliasfn-ng see ntl.
+aliasfn-ng sees ntLines=y nightNotes=. noteglob=$codeglob ntl-rg
 function seev() {
     init-vfiles
-    ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) noteglob=$codeglob ntlq "$@"
+    ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) noteglob=$codeglob ntl-rg "$@"
 }
-aliasfn agsi ntLines=y nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) noteglob=$codeglob ntlq
+noglobfn seev
+aliasfn-ng agsi ntLines=y nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) noteglob=$codeglob ntl-rg
 function agfi() {
     local f="$1"
-    agsi "'$f '() | 'alias | 'alifn" # match functions or aliases
+    ntsearch_query_fzf="'$f '() | 'alias | 'alifn" agsi  # match functions or aliases
 }
+noglobfn agfi
 ###
 alias imd='img2md-imgur'
 alias nts='\noglob ntsearch'
@@ -30,8 +32,11 @@ function vnt() {
     reval "${veditor[@]}" "$outFiles[@]"
 }
 ##
-function ntlq() {
-    ntsearch_query="$*" ntl
+function ntl-rg() {
+    ntsearch_query_rg="$*" ntl
+}
+function ntl-fzf() {
+    ntsearch_query_fzf="$*" ntl
 }
 function ntl() {
     : "Remember that ntsearch_ uses eval-memoi"
@@ -110,7 +115,7 @@ function ntsearch() {
 }
 function ntsearch_() {
     : "See vnt, ntl"
-    : "INPUT: ntsearch_query, ntsearch_additional_paths, nightNotes, ntLines , GLOBAL: acceptor out"
+    : "INPUT: ntsearch_query_rg, ntsearch_query_fzf, ntsearch_additional_paths, nightNotes, ntLines , GLOBAL: acceptor out"
 
     acceptor=''
     out=''
@@ -131,8 +136,8 @@ function ntsearch_() {
         ecerr "$0: No valid paths supplied. Aborting."
         return 1
     }
-    local query_rg="${ntsearch_query:-\S+}" # removes empty lines
-    local query=""
+    local query_rg="${ntsearch_query_rg:-\S+}" # removes empty lines
+    local query="$ntsearch_query_fzf"
     # test -z "$query" || query="'$query"
     # local pattern="."
 
@@ -174,7 +179,7 @@ function ntsearch_fd() {
     if test -n "$ntLines" ; then
         {
             # no-messages suppresses IO errors
-            command rg --no-messages --line-number "$query_rg" "${files[@]}" || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            command rg --no-messages --with-filename --line-number "$query_rg" "${files[@]}" || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
         } | rmprefix "$nightNotes"
             # sd "^$nightNotes" '' # sd is doing the work of `realpath --relative-to` . TODONE this doesn't quote and so is buggy
         ## old way (uses vars now not in scope)
@@ -243,7 +248,8 @@ Outputs the image in markdown format, hosted on imgur." MAGIC
     print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
 }
 function unt() {
-    isI && test -z "$*" && set -- "$(pbpaste)"
+    # isI &&
+    test -z "$*" && set -- "$(pbpaste)"
     local note="$(url2md "$@")"
     ec $note
     if isI ; then

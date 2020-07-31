@@ -27,7 +27,7 @@ alias qadd='quotes-add'
 alias qrm='quotes-rm'
 alias qee=quotes
 ## todo
-alias attic_todo='attic="$attic_todo" un_p=y un_no_preview=y'
+alias attic_todo='attic="$attic_todo" un_p=y un_no_preview=y \noglob'
 alias todo='attic_todo seal'
 alias todos='attic_todo unseal'
 alias todone='attic_todo exor'
