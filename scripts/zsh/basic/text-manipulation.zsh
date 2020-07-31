@@ -14,3 +14,9 @@ rgx() {
     zre a "$1" "$2"
     ec "$a"
 }
+function sdlit() {
+    # alt: `sd -s` ; perf is almost the same, but sd is probably a (very small) bit faster.
+    local search="$1" replace="$2"
+    
+    rmprefix '' "$search" "$replace"
+}
