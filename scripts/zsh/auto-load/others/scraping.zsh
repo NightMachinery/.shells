@@ -365,7 +365,11 @@ outlinify() {
 }
 html2epub-calibre() {
     mdoc "Usage: $0 <title> <authors> <html-file> ..." MAGIC
-    local u="$1 $(uuidgen).html" title="${1}" authors="${2:-nHight}"
+    local authors="${2:-nHight}"
+    local title="$(<<<$1 gtr '/' '.')"
+
+    local u="$title $(uuidgen).html"
+
     merge-html "${@:3}" > "$u"
     ebook-convert "$u" "$title.epub" \
         --authors="$authors" \
@@ -415,9 +419,10 @@ h2e() {
 }
 function web2epub() {
     doc usage: 'we_strict= we_retry= we_dler= we_author= title urls-in-order'
-    local u="$1 $(uuidgen)"
+    local title="$(<<<$1 gtr '/' '.')"
+    local u="$title $(uuidgen)"
     cdm "$u"
-    local author="${we_author:-night}"
+    local author="$(<<<${we_author:-night} gtr '/' '.')"
     local i=0
     local hasFailed=''
     local strict="$we_strict"
@@ -447,12 +452,13 @@ function web2epub() {
         fi
     fi
     ec "Converting to epub ..."
-    revaldbg html2epub "$1" "$author" *.html
+    revaldbg html2epub "$title" "$author" *.html
     mv *.epub ../ && cd '../' &&  { { isDbg || test -n "$hasFailed" } || \rm -r "./$u" }
-    ec $'\n\n'"Book '$1' by '$author' has been converted (hasFailed='${hasFailed}')."$'\n\n'
+    ec $'\n\n'"Book '$title' by '$author' has been converted (hasFailed='${hasFailed}')."$'\n\n'
 }
 function w2e-raw() {
-    web2epub "$1" "${@:2}" && p2k "$1.epub"
+    local title="$(<<<$1 gtr '/' '.')"
+    web2epub "$title" "${@:2}" && p2k "$title.epub"
 }
 function w2e-o() {
     w2e-chrome "$1" "${(@f)$(outlinify "${@:2}")}"
