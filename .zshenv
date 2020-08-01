@@ -28,7 +28,6 @@ isNotExpensive || {
     addToPATH "/usr/libexec/"
     export GEM_HOME="$HOME/.gem"
     addToPATH "$GEM_HOME/bin"
-    addToPATH ~/bin
     addToPATH "$HOME/.poetry/bin"
     addToPATH ~/.nimble/bin
 
@@ -39,6 +38,9 @@ isNotExpensive || {
     # PS1="$(strip "$PS1" ' +') "
     addToPATH ~/anaconda/bin/
     addToPATH ~/miniconda3/bin/
+
+    addToPATH ~/bin
+
     isDarwin && {
         export MONO_GAC_PREFIX="/usr/local"
         export ELM_HOME="/usr/local/bin/"
