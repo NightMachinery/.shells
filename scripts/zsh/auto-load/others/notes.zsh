@@ -257,3 +257,4 @@ function unt() {
     fi
 }
 noglobfn unt
+aliasfn-ng untr brishzr unt # the server can do a unt almost instantaneously, so we will benefit from proxying to it. Besides, this bypasses the small firewall.

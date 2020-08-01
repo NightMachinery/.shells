@@ -1,0 +1,10 @@
+#!/usr/bin/env dash
+
+if test "$1" = '-c' ; then
+   shift
+fi
+
+. ~/.privateBTT.sh
+
+req="$(jq --null-input --compact-output --arg c "$*" --arg v "0" --arg i "$brishz_in" '{"cmd": $c, "stdin": $i, "verbose": $v}')"
+curl --fail --silent --header 'Content-Type: application/json' --request POST --data "$req" https://garden.lilf.ir/api/v1/zsh/ --user "Alice:$GARDEN_PASS0"
