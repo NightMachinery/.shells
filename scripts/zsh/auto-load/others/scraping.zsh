@@ -895,6 +895,7 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     meta=( "${(@0)$(urlmeta2 $url title description image author)}" ) # takes ~0.04s
     title="$meta[1]"
     desc="$meta[2]"
+    desc="$(<<<$desc html2utf.py)"
     img="$meta[3]"
     author="$meta[4]"
     local indent="    "
