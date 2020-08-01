@@ -250,7 +250,7 @@ Outputs the image in markdown format, hosted on imgur." MAGIC
 function unt() {
     # isI &&
     test -z "$*" && set -- "$(pbpaste)"
-    local note="$(url2md "$@")"
+    local note="$(cleanedhtml=no url2md "$@")"
     ec $note
     if isI ; then
         pbcopy $note

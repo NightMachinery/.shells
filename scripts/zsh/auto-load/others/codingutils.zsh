@@ -40,16 +40,14 @@ whichm() {
             continue
         }
 
+        test -z "$enhSavedNames[$item]" || nextItems+="$enhSavedNames[$item]"
+
         output="${aliases[$item]}" ; test -n "$output" && {
             output="$(gq "$output")"
             ec "alias $item=$output"
-            local is=("$output")
-            is+=( ${$(fnswap expand-aliases expand-alias expand-alias-strip "$item")[1]} )
-            whichm "${(u@)is:|items}"
+            nextItems+=( $output ${$(fnswap expand-aliases expand-alias expand-alias-strip "$item")[1]} )
             continue
         }
-
-        test -z "$enhSavedNames[$item]" || nextItems+="$enhSavedNames[$item]"
 
         output="$(which -- "$item")" && ! [[ "$output" =~ '^\s*\w+: suffix aliased to' ]] && {
                 test -e "/$output" && {
@@ -68,7 +66,8 @@ whichm() {
             }
     done
 
-    (( ${#nextItems} == 0 )) || $0 "$nextItems[@]"
+    nextItems=(${(u@)nextItems:|items})
+    (( ${#nextItems} == 0 )) || $0 "${(@)nextItems}"
 }
 function wh() { whichm "$@" | btz }
 function whh() {

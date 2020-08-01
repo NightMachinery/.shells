@@ -30,6 +30,7 @@ isNotExpensive || {
     addToPATH "$GEM_HOME/bin"
     addToPATH ~/bin
     addToPATH "$HOME/.poetry/bin"
+    addToPATH ~/.nimble/bin
 
     # psource ~/anaconda/etc/profile.d/conda.sh
     # silence conda deactivate #this is necessary try sbing and you'll see

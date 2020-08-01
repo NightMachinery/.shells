@@ -168,6 +168,8 @@ function full-html2() {
 
     local mode="${fhMode:-http}"
     local stdout=/dev/stdout
+
+    [[ "$mode" =~ '^curlfast$' ]] &&  { curl --silent --fail --location -o /dev/stdout "$1" ; return $? }
     [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 curlfull.js "$1" ; return $? }
     [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 curlfull.js "$1" ; return $? }
     [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 curlfull.js "$1" ; return $? }
@@ -723,8 +725,18 @@ function hi10-jtoken() {
     # re dvar jtoken id
     # ec "?jtoken=${jtoken}${id}"
 }
+function urlmeta2() {
+    mdoc "[html= ] $0 <url> <req> ...
+gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
+
+    local url="$1"
+    local html="${html:-$(full-html2 "$url")}"
+    local reqs=("${@:2}")
+    <<<"$html" htmlmetadata $reqs[@]
+}
 function urlmeta() {
-    mdoc "[html= ] $0 <url> <req>
+    mdoc "DEPRECATED: Use urlmeta2.
+[html= ] $0 <url> <req>
 gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
 
     local url="$1"
@@ -865,21 +877,29 @@ function jfic() {
 }
 ##
 function url2note() {
-    magic mdoc "[ html= cleanedhtml= ] $0 <url> [<mode>] ; outputs in global variables and stdout." ; mret
+    magic mdoc "[ html= cleanedhtml= ] $0 <url> [<mode>] ; outputs in global variables and stdout.
+Set cleanedhtml=no to disable adding the reading estimate. (This improves performance.)" ; mret
 
-    local url="$(urlfinalg "$1")"
+    # test perf:
+    # url='https://www.newyorker.com/culture/annals-of-inquiry/slate-star-codex-and-silicon-valleys-war-against-the-media' ; html="$(full-html2 "$url")"
+
+    local url="$1"
+    # url="$(urlfinalg "$url")"
     local mode="${2:-md}"
+    local fhMode="${fhMode:-curlfast}"
 
     local html="${html:-$(full-html2 "$url")}"
-    local cleanedhtml="${cleanedhtml:-$(<<<"$html" readability "$url")}"
+    local cleanedhtml="${cleanedhtml:-$(<<<"$html" readability "$url")}" # takes ~1.5s
     
-    meta=( "${(@0)$(urlmeta $url all)}" )
+    # old: # meta=( "${(@0)$(urlmeta $url all)}" ) # takes ~0.475s
+    meta=( "${(@0)$(urlmeta2 $url title description image author)}" ) # takes ~0.04s
     title="$meta[1]"
     desc="$meta[2]"
     img="$meta[3]"
     author="$meta[4]"
     local indent="    "
-    readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)"
+    readest=""
+    [[ "$cleanedhtml" != no ]] && readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)" # takes ~0.25s
 
     if [[ "$mode" == md ]] ; then
         ec "* [${title:-$url}]($url)"
