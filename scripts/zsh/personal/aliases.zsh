@@ -43,4 +43,5 @@ alias ebk='ebook-viewer'
 ##
 alias ltl='lt -l'
 ##
+isDarwin && alias ncdu='ncdu --exclude=/Volumes/ -x' # Do not cross filesystem boundaries
 alias mail='sudo less /var/mail/$(whoami)'

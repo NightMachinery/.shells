@@ -15,7 +15,7 @@ function brishz() {
     fi
     local v=0
     isDbg && v=1
-    local req="$(jq --null-input --compact-output --arg c "$(gq "$@")" --arg v "$v" '{"cmd": $c, "verbose": $v}')"
+    local req="$(jq --null-input --compact-output --arg c "$(gq "$@")"  --arg i "$brishz_in" '{"cmd": $c, "stdin": $i, "verbose": $v}')"
     local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data "$req" $endpoint/zsh/ )
     cmd="$(gq "$cmd[@]")"
     <<<"$cmd" pbcopy

@@ -39,3 +39,12 @@ function pdf-crop-margins () {
 }
 pdfcrop() { re pdf-crop-margins "$@" }
 pdfoutline() { jglob ; mutool show "$1" outline }
+
+function pdf-getpages() {
+    local f="$1" from="$2" to="$3"
+    local o="${4:-${1:r}_$from_${to}.pdf}"
+    pdftk A=$f cat A$from-$to output "$o"
+}
+function jpdfpages() {
+    pdf-getpages "$j" "$@"
+}

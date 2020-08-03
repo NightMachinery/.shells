@@ -1,3 +1,5 @@
+const SunHasSet = true
+
 import Pkg
 # Pkg.add("OhMyREPL")
 
@@ -13,6 +15,13 @@ function more(content::AbstractString)
 end
 macro d(body)
     :(more(Core.@doc($(esc(body)))))
+end
+
+macro labeled(body)
+    bodystr = string(body)
+    quote
+        println("$($bodystr) =>\n\t$($(esc(body)))")
+    end
 end
 
 function sa(x)

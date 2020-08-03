@@ -72,11 +72,16 @@ fftmux() {
 }
 alias fft=fftmux
 fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
-fr() {
+function fr() {
     magic mdoc "frConfirm='' $0 <cmd> [<fd args> ...]" ; mret
-    sels=( "${(@f)$(fd "${fd_default[@]}" "${@:2}"|fz --cycle)}" )
+
+    local args=("${@:2}")
+    local cmdhead="$1"
+    local dir=.
+
+    sels=( "${(@f)$(eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle)}" )
     test -n "$sels" && {
-        local cmd=("$1 $(gq "${sels[@]}")")
+        local cmd=("$cmdhead $(gq "${sels[@]}")")
         if test -n "$frConfirm" ; then
             printz $cmd
         else

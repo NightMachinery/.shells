@@ -52,3 +52,119 @@ function createglob() {
     }
     eval $to'="*.(${(j.|.)'$from'})(.D)"'
 }
+##
+function _@gather() {
+    # GLOBALS: OUTPUT: magic_cmd magic_gathered_vars magic_gathered_*
+    magic_gathered_vars=() magic_cmd=() # GLOBAL
+
+    ##
+    # - `@macrogather [@EOF_UUID] sth sth ... ( array-elem ... ) sth [EOF_UUID]@ ...`
+    # - `key )` `key ( ( )` for escaping
+    # - optionally `[EOF_UUID]@cmd` to `[EOF_UUID]@ cmd`.
+
+    # test:
+    # @gather-reval 1 2 3 hi 4 wow [ "hello world" nii '' 78 bomb ] end [ ] '' boo ] [ [ ] @ eval ' arrN "$magic_gathered_7[@]"'
+    # @gather-reval @MERMAID 1 2 3 hi 4 wow [ "hello world" nii '' 78 bomb ] end [ ] '' boo ] [ [ ] MERMAID@ eval ' arrN "$magic_gathered_7[@]"'
+    ##
+
+    # local args=("$@")
+
+
+
+    local ARRAY_START='[' # parens have parse problems in zsh
+    local ARRAY_END=']'
+    local VAR_PREFIX='magic_gathered_'
+    local MEOF="@"
+    if [[ "$1" =~ '^@(.*)' ]] ; then
+        MEOF="$match[1]$MEOF"
+        shift
+    fi
+    local key i=1 current_name
+    while true ; do
+        (( $#@ == 0 )) && {
+            ecerr "$0: No arguments remaining, but MEOF not recieved. Aborting."
+            return 1
+        }
+        key="$1"
+        shift
+        if [[ "$key" == "$MEOF" ]] ; then
+            magic_cmd=( "$@" )
+            break
+        fi
+        current_name="${VAR_PREFIX}$i"
+        i=$(($i+1))
+        if [[ "$key" == "$ARRAY_START" ]] ; then
+            # ecdbg "ARRAY_START encountered"
+            local vals=()
+            while true ; do
+                (( $#@ == 0 )) && {
+                    ecerr "$0: No arguments remaining, but ARRAY_END not recieved. Aborting."
+                    return 1
+                }
+                val="$1"
+                shift
+                if [[ "$val" == "$ARRAY_END" ]] ; then
+                    # ecdbg "ARRAY_END encountered"
+                    # ec "$(typeset -p vals)"
+                    # eval "$(typeset -p vals)"
+                    eval "typeset -ga ${current_name}=( $(gq "$vals[@]") )"
+                    break
+                else
+                    vals+="$val"
+                fi
+            done
+        else
+            typeset -g $current_name=$key
+        fi
+        magic_gathered_vars+="$current_name"
+    done
+}
+# alias @gather='\noglob _@gather'
+aliasfn @gather _@gather # we don't need the noglob, so why force it downstream?
+function @gather-reval() {
+    @gather "$@"
+    {
+        local cmd=( "$magic_cmd[@]" )
+        unset magic_cmd
+        reval "$cmd[@]"
+    } always {
+        unset magic_gathered_vars
+    }
+}
+function _@opts() {
+    @gather "$@"
+    local cmd=( "$magic_cmd[@]" )
+    unset magic_cmd
+    set -- "$magic_gathered_vars[@]"
+    unset magic_gathered_vars
+    
+    if (( $#@ % 2 != 0 )) ; then
+        ecerr "$0: needs an even number of arguments (key-value pairs). Aborting."
+        return 1
+    fi
+    local var varval var2 var2val setcmd
+    # ecdbg "$0 magic vars: $@"
+    while (( $#@ != 0 )) ; do
+        # ecdbg "entered opts loop"
+        var="$1"
+        shift
+        varval=( "${(P@)var}" )
+        unset "$var"
+        varval="$varval[*]"
+        test -z "$varval" && {
+            ecerr "$0: empty key supplied. Aborting."
+            return 1
+        }
+        var2="$1"
+        shift
+        var2val=( "${(P@)var2}" )
+        unset "$var2"
+        setcmd="typeset -a ${varval}=( $(gq "$var2val[@]") )"
+        ecdbg "setcmd: $setcmd"
+        eval "$setcmd"
+    done
+
+    reval "$cmd[@]"
+}
+aliasfn @opts _@opts
+##

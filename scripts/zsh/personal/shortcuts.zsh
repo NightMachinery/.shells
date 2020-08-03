@@ -28,3 +28,6 @@ vcnpp() {
     vcsh night.sh add ~/scripts/
     vcsh night.sh commit -uno -am "." ; vcsh night.sh pull --no-edit ; vcsh night.sh push
 }
+function cp2tmp() {
+    rsp-dl "$@" ~"/Base/_Local TMP/"
+}
