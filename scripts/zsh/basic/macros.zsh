@@ -92,6 +92,7 @@ function _@gather() {
             break
         fi
         current_name="${VAR_PREFIX}$i"
+        unset $current_name
         i=$(($i+1))
         if [[ "$key" == "$ARRAY_START" ]] ; then
             # ecdbg "ARRAY_START encountered"
@@ -151,7 +152,7 @@ function _@opts() {
         varval=( "${(P@)var}" )
         unset "$var"
         varval="$varval[*]"
-        test -z "$varval" && {
+        [[ "$varval" =~ '^\s*$' ]] && {
             ecerr "$0: empty key supplied. Aborting."
             return 1
         }
@@ -161,7 +162,10 @@ function _@opts() {
         unset "$var2"
         setcmd="typeset -a ${varval}=( $(gq "$var2val[@]") )"
         ecdbg "setcmd: $setcmd"
-        eval "$setcmd"
+        eval "$setcmd" || {
+            ecerr "$0: Assigning the key '$varval' failed. setcmd: $setcmd"$'\n'"Aborting."
+            return 1
+        }
     done
 
     reval "$cmd[@]"
