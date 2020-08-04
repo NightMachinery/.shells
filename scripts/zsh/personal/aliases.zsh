@@ -43,5 +43,6 @@ alias ebk='ebook-viewer'
 ##
 alias ltl='lt -l'
 ##
-isDarwin && alias ncdu='ncdu --exclude=/Volumes/ -x' # Do not cross filesystem boundaries
+isDarwin && alias ncdu="ncdu --exclude 'Volumes' -x" # -x: Do not cross filesystem boundaries. using exclude patterns to avoid the infinite loop has not worked for me. beware that the loop can hog up all ram and then use swap space and fill up the disk completely.  --exclude-firmlinks also makes everything show up as zero.
 alias mail='sudo less /var/mail/$(whoami)'
+alias mcomix='awaysh python3 ~/bin/mcomixstarter.py'
