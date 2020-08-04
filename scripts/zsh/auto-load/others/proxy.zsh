@@ -4,6 +4,8 @@ pxify() {
 
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl
+    pxify-command conda
+    pxify-command manga-py
 }
 function pxify-command() {
     aliasfn "$1" proxychains4 "$1"
