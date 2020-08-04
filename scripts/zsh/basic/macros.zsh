@@ -133,9 +133,12 @@ function @gather-reval() {
     }
 }
 function _@opts() {
+    local prefix="${magic_opts_prefix:-magic}"
     @gather "$@"
     local cmd=( "$magic_cmd[@]" )
     unset magic_cmd
+    [[ "$prefix" == magic ]] && prefix="${magic_opts_prefixes[$cmd[1]]//-/_}_" # variables can't have - in their name
+    ecdbg "magic opts final prefix: $prefix"
     set -- "$magic_gathered_vars[@]"
     unset magic_gathered_vars
     
@@ -143,7 +146,7 @@ function _@opts() {
         ecerr "$0: needs an even number of arguments (key-value pairs). Aborting."
         return 1
     fi
-    local var varval var2 var2val setcmd
+    local var varval var2 var2val setcmd varname
     # ecdbg "$0 magic vars: $@"
     while (( $#@ != 0 )) ; do
         # ecdbg "entered opts loop"
@@ -160,7 +163,9 @@ function _@opts() {
         shift
         var2val=( "${(P@)var2}" )
         unset "$var2"
-        setcmd="typeset -a ${varval}=( $(gq "$var2val[@]") )"
+        varname="${prefix}${varval}"
+        unset "$varname"
+        setcmd="typeset -a ${varname}=( $(gq "$var2val[@]") )"
         ecdbg "setcmd: $setcmd"
         eval "$setcmd" || {
             ecerr "$0: Assigning the key '$varval' failed. setcmd: $setcmd"$'\n'"Aborting."
@@ -171,4 +176,24 @@ function _@opts() {
     reval "$cmd[@]"
 }
 aliasfn @opts _@opts
+function @opts-setprefix () {
+    typeset -A -g magic_opts_prefixes
+    # test -n "${magic_opts_prefixes[$1]}" ||
+    magic_opts_prefixes[$1]="$2"
+}
+function opts-test1() {
+    # typ path
+    typ "opts_test1_path"
+    ec "${opts_test1_extension:-${opts_test1_e:-default}}"
+    typ opts_test1_animal
+    arger "$@"
+}
+@opts-setprefix opts-test2 opts-test3
+function opts-test2() {
+    # typ path
+    typ "opts_test3_path"
+    ec "${opts_test3_extension:-${opts_test3_e:-default}}"
+    typ opts_test3_animal
+    arger "$@"
+}
 ##

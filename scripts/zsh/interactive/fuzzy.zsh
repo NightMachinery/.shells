@@ -1,7 +1,7 @@
 ### SEE ALSO
 # spotlight, spt, spot
 ###
-aliasfn vc code-insiders --reuse-window
+aliasfn vc code-insiders --reuse-window --add # --add: Add a folder or multiple folders to the last active VS Code instance for a multi-root workspace.
 function coder() {
     local p="$(<<<$1 sd "$HOME" /home/eva)"
     rgeval code-insiders --reuse-window --remote 'ssh-remote+82.102.11.148' "$p"
