@@ -137,7 +137,10 @@ function _@opts() {
     @gather "$@"
     local cmd=( "$magic_cmd[@]" )
     unset magic_cmd
-    [[ "$prefix" == magic ]] && prefix="${magic_opts_prefixes[$cmd[1]]//-/_}_" # variables can't have - in their name
+    [[ "$prefix" == magic ]] && {
+        prefix="${magic_opts_prefixes[$cmd[1]]:-$cmd[1]}_"
+        prefix="${prefix//-/_}" # variables can't have - in their name
+    }
     ecdbg "magic opts final prefix: $prefix"
     set -- "$magic_gathered_vars[@]"
     unset magic_gathered_vars
@@ -188,12 +191,12 @@ function opts-test1() {
     typ opts_test1_animal
     arger "$@"
 }
-@opts-setprefix opts-test2 opts-test3
+@opts-setprefix opts-test2 lily
 function opts-test2() {
     # typ path
-    typ "opts_test3_path"
-    ec "${opts_test3_extension:-${opts_test3_e:-default}}"
-    typ opts_test3_animal
+    typ "lily_path"
+    ec "${lily_extension:-${lily_e:-default}}"
+    typ lily_animal
     arger "$@"
 }
 ##
