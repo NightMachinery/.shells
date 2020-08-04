@@ -141,7 +141,7 @@ Global output: wr_title wr_author" MAGIC
           # File supplied
           aget "cat ${(q@)file} > a.html ; mercury-html $1:q ./a.html $2:q"
       } })"
-      # " LINTERBUG
+    # " LINTERBUG
     wr_title="$(<<<"$merc" jqm -r .title | tr '\n' ' ')"
     wr_author="$(<<<"$merc" jqm -r .author)"
     <<<"$merc" jq -e --raw-output 'if .content then [
@@ -1061,4 +1061,14 @@ function tlrec() {
 ##
 function getlinks-img() {
     gl_tag=img gl_prop=src getlinks-c "$@"
+}
+function urls-copy() {
+    local text="$(cat)"
+    <<<"$text" fnswap rg rgm match-url-rg --passthru && {
+        local urls="$(<<<"${text}" urls-extract)"
+        pbcopy "$urls"
+    }
+}
+function urls-extract() {
+    match-url-rg --only-matching --replace '$1'
 }

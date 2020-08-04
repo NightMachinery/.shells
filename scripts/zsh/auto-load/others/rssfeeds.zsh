@@ -33,6 +33,9 @@ function sumym () {
     sumy "${2:-lex-rank}" --length=4 --file =(readmoz-txt "$url") --format=plaintext
 }
 ##
+function rss-tl() {
+    tl -p "$rssTitle | " "$@"
+}
 function rss-ctitle() {
     ggrep -P --silent "$rc_t[@]" <<< "$2"
 }

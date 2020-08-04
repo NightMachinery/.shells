@@ -70,6 +70,7 @@ alias dlga="\noglob deluge-console add"
 alias ys="y-stream"
 alias sb=". ~/.zshenv"
 alias sbi="sb ; source-interactive-all"
+alias sia='source-interactive-all'
 alias sbb='exec zsh'
 alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
 alias api="sudo apt install -y"

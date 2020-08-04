@@ -61,10 +61,7 @@ function ntl() {
 
     if [[ "$acceptor" == '' ]] ; then
         local sel="${(F)lines}"
-        <<<"${sel}" fnswap rg rgm match-url-rg --passthru && {
-            local url="$(<<<"${sel}" match-url-rg --only-matching --replace '$1')"
-            pbcopy "$url"
-        }
+        <<<"${sel}" urls-copy
         return 0
     else
         if [[ "$EDITOR" =~ '^emacs' ]] ; then
