@@ -884,6 +884,9 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     # url='https://www.newyorker.com/culture/annals-of-inquiry/slate-star-codex-and-silicon-valleys-war-against-the-media' ; html="$(full-html2 "$url")"
 
     local url="$1"
+    test -n "$url" || {
+        return 1
+    }
     # url="$(urlfinalg "$url")"
     local mode="${2:-md}"
     local fhMode="${fhMode:-curlfast}"
