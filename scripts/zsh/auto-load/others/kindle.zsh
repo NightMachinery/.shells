@@ -82,7 +82,7 @@ function p2k() {
         # Telegram or Telethon doesn't support filenames bigger than 64.
         local nnt="$nn:t"
         ecdbg "nnt: $nnt"
-        (( ${#nnt} <= 64 )) || mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trim).$nn:e"
+        (( ${#nnt} <= 64 )) || mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trimsed).$nn:e"
         return 0
     } || command rm "$1"
 }

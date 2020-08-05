@@ -4,7 +4,12 @@
 dedent() {
     sd --flags m '^\s*' ''
 }
-trim() {
+function trim() {
+    local out="$*"
+    [[ "$out" =~ '^\s*(.*\S)\s*$' ]] && out="$match[1]" || out=''
+    print -nr -- "$out"
+}
+trimsed() {
     gsed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 trimpy() {

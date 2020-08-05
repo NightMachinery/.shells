@@ -25,6 +25,7 @@ function memoi-eval() {
     local deusvult="$deusvult"
     local skiperr="$memoi_skiperr"
     test -n "$deusvult" && skiperr=''
+    local override_duration='0.12'
     
     test -n "$skiperr" || silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     if test -z "$deusvult" && { (( $(redis-cli --raw exists $rediskey) )) && { (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redis-cli --raw hget $rediskey timestamp)) <= memoi_expire )) } } }
@@ -39,7 +40,7 @@ function memoi-eval() {
         local out
         out="${$(eval "$cmd" 2>"$errfile" ; print -n .)[1,-2]}"
         local duration=$(( EPOCHREALTIME - now ))
-        if (( duration > 0.5 )) ; then
+        if (( duration > override_duration )) ; then
             # by not storing the time if the command executed quickly, we'll ensure a re-eval the next time.
             silent redis-cli hset $rediskey timestamp "$now"
         else

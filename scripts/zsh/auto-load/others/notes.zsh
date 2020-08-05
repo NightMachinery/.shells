@@ -245,9 +245,8 @@ Outputs the image in markdown format, hosted on imgur." MAGIC
     print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
 }
 function unt() {
-    # isI &&
-    test -z "$*" && set -- "$(pbpaste)"
-    local note="$(cleanedhtml=no url2md "$@")"
+    test -z "$*" && set -- "$(pbpaste)" # || set -- "$(trim "$1")" # we are using urls-extract so ne need
+    local note="$(cleanedhtml=no url2md "${(f@)$(<<<"$*" urls-extract)}")"
     ec $note
     if isI ; then
         pbcopy $note
