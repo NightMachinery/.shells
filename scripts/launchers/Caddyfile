@@ -1,3 +1,10 @@
+#
+# noise here to stop emacs from thinking this is C code
+
+{
+	order webdav after basicauth
+}
+
 # doesn't work: http://localhost:8080
 # doesn't work:http://82.102.11.148:8080
 # works: http://:8080
@@ -17,10 +24,14 @@ lilf.ir {
 }
 
 files.lilf.ir, http://:8080 {
-  file_server browse
+  encode zstd gzip
+  file_server browse {
+    root {env.HOME}/Downloads
+  }
 }
 
 sg.lilf.ir {
+  encode zstd gzip
   reverse_proxy localhost:7080
 }
 
@@ -29,14 +40,43 @@ https://garden.lilf.ir {
   basicauth /api/* scrypt {
 	Alice {env.GARDEN_HASHED0} {env.GARDEN_SALT0_B64}
   }
+  encode zstd gzip
+  webdav /api/webdav/tmp/* {
+  root {env.HOME}/tmp
+  prefix /api/webdav/tmp
+  }
+  webdav /api/webdav/dl/* {
+  root {env.HOME}/Downloads
+  prefix /api/webdav/dl
+  }
+  webdav /api/webdav/notes/* {
+  root {env.HOME}/cellar/notes
+  prefix /api/webdav/notes
+  }
+  webdav /api/webdav/scripts/* {
+  root {env.HOME}/scripts
+  prefix /api/webdav/scripts
+  }
   respond /api/hi/ "Hello Darkness My Old Friend!"
   #reverse_proxy /api/v1/* localhost:7230
   route /api/v1/* {
 	uri strip_prefix /api/v1
 	reverse_proxy localhost:7230
   }
+
+  # route /* {
+  #   # uri strip_prefix /organice # organice needs config for being in a prefix, so let's just use the root for it
+  #   reverse_proxy localhost:5000
+  # }
+
   respond "pained gold spots accumulated"
 }
+
+
+# org.lilf.ir {
+#  encode zstd gzip
+#  reverse_proxy localhost:5000
+# }
 
 ##
 # doesn't work, our only bet is the forward proxy plugin
