@@ -6,4 +6,4 @@ export GPG_TTY
 psource ~/torch/install/bin/torch-activate
 
 
-(( $+commands[rustc] )) && export RUST_SRC_PATH="$(memoi-eval rustc --print sysroot)/lib/rustlib/src/rust/src"
+(( $+commands[rustc] )) && export RUST_SRC_PATH="$(memoi_skiperr=y memoi-eval rustc --print sysroot)/lib/rustlib/src/rust/src"

@@ -149,17 +149,41 @@ autoload -U +X bashcompinit && bashcompinit
 _comp_options+=(globdots)
 zsh-defer source-interactive-all
 
-# sth in .zshrc overrides these so ...
-export FZF_BASE="${$(ge_no_ec=y rp fzf):h:h}/shell"
-# ecdbg "FZF_BASE: $FZF_BASE"
-test -d "$FZF_BASE" && {
-    # ecdbg fzf loaded
-    re source "$FZF_BASE"/*.zsh
-    export FZF_COMPLETION_TRIGGER=''
-    bindkey '^T' fzf-completion
-    bindkey '^I' expand-or-complete
-    bindkey '^[[Z' fzf-completion #Shift+Tab
+## fzf zsh integration (obsolete, as we now use fzf-tab
+# # sth in .zshrc overrides these so ...
+# export FZF_BASE="${$(ge_no_ec=y rp fzf):h:h}/shell"
+# # ecdbg "FZF_BASE: $FZF_BASE"
+# test -d "$FZF_BASE" && {
+#     # ecdbg fzf loaded
+#     re source "$FZF_BASE"/*.zsh
+#     export FZF_COMPLETION_TRIGGER=''
+#     bindkey '^T' fzf-completion
+#     bindkey '^I' expand-or-complete
+#     bindkey '^[[Z' fzf-completion #Shift+Tab
+# }
+##
+fzf-history-widget() {
+  # copied from fzf zsh integration
+  local selected num
+  setopt localoptions noglobsubst noposixbuiltins pipefail no_aliases 2> /dev/null
+  selected=( $(fc -rl 1 | perl -ne 'print if !$seen{($_ =~ s/^\s*[0-9]+\s+//r)}++' |
+    FZF_DEFAULT_OPTS="--height ${FZF_TMUX_HEIGHT:-40%} $FZF_DEFAULT_OPTS -n2..,.. --tiebreak=index --bind=ctrl-r:toggle-sort $FZF_CTRL_R_OPTS --query=${(qqq)LBUFFER} +m" fz) )
+  local ret=$?
+  if [ -n "$selected" ]; then
+    num=$selected[1]
+    if [ -n "$num" ]; then
+      zle vi-fetch-history -n $num
+    fi
+  fi
+  zle reset-prompt
+  return $ret
 }
+zle     -N   fzf-history-widget
+bindkey '^R' fzf-history-widget
+
+zle -N fr_zle
+bindkey '^[[Z' fr_zle # shift+tab
+##
 
 zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
 # antibody bundle intelfx/pure

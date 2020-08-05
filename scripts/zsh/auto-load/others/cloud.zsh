@@ -17,7 +17,7 @@ function rclonef() {
 
     # eval-memoi does not currently support env vars, so rcr is out
     local paths
-    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${1}" | fz)}" ) || return 1
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${1}" | fz)}" ) || return 1
     local i
     ##
     # old API design: <cmd>... <entry-of-fuzzy-paths>
@@ -41,7 +41,7 @@ function r0() {
     local cache="$HOME/base/cache/"
     mkdir -p $cache
     local paths
-    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} eval-memoi fd --type file . ~/r0 | fz)}" ) || return 1
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y eval-memoi fd --type file . ~/r0 | fz)}" ) || return 1
     rgeval rsp-dl "$paths[@]" "$cache"
     # local i
     # for i in $paths[@] ; do # skip empty paths

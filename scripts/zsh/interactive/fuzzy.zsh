@@ -72,24 +72,30 @@ fftmux() {
 }
 alias fft=fftmux
 fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
-function fr() {
-    magic mdoc "frConfirm='' $0 <cmd> [<fd args> ...]" ; mret
+function fi-rec() {
+    magic mdoc "[frConfirm='' frWidget=''] $0 <cmd> [<fd args> ...]
+This function uses eval-memoi." ; mret
 
     local args=("${@:2}")
     local cmdhead="$1"
     local dir=.
 
-    sels=( "${(@f)$(eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle)}" )
+    sels=( "${(@f)$(memoi_skiperr=y eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle)}" )
     test -n "$sels" && {
-        local cmd=("$cmdhead $(gq "${sels[@]}")")
-        if test -n "$frConfirm" ; then
-            printz $cmd
+        if test -n "$frWidget" ; then
+            LBUFFER="$LBUFFER$(gq "$sels[@]")"
         else
-            eval $cmd
+            local cmd=("$cmdhead $(gq "${sels[@]}")")
+            if test -n "$frConfirm" ; then
+                printz $cmd
+            else
+                eval $cmd
+            fi
         fi
     }
 }
-f() fr "$@" --max-depth 1
+aliasfn fr_zle frWidget=y fi-rec
+function fi-d1() fi-rec "$@" --max-depth 1 # freeing up f
 ffman() {
     # mnf
     man -k . | fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
