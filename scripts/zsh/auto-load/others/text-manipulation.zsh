@@ -5,7 +5,7 @@ dedent() {
     sd --flags m '^\s*' ''
 }
 function trim() {
-    local out="$*"
+    local out="$(in-or-args "$@")"
     [[ "$out" =~ '^\s*(.*\S)\s*$' ]] && out="$match[1]" || out=''
     print -nr -- "$out"
 }
