@@ -3,7 +3,7 @@ mkdir -p ~/log
 rt_skip="$rt_skip"
 
 
-tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend 'https://www.themoneyillusion.com/feed/' 'https://www.scottaaronson.com/blog/?feed=rss2' 'https://buttondown.email/hillelwayne/rss' 'https://julialang.org/feed.xml'
+tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend 'https://www.themoneyillusion.com/feed/' 'https://www.scottaaronson.com/blog/?feed=rss2' 'https://buttondown.email/hillelwayne/rss' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss'
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=tlrlu" tmuxnewsh rss-genu rss-tsend 'https://www.novelupdates.com/rss.php?uid=145566&unq=5c39d8aba43cc&type=0&lid=local'
 
 #tmuxnewshenv="rt_skip='$rt_skip' " tmuxnewsh rss-royalroad rss-tsend 'https://www.royalroad.com/syndication/21322/'
