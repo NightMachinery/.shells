@@ -197,7 +197,7 @@ zsh-defer antibody bundle zdharma/zzcomplete # ^F
 zsh-defer antibody bundle zsh-users/zsh-autosuggestions
 silence unalias =
 # antibody bundle zsh-users/zsh-syntax-highlighting
-zsh-defer antibody bundle zsh-users/zsh-completions #undeferable
+antibody bundle zsh-users/zsh-completions #undeferable
 ##
 export YSU_MESSAGE_POSITION="after"
 export YSU_MESSAGE_FORMAT="$(tput setaf 1)found %alias_type for %command: %alias$(tput sgr0)"
@@ -269,12 +269,16 @@ fzf-tab-partial-and-complete() {
 
 # zle -N fzf-tab-partial-and-complete
 # bindkey '^I' fzf-tab-partial-and-complete
-zstyle ':completion:*' matcher-list '' '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'
+zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'
+# use `zstyle ':completion:*' matcher-list '' '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'` if you don't want to see the case-insesitive results if there are case-sensitive results. In general, it seems that the matches stop at the first rule that produces at least one match.
+
 # See http://zsh.sourceforge.net/Doc/Release/Completion-System.html
 # These are general rules that make the completion system match better:
 # The first rule adds case-insensitivity.
 # The second (original) rule allows for partial completion before ., _ or -, e.g. f.b -> foo.bar.
 # The third rule allows for completing on the left side of the written text, e.g. bar -> foobar)
+##
+(( $+commands[cod] )) && source <(command cod init $$ zsh | sd '\bcod\b' 'command cod')
 ##
 zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
