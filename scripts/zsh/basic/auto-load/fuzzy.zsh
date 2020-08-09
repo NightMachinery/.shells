@@ -5,6 +5,7 @@ function fz-empty() {
     fnswap fzf-noempty fzf fz "$@"
 }
 function fz() {
+    # "Use `fnswap fzf-noempty gq fz` to get the final command for use in other envs
     local opts
     opts=(${(@)fz_opts}) #Don't quote it or it'll insert empty args
     test -n "$fz_no_preview" || opts+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window down:7:hidden)
