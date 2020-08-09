@@ -1,25 +1,12 @@
-typeset -g GARDEN_PORT=7230
 function brishz() {
-    local opts=()
-    ## old GET
-    # isDbg && opts+=(--data 'verbose=1')
-    # rgeval curl --silent -G $opts[@] --data-urlencode "cmd=$(gq "$@")" http://127.0.0.1:8000/zsh/
-    ##
-    # httpie is slow
-    # isDbg && opts+=(verbose=1)
-    # http --body POST http://127.0.0.1:8000/zsh/ cmd="$(gq "$@")" $opts[@]
-    ##
-    local endpoint="${bzEndpoint:-http://127.0.0.1:$GARDEN_PORT}"
-    if [[ "$endpoint" =~ 'garden' ]] ; then
-        opts+=(--user "Alice:$GARDEN_PASS0")
+    local stdin="$brishz_in"
+    local brishz_copy=""
+    isI && brishz_copy=y
+    if test -z "$stdin" ; then
+        brishz_copy="$brishz_copy" brishzq.zsh "$@"
+    else
+        print -nr -- "$stdin" | brishz_in='MAGIC_READ_STDIN' brishz_copy="$brishz_copy" brishzq.zsh "$@"
     fi
-    local v=0
-    isDbg && v=1
-    local req="$(jq --null-input --compact-output --arg c "$(gq "$@")"  --arg i "$brishz_in" '{"cmd": $c, "stdin": $i, "verbose": $v}')"
-    local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data "$req" $endpoint/zsh/ )
-    cmd="$(gq "$cmd[@]")"
-    <<<"$cmd" pbcopy
-    eval "$cmd"
 }
 aliasfn brishzr bzEndpoint=https://garden.lilf.ir/api/v1 brishz
 function garden-req() {
@@ -35,3 +22,12 @@ function caddypass() {
     # remember to base64:
     # export GARDEN_SALT0_B64="$(print -nr -- "$GARDEN_SALT0" | base64)"
 }
+##
+function h2e-stdin() {
+    h2e "$@" =(</dev/stdin)
+}
+function w2e-rpaste() {
+    local html="$(pbpaste)"
+    brishz_in="$html" brishzr h2e-stdin "$@"
+}
+aliasfn weep w2e-rpaste
