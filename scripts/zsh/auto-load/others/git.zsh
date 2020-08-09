@@ -1,6 +1,7 @@
 ### Aliases
 alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
 alias grm='git rm --cached'
+alias glcs='glc --depth=1'
 ###
 function gsync() {
   git add .

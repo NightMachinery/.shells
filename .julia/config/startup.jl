@@ -1,10 +1,17 @@
 const SunHasSet = true
 
-import Pkg
+# using TerminalExtensions
+
+using Pkg
 # Pkg.add("OhMyREPL")
 
 # using OhMyREPL
-using BenchmarkTools, Infiltrator, FreqTables, RDatasets
+using BenchmarkTools, Infiltrator, FreqTables, RDatasets, Lazy
+
+##
+vscI() = pushdisplay(VSCodeServer.InlineDisplay())
+vscINo() = popdisplay()
+##
 
 more(content) = more(repr("text/plain", content))
 # using Markdown
@@ -13,15 +20,31 @@ function more(content::AbstractString)
     run(pipeline(`echo $(content)`, `less`))
     nothing
 end
-macro d(body)
+macro h(body)
     :(more(Core.@doc($(esc(body)))))
 end
 
 macro labeled(body)
     bodystr = string(body)
     quote
-        println("$($bodystr) =>\n\t$($(esc(body)))")
+        out = $(esc(body))
+        res = @> map(split(string(out),"\n")) do line
+            "\t$line"
+        end join("\n")
+        println("$($bodystr) =>$(res)")
+        out
     end
+end
+
+macro copycode(name, definition)
+    # @def insertme some_code...
+    # @insertme => would insert some_code... here
+    # from http://www.stochasticlifestyle.com/type-dispatch-design-post-object-oriented-programming-julia/
+  return quote
+      macro $(esc(name))()
+          esc($(Expr(:quote, definition)))
+      end
+  end
 end
 
 function sa(x)
@@ -45,17 +68,17 @@ end
 # Repeat an operation n times, e.g.
 # @dotimes 100 println("hi")
 
-macro dotimes(n, body)
-    quote
-        for i = 1:$(esc(n))
-            $(esc(body))
-        end
-    end
-end
+# macro dotimes(n, body)
+#     quote
+#         for i = 1:$(esc(n))
+#             $(esc(body))
+#         end
+#     end
+# end
 
-macro dotimed(n, body)
-  :(@time @dotimes $(esc(n)) $(esc(body)))
-end
+# macro dotimed(n, body)
+#   :(@time @dotimes $(esc(n)) $(esc(body)))
+# end
 
 # Stop Julia from complaining about redifined consts/types -
 # @defonce type MyType
@@ -64,23 +87,23 @@ end
 # or
 # @defonce const pi = 3.14
 
-macro defonce(typedef::Expr)
-  if typedef.head == :type
-    name = typedef.args[2]
-  elseif typedef.head == :typealias || typedef.head == :abstract
-    name = typedef.args[1]
-  elseif typedef.head == :const
-    name = typedef.args[1].args[1]
-  else
-    error("@defonce called with $(typedef.head) expression")
-  end
+# macro defonce(typedef::Expr)
+#   if typedef.head == :type
+#     name = typedef.args[2]
+#   elseif typedef.head == :typealias || typedef.head == :abstract
+#     name = typedef.args[1]
+#   elseif typedef.head == :const
+#     name = typedef.args[1].args[1]
+#   else
+#     error("@defonce called with $(typedef.head) expression")
+#   end
 
-  typeof(name) == Expr && (name = name.args[1]) # Type hints
-  
-  :(if !isdefined(@__MODULE__, $(Expr(:quote, name)))
-      $(esc(typedef))
-    end)
-end
+#   typeof(name) == Expr && (name = name.args[1]) # Type hints
+
+#   :(if !isdefined(@__MODULE__, $(Expr(:quote, name)))
+#       $(esc(typedef))
+#     end)
+# end
 
 # Julia's do-while loop, e.g.
 # @once_then while x < 0.5

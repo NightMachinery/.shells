@@ -141,7 +141,7 @@ chis() {
     ec "$links"
     ec "$links"|pbcopy
     [[ "${o:-y}" == y ]] && { local i
-                              for i in "${(@f)links}"
+                              for i in ${(@f)links}
                               do
                                   $open "$i"
                               done }
