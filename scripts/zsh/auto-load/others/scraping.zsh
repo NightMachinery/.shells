@@ -1075,3 +1075,22 @@ function urls-copy() {
 function urls-extract() {
     match-url-rg --only-matching --replace '$1'
 }
+function urls-cleansharps() {
+    local urls="$(in-or-args "$@")"
+
+    urls=( "${(@f)urls}" )
+    local newUrls=()
+    local url
+    for url in $urls[@] ; do
+        dvar url
+        if [[ "$url" =~ '^(.*)\#.*$' ]] ; then
+            dvar match
+            newUrls+="$match[1]"
+        else
+          newUrls+="$url"
+        fi
+    done
+    arrN ${(@u)newUrls}
+}
+noglobfn urls-cleansharps
+aliasfn-ng urlc urls-cleansharps

@@ -1,3 +1,13 @@
 {
-    "python.pythonPath": "/home/eva/miniconda3/bin/python"
+    "python.pythonPath": "/home/eva/miniconda3/bin/python",
+    "workbench.colorCustomizations": {
+        "activityBar.activeBackground": "#b1e3cc",
+        "activityBar.activeBorder": "#a372cc",
+        "activityBar.background": "#b1e3cc",
+        "activityBar.foreground": "#15202b",
+        "activityBar.inactiveForeground": "#15202b99",
+        "activityBarBadge.background": "#a372cc",
+        "activityBarBadge.foreground": "#15202b"
+    },
+    "peacock.remoteColor": "#8bd6b3"
 }

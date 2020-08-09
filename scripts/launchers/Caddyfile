@@ -65,6 +65,7 @@ https://garden.lilf.ir {
   }
 
   # route /* {
+  # this breaks the webdav directives, possibly because of wrong ordering
   #   # uri strip_prefix /organice # organice needs config for being in a prefix, so let's just use the root for it
   #   reverse_proxy localhost:5000
   # }
