@@ -429,21 +429,24 @@ function web2epub() {
     local hasFailed=''
     local strict="$we_strict"
 
+    local dled_files=()
     # FNSWAP: urlfinalg
     for url in "${(@f)$(urlfinalg "${@:2}")}"
     do
         local bname="$(url-tail "$url")"  #"${url##*/}"
         #test -z "$bname" && bname="u$i"
-        bname="${(l(${##})(0))i} ${bname}.html"
+        bname="${(l(${##})(0))i} ${bname}" # Do NOT add an extension here, so that w2e-curl works.
         i=$((i+1))
 
         # API Change; old: "${we_dler:-wread}"
-        retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" '>' "$bname:q" && ec "Downloaded $url ..." || {
-                command rm "$bname" # delete partial or empty files
-                ec "$url" >> failed_urls
-                ecerr "Failed $url"
-                hasFailed=y
-            }
+        if retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" '>' "$bname:q" && ec "Downloaded $url ..." ; then
+            dled_files+="$bname"
+        else
+            command rm "$bname" # delete partial or empty files
+            ec "$url" >> failed_urls
+            ecerr "Failed $url"
+            hasFailed=y
+        fi
     done
 
     if test -n "$hasFailed" ; then
@@ -453,10 +456,15 @@ function web2epub() {
             return 1
         fi
     fi
-    ec "Converting to epub ..."
-    revaldbg html2epub "$title" "$author" *.html
-    mv *.epub ../ && cd '../' &&  { { isDbg || test -n "$hasFailed" } || \rm -r "./$u" }
-    ec $'\n\n'"Book '$title' by '$author' has been converted (hasFailed='${hasFailed}')."$'\n\n'
+    if (( $#dled_files == 0 )) ; then
+        ecerr "$0: No files were downloaded successfully."
+        # cd '../' # idk if this'd be good
+    else
+        ec "Converting to epub ..."
+        revaldbg html2epub "$title" "$author" "$dled_files[@]"
+        mv *.epub ../ && cd '../' &&  { { isDbg || test -n "$hasFailed" } || \rm -r "./$u" }
+        ec $'\n\n'"Book '$title' by '$author' has been converted (hasFailed='${hasFailed}')."$'\n\n'
+    fi
 }
 function w2e-raw() {
     local title="$(<<<$1 gtr '/' '.')"
