@@ -1,12 +1,17 @@
 ## Vars
 export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Functions
-aliasfn hear-noipc command mpv --keep-open=no --no-video '$MPV_AUDIO_NORM'
+function hear-noipc() {
+    local vol="${hear_noipc_volume:-${hear_noipc_v:-40}}"
+    command mpv --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
+}
 aliasfn hearinvisible silent hear-noipc --no-terminal --load-scripts=no
+@opts-setprefix hearinvisible hear-noipc
+@opts-setprefix hear hear-noipc
 function hear() {
     # arger "${(0@)$(rpargs "$@")}"
     comment '(0@) inserts empty elements with quoting'
-    hear-noipc --volume=40 --input-ipc-server="$mpv_audio_ipc" ${(0@)"$(rpargs "$@")"} #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
+    hear-noipc --input-ipc-server="$mpv_audio_ipc" ${(0@)"$(rpargs "$@")"} #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 }
 ##
 function songc() {

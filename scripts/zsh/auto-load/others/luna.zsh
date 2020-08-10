@@ -20,9 +20,10 @@ avaricemany() {
 }
 avarice() {
     # say "disquiet creatures of avarice have risen yet again ..."
-    hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
+    @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
 }
-alias lq='loop-startover ~/tmp/.luna'
+aliasfn lunaquit loop-startover ~/tmp/.luna
+aliasfn lq lunaquit
 function deluna() {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
@@ -32,7 +33,7 @@ function deluna() {
     do
         (( $(getidle-darwin) >= $timeout || $(getlastunlock-darwin) <= 80 )) && {
             edPre=$'\n' ecdate "$(color 255 100 255 'Deluna committed homicide!')"
-            lq " via deluna"
+            lunaquit " via deluna"
             # { isDbg && sleep 1 } || sleep 30
         }
         sleep 30 # to avoid cpu usage
@@ -58,3 +59,11 @@ function nnl() {
 
     set-volume "$vol"
 }
+##
+bellj_socket=~/.sockets/bellj
+bellj_say="Jingle bells, jingle bells,
+Jingle all the way.
+Oh! what fun it is to ride
+In a one-horse open sleigh."
+function bellj() { lo_sig2cancel=y lo_s=3 lo_p=${lo_p:-$bellj_socket} loop @opts v 130 @ hearinvisible $NIGHTDIR/resources/audio/ReichPhase.wav } #fsay $bellj_say
+aliasfn retry_sleep=0.1 okj retryi-limited 500 loop-startover $bellj_socket

@@ -16,3 +16,7 @@ trs() {
         }
     done
 }
+function ensure-dir() {
+    mkdir -p "$(bottomdir $1)"
+}
+reify ensure-dir
