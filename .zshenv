@@ -46,8 +46,9 @@ isNotExpensive || {
         export ELM_HOME="/usr/local/bin/"
 
         export JAVA_HOME8="`/usr/libexec/java_home --version 1.8`"
-        export JAVA_HOME9="`/usr/libexec/java_home --version 9`"
-        export JAVA_HOME=$JAVA_HOME8
+        # Use `brew info openjdk` to link java properly.
+        export JAVA_HOME14="`/usr/libexec/java_home --version 14`"
+        export JAVA_HOME=$JAVA_HOME14
         addToPATH $JAVA_HOME
 
         addToPATH /usr/local/opt/qt/bin

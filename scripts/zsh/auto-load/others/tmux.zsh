@@ -35,8 +35,8 @@ aliasfn tsh tmuxnewsh2
 function tmuxdaemon() {
     local key="$tdKey"
     local cmd="$(gq "$@")"
-    local name="${tdkey}___ $cmd"
-    name="$name ___ $(md5m "$name")"
+    local name="$cmd ___ ${tdkey}"
+    name="$name $(md5m "$name")"
     name="$(<<<$name str2tmuxname)"
     # perhaps we should ask the user to confirm if a duplicate session with this name already exists?
     silent tmux kill-session -t "$name"  && ecerr "Killed already existing session '$name' to run the new command '$cmd'" # is killing it redundant?

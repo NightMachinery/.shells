@@ -405,7 +405,9 @@ t2e() {
 function html2epub() {
     ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
     local files=( "$@[3,-1]" )
-    arr0 "$files[@]" | filter0 ishtml-file | inargs0 "${h2ed:-html2epub-calibre}" "$1" "$2"
+
+    # filter0 ishtml-file # don't do this, as we download non-html files in w2e-curl
+    arr0 "$files[@]" | inargs0 "${h2ed:-html2epub-calibre}" "$1" "$2"
 }
 html2epub-pandoc() {
     # title author htmls

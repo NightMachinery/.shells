@@ -65,5 +65,20 @@ bellj_say="Jingle bells, jingle bells,
 Jingle all the way.
 Oh! what fun it is to ride
 In a one-horse open sleigh."
-function bellj() { lo_sig2cancel=y lo_s=3 lo_p=${lo_p:-$bellj_socket} loop @opts v 130 @ hearinvisible $NIGHTDIR/resources/audio/ReichPhase.wav } #fsay $bellj_say
+function bell-jingles() {
+    fsay $bellj_say
+}
+function bell-ReichPhase() {
+    @opts v 130 @ hearinvisible $NIGHTDIR/resources/audio/ReichPhase.wav
+}
+function bellj() {
+    lo_sig2cancel=y lo_s=3 lo_p=${lo_p:-$bellj_socket} loop bell-helicopter
+}
+function bell-helicopter() {
+    local duration="${1:-3}"
+
+    ot-play-helicopter # it'd be better if this supported a duration itself, as ot-stop will stop everything.
+    sleep "$duration"
+    ot-stop
+}
 aliasfn retry_sleep=0.1 okj retryi-limited 500 loop-startover $bellj_socket
