@@ -8,12 +8,12 @@ function prefix-files() {
     done
 }
 function globexists() {
-	(silent eval ": $@")
+    (silent eval ": $@")
 }
 noglobfn globexists
 
 ensure-empty() {
-	doc Use 'jee' in code.
+    doc Use 'jee' in code.
 
     (silence eval '\: *(D)') && {
         ecerr Directory "$(pwd)" not empty
@@ -77,4 +77,8 @@ function till-file() {
         ecerr "$0: File '$file' does not yet exist ..."
         sleep "$time" 
     done
+}
+function ext-all() {
+    # useful for, e.g., seeing what to track with git lfs
+    fd . | inargsf mapg '${i:e}' | gsort --uniq
 }

@@ -46,11 +46,21 @@ function ntl() {
     outFiles=() # out and outFiles contain the same data when ntLines=y
     ntLines=y ntsearch "$@" > /dev/null  || return 1 # Beware forking here! We need the global vars outFiles and acceptor
 
-    local i files=() linenumbers=() lines=()
+    local i files=() linenumbers=() lines=() file
     for i in "${outFiles[@]}" ; do
         unset match
         if [[ "$i" =~ '^([^:]*):([^:]*):(.*)' ]] ; then
-            files+="$match[1]"
+            file="$match[1]"
+            # TODO we need to add this to the preview logic, too.
+            # This happens when some files are supplied that are not children of nightNotes.
+            test -e "$file" || {
+                file="$(<<<$file rmprefix "$nightNotes")"
+            }
+            test -e "$file" || {
+                ecerr "$0: $file does not exist. Skipping."
+                continue
+            }
+            files+="$file"
             linenumbers+="$match[2]"
             lines+="$match[3]"
         else

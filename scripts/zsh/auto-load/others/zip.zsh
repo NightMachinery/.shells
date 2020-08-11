@@ -3,3 +3,9 @@ function zir() {
     \rm "$dest" &> /dev/null
     zip -r "$dest" "$1"
 }
+function unzip2dir() {
+    local file="$1"
+
+    unzip "$file" -d "${file:r}/"
+}
+reify unzip2dir

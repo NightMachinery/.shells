@@ -20,3 +20,8 @@ function ensure-dir() {
     mkdir -p "$(bottomdir $1)"
 }
 reify ensure-dir
+function lnrp() {
+    local f="$1" d="$2"
+
+    ln -s "$(realpath "$f")" "$d"
+}

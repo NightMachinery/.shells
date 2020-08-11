@@ -12,6 +12,8 @@ isNotExpensive || {
         test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
     fi
 
+    addToPATH /Applications/SuperCollider.app/Contents/Resources/
+    addToPATH /Applications/SuperCollider.app/Contents/MacOS/
     addToPATH ~/code/node/snips-alice
     addToPATH ~/.emacs.d.doom/bin/
     addToPATH "$HOME/.dotnet/tools"
@@ -22,6 +24,7 @@ isNotExpensive || {
     addToPATH "/usr/local/sbin"
     addToPATH "$HOME/.local/bin"
     addToPATH "/Base/- Code/Resources/"
+    export GOPATH="$HOME/go"
     addToPATH "$HOME/go/bin"
     addToPATH "/usr/local/opt/texinfo/bin"
     addToPATH "$HOME/kscripts/"
