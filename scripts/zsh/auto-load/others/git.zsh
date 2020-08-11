@@ -79,3 +79,26 @@ git-listblobs() {
     | cut -c 1-12,41- \
     | $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
 }
+function git_sparse_clone() (
+    # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
+    rurl="$1" localdir="$2" && shift 2
+
+    mkdir -p "$localdir"
+    cd "$localdir"
+
+    git init
+    git remote add -f origin "$rurl"
+
+    git config core.sparseCheckout true
+
+    # Loops over remaining args
+    local i
+    for i; do
+        echo "$i" >> .git/info/sparse-checkout
+    done
+
+    git pull origin master
+)
+function github-dir() {
+    svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"
+}

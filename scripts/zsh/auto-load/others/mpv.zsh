@@ -76,3 +76,10 @@ function mpv-partial() {
     return 0
 }
 ##
+playtmp() {
+    mkdir -p ~/tmp/delme/
+    cp "$1" ~/tmp/delme/
+    color 0 200 0 Copied "$1" to tmp
+    fsay Copied to tmp
+    pat ~/tmp/delme/"$1:t"
+}

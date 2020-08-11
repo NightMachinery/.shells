@@ -32,3 +32,6 @@ function pbpaste() {
         (( $+commands[pbpaste] )) && command pbpaste
     }
 }
+function pbadd() {
+    osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
+}

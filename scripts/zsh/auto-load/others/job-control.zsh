@@ -74,6 +74,7 @@ loop interrupted' ; sig2=666
 }
 loop-startover() { edPre=$'\n' ecdate "Signal from loop-startover${@:2}" | socat -u - unix-connect:${1} }
 alias loops='loop-startover' #Oops :D
+##
 inbg() {
     { eval "$(gquote "$@")" & }
     disown &>/dev/null  # Prevent whine if job has already completed
@@ -82,4 +83,16 @@ awaysh() inbg silent "$@"
 function away() {
     ruu 'nohup --' "$@" &
     disown &>/dev/null  # Prevent whine if job has already completed
+}
+##
+killjobs() {
+    local kill_list="$(jobs)"
+    if [ -n "$kill_list" ]; then
+        # this runs the shell builtin kill, not unix kill, otherwise jobspecs cannot be killed
+        # the `$@` list must not be quoted to allow one to pass any number parameters into the kill
+        # the kill list must not be quoted to allow the shell builtin kill to recognise them as jobspec parameters
+        kill $@ $(gsed --regexp-extended --quiet 's/\[([[:digit:]]+)\].*/%\1/gp' <<< "$kill_list" | tr '\n' ' ')
+    else
+        return 0
+    fi
 }

@@ -1,5 +1,14 @@
 alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
+##
+# increment-episode() {
+# superseded by tmnte
+#   emulate -L zsh
+#   setopt extendedglob
+#   local cmd=${$(fc -nl -1 -1)/(#b)(*E)(<->)/$match[1]${(l:${#match[2]}::0:)$((match[2]+${1:-1}))}}
+#   geval "$cmd"
+# }
+##
 function increment-last() {
     #$1 is supplied in our alias tmnt. :D
     local pe='s/'$1'/$1 . (sprintf "%0*d", length($2), $2 + '"${2:-1}"')/e'

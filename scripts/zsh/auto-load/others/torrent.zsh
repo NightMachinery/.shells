@@ -1,3 +1,9 @@
+function trr() (
+    mkdir -p "${PEERFLIX_DIR:=$HOME/Downloads/video}"
+    local opts=()
+    isSSH || opts=( --mpv -- --fullscreen )
+    peerflix "$@" --path "${PEERFLIX_DIR}" --no-quit "$opts[@]"
+)
 function trrz() {
     # TODO config stored at ~/Library/Preferences/teevee-nodejs/
     trr "$(teevee fetch)"
