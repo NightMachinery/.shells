@@ -71,7 +71,7 @@ function bell-jingles() {
 function bell-ReichPhase() {
     @opts v 130 @ hearinvisible $NIGHTDIR/resources/audio/ReichPhase.wav
 }
-function bellj() {
+function bellj1() {
     lo_sig2cancel=y lo_s=3 lo_p=${lo_p:-$bellj_socket} loop bell-ReichPhase #bell-helicopter
 }
 function bell-helicopter() {
@@ -81,6 +81,8 @@ function bell-helicopter() {
     sleep "$duration"
     ot-stop
 }
-aliasfn okj retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
+aliasfn okj1 retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 aliasfn bellj2 ot-play-helicopter
 aliasfn okj2 ot-stop
+aliasfn bellj bellj2
+aliasfn okj okj2
