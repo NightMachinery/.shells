@@ -5,23 +5,31 @@ function lunar() {
 luna() {
     lunar pmset displaysleepnow
 }
+##
 lunas() {
-    lunar avaricemany
+    lunar bell-many
 }
-avaricemany() {
+bell-many() {
     setopt localtraps
     # So I don't understand these all that well, but here is my guess:
     trap "" INT # disables INT handling in this function, so we don't quit by INT
-    (redo avarice 25) # this is a new process so it has its own signal handling and so does quit on INT
+    (redo bell-luna 25) # this is a new process so it has its own signal handling and so does quit on INT
     # 25  1:23.87 total
     # each is about 3.5s
 
     ecdate "Luna iterated."
 }
-avarice() {
+bell-avarice() {
     # say "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
 }
+bell-greencase() {
+    # TODO this doesn't result in a constantish duration, so we'll additional code to check the duration in a while loop in bell-many
+    @opts v 70 @ hearinvisible "$(rndarr $GREENCASE_DIR/**/$~audioglob)"
+}
+# aliasfn bell-luna bell-avarice
+aliasfn bell-luna bell-greencase
+##
 aliasfn lunaquit loop-startover ~/tmp/.luna
 aliasfn lq lunaquit
 function deluna() {
