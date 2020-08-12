@@ -18,6 +18,8 @@ alias nts='\noglob ntsearch'
 ###
 ##
 function rgf_() {
+    # @todo shortcuts to navigate multiple lines at a time (to skip the context lines) will help
+
     # local opts=( --delimiter ':|-|\x00' --with-nth 1,3..)
     local opts=( )
     RG_PREFIX="$functions[rgbase] -C 4 --null --line-number --no-heading -e"
@@ -31,6 +33,7 @@ function rgf_() {
         outFiles=("${(@f)outFiles}")
     }
 }
+# @bug `--` won't fit this pattern, though it shouldn't be included in your selections anyways?
 aliasfnq rgf @opts engine rgf_ pattern '(.*)\0(\d+)[:-](.*)' @ ntl.
 aliasfn seerg rgf
 aliasfn rgsee rgf

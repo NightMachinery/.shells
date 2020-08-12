@@ -76,12 +76,16 @@ loop-startover() { edPre=$'\n' ecdate "Signal from loop-startover${@:2}" | socat
 alias loops='loop-startover' #Oops :D
 ##
 inbg() {
-    { eval "$(gquote "$@")" & }
+    ( eval "$(gquote "$@")" & ) &>/dev/null </dev/null # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
     disown &>/dev/null  # Prevent whine if job has already completed
 }
-awaysh() inbg silent "$@"
+# awaysh() inbg silent "$@"
+aliasfn awaysh inbg
 function away() {
+    : "Use awaysh, that seems better in every single case."
+
     ruu 'nohup --' "$@" &
+    # disown is still needed. Without it you'll see `[1]  + 97327 done       nohup sleep 10`
     disown &>/dev/null  # Prevent whine if job has already completed
 }
 ##
