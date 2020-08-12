@@ -121,6 +121,9 @@ alias fff=fffunctions
 chis() {
     # Forked from fzf's wiki
     # browse chrome history
+    local query="${*:-.}"
+    local doOpen="${chis_open:-y}"
+
     local cols sep google_history open
     cols=$(( COLUMNS / 3 ))
     sep='{::}'
@@ -137,10 +140,10 @@ chis() {
         "select substr(title, 1, $cols), url
      from urls order by last_visit_time desc" |
         awk -F $sep '{printf "%-'$cols's  \x1b[36m%s\x1b[m\n", $1, $2}' |
-        ag "${@:-.}" |fz --no-sort --ansi | gsed 's#.*\(https*://\)#\1#')"
+        rgm "$query" |fz --no-sort --ansi | gsed 's#.*\(https*://\)#\1#')"
     ec "$links"
     ec "$links"|pbcopy
-    [[ "${o:-y}" == y ]] && { local i
+    [[ "${doOpen}" == y ]] && { local i
                               for i in ${(@f)links}
                               do
                                   $open "$i"
@@ -203,14 +206,3 @@ function v() {
     reval "${veditor[@]}" "${(@)files}"
 }
 function vni() { fr "${veditor[@]}" . $NIGHTDIR }
-function rgf() {
-    # TODO create a ripgrep parser with json
-
-    # Integration with ripgrep
-    local opts=( --delimiter ':|-|\x00' --with-nth 1,3..)
-    RG_PREFIX="$functions[rgbase] --null --line-number --no-heading -e"
-    local INITIAL_QUERY=( "$@" )
-
-    agC=4 FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq ${INITIAL_QUERY:-.})" \
-        fz-empty --reverse --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --phony --query "$INITIAL_QUERY"
-}

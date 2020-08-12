@@ -23,10 +23,13 @@ function ugm() {
     #  --heading, -+ Group matches per file.  Adds a heading and a line break between results from different files.
 }
 function rgbase() {
-    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto -C ${agC:-1} --color always --hidden "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto --color always --hidden "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+}
+function rgcontext() {
+    rgbase -C ${agC:-1} "$@"
 }
 function rgm() {
-    rgbase --heading "$@" | less-min
+    rgcontext --heading "$@" | less-min
 }
 agm() rgm "$@" #alias agm='rg' #'ag -C "${agC:-1}" --nonumbers'
 

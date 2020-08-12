@@ -278,7 +278,8 @@ zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '
 # The second (original) rule allows for partial completion before ., _ or -, e.g. f.b -> foo.bar.
 # The third rule allows for completing on the left side of the written text, e.g. bar -> foobar)
 ##
-(( $+commands[cod] )) && source <(command cod init $$ zsh | sd '\bcod\b' 'command cod')
+# (( $+commands[cod] )) && source <(command cod init $$ zsh | sd '\bcod\b' 'command cod')
+# https://github.com/dim-an/cod/issues/24
 ##
 zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise

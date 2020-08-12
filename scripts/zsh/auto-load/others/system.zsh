@@ -27,8 +27,9 @@ function volset() {
 aliasfn setv volset
 aliasfn get-volume volget
 aliasfn getv volget
-function mute-external() {
-	: "Use: lo_s=0 loop mute-external [<headphone-volume-from-100>=1]"
+function mute-external_() {
+	: "You probably want to use mute-external which calls this in a loop.
+Usage: mute-external_ [<headphone-volume-from-100>=1]"
 	: "Note that headphones-is is expensive and takes ~0.3 seconds"
 
 	{
@@ -38,7 +39,12 @@ function mute-external() {
 		else
 			volset 0
 		fi
-	} always { volset 0 }
+	}
+}
+function mute-external() {
+	local lev="${1:-1}"
+
+	{ lo_s=0 loop mute-external_ "$lev" }  always { volset 0 }
 }
 function display-off() {
 	watch -n ${1:-1} brightness 0

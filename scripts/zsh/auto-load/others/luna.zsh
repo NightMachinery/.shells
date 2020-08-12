@@ -24,7 +24,7 @@ bell-avarice() {
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
 }
 bell-greencase() {
-    # TODO this doesn't result in a constantish duration, so we'll additional code to check the duration in a while loop in bell-many
+    # @todo0 this doesn't result in a constantish duration, so we'll additional code to check the duration in a while loop in bell-many
     @opts v 70 @ hearinvisible "$(rndarr $GREENCASE_DIR/**/$~audioglob)"
 }
 # aliasfn bell-luna bell-avarice
