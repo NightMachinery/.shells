@@ -1,4 +1,5 @@
 [deps]
+AbstractPlotting = "537997a7-5e4e-5d89-9595-2241ea00577e"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BlackBoxOptim = "a134a8b2-14d6-55f6-9291-3336d3ab0209"
 Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
@@ -33,6 +34,7 @@ IterTools = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 Lazy = "50d2b5c4-7a5e-59d5-8109-a42b560f39c0"
+MKL = "33e6dc65-8f57-5167-99aa-e5a354878fb2"
 MLStyle = "d8e11817-5142-5d16-987a-aa16d5891078"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Measures = "442fdcdd-2543-5da2-b0f3-8c86c306513e"

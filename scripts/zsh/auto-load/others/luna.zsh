@@ -23,9 +23,22 @@ bell-avarice() {
     # say "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
 }
+function greencase_audio_init() {
+    { test -z "$greencase_audio_init" || test -n "$*" } && {
+        greencase_audio=( $GREENCASE_DIR/**/$~audioglob )
+    }
+}
 bell-greencase() {
+    ##
     # @todo0 this doesn't result in a constantish duration, so we'll additional code to check the duration in a while loop in bell-many
-    @opts v 70 @ hearinvisible "$(rndarr $GREENCASE_DIR/**/$~audioglob)"
+    #
+    ## Perf:
+    # The delay is in the files themselves, these below have same time and both sound delayed:
+    # time (@opts v 70 @ hearinvisible '/Users/evar/Base/Music/greencase/PC Computer - Portal 2 - Turret/turretlaunched05.wav')
+    # time (hearinvisible '/Users/evar/Base/Music/greencase/PC Computer - Portal 2 - Turret/turretlaunched05.wav')
+    ##
+    greencase_audio_init
+    reval-ec @opts v 70 @ hearinvisible "$(rndarr $greencase_audio[@])"
 }
 # aliasfn bell-luna bell-avarice
 aliasfn bell-luna bell-greencase
