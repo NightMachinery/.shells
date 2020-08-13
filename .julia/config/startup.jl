@@ -14,7 +14,8 @@ ENV["SHELL"] = @> `which dash` read(String) chomp # necessary for fzf's preview,
 InteractiveCodeSearch.CONFIG.interactive_matcher = `fzf --bind 'shift-up:toggle+up,shift-down:toggle+down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-a:select-all' --color=light --multi --hscroll-off 99999  --preview 'printf -- "%s " {} | command fold -s -w $FZF_PREVIEW_COLUMNS' --preview-window down:7:hidden`
 
 ##
-bello() = run(`brishz.dash redo2 2 bell-greencase`, wait=false)
+# bello() = run(`brishz.dash redo2 2 bell-greencase`, wait=false)
+bello() = run(`brishz.dash bell-toy`, wait=false)
 bellj() = run(`brishz.dash 'awaysh bellj '`, wait=false)
 okj() = run(`brishz.dash 'okj'`, wait=false)
 ##

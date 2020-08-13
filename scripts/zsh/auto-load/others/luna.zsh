@@ -23,6 +23,10 @@ bell-avarice() {
     # say "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
 }
+bell-toy() {
+    # say "disquiet creatures of avarice have risen yet again ..."
+    @opts v 70 @ hearinvisible "$(rndarr $GREENCASE_DIR/toystory2/**/$~audioglob)"
+}
 function greencase_audio_init() {
     { test -z "$greencase_audio_init" || test -n "$*" } && {
         greencase_audio=( $GREENCASE_DIR/**/$~audioglob )
@@ -93,7 +97,8 @@ function bell-ReichPhase() {
     @opts v 130 @ hearinvisible $NIGHTDIR/resources/audio/ReichPhase.wav
 }
 function bellj1() {
-    lo_sig2cancel=y lo_s=3 lo_p=${lo_p:-$bellj_socket} loop bell-ReichPhase #bell-helicopter
+    local bell="${1:-bell-ReichPhase}"
+    lo_sig2cancel=y lo_s=3 lo_p=${lo_p:-$bellj_socket} loop "$bell" #bell-helicopter
 }
 function bell-helicopter() {
     local duration="${1:-3}"
@@ -105,5 +110,9 @@ function bell-helicopter() {
 aliasfn okj1 retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 aliasfn bellj2 ot-play-helicopter
 aliasfn okj2 ot-stop
-aliasfn bellj bellj2
-aliasfn okj okj2
+aliasfn bellj-toy bellj1 bell-toy
+aliasfn bellj-gc bellj1 bell-greencase
+# aliasfn bellj bellj2
+# aliasfn okj okj2
+aliasfn bellj bellj-gc
+aliasfn okj okj1
