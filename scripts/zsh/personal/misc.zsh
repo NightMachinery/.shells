@@ -1,1 +1,7 @@
-function '.a'() { eval "aget $(gquote "$@")" ; }
+function '.a'() {
+    if isDarwin ; then
+        brishzr .a "$@"
+    else
+        eval "aget $(gquote "$@")" ;
+    fi
+}

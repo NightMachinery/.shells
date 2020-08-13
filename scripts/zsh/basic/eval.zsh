@@ -15,24 +15,34 @@ function geval() {
     eval -- "$cmd"
 }
 function aget() {
-    doc "aget does not wait for all forked processed. Probably unsolable unless we invoke zsh -c"
-    local u="$(uuidgen)"
-    local erri jufile
-    mkdir -p "$u" && ec "$(realpath "$u")" >> "$deleteus"
+    ##
+    # "aget does not wait for all forked processed. Probably unsolvable unless we invoke zsh -c"
+    # `zsh -f -c 'sleep 3 &'` doesn't wait for them either. We had this problem in borg's old forking system as well.
+    ##
+    local cmd=("$@")
+
+    local u="./$(uuidgen)" erri jufile j jd
+    mkdir -p "$u"
+    u="$(realpath "$u")"
+    jd="$u"
+    ec $u >> "$deleteus"
     test -e "$ag_f" && {
-        cp "$ag_f" ./"$u"/
+        cp "$ag_f" "$u"/
         ecdbg ag_f: "$ag_f"
     }
     cd "$u"
-    test -e "$ag_f" && jufile=(./*(D))
+    test -e "$ag_f" && {
+        jufile=(./*(D))
+        j="$jufile"
+    }
     ecdbg jufile: "$jufile"
-    eval "$@" && {
+    eval "$cmd[@]" && {
         wait
         test -n "$ag_no_rm" || {
              cd ..
-            \rm -r "$u"
+             command rm -r "$u"
         }
-    } || { err="$?" && ecerr aget "$@" exited "$err"; l ; cd .. ; (exit "$err") }
+    } || { err="$?" && ecerr aget "$cmd[@]" exited "$err"; l ; cd .. ; return "$err" }
 }
 function reval() {
     # ecdbg revaling "$(gq "$@")"

@@ -183,7 +183,7 @@ function ntsearch_() {
         fzopts+=(--delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
         local FZF_SHELL='zshplain.dash'
         # FZF_SHELL=zsh
-        previewcode=( 'ln={2} file={1} match={3..} ; fileabs="$nightNotes/$file" ;
+        previewcode=( 'ln={2} file={1} match={s3..} ; fileabs="$nightNotes/$file" ;
 { print -r -- "$file" '
                       "\$'\\n'$(gq $(colorbg 200 255 200 ; colorfg 0 0 0))\$match$(gq $reset_color)\$'\\n\\n' ; "
                       # 'echo ln: $ln ; '
@@ -213,7 +213,7 @@ function ntsearch_fd() {
     if test -n "$ntLines" ; then
         {
             # no-messages suppresses IO errors
-            command rg --no-messages --with-filename --line-number "$query_rg" "${files[@]}" || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            command rg --smart-case --engine auto --no-messages --with-filename --line-number "$query_rg" "${files[@]}" || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
         } | rmprefix "$nightNotes"
             # sd "^$nightNotes" '' # sd is doing the work of `realpath --relative-to` . TODONE this doesn't quote and so is buggy
         ## old way (uses vars now not in scope)

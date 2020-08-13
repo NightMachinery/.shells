@@ -18,9 +18,19 @@ InteractiveCodeSearch.CONFIG.interactive_matcher = `fzf --bind 'shift-up:toggle+
 bello() = run(`brishz.dash bell-toy`, wait=false)
 bellj() = run(`brishz.dash 'awaysh bellj '`, wait=false)
 okj() = run(`brishz.dash 'okj'`, wait=false)
+function firstbell()
+    if ! @isdefined firstLoad
+        bellj()
+    else
+        bello()
+    end
+    global firstLoad = true
+end
 ##
 vscI() = pushdisplay(VSCodeServer.InlineDisplay())
 vscINo() = popdisplay()
+##
+ensureDir(dest) = mkpath(dirname(dest))
 ##
 
 more(content) = more(repr("text/plain", content))
