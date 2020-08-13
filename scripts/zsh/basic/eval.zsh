@@ -43,8 +43,8 @@ function aget() {
             command rm -r "$u"
         }
     else
-        err="$?" && ecerr aget "$cmd[@]" exited "$err"
-        ll
+        err="$?" && ecerr "aget $cmd[@] exited '$err'. Listing files (can be empty):"
+        exa -a -l
         cd ..
         return "$err"
     fi
