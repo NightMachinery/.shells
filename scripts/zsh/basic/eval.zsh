@@ -42,7 +42,7 @@ function aget() {
              cd ..
              command rm -r "$u"
         }
-    } || { err="$?" && ecerr aget "$cmd[@]" exited "$err"; l ; cd .. ; return "$err" }
+    } || { err="$?" && ecerr aget "$cmd[@]" exited "$err"; ll ; cd .. ; return "$err" }
 }
 function reval() {
     # ecdbg revaling "$(gq "$@")"
