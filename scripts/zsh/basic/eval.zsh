@@ -36,13 +36,18 @@ function aget() {
         j="$jufile"
     }
     ecdbg jufile: "$jufile"
-    eval "$cmd[@]" && {
+    if eval "$cmd[@]" ; then
         wait
         test -n "$ag_no_rm" || {
-             cd ..
-             command rm -r "$u"
+            cd ..
+            command rm -r "$u"
         }
-    } || { err="$?" && ecerr aget "$cmd[@]" exited "$err"; ll ; cd .. ; return "$err" }
+    else
+        err="$?" && ecerr aget "$cmd[@]" exited "$err"
+        ll
+        cd ..
+        return "$err"
+    fi
 }
 function reval() {
     # ecdbg revaling "$(gq "$@")"
