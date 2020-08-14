@@ -4,10 +4,13 @@ alias grm='git rm --cached'
 alias glcs='glc --depth=1'
 ###
 function gsync() {
-  git add .
-  git commit -a -m .
-  git pull --no-edit
-  git push
+  pushf "$(git rev-parse --show-toplevel)" || return 1
+  {
+    git add .
+    git commit -a -m .
+    git pull --no-edit
+    git push
+  } always { popf }
 }
 ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat }
 guc() {

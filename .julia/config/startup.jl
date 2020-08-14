@@ -1,4 +1,3 @@
-const SunHasSet = true
 reloadStartup() = include(ENV["HOME"] * "/.julia/config/startup.jl")
 
 # using TerminalExtensions
@@ -15,9 +14,9 @@ InteractiveCodeSearch.CONFIG.interactive_matcher = `fzf --bind 'shift-up:toggle+
 
 ##
 # bello() = run(`brishz.dash redo2 2 bell-greencase`, wait=false)
-bello() = run(`brishz.dash bello`, wait=false)
-bellj() = run(`brishz.dash 'awaysh bellj '`, wait=false)
-okj() = run(`brishz.dash 'okj'`, wait=false)
+bello() = run(`brishz.dash awaysh bello`, wait=false)
+bellj() = run(`brishz.dash awaysh bellj`, wait=false)
+okj() = run(`brishz.dash awaysh okj`, wait=false)
 function firstbell()
     if ! @isdefined firstLoad
         bellj()
@@ -52,7 +51,7 @@ function repl_post()
     end
 end
 function repl_transform_prepost(ex)
-    res_sym = gensym()
+    res_sym = gensym("res_sym") # the string will be included in the name, helpful for debugging?
     Expr(:toplevel, :($repl_pre()), :($res_sym = $ex),:($repl_post()),:($res_sym))
 end
 if ! @isdefined BELL_LOADED
@@ -76,7 +75,29 @@ vscINo() = popdisplay()
 ##
 ensureDir(dest) = mkpath(dirname(dest))
 ##
+macro currentFuncName()
+    # Using `local` is optional, but it makes the code more readable
+    return quote
+        local st = stacktrace(backtrace())
+        local myf = ""
+        for frm in st
+            funcname = frm.func
+            if frm.func != :backtrace && frm.func!= Symbol("macro expansion")
+                myf = frm.func
+                break
+            end
+        end
+        replace(string(myf), r"#?([^#]*)#?.*" => s"\1")
+    end
+end
+macro codeLocation()
+    # From https://discourse.julialang.org/t/how-to-print-function-name-and-source-file-line-number/43486/4
+    return quote
+        "Running function " * $("$(__module__)") * ".$(@currentFuncName) at " * $("$(__source__.file)") * ":" * $("$(__source__.line)")
+    end
+end
 
+##
 more(content) = more(repr("text/plain", content))
 # using Markdown
 # more(content::Markdown.MD) = more(Markdown.term(Core.CoreSTDOUT(), content))
@@ -209,3 +230,9 @@ macro fn(expr::Expr)
   @eval $name($(args...)) = $body
   name
 end
+
+###
+if ! @isdefined SunHasSet
+    bello() # Julia's first startup takes forever
+end
+const SunHasSet = true ;

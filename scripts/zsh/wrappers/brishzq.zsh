@@ -31,7 +31,7 @@ if [[ "$endpoint" =~ 'garden' ]] ; then
 fi
 local v=0
 isDbg && v=1
-local req="$(<<<"$stdin" jq --raw-input --slurp --null-input --compact-output --arg c "$input_cmd[*]" --arg v $v 'inputs as $i | {"cmd": $c, "stdin": $i, "verbose": $v}')"
+local req="$(print -nr -- "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg c "$input_cmd[*]" --arg v $v 'inputs as $i | {"cmd": $c, "stdin": $i, "verbose": $v}')"
 local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint/zsh/ )
 cmd="$(gq print -nr -- $req) | $(gq "$cmd[@]")"
 test -n "$copy_cmd" && <<<"$cmd" pbcopy

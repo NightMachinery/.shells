@@ -37,7 +37,10 @@ alias lc='l -s created'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
 alias lac='l -s accessed'
-function last-exa() { ec "${2:-.}/$(exa -as "$@"|tail -n1)" }
+function last-exa() {
+    # Ignoring hidden files, add --all to show them
+    ec "${2:-.}/$(exa --sort "$@"|tail -n1)"
+}
 alias last-created='last-exa created'
 alias last-accessed='last-exa accessed'
 alias last-modified='last-exa modified'

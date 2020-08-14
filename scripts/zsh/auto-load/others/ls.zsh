@@ -6,9 +6,6 @@ function ls-by-added() {
         sort --reverse | \
         sed -E "s/^.*\\+0000 //" # removes the timestamps
 }
-function onla() {
-    geval "$(gquote "$@")"" ${$(last-added):q}"
-}
 function onxla(){
     last-added|gxargs -I _ "$(gquote "$@")"
 }
@@ -18,15 +15,13 @@ function onxlc(){
 function first-file(){
     exa|head -n1
 }
-function onlac(){
-    geval "$(gquote "$@")"" ${$(last-accessed):q}"
+function on-g() {
+    # local engine="${on_g_engine:${on_g_e}}"
+    local engine="$1" ; shift || return 1
+    printz-quoted "$@" "$(realpath "$(reval "$engine")")"
 }
-function onlm(){
-    geval "$(gquote "$@")"" ${$(last-modified):q}"
-}
-function onlc(){
-    geval "$(gquote "$@")"" ${$(last-created):q}"
-}
-function onff(){
-    geval "$(gquote "$@")"" ${$(first-file):q}"
-}
+aliasfn onla on-g last-added
+aliasfn onlac on-g last-accessed
+aliasfn onlm on-g last-modified
+aliasfn onlc on-g last-created
+aliasfn onff on-g first-file

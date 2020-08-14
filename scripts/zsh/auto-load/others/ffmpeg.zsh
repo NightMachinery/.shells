@@ -29,14 +29,15 @@ aliasfn imgseq2vidNI fnswap printz-quoted reval imgseq2vid
 function imgdirs2vid() {
     local framerate="${imgseq2vid_r:-30}"
     local crf="${imgseq2vid_crf:-25}"
-    local input="${1}"
+    local input="${imgseq2vid_input}"
     test -z "$input" && input='%06d.png'
     
-    local dirs=( *(/) ) dir
+    local dirs=( "$@" ) dir
     for dir in $dirs[@] ; do
+        dir="$(realpath "$dir")"
         pushf $dir
 
-        local out="../$dir.mp4"
+        local out="${dir}.mp4"
         # @opts out "$out" @ imgseq2vidNI
         ffmpeg -threads 0 -thread_queue_size 10000 -framerate $framerate -i $input -c:v libx265 -pix_fmt yuv420p -crf $crf -movflags +faststart -r $framerate $out
 
