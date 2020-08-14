@@ -2,9 +2,19 @@ function enh-savename() {
     : "<name of original function> <its renamed version after enhancement>"
     # TODO Adding a way to keep track of all saved names would be good.
 
+    local n1="$1" n2="$2"
+
+
+
     typeset -A -g enhSavedNames
 
-    test -n "${enhSavedNames[$1]}" || enhSavedNames[$1]="$2"
+    test -n "${enhSavedNames[$n1]}" || {
+        if ! (( $+commands[$n2] || $+functions[$n2] || $+aliases[$n2] )) ; then
+            print -r -- "$0: n1=$n1; $n2 is probably invalid. (Use enh-savename after creating the renamed version, so we can verify that it exists.) Aborting." >&2
+            return 1
+        fi
+        enhSavedNames[$n1]="$n2"
+    }
 }
 ##
 function enh-mkdest() {
@@ -48,9 +58,9 @@ noglobfn() {
     (( ${+aliases[$1]} )) && unalias "$1"
     {
         local realname="_noglob_$1"
-        enh-savename "$1" "$realname"
         functions[$realname]=$functions[$1]
         alias "$1"="\noglob $realname"
+        enh-savename "$1" "$realname"
     }
     #unfunction "$1"
     # if anyone uses the previous version they are probably not needing a noglob so let them be
@@ -63,9 +73,9 @@ function reify() {
     local realname="_reify_$1"
     local enhanced="run-on-each $realname"' "$@"'
     [[ "$functions[$1]" =~ '\s*\Q'"$enhanced"'\E\s*' ]] || {
-        enh-savename "$1" "$realname"
         functions[$realname]=$functions[$1]
         functions[$1]="$enhanced"
+        enh-savename "$1" "$realname"
     }
 }
 reify reify

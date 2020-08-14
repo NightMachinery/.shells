@@ -19,8 +19,8 @@ diraction-personal-config (){
 }
 antibody bundle "adrieankhisbe/diractions"
 
-aliasfn cellp incell gsync
 aliasfnq incell indir "$cellar"
+aliasfn cellp incell gsync
 aliasfnq indl indir ~/Downloads/
 aliasfnq intdl indir ~"/Downloads/Telegram Desktop"
 ##

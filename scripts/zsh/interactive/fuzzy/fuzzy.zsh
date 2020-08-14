@@ -173,3 +173,12 @@ function v() {
     reval "${veditor[@]}" "${(@)files}"
 }
 function vni() { fr "${veditor[@]}" . $NIGHTDIR }
+##
+function vp-ls() {
+    arrN ~/Downloads/**/*.pdf ~/Base/_Books/**/*.pdf
+}
+function vp() {
+    # v pdf
+    vp-ls | fz | inargsf re open
+}
+##

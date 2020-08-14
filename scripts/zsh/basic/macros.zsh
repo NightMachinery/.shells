@@ -1,12 +1,23 @@
 ##
+function extract-head() {
+    local i
+    for i in "${=@}" ; do
+        if ! [[ "$i" =~ '=' ]] ; then
+            ec "$i"
+            return 0
+        fi
+    done
+    return 1
+}
 function _aliasfn() {
     : "ruu might be needed. Example: aliasfn hi ruu someVar=12"
     local name="$1"
-    local goesto="$2"
+    local goesto
+    goesto="$(extract-head)"
     local body="$@[2,-1]"
 
     functions[$name]="$body "'"$@"'
-    enh-savename "$name" "$goesto"
+    test -z "$goesto" || enh-savename "$name" "$goesto"
 }
 # enh-savename aliasfn _aliasfn # redundant, we will auto-erase noglob ourselves
 alias aliasfn='\noglob _aliasfn'
