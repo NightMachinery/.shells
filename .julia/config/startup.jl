@@ -15,7 +15,7 @@ InteractiveCodeSearch.CONFIG.interactive_matcher = `fzf --bind 'shift-up:toggle+
 
 ##
 # bello() = run(`brishz.dash redo2 2 bell-greencase`, wait=false)
-bello() = run(`brishz.dash bell-toy`, wait=false)
+bello() = run(`brishz.dash bello`, wait=false)
 bellj() = run(`brishz.dash 'awaysh bellj '`, wait=false)
 okj() = run(`brishz.dash 'okj'`, wait=false)
 function firstbell()
@@ -26,6 +26,50 @@ function firstbell()
     end
     global firstLoad = true
 end
+##
+using REPL
+cmd_start_time = time() # to avoid buzzing on reloadStartup
+is_continous_bell = false
+bell_single_threshold_seconds = 10
+bell_continuous_threshold_seconds = 60
+function repl_pre()
+    global is_continous_bell
+    global cmd_start_time = time() # Get the system time in seconds since the epoch
+    if is_continous_bell
+        okj()
+        is_continous_bell = false
+    end
+end
+function repl_post()
+    global cmd_start_time
+    global is_continous_bell
+    dur = time() - cmd_start_time
+    if dur >= bell_continuous_threshold_seconds
+        bellj()
+        is_continous_bell = true
+    elseif dur >= bell_single_threshold_seconds
+        bello()
+    end
+end
+function repl_transform_prepost(ex)
+    res_sym = gensym()
+    Expr(:toplevel, :($repl_pre()), :($res_sym = $ex),:($repl_post()),:($res_sym))
+end
+if ! @isdefined BELL_LOADED
+    if isdefined(Base, :active_repl_backend)
+        if VERSION >= v"1.5.0-DEV.282"
+            pushfirst!(Base.active_repl_backend.ast_transforms, repl_transform_prepost)
+        else
+            # Unsupported
+        end
+    elseif isdefined(Main, :IJulia)
+        # Unsupported
+        Main.IJulia.push_preexecute_hook(repl_pre)
+    elseif VERSION >= v"1.5.0-DEV.282"
+        pushfirst!(REPL.repl_ast_transforms, repl_transform_prepost)
+    end
+end
+const BELL_LOADED = true
 ##
 vscI() = pushdisplay(VSCodeServer.InlineDisplay())
 vscINo() = popdisplay()

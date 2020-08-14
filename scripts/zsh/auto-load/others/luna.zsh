@@ -25,7 +25,7 @@ bell-avarice() {
 }
 bell-toy() {
     # say "disquiet creatures of avarice have risen yet again ..."
-    @opts v 70 @ hearinvisible "$(rndarr $GREENCASE_DIR/toystory2/**/$~audioglob)"
+    @opts v 140 @ hearinvisible "$(rndarr $GREENCASE_DIR/toystory2/**/$~audioglob)"
 }
 function greencase_audio_init() {
     { test -z "$greencase_audio_init" || test -n "$*" } && {
@@ -42,7 +42,7 @@ bell-greencase() {
     # time (hearinvisible '/Users/evar/Base/Music/greencase/PC Computer - Portal 2 - Turret/turretlaunched05.wav')
     ##
     greencase_audio_init
-    reval-ec @opts v 70 @ hearinvisible "$(rndarr $greencase_audio[@])"
+    reval-ec @opts v 140 @ hearinvisible "$(rndarr $greencase_audio[@])"
 }
 # aliasfn bell-luna bell-avarice
 aliasfn bell-luna bell-greencase
@@ -116,3 +116,4 @@ aliasfn bellj-gc bellj1 bell-greencase
 # aliasfn okj okj2
 aliasfn bellj bellj-gc
 aliasfn okj okj1
+aliasfn bello bell-toy # main gateway of a single alarm bell

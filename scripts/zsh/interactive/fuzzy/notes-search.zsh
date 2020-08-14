@@ -213,7 +213,8 @@ function ntsearch_fd() {
     if test -n "$ntLines" ; then
         {
             # no-messages suppresses IO errors
-            command rg --smart-case --engine auto --no-messages --with-filename --line-number "$query_rg" "${files[@]}" || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            # xargs is needed to avoid argument list too long error
+            { print -nr -- "${(@pj.\0.)files}" | xargs -0 command rg --smart-case --engine auto --no-messages --with-filename --line-number "$query_rg" } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
         } | rmprefix "$nightNotes"
             # sd "^$nightNotes" '' # sd is doing the work of `realpath --relative-to` . TODONE this doesn't quote and so is buggy
         ## old way (uses vars now not in scope)
