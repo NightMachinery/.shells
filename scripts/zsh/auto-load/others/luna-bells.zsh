@@ -96,10 +96,6 @@ function bell-jingles() {
 function bell-ReichPhase() {
     @opts v 130 @ hearinvisible $NIGHTDIR/resources/audio/ReichPhase.wav
 }
-function bellj1() {
-    local bell="${1:-bell-ReichPhase}"
-    lo_sig2cancel=y lo_s=0.2 lo_p=${lo_p:-$bellj_socket} loop "$bell" #bell-helicopter
-}
 function bell-helicopter() {
     local duration="${1:-3}"
 
@@ -108,15 +104,55 @@ function bell-helicopter() {
     ot-stop
 }
 function bell-diwhite() {
-    ot-play-diwhite 1
+    ot-play-diwhite "${1:-1}"
 }
-aliasfn okj1 retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
-aliasfn bellj2 ot-play-helicopter
-aliasfn okj2 ot-stop
-aliasfn bellj-toy bellj1 bell-toy
-aliasfn bellj-gc bellj1 bell-greencase
-# aliasfn bellj bellj2
-# aliasfn okj okj2
-aliasfn bellj bellj-gc
-aliasfn okj okj1
+##
+function bell-repeat() {
+    local bell="${1:-bell-ReichPhase}"
+    lo_sig2cancel=y lo_s=0.2 lo_p=${lo_p:-$bellj_socket} loop "$bell" #bell-helicopter
+}
+aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
+function bell-auto() {
+    local engine=( "${@:-bello}" )
+    local timeout="${bell_auto_t:-0.3}" # The timeout should perhaps be bigger than sleep, otherwise activity can get ignored.
+    local sleep="${bell_auto_sleep:-${bell_auto_st:-0}}" # The lower, the more CPU usage in single mode.
+    local single="${bell_auto_single:-${bell_auto_sm}}"
+    local exit_cmd=("${(@)bell_auto_exit}")
+
+    local nonce
+    nonce="$(oneinstance-setup bell-auto)" || return 1
+
+    ec "$0 (nonce: $nonce) started with timeout $timeout and engine: $engine[@]"
+
+    reval "$engine[@]"
+    sleep "$sleep" # necessary for succesfully exiting sc bells because they take time to initialize. It also makes it act as a onetime bell in case of an active user.
+
+    while oneinstance $0 $nonce
+    do
+        if (( $(getidle-darwin) <= $timeout )) ; then
+            ec "$0 exited because of user activity."
+            break
+        fi
+        if test -z "$single" ; then # it's better that we we play first and then sleep
+            reval "$engine[@]"
+        fi
+        # @optional We can repeat the checks here, to exit more aggressively
+        sleep "$sleep"
+    done
+    test -n "$exit_cmd[*]" && reval-ec "$exit_cmd[@]"
+    ec "$0 exited. (nonce: $nonce)"
+}
+aliasfn bell-auto-stop oneinstance-setup bell-auto
+aliasfn bellsc-stop ot-stop
+##
+aliasfn bellsc-heli ot-play-helicopter
+aliasfn bell-auto-sc @opts single y sleep 1 t 1.3 exit bellsc-stop @ bell-auto
+aliasfn bella-heli bell-auto-sc bellsc-heli
+aliasfn bella-diwhite bell-auto-sc bell-diwhite 9999999 # 9999999/3600/24 = 115.74072916666667
+aliasfn bellr-toy bell-repeat bell-toy
+aliasfn bellr-gc bell-repeat bell-greencase
+aliasfn bella-toy bell-auto bell-toy
+aliasfn bella-gc bell-auto bell-greencase
+aliasfn bellj bella-toy
+aliasfn okj bell-auto-stop
 aliasfn bello bell-diwhite # main gateway of a single alarm bell

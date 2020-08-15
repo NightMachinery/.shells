@@ -41,4 +41,9 @@ aliasfn brishz-restart brishz-all %BRISH_RESTART
 aliasfn brishzr-restart brishzr-all %BRISH_RESTART
 aliasfn xl brishz-restart
 aliasfn xr brishzr-restart
+## tests:
+# dbg bsh-er brishz2.dash '%GARDEN_ALL pwd ; typ a ; a=12'
+# @todesign Solve this deadlock problem, so that we can use $GARDEN_ALL from within a brish command.
+# brishzq.zsh brishz-all ec This will deadlock
+# brishzq.zsh awaysh brishz-all ec This will not deadlock
 ##

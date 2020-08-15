@@ -17,7 +17,7 @@ function ot-server-daemon() {
     ot-loadovertone
 }
 function ot-loadovertone() {
-    ot-rep "(use 'overtone.live)"
+    ot-rep "(use 'overtone.live) (use 'overtone.inst.piano)"
 }
 function ot-rep() {
     ##
