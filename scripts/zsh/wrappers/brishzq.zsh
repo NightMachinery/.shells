@@ -25,7 +25,7 @@ local opts=()
 # isDbg && opts+=(verbose=1)
 # http --body POST http://127.0.0.1:8000/zsh/ cmd="$(gq "$@")" $opts[@]
 ##
-local endpoint="${bzEndpoint:-http://127.0.0.1:$GARDEN_PORT}"
+local endpoint="${bshEndpoint:-http://127.0.0.1:$GARDEN_PORT}"
 if [[ "$endpoint" =~ 'garden' ]] ; then
     opts+=(--user "Alice:$GARDEN_PASS0")
 fi

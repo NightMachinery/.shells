@@ -110,8 +110,9 @@ function ot-play-helicopter() {
 EOF
 }
 function ot-play-diwhite() {
+    local dur="${1:-10}"
     ot-rep <<EOF
-(demo 10
+(demo $dur
       (let [vals (dwhite 0 15 INF)
             trig (impulse:kr (mouse-x 1 40 1))
             val (demand:kr trig 0 vals)

@@ -8,7 +8,8 @@ function brishz() {
         print -nr -- "$stdin" | brishz_in='MAGIC_READ_STDIN' brishz_copy="$brishz_copy" brishzq.zsh "$@"
     fi
 }
-aliasfn brishzr bzEndpoint=https://garden.lilf.ir/api/v1 brishz
+aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1
+aliasfn brishzr bsh-er brishz
 function garden-req() {
     # We spoof our IP here, to see if the server is fooled.
     local opts=()
@@ -31,3 +32,13 @@ function w2e-rpaste() {
     brishz_in="$html" brishzr h2e-stdin "$@"
 }
 aliasfn weep w2e-rpaste
+##
+aliasfn bsh brishz
+aliasfn bshr brishzr # You can also use .a
+aliasfn brishz-all brishz %GARDEN_ALL
+aliasfn brishzr-all brishzr %GARDEN_ALL
+aliasfn brishz-restart brishz-all %BRISH_RESTART
+aliasfn brishzr-restart brishzr-all %BRISH_RESTART
+aliasfn xl brishz-restart
+aliasfn xr brishzr-restart
+##

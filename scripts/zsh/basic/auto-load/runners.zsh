@@ -12,15 +12,21 @@ function rexa(){
         eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
     done
 }
-redoq() {
+redo-eval() {
     local i
     for i in {1.."${@: -1}"}
     do
         eval "${@: 1:-1}"
     done
 }
-redo() redoq "$(gquote "${@: 1:-1}")" "${@: -1}"
+redo() redo-eval "$(gquote "${@: 1:-1}")" "${@: -1}"
 redo2() { redo "$@[2,-1]" "$1" }
+function redo-async() {
+    local cmd=( "$@[2,-1]" ) n="$1" i
+    for i in {1..$n}; do
+        reval "$cmd[@]" &
+    done
+}
 ##
 function skipglob() {
     if test -n "${*[2,-1]}" ; then

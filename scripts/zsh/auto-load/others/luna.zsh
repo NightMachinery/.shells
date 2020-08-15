@@ -98,7 +98,7 @@ function bell-ReichPhase() {
 }
 function bellj1() {
     local bell="${1:-bell-ReichPhase}"
-    lo_sig2cancel=y lo_s=3 lo_p=${lo_p:-$bellj_socket} loop "$bell" #bell-helicopter
+    lo_sig2cancel=y lo_s=0.2 lo_p=${lo_p:-$bellj_socket} loop "$bell" #bell-helicopter
 }
 function bell-helicopter() {
     local duration="${1:-3}"
@@ -106,6 +106,9 @@ function bell-helicopter() {
     ot-play-helicopter # it'd be better if this supported a duration itself, as ot-stop will stop everything.
     sleep "$duration"
     ot-stop
+}
+function bell-diwhite() {
+    ot-play-diwhite 1
 }
 aliasfn okj1 retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 aliasfn bellj2 ot-play-helicopter
@@ -116,4 +119,4 @@ aliasfn bellj-gc bellj1 bell-greencase
 # aliasfn okj okj2
 aliasfn bellj bellj-gc
 aliasfn okj okj1
-aliasfn bello bell-toy # main gateway of a single alarm bell
+aliasfn bello bell-diwhite # main gateway of a single alarm bell
