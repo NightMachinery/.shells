@@ -144,6 +144,7 @@ function bell-auto() {
     ec "$0 exited. (nonce: $nonce)"
 }
 aliasfn bell-auto-stop oneinstance-setup bell-auto
+aliasfn bellaok bell-auto-stop
 aliasfn bellsc-stop ot-stop
 ##
 aliasfn bellsc-heli ot-play-helicopter
@@ -154,6 +155,8 @@ aliasfn bellr-toy bell-repeat bell-toy
 aliasfn bellr-gc bell-repeat bell-greencase
 aliasfn bella-toy bell-auto bell-toy
 aliasfn bella-gc bell-auto bell-greencase
-aliasfn bellj bella-toy
+##
+aliasfn bella bella-toy
+aliasfn bellj bella
 aliasfn okj bell-auto-stop
 aliasfn bello bell-diwhite # main gateway of a single alarm bell

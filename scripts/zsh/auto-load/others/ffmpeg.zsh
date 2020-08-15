@@ -1,3 +1,9 @@
+function 2mp3() {
+    jglob
+    local i="$1"
+
+    ffmpeg -i $i ${i:r}.mp3
+}
 function 265to264() {
     ffmpeg -i "$1" -map 0 -c:s copy -c:v libx264 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x264.mkv"
     #-map_metadata 0
@@ -34,6 +40,10 @@ function imgdirs2vid() {
     
     local dirs=( "$@" ) dir
     for dir in $dirs[@] ; do
+        if ! test -d "$dir" ; then
+            ecerr "$0: Directory '$dir' does not exist. Skipping."
+            continue
+        fi
         dir="$(realpath "$dir")"
         pushf $dir
 

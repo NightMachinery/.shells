@@ -16,6 +16,7 @@ InteractiveCodeSearch.CONFIG.interactive_matcher = `fzf --bind 'shift-up:toggle+
 # bello() = run(`brishz.dash redo2 2 bell-greencase`, wait=false)
 bello() = run(`brishz.dash awaysh bello`, wait=false)
 bellj() = run(`brishz.dash awaysh bellj`, wait=false)
+bella() = run(`brishz.dash awaysh bella`, wait=false)
 okj() = run(`brishz.dash awaysh okj`, wait=false)
 function firstbell()
     if ! @isdefined firstLoad
@@ -232,7 +233,7 @@ macro fn(expr::Expr)
 end
 
 ###
-if ! @isdefined SunHasSet
-    bello() # Julia's first startup takes forever
-end
+# if ! @isdefined SunHasSet
+#     bello() # Julia's first startup takes forever
+# end
 const SunHasSet = true ;

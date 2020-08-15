@@ -151,6 +151,7 @@ alias yarc="noglob retry ysmall --download-archive ~/.yarchive"
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'"
 alias yaudio="noglob youtube-dl --no-playlist -f 'bestaudio[ext=m4a]/bestaudio'"
+alias ymp3='noglob youtube-dl --no-playlist --prefer-ffmpeg --extract-audio --audio-format mp3'
 # `-f best` to download single file
 ##
 alias tl='\noglob tlrl-ng'
