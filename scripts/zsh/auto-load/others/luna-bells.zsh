@@ -113,8 +113,9 @@ function bell-repeat() {
 }
 aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 function bell-auto() {
+    # You might need to use `sleep $timeout ; ...` to test bell-auto.
     local engine=( "${@:-bello}" )
-    local timeout="${bell_auto_t:-0.3}" # The timeout should perhaps be bigger than sleep, otherwise activity can get ignored.
+    local timeout="${bell_auto_t:-5}" # The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
     local sleep="${bell_auto_sleep:-${bell_auto_st:-0}}" # The lower, the more CPU usage in single mode.
     local single="${bell_auto_single:-${bell_auto_sm}}"
     local exit_cmd=("${(@)bell_auto_exit}")

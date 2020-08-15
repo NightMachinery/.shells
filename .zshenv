@@ -12,6 +12,7 @@ isNotExpensive || {
         test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
     fi
 
+    addToPATH /usr/sbin
     addToPATH /Applications/SuperCollider.app/Contents/Resources/
     addToPATH /Applications/SuperCollider.app/Contents/MacOS/
     addToPATH ~/code/node/snips-alice
