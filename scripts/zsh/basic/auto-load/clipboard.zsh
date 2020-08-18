@@ -35,3 +35,10 @@ function pbpaste() {
 function pbadd() {
     osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
 }
+function pbpaste-plus() {
+    # GLOBAL out: paste
+    unset paste
+    paste="$(pbpaste)"
+    local ppaths=( "${(@f)$(clipboard-to-path.nu)}" )
+    test -n "$ppaths[*]" && paste=( $ppaths[@] )
+}

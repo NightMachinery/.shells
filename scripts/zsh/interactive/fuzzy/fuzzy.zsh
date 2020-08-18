@@ -42,6 +42,7 @@ function ffkill() {
     fi
     "$engine" "$@" | inargsf kill $opts[@]
 }
+aliasfn fk ffkill
 aliasfn ffportlkill fkEngine=ffportl ffkill
 aliasfn killport ffportlkill
 function lsofp() {

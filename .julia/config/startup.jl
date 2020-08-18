@@ -19,11 +19,11 @@ function runi(cmd ; kwargs...)
     run(ignorestatus(cmd) ; kwargs...)
 end
 ##
-# bello() = run(`brishz.dash redo2 2 bell-greencase`, wait=false)
-bello() = run(`brishz.dash awaysh bello`, wait=false)
-bellj() = run(`brishz.dash awaysh bellj`, wait=false)
-bella() = run(`brishz.dash awaysh bella`, wait=false)
-okj() = run(`brishz.dash awaysh okj`, wait=false)
+# bello() = runi(`brishz.dash redo2 2 bell-greencase`, wait=false)
+bello() = runi(`brishz.dash awaysh bello`, wait=false)
+bellj() = runi(`brishz.dash awaysh bellj`, wait=false)
+bella() = runi(`brishz.dash awaysh bella`, wait=false)
+okj() = runi(`brishz.dash awaysh okj`, wait=false)
 function firstbell()
     if ! @isdefined firstLoad
         bellj()
@@ -109,7 +109,7 @@ more(content) = more(repr("text/plain", content))
 # using Markdown
 # more(content::Markdown.MD) = more(Markdown.term(Core.CoreSTDOUT(), content))
 function more(content::AbstractString)
-    run(pipeline(`echo $(content)`, `less`))
+    runi(pipeline(`echo $(content)`, `less`))
     nothing
 end
 macro h(body)

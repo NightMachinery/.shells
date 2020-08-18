@@ -28,3 +28,16 @@ function tlg-file-captioned() {
         ec "Sent $file to $rec"
     done
 }
+function tlg-clean-copied() {
+    _tlg-clean-copied "$(_tlg-clean-copied "$*")" # telegram sometimes uses two of these tags
+}
+function _tlg-clean-copied() {
+    local text="$*"
+    if [[ "$text" =~ '\[[^]]*\]\s*((.|\n)*)' ]] ; then
+       text="$match[1]"
+    fi
+    print -nr -- "$text"
+}
+function tlg-clean-paste() {
+    tlg-clean-copied "$(pbpaste)"
+}

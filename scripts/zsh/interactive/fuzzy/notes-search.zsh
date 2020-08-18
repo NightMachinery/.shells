@@ -1,13 +1,13 @@
-aliasfn-ng ntl. ntLines=y nightNotes=. noteglob=$codeglob ntl
+aliasfn-ng ntl. ntLines=y nightNotes=. noteglob=$textglob ntl
 @opts-setprefix ntl. ntl
 aliasfn-ng see ntl.
-aliasfn-ng sees ntLines=y nightNotes=. noteglob=$codeglob ntl-rg
+aliasfn-ng sees ntLines=y nightNotes=. noteglob=$textglob ntl-rg
 function seev() {
     init-vfiles
-    ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) noteglob=$codeglob ntl-rg "$@"
+    ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) noteglob=$textglob ntl-rg "$@"
 }
 noglobfn seev
-aliasfn-ng agsi ntLines=y nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) noteglob=$codeglob ntl-rg
+aliasfn-ng agsi ntLines=y nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) noteglob=$textglob ntl-rg
 function agfi() {
     local f="$1"
     ntsearch_query_fzf="'$f '() | 'alias | 'alifn" agsi  # match functions or aliases
