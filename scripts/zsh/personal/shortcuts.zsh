@@ -1,28 +1,39 @@
 ##
-diraction-personal-config (){
-    #     tdl  $HOME/Downloads/Telegram\\ Desktop
-    # whitespace bug in batch
-    diraction create tdl "$HOME/Downloads/Telegram Desktop" --create-missing-dirs
-    fnswap alias aliassafe diraction-batch-create --create-missing-dir <<< "
-    base $HOME/Base
-    cod $codedir
-    dl  $HOME/Downloads
-    vdl  $HOME/Downloads/video
-    tmp  $HOME/tmp
-    jtmp $HOME/julia_tmp
-    ktmp $HOME/tmp-kindle
-    cel $cellar
-    nt $HOME/cellar/notes/
-    jrl $HOME/cellar/notes/journal
-    dom $DOOMDIR
-"
-}
-antibody bundle "adrieankhisbe/diractions"
+# diraction-personal-config (){
+#     #     tdl  $HOME/Downloads/Telegram\\ Desktop
+#     # whitespace bug in batch
+#     diraction create tdl "$HOME/Downloads/Telegram Desktop" --create-missing-dirs
+#     fnswap alias aliassafe diraction-batch-create --create-missing-dir <<< "
+# "
+# }
+# antibody bundle "adrieankhisbe/diractions"
+##
+function aliasdir() {
+    local name="$1" dir="$2"
 
-aliasfnq incell indir "$cellar"
+    { test -z "$dir" || test -z "$name" } && {
+        ecerr "$0: empty arguments. Aborting."
+        return 1
+    }
+    mkdir -p "$dir"
+    aliassafe2 "$name" indir "$dir"
+}
+aliasdir base $HOME/Base
+aliasdir cod $codedir
+aliasdir dl  $HOME/Downloads
+aliasfn indl dl
+aliasdir dlt ~"/Downloads/Telegram Desktop"
+aliasdir dlv  $HOME/Downloads/video
+aliasdir tmp  $HOME/tmp
+aliasdir jtmp $HOME/julia_tmp
+aliasdir ktmp $HOME/tmp-kindle
+aliasdir cel $cellar
+aliasfn incell cel
+aliasdir jrl $HOME/cellar/notes/journal
+aliasdir dom $DOOMDIR
+aliasdir nt $cellar/notes/
+##
 aliasfn cellp incell gsync
-aliasfnq indl indir ~/Downloads/
-aliasfnq intdl indir ~"/Downloads/Telegram Desktop"
 ##
 vcnpp() {
     vcsh night.sh add ~/scripts/

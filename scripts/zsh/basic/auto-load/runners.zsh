@@ -51,6 +51,12 @@ function indir() {
         ecerr "$0: '$origfile' is invalid (probably doesn't exist)"
         return 1
     }
+
+    if test -z "$cmd[*]" ; then
+        cd "$dir"
+        return 0
+    fi
+
     pushf "$dir"
     {
         reval "${cmd[@]}"

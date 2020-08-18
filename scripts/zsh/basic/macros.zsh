@@ -17,7 +17,15 @@ function _aliasfn() {
     local body="$@[2,-1]"
 
     functions[$name]="$body "'"$@"'
-    test -z "$goesto" || enh-savename "$name" "$goesto"
+    test -z "$goesto" || {
+        ## This is dangerous. Our own _indir completor would mess up, because the words supplied to it no longer contain the requisites.
+        # isI && {
+        #     local cf="_$goesto"
+        #     (( $+functions[$cf] )) && compdef  "$name"
+        # }
+        ##
+        enh-savename "$name" "$goesto"
+    }
 }
 # enh-savename aliasfn _aliasfn # redundant, we will auto-erase noglob ourselves
 alias aliasfn='\noglob _aliasfn'
@@ -50,8 +58,17 @@ function aliasfn-classic() {
 }
 aliasfn alifn aliasfn-classic
 function aliassafe() {
+    # Alt: aliassafe2
     builtin alias "$@"
     aliasfn-classic "$@"
+}
+function aliassafe2() {
+    local head="$1"
+    local body=("${@[2,-1]}")
+    local bodyquoted="$(gq "$body[@]")"
+
+    builtin alias "$head"="$bodyquoted"
+    aliasfnq "$head" "$body[@]"
 }
 ##
 function createglob() {
