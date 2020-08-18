@@ -25,3 +25,5 @@
   status = auto
 [http]
   sslVerify = true
+[pull]
+	rebase = false

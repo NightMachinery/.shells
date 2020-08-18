@@ -23,10 +23,14 @@ rexa "compdef _=rclone" rcr
 function _indir() {
     # BEWARE: This completion function has a rather creepy eval in it.
 
+    ## Special vars:
     #  words: 1:function 2:directory 3:pattern
+    #  CURRENT: number of words
+    #  curcontext (idk)
+    #  service: seemingly name of first arg?
 
     local diract=$words[2]
-    dbg dvar diract
+    # dbg dvar diract
     local dirdir="$(eval print -nr -- $diract)"
     local subcommand=$words[3]
 
