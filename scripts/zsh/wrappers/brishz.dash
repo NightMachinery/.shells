@@ -7,4 +7,12 @@ fi
 # If we ever should need supporting the featureset of brishzq.zsh, switch to:
 # brishz_noquote=y brishzq.zsh "$@"
 
-curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"'"$*"'","verbose":"0"}' http://127.0.0.1:7230/zsh/
+cmd="$*"
+if test -e "$cmd" ; then
+  cmd="$(cat "$cmd")" || {
+     echo Bad input to brishz
+     exit 1
+  }
+fi
+
+curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"'"$cmd"'","verbose":"0"}' http://127.0.0.1:7230/zsh/

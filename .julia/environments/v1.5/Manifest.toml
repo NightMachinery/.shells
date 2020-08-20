@@ -2058,9 +2058,9 @@ version = "0.2.0"
 
 [[adwaita_icon_theme_jll]]
 deps = ["Libdl", "Pkg", "hicolor_icon_theme_jll"]
-git-tree-sha1 = "245d4d5884e54d171c9683e1d30213358ddeb648"
+git-tree-sha1 = "b641e8f51f6fd59f15a9b7beb9b1cf4c2c0b31ba"
 uuid = "b437f822-2cd6-5e08-a15c-8bac984d38ee"
-version = "3.33.92+3"
+version = "3.33.92+4"
 
 [[at_spi2_atk_jll]]
 deps = ["ATK_jll", "Libdl", "Pkg", "XML2_jll", "Xorg_libX11_jll", "at_spi2_core_jll"]
@@ -2082,9 +2082,9 @@ version = "2.38.2+7"
 
 [[hicolor_icon_theme_jll]]
 deps = ["Libdl", "Pkg"]
-git-tree-sha1 = "4f8addaf9ca8492b0ba3f289587c983ba395dd60"
+git-tree-sha1 = "f2c47ff27831f0404b621ee4bce3705d433b6f78"
 uuid = "059c91fe-1bad-52ad-bddd-f7b78713c282"
-version = "0.17.0+1"
+version = "0.17.0+2"
 
 [[iso_codes_jll]]
 deps = ["Libdl", "Pkg"]

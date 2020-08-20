@@ -37,7 +37,11 @@ function pdf-crop-margins () {
     \rm "${@[-1]}"
     \mv "$u" "${@[-1]}"
 }
-pdfcrop() { re pdf-crop-margins "$@" }
+pdfcrop() {
+    jglob
+    re pdf-crop-margins "$@"
+}
+aliasfn pcr pdfcrop
 pdfoutline() { jglob ; mutool show "$1" outline }
 
 function pdf-getpages() {

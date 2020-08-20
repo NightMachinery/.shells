@@ -55,6 +55,10 @@ function indir() {
     if test -z "$cmd[*]" ; then
         cd "$dir"
         return 0
+    elif [[ "$cmd[1]" == 'cd' ]] ; then
+        cd "$dir"
+        reval "${cmd[@]}"
+        return $?
     fi
 
     pushf "$dir"

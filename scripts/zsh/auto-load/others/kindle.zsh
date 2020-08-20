@@ -61,7 +61,7 @@ dir2k() {
     local dir="${1:-.}/"
     local p
     p=($dir/*.pdf(N))
-    skipglob "re pdf-crop-margins" "${(@)p}"
+    # skipglob "re pdf-crop-margins" "${(@)p}"
     skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
     skipglob "re p2ko" $dir/*.pdf(N)
 }
