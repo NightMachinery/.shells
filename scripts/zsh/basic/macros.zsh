@@ -9,7 +9,7 @@ function extract-head() {
     done
     return 1
 }
-function _aliasfn() {
+function h_aliasfn() {
     : "ruu might be needed. Example: aliasfn hi ruu someVar=12"
     local name="$1"
     local goesto
@@ -27,28 +27,28 @@ function _aliasfn() {
         enh-savename "$name" "$goesto"
     }
 }
-# enh-savename aliasfn _aliasfn # redundant, we will auto-erase noglob ourselves
-alias aliasfn='\noglob _aliasfn'
-function _aliasfnq() {
+# enh-savename aliasfn h_aliasfn # redundant, we will auto-erase noglob ourselves
+alias aliasfn='\noglob h_aliasfn'
+function h_aliasfnq() {
     local name="$1"
     local goesto="$2"
     local body=("$@[2,-1]")
 
-    fnswap enh-savename true _aliasfn "$name" "$(gq "${body[@]}")"
+    fnswap enh-savename true h_aliasfn "$name" "$(gq "${body[@]}")"
     enh-savename "$name" "$goesto"
 }
-alias aliasfnq='\noglob _aliasfnq'
+alias aliasfnq='\noglob h_aliasfnq'
 
-function _aliasfn-ng() {
+function h_aliasfn-ng() {
     aliasfn "$@"
     noglobfn "$1"
 }
-alias aliasfn-ng='\noglob _aliasfn-ng'
-function _aliasfnq-ng() {
+alias aliasfn-ng='\noglob h_aliasfn-ng'
+function h_aliasfnq-ng() {
     aliasfnq "$@"
     noglobfn "$1"
 }
-alias aliasfnq-ng='\noglob _aliasfnq-ng'
+alias aliasfnq-ng='\noglob h_aliasfnq-ng'
 
 function aliasfn-classic() {
     local args=( "$@" )
@@ -81,7 +81,7 @@ function createglob() {
     eval $to'="*.(${(j.|.)'$from'})(.D)"'
 }
 ##
-function _@gather() {
+function h_@gather() {
     # GLOBALS: OUTPUT: magic_cmd magic_gathered_vars magic_gathered_*
     magic_gathered_vars=() magic_cmd=() # GLOBAL
 
@@ -148,8 +148,8 @@ function _@gather() {
         magic_gathered_vars+="$current_name"
     done
 }
-# alias @gather='\noglob _@gather'
-aliasfn @gather _@gather # we don't need the noglob, so why force it downstream?
+# alias @gather='\noglob h_@gather'
+aliasfn @gather h_@gather # we don't need the noglob, so why force it downstream?
 function @gather-reval() {
     @gather "$@"
     {
@@ -160,7 +160,7 @@ function @gather-reval() {
         unset magic_gathered_vars
     }
 }
-function _@opts() {
+function h_@opts() {
     local prefix="${magic_opts_prefix:-magic}"
     @gather "$@"
     local cmd=( "$magic_cmd[@]" )
@@ -206,7 +206,7 @@ function _@opts() {
 
     reval "$cmd[@]"
 }
-aliasfn @opts _@opts
+aliasfn @opts h_@opts
 function @opts-setprefix () {
     typeset -A -g magic_opts_prefixes
     # test -n "${magic_opts_prefixes[$1]}" ||

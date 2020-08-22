@@ -125,7 +125,7 @@ function vsox() {
     local inp=(*)
     sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
-function _1jma() {
+function h_1jma() {
     local u="$(uuidgen)"
     local p=~/Downloads/"$u"/
     mkdir "$p"
@@ -135,7 +135,7 @@ function _1jma() {
 }
 function jma() {
     jee
-    zargs --max-procs 60 -n 1 -- "$@" -- _1jma
+    zargs --max-procs 60 -n 1 -- "$@" -- h_1jma
     jup
     dir2k
 }

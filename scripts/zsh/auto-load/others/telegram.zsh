@@ -29,9 +29,9 @@ function tlg-file-captioned() {
     done
 }
 function tlg-clean-copied() {
-    _tlg-clean-copied "$(_tlg-clean-copied "$*")" # telegram sometimes uses two of these tags
+    h_tlg-clean-copied "$(h_tlg-clean-copied "$*")" # telegram sometimes uses two of these tags
 }
-function _tlg-clean-copied() {
+function h_tlg-clean-copied() {
     local text="$*"
     if [[ "$text" =~ '\[[^]]*\]\s*((.|\n)*)' ]] ; then
        text="$match[1]"
