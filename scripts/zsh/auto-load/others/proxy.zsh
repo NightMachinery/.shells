@@ -1,3 +1,7 @@
+##
+alias pxs='ALL_PROXY=socks5://127.0.0.1:1080'
+alias pxa='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087'
+##
 pxify() {
     typeset -g proxycmd="proxychains4"
     enh-pxpy tsend

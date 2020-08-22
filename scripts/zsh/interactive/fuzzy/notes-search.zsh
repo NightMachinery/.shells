@@ -13,6 +13,11 @@ function agfi() {
     ntsearch_query_fzf="'$f '() | 'alias | 'alifn" agsi  # match functions or aliases
 }
 noglobfn agfi
+##
+function ntimg() {
+    innt fdrp --full-path --extension png --extension jpg --extension svg --extension jpeg "$*" | fz | inargsf imgcat
+}
+aliasfn nti ntimg
 ###
 alias nts='\noglob ntsearch'
 ###

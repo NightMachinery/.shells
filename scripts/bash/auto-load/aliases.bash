@@ -119,7 +119,6 @@ esac
 
 alias mac-mail-log="sudo log stream --predicate  '(process == \"smtpd\") || (process == \"smtp\")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp. 
 alias erase-nonprintables='tr -cd "[:print:]\n"'
-alias pxa='ALL_PROXY=socks5://127.0.0.1:1080'
 # alias cxc='\noglob __calc_plugin'
 alias s=silent
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth

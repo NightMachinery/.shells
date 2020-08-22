@@ -1,5 +1,5 @@
 re 'self-enh enh-mkdest' cp ln
-_mv() {
+_h_mv() {
     emd_c='command mv' enh-mkdest "$@"
 }
 mv () {
@@ -7,7 +7,7 @@ mv () {
     args-nochromefile "$@"
     set -- "${out[@]}"
     if [ "$#" -ne 1 ] || [ ! -e "$1" ]; then
-        _mv "$@"
+        _h_mv "$@"
     else
         local newfilename="$1"
         vared newfilename || {
@@ -15,7 +15,7 @@ mv () {
             return 1
         }
         # bash: read -ei "$1" newfilename
-        _mv -v -- "$1" "$newfilename"
+        _h_mv -v -- "$1" "$newfilename"
     fi
 }
 alias noglob='noglob ruu ""'

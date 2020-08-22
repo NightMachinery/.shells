@@ -1,4 +1,4 @@
-function _dhint() {
+function _h_dhint() {
     pandoc -f markdown <(curl  --silent --fail --location "https://github.com/rstacruz/cheatsheets/raw/master/$1.md")
 }
 function dhint() {
@@ -8,7 +8,7 @@ function dhint() {
     # md.py =(curlm "https://github.com/rstacruz/cheatsheets/raw/master/$1.md") | bt
 
     # mdw but we couldn't memoi that
-    memoi_expire=9999999999 eval-memoi _dhint "$1" | skipin w3m -T text/html
+    memoi_expire=9999999999 eval-memoi _h_dhint "$1" | skipin w3m -T text/html
 }
 function months() {
     echo "1.  January - 31 days

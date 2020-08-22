@@ -1,9 +1,9 @@
 ##
-if (( $+commands[tag-ag] )); then
-    export TAG_SEARCH_PROG=ag  # replace with rg for ripgrep
-    export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
-    agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
-fi
+# if (( $+commands[tag-ag] )); then
+#     export TAG_SEARCH_PROG=ag  # replace with rg for ripgrep
+#     export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
+#     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
+# fi
 ##
 alias agc='ec "${(F)commands}"|agC=0 rgm  --color=never'
 alias agfunc='ec "${(Fk)functions}"| agC=0 rgm  --color=never'
@@ -11,7 +11,11 @@ alias rr=rgm
 alias rrn='rgm --line-number'
 aliasfn rd emcrg
 ##
-aliasfn ag. ag --unrestricted -g # search in the pathnames
+aliasfn fda fd --hidden --no-ignore #ag --unrestricted -g # search in the pathnames
+function fdrp() {
+    fda "$@" | inargsf re realpath
+}
+##
 function emcrg() {
     emc -e "(night/search-dir \"$(pwd)\")"
 }

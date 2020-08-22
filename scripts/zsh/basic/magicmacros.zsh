@@ -1,6 +1,8 @@
-alias -g ppp=' | inargsf '
+## Global Aliases
+alias -g @ff=' | fz | inargsf '
 # alias -g MAGIC='| { eval "$(read -d "" -r -E)" }'
 alias -g MAGIC='| { eval "$(< /dev/stdin)" }'
+##
 function magic_h() {
     : 'Usage: magic ... ; mret'
     : 'Does not access stdin, which makes it less buggy. E.g., "arger 1 2 3|fz |stdinmagic" hangs. https://unix.stackexchange.com/questions/585941/zsh-weird-behavior-bug-in-reading-stdin '
