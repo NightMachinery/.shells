@@ -49,3 +49,11 @@ function saveas-img() {
     fi
 }
 ##
+function text2img() {
+    : " < text text2img <img-name>"
+    local img="$1"
+
+    test -z "$img" || { ecerr "$0: Empty image destination. Aborting." ; return 1 }
+
+    convert -page  4000x4000 -font FreeMono -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"$img".png
+}

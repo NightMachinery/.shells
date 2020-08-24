@@ -118,7 +118,7 @@ alias ffc=ffcommands
 fffunctions() {
     printz "$(agfunc "${@:-.}" | fz --prompt 'Functions> ')"
 }
-alias fff=fffunctions
+alias ff=fffunctions
 function init-vfiles() {
     : GLOBAL vfiles
 

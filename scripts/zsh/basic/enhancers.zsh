@@ -1,6 +1,6 @@
 function enh-savename() {
     : "<name of original function> <its renamed version after enhancement>"
-    # TODO Adding a way to keep track of all saved names would be good.
+    # @design Adding a way to keep track of all saved names would be good.
 
     local n1="$1" n2="$2"
 
@@ -57,7 +57,7 @@ noglobfn() {
 
     (( ${+aliases[$1]} )) && unalias "$1"
     {
-        local realname="_noglob_$1"
+        local realname="h_noglob_$1"
         functions[$realname]=$functions[$1]
         alias "$1"="\noglob $realname"
         enh-savename "$1" "$realname"
@@ -70,7 +70,7 @@ function reify() {
 
     test -n "$functions[$1]" || { ecerr "Function '$1' is empty or doesn't exist." ; return 1 }
 
-    local realname="_reify_$1"
+    local realname="h_reify_$1"
     local enhanced="run-on-each $realname"' "$@"'
     [[ "$functions[$1]" =~ '\s*\Q'"$enhanced"'\E\s*' ]] || {
         functions[$realname]=$functions[$1]
@@ -92,7 +92,7 @@ function enh-urlfinal() {
 
     test -n "$functions[$1]" || { ecerr "Function '$1' is empty or doesn't exist." ; return 1 }
 
-    local realname="_urlfinal_$1"
+    local realname="h_urlfinal_$1"
     local enhanced="transformer urlfinalg $realname"' "$@"'
     [[ "$functions[$1]" =~ '\s*\Q'"$enhanced"'\E\s*' ]] || {
         enh-savename "$1" "$realname"

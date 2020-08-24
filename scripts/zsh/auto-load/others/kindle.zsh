@@ -1,7 +1,3 @@
-function k2pdfopt() {
-    isDarwin && { command k2pdfopt "$@" ; return $? }
-    command k2pdfopt_linux "$@"
-}
 function 2mobi() {
     doc usage: FILE calibre-options
     jglob
@@ -42,6 +38,7 @@ function 2ko() {
     mdoc "2kindle-original; Sends to Kindle without conversion.
 Usage: $0 <file> [<kindle-email>]
 Uses 2kindle under the hood." MAGIC
+
     jglob
     2kindle "$1" "some_subject" "$2"
 }
