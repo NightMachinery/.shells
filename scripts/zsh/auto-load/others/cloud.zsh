@@ -15,7 +15,6 @@ Note: rclone, as of yet, does not support resuming downloads."
 function rclonef() {
     doc "Warning: you need to supply exactly one / after the directory, or it won't work. Examples: 'rabbit0:' 'rabbit0:g/'"
 
-    # eval-memoi does not currently support env vars, so rcr is out
     local paths
     paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${1}" | fz)}" ) || return 1
     local i
@@ -73,6 +72,8 @@ function jdlrc() {
     done
 }
 function aa-rc() {
+    : "Alt: rcraa"
+    
     local dest=( $jrabbit "$(basename "$(pwd)")" )
     local jrabbit="${(j|/|)dest}"
     # dvar jrabbit

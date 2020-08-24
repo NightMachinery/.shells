@@ -983,6 +983,12 @@ git-tree-sha1 = "2be5c3e8adddf062c3903a6d7618f233fa4d2874"
 uuid = "5903a43b-9cc3-4c30-8d17-598619ec4e9b"
 version = "0.3.0"
 
+[[Infinity]]
+deps = ["Dates", "Random", "Requires"]
+git-tree-sha1 = "633bac4f993e1237ad9745ae8df9c8378c6ef27a"
+uuid = "a303e19e-6eb4-11e9-3b09-cd9505f79100"
+version = "0.2.3"
+
 [[Inflate]]
 git-tree-sha1 = "f5fc07d4e706b84f72d54eedcc1c13d92fb0871c"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"

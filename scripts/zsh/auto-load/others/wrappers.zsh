@@ -22,3 +22,10 @@ function exa() {
 #   pxify-auto
 #   tsend "$@"
 # }
+function k2pdfopt() {
+    if isDarwin ; then
+        command k2pdfopt_darwin "$@"
+    else
+        command k2pdfopt_linux "$@"
+    fi
+}
