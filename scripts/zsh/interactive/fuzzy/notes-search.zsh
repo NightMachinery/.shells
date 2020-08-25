@@ -63,6 +63,7 @@ function vnt() {
 function ntl-rg() {
     ntsearch_query_rg="$*" ntl
 }
+aliasfn ntt ntl-rg
 function ntl-fzf() {
     ntsearch_query_fzf="$*" ntl
 }

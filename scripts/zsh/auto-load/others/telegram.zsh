@@ -8,7 +8,7 @@ function tsendf() {
         tsend "$1" '' -f "$f"
     done
 }
-air() { zargs -i ___ -- "$@" -- tsendf ___ "$(mpv-get)"}
+air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(mpv-get)"}
 function reval-tlg() {
     mdoc 'enve; The Enveloper ^_^
 An enhancer that sends stdout asynchronously to my Telegram. Also prints stdout.

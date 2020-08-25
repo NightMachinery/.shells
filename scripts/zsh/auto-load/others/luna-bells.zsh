@@ -19,9 +19,12 @@ bell-many() {
 
     ecdate "Luna iterated."
 }
+function bell-zsh1() {
+    @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"
+}
 bell-avarice() {
     # say "disquiet creatures of avarice have risen yet again ..."
-    @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/luna/$~audioglob)"
+    @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
 }
 bell-toy() {
     # say "disquiet creatures of avarice have risen yet again ..."
@@ -160,3 +163,5 @@ aliasfn bella bella-toy
 aliasfn bellj bella
 aliasfn okj bell-auto-stop
 aliasfn bello bell-diwhite # main gateway of a single alarm bell
+aliasfn bell-zsh bell-zsh1
+aliasfn bella-zsh bell-auto bell-zsh

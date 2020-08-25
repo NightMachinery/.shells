@@ -4,7 +4,7 @@ alias evaldbg='seval'
 alias eval-good='geval'
 alias eval-quoted='reval'
 alias greval=rgeval
-alias reval-ec='ge_no_hist=y rgeval'
+reval-ec() { ge_no_hist=y rgeval "$@" }
 ###
 function geval() {
     local cmd="$@"
