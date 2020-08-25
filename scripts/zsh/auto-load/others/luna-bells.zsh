@@ -44,8 +44,8 @@ bell-greencase() {
     greencase_audio_init
     reval-ec @opts v 140 @ hearinvisible "$(rndarr $greencase_audio[@])"
 }
-# aliasfn bell-luna bell-avarice
-aliasfn bell-luna bell-greencase
+aliasfn bell-luna bell-avarice
+# aliasfn bell-luna bell-greencase
 ##
 aliasfn lunaquit loop-startover ~/tmp/.luna
 aliasfn lq lunaquit

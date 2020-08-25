@@ -67,3 +67,15 @@ function indir() {
     } always { popf }
 }
 aliasfn in indir # best reserved for interactive use
+##
+function reval-notifexit() {
+    # always alone is not sufficient. Test with `zsh -c 'reval-notifexit iterm_focus.py'`.
+    # But now always is most probably redundant.
+    setopt localtraps
+    trap "" INT
+    { ( reval "$@" ) } always {
+        # bello
+        notif "$0: $@"
+    }
+}
+##

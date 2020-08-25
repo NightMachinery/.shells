@@ -71,9 +71,6 @@ isNotExpensive || {
 
     addToPATH "/usr/local/opt/curl/bin"
     export HH_CONFIG=hicolor
-    ## Ugly Stuff PERSONALINFO
-    export corra="198.143.181.104"
-    alias ccorra="echo -n $corra | pbcopy"
     #isLinux && export TCLLIBPATH=/usr/lib/x86_64-linux-gnu
     isDarwin && export TCLLIBPATH="/usr/local/lib" # for expect to work
     source <(antibody init)

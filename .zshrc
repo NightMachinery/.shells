@@ -186,8 +186,23 @@ bindkey '^[[Z' fr_zle # shift+tab
 ##
 
 zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
+##
 # antibody bundle intelfx/pure
 antibody bundle sindresorhus/pure
+function prompt_pure_check_cmd_exec_time () {
+  # Obviously, we are abusing pure's private API here :D We can achieve the same using the preexec and precmd hooks, but reusing this seems cheaper
+  integer elapsed
+  (( elapsed = EPOCHSECONDS - ${prompt_pure_cmd_timestamp:-$EPOCHSECONDS} ))
+  typeset -g prompt_pure_cmd_exec_time=
+  (( elapsed > ${PURE_CMD_MAX_EXEC_TIME:-5} )) && {
+    prompt_pure_human_time_to_var $elapsed "prompt_pure_cmd_exec_time"
+  }
+
+  (( elapsed > ${BELL_EXEC_TIME:-10} )) && {
+    iterm-session-is-active && silent awaysh bella
+  }
+}
+##
 # antibody bundle denysdovhan/spaceship-prompt
 # antibody bundle Tarrasch/zsh-bd
 # antibody bundle Tarrasch/zsh-colors
