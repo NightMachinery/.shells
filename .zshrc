@@ -200,7 +200,11 @@ function prompt_pure_check_cmd_exec_time () {
 
   (( elapsed > ${BELL_EXEC_TIME:-10} )) && {
     # @notcrossplatform
-    isDarwin && iterm-session-is-active && silent awaysh bella-zsh
+    isDarwin && iterm-session-is-active && {
+        local skipfirst=''
+        iterm-focus-is && skipfirst=y
+        silent awaysh @opts sf "$skipfirst" @ bella-zsh
+      }
   }
 }
 ##

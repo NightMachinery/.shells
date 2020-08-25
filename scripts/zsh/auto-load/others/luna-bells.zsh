@@ -121,6 +121,7 @@ function bell-auto() {
     local timeout="${bell_auto_t:-5}" # The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
     local sleep="${bell_auto_sleep:-${bell_auto_st:-0}}" # The lower, the more CPU usage in single mode.
     local single="${bell_auto_single:-${bell_auto_sm}}"
+    local skipfirst="${bell_skip_first:-${bell_auto_sf}}"
     local exit_cmd=("${(@)bell_auto_exit}")
 
     local nonce
@@ -128,8 +129,10 @@ function bell-auto() {
 
     ec "$0 (nonce: $nonce) started with timeout $timeout and engine: $engine[@]"
 
-    reval "$engine[@]"
-    sleep "$sleep" # necessary for succesfully exiting sc bells because they take time to initialize. It also makes it act as a onetime bell in case of an active user.
+    if test -z "$skipfirst" ; then
+        reval "$engine[@]"
+        sleep "$sleep" # necessary for succesfully exiting sc bells because they take time to initialize. It also makes it act as a onetime bell in case of an active user.
+    fi
 
     while oneinstance $0 $nonce
     do
@@ -165,3 +168,5 @@ aliasfn okj bell-auto-stop
 aliasfn bello bell-diwhite # main gateway of a single alarm bell
 aliasfn bell-zsh bell-zsh1
 aliasfn bella-zsh bell-auto bell-zsh
+@opts-setprefix bella-zsh bell-auto
+# aliasfn bellz bella-zsh # just use bellj?
