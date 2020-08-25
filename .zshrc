@@ -199,7 +199,8 @@ function prompt_pure_check_cmd_exec_time () {
   }
 
   (( elapsed > ${BELL_EXEC_TIME:-10} )) && {
-    iterm-session-is-active && silent awaysh bella
+    # @notcrossplatform
+    isDarwin && iterm-session-is-active && silent awaysh bella
   }
 }
 ##
