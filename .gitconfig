@@ -7,11 +7,6 @@
 	lola = log --graph --decorate --pretty=oneline --abbrev-commit --all
 [credential]
 	helper = osxkeychain
-[filter "lfs"]
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
-	process = git-lfs filter-process
-	required = true
 [push]
 	default = matching
 [core]
