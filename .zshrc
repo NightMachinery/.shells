@@ -203,7 +203,7 @@ function prompt_pure_check_cmd_exec_time () {
     isDarwin && iterm-session-is-active && {
         local skipfirst=''
         iterm-focus-is && skipfirst=y
-        silent awaysh @opts sf "$skipfirst" @ bella-zsh
+        silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
       }
   }
 }
