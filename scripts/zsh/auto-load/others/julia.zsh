@@ -1,3 +1,16 @@
+##
+function jpre() {
+    # jrm
+    eval "prefix-files $1:q ${jpredicate:-*(D.)}"
+}
+function jvoice() {
+    jpre "voicenote-"
+}
+jvideo() jpre "videonote-"
+aliasfn jvid jvideo
+jdoc() jpre "fdoc-"
+jstream() jpre "streaming-"
+##
 function jsummon() {
     mkdir -p ~/julia_tmp/
     local u=(*)
@@ -49,17 +62,8 @@ ensure-ju() {
     test -e "$files" || { ecerr "jufile error: $jufile"
                           return 1 }
 }
-function jpre() {
-    # jrm
-    eval "prefix-files $1:q ${jpredicate:-*(D.)}"
-}
-function jvoice() {
-    jpre "voicenote-"
-}
-jvideo() jpre "videonote-"
-jdoc() jpre "fdoc-"
-jstream() jpre "streaming-"
 jmv() {
+    # No longer needed, I think. You can now touch the file to resend it.
     test -e "$jufile" && mv "$jufile" "n_$jufile"
 }
 jrm() {
