@@ -1,5 +1,5 @@
-brew "m-cli"
 brew "dark-mode"
+brew "m-cli"
+brew "nu"
 brew "slhck/moreutils/moreutils", args: ["without-parallel"]
 brew "ucg"
-brew "nu"

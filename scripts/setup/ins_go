@@ -1,11 +1,9 @@
-github.com/mholt/archiver/cmd/arc
-github.com/adnanh/webhook
-github.com/jesseduffield/lazygit
-
-github.com/alecthomas/chroma/cmd/chroma
 github.com/Rican7/define
-
+github.com/alecthomas/chroma/cmd/chroma
+github.com/bitfield/script/
 github.com/ciehanski/libgen-cli
-github.com/mholt/archiver/cmd/arc
-github.com/ericchiang/pup
 github.com/cosmos72/gomacro
+github.com/ericchiang/pup
+github.com/jesseduffield/lazygit
+github.com/mholt/archiver/cmd/arc
+github.com/miguelmota/cointop

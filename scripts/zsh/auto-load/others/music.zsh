@@ -82,7 +82,7 @@ songd() {
     }
     silence eval '\rm -r -- "$music_dir/"*(-@D)' #The characters in parentheses are glob qualifiers: - to dereference symlinks, @ to match only symlinks (the combination -@ means broken symlinks only), and D to match dot files. To recurse into subdirectories, make that rm -- **/*(-@D).
     local bp
-    { test "${1}" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
+    { test "${1}" = "-d" || test "$1" = "-a" || test "$1" = "-p" } && {
         bp="$1"
         shift
     }
@@ -173,10 +173,10 @@ mub() {
     songc --loop-playlist ${*:+"$*"} #alBum
 }
 mup() playlistc "$@"
-mus() mu -b "$(@s "$@" album)"
+mus() mu -a "$(@s "$@" album)"
 mu() {
     local bp=()
-    { test "${1}" = "-d" || test "$1" = "-b" || test "$1" = "-p" } && {
+    { test "${1}" = "-d" || test "$1" = "-a" || test "$1" = "-p" } && {
         bp+="$1"
         shift
     }
@@ -189,7 +189,7 @@ svpl() {
 }
 function sdl() {
     local bp
-    { test "${1[1]}" = "-" } && { # || test "$1" = "-b" || test "$1" = "-p" } && {
+    { test "${1[1]}" = "-" } && { # || test "$1" = "-a" || test "$1" = "-p" } && {
         bp="$1"
         shift
     }

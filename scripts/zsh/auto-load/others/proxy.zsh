@@ -9,6 +9,7 @@ pxify() {
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl
     pxify-command conda
+    pxify-command go
     pxify-command manga-py
 }
 function pxify-command() {
