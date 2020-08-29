@@ -194,7 +194,7 @@ function sdl() {
         shift
     }
     test -z "$bp" && {
-        nisout spotdl --no-encode -i m4a -f "${spotdl_dir:-.}" -s "$*" } || {
+        nisout spotdl --no-encode -i m4a -f "${spotdl_dir:-.}/{artist} - {track-name}.{output-ext}" -s "$*" } || {
         nisout sdlg "$bp" "$@"
     }
 }

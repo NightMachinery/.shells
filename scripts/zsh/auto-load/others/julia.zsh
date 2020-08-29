@@ -99,7 +99,7 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 }
 function sdlg() {
     #use with aget
-    spotdl "$@" && spotdl -f "${spotdl_dir:-.}"  -l *.txt && {
+    spotdl "$@" && spotdl --no-encode -i m4a -f "${spotdl_dir:-.}/{artist} - {track-name}.{output-ext}"  -l *.txt && {
             mkdir -p ./ghosts/
             mv *.txt ./ghosts/
         }
