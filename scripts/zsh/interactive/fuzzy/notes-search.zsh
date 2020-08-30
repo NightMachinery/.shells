@@ -15,10 +15,35 @@ function agfi() {
 noglobfn agfi
 ##
 function ntt() {
-    ntl-fzf "$(mg_sep=' ' mapg "\'\$i" "$@")"  #"'$*"
+    local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
+
+    ntl-fzf "$query"
 }
 aliasfn ntrem ntt /reminders
 aliasfn rem ntrem
+function remd() {
+    ## testing
+    # `fnrep datej "ec 1399/12/03" remd`
+    ##
+    local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
+
+    local now=("${(s./.)$(datej)}")
+    local cyear="$now[1]"
+    local cmonth="$now[2]"
+    local cday="$now[3]"
+    local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
+
+    if (( cmonth == 12 )) ; then
+        local nextYear=$((cyear+1))
+
+        ntl-fzf "'/reminders '$cyear/$cmonth | '$nextYear/01 $query"
+    else
+        typeset -Z2 nextMonth
+        nextMonth=$((cmonth+1))
+
+        ntl-fzf "'/reminders '$cyear/$cmonth | '$cyear/$nextMonth $query"
+    fi
+}
 ##
 function ntimg() {
     innt fdrp --full-path --extension png --extension jpg --extension svg --extension jpeg "$*" | fz | inargsf imgcat
@@ -227,7 +252,7 @@ function ntsearch_fd() {
         {
             # no-messages suppresses IO errors
             # xargs is needed to avoid argument list too long error
-            { print -nr -- "${(@pj.\0.)files}" | xargs -0 command rg --smart-case --engine auto --no-messages --with-filename --line-number "$query_rg" } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            { print -nr -- "${(@pj.\0.)files}" | xargs -0 command rg --smart-case --engine auto --no-messages --with-filename --line-number --sort path "$query_rg" } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
         } | rmprefix "$nightNotes"
             # sd "^$nightNotes" '' # sd is doing the work of `realpath --relative-to` . TODONE this doesn't quote and so is buggy
         ## old way (uses vars now not in scope)

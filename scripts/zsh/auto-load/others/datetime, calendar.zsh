@@ -28,6 +28,7 @@ function remj() {
 
     [[ "$day" =~ '^\+(\d+)$' ]] && day=$(( cday + $match[1] ))
     # test -z "$day" && { ecerr "$0: empty first arg. Aborting." ; return 1 }
+    typeset -Z2 day="$day"
     local month="${3:-$cmonth}"
     [[ "$month" =~ '^\+(\d+)$' ]] && month=$(( cmonth + $match[1] ))
     [[ "$month" =~ '^\d$' ]] && month="0$month"
@@ -37,7 +38,7 @@ function remj() {
     [[ "$year" =~ '^\d\d$' ]] && year="14$year"
 
     if test -n "$year" ; then
-        colorfg 50 10 255 "Year set explicitly to $year"
+        color 50 10 255 "Year set explicitly to $year"
     else
         year="$cyear"
     fi
