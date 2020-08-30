@@ -52,13 +52,14 @@ function remj() {
     reminday_store "$dest" "$text"
 }
 function reminday_store() {
-    local dest="$1" text="$2"
+    local dest="${1}" text="$2"
 
     test -z "$dest" && return 1
     test -z "$text" && return 1
 
+    dest="$dest".md
     ensure-dir "$dest" || return 1
-    ec "$text" >> $dest
+    ec "$text"$'\n' >> $dest
     ec "$dest : $text"
 }
 function remn() {
@@ -69,5 +70,32 @@ function remn() {
     gdate="$(datenat.go $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
     local dest="$remindayDir/$(jalalim tojalali "$gdate") $(<<<$gdate tr '/' '_')"
     reminday_store "$dest" "$text"
+}
+function tlg-reminday() {
+    local rec="$1"
+    test -z "$rec" && {
+        ecerr "$0: Empty receiver."
+        return 1
+    }
+
+    local now=("${(s./.)$(datej)}")
+    local cyear="$now[1]"
+    local cmonth="$now[2]"
+    local cday="$now[3]"
+    local today=( "$remindayDir/$cyear/$cmonth/$cday"*(N.) )
+
+    local text="$(datej) $(date +"%A %B %d")"
+    local f bak
+    for f in $today[@] ; do
+        if test -e "$f" ; then
+            bak="$(realpath --relative-to "$remindayDir" "$f")"
+            bak="$cellar/reminders_bak/$bak"
+            text="$text"$'\n'"$(<$f)"
+            ensure-dir "$bak"
+            mv "$f" "$bak"
+            rmdir-empty "$remindayDir"
+        fi
+    done
+    tsend --parse-mode markdown -- "$rec" "$text"
 }
 ##

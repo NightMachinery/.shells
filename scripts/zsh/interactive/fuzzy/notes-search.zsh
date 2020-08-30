@@ -14,6 +14,12 @@ function agfi() {
 }
 noglobfn agfi
 ##
+function ntt() {
+    ntl-fzf "$(mg_sep=' ' mapg "\'\$i" "$@")"  #"'$*"
+}
+aliasfn ntrem ntt /reminders
+aliasfn rem ntrem
+##
 function ntimg() {
     innt fdrp --full-path --extension png --extension jpg --extension svg --extension jpeg "$*" | fz | inargsf imgcat
 }
@@ -62,9 +68,6 @@ function vnt() {
 ##
 function ntl-rg() {
     ntsearch_query_rg="$*" ntl
-}
-function ntt() {
-    ntl-fzf "'$*"
 }
 function ntl-fzf() {
     ntsearch_query_fzf="$*" ntl
