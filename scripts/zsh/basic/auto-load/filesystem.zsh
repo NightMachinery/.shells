@@ -25,3 +25,14 @@ function lnrp() {
 
     ln -s "$(realpath "$f")" "$d"
 }
+function rmdir-empty() {
+    : "Removes all recursively empty directories from <root-dir>"
+
+    local root="$1"
+    if ! test -d "$root" ; then
+        ecerr "$0: Non-existent root directory: $root"
+        return 1
+    fi
+    # From https://unix.stackexchange.com/a/107556/282382
+    gfind "$root" -mindepth 1 -type d -empty -delete
+}
