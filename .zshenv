@@ -26,6 +26,7 @@ isNotExpensive || {
     addToPATH "$HOME/.local/bin"
     addToPATH "/Base/- Code/Resources/"
     export GOPATH="$HOME/go"
+    export GOBIN="$GOPATH/bin"
     addToPATH "$HOME/go/bin"
     addToPATH "/usr/local/opt/texinfo/bin"
     addToPATH "$HOME/kscripts/"

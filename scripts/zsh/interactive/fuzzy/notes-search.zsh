@@ -189,26 +189,28 @@ function ntsearch_() {
         fzopts+='--read0'
     else
         fzopts+=(--delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
-        local FZF_SHELL='zshplain.dash'
-        # FZF_SHELL=zsh
-        previewcode=( 'ln={2} file={1} match={s3..} ; fileabs="$nightNotes/$file" ;
-{ print -r -- "$file" '
-                      "\$'\\n'$(gq $(colorbg 200 255 200 ; colorfg 0 0 0))\$match$(gq $reset_color)\$'\\n\\n' ; "
-                      # 'echo ln: $ln ; '
-                      '[[ $ln == 1 ]] || gsed -n $(( i=ln-6 , i >= 1 ? i : 1 )),$(( i=ln-1 , i >= 1 ? i : 1 ))p $fileabs ; '
-                      "print -r -- $(gq $(colorbg 255 255 255 ; colorfg 255 120 0))\$match$(gq $reset_color) ; "
+        ## Old previewer
+        # local FZF_SHELL='zshplain.dash'
+#         previewcode=( 'ln={2} file={1} match={s3..} ; fileabs="$nightNotes/$file" ;
+# { print -r -- "$file" '
+#                       "\$'\\n'$(gq $(colorbg 200 255 200 ; colorfg 0 0 0))\$match$(gq $reset_color)\$'\\n\\n' ; "
+#                       # 'echo ln: $ln ; '
+#                       '[[ $ln == 1 ]] || gsed -n $(( i=ln-6 , i >= 1 ? i : 1 )),$(( i=ln-1 , i >= 1 ? i : 1 ))p $fileabs ; '
+#                       "print -r -- $(gq $(colorbg 255 255 255 ; colorfg 255 120 0))\$match$(gq $reset_color) ; "
 
-                      '
-gsed -n $((ln+1)),$((ln+50))p $fileabs
-} |& ' "$(gq "$(rp ansifold)")" '-s -w $(($FZF_PREVIEW_COLUMNS - 1))' )
+#                       '
+# gsed -n $((ln+1)),$((ln+50))p $fileabs
+# } |& ' "$(gq "$(rp ansifold)")" '-s -w $(($FZF_PREVIEW_COLUMNS - 1))' )
         # install location is at perl -V:'installbin' , link it
         # cpanm App::ansifold
         # https://metacpan.org/pod/Text::ANSI::WideUtil
+        ##
+        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes)"
     fi
 
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
-    ntsearch_fd | fz --preview-window right --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
+    ntsearch_fd | fz --preview-window right:wrap --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
         read -d $'\0' -r acceptor
         out="$(cat)"
         ec "$out"
