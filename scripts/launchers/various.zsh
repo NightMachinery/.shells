@@ -14,5 +14,6 @@ tmuxnew serve-dl 'caddy run --config $NIGHTDIR/launchers/Caddyfile' # miniserve 
 ##
 
 #tmuxnew splash 'docker run -it -p 8050:8050 scrapinghub/splash'
-borgpath=~/code/betterborg/stdborg.py
-tmuxnew julia "zsh -c 'cdd $(gq $borgpath) && python3 $(gq $borgpath)'"
+borgdir=~/code/betterborg/
+tmuxnew julia "dash -c 'cd $(gq $borgdir) && $(gq "$(rp python3)") $(gq $borgdir/stdborg.py)'"
+tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(rp python3)") $(gq $borgdir/inline.py)'"
