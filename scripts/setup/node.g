@@ -5,6 +5,7 @@ cf-warp
 chalk-animation
 chalk-cli
 chance-cli
+chrono-node
 cliflix
 commander
 dockly
@@ -19,7 +20,9 @@ http-server
 jalali-moment
 janeway
 kaomoji
+kitsu
 moby
+moment
 npm-check
 npmlist
 oji
@@ -39,6 +42,3 @@ wikiquote-cli
 wikit
 youtube-dl-interactive
 zooqle
-chrono-node
-moment
-kitsu
