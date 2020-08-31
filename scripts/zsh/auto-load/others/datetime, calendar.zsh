@@ -68,7 +68,7 @@ function remn() {
     [[ "$text" == '-' ]] && text="$(</dev/stdin)"
 
     local gdate
-    gdate="$(datenat.go $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
+    gdate="$(datenat.js $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
     local dest="$remindayDir/$(jalalim tojalali "$gdate") $(<<<$gdate tr '/' '_')"
     reminday_store "$dest" "$text"
 }
