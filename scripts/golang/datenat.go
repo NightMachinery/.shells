@@ -1,4 +1,4 @@
-/// 2>/dev/null ; gorun "$0" "$@" ; exit $?
+/// 2>/dev/null ; exec gorun "$0" "$@"
 // DEPRECATED: Use datenat.js (chrono). See https://github.com/tj/go-naturaldate/issues/12 for a list of bugs.
 
 package main
