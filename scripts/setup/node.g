@@ -42,3 +42,4 @@ zooqle
 chrono-node
 moment
 kitsu
+kitsu
