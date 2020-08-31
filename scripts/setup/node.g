@@ -42,3 +42,6 @@ wikiquote-cli
 wikit
 youtube-dl-interactive
 zooqle
+chrono-node
+moment
+kitsu
