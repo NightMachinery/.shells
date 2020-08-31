@@ -19,8 +19,16 @@ function ntt() {
 
     ntl-fzf "$query"
 }
-aliasfn ntrem ntt /reminders
-aliasfn rem ntrem
+##
+function rem-fz() {
+    local query_pre="$rem_fz_q"
+    local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
+
+    local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
+    ntl-fzf "'/reminders $query_pre $query"
+}
+aliasfn ntrem rem-fz
+aliasfn rem rem-fz
 function remd() {
     ## testing
     # `fnrep datej "ec 1399/12/03" remd`
@@ -31,17 +39,16 @@ function remd() {
     local cyear="$now[1]"
     local cmonth="$now[2]"
     local cday="$now[3]"
-    local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
 
     if (( cmonth == 12 )) ; then
         local nextYear=$((cyear+1))
 
-        ntl-fzf "'/reminders '$cyear/$cmonth | '$nextYear/01 $query"
+        @opts q "'$cyear/$cmonth | '$nextYear/01" @ rem-fz $query
     else
         typeset -Z2 nextMonth
         nextMonth=$((cmonth+1))
 
-        ntl-fzf "'/reminders '$cyear/$cmonth | '$cyear/$nextMonth $query"
+        @opts q "'$cyear/$cmonth | '$cyear/$nextMonth" @ rem-fz $query
     fi
 }
 ##
