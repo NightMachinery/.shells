@@ -90,7 +90,7 @@ function tlg-reminday() {
     for f in $today[@] ; do
         if test -e "$f" ; then
             bak="$(realpath --relative-to "$remindayDir" "$f")"
-            bak="$cellar/reminders_bak/$bak"
+            bak="${remindayBakDir}/$bak"
             text="$text"$'\n'"$(<$f)"
             ensure-dir "$bak"
             mv "$f" "$bak"
