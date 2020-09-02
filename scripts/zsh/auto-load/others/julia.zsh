@@ -70,10 +70,10 @@ jrm() {
     test -e "$jufile" && \rm "$jufile"
 }
 jopus() {
-    jrm
-    local u=(*)
+    jglob
+    local u="$1"
     ffmpeg -i "$u" -strict -2 "${u:r}.opus"
-    \rm "$u"
+    command rm "$u"
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
 jup() {
@@ -123,7 +123,8 @@ function vasox() {
 }
 function vosox() {
     opusdec --force-wav * - 2> /dev/null | sox - "brave_n_failed.mp3" -G "$@"
-    silence jopus
+    jrm
+    silence jopus *
 }
 function vsox() {
     local inp=(*)

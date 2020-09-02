@@ -1,12 +1,14 @@
+// ABANDONED
+
 package main
 
 import (
-	"bufio"
-	. "fmt"
-	"os"
+	//"bufio"
+	//. "fmt"
+	//"os"
 )
 
 func main() {
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Split()
+	//scanner := bufio.NewScanner(os.Stdin)
+	//scanner.Split()
 }
