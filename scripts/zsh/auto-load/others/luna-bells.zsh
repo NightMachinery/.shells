@@ -111,6 +111,10 @@ function bell-diwhite() {
 }
 ##
 function bell-repeat() {
+    isSSH && {
+        ecerr "$0: You're on SSH."
+        return 1
+    }
     local bell="${1:-bell-ReichPhase}"
     lo_sig2cancel=y lo_s=0.2 lo_p=${lo_p:-$bellj_socket} loop "$bell" #bell-helicopter
 }
