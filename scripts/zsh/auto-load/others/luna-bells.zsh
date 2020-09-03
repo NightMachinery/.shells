@@ -116,6 +116,9 @@ function bell-repeat() {
 }
 aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 function bell-auto() {
+    isDarwin || {
+        ecerr "$0: Not running on Darwin."
+    }
     # You might need to use `sleep $timeout ; ...` to test bell-auto.
     local engine=( "${@:-bello}" )
     local timeout="${bell_auto_t:-5}" # The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
