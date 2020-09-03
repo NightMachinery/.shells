@@ -8,4 +8,8 @@ github.com/ericchiang/pup
 github.com/jesseduffield/lazygit
 github.com/mholt/archiver/cmd/arc
 github.com/miguelmota/cointop
+<<<<<<< HEAD
 github.com/tigrawap/slit/cmd/slit
+=======
+github.com/nikitavoloboev/license-up
+>>>>>>> e34b17f5a04a8180c8f2bb8cb9a66bc4d5f4b6e0
