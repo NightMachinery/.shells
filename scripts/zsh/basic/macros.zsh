@@ -78,7 +78,7 @@ function createglob() {
         ecerr "$0: insuffient arguments supplied. (needs 2)"
         return 1
     }
-    eval $to'="*.(${(j.|.)'$from'})(.D)"'
+    eval $to'="*.(${(j.|.)'$from'})(.DN)"'
 }
 ##
 function h_@gather() {

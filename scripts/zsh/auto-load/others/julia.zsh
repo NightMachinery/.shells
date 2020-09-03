@@ -1,4 +1,26 @@
 ##
+function arrJ() {
+    local items=( "$@" )
+    print -nr -- "[ ${(j.,.)items} ]"
+}
+function jivid() {
+    # j inline video
+    local vids=( ./$~videoglob ) f url results=()
+    for f in $vids[@] ; do
+        url="$(jdl "$f")"
+        results+="$(jq --null-input --compact-output --arg url "$url" --arg f "${f:t}" '{ tlg_title: $f , tlg_video: $url }')"
+    done
+    arrJ "$results[@]"
+}
+function jiy() {
+    jee
+
+    silent ymp4 "$@"
+    jivid
+    silent command rm *(N)
+}
+noglobfn jiy
+##
 function jpre() {
     # jrm
     eval "prefix-files $1:q ${jpredicate:-*(D.)}"
