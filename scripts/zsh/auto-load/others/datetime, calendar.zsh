@@ -85,7 +85,7 @@ function tlg-reminday() {
     local cday="$now[3]"
     local today=( "$remindayDir/$cyear/$cmonth/$cday"*(N.) )
 
-    local text="$(datej) $(date +"%A %B %d")"
+    local text=""
     local f bak
     for f in $today[@] ; do
         if test -e "$f" ; then
@@ -97,6 +97,7 @@ function tlg-reminday() {
             rmdir-empty "$remindayDir"
         fi
     done
+    text="$text"$'\n\n'"$(datej) $(date +"%A %B %d")"
     tsend --parse-mode markdown -- "$rec" "$text"
 }
 ##
