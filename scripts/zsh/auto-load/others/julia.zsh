@@ -3,6 +3,30 @@ function arrJ() {
     local items=( "$@" )
     print -nr -- "[ ${(j.,.)items} ]"
 }
+##
+function html-esc() {
+    gsed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+    # ALT: recode ascii..html
+}
+
+function jigoo() {
+    local query="$*"
+
+    local goo_urls goo_titles goo_asbtracts goo_metadata
+    silent @opts c 11 @ goo-g "$query" || return 1 # outputs in global vars
+    local i r=() o
+    for i in {1..${#goo_urls}} ; do
+        # r+="$(readmoz_nosummary=y readmoz-md "$goo_urls[$i]" | jq --raw-input --slurp --null-input --compact-output --arg title "$goo_titles[$i]" 'inputs as $i | {"tlg_title": $title, "tlg_content": $i, "tlg_parsemode": "md"}')"
+        o="<a href=\"$goo_urls[$i]\" ><b>$(<<<${goo_titles[$i]} html-esc)</b></a>"$'\n\n'"$(<<<${goo_abstracts[$i]} html-esc)"
+        if [[ "$goo_metadata[$i]" =~ '\S' ]] ; then
+            o+=$'\n\n'"<i>$(<<<$goo_metadata[$i] html-esc)</i>"
+        fi
+        r+="$(print -nr -- $o | jq --raw-input --slurp --null-input --compact-output --arg title "$goo_titles[$i]" 'inputs as $i | {"tlg_title": $title, "tlg_content": $i, "tlg_parsemode": "html"}')"
+    done
+
+    arrJ $r[@]
+}
+##
 function jivid() {
     # j inline video
     local vids=( ./$~videoglob ) f url results=()
