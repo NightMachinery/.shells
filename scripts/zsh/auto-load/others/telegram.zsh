@@ -1,5 +1,11 @@
 alias tsmf='tsendf $me'
 ###
+function tnotif() {
+    local msg="$*"
+
+    tsend --parse-mode markdown -- "$tlg_notifs" "$msg"
+}
+##
 function tsendf() {
     
     local f

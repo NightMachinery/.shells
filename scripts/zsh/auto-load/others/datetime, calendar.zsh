@@ -72,6 +72,45 @@ function remn() {
     local dest="$remindayDir/$(jalalim tojalali "$gdate") $(<<<$gdate tr '/' '_')"
     reminday_store "$dest" "$text"
 }
+function rem-todaypaths() {
+    unset today
+
+    local now=("${(s./.)$(datej)}")
+    local cyear="$now[1]"
+    local cmonth="$now[2]"
+    local cday="$now[3]"
+
+    today=( "$remindayDir/$cyear/$cmonth/$cday"*(N.) )
+}
+function rem-today() {
+    local deleteMode="${rem_today_delete:-$rem_today_d}"
+
+    local today
+    rem-todaypaths
+
+    local text=""
+    local f bak
+    for f in $today[@] ; do
+        if test -e "$f" ; then
+            text="$text"$'\n'"$(<$f)"
+            if test -n "$deleteMode" ; then
+                bak="$(realpath --relative-to "$remindayDir" "$f")"
+                bak="${remindayBakDir}/$bak"
+                ensure-dir "$bak"
+                mv "$f" "$bak"
+                rmdir-empty "$remindayDir"
+            fi
+        fi
+    done
+
+    ec "$text"
+}
+function rem-today-notify() {
+    local text="$(rem-today)"
+    if test -n "$text" ; then
+        terminal-notifier -title "$(datej)" -message "$text"
+    fi
+}
 function tlg-reminday() {
     local rec="$1"
     test -z "$rec" && {
@@ -79,24 +118,10 @@ function tlg-reminday() {
         return 1
     }
 
-    local now=("${(s./.)$(datej)}")
-    local cyear="$now[1]"
-    local cmonth="$now[2]"
-    local cday="$now[3]"
-    local today=( "$remindayDir/$cyear/$cmonth/$cday"*(N.) )
-
-    local text=""
-    local f bak
-    for f in $today[@] ; do
-        if test -e "$f" ; then
-            bak="$(realpath --relative-to "$remindayDir" "$f")"
-            bak="${remindayBakDir}/$bak"
-            text="$text"$'\n'"$(<$f)"
-            ensure-dir "$bak"
-            mv "$f" "$bak"
-            rmdir-empty "$remindayDir"
-        fi
-    done
+    local text="$(@opts delete y @ rem-today)"
+    if test -n "$text" ; then
+        tnotif "$text"
+    fi
     text="$text"$'\n\n'"$(datej) $(date +"%A %B %d")"
     tsend --parse-mode markdown -- "$rec" "$text"
 }
