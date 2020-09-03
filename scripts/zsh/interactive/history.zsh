@@ -1,3 +1,4 @@
+###
 alias tmnte=increment-last\ \''(E)(\d+)'\'
 alias tmnt=increment-last\ \''()(\d+)(?=\D*\z)'\'
 ##
@@ -17,6 +18,7 @@ function increment-last() {
     local cmd=${$(fc -nl -1 -1| perl -pe "$pe")}
     geval "$cmd"
 }
+###
 function increment-last2() {
     local pattern="$1"
     local after="${2}"
