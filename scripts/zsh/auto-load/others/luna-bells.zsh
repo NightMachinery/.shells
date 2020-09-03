@@ -118,6 +118,7 @@ aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj
 function bell-auto() {
     isDarwin || {
         ecerr "$0: Not running on Darwin."
+        return 1
     }
     # You might need to use `sleep $timeout ; ...` to test bell-auto.
     local engine=( "${@:-bello}" )
