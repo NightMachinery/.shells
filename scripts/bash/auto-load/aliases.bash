@@ -70,7 +70,6 @@ alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
 alias dlga="\noglob deluge-console add"
-alias ys="y-stream"
 alias sb=". ~/.zshenv"
 alias sbi="sb ; source-interactive-all"
 alias sia='source-interactive-all'
@@ -144,6 +143,9 @@ alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 alias ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
 alias y="ybase --embed-subs --embed-thumbnail --add-metadata --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'"
 alias ysmall="y -f '(bestvideo[height<=800]+bestaudio/best[height<=800]/best)[protocol^=http]'"
+alias ys="ysmall"
+# ysmp4 still can output an mkv. Probably because of merging?
+alias ysmp4="y -f '(bestvideo[ext=mp4][height<=800]+bestaudio/best[ext=mp4][height<=800]/best[ext=mp4]/best)'"
 # youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
 alias yarc="noglob retry ysmall --download-archive ~/.yarchive"
 alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
