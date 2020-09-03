@@ -56,3 +56,4 @@ wikiquotes
 xkcdpass
 yapf
 yq
+hachoir
