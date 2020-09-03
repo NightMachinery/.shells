@@ -943,11 +943,12 @@ noglobfn url2md
 noglobfn url2html
 ##
 function readmoz() {
-    magic mdoc "[rmS= rmHtml= ] $0 <url>
+    magic mdoc "[rmS= rmHtml= readmoz_nosummary=] $0 <url>
 Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rmS to only print the summary." ; mret
 
     local url="$1"
     local summaryMode="$rmS"
+    local noSummaryMode="${readmoz_nosummary:-$readmoz_ns}"
 
     local html
     html="${rmHtml:-$(full-html2 "$url")}" || {
@@ -959,10 +960,12 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
         return 0 # this is not exactly an error. Returning 1 might cause useless retries.
     fi
     local cleanedhtml="$(<<<"$html" readability "$url")"
-    local prehtml="$(url2html "$url")"
-    ec "$prehtml"
-    # <p> --- </p>
-    test -n "$summaryMode" || ec "<hr> $cleanedhtml"
+    if test -z "$noSummaryMode" ; then
+        local prehtml="$(url2html "$url")"
+        ec "$prehtml <hr> "
+        # <p> --- </p>
+    fi
+    test -n "$summaryMode" || ec "$cleanedhtml"
 }
 noglobfn readmoz
 function readmozsum() {

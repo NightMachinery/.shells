@@ -1,17 +1,4 @@
 ##
-function goo() {
-    local query="$*"
-    local count="${goo_count:-${goo_c:-10}}"
-
-    local memoi_cmd="$(cmd-sub memoi-eval '')"
-
-    local res search="$($memoi_cmd googler --json --count "$count" "$query")"
-
-    goo_urls=("${(@f)$(<<<$search jq -re '.[] | .url')}") || return 1
-    goo_titles=("${(@f)$(<<<$search jq -re '.[] | .title')}")
-
-    # ec ${(F)goo_urls}
-}
 function ffgoo() {
     local query="$*"
     local count="${ffgoo_count:-${ffgoo_c:-30}}"
@@ -24,7 +11,7 @@ function ffgoo() {
     # local isI="$(cmd-sub isI true)"
     # local fz_opts=( "$fz_opts[@]" )
 
-    local search="$($memoi_cmd googler --json --count "$count" "$query")"
+    local search="$($memoi_cmd googler-en --json --count "$count" "$query")"
     local is i
     is=("${(@f)$(<<<$search jq -re '.[] | .title + " | " + .abstract + " | " + .metadata' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. | awk '{print $1}')}") || return 1
     for i in $is[@] ; do

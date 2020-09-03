@@ -1,3 +1,6 @@
+export LESS='-RiNF --mouse --wheel-lines=3' #F: --quit-if-one-screen ; R: maintain the ANSI colour sequences; i: smartcase searches (all lower=ignore case);  -N or --LINE-NUMBERS Causes a line number to be displayed at the beginning of each line in the display.
+isSSH && LESS="-RiNF"
+##
 dl_base_url='https://files.lilf.ir'
 fd_default=( --hidden --no-ignore )
 h2ed='html2epub-pandoc'
