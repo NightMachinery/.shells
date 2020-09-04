@@ -18,7 +18,7 @@ noglobfn agfi
 function ntt() {
     local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
 
-    ntsearch_injector="unseal-get" ntl-fzf "$query"
+    ntsearch_injector="unseal-get2note" ntl-fzf "$query"
 }
 ##
 function rem-fz() {
@@ -127,7 +127,7 @@ function ntl() {
                 file="$nightNotes/$file"
             }
             if ! test -e "$file" ; then
-                if test -z "$ntsearch_injector" ; then
+                if true || test -z "$ntsearch_injector" ; then
                     ecerr "$0: $(gq "$file") does not exist."
                 else
                     color 100 200 200 "$0: File does not exist, probably a selection from the injector."$'\n\n' >&2
@@ -140,7 +140,7 @@ function ntl() {
                 continue
             fi
         else
-            if test -z "$ntsearch_injector" ; then
+            if true || test -z "$ntsearch_injector" ; then
                 ecerr "$0: ntsearch has returned illegible data."
             else
                 color 100 200 200 "$0: illegible data, probably a selection from the injector."$'\n\n' >&2

@@ -25,6 +25,7 @@ enh-pxpy() {
 }"
 }
 function pxify-auto() {
+    return 0 # We now use Wireguard
     typeset -g pxified
     # local initCountry="$(serr mycountry)"
     if test -z "$pxified" && [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]] ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then

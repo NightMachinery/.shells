@@ -71,7 +71,10 @@ seal() {
     print -r -n -- "$n$(in-or-args "$@")"$'\n' >> "$attic"
 }
 function unseal-get() {
-    <"$attic[@]" RS2NUL
+    <"$attic[@]" "$@"
+}
+function unseal-get2note() {
+    unseal-get prefixer -s -i $'\36' -o '\x00' -a "${attic}:PREFIXER_LINENUMBER:" -l /dev/null
 }
 alias uns=unseal
 unseal() {
@@ -84,7 +87,7 @@ unseal() {
         other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y
         }
-    local l="$(unseal-get | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
+    local l="$(unseal-get RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy
