@@ -79,3 +79,20 @@ function reval-notifexit() {
     }
 }
 ##
+function env-clean() {
+    local env=()
+    local i
+    for i in "$@" ; do
+        if [[ "$i" =~ '^([^=]*)=(.*)$' ]] ; then
+            env+="$i"
+            shift
+        else
+            break
+        fi
+    done
+
+    local cmdhead="$1"
+    local cmdbody=( "$@[2,-1]" )
+    env -i "$env[@]" "$(rp "$cmdhead")" "$cmdbody[@]"
+}
+##

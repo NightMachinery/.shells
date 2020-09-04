@@ -1,6 +1,11 @@
-function isDarwin() { [[ "$uname" == "Darwin" ]] }
+### BASH COMPATIBLE (Gets sourced by .shared.sh)
+function isDarwin() {
+    [[ "$uname" == "Darwin" ]]
+}
 alias isD=isDarwin
-function isLinux() { [[ "$uname" == "Linux" ]] }
+function isLinux() {
+    [[ "$uname" == "Linux" ]]
+}
 alias isL=isLinux
 isI() {
     ! test -z "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]

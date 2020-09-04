@@ -16,7 +16,7 @@ function tmuxnewsh2() {
     local env=()
     local i
     for i in "$@" ; do
-        if [[ "$i" =~ '([^=]*)=(.*)' ]] ; then
+        if [[ "$i" =~ '^([^=]*)=(.*)$' ]] ; then
             env+="$match[1]=$(gq "$match[2]")"
             shift
         else

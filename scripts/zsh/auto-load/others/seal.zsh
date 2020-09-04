@@ -23,9 +23,9 @@ alias attic_quotes='attic="$attic_quotes" un_p=y un_no_preview=y'
 alias quotes-add='attic_quotes seal'
 alias quotes='attic_quotes unseal'
 alias quotes-rm='attic_quotes exor'
-alias qadd='quotes-add'
-alias qrm='quotes-rm'
-alias qee=quotes
+# alias qadd='quotes-add'
+# alias qrm='quotes-rm'
+# alias qee=quotes
 ## todo
 alias attic_todo='attic="$attic_todo" un_p=y un_no_preview=y \noglob'
 alias todo='attic_todo seal'
@@ -70,6 +70,9 @@ seal() {
     ! test -e "$attic" || n=$''
     print -r -n -- "$n$(in-or-args "$@")"$'\n' >> "$attic"
 }
+function unseal-get() {
+    <"$attic[@]" RS2NUL
+}
 alias uns=unseal
 unseal() {
     doc unseal
@@ -81,7 +84,7 @@ unseal() {
         other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y
         }
-    local l="$(<"$attic[@]" RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
+    local l="$(unseal-get | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy

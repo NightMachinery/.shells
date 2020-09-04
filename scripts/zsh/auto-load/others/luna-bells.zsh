@@ -178,7 +178,9 @@ aliasfn bell-zsh bell-zsh1
 aliasfn bella-zsh bell-auto bell-zsh
 @opts-setprefix bella-zsh bell-auto
 # aliasfn bellz bella-zsh # just use bellj?
-##
+## https://www.iterm2.com/triggers.html
+# We might need to use `reset` after these magic commands, as they cause more than once activation in certain situations (tmux, mosh, emacs, etc)(Because the redraw the screen): https://iterm2-discuss.narkive.com/BQCgkSxC/trigger-only-in-new-output
+# If this is a big issue, add a UID to the magic commands, and store them in redis. Don't run commands for duplicate IDs. Periodically clean the stored IDs to minimize conflict chance.
 aliasfn bella-magic ec '${ITERMMAGIC}'_BELLA
 function bella-zsh-magic() { ec "${ITERMMAGIC}_ZSH_BELLA_${ITERM_SESSION_ID}" }
 function bella-zsh-gateway() {

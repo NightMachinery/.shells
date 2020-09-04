@@ -52,7 +52,9 @@ function aget() {
 function reval() {
     # ecdbg revaling "$(gq "$@")"
     # Don't put stuff here, reval is used in ecdbg itself!
-    eval "$(gq "$@")"
+    local cmd="$(gq "$@")"
+    test -z "$*" && return 0 # Don't throw an error, it throws some other stuff up :|
+    eval "$cmd"
 }
 function rgeval() {
     geval "$(gq "$@")"

@@ -2,6 +2,7 @@ aliasfn-ng ntl. ntLines=y nightNotes=. noteglob=$textglob ntl
 @opts-setprefix ntl. ntl
 aliasfn-ng see ntl.
 aliasfn-ng sees ntLines=y nightNotes=. noteglob=$textglob ntl-rg
+aliasfn-ng seesall ntLines=y nightNotes=. noteglob='*(.)' ntl-rg
 function seev() {
     init-vfiles
     ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) noteglob=$textglob ntl-rg "$@"
@@ -17,7 +18,7 @@ noglobfn agfi
 function ntt() {
     local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
 
-    ntl-fzf "$query"
+    ntsearch_injector="unseal-get" ntl-fzf "$query"
 }
 ##
 function rem-fz() {
@@ -113,30 +114,46 @@ function ntl() {
     local engine=("${(@)ntl_engine:-ntsearch}") pattern="${ntl_pattern}"
     test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
 
-    outFiles=() # out and outFiles contain the same data when ntLines=y
+    outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
     ntLines=y reval "$engine[@]" "$@" > /dev/null  || return 1 # Beware forking here! We need the global vars outFiles and acceptor
 
     local i files=() linenumbers=() lines=() file
-    for i in "${outFiles[@]}" ; do
+    for i in "${out[@]}" ; do
         unset match
         if [[ "$i" =~ "$pattern" ]] ; then
             file="$match[1]"
-            # TODO we need to add this to the preview logic, too. (in our perf rewrite of it?)
-            # This happens when some files are supplied that are not children of nightNotes.
             test -e "$file" || {
-                file="$(<<<$file rmprefix "$nightNotes")"
+                # file="$(<<<$file rmprefix "$nightNotes")"
+                file="$nightNotes/$file"
             }
-            test -e "$file" || {
-                ecerr "$0: $file does not exist. Skipping."
+            if ! test -e "$file" ; then
+                if test -z "$ntsearch_injector" ; then
+                    ecerr "$0: $(gq "$file") does not exist."
+                else
+                    color 100 200 200 "$0: File does not exist, probably a selection from the injector."$'\n\n' >&2
+                    dvar file
+                fi
+            else
+                files+="$file"
+                linenumbers+="$match[2]"
+                lines+="$match[3]"
                 continue
-            }
-            files+="$file"
-            linenumbers+="$match[2]"
-            lines+="$match[3]"
+            fi
         else
-            ecerr "$0: ntsearch has returned illegible data. Aborting."
-            return 1
+            if test -z "$ntsearch_injector" ; then
+                ecerr "$0: ntsearch has returned illegible data."
+            else
+                color 100 200 200 "$0: illegible data, probably a selection from the injector."$'\n\n' >&2
+            fi
+            dvar i
         fi
+        ## Old way: Just returning everything
+        # ec "$(<<<"${(F)out}" rmprefix "$nightNotes")"
+        # return 1
+        ## New way: faking data
+        files+="~/tmp/madeup.txt"
+        linenumbers+="1"
+        lines+="$i"
     done
 
     if [[ "$acceptor" == '' ]] ; then
@@ -183,12 +200,15 @@ function ntsearch() {
 
     out=( "${(@0)out}" )
     out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
-    local i
-    for i in "$out[@]"
-    do
-        outFiles+="$nightNotes/$(<<<"$i" head -n 1)"
-    done
-    ec "${(@F)out}"
+
+    if test -z "$ntLines" ; then
+        local i
+        for i in "$out[@]"
+        do
+            outFiles+="$nightNotes/$(<<<"$i" head -n 1)"
+        done
+        ec "${(@F)out}"
+    fi
 }
 function ntsearch_() {
     : "See vnt, ntl"
@@ -223,7 +243,7 @@ function ntsearch_() {
     if test -z "$ntLines" ; then
         fzopts+='--read0'
     else
-        fzopts+=(--delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
+        fzopts+=(--read0 --delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
         ## Old previewer
         # local FZF_SHELL='zshplain.dash'
 #         previewcode=( 'ln={2} file={1} match={s3..} ; fileabs="$nightNotes/$file" ;
@@ -240,7 +260,7 @@ function ntsearch_() {
         # cpanm App::ansifold
         # https://metacpan.org/pod/Text::ANSI::WideUtil
         ##
-        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes)"
+        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) || printf -- \"\n\n%s \" {}"
     fi
 
     # we no longer need caching, it's fast enough
@@ -253,24 +273,15 @@ function ntsearch_() {
 
 }
 function ntsearch_fd() {
-    : "INPUT VARS: files ntLines nightNotes query_rg"
+    : "INPUT VARS: ntsearch_injector files ntLines nightNotes query_rg"
 
     if test -n "$ntLines" ; then
         {
             # no-messages suppresses IO errors
             # xargs is needed to avoid argument list too long error
-            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --smart-case --engine auto --no-messages --with-filename --line-number --sort path "$query_rg" } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
-        } | rmprefix "$nightNotes"
-            # sd "^$nightNotes" '' # sd is doing the work of `realpath --relative-to` . TODONE this doesn't quote and so is buggy
-        ## old way (uses vars now not in scope)
-        # i=1
-        # for line in "${(@f)content}" ; do
-        #     if test -n "$line" ; then
-        #         ec "${filename}:${i}:${line}"
-        #     fi
-        #     i=$((i+1))
-        # done
-        ##
+            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --smart-case --engine auto --no-messages --with-filename --line-number --sort path "$query_rg" | rmprefix "$nightNotes" $'\n' '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+        }
+        reval "$ntsearch_injector[@]"
     else
         local first='y' file filename content line i
         for file in "$files[@]"
