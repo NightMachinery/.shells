@@ -1,0 +1,3 @@
+#!/usr/bin/env dash
+
+brishzq.zsh zopen "$@"
