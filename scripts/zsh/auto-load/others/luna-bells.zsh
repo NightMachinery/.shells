@@ -126,7 +126,7 @@ function bell-auto() {
     }
     # You might need to use `sleep $timeout ; ...` to test bell-auto.
     local engine=( "${@:-bello}" )
-    local timeout="${bell_auto_t:-5}" # The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
+    local timeout="${bell_auto_t:-30}" # The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
     local sleep="${bell_auto_sleep:-${bell_auto_st:-0}}" # The lower, the more CPU usage in single mode.
     local single="${bell_auto_single:-${bell_auto_sm}}"
     local skipfirst="${bell_skip_first:-${bell_auto_sf}}"
@@ -178,3 +178,24 @@ aliasfn bell-zsh bell-zsh1
 aliasfn bella-zsh bell-auto bell-zsh
 @opts-setprefix bella-zsh bell-auto
 # aliasfn bellz bella-zsh # just use bellj?
+##
+aliasfn bella-magic ec '${ITERMMAGIC}'_BELLA
+function bella-zsh-magic() { ec "${ITERMMAGIC}_ZSH_BELLA_${ITERM_SESSION_ID}" }
+function bella-zsh-gateway() {
+    if isSSH ; then
+        bella-zsh-magic
+    else
+        bella-zsh-maybe
+    fi
+}
+function bella-zsh-maybe() {
+    # @notcrossplatform
+    local ITERM_SESSION_ID="${1:-$ITERM_SESSION_ID}" # brishz has its own bogus ITERM_SESSION_ID, so prefer explicit input
+    
+    isDarwin && iterm-session-is-active && {
+        local skipfirst=''
+        iterm-focus-is && skipfirst=y
+        silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
+        }
+}
+##

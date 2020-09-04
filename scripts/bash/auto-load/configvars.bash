@@ -1,6 +1,8 @@
 export LESS='-RiNF --mouse --wheel-lines=3' #F: --quit-if-one-screen ; R: maintain the ANSI colour sequences; i: smartcase searches (all lower=ignore case);  -N or --LINE-NUMBERS Causes a line number to be displayed at the beginning of each line in the display.
 isSSH && LESS="-RiNF"
 ##
+ITERMMAGIC=ITERM_MAGIC
+##
 dl_base_url='https://files.lilf.ir'
 fd_default=( --hidden --no-ignore )
 h2ed='html2epub-pandoc'
@@ -31,9 +33,9 @@ video_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
 createglob video_formats videoglob
 media_formats=( ${audio_formats[@]} ${video_formats[@]} )
 createglob media_formats mediaglob
-code_formats=( el py jl scala sc kt kotlin java clj cljs rkt js rs toml zsh dash bash sh ml php lua glsl frag go )
+code_formats=( el py jl scala sc kt kotlin java clj cljs rkt js rs zsh dash bash sh ml php lua glsl frag go )
 createglob code_formats codeglob
-config_formats=( ini json cson toml conf )
+config_formats=( ini json cson toml conf plist xml )
 createglob config_formats configglob
 text_formats=( $note_formats[@] $code_formats[@] $config_formats[@] )
 createglob text_formats textglob

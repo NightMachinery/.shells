@@ -29,3 +29,6 @@ function k2pdfopt() {
         command k2pdfopt_linux "$@"
     fi
 }
+function mosh() {
+  command mosh --server="ITERM_SESSION_ID=$ITERM_SESSION_ID mosh-server" "$@" # -- zsh
+}
