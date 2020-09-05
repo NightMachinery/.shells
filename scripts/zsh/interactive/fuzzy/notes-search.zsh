@@ -41,6 +41,9 @@ function remd() {
     local cmonth="$now[2]"
     local cday="$now[3]"
 
+
+    local ntsearch_additional_paths=( "$remindayBakDir/$cyear/$cmonth/$cday"*(N.) )
+
     if (( cmonth == 12 )) ; then
         local nextYear=$((cyear+1))
 

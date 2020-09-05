@@ -80,7 +80,7 @@ function rem-todaypaths() {
     local cmonth="$now[2]"
     local cday="$now[3]"
 
-    today=( "$remindayDir/$cyear/$cmonth/$cday"*(N.) )
+    today=( "$remindayDir/$cyear/$cmonth/$cday"*(N.)  "$remindayBakDir/$cyear/$cmonth/$cday"*(N.) )
 }
 function rem-today() {
     local deleteMode="${rem_today_delete:-$rem_today_d}"
@@ -106,6 +106,7 @@ function rem-today() {
     ec "$text"
 }
 function rem-today-notify() {
+    cellp
     local text="$(rem-today)"
     if test -n "$text" ; then
         terminal-notifier -title "$(datej)" -message "$text"
