@@ -82,7 +82,6 @@ alias loops='loop-startover' #Oops :D
 #     # @todo0 @design make zsh functions cancelable. Useful for zopen.
 # }
 ##
-
 insubshell() {
     local cmd="$(gquote "$@")"
     insubshell-eval "$cmd"
@@ -92,7 +91,7 @@ insubshell-eval() {
     local marker="${awaysh_marker:-CLOWN_MARKER}"
 
     (
-        jobs -Z "$marker $cmd"
+        jobs -Z "zsh $marker $cmd" # keep zsh at first so doing, e.g., `pkill zsh` still works
         # https://unix.stackexchange.com/questions/169987/update-process-name-in-shell-is-it-possible/170322#170322
         # The thing is a quite of a hack, and before using it, one basically is required to first run zsh with long parameter list, to reserve enough space for argv, to then be able to assign strings of that length.
         eval "$cmd"
