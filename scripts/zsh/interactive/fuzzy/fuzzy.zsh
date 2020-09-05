@@ -50,7 +50,7 @@ function ffkill() {
     "$engine" "$@"  | inargsf revaldbg "$kill_engine[@]" $opts[@]
 }
 aliasfn fk ffkill
-aliasfn fkj ffkill JOKER_MARKER
+aliasfnq fkj ffkill "'JOKER_MARKER"
 aliasfn ffportlkill fkEngine=ffportl ffkill
 aliasfn killport ffportlkill
 function lsofp() {

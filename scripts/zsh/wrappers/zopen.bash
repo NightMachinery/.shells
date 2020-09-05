@@ -8,7 +8,7 @@ if test -z "$BASHRC_LOADED" ; then
     source ~/.bashrc
 fi
 
-brishzq.zsh insubshell zopen "${args[@]}" & # idk what would happen on print, we can use awaysh if necessary
+brishzq.zsh awaysh-named JOKER_MARKER zopen "${args[@]}" & # idk what would happen on print, we can use awaysh if necessary
 
 # brishzq.zsh ec test
 # brishz.dash ec test2

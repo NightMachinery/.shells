@@ -17,16 +17,16 @@ function ps-grandchildren() {
   done
 }
 function kill-withchildren() {
-    local sig=2
+    local sig=15 # TERM
     if [[ "$1" =~ '-\d+' ]] ; then
         sig="$1"
         shift
     fi
     local pids=("$@") pid
 
-
+    local children
     for pid in "$pids[@]" ; do
-        local children=("${(@f)$(ps-grandchildren "$pid")}") child
+        children=("${(@f)$(ps-grandchildren "$pid")}")
         kill -$sig "$pid" "$children[@]"
     done
 }

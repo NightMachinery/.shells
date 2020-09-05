@@ -82,22 +82,34 @@ alias loops='loop-startover' #Oops :D
 #     # @todo0 @design make zsh functions cancelable. Useful for zopen.
 # }
 ##
+
 insubshell() {
+    local cmd="$(gquote "$@")"
+    insubshell-eval "$cmd"
+}
+insubshell-eval() {
+    local cmd="$@"
+    local marker="${awaysh_marker:-CLOWN_MARKER}"
+
     (
-        local cmd="$(gquote "$@")"
-        jobs -Z "JOKER_MARKER $cmd"
+        jobs -Z "$marker $cmd"
         # https://unix.stackexchange.com/questions/169987/update-process-name-in-shell-is-it-possible/170322#170322
         # The thing is a quite of a hack, and before using it, one basically is required to first run zsh with long parameter list, to reserve enough space for argv, to then be able to assign strings of that length.
         eval "$cmd"
-        # reval "$@"
     )
 }
-inbg() {
-    ( eval "$(gquote "$@")" & ) &>/dev/null </dev/null # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
+awaysh() {
+    local cmd="$(gquote "$@") &"
+
+    insubshell-eval "$cmd" &>/dev/null </dev/null # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
     disown &>/dev/null  # Prevent whine if job has already completed
 }
 # awaysh() inbg silent "$@"
-aliasfn awaysh inbg
+aliasfn inbg awaysh
+function awaysh-named() {
+    # note that somehow using simple commands like sleep will not retain the parent process (and so you can't see its name either), but wrapping that sleep in a function will keep the executing subshell alive. Idk why.
+    awaysh_marker="$1" awaysh "${@:2}"
+}
 function away() {
     : "Use awaysh, that seems better in every single case."
 
