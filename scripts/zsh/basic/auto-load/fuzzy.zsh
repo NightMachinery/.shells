@@ -15,7 +15,7 @@ function fz() {
     test -n "$fz_no_preview" || opts+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window down:7:wrap:hidden)
     
     # FNSWAP: fzf-noempty
-    SHELL="${FZF_SHELL:-$(rp dash)}" fzf-noempty --bind 'shift-up:toggle+up,shift-down:toggle+down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-a:select-all' --color=light --multi --hscroll-off 99999 "${(@)opts}" "$@"
+    SHELL="${FZF_SHELL:-$(rp dash)}" fzf-noempty "${(@)opts}" "$@" # moved options to FZF_DEFAULT_OPTS
     # --select-1 
 }
 function fzf-noempty() {

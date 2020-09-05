@@ -34,7 +34,18 @@ function ot-rep() {
     # fi
     ##
     local code="$(in-or-args "$@")"
-    rep --port "$OVERTONE_PORT" "$code"
+    local cmd=(rep --port "$OVERTONE_PORT" "$code")
+    local noretry="$ot_rep_noretry"
+
+    "$cmd[@]" || {
+      if test -z "$noretry" ; then
+      ot_rep_noretry=y ot-server-daemon
+      "$cmd[@]" && return 0
+      fi
+      redo2 3 fsay "Overtone is down ..."
+      return 1
+    }
+
 }
 function ot-stop() {
     ot-rep "(stop)"

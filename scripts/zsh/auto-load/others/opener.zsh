@@ -5,8 +5,9 @@ function zopen() {
     test -z "$f" && return 1
     case "$ext" in
         wav) hearinvisible "$f" ;;
+        zip|rar|7z) unzip2dir "$f" ;;
         *) fsay "Unsupported file" ;;
     esac
-    sleep 20
+    # sleep 20
 }
 aliasfn zop zopen

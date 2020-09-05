@@ -182,7 +182,7 @@ mu() {
     }
     songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
-muc() { fz_opts=(--no-sort) songc --loop-playlist "$@" }
+muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$@" }
 svpl() {
     # Save Playlist save-playlist save-pl
     mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
