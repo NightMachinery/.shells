@@ -73,17 +73,17 @@ function e() {
     echo $? "${pipestatus[@]}" "${PIPESTATUS[@]}"
 }
 function argerdbg() {
-	isNotDbg || {
+    isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")
-	coN=y coNr=y color "$errcol[@]" ''
-	argerng "$@"
-	resetcolor
-	}
+        coN=y coNr=y color "$errcol[@]" ''
+        argerng "$@"
+        resetcolor
+    } >&2
 }
 function revaldbg() {
-	ecdbg "$(gq "$@")"
-	argerdbg "$@"
-	reval "$@"
+    ecdbg "$(gq "$@")"
+    argerdbg "$@"
+    reval "$@"
 }
 echo-fin() { arger "$fin[@]" } # Useful for debugging env
 function dbgserr() {

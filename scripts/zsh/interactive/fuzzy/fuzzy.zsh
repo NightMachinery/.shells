@@ -34,15 +34,23 @@ function ffps() {
 }
 function ffkill() {
     doc "alt: fkill; [fkEngine=ffps] ffkill ..."
-    local engine="${fkEngine:-ffps}"
+    local engine=("${(@)fkEngine:-ffps}")
+    local kill_engine=("${(@)ffkill_ke:-kill-withchildren}")
+    ## Abandoned designs
+    # local kg="${ffkill_group}" # kill the whole process group. (BUT ffps doesn't return a PGID)
+    # test -n "$kg" && kg='-'
+    # | inargsf revaldbg mapg "${kg}"'${i}'
+    ##
+
     local opts=()
     if [[ "$1" =~ '-\d+' ]] ; then
         opts+="$1"
         shift
     fi
-    "$engine" "$@" | inargsf kill $opts[@]
+    "$engine" "$@"  | inargsf revaldbg "$kill_engine[@]" $opts[@]
 }
 aliasfn fk ffkill
+aliasfn fkj ffkill JOKER_MARKER
 aliasfn ffportlkill fkEngine=ffportl ffkill
 aliasfn killport ffportlkill
 function lsofp() {

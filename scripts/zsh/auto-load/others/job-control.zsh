@@ -78,6 +78,20 @@ loop interrupted' ; sig2=666
 loop-startover() { edPre=$'\n' ecdate "Signal from loop-startover${@:2}" | socat -u - unix-connect:${1} }
 alias loops='loop-startover' #Oops :D
 ##
+# function cancelable() {
+#     # @todo0 @design make zsh functions cancelable. Useful for zopen.
+# }
+##
+insubshell() {
+    (
+        local cmd="$(gquote "$@")"
+        jobs -Z "JOKER_MARKER $cmd"
+        # https://unix.stackexchange.com/questions/169987/update-process-name-in-shell-is-it-possible/170322#170322
+        # The thing is a quite of a hack, and before using it, one basically is required to first run zsh with long parameter list, to reserve enough space for argv, to then be able to assign strings of that length.
+        eval "$cmd"
+        # reval "$@"
+    )
+}
 inbg() {
     ( eval "$(gquote "$@")" & ) &>/dev/null </dev/null # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
     disown &>/dev/null  # Prevent whine if job has already completed

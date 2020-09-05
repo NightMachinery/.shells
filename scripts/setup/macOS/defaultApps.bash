@@ -23,6 +23,10 @@ function set-defaults() {
     # duti -s $cf_iterm "" all
     ## zopen
     duti -s $cf_zopen com.microsoft.waveform-audio all
+    duti -s $cf_zopen public.mp3 all
+    duti -s $cf_zopen com.apple.m4a-audio all
+    duti -s $cf_zopen public.mpeg-4-audio all
+    duti -s $cf_zopen public.audio all
     duti -s $cf_zopen "public.zip-archive" all
     duti -s $cf_zopen "org.idpf.epub-container" all
     duti -s $cf_zopen "public.mobi" all
