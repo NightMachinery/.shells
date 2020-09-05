@@ -88,7 +88,7 @@ insubshell() {
 }
 insubshell-eval() {
     local cmd="$@"
-    local marker="${awaysh_marker:-CLOWN_MARKER}"
+    local marker="${awaysh_marker:-AWAYSH_MARKER}"
 
     (
         jobs -Z "zsh $marker $cmd" # keep zsh at first so doing, e.g., `pkill zsh` still works

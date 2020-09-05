@@ -120,6 +120,7 @@ function h_@gather() {
             break
         fi
         current_name="${VAR_PREFIX}$i"
+        current_name="${current_name//-/_}" # variables can't have - in their name
         unset $current_name
         i=$(($i+1))
         if [[ "$key" == "$ARRAY_START" ]] ; then
@@ -167,7 +168,8 @@ function h_@opts() {
     unset magic_cmd
     [[ "$prefix" == magic ]] && {
         prefix="${magic_opts_prefixes[$cmd[1]]:-$cmd[1]}_"
-        prefix="${prefix//-/_}" # variables can't have - in their name
+        # Now done for all of the variable names, so redundant here:
+        # prefix="${prefix//-/_}" # variables can't have - in their name
     }
     ecdbg "magic opts final prefix: $prefix"
     set -- "$magic_gathered_vars[@]"
@@ -181,7 +183,7 @@ function h_@opts() {
     # ecdbg "$0 magic vars: $@"
     while (( $#@ != 0 )) ; do
         # ecdbg "entered opts loop"
-        var="$1"
+        var="${1//-/_}"
         shift
         varval=( "${(P@)var}" )
         unset "$var"
@@ -190,11 +192,12 @@ function h_@opts() {
             ecerr "$0: empty key supplied. Aborting."
             return 1
         }
-        var2="$1"
+        var2="${1//-/_}"
         shift
         var2val=( "${(P@)var2}" )
         unset "$var2"
         varname="${prefix}${varval}"
+        varname="${varname//-/_}"
         unset "$varname"
         setcmd="typeset -a ${varname}=( $(gq "$var2val[@]") )"
         ecdbg "setcmd: $setcmd"
