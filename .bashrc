@@ -17,11 +17,13 @@ source "$NIGHTDIR"/zsh/basic/conditions.zsh
 ##
 source ~/.shared.sh
 ### Interactive
-bind '"\e[A": history-search-backward'
-bind '"\e[B": history-search-forward'
+if isI ; then
+    bind '"\e[A": history-search-backward'
+    bind '"\e[B": history-search-forward'
+    ##
+    # This takes a whole second to load
+    # [ -f /usr/local/etc/bash_completion ] && . /usr/local/etc/bash_completion
+    ##
+fi
 ##
-[ -f /usr/local/etc/bash_completion ] && . /usr/local/etc/bash_completion
-
-
-
-
+export BASHRC_LOADED=y

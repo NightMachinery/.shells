@@ -198,7 +198,7 @@ function prompt_pure_check_cmd_exec_time () {
     prompt_pure_human_time_to_var $elapsed "prompt_pure_cmd_exec_time"
   }
 
-  (( elapsed > ${BELL_EXEC_TIME:-10} )) && {
+  (( elapsed > ${BELL_EXEC_TIME:-5} )) && {
     bella-zsh-gateway
   }
 }
