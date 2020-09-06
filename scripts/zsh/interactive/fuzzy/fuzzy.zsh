@@ -37,7 +37,7 @@ function ffkill() {
     local engine=("${(@)fkEngine:-ffps}")
     local kill_engine=("${(@)ffkill_ke:-kill-withchildren}")
     ## Abandoned designs
-    # local kg="${ffkill_group}" # kill the whole process group. (BUT ffps doesn't return a PGID)
+    # local kg="${ffkill_group}" # kill the whole process group. (https://unix.stackexchange.com/a/14853/282382)
     # test -n "$kg" && kg='-'
     # | inargsf revaldbg mapg "${kg}"'${i}'
     ##
