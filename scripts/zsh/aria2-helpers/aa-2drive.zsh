@@ -6,7 +6,7 @@ local num="$2"
     ecerr "$num files supplied to aa-2drive. Aborting."
     return 1
 }
-local relative="${$(realpath --relative-to "$(pwd)" "$full"):h}"
+local relative="${$(realpath-relchild "$(pwd)" "$full"):h}"
 ecdbg pwd is "$(pwd)"
 [[ "$relative" == '.' ]] && relative=''
 rgeval rcr copy "$full" "rabbit0:aa/$relative" && {

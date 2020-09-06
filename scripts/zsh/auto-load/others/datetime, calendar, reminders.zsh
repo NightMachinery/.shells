@@ -61,7 +61,9 @@ function reminday_store() {
     dest="$dest".md
     ensure-dir "$dest" || return 1
     ec "$text"$'\n' >> $dest
-    ec "$dest : $text"
+    Bold ; color 100 255 200 "$dest : $text" ; resetcolor
+    ec $'\n'
+    cellp # to sync the reminders
 }
 function remn() {
     local text="$1" natdate="${@:2}"
@@ -80,7 +82,16 @@ function rem-todaypaths() {
     local cmonth="$now[2]"
     local cday="$now[3]"
 
-    today=( "$remindayDir/$cyear/$cmonth/$cday"*(N.)  "$remindayBakDir/$cyear/$cmonth/$cday"*(N.) )
+    today=( "$remindayBakDir/$cyear/$cmonth/$cday"*(N.) "$remindayDir/$cyear/$cmonth/$cday"*(N.) ) # backups should be first, as the normal ones get appended to them (and so can cause duplicates if they come first)
+}
+function rem_extract-date-path() {
+    local f="$(realpath "$1")"
+    if [[ "$f" =~ '(\d\d\d\d/\d\d/\d\d.*)' ]] ; then
+        ec "$match[1]"
+    else
+        ecerr "Couldn't get date path components of: $f"
+        return 1
+    fi
 }
 function rem-today() {
     local deleteMode="${rem_today_delete:-$rem_today_d}"
@@ -92,16 +103,15 @@ function rem-today() {
     local f bak
     for f in $today[@] ; do
         if test -e "$f" ; then
-            text="$text"$'\n'"$(<$f)"
+            text="$text"$'\n'"${$(<$f ; ec .)[1,-2]}"
             if test -n "$deleteMode" ; then
-                bak="$(realpath --relative-to "$remindayDir" "$f")"
+                bak="$(rem_extract-date-path "$f")"
                 bak="${remindayBakDir}/$bak"
-                ensure-dir "$bak"
-                mv "$f" "$bak"
-                rmdir-empty "$remindayDir"
+                serr append-f2f "$f" "$bak" && command rm "$f" # not deleting if the source is the same as the dest
             fi
         fi
     done
+    rmdir-empty "$remindayDir"
 
     ec "$text"
 }

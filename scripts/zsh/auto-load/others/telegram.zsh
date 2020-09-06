@@ -29,7 +29,7 @@ function tlg-file-captioned() {
     local rec="$me"
 
     for file in $files[@] ; do
-        file="$(realpath --relative-to $PWD "$file")"
+        file="$(realpath-relchild $PWD "$file")"
         tsend --file "$file" -- "$rec" "$file"
         ec "Sent $file to $rec"
     done

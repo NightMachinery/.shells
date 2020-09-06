@@ -282,7 +282,7 @@ function ntsearch_fd() {
         {
             # no-messages suppresses IO errors
             # xargs is needed to avoid argument list too long error
-            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --smart-case --engine auto --no-messages --with-filename --line-number --sort path "$query_rg" | rmprefix "$nightNotes" $'\n' '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --smart-case --engine auto --no-messages --with-filename --line-number --sort path -- "$query_rg" | rmprefix "$nightNotes" $'\n' '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
         }
         reval "$ntsearch_injector[@]"
     else
@@ -299,7 +299,7 @@ function ntsearch_fd() {
                 fi
             }
             first=''
-            filename="$(realpath --relative-to $nightNotes $file)"
+            filename="$(realpath-relchild $nightNotes $file)" # idk if realpath-relchild is appropriate here, we might have assumed that the path is really relative to nightNotes
             content="$(< $file)"
             color 30 90 255 $filename$'\n'
             ec $content
