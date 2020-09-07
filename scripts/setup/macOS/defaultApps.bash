@@ -24,6 +24,7 @@ function set-defaults() {
     ## zopen
     duti -s $cf_zopen com.microsoft.waveform-audio all
     duti -s $cf_zopen public.mp3 all
+    duti -s $cf_zopen public.mp2 all
     duti -s $cf_zopen com.apple.m4a-audio all
     duti -s $cf_zopen public.mpeg-4-audio all
     duti -s $cf_zopen public.audio all
