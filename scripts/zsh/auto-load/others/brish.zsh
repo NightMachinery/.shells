@@ -24,15 +24,6 @@ function caddypass() {
     # export GARDEN_SALT0_B64="$(print -nr -- "$GARDEN_SALT0" | base64)"
 }
 ##
-function h2e-stdin() {
-    h2e "$@" =(</dev/stdin)
-}
-function w2e-rpaste() {
-    local html="$(pbpaste)"
-    brishz_in="$html" brishzr h2e-stdin "$@"
-}
-aliasfn weep w2e-rpaste
-##
 aliasfn bsh brishz
 aliasfn bshr brishzr # You can also use .a
 aliasfn brishz-all brishz %GARDEN_ALL

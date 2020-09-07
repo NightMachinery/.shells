@@ -7,7 +7,7 @@ function zopen() {
         }
         local ext="${f:e}" usemime=''
         case "$ext" in
-            wav|mp3|m4a) hearinvisible "$f" ;;
+            wav|mp2|mp3|m4a) hearinvisible "$f" ;;
             zip|rar|7z) unzip2dir "$f" ; bello ;;
             mobi|epub|azw*) awaysh ebook-viewer "$f" ;;
             *) usemime=y ;;

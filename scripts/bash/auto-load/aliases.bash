@@ -36,8 +36,20 @@ alias lm='l -s modified'
 alias la='ls-by-added|tac'
 alias lac='l -s accessed'
 function last-exa() {
+    # Usage:
+    # last-exa created
+    # last-exa created SOME_DIR
+    # Illegal: last-exa created SOME_File ...
+    #   Because exa doesn't sort them. exa is stupid. Use `array=(*.sh(Nom))` instead: o -> sort, m -> mod date
+    #   https://unix.stackexchange.com/a/214280/282382
+    ##
+    local dir="$(bottomdir "${2:-.}")"
     # Ignoring hidden files, add --all to show them
-    ec "${2:-.}/$(exa --sort "$@"|tail -n1)"
+    local rs="$(exa --sort "$@"|tail -n1)"
+    if ! [[ "$rs" =~ '^/' ]] ; then
+        rs="$dir/$rs"
+    fi
+    ec "$rs"
 }
 alias last-created='last-exa created'
 alias last-accessed='last-exa accessed'
