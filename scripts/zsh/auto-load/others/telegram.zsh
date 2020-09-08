@@ -3,6 +3,7 @@ alias tsmf='tsendf $me'
 function tnotif() {
     local msg="$*"
 
+    matrix-send-self "$msg"
     tsend --parse-mode markdown -- "$tlg_notifs" "$msg"
 }
 ##
