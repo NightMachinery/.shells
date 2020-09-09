@@ -32,3 +32,11 @@ function k2pdfopt() {
 function mosh() {
   command mosh --server="ITERM_SESSION_ID=$ITERM_SESSION_ID mosh-server" "$@" # -- zsh
 }
+function ffmpeg() {
+    isI && command ffmpeg "$@" || command ffmpeg -loglevel error "$@"
+}
+function youtube-dl() {
+    local opts=()
+    isI || opts+=( --quiet --no-progress )
+    transformer urlfinalg "command $proxycmd youtube-dl $opts[@]" "$@"
+}

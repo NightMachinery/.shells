@@ -51,3 +51,4 @@ alias pz='printz-quoted' # USEME for using zsh history suggestions effectively; 
 ##
 alias bw='sudo bandwhich'
 ##
+alias o="@opts"

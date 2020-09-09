@@ -44,8 +44,8 @@ function gquote() {
 }
 alias gq=gquote
 function run-on-each() {
-    doc "Note that run-on-each won't run anything at all if no arguments are supplied"
-    doc Use unusual name not to shadow actual vars
+    # doc "Note that run-on-each won't run anything at all if no arguments are supplied"
+    # doc Use unusual name not to shadow actual vars
     local i98765
     for i98765 in "${@:2}"
     do
@@ -53,5 +53,14 @@ function run-on-each() {
     done
 }
 alias re='run-on-each'
+function re-async() {
+    # doc "Note that run-on-each won't run anything at all if no arguments are supplied"
+    # doc Use unusual name not to shadow actual vars
+    local i98765
+    for i98765 in "${@:2}"
+    do
+        eval "$1 $(gquote "$i98765")" &
+    done
+}
 run-on-each setopt re_match_pcre extendedglob pipefail
 run-on-each unsetopt autopushd
