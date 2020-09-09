@@ -1,3 +1,8 @@
+function glan() {
+    # --time sets the refresh delay in seconds
+    # --byte display network rate in byte per second
+    glances --time 10 --theme-white --disable-webui --fs-free-space --byte --process-short-name "$@"
+}
 function ppgrep() {
     case "$(uname)" in
         Darwin)
