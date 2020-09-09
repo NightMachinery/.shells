@@ -57,3 +57,4 @@ xkcdpass
 yapf
 yq
 hachoir
+fanficfare
