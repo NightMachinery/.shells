@@ -86,9 +86,10 @@ insubshell() {
     local cmd="$(gquote "$@")"
     insubshell-eval "$cmd"
 }
+@opts-setprefix insubshell insubshell-eval
 insubshell-eval() {
     local cmd="$@"
-    local marker="${awaysh_marker:-AWAYSH_MARKER}"
+    local marker="${insubshell_eval_marker:-${insubshell_eval_m:-AWAYSH_MARKER}}"
 
     (
         jobs -Z "zsh $marker $cmd" # keep zsh at first so doing, e.g., `pkill zsh` still works
@@ -103,11 +104,18 @@ awaysh() {
     insubshell-eval "$cmd" &>/dev/null </dev/null # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
     disown &>/dev/null  # Prevent whine if job has already completed
 }
+@opts-setprefix awaysh insubshell-eval
 # awaysh() inbg silent "$@"
 aliasfn inbg awaysh
 function awaysh-named() {
     # note that somehow using simple commands like sleep will not retain the parent process (and so you can't see its name either), but wrapping that sleep in a function will keep the executing subshell alive. Idk why.
-    awaysh_marker="$1" awaysh "${@:2}"
+    insubshell_eval_marker="$1" awaysh "${@:2}"
+}
+function awaysh-bnamed() {
+    brishz awaysh-named "$@"
+}
+function insubshell-bnamed() {
+    brishz @opts marker "$1" @ insubshell "${@:2}"
 }
 function away() {
     : "Use awaysh, that seems better in every single case."

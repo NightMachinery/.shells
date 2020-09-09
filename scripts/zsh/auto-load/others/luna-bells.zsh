@@ -8,7 +8,7 @@ luna() {
 }
 ##
 lunas() {
-    lunar brishz awaysh-named LUNA_MARKER bell-many
+    lunar awaysh-bnamed LUNA_MARKER bell-many
 }
 bell-many() {
     setopt localtraps
