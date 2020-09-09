@@ -2,6 +2,7 @@
 # noise here to stop emacs from thinking this is C code
 
 {
+    experimental_http3
 	order webdav after basicauth
 }
 
