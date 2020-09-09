@@ -9,7 +9,7 @@ function comp_wh() {
         done
     done
 }
-comp_wh cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp p tldr re inargs-gen inargsE-gen agf agfi ags agsi fi-rec
+comp_wh run-on-each re-async cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp p tldr re inargs-gen inargsE-gen agf agfi ags agsi fi-rec
 ##
 rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 rexa "compdef _=man" mn

@@ -1,13 +1,14 @@
 function lunar() {
     deluna ${deluna} & # timeout of deluna
-    lo_s=$((60*${lo_min:-45})) lo_noinit=y lo_p=${lo_p:-~/tmp/.luna} loop "$@"
+    # lo_min should include the rest time as well, as the bells are sounded in the background currently.
+    lo_s=$((60*${lo_min:-50})) lo_noinit=y lo_p=${lo_p:-~/tmp/.luna} loop "$@"
 }
 luna() {
     lunar pmset displaysleepnow
 }
 ##
 lunas() {
-    lunar bell-many
+    lunar brishz awaysh-named LUNA_MARKER bell-many
 }
 bell-many() {
     setopt localtraps
@@ -50,12 +51,15 @@ bell-greencase() {
 aliasfn bell-luna bell-avarice
 # aliasfn bell-luna bell-greencase
 ##
-aliasfn lunaquit loop-startover ~/tmp/.luna
+function lunaquit() {
+    loop-startover ~/tmp/.luna "$@"
+    pgrep LUNA_MARKER | inargsf reval-ec serr kill-withchildren
+}
 aliasfn lq lunaquit
 function deluna() {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
-    local timeout="${1:-150}" # 150 is good for PC work, but 800 might be better for reading, as the screen dims in 10 minutes
+    local timeout="${1:-240}" # 150 is good for PC work, but 800 might be better for reading, as the screen dims in 10 minutes
     ec "deluna (nonce: $nonce) started with timeout $timeout"
     while oneinstance $0 $nonce
     do
@@ -68,16 +72,16 @@ function deluna() {
     done
     ec deluna exited "(nonce: $nonce)"
 }
-function nnl() {
-    mdoc "Not Now Luna!" MAGIC
-    local started="$(date +"%s")"
+function notnowluna() {
+    mdoc "DEPRECATED: Using lunaquit handles this usecase as well nowadays.
+Not Now Luna!" MAGIC
     local vol="$(get-volume)"
     local timeout=150
-    isDbg && timeout=5
 
     set-volume 0
 
     # No need for this much force:
+    # local started="$(date +"%s")"
     # while (( ($(date +"%s") - $started) <= $timeout ))
     # do
     #     set-volume 0

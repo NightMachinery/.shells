@@ -2,7 +2,7 @@
 export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Functions
 function hear-noipc() {
-    local vol="${hear_noipc_volume:-${hear_noipc_v:-40}}"
+    local vol="${hear_noipc_volume:-${hear_noipc_v:-70}}"
     command mpv --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
 }
 aliasfn hearinvisible silent hear-noipc --no-terminal --load-scripts=no

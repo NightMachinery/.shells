@@ -1,3 +1,29 @@
+function merge-mp3() {
+    local out="${merge_mp3_out:-${merge_mp3_o:-merged.mp3}}"
+    { test -z "$out" } && { # redundant
+        ecerr "$0: Empty output name. Aborting"
+        return 1
+    }
+    test -z "${out:e}" && out="${out}.mp3"
+    local inputs=() i input_len="${#@}"
+    for i in "$@" ; do
+        inputs+=( -i "$i" )
+    done
+
+    reval-ec ffmpeg "$inputs[@]" -filter_complex amix=inputs="${input_len}":duration=longest "$out"
+}
+swap-audio() {
+    ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
+}
+audio-join() {
+    mdocu '<output> <audio-file> ...
+Joins the <audio-file>s into <output>. Automatically sets the extension of <output>.
+Outs: aj_out -> The output file. (Might be relative.)' MAGIC
+
+    aj_out="$1.${2:e}" # GLOBAL
+    ffmpeg -i "concat:${(j:|:)@[2,-1]}" -acodec copy "$aj_out"
+}
+##
 function 2mp3() {
     jglob
     local i="$1"

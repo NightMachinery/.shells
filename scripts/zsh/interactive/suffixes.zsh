@@ -13,7 +13,7 @@ if [[ -n "$XIVIEWER" ]]; then
 fi
 
 for ft in $video_formats; do alias -s $ft=mpv; done
-for ft in $audio_formats; do alias -s $ft=hear; done
+for ft in $audio_formats; do alias -s $ft=hearinvisible; done
 
 #list whats inside packed file
 alias -s zip="unzip -l"
