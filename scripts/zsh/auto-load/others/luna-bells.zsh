@@ -68,7 +68,7 @@ function deluna() {
             lunaquit " via deluna"
             # { isDbg && sleep 1 } || sleep 30
         }
-        sleep 30 # to avoid cpu usage
+        sleep 3 # to avoid cpu usage
     done
     ec deluna exited "(nonce: $nonce)"
 }

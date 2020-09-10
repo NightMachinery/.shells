@@ -114,8 +114,11 @@ function awaysh-named() {
 function awaysh-bnamed() {
     brishz awaysh-named "$@"
 }
+function insubshell-named() {
+    @opts marker "$1" @ insubshell "${@:2}"
+}
 function insubshell-bnamed() {
-    brishz @opts marker "$1" @ insubshell "${@:2}"
+    brishz insubshell-named "${@}"
 }
 function away() {
     : "Use awaysh, that seems better in every single case."
