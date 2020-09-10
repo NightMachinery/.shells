@@ -58,3 +58,5 @@ yq
 hachoir
 fanficfare
 sumy
+ipydex
+plumbum
