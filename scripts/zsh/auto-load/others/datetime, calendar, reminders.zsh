@@ -116,11 +116,17 @@ function rem-today() {
     ec "$text"
 }
 function rem-today-notify() {
-    cellp
-    local text="$(rem-today)"
-    if test -n "$text" ; then
-        terminal-notifier -title "$(datej)" -message "$text"
-    fi
+    ensure-dir ~/logs/
+    {
+        ec "---"
+        date
+        cellp
+        local text="$(rem-today)"
+        if test -n "$text" ; then
+            reval-ec terminal-notifier -title "$(datej)" -message "$text"
+        fi
+        ec "---"
+    } >> ~/logs/rem-today-notify.txt  2>&1 | cat
 }
 function tlg-reminday() {
     local rec="$1"
