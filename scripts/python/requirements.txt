@@ -8,7 +8,6 @@ fire
 gensim
 git+https://github.com/NightMachinary/BrishGarden.git
 git+https://github.com/NightMachinary/brish.git
-git+https://github.com/s0hv/rsstail.py
 git+https://github.com/wustho/epr.git
 glances[action,browser,cloud,cpuinfo,docker,export,folders,gpu,graph,ip,raid,snmp,web,wifi]
 gnureadline
@@ -58,3 +57,4 @@ yapf
 yq
 hachoir
 fanficfare
+sumy
