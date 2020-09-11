@@ -1,6 +1,7 @@
 function play-tag() {
     local f="$1"
-    tag --add Green "$f"
+    # tag --add green "$f"
+    ntag-add "$f" CR
     mpv "$f"
 }
 function openv() {

@@ -918,6 +918,11 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     readest=""
     [[ "$cleanedhtml" != no ]] && readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)" # takes ~0.25s
 
+    local maxDesc=600
+    if (( ${#desc} > $maxDesc )) ; then
+        desc="${desc[1,$maxDesc]} ..."
+    fi
+
     if [[ "$mode" == md ]] ; then
         ec "* [${title:-$url}]($url)"
         test -z "$author" || ec "${indent}* By: $author"

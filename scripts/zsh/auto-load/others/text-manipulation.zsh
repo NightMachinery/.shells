@@ -5,6 +5,8 @@ dedent() {
     sd --flags m '^\s*' ''
 }
 function trim() {
+    : "Doesn't support multiline input, use trimsed for that"
+
     local out="$(in-or-args "$@")"
     [[ "$out" =~ '^\s*(.*\S)\s*$' ]] && out="$match[1]" || out=''
     print -nr -- "$out"
