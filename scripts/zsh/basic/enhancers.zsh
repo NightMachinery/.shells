@@ -3,15 +3,14 @@ function enh-savename() {
     # @design Adding a way to keep track of all saved names would be good.
 
     local n1="$1" n2="$2"
-
+    test -z "$2" && return 1
 
 
     typeset -A -g enhSavedNames
 
     test -n "${enhSavedNames[$n1]}" || {
-        if ! (( $+commands[$n2] || $+functions[$n2] || $+aliases[$n2] )) ; then
-            print -r -- "$0: n1=$n1; $n2 is probably invalid. (Use enh-savename after creating the renamed version, so we can verify that it exists.) Aborting." >&2
-            return 1
+        if isdbg && ! (( $+commands[$n2] || $+functions[$n2] || $+aliases[$n2] )) ; then
+            print -r -- "WARNING $0: n1=$n1; n2=$n2 is probably invalid. (Use enh-savename after creating the renamed version, so we can verify that it exists.)" >&2
         fi
         enhSavedNames[$n1]="$n2"
     }

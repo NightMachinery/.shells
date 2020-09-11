@@ -1,14 +1,18 @@
-aliasfn-ng ntl. ntLines=y nightNotes=. noteglob=$textglob ntl
-@opts-setprefix ntl. ntl
+function ntl() {
+    ntsearch_injector="unseal-get2note" ntsearch_glob='' ntsearch_rg_opts=($ntsearch_rg_opts[@] --iglob '*.txt' --iglob '*.md' --iglob '*.org') ntl-rg "$@"
+}
+noglobfn ntl
+aliasfnq-ng ntl. nightNotes=. ntsearch_glob='' ntsearch-lines # ntsearch_glob=$textglob
+@opts-setprefix ntl. ntsearch-lines
 aliasfn-ng see ntl.
-aliasfn-ng sees ntLines=y nightNotes=. noteglob=$textglob ntl-rg
-aliasfn-ng seesall ntLines=y nightNotes=. noteglob='*(.)' ntl-rg
+aliasfnq-ng sees nightNotes=. ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
+aliasfn-ng seesall ntsearch_rg_opts=(--no-ignore --hidden) nightNotes=. ntsearch_glob='' ntl-rg # still does not see binaries
 function seev() {
     init-vfiles
-    ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) noteglob=$textglob ntl-rg "$@"
+    ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) ntsearch_glob='' ntl-rg "$@" # ntsearch_glob=$textglob
 }
 noglobfn seev
-aliasfn-ng agsi ntLines=y nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) noteglob=$textglob ntl-rg
+aliasfn-ng agsi nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
 function agfi() {
     local f="$1"
     ntsearch_query_fzf="'$f '() | 'alias | 'alifn" agsi  # match functions or aliases
@@ -18,7 +22,7 @@ noglobfn agfi
 function ntt() {
     local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
 
-    ntsearch_injector="unseal-get2note" ntl-fzf "$query"
+    ntsearch_query_fzf="$query" ntl
 }
 ##
 function rem-fz() {
@@ -26,7 +30,9 @@ function rem-fz() {
     local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
 
     local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
-    ntl-fzf "'/reminders $query_pre $query"
+
+    local nightNotes="$remindayDir"
+    ntl-fzf "$query_pre $query"
 }
 aliasfn ntrem rem-fz
 aliasfn rem rem-fz
@@ -103,12 +109,12 @@ function vnt() {
 }
 ##
 function ntl-rg() {
-    ntsearch_query_rg="$*" ntl
+    ntsearch_query_rg="$*" ntsearch-lines
 }
 function ntl-fzf() {
-    ntsearch_query_fzf="$*" ntl
+    ntsearch_query_fzf="$*" ntsearch-lines
 }
-function ntl() {
+function ntsearch-lines() {
     : "Remember that ntsearch_ uses eval-memoi"
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"
     : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
@@ -214,7 +220,7 @@ function ntsearch() {
     fi
 }
 function ntsearch_() {
-    : "See vnt, ntl"
+    : "See vnt, ntsearch-lines"
     : "INPUT: ntsearch_query_rg, ntsearch_query_fzf, ntsearch_additional_paths, nightNotes, ntLines , GLOBAL: acceptor out"
 
     acceptor=''
@@ -227,11 +233,17 @@ function ntsearch_() {
     # local additional_paths=("${(@f)$(<<<${(F)ntsearch_additional_paths} filter test -e)}")
 
     dvar additional_paths
-    local glob="*${*}$noteglob"
+    local glob="*$ntsearch_glob"
     local files
     # files=( "${(@f)$(fd -e md -e txt -e org --full-path ${pattern} $nightNotes )}" )
     files=(${additional_paths[@]})
-    [[ "$nightNotes" != '/' ]] && files+=($nightNotes/**/${~glob}) # `/` means we are only interested in additional_paths, but since the machinary relies on nightNotes existing, we use `/`.
+    [[ "$nightNotes" != '/' ]] && {
+        if test -n "$ntsearch_glob" ; then
+            files+=($nightNotes/**/${~glob}) # `/` means we are only interested in additional_paths, but since the machinary relies on nightNotes existing, we use `/`.
+        else
+            files+="$nightNotes"
+        fi
+    }
     (( $#files == 0 )) && {
         ecerr "$0: No valid paths supplied. Aborting."
         return 1
@@ -276,13 +288,13 @@ function ntsearch_() {
 
 }
 function ntsearch_fd() {
-    : "INPUT VARS: ntsearch_injector files ntLines nightNotes query_rg"
+    : "INPUT VARS: ntsearch_injector ntsearch_rg_opts files ntLines nightNotes query_rg"
 
     if test -n "$ntLines" ; then
         {
             # no-messages suppresses IO errors
             # xargs is needed to avoid argument list too long error
-            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --smart-case --engine auto --no-messages --with-filename --line-number --sort path -- "$query_rg" | rmprefix "$nightNotes" $'\n' '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] -- "$query_rg" | rmprefix "$nightNotes" $'\n' '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
         }
         reval "$ntsearch_injector[@]"
     else

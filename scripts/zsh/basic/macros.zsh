@@ -12,9 +12,9 @@ function extract-head() {
 function h_aliasfn() {
     : "ruu might be needed. Example: aliasfn hi ruu someVar=12"
     local name="$1"
-    local goesto
-    goesto="$(extract-head)"
     local body="$@[2,-1]"
+    local goesto
+    goesto="$(extract-head "$body[@]")"
 
     functions[$name]="$body "'"$@"'
     test -z "$goesto" || {
@@ -31,11 +31,22 @@ function h_aliasfn() {
 alias aliasfn='\noglob h_aliasfn'
 function h_aliasfnq() {
     local name="$1"
-    local goesto="$2"
-    local body=("$@[2,-1]")
+    local goesto=""
+    local body=("$@[2,-1]") qbody=""
+    local i flag=''
+    while true ; do
+        if [[ "$body[1]" =~ '^([^=]*)=(.*)$' ]] ; then
+            qbody="${qbody}${match[1]}=$(gq "$match[2]") "
+            shift body
+        else
+            goesto="$body[1]"
+            qbody="${qbody}$(gq "$body[@]")"
+            break
+        fi
+    done
 
-    fnswap enh-savename true h_aliasfn "$name" "$(gq "${body[@]}")"
-    enh-savename "$name" "$goesto"
+    fnswap enh-savename true h_aliasfn "$name" "$qbody"
+    enh-savename "$name" "$goesto" || true
 }
 alias aliasfnq='\noglob h_aliasfnq'
 

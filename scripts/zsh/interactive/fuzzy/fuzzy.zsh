@@ -1,16 +1,6 @@
 ### SEE ALSO
 # spotlight, spt, spot
 ###
-aliasfn vc code-insiders --reuse-window --add # --add: Add a folder or multiple folders to the last active VS Code instance for a multi-root workspace.
-function coder() {
-    local p="$(<<<$1 sd "$HOME" /home/eva)"
-    rgeval code-insiders --reuse-window --remote 'ssh-remote+82.102.11.148' "$p"
-}
-aliasfn vr veditor=(coder) v
-aliasfn vcode veditor=(code-insiders --reuse-window)
-aliasfn ve veditor=(emc)
-aliasfn vv ve v
-##
 alias frc='frConfirm=y '
 alias cf='frc f'
 alias cfr='frc fr'
@@ -127,6 +117,7 @@ fffunctions() {
     printz "$(agfunc "${@:-.}" | fz --prompt 'Functions> ')"
 }
 alias ff=fffunctions
+###
 function init-vfiles() {
     : GLOBAL vfiles
 
@@ -181,8 +172,18 @@ function v() {
     local ve="$ve"
     reval "${veditor[@]}" "${(@)files}"
 }
-function vni() { fr "${veditor[@]}" . $NIGHTDIR }
 ##
+function vni() { fr "${veditor[@]}" . $NIGHTDIR }
+aliasfn vc code-insiders --reuse-window --add # --add: Add a folder or multiple folders to the last active VS Code instance for a multi-root workspace.
+function coder() {
+    local p="$(<<<$1 sd "$HOME" /home/eva)"
+    rgeval code-insiders --reuse-window --remote 'ssh-remote+82.102.11.148' "$p"
+}
+aliasfn vr veditor=(coder) v
+aliasfn vcode veditor=(code-insiders --reuse-window)
+aliasfn ve veditor=(emc)
+aliasfn vv ve v
+###
 function vp-ls() {
     arrN ~/Downloads/**/*.pdf ~/Base/_Books/**/*.pdf
 }

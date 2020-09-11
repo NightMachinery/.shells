@@ -9,7 +9,6 @@ alias agc='ec "${(F)commands}"|agC=0 rgm  --color=never'
 alias agfunc='ec "${(Fk)functions}"| agC=0 rgm  --color=never'
 alias rr=rgm
 alias rrn='rgm --line-number'
-aliasfn rd emcrg
 ##
 aliasfn fda fd --hidden --no-ignore #ag --unrestricted -g # search in the pathnames
 function fdrp() {
@@ -19,6 +18,7 @@ function fdrp() {
 function emcrg() {
     emc -e "(night/search-dir \"$(pwd)\")"
 }
+# aliasfn rd emcrg
 function ugm() {
     # https://github.com/Genivia/ugrep/issues/31
     ugrep --binary-files=without-match --pretty --context=3 --recursive --smart-case --sort=best --query=1 --no-confirm  --regexp="$*"

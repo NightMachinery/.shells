@@ -10,7 +10,6 @@ function yab() {
 }
 noglobfn yab
 ##
-aliasfn dir2ab da_nm=y dir2ab-merge
 function dir2ab-merge() {
 	mdoc "Usage: [da_nm=<not empty <-> no merge>] $0 <dir> [<output_name>]
 	Joins the audio files in <dir>, removes the originals, generates a podcast feed, and returns the url." MAGIC
@@ -53,6 +52,7 @@ function dir2ab-merge() {
 	get-dl-link $abdir/feed.rss
 	popf
 }
+aliasfn dir2ab da_nm=y dir2ab-merge
 
 movie2ab() {
 	mdocu '<link> ... [-t,--title=<title>]
