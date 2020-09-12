@@ -9,7 +9,11 @@ Uses ghostscript to rewrite the file without encryption." MAGIC
     gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="${in:r}_unencrypted.pdf" -c .setpdfwrite -f "$in"
 }
 function pdf-cover() {
-    convert "pdf:$1[0]" "png:$1:r.png"
+    local i="$1" out="${1:r}.png"
+    sout command gs -o "$out" -sDEVICE=pngalpha -dLastPage=1 "$i"
+    ## imagemagick sometimes did not work and didn't produce any error messages either
+    # convert "pdf:${i}[0]" "png:$out"
+    ##
 }
 pdf-count() {
   setopt local_options pipefail
