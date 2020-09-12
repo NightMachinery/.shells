@@ -2,7 +2,8 @@ test -z "$ZSH_PROFILEME" || zmodload zsh/zprof # use zprof -c to reset counters
 # Does not profile internals of functions well.
 
 set -o vi
-export disable_malice=y
+# export disable_malice=''
+export disable_malice='y'
 export NIGHT_PERSONAL=y
 source "$HOME/scripts/zsh/load-first.zsh"
 typeset -g NIGHT_NO_EXPENSIVE

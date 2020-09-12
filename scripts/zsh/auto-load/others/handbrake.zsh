@@ -1,7 +1,10 @@
 ##
 function hb265() {
   # --optimize          Optimize MP4 files for HTTP streaming
-  HandBrakeCLI --encoder x265_12bit --optimize -i "$1" -o "${2:-out}.mp4"
+  local i="$1"
+  local o="${2:-${1:r}_h265.mp4}"
+
+  HandBrakeCLI --encoder x265_12bit --optimize -i "$1" -o "$o"
 }
 ##
 aliasfnq hb265sharp_strongest  fnswap printz-quoted reval re "hbjson $NIGHTDIR'/configFiles/handbrake/H265 ising (strongest).json'"

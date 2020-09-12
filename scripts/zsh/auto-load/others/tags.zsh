@@ -77,7 +77,7 @@ function tag-apple-get() {
         return 1
     }
 
-    mdls -name kMDItemUserTags -raw "$f" -nullMarker '' | awk 'NR>1' | sed '$d' | prefixer -i $',\n' --skip-empty | trimsed
+    mdls -name kMDItemUserTags -raw "$f" -nullMarker '' | awk 'NR>1' | sed '$d' | prefixer --trim -i $',\n' --skip-empty
 }
 function ntag-fromapple() {
     local f="$1"
