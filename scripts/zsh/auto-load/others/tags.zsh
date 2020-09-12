@@ -1,5 +1,5 @@
 ##
-ntag_sep=',,'
+ntag_sep='.' # . is likely to conflict with existing names, but it's cute.
 ##
 function ntag-has() {
     local f="$1" tag="$2"
@@ -12,7 +12,7 @@ function ntag-add() {
         ecerr "$0: Nonexistent file: $f"
         return 1
     }
-    local ft="${f:t}" fe="${f:e}"
+    local ft="${f:t}" fe="${f:e}" fh="${f:h}"
     local ftr="${ft:r}"
 
     for tag in $tags[@] ; do
@@ -21,7 +21,7 @@ function ntag-add() {
         fi
     done
     test -z "$toadd[*]" || {
-        local dest="$( {
+        local dest="$fh/$( {
               print -nr -- "$ftr" | prefixer -i "${ntag_sep}" -o '\x00'
               print -nr -- $'\0'
               arr0 $toadd[@]
