@@ -1,4 +1,3 @@
-@postlight/mercury-parser
 bulksplash
 carbon-now-cli
 cf-warp
@@ -27,12 +26,13 @@ npm-check
 npmlist
 oji
 peerflix-server
+@postlight/mercury-parser
 puppeteer
 puppeteer-extra
 puppeteer-extra-plugin-repl
 puppeteer-extra-plugin-stealth
-random-word-cli
 randomcolor
+random-word-cli
 read-time-estimate
 seedrandom
 strip-ansi-cli
@@ -42,6 +42,3 @@ wikiquote-cli
 wikit
 youtube-dl-interactive
 zooqle
-chrono-node
-moment
-kitsu

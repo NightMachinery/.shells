@@ -1,8 +1,8 @@
-PyPDF2
 convertdate
 daudin
 dephell[full]
 ezgmail
+fanficfare
 fastapi[all]
 fire
 gensim
@@ -15,18 +15,20 @@ google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 google_images_download
+hachoir
 html5lib
 httpie
 https://github.com/jakubroztocil/httpie/archive/master.tar.gz
 imdbpy
 instaloader
+ipydex
 ipython
 iredis
 jedi
 jill
 json-rpc
-libgen.py
 libgenapi
+libgen.py
 magic-wormhole
 metadata-parser
 metadata_parser
@@ -38,6 +40,8 @@ passlib[bcrypt,argon2,totp]
 pdfCropMargins
 pexpect
 piep
+plumbum
+PyPDF2
 pypyp
 python-jose[cryptography]
 python-multipart
@@ -46,6 +50,7 @@ rich
 service_factory
 spotdl
 subliminal
+sumy
 syncer
 tgcrypto
 tqdm
@@ -55,8 +60,3 @@ wikiquotes
 xkcdpass
 yapf
 yq
-hachoir
-fanficfare
-sumy
-ipydex
-plumbum
