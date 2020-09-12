@@ -1,5 +1,6 @@
 ##
 ntag_sep='.' # . is likely to conflict with existing names, but it's cute.
+ntag_fd_opts=() # --no-ignore --hidden
 ##
 function ntag-has() {
     local f="$1" tag="$2"
@@ -14,6 +15,7 @@ function ntag-add() {
     }
     local ft="${f:t}" fe="${f:e}" fh="${f:h}"
     local ftr="${ft:r}"
+    test -z "$fe" && ftr="$ft" # :r strips the last dot even if the extension is empty
 
     for tag in $tags[@] ; do
         if ! ntag-has "$ft" "$tag" ; then
@@ -50,6 +52,7 @@ function ntag-rm() {
     }
     local ft="${f:t}" fh="${f:h}" fe="${f:e}"
     local ftr="${ft:r}"
+    test -z "$fe" && ftr="$ft"
 
     # if [[ "$ft" =~ '^([^.]*)(\..*)(\.[^.]*)$' ]] ; then
     #     dest="$(print -nr -- "$match[2]" | prefixer rm --skip-empty -i . -o . -- "$to_rm[@]")"
@@ -101,7 +104,7 @@ function ntag-toapple() {
             blue) reval-ec command tag --add Blue "$f" ;;
             purple) reval-ec command tag --add Purple "$f" ;;
             gray|grey) reval-ec command tag --add Gray "$f" ;;
-            *) reval-ec command tag --add "$tag" "$f" ;;
+            # *) reval-ec command tag --add "$tag" "$f" ;; # clutters things
         esac
     done
 }
@@ -150,8 +153,8 @@ function ntag-gen-rec() {
     test -e "$dir" || return 1
     dir="$(realpath "$dir")"
 
-    fd --no-ignore --hidden --type file --type symlink --type socket . "$dir" | inargsf re "$engine[@]"
-    fd --no-ignore --hidden --type directory . "$dir" | inargsf re "$engine[@]" # @todo @BUG: Having nested tagged directories can invalidate the path of the deeper dir. Crude workaround: run this function multiple times. (Sorting by, e.g., length should solve this?)
+    fd ${ntag_fd_opts[@]} --type file --type symlink --type socket . "$dir" | inargsf re "$engine[@]"
+    fd ${ntag_fd_opts[@]} --type directory . "$dir" | inargsf re "$engine[@]" # @todo @BUG: Having nested tagged directories can invalidate the path of the deeper dir. Crude workaround: run this function multiple times. (Sorting by, e.g., length should solve this?)
     reval "$engine[@]" "$dir" # last because renaming the root dir will invalidate all further operations
 }
 ##
@@ -171,7 +174,7 @@ function ntag-search() {
     # local nightNotes="${ntag_search_dir:-.}"
     # ntsearch_glob='' ntsearch_rg_opts=(-uuu) ntl-fzf "$query"
     ##
-    fd --no-ignore --hidden | fz --query "$query"
+    fd ${ntag_fd_opts[@]} | fz --query "$query"
 }
 aliasfn tgs ntag-search
 ##
