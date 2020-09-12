@@ -1,5 +1,5 @@
 zmodload zsh/terminfo zsh/system zsh/datetime
-autoload -U zargs #Necessary for scripts
+autoload -U zargs
 autoload -U regexp-replace
 ## Aliases
 alias ec='print -r --'
