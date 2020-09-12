@@ -10,17 +10,20 @@ function w2e-rpaste() {
 # aliasfn weep w2e-rpaste
 ##
 function w2e-dl() {
-    local file=( ~/Downloads/*.html(om) ) # Let it fail
-    file=$file[1]
-    ishtml-file "$file" || {
-        return 1
-    }
-    local name="${file:t:r}"
-    test -z "$name" && {
-        ecerr "$0: Empty name for file: $file"
-        return 1
-    }
-    reval-ec h2e "$name" "$file"
+    pushf ~/tmp/
+    {
+        local file=( ~/Downloads/*.html(om) ) # Let it fail
+        file=$file[1]
+        ishtml-file "$file" || {
+            return 1
+        }
+        local name="${file:t:r}"
+        test -z "$name" && {
+            ecerr "$0: Empty name for file: $file"
+            return 1
+        }
+        reval-ec h2e "$name" "$file"
+    } always { popf }
 }
 aliasfn weed w2e-dl
 ##

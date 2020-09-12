@@ -1,5 +1,3 @@
-# @todo refactor out creatig ftr to a function
-# @todo refactor out adding fe to dest to a function
 ##
 ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore ) # --no-ignore --hidden
@@ -42,6 +40,30 @@ function ntag-migrate-sep-rec() {
     ntag_gen_rec_e=(ntag-migrate-sep "$old" "$new") ntag-gen-rec "${fs[@]}"
 }
 ##
+function ntag_ftr() {
+    local f="$1"
+
+    local ft="${f:t}" # fe="${f:e}" fh="${f:h}"
+    local ftr="${ft:r}"
+    # test -z "$fe" && ftr="$ft" # :r strips the last dot even if the extension is empty
+    # [[ "$ntag_sep" == *. ]] && ftr="${ftr}."
+    [[ "${ftr}." == *"${ntag_sep}" ]] && ftr="${ftr}."
+    # [[ "${ftr}" == '' ]] && ftr="${ntag_sep}"
+    ec "$ftr"
+}
+function ntag_merge_dest_fe() {
+    local dest="$1" fe="$2"
+
+    if test -n "$fe" ; then
+        if [[ "$dest" == *. ]] ; then
+            dest="${dest}${fe}"
+        else
+            dest="${dest}.${fe}"
+        fi
+    fi
+
+    ec "$dest"
+}
 function ntag-has() {
     local f="$1" tag="$2"
     
@@ -54,10 +76,7 @@ function ntag-add() {
         return 1
     }
     local ft="${f:t}" fe="${f:e}" fh="${f:h}"
-    local ftr="${ft:r}"
-    # test -z "$fe" && ftr="$ft" # :r strips the last dot even if the extension is empty
-    # [[ "$ntag_sep" == *. ]] && ftr="${ftr}."
-    [[ "${ftr}." == *"${ntag_sep}" ]] && ftr="${ftr}."
+    local ftr="$(ntag_ftr "$f")"
 
     for tag in $tags[@] ; do
         if ! ntag-has "$ft" "$tag" ; then
@@ -66,17 +85,11 @@ function ntag-add() {
     done
     test -z "$toadd[*]" || {
         local dest="$fh/$( {
-              print -nr -- "$ftr" | prefixer -i "${ntag_sep}" -o '\x00'
+              print -nr -- "$ftr" | prefixer --skip-empty -i "${ntag_sep}" -o '\x00'
               print -nr -- $'\0'
               arr0 $toadd[@]
-               } | prefixer --skip-empty -i '\x00' -o "${ntag_sep}" )${ntag_sep}"
-        if test -n "$fe" ; then
-            if [[ "$dest" == *. ]] ; then
-                dest="${dest}${fe}"
-            else
-                dest="${dest}.${fe}"
-            fi
-        fi
+               } | prefixer -i '\x00' -o "${ntag_sep}" )${ntag_sep}"
+        dest="$(ntag_merge_dest_fe "$dest" "$fe")"
         ntag-mv "$f" "$dest" || return 1
     }
 }
@@ -86,10 +99,7 @@ function ntag-get() {
 
     local f="$1"
     local ft="${f:t}" fh="${f:h}" fe="${f:e}"
-    local ftr="${ft:r}"
-    # test -z "$fe" && ftr="$ft" # :r strips the last dot even if the extension is empty
-    # [[ "$ntag_sep" == *. ]] && ftr="${ftr}."
-    [[ "${ftr}." == *"${ntag_sep}" ]] && ftr="${ftr}."
+    local ftr="$(ntag_ftr "$f")"
 
     local tmp=("${(@0)$(<<<"$ftr" prefixer -i "${ntag_sep}" -o '\x00' )}")
 
@@ -106,27 +116,13 @@ function ntag-rm() {
         return 1
     }
     local ft="${f:t}" fh="${f:h}" fe="${f:e}"
-    local ftr="${ft:r}"
-    # test -z "$fe" && ftr="$ft" # :r strips the last dot even if the extension is empty
-    # [[ "$ntag_sep" == *. ]] && ftr="${ftr}."
-    dvar ftr before
-    [[ "${ftr}." == *"${ntag_sep}" ]] && ftr="${ftr}."
+    local ftr="$(ntag_ftr "$f")"
 
-    # if [[ "$ft" =~ '^([^.]*)(\..*)(\.[^.]*)$' ]] ; then
-    #     dest="$(print -nr -- "$match[2]" | prefixer rm --skip-empty -i . -o . -- "$to_rm[@]")"
-    #     if test -n "$dest" ; then
-    #         dest="${match[1]}.${dest}${match[3]}"
-    #     else
-    #         if [[ "${match[3]}" != '.' ]] ; then
-    #             dest="${match[1]}${match[3]}"
-    #         else
-    #             dest="${match[1]}" # No empty extension
-    #         fi
-    #     fi
-    # fi
-
-    # We should add the dot removed from ftr (Can thus cause a bug if there is no extension?)
-    dest="$(print -nr -- "${ftr}" | prefixer rm -i "${ntag_sep}" -o "${ntag_sep}" -- "$to_rm[@]")"
+    local origparts="$(print -nr -- "${ftr}" | prefixer -i "${ntag_sep}" -o '\x00')"
+    origparts=( "${(@0)origparts}" )
+    local newparts=( "${(@)origparts[2,-1]:|to_rm}" )
+    dest="${origparts[1]}${ntag_sep}$(arr0 "${newparts[@]}" |prefixer --skip-empty -i '\x00' -o "${ntag_sep}")${ntag_sep}"
+    # dest="$(print -nr -- "${ftr}" | prefixer rm -i "${ntag_sep}" -o "${ntag_sep}" -- "$to_rm[@]")"
     re dvar ftr dest ntag_sep
     local parts="$(print -nr -- "${dest}" | prefixer --skip-empty -i "${ntag_sep}" -o '\x00')"
     parts=( "${(@0)parts}" )
@@ -134,14 +130,7 @@ function ntag-rm() {
     if (( parts_len == 1 )) ; then # [[ "$dest" =~ '^(.*)(\Q'"${ntag_sep}"'\E)$' ]] ; then
         dest="${parts[1]}"
     fi
-    if test -n "$fe" ; then
-        if [[ "$dest" == *. ]] ; then
-            dest="${dest}${fe}"
-        else
-            dest="${dest}.${fe}"
-        fi
-    fi
-    # fi
+    dest="$(ntag_merge_dest_fe "$dest" "$fe")"
     if test -n "$dest" && [[ "$ft" != "$dest" ]] ; then
         dest="${fh}/$dest"
         ntag_rm_dest="$dest"
