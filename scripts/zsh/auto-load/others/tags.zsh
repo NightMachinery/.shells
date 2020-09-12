@@ -1,54 +1,85 @@
+##
+ntag_sep=',,'
+##
 function ntag-has() {
     local f="$1" tag="$2"
     
-    [[ "$f" == *.${tag}.* ]]
+    [[ "$f" == *"${ntag_sep}${tag}${ntag_sep}"* ]]
 }
 function ntag-add() {
     local f="$1" tags=("${@:2}") tag toadd=()
-    local ft="${f:t}"
     test -e "$f" || {
         ecerr "$0: Nonexistent file: $f"
         return 1
     }
+    local ft="${f:t}" fe="${f:e}"
+    local ftr="${ft:r}"
+
     for tag in $tags[@] ; do
         if ! ntag-has "$ft" "$tag" ; then
             toadd+="$tag"
         fi
     done
-    test -z "$toadd[*]" || reval-ec mv "$f" "${f:r}.${(j/./)toadd}.${f:e}"
+    test -z "$toadd[*]" || {
+        local dest="$( {
+              print -nr -- "$ftr" | prefixer -i "${ntag_sep}" -o '\x00'
+              print -nr -- $'\0'
+              arr0 $toadd[@]
+               } | prefixer --skip-empty -i '\x00' -o "${ntag_sep}" )${ntag_sep}"
+        if test -n "$fe" ; then
+            dest="${dest}.${fe}"
+        fi
+        reval-ec mv "$f" "$dest"
+    }
 }
 alias tg=ntag-add
 function ntag-get() {
     : "You might want to use realpath before passing a path to this function. Since the tags might be stored on symlinks, we don't do that here automatically."
 
-    local tmp=("${(@0)$(<<<"$1" prefixer -i . -o '\x00' )}")
+    local input="${1:r}"
+    local tmp=("${(@0)$(<<<"$input" prefixer -i "${ntag_sep}" -o '\x00' )}")
 
     local tags=( ${tmp[2,-2]} )
     arrN "$tags[@]"
 }
 function ntag-rm() {
-    local f="$1" to_rm=("${@:2}") dest
+    local f="$1" to_rm=("${@:2}") dest=''
     test -e "$f" || {
         ecerr "$0: Nonexistent file: $f"
         return 1
     }
-    local ft="${f:t}" fh="${f:h}"
+    local ft="${f:t}" fh="${f:h}" fe="${f:e}"
+    local ftr="${ft:r}"
 
-    if [[ "$ft" =~ '^([^.]*)(\..*)(\.[^.]*)$' ]] ; then
-        dest="$(print -nr -- "$match[2]" | prefixer rm --skip-empty -i . -o . -- "$to_rm[@]")"
-        if test -n "$dest" ; then
-            dest="${match[1]}.${dest}${match[3]}"
-        else
-            if [[ "${match[3]}" != '.' ]] ; then
-                dest="${match[1]}${match[3]}"
-            else
-                dest="${match[1]}" # No empty extension
-            fi
-        fi
-        if [[ "$ft" != "$dest" ]] ; then
-            dest="${fh}/$dest"
-            reval-ec mv "$f" "$dest"
-        fi
+    # if [[ "$ft" =~ '^([^.]*)(\..*)(\.[^.]*)$' ]] ; then
+    #     dest="$(print -nr -- "$match[2]" | prefixer rm --skip-empty -i . -o . -- "$to_rm[@]")"
+    #     if test -n "$dest" ; then
+    #         dest="${match[1]}.${dest}${match[3]}"
+    #     else
+    #         if [[ "${match[3]}" != '.' ]] ; then
+    #             dest="${match[1]}${match[3]}"
+    #         else
+    #             dest="${match[1]}" # No empty extension
+    #         fi
+    #     fi
+    # fi
+
+    # We should add the dot removed from ftr (Can thus cause a bug if there is no extension?)
+    dest="$(print -nr -- "${ftr}" | prefixer rm -i "${ntag_sep}" -o "${ntag_sep}" -- "$to_rm[@]")"
+    re dvar ftr dest
+    local parts="$(print -nr -- "${dest}" | prefixer --skip-empty -i "${ntag_sep}" -o '\x00')"
+    parts=( "${(@0)parts}" )
+    local parts_len="${#parts}"
+    if (( parts_len == 1 )) ; then # [[ "$dest" =~ '^(.*)(\Q'"${ntag_sep}"'\E)$' ]] ; then
+        dest="${parts[1]}"
+    fi
+    if test -n "$fe" ; then
+    dest="${dest}.${fe}"
+    fi
+    # fi
+    if test -n "$dest" && [[ "$ft" != "$dest" ]] ; then
+        dest="${fh}/$dest"
+        reval-ec mv "$f" "$dest"
     fi
 }
 ###
@@ -58,8 +89,9 @@ function ntag-toapple() {
         ecerr "$0: Nonexistent file: $f"
         return 1
     }
+    local ft="${f:t}" fh="${f:h}"
 
-    local tags=( "${(@f)$(ntag-get "$f")}" ) tag
+    local tags=( "${(@f)$(ntag-get "$ft")}" ) tag
     for tag in $tags[@] ; do
         case "${tag:l}" in
             red) reval-ec command tag --add Red "$f" ;;
@@ -69,6 +101,7 @@ function ntag-toapple() {
             blue) reval-ec command tag --add Blue "$f" ;;
             purple) reval-ec command tag --add Purple "$f" ;;
             gray|grey) reval-ec command tag --add Gray "$f" ;;
+            *) reval-ec command tag --add "$tag" "$f" ;;
         esac
     done
 }
@@ -132,7 +165,7 @@ function ntag-fromapple-force() {
 }
 ## fuzzy
 function ntag-search() {
-    local query="$(mg_sep=' ' mapg "\'.\$i." "$@")"
+    local query="$(mg_sep=' ' mapg "\'\${ntag_sep}\$i\${ntag_sep}" "$@")"
 
     ##
     # local nightNotes="${ntag_search_dir:-.}"
