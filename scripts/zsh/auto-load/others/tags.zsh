@@ -19,7 +19,10 @@ function ntag-add() {
 }
 alias tg=ntag-add
 function ntag-get() {
+    : "You might want to use realpath before passing a path to this function. Since the tags might be stored on symlinks, we don't do that here automatically."
+
     local tmp=("${(@0)$(<<<"$1" prefixer -i . -o '\x00' )}")
+
     local tags=( ${tmp[2,-2]} )
     arrN "$tags[@]"
 }
@@ -29,15 +32,21 @@ function ntag-rm() {
         ecerr "$0: Nonexistent file: $f"
         return 1
     }
+    local ft="${f:t}" fh="${f:h}"
 
-    if [[ "$f" =~ '^([^.]*)(\..*)(\.[^.]*)$' ]] ; then
+    if [[ "$ft" =~ '^([^.]*)(\..*)(\.[^.]*)$' ]] ; then
         dest="$(print -nr -- "$match[2]" | prefixer rm --skip-empty -i . -o . -- "$to_rm[@]")"
         if test -n "$dest" ; then
             dest="${match[1]}.${dest}${match[3]}"
         else
-            dest="${match[1]}${match[3]}"
+            if [[ "${match[3]}" != '.' ]] ; then
+                dest="${match[1]}${match[3]}"
+            else
+                dest="${match[1]}" # No empty extension
+            fi
         fi
-        if [[ "$f" != "$dest" ]] ; then
+        if [[ "$ft" != "$dest" ]] ; then
+            dest="${fh}/$dest"
             reval-ec mv "$f" "$dest"
         fi
     fi
