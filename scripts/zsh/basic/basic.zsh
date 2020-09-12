@@ -1,4 +1,4 @@
-zmodload zsh/terminfo zsh/system
+zmodload zsh/terminfo zsh/system zsh/datetime
 autoload -U zargs #Necessary for scripts
 autoload -U regexp-replace
 ## Aliases

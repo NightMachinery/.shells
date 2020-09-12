@@ -1,5 +1,5 @@
 function lunar() {
-    deluna ${deluna} & # timeout of deluna
+    tmuxnewsh2 deluna reval-notifexit deluna ${deluna} # timeout of deluna
     # lo_min should include the rest time as well, as the bells are sounded in the background currently.
     lo_s=$((60*${lo_min:-50})) lo_noinit=y lo_p=${lo_p:-~/tmp/.luna} loop "$@"
 }
@@ -64,7 +64,7 @@ function deluna() {
     while oneinstance $0 $nonce
     do
         (( $(getidle-darwin) >= $timeout || $(getlastunlock-darwin) <= 80 )) && {
-            edPre=$'\n' ecdate "$(color 255 100 255 'Deluna committed homicide!')"
+            edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(getidle-darwin), last_unlock: $(getlastunlock-darwin))")"
             lunaquit " via deluna"
             # { isDbg && sleep 1 } || sleep 30
         }

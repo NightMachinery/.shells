@@ -1,5 +1,11 @@
 function fromnow() {
-    mdoc "date= $0 -> seconds since \$date" MAGIC
+    local then
+    test -n "$date" && then="$(gdate --date "$date" "+%s")" || return 1
+    ec $(( EPOCHSECONDS - then ))
+}
+function fromnow-py() {
+    : "date= $0 -> seconds since \$date"
+
     python3 -c 'import datetime ; from dateutil.parser import parse ; import os
 date = parse(os.environ["date"])
 print((datetime.datetime.now(date.tzinfo) - date).total_seconds())'
