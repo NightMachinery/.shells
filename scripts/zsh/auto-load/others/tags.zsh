@@ -253,6 +253,10 @@ function ntag-search() {
 }
 aliasfn tgs ntag-search
 aliasfn tgsor @opts or y @ ntag-search
+##
+aliasfn ntag-grep fnswap isI false ntag-search
+@opts-setprefix ntag-grep ntag-search
+##
 function ntag_filter_rg() {
     local pattern="$1" bg="${2:-0,0,0}" fg="${3:-255,255,255}"
 
@@ -260,12 +264,13 @@ function ntag_filter_rg() {
     command rg --passthrough --smart-case --colors "match:none" --colors "match:style:nobold" --fixed-strings --color always --colors "match:bg:$bg" --colors "match:fg:$fg" "${ntag_sep[-1]}${pattern}${ntag_sep[1]}"  #"${ntag_sep}${pattern}${ntag_sep}"
 }
 function ntag-filter() {
+    : "Alt: Use ntag-grep if you never want the coloring."
     ## perf
     # `time (@opts or yes @ green red)` ~ 120ms
     # `time (fnswap isI false @opts or yes @ green red)` ~ 190ms
     ##
     local res
-    res="$(fnswap isI false ntag-search "$@")" || return 1
+    res="$(ntag-grep "$@")" || return 1
     if isI ; then
         <<<$res ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128
     else
