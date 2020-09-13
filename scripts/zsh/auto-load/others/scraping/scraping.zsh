@@ -210,6 +210,7 @@ function random-poemist() {
 xkcd() {
     wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
 }
+##
 wayback() {
     comment -e, --exact-url
     comment "-t, --to TIMESTAMP Should take the format YYYYMMDDhhss, though
@@ -235,6 +236,7 @@ function wayback-url() {
 # enh-urlfinal wayback-url ## old URLs often redirect to hell
 reify wayback-url
 noglobfn wayback-url
+##
 function w2e-curl() {
     we_dler=wread-curl w2e "$@"
 }
@@ -354,7 +356,7 @@ Options:
         url2note "$1" none || { ecerr "tlrl-ng: url2note failed with $? on url $1" ; return 33 }
         title="${title:-untitled $1}"
         : 'Note that readest is obviously only for the FIRST link.'
-        author="[$readest] $author $(url-goometa "$1")"
+        author="[$readest] $author $(url-date "$1")"
     fi
     title="$( ec "${opts[-p]}${title}" | sd / _ )"
     
@@ -1124,7 +1126,7 @@ noglobfn urls-cleansharps
 aliasfn-ng urlc urls-cleansharps
 ##
 function url-moddate() {
-    : "Mostly useless because some sites don't have the header and others just set it incorrectly. Alt: url-goometa"
+    : "Mostly useless because some sites don't have the header and others just set it incorrectly. Alt: url-date"
 
     local url="${1:?URL Required}"
 
@@ -1132,11 +1134,33 @@ function url-moddate() {
 }
 function url-goometa() {
     : "Usually contains the date."
+    # https://stackoverflow.com/a/47037351/1410221
 
     local url="${1:?URL Required}"
 
     local search="$(googler-en --json --count "1" "$url")"
     # dact ec $search
     <<<$search jqm ' .[] | .metadata'
+}
+function url-date-wayback() {
+    local url="$1"
+
+    local first
+    first="$(wayback-url "$url")" # || return 1
+
+    # YYYYMMDDhhmmss
+    if [[ "$first" =~ 'https://web.archive.org/web/(\d{4})(\d{2})(\d{2})\d*/' ]] ; then
+        # gdate --date "$match[1]" "+%F"
+        ec "${match[1]}-${match[2]}-${match[3]}"
+    fi
+}
+function url-date() {
+    local url="$1" date
+
+    date="$(url-date-wayback "$url")"
+    if [[ "$date" =~ '^\s*$' ]] ; then
+        date="$(url-goometa "$url")" # Google's metadata can contain irrelevant stuff, but if they usually contain the date, and are more accurate than wayback's.
+    fi
+    ec $date
 }
 ##
