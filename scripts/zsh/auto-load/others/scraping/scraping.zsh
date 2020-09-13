@@ -354,7 +354,7 @@ Options:
         url2note "$1" none || { ecerr "tlrl-ng: url2note failed with $? on url $1" ; return 33 }
         title="${title:-untitled $1}"
         : 'Note that readest is obviously only for the FIRST link.'
-        author="[$readest] $author"
+        author="[$readest] $author $(url-goometa "$1")"
     fi
     title="$( ec "${opts[-p]}${title}" | sd / _ )"
     
@@ -1122,3 +1122,21 @@ function urls-cleansharps() {
 }
 noglobfn urls-cleansharps
 aliasfn-ng urlc urls-cleansharps
+##
+function url-moddate() {
+    : "Mostly useless because some sites don't have the header and others just set it incorrectly. Alt: url-goometa"
+
+    local url="${1:?URL Required}"
+
+    curlm --head "$url" | awk '/last-modified/{print}' | gcut -d ' ' -f2-
+}
+function url-goometa() {
+    : "Usually contains the date."
+
+    local url="${1:?URL Required}"
+
+    local search="$(googler-en --json --count "1" "$url")"
+    # dact ec $search
+    <<<$search jqm ' .[] | .metadata'
+}
+##
