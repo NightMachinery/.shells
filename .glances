@@ -1,0 +1,7 @@
+[amp_msg]
+# Use the default AMP (no dedicated AMP Python script)
+enable=true
+regex=.*
+refresh=60
+one_line=true
+command=brishz.dash datej
