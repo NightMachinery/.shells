@@ -1,7 +1,53 @@
+# https://raw.githubusercontent.com/nicolargo/glances/master/conf/glances.conf
+
 [amp_msg]
 # Use the default AMP (no dedicated AMP Python script)
 enable=true
 regex=.*
 refresh=60
 one_line=true
-command=brishz.dash datej
+command=brishz.dash datej # glances
+
+[network]
+hide=utun0,utun1,utun2,p2p0,awdl0,bridge0
+
+[fs]
+disable=False
+# Define the list of hidden file system (comma-separated regexp)
+hide=/boot.*,/snap.*,_ate/var/vm,_lumes/Data,_s/Recovery,_orFullDisk,/nix
+# Define filesystem space thresholds in %
+# Default values if not defined: 50/70/90
+# It is also possible to define per mount point value
+# Example: /_careful=40
+careful=95
+warning=98
+critical=99
+
+[mem]
+disable=False
+# Define RAM thresholds in %
+# Default values if not defined: 50/70/90
+careful=75
+#careful_action_repeat=echo {{percent}} >> /tmp/memory.alert
+warning=87
+critical=95
+
+[memswap]
+disable=False
+# Define SWAP thresholds in %
+# Default values if not defined: 50/70/90
+careful=90
+warning=95
+critical=98
+
+[load]
+disable=False
+# Define LOAD thresholds
+# Value * number of cores
+# Default values if not defined: 0.7/1.0/5.0 per number of cores
+# Source: http://blog.scoutapp.com/articles/2009/07/31/understanding-load-averages
+#         http://www.linuxjournal.com/article/9001
+careful=1.5
+warning=2.5
+critical=5.0
+#log=False
