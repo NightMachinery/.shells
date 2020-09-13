@@ -31,3 +31,13 @@ function fzf-gateway() {
     SHELL="${FZF_SHELL:-$(rp dash)}" fzf-tmux -p90% "$@" | sponge
     # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
 }
+function fzp() {
+    local opts=("${@[1,-2]}") query="${@[-1]}"
+
+    # FNSWAP: isI
+    if isI ; then
+        fz "$opts[@]" --query "$query"
+    else
+        fz --no-sort "$opts[@]" --filter "$query"
+    fi
+}

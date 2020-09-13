@@ -1,10 +1,27 @@
+## Usage
+# `fd ..tag..` or even `fd .tag.` easily lists the tagged files for you
+# LIMITATION: The separator somewhat limits what chars you can use in a tag. For example, using `..`, we can't have the tag `.test.`, though `.te.st` is possible. I recommend against using  the sep chars at all, as it hurts readability, too.
+## shortcut aliases
+function mg() {
+    ntag-add "$1" gray
+}
+reify mg
+function h_aliastag() {
+    aliasfn "$1" ntag-filter "$1"
+    @opts-setprefix "$1" ntag-search
+}
+re h_aliastag red orange yellow green blue purple black aqua teal
+aliasfnq gray ntag-filter "gray | 'grey"
+@opts-setprefix gray ntag-search
+aliasfn grey gray
+@opts-setprefix grey ntag-search
 ##
 ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore ) # --no-ignore --hidden
 ##
 function ntag-mv() {
     local i="$1" o="$2"
-    color 100 255 200 "$0 $(gq "$@")" >&2
+    color 100 255 200 "$0 $(gq "$@")" # >&2
     
     test -z "$o" && return 1
     test -e "$o" && {
@@ -223,13 +240,39 @@ function ntag-fromapple-force() {
 }
 ## fuzzy
 function ntag-search() {
-    local query="$(mg_sep=' ' mapg "\'\${ntag_sep}\$i\${ntag_sep}" "$@")"
+    local orMode="${ntag_search_or}"
+    local query_sep=''
+    test -n "$orMode" && query_sep=' | '
+    local query="$(mg_sep=' ' mapg "\'\${ntag_sep}\$i\${ntag_sep}\${query_sep}" "$@")"
 
     ##
     # local nightNotes="${ntag_search_dir:-.}"
     # ntsearch_glob='' ntsearch_rg_opts=(-uuu) ntl-fzf "$query"
     ##
-    fd ${ntag_fd_opts[@]} | fz --query "$query"
+    fd ${ntag_fd_opts[@]} | fzp "$query"
 }
 aliasfn tgs ntag-search
+aliasfn tgsor @opts or y @ ntag-search
+function ntag_filter_rg() {
+    local pattern="$1" bg="${2:-0,0,0}" fg="${3:-255,255,255}"
+
+    # We need to limit highlighting ntag_sep, as the color codes will impede further matches
+    command rg --passthrough --smart-case --colors "match:none" --colors "match:style:nobold" --fixed-strings --color always --colors "match:bg:$bg" --colors "match:fg:$fg" "${ntag_sep[-1]}${pattern}${ntag_sep[1]}"  #"${ntag_sep}${pattern}${ntag_sep}"
+}
+function ntag-filter() {
+    ## perf
+    # `time (@opts or yes @ green red)` ~ 120ms
+    # `time (fnswap isI false @opts or yes @ green red)` ~ 190ms
+    ##
+    local res
+    res="$(fnswap isI false ntag-search "$@")" || return 1
+    if isI ; then
+        <<<$res ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128
+    else
+        ec $res
+    fi
+}
+@opts-setprefix ntag-filter ntag-search
+aliasfn tgf ntag-filter
+aliasfn tgfor @opts or y @ ntag-filter
 ##

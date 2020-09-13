@@ -1,4 +1,5 @@
 ## Global Aliases
+alias -g @f=' | inargsf '
 alias -g @ff=' | fz | inargsf '
 # alias -g MAGIC='| { eval "$(read -d "" -r -E)" }'
 alias -g MAGIC='| { eval "$(< /dev/stdin)" }'

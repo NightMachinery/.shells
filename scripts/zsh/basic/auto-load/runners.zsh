@@ -66,7 +66,7 @@ function indir() {
         reval "${cmd[@]}"
     } always { popf }
 }
-aliasfn in indir # best reserved for interactive use
+alias in=indir # best reserved for interactive use
 ##
 function reval-notifexit() {
     # always alone is not sufficient. Test with `zsh -c 'reval-notifexit iterm_focus.py'`.
