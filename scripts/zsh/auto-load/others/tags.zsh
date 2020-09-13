@@ -251,8 +251,10 @@ function ntag-search() {
     ##
     fd ${ntag_fd_opts[@]} | fzp "$query"
 }
-aliasfn tgs ntag-search
 aliasfn tgsor @opts or y @ ntag-search
+function tgs() {
+    ntag-filter "$@" | fz --ansi
+}
 ##
 aliasfn ntag-grep fnswap isI false ntag-search
 @opts-setprefix ntag-grep ntag-search
@@ -261,7 +263,8 @@ function ntag_filter_rg() {
     local pattern="$1" bg="${2:-0,0,0}" fg="${3:-255,255,255}"
 
     # We need to limit highlighting ntag_sep, as the color codes will impede further matches
-    command rg --passthrough --smart-case --colors "match:none" --colors "match:style:nobold" --fixed-strings --color always --colors "match:bg:$bg" --colors "match:fg:$fg" "${ntag_sep[-1]}${pattern}${ntag_sep[1]}"  #"${ntag_sep}${pattern}${ntag_sep}"
+    # `nobold`
+    command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --fixed-strings --color always --colors "match:bg:$bg" --colors "match:fg:$fg" "${ntag_sep[-1]}${pattern}${ntag_sep[1]}"  #"${ntag_sep}${pattern}${ntag_sep}"
 }
 function ntag-filter() {
     : "Alt: Use ntag-grep if you never want the coloring."
@@ -272,7 +275,10 @@ function ntag-filter() {
     local res
     res="$(ntag-grep "$@")" || return 1
     if isI ; then
-        <<<$res ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128
+        <<<$res ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128 | command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --color always --colors "match:bg:255,255,255" --colors "match:fg:255,120,0" '(?<!;\dm)(?<!;\d\dm)(?<!;\d\d\dm)\.(?!\e\[)[^./]+\.' --pcre2
+        # https://www.regular-expressions.info/lookaround.html
+        # Lookbehind needs to be fixed length in rg's pcre.
+        # Use `cat -v` to see the ANSI codes. `\e` is `^[[`.
     else
         ec $res
     fi
