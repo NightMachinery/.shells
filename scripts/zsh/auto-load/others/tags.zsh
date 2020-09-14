@@ -1,23 +1,31 @@
 ## Usage
-# `fd ..tag..` or even `fd .tag.` easily lists the tagged files for you
+# `fd [-uuu] ..tag..` or even `fd .tag.` easily lists the tagged files for you
 # LIMITATION: The separator somewhat limits what chars you can use in a tag. For example, using `..`, we can't have the tag `.test.`, though `.te.st` is possible. I recommend against using  the sep chars at all, as it hurts readability, too.
+##
+ntag_colors=(red orange yellow green blue purple gray black aqua teal)
+ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
+ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
 ## shortcut aliases
-function mg() {
-    ntag-add "$1" gray
+function h_tgfn_tag() {
+    local tag="${1:? Tag required}"
+
+    eval "function tg-$tag() {
+    ntag-add \"\$1\" $tag
 }
-reify mg
+reify tg-$tag
+"
+}
+re h_tgfn_tag $ntag_colors[@]
+aliasfn mg tg-gray
 function h_aliastag() {
     aliasfn "$1" ntag-filter "$1"
     @opts-setprefix "$1" ntag-search
 }
-re h_aliastag red orange yellow green blue purple black aqua teal
+re h_aliastag $ntag_colors[@]
 aliasfnq gray ntag-filter "gray | 'grey"
 @opts-setprefix gray ntag-search
 aliasfn grey gray
 @opts-setprefix grey ntag-search
-##
-ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
-ntag_fd_opts=( --no-ignore ) # --no-ignore --hidden
 ##
 function ntag-mv() {
     local i="$1" o="$2"
@@ -175,12 +183,14 @@ function ntag-toapple() {
             blue) reval-ec command tag --add Blue "$f" ;;
             purple) reval-ec command tag --add Purple "$f" ;;
             gray|grey) reval-ec command tag --add Gray "$f" ;;
+            # Uncomment this line to transfer all tags to the Apple tag system. Note that ntag-from-apple-force only removes colored tags currently, so you can not sync back custom tag removal from the Apple side.
             # *) reval-ec command tag --add "$tag" "$f" ;; # clutters things
         esac
     done
 }
 ##
 function ntag-rm-colors() {
+    # Remove Apple color tags from the ntag system
     ntag-rm "$1" red orange yellow green blue purple gray grey
 }
 function tag-apple-rm-colors() {
