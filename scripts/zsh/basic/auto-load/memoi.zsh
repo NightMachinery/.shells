@@ -6,7 +6,7 @@ memoi_expire=$(( 3600*24*7 ))
 function meme() { memoi_expire=$(( $1 * 60 )) reval "$@" }
 function memoi-eval() {
 ###
-#    doc "[memoi_expire=<seconds> memoi_strict= memoi_key= deusvult= memoi_skiperr=] $0 cmd...
+#    doc "[memoi_expire=<seconds> memoi_strict= memoi_key= deusvult= memoi_skiperr= memoi_od=] $0 cmd...
 # memoi_key is used to differentiate commands that, e.g., depend on an env var that may change.
 # deusvult forces expiration and a reevaluation. It is a global override. It also voids skiperr.
 # skiperr skips storing stderr and the return code, and also doesn't ping redis to see if it's alive.
@@ -24,8 +24,8 @@ function memoi-eval() {
     local rediskey="$custom_key|> $cmd"
     local deusvult="$deusvult"
     local skiperr="$memoi_skiperr"
-    test -n "$deusvult" && skiperr=''
-    local override_duration='0.12'
+    # test -n "$deusvult" && skiperr=''
+    local override_duration="${memoi_override_duration:-${memoi_od:-0.12}}"
     
     test -n "$skiperr" || silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     if test -z "$deusvult" && { (( $(redis-cli --raw exists $rediskey) )) && { (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redis-cli --raw hget $rediskey timestamp)) <= memoi_expire )) } } }
@@ -35,7 +35,9 @@ function memoi-eval() {
     else
         # dact fsay memoi not fresh enough
         # ec 'Evaling (no memoi): ' "$cmd"
-        local errfile=/dev/null
+
+        # Redirecting to the real stderr lets us use, e.g., fzf
+        local errfile=/dev/stderr #/dev/null
         test -z "$skiperr" && errfile="$(mktemp)"
         local out
         out="${$(eval "$cmd" 2>"$errfile" ; print -n .)[1,-2]}"
@@ -64,3 +66,5 @@ function memoi-eval() {
         return $retcode
     fi
 }
+@opts-setprefix memoi-eval memoi
+@opts-setprefix eval-memoi memoi
