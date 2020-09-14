@@ -1,12 +1,11 @@
 # https://raw.githubusercontent.com/nicolargo/glances/master/conf/glances.conf
 
 [amp_msg]
-# Use the default AMP (no dedicated AMP Python script)
 enable=true
-regex=.*
 refresh=60
 one_line=true
 command=brishz.dash datej # glances
+# command=brishz.dash fnswap isI true color red hellooooooo # glances
 
 [network]
 hide=utun0,utun1,utun2,p2p0,awdl0,bridge0
