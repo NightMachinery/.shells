@@ -95,7 +95,11 @@ function ntag-has() {
     [[ "$f" == *"${ntag_sep}${tag}${ntag_sep}"* ]]
 }
 function ntag-add() {
+    : "GLOBAL OUT: ntag_add_dest"
+    unset ntag_add_dest
+
     local f="$1" tags=("${@:2}") tag toadd=()
+    ntag_add_dest="$f"
     test -e "$f" || {
         ecerr "$0: Nonexistent file: $f"
         return 1
@@ -116,6 +120,7 @@ function ntag-add() {
                } | prefixer -i '\x00' -o "${ntag_sep}" )${ntag_sep}"
         dest="$(ntag_merge_dest_fe "$dest" "$fe")"
         ntag-mv "$f" "$dest" || return 1
+        ntag_add_dest="$dest"
     }
 }
 alias tg=ntag-add
@@ -284,11 +289,18 @@ function ntag-filter() {
     ##
     local res
     res="$(ntag-grep "$@")" || return 1
+    ##
+    # https://www.regular-expressions.info/lookaround.html
+    # Lookbehind needs to be fixed length in rg's pcre.
+    # Use `cat -v` to see the ANSI codes. `\e` is `^[[`.
+    # Hardcoded for ntag_sep=..
+    local re_def='(?<!;\dm)(?<!;\d\dm)(?<!;\d\d\dm)\.(?!\e\[)[^./]+\.(?=(\e|\d|\[|;|m)*\.)'
+    # local re_def='\.(\e|\d|\[|;|m)*\.(?!\e\[)[^./]+\.(\e|\d|\[|;|m)*\.'
+    # Redundant: We want to lookbehind to ensure we have two dots before the match, but we can't. Perhaps we should just hardcode all the colors.
+    ##
     if isI ; then
-        <<<$res ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128 | command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --color always --colors "match:bg:255,255,255" --colors "match:fg:255,120,0" '(?<!;\dm)(?<!;\d\dm)(?<!;\d\d\dm)\.(?!\e\[)[^./]+\.' --pcre2
-        # https://www.regular-expressions.info/lookaround.html
-        # Lookbehind needs to be fixed length in rg's pcre.
-        # Use `cat -v` to see the ANSI codes. `\e` is `^[[`.
+
+        <<<$res ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128 | command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --color always --colors "match:bg:255,255,255" --colors "match:fg:255,120,0" --pcre2 "$re_def"
     else
         ec $res
     fi

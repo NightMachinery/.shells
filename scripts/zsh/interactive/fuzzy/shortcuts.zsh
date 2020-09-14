@@ -1,8 +1,8 @@
 function play-tag() {
     local f="$1"
     # tag --add green "$f"
-    ntag-add "$f" CR
-    mpv "$f"
+    ntag-add "$f" green
+    mpv "$ntag_add_dest"
 }
 function openv() {
     arrN $~videoglob | fz | inargsf play-tag
