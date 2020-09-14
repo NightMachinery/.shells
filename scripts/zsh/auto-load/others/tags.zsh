@@ -208,6 +208,7 @@ function tag-apple-get() {
         return 1
     }
 
+    # https://apple.stackexchange.com/questions/401225/mdls-does-not-work-on-mounted-sparse-bundles
     mdls -name kMDItemUserTags -raw "$f" -nullMarker '' | awk 'NR>1' | sed '$d' | prefixer --trim -i $',\n' --skip-empty
 }
 function ntag-fromapple() {
