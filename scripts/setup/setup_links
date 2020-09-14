@@ -6,6 +6,8 @@ ln -s "$NIGHTDIR"/zsh/auto-load ~/zal
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
 ln -s "$HOME/Downloads/" ~/"$music_dir"/d
 ln -s /home/linuxbrew/.linuxbrew/bin/nvim /usr/local/bin/nvim
+lnrp brishz.dash /usr/local/bin/
+lnrp brishzrb.dash /usr/local/bin/
 isLinux && ln -s "$(rp sed)" ~/bin/gsed
 # ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
 

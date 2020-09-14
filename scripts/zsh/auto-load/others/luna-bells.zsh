@@ -14,7 +14,15 @@ bell-many() {
     setopt localtraps
     # So I don't understand these all that well, but here is my guess:
     trap "" INT # disables INT handling in this function, so we don't quit by INT
-    (redo bell-luna 25) # this is a new process so it has its own signal handling and so does quit on INT
+    (
+        local count=25
+        # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-getv works as long as you don't play multiple videos simultaneously, and is cross-platform.
+        if [[ "$(mpv-getv pause)" == 'false' ]] ; then
+            fsay "Luna sees MPV"
+        else
+            redo bell-luna "$count"
+        fi
+    ) # this is a new process so it has its own signal handling and so does quit on INT
     # 25  1:23.87 total
     # each is about 3.5s
 
