@@ -19,12 +19,16 @@ isNotExpensive || {
     # Won't defer if not interactive or disabled explicitly
     { [[ -o interactive ]] && test -z "$DISABLE_DEFER" } && antibody bundle romkatv/zsh-defer || alias zsh-defer=''
     source-interactive-all() {
-        run-on-each source "$NIGHTDIR"/zsh/interactive/**/*(.)
+        run-on-each source "$NIGHTDIR"/zsh/interactive/auto-load/**/*(.)
+        source "$NIGHTDIR"/zsh/interactive/completions.zsh # needs to be semi-last
         typeset -g NIGHT_NO_EXPENSIVE
         NIGHT_NO_EXPENSIVE=y
     }
-    function rp() {
+    function realpath2() {
         test -e "$1" && realpath "$1" || realpath "$(which "$1")"
+    }
+    function rp() {
+        realpath2 "$@"
     }
 }
 test -n "$NO_AUTOLOAD_BASH" || zsh-defer source "$NIGHTDIR"/bash/load-others.bash

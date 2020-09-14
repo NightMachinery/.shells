@@ -93,6 +93,6 @@ function env-clean() {
 
     local cmdhead="$1"
     local cmdbody=( "$@[2,-1]" )
-    env -i "$env[@]" "$(rp "$cmdhead")" "$cmdbody[@]"
+    env -i "$env[@]" "$(realpath2 "$cmdhead")" "$cmdbody[@]"
 }
 ##

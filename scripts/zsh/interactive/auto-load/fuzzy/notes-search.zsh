@@ -270,7 +270,7 @@ function ntsearch_() {
 
 #                       '
 # gsed -n $((ln+1)),$((ln+50))p $fileabs
-# } |& ' "$(gq "$(rp ansifold)")" '-s -w $(($FZF_PREVIEW_COLUMNS - 1))' )
+# } |& ' "$(gq "$(realpath2 ansifold)")" '-s -w $(($FZF_PREVIEW_COLUMNS - 1))' )
         # install location is at perl -V:'installbin' , link it
         # cpanm App::ansifold
         # https://metacpan.org/pod/Text::ANSI::WideUtil

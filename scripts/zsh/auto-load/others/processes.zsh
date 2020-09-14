@@ -25,9 +25,9 @@ function kill-withchildren() {
     local pids=("$@") pid
 
     local children
-    for pid in "$pids[@]" ; do
+    for pid in $pids[@] ; do
         children=("${(@f)$(ps-grandchildren "$pid")}")
-        kill -$sig "$pid" "$children[@]"
+        kill -$sig $pid $children[@] # `kill ''` will kill itself in noninteractive zsh (at least does so in brishz)
     done
 }
 ##

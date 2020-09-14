@@ -298,7 +298,7 @@ function ntag-filter() {
     # local re_def='\.(\e|\d|\[|;|m)*\.(?!\e\[)[^./]+\.(\e|\d|\[|;|m)*\.'
     # Redundant: We want to lookbehind to ensure we have two dots before the match, but we can't. Perhaps we should just hardcode all the colors.
     ##
-    if isI ; then
+    if isI && istty ; then
 
         <<<$res ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128 | command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --color always --colors "match:bg:255,255,255" --colors "match:fg:255,120,0" --pcre2 "$re_def"
     else

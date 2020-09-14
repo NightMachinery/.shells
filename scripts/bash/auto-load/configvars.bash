@@ -3,7 +3,7 @@ isSSH && LESS="-RiNF"
 ##
 export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-a:select-all' --color=light --multi --hscroll-off 99999"
 export FZF_DEFAULT_COMMAND="fd --type f" # fzf runs this when input is a tty
-export SHELL="$(rp dash)" # fzf uses this shell to run the default command
+export SHELL="$(realpath2 dash)" # fzf uses this shell to run the default command
 # It might be problematic to set this variable, but who knows ...
 ##
 ITERMMAGIC=ITERM_MAGIC

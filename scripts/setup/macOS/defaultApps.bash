@@ -19,6 +19,7 @@ function set-defaults() {
     duti -s $cf_emacs .pdf editor
     # duti -s $cf_emacs "" editor
     ## iTerm
+    duti -s $cf_iterm ".mp3test" all
     # duti -s $cf_iterm "public.zip-archive" all
     # duti -s $cf_iterm "" all
     ## zopen

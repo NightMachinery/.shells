@@ -18,7 +18,8 @@ bell-many() {
         local count=25
         # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-getv works as long as you don't play multiple videos simultaneously, and is cross-platform.
         if [[ "$(mpv-getv pause)" == 'false' ]] ; then
-            fsay "Luna sees MPV"
+            # fsay "Luna sees MPV"
+            bell-luna-mpv
         else
             redo bell-luna "$count"
         fi
@@ -32,8 +33,11 @@ function bell-zsh1() {
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"
 }
 bell-avarice() {
-    # say "disquiet creatures of avarice have risen yet again ..."
+    # fsay "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
+}
+bell-luna-mpv() {
+    @opts v 100 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/luna_mpv/$~audioglob)"
 }
 bell-toy() {
     # say "disquiet creatures of avarice have risen yet again ..."
@@ -46,7 +50,7 @@ function greencase_audio_init() {
 }
 bell-greencase() {
     ##
-    # @todo0 this doesn't result in a constantish duration, so we'll additional code to check the duration in a while loop in bell-many
+    # @retiredtodo this doesn't result in a constantish duration, so we'll additional code to check the duration in a while loop in bell-many
     #
     ## Perf:
     # The delay is in the files themselves, these below have same time and both sound delayed:

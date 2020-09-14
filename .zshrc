@@ -151,7 +151,7 @@ zsh-defer source-interactive-all
 
 ## fzf zsh integration (obsolete, as we now use fzf-tab
 # # sth in .zshrc overrides these so ...
-# export FZF_BASE="${$(ge_no_ec=y rp fzf):h:h}/shell"
+# export FZF_BASE="${$(ge_no_ec=y realpath2 fzf):h:h}/shell"
 # # ecdbg "FZF_BASE: $FZF_BASE"
 # test -d "$FZF_BASE" && {
 #     # ecdbg fzf loaded
