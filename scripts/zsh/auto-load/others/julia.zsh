@@ -1,4 +1,25 @@
 ##
+jkey_expire=$((3600*24*60))
+function jtokey() {
+    local key="${1?Key required}" cmd="${2?Cmd required}" jjson="${3}" jdata="${4}"
+
+    cmd="$(redism hset "$key" cmd)"
+    jjson="$(redism hset "$key" jjson "$jjson")"
+    jdata="$(redism hset "$key" jdata "$jdata")"
+    redism expire "$key" "$jkey_expire"
+}
+function jfromkey() {
+    local key="${1?Key required}"
+
+    local cmd jjson jdata
+    cmd="${$(redism hget "$key" cmd):?Empty cmd}"
+    jjson="$(redism hget "$key" jjson)"
+    jdata="$(redism hget "$key" jdata)"
+    silent redism expire "$key" "$jkey_expire" # this way used commands don't die
+
+    eval "$cmd"
+}
+##
 function arrJ() {
     local items=( "$@" )
     print -nr -- "[ ${(j.,.)items} ]"
