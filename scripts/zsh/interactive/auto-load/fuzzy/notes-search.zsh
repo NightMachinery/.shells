@@ -61,10 +61,6 @@ function remd() {
         @opts q "'$cyear/$cmonth | '$cyear/$nextMonth" @ rem-fz $query
     fi
 }
-##
-aliasfn remc-fz withremc rem-fz
-aliasfn remc remc-fz
-aliasfn remcd withremc remd
 ###
 function ntimg() {
     innt fdrp --full-path --extension png --extension jpg --extension svg --extension jpeg "$*" | fz | inargsf imgcat

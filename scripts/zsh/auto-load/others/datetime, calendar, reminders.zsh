@@ -1,4 +1,19 @@
-# Some vars and `withremc` are defined in configvars
+# Some vars are defined in configvars
+###
+export remindayCDir="$cellar/remindersC"
+export remindayBakCDir="$HOME/tmp/remindersC_bak"
+alias withremc='remindayDir="$remindayCDir" remindayBakDir="$remindayBakCDir" '
+
+aliasfn remcnd withremc remnd
+aliasfn remcn withremc remn
+aliasfn remcj withremc remj
+aliasfn remc-fz withremc rem-fz
+aliasfn remc remc-fz
+aliasfn remcd withremc remd
+function remc-today() {
+    withremc rem-today "$@"
+}
+@opts-setprefix remc-today rem-today
 ###
 function fromnow() {
     local then
@@ -126,11 +141,6 @@ function rem-today() {
 
     trim "$text"
 }
-function remc-today() {
-    withremc rem-today "$@"
-}
-@opts-setprefix remc-today rem-today
-
 function rem-today-notify() {
     ensure-dir ~/logs/
     {
@@ -164,9 +174,6 @@ function tlg-reminday() {
     tsend --parse-mode markdown -- "$rec" "$text"
 }
 ##
-aliasfn remcn withremc remn
-aliasfn remcj withremc remj
-##
 remnd() {
     # Example: `remcnd "⛸ 🚪 Don't put the shoes behind the door" 1 3 7 20 60 360`
     local d msg="$1" ; shift
@@ -175,5 +182,4 @@ remnd() {
     done
     cellp
 }
-aliasfn remcnd withremc remnd
 ##

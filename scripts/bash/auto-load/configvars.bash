@@ -27,9 +27,6 @@ export nightNotes="$cellar/notes/"
 ##
 export remindayDir="$nightNotes/reminders"
 export remindayBakDir="$cellar/reminders_bak"
-export remindayCDir="$cellar/remindersC"
-export remindayBakCDir="$HOME/tmp/remindersC_bak"
-alias withremc='remindayDir="$remindayCDir" remindayBakDir="$remindayBakCDir" '
 ##
 export ZETTLE_DIR="$nightNotes/zettle"
 export ZETTLE_DIR="${ZETTLE_DIR:a}"
