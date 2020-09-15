@@ -1,11 +1,13 @@
 ##
 jkey_expire=$((3600*24*60))
 function jtokey() {
-    local key="${1?Key required}" cmd="${2?Cmd required}" jjson="${3}" jdata="${4}"
+    local key="${1?Key required}" cmd="${2?Cmd required}" jjson="${3}" jjson_btn="${4}" jdata="${5}" jaction="${6}"
 
-    cmd="$(redism hset "$key" cmd)"
+    cmd="$(redism hset "$key" cmd "$cmd")"
     jjson="$(redism hset "$key" jjson "$jjson")"
+    jjson_btn="$(redism hset "$key" jjson_btn "$jjson_btn")"
     jdata="$(redism hset "$key" jdata "$jdata")"
+    jaction="$(redism hset "$key" jaction "$jaction")"
     redism expire "$key" "$jkey_expire"
 }
 function jfromkey() {
@@ -14,10 +16,13 @@ function jfromkey() {
     local cmd jjson jdata
     cmd="${$(redism hget "$key" cmd):?Empty cmd}"
     jjson="$(redism hget "$key" jjson)"
+    jjson_btn="$(redism hget "$key" jjson_btn)"
     jdata="$(redism hget "$key" jdata)"
+    jaction="$(redism hget "$key" jaction)"
     silent redism expire "$key" "$jkey_expire" # this way used commands don't die
 
-    eval "$cmd"
+    local res="$(eval "$cmd" 2>&1)"
+    arr0 "$res" "$jaction"
 }
 ##
 function arrJ() {
