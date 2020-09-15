@@ -5,6 +5,7 @@ export water='-1001293952668'
 export ephemeral='-1001404743282'
 export tlogs='-1001460496622'
 export tlg_notifs='-1001185370891'
+export tlg_notifc="$water"
 ###
 function alice() {
     tsend -- "$alice" "$*" && ec "Alicized successfully: $*" || ecerr 'Alicization failed!'

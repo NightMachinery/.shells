@@ -102,6 +102,9 @@ function rem_extract-date-path() {
 function rem-today() {
     local deleteMode="${rem_today_delete:-$rem_today_d}"
 
+    ensure-dir "$remindayDir/"
+    ensure-dir "$remindayBakDir/"
+
     local today
     rem-todaypaths
 
@@ -109,7 +112,7 @@ function rem-today() {
     local f bak
     for f in $today[@] ; do
         if test -e "$f" ; then
-            text="$text"$'\n'"${$(<$f ; ec .)[1,-2]}"
+            text="$text"$'\n\n'"$(<$f)" #"${$(<$f ; ec .)[1,-2]}"
             if test -n "$deleteMode" ; then
                 bak="$(rem_extract-date-path "$f")"
                 bak="${remindayBakDir}/$bak"
@@ -119,15 +122,20 @@ function rem-today() {
     done
     rmdir-empty "$remindayDir"
 
-    ec "$text"
+    trim "$text"
 }
+function remc-today() {
+    withremc rem-today "$@"
+}
+@opts-setprefix remc-today rem-today
+
 function rem-today-notify() {
     ensure-dir ~/logs/
     {
         ec "---"
         date
         cellp
-        local text="$(rem-today)"
+        local text="$(rem-today ; ec ; remc-today)"
         if test -n "$text" ; then
             reval-ec terminal-notifier -title "$(datej)" -message "$text"
         fi
@@ -144,6 +152,11 @@ function tlg-reminday() {
     local text="$(@opts delete y @ rem-today)"
     if test -n "$text" ; then
         tnotif "$text"
+    fi
+    local textc="$(@opts delete y @ remc-today)"
+    if test -n "$textc" ; then
+        text+=$'\n\n'"$textc"
+        tnotifc "$textc"
     fi
     text="$text"$'\n\n'"$(datej) $(date +"%A %B %d")"
     tsend --parse-mode markdown -- "$rec" "$text"
