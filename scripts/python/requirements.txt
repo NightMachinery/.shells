@@ -1,3 +1,4 @@
+PyPDF2
 convertdate
 daudin
 dephell[full]
@@ -27,8 +28,8 @@ iredis
 jedi
 jill
 json-rpc
-libgenapi
 libgen.py
+libgenapi
 magic-wormhole
 metadata-parser
 metadata_parser
@@ -41,7 +42,6 @@ pdfCropMargins
 pexpect
 piep
 plumbum
-PyPDF2
 pypyp
 python-jose[cryptography]
 python-multipart
