@@ -4,6 +4,7 @@ alias evaldbg='seval'
 alias eval-good='geval'
 alias eval-quoted='reval'
 alias greval=rgeval
+eval-ec() { ge_no_hist=y geval "$@" }
 reval-ec() { ge_no_hist=y rgeval "$@" }
 ###
 function geval() {
