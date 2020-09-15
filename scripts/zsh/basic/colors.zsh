@@ -1,11 +1,11 @@
 autoload -U colors && colors
 
 ## Functions
-Bold () { print -n -- '\e[1m' }
-Underline () { print -n -- '\e[4m' }
-Flash () { print -n -- '\e[5m' } # doesn't work on my iTerm
-Invert () { print -n -- '\e[7m' }
-Invisible () { print -n -- '\e[8m' } # again doesn't work
+Bold () { ! isI || print -n -- '\e[1m' }
+Underline () { ! isI || print -n -- '\e[4m' }
+Flash () { ! isI || print -n -- '\e[5m' } # doesn't work on my iTerm
+Invert () { ! isI || print -n -- '\e[7m' }
+Invisible () { ! isI || print -n -- '\e[8m' } # again doesn't work
 ##
 function palette() {
     local i

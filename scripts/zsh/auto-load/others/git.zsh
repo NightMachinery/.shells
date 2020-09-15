@@ -4,12 +4,14 @@ alias grm='git rm --cached'
 alias glcs='glc --depth=1'
 ###
 function gsync() {
+  local remote="${gsync_remote:-${gsync_r:-origin}}"
+
   pushf "$(git rev-parse --show-toplevel)" || return 1
   {
     git add .
     git commit -a -m .
-    git pull --no-edit
-    git push
+    git pull --no-edit "$remote"
+    git push "$remote"
   } always { popf }
 }
 ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat }

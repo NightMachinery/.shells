@@ -1,3 +1,5 @@
+# Some vars and `withremc` are defined in configvars
+###
 function fromnow() {
     local then
     test -n "$date" && then="$(gdate --date "$date" "+%s")" || return 1
@@ -161,4 +163,17 @@ function tlg-reminday() {
     text="$text"$'\n\n'"$(datej) $(date +"%A %B %d")"
     tsend --parse-mode markdown -- "$rec" "$text"
 }
+##
+aliasfn remcn withremc remn
+aliasfn remcj withremc remj
+##
+remnd() {
+    # Example: `remcnd "⛸ 🚪 Don't put the shoes behind the door" 1 3 7 20 60 360`
+    local d msg="$1" ; shift
+    for d in "$@" ; do
+        fnswap cellp true remn "$msg" "$d day later"
+    done
+    cellp
+}
+aliasfn remcnd withremc remnd
 ##

@@ -24,7 +24,7 @@ function ntt() {
 
     ntsearch_query_fzf="$query" ntl
 }
-##
+###
 function rem-fz() {
     local query_pre="$rem_fz_q"
     local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
@@ -62,6 +62,10 @@ function remd() {
     fi
 }
 ##
+aliasfn remc-fz withremc rem-fz
+aliasfn remc remc-fz
+aliasfn remcd withremc remd
+###
 function ntimg() {
     innt fdrp --full-path --extension png --extension jpg --extension svg --extension jpeg "$*" | fz | inargsf imgcat
 }
