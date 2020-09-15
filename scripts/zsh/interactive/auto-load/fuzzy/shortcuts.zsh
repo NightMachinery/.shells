@@ -5,7 +5,7 @@ function play-tag() {
     mpv "$ntag_add_dest"
 }
 function openv() {
-    arrN $~videoglob | fz | inargsf play-tag
+    arrN $~videoglob | ntag-color | fz --ansi | inargsf play-tag
 }
 aliasfn r2 incache openv
 aliasfn lec indir ~/base/Lectures openv
