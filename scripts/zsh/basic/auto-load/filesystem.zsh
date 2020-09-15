@@ -47,8 +47,8 @@ function rmdir-empty() {
     gfind "$root" -mindepth 1 -type d -empty -delete
 }
 function append-f2f() {
-    local from="$(realpath "$1")" to="$(realpath "$2")"
-    if [[ "$from" == "$to" ]] ; then
+    local from="$(realpath "$1")" to="$(realpath --canonicalize-missing "$2")"
+    if [[ "${from:l}" == "${to:l}" ]] ; then # realpath --canonicalize-missing does not normalize the case in macOS, so we are forcing them both to lowercase.
         ecerr "$0: Destination is the same as the source. Aborting."
         return 1 # We rely on this not being zero
     fi
