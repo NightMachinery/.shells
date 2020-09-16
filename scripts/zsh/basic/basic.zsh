@@ -22,7 +22,13 @@ function uuidpy() {
 }
 function uuidm() {
     doc "This is the official interface to create new UUIDs"
-    uuidgen | gtr -d '-' # '-' causes problems with some usages
+
+    ##
+    # You need to `gtr -d '\n'` on bigger outputs
+    xxd -l 16 -p /dev/urandom
+    ## Alt:
+    # uuidgen | gtr -d '-' # '-' causes problems with some usages
+    ##
 }
 function md5m() {
     print -nr -- "$1" | md5sum | awk '{print $1}' || {

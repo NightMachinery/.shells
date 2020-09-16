@@ -249,32 +249,28 @@ function w2e-gh() {
     h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }
 noglobfn w2e-gh
+
+function url-exists() {
+    local ret=1 url="$1"
+
+     # Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
+    curl --output /dev/null --silent -r 0-0 --fail --location "$url" && {
+        ret=0
+        url_exists_out="${url_exists_out:-$url}" # only set it if it's not set before. This helps us try  a bunch of URLs and find the first one that exists.
+    }
+    return "$ret"
+}
 function gh-to-readme() {
-    local urls=() i i2 readme url
+    local urls=() i i2 readme url exts=(md rst org) readmes=(readme README ReadMe readMe Readme)
+
     for i in "$@"
     do
-        ! [[ "$i" =~ 'github.com' ]] || [[ "$i" == *.(md|rst) ]] ||
+        ! [[ "$i" =~ 'github.com' ]] || [[ "$i" == *.(${(j.|.)~exts}) ]] ||
             {    i2="${i}.md"
-                 comment we hope to handle wiki pages with method, but beware that nonexistent wiki pages trigger create a new page, not the desired not existent response.
-                 url-exists "$i2" ||
-                     { i2="${i}/blob/master/README.md"
-                       url-exists "$i2" ||
-                           { i2="${i}/blob/master/README.rst"
-                             url-exists "$i2" ||
-                                 { i2="${i}/blob/master/readme.md"
-                                   url-exists "$i2" ||
-                                       { i2="${i}/blob/master/readme.rst"
-                                         url-exists "$i2" ||
-                                             {
-                                                 for readme in "${(0@)$(permute-case readme)}"
-                                                 do
-                                                     i2="${i}/blob/master/${readme}.md"
-                                                     url-exists "$i2" && break
-                                                     i2="${i}/blob/master/${readme}.rst"
-                                                     url-exists "$i2" && break
-                                                 done
-                                             } } } } }
-                 i="$i2"
+                 comment we hope to handle wiki pages with this method, but beware that nonexistent wiki pages trigger create a new page, not the desired not existent response.
+                 unset url_exists_out
+                 re url-exists "$i2" "${i}/blob/master/${^readmes[@]}.${^exts[@]}"
+                 i="$url_exists_out"
             }
         url-exists "$i" && urls+="$i" || color red "$i does not seem to exist." >&2
     done

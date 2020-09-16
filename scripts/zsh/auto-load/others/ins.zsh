@@ -25,10 +25,11 @@ insadd() {
     test -n "$noi" ||
         ins "$1"
 }
-npmadd() {
+aliasfn npmi npm install -g
+npmiadd() {
     ec "$1" >> "$nodables"
     test -n "$noi" ||
-        npm install -g "$1"
+        npmi "$1"
 }
 brew-bundle() { ec "$1 \"$2\"" >> "$brewables" }
 btadd() {

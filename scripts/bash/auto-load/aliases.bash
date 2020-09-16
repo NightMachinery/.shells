@@ -19,7 +19,6 @@ ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
 alias ungron="gron --ungron"
 alias fzg='fz --no-sort --filter' #Filter mode. Do not start interactive finder. When used with  --no-sort,  fzf becomes  a fuzzy-version of grep. # Just fz -f if you don't want the nosort.
-alias url-exists='curl --output /dev/null --silent -r 0-0 --fail --location' #Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
 alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
 alias nn='LESS="-RiN" nnn -d'
@@ -172,7 +171,6 @@ alias dpans="h2ed=html2epub-pandoc-simple"
 alias carbon='carbon-now --headless --copy'
 alias jglob='test -z "$*" && { test -n "$jufile" && set -- "$jufile" || { ecerr No args and no jufile supplied to $0 ; return 1 } }'
 alias sii=nig
-alias npmi=npmadd
 alias pkno='pk_no=y '
 alias rmswp='command rm -i $NIGHTDIR/**/*.swp(D)'
 alias rmpyc='command rm -ri $NIGHTDIR/**/__pycache__'
