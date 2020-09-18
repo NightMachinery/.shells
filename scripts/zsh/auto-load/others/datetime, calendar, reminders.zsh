@@ -190,7 +190,7 @@ function tlg-reminday() {
         return 1
     }
     local text="$(@opts delete y notif y @ rem-summary)"
-    text="$text"$'\n\n'"$(datej) $(date +"%A %B %d")"
+    text="$text"$'\n\n'"$(datej-all)"
     tsend --parse-mode markdown -- "$rec" "$text"
 }
 function rem-summary() {
@@ -207,6 +207,57 @@ function rem-summary() {
     fi
     text+="$(prefix-if-ne $'\n\n' "$(rem-comingup)")"
     trim "$text"
+}
+function monthj2en() {
+    local m=$(( ${1:?Month required} ))
+
+    case "$m" in
+        1) ec Farvardin;;
+        2) ec Ordibehesht;;
+        3) ec Khordad;;
+        4) ec Tir;;
+        5) ec Mordad;;
+        6) ec Shahrivar;;
+        7) ec Mehr;;
+        8) ec Aban;;
+        9) ec Azar;;
+        10) ec Dey;;
+        11) ec Bahman;;
+        12) ec Esfand;;
+        *) ecerr "$0: Invalid month: $1";;
+    esac
+}
+function monthj2fa() {
+    local m=$(( ${1:?Month required} ))
+
+    case "$m" in
+        1) ec فروردین;;
+        2) ec اردیبهشت;;
+        3) ec خرداد;;
+        4) ec تیر;;
+        5) ec مرداد;;
+        6) ec شهریور;;
+        7) ec مهر;;
+        8) ec آبان;;
+        9) ec آذر;;
+        10) ec دی;;
+        11) ec بهمن;;
+        12) ec اسفند;;
+        *) ecerr "$0: Invalid month: $1";;
+    esac
+}
+function datej-all() {
+    local now=("${(s./.)$(datej)}")
+    local cyear="$now[1]"
+    cyear="${cyear[3,4]}"
+    integer cmonth="$now[2]"
+    integer cday="$now[3]"
+
+    # Persian text is not well weupported in widgets or Telegram.
+    # Full:
+    # ec "$cyear/$(monthj2en $cmonth) $cmonth/$cday $(date +'%A %B %d')"
+    # Abbrev: (We don't want it occupying two lines on the widget.)
+    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $(date +'%a %y/%b%-m/%d')"
 }
 ##
 remnd() {
