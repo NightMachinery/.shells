@@ -1,7 +1,13 @@
 ### Module Text Manipulation
 ### This module specializes in functions that do not touch the disk.
 ###
-dedent() {
+function prefix-if-ne() {
+    local prefix="$1" out="$2"
+    if [[ "$out" =~ '\S' ]] ; then
+        ecn "${prefix}$out"
+    fi
+}
+function dedent() {
     sd --flags m '^\s*' ''
 }
 function trim() {
