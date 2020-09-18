@@ -14,6 +14,20 @@ function remc-today() {
     withremc rem-today "$@"
 }
 @opts-setprefix remc-today rem-today
+aliasfn remc-today-d withremc rem-today-d
+aliasfn remc-comingup withremc rem-comingup
+##
+function rem-comingup() {
+    local out='' i pre
+
+    for i in {1..7} ; do
+        pre="$i day(s) later:"
+        out+="$(prefix-if-ne $'\n\n'"$pre"$'\n' "$(rem-today-d "$i" | prefixer -a '  ')")"
+    done
+
+    # out="$(prefix-if-ne "Coming up:"$'\n' "$out")"
+    trim "$out"
+}
 ###
 function fromnow() {
     local then
@@ -76,30 +90,41 @@ function remj() {
     reminday_store "$dest" "$text"
 }
 function reminday_store() {
-    local dest="${1}" text="$2"
+    local dest="${1}" text="$(trim "$2")"
 
     test -z "$dest" && return 1
     test -z "$text" && return 1
 
     dest="$dest".md
     ensure-dir "$dest" || return 1
-    ec "$text"$'\n' >> $dest
+    ec "$text" >> $dest
     Bold ; color 100 255 200 "$dest : $text" ; resetcolor
     ec $'\n'
     cellp # to sync the reminders
 }
-function remn() {
-    local text="$1" natdate="${@:2}"
-    [[ "$text" == '-' ]] && text="$(</dev/stdin)"
+function datenatj() {
+    : "GLOBAL OUT: datenatj_date"
+
+    unset datenatj_date
+    local natdate="$*"
 
     local gdate
     gdate="$(datenat.js $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
-    local dest="$remindayDir/$(jalalim tojalali "$gdate") $(<<<$gdate tr '/' '_')"
+    datenatj_date="$gdate"
+    ecn "$(jalalim tojalali "$gdate")"
+}
+function remn() {
+    local text="$1" natdate="${@:2}"
+    [[ "$text" == '-' ]] && text="$(</dev/stdin)"
+    local jdate
+    jdate="$(datenatj "$natdate")" || return 1
+    local dest="$remindayDir/$jdate $(<<<$datenatj_date tr '/' '_')"
     reminday_store "$dest" "$text"
 }
 function rem-todaypaths() {
     unset today
 
+    # FNSWAP: datej
     local now=("${(s./.)$(datej)}")
     local cyear="$now[1]"
     local cmonth="$now[2]"
@@ -141,6 +166,10 @@ function rem-today() {
 
     trim "$text"
 }
+function rem-today-d() {
+    local day="${1:-1}"
+    fnrep datej "datenatj $day day later" rem-today
+}
 function rem-today-notify() {
     ensure-dir ~/logs/
     {
@@ -160,18 +189,24 @@ function tlg-reminday() {
         ecerr "$0: Empty receiver."
         return 1
     }
-
-    local text="$(@opts delete y @ rem-today)"
-    if test -n "$text" ; then
-        tnotif "$text"
-    fi
-    local textc="$(@opts delete y @ remc-today)"
-    if test -n "$textc" ; then
-        text+=$'\n\n'"$textc"
-        tnotifc "$textc"
-    fi
+    local text="$(@opts delete y notif y @ rem-summary)"
     text="$text"$'\n\n'"$(datej) $(date +"%A %B %d")"
     tsend --parse-mode markdown -- "$rec" "$text"
+}
+function rem-summary() {
+    local deleteMode="$rem_summary_delete" notifMode="$rem_summary_notif"
+
+    local text="$(@opts delete "$deleteMode" @ rem-today)"
+    if test -n "$text" && test -n "$notifMode" ; then
+        tnotif "$text" >&2
+    fi
+    local textc="$(@opts delete "$deleteMode" @ remc-today)"
+    text+="$(prefix-if-ne $'\n\n' "$textc")"
+    if test -n "$textc" && test -n "$notifMode" ; then
+        tnotifc "$textc" >&2
+    fi
+    text+="$(prefix-if-ne $'\n\n' "$(rem-comingup)")"
+    trim "$text"
 }
 ##
 remnd() {
