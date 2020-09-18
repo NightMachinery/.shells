@@ -42,10 +42,9 @@ isDarwin && {
     export MONO_GAC_PREFIX="/usr/local"
     export ELM_HOME="/usr/local/bin/"
 
-    export JAVA_HOME8="`/usr/libexec/java_home --version 1.8`"
     # Use `brew info openjdk` to link java properly.
-    export JAVA_HOME14="`/usr/libexec/java_home --version 14`"
-    export JAVA_HOME=$JAVA_HOME14
+    export JAVA_HOME15="`/usr/libexec/java_home --version 15`"
+    export JAVA_HOME=$JAVA_HOME15
     addToPATH $JAVA_HOME
 
     addToPATH /usr/local/opt/qt/bin

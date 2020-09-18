@@ -11,7 +11,8 @@ function ffz() {
     # isI || fzf_opts=(--filter "$query")
     # sel="$(zoxide query --list | fz --no-sort -1 --query "$query" "$fzf_opts[@]" | head -1)" || return 1
     ##
-    sel="$(zoxide query --list | memoi_skiperr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query" | head -1)" || return 1
+    # memoi-eval doesn't read from pipe
+    sel="$( { serr zoxide query --list || true } | memoi_skiperr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query" | head -1)" || return 1
     cd "$sel"
 }
 aliasfn z ffz

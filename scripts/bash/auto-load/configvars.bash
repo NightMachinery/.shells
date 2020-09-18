@@ -24,6 +24,8 @@ export BASE_DIR="$HOME/base"
 export GREENCASE_DIR="$BASE_DIR/music/greencase"
 ##
 export nightNotes="$cellar/notes/"
+export memorydir="$nightNotes/private/memories"
+export peopledir="$nightNotes/private/memories/people"
 ##
 export remindayDir="$nightNotes/reminders"
 export remindayBakDir="$cellar/reminders_bak"

@@ -144,8 +144,8 @@ alias cask="brew cask"
 alias bi="brew install --force-bottle"
 alias bci="brew cask install --no-quarantine"
 alias weather="wego | less -r"
-alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
-alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
+# alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
+# alias j9='export JAVA_HOME=$JAVA_HOME9; export PATH=$JAVA_HOME/bin:$PATH'
 ##
 # https://github.com/ytdl-org/youtube-dl#format-selection-examples
 alias ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"

@@ -12,7 +12,7 @@ function seev() {
     ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) ntsearch_glob='' ntl-rg "$@" # ntsearch_glob=$textglob
 }
 noglobfn seev
-aliasfn-ng agsi nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
+aliasfn-ng agsi nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
 function agfi() {
     local f="$1"
     ntsearch_query_fzf="'$f '() | 'alias | 'alifn" agsi  # match functions or aliases
