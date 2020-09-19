@@ -257,7 +257,7 @@ function datej-all() {
     # Full:
     # ec "$cyear/$(monthj2en $cmonth) $cmonth/$cday $(date +'%A %B %d')"
     # Abbrev: (We don't want it occupying two lines on the widget.)
-    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $(date +'%a %y/%b%-m/%d')"
+    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $(date +'%a %b%-m/%d')" # %y/
 }
 ##
 remnd() {
