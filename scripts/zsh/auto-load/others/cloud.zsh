@@ -31,7 +31,7 @@ function rclonef() {
 function r1() {
     local root="${r1_root:-${r1_r}}" query="$*"
 
-    local cache="$HOME/base/cache/"
+    local cache="${r1_path:-${r1_p:-$HOME/base/cache/}}"
     mkdir -p $cache
     rabbit="$root" @opts query "$query" @ rclonef rabbit0: $cache
 }
