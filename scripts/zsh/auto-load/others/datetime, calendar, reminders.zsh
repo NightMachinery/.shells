@@ -103,21 +103,24 @@ function reminday_store() {
     cellp # to sync the reminders
 }
 function datenatj() {
-    : "GLOBAL OUT: datenatj_date"
+    : "GLOBAL OUT: datenatj_date datenatj_datej"
 
     unset datenatj_date
+    unset datenatj_datej
     local natdate="$*"
 
     local gdate
     gdate="$(datenat.js $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
     datenatj_date="$gdate"
-    ecn "$(jalalim tojalali "$gdate")"
+    datenatj_datej="$(jalalim tojalali "$gdate")"
+    ecn "$datenatj_datej"
 }
 function remn() {
     local text="$1" natdate="${@:2}"
     [[ "$text" == '-' ]] && text="$(</dev/stdin)"
     local jdate
-    jdate="$(datenatj "$natdate")" || return 1
+    sout datenatj "$natdate" || return 1
+    jdate="$datenatj_datej"
     local dest="$remindayDir/$jdate $(<<<$datenatj_date tr '/' '_')"
     reminday_store "$dest" "$text"
 }
@@ -257,7 +260,7 @@ function datej-all() {
     # Full:
     # ec "$cyear/$(monthj2en $cmonth) $cmonth/$cday $(date +'%A %B %d')"
     # Abbrev: (We don't want it occupying two lines on the widget.)
-    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $(date +'%a %y/%b%-m/%d')"
+    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $(date +'%a %b%-m/%d')" # %y/
 }
 ##
 remnd() {
