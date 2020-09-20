@@ -1,6 +1,7 @@
 alias tsmf='tsendf $me'
 ###
 function tnotif() {
+    # ALT: notif
     local msg="$*"
 
     matrix-send-self "$msg"
