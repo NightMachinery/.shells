@@ -122,7 +122,7 @@ function init-vfiles() {
     : GLOBAL vfiles
 
     if test -n "$*" || test -z "$vfiles[1]" ; then
-        local i dirs=( "${(@0)$(arr0 ~/.julia/config ~/.julia/environments $DOOMDIR $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust | filter0 test -e)}" )
+        local i dirs=( "${(@0)$(arr0 ~/.julia/config ~/.julia/environments $DOOMDIR $NIGHTDIR $cellar $codedir/nodejs $codedir/lua $codedir/python $codedir/uni $codedir/rust $codedir/golang | filter0 test -e)}" )
         vfiles=( ${(0@)"$(fd -0 --ignore-file ~/.gitignore_global --exclude node_modules --exclude resources --exclude goog --ignore-case --type file --regex "\\.(${(j.|.)text_formats})\$" $dirs[@] )"} ~/.zshrc ~/.zshenv )
         # for i in "$dirs[@]" ; do
         #     vfiles+=( $i/**/*(.D^+isbinary) )

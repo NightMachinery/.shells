@@ -27,6 +27,11 @@ aliasfnq gray ntag-filter "gray | 'grey"
 aliasfn grey gray
 @opts-setprefix grey ntag-search
 ##
+function ntag-ll() {
+    ll --color always | ntag-color
+}
+aliasfn lll ntag-ll
+##
 function ntag-rmadd() {
     ## tests
     # `@opts rm [ red bad ] add [ yellow blue purple ] @ ntag-rmadd `
@@ -284,12 +289,12 @@ function ntag-search() {
     # local nightNotes="${ntag_search_dir:-.}"
     # ntsearch_glob='' ntsearch_rg_opts=(-uuu) ntl-fzf "$query"
     ##
-    local input="$(catp)"
+    local input
     {
-        if test -z "$input" ; then
-            fd ${ntag_fd_opts[@]}
-        else
+        if input="$(pcat)" ; then
             ecn $input
+        else
+            fd ${ntag_fd_opts[@]}
         fi
     } | fzp "$query"
 }
