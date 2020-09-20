@@ -27,6 +27,25 @@ aliasfnq gray ntag-filter "gray | 'grey"
 aliasfn grey gray
 @opts-setprefix grey ntag-search
 ##
+function ntag-rmadd() {
+    ## tests
+    # `@opts rm [ red bad ] add [ yellow blue purple ] @ ntag-rmadd `
+    ##
+    local f="$1"
+    test -e "$f" || {
+        ecerr "$0: Nonexistent file: $f"
+        return 1
+    }
+
+    local add=("${ntag_rmadd_add[@]}")
+    local rm=("${ntag_rmadd_rm[@]}")
+
+    ntag-rm "$f" $rm[@] || return 1
+    ntag-add "$ntag_rm_dest" $add[@]
+}
+reify ntag-rmadd
+aliasfn green2red @opts rm green add red @ ntag-rmadd
+##
 function ntag-mv() {
     local i="$1" o="$2"
     color 100 255 200 "$0 $(gq "$@")" # >&2
@@ -265,7 +284,14 @@ function ntag-search() {
     # local nightNotes="${ntag_search_dir:-.}"
     # ntsearch_glob='' ntsearch_rg_opts=(-uuu) ntl-fzf "$query"
     ##
-    fd ${ntag_fd_opts[@]} | fzp "$query"
+    local input="$(catp)"
+    {
+        if test -z "$input" ; then
+            fd ${ntag_fd_opts[@]}
+        else
+            ecn $input
+        fi
+    } | fzp "$query"
 }
 aliasfn tgsor @opts or y @ ntag-search
 function tgs() {
@@ -306,9 +332,9 @@ function ntag-filter() {
     local res
     res="$(ntag-grep "$@")" || return 1
     if test -n "$colorMode" || { isI && istty } ; then
-        ecn $res | ntag-color
+        ec $res | ntag-color
     else
-        ecn $res
+        ec $res
     fi
 }
 @opts-setprefix ntag-filter ntag-search

@@ -30,6 +30,8 @@ function set-defaults() {
     duti -s $cf_zopen public.mpeg-4-audio all
     duti -s $cf_zopen public.audio all
     duti -s $cf_zopen "public.zip-archive" all
+    duti -s $cf_zopen "com.rarlab.rar-archive" all
+    duti -s $cf_zopen ".rar" all
     duti -s $cf_zopen "org.idpf.epub-container" all
     duti -s $cf_zopen "public.mobi" all
     duti -s $cf_zopen ".azw3" all

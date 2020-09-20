@@ -2,10 +2,15 @@ function play-tag() {
     local f="$1"
     # tag --add green "$f"
     ntag-add "$f" green
-    mpv "$ntag_add_dest"
+    rgeval mpv "$ntag_add_dest"
 }
 function openv() {
-    arrN $~videoglob | ntag-color | fz --ansi | inargsf play-tag
+    # om sorts by moddate
+    {
+        local vids="$(arrN *.(${(j.|.)~video_formats})(.DNom))"
+        <<<$vids green # to have these at first
+        ec $vids
+    } | ntag-color | fz --ansi | inargsf play-tag
 }
 aliasfn r2 incache openv
-aliasfn lec indir ~/base/Lectures openv
+lec() { indir ~/base/Lectures openv }

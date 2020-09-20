@@ -17,8 +17,8 @@ function ps-grandchildren() {
   done
 }
 function kill-withchildren() {
-    local sig=15 # TERM
-    if [[ "$1" =~ '-\d+' ]] ; then
+    local sig=-15 # TERM
+    if [[ "$1" =~ '-\S+' ]] ; then
         sig="$1"
         shift
     fi
@@ -27,7 +27,7 @@ function kill-withchildren() {
     local children
     for pid in $pids[@] ; do
         children=("${(@f)$(ps-grandchildren "$pid")}")
-        kill -$sig $pid $children[@] # `kill ''` will kill itself in noninteractive zsh (at least does so in brishz)
+        revaldbg kill $sig $pid $children[@] # `kill ''` will kill itself in noninteractive zsh (at least does so in brishz)
     done
 }
 ##
