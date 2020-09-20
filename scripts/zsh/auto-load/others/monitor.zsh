@@ -14,6 +14,11 @@ function ppgrep() {
             ;;
     esac
 }
+##
+function  jglan() {
+    # doesn't work all that well (skips some newlines)
+    jah fnswap glances 'gtimeout 10s unbuffer glances' glan
+}
 function jprocs() {
     jah procs -c always "$@"
 }
@@ -21,6 +26,7 @@ function jprocs-pic() {
     procs "$@" | text2img "$0 $*"
     jdoc
 }
+##
 function getidle-darwin() {
     ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }

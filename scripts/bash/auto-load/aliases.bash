@@ -137,7 +137,6 @@ alias pi='\noglob pip install -U'
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias eta="etlas exec eta"
 alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
-alias pe="pkill -SIGUSR2 -i emacs ; emacsclient -e '(setq debug-on-quit nil)'"
 alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"

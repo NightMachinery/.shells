@@ -33,7 +33,7 @@ function ffkill() {
     ##
 
     local opts=()
-    if [[ "$1" =~ '-\d+' ]] ; then
+    if [[ "$1" =~ '-\S+' ]] ; then
         opts+="$1"
         shift
     fi
