@@ -1,11 +1,12 @@
+ffz_last_query=''
 function ffz() {
     ##
     # @retiredtodo2 We can bypass the interactive selection if the score of the top match is high enough compared to the second-best match, and have a `zi` that disables this auto-bypass.
     # DONE: We can also just cache the result for each query!
     ##
     setopt localoptions pipefail
-    local query="$*" sel
-
+    local query="${*:-$ffz_last_query}" sel
+    ffz_last_query="$query"
     ##
     # local fzf_opts=()
     # isI || fzf_opts=(--filter "$query")

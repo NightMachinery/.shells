@@ -33,3 +33,11 @@ function removeTrailingSlashes() {
 function str-normalize() {
     iconv -f utf-8 -t ascii//translit
 }
+##
+function prefixer-rm() {
+    local input
+    input="$(cat)" || return 3
+    ecn $input | prefixer rm -- "${(@f)$(ecn $input | reval "$@")}"
+}
+aliasfn prm prefixer-rm
+##

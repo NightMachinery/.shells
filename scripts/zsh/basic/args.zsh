@@ -5,7 +5,9 @@ function in-or-args2() {
 function in-or-args() {
     (( $# )) && ec "$@" || print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
 }
-function pcat() { possiblycat "$@" }
+function pcat() {
+    possiblycat "${@:-50}"
+}
 ##
 function arr0() { print -nr -- "${(pj.\0.)@}" }
 function arrN() { print -nr -- "${(pj.\n.)@}" }

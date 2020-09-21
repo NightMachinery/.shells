@@ -291,20 +291,24 @@ function ntag-search() {
     ##
     local input
     {
-        if input="$(pcat)" ; then
+        # @weird: Increase pcat's timeout if you see weird behavior
+        if input="$(pcat 10)" ; then
             ecn $input
         else
             fd ${ntag_fd_opts[@]}
         fi
     } | fzp "$query"
 }
-aliasfn tgsor @opts or y @ ntag-search
+aliasfn ntag-searchor @opts or y @ ntag-search
+aliasfn tgsor ntag-searchor
 function tgs() {
     @opts color y @ ntag-filter "$@" | fz --ansi
 }
 ##
 aliasfn ntag-grep fnswap isI false ntag-search
 @opts-setprefix ntag-grep ntag-search
+
+aliasfn ntag-grepor fnswap isI false ntag-searchor
 ##
 function ntag_filter_rg() {
     local pattern="$1" bg="${2:-0,0,0}" fg="${3:-255,255,255}"

@@ -1134,7 +1134,8 @@ function url-goometa() {
 
     local url="${1:?URL Required}"
 
-    local search="$(googler-en --json --count "1" "$url")"
+    # `--time y19` makes it more likely that Google returns the date. We can't use a higher value than 19 years.
+    local search="$(googler-en --time y19 --json --count "1" "$url")"
     # dact ec $search
     <<<$search jqm ' .[] | .metadata'
 }
