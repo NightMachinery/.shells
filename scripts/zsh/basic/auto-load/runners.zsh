@@ -44,15 +44,6 @@ function skipemptyin() {
 }
 aliasfn skipin skipemptyin
 ##
-function cdz() {
-    local i="$*"
-
-    if test -d "$i" ; then
-        cd "$i"
-    else
-        ffz "$i"
-    fi
-}
 function indir() {
     # we are not handling the autocompletion system at all
     local origfile="$1" dir="$(bottomdir "$1")" cmd=("${@:2}") origPWD=$PWD

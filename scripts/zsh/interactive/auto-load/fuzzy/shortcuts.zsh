@@ -3,7 +3,7 @@ function play-tag() {
     local f="$1"
     # tag --add green "$f"
     ntag-add "$f" green
-    rgeval mpv "$ntag_add_dest"
+    rgeval mpv "$(realpath "$ntag_add_dest")" # realpath to unbreak rgeval's usefulness because we use this via `indir`.
 }
 function openv() {
     # om sorts by moddate

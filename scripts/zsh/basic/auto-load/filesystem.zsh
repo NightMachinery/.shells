@@ -8,6 +8,7 @@ function realpath-relchild() {
         ec "$rel"
     fi
 }
+##
 function cdm() {
     mkdir -p -- "$1" &&
         cd -P -- "$1"
@@ -15,7 +16,18 @@ function cdm() {
 function bottomdir() {
     { { [ -e "$1" ]  && ! [ -d "$1" ] } || { ! [ -e "$1" ] && [[ "$1" != */ ]] } } && { ec "${1:h}"; } || { ec "$1"; } ;}
 function cdd() {
-    cd "$(bottomdir "$1")" }
+    cd "$(bottomdir "$1")"
+}
+function cdz() {
+    local i="$*"
+
+    if test -d "$i" ; then
+        cd "$i"
+    else
+        ffz "$i"
+    fi
+}
+##
 trs() {
     local i
     for i in "$@"

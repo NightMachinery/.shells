@@ -8,9 +8,7 @@ function ffz() {
     local query="${*:-$ffz_last_query}" sel
     ffz_last_query="$query"
     ##
-    # local fzf_opts=()
-    # isI || fzf_opts=(--filter "$query")
-    # sel="$(zoxide query --list | fz --no-sort -1 --query "$query" "$fzf_opts[@]" | head -1)" || return 1
+    local fz_opts=( $fz_opts[@] --prompt "Z> ")
     ##
     # memoi-eval doesn't read from pipe
     sel="$( { serr zoxide query --list || true } | memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query" | head -1)" ||  {
