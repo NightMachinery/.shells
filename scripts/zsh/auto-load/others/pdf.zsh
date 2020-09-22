@@ -56,3 +56,26 @@ function pdf-getpages() {
 function jpdfpages() {
     pdf-getpages "$j" "$@"
 }
+##
+function pdf-compress-gray() {
+    jglob
+    local input="${1}"
+    local out="${2:-${input:r}_cg.pdf}"
+    local dpi="${pdf_compress_gray_dpi:-90}"
+
+        # -dEmbedAllFonts=true \
+        # -dSubsetFonts=true \
+    gs  -q -dNOPAUSE -dBATCH -dSAFER \
+        -sProcessColorModel=DeviceGray -sColorConversionStrategy=Gray -dDownsampleColorImages=true -dOverrideICC \
+        -sDEVICE=pdfwrite \
+        -dCompatibilityLevel=1.4 \
+        -dPDFSETTINGS=/screen \
+        -dColorImageDownsampleType=/Bicubic \
+        -dColorImageResolution=$dpi \
+        -dGrayImageDownsampleType=/Bicubic \
+        -dGrayImageResolution=$dpi \
+        -dMonoImageDownsampleType=/Bicubic \
+        -dMonoImageResolution=$dpi \
+        -sOutputFile="$out" "$input"
+}
+##
