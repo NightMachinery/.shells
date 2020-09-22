@@ -278,7 +278,9 @@ function ntag-fromapple-force() {
     ntag-rm-colors-rec
     ntag-fromapple-rec
 }
-## fuzzy
+#### fuzzy
+###
+## Non-coloring, potentially fuzzy (Using `tgs`, `tgsor` instead is recommended.)
 function ntag-search() {
     local orMode="${ntag_search_or}"
     local query_sep=''
@@ -300,16 +302,12 @@ function ntag-search() {
     } | fzp "$query"
 }
 aliasfn ntag-searchor @opts or y @ ntag-search
-aliasfn tgsor ntag-searchor
-function tgs() {
-    @opts color y @ ntag-filter "$@" | fz --ansi
-}
 ##
 aliasfn ntag-grep fnswap isI false ntag-search
 @opts-setprefix ntag-grep ntag-search
 
 aliasfn ntag-grepor fnswap isI false ntag-searchor
-##
+###
 function ntag_filter_rg() {
     local pattern="$1" bg="${2:-0,0,0}" fg="${3:-255,255,255}"
 
@@ -348,5 +346,15 @@ function ntag-filter() {
 }
 @opts-setprefix ntag-filter ntag-search
 aliasfn tgf ntag-filter
-aliasfn tgfor @opts or y @ ntag-filter
-##
+aliasfn ntag-filteror @opts or y @ ntag-filter
+aliasfn tgfor ntag-filteror
+## interactive
+function ntag-filterori() {
+    @opts color y or y @ ntag-filter "$@" | fz --ansi
+}
+aliasfn tgsor ntag-filterori
+function ntag-filteri() {
+    @opts color y @ ntag-filter "$@" | fz --ansi
+}
+aliasfn tgs ntag-filteri
+###
