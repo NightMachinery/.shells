@@ -66,9 +66,10 @@ function pdf-compress-gray() {
         # -dEmbedAllFonts=true \
         # -dSubsetFonts=true \
     gs  -q -dNOPAUSE -dBATCH -dSAFER \
-        -sProcessColorModel=DeviceGray -sColorConversionStrategy=Gray -dDownsampleColorImages=true -dOverrideICC \
         -sDEVICE=pdfwrite \
         -dCompatibilityLevel=1.4 \
+        -sProcessColorModel=DeviceGray -sColorConversionStrategy=Gray -dOverrideICC \
+        -dDownsampleColorImages=true -dDownsampleGrayImages=true \
         -dPDFSETTINGS=/screen \
         -dColorImageDownsampleType=/Bicubic \
         -dColorImageResolution=$dpi \
