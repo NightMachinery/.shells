@@ -24,12 +24,11 @@ function tsendf() {
 }
 air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(mpv-get)"}
 function reval-tlg() {
-    mdoc 'enve; The Enveloper ^_^
-An enhancer that sends stdout asynchronously to my Telegram. Also prints stdout.
-Usage: me= enve command ...' MAGIC
-    local out="$(eval "$(gquote "$@")")"
+    local rec="${reval_tlg_receiver:-${reval_tlg_r:-$me}}"
+    local out="$(eval "$(gquote "$@")" 2>&1)"
+
     ec "$out"
-    tsend $me "$out" &
+    tsend "$rec" "$out"
 }
 # aliasfn reval-tlg enve
 function tlg-file-captioned() {
