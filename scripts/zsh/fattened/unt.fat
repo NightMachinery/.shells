@@ -127,7 +127,7 @@ gquote () {
 alias eval-memoi=memoi-eval
 memoi-eval () {
 	local now="$(date +%s)" 
-	local cmd="$(gq "$@")" 
+	local cmd="$(gquote "$@")"
 	redis-cli --raw ping &> /dev/null || {
 		test -n "$memoi_strict" && {
 			ecerr '`redis-cli ping` failed. Please make sure redis is up.'
@@ -168,7 +168,7 @@ alias ec='print -r --'
 print: shell built-in command
 memoi-eval () {
 	local now="$(date +%s)" 
-	local cmd="$(gq "$@")" 
+	local cmd="$(gquote "$@")"
 	redis-cli --raw ping &> /dev/null || {
 		test -n "$memoi_strict" && {
 			ecerr '`redis-cli ping` failed. Please make sure redis is up.'
@@ -310,7 +310,7 @@ print(out[:-1])
 '
 }
 reval () {
-	eval "$(gq "$@")"
+	eval "$(gquote "$@")"
 }
 alias s=silent
 alias silent='&>/dev/null'

@@ -44,27 +44,39 @@ function skipemptyin() {
 }
 aliasfn skipin skipemptyin
 ##
+function cdz() {
+    local i="$*"
+
+    if test -d "$i" ; then
+        cd "$i"
+    else
+        ffz "$i"
+    fi
+}
 function indir() {
     # we are not handling the autocompletion system at all
-    local origfile="$1" dir="$(bottomdir "$1")" cmd=("${@:2}")
+    local origfile="$1" dir="$(bottomdir "$1")" cmd=("${@:2}") origPWD=$PWD
     { test -e "$origfile" && test -d "$dir" } || {
-        ecerr "$0: '$origfile' is invalid (probably doesn't exist)"
-        return 1
+        ##
+        # ecerr "$0: '$origfile' is invalid (probably doesn't exist)"
+        # return 1
+        ##
+        dir="$origfile" # using ffz
     }
 
     if test -z "$cmd[*]" ; then
-        cd "$dir"
+        cdz "$dir" || return $?
         return 0
     elif [[ "$cmd[1]" == 'cd' ]] ; then
-        cd "$dir"
+        cdz "$dir" || return $?
         reval "${cmd[@]}"
         return $?
     fi
 
-    pushf "$dir"
+    cdz "$dir" || return $?
     {
         reval "${cmd[@]}"
-    } always { popf }
+    } always { cd "$origPWD" }
 }
 alias in=indir # best reserved for interactive use
 ##

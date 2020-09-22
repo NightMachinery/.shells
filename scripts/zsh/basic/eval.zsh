@@ -51,14 +51,14 @@ function aget() {
     fi
 }
 function reval() {
-    # ecdbg revaling "$(gq "$@")"
+    # ecdbg revaling "$(gquote "$@")"
     # Don't put stuff here, reval is used in ecdbg itself!
-    local cmd="$(gq "$@")"
+    local cmd="$(gquote "$@")"
     test -z "$*" && return 0 # Don't throw an error, it throws some other stuff up :|
     eval "$cmd"
 }
 function rgeval() {
-    geval "$(gq "$@")"
+    geval "$(gquote "$@")"
 }
 function psource()
 {

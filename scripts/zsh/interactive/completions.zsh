@@ -47,7 +47,7 @@ function _indir() {
 
     local compfun="_${subcommand}"
     (( $+functions[$compfun] )) || compfun=_files
-    cd $PWD
+    cdz $PWD || return 0 # returning non-zero causes some retries which we don't want.
     {
         service="$subcommand" $compfun
         local ret=$?

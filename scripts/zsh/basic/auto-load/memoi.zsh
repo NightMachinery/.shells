@@ -21,7 +21,7 @@ function memoi-eval() {
     unset memoi_cache_used
     # needs zmodload zsh/datetime loaded
     local now=$EPOCHREALTIME #"$(date +%s)"
-    local cmd="$(gq "$@")"
+    local cmd="$(gquote "$@")"
     local custom_key="$memoi_key"
     local rediskey="$custom_key|> $cmd"
     local deusvult="$deusvult"

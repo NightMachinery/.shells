@@ -1154,9 +1154,9 @@ function url-date-wayback() {
 function url-date() {
     local url="$1" date
 
-    date="$(url-date-wayback "$url")"
+    date="$(url-goometa "$url")" # Google's metadata can contain irrelevant stuff, but if they usually contain the date, and are more accurate than wayback's.
     if [[ "$date" =~ '^\s*$' ]] ; then
-        date="$(url-goometa "$url")" # Google's metadata can contain irrelevant stuff, but if they usually contain the date, and are more accurate than wayback's.
+        date="$(url-date-wayback "$url")"
     fi
     ec $date
 }
