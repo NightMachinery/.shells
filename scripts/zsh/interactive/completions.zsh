@@ -13,7 +13,7 @@ comp_wh run-on-each re-async cee ceer whichm whdeep whdeep-words wh whh whz lesh
 ##
 rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 rexa "compdef _=man" mn
-rexa "compdef _=rclone" rcr
+((${+commands[rclone]})) && rexa "compdef _=rclone" rcr
 # rexa "compdef _=xargs"
 ##
 # isExpensive && {

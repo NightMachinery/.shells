@@ -58,7 +58,10 @@ function jpdfpages() {
 }
 ##
 function pdf-compress-gray() {
+    : 'ALT: `pdftk in.pdf output out.pdf compress` does not compress as much'
+
     jglob
+
     local input="${1}"
     local out="${2:-${input:r}_cg.pdf}"
     local dpi="${pdf_compress_gray_dpi:-90}"
