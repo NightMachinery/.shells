@@ -108,18 +108,8 @@ bindkey -v
 
 bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+Return to insert a literal newline without accepting the command
 
-#Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
-# Use colon separators#.
-#xterm-24bit|xterm with 24-bit direct color mode,
-#use=xterm-256color,
-#setb24=\E[48:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
-#setf24=\E[38:2:%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1%{255}%&%dm,
-## Use semicolon separators.
-#xterm-24bits|xterm with 24-bit direct color mode,
-#use=xterm-256color,
-#setb24=\E[48;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
-#setf24=\E[38;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&%d;%p1%{255}%&%dm,
-#tic -x -o ~/.terminfo terminfo-24bit.src
+# Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
+# tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
 isDarwin && export TERM=xterm-24bits || true
 
 
