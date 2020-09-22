@@ -4,7 +4,7 @@ isNotExpensive || {
     }
     export _ZO_DATA_DIR="$HOME/.z.dir"
     mkdir -p "$_ZO_DATA_DIR"
-    if ((${+commands[zoxide])) ; then
+    if ((${+commands[zoxide]})) ; then
            eval "$(zoxide init zsh --no-aliases)" # --no-aliases: don't define extra aliases like zi, zq, za, and zr
            # `z -i` is fzf z.
     fi
