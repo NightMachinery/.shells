@@ -1,5 +1,5 @@
-if ! command -v brew &> /dev/null ; then
-    # brew not found
+if true ; then # ! command -v brew &> /dev/null ; then
+    # Sometimes brew itself is in path but its dirs are not.
     test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
     test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
 fi

@@ -1,4 +1,5 @@
 #!/usr/bin/env zsh
+brew install jq --head
 brew install --HEAD mosh
 brew tap moncho/dry
 brew install dry
