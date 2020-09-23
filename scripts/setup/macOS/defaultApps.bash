@@ -9,6 +9,7 @@ function set-defaults() {
     ## Emacs
     duti -s $cf_emacs "public.plain-text" editor
     duti -s $cf_emacs "public.text" editor
+    duti -s $cf_emacs "public.yaml" editor
     duti -s $cf_emacs "public.data" editor
     duti -s $cf_emacs "org.vim.cfg-file" editor
     duti -s $cf_emacs "public.python-script" editor
