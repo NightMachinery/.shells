@@ -25,7 +25,7 @@ function fz() {
 }
 function fzf-noempty() {
     local in="$(</dev/stdin)" # So we need to wait for the whole input to finish first.
-    test -z "$in" && (exit 130) || { ec "$in" | fzf-gateway "$@" }
+    test -z "$in" && { return 130 } || { ec "$in" | fzf-gateway "$@" }
 }
 function fzf-gateway() {
     SHELL="${FZF_SHELL:-$(realpath2 dash)}" fzf-tmux -p90% "$@" | sponge

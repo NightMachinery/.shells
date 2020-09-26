@@ -86,7 +86,8 @@ function remj() {
         ecerr "$0: Invalid date: $target_date"
         return 1
     fi
-    local dest="$remindayDir/$target_date $(jalalim togregorian "$target_date"|tr '/' '_')"
+    local gdate="$(gdate --date "$(jalalim togregorian "$target_date")" +'%a %Y_%m_%d')"
+    local dest="$remindayDir/$target_date $gdate"
     reminday_store "$dest" "$text"
 }
 function reminday_store() {
@@ -121,7 +122,8 @@ function remn() {
     local jdate
     sout datenatj "$natdate" || return 1
     jdate="$datenatj_datej"
-    local dest="$remindayDir/$jdate $(<<<$datenatj_date tr '/' '_')"
+    local gdate="$(gdate --date "$datenatj_date" +'%a %Y_%m_%d')"
+    local dest="$remindayDir/$jdate $gdate"
     reminday_store "$dest" "$text"
 }
 function rem-todaypaths() {

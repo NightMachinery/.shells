@@ -280,7 +280,7 @@ function ntsearch_() {
 
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
-    ntsearch_fd | fz --preview-window right:wrap --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
+    ntsearch_fd | fz_empty=y fz --preview-window right:wrap --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
         read -d $'\0' -r acceptor
         out="$(cat)"
         ec "$out"
@@ -294,9 +294,10 @@ function ntsearch_fd() {
         {
             # no-messages suppresses IO errors
             # xargs is needed to avoid argument list too long error
-            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] -- "$query_rg" | rmprefix "$nightNotes" $'\n' '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] -- "$query_rg" | prefixer --skip-empty -r "$nightNotes" -i $'\n' -o '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            # Old way: rmprefix "$nightNotes" $'\n' '\x00'
         }
-        reval "$ntsearch_injector[@]"
+        reval "$ntsearch_injector[@]" | command rg --null-data --smart-case --engine auto --no-messages $ntsearch_rg_opts[@] -- "$query_rg"
     else
         local first='y' file filename content line i
         for file in "$files[@]"
