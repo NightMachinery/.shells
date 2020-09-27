@@ -27,6 +27,7 @@ lilf.ir {
 files.lilf.ir, http://:8080 {
   encode zstd gzip
   file_server browse {
+    hide *..hidden..*
     root {env.HOME}/Downloads
   }
 }

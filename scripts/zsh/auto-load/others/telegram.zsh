@@ -19,7 +19,7 @@ function tsendf() {
     local f
     for f in "${@:2}"
     do
-        tsend "$1" '' -f "$f"
+        tsend -- "$1" '' -f "$f"
     done
 }
 air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(mpv-get)"}
@@ -28,7 +28,7 @@ function reval-tlg() {
     local out="$(eval "$(gquote "$@")" 2>&1)"
 
     ec "$out"
-    tsend "$rec" "$out"
+    tsend -- "$rec" "$out"
 }
 # aliasfn reval-tlg enve
 function tlg-file-captioned() {
