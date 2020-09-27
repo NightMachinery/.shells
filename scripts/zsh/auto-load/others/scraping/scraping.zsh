@@ -58,7 +58,7 @@ function curlm() {
     curl --silent --fail --location --cookie-jar "$(mktemp)" --header "$(cookies-auto "$@")" "$@"
 }
 function cookies-copy() {
-    eccopy "theCookies=$(gq "$(cookies-auto "$@")" "$@")"
+    ec-copy "theCookies=$(gq "$(cookies-auto "$@")" "$@")"
 }
 aliasfn cook cookies-copy
 function cookies-killlock() {
@@ -775,7 +775,7 @@ function hi10-cook() {
     local url="$1"
     local title="$(urlmeta $url title|str2tmuxname)"
     local cmd="FORCE_INTERACTIVE=y $(cook hi10-rc hi10-ng "$url")"
-    eccopy "tmux new -s $(gq "$title") zsh -c $(gq "$cmd")"
+    ec-copy "tmux new -s $(gq "$title") zsh -c $(gq "$cmd")"
 }
 function hi10-ng() {
     mdoc "$0 <url-of-hi10-page> [<regex>]

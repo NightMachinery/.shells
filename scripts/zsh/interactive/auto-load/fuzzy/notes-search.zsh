@@ -124,7 +124,7 @@ function ntsearch-lines() {
     test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
-    ntLines=y reval "$engine[@]" "$@" > /dev/null  || return 1 # Beware forking here! We need the global vars outFiles and acceptor
+    ntLines=y reval "$engine[@]" "$@" > /dev/null  || return 88 # Beware forking here! We need the global vars outFiles and acceptor
 
     local i files=() linenumbers=() lines=() file
     for i in "${out[@]}" ; do
@@ -166,10 +166,12 @@ function ntsearch-lines() {
     done
 
     if [[ "$acceptor" == '' ]] ; then
+        ecdbg "$0: Outputting selections ..."
         local sel="${(F)lines}"
         <<<"${sel}" urls-copy
         return 0
     else
+        ecdbg "$0: Opening editor ..."
         if [[ "$EDITOR" =~ '^emacs' ]] ; then
             local cmd='(progn '
             for i in {1..$#files} ; do
@@ -181,7 +183,7 @@ function ntsearch-lines() {
             # The first time we use this in a zsh session, the highlight sometimes does not work. Idk why.
             cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h)"
             cmd+=')'
-            emacsclient -t -e "$cmd"
+            revaldbg emacsclient -t -e "$cmd"
         else
             # should work with both emacs and vim
             # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
@@ -205,7 +207,11 @@ function ntsearch() {
         return 1
     }
 
-    ntsearch_ "$@" > /dev/null || { unset out ; return 1 } # don't fork here. Receiving globals vars out and acceptor.
+    ntsearch_ "$@" > /dev/null || {
+        ecerr "$0: ntsearch_ failed $?."
+        unset out
+        return 1
+    } # don't fork here. Receiving globals vars out and acceptor.
 
     out=( "${(@0)out}" )
     out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
@@ -294,10 +300,11 @@ function ntsearch_fd() {
         {
             # no-messages suppresses IO errors
             # xargs is needed to avoid argument list too long error
-            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] -- "$query_rg" | prefixer --skip-empty -r "$nightNotes" -i $'\n' -o '\x00' } || true # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
+            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] -- "$query_rg" | prefixer --skip-empty -r "$nightNotes" -i $'\n' -o '\x00' }
             # Old way: rmprefix "$nightNotes" $'\n' '\x00'
         }
         reval "$ntsearch_injector[@]" | command rg --null-data --smart-case --engine auto --no-messages $ntsearch_rg_opts[@] -- "$query_rg"
+        return 0 # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
     else
         local first='y' file filename content line i
         for file in "$files[@]"
