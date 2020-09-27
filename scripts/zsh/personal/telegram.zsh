@@ -14,8 +14,9 @@ noglobfn alice
 alias al=alice #NAMECONFLICT: ../Cellar/mono/6.8.0.105/bin/al
 
 function alicedate() {
-    cellp || { # to update reminders
-        remj "cellp failed with $?"
+    local log
+    log="$(cellp 2>&1)" || { # to update reminders
+        remj "cellp failed with $?: $log"
     }
     tlg-reminday "$alice"
 }
