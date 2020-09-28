@@ -13,3 +13,5 @@ github.com/tigrawap/slit/cmd/slit
 github.com/NightMachinary/possiblycat
 github.com/caddyserver/xcaddy/cmd/xcaddy
 github.com/muesli/duf
+github.com/olivere/iterm2-imagetools/cmd/imgcat
+github.com/olivere/iterm2-imagetools/cmd/imgls

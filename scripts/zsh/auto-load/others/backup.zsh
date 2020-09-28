@@ -11,7 +11,9 @@ function ziib-all() {
     {
         mkdir -p discourse
         scp root@51.178.215.202:/var/discourse/containers/app.yml ./discourse/
+
         scp zii@51.178.215.202:/home/zii/Caddyfile .
+        scp zii@51.178.215.202:/home/zii/.privateShell .
 
         mkdir -p mailu
         scp root@51.178.215.202:/mailu/docker-compose.yml ./mailu/
