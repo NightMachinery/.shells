@@ -26,7 +26,6 @@ alias bat='bat --theme OneHalfLight --pager="less -FRXn"'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'
 alias dbg='DEBUGME=d'
-alias sud='ruu sudo'
 alias l='exa -a' # --oneline
 alias ll='exa -a -l'
 alias lt='exa -a -T'

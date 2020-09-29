@@ -99,3 +99,26 @@ function env-clean() {
     env -i "$env[@]" "$(realpath2 "$cmdhead")" "$cmdbody[@]"
 }
 ##
+function sud() {
+    ## test
+    # alias bb='bash -c'
+    # sud fin='h j a' bb 'echo $fin'
+    ##
+    local env=()
+    local i
+    for i in "$@"
+    do
+        if [[ "$i" =~ '^([^=]*)=(.*)$' ]]
+        then
+            env+="$i"
+            shift
+        else
+            break
+        fi
+    done
+    local cmdhead="$1"
+    cmdhead=($(expand-alias-strip "$cmdhead"))
+    local cmdbody=("$@[2,-1]")
+    revaldbg sudo "$env[@]" "$(realpath2 "${cmdhead[1]}")" "${(@)cmdhead[2,-1]}" "$cmdbody[@]"
+}
+##
