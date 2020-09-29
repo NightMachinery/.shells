@@ -19,7 +19,7 @@ function tsendf() {
     local f
     for f in "${@:2}"
     do
-        tsend -- "$1" '' -f "$f"
+        tsend -f "$f" -- "$1" ''
     done
 }
 air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(mpv-get)"}
