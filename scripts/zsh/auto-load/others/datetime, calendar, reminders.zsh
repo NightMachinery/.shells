@@ -271,7 +271,8 @@ remnd() {
     for d in "${@[1,-2]}" ; do
         fnswap cellp true remn "$msg" "$d day later"
     done
-    fnswap cellp true remn "Last reminder: $msg" "${@[-1]} day later"
+    (( ${#@} > 1 )) && msg="Last reminder: $msg"
+    fnswap cellp true remn "$msg" "${@[-1]} day later"
     cellp
 }
 ##
