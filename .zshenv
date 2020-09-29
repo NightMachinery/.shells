@@ -25,7 +25,9 @@ isNotExpensive || {
         NIGHT_NO_EXPENSIVE=y
     }
     function realpath2() {
-        test -e "$1" && realpath "$1" || realpath "$(which "$1")"
+        test -e "$1" && realpath "$1" || {
+                (( ${+commands[$1]} )) && realpath "${commands[$1]}"
+            }
     }
     function rp() {
         realpath2 "$@"
