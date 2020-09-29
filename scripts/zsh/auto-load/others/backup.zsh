@@ -11,6 +11,7 @@ function ziib-all() {
     {
         mkdir -p discourse
         scp root@51.178.215.202:/var/discourse/containers/app.yml ./discourse/
+        full-html2 https://discourse.lilf.ir/admin/site_settings.json > ./discourse/site_settings.json # https://github.com/pfaffman/discourse-settings-uploader
 
         scp zii@51.178.215.202:/home/zii/Caddyfile .
         scp zii@51.178.215.202:/home/zii/.privateShell .

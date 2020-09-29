@@ -268,9 +268,10 @@ function datej-all() {
 remnd() {
     # Example: `remcnd "⛸ 🚪 Don't put the shoes behind the door" 1 3 7 20 60 360`
     local d msg="$1" ; shift
-    for d in "$@" ; do
+    for d in "${@[1,-2]}" ; do
         fnswap cellp true remn "$msg" "$d day later"
     done
+    fnswap cellp true remn "Last reminder: $msg" "${@[-1]} day later"
     cellp
 }
 ##

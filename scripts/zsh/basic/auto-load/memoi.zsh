@@ -3,7 +3,7 @@ alias deus='deusvult=y '
 ## Vars
 memoi_expire=$(( 3600*24*7 ))
 ## Functions
-function meme() { memoi_expire=$(( $1 * 60 )) reval "$@" }
+function expirein() { memoi_expire=$(( $1 * 60 )) reval "$@" }
 function memoi-eval() {
 ###
 # GLOBAL OUT (as always these do not survive  a fork): memoi_cache_used
@@ -31,9 +31,14 @@ function memoi-eval() {
     local override_duration="${memoi_override_duration:-${memoi_od:-0.12}}"
 
     local retcode=0 # If skiperr, we will return the correct exit code if the cache is not used. (We rely on this behavior in, e.g., `ffz`.
+    local delme=''
 
     test -n "$skiperr" || silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
-    if test -z "$deusvult" && { (( $(redis-cli --raw exists $rediskey) )) && { (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redis-cli --raw hget $rediskey timestamp)) <= memoi_expire )) } } }
+    if test -z "$deusvult" && {
+        (( $(redis-cli --raw exists $rediskey) )) # && {
+        # (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redis-cli --raw hget $rediskey timestamp)) <= memoi_expire )) }
+        # }
+        }
     then
         # dact fsay using memoi
         # ec Using memoi: "$cmd"
@@ -49,11 +54,17 @@ function memoi-eval() {
         out="${$(eval "$cmd" 2>"$errfile" ; ret_code=$? ; print -n . ; return $ret_code)[1,-2]}" ; retcode=$?
         local duration=$(( EPOCHREALTIME - now ))
         if (( duration > override_duration )) ; then
+            ##
             # by not storing the time if the command executed quickly, we'll ensure a re-eval the next time.
-            silent redis-cli hset $rediskey timestamp "$now"
+            # silent redis-cli hset $rediskey timestamp "$now"
+            ##
+            (( memoi_expire > 0 )) && silent redis-cli expire $rediskey "$memoi_expire"
         else
+            ##
             # ecdbg "Command took $duration. Setting its timestamp to 0 so that the next evaluation will not use the cache."
-            silent redis-cli hset $rediskey timestamp "0"
+            # silent redis-cli hset $rediskey timestamp "0"
+            ##
+            delme=y
         fi
         print -nr -- "$out" | silent redis-cli -x hset $rediskey stdout
         if test -z "$skiperr" ; then
@@ -74,6 +85,7 @@ function memoi-eval() {
         # zprof
         retcode="$(redis-cli --raw hget $rediskey exit)"
     fi
+    test -n "$delme" && silent redis-cli del $rediskey
     return $retcode
 }
 @opts-setprefix memoi-eval memoi
