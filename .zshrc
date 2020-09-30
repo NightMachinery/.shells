@@ -316,6 +316,22 @@ zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '
 zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
 
+##
+# DISABLE_AUTO_TITLE="true" # disables omz setting the title
+omz_termsupport_precmd () {
+    # @omz adds this to precmd_functions
+    if [[ "$DISABLE_AUTO_TITLE" == true ]]
+    then
+        return
+    fi
+    tty-title "${PWD:t}"
+}
+prompt_pure_set_title() true # disables pure setting the title
+function tty-title() {
+  local text="$@"
+
+  title "$text" "$text" # from omz, see https://superuser.com/a/344397/856545 for setting tab and window separately
+}
 ###
 export rcLoaded='loading'
 zsh-defer export rcLoaded='yes'

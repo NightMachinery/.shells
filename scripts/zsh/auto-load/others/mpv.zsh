@@ -10,7 +10,22 @@ function mpv() {
 
     local opts=()
     test -z "$isStreaming" && opts+="$MPV_AUDIO_NORM"
-    command mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(0@)$(rpargs "$@")}"
+
+    local i args=() first
+    for i in "$@"
+    do
+        if test -e "$i" ; then
+            if test -z "$first" ; then
+                first="${i:t}"
+            fi
+            args+="$(realpath --canonicalize-existing -- "$i")"
+        else
+            args+="$i"
+        fi
+    done
+
+    tty-title "$first"
+    command mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
 }
 function mpv-get() {
     <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "${2:-$mpv_audio_ipc}"|jq --raw-output -e .data

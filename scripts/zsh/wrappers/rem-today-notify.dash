@@ -2,3 +2,5 @@
 
 PATH="$HOME/scripts/zsh/wrappers/brishz/:$PATH"
 brishz.dash rem-today-notify
+##
+brishz.dash brew update
