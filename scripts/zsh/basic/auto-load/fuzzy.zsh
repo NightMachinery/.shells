@@ -28,7 +28,7 @@ function fzf-noempty() {
     test -z "$in" && { return 130 } || { ec "$in" | fzf-gateway "$@" }
 }
 function fzf-gateway() {
-    SHELL="${FZF_SHELL:-$(realpath2 dash)}" fzf-tmux -p90% "$@" | sponge
+    SHELL="${FZF_SHELL:-${commands[dash]}}" fzf-tmux -p90% "$@" | sponge
     # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
 }
 function fzp() {

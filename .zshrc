@@ -330,7 +330,7 @@ prompt_pure_set_title() true # disables pure setting the title
 function tty-title() {
   local text="$@"
 
-  title "$text" "$text" # from omz, see https://superuser.com/a/344397/856545 for setting tab and window separately
+  title "$text" "$text" # from @omz, see https://superuser.com/a/344397/856545 for setting tab and window separately
 }
 ###
 export rcLoaded='loading'

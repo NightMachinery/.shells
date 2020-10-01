@@ -21,7 +21,7 @@ function h_aliastag() {
     aliasfn "$1" ntag-filter "$1"
     @opts-setprefix "$1" ntag-search
 }
-re h_aliastag $ntag_colors[@]
+re h_aliastag $ntag_colors[@] @todo @todo{0..9} # You can use `fd ..@todo` to prefix-search.
 aliasfnq gray ntag-filter "gray | 'grey"
 @opts-setprefix gray ntag-search
 aliasfn grey gray
