@@ -7,8 +7,11 @@ luna() {
     lunar pmset displaysleepnow
 }
 ##
+luna-audio() {
+    awaysh-bnamed LUNA_MARKER bell-many
+}
 lunas() {
-    lunar awaysh-bnamed LUNA_MARKER bell-many
+    lunar luna-audio
 }
 bell-many() {
     setopt localtraps

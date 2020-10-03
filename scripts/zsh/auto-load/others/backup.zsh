@@ -18,6 +18,9 @@ function ziib-all() {
         scp zii@51.178.215.202:/home/zii/Caddyfile .
         scp zii@51.178.215.202:/home/zii/.privateShell .
 
+        mkdir -p v2ray
+        scp zii@51.178.215.202:/usr/local/etc/v2ray/config.json ./v2ray/
+
         mkdir -p mailu
         scp root@51.178.215.202:/mailu/docker-compose.yml ./mailu/
         scp root@51.178.215.202:/mailu/mailu.env ./mailu/
