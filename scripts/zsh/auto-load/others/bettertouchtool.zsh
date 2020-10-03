@@ -1,4 +1,5 @@
 ## https://docs.bettertouchtool.net/docs/1104_webserver.html
+# @darwinonly We might need to add a `isDarwin || return 0` to these
 function btt-refresh {
     local uuid="${1:? UUID required}"
     command curl "http://127.0.0.1:8855/refresh_widget/?uuid=$uuid"

@@ -20,7 +20,7 @@ aliasfn remc-comingup withremc rem-comingup
 function rem-comingup() {
     local out='' i pre
 
-    for i in {1..7} ; do
+    for i in {1..31} ; do
         pre="$i day(s) later:"
         out+="$(prefix-if-ne $'\n\n'"$pre"$'\n' "$(rem-today-d "$i" | prefixer -a '  ')")"
     done
