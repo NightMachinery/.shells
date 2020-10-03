@@ -57,3 +57,11 @@ function text2img() {
 
     convert -page  4000x4000 -font FreeMono -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"$img".png
 }
+##
+function 2ico() {
+	local i="${1}" o="${2:-${1:r}.ico}" s="${png2ico_size:-256}"
+
+	convert -background transparent "$i" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 "$o"
+	# convert -resize x${s} -gravity center -crop ${s}x${s}+0+0 "$i" -flatten -colors 256 -background transparent "$o"
+}
+aliasfn png2ico 2ico
