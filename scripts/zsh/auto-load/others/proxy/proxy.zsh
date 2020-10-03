@@ -1,6 +1,6 @@
 ##
 alias pxs='ALL_PROXY=socks5://127.0.0.1:1080'
-alias pxa='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087'
+alias pxa='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 ##
 pxify() {
     typeset -g proxycmd="proxychains4"
@@ -11,11 +11,17 @@ pxify() {
     pxify-command conda
     pxify-command go
     pxify-command manga-py
+
+    pxaify-command brew # makes downloads faster
 }
 function pxify-command() {
     aliasfn "$1" proxychains4 "$1"
 }
 reify pxify-command
+function pxaify-command() {
+    aliasfn "$1" pxa command "$1"
+}
+reify pxaify-command
 pxpy() {
     px python "$commands[$1]" "${@:2}"
 }
@@ -25,7 +31,7 @@ enh-pxpy() {
 }"
 }
 function pxify-auto() {
-    return 0 # We now use Wireguard
+    # return 0 # We now use Wireguard
     typeset -g pxified
     # local initCountry="$(serr mycountry)"
     if test -z "$pxified" && [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]] ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
@@ -34,3 +40,89 @@ function pxify-auto() {
     fi
 }
 silent pxify-auto
+##
+function darwin-proxy-getns() {
+    # get the active network service
+    # From https://apple.stackexchange.com/a/223446/282215
+    
+    while read -r line; do
+        sname=$(echo "$line" | awk -F  "(, )|(: )|[)]" '{print $2}')
+        sdev=$(echo "$line" | awk -F  "(, )|(: )|[)]" '{print $4}')
+        #echo "Current service: $sname, $sdev, $currentservice"
+        if [ -n "$sdev" ]; then
+            ifout="$(ifconfig "$sdev" 2>/dev/null)"
+            echo "$ifout" | command rg 'status: active' > /dev/null 2>&1
+            rc="$?"
+            if [ "$rc" -eq 0 ]; then
+                currentservice="$sname"
+                currentdevice="$sdev"
+                currentmac=$(echo "$ifout" | awk '/ether/{print $2}')
+
+                # echo "$currentservice, $currentdevice, $currentmac"
+                ec "$currentservice"
+            fi
+        fi
+    done <<< "$(networksetup -listnetworkserviceorder | command rg 'Hardware Port')"
+
+    if [ -z "$currentservice" ]; then
+        >&2 echo "Could not find current service"
+        exit 1
+    fi
+}
+function darwin-proxies-gen() {
+    local ns
+    for ns in "$(darwin-proxy-getns)" ; do # "${(@f)$(networksetup -listallnetworkservices | gsed 1d)}" ; do
+        ec "ns: $ns"
+        eval-ec "$*"
+    done
+}
+aliasfnq darwin-proxies-set darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost 1080
+aliasfnq darwin-proxies-on darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' on
+aliasfnq darwin-proxies-off darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' off
+##
+function proxy-on() {
+    # proxy on
+    # @darwinonly
+    darwin-proxies-set
+    darwin-proxies-on
+
+    # proxy-widget-refresh
+    btt-update $proxy_widget_uuid $proxy_widget_on
+}
+function proxy-off() {
+    # proxy off
+    # @darwinonly
+    darwin-proxies-off
+
+    # proxy-widget-refresh
+    btt-update $proxy_widget_uuid $proxy_widget_off
+}
+aliasfn pu proxy-on
+aliasfn pd proxy-off
+##
+function proxy-is() {
+    # @darwinonly
+    networksetup -getsocksfirewallproxy "$(darwin-proxy-getns)" | silent command rg 'Enabled: Yes'
+}
+function proxy-toggle() {
+    silent bello &
+    if proxy-is ; then
+        proxy-off
+    else
+        proxy-on
+    fi
+}
+##
+proxy_widget_uuid=604BAF41-4517-4C56-B665-F1710C405A28
+proxy_widget_on="🌋"
+proxy_widget_off="⛰"
+function proxy-widget() {
+    if proxy-is ; then
+        ec $proxy_widget_on
+    else
+        ec $proxy_widget_off
+    fi
+}
+# aliasfn proxy-widget-refresh btt-refresh '$proxy_widget_uuid'
+proxy-widget-refresh() { btt-update $proxy_widget_uuid "$(proxy-widget)" }
+##

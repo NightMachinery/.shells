@@ -1,7 +1,17 @@
 #!/usr/bin/env zsh
 tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
 
-git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
+# git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 
-curl https://cht.sh/:cht.sh | sudo tee /usr/local/bin/cht.sh
-sudo chmod +x /usr/local/bin/cht.sh
+curl https://cht.sh/:cht.sh > ~/bin/cht.sh
+chmod +x ~/bin/cht.sh
+##
+conda install -c eumetsat expect
+##
+cpanm App::ansifold
+##
+nimble install https://github.com/NightMachinary/htmlmetadata
+##
+brew tap v2ray/v2ray
+brew install v2ray-core
+##
