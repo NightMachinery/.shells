@@ -688,10 +688,10 @@ Uses getlinksfull (full-html) under the hood." MAGIC
     # zargs --verbose -i _ -- "$pages[@]" -- getlinksfull _ "$regex"
 }
 function getlinks2() {
-    fhMode=curl getlinksfull2 "$@"
+    fhMode="${fhMode:-curl}" getlinksfull2 "$@"
 }
 function getlinks-c() {
-    fhMode=aacookies getlinksfull2 "$@"
+    fhMode="${fhMode:-aacookies}" getlinksfull2 "$@"
 }
 function aamedia() {
     mdoc "$0 <page-url> ...
