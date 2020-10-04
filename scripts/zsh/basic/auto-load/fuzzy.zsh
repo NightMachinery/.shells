@@ -28,8 +28,12 @@ function fzf-noempty() {
     test -z "$in" && { return 130 } || { ec "$in" | fzf-gateway "$@" }
 }
 function fzf-gateway() {
+    if [[ -o interactive ]] ; then # bug: https://github.com/junegunn/fzf/issues/2201
     SHELL="${FZF_SHELL:-${commands[dash]}}" fzf-tmux -p90% "$@" | sponge
     # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
+    else
+    SHELL="${FZF_SHELL:-${commands[dash]}}" fzf "$@"
+    fi
 }
 function fzp() {
     local opts=("${@[1,-2]}") query="${@[-1]}"
