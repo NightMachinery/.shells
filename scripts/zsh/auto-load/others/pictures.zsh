@@ -65,3 +65,17 @@ function 2ico() {
 	# convert -resize x${s} -gravity center -crop ${s}x${s}+0+0 "$i" -flatten -colors 256 -background transparent "$o"
 }
 aliasfn png2ico 2ico
+##
+function convert-pad() {
+	local i="${1:? Input required}" o="${2:-${1:r}_padded.png}" w="${convert_pad_w:-${convert_pad_s:-1024}}" h="${convert_pad_h:-${convert_pad_s:-1024}}" 
+	
+ convert "$i" -gravity center -extent ${w}x${h} "$o"
+}
+##
+function jiconpack() {
+jej
+
+unzip2dir $j
+mv **/*.png .
+re convert-pad *.png
+}
