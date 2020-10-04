@@ -693,6 +693,9 @@ function getlinks2() {
 function getlinks-c() {
     fhMode="${fhMode:-aacookies}" getlinksfull2 "$@"
 }
+function getlinks-uniq() {
+    getlinks-c "$@" | gsort --unique
+}
 function aamedia() {
     mdoc "$0 <page-url> ...
 Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
