@@ -13,6 +13,9 @@ pxify() {
     pxify-command manga-py
 
     pxaify-command brew # makes downloads faster
+    pxaify-command git
+    pxaify-command emacs
+    pxaify-command emacsclient
 }
 function pxify-command() {
     aliasfn "$1" proxychains4 "$1"
@@ -30,7 +33,7 @@ enh-pxpy() {
     pxpy $1 \"\$@\"
 }"
 }
-function pxify-auto() {
+function pxify-auto() { # @gateway
     # return 0 # We now use Wireguard
     typeset -g pxified
     # local initCountry="$(serr mycountry)"
