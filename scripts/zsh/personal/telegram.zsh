@@ -23,16 +23,18 @@ function alicedate() {
 }
 ##
 function hb265-tlg() {
-    local files=("$@") rec="${hb265_tlg_rec:-${hb265_tlg_r:-$tlg_amar}}"
-    test -z "$rec" && {
-        ecerr "$0: Empty receiver"
+    local files=("$@")
+    local rec="${hb265_tlg_rec:-${hb265_tlg_r:-$water}}" destdir="${hb265_tlg_destdir:-${hb265_tlg_d}}"
+    { test -z "$rec" || test -z "$destdir" } && {
+        ecerr "$0: Empty args"
         return 1
     }
+
     local f dest finaldest out link
     for f in "$files[@]" ; do
         dest="${f:r}_h265.mp4"
         if out="$(hb265 "$f" "$dest" 2>&1)" && test -e "$dest" ; then
-            finaldest=~/Downloads/amar/"${dest:t}"
+            finaldest="${destdir}/${dest:t}"
             mv "$dest" "$finaldest"
             link="$(get-dl-link "${finaldest}")"
             tsend -- "$rec" "$link"
@@ -41,7 +43,26 @@ function hb265-tlg() {
         fi
     done
 }
-function hb2amar() {
-    transformer realpath 'awaysh-bnamed amar hb265-tlg' "$@"
+##
+function hb265-tlg-bg() {
+    local rec="${hb265_tlg_rec:-${hb265_tlg_r:-$water}}" destdir="${hb265_tlg_destdir:-${hb265_tlg_d}}"
+
+    awaysh-bnamed-rp "$0" @opts rec "$rec" destdir "$destdir" @ hb265-tlg "$@"
 }
+@opts-setprefix hb265-tlg-bg hb265-tlg
+function ocwvid-process() {
+    local l="$1"
+
+    tsend --link-preview -- $water "New video available: $l"
+    pushf "$amardir/wip/$(uuidm)"
+    {
+        aa "$l"
+        hb265-tlg-bg *
+    } always { popf }
+}
+@opts-setprefix ocwvid-process hb265-tlg
+##
+amardir=~/Downloads/amar
+alias withamar='@opts rec "$tlg_amar" destdir "$amardir" @'
+aliasfn amar-process withamar ocwvid-process
 ##

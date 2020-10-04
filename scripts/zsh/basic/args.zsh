@@ -30,6 +30,8 @@ function args-nochromefile() {
 function rpargs() {
     doc 'Converts all existent paths in args to their abs path. Outputs both in NUL-delimited stdout and $out.'
 
+    unset out
+
     local i args
     args=()
     for i in "$@"

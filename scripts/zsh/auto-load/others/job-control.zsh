@@ -114,6 +114,28 @@ function awaysh-named() {
 function awaysh-bnamed() {
     brishz awaysh-named "$@"
 }
+function awaysh-bnamed-rp() {
+    local name="${1:? Name required}" ; shift
+    local args=("$@")
+
+    transformer realpath-ife 'awaysh-bnamed "$name"' "$args[@]"
+
+    ## old ways:
+    # silent rpargs "$@"
+    # awaysh-bnamed "$name" "$out[@]"
+    ##
+    #     local i cmd=()
+    #     for i in "$args[@]" ; do
+    #         if test -e "$i" ; then
+    #             ec "Realpathing: $i"
+    #             cmd+="$(realpath "$i")"
+    #         else
+    #             cmd+="$i"
+    #         fi
+    #     done
+    #     awaysh-bnamed "$name" "$cmd[@]"
+    ##
+}
 function insubshell-named() {
     @opts marker "$1" @ insubshell "${@:2}"
 }

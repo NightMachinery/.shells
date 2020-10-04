@@ -1,3 +1,11 @@
+function realpath-ife() {
+    if test -e "$1" ; then
+        realpath "$1"
+    else
+        ec "$1"
+    fi
+}
+reify realpath-ife
 function get-tmpdir() {
     dirname "$(gmktemp -u)"
 }
