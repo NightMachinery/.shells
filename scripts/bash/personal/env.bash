@@ -1,6 +1,9 @@
 export NNN_USE_EDITOR=1
 # export BROWSER="lynx"
+##
 export HOMEBREW_AUTO_UPDATE_SECS=$((3600*24*7))
+export HOMEBREW_NO_AUTO_UPDATE=y # since the other option doesn't seem to work reliably. Use cron to update brew manually.
+##
 export LC_ALL="en_US.UTF-8" #set locale; use sudo locale-gen to create them. update-locale is supposed to be the way to go about this, but it didn't work for me.
 export LPASS_AUTO_SYNC_TIME=$((3600*24*7))
 export LPASS_AGENT_TIMEOUT=$((3600*24*7))

@@ -28,7 +28,7 @@ function fzf-noempty() {
     test -z "$in" && { return 130 } || { ec "$in" | fzf-gateway "$@" }
 }
 function fzf-gateway() {
-    if [[ -o interactive ]] ; then # bug: https://github.com/junegunn/fzf/issues/2201
+    if true ; then # we might want to check tmux's version here, as fzf-tmux needs the current HEAD
     SHELL="${FZF_SHELL:-${commands[dash]}}" fzf-tmux -p90% "$@" | sponge
     # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
     else
