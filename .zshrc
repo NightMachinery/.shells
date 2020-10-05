@@ -337,7 +337,9 @@ function tty-title() {
 function cmd-modifier {
   if [[ "$persian_exc_chars" == *"${BUFFER[1]}"* ]] ; then
     BUFFER="$(ecn "$BUFFER" | per2en)"
+    # We can move the accept-line into the else block, this way translations will require confirmation.
   fi
+
   zle accept-line
 }
 zle -N cmd-modifier-widget  cmd-modifier
@@ -350,6 +352,7 @@ function cmd-modifier-off {
   bindkey '^M' accept-line
 }
 cmd-modifier-on
+ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=cmd-modifier-widget
 ###
 export rcLoaded='loading'
 zsh-defer export rcLoaded='yes'
