@@ -19,8 +19,10 @@ function ffport() {
 }
 aliasfn ffportl fpFilter=LISTEN ffport
 function ffps() {
+    local query="$(fz-createquery "$@")"
+
     # ps auxww: List all running processes including the full command string
-    ps auxww | fz --with-nth '11..' --header-lines 1 --query "$*" | awk '{print $2}'
+    ps auxww | fz --with-nth '11..' --header-lines 1 --query "$query" | awk '{print $2}'
 }
 function ffkill() {
     doc "alt: fkill; [fkEngine=ffps] ffkill ..."

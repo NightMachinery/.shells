@@ -20,14 +20,14 @@ function agfi() {
 noglobfn agfi
 ##
 function ntt() {
-    local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
+    local query="$(fz-createquery "$@")"
 
     ntsearch_query_fzf="$query" ntl
 }
 ###
 function rem-fz() {
     local query_pre="$rem_fz_q"
-    local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
+    local query="$(fz-createquery "$@")"
 
     local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
 
@@ -40,7 +40,7 @@ function remd() {
     ## testing
     # `fnrep datej "ec 1399/12/03" remd`
     ##
-    local query="$(mg_sep=' ' mapg "\'\$i" "$@")"
+    local query="$(fz-createquery "$@")"
 
     local now=("${(s./.)$(datej)}")
     local cyear="$now[1]"

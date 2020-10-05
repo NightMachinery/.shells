@@ -1,6 +1,7 @@
 function emcpe() {
     local fz_opts=( $fz_opts[@] -1 )
-    ffkill -SIGUSR2 \'emacs \'daemon
+    # ffkill -SIGUSR2 \'emacs \'daemon
+    ffkill -SIGUSR2 emacs daemon
     emacsclient -e '(setq debug-on-quit nil)'
 }
 function emn() {
