@@ -53,10 +53,12 @@ function hb265-tlg-bg() {
 function ocwvid-process() {
     local l="$1"
 
-    tsend --link-preview -- $water "New video available: $l"
+    local name="${$(url-tail "$l"|url-decode.py):r}"
+    tsend --link-preview --parse-mode markdown -- $water "[$name]($(<<<$l url-encode.py))"
     pushf "$amardir/wip/$(uuidm)"
     {
-        aa "$l"
+        getlinks-c -e '\.mp4$' "$l" | head -1 | inargsf aa -Z || return 3
+        mv * "$name"
         hb265-tlg-bg *
     } always { popf }
 }
