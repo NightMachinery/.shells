@@ -58,7 +58,7 @@ function ocwvid-process() {
     pushf "$amardir/wip/$(uuidm)"
     {
         getlinks-c -e '\.mp4$' "$l" | head -1 | inargsf aa -Z || return 3
-        mv * "$name"
+        mv * "$name".mp4
         hb265-tlg-bg *
     } always { popf }
 }
