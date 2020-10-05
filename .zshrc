@@ -335,7 +335,7 @@ function tty-title() {
 ##
 # https://stackoverflow.com/a/14634437/1410221
 function cmd-modifier {
-  if [[ "$persian_chars" == *"${BUFFER[1]}"* ]] ; then
+  if [[ "$persian_exc_chars" == *"${BUFFER[1]}"* ]] ; then
     BUFFER="$(ecn "$BUFFER" | per2en)"
   fi
   zle accept-line
