@@ -36,6 +36,7 @@ function fzf-gateway() {
     fi
 }
 function fzp() {
+    # fz potentially
     local opts=("${@[1,-2]}") query="${@[-1]}"
 
     # FNSWAP: isI
@@ -44,4 +45,17 @@ function fzp() {
     else
         fz --no-sort "$opts[@]" --filter "$query"
     fi
+}
+function fzp-q() {
+    local query="$(fz-createquery "$@")"
+
+    fzp "$query"
+}
+function fz-q() {
+    local query="$(fz-createquery "$@")"
+
+    fz --query "$query"
+}
+function fz-createquery() {
+    (( ${#@} == 0 )) || mg_sep=' ' mapg "\'\$i" "${=@}"
 }
