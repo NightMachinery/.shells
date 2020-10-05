@@ -1,7 +1,7 @@
 function brishz() {
     local stdin="$brishz_in"
-    local brishz_copy=""
-    isI && brishz_copy=y
+    local brishz_copy="${brishz_copy:-$brishz_c}"
+    # isI && brishz_copy=y
     if test -z "$stdin" ; then
         brishz_copy="$brishz_copy" brishzq.zsh "$@"
     else
