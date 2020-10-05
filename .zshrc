@@ -332,6 +332,24 @@ function tty-title() {
 
   title "$text" "$text" # from @omz, see https://superuser.com/a/344397/856545 for setting tab and window separately
 }
+##
+# https://stackoverflow.com/a/14634437/1410221
+function cmd-modifier {
+  if [[ "$persian_chars" == *"${BUFFER[1]}"* ]] ; then
+    BUFFER="$(ecn "$BUFFER" | per2en)"
+  fi
+  zle accept-line
+}
+zle -N cmd-modifier-widget  cmd-modifier
+function cmd-modifier-on {
+  bindkey '^J' cmd-modifier-widget
+  bindkey '^M' cmd-modifier-widget
+}
+function cmd-modifier-off {
+  bindkey '^J' accept-line
+  bindkey '^M' accept-line
+}
+cmd-modifier-on
 ###
 export rcLoaded='loading'
 zsh-defer export rcLoaded='yes'

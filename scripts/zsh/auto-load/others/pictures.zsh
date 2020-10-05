@@ -53,9 +53,13 @@ function text2img() {
     : " < text text2img <img-name>"
     local img="$1"
 
-    test -z "$img" || { ecerr "$0: Empty image destination. Aborting." ; return 1 }
+    test -z "$img" && { ecerr "$0: Empty image destination. Aborting." ; return 1 }
 
     convert -page  4000x4000 -font FreeMono -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"$img".png
+    ## persian (doesn't work well)
+    # ec سلام monster |     convert -page  700x700 -font '/Users/evar/Library/Fonts/B Nazanin Bold_0.ttf' -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:hi.png
+    # Use https://stackoverflow.com/questions/23536375/linux-cli-how-to-render-arabic-text-into-bitmap instead
+    ##
 }
 ##
 function 2ico() {
