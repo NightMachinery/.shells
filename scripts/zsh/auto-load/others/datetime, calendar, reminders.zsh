@@ -3,10 +3,15 @@
 @opts-setprefix remj reminday_store
 @opts-setprefix remn reminday_store
 @opts-setprefix remnd reminday_store
+@opts-setprefix rem-sync reminday_store
 ##
 function rem-sync() {
-    ec $'\n'
-    cellp
+    local nosync="${reminday_store_nosync}"
+
+    test -n "$nosync" || {
+        ec $'\n'
+        cellp
+    }
 }
 export remindayCDir="$cellar/remindersC"
 export remindayBakCDir="$HOME/tmp/remindersC_bak"
@@ -120,6 +125,7 @@ function reminday_store() {
     ec "$text" >> $dest || return $?
     Bold ; color 100 255 200 "$dest : $text" ; resetcolor
     test -n "$nosync" || {
+        : 'redundant check, as we check =nosync= in rem-sync as well'
         rem-sync # to sync the reminders
     }
     rem_dest="$dest"
