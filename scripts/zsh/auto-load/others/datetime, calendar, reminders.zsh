@@ -159,10 +159,25 @@ function rem-today() {
     local f bak
     for f in $today[@] ; do
         if test -e "$f" ; then
-            text="$text"$'\n\n'"$(<$f)" #"${$(<$f ; ec .)[1,-2]}"
+            local ext="${f:e}"
+            if [[ "$ext" == zsh ]] ; then
+                if test -n "$deleteMode" ; then # only run the code once
+                local out
+                out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
+                fi
+            elif [[ "$ext" == bak ]] ; then
+                ec "$0: Skipped: $f"
+            else
+                # text+=$'\n\n'"$0: Unsupported file: $f"
+                text+=$'\n\n'"$(<$f)" #"${$(<$f ; ec .)[1,-2]}"
+            fi
             if test -n "$deleteMode" ; then
                 bak="$(rem_extract-date-path "$f")"
                 bak="${remindayBakDir}/$bak"
+                if [[ "$ext" == zsh ]] ; then
+                    bak+=".bak"
+                fi
                 serr append-f2f "$f" "$bak" && command rm "$f" # not deleting if the source is the same as the dest
             fi
         fi

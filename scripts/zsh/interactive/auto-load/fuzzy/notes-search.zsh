@@ -1,5 +1,6 @@
 function ntl() {
-    ntsearch_injector="unseal-get2note" ntsearch_glob='' ntsearch_rg_opts=($ntsearch_rg_opts[@] --iglob '*.txt' --iglob '*.md' --iglob '*.org') ntl-rg "$@"
+    typeset -a ntsearch_rg_opts
+    ntsearch_injector="unseal-get2note" ntsearch_glob='' ntsearch_rg_opts=("$ntsearch_rg_opts[@]" --iglob '*.txt' --iglob '*.md' --iglob '*.org') ntl-rg "$@"
 }
 noglobfn ntl
 aliasfnq-ng ntl. nightNotes=. ntsearch_glob='' ntsearch-lines # ntsearch_glob=$textglob
@@ -32,7 +33,15 @@ function rem-fz() {
     local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
 
     local nightNotes="$remindayDir"
-    ntl-fzf "$query_pre $query"
+
+    local now=("${(s./.)$(datej)}")
+    local cyear="$now[1]"
+    local cmonth="$now[2]"
+    local cday="$now[3]"
+    local ntsearch_additional_paths=( "$remindayBakDir/$cyear/$cmonth/$cday"^*.zsh(N.) )
+
+    typeset -a ntsearch_rg_opts
+    ntsearch_glob='' ntsearch_rg_opts=("$ntsearch_rg_opts[@]" --iglob '!*.zsh') ntl-fzf "$query_pre $query"
 }
 aliasfn ntrem rem-fz
 aliasfn rem rem-fz
@@ -46,9 +55,6 @@ function remd() {
     local cyear="$now[1]"
     local cmonth="$now[2]"
     local cday="$now[3]"
-
-
-    local ntsearch_additional_paths=( "$remindayBakDir/$cyear/$cmonth/$cday"*(N.) )
 
     if (( cmonth == 12 )) ; then
         local nextYear=$((cyear+1))
