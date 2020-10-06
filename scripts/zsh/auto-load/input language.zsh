@@ -1,3 +1,4 @@
+# https://stackoverflow.com/questions/64223773/how-to-translate-a-string-from-a-keyboard-layout-to-another
 ##
 # edit this in vim or sth; emacs's RTL support makes it harder.
 export persian_exc_chars="ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپوؤئيإأآة»«؛كٓژٰ‌ٔء؟٬٫﷼٪×،ـ"

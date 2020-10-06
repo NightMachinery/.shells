@@ -6,22 +6,18 @@ FZF_DOCKER_PS_FORMAT="table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Stat
 # FZF_DOCKER_PS_START_FORMAT="table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}"
 
 function ffdocker-ps() {
-    fz --header-lines=1 --with-nth '2..' "$@" <<<"$(docker ps --all --format "${FZF_DOCKER_PS_FORMAT}")" | awk '{print $1}'
+    local query="$(fz-createquery "$@")"
+    fz --header-lines=1 --with-nth '2..' --query "$query" <<<"$(docker ps --all --format "${FZF_DOCKER_PS_FORMAT}")" | awk '{print $1}'
 }
 
-function ffdocker-start() {
-    local ps
-    ps="$(ffdocker-ps)" || return 1
-    rgeval docker start "$ps"
+function ffdocker-gen() {
+    local cmd="$1" ; shift
+    local ps i
+    ps=("${(@f)$(ffdocker-ps "$@")}") || return 1
+    for i in "$ps[@]" ; do
+        rgeval docker "$cmd" "$i"
+    done
 }
-function ffdocker-stop() {
-    local ps
-    ps="$(ffdocker-ps)" || return 1
-    rgeval docker stop "$ps"
-}
-
-function ffdocker-rm() {
-    local ps
-    ps="$(ffdocker-ps)" || return 1
-    rgeval docker rm "$ps"
-}
+aliasfn ffdocker-start ffdocker-gen start
+aliasfn ffdocker-stop ffdocker-gen stop
+aliasfn ffdocker-rm ffdocker-gen rm

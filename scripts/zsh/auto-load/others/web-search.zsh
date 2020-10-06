@@ -1,6 +1,14 @@
 function googler-en() {
     googler --tld com --lang en "$@"
 }
+function ddgr-en() {
+    ddgr --unsafe "$@"
+}
+function search-json() {
+    local count="${search_json_count:-10}" query="$1"
+    
+    googler-en --json --count "$count" "$query" || ddgr-en --json --num "$count" "$query"
+}
 function goo-g() {
     # use -x, --exact for an exact search.
     unset goo_urls goo_titles goo_asbtracts goo_metadata
@@ -10,7 +18,8 @@ function goo-g() {
 
     local memoi_cmd="$(cmd-sub memoi-eval '')"
 
-    local res search="$($memoi_cmd googler-en --json --count "$count" "$query")"
+    local res search
+    search="$(search_json_count="$count" $memoi_cmd search-json "$query")"
 
     goo_urls=("${(@0)$(<<<$search jq -re --nul-output '.[] | .url')}") || return 1
     goo_titles=("${(@0)$(<<<$search jq -re --nul-output '.[] | .title')}")
