@@ -1,6 +1,7 @@
 function labeled() {
     #  zip enumerate
-    ec "${@[2,-1]}: $(reval "$@")"
+    ec "$(gq "${@}"): $(reval "$@")"
+    # ec "${@[2,-1]}: $(reval "$@")"
 }
 ##
 function fnrep() {
