@@ -2,7 +2,7 @@ function googler-en() {
     googler --tld com --lang en "$@"
 }
 function ddgr-en() {
-    ddgr --unsafe "$@"
+    ddgr --reg 'us-en' --unsafe "$@"
 }
 function search-json() {
     local count="${search_json_count:-10}" query="$1"
