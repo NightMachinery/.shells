@@ -1,5 +1,9 @@
 # Some vars are defined in configvars
 ###
+@opts-setprefix remj reminday_store
+@opts-setprefix remn reminday_store
+@opts-setprefix remnd reminday_store
+##
 function rem-sync() {
     ec $'\n'
     cellp
@@ -9,8 +13,12 @@ export remindayBakCDir="$HOME/tmp/remindersC_bak"
 alias withremc='remindayDir="$remindayCDir" remindayBakDir="$remindayBakCDir" '
 
 aliasfn remcnd withremc remnd
+@opts-setprefixas remcnd remnd
 aliasfn remcn withremc remn
+@opts-setprefixas remcn remn
 aliasfn remcj withremc remj
+@opts-setprefixas remcj remj
+
 aliasfn remc-fz withremc rem-fz
 aliasfn remc remc-fz
 aliasfn remcd withremc remd
@@ -96,7 +104,6 @@ function remj() {
     local dest="$remindayDir/$target_date $gdate"
     reminday_store "$dest" "$text"
 }
-@opts-setprefix remj reminday_store
 function reminday_store() {
     unset rem_dest
     local dest="${1}" text="$(trim "$2")" nosync="${reminday_store_nosync}" ext="${reminday_store_ext:-.md}"
@@ -140,7 +147,6 @@ function remn() {
     local dest="$remindayDir/$jdate $gdate"
     reminday_store "$dest" "$text"
 }
-@opts-setprefix remn reminday_store
 function rem-todaypaths() {
     unset today
 
@@ -296,12 +302,13 @@ function datej-all() {
 }
 ##
 remnd() {
+    : readmeall
     # Example: `remcnd "⛸ 🚪 Don't put the shoes behind the door" 1 3 7 20 60 360`
     local d msg="$1" ; shift
     for d in "${@[1,-2]}" ; do
         @opts nosync y @ remn "$msg" "$d day later"
     done
-    (( ${#@} > 1 )) && msg="Last reminder: $msg"
+    (( ${#@} > 1 )) && test -z "$reminday_store_ext" && msg="Last reminder: $msg"
     @opts nosync y @ remn "$msg" "${@[-1]} day later"
     rem-sync
 }

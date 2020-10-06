@@ -226,6 +226,17 @@ function @opts-setprefix () {
     # test -n "${magic_opts_prefixes[$1]}" ||
     magic_opts_prefixes[$1]="$2"
 }
+function @opts-setprefixas () {
+    typeset -A -g magic_opts_prefixes
+    local pre="${magic_opts_prefixes[$2]}"
+    test -z "$pre" && {
+        # ecerr "$0: ${(q+)2} doesn't have any prefix set."
+        # return 1
+        ##
+        pre="$2"
+    }
+    magic_opts_prefixes[$1]="$pre"
+}
 function opts-test1() {
     # typ path
     typ "opts_test1_path"
