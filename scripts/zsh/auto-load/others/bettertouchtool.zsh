@@ -2,12 +2,12 @@
 # @darwinonly We might need to add a `isDarwin || return 0` to these
 function btt-refresh {
     local uuid="${1:? UUID required}"
-    command curl "http://127.0.0.1:8855/refresh_widget/?uuid=$uuid"
+    command curl --fail --silent "http://127.0.0.1:8855/refresh_widget/?uuid=$uuid"
 }
 function btt-update {
      local uuid="${1:? UUID required}" text="$2"
      # text="$(url-encode.py <<<"$text")" # doesn't encode newlines by current design
-     command curl "http://127.0.0.1:8855/update_touch_bar_widget/?uuid=$uuid&text=$text"
+     command curl --fail --silent "http://127.0.0.1:8855/update_touch_bar_widget/?uuid=$uuid&text=$text"
 }
 ##
 function btt-datej() {
