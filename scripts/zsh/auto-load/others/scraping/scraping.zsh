@@ -909,6 +909,10 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         return 1
     }
     # url="$(urlfinalg "$url")"
+    local imgMode="${url2note_img}" emacsMode="${url2note_emacs}"
+    if [[ "$url" == *youtube.com* ]] ; then
+        imgMode=y
+    fi
     local mode="${2:-md}"
     local fhMode="${fhMode:-curlfast}"
 
@@ -930,13 +934,8 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         desc="${desc[1,$maxDesc]} ..."
     fi
 
-    local imgMode="${url2note_img}"
-    if [[ "$url" == *youtube.com* ]] ; then
-        imgMode=y
-    fi
-
+    local indent="    "
     if [[ "$mode" == md ]] ; then
-        local indent="    "
         ec "* [${title:-$url}]($url)"
         test -z "$author" || ec "${indent}* By: $author"
         test -z "$readest" || ec "${indent}* $readest"
@@ -944,8 +943,14 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         #test -z "$title" || ec "${indent}* $url"
         test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
     elif [[ "$mode" == org ]] ; then
-        local indent="  "
-        ec "- [[$(ec $url| url-encode.py)][${title:-$url}]]"
+        if test -z "$emacsMode" ; then
+            indent="  "
+            ec "- [[$(ec $url| url-encode.py)][${title:-$url}]]"
+        else
+            # we insert the links with the heading already created in emacs.
+            indent=""
+            ec "[[$(ec $url| url-encode.py)][${title:-$url}]]"
+        fi
         test -z "$author" || ec "${indent}+ By: $author"
         test -z "$readest" || ec "${indent}+ $readest"
         test -z "$desc" || ec "${indent}+ $desc"
