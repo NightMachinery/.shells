@@ -172,21 +172,21 @@ function full-html2() {
     local mode="${fhMode:-http}"
     local stdout=/dev/stdout
 
-    [[ "$mode" =~ '^curlfast$' ]] &&  { curl --silent --fail --location -o /dev/stdout "$1" ; return $? }
-    [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 curlfull.js "$1" ; return $? }
-    [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 curlfull.js "$1" ; return $? }
-    [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 curlfull.js "$1" ; return $? }
+    [[ "$mode" =~ '^curlfast$' ]] &&  { $proxyenv curl --silent --fail --location -o /dev/stdout "$1" ; return $? }
+    [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$1" ; return $? }
+    [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 $proxyenv curlfull.js "$1" ; return $? }
+    [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 $proxyenv curlfull.js "$1" ; return $? }
     [[ "$mode" =~ '^aa(cookies)?$' ]] && {
         local tmp="$(uuidgen)"
         local tmpdir="$(get-tmpdir)"
-        dbgserr aacookies "$1" --dir "$tmpdir" -o "$tmp" || return $?
+        $proxyenv dbgserr aacookies "$1" --dir "$tmpdir" -o "$tmp" || return $?
         < "$tmpdir/$tmp"
         return $?
         # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
     }
-    [[ "$mode" =~ '^(c|g)url$' ]] && { gurl "$1" ; return $? }
+    [[ "$mode" =~ '^(c|g)url$' ]] && { $proxyenv gurl "$1" ; return $? }
     [[ "$mode" =~ '^http(ie)?$' ]] && {
-        dbgserr httpm "$1"
+        $proxyenv dbgserr httpm "$1"
         return $?
     }
 }
@@ -898,7 +898,7 @@ function jfic() {
 }
 ##
 function url2note() {
-    magic mdoc "[ html= cleanedhtml= ] $0 <url> [<mode>] ; outputs in global variables and stdout.
+    magic mdoc "[ html= cleanedhtml= url2note_img ] $0 <url> [<mode>] ; outputs in global variables and stdout.
 Set cleanedhtml=no to disable adding the reading estimate. (This improves performance.)" ; mret
 
     # test perf:
@@ -922,7 +922,6 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     desc="$(<<<$desc html2utf.py)"
     img="$meta[3]"
     author="$meta[4]"
-    local indent="    "
     readest=""
     [[ "$cleanedhtml" != no ]] && readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)" # takes ~0.25s
 
@@ -931,31 +930,49 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         desc="${desc[1,$maxDesc]} ..."
     fi
 
+    local imgMode="${url2note_img}"
+    if [[ "$url" == *youtube.com* ]] ; then
+        imgMode=y
+    fi
+
     if [[ "$mode" == md ]] ; then
+        local indent="    "
         ec "* [${title:-$url}]($url)"
         test -z "$author" || ec "${indent}* By: $author"
         test -z "$readest" || ec "${indent}* $readest"
         test -z "$desc" || ec "${indent}* $desc"
         #test -z "$title" || ec "${indent}* $url"
-        test -z "$img" || ec '![]'"($img)"
+        test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
+    elif [[ "$mode" == org ]] ; then
+        local indent="  "
+        ec "- [[$(ec $url| url-encode.py)][${title:-$url}]]"
+        test -z "$author" || ec "${indent}+ By: $author"
+        test -z "$readest" || ec "${indent}+ $readest"
+        test -z "$desc" || ec "${indent}+ $desc"
+        test -n "$imgMode" && test -n "$img" && ec "${indent}[[img$img]]"
     elif [[ "$mode" == html ]] ; then
         test -z "$title" || ec "<h1>${title}</h1>"
         ec "<p>$url</p>"
         test -z "$author" || ec "<p>By: $author</p>"
         test -z "$readest" || ec "<p>${readest}</p>"
         test -z "$desc" || ec "<p>Description: $desc</p>"
-        test -z "$img" || ec "<img src=\"$img\" />"
+        test -n "$imgMode" && test -n "$img" && ec "<img src=\"$img\" />"
     elif [[ "$mode" == none ]] ; then
 
     fi
 
 }
-function url2md() { url2note "$1" md }
-function url2html() { url2note "$1" html }
-reify url2md
-reify url2html
 noglobfn url2note
+function url2org() { url2note "$1" org }
+renog url2org
+@opts-setprefix url2org url2note
+function url2md() { url2note "$1" md }
+@opts-setprefix url2md url2note
+reify url2md
 noglobfn url2md
+function url2html() { url2note "$1" html }
+@opts-setprefix url2html url2note
+reify url2html
 noglobfn url2html
 ##
 function readmoz() {

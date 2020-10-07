@@ -1,9 +1,14 @@
 ##
 alias pxs='ALL_PROXY=socks5://127.0.0.1:1080'
-alias pxa='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
+export pxa_env='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
+alias pxa="$pxa_env"
+function reval-pxa() {
+    reval pxa "$@"
+}
 ##
 pxify() {
     typeset -g proxycmd="proxychains4"
+    typeset -g proxyenv="reval-pxa"
     enh-pxpy tsend
 
     # keeping the shell bare-bones seem wiser
@@ -106,7 +111,10 @@ aliasfn pd proxy-off
 ##
 function proxy-is() {
     # @darwinonly
-    networksetup -getsocksfirewallproxy "$(darwin-proxy-getns-cached)" | silent command rg 'Enabled: Yes'
+    unset proxy_port
+    local pxstatus="$(networksetup -getsocksfirewallproxy "$(darwin-proxy-getns-cached)")"
+    [[ "$pxstatus" =~ 'Port:\s*(\S*)' ]] && proxy_port="$match[1]"
+    ec $pxstatus | silent command rg 'Enabled: Yes'
 }
 function proxy-toggle() {
     # silent bello &
@@ -119,10 +127,14 @@ function proxy-toggle() {
 ##
 proxy_widget_uuid=604BAF41-4517-4C56-B665-F1710C405A28
 proxy_widget_on="🌋"
+proxy_widget_on2="🏜"
 proxy_widget_off="⛰"
 function proxy-widget() {
     if proxy-is ; then
-        ec $proxy_widget_on
+        case "$proxy_port" in
+        1080) ec $proxy_widget_on ;;
+        *) ec $proxy_widget_on2 ;;
+        esac
     else
         ec $proxy_widget_off
     fi

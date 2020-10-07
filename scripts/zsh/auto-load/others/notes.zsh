@@ -38,11 +38,12 @@ Outputs the image in markdown format, hosted on imgur." MAGIC
 }
 function unt() {
     test -z "$*" && set -- "$(pbpaste)" # || set -- "$(trim "$1")" # we are using urls-extract so ne need
-    local note="$(cleanedhtml=no url2md "${(f@)$(<<<"$*" urls-extract)}")"
+    local note="$(cleanedhtml=no url2org "${(f@)$(<<<"$*" urls-extract)}")"
     ec $note
     if isI ; then
         pbcopy $note
     fi
 }
+@opts-setprefix unt url2note
 noglobfn unt
 aliasfn-ng untr brishzr unt # the server can do a unt almost instantaneously, so we will benefit from proxying to it. Besides, this bypasses the small firewall.

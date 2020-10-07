@@ -335,7 +335,11 @@ function tty-title() {
 ##
 # https://stackoverflow.com/a/14634437/1410221
 function cmd-modifier {
-  if [[ "$persian_exc_chars" == *"${BUFFER[1]}"* ]] ; then
+  ## perf
+  # `BUFFER="ahjaha ah  isi s s" fnswap zle true time2 cmd-modifier`
+  # `BUFFER="زjhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhjhhibjhiuutybyiyyhbbhgdryahjaha ah  isi s s" fnswap zle true time2 cmd-modifier`
+  ##
+  if [[ "$persian_exc_chars" == *"${BUFFER[1]:-A}"* ]] ; then
     BUFFER="$(ecn "$BUFFER" | per2en)"
     # We can move the accept-line into the else block, this way translations will require confirmation.
   fi
