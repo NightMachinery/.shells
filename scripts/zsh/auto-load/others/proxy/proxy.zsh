@@ -1,4 +1,6 @@
 ##
+typeset -g proxycmd="command"
+typeset -g proxyenv="reval"
 alias pxs='ALL_PROXY=socks5://127.0.0.1:1080'
 export pxa_env='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa="$pxa_env"
