@@ -954,7 +954,23 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         test -z "$author" || ec "${indent}+ By: $author"
         test -z "$readest" || ec "${indent}+ $readest"
         test -z "$desc" || ec "${indent}+ $desc"
-        test -n "$imgMode" && test -n "$img" && ec "${indent}[[img$img]]"
+        ##
+        if test -n "$imgMode" && test -n "$img" ; then
+            # ec "${indent}[[img$img]]"
+            ##
+            local ext="${${img:e}:-png}"
+            local name="$(uuidm).$ext"
+            local imgdir="$orgdir/images"
+            mkdir -p "$imgdir"
+            if silent $proxyenv aa "$img" --dir "$imgdir" -o "$name" ; then
+                # local imgpath="$orgdir/images/$name"
+                local imgpath="images/$name"
+                ec "${indent}[[orgdir:$imgpath]]"
+            else
+                ecerr "$0: Failed to download: $img"
+            fi
+        fi
+        ##
     elif [[ "$mode" == html ]] ; then
         test -z "$title" || ec "<h1>${title}</h1>"
         ec "<p>$url</p>"
