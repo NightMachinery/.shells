@@ -16,3 +16,9 @@ function en2per() {
 }
 aliasfn e2p en2per
 function pep() { pbpaste | reval-copy en2per }
+##
+function input-switch-darwin() {
+    # https://apple.stackexchange.com/questions/402855/how-to-switch-the-keyboard-input-language-from-the-terminal
+    cliclick kd:ctrl kp:space ku:ctrl # takes ~0.4
+}
+##
