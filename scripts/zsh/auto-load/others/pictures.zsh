@@ -63,23 +63,42 @@ function text2img() {
 }
 ##
 function 2ico() {
-	local i="${1}" o="${2:-${1:r}.ico}" s="${png2ico_size:-256}"
+    local i="${1}" o="${2:-${1:r}.ico}" s="${png2ico_size:-256}"
 
-	convert -background transparent "$i" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 "$o"
-	# convert -resize x${s} -gravity center -crop ${s}x${s}+0+0 "$i" -flatten -colors 256 -background transparent "$o"
+    convert -background transparent "$i" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 "$o"
+    # convert -resize x${s} -gravity center -crop ${s}x${s}+0+0 "$i" -flatten -colors 256 -background transparent "$o"
 }
 aliasfn png2ico 2ico
 ##
 function convert-pad() {
-	local i="${1:? Input required}" o="${2:-${1:r}_padded.png}" w="${convert_pad_w:-${convert_pad_s:-1024}}" h="${convert_pad_h:-${convert_pad_s:-1024}}" 
-	
- convert "$i" -gravity center -extent ${w}x${h} "$o"
+    jglob
+    local i="${1:? Input required}" o="${2:-${1:r}_padded.png}" w="${convert_pad_w:-${convert_pad_s:-1024}}" h="${convert_pad_h:-${convert_pad_s:-1024}}"
+
+    local actualw=$(identify -format %w "$i")
+    local actualh=$(identify -format %h "$i")
+
+    if (( w < actualw )) ; then
+        w=$actualw
+    fi
+    if (( h < actualh )) ; then
+        h=$actualh
+    fi
+    
+    convert "$i" -gravity center -extent ${w}x${h} "$o"
+}
+function touchbar-screenshot() {
+    local img="$(gmktemp --suffix png)"
+    screencapture -b "$img" || return 1 # -x for no sound
+    local imgp="$(gmktemp --suffix png)"
+    convert-pad "$img" "$imgp" || return 2
+    pbadd "$imgp"
+    bello
 }
 ##
 function jiconpack() {
-jej
+    jej
 
-unzip2dir $j
-mv **/*.png .
-re convert-pad *.png
+    unzip2dir $j
+    mv **/*.png .
+    re convert-pad *.png
 }
