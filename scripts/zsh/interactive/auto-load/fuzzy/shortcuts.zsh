@@ -34,7 +34,7 @@ function openv() {
     } | ntag-color | fz --ansi --query "$query" | inargsf play-tag
 }
 function delenda() {
-    ntag-filterori red green gray grey | inargsf trs
+    ntag-filterori red green aqua teal gray grey | inargsf trs
 }
 ##
 zv() {
