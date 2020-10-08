@@ -49,7 +49,16 @@ function ntag-rmadd() {
     ntag-add "$ntag_rm_dest" $add[@]
 }
 reify ntag-rmadd
+##
 aliasfn green2red @opts rm green add red @ ntag-rmadd
+aliasfn green2gray @opts rm green add gray @ ntag-rmadd
+aliasfn green2teal @opts rm green add teal @ ntag-rmadd
+aliasfn green2aqua @opts rm green add teal @ ntag-rmadd
+greens=( green aqua teal )
+aliasfn greens2red @opts rm [ "$greens[@]" ] add red @ ntag-rmadd
+aliasfn greens2gray @opts rm [ "$greens[@]" ] add gray @ ntag-rmadd
+aliasfn greens2teal @opts rm [ "$greens[@]" ] add teal @ ntag-rmadd
+aliasfn greens2aqua @opts rm [ "$greens[@]" ] add teal @ ntag-rmadd
 ##
 function ntag-mv() {
     local i="$1" o="$2"
@@ -117,6 +126,10 @@ function ntag-has() {
     local f="$1" tag="$2"
     
     [[ "$f" == *"${ntag_sep}${tag}${ntag_sep}"* ]]
+}
+function ntag-add-givedest() {
+    silent ntag-add "$@" || return $?
+    ec "$ntag_add_dest"
 }
 function ntag-add() {
     : "GLOBAL OUT: ntag_add_dest"
