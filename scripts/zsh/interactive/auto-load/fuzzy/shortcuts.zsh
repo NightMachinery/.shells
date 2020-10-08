@@ -19,9 +19,18 @@ function openv() {
         # fd has nondeterministic sort order.
         vids="$(fd -uuu --type file --regex "\.(${(j.|.)video_formats})\$" "$dirs[@]")"
         dvar vids
-        <<<$vids ntag-grepor green # to have these at first
-        <<<$vids ntag-grepor gray grey
-        ec $vids
+        local prio=''
+        prio="$(<<<$vids ntag-grepor green)" # to have these at first
+        # ec --- ; arrN "$prio[@]" ; ec ---
+        prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor aqua | prefixer rm -- "${(@f)prio}")")"
+        # ec --- ; arrN "$prio[@]" ; ec ---
+        prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor teal | prefixer rm -- "${(@f)prio}")")"
+        # ec --- ; arrN "$prio[@]" ; ec ---
+        prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor gray grey | prefixer rm -- "${(@f)prio}")")"
+        # ec --- ; arrN "$prio[@]" ; ec ---
+
+        ec $prio
+        ec $vids | prefixer rm --skip-empty -- "${(@f)prio}"
     } | ntag-color | fz --ansi --query "$query" | inargsf play-tag
 }
 function delenda() {
