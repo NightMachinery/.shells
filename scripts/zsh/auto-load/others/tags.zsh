@@ -371,3 +371,13 @@ function ntag-filteri() {
 }
 aliasfn tgs ntag-filteri
 ###
+function ntag-recoverpath() {
+    local orig="$1"
+    if test -e "$orig" ; then
+        ec $orig
+    else
+        local orighead="$(<<<$orig prefixer -i .. | ghead -n1)"
+        local candidates=( "${orighead:r}"..*.."${orig:e}"(DN) )
+        ec "$candidates[1]"
+    fi
+}
