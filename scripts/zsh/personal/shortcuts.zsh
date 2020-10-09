@@ -51,11 +51,13 @@ function vcnpp() {
     local msg="${*}"
 
     local repo="$(vcn-getrepo)"
-    vcsh $repo add ~/scripts/
-    vcsh $repo commit -uno -am "${msg:-$(vcn-with git-commitmsg)}"
-    vcsh $repo pull --no-edit
-    vcsh $repo push
-
+    pushf ~/
+    {
+        vcsh $repo add ~/scripts/
+        vcsh $repo commit -uno -am "${msg:-$(vcn-with git-commitmsg)}"
+        vcsh $repo pull --no-edit
+        vcsh $repo push
+    } always { popf }
     # fnswap git "vcsh $(gq "$repo")" @opts noadd y @ gsync "$msg"
 }
 function cp2tmp() {
