@@ -38,12 +38,21 @@ aliasdir cac ~/base/cache
 ##
 aliasfn cellp incell gsync
 ##
-vcnpp() {
-    local msg="${*}"
+function vcn-getrepo() {
     local repo=night.sh
     isMBP && repo=.shells
+    ec $repo
+}
+function vcn-with() {
+    local repo="$(vcn-getrepo)"
+    fnswap git "vcsh $(gq "$repo")" "$@"
+}
+function vcnpp() {
+    local msg="${*}"
+
+    local repo="$(vcn-getrepo)"
     vcsh $repo add ~/scripts/
-    vcsh $repo commit -uno -am "${msg:-.}"
+    vcsh $repo commit -uno -am "${msg:-$(git-commitmsg)}"
     vcsh $repo pull --no-edit
     vcsh $repo push
 
