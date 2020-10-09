@@ -58,7 +58,8 @@ greens=( green aqua teal )
 aliasfn greens2red @opts rm [ "$greens[@]" ] add red @ ntag-rmadd
 aliasfn greens2gray @opts rm [ "$greens[@]" ] add gray @ ntag-rmadd
 aliasfn greens2teal @opts rm [ "$greens[@]" ] add teal @ ntag-rmadd
-aliasfn greens2aqua @opts rm [ "$greens[@]" ] add teal @ ntag-rmadd
+aliasfn greens2aqua @opts rm [ "$greens[@]" ] add aqua @ ntag-rmadd
+aliasfn greens2hell @opts rm [ "$greens[@]" ] @ ntag-rmadd
 ##
 function ntag-mv() {
     local i="$1" o="$2"
@@ -330,16 +331,24 @@ function ntag_filter_rg() {
 }
 function ntag-color() {
     # INPUT: stdin
+    ## @perf
+    # `ll --color always | time (ntag-color)` 115ms
     ##
     # https://www.regular-expressions.info/lookaround.html
     # Lookbehind needs to be fixed length in rg's pcre.
     # Use `cat -v` to see the ANSI codes. `\e` is `^[[`.
     # Hardcoded for ntag_sep=..
-    local re_def='(?<!;\dm)(?<!;\d\dm)(?<!;\d\d\dm)\.(?!\e\[)[^./]+\.(?=(?:\e(?:\e|\d|\[|;|m)*)?\.)'
-    # local re_def='\.(\e|\d|\[|;|m)*\.(?!\e\[)[^./]+\.(\e|\d|\[|;|m)*\.'
-    # Redundant: We want to lookbehind to ensure we have two dots before the match, but we can't. Perhaps we should just hardcode all the colors.
+    ###
+    # local re_def='(?<!;\dm)(?<!;\d\dm)(?<!;\d\d\dm)\.(?!\e\[)[^./]+\.(?=(?:\e(?:\e|\d|\[|;|m)*)?\.)'
     ##
-    ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128 | command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --color always --colors "match:bg:255,255,255" --colors "match:fg:255,120,0" --pcre2 "$re_def"
+    # local re_def='(?<=\.\e\[0m)(?<!;\dm)(?<!;\d\dm)(?<!;\d\d\dm)\.(?!\e\[)[^./]+\.(?=(?:\e(?:\e|\d|\[|;|m)*)?\.)'
+    # local re_def2='(?<=\.)(?<!;\dm)(?<!;\d\dm)(?<!;\d\d\dm)\.(?!\e\[)[^./]+\.(?=(?:\e(?:\e|\d|\[|;|m)*)?\.)'
+    ##
+    # We have to use two patterns because various-length look-behind is not supported.
+    local re_def='(?<=\.\e\[0m)\.(?!\e\[)[^./]+\.(?=(?:\e(?:\e|\d|\[|;|m)*)?\.)'
+    local re_def2='(?<=\.)\.(?!\e\[)[^./]+\.(?=(?:\e(?:\e|\d|\[|;|m)*)?\.)'
+    ##
+    ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128 | command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --color always --colors "match:bg:255,255,255" --colors "match:fg:255,120,0" --pcre2 -e "$re_def" -e "$re_def2"
 }
 function ntag-filter() {
     : "Alt: Use ntag-grep if you never want the coloring."

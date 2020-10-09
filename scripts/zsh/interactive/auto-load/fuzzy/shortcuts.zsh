@@ -38,7 +38,7 @@ function delenda() {
 }
 ##
 zv() {
-    local q="$1" ; shift
+    local q="$1" ; (( $#@ >= 1 )) && shift
     local query=("$@")
 
     if test -n "$q" ; then
