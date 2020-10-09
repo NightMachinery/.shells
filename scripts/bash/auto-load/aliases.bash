@@ -1,6 +1,6 @@
 # Perhaps you should use aliasfn
 ###
-re "silence unalias" a la map p fd ff pip sp rd pu # mv cp
+re "silence unalias" a l la ll map p fd ff pip sp rd pu # mv cp
 alias rgjl="rgm -t julia" #"rgm --glob '*.jl'"
 alias rgpy="rgm --glob '*.py'"
 alias spt='spotlight -name'
@@ -26,9 +26,10 @@ alias bat='bat --theme OneHalfLight --pager="less -FRXn"'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'
 alias dbg='DEBUGME=d'
-alias l='exa -a' # --oneline
-alias ll='exa -a -l'
-alias lt='exa -a -T'
+##
+# alias l='exa -a' # --oneline
+# alias ll='exa -a -l'
+# alias lt='exa -a -T'
 alias lc='l -s created'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
@@ -57,6 +58,7 @@ alias l-c=last-created
 alias l-ac=last-accessed
 alias l-a=last-added
 alias l-m=last-modified
+##
 alias em="emc -e '(counsel-recentf)'" # helm-recentf
 alias dmy='DEBUGME=y'
 alias a=aget

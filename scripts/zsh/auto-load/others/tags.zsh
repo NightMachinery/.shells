@@ -27,33 +27,74 @@ aliasfnq gray ntag-filter "gray | 'grey"
 aliasfn grey gray
 @opts-setprefix grey ntag-search
 ##
-function ntag-ll() {
-    ll --color always | ntag-color
+function ntag-l() {
+    if isI && istty ; then
+        exa -a --color always "$@" | ntag-color
+    else
+        exa -a "$@"
+    fi
 }
-aliasfn lll ntag-ll
+aliasfn l ntag-l
+aliasfn lv-simple ntag-l '${~videoglob}'
+aliasfn lv lv-simple
+lv-sorted() { ntag-lv | tac }
+function ntag-ll() {
+    if isI && istty ; then
+        exa -a -l --color always "$@" | ntag-color
+    else
+        exa -a -l "$@"
+    fi
+}
+aliasfn ll ntag-ll
+# aliasfn lll ntag-ll
+function ntag-lt() {
+    if isI && istty ; then
+        exa -a -T --color always "$@" | ntag-color
+    else
+        exa -a -T "$@"
+    fi
+}
+aliasfn lt ntag-lt
+##
+ntag-ls() {
+    : "Lists only tagged files"
+    local paths=("${@:-.}") # you can also give options to fd, e.g., `ntag-ls --maxdepth 1`
+    fd --color always ${ntag_fd_opts[@]} --glob --type file "*..*..*" "$paths[@]" | ntag-color
+}
+aliasfn lk ntag-ls
 ##
 function ntag-rmadd() {
     ## tests
     # `@opts rm [ red bad ] add [ yellow blue purple ] @ ntag-rmadd `
     ##
-    local f="$1"
-    test -e "$f" || {
-        ecerr "$0: Nonexistent file: $f"
-        return 1
-    }
-
+    local files=("$@") f retcode=0
     local add=("${ntag_rmadd_add[@]}")
     local rm=("${ntag_rmadd_rm[@]}")
 
-    ntag-rm "$f" $rm[@] || return 1
-    ntag-add "$ntag_rm_dest" $add[@]
+    if (( $#@ == 0 )) ; then
+        files=("${(@f)$(ntag-grepor ${rm[@]} | fz)}") || return $?
+    fi
+
+    for f in $files[@] ; do
+        test -e "$f" || {
+            ecerr "$0: Nonexistent file: $f"
+            retcode=1
+            continue
+        }
+
+        ntag-rm "$f" $rm[@] || {
+            retcode=1
+            continue
+        }
+        ntag-add "$ntag_rm_dest" $add[@]
+    done
+    return $retcode
 }
-reify ntag-rmadd
-##
+###
 aliasfn green2red @opts rm green add red @ ntag-rmadd
 aliasfn green2gray @opts rm green add gray @ ntag-rmadd
 aliasfn green2teal @opts rm green add teal @ ntag-rmadd
-aliasfn green2aqua @opts rm green add teal @ ntag-rmadd
+aliasfn green2aqua @opts rm green add aqua @ ntag-rmadd
 greens=( green aqua teal )
 aliasfn greens2red @opts rm [ "$greens[@]" ] add red @ ntag-rmadd
 aliasfn greens2gray @opts rm [ "$greens[@]" ] add gray @ ntag-rmadd
@@ -61,6 +102,8 @@ aliasfn greens2teal @opts rm [ "$greens[@]" ] add teal @ ntag-rmadd
 aliasfn greens2aqua @opts rm [ "$greens[@]" ] add aqua @ ntag-rmadd
 aliasfn greens2hell @opts rm [ "$greens[@]" ] @ ntag-rmadd
 ##
+aliasfn red2hell @opts rm [ red ] @ ntag-rmadd
+###
 function ntag-mv() {
     local i="$1" o="$2"
     color 100 255 200 "$0 $(gq "$@")" # >&2
