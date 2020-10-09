@@ -32,7 +32,7 @@ aliasfn incell cel
 aliasdir jrl $HOME/cellar/notes/journal
 aliasdir dom $DOOMDIR
 aliasdir innt $cellar/notes/
-aliasdir nt $cellar/notes/
+aliasdir dir nt $cellar/notes/
 aliasdir incache ~/base/cache
 aliasdir cac ~/base/cache
 ##
@@ -55,8 +55,14 @@ function vcnpp() {
     {
         vcsh $repo add ~/scripts/
         vcsh $repo commit -uno -am "${msg:-$(vcn-with git-commitmsg)}"
-        vcsh $repo pull --no-edit
-        vcsh $repo push
+        local remote remotes="${(@f)$(vcsh $repo remote)}"
+        for remote in $remotes[@] ; do
+        vcsh $repo pull "$remote" master --no-edit
+        done
+        for remote in $remotes[@] ; do
+        vcsh $repo push "$remote" master
+        done
+        isMBP && brishzr vcnpp
     } always { popf }
     # fnswap git "vcsh $(gq "$repo")" @opts noadd y @ gsync "$msg"
 }
