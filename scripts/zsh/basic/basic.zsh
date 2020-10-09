@@ -1,10 +1,18 @@
 zmodload zsh/terminfo zsh/system zsh/datetime
 autoload -U zargs
 autoload -U regexp-replace
-## Aliases
+##
 alias ec='print -r --'
 alias ecn='print -rn --'
-## Global Aliases
+function ec-file() {
+    local target="${ec_file_target:/dev/tty}"
+    if test -w "$target" ; then
+        ec "$@" >> "$target"
+    else
+        return 1
+    fi
+}
+function ec-tty() { ec_file_target=/dev/tty ec-file "$@" } # echoes directly to the terminal. Survives $() or silent.
 ## Vars
 zshword='[a-zA-Z0-9!_-]' #unused, I opted for simpler solutions
 ##

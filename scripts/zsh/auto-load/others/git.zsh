@@ -7,7 +7,10 @@ function git-commitmsg() {
   ## alts
   # git diff --cached --diff-filter='M' --name-only # gives names of modified files
   ##
-  local msg="$(git -c color.status=false status | command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed | prefixer --skip-empty -o '; ')"
+  local msg="$(git -c color.status=false status | command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed)"
+
+  ec-tty $msg
+  msg="$(ecn $msg | prefixer --skip-empty -o '; ')"
   ec "${msg:-.}"
 }
 function gsync() {
@@ -50,17 +53,17 @@ git-resolve() {
   FILE_PATH="$2"
 
   if [ -z "$FILE_PATH" ] || [ -z "$STRATEGY" ]; then
-  echo "Usage:   <strategy> <file>"
-  echo ""
-  echo "Example: --ours package.json"
-  echo "Example: --union package.json"
-  echo "Example: --theirs package.json"
-  return
+echo "Usage:   <strategy> <file>"
+echo ""
+echo "Example: --ours package.json"
+echo "Example: --union package.json"
+echo "Example: --theirs package.json"
+return
   fi
 
   if [ ! -e "$FILE_PATH" ]; then
-  echo "$FILE_PATH does not exist; aborting."
-  return
+echo "$FILE_PATH does not exist; aborting."
+return
   fi
 
   # remove leading ./ if present, to match the output of $git[@] diff --name-only
@@ -68,8 +71,8 @@ git-resolve() {
   FILE_PATH_FOR_GREP=${FILE_PATH#./}
   # grep -Fxq: match string (F), exact (x), quiet (exit with code 0/1) (q)
   if ! $git[@] diff --name-only --diff-filter=U | grep -Fxq "$FILE_PATH_FOR_GREP"; then
-  echo "$FILE_PATH is not in conflicted state; aborting."
-  return
+echo "$FILE_PATH is not in conflicted state; aborting."
+return
   fi
 
   $git[@] show :1:"$FILE_PATH" > ./tmp.common
@@ -93,25 +96,25 @@ git-listblobs() {
     | $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
 }
 function git_sparse_clone() (
-    # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
-    rurl="$1" localdir="$2" && shift 2
+  # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
+  rurl="$1" localdir="$2" && shift 2
 
-    mkdir -p "$localdir"
-    cd "$localdir"
+  mkdir -p "$localdir"
+  cd "$localdir"
 
-    git init
-    git remote add -f origin "$rurl"
+  git init
+  git remote add -f origin "$rurl"
 
-    git config core.sparseCheckout true
+  git config core.sparseCheckout true
 
-    # Loops over remaining args
-    local i
-    for i; do
-        echo "$i" >> .git/info/sparse-checkout
-    done
+  # Loops over remaining args
+  local i
+  for i; do
+    echo "$i" >> .git/info/sparse-checkout
+  done
 
-    git pull origin master
+  git pull origin master
 )
 function github-dir() {
-    svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"
+  svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"
 }
