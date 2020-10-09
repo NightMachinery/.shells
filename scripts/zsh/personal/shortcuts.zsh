@@ -43,9 +43,11 @@ vcnpp() {
     local repo=night.sh
     isMBP && repo=.shells
     vcsh $repo add ~/scripts/
-    fnswap git "vcsh $(gq "$repo")" @opts noadd y @ gsync "$msg"
+    vcsh $repo commit -uno -am "${msg:-.}"
+    vcsh $repo pull --no-edit
+    vcsh $repo push
 
-    # vcsh $repo commit -uno -am "${msg:-.}" ; vcsh night.sh pull --no-edit ; vcsh night.sh push
+    # fnswap git "vcsh $(gq "$repo")" @opts noadd y @ gsync "$msg"
 }
 function cp2tmp() {
     rsp-dl "$@" ~"/Base/_Local TMP/"
