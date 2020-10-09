@@ -20,7 +20,8 @@ function gsync() {
   pushf "$(git rev-parse --show-toplevel)" || return 1
   {
     test -z "$noadd" && git add .
-    git commit -a -m "${msg:-$(git-commitmsg)}"
+    local automsg="$(git-commitmsg)"
+    git commit -a -m "${msg:-$automsg}"
     git pull --no-edit "$remote"
     git push "$remote"
   } always { popf }
