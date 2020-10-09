@@ -55,7 +55,7 @@ function vcnpp() {
     {
         vcsh $repo add ~/scripts/
         vcsh $repo commit -uno -am "${msg:-$(vcn-with git-commitmsg)}"
-        local remote remotes="${(@f)$(vcsh $repo remote)}"
+        local remote remotes=("${(@f)$(vcsh $repo remote)}")
         for remote in $remotes[@] ; do
         vcsh $repo pull "$remote" master --no-edit
         done
