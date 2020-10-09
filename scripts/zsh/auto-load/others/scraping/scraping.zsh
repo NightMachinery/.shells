@@ -910,8 +910,10 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     }
     # url="$(urlfinalg "$url")"
     local imgMode="${url2note_img}" emacsMode="${url2note_emacs}"
-    if [[ "$url" == *youtube.com* ]] ; then
+    if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com(?:/embed/([^/]*))' ]] ; then
         imgMode=y
+        local id="$match[1]"
+        img="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" # embedded videos don't set their bloody meta tags
     fi
     local mode="${2:-md}"
     local fhMode="${fhMode:-curlfast}"
@@ -922,9 +924,9 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     # old: # meta=( "${(@0)$(urlmeta $url all)}" ) # takes ~0.475s
     meta=( "${(@0)$(urlmeta2 $url title description image author)}" ) # takes ~0.04s
     title="$meta[1]"
-    desc="$meta[2]"
+    desc="${meta[2]}"
     desc="$(<<<$desc html2utf.py)"
-    img="$meta[3]"
+    img="${meta[3]:-$img}"
     author="$meta[4]"
     readest=""
     [[ "$cleanedhtml" != no ]] && readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)" # takes ~0.25s

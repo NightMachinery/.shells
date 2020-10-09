@@ -7,6 +7,9 @@ function isLinux() {
     [[ "$uname" == "Linux" ]]
 }
 alias isL=isLinux
+function isMBP() {
+    [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]]
+}
 ##
 isI() {
     ! test -z "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]

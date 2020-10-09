@@ -44,7 +44,7 @@ function pxify-auto() { # @gateway
     # return 0 # We now use Wireguard
     typeset -g pxified
     # local initCountry="$(serr mycountry)"
-    if test -z "$pxified" && [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]] ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
+    if test -z "$pxified" && isMBP ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
         pxified=y
         pxify
     fi

@@ -382,7 +382,7 @@ function ntag-recoverpath() {
         ec $orig
     else
         local orighead="$(ntag-gethead "$orig")"
-        local candidates=( "${orighead}"..*.."${orig:e}"(DN) )
+        local candidates=( "${orighead}"..*.."${orig:e}"(DN) "${orighead}$(prefix-if-ne . "${orig:e}")" )
         local res="$candidates[1]"
         if test -e "$res" ; then
             ec $res

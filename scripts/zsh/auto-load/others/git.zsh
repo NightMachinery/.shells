@@ -3,13 +3,19 @@ alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
 alias grm='git rm --cached'
 alias glcs='glc --depth=1'
 ###
+function git-commitmsg() {
+  # --only-matching
+  local msg="$(git -c color.status=false status | command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed | prefixer --skip-empty -o '; ')"
+  ec "${msg:-.}"
+}
 function gsync() {
-  local remote="${gsync_remote:-${gsync_r:-origin}}"
+  local msg="${*}"
+  local remote="${gsync_remote:-${gsync_r:-origin}}" noadd="${gsync_noadd}"
 
   pushf "$(git rev-parse --show-toplevel)" || return 1
   {
-    git add .
-    git commit -a -m .
+    test -z "$noadd" && git add .
+    git commit -a -m "${msg:-$(git-commitmsg)}"
     git pull --no-edit "$remote"
     git push "$remote"
   } always { popf }

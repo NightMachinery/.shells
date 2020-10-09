@@ -39,8 +39,13 @@ aliasdir cac ~/base/cache
 aliasfn cellp incell gsync
 ##
 vcnpp() {
-    vcsh night.sh add ~/scripts/
-    vcsh night.sh commit -uno -am "." ; vcsh night.sh pull --no-edit ; vcsh night.sh push
+    local msg="${*}"
+    local repo=night.sh
+    isMBP && repo=.shells
+    vcsh $repo add ~/scripts/
+    fnswap git "vcsh $(gq "$repo")" @opts noadd y @ gsync "$msg"
+
+    # vcsh $repo commit -uno -am "${msg:-.}" ; vcsh night.sh pull --no-edit ; vcsh night.sh push
 }
 function cp2tmp() {
     rsp-dl "$@" ~"/Base/_Local TMP/"
