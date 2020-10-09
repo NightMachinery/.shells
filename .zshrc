@@ -249,7 +249,8 @@ zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
 expand-or-complete-with-dots() {
     # toggle line-wrapping off and back on again
     [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti rmam
-    print -Pn "%{%F{red}......%f%}"
+    # print -Pn "%{%F{red}......%f%}"
+    print -Pn "%{%F{green}...%f%}"
     [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti smam
 
     zle expand-or-complete
@@ -310,6 +311,10 @@ fzf-tab-complete() { # @overrides
   fi
   eval "$fzf_tab_complete_code"
 }
+##
+# https://unix.stackexchange.com/a/14231/282382
+# to make tab work on empty line
+zstyle ':completion:*' insert-tab false
 ##
 zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'
 # use `zstyle ':completion:*' matcher-list '' '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'` if you don't want to see the case-insesitive results if there are case-sensitive results. In general, it seems that the matches stop at the first rule that produces at least one match.
