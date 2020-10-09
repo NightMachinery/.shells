@@ -245,7 +245,7 @@ zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
 # alias revealaliases='export ZSH_PLUGINS_ALIAS_TIPS_REVEAL=1'
 ##
 
-##
+###
 expand-or-complete-with-dots() {
     # toggle line-wrapping off and back on again
     [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti rmam
@@ -290,17 +290,27 @@ zstyle ':fzf-tab:*' no-group-color $'\033[38;5;24m'
 # done
 # zstyle ':fzf-tab:*' group-colors $FZF_TAB_GROUP_COLORS
 
-antibody bundle Aloxaf/fzf-tab
-fzf-tab-partial-and-complete() {
-    if [[ $LASTWIDGET = 'fzf-tab-partial-and-complete' ]]; then
-        fzf-tab-complete
-    else
-        zle complete-word
-    fi
-}
-
-# zle -N fzf-tab-partial-and-complete
+antibody bundle Aloxaf/fzf-tab # should come after all tab keybindings
+## fzf-tab has abandoned this API
+# fzf-tab-partial-and-complete() {  # @overrides
+#     if [[ $LASTWIDGET = 'fzf-tab-partial-and-complete' ]]; then
+#         fzf-tab-complete
+#     else
+#         zle complete-word
+#     fi
+# }
+# # zle -N fzf-tab-partial-and-complete
 # bindkey '^I' fzf-tab-partial-and-complete
+##
+fzf_tab_complete_code="${functions[fzf-tab-complete]}"
+fzf-tab-complete() { # @overrides
+  per2en-buffer
+  if [[ "$out" == per ]] ; then
+   input-lang-set en
+  fi
+  eval "$fzf_tab_complete_code"
+}
+##
 zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'
 # use `zstyle ':completion:*' matcher-list '' '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'` if you don't want to see the case-insesitive results if there are case-sensitive results. In general, it seems that the matches stop at the first rule that produces at least one match.
 
@@ -312,10 +322,9 @@ zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '
 ##
 # (( $+commands[cod] )) && source <(command cod init $$ zsh | sd '\bcod\b' 'command cod')
 # https://github.com/dim-an/cod/issues/24
-##
+###
 zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
-
 ##
 # DISABLE_AUTO_TITLE="true" # disables omz setting the title
 omz_termsupport_precmd () {
@@ -334,16 +343,19 @@ function tty-title() {
 }
 ##
 # https://stackoverflow.com/a/14634437/1410221
-function cmd-modifier {
+function per2en-buffer() {
+  out=en
   ## perf
   # `BUFFER="ahjaha ah  isi s s" fnswap zle true time2 cmd-modifier`
   # `BUFFER="زjhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhjhhibjhiuutybyiyyhbbhgdryahjaha ah  isi s s" fnswap zle true time2 cmd-modifier`
   ##
   if [[ "$persian_exc_chars" == *"${BUFFER[1]:-A}"* ]] ; then
     BUFFER="$(ecn "$BUFFER" | per2en)"
-    # We can move the accept-line into the else block, this way translations will require confirmation.
+    out=per
   fi
-
+}
+function cmd-modifier {
+  per2en-buffer
   zle accept-line
 }
 zle -N cmd-modifier-widget  cmd-modifier

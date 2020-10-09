@@ -4,7 +4,9 @@ alias grm='git rm --cached'
 alias glcs='glc --depth=1'
 ###
 function git-commitmsg() {
-  # --only-matching
+  ## alts
+  # git diff --cached --diff-filter='M' --name-only # gives names of modified files
+  ##
   local msg="$(git -c color.status=false status | command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed | prefixer --skip-empty -o '; ')"
   ec "${msg:-.}"
 }

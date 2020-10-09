@@ -26,7 +26,7 @@ function input-lang-set-darwin() {
     # they all ran about the same 77ms
     local wanted="${1:l}" to='US'
     case "$wanted" in
-        en*) to=US ;;
+        en*|u.s*) to=US ;;
         fa*|per*) to='Persian-ISIRI2901' ;;
         toggle*)
             case "$(input-lang-get)" in
@@ -41,6 +41,14 @@ function input-lang-set-darwin() {
     # toggles:
     # cliclick kd:ctrl kp:space ku:ctrl # takes ~0.4
     ##
+}
+function input-lang-set() {
+    # @darwinonly
+    if isDarwin ; then
+        input-lang-set-darwin "$@"
+    else
+        return 0
+    fi
 }
 function input-lang-get-darwin() {
     defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources | command rg -e '"KeyboardLayout Name" = "([^"]*)"' --replace '$1' --only-matching --color never
