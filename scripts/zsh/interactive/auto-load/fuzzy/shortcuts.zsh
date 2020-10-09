@@ -38,12 +38,13 @@ function delenda() {
 }
 ##
 zv() {
-    local q="$*"
+    local q="$1" ; shift
+    local query=("$@")
 
     if test -n "$q" ; then
-        indir "$q" openv
+        indir "$q" openv $query[@]
     else
-        @opts dirs [ ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads ] @ openv
+        @opts dirs [ ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads ] @ openv $query[@]
     fi
 }
 aliasfn r2 incache openv

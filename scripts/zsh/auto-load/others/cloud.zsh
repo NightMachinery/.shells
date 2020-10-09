@@ -6,15 +6,30 @@ typeset -g b7=0AG9i3iMiXl8WUk9PVA
 
 function rcr() {
     doc "rclone - rudi
-Note: rclone, as of yet, does not support resuming downloads."
-    : "rclone auto-skips existing files."
+Note: rclone, as of yet, does not support resuming downloads.
+Use rcrdl to copy from remote to local."
 
     local opts=()
     isI && opts+="--progress"
     RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$(url-tail "$rudi")" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$(url-tail "$rabbit")" rclone "$opts[@]" --multi-thread-streams=0 --drive-server-side-across-configs "$@"
 }
+function rcrdl() {
+    : "rclone auto-skips existing files, but we need special support for tags."
+
+    local remote="$1" local="$2"
+    local localpath="$local"
+    if test -d "$localpath" ; then
+        localpath+="/${remote:t}"
+    fi
+    localpath="$(ntag-recoverpath "$localpath")"
+    if test -e "$localpath" ; then
+        ecerr "$0:WARN: already exists: $localpath"
+    fi
+
+    : "rclone auto-skips existing files (testing by size and modification time or MD5SUM)."
+    revaldbg rcr copyto "$remote" "$localpath"
+}
 function rclonef() {
-    : "rclone auto-skips existing files."
     doc "Warning: you need to supply exactly one / after the directory, or it won't work. Examples: 'rabbit0:' 'rabbit0:g/'"
     local query="${rclonef_query}"
 
@@ -26,7 +41,7 @@ function rclonef() {
     # rexa "rclone $*[1,-2]" "$paths[@]" # rexa can't handle '/'
     ##
     for i in $paths[@] ; do # skip empty paths
-        revaldbg rcr copy "${1}$i" "$2"
+        rcrdl "${1}$i" "$2"
     done
 
 }
