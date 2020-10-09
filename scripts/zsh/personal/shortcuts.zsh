@@ -52,7 +52,7 @@ function vcnpp() {
 
     local repo="$(vcn-getrepo)"
     vcsh $repo add ~/scripts/
-    vcsh $repo commit -uno -am "${msg:-$(git-commitmsg)}"
+    vcsh $repo commit -uno -am "${msg:-$(vcn-with git-commitmsg)}"
     vcsh $repo pull --no-edit
     vcsh $repo push
 
