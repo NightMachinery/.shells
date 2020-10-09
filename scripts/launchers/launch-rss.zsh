@@ -3,7 +3,7 @@ mkdir -p ~/log
 rt_skip="$rt_skip"
 
 ## uni
-tmuxnewshenv="rt_skip='$rt_skip' rt_e=(amar-process) rt_notel=y rt_ge=(withchrome getlinks-uniq -e '/session/id/video/') rt_nt=y rt_eid=$((3600*6)) rt_eud=0" tmuxnewsh rss-ocwvids rss-tsend 'http://ocw.sharif.edu/course/id/224'
+tmuxnewshenv="rt_skip='$rt_skip' rt_e=(amar-process) rt_notel=y rt_ge=(withchrome getlinks-uniq -e '/session/id/video/') rt_nt=y rt_eid=$((3600*3)) rt_eud=0" tmuxnewsh rss-ocwvids rss-tsend 'http://ocw.sharif.edu/course/id/224'
 ##
 tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend  'https://www.scottaaronson.com/blog/?feed=rss2' 'https://buttondown.email/hillelwayne/rss' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' 'https://tamaspapp.eu/post/index.xml' 'https://www.overcomingbias.com/feed' 'https://vitalik.ca/feed.xml' 'https://danluu.com/atom.xml' 'https://huyenchip.com/feed.xml' 'https://feeds2.feedburner.com/GFWReport'
 # 'https://www.themoneyillusion.com/feed/'

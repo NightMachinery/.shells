@@ -54,7 +54,10 @@ function ocwvid-process() {
     local l="$1"
 
     local name="${$(url-tail "$l"|url-decode.py):r}"
-    tsend --link-preview --parse-mode markdown -- $water "[$name]($(<<<$l url-encode.py))"
+    local caption="New video on OCW:"$'\n'"[$name]($(<<<$l url-encode.py))"
+
+    tsend --link-preview --parse-mode markdown -- $water "$caption"
+    tsend --link-preview --parse-mode markdown -- $tlg_amar "$caption"
     pushf "$amardir/wip/$(uuidm)"
     {
         getlinks-c -e '\.mp4$' "$l" | head -1 | inargsf aa -Z || return 3
