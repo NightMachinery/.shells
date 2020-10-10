@@ -128,6 +128,7 @@ function reminday_store() {
         : 'redundant check, as we check =nosync= in rem-sync as well'
         rem-sync # to sync the reminders
     }
+    silent deus iwidget-rem # refresh the cache
     rem_dest="$dest"
 }
 function datenatj() {

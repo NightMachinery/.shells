@@ -43,3 +43,4 @@ wikit
 youtube-dl-interactive
 zooqle
 libgen
+prettier

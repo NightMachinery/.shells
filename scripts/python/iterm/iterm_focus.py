@@ -19,7 +19,7 @@ async def main(connection):
     # if z("isdbg"):
     #     nest_asyncio.apply()
 
-    input_lang = 'U.S.'
+    input_lang = 'U.S.' # @possibly use redis for this. This can make us override the saved setting with the touchbar toggle.
     app = await iterm2.async_get_app(connection)
     async with iterm2.FocusMonitor(connection) as monitor:
         while True:

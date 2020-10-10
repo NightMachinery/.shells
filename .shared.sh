@@ -5,6 +5,7 @@ if true ; then # ! command -v brew &> /dev/null ; then
 fi
 
 addToPATH /usr/sbin
+addToPATH /Applications/mpv.app/Contents/MacOS
 addToPATH /Applications/SuperCollider.app/Contents/Resources/
 addToPATH /Applications/SuperCollider.app/Contents/MacOS/
 addToPATH ~/code/node/snips-alice
