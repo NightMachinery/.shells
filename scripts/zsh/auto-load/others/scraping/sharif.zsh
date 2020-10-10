@@ -42,7 +42,7 @@ function sharif-dep-save() {
     local name="${2:-$dep}"
 
     local dest="${name}.html"
-    ec '<html dir="rtl"><head><body>' > $dest
+    ec '<html dir="rtl"><head><link rel="stylesheet" type="text/css" href="https://edu.sharif.edu/css/default.css"></head><body>' > $dest
 
     curlm 'https://edu.sharif.edu/action.do' \
         -H 'authority: edu.sharif.edu' \
@@ -63,7 +63,7 @@ function sharif-dep-save() {
         --data-raw 'level=0&teacher_name=&sort_item=1&depID='$depID \
         --compressed | pup 'body > table > tbody > tr:nth-child(2) > td > form' >> $dest || return $?
 
-    ec '</body></head></html>' >> $dest
+    ec '</body></html>' >> $dest
 
     prettier --write "$dest"
 }
@@ -76,6 +76,7 @@ function sharif-dep-save-all() {
             ret=1
         }
     done
+    aa https://edu.sharif.edu/css/default.css # to backup the CSS as well.
     return $ret
 }
 function sharif-dep-git-update() {
@@ -85,8 +86,10 @@ function sharif-dep-git-update() {
         git add --all
         if test -n "$(git status --porcelain)" ; then
             local timestamp="$(jalalicli today -j 'yyyy/MM/dd HH:mm:ss')"
+            dirindex_gen.py --skipmod --filter '*.html'
             git commit -a -m "Updated at: $timestamp" || return $?
-            git push
+            # git push
+            git push --set-upstream origin master
         fi
     } always { popf }
 }
