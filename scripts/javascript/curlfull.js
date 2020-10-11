@@ -12,6 +12,10 @@ puppeteer.use(StealthPlugin());
 
 (async () => {
     const url = process.argv[2];
+    var cookieFile = '';
+    if (process.argv.length >= 4) {
+        cookieFile = process.argv[3];
+    }
     const browser = await puppeteer.launch({ headless: true });
     // process.exit(31);
     // use tor
@@ -33,6 +37,13 @@ puppeteer.use(StealthPlugin());
     //console.log(title);
     const html = await page.content();
     console.log(html);
+
+    if (cookieFile != '') {
+        const fs = require('fs').promises;
+
+        const cookies = await page.cookies();
+        await fs.writeFile(cookieFile, JSON.stringify(cookies, null, 2));
+    }
 
     browser.close();
 })();

@@ -126,24 +126,6 @@ if [[ "${terminfo[kcud1]}" != "" ]]; then
     bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
 fi
 ### iTerm Integration
-## None of these work for me under tmux. icat-it and icat-py might work if the image's original data is sufficiently small. (I could never get them to work.)
-aliasfn icat-it ~/.iterm2/imgcat
-aliasfn ils-it ~/.iterm2/imgls
-## https://github.com/olivere/iterm2-imagetools
-aliasfn icat-go "$GOBIN/imgcat" -height 600px # This will zoom, too, but that's actually good in most cases!
-function ils() { imgls -height 200px ${~imageglob} "$@" }
-## https://github.com/wookayin/python-imgcat
-aliasfn icat-py imgcat --height 30 # This will zoom, too, but that's actually good in most cases!
-##
-function icat() {
-  if test -z "$TMUX" ; then
-    icat-go "$@"
-  else
-    icat-py "$@"
-    ecerr "$0: Tmux not supported."
-  fi
-}
-##
 alias it2attention=~/.iterm2/it2attention
 alias it2check=~/.iterm2/it2check
 alias it2copy=~/.iterm2/it2copy

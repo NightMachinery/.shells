@@ -1,4 +1,34 @@
+###
+## None of these work for me under tmux. icat-it and icat-py might work if the image's original data is sufficiently small. (I could never get them to work.)
+aliasfn icat-it ~/.iterm2/imgcat
+aliasfn ils-it ~/.iterm2/imgls
+## https://github.com/olivere/iterm2-imagetools
+function icat-go() {
+    isI || return 0
+    local h="${icat_go_height:-${icat_go_h:-600}}"
+    
+    "$GOBIN/imgcat" -height ${h}px "$@" # This will zoom, too, but that's actually good in most cases!
+}
+function ils() {
+    isI || { exa -a ; return 0 }
+    imgls -height 200px ${~imageglob} "$@"
+}
+## https://github.com/wookayin/python-imgcat
+function icat-py() {
+    isI || return 0
+    imgcat --height 30 "$@" # This will zoom, too, but that's actually good in most cases!
+}
 ##
+function icat() {
+    isI || return 0
+    if test -z "$TMUX" ; then
+        icat-go "$@"
+    else
+        icat-py "$@"
+        ecerr "$0: Tmux not supported."
+    fi
+}
+###
 function iterm-boot() {
     # Alt: `lnrp iterm_focus.py ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch/` uses iterm's own python which doesn't have our Brish
     tmuxnewsh2 iterm_focus ITERM2_COOKIE=$(osascript -e 'tell application "iTerm2" to request cookie') reval-notifexit iterm_focus.py

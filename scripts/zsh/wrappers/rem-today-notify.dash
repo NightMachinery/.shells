@@ -2,5 +2,6 @@
 
 PATH="$HOME/scripts/zsh/wrappers/brishz/:$PATH"
 brishz.dash rem-today-notify
-##
+## @startup-darwin yeah this file has been named badly <_<
 brishz.dash brew update
+brishz.dash sharif-dep-git-update

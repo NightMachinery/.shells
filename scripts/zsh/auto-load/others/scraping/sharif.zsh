@@ -3,7 +3,7 @@ function sharif-dep-getIDs() {
     typeset -gA sharif_deps=()
 
     local data
-    data="$(curlm 'https://edu.sharif.edu/action.do' \
+    data="$(curl "$sharif_curl_opts[@]" 'https://edu.sharif.edu/action.do' \
         -H 'authority: edu.sharif.edu' \
         -H 'pragma: no-cache' \
         -H 'cache-control: no-cache' \
@@ -44,7 +44,7 @@ function sharif-dep-save() {
     local dest="${name}.html"
     ec '<html dir="rtl"><head><link rel="stylesheet" type="text/css" href="https://edu.sharif.edu/css/default.css"></head><body>' > $dest
 
-    curlm 'https://edu.sharif.edu/action.do' \
+    curl "$sharif_curl_opts[@]" 'https://edu.sharif.edu/action.do' \
         -H 'authority: edu.sharif.edu' \
         -H 'pragma: no-cache' \
         -H 'cache-control: no-cache' \
@@ -80,6 +80,8 @@ function sharif-dep-save-all() {
     return $ret
 }
 function sharif-dep-git-update() {
+    sharif-login
+
     pushf "$codedir/data/sharif_course_list"
     {
         sharif-dep-save-all
@@ -88,8 +90,81 @@ function sharif-dep-git-update() {
             local timestamp="$(jalalicli today -j 'yyyy/MM/dd HH:mm:ss')"
             dirindex_gen.py --skipmod --filter '*.html'
             git commit -a -m "Updated at: $timestamp" || return $?
-            # git push
-            git push --set-upstream origin master
         fi
+        git push --set-upstream origin master
     } always { popf }
 }
+##
+sharif_tmp_dir=~/tmp/shariflogin
+sharif_cjar="$sharif_tmp_dir/cjar.txt"
+sharif_curl_opts=(--silent --fail --no-progress-meter --cookie $sharif_cjar --cookie-jar $sharif_cjar)
+function sharif-login() {
+    # pushf ~/tmp/"$(uuidm)"
+    pushf $sharif_tmp_dir
+    {
+        silent command rm l.html l2.html "$sharif_cjar" jc.jpg
+        local cjar jcaptcha
+        cjar="$sharif_cjar"
+        curl "$sharif_curl_opts[@]" 'https://edu.sharif.edu/login.do' > l.html
+
+        # curl -v --fail --no-progress-meter --cookie $cjar --cookie-jar $cjar 'https://edu.sharif.edu/' \
+            #     -H 'authority: edu.sharif.edu' \
+            #     -H 'pragma: no-cache' \
+            #     -H 'cache-control: no-cache' \
+            #     -H 'dnt: 1' \
+            #     -H 'upgrade-insecure-requests: 1' \
+            #     -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36' \
+            #     -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
+            #     -H 'sec-fetch-site: none' \
+            #     -H 'sec-fetch-mode: navigate' \
+            #     -H 'sec-fetch-user: ?1' \
+            #     -H 'sec-fetch-dest: document' \
+            #     -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
+            #     --compressed > l.html
+
+        ##
+        # cfTimeout=5 curlfull.js 'https://edu.sharif.edu/' cjs.json > l.html
+        # local cookie="$(<cjs.json jqm '.[] | .name + "=" + .value')"
+        ##
+
+        jcaptcha="https://edu.sharif.edu/$(<l.html command rg --only-matching -e 'src="(jcaptcha\.jpg\?rand=[^"]*)"' --replace '$1')"
+
+        while true ; do
+            curl "$sharif_curl_opts[@]" "$jcaptcha" -o jc.jpg # downloading the image resets the captcha
+            @opts height 50 @ icat-go jc.jpg
+            local solved_captcha="$(tesseract jc.jpg stdout -c tessedit_char_whitelist=0123456789 |trimsed)"
+
+            typ solved_captcha
+            # vared solved_captcha
+            # typ solved_captcha
+
+            curl "$sharif_curl_opts[@]" 'https://edu.sharif.edu/login.do' \
+                -H 'authority: edu.sharif.edu' \
+                -H 'pragma: no-cache' \
+                -H 'cache-control: no-cache' \
+                -H 'origin: https://edu.sharif.edu' \
+                -H 'upgrade-insecure-requests: 1' \
+                -H 'dnt: 1' \
+                -H 'content-type: application/x-www-form-urlencoded' \
+                -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36' \
+                -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
+                -H 'sec-fetch-site: same-origin' \
+                -H 'sec-fetch-mode: navigate' \
+                -H 'sec-fetch-user: ?1' \
+                -H 'sec-fetch-dest: document' \
+                -H 'referer: https://edu.sharif.edu/login.do' \
+                -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
+                --data-raw 'username='$sharif_username'&password='$sharif_password'&jcaptcha='$solved_captcha'&x=0&y=0&command=login&captcha_key_name=null&captchaStatus=false' \
+                --compressed > l2.html
+            if < l2.html rg --quiet 'کاربر جاری' ; then
+                ec login successful
+                break
+            else
+                continue
+            fi
+        done
+    } always {
+        popf
+    }
+}
+##
