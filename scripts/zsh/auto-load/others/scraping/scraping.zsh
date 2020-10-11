@@ -55,7 +55,8 @@ function wgetm() {
     wget --header "$(cookies-auto "$@")" "$@"
 }
 function curlm() {
-    curl --silent --fail --location --cookie-jar "$(mktemp)" --header "$(cookies-auto "$@")" "$@"
+    # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
+    curl --silent --fail --location --cookie-jar /dev/null --header "$(cookies-auto "$@")" "$@"
 }
 function cookies-copy() {
     ec-copy "theCookies=$(gq "$(cookies-auto "$@")" "$@")"

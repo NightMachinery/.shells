@@ -66,6 +66,41 @@ function sharif-dep-save() {
     ec '</body></html>' >> $dest
 
     prettier --write "$dest"
+    local destjson="${dest:r}.json" oldjson=''
+    if test -e "$destjson" ; then
+        oldjson="$(cat $destjson)"
+    fi
+    <$dest sharif-dep-2json > $destjson
+    if test -n "$oldjson" ; then
+        local diff="$(marked_courses='[9999,9998]' sharif_diff.js =(ec "$oldjson") "$destjson")"
+        if test -n "$diff" ; then
+            # EDU_DIFF channel
+            tsend -- -1001472917717 "$diff"
+            color blue "$diff"
+        fi
+    fi
+}
+function sharif-dep-2json() {
+    table2json2.js | jq '[.[]| .[] |
+        if .[0] != "گروه" then
+            {
+            "Group": .[0],
+            "Credits": .[1],
+            "Name": .[2],
+            "Prereqs": .[3],
+            "Capacity": .[4],
+            "EnrolledStudents": .[5],
+            "Professor": .[6],
+            "ExamDate": .[7],
+            "ClassTime": .[8],
+            "Comments": .[9],
+            "MessageOnSignup": .[10],
+            "CourseID": .[11]
+            }
+        else
+            empty
+        end
+        ]'
 }
 function sharif-dep-save-all() {
     sharif-dep-getIDs || return $?

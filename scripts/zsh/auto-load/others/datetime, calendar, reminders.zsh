@@ -201,7 +201,7 @@ function rem-today() {
                 text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
             elif [[ "$ext" == bak ]] ; then
-                ec "$0: Skipped: $f"
+                ecn $'\n\n'"$0: Skipped: $f"
             else
                 # text+=$'\n\n'"$0: Unsupported file: $f"
                 text+=$'\n\n'"$(<$f)" #"${$(<$f ; ec .)[1,-2]}"
