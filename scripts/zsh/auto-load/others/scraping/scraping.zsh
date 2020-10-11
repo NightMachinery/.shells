@@ -535,7 +535,7 @@ function 2epub-pandoc-simple() {
 aliasfn html2epub-pandoc-simple 2epub-pandoc-simple
 function 2epub-pandoc-byext () {
     magic mdocu "[PANDOC_EXT=txt] <title> <author> <file> ..." ; mret
-    local ext="{$PANDOC_EXT:-txt}"
+    local ext="${PANDOC_EXT:-txt}"
     local title="$1"
     local author="$2"
     local files=( "${@:3}" )
@@ -899,7 +899,7 @@ function jfic() {
 }
 ##
 function url2note() {
-    magic mdoc "[ html= cleanedhtml= url2note_img ] $0 <url> [<mode>] ; outputs in global variables and stdout.
+    magic mdoc "[ url2note_override_title= html= cleanedhtml= url2note_img ] $0 <url> [<mode>] ; outputs in global variables and stdout.
 Set cleanedhtml=no to disable adding the reading estimate. (This improves performance.)" ; mret
 
     # test perf:
@@ -924,7 +924,7 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     
     # old: # meta=( "${(@0)$(urlmeta $url all)}" ) # takes ~0.475s
     meta=( "${(@0)$(urlmeta2 $url title description image author)}" ) # takes ~0.04s
-    title="$meta[1]"
+    title="${url2note_override_title:-$meta[1]}"
     desc="${meta[2]}"
     desc="$(<<<$desc html2utf.py)"
     img="${meta[3]:-$img}"

@@ -1,11 +1,21 @@
 function tsend-rssln() {
-    local item="[$rssTitle]($2)"
+    local rec="${1:?}" link="${2:?}" title="$rssTitle"
+
+    local reallink
+    reallink="$(techmeme-extracturl $link)" || reallink="$link"
+    local item="[$title]($reallink)"
     local acc="$PURGATORY/rssln.md"
-    print -nr -- "$item"$'\n\n' >> $acc
-    tsend --parse-mode markdown -- "$1" $item
+    ##
+    # print -nr -- "$item"$'\n\n' >> $acc
+    url2note_override_title="$title" readmoz-md "$reallink" >> $acc
+    ecn $'\n\n' >> $acc
+    ##
+    tsend --link-preview --parse-mode markdown -- "$rec" $item
 }
 function rssln2k() {
     local acc="$PURGATORY/rssln.md"
+    test -e "$acc" || { ec "$0: Doesn't exist: $acc" ; return 0 }
+
     {
         pushf "$PURGATORY"
         local title="ephemeral"
