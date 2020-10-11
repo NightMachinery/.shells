@@ -19,12 +19,12 @@ for ( var i=0; i < a.length ; i++ ){
     ac = a[i].Capacity
     bc = b[i].Capacity
 
-    if (bc > ac) {
-        console.log(a[i].Name + "'s capacity increased from " + ac + " to " + bc)
-    }
-
     ae = a[i].EnrolledStudents
     be = b[i].EnrolledStudents
+
+    if (bc > ac) {
+        console.log(a[i].Name + "'s capacity increased from " + ac + " to " + bc + " (" + be + " students currently enrolled)")
+    }
 
     if (be < ae && (marked_courses.includes(aid.toString()) || ac == ae)) {
         console.log(a[i].Name + "'s enrolled students decreased from " + ae + " to " + be)
