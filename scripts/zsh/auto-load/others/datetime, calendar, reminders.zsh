@@ -128,7 +128,7 @@ function reminday_store() {
         : 'redundant check, as we check =nosync= in rem-sync as well'
         rem-sync # to sync the reminders
     }
-    silent deus iwidget-rem # refresh the cache
+    awaysh deus iwidget-rem # refresh the cache
     rem_dest="$dest"
 }
 function datenatj() {
@@ -176,6 +176,8 @@ function rem_extract-date-path() {
 }
 function rem-today() {
     local deleteMode="${rem_today_delete:-$rem_today_d}"
+    unset rem_today_delete # stop propagating these to inner calls of rem-today SHUDDERS
+    unset rem_today_d
 
     ensure-dir "$remindayDir/"
     ensure-dir "$remindayBakDir/"
@@ -191,7 +193,11 @@ function rem-today() {
             if [[ "$ext" == zsh ]] ; then
                 if test -n "$deleteMode" ; then # only run the code once
                 local out
-                out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                ##
+                # out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                # Run clean zsh so that  our env doesn't pollute it.
+                out="$(zsh -c "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                ##
                 text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
             elif [[ "$ext" == bak ]] ; then
