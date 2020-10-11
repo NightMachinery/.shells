@@ -2,7 +2,7 @@ function tsend-rssln() {
     local rec="${1:?}" link="${2:?}" title="$rssTitle"
 
     local reallink
-    reallink="$(techmeme-extracturl $link)" || reallink="$link"
+    reallink="$(techmeme-extracturl $link)" && test -n "$reallink" || reallink="$link"
     local item="[$title]($reallink)"
     local acc="$PURGATORY/rssln.md"
     ##

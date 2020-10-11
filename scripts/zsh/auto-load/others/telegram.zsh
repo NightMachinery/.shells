@@ -7,12 +7,13 @@ function tnotif() {
     matrix-send-self "$msg"
     tsend --parse-mode markdown -- "$tlg_notifs" "$msg"
 }
-function tnotifc() {
+function tnotif-casual() {
     # CASUAL Mode
     local msg="$*"
 
     tsend --parse-mode markdown -- "$tlg_notifc" "$msg"
 }
+aliasfn tnotifc tnotif-casual
 ##
 function tsendf() {
     
