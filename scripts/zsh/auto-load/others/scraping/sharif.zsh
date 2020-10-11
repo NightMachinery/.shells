@@ -164,7 +164,10 @@ function sharif-login() {
 
         jcaptcha="https://edu.sharif.edu/$(<l.html command rg --only-matching -e 'src="(jcaptcha\.jpg\?rand=[^"]*)"' --replace '$1')"
 
+        local retries=0
         while true ; do
+            retries=$((retries+1))
+
             curl "$sharif_curl_opts[@]" "$jcaptcha" -o jc.jpg # downloading the image resets the captcha
             @opts height 50 @ icat-go jc.jpg
             local solved_captcha="$(tesseract jc.jpg stdout -c tessedit_char_whitelist=0123456789 |trimsed)"
@@ -195,7 +198,13 @@ function sharif-login() {
                 ec login successful
                 break
             else
-                continue
+                if (( retries <= 10 )) ; then
+                    continue
+                else
+                    retries=0
+                    reval-ecdate sleep 3600
+                    continue
+                fi
             fi
         done
     } always {

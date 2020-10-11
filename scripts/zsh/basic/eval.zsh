@@ -6,8 +6,15 @@ alias eval-quoted='reval'
 alias greval=rgeval
 eval-ec() { ge_no_hist=y geval "$@" }
 reval-ec() { ge_no_hist=y rgeval "$@" }
+reval-ecdate() {
+    test -z "$*" && return 0
+    local cmd="$(gq "$@")"
+    ecdate "$cmd"
+    eval "$cmd"
+}
 ###
 function geval() {
+    test -z "$*" && return 0
     local cmd="$@"
     test -z "$ge_ecdbg" && {
         test -z "$ge_no_ec"  && ec "$cmd" >&2

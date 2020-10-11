@@ -44,6 +44,34 @@ def p2int(p):
     except:
         return p
 
+async def discreet_send(client, receiver, message, file=None, force_document=False, parse_mode=None, reply_to=None, link_preview=False):
+    message = message.strip()
+    if len(message) == 0:
+        return reply_to
+    else:
+        length = len(message)
+        last_msg = reply_to
+        if length <= 12000:
+            s = 0
+            e = 4000
+            while (length > s):
+                last_msg = await client.send_message(receiver, message[s:e], file=file, force_document=force_document, parse_mode=parse_mode, link_preview=link_preview, reply_to=(reply_to if s == 0 else last_msg))
+
+                s = e
+                e = s + 4000
+        else:
+            from brish import z
+            f = z('''
+            local f="$(gmktemp --suffix .txt)"
+            ec {message} > "$f"
+            ec "$f"
+            ''').outrs
+            last_msg = await client.send_file(receiver, f, reply_to=reply_to, allow_cache=False, caption='This message is too long, so it has been sent as a text file.')
+            z('command rm {f}')
+            if file:
+                last_msg = await client.send_file(receiver, file, reply_to=(last_msg or reply_to), allow_cache=False)
+        return last_msg
+
 async def tsend(arguments):
     arguments['<message>'] = str(arguments['<message>'])
     if backend == 2:
@@ -59,10 +87,10 @@ async def tsend(arguments):
             api_hash) as client:
 
             # print(arguments)
-        # if arguments['--file'] is not none:
             if arguments['--parse-mode'] == 'html':
                 arguments['<message>'] = re.sub(r"(<(br|p)\s*/?>)", r'\1' + '\n', arguments['<message>'])
-            await client.send_message(p2int(arguments['<receiver>']), arguments['<message>'], file=arguments['--file'], force_document=arguments['--force-document'], parse_mode=arguments['--parse-mode'], link_preview=arguments['--link-preview'])
+
+            await discreet_send(client, p2int(arguments['<receiver>']), arguments['<message>'], file=arguments['--file'], force_document=arguments['--force-document'], parse_mode=arguments['--parse-mode'], link_preview=arguments['--link-preview'])
 
 def parse_tsend(argv):
     return docopt(__doc__, version='telegram-send 0.1', argv=argv)
