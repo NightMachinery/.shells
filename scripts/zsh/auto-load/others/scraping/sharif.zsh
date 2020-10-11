@@ -75,7 +75,7 @@ function sharif-dep-save() {
         local diff="$(marked_courses='[9999,9998]' sharif_diff.js =(ec "$oldjson") "$destjson")"
         if test -n "$diff" ; then
             # EDU_DIFF channel
-            tsend -- -1001472917717 "$diff"
+            tsend -- -1001472917717 "${dest:t:r}"$'\n'"$diff"
             color blue "$diff"
         fi
     fi
