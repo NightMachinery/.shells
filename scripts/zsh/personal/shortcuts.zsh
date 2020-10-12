@@ -47,7 +47,13 @@ function vcn-with() {
     local repo="$(vcn-getrepo)"
     fnswap git "vcsh $(gq "$repo")" "$@"
 }
-aliasfn vcns vcn-with gss -uno
+function vcns() {
+    pushf ~/ # to have nice paths in git's output
+    {
+        vcn-with git add "$NIGHTDIR" # To see newly added files in the status
+        vcn-with gss -uno
+    } always { popf }
+}
 function vcnpp() {
     local msg="${*}"
 
