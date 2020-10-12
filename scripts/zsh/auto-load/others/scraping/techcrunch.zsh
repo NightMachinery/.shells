@@ -1,11 +1,12 @@
 function techcrunch-curl() {
     local url="${1:?}"
-    local con="$(urlfinalg $url)"
-    if [[ "$con" == 'https://consent\.yahoo\.com/v2/collectConsent\?sessionId=(.*)' ]] ; then
+    local con="$(url-final $url)"
+    if [[ "$con" =~ 'https://consent\.yahoo\.com/v2/collectConsent\?sessionId=(.*)' ]] ; then
         local sid="${match[1]}"
+        dvar sid
         # sid='3_cc-session_36dd4d76-973e-407c-b328-8b546d2f6fc7'
 
-        gurl --fail --location --cookie-jar =() 'https://consent.yahoo.com/v2/collectConsent?sessionId='$sid \
+        curl -o /dev/stdout --fail --location --cookie-jar =() 'https://consent.yahoo.com/v2/collectConsent?sessionId='$sid \
             -H 'Connection: keep-alive' \
             -H 'Pragma: no-cache' \
             -H 'Cache-Control: no-cache' \
@@ -24,6 +25,7 @@ function techcrunch-curl() {
             --data-raw 'sessionId='$sid'&originalDoneUrl='"$(<<<$url url-encode.py)"'&namespace=techcrunch&agree=agree&agree=agree' \
             --compressed
     else
+        dvar con
         gurl $url
     fi
 }
