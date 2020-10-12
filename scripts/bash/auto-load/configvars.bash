@@ -54,7 +54,8 @@ text_formats=( $note_formats[@] $code_formats[@] $config_formats[@] )
 createglob text_formats textglob
 ##
 if isDarwin ; then
-    veditor=(code-insiders -r)
+    # veditor=(code-insiders -r)
+    veditor=(emc)
     cookiesFiles="${HOME}/Library/Application Support/Google/Chrome/Default/Cookies"
 else
     # test -e ~/.SpaceVim && veditor=(svi -p) ||

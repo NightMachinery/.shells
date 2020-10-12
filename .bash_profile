@@ -22,3 +22,4 @@ unset __conda_setup
 
 # export PATH="$HOME/.poetry/bin:$PATH"
 if [ -e /Users/evar/.nix-profile/etc/profile.d/nix.sh ]; then . /Users/evar/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
+complete -C /Users/evar/go/bin/bitcomplete bit

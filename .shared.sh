@@ -5,7 +5,6 @@ if true ; then # ! command -v brew &> /dev/null ; then
 fi
 
 addToPATH /usr/sbin
-addToPATH /Applications/mpv.app/Contents/MacOS
 addToPATH /Applications/SuperCollider.app/Contents/Resources/
 addToPATH /Applications/SuperCollider.app/Contents/MacOS/
 addToPATH ~/code/node/snips-alice
@@ -28,6 +27,7 @@ export GEM_HOME="$HOME/.gem"
 addToPATH "$GEM_HOME/bin"
 addToPATH "$HOME/.poetry/bin"
 addToPATH ~/.nimble/bin
+addToPATH /Applications/mpv.app/Contents/MacOS
 
 # psource ~/anaconda/etc/profile.d/conda.sh
 # silence conda deactivate #this is necessary try sbing and you'll see
