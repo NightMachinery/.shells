@@ -1,3 +1,4 @@
+complete -o nospace -C /Users/evar/go/bin/bitcomplete bit # needs bashcompinit
 ##
 function comp_wh() {
     local i j

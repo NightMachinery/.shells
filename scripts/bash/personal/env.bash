@@ -27,3 +27,6 @@ export NODEJS_CHECK_SIGNATURES=no #for asdf's nodejs
 export WG_CONF=~/Base/keys/zii/peer1.conf
 ##
 export DOOMDIR=~/doom.d
+##
+test -z "$XDG_RUNTIME_DIR" && export XDG_RUNTIME_DIR="/tmp/runtime-sth" # Ubuntu bug?
+##

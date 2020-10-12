@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const timeout = ((process.env.cfTimeout) || 600) * 1000
+const timeout = ((process.env.cfTimeout) || 20) * 1000
 
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
