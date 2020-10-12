@@ -28,16 +28,6 @@ function cdz() {
     fi
 }
 ##
-trs() {
-    local i
-    for i in "$@"
-    do
-        [[ -e "$i" ]] && {
-            ec Trying to remove "$i"
-            trash -- "$i"
-        }
-    done
-}
 function ensure-dir() {
     mkdir -p "$(bottomdir $1)"
 }

@@ -36,8 +36,9 @@ function ntag-l() {
 }
 aliasfn l ntag-l
 aliasfn lv-simple ntag-l '${~videoglob}'
-aliasfn lv lv-simple
+aliasfn lv lv-simple2
 lv-sorted() { ntag-lv | tac }
+lv-simple2() { @opts nopriority y @ ntag-lv | tac }
 function ntag-ll() {
     if isI && istty ; then
         exa -a -l --color always "$@" | ntag-color

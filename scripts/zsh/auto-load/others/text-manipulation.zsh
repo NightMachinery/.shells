@@ -2,9 +2,18 @@
 ### This module specializes in functions that do not touch the disk.
 ###
 function prefix-if-ne() {
-    local prefix="$1" out="$2"
-    if [[ "$out" =~ '\S' ]] ; then
+    : "prefix if not empty: <prefix> <output> [<optional-checks> ...]"
+    local prefix="$1" out="${2}" ; shift 1 || return $?
+    (( $#@ >= 1 )) || return 0 # Empty (unset) out
+    local ne=y
+    local i
+    for i in "$@" ; do
+       [[ "$i" =~ '\S' ]] || ne='' # out and all optional-checks should be non-empty
+    done
+    if test -n "$ne" ; then
         ecn "${prefix}$out"
+    else
+        ecn "$out"
     fi
 }
 function dedent() {

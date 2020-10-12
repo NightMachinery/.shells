@@ -31,17 +31,19 @@ function rcrdl() {
 }
 function rclonef() {
     doc "Warning: you need to supply exactly one / after the directory, or it won't work. Examples: 'rabbit0:' 'rabbit0:g/'"
-    local query="${rclonef_query}"
+    local query="${rclonef_query}" remote="${1:?}" local="${2:?}"
 
     local paths
-    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${1}" | fz --query "$query ")}" ) || return 1
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${remote}" | fz --query "$query ")}" ) || return 1
     local i
     ##
     # old API design: <cmd>... <entry-of-fuzzy-paths>
     # rexa "rclone $*[1,-2]" "$paths[@]" # rexa can't handle '/'
     ##
     for i in $paths[@] ; do # skip empty paths
-        rcrdl "${1}$i" "$2"
+        local destdir="$local/${i:h:t}"
+        mkdir -p "$destdir"
+        reval-ec rcrdl "${remote}$i" "$destdir"
     done
 
 }

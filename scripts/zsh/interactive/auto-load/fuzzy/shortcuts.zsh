@@ -6,18 +6,23 @@ function play-tag() {
     rgeval mpv "$(realpath "$ntag_add_dest")" # realpath to unbreak rgeval's usefulness because we use this via `indir`.
 }
 function ntag-lv() {
-    local vids='' fd_args=("$@")
+    local fd_args=("$@") noprioMode="${ntag_lv_nopriority}"
+
+    local vids=''
     {
         # fd has nondeterministic sort order.
-        vids="$(fd -uuu --type file --regex "\.(${(j.|.)video_formats})\$" "$fd_args[@]")"
-        local prio=''
-        prio="$(<<<$vids ntag-grepor green)" # to have these at first
-        prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor aqua | prefixer rm -- "${(@f)prio}")")"
-        prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor teal | prefixer rm -- "${(@f)prio}")")"
-        prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor gray grey | prefixer rm -- "${(@f)prio}")")"
-
-        ec $prio
-        ec $vids | prefixer rm --skip-empty -- "${(@f)prio}"
+        vids="$(fd --color always -uuu --type file --regex "\.(${(j.|.)video_formats})\$" "$fd_args[@]")"
+        if test -z "$noprioMode" ; then
+            local prio=''
+            prio="$(<<<$vids ntag-grepor green)" # to have these at first
+            prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor aqua | prefixer rm -- "${(@f)prio}")" "$prio")"
+            prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor teal | prefixer rm -- "${(@f)prio}")")"
+            prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor gray grey | prefixer rm -- "${(@f)prio}")")"
+            test -n "$prio" && ec $prio
+            ec $vids | prefixer rm --skip-empty -- "${(@f)prio}"
+        else
+            ec $vids
+        fi
     } | ntag-color
 }
 function openv() {

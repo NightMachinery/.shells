@@ -47,6 +47,7 @@ function vcn-with() {
     local repo="$(vcn-getrepo)"
     fnswap git "vcsh $(gq "$repo")" "$@"
 }
+aliasfn vcns vcn-with gss -uno
 function vcnpp() {
     local msg="${*}"
 

@@ -85,7 +85,7 @@ function remj() {
     # test -z "$day" && { ecerr "$0: empty first arg. Aborting." ; return 1 }
     typeset -Z2 day="$day"
     local month="${3:-$cmonth}"
-    [[ "$month" =~ '^\+(\d+)$' ]] && month=$(( cmonth + $match[1] ))
+    [[ "$month" =~ '^\+(\d+)$' ]] && month=$(( cmonth + $match[1] )) # @BEWARE We do NOT support transfering >=25 values here to the year. Use `remn` for that!
     [[ "$month" =~ '^\d$' ]] && month="0$month"
     local year="${4}"
     [[ "$year" =~ '^\+(\d+)$' ]] && year=$(( cyear + $match[1] ))
@@ -196,7 +196,7 @@ function rem-today() {
                 ##
                 # out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
                 # Run clean zsh so that  our env doesn't pollute it.
-                out="$(zsh -c "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                out=$'\n\n'"$(zsh -c "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
                 ##
                 text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi

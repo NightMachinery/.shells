@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-    const url = process.argv[2];
+// Use `techcrunch-curl` instead.
+
+const url = process.argv[2];
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch()
@@ -16,11 +18,11 @@ const puppeteer = require('puppeteer');
   await page.click('.con-wizard > .wizard-body > .actions > .consent-form > .primary')
 
 
-	const timeout = ((process.env.cfTimeout) || 20) * 1000
+  const timeout = ((process.env.cfTimeout) || 20) * 1000
 
-    await page.waitFor(timeout);
-    const html = await page.content();
-    console.log(html);
+  await page.waitFor(timeout);
+  const html = await page.content();
+  console.log(html);
 
   await browser.close()
 })()
