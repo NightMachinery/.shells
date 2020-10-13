@@ -20,15 +20,35 @@ function git-commitmsg() {
 }
 function gsync() {
   local msg="${*}"
-  local remote="${gsync_remote:-${gsync_r:-origin}}" noadd="${gsync_noadd}"
+  local noadd="${gsync_noadd}"
+  local branch="${gsync_branch:-${gsync_b:-master}}"
+  local remote="${gsync_remote:-${gsync_r}}"
 
   pushf "$(git rev-parse --show-toplevel)" || return 1
   {
-    test -z "$noadd" && git add .
+    test -z "$noadd" && git add --all
     local automsg="$(git-commitmsg)"
     git commit -a -m "${msg:-$automsg}"
-    git pull --no-edit "$remote"
-    git push "$remote"
+
+    local remotes
+    if test -z "$remote" ; then
+      local excludedRemotes=(upstream)
+      remotes=("${(@)${(@f)$(git remote)}:|excludedRemotes}")
+    else
+      remotes=("$remote")
+    fi
+    for remote in $remotes[@]
+    do
+      ec
+      reval-ec git pull "$remote" "$branch" --no-edit
+      ec
+    done
+    for remote in $remotes[@]
+    do
+      ec
+      reval-ec git push "$remote" "$branch"
+      ec
+    done
   } always { popf }
 }
 ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat }

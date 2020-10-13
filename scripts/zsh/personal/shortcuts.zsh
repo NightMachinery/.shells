@@ -63,16 +63,19 @@ function vcnpp() {
         vcsh $repo add ~/scripts/
         local automsg="$(vcn-with git-commitmsg)"
         vcsh $repo commit -uno -am "${msg:-$automsg}"
-        local remote remotes=("${(@f)$(vcsh $repo remote)}")
-        for remote in $remotes[@] ; do
-        vcsh $repo pull "$remote" master --no-edit
-        done
-        for remote in $remotes[@] ; do
-        vcsh $repo push "$remote" master
-        done
+
+        vcn-with @opts noadd y @ gsync "$msg"
+        ##
+        # local remote remotes=("${(@f)$(vcsh $repo remote)}")
+        # for remote in $remotes[@] ; do
+        # vcsh $repo pull "$remote" master --no-edit
+        # done
+        # for remote in $remotes[@] ; do
+        # vcsh $repo push "$remote" master
+        # done
+        ##
         isMBP && brishzr vcnpp
     } always { popf }
-    # fnswap git "vcsh $(gq "$repo")" @opts noadd y @ gsync "$msg"
 }
 function cp2tmp() {
     rsp-dl "$@" ~"/Base/_Local TMP/"
