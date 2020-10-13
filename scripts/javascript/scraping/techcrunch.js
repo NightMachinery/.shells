@@ -20,7 +20,7 @@ const puppeteer = require('puppeteer');
 
   const timeout = ((process.env.cfTimeout) || 20) * 1000
 
-  await page.waitFor(timeout);
+  await page.waitForTimeout(timeout);
   const html = await page.content();
   console.log(html);
 

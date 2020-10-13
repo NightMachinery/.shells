@@ -26,7 +26,7 @@ puppeteer.use(StealthPlugin());
     const waittill = { timeout: 300000, waitUntil: ['networkidle2', 'domcontentloaded'] }
     await page.goto(url, waittill);
     // await page.waitForNavigation(waittill); // can get stuck
-    await page.waitFor(timeout);
+    await page.waitForTimeout(timeout);
 
     // Start an interactive REPL here with the `page` instance.
     // await page.repl()

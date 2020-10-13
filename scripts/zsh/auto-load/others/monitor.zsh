@@ -51,6 +51,7 @@ function lsport() {
     ((${#opts})) && sudo lsof -n $opts[@]
 }
 function headphones-is() {
+    # @alt `hs.audiodevice.current().name`
     system_profiler SPAudioDataType | command rg --quiet Headphones
 }
 aliasfn is-headphones headphones-is

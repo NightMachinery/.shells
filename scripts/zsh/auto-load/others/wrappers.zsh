@@ -1,4 +1,17 @@
 function '$'() { eval "$(gquote "$@")" ; }
+function mcli-getexecpath_h() {
+  brew unlink m-cli
+
+  mcli_path=("$(brew --cellar m-cli)"/*/bin/m)
+  ec "$mcli_path"
+}
+function mcli-getexecpath() {
+  memoi_expire=0 memoi-eval mcli-getexecpath_h "$@"
+}
+function mcli() {
+  # https://github.com/rgcr/m-cli
+  command "${mcli_path:-$(mcli-getexecpath)}" "$@"
+}
 function tldr() {
   #nig ea  #not needed because of piping autoremoval of color.
   isDarwin && { command tldr "$@" || command tldr -p linux "$@" ; return $? }

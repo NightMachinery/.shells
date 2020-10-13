@@ -102,3 +102,8 @@ function jiconpack() {
     mv **/*.png .
     re convert-pad *.png
 }
+##
+function img-dimensions() {
+  identify -format 'width=%wpx;height=%hpx;' "$1" # 2>/dev/null
+}
+##
