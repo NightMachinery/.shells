@@ -5,7 +5,7 @@ alias tlcode='tlrl-code'
 alias tlgh='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
 alias wread-c='fhMode=curl wr_force=y wread'
-alias withchrome='fhMode=curlfullshort '
+aliasfn withchrome 'fhMode=curlfullshort' reval
 alias w2e-noredirect='fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
 alias tlnoredirect='tlrl-ng -e w2e-noredirect'
 aliasfn tlnor tlnoredirect
@@ -57,6 +57,15 @@ function wgetm() {
 function curlm() {
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
     curl --silent --fail --location --cookie-jar /dev/null --header "$(cookies-auto "$@")" "$@"
+}
+function curl-useragent() {
+    # Copy from Chrome's network pane
+    curl --fail --no-progress-meter \
+        -H 'upgrade-insecure-requests: 1' \
+        -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36' \
+        -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
+        -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
+        --compressed "$@"
 }
 function cookies-copy() {
     ec-copy "theCookies=$(gq "$(cookies-auto "$@")" "$@")"
