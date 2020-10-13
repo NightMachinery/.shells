@@ -28,7 +28,7 @@ function gsync() {
   {
     test -z "$noadd" && git add --all
     local automsg="$(git-commitmsg)"
-    git commit -a -m "${msg:-$automsg}"
+    git commit -uno -a -m "${msg:-$automsg}"
 
     local remotes
     if test -z "$remote" ; then
