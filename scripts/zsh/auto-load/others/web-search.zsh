@@ -5,9 +5,11 @@ function ddgr-en() {
     ddgr --reg 'us-en' --unsafe "$@"
 }
 function search-json() {
-    local count="${search_json_count:-10}" query="$1"
+    local count="${search_json_count:-10}" ddgMode="${search_json_ddg}" query="$1"
     
-    googler-en --json --count "$count" "$query" || ddgr-en --json --num "$count" "$query"
+    if test -n "$ddgMode" || ! googler-en --json --count "$count" "$query" ; then
+        ddgr-en --json --num "$count" "$query"
+    fi
 }
 function goo-g() {
     # use -x, --exact for an exact search.
@@ -19,7 +21,7 @@ function goo-g() {
     local memoi_cmd="$(cmd-sub memoi-eval '')"
 
     local res search
-    search="$(search_json_count="$count" $memoi_cmd search-json "$query")"
+    search="$(search_json_count="$count" memoi_key="$search_json_ddg|$count" $memoi_cmd search-json "$query")"
 
     goo_urls=("${(@0)$(<<<$search jq -re --nul-output '.[] | .url')}") || return 1
     goo_titles=("${(@0)$(<<<$search jq -re --nul-output '.[] | .title')}")

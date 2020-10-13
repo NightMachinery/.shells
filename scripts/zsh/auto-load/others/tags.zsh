@@ -35,7 +35,7 @@ function ntag-l() {
     fi
 }
 aliasfn l ntag-l
-aliasfn lv-simple ntag-l '${~videoglob}'
+aliasfn lv-simple ntag-l -- '${~videoglob}'
 aliasfn lv lv-simple2
 lv-sorted() { ntag-lv | tac }
 lv-simple2() { @opts nopriority y @ ntag-lv | tac }
