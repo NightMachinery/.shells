@@ -73,7 +73,7 @@ function ntag-rmadd() {
     local rm=("${ntag_rmadd_rm[@]}")
 
     if (( $#@ == 0 )) ; then
-        files=("${(@f)$(ntag-grepor ${rm[@]} | fz)}") || return $?
+        files=("${(@f)$(ntag-grepor ${rm[@]} | ntag-color | fz --ansi)}") || return $?
     fi
 
     for f in $files[@] ; do

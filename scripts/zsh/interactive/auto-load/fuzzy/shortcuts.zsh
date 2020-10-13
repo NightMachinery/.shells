@@ -16,8 +16,8 @@ function ntag-lv() {
             local prio=''
             prio="$(<<<$vids ntag-grepor green)" # to have these at first
             prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor aqua | prefixer rm -- "${(@f)prio}")" "$prio")"
-            prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor teal | prefixer rm -- "${(@f)prio}")")"
-            prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor gray grey | prefixer rm -- "${(@f)prio}")")"
+            prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor teal | prefixer rm -- "${(@f)prio}")" "$prio")"
+            prio+="$(prefix-if-ne $'\n' "$(<<<$vids ntag-grepor gray grey | prefixer rm -- "${(@f)prio}")" "$prio")"
             test -n "$prio" && ec $prio
             ec $vids | prefixer rm --skip-empty -- "${(@f)prio}"
         else
