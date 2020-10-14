@@ -1,7 +1,10 @@
 function '$'() { eval "$(gquote "$@")" ; }
+function hammerspoon() {
+  hs "$@"
+}
 function mcli-getexecpath_h() {
   brew unlink m-cli
-
+  
   mcli_path=("$(brew --cellar m-cli)"/*/bin/m)
   ec "$mcli_path"
 }

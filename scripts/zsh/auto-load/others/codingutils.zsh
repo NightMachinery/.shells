@@ -157,10 +157,14 @@ serr rm "$zipdest"
     pbadd "$zipdest"
 }
 function cee() {
-    cat `which "$1"`
+    local f
+    f="$(which "$1")" || return $?
+    cat "$f"
 }
 function ceer() {
-    geval "${@:2} $(which "$1")"
+    local f
+    f="$(which "$1")" || return $?
+    rgeval "${@:2}" "$f"
 }
 function mn() {
     local LESS=$LESSMIN

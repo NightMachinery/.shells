@@ -76,5 +76,5 @@ function re-async() {
         eval "$1 $(gquote "$i98765")" &
     done
 }
-run-on-each setopt re_match_pcre extendedglob pipefail
-run-on-each unsetopt autopushd
+setopt re_match_pcre extendedglob pipefail hash_executables_only # hash_executables_only will not hash dirs instead of executables, but it can be slow.
+unsetopt autopushd

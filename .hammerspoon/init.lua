@@ -1,3 +1,4 @@
+local ipc = require "hs.ipc"
 local popclick = require "hs.noises"
 local application = require "hs.application"
 local window = require "hs.window"
@@ -59,9 +60,12 @@ popclickListening = false
 local tssScrollDown = newScroller(0.02, -10)
 local scrollExcluded = { "iTerm2", "Terminal", "Emacs", "Code", "Code - Insiders" }
 function scrollHandler(evNum)
+  if not popclickListening then
+    return
+  end
   appName = application.frontmostApplication():name()
   iterm_focus = exec_raw('/usr/local/bin/redis-cli --raw get iterm_focus')
-  hs.alert.show("App: " .. appName .. ", iterm_focus: " .. iterm_focus .. ", NH: " .. evNum)
+  -- hs.alert.show("App: " .. appName .. ", iterm_focus: " .. iterm_focus .. ", NH: " .. evNum)
   iterm_focus = (iterm_focus == 'TERMINAL_WINDOW_BECAME_KEY\n')
   if evNum == 1 then
     if iterm_focus or has_value(scrollExcluded, appName) then
@@ -87,19 +91,30 @@ function popclickPlayPause()
     alert.show("listening")
   else
     listener:stop()
+    scrollHandler(2) -- stop
     alert.show("stopped listening")
   end
   popclickListening = not popclickListening
+  return popclickListening
 end
 
 function popclickInit()
   popclickListening = false
   local fn = scrollHandler
   listener = popclick.new(fn)
+  exec_raw('brishz.dash awaysh hs-popclick-btt-refresh')
+end
+function install()
+  -- @bootstrap
+  hs.ipc.cliInstall()
 end
 ---
 hyper = {"cmd","ctrl","alt","shift"}
 hs.window.animationDuration = 0;
 ---
 popclickInit()
-popclickPlayPause()
+-- popclickPlayPause()
+-- hs.urlevent.bind("popclickPlayPause", function(eventName, params)
+--                    popclickPlayPause()
+--                    -- alert.show("popclickListening: " .. tostring(popclickListening))
+-- end)
