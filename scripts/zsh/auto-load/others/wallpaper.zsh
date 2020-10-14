@@ -9,8 +9,8 @@ function wallpaper-set-darwin() {
 function wallpaper-auto-bing() {
     pushf ~/Pictures/wallpapers/bing
     {
-        # local dest="$(uuidm).jpg"
-        reval-ec aa "$(bing-wallpaper-get)" # -o "$dest"
+        local dest="$(uuidm).jpg"
+        reval-ec aa "$(bing-wallpaper-get)" -o "$dest"
         reval-ec wallpaper-set-darwin "$(last-created)"
     } always { popf }
 }

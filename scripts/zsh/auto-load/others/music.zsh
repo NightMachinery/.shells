@@ -6,6 +6,7 @@ function hear-noipc() {
     command mpv --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
 }
 aliasfn hearinvisible silent hear-noipc --no-terminal --load-scripts=no
+aliasfn heari hearinvisible
 @opts-setprefix hearinvisible hear-noipc
 @opts-setprefix hear hear-noipc
 function hear() {

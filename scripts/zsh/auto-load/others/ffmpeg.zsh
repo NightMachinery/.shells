@@ -16,12 +16,25 @@ swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
 audio-join() {
+    : "@alt audio-join2"
     mdocu '<output> <audio-file> ...
 Joins the <audio-file>s into <output>. Automatically sets the extension of <output>.
 Outs: aj_out -> The output file. (Might be relative.)' MAGIC
 
-    aj_out="$1.${2:e}" # GLOBAL
+    aj_out="${1:r}.${2:e}" # GLOBAL
     ffmpeg -i "concat:${(j:|:)@[2,-1]}" -acodec copy "$aj_out"
+}
+audio-join2() {
+    : '<output> <audio-file> ...'
+    (( $#@ < 2 )) && { ecerr "$0: Not enough arguments" ; return 1 }
+    aj_out="${1:r}.${2:e}" # GLOBAL
+    shift
+
+    local concat="$(gmktemp)"
+    {  for f in "$@"; do echo "file ${(qq)$(realpath $f)}"; done } > $concat # https://www.ffmpeg.org/ffmpeg-utils.html#Quoting-and-escaping
+    revaldbg ffmpeg -f concat -safe 0 -i "$concat"  -c copy "$aj_out"
+    dact cat $concat
+    command rm "$concat"
 }
 ##
 function 2mp3() {

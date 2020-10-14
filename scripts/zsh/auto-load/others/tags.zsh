@@ -88,9 +88,14 @@ function ntag-rmadd() {
             continue
         }
         ntag-add "$ntag_rm_dest" $add[@]
+        ntag-toapple-force "$ntag_add_dest"
     done
     return $retcode
 }
+function ntag-add-multi() {
+    @opts add "${1:?}" @ ntag-rmadd "${@:2}"
+}
+aliasfn tgm ntag-add-multi
 ###
 aliasfn green2red @opts rm green add red @ ntag-rmadd
 aliasfn green2gray @opts rm green add gray @ ntag-rmadd
@@ -202,6 +207,7 @@ function ntag-add() {
                } | prefixer -i '\x00' -o "${ntag_sep}" )${ntag_sep}"
         dest="$(ntag_merge_dest_fe "$dest" "$fe")"
         ntag-mv "$f" "$dest" || return 1
+        ntag-toapple-force "$dest"
         ntag_add_dest="$dest"
     }
 }
@@ -247,6 +253,7 @@ function ntag-rm() {
         dest="${fh}/$dest"
         ntag_rm_dest="$dest"
         ntag-mv "$f" "$dest" || return 1
+        ntag-toapple-force "$dest"
     else
         ntag_rm_dest="$f"
     fi
@@ -263,15 +270,15 @@ function ntag-toapple() {
     local tags=( "${(@f)$(ntag-get "$ft")}" ) tag
     for tag in $tags[@] ; do
         case "${tag:l}" in
-            red) reval-ec command tag --add Red "$f" ;;
-            orange) reval-ec command tag --add Orange "$f" ;;
-            yellow) reval-ec command tag --add Yellow "$f" ;;
-            green) reval-ec command tag --add Green "$f" ;;
-            blue) reval-ec command tag --add Blue "$f" ;;
-            purple) reval-ec command tag --add Purple "$f" ;;
-            gray|grey) reval-ec command tag --add Gray "$f" ;;
+            red) revaldbg command tag --add Red "$f" ;;
+            orange) revaldbg command tag --add Orange "$f" ;;
+            yellow) revaldbg command tag --add Yellow "$f" ;;
+            green) revaldbg command tag --add Green "$f" ;;
+            blue) revaldbg command tag --add Blue "$f" ;;
+            purple) revaldbg command tag --add Purple "$f" ;;
+            gray|grey) revaldbg command tag --add Gray "$f" ;;
             # Uncomment this line to transfer all tags to the Apple tag system. Note that ntag-from-apple-force only removes colored tags currently, so you can not sync back custom tag removal from the Apple side.
-            # *) reval-ec command tag --add "$tag" "$f" ;; # clutters things
+            # *) revaldbg command tag --add "$tag" "$f" ;; # clutters things
         esac
     done
 }
@@ -319,22 +326,32 @@ function ntag-gen-rec() {
     local engine=("${ntag_gen_rec_e[@]}")
     test -z "$engine[*]" && return 1
     local engine_q="$(gq "$engine[@]")"
-    local dir="${1:-.}"
-    test -e "$dir" || return 1
-    dir="$(realpath "$dir")"
 
-    fd ${ntag_fd_opts[@]} --type file --type symlink --type socket . "$dir" | inargsf re "$engine_q"
-    fd ${ntag_fd_opts[@]} --type directory . "$dir" | inargsf re "$engine_q" # @todo @BUG: Having nested tagged directories can invalidate the path of the deeper dir. Crude workaround: run this function multiple times. (Sorting by, e.g., length should solve this?)
-    reval "$engine[@]" "$dir" # last because renaming the root dir will invalidate all further operations
+    local f
+    for f in "${@:-.}" ; do
+        test -e "$f" || {
+            ecerr "$0: Nonexistent path: $f"
+            continue
+        }
+        f="$(realpath "$f")"
+        if test -d "$f" ; then
+            local dir="${f}"
+            fd ${ntag_fd_opts[@]} --type file --type symlink --type socket . "$dir" | inargsf re "$engine_q"
+            fd ${ntag_fd_opts[@]} --type directory . "$dir" | inargsf re "$engine_q" # @todo @BUG: Having nested tagged directories can invalidate the path of the deeper dir. Crude workaround: run this function multiple times. (Sorting by, e.g., length should solve this?)
+            reval "$engine[@]" "$dir" # last because renaming the root dir will invalidate all further operations
+        else
+            reval "$engine[@]" "$f"
+        fi
+    done
 }
 ##
 function ntag-toapple-force() {
-    tag-apple-rm-colors-rec
-    ntag-toapple-rec
+    tag-apple-rm-colors-rec "$@"
+    ntag-toapple-rec "$@"
 }
 function ntag-fromapple-force() {
-    ntag-rm-colors-rec
-    ntag-fromapple-rec
+    ntag-rm-colors-rec "$@"
+    ntag-fromapple-rec "$@"
 }
 #### fuzzy
 ###

@@ -20,7 +20,7 @@ function ffz() {
     serr zoxide query --list
     memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia ~/Downloads $music_dir
     true
- } | deusvult="${ffz_nocache:-$deusvult}" memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query" | head -1)" ||  {
+ } | deusvult="${ffz_nocache:-$deusvult}" memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | head -1)" ||  {
         return 1
     }
     if test -z "$ffz_nocache" && ! test -e "$sel" ; then
