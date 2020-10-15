@@ -8,7 +8,13 @@ function porc-process() {
     typeset -p keyword
     case "$keyword" in
         grasshopper) hammerspoon -c 'scrollHandler(3)' ;;
-        bumblebee) hammerspoon -c 'scrollHandler(3) ; scrollHandler(3) ; scrollHandler(3)' ;;
+        bumblebee)
+            # hammerspoon -c 'hs.eventtap.scrollWheel({0,1000},{}, "pixel")'
+            hammerspoon -c 'scrollHandler(3) ; scrollHandler(3) ; scrollHandler(3)'
+            ;;
+        terminator)
+            # hammerspoon -c 'hs.eventtap.scrollWheel({0,3000},{}, "pixel")'
+            ;;
         miss) ec miss
               hs-popclickPlayPause
               ;;

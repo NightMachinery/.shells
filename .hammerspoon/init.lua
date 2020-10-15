@@ -30,7 +30,7 @@ function exec_raw(cmd)
   return (s)
 end
 function exec(cmd)
-  return trim1(exec_raw(s))
+  return trim1(exec_raw(cmd))
 end
 function trim1(s)
    return (s:gsub("^%s*(.-)%s*$", "%1"))
@@ -58,7 +58,7 @@ end
 listener = nil
 popclickListening = false
 local tssScrollDown = newScroller(0.02, -10)
-local scrollExcluded = { "iTerm2", "Terminal", "Emacs", "Code", "Code - Insiders" }
+local scrollExcluded = { "iTerm2", "Terminal", "Code", "Code - Insiders" } -- "Emacs",
 function scrollHandler(evNum)
   if not popclickListening then
     return
@@ -75,10 +75,12 @@ function scrollHandler(evNum)
   elseif evNum == 2 then
     stopScroll(tssScrollDown) -- Don't exclude apps here or we'll have infinite scroll
   elseif evNum == 3 then
-    if appName == "ReadKit" then
-      eventtap.keyStroke({}, "j")
-    elseif iterm_focus or has_value(scrollExcluded, appName) then
+    if iterm_focus or has_value(scrollExcluded, appName) then
       return
+    elseif appName == "python" then
+      for i = 1,10 do
+        eventtap.keyStroke({}, hs.keycodes.map['up'])
+      end
     else
       eventtap.scrollWheel({0,250},{}, "pixel")
     end
