@@ -15,13 +15,13 @@ local applescript = require "hs.applescript"
 local eventtap = require "hs.eventtap"
 ---
 function has_value (tab, val)
-    for index, value in ipairs(tab) do
-        if value == val then
-            return true
-        end
+  for index, value in ipairs(tab) do
+    if value == val then
+      return true
     end
+  end
 
-    return false
+  return false
 end
 function exec_raw(cmd)
   local f = assert(io.popen(cmd, 'r'))
@@ -33,7 +33,10 @@ function exec(cmd)
   return trim1(exec_raw(cmd))
 end
 function trim1(s)
-   return (s:gsub("^%s*(.-)%s*$", "%1"))
+  return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+function brishz(cmd)
+  exec("/usr/local/bin/brishzq.zsh " .. cmd)
 end
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
 function newScroller(delay, tick)
@@ -113,6 +116,19 @@ end
 ---
 hyper = {"cmd","ctrl","alt","shift"}
 hs.window.animationDuration = 0;
+---
+function appWatch(appName, event, app)
+ -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
+  if event == hs.application.watcher.activated then
+    if appName ~= 'mpv' then
+      brishz("nightshift-on")
+    else
+      brishz("nightshift-off")
+    end
+  end
+end
+appWatcher = hs.application.watcher.new(appWatch)
+appWatcher:start()
 ---
 popclickInit()
 -- popclickPlayPause()
