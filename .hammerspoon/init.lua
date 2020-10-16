@@ -40,13 +40,13 @@ function brishz(cmd)
 end
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
 function newScroller(delay, tick)
-  return { delay = delay, tick = tick, timer = nil }
+  return { delay = delay, tick = tick, timer = nil, mode = "pixel" }
 end
 
 function startScroll(scroller)
   if scroller.timer == nil then
     scroller.timer = timer.doEvery(scroller.delay, function()
-                                     eventtap.scrollWheel({0,scroller.tick},{}, "pixel")
+                                     eventtap.scrollWheel({0,scroller.tick},{}, scroller.mode)
     end)
   end
 end
@@ -63,6 +63,7 @@ popclickListening = false
 local tssScrollDown = newScroller(0.02, -10)
 local scrollExcluded = { "iTerm2", "Terminal", "Code", "Code - Insiders" } -- "Emacs",
 function scrollHandler(evNum)
+  -- hs.alert.show("Listening: " .. tostring(popclickListening) .. ", NH: " .. evNum)
   if not popclickListening then
     return
   end
@@ -73,6 +74,15 @@ function scrollHandler(evNum)
   if evNum == 1 then
     if iterm_focus or has_value(scrollExcluded, appName) then
       return
+    elseif appName == "Emacs" then
+      tssScrollDown.tick = -1
+      -- tssScrollDown.mode = "line"
+      tssScrollDown.mode = "pixel"
+      tssScrollDown.delay  = 0.1
+    else
+      tssScrollDown.tick = -10
+      tssScrollDown.mode = "pixel"
+      tssScrollDown.delay  = 0.02
     end
     startScroll(tssScrollDown)
   elseif evNum == 2 then
@@ -84,6 +94,11 @@ function scrollHandler(evNum)
       for i = 1,10 do
         eventtap.keyStroke({}, hs.keycodes.map['up'])
       end
+    elseif appName == "Emacs" then
+      -- eventtap.scrollWheel({0,100},{}, "line") -- works accurately for text modes
+      -- it seems any amount of scrolling seems the same to pdf-mode
+      -- eventtap.scrollWheel({0,40000},{}, "pixel")
+      eventtap.keyStroke({}, 'k')
     else
       eventtap.scrollWheel({0,250},{}, "pixel")
     end
@@ -91,11 +106,12 @@ function scrollHandler(evNum)
 end
 
 function popclickPlayPause()
+  -- alert.show("toggling popclick")
   if not popclickListening then
-    listener:start()
+    listener:start() -- @workaround_lisflag
     alert.show("listening")
   else
-    listener:stop()
+    listener:stop() -- @workaround_lisflag
     scrollHandler(2) -- stop
     alert.show("stopped listening")
   end
@@ -107,6 +123,9 @@ function popclickInit()
   popclickListening = false
   local fn = scrollHandler
   listener = popclick.new(fn)
+  --- @workaround_lisflag we use the flag to control acting on the events to work around the bug that sometimes starting the listener can take ~6 seconds. Update: When that bug happens, it doesn't seem that listener can listen at all! Restarting hammerspoon completely seems to solve this issue.
+  -- listener:start()
+  ---
   exec_raw('brishz.dash awaysh hs-popclick-btt-refresh')
 end
 function install()
@@ -136,3 +155,4 @@ popclickInit()
 --                    popclickPlayPause()
 --                    -- alert.show("popclickListening: " .. tostring(popclickListening))
 -- end)
+---

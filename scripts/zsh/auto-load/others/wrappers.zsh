@@ -1,6 +1,7 @@
 function '$'() { eval "$(gquote "$@")" ; }
 function hammerspoon() {
-  hs "$@"
+  # -t timeout (default 4)
+  hs -t 5 "$@"
 }
 function mcli-getexecpath_h() {
   brew unlink m-cli
