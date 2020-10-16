@@ -5,7 +5,10 @@ alias glcs='glc --depth=1'
 ###
 function git-status-summary() {
   # @alt gss [-uno]
-  git -c color.status=false status | command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed
+  git -c color.status=false status | {
+    command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed
+    true
+    }
 }
 aliasfn gss2 git-status-summary
 function git-commitmsg() {
