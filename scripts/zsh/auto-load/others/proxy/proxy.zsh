@@ -1,7 +1,8 @@
 ##
+socksport=1081
 typeset -g proxycmd="command"
 typeset -g proxyenv="reval"
-alias pxs='ALL_PROXY=socks5://127.0.0.1:1080'
+alias pxs="ALL_PROXY=socks5://127.0.0.1:$socksport"
 export pxa_env='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa="$pxa_env"
 function reval-pxa() {
@@ -87,7 +88,7 @@ function darwin-proxies-gen() {
         eval-ec "$*"
     done
 }
-aliasfnq darwin-proxies-set darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost 1080
+aliasfnq darwin-proxies-set darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost $socksport
 aliasfnq darwin-proxies-on darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' on
 aliasfnq darwin-proxies-off darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' off
 ##
@@ -134,7 +135,7 @@ proxy_widget_off="⛰"
 function proxy-widget() {
     if proxy-is ; then
         case "$proxy_port" in
-        1080) ec $proxy_widget_on ;;
+        $socksport) ec $proxy_widget_on ;;
         *) ec $proxy_widget_on2 ;;
         esac
     else
