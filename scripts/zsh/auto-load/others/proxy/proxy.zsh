@@ -1,7 +1,7 @@
 ##
 socksport=1081
-typeset -g proxycmd="command"
-typeset -g proxyenv="reval"
+typeset -g proxycmd="${proxycmd:-command}"
+typeset -g proxyenv="${proxyenv:-reval}"
 alias pxs="ALL_PROXY=socks5://127.0.0.1:$socksport"
 export pxa_env='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa="$pxa_env"

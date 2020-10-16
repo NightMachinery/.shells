@@ -14,7 +14,7 @@ function git-commitmsg() {
   ##
   local msg="$(git-status-summary)"
 
-  ec-tty $msg
+  # ec-tty $msg
   msg="$(ecn $msg | prefixer --skip-empty -o '; ')"
   ec "${msg:-.}"
 }
@@ -28,6 +28,7 @@ function gsync() {
   {
     test -z "$noadd" && git add --all
     local automsg="$(git-commitmsg)"
+    git-status-summary
     git commit -uno -a -m "${msg:-$automsg}"
 
     local remotes
