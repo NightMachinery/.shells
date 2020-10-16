@@ -93,10 +93,10 @@ https://garden.lilf.ir {
 #   reverse_proxy https://google.com
 # }
 
-np.lilf.ir {
+:443, np.lilf.ir {
 route {
   forward_proxy {
-    basic_auth alice {env.NP_PASS0}
+    basic_auth alice {$NP_PASS0}
     probe_resistance secret.com
     hide_ip
     hide_via
