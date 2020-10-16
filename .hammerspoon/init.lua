@@ -98,7 +98,10 @@ function scrollHandler(evNum)
       -- eventtap.scrollWheel({0,100},{}, "line") -- works accurately for text modes
       -- it seems any amount of scrolling seems the same to pdf-mode
       -- eventtap.scrollWheel({0,40000},{}, "pixel")
-      eventtap.keyStroke({}, 'k')
+      for i = 1,3 do
+        eventtap.scrollWheel({0,250},{}, "line") -- works accurately for text modes
+      end
+      -- eventtap.keyStroke({}, 'k')
     else
       eventtap.scrollWheel({0,250},{}, "pixel")
     end
