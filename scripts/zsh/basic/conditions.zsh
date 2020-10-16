@@ -1,4 +1,13 @@
 ### BASH COMPATIBLE (Gets sourced by .shared.sh)
+### Bash doesn't support aliases in scripts.
+function iszsh() {
+    [[ -n $ZSH_VERSION ]]
+}
+isZsh() { iszsh ; }
+function isbash() {
+    [[ -n $BASH_VERSION ]]
+}
+isBash() { isbash ; }
 function isDarwin() {
     [[ "$uname" == "Darwin" ]]
 }

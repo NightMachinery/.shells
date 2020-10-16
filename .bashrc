@@ -1,7 +1,13 @@
+### ZSH COMPATIBLE
 ##
 export NIGHTDIR=~/scripts
+source "$NIGHTDIR"/zsh/basic/conditions.zsh
 ##
-shopt -s globstar
+if isBash ; then
+    if (( BASH_VERSINFO[0] >= 5 )) ; then
+        shopt -s globstar
+    fi
+fi
 function run-on-each() {
     local i98765
     for i98765 in "${@:2}"
@@ -13,7 +19,6 @@ alias re=run-on-each
 function addToPATH {
     export PATH="$1:$PATH"
 }
-source "$NIGHTDIR"/zsh/basic/conditions.zsh
 ##
 source ~/.shared.sh
 ### Interactive
@@ -26,4 +31,4 @@ if isI ; then
     ##
 fi
 ##
-export BASHRC_LOADED=y
+BASHRC_LOADED=y

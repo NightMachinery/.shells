@@ -1,4 +1,5 @@
-#!/usr/bin/env zshplain.dash
+#!/usr/bin/env /usr/local/bin/zshplain.dash
+# macOS bug: https://stackoverflow.com/questions/9988125/shebang-pointing-to-script-also-having-shebang-is-effectively-ignored
 
 . ~/.privateShell
 alias gq=gquote

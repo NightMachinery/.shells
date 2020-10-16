@@ -59,7 +59,7 @@ function fz-q() {
 function fz-createquery() {
     # (( ${#@} == 0 )) || mg_sep=' ' mapg "\'\$i" "${=@}"
     local i res=''
-    for i in "$@" ; do
+    for i in ${=@} ; do
         # ! is exact-match by default.
         if [[ "$i" =~ "^(\!|')" ]] ; then
             res+="$i "

@@ -8,7 +8,7 @@ function git-status-summary() {
   git -c color.status=false status | {
     command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed
     true
-    }
+  }
 }
 aliasfn gss2 git-status-summary
 function git-commitmsg() {

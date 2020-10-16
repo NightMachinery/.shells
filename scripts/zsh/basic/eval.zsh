@@ -18,10 +18,18 @@ function geval() {
     local cmd="$@"
     test -z "$ge_ecdbg" && {
         test -z "$ge_no_ec"  && ec "$cmd" >&2
-        test -z "$ge_no_hist" && print -r -S -- "$cmd" #Add to history
+        test -z "$ge_no_hist" && hist-add-unquoted "$cmd" #Add to history
     } || ecdbg "$cmd"
     eval -- "$cmd"
 }
+function hist-add-unquoted() {
+    print -r -S -- "$*"
+}
+function hist-add() {
+    print -r -S -- "$(gq "$@")"
+}
+alias hist-add-self='hist-add "$0" "$@"'
+##
 function aget() {
     ##
     # "aget does not wait for all forked processed. Probably unsolvable unless we invoke zsh -c"

@@ -16,6 +16,20 @@ function en2per() {
 }
 aliasfn e2p en2per
 function pep() { pbpaste | reval-copy en2per }
+
+function lang-toggle() {
+    local out="$*" to=US
+    # if [[ "$persian_exc_chars" == *"${out[1]:-A}"* ]]
+    case "$(input-lang-get)" in
+        U.S.) to='Persian-ISIRI2901' ;;
+        Persian*) to='US' ;;
+    esac
+    case "$to" in
+        US) ec "$out" | per2en ;;
+        Persian*) ec "$out" | en2per ;;
+    esac
+    input-lang-set toggle
+}
 ##
 function input-lang-set-darwin() {
     # https://apple.stackexchange.com/questions/402855/how-to-switch-the-keyboard-input-language-from-the-terminal

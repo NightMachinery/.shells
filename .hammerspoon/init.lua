@@ -36,7 +36,7 @@ function trim1(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 function brishz(cmd)
-  exec("/usr/local/bin/brishzq.zsh " .. cmd)
+  return exec("/usr/local/bin/brishzq.zsh " .. cmd)
 end
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
 function newScroller(delay, tick)
@@ -140,7 +140,7 @@ hyper = {"cmd","ctrl","alt","shift"}
 hs.window.animationDuration = 0;
 ---
 function appWatch(appName, event, app)
- -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
+  -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
   if event == hs.application.watcher.activated then
     if appName ~= 'mpv' then
       brishz("nightshift-on")
@@ -158,4 +158,25 @@ popclickInit()
 --                    popclickPlayPause()
 --                    -- alert.show("popclickListening: " .. tostring(popclickListening))
 -- end)
+---
+hs.hotkey.bind(hyper, "p", function()
+                 eventtap.keyStroke({"cmd"}, 'a')
+                 eventtap.keyStroke({"cmd"}, 'c')
+                 local res = brishz(("lang-toggle %q"):format(hs.pasteboard.getContents()))
+                 hs.eventtap.keyStrokes(tostring(res))
+end)
+---
+function reloadConfig(files)
+  doReload = false
+  for _,file in pairs(files) do
+    if file:sub(-4) == ".lua" then
+      doReload = true
+    end
+  end
+  if doReload then
+    hs.reload()
+  end
+end
+myWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", reloadConfig):start()
+brishz("bell-lm-eternalhappiness")
 ---

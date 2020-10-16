@@ -222,4 +222,8 @@ function bella-zsh-maybe() {
         silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
         }
 }
+## Little Misfortune
+function bell-lm-eternalhappiness() {
+    awaysh-named "${0}_MARKER" hearinvisible "$GREENCASE_DIR/LittleMisfortune/01_09_MI_eternalhappiness.flac"
+}
 ##

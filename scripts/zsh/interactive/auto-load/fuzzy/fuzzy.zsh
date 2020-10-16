@@ -1,10 +1,40 @@
 ### SEE ALSO
 # spotlight, spt, spot
 ###
-alias frc='frConfirm=y '
-alias cf='frc f'
-alias cfr='frc fr'
-###
+# alias frc='frConfirm=y '
+# alias cf='frc fi-d1'
+# alias cfr='frc fi-rec'
+function fr() {
+    (( $#@ == 0 )) && return 1
+    (( $#@ == 1 )) && set -- "$@" ''
+    @opts query "${@[-1]}" @ fi-rec "${@[1,-2]}"
+    hist-add-self
+}
+function fi-rec() {
+    magic mdoc "[frConfirm='' frWidget=''] $0 <cmd> [<fd args> ...]
+This function uses eval-memoi." ; mret
+
+    local args=("${@:2}") query="$(fz-createquery $fi_rec_query[@])"
+    local cmdhead="$1"
+    local dir=.
+
+    sels=( "${(@f)$(memoi_skiperr=y eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
+    test -n "$sels" && {
+        if test -n "$frWidget" ; then
+            LBUFFER="$LBUFFER$(gq "$sels[@]")"
+        else
+            local cmd=("$cmdhead $(gq "${sels[@]}")")
+            if test -n "$frConfirm" ; then
+                printz $cmd
+            else
+                geval $cmd
+            fi
+        fi
+    }
+}
+aliasfn fr_zle frWidget=y fi-rec
+function fi-d1() fi-rec "$@" --max-depth 1 # freeing up f
+##
 function ffport() {
     doc "[fpFilter=.*] ffport <port> ..."
 
@@ -73,30 +103,7 @@ fftmux() {
 }
 alias fft=fftmux
 fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
-function fi-rec() {
-    magic mdoc "[frConfirm='' frWidget=''] $0 <cmd> [<fd args> ...]
-This function uses eval-memoi." ; mret
-
-    local args=("${@:2}")
-    local cmdhead="$1"
-    local dir=.
-
-    sels=( "${(@f)$(memoi_skiperr=y eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle)}" )
-    test -n "$sels" && {
-        if test -n "$frWidget" ; then
-            LBUFFER="$LBUFFER$(gq "$sels[@]")"
-        else
-            local cmd=("$cmdhead $(gq "${sels[@]}")")
-            if test -n "$frConfirm" ; then
-                printz $cmd
-            else
-                eval $cmd
-            fi
-        fi
-    }
-}
-aliasfn fr_zle frWidget=y fi-rec
-function fi-d1() fi-rec "$@" --max-depth 1 # freeing up f
+##
 ffman() {
     # mnf
     man -k . | fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
