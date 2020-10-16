@@ -920,10 +920,13 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     }
     # url="$(urlfinalg "$url")"
     local imgMode="${url2note_img}" emacsMode="${url2note_emacs}"
-    if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com(?:/embed/([^/]*))' ]] ; then
+
+    if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com' ]] ; then
         imgMode=y
-        local id="$match[1]"
-        img="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" # embedded videos don't set their bloody meta tags
+        if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com(?:/embed/([^/]*))' ]] ; then
+            local id="$match[1]"
+            img="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" # embedded videos don't set their bloody meta tags
+        fi
     fi
     local mode="${2:-md}"
     local fhMode="${fhMode:-curlfast}"
