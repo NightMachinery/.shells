@@ -61,8 +61,9 @@ function vcnpp() {
     pushf ~/
     {
         vcsh $repo add ~/scripts/
-        local automsg="$(vcn-with git-commitmsg)"
-        vcsh $repo commit -uno -am "${msg:-$automsg}"
+
+        # local automsg="$(vcn-with git-commitmsg)"
+        # vcsh $repo commit -uno -am "${msg:-$automsg}"
 
         vcn-with @opts noadd y @ gsync "$msg"
         ##
