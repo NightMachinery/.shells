@@ -96,7 +96,7 @@ https://garden.lilf.ir {
 np.lilf.ir {
 route {
   forward_proxy {
-    basic_auth alice abcabc # {env.NP_PASS0}
+    basic_auth alice {env.NP_PASS0}
     probe_resistance secret.com
     hide_ip
     hide_via
