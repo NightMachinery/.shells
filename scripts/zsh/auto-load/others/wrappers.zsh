@@ -55,5 +55,5 @@ function ffmpeg() {
 function youtube-dl() {
     local opts=()
     isI || opts+=( --quiet --no-progress )
-    transformer urlfinalg "command $proxycmd youtube-dl $opts[@]" "$@"
+    transformer urlfinalg "$proxycmd youtube-dl $opts[@]" "$@"
 }
