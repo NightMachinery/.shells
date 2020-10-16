@@ -32,7 +32,14 @@ alias b='builtin'
 alias typ='typeset -p'
 alias n='noglob'
 alias bs='brew search'
+##
 alias ci='curl --retry 120 --retry-delay 1 ipinfo.io' # ; ec ; myip ; mycountry' # ; px curl --retry 0 ipinfo.io'
+aliasfn ci78 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1078' https://ipinfo.io
+aliasfn ci79 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1079' https://ipinfo.io
+aliasfn ci80 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1080' https://ipinfo.io
+aliasfn ci81 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1081' https://ipinfo.io
+aliasfn ci87 curl --retry 120 --retry-delay 1 -x 'http://127.0.0.1:1087' https://ipinfo.io
+##
 alias pym='python -m'
 alias pyc='python -c'
 alias tsm='tsend $me'
