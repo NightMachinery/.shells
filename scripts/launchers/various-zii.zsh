@@ -7,3 +7,5 @@ tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && borg_admins=madscientistX TE
 tmuxnew wirehole "cd ~/code/misc/wirehole && docker-compose up"
 
 tmuxnew v2ray v2ray -config /usr/local/etc/v2ray/config.json
+
+tmuxnewsh2 trojan indir ~/code/misc/trojan-caddy-docker-compose docker-compose up

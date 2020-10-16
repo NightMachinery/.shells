@@ -16,4 +16,6 @@ brew tap v2ray/v2ray
 brew install v2ray-core
 brew tap lutzifer/homebrew-tap
 brew install keyboardSwitcher
+brew tap trojan-gfw/homebrew-trojan
+brew install trojan
 ##

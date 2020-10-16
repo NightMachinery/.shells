@@ -44,3 +44,4 @@ youtube-dl-interactive
 zooqle
 libgen
 prettier
+http-proxy-to-socks

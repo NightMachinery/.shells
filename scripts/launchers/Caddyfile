@@ -92,3 +92,17 @@ https://garden.lilf.ir {
 # :8060 {
 #   reverse_proxy https://google.com
 # }
+
+np.lilf.ir {
+route {
+  forward_proxy {
+    basic_auth alice abcabc # {env.NP_PASS0}
+    probe_resistance secret.com
+    hide_ip
+    hide_via
+  }
+  file_server browse {
+    root {env.HOME}/Downloads
+  }
+}
+}
