@@ -53,7 +53,7 @@ function gsync() {
     }
     msg="${msg:-$(git-commitmsg)}"
 
-    git-status-summary
+    git-status-summary -uno
 
     git submodule foreach git commit -uno -a -m "${msg}"
     git commit -uno -a -m "${msg}"
