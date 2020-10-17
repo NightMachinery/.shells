@@ -31,6 +31,25 @@ function lang-toggle() {
     input-lang-set toggle
 }
 ##
+input_lang_push_lang_get() redism get input_lang_push_lang
+input_lang_push_lang_set() { silent redism set input_lang_push_lang "$@" ; }
+function input-lang-push() {
+    local force="$input_lang_push_force"
+
+    local input_lang_push_lang="$(input_lang_push_lang_get)"
+    if test -n "$input_lang_push_force" || test -z "$input_lang_push_lang" ; then
+        input_lang_push_lang_set "$(input-lang-get)"
+    fi
+    @opts nopopreset y @ input-lang-set "$@"
+}
+function input-lang-pop() {
+    local input_lang_push_lang="$(input_lang_push_lang_get)"
+    if test -n "$input_lang_push_lang" ; then
+        input-lang-set "$input_lang_push_lang"
+        input_lang_push_lang_set ''
+    fi
+}
+##
 function input-lang-set-darwin() {
     # https://apple.stackexchange.com/questions/402855/how-to-switch-the-keyboard-input-language-from-the-terminal
     # https://github.com/Lutzifer/keyboardSwitcher
@@ -58,10 +77,16 @@ function input-lang-set-darwin() {
 }
 function input-lang-set() {
     # @darwinonly
+    local nopopreset="$input_lang_set_nopopreset"
+
     if isDarwin ; then
         input-lang-set-darwin "$@"
     else
-        return 0
+        return 6
+    fi
+    btt-refresh 623FC96A-0BD0-4463-B186-D4E55024A637
+    if test -z "$nopopreset" ; then
+        input_lang_push_lang_set ''
     fi
 }
 function input-lang-get-darwin() {

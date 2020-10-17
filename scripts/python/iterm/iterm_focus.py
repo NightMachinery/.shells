@@ -19,7 +19,7 @@ async def main(connection):
     # if z("isdbg"):
     #     nest_asyncio.apply()
 
-    input_lang = 'U.S.' # @possibly use redis for this. This can make us override the saved setting with the touchbar toggle.
+    # input_lang = 'U.S.'
     app = await iterm2.async_get_app(connection)
     async with iterm2.FocusMonitor(connection) as monitor:
         while True:
@@ -37,10 +37,12 @@ async def main(connection):
                 if update.window_changed:
                     focus=update.window_changed.event.name
                     if focus == 'TERMINAL_WINDOW_BECAME_KEY':
-                        input_lang = z('input-lang-get-darwin').outrs
-                        z('input-lang-set en')
+                        # input_lang = z('input-lang-get-darwin').outrs
+                        # z('input-lang-set en')
+                        z('input-lang-push en')
                     else:
-                        z('input-lang-set {input_lang}')
+                        # z('input-lang-set {input_lang}')
+                        z('input-lang-pop')
                     zp('reval-ec redis-cli set iterm_focus {focus} 2>&1')
                 zp('reval-ec redis-cli set iterm_active_session {window.current_tab.active_session_id} 2>&1')
 

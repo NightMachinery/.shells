@@ -143,9 +143,9 @@ function appWatch(appName, event, app)
   -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
   if event == hs.application.watcher.activated then
     if appName ~= 'mpv' then
-      brishz("nightshift-on")
+      brishz("input-lang-pop ; nightshift-on")
     else
-      brishz("nightshift-off")
+      brishz("input-lang-push en ; nightshift-off")
     end
   end
 end
