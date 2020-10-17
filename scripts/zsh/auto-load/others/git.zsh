@@ -4,23 +4,41 @@ alias grm='git rm --cached'
 alias glcs='glc --depth=1'
 ###
 function git-status-summary() {
+  local args=("$@")
+
+  local opts=()
+  if isI && istty ; then
+    opts+=(-c color.status=always -c color.ui=always)
+  fi
+  local out="$(git "$opts[@]" submodule foreach git status -s "$args[@]")"
+  out+="$(prefix-if-ne $'\n\nMain repo\n' "$(git "$opts[@]" status -s "$args[@]")" "$out")"
+  ec "$out"
+}
+aliasfn gss git-status-summary
+function git-status-summary2() {
   # @alt gss [-uno]
-  git -c color.status=false status | {
+  local args=("$@")
+
+  {
+    git -c color.status=false submodule foreach git -c color.status=false status "$args[@]"| prefixer -a 'Submodules: '
+    git -c color.status=false status "$args[@]"
+  } | {
     command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed
     true
   }
 }
-aliasfn gss2 git-status-summary
+aliasfn gss2 git-status-summary2
 function git-commitmsg() {
   ## alts
   # git diff --cached --diff-filter='M' --name-only # gives names of modified files
   ##
-  local msg="$(git-status-summary)"
+  local msg="$(git-status-summary2 -uno)"
 
   # ec-tty $msg
   msg="$(ecn $msg | prefixer --skip-empty -o '; ')"
   ec "${msg:-.}"
 }
+##
 function gsync() {
   local msg="${*}"
   local noadd="${gsync_noadd}"
@@ -29,10 +47,16 @@ function gsync() {
 
   pushf "$(git rev-parse --show-toplevel)" || return 1
   {
-    test -z "$noadd" && git add --all
-    local automsg="$(git-commitmsg)"
+    test -z "$noadd" && {
+      git submodule foreach git add --all
+      git add --all
+    }
+    msg="${msg:-$(git-commitmsg)}"
+
     git-status-summary
-    git commit -uno -a -m "${msg:-$automsg}"
+
+    git submodule foreach git commit -uno -a -m "${msg}"
+    git commit -uno -a -m "${msg}"
 
     local remotes
     if test -z "$remote" ; then
@@ -44,12 +68,14 @@ function gsync() {
     for remote in $remotes[@]
     do
       ec
+      reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit
       reval-ec git pull "$remote" "$branch" --no-edit
       ec
     done
     for remote in $remotes[@]
     do
       ec
+      reval-ec git submodule foreach git push "$remote" "$branch"
       reval-ec git push "$remote" "$branch"
       ec
     done
