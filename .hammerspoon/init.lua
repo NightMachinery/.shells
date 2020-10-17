@@ -38,6 +38,9 @@ end
 function brishz(cmd)
   return exec("/usr/local/bin/brishzq.zsh " .. cmd)
 end
+function brishzeval(cmd)
+  return exec(("/usr/local/bin/brishz.dash %q"):format(cmd))
+end
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
 function newScroller(delay, tick)
   return { delay = delay, tick = tick, timer = nil, mode = "pixel" }
@@ -129,7 +132,7 @@ function popclickInit()
   --- @workaround_lisflag we use the flag to control acting on the events to work around the bug that sometimes starting the listener can take ~6 seconds. Update: When that bug happens, it doesn't seem that listener can listen at all! Restarting hammerspoon completely seems to solve this issue.
   -- listener:start()
   ---
-  exec_raw('brishz.dash awaysh hs-popclick-btt-refresh')
+  brishzeval('awaysh hs-popclick-btt-refresh')
 end
 function install()
   -- @bootstrap
@@ -143,9 +146,9 @@ function appWatch(appName, event, app)
   -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
   if event == hs.application.watcher.activated then
     if appName ~= 'mpv' then
-      brishz("input-lang-pop ; nightshift-on")
+      brishzeval("input-lang-pop ; nightshift-on")
     else
-      brishz("input-lang-push en ; nightshift-off")
+      brishzeval("input-lang-push en ; nightshift-off")
     end
   end
 end
