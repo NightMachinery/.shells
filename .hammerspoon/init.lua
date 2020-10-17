@@ -160,8 +160,11 @@ popclickInit()
 -- end)
 ---
 hs.hotkey.bind(hyper, "p", function()
-                 eventtap.keyStroke({"cmd"}, 'a')
-                 eventtap.keyStroke({"cmd"}, 'c')
+                 -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
+                 -- eventtap.keyStroke({"cmd"}, 'a')
+                 -- eventtap.keyStroke({"cmd"}, 'c')
+                 eventtap.keyStroke({"cmd"}, 0)
+                 eventtap.keyStroke({"cmd"}, 8)
                  local res = brishz(("lang-toggle %q"):format(hs.pasteboard.getContents()))
                  hs.eventtap.keyStrokes(tostring(res))
 end)

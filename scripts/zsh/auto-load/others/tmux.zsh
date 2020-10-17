@@ -62,7 +62,9 @@ function str2tmuxname() {
     # this might be too restrictive
     gtr -cd ' [a-zA-Z0-9]_-'
 }
-ivy() {
+function ivy() {
+    various-darwin.zsh
+
     export DISABLE_DEFER=y
     tmux new-session -d 'zsh'
     tmux send-keys "mu "
