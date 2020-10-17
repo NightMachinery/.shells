@@ -51,11 +51,14 @@ function gsync() {
       git submodule foreach git add --all
       git add --all
     }
+    git submodule update --recursive # idk what this does really. Fetching? Don't use `--remote` here.
+    
     msg="${msg:-$(git-commitmsg)}"
 
     git-status-summary -uno
 
     git submodule foreach git commit -uno -a -m "${msg}"
+    ec "Main repo"
     git commit -uno -a -m "${msg}"
 
     local remotes

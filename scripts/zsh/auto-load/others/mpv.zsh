@@ -5,6 +5,10 @@ typeset -g MPV_AUDIO_NORM=--af-add='dynaudnorm=g=5:f=250:r=0.9:p=0.5'     # audi
 
 
 ## Functions
+function mpv-manga() {
+    # shader: 1,4 are good, I chose 4.
+    mpv_ipc=~/tmp/.mpv.manga mpv --no-config --load-scripts=no --script=~/.config/mpv/mpv-manga-reader/manga-reader.lua --image-display-duration=inf --input-conf=~/.config/mpv/input.conf --reset-on-next-file=video-pan-x,video-pan-y --video-align-x=1 --video-align-y=-1 --video-zoom=1 --fs --glsl-shaders="~~/shaders/Anime4K_3.0_Denoise_Bilateral_Mode.glsl:~~/shaders/Anime4K_3.0_Upscale_CNN_M_x2_Deblur.glsl" "$@"
+}
 function mpv() {
     local isStreaming="$mpv_streaming"
 
@@ -25,7 +29,7 @@ function mpv() {
     done
 
     tty-title "$first"
-    command mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
+    revaldbg command mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
 }
 function mpv-get() {
     <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "${2:-$mpv_audio_ipc}"|jq --raw-output -e .data
