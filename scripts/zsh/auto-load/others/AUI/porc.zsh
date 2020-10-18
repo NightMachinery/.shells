@@ -4,6 +4,7 @@ function porc-listen() {
 }
 function porc-process() {
     local keyword="${1:?}"
+    # @todo https://stackoverflow.com/questions/64419066/macos-get-the-current-output-level-of-the-speakers
 
     typeset -p keyword
     case "$keyword" in

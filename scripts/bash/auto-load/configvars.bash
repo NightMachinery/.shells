@@ -46,7 +46,7 @@ video_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
 createglob video_formats videoglob
 media_formats=( ${audio_formats[@]} ${video_formats[@]} )
 createglob media_formats mediaglob
-code_formats=( el py jl scala sc kt kotlin java clj cljs rkt js rs zsh dash bash sh ml php lua glsl frag go )
+code_formats=( m cpp h c applescript as osa nu nush el py jl scala sc kt kotlin java clj cljs rkt js rs zsh dash bash sh ml php lua glsl frag go )
 createglob code_formats codeglob
 config_formats=( ini json cson toml conf plist xml )
 createglob config_formats configglob

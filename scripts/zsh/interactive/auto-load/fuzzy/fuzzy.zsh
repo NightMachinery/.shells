@@ -140,6 +140,7 @@ function init-vfiles() {
 
     # --ignore-file seems not working
 }
+aliasfn vinit init-vfiles yes
 function v() {
     local emacs_root=~/.emacs.d.doom/.local # normal emacs doesn't have this .local part
     local emacs_recent="$emacs_root/.cache/recentf"

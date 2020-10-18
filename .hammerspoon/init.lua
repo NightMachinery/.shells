@@ -173,6 +173,8 @@ popclickInit()
 -- end)
 ---
 hs.hotkey.bind(hyper, "p", function()
+                 -- This was slow even with input-lang-get-darwin-fast, so the fault is probably with hammerspoon itself?
+
                  -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
                  -- eventtap.keyStroke({"cmd"}, 'a')
                  -- eventtap.keyStroke({"cmd"}, 'c')

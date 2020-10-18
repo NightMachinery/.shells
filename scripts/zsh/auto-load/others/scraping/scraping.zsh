@@ -179,24 +179,29 @@ function full-html2() {
 
     #fhMode="${fhMode:-http}" full-html "$1" /dev/stdout
 
-    local mode="${fhMode:-http}"
-    local stdout=/dev/stdout
+    local url="$1"
+    if [[ "$url" =~ '^(?:https?://)?[^/]*techcrunch\.' ]] ; then
+        techcrunch-curl "$url"
+        return $?
+    fi
 
-    [[ "$mode" =~ '^curlfast$' ]] &&  { $proxyenv curl --silent --fail --location -o /dev/stdout "$1" ; return $? }
-    [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$1" ; return $? }
-    [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 $proxyenv curlfull.js "$1" ; return $? }
-    [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 $proxyenv curlfull.js "$1" ; return $? }
+    local mode="${fhMode:-http}"
+
+    [[ "$mode" =~ '^curlfast$' ]] &&  { $proxyenv curl --silent --fail --location -o /dev/stdout "$url" ; return $? }
+    [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$url" ; return $? }
+    [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 $proxyenv curlfull.js "$url" ; return $? }
+    [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 $proxyenv curlfull.js "$url" ; return $? }
     [[ "$mode" =~ '^aa(cookies)?$' ]] && {
         local tmp="$(uuidgen)"
         local tmpdir="$(get-tmpdir)"
-        $proxyenv dbgserr aacookies "$1" --dir "$tmpdir" -o "$tmp" || return $?
+        $proxyenv dbgserr aacookies "$url" --dir "$tmpdir" -o "$tmp" || return $?
         < "$tmpdir/$tmp"
         return $?
         # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
     }
-    [[ "$mode" =~ '^(c|g)url$' ]] && { $proxyenv gurl "$1" ; return $? }
+    [[ "$mode" =~ '^(c|g)url$' ]] && { $proxyenv gurl "$url" ; return $? }
     [[ "$mode" =~ '^http(ie)?$' ]] && {
-        $proxyenv dbgserr httpm "$1"
+        $proxyenv dbgserr httpm "$url"
         return $?
     }
 }

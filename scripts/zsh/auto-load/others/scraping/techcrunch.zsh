@@ -1,12 +1,14 @@
 function techcrunch-curl() {
     local url="${1:?}"
     local con="$(url-final $url)"
-    if [[ "$con" =~ 'https://consent\.yahoo\.com/v2/collectConsent\?sessionId=(.*)' ]] ; then
-        local sid="${match[1]}"
+    # https://consent\.yahoo\.com/v2/collectConsent\?
+    if [[ "$con" =~ '^(.*)sessionId=(.*)' ]] ; then
+        local sid="${match[2]}"
         dvar sid
         # sid='3_cc-session_36dd4d76-973e-407c-b328-8b546d2f6fc7'
 
-        curl -o /dev/stdout --fail --location --cookie-jar =() 'https://consent.yahoo.com/v2/collectConsent?sessionId='$sid \
+        # https://consent.yahoo.com/v2/collectConsent?
+        curl --silent -o /dev/stdout --fail --location --cookie-jar =() "${match[1]}sessionId="$sid \
             -H 'Connection: keep-alive' \
             -H 'Pragma: no-cache' \
             -H 'Cache-Control: no-cache' \
