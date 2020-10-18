@@ -20,15 +20,21 @@ function pep() { pbpaste | reval-copy en2per }
 function lang-toggle() {
     local out="$*" to=US
     # if [[ "$persian_exc_chars" == *"${out[1]:-A}"* ]]
-    case "$(input-lang-get)" in
+    case "$(input-lang-get-fast)" in
         U.S.) to='Persian-ISIRI2901' ;;
         Persian*) to='US' ;;
     esac
     case "$to" in
-        US) ec "$out" | per2en ;;
-        Persian*) ec "$out" | en2per ;;
+        US)
+            ec "$out" | per2en
+            input-lang-set en
+            ;;
+        Persian*)
+            ec "$out" | en2per
+            input-lang-set per
+            ;;
     esac
-    input-lang-set toggle
+    # input-lang-set toggle
 }
 ##
 input_lang_push_lang_get() redism get input_lang_push_lang
@@ -38,7 +44,7 @@ function input-lang-push() {
 
     local input_lang_push_lang="$(input_lang_push_lang_get)"
     if test -n "$input_lang_push_force" || test -z "$input_lang_push_lang" ; then
-        input_lang_push_lang_set "$(input-lang-get)"
+        input_lang_push_lang_set "$(input-lang-get-fast)"
     fi
     @opts nopopreset y @ input-lang-set "$@"
 }
@@ -105,6 +111,11 @@ function input-lang-get-darwin-old() {
 }
 function input-lang-get-darwin() {
     input_lang_get_objc # @alt: `xkbswitch -ge`
+}
+function input-lang-get-fast() {
+    # @darwinonly
+    # fnswap input-lang-get-darwin input-lang-get-darwin-fast input-lang-get "$@"
+    input-lang-get "$@" # fast was too unreliable
 }
 function input-lang-get() {
     local lang="$(input-lang-get-darwin)" # @darwinonly

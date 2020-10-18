@@ -28,7 +28,7 @@ function ntag-lv() {
 function openv() {
     local dirs=(${openv_dirs[@]}) query="$(fz-createquery "$@")"
     test -z "$dirs[*]" && dirs=(.)
-    ntag-lv "$dirs[@]" | fz --ansi --query "$query" | inargsf play-tag
+    ntag-lv "$dirs[@]" | fz --ansi --query "$query" --preview-window down:4:wrap | inargsf play-tag
 }
 function delenda() {
     ntag-filterori red green aqua teal gray grey | inargsf trs

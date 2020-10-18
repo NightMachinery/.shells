@@ -146,13 +146,19 @@ end
 hyper = {"cmd","ctrl","alt","shift"}
 hs.window.animationDuration = 0;
 ---
+local enOnly = { "iTerm2", "Terminal", "Code", "Code - Insiders", "Emacs", "mpv" } -- "Emacs",
 function appWatch(appName, event, app)
   -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
   if event == hs.application.watcher.activated then
-    if appName ~= 'mpv' then
-      brishzeval("input-lang-pop ; nightshift-on")
-    else
+    if appName == "mpv" then
       brishzeval("input-lang-push en ; nightshift-off")
+      return
+    end
+
+    if has_value(enOnly, appName) then
+      brishzeval("input-lang-push en ; nightshift-on")
+    else
+      brishzeval("input-lang-pop ; nightshift-on")
     end
   end
 end
