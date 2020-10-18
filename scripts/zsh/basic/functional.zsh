@@ -1,3 +1,26 @@
+function fndef-unquoted() {
+    functions[${1:?}]="${@:2}"
+}
+fndef-uq() { fndef-unquoted "$@" }
+function fndef() {
+    fndef-unquoted "$1" "$(gq "${@:2}")"
+}
+function lambda-unquoted() {
+    unset lambda_out
+    local name="$(uuidm)_$EPOCHREALTIME"
+    fndef-unquoted "$name" "$@" || {
+        ec "false"
+        return 1
+    }
+    # ec "$name"
+    lambda_out="$name"
+}
+lambda-uq() { lambda-unquoted "$@" }
+function lambda() {
+    unset lambda_out
+    lambda-unquoted "$(gq "$@")"
+}
+##
 function labeled() {
     #  zip enumerate
     ec "$(gq "${@}"): $(reval "$@")"

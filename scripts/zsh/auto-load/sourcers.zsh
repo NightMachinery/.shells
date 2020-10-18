@@ -23,3 +23,9 @@ cina() {
     cin
     conda activate "$@"
 }
+function rust-setup() {
+    (( $+commands[rustc] )) && {
+        # export RUST_SRC_PATH="$(memoi_skiperr=y memoi-eval rustc --print sysroot)/lib/rustlib/src/rust/src"
+        export RUST_SRC_PATH="$(memoi_skiperr=y memoi-eval rustc --print sysroot)/lib/rustlib/src/rust/library"
+    }
+}

@@ -59,7 +59,7 @@ function input-lang-set-darwin() {
     # they all ran about the same 77ms
     local wanted="${1:l}" to='US'
     case "$wanted" in
-        en*|u.s*) to=US ;;
+        en*|us|u.s*) to=US ;;
         fa*|per*) to='Persian-ISIRI2901' ;;
         toggle*)
             case "$(input-lang-get)" in
@@ -89,15 +89,38 @@ function input-lang-set() {
         input_lang_push_lang_set ''
     fi
 }
-function input-lang-get-darwin() {
+function input-lang-get-darwin-fast() {
+    # bug: not updated instantaneously
+    ## Perf: (8.5x faster)
+    # `hyperfine --warmup 5 "defaults read $HOME/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources" 'rg --quiet -F "LayoutTU.S." ~/Library/Preferences/com.apple.HIToolbox.plist'`
+    ##
+    if rg --quiet -F "LayoutTU.S." ~/Library/Preferences/com.apple.HIToolbox.plist ; then
+        ec "U.S."
+    else
+        ec "Persian-ISIRI 2901"
+    fi
+}
+function input-lang-get-darwin-old() {
     defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources | command rg -e '"KeyboardLayout Name" = "([^"]*)"' --replace '$1' --only-matching --color never
 }
-aliasfn input-lang-get input-lang-get-darwin # @darwinonly
+function input-lang-get-darwin() {
+    input_lang_get_objc # @alt: `xkbswitch -ge`
+}
+function input-lang-get() {
+    local lang="$(input-lang-get-darwin)" # @darwinonly
+    case "${lang:l}" in
+        us|u.s.) ec "U.S.";;
+        fa*|persian*)
+            ec "Persian" ;;
+        *) ec "$lang" ;;
+    esac
+
+}
 function input-lang-get-icon() {
     local lang="$(input-lang-get)"
-    case "$lang" in
-        U.S.) ec "🇺🇸";;
-        Persian*)
+    case "${lang:l}" in
+        us|u.s.) ec "🇺🇸";;
+        persian*)
             # ec "🇱🇧" ;;
             ec "🇮🇷" ;;
         *) ec "$lang" ;;

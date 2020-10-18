@@ -223,7 +223,13 @@ function bella-zsh-maybe() {
         }
 }
 ## Little Misfortune
-function bell-lm-eternalhappiness() {
-    awaysh-named "${0}_MARKER" hearinvisible "$GREENCASE_DIR/LittleMisfortune/01_09_MI_eternalhappiness.flac"
+function bell-lm-maker() {
+    local name="${1:?}" f="${2:?}"
+
+    fndef "bell-lm-$name" awaysh-named "BELL_LM_${name:u}_MARKER" hearinvisible "$GREENCASE_DIR/LittleMisfortune/$f"
 }
+bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
+bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
+bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
+# `fr heari 'flac/ MI cool'`
 ##

@@ -8,3 +8,7 @@ function timer() {
     }
 }
 noglobfn timer
+function timer-lm() {
+    timer "${1:-30}" eval lo_s="${2:-60}" loop bell-lm-whattimeisit
+}
+noglobfn timer-lm

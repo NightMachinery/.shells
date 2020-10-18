@@ -1,20 +1,24 @@
 #!/usr/bin/env zsh
 mkdir -p ~/bin
 
-ln -s "$NIGHTDIR"/bash/auto-load ~/bal
-ln -s "$NIGHTDIR"/zsh/auto-load ~/zal
+# ln -s "$NIGHTDIR"/bash/auto-load ~/bal
+# ln -s "$NIGHTDIR"/zsh/auto-load ~/zal
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
+##
 ln -s "$HOME/Downloads/" ~/"$music_dir"/d
-ln -s /home/linuxbrew/.linuxbrew/bin/nvim /usr/local/bin/nvim
+# ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
+##
+# ln -s /home/linuxbrew/.linuxbrew/bin/nvim /usr/local/bin/nvim
 ##
 lnrp zshplain.dash /usr/local/bin/
 
 lnrp brishz.dash /usr/local/bin/
 lnrp brishzrb.dash /usr/local/bin/
 lnrp brishzq.zsh /usr/local/bin/
+
+lnrp ~/.cargo/bin/input_lang_get_icon /usr/local/bin/
 ##
 isLinux && ln -s "$(rp sed)" ~/bin/gsed
-# ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
 
 ## blcs
-blc tag-ag tag tag-ag
+# blc tag-ag tag tag-ag

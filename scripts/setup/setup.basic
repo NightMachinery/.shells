@@ -2,4 +2,4 @@
 . ./ins_brewe
 # . ./ins_asdf
 ins-all
-re source ./setup_dirs ./setup_links ./setup_misc ./git.config ./setup.cargo ./setup.linux
+re source ./setup_dirs ./setup_links ./setup_misc ./git.config ./setup.cargo ./setup.linux ./setup_macOS.zsh

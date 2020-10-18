@@ -1,3 +1,9 @@
+##
+function doom-sync() {
+    rust-setup
+    doom sync
+}
+##
 function emcpe() {
     local fz_opts=( $fz_opts[@] -1 )
     # ffkill -SIGUSR2 \'emacs \'daemon
