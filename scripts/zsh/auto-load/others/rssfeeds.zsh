@@ -22,6 +22,7 @@ function rssln2k() {
         mv "$acc" "$acc.bak" # move first to avoid synch issues
         acc="$acc.bak"
         md2epub-pandoc "$title" "rssln $(datej)" "$acc"
+        tsend --file "$title.epub" -- "$ephemeral" "$(datej)"
         pkDel=y p2k "$title.epub"
     } always { popf }
 }
