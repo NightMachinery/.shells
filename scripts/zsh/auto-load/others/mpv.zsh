@@ -2,12 +2,16 @@
 export mpv_ipc=~/tmp/.mpvipc # https://github.com/AN3223/dotfiles/blob/master/.config/mpv/scripts/multisocket.lua
 typeset -g MPV_AUDIO_NORM=--af-add='dynaudnorm=g=5:f=250:r=0.9:p=0.5'     # audio volume normalizer. See https://github.com/mpv-player/mpv/issues/6563
 # typeset -g MPV_AUDIO_NORM=--af-add='loudnorm=I=-16:TP=-3:LRA=4' # alt
-
+export MPV_HOME="${MPV_HOME:-$HOME/.config/mpv}"
 
 ## Functions
 function mpv-manga() {
     # shader: 1,4 are good, I chose 4.
-    mpv_ipc=~/tmp/.mpv.manga mpv --no-config --load-scripts=no --script=~/.config/mpv/mpv-manga-reader/manga-reader.lua --image-display-duration=inf --input-conf=~/.config/mpv/input.conf --reset-on-next-file=video-pan-x,video-pan-y --video-align-x=1 --video-align-y=-1 --video-zoom=1 --fs --glsl-shaders="~~/shaders/Anime4K_3.0_Denoise_Bilateral_Mode.glsl:~~/shaders/Anime4K_3.0_Upscale_CNN_M_x2_Deblur.glsl" "$@"
+    # Probably because of --no-config, mpv can't expand '~~/'. So we use $MPV_HOME directly.
+    pushf "$MPV_HOME" # shader hotkeys need '~~/' to work.
+    {
+        mpv_ipc=~/tmp/.mpv.manga mpv --no-config --load-scripts=no --script=$MPV_HOME/mpv-manga-reader/manga-reader.lua --image-display-duration=inf --input-conf=$MPV_HOME/input.conf --reset-on-next-file=video-pan-x,video-pan-y --video-align-x=1 --video-align-y=-1 --video-zoom=1 --fs --glsl-shaders="$MPV_HOME/shaders/Anime4K_3.0_Denoise_Bilateral_Mode.glsl:$MPV_HOME/shaders/Anime4K_3.0_Upscale_CNN_M_x2_Deblur.glsl" "$@"
+    } always { popf }
 }
 function mpv() {
     local isStreaming="$mpv_streaming"

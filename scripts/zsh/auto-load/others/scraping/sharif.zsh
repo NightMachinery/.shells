@@ -42,9 +42,9 @@ function sharif-dep-save() {
     local name="${2:-$dep}"
 
     local dest="${name}.html"
-    ec '<html dir="rtl"><head><link rel="stylesheet" type="text/css" href="https://edu.sharif.edu/css/default.css"></head><body>' > $dest
 
-    curl "$sharif_curl_opts[@]" 'https://edu.sharif.edu/action.do' \
+    local out=''
+    out="$(curl "$sharif_curl_opts[@]" 'https://edu.sharif.edu/action.do' \
         -H 'authority: edu.sharif.edu' \
         -H 'pragma: no-cache' \
         -H 'cache-control: no-cache' \
@@ -61,7 +61,13 @@ function sharif-dep-save() {
         -H 'referer: https://edu.sharif.edu/action.do' \
         -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
         --data-raw 'level=0&teacher_name=&sort_item=1&depID='$depID \
-        --compressed | pup 'body > table > tbody > tr:nth-child(2) > td > form' >> $dest || return $?
+        --compressed | pup 'body > table > tbody > tr:nth-child(2) > td > form')" || return $?
+    if test -z "$out" ; then
+        tnotif-casual "$0: Empty: $name ($depID)"
+        return 1
+    fi
+    ec '<html dir="rtl"><head><link rel="stylesheet" type="text/css" href="https://edu.sharif.edu/css/default.css"></head><body>' > $dest
+    ec "$out" >> $dest
 
     ec '</body></html>' >> $dest
 

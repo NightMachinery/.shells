@@ -41,6 +41,8 @@ function set-defaults() {
     duti -s $cf_zopen "public.mobi" all
     duti -s $cf_zopen ".azw3" all
     duti -s $cf_zopen ".azw" all
+    duti -s $cf_zopen ".cbz" all
+    duti -s $cf_zopen "com.yacreader.yacreader.cbz" all
 
 }
 

@@ -5,11 +5,12 @@ function zopen() {
             ecerr "Nonexistent file: $f"
             continue
         }
-        local ext="${f:e}" usemime=''
+        local ext="${f:e:l}" usemime=''
         case "$ext" in
             wav|mp2|mp3|mp3test|m4a|ogg|au|flac) hearinvisible "$f" ;;
             zip|rar|7z) unzip2dir "$f" ; bell=y ;;
             mobi|epub|azw*) awaysh ebook-viewer "$f" ;;
+            cbz) awaysh mpv-manga "$f" ;;
             *) usemime=y ;;
         esac
         if test -n "$usemime" ; then

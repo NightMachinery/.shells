@@ -82,6 +82,10 @@ function scrollHandler(evNum)
       -- tssScrollDown.mode = "line"
       tssScrollDown.mode = "pixel"
       tssScrollDown.delay  = 0.1
+    elseif appName == "mpv" then
+      tssScrollDown.tick = -10
+      tssScrollDown.mode = "pixel"
+      tssScrollDown.delay  = 0.001
     else
       tssScrollDown.tick = -10
       tssScrollDown.mode = "pixel"

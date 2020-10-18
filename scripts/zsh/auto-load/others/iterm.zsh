@@ -65,3 +65,10 @@ function iterm-focus-get() {
 function iterm-focus-is() {
     [[ "$(iterm-focus-get)" == TERMINAL_WINDOW_BECAME_KEY ]]
 }
+##
+function tty-title() {
+  isI || return
+  local text="$@"
+
+  title "$text" "$text" # from @omz, see https://superuser.com/a/344397/856545 for setting tab and window separately
+}

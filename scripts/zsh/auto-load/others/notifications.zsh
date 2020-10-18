@@ -5,5 +5,10 @@ function notif() {
     ((${+commands[terminal-notifier]})) && terminal-notifier -title "notif" -message "$msg"
     # fsay "Notification. Notification."
     # fsay "$msg"
-    tnotif $msg
+    tnotif $msg # @FNSWAP
 }
+function notif-casual() {
+    fnswap tnotif tnotif-casual notif "$@"
+}
+aliasfn notifc notif-casual
+##
