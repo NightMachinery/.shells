@@ -10,4 +10,9 @@ tmuxnew wirehole "cd ~/code/misc/wirehole && docker-compose up"
 
 tmuxnew v2ray v2ray -config /usr/local/etc/v2ray/config.json
 
-tmuxnewsh2 trojan indir ~/code/misc/trojan-caddy-docker-compose docker-compose up
+##
+# tmuxnewsh2 trojan indir ~/code/misc/trojan-caddy-docker-compose docker-compose up
+
+# Currently managed by systemd:
+# tmuxnew trojan trojan --config /usr/local/etc/trojan/config.json
+##

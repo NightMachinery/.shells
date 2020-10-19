@@ -1,4 +1,9 @@
 ##
+function emc-sudo() {
+    local f="$(ec ${1} | gtr '"' '\"')"
+    emc -e '(find-file "/sudo::'$f'")'
+}
+##
 function doom-sync() {
     rust-setup
     doom sync

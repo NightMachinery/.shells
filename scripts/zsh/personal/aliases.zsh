@@ -39,6 +39,7 @@ aliasfn ci79 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1079' https
 aliasfn ci80 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1080' https://ipinfo.io
 aliasfn ci81 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1081' https://ipinfo.io
 aliasfn ci87 curl --retry 120 --retry-delay 1 -x 'http://127.0.0.1:1087' https://ipinfo.io
+aliasfn ci90 curl --retry 120 --retry-delay 1 -x 'socks5://127.0.0.1:1090' https://ipinfo.io
 ##
 alias pym='python -m'
 alias pyc='python -c'
