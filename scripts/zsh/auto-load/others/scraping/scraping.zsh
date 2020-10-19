@@ -177,15 +177,18 @@ function full-html2() {
     # seems to be because the server is messed up, but whatever:
     # http: error: Incomplete download: size=46696; downloaded=131310
 
-    #fhMode="${fhMode:-http}" full-html "$1" /dev/stdout
-
-    local url="$1"
-    if [[ "$url" =~ '^(?:https?://)?[^/]*techcrunch\.' ]] ; then
-        techcrunch-curl "$url"
-        return $?
-    fi
 
     local mode="${fhMode:-http}"
+    local url="$1"
+
+    if [[ "$url" =~ '^(?:https?://)?[^/]*techcrunch\.' ]] ; then
+        ecdbg "$0: Techcrunch Mode"
+        techcrunch-curl "$url"
+        return $?
+    elif [[ "$url" =~ '^(?:https?://)?[^/]*t\.co/' ]] ; then # techmeme sometimes links to FT using these
+        ecdbg "$0: t.co Mode"
+        mode='curlfull'
+    fi
 
     [[ "$mode" =~ '^curlfast$' ]] &&  { $proxyenv curl --silent --fail --location -o /dev/stdout "$url" ; return $? }
     [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$url" ; return $? }

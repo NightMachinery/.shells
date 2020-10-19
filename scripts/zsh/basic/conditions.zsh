@@ -21,7 +21,9 @@ function isMBP() {
 }
 ##
 isI() {
-    ! test -z "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]
+    test -z "$FORCE_NONINTERACTIVE" && {
+        test -n "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]
+    }
 }
 ##
 function isOutTty() {

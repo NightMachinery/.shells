@@ -16,8 +16,8 @@ function porc-process() {
         terminator)
             # hammerspoon -c 'hs.eventtap.scrollWheel({0,3000},{}, "pixel")'
             ;;
-        miss) ec miss
-              hs-popclickPlayPause
+        miss)
+            # hs-popclickPlayPause
               ;;
     esac
 }

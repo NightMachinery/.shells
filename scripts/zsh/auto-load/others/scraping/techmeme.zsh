@@ -1,4 +1,5 @@
 function techmeme-extracturl() {
+    # @alt: use https://www.techmeme.com/river
     local turl="${1:?}"
 
     if [[ "$turl" =~ '#a([^#]+)$' ]] ; then

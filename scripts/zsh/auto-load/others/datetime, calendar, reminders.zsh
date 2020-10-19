@@ -196,7 +196,7 @@ function rem-today() {
                 ##
                 # out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
                 # Run clean zsh so that  our env doesn't pollute it.
-                out=$'\n\n'"$(zsh "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                out=$'\n\n'"$(FORCE_INTERACTIVE='' FORCE_NONINTERACTIVE=y zsh "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
                 ##
                 text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
