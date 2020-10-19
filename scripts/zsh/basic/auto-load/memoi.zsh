@@ -28,7 +28,7 @@ function memoi-eval() {
     local skiperr="$memoi_skiperr"
     # test -n "$deusvult" && skiperr='' # uncommenting this can help make `deus` transparently undo the memoi effect. But I am not sure we want that.
     local inheriterr="${memoi_inheriterr:-$skiperr}" # skipping forces inheritance, because why not?
-    local override_duration="${memoi_override_duration:-${memoi_od:-0.12}}"
+    local override_duration="${memoi_override_duration:-${memoi_od:-0.12}}" # 0.12
 
     local retcode=0 # If skiperr, we will return the correct exit code if the cache is not used. (We rely on this behavior in, e.g., `ffz`.
     local delme=''

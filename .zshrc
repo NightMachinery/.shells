@@ -182,6 +182,8 @@ bindkey '^R' fzf-history-widget
 
 zle -N fr_zle
 bindkey '^[[Z' fr_zle # shift+tab
+zle -N fr_zle_deus
+bindkey '^[\t' fr_zle_deus # alt+tab
 ##
 
 zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br

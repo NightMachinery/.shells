@@ -18,7 +18,7 @@ This function uses eval-memoi." ; mret
     local cmdhead="$1"
     local dir=.
 
-    sels=( "${(@f)$(memoi_skiperr=y eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
+    sels=( "${(@f)$(memoi_skiperr=y memoi_override_duration=0.3 eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
     test -n "$sels" && {
         if test -n "$frWidget" ; then
             LBUFFER="$LBUFFER$(gq "$sels[@]")"
@@ -33,6 +33,7 @@ This function uses eval-memoi." ; mret
     }
 }
 aliasfn fr_zle frWidget=y fi-rec
+aliasfn fr_zle_deus deusvult=y frWidget=y fi-rec
 function fi-d1() fi-rec "$@" --max-depth 1 # freeing up f
 ##
 function ffport() {
