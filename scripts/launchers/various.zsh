@@ -12,8 +12,9 @@ tmuxnew BrishGarden brishgarden /api/v1 # do NOT use tmuxnewsh, as that sets FOR
 # caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile # miniserve -- . #http-server
 ##
-
+tmuxnewsh2 mahouka hi10-new-notify mahouka
 #tmuxnew splash 'docker run -it -p 8050:8050 scrapinghub/splash'
+##
 borgdir=~/code/betterborg/
 tmuxnew julia "dash -c 'cd $(gq $borgdir) && $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
 tmuxnew julia_jlib "dash -c 'cd $(gq $borgdir) && borg_session=session_jlib borg_plugin_path=jlib_plugins borg_brish_count=10 $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
