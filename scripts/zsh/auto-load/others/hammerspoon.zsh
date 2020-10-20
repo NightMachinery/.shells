@@ -38,3 +38,38 @@ function hs-popclick2icon() {
         }
     fi
 }
+##
+# function h_gradS-get() {
+#     local lockStr="lock_gradS"
+#     local lock="$(redism setnx $lockStr 5)"
+#     if [[ "$lock" == 1 ]] ; then
+#         deus @opts expire 0 od 0 @ eval-memoi hammerspoon -c gradS
+#         silent redism del "$lockStr"
+#     else
+#         silent redism expire "$lockStr" 300 # for resilience
+#         @opts expire 0 od 0 @ eval-memoi hammerspoon -c gradS
+#     fi
+# }
+# function gradS-get() {
+#     local out="$(h_gradS-get)"
+#     if test -z "$out" ; then
+#         out='empty'
+#     fi
+#     ec "$out"
+# }
+function h_gradS-get() {
+    local lockStr="lock_gradS"
+    local lock="$(redism setnx $lockStr 5)"
+    if [[ "$lock" == 1 ]] ; then
+        hammerspoon -c gradS
+        silent redism del "$lockStr"
+        return 0
+    else
+        silent redism expire "$lockStr" 300 # for resilience
+        return 1
+    fi
+}
+function gradS-get() {
+    retry_sleep=0.1 serr retry h_gradS-get
+}
+##

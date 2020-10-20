@@ -35,7 +35,8 @@ function memoi-eval() {
 
     test -n "$skiperr" || silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     if test -z "$deusvult" && {
-        (( $(redis-cli --raw exists $rediskey) )) # && {
+        integer ttl="$(redis-cli --raw ttl $rediskey)"
+        (( ttl > 10 || ttl == -1 )) # && {
         # (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redis-cli --raw hget $rediskey timestamp)) <= memoi_expire )) }
         # }
         }
@@ -85,7 +86,10 @@ function memoi-eval() {
         # zprof
         retcode="$(redis-cli --raw hget $rediskey exit)"
     fi
-    test -n "$delme" && silent redis-cli del $rediskey
+    ##
+    # There are concurrency issues with just deleting the key (someone might be in the middle of using it.)
+    test -n "$delme" && silent redis-cli expire "$rediskey" 1 # silent redis-cli del $rediskey
+    ##
     return $retcode
 }
 @opts-setprefix memoi-eval memoi
