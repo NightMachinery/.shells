@@ -1,11 +1,17 @@
 function brishz() {
+    ## PERF:
+    # `hyperfine --warmup 5 'brishzq.zsh ec hi' 'brishz.dash ec hi'` 81ms vs 27ms
+    ##
     local stdin="$brishz_in"
-    local brishz_copy="${brishz_copy:-$brishz_c}"
+    local -x brishz_copy="${brishz_copy:-$brishz_c}"
+    local -x brishz_session="${brishz_session:-$brishz_s}"
+    local -x brishz_nolog="${brishz_nolog}"
     # isI && brishz_copy=y
+    
     if test -z "$stdin" ; then
-        brishz_copy="$brishz_copy" brishzq.zsh "$@"
+        brishzq.zsh "$@"
     else
-        print -nr -- "$stdin" | brishz_in='MAGIC_READ_STDIN' brishz_copy="$brishz_copy" brishzq.zsh "$@"
+        print -nr -- "$stdin" | brishz_in='MAGIC_READ_STDIN' brishzq.zsh "$@"
     fi
 }
 aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1

@@ -11,6 +11,8 @@ isDbg () {
 }
 ###
 local copy_cmd="$brishz_copy"
+local session="${brishz_session}"
+local nolog="${brishz_nolog}"
 local input_cmd=( "$@" )
 test -z "$brishz_noquote" && input_cmd="$(gq "${(@)input_cmd}")"
 local stdin="$brishz_in"
@@ -26,14 +28,17 @@ local opts=()
 # isDbg && opts+=(verbose=1)
 # http --body POST http://127.0.0.1:8000/zsh/ cmd="$(gq "$@")" $opts[@]
 ##
-local endpoint="${bshEndpoint:-http://127.0.0.1:$GARDEN_PORT}"
+local endpoint="${bshEndpoint:-http://127.0.0.1:$GARDEN_PORT}/zsh/"
+if test -n "$nolog" ; then
+    endpoint+="nolog/"
+fi
 if [[ "$endpoint" =~ 'garden' ]] ; then
     opts+=(--user "Alice:$GARDEN_PASS0")
 fi
 local v=0
 isDbg && v=1
-local req="$(print -nr -- "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg c "$input_cmd[*]" --arg v $v 'inputs as $i | {"cmd": $c, "stdin": $i, "verbose": $v}')"
-local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint/zsh/ )
+local req="$(print -nr -- "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg nolog "$nolog" --arg s "$session" --arg c "$input_cmd[*]" --arg v $v 'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "verbose": $v, "nolog": $nolog}')"
+local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint )
 cmd="$(gq print -nr -- $req) | $(gq "$cmd[@]")"
 if ((${+commands[pbcopy]})) ; then
     test -n "$copy_cmd" && <<<"$cmd" pbcopy

@@ -39,6 +39,26 @@ function hs-popclick2icon() {
     fi
 }
 ##
+function gradS-get() {
+    hammerspoon -c gradS # locking done via garden sessions
+}
+##
+# gradS=E
+# function h_gradS-get() {
+#     local lockStr="lock_gradS"
+#     local lock="$(redism setnx $lockStr 5)"
+#     if [[ "$lock" == 1 ]] ; then
+#         gradS="$(hammerspoon -c gradS)"
+#         silent redism del "$lockStr"
+#     else
+#         silent redism expire "$lockStr" 60 # for resilience
+#     fi
+# }
+# function gradS-get() {
+#     h_gradS-get
+#     ec "$gradS"
+# }
+##
 # function h_gradS-get() {
 #     local lockStr="lock_gradS"
 #     local lock="$(redism setnx $lockStr 5)"
@@ -57,19 +77,20 @@ function hs-popclick2icon() {
 #     fi
 #     ec "$out"
 # }
-function h_gradS-get() {
-    local lockStr="lock_gradS"
-    local lock="$(redism setnx $lockStr 5)"
-    if [[ "$lock" == 1 ]] ; then
-        hammerspoon -c gradS
-        silent redism del "$lockStr"
-        return 0
-    else
-        silent redism expire "$lockStr" 300 # for resilience
-        return 1
-    fi
-}
-function gradS-get() {
-    retry_sleep=0.1 serr retry h_gradS-get
-}
+##
+# function h_gradS-get() {
+#     local lockStr="lock_gradS"
+#     local lock="$(redism setnx $lockStr 5)"
+#     if [[ "$lock" == 1 ]] ; then
+#         hammerspoon -c gradS
+#         silent redism del "$lockStr"
+#         return 0
+#     else
+#         silent redism expire "$lockStr" 300 # for resilience
+#         return 1
+#     fi
+# }
+# function gradS-get() {
+#     retry_sleep=0.1 serr retry h_gradS-get
+# }
 ##

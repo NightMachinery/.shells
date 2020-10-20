@@ -8,6 +8,13 @@ fi
 # brishz_noquote=y brishzq.zsh "$@"
 
 cmd="$*"
+session="${brishz_session}"
+nolog="${brishz_nolog}"
+endpoint="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}/zsh/"
+if test -n "$nolog" ; then
+    endpoint="${endpoint}nolog/"
+fi
+
 if test -e "$cmd" ; then
   cmd="$(cat "$cmd")" || {
      echo Bad input to brishz
@@ -15,4 +22,4 @@ if test -e "$cmd" ; then
   }
 fi
 
-curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"'"$cmd"'","verbose":"0"}' http://127.0.0.1:7230/zsh/
+curl --fail --silent --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"session\":\"$session\", \"verbose\":\"0\", \"nolog\":\"$nolog\"}" $endpoint

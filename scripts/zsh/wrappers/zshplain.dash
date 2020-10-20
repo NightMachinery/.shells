@@ -1,4 +1,8 @@
-#!/usr/bin/env bash
- export autowhdeepwarning=no
-test -n "$BASHRC_LOADED" || source ~/.bashrc # We need the path to work correctly, and dash can't source this file right.
+#!/usr/bin/env dash
+
+export autowhdeepwarning=no
+##
+# This took ~60ms so I got rid of it. It obviously needs bash, not dash. Fix the system PATH, that's cheaper.
+# test -n "$BASHRC_LOADED" || source ~/.bashrc # We need the path to work correctly, and dash can't source this file right.
+##
 zsh -f "$@"
