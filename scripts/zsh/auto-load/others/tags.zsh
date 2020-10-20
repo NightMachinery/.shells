@@ -389,6 +389,7 @@ function ntag_filter_rg() {
     # We need to limit highlighting ntag_sep, as the color codes will impede further matches
     # `nobold`
     command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --fixed-strings --color always --colors "match:bg:$bg" --colors "match:fg:$fg" "${ntag_sep[-1]}${pattern}${ntag_sep[1]}"  #"${ntag_sep}${pattern}${ntag_sep}"
+    return 0
 }
 function ntag-color() {
     # INPUT: stdin
@@ -410,6 +411,7 @@ function ntag-color() {
     local re_def2='(?<=\.)\.(?!\e\[)[^./]+\.(?=(?:\e(?:\e|\d|\[|;|m)*)?\.)'
     ##
     ntag_filter_rg blue 0,0,255  | ntag_filter_rg green 0,255,0 0,0,0 | ntag_filter_rg red 255,0,0 | ntag_filter_rg orange 255,120,0 | ntag_filter_rg yellow 255,255,0 0,0,0 | ntag_filter_rg purple 100,10,255 | ntag_filter_rg gray 100,100,100 | ntag_filter_rg grey 100,100,100 | ntag_filter_rg black 0,0,0 | ntag_filter_rg aqua 0,255,255 0,0,0 | ntag_filter_rg teal 0,128,128 | command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --color always --colors "match:bg:255,255,255" --colors "match:fg:255,120,0" --pcre2 -e "$re_def" -e "$re_def2"
+    return 0
 }
 function ntag-filter() {
     : "Alt: Use ntag-grep if you never want the coloring."

@@ -46,6 +46,19 @@ function rem-comingup() {
     trim "$out"
 }
 ###
+function seconds-fmt-short() {
+    integer secs="${1:?}"
+
+    printf '%dh:%dm:%ds\n' $(($secs/3600)) $(($secs%3600/60)) \
+        $(($secs%60))
+}
+function seconds-fmt() {
+    local secs="${1:?}"
+
+    printf '%02dd:%02dh:%02dm:%05.2fs\n' $(($secs/86400)) $(($secs%86400/3600)) $(($secs%3600/60)) \
+        $(($secs%60))
+}
+##
 function fromnow() {
     local then
     test -n "$date" && then="$(gdate --date "$date" "+%s")" || return 1
@@ -58,6 +71,7 @@ function fromnow-py() {
 date = parse(os.environ["date"])
 print((datetime.datetime.now(date.tzinfo) - date).total_seconds())'
 }
+##
 function dateshort() { date +"%b %d %H:%M:%S" }
 dateshortnum() { date +"%Y/%m/%d" }
 datej() {

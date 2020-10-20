@@ -4,9 +4,10 @@ function porc-listen() {
 }
 function porc-process() {
     local keyword="${1:?}"
+    typeset -p keyword
     # @todo https://stackoverflow.com/questions/64419066/macos-get-the-current-output-level-of-the-speakers
 
-    typeset -p keyword
+    local  app="$(frontapp-get)"
     case "$keyword" in
         grasshopper) hammerspoon -c 'scrollHandler(3)' ;;
         bumblebee)
@@ -15,6 +16,11 @@ function porc-process() {
             ;;
         terminator)
             # hammerspoon -c 'hs.eventtap.scrollWheel({0,3000},{}, "pixel")'
+            case "$app" in
+                io.mpv)
+                    hammerspoon -c "hs.eventtap.keyStroke({}, hs.keycodes.map['space'])"
+                ;;
+            esac
             ;;
         miss)
             # hs-popclickPlayPause

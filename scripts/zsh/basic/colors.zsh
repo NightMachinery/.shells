@@ -52,6 +52,7 @@ resetcolor() {
     comment 'This var is builtin in zsh'
     ! isI || printf %s "$reset_color"
 }
+aliasfn  colorreset  resetcolor
 helloworld() {
     colorbg 0 0 255;colorfg 0 255; ec HELLO "$(colorfg 255 100)"BRAVE"$(colorfg 0 255)" $(colorbg 100 0 255)NEW$(colorbg 0 0 255) WORLD\!;resetcolor
 }

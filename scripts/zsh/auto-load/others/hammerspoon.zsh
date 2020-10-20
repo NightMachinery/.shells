@@ -1,18 +1,19 @@
 BTT_HS_NOISES_UID='5DBF0BE7-5822-459A-B450-36E3396124F9'
 ##
-function hs-popclickPlayPause() {
-    local lis="$(hammerspoon -c 'popclickPlayPause()')"
+function hs-popclickBttToggle() {
+    local lis="$(hammerspoon -c 'popclickBttToggle()')"
     hs-popclick-btt-refresh
-    @opts say y @ hs-popclick2icon $lis
+    @opts say '' @ hs-popclick2icon $lis
 
 }
 function hs-popclick-btt-refresh() {
     btt-refresh "$BTT_HS_NOISES_UID"
 }
-function hs-popclickListening() {
-    local lis="$(hammerspoon -c 'popclickListening')"
+function hs-popclickBttGet() {
+    local lis="$(hammerspoon -c 'popclickBttGet()')"
     hs-popclick2icon $lis
 }
+@opts-setprefix hs-popclickBttGet hs-popclick2icon
 function hs-popclick2icon() {
     local lis="${1}" say="${hs_popclick2icon_say}"
 

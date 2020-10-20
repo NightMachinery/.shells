@@ -1,3 +1,12 @@
+function frontapp-get() {
+    # @darwinonly
+    if isDarwin ; then
+        lsappinfo info "$(lsappinfo front)" | command rg --only-matching --replace='$1' 'bundleID="([^"]*)"'
+    else
+        return 1
+    fi
+}
+##
 alias mac-mail-log="sudo log stream --predicate  '(process == \"smtpd\") || (process == \"smtp\")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp.
 
 alias lock='"/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession" -suspend ; pmset displaysleepnow' # Command+Ctrl+q locks natively; Use lock.as to press them ;)) (Needs assistive access)
@@ -10,6 +19,15 @@ function finder-hideicons() {
 # @darwinonly https://github.com/leberwurstsaft/nshift/releases
 aliasfn nightshift-on nshift 100
 aliasfn nightshift-off nshift off
+function nightshift-auto() {
+    local  app="$(frontapp-get)"
+    case "$app" in
+        io.mpv)
+            nightshift-off
+            ;;
+        *) nightshift-on ;
+    esac
+}
 ###
 # ### Doesn't work. From https://gist.github.com/thomasfinch/14bd3181799734c872d2ad3b207cc01c
 # CORE_BRIGHTNESS="/var/root/Library/Preferences/com.apple.CoreBrightness.plist"

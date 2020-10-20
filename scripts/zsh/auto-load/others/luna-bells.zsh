@@ -231,5 +231,6 @@ function bell-lm-maker() {
 bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
 bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
+bell-lm-maker strawberryjuice flac/10.3_09_MI_strawberryjuice..blue..flac
 # `fr heari 'flac/ MI cool'`
 ##
