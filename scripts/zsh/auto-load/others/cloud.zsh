@@ -34,7 +34,7 @@ function rclonef() {
     local query="${rclonef_query}" remote="${1:?}" local="${2:?}"
 
     local paths
-    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${remote}" | fz --query "$query ")}" ) || return 1
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi fnswap isI false rcr lsf --recursive --files-only "${remote}" | fz --preview-window down:4:wrap --query "$query ")}" ) || return 1
     local i
     ##
     # old API design: <cmd>... <entry-of-fuzzy-paths>

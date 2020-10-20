@@ -70,10 +70,10 @@ lastS = 0
 timerS = nil
 gradS = 0
 timerSR = timer.doEvery(0.1, function()
-                gradS = gradS - 1
-                if gradS < 0 then
-                  gradS = 0
-                end
+                          gradS = gradS - 1
+                          if gradS < 0 then
+                            gradS = 0
+                          end
 end)
 function stopTimerS()
   if timerS ~= nil then
@@ -245,15 +245,22 @@ popclickInit()
 -- end)
 ---
 hs.hotkey.bind(hyper, "p", function()
-                 -- This was slow even with input-lang-get-darwin-fast, so the fault is probably with hammerspoon itself?
+                 appName = application.frontmostApplication():name()
+                 -- brishz("true " .. hs.pasteboard.getContents())
+                 if appName == "Screen Sharing" then
+                   -- Doesn't work, test with `sleep 2 ; hs -c 'hs.eventtap.keyStrokes("hi jungle")'`
+                   -- hs.eventtap.keyStrokes(hs.pasteboard.getContents())
+                 else
+                   -- This was slow even with input-lang-get-darwin-fast, so the fault is probably with hammerspoon itself?
 
-                 -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
-                 -- eventtap.keyStroke({"cmd"}, 'a')
-                 -- eventtap.keyStroke({"cmd"}, 'c')
-                 eventtap.keyStroke({"cmd"}, 0)
-                 eventtap.keyStroke({"cmd"}, 8)
-                 local res = brishz(("lang-toggle %q"):format(hs.pasteboard.getContents()))
-                 hs.eventtap.keyStrokes(tostring(res))
+                   -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
+                   -- eventtap.keyStroke({"cmd"}, 'a')
+                   -- eventtap.keyStroke({"cmd"}, 'c')
+                   eventtap.keyStroke({"cmd"}, 0)
+                   eventtap.keyStroke({"cmd"}, 8)
+                   local res = brishz(("lang-toggle %q"):format(hs.pasteboard.getContents()))
+                   hs.eventtap.keyStrokes(tostring(res))
+                 end
 end)
 ---
 function reloadConfig(files)

@@ -16,17 +16,20 @@ fkill-cli
 get-stdin
 git+https://github.com/NightMachinary/readability-cli.git
 html-to-text
+http-proxy-to-socks
 http-server
 jalali-moment
 janeway
 kaomoji
 kitsu
+libgen
 moby
 moment
 npm-check
 npmlist
 oji
 peerflix-server
+prettier
 puppeteer
 puppeteer-extra
 puppeteer-extra-plugin-repl
@@ -42,6 +45,3 @@ wikiquote-cli
 wikit
 youtube-dl-interactive
 zooqle
-libgen
-prettier
-http-proxy-to-socks

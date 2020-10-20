@@ -257,7 +257,8 @@ FZF_TAB_OPTS=(
     --print-query
 )
 function fztab() {
-    fz "$@"
+   # Do NOT use --exit-0 or in macOS you will not be able to start typing before the fzf window opens
+    prefixer rm --rm-ansi --rm-x -- './' '../' '\x00.\x00/' '\x00..\x00/' | fzf-gateway "$@"
 }
 FZF_TAB_COMMAND=( fztab "$FZF_TAB_OPTS[@]" )
 # zstyle ':fzf-tab:*' print-query alt-enter # this is the default
