@@ -149,6 +149,11 @@ function away() {
     # disown is still needed. Without it you'll see `[1]  + 97327 done       nohup sleep 10`
     disown &>/dev/null  # Prevent whine if job has already completed
 }
+function kill-marker() {
+    local id="${1:?}"
+
+    pgrep -f "$id" | inargsf kill-withchildren
+}
 ##
 killjobs() {
     local kill_list="$(jobs)"

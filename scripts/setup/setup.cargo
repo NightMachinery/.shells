@@ -3,6 +3,8 @@ rustup component add rust-src
 ###
 #cargo install --git https://github.com/nightmachinary/tlrl
 cargo install --git https://github.com/NightMachinary/rmprefix
+cargo install --git https://github.com/NightMachinary/input_lang_get_icon
+##
 cargo install scriptisto
 cargo install cargo-play
 cargo install zoxide -f

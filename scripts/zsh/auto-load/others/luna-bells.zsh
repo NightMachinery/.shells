@@ -241,3 +241,19 @@ bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
 bell-lm-maker strawberryjuice flac/10.3_09_MI_strawberryjuice..blue..flac
 # `fr heari 'flac/ MI cool'`
 ##
+function reval-onhold() {
+    local id="$(uuidm)_REVAL_ONHOLD_MARKER"
+
+    setopt localtraps
+    trap "" INT
+    {
+        (
+            awaysh-bnamed "$id" hearinvisible "$ONHOLD"
+            reval "$@"
+        )
+    } always {
+        kill-marker "$id"
+    }
+}
+aliasfn kill-marker-onhold kill-marker REVAL_ONHOLD_MARKER
+##
