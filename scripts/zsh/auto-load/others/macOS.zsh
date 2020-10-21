@@ -1,3 +1,24 @@
+##
+function screen-gray-set-darwin () {
+
+    ##
+    defaults write com.apple.universalaccess grayscale -bool $1
+    defaults write com.apple.CoreGraphics DisplayUseForcedGray -bool $1
+    launchctl unload /System/Library/LaunchAgents/com.apple.universalaccessd.plist # Operation not permitted while System Integrity Protection is engaged
+    launchctl load /System/Library/LaunchAgents/com.apple.universalaccessd.plist
+
+    case "$1" in
+        "NO")
+            echo "  Changing Display to use color. This will take a moment..."
+        ;;
+        "YES")
+            echo "  Changing Display to use grayscale. This will take a moment..."
+        ;;
+    esac
+    ##
+
+}
+##
 function frontapp-get() {
     # @darwinonly
     if isDarwin ; then

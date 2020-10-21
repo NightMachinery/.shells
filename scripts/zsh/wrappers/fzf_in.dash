@@ -1,0 +1,5 @@
+#!/usr/bin/env dash
+echo hi
+gtimeout 0.1 cat || true
+echo bye
+#cat | fzf "$@"

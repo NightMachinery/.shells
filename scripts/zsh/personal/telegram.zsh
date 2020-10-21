@@ -62,7 +62,7 @@ function ocwvid-process() {
     {
         getlinks-c -e '\.mp4$' "$l" | head -1 | inargsf aa -Z || return 3
         mv * "$name".mp4
-        hb265-tlg-bg *
+        failnoisily hb265-tlg-bg *
     } always { popf }
 }
 @opts-setprefix ocwvid-process hb265-tlg

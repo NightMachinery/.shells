@@ -21,3 +21,12 @@ function retry-limited-eval() {
     return "$ecode"
 }
 alifn retry='retry-limited 0'
+##
+function failnoisily() {
+    reval "$@"
+    local r=$?
+    if (( r )) ; then
+        notif "$0: $(gq "$@") (returned $r) "
+    fi
+}
+##

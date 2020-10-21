@@ -8,10 +8,16 @@ luna() {
 }
 ##
 luna-audio() {
-    awaysh-bnamed LUNA_MARKER bell-many
+    awaysh-bnamed LUNA_MARKER h_luna-audio
+}
+h_luna-audio() {
+        display-gray-on
+        bell-many
+        display-gray-off
 }
 lunas() {
     lunar luna-audio
+    display-gray-off
 }
 bell-many() {
     setopt localtraps
@@ -69,6 +75,7 @@ aliasfn bell-luna bell-avarice
 function lunaquit() {
     loop-startover ~/tmp/.luna "$@"
     pgrep LUNA_MARKER | inargsf reval-ec serr kill-withchildren
+    display-gray-off
 }
 aliasfn lq lunaquit
 function deluna() {

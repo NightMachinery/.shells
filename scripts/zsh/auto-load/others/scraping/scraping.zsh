@@ -4,7 +4,6 @@ alias withtxt="we_dler=readmoz-txt h2ed=txt2epub " # better for tables
 alias tlcode='tlrl-code'
 alias tlgh='tlrl-gh'
 alias gurl='curlm -o /dev/stdout'
-alias wread-c='fhMode=curl wr_force=y wread'
 aliasfn withchrome 'fhMode=curlfullshort' reval
 alias w2e-noredirect='fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
 alias tlnoredirect='tlrl-ng -e w2e-noredirect'
@@ -13,6 +12,8 @@ alias w2e-chrome='withchrome w2e-noredirect' # readmoz uses full-html2 under the
 alias tlchrome='tlrl-ng -e w2e-chrome'
 aliasfn tlf tlchrome
 alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
+##
+alias wread-c='fhMode=curl wr_force=y wread'
 ###
 function tlarc() {
     fhMode=curlfullshort transformer to-archive-is tl "$@"

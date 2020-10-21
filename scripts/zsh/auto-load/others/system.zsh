@@ -63,4 +63,17 @@ function logout-darwin() {
 function logout-darwin2() {
 	osascript -e 'tell application \"System Events\" to log out'
 }
+## @darwinonly
+function display-gray-is() {
+	[[ "$(gray_darwin.c s)" == "Grayscale is now: 1" ]]
+}
+function display-gray-toggle() {
+	gray_darwin.c
+}
+function display-gray-off() {
+	gray_darwin.c n
+}
+function display-gray-on() {
+	gray_darwin.c y
+}
 ##

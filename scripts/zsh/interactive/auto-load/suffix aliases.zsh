@@ -4,13 +4,12 @@ if [[ -n "$BROWSER" ]]; then
     for ft in $_browser_fts; do alias -s $ft=$BROWSER; done
 fi
 
-_editor_fts=(cpp cxx cc c hh h inl asc txt TXT tex)
+# _editor_fts=(cpp cxx cc c hh h inl asc txt TXT tex)
+_editor_fts=(txt TXT tex)
 for ft in $_editor_fts; do alias -s $ft=$EDITOR; done
 
-if [[ -n "$XIVIEWER" ]]; then
-    _image_fts=(jpg jpeg png gif mng tiff tif xpm)
-    for ft in $_image_fts; do alias -s $ft=$XIVIEWER; done
-fi
+_image_fts=(jpg jpeg png gif mng tiff tif xpm)
+for ft in $_image_fts; do alias -s $ft=icat; done # sth is buggy and sometimes zsh says `zsh: permission denied: /Users/evar/Base/_Art/ddg/The Kindness..blue../09ec3883406d840ceb13a911359f709fa94cf24a.jpg`. This seems to only happen with full paths.
 
 for ft in $video_formats; do alias -s $ft=mpv; done
 for ft in $audio_formats; do alias -s $ft=hearinvisible; done
