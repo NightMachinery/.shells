@@ -257,8 +257,10 @@ FZF_TAB_OPTS=(
     --print-query
 )
 function fztab() {
-   # Do NOT use --exit-0 or in macOS you will not be able to start typing before the fzf window opens
-    prefixer rm --rm-ansi --rm-x -- './' '../' '\x00.\x00/' '\x00..\x00/' | fzf-gateway "$@"
+    # prefixer rm --rm-ansi --rm-x -- './' '../' '\x00.\x00/' '\x00..\x00/' |
+
+    # Do NOT use --exit-0 or in macOS you will not be able to start typing before the fzf window opens
+    fzf-gateway "$@"
 }
 FZF_TAB_COMMAND=( fztab "$FZF_TAB_OPTS[@]" )
 # zstyle ':fzf-tab:*' print-query alt-enter # this is the default
@@ -297,6 +299,7 @@ fzf-tab-complete() { # @overrides
   eval "$fzf_tab_complete_code"
 }
 ##
+zstyle -d ':completion:*' special-dirs # to not show ./ and ../
 # https://unix.stackexchange.com/a/14231/282382
 # to make tab work on empty line
 zstyle ':completion:*' insert-tab false

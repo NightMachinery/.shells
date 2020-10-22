@@ -52,8 +52,8 @@ function oneinstance-setup() {
     someNonce="nonce_${someNonce}"
 
     ## Old way (vulnerable to race conditions)
-    # (( $(redis-cli --raw exists $someNonce) )) || sout redis-cli set $someNonce 0
-    # local nonce=$(( $(redis-cli --raw get $someNonce) + 1 ))
+    # (( $(redism exists $someNonce) )) || sout redis-cli set $someNonce 0
+    # local nonce=$(( $(redism get $someNonce) + 1 ))
     # (( $nonce == 10000 )) && nonce=0
     ##
     local nonce="$(uuidm)"
@@ -68,7 +68,7 @@ oneinstance() {
     test -z "$someNonce" && { ecerr someNonce is empty. ; return 1 }
     someNonce="nonce_${someNonce}"
 
-    [[ "$nonce" == "$(redis-cli --raw get $someNonce)" ]]
+    [[ "$nonce" == "$(redism get $someNonce)" ]]
 }
 
 _loop_trap() {

@@ -13,6 +13,7 @@ function ec-file() {
     fi
 }
 function ec-tty() { ec_file_target=/dev/tty ec-file "$@" } # echoes directly to the terminal. Survives $() or silent.
+ectty() ec-tty "$@"
 ## Vars
 zshword='[a-zA-Z0-9!_-]' #unused, I opted for simpler solutions
 ##

@@ -36,10 +36,13 @@ function trim1(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 function brishz(cmd)
-  return exec("/usr/local/bin/brishzq.zsh " .. cmd)
+  cmdq = "/usr/local/bin/brishzq.zsh " .. cmd
+  -- hs.alert.show(cmdq, 20)
+  return exec(cmdq)
 end
 function brishzeval(cmd)
-  return exec(("/usr/local/bin/brishz.dash %q"):format(cmd))
+  local cmdq = ("/usr/local/bin/brishz.dash %q"):format(cmd)
+  return exec(cmdq)
 end
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
 function newScroller(delay, tick)
@@ -153,9 +156,9 @@ function scrollHandler(evNum)
       --   end
       -- end
     elseif evNum == 1 then
-      -- brishz("bello")
+      -- brishzeval("bello")
       if appName == "mpv" then
-        -- brishz("bell-lm-timetoparty")
+        -- brishzeval("bell-lm-timetoparty")
         -- timerS = hs.timer.doAfter(0.9, function() hs.eventtap.keyStroke({}, hs.keycodes.map['space']) end)
         timerS = timer.doEvery(0.01, function()
                                  gradS = gradS + 0.2
@@ -246,7 +249,7 @@ popclickInit()
 ---
 hs.hotkey.bind(hyper, "p", function()
                  appName = application.frontmostApplication():name()
-                 -- brishz("true " .. hs.pasteboard.getContents())
+                 -- brishzeval("true " .. hs.pasteboard.getContents())
                  if appName == "Screen Sharing" then
                    -- Doesn't work, test with `sleep 2 ; hs -c 'hs.eventtap.keyStrokes("hi jungle")'`
                    -- hs.eventtap.keyStrokes(hs.pasteboard.getContents())
@@ -275,5 +278,5 @@ function reloadConfig(files)
   end
 end
 myWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", reloadConfig):start()
-brishz("bell-lm-eternalhappiness")
+brishzeval("bell-lm-eternalhappiness")
 ---

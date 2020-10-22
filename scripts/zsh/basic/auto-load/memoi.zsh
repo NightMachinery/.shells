@@ -33,11 +33,11 @@ function memoi-eval() {
     local retcode=0 # If skiperr, we will return the correct exit code if the cache is not used. (We rely on this behavior in, e.g., `ffz`.
     local delme=''
 
-    test -n "$skiperr" || silent redis-cli --raw ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
+    test -n "$skiperr" || silent redism ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     if test -z "$deusvult" && {
-        integer ttl="$(redis-cli --raw ttl $rediskey)"
+        integer ttl="$(redism ttl $rediskey)"
         (( ttl > 10 || ttl == -1 )) # && {
-        # (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redis-cli --raw hget $rediskey timestamp)) <= memoi_expire )) }
+        # (( memoi_expire == 0 )) || { ((memoi_expire >= 0 )) && (( (now - $(redism hget $rediskey timestamp)) <= memoi_expire )) }
         # }
         }
     then
@@ -54,7 +54,7 @@ function memoi-eval() {
         local out
         out="${$(eval "$cmd" 2>"$errfile" ; ret_code=$? ; print -n . ; return $ret_code)[1,-2]}" ; retcode=$?
         local duration=$(( EPOCHREALTIME - now ))
-        if (( duration > override_duration )) ; then
+        if (( duration >= override_duration )) ; then
             ##
             # by not storing the time if the command executed quickly, we'll ensure a re-eval the next time.
             # silent redis-cli hset $rediskey timestamp "$now"
@@ -77,14 +77,14 @@ function memoi-eval() {
         fi
     fi
 
-    # silent redis-cli --raw hexists $rediskey stdout && print -nr -- "${$(redis-cli --raw hget $rediskey stdout ; print -n .)[1,-3]}"
-    redis-cli --raw hexists $rediskey stdout &> /dev/null && redis-cli --raw hget $rediskey stdout # outputting directly to stdout is much faster (300ms vs 70ms). Note that redis-cli outputs an extra newline, which can be corrected for using ` | ghead -n -1`, but this costs an additional 30ms.
+    # silent redism hexists $rediskey stdout && print -nr -- "${$(redism hget $rediskey stdout ; print -n .)[1,-3]}"
+    redism hexists $rediskey stdout &> /dev/null && redism hget $rediskey stdout # outputting directly to stdout is much faster (300ms vs 70ms). Note that redis-cli outputs an extra newline, which can be corrected for using ` | ghead -n -1`, but this costs an additional 30ms.
     if test -z "$skiperr" ; then
         { test -z "$inheriterr" } && {
-        silent redis-cli --raw hexists $rediskey stderr && print -nr -- "${$(redis-cli --raw hget $rediskey stderr ; print -n .)[1,-3]}" >&2
+        silent redism hexists $rediskey stderr && print -nr -- "${$(redism hget $rediskey stderr ; print -n .)[1,-3]}" >&2
         }
         # zprof
-        retcode="$(redis-cli --raw hget $rediskey exit)"
+        retcode="$(redism hget $rediskey exit)"
     fi
     ##
     # There are concurrency issues with just deleting the key (someone might be in the middle of using it.)

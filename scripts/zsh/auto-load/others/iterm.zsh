@@ -43,7 +43,7 @@ function iterm-session-active() {
     # These need iTerm to immediately send the focus events when enabled, not waiting for a focus change. I tested it with `unset hi ; echo -ne '\e[?1004h\e[?1004l'; read -r -k 3 -t 0.5 hi ; typeset -p hi`; `hi` remained unset.
     # Alt for linux: xdotool https://unix.stackexchange.com/questions/480052/how-do-i-detect-whether-my-terminal-has-focus-in-the-gui-from-a-shell-script
 
-    redis-cli --raw get iterm_active_session
+    redism get iterm_active_session
 }
 
 function iterm-session-my() {
@@ -59,7 +59,7 @@ function iterm-session-is-active() {
 }
 
 function iterm-focus-get() {
-    redis-cli --raw get iterm_focus
+    redism get iterm_focus
 }
 
 function iterm-focus-is() {
