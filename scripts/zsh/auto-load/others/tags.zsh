@@ -73,7 +73,7 @@ function ntag-rmadd() {
     local rm=("${ntag_rmadd_rm[@]}")
 
     if (( $#@ == 0 )) ; then
-        files=("${(@f)$(ntag-grepor ${rm[@]} | ntag-color | fz --ansi)}") || return $?
+        files=("${(@f)$(ntag-grepor ${rm[@]} | ntag-color | fz-ntag)}") || return $?
     fi
 
     for f in $files[@] ; do
@@ -435,11 +435,11 @@ aliasfn ntag-filteror @opts or y @ ntag-filter
 aliasfn tgfor ntag-filteror
 ## interactive
 function ntag-filterori() {
-    @opts color y or y @ ntag-filter "$@" | fz --ansi
+    @opts color y or y @ ntag-filter "$@" | fz-ntag
 }
 aliasfn tgsor ntag-filterori
 function ntag-filteri() {
-    @opts color y @ ntag-filter "$@" | fz --ansi
+    @opts color y @ ntag-filter "$@" | fz-ntag
 }
 aliasfn tgs ntag-filteri
 ###
@@ -465,3 +465,6 @@ function ntag-recoverpath() {
     fi
 }
 ##
+function fz-ntag() {
+    fz --ansi --preview "$FZF_PREVIEW_NTAG" "$@"
+}

@@ -92,5 +92,7 @@ function memoi-eval() {
     ##
     return $retcode
 }
+function eval-memoi() { memoi-eval "$@" }
+enh-savename eval-memoi memoi-eval
 @opts-setprefix memoi-eval memoi
 @opts-setprefix eval-memoi memoi

@@ -20,37 +20,70 @@ function ffgoo() {
     done
 }
 ##
-chis() {
-    # Forked from fzf's wiki
-    # browse Chrome's history
+function chrome-history-get() {
+    local query="${*}"
 
-    local query="${*:-.}"
-    local doOpen="${chis_open:-y}"
-
-    local cols sep google_history open
+    local cols sep google_history s2='%s'
     cols=$(( COLUMNS / 3 ))
     sep='{::}'
+    if isI ; then
+        s2='\x1b[36m%s\x1b[m'
+    fi
 
     if [ "$(uname)" = "Darwin" ]; then
         google_history="$HOME/Library/Application Support/Google/Chrome/Default/History"
-        open=open
     else
         google_history="$HOME/.config/google-chrome/Default/History"
-        open=xdg-open
     fi
     cp -f "$google_history" /tmp/h
     local links="$(sqlite3 -separator $sep /tmp/h \
         "select substr(title, 1, $cols), url
      from urls order by last_visit_time desc" |
-        awk -F $sep '{printf "%-'$cols's  \x1b[36m%s\x1b[m\n", $1, $2}' |
-        rgbase "$query" |fz --exact --no-sort --ansi | gsed 's#.*\(https*://\)#\1#')"
+        awk -F $sep '{printf "%-'$cols's  '$s2'\n", $1, $2}')"
+    if test -n "$query" ; then
+        links="$(ec "$links" | rgbase "$query")" # beware: rgbase always colors
+    fi
+    ec $links
+}
+function chis_find() {
+    # Forked from fzf's wiki
+    # browse Chrome's history
+    local query='' fz_query='' memoi_cmd=''
+    typeset -A fz_opts
+    if isI ; then
+        query="${*}"
+        fz_opts+='--ansi'
+    else
+        fz_query="$*"
+        memoi_cmd='memoi-eval'
+    fi
+
+    # ` sponge | ghead -n 100 |`
+    local links="$(revaldbg $memoi_cmd chrome-history-get "$query"| fzp --exact --no-sort "$fz_query")"
     ec "$links"
+}
+@opts-setprefix chis_find chis
+function chis_clean() {
+    {
+        if (( $#@ == 0 )) ; then
+            cat
+        else
+            ec "${(F)@}"
+        fi
+    } | gsed 's#.*\(https*://\)#\1#'
+}
+function chis() {
+    local doOpen="${chis_open:-y}"
+    local links="$(chis_find "$@" | chis_clean)"
+
     ec "$links"|pbcopy
-    [[ "${doOpen}" == y ]] && { local i
-                              for i in ${(@f)links}
-                              do
-                                  $open "$i"
-                              done }
-    return 0
+    [[ "${doOpen}" == y ]] && {
+        local i
+        for i in ${(@f)links}
+        do
+            open "$i"
+        done
+    }
 }
 alias ffchrome=chis
+##

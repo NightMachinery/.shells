@@ -1,6 +1,5 @@
 zmodload zsh/terminfo zsh/system zsh/datetime
-autoload -U zargs
-autoload -U regexp-replace
+autoload -Uz zargs regexp-replace is-at-least colors # U: do not use aliases, z: always use zsh mode
 ##
 alias ec='print -r --'
 alias ecn='print -rn --'

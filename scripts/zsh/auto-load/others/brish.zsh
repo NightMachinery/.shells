@@ -1,6 +1,6 @@
 function brishz() {
     ## PERF:
-    # `hyperfine --warmup 5 'brishzq.zsh ec hi' 'brishz.dash ec hi'` 81ms vs 27ms
+    # `hyperfine --warmup 5 'brishzq.zsh ec hi' "brishz_quote=y brishz.dash 'ec hi'" "brishz_quote='' brishz.dash 'ec hi'"` 81ms, 34ms, 24ms
     ##
     local stdin="$brishz_in"
     local -x brishz_copy="${brishz_copy:-$brishz_c}"

@@ -28,7 +28,7 @@ function ntag-lv() {
 function openv() {
     local dirs=(${openv_dirs[@]}) query="$(fz-createquery "$@")"
     test -z "$dirs[*]" && dirs=(.)
-    ntag-lv "$dirs[@]" | fz --ansi --query "$query" --preview-window down:4:wrap | inargsf play-tag
+    @opts nopriority '' @ ntag-lv "$dirs[@]" | fz-ntag --delimiter / --with-nth  -3..-1 --query "$query" --preview-window down:4:wrap | inargsf play-tag
 }
 function delenda() {
     ntag-filterori red green aqua teal gray grey | inargsf trs
@@ -44,6 +44,7 @@ zv() {
         @opts dirs [ ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads ] @ openv $query[@]
     fi
 }
+aliasfnq zvv zv ''
 aliasfn r2 incache openv
 lec() { indir ~/base/Lectures openv "$@" }
 ###

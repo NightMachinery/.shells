@@ -39,12 +39,13 @@ function lang-toggle() {
 ##
 input_lang_push_lang_get() redism get input_lang_push_lang
 input_lang_push_lang_set() { silent redism set input_lang_push_lang "$@" ; }
+input_lang_push_lang_setnx() { silent redism setnx input_lang_push_lang "$@" ; }
+input_lang_push_lang_del() { silent redism del input_lang_push_lang ; }
 function input-lang-push() {
     local force="$input_lang_push_force"
 
-    local input_lang_push_lang="$(input_lang_push_lang_get)"
-    if test -n "$input_lang_push_force" || test -z "$input_lang_push_lang" ; then
-        input_lang_push_lang_set "$(input-lang-get-fast)"
+    if test -n "$input_lang_push_force" ; then
+        input_lang_push_lang_setnx "$(input-lang-get-fast)" &
     fi
     @opts nopopreset y @ input-lang-set "$@"
 }
@@ -52,7 +53,6 @@ function input-lang-pop() {
     local input_lang_push_lang="$(input_lang_push_lang_get)"
     if test -n "$input_lang_push_lang" ; then
         input-lang-set "$input_lang_push_lang"
-        input_lang_push_lang_set ''
     fi
 }
 ##
@@ -92,7 +92,7 @@ function input-lang-set() {
     fi
     btt-refresh 623FC96A-0BD0-4463-B186-D4E55024A637
     if test -z "$nopopreset" ; then
-        input_lang_push_lang_set ''
+        input_lang_push_lang_del
     fi
 }
 function input-lang-get-darwin-fast() {

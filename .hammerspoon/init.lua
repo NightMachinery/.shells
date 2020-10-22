@@ -30,6 +30,7 @@ function exec_raw(cmd)
   return (s)
 end
 function exec(cmd)
+  -- hs.alert.show(cmd, 20)
   return trim1(exec_raw(cmd))
 end
 function trim1(s)
@@ -42,6 +43,10 @@ function brishz(cmd)
 end
 function brishzeval(cmd)
   local cmdq = ("/usr/local/bin/brishz.dash %q"):format(cmd)
+  return exec(cmdq)
+end
+function brishzeval2(cmd)
+  local cmdq = ("brishz_quote=y /usr/local/bin/brishz.dash %q"):format(cmd)
   return exec(cmdq)
 end
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
@@ -192,6 +197,9 @@ function popclickScrollToggle()
   if popclickScrollEnabled then
     lastS = 0
     scrollHandler(2) -- stop
+    -- alert.show("stopped popclickScroll")
+  else
+    -- alert.show("enabled popclickScroll")
   end
   popclickScrollEnabled = not popclickScrollEnabled
   return popclickScrollEnabled
@@ -220,6 +228,7 @@ end
 ---
 hyper = {"cmd","ctrl","alt","shift"}
 hs.window.animationDuration = 0;
+hs.dockicon.hide() -- to appear above full-screen windows you must hide the Hammerspoon Dock icon
 ---
 enOnly = { "iTerm2", "Terminal", "Code", "Code - Insiders", "Emacs", "mpv" } -- "Emacs",
 function appWatch(appName, event, app)
@@ -234,6 +243,7 @@ function appWatch(appName, event, app)
     end
   end
   if bshcode ~= '' then
+    bshcode = bshcode .. " # appName: " .. appName .. ", event: " .. tostring(event)
     brishzeval(bshcode)
   end
 end
@@ -261,10 +271,41 @@ hs.hotkey.bind(hyper, "p", function()
                    -- eventtap.keyStroke({"cmd"}, 'c')
                    eventtap.keyStroke({"cmd"}, 0)
                    eventtap.keyStroke({"cmd"}, 8)
-                   local res = brishz(("lang-toggle %q"):format(hs.pasteboard.getContents()))
+                   local res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents()))
                    hs.eventtap.keyStrokes(tostring(res))
                  end
 end)
+---
+function chis()
+  -- https://www.hammerspoon.org/docs/hs.chooser.html
+  c = hs.chooser.new(function(x) brishzeval2(("chis_clean %q | inargsf open"):format(x.text)) end)
+  c:width(95)
+  c:rows(15)
+  chis_first = true
+  local timer
+  c:choices(function()
+      local q = c:query()
+      local cmd = ("chis_find %q"):format(q)
+      if chis_first then
+        chis_first = false
+        cmd = "deus " .. cmd
+      end
+      local res = brishzeval2(cmd)
+      local out = {}
+      for l in res:gmatch("([^\r\n]+)\r?\n?") do
+        table.insert(out, {["text"] = l})
+      end
+      return out
+  end)
+  c:queryChangedCallback(function(query)
+        if timer and timer:running() then
+            timer:stop()
+        end
+        timer = hs.timer.doAfter(0.2, function() c:refreshChoicesCallback() end)
+  end)
+  c:show()
+end
+hs.hotkey.bind(hyper, "o", chis)
 ---
 function reloadConfig(files)
   doReload = false
