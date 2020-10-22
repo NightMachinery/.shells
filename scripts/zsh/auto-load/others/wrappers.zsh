@@ -57,3 +57,6 @@ function youtube-dl() {
     isI || opts+=( --quiet --no-progress )
     transformer urlfinalg "$proxycmd youtube-dl $opts[@]" "$@"
 }
+function edir() {
+  command edir --all --recurse  --suffix '' "$@"
+}
