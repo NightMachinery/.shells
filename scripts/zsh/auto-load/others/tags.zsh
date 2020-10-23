@@ -391,7 +391,8 @@ function ntag_filter_rg() {
     command rg --passthrough --smart-case --colors "match:none" --colors "match:style:bold" --fixed-strings --color always --colors "match:bg:$bg" --colors "match:fg:$fg" "${ntag_sep[-1]}${pattern}${ntag_sep[1]}"  #"${ntag_sep}${pattern}${ntag_sep}"
     return 0
 }
-function ntag-color() {
+aliasfn ntag-color ntagcolor
+function ntag-color1() {
     # INPUT: stdin
     ## @perf
     # `ll --color always | time (ntag-color)` 115ms
@@ -466,5 +467,54 @@ function ntag-recoverpath() {
 }
 ##
 function fz-ntag() {
-    fz --ansi --preview "$FZF_PREVIEW_NTAG" "$@"
+    fz --ansi --preview "$FZF_PREVIEW_NTAG" --keep-right "$@"
 }
+##
+function ntag-select() {
+    local query="${1}"
+
+    arrN $ntag_colors[@] | fzp "$query" # sponge # zsh bugs again
+    ec $query
+}
+function ntag-finder-sel-add() {
+   finder-selection-get.as | inargsf @opts add [ "$@" ] @ ntag-rmadd
+}
+##
+function ntag-color-dotless() {
+    # @incomplete You need to add the other colors
+    local FORCE_INTERACTIVE=y FORCE_NONINTERACTIVE=""
+    prefixer replace -- \
+        red "$(colorfg 255 0 0)red$(colorreset)" \
+        orange "$(colorfg 255 120 0)orange$(colorreset)" \
+        yellow "$(colorfg 255 255 0)yellow$(colorreset)"
+}
+function ntag-color0() {
+    # @deprecated This needs to perform the line loop in zsh which kills performance. I wrote the go script `ntagcolor.go` just for this.
+    local in="$(cat)"
+
+    local FORCE_INTERACTIVE=y FORCE_NONINTERACTIVE=""
+    local cmd="$(gq prefixer replace --skip-empty -i .. -o '' --replace "$(colorbg 255 255 255 ; colorfg 255 120 0 ; Bold).\$1.${reset_color}" -- \
+        blue "$(colorbg 0 0 255 ; colorfg 255 255 255 ; Bold).blue.${reset_color}" \
+        green "$(colorbg 0 255 0 ; colorfg 0 0 0 ; Bold).green.${reset_color}" \
+        red "$(colorbg 255 0 0 ; colorfg 255 255 255 ; Bold).red.${reset_color}" \
+        orange "$(colorbg  255 120 0; colorfg 255 255 255 ; Bold).orange.${reset_color}" \
+        yellow "$(colorbg 255 255 0 ; colorfg 0 0 0 ; Bold).yellow.${reset_color}" \
+        purple "$(colorbg 100 10 255 ; colorfg 255 255 255 ; Bold).purple.${reset_color}" \
+        gray "$(colorbg 100 100 100 ; colorfg 255 255 255 ; Bold).gray.${reset_color}" \
+        grey "$(colorbg 100 100 100 ; colorfg 255 255 255 ; Bold).grey.${reset_color}" \
+        black "$(colorbg 0 0 0 ; colorfg 255 255 255 ; Bold).black.${reset_color}" \
+        aqua "$(colorbg 0 255 255 ; colorfg 0 0 0 ; Bold).aqua.${reset_color}" \
+        teal "$(colorbg 0 128 128 ; colorfg 255 255 255 ; Bold).teal.${reset_color}")"
+
+    local i
+    for i in ${(@f)in} ; do
+        if [[ "$i" =~ '([^.]*)\.\.(.*)\.\.([^.]*)' ]] ; then
+            local colored="$(ecn "$match[2]" | eval "$cmd" )"
+
+            ec "${match[1]}.${colored}.${match[3]}"
+        else
+            ec "$i"
+        fi
+    done
+}
+##

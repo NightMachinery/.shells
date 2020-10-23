@@ -3,7 +3,9 @@
 FZF_SIMPLE_PREVIEW='printf -- "%s " {}'
 # fzf supports wrapping itself. # | command fold -s -w $FZF_PREVIEW_COLUMNS'
 # << was bad for dash, no <<< in dash
-FZF_PREVIEW_NTAG="brishz_in={} brishzq.zsh ntag-color"
+
+# FZF_PREVIEW_NTAG="brishz_in={} brishzq.zsh ntag-color"
+FZF_PREVIEW_NTAG='printf -- "%s " {} | ntagcolor'
 ##
 ### Functions
 function fz-empty() {

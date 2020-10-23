@@ -11,7 +11,10 @@ alias mycountry='geo.bash -o country'
 alias itunesprogress='exa -a -T -l ~/Library/iTunes/'
 alias tll="tl -e w2e-curl"
 alias visudo="VISUAL=vim sudo visudo"
-alias fiy='FORCE_INTERACTIVE=y'
+##
+alias FIY='FORCE_INTERACTIVE=y FORCE_NONINTERACTIVE="" '
+alias FIN='FORCE_INTERACTIVE="" FORCE_NONINTERACTIVE=y '
+##
 alias myip='curlm http://checkip.amazonaws.com' #'curlm https://ipinfo.io/ip' #'dig +short myip.opendns.com @resolver1.opendns.com'
 ialias re='run-on-each' #duplicate, to make it ialias
 ialias ec='print -r --' #duplicate, to make it ialias

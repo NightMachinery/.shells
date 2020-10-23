@@ -295,6 +295,7 @@ function chis()
       local out = {}
       for l in res:gmatch("([^\r\n]+)\r?\n?") do
         table.insert(out, {["text"] = l})
+        -- table.insert(out, {["text"] = hs.styledtext.ansi(l)}) -- so slow it's completely broken
       end
       return out
   end)
@@ -307,6 +308,34 @@ function chis()
   c:show()
 end
 hs.hotkey.bind(hyper, "o", chis)
+--
+function ntagFinder()
+  -- @todo add hotkey to remove tag instead (use anycomplete for ref)
+  c = hs.chooser.new(function(x) brishzeval2(("ntag-finder-sel-add %q"):format(x.text)) end)
+  -- c:width(95)
+  c:rows(10)
+  local timer
+  c:choices(function()
+      local q = c:query()
+      local cmd = ("ntag-select %q"):format(q)
+      local res = brishzeval2(cmd)
+      local out = {}
+      for l in res:gmatch("([^\r\n]+)\r?\n?") do
+        -- @upstreambug https://github.com/Hammerspoon/hammerspoon/issues/2574
+        -- table.insert(out, {["text"] = hs.styledtext.ansi(l, {font={size=25}})})
+        table.insert(out, {["text"] = l})
+      end
+      return out
+  end)
+  c:queryChangedCallback(function(query)
+        if timer and timer:running() then
+            timer:stop()
+        end
+        timer = hs.timer.doAfter(0.0, function() c:refreshChoicesCallback() end)
+  end)
+  c:show()
+end
+hs.hotkey.bind(hyper, "n", ntagFinder)
 ---
 function reloadConfig(files)
   doReload = false
