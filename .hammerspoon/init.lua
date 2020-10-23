@@ -278,6 +278,7 @@ end)
 ---
 function chis()
   -- https://www.hammerspoon.org/docs/hs.chooser.html
+  -- @todo it'd probably be better if we put the URLs as `subtext`, and their titles as `text`. hs.chooser has this better than fzf.
   c = hs.chooser.new(function(x) brishzeval2(("chis_clean %q | inargsf open"):format(x.text)) end)
   c:width(95)
   c:rows(15)
