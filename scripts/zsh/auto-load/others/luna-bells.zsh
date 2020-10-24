@@ -235,10 +235,16 @@ function bell-lm-maker() {
 
     fndef "bell-lm-$name" awaysh-named "BELL_LM_${name:u}_MARKER" hearinvisible "$GREENCASE_DIR/LittleMisfortune/$f"
 }
+function bell-lm-maker-dir() {
+    local name="${1:?}" f="${2:?}"
+
+    fndef "bell-lm-$name" awaysh-named "BELL_LM_${name:u}_MARKER" hear-rnd $GREENCASE_DIR/LittleMisfortune/$f/${~audioglob}
+}
 bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
 bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
 bell-lm-maker strawberryjuice flac/10.3_09_MI_strawberryjuice..blue..flac
+bell-lm-maker-dir mhm mhm
 # `fr heari 'flac/ MI cool'`
 ##
 function reval-onhold() {
@@ -256,4 +262,17 @@ function reval-onhold() {
     }
 }
 aliasfn kill-marker-onhold kill-marker REVAL_ONHOLD_MARKER
+function reval-bell() {
+    local bell=("${reval_bell_engine[@]:-${reval_bell_e[@]:-${reval_bell_bell[@]:-bello}}}")
+    setopt localtraps
+    trap "" INT
+    {
+        (
+            reval "$@"
+        )
+    } always {
+        silent reval "$bell[@]"
+    }
+}
+aliasfn reval-bell-lm-mhm @opts bell bell-lm-mhm @ reval-bell
 ##

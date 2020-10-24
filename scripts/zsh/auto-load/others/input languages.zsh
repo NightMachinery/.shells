@@ -56,7 +56,7 @@ function input-lang-pop() {
     fi
 }
 ##
-function input-lang-set-darwin() {
+function input-lang-set-darwin-old() {
     # https://apple.stackexchange.com/questions/402855/how-to-switch-the-keyboard-input-language-from-the-terminal
     # https://github.com/Lutzifer/keyboardSwitcher
     ##
@@ -80,6 +80,16 @@ function input-lang-set-darwin() {
     # toggles:
     # cliclick kd:ctrl kp:space ku:ctrl # takes ~0.4
     ##
+}
+function input-lang-set-darwin() {
+    # `hyperfine --warmup 5 'xkbswitch -se US' "hs -c 'langSetEn()'"` 72 vs 29
+    local wanted="${1:l}"
+    case "$wanted" in
+        en*|us|u.s*) hammerspoon -c 'langSetPer()' ;;
+        fa*|per*) hammerspoon -c 'langSetEn()' ;;
+        toggle*)  hammerspoon -c 'langSetToggle()' ;;
+        *) ecerr "Not supported" ; return 1 ;;
+    esac
 }
 function input-lang-set() {
     # @darwinonly
@@ -110,7 +120,14 @@ function input-lang-get-darwin-old() {
     defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources | command rg -e '"KeyboardLayout Name" = "([^"]*)"' --replace '$1' --only-matching --color never
 }
 function input-lang-get-darwin() {
-    input_lang_get_objc # @alt: `xkbswitch -ge`
+    ## hammerspoon is quite fast:
+    # `hyperfine --warmup 5 "hs -c 'hs.keycodes.currentSourceID()'" "xkbswitch -ge" "input_lang_get_objc"` 28ms vs 71ms
+    ##
+    if [[ "$(hammerspoon -A -c 'hs.keycodes.currentSourceID()')" =~ 'com.apple.keylayout\.(.*)' ]] ; then
+        ec "${match[1]}"
+    else
+        input_lang_get_objc # @alt: `xkbswitch -ge`
+    fi
 }
 function input-lang-get-fast() {
     # @darwinonly
@@ -128,6 +145,12 @@ function input-lang-get() {
 
 }
 function input-lang-get-icon() {
+    ##
+    # `hyperfine --warmup 5 "input_lang_get_icon" 'brishz.dash input-lang-get-icon'`
+    #  33 vs 67
+    # Old result (from when the rust version used input_lang_get_objc):
+    #  80 vs 71
+    ##
     local lang="$(input-lang-get)"
     case "${lang:l}" in
         us|u.s.) ec "🇺🇸";;

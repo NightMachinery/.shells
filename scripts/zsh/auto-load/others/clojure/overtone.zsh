@@ -97,12 +97,14 @@ function ot-rep-test2() {
     ot-rep "$ot_test2"
 }
 function ot-play-beeps1() {
+    local dur="${1:-1}"
+
     ot-rep <<EOF
 
 (def buf (buffer 2048))
 
 ; Bounce around cutting a single band out of white noise.
-(demo 10
+(demo $dur
   (let [rate 10
         src (* 0.8 (white-noise))
         freqs (fft buf src)
@@ -121,7 +123,7 @@ function ot-play-helicopter() {
 EOF
 }
 function ot-play-diwhite() {
-    local dur="${1:-10}"
+    local dur="${1:-1}"
     ot-rep <<EOF
 (demo $dur
       (let [vals (dwhite 0 15 INF)

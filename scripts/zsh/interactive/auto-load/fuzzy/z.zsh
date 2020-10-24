@@ -27,6 +27,7 @@ function ffz() {
         ecerr $msg
         return $r
     }
+    sel="$(ntag-recoverpath "$sel")"
     if test -z "$ffz_nocache" && ! test -e "$sel" ; then
         ffz_nocache=y reval "$0" "$@"
         return $?

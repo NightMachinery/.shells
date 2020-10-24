@@ -226,9 +226,26 @@ function install()
   hs.ipc.cliInstall()
 end
 ---
+local inputEnglish = "com.apple.keylayout.US"
+local inputPersian = "com.apple.keylayout.Persian-ISIRI2901"
+--
 hyper = {"cmd","ctrl","alt","shift"}
 hs.window.animationDuration = 0;
 hs.dockicon.hide() -- to appear above full-screen windows you must hide the Hammerspoon Dock icon
+---
+function langSetPer()
+  hs.keycodes.currentSourceID(inputPersian)
+end
+function langSetEn()
+  hs.keycodes.currentSourceID(inputEnglish)
+end
+function langSetToggle()
+  if hs.keycodes.currentSourceID() == inputEnglish then
+    langSetPer()
+  else
+    langSetEn()
+  end
+end
 ---
 enOnly = { "iTerm2", "Terminal", "Code", "Code - Insiders", "Emacs", "mpv" } -- "Emacs",
 function appWatch(appName, event, app)
@@ -271,7 +288,15 @@ hs.hotkey.bind(hyper, "p", function()
                    -- eventtap.keyStroke({"cmd"}, 'c')
                    eventtap.keyStroke({"cmd"}, 0)
                    eventtap.keyStroke({"cmd"}, 8)
-                   local res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents()))
+                   local res
+                   -- res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
+                   if hs.keycodes.currentSourceID() == inputEnglish then
+                     res = brishzeval2(("ecn %q | en2per"):format(hs.pasteboard.getContents()))
+                     langSetPer()
+                   else
+                     res = brishzeval2(("ecn %q | per2en"):format(hs.pasteboard.getContents()))
+                     langSetEn()
+                   end
                    hs.eventtap.keyStrokes(tostring(res))
                  end
 end)

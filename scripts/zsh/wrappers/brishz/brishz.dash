@@ -26,7 +26,7 @@ if test -e "$cmd" ; then
 fi
 
 if test -z "$brishz_quote" ; then
-   curl --fail --silent --location --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"session\":\"$session\", \"verbose\":\"$v\", \"nolog\":\"$nolog\"}" $endpoint
+   curl --fail --silent --location --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"stdin\":\"$stdin\", \"session\":\"$session\", \"verbose\":\"$v\", \"nolog\":\"$nolog\"}" $endpoint
 else
     req="$(printf -- "%s " "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg nolog "$nolog" --arg s "$session" --arg c "$cmd" --arg v $v 'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "verbose": $v, "nolog": $nolog}')"
     printf -- "%s" "$req" | curl --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint

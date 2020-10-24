@@ -101,8 +101,8 @@ insubshell-eval() {
 awaysh() {
     local cmd="$(gquote "$@") &"
 
-    insubshell-eval "$cmd" &>/dev/null </dev/null # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
-    disown &>/dev/null  # Prevent whine if job has already completed
+    insubshell-eval "$cmd" &>/dev/null </dev/null || return $? # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
+    disown &>/dev/null || true  # Prevent whine if job has already completed
 }
 @opts-setprefix awaysh insubshell-eval
 # awaysh() inbg silent "$@"

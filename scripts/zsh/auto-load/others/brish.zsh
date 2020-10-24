@@ -32,8 +32,8 @@ function caddypass() {
 ##
 aliasfn bsh brishz
 aliasfn bshr brishzr # You can also use .a
-aliasfn brishz-all brishz %GARDEN_ALL
-aliasfn brishzr-all brishzr %GARDEN_ALL
+aliasfn brishz-all reval-bell-lm-mhm brishz %GARDEN_ALL
+aliasfn brishzr-all reval-bell-lm-mhm brishzr %GARDEN_ALL
 aliasfn brishz-restart brishz-all %BRISH_RESTART
 aliasfn brishzr-restart brishzr-all %BRISH_RESTART
 aliasfn xl brishz-restart

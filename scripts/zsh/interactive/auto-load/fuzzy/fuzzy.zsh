@@ -7,7 +7,7 @@
 function fr() {
     (( $#@ == 0 )) && return 1
     (( $#@ == 1 )) && set -- "$@" ''
-    @opts query "${@[-1]}" @ fi-rec "${@[1,-2]}"
+    @opts query "${@[-1]}" @ fi-rec "$(gq "${@[1,-2]}")"
     hist-add-self
 }
 function fi-rec() {

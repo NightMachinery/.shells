@@ -33,8 +33,7 @@ function alpha2white() { rm-alpha "$1" white }
 
 combine-funcs alpha2bw alpha2black alpha2white
 ##
-function saveas-img() {
-    # used from night-org.el
+function saveas-img() { # image-paste, imgpaste; used from night-org.el
     local dest="$1" ; test -z "$dest" && {
         ecerr "$0: empty dest."
         return 1
