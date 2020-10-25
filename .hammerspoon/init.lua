@@ -77,6 +77,8 @@ scrollExcluded = { "iTerm2", "Terminal", "Code", "Code - Insiders" } -- "Emacs",
 lastS = 0
 timerS = nil
 gradS = 0
+-- gradMode = true
+gradMode = false
 timerSR = timer.doEvery(0.1, function()
                           gradS = gradS - 1
                           if gradS < 0 then
@@ -149,7 +151,7 @@ function scrollHandler(evNum)
         eventtap.scrollWheel({0,250},{}, "pixel")
       end
     end
-  else
+  elseif gradMode then
     if evNum == 3 then
       -- if appName == "mpv" then
       --   hs.eventtap.keyStroke({}, hs.keycodes.map['space'])
@@ -325,10 +327,10 @@ function chis()
       return out
   end)
   c:queryChangedCallback(function(query)
-        if timer and timer:running() then
-            timer:stop()
-        end
-        timer = hs.timer.doAfter(0.2, function() c:refreshChoicesCallback() end)
+      if timer and timer:running() then
+        timer:stop()
+      end
+      timer = hs.timer.doAfter(0.2, function() c:refreshChoicesCallback() end)
   end)
   c:show()
 end
@@ -353,10 +355,10 @@ function ntagFinder()
       return out
   end)
   c:queryChangedCallback(function(query)
-        if timer and timer:running() then
-            timer:stop()
-        end
-        timer = hs.timer.doAfter(0.0, function() c:refreshChoicesCallback() end)
+      if timer and timer:running() then
+        timer:stop()
+      end
+      timer = hs.timer.doAfter(0.0, function() c:refreshChoicesCallback() end)
   end)
   c:show()
 end

@@ -7,7 +7,6 @@ alias spt='spotlight -name'
 alias nohistory='unset HISTFILE' #disables history for current session
 alias cleanbuffer='printf "\ec\e[3J"' # there is a similar tool in my anaconda's bin named clear.
 alias emcsave="emc -e '(save-some-buffers t)'"
-alias mycountry='geo.bash -o country'
 alias itunesprogress='exa -a -T -l ~/Library/iTunes/'
 alias tll="tl -e w2e-curl"
 alias visudo="VISUAL=vim sudo visudo"

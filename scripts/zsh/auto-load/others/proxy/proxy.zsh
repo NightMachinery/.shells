@@ -5,6 +5,8 @@ typeset -g proxyenv="${proxyenv:-reval}"
 alias pxs="ALL_PROXY=socks5://127.0.0.1:$socksport"
 export pxa_env='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa="$pxa_env"
+alias pxa-local="local -x $pxa_env"
+alias pxa-maybe='isIran && pxa-local'
 function reval-pxa() {
     reval pxa "$@"
 }

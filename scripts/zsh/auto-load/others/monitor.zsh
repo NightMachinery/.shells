@@ -3,6 +3,28 @@ function glan() {
     # --byte display network rate in byte per second
     glances --config ~/.glances --time 10 --theme-white --disable-webui --fs-free-space --byte --process-short-name "$@"
 }
+function fftop() {
+    # linux: top -p
+    # darwin: top -pid
+    htop -p "${(j.,.)${(@f)$(ffps "$@")}}"
+}
+aliasfn pt fftop # process-top
+function  pt-cpu-get() {
+    procs --or "$@" | gtail -n +3 | awk '{print $4}'
+}
+function pt-cpu() {
+    local pids=("${(@f)$(ffps "$@")}")
+    lo_s=0.05 serr loop pt-cpu-get $pids | {
+        ## ttyplot -s 20 -u '%' # mediocre, buggy
+        datadash --average-line # install: https://github.com/keithknott26/datadash/issues/5
+        ##
+        # feedgnuplot --stream --terminal 'dumb 120,30' --lines # outputs new plots instead of updating the creen.
+        # `gnuplot -e 'set terminal'` for a list of outputs
+        ##
+        ## asciigraph -r # usable but no stats and wrong height detection. No fixed scale. `goi github.com/guptarohit/asciigraph/cmd/asciigraph`
+    }
+}
+##
 function ppgrep() {
     case "$(uname)" in
         Darwin)

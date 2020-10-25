@@ -26,6 +26,7 @@ function icat() {
     else
         icat-py "$@"
         ecerr "$0: Tmux not supported."
+        # @todo use ANSI https://github.com/trashhalo/imgcat
     fi
 }
 ###

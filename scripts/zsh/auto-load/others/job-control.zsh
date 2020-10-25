@@ -27,7 +27,7 @@ function loop() {
     while (( sig2 != 666 )) && (( sig != 130 ))
     do
         (( sig )) && { eval "$cmd" ; c=$[c+1] }
-        print -n "\r$(colorbg 0 30 230)$(colorfg 255 255 100)Iteration $c$(resetcolor)"
+        print -n "\r$(colorbg 0 30 230)$(colorfg 255 255 100)Iteration $c$(resetcolor)" >&2
         # </dev/null sleep-neon $inter &
         # neon=$!
         trap _loop_trap INT

@@ -150,6 +150,7 @@ function input-lang-get-icon() {
     #  33 vs 67
     # Old result (from when the rust version used input_lang_get_objc):
     #  80 vs 71
+    #  Using hs will cost us 2.2 cpu percentages.
     ##
     local lang="$(input-lang-get)"
     case "${lang:l}" in

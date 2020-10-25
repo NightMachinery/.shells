@@ -44,3 +44,7 @@ function isNotDbg() {
     ! isDbg
 }
 ##
+alias mycountry='geo.bash -o country'
+isIran() {
+    [[ "$(mycountry)" == Iran ]]
+}

@@ -805,6 +805,7 @@ Use hi10-cook to copy the necessary command for pasting in a remote server." MAG
     local url="$1"
     local regex=${2:-'\.mkv$'}
 
+    pxa-maybe
     local title="$(urlmeta $url title)"
     [[ "${$(pwd):t}" == "$title" ]] || cdm "$title"
     getlinks-c "$url" -e "$regex" | inargsf hi10-multilink
