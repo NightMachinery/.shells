@@ -7,3 +7,4 @@ function time2() {
 
     ec "Took $(( EPOCHREALTIME - time2_start ))"
 }
+aliasfn hyp hyperfine --warmup 5
