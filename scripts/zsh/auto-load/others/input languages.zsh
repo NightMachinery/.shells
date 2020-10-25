@@ -50,6 +50,7 @@ function input-lang-push() {
     @opts nopopreset y @ input-lang-set "$@"
 }
 function input-lang-pop() {
+    # return 0
     local input_lang_push_lang="$(input_lang_push_lang_get)"
     if test -n "$input_lang_push_lang" ; then
         input-lang-set "$input_lang_push_lang"
@@ -85,8 +86,8 @@ function input-lang-set-darwin() {
     # `hyperfine --warmup 5 'xkbswitch -se US' "hs -c 'langSetEn()'"` 72 vs 29
     local wanted="${1:l}"
     case "$wanted" in
-        en*|us|u.s*) hammerspoon -c 'langSetPer()' ;;
-        fa*|per*) hammerspoon -c 'langSetEn()' ;;
+        en*|us|u.s*) hammerspoon -c 'langSetEn()' ;;
+        fa*|per*) hammerspoon -c 'langSetPer()' ;;
         toggle*)  hammerspoon -c 'langSetToggle()' ;;
         *) ecerr "Not supported" ; return 1 ;;
     esac

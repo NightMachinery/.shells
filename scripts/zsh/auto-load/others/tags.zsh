@@ -178,7 +178,10 @@ function ntag-has() {
     [[ "$f" == *"${ntag_sep}${tag}${ntag_sep}"* ]]
 }
 function ntag-add-givedest() {
-    silent ntag-add "$@" || return $?
+    silent ntag-add "$@" || {
+        ec "${1}"
+        return $?
+    }
     ec "$ntag_add_dest"
 }
 function ntag-add() {
