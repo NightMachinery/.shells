@@ -12,17 +12,32 @@ aliasfn pt fftop # process-top
 function  pt-cpu-get() {
     procs --or "$@" | gtail -n +3 | awk '{print $4}'
 }
-function pt-cpu() {
+function  pt-cpu-get-grep() {
+    procs | rg "$@" | awk '{print $4}'
+}
+function t_cpu-get-lang-icon() {
+    # did not work well. Buffering issues?
+    procs | rg "input_lang_get_icon" | rg -v rg
+}
+function pt-cpu-get-plus() {
+    local q="$*" a
+    if [[ "$q" =~ '^\d+$' ]] ; then
+        pt-cpu-get "$q"
+    else
+            a="$(pgrep -f "$q" | ghead -n 1)" # @todo add support for multiple matches (we should sum them)
+            if test -n "$a" ; then
+                pt-cpu-get "$a"
+            else
+                ec 0 # no process found so 0 cpu used by them
+            fi
+    fi
+}
+function pt-cpu-i() {
     local pids=("${(@f)$(ffps "$@")}")
-    lo_s=0.05 serr loop pt-cpu-get $pids | {
-        ## ttyplot -s 20 -u '%' # mediocre, buggy
-        datadash --average-line # install: https://github.com/keithknott26/datadash/issues/5
-        ##
-        # feedgnuplot --stream --terminal 'dumb 120,30' --lines # outputs new plots instead of updating the creen.
-        # `gnuplot -e 'set terminal'` for a list of outputs
-        ##
-        ## asciigraph -r # usable but no stats and wrong height detection. No fixed scale. `goi github.com/guptarohit/asciigraph/cmd/asciigraph`
-    }
+    lo_s=0.05 serr loop pt-cpu-get $pids | plot-stdin
+}
+function pt-cpu() {
+    lo_s=0.05 serr loop pt-cpu-get-plus "$@" | plot-stdin
 }
 ##
 function ppgrep() {

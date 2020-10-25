@@ -33,6 +33,9 @@ char-usage-all() {
     char-usage $vfiles[@]  $NIGHTDIR/**/*(.) | tac > "all $(dateshort).cusage"
 }
 ##
+function tokei-largest() {
+    wc -l **/${~codeglob} | gsort -n
+}
 function tokei-percent() {
     # tokei 12.0.4
     local t="$(tokei)"

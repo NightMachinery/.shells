@@ -11,6 +11,13 @@ function reval-pxa() {
     reval pxa "$@"
 }
 ##
+v2-on() {
+    tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
+}
+v2-off() {
+    tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/direct.json
+}
+##
 pxify() {
     typeset -g proxycmd="proxychains4"
     typeset -g proxyenv="reval-pxa"
