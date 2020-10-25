@@ -10,4 +10,18 @@ function sleepifidle() {
     ecdate sleeping with load5 $(load5)
     sleepforce
 }
-
+##
+powersaving_apps=(bettert tmux iterm chrome hammersp Insiders)
+function powersaving-off() {
+    # ffkill -SIGCONT $powersaving_apps
+    pgrep -i "${(j.|.)powersaving_apps}" | inargsf kill -SIGCONT
+    proxy-on
+    wgd
+}
+function powersaving-on() {
+    wgu
+    proxy-off
+    # ffkill -SIGSTOP $powersaving_apps
+    pgrep -i "${(j.|.)powersaving_apps}" | inargsf kill -SIGSTOP
+}
+##
