@@ -45,9 +45,9 @@ function hb265-tlg() {
 }
 ##
 function hb265-tlg-bg() {
-    local rec="${hb265_tlg_rec:-${hb265_tlg_r:-$water}}" destdir="${hb265_tlg_destdir:-${hb265_tlg_d}}"
+    local rec="${hb265_tlg_rec:-${hb265_tlg_r:-$water}}" destdir="${hb265_tlg_destdir:-${hb265_tlg_d:?}}"
 
-    awaysh-bnamed-rp "$0" @opts rec "$rec" destdir "$destdir" @ hb265-tlg "$@"
+    awaysh-bnamed-rp "$0" failnoisily @opts rec "$rec" destdir "$destdir" @ hb265-tlg "$@"
 }
 @opts-setprefix hb265-tlg-bg hb265-tlg
 function ocwvid-process() {

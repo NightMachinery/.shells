@@ -38,6 +38,7 @@ Usage: mute-external_ [<headphone-volume-from-100>=1]"
 			volset "$lev"
 		else
 			volset 0
+			display-gray-on
 		fi
 	}
 }

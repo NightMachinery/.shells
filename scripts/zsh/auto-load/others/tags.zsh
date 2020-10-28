@@ -2,6 +2,9 @@
 # `fd [-uuu] ..tag..` or even `fd .tag.` easily lists the tagged files for you
 # LIMITATION: The separator somewhat limits what chars you can use in a tag. For example, using `..`, we can't have the tag `.test.`, though `.te.st` is possible. I recommend against using  the sep chars at all, as it hurts readability, too.
 ##
+# macOS deps:
+# https://github.com/jdberry/tag
+##
 ntag_colors=(red orange yellow green blue purple gray black aqua teal)
 ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
@@ -188,7 +191,7 @@ function ntag-add() {
     : "GLOBAL OUT: ntag_add_dest"
     unset ntag_add_dest
 
-    local f="$1" tags=("${@:2}") tag toadd=()
+    local f="$(ntag-recoverpath "$1")" tags=("${@:2}") tag toadd=()
     ntag_add_dest="$f"
     test -e "$f" || {
         ecerr "$0: Nonexistent file: $f"
@@ -300,8 +303,12 @@ function tag-apple-get() {
         return 1
     }
 
+    ##
     # https://apple.stackexchange.com/questions/401225/mdls-does-not-work-on-mounted-sparse-bundles
-    mdls -name kMDItemUserTags -raw "$f" -nullMarker '' | awk 'NR>1' | sed '$d' | prefixer --trim -i $',\n' --skip-empty
+    #mdls -name kMDItemUserTags -raw "$f" -nullMarker '' | awk 'NR>1' | sed '$d' | prefixer --trim -i $',\n' --skip-empty
+    ##
+    command tag --garrulous --list "$f" | gsed 1d | trimsed
+    ##
 }
 function ntag-fromapple() {
     local f="$1"
