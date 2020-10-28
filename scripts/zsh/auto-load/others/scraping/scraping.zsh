@@ -645,7 +645,7 @@ Remember that you can customize full-html by fhMode." MAGIC
     u="$(uuidpy)"
     full-html "$url" "$u"
     test -e "$u" || { ecerr "${0}: Couldn't download $url" ; return 1 }
-    getlinks.py "$1" "$u" | command rg "${@[2,-1]:-.*}"
+    getlinks.py "$1" "$u" | trimsed | command rg "${@[2,-1]:-.*}"
     \rm "$u"
 }
 noglobfn getlinksfull
