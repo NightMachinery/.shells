@@ -254,7 +254,7 @@ function reval-onhold() {
     trap "" INT
     {
         (
-            awaysh-bnamed "$id" hearinvisible "$ONHOLD"
+            awaysh-bnamed "$id" @opts s 0 @ loop hearinvisible "$ONHOLD"
             reval "$@"
         )
     } always {

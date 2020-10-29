@@ -44,6 +44,8 @@ function loop() {
         # kill $neon
     done
 }
+@opts-setprefix loop lo
+##
 function oneinstance-setup() {
     ensure-redis || return 1
     
