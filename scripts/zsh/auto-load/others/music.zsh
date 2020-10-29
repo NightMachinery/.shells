@@ -3,7 +3,7 @@ export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Functions
 function hear-noipc() {
     local vol="${hear_noipc_volume:-${hear_noipc_v:-70}}"
-    command mpv --script-opts-add=autotag-enabled=no --script=$MPV_HOME/scripts/load_renamer.lua --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
+    command-mpv --script-opts-add=autotag-enabled=no --script=$MPV_HOME/scripts/load_renamer.lua --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
 }
 aliasfn hearinvisible silent hear-noipc --no-terminal --load-scripts=no
 aliasfn heari hearinvisible

@@ -13,6 +13,14 @@ function mpv-manga() {
         mpv_ipc=~/tmp/.mpv.manga mpv --no-config --load-scripts=no --script=$MPV_HOME/mpv-manga-reader/manga-reader.lua --image-display-duration=inf --input-conf=$MPV_HOME/input.conf --reset-on-next-file=video-pan-x,video-pan-y --video-align-x=1 --video-align-y=-1 --video-zoom=1 --fs --glsl-shaders="$MPV_HOME/shaders/Anime4K_3.0_Denoise_Bilateral_Mode.glsl:$MPV_HOME/shaders/Anime4K_3.0_Upscale_CNN_M_x2_Deblur.glsl" "$@"
     } always { popf }
 }
+function command-mpv() {
+    # kitty injects its corrupt PATH into our shells
+    if test -e /Applications/mpv.app/Contents/MacOS/mpv ; then
+        command /Applications/mpv.app/Contents/MacOS/mpv "$@"
+    else
+        command mpv "$@"
+    fi
+}
 function mpv() {
     local isStreaming="$mpv_streaming"
 
@@ -33,7 +41,7 @@ function mpv() {
     done
 
     tty-title "$first"
-    revaldbg command mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
+    revaldbg command-mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
 }
 function mpv-get() {
     <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "${2:-$mpv_audio_ipc}"|jq --raw-output -e .data

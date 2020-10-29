@@ -43,7 +43,7 @@ aliasfn nightshift-off nshift off
 function nightshift-auto() {
     local  app="$(frontapp-get)"
     case "$app" in
-        io.mpv)
+        io.mpv|mpv)
             nightshift-off
             ;;
         *) nightshift-on ;

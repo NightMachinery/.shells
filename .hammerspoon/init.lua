@@ -265,7 +265,7 @@ function appWatch(appName, event, app)
     end
   end
   if bshcode ~= '' then
-    bshcode = bshcode .. " # appName: " .. appName .. ", event: " .. tostring(event)
+    bshcode = "( " .. bshcode .. " ) & # appName: " .. appName .. ", event: " .. tostring(event)
     brishzeval(bshcode)
   end
 end
