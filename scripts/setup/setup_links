@@ -4,6 +4,7 @@ mkdir -p ~/bin
 # ln -s "$NIGHTDIR"/bash/auto-load ~/bal
 # ln -s "$NIGHTDIR"/zsh/auto-load ~/zal
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
+lnrp $NIGHTDIR/configFiles/kitty/kitty.conf ~/.config/kitty/
 ##
 ln -s "$HOME/Downloads/" ~/"$music_dir"/d
 # ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
