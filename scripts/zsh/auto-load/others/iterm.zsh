@@ -16,11 +16,19 @@ function ils() {
 ## https://github.com/wookayin/python-imgcat
 function icat-py() {
     isI || return 0
-    imgcat --height 30 "$@" # This will zoom, too, but that's actually good in most cases!
+    python -m imgcat --height 30 "$@" # This will zoom, too, but that's actually good in most cases!
 }
+##
+aliasfn icat-kitty kitty +kitten icat
+aliasfn icat-kitty2 pixcat fit-screen --enlarge --vertical-margin 60 # accepts dirs, too
+aliasfn islideshow-kitty icat-kitty2 --hang # press ENTER to go to next image
 ##
 function icat() {
     isI || return 0
+    if isKitty ; then
+        icat-kitty2 "$@"
+        return $?
+    fi
     if test -z "$TMUX" ; then
         icat-go "$@"
     else

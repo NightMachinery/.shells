@@ -5,6 +5,13 @@ fndef-uq() { fndef-unquoted "$@" }
 function fndef() {
     fndef-unquoted "$1" "$(gq "${@:2}")"
 }
+## doesn't work because the inner vars do not expand (naturally). But you can still use this trick instead of using fndef.
+# function fndef2() {
+#     function "$1" () {
+#         "${@:2}"
+#     }
+# }
+##
 function lambda-unquoted() {
     unset lambda_out
     local name="$(uuidm)_$EPOCHREALTIME"

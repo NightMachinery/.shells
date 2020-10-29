@@ -60,3 +60,4 @@ wikiquotes
 xkcdpass
 yapf
 yq
+pixcat

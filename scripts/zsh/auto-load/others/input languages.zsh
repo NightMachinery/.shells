@@ -44,8 +44,12 @@ input_lang_push_lang_del() { silent redism del input_lang_push_lang ; }
 function input-lang-push() {
     local force="$input_lang_push_force"
 
+
+    local input_lang_push_lang="$(input-lang-get-fast)"
     if test -n "$input_lang_push_force" ; then
-        input_lang_push_lang_setnx "$(input-lang-get-fast)" &
+        input_lang_push_lang_set "$input_lang_push_lang" &
+    else
+        input_lang_push_lang_setnx "$input_lang_push_lang" &
     fi
     @opts nopopreset y @ input-lang-set "$@"
 }

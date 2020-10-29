@@ -14,8 +14,22 @@ function reval-copy() {
 function ec-copy() {
     reval-copy ec "$@"
 }
+##
+function pbcopy-term() {
+    local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"
+
+    # OSC 52, supported by kitty, iTerm, and others
+    printf "\033]52;c;$(printf "%s" "$in" | base64)\a"
+}
 function pbcopy() {
-    local in="$(in-or-args "$@")"
+    # local in="$(in-or-args "$@")"
+    local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"
+
+    if isKitty ; then
+        ecn "$in" | kitty +kitten clipboard
+        return $?
+    fi
+
     { false && (( $+commands[copyq] )) } && {
         silent copyq copy -- "$in"
     } || {
@@ -25,7 +39,11 @@ function pbcopy() {
     }
 }
 function pbpaste() {
-    # local in="$(in-or-args "$@")"
+    if isKitty ; then
+        kitty +kitten clipboard --get-clipboard
+        return $?
+    fi
+
     { false && (( $+commands[copyq] )) } && {
         copyq clipboard
     } || {

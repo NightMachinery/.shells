@@ -20,6 +20,11 @@ function isMBP() {
     [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]]
 }
 ##
+function isKitty() {
+    test -n "$KITTY_WINDOW_ID"
+}
+iskitty() { isKitty "$@" }
+##
 isI() {
     test -z "$FORCE_NONINTERACTIVE" && {
         test -n "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]

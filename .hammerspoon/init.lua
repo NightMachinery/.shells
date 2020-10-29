@@ -252,7 +252,7 @@ function langSetToggle()
   end
 end
 ---
-enOnly = { "iTerm2", "Terminal", "Code", "Code - Insiders", "Emacs", "mpv" } -- "Emacs",
+enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv" } -- "Emacs",
 function appWatch(appName, event, app)
   -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
   local bshcode = ''
@@ -384,8 +384,8 @@ hs.hotkey.bind(hyper, "k", function()
       app = hs.application.get("kitty")
   end
 
-  app:mainWindow():moveToUnit'[100,50,0,0]'
-  app:mainWindow().setShadows(false)
+  -- app:mainWindow():moveToUnit'[100,50,0,0]'
+  -- app:mainWindow().setShadows(false)
 end)
 ---
 function reloadConfig(files)

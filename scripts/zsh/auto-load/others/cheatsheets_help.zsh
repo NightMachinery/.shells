@@ -10,6 +10,7 @@ function dhint() {
     # mdw but we couldn't memoi that
     memoi_expire=0 eval-memoi h_dhint "$1" | skipin w3m -T text/html
 }
+##
 function months() {
     echo "1.  January - 31 days
 2.  February - 28 days in a common year and 29 days in leap years
@@ -25,3 +26,6 @@ function months() {
 12. December - 31 days"
     wh monthj2en
 }
+##
+ch-mpv() icat $nightNotes/cheatsheets/mpv/mpbindings.png
+##
