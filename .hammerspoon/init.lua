@@ -367,6 +367,27 @@ function ntagFinder()
 end
 hs.hotkey.bind(hyper, "n", ntagFinder)
 ---
+-- https://github.com/kovidgoyal/kitty/issues/45
+hs.hotkey.bind(hyper, "k", function()
+  local app = hs.application.get("kitty")
+
+  if app then
+      if not app:mainWindow() then
+          app:selectMenuItem({"kitty", "New OS window"})
+      elseif app:isFrontmost() then
+          app:hide()
+      else
+          app:activate()
+      end
+  else
+      hs.application.launchOrFocus("kitty")
+      app = hs.application.get("kitty")
+  end
+
+  app:mainWindow():moveToUnit'[100,50,0,0]'
+  app:mainWindow().setShadows(false)
+end)
+---
 function reloadConfig(files)
   doReload = false
   for _,file in pairs(files) do
