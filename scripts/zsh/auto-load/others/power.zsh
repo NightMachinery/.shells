@@ -11,7 +11,7 @@ function sleepifidle() {
     sleepforce
 }
 ##
-powersaving_apps=(bettert iterm chrome hammersp Insiders scsynth Telegram java) # tmux
+powersaving_apps=(bettert iterm chrome Insiders scsynth Telegram java) # tmux hammersp
 function powersaving-off() {
     # ffkill -SIGCONT $powersaving_apps
     pgrep -i "${(j.|.)powersaving_apps}" | inargsf kill -SIGCONT

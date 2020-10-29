@@ -207,17 +207,20 @@ function popclickScrollToggle()
   return popclickScrollEnabled
 end
 function popclickBttToggle()
-  return popclickScrollToggle()
+  -- return popclickScrollToggle()
+  return popclickPlayPause()
 end
 function popclickBttGet()
-  return popclickScrollEnabled
+  -- return popclickScrollEnabled
+  return popclickListening
 end
 function popclickInit()
   popclickListening = false
-  popclickScrollEnabled = false
+  -- popclickScrollEnabled = false
+  popclickScrollEnabled = true
   local fn = scrollHandler
   listener = popclick.new(fn)
-  popclickPlayPause()
+  -- popclickPlayPause()
   --- @workaround_lisflag we use the flag to control acting on the events to work around the bug that sometimes starting the listener can take ~6 seconds. Update: When that bug happens, it doesn't seem that listener can listen at all! Restarting hammerspoon completely seems to solve this issue.
   -- listener:start()
   ---
