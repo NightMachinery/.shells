@@ -1,3 +1,6 @@
+function autosuggestions-goo() {
+gurl "http://suggestqueries.google.com/complete/search?client=firefox&q=$(ecn "$*"|url-encode.py)" | jqm '.[1] | .[]'
+}
 ##
 function ffgoo() {
     local query="$*"
