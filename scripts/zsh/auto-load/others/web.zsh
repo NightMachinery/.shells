@@ -1,5 +1,8 @@
 function autosuggestions-goo() {
-gurl "http://suggestqueries.google.com/complete/search?client=firefox&q=$(ecn "$*"|url-encode.py)" | jqm '.[1] | .[]'
+    curl-useragent "http://suggestqueries.google.com/complete/search?client=firefox&q=$(ecn "$*"|url-encode.py)" | jqm '.[1] | .[]' || autosuggestions-ddg "$@"
+}
+function autosuggestions-ddg() {
+    curl-useragent "https://duckduckgo.com/ac/?q=$(ecn "$*"|url-encode.py)" | jqm '.[]|.phrase'
 }
 ##
 function ffgoo() {
