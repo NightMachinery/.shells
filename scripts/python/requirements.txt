@@ -37,10 +37,12 @@ neovim
 nest_asyncio
 numpy
 ocrmypdf
+opencv-python
 passlib[bcrypt,argon2,totp]
 pdfCropMargins
 pexpect
 piep
+pixcat
 plumbum
 pypyp
 python-jose[cryptography]
@@ -60,4 +62,3 @@ wikiquotes
 xkcdpass
 yapf
 yq
-pixcat

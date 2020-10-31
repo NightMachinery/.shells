@@ -1,6 +1,7 @@
 autoconf
 automake
 curl
+handbrake-cli
 libffi-dev
 libncurses-dev
 libreadline-dev
@@ -18,4 +19,3 @@ transmission-cli
 unixodbc-dev
 unzip
 zlib1g-dev
-handbrake-cli
