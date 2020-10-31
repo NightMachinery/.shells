@@ -34,3 +34,11 @@ isNotExpensive || {
     }
 }
 test -n "$NO_AUTOLOAD_BASH" || zsh-defer source "$NIGHTDIR"/bash/load-others.bash
+
+if isKitty ; then
+    function kitty-fix-path() {
+        preexec_functions[$preexec_functions[(i)kitty-fix-path]]=()
+        source ~/.shared.sh
+    }
+    preexec_functions+=kitty-fix-path
+fi

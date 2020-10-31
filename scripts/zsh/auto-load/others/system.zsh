@@ -78,3 +78,38 @@ function display-gray-on() {
 	gray_darwin.c y
 }
 ##
+function brightness-get() {
+	if isDarwin ; then # @darwinonly
+		if [[ "$(brightness -l)" =~ 'display 0: brightness (\S+)' ]] ; then
+			ec "$match[1]"
+		else
+			return 1
+		fi
+	fi
+}
+function brightness-screen() {
+	local mode="${1:-1}"
+
+	local screen="$(gmktemp --suffix .png)"
+	screencapture -x "$screen" # @darwinonly
+	local screen_brightness="$(detect_brightness_mode=$mode detect_brightness.py $screen)"
+	ec $screen_brightness
+}
+function brightness-auto() {
+	local darkest="${1:-0.5}"
+
+	local screen_brightness="$(brightness-screen)"
+	dvar screen_brightness
+
+	local to=$(( (1 - screen_brightness)*(1 - darkest) + darkest ))
+	if (( to > 1 )) ; then
+		to=1
+	fi
+	dvar to
+	brightness $to
+}
+function brightness-auto-loop() {
+	# brightness-auto takes ~0.85s
+	serr @opts s "${lo_s:-3}" @ loop brightness-auto "${@:-0.3}"
+}
+@opts-setprefix brightness-auto-loop lo
