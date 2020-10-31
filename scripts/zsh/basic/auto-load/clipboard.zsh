@@ -16,6 +16,7 @@ function ec-copy() {
 }
 ##
 function pbcopy-term() {
+    # @alt: it2copy
     local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"
 
     # OSC 52, supported by kitty, iTerm, and others
