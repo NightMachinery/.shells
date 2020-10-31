@@ -19,7 +19,15 @@ function autosuggestions-gateway() {
 aliasfn asg autosuggestions-gateway
 aliasfn as autosuggestions-gateway # @nameconfilct (macOS)
 function jias() {
-    autosuggestions-gateway "$@" | jiarr
+    # autosuggestions-gateway "$@" | jiarr
+    local i results=() url
+    for i in ${(@f)"$(autosuggestions-gateway "$@")"}
+    do
+        url="$(<<<"$i" url-encode.py)"
+        url="[$i](https://www.google.com/search?q=$url)" # @todo md-quote i (don't use url-encode as it is very ugly)
+        results+="$(jq --null-input --compact-output --arg i "${i}" --arg url "$url" '{ tlg_parsemode: "md", tlg_title: $i, tlg_content: $url }')"
+    done
+    arrJ "$results[@]"
 }
 ##
 function ffgoo() {
