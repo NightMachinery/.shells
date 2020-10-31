@@ -1,3 +1,8 @@
+##
+function do-rnd() {
+    reval "$(rndarr "$@")"
+}
+##
 function fndef-unquoted() {
     functions[${1:?}]="${@:2}"
 }

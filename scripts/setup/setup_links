@@ -19,8 +19,10 @@ ln -s "$HOME/Downloads/" ~/"$music_dir"/d
 lnrp zshplain.dash /usr/local/bin/
 
 lnrp brishz.dash /usr/local/bin/
+lnrp brishz2.dash /usr/local/bin/
 lnrp brishzrb.dash /usr/local/bin/
 lnrp brishzq.zsh /usr/local/bin/
+lnrp bsh.dash /usr/local/bin/
 
 lnrp ~/.cargo/bin/input_lang_get_icon /usr/local/bin/
 ##

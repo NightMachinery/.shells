@@ -20,4 +20,5 @@ brew tap trojan-gfw/homebrew-trojan
 brew install trojan
 ##
 luarocks install penlight # require 'pl.pretty'.dump(table)
+luarocks install luaposix
 ##

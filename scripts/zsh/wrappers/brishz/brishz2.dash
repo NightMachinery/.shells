@@ -1,7 +1,3 @@
 #!/usr/bin/env dash
 
-if test "$1" = '-c' ; then
-   shift
-fi
-
-brishz_noquote=y brishzq.zsh "$@"
+brishz_quote=y brishz.dash "$@"

@@ -489,6 +489,9 @@ function ntag-select() {
 function ntag-finder-sel-add() {
    finder-selection-get.as | inargsf @opts add [ "$@" ] @ ntag-rmadd
 }
+function ntag-finder-sel-rm() {
+   finder-selection-get.as | inargsf @opts rm [ "$@" ] @ ntag-rmadd
+}
 ##
 function ntag-color-dotless() {
     # @incomplete You need to add the other colors
@@ -528,3 +531,6 @@ function ntag-color0() {
     done
 }
 ##
+function air-blue() {
+    ntag-add "$(mpv-get)" blue
+}

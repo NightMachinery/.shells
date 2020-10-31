@@ -4,6 +4,23 @@ function autosuggestions-goo() {
 function autosuggestions-ddg() {
     curl-useragent "https://duckduckgo.com/ac/?q=$(ecn "$*"|url-encode.py)" | jqm '.[]|.phrase'
 }
+function autosuggestions-gateway() {
+    set -- "$(trim "$*")"
+    test -z "$*" && {
+        if test -z "$autosuggestions_gateway_flag" ; then
+            autosuggestions_gateway_flag=y $0 "$(pbpaste)"
+            return $?
+        else
+            return 0
+        fi
+    }
+    autosuggestions-goo "$@"
+}
+aliasfn asg autosuggestions-gateway
+aliasfn as autosuggestions-gateway # @nameconfilct (macOS)
+function jias() {
+    autosuggestions-gateway "$@" | jiarr
+}
 ##
 function ffgoo() {
     local query="$*"

@@ -276,3 +276,30 @@ function reval-bell() {
 }
 aliasfn reval-bell-lm-mhm @opts bell bell-lm-mhm @ reval-bell
 ##
+function bell-maker() {
+    local name="${1:?}" f="${2:?}"
+
+    fndef "bell-$name" awaysh-named "BELL_${name:u}_MARKER" hearinvisible "$GREENCASE_DIR/$f"
+}
+bell-maker pp-electricity1 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/AMB07_etincel..blue..wav"
+bell-maker pp-electricity2 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/AMB11_etincel..blue..wav" # shorter
+bell-pp-electricity() { do-rnd bell-pp-electricity{1..2} }
+bell-maker pp-nok "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_00_nok..blue..wav"
+bell-maker pp-ok "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_00_ok..blue..wav"
+bell-maker pp-attack-rotational1 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_p_attac..blue..wav"
+bell-maker pp-attack-rotational2 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_p_attac2..blue..wav"
+bell-maker pp-attack-rotational3 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_p_attac3..blue..wav"
+bell-pp-attack-rotational() { do-rnd bell-pp-attack-rotational{1..3} }
+bell-maker pp-piece1 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_piece1..blue..wav"
+bell-maker pp-piece2 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_piece2..blue..wav"
+bell-maker pp-piece3 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_piece3..blue..wav"
+bell-pp-piece() { do-rnd bell-pp-piece{1..3} }
+bell-pp-piece-r() { redo2 10 bell-pp-piece }
+##
+function bell-m-beeps() {
+    : "Plays continuous beeps"
+    
+    perl -e 'for($i=0;;$i++){
+    print pack("n", ((($i*($i>>8|$i>>9)&46&$i>>8))^($i&$i>>13|$i>>6)));
+}' | silent play -c 1 -b 8 -e unsigned -t raw -r 8k -
+}

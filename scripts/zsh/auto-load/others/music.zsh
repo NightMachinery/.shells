@@ -5,9 +5,17 @@ function hear-noipc() {
     local vol="${hear_noipc_volume:-${hear_noipc_v:-70}}"
     command-mpv --script-opts-add=autotag-enabled=no --script=$MPV_HOME/scripts/load_renamer.lua --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
 }
-aliasfn hearinvisible silent hear-noipc --no-terminal --load-scripts=no
+##
+# aplay (linux only)
+# paplay (PulseAudio)
+# afplay (macOS only), fast
+# mplayer -quiet
+# aliasfn hearinvisible silent hear-noipc --no-terminal --load-scripts=no
+# aliasfn hearinvisible silent ffplay -autoexit -nodisp -loglevel panic # faster startup than mpv
+aliasfn hearinvisible silent play # faster startup than ffplay (play from sox)
 aliasfn heari hearinvisible
 @opts-setprefix hearinvisible hear-noipc
+##
 @opts-setprefix hear hear-noipc
 function hear() {
     # arger "${(0@)$(rpargs "$@")}"

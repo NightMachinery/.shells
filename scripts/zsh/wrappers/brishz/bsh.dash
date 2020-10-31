@@ -2,4 +2,4 @@
 
 # brishz.dash "$(cat)"
 
-brishz_session=bsh brishz_noquote=y brishzq.zsh "$(cat)"
+brishz_session=bsh brishz_quote=y brishz.dash "$(cat)"

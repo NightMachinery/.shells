@@ -29,6 +29,17 @@ function arrJ() {
     local items=( "$@" )
     print -nr -- "[ ${(j.,.)items} ]"
 }
+function jiarr() {
+    if (( $#@ == 0 )) ; then
+        set -- "${(@f)$(cat)}"
+    fi
+
+    local i results=()
+    for i in $@ ; do
+        results+="$(jq --null-input --compact-output --arg i "${i}" '{ tlg_title: $i, tlg_content: $i }')"
+    done
+    arrJ "$results[@]"
+}
 ##
 function html-esc() {
     gsed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'

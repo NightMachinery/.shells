@@ -1,0 +1,5 @@
+#!/usr/bin/env dash
+
+# brishz.dash "$(cat)"
+
+brishz_session=bsh brishz_noquote=y brishzq.zsh "$(cat)"

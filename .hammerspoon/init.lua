@@ -1,3 +1,10 @@
+nightdir = os.getenv("NIGHTDIR") or (os.getenv("HOME") .. "/scripts")
+-- require("luarocks.loader")
+-- `luarocks path`
+package.path = package.path .. ';/usr/local/Cellar/luarocks/3.3.1/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?/init.lua;/usr/local/lib/lua/5.4/?.lua;/usr/local/lib/lua/5.4/?/init.lua;./?.lua;./?/init.lua;/Users/evar/.luarocks/share/lua/5.4/?.lua;/Users/evar/.luarocks/share/lua/5.4/?/init.lua;' .. nightdir ..  '/lua/?.lua'
+package.cpath = package.cpath .. ';/usr/local/lib/lua/5.4/?.so;/usr/local/lib/lua/5.4/loadall.so;./?.so;/Users/evar/.luarocks/lib/lua/5.4/?.so'
+
+require "pipe"
 ipc = require "hs.ipc"
 popclick = require "hs.noises"
 application = require "hs.application"
@@ -13,6 +20,8 @@ timer = require "hs.timer"
 appfinder = require "hs.appfinder"
 applescript = require "hs.applescript"
 eventtap = require "hs.eventtap"
+-- chooser = require "hs.chooser"
+plp = require 'pl.pretty'
 ---
 function has_value (tab, val)
   for index, value in ipairs(tab) do
@@ -22,32 +31,6 @@ function has_value (tab, val)
   end
 
   return false
-end
-function exec_raw(cmd)
-  local f = assert(io.popen(cmd, 'r'))
-  local s = assert(f:read('*a'))
-  f:close()
-  return (s)
-end
-function exec(cmd)
-  -- hs.alert.show(cmd, 20)
-  return trim1(exec_raw(cmd))
-end
-function trim1(s)
-  return (s:gsub("^%s*(.-)%s*$", "%1"))
-end
-function brishz(cmd)
-  cmdq = "/usr/local/bin/brishzq.zsh " .. cmd
-  -- hs.alert.show(cmdq, 20)
-  return exec(cmdq)
-end
-function brishzeval(cmd)
-  local cmdq = ("/usr/local/bin/brishz.dash %q"):format(cmd)
-  return exec(cmdq)
-end
-function brishzeval2(cmd)
-  local cmdq = ("brishz_quote=y /usr/local/bin/brishz.dash %q"):format(cmd)
-  return exec(cmdq)
 end
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
 function newScroller(delay, tick)
@@ -265,7 +248,7 @@ function appWatch(appName, event, app)
     end
   end
   if bshcode ~= '' then
-    bshcode = "( " .. bshcode .. " ) & # appName: " .. appName .. ", event: " .. tostring(event)
+    bshcode = "{ " .. bshcode .. " } &>/dev/null & # appName: " .. appName .. ", event: " .. tostring(event)
     brishzeval(bshcode)
   end
 end
@@ -309,9 +292,22 @@ end)
 function chis()
   -- https://www.hammerspoon.org/docs/hs.chooser.html
   -- @todo it'd probably be better if we put the URLs as `subtext`, and their titles as `text`. hs.chooser has this better than fzf.
-  c = hs.chooser.new(function(x) brishzeval2(("chis_clean %q | inargsf open"):format(x.text)) end)
+  local tab = nil
+  c = hs.chooser.new(function(x)
+      if tab then tab:delete() end
+      if not x then return end
+      brishzeval2bg(("chis_clean %q | inargsf open"):format(x.text))
+  end)
+  c:placeholderText("Search history ...")
   c:width(95)
   c:rows(15)
+  tab = hs.hotkey.bind('', 'tab', function()
+                         local x = c:selectedRowContents()
+                         if not x then
+                           return
+                         end
+                         brishzeval2bg(("bell-lm-mhm ; chis_clean %q | inargsf open ; "):format(x.text))
+  end)
   chis_first = true
   local timer
   c:choices(function()
@@ -340,11 +336,34 @@ end
 hs.hotkey.bind(hyper, "o", chis)
 --
 function ntagFinder()
-  -- @todo add hotkey to remove tag instead (use anycomplete for ref)
-  c = hs.chooser.new(function(x) brishzeval2(("ntag-finder-sel-add %q"):format(x.text)) end)
-  -- c:width(95)
-  c:rows(10)
   local timer
+  local tab = nil
+  local antitab = nil
+  c = hs.chooser.new(function(x)
+      if tab then tab:delete() end
+      if antitab then antitab:delete() end
+      if not x then return end
+      brishzeval2bg(("ntag-finder-sel-add %q"):format(x.text))
+  end)
+  c:placeholderText("ntag ...")
+  -- c:width(95)
+  c:rows(11)
+  tab = hs.hotkey.bind('', 'tab', function()
+                         local x = c:selectedRowContents()
+                         if not x then
+                           return
+                         end
+                         -- brishzeval2bg(("ntag-finder-sel-add %q ; bell-lm-mhm"):format(x.text))
+                         brishzeval2bg(("bell-lm-mhm ; ntag-finder-sel-add %q ; "):format(x.text))
+  end)
+  antitab = hs.hotkey.bind('shift', 'tab', function()
+                         local x = c:selectedRowContents()
+                         if not x then
+                           return
+                         end
+                         -- brishzeval2bg(("ntag-finder-sel-rm %q ; bell-pp-piece"):format(x.text))
+                         brishzeval2bg(("bell-pp-piece ; ntag-finder-sel-rm %q ; "):format(x.text))
+  end)
   c:choices(function()
       local q = c:query()
       local cmd = ("ntag-select %q"):format(q)
@@ -366,6 +385,93 @@ function ntagFinder()
   c:show()
 end
 hs.hotkey.bind(hyper, "n", ntagFinder)
+---
+function anycomplete()
+  local timer
+  local myTask = nil
+  local tab = nil
+  local antitab = nil
+
+  if hs.keycodes.currentSourceID() == inputEnglish then
+    eventtap.keyStroke({"shift", "alt"}, hs.keycodes.map['left'])
+  else
+    eventtap.keyStroke({"shift", "alt"}, hs.keycodes.map['right'])
+  end
+  eventtap.keyStroke({"cmd"}, hs.keycodes.map['c'])
+  c = hs.chooser.new(function(x)
+      if tab then tab:delete() end
+      if antitab then antitab:delete() end
+      if not x then return end
+
+      hs.eventtap.keyStrokes(x.text)
+  end)
+  c:placeholderText("anycomplete ...")
+  c:width(70)
+  c:rows(11)
+  tab = hs.hotkey.bind('', 'tab', function()
+                         local x = c:selectedRowContents()
+                         if not x then
+                           return
+                         end
+                         c:query(x.text)
+                         refreshChoices()
+  end)
+  antitab = hs.hotkey.bind('shift', 'tab', function()
+                         local x = c:selectedRowContents()
+                         if not x then
+                           return
+                         end
+                         hs.pasteboard.setContents(x.text)
+                         c:hide()
+  end)
+  -- c:choices(function()
+  --     local q = c:query()
+  --     local cmd = ("autosuggestions-gateway %q"):format(q)
+  --     print("cmd: " .. cmd)
+  --     local res = brishzeval2(cmd)
+  --     local out = {}
+  --     for l in res:gmatch("([^\r\n]+)\r?\n?") do
+  --       table.insert(out, {["text"] = l})
+  --     end
+  --     return out
+  -- end)
+  function refreshChoices()
+    if myTask then
+      myTask:terminate()
+      myTask = nil
+    end
+    local q = c:query()
+    local cmd = ("autosuggestions-gateway %q"):format(q)
+    -- print("cmd: " .. cmd)
+    myTask = hs.task.new("/usr/local/bin/brishz2.dash",
+                function(exitCode, stdOut, stdErr)
+                  local res = stdOut
+                  local out = {}
+                  for l in res:gmatch("([^\r\n]+)\r?\n?") do
+                    table.insert(out, {["text"] = l})
+                  end
+                  c:choices(out)
+                end, {cmd})
+    if myTask  then
+      myTask:start()
+    end
+  end
+  c:queryChangedCallback(function(query)
+      if timer and timer:running() then
+        timer:stop()
+      end
+      -- timer = hs.timer.doAfter(0.3, function() c:refreshChoicesCallback() end)
+      timer = hs.timer.doAfter(0.0, refreshChoices)
+  end)
+  c:query(hs.pasteboard.getContents())
+  c:show()
+  if hs.keycodes.currentSourceID() == inputEnglish then
+    eventtap.keyStroke({}, hs.keycodes.map['right'])
+  else
+    eventtap.keyStroke({}, hs.keycodes.map['left'])
+  end
+end
+hs.hotkey.bind(hyper, "g", anycomplete)
 ---
 -- https://github.com/kovidgoyal/kitty/issues/45
 hs.hotkey.bind(hyper, "k", function()
