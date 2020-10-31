@@ -34,10 +34,10 @@ function rcr-list() {
 }
 function rclonef() {
     doc "Warning: you need to supply exactly one / after the directory, or it won't work. Examples: 'rabbit0:' 'rabbit0:g/'"
-    local query="${rclonef_query}" remote="${1:?}" local="${2:?}"
+    local rgquery=("${rclonef_rgquery[@]:-.}") query="${rclonef_query}" remote="${1:?}" local="${2:?}"
 
     local paths
-    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi rcr-list "$remote" | fz --preview-window down:4:wrap --query "$query ")}" ) || return 1
+    paths=( "${(@f)$(memoi_expire=${rfExpire:-$((3600*24*7))} memoi_skiperr=y memoi_key="$rudi||$rabbit" eval-memoi rcr-list "$remote" | rg --smart-case "$rgquery[@]" | fz --preview-window down:4:wrap --query "$query ")}" ) || return 1
     local i
     ##
     # old API design: <cmd>... <entry-of-fuzzy-paths>
@@ -51,11 +51,12 @@ function rclonef() {
 
 }
 function r1() {
-    local root="${r1_root:-${r1_r}}" query="$(fz-createquery "$@")"
+    local root="${r1_root:-${r1_r}}" query='' rgquery="$(rg-createquery "$@")"
+    # query="$(fz-createquery "$@")"
 
     local cache="${r1_path:-${r1_p:-$HOME/base/cache/}}"
     mkdir -p $cache
-    rabbit="$root" @opts query "$query" @ rclonef rabbit0: $cache
+    rabbit="$root" @opts rgquery "$rgquery" query "$query" @ rclonef rabbit0: $cache
 }
 function r0() {
     # this supports resume but needs a mounted drive `rcrmount rabbit0: ~/r0`

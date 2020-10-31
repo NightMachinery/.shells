@@ -59,6 +59,13 @@ function fz-q() {
 
     fz --query "$query"
 }
+function rg-createquery() {
+    local i res=''
+    for i in ${@} ; do
+        res+=".*$i"
+    done
+    ec $res
+}
 function fz-createquery() {
     # (( ${#@} == 0 )) || mg_sep=' ' mapg "\'\$i" "${=@}"
     local i res=''
