@@ -7,7 +7,7 @@ function addToPATH {
     #path[1,0]="$1"
     #path=("$1" "$path[@]")
     PATH="$1:$PATH"
-    typeset -Ug path
+    # typeset -Ug path
 }
 function add-path {
     doc add-path NODE_PATH /some/path

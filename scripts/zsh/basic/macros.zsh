@@ -64,7 +64,7 @@ alias aliasfnq-ng='\noglob h_aliasfnq-ng'
 function aliasfn-classic() {
     local args=( "$@" )
     [[ "$args[*]" =~ '\s*([^=]+)=(.*[^\s])\s*' ]] || { echo invalid alias: "$args[*]" >&2 ; return 1 }
-    run-on-each dvar args match
+    # run-on-each dvar args match
     aliasfn "$match[1]" "$match[2]"
 }
 aliasfn alifn aliasfn-classic

@@ -1,4 +1,9 @@
 ## Global Aliases
+alias -g ...='../..'
+alias -g ....='../../..'
+alias -g .....='../../../..'
+alias -g ......='../../../../..'
+
 alias -g @f=' | inargsf '
 alias -g @ff=' | fz | inargsf '
 # alias -g MAGIC='| { eval "$(read -d "" -r -E)" }'

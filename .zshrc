@@ -1,10 +1,10 @@
+# @perf zshrc takes a lot of time (2s?). Most of these seem to be from compinit. Hard to profile these as their second runs are lighter.
+
 # export TERM="xterm-256color" #Might do a lot of damage. Added for multi-term.
+### OMZ config (no longer loaded)
 DEFAULT_USER="evar"
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
-
-# Path to your oh-my-zsh installation.
-export ZSH=~/.oh-my-zsh
 
 # Set name of the theme to load. Optionally, if you set this to "random"
 # it'll load a random theme each time that oh-my-zsh is loaded.
@@ -62,11 +62,11 @@ export ZSH=~/.oh-my-zsh
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git git-extras lein pip sbt scala screen sprunge sudo vi-mode redis-cli)
+# plugins=(git git-extras lein pip sbt scala screen sprunge sudo vi-mode redis-cli)
+plugins=(git git-extras)
 isDarwin && plugins+=(osx)
-# ecdbg $options[autopushd]
-source $ZSH/oh-my-zsh.sh
-# ecdbg $options[autopushd]
+# export ZSH=~/.oh-my-zsh
+# source $ZSH/oh-my-zsh.sh # @retiredperf this takes ~2.5s
 
 # User configuration
 
@@ -96,23 +96,75 @@ source $ZSH/oh-my-zsh.sh
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+###
+
+zsh-defer psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh
+
+## vi-mode (forked from OMZ)
+# Updates editor information when the keymap changes.
+function zle-keymap-select() {
+  zle reset-prompt
+  zle -R
+}
+
+# Ensure that the prompt is redrawn when the terminal size changes.
+TRAPWINCH() {
+  zle &&  zle -R
+}
+
+zle -N zle-keymap-select
+zle -N edit-command-line
 
 
-# POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(status)
+bindkey -v
 
-zsh-defer psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh 
+# allow v to edit the command line (standard behaviour)
+autoload -Uz edit-command-line
+bindkey -M vicmd 'v' edit-command-line
 
+# allow ctrl-p, ctrl-n for navigate history (standard behaviour)
+bindkey '^P' up-history
+bindkey '^N' down-history
+
+# allow ctrl-h, ctrl-w, ctrl-? for char and word deletion (standard behaviour)
+bindkey '^?' backward-delete-char
+bindkey '^h' backward-delete-char
+bindkey '^w' backward-kill-word
+
+# allow ctrl-r to perform backward search in history
+bindkey '^r' history-incremental-search-backward
+
+# allow ctrl-a and ctrl-e to move to beginning/end of line
+bindkey '^a' beginning-of-line
+bindkey '^e' end-of-line
+
+# if mode indicator wasn't setup by theme, define default
+if [[ "$MODE_INDICATOR" == "" ]]; then
+  MODE_INDICATOR="%{$fg_bold[red]%}<%{$fg[red]%}<<%{$reset_color%}"
+fi
+
+function vi_mode_prompt_info() {
+  echo "${${KEYMAP/vicmd/$MODE_INDICATOR}/(main|viins)/}"
+}
+
+# define right prompt, if it wasn't defined by a theme
+if [[ "$RPS1" == "" && "$RPROMPT" == "" ]]; then
+  RPS1='$(vi_mode_prompt_info)'
+fi
+##
 #This doesn't work. I have no idea why.
 bindkey -M viins ‘ii’ vi-cmd-mode
 bindkey -v
 
 bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+Return to insert a literal newline without accepting the command
 
+##
 # Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
 # tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
 isDarwin && export TERM=xterm-24bits || true
+##
 
-
+##
 # start typing + [Up-Arrow] - fuzzy find history forward
 if [[ "${terminfo[kcuu1]}" != "" ]]; then
     autoload -U up-line-or-beginning-search
@@ -136,17 +188,27 @@ alias it2setkeylabel=~/.iterm2/it2setkeylabel
 alias it2ul=~/.iterm2/it2ul
 alias it2universion=~/.iterm2/it2universion
 ###
-unsetopt correct_all
-fpath=(~/.zsh.d/ $fpath)
 antibody bundle mafredri/zsh-async
 zsh-defer antibody bundle zdharma/zui
-re source "$NIGHTDIR"/zsh/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
+
+# re source "$NIGHTDIR"/zsh/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
+
 # autoload -U deer
 # zle -N deer
 # bindkey '\ek' deer
-autoload -U +X bashcompinit && bashcompinit
-_comp_options+=(globdots)
-zsh-defer source-interactive-all
+
+if isExpensive ; then
+  unsetopt correct_all
+
+  fpath=(~/.zsh.d/ $fpath[@])
+
+  autoload -Uz compinit && compinit # @heavy >0.35s
+  autoload -U +X bashcompinit && bashcompinit
+  zmodload -i zsh/complist
+  _comp_options+=(globdots)
+fi
+
+zsh-defer source-interactive-all # @heavy 0.32s
 
 ## fzf zsh integration (obsolete, as we now use fzf-tab
 # # sth in .zshrc overrides these so ...
@@ -186,7 +248,7 @@ zle -N fr_zle_deus
 bindkey '^[\t' fr_zle_deus # alt+tab
 ##
 
-zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
+# zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
 ##
 # antibody bundle intelfx/pure
 antibody bundle sindresorhus/pure
@@ -211,7 +273,7 @@ function prompt_pure_check_cmd_exec_time () {
 zsh-defer antibody bundle unixorn/git-extra-commands
 zsh-defer antibody bundle zdharma/zzcomplete # ^F
 zsh-defer antibody bundle zsh-users/zsh-autosuggestions
-silence unalias =
+silent unalias =
 # antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions #undeferable
 ##
@@ -328,6 +390,7 @@ omz_termsupport_precmd () {
     fi
     tty-title "${PWD:t}"
 }
+precmd_functions+=(omz_termsupport_precmd)
 prompt_pure_set_title() true # disables pure setting the title
 ##
 # https://stackoverflow.com/a/14634437/1410221

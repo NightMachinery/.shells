@@ -56,7 +56,9 @@ typeset -Ag naliases #normal aliases #now useless
 
 balias() as_caller=$0 alias-special baliases "$@"
 ialias() as_caller=$0 alias-special ialiases "$@"
-alias() as_caller=$0 alias-special naliases "$@"
+if isMalice ; then
+  function alias() as_caller=$0 alias-special naliases "$@"
+fi
 
 expand-alias-space() {
     (( $+baliases[$LBUFFER] )) ; insertBlank=$?

@@ -11,10 +11,17 @@ function sleepifidle() {
     sleepforce
 }
 ##
-powersaving_apps=(bettert iterm chrome Insiders scsynth Telegram java) # tmux hammersp
+powersaving_apps=(iterm chrome Insiders scsynth Telegram java podcast Finder bettertouch) # tmux hammersp bettert
+# seems that -SIGSTOP is useless for scsynth
+# btt starts itself up again after a minute or two (even with sudo kill)
+# emacs daemon can't handle SIGSTOP
 function powersaving-off() {
     # ffkill -SIGCONT $powersaving_apps
-    pgrep -i "${(j.|.)powersaving_apps}" | inargsf kill -SIGCONT
+    pgrep -i "${(j.|.)powersaving_apps}" | inargsf sudo kill -SIGCONT
+
+    # awaysh /Applications/BetterTouchTool.app/Contents/MacOS/BetterTouchTool
+    # open /Applications/BetterTouchTool.app
+
     # proxy-on
     # wgd
 }
@@ -23,6 +30,7 @@ function powersaving-on() {
     # proxy-off
     
     # ffkill -SIGSTOP $powersaving_apps
-    pgrep -i "${(j.|.)powersaving_apps}" | inargsf kill -SIGSTOP
+    pgrep -i "${(j.|.)powersaving_apps}" | inargsf sudo kill -SIGSTOP
+    # pgrep -i "bettertouch" | inargsf sudo kill
 }
 ##

@@ -4,3 +4,4 @@ re noglobfn jlib jfic
 ##
 psource "$HOME/.privateShell"
 [ -e ~/.localScripts ] && re psource ~/.localScripts/**/*.zsh || :
+typeset -Ug path

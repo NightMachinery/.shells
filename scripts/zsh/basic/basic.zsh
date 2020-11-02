@@ -58,6 +58,7 @@ function gquote() {
 }
 alias gq=gquote
 function run-on-each() {
+    # ec "INFO: $0 $(gq "$@")"
     # doc "Note that run-on-each won't run anything at all if no arguments are supplied"
     # doc Use unusual name not to shadow actual vars
     local i98765
@@ -65,6 +66,9 @@ function run-on-each() {
     do
         eval "$1 $(gquote "$i98765")"
     done
+}
+function run-on-each2() {
+    zargs --max-lines=1 --no-run-if-empty -- "${@:2}" -- "$=1" || ecerr "ERR: $0 $(gq "$@")"
 }
 alias re='run-on-each'
 function re-async() {
@@ -76,5 +80,7 @@ function re-async() {
         eval "$1 $(gquote "$i98765")" &
     done
 }
-setopt re_match_pcre extendedglob pipefail hash_executables_only # hash_executables_only will not hash dirs instead of executables, but it can be slow.
+setopt multios re_match_pcre extendedglob pipefail interactivecomments hash_executables_only # hash_executables_only will not hash dirs instead of executables, but it can be slow.
+setopt long_list_jobs complete_in_word always_to_end
+setopt append_history extended_history hist_expire_dups_first hist_ignore_dups hist_ignore_space hist_verify inc_append_history share_history
 unsetopt autopushd

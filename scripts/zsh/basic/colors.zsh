@@ -90,23 +90,23 @@ random-color() {
     # --seed "$(head -c 100 /dev/random)" 
 }
 random-color-arr() {
-	#shuf -i 0-255 -n 3
-	# subshell doesn't change OUR seed. #ec $(($RANDOM % 256)) $(($RANDOM % 256)) $(($RANDOM % 256))
-	[[ "$(randomColor.js -f rgbArray "$@")" =~ '\[(\d+),(\d+),(\d+)\]' ]] && ec "$match[@]"
+    #shuf -i 0-255 -n 3
+    # subshell doesn't change OUR seed. #ec $(($RANDOM % 256)) $(($RANDOM % 256)) $(($RANDOM % 256))
+    [[ "$(randomColor.js -f rgbArray "$@")" =~ '\[(\d+),(\d+),(\d+)\]' ]] && ec "$match[@]"
 }
 ecrainbow-n() {
-	local hue="$(random-color -f hex)"
-	print -nr -- "$(colorfg $(random-color-arr -l dark --hue "$hue"))$(colorbg $(random-color-arr -l light --hue "$hue"))""$@"
+    local hue="$(random-color -f hex)"
+    print -nr -- "$(colorfg $(random-color-arr -l dark --hue "$hue"))$(colorbg $(random-color-arr -l light --hue "$hue"))""$@"
 }
 ecrainbow() { ecrainbow-n "$@" ; echo }
 ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
 ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
 ecalternate() {
-	(($#)) || { resetcolor ; echo ; return 0 }
-	ecalt1 "$1"
-	shift 1
-	(($#)) || { resetcolor ; echo ; return 0 }
-	ecalt2 "$1"
-	shift 1
-	$0 "$@"	
+    (($#)) || { resetcolor ; echo ; return 0 }
+    ecalt1 "$1"
+    shift 1
+    (($#)) || { resetcolor ; echo ; return 0 }
+    ecalt2 "$1"
+    shift 1
+    $0 "$@"
 }

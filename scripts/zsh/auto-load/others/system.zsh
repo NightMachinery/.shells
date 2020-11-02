@@ -93,6 +93,7 @@ function brightness-screen() {
 	local screen="$(gmktemp --suffix .png)"
 	screencapture -x "$screen" # @darwinonly
 	local screen_brightness="$(detect_brightness_mode=$mode detect_brightness.py $screen)"
+	command rm $screen
 	ec $screen_brightness
 }
 function brightness-auto() {
@@ -113,3 +114,27 @@ function brightness-auto-loop() {
 	serr @opts s "${lo_s:-3}" @ loop brightness-auto "${@:-0.3}"
 }
 @opts-setprefix brightness-auto-loop lo
+##
+function open_command() {
+  # forked from OMZ
+  local open_cmd
+
+  # define the open command
+  case "$OSTYPE" in
+    darwin*)  open_cmd='open' ;;
+    cygwin*)  open_cmd='cygstart' ;;
+    linux*)   open_cmd='xdg-open' ;;
+    msys*)    open_cmd='start ""' ;;
+    *)        echo "Platform $OSTYPE not supported"
+              return 1
+              ;;
+  esac
+
+  # don't use nohup on OSX
+  if [[ "$OSTYPE" == darwin* ]]; then
+    $open_cmd "$@" &>/dev/null
+  else
+    awaysh $open_cmd "$@"
+  fi
+}
+##

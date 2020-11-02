@@ -2,7 +2,7 @@
 
 tmuxnew BrishGarden brishgarden
 
-tmuxnew supercollider scsynth -u 57110 -a 1024 -i 2 -o 2 -R 0 -l 100  -B 127.0.0.1
+# tmuxnew supercollider scsynth -u 57110 -a 1024 -i 2 -o 2 -R 0 -l 100  -B 127.0.0.1
 
 # needs to run by cron # tmux new -d -s books "$NIGHTDIR/zsh/book-checker.zsh"
 

@@ -66,3 +66,7 @@ addToPATH "/usr/local/opt/curl/bin"
 
 run-on-each addToPATH "$NIGHTDIR"/**/
 addToPATH /myBin/
+
+if isZsh ; then
+    typeset -Ug path
+fi

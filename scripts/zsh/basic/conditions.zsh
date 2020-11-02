@@ -16,14 +16,20 @@ function isLinux() {
     [[ "$uname" == "Linux" ]]
 }
 alias isL=isLinux
-function isMBP() {
-    [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]]
-}
+if iszsh ; then
+    function isMBP() {
+        [[ "$HOST" == 'Fereidoons-MacBook-Pro.local' ]]
+    }
+else
+    function isMBP() {
+        [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]]
+    }
+fi
 ##
 function isKitty() {
     test -n "$KITTY_WINDOW_ID"
 }
-iskitty() { isKitty "$@" }
+iskitty() { isKitty "$@" ; }
 ##
 isI() {
     test -z "$FORCE_NONINTERACTIVE" && {
