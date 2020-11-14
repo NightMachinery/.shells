@@ -10,10 +10,10 @@ function hear-noipc() {
 # paplay (PulseAudio)
 # afplay (macOS only), fast
 # mplayer -quiet
-# aliasfn hearinvisible silent hear-noipc --no-terminal --load-scripts=no
 # aliasfn hearinvisible silent ffplay -autoexit -nodisp -loglevel panic # faster startup than mpv
 aliasfn hearinvisible silent play # faster startup than ffplay (play from sox)
 aliasfn heari hearinvisible
+aliasfn hearinvisible-mpv silent hear-noipc --no-terminal --load-scripts=no
 @opts-setprefix hearinvisible hear-noipc
 ##
 @opts-setprefix hear hear-noipc
