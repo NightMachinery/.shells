@@ -43,10 +43,10 @@ function bell-zsh1() {
 }
 bell-avarice() {
     # fsay "disquiet creatures of avarice have risen yet again ..."
-    @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
+    @opts v 70 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
 }
 bell-luna-mpv() {
-    @opts v 100 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/luna_mpv/$~audioglob)"
+    @opts v 100 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna_mpv/$~audioglob)"
 }
 bell-toy() {
     # say "disquiet creatures of avarice have risen yet again ..."

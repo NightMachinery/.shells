@@ -43,6 +43,7 @@ function mpv() {
     tty-title "$first"
     revaldbg command-mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
 }
+aliasfn mpv-noconfig command mpv --no-config --load-scripts=no
 function mpv-get() {
     <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "${2:-$mpv_audio_ipc}"|jq --raw-output -e .data
 }
@@ -84,10 +85,10 @@ function mpv-cache() {
     mpv --force-seekable=yes --cache=yes --cache-secs=99999999 "$@"
 }
 function mpv-stream() {
-    local file="$@[-1]"
+    local file="$(realpath "$@[-1]")"
     local opts=( "${@[1,-2]}" )
     # cache has been disabled in mpv.conf
-    mpv_streaming=y mpv $opts[@] appending://"$file"
+    mpv_streaming=y mpv-notag $opts[@] appending://"$file"
 }
 aliasfn mpvs mpv-stream
 ##
@@ -99,7 +100,7 @@ function mpv-partial() {
     ecerr "$0 started ..."
     local l=''
     # --quiet
-    mpv "$@" |& {
+    mpv-stream "$@" |& {
         while read -d $'\n' -r l
         do
             color 50 200 50 "$l" >&2
