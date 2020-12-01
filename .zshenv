@@ -11,8 +11,12 @@ isNotExpensive || {
     source ~/.shared.sh
 
     export HH_CONFIG=hicolor
+    ## 
+    # this is a TCL list https://wiki.tcl-lang.org/page/list , uses whitespace as sep
     #isLinux && export TCLLIBPATH=/usr/lib/x86_64-linux-gnu
+    isLinux && export TCLLIBPATH="$TCLLIBPATH /home/linuxbrew/.linuxbrew/lib"
     isDarwin && export TCLLIBPATH="/usr/local/lib" # for expect to work
+    ##
     source <(antibody init)
     ANTIBODY_HOME="$(antibody home)"
     DISABLE_DEFER=y
