@@ -10,3 +10,4 @@ cargo install cargo-play
 cargo install zoxide -f
 cargo install cargo-edit
 cargo install gping
+cargo install procs
