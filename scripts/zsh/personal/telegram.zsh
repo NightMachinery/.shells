@@ -58,11 +58,12 @@ function ocwvid-process() {
 
     tsend --link-preview --parse-mode markdown -- $water "$caption"
     tsend --link-preview --parse-mode markdown -- $tlg_amar "$caption"
-    pushf "$amardir/wip/$(uuidm)"
+    pushf "$amardir/wip/$(uuidm)" || return $?
     {
         getlinks-c -e '\.mp4$' "$l" | head -1 | inargsf aa -Z || return 3
-        mv * "$name".mp4
-        failnoisily hb265-tlg-bg *
+	local dest="$name".mp4
+        mv * $dest
+        failnoisily hb265-tlg-bg $dest
     } always { popf }
 }
 @opts-setprefix ocwvid-process hb265-tlg
