@@ -54,10 +54,13 @@ function ppgrep() {
 ##
 function  jglan() {
     # doesn't work all that well (skips some newlines)
-    jah fnswap glances 'gtimeout 10s unbuffer glances' glan
+    fnswap glances 'gtimeout 10s unbuffer glances' glan | aha --line-fix > jglan.html # --black is worse
+}
+function jhtop() {
+	gtimeout 1s htop | aha --line-fix --black > jhtop.html
 }
 function jprocs() {
-    jah procs -c always "$@"
+    procs --pager disable --color always | aha --black > jprocs.html
 }
 function jprocs-pic() {
     procs "$@" | text2img "$0 $*"

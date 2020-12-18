@@ -75,7 +75,9 @@ function vcnpp() {
         # vcsh $repo push "$remote" master
         # done
         ##
-        isMBP && brishzr vcnpp
+        if isMBP ; then
+	    brishzr vcnpp
+	fi
     } always { popf }
 }
 function cp2tmp() {

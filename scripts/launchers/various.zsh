@@ -11,6 +11,8 @@ tmuxnew BrishGarden brishgarden /api/v1 # do NOT use tmuxnewsh, as that sets FOR
 ##
 # caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile # miniserve -- . #http-server
+
+tmuxnew shadowsocks-ss ss-server -c ~/ss.json # we might also have this in systemd
 ##
 tmuxnewsh2 mahouka hi10-new-notify mahouka
 #tmuxnew splash 'docker run -it -p 8050:8050 scrapinghub/splash'
