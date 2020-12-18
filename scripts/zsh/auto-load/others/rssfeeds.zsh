@@ -36,6 +36,10 @@ function sumgensim() {
     text="$(w3m -dump "$1")" word_count="${2:-150}" serr python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
 }
 function sumym () {
+    ## ALT:
+    # Not that good (bad free tier, traditional algo):
+    # https://smmry.com/https://www.theverge.com/2020/11/18/21573109/epic-tim-sweeney-apple-app-store-fee-cut-reduction-criticize#&SM_LENGTH=5
+    ##
     local url="$1"
 
     # https://pypi.org/project/sumy/

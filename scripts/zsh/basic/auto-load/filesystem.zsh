@@ -10,8 +10,10 @@ function realpath-relchild() {
 }
 ##
 function cdm() {
-    mkdir -p -- "$1" &&
-        cd -P -- "$1"
+    local d="$*"
+
+    mkdir -p -- "$d" &&
+        cd -P -- "$d"
 }
 function bottomdir() {
     { { [ -e "$1" ]  && ! [ -d "$1" ] } || { ! [ -e "$1" ] && [[ "$1" != */ ]] } } && { ec "${1:h}"; } || { ec "$1"; } ;}

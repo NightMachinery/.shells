@@ -8,28 +8,43 @@
 ntag_colors=(red orange yellow green blue purple gray black aqua teal)
 ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
-## shortcut aliases
+### shortcut aliases
 function h_tgfn_tag() {
     local tag="${1:? Tag required}"
 
-    eval "function tg-$tag() {
-    ntag-add \"\$1\" $tag
-}
-reify tg-$tag
-"
+    aliasfnq tg-"$tag" ntag-add-multi "$tag"
 }
 re h_tgfn_tag $ntag_colors[@]
 aliasfn mg tg-gray
+##
+function ntag-filter-or-add() {
+    local tag="${1:?}" ; shift
+    if (( $#@ == 0 )) ; then
+        ntag-filter "$tag"
+    else
+        ntag-add-multi "$tag" "$@"
+    fi
+}
 function h_aliastag() {
-    aliasfn "$1" ntag-filter "$1"
+    # aliasfn "$1" ntag-filter "$1"
+    aliasfn "$1" ntag-filter-or-add "$1"
     @opts-setprefix "$1" ntag-search
 }
 re h_aliastag $ntag_colors[@] @todo @todo{0..9} # You can use `fd ..@todo` to prefix-search.
-aliasfnq gray ntag-filter "gray | 'grey"
+##
+# aliasfnq gray ntag-filter "gray | 'grey"
+function gray() {
+    local tag="gray | 'grey"
+    if (( $#@ == 0 )) ; then
+        ntag-filter "$tag"
+    else
+        ntag-add-multi "gray" "$@"
+    fi
+}
 @opts-setprefix gray ntag-search
 aliasfn grey gray
 @opts-setprefix grey ntag-search
-##
+###
 function ntag-l() {
     if isI && istty ; then
         exa -a --color always "$@" | ntag-color
