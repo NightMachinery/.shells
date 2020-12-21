@@ -346,9 +346,13 @@ function url-tailf() {
     ec "$(url-tail "$(urlfinalg "$1")")"
 }
 function url-tailedtitle() {
-    ec "$(urlmeta "$1" title) $(url-tail "$(urlfinalg "$1")")"
+    ec "$(url-title "$1") $(url-tail "$(urlfinalg "$1")")"
 }
 renog url-tailedtitle
+function url-title() {
+    urlmeta2 "${1:?}" title
+}
+renog url-title
 function tlrl-gh() {
     tlrl-ng -e w2e-gh -p "[$(url-tailf "$1")] " "$@"
 }
