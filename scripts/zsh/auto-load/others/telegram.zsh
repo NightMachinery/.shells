@@ -1,4 +1,4 @@
-alias tsmf='tsendf $me'
+alias tsmf='tsendf $me_tel'
 ###
 function tnotif() {
     # ALT: notif
@@ -55,3 +55,11 @@ function h_tlg-clean-copied() {
 function tlg-clean-paste() {
     tlg-clean-copied "$(pbpaste)"
 }
+##
+function podcast2tel() {
+    local dest="${podcast2tel_dest:-${me_tel}}"
+    local l="$1"
+    local title="$rssTitle" # from rss-tsend
+    tsend --file "$l" -- "$dest" "$title"
+}
+##

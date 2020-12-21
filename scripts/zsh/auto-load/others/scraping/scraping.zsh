@@ -68,6 +68,9 @@ function curl-useragent() {
         -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
         --compressed "$@"
 }
+function web-lastmod() {
+    curlm -I "$1" 2>&1 | rg --smart-case last-modified
+}
 function cookies-copy() {
     ec-copy "theCookies=$(gq "$(cookies-auto "$@")" "$@")"
 }

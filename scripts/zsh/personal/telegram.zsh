@@ -1,4 +1,5 @@
-me="Arstar"
+export me_tel="Arstar"
+me="$me_tel"
 export alice='-1001179162919'
 export arista='-1001154785017'
 export water='-1001293952668'
@@ -7,6 +8,7 @@ export tlogs='-1001460496622'
 export tlg_notifs='-1001185370891'
 export tlg_notifc="$water"
 export tlg_amar='-1001286597974'
+export tlg_podcastgen='-1001222930214'
 ###
 function alice() {
     tsend -- "$alice" "$*" && ec "Alicized successfully: $*" || ecerr 'Alicization failed!'
