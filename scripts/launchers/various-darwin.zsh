@@ -1,5 +1,7 @@
 #!/usr/bin/env zsh
 
+powersaving_status_del
+
 tmuxnew BrishGarden brishgarden
 
 # tmuxnew supercollider scsynth -u 57110 -a 1024 -i 2 -o 2 -R 0 -l 100  -B 127.0.0.1
