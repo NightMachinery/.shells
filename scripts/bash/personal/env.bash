@@ -24,7 +24,8 @@ export NODEJS_CHECK_SIGNATURES=no #for asdf's nodejs
 # export WG_CONF=~/.cf-warp/cf-warp.conf
 # export WG_CONF=~/Base/keys/karbas/fereydoun1.conf
 # export WG_CONF=~/Base/keys/zii/wg0-client-c1.conf
-export WG_CONF=~/Base/keys/zii/peer1.conf
+# export WG_CONF=~/Base/keys/zii/peer1.conf
+export WG_CONF=~/Base/keys/eva/eva_peer1.conf
 ##
 export DOOMDIR=~/doom.d
 ##
