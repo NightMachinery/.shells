@@ -62,3 +62,4 @@ wikiquotes
 xkcdpass
 yapf
 yq
+lightnovel-crawler
