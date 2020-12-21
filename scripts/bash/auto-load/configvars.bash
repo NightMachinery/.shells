@@ -1,5 +1,6 @@
 export LESS='-RiNF --mouse --wheel-lines=3' #F: --quit-if-one-screen ; R: maintain the ANSI colour sequences; i: smartcase searches (all lower=ignore case);  -N or --LINE-NUMBERS Causes a line number to be displayed at the beginning of each line in the display.
 isSSH && LESS="-RiNF"
+export PAGER="$commands[less]"
 ##
 # I also use in my own functions (e.g., `reval-onhold`), so let them be.
 # https://github.com/alexdelorenzo/onhold

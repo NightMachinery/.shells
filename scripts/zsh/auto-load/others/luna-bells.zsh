@@ -77,7 +77,10 @@ function lunaquit() {
     pgrep LUNA_MARKER | inargsf reval-ec serr kill-withchildren
     display-gray-off
 }
-aliasfn lq lunaquit
+function lq() {
+    lunaquit
+    bell-lm-amiindanger
+}
 function deluna() {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
@@ -244,6 +247,7 @@ bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
 bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
 bell-lm-maker strawberryjuice flac/10.3_09_MI_strawberryjuice..blue..flac
+bell-lm-maker amiindanger flac/06.4_04_MI_amiindanger.flac
 bell-lm-maker-dir mhm mhm
 # `fr heari 'flac/ MI cool'`
 ##

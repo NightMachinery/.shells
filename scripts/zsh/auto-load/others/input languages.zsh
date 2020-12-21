@@ -36,11 +36,14 @@ function lang-toggle() {
     esac
     # input-lang-set toggle
 }
+###
 ##
-input_lang_push_lang_get() redism get input_lang_push_lang
-input_lang_push_lang_set() { silent redism set input_lang_push_lang "$@" ; }
-input_lang_push_lang_setnx() { silent redism setnx input_lang_push_lang "$@" ; }
-input_lang_push_lang_del() { silent redism del input_lang_push_lang ; }
+redis-defvar input_lang_push_lang
+# input_lang_push_lang_get() redism get input_lang_push_lang
+# input_lang_push_lang_set() { silent redism set input_lang_push_lang "$@" ; }
+# input_lang_push_lang_setnx() { silent redism setnx input_lang_push_lang "$@" ; }
+# input_lang_push_lang_del() { silent redism del input_lang_push_lang ; }
+##
 function input-lang-push() {
     local force="$input_lang_push_force"
 
