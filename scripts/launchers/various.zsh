@@ -13,6 +13,7 @@ tmuxnew BrishGarden brishgarden /api/v1 # do NOT use tmuxnewsh, as that sets FOR
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile # miniserve -- . #http-server
 
 tmuxnew shadowsocks-ss ss-server -c ~/ss.json # we might also have this in systemd
+tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
 ##
 tmuxnewsh2 mahouka hi10-new-notify mahouka
 #tmuxnew splash 'docker run -it -p 8050:8050 scrapinghub/splash'
