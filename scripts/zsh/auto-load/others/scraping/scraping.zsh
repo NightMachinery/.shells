@@ -1234,3 +1234,5 @@ function url-date() {
     ec $date
 }
 ##
+aliasfn rss-tll rss-tl -e w2e-curl
+##
