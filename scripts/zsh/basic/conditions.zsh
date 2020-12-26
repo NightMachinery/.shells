@@ -25,6 +25,10 @@ else
         [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]]
     }
 fi
+function isLocal() {
+	# @darwinonly
+	isDarwin
+}
 ##
 function isKitty() {
     test -n "$KITTY_WINDOW_ID"

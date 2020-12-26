@@ -182,7 +182,8 @@ function full-html2() {
     # http: error: Incomplete download: size=46696; downloaded=131310
 
 
-    local mode="${fhMode:-http}"
+    # local mode="${fhMode:-http}"
+    local mode="${fhMode:-cloudscraper}"
     local url="$1"
 
     if [[ "$url" =~ '^(?:https?://)?[^/]*techcrunch\.' ]] ; then
@@ -207,6 +208,10 @@ function full-html2() {
         # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
     }
     [[ "$mode" =~ '^(c|g)url$' ]] && { $proxyenv gurl "$url" ; return $? }
+    [[ "$mode" =~ '^cloudscraper$' ]] && { 
+	    $proxyenv cloudscraper_get.py "$url" # idk if proxyenv works for this
+            return $?
+    }
     [[ "$mode" =~ '^http(ie)?$' ]] && {
         $proxyenv dbgserr httpm "$url"
         return $?
@@ -946,7 +951,7 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         fi
     fi
     local mode="${2:-md}"
-    local fhMode="${fhMode:-curlfast}"
+    isLocal && local fhMode="${fhMode:-curlfast}" # servers are fast enough to work with the default fhMode
 
     local html="${html:-$(full-html2 "$url")}"
     local cleanedhtml="${cleanedhtml:-$(<<<"$html" readability "$url")}" # takes ~1.5s
