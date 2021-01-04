@@ -26,7 +26,7 @@ function ntag-filter-or-add() {
     fi
 }
 function h_aliastag() {
-    # aliasfn "$1" ntag-filter "$1"
+    # aliasfn "$1" ntag-filter "$1" # @altAPT ; This is used less often, so I dropped it. You can use `tgf blue green ...` for this.
     aliasfn "$1" ntag-filter-or-add "$1"
     @opts-setprefix "$1" ntag-search
 }

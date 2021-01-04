@@ -889,7 +889,7 @@ function libgendl-md5() {
         test -z "$lgNoBok" && ecerr "bok failed. Trying main ..."
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
-          aa -Z $links[@]
+          aa --conditional-get=true --allow-overwrite=true -Z $links[@]
         else
           ecerr "$0: No books found for md5: $md5"
           return 1

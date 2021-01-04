@@ -16,3 +16,11 @@ function http-static-caddy() {
 aliasfn http-static http-static-caddy
 ##
 aliasfn wifi-info wifi network # @darwinonly
+##
+aliasfn speedtest-py pipx run speedtest-cli
+function speedtest-i() {
+    local q="$(fz-createquery "$@")"
+
+    speedtest-py --server "$(speedtest-py --list | fzp "$q" | ghead -n 1 | cut -d ')' -f1 | trimsed)"
+}
+##

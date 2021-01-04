@@ -1,5 +1,7 @@
 alias aacert='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 alias ysp='y-stream-pipe'
+aliasfn aa-gateway aacookies
+aliasfn aa-insecure aa-gateway --check-certificate=false
 ###
 function aaserver() {
     mkdir -p ~/Downloads/aas/
@@ -25,9 +27,10 @@ Uses |theCookies| var or else feeds first URL to |cookies|." MAGIC
 }
 
 function aas() {
-    # aa "$@" --on-download-start aa-stream
+    : "@deprecated Use y-stream instead."
+
     local out="$(md5m "$1")"
-    aa "$@" --dir "$out" --on-download-complete aa-stream &
+    aaNoSplit=y aa "$@" --dir "$out" --on-download-complete aa-stream &
     sleep 10
     retry-mpv "'$out'/*" || kill %
 }
