@@ -16,13 +16,21 @@ function tnotif-casual() {
 aliasfn tnotifc tnotif-casual
 ##
 function tsendf() {
-    
     local f
     for f in "${@:2}"
     do
         tsend -f "$f" -- "$1" ''
     done
 }
+function tsend-url() {
+    local dest="${1:?}" url="${2:?}" msg="$3"
+    pushf ~/tmp/"$(uuidm)" || return $?
+    {
+    aacookies "$url" || return $?
+    tsend --file * -- $dest "${msg:-$url}"
+    } always { popf }
+}
+##
 air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(mpv-get)"}
 function reval-tlg() {
     local rec="${reval_tlg_receiver:-${reval_tlg_r:-$me}}"
@@ -60,6 +68,8 @@ function podcast2tel() {
     local dest="${podcast2tel_dest:-${me_tel}}"
     local l="$1"
     local title="$rssTitle" # from rss-tsend
-    tsend --file "$l" -- "$dest" "$title"
+
+    # tsend --file "$l" -- "$dest" "$title" # sometimes did not work
+    tsend-url "$dest" "$l" "$title"
 }
 ##

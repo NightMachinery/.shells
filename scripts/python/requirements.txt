@@ -1,4 +1,5 @@
 PyPDF2
+cloudscraper
 convertdate
 daudin
 dephell[full]
@@ -30,6 +31,7 @@ jill
 json-rpc
 libgen.py
 libgenapi
+lightnovel-crawler
 magic-wormhole
 metadata-parser
 metadata_parser
@@ -42,6 +44,7 @@ passlib[bcrypt,argon2,totp]
 pdfCropMargins
 pexpect
 piep
+pipx
 pixcat
 plumbum
 pypyp
@@ -62,5 +65,3 @@ wikiquotes
 xkcdpass
 yapf
 yq
-lightnovel-crawler
-pipx

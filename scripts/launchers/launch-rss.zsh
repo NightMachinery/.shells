@@ -5,9 +5,11 @@ rt_skip="$rt_skip"
 ## podcasts
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(@opts dest $tlg_podcastgen @ podcast2tel) rt_notel=y rt_ge=( rsstail -i 120 -e -n 3 -N ) rt_eud=0" tmuxnewsh rss-podcastgen rss-tsend 'https://rss.art19.com/techmeme-ridehome'
 ## uni
-tmuxnewshenv="rt_skip='$rt_skip' rt_e=(amar-process) rt_notel=y rt_ge=(withchrome getlinks-uniq -e '/session/id/video/') rt_nt=y rt_eid=$((3600*3)) rt_eud=0" tmuxnewsh rss-ocwvids rss-tsend 'http://ocw.sharif.edu/course/id/224'
+# tmuxnewshenv="rt_skip='$rt_skip' rt_e=(amar-process) rt_notel=y rt_ge=(withchrome getlinks-uniq -e '/session/id/video/') rt_nt=y rt_eid=$((3600*3)) rt_eud=0" tmuxnewsh rss-ocwvids rss-tsend 'http://ocw.sharif.edu/course/id/224'
 ##
-tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend  'https://www.scottaaronson.com/blog/?feed=rss2' 'https://buttondown.email/hillelwayne/rss' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' 'https://tamaspapp.eu/post/index.xml' 'https://www.overcomingbias.com/feed' 'https://danluu.com/atom.xml' 'https://huyenchip.com/feed.xml' 'https://feeds2.feedburner.com/GFWReport' 'https://us4.campaign-archive.com/feed?u=412bdf6ca38cdf29c3374de56&id=06c013e05f' 'http://www.viridiandreams.net/feed/' 'https://medium.com/feed/@superwuster'
+tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend 'https://www.scottaaronson.com/blog/?feed=rss2' 'https://buttondown.email/hillelwayne/rss' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' 'https://tamaspapp.eu/post/index.xml' 'https://www.overcomingbias.com/feed' 'https://danluu.com/atom.xml' 'https://huyenchip.com/feed.xml' 'https://feeds2.feedburner.com/GFWReport' 'https://us4.campaign-archive.com/feed?u=412bdf6ca38cdf29c3374de56&id=06c013e05f' 'http://www.viridiandreams.net/feed/'
+
+tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tll'" tmuxnewsh rss-gen-tll rss-tsend 'https://medium.com/feed/@superwuster'
 # 'https://www.themoneyillusion.com/feed/'
 ##
 # tmuxnewshenv="rt_skip='$rt_skip' rt_e=tlrlu" tmuxnewsh rss-genu rss-tsend 'https://www.novelupdates.com/rss.php?uid=145566&unq=5c39d8aba43cc&type=0&lid=local'
