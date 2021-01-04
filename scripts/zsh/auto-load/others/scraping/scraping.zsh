@@ -860,7 +860,8 @@ function hi10-from-page() {
 }
 function libgendl-md5-main() {
     local md5="$1"
-    local mainmirror="http://93.174.95.29"
+    # local mainmirror="http://93.174.95.29"
+    local mainmirror="http://31.42.184.140"
     # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
     local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
     getlinks-c -e '\.[^/]+$' "$urls[@]" # will get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
