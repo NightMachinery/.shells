@@ -18,10 +18,13 @@ cronenable() {
 	crontab -u $user "$cronpath"
 	mv "$cronpath" "${cronpath}.bak"
 }		
+##
 function volget() {
+	# @darwinonly
 	osascript -e 'set ovol to output volume of (get volume settings)'
 }
 function volset() {
+	# @darwinonly
 	osascript -e "set volume output volume $1"
 }
 aliasfn setv volset
@@ -48,14 +51,15 @@ function mute-external() {
 	{ lo_s=0 loop mute-external_ "$lev" }  always { volset 0 }
 }
 function display-off() {
+	# @darwinonly
 	watch -n ${1:-1} brightness 0
-	#macOS only probably
 }
 function resetdns-darwin() {
 	sudo dscacheutil -flushcache
 }
 ##
 function logout() {
+	# @darwinonly
 	logout-darwin "$@"
 }
 function logout-darwin() {
@@ -64,6 +68,16 @@ function logout-darwin() {
 function logout-darwin2() {
 	osascript -e 'tell application \"System Events\" to log out'
 }
+##
+function screen-gamma-set-dur() {
+	# @darwinonly, see https://stackoverflow.com/questions/3552037/how-to-programmatically-invert-screen-colors-in-linux
+	local dur="${1:-3}" # duration in seconds
+	local t1="${2:-1}"
+	local t2="${3:-0}"
+
+	invert_darwin.c "$dur" "$t1" "$t2"
+}
+aliasfn screen-invert-dur screen-gamma-set-dur
 ## @darwinonly
 function display-gray-is() {
 	[[ "$(gray_darwin.c s)" == "Grayscale is now: 1" ]]
