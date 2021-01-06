@@ -864,7 +864,9 @@ function libgendl-md5-main() {
     local mainmirror="http://31.42.184.140"
     # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
     local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
-    getlinks-c -e '\.[^/]+$' "$urls[@]" # will get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
+    getlinks-c -e '\.[^/]+$' "$urls[@]" | {  # will get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
+        rg -F 'cloudflare-ipfs.com'
+    }
 }
 function libgendl-md5-bok() {
     local outs="$(libgendl-md5-bok-helper "$1" |inargsf bok.py)"
@@ -895,7 +897,7 @@ function libgendl-md5() {
         test -z "$lgNoBok" && ecerr "bok failed. Trying main ..."
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
-          aa --conditional-get=true --allow-overwrite=true -Z $links[@]
+          aa-multi $links[@]
         else
           ecerr "$0: No books found for md5: $md5"
           return 1
