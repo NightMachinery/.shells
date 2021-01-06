@@ -5,7 +5,7 @@ function p() { # paste
 ##
 function enh-addfinder() {
     local sel
-    sel=("${(@f)$(finder-selection-get.as)}") || return $?
+    sel=("${(@f)$(finder-sel-get)}") || return $?
     test -z "$sel[*]" && return 1
     rgeval "$@" $sel[@]
 }

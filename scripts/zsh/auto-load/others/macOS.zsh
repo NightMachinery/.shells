@@ -1,6 +1,6 @@
 ##
 function screen-gray-set-darwin () {
-
+    # @deprecated Use =display-gray-on= and co
     ##
     defaults write com.apple.universalaccess grayscale -bool $1
     defaults write com.apple.CoreGraphics DisplayUseForcedGray -bool $1
