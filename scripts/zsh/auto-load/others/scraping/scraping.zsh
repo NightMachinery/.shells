@@ -52,12 +52,16 @@ function tlwb() {
 }
 noglobfn tlwb
 
-function wgetm() {
+function wget-cookies() {
     wget --header "$(cookies-auto "$@")" "$@"
 }
 function curlm() {
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
-    curl --silent --fail --location --cookie-jar /dev/null --header "$(cookies-auto "$@")" "$@"
+    curl --silent --fail --location --cookie-jar /dev/null "$@"
+}
+function curl-cookies() {
+    # cookies-auto takes ~0.5s
+    curlm --header "$(cookies-auto "$@")" "$@"
 }
 function curl-useragent() {
     # Copy from Chrome's network pane
@@ -326,7 +330,7 @@ function url-final() {
 function url-final2() {
     doc "This one doesn't download stuff."
     doc 'WARNING: Can eat info. E.g., https://0bin.net/paste/5txWS7vyTdaEvNAg#QJZjwyNoWYyaV5-rqdCAcV7opxc+kyaMwoQ7wyjLjKy'
-    [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
+    [[ "$(2>&1 wget --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 function url-final3() {
     doc 'The most reliable and expensive way.'
