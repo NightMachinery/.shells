@@ -44,7 +44,7 @@ function rclonef() {
     # rexa "rclone $*[1,-2]" "$paths[@]" # rexa can't handle '/'
     ##
     for i in $paths[@] ; do # skip empty paths
-        local destdir="$local/${i:h:t}"
+        local destdir="$local/${i:h:h:t}/${i:h:t}"
         mkdir -p "$destdir"
         reval-ec rcrdl "${remote}$i" "$destdir"
     done

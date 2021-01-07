@@ -4,7 +4,12 @@ trs() {
     do
         [[ -e "$i" ]] && {
             ec Trying to remove "$i"
-            trash -- "$i"
+            if (( ${+commands[trash]} )) ; then
+                trash -- "$i"
+            else
+                ecerr "WARNING: 'trash' command not found, switching to 'rm'."
+                rm -r -- "$i"
+            fi
         }
     done
 }
