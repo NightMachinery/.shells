@@ -20,3 +20,12 @@ function sdlit() {
     
     rmprefix '' "$search" "$replace"
 }
+##
+function double-newlines() {
+    awk 'ORS="\n\n"'
+}
+function p-double-newlines() {
+    pbpaste | double-newlines | pbcopy
+}
+alias pdn='p-double-newlines'
+##
