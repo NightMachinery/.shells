@@ -72,7 +72,7 @@ with torch.no_grad():
     wav, c, *_ = text2speech(x)
     wav = vocoder.inference(c)
 rtf = (time.time() - start) / (len(wav) / fs)
-print(f"RTF = {rtf:5f}")
+# print(f"RTF = {rtf:5f}", file=sys.stderr)
 
 # let us listen to generated samples
 from IPython.display import display, Audio
