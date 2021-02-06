@@ -8,13 +8,27 @@
 # echo some text | ESPnet2-TTS.py > output.wav
 
 fs, lang = 22050, "English"
+
+##
+# `espnet_model_zoo_query`
+# https://github.com/espnet/espnet_model_zoo/blob/master/espnet_model_zoo/table.csv
+# https://zenodo.org/communities/espnet/search?page=1&size=20&q=&sort=mostviewed
+# jsut: Japanese
+# csmsc: Mandarin
+
 # tag = "kan-bayashi/ljspeech_tacotron2"
 # tag = "kan-bayashi/ljspeech_fastspeech"
 # tag = "kan-bayashi/ljspeech_fastspeech2"
 tag = "kan-bayashi/ljspeech_conformer_fastspeech2"
+
+# tag = "kan-bayashi/ljspeech_tts_train_tacotron2_raw_phn_tacotron_g2p_en_no_space_train.loss.best" # slower speech, more old lady like
+
+# tag = "kan-bayashi/ljspeech_tts_train_fastspeech_raw_phn_tacotron_g2p_en_no_space_train.loss.best" # has some subtle background noise/echo?
+##
 # vocoder_tag = "ljspeech_parallel_wavegan.v1"
 vocoder_tag = "ljspeech_full_band_melgan.v2"
 # vocoder_tag = "ljspeech_multi_band_melgan.v2"
+##
 
 import sys
 import time
