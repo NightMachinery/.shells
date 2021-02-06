@@ -52,7 +52,7 @@ zv() {
     if test -n "$q" ; then
         indir "$q" openv $query[@]
     else
-        @opts dirs [ ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads ] @ openv $query[@]
+        @opts dirs [ ~/base/cache ~/base/Lectures ~/base/series ~/Base/'animated series' ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads ] @ openv $query[@]
     fi
 }
 aliasfnq zvv zv ''

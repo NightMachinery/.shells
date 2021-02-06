@@ -20,6 +20,7 @@ function ffz() {
     serr zoxide query --list
     arrN /Volumes/*(/N)
     arrN /Volumes/*/*(/N)
+    list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads
     memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia ~/Downloads $music_dir
     true
  } | { sponge || true } | deusvult="${ffz_nocache:-$deusvult}" memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | head -1)" ||  {

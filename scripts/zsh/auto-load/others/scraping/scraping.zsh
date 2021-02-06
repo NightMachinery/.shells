@@ -743,7 +743,8 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
     for url in ${urls[@]}
     do
         url="$(urlfinalg $url)"
-        [[ "$url" =~ "$regex" ]] && ec $url || getlinks-c -e $regex "$url"
+        [[ "$url" =~ "$regex" ]] && ec $url
+        getlinks-c -e $regex "$url" # even a URL that ends in, e.g., '.mkv' can be actually an HTML page that links to the actual file
     done | gsort -u | {
         if isDbg
         then

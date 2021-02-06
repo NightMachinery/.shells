@@ -248,6 +248,7 @@ bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
 bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
 bell-lm-maker strawberryjuice flac/10.3_09_MI_strawberryjuice..blue..flac
 bell-lm-maker amiindanger flac/06.4_04_MI_amiindanger.flac
+bell-lm-maker shouldisitdown flac/16-1_15_MI_shouldisitdown.flac
 bell-lm-maker-dir mhm mhm
 # `fr heari 'flac/ MI cool'`
 ##
@@ -258,7 +259,7 @@ function reval-onhold() {
     trap "" INT
     {
         (
-            awaysh-bnamed "$id" @opts s 0 @ loop hearinvisible "$ONHOLD"
+            awaysh-bnamed "$id" @opts s 0 @ loop hearinvisible-mpv "$ONHOLD"
             reval "$@"
         )
     } always {
@@ -299,6 +300,8 @@ bell-maker pp-piece2 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything
 bell-maker pp-piece3 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_piece3..blue..wav"
 bell-pp-piece() { do-rnd bell-pp-piece{1..3} }
 bell-pp-piece-r() { redo2 10 bell-pp-piece }
+
+bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
 ##
 function bell-m-beeps() {
     : "Plays continuous beeps"
