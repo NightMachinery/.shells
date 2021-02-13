@@ -1,3 +1,12 @@
+##
+function vid-fix() {
+    local i="${1:?}"
+
+    # local o="${i:r}_fixed.${i:e}"
+    local o="${i:r}_fixed.${vid_fix_ext:-mkv}" # forcing mkv is better
+    ffmpeg -err_detect ignore_err -i "$i" -c copy "$o"
+}
+##
 function merge-mp3() {
     local out="${merge_mp3_out:-${merge_mp3_o:-merged.mp3}}"
     { test -z "$out" } && { # redundant

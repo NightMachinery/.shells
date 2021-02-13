@@ -40,7 +40,15 @@ function finder-hideicons() {
 # @darwinonly https://github.com/leberwurstsaft/nshift/releases
 aliasfn nightshift-on nshift 100
 aliasfn nightshift-off nshift off
+
+redis-defvar nightshift_auto_enabled
+nightshift_auto_enabled_setnx 1
 function nightshift-auto() {
+    # `nightshift_auto_enabled_set 0` to disable
+    if (( $(nightshift_auto_enabled_get) != 1 )) ; then
+        return 0
+    fi
+
     local  app="$(frontapp-get)"
     case "$app" in
         io.mpv|mpv)

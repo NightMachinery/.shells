@@ -57,6 +57,8 @@ function ffps() {
 }
 function ffkill() {
     doc "alt: fkill; [fkEngine=ffps] ffkill ..."
+    doc "Tip: fnswap kill 'sudo kill'"
+
     local engine=("${(@)fkEngine:-ffps}")
     local kill_engine=("${(@)ffkill_ke:-kill-withchildren}")
     ## Abandoned designs

@@ -25,9 +25,10 @@ redism() {
 ##
 function redis-defvar() {
     local name="${1:?}"
-    function "${name}_get"() { redism get "$name" }
-    function "${name}_set"() { silent redism set "$name" "$@" }
-    function "${name}_setnx"() { silent redism setnx "$name" "$@" }
-    function "${name}_del"() { silent redism del "$name" }
+
+    fndef "${name}_get" redism get "$name"
+    aliasfnq "${name}_set" silent redism set "$name"
+    aliasfnq "${name}_setnx" silent redism setnx "$name"
+    fndef "${name}_del" silent redism del "$name"
 }
 ##
