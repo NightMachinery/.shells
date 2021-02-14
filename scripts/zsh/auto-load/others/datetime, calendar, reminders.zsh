@@ -259,7 +259,7 @@ function tlg-reminday() {
     }
     local text="$(@opts delete y notif y @ rem-summary)"
     text="$text"$'\n\n'"$(datej-all)"
-    tsend --parse-mode markdown -- "$rec" "$text"
+    tsend --parse-mode markdown -- "$rec" "# $text" # '#' is needed to make this invisible to timetracker.py
 }
 function rem-summary() {
     local deleteMode="$rem_summary_delete" notifMode="$rem_summary_notif"
