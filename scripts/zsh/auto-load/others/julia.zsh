@@ -184,13 +184,7 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
     }
     googleimagesdownload "$@" && jup
 }
-function sdlg() {
-    #use with aget
-    spotdl "$@" && spotdl --no-encode -i m4a -f "${spotdl_dir:-.}/{artist} - {track-name}.{output-ext}"  -l *.txt && {
-            mkdir -p ./ghosts/
-            mv *.txt ./ghosts/
-        }
-}
+##
 function tsox() {
     silence ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
 }

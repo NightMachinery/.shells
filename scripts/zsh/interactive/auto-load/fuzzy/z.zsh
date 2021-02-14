@@ -1,5 +1,10 @@
 function list-dirs() {
-    fd --follow --absolute-path --type d . "$1"
+    local d="${1:?}"
+
+    if ! test -d "$d" ; then
+        return 1
+    fi
+    fd --follow --absolute-path --type d . $d
 }
 reify list-dirs
 ##

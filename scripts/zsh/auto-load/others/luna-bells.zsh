@@ -310,3 +310,8 @@ function bell-m-beeps() {
     print pack("n", ((($i*($i>>8|$i>>9)&46&$i>>8))^($i&$i>>13|$i>>6)));
 }' | silent play -c 1 -b 8 -e unsigned -t raw -r 8k -
 }
+##
+function warn-posture() {
+    lo_s=$((60*10)) loop tts-glados1-cached "Correct your posture. The tail should be backward."
+}
+##

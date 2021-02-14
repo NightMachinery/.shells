@@ -199,7 +199,19 @@ svpl() {
     # Save Playlist save-playlist save-pl
     mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
 }
+##
+function sdlg() {
+    ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1
+
+    #use with aget
+    spotdl "$@" && spotdl --no-encode -i m4a -f "${spotdl_dir:-.}/{artist} - {track-name}.{output-ext}"  -l *.txt && {
+            mkdir -p ./ghosts/
+            mv *.txt ./ghosts/
+        }
+}
 function sdl() {
+    ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1
+
     local bp
     { test "${1[1]}" = "-" } && { # || test "$1" = "-a" || test "$1" = "-p" } && {
         bp="$1"
@@ -210,3 +222,4 @@ function sdl() {
         nisout sdlg "$bp" "$@"
     }
 }
+##

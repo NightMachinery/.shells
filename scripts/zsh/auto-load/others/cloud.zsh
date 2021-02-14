@@ -18,12 +18,17 @@ function rcrdl() {
 
     local remote="$1" local="$2"
     local localpath="$local"
-    if test -d "$localpath" ; then
+
+    if ! [[ "$destdir" =~ '^\w+:' ]] ; then # if is local
+        if test -d "$localpath" ; then
+            localpath+="/${remote:t}"
+        fi
+        localpath="$(ntag-recoverpath "$localpath")" # automaticallys skips if 'local' is actually another remote, no?
+        if test -e "$localpath" ; then
+            ecerr "$0:WARN: already exists: $localpath"
+        fi
+    else
         localpath+="/${remote:t}"
-    fi
-    localpath="$(ntag-recoverpath "$localpath")"
-    if test -e "$localpath" ; then
-        ecerr "$0:WARN: already exists: $localpath"
     fi
 
     : "rclone auto-skips existing files (testing by size and modification time or MD5SUM)."
@@ -45,7 +50,9 @@ function rclonef() {
     ##
     for i in $paths[@] ; do # skip empty paths
         local destdir="$local/${i:h:h:t}/${i:h:t}"
-        mkdir -p "$destdir"
+        if ! [[ "$destdir" =~ '^\w+:' ]] ; then # skip if 'local' is actually another remote
+            mkdir -p "$destdir"
+        fi
         reval-ec rcrdl "${remote}$i" "$destdir"
     done
 
