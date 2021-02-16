@@ -7,7 +7,7 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_e=(@opts dest $tlg_podcastgen @ podcast2tel)
 ## uni
 # tmuxnewshenv="rt_skip='$rt_skip' rt_e=(amar-process) rt_notel=y rt_ge=(withchrome getlinks-uniq -e '/session/id/video/') rt_nt=y rt_eid=$((3600*3)) rt_eud=0" tmuxnewsh rss-ocwvids rss-tsend 'http://ocw.sharif.edu/course/id/224'
 ##
-tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend 'https://www.scottaaronson.com/blog/?feed=rss2' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' 'https://tamaspapp.eu/post/index.xml' 'https://www.overcomingbias.com/feed' 'https://danluu.com/atom.xml' 'https://huyenchip.com/feed.xml' 'https://feeds2.feedburner.com/GFWReport' 'http://www.viridiandreams.net/feed/'
+tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend 'https://www.scottaaronson.com/blog/?feed=rss2' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' 'https://tamaspapp.eu/post/index.xml' 'https://www.overcomingbias.com/feed' 'https://danluu.com/atom.xml' 'https://huyenchip.com/feed.xml' 'https://feeds2.feedburner.com/GFWReport' 'http://www.viridiandreams.net/feed/' 'https://www.bloomberg.com/opinion/authors/ARbTQlRLRjE/matthew-s-levine.rss'
 # 'https://buttondown.email/hillelwayne/rss' 
 # Rob Henderson Newsletter (Human Nature series) https://www.amazon.com/Incentives-Motivation-Information-Donald-Campbell-dp-1107610338/dp/1107610338/ref=dp_ob_title_bk
 

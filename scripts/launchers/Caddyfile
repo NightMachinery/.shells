@@ -42,6 +42,11 @@ searx.lilf.ir {
   reverse_proxy localhost:4004
 }
 
+code.lilf.ir {
+  # encode zstd gzip
+  reverse_proxy localhost:7451
+}
+
 
 https://garden.lilf.ir {
 #  @protected /api/*
