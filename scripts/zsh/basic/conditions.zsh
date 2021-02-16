@@ -59,7 +59,17 @@ function isNotDbg() {
     ! isDbg
 }
 ##
+isNet() {
+    # wget -q --spider http://google.com
+    
+    ping -q -c 1 -W 1 8.8.8.8 &>/dev/null
+}
+
 alias mycountry='geo.bash -o country'
 isIran() {
-    [[ "$(mycountry)" == Iran ]]
+    # [[ "$(mycountry)" == Iran ]]
+
+    ## faster
+    ! ping -q -c 1 -W 1 facebook.com &>/dev/null #  faster when it succeeds
+    # ! ping -q -c 1 -W 1 69.171.250.35 &>/dev/null # (facebook's ip) succeeds even in Iran
 }

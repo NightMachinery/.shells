@@ -3,6 +3,9 @@ alias deus='deusvult=y '
 ## Vars
 memoi_expire=$(( 3600*24*7 ))
 ## Functions
+function isDeus() { test -n "$deusvult" }
+aliasfn isdeus isDeus
+
 function expirein() { memoi_expire=$(( $1 * 60 )) reval "$@" }
 function memoi-eval() {
 ###
@@ -96,3 +99,4 @@ function eval-memoi() { memoi-eval "$@" }
 enh-savename eval-memoi memoi-eval
 @opts-setprefix memoi-eval memoi
 @opts-setprefix eval-memoi memoi
+##

@@ -53,7 +53,7 @@ function play-and-trash(){
     mpv "$@" && trs "$1"
 }
 aliasfn mpv-notag mpv --script-opts-add=autotag-enabled=no
-aliasfn mpvn mpv-notag
+aliasfn mpvn awaysh mpv-notag
 function mpv-noidle() {
     set-volume 0
     silence mpv-notag "$@" &

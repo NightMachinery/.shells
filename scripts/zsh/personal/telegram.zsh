@@ -12,7 +12,14 @@ export tlg_amar="$water"
 export tlg_podcastgen='-1001222930214'
 ###
 function alice() {
-    tsend -- "$alice" "$*" && ec "Alicized successfully: $*" || ecerr 'Alicization failed!'
+    tsend -- "$alice" "$*" && {
+        bell-pp-electricity
+        ec "Alicized successfully: $*"
+    } || {
+            ecerr 'Alicization failed!'
+            redo2 2 tts-glados1-cached Alicization has failed
+            return 1
+        }
 }
 noglobfn alice
 alias al=alice #NAMECONFLICT: ../Cellar/mono/6.8.0.105/bin/al

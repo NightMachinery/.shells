@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 
 powersaving_status_del
+wireguard_enabled_del
 
 tmuxnew BrishGarden brishgarden
 
