@@ -1,9 +1,11 @@
 ##
 function vid-fix() {
-    local i="${1:?}"
+    local i="${1:?}" o="$2"
 
-    # local o="${i:r}_fixed.${i:e}"
-    local o="${i:r}_fixed.${vid_fix_ext:-mkv}" # forcing mkv is better
+    if test -z "$o" ; then
+        # o="${i:r}_fixed.${i:e}"
+        o="${i:r}_fixed.${vid_fix_ext:-mkv}" # forcing mkv is better
+    fi
     ffmpeg -err_detect ignore_err -i "$i" -c copy "$o"
 }
 ##

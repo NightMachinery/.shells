@@ -11,7 +11,7 @@ for ft in $_editor_fts; do alias -s $ft=$EDITOR; done
 _image_fts=(jpg jpeg png gif mng tiff tif xpm)
 for ft in $_image_fts; do alias -s $ft=icat; done # sth is buggy and sometimes zsh says `zsh: permission denied: /Users/evar/Base/_Art/ddg/The Kindness..blue../09ec3883406d840ceb13a911359f709fa94cf24a.jpg`. This seems to only happen with full paths.
 
-for ft in $video_formats; do alias -s $ft=mpv; done
+for ft in $video_formats; do alias -s $ft='awaysh mpv'; done
 for ft in $audio_formats; do alias -s $ft=hearinvisible; done
 
 #list whats inside packed file

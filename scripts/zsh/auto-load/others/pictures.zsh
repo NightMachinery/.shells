@@ -48,17 +48,37 @@ function saveas-img() { # image-paste, imgpaste; used from night-org.el
     fi
 }
 ##
-function text2img() {
+function text2img-old() {
     : " < text text2img <img-name>"
     local img="$1"
 
     test -z "$img" && { ecerr "$0: Empty image destination. Aborting." ; return 1 }
 
+    # `convert -list font` for available fonts, or use absolute paths
     convert -page  4000x4000 -font FreeMono -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"$img".png
     ## persian (doesn't work well)
     # ec سلام monster |     convert -page  700x700 -font '/Users/evar/Library/Fonts/B Nazanin Bold_0.ttf' -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:hi.png
     # Use https://stackoverflow.com/questions/23536375/linux-cli-how-to-render-arabic-text-into-bitmap instead
     ##
+}
+function text2img() {
+    local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf"
+    # local font="Arial"
+    # if isDarwin ; then # @darwinonly
+    #     font="$HOME/Library/Fonts/unifont-13.0.06.ttf"
+    # fi
+    text2img.py $font "$@"
+}
+function text-show() {
+    local tmp="$(gmktemp --suffix .png)"
+
+    text2img $tmp
+    icat $tmp
+    rm $tmp
+}
+function ts() {
+    # @nameconflict with moreutils' ts which adds timestamps to stdin
+    reval "$@" | text-show
 }
 ##
 function 2ico() {

@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 powersaving_status_del
-wireguard_enabled_del
+# wireguard_enabled_del
 
 tmuxnew BrishGarden brishgarden
 
@@ -18,10 +18,12 @@ tmuxnew naive-eva naive --listen="socks://127.0.0.1:1078" --proxy="https://alice
 # tmuxnewsh2 trojan trojan -c "$nightNotes"/private/configs/zii/trojan_client.json
 # tmuxnew trojan-client-v1-zii trojan -c $nightNotes/private/configs/zii/trojan_client_v1.json
 
-v2-on
+v2-on # v2ray-genrouter
 # tmuxnewsh2 socks2http hpts --level info -s 127.0.0.1:1080 -p 1087 # https://github.com/oyyd/http-proxy-to-socks
 ###
-tmuxnewsh2 hotwords-porc porc-listen
+# tmuxnewsh2 hotwords-porc porc-listen
+##
+tmuxnewsh2 browser-recordings-process-watch browser-recordings-process-watch
 ## These two might not load properly in the cron context
 iterm-boot
 ot-server-daemon

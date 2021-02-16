@@ -57,6 +57,6 @@ alias mcomix='awaysh python3 ~/bin/mcomixstarter.py'
 ##
 alias pz='printz-quoted' # USEME for using zsh history suggestions effectively; E.g., `pz in doom sees`
 ##
-alias bw='sudo bandwhich'
+alias bwh='sudo bandwhich'
 ##
 alias o="@opts"

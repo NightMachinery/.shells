@@ -102,7 +102,8 @@ try:
     def labelprocessed(msg):
         # msg.addLabel(lblTest)
         msg.addLabel(lblProcessed)
-    
+
+    ## https://www.ben-evans.com/newsletter
     text2kindle = g.search(
             f"after:{cutoff_date} AND ((from:ben-evans.com) AND NOT label:auto/processed)", maxResults=100
     )
@@ -112,8 +113,9 @@ try:
             print(f"Processing '{m.subject}' ...")
             labelprocessed(m)
             zp("t2e {m.subject} =(ec {m.originalBody})")
+    ##
 
-
+    ##
     substack = g.search(
             f"after:{cutoff_date} AND ((from:substack.com) AND NOT label:auto/processed)", maxResults=100
     )
@@ -130,7 +132,9 @@ try:
                 ecerr(""*2)
                 continue
             zp("h2e {m.subject} =(ec {bodyhtml})")
+    ##
 
+    ##
     fics = g.search(
         f"after:{cutoff_date} AND ((from:fanfiction) AND NOT label:auto/processed)", maxResults=200
     )
@@ -151,7 +155,9 @@ try:
                 kRes.print(file=sys.stderr)
                 continue
             labelprocessed(m)
+    ##
 
+    ##
     news = g.search(
         f"after:{cutoff_date} AND ((from:tldrnewsletter.com) AND NOT label:auto/processed)", maxResults=200
     )
@@ -228,6 +234,8 @@ try:
             print(f"Processed '{m.subject}'!")
 
             body.close()  # This file is deleted immediately upon closing it.
+    ##
+
     # embed()
 except KeyboardInterrupt:
     pass
