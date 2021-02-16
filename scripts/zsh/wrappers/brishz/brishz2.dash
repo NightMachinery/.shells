@@ -1,3 +1,5 @@
 #!/usr/bin/env dash
 
+export PATH="$PATH:/usr/local/bin"
+
 brishz_quote=y brishz.dash "$@"

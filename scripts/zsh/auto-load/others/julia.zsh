@@ -186,6 +186,7 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
 }
 ##
 function tsox() {
+    # @alt audiofx-sox
     silence ffmpeg -i "$1" "${1:r}".wav && sox "${1:r}".wav "${1:r}.$2" -G "${@:3}"
 }
 function vdsox() {
@@ -194,6 +195,9 @@ function vdsox() {
     silence jvideo
 }
 function vasox() {
+    ## usage example:
+    # vasox speed 1.3 : pitch 500 : reverb
+    ##
     local inp=(*)
     tsox "$inp" 'c.mp3' "$@"
     \rm -- ^*.mp3
