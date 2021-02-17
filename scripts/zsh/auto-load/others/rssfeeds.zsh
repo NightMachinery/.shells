@@ -70,7 +70,7 @@ function rss-tsend() {
     local id="${rt_id:-$water}"
     local rssurls="rssurls_${rt_duplicates_key}" # used for storing dup links in redis
 
-    local c t l
+    local c t l l_norm
     local url
     local urls=()
     for url in "$@"
@@ -98,8 +98,9 @@ function rss-tsend() {
             else
                 read -d $'\n' -r l
             fi
+            l_norm = "$(url_normalizer.js "$l")"
 
-            ! (( $(redism SISMEMBER $rssurls "$l") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
+            ! (( $(redism SISMEMBER $rssurls "$l_norm") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
 
             t="$(<<<"$t" html2utf.py)"
             for c in $conditions[@]
@@ -108,7 +109,7 @@ function rss-tsend() {
             done
             ec "$t"
 
-            labeled redism SADD $rssurls "$(url_normalizer.js "$l")"
+            labeled redism SADD $rssurls $l_norm
             # ensurerun "150s" tsend ...
             test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
             sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
