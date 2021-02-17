@@ -14,14 +14,12 @@ from PIL import ImageFont
 from PIL import Image
 from PIL import ImageDraw
 
-# use a good font!
 fontFile = sys.argv[1]
 
 imageOut = sys.argv[2]
 
-# load the font and image
 font = ImageFont.truetype(fontFile, 21)
-image = Image.new("RGB", (1200, 600), (255, 255, 255))
+image = Image.new("RGB", (1400, 600), (255, 255, 255))
 
 # first you must prepare your text (you dont need this step for english text)
 text = sys.stdin.read()

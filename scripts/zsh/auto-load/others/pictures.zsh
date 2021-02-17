@@ -49,6 +49,7 @@ function saveas-img() { # image-paste, imgpaste; used from night-org.el
 }
 ##
 function text2img-old() {
+    # Doesn't work with Persian at all
     : " < text text2img <img-name>"
     local img="$1"
 
@@ -62,11 +63,12 @@ function text2img-old() {
     ##
 }
 function text2img() {
-    local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf"
-    # local font="Arial"
-    # if isDarwin ; then # @darwinonly
-    #     font="$HOME/Library/Fonts/unifont-13.0.06.ttf"
-    # fi
+    # @alt https://xg4.github.io/text2image/ does support Persian seemingly, but not completely?
+    # @alt @good https://vincent7128.github.io/text-image/ seems to work as well as text2img.py with Persian, but it can also size the output image automatically.
+
+    # local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf" # monospace font by GNU that supports most languages, but quite ugly and unreadable.
+    local font="Courier New" # See https://github.com/IranOpenFontGroup/Discussions/issues/7 for more Persian monospace fonts
+    
     text2img.py $font "$@"
 }
 function text-show() {

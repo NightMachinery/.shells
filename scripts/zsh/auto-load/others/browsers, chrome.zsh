@@ -14,7 +14,7 @@ function browser-recordings-process() {
 
     local r
     for r in "$recs[@]"; do
-        vid-fix "$r" "$out_dir/${r:t:r}.mkv" || {
+        vid-fix "$r" "$out_dir/${r:t:r} :: $(jalalicli today --jalali-format='MMM w:W E dd').mkv" || {
             ecerr "$0: vid-fix failed $? for '$r'"
             continue
         }
@@ -24,6 +24,7 @@ function browser-recordings-process() {
 }
 
 function browser-recordings-process-watch() {
+    ec "$0: Started"
     while true ; do
         ec "$browser_rec_dir" | entr -dnr true
         # -d Track the directories of regular files provided as input and exit if a new file is added. This option also enables directories to be specified explicitly. Files with names beginning with ‘.’ are ignored.

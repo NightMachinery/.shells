@@ -9,9 +9,17 @@ using Pkg
 using BenchmarkTools, Infiltrator, FreqTables, RDatasets, Lazy, UUIDs, Printf
 
 using InteractiveCodeSearch
+## Usage: https://github.com/tkf/InteractiveCodeSearch.jl#reference
+# @search show             # # search method definitions
+# @searchmethods 1         # search methods defined for integer
+# @searchhistory           # search history (Julia ≥ 0.7)
+# @searchreturn String Pkg # search methods returning a given type (Julia ≥ 0.7)
+##
 ENV["SHELL"] = @> `which dash` read(String) chomp # necessary for fzf's preview, and nice anyhow
 InteractiveCodeSearch.CONFIG.interactive_matcher = `fzf --bind 'shift-up:toggle+up,shift-down:toggle+down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-a:select-all' --color=light --multi --hscroll-off 99999  --preview 'printf -- "%s " {} | command fold -s -w $FZF_PREVIEW_COLUMNS' --preview-window down:7:hidden`
 
+# InteractiveCodeSearch.CONFIG.trigger_key = ')'      # insert "@search" on ')' (default)
+# InteractiveCodeSearch.CONFIG.trigger_key = nothing  # disable shortcut
 ##
 macro comment(args...) end
 ##

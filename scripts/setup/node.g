@@ -45,3 +45,4 @@ wikiquote-cli
 wikit
 youtube-dl-interactive
 zooqle
+normalize-url

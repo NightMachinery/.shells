@@ -108,7 +108,7 @@ function rss-tsend() {
             done
             ec "$t"
 
-            labeled redism SADD $rssurls "$l"
+            labeled redism SADD $rssurls "$(url_normalizer.js "$l")"
             # ensurerun "150s" tsend ...
             test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
             sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages

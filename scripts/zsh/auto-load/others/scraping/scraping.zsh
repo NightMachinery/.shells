@@ -896,7 +896,7 @@ function libgendl-md5-old() {
 }
 function libgendl-md5() {
     local md5="$1"
-    local lgNoBok="$lgNoBok"
+    local lgNoBok="${lgNoBok:-y}" # bok is useless now
 
     { test -z "$lgNoBok" && libgendl-md5-bok "$md5" } || {
         test -z "$lgNoBok" && ecerr "bok failed. Trying main ..."
