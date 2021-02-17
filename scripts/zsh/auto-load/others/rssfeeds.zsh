@@ -98,7 +98,7 @@ function rss-tsend() {
             else
                 read -d $'\n' -r l
             fi
-            l_norm = "$(url_normalizer.js "$l")"
+            l_norm="$(url_normalizer.js "$l")"
 
             ! (( $(redism SISMEMBER $rssurls "$l_norm") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
 
