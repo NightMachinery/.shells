@@ -98,7 +98,7 @@ function rss-tsend() {
             else
                 read -d $'\n' -r l
             fi
-            l_norm="$(url_normalizer.js "$l")"
+            l_norm="$(url_normalizer.js "$l")" || l_norm="$l"
 
             ! (( $(redism SISMEMBER $rssurls "$l_norm") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
 
@@ -107,7 +107,7 @@ function rss-tsend() {
             do
                 reval "$c" "$l" "$t" || { ecdate "Skipping $t $l" ; continue 2 }
             done
-            ec "$t"
+            ec "Title: $t"
 
             labeled redism SADD $rssurls $l_norm
             # ensurerun "150s" tsend ...
