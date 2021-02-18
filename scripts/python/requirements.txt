@@ -67,3 +67,4 @@ yapf
 yq
 peewee
 catsql
+zxcvbn

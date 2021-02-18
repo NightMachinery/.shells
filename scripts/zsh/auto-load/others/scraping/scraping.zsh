@@ -333,7 +333,7 @@ function url-final2() {
     [[ "$(2>&1 wget --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 function url-final3() {
-    doc 'The most reliable and expensive way.'
+    doc '@deprecated The most reliable and expensive way.'
     # too expensive
     # retry-limited 3 urlfinal.js "$1" || url-final2 "$1"
     url-final2 "$1"
@@ -676,7 +676,7 @@ noglobfn lwseq
 function urlfinalg() {
     doc supports Google redirects. Set uf_idem to y to return original.
     local URL="$1"
-    { test -n "$uf_idem" || ! match-url "$URL" } && {
+    { test -n "$uf_idem" || ! match-url "$URL" || [[ "$URL" == *bloomberg.com* ]] } && {
         ec "$URL"
         return 0
     }
