@@ -96,7 +96,7 @@ function rss-tsend() {
                 l="$t"
                 t=""
             else
-                read -d $'\n' -r l
+                read -d $'\n' -r l # Warning: I have seen this somehow skipped once and then the whole subsequent cycle breaks. I assume it was some faulty feed, as after I disabled that feed, thhe problem went away. Still, rsstail is buggy.
             fi
             l_norm="$(url_normalizer.js "$l")" || l_norm="$l"
 
