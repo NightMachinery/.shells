@@ -50,3 +50,6 @@ function prefixer-rm() {
 }
 aliasfn prm prefixer-rm
 ##
+function text2num() {
+    <<<"$(in-or-args "$@")" text2num.py
+}
