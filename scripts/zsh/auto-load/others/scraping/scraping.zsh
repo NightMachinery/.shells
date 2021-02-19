@@ -63,6 +63,10 @@ function curl-cookies() {
     # cookies-auto takes ~0.5s
     curlm --header "$(cookies-auto "$@")" "$@"
 }
+export useragent_googlebot="Mozilla/5.0 (compatible; Googlebot/2.1; +http://google.com/bot.html)"
+function curl-googlebot() {
+    curlm --user-agent "$useragent_googlebot" "$@"
+}
 function curl-useragent() {
     # Copy from Chrome's network pane
     curl --fail --no-progress-meter \

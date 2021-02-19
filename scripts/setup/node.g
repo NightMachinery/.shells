@@ -46,3 +46,5 @@ wikit
 youtube-dl-interactive
 zooqle
 normalize-url
+fuzzyset
+fuzzyset

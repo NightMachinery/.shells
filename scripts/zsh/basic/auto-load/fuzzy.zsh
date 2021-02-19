@@ -8,6 +8,8 @@ FZF_SIMPLE_PREVIEW='printf -- "%s " {}'
 FZF_PREVIEW_NTAG='printf -- "%s " {} | ntagcolor'
 ##
 ### Functions
+aliasfn fz-grep fz --no-sort --filter #Filter mode. Do not start interactive finder. When used with  --no-sort,  fzf becomes  a fuzzy-version of grep. # Just fz -f if you don't want the nosort.
+
 function fz-empty() {
     fz_empty='y' fz "$@"
 }
