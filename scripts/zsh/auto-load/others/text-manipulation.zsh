@@ -51,5 +51,9 @@ function prefixer-rm() {
 aliasfn prm prefixer-rm
 ##
 function text2num() {
-    <<<"$(in-or-args "$@")" text2num.py
+    # reverse op: https://github.com/kslazarev/numbers_and_words
+    # Roman numerals https://github.com/allo-media/text2num/issues/43
+    ##
+    # prefixer will not replace 'IV\n' so we should not put '\n' at the end
+    ecn "$(in-or-args "$@")" | prefixer replace -i ' ' -o ' ' II 2 III 3 IV 4 V 5 VI 6 VII 7 VIII 8 IX 9 | text2num.py
 }
