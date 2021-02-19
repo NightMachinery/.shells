@@ -14,8 +14,9 @@ function brishz() {
         print -nr -- "$stdin" | brishz_in='MAGIC_READ_STDIN' brishzq.zsh "$@"
     fi
 }
-aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1
+aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1 # bsh eval remote
 aliasfn brishzr bsh-er brishz
+##
 function garden-req() {
     # We spoof our IP here, to see if the server is fooled.
     local opts=()
