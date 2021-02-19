@@ -254,3 +254,12 @@ function jyl() {
 }
 alifn jylist=jyl
 noglobfn jyl jylist
+##
+export borgEndpoint="http://127.0.0.1:5922"
+function borg-req() {
+    curl --fail --silent --location --header "Content-Type: application/json" --data '@-' $borgEndpoint/"$@"
+}
+function borg-tt-mark() {
+    ec "$*" | text2num | jq --raw-input --slurp --null-input --compact-output 'inputs as $i | {"name": $i}' | borg-req timetracker/mark/
+}
+##
