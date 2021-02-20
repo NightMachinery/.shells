@@ -135,6 +135,16 @@ function sharif-dep-git-update() {
         git push --set-upstream origin master
     } always { popf }
 }
+function sharif-dep-update-continuous() {
+    local sleep="${1:-600}"
+
+    while true ; do
+        sharif-login
+        sharif-dep-save-all
+        ecdate "$0: Updated"
+        sleep-neon "$sleep"
+    done
+}
 ##
 sharif_tmp_dir=~/tmp/shariflogin
 sharif_cjar="$sharif_tmp_dir/cjar.txt"
@@ -208,7 +218,7 @@ function sharif-login() {
                     continue
                 else
                     retries=0
-                    reval-ecdate sleep 3600
+                    reval-ecdate sleep-neon 900
                     continue
                 fi
             fi
