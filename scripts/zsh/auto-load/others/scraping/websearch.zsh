@@ -1,5 +1,11 @@
 function googler-en() {
-    googler --tld com --lang en "$@"
+    local ans
+    ans="$(googler --tld com --lang en "$@")" || return $?
+    # we need to fail proactively to activate the failsafe, ddgr-en:
+    if [[ "$ans" =~ '^\s*\[\s*\]\s*$' ]] ; then # empty answer in json
+        return 1
+    fi
+    ec $ans
 }
 function ddgr-en() {
     ddgr --reg 'us-en' --unsafe "$@"
