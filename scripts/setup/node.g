@@ -48,3 +48,4 @@ zooqle
 normalize-url
 fuzzyset
 fuzzyset
+html-table-to-json

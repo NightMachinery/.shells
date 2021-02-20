@@ -10,7 +10,7 @@ function comp_wh() {
         done
     done
 }
-comp_wh run-on-each re-async cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp p tldr re inargs-gen inargsE-gen agf agfi ags agsi fi-rec brishz bsh onlc onlm printz-quoted # realpath2
+comp_wh run-on-each re-async cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp p tldr re inargs-gen inargsE-gen agf agfi ags h_noglob_agsi fi-rec brishz bsh onlc onlm printz-quoted # realpath2
 ##
 rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 rexa "compdef _=man" mn
