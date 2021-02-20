@@ -17,10 +17,16 @@ const marked_courses = JSON.parse((process.env.marked_courses) || '[]').map(x =>
 // > 10 > ""
 // true
 ///
+
+function course_summary(course) {
+    // return course.Name + " (group: " + course.Group + ", id: " + course.CourseID + ", " + (course.Professor || "NA") + ", " + (course.ClassTime || "NA") + ")"
+    return course.Name + " (group: " + course.Group + ", id: " + course.CourseID + ", " + (course.Professor || "استاد نامشخص") + "، " + (course.ClassTime || "زمان نامشخص") + ")"
+}
+
 for ( var i=0; i < b.length ; i++ ){
     bi = b[i]
     bid = bi.CourseID
-    bn = bi.Name + " (group: " + bi.Group + ", id:" + bi.CourseID + ")"
+    bn = course_summary(bi)
 
     ai = null
     for (var at in a) {
@@ -30,14 +36,14 @@ for ( var i=0; i < b.length ; i++ ){
         }
     }
     if (ai == null) {
-        console.log("ƪ " + bn + " is new:\n" + JSON.stringify(bi, null, 4))
+        console.log("ƪ " + bn + " is new:\n" + JSON.stringify(bi, null, 4) + "\n")
         continue
     }
 }
 for ( var i=0; i < a.length ; i++ ){
     ai = a[i]
     aid = ai.CourseID
-    an = ai.Name + " (group: " + ai.Group + ", id:" + ai.CourseID + ")"
+    an = course_summary(ai)
 
     bi = null
     for (var bt in b) {
@@ -53,15 +59,23 @@ for ( var i=0; i < a.length ; i++ ){
     }
 
     bid = bi.CourseID
-    bn = bi.Name + " (group: " + bi.Group + ", id:" + bi.CourseID + ")"
+    bn = course_summary(bi)
 
 
     if (aid != bid) {
-        console.log("WARN: " + an + "'s id has changed from " + aid + " to " + bid)
+        console.log("WARN_IMPOSSIBLE: " + an + "'s id has changed from " + aid + " to " + bid)
         continue
     }
-    if (an != bn) {
+    if (ai.Name != bi.Name) {
         console.log("WARN: " + an + "'s name has changed to " + bn)
+        continue
+    }
+    if (ai.Professor != bi.Professor) {
+        console.log("WARN: " + an + "'s Professor has changed to " + bn)
+        continue
+    }
+    if (ai.ClassTime != bi.ClassTime) {
+        console.log("WARN: " + an + "'s class schedule has changed to " + bn)
         continue
     }
 
@@ -73,11 +87,11 @@ for ( var i=0; i < a.length ; i++ ){
 
     if (bc > ac) {
         // "ƪ " forces LTR in Telegram
-        console.log("ƪ " + an + "'s capacity increased from " + ac + " to " + bc + " (" + be + " students currently enrolled)")
+        console.log("ƪ " + bn + "'s capacity increased from " + ac + " to " + bc + " (" + be + " students currently enrolled)" + "\n")
     }
 
     if (be < ae && (marked_courses.includes(aid.toString()) || ac == ae)) {
-        console.log("ƪ " + an + "'s enrolled students decreased from " + ae + " to " + be + " (current capacity: " + bc + ")")
+        console.log("ƪ " + bn + "'s enrolled students decreased from " + ae + " to " + be + " (current capacity: " + bc + ")" + "\n")
     }
 
 }

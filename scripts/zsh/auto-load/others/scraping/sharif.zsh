@@ -117,7 +117,7 @@ function sharif-dep-save-all() {
             ret=1
         }
     done
-    aa https://edu.sharif.edu/css/default.css # to backup the CSS as well.
+    aa --allow-overwrite=true https://edu.sharif.edu/css/default.css # to backup the CSS as well.
     return $ret
 }
 function sharif-dep-git-update() {
@@ -138,11 +138,20 @@ function sharif-dep-git-update() {
 function sharif-dep-update-continuous() {
     local sleep="${1:-600}"
 
+    local m s
     while true ; do
         sharif-login
-        sharif-dep-save-all
+        fnswap prettier true sharif-dep-save-all # no need to prettify the HTMLs
         ecdate "$0: Updated"
-        sleep-neon "$sleep"
+        s="$sleep"
+        m="$(gdate '+%M')" # minutes since last hour
+        m=$(( 60 - m ))
+        if (( m < 10 )) ; then
+            s=$(( m * 60 ))
+        elif (( m > 50 )) ; then
+            s=30
+        fi
+        reval-ecdate sleep-neon "$s"
     done
 }
 ##
@@ -214,7 +223,7 @@ function sharif-login() {
                 ec login successful
                 break
             else
-                if (( retries <= 10 )) ; then
+                if (( retries <= 20 )) ; then
                     continue
                 else
                     retries=0
