@@ -157,7 +157,7 @@ function sharif-dep-update-continuous() {
 ##
 sharif_tmp_dir=~/tmp/shariflogin
 sharif_cjar="$sharif_tmp_dir/cjar.txt"
-sharif_curl_opts=(--silent --fail --no-progress-meter --cookie $sharif_cjar --cookie-jar $sharif_cjar)
+sharif_curl_opts=(--silent --fail --no-progress-meter --cookie $sharif_cjar --cookie-jar $sharif_cjar --max-time 30 --retry 20 --retry-delay 1)
 function sharif-login() {
     # pushf ~/tmp/"$(uuidm)"
     pushf $sharif_tmp_dir
