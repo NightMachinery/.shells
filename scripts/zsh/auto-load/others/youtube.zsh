@@ -26,3 +26,8 @@ function ytrans() {
     t2e "$title" "$title.txt"
 }
 renog ytrans
+##
+function streamlink-m() {
+    streamlink --player='mpv' "$@" 720p,best
+}
+##
