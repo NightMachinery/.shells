@@ -81,6 +81,7 @@ function sharif-dep-save() {
         local diff="$(marked_courses='[9999,9998,44737]' sharif_diff.js =(ec "$oldjson") "$destjson")"
         if test -n "$diff" ; then
             # EDU_DIFF channel
+            # @idea also send to channel based on dep ID, to reduce the clutter
             tsend -- -1001472917717 "${dest:t:r}"$'\n'"$diff"
             color blue "$diff"
         fi
@@ -112,7 +113,7 @@ function sharif-dep-save-all() {
     sharif-dep-getIDs || return $?
     local ret=0
     for name id in "${(@kv)sharif_deps}" ; do
-        reval-ec sharif-dep-save "$id" "$name" || {
+        reval-ecdate sharif-dep-save "$id" "$name" || {
             ecerr "Failed with $? for $name ($id)"
             ret=1
         }
@@ -123,7 +124,7 @@ function sharif-dep-save-all() {
 function sharif-dep-git-update() {
     sharif-login
 
-    pushf "$codedir/data/sharif_course_list"
+    pushf "$sharif_dir" || return $?
     {
         sharif-dep-save-all
         git add --all
@@ -139,28 +140,32 @@ function sharif-dep-update-continuous() {
     local sleep="${1:-600}"
 
     local m s
-    while true ; do
-        sharif-login
-        fnswap prettier true sharif-dep-save-all # no need to prettify the HTMLs
-        ecdate "$0: Updated"
-        s="$sleep"
-        m="$(gdate '+%M')" # minutes since last hour
-        m=$(( 60 - m ))
-        if (( m < 10 )) ; then
-            s=$(( m * 60 ))
-        elif (( m > 50 )) ; then
-            s=30
-        fi
-        reval-ecdate sleep-neon "$s"
-    done
+    pushf "$sharif_dir" || return $?
+    {
+        while true ; do
+            sharif-login
+            fnswap prettier true sharif-dep-save-all # no need to prettify the HTMLs
+            ecdate "$0: Updated"
+            s="$sleep"
+            m="$(gdate '+%M')" # minutes since last hour
+            m=$(( 60 - m ))
+            if (( m < 10 )) ; then
+                s=$(( m * 60 ))
+            elif (( m > 50 )) ; then
+                s=30
+            fi
+            reval-ecdate sleep-neon "$s"
+        done
+    } always { popf }
 }
 ##
 sharif_tmp_dir=~/tmp/shariflogin
+sharif_dir="$codedir/data/sharif_course_list"
 sharif_cjar="$sharif_tmp_dir/cjar.txt"
-sharif_curl_opts=(--silent --fail --no-progress-meter --cookie $sharif_cjar --cookie-jar $sharif_cjar --max-time 30 --retry 20 --retry-delay 1)
+sharif_curl_opts=(--silent --fail --no-progress-meter --cookie $sharif_cjar --cookie-jar $sharif_cjar --max-time 10 --retry 20 --retry-delay 1)
 function sharif-login() {
     # pushf ~/tmp/"$(uuidm)"
-    pushf $sharif_tmp_dir
+    pushf $sharif_tmp_dir || return $?
     {
         silent command rm l.html l2.html "$sharif_cjar" jc.jpg
         local cjar jcaptcha

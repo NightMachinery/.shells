@@ -54,7 +54,7 @@ for ( var i=0; i < a.length ; i++ ){
         }
     }
     if (bi == null) {
-        console.log("WARN: " + an + " has changed its ID or group or the course has been deleted. (Skipping it.)")
+        console.log("WARN: " + an + " has changed its ID or group or the course has been deleted. (Skipping it.)" + "\n")
         continue
     }
 
@@ -63,19 +63,19 @@ for ( var i=0; i < a.length ; i++ ){
 
 
     if (aid != bid) {
-        console.log("WARN_IMPOSSIBLE: " + an + "'s id has changed from " + aid + " to " + bid)
+        console.log("WARN_IMPOSSIBLE: " + an + "'s id has changed from " + aid + " to " + bid + "\n")
         continue
     }
     if (ai.Name != bi.Name) {
-        console.log("WARN: " + an + "'s name has changed to " + bn)
+        console.log("WARN: " + an + "'s name has changed to " + bn + "\n")
         continue
     }
     if (ai.Professor != bi.Professor) {
-        console.log("WARN: " + an + "'s Professor has changed to " + bn)
+        console.log("WARN: " + an + "'s Professor has changed to " + bn + "\n")
         continue
     }
     if (ai.ClassTime != bi.ClassTime) {
-        console.log("WARN: " + an + "'s class schedule has changed to " + bn)
+        console.log("WARN: " + an + "'s class schedule has changed to " + bn + "\n")
         continue
     }
 
@@ -88,6 +88,7 @@ for ( var i=0; i < a.length ; i++ ){
     if (bc > ac) {
         // "ƪ " forces LTR in Telegram
         console.log("ƪ " + bn + "'s capacity increased from " + ac + " to " + bc + " (" + be + " students currently enrolled)" + "\n")
+        continue // skip double notif if the enrollment had also fallen
     }
 
     if (be < ae && (marked_courses.includes(aid.toString()) || ac == ae)) {
