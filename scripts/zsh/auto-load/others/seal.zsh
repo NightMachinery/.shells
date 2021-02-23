@@ -32,6 +32,7 @@ alias attic_todo='attic="$attic_todo" un_p=y un_no_preview=y \noglob'
 alias todo='attic_todo seal'
 alias todos='attic_todo unseal'
 alias todone='attic_todo exor'
+aliasfn tdn todone
 alias todo-import='attic_todo seal-import'
 alias todo-import-NUL='attic_todo seal-import-NUL'
 alias td=todo

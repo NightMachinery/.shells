@@ -1,4 +1,4 @@
-alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
+##
 tmuxnew() {
     silent tmux kill-session -t "$1"
     tmux new -d -s "$@"
@@ -42,6 +42,7 @@ function tmuxdaemon() {
     silent tmux kill-session -t "$name"  && ecerr "Killed already existing session '$name' to run the new command '$cmd'" # is killing it redundant?
     tmuxnewsh2 "$name" "$@" && ec "Created session '$name'"
 }
+##
 function tmuxzombie-ls() {
     tmux list-panes -a -F "#{pane_dead} #{pane_id}" | awk '/^1/ { print $2 }'
 }
@@ -58,10 +59,18 @@ tmuxzombie() {
     # kills the pane of a session, thus turning it to a "dead pane"
     tmux list-panes  -s -F '#{pane_pid}' -t "$1" | inargsf serr kill
 }
+##
 function str2tmuxname() {
     # this might be too restrictive
     gtr -cd ' [a-zA-Z0-9]_-'
 }
+##
+function tmux-capture() {
+    local target="${1:?}" limit="${2}" # empty limit seems to mean return everything
+    tmux capture-pane -p -S -"$limit" -t "$target"
+}
+##
+alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 function ivy() {
     various-darwin.zsh
 
@@ -78,3 +87,4 @@ function ivy() {
     comment '-2            Force tmux to assume the terminal supports 256 colours.'
     tmux -2 attach-session -d
 }
+##
