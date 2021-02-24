@@ -25,9 +25,12 @@ else
         [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]]
     }
 fi
+function isLilf() {
+    [[ "$(hostname)" == 'lilf.ir' ]]
+}
 function isLocal() {
-	# @darwinonly
-	isDarwin
+    # @darwinonly0
+    isDarwin
 }
 ##
 function isKitty() {

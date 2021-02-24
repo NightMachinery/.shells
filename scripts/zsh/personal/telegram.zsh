@@ -12,9 +12,12 @@ export tlg_amar="$water"
 export tlg_podcastgen='-1001222930214'
 ###
 function alice() {
-    tsend -- "$alice" "$*" && {
+    local i="$*"
+
+    # tsend -- "$alice" "$i" && {
+    brishzr borg-tt-mark "$i" && {
         bell-pp-electricity
-        ec "Alicized successfully: $*"
+        # ec "Alicized successfully: $i"
     } || {
             ecerr 'Alicization failed!'
             redo2 2 tts-glados1-cached Alicization has failed

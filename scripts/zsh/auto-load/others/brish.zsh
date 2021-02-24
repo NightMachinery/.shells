@@ -15,7 +15,13 @@ function brishz() {
     fi
 }
 aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1 # bsh eval remote
-aliasfn brishzr bsh-er brishz
+function brishzr() {
+    if isLilf ; then
+        reval "$@"
+    else
+        bsh-er brishz "$@"
+    fi
+}
 ##
 function garden-req() {
     # We spoof our IP here, to see if the server is fooled.
