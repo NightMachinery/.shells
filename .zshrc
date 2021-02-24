@@ -438,6 +438,8 @@ zstyle :bracketed-paste-magic paste-finish pastefinish
 
 # https://github.com/zsh-users/zsh-autosuggestions/issues/351
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
+##
+psource $HOME/.shellfishrc
 ###
 export rcLoaded='loading'
 zsh-defer export rcLoaded='yes'

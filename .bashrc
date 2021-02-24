@@ -32,3 +32,5 @@ if isI ; then
 fi
 ##
 BASHRC_LOADED=y
+
+test -e "$HOME/.shellfishrc" && source "$HOME/.shellfishrc"

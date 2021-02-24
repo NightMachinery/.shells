@@ -107,6 +107,8 @@ function convert-pad() {
     
     convert "$i" -gravity center -extent ${w}x${h} "$o"
 }
+aliasfn img-fix-telegram convert-pad
+##
 function touchbar-screenshot() {
     local img="$(gmktemp --suffix png)"
     screencapture -b "$img" || return 1 # -x for no sound
