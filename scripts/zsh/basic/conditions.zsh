@@ -32,6 +32,11 @@ function isLocal() {
     # @darwinonly0
     isDarwin
 }
+function isServer() {
+    # @darwinonly0
+    # This is actually isLinuxServer, but since macOS servers are rare, I have simplified
+    isLinux
+}
 ##
 function isKitty() {
     test -n "$KITTY_WINDOW_ID"
@@ -67,12 +72,4 @@ isNet() {
     
     ping -q -c 1 -W 1 8.8.8.8 &>/dev/null
 }
-
-alias mycountry='geo.bash -o country'
-isIran() {
-    # [[ "$(mycountry)" == Iran ]]
-
-    ## faster
-    ! ping -q -c 1 -W 1 facebook.com &>/dev/null #  faster when it succeeds
-    # ! ping -q -c 1 -W 1 69.171.250.35 &>/dev/null # (facebook's ip) succeeds even in Iran
-}
+##

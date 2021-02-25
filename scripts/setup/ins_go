@@ -20,3 +20,4 @@ github.com/olivere/iterm2-imagetools/cmd/imgls
 github.com/sethvargo/go-password/password
 github.com/tigrawap/slit/cmd/slit
 github.com/trashhalo/imgcat
+github.com/ameshkov/dnslookup

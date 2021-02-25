@@ -14,7 +14,6 @@ alias visudo="VISUAL=vim sudo visudo"
 alias FIY='FORCE_INTERACTIVE=y FORCE_NONINTERACTIVE="" '
 alias FIN='FORCE_INTERACTIVE="" FORCE_NONINTERACTIVE=y '
 ##
-alias myip='curlm http://checkip.amazonaws.com' #'curlm https://ipinfo.io/ip' #'dig +short myip.opendns.com @resolver1.opendns.com'
 ialias re='run-on-each' #duplicate, to make it ialias
 ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
@@ -121,6 +120,7 @@ esac
 alias erase-nonprintables='tr -cd "[:print:]\n"'
 # alias cxc='\noglob __calc_plugin'
 alias s=silent
+alias rh=rehash
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
 alias coursera='coursera-dl -n -pl --aria2 --video-resolution 720p --download-quizzes --download-notebooks -sl "en,fa" --resume'
 alias ox='zdict -dt oxford'
