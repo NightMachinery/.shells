@@ -11,13 +11,15 @@ function ffdocker-ps() {
 }
 
 function ffdocker-gen() {
-    local cmd="$1" ; shift
+    typeset -a ffdocker_gen_post_cmd
+    local cmd=("${(@)ffdocker_gen_cmd:?}") post_cmd=("${(@)ffdocker_gen_post_cmd}")
     local ps i
     ps=("${(@f)$(ffdocker-ps "$@")}") || return 1
     for i in "$ps[@]" ; do
-        rgeval docker "$cmd" "$i"
+        rgeval docker "$cmd[@]" "$i" "$post_cmd[@]"
     done
 }
-aliasfn ffdocker-start ffdocker-gen start
-aliasfn ffdocker-stop ffdocker-gen stop
-aliasfn ffdocker-rm ffdocker-gen rm
+aliasfn ffdocker-attach @opts cmd [ exec -it ] post_cmd bash @ ffdocker-gen
+aliasfn ffdocker-start @opts cmd start @ ffdocker-gen
+aliasfn ffdocker-stop @opts cmd stop @ ffdocker-gen
+aliasfn ffdocker-rm @opts cmd rm @ ffdocker-gen

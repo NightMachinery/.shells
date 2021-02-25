@@ -1,0 +1,46 @@
+{
+    "log":{},
+    "inbounds":[ // v2ray receives requests from other apps through these
+        {
+            "listen": "172.17.0.1",
+            "port":"1081",
+            "protocol":"socks",
+            "settings":{
+                "auth":"noauth",
+                "udp":true,
+                "ip": "82.102.11.148"
+                // "ip": "172.17.0.1"
+            }
+        }
+        , {
+            "listen": "172.17.0.1",
+            "port":"1087",
+            "protocol":"http",
+            "settings":{}
+        }
+    ],
+    "outbounds":[
+        {
+            "tag":"direct",
+            "protocol":"freedom",
+            "settings":{}
+        },
+        {
+            "tag":"blocked",
+            "protocol":"blackhole",
+            "settings":{}
+        }
+    ],
+    "routing":{
+        "domainStrategy":"IPOnDemand",
+        "rules":[ // https://www.v2ray.com/en/configuration/routing.html
+            {
+                "type":"field",
+                "domain":[
+                    "geosite:category-ads-all"
+                ],
+                "outboundTag":"blocked"
+            }
+        ]
+    }
+}
