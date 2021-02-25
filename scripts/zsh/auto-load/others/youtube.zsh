@@ -1,3 +1,15 @@
+typeset -ga ytdl_opts
+function youtube-dl() {
+    local opts=()
+    isI || opts+=( --quiet --no-progress )
+    if isSSH ; then
+        transformer urlfinalg "$proxycmd youtube-dl $opts[@]" "$ytdl_opts[@]" "$@"
+    else
+        # urlfinalg takes too much time on Iran's net.
+        $proxycmd youtube-dl "$opts[@]" "$ytdl_opts[@]" "$@"
+    fi
+}
+##
 function yf() {
     # GISTME
     local ffull="$(youtube-dl -F "$@" | fz)"

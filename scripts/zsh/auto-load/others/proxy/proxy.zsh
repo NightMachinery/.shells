@@ -1,12 +1,22 @@
 ##
-socksport=1081
 typeset -g proxycmd="${proxycmd:-command}"
 typeset -g proxyenv="${proxyenv:-reval}"
-alias pxs="ALL_PROXY=socks5://127.0.0.1:$socksport"
+##
+socksport=1081
+export pxs_env="ALL_PROXY=socks5h://127.0.0.1:$socksport"
+alias pxs="$pxs_env"
+alias pxs-local="local -x $pxs_env"
+# alias pxs-maybe='isIran && pxs-local'
+alias pxs-maybe='isLocal && pxs-local'
+function reval-pxs() {
+    reval pxs "$@"
+}
+##
 export pxa_env='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa="$pxa_env"
 alias pxa-local="local -x $pxa_env"
-alias pxa-maybe='isIran && pxa-local'
+# alias pxa-maybe='isIran && pxa-local'
+alias pxa-maybe='isLocal && pxa-local'
 function reval-pxa() {
     reval pxa "$@"
 }

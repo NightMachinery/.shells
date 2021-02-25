@@ -9,7 +9,7 @@ function time2-unquoted() {
 
     eval "$cmd"
 
-    ec "Took $(( EPOCHREALTIME - time2_start ))"
+    ec $'\n\n'"Took $(( EPOCHREALTIME - time2_start ))"
 }
 aliasfn time2-uq time2-unquoted
 function time-p() {

@@ -9,7 +9,8 @@ sin() {
 sin-e() {
     re source "$NIGHTDIR"/zsh/exorbitant/**/*(.)
 }
-cin() {
+##
+conda-init() {
     test -n "$CONDA_IS_LOADED" && return 0
     local __conda_setup="$(conda 'shell.zsh' 'hook' 2> /dev/null)"
     if [ $? -eq 0 ]; then
@@ -19,10 +20,13 @@ cin() {
         ecerr conda not loaded
     fi
 }
-cina() {
+aliasfn conda-init cin
+conda-activate() {
     cin
     conda activate "$@"
 }
+aliasfn cina conda-activate
+##
 function rust-setup() {
     (( $+commands[rustc] )) && {
         # export RUST_SRC_PATH="$(memoi_skiperr=y memoi-eval rustc --print sysroot)/lib/rustlib/src/rust/src"

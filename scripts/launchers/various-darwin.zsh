@@ -12,14 +12,16 @@ tmuxnew BrishGarden brishgarden
 ###
 # tmuxnew v2ray v2ray -config /Users/evar/cellar/notes/private/configs/zii/v2ray/v1.zii.json
 
-tmuxnew naive-zii naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.zii.lilf.ir" --log
-tmuxnew naive-eva naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log
+# orig 1080
+tmuxnew naive-zii naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.zii.lilf.ir" --log  --concurrency=4
+
+tmuxnew naive-eva naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
 
 # tmuxnewsh2 trojan trojan -c "$nightNotes"/private/configs/zii/trojan_client.json
 # tmuxnew trojan-client-v1-zii trojan -c $nightNotes/private/configs/zii/trojan_client_v1.json
 
 v2-on # v2ray-genrouter
-# tmuxnewsh2 socks2http hpts --level info -s 127.0.0.1:1080 -p 1087 # https://github.com/oyyd/http-proxy-to-socks
+# tmuxnewsh2 socks2http hpts --level info -s 127.0.0.1:1081 -p 1087 # https://github.com/oyyd/http-proxy-to-socks
 ###
 # tmuxnewsh2 hotwords-porc porc-listen
 ##
