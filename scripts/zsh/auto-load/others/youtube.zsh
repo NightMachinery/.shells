@@ -1,12 +1,12 @@
-typeset -ga ytdl_opts
 function youtube-dl() {
+    typeset -ga ytdl_opts # has priority over args
     local opts=()
     isI || opts+=( --quiet --no-progress )
     if isSSH ; then
-        transformer urlfinalg "$proxycmd youtube-dl $opts[@]" "$ytdl_opts[@]" "$@"
+        transformer urlfinalg "revaldbg $proxycmd youtube-dl $opts[@]" "$@" "$ytdl_opts[@]"
     else
         # urlfinalg takes too much time on Iran's net.
-        $proxycmd youtube-dl "$opts[@]" "$ytdl_opts[@]" "$@"
+        revaldbg $proxycmd youtube-dl "$opts[@]" "$@" "$ytdl_opts[@]"
     fi
 }
 ##

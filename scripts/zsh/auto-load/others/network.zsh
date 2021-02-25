@@ -24,3 +24,6 @@ function speedtest-i() {
     speedtest-py --server "$(speedtest-py --list | fzp "$q" | ghead -n 1 | cut -d ')' -f1 | trimsed)"
 }
 ##
+function ip-geolocate() {
+    gurl ipinfo.io/"$1"/geo
+}

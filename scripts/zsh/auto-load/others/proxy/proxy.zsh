@@ -111,6 +111,9 @@ aliasfnq darwin-proxies-set darwin-proxies-gen networksetup -setsocksfirewallpro
 aliasfnq darwin-proxies-on darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' on
 aliasfnq darwin-proxies-off darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' off
 ##
+aliasfnq darwin-dns-get darwin-proxies-gen networksetup -getdnsservers '$ns'
+aliasfnq darwin-dns-set darwin-proxies-gen networksetup -setdnsservers '$ns'
+##
 function proxy-on() {
     # proxy on
     # @darwinonly

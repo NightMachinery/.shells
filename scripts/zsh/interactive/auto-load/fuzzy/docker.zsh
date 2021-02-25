@@ -11,7 +11,7 @@ function ffdocker-ps() {
 }
 
 function ffdocker-gen() {
-    typeset -a ffdocker_gen_post_cmd
+    typeset -ga ffdocker_gen_post_cmd
     local cmd=("${(@)ffdocker_gen_cmd:?}") post_cmd=("${(@)ffdocker_gen_post_cmd}")
     local ps i
     ps=("${(@f)$(ffdocker-ps "$@")}") || return 1
@@ -19,6 +19,8 @@ function ffdocker-gen() {
         rgeval docker "$cmd[@]" "$i" "$post_cmd[@]"
     done
 }
+
+aliasfn ffdocker-logs @opts cmd logs @ ffdocker-gen # https://docs.docker.com/engine/reference/commandline/logs/
 aliasfn ffdocker-attach @opts cmd [ exec -it ] post_cmd bash @ ffdocker-gen
 aliasfn ffdocker-start @opts cmd start @ ffdocker-gen
 aliasfn ffdocker-stop @opts cmd stop @ ffdocker-gen
