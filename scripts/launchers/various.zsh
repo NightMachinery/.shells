@@ -14,7 +14,7 @@ tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile # miniserve
 
 tmuxnew shadowsocks-ss ss-server -c "$nightNotes/private/configs/eva/shadowsocks/ss.json" # see `man shadowsocks-libev` for config # we might also have this in systemd: `systemctl status ss8324` # needed for the old laptop
 tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
-tmuxnewsh2 v2-socks v2ray -config $NIGHTDIR/configFiles/v2ray/socks_eva.json
+# tmuxnewsh2 v2-socks v2ray -config $NIGHTDIR/configFiles/v2ray/socks_eva.json
 ##
 #tmuxnewsh2 mahouka hi10-new-notify mahouka
 ##
