@@ -52,11 +52,6 @@ function mosh() {
 function ffmpeg() {
     isI && command ffmpeg "$@" || command ffmpeg -loglevel error "$@"
 }
-function youtube-dl() {
-    local opts=()
-    isI || opts+=( --quiet --no-progress )
-    transformer urlfinalg "$proxycmd youtube-dl $opts[@]" "$@"
-}
 function edir() {
   command edir --all --recurse  --suffix '' "$@"
 }
