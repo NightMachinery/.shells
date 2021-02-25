@@ -30,6 +30,9 @@ function myip-linux() {
     hostname -I | awk '{print $1}'
 }
 myip() {
+    # these are all slow in Iran. If we could find some bloody Iranian service ...
+    # https://iranwebmaster.net/t/ip/260
+    
     if isServer ; then
         myip-linux
     else
