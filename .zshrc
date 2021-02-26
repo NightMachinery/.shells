@@ -308,39 +308,36 @@ zle -N expand-or-complete-with-dots
 bindkey "^I" expand-or-complete-with-dots
 ##
 # antibody bundle Aloxaf/fzf-tab
-FZF_TAB_OPTS=(
-    --ansi   # Enable ANSI color support, necessary for showing groups
-    --expect='$continuous_trigger,$print_query' # For continuous completion
-    # '--color=hl:$(( $#headers == 0 ? 108 : 255 ))'
+FZTAB_OPTS=(
     --color=light
-    --nth=2,3 --delimiter='\x00'  # Don't search prefix
-    --layout=reverse --height='${FZF_TMUX_HEIGHT:=75%}'
-    --tiebreak=begin -m --bind=tab:down,btab:up,change:top,ctrl-space:toggle --cycle
-    '--query=$query'   # $query will be expanded to query string at runtime.
-    '--header-lines=$#headers' # $#headers will be expanded to lines of headers at runtime
-    --print-query
+    # --height='${FZF_TMUX_HEIGHT:=75%}'
 )
 function fztab() {
     # prefixer rm --rm-ansi --rm-x -- './' '../' '\x00.\x00/' '\x00..\x00/' |
 
     # Do NOT use --exit-0 or in macOS you will not be able to start typing before the fzf window opens
-    fzf-gateway "$@"
+    fzf-gateway  "$@" "$FZTAB_OPTS[@]"
+
+    # Check out /Users/evar/Library/Caches/antibody/https-COLON--SLASH--SLASH-github.com-SLASH-Aloxaf-SLASH-fzf-tab/lib/-ftb-fzf to see how this is run
 }
-FZF_TAB_COMMAND=( fztab "$FZF_TAB_OPTS[@]" )
 # zstyle ':fzf-tab:*' print-query alt-enter # this is the default
-zstyle ':fzf-tab:*' command $FZF_TAB_COMMAND
-zstyle ':fzf-tab:*' no-group-color $'\033[38;5;24m'
-# FZF_TAB_GROUP_COLORS=(
-#     $'\033[94m' $'\033[32m' $'\033[33m' $'\033[35m' $'\033[31m' $'\033[38;5;27m' $'\033[36m' \
-#         $'\033[38;5;100m' $'\033[38;5;98m' $'\033[91m' $'\033[38;5;80m' $'\033[92m' \
-#         $'\033[38;5;214m' $'\033[38;5;165m' $'\033[38;5;124m' $'\033[38;5;120m'
-# )
+zstyle ':fzf-tab:*' fzf-command fztab
+zstyle ':completion:*' format '[%d]' # enables groups # this shows some bloody '.', it's an upstream bug/feature https://github.com/Aloxaf/fzf-tab/pull/183
+zstyle ':fzf-tab:*' switch-group ',' '.'
+zstyle ':fzf-tab:*' default-color $'\033[38;5;24m'
+##
+FZF_TAB_GROUP_COLORS=(
+    $'\033[38;5;24m' $'\033[32m' $'\033[33m' $'\033[35m' $'\033[31m' $'\033[38;5;27m' $'\033[36m' \
+        $'\033[38;5;100m' $'\033[38;5;98m' $'\033[91m' $'\033[38;5;80m' $'\033[92m' \
+        $'\033[38;5;214m' $'\033[38;5;165m' $'\033[38;5;124m' $'\033[38;5;120m'
+)
 # FZF_TAB_GROUP_COLORS=()
 # for i in {1..16} ; do
 #     # FZF_TAB_GROUP_COLORS+="$(colorfg 10 255 10)"
 #     FZF_TAB_GROUP_COLORS+=$'\033[38;5;19m'
 # done
-# zstyle ':fzf-tab:*' group-colors $FZF_TAB_GROUP_COLORS
+zstyle ':fzf-tab:*' group-colors $FZF_TAB_GROUP_COLORS
+##
 
 antibody bundle Aloxaf/fzf-tab # should come after all tab keybindings
 ## fzf-tab has abandoned this API

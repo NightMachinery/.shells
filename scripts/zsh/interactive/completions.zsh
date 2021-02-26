@@ -59,4 +59,13 @@ function _indir() {
 
 }
 compdef _indir indir
+## foo has grouped completions:
+_foo() {
+    A=( -h --help foo bar baz )
+    compadd -J group1 -X expl1 -x msg1 -a A
+    B=( clown-fish hippo )
+    compadd -J group2 -X expl2 -x msg2 -a B
+}
+function foo { echo $* }
+compdef _foo foo
 ##
