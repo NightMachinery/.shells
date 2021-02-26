@@ -2,6 +2,9 @@
 
 powersaving_status_del
 # wireguard_enabled_del
+##
+darwin-dns-set 127.0.0.1 1.1.1.1
+##
 
 tmuxnew BrishGarden brishgarden
 

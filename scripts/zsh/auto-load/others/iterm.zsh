@@ -40,7 +40,7 @@ function icat() {
 ###
 function iterm-boot() {
     # Alt: `lnrp iterm_focus.py ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch/` uses iterm's own python which doesn't have our Brish
-    tmuxnewsh2 iterm_focus ITERM2_COOKIE=$(osascript -e 'tell application "iTerm2" to request cookie') reval-notifexit iterm_focus.py
+    tmuxnewsh2 iterm_focus reval-notifexit iterm_focus.py
 }
 ##
 it2prof() { echo -e "\033]50;SetProfile=$1\a" ; } # Change iterm2 profile. Usage it2prof ProfileName (case sensitive)

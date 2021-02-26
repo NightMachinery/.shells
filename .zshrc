@@ -322,8 +322,9 @@ function fztab() {
 }
 # zstyle ':fzf-tab:*' print-query alt-enter # this is the default
 zstyle ':fzf-tab:*' fzf-command fztab
-zstyle ':completion:*' format '[%d]' # enables groups # this shows some bloody '.', it's an upstream bug/feature https://github.com/Aloxaf/fzf-tab/pull/183
+zstyle ':completion:*' format '[%d]' # enables groups
 zstyle ':fzf-tab:*' switch-group ',' '.'
+zstyle ':fzf-tab:*:' prefix ''
 zstyle ':fzf-tab:*' default-color $'\033[38;5;24m'
 ##
 FZF_TAB_GROUP_COLORS=(
