@@ -1,7 +1,7 @@
 # Perhaps you should use aliasfn
 ###
 re unalias a l la ll map p fd ff pip sp rd pu gss gd &>/dev/null # mv cp
-alias 'brishzr-repeat'='isMBP && { ec ; reval-ec brishzr "$0" ; ec }' # @MBPOnly
+alias 'brishzr-repeat'='isLocal && { ec ; reval-ec brishzr "$0" ; ec }'
 alias rgjl="rgm -t julia" #"rgm --glob '*.jl'"
 alias rgpy="rgm --glob '*.py'"
 alias spt='spotlight -name'

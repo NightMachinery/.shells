@@ -38,7 +38,7 @@ aliasdir cac ~/base/cache
 ##
 function cellp() {
     incell gsync
-    brishz-repeat
+    brishzr-repeat
 }
 ##
 function vcn-getrepo() {

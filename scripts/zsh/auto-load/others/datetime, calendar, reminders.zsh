@@ -1,3 +1,6 @@
+### Usage examples
+# `remcnd 'How are your health habits going? Nutrition is still not tracked, no? Take care.' {7..90..7}`
+###
 # Some vars are defined in configvars
 ###
 @opts-setprefix remj reminday_store
@@ -121,11 +124,11 @@ function remj() {
     # local gdate="$(gdate --date "$(jalalicli togregorian "$target_date")" +'%a %Y_%m_%d')"
     local gdate="$(jalalicli togregorian "$target_date" -g 'Mon 2006_01_02')"
     local dest="$remindayDir/$target_date $gdate"
-    reminday_store "$dest" "$text"
+    @opts datej "$target_date" @ reminday_store "$dest" "$text"
 }
 function reminday_store() {
     unset rem_dest
-    local dest="${1}" text="$(trim "$2")" nosync="${reminday_store_nosync}" ext="${reminday_store_ext:-.md}"
+    local dest="${1}" text="$(trim "$2")" nosync="${reminday_store_nosync}" ext="${reminday_store_ext:-.md}" datej="${reminday_store_datej}"
 
     if [[ "$ext" != .* ]] ; then
         ext=".$ext"
@@ -137,12 +140,18 @@ function reminday_store() {
     dest="${dest}${ext}"
     ensure-dir "$dest" || return 1
     ec "$text" >> $dest || return $?
-    Bold ; color 100 255 200 "$dest : $text" ; resetcolor
+    ##
+    if test -n "$datej" ; then
+        Bold ; color 100 255 200 "$(@opts mode 1 @ datej-all "$datej")" ; resetcolor
+    fi
+    ecn "$dest : " ; Bold ; color 100 200 255 "$text" ; resetcolor
+    ##
     test -n "$nosync" || {
         : 'redundant check, as we check =nosync= in rem-sync as well'
         rem-sync # to sync the reminders
     }
     awaysh deus iwidget-rem # refresh the cache
+    isLocal && brishzr awaysh deus iwidget-rem # refresh the cache
     rem_dest="$dest"
 }
 function datenatj() {
@@ -164,7 +173,7 @@ function datenat-full1() {
 
     local jdate
     sout datenatj "$natdate" || return 1
-    jdate="$datenatj_datej"
+    jdate="$datenatj_datej" # OUT: datenatj_datej is used in 'remn'
     local gdate="$(gdate --date "$datenatj_date" +'%a %Y_%m_%d')"
     ec "$jdate $gdate"
 }
@@ -173,7 +182,7 @@ function remn() {
     [[ "$text" == '-' ]] && text="$(</dev/stdin)"
     local dest
     dest="$remindayDir/$(datenat-full1 "$natdate")" || return $?
-    reminday_store "$dest" "$text"
+    @opts datej "$(datenatj "$natdate")" @ reminday_store "$dest" "$text"
 }
 function datenat-full2() {
     local natdate="$*"
@@ -182,7 +191,7 @@ function datenat-full2() {
     sout datenatj "$natdate" || return 1
     jdate="$datenatj_datej"
 
-    datej-all "$jdate"
+    @opts mode 1 @ datej-all "$jdate"
 }
 function remn-interactive() {
     local text="$*"
@@ -344,20 +353,25 @@ function datej-all() {
     # datej-all 1380/06/20
     # 80/Shahrivar6/20 Tue Sep9/11
     ##
-    local datej="${*:-$(datej)}"
+    local datej="${*:-$(datej)}" mode="${datej_all_mode:-0}"
 
-    local dateg="$(jalalicli togregorian --gregorian-format='Mon Jan1/2' "$datej")"
     local now=("${(s./.)datej}")
     local cyear="$now[1]"
-    cyear="${cyear[3,4]}"
+    (( mode == 0 )) && cyear="${cyear[3,4]}"
     integer cmonth="$now[2]"
     integer cday="$now[3]"
 
-    # Persian text is not well supported in widgets or Telegram.
-    # Full:
-    # ec "$cyear/$(monthj2en $cmonth) $cmonth/$cday $(date +'%A %B %d')"
-    # Abbrev: (We don't want it occupying two lines on the widget.)
-    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg" # %y/
+    if (( mode == 0 )) ; then
+        local dateg="$(jalalicli togregorian --gregorian-format='Mon Jan1/2' "$datej")"
+        # Persian text is not well supported in widgets or Telegram.
+        # Abbrev: (We don't want it occupying two lines on the widget.)
+        ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg"
+    elif (( mode == 1 )) ; then
+        local dateg="$(jalalicli togregorian --gregorian-format='Monday January1/2/2006' "$datej")"
+        ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg"
+    else
+        ecerr "$0: Unsupported mode '$mode'"
+    fi
 }
 ##
 remnd() {
