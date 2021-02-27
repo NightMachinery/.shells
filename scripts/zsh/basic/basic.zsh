@@ -84,3 +84,4 @@ setopt autocd multios re_match_pcre extendedglob pipefail interactivecomments ha
 setopt long_list_jobs complete_in_word always_to_end
 setopt append_history extended_history hist_expire_dups_first hist_ignore_dups hist_ignore_space hist_verify inc_append_history share_history
 unsetopt autopushd
+rehash # make hash_executables_only take effect

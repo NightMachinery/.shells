@@ -21,6 +21,10 @@ async def main(connection):
 
     # input_lang = 'U.S.'
     app = await iterm2.async_get_app(connection)
+
+    # nest_asyncio.apply()
+    # embed(using='asyncio')
+
     async with iterm2.FocusMonitor(connection) as monitor:
         while True:
             update = await monitor.async_get_next_update()
