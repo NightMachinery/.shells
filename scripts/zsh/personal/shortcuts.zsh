@@ -36,7 +36,10 @@ aliasdir nt $cellar/notes/
 aliasdir incache ~/base/cache
 aliasdir cac ~/base/cache
 ##
-aliasfn cellp incell gsync
+function cellp() {
+    incell gsync
+    brishz-repeat
+}
 ##
 function vcn-getrepo() {
     local repo=night.sh
@@ -75,9 +78,7 @@ function vcnpp() {
         # vcsh $repo push "$remote" master
         # done
         ##
-        if isMBP ; then
-	    brishzr vcnpp
-	fi
+        brishzr-repeat
     } always { popf }
 }
 function cp2tmp() {

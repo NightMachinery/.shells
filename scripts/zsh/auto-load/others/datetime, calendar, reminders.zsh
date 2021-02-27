@@ -158,16 +158,41 @@ function datenatj() {
     datenatj_datej="$(jalalicli tojalali "$gdate")"
     ecn "$datenatj_datej"
 }
-function remn() {
-    local text="$1" natdate="${@:2}"
-    [[ "$text" == '-' ]] && text="$(</dev/stdin)"
+function datenat-full1() {
+    # Used in 'remn'
+    local natdate="$*"
+
     local jdate
     sout datenatj "$natdate" || return 1
     jdate="$datenatj_datej"
     local gdate="$(gdate --date "$datenatj_date" +'%a %Y_%m_%d')"
-    local dest="$remindayDir/$jdate $gdate"
+    ec "$jdate $gdate"
+}
+function remn() {
+    local text="$1" natdate="${@:2}"
+    [[ "$text" == '-' ]] && text="$(</dev/stdin)"
+    local dest
+    dest="$remindayDir/$(datenat-full1 "$natdate")" || return $?
     reminday_store "$dest" "$text"
 }
+function datenat-full2() {
+    local natdate="$*"
+
+    local jdate
+    sout datenatj "$natdate" || return 1
+    jdate="$datenatj_datej"
+
+    datej-all "$jdate"
+}
+function remn-interactive() {
+    local text="$*"
+    
+    local natdate=""
+    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --reverse --bind "change:reload:brishz.dash serr datenat-full2 {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
+    remn "$text" "$natdate"
+}
+aliasfn ri remn-interactive
+##
 function rem-todaypaths() {
     unset today
 
@@ -315,17 +340,24 @@ function monthj2fa() {
     esac
 }
 function datej-all() {
-    local now=("${(s./.)$(datej)}")
+    ## test:
+    # datej-all 1380/06/20
+    # 80/Shahrivar6/20 Tue Sep9/11
+    ##
+    local datej="${*:-$(datej)}"
+
+    local dateg="$(jalalicli togregorian --gregorian-format='Mon Jan1/2' "$datej")"
+    local now=("${(s./.)datej}")
     local cyear="$now[1]"
     cyear="${cyear[3,4]}"
     integer cmonth="$now[2]"
     integer cday="$now[3]"
 
-    # Persian text is not well weupported in widgets or Telegram.
+    # Persian text is not well supported in widgets or Telegram.
     # Full:
     # ec "$cyear/$(monthj2en $cmonth) $cmonth/$cday $(date +'%A %B %d')"
     # Abbrev: (We don't want it occupying two lines on the widget.)
-    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $(date +'%a %b%-m/%d')" # %y/
+    ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg" # %y/
 }
 ##
 remnd() {

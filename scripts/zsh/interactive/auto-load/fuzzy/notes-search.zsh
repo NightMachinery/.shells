@@ -85,7 +85,7 @@ function rgf_() {
     local INITIAL_QUERY=( "$@" )
 
     FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq ${INITIAL_QUERY:-.})" \
-        fz-empty --reverse --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --phony --query "$INITIAL_QUERY" --expect=alt-enter | {
+        fz-empty --reverse --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --disabled --query "$INITIAL_QUERY" --expect=alt-enter | {
         read -d $'\n' -r acceptor
         outFiles="$(cat)"
         print -r -- "$outFiles"
