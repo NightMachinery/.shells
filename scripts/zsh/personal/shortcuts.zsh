@@ -37,8 +37,8 @@ aliasdir incache ~/base/cache
 aliasdir cac ~/base/cache
 ##
 function cellp() {
-    incell gsync
-    brishzr-repeat
+    brishzr-repeat # now that eva is a remote, we just need to make sure things are clean and committed there
+    reval-ec incell gsync
 }
 ##
 function vcn-getrepo() {

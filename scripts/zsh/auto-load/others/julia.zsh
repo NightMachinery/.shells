@@ -255,9 +255,6 @@ function jyl() {
 alifn jylist=jyl
 noglobfn jyl jylist
 ##
-export borgEndpoint="http://127.0.0.1:5922"
-export timetracker_db="$attic_private_dir/timetracker.db"
-
 function borg-req() {
     curl --fail --silent --location --header "Content-Type: application/json" --data '@-' $borgEndpoint/"$@"
 }

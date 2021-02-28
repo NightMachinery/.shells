@@ -194,6 +194,8 @@ function coder() {
     local p="$(<<<$1 sd "$HOME" /home/eva)"
     rgeval code-insiders --reuse-window --remote 'ssh-remote+82.102.11.148' "$p"
 }
+aliasfn vcr coder
+##
 aliasfn vr veditor=(coder) v
 aliasfn vcode veditor=(code-insiders --reuse-window)
 aliasfn ve veditor=(emc)
