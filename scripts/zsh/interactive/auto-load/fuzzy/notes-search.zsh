@@ -287,12 +287,17 @@ function ntsearch_() {
         # cpanm App::ansifold
         # https://metacpan.org/pod/Text::ANSI::WideUtil
         ##
-        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) || printf -- \"\n\n%s \" {}"
+        ##
+        # https://github.com/junegunn/fzf/issues/2373 preview header
+        # remove `:+{2}-5` from preview-window and use mode=0 to revert to the previous behavior
+        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) 1 || printf -- \"\n\n%s \" {}"
+        ##
+        # previewcode="cat $(gq $nightNotes)/{1} || printf -- error5"
     fi
 
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
-    ntsearch_fd | fz_empty=y fz --preview-window right:wrap --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
+    ntsearch_fd | fz_empty=y fz --preview-window 'right:50%:wrap:nohidden:+{2}-5' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
         read -d $'\0' -r acceptor
         out="$(cat)"
         ec "$out"

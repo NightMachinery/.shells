@@ -4,15 +4,7 @@
 # imports string.zsh
 # imports binaries sd, fzf, perl
 
-## vars
-test -z "$attic_dir" && export attic_dir="$cellar/attic/"
-export attic_private_dir="$cellar/attic_private/"
-test -z "$attic" && attic="$attic_dir/.darkattic"
-test -z "$attic_todo" && attic_todo="$attic_private_dir/.attic_todo"
-test -z "$attic_temoji" && attic_temoji="$attic_dir/.temojis"
-test -z "$attic_quotes" && attic_quotes="$attic_dir/.quotes"
-test -z "$attic_emails" && attic_emails="$attic_private_dir/.emails"
-
+## vars defined in configvars.bash
 ### aliases
 ## emails
 alias attic_emails='attic="$attic_emails" un_p=y un_no_preview=y'

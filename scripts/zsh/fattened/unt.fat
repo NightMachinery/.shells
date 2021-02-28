@@ -238,7 +238,8 @@ color () {
 	true colorfg colorbg
 	local in inargs
 	local noreset="$coNr" 
-	local nonewline="$coN" 
+	local nonewline="$coN" # note that if args are supplied without stdin, it is troublesome to add $'\n'
+	# local nonewline="y"
 	\noglob : "Note that we need to first get stdin and then print the color, otherwise we'll print the color before anything has been outputted, resulting in race conditions."
 	[[ "$1" =~ '^\d+$' ]] && {
 		in-or-args2 "${@[4,-1]}"

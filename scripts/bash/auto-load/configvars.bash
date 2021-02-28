@@ -8,7 +8,8 @@ export PAGER="$commands[less]"
 export ONHOLD=$GREENCASE_DIR/music/Sleep\ Party\ People\ -\ Heaven\ Is\ Above\ Us.m4a
 export DING="$GREENCASE_DIR/LittleMisfortune/flac/26.1_16_MI_thetrainishere..blue..flac"
 ##
-export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-a:select-all' --color=light --multi --hscroll-off 99999"
+# `preview-half-page-down` is also an option
+export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-a:select-all' --color=light --multi --hscroll-off 99999"
 export FZF_DEFAULT_COMMAND="fd --type f" # fzf runs this when input is a tty
 export SHELL=/bin/dash #"${commands[dash]}" # fzf uses this shell to run the default command
 # It might be problematic to set SHELL, but who knows ...
@@ -35,6 +36,17 @@ export nightNotes="$cellar/notes/"
 export orgdir="$nightNotes/org"
 export memorydir="$nightNotes/private/memories"
 export peopledir="$nightNotes/private/memories/people"
+##
+test -z "$attic_dir" && export attic_dir="$cellar/attic/"
+export attic_private_dir="$cellar/attic_private/"
+test -z "$attic" && attic="$attic_dir/.darkattic"
+test -z "$attic_todo" && attic_todo="$attic_private_dir/.attic_todo"
+test -z "$attic_temoji" && attic_temoji="$attic_dir/.temojis"
+test -z "$attic_quotes" && attic_quotes="$attic_dir/.quotes"
+test -z "$attic_emails" && attic_emails="$attic_private_dir/.emails"
+##
+export borgEndpoint="http://127.0.0.1:5922"
+export timetracker_db="${attic_private_dir:?}/timetracker.db"
 ##
 export remindayDir="$nightNotes/reminders"
 export remindayBakDir="$cellar/reminders_bak"
