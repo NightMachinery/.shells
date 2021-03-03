@@ -18,6 +18,10 @@ mv () {
         _h_mv -v -- "$1" "$newfilename"
     fi
 }
+mv2 () {
+    (( $#@ < 2 )) && { ecerr "Usage: mv2 <dest> <path> ..." ; return 1 }
+    reval-ec mv "${@[-1]}" "${@[1,-2]}"
+}
 alias noglob='noglob ruu ""'
 watchm() {
     ruu "watch -n $1" "${@:2}"

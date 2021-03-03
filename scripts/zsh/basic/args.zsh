@@ -1,9 +1,17 @@
 ###
 function in-or-args2() {
-    (( $# )) && inargs=( "$@" ) || inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
+    (( $# )) && inargs=( "$@" ) || {
+            if ! isInTty ; then
+                inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
+            fi
+        }
 }
 function in-or-args() {
-    (( $# )) && ec "$@" || print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
+    (( $# )) && ec "$@" || {
+            if ! isInTty ; then
+                print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
+            fi
+        }
 }
 function pcat() {
     possiblycat "${@:-50}"

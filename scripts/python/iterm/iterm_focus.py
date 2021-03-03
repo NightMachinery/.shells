@@ -36,7 +36,7 @@ async def main(connection):
                 # zp("ecdbg {update.window_changed.event.__dict__!s}")
                 # zp("ecdbg {window.__dict__!s}")
             ##
-            if (update.active_session_changed or update.selected_tab_changed or update.window_changed) and window.current_tab:
+            if (update.active_session_changed or update.selected_tab_changed or update.window_changed) and window and window.current_tab:
                 # embed(using='asyncio')
                 if update.window_changed:
                     focus=update.window_changed.event.name

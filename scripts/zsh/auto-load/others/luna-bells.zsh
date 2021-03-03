@@ -7,35 +7,46 @@ luna() {
     lunar pmset displaysleepnow
 }
 ##
-luna-audio() {
-    awaysh-bnamed LUNA_MARKER h_luna-audio
-}
-h_luna-audio() {
-        display-gray-on
-        bell-many
-        display-gray-off
+luna-advanced-bell() {
+    awaysh-bnamed LUNA_MARKER h_luna-advanced-bell
 }
 lunas() {
-    lunar luna-audio
-    display-gray-off
+    lunar luna-advanced-bell
+    display-gray-off # probably redundant
 }
-bell-many() {
+redis-defvar luna_signal1
+h_luna-advanced-bell() {
     setopt localtraps
     # So I don't understand these all that well, but here is my guess:
     trap "" INT # disables INT handling in this function, so we don't quit by INT
     (
-        local count=25
-        # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-getv works as long as you don't play multiple videos simultaneously, and is cross-platform.
-        if [[ "$(mpv-getv pause)" == 'false' ]] ; then
-            # fsay "Luna sees MPV"
-            bell-luna-mpv
+        local signal1="$(luna_signal1_get)"
+        luna_signal1_del
+
+        display-gray-on
+
+        if [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]] ; then
+            redo2 1 bell-visual-flash1
+            sleep 10 # keeps screen gray
         else
-            redo bell-luna "$count"
+            if [[ "$signal1" == flash ]] ; then
+                redo2 10 bell-visual-flash1
+            else
+                local count=25
+                # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-getv works as long as you don't play multiple videos simultaneously, and is cross-platform.
+                if [[ "$(mpv-getv pause)" == 'false' ]] ; then
+                    # fsay "Luna sees MPV"
+                    bell-luna-mpv
+                else
+                    redo bell-luna "$count"
+                fi
+            fi
         fi
     ) # this is a new process so it has its own signal handling and so does quit on INT
     # 25  1:23.87 total
     # each is about 3.5s
 
+    display-gray-off
     ecdate "Luna iterated."
 }
 function bell-zsh1() {
@@ -59,7 +70,7 @@ function greencase_audio_init() {
 }
 bell-greencase() {
     ##
-    # @retiredtodo this doesn't result in a constantish duration, so we'll additional code to check the duration in a while loop in bell-many
+    # @retiredtodo this doesn't result in a constantish duration, so we'll need additional code to check the duration in a while loop in luna-advanced-bell
     #
     ## Perf:
     # The delay is in the files themselves, these below have same time and both sound delayed:
@@ -316,4 +327,15 @@ function warn-posture() {
 }
 ##
 aliasfnq bell-gibberish1-long tts-gateway-g1 'An apple is an edible fruit produced by an apple tree (Malus domestica). Apple trees are cultivated worldwide and are the most widely grown species in the genus Malus. The tree originated in Central Asia, where its wild ancestor, Malus sieversii, is still found today. Apples have been grown for thousands of years in Asia and Europe and were brought to North America by European colonists. Apples have religious and mythological significance in many cultures, including Norse, Greek, and European Christian tradition.'
+##
+function bell-visual-flash1() {
+    local b off="${1:-0.1}" s="${2:-0.2}"
+    b="$(brightness-get)" || return $?
+    if (( (b) <= (off + 0.1) )) ; then
+        off=0
+    fi
+    brightness-set "$off" || return $?
+    sleep "$s"
+    brightness-set "$b" || return $?
+}
 ##

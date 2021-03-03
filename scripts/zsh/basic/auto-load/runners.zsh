@@ -99,6 +99,14 @@ function env-clean() {
     env -i "$env[@]" "$(realpath2 "$cmdhead")" "$cmdbody[@]"
 }
 ##
+function sudo() {
+    unset -f sudo
+    if [[ "$(uname)" == 'Darwin' ]] && ! grep 'pam_tid.so' /etc/pam.d/sudo --silent; then
+        # Enables touch ID for sudo:
+        sudo sed -i -e '1s;^;auth       sufficient     pam_tid.so\n;' /etc/pam.d/sudo
+    fi
+    sudo "$@"
+}
 function sud() {
     ## test
     # alias bb='bash -c'
@@ -119,6 +127,18 @@ function sud() {
     local cmdhead="$1"
     cmdhead=($(expand-alias-strip "$cmdhead"))
     local cmdbody=("$@[2,-1]")
-    revaldbg sudo "$env[@]" "$(realpath2 "${cmdhead[1]}")" "${(@)cmdhead[2,-1]}" "$cmdbody[@]"
+    local cmd_binary
+    { cmd_binary="$(realpath2 "${cmdhead[1]}")" && test -n "$cmd_binary" } || {
+        local ret=$?
+        ecerr "$0: realpath2 could not find '${cmdhead[1]}'"
+        return $ret
+    }
+    revaldbg sudo "$env[@]" "$cmd_binary" "${(@)cmdhead[2,-1]}" "$cmdbody[@]"
+}
+function sudoify() {
+    local head="$1" ; shift
+
+    fnswap "$head" "sudo $head" "$@"
+    # @tip command is also a unix command, and so can be sudoified
 }
 ##

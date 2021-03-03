@@ -29,3 +29,6 @@ function p-double-newlines() {
 }
 alias pdn='p-double-newlines'
 ##
+function rget() {
+    rg --only-matching --replace '$1' "$@"
+}

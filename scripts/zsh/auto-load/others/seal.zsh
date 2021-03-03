@@ -58,11 +58,18 @@ unseal-split1() {
 }
 ## core
 seal() {
+    local i="$@"
+    # local i="$(in-or-args "$@")"
+    if test -z "$i" ; then
+        unseal
+        return $?
+    fi
+
     doc Use with 'uns' to store and retrieve one-liners
     doc Use exor to remove seals.
     local n=''
     ! test -e "$attic" || n=$''
-    print -r -n -- "$n$(in-or-args "$@")"$'\n' >> "$attic"
+    print -r -n -- "$n$i"$'\n' >> "$attic"
 }
 function unseal-get() {
     <"$attic[@]" "$@"
@@ -72,6 +79,8 @@ function unseal-get2note() {
 }
 alias uns=unseal
 unseal() {
+    local query="$(fz-createquery "$@")"
+    
     doc unseal
     doc in: un_fz un_p
     re 'ecdbg un_fz:'  "$un_fz[@]"
@@ -81,7 +90,7 @@ unseal() {
         other_options+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window hidden)
         fz_no_preview=y
         }
-    local l="$(unseal-get RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${*:-}")"
+    local l="$(unseal-get RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${query}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy
