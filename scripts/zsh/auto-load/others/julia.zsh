@@ -259,11 +259,22 @@ function borg-req() {
     curl --fail --silent --location --header "Content-Type: application/json" --data '@-' $borgEndpoint/"$@"
 }
 function borg-tt-mark() {
-    ec "$*" | text2num | jq --raw-input --slurp --null-input --compact-output 'inputs as $i | {"name": $i}' | borg-req timetracker/mark/
+	local out
+	out="$(ec "$*" | text2num | jq --raw-input --slurp --null-input --compact-output 'inputs as $i | {"name": $i}' | borg-req timetracker/mark/)" || return $?
+	ec $out
+	[[ "$out" == *"cold shoulder"* ]] && return 1
 }
 function borg-tt-last() {
     local count="${1:-6}"
 
     catsql --table activity --order id- --limit "$count" "$timetracker_db" | gsed -n '4,$p' | sd -f m '^\d+,' '' | sdlit $'\n' $'\n\n' | sdlit , $'\n    '
+}
+##
+function reval-2json() {
+	local out="$(gmktemp)"
+	local err="$(gmktemp)"
+	FORCE_NONINTERACTIVE=y reval "$@" > "$out" 2> "$err"
+	local ret=$?
+	cat "$out" | jq --raw-input --slurp --null-input --arg ret "$ret" --slurpfile err <(cat "$err" | jq --raw-input .) 'inputs as $i | {"retcode": $ret, "stdout": $i, "stderr": $err}' # --compact-output
 }
 ##
