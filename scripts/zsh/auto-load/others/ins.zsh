@@ -101,7 +101,7 @@ function ins() {
 }
 function jins() {
     mdoc Add Julia package MAGIC
-    julia --startup-file=no -e 'using Pkg; Pkg.add("'"$1"'"); Pkg.precompile()' # using '"$1"
+    julia --startup-file=no -e 'using Pkg; Pkg.add("'"$1"'"); using Dates ; Pkg.gc(collect_delay=Day(0)) ; Pkg.precompile()' # using '"$1"
     # No longer necessary: We import the newly installed package to precompile it.
 }
 reify jins

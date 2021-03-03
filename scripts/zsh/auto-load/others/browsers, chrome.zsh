@@ -37,3 +37,13 @@ function browser-recordings-process-watch() {
         sleep 1
     done
 }
+##
+function browser-current-title() {
+    # @darwinonly @chromeonly
+    chrome-cli info | rget 'Title:\s+(.*)'
+}
+function browser-current-url() {
+    # @darwinonly @chromeonly
+    chrome-cli info | rget 'Url:\s+(.*)'
+}
+##

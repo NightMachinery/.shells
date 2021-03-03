@@ -49,3 +49,4 @@ normalize-url
 fuzzyset
 fuzzyset
 html-table-to-json
+chrome-remote-interface

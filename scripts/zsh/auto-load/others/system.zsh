@@ -99,8 +99,20 @@ function brightness-get() {
 		else
 			return 1
 		fi
+	else
+		return 1
 	fi
 }
+function brightness-set() {
+	local i="$1"
+
+	if isDarwin ; then # @darwinonly
+		brightness "$i"
+	else
+		return 1
+	fi
+}
+##
 function brightness-screen() {
 	local mode="${1:-1}"
 
