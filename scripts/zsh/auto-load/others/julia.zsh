@@ -262,7 +262,7 @@ function borg-tt-mark() {
 	local out
 	out="$(ec "$*" | text2num | jq --raw-input --slurp --null-input --compact-output 'inputs as $i | {"name": $i}' | borg-req timetracker/mark/)" || return $?
 	ec $out
-	[[ "$out" == *"cold shoulder"* ]] && return 1
+	[[ "$out" == *("cold shoulder"|"Julia encountered an exception.")* ]] && return 1 || true
 }
 function borg-tt-last() {
     local count="${1:-6}"
