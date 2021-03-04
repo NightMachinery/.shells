@@ -38,6 +38,13 @@ function isServer() {
     isLinux
 }
 ##
+function isBorg() {
+    [[ -n "$JBRISH" ]]
+}
+isJulia() { isBorg "$@" ; }
+# isborg() { isBorg "$@" ; }
+# isjulia() { isBorg "$@" ; }
+##
 function isKitty() {
     test -n "$KITTY_WINDOW_ID"
 }
