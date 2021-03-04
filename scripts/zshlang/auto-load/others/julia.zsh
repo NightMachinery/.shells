@@ -261,6 +261,7 @@ function borg-req() {
 function borg-tt-mark() {
 	local out
 	out="$(ec "$*" | text2num | jq --raw-input --slurp --null-input --compact-output 'inputs as $i | {"name": $i}' | borg-req timetracker/mark/)" || return $?
+	test -z "$out" && return 1
 	ec $out
 	[[ "$out" == *("cold shoulder"|"Julia encountered an exception.")* ]] && return 1 || true
 }

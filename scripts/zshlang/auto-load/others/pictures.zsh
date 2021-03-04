@@ -95,8 +95,9 @@ function convert-pad() {
     jglob
     local i="${1:? Input required}" o="${2:-${1:r}_padded.png}" w="${convert_pad_w:-${convert_pad_s:-1024}}" h="${convert_pad_h:-${convert_pad_s:-1024}}"
 
-    local actualw=$(identify -format %w "$i")
-    local actualh=$(identify -format %h "$i")
+    local actualw actualh
+    actualw=$(identify -format %w "$i") || return $?
+    actualh=$(identify -format %h "$i") || return $?
 
     if (( w < actualw )) ; then
         w=$actualw
@@ -105,7 +106,10 @@ function convert-pad() {
         h=$actualh
     fi
     
-    convert "$i" -gravity center -extent ${w}x${h} "$o"
+    convert "$i" -gravity center -extent ${w}x${h} "$o" || return $?
+    if isBorg ; then
+        trs "$i"
+    fi
 }
 aliasfn img-fix-telegram convert-pad
 ##
