@@ -120,6 +120,12 @@ function ntl-rg() {
 function ntl-fzf() {
     ntsearch_query_fzf="$*" ntsearch-lines
 }
+function ntl-fzfq() {
+    local query="$(fz-createquery "$@")"
+
+    ntsearch_query_fzf="$query" ntsearch-lines
+}
+##
 function ntsearch-lines() {
     : "Remember that ntsearch_ uses eval-memoi"
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"

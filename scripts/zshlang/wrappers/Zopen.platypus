@@ -53,7 +53,7 @@
 	<key>ScriptArgs</key>
 	<array/>
 	<key>ScriptPath</key>
-	<string>/Users/evar/scripts/zsh/wrappers/zopen.bash</string>
+	<string>/Users/evar/scripts/zshlang/wrappers/zopen.bash</string>
 	<key>StatusItemDisplayType</key>
 	<string>Icon</string>
 	<key>StatusItemIcon</key>

@@ -5,7 +5,7 @@ set -o vi
 # export disable_malice=''
 export disable_malice='y'
 export NIGHT_PERSONAL=y
-source "$HOME/scripts/zsh/load-first.zsh"
+source "$HOME/scripts/zshlang/load-first.zsh"
 typeset -g NIGHT_NO_EXPENSIVE
 isNotExpensive || {
     source ~/.shared.sh
@@ -23,8 +23,8 @@ isNotExpensive || {
     # Won't defer if not interactive or disabled explicitly
     { [[ -o interactive ]] && test -z "$DISABLE_DEFER" } && antibody bundle romkatv/zsh-defer || alias zsh-defer=''
     source-interactive-all() {
-        run-on-each source "$NIGHTDIR"/zsh/interactive/auto-load/**/*(.)
-        source "$NIGHTDIR"/zsh/interactive/completions.zsh # needs to be semi-last
+        run-on-each source "$NIGHTDIR"/zshlang/interactive/auto-load/**/*(.)
+        source "$NIGHTDIR"/zshlang/interactive/completions.zsh # needs to be semi-last
         typeset -g NIGHT_NO_EXPENSIVE
         NIGHT_NO_EXPENSIVE=y
     }

@@ -1,13 +1,26 @@
 typeset -Ug path
 function addToPATH {
+    local newPath="$1"
+
+    if ! test -d "$newPath" ; then
+        return 1
+    fi
+    ## too costly:
+    # if (( ${+commands[grealpath]} )) ; then
+    #     newPath="$(grealpath --canonicalize-existing "$newPath")" || return $?
+    # fi
+    ##
     # case ":$PATH:" in
     #     *":$1:"*) :;; # already there
     #     *) PATH="$1:$PATH";; # org/r PATH="$PATH:$1"
     # esac
     #path[1,0]="$1"
     #path=("$1" "$path[@]")
-    PATH="$1:$PATH"
+    ##
+    PATH="$newPath:$PATH"
     # typeset -Ug path
+    ##
+    # rehash
 }
 function add-path {
     doc add-path NODE_PATH /some/path

@@ -7,16 +7,15 @@ fi
 addToPATH /usr/sbin
 addToPATH /Applications/SuperCollider.app/Contents/Resources/
 addToPATH /Applications/SuperCollider.app/Contents/MacOS/
-addToPATH ~/code/node/snips-alice
 addToPATH ~/.emacs.d.doom/bin/
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
-addToPATH /snap/bin
+isLinux && addToPATH /snap/bin
 addToPATH "/usr/local/bin"
 addToPATH "/usr/local/sbin"
 addToPATH "$HOME/.local/bin"
-addToPATH "/Base/- Code/Resources/"
+addToPATH "$HOME/code/resources/"
 export GOPATH="$HOME/go"
 export GOBIN="$GOPATH/bin"
 addToPATH "$HOME/go/bin"

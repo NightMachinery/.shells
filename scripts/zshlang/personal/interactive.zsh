@@ -1,5 +1,5 @@
 isI && {
-    source "$NIGHTDIR"/zsh/widgets.zsh
+    source "$NIGHTDIR"/zshlang/widgets.zsh
     precmd_pipestatus() {
         RPROMPT="${(j.|.)pipestatus}"
         if [[ "${(j.|.)pipestatus}" == 0 ]]; then

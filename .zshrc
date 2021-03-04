@@ -193,7 +193,7 @@ alias it2universion=~/.iterm2/it2universion
 antibody bundle mafredri/zsh-async
 zsh-defer antibody bundle zdharma/zui
 
-# re source "$NIGHTDIR"/zsh/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
+# re source "$NIGHTDIR"/zshlang/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
 
 # autoload -U deer
 # zle -N deer
