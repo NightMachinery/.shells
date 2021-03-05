@@ -8,6 +8,13 @@ darwin-dns-set 127.0.0.1 1.1.1.1
 
 tmuxnew BrishGarden brishgarden
 
+tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile_darwin
+##
+tmuxnew smb sudo /usr/sbin/smbd -no-symlinks false
+tmuxnewsh2 shared-dav wsgidav --config="$NIGHTDIR/launchers/wsgidav_darwin.yaml"
+# tmuxnewsh2 shared-dav wsgidav --host=192.168.1.56 --port=8113 --root=~/Base/shared --auth=anonymous
+##
+
 # tmuxnew supercollider scsynth -u 57110 -a 1024 -i 2 -o 2 -R 0 -l 100  -B 127.0.0.1
 
 # needs to run by cron # tmux new -d -s books "$NIGHTDIR/zshlang/book-checker.zsh"

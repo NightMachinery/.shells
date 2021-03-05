@@ -35,9 +35,9 @@ function ensure-dir() {
 }
 reify ensure-dir
 function lnrp() {
-    local f="$1" d="$2"
+    local f="${1:?}" d="${2:?}"
 
-    ln -s "$(realpath2 "$f")" "$d"
+    ln -i -s "$(realpath2 "$f")" "$d"
 }
 function rmdir-empty() {
     : "Removes all recursively empty directories from <root-dir>"
@@ -62,11 +62,21 @@ function append-f2f() {
 ##
 function  mv-merge() {
     # https://unix.stackexchange.com/questions/127712/merging-folders-with-mv/172402
-    local src="${1:?}" dest="${2:?}"
+    local paths=() i opts_end
+    for i in "$@" ; do
+        if [[ -n "$opts_end" || "$i" != '-'* ]] ; then
+            paths+="$i"
+        fi
+        if [[ "$i" == '--' ]] ; then
+            opts_end=y
+        fi
+    done
+    if (( ${#paths} <= 1 )) ; then
+        ecerr "$0: Only one path supplied."
+        return 1
+    fi
+    command gcp -r --link --archive --interactive --verbose "$@" || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
 
-    command gcp -r --link --archive --interactive "$src" "$dest" || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
-
-    # rm -r "$src"
-    trs "$src"
+    trs "${(@)paths[1,-2]}"
 }
 ##

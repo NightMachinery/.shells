@@ -2,7 +2,7 @@ typeset -Ug path
 function addToPATH {
     local newPath="$1"
 
-    if ! test -d "$newPath" ; then
+    if ! test -d "$newPath" ; then # works for symlinks, too
         return 1
     fi
     ## too costly:

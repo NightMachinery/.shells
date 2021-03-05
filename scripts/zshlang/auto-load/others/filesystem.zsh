@@ -90,3 +90,15 @@ function ext-all() {
     # useful for, e.g., seeing what to track with git lfs
     fd . | inargsf mapg '${i:e}' | gsort --uniq
 }
+##
+function vidir() {
+    # org has the right comment syntax (to delete), and can autocomplete well
+    edir --all --trash --suffix .org "$@"
+}
+##
+function progress() {
+    # @wrapper
+    command progress --additional-command gcp --additional-command gmv --additional-command gcat --additional-command gdd --monitor "$@" # --monitor-continuously
+}
+aliasfn prg progress
+##

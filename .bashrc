@@ -1,7 +1,7 @@
 ### ZSH COMPATIBLE
 ##
 export NIGHTDIR=~/scripts
-source "$NIGHTDIR"/zsh/basic/conditions.zsh
+source "$NIGHTDIR"/zshlang/basic/conditions.zsh
 ##
 if isBash ; then
     if (( BASH_VERSINFO[0] >= 5 )) ; then

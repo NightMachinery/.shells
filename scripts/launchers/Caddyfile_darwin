@@ -1,0 +1,21 @@
+#
+# noise here to stop emacs from thinking this is C code
+
+{
+    # experimental_http3
+	order webdav after basicauth
+}
+
+http://192.168.1.56:8112 {
+  encode zstd gzip
+  file_server browse {
+    hide *..hidden..*
+    root {env.HOME}/Base/shared
+  }
+}
+
+# http://192.168.1.56:8113 {
+#   webdav {
+#     root {env.HOME}/Base/shared
+#   }
+# }

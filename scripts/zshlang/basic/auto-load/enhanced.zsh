@@ -1,6 +1,11 @@
 re 'self-enh enh-mkdest' cp ln
 _h_mv() {
-    emd_c='command mv' enh-mkdest "$@"
+    local emd_c='command mv'
+    if isI ; then
+        emd_c='mv-merge'
+        color 170 170 170 "mv: using mv-merge instead"
+    fi
+    enh-mkdest "$@"
 }
 mv () {
     local out

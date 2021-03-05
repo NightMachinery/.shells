@@ -6,8 +6,16 @@ noglobfn ntl
 aliasfnq-ng ntl. nightNotes=. ntsearch_glob='' ntsearch-lines # ntsearch_glob=$textglob
 @opts-setprefix ntl. ntsearch-lines
 aliasfn-ng see ntl.
+##
 aliasfnq-ng sees nightNotes=. ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
-aliasfn-ng seesall ntsearch_rg_opts=(--no-ignore --hidden) nightNotes=. ntsearch_glob='' ntl-rg # still does not see binaries
+aliasfnq-ng sees-fzf nightNotes=. ntsearch_glob='' ntl-fzf # ntsearch_glob=$textglob
+aliasfnq-ng sees-fzfq nightNotes=. ntsearch_glob='' ntl-fzfq # ntsearch_glob=$textglob
+##
+# still does not see binaries
+aliasfn-ng seesall ntsearch_rg_opts=(--no-ignore --hidden) nightNotes=. ntsearch_glob='' ntl-rg
+aliasfn-ng seesall-fzf ntsearch_rg_opts=(--no-ignore --hidden) nightNotes=. ntsearch_glob='' ntl-fzf
+aliasfn-ng seesall-fzfq ntsearch_rg_opts=(--no-ignore --hidden) nightNotes=. ntsearch_glob='' ntl-fzfq
+##
 function seev() {
     init-vfiles
     ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) ntsearch_glob='' ntl-rg "$@" # ntsearch_glob=$textglob

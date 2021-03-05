@@ -24,11 +24,13 @@ function tsendf() {
 }
 function tsend-url() {
     local dest="${1:?}" url="${2:?}" msg="$3"
-    pushf ~/tmp/"$(uuidm)" || return $?
+
+    local tmp=~/tmp/"$(uuidm)"
+    pushf $tmp || return $?
     {
-    aacookies "$url" || return $?
-    tsend --file * -- $dest "${msg:-$url}"
-    } always { popf }
+        aacookies "$url" || return $?
+        tsend --file * -- $dest "${msg:-$url}"
+    } always { popf ; command rm -rf "$tmp" }
 }
 ##
 air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(mpv-get)"}

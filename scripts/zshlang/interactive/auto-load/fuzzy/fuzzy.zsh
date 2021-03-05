@@ -74,7 +74,7 @@ function ffkill() {
     fi
     "$engine" "$@"  | inargsf revaldbg "$kill_engine[@]" $opts[@]
 }
-aliasfn ffkill-super fnswap kill 'sudo kill' ffkill -9
+aliasfnq ffkill-super fnswap kill 'sudo kill' ffkill -9
 aliasfn fk ffkill
 aliasfn fks ffkill-super
 aliasfnq fk-joker ffkill "'JOKER_MARKER"
