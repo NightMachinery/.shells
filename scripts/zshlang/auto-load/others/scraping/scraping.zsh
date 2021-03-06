@@ -51,13 +51,17 @@ function tlwb() {
     tl $opts[@] "${(@f)$(wayback-url "${urls[@]}")}"
 }
 noglobfn tlwb
-
-function wget-cookies() {
-    wget --header "$(cookies-auto "$@")" "$@"
+##
+function wgetm() {
+    wget --header "$(cookies)" "$@"
 }
+function wget-cookies() {
+    wgetm --header "$(cookies-auto "$@")" "$@"
+}
+##
 function curlm() {
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
-    curl --silent --fail --location --cookie-jar /dev/null "$@"
+    curl  --header "$(cookies)" --silent --fail --location --cookie-jar /dev/null "$@"
 }
 function curl-cookies() {
     # cookies-auto takes ~0.5s
@@ -113,15 +117,18 @@ cookies() {
     mdoc "$0 [<cookie-or-url>=theCookies]
 Outputs in header style." MAGIC
 
-    local url="$1"
+    local input="$1"
     local env_c="$theCookies"
-    local c="Cookie:$1"
 
-    if [[ "$url" =~ '^http' ]]
+    local c
+    if [[ "$input" =~ '^http' ]]
     then
-        c="Cookie:$(getcookies "$url")"
+        c="Cookie:$(getcookies "$input")"
+    elif test -z "$input" ; then
+        test -n "$env_c" && c="Cookie:${env_c}"
+    else
+        c="Cookie:$input"
     fi
-    test -z "$url" && c="Cookie:${env_c}"
     ec "$c"
 }
 function cookies-auto() {
@@ -334,7 +341,7 @@ function url-final() {
 function url-final2() {
     doc "This one doesn't download stuff."
     doc 'WARNING: Can eat info. E.g., https://0bin.net/paste/5txWS7vyTdaEvNAg#QJZjwyNoWYyaV5-rqdCAcV7opxc+kyaMwoQ7wyjLjKy'
-    [[ "$(2>&1 wget --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
+    [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 function url-final3() {
     doc '@deprecated The most reliable and expensive way.'
@@ -737,6 +744,18 @@ function getlinks-c() {
 function getlinks-uniq() {
     getlinks-c "$@" | gsort --unique
 }
+##
+function url-size() {
+    local size
+    size="$(curlm --head "$@" | rget '^content-length\S*\s*(\d+)')" || return $?
+    # test -z "$size" && return 1 # rget ensures it
+    if isOutTty ; then
+        ec "$size" | numfmt --to=iec-i --suffix=B
+    else
+        ec "$size"
+    fi
+}
+##
 function aamedia() {
     mdoc "$0 <page-url> ...
 Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
@@ -745,13 +764,24 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
 
     local formats=( ${media_formats[@]} pdf )
     local regex='\.('"${(j.|.)formats}"')$'
-    local url
+    local url size
     for url in ${urls[@]}
     do
-        url="$(urlfinalg $url)"
-        [[ "$url" =~ "$regex" ]] && ec $url
-        getlinks-c -e $regex "$url" # even a URL that ends in, e.g., '.mkv' can be actually an HTML page that links to the actual file
-    done | gsort -u | {
+        url="$(url-final2 $url)" # url-final2 might be better as our URLs can be big files
+        if [[ "$url" =~ "$regex" ]] ; then
+            ec $url
+            # even a URL that ends in, e.g., '.mkv' can be actually an HTML page that links to the actual file
+        fi
+        size="$(url-size "$url")" || {
+            ecerr "$0: Could not get size of URL '$url'"
+            continue
+        }
+        if (( $size < 5000000 )) ; then # 5 MB
+            getlinks-c -e $regex "$url"
+        else
+            ecerr "$0: Skipped big URL '$url'"
+        fi
+    done | gsort -u | fzp | {
         if isDbg
         then
             color 150 0 255 "$(cat)"
