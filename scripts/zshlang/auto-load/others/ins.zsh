@@ -51,7 +51,7 @@ noglobfn piadd
 goi() {
     comment -u update -v verbose
     test -n "$noi" ||
-        go get -u -v "$@"
+        reval-ec go get -u -v "$@"
 }
 gmi() {
     gem install "$@"

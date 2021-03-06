@@ -10,8 +10,9 @@ tmuxnew BrishGarden brishgarden
 
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile_darwin
 ##
-tmuxnew smb sudo /usr/sbin/smbd -no-symlinks false
-tmuxnewsh2 shared-dav wsgidav --config="$NIGHTDIR/launchers/wsgidav_darwin.yaml"
+tmuxnewsh2 smb loop reval-notifexit sudo /usr/sbin/smbd -no-symlinks false
+tmuxnewsh2 ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/_Books --debug
+tmuxnewsh2 shared-dav reval-notifexit wsgidav --config="$NIGHTDIR/launchers/wsgidav_darwin.yaml"
 # tmuxnewsh2 shared-dav wsgidav --host=192.168.1.56 --port=8113 --root=~/Base/shared --auth=anonymous
 ##
 
