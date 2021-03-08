@@ -11,8 +11,15 @@ function reval-copy() {
 
     reval "$@" > >(pbcopy) | cat
 }
+##
 function ec-copy() {
-    reval-copy ec "$@"
+    local i="$*"
+
+    ## Old API
+    # reval-copy ec "$i" # copies with a newline at the end
+    ##
+    pbcopy "$i"
+    ec "$i"
 }
 ##
 function pbcopy-term() {
@@ -25,6 +32,7 @@ function pbcopy-term() {
 function pbcopy() {
     # local in="$(in-or-args "$@")"
     local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"
+    dact typ in
 
     if isKitty ; then
         ecn "$in" | kitty +kitten clipboard

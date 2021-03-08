@@ -87,10 +87,7 @@ function lsofp() {
 }
 aliasfn fflsof lsofp
 aliasfn plsof lsofp
-function fzinw() {
-    doc 'fz in words: allows you to select the part of the output you need from a command. (alt: smenu?)'
-    iaIFS=$' \t\n\C-@'"'"'(){}"[]' inargss arrN | fz
-}
+##
 fftmux() {
     local query="$*"
     local engine=(tmux a -t)

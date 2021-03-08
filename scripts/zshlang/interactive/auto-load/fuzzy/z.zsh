@@ -1,10 +1,14 @@
 function list-dirs() {
-    local d="${1:?}"
+    local d="${1:?}" multi_fs="${list_dirs_m}" # multi = disable one-file-system
 
     if ! test -d "$d" ; then
         return 1
     fi
-    fd --follow --absolute-path --type d . $d
+    local opts=()
+    if test -z "$multi_fs" ; then
+        opts+="--one-file-system"
+    fi
+    fd "$opts[@]" --follow --absolute-path --type d . $d
 }
 reify list-dirs
 ##
@@ -25,8 +29,8 @@ function ffz() {
     serr zoxide query --list
     arrN /Volumes/*(/N)
     arrN /Volumes/*/*(/N)
-    list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads
-    memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia ~/Downloads $music_dir
+    # list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
+    memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
     true
  } | { sponge || true } | deusvult="${ffz_nocache:-$deusvult}" memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | head -1)" ||  {
         local r=$? msg="$0: returned $? ${pipestatus[@]}"

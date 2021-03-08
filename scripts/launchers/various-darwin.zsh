@@ -10,10 +10,16 @@ tmuxnew BrishGarden brishgarden
 
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile_darwin
 ##
-tmuxnewsh2 smb loop reval-notifexit sudo /usr/sbin/smbd -no-symlinks false
-tmuxnewsh2 ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/_Books --debug
-tmuxnewsh2 shared-dav reval-notifexit wsgidav --config="$NIGHTDIR/launchers/wsgidav_darwin.yaml"
-# tmuxnewsh2 shared-dav wsgidav --host=192.168.1.56 --port=8113 --root=~/Base/shared --auth=anonymous
+tmuxnewsh2 sftpgo_shared reval-notifexit sftpgo serve --config-file "$NIGHTDIR/launchers/sftpgo_darwin.json" --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log
+# tmuxnewsh2 shared_sftpgo indir ~/Base/keys/sftpgo sftpgo portable -d ~/Base/shared --permissions '*' --username "$SFTPGO_USER1" --password "$SFTPGO_PASS1" --webdav-port 8114 --sftpd-port 8115 --ftpd-port 8116 --log-verbose --log-file-path sftpgo.log --advertise-service
+##
+tmuxnewsh2 shared_smb loop reval-notifexit sudo /usr/sbin/smbd -no-symlinks false -stdout -debug
+tmuxnewsh2 shared_ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/_Books --debug
+##
+# @warn dav has no pass set on writable
+# @fatal wsgidav consumes way too much CPU (was at 98% even with no WiFi connected), and might even be hanging the laptop
+# tmuxnewsh2 shared_dav reval-notifexit wsgidav --config="$NIGHTDIR/launchers/wsgidav_darwin.yaml"
+# tmuxnewsh2 shared_dav wsgidav --host=192.168.1.56 --port=8113 --root=~/Base/shared --auth=anonymous
 ##
 
 # tmuxnew supercollider scsynth -u 57110 -a 1024 -i 2 -o 2 -R 0 -l 100  -B 127.0.0.1

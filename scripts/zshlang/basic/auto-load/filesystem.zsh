@@ -77,6 +77,6 @@ function  mv-merge() {
     fi
     command gcp -r --link --archive --interactive --verbose "$@" || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
 
-    trs "${(@)paths[1,-2]}"
+    colorfg 170 170 170 ; trs "${(@)paths[1,-2]}" ; resetcolor
 }
 ##

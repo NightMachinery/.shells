@@ -21,7 +21,8 @@ function enh-mkdest() {
     local dest="${@: -1}"
     ecdbg "dest: $dest   bdest: $(bottomdir "$dest")"
     mkdir -p "$(bottomdir "$dest")"
-    ruu "${=emd_c:-comment}" "$@"
+    # ruu "${=emd_c:-comment}" "$@" # Old API
+    revaldbg "${=emd_c:-comment}" "$@"
 }
 function self-enh() {
     eval "function \\$2() emd_c='command $2' $1" '"$@"'
@@ -49,7 +50,7 @@ function ruu() {
     local f=()
     [[ "$1" =~ '^\s*$' ]] || f+="${=1}"
     local a="$(expand-alias-strip "$2")"
-    seval "$f[@]" "$=a" "$(gquote "${@:3}")"
+    revaldbg "$f[@]" "$=a" "${@:3}"
 }
 noglobfn() {
     doc Prepends noglob to functions. You need to define the original function in quotes if you want to reload the function definition in the future.

@@ -26,8 +26,8 @@ function rm-caches() {
     rm-deleteus
     trs-rm  ~/.local/share/Trash/*(DN)
     trs-rm ~/sent
-    trs-rm ~/logs ~/log
-    trs-rm ~/julia_tmp/ ~/tmp-kindle
+    trs-rm ~/logs/*(DN) ~/log/*(DN) # do NOT delete these folders themselves
+    trs-rm ~/julia_tmp/*(DN) ~/tmp-kindle/*(DN)
     trs-rm "$(brew --cache)"
     conda clean --all --yes # STILL does not delete old python version stuff!
     trs-empty

@@ -134,7 +134,10 @@ function input-lang-get-darwin() {
     if [[ "$(hammerspoon -A -c 'hs.keycodes.currentSourceID()')" =~ 'com.apple.keylayout\.(.*)' ]] ; then
         ec "${match[1]}"
     else
-        input_lang_get_objc # @alt: `xkbswitch -ge`
+        # @fatal this API is very slow in Big Sur (or sth else is breaking it, who knows)
+        # input_lang_get_objc # @alt: `xkbswitch -ge`
+        ##
+        input-lang-get-darwin-old
     fi
 }
 function input-lang-get-fast() {

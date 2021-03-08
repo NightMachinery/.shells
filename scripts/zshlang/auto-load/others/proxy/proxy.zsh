@@ -12,9 +12,18 @@ function reval-pxs() {
     reval pxs "$@"
 }
 ##
-export pxa_env='ALL_PROXY=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
-alias pxa="$pxa_env"
-alias pxa-local="local -x $pxa_env"
+function pxa-create() {
+    typeset -g px_httpport="${1:-1088}"
+    # 1087: genrouter
+    # 1088: shadowsocks
+    # @todo0 make this support multiple ports at the  same time
+
+    export pxa_env="ALL_PROXY=http://127.0.0.1:${px_httpport} http_proxy=http://127.0.0.1:${px_httpport} https_proxy=http://127.0.0.1:${px_httpport} HTTP_PROXY=http://127.0.0.1:${px_httpport} HTTPS_PROXY=http://127.0.0.1:${px_httpport}"
+    silent re unalias pxa pxa-local
+    alias pxa="$pxa_env"
+    alias pxa-local="local -x $pxa_env"
+}
+pxa-create
 # alias pxa-maybe='isIran && pxa-local'
 alias pxa-maybe='isLocal && pxa-local'
 function reval-pxa() {
@@ -36,11 +45,12 @@ pxify() {
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl
     pxify-command conda
-    pxify-command go
+    # pxify-command go # TLS errors with genrouter
     pxify-command manga-py
 
     pxaify-command brew # makes downloads faster
     pxaify-command git
+    pxaify-command go
     pxaify-command emacs
     pxaify-command emacsclient
 }

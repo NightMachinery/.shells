@@ -1,0 +1,195 @@
+{
+  "common": {
+    "idle_timeout": 15,
+    "upload_mode": 0,
+    "actions": {
+      "execute_on": [],
+      "hook": ""
+    },
+    "setstat_mode": 0,
+    "proxy_protocol": 0,
+    "proxy_allowed": [],
+    "post_connect_hook": "",
+    "max_total_connections": 0,
+    "defender": {
+      "enabled": false,
+      "ban_time": 30,
+      "ban_time_increment": 50,
+      "threshold": 15,
+      "score_invalid": 2,
+      "score_valid": 1,
+      "observation_time": 30,
+      "entries_soft_limit": 100,
+      "entries_hard_limit": 150,
+      "safelist_file": "",
+      "blocklist_file": ""
+    }
+  },
+  "sftpd": {
+    "bindings": [
+      {
+        "port": 8115,
+        "address": "192.168.1.56",
+        "apply_proxy_config": true
+      }
+    ],
+    "max_auth_tries": 0,
+    "banner": "",
+    "host_keys": [],
+    "kex_algorithms": [],
+    "ciphers": [],
+    "macs": [],
+    "trusted_user_ca_keys": [],
+    "login_banner_file": "",
+    "enabled_ssh_commands": [
+      "md5sum",
+      "sha1sum",
+      "cd",
+      "pwd",
+      "scp"
+    ],
+    "keyboard_interactive_auth_hook": "",
+    "password_authentication": true
+  },
+  "ftpd": {
+    "bindings": [
+      {
+        "port": 8116,
+        "address": "192.168.1.56",
+        "apply_proxy_config": true,
+        "tls_mode": 0,
+        "force_passive_ip": "",
+        "client_auth_type": 0,
+        "tls_cipher_suites": []
+      }
+    ],
+    "banner": "",
+    "banner_file": "",
+    "active_transfers_port_non_20": true,
+    "passive_port_range": {
+      "start": 50000,
+      "end": 50100
+    },
+    "disable_active_mode": false,
+    "enable_site": false,
+    "hash_support": 0,
+    "combine_support": 0,
+    "certificate_file": "",
+    "certificate_key_file": "",
+    "ca_certificates": [],
+    "ca_revocation_lists": []
+  },
+  "webdavd": {
+    "bindings": [
+      {
+        "port": 8114,
+        "address": "192.168.1.56",
+        "enable_https": false,
+        "client_auth_type": 0,
+        "tls_cipher_suites": []
+      }
+    ],
+    "certificate_file": "",
+    "certificate_key_file": "",
+    "ca_certificates": [],
+    "ca_revocation_lists": [],
+    "cors": {
+      "enabled": false,
+      "allowed_origins": [],
+      "allowed_methods": [],
+      "allowed_headers": [],
+      "exposed_headers": [],
+      "allow_credentials": false,
+      "max_age": 0
+    },
+    "cache": {
+      "users": {
+        "expiration_time": 0,
+        "max_size": 50
+      },
+      "mime_types": {
+        "enabled": true,
+        "max_size": 1000
+      }
+    }
+  },
+  "data_provider": {
+    "driver": "sqlite",
+    "name": "sftpgo.db",
+    "host": "",
+    "port": 0,
+    "username": "",
+    "password": "",
+    "sslmode": 0,
+    "connection_string": "",
+    "sql_tables_prefix": "",
+    "track_quota": 2,
+    "pool_size": 0,
+    "users_base_dir": "",
+    "actions": {
+      "execute_on": [],
+      "hook": ""
+    },
+    "external_auth_hook": "",
+    "external_auth_scope": 0,
+    "credentials_path": "credentials",
+    "prefer_database_credentials": false,
+    "pre_login_hook": "",
+    "post_login_hook": "",
+    "post_login_scope": 0,
+    "check_password_hook": "",
+    "check_password_scope": 0,
+    "password_hashing": {
+      "argon2_options": {
+        "memory": 65536,
+        "iterations": 1,
+        "parallelism": 2
+      }
+    },
+    "update_mode": 0,
+    "skip_natural_keys_validation": false
+  },
+  "httpd": {
+    "bindings": [
+      {
+        "port": 8080,
+        "address": "127.0.0.1",
+        "enable_web_admin": true,
+        "enable_https": false,
+        "client_auth_type": 0,
+        "tls_cipher_suites": []
+      }
+    ],
+    "templates_path": "templates",
+    "static_files_path": "static",
+    "backups_path": "backups",
+    "certificate_file": "",
+    "certificate_key_file": "",
+    "ca_certificates": [],
+    "ca_revocation_lists": []
+  },
+  "telemetry": {
+    "bind_port": 10000,
+    "bind_address": "127.0.0.1",
+    "enable_profiler": false,
+    "auth_user_file": "",
+    "certificate_file": "",
+    "certificate_key_file": "",
+    "tls_cipher_suites": []
+  },
+  "http": {
+    "timeout": 20,
+    "retry_wait_min": 2,
+    "retry_wait_max": 30,
+    "retry_max": 3,
+    "ca_certificates": [],
+    "certificates": [],
+    "skip_tls_verify": false
+  },
+  "kms": {
+    "secrets": {
+      "url": "",
+      "master_key_path": ""
+    }
+  }
+}

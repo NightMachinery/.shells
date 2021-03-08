@@ -97,6 +97,8 @@ provider_mapping:
     "/":
         root: "/Users/evar/Base/shared"
         readonly: true
+    "/writable":
+        root: "/Users/evar/Base/shared/writable"
 
 # ==============================================================================
 # AUTHENTICATION
@@ -136,6 +138,7 @@ simple_dc:
                 password: "def456"
                 password: "qwerty"
         "/": true  # Pass true to allow anonymous access
+        "/writable": true
 
 # Additional options for NTDomainController only:
 nt_dc:
