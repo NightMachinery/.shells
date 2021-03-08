@@ -7,6 +7,17 @@
 ##
 alias agc='ec "${(F)commands}"|agC=0 rgm  --color=never'
 alias agfunc='ec "${(Fk)functions}"| agC=0 rgm  --color=never'
+function ffall() {
+	local query="$(fz-createquery "$@")"
+
+	{
+		ec "${(Fk)functions}"
+		ec "${(Fk)aliases}"
+		ec "${(Fk)commands}"
+		ec "${(Fk)builtins}"
+	} | fzp "$query"
+}
+##
 alias rr=rgm
 alias rrn='rgm --line-number'
 ##

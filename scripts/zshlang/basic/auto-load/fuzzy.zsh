@@ -73,7 +73,7 @@ function fz-createquery() {
     local i res=''
     for i in ${=@} ; do
         # ! is exact-match by default.
-        if [[ "$i" =~ "^(\!|'|\|)" ]] ; then
+        if [[ "$i" =~ "^(\^|\!|'|\|)" || "$i" =~ '\$$' ]] ; then
             res+="$i "
         else
             res+="'$i "
