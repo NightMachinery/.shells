@@ -197,7 +197,8 @@ function remn-interactive() {
     local text="$*"
     
     local natdate=""
-    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --reverse --bind "change:reload:brishz.dash serr datenat-full2 {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
+    # @warn brishz.dash does not quote its arguments, so we essentially have an @unsafeEval here. I think it's worth the speed boost, though I have noot profiled it.
+    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash serr datenat-full2 {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
     remn "$text" "$natdate"
 }
 aliasfn ri remn-interactive
@@ -291,16 +292,25 @@ function tlg-reminday() {
         ecerr "$0: Empty receiver."
         return 1
     }
-    local text="$(@opts delete y notif y @ rem-summary)"
+    local text="$(@opts delete y notif y md  y @ rem-summary)"
     text="$text"$'\n\n'"$(datej-all)"
-    tsend --parse-mode markdown -- "$rec" "# $text" # '#' is needed to make this invisible to timetracker.py
+
+    tsend --parse-mode markdown -- "$rec" "$text"
 }
 function rem-summary() {
-    local deleteMode="$rem_summary_delete" notifMode="$rem_summary_notif"
+    local deleteMode="$rem_summary_delete" notifMode="$rem_summary_notif" markdownMode="${rem_summary_md}"
 
     local text="$(@opts delete "$deleteMode" @ rem-today)"
-    if test -n "$text" && test -n "$notifMode" ; then
-        tnotif "$text" >&2
+    if test -n "$text" ; then
+        test -n "$notifMode" && tnotif "$text" >&2
+        if test -n "$markdownMode" ; then
+            # '#' is needed to make this invisible to timetracker.py
+            text="$(ecn "$text" | prefixer --add-prefix='# **' --add-postfix='**')"
+        fi
+    else
+        if test -n "$markdownMode" ; then
+            text="# 🌠"
+        fi
     fi
     local textc="$(@opts delete "$deleteMode" @ remc-today)"
     text+="$(prefix-if-ne $'\n\n' "$textc")"
@@ -373,6 +383,7 @@ function datej-all() {
         ecerr "$0: Unsupported mode '$mode'"
     fi
 }
+aliasfn datej-all-long @opts mode 1 @ datej-all
 ##
 remnd() {
     : readmeall

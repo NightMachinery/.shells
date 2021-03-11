@@ -163,13 +163,14 @@ function input-lang-get-icon() {
     #  80 vs 71
     #  Using hs will cost us 2.2 cpu percentages.
     ##
-    local lang="$(input-lang-get)"
+    local lang="$(serr input-lang-get)"
     case "${lang:l}" in
         us|u.s.) ec "🇺🇸";;
         persian*)
             # ec "🇱🇧" ;;
             ec "🇮🇷" ;;
-        *) ec "$lang" ;;
+        # *) ec "$lang" ;;
+        *) ec "NA" ;;
     esac
 }
 ##

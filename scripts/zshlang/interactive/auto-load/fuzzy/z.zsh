@@ -14,6 +14,8 @@ reify list-dirs
 ##
 ffz_last_query=''
 function ffz() {
+    ## Performance:
+    # Note that piping a lot of stuff into fzp itself seems to be slow, even when the result is cached. To be sure, control the amount of feeded dirs, and run 'deus z' to refresh the caches. Note that older clients might poison the caches again ...
     ##
     # @retiredtodo2 We can bypass the interactive selection if the score of the top match is high enough compared to the second-best match, and have a `zi` that disables this auto-bypass.
     # DONE: We can also just cache the result for each query!

@@ -152,7 +152,7 @@
   "httpd": {
     "bindings": [
       {
-        "port": 8080,
+        "port": 8120,
         "address": "127.0.0.1",
         "enable_web_admin": true,
         "enable_https": false,
