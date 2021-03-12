@@ -12,10 +12,20 @@ function ddgr-en() {
 }
 function search-json() {
     local count="${search_json_count:-10}" ddgMode="${search_json_ddg}" query="$1"
-    
-    if test -n "$ddgMode" || ! googler-en --json --count "$count" "$query" ; then
-        ddgr-en --json --num "$count" "$query"
+
+    local bad_google="search_json_bad_google" bad_google_val
+    bad_google_val="{$(redism get "$bad_google"):-0}" || bad_google_val=0
+
+    if test -z "$ddgMode" && { isDeus || (( ${bad_google_val} <= 3 )) } ; then
+       if googler-en --json --count "$count" "$query" ; then
+           redism del $bad_google
+           return 0
+       else
+           redism incr $bad_google
+           redism expire $bad_google $((3600*24*7))
+       fi
     fi
+    ddgr-en --json --num "$count" "$query"
 }
 function goo-g() {
     # use -x, --exact for an exact search.

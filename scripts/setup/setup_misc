@@ -18,6 +18,7 @@ brew tap lutzifer/homebrew-tap
 brew install keyboardSwitcher
 brew tap trojan-gfw/homebrew-trojan
 brew install trojan
+brew install --head googler
 ##
 luarocks install penlight # require 'pl.pretty'.dump(table)
 luarocks install luaposix

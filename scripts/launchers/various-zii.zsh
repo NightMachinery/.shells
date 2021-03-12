@@ -21,6 +21,7 @@ typeset -A artists
 artists['Marjan Farsad']='https://open.spotify.com/artist/5sGy7zfcUWYPh3wHbyz4fn'
 artists['Hani Niroo']='https://open.spotify.com/artist/07xBlQ8c7xhTa7IefYshum'
 artists['Sogand']='https://open.spotify.com/artist/2mGkJsyXC8byI83UHSO4w1'
+artists['Rana Farhan']='https://open.spotify.com/artist/5Fq4u0e9OPI4k4R3QC6OZO'
 ##
 artists['Niaz Nawab']='https://open.spotify.com/artist/4hprwICrkEC8ule8JvCcJS'
 artists['Aida Shahghasemi']='https://open.spotify.com/artist/1bQlJQRMtgj4p2gy9nN9Mz'
@@ -28,6 +29,9 @@ artists['Tara Tiba']='https://open.spotify.com/artist/0s6fPszrilIZ2kmduBE9N7'
 artists['Rana Mansour']='https://open.spotify.com/artist/3zrjEdzGRRwrLHv3KQDDuB'
 ###
 artists['Alexander Rybak']='https://open.spotify.com/artist/3LLNDXrxL4uxXtnUJS5XWM'
+artists['Pharrell Williams']='https://open.spotify.com/artist/3V38zs2XJF5nXDv5jt31zm'
+artists['Depeche Mode']='https://open.spotify.com/artist/762310PdDnwsDxAQxzQkfX'
+artists['System Of A Down']='https://open.spotify.com/artist/5eAWCfyUhZtHHtBdNk56l1'
 ##
 artists['Brian Eno']='https://open.spotify.com/artist/7MSUfLeTdDEoZiJPDSBXgi'
 ###
@@ -36,6 +40,8 @@ artists['Halsey']='https://open.spotify.com/artist/26VFTg2z8YR0cCuwLzESi2'
 artists['AURORA']='https://open.spotify.com/artist/1WgXqy2Dd70QQOU7Ay074N'
 artists['Selena Gomez']='https://open.spotify.com/artist/0C8ZW7ezQVs4URX5aX7Kqx'
 artists['Demi Lovato']='https://open.spotify.com/artist/6S2OmqARrzebs0tKUEyXyp'
+artists['Billie Eilish']='https://open.spotify.com/artist/6qqNVTkY8uBg9cP3Jd7DAH'
+artists['Lily Allen']='https://open.spotify.com/artist/13saZpZnCDWOI9D4IJhp1f'
 ##
 artists['Camila Cabello']='https://open.spotify.com/artist/4nDoRrQiYLoBzwC5BhVJzF'
 artists['Fifth Harmony']='https://open.spotify.com/artist/1l8Fu6IkuTP0U5QetQJ5Xt'
@@ -46,3 +52,4 @@ artists['']=''
 artists['']=''
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_ge=(spotify-discography-get) rt_eud=0 rt_eid=$((3600*24*14))" tmuxnewsh rss-spotify rss-tsend ${(@v)artists}
 ##
+chronic-all
