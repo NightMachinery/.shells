@@ -46,16 +46,18 @@ def p2int(p):
 
 async def discreet_send(client, receiver, message, file=None, force_document=False, parse_mode=None, reply_to=None, link_preview=False):
     message = message.strip()
+    last_msg = reply_to
     if len(message) == 0:
-        return reply_to
+        if file:
+            last_msg = await client.send_file(receiver, file, reply_to=(last_msg), allow_cache=False)
+        return last_msg
     else:
         length = len(message)
-        last_msg = reply_to
         if length <= 12000:
             s = 0
             e = 4000
             while (length > s):
-                last_msg = await client.send_message(receiver, message[s:e], file=file, force_document=force_document, parse_mode=parse_mode, link_preview=link_preview, reply_to=(reply_to if s == 0 else last_msg))
+                last_msg = await client.send_message(receiver, message[s:e], file=file, force_document=force_document, parse_mode=parse_mode, link_preview=link_preview, reply_to=(last_msg))
 
                 s = e
                 e = s + 4000
@@ -66,10 +68,10 @@ async def discreet_send(client, receiver, message, file=None, force_document=Fal
             ec {message} > "$f"
             ec "$f"
             ''').outrs
-            last_msg = await client.send_file(receiver, f, reply_to=reply_to, allow_cache=False, caption='This message is too long, so it has been sent as a text file.')
+            last_msg = await client.send_file(receiver, f, reply_to=last_msg, allow_cache=False, caption='This message is too long, so it has been sent as a text file.')
             z('command rm {f}')
             if file:
-                last_msg = await client.send_file(receiver, file, reply_to=(last_msg or reply_to), allow_cache=False)
+                last_msg = await client.send_file(receiver, file, reply_to=(last_msg), allow_cache=False)
         return last_msg
 
 async def tsend(arguments):
