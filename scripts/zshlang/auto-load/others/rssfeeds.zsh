@@ -58,6 +58,9 @@ function rss-tsend() {
     ensure-redis || return 1
     mkdir -p ~/logs/
     local log=~/logs/rss-tsend.log
+    ensure-dir "$log"
+    local log_err=~/logs/rss-tsend_err.log
+    ensure-dir "$log_err"
     local engine=("${rt_e[@]:-tl}")
     local skip_engine="$rt_skip"
     local no_title="$rt_nt"
@@ -93,7 +96,7 @@ function rss-tsend() {
         # https://github.com/flok99/rsstail
         ##
 
-        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log | tee -a $log | while read -d $'\n' -r t; do
+        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err | tee -a $log | while read -d $'\n' -r t; do
             if test -n "$no_title" ; then
                 l="$t"
                 t=""

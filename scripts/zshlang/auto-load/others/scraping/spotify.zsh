@@ -31,7 +31,7 @@ function rss-engine-spotify() {
     # }
     ##
     local d
-    d="$(urlmeta2 "$url" description | rget '\s(\d\d\d\d)\s')" && {
+    d="$(serr urlmeta2 "$url" description | rget '\s(\d\d\d\d)\s')" && {
         local y="$(gdate '+%Y')"
         if (( y - d >= 2 )) ; then
             ecerr "$0: Skipping '$title' because of age '$d'"

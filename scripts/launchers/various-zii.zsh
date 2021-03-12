@@ -22,5 +22,5 @@ artists['Alexander Rybak']='https://open.spotify.com/artist/3LLNDXrxL4uxXtnUJS5X
 artists['Becky G']='https://open.spotify.com/artist/4obzFoKoKRHIphyHzJ35G3'
 artists['Halsey']='https://open.spotify.com/artist/26VFTg2z8YR0cCuwLzESi2'
 artists['Brian Eno']='https://open.spotify.com/artist/7MSUfLeTdDEoZiJPDSBXgi'
-tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_ge=(spotify-discography-get) rt_eud=0" tmuxnewsh rss-spotify rss-tsend "${(@v)artists}"
+tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_ge=(spotify-discography-get) rt_eud=0 rt_eid=$((3600*24*14))" tmuxnewsh rss-spotify rss-tsend "${(@v)artists}"
 ##
