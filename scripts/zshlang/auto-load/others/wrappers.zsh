@@ -55,3 +55,8 @@ function ffmpeg() {
 function edir() {
   command edir --all --recurse  --suffix '' "$@"
 }
+##
+watchm() {
+    ruu "watch -n $1" "${@:2}"
+}
+##
