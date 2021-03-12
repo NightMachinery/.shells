@@ -19,11 +19,11 @@ function search-json() {
 
     if test -z "$ddgMode" && { isDeus || (( ${bad_google_val} <= 3 )) } ; then
        if googler-en --json --count "$count" "$query" ; then
-           redism del $bad_google
+           silent redism del $bad_google
            return 0
        else
-           redism incr $bad_google
-           redism expire $bad_google $((3600*24*7))
+           silent redism incr $bad_google
+           silent redism expire $bad_google $((3600*24*7))
        fi
     fi
     ddgr-en --json --num "$count" "$query"
@@ -52,6 +52,27 @@ function goo() {
 }
 function google-quote() {
     mapln '"$1"' "$@"
+}
+##
+function ffgoo() {
+    local query="$*"
+    local count="${ffgoo_count:-${ffgoo_c:-30}}"
+
+    setopt local_options
+    setopt pipefail
+
+    local fzf_cmd="$(cmd-sub fz fzf)"
+    local memoi_cmd="$(cmd-sub memoi-eval '')"
+    # local isI="$(cmd-sub isI true)"
+    # local fz_opts=( "$fz_opts[@]" )
+
+    local search="$(search_json_count="$count" $memoi_cmd search-json "$query")"
+    local is i
+    is=("${(@f)$(<<<$search jq -re '.[] | .title + ": " + (.abstract |= gsub("\\n";" ")).abstract + (if .metadata then " (" + (.metadata) + ")" else "" end)' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. | awk '{print $1}')}") || return 1
+    for i in $is[@] ; do
+        i=$((i-1)) # jq is zero-indexed
+        <<<$search jq -re ".[$i] | .url"
+    done
 }
 ##
 @s() {
