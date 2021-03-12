@@ -1,4 +1,10 @@
-re 'self-enh enh-mkdest' cp ln
+re 'self-enh enh-mkdest' ln
+##
+cp() {
+    local emd_c='command gcp'
+    enh-mkdest "$@"
+}
+##
 _h_mv() {
     local emd_c='command mv'
     if isI ; then
@@ -27,7 +33,6 @@ mv2 () {
     (( $#@ < 2 )) && { ecerr "Usage: mv2 <dest> <path> ..." ; return 1 }
     reval-ec mv "${@[-1]}" "${@[1,-2]}"
 }
+##
 alias noglob='noglob ruu ""'
-watchm() {
-    ruu "watch -n $1" "${@:2}"
-}
+##
