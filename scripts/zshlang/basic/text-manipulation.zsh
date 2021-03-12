@@ -30,5 +30,5 @@ function p-double-newlines() {
 alias pdn='p-double-newlines'
 ##
 function rget() {
-    rg --smart-case --only-matching --replace '$1' "$@"
+    command rg --text --smart-case --only-matching --replace '$1' "$@"
 }

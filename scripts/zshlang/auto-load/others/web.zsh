@@ -42,7 +42,7 @@ function ffgoo() {
     # local isI="$(cmd-sub isI true)"
     # local fz_opts=( "$fz_opts[@]" )
 
-    local search="$($memoi_cmd googler-en --json --count "$count" "$query")"
+    local search="$(search_json_count="$count" $memoi_cmd search-json "$query")"
     local is i
     is=("${(@f)$(<<<$search jq -re '.[] | .title + " | " + .abstract + " | " + .metadata' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. | awk '{print $1}')}") || return 1
     for i in $is[@] ; do
