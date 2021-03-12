@@ -90,7 +90,7 @@ spotify-artist-fz() {
     local query="${*:?}"
     local count="${spotify_artist_fz_c:-6}"
 
-    local urls url
+    local urls url name
     urls=("${(@f)$(ffgoo_count=$count ffgoo "$query site:https://open.spotify.com/artist/")}")  || {
         local ret=$?
         ecerr "$0: ffgoo failed with '$ret'"
@@ -98,14 +98,13 @@ spotify-artist-fz() {
     }
     for url in $urls[@]
     do
-        local name
         name="$(spotify-url-get-artist "$url")" || name="$query"
         ec "artists['$name']='$url'"
     done
 }
 function spotify-artist-fz-re() {
     local o="$(run-on-each spotify-artist-fz "$@")"
-    ec
+    ec 
     ec-copy "$o"
 }
 ##
