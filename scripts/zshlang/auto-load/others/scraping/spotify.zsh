@@ -2,7 +2,25 @@ function h_spotify-discography-get() {
     local url="${1:?}"
 
 
-    local title="$(serr url-title $url)"
+    local title="$(serr url-title $url | gtr -d $'\n')"
+
+    ec "$title"
+    ec "$url"
+}
+function spotify-discography-get() {
+    local artist_url="${1:?}"
+
+    # `/album/` gets singles, too
+    withchrome getlinks-c "${artist_url}/discography" | rg -F /album/ | inargsf re h_spotify-discography-get
+}
+renog spotify-discography-get
+##
+function rss-engine-spotify() {
+    local url="${1:?}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"
+
+    local log="$HOME/logs/$0"
+    ensure-dir "$log" || return $?
+
     ##
     # local date
     # date="$(serr url-date "$url")" && date="$(datenat_unix=y serr datenat "$date")" && test -n "$date" && {
@@ -21,23 +39,6 @@ function h_spotify-discography-get() {
         fi
     }
     ##
-
-    ec "$title"
-    ec "$url"
-}
-function spotify-discography-get() {
-    local artist_url="${1:?}"
-
-    # `/album/` gets singles, too
-    withchrome getlinks-c "${artist_url}/discography" | rg -F /album/ | inargsf re h_spotify-discography-get
-}
-renog spotify-discography-get
-##
-function rss-engine-spotify() {
-    local url="${1:?}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"
-
-    local log="$HOME/logs/$0"
-    ensure-dir "$log" || return $?
 
     local dir="${deleteusdir:?}/music/$title $(md5m "$url")/"
     pushf "$dir"
