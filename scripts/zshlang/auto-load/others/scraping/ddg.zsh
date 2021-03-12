@@ -2,6 +2,7 @@ function ddg-html() {
     local query="${1}"
     test -n "$query" || return 1
     
+    # @docs https://duckduckgo.com/params
     revaldbg eval-memoi withchrome full-html2 'https://duckduckgo.com/?q='"$(ec "$query" | gtr $'\n' ' ' | url-encode.py )"'&kp=-2&kl=us-en'
 }
 function ddg-json() {
