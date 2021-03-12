@@ -49,6 +49,7 @@ pxify() {
     pxify-command manga-py
 
     pxaify-command brew # makes downloads faster
+    pxaify-command pip # makes downloads faster
     pxaify-command git
     pxaify-command go
     pxaify-command emacs

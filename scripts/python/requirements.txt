@@ -69,3 +69,4 @@ peewee
 catsql
 zxcvbn
 text2num
+ddgr
