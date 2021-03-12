@@ -118,7 +118,7 @@ function rss-tsend() {
             # ensurerun "150s" tsend ...
             test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
             sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
-            test -n "$skip_engine" || rssTitle="$t" revaldbg "$engine[@]" "$l" # "$t"
+            test -n "$skip_engine" || (rssTitle="$t" revaldbg "$engine[@]" "$l") # "$t"
         done
         ecdate restarting "$0 $@ (get_engine: $get_engine[*] )(exit: ${pipestatus[@]})" | tee -a $log
         sleep "$each_iteration_delay" # allows us to terminate the program
