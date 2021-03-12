@@ -73,7 +73,7 @@ function rss-tsend() {
     local id="${rt_id:-$water}"
     local rssurls="rssurls_${rt_duplicates_key}" # used for storing dup links in redis
 
-    local c t l l_norm
+    local c t l l_norm fd_in
     local url
     local urls=()
     for url in "$@"
@@ -95,31 +95,37 @@ function rss-tsend() {
 
         # https://github.com/flok99/rsstail
         ##
+        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err | tee -a $log | {
+            # protect our stdin:
+            exec {fd_in}<&0
+            exec </dev/null
+            while read -d $'\n' -r ti <&${fd_in}; do
+                if test -n "$no_title" ; then
+                    l="$t"
+                    t=""
+                else
+                    read -d $'\n' -r l <&${fd_in} # Warning: I have seen this somehow skipped once and then the whole subsequent cycle breaks. I assume it was some faulty feed, as after I disabled that feed, the problem went away. Still, rsstail is buggy. Update: with `fd_in`, this might already be fixed.
+                fi
+                l_norm="$(url-normalize "$l")"
 
-        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err | tee -a $log | while read -d $'\n' -r t; do
-            if test -n "$no_title" ; then
-                l="$t"
-                t=""
-            else
-                read -d $'\n' -r l # Warning: I have seen this somehow skipped once and then the whole subsequent cycle breaks. I assume it was some faulty feed, as after I disabled that feed, thhe problem went away. Still, rsstail is buggy.
-            fi
-            l_norm="$(url-normalize "$l")"
+                ! (( $(redism SISMEMBER $rssurls "$l_norm") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
 
-            ! (( $(redism SISMEMBER $rssurls "$l_norm") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
+                t="$(<<<"$t" html2utf.py)"
+                for c in $conditions[@]
+                do
+                    reval "$c" "$l" "$t" || { ecdate "Skipping $t $l" ; continue 2 }
+                done
+                ec "Title: $t"
 
-            t="$(<<<"$t" html2utf.py)"
-            for c in $conditions[@]
-            do
-                reval "$c" "$l" "$t" || { ecdate "Skipping $t $l" ; continue 2 }
+                labeled redism SADD $rssurls $l_norm
+                # ensurerun "150s" tsend ...
+                test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
+                sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
+                test -n "$skip_engine" || rssTitle="$t" revaldbg "$engine[@]" "$l" # "$t"
             done
-            ec "Title: $t"
-
-            labeled redism SADD $rssurls $l_norm
-            # ensurerun "150s" tsend ...
-            test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
-            sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
-            test -n "$skip_engine" || (rssTitle="$t" revaldbg "$engine[@]" "$l") # "$t"
-        done
+        } always {
+            exec {fd_in}<&-
+        }
         ecdate restarting "$0 $@ (get_engine: $get_engine[*] )(exit: ${pipestatus[@]})" | tee -a $log
         sleep "$each_iteration_delay" # allows us to terminate the program
     done
