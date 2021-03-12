@@ -292,7 +292,7 @@ function tlg-reminday() {
         ecerr "$0: Empty receiver."
         return 1
     }
-    local text="$(@opts delete y notif y md  y @ rem-summary)"
+    local text="$(@opts delete y notif y md y @ rem-summary)"
     text="$text"$'\n\n'"$(datej-all)"
 
     tsend --parse-mode markdown -- "$rec" "$text"
