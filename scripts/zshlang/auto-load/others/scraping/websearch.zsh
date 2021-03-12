@@ -14,7 +14,8 @@ function search-json() {
     local count="${search_json_count:-10}" ddgMode="${search_json_ddg}" query="$1"
 
     local bad_google="search_json_bad_google" bad_google_val
-    bad_google_val="{$(redism get "$bad_google"):-0}" || bad_google_val=0
+    bad_google_val="${$(redism get "$bad_google"):-0}" || bad_google_val=0
+    dvar bad_google_val
 
     if test -z "$ddgMode" && { isDeus || (( ${bad_google_val} <= 3 )) } ; then
        if googler-en --json --count "$count" "$query" ; then
