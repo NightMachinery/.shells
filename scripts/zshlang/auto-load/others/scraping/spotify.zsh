@@ -4,7 +4,7 @@ function h_spotify-discography-get() {
 
     local title="$(url-title $url)"
     local date
-    date="$(url-date "$url")" && date="$(datenat_unix=y datenat "$date")" && {
+    date="$(url-date "$url")" && date="$(datenat_unix=y datenat "$date")" && test -n "$date" && {
             if (( EPOCHREALTIME - date > (3600*24*365) )) ; then
                 ecerr "$0: Skipping '$title' because of age"
                 return 0

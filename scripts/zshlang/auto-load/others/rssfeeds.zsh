@@ -75,7 +75,9 @@ function rss-tsend() {
     local urls=()
     for url in "$@"
     do
-        urls+="-u"
+        if [[ "${get_engine[1]}" == rsstail ]] ; then
+            urls+="-u"
+        fi
         urls+="$url"
     done
 
