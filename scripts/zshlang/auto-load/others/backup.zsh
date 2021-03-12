@@ -4,7 +4,13 @@ function backup-cron() {
     mkdir -p "$d"
     crontab -l > "${d}/$(whoami)"
 }
-
+##
+function backup-file() {
+    local f="${1:?}"
+    if test -e "$f" ; then
+        cp --verbose --backup $f ~/base/backup/auto/"${f:t} $(md5m "$f")/$(dateshort)/"
+    fi
+}
 ### zii
 function ziib-all() {
     pushf $nightNotes/private/configs/zii/

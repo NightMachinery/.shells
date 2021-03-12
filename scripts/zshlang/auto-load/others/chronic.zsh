@@ -1,6 +1,7 @@
 function chronic-all() {
     tmuxzombie-kill
     rm-caches
+    chronic-backup
     chronic-update
 }
 function chronic-update() {
@@ -11,5 +12,8 @@ function chronic-update() {
     if isServer ; then
         brew upgrade
     fi
+}
+function chronic-backup() {
+    re backup-file $timetracker_db
 }
 ##
