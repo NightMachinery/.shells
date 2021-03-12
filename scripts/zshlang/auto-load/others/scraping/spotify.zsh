@@ -2,14 +2,26 @@ function h_spotify-discography-get() {
     local url="${1:?}"
 
 
-    local title="$(url-title $url)"
-    local date
-    date="$(url-date "$url")" && date="$(datenat_unix=y datenat "$date")" && test -n "$date" && {
-            if (( EPOCHREALTIME - date > (3600*24*365) )) ; then
-                ecerr "$0: Skipping '$title' because of age"
-                return 0
-            fi
+    local title="$(serr url-title $url)"
+    ##
+    # local date
+    # date="$(serr url-date "$url")" && date="$(datenat_unix=y serr datenat "$date")" && test -n "$date" && {
+    #         if (( EPOCHREALTIME - date > (3600*24*365) )) ; then
+    #             ecerr "$0: Skipping '$title' because of age"
+    #             return 0
+    #         fi
+    # }
+    ##
+    local d
+    d="$(urlmeta2 "$url" description | rget '\s(\d\d\d\d)\s')" && {
+        local y="$(gdate '+%Y')"
+        if (( y - d >= 2 )) ; then
+            ecerr "$0: Skipping '$title' because of age '$d'"
+            return 0
+        fi
     }
+    ##
+
     ec "$title"
     ec "$url"
 }
