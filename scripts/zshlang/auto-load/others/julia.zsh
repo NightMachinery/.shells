@@ -161,9 +161,7 @@ jopus() {
 }
 jup() {
     globexists ./**/*(.D) || return 0
-    #rex "mv _ ${1:-./}" ./**/*(.D)
-    #possibly silence it
-    mv ./**/*(.D) "${1:-./}"
+    command mv --update ./**/*(.D) "${1:-./}"
 }
 jimg() {
     test "$1" = "-h" && {

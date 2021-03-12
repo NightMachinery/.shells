@@ -35,6 +35,13 @@ function rss-engine-spotify() {
             return $ret
         }
         jup
-        tsendf "$receiver" *(DN) || return $?
+        ltl
+        tsendf "$receiver" *(DN) || {
+            local ret=$?
+            local msg="$0: tsendf failed with '$ret' for '$title' '$url'"
+            ecerr $msg
+            tsend "$receiver" "$msg"
+            return $ret
+        }
     } always { popf ; trs-rm "$dir" }
 }
