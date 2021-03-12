@@ -98,16 +98,25 @@ https://garden.lilf.ir {
 #   reverse_proxy https://google.com
 # }
 
-:443, np.lilf.ir {
-route {
-  forward_proxy {
-    basic_auth alice {$NP_PASS0}
-    probe_resistance secret.com
-    hide_ip
-    hide_via
-  }
-  file_server browse {
-    root {env.HOME}/Downloads
-  }
-}
-}
+(np) {
+	route {
+		forward_proxy {
+			basic_auth alice {$NP_PASS0}
+			probe_resistance secret.com
+			hide_ip
+			hide_via
+		}
+		file_server browse {
+			root {env.HOME}/Downloads
+		}
+		# respond "pained gold spots accumulated"
+		}
+	}
+
+	:443 { # @upstreambug https://caddy.community/t/caddy-suddenly-directs-my-site-to-the-wrong-directive/11597/2
+		import np
+	}
+
+	np.lilf.ir {
+		import np
+	}
