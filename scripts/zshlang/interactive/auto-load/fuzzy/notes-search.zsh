@@ -24,7 +24,7 @@ noglobfn seev
 aliasfn-ng agsi nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
 function agfi() {
     local f="$1"
-    ntsearch_query_fzf="'$f '() | 'alias | 'alifn" agsi  # match functions or aliases
+    ntsearch_query_fzf="'$f '() | 'alias | 'alifn " agsi  # match functions or aliases
 }
 noglobfn agfi
 ##

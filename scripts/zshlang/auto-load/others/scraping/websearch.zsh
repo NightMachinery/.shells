@@ -1,7 +1,7 @@
 function googler-en() {
     local ans
     ans="$(googler --tld com --lang en "$@")" || return $?
-    # we need to fail proactively to activate the failsafe, ddgr-en:
+    # we need to fail proactively to activate the failsafe, ddg:
     if [[ "$ans" =~ '^\s*\[\s*\]\s*$' ]] ; then # empty answer in json
         return 1
     fi
@@ -26,7 +26,10 @@ function search-json() {
            silent redism expire $bad_google $((3600*24*7))
        fi
     fi
-    ddgr-en --json --num "$count" "$query"
+    ##
+    # ddgr-en --json --num "$count" "$query"
+    ##
+    ddg-json "$query"
 }
 function goo-g() {
     # use -x, --exact for an exact search.

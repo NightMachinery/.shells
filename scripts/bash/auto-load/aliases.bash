@@ -135,7 +135,7 @@ alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64
 alias ls="ls -aG"
 alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
-alias bi="brew install --force-bottle"
+alias bi="brew install" # `--force-bottle` now causes problems when no bottle is available
 alias bci="brew install --cask --no-quarantine"
 alias weather="wego | less -r"
 # alias j8='export JAVA_HOME=$JAVA_HOME8; export PATH=$JAVA_HOME/bin:$PATH'
