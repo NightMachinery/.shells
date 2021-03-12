@@ -24,10 +24,13 @@ renog spotify-discography-get
 function rss-engine-spotify() {
     local url="${1:?}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"
 
+    local log="$HOME/logs/$0"
+    ensure-dir "$log" || return $?
+
     local dir="${deleteusdir:?}/music/$title $(md5m "$url")/"
     pushf "$dir"
     {
-        spotdl "$url" || {
+        spotdl "$url" &>> "$log" || {
             local ret=$?
             local msg="$0: spotdl failed with '$ret' for '$title' '$url'"
             ecerr $msg
