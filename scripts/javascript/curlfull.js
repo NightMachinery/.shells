@@ -16,10 +16,12 @@ puppeteer.use(StealthPlugin());
     if (process.argv.length >= 4) {
         cookieFile = process.argv[3];
     }
-    const browser = await puppeteer.launch({ headless: true });
-    // process.exit(31);
-    // use tor
-    //const browser = await puppeteer.launch({args:['--proxy-server=socks5://127.0.0.1:9050']});
+    var browser
+    if (process.env.ALL_PROXY) {
+        browser = await puppeteer.launch({ headless: true, args:['--proxy-server=' + process.env.ALL_PROXY] });
+    } else {
+        browser = await puppeteer.launch({ headless: true });
+    }
     const page = await browser.newPage();
 
     // https://github.com/puppeteer/puppeteer/blob/master/docs/api.md#pagegotourl-options
