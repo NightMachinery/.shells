@@ -88,8 +88,8 @@ function spotify-url-get-unix() {
 ##
 spotify-artist-fz() {
     local query="${*:?}"
+    local count="${spotify_artist_fz_c:-6}"
 
-    local count=6
     local urls url
     urls=("${(@f)$(ffgoo_count=$count ffgoo "$query site:https://open.spotify.com/artist/")}")  || {
         local ret=$?
@@ -102,5 +102,10 @@ spotify-artist-fz() {
         name="$(spotify-url-get-artist "$url")" || name="$query"
         ec "artists['$name']='$url'"
     done
+}
+function spotify-artist-fz-re() {
+    local o="$(run-on-each spotify-artist-fz "$@")"
+    ec
+    ec-copy "$o"
 }
 ##
