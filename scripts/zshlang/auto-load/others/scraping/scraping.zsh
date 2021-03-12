@@ -362,6 +362,14 @@ function tlrlu(){
 function tlrl-code(){
     tlrl-ng -e w2e-code -p "[$(url-tailf "$1")] " "$@"
 }
+##
+function url-normalize() {
+    local l="${1:?}"
+
+    l_norm="$(url_normalizer.js "$l")" || l_norm="$l"
+    ec  "$l_norm"
+}
+renog url-normalize
 function url-tailf() {
     ec "$(url-tail "$(urlfinalg "$1")")"
 }
@@ -373,6 +381,7 @@ function url-title() {
     urlmeta2 "${1:?}" title
 }
 renog url-title
+##
 function tlrl-gh() {
     tlrl-ng -e w2e-gh -p "[$(url-tailf "$1")] " "$@"
 }

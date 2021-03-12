@@ -154,6 +154,11 @@ function reminday_store() {
     isLocal && brishzr awaysh deus iwidget-rem # refresh the cache
     rem_dest="$dest"
 }
+##
+function datenat() {
+    datenat.js "$@"
+}
+aliasfn datenat-future datenat_nopast=y datenat
 function datenatj() {
     : "GLOBAL OUT: datenatj_date datenatj_datej"
 
@@ -162,11 +167,12 @@ function datenatj() {
     local natdate="$*"
 
     local gdate
-    gdate="$(datenat.js $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
+    gdate="$(datenat $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
     datenatj_date="$gdate"
     datenatj_datej="$(jalalicli tojalali "$gdate")"
     ecn "$datenatj_datej"
 }
+aliasfn datenatj-future datenat_nopast=y datenatj
 function datenat-full1() {
     # Used in 'remn'
     local natdate="$*"
@@ -177,13 +183,7 @@ function datenat-full1() {
     local gdate="$(gdate --date "$datenatj_date" +'%a %Y_%m_%d')"
     ec "$jdate $gdate"
 }
-function remn() {
-    local text="$1" natdate="${@:2}"
-    [[ "$text" == '-' ]] && text="$(</dev/stdin)"
-    local dest
-    dest="$remindayDir/$(datenat-full1 "$natdate")" || return $?
-    @opts datej "$(datenatj "$natdate")" @ reminday_store "$dest" "$text"
-}
+aliasfn datenat-full1-future datenat_nopast=y datenat-full1
 function datenat-full2() {
     local natdate="$*"
 
@@ -193,12 +193,21 @@ function datenat-full2() {
 
     @opts mode 1 @ datej-all "$jdate"
 }
+aliasfn datenat-full2-future datenat_nopast=y datenat-full2
+##
+function remn() {
+    local text="$1" natdate="${@:2}"
+    [[ "$text" == '-' ]] && text="$(</dev/stdin)"
+    local dest
+    dest="$remindayDir/$(datenat-full1-future "$natdate")" || return $?
+    @opts datej "$(datenatj-future "$natdate")" @ reminday_store "$dest" "$text"
+}
 function remn-interactive() {
     local text="$*"
     
     local natdate=""
     # @warn brishz.dash does not quote its arguments, so we essentially have an @unsafeEval here. I think it's worth the speed boost, though I have noot profiled it.
-    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash serr datenat-full2 {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
+    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
     remn "$text" "$natdate"
 }
 aliasfn ri remn-interactive
@@ -271,7 +280,7 @@ function rem-today() {
 }
 function rem-today-d() {
     local day="${1:-1}"
-    fnrep datej "datenatj $day day later" rem-today
+    fnrep datej "datenatj-future $day day later" rem-today
 }
 function rem-today-notify() {
     ensure-dir ~/logs/

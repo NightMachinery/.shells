@@ -98,7 +98,7 @@ function rss-tsend() {
             else
                 read -d $'\n' -r l # Warning: I have seen this somehow skipped once and then the whole subsequent cycle breaks. I assume it was some faulty feed, as after I disabled that feed, thhe problem went away. Still, rsstail is buggy.
             fi
-            l_norm="$(url_normalizer.js "$l")" || l_norm="$l"
+            l_norm="$(url-normalize "$l")"
 
             ! (( $(redism SISMEMBER $rssurls "$l_norm") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
 
