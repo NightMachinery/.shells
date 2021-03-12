@@ -18,6 +18,9 @@ tmuxnew v2ray v2ray -config /usr/local/etc/v2ray/config.json
 # tmuxnew trojan trojan --config /usr/local/etc/trojan/config.json
 ##
 typeset -A artists
+####
+artists['Reza Yazdani']='https://open.spotify.com/artist/0tctijgZruddzQ8FCgvDj2'
+###
 artists['Marjan Farsad']='https://open.spotify.com/artist/5sGy7zfcUWYPh3wHbyz4fn'
 artists['Hani Niroo']='https://open.spotify.com/artist/07xBlQ8c7xhTa7IefYshum'
 artists['Sogand']='https://open.spotify.com/artist/2mGkJsyXC8byI83UHSO4w1'
@@ -27,7 +30,7 @@ artists['Niaz Nawab']='https://open.spotify.com/artist/4hprwICrkEC8ule8JvCcJS'
 artists['Aida Shahghasemi']='https://open.spotify.com/artist/1bQlJQRMtgj4p2gy9nN9Mz'
 artists['Tara Tiba']='https://open.spotify.com/artist/0s6fPszrilIZ2kmduBE9N7'
 artists['Rana Mansour']='https://open.spotify.com/artist/3zrjEdzGRRwrLHv3KQDDuB'
-###
+####
 artists['Alexander Rybak']='https://open.spotify.com/artist/3LLNDXrxL4uxXtnUJS5XWM'
 artists['Pharrell Williams']='https://open.spotify.com/artist/3V38zs2XJF5nXDv5jt31zm'
 artists['Depeche Mode']='https://open.spotify.com/artist/762310PdDnwsDxAQxzQkfX'
@@ -46,7 +49,6 @@ artists['Lily Allen']='https://open.spotify.com/artist/13saZpZnCDWOI9D4IJhp1f'
 artists['Camila Cabello']='https://open.spotify.com/artist/4nDoRrQiYLoBzwC5BhVJzF'
 artists['Fifth Harmony']='https://open.spotify.com/artist/1l8Fu6IkuTP0U5QetQJ5Xt'
 ##
-artists['']=''
 artists['']=''
 artists['']=''
 artists['']=''

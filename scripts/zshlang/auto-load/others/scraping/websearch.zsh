@@ -56,7 +56,7 @@ function google-quote() {
 ##
 function ffgoo() {
     local query="$*"
-    local count="${ffgoo_count:-${ffgoo_c:-30}}"
+    local count="${ffgoo_count:-${ffgoo_c:-25}}"
 
     setopt local_options
     setopt pipefail
@@ -68,7 +68,7 @@ function ffgoo() {
 
     local search="$(search_json_count="$count" $memoi_cmd search-json "$query")"
     local is i
-    is=("${(@f)$(<<<$search jq -re '.[] | .title + ": " + (.abstract |= gsub("\\n";" ")).abstract + (if .metadata then " (" + (.metadata) + ")" else "" end)' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. | awk '{print $1}')}") || return 1
+    is=("${(@f)$(<<<$search jq -re '.[] | .title + ": " + (.abstract |= gsub("\\n";" ") + " " + .url).abstract + (if .metadata then " (" + (.metadata) + ")" else "" end)' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. | awk '{print $1}')}") || return 1
     for i in $is[@] ; do
         i=$((i-1)) # jq is zero-indexed
         <<<$search jq -re ".[$i] | .url"
