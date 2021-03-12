@@ -26,10 +26,7 @@ function search-json() {
            silent redism expire $bad_google $((3600*24*7))
        fi
     fi
-    ##
-    # ddgr-en --json --num "$count" "$query"
-    ##
-    ddg-json "$query"
+    ddg-json "$query" "$count"
 }
 function goo-g() {
     # use -x, --exact for an exact search.

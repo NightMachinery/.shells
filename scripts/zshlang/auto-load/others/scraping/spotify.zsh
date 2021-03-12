@@ -91,7 +91,7 @@ spotify-artist-fz() {
     local count="${spotify_artist_fz_c:-6}"
 
     local urls url name
-    urls=("${(@f)$(ffgoo_count=$count ffgoo "$query site:https://open.spotify.com/artist/")}")  || {
+    urls=("${(@f)$(ddg_json_js=y ffgoo_count=$count ffgoo "$query site:https://open.spotify.com/artist/")}")  || {
         local ret=$?
         ecerr "$0: ffgoo failed with '$ret'"
         return $ret

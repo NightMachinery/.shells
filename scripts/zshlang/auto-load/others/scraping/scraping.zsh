@@ -211,6 +211,8 @@ function full-html2() {
     fi
 
     [[ "$mode" =~ '^curlfast$' ]] &&  { $proxyenv curl --silent --fail --location -o /dev/stdout "$url" ; return $? }
+    [[ "$mode" =~ '^curlfullzero$' ]] &&  { cfTimeout=0 $proxyenv curlfull.js "$url" ; return $? } # not really usable
+    [[ "$mode" =~ '^curlfullshorter$' ]] &&  { cfTimeout=0.5 $proxyenv curlfull.js "$url" ; return $? } # not really usable
     [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$url" ; return $? }
     [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 $proxyenv curlfull.js "$url" ; return $? }
     [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 $proxyenv curlfull.js "$url" ; return $? }
@@ -224,7 +226,7 @@ function full-html2() {
     }
     [[ "$mode" =~ '^(c|g)url$' ]] && { $proxyenv gurl "$url" ; return $? }
     [[ "$mode" =~ '^cloudscraper$' ]] && { 
-	    $proxyenv cloudscraper_get.py "$url" # idk if proxyenv works for this
+        $proxyenv cloudscraper_get.py "$url" # idk if proxyenv works for this
             return $?
     }
     [[ "$mode" =~ '^http(ie)?$' ]] && {
