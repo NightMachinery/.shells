@@ -99,7 +99,7 @@ function rss-tsend() {
             # protect our stdin:
             exec {fd_in}<&0
             exec </dev/null
-            while read -d $'\n' -r ti <&${fd_in}; do
+            while read -d $'\n' -r t <&${fd_in}; do
                 if test -n "$no_title" ; then
                     l="$t"
                     t=""
