@@ -1,6 +1,8 @@
 rm-deleteus() {
+    trs-rm "$deleteusdir"
+    ##
     ! test -e "$deleteus" && return 0
-    re trs "${(@f)$(<"$deleteus")}"
+    trs-rm "${(@f)$(<"$deleteus")}"
     mv "$deleteus" "$deleteus.pbak"
 }
 ##

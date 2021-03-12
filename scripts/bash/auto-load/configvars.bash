@@ -28,6 +28,7 @@ to_dirtouch=y
 export logdir="$HOME/logs"
 PRUNE_SONGD_DAYS="+120"
 export deleteus=~/.deleteus
+export deleteusdir=~/tmp/deleteus
 export codedir="$HOME/code"
 export BASE_DIR="$HOME/base"
 export GREENCASE_DIR="$BASE_DIR/music/greencase"

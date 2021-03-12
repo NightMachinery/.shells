@@ -24,7 +24,7 @@ renog spotify-discography-get
 function rss-engine-spotify() {
     local url="${1:?}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"
 
-    local dir="$HOME/tmp/music/$title $(md5m "$url")/"
+    local dir="${deleteusdir:?}/music/$title $(md5m "$url")/"
     pushf "$dir"
     {
         spotdl "$url" || {
@@ -36,12 +36,12 @@ function rss-engine-spotify() {
         }
         jup
         ltl
-        revaldbg tsendf "$receiver" *(DN) || {
+        revaldbg tsendf "$receiver" *.mp3(DN) || {
             local ret=$?
             local msg="$0: tsendf failed with '$ret' for '$title' '$url'"
             ecerr $msg
             tsend "$receiver" "$msg"
             return $ret
         }
-    } always { popf ; isDbg || trs-rm "$dir" }
+    } always { popf ; trs-rm "$dir" }
 }
