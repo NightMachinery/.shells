@@ -19,6 +19,8 @@ tmuxnew v2ray v2ray -config /usr/local/etc/v2ray/config.json
 ##
 typeset -A artists
 ####
+artists['Mohsen Namjoo']='https://open.spotify.com/artist/4eVyI1yiHoRjVrxt5y7gGL'
+artists['Mohsen Chavoshi']='https://open.spotify.com/artist/2IYl0pVatTl6O2d1CQj6GQ'
 artists['Reza Yazdani']='https://open.spotify.com/artist/0tctijgZruddzQ8FCgvDj2'
 ###
 artists['Marjan Farsad']='https://open.spotify.com/artist/5sGy7zfcUWYPh3wHbyz4fn'
@@ -35,6 +37,8 @@ artists['Alexander Rybak']='https://open.spotify.com/artist/3LLNDXrxL4uxXtnUJS5X
 artists['Pharrell Williams']='https://open.spotify.com/artist/3V38zs2XJF5nXDv5jt31zm'
 artists['Depeche Mode']='https://open.spotify.com/artist/762310PdDnwsDxAQxzQkfX'
 artists['System Of A Down']='https://open.spotify.com/artist/5eAWCfyUhZtHHtBdNk56l1'
+artists['Maroon 5']='https://open.spotify.com/artist/04gDigrS5kc9YWfZHwBETP'
+artists['Owl City']='https://open.spotify.com/artist/07QEuhtrNmmZ0zEcqE9SF6'
 ##
 artists['Brian Eno']='https://open.spotify.com/artist/7MSUfLeTdDEoZiJPDSBXgi'
 ###
@@ -48,13 +52,18 @@ artists['Lily Allen']='https://open.spotify.com/artist/13saZpZnCDWOI9D4IJhp1f'
 artists['Lana Del Rey']='https://open.spotify.com/artist/00FQb4jTyendYWaN8pK0wa'
 artists['Ariana Grande']='https://open.spotify.com/artist/66CXWjxzNUsdJxJ2JdwvnR'
 artists['INNA']='https://open.spotify.com/artist/2w9zwq3AktTeYYMuhMjju8'
+artists['Lorde']='https://open.spotify.com/artist/163tK9Wjr9P9DmM0AVK7lm'
+artists['Melanie Martinez']='https://open.spotify.com/artist/63yrD80RY3RNEM2YDpUpO8'
+artists['Taylor Swift']='https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02'
+artists['Dido']='https://open.spotify.com/artist/2mpeljBig2IXLXRAFO9AAs'
+artists['Carly Rae Jepsen']='https://open.spotify.com/artist/6sFIWsNpZYqfjUpaCgueju'
 ##
+artists['Hey Violet']='https://open.spotify.com/artist/4JNfz6aO9ZFz0gp5GY88am'
+artists['Cavetown']='https://open.spotify.com/artist/2hR4h1Cao2ueuI7Cx9c7V8'
 artists['Camila Cabello']='https://open.spotify.com/artist/4nDoRrQiYLoBzwC5BhVJzF'
 artists['Fifth Harmony']='https://open.spotify.com/artist/1l8Fu6IkuTP0U5QetQJ5Xt'
 ##
-artists['']=''
-artists['']=''
-artists['']=''
+# artists['']=''
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_ge=(spotify-discography-get) rt_eud=0 rt_eid=$((3600*24*14))" tmuxnewsh rss-spotify rss-tsend ${(@v)artists}
 ##
 chronic-all
