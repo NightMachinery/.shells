@@ -91,7 +91,7 @@ function rss-tsend() {
         # https://github.com/flok99/rsstail
         ##
 
-        reval "$get_engine[@]" "${urls[@]}" 2>> $log | tee -a $log | while read -d $'\n' -r t; do
+        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log | tee -a $log | while read -d $'\n' -r t; do
             if test -n "$no_title" ; then
                 l="$t"
                 t=""

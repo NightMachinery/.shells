@@ -55,6 +55,9 @@ isI() {
         test -n "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]
     }
 }
+isIReally() {
+    [[ -o interactive ]]
+}
 ##
 function isOutTty() {
     [ -t 1 ]
