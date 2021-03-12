@@ -75,7 +75,9 @@ function  mv-merge() {
         ecerr "$0: Only one path supplied."
         return 1
     fi
-    command gcp -r --link --archive --interactive --verbose "$@" || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
+    local opts=()
+    isI && opts+='--interactive'
+    command gcp -r --link --archive --verbose "${opts[@]}" "$@" || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
 
     colorfg 170 170 170 ; trs "${(@)paths[1,-2]}" ; resetcolor
 }
