@@ -4,13 +4,17 @@ alias evaldbg='seval'
 alias eval-good='geval'
 alias eval-quoted='reval'
 alias greval=rgeval
-eval-ec() { ge_no_hist=y geval "$@" }
-reval-ec() { ge_no_hist=y rgeval "$@" }
-reval-ecdate() {
+function eval-ec() { ge_no_hist=y geval "$@" }
+function reval-ec() { ge_no_hist=y rgeval "$@" }
+function reval-ecdate() {
     test -z "$*" && return 0
     local cmd="$(gq "$@")"
     ecdate "$cmd"
     eval "$cmd"
+}
+function reval-rainbow() {
+    argerng "$@"
+    reval "$@"
 }
 ###
 function geval() {

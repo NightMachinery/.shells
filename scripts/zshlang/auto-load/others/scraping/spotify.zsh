@@ -53,7 +53,7 @@ function rss-engine-spotify() {
         }
         jup
         ltl
-        revaldbg tsendf "$receiver" *.mp3(DN) || {
+        reval-rainbow tsendf "$receiver" *.mp3(DN) || {
             local ret=$?
             local msg="$0: tsendf failed with '$ret' for '$title' '$url'"
             ecerr $msg
