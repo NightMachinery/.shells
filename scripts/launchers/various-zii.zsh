@@ -25,7 +25,7 @@ artists['Reza Yazdani']='https://open.spotify.com/artist/0tctijgZruddzQ8FCgvDj2'
 ###
 artists['Marjan Farsad']='https://open.spotify.com/artist/5sGy7zfcUWYPh3wHbyz4fn'
 artists['Hani Niroo']='https://open.spotify.com/artist/07xBlQ8c7xhTa7IefYshum'
-artists['Sogand']='https://open.spotify.com/artist/2mGkJsyXC8byI83UHSO4w1'
+# artists['Sogand']='https://open.spotify.com/artist/2mGkJsyXC8byI83UHSO4w1'
 artists['Rana Farhan']='https://open.spotify.com/artist/5Fq4u0e9OPI4k4R3QC6OZO'
 ##
 artists['Niaz Nawab']='https://open.spotify.com/artist/4hprwICrkEC8ule8JvCcJS'
@@ -40,7 +40,7 @@ artists['System Of A Down']='https://open.spotify.com/artist/5eAWCfyUhZtHHtBdNk5
 artists['Maroon 5']='https://open.spotify.com/artist/04gDigrS5kc9YWfZHwBETP'
 artists['Owl City']='https://open.spotify.com/artist/07QEuhtrNmmZ0zEcqE9SF6'
 ##
-artists['Brian Eno']='https://open.spotify.com/artist/7MSUfLeTdDEoZiJPDSBXgi'
+# artists['Brian Eno']='https://open.spotify.com/artist/7MSUfLeTdDEoZiJPDSBXgi'
 ###
 # artists['Becky G']='https://open.spotify.com/artist/4obzFoKoKRHIphyHzJ35G3'
 artists['Halsey']='https://open.spotify.com/artist/26VFTg2z8YR0cCuwLzESi2'

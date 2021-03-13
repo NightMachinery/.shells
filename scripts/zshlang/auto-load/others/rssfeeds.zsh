@@ -95,7 +95,7 @@ function rss-tsend() {
 
         # https://github.com/flok99/rsstail
         ##
-        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err | tee -a $log | {
+        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err > >(command ts "%d-%m-%y %H_%M_%S" >> $log) | {
             # protect our stdin:
             exec {fd_in}<&0
             exec </dev/null
@@ -115,7 +115,7 @@ function rss-tsend() {
                 do
                     reval "$c" "$l" "$t" || { ecdate "Skipping $t $l" ; continue 2 }
                 done
-                ec "Title: $t"
+                test -n "$no_title" || ec "Title: $t"
 
                 labeled redism SADD $rssurls $l_norm
                 # ensurerun "150s" tsend ...

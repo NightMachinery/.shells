@@ -36,7 +36,7 @@ function memoi-eval() {
     local retcode=0 # If skiperr, we will return the correct exit code if the cache is not used. (We rely on this behavior in, e.g., `ffz`.
     local delme=''
 
-    test -n "$skiperr" || silent redism ping || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
+    test -n "$skiperr" || [[ "${$(redism ping):l}" == pong ]] || { test -n "$memoi_strict" && { ecerr '`redis-cli ping` failed. Please make sure redis is up.' ; return 33 } || eval "$cmd" }
     if test -z "$deusvult" && {
         integer ttl="$(redism ttl $rediskey)"
         (( ttl > 10 || ttl == -1 )) # && {
