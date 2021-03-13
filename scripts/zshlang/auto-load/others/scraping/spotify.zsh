@@ -83,9 +83,14 @@ function spotify-url-get-artist() {
 function spotify-url-get-date() {
     local url="${1:?}" out_fmt="${spotify_url_get_date_fmt:-%Y-%B}"
 
+    local date tmp
     date="$(eval-memoi full-html2 "$url" | pup 'meta[property="music:release_date"] attr{content}')" || return $?
+    dvar date
     if [[ "$date" =~ '^\s*(\d\d\d\d)\s*$' ]] ; then
         date="${match[1]}-1-1" # `gdate --date="2009"` parses wrongly
+    else
+        # try parsing it ourselves first, as gdate mistakes the position of months and days
+        tmp="@$(jalalicli tojalali -j unix -g '2006-01-02' "$date")" && date="$tmp"
     fi
     gdate --date="$date" "+$out_fmt"
 }

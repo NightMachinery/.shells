@@ -55,28 +55,29 @@ function google-quote() {
 }
 ##
 function ffgoo() {
-    local query="$*"
+    local query="$*" fz_query=''
     local count="${ffgoo_count:-${ffgoo_c:-25}}"
 
     setopt local_options
     setopt pipefail
 
-    local fzf_cmd="$(cmd-sub fz fzf)"
+    local fzf_cmd=fzp
     local memoi_cmd="$(cmd-sub memoi-eval '')"
     # local isI="$(cmd-sub isI true)"
     # local fz_opts=( "$fz_opts[@]" )
 
     local search="$(search_json_count="$count" $memoi_cmd search-json "$query")"
     local is i
-    is=("${(@f)$(<<<$search jq -re '.[] | .title + ": " + (.abstract |= gsub("\\n";" ")).abstract + (if .metadata then " (" + (.metadata) + ")" else "" end + " " + .url)' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. | awk '{print $1}')}") || return 1
+    if isI ; then
+        is=("${(@f)$(<<<$search jq -re '.[] | .title + ": " + (.abstract |= gsub("\\n";" ")).abstract + (if .metadata then " (" + (.metadata) + ")" else "" end + " " + .url)' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. "$fz_query" | {
+      awk '{print $1}'
+} )}") || return 1
+    else
+        is=(1)
+    fi
     for i in $is[@] ; do
         i=$((i-1)) # jq is zero-indexed
         <<<$search jq -re ".[$i] | .url"
     done
-}
-##
-@s() {
-    # @todo Rename me
-    googler -j -w 'spotify.com' --url-handler echo "${(@f)$(google-quote "$@")}"
 }
 ##

@@ -1,16 +1,25 @@
 #!/usr/bin/env zsh
 
 typeset -A artists
+# artists['']=''
 #### Persian
+artists['Kiosk']='https://open.spotify.com/artist/42o3S5oDd4Q4YyMNRmN5oS'
+artists['The Ways']='https://open.spotify.com/artist/5F3JQSbuDo4pWGLC2UTLTI'
+artists['Dariush']='https://open.spotify.com/artist/2jvB5M73tBZlWybPmxIaw7'
+artists['Siavash Ghomayshi']='https://open.spotify.com/artist/4DKaZIByJZluOmixSYIjjk'
+artists['Ebi']='https://open.spotify.com/artist/3pI1XXzzKOYdYCLWurc2Ky'
+artists['Hadi Pakzad']='https://open.spotify.com/artist/5wlXrK5ShXNEHFJXQlGOcm' # @dead
 artists['Pallett']='https://open.spotify.com/artist/0In2x96q97ZDsP2KALpdVf'
 artists['Eendo']='https://open.spotify.com/artist/6jCwWmmC5b4fF2y0OOP6g8'
 artists['Mohsen Namjoo']='https://open.spotify.com/artist/4eVyI1yiHoRjVrxt5y7gGL'
 artists['Mohsen Chavoshi']='https://open.spotify.com/artist/2IYl0pVatTl6O2d1CQj6GQ'
 artists['Reza Yazdani']='https://open.spotify.com/artist/0tctijgZruddzQ8FCgvDj2'
 ###
+artists['Hayedeh']='https://open.spotify.com/artist/5b1CDxqOGnXr5M1DUn2XQh' # @dead
 artists['Marjan Farsad']='https://open.spotify.com/artist/5sGy7zfcUWYPh3wHbyz4fn'
+artists['Abjeez']='https://open.spotify.com/artist/28KQ0K3QhthwwfeVnkK5Qd'
 artists['Hani Niroo']='https://open.spotify.com/artist/07xBlQ8c7xhTa7IefYshum'
-# artists['Sogand']='https://open.spotify.com/artist/2mGkJsyXC8byI83UHSO4w1'
+artists['Sogand']='https://open.spotify.com/artist/2mGkJsyXC8byI83UHSO4w1'
 artists['Rana Farhan']='https://open.spotify.com/artist/5Fq4u0e9OPI4k4R3QC6OZO'
 ## tosee
 artists['Niaz Nawab']='https://open.spotify.com/artist/4hprwICrkEC8ule8JvCcJS'
@@ -38,7 +47,6 @@ artists['Sia']='https://open.spotify.com/artist/5WUlDfRSoLAfcVSX1WnrxN'
 artists['The Tiger Lillies']='https://open.spotify.com/artist/72o2T9aqYR2PFNYpzYrMmw'
 artists['Portishead']='https://open.spotify.com/artist/6liAMWkVf5LH7YR9yfFy1Y'
 artists['Madonna']='https://open.spotify.com/artist/6tbjWDEIzxoDsBA1FuhfPW'
-# artists['Becky G']='https://open.spotify.com/artist/4obzFoKoKRHIphyHzJ35G3'
 artists['Halsey']='https://open.spotify.com/artist/26VFTg2z8YR0cCuwLzESi2'
 artists['AURORA']='https://open.spotify.com/artist/1WgXqy2Dd70QQOU7Ay074N'
 artists['Selena Gomez']='https://open.spotify.com/artist/0C8ZW7ezQVs4URX5aX7Kqx'
@@ -47,12 +55,13 @@ artists['Billie Eilish']='https://open.spotify.com/artist/6qqNVTkY8uBg9cP3Jd7DAH
 artists['Lily Allen']='https://open.spotify.com/artist/13saZpZnCDWOI9D4IJhp1f'
 artists['Lana Del Rey']='https://open.spotify.com/artist/00FQb4jTyendYWaN8pK0wa'
 artists['Ariana Grande']='https://open.spotify.com/artist/66CXWjxzNUsdJxJ2JdwvnR'
-# artists['INNA']='https://open.spotify.com/artist/2w9zwq3AktTeYYMuhMjju8'
 artists['Lorde']='https://open.spotify.com/artist/163tK9Wjr9P9DmM0AVK7lm'
 artists['Melanie Martinez']='https://open.spotify.com/artist/63yrD80RY3RNEM2YDpUpO8'
-# artists['Taylor Swift']='https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02'
 artists['Dido']='https://open.spotify.com/artist/2mpeljBig2IXLXRAFO9AAs'
 artists['Carly Rae Jepsen']='https://open.spotify.com/artist/6sFIWsNpZYqfjUpaCgueju'
+# artists['Becky G']='https://open.spotify.com/artist/4obzFoKoKRHIphyHzJ35G3'
+# artists['Taylor Swift']='https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02'
+# artists['INNA']='https://open.spotify.com/artist/2w9zwq3AktTeYYMuhMjju8'
 ## tosee
 artists['Hey Violet']='https://open.spotify.com/artist/4JNfz6aO9ZFz0gp5GY88am'
 artists['Cavetown']='https://open.spotify.com/artist/2hR4h1Cao2ueuI7Cx9c7V8'

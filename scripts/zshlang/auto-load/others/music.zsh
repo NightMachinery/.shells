@@ -185,7 +185,6 @@ mub() {
     songc --loop-playlist ${*:+"$*"} #alBum
 }
 mup() playlistc "$@"
-mus() mu -a "$(@s "$@" album)"
 mu() {
     local bp=()
     { test "${1}" = "-d" || test "$1" = "-a" || test "$1" = "-p" } && {
