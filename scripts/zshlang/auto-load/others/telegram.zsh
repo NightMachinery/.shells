@@ -16,6 +16,14 @@ function tnotif-casual() {
 aliasfn tnotifc tnotif-casual
 ##
 function tsendf() {
+    local f opts=()
+    for f in "${@:2}"
+    do
+        opts+=(--file "$f")
+    done
+    tsend "$opts[@]" -- "$1" ''
+}
+function tsendf-discrete() {
     local f
     for f in "${@:2}"
     do

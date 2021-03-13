@@ -18,7 +18,7 @@ tmuxnew v2ray v2ray -config /usr/local/etc/v2ray/config.json
 # tmuxnew trojan trojan --config /usr/local/etc/trojan/config.json
 ##
 typeset -A artists
-####
+#### Persian
 artists['Mohsen Namjoo']='https://open.spotify.com/artist/4eVyI1yiHoRjVrxt5y7gGL'
 artists['Mohsen Chavoshi']='https://open.spotify.com/artist/2IYl0pVatTl6O2d1CQj6GQ'
 artists['Reza Yazdani']='https://open.spotify.com/artist/0tctijgZruddzQ8FCgvDj2'
@@ -32,7 +32,7 @@ artists['Niaz Nawab']='https://open.spotify.com/artist/4hprwICrkEC8ule8JvCcJS'
 artists['Aida Shahghasemi']='https://open.spotify.com/artist/1bQlJQRMtgj4p2gy9nN9Mz'
 artists['Tara Tiba']='https://open.spotify.com/artist/0s6fPszrilIZ2kmduBE9N7'
 artists['Rana Mansour']='https://open.spotify.com/artist/3zrjEdzGRRwrLHv3KQDDuB'
-####
+#### English
 artists['Alexander Rybak']='https://open.spotify.com/artist/3LLNDXrxL4uxXtnUJS5XWM'
 artists['Pharrell Williams']='https://open.spotify.com/artist/3V38zs2XJF5nXDv5jt31zm'
 artists['Depeche Mode']='https://open.spotify.com/artist/762310PdDnwsDxAQxzQkfX'
@@ -62,7 +62,12 @@ artists['Hey Violet']='https://open.spotify.com/artist/4JNfz6aO9ZFz0gp5GY88am'
 artists['Cavetown']='https://open.spotify.com/artist/2hR4h1Cao2ueuI7Cx9c7V8'
 artists['Camila Cabello']='https://open.spotify.com/artist/4nDoRrQiYLoBzwC5BhVJzF'
 artists['Fifth Harmony']='https://open.spotify.com/artist/1l8Fu6IkuTP0U5QetQJ5Xt'
-##
+#### French
+artists['Cœur De Pirate']='https://open.spotify.com/artist/2eRNMtoi82UZUuaL6naDjA'
+#### Asian
+artists['BLACKPINK']='https://open.spotify.com/artist/41MozSoPIsD1dJM0CLPjZF'
+artists['f(x)']='https://open.spotify.com/artist/3wRA5UYoo08BBKJnzyKkpF'
+####
 # artists['']=''
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_nt=y rt_ge=(spotify-discography-get) rt_eud=0 rt_eid=$((3600*24*14))" tmuxnewsh rss-spotify rss-tsend ${(@v)artists}
 ##

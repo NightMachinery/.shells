@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
+
 """telegram-send
 Usage:
-  tsend.py [--file=<file> --force-document --link-preview --parse-mode=<parser>] [--] <receiver> <message> 
+  tsend.py [--file=<file>]... [--force-document --link-preview --parse-mode=<parser>] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
 
 Options:
-  -f <file> --file=<file>   Sends a file, with message as its caption.
+  -f <file> --file=<file>   Sends a file, with message as its caption. (Can be specified multiple times, and sends all the files as an album. So they have to be the same kind of 'media'.)
   --force_document Whether to send the given file as a document or not.
   --link_preview Whether to show a preview of web links.
   --parse_mode <parser> Which parser to use for the message.
