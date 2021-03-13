@@ -5,8 +5,6 @@
 	co = checkout
 	lol = log --graph --decorate --pretty=oneline --abbrev-commit
 	lola = log --graph --decorate --pretty=oneline --abbrev-commit --all
-[credential]
-	helper = osxkeychain
 [push]
 	default = matching
 [core]
@@ -31,3 +29,7 @@
     cmd = kitty kitty +kitten diff $LOCAL $REMOTE
 [receive]
 	denyCurrentBranch = updateInstead
+[url "ssh://git@github.com/"]
+	insteadOf = https://github.com/
+[url "ssh://git@bitbucket.org/"]
+	insteadOf = https://bitbucket.org/

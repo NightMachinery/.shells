@@ -34,11 +34,15 @@ function ffz() {
     # list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
     memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
     true
- } | { sponge || true } | deusvult="${ffz_nocache:-$deusvult}" memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | head -1)" ||  {
+ } | { sponge || true } | deusvult="${ffz_nocache:-$deusvult}" memoi_key=fuzzy_z memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | head -1)" ||  {
         local r=$? msg="$0: returned $? ${pipestatus[@]}"
         ecerr $msg
         return $r
     }
+    if test -z "$sel" ; then
+        ecerr "$0: selection is empty even though no error was returned. This is likely to be a bug."
+        return 1
+    fi
     sel="$(ntag-recoverpath "$sel")"
     if test -z "$ffz_nocache" && ! test -e "$sel" ; then
         ffz_nocache=y reval "$0" "$@"
