@@ -9,11 +9,11 @@ function reval-ec() { ge_no_hist=y rgeval "$@" }
 function reval-ecdate() {
     test -z "$*" && return 0
     local cmd="$(gq "$@")"
-    ecdate "$cmd"
+    ecdate "$cmd" >&2
     eval "$cmd"
 }
 function reval-rainbow() {
-    argerng "$@"
+    argerng "$@" >&2
     reval "$@"
 }
 ###

@@ -2,9 +2,8 @@ function h_spotify-discography-get() {
     local url="${1:?}"
 
 
-    local title="$(serr url-title $url | gtr -d $'\n')"
-
-    ec "$title"
+    # local title="$(serr url-title $url | sd '\s+' ' ')"
+    # ec "$title"
     ec "$url"
 }
 function spotify-discography-get() {
@@ -16,17 +15,22 @@ function spotify-discography-get() {
 renog spotify-discography-get
 ##
 function rss-engine-spotify() {
-    local url="${1:?}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"
+    local url="${1}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"
+    test -n "$url" || return 1
+    test -n "$title" || title="$(serr url-title $url | sd '\s+' ' ')"
 
+
+    local log_spotdl="$HOME/logs/$0_spotdl"
     local log="$HOME/logs/$0"
     ensure-dir "$log" || return $?
 
+    ecdate "${title}: $url" | tee -a $log
     ##
     local date
     # date="$(serr url-date "$url")" && date="$(datenat_unix=y serr datenat "$date")" && test -n "$date" && {
     date="$(spotify-url-get-unix "$url")" && test -n "$date" && {
             if (( EPOCHREALTIME - date > (3600*24*365) )) ; then
-                ecerr "$0: Skipping '$title' because of age '$(spotify-url-get-date "$url")'"
+                ecerr "$0: Skipping '$title' because of age '$(spotify-url-get-date "$url")'" 2>&2 2>>$log
                 return 0
             fi
     }
@@ -41,10 +45,10 @@ function rss-engine-spotify() {
     # }
     ##
 
-    local dir="${deleteusdir:?}/music/$title $(md5m "$url")/"
+    local dir="${deleteusdir:?}/music/$title $(md5m "$url")/" files
     pushf "$dir"
     {
-        spotdl "$url" &>> "$log" || {
+        gtimeout --kill-after=15m --verbose 24h spotdl "$url" &>> "$log_spotdl" || {
             local ret=$?
             local msg="$0: spotdl failed with '$ret' for '$title' '$url'"
             ecerr $msg
@@ -53,7 +57,12 @@ function rss-engine-spotify() {
         }
         jup
         ltl
-        reval-rainbow tsendf "$receiver" *.mp3(DN) || {
+        files=(*.mp3(DN))
+        if (( ${#files} == 0 )) ; then
+            tsend "$receiver" "$0: No files were found for '$title' '$url'"
+            return 1
+        fi
+        reval-rainbow tsendf "$receiver" $files[@] |& tee -a $log || {
             local ret=$?
             local msg="$0: tsendf failed with '$ret' for '$title' '$url'"
             ecerr $msg

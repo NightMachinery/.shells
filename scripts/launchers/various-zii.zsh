@@ -42,7 +42,7 @@ artists['Owl City']='https://open.spotify.com/artist/07QEuhtrNmmZ0zEcqE9SF6'
 ##
 artists['Brian Eno']='https://open.spotify.com/artist/7MSUfLeTdDEoZiJPDSBXgi'
 ###
-artists['Becky G']='https://open.spotify.com/artist/4obzFoKoKRHIphyHzJ35G3'
+# artists['Becky G']='https://open.spotify.com/artist/4obzFoKoKRHIphyHzJ35G3'
 artists['Halsey']='https://open.spotify.com/artist/26VFTg2z8YR0cCuwLzESi2'
 artists['AURORA']='https://open.spotify.com/artist/1WgXqy2Dd70QQOU7Ay074N'
 artists['Selena Gomez']='https://open.spotify.com/artist/0C8ZW7ezQVs4URX5aX7Kqx'
@@ -51,10 +51,10 @@ artists['Billie Eilish']='https://open.spotify.com/artist/6qqNVTkY8uBg9cP3Jd7DAH
 artists['Lily Allen']='https://open.spotify.com/artist/13saZpZnCDWOI9D4IJhp1f'
 artists['Lana Del Rey']='https://open.spotify.com/artist/00FQb4jTyendYWaN8pK0wa'
 artists['Ariana Grande']='https://open.spotify.com/artist/66CXWjxzNUsdJxJ2JdwvnR'
-artists['INNA']='https://open.spotify.com/artist/2w9zwq3AktTeYYMuhMjju8'
+# artists['INNA']='https://open.spotify.com/artist/2w9zwq3AktTeYYMuhMjju8'
 artists['Lorde']='https://open.spotify.com/artist/163tK9Wjr9P9DmM0AVK7lm'
 artists['Melanie Martinez']='https://open.spotify.com/artist/63yrD80RY3RNEM2YDpUpO8'
-artists['Taylor Swift']='https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02'
+# artists['Taylor Swift']='https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02'
 artists['Dido']='https://open.spotify.com/artist/2mpeljBig2IXLXRAFO9AAs'
 artists['Carly Rae Jepsen']='https://open.spotify.com/artist/6sFIWsNpZYqfjUpaCgueju'
 ##
@@ -64,6 +64,6 @@ artists['Camila Cabello']='https://open.spotify.com/artist/4nDoRrQiYLoBzwC5BhVJz
 artists['Fifth Harmony']='https://open.spotify.com/artist/1l8Fu6IkuTP0U5QetQJ5Xt'
 ##
 # artists['']=''
-tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_ge=(spotify-discography-get) rt_eud=0 rt_eid=$((3600*24*14))" tmuxnewsh rss-spotify rss-tsend ${(@v)artists}
+tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_nt=y rt_ge=(spotify-discography-get) rt_eud=0 rt_eid=$((3600*24*14))" tmuxnewsh rss-spotify rss-tsend ${(@v)artists}
 ##
 chronic-all
