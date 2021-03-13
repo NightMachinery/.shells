@@ -84,6 +84,9 @@ function spotify-url-get-date() {
     local url="${1:?}" out_fmt="${spotify_url_get_date_fmt:-%Y-%B}"
 
     date="$(eval-memoi full-html2 "$url" | pup 'meta[property="music:release_date"] attr{content}')" || return $?
+    if [[ "$date" =~ '^\s*(\d\d\d\d)\s*$' ]] ; then
+        date="${match[1]}-1-1" # `gdate --date="2009"` parses wrongly
+    fi
     gdate --date="$date" "+$out_fmt"
 }
 function spotify-url-get-year() {
