@@ -68,6 +68,8 @@ function text2img() {
 
     # local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf" # monospace font by GNU that supports most languages, but quite ugly and unreadable.
     local font="Courier New" # See https://github.com/IranOpenFontGroup/Discussions/issues/7 for more Persian monospace fonts
+    local font2="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
+    test -e "$font2" && font="$font2"
     
     text2img.py $font "$@"
 }
@@ -78,10 +80,12 @@ function text-show() {
     icat $tmp
     rm $tmp
 }
+@opts-setprefix text-show text2img
 function ts() {
     # @nameconflict with moreutils' ts which adds timestamps to stdin
     reval "$@" | text-show
 }
+@opts-setprefix ts text2img
 ##
 function 2ico() {
     local i="${1}" o="${2:-${1:r}.ico}" s="${png2ico_size:-256}"

@@ -210,7 +210,11 @@ function h_@opts() {
         varname="${prefix}${varval}"
         varname="${varname//-/_}"
         unset "$varname"
-        setcmd="typeset -a ${varname}=( $(gq "$var2val[@]") )"
+        if (( ${#var2val} == 1 )) ; then
+            setcmd="local -x ${varname}=$(gq "$var2val[@]")"
+        else
+            setcmd="local -x -a ${varname}=( $(gq "$var2val[@]") )"
+        fi
         ecdbg "setcmd: $setcmd"
         eval "$setcmd" || {
             ecerr "$0: Assigning the key '$varval' failed. setcmd: $setcmd"$'\n'"Aborting."
@@ -239,17 +243,17 @@ function @opts-setprefixas () {
 }
 function opts-test1() {
     # typ path
-    typ "opts_test1_path"
+    typeset -p "opts_test1_path"
     ec "${opts_test1_extension:-${opts_test1_e:-default}}"
-    typ opts_test1_animal
+    typeset -p opts_test1_animal
     arger "$@"
 }
 @opts-setprefix opts-test2 lily
 function opts-test2() {
     # typ path
-    typ "lily_path"
+    typeset -p "lily_path"
     ec "${lily_extension:-${lily_e:-default}}"
-    typ lily_animal
+    typeset -p lily_animal
     arger "$@"
 }
 ##

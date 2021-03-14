@@ -96,20 +96,26 @@ function remj() {
 
     local text="$1"
     [[ "$text" == '-' ]] && text="$(</dev/stdin)"
+    local D=0 M=0 Y=0
     local day="${2:-$cday}"
 
-    [[ "$day" =~ '^\+(\d+)$' ]] && day=$(( cday + $match[1] ))
+    # [[ "$day" =~ '^\+(\d+)$' ]] && day=$(( cday + $match[1] ))
+    [[ "$day" =~ '^\+(\d+)$' ]] && { D="${match[1]}" ; day="${cday}" }
+
     # test -z "$day" && { ecerr "$0: empty first arg. Aborting." ; return 1 }
     typeset -Z2 day="$day"
     local month="${3:-$cmonth}"
-    [[ "$month" =~ '^\+(\d+)$' ]] && month=$(( cmonth + $match[1] )) # @BEWARE We do NOT support transfering >=25 values here to the year. Use `remn` for that!
+    # [[ "$month" =~ '^\+(\d+)$' ]] && month=$(( cmonth + $match[1] ))
+    [[ "$month" =~ '^\+(\d+)$' ]] && { M="${match[1]}" ; month="${cmonth}" }
     [[ "$month" =~ '^\d$' ]] && month="0$month"
     local year="${4}"
-    [[ "$year" =~ '^\+(\d+)$' ]] && year=$(( cyear + $match[1] ))
+    # [[ "$year" =~ '^\+(\d+)$' ]] && year=$(( cyear + $match[1] ))
+    [[ "$year" =~ '^\+(\d+)$' ]] && { Y="$match[1]" ; year="${cyear}" }
     [[ "$year" =~ '^\d$' ]] && year="140$year"
     [[ "$year" =~ '^\d\d$' ]] && year="14$year"
 
     if test -n "$year" ; then
+        # No longer complete (other increments can increase the year), but better than nothing? :D
         color 50 10 255 "Year set explicitly to $year"
     else
         year="$cyear"
@@ -121,7 +127,9 @@ function remj() {
         ecerr "$0: Invalid date: $target_date"
         return 1
     fi
-    # local gdate="$(gdate --date "$(jalalicli togregorian "$target_date")" +'%a %Y_%m_%d')"
+    local target_date_unix
+    target_date_unix="$(jalalicli togregorian "$target_date" -g unix -y "$Y" -m "$M" -d "$D")" || return $?
+    target_date="$(jalalicli tojalali "$target_date_unix" -g 'unix')" || return $?
     local gdate="$(jalalicli togregorian "$target_date" -g 'Mon 2006_01_02')"
     local dest="$remindayDir/$target_date $gdate"
     @opts datej "$target_date" @ reminday_store "$dest" "$text"
