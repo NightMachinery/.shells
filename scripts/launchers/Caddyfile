@@ -25,6 +25,9 @@ lilf.ir {
 }
 
 files.lilf.ir, http://:8080 {
+  basicauth /private/* scrypt {
+	Alice {env.GARDEN_HASHED0} {env.GARDEN_SALT0_B64}
+  }
   encode zstd gzip
   file_server browse {
     hide *..hidden..*
@@ -54,10 +57,8 @@ https://garden.lilf.ir {
 	Alice {env.GARDEN_HASHED0} {env.GARDEN_SALT0_B64}
   }
   encode zstd gzip
-  file_server /api/files/tmp/* browse {
-    hide *..hidden..*
-    root {env.HOME}/tmp
-  }
+
+  # file servers are a bit troublesome: https://caddy.community/t/cant-get-browseable-file-server-with-request-matcher-to-work-caddyfile/8055
   ## WebDAVs:
   # webdav /api/webdav/tmp/* {
   # root {env.HOME}/tmp
