@@ -90,7 +90,7 @@ function wallpaper-auto-bing() {
     {
         local dest="$(uuidm).jpg"
         reval-ec aa "$(bing-wallpaper-get)" -o "$dest"
-        reval-ec wallpaper-set "$(last-created)" || notif "$0: setting wallpaper returned $?"
+        reval-ec wallpaper-set "$(last-modified)" || notif "$0: setting wallpaper returned $?"
     } always { popf }
 }
 function wallpaper-auto-ipad() {
