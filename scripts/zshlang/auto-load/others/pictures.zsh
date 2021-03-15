@@ -131,3 +131,33 @@ function img-dimensions() {
   identify -format 'width=%wpx;height=%hpx;' "$1" # 2>/dev/null
 }
 ##
+function pad2square() {
+    # @alt convert-pad
+    local input="$1"
+    local o="${2:-${1:r}_padded.png}"
+    ensure-args input @MRET
+    [[ "$o" == *.png ]] || o+='.png'
+
+    convert "$input" \( +clone -rotate 90 +clone -mosaic +level-colors gray -transparent gray \) +swap -gravity center -composite "$o"
+}
+##
+function resize4ipad-fill() {
+    local input="$1"
+    local o="${2:-${1:r}_ipad.png}"
+    ensure-args input @MRET
+    [[ "$o" == *.png ]] || o+='.png'
+
+    local w=2048 h=2048
+    local size="${w}x${h}"
+    convert "$input" -resize "${size}^" -gravity center -extent "$size" "$o"
+}
+function resize4ipad-pad() {
+    local input="$1"
+    local o="${2:-${1:r}_ipad.png}"
+    ensure-args input @MRET
+    [[ "$o" == *.png ]] || o+='.png'
+
+    convert "$input" -resize 2048x $o
+    pad2square "$o" "$o"
+}
+##

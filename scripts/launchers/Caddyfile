@@ -54,22 +54,28 @@ https://garden.lilf.ir {
 	Alice {env.GARDEN_HASHED0} {env.GARDEN_SALT0_B64}
   }
   encode zstd gzip
-  webdav /api/webdav/tmp/* {
-  root {env.HOME}/tmp
-  prefix /api/webdav/tmp
+  file_server /api/files/tmp/* browse {
+    hide *..hidden..*
+    root {env.HOME}/tmp
   }
-  webdav /api/webdav/dl/* {
-  root {env.HOME}/Downloads
-  prefix /api/webdav/dl
-  }
-  webdav /api/webdav/notes/* {
-  root {env.HOME}/cellar/notes
-  prefix /api/webdav/notes
-  }
-  webdav /api/webdav/scripts/* {
-  root {env.HOME}/scripts
-  prefix /api/webdav/scripts
-  }
+  ## WebDAVs:
+  # webdav /api/webdav/tmp/* {
+  # root {env.HOME}/tmp
+  # prefix /api/webdav/tmp
+  # }
+  # webdav /api/webdav/dl/* {
+  # root {env.HOME}/Downloads
+  # prefix /api/webdav/dl
+  # }
+  # webdav /api/webdav/notes/* {
+  # root {env.HOME}/cellar/notes
+  # prefix /api/webdav/notes
+  # }
+  # webdav /api/webdav/scripts/* {
+  # root {env.HOME}/scripts
+  # prefix /api/webdav/scripts
+  # }
+  ##
   respond /api/hi/ "Hello Darkness My Old Friend!"
   #reverse_proxy /api/v1/* localhost:7230
   route /api/v1/* {
