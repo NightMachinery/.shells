@@ -31,3 +31,11 @@ function kill-withchildren() {
     done
 }
 ##
+function renice-me() {
+  renice -n "${1:-10}" $$
+}
+function nice-get() {
+  gnice
+  # ps -l -p "${1:-$$}"
+}
+##
