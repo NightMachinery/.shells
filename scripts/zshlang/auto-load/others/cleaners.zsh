@@ -38,5 +38,10 @@ function rm-caches-all() {
     rm-caches-sudo
     rm-caches
 }
-aliasfn cleanup rm-caches-all
+##
+function cleanup() {
+    isLocal && clean-deps
+    brew cleanup
+    rm-caches-all
+}
 ##
