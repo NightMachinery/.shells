@@ -70,9 +70,7 @@ function text2img() {
     if test -z "$font" ; then
         # local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf" # monospace font by GNU that supports most languages, but quite ugly and unreadable.
         local font="Courier New" # See https://github.com/IranOpenFontGroup/Discussions/issues/7 for more Persian monospace fonts
-        local font2="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
-        test -e "$font2" && font="$font2"
-        local font3="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf" # monospace
+        test -e "$Font_Symbola_CourierNew" && font="$Font_Symbola_CourierNew"
     fi
 
     text2img.py $font "$@"

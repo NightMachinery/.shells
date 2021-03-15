@@ -164,3 +164,10 @@ function open_command() {
   fi
 }
 ##
+function location-get-darwin() {
+	CoreLocationCLI -json | jq .
+}
+function location-get() {
+	# @darwinonly
+	location-get-darwin | jqm '.latitude, .longitude'
+}

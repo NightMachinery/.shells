@@ -5,6 +5,7 @@ cf-warp
 chalk-animation
 chalk-cli
 chance-cli
+chrome-remote-interface
 chrono-node
 cliflix
 commander
@@ -13,8 +14,10 @@ emma-cli
 emoji-finder
 empty-trash-cli
 fkill-cli
+fuzzyset
 get-stdin
 git+https://github.com/NightMachinary/readability-cli.git
+html-table-to-json
 html-to-text
 http-proxy-to-socks
 http-server
@@ -25,6 +28,8 @@ kitsu
 libgen
 moby
 moment
+node-fetch
+normalize-url
 npm-check
 npmlist
 oji
@@ -45,9 +50,3 @@ wikiquote-cli
 wikit
 youtube-dl-interactive
 zooqle
-normalize-url
-fuzzyset
-fuzzyset
-html-table-to-json
-chrome-remote-interface
-node-fetch

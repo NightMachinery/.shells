@@ -2,6 +2,9 @@ export LESS='-RiNF --mouse --wheel-lines=3' #F: --quit-if-one-screen ; R: mainta
 isSSH && LESS="-RiNF"
 export PAGER="$commands[less]"
 ##
+export Font_Symbola_CourierNew="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
+export Font_CourierNew_Symbola="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf" # monospace
+##
 # I also use in my own functions (e.g., `reval-onhold`), so let them be.
 # https://github.com/alexdelorenzo/onhold
 # https://github.com/alexdelorenzo/ding

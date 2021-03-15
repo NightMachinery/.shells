@@ -9,6 +9,8 @@ function crypto-prices() {
     btc="$(gurl 'https://api.coinbase.com/v2/prices/BTC-USD/spot' | jqm "\"BTC: \" + .data.amount")" || return $?
     eth="$(gurl 'https://api.coinbase.com/v2/prices/ETH-USD/spot' | jqm "\"ETH: \" + .data.amount")" || return $?
 
-    ec "$btc $eth"
+    # ec "$btc $eth"
+    ec "$btc"
+    ec "$eth"
 }
 aliasfn cryp crypto-prices

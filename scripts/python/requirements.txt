@@ -1,7 +1,9 @@
 PyPDF2
+catsql
 cloudscraper
 convertdate
 daudin
+ddgr
 dephell[full]
 ezgmail
 fanficfare
@@ -42,6 +44,7 @@ ocrmypdf
 opencv-python
 passlib[bcrypt,argon2,totp]
 pdfCropMargins
+peewee
 pexpect
 piep
 pipx
@@ -57,6 +60,7 @@ spotdl
 subliminal
 sumy
 syncer
+text2num
 tgcrypto
 tqdm
 waybackpack
@@ -65,8 +69,4 @@ wikiquotes
 xkcdpass
 yapf
 yq
-peewee
-catsql
 zxcvbn
-text2num
-ddgr

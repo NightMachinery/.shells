@@ -6,6 +6,7 @@ github.com/NightMachinary/prefixer
 github.com/Rican7/define
 github.com/acarl005/stripansi
 github.com/alecthomas/chroma/cmd/chroma
+github.com/ameshkov/dnslookup
 github.com/bitfield/script/
 github.com/caddyserver/xcaddy/cmd/xcaddy
 github.com/ciehanski/libgen-cli
@@ -20,4 +21,3 @@ github.com/olivere/iterm2-imagetools/cmd/imgls
 github.com/sethvargo/go-password/password
 github.com/tigrawap/slit/cmd/slit
 github.com/trashhalo/imgcat
-github.com/ameshkov/dnslookup
