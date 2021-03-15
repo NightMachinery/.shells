@@ -282,20 +282,42 @@ function gsync() {
     for remote in $remotes[@]
     do
       ec
-      reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit
-      reval-ec git pull "$remote" "$branch" --no-edit
+      if gr-isLocal "$remote" || isNet ; then
+        reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit
+        reval-ec git pull "$remote" "$branch" --no-edit
+      else
+        ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."
+      fi
       ec
     done
     for remote in $remotes[@]
     do
       ec
-      reval-ec git submodule foreach git push "$remote" "$branch"
-      reval-ec git push "$remote" "$branch"
+      if gr-isLocal "$remote" || isNet ; then
+        reval-ec git submodule foreach git push "$remote" "$branch"
+        reval-ec git push "$remote" "$branch"
+      else
+        ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."
+      fi
       ec
     done
   } always { popf }
 }
+##
+function gr-isLocal() {
+  local remote="${1:?}"
+
+  local url urls=()
+  urls=(${(@f)"$(git remote get-url "$remote")"}) || return $?
+  for url in ${urls[@]} ; do
+    if [[ "${url:l}" == *(127.0.0.1|localhost)* ]] ; then
+      return 0
+    fi
+  done
+  return 1
+}
 ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat }
+##
 guc() {
   mdoc "$0 [<how-many>=1]
 Undoes last commits without changing files." MAGIC

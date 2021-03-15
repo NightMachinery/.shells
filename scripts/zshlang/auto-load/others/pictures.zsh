@@ -121,15 +121,6 @@ function convert-pad() {
 }
 aliasfn img-fix-telegram convert-pad
 ##
-function touchbar-screenshot() {
-    local img="$(gmktemp --suffix png)"
-    screencapture -b "$img" || return 1 # -x for no sound
-    local imgp="$(gmktemp --suffix png)"
-    convert-pad "$img" "$imgp" || return 2
-    pbadd "$imgp"
-    bello
-}
-##
 function jiconpack() {
     jej
 

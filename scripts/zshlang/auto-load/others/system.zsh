@@ -117,7 +117,7 @@ function brightness-screen() {
 	local mode="${1:-1}"
 
 	local screen="$(gmktemp --suffix .png)"
-	screencapture -x "$screen" # @darwinonly
+	@opts silent y @ screenshot-all "$screen"
 	local screen_brightness="$(detect_brightness_mode=$mode detect_brightness.py $screen)"
 	command rm $screen
 	ec $screen_brightness

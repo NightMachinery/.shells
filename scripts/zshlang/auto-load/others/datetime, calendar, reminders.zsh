@@ -14,8 +14,17 @@ function rem-sync() {
     test -n "$nosync" || {
         ec $'\n'
         cellp
+        awaysh iwidget-rem-refresh
     }
 }
+function iwidget-rem-refresh() {
+        deus iwidget-rem # refresh the cache
+        if isLocal ; then
+            awaysh wallpaper-auto
+            brishzr awaysh deus iwidget-rem-refresh # refresh the cache
+        fi
+}
+##
 export remindayCDir="$cellar/remindersC"
 export remindayBakCDir="$HOME/tmp/remindersC_bak"
 alias withremc='remindayDir="$remindayCDir" remindayBakDir="$remindayBakCDir" '
@@ -155,12 +164,7 @@ function reminday_store() {
     fi
     ecn "$dest : " ; Bold ; color 100 200 255 "$text" ; resetcolor
     ##
-    test -n "$nosync" || {
-        : 'redundant check, as we check =nosync= in rem-sync as well'
-        rem-sync # to sync the reminders
-    }
-    awaysh deus iwidget-rem # refresh the cache
-    isLocal && brishzr awaysh deus iwidget-rem # refresh the cache
+    rem-sync
     rem_dest="$dest"
 }
 ##
