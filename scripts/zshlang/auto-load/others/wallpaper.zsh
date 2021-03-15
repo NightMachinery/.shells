@@ -40,7 +40,7 @@ function wallpaper-overlay() {
     rsync "$f" "$o" # ignores if same
 }
 function wallpaper-overlay-ipad() {
-    local f="$1" f_ipad="${2:-$HOME/tmp/ipad.png}"
+    local f="$1" f_ipad="${2:-$HOME/Downloads/private/ipad.png}"
     f="$(realpath "$f")" || return $?
 
     resize4ipad-fill "$f" $f_ipad @RET
@@ -68,7 +68,7 @@ function wallpaper-set() {
     local f="$1"
     f="$(realpath "$f")" || return $?
     ##
-    local ipad=y
+    local ipad=''
     if test -n "$ipad" ; then
         wallpaper-overlay-ipad "$f"
         # errors ignored
@@ -92,5 +92,8 @@ function wallpaper-auto-bing() {
         reval-ec aa "$(bing-wallpaper-get)" -o "$dest"
         reval-ec wallpaper-set "$(last-created)" || notif "$0: setting wallpaper returned $?"
     } always { popf }
+}
+function wallpaper-auto-ipad() {
+    fnswap wallpaper-set wallpaper-overlay-ipad wallpaper-auto
 }
 ##
