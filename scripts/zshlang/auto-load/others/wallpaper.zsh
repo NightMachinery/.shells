@@ -1,5 +1,5 @@
 function wallpaper-overlay() {
-    local input="$1" overlay_rem="y" overlay_weather=y
+    local input="$1" overlay_rem="y" overlay_weather="${wallpaper_overlay_weather:-y}"
     local o="${2:-${1:r}_overlay.png}"
     ensure-args input @MRET
     local rem_x="${wallpaper_overlay_rx:-160}"
@@ -10,7 +10,7 @@ function wallpaper-overlay() {
 
     local f
     f="$(realpath "$input")" || return $?
-    if test -n "$overlay_rem" ; then
+    if [[ "$overlay_rem" == y ]] ; then
         local t="$(gmktemp --suffix .png)"
         # https://stackoverflow.com/questions/66629425/pillow-how-to-draw-text-with-the-inverse-color-of-the-underlying-image
         local font="$Font_CourierNew_Symbola" # monospace
@@ -23,10 +23,10 @@ function wallpaper-overlay() {
                 ecerr "$0: Failed to overlay addons with $?"
             }
     fi
-    if test -n "$overlay_weather" ; then
+    if [[ "$overlay_weather" == (y|ipad) ]] ; then
         t="$(gmktemp --suffix .png)"
-        local loc='Sabzevar,Iran'
-        loc="$(location-get | prefixer -o , --skip-empty)"
+        local loc
+        loc="$(serr location-get | prefixer -o , --skip-empty)" || loc='Sabzevar,Iran'
         # https://wttr.in/:help
         gurl "wttr.in/${loc}_transparency=255_mQ0_lang=en.png" > "$t" && {
             #  -channel RGB -negate
@@ -45,8 +45,8 @@ function wallpaper-overlay-ipad() {
 
     resize4ipad-fill "$f" $f_ipad @RET
     # if resize4ipad "$f" $f_ipad ; then
-    if @opts rx 300 ry 330 rs 43 se_pos '+300+360' weather_pos '+300-0' @ wallpaper-overlay "$f_ipad" "$f_ipad" ; then
-        # isLocal && scpeva "$f_ipad" Downloads/private/"${f_ipad:t}" @RET
+    if @opts weather ipad rx 300 ry 330 rs 43 se_pos '+300+360' weather_pos '+300-0' @ wallpaper-overlay "$f_ipad" "$f_ipad" ; then
+        isLocal && scpeva "$f_ipad" Downloads/private/"${f_ipad:t}" @RET
     else
         ecerr "$0: resize4ipad exited $?"
         return 1
@@ -54,6 +54,7 @@ function wallpaper-overlay-ipad() {
 }
 ##
 function wallpaper-set-darwin() {
+    ensure isDarwin @MRET
     local f="$1"
     f="$(realpath "$f")" || return $?
     ###
@@ -70,6 +71,7 @@ function wallpaper-set() {
     local ipad=y
     if test -n "$ipad" ; then
         wallpaper-overlay-ipad "$f"
+        # errors ignored
     fi
     ##
     local t="$(gmktemp --suffix .png)"

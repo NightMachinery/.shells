@@ -165,6 +165,7 @@ function open_command() {
 }
 ##
 function location-get-darwin() {
+	ensure isDarwin @MRET
 	CoreLocationCLI -json | jq .
 }
 function location-get() {
