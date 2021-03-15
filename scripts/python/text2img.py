@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 ##
-# install: pip install --upgrade arabic-reshaper python-bidi Pillow numpy blend_modes
+# install: `pip install --upgrade arabic-reshaper python-bidi Pillow numpy blend_modes`
 # usage: echo <text> | text2img.py <font> <output>
 ##
 
@@ -121,7 +121,7 @@ if bold:
 
 draw.text((x, y), bidi_text, fill=(r, g, b), font=font, embedded_color=True)
 
-if imgA.any():
+if imgA is not None:
     imgB = numpy.array(image)
     imgB = imgB.astype(float)
     # imgOut = blend_modes.soft_light(imgA, imgB, 1.0)
