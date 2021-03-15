@@ -93,7 +93,7 @@ async def tsend(arguments):
             if arguments['--parse-mode'] == 'html':
                 arguments['<message>'] = re.sub(r"(<(br|p)\s*/?>)", r'\1' + '\n', arguments['<message>'])
 
-            await discreet_send(client, p2int(arguments['<receiver>']), arguments['<message>'], file=arguments['--file'], force_document=arguments['--force-document'], parse_mode=arguments['--parse-mode'], link_preview=arguments['--link-preview'])
+            await discreet_send(client, p2int(arguments['<receiver>']), arguments['<message>'], file=(arguments['--file'] or None), force_document=arguments['--force-document'], parse_mode=arguments['--parse-mode'], link_preview=arguments['--link-preview'])
 
 def parse_tsend(argv):
     return docopt(__doc__, version='telegram-send 0.1', argv=argv)
