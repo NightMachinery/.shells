@@ -7,8 +7,11 @@ alias -g ......='../../../../..'
 alias -g @f=' | inargsf '
 alias -g @ff=' | fz | inargsf '
 alias -g @w=' | fzinw '
+##
 # alias -g MAGIC='| { eval "$(read -d "" -r -E)" }'
 alias -g MAGIC='| { eval "$(< /dev/stdin)" }'
+alias -g '@RET'=' || return $?'
+alias -g '@MRET'='"$0" || return $?'
 ##
 function magic_h() {
     : 'Usage: magic ... ; mret'

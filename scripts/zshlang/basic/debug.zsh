@@ -95,3 +95,52 @@ function dbgserr() {
         reval serr "${cmd[@]}"
     fi
 }
+##
+function ensure() {
+    local msg="${ensure_msg:-$ensure_m}"
+    local caller cmd
+    if (( $#@ == 0 )) ; then
+        ecerr "$0: called with no arguments."
+        return 1
+    fi
+    if (( $#@ == 1 )) ; then
+        cmd="$1"
+        caller="$cmd"
+    else
+        caller="${@[-1]}" cmd=("${@[1,-2]}")
+    fi
+    reval "$cmd[@]" && return 0
+    local ret=$?
+    test -z "$msg" && msg="$(ecalternate "$cmd[@]") (exited $ret)"
+    ##
+    ecerr "$caller: $msg"
+    # ecerr "$caller: Failed $ret: $(gq "$cmd[@]")"
+    # ecerr "$caller: Failed $ret"$'\n    '"$(gq "$cmd[@]")"
+    ##
+    return $ret
+}
+function ensure-args() {
+    if (( $#@ <= 1 )) ; then
+        ecerr "$0: not enough arguments."
+        return 1
+    fi
+    local caller="${@[-1]}" args=("${@[1,-2]}")
+
+    local arg ret=0
+    for arg in "$args[@]" ; do
+        if test -z "${(P)arg}" ; then
+            ecerr "$caller: argument '$arg' is empty."
+            ret=1
+        fi
+    done
+    return $ret
+}
+function ensure-net() {
+    local ensure_msg="No internet access"
+    ensure isNet "$@"
+#     if ! isNet ; then
+#         ecerr "${1:-$0}: $ensure_msg"
+#         return 1
+#     fi
+}
+##

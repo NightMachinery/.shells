@@ -16,6 +16,7 @@ function brishz() {
 }
 aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1 # bsh eval remote
 function brishzr() {
+    ensure-net "$0" || return $?
     if isLilf ; then
         reval "$@"
     else

@@ -26,7 +26,7 @@ function wallpaper-auto() {
     wallpaper-auto-bing
 }
 function wallpaper-auto-bing() {
-    isNet || return 1
+    ensure-net @MRET
 
     pushf ~/Pictures/wallpapers/bing
     {

@@ -305,7 +305,8 @@ function gsync() {
 }
 ##
 function gr-isLocal() {
-  local remote="${1:?}"
+  local remote="${1}"
+  ensure-args remote @MRET
 
   local url urls=()
   urls=(${(@f)"$(git remote get-url "$remote")"}) || return $?

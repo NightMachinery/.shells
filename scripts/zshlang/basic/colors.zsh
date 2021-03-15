@@ -102,6 +102,10 @@ ecrainbow() { ecrainbow-n "$@" ; echo }
 ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
 ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
 ecalternate() {
+    if ! isI ; then
+        ec "$(gq "$@")"
+        return 0
+    fi
     (($#)) || { resetcolor ; echo ; return 0 }
     ecalt1 "$1"
     shift 1
