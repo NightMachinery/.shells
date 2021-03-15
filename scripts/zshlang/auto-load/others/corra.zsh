@@ -5,7 +5,7 @@ scpeva() {
     (( $#@ >= 2 )) || return 1
     ensure-net @MRET
     local files=(${@[1,-2]}) o="${@[-1]}"
-    ensure-args f o @MRET
+    ensure-args files o @MRET
 
     scp -r "$files[@]" eva@82.102.11.148:/home/eva/"$o"
 }

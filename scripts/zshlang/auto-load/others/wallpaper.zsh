@@ -46,8 +46,7 @@ function wallpaper-overlay-ipad() {
     resize4ipad-fill "$f" $f_ipad @RET
     # if resize4ipad "$f" $f_ipad ; then
     if @opts rx 300 ry 330 rs 43 se_pos '+300+360' weather_pos '+300-0' @ wallpaper-overlay "$f_ipad" "$f_ipad" ; then
-        # @todo0
-        scpeva "$f_ipad" Downloads/private/"${f_ipad:t}" @RET
+        # isLocal && scpeva "$f_ipad" Downloads/private/"${f_ipad:t}" @RET
     else
         ecerr "$0: resize4ipad exited $?"
         return 1
