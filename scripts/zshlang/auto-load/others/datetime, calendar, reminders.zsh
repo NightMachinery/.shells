@@ -42,7 +42,8 @@ function rem-comingup() {
 
     for i in {1..31} ; do
         pre="$i day(s) later:"
-        out+="$(prefix-if-ne $'\n\n'"$pre"$'\n' "$(rem-today-d "$i" | prefixer -a '  ')")"
+        # bidi chars: https://www.w3.org/International/questions/qa-bidi-unicode-controls.en
+        out+="$(prefix-if-ne $'\n\n'"$pre"$'\n' "$(rem-today-d "$i" | prefixer --skip-empty -a $'\U202A''  ' --add-postfix $'\U202C')")"
     done
 
     # out="$(prefix-if-ne "Coming up:"$'\n' "$out")"
