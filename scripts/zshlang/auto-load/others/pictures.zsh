@@ -66,18 +66,22 @@ function text2img() {
     # @alt https://xg4.github.io/text2image/ does support Persian seemingly, but not completely?
     # @alt @good https://vincent7128.github.io/text-image/ seems to work as well as text2img.py with Persian, but it can also size the output image automatically.
 
-    # local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf" # monospace font by GNU that supports most languages, but quite ugly and unreadable.
-    local font="Courier New" # See https://github.com/IranOpenFontGroup/Discussions/issues/7 for more Persian monospace fonts
-    local font2="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
-    test -e "$font2" && font="$font2"
-    
+    local font="${text2img_font}"
+    if test -z "$font" ; then
+        # local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf" # monospace font by GNU that supports most languages, but quite ugly and unreadable.
+        local font="Courier New" # See https://github.com/IranOpenFontGroup/Discussions/issues/7 for more Persian monospace fonts
+        local font2="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
+        test -e "$font2" && font="$font2"
+        local font3="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf" # monospace
+    fi
+
     text2img.py $font "$@"
 }
 function text-show() {
     local tmp="$(gmktemp --suffix .png)"
 
     text2img $tmp
-    icat $tmp
+    icat-realsize $tmp
     rm $tmp
 }
 @opts-setprefix text-show text2img

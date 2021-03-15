@@ -5,9 +5,11 @@ aliasfn ils-it ~/.iterm2/imgls
 ## https://github.com/olivere/iterm2-imagetools
 function icat-go() {
     isI || return 0
-    local h="${icat_go_height:-${icat_go_h:-600}}"
-    
-    "$GOBIN/imgcat" -height ${h}px "$@" # This will zoom, too, but that's actually good in most cases!
+    local h="${icat_go_height:-${icat_go_h:-1300}}"
+
+    local opts=()
+    [[ "$h" == x ]] || opts+=(-height ${h}px) # This will zoom, too, but that's actually good in most cases!
+    "$GOBIN/imgcat" "$opts[@]" "$@"
 }
 function ils() {
     isI || { exa -a ; return 0 }
@@ -23,6 +25,10 @@ aliasfn icat-kitty kitty +kitten icat
 aliasfn icat-kitty2 pixcat fit-screen --enlarge --vertical-margin 60 # accepts dirs, too
 aliasfn islideshow-kitty icat-kitty2 --hang # press ENTER to go to next image
 ##
+function icat-realsize() {
+    isI || return 0
+    @opts h x @ icat-go "$@"
+}
 function icat() {
     isI || return 0
     if isKitty ; then

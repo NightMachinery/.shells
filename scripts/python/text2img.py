@@ -35,7 +35,7 @@ imageIn = None
 if len(sys.argv) >= 4:
     imageIn = sys.argv[3]
 ###
-s = int(os.environ.get("text2img_s", 33))
+s = int(os.environ.get("text2img_s", 40))
 font = ImageFont.truetype(fontFile, s, encoding='unic', layout_engine=ImageFont.LAYOUT_RAQM)
 ##
 # `encoding=...` might not be necessary (idk what it does)
@@ -57,12 +57,30 @@ if imageIn:
     imgA = imgA.astype(float)
     image = Image.new("RGBA", (image.size[0], image.size[1]), (0, 0, 255, 0))
 else:
-    w = int(os.environ.get("text2img_w", 1400))
-    h = int(os.environ.get("text2img_h", 600))
+    ##
+    # ascent, descent = font.getmetrics()
+    # # w, h = font.getsize('A') # does not understand newlines
+    # (w, h), (offset_x, offset_y) = font.font.getsize(text)
+    # lines = text.split("\n")
+    # # h = (len(lines))*(ascent-offset_y+descent/2)
+    # w = 100
+    # for line in lines:
+    #     # print(f"line's size: {font.getsize(line)}")
+    #     w = max(w, font.getsize(line)[0])
+    ##
+    # Determine text size using a scratch image.
+    image = Image.new("RGBA", (1,1))
+    draw = ImageDraw.Draw(image)
+    textsize = draw.textsize(text, font)
+    w, h = textsize
+    ##
+    w = int(os.environ.get("text2img_w", w or 1400))
+    h = int(os.environ.get("text2img_h", h or 700))
     bgr = int(os.environ.get("text2img_bgr", 255))
     bgg = int(os.environ.get("text2img_bgg", 255))
     bgb = int(os.environ.get("text2img_bgb", 255))
-    image = Image.new("RGB", (w, h), (bgr, bgg, bgb))
+    bga = int(os.environ.get("text2img_bga", 0))
+    image = Image.new("RGBA", (w, h), (bgr, bgg, bgb, bga))
 
 # first you must prepare your text (you dont need this step for english text)
 reshaped_text = arabic_reshaper.reshape(text)    # correct its shape

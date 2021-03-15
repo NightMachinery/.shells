@@ -5,7 +5,8 @@ function wallpaper-set-darwin() {
     if test -n "$add_on" ; then
         local t="$(gmktemp --suffix .png)"
         # https://stackoverflow.com/questions/66629425/pillow-how-to-draw-text-with-the-inverse-color-of-the-underlying-image
-        iwidget-rem | @opts r 255 g 255 b 255 x 160 y 60 s 43 bold 1 @ text2img "$t" "$f" && f="$t" || {
+        local font="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf" # monospace
+        iwidget-rem | @opts r 255 g 255 b 255 x 160 y 60 s 43 bold 1 font "$font" @ text2img "$t" "$f" && f="$t" || {
                 ecerr "$0: Failed to overlay addons with $?"
             }
     fi
