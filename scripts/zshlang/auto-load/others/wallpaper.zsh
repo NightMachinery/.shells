@@ -1,7 +1,3 @@
-function weather-short() {
-    curl -s 'wttr.in/{'سبزوار'}?format=%l:+%C+%t+%h+%w+%m+%M+%p&m' @RET
-    ec
-}
 function wallpaper-set-darwin() {
     local f="$1" overlay_rem="y" overlay_weather=y
     f="$(realpath "$f")" || return $?
@@ -14,7 +10,7 @@ function wallpaper-set-darwin() {
             # ec "$(datej-all)"$'\t'"$(weather-short)"
             # @opts key "$(date '+%Y/%m/%d')" @ memoi-eval rem-summary
             # weather-short
-            iwidget-rem
+            datej_all_mode=1 iwidget-rem
         } | @opts r 255 g 255 b 255 x 160 y 60 s 43 bold 1 font "$font" @ text2img "$t" "$f" && f="$t" || {
                 ecerr "$0: Failed to overlay addons with $?"
             }
