@@ -33,6 +33,8 @@ function alicedate() {
         remj "$0, $(hostname), $(dateshort): cellp failed with $?: $log"
     }
     tlg-reminday "$alice"
+    isServer && ensure wallpaper-auto-ipad @MRET
+    true
 }
 ##
 function hb265-tlg() {

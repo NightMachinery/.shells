@@ -50,7 +50,14 @@ function last-exa() {
     fi
     ec "$rs"
 }
-alias last-created='last-exa created'
+function last-created() {
+    if isDarwin ; then
+        last-exa created
+    else
+        ecerr "$0: creation time is not supported on Linux. Using mod date instead."
+        last-modified
+    fi
+}
 alias last-accessed='last-exa accessed'
 alias last-modified='last-exa modified'
 alias last-added='ls-by-added |head -n1' #macOS only
