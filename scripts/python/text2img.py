@@ -15,7 +15,7 @@ from PIL import ImageFont
 from PIL import Image
 from PIL import ImageDraw
 import numpy
-import blend_modes
+import blend_modes # @alt https://github.com/akiomik/pilgram
 
 try:
     from IPython import embed

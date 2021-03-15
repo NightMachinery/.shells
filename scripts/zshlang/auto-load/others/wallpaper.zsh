@@ -21,6 +21,9 @@ function wallpaper-set() {
     wallpaper-set-darwin "$@"
 }
 ##
+function wallpaper-auto() {
+    wallpaper-auto-bing
+}
 function wallpaper-auto-bing() {
     isNet || return 1
 
