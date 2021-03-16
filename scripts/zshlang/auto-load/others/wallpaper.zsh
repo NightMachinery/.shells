@@ -4,7 +4,8 @@ function wallpaper-overlay() {
     ensure-args input @MRET
     local rem_x="${wallpaper_overlay_rx:-160}"
     local rem_y="${wallpaper_overlay_ry:-60}"
-    local rem_s="${wallpaper_overlay_rs:-43}"
+    local rem_s="${wallpaper_overlay_rs:-38}"
+    local rem_fold="${wallpaper_overlay_rfold:-64}"
     local se_pos="${wallpaper_overlay_se_pos:-+200+70}"
     local weather_pos="${wallpaper_overlay_weather_pos:-+170+0}"
     local weather_s="${wallpaper_overlay_weather_s:-400}"
@@ -23,7 +24,7 @@ function wallpaper-overlay() {
                 # @opts key "$(date '+%Y/%m/%d')" @ memoi-eval rem-summary
                 # weather-short
                 datej_all_mode=1 iwidget-rem
-            } | @opts r 255 g 255 b 255 x $rem_x y $rem_y s $rem_s bold 1 font "$font" @ text2img "$t" "$f" && f="$t" || {
+            } | gfold -w "$rem_fold" | @opts r 255 g 255 b 255 x $rem_x y $rem_y s $rem_s bold 1 font "$font" @ text2img "$t" "$f" && f="$t" || {
                     ecerr "$0: Failed to overlay addons with $?"
                 }
         fi
