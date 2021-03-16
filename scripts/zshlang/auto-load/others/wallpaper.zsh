@@ -7,6 +7,7 @@ function wallpaper-overlay() {
     local rem_s="${wallpaper_overlay_rs:-43}"
     local se_pos="${wallpaper_overlay_se_pos:-+200+70}"
     local weather_pos="${wallpaper_overlay_weather_pos:-+170+0}"
+    local weather_s="${wallpaper_overlay_weather_s:-400}"
 
     local f
     f="$(realpath "$input")" || return $?
@@ -34,7 +35,7 @@ function wallpaper-overlay() {
             gurl "wttr.in/${loc}_transparency=255_mQ0_lang=en.png" > "$t" && {
                 #  -channel RGB -negate
                 # dark: plus > negate > screen; overlay, lighten, diff, add are very bad
-                convert \( "$f" \( -background none -font "$font" -pointsize 30 -fill 'rgba(0,255,0,255)' label:"$(crypto-prices)" \) -gravity southeast -geometry $se_pos -compose plus -composite \) \( "$t" -channel RGB -resize 400x \) -gravity east -geometry $weather_pos -compose plus -composite "$t" && f="$t"
+                convert \( "$f" \( -background none -font "$font" -pointsize 30 -fill 'rgba(0,255,0,255)' label:"$(crypto-prices)" \) -gravity southeast -geometry $se_pos -compose plus -composite \) \( "$t" -channel RGB -resize "${weather_s}x" \) -gravity east -geometry $weather_pos -compose plus -composite "$t" && f="$t"
                 # box the text: `-bordercolor 'rgba(0,0,255,100)' -border 1`
                 # bolden the text: `-stroke 'rgba(0,255,0,255)' -strokewidth 2`
             }
@@ -52,7 +53,7 @@ function wallpaper-overlay-ipad() {
 
     ensure resize4ipad-fill "$f" $f_ipad @MRET
     # if resize4ipad "$f" $f_ipad ; then
-    if @opts weather ipad rx 300 ry 330 rs 43 se_pos '+300+360' weather_pos '+300-0' @ wallpaper-overlay "$f_ipad" "$f_ipad" ; then
+    if @opts rx 300 ry 330 rs 43 se_pos '+300+360' weather ipad weather_s 700 weather_pos '+300-0' @ wallpaper-overlay "$f_ipad" "$f_ipad" ; then
         isLocal && { scpeva "$f_ipad" Downloads/private/"${f_ipad:t}" @RET }
         true
     else
@@ -102,6 +103,7 @@ function wallpaper-auto-bing() {
     } always { popf }
 }
 function wallpaper-auto-ipad() {
+    # takes ~9 minutes on eva
     fnswap wallpaper-set wallpaper-overlay-ipad wallpaper-auto
 }
 ##

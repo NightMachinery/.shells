@@ -26,7 +26,8 @@ function iwidget-rem-refresh() {
 }
 ##
 export remindayCDir="$cellar/remindersC"
-export remindayBakCDir="$HOME/tmp/remindersC_bak"
+export remindayBakCDir="$cellar/remindersC_bak" # moving these to a local location will cause one server to lose out on it.
+# export remindayBakCDir="$HOME/tmp/remindersC_bak"
 alias withremc='remindayDir="$remindayCDir" remindayBakDir="$remindayBakCDir" '
 
 aliasfn remcnd withremc remnd
