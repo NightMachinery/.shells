@@ -1,5 +1,8 @@
-function rtl-reshaper() {
+function rtl-reshaper-py() {
     rtl_reshaper.py "$@"
+}
+function rtl-reshaper() {
+    rtl_reshaper_rs "$@"
 }
 function reval-rtl() {
     reval "$@" | rtl-reshaper

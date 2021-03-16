@@ -1,13 +1,14 @@
 ### Vars
+# FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.py'
+FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper_rs'
 ##
-FZF_SIMPLE_PREVIEW='printf -- "%s " {}'
+FZF_SIMPLE_PREVIEW="$FZF_RTL_PREVIEW"
+# FZF_SIMPLE_PREVIEW='printf -- "%s " {}'
 # fzf supports wrapping itself. # | command fold -s -w $FZF_PREVIEW_COLUMNS'
 # << was bad for dash, no <<< in dash
 ##
-FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.py'
-##
 # FZF_PREVIEW_NTAG="brishz_in={} brishzq.zsh ntag-color"
-FZF_PREVIEW_NTAG='printf -- "%s " {} | ntagcolor'
+FZF_PREVIEW_NTAG="$FZF_SIMPLE_PREVIEW | ntagcolor"
 ##
 ### Functions
 aliasfn fz-grep fz --no-sort --filter #Filter mode. Do not start interactive finder. When used with  --no-sort,  fzf becomes  a fuzzy-version of grep. # Just fz -f if you don't want the nosort.

@@ -302,9 +302,10 @@ function ntsearch_() {
         # https://metacpan.org/pod/Text::ANSI::WideUtil
         ##
         ##
-        # https://github.com/junegunn/fzf/issues/2373 preview header
+        # @todo1 https://github.com/junegunn/fzf/issues/2373 preview header
         # remove `:+{2}-5` from preview-window and use mode=0 to revert to the previous behavior
         previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) 1 || printf -- \"\n\n%s \" {}"
+        # @todo1 adding ` | rtl_reshaper_rs` works fine if RTL text is not colored, it seems. It's best if ntom does the reshaping itself ...
         ##
         # previewcode="cat $(gq $nightNotes)/{1} || printf -- error5"
     fi

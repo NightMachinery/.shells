@@ -392,7 +392,7 @@ omz_termsupport_precmd () {
 }
 precmd_functions+=(omz_termsupport_precmd)
 prompt_pure_set_title() true # disables pure setting the title
-##
+###
 # https://stackoverflow.com/a/14634437/1410221
 function per2en-buffer() {
   out=en
@@ -405,8 +405,25 @@ function per2en-buffer() {
     out=per
   fi
 }
+##
+function cmd-modifier-rtl() {
+  # @bug pollutes history
+  # @warn `sbb | rtl...` redirects the stdout so you'll lose your normal stdout
+  # @warn the piping forks the process and so you can no longer affect the main shell's state.
+  if ! [[ "${BUFFER}" =~ ';\s*$' || "${BUFFER}" == *(rtl-off|rtl_reshaper_rs)* ]] ; then
+    BUFFER+=" | rtl_reshaper_rs"
+  fi
+}
+function rtl-on() {
+  CM_RTL_MODE=y
+}
+function rtl-off() {
+  CM_RTL_MODE=''
+}
+##
 function cmd-modifier {
   per2en-buffer
+  test -n "$CM_RTL_MODE" && cmd-modifier-rtl
   zle accept-line
 }
 zle -N cmd-modifier-widget  cmd-modifier
@@ -420,6 +437,7 @@ function cmd-modifier-off {
 }
 cmd-modifier-on
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=cmd-modifier-widget
+###
 ## https://github.com/zsh-users/zsh-autosuggestions/issues/351
 # This speeds up pasting w/ autosuggest
 # https://github.com/zsh-users/zsh-autosuggestions/issues/238

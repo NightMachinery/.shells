@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+## Alternatives:
+# https://github.com/NightMachinary/rtl_reshaper_rs
+# https://github.com/Naheel-Azawy/c-arabic-reshaper
+##
 
 import arabic_reshaper
 import sys
