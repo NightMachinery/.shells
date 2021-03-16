@@ -29,7 +29,9 @@ isLinux && ln -s "$(rp sed)" ~/bin/gsed
 ## blcs
 # blc tag-ag tag tag-ag
 ##
-if isDarwin ; then
-    lnrp "$NIGHTDIR/symlinkme/.gitconfig" ~/.gitconfig
+if isLocal ; then
+    lnrp "$NIGHTDIR/symlinkme/local/.gitconfig" ~/.gitconfig
+else
+    lnrp "$NIGHTDIR/symlinkme/servers/.gitconfig" ~/.gitconfig
 fi
 ##
