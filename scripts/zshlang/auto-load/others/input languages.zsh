@@ -131,13 +131,13 @@ function input-lang-get-darwin() {
     ## hammerspoon is quite fast:
     # `hyperfine --warmup 5 "hs -c 'hs.keycodes.currentSourceID()'" "xkbswitch -ge" "input_lang_get_objc"` 28ms vs 71ms
     ##
-    if [[ "$(hammerspoon -A -c 'hs.keycodes.currentSourceID()')" =~ 'com.apple.keylayout\.(.*)' ]] ; then
+    if false && [[ "$(hammerspoon -A -c 'hs.keycodes.currentSourceID()')" =~ 'com.apple.keylayout\.(.*)' ]] ; then
         ec "${match[1]}"
     else
-        # @fatal this API is very slow in Big Sur (or sth else is breaking it, who knows)
-        # input_lang_get_objc # @alt: `xkbswitch -ge`
+        # @warn this macOS API has an unknown bug that can cause it to be very slow
+        gtimeout --signal=9 0.2s input_lang_get_objc || input-lang-get-darwin-old
+        # @alt: `xkbswitch -ge`
         ##
-        input-lang-get-darwin-old
     fi
 }
 function input-lang-get-fast() {

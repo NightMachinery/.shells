@@ -144,6 +144,9 @@ function init-vfiles() {
 }
 aliasfn vinit init-vfiles yes
 function v() {
+    local q="$* "
+    # local q="$(fz-createquery "$@")"
+
     local emacs_root=~/.emacs.d.doom/.local # normal emacs doesn't have this .local part
     local emacs_recent="$emacs_root/.cache/recentf"
     : GLOBAL vfiles
@@ -180,7 +183,7 @@ function v() {
     # %Y     time of last data modification, seconds since Epoch
     # reing gstat is needed if the files get too numerous, but then things will be too slow
     files=( ${(0@)"$(gstat  --printf='%040.18Y:%n\0' "${(@)files:|excluded}" | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"} ${(@)excluded} ) #Don't quote this there is always a final empty element
-    files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$*")"} ) || return 1
+    files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$q")"} ) || return 1
     local ve="$ve"
     reval "${veditor[@]}" "${(@)files}"
 }
@@ -203,6 +206,9 @@ function vp-ls() {
 }
 function vp() {
     # v pdf
-    vp-ls | fz | inargsf re open
+    local q="$* "
+    # local q="$(fz-createquery "$@")"
+
+    vp-ls | fz-rtl --query "$q" | inargsf chrome-open-pdf
 }
 ##

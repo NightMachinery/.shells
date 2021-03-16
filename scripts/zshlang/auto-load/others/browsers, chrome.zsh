@@ -47,3 +47,31 @@ function browser-current-url() {
     chrome-cli info | rget 'Url:\s+(.*)'
 }
 ##
+function chrome-open-file() {
+    ensure isDarwin @MRET # @darwinonly
+    local f="$1"
+    ensure-args f @MRET
+    shift
+    ##
+    revaldbg chrome-cli open "file://$(realpath "$f")" "$@"
+    ##
+    # open -a "/Applications/Google Chrome.app" "$@"
+    ##
+}
+function chrome-open-pdf() {
+    ensure isDarwin @MRET # @darwinonly
+    local f="$1"
+    ensure-args f @MRET
+
+    local w opts=() specialWindow=''
+    if test -n "$specialWindow" ; then
+        if w="$(chrome-cli list windows | rg '.pdf' | rget '^\s*\[(\d+)\]')" ; then
+            opts+=(-w "$w")
+        else
+            opts+=(-n) # new window
+        fi
+    fi
+    chrome-open-file "$f" "$opts[@]"
+}
+reify chrome-open-pdf
+##

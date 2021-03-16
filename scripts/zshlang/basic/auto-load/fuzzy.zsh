@@ -3,7 +3,9 @@
 FZF_SIMPLE_PREVIEW='printf -- "%s " {}'
 # fzf supports wrapping itself. # | command fold -s -w $FZF_PREVIEW_COLUMNS'
 # << was bad for dash, no <<< in dash
-
+##
+FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.py'
+##
 # FZF_PREVIEW_NTAG="brishz_in={} brishzq.zsh ntag-color"
 FZF_PREVIEW_NTAG='printf -- "%s " {} | ntagcolor'
 ##
@@ -19,7 +21,7 @@ function fz() {
     opts=(${(@)fz_opts} --exit-0) #Don't quote it or it'll insert empty args
     # --exit-0 : By using this we'll lose the automatic streaming feature of fzf as we need to wait for the whole input. (Update: It doesn't seem that the streaming feature is useful at all, as it doesn't show anything until completion in my tests ...)
     # --select-1 : auto-selects if only one match
-    test -n "$fz_no_preview" || opts+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window down:7:wrap:hidden)
+    test -n "$fz_no_preview" || opts+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window up:7:wrap:nohidden:nocycle)
 
     local cmdbody=( "${(@)opts}" "$@" )
     if test -z "$emptyMode" ; then

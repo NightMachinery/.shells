@@ -91,7 +91,7 @@ function chis() {
         local i
         for i in ${(@f)links}
         do
-            open "$i"
+            chrome-open "$i"
         done
     }
 }

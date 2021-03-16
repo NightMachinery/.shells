@@ -7,7 +7,7 @@ cp() {
 ##
 _h_mv() {
     local emd_c='command mv'
-    if isI ; then
+    if isI && isRcLoaded ; then
         emd_c='mv-merge'
         color 170 170 170 "mv: using mv-merge instead"
     fi

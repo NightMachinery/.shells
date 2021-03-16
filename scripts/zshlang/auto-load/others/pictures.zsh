@@ -83,11 +83,10 @@ function text-show() {
     rm $tmp
 }
 @opts-setprefix text-show text2img
-function ts() {
-    # @nameconflict with moreutils' ts which adds timestamps to stdin
+function reval-ts() {
     reval "$@" | text-show
 }
-@opts-setprefix ts text2img
+@opts-setprefix reval-ts text2img
 ##
 function 2ico() {
     local i="${1}" o="${2:-${1:r}.ico}" s="${png2ico_size:-256}"

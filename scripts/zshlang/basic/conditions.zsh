@@ -72,6 +72,9 @@ function isInTty() {
 ##
 alias isExpensive='[[ -z "$NIGHT_NO_EXPENSIVE" ]]'
 alias isNotExpensive='[[ -n "$NIGHT_NO_EXPENSIVE" ]]'
+function isRcLoaded() {
+    test -n "$rcLoaded"
+}
 ##
 function isDbg() {
     test -n "$DEBUGME"
@@ -83,7 +86,13 @@ function isNotDbg() {
 ##
 isNet() {
     # wget -q --spider http://google.com
-    
-    ping -q -c 1 -W 1 8.8.8.8 &>/dev/null
+    ##
+    if isDarwin ; then
+        ping -q -c 1 -W 400 8.8.8.8 &>/dev/null
+        # -W waittime in ms
+    else
+        ping -q -c 1 -W 1 8.8.8.8 &>/dev/null
+        # -W waittime in s
+    fi
 }
 ##

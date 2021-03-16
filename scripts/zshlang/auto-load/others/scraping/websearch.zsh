@@ -69,7 +69,7 @@ function ffgoo() {
     local search="$(search_json_count="$count" $memoi_cmd search-json "$query")"
     local is i
     if isI ; then
-        is=("${(@f)$(<<<$search jq -re '.[] | .title + ": " + (.abstract |= gsub("\\n";" ")).abstract + (if .metadata then " (" + (.metadata) + ")" else "" end + " " + .url)' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap --with-nth 2.. "$fz_query" | {
+        is=("${(@f)$(<<<$search jq -re '.[] | .title + ": " + (.abstract |= gsub("\\n";" ")).abstract + (if .metadata then " (" + (.metadata) + ")" else "" end + " " + .url)' |cat -n | SHELL=dash $fzf_cmd --multi --preview 'printf -- "%s " {}' --preview-window up:7:wrap:nohidden --with-nth 2.. "$fz_query" | {
       awk '{print $1}'
 } )}") || return 1
     else
