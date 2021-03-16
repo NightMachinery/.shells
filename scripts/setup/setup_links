@@ -28,3 +28,8 @@ isLinux && ln -s "$(rp sed)" ~/bin/gsed
 
 ## blcs
 # blc tag-ag tag tag-ag
+##
+if isDarwin ; then
+    lnrp "$NIGHTDIR/symlinkme/.gitconfig" ~/.gitconfig
+fi
+##
