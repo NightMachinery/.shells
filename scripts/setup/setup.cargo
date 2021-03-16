@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 rustup component add rust-src
 ###
+# @workaround `CARGO_NET_GIT_FETCH_WITH_CLI=true` uses git binary to fetch
 #cargo install --git https://github.com/nightmachinary/tlrl
 cargo install --git https://github.com/NightMachinary/rmprefix
 cargo install --git https://github.com/NightMachinary/input_lang_get_icon
