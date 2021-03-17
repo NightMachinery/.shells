@@ -12,8 +12,8 @@ function hs-popclick-btt-refresh() {
 function hs-popclickBttGet() {
     local lis
     lis="$(serr hammerspoon -c 'popclickBttGet()')" || {
-        # ecerr "$0: could not get value from hammerspoon"
-        # return 1
+        ecerr "$0: could not get value from hammerspoon"
+        return 1
         ##
         lis=''
     }

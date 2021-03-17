@@ -32,3 +32,11 @@ alias pdn='p-double-newlines'
 function rget() {
     command rg --text --smart-case --only-matching --replace '$1' "$@"
 }
+##
+function text-wrap() {
+    local w="${1:-90}"
+
+    command ggrep -Eo ".{1,$w}" # unicode-safe
+}
+aliasfn foldm text-wrap
+##

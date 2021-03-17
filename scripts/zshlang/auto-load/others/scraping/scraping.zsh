@@ -53,7 +53,7 @@ function tlwb() {
 noglobfn tlwb
 ##
 function wgetm() {
-    wget --header "$(cookies)" "$@"
+    $proxyenv wget --header "$(cookies)" "$@"
 }
 function wget-cookies() {
     wgetm --header "$(cookies-auto "$@")" "$@"
@@ -61,7 +61,7 @@ function wget-cookies() {
 ##
 function curlm() {
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
-    curl  --header "$(cookies)" --silent --fail --location --cookie-jar /dev/null "$@"
+    $proxyenv curl  --header "$(cookies)" --silent --fail --location --cookie-jar /dev/null "$@"
 }
 function curl-cookies() {
     # cookies-auto takes ~0.5s
@@ -73,13 +73,14 @@ function curl-googlebot() {
 }
 function curl-useragent() {
     # Copy from Chrome's network pane
-    curl --fail --no-progress-meter \
+    $proxyenv curl --fail --no-progress-meter \
         -H 'upgrade-insecure-requests: 1' \
         -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36' \
         -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
         -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
         --compressed "$@"
 }
+##
 function web-lastmod() {
     curlm -I "$1" 2>&1 | rg --smart-case last-modified
 }

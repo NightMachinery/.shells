@@ -28,11 +28,12 @@ function wallpaper-overlay() {
                     ecerr "$0: Failed to overlay addons with $?"
                 }
         fi
-        if [[ "$overlay_weather" == (y|ipad) ]] ; then
+        if isNet && [[ "$overlay_weather" == (y|ipad) ]] ; then
             t="$(gmktemp --suffix .png)"
             local loc
             loc="$(serr location-get | prefixer -o , --skip-empty)" || loc='Sabzevar,Iran'
             # https://wttr.in/:help
+            # @todo2 use a transparent image instead if req failed
             gurl "wttr.in/${loc}_transparency=255_mQ0_lang=en.png" > "$t" && {
                 #  -channel RGB -negate
                 # dark: plus > negate > screen; overlay, lighten, diff, add are very bad
@@ -91,7 +92,10 @@ function wallpaper-set() {
 }
 ##
 function wallpaper-auto() {
-    wallpaper-auto-bing
+    local log=~/logs/wallpaper-auto
+    ensure-dir "$log"
+    ecdate "$0" >> "$log"
+    wallpaper-auto-bing |& tee -a "$log"
 }
 function wallpaper-auto-bing() {
     ensure-net @MRET

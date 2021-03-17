@@ -18,7 +18,7 @@ function aliasdir() {
     mkdir -p "$dir"
     aliassafe2 "$name" indir "$dir"
 }
-aliasdir base $HOME/Base
+aliasdir base $HOME/base
 aliasdir cod $codedir
 aliasdir dl  $HOME/Downloads
 aliasfn indl dl
