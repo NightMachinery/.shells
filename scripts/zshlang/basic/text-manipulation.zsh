@@ -21,14 +21,6 @@ function sdlit() {
     rmprefix '' "$search" "$replace"
 }
 ##
-function double-newlines() {
-    awk 'ORS="\n\n"'
-}
-function p-double-newlines() {
-    pbpaste | double-newlines | pbcopy
-}
-alias pdn='p-double-newlines'
-##
 function rget() {
     command rg --text --smart-case --only-matching --replace '$1' "$@"
 }
@@ -38,5 +30,5 @@ function text-wrap() {
 
     command ggrep -Eo ".{1,$w}" # unicode-safe
 }
-aliasfn foldm text-wrap
+alias foldm='text-wrap'
 ##

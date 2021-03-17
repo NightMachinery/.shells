@@ -62,3 +62,11 @@ function numfmt-bytes() {
     numfmt --to=iec-i --suffix=B "$@"
 }
 ##
+function double-newlines() {
+    awk 'ORS="\n\n"'
+}
+function p-double-newlines() {
+    pbpaste | double-newlines | pbcopy
+}
+alias pdn='p-double-newlines'
+##
