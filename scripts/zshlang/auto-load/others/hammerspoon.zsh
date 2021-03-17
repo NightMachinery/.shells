@@ -10,8 +10,14 @@ function hs-popclick-btt-refresh() {
     btt-refresh "$BTT_HS_NOISES_UID"
 }
 function hs-popclickBttGet() {
-    local lis="$(serr hammerspoon -c 'popclickBttGet()')"
-    hs-popclick2icon $lis
+    local lis
+    lis="$(serr hammerspoon -c 'popclickBttGet()')" || {
+        # ecerr "$0: could not get value from hammerspoon"
+        # return 1
+        ##
+        lis=''
+    }
+    hs-popclick2icon "$lis"
 }
 @opts-setprefix hs-popclickBttGet hs-popclick2icon
 function hs-popclick2icon() {

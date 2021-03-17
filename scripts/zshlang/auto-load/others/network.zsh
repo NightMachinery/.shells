@@ -104,6 +104,9 @@ function ip-internal-get() {
 
     ifconfig | grep "inet "
 }
+function ip-internal-get1() {
+    ip-internal-get | gsed 1d | rget '(\d+\.\d+\.\d+\.\d+)'
+}
 ##
 function http-static-py() {
     python -m http.server "${1:-8000}"

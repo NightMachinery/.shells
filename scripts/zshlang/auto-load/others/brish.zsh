@@ -23,7 +23,7 @@ function brishzr() {
         bsh-er brishz "$@"
     fi
 }
-##
+## @security @tests
 function garden-req() {
     # We spoof our IP here, to see if the server is fooled.
     local opts=()
@@ -31,6 +31,10 @@ function garden-req() {
     curl $opts[@] --fail --silent --location --user "Alice:$GARDEN_PASS0" 'https://garden.lilf.ir/api/v1/request/'"$1" --header "X-Forwarded-For: 1.2.3.4"
 }
 aliasfn garden-ip garden-req 'ip/'
+function brishz-tests-nonlocal-access() {
+    reval-ec curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"ec hi","verbose":"0"}' http://127.0.0.1:7230/zsh/
+    reval-ec curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"ec hi","verbose":"0"}' "http://$(ip-internal-get1 | ghead -1):7230/zsh/"
+}
 ##
 function caddypass() {
     caddy hash-password -algorithm scrypt -salt "$GARDEN_SALT0" -plaintext "$GARDEN_PASS0"
