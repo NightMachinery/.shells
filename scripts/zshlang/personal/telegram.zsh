@@ -14,15 +14,17 @@ export tlg_podcastgen='-1001222930214'
 function alice() {
     local i="$*"
 
-    # tsend -- "$alice" "$i" && {
-    brishzr borg-tt-mark "$i" && {
+    local res
+    if res="$(brishzr borg-tt-mark "$i")" && test -n "$res" ; then
+        ec "$res"
         bell-pp-electricity
         # ec "Alicized successfully: $i"
-    } || {
-            ecerr 'Alicization failed!'
+        true
+    else
+            ecdate-err "Alicization failed\!"
             redo2 2 tts-glados1-cached Alicization has failed
             return 1
-        }
+    fi
 }
 noglobfn alice
 alias al=alice #NAMECONFLICT: ../Cellar/mono/6.8.0.105/bin/al

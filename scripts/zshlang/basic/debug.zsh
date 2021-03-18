@@ -29,7 +29,12 @@ dact() {
     doc DEBUG Act
     isNotDbg || eval "$(gquote "$@")"
 }
+##
 ecerr() { color 255 43 244 "$@" 1>&2 }
+function ecdate-err() {
+    ecdate "$(colorfg 255 50 10)${*}$(resetcolor)" >&2
+}
+##
 function rederr-old() {
     comment Somehow just using pipes sometimes does not work and causes stdout to actually go red ...
     local out="$(mktemp)"

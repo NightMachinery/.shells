@@ -123,7 +123,7 @@ function ot-play-helicopter() {
 EOF
 }
 function ot-play-diwhite() {
-    local dur="${1:-1}"
+    local dur="${1:-1}" vol="${2:-30000}"
     ot-rep <<EOF
 (demo $dur
       (let [vals (dwhite 0 15 INF)
@@ -131,7 +131,7 @@ function ot-play-diwhite() {
             val (demand:kr trig 0 vals)
             poll (poll trig val "diwhite val:")
             freq (+ 340 (* 30 val))]
-        (* 0.1 (sin-osc freq))))
+        (* $vol (sin-osc freq))))
 EOF
 }
 function ot-play-happybirthday() {
