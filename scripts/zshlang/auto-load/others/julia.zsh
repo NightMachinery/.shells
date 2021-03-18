@@ -111,9 +111,11 @@ jdlc() {
     # silence popd
 }
 jdl-helper() {
-    mkdir -p ~/Downloads/tmp/
-    cp "$1" ~/Downloads/tmp/
-    get-dl-link ~/Downloads/tmp/"${1:t}"
+    local subdir="${jdl_subdir:-tmp}"
+
+    mkdir -p ~/Downloads/$subdir/
+    cp "$1" ~/Downloads/$subdir/
+    get-dl-link ~/Downloads/$subdir/"${1:t}"
     ec $'\n'
 }
 function jdl() {
@@ -122,7 +124,7 @@ function jdl() {
     re jdl-helper "$@"
 }
 function jdl-private() {
-    dl_base_url="${dl_base_url}/private/" jdl "$@"
+    jdl_subdir="private" jdl "$@"
 }
 ##
 jaaks() {
