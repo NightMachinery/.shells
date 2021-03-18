@@ -11,7 +11,12 @@ function hear-noipc() {
 # afplay (macOS only), fast
 # mplayer -quiet
 # aliasfn hearinvisible silent ffplay -autoexit -nodisp -loglevel panic # faster startup than mpv
-aliasfn hearinvisible silent play # faster startup than ffplay (play from sox)
+function hearinvisible() {
+    local vol="${hearinvisible_volume:-${hearinvisible_v:-1}}"
+
+    silent play --norm "$@" -G gain "$vol"
+    # faster startup than ffplay (play from sox)
+}
 aliasfn heari hearinvisible
 aliasfn hearinvisible-mpv silent hear-noipc --no-terminal --load-scripts=no
 @opts-setprefix hearinvisible hear-noipc

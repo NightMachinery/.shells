@@ -7,6 +7,7 @@ curl https://cht.sh/:cht.sh > ~/bin/cht.sh
 chmod +x ~/bin/cht.sh
 ##
 conda install -c eumetsat expect
+conda install -c plotly plotly-orca # also can be installed via npm
 ##
 cpanm App::ansifold
 ##

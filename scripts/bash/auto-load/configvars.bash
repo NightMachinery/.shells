@@ -10,14 +10,16 @@ export Font_CourierNew_Symbola="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf
 # https://github.com/alexdelorenzo/ding
 export ONHOLD=$GREENCASE_DIR/music/Sleep\ Party\ People\ -\ Heaven\ Is\ Above\ Us.m4a
 export DING="$GREENCASE_DIR/LittleMisfortune/flac/26.1_16_MI_thetrainishere..blue..flac"
-##
+###
 # `preview-half-page-down` is also an option
-export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-a:select-all' --color=light --multi --hscroll-off 99999"
+# unsupported key: ctrl-enter
+export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-s:select-all,alt-enter:print-query' --color=light --multi --hscroll-off 99999"
+##
 export FZF_DEFAULT_COMMAND="fd --type f" # fzf runs this when input is a tty
 export SHELL=/bin/dash #"${commands[dash]}" # fzf uses this shell to run the default command
 # It might be problematic to set SHELL, but who knows ...
 export FZF_SHELL="$SHELL" # night.sh's variable
-##
+###
 ITERMMAGIC=ITERM_MAGIC
 ##
 dl_base_url='https://files.lilf.ir'

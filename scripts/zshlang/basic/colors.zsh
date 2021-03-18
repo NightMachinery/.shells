@@ -101,7 +101,7 @@ ecrainbow-n() {
 ecrainbow() { ecrainbow-n "$@" ; echo }
 ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
 ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
-ecalternate() {
+h_ecalternate() {
     if ! isI ; then
         ec "$(gq "$@")"
         return 0
@@ -113,4 +113,10 @@ ecalternate() {
     ecalt2 "$1"
     shift 1
     $0 "$@"
+}
+ecalternate() {
+    local o
+    o="$(h_ecalternate "$@")" @RET
+    # Removes last whitespace  char:
+    ecn "${o[1,-7]}" ; resetcolor ; ec
 }

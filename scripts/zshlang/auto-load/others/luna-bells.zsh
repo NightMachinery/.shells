@@ -1,3 +1,5 @@
+## See $nightNotes/cheatsheets/zsh/bells.org
+###
 function lunar() {
     tmuxnewsh2 deluna reval-notifexit deluna ${deluna} # timeout of deluna
     # lo_min should include the rest time as well, as the bells are sounded in the background currently.

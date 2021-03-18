@@ -116,11 +116,15 @@ jdl-helper() {
     get-dl-link ~/Downloads/tmp/"${1:t}"
     ec $'\n'
 }
-jdl() {
+function jdl() {
     jglob
     # dl_base_url="http://$(myip):8080/"
     re jdl-helper "$@"
 }
+function jdl-private() {
+    dl_base_url="${dl_base_url}/private/" jdl "$@"
+}
+##
 jaaks() {
     jee
     aa "$@"

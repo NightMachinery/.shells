@@ -47,13 +47,17 @@ function browser-current-url() {
     chrome-cli info | rget 'Url:\s+(.*)'
 }
 ##
+function chrome-open() {
+    ensure isDarwin @MRET # @darwinonly
+    chrome-cli open "$@"
+}
 function chrome-open-file() {
     ensure isDarwin @MRET # @darwinonly
     local f="$1"
     ensure-args f @MRET
     shift
     ##
-    revaldbg chrome-cli open "file://$(realpath "$f")" "$@"
+    chrome-open "file://$(realpath "$f")" "$@"
     ##
     # open -a "/Applications/Google Chrome.app" "$@"
     ##

@@ -95,3 +95,8 @@ function headphones-is() {
     system_profiler SPAudioDataType | command rg --quiet Headphones
 }
 aliasfn is-headphones headphones-is
+##
+function lsof-openfiles() {
+    sudo lsof -n | cut -f1 -d' ' | uniq -c | sort | tail
+}
+##
