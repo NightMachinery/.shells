@@ -161,7 +161,12 @@ aliasfn ip-geolocate ip-geolocate-mm-country
 # ipinfo has a rate limit. ifconfig.me provides a similar service (plus a REST-like API). Also ifonfo.io
 # alias mycountry='gurl ipinfo.io/country' # ~1.3s
 mycountry() {
-    ip-geolocate "$(myip)" # ~0.9s
+    local ip
+    ip="$(myip)" || {
+        ecerr "$0: No net"
+        return 1
+    }
+    ip-geolocate "$ip" # ~0.9s
 }
 # alias mycountry='geo.bash -o country' # ~2.4s
 # `whois "$(myip)"` has lots of info but is even more slow
