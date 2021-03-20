@@ -6,9 +6,11 @@ function tsend-rssln() {
     local item="[$title]($reallink)"
     local acc="$PURGATORY/rssln.md"
     ##
-    # print -nr -- "$item"$'\n\n' >> $acc
-    url2note_override_title="$title" readmoz-md "$reallink" >> $acc # readmoz does not do urlfinalg
-    ecn $'\n\n' >> $acc
+    local accEnabled='' # we don't need this, the podcast is better
+    if test -n "$accEnabled" ; then
+        url2note_override_title="$title" readmoz-md "$reallink" >> $acc # readmoz does not do urlfinalg
+        ecn $'\n\n' >> $acc
+    fi
     ##
     tsend --link-preview --parse-mode markdown -- "$rec" $item
 }
