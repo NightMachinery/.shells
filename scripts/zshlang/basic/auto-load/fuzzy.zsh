@@ -1,4 +1,5 @@
 ### Vars
+# FZF_SIMPLE_PREVIEW='cat {f}'
 # FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.py'
 FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper_rs'
 ##
@@ -45,13 +46,31 @@ function fzf-gateway() {
 }
 function fzp() {
     # fz potentially
-    local opts=("${@[1,-2]}") query="${@[-1]}"
+    local opts=("${@[1,-2]}") query="${@[-1]}" disallowNI="${fzp_dni}" ugrepMode="${fzp_ug}"
+    local fzp_ug='' # redundant, but this makes sure we won't have an infinite loop in the future
+
+    local ugfz_cmd='ugfz'
+    if [[ "$ugrepMode" == (i0|o0|i0o0) ]] ; then
+        ugfz_cmd="ugfz-$ugrepMode"
+    fi
 
     # FNSWAP: isI
     if isI ; then
-        fz "$opts[@]" --query "$query"
+        if test -n "$ugrepMode" ; then
+            "$ugfz_cmd" "$opts[@]" "$query" @RET
+        else
+            fz "$opts[@]" --query "$query" @RET
+        fi
     else
-        fz --no-sort "$opts[@]" --filter "$query"
+        if test -n "$disallowNI" ; then
+            ecerr "$0: Non-interactive usage has been explicitly forbidden."
+            return 1
+        fi
+        if test -n "$ugrepMode" ; then
+            "$ugfz_cmd" "$opts[@]" "$query" @RET
+        else
+            fz --no-sort "$opts[@]" --filter "$query" @RET
+        fi
     fi
 }
 function fzp-q() {

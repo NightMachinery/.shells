@@ -1,4 +1,4 @@
-/// 2>/dev/null ; exec gorun "$0" "$@"
+/// 2>/dev/null ; GO111MODULE=off exec gorun "$0" "$@"
 
 package main
 

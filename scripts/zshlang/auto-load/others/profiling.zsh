@@ -8,6 +8,7 @@ function time2-unquoted() {
     local time2_start=$EPOCHREALTIME
 
     eval "$cmd"
+    # (eval "$cmd") # subshell protects against premature exits because of, e.g., glob failure
 
     ec $'\n\n'"Took $(( EPOCHREALTIME - time2_start ))"
 }

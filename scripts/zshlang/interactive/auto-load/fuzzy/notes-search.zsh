@@ -21,10 +21,27 @@ function seev() {
     ntLines=y nightNotes="/" ntsearch_additional_paths=($vfiles[@]) ntsearch_glob='' ntl-rg "$@" # ntsearch_glob=$textglob
 }
 noglobfn seev
+##
 aliasfn-ng agsi nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
-function agfi() {
+function agfi1() {
+    ##
+    # a bit faster than the ugrep mode, possibly because i0o0 wastes two invocations of prefixer
+    # note that this streams the results while the ugrep mode waits for the results to finish, so this appears faster than it really is
+    ##
     local f="$1"
     ntsearch_query_fzf="'$f '() | 'alias | 'alifn " agsi  # match functions or aliases
+}
+function agfi() {
+    ## PERF:
+    # `FZF_DEFAULT_OPTS+=' -1'`
+    # `redo2 100 time2 silent agfi dbgserr`
+    # `redo2 100 time2 silent agfi1 dbgserr`
+    # agfi1 is ~9ms faster
+    ##
+    local f="$1"
+    # ntsearch_query_fzf="'$f '() | 'alias | 'alifn " agsi  # match functions or aliases
+    local -x FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --height 50%"
+    fzp_ug=y ntsearch_query_fzf="\b$f\b\s*\(\)|:\s*alias\S*\s*\b$f\b|:\s*alifn\S*\s*\b$f\b " agsi  # match functions or aliases
 }
 noglobfn agfi
 ##
@@ -92,12 +109,13 @@ function rgf_() {
     RG_PREFIX="$functions[rgbase] -C 4 --null --line-number --no-heading -e"
     local INITIAL_QUERY=( "$@" )
 
+    FZF_SIMPLE_PREVIEW='cat {f}' \
     FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq ${INITIAL_QUERY:-.})" \
         fz-empty --reverse --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --disabled --query "$INITIAL_QUERY" --expect=alt-enter | {
         read -d $'\n' -r acceptor
-        outFiles="$(cat)"
-        print -r -- "$outFiles"
-        outFiles=("${(@f)outFiles}")
+        out="$(cat)"
+        print -r -- "$out"
+        out=("${(@f)out}")
     }
 }
 # @bug `--` won't fit this pattern, though it shouldn't be included in your selections anyways?
@@ -108,13 +126,6 @@ aliasfn ffrg rgf
 ##
 function emcnt() {
     emc -e "(night/search-notes)"
-}
-function ugnt() {
-    local i args=()
-    for i in "$note_formats[@]" ; do
-        args+=( -O "$i" )
-    done
-    ugm "$args[@]" "$@" $nightNotes/
 }
 function vnt() {
     outFiles=()
@@ -134,22 +145,31 @@ function ntl-fzfq() {
     ntsearch_query_fzf="$query" ntsearch-lines
 }
 ##
+function ntsearch-whole() {
+    @opts engine ntsearch pattern '(.*)\n' @ ntsearch-lines
+}
+function ntsearch-lines-engine() {
+    ntLines=y ntsearch "$@"
+}
 function ntsearch-lines() {
     : "Remember that ntsearch_ uses eval-memoi"
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"
     : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
 
     : "The engine should return output in outFiles."
-    local engine=("${(@)ntl_engine:-ntsearch}") pattern="${ntl_pattern}"
+    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}"
     test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
-    ntLines=y reval "$engine[@]" "$@" > /dev/null  || return 88 # Beware forking here! We need the global vars outFiles and acceptor
+    # outFiles is no longer used by anything except `vnt`?
+    reval "$engine[@]" "$@" > /dev/null  || return 88 # Beware forking here! We need the global vars out and acceptor
 
     local i files=() linenumbers=() lines=() file
     for i in "${out[@]}" ; do
         unset match
+        # dvar i
         if [[ "$i" =~ "$pattern" ]] ; then
+            # dvar match
             file="$match[1]"
             test -e "$file" || {
                 # file="$(<<<$file rmprefix "$nightNotes")"
@@ -164,7 +184,7 @@ function ntsearch-lines() {
                 fi
             else
                 files+="$file"
-                linenumbers+="$match[2]"
+                linenumbers+="${match[2]:-1}"
                 lines+="$match[3]"
                 continue
             fi
@@ -259,12 +279,12 @@ function ntsearch_() {
     # local additional_paths=("${(@f)$(<<<${(F)ntsearch_additional_paths} filter test -e)}")
 
     dvar additional_paths
-    local glob="*$ntsearch_glob"
     local files
     # files=( "${(@f)$(fd -e md -e txt -e org --full-path ${pattern} $nightNotes )}" )
     files=(${additional_paths[@]})
     [[ "$nightNotes" != '/' ]] && {
         if test -n "$ntsearch_glob" ; then
+            local glob="*$ntsearch_glob"
             files+=($nightNotes/**/${~glob}) # `/` means we are only interested in additional_paths, but since the machinary relies on nightNotes existing, we use `/`.
         else
             files+="$nightNotes"
@@ -282,74 +302,90 @@ function ntsearch_() {
     local fzopts=()
     local previewcode="$FZF_SIMPLE_PREVIEW"
     if test -z "$ntLines" ; then
-        fzopts+='--read0'
+        if test -z "$fzp_ug" ; then
+            fzopts+='--read0'
+        else
+            ecerr "$0: ugrep does not support read0"
+            return 1
+        fi
+        previewcode="cat {f}"
     else
-        fzopts+=(--read0 --delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
-        ## Old previewer
-        # local FZF_SHELL='zshplain.dash'
-#         previewcode=( 'ln={2} file={1} match={s3..} ; fileabs="$nightNotes/$file" ;
-# { print -r -- "$file" '
-#                       "\$'\\n'$(gq $(colorbg 200 255 200 ; colorfg 0 0 0))\$match$(gq $reset_color)\$'\\n\\n' ; "
-#                       # 'echo ln: $ln ; '
-#                       '[[ $ln == 1 ]] || gsed -n $(( i=ln-6 , i >= 1 ? i : 1 )),$(( i=ln-1 , i >= 1 ? i : 1 ))p $fileabs ; '
-#                       "print -r -- $(gq $(colorbg 255 255 255 ; colorfg 255 120 0))\$match$(gq $reset_color) ; "
-
-#                       '
-# gsed -n $((ln+1)),$((ln+50))p $fileabs
-# } |& ' "$(gq "$(realpath2 ansifold)")" '-s -w $(($FZF_PREVIEW_COLUMNS - 1))' )
-        # install location is at perl -V:'installbin' , link it
-        # cpanm App::ansifold
-        # https://metacpan.org/pod/Text::ANSI::WideUtil
-        ##
-        ##
+        if test -z "$fzp_ug" ; then
+            fzopts+=(--read0 --delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
+        else
+            fzopts+=(--delimiter : --nth '1,3..')
+        fi
+        ###
         # @todo1 https://github.com/junegunn/fzf/issues/2373 preview header
         # remove `:+{2}-5` from preview-window and use mode=0 to revert to the previous behavior
-        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) 1 | rtl_reshaper_rs || printf -- \"\n\n%s \" {}"
-        # rtl_reshaper_rs does introduce somewhat of a delay ...
-        # @todo1 adding ` | rtl_reshaper_rs` works fine if RTL text is not colored, it seems. It's best if ntom does the reshaping itself ...
+        ##
+        local rtl=''
+        # rtl='| rtl_reshaper_rs' # very bad perf for large files
+        # adding ` | rtl_reshaper_rs` works fine if RTL text is not colored, it seems. It's best if ntom does the reshaping itself ...
+        ##
+        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) 1 $rtl || printf -- \"\n\n%s \" {}"
         ##
         # previewcode="cat $(gq $nightNotes)/{1} || printf -- error5"
+        ###
     fi
 
+    ##
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
-    ntsearch_fd | fz_empty=y fz --preview-window 'right:50%:wrap:nohidden:+{2}-/2' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --query "$query"  --expect=alt-enter | {   # right:hidden to hide preview
+
+
+    ntsearch_fd | fz_empty=y fzp_dni=y fzp --preview-window 'right:50%:wrap:nohidden:+{2}-/2' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0  --expect=alt-enter "$query" | {   # right:hidden to hide preview
         read -d $'\0' -r acceptor
         out="$(cat)"
         ec "$out"
     } # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF' # to remove empty lines (I don't know why I commented this, or if it actually works. But I now use rg itself to filter empty lines out.
 
 }
+function ntsearch_fd_h() {
+    print -nr -- "${(@pj.\0.)files}" \
+        | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] "$@" -- "$query_rg" \
+        | prefixer --skip-empty -r "$nightNotes" -i $'\n' -o "$osep"
+    # no-messages suppresses IO errors
+    # xargs is needed to avoid argument list too long error
+
+}
 function ntsearch_fd() {
     : "INPUT VARS: ntsearch_injector ntsearch_rg_opts files ntLines nightNotes query_rg"
 
+    local osep='\x00'
+    if test -n "$fzp_ug" ; then
+        osep=$'\n'
+    fi
     if test -n "$ntLines" ; then
         {
-            # no-messages suppresses IO errors
-            # xargs is needed to avoid argument list too long error
-            { print -nr -- "${(@pj.\0.)files}" | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] -- "$query_rg" | prefixer --skip-empty -r "$nightNotes" -i $'\n' -o '\x00' }
-            # Old way: rmprefix "$nightNotes" $'\n' '\x00'
+           ntsearch_fd_h
         }
-        reval "$ntsearch_injector[@]" | command rg --null-data --smart-case --engine auto --no-messages $ntsearch_rg_opts[@] -- "$query_rg"
+        if test -n "$ntsearch_injector[*]" ; then
+            if test -n "$fzp_ug" ; then
+                ecerr "$0: ntsearch_injectors are not yet supported in ugrep mode, as they output NUL separated data"
+            else
+                # --null-data  bothh reads and write 0: `arr0 1 2 3 | rg --null-data -e 2 | cat -vte`
+                reval "$ntsearch_injector[@]" | command rg --null-data --smart-case --engine auto --no-messages $ntsearch_rg_opts[@] -- "$query_rg"
+            fi
+        fi
         return 0 # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
     else
-        local first='y' file filename content line i
-        for file in "$files[@]"
-        do
-            test -f "$file" || continue
-
-            test -n "$first" || {
-                if test -z "$ntLines" ; then
-                    print -n $'\0'
-                else
-
-                fi
-            }
-            first=''
-            filename="$(realpath-relchild $nightNotes $file)" # idk if realpath-relchild is appropriate here, we might have assumed that the path is really relative to nightNotes
-            content="$(< $file)"
-            color 30 90 255 $filename$'\n'
-            ec $content
-        done
+        local first='y' file content files_all=()
+        ##
+        ntsearch_fd_h -l | ntsearch_outputter.go "$nightNotes"
+        ##
+        # files_all=("${(@0)$(ntsearch_fd_h -l)}") @RET
+        # for file in "$files_all[@]"
+        # do
+        #     # dvar file
+        #     test -n "$first" || {
+        #             print -n $'\0'
+        #     }
+        #     first=''
+        #     content="$(< "$nightNotes/$file")"
+        #     color 30 90 255 $file$'\n'
+        #     ec $content
+        # done
+        ##
     fi
 }

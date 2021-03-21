@@ -1,0 +1,8 @@
+#!/usr/bin/env zshplain.dash 
+
+# "${@[1,-2]}" -e "${q}" || echo error $?
+ugrep --bool --smart-case --sort=best --no-confirm --perl-regexp --hidden --binary-files=without-match -e "" || echo error2 $?
+
+pwd
+echo "${@[1,-2]}" -e "${q}"
+true
