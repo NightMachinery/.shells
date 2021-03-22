@@ -39,15 +39,24 @@ function agfi() {
     # agfi1 is ~9ms faster
     ##
     local f="$1" prefix_mode="${agfi_p}"
+    # f="$(ec "$f" | sdlit . '\.')" # not worth the perf hit, though I haven't benchmarked
 
     local -x FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --height 50%"
     local q
+    ##
+    # local word_break='\W'
+    # using '\b' doesn't work with names such as 'ntl.', but using '\W' breaks ugrep:
+    # https://github.com/Genivia/ugrep/issues/114
+    # best is to just use 'ntl' instead of 'ntl.', as the dotted versions are matched as well
+    local word_break='\b'
+    ##
     if ! isI || test -n "$prefix_mode" ; then
-        q="\b${f}[^:]*\s*\(\)|:\s*alias[^:=]*\s*\b$f|:\s*alifn[^:=]*\s*\b$f "
+        q="${word_break}${f}[^:]*\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f|:\s*alifn[^:=]*\s*${word_break}$f "
     else
-        q="\b${f}\b\s*\(\)|:\s*alias[^:=]*\s*\b$f\b|:\s*alifn[^:=]*\s*\b$f\b "
+        q="${word_break}${f}${word_break}\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f${word_break}|:\s*alifn[^:=]*\s*${word_break}$f${word_break} "
     fi
 
+    isDbg && ec-copy "$q"
     fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi | {
         if isI ; then
             cat
@@ -271,14 +280,17 @@ function ntsearch() {
         return 1
     } # don't fork here. Receiving globals vars out and acceptor.
 
-    if isI ; then
+    if isI || test -z "$fzp_ug" ; then
+        # fzp_ug doesn't output zero in non-interactive usage (because fzf is not invoked), so we don't need to break these.
         out=( "${(@0)out}" )
         out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
+    else
+        # we might want to split out by newlines? things are working fine without doing this though ...
+        # out=( "${(@f)out}" )
     fi
 
     if test -z "$ntLines" ; then
         ensure isI @MRET
-
         local i
         for i in "$out[@]"
         do
