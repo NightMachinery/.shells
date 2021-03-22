@@ -57,25 +57,24 @@ function agfi() {
     fi
 
     isDbg && ec-copy "$q"
-    fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi | {
-        if isI ; then
-            cat
-        else
-            sd '\n' '\n\n' # improves readability
-        fi
-    }
+    if isI ; then
+        # We need to run this without piping in the interactive case, or else jumping to editor will break
+        fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi
+    else
+        fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi | sd '\n' '\n\n' # improves readability
+    fi
 }
 noglobfn agfi
 ##
 function ntt() {
-    local query="$(fz-createquery "$@")"
+    local query="$(fzp_ug=ni fz-createquery "$@")"
 
     ntsearch_query_fzf="$query" ntl
 }
 ###
 function rem-fz() {
     local query_pre="$rem_fz_q"
-    local query="$(fz-createquery "$@")"
+    local query="$(fzp_ug=ni fz-createquery "$@")"
 
     local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
 
@@ -96,7 +95,9 @@ function remd() {
     ## testing
     # `fnrep datej "ec 1399/12/03" remd`
     ##
-    local query="$(fz-createquery "$@")"
+    local query="$(fzp_ug=ni fz-createquery "$@")"
+
+    local ntsearch_lines_nnp=y
 
     local now=("${(s./.)$(datej)}")
     local cyear="$now[1]"
@@ -106,12 +107,12 @@ function remd() {
     if (( cmonth == 12 )) ; then
         local nextYear=$((cyear+1))
 
-        @opts q "'$cyear/$cmonth | '$nextYear/01" @ rem-fz $query
+        @opts q "$(fzp_ug=ni fz-createquery "$cyear/$cmonth" "|" "$nextYear/01")" @ rem-fz $query
     else
         typeset -Z2 nextMonth
         nextMonth=$((cmonth+1))
 
-        @opts q "'$cyear/$cmonth | '$cyear/$nextMonth" @ rem-fz $query
+        @opts q "$(fzp_ug=ni fz-createquery "$cyear/$cmonth" "|" "$cyear/$nextMonth")" @ rem-fz $query
     fi
 }
 ###
@@ -159,7 +160,7 @@ function ntl-fzf() {
     ntsearch_query_fzf="$*" ntsearch-lines
 }
 function ntl-fzfq() {
-    local query="$(fz-createquery "$@")"
+    local query="$(fzp_ug=ni fz-createquery "$@")"
 
     ntsearch_query_fzf="$query" ntsearch-lines
 }
@@ -274,6 +275,13 @@ function ntsearch() {
         return 1
     }
 
+    local fzp_ug="$fzp_ug"
+    if ! isI ; then
+        # @surprise
+        fzp_ug=y
+        # non-interactive fzf returns bad output that is ugly unprocessed, and can't be processed by our normal code
+    fi
+
     ntsearch_ "$@" > /dev/null || {
         ecerr "$0: ntsearch_ failed $?."
         unset out
@@ -285,8 +293,7 @@ function ntsearch() {
         out=( "${(@0)out}" )
         out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
     else
-        # we might want to split out by newlines? things are working fine without doing this though ...
-        # out=( "${(@f)out}" )
+        out=( "${(@f)out}" )
     fi
 
     if test -z "$ntLines" ; then
@@ -367,15 +374,19 @@ function ntsearch_() {
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
 
-
-    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window 'right:50%:wrap:nohidden:+{2}-/2' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0  --expect=alt-enter "$query" | {   # right:hidden to hide preview
+    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window 'right:50%:wrap:nohidden:+{2}-/2' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --expect=alt-enter "$query" | {   # right:hidden to hide preview
         unset acceptor
         if isI ; then
             read -d $'\0' -r acceptor
         fi
         out="$(cat)"
         ec "$out"
-    } # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF' # to remove empty lines (I don't know why I commented this, or if it actually works. But I now use rg itself to filter empty lines out.
+    } || {
+        local ret=$? s="${(j.|.)pipestatus[@]}"
+        ecerr "$0: failed last statement with: $s"
+        return $ret
+    }
+    # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF' # to remove empty lines (I don't know why I commented this, or if it actually works. But I now use rg itself to filter empty lines out.
 
 }
 function ntsearch_fd_h() {
@@ -399,7 +410,7 @@ function ntsearch_fd() {
         }
         if test -n "$ntsearch_injector[*]" ; then
             if test -n "$fzp_ug" ; then
-                ecerr "$0: ntsearch_injectors are not yet supported in ugrep mode, as they output NUL separated data"
+                ecerr "$0: ntsearch_injectors are not yet supported in ugrep mode, as they output NUL separated data. (NOT aborting.)"
             else
                 # --null-data  bothh reads and write 0: `arr0 1 2 3 | rg --null-data -e 2 | cat -vte`
                 reval "$ntsearch_injector[@]" | command rg --null-data --smart-case --engine auto --no-messages $ntsearch_rg_opts[@] -- "$query_rg"

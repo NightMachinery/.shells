@@ -71,7 +71,7 @@ function fzp() {
         local truncateMode=''
         if test -n "$disallowNI" ; then
             if [[ "$disallowNI" == truncate ]] ; then
-                truncateMode=300
+                truncateMode=100
             else
                 ecerr "$0: Non-interactive usage has been explicitly forbidden."
                 return 1
@@ -79,7 +79,8 @@ function fzp() {
         fi
         {
             if test -n "$ugrepMode" ; then
-                "$ugfz_cmd" "$opts[@]" "$query" @RET
+                ensure-dbg "$ugfz_cmd" "$opts[@]" "$query" @MRET
+                # revaldbg "$ugfz_cmd" "$opts[@]" "$query" @RET
             else
                 fz --no-sort "$opts[@]" --filter "$query" @RET
             fi
@@ -89,6 +90,9 @@ function fzp() {
             else
                 cat
             fi
+        } || {
+            ecdbg "fzp  failed: ${(j.|.)pipestatus[@]}"
+            return 1
         }
     fi
 }
@@ -110,14 +114,38 @@ function rg-createquery() {
     ec $res
 }
 function fz-createquery() {
-    # (( ${#@} == 0 )) || mg_sep=' ' mapg "\'\$i" "${=@}"
+    local ugrepMode="$fzp_ug"
+    if [[ "$fzp_ug" == ni ]] ; then
+        if isI ; then
+            ugrepMode=''
+        else
+            ugrepMode='y'
+        fi
+    fi
+    
     local i res=''
     for i in ${=@} ; do
         # ! is exact-match by default.
         if [[ "$i" =~ "^(\^|\!|'|\|)" || "$i" =~ '\$$' ]] ; then
-            res+="$i "
+            if test -z "$ugrepMode" ; then
+                res+="$i "
+            else
+                local s="$i[1]" r="${i[2,-1]}"
+                if [[ "$s" == '!' ]] ; then
+                    res+="-$r "
+                elif [[ "$s" == "'" ]] ; then
+                    res+="$r "
+                else
+                    # ^, $, | are valid regex
+                    res+="$i "
+                fi
+            fi
         else
-            res+="'$i "
+            if test -z "$ugrepMode" ; then
+                res+="'$i "
+            else
+                res+="$i "
+            fi
         fi
     done
     ec "$res"

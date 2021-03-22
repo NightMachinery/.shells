@@ -125,6 +125,13 @@ function ensure() {
     return $ret
 }
 alias assert='ensure'
+function ensure-dbg() {
+    if isDbg ; then
+        ensure "$@"
+    else
+        reval "${@[1,-2]}"
+    fi
+}
 function ensure-args() {
     if (( $#@ <= 1 )) ; then
         ecerr "$0: not enough arguments."

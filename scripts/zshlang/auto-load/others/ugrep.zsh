@@ -70,8 +70,12 @@ function ugfz() {
     else
         ugrep_opts+='--color=never'
     fi
+    if true || ! isDbg ; then
+        # @warn @untested Not adding this might break an otherwise fine execution
+        ugrep_opts+='--no-messages'
+    fi
 
-    RG_PREFIX="cat $(gq "$tmp") | ugrep $ugrep_opts[*] --no-messages -e"
+    RG_PREFIX="cat $(gq "$tmp") | ugrep $ugrep_opts[*] -e"
 
     local FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq "${INITIAL_QUERY}")" # Not exported as we are just feeding fzf on stdin ourselves
     if isI ; then
@@ -79,7 +83,12 @@ function ugfz() {
             FZF_SIMPLE_PREVIEW='cat {f}' \
                 fz --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --disabled --query "$INITIAL_QUERY "
     else
-        eval "$FZF_DEFAULT_COMMAND"
+        eval "$FZF_DEFAULT_COMMAND" | {
+            sponge || true # no idea why sometimes this can fail 141
+        } || {
+            ecerr "$0: failed ${(@j.|.)pipestatus}"
+            return 1
+        }
     fi
 }
 ###

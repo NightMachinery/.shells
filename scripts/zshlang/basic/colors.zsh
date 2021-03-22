@@ -117,6 +117,10 @@ h_ecalternate() {
 ecalternate() {
     local o
     o="$(h_ecalternate "$@")" @RET
-    # Removes last whitespace  char:
-    ecn "${o[1,-7]}" ; resetcolor ; ec
+    if isI ; then
+        # Removes last whitespace  char:
+        ecn "${o[1,-7]}" ; resetcolor ; ec
+    else
+        ec "$o"
+    fi
 }
