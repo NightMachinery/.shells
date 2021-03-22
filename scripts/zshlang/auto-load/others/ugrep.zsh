@@ -60,11 +60,18 @@ function ugfz() {
     tmp="$(gmktemp)" @RET
     ecn "$input" > "$tmp"
 
+    local ugrep_opts=("$ugrep_opts[@]")
     ## Add line numbers to output:
     # opts+=( --delimiter ':' --with-nth 2..)
     # ugrep_opts+="--format='%n:%O%~'"
     ##
-    RG_PREFIX="cat $(gq "$tmp") | ugrep $ugrep_opts[*] --no-messages --color=always -e"
+    if isI ; then
+        ugrep_opts+='--color=always' # gets stripped by fzf if interactive
+    else
+        ugrep_opts+='--color=never'
+    fi
+
+    RG_PREFIX="cat $(gq "$tmp") | ugrep $ugrep_opts[*] --no-messages -e"
 
     local FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq "${INITIAL_QUERY}")" # Not exported as we are just feeding fzf on stdin ourselves
     if isI ; then
