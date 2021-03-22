@@ -111,23 +111,6 @@ ffman() {
     man -k . | fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
 }
 alias ffm=ffman
-ffaliases() {
-    # also see aga
-    for k in "${(@k)aliases}"; do
-        ec "$k=${aliases[$k]}"
-    done | fz --prompt='Aliases> '
-}
-alias ffa=ffaliases
-ffcommands() {
-    # cmf (previous name)
-    # command finder
-    printz "$(agc "${@:-.}" | fz --prompt 'Commands> ')"
-}
-alias ffc=ffcommands
-fffunctions() {
-    printz "$(agfunc "${@:-.}" | fz --prompt 'Functions> ')"
-}
-alias ff=fffunctions
 ###
 function init-vfiles() {
     : GLOBAL vfiles

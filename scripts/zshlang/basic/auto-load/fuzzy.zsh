@@ -54,6 +54,7 @@ function fzp() {
         ugfz_cmd="ugfz-$ugrepMode"
     fi
 
+
     # FNSWAP: isI
     if isI ; then
         if test -n "$ugrepMode" ; then
@@ -62,15 +63,31 @@ function fzp() {
             fz "$opts[@]" --query "$query" @RET
         fi
     else
+        ## tests:
+        # `fd | fzp_ug=y fzp_dni=truncate fnswap isI false fzp`
+        ##
+        local truncateMode=''
         if test -n "$disallowNI" ; then
-            ecerr "$0: Non-interactive usage has been explicitly forbidden."
-            return 1
+            if [[ "$disallowNI" == truncate ]] ; then
+                truncateMode=300
+            else
+                ecerr "$0: Non-interactive usage has been explicitly forbidden."
+                return 1
+            fi
         fi
-        if test -n "$ugrepMode" ; then
-            "$ugfz_cmd" "$opts[@]" "$query" @RET
-        else
-            fz --no-sort "$opts[@]" --filter "$query" @RET
-        fi
+        {
+            if test -n "$ugrepMode" ; then
+                "$ugfz_cmd" "$opts[@]" "$query" @RET
+            else
+                fz --no-sort "$opts[@]" --filter "$query" @RET
+            fi
+        } | {
+            if test -n "$truncateMode" ; then
+                ghead -n "$truncateMode"
+            else
+                cat
+            fi
+        }
     fi
 }
 function fzp-q() {

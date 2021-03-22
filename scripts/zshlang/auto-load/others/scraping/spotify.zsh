@@ -29,7 +29,7 @@ function rss-engine-spotify() {
     local date
     # date="$(serr url-date "$url")" && date="$(datenat_unix=y serr datenat "$date")" && test -n "$date" && {
     date="$(spotify-url-get-unix "$url")" && test -n "$date" && {
-            if (( EPOCHREALTIME - date > (3600*24*365) )) ; then
+            if (( EPOCHREALTIME - date > (3600*24*60) )) ; then
                 ecerr "$0: Skipping '$title' because of age '$(spotify-url-get-date "$url")'" 2>&2 2>>$log
                 return 0
             fi

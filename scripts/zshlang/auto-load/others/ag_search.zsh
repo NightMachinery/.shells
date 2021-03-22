@@ -4,19 +4,41 @@
 #     export TAG_CMD_FMT_STRING='nvim -c "call cursor({{.LineNumber}}, {{.ColumnNumber}})" "{{.Filename}}"'
 #     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
 # fi
-##
-alias agc='ec "${(F)commands}"|agC=0 rgm  --color=never'
-alias agfunc='ec "${(Fk)functions}"| agC=0 rgm  --color=never'
-function ffall() {
-	local query="$(fz-createquery "$@")"
-
-	{
-		ec "${(Fk)functions}"
-		ec "${(Fk)aliases}"
-		ec "${(Fk)commands}"
-		ec "${(Fk)builtins}"
-	} | fzp "$query"
+###
+ffaliases() {
+    # also see aga
+    for k in "${(@k)aliases}"; do
+        ec "$k=${aliases[$k]}"
+    done | fz --prompt='Aliases> '
 }
+# alias ffa=ffaliases
+
+alias agcommands='ec "${(F)commands}"|agC=0 rgm  --color=never'
+ffcommands() {
+    # cmf (previous name)
+    # command finder
+    printz "$(agcommands "${@:-.}" | fz --prompt 'Commands> ')"
+}
+# alias ffc=ffcommands
+
+alias agfunc='ec "${(Fk)functions}"| agC=0 rgm  --color=never'
+fffunctions() {
+    printz "$(agfunc "${@:-.}" | fz --prompt 'Functions> ')"
+}
+# alias ff=fffunctions
+##
+function ffall() {
+    # @alt agfi
+    local query="$(fz-createquery "$@")"
+
+    {
+        ec "${(Fk)functions}"
+        ec "${(Fk)aliases}"
+        ec "${(Fk)commands}"
+        ec "${(Fk)builtins}"
+    } | fzp "$query"
+}
+alias ffa=ffall
 ##
 alias rr=rgm
 alias rrn='rgm --line-number'

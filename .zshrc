@@ -355,7 +355,7 @@ antibody bundle Aloxaf/fzf-tab # should come after all tab keybindings
 fzf_tab_complete_code="${functions[fzf-tab-complete]}"
 fzf-tab-complete() { # @overrides
   per2en-buffer
-  if [[ "$out" == per ]] ; then
+  if [[ "$out_sym2983387" == per ]] ; then
    input-lang-set en
   fi
   eval "$fzf_tab_complete_code"
@@ -395,14 +395,14 @@ prompt_pure_set_title() true # disables pure setting the title
 ###
 # https://stackoverflow.com/a/14634437/1410221
 function per2en-buffer() {
-  out=en
+  out_sym2983387=en
   ## perf
   # `BUFFER="ahjaha ah  isi s s" fnswap zle true time2 cmd-modifier`
   # `BUFFER="زjhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhjhhibjhiuutybyiyyhbbhgdryahjaha ah  isi s s" fnswap zle true time2 cmd-modifier`
   ##
   if [[ "$persian_exc_chars" == *"${BUFFER[1]:-A}"* ]] ; then
     BUFFER="$(ecn "$BUFFER" | per2en)"
-    out=per
+    out_sym2983387=per
   fi
 }
 ##

@@ -20,9 +20,9 @@ conda-init() {
         ecerr conda not loaded
     fi
 }
-aliasfn conda-init cin
+aliasfn cin conda-init
 conda-activate() {
-    cin
+    conda-init
     conda activate "$@"
 }
 aliasfn cina conda-activate

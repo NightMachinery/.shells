@@ -38,10 +38,17 @@ function agfi() {
     # `redo2 100 time2 silent agfi1 dbgserr`
     # agfi1 is ~9ms faster
     ##
-    local f="$1"
-    # ntsearch_query_fzf="'$f '() | 'alias | 'alifn " agsi  # match functions or aliases
+    local f="$1" prefix_mode="${agfi_p}"
+
     local -x FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --height 50%"
-    fzp_ug=y ntsearch_query_fzf="\b$f\b\s*\(\)|:\s*alias\S*\s*\b$f\b|:\s*alifn\S*\s*\b$f\b " agsi  # match functions or aliases
+    local q
+    if ! isI || test -n "$prefix_mode" ; then
+        q="\b${f}[^:]*\s*\(\)|:\s*alias[^:=]*\s*\b$f|:\s*alifn[^:=]*\s*\b$f "
+    else
+        q="\b${f}\b\s*\(\)|:\s*alias[^:=]*\s*\b$f\b|:\s*alifn[^:=]*\s*\b$f\b "
+    fi
+
+    fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi  # match functions or aliases
 }
 noglobfn agfi
 ##
@@ -98,9 +105,6 @@ function ntimg() {
 }
 aliasfn nti ntimg
 ###
-alias nts='\noglob ntsearch'
-###
-##
 function rgf_() {
     # @todo shortcuts to navigate multiple lines at a time (to skip the context lines) will help
 
@@ -148,6 +152,8 @@ function ntl-fzfq() {
 function ntsearch-whole() {
     @opts engine ntsearch pattern '(.*)\n' @ ntsearch-lines
 }
+alias nts='\noglob ntsearch-whole'
+##
 function ntsearch-lines-engine() {
     ntLines=y ntsearch "$@"
 }
@@ -157,13 +163,17 @@ function ntsearch-lines() {
     : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
 
     : "The engine should return output in outFiles."
-    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}"
+    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}" ni_noprocess="${ntsearch_lines_nnp}"
     test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
     # outFiles is no longer used by anything except `vnt`?
     reval "$engine[@]" "$@" > /dev/null  || return 88 # Beware forking here! We need the global vars out and acceptor
 
+    if ! isI && test -n "$ni_noprocess" ; then
+        ec "${(@F)out}"
+        return 0
+    fi
     local i files=() linenumbers=() lines=() file
     for i in "${out[@]}" ; do
         unset match
@@ -204,6 +214,8 @@ function ntsearch-lines() {
         linenumbers+="1"
         lines+="$i"
     done
+
+    # re dvar out files linenumbers lines
 
     if [[ "$acceptor" == '' ]] ; then
         ecdbg "$0: Outputting selections ..."
@@ -253,10 +265,14 @@ function ntsearch() {
         return 1
     } # don't fork here. Receiving globals vars out and acceptor.
 
-    out=( "${(@0)out}" )
-    out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
+    if isI ; then
+        out=( "${(@0)out}" )
+        out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
+    fi
 
     if test -z "$ntLines" ; then
+        ensure isI @MRET
+
         local i
         for i in "$out[@]"
         do
@@ -334,8 +350,11 @@ function ntsearch_() {
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
 
 
-    ntsearch_fd | fz_empty=y fzp_dni=y fzp --preview-window 'right:50%:wrap:nohidden:+{2}-/2' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0  --expect=alt-enter "$query" | {   # right:hidden to hide preview
-        read -d $'\0' -r acceptor
+    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window 'right:50%:wrap:nohidden:+{2}-/2' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0  --expect=alt-enter "$query" | {   # right:hidden to hide preview
+        unset acceptor
+        if isI ; then
+            read -d $'\0' -r acceptor
+        fi
         out="$(cat)"
         ec "$out"
     } # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF' # to remove empty lines (I don't know why I commented this, or if it actually works. But I now use rg itself to filter empty lines out.

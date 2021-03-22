@@ -124,6 +124,7 @@ function ensure() {
     ##
     return $ret
 }
+alias assert='ensure'
 function ensure-args() {
     if (( $#@ <= 1 )) ; then
         ecerr "$0: not enough arguments."
