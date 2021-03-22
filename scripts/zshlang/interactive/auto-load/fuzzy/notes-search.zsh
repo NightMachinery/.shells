@@ -48,7 +48,13 @@ function agfi() {
         q="\b${f}\b\s*\(\)|:\s*alias[^:=]*\s*\b$f\b|:\s*alifn[^:=]*\s*\b$f\b "
     fi
 
-    fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi  # match functions or aliases
+    fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi | {
+        if isI ; then
+            cat
+        else
+            sd '\n' '\n\n' # improves readability
+        fi
+    }
 }
 noglobfn agfi
 ##

@@ -230,22 +230,38 @@ function git-status-summary() {
 aliasfn gss git-status-summary
 function git-status-summary2() {
   # @alt gss [-uno]
-  local args=("$@")
+  local args=("$@") tail_mode="${gss_tail}"
 
   {
     git -c color.status=false submodule foreach git -c color.status=false status "$args[@]"| prefixer -a 'Submodules: '
     git -c color.status=false status "$args[@]"
   } | {
-    command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed
+    command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed | {
+      if test -n "$tail_mode" ; then
+        h_gss_tail
+      else
+        cat
+      fi
+    }
     true
   }
 }
+@opts-setprefix git-status-summary2 gss
 aliasfn gss2 git-status-summary2
+@opts-setprefixas gss2 git-status-summary2
+function h_gss_tail() {
+  local line
+  for line in "${(@f)$(cat)}" ; do
+    if [[ "$line" =~ '^\s*(\S*)\s*(.*)$' ]] ; then
+      ec "$match[1] $(basename "$match[2]")"
+    fi
+  done
+}
 function git-commitmsg() {
   ## alts
   # git diff --cached --diff-filter='M' --name-only # gives names of modified files
   ##
-  local msg="$(git-status-summary2 -uno)"
+  local msg="$(@opts tail y @ git-status-summary2 -uno)"
 
   # ec-tty $msg
   msg="$(ecn $msg | prefixer --skip-empty -o '; ')"
