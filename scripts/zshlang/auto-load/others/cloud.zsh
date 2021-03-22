@@ -15,6 +15,7 @@ Use rcrdl to copy from remote to local."
 }
 function rcrdl() {
     : "rclone auto-skips existing files, but we need special support for tags."
+    : "Use 'rcrget.' to download a remote dir to PWD"
 
     local remote="$1" local="$2"
     local localpath="$local"
@@ -92,14 +93,18 @@ function rcrmount-up() {
     rcr mount --vfs-cache-max-size 3G --vfs-cache-mode writes --cache-dir ~/tmp/cache --vfs-cache-max-age $((1))h --vfs-cache-poll-interval 1h "$@"
 }
 function rcrget() {
-    local id="$(url-tail "$1")"
-    rudi="$id" rcr copy rudi: rabbit0:g/"$*[2,-1]"
+    local id="$(url-tail "$1")" dest="${rcrget_dest:-rabbit0:g}"
+    rudi="$id" rcr copy rudi: "$dest"/"$*[2,-1]"
 }
+function rcrget.() {
+    rcrget_dest=. rcrget "$@"
+}
+##
 function jdlrc() {
     jglob
     local i
     for i in "$@" ; do
-        rcr copy -v --no-traverse "./$i" "rabbit0:julia/$jrabbit"
+        reval-ec rcr copy -v --no-traverse "./$i" "rabbit0:julia/$jrabbit"
     done
 }
 function aa-rc() {
