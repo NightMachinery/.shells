@@ -97,6 +97,10 @@ function headphones-is() {
 aliasfn is-headphones headphones-is
 ##
 function lsof-openfiles() {
-    sudo lsof -n | cut -f1 -d' ' | uniq -c | sort | tail
+    local user="$(whoami)"
+    ec "Total open files for $user: $(lsof -u "$user" | wc -l)"
+    
+    # sudo lsof -n | cut -f1 -d' ' | uniq -c | sort | tail -n30
+    sudo lsof -n | cut -f1 -d' ' | gsort | guniq -c | gsort | tail -n30 # this merges different processes with the same name. idk what happens in the unmerged case exactly.
 }
 ##

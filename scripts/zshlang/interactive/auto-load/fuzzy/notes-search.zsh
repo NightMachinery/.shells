@@ -92,13 +92,16 @@ function rem-fz() {
 aliasfn ntrem rem-fz
 aliasfn rem rem-fz
 function remd() {
-    ## testing
+    ## tests:
     # `fnrep datej "ec 1399/12/03" remd`
+    # `fnswap isI false fnrep datej "ec 1399/12/03" remd`
+    # `fnswap isI false remd`
+    # `FORCE_NONINTERACTIVE=y remd mid`
     ##
     local query="$(fzp_ug=ni fz-createquery "$@")"
 
     local ntsearch_lines_nnp=y
-
+    
     local now=("${(s./.)$(datej)}")
     local cyear="$now[1]"
     local cmonth="$now[2]"
@@ -244,14 +247,23 @@ function ntsearch-lines() {
             local cmd='(progn '
             for i in {1..$#files} ; do
                 # (forward-char $col)
-                cmd+=" (find-file \"${files[$i]}\") (goto-line ${linenumbers[$i]}) "
-                cmd+=' (recenter)'
+                ##
+                if (( $#files > 1 )) ; then
+                    cmd+="(tab-bar-new-tab) "
+                    if (( i == 1 )) ; then
+                        cmd+="(tab-bar-close-other-tabs) "
+                    fi
+                fi
+                cmd+="(find-file \"${files[$i]}\") (goto-line ${linenumbers[$i]}) "
+                ##
+                cmd+='(recenter) '
             done
             # lower than this 1.5 delay will not work. More delay might be necessary for edge cases.
             # The first time we use this in a zsh session, the highlight sometimes does not work. Idk why.
-            cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h)"
+            cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h) "
             cmd+=')'
-            revaldbg emacsclient -t -e "$cmd"
+            # --no-wait will open stuff in the active frame, instead of opening a new frame
+            revaldbg emacsclient -a '' -t -e "$cmd"
         else
             # should work with both emacs and vim
             # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
