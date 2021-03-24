@@ -1,7 +1,13 @@
 ##
 typeset -g proxycmd="${proxycmd:-command}"
 typeset -g proxyenv="${proxyenv:-reval}"
+###
+# Do not add each IP in full - it will be too long and you won't be able to execute any commands in bash:
+# printf -v no_proxy '%s,' 10.1.{1..255}.{1..255};
+# export no_proxy="${no_proxy%,}";
 ##
+export no_proxy='127.0.0.1,localhost'
+###
 socksport=1081
 export pxs_env="ALL_PROXY=socks5h://127.0.0.1:$socksport"
 alias pxs="$pxs_env"

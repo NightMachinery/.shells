@@ -8,7 +8,7 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_e=(@opts dest $tlg_podcastgen @ podcast2tel)
 # tmuxnewshenv="rt_skip='$rt_skip' rt_e=(amar-process) rt_notel=y rt_ge=(withchrome getlinks-uniq -e '/session/id/video/') rt_nt=y rt_eid=$((3600*3)) rt_eud=0" tmuxnewsh rss-ocwvids rss-tsend 'http://ocw.sharif.edu/course/id/224'
 ##
 tmuxnewsh2 rss-lw rt_skip=$rt_skip rt_e=rss-tll rss-tsend 'https://www.greaterwrong.com/users/zvi?show=posts&format=rss'
-tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend 'https://www.scottaaronson.com/blog/?feed=rss2' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' 'https://www.overcomingbias.com/feed' 'https://danluu.com/atom.xml' 'https://feeds2.feedburner.com/GFWReport' 'http://www.viridiandreams.net/feed/' 'https://www.bloomberg.com/opinion/authors/ARbTQlRLRjE/matthew-s-levine.rss'
+tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh rss-gen rss-tsend 'https://www.scottaaronson.com/blog/?feed=rss2' 'https://julialang.org/feed.xml' 'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' 'https://www.overcomingbias.com/feed' 'https://danluu.com/atom.xml' 'https://feeds2.feedburner.com/GFWReport' 'http://www.viridiandreams.net/feed/' 'https://www.bloomberg.com/opinion/authors/ARbTQlRLRjE/matthew-s-levine.rss' 'https://www.oreilly.com/radar/topics/radar-trends/feed/index.xml'
 # 'https://buttondown.email/hillelwayne/rss' 'https://huyenchip.com/feed.xml' 'https://tamaspapp.eu/post/index.xml'
 # Rob Henderson Newsletter (Human Nature series) https://www.amazon.com/Incentives-Motivation-Information-Donald-Campbell-dp-1107610338/dp/1107610338/ref=dp_ob_title_bk
 
@@ -23,7 +23,7 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_e=(tl -p 'stratechery | ')" tmuxnewsh rss-st
 tmuxnewshenv="rt_skip='$rt_skip' rt_c=(rss-ctitle) rc_t=(-v 'Ansi Common Lisp') rt_e=(tl -p 'Paul Graham | ')" tmuxnewsh rss-paul rss-tsend 'http://www.aaronsw.com/2002/feeds/pgessays.rss'
 
 # alt: https://www.oreilly.com/radar/topics/radar-trends/feed/index.xml
-tmuxnewshenv="rt_skip='$rt_skip' rt_ge=(getlinks-c -e 'radar-trends-to-watch') rt_nt=y rt_eid=$((3600*24)) rt_eud=0" tmuxnewsh rss-oreillyTrends rss-tsend 'https://www.oreilly.com/radar/topics/radar-trends/'
+# tmuxnewshenv="rt_skip='$rt_skip' rt_ge=(getlinks-c -e 'radar-trends-to-watch') rt_nt=y rt_eid=$((3600*24)) rt_eud=0" tmuxnewsh rss-oreillyTrends rss-tsend 'https://www.oreilly.com/radar/topics/radar-trends/'
 
 
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(tsend-rssln $ephemeral) rt_notel=y rt_id=$arista" tmuxnewsh rss-techmeme rss-tsend 'https://www.techmeme.com/feed.xml'

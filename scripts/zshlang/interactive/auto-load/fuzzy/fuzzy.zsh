@@ -170,8 +170,10 @@ function v() {
     local ve="$ve"
     reval "${veditor[@]}" "${(@)files}"
 }
+# function vni() { fr "${veditor[@]}" . $NIGHTDIR }
 ##
-function vni() { fr "${veditor[@]}" . $NIGHTDIR }
+# vc: Visual Code
+# this opens a new window for me when the first window opened was not by itself (perhaps a macOS bug?)
 aliasfn vc code-insiders --reuse-window --add # --add: Add a folder or multiple folders to the last active VS Code instance for a multi-root workspace.
 function coder() {
     local p="$(<<<$1 sd "$HOME" /home/eva)"
@@ -179,10 +181,10 @@ function coder() {
 }
 aliasfn vcr coder
 ##
-aliasfn vr veditor=(coder) v
-aliasfn vcode veditor=(code-insiders --reuse-window)
-aliasfn ve veditor=(emc)
-aliasfn vv ve v
+aliasfn vr veditor=(coder) v # v remote
+aliasfn ve-code veditor=(code-insiders --reuse-window)
+aliasfn ve-emc veditor=(emc)
+aliasfn vv ve-emc v
 ###
 function vp-ls() {
     arrN ~/Downloads/**/*.pdf ~/Base/_Books/**/*.pdf
