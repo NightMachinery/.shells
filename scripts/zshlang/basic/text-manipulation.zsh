@@ -22,7 +22,8 @@ function sdlit() {
 }
 ##
 function rget() {
-    command rg --text --smart-case --only-matching --replace '$1' "$@"
+    local rep="${rget_replace:-${rget_r:-\$1}}"
+    command rg --text --smart-case --only-matching --replace "$rep" "$@"
 }
 ##
 function text-wrap() {

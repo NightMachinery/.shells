@@ -4,21 +4,51 @@ aliasfn icat-it ~/.iterm2/imgcat
 aliasfn ils-it ~/.iterm2/imgls
 ## https://github.com/olivere/iterm2-imagetools
 function icat-go() {
+    : "@warn will uglify images if it has to shrink them"
     isI || return 0
-    local h="${icat_go_height:-${icat_go_h:-1300}}"
+    local h="${icat_go_height:-${icat_go_h:-${icat_h:-1300}}}"
 
     local opts=()
     [[ "$h" == x ]] || opts+=(-height ${h}px) # This will zoom, too, but that's actually good in most cases!
     "$GOBIN/imgcat" "$opts[@]" "$@"
 }
+function ils-imgls() {
+    if (( $#@ == 0 )) ; then
+        set -- ${~imageglob}
+    fi
+    (( $#@ == 0 )) && return 0
+
+    isI || { exa -a "$@" ; return 0 }
+    imgls -height 200px "$@"
+}
+function ils-montage() {
+    if (( $#@ == 0 )) ; then
+        set -- ${~imageglob}
+    fi
+    (( $#@ == 0 )) && return 0
+
+    local tmp="$(gmktemp --suffix=.png)"
+
+    #  '1x1<' tells IM to only resize smaller images to the given size. As no image can be smaller that 1 pixel, no image will be resized. The tile size will thus be again the largest dimention of all the images on the page.
+    magick montage -label '%f' -geometry '1x1<+0+0' "$@" png:- >$tmp | icat_margin=100 icat-autoresize
+    pbadd "$tmp"
+}
 function ils() {
-    isI || { exa -a ; return 0 }
-    imgls -height 200px ${~imageglob} "$@"
+    if (( $#@ == 0 )) ; then
+        set -- ${~imageglob}
+    fi
+    (( $#@ == 0 )) && return 0
+
+    if (( $#@ <= 6 )) ; then
+        ils-montage "$@"
+    else
+        ils-imgls "$@"
+    fi
 }
 ## https://github.com/wookayin/python-imgcat
 function icat-py() {
     isI || return 0
-    python -m imgcat --height 30 "$@" # This will zoom, too, but that's actually good in most cases!
+    python -m imgcat --height "${icat_h:-30}" "$@" # This will zoom, too, but that's actually good in most cases!
 }
 ##
 aliasfn icat-kitty kitty +kitten icat
@@ -29,6 +59,16 @@ function icat-realsize() {
     isI || return 0
     @opts h x @ icat-go "$@"
 }
+function icat-autoresize() {
+    local margin="${icat_margin:-800}"
+    (( $#@ == 0 )) && set -- -
+
+    local i
+    for i in $@ ; do
+        magick convert "${${i:e}:-png}":"$i" -resize "$(( $(screen-width) - margin ))"x png:- | icat-realsize
+    done
+}
+@opts-setprefix icat-autoresize icat
 function icat() {
     isI || return 0
     if isKitty ; then
@@ -36,12 +76,19 @@ function icat() {
         return $?
     fi
     if test -z "$TMUX" ; then
-        icat-go "$@"
+        icat-autoresize "$@"
     else
         icat-py "$@"
         ecerr "$0: Tmux not supported."
         # @todo use ANSI https://github.com/trashhalo/imgcat
     fi
+}
+function icat-labeled() {
+    local i
+    for i in "$@" ; do
+        ec $i
+        icat $i
+    done
 }
 ###
 function iterm-boot() {

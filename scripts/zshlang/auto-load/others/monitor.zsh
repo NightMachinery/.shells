@@ -104,3 +104,16 @@ function lsof-openfiles() {
     sudo lsof -n | cut -f1 -d' ' | gsort | guniq -c | gsort | tail -n30 # this merges different processes with the same name. idk what happens in the unmerged case exactly.
 }
 ##
+function screen-resolution() {
+    : "outputs: width \n height"
+    ensure isDarwin @MRET
+
+    system_profiler SPDisplaysDataType | @opts r '$1'$'\n''$2' @ rget 'Resolution:\s*(\d+)\s*x\s*(\d+)'
+}
+function screen-width() {
+    screen-resolution | ghead -n 1
+}
+function screen-height() {
+    screen-resolution | gtail -n 1
+}
+##

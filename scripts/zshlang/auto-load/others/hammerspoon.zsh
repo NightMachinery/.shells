@@ -43,6 +43,7 @@ function hs-popclick2icon() {
             # fsay "Yikes forever"
         }
     fi
+    true
 }
 ##
 function gradS-get() {
