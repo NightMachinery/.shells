@@ -126,9 +126,17 @@ function jiconpack() {
     re convert-pad *.png
 }
 ##
-function img-dimensions() {
-  identify -format 'width=%wpx;height=%hpx;' "$1" # 2>/dev/null
+# function img-dimensions() {
+#     magick identify -format 'width=%wpx;height=%hpx;' "$1" # 2>/dev/null
+# }
+function img-width() {
+    magick identify -format '%w' "$1"
 }
+reify img-width
+function img-height() {
+    magick identify -format '%h' "$1"
+}
+reify img-height
 ##
 function pad2square() {
     # @alt convert-pad

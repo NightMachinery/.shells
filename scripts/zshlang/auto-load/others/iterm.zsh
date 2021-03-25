@@ -21,6 +21,7 @@ function ils-imgls() {
     isI || { exa -a "$@" ; return 0 }
     imgls -height 200px "$@"
 }
+@opts-setprefix ils-imgls icat
 function ils-montage() {
     if (( $#@ == 0 )) ; then
         set -- ${~imageglob}
@@ -30,9 +31,10 @@ function ils-montage() {
     local tmp="$(gmktemp --suffix=.png)"
 
     #  '1x1<' tells IM to only resize smaller images to the given size. As no image can be smaller that 1 pixel, no image will be resized. The tile size will thus be again the largest dimention of all the images on the page.
-    magick montage -label '%f' -geometry '1x1<+0+0' "$@" png:- >$tmp | icat_margin=100 icat-autoresize
+    magick montage -label '%f' -geometry '1x1<+0+0' "$@" png:- >$tmp | icat_margin='' icat-autoresize
     pbadd "$tmp"
 }
+@opts-setprefix ils-montage icat
 function ils() {
     if (( $#@ == 0 )) ; then
         set -- ${~imageglob}
@@ -45,6 +47,7 @@ function ils() {
         ils-imgls "$@"
     fi
 }
+@opts-setprefix ils icat
 ## https://github.com/wookayin/python-imgcat
 function icat-py() {
     isI || return 0
@@ -60,12 +63,36 @@ function icat-realsize() {
     @opts h x @ icat-go "$@"
 }
 function icat-autoresize() {
-    local margin="${icat_margin:-800}"
+    local margin="${icat_margin:-${icat_m}}"
     (( $#@ == 0 )) && set -- -
 
+    integer margin_height=100
+    local sw="$(screen-width)"
+    local sh="$(screen-height)"
     local i
     for i in $@ ; do
-        magick convert "${${i:e}:-png}":"$i" -resize "$(( $(screen-width) - margin ))"x png:- | icat-realsize
+        local m="$margin"
+        if [[ "$i" == - ]] ; then
+            i="$(gmktemp --suffix=.png)"
+            cat > "$i"
+            # needed for gettings dimensions
+        fi
+        local w_r=$(( sw - 50 )) # width_real
+        if test -z "$m" ; then
+            # needs zsh/mathfunc
+            local w="$(img-width "$i")"
+            local h="$(img-height "$i")"
+            local r=$(( float(w)/h ))
+            # re dvar w h r
+            local max_w=$(( int((sh - margin_height) * r) ))
+            if (( w_r > max_w )) ; then
+                # dvar max_w
+                w_r=$max_w
+            fi
+        else
+            w_r=$(( sw - m ))
+        fi
+        magick convert "${${i:e}:-png}":"$i" -resize "$w_r"x png:- | icat-realsize
     done
 }
 @opts-setprefix icat-autoresize icat
