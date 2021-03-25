@@ -23,8 +23,7 @@ fi
 context="${fzf_mru_context:-${context}}"
 if test -z "$context" ; then
     # @warn setting the context with this heuristic can introduce non-existent cached entries into different contexts
-    context="$(echo "$input" | ghead -n 2 | gtr -d $'\n''/\\')" || return $?
-    # @privacy we can hash the context name to avoid putting candidate names on the filesystem, but as the files themselves contain some data, it's rather pointless.
+    context="$(echo "$input" | ghead -n 2 | md5sum | gawk '{ORS="" ; print $1}')" || return $?
 
     if test -z "$context" ; then
     echo "$0: You need to provide a context. (Automatic generation of a context failed.)" >&2
