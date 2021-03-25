@@ -108,7 +108,7 @@ fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
 ##
 ffman() {
     # mnf
-    man -k . | fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
+    man -k . | fzf_mru_context="$0" fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
 }
 alias ffm=ffman
 ###
@@ -166,7 +166,7 @@ function v() {
     # %Y     time of last data modification, seconds since Epoch
     # reing gstat is needed if the files get too numerous, but then things will be too slow
     files=( ${(0@)"$(gstat  --printf='%040.18Y:%n\0' "${(@)files:|excluded}" | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"} ${(@)excluded} ) #Don't quote this there is always a final empty element
-    files=( ${(0@)"$(<<<"${(F)files}" fz --print0 --query "$q")"} ) || return 1
+    files=( ${(0@)"$(<<<"${(F)files}" fzf_mru_context="$0" fz --print0 --query "$q")"} ) || return 1
     local ve="$ve"
     reval "${veditor[@]}" "${(@)files}"
 }
@@ -194,6 +194,6 @@ function vp() {
     local q="$* "
     # local q="$(fz-createquery "$@")"
 
-    vp-ls | fz-rtl --query "$q" | inargsf chrome-open-pdf
+    vp-ls | fzf_mru_context="$0" fz-rtl --query "$q" | sponge | inargsf chrome-open-pdf
 }
 ##

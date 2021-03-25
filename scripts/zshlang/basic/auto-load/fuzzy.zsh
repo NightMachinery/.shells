@@ -37,11 +37,16 @@ function fzf-noempty() {
     test -z "$in" && { return 130 } || { ec "$in" | fzf-gateway "$@" }
 }
 function fzf-gateway() {
+    local -x SHELL="${FZF_SHELL:-${commands[dash]}}"
     if true ; then # we might want to check tmux's version here, as fzf-tmux needs the current HEAD
-    SHELL="${FZF_SHELL:-${commands[dash]}}" fzf-tmux -p90% "$@" | sponge
-    # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
+        if test -z "$fzf_mru_context" ; then
+           fzf-tmux -p90% "$@" | sponge
+           # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
+        else
+            fzf_mru.sh "$@"
+        fi
     else
-    SHELL="${FZF_SHELL:-${commands[dash]}}" fzf "$@"
+        fzf "$@"
     fi
 }
 function fzp() {

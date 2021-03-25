@@ -39,7 +39,7 @@ function ntag-lv() {
 function openv() {
     local dirs=(${openv_dirs[@]}) query="$(fz-createquery "$@")"
     test -z "$dirs[*]" && dirs=(.)
-    @opts nopriority '' @ ntag-lv "$dirs[@]" | fz-ntag --delimiter / --with-nth  -3..-1 --query "$query" --preview-window down:4:wrap | inargsf play-tag
+    @opts nopriority '' @ ntag-lv "$dirs[@]" | fzf_mru_context="$0_${(@F)dirs}" fzf_mru_count=10 fz-ntag --tiebreak=end,length --delimiter / --with-nth  -3..-1 --query "$query" --preview-window down:4:wrap | inargsf play-tag
 }
 function delenda() {
     ntag-filterori red green aqua teal gray grey | inargsf trs

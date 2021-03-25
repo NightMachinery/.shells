@@ -40,8 +40,13 @@ function ffz() {
         return $r
     }
     if test -z "$sel" ; then
-        ecerr "$0: selection is empty even though no error was returned. This is likely to be a bug."
-        return 1
+        if test -z "$ffz_nocache" ; then
+            ffz_nocache=y reval "$0" "$@"
+            return $?
+        else
+            ecerr "$0: selection is empty even though no error was returned. This is likely to be a bug."
+            return 1
+        fi
     fi
     sel="$(ntag-recoverpath "$sel")"
     if test -z "$ffz_nocache" && ! test -e "$sel" ; then

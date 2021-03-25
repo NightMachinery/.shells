@@ -137,7 +137,7 @@ function ntag-mv() {
         ecerr "$0: Dest exists: $o"
         return 1
     }
-    mv "$i" "$o"
+    command mv "$i" "$o"
 }
 ##
 function ntag-migrate-sep() {

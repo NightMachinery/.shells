@@ -23,14 +23,14 @@ fi
 context="${fzf_mru_context:-${context}}"
 if test -z "$context" ; then
     # @warn setting the context with this heuristic can introduce non-existent cached entries into different contexts
-    context="$(echo "$input" | ghead -n 2 | md5sum | gawk '{ORS="" ; print $1}')" || return $?
+    context="$(echo "$input" | ghead -n 2)" || return $?
 
     if test -z "$context" ; then
     echo "$0: You need to provide a context. (Automatic generation of a context failed.)" >&2
     exit 1
     fi
 fi
-
+context="$(echo "$context" | md5sum | gawk '{ORS="" ; print $1}')" # protects against bad names, also good for privacy, but bad for readability
 
 conf_dir="$HOME/.cache/fzf_mru"
 mkdir -p "$conf_dir" || (
@@ -45,7 +45,7 @@ touch "$conf_cache" || (
 conf_tmp="${conf_cache}.tmp"
 
 # Removing duplicate lines: seen is an associative-array that Awk will pass every line of the file to. If a line isn't in the array then seen[$0] will evaluate to false. (The name 'seen' does not matter.)
-result="$(echo "$input" | cat "$conf_cache" - | gawk '!seen[$0]++' | fzf --tiebreak=index "$@")" || return $?
+result="$(echo "$input" | cat "$conf_cache" - | gawk '!seen[$0]++' | fzf-tmux -p90% --tiebreak=index "$@" | sponge)" || return $?
 if test -n "$result" ; then
     echo "$result"
     ##
