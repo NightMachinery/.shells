@@ -1,5 +1,5 @@
 #!/bin/dash
-# @deps: GNU coreutils prefixed with 'g'
+# @deps: GNU coreutils prefixed with 'g' (as installed by Homebrew), GNU moreutils, fzf-tmux
 
 echo() {
     printf -- "%s\n" "$*"
@@ -30,6 +30,7 @@ if test -z "$context" ; then
     exit 1
     fi
 fi
+# md5sum is from coreutils
 context="$(echo "$context" | md5sum | gawk '{ORS="" ; print $1}')" # protects against bad names, also good for privacy, but bad for readability
 
 conf_dir="$HOME/.cache/fzf_mru"
