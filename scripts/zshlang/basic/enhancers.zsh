@@ -50,7 +50,9 @@ function ruu() {
     local f=()
     [[ "$1" =~ '^\s*$' ]] || f+="${=1}"
     local a="$(expand-alias-strip "$2")"
-    revaldbg "$f[@]" "$=a" "${@:3}"
+
+    # @experimental
+    evaldbg "$(gq "$f[@]")" "$a" "$(gq "${@:3}")"
 }
 noglobfn() {
     doc Prepends noglob to functions. You need to define the original function in quotes if you want to reload the function definition in the future.

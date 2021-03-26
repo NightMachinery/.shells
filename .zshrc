@@ -457,5 +457,5 @@ ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
 ##
 psource $HOME/.shellfishrc
 ###
-export rcLoaded='loading'
-zsh-defer export rcLoaded='yes'
+rcLoaded='loading' # Do NOT export this, or `exec zsh` will inherit it
+zsh-defer typeset -g rcLoaded='yes'

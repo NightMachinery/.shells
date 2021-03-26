@@ -5,7 +5,7 @@ cp() {
     enh-mkdest "$@"
 }
 ##
-_h_mv() {
+h_mv() {
     local emd_c='command mv'
     if isIReally && isRcLoaded ; then
         emd_c='mv-merge'
@@ -18,7 +18,7 @@ mv () {
     args-nochromefile "$@"
     set -- "${out[@]}"
     if [ "$#" -ne 1 ] || [ ! -e "$1" ]; then
-        _h_mv "$@"
+        h_mv "$@"
     else
         local newfilename="$1"
         vared newfilename || {
@@ -26,7 +26,7 @@ mv () {
             return 1
         }
         # bash: read -ei "$1" newfilename
-        _h_mv -v -- "$1" "$newfilename"
+        h_mv -v -- "$1" "$newfilename"
     fi
 }
 mv2 () {
