@@ -75,7 +75,7 @@ dvar () {
 }
 function raise-blood() ceer rederr.zsh source
 function e() {
-    echo $? "${pipestatus[@]}" "${PIPESTATUS[@]}"
+    ecerr $'\n'Returned $?:"${(j.|.)pipestatus[@]}"
 }
 function argerdbg() {
     isNotDbg || {
