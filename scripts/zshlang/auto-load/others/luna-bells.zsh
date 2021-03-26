@@ -239,11 +239,12 @@ function bella-zsh-maybe() {
     # @notcrossplatform
     local ITERM_SESSION_ID="${1:-$ITERM_SESSION_ID}" # brishz has its own bogus ITERM_SESSION_ID, so prefer explicit input
     
-    isDarwin && iterm-session-is-active && {
+    if isDarwin && iterm-session-is-active ; then
+        # this is called via BrishGarden by iTerm
         local skipfirst=''
         iterm-focus-is && skipfirst=y
         silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
-        }
+    fi
 }
 ## Little Misfortune
 function bell-lm-maker() {

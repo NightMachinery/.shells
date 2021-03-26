@@ -70,6 +70,12 @@ function  mv-merge() {
         if [[ "$i" == '--' ]] ; then
             opts_end=y
         fi
+        if [[ "$i" == /Volumes/* ]] ; then
+            if ask "$0: There seems to be external (cross-device) paths in args. Proceed with using normal mv instead?" ; then
+                command gmv -i --verbose "$@"
+                return $?
+            fi
+        fi
     done
     if (( ${#paths} <= 1 )) ; then
         ecerr "$0: Only one path supplied."
