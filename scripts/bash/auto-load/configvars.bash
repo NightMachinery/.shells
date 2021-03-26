@@ -38,7 +38,7 @@ export codedir="$HOME/code"
 export BASE_DIR="$HOME/base"
 export GREENCASE_DIR="$BASE_DIR/music/greencase"
 ##
-export nightNotes="$cellar/notes/"
+export nightNotes="$cellar/notes/" # keep the trailing '/', it is important when removing prefixes
 export orgdir="$nightNotes/org"
 export memorydir="$nightNotes/private/memories"
 export peopledir="$nightNotes/private/memories/people"

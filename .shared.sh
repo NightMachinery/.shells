@@ -11,6 +11,7 @@ fi
 addToPATH /usr/sbin
 addToPATH /Applications/SuperCollider.app/Contents/Resources/
 addToPATH /Applications/SuperCollider.app/Contents/MacOS/
+addToPATH /Applications/MEGAcmd.app/Contents/MacOS/
 addToPATH ~/.emacs.d.doom/bin/
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"

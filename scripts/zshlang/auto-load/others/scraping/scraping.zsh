@@ -751,6 +751,7 @@ function getlinks2() {
     fhMode="${fhMode:-curl}" getlinksfull2 "$@"
 }
 function getlinks-c() {
+    # @hiddenAPI 'fhMode=aacookies' is used by aamedia to fnswap aria2c
     fhMode="${fhMode:-aacookies}" getlinksfull2 "$@"
 }
 function getlinks-uniq() {
@@ -776,20 +777,28 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
 
     local formats=( ${media_formats[@]} pdf )
     local regex='\.('"${(j.|.)formats}"')$'
-    local url size
+    local url size matched
     for url in ${urls[@]}
     do
         url="$(url-final2 $url)" # url-final2 might be better as our URLs can be big files
+        matched=''
         if [[ "$url" =~ "$regex" ]] ; then
             ec $url
+            matched=y
             # even a URL that ends in, e.g., '.mkv' can be actually an HTML page that links to the actual file
         fi
         size="$(url-size "$url")" || {
             ecerr "$0: Could not get size of URL '$url'"
-            continue
+            if test -z "$matched" ; then
+                ecerr "$0: proceeding anyway ..."
+                size=0
+            else
+                ecerr "$0: skipping it, as it has already matched"
+                continue
+            fi
         }
         if (( $size < 5000000 )) ; then # 5 MB
-            getlinks-c -e $regex "$url"
+            fnswap aria2c 'gtimeout 5m aria2c' getlinks-c -e $regex "$url"
         else
             ecerr "$0: Skipped big URL '$url'"
         fi

@@ -1,8 +1,16 @@
 function rtl-reshaper-py() {
-    rtl_reshaper.py "$@"
+  if isRtl ; then
+      cat
+  else
+      rtl_reshaper.py "$@"
+  fi
 }
 function rtl-reshaper() {
-    rtl_reshaper_rs "$@"
+    if isRtl ; then
+        cat
+    else
+        rtl_reshaper_rs "$@"
+    fi
 }
 function reval-rtl() {
     reval "$@" | rtl-reshaper

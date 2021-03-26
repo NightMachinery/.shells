@@ -33,7 +33,11 @@ function ntag-lv-nocolor() {
     fi
 }
 function ntag-lv() {
-    ntag-lv-nocolor "$@" | ntag-color
+    if isI && istty ; then
+        ntag-lv-nocolor "$@" | ntag-color | rtl-reshaper
+    else
+        ntag-lv-nocolor "$@" | ntag-color
+    fi
 }
 @opts-setprefix ntag-lv-nocolor ntag-lv
 function openv() {

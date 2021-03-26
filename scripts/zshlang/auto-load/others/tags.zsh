@@ -47,7 +47,7 @@ aliasfn grey gray
 ###
 function ntag-l() {
     if isI && istty ; then
-        exa -a --color always "$@" | ntag-color
+        exa -a --color always "$@" | ntag-color | rtl-reshaper
     else
         exa -a "$@"
     fi
@@ -59,7 +59,7 @@ lv-sorted() { ntag-lv | tac }
 lv-simple2() { @opts nopriority y @ ntag-lv | tac }
 function ntag-ll() {
     if isI && istty ; then
-        exa -a -l --color always "$@" | ntag-color
+        exa -a -l --color always "$@" | ntag-color | rtl-reshaper
     else
         exa -a -l "$@"
     fi
@@ -68,7 +68,7 @@ aliasfn ll ntag-ll
 # aliasfn lll ntag-ll
 function ntag-lt() {
     if isI && istty ; then
-        exa -a -T --color always "$@" | ntag-color
+        exa -a -T --color always "$@" | ntag-color | rtl-reshaper
     else
         exa -a -T "$@"
     fi
@@ -78,7 +78,12 @@ aliasfn lt ntag-lt
 ntag-ls() {
     : "Lists only tagged files"
     local paths=("${@:-.}") # you can also give options to fd, e.g., `ntag-ls --maxdepth 1`
-    fd --color always ${ntag_fd_opts[@]} --glob --type file "*..*..*" "$paths[@]" | ntag-color
+
+    if isI && istty ; then
+        fd --color always ${ntag_fd_opts[@]} --glob --type file "*..*..*" "$paths[@]" | ntag-color | rtl-reshaper
+    else
+        fd ${ntag_fd_opts[@]} --glob --type file "*..*..*" "$paths[@]"
+    fi
 }
 aliasfn lk ntag-ls
 ##

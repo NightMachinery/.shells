@@ -49,6 +49,16 @@ function isKitty() {
     test -n "$KITTY_WINDOW_ID"
 }
 iskitty() { isKitty "$@" ; }
+function isAppleTerminal() {
+    [[ "$TERM_PROGRAM" == Apple_Terminal ]]
+}
+function isiTerm() {
+    [[ "$TERM_PROGRAM" == iTerm.app ]]
+}
+##
+function isRtl() {
+    isKitty || isAppleTerminal
+}
 ##
 isI() {
     test -z "$FORCE_NONINTERACTIVE" && {
