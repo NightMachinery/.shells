@@ -57,6 +57,9 @@ function vcns() {
         vcn-with gss -uno
     } always { popf }
 }
+function vcndiff() {
+    vcn-with git diff HEAD
+}
 function vcnpp() {
     local msg="${*}"
 
