@@ -64,6 +64,10 @@ function str2tmuxname() {
     # this might be too restrictive
     gtr -cd ' [a-zA-Z0-9]_-'
 }
+function str2filename() {
+    # this might be too restrictive
+    gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t'
+}
 ##
 function tmux-capture() {
     local target="${1:?}" limit="${2}" # empty limit seems to mean return everything

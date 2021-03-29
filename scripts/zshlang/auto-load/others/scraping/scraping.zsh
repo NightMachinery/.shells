@@ -770,7 +770,7 @@ function url-size() {
 }
 ##
 function aamedia() {
-    mdoc "$0 <page-url> ...
+    mdoc "$0 <page-url, 0 <= level of recursion <= 1 > ...
 Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
 
     local urls=( ${(u@)@} )
@@ -812,10 +812,54 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
     }
 }
 function aaCW() {
-    mdoc "$0 <url> ..." MAGIC
-    local theCookies=${theCookies:-"$(cookies $1)"}
+    mdoc "$0 <url, 1 <= level of recursion <= 2 > ..." MAGIC
+    local theCookies=${theCookies:-"$(cookies $1)"} fhMode=aacookies
     getlinks-c -e 'resource/view\.php' "$@" | inargsf aamedia
 }
+alias aaCW1='aamedia1'
+function aamedia1() {
+    : "aaCW2 <link-to-page-that-contains-media (level of recursion = 1)> ..."
+    local theCookies=${theCookies:-"$(cookies $1)"} fhMode=aacookies
+    local urls=( ${(u@)@} )
+
+    local formats=( ${media_formats[@]} pdf )
+    local regex='\.('"${(j.|.)formats}"')$'
+    local i t l li titles=() links=()
+    for i in "$@" ; do
+        l="$(getlinks-c "$i" -e "$regex")" || continue
+        t="$(url-title "$i")"
+        for l2 in ${(@f)l} ; do
+            titles+="$t"
+            links+="$l"
+        done
+    done
+
+    bello
+    local sel_i
+    for i in {1.."${#links}"} ; do
+        l="${links[$i]}"
+        t="${titles[$i]}"
+        # reval-rtl ec "${t}:"$'\n'"$l"$'\n'
+        reval-rtl ecn "${t}:"$'\t'"$l"
+        ec
+    done | sponge | fz-masked "${(@F)links}" @RET # prints selected links to stdout
+    # fz-masked needs to be the last process in the pipe or it'll fork and we will lose sel_i
+    # do not rtl-reshape the links printed here, or they won't be copy-paste-able
+    ec $'\n'
+
+    local opts
+    for i in ${sel_i[@]} ; do
+        l="${links[$i]}"
+        t="${titles[$i]}"
+        test -z "$l" && continue
+        reval-rtl ec "Downloading ${t}:"$'\n'"$l" #$'\n'
+        opts=()
+        test -n "$t" && opts+=(-o "$(ec "${t}.${l:e}" | str2filename)")
+        revaldbg aacookies "$opts[@]" "$l"
+    done
+    unset sel_i
+}
+##
 function ygen() {
     y --force-generic-extractor "$@"
     rename .apt .mp4 *.apt

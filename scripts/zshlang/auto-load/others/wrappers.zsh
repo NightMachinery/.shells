@@ -60,3 +60,7 @@ watchm() {
     ruu "watch -n $1" "${@:2}"
 }
 ##
+function fd() {
+  # include all files by default
+  command fd -uuu "$@"
+}

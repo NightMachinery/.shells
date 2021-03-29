@@ -215,7 +215,7 @@ aliasfn bella-gc bell-auto bell-greencase
 aliasfn bella bella-toy
 aliasfn bellj bella
 aliasfn okj bell-auto-stop
-aliasfn bello bell-diwhite # main gateway of a single alarm bell
+aliasfn bello awaysh bell-diwhite # main gateway of a single alarm bell
 aliasfn bell-zsh bell-zsh1
 aliasfn bella-zsh bell-auto bell-zsh
 @opts-setprefix bella-zsh bell-auto

@@ -8,6 +8,9 @@ FZF_SIMPLE_PREVIEW="$FZF_RTL_PREVIEW"
 # fzf supports wrapping itself. # | command fold -s -w $FZF_PREVIEW_COLUMNS'
 # << was bad for dash, no <<< in dash
 ##
+FZF_CAT_PREVIEW='cat {f}'
+FZF_CAT_RTL_PREVIEW='cat {f} | rtl_reshaper_rs'
+##
 # FZF_PREVIEW_NTAG="brishz_in={} brishzq.zsh ntag-color"
 FZF_PREVIEW_NTAG="$FZF_SIMPLE_PREVIEW | ntagcolor"
 ##
@@ -101,6 +104,17 @@ function fzp() {
         }
     fi
 }
+##
+function fz-masked() {
+    : "GLOBAL sel_i"
+    unset sel_i
+    local masks="$(cat)" input="${@[-1]}" opts=("${@[1,-2]}")
+
+    sel_i="$(ecn "${masks}" | cat -n | FZF_SIMPLE_PREVIEW="${FZF_CAT_PREVIEW}" fz --with-nth 2.. "$opts[@]" | gawk '{print $1}')" @RET
+    gawk 'NR == FNR {nums[$1]; next} FNR in nums' <(ec "$sel_i") <(ec "$input")
+    sel_i=(${(@f)sel_i})
+}
+##
 function fzp-q() {
     local query="$(fz-createquery "$@")"
 
@@ -155,3 +169,4 @@ function fz-createquery() {
     done
     ec "$res"
 }
+##

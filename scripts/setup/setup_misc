@@ -5,10 +5,13 @@ tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
 
 curl https://cht.sh/:cht.sh > ~/bin/cht.sh
 chmod +x ~/bin/cht.sh
-##
+###
 conda install -c eumetsat expect
 conda install -c plotly plotly-orca # also can be installed via npm
 ##
+pig https://github.com/NightMachinary/BrishGarden.git
+pig git@github.com:NightMachinary/brish.git
+###
 cpanm App::ansifold
 ##
 nimble install https://github.com/NightMachinary/htmlmetadata

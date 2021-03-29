@@ -52,6 +52,8 @@ isDarwin && {
     export JAVA_HOME=$JAVA_HOME15
     addToPATH $JAVA_HOME
 
+    export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
+
     addToPATH /usr/local/opt/qt/bin
 
     export LDFLAGS='-L/usr/local/opt/texinfo/lib -L/usr/local/opt/qt/lib'

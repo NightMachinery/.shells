@@ -259,22 +259,6 @@ function jyl() {
 alifn jylist=jyl
 noglobfn jyl jylist
 ##
-function borg-req() {
-    curl --fail --silent --location --header "Content-Type: application/json" --data '@-' $borgEndpoint/"$@"
-}
-function borg-tt-mark() {
-	local out
-	out="$(ec "$*" | text2num | jq --raw-input --slurp --null-input --compact-output 'inputs as $i | {"name": $i}' | borg-req timetracker/mark/)" || return $?
-	test -z "$out" && return 1
-	ec $out
-	[[ "$out" == *("cold shoulder"|"Julia encountered an exception.")* ]] && return 1 || true
-}
-function borg-tt-last() {
-    local count="${1:-6}"
-
-    catsql --table activity --order id- --limit "$count" "$timetracker_db" | gsed -n '4,$p' | sd -f m '^\d+,' '' | sdlit $'\n' $'\n\n' | sdlit , $'\n    '
-}
-##
 function reval-2json() {
 	local out="$(gmktemp)"
 	local err="$(gmktemp)"

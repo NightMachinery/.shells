@@ -143,6 +143,12 @@ git-tree-sha1 = "2dcc50ea6a0a1ef6440d6eecd0fe3813e5671f45"
 uuid = "a9c8d775-2e2e-55fc-8582-045d282d599e"
 version = "1.0.0"
 
+[[CRlibm]]
+deps = ["Libdl"]
+git-tree-sha1 = "9d1c22cff9c04207f336b8e64840d0bd40d86e0e"
+uuid = "96374032-68de-5a5b-8d9e-752f78720389"
+version = "0.8.0"
+
 [[CSSUtil]]
 deps = ["Colors", "JSON", "Markdown", "Measures", "WebIO"]
 git-tree-sha1 = "b9fb4b464ec10e860abe251b91d4d049934f7399"
@@ -448,6 +454,11 @@ git-tree-sha1 = "18ee049accec8763be17a933737c1dd0fdf8673a"
 uuid = "da5c29d0-fa7d-589e-88eb-ea29b0a81949"
 version = "1.0.0"
 
+[[ErrorfreeArithmetic]]
+git-tree-sha1 = "d6863c556f1142a061532e79f611aa46be201686"
+uuid = "90fa49ef-747e-5e6f-a989-263ba693cf1a"
+version = "0.5.2"
+
 [[Exfiltrator]]
 git-tree-sha1 = "a9e7599414886b1ddd3055ec60a1a9315efacbe3"
 uuid = "8fb92a4a-34c4-45cc-956f-769d12f66c92"
@@ -499,6 +510,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "5a0d4b6a22a34d17d53543bd124f4b08ed78e8b0"
 uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
 version = "3.3.9+7"
+
+[[FastRounding]]
+deps = ["ErrorfreeArithmetic", "Test"]
+git-tree-sha1 = "224175e213fd4fe112db3eea05d66b308dc2bf6b"
+uuid = "fa42c844-2597-5d31-933b-ebd51ab2693f"
+version = "0.2.0"
 
 [[FileIO]]
 deps = ["Pkg"]
@@ -888,6 +905,12 @@ git-tree-sha1 = "535bcaae047f017f4fd7331ee859b75f2b27e505"
 uuid = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 version = "0.23.3"
 
+[[ImplicitEquations]]
+deps = ["IntervalArithmetic", "RecipesBase", "Test", "Unicode"]
+git-tree-sha1 = "847e80df5456f7f892b1c9bee28892ec63a04457"
+uuid = "95701278-4526-5785-aba3-513cca398f19"
+version = "1.0.4"
+
 [[Indexing]]
 git-tree-sha1 = "ce1566720fd6b19ff3411404d4b977acd4814f9f"
 uuid = "313cdc1a-70c2-5d6a-ae34-0150d3930a38"
@@ -943,6 +966,12 @@ deps = ["AxisAlgorithms", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "
 git-tree-sha1 = "eb1dd6d5b2275faaaa18533e0fc5f9171cec25fa"
 uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 version = "0.13.1"
+
+[[IntervalArithmetic]]
+deps = ["CRlibm", "FastRounding", "LinearAlgebra", "Markdown", "Random", "RecipesBase", "RoundingEmulator", "SetRounding", "StaticArrays"]
+git-tree-sha1 = "c550c0477cd137e266f56c5a4daeaf953b7d3208"
+uuid = "d1acc4aa-44c8-5952-acd4-ba5d80a2a253"
+version = "0.17.7"
 
 [[IntervalSets]]
 deps = ["Dates", "EllipsisNotation", "Statistics"]
@@ -1741,6 +1770,11 @@ git-tree-sha1 = "2ed8d8a16d703f900168822d83699b8c3c1a5cd8"
 uuid = "6038ab10-8711-5258-84ad-4b1120ba62dc"
 version = "1.0.2"
 
+[[RoundingEmulator]]
+git-tree-sha1 = "40b9edad2e5287e05bd413a38f61a8ff55b9557b"
+uuid = "5eaf0fd0-dfba-4ccb-bf02-d820a40db705"
+version = "0.2.1"
+
 [[RoundingIntegers]]
 deps = ["Test"]
 git-tree-sha1 = "293ba0ab32218b9ffd596040224228def84f8da0"
@@ -1782,6 +1816,12 @@ version = "1.2.16"
 
 [[Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[SetRounding]]
+deps = ["Test"]
+git-tree-sha1 = "faca28c7937138d560ede5bfef2076d0cdf3584b"
+uuid = "3cc68bcd-71a2-5612-b932-767ffbe40ab0"
+version = "0.2.0"
 
 [[ShaderAbstractions]]
 deps = ["ColorTypes", "FixedPointNumbers", "GeometryBasics", "LinearAlgebra", "Observables", "StaticArrays", "StructArrays", "Tables"]

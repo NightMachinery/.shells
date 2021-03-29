@@ -12,7 +12,7 @@ function wgd() {
     local WG_CONF="${1:-$WG_CONF}"
 
     bwg down "$WG_CONF"
-    sleep 0.1 ; wg-widget-refresh # otherwise thinks the net is down
+    sleep 0.2 ; wg-widget-refresh # otherwise thinks the net is down
 }
 ##
 function wg-toggle() {
