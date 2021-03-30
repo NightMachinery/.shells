@@ -56,7 +56,7 @@ pxify() {
 
     pxaify-command brew # makes downloads faster
     pxaify-command pip # makes downloads faster
-    pxaify-command git
+    # pxaify-command git # use git's own config
     pxaify-command go
     pxaify-command emacs
     pxaify-command emacsclient
@@ -183,4 +183,11 @@ function proxy-widget() {
 }
 # aliasfn proxy-widget-refresh btt-refresh '$proxy_widget_uuid'
 proxy-widget-refresh() { btt-update $proxy_widget_uuid "$(proxy-widget)" }
+##
+function proxy-git-on() {
+    git config --global http.proxy socks5h://127.0.0.1:"${1:-1081}"
+}
+function proxy-git-off() {
+    git config --global --unset http.proxy
+}
 ##

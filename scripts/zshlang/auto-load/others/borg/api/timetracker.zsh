@@ -30,6 +30,7 @@ function borg-tt-cmdlog() {
         if [[ "$i" =~ '^\s*:::(.*)' ]] ; then
             if test -n "$received_at" && (( $#cmd >= 1 )) ; then
                 reval-ec @opts at "$received_at" @ borg-tt-mark "${(@F)cmd}"
+                ec
             fi
             received_at="$match[1]"
             cmd=()
@@ -43,5 +44,6 @@ function borg-tt-cmdlog() {
     # @copypaste :
     if test -n "$received_at" && (( $#cmd >= 1 )) ; then
         reval-ec @opts at "$received_at" @ borg-tt-mark "${(@F)cmd}"
+        ec
     fi
 }

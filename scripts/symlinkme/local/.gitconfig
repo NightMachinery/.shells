@@ -18,6 +18,7 @@
   status = auto
 [http]
   sslVerify = true
+	proxy = socks5h://127.0.0.1:1081
 [pull]
 	rebase = false
 [difftool]
