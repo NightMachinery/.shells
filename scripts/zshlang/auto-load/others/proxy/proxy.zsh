@@ -185,6 +185,7 @@ function proxy-widget() {
 proxy-widget-refresh() { btt-update $proxy_widget_uuid "$(proxy-widget)" }
 ##
 function proxy-git-on() {
+    : "You need to set the appropriate SSH proxies, too"
     git config --global http.proxy socks5h://127.0.0.1:"${1:-1081}"
 }
 function proxy-git-off() {

@@ -223,7 +223,7 @@ aliasfn bella-zsh bell-auto bell-zsh
 ## https://www.iterm2.com/triggers.html
 # We might need to use `reset` after these magic commands, as they cause more than once activation in certain situations (tmux, mosh, emacs, etc)(Because the redraw the screen): https://iterm2-discuss.narkive.com/BQCgkSxC/trigger-only-in-new-output
 # If this is a big issue, add a UID to the magic commands, and store them in redis. Don't run commands for duplicate IDs. Periodically clean the stored IDs to minimize conflict chance.
-aliasfnq bella-magic ec $'\n'"${ITERMMAGIC}_BELLA"
+aliasfnq bella-magic ec $'\n'"${ITERMMAGIC}_BELLA" # slow activation is due to iTerm. The bell 'rings' almost immediately once it reaches BrishGarden.
 function bella-zsh-magic() {
     test -z "$ITERM_SESSION_ID" && return 1
     ec $'\n'"${ITERMMAGIC}_ZSH_BELLA_${ITERM_SESSION_ID}"
