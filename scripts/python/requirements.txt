@@ -71,3 +71,4 @@ yapf
 yq
 zxcvbn
 hiredis
+icecream

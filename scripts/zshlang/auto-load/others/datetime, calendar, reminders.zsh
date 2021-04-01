@@ -221,7 +221,7 @@ function remn-interactive() {
     
     local natdate=""
     # @warn brishz.dash does not quote its arguments, so we essentially have an @unsafeEval here. I think it's worth the speed boost, though I have noot profiled it.
-    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
+    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash reval-true serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
     remn "$text" "$natdate"
 }
 aliasfn ri remn-interactive

@@ -28,4 +28,8 @@ tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && TELEGRAM_TOKEN=$(gq $TELEGRA
 ##
 tmuxnewsh2 lightnovel-crawler PUBLIC_DATA_PATH=$HOME/Downloads/tmp PUBLIC_ADDRESS=https://files.lilf.ir/tmp/  BOT=telegram TELEGRAM_TOKEN=$TELEGRAM_TOKEN_OCEAN lightnovel-crawler
 ##
+if test -e ~/code/kotlin/smsq/go/config.json ; then
+    tmuxnew smsq smsq ~/code/kotlin/smsq/go/config.json
+fi
+##
 chronic-all
