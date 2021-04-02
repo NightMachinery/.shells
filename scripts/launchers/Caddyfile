@@ -100,6 +100,16 @@ https://garden.lilf.ir {
 # }
 
 ##
+# hook.android.lilf.ir:8443 {
+android.lilf.ir:8443, api.android.lilf.ir:8443, hook.android.lilf.ir:8443 {
+ reverse_proxy localhost:8445
+}
+# android.lilf.ir:8443, api.android.lilf.ir:8443 {
+#  reverse_proxy localhost:8446
+# }
+##
+
+##
 # doesn't work, our only bet is the forward proxy plugin
 # :8060 {
 #   reverse_proxy https://google.com
