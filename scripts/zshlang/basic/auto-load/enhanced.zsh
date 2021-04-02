@@ -14,9 +14,10 @@ h_mv() {
     enh-mkdest "$@"
 }
 mv () {
-    local out
+    unset out # out is GLOBAL
     args-nochromefile "$@"
     set -- "${out[@]}"
+    unset out
     if [ "$#" -ne 1 ] || [ ! -e "$1" ]; then
         h_mv "$@"
     else
@@ -26,7 +27,8 @@ mv () {
             return 1
         }
         # bash: read -ei "$1" newfilename
-        h_mv -v -- "$1" "$newfilename"
+        h_mv -v -- "$1" "$newfilename" @RET
+        out="$newfilename"
     fi
 }
 mv2 () {

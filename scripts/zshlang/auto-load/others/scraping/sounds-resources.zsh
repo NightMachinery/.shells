@@ -14,3 +14,11 @@ function sounds-resources-dl() {
         para trs ::: *.zip
     fi
 }
+##
+function gc-tag() {
+    if ask "$(heari "$(mpv-get)")" ; then
+        ntag-add "$(mpv-get)" blue @RET
+        mv "$ntag_add_dest"
+    fi
+}
+##

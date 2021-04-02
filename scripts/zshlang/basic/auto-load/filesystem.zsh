@@ -70,7 +70,7 @@ function  mv-merge() {
         if [[ "$i" == '--' ]] ; then
             opts_end=y
         fi
-        if [[ "$(realpath  "$i")" == /Volumes/* ]] ; then
+        if [[ "$(grealpath --  "$i")" == /Volumes/* ]] ; then
             if ask "$0: There seems to be external (cross-device) paths in args. Proceed with using normal mv instead?" ; then
                 command gmv -i --verbose "$@"
                 return $?

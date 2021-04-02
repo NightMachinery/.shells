@@ -77,7 +77,8 @@ function reval-notifexit() {
     setopt localtraps
     trap "" INT
     { ( reval "$@" ) } always {
-        # bello
+        bell-sc2-eradicator_destroyed
+        trap - INT # Remove active traps
         notif "$0: $@"
     }
 }

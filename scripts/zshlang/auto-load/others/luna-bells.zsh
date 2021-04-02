@@ -315,6 +315,10 @@ bell-maker pp-piece3 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything
 bell-pp-piece() { do-rnd bell-pp-piece{1..3} }
 bell-pp-piece-r() { redo2 10 bell-pp-piece }
 
+##
+bell-maker sc2-nav_online "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zCutscene_Zerg04_DropShipAdjutant_020_navigation online..blue...ogg"
+bell-maker sc2-eradicator_destroyed "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_172_eradicator destroyed situation critical..blue...ogg"
+##
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
 ##
 function bell-m-beeps() {
