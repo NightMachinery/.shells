@@ -1,0 +1,23 @@
+#!/usr/bin/env dash
+
+export PATH="$PATH:/usr/local/bin"
+
+if test "$1" = '-c' ; then
+   shift
+fi
+
+echo() {
+    printf -- "%s\n" "$*"
+}
+
+out="$(brishz_json_output=1 brishz_quote=y brishz.dash "cd $(command gprintf '%q' "$PWD") ; " "$@" " ; ret=\$? ; cd /tmp ; (exit \$ret) ")" || return $?
+
+echo "$out" | jq -rje .out
+echo "$out" | jq -rje .err >&2
+exit "$(echo "$out" | jq -rje .retcode)"
+
+## tests:
+# `sout brishz_para.dash ecerr hi`
+# `serr brishz_para.dash ecerr hi`
+# `brishz_para.dash exit.dash 79`
+##

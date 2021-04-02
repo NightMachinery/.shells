@@ -74,9 +74,17 @@ dvar () {
     ecdbg "$pre$1 in env: $(printenv "$1")"
 }
 function raise-blood() ceer rederr.zsh source
-function e() {
-    ecerr $'\n'Returned $?:"${(j.|.)pipestatus[@]}"
+function retcode() {
+    local r=$? ps=("$pipestatus[@]")
+
+    if (( ${#ps} > 1 )) ; then
+        ecerr $'\n'Returned ${r}: "${(j.|.)ps[@]}"
+    else
+        ecerr $'\n'Returned ${r}
+    fi
+    return $r
 }
+alias e='retcode'
 function argerdbg() {
     isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")

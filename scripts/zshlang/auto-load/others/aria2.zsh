@@ -117,3 +117,30 @@ function aaimg() {
     # do not use aa, as it will retry bad links forever
     getlinks-img "$@" | inargsf sout aria2c -Z
 }
+##
+function aa-remotename() {
+    : "supports only a single URL"
+    local url="${@[-1]}" rename="${aa_rename}"
+
+    local name=''
+    name="$(url-filename "$url")"
+    if test -n "$name" ; then
+        # When the --force-sequential (-Z) option is used, --out is ignored.
+
+        # --auto-file-renaming doesn't seem to work, so:
+        if test -n "$rename" && test -e "$name" ; then
+            name="${name:r}_$(uuidm).${name:e}"
+        fi
+        aa-gateway --out="$name" "$@"
+        ## useful opts:
+        # --auto-file-renaming=true
+        # --conditional-get=true
+        ##
+        return $?
+    else
+        aa-gateway "$@"
+        return $?
+    fi
+}
+@opts-setprefix aa-remotename aa
+##

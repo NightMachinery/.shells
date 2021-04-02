@@ -1,6 +1,6 @@
 passgen() {
     # @alt passgen.go
-    openssl rand -base64 "${1:-16}"
+    reval-copy openssl rand -base64 "${1:-16}"
 }
 ##
 pass-check() {

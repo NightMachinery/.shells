@@ -101,11 +101,18 @@ function env-clean() {
 ##
 function sudo() {
     unset -f sudo
-    if [[ "$(uname)" == 'Darwin' ]] && ! grep 'pam_tid.so' /etc/pam.d/sudo --silent; then
-        # Enables touch ID for sudo:
-        sudo sed -i -e '1s;^;auth       sufficient     pam_tid.so\n;' /etc/pam.d/sudo
+    if [[ "$(uname)" == 'Darwin' ]] ; then
+        if ! command grep 'pam_tid.so' /etc/pam.d/sudo --silent; then
+            # Enables touch ID for sudo:
+            command sudo sed -i -e '1s;^;auth       sufficient     pam_tid.so\n;' /etc/pam.d/sudo
+        fi
+        if ! command grep 'pam_reattach.so' /etc/pam.d/sudo --silent; then
+            # needs https://github.com/fabianishere/pam_reattach
+            # Reattach to the user's GUI session on macOS during authentication (for Touch ID support in tmux)
+            command sudo sed -i -e '1s;^;auth     optional     pam_reattach.so\n;' /etc/pam.d/sudo
+        fi
     fi
-    sudo "$@"
+    command sudo "$@"
 }
 function sud() {
     ## test

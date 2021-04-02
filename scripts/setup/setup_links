@@ -18,6 +18,7 @@ lnrp zshplain.dash /usr/local/bin/
 
 lnrp brishz.dash /usr/local/bin/
 lnrp brishz2.dash /usr/local/bin/
+lnrp brishz_para.dash /usr/local/bin/
 lnrp brishzrb.dash /usr/local/bin/
 lnrp brishzq.zsh /usr/local/bin/
 lnrp bsh.dash /usr/local/bin/

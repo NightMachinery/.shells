@@ -60,8 +60,42 @@ function wget-cookies() {
 }
 ##
 function curlm() {
+    local nosilent="${curlm_ns}"
+
+    local opts=()
+    if test -z "$nosilent" ; then
+        opts+='--silent'
+    fi
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
-    $proxyenv curl  --header "$(cookies)" --silent --fail --location --cookie-jar /dev/null "$@"
+    $proxyenv curl --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
+}
+function curl-dl() {
+    ##
+    # curl doesn't preallocate (see, e.g., https://curl.se/mail/archive-2014-02/0007.html)
+    ##
+    # cookies-auto takes ~0.5s
+    # @api I rely on the cookies getting fetched here
+    ##
+    local curlm_ns=''
+    isI && curlm_ns=y
+
+    local opts=()
+    opts+=( --header "$(cookies-auto "$@")" )
+
+    curlm "$opts[@]" --remote-header-name --remote-name-all "$@"
+    # remote-header-name: This  option tells the -O, --remote-name option to use the server-specified Content-Disposition filename instead of extracting a filename from the URL.
+    # remote-name-all saves all URLs to their given names
+    local r=$?
+    if (( r == 23 )) ; then
+        ecerr "$0: 23     Write error. Curl couldn't write data to a local filesystem or similar. Trying to use a random output name ..."
+        ecerr "$0: Currently this is only supported for a single URL which should be the last arg"
+        local url="${@[-1]}"
+        local name=''
+        name="$(url-filename "$url")" || name="$(url-tail "$url")"
+        curlm "$opts[@]" --output "${name:r}_$(uuidm).${name:e}" "$@"
+        return $?
+    fi
+    retrun $r
 }
 function curl-cookies() {
     # cookies-auto takes ~0.5s
@@ -145,15 +179,14 @@ function cookies-auto() {
         do
             if [[ "$i" =~ '^http' ]]
             then
-                c="$(cookies "$i")"
-                break 
+                c="$(serr cookies "$i")" && break || break # the error is likely to be repeated anyway
             fi
         done
     else
         c="$(cookies)"
     fi
 
-    ec "$c"
+    ecn "$c"
 }
 function wread() {
     mdoc "[wr_force=] $0 [--file <file>] <url> [<output-format>]
@@ -381,6 +414,7 @@ function url-tailedtitle() {
 }
 renog url-tailedtitle
 function url-title() {
+    : "See also url-filename"
     urlmeta2 "${1:?}" title
 }
 renog url-title
@@ -758,6 +792,10 @@ function getlinks-uniq() {
     getlinks-c "$@" | gsort --unique
 }
 ##
+function url-filename() {
+    : "works with multiple URLs already"
+    curlm --head "$@" | rget 'Content-Disposition:.*filename="(.*)"'
+}
 function url-size() {
     local size
     size="$(curlm --head "$@" | rget '^content-length\S*\s*(\d+)')" || return $?
@@ -776,7 +814,7 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
     local urls=( ${(u@)@} )
 
     local formats=( ${media_formats[@]} pdf )
-    local regex='\.('"${(j.|.)formats}"')$'
+    local regex='\.('"${(j.|.)formats}"')(\?[^/]*)?$'
     local url size matched
     for url in ${urls[@]}
     do
@@ -802,7 +840,7 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
         else
             ecerr "$0: Skipped big URL '$url'"
         fi
-    done | gsort -u | fzp | {
+    done | gsort -u | { bello ; fzp } | {
         if isDbg
         then
             color 150 0 255 "$(cat)"
@@ -818,16 +856,29 @@ function aaCW() {
 }
 alias aaCW1='aamedia1'
 function aamedia1() {
-    : "aaCW2 <link-to-page-that-contains-media (level of recursion = 1)> ..."
+    : "aaCW2 <link-to-page-that-contains-media (level of recursion = 1; will support level 0 as well if its URL size is big)> ..."
     local theCookies=${theCookies:-"$(cookies $1)"} fhMode=aacookies
     local urls=( ${(u@)@} )
 
     local formats=( ${media_formats[@]} pdf )
     local regex='\.('"${(j.|.)formats}"')$'
-    local i t l li titles=() links=()
-    for i in "$@" ; do
-        l="$(getlinks-c "$i" -e "$regex")" || continue
-        t="$(url-title "$i")"
+    local url t l titles=() links=()
+    for url in "${urls[@]}" ; do
+        size="$(url-size "$url")"  || {
+            ecerr "$0: Could not get size of URL '$url'"
+            ecerr "$0: proceeding anyway ..."
+            size=0
+        }
+        if (( $size > 2000000 )) ; then # 2 MB
+            ecerr "$0: Link '$url' is too big, adding it as a file instead"
+            # t="$(url-tail "$url")"
+            t=''
+            titles+="$t"
+            links+="$url"
+            continue
+        fi
+        t="$(url-title "$url")"
+        l="$(getlinks-c "$url" -e "$regex")" || continue
         for l2 in ${(@f)l} ; do
             titles+="$t"
             links+="$l"
@@ -854,8 +905,12 @@ function aamedia1() {
         test -z "$l" && continue
         reval-rtl ec "Downloading ${t}:"$'\n'"$l" #$'\n'
         opts=()
-        test -n "$t" && opts+=(-o "$(ec "${t}.${l:e}" | str2filename)")
-        revaldbg aacookies "$opts[@]" "$l"
+        if test -n "$t" ; then
+            opts+=(-o "$(ec "${t}.${l:e}" | str2filename)")
+            revaldbg aacookies "$opts[@]" "$l"
+        else
+            revaldbg ensure curl-dl "$opts[@]" "$l" "$0"
+        fi
     done
     unset sel_i
 }

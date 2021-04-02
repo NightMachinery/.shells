@@ -57,11 +57,12 @@ function agfi() {
     fi
 
     isDbg && ec-copy "$q"
+    local ntsearch_lines_nw=y fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q"
     if isI ; then
         # We need to run this without piping in the interactive case, or else jumping to editor will break
-        fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi
+        agsi
     else
-        fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q" agsi | sd '\n' '\n\n' # improves readability
+        agsi | sd '\n' '\n\n' # improves readability
     fi
 }
 noglobfn agfi

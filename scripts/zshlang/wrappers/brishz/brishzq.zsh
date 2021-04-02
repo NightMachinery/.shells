@@ -1,6 +1,10 @@
 #!/usr/bin/env /usr/local/bin/zshplain.dash
 # macOS bug: https://stackoverflow.com/questions/9988125/shebang-pointing-to-script-also-having-shebang-is-effectively-ignored
 
+if test "$1" = '-c' ; then
+   shift
+fi
+
 . ~/.privateShell
 alias gq=gquote
 gquote () {

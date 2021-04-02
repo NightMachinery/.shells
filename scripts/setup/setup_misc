@@ -24,6 +24,14 @@ brew tap trojan-gfw/homebrew-trojan
 brew install trojan
 brew install --head googler
 ##
+# https://superuser.com/questions/545889/how-can-i-install-gnu-parallel-alongside-moreutils
+brew install --force moreutils
+brew unlink moreutils
+brew install --force parallel
+brew link --overwrite moreutils
+brew unlink parallel
+brew link --overwrite parallel
+##
 luarocks install penlight # require 'pl.pretty'.dump(table)
 luarocks install luaposix
 ##

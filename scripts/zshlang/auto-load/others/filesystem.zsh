@@ -22,11 +22,12 @@ noglobfn globexists
 
 ensure-empty() {
     doc Use 'jee' in code.
+    local dir="$PWD"
 
-    (silence eval '\: *(D)') && {
-        ecerr Directory "$(pwd)" not empty
+    if ! dir-isempty "$dir" ; then
+        ecerr Directory "$dir" not empty
         return 1
-    } || return 0
+    fi
 }
 typeset -ag pushf_stack
 pushf() {
@@ -98,7 +99,19 @@ function vidir() {
 ##
 function progress() {
     # @wrapper
-    command progress --additional-command gcp --additional-command gmv --additional-command gcat --additional-command gdd --monitor "$@" # --monitor-continuously
+    command progress --additional-command gcp --additional-command gmv --additional-command gcat --additional-command gdd --additional-command curl --additional-command aria2c --additional-command wget --monitor "$@" # --monitor-continuously
 }
 aliasfn prg progress
+##
+function fd-count() {
+    local dir="$PWD"
+    fd -uuu . "$dir" | wc -l
+}
+function dir-isempty() {
+    # @alt `! (silence eval '\: *(D)')`
+    local dir="$PWD"
+    local c
+    c="$(fd-count "$dir")" @RET
+    (( c == 0 ))
+}
 ##

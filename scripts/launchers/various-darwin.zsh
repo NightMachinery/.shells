@@ -9,7 +9,7 @@ powersaving_status_del
 darwin-dns-set 127.0.0.1 1.1.1.1
 ##
 
-tmuxnewsh2 BrishGarden brishgarden # using shell to increase max open files
+tmuxnewsh2 BrishGarden BRISHGARDEN_N=16 brishgarden # using the shell to increase max open files
 
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile_darwin
 ##
