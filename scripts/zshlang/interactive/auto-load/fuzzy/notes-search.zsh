@@ -176,13 +176,14 @@ alias nts='\noglob ntsearch-whole'
 function ntsearch-lines-engine() {
     ntLines=y ntsearch "$@"
 }
+alias snw='ntsearch_lines_nw=y '
 function ntsearch-lines() {
     : "Remember that ntsearch_ uses eval-memoi"
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"
     : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
 
     : "The engine should return output in outFiles."
-    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}" ni_noprocess="${ntsearch_lines_nnp}"
+    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}" ni_noprocess="${ntsearch_lines_nnp}" no_wait="${ntsearch_lines_nw}"
     test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
@@ -244,6 +245,11 @@ function ntsearch-lines() {
     else
         ecdbg "$0: Opening editor ..."
         if [[ "$EDITOR" =~ '^emacs' ]] ; then
+            local opts=()
+            if test -n "$no_wait" ; then
+                opts+='--no-wait'
+                # --no-wait will open stuff in the active frame, instead of opening a new frame
+            fi
             local cmd='(progn '
             for i in {1..$#files} ; do
                 # (forward-char $col)
@@ -262,8 +268,7 @@ function ntsearch-lines() {
             # The first time we use this in a zsh session, the highlight sometimes does not work. Idk why.
             cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h) "
             cmd+=')'
-            # --no-wait will open stuff in the active frame, instead of opening a new frame
-            revaldbg emacsclient -a '' -t -e "$cmd"
+            revaldbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
         else
             # should work with both emacs and vim
             # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
