@@ -61,6 +61,6 @@ watchm() {
 }
 ##
 function fd() {
-  # include all files by default
-  command fd -uuu "$@"
+  # include ignored files by default
+  command fd -u "$@"
 }

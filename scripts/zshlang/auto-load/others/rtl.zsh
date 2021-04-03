@@ -13,7 +13,13 @@ function rtl-reshaper() {
     fi
 }
 function reval-rtl() {
+  if isRtl ; then
+    # not having a pipe can make more stuff work, so this opens the possibility of you seeing bugs later (i.e., some bugs will only become visible when you use rtl-reshaper)
+    # but still, seeing bugs later is also a blessing, right? ;)
+    reval "$@"
+  else
     reval "$@" | rtl-reshaper
+  fi
 }
 aliasfn rtl reval-rtl
 ##
@@ -44,6 +50,9 @@ function bicon-emc() {
   $proxyenv biconm --reshape-only emacsclient -t "$@"
   reset
 }
+##
+redis-defvar bicon_zsh_disabled
+# Use bicon_zsh_disabled_del to enable bicon mode by default
 function bicon-zsh() {
   biconm zsh
   reset

@@ -112,6 +112,7 @@ function pngpaste() {
                                   {name:\"${name}\"})" @RET
     if test -n "$stdout" ; then
         cat "$f"
+        command rm "$f"
     fi
     ## @alt:
     # https://github.com/jcsalterego/pngpaste/issues/16

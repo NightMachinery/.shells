@@ -1,5 +1,7 @@
 # @perf zshrc takes a lot of time (2s?). Most of these seem to be from compinit. Hard to profile these as their second runs are lighter.
-
+###
+bicon_force_plugins=y
+###
 # export TERM="xterm-256color" #Might do a lot of damage. Added for multi-term.
 ### OMZ config (no longer loaded)
 DEFAULT_USER="evar"
@@ -274,7 +276,7 @@ function prompt_pure_check_cmd_exec_time () {
 # antibody bundle Vifon/deer
 zsh-defer antibody bundle unixorn/git-extra-commands
 zsh-defer antibody bundle zdharma/zzcomplete # ^F
-if ! isBicon ; then
+if test -n "$bicon_force_plugins" || ! isBicon ; then
   zsh-defer antibody bundle zsh-users/zsh-autosuggestions
 fi
 silent unalias =
@@ -380,7 +382,7 @@ zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '
 # (( $+commands[cod] )) && source <(command cod init $$ zsh | sd '\bcod\b' 'command cod')
 # https://github.com/dim-an/cod/issues/24
 ###
-if ! isBicon ; then
+if test -n "$bicon_force_plugins" || ! isBicon ; then
   zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
 fi
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise

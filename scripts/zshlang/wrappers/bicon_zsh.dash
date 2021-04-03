@@ -1,0 +1,20 @@
+#!/bin/dash
+
+export PATH="${HOME}/bin:/usr/local/bin:$PATH"
+
+dis="$(redis-cli --raw get bicon_zsh_disabled)" || true
+if test -z "$dis" ; then
+    BICON_MODE=y bicon.bin zsh "$@"
+else
+    zsh "$@"
+fi
+
+## Known issues
+# breaks PWD of next sessions https://gitlab.com/gnachman/iterm2/-/issues/9601
+## perf:
+# time2 bicon_zsh.dash -f -c 'echo'
+# Took 0.027724981307983398
+#
+# time2 redis-cli --raw get bicon_zsh_disabled
+# Took 0.0090351104736328125
+##
