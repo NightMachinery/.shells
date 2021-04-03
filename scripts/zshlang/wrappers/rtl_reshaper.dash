@@ -1,0 +1,4 @@
+#!/bin/dash
+
+w="${1:-${COLUMNS:-120}}"
+command ggrep -Eo ".{1,$w}" | rtl_reshaper_rs

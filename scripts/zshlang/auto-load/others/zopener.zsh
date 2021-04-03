@@ -11,6 +11,7 @@ function zopen() {
             zip|rar|7z) unzip2dir "$f" ; bell=y ;;
             mobi|epub|azw*) awaysh ebook-viewer "$f" ;;
             cbz) awaysh mpv-manga "$f" ;;
+            pdf) chrome-open-pdf "$f" ;;
             *) usemime=y ;;
         esac
         if test -n "$usemime" ; then

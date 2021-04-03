@@ -43,6 +43,8 @@ function set-defaults() {
     duti -s $cf_zopen ".azw" all
     duti -s $cf_zopen ".cbz" all
     duti -s $cf_zopen "com.yacreader.yacreader.cbz" all
+    duti -s $cf_zopen .pdf all
+    duti -s $cf_zopen "com.adobe.pdf" all
 
 }
 

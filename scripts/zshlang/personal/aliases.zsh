@@ -28,6 +28,16 @@ alias grep='grep --color=auto'
 ialias plc=playlistc
 alifn emc-gateway="emacsclient -t"
 alifn emc="bicon-emc"
+##
+function emc-focus() {
+    # How to give the focus to a specific tab? https://gitlab.com/gnachman/iterm2/-/issues/9602
+    cliclick kd:cmd kp:num-5 ku:cmd # Took ~0.5
+}
+function emcnw() {
+    emc-gateway --no-wait "$@"
+    emc-focus
+}
+##
 ialias emcg="emacsclient -c"
 alias b='builtin'
 alias typ='typeset -p'
@@ -65,7 +75,5 @@ alias mail='sudo less /var/mail/$(whoami)'
 alias mcomix='awaysh python3 ~/bin/mcomixstarter.py'
 ##
 alias pz='printz-quoted' # USEME for using zsh history suggestions effectively; E.g., `pz in doom sees`
-##
-alias bwh='sudo bandwhich'
 ##
 alias o="@opts"

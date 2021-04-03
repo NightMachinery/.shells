@@ -29,7 +29,7 @@ function rget() {
 function text-wrap() {
     local w="${1:-90}"
 
-    command ggrep -Eo ".{1,$w}" # unicode-safe
+    command ggrep -Eo ".{1,$w}" # unicode-safe (RTL safe)
 }
 alias foldm='text-wrap'
 ##

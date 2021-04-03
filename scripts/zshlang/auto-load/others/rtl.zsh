@@ -9,7 +9,7 @@ function rtl-reshaper() {
     if isRtl ; then
         cat
     else
-        rtl_reshaper_rs "$@"
+        rtl_reshaper.dash "$@"
     fi
 }
 function reval-rtl() {
@@ -39,13 +39,21 @@ function biconm() {
 }
 function bicon-emc() {
   if isBicon ; then
+  if true ; then
+    emcnw "$@"
+    return $?
+  else
     ecerr "You're already in Bicon mode. Editing RTL text will be 'reversed'. Use a clean session instead."
     {
-    ( emc-gateway -e "(progn (setq-default bidi-display-reordering nil) (redraw-display))" "$@" )
+      (
+        emacsclient -e "(progn (setq-default bidi-display-reordering nil) (redraw-display))"
+        emc-gateway "$@"
+      )
     } always {
       emacsclient -e "(setq-default bidi-display-reordering t)"
     }
     return $?
+  fi
   fi
   $proxyenv biconm --reshape-only emacsclient -t "$@"
   reset

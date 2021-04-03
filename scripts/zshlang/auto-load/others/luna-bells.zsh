@@ -246,6 +246,14 @@ function bella-zsh-maybe() {
         silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
     fi
 }
+##
+aliasfn bell-dl tts-glados1-cached 'Download, complete'
+##
+function bell-maker() {
+    local name="${1:?}" f="${2:?}"
+
+    fndef "bell-$name" awaysh-named "BELL_${name:u}_MARKER" hearinvisible "$GREENCASE_DIR/$f"
+}
 ## Little Misfortune
 function bell-lm-maker() {
     local name="${1:?}" f="${2:?}"
@@ -294,12 +302,7 @@ function reval-bell() {
     }
 }
 aliasfn reval-bell-lm-mhm @opts bell bell-lm-mhm @ reval-bell
-##
-function bell-maker() {
-    local name="${1:?}" f="${2:?}"
-
-    fndef "bell-$name" awaysh-named "BELL_${name:u}_MARKER" hearinvisible "$GREENCASE_DIR/$f"
-}
+## Pink Panther:
 bell-maker pp-electricity1 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/AMB07_etincel..blue..wav"
 bell-maker pp-electricity2 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/AMB11_etincel..blue..wav" # shorter
 bell-pp-electricity() { do-rnd bell-pp-electricity{1..2} }
@@ -314,11 +317,18 @@ bell-maker pp-piece2 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything
 bell-maker pp-piece3 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_piece3..blue..wav"
 bell-pp-piece() { do-rnd bell-pp-piece{1..3} }
 bell-pp-piece-r() { redo2 10 bell-pp-piece }
-
-##
+### Starcraft:
+# @alt tts-gateway 'Garden, Online'
 bell-maker sc2-nav_online "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zCutscene_Zerg04_DropShipAdjutant_020_navigation online..blue...ogg"
-bell-maker sc2-eradicator_destroyed "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_172_eradicator destroyed situation critical..blue...ogg"
+aliasfn reval-bell-sc2-nav_online @opts bell bell-sc2-nav_online @ reval-bell
 ##
+
+bell-maker sc2-activating_bots "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_066_activating automated sentry bots..blue...ogg"
+# aliasfn reval-bell-sc2-activating_bots @opts bell bell-sc2-activating_bots @ reval-bell
+
+bell-maker sc2-eradicator_destroyed "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_172_eradicator destroyed situation critical..blue...ogg"
+###
+## Madagascar:
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
 ##
 function bell-m-beeps() {

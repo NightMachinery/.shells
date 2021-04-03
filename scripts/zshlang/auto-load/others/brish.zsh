@@ -44,8 +44,8 @@ function caddypass() {
 ##
 aliasfn bsh brishz
 aliasfn bshr brishzr # You can also use .a
-aliasfn brishz-all reval-bell-lm-mhm brishz %GARDEN_ALL
-aliasfn brishzr-all reval-bell-lm-mhm brishzr %GARDEN_ALL
+aliasfn brishz-all reval-bell-sc2-nav_online brishz %GARDEN_ALL
+aliasfn brishzr-all @opts bell bell-sc2-activating_bots @ reval-bell brishzr %GARDEN_ALL
 aliasfn brishz-restart brishz-all %BRISH_RESTART
 aliasfn brishzr-restart brishzr-all %BRISH_RESTART
 aliasfn xl brishz-restart

@@ -17,7 +17,9 @@ function ot-server-daemon() {
     ot-loadovertone
 }
 function ot-loadovertone() {
-    ot-rep "(use 'overtone.live) (use 'overtone.inst.piano)"
+  ot-rep "(use 'overtone.live) (use 'overtone.inst.piano)" && {
+    tts-gateway-i1 'Overtone, Online'
+  }
 }
 function ot-rep() {
     ##

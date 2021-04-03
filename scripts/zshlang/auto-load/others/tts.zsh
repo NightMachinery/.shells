@@ -6,7 +6,7 @@ function tts-gateway() {
     # <<<"$text" ESPnet2-TTS.py > "$tmp"
     ##
 
-    local cache="$HOME/.chache/tts_gateway/$(md5m "$engine[*] ||| $text").wav"
+    local cache="$HOME/.cache/tts_gateway/$(ec $engine[*] | str2filename)/$(ecn $text | ghead -c 40 | str2filename)_$(md5m "$engine[*] ||| $text").wav"
     local log="${cache}_stderr.txt"
     ensure-dir "$cache"
     if isDeus || ! test -e "$cache" ; then

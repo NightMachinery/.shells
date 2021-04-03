@@ -84,6 +84,11 @@ function vcnpp() {
         brishzr-repeat
     } always { popf }
 }
+##
+function gsync-extra-private() {
+    fnswap git 'vcsh extra-private' @opts noadd y @ gsync "$@"
+}
+##
 function cp2tmp() {
     rsp-dl "$@" ~"/Base/_Local TMP/"
 }

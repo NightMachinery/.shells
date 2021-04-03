@@ -41,7 +41,7 @@ function agfi() {
     local f="$1" prefix_mode="${agfi_p}"
     # f="$(ec "$f" | sdlit . '\.')" # not worth the perf hit, though I haven't benchmarked
 
-    local -x FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --height 50%"
+    local -x FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS --height 50% --select-1"
     local q
     ##
     # local word_break='\W'
@@ -57,7 +57,7 @@ function agfi() {
     fi
 
     isDbg && ec-copy "$q"
-    local ntsearch_lines_nw=y fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q"
+    local ntsearch_lines_nw=y ntsearch_lines_fe=y fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q"
     if isI ; then
         # We need to run this without piping in the interactive case, or else jumping to editor will break
         agsi
@@ -184,7 +184,7 @@ function ntsearch-lines() {
     : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
 
     : "The engine should return output in outFiles."
-    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}" ni_noprocess="${ntsearch_lines_nnp}" no_wait="${ntsearch_lines_nw}"
+    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}" ni_noprocess="${ntsearch_lines_nnp}" no_wait="${ntsearch_lines_nw}" force_editor="${ntsearch_lines_fe}"
     test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
@@ -238,7 +238,7 @@ function ntsearch-lines() {
 
     # re dvar out files linenumbers lines
 
-    if [[ "$acceptor" == '' ]] ; then
+    if test -z "$force_editor" && [[ "$acceptor" == '' ]] ; then
         ecdbg "$0: Outputting selections ..."
         local sel="${(F)lines}"
         <<<"${sel}" urls-copy
@@ -270,6 +270,9 @@ function ntsearch-lines() {
             cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h) "
             cmd+=')'
             revaldbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
+            if test -n "$no_wait" ; then
+                emc-focus
+            fi
         else
             # should work with both emacs and vim
             # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
@@ -379,8 +382,8 @@ function ntsearch_() {
         # remove `:+{2}-5` from preview-window and use mode=0 to revert to the previous behavior
         ##
         local rtl=''
-        # rtl='| rtl_reshaper_rs' # very bad perf for large files
-        # adding ` | rtl_reshaper_rs` works fine if RTL text is not colored, it seems. It's best if ntom does the reshaping itself ...
+        # rtl='| rtl_reshaper.dash' # very bad perf for large files
+        # adding ` | rtl_reshaper.dash` works fine if RTL text is not colored, it seems. It's best if ntom does the reshaping itself ...
         ##
         previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) 1 $rtl || printf -- \"\n\n%s \" {}"
         ##

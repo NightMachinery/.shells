@@ -190,3 +190,5 @@ isIranHTTP() {
     curl -s http://whatismyip.akamai.com/ | silent rg -F 'peyvandha.ir'
 }
 ##
+aliasfn bwh sudo bandwhich -p -a
+##
