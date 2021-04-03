@@ -99,7 +99,7 @@ function vidir() {
 ##
 function progress() {
     # @wrapper
-    command progress --additional-command gcp --additional-command gmv --additional-command gcat --additional-command gdd --additional-command curl --additional-command aria2c --additional-command wget --monitor "$@" # --monitor-continuously
+    command progress --additional-command gcp --additional-command gmv --additional-command gcat --additional-command gdd --additional-command curl --additional-command aria2c --additional-command wget --additional-command ffmpeg --additional-command youtube-dl --monitor "$@" # --monitor-continuously
 }
 aliasfn prg progress
 ##

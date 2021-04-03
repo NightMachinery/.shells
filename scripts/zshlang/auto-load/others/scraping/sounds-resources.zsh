@@ -16,7 +16,7 @@ function sounds-resources-dl() {
 }
 ##
 function gc-tag() {
-    if ask "$(heari "$(mpv-get)")" ; then
+    if ask "$(heari "$(mpv-get)")" Y ; then
         ntag-add "$(mpv-get)" blue @RET
         mv "$ntag_add_dest"
     fi

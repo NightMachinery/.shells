@@ -274,7 +274,9 @@ function prompt_pure_check_cmd_exec_time () {
 # antibody bundle Vifon/deer
 zsh-defer antibody bundle unixorn/git-extra-commands
 zsh-defer antibody bundle zdharma/zzcomplete # ^F
-zsh-defer antibody bundle zsh-users/zsh-autosuggestions
+if ! isBicon ; then
+  zsh-defer antibody bundle zsh-users/zsh-autosuggestions
+fi
 silent unalias =
 # antibody bundle zsh-users/zsh-syntax-highlighting
 antibody bundle zsh-users/zsh-completions #undeferable
@@ -378,7 +380,9 @@ zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '
 # (( $+commands[cod] )) && source <(command cod init $$ zsh | sd '\bcod\b' 'command cod')
 # https://github.com/dim-an/cod/issues/24
 ###
-zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
+if ! isBicon ; then
+  zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
+fi
 zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
 ##
 # DISABLE_AUTO_TITLE="true" # disables omz setting the title

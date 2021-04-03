@@ -71,7 +71,7 @@ function  mv-merge() {
             opts_end=y
         fi
         if [[ "$(grealpath --  "$i")" == /Volumes/* ]] ; then
-            if ask "$0: There seems to be external (cross-device) paths in args. Proceed with using normal mv instead?" ; then
+            if ask "$0: There seems to be external (cross-device) paths in args. Proceed with using normal mv instead?" Y ; then
                 command gmv -i --verbose "$@"
                 return $?
             fi

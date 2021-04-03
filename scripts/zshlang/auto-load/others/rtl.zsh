@@ -28,3 +28,24 @@ function fz-rtl1() {
     gawk 'NR == FNR {nums[$1]; next} FNR in nums' <(ec "$sels_i") <(ec "$input")
 }
 ##
+function biconm() {
+  BICON_MODE=y bicon.bin "$@"
+}
+function bicon-emc() {
+  if isBicon ; then
+    ecerr "You're already in Bicon mode. Editing RTL text will be 'reversed'. Use a clean session instead."
+    {
+    ( emc -e "(progn (setq-default bidi-display-reordering nil) (redraw-display))" "$@" )
+    } always {
+      emacsclient -e "(setq-default bidi-display-reordering t)"
+    }
+    return $?
+  fi
+  $proxyenv biconm --reshape-only emacsclient -t "$@"
+  reset
+}
+function bicon-zsh() {
+  biconm zsh
+  reset
+}
+##

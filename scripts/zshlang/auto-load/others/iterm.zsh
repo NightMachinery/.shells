@@ -28,10 +28,15 @@ function ils-montage() {
     fi
     (( $#@ == 0 )) && return 0
 
+    local opts=()
+    local label='%f'
+    if (( $#@ > 1 )) ; then
+        opts+=( -label "$label" )
+    fi
     local tmp="$(gmktemp --suffix=.png)"
 
     #  '1x1<' tells IM to only resize smaller images to the given size. As no image can be smaller that 1 pixel, no image will be resized. The tile size will thus be again the largest dimention of all the images on the page.
-    magick montage -label '%f' -geometry '1x1<+0+0' "$@" png:- >$tmp | icat_margin='' icat-autoresize
+    magick montage "$opts[@]" -geometry '1x1<+0+0' "$@" png:- >$tmp | icat_margin='' icat-autoresize
     pbadd "$tmp"
 }
 @opts-setprefix ils-montage icat
@@ -66,7 +71,7 @@ function icat-autoresize() {
     local margin="${icat_margin:-${icat_m}}"
     (( $#@ == 0 )) && set -- -
 
-    integer margin_height=100
+    integer margin_height=270
     local sw="$(screen-width)"
     local sh="$(screen-height)"
     local i
@@ -79,6 +84,7 @@ function icat-autoresize() {
         fi
         local w_r=$(( sw - 50 )) # width_real
         if test -z "$m" ; then
+            ecdbg "$0: automatically determining size ..."
             # needs zsh/mathfunc
             local w="$(img-width "$i")"
             local h="$(img-height "$i")"
@@ -92,7 +98,11 @@ function icat-autoresize() {
         else
             w_r=$(( sw - m ))
         fi
-        magick convert "${${i:e}:-png}":"$i" -resize "$w_r"x png:- | icat-realsize
+        ##
+        # this command makes some pngpaste images (screenshots? pasting from Telegram works fine) look faded and white. Using `montage` first fixes this problem, so use `ils` instead.
+        # Might be related to `-colorspace`, but I could not fix it.
+        revaldbg magick convert "${${i:e}:-png}":"$i" -resize "$w_r"x png:- | icat-realsize
+        ##
     done
 }
 @opts-setprefix icat-autoresize icat

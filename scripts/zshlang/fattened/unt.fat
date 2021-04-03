@@ -291,7 +291,7 @@ See |cookies| for higher-level API." | {
 		eval "$(< /dev/stdin)"
 	}
 	local url="$1" 
-	local cf="${cookiesFiles:-${HOME}/Library/Application Support/Google/Chrome/Default/Cookies}" 
+	local cf="${cookiesFile:-${HOME}/Library/Application Support/Google/Chrome/Default/Cookies}"
 	test -e "$cf" || {
 		ecdbg "getcookies called with non-existent file: $cf"
 		return 0

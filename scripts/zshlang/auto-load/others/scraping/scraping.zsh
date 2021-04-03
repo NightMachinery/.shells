@@ -123,14 +123,16 @@ function cookies-copy() {
 }
 aliasfn cook cookies-copy
 function cookies-killlock() {
-    kill "$(serr fuser "$cookiesFile")"
+    if ask "$(fuser "$cookiesFile" | inargsf ps -fp)" ; then
+        kill "$(serr fuser "$cookiesFile")"
+    fi
 }
 getcookies() {
     mdoc "[cookiesFile= ] $0 <url>
 Will output Chrome's cookies for the given URL in key=val;key2=val2
 See |cookies| for higher-level API." MAGIC
     local url="$1"
-    local cf="${cookiesFiles}"
+    local cf="${cookiesFile}"
 
     test -e "$cf" || { ecdbg "getcookies called with non-existent file: $cf" ; return 0 }
     cookiesFile="$cf" url="$url" python -c '

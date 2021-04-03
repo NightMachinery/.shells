@@ -11,6 +11,7 @@ conda install -c plotly plotly-orca # also can be installed via npm
 ##
 pig https://github.com/NightMachinary/BrishGarden.git
 pig git@github.com:NightMachinary/brish.git
+pi git+https://github.com/n8henrie/pycookiecheat.git@dev
 ###
 cpanm App::ansifold
 ##

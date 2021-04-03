@@ -56,8 +56,11 @@ function isiTerm() {
     [[ "$TERM_PROGRAM" == iTerm.app ]]
 }
 ##
+function isBicon() {
+    test -n "$BICON_MODE"
+}
 function isRtl() {
-    isKitty || isAppleTerminal
+    isKitty || isAppleTerminal || isBicon
 }
 ##
 isI() {

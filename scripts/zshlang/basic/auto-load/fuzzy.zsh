@@ -1,15 +1,23 @@
 ### Vars
-# FZF_SIMPLE_PREVIEW='cat {f}'
-# FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.py'
-FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper_rs'
-##
-FZF_SIMPLE_PREVIEW="$FZF_RTL_PREVIEW"
-# FZF_SIMPLE_PREVIEW='printf -- "%s " {}'
+FZF_SIMPLE_PREVIEW='printf -- "%s " {}'
 # fzf supports wrapping itself. # | command fold -s -w $FZF_PREVIEW_COLUMNS'
 # << was bad for dash, no <<< in dash
 ##
+if isRtl ; then
+    FZF_RTL_PREVIEW="$FZF_SIMPLE_PREVIEW"
+else
+    # FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper.py'
+    FZF_RTL_PREVIEW='printf -- "%s " {} | rtl_reshaper_rs'
+fi
+##
+FZF_SIMPLE_PREVIEW="$FZF_RTL_PREVIEW"
+##
 FZF_CAT_PREVIEW='cat {f}'
-FZF_CAT_RTL_PREVIEW='cat {f} | rtl_reshaper_rs'
+if isRtl ; then
+    FZF_CAT_RTL_PREVIEW="$FZF_CAT_PREVIEW"
+else
+    FZF_CAT_RTL_PREVIEW='cat {f} | rtl_reshaper_rs'
+fi
 ##
 # FZF_PREVIEW_NTAG="brishz_in={} brishzq.zsh ntag-color"
 FZF_PREVIEW_NTAG="$FZF_SIMPLE_PREVIEW | ntagcolor"

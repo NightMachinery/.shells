@@ -83,7 +83,7 @@ createglob text_formats textglob
 if isDarwin ; then
     # veditor=(code-insiders -r)
     veditor=(emc)
-    cookiesFiles="${HOME}/Library/Application Support/Google/Chrome/Default/Cookies"
+    cookiesFile="${HOME}/Library/Application Support/Google/Chrome/Default/Cookies"
 else
     # test -e ~/.SpaceVim && veditor=(svi -p) ||
     veditor=(vim -p) # doc '-o opens in split view, -p in tabs. Use gt, gT, <num>gt to navigate tabs.'
