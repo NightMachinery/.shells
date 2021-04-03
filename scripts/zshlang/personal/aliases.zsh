@@ -26,7 +26,8 @@ alias hrep="fc -El 0 | grep"
 alias grep='grep --color=auto'
 
 ialias plc=playlistc
-alifn emc="emacsclient -t"
+alifn emc-gateway="emacsclient -t"
+alifn emc="bicon-emc"
 ialias emcg="emacsclient -c"
 alias b='builtin'
 alias typ='typeset -p'

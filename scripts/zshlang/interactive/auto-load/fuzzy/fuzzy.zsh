@@ -183,7 +183,7 @@ aliasfn vcr coder
 ##
 aliasfn vr veditor=(coder) v # v remote
 aliasfn ve-code veditor=(code-insiders --reuse-window)
-aliasfn ve-emc veditor=(emc)
+aliasfn ve-emc veditor=(emc-gateway)
 aliasfn vv ve-emc v
 ###
 function vp-ls() {

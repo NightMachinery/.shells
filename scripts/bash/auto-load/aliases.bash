@@ -7,7 +7,7 @@ alias rgpy="rgm --glob '*.py'"
 alias spt='spotlight -name'
 alias nohistory='unset HISTFILE' #disables history for current session
 alias cleanbuffer='printf "\ec\e[3J"' # there is a similar tool in my anaconda's bin named clear.
-alias emcsave="emc -e '(save-some-buffers t)'"
+alias emcsave="emc-gateway -e '(save-some-buffers t)'"
 alias itunesprogress='exa -a -T -l ~/Library/iTunes/'
 alias tll="tl -e w2e-curl"
 alias visudo="VISUAL=vim sudo visudo"
@@ -66,7 +66,7 @@ alias l-ac=last-accessed
 alias l-a=last-added
 alias l-m=last-modified
 ##
-alias em="emc -e '(counsel-recentf)'" # helm-recentf
+alias em="emc-gateway -e '(counsel-recentf)'" # helm-recentf
 alias dmy='DEBUGME=y'
 alias a=aget
 alias jee='ensure-empty || return 1'

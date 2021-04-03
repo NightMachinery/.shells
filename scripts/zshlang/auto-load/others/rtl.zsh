@@ -41,7 +41,7 @@ function bicon-emc() {
   if isBicon ; then
     ecerr "You're already in Bicon mode. Editing RTL text will be 'reversed'. Use a clean session instead."
     {
-    ( emc -e "(progn (setq-default bidi-display-reordering nil) (redraw-display))" "$@" )
+    ( emc-gateway -e "(progn (setq-default bidi-display-reordering nil) (redraw-display))" "$@" )
     } always {
       emacsclient -e "(setq-default bidi-display-reordering t)"
     }

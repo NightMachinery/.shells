@@ -149,7 +149,7 @@ aliasfn rgsee rgf
 aliasfn ffrg rgf
 ##
 function emcnt() {
-    emc -e "(night/search-notes)"
+    emc-gateway -e "(night/search-notes)"
 }
 function vnt() {
     outFiles=()

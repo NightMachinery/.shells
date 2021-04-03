@@ -49,7 +49,7 @@ function fdrp() {
 }
 ##
 function emcrg() {
-    emc -e "(night/search-dir \"$(pwd)\")"
+    emc-gateway -e "(night/search-dir \"$(pwd)\")"
 }
 # aliasfn rd emcrg
 function rgbase() {

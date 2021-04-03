@@ -1,7 +1,7 @@
 ##
 function emc-sudo() {
     local f="$(ec ${1} | gtr '"' '\"')"
-    emc -e '(find-file "/sudo::'$f'")'
+    emc-gateway -e '(find-file "/sudo::'$f'")'
 }
 ##
 function doom-sync() {
@@ -16,15 +16,15 @@ function emcpe() {
     emacsclient -e '(setq debug-on-quit nil)'
 }
 function emn() {
-    emc -e '(helm-man-woman "")' # can't input to helm using its arg. why?
+    emc-gateway -e '(helm-man-woman "")' # can't input to helm using its arg. why?
     #"(woman \"$*\")"
 }
 ## did not work
 # function emc-openclose() {
 #     local f="$1"
-#     emc -e "(progn (find-file ${f:q}) (save-buffers-kill-terminal)"
-#     # { sleep 0.1 ; emc -e '(save-buffers-kill-terminal)' } &
-#     # emc "$f"
+#     emc-gateway -e "(progn (find-file ${f:q}) (save-buffers-kill-terminal)"
+#     # { sleep 0.1 ; emc-gateway -e '(save-buffers-kill-terminal)' } &
+#     # emc-gateway "$f"
 #     reset
 # }
 # reify emc-openclose
