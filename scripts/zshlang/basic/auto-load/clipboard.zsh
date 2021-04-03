@@ -82,7 +82,7 @@ function pngpaste() {
     ensure isDarwin @MRET
 
     local stdout=''
-    if [[ name == '-' ]] ; then
+    if [[ "$name" == '-' ]] ; then
         name="$(gmktemp --suffix ".${extension}")" @RET
         stdout=y
     fi
@@ -101,12 +101,17 @@ function pngpaste() {
 
     [[ "$name" =~ '\.'${extension}'$' ]] || name+=".${extension}"
 
+    local f="${dir}/${name}"
+    if test -e "$f" ; then
+        command rm "$f"
+    fi
+
     revaldbg osascript -e "tell application \"System Events\" to ¬
                   write (the clipboard as ${class}) to ¬
                           (make new file at folder \"${dir}\" with properties ¬
                                   {name:\"${name}\"})" @RET
     if test -n "$stdout" ; then
-        cat "$name"
+        cat "$f"
     fi
     ## @alt:
     # https://github.com/jcsalterego/pngpaste/issues/16
