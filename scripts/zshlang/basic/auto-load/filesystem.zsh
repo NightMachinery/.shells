@@ -15,8 +15,19 @@ function cdm() {
     mkdir -p -- "$d" &&
         cd -P -- "$d"
 }
+##
 function bottomdir() {
-    { { [ -e "$1" ]  && ! [ -d "$1" ] } || { ! [ -e "$1" ] && [[ "$1" != */ ]] } } && { ec "${1:h}"; } || { ec "$1"; } ;}
+    { { [ -e "$1" ]  && ! [ -d "$1" ] } || { ! [ -e "$1" ] && [[ "$1" != */ ]] } } && { ec "${1:h}"; } || { ec "$1"; }
+}
+function bottomfile() {
+    local name="$1"
+
+    if test -n "$name" && ! test -d "$name" ; then
+        local dir="$(bottomdir "$name")"
+        ecn "$name" | prefixer -r "${dir}" | sd '^/*' ''
+    fi
+}
+##
 function cdd() {
     cd "$(bottomdir "$1")"
 }

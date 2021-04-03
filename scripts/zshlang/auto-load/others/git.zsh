@@ -262,11 +262,17 @@ function git-commitmsg() {
   ## alts
   # git diff --cached --diff-filter='M' --name-only # gives names of modified files
   ##
+  local default="${git_commitmsg_default:-autocommit}"
+
   local msg="$(@opts tail y @ git-status-summary2 -uno)"
 
   # ec-tty $msg
   msg="$(ecn $msg | prefixer --skip-empty -o '; ')"
-  ec "${msg:-.}"
+  if [[ "$msg" =~ '^\s*$' ]] ; then
+    ec "$default"
+  else
+    ec "${msg:-$default}"
+  fi
 }
 ##
 function gsync() {
@@ -302,6 +308,7 @@ function gsync() {
     do
       ec
       if gr-isLocal "$remote" || isNet ; then
+        # @todo @maybe get the remotes from the submodule itself. The submodules' remotes don't necessarily match the main repo's, such as when the submodule only has an 'upstream' remote.
         reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit
         reval-ec git pull "$remote" "$branch" --no-edit
       else

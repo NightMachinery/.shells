@@ -69,3 +69,57 @@ function pbpaste-plus() {
     local ppaths=( "${(@f)$(clipboard-to-path.nu)}" )
     test -n "$ppaths[*]" && paste=( $ppaths[@] )
 }
+##
+clipboard-info-darwin() {
+  osascript -e "clipboard info" |
+  sed -E 's/, /,/g; s/,([0-9]+)/:\1/g' | tr ':,' '\t\n'
+}
+function pngpaste() {
+    # See https://apple.stackexchange.com/a/375353/282215 for getting other types of stuff out of the clipboard
+    local name="${1}" extension="${2:-png}" class="${3}"
+    test -z "$class" && class='«class PNGf»'
+    # ensure-args name @MRET
+    ensure isDarwin @MRET
+
+    local stdout=''
+    if [[ name == '-' ]] ; then
+        name="$(gmktemp --suffix ".${extension}")" @RET
+        stdout=y
+    fi
+    local dir
+    dir="$(bottomdir "$name")"
+    if test -z "$dir" ; then
+        dir="$PWD"
+    fi
+    dir="$(grealpath "$dir")"
+    mkdir -p "$dir" @RET
+
+    name="$(bottomfile "$name")"
+    if test -z "${name}" ; then
+        name+="$(dateshort | gtr ':' '_' | str2filename)" @RET
+    fi
+
+    [[ "$name" =~ '\.'${extension}'$' ]] || name+=".${extension}"
+
+    revaldbg osascript -e "tell application \"System Events\" to ¬
+                  write (the clipboard as ${class}) to ¬
+                          (make new file at folder \"${dir}\" with properties ¬
+                                  {name:\"${name}\"})" @RET
+    if test -n "$stdout" ; then
+        cat "$name"
+    fi
+    ## @alt:
+    # https://github.com/jcsalterego/pngpaste/issues/16
+    # https://apple.stackexchange.com/questions/418043/macos-saving-images-from-the-clipboard-using-pngpaste-is-faded-and-white
+    # pngpaste images (screenshots? pasting from Telegram works fine) look faded and white. Using `montage` first fixes this problem, so use `ils` instead.
+    # Use `magick convert png:a1.png -resize 1700x png:- | icat-realsize` to test it with `pngpaste a1.png`
+    # things that did not work:
+    # - Might be related to `-colorspace`, but I could not fix it.
+    # - -define png:color-type=6
+    # - png32:-
+    ##
+}
+function jpgpaste() {
+    pngpaste "$1" jpg 'JPEG picture'
+}
+##

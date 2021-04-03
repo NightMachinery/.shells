@@ -99,8 +99,6 @@ function icat-autoresize() {
             w_r=$(( sw - m ))
         fi
         ##
-        # this command makes some pngpaste images (screenshots? pasting from Telegram works fine) look faded and white. Using `montage` first fixes this problem, so use `ils` instead.
-        # Might be related to `-colorspace`, but I could not fix it.
         revaldbg magick convert "${${i:e}:-png}":"$i" -resize "$w_r"x png:- | icat-realsize
         ##
     done
