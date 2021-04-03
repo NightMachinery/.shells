@@ -22,3 +22,6 @@ function jinit() {
     }
 }
 jinit
+##
+@opts-setprefix assert ensure
+##

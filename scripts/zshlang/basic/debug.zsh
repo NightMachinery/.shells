@@ -110,6 +110,7 @@ function dbgserr() {
 }
 ##
 function ensure() {
+    # @deprecated Use `assert` instead
     local msg="${ensure_msg:-$ensure_m}"
     local caller cmd
     if (( $#@ == 0 )) ; then
@@ -132,15 +133,33 @@ function ensure() {
     ##
     return $ret
 }
-alias assert='ensure'
 function ensure-dbg() {
+    # @deprecated Use `assert-dbg` instead
     if isDbg ; then
         ensure "$@"
     else
         reval "${@[1,-2]}"
     fi
 }
+##
+function assert() {
+    # Usage: assert true @RET
+    ensure "$@" "${funcstack[2]:-assert}"
+    # `@opts-setprefix assert ensure` in load-first
+}
+function assert-dbg() {
+    if isDbg ; then
+        assert "$@"
+    else
+        reval "$@"
+    fi
+}
+##
+function assert-args() {
+    ensure-args "$@" "${funcstack[2]:-assert}"
+}
 function ensure-args() {
+    # @deprecated Use `assert-args` instead
     if (( $#@ <= 1 )) ; then
         ecerr "$0: not enough arguments."
         return 1
@@ -156,7 +175,11 @@ function ensure-args() {
     done
     return $ret
 }
+function assert-net() {
+    ensure-net "$@" "${funcstack[2]:-assert}"
+}
 function ensure-net() {
+    # @deprecated Use `assert-net` instead
     local ensure_msg="No internet access"
     ensure isNet "$@"
 #     if ! isNet ; then

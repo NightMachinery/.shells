@@ -17,9 +17,19 @@ aa-raw() {
 
     isI || opts+=(--show-console-readout false --summary-interval 0)
     test -n "$aaNoSplit" || opts+=(--enable-http-pipelining --split 6 --stream-piece-selector geom)
-    aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false  $opts[@] "$@" #-Z has some unsavory sideeffects so I have not included it in this.
+    aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false  $opts[@] "$@"
+    local ret=$?
+    #-Z has some unsavory sideeffects so I have not included it in this.
 
-    bell-dl
+    # arger "${funcstack[@]}"
+    if isI && [[ "${funcstack[-1]}" == ('aacookies'|'aa-raw') ]] ; then
+        ##
+        # @done think of some way to only trigger this when we use `aa` directly on the shell.
+        # one way is to rename all usages of aa to aa-gateway and then add the bell to aa itself.
+        ##
+        bell-dl
+    fi
+    return $ret
 }
 aagh() { aa "${(@f)$(gh-to-raw "$@")}" }
 aacookies() {
