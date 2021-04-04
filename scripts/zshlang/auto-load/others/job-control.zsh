@@ -98,7 +98,7 @@ insubshell-eval() {
         # https://unix.stackexchange.com/questions/169987/update-process-name-in-shell-is-it-possible/170322#170322
         # The thing is a quite of a hack, and before using it, one basically is required to first run zsh with long parameter list, to reserve enough space for argv, to then be able to assign strings of that length.
         eval "$cmd"
-    )
+    ) &>/dev/null </dev/null
 }
 function awaysh-exit() {
     ##
@@ -118,7 +118,11 @@ function awaysh-doublefork() {
     # https://stackoverflow.com/questions/66936760/shell-fork-daemonize-a-subshell-such-that-it-survives-the-death-of-its-tmux-s
     awaysh1 awaysh-exit "$@"
 }
-aliasfn awaysh awaysh-doublefork
+function awaysh() {
+    ( awaysh1 "$@" ) &>/dev/null </dev/null
+    # subshell needed to silence messages generated from MONITOR (e.g., `[9] 5152`)
+    # also, weirdly, with this subshell, we no longer need MONITOR in the first place :|
+}
 function awaysh-sure() {
     # @broken completely
     awaysh-doublefork "$@"
@@ -126,14 +130,27 @@ function awaysh-sure() {
     sleep 1 # give it time to fork
 }
 function awaysh1() {
-    local cmd="$(gquote "$@") & ; disown "
-    # local cmd="$(gquote "$@")"
+    local cmd="$(gquote "$@")"
 
-    setopt LOCAL_OPTIONS NO_NOTIFY NO_MONITOR
+    setopt LOCAL_OPTIONS NO_NOTIFY
     # http://zsh.sourceforge.net/Doc/Release/Options.html#index-NO_005fMONITOR
     # http://zsh.sourceforge.net/Doc/Release/Options.html#index-NO_005fNOTIFY
 
-    ( insubshell-eval "$cmd" &>/dev/null </dev/null ) & # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
+    ##
+    setopt NO_MONITOR # the subshell in awaysh makes this possible
+    # note that without MONITOR, the forked children will, probably, still share their parent's process group ID.
+    #
+    # &| operator: It runs the given command in background, but the command is not a job, so your display is not spammed. You cannot use wait though.
+    ( insubshell-eval "$cmd"  &| ) &|
+    ##
+    # setopt MONITOR
+    # Without MONITOR, killing (signaling) the parent shell will kill these as well.
+    #
+    # ( insubshell-eval "$cmd"  & ; disown-true ) &
+    # disown-true
+    ##
+}
+function disown-true() {
     disown &>/dev/null || true  # Prevent whine if job has already completed
 }
 @opts-setprefix awaysh insubshell-eval

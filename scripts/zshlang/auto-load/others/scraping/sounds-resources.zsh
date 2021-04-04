@@ -16,9 +16,16 @@ function sounds-resources-dl() {
 }
 ##
 function gc-tag() {
+    : "@alt lkh (ntag-ls-head)"
+
     if ask "$(heari "$(mpv-get)")" Y ; then
-        ntag-add "$(mpv-get)" blue @RET
-        mv "$ntag_add_dest"
+        local tag=''
+        vared -p "tag: " tag || tag=''
+        ntag-add "$(mpv-get)" $tag blue @RET
+        vared -p "bell-maker: " tag || tag=''
+        if test -n "$tag" ; then
+            reval-copy gquote bell-maker "${tag}" "$(grealpath "${ntag_add_dest}" | dir-rmprefix "$(grealpath "$GREENCASE_DIR")")"
+        fi
     fi
 }
 ##

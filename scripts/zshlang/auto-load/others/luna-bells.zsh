@@ -94,14 +94,49 @@ function lunaquit() {
         display-gray-off
     fi
 }
-function lunaquit-finalize() {
-    display-gray-off ; bell-lm-amiindanger
+function lunaquit-monitor() {
+    local rest_dur="${1:-100}" lq_dur="${2:-240}"
+
+    local i idle recent_idle=0
+    for i in {1..${lq_dur}} ; do
+        idle="$(idle-get)"
+        if (( idle > recent_idle )) ; then
+            recent_idle="$idle"
+        fi
+        sleep 1
+    done
+    if (( recent_idle >= rest_dur )) ; then
+        display-gray-off
+        if (( idle <= 10 )) ; then
+            # tts-glados1-cached 'Good job'
+            bell-lm-mo-welldone
+        fi
+    else
+        awaysh-bnamed BELL_EVACUATE_MARKER bell-evacuate
+    fi
+}
+function bell-evacuate() {
+    awaysh-bnamed BELL_EVACUATE_MARKER redo2 365 bell-visual-flash1 # each iter takes ~0.5
+    # @placeholder
+    local bell_awaysh=no i
+    for i in {1..4} ; do # each iter takes ~46s
+        bell-sc2-personnel-must-evacuate
+        bell-sc2-zerg-detected
+        bell-sc2-will-face-justice
+        bell-sc2-personnel-must-evacuate
+        bell-helicopter
+        bell-sc2-my-sins
+        bell-sc2-extreme-zerg-infestation
+        bell-sc2-personnel-must-evacuate
+        bell-sc2-containment-breach
+        bell-sc2-personnel-must-evacuate
+        bell-sc2-my-sins
+        bell-sc2-containment-breach
+    done
 }
 function lq() {
-    local gray="${1:-240}"
-
     @opts lunaquit_grayoff no @ lunaquit
-    awaysh eval "sleep ${gray} ; lunaquit-finalize"
+    lunaquit-monitor "$@"
     # bell-lm-amiindanger
 }
 function deluna() {
@@ -260,20 +295,49 @@ function bella-zsh-maybe() {
 aliasfn bell-dl tts-glados1-cached 'Download, complete'
 ##
 function bell-maker() {
-    local name="${1:?}" f="${2:?}"
+    local name="${1}" fs=( ${@[2,-1]} )
+    assert-args name fs @RET
 
-    fndef "bell-$name" awaysh-named "BELL_${name:u}_MARKER" hearinvisible "$GREENCASE_DIR/$f"
+    local i
+    for i in {1..${#fs}} ; do
+        local f="${fs[$i]}"
+        if ! test -e "$f" ; then
+            fs[$i]="$GREENCASE_DIR/$f"
+        fi
+    done
+
+    fndef "bell-$name" bell-ringer "BELL_$(ec ${name:u} | gtr '-' '_')_MARKER" "$fs[@]"
+}
+function bell-ringer() {
+    local marker="${1}" fs=("${@[2,-1]}") awaysh="${bell_awaysh:-y}"
+    assert-args marker fs
+
+    if bool "$awaysh" ; then
+        awaysh-named "$marker" hear-rnd "$fs[@]"
+    else
+        hear-rnd "$fs[@]"
+    fi
 }
 ## Little Misfortune
 function bell-lm-maker() {
-    local name="${1:?}" f="${2:?}"
+    local name="${1}" fs=("${@[2,-1]}")
+    assert-args name fs @RET
 
-    fndef "bell-lm-$name" awaysh-named "BELL_LM_${name:u}_MARKER" hearinvisible "$GREENCASE_DIR/LittleMisfortune/$f"
+    local i
+    for i in {1..${#fs}} ; do
+        local f="${fs[$i]}"
+        if ! test -e "$f" ; then
+            fs[$i]="$GREENCASE_DIR/LittleMisfortune/$f"
+        fi
+    done
+
+    bell-maker "lm-$name" "$fs[@]"
 }
 function bell-lm-maker-dir() {
-    local name="${1:?}" f="${2:?}"
+    local name="${1}" f="${2}"
+    assert-args name f @RET
 
-    fndef "bell-lm-$name" awaysh-named "BELL_LM_${name:u}_MARKER" hear-rnd $GREENCASE_DIR/LittleMisfortune/$f/${~audioglob}
+    bell-lm-maker "$name" $GREENCASE_DIR/LittleMisfortune/$f/${~audioglob}
 }
 bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
@@ -281,6 +345,7 @@ bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
 bell-lm-maker strawberryjuice flac/10.3_09_MI_strawberryjuice..blue..flac
 bell-lm-maker amiindanger flac/06.4_04_MI_amiindanger.flac
 bell-lm-maker shouldisitdown flac/16-1_15_MI_shouldisitdown.flac
+bell-lm-maker mo-welldone flac/17.1_11_MO_welldone.flac
 bell-lm-maker-dir mhm mhm
 # `fr heari 'flac/ MI cool'`
 ##
@@ -333,10 +398,36 @@ bell-maker sc2-nav_online "Starcraft/Starcraft II/Heart of the Swarm/PC Computer
 aliasfn reval-bell-sc2-nav_online @opts bell bell-sc2-nav_online @ reval-bell
 ##
 
+bell-maker sc2-activating-defense-turrets 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_067..activating automated defense turrets..blue..ogg'
+
+bell-maker sc2-activate-warbot-shield 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_079..activate warbot shield..blue..ogg'
+
 bell-maker sc2-activating_bots "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_066_activating automated sentry bots..blue...ogg"
 # aliasfn reval-bell-sc2-activating_bots @opts bell bell-sc2-activating_bots @ reval-bell
 
 bell-maker sc2-eradicator_destroyed "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_172_eradicator destroyed situation critical..blue...ogg"
+
+bell-maker sc2-containment-breach 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_061..containment breach, zerg specimens free..blue..ogg'
+
+bell-maker sc2-zerg-detected 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zScripted_ZAdjutantIntro_DropShipAdjutant_019_warning zerg organisms detected..blue..ogg'
+
+bell-maker sc2-extreme-zerg-infestation 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zCutscene_Zerg04_DropShipAdjutant_014_warning destination contains extreme levels of zerg infestation, confirm..blue..ogg'
+
+bell-maker sc2-personnel-must-evacuate 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zCutscene_Zerg02_DropShipAdjutant_016_all personal must evacuate..blue..ogg'
+
+bell-maker sc2-no-more-personnel-remain 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_118..no more personnel remain on sublevel..blue..ogg'
+
+bell-maker sc2-testing-repeating-instructions 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_150..testing, no playback errors detected, repeating instructions..blue..ogg'
+
+bell-maker sc2-subject-unresponsive-translating 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_151..subject is unresponsive, translating isntructions into native language..blue..ogg'
+
+bell-maker sc2-my-sins 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zeratul/Zeratul/zSMAmbient_Zeratul_Zeratul_003_my sins weigh heavy..blue..ogg'
+
+bell-maker sc2-will-face-justice 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zeratul/Zeratul/zSMAmbient_Zeratul_Zeratul_004_I will face justice for my acts..blue..ogg'
+
+bell-maker sc2-serve-xelnaga "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zeratul/Zeratul/zSMAmbient_Zeratul_Zeratul_005_I serve the \"Xel'naga\"..blue..ogg"
+
+# bell-maker sc2- ''
 ###
 ## Madagascar:
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"

@@ -70,7 +70,8 @@ function bool() {
     if [[ "${i}" == (n|no|0) ]] ; then
         return 1
     else
-        return test -n "${i}"
+        test -n "${i}"
+        return $?
     fi
 }
 ##

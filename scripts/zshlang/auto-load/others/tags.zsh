@@ -86,6 +86,10 @@ ntag-ls() {
     fi
 }
 aliasfn lk ntag-ls
+function ntag-ls-head() {
+    ntag-ls --color always | prefixer -a "${PWD:t}/"
+}
+aliasfn lkh ntag-ls-head
 ##
 function ntag-rmadd() {
     ## tests

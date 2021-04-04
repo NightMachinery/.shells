@@ -68,9 +68,14 @@ function jprocs-pic() {
 }
 ##
 function idle-get() {
+    # output in seconds
+    assert isDarwin @RET
+
     ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }
 function  lastunlock-get() {
+    assert isDarwin @RET
+
     # Using lower precision helps a lot with performance
     # hyperfine --warmup 5 "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 3h" "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 30h"
 
@@ -78,7 +83,7 @@ function  lastunlock-get() {
     unset date
     date="$(command log show --style syslog --predicate 'process == "loginwindow"' --debug --info --last "$precision" | command rg "going inactive, create activity semaphore|releasing the activity semaphore" | tail -n1 |cut -c 1-31)" fromnow || ec 9999999
 }
-function ecdate() { ec "$edPre$(color 100 100 100 $(dateshort))            $@" }
+##
 function load5() {
     # 1 5 15 minutes
     sysctl -n vm.loadavg | awk '{print $3}'

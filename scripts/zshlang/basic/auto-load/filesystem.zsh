@@ -28,6 +28,13 @@ function bottomfile() {
     fi
 }
 ##
+function dir-rmprefix() {
+    local dir="$1" ; shift
+    assert-args dir @RET
+
+    prefixer --case-sensitivity no -r "$dir" "$@" | sd '^/*' ''
+}
+##
 function cdd() {
     cd "$(bottomdir "$1")"
 }
