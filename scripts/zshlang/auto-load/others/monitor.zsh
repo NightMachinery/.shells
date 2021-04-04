@@ -67,10 +67,10 @@ function jprocs-pic() {
     jdoc
 }
 ##
-function getidle-darwin() {
+function idle-get() {
     ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }
-function  getlastunlock-darwin() {
+function  lastunlock-get() {
     # Using lower precision helps a lot with performance
     # hyperfine --warmup 5 "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 3h" "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 30h"
 

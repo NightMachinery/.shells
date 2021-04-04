@@ -63,7 +63,7 @@ function mpv-noidle() {
     while true
     do
         set-volume 0
-        (( $(getidle-darwin) >= 0.2 )) &&  {
+        (( $(idle-get) >= 0.2 )) &&  {
             cleanbuffer
             kill -9 -$mympv # '-' makes it kill the whole process group. It's necessary.
             # pk mpv

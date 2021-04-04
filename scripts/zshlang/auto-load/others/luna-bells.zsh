@@ -111,8 +111,8 @@ function deluna() {
     ec "deluna (nonce: $nonce) started with timeout $timeout"
     while oneinstance $0 $nonce
     do
-        (( $(getidle-darwin) >= $timeout || $(getlastunlock-darwin) <= 80 )) && {
-            edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(getidle-darwin), last_unlock: $(getlastunlock-darwin))")"
+        (( $(idle-get) >= $timeout || $(lastunlock-get) <= 80 )) && {
+            edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get))")"
             lunaquit " via deluna"
             # { isDbg && sleep 1 } || sleep 30
         }
@@ -196,7 +196,7 @@ function bell-auto() {
 
     while oneinstance $0 $nonce
     do
-        if (( $(getidle-darwin) <= $timeout )) ; then
+        if (( $(idle-get) <= $timeout )) ; then
             ec "$0 exited because of user activity."
             break
         fi
