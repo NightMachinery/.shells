@@ -73,7 +73,7 @@ function idle-get() {
 
     ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }
-function  lastunlock-get() {
+function lastunlock-get() {
     assert isDarwin @RET
 
     # Using lower precision helps a lot with performance
@@ -82,6 +82,9 @@ function  lastunlock-get() {
     local precision="${1:-1h}" # can only spot the last unlock in this timeframe
     unset date
     date="$(command log show --style syslog --predicate 'process == "loginwindow"' --debug --info --last "$precision" | command rg "going inactive, create activity semaphore|releasing the activity semaphore" | tail -n1 |cut -c 1-31)" fromnow || ec 9999999
+}
+function lastunlock-get-min() {
+    ec $(( $(lastunlock-get) / 60 ))
 }
 ##
 function load5() {
