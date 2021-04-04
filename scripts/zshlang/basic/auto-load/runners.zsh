@@ -75,10 +75,10 @@ function reval-notifexit() {
     # always alone is not sufficient. Test with `zsh -c 'reval-notifexit iterm_focus.py'`.
     # But now always is most probably redundant.
     setopt localtraps
-    trap "" INT
+    trap "" INT TERM HUP EXIT
     { ( reval "$@" ) } always {
-        bell-sc2-eradicator_destroyed
-        trap - INT # Remove active traps
+        brishz bell-sc2-eradicator_destroyed
+        trap - INT TERM # Remove active traps
         notif "$0: $@"
     }
 }

@@ -18,7 +18,9 @@ function ot-server-daemon() {
 }
 function ot-loadovertone() {
   ot-rep "(use 'overtone.live) (use 'overtone.inst.piano)" && {
-    tts-gateway-i1 'Overtone, Online'
+    # tts-gateway-i1 'Overtone, Online'
+    tts-glados1-cached 'Overtone, Online'
+    ot-play-beeps1 3
   }
 }
 function ot-rep() {

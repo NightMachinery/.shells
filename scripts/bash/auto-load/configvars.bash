@@ -20,7 +20,8 @@ export SHELL=/bin/dash #"${commands[dash]}" # fzf uses this shell to run the def
 # It might be problematic to set SHELL, but who knows ...
 export FZF_SHELL="$SHELL" # night.sh's variable
 ###
-ITERMMAGIC=ITERM_MAGIC
+export ITERMMAGIC=ITERM_MAGIC
+export iterm_socket="$HOME/tmp/.iterm_socket"
 ##
 dl_base_url='https://files.lilf.ir'
 fd_default=( --hidden --no-ignore )

@@ -100,15 +100,49 @@ insubshell-eval() {
         eval "$cmd"
     )
 }
-awaysh() {
-    local cmd="$(gquote "$@") &"
+function awaysh-exit() {
+    ##
+    trap "" INT TERM HUP EXIT
+    {
+        (true)
+    } always {
+        awaysh1 "$@"
+    }
+    exit 0
+    ##
+    # awaysh1 "$@"
+    # exit 0
+    ##
+}
+function awaysh-doublefork() {
+    # https://stackoverflow.com/questions/66936760/shell-fork-daemonize-a-subshell-such-that-it-survives-the-death-of-its-tmux-s
+    awaysh1 awaysh-exit "$@"
+}
+aliasfn awaysh awaysh-doublefork
+function awaysh-sure() {
+    # @broken completely
+    awaysh-doublefork "$@"
+    # ( awaysh-exit "$@" )
+    sleep 1 # give it time to fork
+}
+function awaysh1() {
+    local cmd="$(gquote "$@") & ; disown "
+    # local cmd="$(gquote "$@")"
 
-    insubshell-eval "$cmd" &>/dev/null </dev/null || return $? # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
+    setopt LOCAL_OPTIONS NO_NOTIFY NO_MONITOR
+    # http://zsh.sourceforge.net/Doc/Release/Options.html#index-NO_005fMONITOR
+    # http://zsh.sourceforge.net/Doc/Release/Options.html#index-NO_005fNOTIFY
+
+    ( insubshell-eval "$cmd" &>/dev/null </dev/null ) & # if we don't disconnect the pipes, then closing the shell can lead to pipe failure. The stdin's case is less clear.
     disown &>/dev/null || true  # Prevent whine if job has already completed
 }
 @opts-setprefix awaysh insubshell-eval
+@opts-setprefix awaysh1 insubshell-eval
+@opts-setprefix awaysh2 insubshell-eval
+##
 # awaysh() inbg silent "$@"
 aliasfn inbg awaysh
+##
 function awaysh-named() {
     # note that somehow using simple commands like sleep will not retain the parent process (and so you can't see its name either), but wrapping that sleep in a function will keep the executing subshell alive. Idk why.
     insubshell_eval_marker="$1" awaysh "${@:2}"
@@ -138,12 +172,14 @@ function awaysh-bnamed-rp() {
     #     awaysh-bnamed "$name" "$cmd[@]"
     ##
 }
+##
 function insubshell-named() {
     @opts marker "$1" @ insubshell "${@:2}"
 }
 function insubshell-bnamed() {
     brishz insubshell-named "${@}"
 }
+##
 function away() {
     : "Use awaysh, that seems better in every single case."
 
@@ -151,6 +187,7 @@ function away() {
     # disown is still needed. Without it you'll see `[1]  + 97327 done       nohup sleep 10`
     disown &>/dev/null  # Prevent whine if job has already completed
 }
+##
 function kill-marker() {
     local id="${1:?}"
 

@@ -1,8 +1,6 @@
 #!/usr/bin/env zsh
 
 ##
-cp "$timetracker_db" ~/base/backup/tt/tt_"$(dateshort)".db
-##
 powersaving_status_del
 # wireguard_enabled_del
 ##

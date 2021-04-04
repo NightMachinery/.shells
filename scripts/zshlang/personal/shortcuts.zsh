@@ -58,29 +58,17 @@ function vcns() {
     } always { popf }
 }
 function vcndiff() {
+    vcn-with git add ~/scripts/
     vcn-with git diff HEAD
 }
 function vcnpp() {
     local msg="${*}"
 
-    local repo="$(vcn-getrepo)"
     pushf ~/
     {
-        vcsh $repo add ~/scripts/
-
-        # local automsg="$(vcn-with git-commitmsg)"
-        # vcsh $repo commit -uno -am "${msg:-$automsg}"
-
+        vcn-with git add ~/scripts/
         vcn-with @opts noadd y @ gsync "$msg"
-        ##
-        # local remote remotes=("${(@f)$(vcsh $repo remote)}")
-        # for remote in $remotes[@] ; do
-        # vcsh $repo pull "$remote" master --no-edit
-        # done
-        # for remote in $remotes[@] ; do
-        # vcsh $repo push "$remote" master
-        # done
-        ##
+
         brishzr-repeat
     } always { popf }
 }

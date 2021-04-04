@@ -212,3 +212,13 @@ function tty-title() {
 
     title "$text" "$text"
 }
+##
+function iterm-tab-activate() {
+    local i="${1:-5}"
+    i=$(( i - 1 )) @RET # make it zero-based
+    ec "tab_activate ${i}" | socat - unix-connect:"$iterm_socket"
+    ##
+    # cliclick kd:cmd kp:num-${i} ku:cmd # Took ~0.5
+    ##
+}
+##

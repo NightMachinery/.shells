@@ -184,7 +184,8 @@ function ntsearch-lines() {
     : "Use alt-enter to jump straight into editing the files! Multiple selection is possible!"
 
     : "The engine should return output in outFiles."
-    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}" ni_noprocess="${ntsearch_lines_nnp}" no_wait="${ntsearch_lines_nw}" force_editor="${ntsearch_lines_fe}"
+    local engine=("${(@)ntsearch_lines_engine:-ntsearch-lines-engine}") pattern="${ntsearch_lines_pattern}" ni_noprocess="${ntsearch_lines_nnp}" no_wait="${ntsearch_lines_nw:-y}" force_editor="${ntsearch_lines_fe}"
+    [[ "{$no_wait:l}" == (n|no) ]] && no_wait=''
     test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y

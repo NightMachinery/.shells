@@ -30,8 +30,8 @@ alifn emc-gateway="emacsclient -t"
 alifn emc="bicon-emc"
 ##
 function emc-focus() {
-    # How to give the focus to a specific tab? https://gitlab.com/gnachman/iterm2/-/issues/9602
-    cliclick kd:cmd kp:num-5 ku:cmd # Took ~0.5
+    # @itermOnly
+    iterm-tab-activate 5
 }
 function emcnw() {
     emc-gateway --no-wait "$@"
