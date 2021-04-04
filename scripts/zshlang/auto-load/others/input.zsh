@@ -1,13 +1,17 @@
-ask() {
+function vared-py() {
+    vared.py "$@" # </dev/tty # incompatible with prompt_toolkit
+}
+function ask() {
     doc 'This is a general-purpose function to ask Yes/No questions in Bash, either with or without a default answer. It keeps repeating the question until it gets a valid answer.'
+    : "usage: prompt [default]"
 
-    # https://gist.github.com/davejamesmiller/1965569
+    # forked from https://gist.github.com/davejamesmiller/1965569
     local prompt default reply
 
-    if [ "${2:-}" = "Y" ]; then
+    if [ "${2:l}" = "y" ]; then
         prompt="Y/n"
         default=Y
-    elif [ "${2:-}" = "N" ]; then
+    elif [ "${2:l}" = "n" ]; then
         prompt="y/N"
         default=N
     else
@@ -18,7 +22,7 @@ ask() {
     while true; do
 
         # Ask the question (not using "read -p" as it uses stderr not stdout)
-        echo -n "$1 [$prompt] "
+        ecn "$1 [$prompt] " >/dev/tty
 
         # Read the answer (use /dev/tty in case stdin is redirected from somewhere else)
         read reply </dev/tty

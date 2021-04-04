@@ -181,6 +181,8 @@ if [[ "${terminfo[kcud1]}" != "" ]]; then
     bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
     bindkey "^[[B" down-line-or-beginning-search
 fi
+bindkey '^[[1;3D' backward-word # alt-left
+bindkey '^[[1;3C' forward-word # alt-right
 ### iTerm Integration
 alias it2attention=~/.iterm2/it2attention
 alias it2check=~/.iterm2/it2check

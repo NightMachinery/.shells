@@ -30,8 +30,15 @@ dact() {
     isNotDbg || eval "$(gquote "$@")"
 }
 ##
-ecerr() { color 255 43 244 "$@" 1>&2 }
-function ecdate() { ec "$edPre$(color 100 100 100 $(dateshort))            $@" }
+function ecerr() {
+    ec "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
+}
+function ecnerr() {
+    ecn "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
+}
+function ecdate() {
+    ec "$edPre$(color 100 100 100 $(dateshort))            $@"
+}
 function ecdate-err() {
     ecdate "$(colorfg 255 50 10)${*}$(resetcolor)" >&2
 }

@@ -1,3 +1,4 @@
+##
 function ensurerun() {
     ruu "retry gtimeout $1" "${@:2}"
 }
@@ -90,16 +91,23 @@ insubshell() {
 }
 @opts-setprefix insubshell insubshell-eval
 insubshell-eval() {
-    local cmd="$@"
+    local cmd=("$@")
     local marker="${insubshell_eval_marker:-${insubshell_eval_m:-AWAYSH_MARKER}}"
 
     (
-        jobs -Z "zsh $marker $cmd" # keep zsh at first so doing, e.g., `pkill zsh` still works
+        mark-me "$marker" ${cmd[@]} # keep zsh at first so doing, e.g., `pkill zsh` still works
         # https://unix.stackexchange.com/questions/169987/update-process-name-in-shell-is-it-possible/170322#170322
         # The thing is a quite of a hack, and before using it, one basically is required to first run zsh with long parameter list, to reserve enough space for argv, to then be able to assign strings of that length.
-        eval "$cmd"
+        eval "$cmd[*]"
     ) &>/dev/null </dev/null
 }
+function mark-me() {
+    local mark
+    mark="$(ec "${${1:u}:-NA}" | gtr '-' '_')" @RET
+    [[ "$mark" =~ '_MARKER$' ]] || mark+=_MARKER
+    jobs -Z "zsh $mark $(gq "${@[2,-1]}")"
+}
+##
 function awaysh-exit() {
     ##
     trap "" INT TERM HUP EXIT
@@ -144,6 +152,7 @@ function awaysh1() {
     ( insubshell-eval "$cmd"  &| ) &|
     ##
     # setopt MONITOR
+    # We might also need POSIX_JOBS to really activate this completely?
     # Without MONITOR, killing (signaling) the parent shell will kill these as well.
     #
     # ( insubshell-eval "$cmd"  & ; disown-true ) &

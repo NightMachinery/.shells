@@ -1,7 +1,12 @@
 function youtube-dl() {
+    local cookie_mode="${youtube_dl_c}"
     typeset -ga ytdl_opts # has priority over args
+
     local opts=()
     isI || opts+=( --quiet --no-progress )
+    if bool $cookie_mode ; then
+        opts+=(--add-header "$(cookies-auto "$@")")
+    fi
     if isSSH ; then
         transformer urlfinalg "revaldbg $proxycmd youtube-dl $opts[@]" "$@" "$ytdl_opts[@]"
     else

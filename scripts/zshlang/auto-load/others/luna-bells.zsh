@@ -89,15 +89,20 @@ function lunaquit() {
     local gray="${lunaquit_grayoff:-y}"
 
     loop-startover ~/tmp/.luna "$@"
-    pgrep LUNA_MARKER | inargsf reval-ec serr kill-withchildren
+    local pids
+    pids="$(pgrep LUNA_MARKER)" || return 1
+    [[ "$pids[*]" =~ '^\s*$' ]] && return 1
+    ec "$pids" | inargsf reval-ec serr kill-withchildren
     if bool $gray ; then
         display-gray-off
     fi
+    return 0
 }
 function lunaquit-monitor() {
     local rest_dur="${1:-100}" lq_dur="${2:-240}"
 
     local i idle recent_idle=0
+    mark-me "$0"
     for i in {1..${lq_dur}} ; do
         idle="$(idle-get)"
         if (( idle > recent_idle )) ; then
@@ -114,6 +119,7 @@ function lunaquit-monitor() {
     else
         awaysh-bnamed BELL_EVACUATE_MARKER bell-evacuate
     fi
+    mark-me zsh
 }
 function bell-evacuate() {
     awaysh-bnamed BELL_EVACUATE_MARKER redo2 365 bell-visual-flash1 # each iter takes ~0.5
@@ -133,12 +139,17 @@ function bell-evacuate() {
         bell-sc2-my-sins
         bell-sc2-containment-breach
     done
+    display-gray-off # if you're still here, I doubt keeping the display gray will be able to help you any. :(
 }
-function lq() {
-    @opts lunaquit_grayoff no @ lunaquit
-    lunaquit-monitor "$@"
-    # bell-lm-amiindanger
+function lunaquit-quick() {
+    # if there is no LUNA process around, we'll do nothing:
+    if @opts grayoff no @ lunaquit ; then
+        brishz awaysh lunaquit-monitor "$@" # it marks itself
+        # bell-lm-amiindanger
+    fi
 }
+aliasfn lq lunaquit-quick
+##
 function deluna() {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
