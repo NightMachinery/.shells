@@ -63,3 +63,14 @@ function opts-urls() {
         fi
     done
 }
+##
+function bool() {
+    local i="${1:l}"
+
+    if [[ "${i}" == (n|no|0) ]] ; then
+        return 1
+    else
+        return test -n "${i}"
+    fi
+}
+##

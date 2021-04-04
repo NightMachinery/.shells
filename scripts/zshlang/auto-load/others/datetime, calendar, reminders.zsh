@@ -258,7 +258,7 @@ function rem-today() {
     rem-todaypaths
 
     local text=""
-    local f bak
+    local f bak res
     for f in $today[@] ; do
         if test -e "$f" ; then
             local ext="${f:e}"
@@ -273,7 +273,9 @@ function rem-today() {
                 text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
             elif [[ "$ext" == bak ]] ; then
-                ecn $'\n\n'"$0: Skipped: $f"
+                res="$0: Skipped: $f"
+                ecerr "$res"
+                # text+=$'\n\n'"$res"
             else
                 # text+=$'\n\n'"$0: Unsupported file: $f"
                 text+=$'\n\n'"$(<$f)" #"${$(<$f ; ec .)[1,-2]}"

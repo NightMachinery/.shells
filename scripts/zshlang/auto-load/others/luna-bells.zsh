@@ -9,12 +9,12 @@ luna() {
     lunar pmset displaysleepnow
 }
 ##
-luna-advanced-bell() {
-    awaysh-bnamed LUNA_MARKER h_luna-advanced-bell
-}
 lunas() {
     lunar luna-advanced-bell
     display-gray-off # probably redundant
+}
+luna-advanced-bell() {
+    awaysh-bnamed LUNA_MARKER h_luna-advanced-bell
 }
 redis-defvar luna_signal1
 h_luna-advanced-bell() {
@@ -86,13 +86,23 @@ aliasfn bell-luna bell-avarice
 # aliasfn bell-luna bell-greencase
 ##
 function lunaquit() {
+    local gray="${lunaquit_grayoff:-y}"
+
     loop-startover ~/tmp/.luna "$@"
     pgrep LUNA_MARKER | inargsf reval-ec serr kill-withchildren
-    display-gray-off
+    if bool $gray ; then
+        display-gray-off
+    fi
+}
+function lunaquit-finalize() {
+    display-gray-off ; bell-lm-amiindanger
 }
 function lq() {
-    lunaquit
-    bell-lm-amiindanger
+    local gray="${1:-240}"
+
+    @opts lunaquit_grayoff no @ lunaquit
+    awaysh eval "sleep ${gray} ; lunaquit-finalize"
+    # bell-lm-amiindanger
 }
 function deluna() {
     local nonce
