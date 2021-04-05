@@ -41,6 +41,8 @@ function firstbell()
     global firstLoad = true
 end
 ##
+<|(f,x) = f(x)
+##
 using REPL
 cmd_start_time = time() # to avoid buzzing on reloadStartup
 is_continous_bell = false

@@ -272,7 +272,7 @@ function git-commitmsg() {
     ec "$default"
   else
     if (( ${#msg} > 100 )) ; then
-      if ask "$0: msg is too long. Do you wish to edit it?" y ; then
+      if isIReally && ask "$0: msg is too long. Do you wish to edit it?" y ; then
         msg="$(ec "$msg" | prefixer -o '; ')"
         ## @zshbug: vared doesn't work in subshells under an interactive shell
         # zmodload zsh/zle

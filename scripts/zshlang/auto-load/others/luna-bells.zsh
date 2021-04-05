@@ -307,17 +307,22 @@ aliasfn bell-dl tts-glados1-cached 'Download, complete'
 ##
 function bell-maker() {
     local name="${1}" fs=( ${@[2,-1]} )
-    assert-args name fs @RET
 
-    local i
-    for i in {1..${#fs}} ; do
-        local f="${fs[$i]}"
-        if ! test -e "$f" ; then
-            fs[$i]="$GREENCASE_DIR/$f"
-        fi
-    done
+    local fn="bell-$name"
+    if isServer ; then
+        fndef $fn true
+    else
+        assert-args name fs @RET
+        local i
+        for i in {1..${#fs}} ; do
+            local f="${fs[$i]}"
+            if ! test -e "$f" ; then
+                fs[$i]="$GREENCASE_DIR/$f"
+            fi
+        done
 
-    fndef "bell-$name" bell-ringer "BELL_$(ec ${name:u} | gtr '-' '_')_MARKER" "$fs[@]"
+        fndef $fn bell-ringer "BELL_$(ec ${name:u} | gtr '-' '_')_MARKER" "$fs[@]"
+    fi
 }
 function bell-ringer() {
     local marker="${1}" fs=("${@[2,-1]}") awaysh="${bell_awaysh:-y}"
@@ -332,23 +337,33 @@ function bell-ringer() {
 ## Little Misfortune
 function bell-lm-maker() {
     local name="${1}" fs=("${@[2,-1]}")
-    assert-args name fs @RET
 
-    local i
-    for i in {1..${#fs}} ; do
-        local f="${fs[$i]}"
-        if ! test -e "$f" ; then
-            fs[$i]="$GREENCASE_DIR/LittleMisfortune/$f"
-        fi
-    done
+    if isServer ; then
+        fndef "bell-lm-$name" true
+    else
+        assert-args name fs @RET
 
-    bell-maker "lm-$name" "$fs[@]"
+        local i
+        for i in {1..${#fs}} ; do
+            local f="${fs[$i]}"
+            if ! test -e "$f" ; then
+                fs[$i]="$GREENCASE_DIR/LittleMisfortune/$f"
+            fi
+        done
+
+        bell-maker "lm-$name" "$fs[@]"
+    fi
 }
 function bell-lm-maker-dir() {
     local name="${1}" f="${2}"
-    assert-args name f @RET
 
-    bell-lm-maker "$name" $GREENCASE_DIR/LittleMisfortune/$f/${~audioglob}
+    if isServer ; then
+        fndef "bell-lm-$name" true
+    else
+        assert-args name f @RET
+
+        bell-lm-maker "$name" $GREENCASE_DIR/LittleMisfortune/$f/${~audioglob}
+    fi
 }
 bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
