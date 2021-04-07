@@ -80,6 +80,7 @@ agi() {
 agcell() {
     agm -uuu --iglob '!.git' "$@" $cellar # --binary --hidden don't work with -C somehow, so we use -uuu :D
 }
+##
 agrdry() {
     agm -F  -- "$from" "${@}"
 }
@@ -88,8 +89,13 @@ function agr {
     doc 'usage: from=sth to=another agr [ag-args]'
     comment -l --files-with-matches
 
-    ag -0 -l --literal -- "$from" "${@}" | pre-files "$from" "$to"
+    local opts=()
+    if test -z "$agr_regex" ; then
+        opts+='--literal'
+    fi
+    ag -0 -l "$opts[@]" -- "$from" "${@}" | pre-files "$from" "$to"
 }
+##
 function spotlight() { mdfind "$@" | fz --select-1 | tee >(pbcopy) }
 function spot() {
     local file="$(spt ${@[-1]})"
