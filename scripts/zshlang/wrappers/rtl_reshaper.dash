@@ -2,11 +2,19 @@
 
 w="${1:-${COLUMNS:-120}}"
 
+rtl_reshaper() {
+    # its wrapping is confused by ANSI colors, so we still need to do our own wrapping
+    COLUMNS="$w" fribidi --nobreak "$@"
+    ##
+    # rtl_reshaper_rs
+    ##
+}
 
 # wrapping text with ANSI codes https://stackoverflow.com/questions/66986819/how-do-i-wrap-unicode-text-containing-ansi-color-codes-at-word-boundaries
-ansifold --boundary=word --width="$w" | rtl_reshaper_rs
+# ansifold still breaks some ANSI codes, but it is good enough
+ansifold --boundary=word --width="$w" | rtl_reshaper
 
-# command ggrep -Eo ".{1,$w}" | rtl_reshaper_rs
+# command ggrep -Eo ".{1,$w}" | rtl_reshaper
 ## optionally erase the binary data:
 # gtr -d '\000'
 # gtr -cd "[:print:]\n"

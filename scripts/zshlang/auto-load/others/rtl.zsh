@@ -9,7 +9,7 @@ function rtl-reshaper() {
     if isRtl ; then
         cat
     else
-        rtl_reshaper.dash "$@"
+         COLUMNS="$COLUMNS" rtl_reshaper.dash "$@"
     fi
 }
 function reval-rtl() {
