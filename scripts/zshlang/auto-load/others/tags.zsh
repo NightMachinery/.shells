@@ -556,5 +556,5 @@ function ntag-color0() {
 }
 ##
 function air-blue() {
-    ntag-add "$(mpv-get)" blue
+    ntag-add "$(hear-get)" blue
 }

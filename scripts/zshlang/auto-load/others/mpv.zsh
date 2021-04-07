@@ -45,10 +45,10 @@ function mpv() {
 }
 aliasfn mpv-noconfig command mpv --no-config --load-scripts=no
 ###
-function mpv-get() {
+function hear-get() {
     hear-do get_property "${1:-path}" | jq --raw-output -e .data
 }
-function mpv-getv() {
+function mpv-get() {
     mpv-do get_property "${1:-path}" | jq --raw-output -e .data
 }
 ##

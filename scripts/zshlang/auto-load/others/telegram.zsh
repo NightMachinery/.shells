@@ -41,7 +41,7 @@ function tsend-url() {
     } always { popf ; command rm -rf "$tmp" }
 }
 ##
-air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(mpv-get)"}
+air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(hear-get)"}
 function reval-tlg() {
     local rec="${reval_tlg_receiver:-${reval_tlg_r:-$me}}"
     local out="$(eval "$(gquote "$@")" 2>&1)"

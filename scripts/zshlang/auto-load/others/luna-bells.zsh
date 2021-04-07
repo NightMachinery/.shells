@@ -35,8 +35,8 @@ h_luna-advanced-bell() {
                 redo2 10 bell-visual-flash1
             else
                 local count=25
-                # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-getv works as long as you don't play multiple videos simultaneously, and is cross-platform.
-                if [[ "$(mpv-getv pause)" == 'false' ]] ; then
+                # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-get works as long as you don't play multiple videos simultaneously, and is cross-platform.
+                if [[ "$(mpv-get pause)" == 'false' ]] ; then
                     # fsay "Luna sees MPV"
                     bell-luna-mpv
                 else
