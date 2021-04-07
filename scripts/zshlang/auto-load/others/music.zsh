@@ -180,7 +180,7 @@ hearp() {
     }
     # Don't use mpv's native --shuffle since it MIGHT use autoloaded tracks, also empty string causes a harmless error
     # k shuffles live in mpv (with MY config :D)
-    hear --loop-playlist --playlist <(ec "$tracks")
+    hear --loop-playlist --playlist=<(ec "$tracks")
 }
 mut() {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop ${*:+"$*"}
@@ -199,10 +199,12 @@ mu() {
     songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
 muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$@" }
-svpl() {
+##
+function playlist-save() {
     # Save Playlist save-playlist save-pl
     mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
 }
+aliasfn pls playlist-save
 ##
 function sdlg() {
     ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1

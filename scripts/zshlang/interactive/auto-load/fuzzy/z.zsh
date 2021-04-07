@@ -1,16 +1,3 @@
-function list-dirs() {
-    local d="${1:?}" multi_fs="${list_dirs_m}" # multi = disable one-file-system
-
-    if ! test -d "$d" ; then
-        return 1
-    fi
-    local opts=()
-    if test -z "$multi_fs" ; then
-        opts+="--one-file-system"
-    fi
-    fd "$opts[@]" --follow --absolute-path --type d . $d
-}
-reify list-dirs
 ##
 ffz_last_query=''
 function ffz() {
@@ -29,6 +16,8 @@ function ffz() {
     # memoi-eval doesn't read from pipe
     sel="$( {
     serr zoxide query --list
+    arrN ~/*(/N)
+    arrN ~/base/*(/N)
     arrN /Volumes/*(/N)
     arrN /Volumes/*/*(/N)
     # list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s

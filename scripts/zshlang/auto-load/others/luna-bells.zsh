@@ -51,9 +51,6 @@ h_luna-advanced-bell() {
     display-gray-off
     ecdate "Luna iterated."
 }
-function bell-zsh1() {
-    @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"
-}
 bell-avarice() {
     # fsay "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
@@ -272,7 +269,24 @@ aliasfn bella bella-toy
 aliasfn bellj bella
 aliasfn okj bell-auto-stop
 aliasfn bello awaysh bell-diwhite # main gateway of a single alarm bell
-aliasfn bell-zsh bell-zsh1
+##
+aliasfn bell-zsh-start bell-sc2-I-return
+function bell-zsh1() {
+    @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"
+}
+# aliasfn bell-zsh bell-zsh1
+function bell-zsh() {
+     local cmd head=''
+        if cmd=($(fc -nl -1 -1)) ; then
+            head="$(sout fnrep which 'print -r "$@" >&1 >&2' whichm "$cmd[1]" |& gtail -n 1)"
+            if test -z "$(ec "$head" | sd '\W' '')" ; then
+                head="$cmd[1]"
+            fi
+            if test -n "$head" ; then
+                redo2 2 tts-say-i1 "Completed: $head"
+            fi
+        fi
+}
 aliasfn bella-zsh bell-auto bell-zsh
 @opts-setprefix bella-zsh bell-auto
 # aliasfn bellz bella-zsh # just use bellj?
@@ -295,10 +309,11 @@ function bella-zsh-maybe() {
     # @notcrossplatform
     local ITERM_SESSION_ID="${1:-$ITERM_SESSION_ID}" # brishz has its own bogus ITERM_SESSION_ID, so prefer explicit input
     
-    if isDarwin && iterm-session-is-active ; then
+    if isDarwin ; then
+    # if isDarwin && iterm-session-is-active ; then
         # this is called via BrishGarden by iTerm
         local skipfirst=''
-        iterm-focus-is && skipfirst=y
+        iterm-session-is-active && iterm-focus-is && skipfirst=y
         silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
     fi
 }
@@ -328,6 +343,7 @@ function bell-ringer() {
     local marker="${1}" fs=("${@[2,-1]}") awaysh="${bell_awaysh:-y}"
     assert-args marker fs
 
+    bella_zsh_disable1=y
     if bool "$awaysh" ; then
         awaysh-named "$marker" hear-rnd "$fs[@]"
     else
@@ -446,12 +462,20 @@ bell-maker sc2-no-more-personnel-remain 'Starcraft/Starcraft II/Heart of the Swa
 bell-maker sc2-testing-repeating-instructions 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_150..testing, no playback errors detected, repeating instructions..blue..ogg'
 
 bell-maker sc2-subject-unresponsive-translating 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_151..subject is unresponsive, translating isntructions into native language..blue..ogg'
-
+##
 bell-maker sc2-my-sins 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zeratul/Zeratul/zSMAmbient_Zeratul_Zeratul_003_my sins weigh heavy..blue..ogg'
 
 bell-maker sc2-will-face-justice 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zeratul/Zeratul/zSMAmbient_Zeratul_Zeratul_004_I will face justice for my acts..blue..ogg'
 
 bell-maker sc2-serve-xelnaga "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zeratul/Zeratul/zSMAmbient_Zeratul_Zeratul_005_I serve the \"Xel'naga\"..blue..ogg"
+##
+bell-maker sc2-I-return 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zurvan/Zurvan/zMission_Zerus01_AncientOneUnnamed_025..sc2-I-return..blue..ogg'
+
+bell-maker sc2-evil-laugh 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zurvan/Zurvan/zMission_Zerus01_AncientOneUnnamed_133_alt1..zerus evil laugh..blue..ogg'
+
+bell-maker sc2-it-is-time 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zurvan/Zurvan/zMission_Zerus03_AncientOneNamed_011..it is time..blue..ogg'
+
+bell-maker sc2-become-primal 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zurvan/Zurvan/zSMAmbient_ZerusZurvan_AncientOneNamed_004..become pure, become primal..blue..ogg'
 
 # bell-maker sc2- ''
 ###

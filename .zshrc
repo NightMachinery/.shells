@@ -258,6 +258,8 @@ bindkey '^[\t' fr_zle_deus # alt+tab
 ##
 # antibody bundle intelfx/pure
 antibody bundle sindresorhus/pure
+
+bella_zsh_disable1=''
 function prompt_pure_check_cmd_exec_time () {
   # Obviously, we are abusing pure's private API here :D We can achieve the same using the preexec and precmd hooks, but reusing this seems cheaper
   integer elapsed
@@ -267,9 +269,10 @@ function prompt_pure_check_cmd_exec_time () {
     prompt_pure_human_time_to_var $elapsed "prompt_pure_cmd_exec_time"
   }
 
-  (( elapsed > ${BELL_EXEC_TIME:-5} )) && {
+  if test -z "$bella_zsh_disable1" && (( elapsed > ${BELL_EXEC_TIME:-5} )) ; then
     bella-zsh-gateway
-  }
+  fi
+  bella_zsh_disable1=''
 }
 ##
 # antibody bundle denysdovhan/spaceship-prompt
@@ -467,3 +470,4 @@ psource $HOME/.shellfishrc
 ###
 rcLoaded='loading' # Do NOT export this, or `exec zsh` will inherit it
 zsh-defer typeset -g rcLoaded='yes'
+bell-zsh-start

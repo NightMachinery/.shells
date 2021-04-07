@@ -32,6 +32,7 @@ alifn emc="bicon-emc"
 function emc-focus() {
     # @itermOnly
     iterm-tab-activate 5
+    bella_zsh_disable1=y
 }
 function emcnw() {
     emc-gateway --no-wait "$@"

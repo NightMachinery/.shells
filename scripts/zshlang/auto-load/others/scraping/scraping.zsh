@@ -417,6 +417,7 @@ function url-tailedtitle() {
 renog url-tailedtitle
 function url-title() {
     : "See also url-filename"
+
     urlmeta2 "${1:?}" title
 }
 renog url-title
@@ -887,7 +888,9 @@ function aamedia1() {
         done
     done
 
-    bello
+    tts-glados1-cached "Media ready to download"
+    re typ links titles
+
     local sel_i
     for i in {1.."${#links}"} ; do
         l="${links[$i]}"
@@ -911,10 +914,13 @@ function aamedia1() {
             opts+=(-o "$(ec "${t}.${l:e}" | str2filename)")
             revaldbg aacookies "$opts[@]" "$l"
         else
-            revaldbg ensure curl-dl "$opts[@]" "$l" "$0"
+            revaldbg ensure aa-remotename "$opts[@]" "$l" "$0"
+            # revaldbg ensure curl-dl "$opts[@]" "$l" "$0"
         fi
     done
     unset sel_i
+
+    bell-dl
 }
 ##
 function ygen() {
@@ -938,6 +944,7 @@ function urlmeta2() {
 gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
 
     local url="$1"
+    local fhMode="${fhMode:-curl}"
     local html="${html:-$(full-html2 "$url")}"
     local reqs=("${@:2}")
     <<<"$html" htmlmetadata $reqs[@]

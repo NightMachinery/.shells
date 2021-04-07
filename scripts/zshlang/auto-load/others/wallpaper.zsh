@@ -86,9 +86,9 @@ function wallpaper-set() {
     fi
     ##
     local t="$(gmktemp --suffix .png)"
-    wallpaper-overlay "$f" "$t" && f="$t"
+    assert wallpaper-overlay "$f" "$t" && f="$t" || return $?
 
-    wallpaper-set-darwin "$f"
+    assert wallpaper-set-darwin "$f" @RET
 }
 ##
 function wallpaper-auto() {
@@ -98,13 +98,18 @@ function wallpaper-auto() {
     wallpaper-auto-bing |& tee -a "$log"
 }
 function wallpaper-auto-bing() {
-    ensure-net @MRET
+    assert-net || {
+        return 0
+    }
 
     pushf ~/Pictures/wallpapers/bing
     {
         local dest="$(uuidm).jpg"
-        reval-ec aa "$(bing-wallpaper-get)" -o "$dest"
-        reval-ec wallpaper-set "$(last-modified)" || notif "$0: setting wallpaper returned $?"
+        reval-ec aa "$(bing-wallpaper-get)" -o "$dest" @RET
+        reval-ec wallpaper-set "$dest" || {
+            notif "$0: setting wallpaper returned $?"
+            return 1
+        }
     } always { popf }
 }
 function wallpaper-auto-ipad() {

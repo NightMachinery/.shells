@@ -80,7 +80,7 @@ function ivy() {
 
     export DISABLE_DEFER=y
     tmux new-session -d 'zsh'
-    tmux send-keys "mu "
+    tmux send-keys "muc " # 'mu' could also download, but it needs to be updated
     tmux split-window -h  'zsh'
     tmux send-keys "lunas
 "

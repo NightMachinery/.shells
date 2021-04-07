@@ -49,6 +49,9 @@ function fzf-noempty() {
 }
 function fzf-gateway() {
     local -x SHELL="${FZF_SHELL:-${commands[dash]}}"
+
+    bella_zsh_disable1=y
+
     if true ; then # we might want to check tmux's version here, as fzf-tmux needs the current HEAD
         if test -z "$fzf_mru_context" ; then
            fzf-tmux -p90% "$@" | sponge

@@ -44,10 +44,43 @@ function mpv() {
     revaldbg command-mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
 }
 aliasfn mpv-noconfig command mpv --no-config --load-scripts=no
+###
 function mpv-get() {
-    <<<'{ "command": ["get_property", "'"${1:-path}"'"] }' socat - "${2:-$mpv_audio_ipc}"|jq --raw-output -e .data
+    hear-do get_property "${1:-path}" | jq --raw-output -e .data
 }
-mpv-getv() mpv-get "$1" "$mpv_ipc"
+function mpv-getv() {
+    mpv-do get_property "${1:-path}" | jq --raw-output -e .data
+}
+##
+function mpv-do () {
+    local cmd
+    cmd="$(arrJ "$@")" @RET
+
+    mpv-rpc "$cmd"
+}
+function mpv-rpc () {
+    local soc="${mpv_rpc_socket:-$mpv_ipc}" cmd="$1"
+    assert-args soc cmd @RET
+    assert test -e "$soc" @RET
+
+    local cmd='{ "command": '$cmd' }'
+    # the compacting is necessary :FACEPALMS:
+    cmd="$(ec $cmd | jq --compact-output .)" || {
+        ecerr "$0: bad json produced (bug?)"
+        return 1
+    }
+    ecdbg "$0: cmd: $cmd"
+    ec $cmd | socat - "$soc" | jq .
+}
+alias mpv-rpc-audio='mpv_rpc_socket="$mpv_audio_ipc" '
+aliasfn hear-do mpv-rpc-audio mpv-do
+
+aliasfn hear-prev mpv-do playlist-prev
+aliasfn hear-next mpv-do playlist-next
+
+aliasfn hear-prev hear-do playlist-prev
+aliasfn hear-next hear-do playlist-next
+###
 function play-and-trash(){
     #aliased to pat
     mpv "$@" && trs "$1"

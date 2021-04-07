@@ -85,19 +85,21 @@ alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias pat='play-and-trash'
 alias vi='nvim -u NONE'
 alias setuid='sudo chmod 4755' #set the SetUID bit, make it executable for all and writable only by root. You still need to chown the file to root:root (root:wheel on macOS).
-alias sb=". ~/.zshenv"
+##
+alias sb=". ~/.zshenv ; bell-zsh-start"
+alias sbp='eval "$(pbpaste)"'
 alias sbi="sb ; source-interactive-all"
-alias sia='source-interactive-all'
+alias sia='source-interactive-all ; bell-zsh-start'
 alias sbb='exec zsh'
-alias cdrose="cd /var/snap/nextcloud/common/nextcloud/data/FriedRose/files"
+alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
+alias szsh='source "$NIGHTDIR"/zshlang/load-others.zsh'
+##
 alias api="sudo apt install -y"
 alias apug="sudo apt upgrade"
 alias brm="brew remove"
 alias bri="brew reinstall"
 alias apup="sudo apt update"
 alias ncs="sudo nextcloud.occ files:scan --all"
-alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
-alias szsh='source "$NIGHTDIR"/zshlang/load-others.zsh'
 alias reeb='run-on-each rename-ebook'
 alias set-volume='setv'
 alias aa='\noglob aacookies'

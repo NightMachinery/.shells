@@ -25,10 +25,6 @@ function jfromkey() {
     arr0 "$res" "$jaction"
 }
 ##
-function arrJ() {
-    local items=( "$@" )
-    print -nr -- "[ ${(j.,.)items} ]"
-}
 function jiarr() {
     if (( $#@ == 0 )) ; then
         set -- "${(@f)$(cat)}"

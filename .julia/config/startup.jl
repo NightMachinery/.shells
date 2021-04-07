@@ -6,7 +6,7 @@ using Pkg
 # Pkg.add("OhMyREPL")
 
 # using OhMyREPL
-using BenchmarkTools, Infiltrator, FreqTables, RDatasets, Lazy, UUIDs, Printf
+using BenchmarkTools, Infiltrator, FreqTables, RDatasets, Lazy, UUIDs, Printf, Distributions
 
 using InteractiveCodeSearch
 ## Usage: https://github.com/tkf/InteractiveCodeSearch.jl#reference
