@@ -59,7 +59,7 @@ function vcns() {
 }
 function vcndiff() {
     vcn-with git add ~/scripts/
-    vcn-with git diff HEAD
+    vcn-with git diff HEAD~"${1:-0}"
 }
 function vcnpp() {
     local msg="${*}"
