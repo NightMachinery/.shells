@@ -53,6 +53,7 @@ function mpv-get() {
 }
 ##
 function mpv-do () {
+    : "See https://mpv.io/manual/stable/#list-of-input-commands"
     local cmd
     cmd="$(arrJ "$@")" @RET
 
@@ -75,11 +76,14 @@ function mpv-rpc () {
 alias mpv-rpc-audio='mpv_rpc_socket="$mpv_audio_ipc" '
 aliasfn hear-do mpv-rpc-audio mpv-do
 
-aliasfn hear-prev mpv-do playlist-prev
-aliasfn hear-next mpv-do playlist-next
+aliasfn mpv-prev mpv-do playlist-prev
+aliasfn mpv-next mpv-do playlist-next
+aliasfn mpv-play-toggle mpv-do keypress space
 
 aliasfn hear-prev hear-do playlist-prev
 aliasfn hear-next hear-do playlist-next
+aliasfn hear-play-toggle hear-do keypress space
+aliasfn hear-shuffle hear-do playlist-shuffle # or just press 'k'
 ###
 function play-and-trash(){
     #aliased to pat
