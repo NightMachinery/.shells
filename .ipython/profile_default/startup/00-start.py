@@ -4,6 +4,8 @@ from pathlib import Path
 import os
 import sys
 import re
+import logging
+logger = logging.getLogger("ipy")
 try:
     from brish import z, zs, zq, bsh
 except: pass

@@ -32,6 +32,7 @@ brew install --force parallel
 brew link --overwrite moreutils
 brew unlink parallel
 brew link --overwrite parallel
+echo 'will cite' | command parallel --citation 1> /dev/null 2> /dev/null
 ##
 luarocks install penlight # require 'pl.pretty'.dump(table)
 luarocks install luaposix

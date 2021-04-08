@@ -1,6 +1,6 @@
 ##
 function brishgarden-boot() {
-    tmuxnewsh2 BrishGarden BRISHGARDEN_N="${1:-256}" brishgarden # using the shell to increase max open files
+    tmuxnewsh2 BrishGarden BRISHGARDEN_N="${1:-256}" brishgarden "${@[2,-1]}" # using the shell to increase max open files
     ## tests:
     # `time (parallel_jobs=0 para 'sleep 1 ; ec {}' ::: {1..100} >/dev/null)`
     # `time (parallel_jobs=0 para -k 'sleep 1 ; ec {}' ::: {1..100} >/dev/null)`
