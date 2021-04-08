@@ -1,5 +1,5 @@
 function parallel() {
-    PARALLEL_SHELL="${PARALLEL_SHELL:-brishz_para.dash}" command parallel "$@"
+    PARALLEL_SHELL="${PARALLEL_SHELL:-brishz_para.dash}" command parallel --will-cite "$@"
 }
 function parallelm() {
     local disable_opts="${parallel_d}"
