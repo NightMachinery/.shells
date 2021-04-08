@@ -1,10 +1,12 @@
-## set max open files
-# ulimit -n 5120 # The "hard limit" could also be set, but only to a value less than the current one, and only to a value not less than the "soft limit".
-ulimit -S -n 10240 # soft limits
-ulimit -S -n 50000 # soft limits
-# ulimit -S -n "$(ulimit -Hn)" # max possible
-ulimit -Su "$(ulimit -Hu)"
+### set max open files, etc
+# The "hard limit" (`-H`) could also be set, but only to a value less than the current one, and only to a value not less than the "soft limit" (`-S`).
+ulimit -S -n 50000 || ulimit -S -n 10240
 ##
+local maxproc="$(ulimit -Hu)"
+maxproc=$(( maxproc - 100 )) # give some slack to the OS
+ulimit -Su "$maxproc"
+unset maxproc
+###
 if true ; then # ! command -v brew &> /dev/null ; then
     # Sometimes brew itself is in path but its dirs are not.
     test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
