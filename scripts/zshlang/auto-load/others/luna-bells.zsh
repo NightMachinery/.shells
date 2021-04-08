@@ -279,6 +279,9 @@ function bell-zsh() {
      local cmd head=''
         if cmd=($(fc -nl -1 -1)) ; then
             head="$(sout fnrep which 'print -r "$@" >&1 >&2' whichm "$cmd[1]" |& gtail -n 1)"
+            if [[ "$head" =~ '^.*=\S*\s*(\S*)' ]] ; then
+                head="${match[1]}"
+            fi
             if test -z "$(ec "$head" | sd '\W' '')" ; then
                 head="$cmd[1]"
             fi

@@ -16,6 +16,10 @@ function chronic-update() {
 }
 function chronic-backup() {
     re backup-file $timetracker_db
+    backup-startupSh
+    backup-cron
+    ziib-all
+    # backup-rsync
 }
 function chronic-anticreep() {
     pip uninstall -y enum34 # Since python 3.6 the enum34 library is no longer compatible with the standard library.
