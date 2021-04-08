@@ -96,9 +96,11 @@ function rcrget() {
     local id="$(url-tail "$1")" dest="${rcrget_dest:-rabbit0:g}"
     rudi="$id" rcr copy rudi: "$dest"/"$*[2,-1]"
 }
+noglobfn rcrget
 function rcrget.() {
     rcrget_dest=. rcrget "$@"
 }
+noglobfn rcrget.
 ##
 function jdlrc() {
     jglob
