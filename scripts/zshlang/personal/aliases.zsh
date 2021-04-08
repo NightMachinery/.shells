@@ -1,25 +1,3 @@
-isNotExpensive || {
-    function zimportzlua() {
-        zoxide import --merge ~/.zlua
-    }
-    export _ZO_DATA_DIR="$HOME/.z.dir"
-    mkdir -p "$_ZO_DATA_DIR"
-    if ((${+commands[zoxide]})) ; then
-           eval "$(zoxide init zsh --no-aliases)" # --no-aliases: don't define extra aliases like zi, zq, za, and zr
-           # `z -i` is fzf z.
-    fi
-    ##
-    # export _ZL_ADD_ONCE=1
-    # export _ZL_MATCH_MODE=1
-    # antibody bundle skywind3000/z.lua
-    ##
-    ialiases[z]=y
-    ## these are for zlua
-    # ialias zz='z -c'      # restrict matches to subdirs of $PWD
-    # alias zi='z -i'      # cd with interactive selection
-    # ialias zf='z -I'      # use fzf to select in multiple matches
-    # ialias zb='z -b'      # quickly cd to the parent directory
-}
 ialias zshrc='$=EDITOR ~/.zshrc'
 ialias zshenv='$=EDITOR ~/.zshenv'
 alias hrep="fc -El 0 | grep"

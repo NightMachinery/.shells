@@ -1,3 +1,17 @@
+##
+function brishgarden-boot() {
+    tmuxnewsh2 BrishGarden BRISHGARDEN_N="${1:-256}" brishgarden # using the shell to increase max open files
+    ## tests:
+    # `time (parallel_jobs=0 para 'sleep 1 ; ec {}' ::: {1..100} >/dev/null)`
+    # `time (parallel_jobs=0 para -k 'sleep 1 ; ec {}' ::: {1..100} >/dev/null)`
+    # `parallel_jobs=0 time2 para 'sleep 5 ; ec ${brish_server_index}: {}' ::: {1..100}`
+    # `parallel_jobs=0 time2 para 'ec ${brish_server_index}: {}' ::: {1..200}`
+    ##
+}
+function brishgarden-count() {
+    fnswap isI false ffps BRIIIII | wc -l
+}
+##
 function brishz() {
     ## PERF:
     # `hyperfine --warmup 5 'brishzq.zsh ec hi' "brishz_quote=y brishz.dash 'ec hi'" "brishz_quote='' brishz.dash 'ec hi'"` 81ms, 34ms, 24ms

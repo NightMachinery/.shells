@@ -11,6 +11,12 @@ function backup-rsync-greencase() {
     fi
 }
 ##
+function backup-startupSh() {
+    local d="$nightNotes/private/configs/$(hostname)/$(whoami)"
+    mkdir -p "$d"
+    cp /Users/Shared/bin/startup.sh "${d}/"
+}
+##
 function backup-cron() {
     # aka cellar-getcron
     local d="$nightNotes/backups/crontabs/$(hostname)"
@@ -32,26 +38,35 @@ function backup-file() {
 }
 ### zii
 function ziib-all() {
-    pushf $nightNotes/private/configs/zii/
+    assert-net @RET
+
+    assert pushf $nightNotes/private/configs/zii/ @RET
     {
         mkdir -p discourse
-        scp root@51.178.215.202:/var/discourse/containers/app.yml ./discourse/
-        full-html2 https://discourse.lilf.ir/admin/site_settings.json > ./discourse/site_settings.json # https://github.com/pfaffman/discourse-settings-uploader
+        assert scp root@51.178.215.202:/var/discourse/containers/app.yml ./discourse/
+
+        local res
+        if res="$(full-html2 https://discourse.lilf.ir/admin/site_settings.json)" ; then
+           # https://github.com/pfaffman/discourse-settings-uploader
+           ec "$res" > ./discourse/site_settings.json
+        else
+            ecerr "$0: Could not download https://discourse.lilf.ir/admin/site_settings.json"
+        fi
 
 
-        scp zii@51.178.215.202:/home/zii/.muttrc .
-        scp zii@51.178.215.202:/home/zii/Caddyfile .
-        scp zii@51.178.215.202:/home/zii/.privateShell .
+        assert scp zii@51.178.215.202:/home/zii/.muttrc .
+        assert scp zii@51.178.215.202:/home/zii/Caddyfile .
+        assert scp zii@51.178.215.202:/home/zii/.privateShell .
 
         mkdir -p v2ray
-        scp zii@51.178.215.202:/usr/local/etc/v2ray/config.json ./v2ray/
+        assert scp zii@51.178.215.202:/usr/local/etc/v2ray/config.json ./v2ray/
 
         mkdir -p trojan
-        scp root@51.178.215.202:/usr/local/etc/trojan/config.json ./trojan/
+        assert scp root@51.178.215.202:/usr/local/etc/trojan/config.json ./trojan/
 
         mkdir -p mailu
-        scp root@51.178.215.202:/mailu/docker-compose.yml ./mailu/
-        scp root@51.178.215.202:/mailu/mailu.env ./mailu/
+        assert scp root@51.178.215.202:/mailu/docker-compose.yml ./mailu/
+        assert scp root@51.178.215.202:/mailu/mailu.env ./mailu/
     } always { popf }
 }
 ###
