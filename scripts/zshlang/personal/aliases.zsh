@@ -1,47 +1,20 @@
 ialias zshrc='$=EDITOR ~/.zshrc'
 ialias zshenv='$=EDITOR ~/.zshenv'
+##
+alias sb=". ~/.zshenv ; bell-zsh-start"
+alias ss='emc-sourceme'
+alias sbp='eval "$(pbpaste)"'
+alias sbi="sb ; source-interactive-all"
+alias sia='source-interactive-all ; bell-zsh-start'
+alias sbb='exec zsh'
+alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
+alias szsh='source "$NIGHTDIR"/zshlang/load-others.zsh'
+##
 alias hrep="fc -El 0 | grep"
 alias grep='grep --color=auto'
 
 ialias plc=playlistc
 ##
-alifn emc="bicon-emc"
-alifn emc-gateway="emacsclient -t"
-function emc-eval() {
-    # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1
-    revaldbg emacs --batch --eval "(progn
-     (require 'server)
-     (princ
-       (format \"%s\\n\"
-         (server-eval-at \"server\" '(with-current-buffer (window-buffer (selected-window))
-                                         "${*}")
-            )
-         )
-       )
-     )"
-}
-aliasfnq emc-buffer-file-name emc-eval "(buffer-file-name)"
-function emc-sourceme() {
-    local f
-    f="$(emc-buffer-file-name)" @RET
-    if [[ "$f" == *.zsh ]] ; then
-        reval-ec source "$f"
-    else
-        ecerr "$0: file doesn't seem suitable: $f"
-    fi
-}
-alias ss='emc-sourceme'
-function emc-focus() {
-    # @itermOnly
-    iterm-tab-activate 5
-    bella_zsh_disable1=y
-}
-function emcnw() {
-    emc-gateway --no-wait "$@"
-    emc-focus
-}
-##
-ialias emcg="emacsclient -c"
 alias b='builtin'
 alias typ='typeset -p'
 alias n='noglob'
