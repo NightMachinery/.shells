@@ -101,9 +101,14 @@ function _crash_format_trace_info() {
   local node=${str[1]} line=${str[2]} color
 
   if [[ $tracetype = 'file' ]]; then
-    if test -n "$file" && builtin type grealpath >/dev/null 2>&1; then
-      node=$(grealpath "$node")
-    fi
+      if test -n "$node" ; then
+         if builtin type grealpath >/dev/null 2>&1 ; then
+             local res
+             res="$(serr grealpath -e "$node")" && node="$res"
+         fi
+      else
+          node="NA"
+      fi
     color='\033[0;35m'
   fi
 
@@ -111,6 +116,7 @@ function _crash_format_trace_info() {
     color='\033[1;33m'
   fi
 
+  # echo -n 'HERE: '
   echo "$color$node\033[0;m \033[0;38;5;242m:\033[0;m line $line"
 }
 
@@ -162,10 +168,8 @@ function _crash_global_exception_handler() {
       echo "  \033[0;33m$message\033[0;m"
   fi
 
-  # Print the function and file/line where the exception was thrown
-  echo
-  echo "  in $(_crash_format_trace_info 'function' ${trace[1]})"
-  echo "  at $(_crash_format_trace_info 'file' ${files[1]})"
+
+  _crash_print_one_trace "${trace[1]}" "${files[1]}" 0 ''
 
   # Loop backwards through the trace, printing the function
   # and file/line for each step
@@ -174,9 +178,8 @@ function _crash_global_exception_handler() {
     shift trace
     shift files
 
-    echo
-    echo "  \033[0;38;5;242m$i\033[0;m   $(_crash_format_trace_info 'function' ${trace[1]})"
-    echo "      $(_crash_format_trace_info 'file' ${files[1]})"
+
+    _crash_print_one_trace "${trace[1]}" "${files[1]}" 1 "$i"
 
     i=$(( i + 1 ))
   done
@@ -184,6 +187,39 @@ function _crash_global_exception_handler() {
   # Exit with the same state as reported, to ensure any
   # programs relying on the exit state receive the right one
   return $state
+}
+function _crash_print_one_trace() {
+    local name_full=(${1}) file="${2}" formatting="${3:-0}" i="${4}"
+
+    local excluded_names=(ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg)
+    name=("${(s/:/)name_full}")
+    name=("${name[1]}")
+    name=(${(@)name:|excluded_names})
+
+
+    if test -n "${name}" ; then
+        if ! bool "$TRACE_NO_EXCLUDE_PREFIXES" ; then
+            local excluded_prefixes=(reval eval geval seval ensure assert)
+            local g="(${(@j.|.)excluded_prefixes})*"
+            if [[ "${name}" == ${~g} ]] ; then
+                return 0
+            fi
+        fi
+        # Print the function and file/line where the exception was thrown
+        echo
+        if [[ "$formatting" == 0 ]] ; then
+            echo "  in $(_crash_format_trace_info 'function' ${name_full})"
+        else
+            echo "  \033[0;38;5;242m$i\033[0;m   $(_crash_format_trace_info 'function' ${name_full})"
+        fi
+        if test -n "${file}" ; then
+            if [[ "$formatting" == 0 ]] ; then
+                echo "  at $(_crash_format_trace_info 'file' ${file})"
+            else
+                echo "      $(_crash_format_trace_info 'file' ${file})"
+            fi
+        fi
+    fi
 }
 
 ##################################
