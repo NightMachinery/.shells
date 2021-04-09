@@ -18,7 +18,16 @@ This function uses eval-memoi." ; mret
     local cmdhead="$1"
     local dir=.
 
-    sels=( "${(@f)$(memoi_skiperr=y memoi_override_duration=0.3 eval-memoi reval-onhold fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
+    {
+    if test -n "$frWidget" ; then
+          zle-print-dots
+    fi
+    ##
+    # reval-onhold wastes ~0.8s, so it's not worth it
+    ##
+    sels=( "${(@f)$(memoi_skiperr=y memoi_override_duration=0.3 eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
+
+
     test -n "$sels" && {
         if test -n "$frWidget" ; then
             LBUFFER="$LBUFFER$(gq "$sels[@]")"
@@ -29,6 +38,11 @@ This function uses eval-memoi." ; mret
             else
                 geval $cmd
             fi
+        fi
+    }
+    } always {
+        if test -n "$frWidget" ; then
+            zle redisplay
         fi
     }
 }

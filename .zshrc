@@ -303,15 +303,17 @@ zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
 ##
 
 ###
+function zle-print-dots() {
+  # toggle line-wrapping off and back on again
+  [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti rmam
+  # print -Pn "%{%F{red}......%f%}"
+  print -Pn "%{%F{green}...%f%}"
+  [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti smam
+}
 expand-or-complete-with-dots() {
-    # toggle line-wrapping off and back on again
-    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti rmam
-    # print -Pn "%{%F{red}......%f%}"
-    print -Pn "%{%F{green}...%f%}"
-    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti smam
-
-    zle expand-or-complete
-    zle redisplay
+  zle-print-dots
+  zle expand-or-complete
+  zle redisplay
 }
 zle -N expand-or-complete-with-dots
 bindkey "^I" expand-or-complete-with-dots
