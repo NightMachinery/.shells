@@ -18,6 +18,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 ####
+# Changes:
+# * Changed zshexit (a special hook that is run when the shell is about to exit) to zshexit_obs
+# * changed all 'exit x' to 'return x'
+####
 #############################
 # Internal helper functions #
 #############################
@@ -43,6 +47,7 @@ function _crash_usage() {
 function _crash_map_exit_code() {
   local sig_name code="$1"
 
+  # Note that the real exit codes are in [0, 255]: See `(exit 256)`
   case $code in
     # is this a signal name (error code = signal + 128) ?
     129) sig_name=HUP ;;
@@ -76,7 +81,9 @@ function _crash_map_exit_code() {
     22) sig_name=TTOU ;;
 
     # Exit codes used internally by crash
-    72) sig_name=EXCEPTION ;;
+    333) sig_name=EXCEPTION ;;
+    666) sig_name=TRACEBACK ;;
+    667) sig_name=DEBUG ;;
 
     # Catch all - we have no idea what happened
     *)  sig_name=FATAL ;;
@@ -94,8 +101,8 @@ function _crash_format_trace_info() {
   local node=${str[1]} line=${str[2]} color
 
   if [[ $tracetype = 'file' ]]; then
-    if builtin type realpath >/dev/null 2>&1; then
-      node=$(realpath $node)
+    if test -n "$file" && builtin type grealpath >/dev/null 2>&1; then
+      node=$(grealpath "$node")
     fi
     color='\033[0;35m'
   fi
@@ -143,13 +150,16 @@ function _crash_global_exception_handler() {
 
   # Print the signal name as a header
   echo
-  echo "  \033[1;37;41m $sig_name \033[0;m"
+  echo "  \033[1;37;41m ${sig_name} ${state} \033[0;m"
 
   # If an exception is defined, print it and its message
   if [[ -n $exception ]]; then
     echo
     echo "  \033[1;31m$exception\033[0;m"
-    echo "  \033[0;33m$message\033[0;m"
+  fi
+  if test -n "$message" ; then
+      [[ -n $exception ]] || echo
+      echo "  \033[0;33m$message\033[0;m"
   fi
 
   # Print the function and file/line where the exception was thrown
@@ -209,7 +219,7 @@ function try() {
 
   # The exit wasn't caused by a crash exception, so unset any saved exception
   # and message, and call the global error handler directly
-  if [[ $state -ne 72 ]]; then
+  if [[ $state -ne 333 ]]; then
     CRASH_THROWN_EXCEPTION=''
     CRASH_THROWN_EXCEPTION_MESSAGE=''
 
@@ -225,7 +235,7 @@ function try() {
 
   # Check for the crash exit state, and parse the output to retrieve
   # the exception and message so that catch can handle them
-  if [[ $state -eq 72 ]]; then
+  if [[ $state -eq 333 ]]; then
     # First separate the output into an array of lines
     local IFS
     local -a lines; IFS=$'\n' lines=($(echo "$output"))
@@ -291,7 +301,8 @@ function catch() {
 # Throw an exception
 ###
 function throw() {
-  local exception="$1" message="${(@)@:2}"
+    local exception="$1" message="${(@)@:2}"
+    local retcode="${throw_ret:-333}" # @warn 333 is (how necessary is this?) used internally by the catch/try system
 
   # Store the exception, message and traces in their respective global variables
   CRASH_THROWN_EXCEPTION="$exception"
@@ -308,14 +319,14 @@ function throw() {
     # echo $CRASH_THROWN_EXCEPTION
     # echo $CRASH_THROWN_EXCEPTION_MESSAGE
     ##
-    _crash_global_exception_handler 72
-    return $?
+    _crash_global_exception_handler $retcode
+    return $retcode
   else
       zshexit_obs
-      return $?
+      return $retcode
   fi
 
-  return 72
+  return $retcode
 }
 
 ###

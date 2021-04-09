@@ -30,17 +30,30 @@ dact() {
     isNotDbg || eval "$(gquote "$@")"
 }
 ##
+function ecnerr-raw() {
+    local trace="${ecerr_trace}"
+    if bool "$trace" && ! bool "$ectrace_notrace" ; then
+        # ectrace uses ecerr when tracing is disabled, so we need to disable notrace or there will be an inf loop
+        ectrace_notrace=no ectrace 667 '' "$*" 1>&2
+    else
+        ecn "$*" 1>&2
+    fi
+}
+function ecerr-raw() {
+    ecnerr-raw "$@"$'\n'
+}
 function ecerr() {
-    ec "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
+    ecerr-raw "$(colorfg 255 43 244)$@$(colorreset)"
 }
 function ecnerr() {
+    # we can alsoo use `ecnerr-raw`, but that might break stuff, as ecn is supposed not to add newlines, but the traceback inserts tons of stuff
     ecn "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
 }
 function ecdate() {
     ec "$edPre$(color 100 100 100 $(dateshort))            $@"
 }
 function ecdate-err() {
-    ecdate "$(colorfg 255 50 10)${*}$(resetcolor)" >&2
+    ecerr-raw "$(ecdate "$(colorfg 255 50 10)${*}$(resetcolor)")" >&2
 }
 ##
 function rederr-old() {
@@ -119,7 +132,6 @@ function dbgserr() {
 ##
 function ensure() {
     # @deprecated Use `assert` instead
-    local msg="${ensure_msg:-$ensure_m}"
     local caller cmd
     if (( $#@ == 0 )) ; then
         ecerr "$0: called with no arguments."
@@ -131,15 +143,7 @@ function ensure() {
     else
         caller="${@[-1]}" cmd=("${@[1,-2]}")
     fi
-    reval "$cmd[@]" && return 0
-    local ret=$?
-    test -z "$msg" && msg="$(ecalternate "$cmd[@]") (exited $ret)"
-    ##
-    ecerr "$caller: $msg"
-    # ecerr "$caller: Failed $ret: $(gq "$cmd[@]")"
-    # ecerr "$caller: Failed $ret"$'\n    '"$(gq "$cmd[@]")"
-    ##
-    return $ret
+    ensure_head="$caller" assert "$cmd[@]"
 }
 function ensure-dbg() {
     # @deprecated Use `assert-dbg` instead
@@ -152,10 +156,52 @@ function ensure-dbg() {
 ##
 function assert() {
     # Usage: assert true @RET
-    # `@opts-setprefix assert ensure` in load-first
-    if ! ensure "$@" "${funcstack[2]:-assert}" ; then
-        throw "Failed: $*"
+    # See [[~/cellar/notes/bookmarks/useme/zsh/debugging, stacktraces, exceptions.org]] for tests
+    ##
+    # `@opts-setprefix assert ensure` is in load-first.zsh
+    local msg="${ensure_msg:-$ensure_m}"
+
+    local head
+    head="${ensure_head:-${funcstack[2]:-assert}}"
+
+    ## use ectrace_notrace instead
+    # local notrace="${ensure_notrace}"
+    # if bool "$notrace" ; then
+    #     ensure "$@" "$head"
+    #     return $?
+    # else
+    # ...
+    ##
+    reval "$@"
+    local ret=$?
+    test -z "$msg" && msg="$(ecalternate "${@}")" # "(exited $ret)"
+    msg="${head}: $msg"
+    if (( ret != 0 ))  ; then
+        ectrace "$ret" "$msg"
     fi
+    return $ret
+}
+function ectrace() {
+    {
+        local ret="${1:-666}" exc="$2" msg="${@[3,-1]}" notrace="${ectrace_notrace}"
+
+        if bool "$notrace" ; then
+            ecerr "${exc} (exited $ret)"$'\n'
+            if test -n "$msg" ; then
+                ecerr "$msg"
+            fi
+        else
+            throw_ret=$ret throw "$exc" "$msg" | {
+                if isI ; then
+                    cat
+                else
+                    # @todo2 make crash.zsh use our own color infra
+                    erase-ansi
+                fi
+            }
+        fi
+        return $ret
+    } >&2 # @todo make crash.zsh use stderr itself
 }
 function assert-dbg() {
     if isDbg ; then
@@ -176,13 +222,20 @@ function ensure-args() {
     fi
     local caller="${@[-1]}" args=("${@[1,-2]}")
 
-    local arg ret=0
+    local arg ret=0 failed=()
     for arg in "$args[@]" ; do
         if test -z "${(P)arg}" ; then
-            ecerr "$caller: argument '$arg' is empty."
+            ##
+            # ecerr "$caller: argument '$arg' is empty."
+            ##
+            failed+="$arg"
+            ##
             ret=1
         fi
     done
+    if (( ret != 0 )) ; then
+        ectrace "$ret" "$caller: Empty args: ${(j., .)failed}"
+    fi
     return $ret
 }
 function assert-net() {
