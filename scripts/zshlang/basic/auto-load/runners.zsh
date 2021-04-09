@@ -58,16 +58,22 @@ function indir() {
     if test -z "$cmd[*]" ; then
         cdz "$dir" || return $?
         return 0
-    elif [[ "$cmd[1]" == 'cd' ]] ; then
-        cdz "$dir" || return $?
-        reval "${cmd[@]}"
-        return $?
+    # elif [[ "$cmd[1]" == 'cd' ]] ; then
+    #     cdz "$dir" || return $?
+    #     reval "${cmd[@]}"
+    #     return $?
     fi
 
     cdz "$dir" || return $?
+    local dir_final=$PWD
     {
         reval "${cmd[@]}"
-    } always { cd "$origPWD" }
+    } always {
+        if [[ "$PWD" == "$dir_final" ]] ; then
+            # if we are still in the directory that indir started in, go back to the original directory of the caller:
+            cd "$origPWD"
+        fi
+    }
 }
 alias in=indir # best reserved for interactive use
 ##
