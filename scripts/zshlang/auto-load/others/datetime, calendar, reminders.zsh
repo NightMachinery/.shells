@@ -18,11 +18,16 @@ function rem-sync() {
     }
 }
 function iwidget-rem-refresh() {
-        deus iwidget-rem # refresh the cache
-        if isLocal ; then
-            awaysh wallpaper-auto
-            brishzr awaysh deus iwidget-rem-refresh # refresh the cache
-        fi
+    if [[ "$remindayDir" == "$remindayCDir" ]] ; then
+        ecerr "$0: remindayDir is set to remindayCDir; Skipping refresh."
+        return 0
+    fi
+
+    deus iwidget-rem # refresh the cache
+    if isLocal ; then
+        awaysh wallpaper-auto
+        brishzr awaysh deus iwidget-rem-refresh # refresh the cache
+    fi
 }
 ##
 export remindayCDir="$cellar/remindersC"

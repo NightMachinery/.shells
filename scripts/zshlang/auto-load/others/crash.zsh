@@ -194,12 +194,15 @@ function _crash_print_one_trace() {
     local excluded_names=(ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg)
     name=("${(s/:/)name_full}")
     name=("${name[1]}")
-    name=(${(@)name:|excluded_names})
+
+    if ! bool "$TRACE_NO_EXCLUDE" ; then
+        name=(${(@)name:|excluded_names})
+    fi
 
 
     if test -n "${name}" ; then
-        if ! bool "$TRACE_NO_EXCLUDE_PREFIXES" ; then
-            local excluded_prefixes=( reval eval geval seval ensure assert ec- ecerr ecnerr )
+        if ! bool "$TRACE_NO_EXCLUDE" && ! bool "$TRACE_NO_EXCLUDE_PREFIXES" ; then
+            local excluded_prefixes=( reval eval geval seval ensure assert ec- ecdate ecerr ecnerr )
             local g="(${(@j.|.)excluded_prefixes})*"
             if [[ "${name}" == ${~g} ]] ; then
                 return 0
