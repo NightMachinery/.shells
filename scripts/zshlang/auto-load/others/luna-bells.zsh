@@ -396,16 +396,22 @@ bell-lm-maker-dir mhm mhm
 ##
 function reval-onhold() {
     local id="$(uuidm)_REVAL_ONHOLD_MARKER"
+    id="${id:u}"
 
     setopt localtraps
     trap "" INT
     {
         (
-            awaysh-bnamed "$id" @opts s 0 @ loop hearinvisible-mpv "$ONHOLD"
+            ##
+            # awaysh-bnamed "$id" @opts s 0 @ loop hearinvisible "$ONHOLD"
+            awaysh-bnamed "$id" play "$ONHOLD" repeat 999999999 # repeat is faster than loop
+            ##
             reval "$@"
         )
     } always {
-        kill-marker "$id"
+        # @raceCondition it's possible to kill the parent shell before the player has spawned, and then the player can go on live forever. Since switching to 'play' from mpv, this problem should have become somewhat mitigated
+        kill-marker $id
+        awaysh-bnamed KILLER eval "sleep 1 && kill-marker $id"
     }
 }
 aliasfn kill-marker-onhold kill-marker REVAL_ONHOLD_MARKER

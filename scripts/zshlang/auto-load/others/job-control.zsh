@@ -217,7 +217,7 @@ function away() {
 function kill-marker() {
     local id="${1:?}"
 
-    pgrep -f "$id" | inargsf kill-withchildren
+    { pgrep -f "$id" || pgrep -f "${id:u}" } | inargsf kill-withchildren
 }
 ##
 killjobs() {

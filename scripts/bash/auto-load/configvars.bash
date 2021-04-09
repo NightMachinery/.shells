@@ -8,7 +8,7 @@ export Font_CourierNew_Symbola="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf
 # I also use in my own functions (e.g., `reval-onhold`), so let them be.
 # https://github.com/alexdelorenzo/onhold
 # https://github.com/alexdelorenzo/ding
-export ONHOLD=$GREENCASE_DIR/music/Sleep\ Party\ People\ -\ Heaven\ Is\ Above\ Us.m4a
+export ONHOLD=$GREENCASE_DIR/music/Sleep\ Party\ People\ -\ Heaven\ Is\ Above\ Us.mp3
 export DING="$GREENCASE_DIR/LittleMisfortune/flac/26.1_16_MI_thetrainishere..blue..flac"
 ###
 # `preview-half-page-down` is also an option

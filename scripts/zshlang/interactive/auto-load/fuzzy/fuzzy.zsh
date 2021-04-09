@@ -18,7 +18,7 @@ This function uses eval-memoi." ; mret
     local cmdhead="$1"
     local dir=.
 
-    sels=( "${(@f)$(memoi_skiperr=y memoi_override_duration=0.3 eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
+    sels=( "${(@f)$(memoi_skiperr=y memoi_override_duration=0.3 eval-memoi reval-onhold fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
     test -n "$sels" && {
         if test -n "$frWidget" ; then
             LBUFFER="$LBUFFER$(gq "$sels[@]")"

@@ -20,9 +20,11 @@ google-auth-httplib2
 google-auth-oauthlib
 google_images_download
 hachoir
+hiredis
 html5lib
 httpie
 https://github.com/jakubroztocil/httpie/archive/master.tar.gz
+icecream
 imdbpy
 instaloader
 ipydex
@@ -70,5 +72,3 @@ xkcdpass
 yapf
 yq
 zxcvbn
-hiredis
-icecream
