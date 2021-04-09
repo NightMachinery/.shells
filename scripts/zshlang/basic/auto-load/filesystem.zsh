@@ -90,7 +90,7 @@ function  mv-merge() {
         fi
         if [[ "$(grealpath --  "$i")" == /Volumes/* ]] ; then
             if ask "$0: There seems to be external (cross-device) paths in args. Proceed with using normal mv instead?" Y ; then
-                command gmv -i --verbose "$@"
+                command gmv -i --verbose "$@" >&2
                 return $?
             fi
         fi
@@ -101,9 +101,9 @@ function  mv-merge() {
     fi
     local opts=()
     isIReally && opts+='--interactive'
-    command gcp -r --link --archive --verbose "${opts[@]}" "$@" || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
+    assert command gcp -r --link --archive --verbose "${opts[@]}" "$@" >&2 || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
 
-    colorfg 170 170 170 ; trs "${(@)paths[1,-2]}" ; resetcolor
+    { colorfg 170 170 170 ; trs "${(@)paths[1,-2]}" ; resetcolor } >&2
 }
 ##
 function list-dirs() {

@@ -70,3 +70,27 @@ function p-double-newlines() {
 }
 alias pdn='p-double-newlines'
 ##
+function char2ascii() {
+    ##
+    LC_CTYPE=C printf '%d' "'${1[1]}"
+    ##
+    # ecn "${1[1]}" | command od -An -tuC
+    ### Use od (octal dump) to print:
+    ### -An  means Address none
+    ### -t  select a type
+    ###  u  type is unsigned decimal.
+    ###  C  of size (one) char.
+}
+function ascii2char() {
+    [ "$1" -lt 256 ] || return 1
+    printf "\\$(printf '%03o' "$1")"
+}
+function char2unicode() {
+    # UTF-8
+    perl -CA -le 'print ord shift' "$1"
+}
+function unicode2char() {
+    # works with emojis
+    printf "\U$(printf %08x "${1}")\n"
+}
+##

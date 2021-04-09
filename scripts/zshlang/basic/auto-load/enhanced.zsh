@@ -9,7 +9,7 @@ h_mv() {
     local emd_c='command mv'
     if isIReally && isRcLoaded ; then
         emd_c='mv-merge'
-        color 170 170 170 "mv: using mv-merge instead"
+        color 170 170 170 "mv: using mv-merge instead" >&2
     fi
     enh-mkdest "$@"
 }

@@ -152,8 +152,10 @@ function ensure-dbg() {
 ##
 function assert() {
     # Usage: assert true @RET
-    ensure "$@" "${funcstack[2]:-assert}"
     # `@opts-setprefix assert ensure` in load-first
+    if ! ensure "$@" "${funcstack[2]:-assert}" ; then
+        throw "Failed: $*"
+    fi
 }
 function assert-dbg() {
     if isDbg ; then
