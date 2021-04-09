@@ -34,7 +34,7 @@ function ecnerr-raw() {
     local trace="${ecerr_trace}"
     if bool "$trace" && ! bool "$ectrace_notrace" ; then
         # ectrace uses ecerr when tracing is disabled, so we need to disable notrace or there will be an inf loop
-        ectrace_notrace=no ectrace 667 '' "$*" 1>&2
+        ectrace_notrace=no ectrace_ret="667" ectrace '' "$*" 1>&2
     else
         ecn "$*" 1>&2
     fi
@@ -177,13 +177,13 @@ function assert() {
     test -z "$msg" && msg="$(ecalternate "${@}")" # "(exited $ret)"
     msg="${head}: $msg"
     if (( ret != 0 ))  ; then
-        ectrace "$ret" "$msg"
+        ectrace_ret="$ret" ectrace "$msg"
     fi
     return $ret
 }
 function ectrace() {
     {
-        local ret="${1:-666}" exc="$2" msg="${@[3,-1]}" notrace="${ectrace_notrace}"
+        local ret="${ectrace_ret:-666}" exc="$1" msg="${@[2,-1]}" notrace="${ectrace_notrace}"
 
         if bool "$notrace" ; then
             ecerr "${exc} (exited $ret)"$'\n'
@@ -234,7 +234,7 @@ function ensure-args() {
         fi
     done
     if (( ret != 0 )) ; then
-        ectrace "$ret" "$caller: Empty args: ${(j., .)failed}"
+        ectrace_ret="$ret" ectrace "$caller: Empty args: ${(j., .)failed}"
     fi
     return $ret
 }

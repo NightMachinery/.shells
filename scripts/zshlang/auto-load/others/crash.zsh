@@ -199,7 +199,7 @@ function _crash_print_one_trace() {
 
     if test -n "${name}" ; then
         if ! bool "$TRACE_NO_EXCLUDE_PREFIXES" ; then
-            local excluded_prefixes=(reval eval geval seval ensure assert)
+            local excluded_prefixes=( reval eval geval seval ensure assert ec- ecerr ecnerr )
             local g="(${(@j.|.)excluded_prefixes})*"
             if [[ "${name}" == ${~g} ]] ; then
                 return 0
