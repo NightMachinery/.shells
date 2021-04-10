@@ -14,7 +14,7 @@ function hear-noipc() {
 function hearinvisible() {
     local vol="${hearinvisible_volume:-${hearinvisible_v:-1}}"
 
-    silent play --norm "$@" -G gain "$vol"
+    assert-dbg silent play --norm "$@" -G gain "$vol"
     # faster startup than ffplay (play from sox)
     # For even faster startup, disable `--norm`. That option processes the whole input once before playing, which takes a second or two for minute-long files
     # @seeAlso hearinvisible-fast

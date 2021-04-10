@@ -16,8 +16,8 @@ function loop() {
     local lo_p="$lo_p"
     ensure-dir "$lo_p"
 
-    >&2 chalk -t "{rgb(255,255,255).bgRgb(0,30,230) Looping {rgb(0,30,230).bgRgb(255,255,255) $cmd} with interval {rgb(255,73,28) $inter}}"
-    local sig=1 neon c=0 sig2=0
+    >&2 ec "$(colorfg 255 255 255)$(colorbg 0 30 230) Looping $(colorfg 0 30 230)$(colorbg 255 255 255) ${cmd}$(colorfg 255 255 255)$(colorbg 0 30 230) with interval $(colorfg 255,73,28) $inter$(resetcolor)"
+    local sig=1 neon prv_loop_iteration=0 sig2=0
     test -z "$lo_noinit" || {
         color 0 255 100 "$(colorbg 255 255 255)Skipping first iteration" >&2
         sig=0
@@ -27,8 +27,11 @@ function loop() {
     }
     while (( sig2 != 666 )) && (( sig != 130 ))
     do
-        (( sig )) && { eval "$cmd" ; c=$[c+1] }
-        print -n "\r$(colorbg 0 30 230)$(colorfg 255 255 100)Iteration $c$(resetcolor)" >&2
+        (( sig )) && {
+            ( eval "$cmd" ) # using a fork to avoid the command messing with our internal private vars
+            prv_loop_iteration=$[prv_loop_iteration+1]
+        }
+        print -n "\r$(colorbg 0 30 230)$(colorfg 255 255 100)Iteration $prv_loop_iteration$(resetcolor)" >&2
         # </dev/null sleep-neon $inter &
         # neon=$!
         trap _loop_trap INT
@@ -46,6 +49,12 @@ function loop() {
     done
 }
 @opts-setprefix loop lo
+function _loop_trap() {
+    ec '
+loop interrupted' ; sig2=666
+}
+loop-startover() { edPre=$'\n' ecdate "Signal from loop-startover${@:2}" | socat -u - unix-connect:${1} }
+alias loops='loop-startover' #Oops :D
 ##
 function oneinstance-setup() {
     ensure-redis || return 1
@@ -73,13 +82,6 @@ oneinstance() {
 
     [[ "$nonce" == "$(redism get $someNonce)" ]]
 }
-
-_loop_trap() {
-    ec '
-loop interrupted' ; sig2=666
-}
-loop-startover() { edPre=$'\n' ecdate "Signal from loop-startover${@:2}" | socat -u - unix-connect:${1} }
-alias loops='loop-startover' #Oops :D
 ##
 # function cancelable() {
 #     # @todo0 @design make zsh functions cancelable. Useful for zopen.

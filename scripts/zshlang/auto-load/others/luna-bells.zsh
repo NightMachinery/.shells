@@ -1,5 +1,10 @@
 ## See $nightNotes/cheatsheets/zsh/bells.org
 ###
+if isNotExpensive ; then
+    # This single file costs a second of loading time :|
+    return 0
+fi
+###
 function lunar() {
     tmuxnewsh2 deluna reval-notifexit deluna ${deluna} # timeout of deluna
     # lo_min should include the rest time as well, as the bells are sounded in the background currently.
@@ -17,6 +22,7 @@ luna-advanced-bell() {
     awaysh-bnamed LUNA_MARKER h_luna-advanced-bell
 }
 redis-defvar luna_signal1
+redis-defvar luna_skipped
 h_luna-advanced-bell() {
     setopt localtraps
     # So I don't understand these all that well, but here is my guess:
@@ -24,23 +30,44 @@ h_luna-advanced-bell() {
     (
         local signal1="$(luna_signal1_get)"
         luna_signal1_del
+        local skipped="${$(luna_skipped_get):-0}"
+        local res
+        res=$(( skipped + 1 )) || ectrace
+        assert luna_skipped_set "$res"
 
         display-gray-on
 
+
+        local bell_awaysh=no i
         if [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]] ; then
+            if (( skipped >= 1 )) ; then
+                    tts-gateway 'CRITICAL: You are at your ${skipped}th skip'
+            fi
             redo2 1 bell-visual-flash1
             sleep 10 # keeps screen gray
         else
-            if [[ "$signal1" == flash ]] ; then
-                redo2 10 bell-visual-flash1
+            if (( skipped >= 1 )) ; then
+                # @placeholder
+                brishz awaysh lunaquit-monitor '' ''
+                for i in {1..3} ; do
+                    redo2 1 bell-visual-flash1
+                    tts-gateway 'CRITICAL: You are at your ${skipped}th skip'
+                    bell-hp3-be-careful-harry
+                    bell-helicopter 20
+                    bell-lm-amiindanger
+                done
             else
-                local count=25
-                # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-get works as long as you don't play multiple videos simultaneously, and is cross-platform.
-                if [[ "$(mpv-get pause)" == 'false' ]] ; then
-                    # fsay "Luna sees MPV"
-                    bell-luna-mpv
+                if [[ "$signal1" == flash ]] ; then
+                    redo2 10 bell-visual-flash1
                 else
-                    redo bell-luna "$count"
+                    local count=25
+                    # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-get works as long as you don't play multiple videos simultaneously, and is cross-platform.
+                    if [[ "$(mpv-get pause)" == 'false' ]] ; then
+                        # fsay "Luna sees MPV"
+                        bell-luna-mpv
+                    else
+                        redo bell-luna "$count"
+                    fi
                 fi
             fi
         fi
@@ -49,6 +76,7 @@ h_luna-advanced-bell() {
     # each is about 3.5s
 
     display-gray-off
+    luna_skipped_set 0
     ecdate "Luna iterated."
 }
 bell-avarice() {
@@ -120,7 +148,7 @@ function lunaquit-monitor() {
 }
 function bell-evacuate() {
     awaysh-bnamed BELL_EVACUATE_MARKER redo2 365 bell-visual-flash1 # each iter takes ~0.5
-    # @placeholder
+
     local bell_awaysh=no i
     for i in {1..4} ; do # each iter takes ~46s
         bell-sc2-personnel-must-evacuate
@@ -157,7 +185,7 @@ function deluna() {
         (( $(idle-get) >= $timeout || $(lastunlock-get) <= 80 )) && {
             edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get))")"
             lunaquit " via deluna"
-            # { isDbg && sleep 1 } || sleep 30
+            luna_skipped_set 0
         }
         sleep 3 # to avoid cpu usage
     done
@@ -334,9 +362,16 @@ function bell-maker() {
         local i
         for i in {1..${#fs}} ; do
             local f="${fs[$i]}"
-            if ! test -e "$f" ; then
+            ## This is too expensive:
+            # if ! test -e "$f" ; then
+            #     fs[$i]="$GREENCASE_DIR/$f"
+            # fi
+            # fs[$i]="$(grealpath "${fs[i]}")"
+            ##
+            if [[ "$f" != /* ]] ; then
                 fs[$i]="$GREENCASE_DIR/$f"
             fi
+            ##
         done
 
         fndef $fn bell-ringer "BELL_$(ec ${name:u} | gtr '-' '_')_MARKER" "$fs[@]"
@@ -365,7 +400,7 @@ function bell-lm-maker() {
         local i
         for i in {1..${#fs}} ; do
             local f="${fs[$i]}"
-            if ! test -e "$f" ; then
+            if [[ "$f" != /* ]] ; then
                 fs[$i]="$GREENCASE_DIR/LittleMisfortune/$f"
             fi
         done
@@ -486,10 +521,14 @@ bell-maker sc2-it-is-time 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer
 
 bell-maker sc2-become-primal 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zurvan/Zurvan/zSMAmbient_ZerusZurvan_AncientOneNamed_004..become pure, become primal..blue..ogg'
 
+bell-maker sc2-evo-perfection 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Abathur/Abathur/zSMAmbient_EvolutionMaster_EvolutionMaster_003_perfection, deep in the core, in strands..blue..ogg'
+
 # bell-maker sc2- ''
 ###
 ## Madagascar:
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
+## HP3:
+bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 12/Dialog part 1/pc_her_Adv6_7_be careful harry..blue..wav'
 ##
 function bell-m-beeps() {
     : "Plays continuous beeps"

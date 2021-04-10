@@ -94,8 +94,12 @@ function wallpaper-set() {
 function wallpaper-auto() {
     local log=~/logs/wallpaper-auto
     ensure-dir "$log"
+
+    ec "==================================="$'\n' >> "$log"
     ecdate "$0" >> "$log"
     wallpaper-auto-bing |& tee -a "$log"
+
+    ec $'\n'"===================================" >> "$log"
 }
 function wallpaper-auto-bing() {
     assert-net || {

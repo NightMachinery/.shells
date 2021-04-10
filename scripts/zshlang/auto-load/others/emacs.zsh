@@ -64,7 +64,7 @@ function emc-sourceme() {
     local f
     f="$(emc-buffer-file-name)" @RET
     if [[ "$f" == *.zsh ]] ; then
-        reval-ec source "$f"
+        NIGHT_NO_EXPENSIVE='' reval-ec source "$f"
     else
         ecerr "$0: file doesn't seem suitable: $f"
     fi

@@ -1,5 +1,5 @@
 function tts-gateway() {
-    local text="${*:?}" engine=("${tts_gateway_engine[@]:-${tts_gateway_e[@]:-tts-say}}") postproc=("${tts_gateway_postproc[@]}") ext="${tts_gateway_ext:-wav}"
+    local text="${*:?}" engine=("${tts_gateway_engine[@]:-${tts_gateway_e[@]:-tts-espnet}}") postproc=("${tts_gateway_postproc[@]}") ext="${tts_gateway_ext:-wav}"
 
     bella_zsh_disable1=y
 
@@ -8,7 +8,7 @@ function tts-gateway() {
     # <<<"$text" ESPnet2-TTS.py > "$tmp"
     ##
 
-    local cache="$HOME/.cache/tts_gateway/$(ec $engine[*] | str2filename)/$(ecn $text | ghead -c 40 | str2filename)_$(md5m "$engine[*] ||| $text").${tts_gateway_ext}"
+    local cache="$HOME/.cache/tts_gateway/$(ec $engine[*] | str2filename)/$(ecn $text | ghead -c 40 | str2filename)_$(md5m "$engine[*] ||| $text").${ext}"
     local log="${cache}_stderr.txt"
     ensure-dir "$cache"
     if isDeus || ! test -e "$cache" ; then
@@ -29,7 +29,7 @@ function tts-gateway() {
 
     ecdbg "$0: File generated at $cache"
 
-    hearinvisible "$cache" || ecerr "$0: Playing '$cache' failed with $?"
+    assert hearinvisible "$cache" @RET
 }
 aliasfn tts-gateway-i1 @opts postproc audiofx-infantilize1 @ tts-gateway
 aliasfn tts-gateway-i2 @opts postproc audiofx-infantilize2 @ tts-gateway
@@ -62,9 +62,13 @@ function tts-say() {
     local text="${1}" output="${2}"
     assert-args output @RET
 
-    <<<"$text" fsay --input-file -  -o "$output"
+    if isDarwin ; then
+        <<<"$text" fsay --input-file -  -o "$output"
+    else
+        tts-espnet "$@"
+    fi
 }
-aliasfn tts-say-cached @opts e tts-say @ tts-gateway
+aliasfn tts-say-cached @opts ext aiff e tts-say @ tts-gateway
 function tts-say-i1() {
     local fsay_r=50
 
