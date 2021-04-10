@@ -78,13 +78,24 @@ function lastunlock-get() {
 
     # Using lower precision helps a lot with performance
     # hyperfine --warmup 5 "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 3h" "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 30h"
-
     local precision="${1:-1h}" # can only spot the last unlock in this timeframe
+    [[ "$precision" =~ '^\d+$' ]] && precision+=h
+
     unset date
-    date="$(command log show --style syslog --predicate 'process == "loginwindow"' --debug --info --last "$precision" | command rg "going inactive, create activity semaphore|releasing the activity semaphore" | tail -n1 |cut -c 1-31)" fromnow || ec 9999999
+    date="$(assert revaldbg command log show --style syslog --predicate 'process == "loginwindow"' --debug --info --last "$precision" | command rg "going inactive, create activity semaphore|releasing the activity semaphore" | tail -n1 |cut -c 1-31)" || {
+        # This means the last login was before the precision set
+        ec 9999998
+        return 0
+    }
+
+    date="$date" fromnow || {
+        ectrace "$(retcode 2>&1)"
+        ec 9999999
+        return 1
+    }
 }
 function lastunlock-get-min() {
-    ec $(( $(lastunlock-get) / 60 ))
+    ec $(( $(lastunlock-get "$@") / 60 ))
 }
 ##
 function load5() {

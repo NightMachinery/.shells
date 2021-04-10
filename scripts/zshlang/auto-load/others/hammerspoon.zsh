@@ -101,3 +101,11 @@ function gradS-get() {
 #     retry_sleep=0.1 serr retry h_gradS-get
 # }
 ##
+function alert() {
+    local msg="$*" dur="${alert_dur:-5}"
+
+    msg="$(ec $msg | sdlit '"' '\"')"
+    hammerspoon -c "hs.alert (\"$msg\", ${dur})"
+    # https://www.hammerspoon.org/docs/hs.alert.html
+}
+##

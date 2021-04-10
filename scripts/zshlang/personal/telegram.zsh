@@ -18,6 +18,7 @@ function alice() {
     if res="$(brishzr borg-tt-mark "$i")" && test -n "$res" ; then
         ec "$res"
         bell-pp-electricity
+        @opts dur 10 @ alert "$res"
         # ec "Alicized successfully: $i"
         true
     else

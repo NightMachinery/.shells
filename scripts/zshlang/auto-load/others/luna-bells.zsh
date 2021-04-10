@@ -137,6 +137,7 @@ function lunaquit-monitor() {
     done
     if (( recent_idle >= rest_dur )) ; then
         display-gray-off
+        luna_skipped_set 0
         if (( idle <= 10 )) ; then
             # tts-glados1-cached 'Good job'
             bell-lm-mo-welldone

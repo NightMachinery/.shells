@@ -79,8 +79,10 @@ function seconds-fmt() {
 }
 ##
 function fromnow() {
+    assert-args date
+
     local then
-    test -n "$date" && then="$(gdate --date "$date" "+%s")" || return 1
+    then="$(assert gdate --date "$date" "+%s")" || return 1
     ec $(( EPOCHSECONDS - then ))
 }
 function fromnow-py() {

@@ -451,6 +451,15 @@ function cmd-modifier-off {
 cmd-modifier-on
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=cmd-modifier-widget
 ###
+function zle-enable-url-quote() {
+  # @warn this also quotes if you're pasting in quotes, which obviously ruins the result
+  autoload -Uz url-quote-magic
+  zle -N self-insert url-quote-magic
+  autoload -Uz bracketed-paste-magic
+  zle -N bracketed-paste bracketed-paste-magic
+}
+zle-enable-url-quote
+##
 ## https://github.com/zsh-users/zsh-autosuggestions/issues/351
 # This speeds up pasting w/ autosuggest
 # https://github.com/zsh-users/zsh-autosuggestions/issues/238
