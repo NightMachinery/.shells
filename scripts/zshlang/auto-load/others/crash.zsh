@@ -188,10 +188,24 @@ function _crash_global_exception_handler() {
   # programs relying on the exit state receive the right one
   return $state
 }
+##
+typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 )
+typeset -ag funcstack_excluded_prefixes=( reval eval geval seval memoi-eval ensure assert ec- ecdate ecerr ecnerr redo- )
+typeset -g funcstack_excluded_prefixes_glob="(${(@j.|.)funcstack_excluded_prefixes})*"
+function funcstack-isExcluded() {
+  local name=("$1")
+  name=(${(@)name:|funcstack_excluded_names})
+
+
+  if test -z "$name" || [[ "${name}" == ${~funcstack_excluded_prefixes_glob} ]] ; then
+    return 0
+  fi
+  return 1
+}
 function _crash_print_one_trace() {
     local name_full=(${1}) file="${2}" formatting="${3:-0}" i="${4}"
 
-    local excluded_names=(ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg)
+    local excluded_names=("${funcstack_excluded_names[@]}")
     name=("${(s/:/)name_full}")
     name=("${name[1]}")
 
@@ -202,9 +216,7 @@ function _crash_print_one_trace() {
 
     if test -n "${name}" ; then
         if ! bool "$TRACE_NO_EXCLUDE" && ! bool "$TRACE_NO_EXCLUDE_PREFIXES" ; then
-            local excluded_prefixes=( reval eval geval seval ensure assert ec- ecdate ecerr ecnerr )
-            local g="(${(@j.|.)excluded_prefixes})*"
-            if [[ "${name}" == ${~g} ]] ; then
+            if [[ "${name}" == ${~funcstack_excluded_prefixes_glob} ]] ; then
                 return 0
             fi
         fi

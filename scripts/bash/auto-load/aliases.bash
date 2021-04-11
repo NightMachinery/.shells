@@ -91,7 +91,6 @@ alias brm="brew remove"
 alias bri="brew reinstall"
 alias apup="sudo apt update"
 alias reeb='run-on-each rename-ebook'
-alias set-volume='setv'
 alias aa='\noglob aacookies'
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias pc='pbcopy'

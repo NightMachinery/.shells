@@ -24,10 +24,12 @@ alias mret0='magic_ret=0 ; return 0'
 alias mret='test -z "$magic_ret" || return "$magic_ret"'
 ###
 mdoc_col=(0 35 255)
-function color() {
-    : 'This is a placeholder for the real color function.'
-    ec "COLOR_REP (YOU SHOULDN'T SEE THIS): $@"
-}
+if ! (( ${+functions[color]} )) ; then
+    function color() {
+        : 'This is a placeholder for the real color function.'
+        ec "COLOR_REP (YOU SHOULDN'T SEE THIS): $@"
+    }
+fi
 function m_doc() {
     : 'Usage: m_doc <original-args> <name-of-script> <text-to-prepend-to-help> <help> ...
 Just use the alias `mdoc`.'
@@ -49,3 +51,35 @@ mdoc-test2() {
     magic mdoc Usage: sth ; mret
     echo no
 }
+##
+function fn-isTop() {
+    local caller=( "${@:-${funcstack[2]}}" ) prefixes=( ${fn_isTop_p[@]} )
+    test -z "$caller" && {
+        ectrace "$0: Have you called me at the top level by myself? :D"
+        return 1
+    }
+    local caller_glob="(${(@j.|.)caller})"
+    if (( ${#prefixes} > 0 )) ; then
+        caller_glob="(${caller_glob}|(${(@j.|.)prefixes}*))"
+    fi
+    # dvar caller_glob
+
+    local i
+    for i in {${#funcstack}..1} ; do
+        # ecdbg "fn ${i}: ${funcstack[$i]}"
+
+        [[ "${funcstack[$i]}" == ${~caller_glob} ]] && return 0
+        if ! funcstack-isExcluded "${funcstack[$i]}" ; then
+            [[ "${funcstack[$i]}" == ${~caller_glob} ]]
+            return $?
+        fi
+    done
+    ectrace "$0: @impossible funcstack exhausted"
+    return 1
+}
+function r-e-val() {
+    : "A function used to test fn-isTop"
+
+    reval "$@"
+}
+##

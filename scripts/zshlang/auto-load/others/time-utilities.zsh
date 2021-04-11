@@ -32,7 +32,12 @@ function h_timer-late() {
     local bell_awaysh=no
     bell-visual-flash1
     bell-lm-whattimeisit
-    tts-glados1-cached "$(( int(i * i_dur / 60) )) minutes late ... so so late"'!'
+    local m=$(( int(i * i_dur / 60) ))
+    if (( m <= 200 )) ; then
+        tts-glados1-cached "$m minutes late ... so so late"'!'
+    else
+        tts-glados1-cached 'I'\''m late, I'\''m late! For a very important date! No time to say '\''hello, goodbye,'\'' I'\''m late, I'\''m late, I'\''m late!'
+    fi
 }
 function timer-late() {
     @opts notify no @ timer "${1:-30}" eval lo_s="${2:-60}" loop awaysh h_timer-late

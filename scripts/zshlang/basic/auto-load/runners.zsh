@@ -77,14 +77,16 @@ function indir() {
 }
 alias in=indir # best reserved for interactive use
 ##
+typeset -ag exit_traps=( 0 INT TERM HUP EXIT ) # '0' alone seems enough though https://stackoverflow.com/questions/8122779/is-it-necessary-to-specify-traps-other-than-exit
+alias trapexits='setopt localtraps ; trap "" $exit_traps[@]'
+alias trapexits-release='trap - $exit_traps[@]'
 function reval-notifexit() {
     # always alone is not sufficient. Test with `zsh -c 'reval-notifexit iterm_focus.py'`.
     # But now always is most probably redundant.
-    setopt localtraps
-    trap "" INT TERM HUP EXIT
+    trapexits
     { ( reval "$@" ) } always {
         brishz bell-sc2-eradicator_destroyed
-        trap - INT TERM # Remove active traps
+        trapexits-release
         notif "$0: $@"
     }
 }

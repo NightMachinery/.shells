@@ -103,7 +103,10 @@ function  mv-merge() {
     isIReally && opts+='--interactive'
     assert command gcp -r --link --archive --verbose "${opts[@]}" "$@" >&2 || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
 
-    { colorfg 170 170 170 ; trs "${(@)paths[1,-2]}" ; resetcolor } >&2
+    { colorfg "$gray[@]" ; trs "${(@)paths[1,-2]}" ; resetcolor } >&2
+}
+function ecgray() {
+    { colorfg "$gray[@]" ; ec "${@}" ; resetcolor }
 }
 ##
 function list-dirs() {

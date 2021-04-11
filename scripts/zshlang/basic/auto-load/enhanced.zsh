@@ -7,9 +7,9 @@ cp() {
 ##
 h_mv() {
     local emd_c='command mv'
-    if isIReally && isRcLoaded ; then
+    if isIReally && isRcLoaded && fn-isTop mv ; then
         emd_c='mv-merge'
-        color 170 170 170 "mv: using mv-merge instead" >&2
+        ecgray "mv (top-level): using mv-merge instead" >&2
     fi
     enh-mkdest "$@"
 }

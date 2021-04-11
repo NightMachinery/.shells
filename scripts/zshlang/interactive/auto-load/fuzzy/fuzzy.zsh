@@ -92,8 +92,11 @@ aliasfnq ffkill-super fnswap kill 'sudo kill' ffkill -9
 aliasfn fk ffkill
 aliasfn fks ffkill-super
 aliasfnq fk-joker ffkill "'JOKER_MARKER"
+##
+aliasfn ffportkill fkEngine=ffport ffkill
 aliasfn ffportlkill fkEngine=ffportl ffkill
-aliasfn killport ffportlkill
+aliasfn killport ffportkill
+##
 function lsofp() {
     ffps "$@" | inargsf re "lsof -p" | less
     # Old:

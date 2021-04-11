@@ -2,9 +2,10 @@
 export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Functions
 function hear-noipc() {
-    local vol="${hear_noipc_volume:-${hear_noipc_v:-70}}"
+    local vol="${hear_volume:-${hear_v:-70}}"
     command-mpv --script-opts-add=autotag-enabled=no --script=$MPV_HOME/scripts/load_renamer.lua --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
 }
+@opts-setprefix hear-noipc hear
 ##
 # aplay (linux only)
 # paplay (PulseAudio)
@@ -12,23 +13,51 @@ function hear-noipc() {
 # mplayer -quiet
 # aliasfn hearinvisible silent ffplay -autoexit -nodisp -loglevel panic # faster startup than mpv
 function hearinvisible() {
-    local vol="${hearinvisible_volume:-${hearinvisible_v:-1}}"
-
-    assert-dbg silent play --norm "$@" -G gain "$vol"
-    # faster startup than ffplay (play from sox)
-    # For even faster startup, disable `--norm`. That option processes the whole input once before playing, which takes a second or two for minute-long files
-    # @seeAlso hearinvisible-fast
+    hearinvisible-playfast --norm "$@"
 }
+@opts-setprefix hearinvisible hear
 function hearinvisible-fast() {
-    local vol="${hearinvisible_volume:-${hearinvisible_v:-1}}"
-
-    silent play "$@" -G gain "$vol"
+    hearinvisible-playfast "$@"
+    # For even faster startup, disable `--norm`. That option processes the whole input once before playing, which takes a second or two for minute-long files
 }
+@opts-setprefix hearinvisible-fast hear
+function hearinvisible-playfast() {
+    local vol="${hear_volume:-${hear_v:-1}}" loudidle="${hear_loudidle}"
+
+
+    if bool $loudidle ; then
+        if (( $(idle-get) >= 20 )) ; then
+            loudidle=y
+        else
+            loudidle=''
+        fi
+    fi
+
+    trapexits
+    local vol_orig
+    {
+    if bool $loudidle ; then
+        vol_orig="$(volume-get)"
+        volume-set 100
+    fi
+    assert-dbg silent play "$@" -G gain "$vol"
+    # faster startup than ffplay (play from sox)
+    } always {
+        if bool $loudidle ; then
+            volume-set "$vol_orig"
+        fi
+        trapexits-release
+    }
+    ## tests:
+    # `bell_awaysh=no fnrep idle-get 'ec 300' bell-lm-mhm`
+    ##
+}
+@opts-setprefix hearinvisible-playfast hear
 aliasfn heari hearinvisible
+@opts-setprefix heari hear
 aliasfn hearinvisible-mpv silent hear-noipc --no-terminal --load-scripts=no
-@opts-setprefix hearinvisible hear-noipc
+@opts-setprefix hearinvisible-mpv hear
 ##
-@opts-setprefix hear hear-noipc
 function hear() {
     # arger "${(0@)$(rpargs "$@")}"
     comment '(0@) inserts empty elements with quoting'
@@ -37,6 +66,7 @@ function hear() {
 function hear-rnd() {
     hearinvisible "$(rndarr "$@")"
 }
+@opts-setprefix hear-rnd hear # @inuse
 ##
 function songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.

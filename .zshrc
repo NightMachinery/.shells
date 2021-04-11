@@ -118,12 +118,32 @@ zle -N zle-keymap-select
 zle -N edit-command-line
 
 
-bindkey -v
+### vim
+if true ; then
+# if false ; then
+  bindkey -v
 
-# allow v to edit the command line (standard behaviour)
-autoload -Uz edit-command-line
-bindkey -M vicmd 'v' edit-command-line
-
+  # allow v to edit the command line (standard behaviour)(does not work for @me? It opens emacs ...)
+  autoload -Uz edit-command-line
+  bindkey -M vicmd 'v' edit-command-line
+else
+  # usable but noticably slow
+  # https://github.com/jeffreytse/zsh-vi-mode
+  export ZVM_LAZY_KEYBINDINGS=false
+  antibody bundle jeffreytse/zsh-vi-mode
+  ZVM_LAZY_KEYBINDINGS=false
+  ZVM_LINE_INIT_MODE=$ZVM_MODE_INSERT
+  ZVM_VI_HIGHLIGHT_BACKGROUND='#c2e4ff'
+  # ZVM_INSERT_MODE_CURSOR=$ZVM_CURSOR_BEAM
+  # ZVM_NORMAL_MODE_CURSOR=$ZVM_CURSOR_BLOCK
+  ZVM_INSERT_MODE_CURSOR=$ZVM_CURSOR_USER_DEFAULT
+  # ZVM_NORMAL_MODE_CURSOR=$ZVM_CURSOR_BLINKING_BLOCK # doesn't blink
+  ZVM_NORMAL_MODE_CURSOR=$ZVM_CURSOR_UNDERLINE
+  ZVM_OPPEND_MODE_CURSOR=$ZVM_CURSOR_UNDERLINE
+  # config needed:
+  # * need to use hooks to load ctrl-r (fzf) and other conflicts https://github.com/jeffreytse/zsh-vi-mode#execute-extra-commands
+fi
+###
 # allow ctrl-p, ctrl-n for navigate history (standard behaviour)
 bindkey '^P' up-history
 bindkey '^N' down-history
@@ -194,6 +214,15 @@ alias it2setkeylabel=~/.iterm2/it2setkeylabel
 alias it2ul=~/.iterm2/it2ul
 alias it2universion=~/.iterm2/it2universion
 ###
+function zle-enable-url-quote() {
+  # @warn this also quotes if you're pasting in quotes, which obviously ruins the result
+  autoload -Uz url-quote-magic
+  zle -N self-insert url-quote-magic
+  autoload -Uz bracketed-paste-magic
+  zle -N bracketed-paste bracketed-paste-magic
+}
+zle-enable-url-quote # @warn needs to be before stuff like syntax highlighters
+##
 antibody bundle mafredri/zsh-async
 zsh-defer antibody bundle zdharma/zui
 
@@ -451,15 +480,6 @@ function cmd-modifier-off {
 cmd-modifier-on
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=cmd-modifier-widget
 ###
-function zle-enable-url-quote() {
-  # @warn this also quotes if you're pasting in quotes, which obviously ruins the result
-  autoload -Uz url-quote-magic
-  zle -N self-insert url-quote-magic
-  autoload -Uz bracketed-paste-magic
-  zle -N bracketed-paste bracketed-paste-magic
-}
-zle-enable-url-quote
-##
 ## https://github.com/zsh-users/zsh-autosuggestions/issues/351
 # This speeds up pasting w/ autosuggest
 # https://github.com/zsh-users/zsh-autosuggestions/issues/238

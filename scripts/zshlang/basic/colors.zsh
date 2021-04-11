@@ -1,5 +1,6 @@
 autoload -U colors && colors
-
+##
+typeset -ag gray=( 170 170 170 )
 ## Functions
 Bold () { ! isI || print -n -- '\e[1m' }
 Underline () { ! isI || print -n -- '\e[4m' }

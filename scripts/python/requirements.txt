@@ -72,3 +72,7 @@ xkcdpass
 yapf
 yq
 zxcvbn
+numba
+colorama
+pyyaml
+scipy

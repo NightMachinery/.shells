@@ -20,16 +20,26 @@ cronenable() {
 }		
 ##
 function volget() {
-	# @darwinonly
+	: "0-100"
+
+	assert isDarwin @RET # @darwinonly
+
 	osascript -e 'set ovol to output volume of (get volume settings)'
 }
 function volset() {
-	# @darwinonly
+	: "0-100"
+
+	assert isDarwin @RET # @darwinonly
+
 	osascript -e "set volume output volume $1"
 }
 aliasfn setv volset
+aliasfn set-volume volset
+aliasfn volume-set volset
 aliasfn get-volume volget
+aliasfn volume-get volget
 aliasfn getv volget
+##
 function mute-external_() {
 	: "You probably want to use mute-external which calls this in a loop.
 Usage: mute-external_ [<headphone-volume-from-100>=1]"

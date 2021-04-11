@@ -25,3 +25,4 @@ aliasfn ffdocker-attach @opts cmd [ exec -it ] post_cmd bash @ ffdocker-gen
 aliasfn ffdocker-start @opts cmd start @ ffdocker-gen
 aliasfn ffdocker-stop @opts cmd stop @ ffdocker-gen
 aliasfn ffdocker-rm @opts cmd rm @ ffdocker-gen
+aliasfn ffdocker-auto-restart-disable @opts cmd [ update --restart=no ] @ ffdocker-gen

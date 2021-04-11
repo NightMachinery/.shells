@@ -2,6 +2,7 @@
 ###
 if isNotExpensive ; then
     # This single file costs a second of loading time :|
+    # Update: now ~7s
     return 0
 fi
 ###
@@ -38,10 +39,10 @@ h_luna-advanced-bell() {
         display-gray-on
 
 
-        local bell_awaysh=no i
+        local bell_awaysh=no hear_loudidle=no i
         if [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]] ; then
             if (( skipped >= 1 )) ; then
-                    tts-gateway 'CRITICAL: You are at your ${skipped}th skip'
+                    tts-gateway "CRITICAL: You are at your ${skipped}th skip"
             fi
             redo2 1 bell-visual-flash1
             sleep 10 # keeps screen gray
@@ -51,7 +52,7 @@ h_luna-advanced-bell() {
                 brishz awaysh lunaquit-monitor '' ''
                 for i in {1..3} ; do
                     redo2 1 bell-visual-flash1
-                    tts-gateway 'CRITICAL: You are at your ${skipped}th skip'
+                    tts-gateway "CRITICAL: You are at your ${skipped}th skip"
                     bell-hp3-be-careful-harry
                     bell-helicopter 20
                     bell-lm-amiindanger
@@ -150,7 +151,7 @@ function lunaquit-monitor() {
 function bell-evacuate() {
     awaysh-bnamed BELL_EVACUATE_MARKER redo2 365 bell-visual-flash1 # each iter takes ~0.5
 
-    local bell_awaysh=no i
+    local bell_awaysh=no hear_loudidle=no i
     for i in {1..4} ; do # each iter takes ~46s
         bell-sc2-personnel-must-evacuate
         bell-sc2-zerg-detected
@@ -231,7 +232,7 @@ function bell-helicopter() {
     ot-stop
 }
 function bell-diwhite() {
-    ot-play-diwhite "${1:-1}"
+    ot-play-diwhite "${1:-1}" "${@[2,-1]}"
 }
 ##
 function bell-repeat() {
@@ -383,10 +384,16 @@ function bell-ringer() {
     assert-args marker fs
 
     bella_zsh_disable1=y
+    if @opts p redo @ fn-isTop ; then
+        awaysh="${bell_awaysh:-no}"
+        if test -z "$bell_awaysh" ; then
+            ecgray "$0: top-level redo detected; Switching awaysh off."
+        fi
+    fi
     if bool "$awaysh" ; then
-        awaysh-named "$marker" hear-rnd "$fs[@]"
+        awaysh-bnamed "$marker" @opts loudidle y @ hear-rnd "$fs[@]"
     else
-        hear-rnd "$fs[@]"
+        hear_loudidle="${hear_loudidle:-y}" hear-rnd "$fs[@]"
     fi
 }
 ## Little Misfortune

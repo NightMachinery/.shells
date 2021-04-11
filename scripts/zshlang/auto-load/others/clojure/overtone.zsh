@@ -127,7 +127,17 @@ function ot-play-helicopter() {
 EOF
 }
 function ot-play-diwhite() {
-    local dur="${1:-1}" vol="${2:-30000}"
+    local dur="${1:-1}" vol="${2}"
+    if test -z "$vol" ; then
+      if  (( $(volume-get) <= 60 )) ; then
+        vol=30000
+      else
+        vol=0.07 # lower is better on the ears but it might not be heard then?
+      fi
+    fi
+    # dvar vol
+
+
     ot-rep <<EOF
 (demo $dur
       (let [vals (dwhite 0 15 INF)

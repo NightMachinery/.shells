@@ -8,6 +8,7 @@ chmod +x ~/bin/cht.sh
 ###
 conda install -c eumetsat expect
 conda install -c plotly plotly-orca # also can be installed via npm
+conda install -c numba icc_rt
 ##
 pig https://github.com/NightMachinary/BrishGarden.git
 pig git@github.com:NightMachinary/brish.git
