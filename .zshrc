@@ -364,7 +364,6 @@ expand-or-complete-with-dots() {
 zle -N expand-or-complete-with-dots
 bindkey "^I" expand-or-complete-with-dots
 ##
-# antibody bundle Aloxaf/fzf-tab
 FZTAB_OPTS=(
     --color=light
     # --height='${FZF_TMUX_HEIGHT:=75%}'
