@@ -66,6 +66,9 @@ function fn-name() {
         fi
     done
     return 1
+    ## perf tests:
+    # `time2 re-val reval fn-name`
+    ##
 }
 function fn-isTop() {
     local caller=( "${@}" ) prefixes=( ${fn_isTop_p[@]} ) reverse="${fn_isTop_r}"

@@ -154,6 +154,11 @@ function ensure-dbg() {
     fi
 }
 ##
+function assert-wn() {
+     local ensure_head="${ensure_head:-${$(fn-name):-assert}}" # fn-name takes  ~9ms
+
+     assert "$@"
+}
 function assert() {
     # Usage: assert true @RET
     # See [[~/cellar/notes/bookmarks/useme/zsh/debugging, stacktraces, exceptions.org]] for tests
@@ -162,7 +167,8 @@ function assert() {
     local msg="${ensure_msg:-$ensure_m}"
 
     local head
-    head="${ensure_head:-${$(fn-name):-assert}}"
+    # head="${ensure_head:-${$(fn-name):-assert}}" # fn-name takes  ~9ms, use assert-wn instead
+    head="${ensure_head:-${funcstack[2]:-assert}}"
 
     ## use ectrace_notrace instead
     # local notrace="${ensure_notrace}"
@@ -174,12 +180,16 @@ function assert() {
     ##
     reval "$@"
     local ret=$?
-    test -z "$msg" && msg="$(ecalternate "${@}")" # "(exited $ret)"
-    msg="${head}: $msg"
     if (( ret != 0 ))  ; then
+        test -z "$msg" && msg="$(ecalternate "${@}")" # "(exited $ret)"
+        msg="${head}: $msg"
         ectrace_ret="$ret" ectrace "$msg"
     fi
     return $ret
+    ## perf tests:
+    # `time2 re-val reval assert reval true`
+    # `time2 re-val reval reval true`
+    ##
 }
 function ectrace() {
     {
