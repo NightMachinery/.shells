@@ -118,7 +118,9 @@ function ot-play-beeps1() {
 EOF
 }
 function ot-play-helicopter() {
-    ot-rep <<EOF
+  : "See bell-helicopter for a durational API"
+
+  ot-rep <<EOF
 (definst trem [freq 440 depth 10 rate 6 ]
   (* 0.3
      (saw (max 10 (+ freq (* depth (sin-osc:ar rate)))))))

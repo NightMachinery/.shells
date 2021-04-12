@@ -1,16 +1,49 @@
 complete -o nospace -C /Users/evar/go/bin/bitcomplete bit # needs bashcompinit
 ##
-function comp_wh() {
+# Just reuse eval's engine
+# function comp-reval() {
+#     if (( $#words <= 2 )) ; then
+#         _which "$@"
+#         return $?
+#     else
+#         local subcommand=$words[2]
+#         local words=("${(@)words[2,-1]}")
+#         ((CURRENT = CURRENT -2))
+#         local compfun="_${subcommand}"
+#         (( $+functions[$compfun] )) || compfun=_files
+#         service="$subcommand" $compfun
+#         local ret=$?
+#         return $ret
+#     fi
+# }
+##
+
+function comp-wh-set() {
+    comp-set '=which' "$@"
+}
+function comp-set() {
+    (( $#@ >= 1 )) || {
+        ectrace "Not enough args"
+        return 1
+    }
+    local engine="$1" ; shift
+
     local i j
     for i in $@ ; do
         unset out
         preEnhNames "$i"
         for j in $out[@] ; do
-            compdef "$j"=which
+            if [[ "$engine" == '='* ]] ; then
+                compdef "$j""$engine"
+            else
+                compdef "$j" "$engine"
+            fi
         done
     done
 }
-comp_wh run-on-each re-async cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp p tldr re inargs-gen inargsE-gen agf agfi ags h_noglob_agsi fi-rec brishz bsh onlc onlm printz-quoted # realpath2
+comp-wh-set cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp p tldr agf agfi ags h_noglob_agsi # realpath2
+
+comp-set '=eval' reval revaldbg reval-ec eval-memoi memoi-eval eval-timeout reval-timeout fi-rec assert hyperfine hfd hfz para parad brishz bsh onlc onlm printz-quoted run-on-each re-async redo inargs-gen inargsE-gen filterE-gen filter filter0
 ##
 rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 rexa "compdef _=man" mn

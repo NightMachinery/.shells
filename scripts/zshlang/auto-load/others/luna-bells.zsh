@@ -227,9 +227,16 @@ function bell-ReichPhase() {
 function bell-helicopter() {
     local duration="${1:-3}"
 
-    ot-play-helicopter # it'd be better if this supported a duration itself, as ot-stop will stop everything.
-    sleep "$duration"
-    ot-stop
+    trapexits
+    {
+        (
+            ot-play-helicopter # it'd be better if this supported a duration itself, as ot-stop will stop everything.
+            sleep "$duration"
+        )
+    } always {
+        ot-stop
+        trapexits-release
+    }
 }
 function bell-diwhite() {
     ot-play-diwhite "${1:-1}" "${@[2,-1]}"

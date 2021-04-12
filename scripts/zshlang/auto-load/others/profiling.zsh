@@ -9,8 +9,11 @@ function time2-unquoted() {
 
     eval "$cmd"
     # (eval "$cmd") # subshell protects against premature exits because of, e.g., glob failure
+    local ret=$?
 
     ec $'\n\n'"Took $(( EPOCHREALTIME - time2_start ))"
+
+    return $ret
 }
 aliasfn time2-uq time2-unquoted
 function time-p() {

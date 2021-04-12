@@ -10,9 +10,6 @@ export HISTTIMEFORMAT="%m/%d/%Y %T " #I always tend to configure my machines wit
 ###
 unalias run-help &> /dev/null
 autoload run-help
-# typeset -g ZSH_AUTOSUGGEST_STRATEGY
-# ZSH_AUTOSUGGEST_STRATEGY=(history completion)
-#export ZSH_AUTOSUGGEST_USE_ASYNC=y
 ##
 TIMEFMT="%J  %U user %S system %P cpu %*E total; max RSS %M"
 # See TIMEFMT in zshall

@@ -4,6 +4,7 @@ function notif-os() {
     if isServer ; then
         return 0
     fi
+    assert isDarwin @RET
     if ((${+commands[terminal-notifier]})) ; then
         terminal-notifier -title "$title" -message "$msg"
     else
