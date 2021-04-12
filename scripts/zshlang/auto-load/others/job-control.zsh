@@ -233,3 +233,90 @@ killjobs() {
         return 0
     fi
 }
+##
+function eval-timeout() {
+    local time="$1" cmd="${@[2,-1]}" timeout_code=404
+
+    assert-args time @RET
+
+    local ret_tmp="$(gmktemp)" ppid=$$
+    (
+        ## @zshBug does not work with localopts, hence the subshell.
+        ## Another design path would to save =monitor_orig=${options[monitor]}= and set the global NO_MONITOR; But making sure to reset the option might be too much trouble ...
+        # setopt localoptions
+        # setopt nomonitor
+        # setopt nonotify
+        ##
+
+        # See also https://stackoverflow.com/questions/8337472/bash-how-should-i-idle-until-i-get-a-signal
+        # time='infinity' is NOT valid though for zsh
+        sleep "$time" &
+        local spid="$!"
+
+        ##
+        # setopt localtraps
+        # trap h_eval-timeout USR2
+        # trap ${functions[h_eval-timeout]} USR2
+        # trap 'return 0' USR2
+        # trap 'return 8' USR2
+        ##
+
+        {
+            (
+                eval "$cmd[*]"
+                ec "$?" > $ret_tmp
+                # we need to do this inside the subshell to preserve the status code, as the subshell can only return 0-255, like all other processes
+                return 0
+            )
+            local ret=$?
+            if (( ret != 0 )) ; then
+                # dvar ret
+
+                # e.g., the cmd was `exit 6`
+                ec "$ret" > $ret_tmp
+            fi
+            # revaldbg kill -SIGUSR2 "$ppid"
+            silent kill -9 "$spid"
+        } &|
+        local pid=$!
+
+        wait $spid
+        # can't wait for non-childs without polling https://stackoverflow.com/questions/1058047/wait-for-a-process-to-finish
+
+        silent kill-withchildren -9 "$pid" "$spid" & # backgrounding this can save ~23ms!
+    )
+
+    retcode="$(cat "$ret_tmp")" || retcode=$timeout_code
+    # command rm -f "$ret_tmp" # Why bother wasting time on this? The files should clear on reboot anyway ...
+
+    # dvar retcode
+    if test -z "$retcode" ; then
+        return $timeout_code
+    fi
+    return "$retcode"
+
+    ## tests:
+    # `time2 eval-timeout 3 "ec hello ; ecerr hoo ; return 878"`
+    # `time2 eval-timeout 3 sleep 1`
+    # `time2 eval-timeout 3 sleep 100`
+    #
+    # `time2 eval-timeout 3 "exit 8"` is weirdly slow, but
+    # `time2 eval-timeout 3 "return 8"` is ok
+    #
+    ##
+}
+# function h_eval-timeout() {
+#     return 1
+#     # local retcode
+#     # dvar ret
+#     # retcode="$(cat "$ret")" || return 404
+#     # dvar retcode
+#     # if test -z "$retcode" ; then
+#     #     return 404
+#     # fi
+#     # return "$retcode"
+# }
+function reval-timeout() {
+    eval-timeout "$(gq "$@")"
+}
+##

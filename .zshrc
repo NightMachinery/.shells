@@ -153,9 +153,6 @@ bindkey '^?' backward-delete-char
 bindkey '^h' backward-delete-char
 bindkey '^w' backward-kill-word
 
-# allow ctrl-r to perform backward search in history
-bindkey '^r' history-incremental-search-backward
-
 # allow ctrl-a and ctrl-e to move to beginning/end of line
 bindkey '^a' beginning-of-line
 bindkey '^e' end-of-line
@@ -258,12 +255,18 @@ zsh-defer source-interactive-all # @heavy 0.32s
 #     bindkey '^[[Z' fzf-completion #Shift+Tab
 # }
 ##
-fzf-history-widget() {
+function fzf-history-widget() {
   # copied from fzf zsh integration
   local selected num
   setopt localoptions noglobsubst noposixbuiltins pipefail no_aliases 2> /dev/null
+
+  local query
+  # query="${(qqq)LBUFFER}"
+  query="${LBUFFER}"
+  query="$(fz-createquery ${=query})"
+
   selected=( $(fc -rl 1 | perl -ne 'print if !$seen{($_ =~ s/^\s*[0-9]+\s+//r)}++' |
-    FZF_DEFAULT_OPTS="--height ${FZF_TMUX_HEIGHT:-40%} $FZF_DEFAULT_OPTS -n2..,.. --tiebreak=index --bind=ctrl-r:toggle-sort $FZF_CTRL_R_OPTS --query=${(qqq)LBUFFER} +m" fz) )
+    FZF_DEFAULT_OPTS="--height ${FZF_TMUX_HEIGHT:-70%} $FZF_DEFAULT_OPTS -n2..,.. --tiebreak=index --bind=ctrl-r:toggle-sort $FZF_CTRL_R_OPTS +m" fz --query="$query") )
   local ret=$?
   if [ -n "$selected" ]; then
     num=$selected[1]
@@ -275,7 +278,12 @@ fzf-history-widget() {
   return $ret
 }
 zle     -N   fzf-history-widget
+
 bindkey '^R' fzf-history-widget
+##
+# allow ctrl-r to perform backward search in history
+# bindkey '^r' history-incremental-search-backward
+#
 
 zle -N fr_zle
 bindkey '^[[Z' fr_zle # shift+tab
@@ -311,7 +319,16 @@ function prompt_pure_check_cmd_exec_time () {
 zsh-defer antibody bundle unixorn/git-extra-commands
 zsh-defer antibody bundle zdharma/zzcomplete # ^F
 if test -n "$bicon_force_plugins" || ! isBicon ; then
+  ##
+  export ZSH_AUTOSUGGEST_USE_ASYNC=y # idk if export is necessary
   zsh-defer antibody bundle zsh-users/zsh-autosuggestions
+
+  typeset -g ZSH_AUTOSUGGEST_STRATEGY
+  ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+  ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=200 # default is unlimited
+
+  # ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff,bg=cyan,bold,underline"
+  ##
 fi
 silent unalias =
 # antibody bundle zsh-users/zsh-syntax-highlighting
