@@ -384,10 +384,10 @@ function bell-ringer() {
     assert-args marker fs
 
     bella_zsh_disable1=y
-    if @opts p redo @ fn-isTop ; then
-        awaysh="${bell_awaysh:-no}"
+    if @opts p redo r y xp bell- @ fn-isTop ; then
         if test -z "$bell_awaysh" ; then
-            ecgray "$0: top-level redo detected; Switching awaysh off."
+            ecgray "$0: parent redo detected; Switching awaysh off."
+            awaysh="no"
         fi
     fi
     if bool "$awaysh" ; then

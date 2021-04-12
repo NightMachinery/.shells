@@ -162,7 +162,7 @@ function assert() {
     local msg="${ensure_msg:-$ensure_m}"
 
     local head
-    head="${ensure_head:-${funcstack[2]:-assert}}"
+    head="${ensure_head:-${$(fn-name):-assert}}"
 
     ## use ectrace_notrace instead
     # local notrace="${ensure_notrace}"

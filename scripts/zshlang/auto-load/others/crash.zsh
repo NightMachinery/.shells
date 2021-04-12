@@ -191,13 +191,15 @@ function _crash_global_exception_handler() {
 ##
 typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 )
 typeset -ag funcstack_excluded_prefixes=( reval eval geval seval memoi-eval ensure assert ec- ecdate ecerr ecnerr redo- )
-typeset -g funcstack_excluded_prefixes_glob="(${(@j.|.)funcstack_excluded_prefixes})*"
+function funcstack_excluded_prefixes_glob() {
+  ec "(${(@j.|.)funcstack_excluded_prefixes})*"
+}
 function funcstack-isExcluded() {
   local name=("$1")
   name=(${(@)name:|funcstack_excluded_names})
 
 
-  if test -z "$name" || [[ "${name}" == ${~funcstack_excluded_prefixes_glob} ]] ; then
+  if test -z "$name" || [[ "${name}" == ${~"$(funcstack_excluded_prefixes_glob)"} ]] ; then
     return 0
   fi
   return 1

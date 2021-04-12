@@ -15,7 +15,7 @@ function timer() {
 
     sleep-neon $(($t * 60)) && {
         if bool $notify ; then
-            terminal-notifier -title "Timer" -message ""
+            notif-os "Timer" ""
         fi
         reval "$cmd[@]"  #eval ${(q+@)@[2,-1]:-${(z)/#/loop ot-play-happybirthday}}
     }

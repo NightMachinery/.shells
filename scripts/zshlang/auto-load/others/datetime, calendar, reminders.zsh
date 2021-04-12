@@ -313,7 +313,7 @@ function rem-today-notify() {
         rem-sync
         local text="$(rem-today ; ec ; remc-today)"
         if test -n "$text" ; then
-            reval-ec terminal-notifier -title "$(datej)" -message "$text"
+            reval-ec notif-os "$(datej)" "$text"
         fi
         ec "---"
     } >> ~/logs/rem-today-notify.txt  2>&1 | cat

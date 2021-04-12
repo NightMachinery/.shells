@@ -28,25 +28,25 @@ function hearinvisible-playfast() {
     if bool $loudidle ; then
         if (( $(idle-get) >= 20 )) ; then
             loudidle=y
+            trapexits
         else
             loudidle=''
         fi
     fi
 
-    trapexits
     local vol_orig
     {
     if bool $loudidle ; then
         vol_orig="$(volume-get)"
         volume-set 100
     fi
-    assert-dbg silent play "$@" -G gain "$vol"
+    ( assert-dbg silent play "$@" -G gain "$vol" )
     # faster startup than ffplay (play from sox)
     } always {
         if bool $loudidle ; then
             volume-set "$vol_orig"
+            trapexits-release
         fi
-        trapexits-release
     }
     ## tests:
     # `bell_awaysh=no fnrep idle-get 'ec 300' bell-lm-mhm`

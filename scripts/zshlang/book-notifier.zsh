@@ -11,6 +11,6 @@ fi
 local res=$?
 # echo $res
 if [ $res -eq 0 ]; then
-    terminal-notifier -message "$*" -title "Book Has Become Available!"
+    notif-os "Book Has Become Available!" "$*"
     echo "$* is now available!"
 fi

@@ -52,21 +52,52 @@ mdoc-test2() {
     echo no
 }
 ##
+function fn-name() {
+    local start="${1:-2}"
+
+    local indices=( {${start}..${#funcstack}} )
+    local i
+    for i in $indices[@] ; do
+        # ecdbg "fn ${i}: ${funcstack[$i]}"
+
+        if ! funcstack-isExcluded "${funcstack[$i]}" ; then
+            ec "${funcstack[$i]}"
+            return 0
+        fi
+    done
+    return 1
+}
 function fn-isTop() {
-    local caller=( "${@:-${funcstack[2]}}" ) prefixes=( ${fn_isTop_p[@]} )
-    test -z "$caller" && {
-        ectrace "$0: Have you called me at the top level by myself? :D"
-        return 1
-    }
+    local caller=( "${@}" ) prefixes=( ${fn_isTop_p[@]} ) reverse="${fn_isTop_r}"
+    local caller_name="$(fn-name 3)" # funcstack_excluded_names is itself used in fn-name, so we have to get this before polluting it
+    local funcstack_excluded_names=( ${funcstack_excluded_names[@]} ${fn_isTop_x[@]} )
+    local funcstack_excluded_prefixes=( ${funcstack_excluded_prefixes[@]} ${fn_isTop_xp[@]} )
+
+    local indices=( {${#funcstack}..1} )
+    if bool "$reverse" ; then
+        if (( ${#funcstack} < 3 )) ; then
+            # The function has no parents
+            return 1
+        fi
+        indices=( {3..${#funcstack}} )
+
+        funcstack_excluded_names+="$caller_name"
+    else
+        if test -z "$caller" ; then
+            caller+="$caller_name"
+        fi
+    fi
+    assert-args caller @RET
+
     local caller_glob="(${(@j.|.)caller})"
     if (( ${#prefixes} > 0 )) ; then
         caller_glob="(${caller_glob}|(${(@j.|.)prefixes}*))"
     fi
-    # dvar caller_glob
+    re dvar caller_name caller_glob
 
     local i
-    for i in {${#funcstack}..1} ; do
-        # ecdbg "fn ${i}: ${funcstack[$i]}"
+    for i in $indices[@] ; do
+        ecdbg "fn ${i}: ${funcstack[$i]}"
 
         [[ "${funcstack[$i]}" == ${~caller_glob} ]] && return 0
         if ! funcstack-isExcluded "${funcstack[$i]}" ; then
@@ -74,10 +105,15 @@ function fn-isTop() {
             return $?
         fi
     done
-    ectrace "$0: @impossible funcstack exhausted"
-    return 1
+    if bool "$reverse" ; then
+        # requested parent not found
+        return 1
+    else
+        ectrace "$0: @impossible funcstack exhausted"
+        return 1
+    fi
 }
-function r-e-val() {
+function re-val() {
     : "A function used to test fn-isTop"
 
     reval "$@"
