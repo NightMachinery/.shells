@@ -193,10 +193,25 @@ function assert() {
 }
 function ectrace() {
     {
-        local ret="${ectrace_ret:-666}" exc="$1" msg="${@[2,-1]}" notrace="${ectrace_notrace}"
+        ##
+        # doesn't work (can't get the pipe)
+        # retmsg="$(fnswap isI false retcode 2>&1 | prefixer --skip-empty)" # making it local loses the retcode :|
+        ##
+        local ret_orig="${(j.|.)pipestatus[@]}" retmsg
+        local ret="${ectrace_ret}" exc="$1" msg="${@[2,-1]}" notrace="${ectrace_notrace}"
+        if test -z "$ret" ; then
+            retmsg="returned $ret_orig"
+            if [[ "$ret_orig" != 0* ]] ; then
+                ret=$ret_orig
+            else
+                ret=666
+            fi
+        else
+            retmsg="exited $ret"
+        fi
 
         if bool "$notrace" ; then
-            ecerr "${exc} (exited $ret)"$'\n'
+            ecerr "${exc} ($retmsg)"$'\n'
             if test -n "$msg" ; then
                 ecerr "$msg"
             fi

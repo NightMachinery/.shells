@@ -137,9 +137,11 @@ function _crash_catch_all_exception() {
 function _crash_global_exception_handler() {
   # Get the state passed to the handler
   local state="$1"
+  state_code=( "${(ps.|.)state}" )
+  state_code="${state_code[1]}"
 
   # We only want to report errors
-  [[ $state -eq 0 ]] && return 0
+  [[ "$state_code" == 0 ]] && return 0
 
   # Retrieve exception details stored by crash
   local exception="$CRASH_THROWN_EXCEPTION"
@@ -151,8 +153,8 @@ function _crash_global_exception_handler() {
   [[ ${#trace} -eq 0 ]] && trace=($functrace)
   [[ ${#files} -eq 0 ]] && files=($funcfiletrace)
 
-  # Get the signal name for the state
-  sig_name="$(_crash_map_exit_code $state)"
+  # Get the signal name for the state_code
+  sig_name="$(_crash_map_exit_code $state_code)"
 
   # Print the signal name as a header
   echo
@@ -184,9 +186,9 @@ function _crash_global_exception_handler() {
     i=$(( i + 1 ))
   done
 
-  # Exit with the same state as reported, to ensure any
-  # programs relying on the exit state receive the right one
-  return $state
+  # Exit with the same state_code as reported, to ensure any
+  # programs relying on the exit state_code receive the right one
+  return $state_code
 }
 ##
 typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 )

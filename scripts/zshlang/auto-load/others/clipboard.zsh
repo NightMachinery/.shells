@@ -2,8 +2,10 @@ export CLIPBOARD_RECORD_FILE=~/tmp/.clipboard
 function clipboard-record() {
     local sleep=0.5
 
-    ecdate "$0: Started; file=$(gq $file)"
-    local old paste i
+    ecdate "$0: Started; file=$(gq $CLIPBOARD_RECORD_FILE)"
+    clipboard-removedups
+
+    local old paste i counter=0
     while true ; do
         assert pbpaste-plus
         if test -n "$paste[*]" && [[ "$paste[*]" != "$old" ]] ; then
@@ -14,6 +16,12 @@ function clipboard-record() {
                 clipboard-add "$i"
             done
             old="$paste[*]"
+        fi
+        if (( counter == 7200 )) ; then
+            counter=0
+            clipboard-removedups
+        else
+            counter=$(( counter + 1 ))
         fi
         sleep $sleep
     done
@@ -62,6 +70,17 @@ function clipboard-init() {
     else
         ectrace "emoji_trace does not exist" "$emoji_json"
     fi
+}
+function clipboard-removedups() {
+    local file="$CLIPBOARD_RECORD_FILE"
+    assert-args file @RET
+
+    # `gtac --separator='\0'` was buggy :|
+    cat "$file" | sponge | prefixer -i '\x00' -o '\x00' --tac --skip-empty | gawk 'BEGIN { RS="\0";  ORS="\0" } NF && !seen[$0]++' | prefixer -i '\x00' -o '\x00' --tac --skip-empty > "$file" || {
+        ectrace
+        return $?
+    }
+    ecgray "$0: completed"
 }
 ##
 function clipboard-fz() {
