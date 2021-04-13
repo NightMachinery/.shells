@@ -48,6 +48,6 @@ tmuxnewsh2 browser-recordings-process-watch browser-recordings-process-watch
 iterm-boot
 ot-server-daemon
 ##
-
+tmuxnewsh2 clipboard-record clipboard-record
 ##
 chronic-all

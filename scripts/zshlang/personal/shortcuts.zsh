@@ -38,7 +38,7 @@ aliasdir cac ~/base/cache
 ##
 function cellp() {
     brishzr-repeat # now that eva is a remote, we just need to make sure things are clean and committed there
-    reval-ec incell gsync
+    git_commitmsg_ask=no reval-ec incell gsync
 }
 ##
 function vcn-getrepo() {

@@ -289,6 +289,9 @@ zle -N fr_zle
 bindkey '^[[Z' fr_zle # shift+tab
 zle -N fr_zle_deus
 bindkey '^[\t' fr_zle_deus # alt+tab
+
+zle -N clipboard-fz-widget
+bindkey '^p' clipboard-fz-widget
 ##
 
 # zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br

@@ -262,7 +262,7 @@ function git-commitmsg() {
   ## alts
   # git diff --cached --diff-filter='M' --name-only # gives names of modified files
   ##
-  local default="${git_commitmsg_default:-autocommit}"
+  local default="${git_commitmsg_default:-autocommit}" ask_edit="${git_commitmsg_ask:-y}"
 
   local msg="$(@opts tail y @ git-status-summary2 -uno)"
 
@@ -272,7 +272,7 @@ function git-commitmsg() {
     ec "$default"
   else
     if (( ${#msg} > 100 )) ; then
-      if isIReally && ask "$0: msg is too long. Do you wish to edit it?" y ; then
+      if isIReally && bool "$ask_edit" && ask "$0: msg is too long. Do you wish to edit it?" y ; then
         msg="$(ec "$msg" | prefixer -o '; ')"
         ## @zshbug: vared doesn't work in subshells under an interactive shell
         # zmodload zsh/zle

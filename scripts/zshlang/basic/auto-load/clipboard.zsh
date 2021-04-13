@@ -65,9 +65,13 @@ function pbadd() {
 function pbpaste-plus() {
     # GLOBAL out: paste
     unset paste
-    paste="$(pbpaste)"
+    paste="$(pbpaste)" || {
+        ectrace 'pbpaste failed'
+        return 1
+    }
     local ppaths=( "${(@f)$(clipboard-to-path.nu)}" )
     test -n "$ppaths[*]" && paste=( $ppaths[@] )
+    true
 }
 ##
 clipboard-info-darwin() {

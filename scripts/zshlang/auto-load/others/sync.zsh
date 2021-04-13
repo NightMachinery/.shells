@@ -12,7 +12,7 @@ function sync-append() {
     {
         exec {lock_fd}>>$file
         flock -x "$lock_fd"
-        ec "$text" >> $file
+        ecn "$text" >> $file
     } always {
         # test -z "$lock_fd" ||
         exec {lock_fd}>&-
