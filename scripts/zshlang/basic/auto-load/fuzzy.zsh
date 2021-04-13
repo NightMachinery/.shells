@@ -45,7 +45,7 @@ function fz() {
 }
 function fzf-noempty() {
     local in="$(</dev/stdin)" # So we need to wait for the whole input to finish first.
-    test -z "$in" && { return 130 } || { ec "$in" | fzf-gateway "$@" }
+    test -z "$in" && { return 130 } || { ecn "$in" | fzf-gateway "$@" }
 }
 function fzf-gateway() {
     local -x SHELL="${FZF_SHELL:-${commands[dash]}}"

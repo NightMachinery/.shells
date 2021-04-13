@@ -109,3 +109,12 @@ function alert() {
     # https://www.hammerspoon.org/docs/hs.alert.html
 }
 ##
+function hs-hyper-z() {
+    hammerspoon -c 'eventtap.keyStroke(hyper, 6)'
+}
+function hs-hyper-x() {
+    hammerspoon -c 'eventtap.keyStroke(hyper, 7)'
+}
+function hs-cmd-v() {
+    hammerspoon -c 'eventtap.keyStroke({"cmd"}, 9)'
+}

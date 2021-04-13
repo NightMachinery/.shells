@@ -45,13 +45,16 @@ function chrome-history-get() {
     else
         google_history="$HOME/.config/google-chrome/Default/History"
     fi
-    cp -f "$google_history" /tmp/h
-    local links="$(sqlite3 -separator $sep /tmp/h \
+    assert cp -f "$google_history" /tmp/h
+    local links
+    links="$(sqlite3 -separator $sep /tmp/h \
         "select substr(title, 1, $cols), url
      from urls order by last_visit_time desc" |
-        awk -F $sep '{printf "%-'$cols's  '$s2'\n", $1, $2}')"
+        awk -F $sep '{printf "%-'$cols's  '$s2'\n", $1, $2}')" || {
+        ectrace @RET
+    }
     if test -n "$query" ; then
-        links="$(ec "$links" | rgbase "$query")" # beware: rgbase always colors
+        links="$(ec "$links" | rgbase "$query")" @RET # beware: rgbase always colors
     fi
     ec $links
 }
@@ -69,7 +72,8 @@ function chis_find() {
     fi
 
     # ` sponge | ghead -n 100 |`
-    local links="$(revaldbg $memoi_cmd chrome-history-get "$query"| fzp --exact --no-sort "$fz_query")"
+    local links
+    links="$(revaldbg $memoi_cmd chrome-history-get "$query"| fzp --exact --no-sort "$fz_query")" @RET
     ec "$links"
 }
 @opts-setprefix chis_find chis
@@ -84,14 +88,15 @@ function chis_clean() {
 }
 function chis() {
     local doOpen="${chis_open:-y}"
-    local links="$(chis_find "$@" | chis_clean)"
+    local links
+    links="$(chis_find "$@" | chis_clean)" @RET
 
     ec "$links"|pbcopy
     [[ "${doOpen}" == y ]] && {
         local i
         for i in ${(@f)links}
         do
-            chrome-open "$i"
+            chrome-open "$i" >&2 &|
         done
     }
 }

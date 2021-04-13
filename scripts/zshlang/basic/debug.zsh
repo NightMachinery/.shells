@@ -227,6 +227,11 @@ function ectrace() {
         fi
         return $ret
     } >&2 # @todo make crash.zsh use stderr itself
+
+    ## tests:
+    # `return 32 | true || ectrace`
+    # `return 32 | true || ectrace_notrace=y ectrace`
+    ##
 }
 function assert-dbg() {
     if isDbg ; then

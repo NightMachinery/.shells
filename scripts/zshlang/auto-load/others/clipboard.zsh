@@ -76,36 +76,45 @@ function clipboard-removedups() {
     assert-args file @RET
 
     # `gtac --separator='\0'` was buggy :|
-    cat "$file" | sponge | prefixer -i '\x00' -o '\x00' --tac --skip-empty | gawk 'BEGIN { RS="\0";  ORS="\0" } NF && !seen[$0]++' | prefixer -i '\x00' -o '\x00' --tac --skip-empty > "$file" || {
+    local tmp="$(gmktemp)"
+    cat "$file" | sponge | prefixer -i '\x00' -o '\x00' --tac --skip-empty | gawk 'BEGIN { RS="\0";  ORS="\0" } NF && !seen[$0]++' | prefixer -i '\x00' -o '\x00' --tac --skip-empty > "$tmp" || {
         ectrace
         return $?
     }
+    assert flock "$file" mv "$tmp" "$file" @RET # flock is necessary or we can lose the file with parallel 'clipboard-add's
     ecgray "$0: completed"
 }
 ##
-function clipboard-fz() {
+function clipboard-fz-raw() {
     local copy="${clipboard_fz_copy:-y}"
 
     local res
-    res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --tiebreak=index "${@:-}")" @RET
+    res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --tiebreak=index --height='80%' "${@:-}")" @RET
     if bool $copy ; then
         assert pbcopy "$res"
     fi
-    ec "$res"
+    ecn "$res"
+}
+function clipboard-fz() {
+    unset out # @global
+
+    out=(${(@0)"$(clipboard_fz_copy=no clipboard-fz-raw --print0 "${@:-}")"}) @RET # do NOT preserve empty elements; there are stuff with line endings in a single element in some cases
+
+    local i tmp
+    for i in {1..${#out}} ; do
+        tmp=( ${(@ps.\C-^\t\t.)out[$i]} )
+        if (( $#tmp == 2 )) ; then
+            out[$i]="$tmp[1]"
+        fi
+    done
 }
 function clipboard-fz-widget {
     local res i tmp
 
     zle-print-dots
     {
-        res=(${(@0)"$(clipboard_fz_copy=no clipboard-fz --print0 "")"}) @RET # do NOT preserve empty elements; there are stuff with line endings in a single element in some cases
-
-        for i in {1..${#res}} ; do
-            tmp=( ${(@ps.\C-^\t\t.)res[$i]} )
-            if (( $#tmp == 2 )) ; then
-                res[$i]="$tmp[1]"
-            fi
-        done
+        clipboard-fz
+        local res=("${out[@]}") ; unset out
 
         if (( ${#res} >= 2 )) ; then
             res="$(gq "$res[@]")"
@@ -116,6 +125,50 @@ function clipboard-fz-widget {
         assert pbcopy "$res"
     } always {
         zle redisplay
+    }
+}
+##
+function iloop-clipboard-fz() {
+    @opts e clipboard-fz t Clipper @ iloop "$@"
+}
+function iloop-chis() {
+    @opts e [ sout chis ] t CHIS @ iloop "$@"
+}
+function iloop() {
+    local engine=("${iloop_e[@]}") title="${iloop_t:-iloop}" prompt1="${iloop_p1:-ready: }"
+    assert-args engine @RET
+
+    tty-title "$title"
+
+    local q sleep
+    {
+        while true ; do
+            if [[ "$prompt1" == "MAGIC_SKIP" ]] ; then
+                q=''
+                sleep=y
+            else
+                ecn "$prompt1"
+                read -k 1 q # you can press any whitespace to just trigger fzf
+                sleep=''
+            fi
+            reval "$engine[@]" "${@}" "$(trim "$q")" || {
+            # clipboard-fz --bind "change:reload:$(gq cat "$CLIPBOARD_RECORD_FILE")" "${@:-}" || {
+                # reload resets selections https://github.com/junegunn/fzf/issues/2441
+
+                test -n "$sleep" && sleep 0.2
+                continue
+            }
+            out="${(j..)out}"
+            if test -n "$out" ; then
+                assert pbcopy  || continue
+            fi
+            hs-hyper-x
+            if test -n "$out" ; then
+                hs-cmd-v
+            fi
+        done
+    } always {
+        tty-title "$PWD"
     }
 }
 ##
