@@ -2,7 +2,7 @@
 # The "hard limit" (`-H`) could also be set, but only to a value less than the current one, and only to a value not less than the "soft limit" (`-S`).
 ulimit -S -n 50000 || ulimit -S -n 10240
 ##
-local maxproc="$(ulimit -Hu)"
+maxproc="$(ulimit -Hu)" # local not allowed on some shells
 maxproc=$(( maxproc - 100 )) # give some slack to the OS
 ulimit -Su "$maxproc"
 unset maxproc

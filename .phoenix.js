@@ -1,0 +1,295 @@
+// Forked from https://github.com/lukesmurray/bootstrap/blob/master/.phoenix.js
+// Guake Style Applications
+// Must use the following setting
+// Apple menu > System Preferences > Mission Control > Displays have Separate Spaces
+// uses apple script hacks to get around the following issue
+// https://github.com/kasper/phoenix/issues/209
+// helper for finding application names at the bottom of the file
+// while developing run log stream --process Phoenix in a console
+
+// KNOWN ISSUE
+// doesn't work on minimized apps
+// https://github.com/kasper/phoenix/issues/269
+
+// common screen locations
+const topHalf = {
+  left: 0,
+  top: 0,
+  right: 0,
+  bottom: 0.5,
+};
+
+const leftHalf = {
+  left: 0,
+  top: 0,
+  right: 0.5,
+  bottom: 0,
+};
+
+const lowerLeftHalf = {
+  left: 0,
+  top: 0.5,
+  right: 0.5,
+  bottom: 0,
+};
+
+const rightHalf = {
+  left: 0.5,
+  top: 0,
+  right: 0,
+  bottom: 0,
+};
+
+const full = {
+  left: 0,
+  top: 0,
+  right: 0,
+  bottom: 0,
+};
+
+// the actual applications
+quakeApp({
+  key: "`",
+  modifiers: ["cmd"],
+  appName: "kitty",
+  position: topHalf,
+  followsMouse: true,
+  hideOnBlur: true,
+});
+
+/**
+ * Create a keyboard event listener which implements a quake app
+ * @param {string} key the key which triggers the app
+ * @param {string[]} modifiers the modifiers which must be used in combination with the key (["alt", "ctrl"])
+ * @param {string} appName the name of the app
+ * @param {{left: number, top: number, right: number, bottom: number}} relativeFrame the margins to place the application in.
+ * @param {followsMouse} boolean whether the app should open in the screen containing the mouse
+ * @param {hideOnBlur} boolean whether the window should hide when it loses focus
+ */
+function quakeApp({
+  key,
+  modifiers,
+  appName,
+  position,
+  followsMouse,
+  hideOnBlur,
+}) {
+  Key.on(key, modifiers, async function (_, repeat) {
+    // ignore keyboard repeats
+    if (repeat) {
+      return;
+    }
+    let [app, opened] = await startApp(appName, { focus: false });
+
+    // if the app started
+    if (app !== undefined) {
+      // move the app to the currently active space
+      const { moved, space } = moveAppToActiveSpace(app, followsMouse);
+
+      // set the app position
+      setAppPosition(app, position, space);
+
+      // hide the app if it is active and wasn't just opened or moved to
+      // a new space
+      if (app.isActive() && !opened && !moved) {
+        app.hide();
+      } else {
+        app.focus();
+      }
+
+      if (hideOnBlur) {
+        const identifier = Event.on("appDidActivate", (activatedApp) => {
+          if (app.name() !== activatedApp.name()) {
+            app.hide();
+            Event.off(identifier);
+          }
+        });
+      }
+    }
+  });
+}
+
+/**
+ * Positions an application using margins which are a percentage of the width and height.
+ * left: 0 positions the left side of the app on the left side of the screen.
+ * left: .5 positions the left side of the app half the width from the left side of the screen.
+ * {left: 0, right: 0, top: 0, bottom: 0} would be full screen
+ * {left: .25, right: .25, top: .25, bottom: .25} would be centered with half the screen height
+ * {left: 0, right: .5, top: 0, bottom: .5} would be the top left quadrant
+ * @param {App} app the application to set the position of
+ * @param {{left: number, top: number, right: number, bottom: number}} relativeFrame the margins to place the application in.
+ * @param {Space} space the space to position the app in
+ */
+function setAppPosition(app, relativeFrame, space) {
+  const mainWindow = app.mainWindow(); // get app window
+  if (space.screens().length > 1) {
+    // check one space per screen
+    throw new Error(DISPLAYS_HAVE_SEPARATE_SPACES);
+  } else if (space.screens().length > 0) {
+    // set the position of the app
+    const activeScreen = space.screens()[0];
+    const screen = activeScreen.flippedVisibleFrame();
+    const left = screen.x + relativeFrame.left * screen.width;
+    const top = screen.y + relativeFrame.top * screen.height;
+    const right = screen.x + screen.width - relativeFrame.right * screen.width;
+    const bottom =
+      screen.y + screen.height - relativeFrame.bottom * screen.height;
+    if (mainWindow.isFullScreen()) {
+      mainWindow.setFullScreen(false);
+    }
+    mainWindow.setTopLeft({
+      x: left,
+      y: top,
+    });
+    mainWindow.setSize({
+      width: right - left,
+      height: bottom - top,
+    });
+  }
+}
+
+/**
+ * Move the passed in App to the currently active space
+ * Returns whether the app was moved and the space the app is now in.
+ * @param {App} app the application to move to the active space
+ * @param {boolean} followsMouse whether the app should open in the screen containing the mouse or the key with keyboard focus
+ */
+function moveAppToActiveSpace(app, followsMouse) {
+  const activeSpace = followsMouse ? mouseSpace() : Space.active();
+  const mainWindow = app.mainWindow(); // get app window
+  let moved = false; // boolean if the app was moved to a new space
+  if (mainWindow.spaces().length > 1) {
+    // check one space per screen
+    throw new Error(DISPLAYS_HAVE_SEPARATE_SPACES);
+  }
+  if (activeSpace !== undefined) {
+    // check if the main window was moved
+    moved = !!!(
+      mainWindow.spaces().length > 0 &&
+      mainWindow.spaces()[0].isEqual(activeSpace)
+    );
+    if (moved) {
+      // otherwise remove the main window from the spaces it is in
+      mainWindow.spaces().forEach((space) => {
+        space.removeWindows([mainWindow]);
+      });
+      // add window to active space
+      activeSpace.addWindows([mainWindow]);
+    }
+  }
+  return { moved, space: activeSpace };
+}
+
+/**
+ * Get or launch the application with the passed in name.
+ * Returns the app and a boolean for if the app was opened. app is undefined if the application fails to start.
+ * @param {string} appName the name of the application to start
+ * @param {{focus: boolean}} options focus determines whether or not to focus the app on launch
+ */
+async function startApp(appName) {
+  // https://github.com/kasper/phoenix/issues/209
+  // basically a hack to get around this bug
+
+  // get the app if it is open
+  let app = App.get(appName);
+  let opened = false;
+
+  // if app is open
+  if (app !== undefined) {
+    // make sure it has an open window
+    if (app.windows().length === 0) {
+      // if not open a new window
+      await osascript(`tell application "${appName}"
+        try
+            reopen
+        on error
+          log "can not reopen the app"
+          activate
+        end
+          end tell
+        `);
+      opened = true;
+    }
+  } else {
+    // if app is not open activate it
+    await osascript(`tell application "${appName}"
+            activate
+          end tell
+        `);
+
+    app = App.get(appName);
+    opened = true;
+  }
+
+  return [app, opened];
+}
+
+/**
+ * Return a promise containing the Task handler used to run the osascript.
+ * The promise is resolved or rejected with the handler based on the status.
+ * @param {string} script the osascript script to run
+ */
+function osascript(script) {
+  return new Promise((resolve, reject) =>
+    Task.run("/usr/bin/osascript", ["-e", script], (handler) => {
+      if (handler.status === 0) {
+        return resolve(handler);
+      } else {
+        return reject(handler);
+      }
+    })
+  );
+}
+
+/**
+ * Get the space which contains the mouse
+ */
+function mouseSpace() {
+  const mouseLocation = Mouse.location();
+  const screen = Screen.all().find((s) =>
+    screenContainsPoint(s, mouseLocation)
+  );
+  if (screen !== undefined) {
+    return screen.currentSpace();
+  }
+}
+
+/**
+ * Return whether the point is contained in the screen
+ * @param {Screen} screen a screen object to check for a point
+ * @param {Point} point a point using flipped coordinates (origin upper left)
+ */
+function screenContainsPoint(screen, point) {
+  const frame = screen.flippedFrame();
+  return (
+    point.x >= frame.x &&
+    point.x <= frame.x + frame.width &&
+    point.y >= frame.y &&
+    point.y <= frame.y + frame.height
+  );
+}
+
+/**
+ * Error message for invalid display settings
+ */
+const DISPLAYS_HAVE_SEPARATE_SPACES = `Must set Apple menu > System Preferences > Mission Control > Displays have Separate Spaces`;
+
+// Finding Application Names
+// to find application names run the following command
+// open the app you're interested in
+// open a phoenix log `log stream --process Phoenix`
+// uncomment the following keyboard shortcut to trigger a log of open application names
+// Key.on("a", ["alt", "shift"], () => {
+//   const array = App.all()
+//     .map((a) => a.name())
+//     .sort();
+//   let chunk = 10;
+//   Phoenix.log();
+//   Phoenix.log("************ APPLICATIONS START *************");
+//   for (let i = 0, j = array.length; i < j; i += chunk) {
+//     let temp = array.slice(i, i + chunk);
+//     Phoenix.log(temp);
+//   }
+//   Phoenix.log("************ APPLICATIONS END *************");
+//   Phoenix.log();
+// });

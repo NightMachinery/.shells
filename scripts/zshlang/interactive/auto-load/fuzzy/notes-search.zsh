@@ -396,7 +396,7 @@ function ntsearch_() {
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
 
-    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window 'right:50%:wrap:nohidden:+{2}-/2' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --expect=alt-enter "$query" | {   # right:hidden to hide preview
+    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window 'right,50%,wrap,nohidden,+{2}-/2,~3' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --expect=alt-enter "$query" | {   # right:hidden to hide preview
         unset acceptor
         if isI ; then
             read -d $'\0' -r acceptor
