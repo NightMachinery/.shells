@@ -1132,8 +1132,10 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     # old: # meta=( "${(@0)$(urlmeta $url all)}" ) # takes ~0.475s
     meta=( "${(@0)$(urlmeta2 $url title description image author)}" ) # takes ~0.04s
     title="${url2note_override_title:-$meta[1]}"
+    title="$(ecn "$title" | prefixer -o ' ' --skip-empty)"
     desc="${meta[2]}"
     desc="$(<<<$desc html2utf.py)"
+    desc="$(ecn "$desc" | prefixer -o ' ' --skip-empty)"
     img="${meta[3]:-$img}"
     author="$meta[4]"
     readest=""
@@ -1154,16 +1156,16 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
     elif [[ "$mode" == org ]] ; then
         if test -z "$emacsMode" ; then
-            indent="  "
-            ec "- [[$(ec $url| url-encode.py)][${title:-$url}]]"
+            indent="** "
+            ec "* [[$(ec $url| url-encode.py)][${title:-$url}]]"
         else
             # we insert the links with the heading already created in emacs.
             indent=""
             ec "[[$(ec $url| url-encode.py)][${title:-$url}]]"
         fi
-        test -z "$author" || ec "${indent}+ By: $author"
-        test -z "$readest" || ec "${indent}+ $readest"
-        test -z "$desc" || ec "${indent}+ $desc"
+        test -z "$author" || ec "${indent}By: $author"
+        test -z "$readest" || ec "${indent}$readest"
+        test -z "$desc" || ec "${indent}$desc"
         ##
         if test -n "$imgMode" && test -n "$img" ; then
             # ec "${indent}[[img$img]]"

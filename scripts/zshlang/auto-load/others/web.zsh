@@ -61,19 +61,29 @@ function chrome-history-get() {
 function chis_find() {
     # Forked from fzf's wiki
     # browse Chrome's history
+    local rg_enabled="$chis_rg" exact="${chis_exact:-y}" # @warn fzf is very bad at searching URLs fuzzily, so you probably never want to disable 'exact'
     local query='' fz_query='' memoi_cmd=''
-    typeset -A fz_opts
+    typeset -a opts
     if isI ; then
+        opts+='--ansi'
+    fi
+    if bool $exact ; then
+        opts+='--exact'
+    fi
+    if bool $rg_enabled ; then # @warn hammerspoon needs this to be false
         query="${*}"
-        fz_opts+='--ansi'
     else
-        fz_query="$*"
+        if bool $exact ; then
+            fz_query="$*"
+        else
+            fz_query="$*"
+        fi
         memoi_cmd='memoi-eval'
     fi
 
     # ` sponge | ghead -n 100 |`
     local links
-    links="$(revaldbg $memoi_cmd chrome-history-get "$query"| fzp --exact --no-sort "$fz_query")" @RET
+    links="$(revaldbg $memoi_cmd chrome-history-get "$query"| fzp --no-sort "$opts[@]" "$fz_query")" @RET
     ec "$links"
 }
 @opts-setprefix chis_find chis
@@ -98,6 +108,8 @@ function chis() {
         do
             chrome-open "$i" >&2 &|
         done
+
+        # @todo2 give focus to Chrome
     }
 }
 alias ffchrome=chis

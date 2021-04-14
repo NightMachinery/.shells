@@ -223,6 +223,10 @@ function h_@opts() {
     done
 
     reval "$cmd[@]"
+
+    ## tests:
+    # See 'iloop-chis' for a nested usage example
+    ##
 }
 aliasfn @opts h_@opts
 function @opts-setprefix () {

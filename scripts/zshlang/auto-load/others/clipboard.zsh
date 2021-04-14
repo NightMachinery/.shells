@@ -132,7 +132,10 @@ function iloop-clipboard-fz() {
     @opts e clipboard-fz t Clipper @ iloop "$@"
 }
 function iloop-chis() {
-    @opts e [ sout chis ] t CHIS @ iloop "$@"
+    : "@alt omnibar (o, O) of vimium does pretty much the same thing"
+    : "@design we can also use polling and record Chrome's history ourselves ala clipboard-record."
+
+    @opts e [ sout @opts rg '' @ chis ] t CHIS @ iloop "$@"
 }
 function iloop() {
     local engine=("${iloop_e[@]}") title="${iloop_t:-iloop}" prompt1="${iloop_p1:-ready: }"
@@ -147,7 +150,7 @@ function iloop() {
                 q=''
                 sleep=y
             else
-                ecn "$prompt1"
+                ecn $'\n'"$prompt1"
                 read -k 1 q # you can press any whitespace to just trigger fzf
                 sleep=''
             fi
