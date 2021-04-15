@@ -347,14 +347,19 @@ function bella-zsh-gateway() {
 }
 function bella-zsh-maybe() {
     # @notcrossplatform
-    local ITERM_SESSION_ID="${1:-$ITERM_SESSION_ID}" # brishz has its own bogus ITERM_SESSION_ID, so prefer explicit input
-    
+    # this is called via BrishGarden by iTerm
+
     if isDarwin ; then
-    # if isDarwin && iterm-session-is-active ; then
-        # this is called via BrishGarden by iTerm
-        local skipfirst=''
-        iterm-session-is-active && iterm-focus-is && skipfirst=y
-        silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
+        local ITERM_SESSION_ID="${1:-$ITERM_SESSION_ID}" # brishz has its own bogus ITERM_SESSION_ID, so prefer explicit input
+
+        if iterm-session-is-active ; then
+            local skipfirst=''
+            iterm-focus-is && skipfirst=y
+            silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
+        else
+            # Do not use bell-auto for inactive sessions
+            bell-zsh
+        fi
     fi
 }
 ##

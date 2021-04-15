@@ -59,17 +59,18 @@ function vcns() {
 }
 function vcndiff() {
     vcn-with git add ~/scripts/
-    vcn-with git diff HEAD~"${1:-0}"
+    vcn-with git diff --submodule=diff HEAD~"${1:-0}"
 }
 function vcnpp() {
     local msg="${*}"
 
     pushf ~/
     {
-        vcn-with git add ~/scripts/
-        vcn-with @opts noadd y @ gsync "$msg"
+        assert vcn-with git add ~/scripts/ @RET
+        assert vcn-with @opts noadd y @ gsync "$msg" @RET
 
         brishzr-repeat
+        true
     } always { popf }
 }
 ##

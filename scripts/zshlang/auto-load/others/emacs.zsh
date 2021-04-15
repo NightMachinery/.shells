@@ -1,5 +1,7 @@
 ##
 function emc-sudo() {
+    : "See also doom--sudo-file-path"
+
     local f="$(ec ${1} | gtr '"' '\"')"
     emc-gateway -e '(find-file "/sudo::'$f'")'
 }

@@ -4,13 +4,14 @@ alias -g ....='../../..'
 alias -g .....='../../../..'
 alias -g ......='../../../../..'
 
-alias -g @f=' | inargsf '
-alias -g @ff=' | fz | inargsf '
-alias -g @w=' | fzinw '
+alias -g '@f'=' | inargsf '
+alias -g '@ff'=' | fz | inargsf '
+alias -g '@w'=' | fzinw '
 ##
-# alias -g MAGIC='| { eval "$(read -d "" -r -E)" }'
-alias -g MAGIC='| { eval "$(< /dev/stdin)" }'
+# alias -g 'MAGIC'='| { eval "$(read -d "" -r -E)" }'
+alias -g 'MAGIC'='| { eval "$(< /dev/stdin)" }'
 alias -g '@RET'=' || return $?'
+alias -g '@TRET'=' || { ectrace ; return $? }'
 alias -g '@MRET'='"$0" || return $?'
 ##
 function magic_h() {
@@ -53,22 +54,68 @@ mdoc-test2() {
 }
 ##
 function fn-name() {
+    unset file linenumber # @global
+
     local start="${1:-2}"
 
     local indices=( {${start}..${#funcstack}} )
-    local i
+    local i inext res name_found=''
     for i in $indices[@] ; do
         # ecdbg "fn ${i}: ${funcstack[$i]}"
 
-        if ! funcstack-isExcluded "${funcstack[$i]}" ; then
-            ec "${funcstack[$i]}"
-            return 0
+        if test -n "$name_found" || ! funcstack-isExcluded "${funcstack[$i]}" ; then
+
+            # {
+            #     ecerr "i=$i"
+            #     arger "${funcstack[@]}"
+            #     arger "${funcfiletrace[@]}"
+            # } >&2
+
+            if test -z "$name_found" ; then
+                name_found=y
+                ec "${funcstack[$i]}"
+            fi
+            inext=$(( i + 1 ))
+            if (( $#funcstack == i )) || ! funcstack-isExcluded "${funcstack[$inext]}" ; then
+                res=( "${(ps.:.)funcfiletrace[$i]}" )
+                file="${res[1]}"
+                linenumber="${res[2]}"
+                return 0
+            fi
         fi
     done
-    return 1
+
+    test -n "$name_found"
+    return $?
     ## perf tests:
     # `time2 re-val reval fn-name`
     ##
+}
+function fn-line() {
+    local context="${fn_line_c:-0}" start="${1:-2}"
+    start=$(( start + 1 ))
+
+    local file linenumber
+    fn-name "$start" >/dev/null @RET
+
+    if test -e "$file" ; then
+        local code
+
+        # @obviously if you edit the files then this linenumber can become stale
+        code="$(cat "$file" | gsed -n "$((linenumber - c)),$((linenumber + c))p" | prefixer -a $'\t')" || return $?
+
+        if ! [[ "$code" =~ '^\s*$' ]] ; then
+            ecn "$code"
+        fi
+    fi
+}
+function h_fn-line-test() {
+    fn-line
+}
+function fn-line-test() {
+    h_fn-line-test A 87 12 0
+
+    reval h_fn-line-test B 2
 }
 function fn-isTop() {
     local caller=( "${@}" ) prefixes=( ${fn_isTop_p[@]} ) reverse="${fn_isTop_r}"

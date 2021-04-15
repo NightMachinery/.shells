@@ -79,6 +79,10 @@ function reval() {
 function reval-true() {
     reval "$@" || true
 }
+function reval-withstdin() {
+    ecn "$1" | reval "${@[2,-1]}"
+}
+alias rin='reval-withstdin'
 function rgeval() {
     geval "$(gquote "$@")"
 }

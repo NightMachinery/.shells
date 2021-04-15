@@ -829,7 +829,7 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
             # even a URL that ends in, e.g., '.mkv' can be actually an HTML page that links to the actual file
         fi
         size="$(url-size "$url")" || {
-            ecerr "$0: Could not get size of URL '$url'"
+            ecerr "$0: Could not get the size of URL '$url'"
             if test -z "$matched" ; then
                 ecerr "$0: proceeding anyway ..."
                 size=0
@@ -868,7 +868,7 @@ function aamedia1() {
     local url t l titles=() links=()
     for url in "${urls[@]}" ; do
         size="$(url-size "$url")"  || {
-            ecerr "$0: Could not get size of URL '$url'"
+            ecerr "$0: Could not get the size of URL '$url'"
             ecerr "$0: proceeding anyway ..."
             size=0
         }

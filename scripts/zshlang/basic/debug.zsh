@@ -49,6 +49,12 @@ function ecnerr() {
     # we can alsoo use `ecnerr-raw`, but that might break stuff, as ecn is supposed not to add newlines, but the traceback inserts tons of stuff
     ecn "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
 }
+function ecgray() {
+    { colorfg "$gray[@]" ; ec "${@}" ; resetcolor }
+}
+function ecngray() {
+    { colorfg "$gray[@]" ; ecn "${@}" ; resetcolor }
+}
 function ecdate() {
     ec "$edPre$(color 100 100 100 $(dateshort))            $@"
 }
@@ -154,11 +160,6 @@ function ensure-dbg() {
     fi
 }
 ##
-function assert-wn() {
-     local ensure_head="${ensure_head:-${$(fn-name):-assert}}" # fn-name takes  ~9ms
-
-     assert "$@"
-}
 function assert() {
     # Usage: assert true @RET
     # See [[~/cellar/notes/bookmarks/useme/zsh/debugging, stacktraces, exceptions.org]] for tests
@@ -167,8 +168,7 @@ function assert() {
     local msg="${ensure_msg:-$ensure_m}"
 
     local head
-    # head="${ensure_head:-${$(fn-name):-assert}}" # fn-name takes  ~9ms, use assert-wn instead
-    head="${ensure_head:-${funcstack[2]:-assert}}"
+    head="${ensure_head}"
 
     ## use ectrace_notrace instead
     # local notrace="${ensure_notrace}"
@@ -178,17 +178,24 @@ function assert() {
     # else
     # ...
     ##
+    assert_global_lock=y
+    # if a nested assert call resets this, we won't print the trace again
+    # of course, forked processes can't touch this
+    # assert_global_lock is also reset by ectrace (when it actually prints the trace).. We can go and reset it in 'throw' itself ...
     reval "$@"
     local ret=$?
-    if (( ret != 0 ))  ; then
+    if test -n "$assert_global_lock" && (( ret != 0 ))  ; then
+        head="${head:-${$(fn-name):-${funcstack[2]:-assert}}}" # fn-name takes  ~9ms
         test -z "$msg" && msg="$(ecalternate "${@}")" # "(exited $ret)"
         msg="${head}: $msg"
         ectrace_ret="$ret" ectrace "$msg"
     fi
+    # assert_global_lock='' # it's better to trust the one in ectrace, as the trace might have been disabled.
     return $ret
     ## perf tests:
     # `time2 re-val reval assert reval true`
     # `time2 re-val reval reval true`
+    # `assert re-val assert false`
     ##
 }
 function ectrace() {
@@ -216,6 +223,7 @@ function ectrace() {
                 ecerr "$msg"
             fi
         else
+            assert_global_lock=''
             throw_ret=$ret throw "$exc" "$msg" | {
                 if isI ; then
                     cat

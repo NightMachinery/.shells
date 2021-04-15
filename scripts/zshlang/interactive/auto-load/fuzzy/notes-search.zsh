@@ -206,6 +206,7 @@ function ntsearch-lines() {
             test -e "$file" || {
                 # file="$(<<<$file rmprefix "$nightNotes")"
                 file="$nightNotes/$file"
+                file="$(grealpath "$file")" # needed for opening files in the editor
             }
             if ! test -e "$file" ; then
                 if true || test -z "$ntsearch_injector" ; then
@@ -259,7 +260,7 @@ function ntsearch-lines() {
                 if (( $#files > 1 )) ; then
                     cmd+="(tab-bar-new-tab) "
                     if (( i == 1 )) ; then
-                        cmd+="(tab-bar-close-other-tabs) "
+                        cmd+="(tab-bar-close-other-tabs) " # @weirdFeature
                     fi
                 fi
                 cmd+="(find-file \"${files[$i]}\") (goto-line ${linenumbers[$i]}) "

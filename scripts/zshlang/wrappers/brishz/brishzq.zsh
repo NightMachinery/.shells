@@ -6,6 +6,8 @@ if test "$1" = '-c' ; then
 fi
 
 . ~/.privateShell
+
+alias ec='print -r --'
 alias gq=gquote
 gquote () {
     print -r -- "${(q+@)@}"
@@ -39,12 +41,16 @@ fi
 if [[ "$endpoint" =~ 'garden' ]] ; then
     opts+=(--user "Alice:$GARDEN_PASS0")
 fi
-local v=0
-isDbg && v=1
-local req="$(print -nr -- "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg nolog "$nolog" --arg s "$session" --arg c "$input_cmd[*]" --arg v $v 'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "verbose": $v, "nolog": $nolog}')"
+local v=1
+local req="$(print -nr -- "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg nolog "$nolog" --arg s "$session" --arg c "$input_cmd[*]" --arg v $v 'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "json_output": $v, "nolog": $nolog}')"
 local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint )
 cmd="$(gq print -nr -- $req) | $(gq "$cmd[@]")"
 if ((${+commands[pbcopy]})) ; then
     test -n "$copy_cmd" && <<<"$cmd" pbcopy
 fi
-eval "$cmd"
+local out
+out="$(eval "$cmd")" || return $?
+
+ec "$out" | jq -rje .out
+ec "$out" | jq -rje .err >&2
+exit "$(ec "$out" | jq -rje .retcode)"

@@ -105,9 +105,6 @@ function  mv-merge() {
 
     { colorfg "$gray[@]" ; trs "${(@)paths[1,-2]}" ; resetcolor } >&2
 }
-function ecgray() {
-    { colorfg "$gray[@]" ; ec "${@}" ; resetcolor }
-}
 ##
 function list-dirs() {
     local d=(${@}) multi_fs="${list_dirs_m}" # multi = disable one-file-system
