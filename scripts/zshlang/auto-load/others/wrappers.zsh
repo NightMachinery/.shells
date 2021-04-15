@@ -65,3 +65,14 @@ function fd() {
   command fd -u "$@"
 }
 ##
+function open() {
+  assert isDarwin @RET
+  if [[ "$1" =~ '\.pdf$' ]] ; then
+    assert chrome-open-pdf "$1"
+    shift
+    "$0" "$@"
+    return $?
+  elif (( $#@ >= 1 )) ; then
+    command open "$@"
+  fi
+}

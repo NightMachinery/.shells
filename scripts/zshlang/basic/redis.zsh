@@ -18,7 +18,7 @@ redism() {
         ecerr $msg
         ectty $msg
         # eval "$cmd"
-        return $?
+        return $r
     fi
     return $r
 }

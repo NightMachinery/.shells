@@ -29,6 +29,7 @@ function memoi-eval() {
     local rediskey="$custom_key|> $cmd"
     local deusvult="$deusvult"
     local skiperr="$memoi_skiperr"
+    local aborterr="$memoi_aborterr"
     # test -n "$deusvult" && skiperr='' # uncommenting this can help make `deus` transparently undo the memoi effect. But I am not sure we want that.
     local inheriterr="${memoi_inheriterr:-$skiperr}" # skipping forces inheritance, because why not?
     local override_duration="${memoi_override_duration:-${memoi_od:-0.12}}" # 0.12
@@ -57,7 +58,7 @@ function memoi-eval() {
         local out
         out="${$(eval "$cmd" 2>"$errfile" ; ret_code=$? ; print -n . ; return $ret_code)[1,-2]}" ; retcode=$?
         local duration=$(( EPOCHREALTIME - now ))
-        if (( duration >= override_duration )) ; then
+        if { test -z "$aborterr" || (( retcode == 0 )) } && (( duration >= override_duration )) ; then
             ##
             # by not storing the time if the command executed quickly, we'll ensure a re-eval the next time.
             # silent redis-cli hset $rediskey timestamp "$now"

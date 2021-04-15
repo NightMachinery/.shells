@@ -425,14 +425,20 @@ zstyle -d ':completion:*' special-dirs # to not show ./ and ../
 # to make tab work on empty line
 zstyle ':completion:*' insert-tab false
 ##
-zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'
+# zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' 'r:|?=** m:{a-z\-}={A-Z\_}' '+l:|=* r:|=*'
+zstyle ':completion:*' matcher-list 'r:|?=** m:{a-z\-}={A-Z\_}' '+l:|=* r:|=*'
+
 # use `zstyle ':completion:*' matcher-list '' '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' '+l:|=* r:|=*'` if you don't want to see the case-insesitive results if there are case-sensitive results. In general, it seems that the matches stop at the first rule that produces at least one match.
 
-# See http://zsh.sourceforge.net/Doc/Release/Completion-System.html
+# See:
+# https://superuser.com/questions/415650/does-a-fuzzy-matching-mode-exist-for-the-zsh-shell
+# http://zsh.sourceforge.net/Doc/Release/Completion-System.html
+# http://zsh.sourceforge.net/Doc/Release/Completion-Widgets.html#Completion-Matching-Control
 # These are general rules that make the completion system match better:
-# The first rule adds case-insensitivity.
-# The second (original) rule allows for partial completion before ., _ or -, e.g. f.b -> foo.bar.
-# The third rule allows for completing on the left side of the written text, e.g. bar -> foobar)
+# '+m:{a-zA-Z}={A-Za-z}' adds case-insensitivity.
+# '+r:|[._-]=* r:|=*' allows for partial completion before ., _ or -, e.g. f.b -> foo.bar.
+# '+l:|=* r:|=*' allows for completing on the left side of the written text, e.g. bar -> foobar)
+# 'r:|?=** m:{a-z\-}={A-Z\_}' full flex completion (abc => ABraCadabra)
 ##
 # (( $+commands[cod] )) && source <(command cod init $$ zsh | sd '\bcod\b' 'command cod')
 # https://github.com/dim-an/cod/issues/24

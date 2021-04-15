@@ -25,14 +25,14 @@ if isExpensive && isIReally ; then
 fi
 ##
 ffz_last_query=''
-function ffz() {
+function ffz-get() {
     ## Performance:
     # Note that piping a lot of stuff into fzp itself seems to be slow, even when the result is cached. To be sure, control the amount of feeded dirs, and run 'deus z' to refresh the caches. Note that older clients might poison the caches again ...
     ##
     # @retiredtodo2 We can bypass the interactive selection if the score of the top match is high enough compared to the second-best match, and have a `zi` that disables this auto-bypass.
     # DONE: We can also just cache the result for each query!
     ##
-    setopt localoptions pipefail
+    setopt localoptions pipefail interactivecomments
     local query="${*:-$ffz_last_query}" sel
     ffz_last_query="$query"
     ##
@@ -48,9 +48,9 @@ function ffz() {
     # list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
     memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
     true
- } | { sponge || true } | deusvult="${ffz_nocache:-$deusvult}" memoi_key=fuzzy_z memoi_skiperr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | head -1)" ||  {
-        local r=$? msg="$0: returned $? ${pipestatus[@]}"
-        ecerr $msg
+ } | { sponge || true } | deusvult="${ffz_nocache:-$deusvult}" memoi_key=fuzzy_z memoi_skiperr=y memoi_aborterr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | sponge | ghead -n 1 || retcode)" ||  {
+        # local r=$? msg="$0: $(retcode 2>&1)"
+        # ecerr $msg
         return $r
     }
     if test -z "$sel" ; then
@@ -67,7 +67,35 @@ function ffz() {
         ffz_nocache=y reval "$0" "$@"
         return $?
     fi
-    cd "$sel"
+    ec "$sel"
+}
+@opts-setprefix ffz-get ffz
+
+function ffz() {
+    local o
+    o="$(ffz-get "$@")" @RET
+    cd "$o"
 }
 aliasfn z ffz
 aliasfn zi ffz_nocache=y ffz
+##
+function ffz-b() {
+    # z-back
+    local q="$*"
+
+    local o
+    o="$(list-dirs-parents "$PWD" | fzp "$q")" @RET
+    cd "$o"
+}
+alias zb='ffz-b'
+
+function ffz-r() {
+    # z-recursive
+    local q="$*"
+
+    local o
+    o="$(list-dirs "$PWD" | fzp "$q")" @RET
+    cd "$o"
+}
+alias zx='ffz-r'
+##

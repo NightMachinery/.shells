@@ -106,34 +106,3 @@ function  mv-merge() {
     { colorfg "$gray[@]" ; trs "${(@)paths[1,-2]}" ; resetcolor } >&2
 }
 ##
-function list-dirs() {
-    local d=(${@}) multi_fs="${list_dirs_m}" # multi = disable one-file-system
-    local depth="${list_dirs_d}"
-
-    local opts=()
-    if test -z "$multi_fs" ; then
-        opts+="--one-file-system"
-    fi
-    if test -n "$depth" ; then
-        opts+=(--max-depth "$depth")
-    fi
-    arr0 $d[@] | filter0 test -d | inargs0 fd "$opts[@]" --follow --absolute-path --type d .
-}
-function list-dirs-d1() {
-    ## @profile
-    # `hyperfine --shell "brishz_para.dash" --warmup 5 --export-markdown=$HOME/tmp/hyperfine.md 'list-dirs-d1 ~/' 'arrN ~/*(/N)'`
-    #     Benchmark #1: list-dirs-d1 ~/
-    #   Time (mean ± σ):      33.8 ms ±  14.2 ms    [User: 0.7 ms, System: 0.6 ms]
-    #   Range (min … max):    21.0 ms …  77.8 ms    22 runs
-    #
-    # Benchmark #2: arrN ~/*(/N)
-    #   Time (mean ± σ):       6.6 ms ±  15.0 ms    [User: 1.0 ms, System: 0.7 ms]
-    #   Range (min … max):     0.0 ms …  58.7 ms    28 runs
-    #
-    # Summary
-    #   'arrN ~/*(/N)' ran
-    #     5.14 ± 11.92 times faster than 'list-dirs-d1 ~/'
-    ##
-    list_dirs_d=1 list-dirs "$@"
-}
-##

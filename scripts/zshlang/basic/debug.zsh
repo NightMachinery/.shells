@@ -102,12 +102,12 @@ dvar () {
 }
 function raise-blood() ceer rederr.zsh source
 function retcode() {
-    local r=$? ps=("$pipestatus[@]")
+    local r=$? ps=("$pipestatus[@]") name="${1:-${$(fn-name 3):-NA}}"
 
     if (( ${#ps} > 1 )) ; then
-        ecerr $'\n'Returned ${r}: "${(j.|.)ps[@]}"
+        ecerr $'\n'"${name}: returned ${(j.|.)ps[@]}"
     else
-        ecerr $'\n'Returned ${r}
+        ecerr $'\n'"${name}: returned ${r}"
     fi
     return $r
 }
