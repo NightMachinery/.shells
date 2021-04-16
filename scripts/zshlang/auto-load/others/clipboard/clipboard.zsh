@@ -66,7 +66,7 @@ function clipboard-init() {
     # https://github.com/muan/unicode-emoji-json
     # https://gitlab.com/NightMachinary/unicode-emoji-json
     if test -e "$emoji_json" ; then
-        clipboard-add "$(cat "$emoji_json" | jq -r --nul-output --arg sep $'\C-^\t\t' 'keys[] as $k | "\($k)\($sep)\(.[$k] | .name + " (" + .group +")" )"')"
+        clipboard-add "$(cat "$emoji_json" | jq -r --nul-output --arg sep $'\C-^\t\t' 'keys[] as $k | "\($k)\($sep)\(.[$k] | .name + " (" + .group +" EMOJIS)" )"')"
     else
         ectrace "emoji_trace does not exist" "$emoji_json"
     fi
@@ -130,7 +130,7 @@ function clipboard-fz-widget {
 }
 ##
 function iloop-clipboard() {
-    @opts e clipboard-fz t Clipper @ iloop "$@"
+    @opts e clipboard-fz en y t Clipper @ iloop "$@"
 }
 function activate-iloop2-clipboard() {
     kitty-send $'\C-c\n'"iloop2-clipboard"
@@ -158,13 +158,17 @@ function iloop-chis() {
     @opts e [ sout @opts rg '' @ chis ] t CHIS @ iloop "$@"
 }
 function iloop() {
-    local engine=("${iloop_e[@]}") title="${iloop_t:-iloop}" prompt1="${iloop_p1:-ready: }"
+    local engine=("${iloop_e[@]}") title="${iloop_t:-iloop}" prompt1="${iloop_p1:-ready: }" en_only="${iloop_en}"
     assert-args engine @RET
 
     tty-title "$title"
     bella_zsh_disable1=y
 
     local q sleep
+    local rn=1
+    if bool $en_only ; then
+        rn=3
+    fi
     {
         while true ; do
             if [[ "$prompt1" == "MAGIC_SKIP" ]] ; then
@@ -172,17 +176,25 @@ function iloop() {
                 sleep=y
             else
                 ecn $'\n'"$prompt1"
-                read -k 1 q # you can press any whitespace to just trigger fzf
+                read -k "$rn" q # you can press any whitespace to just trigger fzf
+                # reading more allows for changing the letters into en
+                if bool $en_only ; then
+                    (input-lang-push en)
+                    q="$(ecn "$q" | per2en)"
+                fi
+                # typ q
                 sleep=''
             fi
-            if [[ "$q" == '^' ]] ; then
+            if [[ "${q[1]}" == ('^'|'\') ]] ; then
                 # See kitty-esc
+                read -e q # empty the buffer
+                continue
+                ##
                 q=''
             fi
             reval "$engine[@]" "${@}" "$(trim "$q")" || {
             # clipboard-fz --bind "change:reload:$(gq cat "$CLIPBOARD_RECORD_FILE")" "${@:-}" || {
                 # reload resets selections https://github.com/junegunn/fzf/issues/2441
-
                 test -n "$sleep" && sleep 0.2
                 continue
             }

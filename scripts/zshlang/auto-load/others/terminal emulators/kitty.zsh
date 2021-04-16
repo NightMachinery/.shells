@@ -13,5 +13,7 @@ function kitty-C-c() {
     kitty-send $'\C-c' #$'\n''reset'
 }
 function kitty-esc() {
-    kitty-send $'\^['
+    # kitty-send $'\^['
+    # kitty-send "$(printf '\x1b')"
+    printf -- '\x1b\x1b\x1b\x1b\x1b\n' | kitty-remote send-text --stdin
 }

@@ -68,9 +68,16 @@ quakeApp({
     // ["kitty-send", "iloop2-clipboard"],
     // ["input-lang-push", "en"],
     /// use with iloop-clipboard:
-    ["kitty-esc"],
+    // ["kitty-esc"],
+    // ["input-lang-push", "en"],
+    ///
+    ["kitty-send", "        "], // to start fzf forecfully
     ["input-lang-push", "en"],
                ],
+  postCommands: [
+    // ["input-lang-pop"],
+    ["kitty-esc"],
+  ],
 });
 
 /**
@@ -90,6 +97,7 @@ function quakeApp({
   followsMouse,
   hideOnBlur,
   preCommands,
+  postCommands,
 }) {
   Key.on(key, modifiers, async function (_, repeat) {
     // ignore keyboard repeats
@@ -111,13 +119,18 @@ function quakeApp({
       // a new space
       if (app.isActive() && !opened && !moved) {
         app.hide();
+        if (postCommands && postCommands.length >= 1) {
+          for (var cmd of postCommands) {
+            await brishz(cmd)
+          }
+        }
       } else {
+        app.focus();
         if (preCommands && preCommands.length >= 1) {
           for (var cmd of preCommands) {
             await brishz(cmd)
           }
         }
-        app.focus();
       }
 
       if (hideOnBlur) {
