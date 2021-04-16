@@ -34,10 +34,12 @@ function pbcopy() {
     local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"
     dact typ in
 
-    if isKitty ; then
-        ecn "$in" | kitty +kitten clipboard
-        return $?
-    fi
+    ## buggy
+    # if isKitty ; then
+    #     ecn "$in" | kitty +kitten clipboard
+    #     return $?
+    # fi
+    ##
 
     { false && (( $+commands[copyq] )) } && {
         silent copyq copy -- "$in"

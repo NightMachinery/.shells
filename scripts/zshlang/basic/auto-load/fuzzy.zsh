@@ -50,12 +50,17 @@ function fzf-noempty() {
 function fzf-gateway() {
     local -x SHELL="${FZF_SHELL:-${commands[dash]}}"
 
-    bella_zsh_disable1=y
+    typeset -g bella_zsh_disable1=y
 
     if true ; then # we might want to check tmux's version here, as fzf-tmux needs the current HEAD
         if test -z "$fzf_mru_context" ; then
-           fzf-tmux -p90% "$@" | sponge
-           # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
+            if isKitty ; then
+                # @kittyBug?
+                command fzf "$@" | sponge
+            else
+                command fzf-tmux -p90% "$@" | sponge
+                # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
+            fi
         else
             fzf_mru.sh "$@"
         fi

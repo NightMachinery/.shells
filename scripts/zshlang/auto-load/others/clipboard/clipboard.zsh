@@ -98,6 +98,7 @@ function clipboard-fz-raw() {
 function clipboard-fz() {
     unset out # @global
 
+    bella_zsh_disable1=y
     out=(${(@0)"$(clipboard_fz_copy=no clipboard-fz-raw --print0 "${@:-}")"}) @RET # do NOT preserve empty elements; there are stuff with line endings in a single element in some cases
 
     local i tmp
@@ -128,8 +129,27 @@ function clipboard-fz-widget {
     }
 }
 ##
-function iloop-clipboard-fz() {
+function iloop-clipboard() {
     @opts e clipboard-fz t Clipper @ iloop "$@"
+}
+function activate-iloop2-clipboard() {
+    kitty-send $'\C-c\n'"iloop2-clipboard"
+    input-lang-push en
+}
+function iloop2-clipboard() {
+    sout clipboard-fz --height='100%' "${@:-}" @RET
+    out="${(j..)out}"
+    if test -n "$out" ; then
+        silent pbcopy "$out" || {
+            ectrace "pbcopy failed" # do NOT print out to the terminal, it can break it
+            continue
+        }
+    fi
+    hs-hyper-m
+    input-lang-pop
+    if test -n "$out" ; then
+        hs-cmd-v
+    fi
 }
 function iloop-chis() {
     : "@alt omnibar (o, O) of vimium does pretty much the same thing"
@@ -142,6 +162,7 @@ function iloop() {
     assert-args engine @RET
 
     tty-title "$title"
+    bella_zsh_disable1=y
 
     local q sleep
     {
@@ -154,6 +175,10 @@ function iloop() {
                 read -k 1 q # you can press any whitespace to just trigger fzf
                 sleep=''
             fi
+            if [[ "$q" == '^' ]] ; then
+                # See kitty-esc
+                q=''
+            fi
             reval "$engine[@]" "${@}" "$(trim "$q")" || {
             # clipboard-fz --bind "change:reload:$(gq cat "$CLIPBOARD_RECORD_FILE")" "${@:-}" || {
                 # reload resets selections https://github.com/junegunn/fzf/issues/2441
@@ -163,9 +188,13 @@ function iloop() {
             }
             out="${(j..)out}"
             if test -n "$out" ; then
-                assert pbcopy  || continue
+                assert pbcopy "$out" || continue
             fi
-            hs-hyper-x
+            if isKitty ; then
+                hs-hyper-m
+            else
+                hs-hyper-x
+            fi
             if test -n "$out" ; then
                 hs-cmd-v
             fi

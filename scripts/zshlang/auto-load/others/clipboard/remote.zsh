@@ -1,6 +1,6 @@
 function cp2eva() {
     local inargs=''
-    in-or-args2
+    in-or-args2 "$@"
     local tmp
     tmp="$(gmktemp)" || ectrace @RET
     {

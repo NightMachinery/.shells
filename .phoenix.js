@@ -1,4 +1,8 @@
-// Forked from https://github.com/lukesmurray/bootstrap/blob/master/.phoenix.js
+///
+// See also:
+// * https://github.com/fabiospampinato/phoenix (has reload)
+// * https://github.com/kasper/phoenix/wiki#stable-22
+/// Forked from https://github.com/lukesmurray/bootstrap/blob/master/.phoenix.js
 // Guake Style Applications
 // Must use the following setting
 // Apple menu > System Preferences > Mission Control > Displays have Separate Spaces
@@ -47,14 +51,26 @@ const full = {
   bottom: 0,
 };
 
+const hyper = ["cmd", "shift", "control", "alt"]
 // the actual applications
 quakeApp({
-  key: "`",
-  modifiers: ["cmd"],
+  key: "m",
+  modifiers: hyper,
   appName: "kitty",
-  position: topHalf,
+  // position: topHalf,
+  position: full,
   followsMouse: true,
   hideOnBlur: true,
+  preCommands: [
+    ///
+    // ["activate-iloop2-clipboard"],
+    // ["kitty-C-c"],
+    // ["kitty-send", "iloop2-clipboard"],
+    // ["input-lang-push", "en"],
+    /// use with iloop-clipboard:
+    ["kitty-esc"],
+    ["input-lang-push", "en"],
+               ],
 });
 
 /**
@@ -73,6 +89,7 @@ function quakeApp({
   position,
   followsMouse,
   hideOnBlur,
+  preCommands,
 }) {
   Key.on(key, modifiers, async function (_, repeat) {
     // ignore keyboard repeats
@@ -83,6 +100,7 @@ function quakeApp({
 
     // if the app started
     if (app !== undefined) {
+
       // move the app to the currently active space
       const { moved, space } = moveAppToActiveSpace(app, followsMouse);
 
@@ -94,6 +112,11 @@ function quakeApp({
       if (app.isActive() && !opened && !moved) {
         app.hide();
       } else {
+        if (preCommands && preCommands.length >= 1) {
+          for (var cmd of preCommands) {
+            await brishz(cmd)
+          }
+        }
         app.focus();
       }
 
@@ -129,13 +152,22 @@ function setAppPosition(app, relativeFrame, space) {
     // set the position of the app
     const activeScreen = space.screens()[0];
     const screen = activeScreen.flippedVisibleFrame();
-    const left = screen.x + relativeFrame.left * screen.width;
-    const top = screen.y + relativeFrame.top * screen.height;
-    const right = screen.x + screen.width - relativeFrame.right * screen.width;
+
+    const xmargin = screen.x
+    const ymargin = screen.y
+    // const xmargin = 0
+    // const ymargin = 0
+
+    const left = xmargin + relativeFrame.left * screen.width;
+    const top = ymargin + relativeFrame.top * screen.height;
+    // negative values were useless as well
+    // https://github.com/kasper/phoenix/issues/270
+    // const top =  -100 //ymargin + relativeFrame.top * screen.height;
+    const right = xmargin + screen.width - relativeFrame.right * screen.width;
     const bottom =
-      screen.y + screen.height - relativeFrame.bottom * screen.height;
+      ymargin + screen.height - relativeFrame.bottom * screen.height;
     if (mainWindow.isFullScreen()) {
-      mainWindow.setFullScreen(false);
+      mainWindow.setFullScreen(false); // this uses the native fullscreen functionality so setting it to true is no good for popup windows
     }
     mainWindow.setTopLeft({
       x: left,
@@ -293,3 +325,18 @@ const DISPLAYS_HAVE_SEPARATE_SPACES = `Must set Apple menu > System Preferences 
 //   Phoenix.log("************ APPLICATIONS END *************");
 //   Phoenix.log();
 // });
+
+///
+function brishz(...args) {
+  args = [].concat.apply([], args); // flatten args
+
+  return new Promise((resolve, reject) =>
+    Task.run("/usr/local/bin/brishzq.zsh", args, (handler) => {
+      if (handler.status === 0) {
+        return resolve(handler);
+      } else {
+        return reject(handler);
+      }
+    })
+  );
+}

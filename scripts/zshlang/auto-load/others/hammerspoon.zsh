@@ -115,6 +115,9 @@ function hs-hyper-z() {
 function hs-hyper-x() {
     hammerspoon -c 'eventtap.keyStroke(hyper, 7)'
 }
+function hs-hyper-m() {
+    hammerspoon -c 'eventtap.keyStroke(hyper, 46)'
+}
 function hs-cmd-v() {
     hammerspoon -c 'eventtap.keyStroke({"cmd"}, 9)'
 }

@@ -50,4 +50,6 @@ ot-server-daemon
 ##
 tmuxnewsh2 clipboard-record clipboard-record
 ##
+tmuxnewsh kitty loop env -i ${commands[kitty]} -o allow_remote_control=yes --listen-on unix:"$HOME/tmp/.kitty" --single-instance
+##
 chronic-all
