@@ -13,7 +13,9 @@ json-beautify() {
 }
 ##
 function arrJ-noquote() {
-        print -nr -- "[ ${(j.,.)items} ]"
+    local items=( "$@" )
+
+    print -nr -- "[ ${(j.,.)items} ]"
 }
 function arrJ() {
     local items=( "$@" )
