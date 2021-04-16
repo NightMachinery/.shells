@@ -84,7 +84,7 @@ function ffz-b() {
     local q="$*"
 
     local o
-    o="$(list-dirs-parents "$PWD" | fzp "$q")" @RET
+    o="$(list-dirs-parents "$PWD" | fzp "$q" | ghead -n 1)" @RET
     cd "$o"
 }
 alias zb='ffz-b'
@@ -94,7 +94,7 @@ function ffz-r() {
     local q="$*"
 
     local o
-    o="$(list-dirs "$PWD" | fzp "$q")" @RET
+    o="$(list-dirs "$PWD" | fzp "$q" | ghead -n 1)" @RET
     cd "$o"
 }
 alias zx='ffz-r'
