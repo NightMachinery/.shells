@@ -12,13 +12,15 @@ json-beautify() {
     fi
 }
 ##
+function arrJ-noquote() {
+        print -nr -- "[ ${(j.,.)items} ]"
+}
 function arrJ() {
     local items=( "$@" )
 
     ##
     jq --null-input '$ARGS.positional' --args "${items[@]}"
     ##
-    # print -nr -- "[ ${(j.,.)items} ]"
 }
 function arrJ-in() {
     # From https://github.com/stedolan/jq/issues/563

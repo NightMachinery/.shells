@@ -27,7 +27,7 @@ function jias() {
         url="[$i](https://www.google.com/search?q=$url)" # @todo md-quote i (don't use url-encode as it is very ugly)
         results+="$(jq --null-input --compact-output --arg i "${i}" --arg url "$url" '{ tlg_parsemode: "md", tlg_preview: "", tlg_title: $i, tlg_content: $url }')"
     done
-    arrJ "$results[@]"
+    arrJ-noquote "$results[@]"
 }
 ##
 function chrome-history-get() {

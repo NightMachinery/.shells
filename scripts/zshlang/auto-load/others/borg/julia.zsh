@@ -34,7 +34,7 @@ function jiarr() {
     for i in $@ ; do
         results+="$(jq --null-input --compact-output --arg i "${i}" '{ tlg_title: $i, tlg_content: $i }')"
     done
-    arrJ "$results[@]"
+    arrJ-noquote "$results[@]"
 }
 ##
 function html-esc() {
@@ -57,7 +57,7 @@ function jigoo() {
         r+="$(print -nr -- $o | jq --raw-input --slurp --null-input --compact-output --arg title "$goo_titles[$i]" 'inputs as $i | {"tlg_title": $title, "tlg_content": $i, "tlg_parsemode": "html"}')"
     done
 
-    arrJ $r[@]
+    arrJ-noquote $r[@]
 }
 ##
 function jivid() {
@@ -67,7 +67,7 @@ function jivid() {
         url="$(jdl "$f")"
         results+="$(jq --null-input --compact-output --arg url "$url" --arg f "${f:t}" '{ tlg_title: $f , tlg_video: $url }')"
     done
-    arrJ "$results[@]"
+    arrJ-noquote "$results[@]"
 }
 function jiy() {
     jee
