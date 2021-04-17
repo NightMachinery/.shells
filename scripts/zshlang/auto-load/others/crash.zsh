@@ -203,7 +203,7 @@ function _crash_global_exception_handler() {
 }
 ##
 typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 )
-typeset -ag funcstack_excluded_prefixes=( reval eval geval seval memoi-eval ensure assert ec- ecdate ecerr ecnerr redo- )
+typeset -ag funcstack_excluded_prefixes=( reval eval geval rgeval seval memoi-eval ensure assert ec- ecdate ecerr ecnerr redo- )
 function funcstack_excluded_prefixes_glob() {
   ec "(${(@j.|.)funcstack_excluded_prefixes})*"
 }

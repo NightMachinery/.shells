@@ -217,9 +217,10 @@ function away() {
 }
 ##
 function kill-marker() {
-    local id="${1:?}"
+    local id="${1}" ; shift
+    assert-args id @RET
 
-    { pgrep -f "$id" || pgrep -f "${id:u}" } | inargsf kill-withchildren
+    { pgrep -f "$id" || pgrep -f "${id:u}" } | inargsf kill-withchildren "$@"
 }
 ##
 killjobs() {

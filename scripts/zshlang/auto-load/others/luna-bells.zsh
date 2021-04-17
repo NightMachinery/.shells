@@ -125,29 +125,42 @@ function lunaquit() {
     return 0
 }
 function lunaquit-monitor() {
-    local rest_dur="${1:-100}" lq_dur="${2:-240}"
+    trapexits
+    {
+        (
+            local rest_dur="${1:-100}" lq_dur="${2:-240}"
 
-    local i idle recent_idle=0
-    mark-me "$0"
-    for i in {1..${lq_dur}} ; do
-        idle="$(idle-get)"
-        if (( idle > recent_idle )) ; then
-            recent_idle="$idle"
-        fi
-        sleep 1
-    done
-    if (( recent_idle >= rest_dur )) ; then
-        display-gray-off
-        luna_skipped_set 0
-        if (( idle <= 10 )) ; then
-            # tts-glados1-cached 'Good job'
-            bell-lm-mo-welldone
-        fi
-    else
-        awaysh-bnamed BELL_EVACUATE_MARKER bell-evacuate
-    fi
-    mark-me zsh
+            local i idle recent_idle=0
+            mark-me "$0"
+            for i in {1..${lq_dur}} ; do
+                idle="$(idle-get)"
+                if (( idle > recent_idle )) ; then
+                    recent_idle="$idle"
+                fi
+                sleep 1
+            done
+            if (( recent_idle >= rest_dur )) ; then
+                display-gray-off
+                luna_skipped_set 0
+                if (( idle <= 10 )) ; then
+                    # tts-glados1-cached 'Good job'
+                    bell-lm-mo-welldone
+                fi
+            else
+                awaysh-bnamed BELL_EVACUATE_MARKER bell-evacuate
+            fi
+            mark-me zsh
+        )
+    } always {
+        mark-me "LUNA_MONITOR_TIMER_LATE"
+        timer-late 0
+        trapexits-release
+    }
 }
+function kill-marker-luna-timer-late() {
+    kill-marker "LUNA_MONITOR_TIMER_LATE" -9
+}
+
 function bell-evacuate() {
     awaysh-bnamed BELL_EVACUATE_MARKER redo2 365 bell-visual-flash1 # each iter takes ~0.5
 
@@ -187,6 +200,7 @@ function deluna() {
         (( $(idle-get) >= $timeout || $(lastunlock-get) <= 80 )) && {
             edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get))")"
             lunaquit " via deluna"
+            kill-marker-luna-timer-late
             luna_skipped_set 0
         }
         sleep 3 # to avoid cpu usage
@@ -323,7 +337,7 @@ function bell-zsh() {
                 head="$cmd[1]"
             fi
             if test -n "$head" ; then
-                redo2 2 tts-say-i1 "Completed: $head"
+                bell_awaysh=no redo2 2 tts-say-i1 "Completed: $head"
             fi
         fi
 }

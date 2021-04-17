@@ -21,12 +21,13 @@ function gh-release-get() {
     local my_asset
     my_asset="$(ec $assets | jq -r --arg desired "$desired" '.[] | select(.name | contains($desired)) | .browser_download_url')" @TRET
 
-    local d="$HOME/tmp/dl/gh/$repo/"
+    local d="$HOME/.cache/dl/gh/$repo/"
     mkdir -p "$d"
     pushf "$d"
     {
-        assert reval-ec aa-gateway "$my_asset" @RET
-        assert unzip2dir ${~archiveglob} @RET
+        $proxyenv assert reval-ec aa-gateway "$my_asset" @RET
+        unzip2dir_y=y assert unzip2dir ${~archiveglob} @RET
+
         bell-dl
     } always {
         # popf
