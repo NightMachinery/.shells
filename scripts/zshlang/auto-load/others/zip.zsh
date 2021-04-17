@@ -5,6 +5,7 @@ function zir() {
 }
 function unzip2dir() {
     local file="$1"
+    file="$(grealpath -e "$file")" @TRET
 
     # unzip "$file" -d "${file:r}/"
     7z x "$file" -o"${file:r}/"

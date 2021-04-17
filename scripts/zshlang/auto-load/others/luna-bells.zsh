@@ -396,7 +396,7 @@ function bell-ringer() {
     assert-args marker fs
 
     bella_zsh_disable1=y
-    if @opts p redo r y xp bell- @ fn-isTop ; then
+    if @opts p redo r y xp [ bell- tts- ] @ fn-isTop ; then
         if test -z "$bell_awaysh" ; then
             ecgray "$0: parent redo detected; Switching awaysh off."
             awaysh="no"
@@ -559,7 +559,14 @@ function bell-m-beeps() {
 }
 ##
 function warn-posture() {
-    lo_s=$((60*10)) loop tts-glados1-cached "Correct your posture. The tail should be backward."
+    lo_s=$((60*10)) loop h_warn-posture
+}
+function h_warn-posture() {
+    local o
+    o="$(idle-get)" @TRET
+    if (( o < 120 )) ; then
+        tts-glados1-cached "Correct your posture. The tail should be backward."
+    fi
 }
 ##
 aliasfnq bell-gibberish1-long tts-gateway-g1 'An apple is an edible fruit produced by an apple tree (Malus domestica). Apple trees are cultivated worldwide and are the most widely grown species in the genus Malus. The tree originated in Central Asia, where its wild ancestor, Malus sieversii, is still found today. Apples have been grown for thousands of years in Asia and Europe and were brought to North America by European colonists. Apples have religious and mythological significance in many cultures, including Norse, Greek, and European Christian tradition.'

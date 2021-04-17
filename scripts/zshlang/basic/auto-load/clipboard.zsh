@@ -1,3 +1,7 @@
+alias pc='pbcopy'
+alias ccat='reval-copy cat'
+alias pop='pbpaste'
+##
 function tee-copy() {
     doc "teec; ec-and-copy; tee-copy;
 Prints and copies its stdin.

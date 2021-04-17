@@ -58,6 +58,8 @@ pxify() {
     pxaify-command pip # makes downloads faster
     # pxaify-command git # use git's own config
     pxaify-command go
+    pxaify-command mpv
+    pxaify-command spotdl
     pxaify-command emacs
     pxaify-command emacsclient
 }

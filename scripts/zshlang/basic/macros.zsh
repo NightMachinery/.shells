@@ -187,7 +187,7 @@ function h_@opts() {
     unset magic_gathered_vars
     
     if (( $#@ % 2 != 0 )) ; then
-        ecerr "$0: needs an even number of arguments (key-value pairs). Aborting."
+        ectrace "$0: needs an even number of arguments (key-value pairs). Aborting."
         return 1
     fi
     local var varval var2 var2val setcmd varname

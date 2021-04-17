@@ -72,7 +72,7 @@ quakeApp({
     // ["input-lang-push", "en"],
     ///
     ["kitty-send", "        "], // to start fzf forecfully
-    ["input-lang-push", "en"],
+    // ["input-lang-push", "en"],
                ],
   postCommands: [
     // ["input-lang-pop"],

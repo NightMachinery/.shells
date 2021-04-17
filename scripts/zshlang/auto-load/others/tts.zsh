@@ -29,7 +29,7 @@ function tts-gateway() {
 
     ecdbg "$0: File generated at $cache"
 
-    assert hearinvisible "$cache" @RET
+    assert bell-ringer "$0" "$cache" @RET
 }
 aliasfn tts-gateway-i1 @opts postproc audiofx-infantilize1 @ tts-gateway
 aliasfn tts-gateway-i2 @opts postproc audiofx-infantilize2 @ tts-gateway

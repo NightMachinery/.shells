@@ -179,7 +179,7 @@ function iloop() {
                 read -k "$rn" q # you can press any whitespace to just trigger fzf
                 # reading more allows for changing the letters into en
                 if bool $en_only ; then
-                    (input-lang-push en)
+                    # (input-lang-push en)
                     q="$(ecn "$q" | per2en)"
                 fi
                 # typ q
@@ -215,4 +215,22 @@ function iloop() {
         tty-title "$PWD"
     }
 }
+##
+function pbpaste-transform() {
+    pbpaste | reval "$@" | pbcopy-ask
+}
+alias pope="pbpaste-transform"
+
+function pbcopy-ask() {
+    in-or-args2 "$@"
+    ec '==================='$'\n'
+    ecn "$inargs[*]" | bat --style=plain
+    if ask "Copy?" Y ; then
+        pbcopy "$inargs[*]"
+        return $?
+    else
+        return 1
+    fi
+}
+alias pca="pbcopy-ask"
 ##

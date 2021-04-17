@@ -18,7 +18,6 @@ ialias plc=playlistc
 alias b='builtin'
 alias typ='typeset -p'
 alias n='noglob'
-alias bs='brew search'
 ##
 alias ci='curl --retry 120 --retry-delay 1 ipinfo.io' # ; ec ; myip ; mycountry' # ; px curl --retry 0 ipinfo.io'
 # socks5h resolves hostname through proxy (I think). It's faster for my youtube test reqs:

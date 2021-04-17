@@ -66,20 +66,30 @@ createglob note_formats noteglob
 ##
 audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
 createglob audio_formats audioglob
+
 image_formats=(png jpg jpeg gif psd)
 createglob image_formats imageglob
+
 video_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)
 createglob video_formats videoglob
+
 office_formats=(pdf ppt pptx doc docx xlsl)
 createglob office_formats officeglob
+
 media_formats=( ${audio_formats[@]} ${video_formats[@]} ${(@)office_formats} )
 createglob media_formats mediaglob
+
 code_formats=( m cpp h c applescript as osa nu nush el py jl scala sc kt kotlin java clj cljs rkt js rs zsh dash bash sh ml php lua glsl frag go )
 createglob code_formats codeglob
+
 config_formats=( ini json cson toml conf plist xml )
 createglob config_formats configglob
+
 text_formats=( $note_formats[@] $code_formats[@] $config_formats[@] )
 createglob text_formats textglob
+
+archive_formats=( zip rar tar gz 7z )
+createglob archive_formats archiveglob
 ##
 if isDarwin ; then
     # veditor=(code-insiders -r)
