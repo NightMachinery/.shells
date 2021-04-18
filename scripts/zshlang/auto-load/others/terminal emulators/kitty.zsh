@@ -4,10 +4,13 @@ function kitty-remote() {
     if isKitty ; then
         kitty @ "$@"
     else
-        local s
+        local s i
         s=("$HOME/tmp/.kitty"*(DN)) # do NOT use '.' glob as these aren't 'files'
         if (( $#s >= 1 )) ; then
-            kitty @ --to unix:${s[1]} "$@"
+            # dead kitties can leave trash sockets behind
+            for i in ${s[@]} ; do
+                kitty @ --to unix:${i} "$@"
+            done
         fi
     fi
 }
