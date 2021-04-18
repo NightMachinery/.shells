@@ -95,12 +95,12 @@ quakeApp({
     // ["kitty-esc"],
     // ["input-lang-push", "en"],
     ///
-    ["kitty-send", "        "], // to start fzf forecfully
+    ["@opts", "match", "title:Clipper", "@", "kitty-send", "        "], // to start fzf forecfully
     // ["input-lang-push", "en"],
   ],
   postCommands: [
     // ["input-lang-pop"],
-    ["kitty-esc"],
+    ["@opts", "match", "title:Clipper", "@", "kitty-esc"],
   ],
 });
 

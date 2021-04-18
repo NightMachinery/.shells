@@ -5,26 +5,30 @@ function kitty-remote() {
         kitty @ "$@"
     else
         local s
-        s=("$HOME/tmp/.kitty"*(.DN))
+        s=("$HOME/tmp/.kitty"*(DN)) # do NOT use '.' glob as these aren't 'files'
         if (( $#s >= 1 )) ; then
             kitty @ --to unix:${s[1]} "$@"
         fi
     fi
 }
 function kitty-send() {
+    local m="${kitty_send_match}"
     in-or-args2 "$@"
 
-    ec "${inargs[@]}" | kitty-remote send-text --stdin
+    ec "${inargs[@]}" | kitty-remote send-text --match "$m" --stdin
     # https://sw.kovidgoyal.net/kitty/remote-control.html#kitty-send-text
 }
 function kitty-C-c() {
     kitty-send $'\C-c' #$'\n''reset'
 }
+@opts-setprefixas kitty-C-c kitty-send
 function kitty-esc() {
+    local m="${kitty_send_match}"
     # kitty-send $'\^['
     # kitty-send "$(printf '\x1b')"
-    printf -- '\x1b\x1b\x1b\x1b\x1b\n' | kitty-remote send-text --stdin
+    printf -- '\x1b\x1b\x1b\x1b\x1b\n' | kitty-remote send-text --match "$m" --stdin
 }
+@opts-setprefixas kitty-esc kitty-send
 ##
 function kitty-tab-activate() {
     local i="${1:-5}"
