@@ -157,7 +157,7 @@ function quakeApp({
             }
           }
         }
-        await brishz(["echo", title, " = title, ", i, " = i, ", wid, " = wid, ", windowIdTmp, " = widTmp"]);
+        // await brishz(["echo", title, " = title, ", i, " = i, ", wid, " = wid, ", windowIdTmp, " = widTmp"]);
 
         i += 1;
       }
