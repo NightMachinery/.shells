@@ -49,6 +49,7 @@ function emacs-vfiles() {
 alifn emc="bicon-emc"
 function emc-gateway() {
     bella_zsh_disable1=y
+    tty-title emacs
     $proxyenv emacsclient -t "$@"
 }
 function emc-eval() {

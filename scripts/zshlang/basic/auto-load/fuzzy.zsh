@@ -54,15 +54,20 @@ function fzf-gateway() {
 
     if true ; then # we might want to check tmux's version here, as fzf-tmux needs the current HEAD
         if test -z "$fzf_mru_context" ; then
-            if isKitty ; then
+            if isKitty || ! isI ; then
                 # @kittyBug?
                 command fzf "$@" | sponge
             else
+                # fzf-tmux is generally a bit buggy and weird, take care not to use it in non-interactive cases (i.e., with --filter)
                 command fzf-tmux -p90% "$@" | sponge
                 # sponge is necessary: https://github.com/junegunn/fzf/pull/1946#issuecomment-687714849
             fi
         else
-            fzf_mru.sh "$@"
+            if isI ; then
+                fzf_mru.sh "$@"
+            else
+                FORCE_NONINTERACTIVE=y fzf_mru.sh "$@"
+            fi
         fi
     else
         fzf "$@"

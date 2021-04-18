@@ -8,7 +8,7 @@ isKitty () {
     test -n "$KITTY_WINDOW_ID"
 }
 fzf() {
-    if isKitty ; then
+    if isKitty || test -n "$FORCE_NONINTERACTIVE" ; then
         command fzf "$@"
     else
         fzf-tmux -p90% "$@"
