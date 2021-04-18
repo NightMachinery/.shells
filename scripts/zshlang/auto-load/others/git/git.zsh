@@ -61,14 +61,6 @@ alias gcpc='git cherry-pick --continue'
 ##
 alias gcs='git commit -S'
 
-alias gd='git diff'
-alias gdca='git diff --cached'
-alias gdcw='git diff --cached --word-diff'
-alias gdct='git describe --tags `git rev-list --tags --max-count=1`'
-alias gdt='git diff-tree --no-commit-id --name-only -r'
-alias gdw='git diff --word-diff'
-
-gdv() { git diff -w "$@" | view - }
 alias gf='git fetch'
 alias gfa='git fetch --all --prune'
 alias gfo='git fetch origin'
@@ -193,28 +185,8 @@ alias glum='git pull upstream master'
 alias gwch='git whatchanged -p --abbrev-commit --pretty=medium'
 alias gwip='git add -A; git rm $(git ls-files --deleted) 2> /dev/null; git commit --no-verify -m "--wip-- [skip ci]"'
 ##
-alias gdc='git diff --name-only --diff-filter=U' # List conflicted files in git
 alias grm='git rm --cached'
 alias glcs='glc --depth=1'
-##
-# https://sw.kovidgoyal.net/kitty/kittens/diff.html
-# Needs some config in git
-aliasfn git-diff-kitty git difftool --tool='kitty'
-# --dir-diff : concats all the files into a single diff.
-function git-diff() {
-  if (( $#@ == 0 )) ; then
-set -- 'HEAD~1'
-  elif [[ "$1" =~ '^\d+$' ]] ; then
-set -- "HEAD~$1"
-  fi
-
-  if isKitty ; then
-    git-diff-kitty "$@"
-  else
-    git diff "$@"
-  fi
-}
-aliasfn gd git-diff
 ###
 function git-status-summary() {
   local args=("$@")

@@ -23,7 +23,7 @@ function terminal-session-is-focused() {
 }
 function terminal-is-focused() {
     if isKitty ; then
-
+        kitty-is-focused
     elif isiTerm ; then
         iterm-focus-is "$@"
     else

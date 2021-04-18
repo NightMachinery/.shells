@@ -1,3 +1,6 @@
+# cd ~/tmp
+# launch /usr/local/bin/zsh
+##
 cd ~/tmp
 launch /usr/local/bin/bicon_zsh.dash
 new_tab

@@ -54,10 +54,10 @@ function pbcopy() {
     }
 }
 function pbpaste() {
-    if isKitty ; then
-        kitty +kitten clipboard --get-clipboard
-        return $?
-    fi
+    # if isKitty ; then
+    #     kitty +kitten clipboard --get-clipboard
+    #     return $?
+    # fi
 
     { false && (( $+commands[copyq] )) } && {
         copyq clipboard

@@ -1,3 +1,5 @@
+// @docs https://github.com/kasper/phoenix/blob/master/docs/API.md
+//
 // Somehow this has gotten auto-reload by itself?
 //
 // See also:
@@ -59,33 +61,47 @@ quakeApp({
   key: "z",
   modifiers: hyper,
   appName: "kitty",
+  windowId: 0,
   // position: topHalf,
   position: full,
   followsMouse: true,
-  hideOnBlur: true,
+  hideOnBlur: false, // false for sudo prompts
   preCommands: [
     ["kitty_focused_set", "1"],
   ],
   postCommands: [
     ["kitty_focused_set", "0"],
   ],
-  // preCommands: [
-  //   ///
-  //   // ["activate-iloop2-clipboard"],
-  //   // ["kitty-C-c"],
-  //   // ["kitty-send", "iloop2-clipboard"],
-  //   // ["input-lang-push", "en"],
-  //   /// use with iloop-clipboard:
-  //   // ["kitty-esc"],
-  //   // ["input-lang-push", "en"],
-  //   ///
-  //   ["kitty-send", "        "], // to start fzf forecfully
-  //   // ["input-lang-push", "en"],
-  //              ],
-  // postCommands: [
-  //   // ["input-lang-pop"],
-  //   ["kitty-esc"],
-  // ],
+});
+
+quakeApp({
+  // key: "m",
+  key: "x",
+  modifiers: hyper,
+  appName: "kitty",
+  windowId: 1,
+  // position: topHalf,
+  // position: rightHalf,
+  position: full,
+  followsMouse: true,
+  hideOnBlur: false, // false for sudo prompts
+  preCommands: [
+    ///
+    // ["activate-iloop2-clipboard"],
+    // ["kitty-C-c"],
+    // ["kitty-send", "iloop2-clipboard"],
+    // ["input-lang-push", "en"],
+    /// use with iloop-clipboard:
+    // ["kitty-esc"],
+    // ["input-lang-push", "en"],
+    ///
+    ["kitty-send", "        "], // to start fzf forecfully
+    // ["input-lang-push", "en"],
+  ],
+  postCommands: [
+    // ["input-lang-pop"],
+    ["kitty-esc"],
+  ],
 });
 
 /**
@@ -99,13 +115,14 @@ quakeApp({
  */
 function quakeApp({
   key,
-  modifiers,
+  modifiers = hyper,
   appName,
   position,
-  followsMouse,
-  hideOnBlur,
-  preCommands,
-  postCommands,
+  followsMouse = true,
+  hideOnBlur = true,
+  preCommands = [],
+  postCommands = [],
+  windowId = 0,
 }) {
   Key.on(key, modifiers, async function (_, repeat) {
     // ignore keyboard repeats
@@ -115,13 +132,44 @@ function quakeApp({
     let [app, opened] = await startApp(appName, { focus: false });
 
     // if the app started
+    var wid = windowId;
     if (app !== undefined) {
+      ///
+      var i = 0;
+      var windowIdTmp = wid;
+      for (var w of app.windows()) {
+         var title = w.title();
+        if (appName == "kitty") {
+          if (title == "Clipper") {
+            // await brishz(["fsay", "hello"]);
+            if (wid == 1) {
+              windowIdTmp = i;
+              // w.unminimise(); // doesn't work
+            } else {
+              // w.minimise();
+            }
+          } else {
+            if (wid == 0) {
+              windowIdTmp = i;
+              // w.unminimise();
+            } else {
+              // w.minimise();
+            }
+          }
+        }
+        await brishz(["echo", title, " = title, ", i, " = i, ", wid, " = wid, ", windowIdTmp, " = widTmp"]);
 
+        i += 1;
+      }
+      wid = windowIdTmp
+      ///
       // move the app to the currently active space
-      const { moved, space } = moveAppToActiveSpace(app, followsMouse);
+      const { moved, space } = moveAppToActiveSpace(app, followsMouse, wid);
+      // moveAppToActiveSpace(app, followsMouse, 0)
+      // moveAppToActiveSpace(app, followsMouse, 1)
 
       // set the app position
-      setAppPosition(app, position, space);
+      setAppPosition(app, position, space, wid);
 
       // hide the app if it is active and wasn't just opened or moved to
       // a new space
@@ -136,6 +184,9 @@ function quakeApp({
         ///
       } else {
         app.focus();
+        const w = app.windows()[wid];
+        w.raise()
+
         if (preCommands && preCommands.length >= 1) {
           for (var cmd of preCommands) {
             await brishz(cmd)
@@ -173,8 +224,11 @@ function quakeApp({
  * @param {{left: number, top: number, right: number, bottom: number}} relativeFrame the margins to place the application in.
  * @param {Space} space the space to position the app in
  */
-function setAppPosition(app, relativeFrame, space) {
-  const mainWindow = app.mainWindow(); // get app window
+function setAppPosition(app, relativeFrame, space, wid = 0) {
+  // const mainWindow = app.mainWindow(); // get app window
+
+  // brishz_sync(["echo", wid, " = wid (setAppPosition)"]);
+  const mainWindow = app.windows()[wid];
   if (space.screens().length > 1) {
     // check one space per screen
     throw new Error(DISPLAYS_HAVE_SEPARATE_SPACES);
@@ -218,9 +272,12 @@ function setAppPosition(app, relativeFrame, space) {
  * @param {App} app the application to move to the active space
  * @param {boolean} followsMouse whether the app should open in the screen containing the mouse or the key with keyboard focus
  */
-function moveAppToActiveSpace(app, followsMouse) {
+function moveAppToActiveSpace(app, followsMouse, wid = 0) {
   const activeSpace = followsMouse ? mouseSpace() : Space.active();
-  const mainWindow = app.mainWindow(); // get app window
+  // const mainWindow = app.mainWindow(); // get app window
+
+  // brishz_sync(["echo", wid, " = wid (moveAppToActiveSpace)"]);
+  const mainWindow = app.windows()[wid];
   let moved = false; // boolean if the app was moved to a new space
   if (mainWindow.spaces().length > 1) {
     // check one space per screen
@@ -261,7 +318,9 @@ async function startApp(appName) {
   // if app is open
   if (app !== undefined) {
     // make sure it has an open window
-    if (app.windows().length === 0) {
+    win_len = app.windows().length;
+    // await brishz(["echo", win_len, " = win_len"]);
+    if (win_len === 0) {
       // if not open a new window
       await osascript(`tell application "${appName}"
         try
@@ -361,6 +420,8 @@ const DISPLAYS_HAVE_SEPARATE_SPACES = `Must set Apple menu > System Preferences 
 ///
 function brishz(...args) {
   args = [].concat.apply([], args); // flatten args
+  // args = args.map(x => JSON.stringify(x))
+  args = args.map(x => x.toString())
 
   return new Promise((resolve, reject) =>
     Task.run("/usr/local/bin/brishzq.zsh", args, (handler) => {
@@ -373,8 +434,10 @@ function brishz(...args) {
   );
 }
 ///
-
-(async () => {
-  await brishz(["bell-sc2-evil-laugh"])
+function brishz_sync(...args) {
+  (async () => {
+    await brishz(...args)
+  }
+  )();
 }
-)();
+brishz_sync(["bell-sc2-evil-laugh"])

@@ -1,3 +1,19 @@
+##
+ZSH_PWD_CACHE=~/tmp/.zsh_pwd
+function zsh-pwd-save() {
+  print -r -- $PWD > "$ZSH_PWD_CACHE"
+}
+function zsh-pwd-load() {
+  local d
+  d="$(cat "$ZSH_PWD_CACHE" 2>/dev/null)" || return 0
+  if test -d "$d" ; then
+    cd -- "$d"
+  fi
+}
+if [[ -o interactive ]] ; then
+    zsh-pwd-load
+fi
+##
 test -z "$ZSH_PROFILEME" || zmodload zsh/zprof # use zprof -c to reset counters
 # Does not profile internals of functions well.
 

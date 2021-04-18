@@ -2,7 +2,10 @@
 mkdir -p ~/bin
 
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
+##
 lnrp $NIGHTDIR/configFiles/kitty/kitty.conf ~/.config/kitty/
+lnrp $NIGHTDIR/configFiles/kitty/diff.conf ~/.config/kitty/
+##
 if test -e ~/.config/ranger ; then
     ecerr "~/.config/ranger exists"
 else

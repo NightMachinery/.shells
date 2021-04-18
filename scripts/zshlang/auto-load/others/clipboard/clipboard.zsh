@@ -203,7 +203,7 @@ function iloop() {
                 assert pbcopy "$out" || continue
             fi
             if isKitty ; then
-                hs-hyper-m
+                hs-hyper-x
             else
                 hs-hyper-x
             fi

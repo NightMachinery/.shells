@@ -26,6 +26,8 @@
     # trustExitCode = true
 [difftool "kitty"]
     cmd = kitty +kitten diff $LOCAL $REMOTE
+	# submodule = diff
+	# submodules don't work :(
 [difftool "kitty.gui"]
     cmd = kitty kitty +kitten diff $LOCAL $REMOTE
 [receive]

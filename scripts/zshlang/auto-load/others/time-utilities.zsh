@@ -1,6 +1,6 @@
 function h_timer-bell() {
     tts-glados1-cached "The time is now up, commander"
-    awaysh redo2 2 bell-visual-flash1
+    awaysh @opts redo 2 @ bell-visual-flash1
     ##
     # awaysh tts-gateway-i2 "Deploy the delayed sequence." ;  tts-gateway-i1 "Deploy the delayed sequence."
     # awaysh tts-gateway-i2 "Deploy the delayed sequence." ;  awaysh tts-gateway-i1 "Deploy the delayed sequence." ; tts-gateway "Deploy the delayed sequence."

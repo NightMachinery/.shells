@@ -313,7 +313,9 @@ function prompt_pure_check_cmd_exec_time () {
     bella-zsh-gateway
   fi
   bella_zsh_disable1=''
+  ##
 }
+chpwd_functions=(${chpwd_functions[@]} zsh-pwd-save)
 ##
 # antibody bundle denysdovhan/spaceship-prompt
 # antibody bundle Tarrasch/zsh-bd

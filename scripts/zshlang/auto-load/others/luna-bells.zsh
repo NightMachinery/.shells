@@ -44,14 +44,14 @@ h_luna-advanced-bell() {
             if (( skipped >= 1 )) ; then
                     tts-gateway "CRITICAL: You are at your ${skipped}th skip"
             fi
-            redo2 1 bell-visual-flash1
+            @opts redo 1 @ bell-visual-flash1
             sleep 10 # keeps screen gray
         else
             if (( skipped >= 1 )) ; then
                 # @placeholder
                 brishz awaysh lunaquit-monitor '' ''
                 for i in {1..3} ; do
-                    redo2 1 bell-visual-flash1
+                    @opts redo 1 @ bell-visual-flash1
                     tts-gateway "CRITICAL: You are at your ${skipped}th skip"
                     bell-hp3-be-careful-harry
                     bell-helicopter 20
@@ -59,7 +59,7 @@ h_luna-advanced-bell() {
                 done
             else
                 if [[ "$signal1" == flash ]] ; then
-                    redo2 10 bell-visual-flash1
+                    @opts redo 10 @ bell-visual-flash1
                 else
                     local count=25
                     # I did not find out how BTT knows whether there is sth playing. Anyhow, mpv-get works as long as you don't play multiple videos simultaneously, and is cross-platform.
@@ -163,7 +163,10 @@ function kill-marker-luna-timer-late() {
 }
 
 function bell-evacuate() {
-    awaysh-bnamed BELL_EVACUATE_MARKER redo2 365 bell-visual-flash1 # each iter takes ~0.5
+    kill-marker-luna-timer-late
+
+    # `x (4*46)/0.78` = 235
+    awaysh-bnamed BELL_EVACUATE_MARKER @opts redo 235 @ bell-visual-flash1 # each iter takes ~0.78 (outdated?)
 
     local bell_awaysh=no hear_loudidle=no i
     for i in {1..4} ; do # each iter takes ~46s
@@ -372,7 +375,7 @@ function bella-zsh-maybe() {
 
         if terminal-session-is-focused ; then
             local skipfirst=''
-            iterm-focus-is && skipfirst=y
+            terminal-is-focused && skipfirst=y
             silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
         else
             # Do not use bell-auto for inactive sessions
@@ -589,23 +592,36 @@ function h_warn-posture() {
 ##
 aliasfnq bell-gibberish1-long tts-gateway-g1 'An apple is an edible fruit produced by an apple tree (Malus domestica). Apple trees are cultivated worldwide and are the most widely grown species in the genus Malus. The tree originated in Central Asia, where its wild ancestor, Malus sieversii, is still found today. Apples have been grown for thousands of years in Asia and Europe and were brought to North America by European colonists. Apples have religious and mythological significance in many cultures, including Norse, Greek, and European Christian tradition.'
 ##
+redis-defvar bell_visual_flash1_lock
 function bell-visual-flash1() {
-    local b off="${1:-0.1}" s="${2:-0.2}"
+    if [[ "$(bell_visual_flash1_lock_get)" == y ]] ; then
+        tts-gateway "Flash disabled because of lock"
+        return 0
+    fi
+
+    trapexits
+
+    bell_visual_flash1_lock_set y
+
+    local b off="${1:-0.1}" s="${2:-0.2}" redo="${bell_visual_flash1_redo:-1}" s_after="${bell_visual_flash1_sa:-0.3}"
     b="$(brightness-get)" || return $?
     if (( (b) <= (off + 0.1) )) ; then
         off=0
     fi
 
-    trapexits
     {
         (
-            brightness-set "$off" || return $?
-            sleep "$s"
+            for i in {1..${redo}} ; do
+                brightness-set "$off" || return $?
+                sleep "$s"
+                brightness-set "$b" || return $?
+                sleep "$s_after"
+            done
         )
     } always {
-        brightness-set "$b" || return $?
+        brightness-set "$b"
+        bell_visual_flash1_lock_del
         trapexits-release
-        sleep "$s"
     }
 }
 ##

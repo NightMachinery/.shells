@@ -1,7 +1,15 @@
 function kitty-remote() {
     : "Invoke with no args to enter the kitty shell"
 
-    kitty @ --to unix:"$HOME/tmp/.kitty" "$@"
+    if isKitty ; then
+        kitty @ "$@"
+    else
+        local s
+        s=("$HOME/tmp/.kitty"*(.DN))
+        if (( $#s >= 1 )) ; then
+            kitty @ --to unix:${s[1]} "$@"
+        fi
+    fi
 }
 function kitty-send() {
     in-or-args2 "$@"
