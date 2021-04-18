@@ -102,10 +102,10 @@ function gradS-get() {
 # }
 ##
 function alert() {
-    local msg="$*" dur="${alert_dur:-5}"
+    local msg="$*" dur="${alert_dur:-10}"
 
     msg="$(ec $msg | sdlit '"' '\"')"
-    hammerspoon -c "hs.alert (\"$msg\", ${dur})"
+    sout hammerspoon -c "hs.alert (\"$msg\", ${dur})" # outputs a UUID thingy
     # https://www.hammerspoon.org/docs/hs.alert.html
 }
 ##

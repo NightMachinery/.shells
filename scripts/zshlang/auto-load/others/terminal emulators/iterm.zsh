@@ -214,7 +214,6 @@ function tty-title() {
 }
 ##
 function iterm-tab-activate() {
-    : "See also https://sw.kovidgoyal.net/kitty/remote-control.html#kitty-focus-tab"
 
     local i="${1:-5}"
     i=$(( i - 1 )) @RET # make it zero-based

@@ -4,6 +4,16 @@
 echo() {
     printf -- "%s\n" "$*"
 }
+isKitty () {
+    test -n "$KITTY_WINDOW_ID"
+}
+fzf() {
+    if isKitty ; then
+        command fzf "$@"
+    else
+        fzf-tmux -p90% "$@"
+    fi
+}
 
 mru_count="${fzf_mru_count:-90}"
 mru_iteration_count="${fzf_mru_iteration_count:-5}"
@@ -46,7 +56,8 @@ touch "$conf_cache" || (
 conf_tmp="${conf_cache}.tmp"
 
 # Removing duplicate lines: seen is an associative-array that Awk will pass every line of the file to. If a line isn't in the array then seen[$0] will evaluate to false. (The name 'seen' does not matter.)
-result="$(echo "$input" | cat "$conf_cache" - | gawk '!seen[$0]++' | fzf-tmux -p90% --tiebreak=index "$@" | sponge)" || return $?
+result="$(echo "$input" | cat "$conf_cache" - | gawk '!seen[$0]++' | fzf --tiebreak=index "$@" | sponge)" || return $?
+
 if test -n "$result" ; then
     echo "$result"
     ##

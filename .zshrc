@@ -330,7 +330,11 @@ if test -n "$bicon_force_plugins" || ! isBicon ; then
   ZSH_AUTOSUGGEST_STRATEGY=(history completion)
   ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=200 # default is unlimited
 
-  # ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff,bg=cyan,bold,underline"
+  if isKitty ; then
+    ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#000000"
+  else
+    # ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff,bg=cyan,bold,underline"
+  fi
   ##
 fi
 silent unalias =

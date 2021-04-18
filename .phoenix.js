@@ -1,4 +1,5 @@
-///
+// Somehow this has gotten auto-reload by itself?
+//
 // See also:
 // * https://github.com/fabiospampinato/phoenix (has reload)
 // * https://github.com/kasper/phoenix/wiki#stable-22
@@ -54,7 +55,8 @@ const full = {
 const hyper = ["cmd", "shift", "control", "alt"]
 // the actual applications
 quakeApp({
-  key: "m",
+  // key: "m",
+  key: "z",
   modifiers: hyper,
   appName: "kitty",
   // position: topHalf,
@@ -62,22 +64,28 @@ quakeApp({
   followsMouse: true,
   hideOnBlur: true,
   preCommands: [
-    ///
-    // ["activate-iloop2-clipboard"],
-    // ["kitty-C-c"],
-    // ["kitty-send", "iloop2-clipboard"],
-    // ["input-lang-push", "en"],
-    /// use with iloop-clipboard:
-    // ["kitty-esc"],
-    // ["input-lang-push", "en"],
-    ///
-    ["kitty-send", "        "], // to start fzf forecfully
-    // ["input-lang-push", "en"],
-               ],
-  postCommands: [
-    // ["input-lang-pop"],
-    ["kitty-esc"],
+    ["kitty_focused_set", "1"],
   ],
+  postCommands: [
+    ["kitty_focused_set", "0"],
+  ],
+  // preCommands: [
+  //   ///
+  //   // ["activate-iloop2-clipboard"],
+  //   // ["kitty-C-c"],
+  //   // ["kitty-send", "iloop2-clipboard"],
+  //   // ["input-lang-push", "en"],
+  //   /// use with iloop-clipboard:
+  //   // ["kitty-esc"],
+  //   // ["input-lang-push", "en"],
+  //   ///
+  //   ["kitty-send", "        "], // to start fzf forecfully
+  //   // ["input-lang-push", "en"],
+  //              ],
+  // postCommands: [
+  //   // ["input-lang-pop"],
+  //   ["kitty-esc"],
+  // ],
 });
 
 /**
@@ -118,12 +126,14 @@ function quakeApp({
       // hide the app if it is active and wasn't just opened or moved to
       // a new space
       if (app.isActive() && !opened && !moved) {
+        /// @duplicatedCode3581
         app.hide();
         if (postCommands && postCommands.length >= 1) {
           for (var cmd of postCommands) {
             await brishz(cmd)
           }
         }
+        ///
       } else {
         app.focus();
         if (preCommands && preCommands.length >= 1) {
@@ -134,9 +144,16 @@ function quakeApp({
       }
 
       if (hideOnBlur) {
-        const identifier = Event.on("appDidActivate", (activatedApp) => {
+        const identifier = Event.on("appDidActivate", async function (activatedApp) {
           if (app.name() !== activatedApp.name()) {
+            /// @duplicatedCode3581
             app.hide();
+            if (postCommands && postCommands.length >= 1) {
+              for (var cmd of postCommands) {
+                await brishz(cmd)
+              }
+            }
+
             Event.off(identifier);
           }
         });
@@ -172,16 +189,18 @@ function setAppPosition(app, relativeFrame, space) {
     // const ymargin = 0
 
     const left = xmargin + relativeFrame.left * screen.width;
-    const top = ymargin + relativeFrame.top * screen.height;
-    // negative values were useless as well
+    ///
+    // const top = ymargin + relativeFrame.top * screen.height;
     // https://github.com/kasper/phoenix/issues/270
-    // const top =  -100 //ymargin + relativeFrame.top * screen.height;
+    const top =  0
+    ///
     const right = xmargin + screen.width - relativeFrame.right * screen.width;
     const bottom =
       ymargin + screen.height - relativeFrame.bottom * screen.height;
     if (mainWindow.isFullScreen()) {
       mainWindow.setFullScreen(false); // this uses the native fullscreen functionality so setting it to true is no good for popup windows
     }
+    // mainWindow.maximize()
     mainWindow.setTopLeft({
       x: left,
       y: top,
@@ -353,3 +372,9 @@ function brishz(...args) {
     })
   );
 }
+///
+
+(async () => {
+  await brishz(["bell-sc2-evil-laugh"])
+}
+)();

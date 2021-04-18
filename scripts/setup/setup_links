@@ -24,6 +24,8 @@ lnrp brishzrb.dash /usr/local/bin/
 lnrp brishzq.zsh /usr/local/bin/
 lnrp bsh.dash /usr/local/bin/
 
+lnrp fzf_mru.sh /usr/local/bin/
+
 lnrp ~/.cargo/bin/input_lang_get_icon /usr/local/bin/
 ##
 isLinux && ln -s "$(rp sed)" ~/bin/gsed

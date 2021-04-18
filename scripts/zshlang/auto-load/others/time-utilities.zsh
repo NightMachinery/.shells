@@ -29,7 +29,7 @@ function h_timer-late() {
     # now using awaysh
     # i_dur=$(( i_dur + 5.3 )) # compensate for our time budget
     ##
-    local bell_awaysh=no
+    local bell_awaysh=no hear_loudidle=no
     bell-visual-flash1
     bell-lm-whattimeisit
     local m=$(( int(i * i_dur / 60) ))

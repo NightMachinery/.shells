@@ -55,8 +55,14 @@ function bicon-emc() {
     return $?
   fi
   fi
-  $proxyenv biconm --reshape-only emacsclient -t "$@"
-  reset
+
+  if isRtl || isKitty ; then
+    # Kitty shapes the Persian letters itself, and Emacs handles its own BiDi reordering, so no need for bicon
+    emc-gateway "$@"
+  else
+    $proxyenv biconm --reshape-only emacsclient -t "$@"
+    reset
+  fi
 }
 ##
 redis-defvar bicon_zsh_disabled

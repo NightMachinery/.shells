@@ -2,11 +2,14 @@
 
 export PATH="${HOME}/bin:/usr/local/bin:$PATH"
 
+# . ~/.shared.sh
+zsh="/usr/local/bin/zsh"
+
 dis="$(redis-cli --raw get bicon_zsh_disabled)" || true
 if test -z "$dis" ; then
-    BICON_MODE=y bicon.bin zsh "$@"
+    BICON_MODE=y bicon.bin "$zsh" "$@"
 else
-    zsh "$@"
+    "$zsh" "$@"
 fi
 
 ## Known issues

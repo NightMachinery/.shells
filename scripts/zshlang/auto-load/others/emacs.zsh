@@ -47,7 +47,10 @@ function emacs-vfiles() {
 }
 ##
 alifn emc="bicon-emc"
-alifn emc-gateway="emacsclient -t"
+function emc-gateway() {
+    bella_zsh_disable1=y
+    $proxyenv emacsclient -t "$@"
+}
 function emc-eval() {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1
     revaldbg emacs --batch --eval "(progn
@@ -72,8 +75,11 @@ function emc-sourceme() {
     fi
 }
 function emc-focus() {
-    # @itermOnly
-    iterm-tab-activate 5
+    if isKitty ; then
+        kitty-emacs-focus
+    else
+        terminal-activate-tab 5
+    fi
     bella_zsh_disable1=y
 }
 function emcnw() {

@@ -152,6 +152,7 @@ function lunaquit-monitor() {
             mark-me zsh
         )
     } always {
+        kill-marker-luna-timer-late
         mark-me "LUNA_MONITOR_TIMER_LATE"
         timer-late 0
         trapexits-release
@@ -329,6 +330,8 @@ function bell-zsh1() {
 function bell-zsh() {
      local cmd head=''
         if cmd=($(fc -nl -1 -1)) ; then
+            alert "Completed: $cmd"
+            ##
             head="$(sout fnrep which 'print -r "$@" >&1 >&2' whichm "$cmd[1]" |& gtail -n 1)"
             if [[ "$head" =~ '^.*=\S*\s*(\S*)' ]] ; then
                 head="${match[1]}"
@@ -337,7 +340,8 @@ function bell-zsh() {
                 head="$cmd[1]"
             fi
             if test -n "$head" ; then
-                bell_awaysh=no redo2 2 tts-say-i1 "Completed: $head"
+                local msg="Completed: $head"
+                bell_awaysh=no redo2 2 tts-say-i1 $msg
             fi
         fi
 }
@@ -366,7 +370,7 @@ function bella-zsh-maybe() {
     if isDarwin ; then
         local ITERM_SESSION_ID="${1:-$ITERM_SESSION_ID}" # brishz has its own bogus ITERM_SESSION_ID, so prefer explicit input
 
-        if iterm-session-is-active ; then
+        if terminal-session-is-focused ; then
             local skipfirst=''
             iterm-focus-is && skipfirst=y
             silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
@@ -591,8 +595,17 @@ function bell-visual-flash1() {
     if (( (b) <= (off + 0.1) )) ; then
         off=0
     fi
-    brightness-set "$off" || return $?
-    sleep "$s"
-    brightness-set "$b" || return $?
+
+    trapexits
+    {
+        (
+            brightness-set "$off" || return $?
+            sleep "$s"
+        )
+    } always {
+        brightness-set "$b" || return $?
+        trapexits-release
+        sleep "$s"
+    }
 }
 ##

@@ -335,6 +335,7 @@ function ntsearch_() {
 
     acceptor=''
     out=''
+    bella_zsh_disable1=y
 
     local ntLines="$ntLines"
 
