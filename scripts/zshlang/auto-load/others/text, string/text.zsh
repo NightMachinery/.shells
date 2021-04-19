@@ -1,6 +1,19 @@
 ### Module Text Manipulation
 ### This module specializes in functions that do not touch the disk.
 ###
+function whitespace-is() {
+    in-or-args2 "$@"
+    if ecn "$inargs[*]" | silent command rg '\S' ; then
+        return 1
+    else
+        return 0
+    fi
+}
+##
+clean-dups() {
+    sort -u "$1" | sponge "$1"
+}
+##
 function prefix-if-ne() {
     : "prefix if not empty: <prefix> <output> [<optional-checks> ...]"
     local prefix="$1" out="${2}" ; shift 1 || return $?

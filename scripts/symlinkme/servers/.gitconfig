@@ -11,6 +11,7 @@
 	excludesfile = ~/.gitignore_global
 	autocrlf = input
 	pager = delta --light --theme 'Solarized (light)'
+	# ignorecase = false
 [color]
   branch = auto
   diff = auto

@@ -1,9 +1,6 @@
 ### Module Text Processing
 ### This module specializes in functions that touch the disk.
 ###
-clean-dups() {
-    sort -u "$1" | sponge "$1"
-}
 pre-files() {
     doc 'stdin should be null-separated list of files that need replacement; $1 the string to replace, $2 the replacement.'
     comment '-i backs up original input files with the supplied extension (leave empty for no backup; needed for in-place replacement.)(do not put whitespace between -i and its arg.)'
