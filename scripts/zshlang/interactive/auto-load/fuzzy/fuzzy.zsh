@@ -69,6 +69,7 @@ function ffps() {
     # ps auxww: List all running processes including the full command string
     ps auxww | fzp --with-nth '11..' --header-lines 1 "$query" | awk '{print $2}'
 }
+##
 function ffkill() {
     doc "alt: fkill; [fkEngine=ffps] ffkill ..."
     doc "Tip: fnswap kill 'sudo kill'"
@@ -82,7 +83,7 @@ function ffkill() {
     ##
 
     local opts=()
-    if [[ "$1" =~ '-\S+' ]] ; then
+    if [[ "$1" =~ '^-\S+$' ]] ; then
         opts+="$1"
         shift
     fi

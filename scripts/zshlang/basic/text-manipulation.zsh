@@ -30,7 +30,7 @@ function text-wrap() {
     local w="${1:-90}"
 
     ##
-    ansifold --boundary=word --width="$w" --padding --padchar=' ' --paragraph "$@"
+    ansifold --boundary=word --width="$w" --padding --padchar=' ' --paragraph "${@[2,-1]}"
     ##
     # command ggrep -Eo ".{1,$w}" # unicode-safe (RTL safe)
 }

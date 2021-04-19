@@ -1,6 +1,6 @@
 // @docs https://github.com/kasper/phoenix/blob/master/docs/API.md
 //
-// Somehow this has gotten auto-reload by itself?
+// The JavaScript context is (re)loaded when the file changes.
 //
 // See also:
 // * https://github.com/fabiospampinato/phoenix (has reload)

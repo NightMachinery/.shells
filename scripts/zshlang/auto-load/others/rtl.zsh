@@ -38,6 +38,8 @@ function biconm() {
   BICON_MODE=y bicon.bin "$@"
 }
 function bicon-emc() {
+  bella_zsh_disable1=y
+
   if isBicon ; then
   if true ; then
     emcnw "$@"

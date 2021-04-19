@@ -45,7 +45,8 @@ function t_cpu-get-lang-icon() {
 ##
 function pt-cpu-i() {
     : "Supports multiple processes"
-    local pids=("${(@f)$(ffps "$@")}")
+    local pids
+    pids=("${(@f)$(ffps "$@")}") @RET
 
     lo_s=0.05 serr loop pt-cpu-get $pids[@] | plot-stdin
 }
@@ -150,4 +151,57 @@ function screen-width() {
 function screen-height() {
     screen-resolution | gtail -n 1
 }
+##
+function ps-parents-pid() {
+    local pid="$1"
+    assert-args pid @RET
+
+    local ppid="$pid"
+    while true ; do
+        ppid="$(ps-parent-pid "$ppid")" @TRET
+        if (( ppid == 1 )) ; then
+            break
+        fi
+        ec "$ppid"
+    done
+}
+function ps-parent-pid() {
+    ps -fp "$1" | gtail -n1 | awkn 3
+}
+function ps-parents-print() {
+    procs --tree --or "$@" | ansifold --width=$COLUMNS
+    # you can add `--pager always --color always`, and remove ansifold. The colors don't play well with ansifold ...
+}
+function ffparents() {
+    local pids
+    pids=( ${(@f)"$(ffps "$@")"} ) @RET
+
+    if (( $#pids >= 1 )) ; then
+        reval-ec ps-parents-print $pids[@] @RET
+    else
+        return 1
+    fi
+}
+function ps-parents-print1() {
+    local pid="$1"
+    assert-args pid @RET
+
+    local ppids=( ${(@f)"$(ps-parents-pid "$pid")"} )
+
+    ##
+    assert command ps -fp "$pid" "$ppids[@]"
+    ##
+    # local i
+    # for i in $ppids[@] ; do
+    #     assert command ps -fp "$i"
+    # done
+    ##
+}
+function ffparents1() {
+    local pid
+    for pid in ${(@f)"$(ffps "$@")"} ; do
+        reval-ec ps-parents-print "$pid" @RET
+    done
+}
+
 ##

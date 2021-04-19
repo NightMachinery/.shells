@@ -2,8 +2,9 @@
 function emc-sudo() {
     : "See also doom--sudo-file-path"
 
-    local f="$(ec ${1} | gtr '"' '\"')"
-    emc-gateway -e '(find-file "/sudo::'$f'")'
+    local f
+    f="$(grealpath -e ${1} | gtr '"' '\"')" @TRET
+    revaldbg emcnw -e '(find-file "/sudo::'$f'")'
 }
 ##
 function doom-sync() {
@@ -12,12 +13,14 @@ function doom-sync() {
 }
 ##
 function emcpe() {
+    bella_zsh_disable1=y
     local fz_opts=( $fz_opts[@] -1 )
     # ffkill -SIGUSR2 \'emacs \'daemon
     ffkill -SIGUSR2 emacs daemon
     emacsclient -e '(setq debug-on-quit nil)'
 }
 function emn() {
+    bella_zsh_disable1=y
     emc-gateway -e '(helm-man-woman "")' # can't input to helm using its arg. why?
     #"(woman \"$*\")"
 }
@@ -46,7 +49,8 @@ function emacs-vfiles() {
     ec-copy "${(u@F)res}"
 }
 ##
-alifn emc="bicon-emc"
+aliasfn emc-open bicon-emc
+alias emc='emc-open'
 function emc-gateway() {
     bella_zsh_disable1=y
     tty-title emacs

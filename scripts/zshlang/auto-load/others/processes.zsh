@@ -18,7 +18,7 @@ function ps-grandchildren() {
 }
 function kill-withchildren() {
     local sig=-15 # TERM
-    if [[ "$1" =~ '-\S+' ]] ; then
+    if [[ "$1" =~ '^-\S+$' ]] ; then
         sig="$1"
         shift
     fi

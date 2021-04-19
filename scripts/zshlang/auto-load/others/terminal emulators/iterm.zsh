@@ -59,13 +59,23 @@ function icat-py() {
     python -m imgcat --height "${icat_h:-30}" "$@" # This will zoom, too, but that's actually good in most cases!
 }
 ##
-aliasfn icat-kitty kitty +kitten icat
+function icat-kitty() {
+    kitty +kitten icat "$@"
+}
+function icat-kitty-single() {
+    icat-kitty --clear
+    icat-kitty --place "${COLUMNS}x30@0x0" --scale-up "$@"
+}
 aliasfn icat-kitty2 pixcat fit-screen --enlarge --vertical-margin 60 # accepts dirs, too
 aliasfn islideshow-kitty icat-kitty2 --hang # press ENTER to go to next image
 ##
 function icat-realsize() {
     isI || return 0
-    @opts h x @ icat-go "$@"
+    if isKitty ; then
+        icat-kitty "$@"
+    else
+        @opts h x @ icat-go "$@"
+    fi
 }
 function icat-autoresize() {
     local margin="${icat_margin:-${icat_m}}"
