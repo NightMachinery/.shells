@@ -44,14 +44,14 @@ function kitty-tab-get() {
     local id="${1:-$KITTY_WINDOW_ID}"
     assert-args id @RET
 
-    kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.id == ($wid | tonumber))'
+    kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].id == ($wid | tonumber))'
 }
 function kitty-tab-get-emacs() {
     kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].foreground_processes[0].cmdline[0] | contains("emacs") ) | .id'
 }
 function kitty-emacs-focus() {
     local id
-    id="$(kitty-tab-get-emacs)" @TRET
+    id="$(kitty-tab-get-emacs | ghead -n 1)" @TRET
     kitty-tab-activate "$id"
 }
 
@@ -59,11 +59,14 @@ function kitty-tab-is-focused() {
     [[ "$(kitty-tab-get | jq -r '.is_focused')" == 'true' ]]
 }
 ##
-redis-defvar kitty_focused
+# redis-defvar kitty_focused
 function kitty-is-focused() {
-    ## does not work, is always true, probably tracks the last active kitty window regardless of OS focus:
+    ##
+    [[ "$(frontapp-get)" == 'net.kovidgoyal.kitty' ]]
+    ## does not work, is always true, probably tracks the last active kitty window regardless of OS frontapp-getfocus:
     # kitty-remote ls | jq -r '.[] | .is_focused'
     ##
-    [[ "$(kitty_focused_get)" == 1 ]]
+    # [[ "$(kitty_focused_get)" == 1 ]]
+    ##
 }
 ##

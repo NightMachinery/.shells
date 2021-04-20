@@ -54,7 +54,7 @@ function fzf-gateway() {
 
     if true ; then # we might want to check tmux's version here, as fzf-tmux needs the current HEAD
         if test -z "$fzf_mru_context" ; then
-            if isKitty || ! isI ; then
+            if ! isTmux || isKitty || ! isI ; then
                 # @kittyBug?
                 command fzf "$@" | sponge
             else

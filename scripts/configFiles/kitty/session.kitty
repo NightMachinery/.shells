@@ -1,32 +1,39 @@
-# cd ~/tmp
-# launch /usr/local/bin/zsh
-##
-# this does not work, use cmd+n manually:
-# kitty @ launch --type=os-window env FORCE_INTERACTIVE=y zsh -c iloop-clipboard
-##
-cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
-new_tab
-cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
-new_tab
-cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
-new_tab
-cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
-new_tab
 cd ~/tmp
 launch /usr/local/bin/zsh
 new_tab
 cd ~/tmp
 launch /usr/local/bin/bicon_zsh.dash
-new_tab
-cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
-new_tab
-cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
-new_tab
-cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
+##
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/zsh
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+# new_tab
+# cd ~/tmp
+# launch /usr/local/bin/bicon_zsh.dash
+##
+# this does not work (on the CLI), use cmd+n manually:
+# kitty @ launch --type=os-window env FORCE_INTERACTIVE=y zsh -c iloop-clipboard
+# this works:
+new_os_window
+launch env FORCE_INTERACTIVE=y zsh -c iloop-clipboard
+##

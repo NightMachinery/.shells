@@ -16,8 +16,11 @@ fi
 ##
 test -z "$ZSH_PROFILEME" || zmodload zsh/zprof # use zprof -c to reset counters
 # Does not profile internals of functions well.
-
-set -o vi
+##
+# module_path+=( "/Users/evar/.zinit/mod-bin/zmodules/Src" )
+# zmodload zdharma/zplugin
+# Doesn't work with aliases
+##
 # export disable_malice=''
 export disable_malice='y'
 export NIGHT_PERSONAL=y

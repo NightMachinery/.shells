@@ -40,7 +40,7 @@ h_luna-advanced-bell() {
 
 
         local bell_awaysh=no hear_loudidle=no i
-        if [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]] ; then
+        if sharif-vc-is ; then
             if (( skipped >= 1 )) ; then
                     tts-gateway "CRITICAL: You are at your ${skipped}th skip"
             fi
@@ -79,6 +79,9 @@ h_luna-advanced-bell() {
     display-gray-off
     luna_skipped_set 0
     ecdate "Luna iterated."
+}
+function sharif-vc-is() {
+    [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]]
 }
 bell-avarice() {
     # fsay "disquiet creatures of avarice have risen yet again ..."
@@ -373,6 +376,7 @@ function bella-zsh-maybe() {
     if isDarwin ; then
         local ITERM_SESSION_ID="${1:-$ITERM_SESSION_ID}" # brishz has its own bogus ITERM_SESSION_ID, so prefer explicit input
 
+        # https://github.com/marzocchi/zsh-notify does essentially the same thing as us, so we can copy it to support Linux and Apple Terminal.
         if terminal-session-is-focused ; then
             local skipfirst=''
             terminal-is-focused && skipfirst=y

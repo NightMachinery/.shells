@@ -1,4 +1,13 @@
 ##
+function dock-bounce-enable() {
+    defaults write com.apple.dock no-bouncing -bool FALSE
+    killall Dock
+}
+function dock-bounce-disable() {
+    defaults write com.apple.dock no-bouncing -bool TRUE
+    killall Dock
+}
+##
 function screen-gray-set-darwin () {
     # @deprecated Use =display-gray-on= and co
     ##
@@ -24,6 +33,7 @@ function frontapp-get() {
     if isDarwin ; then
         lsappinfo info "$(lsappinfo front)" | command rg --only-matching --replace='$1' 'bundleID="([^"]*)"'
     else
+        ectrace "Linux not supported"
         return 1
     fi
 }

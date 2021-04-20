@@ -26,7 +26,7 @@ function hearinvisible-playfast() {
 
 
     if bool $loudidle ; then
-        if (( $(idle-get) >= 20 )) ; then
+        if (( $(idle-get) >= 20 )) && ! sharif-vc-is ; then
             loudidle=y
             trapexits
         else

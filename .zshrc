@@ -121,6 +121,7 @@ zle -N edit-command-line
 ### vim
 if true ; then
 # if false ; then
+  set -o vi
   bindkey -v
 
   # allow v to edit the command line (standard behaviour)(does not work for @me? It opens emacs ...)
@@ -374,19 +375,21 @@ zle -N expand-or-complete-with-dots
 bindkey "^I" expand-or-complete-with-dots
 ##
 FZTAB_OPTS=(
-    --color=light
+    --color=light # needed, as fzf-tab overrides the colors, so we need to re-override them
     # --height='${FZF_TMUX_HEIGHT:=75%}'
 )
 function fztab() {
-    # prefixer rm --rm-ansi --rm-x -- './' '../' '\x00.\x00/' '\x00..\x00/' |
-
+    ##
+    command fzf "$@" "$FZTAB_OPTS[@]"
+    ##
     # Do NOT use --exit-0 or in macOS you will not be able to start typing before the fzf window opens
-    fzf-gateway  "$@" "$FZTAB_OPTS[@]"
+    # fzf_mru_context= fzf-gateway  "$@" "$FZTAB_OPTS[@]"
 
     # Check out /Users/evar/Library/Caches/antibody/https-COLON--SLASH--SLASH-github.com-SLASH-Aloxaf-SLASH-fzf-tab/lib/-ftb-fzf to see how this is run
 }
 # zstyle ':fzf-tab:*' print-query alt-enter # this is the default
 zstyle ':fzf-tab:*' fzf-command fztab
+# zstyle ':fzf-tab:*' fzf-command fzf
 zstyle ':completion:*' format '[%d]' # enables groups
 zstyle ':fzf-tab:*' switch-group ',' '.'
 zstyle ':fzf-tab:*' prefix ''

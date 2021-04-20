@@ -67,10 +67,10 @@ quakeApp({
   followsMouse: true,
   hideOnBlur: false, // false for sudo prompts
   preCommands: [
-    ["kitty_focused_set", "1"],
+    // ["kitty_focused_set", "1"],
   ],
   postCommands: [
-    ["kitty_focused_set", "0"],
+    // ["kitty_focused_set", "0"],
   ],
 });
 

@@ -73,7 +73,7 @@ function  jglan() {
     fnswap glances 'gtimeout 10s unbuffer glances' glan | aha --line-fix > jglan.html # --black is worse
 }
 function jhtop() {
-	gtimeout 1s htop | aha --line-fix --black > jhtop.html
+    gtimeout 1s htop | aha --line-fix --black > jhtop.html
 }
 function jprocs() {
     procs --pager disable --color always | aha --black > jprocs.html
@@ -87,7 +87,7 @@ function idle-get() {
     # output in seconds
     assert isDarwin @RET
 
-    ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
+    ioreg -c IOHIDSystem | sponge | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }
 function lastunlock-get() {
     assert isDarwin @RET

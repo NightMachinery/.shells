@@ -45,6 +45,10 @@ isJulia() { isBorg "$@" ; }
 # isborg() { isBorg "$@" ; }
 # isjulia() { isBorg "$@" ; }
 ##
+function isTmux() {
+    test -n "$TMUX"
+}
+##
 function isKitty() {
     test -n "$KITTY_WINDOW_ID"
 }

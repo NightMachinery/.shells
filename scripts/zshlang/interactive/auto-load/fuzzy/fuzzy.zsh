@@ -117,6 +117,7 @@ fftmux() {
     do
         [[ $i =~ '([^:]*):.*' ]] && {
             ec "acting on session $match[1]"
+            tty-title "${match[1]}"
             reval "${engine[@]}" "$match[1]"
         }
     done
