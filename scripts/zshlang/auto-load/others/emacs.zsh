@@ -54,7 +54,11 @@ alias emc='emc-open'
 function emc-gateway() {
     bella_zsh_disable1=y
     tty-title emacs
-    $proxyenv emacsclient -t "$@"
+    local my_term="$TERM"
+    if isKitty || isiTerm ; then
+        my_term='xterm-24bits'
+    fi
+    TERM="$my_term" $proxyenv emacsclient -t "$@"
 }
 function emc-eval() {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1

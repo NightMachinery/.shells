@@ -128,6 +128,7 @@ function lunaquit() {
     return 0
 }
 function lunaquit-monitor() {
+    local finished=''
     trapexits
     {
         (
@@ -150,14 +151,18 @@ function lunaquit-monitor() {
                     bell-lm-mo-welldone
                 fi
             else
-                awaysh-bnamed BELL_EVACUATE_MARKER bell-evacuate
+                # awaysh-bnamed BELL_EVACUATE_MARKER bell-evacuate
+                bell-evacuate
             fi
+            finished=y
             mark-me zsh
         )
     } always {
         kill-marker-luna-timer-late
-        mark-me "LUNA_MONITOR_TIMER_LATE"
-        timer-late 0
+        if test -z "$finished" ; then
+            mark-me "LUNA_MONITOR_TIMER_LATE"
+            timer-late 0
+        fi
         trapexits-release
     }
 }

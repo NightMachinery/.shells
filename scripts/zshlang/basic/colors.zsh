@@ -3,7 +3,9 @@ autoload -U colors && colors
 typeset -ag gray=( 170 170 170 )
 ## Functions
 Bold () { ! isI || print -n -- '\e[1m' }
+Italic () { ! isI || print -n -- '\e[3m' }
 Underline () { ! isI || print -n -- '\e[4m' }
+Strikethrough () { ! isI || print -n -- '\e[9m' }
 Flash () { ! isI || print -n -- '\e[5m' } # doesn't work on my iTerm
 Invert () { ! isI || print -n -- '\e[7m' }
 Invisible () { ! isI || print -n -- '\e[8m' } # again doesn't work

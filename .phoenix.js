@@ -104,6 +104,10 @@ quakeApp({
   ],
 });
 
+var kittyMain = null;
+var kittyClipper = null;
+var quakeAppLock = false
+
 /**
  * Create a keyboard event listener which implements a quake app
  * @param {string} key the key which triggers the app
@@ -125,90 +129,139 @@ function quakeApp({
   windowId = 0,
 }) {
   Key.on(key, modifiers, async function (_, repeat) {
+
     // ignore keyboard repeats
     if (repeat) {
       return;
     }
-    let [app, opened] = await startApp(appName, { focus: false });
+    if (quakeAppLock) {
+      await brishz(['fsay', 'lock encountered']);
+      return;
+    }
+    try {
+      quakeAppLock = true;
+      // var activeSpace = followsMouse ? mouseSpace() : Space.active();
+      var activeSpace = Space.active();
 
-    // if the app started
-    var wid = windowId;
-    if (app !== undefined) {
-      ///
-      var i = 0;
-      var windowIdTmp = wid;
-      for (var w of app.windows()) {
-         var title = w.title();
-        if (appName == "kitty") {
-          if (title == "Clipper") {
-            // await brishz(["fsay", "hello"]);
-            if (wid == 1) {
-              windowIdTmp = i;
-              // w.unminimise(); // doesn't work
-            } else {
-              // w.minimise();
-            }
-          } else {
-            if (wid == 0) {
-              windowIdTmp = i;
-              // w.unminimise();
-            } else {
-              // w.minimise();
-            }
-          }
-        }
-        // await brishz(["echo", title, " = title, ", i, " = i, ", wid, " = wid, ", windowIdTmp, " = widTmp"]);
+      let [app, opened] = await startApp(appName, { focus: false });
 
-        i += 1;
-      }
-      wid = windowIdTmp
-      ///
-      // move the app to the currently active space
-      const { moved, space } = moveAppToActiveSpace(app, followsMouse, wid);
-      // moveAppToActiveSpace(app, followsMouse, 0)
-      // moveAppToActiveSpace(app, followsMouse, 1)
-
-      // set the app position
-      setAppPosition(app, position, space, wid);
-
-      // hide the app if it is active and wasn't just opened or moved to
-      // a new space
-      if (app.isActive() && !opened && !moved) {
-        /// @duplicatedCode3581
-        app.hide();
-        if (postCommands && postCommands.length >= 1) {
-          for (var cmd of postCommands) {
-            await brishz(cmd)
-          }
-        }
+      // if the app started
+      var wid = windowId;
+      const isActive = app.isActive()
+      var moved = false;
+      var space = activeSpace;
+      if (app !== undefined) {
         ///
-      } else {
-        app.focus();
-        const w = app.windows()[wid];
-        w.raise()
+        var i = 0;
+        // var windowIdTmp = wid;
+        var windows = app.windows();
+        var win_len = windows.length;
 
-        if (preCommands && preCommands.length >= 1) {
-          for (var cmd of preCommands) {
-            await brishz(cmd)
+        if ((wid == 0 && !kittyMain) || (wid == 1 && !kittyClipper)) {
+          // if ((!kittyMain) || (!kittyClipper)) {
+          if (win_len == 0) {
+            // @phoenixBug https://github.com/kasper/phoenix/issues/131
+            // Windows in other spaces are NOT returned
+            opened = true;
+            brishz_sync(['fsay', 'Zero windows encountered']);
+            app.focus();
+            windows = app.windows();
+            win_len = windows.length;
           }
-        }
-      }
 
-      if (hideOnBlur) {
-        const identifier = Event.on("appDidActivate", async function (activatedApp) {
-          if (app.name() !== activatedApp.name()) {
-            /// @duplicatedCode3581
-            app.hide();
-            if (postCommands && postCommands.length >= 1) {
-              for (var cmd of postCommands) {
-                await brishz(cmd)
+          for (var w of windows) {
+            // brishz_sync(['fsay', 'windows'])
+            var title = w.title();
+            if (appName == "kitty") {
+              if (title == "Clipper") {
+                // await brishz(["fsay", "hello"]);
+                if (wid == 1) {
+                  // windowIdTmp = i;
+                  kittyClipper = w
+                  brishz_sync(['fsay', 'kitty Clipper set']);
+                  // w.unminimise(); // doesn't work
+                } else {
+                  // w.minimise();
+                }
+              } else {
+                if (wid == 0) {
+                  // windowIdTmp = i;
+                  kittyMain = w
+                  brishz_sync(['fsay', 'kitty main set']);
+                  // w.unminimise();
+                } else {
+                  // w.minimise();
+                }
               }
             }
-
-            Event.off(identifier);
           }
-        });
+          // await brishz(["echo", title, " = title, ", i, " = i, ", wid, " = wid, ", windowIdTmp, " = widTmp"]);
+
+          i += 1;
+        }
+        // wid = windowIdTmp
+        var window = null;
+
+        if (appName == "kitty") {
+          if (wid == 0) {
+            window = kittyMain
+          } else {
+            window = kittyClipper
+          }
+        } else {
+          window = windows[wid];
+        }
+        ///
+
+
+        // hide the app if it is active and wasn't just opened or moved to
+        // a new space
+        if (isActive) {
+          /// @duplicatedCode3581
+          app.hide();
+          if (postCommands && postCommands.length >= 1) {
+            for (var cmd of postCommands) {
+              await brishz(cmd)
+            }
+          }
+          ///
+        } else {
+          moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
+          app.focus(); // do NOT window.raise() before this
+          moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
+          setAppPosition(app, position, space, wid, window);
+          window.raise();
+          // app.focus();
+          window.focus();
+
+          if (preCommands && preCommands.length >= 1) {
+            for (var cmd of preCommands) {
+              await brishz(cmd)
+            }
+          }
+        }
+
+        if (hideOnBlur) {
+          const identifier = Event.on("appDidActivate", async function (activatedApp) {
+            if (app.name() !== activatedApp.name()) {
+              /// @duplicatedCode3581
+              app.hide();
+              if (postCommands && postCommands.length >= 1) {
+                for (var cmd of postCommands) {
+                  await brishz(cmd)
+                }
+              }
+
+              Event.off(identifier);
+            }
+          });
+        }
+      } else {
+        brishz_sync(['fsay', 'App', appName , 'not defined'])
       }
+    }
+    finally {
+      quakeAppLock = false;
     }
   });
 }
@@ -224,11 +277,14 @@ function quakeApp({
  * @param {{left: number, top: number, right: number, bottom: number}} relativeFrame the margins to place the application in.
  * @param {Space} space the space to position the app in
  */
-function setAppPosition(app, relativeFrame, space, wid = 0) {
+function setAppPosition(app, relativeFrame, space, wid = 0, window = null) {
   // const mainWindow = app.mainWindow(); // get app window
 
   // brishz_sync(["echo", wid, " = wid (setAppPosition)"]);
-  const mainWindow = app.windows()[wid];
+  var mainWindow = window
+  if (!mainWindow) {
+    mainWindow = app.windows()[wid];
+  }
   if (space.screens().length > 1) {
     // check one space per screen
     throw new Error(DISPLAYS_HAVE_SEPARATE_SPACES);
@@ -250,7 +306,7 @@ function setAppPosition(app, relativeFrame, space, wid = 0) {
     ///
     const right = xmargin + screen.width - relativeFrame.right * screen.width;
     const bottom =
-      ymargin + screen.height - relativeFrame.bottom * screen.height;
+          ymargin + screen.height - relativeFrame.bottom * screen.height;
     if (mainWindow.isFullScreen()) {
       mainWindow.setFullScreen(false); // this uses the native fullscreen functionality so setting it to true is no good for popup windows
     }
@@ -272,12 +328,21 @@ function setAppPosition(app, relativeFrame, space, wid = 0) {
  * @param {App} app the application to move to the active space
  * @param {boolean} followsMouse whether the app should open in the screen containing the mouse or the key with keyboard focus
  */
-function moveAppToActiveSpace(app, followsMouse, wid = 0) {
-  const activeSpace = followsMouse ? mouseSpace() : Space.active();
+function moveAppToActiveSpace(app, followsMouse, wid = 0, window = null, space = null) {
+  // brishz_sync(['fsay', 'green'])
+  // followsMouse = false;
+  var activeSpace = space
+  if (!activeSpace) {
+    // brishz_sync(['fsay', 'no space provided'])
+    activeSpace = followsMouse ? mouseSpace() : Space.active();
+  }
   // const mainWindow = app.mainWindow(); // get app window
 
   // brishz_sync(["echo", wid, " = wid (moveAppToActiveSpace)"]);
-  const mainWindow = app.windows()[wid];
+  var mainWindow = window
+  if (!mainWindow) {
+    mainWindow = app.windows()[wid];
+  }
   let moved = false; // boolean if the app was moved to a new space
   if (mainWindow.spaces().length > 1) {
     // check one space per screen
@@ -287,11 +352,17 @@ function moveAppToActiveSpace(app, followsMouse, wid = 0) {
     // check if the main window was moved
     moved = !!!(
       mainWindow.spaces().length > 0 &&
-      mainWindow.spaces()[0].isEqual(activeSpace)
+        mainWindow.spaces()[0].isEqual(activeSpace)
     );
+    // moved = true;
+
+    // brishz_sync(['fsay', 'blue'])
     if (moved) {
       // otherwise remove the main window from the spaces it is in
+
+      // brishz_sync(['fsay', 'red'])
       mainWindow.spaces().forEach((space) => {
+        // brishz_sync(['fsay', 'moved internal', moved])
         space.removeWindows([mainWindow]);
       });
       // add window to active space
@@ -386,9 +457,9 @@ function screenContainsPoint(screen, point) {
   const frame = screen.flippedFrame();
   return (
     point.x >= frame.x &&
-    point.x <= frame.x + frame.width &&
-    point.y >= frame.y &&
-    point.y <= frame.y + frame.height
+      point.x <= frame.x + frame.width &&
+      point.y >= frame.y &&
+      point.y <= frame.y + frame.height
   );
 }
 
@@ -440,4 +511,6 @@ function brishz_sync(...args) {
   }
   )();
 }
-brishz_sync(["bell-sc2-evil-laugh"])
+///
+// brishz_sync(["bell-sc2-evil-laugh"])
+brishz_sync(["fsay", "Phoenix reloaded"])

@@ -4,5 +4,6 @@ if isDarwin ; then
     brew install fabianishere/personal/pam_reattach
     ## Fonts:
     brew install --cask font-fira-code font-fira-mono
+    brew install --cask font-victor-mono
     ##
 fi

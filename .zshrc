@@ -181,7 +181,8 @@ bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+R
 ##
 # Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
 # tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
-isDarwin && export TERM=xterm-24bits || true
+
+# isDarwin && export TERM=xterm-24bits || true
 ##
 
 ##

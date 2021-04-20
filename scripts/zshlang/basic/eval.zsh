@@ -21,7 +21,7 @@ function geval() {
     test -z "$*" && return 0
     local cmd="$@"
     test -z "$ge_ecdbg" && {
-        test -z "$ge_no_ec"  && { Bold ; colorfg 70 255 50 ; ec "$cmd" ; resetcolor } >&2
+        test -z "$ge_no_ec"  && { Bold ; colorfg 40 200 30 ; Bold ; ec "$cmd" ; resetcolor } >&2
         test -z "$ge_no_hist" && hist-add-unquoted "$cmd" #Add to history
     } || ecdbg "$cmd"
     eval -- "$cmd"
