@@ -32,8 +32,9 @@ lnrp fzf_mru.sh /usr/local/bin/
 
 lnrp ~/.cargo/bin/input_lang_get_icon /usr/local/bin/
 ##
-isLinux && ln -s "$(rp sed)" ~/bin/gsed
-
+if isLinux ; then
+    ln -s "$(rp sed)" ~/bin/gsed
+fi
 ## blcs
 # blc tag-ag tag tag-ag
 ##

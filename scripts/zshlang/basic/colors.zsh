@@ -2,6 +2,7 @@ autoload -U colors && colors
 ##
 typeset -ag gray=( 170 170 170 )
 ## Functions
+# @See terminal-ansi-test for more good stuff
 Bold () { ! isI || print -n -- '\e[1m' }
 Italic () { ! isI || print -n -- '\e[3m' }
 Underline () { ! isI || print -n -- '\e[4m' }

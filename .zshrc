@@ -2,6 +2,10 @@
 ###
 bicon_force_plugins=y
 ###
+if isKitty ; then
+  export TERM='xterm-kitty' # You need to use kitty-terminfo-install on each new server though
+  # Idk why this gets reseted on mosh. It's inherited correctly in SSH ...
+fi
 # export TERM="xterm-256color" #Might do a lot of damage. Added for multi-term.
 ### OMZ config (no longer loaded)
 DEFAULT_USER="evar"

@@ -46,17 +46,16 @@ function k2pdfopt() {
         command k2pdfopt_linux "$@"
     fi
 }
-function mosh() {
-  command mosh --server="ITERM_SESSION_ID=$ITERM_SESSION_ID BICON_MODE=$BICON_MODE mosh-server" "$@" # -- zsh
-}
+##
 function ffmpeg() {
     isI && command ffmpeg "$@" || command ffmpeg -loglevel error "$@"
 }
+##
 function edir() {
   command edir --all --recurse  --suffix '' "$@"
 }
 ##
-watchm() {
+function watchm() {
     ruu "watch -n $1" "${@:2}"
 }
 ##

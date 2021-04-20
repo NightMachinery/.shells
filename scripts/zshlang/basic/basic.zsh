@@ -2,8 +2,6 @@
 zmodload zsh/terminfo zsh/system zsh/datetime zsh/mathfunc
 autoload -Uz zargs regexp-replace is-at-least colors # U: do not use aliases, z: always use zsh mode
 ##
-typeset +x FORCE_INTERACTIVE # unexporting FORCE_INTERACTIVE will stop polluting the children's env
-##
 alias ec='print -r --'
 function ec() { print -r -- "$@" }
 alias ecn='print -rn --'
