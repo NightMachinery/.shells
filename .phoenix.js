@@ -135,7 +135,7 @@ function quakeApp({
       return;
     }
     if (quakeAppLock) {
-      await brishz(['fsay', 'lock encountered']);
+      // await brishz(['fsay', 'lock encountered']);
       return;
     }
     try {
@@ -178,7 +178,7 @@ function quakeApp({
                 if (wid == 1) {
                   // windowIdTmp = i;
                   kittyClipper = w
-                  brishz_sync(['fsay', 'kitty Clipper set']);
+                  // brishz_sync(['fsay', 'kitty Clipper set']);
                   // w.unminimise(); // doesn't work
                 } else {
                   // w.minimise();
@@ -187,7 +187,7 @@ function quakeApp({
                 if (wid == 0) {
                   // windowIdTmp = i;
                   kittyMain = w
-                  brishz_sync(['fsay', 'kitty main set']);
+                  // brishz_sync(['fsay', 'kitty main set']);
                   // w.unminimise();
                 } else {
                   // w.minimise();
@@ -310,7 +310,7 @@ function setAppPosition(app, relativeFrame, space, wid = 0, window = null) {
     if (mainWindow.isFullScreen()) {
       mainWindow.setFullScreen(false); // this uses the native fullscreen functionality so setting it to true is no good for popup windows
     }
-    // mainWindow.maximize()
+    // mainWindow.maximize() // enabling this causes the app to permanently become 'shorter' and not overlap with the menubar. It's not worth it.
     mainWindow.setTopLeft({
       x: left,
       y: top,
@@ -513,4 +513,5 @@ function brishz_sync(...args) {
 }
 ///
 // brishz_sync(["bell-sc2-evil-laugh"])
-brishz_sync(["fsay", "Phoenix reloaded"])
+// brishz_sync(["fsay", "Phoenix reloaded"])
+brishz_sync(['tts-glados1-cached', 'Phoenix flies']);

@@ -48,7 +48,6 @@ alias gcb='git checkout -b'
 alias gcf='git config --list'
 alias gcl='git clone --recursive'
 alias gclean='git clean -fd'
-alias gpristine='git reset --hard && git clean -dfx'
 alias gcm='git checkout master'
 alias gcd='git checkout develop'
 alias gcmsg='git commit -m'
@@ -423,3 +422,15 @@ function git_sparse_clone() (
 function github-dir() {
   svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"
 }
+##
+function git-pristine() {
+  : 'Single repo: git reset --hard && git clean -dfx'
+
+  git clean -dfx
+  git submodule foreach --recursive git clean -dfx
+  git reset --hard
+  git submodule foreach --recursive git reset --hard
+  git submodule update --init --recursive
+}
+
+##

@@ -69,11 +69,12 @@ function run-on-each() {
     # ec "INFO: $0 $(gq "$@")"
     # doc "Note that run-on-each won't run anything at all if no arguments are supplied"
     # doc Use unusual name not to shadow actual vars
-    local i98765
+    local i98765 ret98765=0
     for i98765 in "${@:2}"
     do
-        eval "$1 $(gquote "$i98765")"
+        eval "$1 $(gquote "$i98765")" || ret98765=$?
     done
+    return $ret98765
 }
 function run-on-each2() {
     zargs --max-lines=1 --no-run-if-empty -- "${@:2}" -- "$=1" || ecerr "ERR: $0 $(gq "$@")"

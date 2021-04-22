@@ -6,7 +6,6 @@ alias ss='emc-sourceme'
 alias sbp='eval "$(pbpaste)"'
 alias sbi="sb ; source-interactive-all"
 alias sia='source-interactive-all ; bell-zsh-start'
-alias sbb='exec zsh'
 alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
 alias szsh='source "$NIGHTDIR"/zshlang/load-others.zsh'
 ##

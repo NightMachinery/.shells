@@ -98,13 +98,13 @@ function fn-line() {
     local file linenumber
     fn-name "$start" >/dev/null @RET
 
-    if test -e "$file" ; then
+    if test -e "$file" && ! isbinary "$file" ; then
         local code
 
         # @obviously if you edit the files then this linenumber can become stale
-        code="$(cat "$file" | gsed -n "$((linenumber - c)),$((linenumber + c))p" | prefixer -a $'\t')" || return $?
+        code="$(cat "$file" | erase-bicon | gsed -n "$((linenumber - c)),$((linenumber + c))p" | prefixer -a $'\t')" || return $?
 
-        if ! [[ "$code" =~ '^\s*$' ]] ; then
+        if ! whitespace-is "$code" ; then
             ecn "$code"
         fi
     fi

@@ -84,6 +84,10 @@ function emc-sourceme() {
     fi
 }
 function emc-focus() {
+    if isSSH ; then
+        return 0
+    fi
+
     if isKitty ; then
         kitty-emacs-focus
     else

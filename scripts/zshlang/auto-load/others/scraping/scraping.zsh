@@ -127,7 +127,7 @@ function cookies-killlock() {
         kill "$(serr fuser "$cookiesFile")"
     fi
 }
-getcookies() {
+function getcookies() {
     mdoc "[cookiesFile= ] $0 <url>
 Will output Chrome's cookies for the given URL in key=val;key2=val2
 See |cookies| for higher-level API." MAGIC
@@ -135,7 +135,16 @@ See |cookies| for higher-level API." MAGIC
     local cf="${cookiesFile}"
 
     test -e "$cf" || { ecdbg "getcookies called with non-existent file: $cf" ; return 0 }
-    cookiesFile="$cf" url="$url" python -c '
+
+    local tmp
+    if true ; then # @futureCron Did this solve the locking issue?
+        tmp="$(gmktemp)"
+        assert command cp "$cf" "$tmp" @RET
+        cf="$tmp"
+    fi
+
+    {
+        cookiesFile="$cf" url="$url" python -c '
 from pycookiecheat import chrome_cookies
 import os
 url = os.environ["url"]
@@ -148,7 +157,10 @@ for k,v in cookies.items():
     out += f"{k}={v};"
 print(out[:-1])
 '
-
+    return $?
+    } always {
+        test -n "$tmp" && command rm -f "$tmp"
+    }
 }
 cookies() {
     mdoc "$0 [<cookie-or-url>=theCookies]
@@ -160,7 +172,7 @@ Outputs in header style." MAGIC
     local c
     if [[ "$input" =~ '^http' ]]
     then
-        c="Cookie:$(getcookies "$input")"
+        c="Cookie:$(getcookies "$input")" @RET
     elif test -z "$input" ; then
         test -n "$env_c" && c="Cookie:${env_c}"
     else
@@ -173,7 +185,7 @@ function cookies-auto() {
 
     test -n "$caDisableCookies" && return 0
 
-    local ci=''
+    local ci='' ret=0
     if test -z "$theCookies"
     then
         local i
@@ -181,7 +193,10 @@ function cookies-auto() {
         do
             if [[ "$i" =~ '^http' ]]
             then
-                c="$(serr cookies "$i")" && break || break # the error is likely to be repeated anyway
+                c="$(serr cookies "$i")" && break || {
+                        ret=1
+                        break # the error is likely to be repeated anyway
+                    }
             fi
         done
     else
@@ -189,6 +204,7 @@ function cookies-auto() {
     fi
 
     ecn "$c"
+    return $ret
 }
 function wread() {
     mdoc "[wr_force=] $0 [--file <file>] <url> [<output-format>]
@@ -860,7 +876,8 @@ function aaCW() {
 alias aaCW1='aamedia1'
 function aamedia1() {
     : "aaCW2 <link-to-page-that-contains-media (level of recursion = 1; will support level 0 as well if its URL size is big)> ..."
-    local theCookies=${theCookies:-"$(cookies $1)"} fhMode=aacookies
+    local theCookies fhMode=aacookies
+    theCookies=${theCookies:-"$(cookies $1)"} || { ectrace ; bell-fail ; return $? }
     local urls=( ${(u@)@} )
 
     local formats=( ${media_formats[@]} pdf )
@@ -921,6 +938,10 @@ function aamedia1() {
     unset sel_i
 
     bell-dl
+    if isI && fn-isTop && ask "Run vid-fix?" Y ; then
+        re 'assert vid-fix' *.webm @RET
+        trs *.webm
+    fi
 }
 ##
 function ygen() {
@@ -945,9 +966,15 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
 
     local url="$1"
     local fhMode="${fhMode:-curl}"
-    local html="${html:-$(full-html2 "$url")}"
+    local html
+    html="${html:-$(full-html2 "$url")}" @TRET
     local reqs=("${@:2}")
-    <<<"$html" htmlmetadata $reqs[@]
+    <<<"$html" assert htmlmetadata $reqs[@] || {
+        local tmp="$(gmktemp --suffix .html)"
+        ec "$html" > $tmp
+        ecerr "$0: Copied input HTML to $(gq "$tmp")"
+        return 1
+    }
 }
 function urlmeta() {
     mdoc "DEPRECATED: Use urlmeta2.

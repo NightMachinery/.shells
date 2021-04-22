@@ -45,7 +45,7 @@ v2-on # v2ray-genrouter
 ##
 tmuxnewsh2 browser-recordings-process-watch browser-recordings-process-watch
 ## These two might not load properly in the cron context
-iterm-boot
+# iterm-boot
 ot-server-daemon
 ##
 tmuxnewsh2 clipboard-record clipboard-record

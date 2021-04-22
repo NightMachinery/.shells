@@ -74,3 +74,6 @@ function bicon-zsh() {
   reset
 }
 ##
+function erase-bicon() {
+  gtr -d '\000'
+}

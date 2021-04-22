@@ -4,6 +4,10 @@ function terminal-unsupported() {
 }
 ##
 function terminal-activate-tab() {
+    if isSSH ; then
+        return 0
+    fi
+
     if isKitty ; then
         kitty-tab-activate "$@"
     elif isiTerm ; then

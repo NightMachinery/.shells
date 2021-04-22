@@ -215,7 +215,7 @@ function ntag-add() {
     : "GLOBAL OUT: ntag_add_dest"
     unset ntag_add_dest
 
-    local f="$(ntag-recoverpath "$1")" tags=("${@:2}") tag toadd=()
+    local f="$(ntag-recoverpath "$1")" tags=("${(u)@:2}") tag toadd=()
     ntag_add_dest="$f"
     test -e "$f" || {
         ecerr "$0: Nonexistent file: $f"

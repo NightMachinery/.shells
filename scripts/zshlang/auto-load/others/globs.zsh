@@ -14,6 +14,12 @@ function isbinary() {
     local mime="$(file -b --mime-type "${1:-$REPLY}")"
     ! [[ "$mime" =~ '^(text/|application/json)' ]]
 }
+function isBinary() {
+    isbinary "$@"
+}
 function isnotbinary() {
     ! isbinary "$@"
+}
+function isNotBinary() {
+    isnotbinary "$@"
 }

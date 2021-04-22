@@ -475,8 +475,11 @@ bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
 bell-lm-maker strawberryjuice flac/10.3_09_MI_strawberryjuice..blue..flac
 bell-lm-maker amiindanger flac/06.4_04_MI_amiindanger.flac
 bell-lm-maker shouldisitdown flac/16-1_15_MI_shouldisitdown.flac
-bell-lm-maker mo-welldone flac/17.1_11_MO_welldone.flac
+bell-maker lm-fail LittleMisfortune/flac/10.4_27_MI_fail1..blue..flac
+aliasfn bell-fail bell-lm-fail
 bell-lm-maker-dir mhm mhm
+##
+bell-lm-maker mo-welldone flac/17.1_11_MO_welldone.flac
 # `fr heari 'flac/ MI cool'`
 ##
 function reval-onhold() {
@@ -572,6 +575,8 @@ bell-maker sc2-it-is-time 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer
 bell-maker sc2-become-primal 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Zurvan/Zurvan/zSMAmbient_ZerusZurvan_AncientOneNamed_004..become pure, become primal..blue..ogg'
 
 bell-maker sc2-evo-perfection 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Abathur/Abathur/zSMAmbient_EvolutionMaster_EvolutionMaster_003_perfection, deep in the core, in strands..blue..ogg'
+##
+bell-maker sc-error 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Other/sounds/perror..sc-error..blue..wav'
 
 # bell-maker sc2- ''
 ###

@@ -18,10 +18,16 @@ function sounds-resources-dl() {
 function gc-tag() {
     : "@alt lkh (ntag-ls-head)"
 
-    if ask "$(heari "$(hear-get)")" Y ; then
+    local f="${1:-$(hear-get)}"
+
+    trapexits
+    ( heari "$f" )
+    trapexits-release
+
+    if ask "Proceed with $(gq "$f")?" Y ; then
         local tag=''
         vared -p "tag: " tag || tag=''
-        ntag-add "$(hear-get)" $tag blue @RET
+        ntag-add "$f" $tag blue @RET
         vared -p "bell-maker: " tag || tag=''
         if test -n "$tag" ; then
             reval-copy gquote bell-maker "${tag}" "$(grealpath "${ntag_add_dest}" | dir-rmprefix "$(grealpath "$GREENCASE_DIR")")"

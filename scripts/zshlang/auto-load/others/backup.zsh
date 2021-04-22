@@ -5,7 +5,7 @@ function backup-rsync() {
 function backup-rsync-greencase() {
     source="$GREENCASE_DIR/"
     dest=/Volumes/hyper-diva/backups/greencase
-    aasert mkdir -p "$dest" @RET
+    assert mkdir -p "$dest" @RET
     if test -d "$source" && test -d "$dest" ; then
         rspb --exclude='.git' "$source" "$dest"
     fi

@@ -119,11 +119,11 @@ function _crash_format_trace_info() {
   # echo -n 'HERE: '
   echo "$color$node\033[0;m \033[0;38;5;242m:\033[0;m line $line"
 
-  if test -e "$node" ; then
+  if test -e "$node" && ! isbinary "$node" ; then
     local code c=0
 
     # @obviously if you edit the files then this linenumber can become stale
-    code="$(cat "$node" | gsed -n "$((line - c)),$((line + c))p" | prefixer -a $'\t')" || return 0
+    code="$(cat "$node" | erase-bicon | gsed -n "$((line - c)),$((line + c))p" | prefixer -a $'\t')" || return 0
 
     if ! whitespace-is "$code" ; then
       ecngray "$code"

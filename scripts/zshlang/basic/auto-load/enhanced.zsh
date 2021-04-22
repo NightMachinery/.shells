@@ -27,7 +27,7 @@ mv () {
             return 1
         }
         # bash: read -ei "$1" newfilename
-        h_mv -v -- "$1" "$newfilename" @RET
+        command gmv -v -- "$1" "$newfilename" @RET
         out="$newfilename"
     fi
 }

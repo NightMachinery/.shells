@@ -20,3 +20,25 @@ function ssh() {
   fi
 }
 ##
+function firewall-allow-mosh-darwin() {
+  # https://github.com/mobile-shell/mosh/issues/898
+
+  local fw='/usr/libexec/ApplicationFirewall/socketfilterfw'
+  local mosh_sym="${commands[mosh-server]}"
+  local mosh_abs
+  mosh_abs="$(greadlink -f "$mosh_sym")" @TRET
+
+  reval-ec sudo "$fw" --setglobalstate off
+
+  reval-ec sudo "$fw" --remove "$mosh_sym"
+  reval-ec sudo "$fw" --remove "$mosh_abs"
+
+  reval-ec sudo "$fw" --add "$mosh_sym"
+  reval-ec sudo "$fw" --unblockapp "$mosh_sym"
+
+  reval-ec sudo "$fw" --add "$mosh_abs"
+  reval-ec sudo "$fw" --unblockapp "$mosh_abs"
+
+  reval-ec sudo "$fw" --setglobalstate on
+}
+##

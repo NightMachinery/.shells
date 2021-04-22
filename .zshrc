@@ -382,6 +382,7 @@ bindkey "^I" expand-or-complete-with-dots
 FZTAB_OPTS=(
     --color=light # needed, as fzf-tab overrides the colors, so we need to re-override them
     # --height='${FZF_TMUX_HEIGHT:=75%}'
+    --sync # @futureCron perhaps this will solve the nasty bug? If not, switch to an fzf alternative like fzy and see what happens
 )
 function fztab() {
     ##
