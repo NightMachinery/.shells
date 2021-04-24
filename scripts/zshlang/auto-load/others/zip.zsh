@@ -19,3 +19,4 @@ function unzip2dir() {
     ##
 }
 reify unzip2dir
+aliasfn uzd unzip2dir

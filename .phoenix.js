@@ -14,8 +14,9 @@
 // helper for finding application names at the bottom of the file
 // while developing run log stream --process Phoenix in a console
 
-// KNOWN ISSUE
-// doesn't work on minimized apps
+// * KNOWN ISSUES
+// ** You need to enable `Automatically hide and show the menu bar` or quake apps will look ugly
+// ** doesn't work on minimized apps
 // https://github.com/kasper/phoenix/issues/269
 
 // common screen locations
@@ -95,7 +96,8 @@ quakeApp({
     // ["kitty-esc"],
     // ["input-lang-push", "en"],
     ///
-    ["@opts", "match", "title:Clipper", "@", "kitty-send", "        "], // to start fzf forecfully
+    // ["@opts", "match", "title:Clipper", "@", "kitty-send", "        "], // to start fzf forecfully
+    ["@opts", "match", "title:Clipper", "@", "kitty-send", " "], // to start fzf forecfully
     // ["input-lang-push", "en"],
   ],
   postCommands: [
@@ -314,10 +316,12 @@ function setAppPosition(app, relativeFrame, space, wid = 0, window = null) {
     mainWindow.setTopLeft({
       x: left,
       y: top,
+      // y: -300,
     });
     mainWindow.setSize({
       width: right - left,
-      height: bottom - top,
+      height: (bottom - top),
+      // height: 500,
     });
   }
 }

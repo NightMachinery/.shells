@@ -45,7 +45,7 @@ addToPATH /Applications/mpv.app/Contents/MacOS
 # PS1="$(strip "$PS1" ' +') "
 addToPATH ~/anaconda/bin
 addToPATH ~/miniconda3/bin
-
+addToPATH ~/.cargo/bin/
 addToPATH ~/bin
 
 ## perl

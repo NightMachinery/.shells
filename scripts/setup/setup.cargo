@@ -7,9 +7,9 @@ cargo install --git https://github.com/NightMachinary/rmprefix --force
 cargo install --git https://github.com/NightMachinary/input_lang_get_icon --force
 cargo install --git https://github.com/NightMachinary/rtl_reshaper_rs --force
 ##
+cargo install --git https://github.com/ajeetdsouza/zoxide/ -f
 cargo install scriptisto
 cargo install cargo-play
-cargo install zoxide -f
 cargo install cargo-edit
 cargo install gping
 cargo install procs

@@ -40,6 +40,7 @@ function rm-caches-all() {
 }
 ##
 function cleanup() {
+    trs-empty
     isLocal && clean-deps
     brew cleanup
     rm-caches-all

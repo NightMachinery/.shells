@@ -76,6 +76,12 @@ function tmux-capture() {
 ##
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 function ivy() {
+    if ! whitespace-is "$(pgrep tmux)" ; then
+        if ! ask "$0: tmux seems to be running already; Proceed?" N ; then
+            return 1
+        fi
+    fi
+
     various-darwin.zsh
 
     export DISABLE_DEFER=y

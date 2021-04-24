@@ -166,9 +166,9 @@ function iloop() {
 
     local q sleep
     local rn=1
-    if bool $en_only ; then
-        rn=3
-    fi
+    # if bool $en_only ; then
+    #     rn=3
+    # fi
     {
         while true ; do
             if [[ "$prompt1" == "MAGIC_SKIP" ]] ; then
@@ -178,6 +178,8 @@ function iloop() {
                 ecn $'\n'"$prompt1"
                 read -k "$rn" q # you can press any whitespace to just trigger fzf
                 # reading more allows for changing the letters into en
+                sleep 0.2
+                q="${q}$(pipe-get-nb < /dev/tty)"
                 if bool $en_only ; then
                     # (input-lang-push en)
                     q="$(ecn "$q" | per2en)"

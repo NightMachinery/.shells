@@ -40,7 +40,9 @@ function ffz-get() {
     ##
     # memoi-eval doesn't read from pipe
     sel="$( {
+    tty-title zoxide
     serr zoxide query --list
+    tty-title ffz
     arrN ~/*(/N)
     arrN ~/base/*(/N)
     arrN /Volumes/*(/N)

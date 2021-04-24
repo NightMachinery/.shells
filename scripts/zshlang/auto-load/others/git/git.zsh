@@ -263,8 +263,11 @@ function git-commitmsg() {
 function gsync() {
   local msg="${*}"
   local noadd="${gsync_noadd}"
-  local branch="${gsync_branch:-${gsync_b:-master}}"
+  local branch="${gsync_branch:-${gsync_b}}"
   local remote="${gsync_remote:-${gsync_r}}"
+  if test -z "$branch" ; then
+    branch='--all'
+  fi
 
   pushf "$(git rev-parse --show-toplevel)" || return 1
   {
