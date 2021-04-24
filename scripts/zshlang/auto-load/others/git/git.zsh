@@ -260,6 +260,14 @@ function git-commitmsg() {
   fi
 }
 ##
+function git-branch-name() {
+  git branch --show-current
+  ##
+  # branch="$(git rev-parse --abbrev-ref HEAD)"
+  # ec "$branch" | gtr -d '\n ' | tr -d ' '
+  ##
+}
+##
 function gsync() {
   local msg="${*}"
   local noadd="${gsync_noadd}"
