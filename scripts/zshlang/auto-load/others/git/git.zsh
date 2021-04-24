@@ -265,12 +265,22 @@ function gsync() {
   local noadd="${gsync_noadd}"
   local branch="${gsync_branch:-${gsync_b}}"
   local remote="${gsync_remote:-${gsync_r}}"
-  if test -z "$branch" ; then
-    branch='--all'
-  fi
 
   pushf "$(git rev-parse --show-toplevel)" || return 1
   {
+    if test -z "$branch" ; then
+      ##
+      # all doesn't work for pulling
+      # branch='--all'
+      # To push all your tags:
+      # `git push REMOTE --tags`
+      # Finally, I think you can do this all in one command with:
+      # `git push REMOTE --mirror`
+      # However, in addition --mirror, will also push your remotes, so this might not be exactly what you want.
+      ##
+        branch="$(git-branch-name)" || branch=master
+      ##
+    fi
     test -z "$noadd" && {
       git submodule foreach git add --all
       git add --all
