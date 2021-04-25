@@ -1,10 +1,26 @@
-if isExpensive && isIReally ; then
+typeset -g ZDIRS_ENABLED=y
+typeset -g ZDIRS_NAME=zdirs
+function z-add() {
+    local dir="${1}"
+    if test -n "$dir" ; then
+        redism SADD "$ZDIRS_NAME" "$dir"
+    fi
+}
+function z-add-pwd() {
+    inbg silence z-add "$PWD"
+    # the 'silent' alias is weirdly not defined in the completion context (test with `in x ll y<TAB>`)
+}
+function z-list() {
+    redism SMEMBERS "$ZDIRS_NAME"
+}
+##
+export _ZO_DATA_DIR="$HOME/.z.dir"
+if ! bool "$ZDIRS_ENABLED" && isExpensive && isIReally ; then
     ##
     # function zimportzlua() {
     #     zoxide import --merge ~/.zlua
     # }
     ##
-    export _ZO_DATA_DIR="$HOME/.z.dir"
     mkdir -p "$_ZO_DATA_DIR"
     if ((${+commands[zoxide]})) ; then
            eval "$(zoxide init zsh --no-aliases)" # --no-aliases: don't define extra aliases like zi, zq, za, and zr
@@ -40,8 +56,13 @@ function ffz-get() {
     ##
     # memoi-eval doesn't read from pipe
     sel="$( {
-    tty-title zoxide
-    serr zoxide query --list
+    if bool "$ZDIRS_ENABLED" ; then
+       tty-title zdirs
+       z-list
+    else
+        tty-title zoxide
+        serr zoxide query --list
+    fi
     tty-title ffz
     arrN ~/*(/N)
     arrN ~/base/*(/N)

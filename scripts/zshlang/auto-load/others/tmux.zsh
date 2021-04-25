@@ -84,8 +84,13 @@ function ivy() {
 
     various-darwin.zsh
 
-    export DISABLE_DEFER=y
-    tmux new-session -d 'zsh'
+    ivy-self
+}
+function ivy-self() {
+    local -x DISABLE_DEFER=y
+
+    tmux kill-session -t "ivy" &> /dev/null
+    tmux new-session -s ivy -d 'zsh'
     tmux send-keys "muc " # 'mu' could also download, but it needs to be updated
     tmux split-window -h  'zsh'
     tmux send-keys "lunas
@@ -97,4 +102,5 @@ function ivy() {
     comment '-2            Force tmux to assume the terminal supports 256 colours.'
     tmux -2 attach-session -d
 }
+
 ##

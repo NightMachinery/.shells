@@ -44,7 +44,10 @@ function hearinvisible-playfast() {
     # faster startup than ffplay (play from sox)
     } always {
         if bool $loudidle ; then
-            volume-set "$vol_orig"
+            if [[ "$vol_orig" != 100 ]] ; then
+                # we need this condition or concurrent calls to us can cause race conditions that will reset the volume to 100
+                volume-set "$vol_orig"
+            fi
             trapexits-release
         fi
     }

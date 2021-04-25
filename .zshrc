@@ -322,6 +322,9 @@ function prompt_pure_check_cmd_exec_time () {
   ##
 }
 chpwd_functions=(${chpwd_functions[@]} zsh-pwd-save)
+if bool "$ZDIRS_ENABLED" ; then
+  chpwd_functions+="z-add-pwd"
+fi
 ##
 # antibody bundle denysdovhan/spaceship-prompt
 # antibody bundle Tarrasch/zsh-bd

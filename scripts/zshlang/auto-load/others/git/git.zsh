@@ -261,6 +261,7 @@ function git-commitmsg() {
 }
 ##
 function git-branch-name() {
+  # @see `git symbolic-ref HEAD`
   git branch --show-current
   ##
   # branch="$(git rev-parse --abbrev-ref HEAD)"

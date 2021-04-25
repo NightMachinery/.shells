@@ -1,7 +1,11 @@
 ###
-if [ -z "$HISTFILE" ]; then
-    HISTFILE=$HOME/.zsh_history
-fi
+alias nohistory='unset HISTFILE' #disables history for current session
+function history-enable() {
+    if [ -z "$HISTFILE" ]; then
+        HISTFILE=$HOME/.zsh_history
+    fi
+}
+history-enable
 export HISTSIZE=1000000
 export SAVEHIST=1000000
 ## BASH only

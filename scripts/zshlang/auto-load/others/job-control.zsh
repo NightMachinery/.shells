@@ -168,8 +168,15 @@ function disown-true() {
 @opts-setprefix awaysh1 insubshell-eval
 @opts-setprefix awaysh2 insubshell-eval
 ##
-# awaysh() inbg silent "$@"
-aliasfn inbg awaysh
+function inbg() {
+    (reval "$@" &)
+    ##
+    # setopt localoptions nomonitor
+    # reval "$@" &
+    ##
+    # `time2 brishz2.dash "redism SADD zdirs $(gq "$PWD") &"` is slower
+    ##
+}
 ##
 function awaysh-named() {
     # note that somehow using simple commands like sleep will not retain the parent process (and so you can't see its name either), but wrapping that sleep in a function will keep the executing subshell alive. Idk why.

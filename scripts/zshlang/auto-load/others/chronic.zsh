@@ -15,7 +15,7 @@ function chronic-update() {
     fi
 }
 function chronic-backup() {
-    re backup-file $timetracker_db
+    re backup-file $timetracker_db $HISTFILE
     backup-startupSh
     backup-cron
     ziib-all
