@@ -341,7 +341,7 @@ function bell-zsh1() {
 function bell-zsh() {
      local cmd head=''
         if cmd=($(fc -nl -1 -1)) ; then
-            alert "Completed: $cmd"
+            @opts dur 2 @ alert "Completed: $cmd"
             ##
             head="$(sout fnrep which 'print -r "$@" >&1 >&2' whichm "$cmd[1]" |& gtail -n 1)"
             if [[ "$head" =~ '^.*=\S*\s*(\S*)' ]] ; then

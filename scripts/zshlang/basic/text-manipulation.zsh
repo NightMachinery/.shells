@@ -27,7 +27,7 @@ function rget() {
 }
 ##
 function text-wrap() {
-    local w="${1:-90}"
+    local w="${1:-${COLUMNS:-90}}"
 
     ##
     ansifold --boundary=word --width="$w" --padding --padchar=' ' --paragraph "${@[2,-1]}"
