@@ -8,13 +8,52 @@ Uses ghostscript to rewrite the file without encryption." MAGIC
     local in="$1"
     gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="${in:r}_unencrypted.pdf" -c .setpdfwrite -f "$in"
 }
-function pdf-cover() {
+##
+function pdf-cover-gs() {
     local i="$1" out="${1:r}.png"
+    assert-args i @RET
+
     sout command gs -o "$out" -sDEVICE=pngalpha -dLastPage=1 "$i"
+    # See for setting the output resolution:
+    # https://stackoverflow.com/questions/10091655/ghostscript-pdf-to-png-output-is-always-595x842-a4
     ## imagemagick sometimes did not work and didn't produce any error messages either
     # convert "pdf:${i}[0]" "png:$out"
     ##
 }
+function pdf-cover() {
+    pdf2png "$@" 1
+}
+function pdf2png-mutool() {
+    : "mutool draw [options] file [pages]"
+    # pages:  Comma separated list of page numbers and ranges (for example: 1,5,10-15,20-N), where
+    #               the character N denotes the last page.  If no pages are specified, then all pages
+    #               will be included.
+
+    local i="$1"
+    assert-args i @RET
+    local out="${pdf2png_o:-${i:r}_%03d.png}"
+    [[ "$out" == *.png ]] || out+='.png'
+
+    assert serrdbg command mutool draw -o "$out" -F png "$i" "${@[2,-1]}" @RET
+    : '`-r 300` to set dpi'
+}
+@opts-setprefix pdf2png-mutool pdf2png
+aliasfn pdf2png pdf2png-mutool
+function icat-pdf() {
+    local i="${1}"
+    assert-args i @RET
+
+    local tmp
+    tmp="$(gmktemp --suffix .png)" @TRET
+    {
+        assert @opts o "$tmp" @ pdf2png-mutool -w "$(screen-width)" "$i" 1 @RET
+        icat-realsize "$tmp"
+    } always {
+        silent trs-rm "$tmp"
+    }
+}
+
+##
 pdf-count() {
   setopt local_options pipefail
  { pdfinfo "$1" | grep Pages || { ecerr "$0 failed" ; return 1 } } |awk '{print $2}'

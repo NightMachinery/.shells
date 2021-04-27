@@ -1,6 +1,6 @@
 export CLIPBOARD_RECORD_FILE=~/tmp/.clipboard
 function clipboard-record() {
-    local sleep=0.5
+    local sleep=0.25
 
     ecdate "$0: Started; file=$(gq $CLIPBOARD_RECORD_FILE)"
     clipboard-removedups
@@ -235,4 +235,9 @@ function pbcopy-ask() {
     fi
 }
 alias pca="pbcopy-ask"
+##
+function clipboard-add-quoted() {
+    clipboard-add "$(gq "$@")"
+}
+alias pcz='clipboard-add-quoted'
 ##

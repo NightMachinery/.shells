@@ -101,3 +101,12 @@ function emcnw() {
 }
 ialias emcg="emacsclient -c"
 ##
+function emc-in() {
+    local s="$1"
+
+    local t
+    t="$(gmktemp --suffix "$s")" @TRET
+    cat > "$t" @TRET
+    emc-open "$t"
+}
+##

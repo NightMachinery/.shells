@@ -5,5 +5,8 @@ if isDarwin ; then
     ## Fonts:
     brew install --cask font-fira-code font-fira-mono
     brew install --cask font-victor-mono
+    brew install --cask font-vazir-code
+    brew install --cask font-iosevka
+    brew install --cask font-juliamono
     ##
 fi

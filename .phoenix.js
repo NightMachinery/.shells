@@ -1,6 +1,7 @@
 // @docs https://github.com/kasper/phoenix/blob/master/docs/API.md
 //
 // The JavaScript context is (re)loaded when the file changes.
+//   So you can do `touch ~/.phoenix.js` to force a reload
 //
 // See also:
 // * https://github.com/fabiospampinato/phoenix (has reload)

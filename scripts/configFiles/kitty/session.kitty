@@ -5,8 +5,8 @@
 # launch /usr/local/bin/bicon_zsh.dash
 ##
 cd ~/tmp
-launch /usr/local/bin/bicon_zsh.dash
-# launch /usr/local/bin/zsh -c 'ivy'
+# launch /usr/local/bin/bicon_zsh.dash
+launch /usr/local/bin/zsh -c 'ivy'
 new_tab
 cd ~/tmp
 launch /usr/local/bin/bicon_zsh.dash

@@ -64,10 +64,14 @@ function ffz-get() {
         serr zoxide query --list
     fi
     tty-title ffz
+
     arrN ~/*(/N)
     arrN ~/base/*(/N)
     arrN /Volumes/*(/N)
     arrN /Volumes/*/*(/N)
+
+    list-dirs "$PWD"
+
     # list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
     memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
     true

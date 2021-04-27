@@ -154,9 +154,9 @@ function lunaquit-monitor() {
                 # awaysh-bnamed BELL_EVACUATE_MARKER bell-evacuate
                 bell-evacuate
             fi
-            finished=y
             mark-me zsh
         )
+        finished=y # commenting this line might be better, as deluna will kill the timer-late anyway on inactivity
     } always {
         kill-marker-luna-timer-late
         if test -z "$finished" ; then
@@ -199,6 +199,7 @@ function lunaquit-quick() {
         brishz awaysh lunaquit-monitor "$@" # it marks itself
         # bell-lm-amiindanger
     fi
+    display-gray-off
 }
 aliasfn lq lunaquit-quick
 ##

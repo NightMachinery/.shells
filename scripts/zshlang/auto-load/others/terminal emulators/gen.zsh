@@ -1,4 +1,8 @@
 function terminal-unsupported() {
+    if isTmux ; then
+        # I don't know what else to do except ignoring this
+        return 1
+    fi
     ectrace "Unsupported terminal emulator"
     return 1
 }

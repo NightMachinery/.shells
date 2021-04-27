@@ -1,6 +1,16 @@
 function gh-release-get() {
     local repo="$1"
     assert-args repo @RET
+    local desired="$2"
+    if test -z "$desired" ; then
+        if isDarwin ; then
+            desired="macos"
+        else
+            desired="ubuntu"
+        fi
+    elif [[ "$desired" == . ]] ; then
+        desired=''
+    fi
 
     local releases
     releases="$(revaldbg gurl https://api.github.com/repos/"$repo"/releases)" @TRET
@@ -10,13 +20,6 @@ function gh-release-get() {
 
     local assets
     assets="$(ec $releases | jq -r --arg tag "$tag" '.[] | if .tag_name == $tag then .assets else empty end' )" @TRET
-
-    local desired
-    if isDarwin ; then
-        desired="macos"
-    else
-        desired="ubuntu"
-    fi
 
     local my_asset
     my_asset="$(ec $assets | jq -r --arg desired "$desired" '.[] | select(.name | contains($desired)) | .browser_download_url')" @TRET

@@ -30,7 +30,9 @@ function text-wrap() {
     local w="${1:-${COLUMNS:-90}}"
 
     ##
-    ansifold --boundary=word --width="$w" --padding --padchar=' ' --paragraph "${@[2,-1]}"
+    ansifold --boundary=word --width="$w" --padchar=' ' "${@[2,-1]}"
+    # --paragraph adds extra newlines for paragraphs
+    # --padding adds extra whitespace to the end of lines and makes their width uniform
     ##
     # command ggrep -Eo ".{1,$w}" # unicode-safe (RTL safe)
 }

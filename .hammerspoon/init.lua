@@ -333,7 +333,7 @@ function chis()
   end)
   c:show()
 end
-hs.hotkey.bind(hyper, "o", chis)
+-- hs.hotkey.bind(hyper, "o", chis)
 --
 function ntagFinder()
   local timer
@@ -494,6 +494,38 @@ hs.hotkey.bind(hyper, "g", anycomplete)
 --   -- app:mainWindow():moveToUnit'[100,50,0,0]'
 --   -- app:mainWindow().setShadows(false)
 -- end)
+---
+function appHotkey(o)
+  hs.hotkey.bind(o.modifiers or hyper, o.key, function()
+                   appName = o.appName
+                   -- use `sleep 2 ; reval-copy frontapp-get ; fsay hi` to get this
+
+                   local app = hs.application.get(appName)
+
+                   if app then
+                     if app:isFrontmost() then
+                       app:hide()
+                     else
+                       app:activate()
+                     end
+                   else
+                     if o.launch then
+                       hs.application.launchOrFocus(appName)
+                       app = hs.application.get(appName)
+                     end
+                   end
+  end)
+end
+
+appHotkey{ key='w', appName='com.google.Chrome' }
+appHotkey{ key='o', appName='com.operasoftware.Opera' }
+appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
+appHotkey{ key='t', appName='com.tdesktop.Telegram' }
+appHotkey{ key=';', appName='notion.id' }
+
+hs.hotkey.bind(hyper, "d", function()
+                 brishzeval("notif-dismiss.as")
+                 end)
 ---
 function reloadConfig(files)
   doReload = false

@@ -67,7 +67,11 @@ function fd() {
 function open() {
   assert isDarwin @RET
   if [[ "$1" =~ '\.pdf$' ]] ; then
-    assert chrome-open-pdf "$1"
+    ##
+    command open -a opera "$1"
+    ##
+    # assert chrome-open-pdf "$1"
+    ##
     shift
     "$0" "$@"
     return $?

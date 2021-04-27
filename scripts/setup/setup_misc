@@ -25,6 +25,7 @@ brew install keyboardSwitcher
 brew tap trojan-gfw/homebrew-trojan
 brew install trojan
 brew install --head googler
+brew install --head tdlib
 ##
 # https://superuser.com/questions/545889/how-can-i-install-gnu-parallel-alongside-moreutils
 brew install --force moreutils

@@ -52,4 +52,6 @@ tmuxnewsh2 clipboard-record clipboard-record
 ##
 # tmuxnewsh kitty ITERM_SESSION_ID= loop env -i ${commands[kitty]} -o allow_remote_control=yes --listen-on unix:"$HOME/tmp/.kitty" --single-instance --session "$NIGHTDIR/configFiles/kitty/session.kitty"
 ##
+wallpaper-auto
+##
 chronic-all

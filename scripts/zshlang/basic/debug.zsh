@@ -10,13 +10,15 @@ argerrainbow() {
 	echo
 }
 argerng() {
-	{ test -n "$jahmode" || isI } && ecalternate "$@" || arger "$@"
+    clipboard-add-quoted "$@"
+
+    { test -n "$jahmode" || isI } && ecalternate "$@" || arger "$@"
 }
 ecdbg() {
     isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")
-    	color "$errcol[@]" "$@" >&2
-    	# errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
+        color "$errcol[@]" "$@" >&2
+        # errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
     }
 }
 fsaydbg() {
@@ -126,6 +128,7 @@ function revaldbg() {
     reval "$@"
 }
 echo-fin() { arger "$fin[@]" } # Useful for debugging env
+##
 function dbgserr() {
     local cmd=("$@")
     if isDbg
@@ -134,6 +137,21 @@ function dbgserr() {
     else
         reval serr "${cmd[@]}"
     fi
+}
+function serrdbg() {
+    dbgserr "$@"
+}
+function dbgsout() {
+    local cmd=("$@")
+    if isDbg
+    then
+        reval "${cmd[@]}"
+    else
+        reval sout "${cmd[@]}"
+    fi
+}
+function soutdbg() {
+    dbgsout "$@"
 }
 ##
 function ensure() {
@@ -188,6 +206,9 @@ function assert() {
         head="${head:-${$(fn-name):-${funcstack[2]:-assert}}}" # fn-name takes  ~9ms
         test -z "$msg" && msg="$(ecalternate "${@}")" # "(exited $ret)"
         msg="${head}: $msg"
+
+        clipboard-add-quoted "$@"
+
         ectrace_ret="$ret" ectrace "$msg"
     fi
     # assert_global_lock='' # it's better to trust the one in ectrace, as the trace might have been disabled.

@@ -67,7 +67,12 @@ function ffps() {
     local query="$(fz-createquery "$@")"
 
     # ps auxww: List all running processes including the full command string
-    ps auxww | fzp --with-nth '11..' --header-lines 1 "$query" | awk '{print $2}'
+    command ps auxww | fzp --with-nth '11..' --header-lines 1 "$query" | awk '{print $2}'
+}
+function ffps-c1() {
+    local query="$(fz-createquery "$@")"
+
+    ps-children 1 | inargsf command ps -fp | fzp --with-nth '8..' --header-lines 1 "$query" | gawk '{print $2}'
 }
 ##
 function ffkill() {
@@ -91,6 +96,7 @@ function ffkill() {
 }
 aliasfnq ffkill-super fnswap kill 'sudo kill' ffkill -9
 aliasfn fk ffkill
+aliasfn ffkill-c1 fkEngine=ffps-c1 ffkill
 aliasfn fks ffkill-super
 aliasfnq fk-joker ffkill "'JOKER_MARKER"
 ##
@@ -213,6 +219,6 @@ function vp() {
     local q="$* "
     # local q="$(fz-createquery "$@")"
 
-    vp-ls | fzf_mru_context="$0" fz-rtl --query "$q" | sponge | inargsf chrome-open-pdf
+    vp-ls | fzf_mru_context="$0" fz-rtl --query "$q" | sponge | inargsf open
 }
 ##

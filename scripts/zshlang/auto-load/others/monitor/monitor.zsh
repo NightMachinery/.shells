@@ -205,3 +205,7 @@ function ffparents1() {
 }
 
 ##
+function ps-zombies() {
+    command ps axo pid=,stat= | gawk '$2~/^Z/ { print $1 }'
+}
+##

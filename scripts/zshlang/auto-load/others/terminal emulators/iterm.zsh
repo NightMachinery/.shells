@@ -114,8 +114,30 @@ function icat-autoresize() {
     done
 }
 @opts-setprefix icat-autoresize icat
+
 function icat() {
     isI || return 0
+
+    if (( $#@ == 0 )) ; then
+        local images=( ${~imageglob} *.pdf(N) )
+        if (( ${#images} )) ; then
+            icat "$images[@]"
+            return $?
+        else
+            return 0
+        fi
+    fi
+
+    re h_icat "$@"
+}
+function h_icat() {
+    ecgray "${1:t}"
+
+    if [[ "$1" == *.pdf ]] ; then
+        icat-pdf "$1"
+        return $?
+    fi
+
     if isKitty ; then
         icat-kitty2 "$@"
         return $?
@@ -128,13 +150,15 @@ function icat() {
         # @todo use ANSI https://github.com/trashhalo/imgcat
     fi
 }
-function icat-labeled() {
-    local i
-    for i in "$@" ; do
-        ec $i
-        icat $i
-    done
-}
+alias ic=icat
+##
+# function icat-labeled() {
+#     local i
+#     for i in "$@" ; do
+#         ecgray $i
+#         icat $i
+#     done
+# }
 ###
 function iterm-boot() {
     # Alt: `lnrp iterm_focus.py ~/Library/Application\ Support/iTerm2/Scripts/AutoLaunch/` uses iterm's own python which doesn't have our Brish
