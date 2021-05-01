@@ -10,7 +10,7 @@
 [core]
 	excludesfile = ~/.gitignore_global
 	autocrlf = input
-	pager = delta --light --theme 'Solarized (light)'
+	pager = LESS='-RiF --mouse --wheel-lines=3' delta --light --theme 'Solarized (light)'
 	# ignorecase = false
 [color]
   branch = auto

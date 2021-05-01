@@ -120,8 +120,9 @@ alias glgg='git log --graph'
 alias glgga='git log --graph --decorate --all'
 alias glgm='git log --graph --max-count=10'
 alias glo='git log --oneline --decorate'
-alias glol="git log --graph --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit"
-alias glola="git log --graph --pretty='%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --all"
+function glola() {
+  LESS=$LESSMIN git log --graph --pretty=format:'%Cred%h%Creset %C(yellow)%ad%Creset %Cgreen(%cr)%Creset %s %C(yellow)%d%Creset %C(bold blue)<%an>%Creset' --date=short --abbrev-commit --all
+}
 alias glog='git log --oneline --decorate --graph'
 alias gloga='git log --oneline --decorate --graph --all'
 alias glp="_git_log_prettily"
