@@ -1,7 +1,16 @@
 function k2pdf() {
-    nis k2pdfopt "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi "${k2_odpi:-450}" -y -ui-
+    local rtl="${k2pdf_rtl}"
+
+    local opts=()
+    if bool $rtl ; then
+        opts+='-r'
+        # Right-to-left page scans (-r)
+    fi
+
+    nis k2pdfopt "$opts[@]" "$@" -dev kv -png -bpc 2 -d -wrap+ -hy- -ws -0.2 -x -odpi "${k2pdf_odpi:-430}" -y -ui-
     # -as
 }
+##
 function pdf-unencrypt() {
     mdocu "<file>
 Uses ghostscript to rewrite the file without encryption." MAGIC

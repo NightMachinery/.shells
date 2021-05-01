@@ -5,7 +5,7 @@ function ugbase() {
     if isOutTty  ; then
         opts+='--color=always'
     fi
-    sel="$(command ugrep "$ugrep_opts" "$opts[@]" "$@")"
+    sel="$(command ugrep "$ugrep_opts[@]" "$opts[@]" "$@")"
     # don't add pretty as it adds line numbers to the output
     ret=$?
 
@@ -16,6 +16,12 @@ function ugbase() {
         return $ret
     fi
 }
+##
+function ugbool() {
+    ugbase --bool "$*"
+}
+alias ugb='ugbool'
+##
 function ug-i() {
     ugbase --query=1 "$@"
 }

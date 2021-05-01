@@ -817,7 +817,9 @@ function url-filename() {
 }
 function url-size() {
     local size
-    size="$(curlm --head "$@" | rget '^content-length\S*\s*(\d+)')" || return $?
+    size="$(curlm --head "$@" | rget '^content-length\S*\s*(\d+)' | gtail -n 1)" || return $?
+    # if redirects are present a URL can have multiple content-lengths, hence the tailing
+
     # test -z "$size" && return 1 # rget ensures it
     if isOutTty ; then
         ec "$size" | numfmt --to=iec-i --suffix=B
@@ -854,7 +856,7 @@ Scrapes media and audio links from the given pages, and then downloads them. Use
                 continue
             fi
         }
-        if (( $size < 5000000 )) ; then # 5 MB
+        if (( size < 5000000 )) ; then # 5 MB
             fnswap aria2c 'gtimeout 5m aria2c' getlinks-c -e $regex "$url"
         else
             ecerr "$0: Skipped big URL '$url'"
@@ -889,7 +891,7 @@ function aamedia1() {
             ecerr "$0: proceeding anyway ..."
             size=0
         }
-        if (( $size > 2000000 )) ; then # 2 MB
+        if (( size > 2000000 )) ; then # 2 MB
             ecerr "$0: Link '$url' is too big, adding it as a file instead"
             # t="$(url-tail "$url")"
             t=''
@@ -898,8 +900,9 @@ function aamedia1() {
             continue
         fi
         t="$(url-title "$url")"
-        l="$(getlinks-c "$url" -e "$regex")" || continue
+        l="$(getlinks-c "$url" -e "$regex" | gsort --unique)" || continue
         for l2 in ${(@f)l} ; do
+            # I have a hunch that there is a bug here where l2 can contain newlines and the splitting doesn't happen ...
             titles+="$t"
             links+="$l"
         done

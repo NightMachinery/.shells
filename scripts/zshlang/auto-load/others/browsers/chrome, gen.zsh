@@ -25,6 +25,8 @@ function browser-recordings-process() {
 
 function browser-recordings-process-watch() {
     ec "$0: Started"
+
+    browser-recordings-process
     while true ; do
         ec "$browser_rec_dir" | entr -dnr true
         # -d Track the directories of regular files provided as input and exit if a new file is added. This option also enables directories to be specified explicitly. Files with names beginning with ‘.’ are ignored.
@@ -57,9 +59,14 @@ function chrome-open-file() {
     ensure-args f @MRET
     shift
     ##
-    chrome-open "file://$(realpath "$f")" "$@"
+    local url="file://$(realpath "$f")"
+    pbcopy "$url" && tts-glados1-cached 'copied'
     ##
-    # open -a "/Applications/Google Chrome.app" "$@"
+    # works badly with Workona, otherwise works fine
+    # revaldbg chrome-open $url "$@"
+    ##
+    # doesn't work
+    open -a "/Applications/Google Chrome.app" "$@"
     ##
 }
 function chrome-open-pdf() {

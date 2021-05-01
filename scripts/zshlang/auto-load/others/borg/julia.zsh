@@ -140,6 +140,8 @@ jks() {
     \rm "$orig"
     re p2ko *.pdf
 }
+@opts-setprefix jks k2pdf
+##
 ensure-ju() {
     test -e "$jufile" || { ecerr "jufile doesn't exist"
                            return 1 }

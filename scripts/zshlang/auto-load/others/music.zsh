@@ -73,12 +73,16 @@ function hear-rnd() {
 ##
 function songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
+
+    bella_zsh_disable1=y
     local f
     f=()
     # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}"
     local p="${@: -1}"
-    test -z "${p##-*}" && set -- $@ '.' #Don't quote or you'll get ''s.
-    test -z "${p##-*}" && p='.'
+    if test -z "${p##-*}" ; then
+        set -- $@ '.' #Don't quote or you'll get ''s.
+        p='.'
+    fi
     local f2="$(playlister "$p")"
     f+=( ${(@f)f2} )
     local autopl="${playlist_dir:-$HOME/playlists}/autopl/"
@@ -111,23 +115,34 @@ touch-tracks_() {
     done
 }
 playlistc() {
+    bella_zsh_disable1=y
+
     local pl="$(fd --follow -t f '.' "${playlist_dir:-$HOME/playlists/}" | fz -q "$*")"
     test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp +s "${(@f)pl}" }
 }
 playlister() {
+    bella_zsh_disable1=y
+
     find-music "$@" | fz -q "'.mp3 | '.m4a | '.flac " #--history "$music_dir/.fzfhist" # -q "$1"
     comment By adding the extensions to the query, we force it to show paths from the end.
 }
 find-music() {
-    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow -e m4a -e mp3 -e flac --full-path "$*" "${music_dir:-$HOME/my-music}"
+    bella_zsh_disable1=y
+
+    local fd_pat='.'
+    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow -e m4a -e mp3 -e flac --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" | ugbool "$*"
     # Do NOT use --absolute-path, as we want relative-path playlists
 }
 songd() {
     # music_dir=~/my-music/ ; musiccache='' # Update: Bug solved in newer versions (fine on 5.8). See https://www.zsh.org/mla/workers/2019/msg00700.html # To hardcode-circumvent zsh's unset bug.
     doc 'Use songc to play already downloaded files.
     Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
-    ecdbg "$@"
     comment songd expects existent query
+
+    # ecdbg "${0} called with: " "$@"
+
+    bella_zsh_disable1=y
+
     [[ "${@: -1}" =~ '--?.*' ]] && set -- "$@" ''
     local music_dir="${music_dir}/${musiccache:-cache}"
     local musiccache='/' #To avoid recursion. Can't be empty or it'll auto replace.
@@ -239,7 +254,7 @@ mu() {
     }
     songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
-muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$@" }
+muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*" }
 ##
 function playlist-save() {
     # Save Playlist save-playlist save-pl

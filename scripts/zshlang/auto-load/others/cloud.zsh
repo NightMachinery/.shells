@@ -94,10 +94,18 @@ function rcrmount-up() {
 }
 function rcrget() {
     local id="$(url-tail "$1")" dest="${rcrget_dest:-rabbit0:g}"
-    rudi="$id" rcr copy rudi: "$dest"/"$*[2,-1]"
+    local to="$*[2,-1]"
+
+    rudi="$id" rcr copy rudi: "$dest"/"$to"
 }
 noglobfn rcrget
 function rcrget.() {
+    local to="$*[2,-1]"
+
+    # also save to the cloud (because why not)
+    reval-ec rcrget "$1" "${to:-dot/}"
+
+    ecgray $'\n\n'"Downloading to local disk ..."
     rcrget_dest=. rcrget "$@"
 }
 noglobfn rcrget.

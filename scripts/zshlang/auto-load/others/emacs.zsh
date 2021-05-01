@@ -53,7 +53,7 @@ aliasfn emc-open bicon-emc
 alias emc='emc-open'
 function emc-gateway() {
     bella_zsh_disable1=y
-    tty-title emacs
+    fnswap isI true tty-title emacs
     local my_term="$TERM"
     if isKitty || isiTerm ; then
         my_term='xterm-24bits'
@@ -109,4 +109,9 @@ function emc-in() {
     cat > "$t" @TRET
     emc-open "$t"
 }
+##
+function icat-emc() {
+    icat "$(emc-buffer-file-name)"
+}
+alias icc='icat-emc'
 ##
