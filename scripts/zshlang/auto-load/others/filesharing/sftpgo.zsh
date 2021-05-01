@@ -8,7 +8,7 @@ function sftpgo-portable() {
     local webdav="${sftpgo_portable_webdav}"
     local sftp="${sftpgo_portable_sftp}"
     local ftp="${sftpgo_portable_ftp}"
-    asert-args user pass @RET
+    assert-args user pass @RET
 
     local opts=()
     if test -n "$webdav" ; then
