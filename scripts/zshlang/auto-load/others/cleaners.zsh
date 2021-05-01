@@ -20,7 +20,7 @@ function trs-rm() {
     local p
     for p in $paths[@] ; do
         if test -e "$p" ; then
-            reval-ec command rm -rf "$p"
+            reval-ec command rm -rf -- "$p"
         fi
     done
 }

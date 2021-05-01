@@ -902,9 +902,8 @@ function aamedia1() {
         t="$(url-title "$url")"
         l="$(getlinks-c "$url" -e "$regex" | gsort --unique)" || continue
         for l2 in ${(@f)l} ; do
-            # I have a hunch that there is a bug here where l2 can contain newlines and the splitting doesn't happen ...
             titles+="$t"
-            links+="$l"
+            links+="$l2"
         done
     done
 

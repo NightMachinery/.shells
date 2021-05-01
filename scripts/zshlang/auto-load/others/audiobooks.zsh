@@ -53,7 +53,7 @@ function dir2ab-merge() {
 	popf
 }
 aliasfn dir2ab da_nm=y dir2ab-merge
-
+##
 movie2ab() {
 	mdocu '<link> ... [-t,--title=<title>]
 	Downloads the file, converts it to audio and creates a podcast out of it.

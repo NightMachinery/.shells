@@ -139,6 +139,8 @@ jks() {
     #ecdbg "trying to rm $orig"
     \rm "$orig"
     re p2ko *.pdf
+
+    : "@example pkno @opts odpi 275 rtl y @ jks"
 }
 @opts-setprefix jks k2pdf
 ##

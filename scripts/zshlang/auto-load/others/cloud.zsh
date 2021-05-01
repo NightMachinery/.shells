@@ -102,8 +102,9 @@ noglobfn rcrget
 function rcrget.() {
     local to="$*[2,-1]"
 
-    # also save to the cloud (because why not)
-    reval-ec rcrget "$1" "${to:-dot/}"
+    ## also save to the cloud (because why not)
+    # reval-ec rcrget "$1" "${to:-dot/}"
+    ##
 
     ecgray $'\n\n'"Downloading to local disk ..."
     rcrget_dest=. rcrget "$@"

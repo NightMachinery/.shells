@@ -64,7 +64,11 @@ function isBicon() {
     test -n "$BICON_MODE"
 }
 function isRtl() {
-    isKitty || isAppleTerminal || isBicon
+    # isKitty || isAppleTerminal || isBicon
+    ##
+    # tmux can have its KITTY_WINDOW_ID empty. Instead of fixing that, let's just assume RTL
+    true
+    ##
 }
 ##
 isI() {

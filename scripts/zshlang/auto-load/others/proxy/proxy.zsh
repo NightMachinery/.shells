@@ -127,7 +127,9 @@ function darwin-proxies-gen() {
         eval-ec "$*"
     done
 }
-aliasfnq darwin-proxies-set darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost $socksport
+function darwin-proxies-set() {
+    darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost "${1:-$socksport}"
+}
 aliasfnq darwin-proxies-on darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' on
 aliasfnq darwin-proxies-off darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' off
 ##
