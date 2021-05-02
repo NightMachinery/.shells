@@ -1,6 +1,13 @@
 function ntl() {
     typeset -a ntsearch_rg_opts
-    ntsearch_injector="unseal-get2note" ntsearch_glob='' ntsearch_rg_opts=("$ntsearch_rg_opts[@]" --iglob '*.txt' --iglob '*.md' --iglob '*.org') ntl-rg "$@"
+
+    local opts=()
+    local i
+    for i in org md txt zsh ; do
+        opts+=( --iglob "*.${i}" )
+    done
+
+    ntsearch_injector="unseal-get2note" ntsearch_glob='' ntsearch_rg_opts=("$opts[@]" "$ntsearch_rg_opts[@]") ntl-rg "$@"
 }
 noglobfn ntl
 aliasfnq-ng ntl. nightNotes=. ntsearch_glob='' ntsearch-lines # ntsearch_glob=$textglob

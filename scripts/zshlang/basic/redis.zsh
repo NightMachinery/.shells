@@ -4,7 +4,8 @@ ensure-redis() {
         ecerr "redis-cli not found. Have you installed redis?"
         return 2
     }
-    redism ping &> /dev/null || {
+
+    [[ "${$(redism ping):l}" == pong ]] || {
         ecerr '`redis-cli ping` failed. Please make sure redis is up.'
         return 1
     }

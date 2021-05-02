@@ -49,40 +49,53 @@ function ffz-get() {
     # DONE: We can also just cache the result for each query!
     ##
     setopt localoptions pipefail interactivecomments
-    local query="${*:-$ffz_last_query}" sel
-    ffz_last_query="$query"
-    ##
-    local fz_opts=( $fz_opts[@] --prompt "Z> ")
-    ##
-    # memoi-eval doesn't read from pipe
-    sel="$( {
-    if bool "$ZDIRS_ENABLED" ; then
-       tty-title zdirs
-       z-list
-    else
-        tty-title zoxide
-        serr zoxide query --list
+    local query="${*}" cd_mode="${ffz_cd}" redis_dict='zdirs_choices' nocache="$ffz_nocache"
+    if test -z "$query" ; then
+        query="$ffz_last_query"
+        nocache=y
     fi
-    tty-title ffz
+    ffz_last_query="$query"
+    local redis_key="$query"
+    local sel
+    ##
+    if test -z "$nocache" && test -n "$redis_key" && silent redism hexists "$redis_dict" "$redis_key" ; then
+        sel="$(redism hget "$redis_dict" "$redis_key")" @TRET
+    else
+        local fz_opts=( $fz_opts[@] --prompt "Z> ")
+        ##
+        # memoi-eval doesn't read from pipe
+        sel="$( {
+            if bool "$ZDIRS_ENABLED" ; then
+            tty-title zdirs
+            z-list
+            else
+                tty-title zoxide
+                serr zoxide query --list
+            fi
+            tty-title ffz
 
-    arrN ~/*(/N)
-    arrN ~/base/*(/N)
-    arrN /Volumes/*(/N)
-    arrN /Volumes/*/*(/N)
+            arrN ~/*(/N)
+            arrN ~/base/*(/N)
+            arrN /Volumes/*(/N)
+            arrN /Volumes/*/*(/N)
 
-    # list_dirs_d=3 list-dirs "$PWD"
-    # 'list_dirs_d=3 time2 silent list-dirs ~/' takes 0.12s, using depth=4 takes 0.28s
+            list_dirs_d=3 list-dirs "$PWD"
+            # 'list_dirs_d=3 time2 silent list-dirs ~/' takes 0.12s, using depth=4 takes 0.28s
 
-    # list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
-    memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
-    true
- } | { sponge || true } | deusvult="${ffz_nocache:-$deusvult}" memoi_key=fuzzy_z memoi_skiperr=y memoi_aborterr=y memoi_inheriterr=y memoi_od=0 memoi_expire=0 memoi-eval fzp "$query " | sponge | ghead -n 1 || retcode)" ||  {
-        # local r=$? msg="$0: $(retcode 2>&1)"
-        # ecerr $msg
-        return $r
-    }
+            list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
+            memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
+            true
+            } | fzp "$query " | ghead -n 1 || retcode)" ||  {
+            # local r=$? msg="$0: $(retcode 2>&1)"
+            # ecerr $msg
+            return $r
+        }
+
+        assert silent redism hset "$redis_dict" "$redis_key" "$sel" @RET
+    fi
+
     if test -z "$sel" ; then
-        if test -z "$ffz_nocache" ; then
+        if test -z "$nocache" ; then
             ffz_nocache=y reval "$0" "$@"
             return $?
         else
@@ -91,18 +104,23 @@ function ffz-get() {
         fi
     fi
     sel="$(ntag-recoverpath "$sel")"
-    if test -z "$ffz_nocache" && ! test -e "$sel" ; then
+    if test -z "$nocache" && ! test -e "$sel" ; then
         ffz_nocache=y reval "$0" "$@"
         return $?
     fi
-    ec "$sel"
+
+    if test -n "$cd_mode" ; then
+        cd "$sel"
+    else
+        ec "$sel"
+    fi
+
 }
 @opts-setprefix ffz-get ffz
 
 function ffz() {
-    local o
-    o="$(ffz-get "$@")" @RET
-    cd "$o"
+    ffz_cd=y ffz-get "$@"
+    # avoid forking here, ffz-get needs to save 'ffz_last_query'
 }
 aliasfn z ffz
 aliasfn zi ffz_nocache=y ffz

@@ -1,6 +1,6 @@
 function sftpgo-portable() {
     local serve_dir="${1:-$PWD}"
-    local perms="list,download" # use '*' to grant all
+    local perms="${sftpgo_portable_perms:-list,download}" # use '*' to grant all
     # https://sftpgo.stoplight.io/docs/sftpgo/openapi.yaml/components/schemas/Permission
 
     local user="${sftpgo_portable_user:-alice}"
@@ -23,7 +23,7 @@ function sftpgo-portable() {
 
     local d=~/Base/keys/sftpgo
     assert mkdir -p "$d" @RET
-    indir "$d" sftpgo portable -d "$serve_dir" --permissions "$perms" --username "$user" --password "$pass" --log-verbose --log-file-path "$(ecn "sftpgo__${serve_dir}.log" | gtr / _ | str2filename)" "$opts[@]"
+    indir "$d" reval-ec sftpgo portable -d "$serve_dir" --permissions "$perms" --username "$user" --password "$pass" --log-verbose --log-file-path "$(ecn "sftpgo__${serve_dir}.log" | gtr / _ | str2filename)" "$opts[@]"
     # --advertise-service
 }
 function sftpgo-serve-dl() {

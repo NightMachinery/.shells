@@ -440,7 +440,9 @@ function rem-rec() {
         ecerr "$0: rem_dest has not been set by the cmd."
         return 1
     fi
-    silent rem-sync || {
+
+    # @warn /dev/tty should be open for writing or this will fail:
+    rem-sync >&/dev/tty || {
         ecerr "$0: rem-sync returned $?"
     }
 }
