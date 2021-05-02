@@ -11,11 +11,29 @@ function ot-server() {
     test -n "$dettach" && cmd=':headless'
     { in-ot lein repl $cmd :port "$OVERTONE_PORT" } always { }
 }
+##
+redis-defvar ot_server_lock
 function ot-server-daemon() {
-    tmuxnewsh2 "Overtone Server" ot_server_d='' ot-server # since we are firing up tmux, no need to go headless
-    sleep 30 # it takes time for the server to boot up
-    ot-loadovertone
+  if test -n "$(ot_server_lock_get)" ; then
+    # the lock is needed to avoid continuously restarting Overtone; I.e., it gives the server the slack it needs to boot.
+    tts-glados1-cached "Not restarting Overtone because of lock"
+    return 0
+  fi
+
+  trapexits
+  ot_server_lock_set 1
+  {
+    (
+      tmuxnewsh2 "Overtone Server" ot_server_d='' ot-server # since we are firing up tmux, no need to go headless
+      sleep 30 # it takes time for the server to boot up
+      ot-loadovertone
+    )
+  } always {
+    ot_server_lock_del
+    trapexits-release
+  }
 }
+##
 function ot-loadovertone() {
   ot-rep "(use 'overtone.live) (use 'overtone.inst.piano)" && {
     # tts-gateway-i1 'Overtone, Online'

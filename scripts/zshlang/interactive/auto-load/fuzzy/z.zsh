@@ -53,17 +53,17 @@ function ffz-get() {
     if test -z "$query" ; then
         query="$ffz_last_query"
         nocache=y
+    else
+        ffz_last_query="$query"
     fi
-    ffz_last_query="$query"
     local redis_key="$query"
+
     local sel
-    ##
     if test -z "$nocache" && test -n "$redis_key" && silent redism hexists "$redis_dict" "$redis_key" ; then
         sel="$(redism hget "$redis_dict" "$redis_key")" @TRET
     else
         local fz_opts=( $fz_opts[@] --prompt "Z> ")
-        ##
-        # memoi-eval doesn't read from pipe
+
         sel="$( {
             if bool "$ZDIRS_ENABLED" ; then
             tty-title zdirs

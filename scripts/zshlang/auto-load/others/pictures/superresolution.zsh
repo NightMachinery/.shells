@@ -5,6 +5,11 @@ function waifu2x-ncnn-vulkan() {
     assert revaldbg command waifu2x-ncnn-vulkan -g -1 -m "${$(realpath2 waifu2x-ncnn-vulkan):h}/${model}" "$@" @RET
 }
 function superres-anime-image() {
+    ## @alt
+    # * isr_simple.py
+    # * https://github.com/jiny2001/dcscn-super-resolution
+    ##
+
     local i="${1}" # input image path (jpg/png/webp) or directory
     local o="${2:-${i:r}_enhanced.png}" # output image path (jpg/png/webp) or directory
 
