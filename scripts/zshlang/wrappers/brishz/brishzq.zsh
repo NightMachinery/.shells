@@ -5,6 +5,7 @@ if test "$1" = '-c' ; then
    shift
 fi
 
+path+=( /usr/local/bin )
 . ~/.privateShell
 
 alias ec='print -r --'
@@ -46,7 +47,9 @@ local req="$(print -nr -- "$stdin" | jq --raw-input --slurp --null-input --compa
 local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint )
 cmd="$(gq print -nr -- $req) | $(gq "$cmd[@]")"
 if ((${+commands[pbcopy]})) ; then
-    test -n "$copy_cmd" && <<<"$cmd" pbcopy
+    if test -n "$copy_cmd" ; then
+        <<<"$cmd" pbcopy
+    fi
 fi
 local out
 out="$(eval "$cmd")" || return $?
