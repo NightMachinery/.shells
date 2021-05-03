@@ -1,5 +1,6 @@
-alias pc='pbcopy'
+# alias pc='pbcopy'
 alias ccat='reval-copy cat'
+alias pc=ccat
 alias pop='pbpaste'
 ##
 function tee-copy() {
@@ -65,6 +66,13 @@ function pbpaste() {
         (( $+commands[pbpaste] )) && command pbpaste
     }
 }
+function pbpaste-html() {
+    assert isDarwin @RET
+
+    command pbv public.html public.utf8-plain-text
+    # https://stackoverflow.com/questions/17217450/how-to-get-html-data-out-of-of-the-os-x-pasteboard-clipboard
+}
+##
 function pbadd() {
     osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
 }

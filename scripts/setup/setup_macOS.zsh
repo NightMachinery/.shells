@@ -9,4 +9,12 @@ if isDarwin ; then
     brew install --cask font-iosevka
     brew install --cask font-juliamono
     ##
+    git clone https://github.com/chbrown/macos-pasteboard
+    pushf macos-pasteboard
+    {
+        make install
+    } always {
+        popf
+    }
+    ##
 fi

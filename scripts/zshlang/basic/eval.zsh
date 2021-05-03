@@ -26,13 +26,6 @@ function geval() {
     } || ecdbg "$cmd"
     eval -- "$cmd"
 }
-function hist-add-unquoted() {
-    print -r -S -- "$*"
-}
-function hist-add() {
-    print -r -S -- "$(gq "$@")"
-}
-alias hist-add-self='hist-add "$0" "$@"'
 ##
 function aget() {
     ##

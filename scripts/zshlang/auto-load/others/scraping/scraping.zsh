@@ -899,7 +899,14 @@ function aamedia1() {
             links+="$url"
             continue
         fi
-        t="$(url-title "$url")"
+        t="$(ectrace_notrace=y url-title "$url")" || {
+            if t="$(url-filename "$url")" && [[ "${t:l}" =~ "$regex" ]] ; then
+                ecerr "$0: URL seems to be a file, proceeding with this assumption ..."
+                titles+="${t:r}" # the ext is added from the URL anyway
+                links+="$url"
+            fi
+            continue
+        }
         l="$(getlinks-c "$url" -e "$regex" | gsort --unique)" || continue
         for l2 in ${(@f)l} ; do
             titles+="$t"
@@ -925,6 +932,7 @@ function aamedia1() {
     local opts
     for i in ${sel_i[@]} ; do
         l="${links[$i]}"
+        l="$(urlfinalg "$l")"
         t="${titles[$i]}"
         test -z "$l" && continue
         reval-rtl ec "Downloading ${t}:"$'\n'"$l" #$'\n'
@@ -940,10 +948,17 @@ function aamedia1() {
     unset sel_i
 
     bell-dl
-    if isI && fn-isTop && ask "Run vid-fix?" Y ; then
+    if isI && fn-isTop && fd-exists-d1 --ignore-case '\.webm$' &&ask "Run vid-fix?" Y ; then
         re 'assert vid-fix' *.webm @RET
         trs *.webm
     fi
+}
+function fd-exists() {
+    fd -uu --ignore-case --max-results=1 "$@" | silent command rg .
+    # https://github.com/sharkdp/fd/issues/303
+}
+function fd-exists-d1() {
+    fd-exists --max-depth=1 "$@"
 }
 ##
 function ygen() {

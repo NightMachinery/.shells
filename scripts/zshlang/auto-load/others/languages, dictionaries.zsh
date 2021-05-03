@@ -5,13 +5,16 @@ function sdc() {
     # it2prof 'Hotkey Window'
 }
 # pdc() { sdc "$(strip "$(pbpaste)" '\s+')" }
-alias pdc=ffdict
+function pdc() {
+    @opts autopaste y @ ffdict "$@"
+}
+
 ##
 function ffdict() {
-    local q="${*}" engine=("${ffdict_e[@]:-sdc}")
+    local q="${*}" engine=("${ffdict_e[@]:-sdc}") autopaste="${ffdict_autopaste}"
 
     local w words
-    if test -z "$q" ; then
+    if test -n "$autopaste" && test -z "$q" ; then
         words=("$(strip "$(pbpaste)" '\s+')")
     else
         : "You can use our binding for print-query (currently alt-enter) to print the current query."
