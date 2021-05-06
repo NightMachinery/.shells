@@ -106,3 +106,11 @@ function  mv-merge() {
     { colorfg "$gray[@]" ; trs "${(@)paths[1,-2]}" ; resetcolor } >&2
 }
 ##
+function fd-exists() {
+    fd -uu --ignore-case --max-results=1 "$@" | silent command rg .
+    # https://github.com/sharkdp/fd/issues/303
+}
+function fd-exists-d1() {
+    fd-exists --max-depth=1 "$@"
+}
+##

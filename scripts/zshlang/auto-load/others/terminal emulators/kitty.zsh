@@ -78,3 +78,8 @@ function kitty-launch-emc() {
     ##
 }
 ##
+function kitty-launch-icat() {
+    kitty @ launch --type=tab env PATH="$PATH" "$(which wait4user.sh)" "$(which kitty)" +kitten icat "$@"
+    # @raceCondition sometimes this does not work, no idea why
+}
+##

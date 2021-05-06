@@ -1,4 +1,6 @@
-// @docs https://github.com/kasper/phoenix/blob/master/docs/API.md
+// @docs
+// https://github.com/kasper/phoenix/blob/master/docs/API.md
+// https://github.com/kasper/phoenix/blob/2.6.7/docs/API.md#logging-and-debugging
 //
 // The JavaScript context is (re)loaded when the file changes.
 //   So you can do `touch ~/.phoenix.js` to force a reload

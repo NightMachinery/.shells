@@ -389,7 +389,7 @@ function bella-zsh-maybe() {
             silent awaysh @opts sf "$skipfirst" t 60 @ bella-zsh
         else
             # Do not use bell-auto for inactive sessions
-            bell-zsh
+            awaysh bell-zsh
         fi
     fi
 }

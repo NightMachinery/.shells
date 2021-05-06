@@ -95,7 +95,7 @@ function curl-dl() {
         curlm "$opts[@]" --output "${name:r}_$(uuidm).${name:e}" "$@"
         return $?
     fi
-    retrun $r
+    return $r
 }
 function curl-cookies() {
     # cookies-auto takes ~0.5s
@@ -884,7 +884,10 @@ function aamedia1() {
 
     local formats=( ${media_formats[@]} pdf )
     local regex='\.('"${(j.|.)formats}"')$'
-    local url t l titles=() links=()
+
+    typeset -ag titles=() links=() # @globalOutput
+
+    local url t l
     for url in "${urls[@]}" ; do
         size="$(url-size "$url")"  || {
             ecerr "$0: Could not get the size of URL '$url'"
@@ -915,9 +918,8 @@ function aamedia1() {
     done
 
     tts-glados1-cached "Media ready to download"
-    re typ links titles
 
-    local sel_i
+    typeset -ag sel_i=() # @globalOutput
     for i in {1.."${#links}"} ; do
         l="${links[$i]}"
         t="${titles[$i]}"
@@ -927,12 +929,21 @@ function aamedia1() {
     done | sponge | fz-masked "${(@F)links}" @RET # prints selected links to stdout
     # fz-masked needs to be the last process in the pipe or it'll fork and we will lose sel_i
     # do not rtl-reshape the links printed here, or they won't be copy-paste-able
-    ec $'\n'
-
+    ec $'\n'"#######"$'\n'
+    rgeval aamedia1-finish
+}
+function aamedia1-finish() {
+    if test -e .aamedia1_links ; then
+        silent trs .aamedia1_links.bak # it shoould be recoverable from the trash
+        command mv .aamedia1_links .aamedia1_links.bak
+    fi
+    re typ links titles sel_i >&1 2>&2 &> .aamedia1_links # @globalInput
+    # we can source this file to recover these variables
+    ##
     local opts
     for i in ${sel_i[@]} ; do
         l="${links[$i]}"
-        l="$(urlfinalg "$l")"
+        l="$(url-final2 "$l")" # beware not to use a downloading url-final function
         t="${titles[$i]}"
         test -z "$l" && continue
         reval-rtl ec "Downloading ${t}:"$'\n'"$l" #$'\n'
@@ -945,20 +956,12 @@ function aamedia1() {
             # revaldbg ensure curl-dl "$opts[@]" "$l" "$0"
         fi
     done
-    unset sel_i
 
     bell-dl
     if isI && fn-isTop && fd-exists-d1 --ignore-case '\.webm$' &&ask "Run vid-fix?" Y ; then
         re 'assert vid-fix' *.webm @RET
         trs *.webm
     fi
-}
-function fd-exists() {
-    fd -uu --ignore-case --max-results=1 "$@" | silent command rg .
-    # https://github.com/sharkdp/fd/issues/303
-}
-function fd-exists-d1() {
-    fd-exists --max-depth=1 "$@"
 }
 ##
 function ygen() {

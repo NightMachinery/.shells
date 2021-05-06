@@ -13,6 +13,11 @@ Use rcrdl to copy from remote to local."
     isI && opts+="--progress"
     RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$(url-tail "$rudi")" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$(url-tail "$rabbit")" rclone "$opts[@]" --multi-thread-streams=0 --drive-server-side-across-configs "$@"
 }
+##
+function rcr-gdrive-shareddrives-list() {
+    rcr backend drives "${1:-rudi}:"
+}
+##
 function rcrdl() {
     : "rclone auto-skips existing files, but we need special support for tags."
     : "Use 'rcrget.' to download a remote dir to PWD"
@@ -66,6 +71,7 @@ function r1() {
     mkdir -p $cache
     rabbit="$root" @opts rgquery "$rgquery" query "$query" @ rclonef rabbit0: $cache
 }
+##
 function r0() {
     # this supports resume but needs a mounted drive `rcrmount rabbit0: ~/r0`
     # ALT: r1 (rclonef)(faster, doesn't need mount)
@@ -92,11 +98,22 @@ function rcrmount-up() {
     mkdir -p ~/tmp/cache
     rcr mount --vfs-cache-max-size 3G --vfs-cache-mode writes --cache-dir ~/tmp/cache --vfs-cache-max-age $((1))h --vfs-cache-poll-interval 1h "$@"
 }
+##
 function rcrget() {
-    local id="$(url-tail "$1")" dest="${rcrget_dest:-rabbit0:g}"
+    local dest="${rcrget_dest:-rabbit0:g}"
     local to="$*[2,-1]"
+    local id="$1" file_mode="$rcrget_f"
+    if test -z "$file_mode" && [[ "$id" =~ '/file/' ]] ; then
+        file_mode=y
+    fi
+    id="$(ecn "$id" | command sd '/(view|edit)(\?[^/]*)$' '')"
+    id="$(url-tail "$id")"
 
-    rudi="$id" rcr copy rudi: "$dest"/"$to"
+    if bool "$file_mode" ; then
+        rcr backend copyid rudi: "$id" "$dest"/"$to"
+    else
+        rudi="$id" rcr copy rudi: "$dest"/"$to"
+    fi
 }
 noglobfn rcrget
 function rcrget.() {
@@ -110,6 +127,7 @@ function rcrget.() {
     rcrget_dest=. rcrget "$@"
 }
 noglobfn rcrget.
+@opts-setprefix rcrget. rcrget
 ##
 function jdlrc() {
     jglob

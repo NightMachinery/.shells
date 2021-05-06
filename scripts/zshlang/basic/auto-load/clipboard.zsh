@@ -1,6 +1,12 @@
 # alias pc='pbcopy'
-alias ccat='reval-copy cat'
-alias pc=ccat
+function cat-copy() {
+    local inargs
+    in-or-args2 "$@"
+
+    ec "$inargs" # yes, we are adding a newline here
+    ecn "$inargs" | pbcopy
+}
+alias pc=cat-copy
 alias pop='pbpaste'
 ##
 function tee-copy() {

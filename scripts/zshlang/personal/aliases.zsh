@@ -48,6 +48,6 @@ isDarwin && alias ncdu="ncdu --exclude 'Volumes' -x" # -x: Do not cross filesyst
 alias mail='sudo less /var/mail/$(whoami)'
 alias mcomix='awaysh python3 ~/bin/mcomixstarter.py'
 ##
-alias pz='printz-quoted' # USEME for using zsh history suggestions effectively; E.g., `pz in doom sees`
+alias pz='printz-quoted' # @useme for using zsh history suggestions effectively; E.g., `pz in doom sees`
 ##
 alias o="@opts"
