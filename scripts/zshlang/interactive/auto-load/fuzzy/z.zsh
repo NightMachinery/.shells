@@ -49,6 +49,7 @@ function ffz-get() {
     # DONE: We can also just cache the result for each query!
     ##
     setopt localoptions pipefail interactivecomments
+
     local query="${*}" cd_mode="${ffz_cd}" redis_dict='zdirs_choices' nocache="$ffz_nocache"
     if test -z "$query" ; then
         query="$ffz_last_query"
@@ -59,7 +60,7 @@ function ffz-get() {
     local redis_key="$query"
 
     local sel
-    if test -z "$nocache" && test -n "$redis_key" && silent redism hexists "$redis_dict" "$redis_key" ; then
+    if test -z "$nocache" && test -n "$redis_key" && silence redism hexists "$redis_dict" "$redis_key" ; then
         sel="$(redism hget "$redis_dict" "$redis_key")" @TRET
     else
         local fz_opts=( $fz_opts[@] --prompt "Z> ")
@@ -80,7 +81,7 @@ function ffz-get() {
             arrN /Volumes/*/*(/N)
 
             list_dirs_d=3 list-dirs "$PWD"
-            # 'list_dirs_d=3 time2 silent list-dirs ~/' takes 0.12s, using depth=4 takes 0.28s
+            # 'list_dirs_d=3 time2 silence list-dirs ~/' takes 0.12s, using depth=4 takes 0.28s
 
             list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
             memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
@@ -91,7 +92,7 @@ function ffz-get() {
             return $r
         }
 
-        assert silent redism hset "$redis_dict" "$redis_key" "$sel" @RET
+        assert silence redism hset "$redis_dict" "$redis_key" "$sel" @RET
     fi
 
     if test -z "$sel" ; then

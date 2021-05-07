@@ -30,6 +30,8 @@ function pdf-cover-gs() {
     ##
 }
 function pdf-cover() {
+    : "works with EPUBs, too"
+
     pdf2png "$@" 1
 }
 function pdf2png-mutool() {

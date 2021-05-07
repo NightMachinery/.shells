@@ -18,7 +18,7 @@ cd ~/tmp
 launch /usr/local/bin/bicon_zsh.dash
 new_tab
 cd ~/tmp
-launch /usr/local/bin/zsh
+launch /usr/local/bin/zsh -c emc-gateway
 new_tab
 cd ~/tmp
 launch /usr/local/bin/bicon_zsh.dash

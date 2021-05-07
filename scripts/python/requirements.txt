@@ -76,3 +76,4 @@ numba
 colorama
 pyyaml
 scipy
+gallery-dl

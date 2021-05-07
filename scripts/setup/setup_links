@@ -7,6 +7,8 @@ lnrp $NIGHTDIR/configFiles/kitty/kitty.conf ~/.config/kitty/
 lnrp $NIGHTDIR/configFiles/kitty/diff.conf ~/.config/kitty/
 lnrp $NIGHTDIR/configFiles/kitty/night-solarized-light.conf ~/.config/kitty/
 ##
+lnrp $nightNotes/private/configs/gallery-dl/.gallery-dl.conf ~/.gallery-dl.conf
+##
 if test -e ~/.config/ranger ; then
     ecerr "~/.config/ranger exists"
 else

@@ -48,6 +48,10 @@ def p2int(p):
 async def discreet_send(client, receiver, message, file=None, force_document=False, parse_mode=None, reply_to=None, link_preview=False):
     message = message.strip()
     last_msg = reply_to
+
+    if file and len(file) == 1:
+        file = file[0]
+
     if len(message) == 0:
         if file:
             last_msg = await client.send_file(receiver, file, reply_to=(last_msg), allow_cache=False)

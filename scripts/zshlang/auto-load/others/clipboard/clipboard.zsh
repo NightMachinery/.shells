@@ -237,7 +237,25 @@ function pbcopy-ask() {
 alias pca="pbcopy-ask"
 ##
 function clipboard-add-quoted() {
-    clipboard-add "$(gq "$@")"
+    local cmd="$(gq "$@")"
+
+    pbcopy "$cmd"
+    # clipboard-add "$cmd"
 }
 alias pcz='clipboard-add-quoted'
+##
+function clipboard-add-files() {
+    if isDarwin ; then
+        pbadd $@
+        # will be added to our own clipboard via the recorder
+    else
+        local i
+        for i in $@ ; do
+            i="$(grealpath -e "$i")" @TRET
+
+            clipboard-add "$i"
+        done
+    fi
+}
+alias pba='clipboard-add-files'
 ##

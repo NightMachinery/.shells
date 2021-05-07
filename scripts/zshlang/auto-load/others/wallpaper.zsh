@@ -69,7 +69,12 @@ function wallpaper-set-darwin() {
     local f="$1"
     f="$(realpath "$f")" || return $?
     ###
-    reval-ec osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"' || return $?
+    for i in {1..3} ; do
+        # sometimes doesn't work
+        ecgray "$(dateshort)"
+        reval-ec osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"' || return $?
+        sleep 60
+    done
     ##
     # mcli wallpaper "$f" || return $?
     ##

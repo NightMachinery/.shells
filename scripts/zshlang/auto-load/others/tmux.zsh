@@ -78,7 +78,8 @@ alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 function ivy() {
     if ! whitespace-is "$(pgrep tmux)" ; then
         if ! ask "$0: tmux seems to be running already; Proceed?" N ; then
-            return 1
+            tmux attach -t ivy
+            return 0
         fi
     fi
 

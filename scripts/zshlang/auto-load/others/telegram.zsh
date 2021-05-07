@@ -21,7 +21,7 @@ function tsendf() {
     do
         opts+=(--file "$f")
     done
-    tsend "$opts[@]" -- "$1" ''
+    revaldbg tsend "$opts[@]" -- "$1" ''
 }
 function tsendf-discrete() {
     local f

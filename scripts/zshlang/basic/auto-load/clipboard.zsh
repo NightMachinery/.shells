@@ -137,6 +137,11 @@ function pngpaste() {
     if test -n "$stdout" ; then
         cat "$f"
         command rm "$f"
+    else
+        ecgray "$0: pasted to $(gq "$f")"
+        if fn-isTop ; then
+            icat "$f"
+        fi
     fi
     ## @alt:
     # https://github.com/jcsalterego/pngpaste/issues/16
