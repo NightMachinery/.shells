@@ -8,7 +8,7 @@ function tumblr-post-dl() {
     local dl_urls=()
     if (( ${#dl_urls} == 0 )) ; then
         # needs API keys in ~/.gallery-dl.conf
-        dl_urls=( ${(@f)"$($proxyenv gallery-dl --get-urls "$url")"} ) @TRET
+        dl_urls=( ${(@f)"$($proxyenv gallery-dl --get-urls "$url")"} )
     fi
     ##
     # dl_urls=( ${(@f)"$(ec $html | rget 'data-big-photo="([^"]+)"' )"} )
@@ -24,7 +24,7 @@ function tumblr-post-dl() {
     if (( ${#dl_urls} == 0 )) ; then
         # works for GIFs and photo sets, too
         # the other  cases probably are not needed at all
-        dl_urls=( ${(@f)"$(ec $html | pup 'meta[property="og:image"] attr{content}')"} ) @TRET
+        dl_urls=( ${(@f)"$(ec $html | pup 'meta[property="og:image"] attr{content}')"} )
     fi
 
 
