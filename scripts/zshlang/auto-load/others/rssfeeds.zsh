@@ -106,8 +106,14 @@ function rss-tsend() {
                     l="$t"
                     t=""
                 else
-                    read -d $'\n' -r l <&${fd_in} # Warning: I have seen this somehow skipped once and then the whole subsequent cycle breaks. I assume it was some faulty feed, as after I disabled that feed, the problem went away. Still, rsstail is buggy. Update: with `fd_in`, this might already be fixed.
+                    read -d $'\n' -r l <&${fd_in}
+                    # Warning: I have seen this somehow skipped once and then the whole subsequent cycle breaks. I assume it was some faulty feed, as after I disabled that feed, the problem went away. Still, rsstail is buggy. Update: with `fd_in`, this might already be fixed.
                 fi
+                while ! match-url2 "$l" ; do
+                    ecerr "$0: bad URL $(gq "$l"); Getting the next line of stdin ..."
+
+                    read -d $'\n' -r l <&${fd_in}
+                done
                 l_norm="$(url-normalize "$l")"
 
                 ! (( $(redism SISMEMBER $rssurls "$l_norm") )) || { ec "Duplicate link: $l"$'\n'"Skipping ..." ; continue }
