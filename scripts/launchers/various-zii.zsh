@@ -20,6 +20,8 @@ tmuxnew v2ray v2ray -config /usr/local/etc/v2ray/config.json
 # Currently managed by systemd:
 # tmuxnew trojan trojan --config /usr/local/etc/trojan/config.json
 ##
+tmuxnew naive-eva naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
+
 launch-musicf.zsh
 ##
 chronic-all

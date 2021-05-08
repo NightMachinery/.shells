@@ -27,11 +27,14 @@ function spotify-discography-get2() {
 
     local limit=99999
     local urls=()
-    urls+="https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryArtistDiscographyAlbums&variables={\"uri\":\"spotify:artist:${artist_id}\",\"offset\":0,\"limit\":${limit}&extensions={\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"d1779ae56c892f6d8c8e6abe46d208fec828753bde79974d8dbf59b7ccaee1b4\"}}"
+    urls+="https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryArtistDiscographyAlbums&variables={\"uri\":\"spotify:artist:${artist_id}\",\"offset\":0,\"limit\":${limit}}&extensions={\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"d1779ae56c892f6d8c8e6abe46d208fec828753bde79974d8dbf59b7ccaee1b4\"}}"
     urls+="https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryArtistDiscographySingles&variables={\"uri\":\"spotify:artist:${artist_id}\",\"offset\":0,\"limit\":${limit}}&extensions={\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"d1779ae56c892f6d8c8e6abe46d208fec828753bde79974d8dbf59b7ccaee1b4\"}}"
+
+    # `operationName=queryArtistDiscographyCompilations` for compilations
 
     local auth
     auth="$(spotify-auth "$artist_url")" @RET
+    dvar auth
 
     local url
     for url in $urls[@] ; do
@@ -40,7 +43,7 @@ function spotify-discography-get2() {
         dact ecgray "$url"$'\n'
 
         local data
-        data="$(curlm "$url" -H "$auth")" || { ectrace "$0: failed to fetch the data from Spotify" "data: $(gq "$data")" ; return 1 }
+        data="$(curlm "$url" -H "$auth")" || { data="$(revaldbg curl --silent "$url" -H "$auth")" ; ectrace "$0: failed to fetch the data from Spotify" "data: $(gq "$data")" ; return 1 }
         # if we omit --fail from curl, it would return a proper error message in the payload
 
         ec "$data" | jq -re '.. | .shareUrl? // empty'
