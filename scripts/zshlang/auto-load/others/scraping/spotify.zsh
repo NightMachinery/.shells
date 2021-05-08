@@ -6,13 +6,48 @@ function h_spotify-discography-get() {
     # ec "$title"
     ec "$url"
 }
-function spotify-discography-get() {
-    local artist_url="${1:?}"
+function spotify-discography-get1() {
+    local artist_url="${1}"
+    assert-args artist_url @RET
 
     # `/album/` gets singles, too
     withchrome getlinks-c "${artist_url}/discography" | rg -F /album/ | inargsf re h_spotify-discography-get
 }
-renog spotify-discography-get
+renog spotify-discography-get1
+function spotify-discography-get() {
+    spotify-discography-get2 "$@"
+}
+noglobfn spotify-discography-get
+function spotify-discography-get2() {
+    local artist_url="${1}"
+    assert-args artist_url @RET
+
+    local artist_id
+    artist_id="$(ec "$artist_url" | rget '^https://open.spotify.com/artist/([^/]+)/?')" @TRET
+
+    local limit=99999
+    local urls=()
+    urls+="https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryArtistDiscographyAlbums&variables={\"uri\":\"spotify:artist:${artist_id}\",\"offset\":0,\"limit\":${limit}&extensions={\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"d1779ae56c892f6d8c8e6abe46d208fec828753bde79974d8dbf59b7ccaee1b4\"}}"
+    urls+="https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryArtistDiscographySingles&variables={\"uri\":\"spotify:artist:${artist_id}\",\"offset\":0,\"limit\":${limit}}&extensions={\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"d1779ae56c892f6d8c8e6abe46d208fec828753bde79974d8dbf59b7ccaee1b4\"}}"
+
+    local auth
+    auth="$(withchrome full-html2 "$artist_url" | rget '"accessToken"\s*:\s*"([^"]+)"')" @TRET
+    auth="authorization: Bearer ${auth}"
+
+    local url
+    for url in $urls[@] ; do
+        url="$(ecn "$url" | url-encode.py)"
+
+        dact ecgray "$url"$'\n'
+
+        local data
+        data="$(curlm "$url" -H "$auth")" || { ectrace "$0: failed to fetch from Spotify" "data: $(gq "$data")" ; return 1 }
+        # if we omit --fail from curl, it would return a proper error message in the payload
+
+        ec "$data" | jq -re '.. | .shareUrl? // empty'
+    done
+}
+renog spotify-discography-get2
 ##
 function rss-engine-spotify() {
     local url="${1}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"

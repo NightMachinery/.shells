@@ -59,10 +59,15 @@ function ec_bash() {
 }
 ##
 function gquote() {
-    doc Use this to control quoting centrally.
+    # Use this to control quoting centrally.
     ec "${(q+@)@}"
 }
+function gquote-dq() {
+    # uses double-quotes
+    ec "${(qqq@)@}"
+}
 alias gq=gquote
+alias gqd=gquote-dq
 function gq() { gquote "$@" }
 ##
 function run-on-each() {

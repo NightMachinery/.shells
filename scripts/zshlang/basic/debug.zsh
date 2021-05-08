@@ -52,13 +52,13 @@ function ecnerr() {
     ecn "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
 }
 function ecgray() {
-    { colorfg "$gray[@]" ; ec "${@}" ; resetcolor }
+    { colorfg "$gray[@]" ; ec "${@}" ; resetcolor } 1>&2
 }
 function ecngray() {
-    { colorfg "$gray[@]" ; ecn "${@}" ; resetcolor }
+    { colorfg "$gray[@]" ; ecn "${@}" ; resetcolor } 1>&2
 }
 function ecdate() {
-    ec "$edPre$(color 100 100 100 $(dateshort))            $@"
+    ec "$edPre$(color 100 100 100 $(dateshort))            $@" 1>&2
 }
 function ecdate-err() {
     ecerr-raw "$(ecdate "$(colorfg 255 50 10)${*}$(resetcolor)")" >&2
