@@ -28,6 +28,9 @@ fi
 function isLilf() {
     [[ "$(hostname)" == 'lilf.ir' ]]
 }
+function isZii() {
+    [[ "$(hostname)" == 'mail2.lilf.ir' ]]
+}
 function isLocal() {
     # @darwinonly0
     isDarwin

@@ -77,3 +77,4 @@ colorama
 pyyaml
 scipy
 gallery-dl
+coursera-dl

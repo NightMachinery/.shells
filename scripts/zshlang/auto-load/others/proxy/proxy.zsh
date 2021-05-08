@@ -8,10 +8,19 @@ typeset -g proxyenv="${proxyenv:-reval}"
 ##
 export no_proxy='127.0.0.1,localhost'
 ###
-socksport=1081
-export pxs_env="ALL_PROXY=socks5h://127.0.0.1:$socksport"
-alias pxs="$pxs_env"
-alias pxs-local="local -x $pxs_env"
+function pxs-create() {
+    typeset -g socksport="${1:-1081}"
+
+    export pxs_env="ALL_PROXY=socks5h://127.0.0.1:$socksport"
+    alias pxs="$pxs_env"
+    alias pxs-local="local -x $pxs_env"
+}
+if isZii ; then
+    pxs-create 1078
+else
+    pxs-create
+fi
+
 # alias pxs-maybe='isIran && pxs-local'
 alias pxs-maybe='isLocal && pxs-local'
 function reval-pxs() {
@@ -30,6 +39,7 @@ function pxa-create() {
     alias pxa-local="local -x $pxa_env"
 }
 pxa-create
+
 # alias pxa-maybe='isIran && pxa-local'
 alias pxa-maybe='isLocal && pxa-local'
 function reval-pxa() {
