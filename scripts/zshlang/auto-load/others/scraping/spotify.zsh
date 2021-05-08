@@ -31,8 +31,7 @@ function spotify-discography-get2() {
     urls+="https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryArtistDiscographySingles&variables={\"uri\":\"spotify:artist:${artist_id}\",\"offset\":0,\"limit\":${limit}}&extensions={\"persistedQuery\":{\"version\":1,\"sha256Hash\":\"d1779ae56c892f6d8c8e6abe46d208fec828753bde79974d8dbf59b7ccaee1b4\"}}"
 
     local auth
-    auth="$(withchrome full-html2 "$artist_url" | rget '"accessToken"\s*:\s*"([^"]+)"')" @TRET
-    auth="authorization: Bearer ${auth}"
+    auth="$(spotify-auth "$artist_url")" @RET
 
     local url
     for url in $urls[@] ; do
@@ -41,13 +40,24 @@ function spotify-discography-get2() {
         dact ecgray "$url"$'\n'
 
         local data
-        data="$(curlm "$url" -H "$auth")" || { ectrace "$0: failed to fetch from Spotify" "data: $(gq "$data")" ; return 1 }
+        data="$(curlm "$url" -H "$auth")" || { ectrace "$0: failed to fetch the data from Spotify" "data: $(gq "$data")" ; return 1 }
         # if we omit --fail from curl, it would return a proper error message in the payload
 
         ec "$data" | jq -re '.. | .shareUrl? // empty'
     done
 }
 renog spotify-discography-get2
+
+function spotify-auth() {
+    local url="$1"
+    assert-args url @RET
+
+    local auth
+    auth="$(withchrome full-html2 "$url" | rget '"accessToken"\s*:\s*"([^"]+)"')" || { ectrace "$0: failed to fetch the access token from Spotify" "Note that some server subnets are blocked by Spotify." ; return $? }
+    auth="authorization: Bearer ${auth}"
+
+    ec "$auth"
+}
 ##
 function rss-engine-spotify() {
     local url="${1}" title="${rssTitle}" receiver="${rss_engine_spotify_r:--1001203291196}"
