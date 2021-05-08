@@ -53,6 +53,7 @@ try:
     credpath = local.env["HOME"] + "/.gmail.credentials.json"
     import ezgmail as g
 
+    # @todo1 send notif if this needs auth
     g.init(tokenFile=tokenpath, credentialsFile=credpath)
     service = g.SERVICE_GMAIL
 

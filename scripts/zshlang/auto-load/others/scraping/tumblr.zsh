@@ -40,13 +40,17 @@ function tumblr2tlg() {
     local chat="${tumblr2tlg_chat:--1001408125632}"
     assert-args chat @RET
 
-    pushf "$(uuidm)" @TRET
+    local d="$HOME/tmp/tumblr/$(uuidm)"
+    pushf "$d" @TRET
     {
         assert tumblr-post-dl "$@" @RET
         local f
         for f in *(DN.) ; do
             assert tsendf "$chat" "$f"
         done
-    } always { popf }
+    } always {
+        popf
+        silent trs-rm "$d"
+    }
 }
 ##
