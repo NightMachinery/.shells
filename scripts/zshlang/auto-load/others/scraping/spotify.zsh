@@ -46,8 +46,8 @@ function spotify-discography-get2() {
         data="$(curlm "$url" -H "$auth")" || { data="$(revaldbg curl --silent "$url" -H "$auth")" ; ectrace "$0: failed to fetch the data from Spotify" "data: $(gq "$data")" ; return 1 }
         # if we omit --fail from curl, it would return a proper error message in the payload
 
-        ec "$data" | jq -re '.. | .shareUrl? // empty' | command sd '\?[^/\n]*/?$' ''
-        ec ''
+        data="$(ec "$data" | jq -re '.. | .shareUrl? // empty' | command sd '\?[^/\n]*/?$' '')"
+        ec $data
     done
 }
 renog spotify-discography-get2
