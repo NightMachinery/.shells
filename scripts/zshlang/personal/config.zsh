@@ -1,6 +1,8 @@
 ###
 alias nohistory='unset HISTFILE' #disables history for current session
 function history-enable() {
+    ecerr "$0: Beware that this will still persist the history items before this was called"
+
     if [ -z "$HISTFILE" ]; then
         HISTFILE=$HOME/.zsh_history
     fi
