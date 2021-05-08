@@ -32,4 +32,6 @@ if test -e ~/code/kotlin/smsq/go/config.json ; then
     tmuxnew smsq smsq ~/code/kotlin/smsq/go/config.json
 fi
 ##
+# launch-musicf.zsh
+##
 chronic-all
