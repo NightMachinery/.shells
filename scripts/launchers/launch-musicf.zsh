@@ -99,7 +99,7 @@ artists['Infected Mushroom']='https://open.spotify.com/artist/6S2tas4z6DyIklBajD
 ###
 local proxy=''
 if isZii || isIran ; then
-    proxy="$pxs_env"
+    proxy="$pxa_env"
 fi
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(rss-engine-spotify) rt_notel=y rt_nt=y rt_ge=(spotify-discography-get) rt_eud=0 rt_eid=$((3600*24*7)) $proxy rt_duplicates_key='' " tmuxnewsh musicf-spotify rss-tsend ${(@v)artists}
 

@@ -68,7 +68,7 @@ function rss-engine-spotify() {
     test -n "$title" || title="$(serr url-title $url | sd '\s+' ' ')"
 
 
-    local log_spotdl="$HOME/logs/$0_spotdl"
+    local log_spotdl="$HOME/logs/$0_spotdl" # use `tail -f` with this
     local log="$HOME/logs/$0"
     ensure-dir "$log" || return $?
 
@@ -123,7 +123,7 @@ function rss-engine-spotify() {
 function spotify-url-get-artist() {
     local url="${1:?}"
 
-    full-html2 "$url" | pup 'meta[property="og:title"] attr{content}'
+    fhMode=curl full-html2 "$url" | pup 'meta[property="og:title"] attr{content}'
     ##
     # urlmeta2 "$url" description | rget '^\s*([^·]+)'
 }
@@ -132,7 +132,11 @@ function spotify-url-get-date() {
     local url="${1:?}" out_fmt="${spotify_url_get_date_fmt:-%Y-%B}"
 
     local date tmp
-    date="$(eval-memoi full-html2 "$url" | pup 'meta[property="music:release_date"] attr{content}')" || return $?
+
+    date="$(fhMode=curl full-html2 "$url" | pup 'meta[property="music:release_date"] attr{content}')" || return $?
+    #  `rget '<meta\s*property="music:release_date"\s*content="([^"]+)"'` also works
+    #  withchrome is not strictly necessary, but without it sometimes the tag is not present ...
+
     dvar date
     if [[ "$date" =~ '^\s*(\d\d\d\d)\s*$' ]] ; then
         date="${match[1]}-1-1" # `gdate --date="2009"` parses wrongly
