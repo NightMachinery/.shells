@@ -102,7 +102,7 @@ function rss-tsend() {
             exec {fd_in}<&0
             exec </dev/null
             while read -d $'\n' -r t <&${fd_in}; do
-                if test -n "$no_title" ; then
+                if test -n "$no_title" || match-url2 "$t" ; then
                     l="$t"
                     t=""
                 else
