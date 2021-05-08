@@ -118,7 +118,6 @@ alias erase-nonprintables='tr -cd "[:print:]\n"'
 alias s=silent
 alias rh=rehash
 alias table2ebook='\wget -r -k -c --no-check-certificate -l1' #recursive convert_links continue recursive_depth
-alias coursera='coursera-dl -n -pl --aria2 --video-resolution 720p --download-quizzes --download-notebooks -sl "en,fa" --resume'
 alias ox='zdict -dt oxford'
 alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
