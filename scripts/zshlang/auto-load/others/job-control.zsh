@@ -16,7 +16,7 @@ function loop() {
     local lo_p="$lo_p"
     ensure-dir "$lo_p"
 
-    >&2 ec "$(colorfg 255 255 255)$(colorbg 0 30 230) Looping $(colorfg 0 30 230)$(colorbg 255 255 255) ${cmd}$(colorfg 255 255 255)$(colorbg 0 30 230) with interval $(colorfg 255,73,28) $inter$(resetcolor)"
+    >&2 ec "$(colorfg 255 255 255)$(colorbg 0 30 230) Looping $(colorfg 0 30 230)$(colorbg 255 255 255) ${cmd}$(colorfg 255 255 255)$(colorbg 0 30 230) with interval $(colorfg 255 73 28)$inter$(resetcolor)"
     local sig=1 neon prv_loop_iteration=0 sig2=0
     test -z "$lo_noinit" || {
         color 0 255 100 "$(colorbg 255 255 255)Skipping first iteration" >&2

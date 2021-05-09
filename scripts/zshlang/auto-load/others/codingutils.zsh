@@ -22,7 +22,7 @@ function whz() {
     preEnhNames "$@"
     local items=("$out[@]")
 
-    printz "$(which "$items[-1]")" #"${(q-@)"$(which "$1")"}"
+    printz "$(which -- "$items[-1]")" #"${(q-@)"$(which -- "$1")"}"
 }
 whichm() {
     ##
@@ -36,7 +36,7 @@ whichm() {
     for item in "$items[@]"
     do
         (( ${+builtins[$item]} )) && ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) && {
-            ec "## $(which $item)"
+            ec "## $(which -- $item)"
             continue
         }
 
@@ -158,12 +158,12 @@ serr rm "$zipdest"
 }
 function cee() {
     local f
-    f="$(which "$1")" || return $?
+    f="$(which -- "$1")" || return $?
     cat "$f"
 }
 function ceer() {
     local f
-    f="$(which "$1")" || return $?
+    f="$(which -- "$1")" || return $?
     rgeval "${@:2}" "$f"
 }
 function mn() {

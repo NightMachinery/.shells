@@ -47,6 +47,8 @@ function spotify-discography-get2() {
         # if we omit --fail from curl, it would return a proper error message in the payload
 
         data="$(ec "$data" | jq -re '.. | .shareUrl? // empty' | command sd '\?[^/\n]*/?$' '')"
+        # @correct `\n` is escaped correctly for sd
+
         ec $data
     done
 }

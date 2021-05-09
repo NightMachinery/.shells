@@ -91,6 +91,8 @@ function tts-glados1() {
 
     local text="${1}" output="${2:?}"
 
+    text="$(ecn "$text" | sdlit $'\n' " , ")" # this API does not support multiline input
+
     curl --silent -L --retry 30 --get --fail --data-urlencode "text=$text" "https://glados.c-net.org/generate" > "${output:?}"
 }
 aliasfn tts-glados1-cached @opts e tts-glados1 @ tts-gateway

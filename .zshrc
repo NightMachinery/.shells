@@ -331,7 +331,12 @@ fi
 # antibody bundle Tarrasch/zsh-colors
 # antibody bundle Vifon/deer
 zsh-defer antibody bundle unixorn/git-extra-commands
-zsh-defer antibody bundle zdharma/zzcomplete # ^F
+
+##
+# zsh-defer antibody bundle zdharma/zzcomplete # binds C-f, ^F
+# does not support light themes https://github.com/zdharma/zzcomplete/issues/1
+##
+
 if test -n "$bicon_force_plugins" || ! isBicon ; then
   ##
   export ZSH_AUTOSUGGEST_USE_ASYNC=y # idk if export is necessary
@@ -384,12 +389,15 @@ bindkey "^I" expand-or-complete-with-dots
 ##
 FZTAB_OPTS=(
     --color=light # needed, as fzf-tab overrides the colors, so we need to re-override them
+    -i # case-insensitive (as opposed to smart-case)
     # --height='${FZF_TMUX_HEIGHT:=75%}'
-    --sync # @futureCron perhaps this will solve the nasty bug? If not, switch to an fzf alternative like fzy and see what happens
+    # --sync # did not solve the weird fzf bug
 )
 function fztab() {
     ##
     command fzf "$@" "$FZTAB_OPTS[@]"
+
+    # fnswap isI true ugfz "$@" "$FZTAB_OPTS[@]" ""
     ##
     # Do NOT use --exit-0 or in macOS you will not be able to start typing before the fzf window opens
     # fzf_mru_context= fzf-gateway  "$@" "$FZTAB_OPTS[@]"
@@ -541,6 +549,8 @@ zstyle :bracketed-paste-magic paste-finish pastefinish
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
 ##
 psource $HOME/.shellfishrc
+##
+# psource ~/.xsh # @futureCron remove me if unused
 ###
 rcLoaded='loading' # Do NOT export this, or `exec zsh` will inherit it
 zsh-defer typeset -g rcLoaded='yes'

@@ -30,8 +30,6 @@ function hist-last() {
     ##
 }
 ##
-typeset -g UHIST_FILE="$nightNotes/bookmarks/useme/zsh/universal_history.zsh"
-typeset -g UHIST_FILE_FC="$nightNotes/bookmarks/useme/zsh/universal_history_fc.zsh"
 function seal-history-append() {
     assert test -e "$UHIST_FILE" @RET
 

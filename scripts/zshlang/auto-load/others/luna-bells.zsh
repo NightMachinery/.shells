@@ -84,13 +84,19 @@ function sharif-vc-is() {
     [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]]
 }
 bell-avarice() {
+    bella_zsh_disable1=y
+
     # fsay "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
 }
 bell-luna-mpv() {
+    bella_zsh_disable1=y
+
     @opts v 100 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna_mpv/$~audioglob)"
 }
 bell-toy() {
+    bella_zsh_disable1=y
+
     # say "disquiet creatures of avarice have risen yet again ..."
     @opts v 140 @ hearinvisible "$(rndarr $GREENCASE_DIR/toystory2/**/$~audioglob)"
 }
@@ -108,6 +114,8 @@ bell-greencase() {
     # time (@opts v 70 @ hearinvisible '/Users/evar/Base/Music/greencase/PC Computer - Portal 2 - Turret/turretlaunched05.wav')
     # time (hearinvisible '/Users/evar/Base/Music/greencase/PC Computer - Portal 2 - Turret/turretlaunched05.wav')
     ##
+    bella_zsh_disable1=y
+
     greencase_audio_init
     reval-ec @opts v 140 @ hearinvisible "$(rndarr $greencase_audio[@])"
 }
@@ -128,6 +136,8 @@ function lunaquit() {
     return 0
 }
 function lunaquit-monitor() {
+    # @todo1 make this single-instance
+
     local finished=''
     trapexits
     {
@@ -155,8 +165,7 @@ function lunaquit-monitor() {
                 bell-evacuate
             fi
             mark-me zsh
-        )
-        finished=y # commenting this line might be better, as deluna will kill the timer-late anyway on inactivity
+        ) && finished=y # commenting this line might be better, as deluna will kill the timer-late anyway on inactivity
     } always {
         kill-marker-luna-timer-late
         if test -z "$finished" ; then
@@ -240,14 +249,18 @@ Not Now Luna!" MAGIC
     set-volume "$vol"
 }
 ##
-bellj_socket=~/.sockets/bellj
+bellj_socket=~/.sockets/bellj # @correct ensure-dir is called in `loop`
+
 bellj_say="Jingle bells, jingle bells,
 Jingle all the way.
 Oh! what fun it is to ride
 In a one-horse open sleigh."
+
 function bell-jingles() {
-    fsay $bellj_say
+    tts-glados1-cached $bellj_say
+    # tts-gateway-i2 $bellj_say
 }
+##
 function bell-ReichPhase() {
     @opts v 130 @ hearinvisible $NIGHTDIR/resources/audio/ReichPhase.wav
 }
@@ -275,9 +288,12 @@ function bell-repeat() {
         return 1
     }
     local bell="${1:-bell-ReichPhase}"
-    lo_sig2cancel=y lo_s=0.2 lo_p=${lo_p:-$bellj_socket} loop "$bell" #bell-helicopter
+
+    local bell_awaysh=no
+    lo_sig2cancel=y lo_s=0.2 lo_p=${lo_p:-$bellj_socket} loop "$bell"
 }
 aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
+##
 function bell-auto() {
     isDarwin || {
         ecerr "$0: Not running on Darwin."
@@ -316,8 +332,9 @@ function bell-auto() {
     test -n "$exit_cmd[*]" && reval-ec "$exit_cmd[@]"
     ec "$0 exited. (nonce: $nonce)"
 }
-aliasfn bell-auto-stop oneinstance-setup bell-auto
+aliasfn bell-auto-stop oneinstance-setup bell-auto # forces active bell-autos to exit
 aliasfn bellaok bell-auto-stop
+##
 aliasfn bellsc-stop ot-stop
 ##
 aliasfn bellsc-heli ot-play-helicopter

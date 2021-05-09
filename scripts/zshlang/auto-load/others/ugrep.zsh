@@ -85,9 +85,13 @@ function ugfz() {
 
     local FZF_DEFAULT_COMMAND="$RG_PREFIX $(gq "${INITIAL_QUERY}")" # Not exported as we are just feeding fzf on stdin ourselves
     if isI ; then
+        if test -n "$INITIAL_QUERY" ; then
+            opts+=( --query "$INITIAL_QUERY " )
+        fi
+
         eval "$FZF_DEFAULT_COMMAND" |
             FZF_SIMPLE_PREVIEW='cat {f}' \
-                fz --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --disabled --query "$INITIAL_QUERY "
+                fz --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --disabled
     else
         eval "$FZF_DEFAULT_COMMAND" | {
             sponge || true # no idea why sometimes this can fail 141

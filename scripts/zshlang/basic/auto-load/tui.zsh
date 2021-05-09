@@ -3,7 +3,7 @@ function printz-quoted() {
 }
 function printz() {
     test -n "$*" && {
-        isI && print -rz -- "$@" || ec "$@"
+        isI && print -rz -- "$@ " || ec "$@"
     }
 }
 ##

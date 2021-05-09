@@ -76,6 +76,9 @@ function tmux-capture() {
 ##
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 function ivy() {
+    ## ivy acts as the terminal emulator's startup hook, as well
+    phoenix-reload
+    ##
     if ! whitespace-is "$(pgrep tmux)" ; then
         if ! ask "$0: tmux seems to be running already; Proceed?" N ; then
             tmux attach -t ivy

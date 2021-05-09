@@ -24,6 +24,10 @@ function hearinvisible-fast() {
 function hearinvisible-playfast() {
     local vol="${hear_volume:-${hear_v:-1}}" loudidle="${hear_loudidle}"
 
+    if (( vol >= 10 )) ; then
+        ecgray "$0: Volume assumed to be in the 100 scale"
+        vol=$(( vol / 100.0 )) @TRET
+    fi
 
     if bool $loudidle ; then
         if (( $(idle-get) >= 20 )) && ! sharif-vc-is ; then

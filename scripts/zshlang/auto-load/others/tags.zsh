@@ -9,26 +9,24 @@ ntag_colors=(red orange yellow green blue purple gray black aqua teal)
 ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
 ### shortcut aliases
-function h_tgfn_tag() {
-    local tag="${1:? Tag required}"
+# function h_tgfn_tag() {
+#     local tag="${1:? Tag required}"
 
-    aliasfnq tg-"$tag" ntag-add-multi "$tag"
-}
-re h_tgfn_tag $ntag_colors[@]
-aliasfn mg tg-gray
+#     aliasfnq tg-"$tag" ntag-add-multi "$tag"
+# }
+# re h_tgfn_tag $ntag_colors[@]
+# aliasfn mg tg-gray
 ##
-function ntag-filter-or-add() {
-    local tag="${1:?}" ; shift
-    if (( $#@ == 0 )) ; then
-        ntag-filter "$tag"
-    else
-        ntag-add-multi "$tag" "$@"
-    fi
-}
 function h_aliastag() {
-    # aliasfn "$1" ntag-filter "$1" # @altAPT ; This is used less often, so I dropped it. You can use `tgf blue green ...` for this.
-    aliasfn "$1" ntag-filter-or-add "$1"
-    @opts-setprefix "$1" ntag-search
+    local tag="$1"
+    assert-args tag @RET
+
+    ##
+    # aliasfn "$tag" ntag-filter "$tag" # @altAPT ; This is used less often, so I dropped it. You can use `tgf blue green ...` for this.
+
+    aliasfn "$tag" ntag-filter-or-add "$tag"
+    @opts-setprefix "$tag" ntag-search
+    ##
 }
 re h_aliastag $ntag_colors[@] @todo @todo{0..9} # You can use `fd ..@todo` to prefix-search.
 ##
@@ -44,7 +42,20 @@ function gray() {
 @opts-setprefix gray ntag-search
 aliasfn grey gray
 @opts-setprefix grey ntag-search
+aliasfn mg gray # make gray
+@opts-setprefix mg ntag-search
+
+aliasfn lxg lx gray grey
 ###
+function ntag-filter-or-add() {
+    local tag="${1:?}" ; shift
+    if (( $#@ == 0 )) ; then
+        ntag-filter "$tag"
+    else
+        ntag-add-multi "$tag" "$@"
+    fi
+}
+##
 function ntag-l() {
     if isI && istty ; then
         exa -a --color always "$@" | ntag-color | rtl-reshaper
@@ -371,7 +382,7 @@ function ntag-gen-rec() {
         if test -d "$f" ; then
             local dir="${f}"
             fd ${ntag_fd_opts[@]} --type file --type symlink --type socket . "$dir" | inargsf re "$engine_q"
-            fd ${ntag_fd_opts[@]} --type directory . "$dir" | inargsf re "$engine_q" # @todo @BUG: Having nested tagged directories can invalidate the path of the deeper dir. Crude workaround: run this function multiple times. (Sorting by, e.g., length should solve this?)
+            fd ${ntag_fd_opts[@]} --type directory . "$dir" | inargsf re "$engine_q" # @todo2 @Bug Having nested tagged directories can invalidate the path of the deeper dir. Crude workaround: run this function multiple times. (Sorting by, e.g., length should solve this?)
             reval "$engine[@]" "$dir" # last because renaming the root dir will invalidate all further operations
         else
             reval "$engine[@]" "$f"
@@ -416,6 +427,30 @@ aliasfn ntag-grep fnswap isI false ntag-search
 @opts-setprefix ntag-grep ntag-search
 
 aliasfn ntag-grepor fnswap isI false ntag-searchor
+##
+function ntag-exclude() {
+    local colorMode="${ntag_exclude_c}"
+    if test -z "$colorMode" && { isI && istty } ; then
+        colorMode=y
+    fi
+    local i opts=()
+    for i in $@ ; do
+        opts+=( --exclude "*${ntag_sep}${i}${ntag_sep}*" )
+    done
+    if bool $colorMode ; then
+        opts+=( --color always )
+    fi
+
+    local res
+    res="$(fd ${ntag_fd_opts[@]} "$opts[@]")" @TRET
+
+    if bool "$colorMode" ; then
+        ec $res | ntag-color
+    else
+        ec $res
+    fi
+}
+aliasfn lx ntag-exclude
 ###
 function ntag_filter_rg() {
     local pattern="$1" bg="${2:-0,0,0}" fg="${3:-255,255,255}"
