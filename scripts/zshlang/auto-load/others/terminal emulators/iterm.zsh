@@ -64,7 +64,8 @@ function icat-kitty() {
 }
 function icat-kitty-single() {
     icat-kitty --clear
-    icat-kitty --place "${COLUMNS}x30@0x0" --scale-up "$@"
+    icat-kitty --place "${COLUMNS}x${LINES}@0x0" --scale-up "$@"
+    # @see kitty-launch-icat
 }
 aliasfn icat-kitty2 pixcat fit-screen --enlarge --vertical-margin 60 # accepts dirs, too
 aliasfn islideshow-kitty icat-kitty2 --hang # press ENTER to go to next image

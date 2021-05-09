@@ -2,6 +2,8 @@
 // https://github.com/kasper/phoenix/blob/master/docs/API.md
 // https://github.com/kasper/phoenix/blob/2.6.7/docs/API.md#logging-and-debugging
 //
+// The hotkey window code in hammerspoon: https://gist.github.com/programus/d3bf9c6b8f9b7648891d1f59b665b35e
+//
 // The JavaScript context is (re)loaded when the file changes.
 //   So you can do `touch ~/.phoenix.js` to force a reload
 //

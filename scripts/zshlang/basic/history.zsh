@@ -48,7 +48,7 @@ function seal-history-literal-fc() {
         ##
         # seal-history-unquoted "$cmd"
         ##
-        hist-add-universal-unquoted "$cmd"
+        reval-ec hist-add-universal-unquoted "$cmd"
         ##
     else
         ecerr "$0: failed to match: $(gq "$line")"

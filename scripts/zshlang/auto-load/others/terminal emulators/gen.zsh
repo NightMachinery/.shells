@@ -78,3 +78,19 @@ function terminal-ansi-test() {
 }
 
 ##
+function tty-link() {
+    local link="$1"
+    local desc="${2:-${link:t}}"
+
+    if test -e "$link" ; then
+        link="file://$(hostname)$(grealpath "$link")"
+    fi
+
+    printf '\e]8;;%s\e\\%s\e]8;;\e\\\n' "$link" "$desc"
+    # https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda
+    ## tests:
+    # `tty-link 'https://www.bing.com' bing`
+    # `tty-link ~/tmp "Temp dir"`
+    ##
+}
+##

@@ -71,15 +71,26 @@ function kitty-is-focused() {
 }
 ##
 function kitty-launch-emc() {
-    kitty @ launch '--type=tab' "${commands[zsh]}" -c emc-gateway
+    kitty-remote launch '--type=tab' "${commands[zsh]}" -c emc-gateway
     ##
     # This doesn't work, as somehow our config is not loaded. It will work if there is already a server running on EMACS_SOCKET_NAME though
     # kitty @ launch '--type=tab' bash -c 'TERM=xterm-24bits EMACS_SOCKET_NAME=$HOME/tmp/.emacs ALTERNATE_EDITOR= emacsclient -t ; sleep 10'
     ##
 }
+alias kemc='kitty-launch-emc'
 ##
 function kitty-launch-icat() {
-    kitty @ launch --type=tab env PATH="$PATH" "$(which wait4user.sh)" "$(which kitty)" +kitten icat "$@"
+    ##
+    # kitty @ launch --type=tab env PATH="$PATH" "$(which wait4user.sh)" "$(which kitty)" +kitten icat "$@"
     # @raceCondition sometimes this does not work, no idea why
+    ##
+    local f fs=()
+    for f in $@ ; do
+        fs+="$(grealpath -e "$f")" @TRET
+    done
+
+    # @see icat-kitty-single
+    kitty-remote launch --type=overlay kitty +kitten icat --hold --place "${COLUMNS}x${LINES}@0x0" --scale-up "$fs[@]"
+    ##
 }
 ##

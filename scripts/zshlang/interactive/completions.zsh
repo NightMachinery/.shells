@@ -102,3 +102,5 @@ _foo() {
 function foo { echo $* }
 compdef _foo foo
 ##
+kitty + complete setup zsh | source /dev/stdin
+##

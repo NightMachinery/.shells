@@ -547,7 +547,18 @@ zstyle :bracketed-paste-magic paste-finish pastefinish
 
 # https://github.com/zsh-users/zsh-autosuggestions/issues/351
 ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
-##
+###
+# remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
+WORDCHARS="${WORDCHARS/\//}|"
+## if you want to customize this per function:
+# function backward-kill-word2() {
+#   local WORDCHARS="${WORDCHARS}"
+#   zle backward-kill-word
+# }
+
+# zle -N backward-kill-word2
+# bindkey '^W' backward-kill-word2
+###
 psource $HOME/.shellfishrc
 ##
 # psource ~/.xsh # @futureCron remove me if unused
