@@ -9,7 +9,7 @@ export LPASS_AUTO_SYNC_TIME=$((3600*24*7))
 export LPASS_AGENT_TIMEOUT=$((3600*24*7))
 export VCSH_GITATTRIBUTES=y
 export kindle_email=fifya@kindle.com #PERSONALINFO
-isD && export NEDITOR='emacsclient -t' || export NEDITOR='vim' #emacsclient `-t` is essential.
+isLocal && export NEDITOR='emacs.dash' || export NEDITOR='vim'
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
 export SUDO_EDITOR="$NEDITOR"
 export VISUAL="$NEDITOR"

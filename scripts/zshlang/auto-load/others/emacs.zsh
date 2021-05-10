@@ -1,4 +1,7 @@
 ##
+# export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
+export EMACS_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server"
+##
 function emc-sudo() {
     : "See also doom--sudo-file-path"
 
@@ -66,7 +69,7 @@ function emc-eval() {
      (require 'server)
      (princ
        (format \"%s\\n\"
-         (server-eval-at \"server\" '(with-current-buffer (window-buffer (selected-window))
+         (server-eval-at (concat (getenv \"EMACS_SOCKET_NAME\")) '(with-current-buffer (window-buffer (selected-window))
                                          "${*}")
             )
          )
