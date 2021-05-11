@@ -28,6 +28,8 @@ function browser-recordings-process-watch() {
 
     browser-recordings-process
     while true ; do
+        # @todo3 switch to 'fswatch'
+
         ec "$browser_rec_dir" | entr -dnr true
         # -d Track the directories of regular files provided as input and exit if a new file is added. This option also enables directories to be specified explicitly. Files with names beginning with ‘.’ are ignored.
         # -n Run in non-interactive mode. In this mode entr does not attempt to read from the TTY or change its properties.

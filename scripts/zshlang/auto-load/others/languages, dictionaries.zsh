@@ -27,6 +27,9 @@ function ffdict() {
             words=("${(@)words[2,-1]}")
         fi
     fi
+
+    arrN ${(@)words}
+
     for w in "${(@)words}" ; do
         revaldbg "$engine[@]" "$w"
     done
@@ -38,7 +41,14 @@ function ffdict-wn() {
     @opts e wordnet @ ffdict "$@"
 }
 aliasfn di ffdict
+aliasfn spi ffdict_e=true ffdict
 aliasfn dwn ffdict-wn
 ##
-function sp() { ispell<<<"$*" ; }
+function sp() {
+    if (( $#@ == 0 )) ; then
+        spi
+        return $?
+    fi
+    ispell<<<"$*"
+}
 ##

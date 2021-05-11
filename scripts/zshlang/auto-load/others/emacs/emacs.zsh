@@ -65,7 +65,10 @@ function emc-gateway() {
 }
 function emc-eval() {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1
-    revaldbg emacs --batch --eval "(progn
+
+    local cmd stdin="${emc_eval_in}"
+
+    cmd="(progn
      (require 'server)
      (princ
        (format \"%s\\n\"
@@ -75,6 +78,22 @@ function emc-eval() {
          )
        )
      )"
+
+    if bool "$stdin" ; then
+        cmd="
+(defun night/update-files-stdin ()
+  (interactive)
+  (let ((lines '())
+        this-read)
+    (while (setq this-read (ignore-errors
+                             (read-from-minibuffer \"\")))
+      (setq lines (cons this-read lines)))
+
+      ${cmd}
+     ))"
+    fi
+
+    revaldbg emacs --batch --eval "$cmd"
 }
 aliasfnq emc-buffer-file-name emc-eval "(buffer-file-name)"
 function emc-sourceme() {
@@ -117,4 +136,18 @@ function icat-emc() {
     icat "$(emc-buffer-file-name)"
 }
 alias icc='icat-emc'
+##
+function emc-quote() {
+    local i res=''
+    for i in "$@" ; do
+        res+=" \"$(ecn "$i" | sdlit '\' '\\' | sdlit '"' '\"')\" " @TRET
+    done
+
+    ecn "$res"
+    ## perf:
+    # `time2 emc-quote "${(@f)$(fd --extension org --type f . "$nightNotes")}"` -> 18.4s
+    # @todo9 rewrite this in crystal
+    # @alt use emc-eval with stdin
+    ##
+}
 ##

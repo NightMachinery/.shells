@@ -1,6 +1,32 @@
-#!/usr/bin/env dash
+#!/usr/bin/env bash
 
-# emacsclient -t "$@"
+isKitty () {
+    test -n "$KITTY_WINDOW_ID"
+}
+isiTerm () {
+    [[ "$TERM_PROGRAM" == iTerm.app ]]
+}
+isDarwin () {
+    [[ "$uname" == "Darwin" ]]
+}
 ##
-emacsclient -t --no-wait "$@"
-brishz.dash kitty-emacs-focus
+no_wait=''
+
+if test -n "$no_wait" ; then
+    ##
+    # @warn this mode obviously does not play well with blocking apps such as git
+    ##
+    emacsclient -t --no-wait "$@"
+    ret=$?
+
+    brishz.dash kitty-emacs-focus
+
+    return $ret
+else
+    my_term="$TERM"
+    if isDarwin || isKitty || isiTerm
+    then
+        my_term='xterm-24bits'
+    fi
+    TERM="$my_term" emacsclient -t "$@"
+fi

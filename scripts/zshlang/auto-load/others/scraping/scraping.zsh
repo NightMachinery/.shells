@@ -398,9 +398,12 @@ function url-final2() {
     [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 function url-final3() {
-    doc '@deprecated The most reliable and expensive way.'
-    # too expensive
+    ##
+    # The most reliable and expensive way.
+    # it was too expensive, so @deprecated
+    #
     # retry-limited 3 urlfinal.js "$1" || url-final2 "$1"
+    ##
     url-final2 "$1"
 }
 reify url-final url-final2 url-final3
@@ -749,8 +752,69 @@ function lwseq() {
     re lw2gw "$@" | inargsf getlinks-c | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]:-w2e-curl}" -p "${opts[-p]}" -o "${opts[-o]:-./}"
 }
 noglobfn lwseq
+##
+function url-clean-unalix() {
+    # does url-clean-google itself
+    local redirects="${url_clean_redirects}"
+    local inargs
+    (( $# )) && inargs=( "$@" ) || {
+            if ! isInTty ; then
+                inargs="$(cat)"
+            fi
+        }
+
+    local opts=()
+    if bool $redirects ; then
+        opts+='--unshort'
+    fi
+    arrN "$inargs[@]" | unalix "$opts[@]"
+
+    ## tests:
+    # `pop | { tee /dev/tty ; ec '======' > /dev/tty } | unalix`
+    #
+    # `echo 'https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiY2ZrqxsHwAhXhB2MBHda6BUsQFjAJegQIBBAD&url=https%3A%2F%2Fapps.apple.com%2Fus%2Fapp%2Finspect-browser%2Fid1203594958&usg=AOvVaw2O_zES4FcNiKDn0veAc1bM' | unalix`
+    #
+    # `echo 'https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiY2ZrqxsHwAhXhB2MBHda6BUsQFjAJegQIBBAD&url=https%3A%2F%2Fapps.apple.com%2Fus%2Fapp%2Finspect-browser%2Fid1203594958&usg=AOvVaw2O_zES4FcNiKDn0veAc1bM'$'\n''https://www.imdb.com/title/tt7979580/?pf_rd_m=A2FGELUUNOQJNL&pf_rd_p=ea4e08e1-c8a3-47b5-ac3a-75026647c16e&pf_rd_r=J6DRF89QKAFZ76S5FZYE&pf_rd_s=center-1&pf_rd_t=15506&pf_rd_i=moviemeter&ref_=chtmvm_tt_1'$'\n''https://bitly.is/Pricing-Pop-Up' | { tee /dev/tty ; echo '======' > /dev/tty } | @opts redirects y @ url-clean-unalix`
+    #
+    # `@opts redirects y @ url-clean-unalix 'https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiY2ZrqxsHwAhXhB2MBHda6BUsQFjAJegQIBBAD&url=https%3A%2F%2Fapps.apple.com%2Fus%2Fapp%2Finspect-browser%2Fid1203594958&usg=AOvVaw2O_zES4FcNiKDn0veAc1bM' 'https://www.imdb.com/title/tt7979580/?pf_rd_m=A2FGELUUNOQJNL&pf_rd_p=ea4e08e1-c8a3-47b5-ac3a-75026647c16e&pf_rd_r=J6DRF89QKAFZ76S5FZYE&pf_rd_s=center-1&pf_rd_t=15506&pf_rd_i=moviemeter&ref_=chtmvm_tt_1' 'https://bitly.is/Pricing-Pop-Up'`
+    ##
+}
+@opts-setprefix url-clean-unalix url-clean
+aliasfn url-clean url-clean-unalix
+
+function url-clean-google() {
+    # DEPRECATED Use url-clean
+    ##
+    local URL="$1"
+    assert-args URL @RET
+
+    local u="$URL"
+    [[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
+        [[ "$URL" =~ "url=([^&]*)" ]] && u="$match[1]" || {
+                ecerr "$0: failed to decode Google url $(gq "$URL")"
+                return 1
+            }
+
+        u="$(ec $u | url-decode.py)"
+    }
+
+    ec "$u"
+}
+renog url-final-google
+
 function urlfinalg() {
-    doc supports Google redirects. Set uf_idem to y to return original.
+    # @regressionDanger calling this with zero args now waits on stdin
+    @opts redirects y @ url-clean "$@"
+}
+noglobfn urlfinalg
+aliasfn url-final-gateway urlfinalg
+
+function urlfinalg1() {
+    # DEPRECATED
+    # aka: url-final-gateway
+    # supports Google redirects.
+    # Set uf_idem to y to return original.
+    ##
     local URL="$1"
     pxs-maybe
 
@@ -759,15 +823,12 @@ function urlfinalg() {
         return 0
     }
     local u="$URL"
-    [[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
-        #u=`echo "$URL" | perl -n -e '/url=([a-zA-Z0-9%\.]*)/ && print "$1\n"'`
-        [[ "$URL" =~ "url=([^&]*)" ]] && u="$match[1]" || { ecerr failed to decode Google url ; return 1 }
-        u="$(ec $u | url-decode.py)"
-    }
+    u="$(url-final-google "$u")" @TRET
+
     url-final "$u" #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
 }
-reify urlfinalg
-noglobfn urlfinalg
+renog urlfinalg1
+##
 function jwiki() {
     serr jwiki.py "$*" 1
 }
@@ -1160,7 +1221,10 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     test -n "$url" || {
         return 1
     }
+
+    url="$(url-clean "$url")"
     # url="$(urlfinalg "$url")"
+
     local imgMode="${url2note_img}" emacsMode="${url2note_emacs}"
 
     if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com' ]] ; then
