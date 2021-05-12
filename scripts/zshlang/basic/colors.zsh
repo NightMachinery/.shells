@@ -52,15 +52,20 @@ color() {
     test -n "$noreset" || resetcolor
     test -n "$nonewline" || echo
 }
-resetcolor() {
-    comment 'This var is builtin in zsh'
+
+function resetcolor() {
+    # This var is builtin in zsh, but I guess it needs some module to be loaded
+    if test -z "$reset_color" ; then
+        typeset -g reset_color=$'\C-[[00m'
+    fi
     ! isI || printf %s "$reset_color"
 }
-colorreset() { resetcolor }
-helloworld() {
+function colorreset() { resetcolor }
+##
+function helloworld() {
     colorbg 0 0 255;colorfg 0 255; ec HELLO "$(colorfg 255 100)"BRAVE"$(colorfg 0 255)" $(colorbg 100 0 255)NEW$(colorbg 0 0 255) WORLD\!;resetcolor
 }
-printcolors() {
+function printcolors() {
     printf "\x1b[${bg};2;${red};${green};${blue}m\n"
     helloworld
     comment awk 'BEGIN{
@@ -89,23 +94,25 @@ printcolors() {
 # 38 iso-8316-6           # 48 bg-iso-8316-6
   39 default                49 bg-default'
 }
-random-color() {
+##
+function random-color() {
     randomColor.js "$@" |jq -re '.'
     # --seed "$(head -c 100 /dev/random)" 
 }
-random-color-arr() {
+function random-color-arr() {
     #shuf -i 0-255 -n 3
     # subshell doesn't change OUR seed. #ec $(($RANDOM % 256)) $(($RANDOM % 256)) $(($RANDOM % 256))
     [[ "$(randomColor.js -f rgbArray "$@")" =~ '\[(\d+),(\d+),(\d+)\]' ]] && ec "$match[@]"
 }
-ecrainbow-n() {
+##
+function ecrainbow-n() {
     local hue="$(random-color -f hex)"
     print -nr -- "$(colorfg $(random-color-arr -l dark --hue "$hue"))$(colorbg $(random-color-arr -l light --hue "$hue"))""$@"
 }
-ecrainbow() { ecrainbow-n "$@" ; echo }
-ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
-ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
-h_ecalternate() {
+function ecrainbow() { ecrainbow-n "$@" ; echo }
+function ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
+function ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
+function h_ecalternate() {
     if ! isI ; then
         ec "$(gq "$@")"
         return 0
@@ -118,7 +125,7 @@ h_ecalternate() {
     shift 1
     $0 "$@"
 }
-ecalternate() {
+function ecalternate() {
     local o
     o="$(h_ecalternate "$@")" @RET
     if isI ; then
@@ -128,3 +135,4 @@ ecalternate() {
         ec "$o"
     fi
 }
+##

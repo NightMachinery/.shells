@@ -90,7 +90,35 @@ function kitty-launch-icat() {
     done
 
     # @see icat-kitty-single
-    kitty-remote launch --type=overlay kitty +kitten icat --hold --place "${COLUMNS}x${LINES}@0x0" --scale-up "$fs[@]"
+    revaldbg kitty-remote launch --type=overlay "$(which kitty)" +kitten icat --hold --place "${COLUMNS}x${LINES}@0x0" --scale-up "$fs[@]"
     ##
+}
+##
+function kitty-theme() {
+    # the theme names should be stripped of '.conf' before being fed to kitty-theme, and they should not be in abs paths:
+    # `kitty-theme --test Zenburn `
+    ##
+    command kitty-theme -c $NIGHTDIR/configFiles/kitty/kitty_theme_changer.conf.py "$@"
+}
+function kitty-theme-setup() {
+    kitty-theme --setl night-solarized-light
+
+    kitty-theme --setd ayu
+}
+function kitty-theme-toggle() {
+    kitty-theme --toggle --live
+}
+function kitty-theme-test() {
+    local theme q="$(fz-createquery "$@")"
+
+    local dir
+    dir=~/.config/kitty/kitty-themes/themes/
+
+    theme="$(fd --extension conf . "$dir" | dir-rmprefix "$dir" | command sd '\.conf$' '' | fz)" @RET
+
+    reval-ec kitty-theme --test "$theme"
+}
+function kitty-theme-reload() {
+    kitty-theme --live
 }
 ##

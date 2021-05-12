@@ -1,3 +1,6 @@
+## external sources:
+# * https://github.com/zsh-users/zsh-completions/tree/master/src
+##
 complete -o nospace -C /Users/evar/go/bin/bitcomplete bit # needs bashcompinit
 ##
 # Just reuse eval's engine

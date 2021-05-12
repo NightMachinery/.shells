@@ -6,7 +6,7 @@ function cat-copy() {
     ec "$inargs" # yes, we are adding a newline here
     ecn "$inargs" | pbcopy
 }
-alias pc=cat-copy
+alias pc='\noglob cat-copy'
 alias pop='pbpaste'
 ##
 function tee-copy() {
@@ -72,12 +72,19 @@ function pbpaste() {
         (( $+commands[pbpaste] )) && command pbpaste
     }
 }
+
 function pbpaste-html() {
     assert isDarwin @RET
 
     command pbv public.html public.utf8-plain-text
     # https://stackoverflow.com/questions/17217450/how-to-get-html-data-out-of-of-the-os-x-pasteboard-clipboard
 }
+alias poph='pbpaste-html'
+
+function pbpaste-urls() {
+    pbpaste-html | urls-extract
+}
+alias popu='pbpaste-urls'
 ##
 function pbadd() {
     osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null

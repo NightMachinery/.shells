@@ -12,20 +12,32 @@ conda install -c numba icc_rt
 ##
 pig https://github.com/NightMachinary/BrishGarden.git
 pig git@github.com:NightMachinary/brish.git
+
 pi git+https://github.com/n8henrie/pycookiecheat.git@dev
+
+pi git+git://github.com/fretboardfreak/kitty-theme-changer.git@master
 ###
 cpanm App::ansifold
 ##
 nimble install https://github.com/NightMachinary/htmlmetadata
+
+nimble install --accept "git://github.com/AmanoTeam/Unalix-nim"
 ##
 brew tap v2ray/v2ray
 brew install v2ray-core
+
 brew tap lutzifer/homebrew-tap
 brew install keyboardSwitcher
+
 brew tap trojan-gfw/homebrew-trojan
 brew install trojan
+
 brew install --head googler
+
 brew install --head tdlib
+
+brew install dart-lang/dart/dart
+dart --disable-analytics
 ##
 # https://superuser.com/questions/545889/how-can-i-install-gnu-parallel-alongside-moreutils
 brew install --force moreutils

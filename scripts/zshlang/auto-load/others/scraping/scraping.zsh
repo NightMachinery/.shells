@@ -781,6 +781,7 @@ function url-clean-unalix() {
 }
 @opts-setprefix url-clean-unalix url-clean
 aliasfn url-clean url-clean-unalix
+noglobfn url-clean
 
 function url-clean-google() {
     # DEPRECATED Use url-clean
@@ -800,7 +801,7 @@ function url-clean-google() {
 
     ec "$u"
 }
-renog url-final-google
+renog url-clean-google
 
 function urlfinalg() {
     # @regressionDanger calling this with zero args now waits on stdin
@@ -829,23 +830,6 @@ function urlfinalg1() {
 }
 renog urlfinalg1
 ##
-function jwiki() {
-    serr jwiki.py "$*" 1
-}
-function wread-man() {
-    local m=""
-    m="$(MAN_KEEP_FORMATTING=1 COLUMNS=70 serr man "$1")" && m="$(<<<"$m" command ul)" || m="$(2>&1 "$1" --help)" || { ecerr "$0 failed for $1" ; return 1 }
-    <<<"$m" aha --title "$1"
-}
-function tlman() {
-    uf_idem=y we_dler="wread-man" w2e "$1" "$@"
-}
-function wread-bat() {
-    unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title "$(basename "$1")"
-}
-function tlbat() {
-    uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
-}
 function getlinksfull2() {
     mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
 Uses getlinksfull (full-html) under the hood." MAGIC
@@ -1048,7 +1032,7 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
     local url="$1"
     local fhMode="${fhMode:-curl}"
     local html
-    html="${html:-$(full-html2 "$url")}" @TRET
+    html="${html:-$(revaldbg full-html2 "$url")}" || { ectrace "" "URL: $(gq "$url")"; return $? }
     local reqs=("${@:2}")
     <<<"$html" assert htmlmetadata $reqs[@] || {
         local tmp="$(gmktemp --suffix .html)"

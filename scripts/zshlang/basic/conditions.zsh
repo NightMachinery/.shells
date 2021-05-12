@@ -89,6 +89,12 @@ function isOutTty() {
 }
 alias istty=isOutTty # NOTE: aliases are not fnswappable
 alias isTty=isOutTty
+
+function isErrTty() {
+    [ -t 2 ]
+    # -t fd True if file descriptor fd is open and refers to a terminal.
+}
+
 function isInTty() {
     [ -t 0 ]
     # -t fd True if file descriptor fd is open and refers to a terminal.

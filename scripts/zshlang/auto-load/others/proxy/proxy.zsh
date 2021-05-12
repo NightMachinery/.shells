@@ -68,6 +68,7 @@ pxify() {
     pxaify-command pip # makes downloads faster
     # pxaify-command git # use git's own config
     pxaify-command go
+    pxaify-command dart
     # pxaify-command cargo # did not work
     pxaify-command mpv
     pxaify-command spotdl
@@ -163,8 +164,6 @@ function proxy-off() {
     # proxy-widget-refresh
     btt-update $proxy_widget_uuid $proxy_widget_off
 }
-aliasfn pu proxy-on
-aliasfn pd proxy-off
 ##
 function proxy-is() {
     # @darwinonly

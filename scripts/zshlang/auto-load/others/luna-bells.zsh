@@ -299,7 +299,12 @@ function bell-auto() {
         ecerr "$0: Not running on Darwin."
         return 1
     }
+
     # You might need to use `sleep $timeout ; ...` to test bell-auto.
+
+    bella_zsh_disable1=y
+    local bell_awaysh=no
+
     local engine=( "${@:-bello}" )
     local timeout="${bell_auto_t:-30}" # The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
     local sleep="${bell_auto_sleep:-${bell_auto_st:-0}}" # The lower, the more CPU usage in single mode.

@@ -1,4 +1,4 @@
-#!/usr/bin/env /usr/local/bin/zshplain.dash
+#!/usr/bin/env -S zsh -f
 # macOS bug: https://stackoverflow.com/questions/9988125/shebang-pointing-to-script-also-having-shebang-is-effectively-ignored
 
 if test "$1" = '-c' ; then
@@ -16,6 +16,29 @@ gquote () {
 isDbg () {
     test -n "$DEBUGME"
 }
+
+##
+# typeset -a gray=( 170 170 170 )
+# ecgray () {
+#     {
+# ;45;10M64;45;10M        [ -t 2 ] && colorfg "$gray[@]"
+#         print -r -- "${@}"
+#         [ -t 2 ] && resetcolor
+#     } >&2
+# }
+# isI () {
+#     true
+#     ##
+#     # test -z "$FORCE_NONINTERACTIVE" && {
+#     #     test -n "$FORCE_INTERACTIVE" || [[ -o interactive ]]
+#     # }
+# }
+# colorfg () {
+#     ! isI || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"
+# }
+# resetcolor () {
+#     ! isI || printf %s $'\C-[[00m'
+# }
 ###
 local copy_cmd="$brishz_copy"
 local session="${brishz_session}"
@@ -54,6 +77,14 @@ fi
 local out
 out="$(eval "$cmd")" || return $?
 
-ec "$out" | jq -rje .out
-ec "$out" | jq -rje .err >&2
-exit "$(ec "$out" | jq -rje .retcode)"
+if ec "$out" | jq -e . >/dev/null 2>&1 ; then
+    ec "$out" | jq -rje .out
+    ec "$out" | jq -rje .err >&2
+    exit "$(ec "$out" | jq -rje .retcode)"
+else
+    # ec "${0:t}: invalid json, assuming magic" >&2
+    # @todo1 make garden output these in CmdResults as well
+
+    ec "$out"
+    return 200
+fi
