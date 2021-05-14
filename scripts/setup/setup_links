@@ -5,6 +5,7 @@ ln -s ~/.nvimrc ~/.config/nvim/init.vim
 ##
 lnrp $NIGHTDIR/configFiles/kitty/kitty.conf ~/.config/kitty/
 lnrp $NIGHTDIR/configFiles/kitty/diff.conf ~/.config/kitty/
+lnrp $NIGHTDIR/configFiles/kitty/open-actions.conf ~/.config/kitty/
 
 lnrp $NIGHTDIR/configFiles/kitty/themes/night-solarized-light.conf ~/.config/kitty/kitty-themes/themes/
 kitty-theme-setup

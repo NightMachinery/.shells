@@ -96,8 +96,3 @@ function agr {
     ag -0 -l "$opts[@]" -- "$from" "${@}" | pre-files "$from" "$to"
 }
 ##
-function spotlight() { mdfind "$@" | fz --select-1 | tee >(pbcopy) }
-function spot() {
-    local file="$(spt ${@[-1]})"
-    test -n "$file" && reval "${@[1,-2]}" "$file"
-}

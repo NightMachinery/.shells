@@ -315,7 +315,7 @@ function prompt_pure_check_cmd_exec_time () {
     prompt_pure_human_time_to_var $elapsed "prompt_pure_cmd_exec_time"
   }
 
-  if test -z "$bella_zsh_disable1" && (( elapsed > ${BELL_EXEC_TIME:-5} )) ; then
+  if (( elapsed > ${BELL_EXEC_TIME:-5} )) ; then
     bella-zsh-gateway
   fi
   bella_zsh_disable1=''

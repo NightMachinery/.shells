@@ -117,10 +117,12 @@ function emc-focus() {
     fi
     bella_zsh_disable1=y
 }
-function emcnw() {
+function emc-nowait() {
     emc-gateway --no-wait "$@"
     emc-focus
 }
+alias emcnw='emc-nowait'
+
 ialias emcg="emacsclient -c"
 ##
 function emc-in() {
@@ -149,5 +151,15 @@ function emc-quote() {
     # @todo9 rewrite this in crystal
     # @alt use emc-eval with stdin
     ##
+}
+##
+function emc-nowait2() {
+    local f="$1"
+    assert-args f @RET
+    
+    emc-eval "(find-file $(emc-quote "$f"))"
+    # throws useless error 'Invalid read syntax: "#"', but works anyway
+
+    emc-focus
 }
 ##

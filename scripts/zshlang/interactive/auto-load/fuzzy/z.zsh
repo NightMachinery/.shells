@@ -1,6 +1,10 @@
 typeset -g ZDIRS_ENABLED=y
 typeset -g ZDIRS_NAME=zdirs
 function z-add() {
+    if test -z "$HISTFILE" ; then
+        return 0
+    fi
+
     local dir="${1}"
     if test -n "$dir" ; then
         redism SADD "$ZDIRS_NAME" "$dir"

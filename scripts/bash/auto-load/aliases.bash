@@ -4,7 +4,6 @@ re unalias a l la ll map p fd ff pip sp rd pu gss gd &>/dev/null # mv cp
 alias 'brishzr-repeat'='isLocal && { ec ; assert reval-ec brishzr "$0" ; ec } || true'
 alias rgjl="rgm -t julia" #"rgm --glob '*.jl'"
 alias rgpy="rgm --glob '*.py'"
-alias spt='spotlight -name'
 alias cleanbuffer='printf "\ec\e[3J"' # there is a similar tool in my anaconda's bin named clear.
 alias emcsave="emc-gateway -e '(save-some-buffers t)'"
 alias itunesprogress='exa -a -T -l ~/Library/iTunes/'

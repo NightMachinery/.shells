@@ -375,7 +375,12 @@ function ntsearch_() {
 
     local fzopts=()
     local previewcode="$FZF_SIMPLE_PREVIEW"
+    local preview_header_lines
+    local hidden
     if test -z "$ntLines" ; then
+        preview_header_lines=2
+        hidden='hidden' # preview is useless as ntsearch-whole does not track the line number info needed to scroll to the right place
+
         if test -z "$fzp_ug" ; then
             fzopts+='--read0'
         else
@@ -384,14 +389,17 @@ function ntsearch_() {
         fi
         previewcode="cat {f}"
     else
+        preview_header_lines=3
+        hidden='nohidden'
+
         if test -z "$fzp_ug" ; then
             fzopts+=(--read0 --delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
         else
             fzopts+=(--delimiter : --nth '1,3..')
         fi
         ###
-        # @todo1 https://github.com/junegunn/fzf/issues/2373 preview header
-        # remove `:+{2}-5` from preview-window and use mode=0 to revert to the previous behavior
+        # https://github.com/junegunn/fzf/issues/2373 preview header
+        # remove `:+{2}-/2` from preview-window and use mode=0 to revert to the previous behavior
         ##
         local rtl=''
         # rtl='| rtl_reshaper.dash' # very bad perf for large files
@@ -407,7 +415,7 @@ function ntsearch_() {
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
 
-    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window 'right,50%,wrap,nohidden,+{2}-/2,~3' --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --expect=alt-enter "$query" | {   # right:hidden to hide preview
+    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window "right,50%,wrap,${hidden},+{2}-/2,~${preview_header_lines}" --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --expect=alt-enter "$query" | {   # right:hidden to hide preview
         unset acceptor
         if isI ; then
             read -d $'\0' -r acceptor
@@ -451,10 +459,10 @@ function ntsearch_fd() {
         fi
         return 0 # rg exits nonzero if some of its paths don't exist, so we need to explicitly ignore it.
     else
-        local first='y' file content files_all=()
         ##
-        ntsearch_fd_h -l | ntsearch_outputter.go "$nightNotes"
+        ntsearch_fd_h --files-with-matches | ntsearch_outputter.go "$nightNotes"
         ##
+        # local first='y' file content files_all=()
         # files_all=("${(@0)$(ntsearch_fd_h -l)}") @RET
         # for file in "$files_all[@]"
         # do
@@ -470,3 +478,31 @@ function ntsearch_fd() {
         ##
     fi
 }
+##
+function nt-lucene() {
+    local q="$*" 
+    # @globalInputs ntLines
+    ## https://lucene.apache.org/core/2_9_4/queryparsersyntax.html
+    # '+mustInclude'
+    # 'wildcard*'
+    # 'this is or'
+    # 'me AND you' 'me && you'
+    # '(jakarta OR apache) AND website'
+    # '"grouped words"'
+    ##
+    
+    local files opts=()
+    
+    # files=("$nightNotes"/**/${~noteglob})
+    # files=("$nightNotes"/**/${~textglob})
+
+    files=("${nightNotes%%/}/**/*.{${(j.,.)text_formats}}")
+    # glob syntax: https://docs.oracle.com/javase/8/docs/api/java/nio/file/FileSystem.html#getPathMatcher-java.lang.String-
+    
+    if ! bool "$ntLines" ; then
+        opts+=( --no-split )
+    fi
+    revaldbg lmgrep '--case-sensitive?' false --hyperlink "$opts[@]" -q "$q" "$files[@]"
+}
+alias ntc='\noglob nt-lucene'
+##

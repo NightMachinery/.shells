@@ -28,20 +28,29 @@ function ug-i() {
 function ugf() {
     ug-i --regexp="$*"
 }
-function ugm() {
+function ug-ic() {
+    # ug-i context
+
+    local r="${@[-1]}" opts=("${@[1,-2]}")
+    
     # https://github.com/Genivia/ugrep/issues/31
-    ug-i --pretty --context=3 --regexp="$*" --recursive
+    revaldbg ug-i --pretty --context=3 --regexp="$r" --recursive "$opts[@]"
     # --fuzzy=3 (not compatible with PCRE)
     #  --break  Adds a line break between results from different files.
     #  --heading, -+ Group matches per file.  Adds a heading and a line break between results from different files.
 }
+function ugm() {
+    ug-ic "$*"
+}
 ##
 function ugnt() {
     local i args=()
-    for i in "$note_formats[@]" ; do
-        args+=( -O "$i" )
-    done
-    ugm "$args[@]" "$@" $nightNotes/
+    
+    # for i in "$note_formats[@]" ; do
+    #     args+=( -O "$i" )
+    # done
+    
+    ug-ic "$args[@]" $nightNotes/ "$*"
 }
 ###
 ##

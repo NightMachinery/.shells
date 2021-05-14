@@ -53,7 +53,10 @@ function isTmux() {
 }
 ##
 function isKitty() {
-    test -n "$KITTY_WINDOW_ID"
+    true # @surprise
+    
+    # test -n "$KITTY_WINDOW_ID"
+    # the var can be set incorrectly in tmux
 }
 iskitty() { isKitty "$@" ; }
 function isAppleTerminal() {

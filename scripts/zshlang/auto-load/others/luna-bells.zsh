@@ -391,6 +391,10 @@ function bella-zsh-magic() {
     ec $'\n'"${ITERMMAGIC}_ZSH_BELLA_${ITERM_SESSION_ID}"
 }
 function bella-zsh-gateway() {
+    if bool "$bella_zsh_disable1" || test -z "$HISTFILE" ; then
+        return 0
+    fi
+
     if isSSH ; then
         bella-zsh-magic
     else

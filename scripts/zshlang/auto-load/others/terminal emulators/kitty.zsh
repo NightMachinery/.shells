@@ -1,7 +1,7 @@
 function kitty-remote() {
     : "Invoke with no args to enter the kitty shell"
 
-    if isKitty ; then
+    if isKitty && ! isTmux ; then
         kitty @ "$@"
     else
         local s i
