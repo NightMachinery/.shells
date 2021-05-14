@@ -34,6 +34,12 @@ isNotExpensive || {
     source ~/.shared.sh
 
     export HH_CONFIG=hicolor
+    ##
+    # export GERBIL_HOME="$(brew --cellar gerbil-scheme)" # @exorbitant
+    if isDarwin ; then
+        export GERBIL_HOME=/usr/local/Cellar/gerbil-scheme/0.16/
+        # not sure if this is even right
+    fi
     ## 
     # this is a TCL list https://wiki.tcl-lang.org/page/list , uses whitespace as sep
     #isLinux && export TCLLIBPATH=/usr/lib/x86_64-linux-gnu

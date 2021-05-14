@@ -80,9 +80,9 @@ function emc-eval() {
      )"
 
     if bool "$stdin" ; then
+        ecgray "$0: stdin does NOT work."
+
         cmd="
-(defun night/update-files-stdin ()
-  (interactive)
   (let ((lines '())
         this-read)
     (while (setq this-read (ignore-errors
@@ -90,10 +90,15 @@ function emc-eval() {
       (setq lines (cons this-read lines)))
 
       ${cmd}
-     ))"
+     )"
     fi
 
     revaldbg emacs --batch --eval "$cmd"
+
+    ## tests:
+    # `fd --extension org --type f . "$nightNotes" | emc_eval_in=y dbg emc-eval '(z arrN (identity lines))'`
+    # so the stdin module doesn't work :( I guess lines is not passed to the emacs  server?
+    ##
 }
 aliasfnq emc-buffer-file-name emc-eval "(buffer-file-name)"
 function emc-sourceme() {
@@ -148,7 +153,7 @@ function emc-quote() {
     ecn "$res"
     ## perf:
     # `time2 emc-quote "${(@f)$(fd --extension org --type f . "$nightNotes")}"` -> 18.4s
-    # @todo9 rewrite this in crystal
+    # @todo0 rewrite this in a @perf lang
     # @alt use emc-eval with stdin
     ##
 }
