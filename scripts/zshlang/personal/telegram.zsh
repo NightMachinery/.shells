@@ -42,11 +42,8 @@ function alicedate() {
 ##
 function hb265-tlg() {
     local files=("$@")
-    local rec="${hb265_tlg_rec:-${hb265_tlg_r:-$water}}" destdir="${hb265_tlg_destdir:-${hb265_tlg_d}}"
-    { test -z "$rec" || test -z "$destdir" } && {
-        ecerr "$0: Empty args"
-        return 1
-    }
+    local rec="${hb265_tlg_rec:-${hb265_tlg_r:-$water}}" destdir="${hb265_tlg_destdir:-${hb265_tlg_d:-$HOME/tmp/hb265}}"
+    assert-args files rec destdir @RET
 
     local f dest finaldest out link
     for f in "$files[@]" ; do

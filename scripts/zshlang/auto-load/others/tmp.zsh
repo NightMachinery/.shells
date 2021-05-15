@@ -1,5 +1,4 @@
-
-## @todo these should be in core.zsh
+## @todo0 these should be in core.zsh
 function isdefined() {
     local sym="$1"
 

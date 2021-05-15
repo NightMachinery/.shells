@@ -521,6 +521,7 @@ appHotkey{ key='w', appName='com.google.Chrome' }
 appHotkey{ key='o', appName='com.operasoftware.Opera' }
 appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 appHotkey{ key='t', appName='com.tdesktop.Telegram' }
+appHotkey{ key='e', appName='org.gnu.Emacs' }
 appHotkey{ key='l', appName='notion.id' }
 
 hs.hotkey.bind(hyper, "d", function()

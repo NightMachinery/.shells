@@ -154,7 +154,8 @@ function emc-quote() {
     ## perf:
     # `time2 emc-quote "${(@f)$(fd --extension org --type f . "$nightNotes")}"` -> 18.4s
     # @todo0 rewrite this in a @perf lang
-    # @alt use emc-eval with stdin
+    # @alt if we add --add-postfix to prefixer, we can simply use a pipeline to do this and avoid zsh. It should be fast enough.
+    # NO @alt use emc-eval with stdin
     ##
 }
 ##

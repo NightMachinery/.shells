@@ -32,13 +32,21 @@ whichm() {
     local items=("$@")
     unset out
     local nextItems=()
-    local item output
+    local item output var
     for item in "$items[@]"
     do
-        (( ${+builtins[$item]} )) && ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) && {
+        if ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) ; then
+            if (( ${+builtins[$item]} )) ; then
             ec "## $(which -- $item)"
             continue
-        }
+            elif ! (( ${+commands[$item]} )) ; then
+                if var="$(serr typeset -p "$item")" ; then
+                    # ec "## $var"
+                    ec "$var" # the output of typeset is eval-able :D
+                fi
+                continue
+            fi
+        fi
 
         test -z "$enhSavedNames[$item]" || nextItems+="$enhSavedNames[$item]"
 
@@ -59,7 +67,7 @@ whichm() {
                     # output="# $output"
                     output=""
                     for binary in "${(@f)$(where $item)}" ; do
-                        output+="# $(ll $binary)"$'\n'
+                        output+="## $(ll $binary)"$'\n'
                     done
                 }
                 ec $output
