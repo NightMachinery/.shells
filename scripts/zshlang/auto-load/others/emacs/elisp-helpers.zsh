@@ -32,6 +32,17 @@ function wh-docstring() {
     fi
     } | gtr $'\n' " " )"
 
-    ecn "${res[1,80]}"
+    if test -z "$res" ; then
+        ## disabled as it was unnecessary
+        # local s2
+        # s2="${s%+}" # 'opts+' -> 'opts'
+        # if [[ "$s2" != "$s" ]] ; then
+        #     wh-docstring "$s2"
+        #     return $?
+        # fi
+        ##
+    else
+        ecn "${res[1,80]}"
+    fi
 }
 ##

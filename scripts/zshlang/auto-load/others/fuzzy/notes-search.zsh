@@ -451,7 +451,9 @@ function ntsearch_fd() {
         }
         if test -n "$ntsearch_injector[*]" ; then
             if test -n "$fzp_ug" ; then
-                ecerr "$0: ntsearch_injectors are not yet supported in ugrep mode, as they output NUL separated data. (NOT aborting.)"
+                if ! isBrish ; then
+                    ecgray "$0: ntsearch_injectors are not yet supported in ugrep mode, as they output NUL separated data. (NOT aborting.)"
+                fi
             else
                 # --null-data  bothh reads and write 0: `arr0 1 2 3 | rg --null-data -e 2 | cat -vte`
                 reval "$ntsearch_injector[@]" | command rg --null-data --smart-case --engine auto --no-messages $ntsearch_rg_opts[@] -- "$query_rg"

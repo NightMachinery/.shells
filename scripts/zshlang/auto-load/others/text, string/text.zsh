@@ -76,7 +76,10 @@ function numfmt-bytes() {
 }
 ##
 function double-newlines() {
-    awk 'ORS="\n\n"'
+    # awk 'ORS="\n\n"'
+    ##
+    prefixer -o $'\n\n'
+    ##
 }
 function p-double-newlines() {
     pbpaste | double-newlines | pbcopy

@@ -246,7 +246,7 @@ if isExpensive ; then
   _comp_options+=(globdots)
 fi
 
-zsh-defer source-interactive-all # @heavy 0.32s
+source-interactive-all
 
 ## fzf zsh integration (obsolete, as we now use fzf-tab
 # # sth in .zshrc overrides these so ...
@@ -379,13 +379,27 @@ function zle-print-dots() {
   print -Pn "%{%F{green}...%f%}"
   [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti smam
 }
-expand-or-complete-with-dots() {
+function zle-complete-with-dots() {
   zle-print-dots
-  zle expand-or-complete
+  ##
+  # This expands variables and globs if possible, else it auto-completes:
+  # zle expand-or-complete
+  ##
+  # zle fzf-tab-complete # causes infinite loop
+  ##
+  zle complete-word
+  ##
   zle redisplay
 }
-zle -N expand-or-complete-with-dots
-bindkey "^I" expand-or-complete-with-dots
+zle -N zle-complete-with-dots
+bindkey "^I" zle-complete-with-dots # TAB
+
+function zle-expand() {
+  zle expand-word
+  # zle redisplay # @bug does not syntax-color
+}
+zle -N zle-expand
+bindkey "^_" zle-expand # C-/
 ##
 FZTAB_OPTS=(
     --color=light # needed, as fzf-tab overrides the colors, so we need to re-override them

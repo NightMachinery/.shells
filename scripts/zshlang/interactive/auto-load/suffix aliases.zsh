@@ -1,4 +1,5 @@
-is-at-least 4.2.0 || { return 0 }
+assert is-at-least 4.2.0 @RET
+
 if [[ -n "$BROWSER" ]]; then
     _browser_fts=(htm html de org net com at cx nl se dk)
     for ft in $_browser_fts; do alias -s $ft=$BROWSER; done

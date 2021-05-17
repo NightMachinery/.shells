@@ -53,7 +53,13 @@ function emcrg() {
 }
 # aliasfn rd emcrg
 function rgbase() {
-    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto --color always --hidden "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+    local opts=()
+
+    if isI ; then
+        opts+=( --color always )
+    fi
+
+    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto --hidden "$opts[@]" "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
 }
 function rgcontext() {
     rgbase -C ${agC:-1} "$@"

@@ -118,8 +118,9 @@ function dir-isempty() {
 function list-dirs() {
     local d=(${@}) multi_fs="${list_dirs_m}" # multi = disable one-file-system
     local depth="${list_dirs_d}"
+    typeset -ag list_dirs_fd
+    local opts=( "${list_dirs_fd[@]}" )
 
-    local opts=()
     if test -z "$multi_fs" ; then
         opts+="--one-file-system"
     fi
