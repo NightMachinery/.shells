@@ -32,6 +32,8 @@ if test -e ~/code/kotlin/smsq/go/config.json ; then
     tmuxnew smsq smsq ~/code/kotlin/smsq/go/config.json
 fi
 ##
+# tmuxnewsh2 notes-hugo indir ~cod/hugo/notes-hugo hugo --bind="127.0.0.1" --baseURL="https://notes.lilf.ir" --appendPort=false --gc --port 1313 serve
+##
 # launch-musicf.zsh
 ##
 chronic-all
