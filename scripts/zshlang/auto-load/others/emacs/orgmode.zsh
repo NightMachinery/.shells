@@ -34,3 +34,37 @@ function org-update-files-all() {
     ##
 }
 ##
+function ntt-org() {
+    q="${*}"
+
+    local opts=()
+    opts+=( "--file-extension=${(j.,.)note_formats%%,}")
+
+    {
+        revaldbg ugbase --group-separator=$'\n|-------------------------------------------|\n' --sort --context=3 --regexp="$q" --recursive --heading --color=always "$opts[@]" "$nightNotes" | dir-rmprefix "$nightNotes"
+
+        # --line-number -T
+        #  | sdlit $'\t' '   '
+
+    } | command sd '^(\s*(?:\x1b\[33m)?)(\*|#)' '$1,$2' | command sd --flags=i --string-mode "$q" "$(ecn "$q" | mimic -m 100)"
+    # -m CHANCE, --me-harder=CHANCE
+    #   forward replacement percent, default 1
+    #
+    # without making the query text 'invisible' via 'mimic', the reevaluation of the org-babel source blocks will re-find the query in its own results, causing a loop
+    #
+    # @warn you still need to use quoting shenanigans when you call ntt-org itself so as to not find yourself, but it will not cause a loop at least
+}
+function ntt-org1() {
+    # DEPRECATED
+    q="${*}" metadata="${ntt_org_md:-y}"
+    {
+        if bool $metadata ; then
+            local out
+            silent ntt "$q"
+            ecn ${(@F)out} | double-newlines
+        else
+            ntt "$q"
+        fi
+    } | sd --flags=i "$q" "$(ecn "$q" | mimic -m 100)"
+}
+##

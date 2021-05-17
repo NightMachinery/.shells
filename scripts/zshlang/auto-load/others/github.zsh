@@ -6,9 +6,11 @@ function gh-release-get() {
         # dvar repo
     fi
     local desired="$2"
+    # @todo1 allow desired to be an array of possible choices: desired=( linux ubuntu )
     if test -z "$desired" ; then
         if isDarwin ; then
-            desired="macos"
+            # desired="macos"
+            desired="mac"
         else
             desired="ubuntu"
         fi

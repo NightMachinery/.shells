@@ -48,6 +48,10 @@ isJulia() { isBorg "$@" ; }
 # isborg() { isBorg "$@" ; }
 # isjulia() { isBorg "$@" ; }
 ##
+function isBrish() {
+    [[ -n "${brish_server_index}" ]]
+}
+##
 function isTmux() {
     test -n "$TMUX"
 }

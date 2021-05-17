@@ -35,6 +35,8 @@ whichm() {
     local item output var
     for item in "$items[@]"
     do
+        nextItems+="${item%%+}"
+
         if ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) ; then
             if (( ${+builtins[$item]} )) ; then
             ec "## $(which -- $item)"
