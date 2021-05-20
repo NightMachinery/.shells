@@ -50,6 +50,14 @@ code.lilf.ir {
   reverse_proxy localhost:7451
 }
 
+notes.lilf.ir {
+  encode zstd gzip
+  # reverse_proxy localhost:1313
+  file_server browse {
+    hide *..hidden..*
+    root {env.hugo_base_dir}/public
+  }
+}
 
 https://garden.lilf.ir {
 #  @protected /api/*
