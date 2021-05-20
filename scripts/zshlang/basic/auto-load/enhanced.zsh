@@ -35,6 +35,10 @@ mv2 () {
     (( $#@ < 2 )) && { ecerr "Usage: mv2 <dest> <path> ..." ; return 1 }
     reval-ec mv "${@[2,-1]}" "$1"
 }
+cp2 () {
+    (( $#@ < 2 )) && { ecerr "Usage: cp2 <dest> <path> ..." ; return 1 }
+    reval-ec cp -r "${@[2,-1]}" "$1"
+}
 ##
 alias noglob='noglob ruu ""'
 ##

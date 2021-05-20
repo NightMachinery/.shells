@@ -11,8 +11,10 @@ function emc-sudo() {
 }
 ##
 function doom-sync() {
+    : "-u updates as well"
+
     rust-setup
-    doom sync
+    doom sync "$@"
 }
 ##
 function emcpe() {
@@ -137,6 +139,13 @@ function emc-in() {
     t="$(gmktemp --suffix "$s")" @TRET
     cat > "$t" @TRET
     emc-open "$t"
+    emc-colorize
+}
+function emc-colorize() {
+    emc-eval "(when (equalp major-mode 'fundamental-mode) (xterm-color-colorize-buffer) (set-buffer-modified-p nil) (read-only-mode))"
+    # xterm-color-colorize-buffer eats the ANSI codes, so if we save the file those codes will be LOST
+    #
+    # this whole command is a raceCondition but it should be harmless
 }
 ##
 function icat-emc() {
@@ -168,4 +177,54 @@ function emc-nowait2() {
 
     emc-focus
 }
+##
+function emc-less() {
+    local fs=( $@ ) jq_force="$emc_less_jq"
+    if (( $#@ == 0 )) ; then
+        fs+=/dev/stdin
+    fi
+
+    local f
+    for f in $fs[@] ; do
+        if [[ "$f" == *.json ]] || bool "$jq_force" ; then
+            cat "$f" | jq .
+        else
+            cat "$f"
+        fi
+    done | emc-in
+}
+alias el="emc-less"
+
+function emc-less-jq() {
+    @opts jq y @ emc-less "$@"
+}
+alias elj="emc-less-jq"
+##
+function file-uri2unix() {
+    local f="$1"
+    # assert-args f @RET
+
+    if [[ "$f" =~ 'file://[^/]*(/.*)' ]] ; then
+        ec "$match[1]" | url-decode.py
+    else
+        ec "$f"
+    fi
+}
+function trimr-hash() {
+    local inargs
+    in-or-args2 "$@"
+
+    arrN "${inargs[@]}" | command sd '([^#]*)#.*' '$1'
+}
+##
+function emc-html-viewer() {
+    local f="$1"
+    assert-args f @RET
+
+    f="$(file-uri2unix "$f")" @TRET
+    local tmp="$(gmktemp --suffix .org)"
+    assert html2org "$f" > $tmp @RET
+    emc "$tmp"
+}
+##
 ##

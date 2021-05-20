@@ -67,9 +67,10 @@ pxify() {
     pxaify-command brew # makes downloads faster
     pxaify-command pip # makes downloads faster
     # pxaify-command git # use git's own config
+    pxaify-command npm
     pxaify-command go
     pxaify-command dart
-    # pxaify-command cargo # did not work
+    # pxaify-command cargo # did not work, using CARGO_HTTP_PROXY instead
     pxaify-command mpv
     pxaify-command spotdl
     pxaify-command emacs

@@ -66,7 +66,7 @@ function str2tmuxname() {
 }
 function str2filename() {
     # this might be too restrictive
-    gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t'
+    gtr '/' '_' | gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t'
 }
 ##
 function tmux-capture() {

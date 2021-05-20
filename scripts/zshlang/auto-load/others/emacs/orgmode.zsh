@@ -28,7 +28,7 @@ function org-update-files-all() {
     ##
     # fd --extension org --type f . "$nightNotes" | emc_eval_in=y emc-eval '(apply night/update-files lines)'
     ##
-    fd --extension org --type f . "$nightNotes" | inargsf org-update-files
+    fd --extension org --extension org_archive --type f . "$nightNotes" | inargsf org-update-files
     ##
     # org-update-files "$nightNotes"/**/*.org
     ##

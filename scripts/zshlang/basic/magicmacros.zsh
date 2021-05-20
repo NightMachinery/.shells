@@ -14,6 +14,10 @@ alias -g '@RET'=' || return $?'
 alias -g '@TRET'=' || { ectrace ; return $? }'
 alias -g '@MRET'='"$0" || return $?'
 ##
+alias '@NA'='ectrace "$0: not implemented" @RET'
+alias '@deprecated'='ectrace "$0: deprecated; aborting." @RET'
+alias '@placeholder'='ectrace "$0: this code is in the middle of editing; aborting." @RET'
+##
 function magic_h() {
     : 'Usage: magic ... ; mret'
     : 'Does not access stdin, which makes it less buggy. E.g., "arger 1 2 3|fz |stdinmagic" hangs. https://unix.stackexchange.com/questions/585941/zsh-weird-behavior-bug-in-reading-stdin '

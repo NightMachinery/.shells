@@ -18,7 +18,7 @@ alias b='builtin'
 alias typ='typeset -p'
 alias n='noglob'
 ##
-alias ci='curl --retry 120 --retry-delay 1 ipinfo.io' # ; ec ; myip ; mycountry' # ; px curl --retry 0 ipinfo.io'
+alias ci='curl --progress-bar --retry 120 --retry-delay 1 ipinfo.io | html2text' # ; ec ; myip ; mycountry' # ; px curl --retry 0 ipinfo.io'
 # socks5h resolves hostname through proxy (I think). It's faster for my youtube test reqs:
 # curl -x socks5h://127.0.0.1:1081 -o /dev/null -w %{url_effective}  'https://www.youtube.com/'
 # curl -x http://127.0.0.1:1087 -o /dev/null -w %{url_effective}  'https://www.ipinfo.io/'

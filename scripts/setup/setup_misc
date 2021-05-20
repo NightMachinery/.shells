@@ -16,10 +16,12 @@ pig git@github.com:NightMachinary/brish.git
 pi git+https://github.com/n8henrie/pycookiecheat.git@dev
 
 pi git+git://github.com/fretboardfreak/kitty-theme-changer.git@master
+
+pip install git+git://github.com/reinderien/mimic.git
 ###
 cpanm App::ansifold
 ##
-nimble install https://github.com/NightMachinary/htmlmetadata
+nimble install --accept https://github.com/NightMachinary/htmlmetadata
 
 nimble install --accept "git://github.com/AmanoTeam/Unalix-nim"
 ##
@@ -47,6 +49,10 @@ brew link --overwrite moreutils
 brew unlink parallel
 brew link --overwrite parallel
 echo 'will cite' | command parallel --citation 1> /dev/null 2> /dev/null
+##
+brew install dasht
+# para $proxyenv dasht-docsets-install -f ::: css html bash # didn't work
+re '$proxyenv dasht-docsets-install -f' css html bash
 ##
 luarocks install penlight # require 'pl.pretty'.dump(table)
 luarocks install luaposix

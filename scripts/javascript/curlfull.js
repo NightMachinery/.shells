@@ -12,7 +12,7 @@ puppeteer.use(StealthPlugin());
 
 (async () => {
     const url = process.argv[2];
-    var cookieFile = '';
+    var cookieFile = ''; // @output
     if (process.argv.length >= 4) {
         cookieFile = process.argv[3];
     }

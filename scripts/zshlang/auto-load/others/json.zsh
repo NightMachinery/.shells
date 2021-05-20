@@ -1,7 +1,17 @@
+##
 jqm() {
     # --raw-output / -r: With this option, if the filter's result is a string then it will be written directly to standard output rather than being formatted as a JSON string with quotes. This can be useful for making jq filters talk to non-JSON-based systems.
     # --join-output / -j: Like -r but jq won't print a newline after each output.
     jq -re "$@[1,-2]" "$@[-1] // empty"
+}
+##
+function jq-quote() {
+    local i
+    i="$(in-or-args "$@")" @TRET # this trim-rights the input, which seems desirable
+    ecn "$i" | jq --raw-input --slurp --null-input --compact-output 'inputs'
+    ## tests:
+    # `arrN h j k 'j m n "man"' " 'god'" |jq-quote `
+    ##
 }
 ##
 json-beautify() {

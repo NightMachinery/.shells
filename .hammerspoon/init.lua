@@ -516,8 +516,12 @@ function appHotkey(o)
                    end
   end)
 end
+  -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
 appHotkey{ key='w', appName='com.google.Chrome' }
+-- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
+-- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
+
 appHotkey{ key='o', appName='com.operasoftware.Opera' }
 appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 appHotkey{ key='t', appName='com.tdesktop.Telegram' }

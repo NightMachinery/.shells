@@ -269,10 +269,10 @@ function fzf-history-widget() {
   local query
   # query="${(qqq)LBUFFER}"
   query="${LBUFFER}"
-  query="$(fz-createquery ${=query})"
+  # query="$(fz-createquery ${=query})" # @futureCron @tradeoff ; also see --no-sort
 
   selected=( $(fc -rl 1 | perl -ne 'print if !$seen{($_ =~ s/^\s*[0-9]+\s+//r)}++' |
-    FZF_DEFAULT_OPTS="--height ${FZF_TMUX_HEIGHT:-70%} $FZF_DEFAULT_OPTS -n2..,.. --tiebreak=index --bind=ctrl-r:toggle-sort $FZF_CTRL_R_OPTS +m" fz --query="$query") )
+    FZF_DEFAULT_OPTS="--height ${FZF_TMUX_HEIGHT:-70%} $FZF_DEFAULT_OPTS -n2..,.. --no-sort --tiebreak=index --bind=ctrl-r:toggle-sort $FZF_CTRL_R_OPTS +m" fz --query="$query") )
   local ret=$?
   if [ -n "$selected" ]; then
     num=$selected[1]
@@ -285,7 +285,7 @@ function fzf-history-widget() {
 }
 zle     -N   fzf-history-widget
 
-bindkey '^R' fzf-history-widget
+bindkey '^R' fzf-history-widget # C-r
 ##
 # allow ctrl-r to perform backward search in history
 # bindkey '^r' history-incremental-search-backward
@@ -564,14 +564,19 @@ ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
 ###
 # remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
 WORDCHARS="${WORDCHARS/\//}|"
-## if you want to customize this per function:
-# function backward-kill-word2() {
-#   local WORDCHARS="${WORDCHARS}"
-#   zle backward-kill-word
-# }
 
-# zle -N backward-kill-word2
-# bindkey '^W' backward-kill-word2
+function backward-kill-word2() {
+  if [[ "$LBUFFER" =~ '(.*)\s+$' ]] ; then
+    LBUFFER="$match[1]"
+  else
+    ## if you want to customize WORDCHARS per function:
+    local WORDCHARS="${WORDCHARS}"
+    zle backward-kill-word
+  fi
+}
+zle -N backward-kill-word2
+bindkey '^W' backward-kill-word2 # C-w
+bindkey '^[^?' backward-kill-word2 # alt-backspace alt-delete
 ###
 psource $HOME/.shellfishrc
 ##
