@@ -3,13 +3,13 @@ autoload -U colors && colors
 typeset -ag gray=( 170 170 170 )
 ## Functions
 # @See terminal-ansi-test for more good stuff
-Bold () { ! isI || print -n -- '\e[1m' }
-Italic () { ! isI || print -n -- '\e[3m' }
-Underline () { ! isI || print -n -- '\e[4m' }
-Strikethrough () { ! isI || print -n -- '\e[9m' }
-Flash () { ! isI || print -n -- '\e[5m' } # doesn't work on my iTerm
-Invert () { ! isI || print -n -- '\e[7m' }
-Invisible () { ! isI || print -n -- '\e[8m' } # again doesn't work
+Bold () { ! isColor || print -n -- '\e[1m' }
+Italic () { ! isColor || print -n -- '\e[3m' }
+Underline () { ! isColor || print -n -- '\e[4m' }
+Strikethrough () { ! isColor || print -n -- '\e[9m' }
+Flash () { ! isColor || print -n -- '\e[5m' } # doesn't work on my iTerm
+Invert () { ! isColor || print -n -- '\e[7m' }
+Invisible () { ! isColor || print -n -- '\e[8m' } # again doesn't work
 ##
 function palette() {
     local i
@@ -26,8 +26,8 @@ function paletteget() {
     echo -E ${(qqqq)${(%)color}}
 }
 ##
-colorfg() { ! isI || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
-colorbg() { ! isI || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
+colorfg() { ! isColor || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
+colorbg() { ! isColor || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
 colorb() {
     co_f=colorbg color "$@"
 }
@@ -45,7 +45,7 @@ color() {
         } || {
             # in="$(in-or-args "${@[2,-1]}")"
             in-or-args2 "${@[2,-1]}"
-            isI && printf %s "$fg[$1]"
+            isColor && printf %s "$fg[$1]"
         }
     in="$inargs"
     print -nr -- "$in"
@@ -58,7 +58,7 @@ function resetcolor() {
     if test -z "$reset_color" ; then
         typeset -g reset_color=$'\C-[[00m'
     fi
-    ! isI || printf %s "$reset_color"
+    ! isColor || printf %s "$reset_color"
 }
 function colorreset() { resetcolor }
 ##
@@ -113,7 +113,7 @@ function ecrainbow() { ecrainbow-n "$@" ; echo }
 function ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
 function ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
 function h_ecalternate() {
-    if ! isI ; then
+    if ! isColor ; then
         ec "$(gq "$@")"
         return 0
     fi
@@ -128,7 +128,7 @@ function h_ecalternate() {
 function ecalternate() {
     local o
     o="$(h_ecalternate "$@")" @RET
-    if isI ; then
+    if isColor ; then
         # Removes last whitespace  char:
         ecn "${o[1,-7]}" ; resetcolor ; ec
     else

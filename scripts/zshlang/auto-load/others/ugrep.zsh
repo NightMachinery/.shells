@@ -23,6 +23,8 @@ function ugbool() {
 alias ugb='ugbool'
 ##
 function ug-i() {
+    : "oneliner: ugrep --bool --smart-case '--sort=best' --no-confirm --perl-regexp --hidden '--binary-files=without-match' --query=1"
+    ##
     ugbase --query=1 "$@"
 }
 function ugf() {

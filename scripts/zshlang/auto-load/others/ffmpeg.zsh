@@ -105,3 +105,16 @@ function imgdirs2vid() {
         popf
     done
 }
+##
+function vid2gif() {
+    # https://superuser.com/questions/556029/how-do-i-convert-a-video-to-gif-using-ffmpeg-with-reasonable-quality
+    #
+    # https://engineering.giphy.com/how-to-make-gifs-with-ffmpeg/
+    ##
+    local i="$1"
+    local o="${2:-${i:r}.gif}"
+    assert-args i @RET
+
+    ffmpeg -i $i -vf "fps=10,scale=320:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 "$o"
+}
+##

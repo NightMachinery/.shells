@@ -17,6 +17,16 @@ aa-raw() {
 
     isI || opts+=(--show-console-readout false --summary-interval 0)
     test -n "$aaNoSplit" || opts+=(--enable-http-pipelining --split 6 --stream-piece-selector geom)
+
+
+    local arg
+    for arg in $@ ; do
+        if url-match "$arg" ; then
+            opts+=( --referer "$arg" )
+            break
+        fi
+    done
+
     aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false  $opts[@] "$@"
     local ret=$?
     #-Z has some unsavory sideeffects so I have not included it in this.

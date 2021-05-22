@@ -51,6 +51,10 @@ isJulia() { isBorg "$@" ; }
 function isBrish() {
     [[ -n "${brish_server_index}" ]]
 }
+
+function isBrishOrg() {
+    [[ "$GARDEN_SESSION" == bsh ]]
+}
 ##
 function isTmux() {
     test -n "$TMUX"
@@ -81,13 +85,17 @@ function isRtl() {
     ##
 }
 ##
-isI() {
+function isI() {
     test -z "$FORCE_NONINTERACTIVE" && {
         test -n "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]
     }
 }
-isIReally() {
+function isIReally() {
     [[ -o interactive ]]
+}
+
+function isColor() {
+    isBrishOrg || isI
 }
 ##
 function isOutTty() {

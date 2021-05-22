@@ -3,7 +3,6 @@
 alias withtxt="we_dler=readmoz-txt h2ed=txt2epub " # better for tables
 alias tlcode='tlrl-code'
 alias tlgh='tlrl-gh'
-alias gurl='curlm -o /dev/stdout'
 aliasfn withchrome 'fhMode=curlfullshort' reval
 alias w2e-noredirect='fnswap urlfinalg arrN w2e' # readmoz uses full-html2 under the hood.
 alias tlnoredirect='tlrl-ng -e w2e-noredirect'
@@ -1252,7 +1251,7 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     elif [[ "$mode" == org ]] ; then
         if test -z "$emacsMode" ; then
             indent="** "
-            ec "* [[$(ec $url| url-encode.py)][${title:-$url}]]"
+            ec "* [[$(ecn $url| url-encode.py)][${title:-$url}]]"
         else
             # we insert the links with the heading already created in emacs.
             indent=""

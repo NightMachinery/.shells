@@ -6,7 +6,7 @@ function btt-refresh {
 }
 function btt-update {
      local uuid="${1:? UUID required}" text="$2"
-     # text="$(url-encode.py <<<"$text")" # doesn't encode newlines by current design
+     # text="$(ecn "$text" | url-encode.py)"
      command curl --fail --silent "http://127.0.0.1:8855/update_touch_bar_widget/?uuid=$uuid&text=$text"
 }
 ##

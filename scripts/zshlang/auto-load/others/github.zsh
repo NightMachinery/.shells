@@ -11,7 +11,7 @@ function gh-release-get() {
     if test -z "$desired" ; then
         if isDarwin ; then
             # desired="macos"
-            desired="mac|darwin"
+            desired="mac|darwin|\.dmg"
         else
             desired="linux|ubuntu"
         fi

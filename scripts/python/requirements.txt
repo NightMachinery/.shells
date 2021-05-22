@@ -78,3 +78,5 @@ pyyaml
 scipy
 gallery-dl
 coursera-dl
+amzqr
+wifi-password
