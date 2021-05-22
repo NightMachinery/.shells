@@ -93,12 +93,20 @@ function reval-notifexit() {
     }
 }
 ##
-function env-clean() {
+function reval-env() {
+    test -z "$*" && return 0
+
+    local clean_mode="$reval_env_clean"
+
     local env=()
     local i
     for i in "$@" ; do
         if [[ "$i" =~ '^([^=]*)=(.*)$' ]] ; then
-            env+="$i"
+            if bool $clean_mode ; then
+                env+="$i"
+            else
+                env+="$(gq "$match[1]")=$(gq "$match[2]")"
+            fi
             shift
         else
             break
@@ -107,7 +115,17 @@ function env-clean() {
 
     local cmdhead="$1"
     local cmdbody=( "$@[2,-1]" )
-    env -i "$env[@]" "$(realpath2 "$cmdhead")" "$cmdbody[@]"
+    if bool $clean_mode ; then
+        env -i "$env[@]" "$(realpath2 "$cmdhead")" "$cmdbody[@]"
+    else
+        eval "$env[*] $(gq "$cmdhead" "$cmdbody[@]")"
+    fi
+    ## tests:
+    # `reval-env sth=\"67 fin='"98" !!' echo-fin`
+    ##
+}
+function env-clean() {
+    @opts clean y @ reval-env "$@"
 }
 ##
 function sudo() {

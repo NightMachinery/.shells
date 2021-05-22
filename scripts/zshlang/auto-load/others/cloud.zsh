@@ -106,7 +106,8 @@ function rcrget() {
     if test -z "$file_mode" && [[ "$id" =~ '/file/' ]] ; then
         file_mode=y
     fi
-    id="$(ecn "$id" | command sd '/(view|edit)(\?[^/]*)$' '')"
+    id="$(ecn "$id" | command sd '(/(view|edit))?(\?[^/]*)?$' '')"
+    # dvar id
     id="$(url-tail "$id")"
 
     if bool "$file_mode" ; then

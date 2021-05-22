@@ -1,7 +1,11 @@
 ## external sources:
-# * https://github.com/zsh-users/zsh-completions/tree/master/src
+# [[id:cf763f59-db43-4712-b186-bd4143833092][libraries/completion.org]]
 ##
+# 'bit is an experimental modernized git CLI built on top of git' https://github.com/chriswalz/bit
 complete -o nospace -C /Users/evar/go/bin/bitcomplete bit # needs bashcompinit
+##
+# this generates generic completions from the manpage, but it is incomplete, e.g., `--check-certificate` is not detected for aria2c
+compdef _gnu_generic aria2c
 ##
 # Just reuse eval's engine
 # function comp-reval() {
