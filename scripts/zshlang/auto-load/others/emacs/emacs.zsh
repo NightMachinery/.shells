@@ -1,7 +1,4 @@
 ##
-# export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
-export EMACS_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server"
-##
 function emc-sudo() {
     : "See also doom--sudo-file-path"
 
@@ -76,9 +73,9 @@ function emc-eval() {
        (format \"%s\\n\"
          (server-eval-at (concat (getenv \"EMACS_SOCKET_NAME\")) '(with-current-buffer (window-buffer (selected-window))
                                          "${*}")
-            )
+     )
          )
-       )
+)
      )"
 
     if bool "$stdin" ; then
@@ -133,13 +130,13 @@ alias emcnw='emc-nowait'
 ialias emcg="emacsclient -c"
 ##
 function emc-in() {
-    local s="$1"
+    local s="${1:-.log}"
 
     local t
     t="$(gmktemp --suffix "$s")" @TRET
     cat > "$t" @TRET
     emc-open "$t"
-    emc-colorize
+    # emc-colorize
 }
 function emc-colorize() {
     emc-eval "(when (equalp major-mode 'fundamental-mode) (xterm-color-colorize-buffer) (set-buffer-modified-p nil) (read-only-mode))"
@@ -179,7 +176,7 @@ function emc-nowait2() {
 }
 ##
 function emc-less() {
-    local fs=( $@ ) jq_force="$emc_less_jq"
+    local fs=( $@ ) jq_force="$emc_less_jq" parser="$emc_less_parser"
     if (( $#@ == 0 )) ; then
         fs+=/dev/stdin
     fi
@@ -191,7 +188,13 @@ function emc-less() {
         else
             cat "$f"
         fi
-    done | emc-in
+    done | {
+        if test -n "$parser" ; then
+            prettier --parser "$parser"
+        else
+            cat
+        fi
+    } | emc-in
 }
 alias el="emc-less"
 
@@ -199,6 +202,11 @@ function emc-less-jq() {
     @opts jq y @ emc-less "$@"
 }
 alias elj="emc-less-jq"
+
+function emc-less-html() {
+    @opts parser html @ emc-less "$@"
+}
+alias elh="emc-less-html"
 ##
 function file-uri2unix() {
     local f="$1"

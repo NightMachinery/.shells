@@ -1,3 +1,5 @@
+# /usr/local/bin/brishz.dash bello
+##
 if [ -f ~/.bashrc ]; then
     . ~/.bashrc
 fi

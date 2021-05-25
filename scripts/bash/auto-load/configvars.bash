@@ -42,6 +42,9 @@ export peopledir="$nightNotes/private/memories/people"
 
 typeset -g UHIST_FILE="$nightNotes/bookmarks/useme/zsh/universal_history.zsh"
 typeset -g UHIST_FILE_FC="$nightNotes/bookmarks/useme/zsh/universal_history_fc.zsh"
+
+typeset -g kindle_clippings_dir="${nightNotes}/private/backups/Kindle/clippings"
+typeset -g kindle_clippings_org_dir="${kindle_clippings_dir}/orgified"
 ##
 test -z "$attic_dir" && export attic_dir="$cellar/attic/"
 export attic_private_dir="$cellar/attic_private/"

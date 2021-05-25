@@ -106,3 +106,35 @@ local margin=1
 local scale="${2:-1.75}"
 ebook-convert $f ${f:r}.pdf --custom-size=$((4.6/$scale))x$((6.7/$scale)) --pdf-page-margin-left=$margin --pdf-page-margin-right=$margin --pdf-page-margin-top=$margin --pdf-page-margin-bottom=$margin
 }
+##
+function kindle-sdr-backup() {
+    command gcp -r -v ~vol/Kindle/documents/**/*.sdr ~base/Backup/Kindle/sdr
+}
+
+function kindle-clippings-backup() {
+    # reval-ec kindle-sdr-backup
+
+    local d="$kindle_clippings_dir"
+    assert mkdir -p "$d" @RET
+    local o="${d}/My Clippings.txt"
+
+    assert command gcp -v ~vol/"Kindle/documents/My Clippings.txt" "$o" @RET
+
+    kindle-clippings-orgify
+}
+
+function kindle-clippings-orgify() {
+    local d="$kindle_clippings_dir"
+    local o="${d}/My Clippings.txt"
+    assert test -e "$o" @RET
+
+    trs "$kindle_clippings_org_dir"
+    mkdir -p "$kindle_clippings_org_dir"
+    assert indir "$d" fyodor "$o" "$kindle_clippings_org_dir" @RET
+}
+
+function kindle-clippings-diff() {
+    indir "$kindle_clippings_dir" git-diff HEAD -- "$kindle_clippings_org_dir"
+}
+alias kcd=kindle-clippings-diff
+##

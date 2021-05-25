@@ -46,11 +46,12 @@ function fnrep() {
     local fn="$1"
     local body="$2"
     local cmd=( "${@[3,-1]}" )
-    # local origbody="_origbody_$fn_$(uuidpy)"
-    # eval $origbody'=$functions['$fn'] || '$origbody'=""'
-    # local restore="_restore_$1_$(uuidpy)"
-    # functions[$restore]='{ test -n "$'$origbody'" && functions['$fn']=$'$origbody' || unfunction '$fn' } ; trap - INT TERM ; unfunction '$restore' ; return 1'
-    # functions[$restore]='return 1'
+
+    local origfn
+    origfn="fn_$(uuidm)"
+    functions[$origfn]=$functions[$fn]
+    # ec "origfn: $functions[$origfn]"
+
     local origbody origalias
     origbody=$functions[$fn] || $origbody=''
     origalias=$aliases[$fn] || $origalias=''
@@ -59,7 +60,12 @@ function fnrep() {
     {
         # trap false INT TERM
         unalias $fn &>/dev/null
+
+        alias fnsuper="$origfn"
         functions[$fn]=$body
+        # ec "fn: $functions[$fn]"
+        unalias fnsuper
+
         reval "${cmd[@]}"
         e=$?
     } always {
@@ -67,9 +73,15 @@ function fnrep() {
         # geval "$restore"
         test -n "$origbody" && functions[$fn]="$origbody" || unfunction $fn
         test -n "$origalias" && aliases[$fn]="$origalias"
+        unfunction $origfn
         # trap - INT TERM
     }
     return $e
+
+    ## tests
+    # `fnrep arrN 'ecn "before|" ; fnsuper "$@" ; ecn "|after" ' arrN Hi, $'\t'Alice'!' `
+    # `fnrep arrN 'ecn "<" ; fnsuper "$@" ; ecn ">" ' fnrep arrN 'ecn "before|" ; fnsuper "$@" ; ecn "|after" ' arrN Hi, $'\t'Alice'!'`
+    ##
 }
 function fnswap() {
     fnrep "$1" "$2 "'"$@"' "$@[3,-1]"

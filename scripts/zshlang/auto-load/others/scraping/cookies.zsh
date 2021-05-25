@@ -1,6 +1,6 @@
 ##
 function cookies2json() {
-    local c domains=( $cookies2json_d[@] )
+    local c domains=( ${cookies2json_d[@]:-NA} )
     c="$(in-or-args "$@")" @TRET
     assert-args c domains @RET
 
@@ -42,5 +42,11 @@ function cookies2json() {
     ## tests:
     # `cookies 'https://www.goodreads.com' | @opts d [ '.goodreads.com' 'www.goodreads.com' ] @ cookies2json`
     ##
+}
+function cookies-extract() {
+    local name="$1"
+    assert-args name @RET
+
+    cookies2json| jqm --arg n "$name" '.[] | select(.name | contains($n)) | .value'
 }
 ##

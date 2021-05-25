@@ -1,7 +1,17 @@
 ### ZSH COMPATIBLE
+# /usr/local/bin/brishz.dash bello
+## @duplicateCode/jhsd99wiw3i3hehiajh:
+if test -z "$NIGHTDIR" ; then
+    NIGHTDIR=~/scripts # @hardcoded bash has no way of determining this by itself
+    if ! test -d "$NIGHTDIR" ; then
+        unset NIGHTDIR
+        echo "NIGHTDIR not found"
+    fi
+fi
 ##
-export NIGHTDIR=~/scripts
 source "$NIGHTDIR"/zshlang/basic/conditions.zsh
+##
+export TERM=xterm-256color # @surprise
 ##
 if isBash ; then
     if (( BASH_VERSINFO[0] >= 5 )) ; then
@@ -32,5 +42,3 @@ if isI ; then
 fi
 ##
 BASHRC_LOADED=y
-
-test -e "$HOME/.shellfishrc" && source "$HOME/.shellfishrc"

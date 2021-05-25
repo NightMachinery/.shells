@@ -269,7 +269,10 @@ function fzf-history-widget() {
   local query
   # query="${(qqq)LBUFFER}"
   query="${LBUFFER}"
-  # query="$(fz-createquery ${=query})" # @futureCron @tradeoff ; also see --no-sort
+  query="$(fz-createquery ${=query})"
+  # note that if we want to use C-r to find sth, we can activate from the start and start typing, but if we have already written a command and want to check it in C-r, quoting is necessary
+  #
+  # @tradeoff --no-sort
 
   selected=( $(fc -rl 1 | perl -ne 'print if !$seen{($_ =~ s/^\s*[0-9]+\s+//r)}++' |
     FZF_DEFAULT_OPTS="--height ${FZF_TMUX_HEIGHT:-70%} $FZF_DEFAULT_OPTS -n2..,.. --no-sort --tiebreak=index --bind=ctrl-r:toggle-sort $FZF_CTRL_R_OPTS +m" fz --query="$query") )

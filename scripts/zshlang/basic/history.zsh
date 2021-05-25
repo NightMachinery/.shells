@@ -74,7 +74,7 @@ function hist-add-universal() {
     hist-add-universal-unquoted "$(gq "$@")"
 }
 function seal-history-last-fc() {
-    hist-add-universal-unquoted "$(hist-last 1)"
+    reval-ec hist-add-universal-unquoted "$(hist-last 1)"
 }
 alias shla='seal-history-last-fc'
 ##

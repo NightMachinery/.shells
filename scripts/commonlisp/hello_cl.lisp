@@ -2,6 +2,21 @@
 
 (write-line "Hello CL!")
 
+;;; @broken
+(defun find-symbol-or-lose (name &optional package)
+  (if package
+      (find-symbol (string name) (find-package package))
+      (find-symbol (string name))
+      ))
+
+(cl:documentation 'defun 'function)        ;; @works
+
+(find-symbol "defun" )
+(find-symbol (symbol-name  "car"))
+(documentation :WRITE-LINE 'FUNCTION)
+(documentation (find-symbol-or-lose "WRITE-LINE") 'FUNCTION)
+;;;
+
 (let ((res
         (run-program "/usr/local/bin/brishzq.zsh" '("ec" "hello") :output *standard-output*)))
   (describe res))

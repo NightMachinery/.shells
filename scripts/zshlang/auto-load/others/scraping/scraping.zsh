@@ -1,4 +1,7 @@
 # imports json.zsh
+##
+export useragent_googlebot="Mozilla/5.0 (compatible; Googlebot/2.1; +http://google.com/bot.html)"
+export useragent_chrome='User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36'
 ### Aliases
 alias withtxt="we_dler=readmoz-txt h2ed=txt2epub " # better for tables
 alias tlcode='tlrl-code'
@@ -52,7 +55,7 @@ function tlwb() {
 noglobfn tlwb
 ##
 function wgetm() {
-    $proxyenv wget --header "$(cookies)" "$@"
+    $proxyenv wget --header "$useragent_chrome" --header "$(cookies)" "$@"
 }
 function wget-cookies() {
     wgetm --header "$(cookies-auto "$@")" "$@"
@@ -66,7 +69,7 @@ function curlm() {
         opts+='--silent'
     fi
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
-    $proxyenv curl --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
+    $proxyenv curl --header "$useragent_chrome" --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
 }
 function curl-dl() {
     ##
@@ -100,7 +103,6 @@ function curl-cookies() {
     # cookies-auto takes ~0.5s
     curlm --header "$(cookies-auto "$@")" "$@"
 }
-export useragent_googlebot="Mozilla/5.0 (compatible; Googlebot/2.1; +http://google.com/bot.html)"
 function curl-googlebot() {
     curlm --user-agent "$useragent_googlebot" "$@"
 }
@@ -108,7 +110,7 @@ function curl-useragent() {
     # Copy from Chrome's network pane
     $proxyenv curl --fail --no-progress-meter \
         -H 'upgrade-insecure-requests: 1' \
-        -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36' \
+        -H "$useragent_chrome" \
         -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
         -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
         --compressed "$@"

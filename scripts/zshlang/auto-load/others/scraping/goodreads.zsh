@@ -31,7 +31,9 @@ function goodreads-export-dl() {
     retry_sleep=15 assert retry-limited 100 aacookies --dir $dir -o "${o:t}" https://www.goodreads.com/review_porter/export/13353762/goodreads_export.csv @RET
 }
 function goodreads-export-backup() {
-    local o="${nightNotes}/backups/Goodreads/goodreads_export_$(datej | str2filename).csv"
+    local o
+    # o="${nightNotes}/private/backups/Goodreads/goodreads_export_$(datej | str2filename).csv"
+    o="${nightNotes}/private/backups/Goodreads/goodreads_export.csv"
 
     goodreads-export-dl $o
 }

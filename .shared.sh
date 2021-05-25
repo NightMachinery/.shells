@@ -6,6 +6,17 @@ maxproc="$(ulimit -Hu)" # local not allowed on some shells
 maxproc=$(( maxproc - 100 )) # give some slack to the OS
 ulimit -Su "$maxproc"
 unset maxproc
+### @duplicateCode/jhsd99wiw3i3hehiajh
+if test -z "$NIGHTDIR" ; then
+    NIGHTDIR=~/scripts # @hardcoded bash/'zsh -f' have no way of determining this by themselves
+    if ! test -d "$NIGHTDIR" ; then
+        unset NIGHTDIR
+        echo "NIGHTDIR not found"
+    fi
+fi
+##
+# export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
+export EMACS_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server"
 ###
 if true ; then # ! command -v brew &> /dev/null ; then
     # Sometimes brew itself is in path but its dirs are not.
@@ -37,6 +48,7 @@ addToPATH "$GEM_HOME/bin"
 addToPATH "$HOME/.poetry/bin"
 addToPATH ~/.nimble/bin
 addToPATH /Applications/mpv.app/Contents/MacOS
+addToPATH "${NIGHTDIR}/zshlang/wrappers"
 
 # psource ~/anaconda/etc/profile.d/conda.sh
 # silence conda deactivate #this is necessary try sbing and you'll see

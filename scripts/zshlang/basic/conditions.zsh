@@ -86,12 +86,21 @@ function isRtl() {
 }
 ##
 function isI() {
-    test -z "$FORCE_NONINTERACTIVE" && {
-        test -n "$FORCE_INTERACTIVE" || [[ -o interactive ]] #[[ $- == *i* ]]
-    }
+    if test -n "$FORCE_NONINTERACTIVE" ; then
+        return 1
+    fi
+    if test -n "$FORCE_INTERACTIVE" ; then
+        return 0
+    fi
+
+    isIReally
 }
 function isIReally() {
-    [[ -o interactive ]]
+    if isBash ; then
+        [[ $- == *i* ]]
+    else
+        [[ -o interactive ]]
+    fi
 }
 
 function isColor() {
@@ -129,7 +138,7 @@ function isNotDbg() {
     ! isDbg
 }
 ##
-isNet() {
+function isNet() {
     # wget -q --spider http://google.com
     ##
     if isDarwin ; then

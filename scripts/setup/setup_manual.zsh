@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
 
+##
 gh-release-get nihui/waifu2x-ncnn-vulkan
 
 gh-release-get https://github.com/dainiusjocas/lucene-grep/releases

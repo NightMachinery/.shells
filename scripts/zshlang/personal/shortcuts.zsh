@@ -64,6 +64,9 @@ function aliasdir() {
         hash -d "$name"="$dir"
     fi
 }
+if isDarwin ; then
+    aliasdir vol /Volumes
+fi
 aliasdir base $HOME/base
 aliasdir cod $codedir
 aliasdir dl  $HOME/Downloads
