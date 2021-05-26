@@ -43,8 +43,9 @@ whichm() {
             continue
             elif ! (( ${+commands[$item]} )) ; then
                 if var="$(serr typeset -p "$item")" ; then
-                    # ec "## $var"
                     ec "$var" # the output of typeset is eval-able :D
+                else
+                    ec "## $(which -- "$item")" # might be a global alias
                 fi
                 continue
             fi

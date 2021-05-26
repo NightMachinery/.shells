@@ -153,7 +153,10 @@ alias icc='icat-emc'
 function emc-quote() {
     local i res=''
     for i in "$@" ; do
-        res+=" \"$(ecn "$i" | sdlit '\' '\\' | sdlit '"' '\"')\" " @TRET
+        res+=" \"$(ecn "$i" | sdlit '\' '\\' | sdlit '"' '\"')\" " || {
+            ectrace "i: $(gq "$i")"
+            return 1
+        }
     done
 
     ecn "$res"

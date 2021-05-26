@@ -58,15 +58,24 @@ function ec_bash() {
     fi
 }
 ##
+function gquote-simple() {
+    ec "${(q+@)@}"
+    # @warn This doesn't quote global aliases:
+    # `ec '@RET'`
+    # `reval ec '@RET'`
+}
 function gquote() {
     # Use this to control quoting centrally.
-    ec "${(q+@)@}"
+    ##
+    # the first term can be an alias and so we do not quote it using double-quotes. The rest of the terms are not allowed to be global aliases and are all quoted using double quotes.
+    ec "${(q+@)@[1]}" "${(qqq@)@[2,-1]}" # @did_I_break_sth? Wed May 26 16:34:57 2021
 }
 function gquote-dq() {
     # uses double-quotes
     ec "${(qqq@)@}"
 }
 alias gq=gquote
+alias gqs=gquote-simple
 alias gqd=gquote-dq
 function gq() { gquote "$@" }
 ##

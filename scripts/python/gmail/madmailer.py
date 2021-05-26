@@ -212,6 +212,8 @@ try:
                     ecerr("")
                     ecerr("End of current report")
                     continue
+            else:
+                labelprocessed(m)
 
             if os.environ.get('mmNoTlg', '') == '':
                 items = s.find_all("div", {"class": "text-block"})

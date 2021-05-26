@@ -48,7 +48,6 @@ h_luna-advanced-bell() {
             sleep 10 # keeps screen gray
         else
             if (( skipped >= 1 )) ; then
-                # @placeholder
                 brishz awaysh lunaquit-monitor '' ''
                 for i in {1..3} ; do
                     @opts redo 1 @ bell-visual-flash1
@@ -642,7 +641,7 @@ function bell-visual-flash1() {
 
     trapexits
 
-    bell_visual_flash1_lock_set y
+    bell_visual_flash1_lock_set y # @todo2 use better locking primitives? This is still open to race conditions
 
     local b off="${1:-0.1}" s="${2:-0.2}" redo="${bell_visual_flash1_redo:-1}" s_after="${bell_visual_flash1_sa:-0.3}"
     b="$(brightness-get)" || return $?

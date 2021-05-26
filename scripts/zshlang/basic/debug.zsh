@@ -64,6 +64,13 @@ function ecdate-err() {
     ecerr-raw "$(ecdate "$(colorfg 255 50 10)${*}$(resetcolor)")" >&2
 }
 ##
+function ecnbold() {
+   { Bold ; colorfg 40 200 30 ; Bold ; ecn "$@" ; resetcolor } >&2
+}
+function ecbold() {
+    ecnbold "$*"$'\n'
+}
+##
 function rederr-old() {
     comment Somehow just using pipes sometimes does not work and causes stdout to actually go red ...
     local out="$(mktemp)"

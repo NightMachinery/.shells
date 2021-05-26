@@ -1077,12 +1077,18 @@ function hi10-cook() {
 function hi10-ng() {
     mdoc "$0 <url-of-hi10-page> [<regex>]
 Use hi10-cook to copy the necessary command for pasting in a remote server." MAGIC
-    local url="$1"
+    local url="$1" dest="${hi10_ng_dest}"
     local regex=${2:-'\.mkv$'}
 
     pxa-maybe
-    local title="$(urlmeta $url title)"
-    [[ "${$(pwd):t}" == "$title" ]] || cdm "$title"
+
+    if test -z "$dest" ; then
+        local title="$(fhMode=aacookies urlmeta $url title)"
+        [[ "${$(pwd):t}" == "$title" ]] || cdm "$title"
+    else
+        cdm "$dest"
+    fi
+
     getlinks-c "$url" -e "$regex" | inargsf hi10-multilink
 }
 function hi10-multilink() {

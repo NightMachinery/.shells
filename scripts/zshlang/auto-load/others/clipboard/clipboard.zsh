@@ -237,12 +237,15 @@ function pbcopy-ask() {
 alias pca="pbcopy-ask"
 ##
 function clipboard-add-quoted() {
-    local cmd="$(gq "$@")"
+    local cmd="$(gq "$@")" os_copy="${clipboard_add_quoted_os}"
 
-    pbcopy "$cmd"
-    # clipboard-add "$cmd"
+    if bool $os_copy ; then
+        pbcopy "$cmd"
+    else
+        clipboard-add "$cmd"
+    fi
 }
-alias pcz='clipboard-add-quoted'
+alias pcz='@opts os y @ clipboard-add-quoted'
 ##
 function clipboard-add-files() {
     if isDarwin ; then
