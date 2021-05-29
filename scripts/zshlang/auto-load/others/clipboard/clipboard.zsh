@@ -1,5 +1,9 @@
 export CLIPBOARD_RECORD_FILE=~/tmp/.clipboard
 function clipboard-record() {
+    ##
+    # @codetoread https://github.com/ms-jpq/isomorphic_copy
+    # might have a better way than polling
+    ##
     local sleep=0.25
 
     ecdate "$0: Started; file=$(gq $CLIPBOARD_RECORD_FILE)"

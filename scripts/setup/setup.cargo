@@ -13,3 +13,4 @@ cargo install cargo-play
 cargo install cargo-edit
 cargo install gping
 cargo install procs
+cargo install choose

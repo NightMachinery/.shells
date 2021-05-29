@@ -3,10 +3,15 @@ zmodload zsh/terminfo zsh/system zsh/datetime zsh/mathfunc
 autoload -Uz zargs regexp-replace is-at-least colors # U: do not use aliases, z: always use zsh mode
 ##
 alias ec='print -r --'
-function ec() { print -r -- "$@" }
+function ec {
+    print -r -- "$@"
+}
 alias ecn='print -rn --'
-function ecn() { print -r -- "$@" }
-function ec-file() {
+function ecn {
+    print -r -- "$@"
+}
+
+function ec-file {
     local target="${ec_file_target:/dev/tty}"
     if test -w "$target" ; then
         ec "$@" >> "$target"
@@ -95,7 +100,7 @@ function run-on-each2() {
 }
 alias re='run-on-each'
 function re() { run-on-each "$@" }
-function re-async() {
+function re-async {
     # @alt para
     # Note that run-on-each won't run anything at all if no arguments are supplied
     # Use unusual name not to shadow actual vars
@@ -111,6 +116,11 @@ setopt long_list_jobs complete_in_word always_to_end
 setopt append_history extended_history hist_expire_dups_first hist_ignore_dups hist_ignore_space hist_verify inc_append_history share_history
 setopt TYPESET_SILENT # Without this, the local/typeset commands display the value of any variable which is already defined.
 unsetopt autopushd
+unsetopt AUTO_NAME_DIRS
+# Any parameter that is set to the absolute name of a directory immediately  becomes  a
+#               name  for that directory, that will be used by the `%~' and related prompt sequences,
+#               and will be available when completion is performed  on  a  word  starting  with  `~'.
+#               (Otherwise, the parameter must be used in the form `~param' first.)
 ##
 unsetopt BG_NICE # Run all background jobs at a lower priority.
 # having this enabled will cause some failures in BTT-issued background brishz commands

@@ -80,3 +80,4 @@ gallery-dl
 coursera-dl
 amzqr
 wifi-password
+gay

@@ -38,7 +38,7 @@ function agfi1() {
     local f="$1"
     ntsearch_query_fzf="'$f '() | 'alias | 'alifn " agsi  # match functions or aliases
 }
-function agfi() {
+function agfi {
     ## PERF:
     # `FZF_DEFAULT_OPTS+=' -1'`
     # `redo2 100 time2 silent agfi dbgserr`
@@ -58,9 +58,9 @@ function agfi() {
     local word_break='\b'
     ##
     if ! isI || test -n "$prefix_mode" ; then
-        q="${word_break}${f}[^:]*\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f|:\s*alifn[^:=]*\s*${word_break}$f "
+        q=":\s*${word_break}function\s+${f}|:\s*${word_break}${f}[^:]*\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f|:\s*alifn[^:=]*\s*${word_break}$f "
     else
-        q="${word_break}${f}${word_break}\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f${word_break}|:\s*alifn[^:=]*\s*${word_break}$f${word_break} "
+        q=":\s*${word_break}function\s+${f}${word_break}|:\s*${word_break}${f}${word_break}\s*\(\)|:\s*alias[^:=]*\s*${word_break}$f${word_break}|:\s*alifn[^:=]*\s*${word_break}$f${word_break} "
     fi
 
     isDbg && ec-copy "$q"

@@ -43,7 +43,11 @@ function kitsu-getall() {
         else
             ""
         end) +
-        "\n:AgeGuide: " + .ageRatingGuide +
+        (if (.ageRatingGuide) then
+        "\n:AgeGuide: " + .ageRatingGuide
+        else
+            ""
+        end) +
         "\n:END:\n#+begin_quote\n" + .description + "\n#+end_quote\n"
         )
         } ]'

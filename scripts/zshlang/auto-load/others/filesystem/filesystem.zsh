@@ -33,12 +33,13 @@ typeset -ag pushf_stack
 pushf() {
     # mkdir -p "$1"
     pushf_stack+="$(pwd)"
-    cdm "$1"
+    fnswap z-add true cdm "$1"
 }
 popf() {
-    cd "${pushf_stack[-1]}"
+    fnswap z-add true cd "${pushf_stack[-1]}"
     pushf_stack=("${(@)pushf_stack[1,-2]}")
 }
+##
 function rename-numbered() {
     mdocu "rfp_dry=<dry-run?> <to-dir> <file> ..." MAGIC
     local c=1
@@ -163,5 +164,39 @@ function trs-empty-files() {
     assert-args d @RET
 
     gfind "$d" -empty | inargsf trs
+}
+##
+function h_path-abbrev() {
+    @inargsf
+
+    local dir="$1"
+    assert test -d "$dir" @RET
+
+    pushf "$dir"
+    {
+        eval 'ec ${(%):-%~}' # supports named directories
+    } always { popf }
+}
+aliasfn path-abbrev fnswap z-add true h_path-abbrev # using 'cd' triggers z-add which causes an infinite loop
+aliasfn path2tilde path-abbrev
+
+function path-unabbrev() {
+    @inargsf
+
+    arrN ${~@} # do NOT quote this
+}
+aliasfn tilde2path path-unabbrev
+
+
+function path-abbrev-simple () {
+    ec "$(in-or-args "$@")" | perl -lpe 's/^\Q$ENV{HOME}\E/~/g'
+    ## tests:
+    # `path2tilde $PWD | tee /dev/tty | tilde2path`
+    # `path2tilde $PWD | tee /dev/tty |HOME='$0' tilde2path`
+    ##
+}
+
+function path-unabbrev-simple () {
+    ec "$(in-or-args "$@")" | perl -lpe 's/^~/$ENV{HOME}/g'
 }
 ##

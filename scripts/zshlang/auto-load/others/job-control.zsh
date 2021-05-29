@@ -169,7 +169,9 @@ function disown-true() {
 @opts-setprefix awaysh2 insubshell-eval
 ##
 function inbg() {
-    (reval "$@" &)
+    reval "$@" &|
+    ##
+    # (reval "$@" &)
     ##
     # setopt localoptions nomonitor
     # reval "$@" &

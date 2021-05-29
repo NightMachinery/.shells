@@ -7,7 +7,7 @@ function in-or-args2() {
         }
 }
 function in-or-args() {
-    (( $# )) && ecn "$@" || {
+    (( $# )) && arrN "$@" || {
             if ! isInTty ; then
                 print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
             fi

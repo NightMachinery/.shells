@@ -7,7 +7,15 @@ function z-add() {
 
     local dir="${1}"
     if test -n "$dir" ; then
-        redism SADD "$ZDIRS_NAME" "$dir"
+        dir="$(grealpath -e "$dir")" @TRET
+
+        local res
+        res="$(redism SADD "$ZDIRS_NAME" "$(path-abbrev "$dir")")" @TRET
+        if [[ "$res" == 1 ]] ; then
+            # added a new item to the DB
+            list-dirs-parents "$dir" | inargsf re z-add @TRET
+            # @note 'z-add' is run via 'inbg', so its perf doesn't matter too much
+        fi
     fi
 }
 function z-add-pwd() {
@@ -108,6 +116,7 @@ function ffz-get() {
             return 1
         fi
     fi
+    sel="$(path-unabbrev "$sel")"
     sel="$(ntag-recoverpath "$sel")"
     if test -z "$nocache" && ! test -e "$sel" ; then
         ffz_nocache=y reval "$0" "$@"

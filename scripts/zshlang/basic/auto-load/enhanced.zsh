@@ -40,5 +40,5 @@ cp2 () {
     reval-ec cp -r "${@[2,-1]}" "$1"
 }
 ##
-alias noglob='noglob ruu ""'
+# alias noglob='noglob ruu ""'
 ##

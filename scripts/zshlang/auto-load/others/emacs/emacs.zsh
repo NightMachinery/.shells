@@ -150,23 +150,26 @@ function icat-emc() {
 }
 alias icc='icat-emc'
 ##
-function emc-quote() {
-    local i res=''
-    for i in "$@" ; do
-        res+=" \"$(ecn "$i" | sdlit '\' '\\' | sdlit '"' '\"')\" " || {
-            ectrace "i: $(gq "$i")"
-            return 1
-        }
-    done
+function lisp-quote() {
+    ##
+    in-or-args "$@" | lisp-quote.lisp
+    ##
+    # local i res=''
+    # for i in "$@" ; do
+    #     res+=" \"$(ecn "$i" | sdlit '\' '\\' | sdlit '"' '\"')\" " || {
+    #         ectrace "i: $(gq "$i")"
+    #         return 1
+    #     }
+    # done
 
-    ecn "$res"
+    # ecn "$res"
     ## perf:
-    # `time2 emc-quote "${(@f)$(fd --extension org --type f . "$nightNotes")}"` -> 18.4s
-    # @todo0 rewrite this in a @perf lang
-    # @alt if we add --add-postfix to prefixer, we can simply use a pipeline to do this and avoid zsh. It should be fast enough.
-    # NO @alt use emc-eval with stdin
+    # `time2 emc-quote "${(@f)$(fd --extension org --type f . "$nightNotes")}"`
+    # v1 -> 18.4s
+    # v2 (CL) -> 0.099549055099487305s
     ##
 }
+aliasfn emc-quote lisp-quote
 ##
 function emc-nowait2() {
     local f="$1"

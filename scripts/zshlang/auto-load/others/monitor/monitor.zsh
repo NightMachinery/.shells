@@ -18,6 +18,36 @@ function in-sum() {
 }
 
 ##
+function cpu-usage-get() {
+    ps -A -o %cpu | awk '{s+=$1} END {print s "%"}'
+}
+function memory-free-get() {
+    if isDarwin ; then
+        ec $(( $({
+                    vm_stat | rget 'Pages free:\s+(\d+)\.'
+                    vm_stat | rget 'Pages speculative:\s+(\d+)\.'
+                    vm_stat | rget 'Pages inactive:\s+(\d+)\.'
+                } | in-sum) * $(vm_stat | rget 'page size of (\d+)') )) | numfmt-bytes
+        ##
+        # https://developer.apple.com/library/archive/documentation/Performance/Conceptual/ManagingMemory/Articles/AboutMemory.html
+        #
+        # - *Free memory:* This is RAM that's not being used.
+
+        # - *Wired memory:* Information in this memory can't be moved to the hard disk, so it must stay in RAM. The amount of Wired memory depends on the applications you are using.
+
+        # - *Active memory:* This information is currently in memory, and has been recently used.
+
+        # - *Inactive memory:* This information in memory is not actively being used, but was recently used.
+
+        # - *Used:* This is the total amount of memory used.
+        #
+        # By using purgeable memory, you allow the system to quickly recover memory if it needs to, thereby increasing performance. Memory that is marked as purgeable is not paged to disk when it is reclaimed by the virtual memory system because paging is a time-consuming process. Instead, the data is discarded, and if needed later, it will have to be recomputed.
+    else
+        @NA
+    fi
+}
+
+##
 function  pt-cpu-get() {
     procs --or "$@" | gtail -n +3 | awk '{print $4}' | in-sum
 }

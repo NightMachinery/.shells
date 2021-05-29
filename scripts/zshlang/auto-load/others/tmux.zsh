@@ -89,6 +89,8 @@ function ivy() {
     various-darwin.zsh
 
     ivy-self
+
+    ivy-convenience
 }
 function ivy-self() {
     local -x DISABLE_DEFER=y
@@ -106,5 +108,9 @@ function ivy-self() {
     comment '-2            Force tmux to assume the terminal supports 256 colours.'
     tmux -2 attach-session -d
 }
-
+function ivy-convenience() {
+    tmuxnewsh2 zii1 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
+    tmuxnew julia_repl julia
+    tmuxnew ipython_repl ipython
+}
 ##
