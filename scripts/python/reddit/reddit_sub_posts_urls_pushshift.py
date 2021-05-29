@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-
+# Usage:
+# `reddit_sub_posts_urls_pushshift.py rational 100000000 > rational.txt`
+##
 # from IPython import embed
 
 import sys

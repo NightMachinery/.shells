@@ -1336,15 +1336,18 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
     test -n "$summaryMode" || ec "$cleanedhtml"
 }
 noglobfn readmoz
+
 function readmozsum() {
     : "Use url2html instead? No advtanges to this."
     rmS=y readmoz "$@"
 }
 noglobfn readmozsum
+
 function readmozsum-file() {
     rmS=y readmoz-file "$@"
 }
 noglobfn readmozsum-file
+
 function readmoz-file() {
     magic mdoc "$0 <file> [<url>]"
     local file="$1" url="${2:-https://${$(basename "$file"):-empty}.google.com}"
@@ -1352,39 +1355,56 @@ function readmoz-file() {
     readmoz "$url"
 }
 noglobfn readmoz-file
+
 function readmoz-mdold() {
-    arcMode=oldest transformer to-archive-is readmoz-md "$@"
+    arcMode=oldest transformer to-archive-is re readmoz-md "$@"
 }
 noglobfn readmoz-mdold
+
 function readmoz-mdarc() {
-    fhMode=curlfullshort transformer to-archive-is readmoz-md "$@"
+    fhMode=curlfullshort transformer to-archive-is re readmoz-md "$@"
 }
 noglobfn readmoz-mdarc
+
+##
+# function readmoz-md-old() {
+#     local url="$1"
+#     local format=".${2:-md}"
+
+#     local md="$(gmktemp --suffix "$format")"
+#     # <() would not work with: readmoz-md https://github.com/google/python-fire/blob/master/docs/guide.md | cat
+#     # zsh sure is buggy :|
+#     pandoc -s -f html-native_divs =(readmoz "$url") -o $md
+#     < $md
+#     \rm $md
+# }
+##
+
 function readmoz-md() {
     local url="$1"
-    local format=".${2:-md}"
+    local format="${readmoz_md_to:-md}"
+    assert-args url @RET
 
-    local md="$(gmktemp --suffix "$format")"
-    # <() would not work with: readmoz-md https://github.com/google/python-fire/blob/master/docs/guide.md | cat
-    # zsh sure is buggy :|
-    pandoc -s -f html-native_divs =(readmoz "$url") -o $md
-    < $md
-    \rm $md
+    @opts from html-native_divs to "$format" @ pandoc-convert =(readmoz "$url") "${@[2,-1]}"
 }
 noglobfn readmoz-md
+
+function readmoz-org {
+    @opts to org @ readmoz-md "$1"
+}
+noglobfn readmoz-org
+
 function readmoz-md2() {
     readmoz "$1" | html2text "${@:2}" # --ignore-links
 }
 noglobfn readmoz-md2
+
 function readmoz-txt() {
     local opts=( "${@:2}" )
     test -n "$opts[*]" || opts=(--ignoreHref --ignoreImage --wordwrap=false --uppercaseHeadings=false --tables=true)
     readmoz "$1" | html-to-text "${opts[@]}" # returnDomByDefault
 }
 noglobfn readmoz-txt
-function paulg() {
-    getlinks http://www.paulgraham.com/articles.html | rg http://www.paulgraham.com | filter match-url | uniq -u
-}
 ##
 function mimetype2() {
     # TODO try using `github-linguist "$1"`, though it only works for text files.
