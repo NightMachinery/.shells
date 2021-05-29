@@ -182,7 +182,7 @@ function emc-nowait2() {
 }
 ##
 function emc-less() {
-    local fs=( $@ ) jq_force="$emc_less_jq" parser="$emc_less_parser"
+    local fs=( $@ ) jq_force="$emc_less_jq" parser="$emc_less_parser" suffix="${emc_less_s}"
     if (( $#@ == 0 )) ; then
         fs+=/dev/stdin
     fi
@@ -200,17 +200,17 @@ function emc-less() {
         else
             cat
         fi
-    } | emc-in
+    } | emc-in "$suffix"
 }
 alias el="emc-less"
 
 function emc-less-jq() {
-    @opts jq y @ emc-less "$@"
+    @opts jq y s .json @ emc-less "$@"
 }
 alias elj="emc-less-jq"
 
 function emc-less-html() {
-    @opts parser html @ emc-less "$@"
+    @opts parser html s .html @ emc-less "$@"
 }
 alias elh="emc-less-html"
 ##
