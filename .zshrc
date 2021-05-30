@@ -588,5 +588,5 @@ psource $HOME/.shellfishrc
 rcLoaded='loading' # Do NOT export this, or `exec zsh` will inherit it
 zsh-defer typeset -g rcLoaded='yes'
 
-tty-statusbar-enable
+# tty-statusbar-enable
 bell-zsh-start

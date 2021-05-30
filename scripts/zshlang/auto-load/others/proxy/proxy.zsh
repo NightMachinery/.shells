@@ -131,7 +131,9 @@ function darwin-proxy-getns() {
         exit 1
     fi
 }
+
 aliasfn darwin-proxy-getns-cached memoi_expire=0 memoi-eval darwin-proxy-getns
+
 function darwin-proxies-gen() {
     local ns
     for ns in "$(darwin-proxy-getns-cached)" ; do # "${(@f)$(networksetup -listallnetworkservices | gsed 1d)}" ; do
