@@ -73,22 +73,28 @@ else:
 
         return res.outrs
 
-    def meta_get(c):
-        meta = ""
-        meta+=f"{c.author.name}"
-        if hasattr(c, "score"):
-            meta+=f" ({c.score})"
+    # def meta_get(c):
+    #     meta = ""
+    #     meta+=f"{c.author.name}"
+    #     if hasattr(c, "score"):
+    #         meta+=f" ({c.score})"
 
-        return meta
+    #     return meta
 
     def meta_get_props(c):
         meta = ":PROPERTIES:"
-        meta+=f"\n:AUTHOR: {c.author.name}"
-        if hasattr(c, "score"):
-            meta+=f"\n:SCORE: {c.score}"
 
-        if hasattr(c, "created_utc"):
-            meta+=f"\n:DATE_UNIX: {c.created_utc}"
+        if c.author: # can be None when they are deleted
+            meta+=f"\n:Author: {c.author.name}"
+
+        if hasattr(c, "score"):
+            meta+=f"\n:Score: {c.score}"
+
+        if hasattr(c, "created_utc") and c.created_utc:
+            meta+=f"\n:DateUnix: {c.created_utc}"
+
+        if getattr(c, "link_flair_text", None):
+            meta+=f"\n:FlairText: {c.link_flair_text}"
 
         meta+="\n:END:\n"
         return meta
