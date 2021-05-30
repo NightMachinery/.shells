@@ -1031,9 +1031,14 @@ function urlmeta2() {
 gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
 
     local url="$1"
-    local fhMode="${fhMode:-curl}"
+
+    # local fhMode="${fhMode:-curl}"
+
     local html
-    html="${html:-$(revaldbg full-html2 "$url")}" || { ectrace "" "URL: $(gq "$url")"; return $? }
+    html="${html}"
+    if test -z "$html" ; then
+        html=$(full-html2 "$url") || { ectrace "" "fhMode: ${fhMode}, URL: $(gq "$url"), retcode: $?"; return 1 }
+    fi
     local reqs=("${@:2}")
     <<<"$html" assert htmlmetadata $reqs[@] || {
         local tmp="$(gmktemp --suffix .html)"
@@ -1232,7 +1237,8 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
         fi
     fi
     local mode="${2:-md}"
-    isLocal && local fhMode="${fhMode:-curlfast}" # servers are fast enough to work with the default fhMode
+
+    # isLocal && local fhMode="${fhMode:-curlfast}" # servers are fast enough to work with the default fhMode
 
     local html="${html:-$(full-html2 "$url")}"
     local cleanedhtml="${cleanedhtml:-$(<<<"$html" readability "$url")}" # takes ~1.5s

@@ -6,7 +6,7 @@ function hi10-new-check() {
     <<<$new rg --ignore-case "$query" # --quiet
 }
 function h_hi10-new-notify() {
-    local query="${1:?}" # @regex
+    local query="${1:?}" # @regex with ignore-case
 
     local found
     if found="$(hi10-new-check "$query")" ;  then
