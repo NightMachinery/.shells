@@ -1,6 +1,7 @@
 [user]
 	name = NightMachinary
 	email = rudiwillalwaysloveyou@gmail.com
+	signingKey = 6156FCADABAFE9E8BC468F55C567089D40CA8367
 [alias]
 	co = checkout
 	lol = log --graph --decorate --pretty=oneline --abbrev-commit
@@ -44,3 +45,5 @@
 	required = true
 [init]
 	defaultBranch = master
+[commit]
+	gpgSign = true
