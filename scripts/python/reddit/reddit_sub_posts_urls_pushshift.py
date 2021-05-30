@@ -59,7 +59,7 @@ if link_output:
 else:
     # @todo3 refactor this into a standalone reddit2org (we need a way to get the submission object from the URL)
     ##
-    from brish import z
+    from brish import z, zp, bsh
 
     def stars(lv):
         return "*" * lv + " "

@@ -51,8 +51,9 @@ tramp
 # dist/
 
 # Flycheck
-flycheck_*.el
-flycheck_*
+**/flycheck_*
+# flycheck_*.el
+# flycheck_*
 
 # server auth directory
 /server/

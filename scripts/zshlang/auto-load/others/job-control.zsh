@@ -327,6 +327,9 @@ function eval-timeout() {
 #     # return "$retcode"
 # }
 function reval-timeout() {
-    eval-timeout "$(gq "$@")"
+    local s="$1" ; shift
+    assert-args s @RET
+
+    eval-timeout "$s" "$(gq "$@")"
 }
 ##

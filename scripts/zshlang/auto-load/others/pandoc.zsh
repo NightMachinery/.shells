@@ -15,20 +15,25 @@ function html2org() {
 }
 function pandoc-convert() {
     local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}"
-    ensure-args from to @MRET
+    assert-args from to @RET
+
     if test -z "$input" ; then
-        input="$(gmktemp)"
-        pbpaste > "$input" @RET
+        input="$(gmktemp)" @TRET
+        assert pbpaste > "$input" @RET
     fi
-    tmp_o="$(gmktemp)"
+    tmp_o="$(gmktemp)" @TRET
 
 
-    pandoc --wrap=none --from "$from" --to "$to" "$input" -o "-" | pandoc-normalize-whitespace > "$tmp_o" > >(pbcopy) @RET
+    pandoc --wrap=none --from "$from" --to "$to" "$input" -o "-" | pandoc-normalize-whitespace > "$tmp_o" @TRET
+
     if [[ "$output" != '-' ]] ; then
-        command mv "$tmp_o" "$output"
+        assert command mv "$tmp_o" "$output" @RET
     else
-        cat "$tmp_o"
-        silent trs-rm "$tmp_o"
+        if isIReally ; then
+            cat "$tmp_o" | pbcopy @TRET
+        fi
+        assert cat "$tmp_o" @RET
+        assert silent trs-rm "$tmp_o" @RET
     fi
 }
 function pandoc-normalize-whitespace() {
