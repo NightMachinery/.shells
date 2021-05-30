@@ -963,7 +963,7 @@ function aamedia1() {
         done
     done
 
-    tts-glados1-cached "Media ready to download"
+    bell-dl-ready
 
     typeset -ag sel_i=() # @globalOutput
     for i in {1.."${#links}"} ; do
@@ -1111,7 +1111,11 @@ function hi10-multilink() {
     then
         arger "${(@u)pArgs}"
     fi
+
     doc use fz for filtering and ordering
+
+    bell-dl-ready
+
     arrN "${(@u)pArgs}" | fz | tee "hi10-links.txt" | hi10-dl # (u) makes the array elements unique.
 }
 function hi10-dl() {
@@ -1119,6 +1123,8 @@ function hi10-dl() {
 Generates jtokens for links and downloads them." ; mret
 
     inargsf mapg '$i$(hi10-jtoken)' | inargsf rgeval aa -j2 -Z
+
+    bell-dl
 }
 function hi10-from-page() {
     mdoc "DEPRECATED. Use hi10-ng" MAGIC

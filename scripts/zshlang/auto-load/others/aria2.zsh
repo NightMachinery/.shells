@@ -32,7 +32,7 @@ aa-raw() {
     #-Z has some unsavory sideeffects so I have not included it in this.
 
     # arger "${funcstack[@]}"
-    if isI && @opts p aa- @ fn-isTop aa aacookies ; then
+    if isI && @opts p [ aa- ] @ fn-isTop aa aacookies ; then
         ##
         # @done think of some way to only trigger this when we use `aa` directly on the shell.
         # one way is to rename all usages of aa to aa-gateway and then add the bell to aa itself.

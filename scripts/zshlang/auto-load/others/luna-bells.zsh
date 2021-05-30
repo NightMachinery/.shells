@@ -613,6 +613,8 @@ bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner o
 ## Sonic:
 bell-maker sonic-fx-ready 'Sonic and SEGA All-Stars Racing/PC Computer - Sonic and SEGA All-Stars Racing - General Sound Effects/Sonic and Sega All-Stars Racing/General SFX/FE_READY.wav'
 ##
+aliasfn bell-dl-ready tts-glados1-cached "Media ready to download"
+##
 function bell-m-beeps() {
     : "Plays continuous beeps"
     

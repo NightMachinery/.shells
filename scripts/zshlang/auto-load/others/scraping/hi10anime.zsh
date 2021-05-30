@@ -11,7 +11,8 @@ function h_hi10-new-notify() {
     local found
     if found="$(hi10-new-check "$query")" ;  then
         tnotifc "hi10: $found"
-        sleep $((3*86400))
+        # sleep $((3*86400))
+        sleep 86400 # = 3600*24
     else
         sleep 86400 # = 3600*24
     fi
