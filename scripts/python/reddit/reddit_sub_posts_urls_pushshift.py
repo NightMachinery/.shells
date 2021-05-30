@@ -100,7 +100,19 @@ else:
         return meta
         
     def process_comment(f, comments, lv):
+        while True:
+            try:
+                comments.replace_more(limit=None)
+                break
+            except DuplicateReplaceException:
+                print(traceback.format_exc())
+                break
+            except:
+                print(traceback.format_exc())
+                time.sleep(1)
+
         l = len(comments) - 1
+
         for i, c in enumerate(comments):
             lv_c = lv
 
@@ -169,16 +181,6 @@ else:
 
                 if result.selftext_html:
                     f.write(html2org(result.selftext_html) + "\n\n")
-
-                    while True:
-                        try:
-                            result.comments.replace_more(limit=None)
-                            break
-                        except DuplicateReplaceException:
-                            pass
-                        except:
-                            print(traceback.format_exc())
-                            time.sleep(1)
 
                 process_comment(f, result.comments, lv)
             print(f"wrote {f_name}", file=sys.stderr, flush=True)
