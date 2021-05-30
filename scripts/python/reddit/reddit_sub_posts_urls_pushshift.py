@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Usage:
 # `reddit_sub_posts_urls_pushshift.py rational 100000000 > rational.txt`
+# `tmuxnewsh2 reddit reddit_sub_posts_urls_pushshift.py rational 100000000`
 #
 # Docs:
 # - https://github.com/praw-dev/praw
@@ -51,6 +52,8 @@ if link_output:
     for result in results:
         print(result.permalink)
 else:
+    # @todo3 refactor this into a standalone reddit2org (we need a way to get the submission object from the URL)
+    ##
     from brish import z
 
     def stars(lv):
@@ -88,7 +91,11 @@ else:
             meta = meta_get_props(c)
             ##
 
-            f.write("\n" + stars(lv_c) + (z("html2org /dev/stdin", cmd_stdin=c.body_html).outrs or "EMPTY_COMMENT") + "\n" + meta)
+            head = "EMPTY_COMMENT"
+            if c.body_html:
+                head = (z("html2org /dev/stdin", cmd_stdin=c.body_html).outrs or "EMPTY_COMMENT")
+
+            f.write("\n" + stars(lv_c) + head + "\n" + meta)
             lv_c += 1
             process_comment(f, c.replies, lv_c)
             if l != i:
