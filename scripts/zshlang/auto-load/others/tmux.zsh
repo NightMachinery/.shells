@@ -110,7 +110,10 @@ function ivy-self() {
 }
 function ivy-convenience() {
     tmuxnewsh2 zii1 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
+    tmuxnewsh2 zii2 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
+
     tmuxnew julia_repl julia
+
     tmuxnew ipython_repl ipython
 }
 ##

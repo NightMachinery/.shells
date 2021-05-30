@@ -16,7 +16,7 @@ tmuxnew shadowsocks-ss ss-server -c "$nightNotes/private/configs/eva/shadowsocks
 tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
 # tmuxnewsh2 v2-socks v2ray -config $NIGHTDIR/configFiles/v2ray/socks_eva.json
 ##
-#tmuxnewsh2 mahouka hi10-new-notify mahouka
+tmuxnewsh2 hi10-notify hi10-new-notify 'mahouka|tokyo revenger|kumo desu ga'
 ##
 #tmuxnew splash 'docker run -it -p 8050:8050 scrapinghub/splash'
 ##

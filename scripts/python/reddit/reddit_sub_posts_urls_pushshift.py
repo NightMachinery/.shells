@@ -153,6 +153,9 @@ else:
             if utf8len(f_name) > 240:
                 f_name = f_name[0:60]
 
+            ## max file name length (this is different from max path length, which is usually 4096 bytes)
+            # @linux `getconf NAME_MAX /dev/sda1`, `getconf PATH_MAX /dev/sda1`
+            #
             # BTRFS   255 bytes
             # exFAT   255 UTF-16 characters
             # ext2    255 bytes
@@ -162,6 +165,7 @@ else:
             # FAT32   8.3 (255 UCS-2 code units with VFAT LFNs)
             # NTFS    255 characters
             # XFS     255 bytes
+            ##
 
             f_name += f".{result.id}.org"
             with open(f_name, "w") as f:

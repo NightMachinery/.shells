@@ -610,6 +610,8 @@ bell-maker sc-error 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Bro
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
 ## HP3:
 bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 12/Dialog part 1/pc_her_Adv6_7_be careful harry..blue..wav'
+## Sonic:
+bell-maker sonic-fx-ready 'Sonic and SEGA All-Stars Racing/PC Computer - Sonic and SEGA All-Stars Racing - General Sound Effects/Sonic and Sega All-Stars Racing/General SFX/FE_READY.wav'
 ##
 function bell-m-beeps() {
     : "Plays continuous beeps"

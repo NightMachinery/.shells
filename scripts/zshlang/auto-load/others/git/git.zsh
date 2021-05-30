@@ -273,6 +273,7 @@ function git-branch-name() {
 function gsync() {
   local msg="${*}"
   local noadd="${gsync_noadd}"
+  local pull_only="${gsync_p}"
   local branch="${gsync_branch:-${gsync_b}}"
   local remote="${gsync_remote:-${gsync_r}}"
 
@@ -296,14 +297,15 @@ function gsync() {
       git add --all
     }
     git submodule update --recursive # idk what this does really. Fetching? Don't use `--remote` here.
-    
-    msg="${msg:-$(git-commitmsg)}"
 
     git-status-summary -uno
 
-    git submodule foreach git commit -uno -a -m "${msg}"
-    ec "Main repo"
-    git commit -uno -a -m "${msg}"
+    if ! bool $pull_only ; then
+      msg="${msg:-$(git-commitmsg)}"
+      git submodule foreach git commit -uno -a -m "${msg}"
+      ec "Main repo"
+      git commit -uno -a -m "${msg}"
+    fi
 
     local remotes
     if test -z "$remote" ; then
@@ -312,6 +314,7 @@ function gsync() {
     else
       remotes=("$remote")
     fi
+
     for remote in $remotes[@]
     do
       ec
@@ -324,17 +327,20 @@ function gsync() {
       fi
       ec
     done
-    for remote in $remotes[@]
-    do
-      ec
-      if gr-isLocal "$remote" || isNet ; then
-        reval-ec git submodule foreach git push "$remote" "$branch"
-        reval-ec git push "$remote" "$branch"
-      else
-        ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."
-      fi
-      ec
-    done
+
+    if ! bool $pull_only ; then
+      for remote in $remotes[@]
+      do
+        ec
+        if gr-isLocal "$remote" || isNet ; then
+          reval-ec git submodule foreach git push "$remote" "$branch"
+          reval-ec git push "$remote" "$branch"
+        else
+          ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."
+        fi
+        ec
+      done
+    fi
   } always { popf }
 }
 ##
