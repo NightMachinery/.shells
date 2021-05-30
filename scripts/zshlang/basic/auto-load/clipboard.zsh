@@ -41,6 +41,11 @@ function pbcopy-term() {
     printf "\033]52;c;$(printf "%s" "$in" | base64)\a"
 }
 function pbcopy() {
+    if isLinux ; then
+        # @NA
+        return 0
+    fi
+    ##
     # local in="$(in-or-args "$@")"
     local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"
     dact typ in

@@ -1,3 +1,19 @@
+##
+function reddit2org {
+    local permalink="$1"
+    assert-args permalink @RET
+    if ! [[ "$permalink" == http* ]] ; then
+        permalink="https://old.reddit.com${permalink}"
+    fi
+
+    local html
+    html="$(full-html2 "$permalink")" @TRET
+
+    {
+        ec $html | pup '.content .title, .content .usertext'
+    } | html2org /dev/stdin @TRET
+}
+##
 function reddit-sub-posts-urls-pushshift {
     ecerr "$0: deprecated; Use reddit_sub_posts_urls_pushshift.py instead."
     # return 1

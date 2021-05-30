@@ -73,11 +73,19 @@ function gquote() {
     # Use this to control quoting centrally.
     ##
     # the first term can be an alias and so we do not quote it using double-quotes. The rest of the terms are not allowed to be global aliases and are all quoted using double quotes.
-    ec "${(q+@)@[1]}" "${(qqq@)@[2,-1]}" # @did_I_break_sth? Wed May 26 16:34:57 2021
+    ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}" # @did_I_break_sth? Wed May 26 16:34:57 2021
+}
+function gquote-sq() {
+    # uses single-quotes
+    ec "${(qq@)@}"
 }
 function gquote-dq() {
     # uses double-quotes
     ec "${(qqq@)@}"
+    ## @broken
+    # `eval "$(gquote-dq ec 'hi!')" `
+    # -> hi\!
+    ##
 }
 alias gq=gquote
 alias gqs=gquote-simple
