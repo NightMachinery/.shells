@@ -9,7 +9,10 @@
 ##
 from IPython import embed
 
-import sys, os
+import sys
+import os
+import traceback
+import time
 
 link_output = False
 limit = 10
@@ -28,6 +31,8 @@ if link_output:
     api = PushshiftAPI()
 else:
     import praw
+    from praw.exceptions import DuplicateReplaceException
+    from praw.models.reddit.more import MoreComments
 
     r = praw.Reddit(
         client_id=os.environ["REDDIT_CLIENT_ID"],
@@ -60,7 +65,13 @@ else:
         return "*" * lv + " "
 
     def html2org(html):
-        return z("html2org =(cat)", cmd_stdin=html).outrs
+        tmp = "tmp.html"
+        res = z("cat > {tmp}", cmd_stdin=html)
+        assert res
+        res = z("html2org {tmp}")
+        assert res
+
+        return res.outrs
 
     def meta_get(c):
         meta = ""
@@ -87,6 +98,8 @@ else:
         for i, c in enumerate(comments):
             lv_c = lv
 
+            # if isinstance(c, MoreComments):
+            #     pass
             ##
             # meta = meta_get(c)
             # meta+=": "
@@ -106,25 +119,44 @@ else:
 
 
     for result in results:
-        # embed() ; exit()
-        f_name = z("ecn {result.title} | str2filename").outrs + f".{result.id}" + ".org"
-        with open(f_name, "w") as f:
-            lv = 1
-            f.write(f"#+TITLE: {result.title}\n\n")
+        try:
+            # embed() ; exit()
+
+            # if not "The New Humans" in result.title:
+            #     continue
+
+            f_name = z("ecn {result.title} | str2filename").outrs + f".{result.id}" + ".org"
+            with open(f_name, "w") as f:
+                lv = 1
+                f.write(f"#+TITLE: {result.title}\n\n")
 
 
-            if getattr(result, "url_overridden_by_dest", None):
-                f.write(f"{stars(lv)}[[{result.url_overridden_by_dest}][{result.title}]]\n")
-                lv += 1
-            else:
-                f.write(f"{stars(lv)}{result.title}\n")
-                lv += 1
+                if getattr(result, "url_overridden_by_dest", None):
+                    f.write(f"{stars(lv)}[[{result.url_overridden_by_dest}][{result.title}]]\n")
+                    lv += 1
+                else:
+                    f.write(f"{stars(lv)}{result.title}\n")
+                    lv += 1
 
-            meta = meta_get_props(result)
-            f.write(meta)
+                meta = meta_get_props(result)
+                f.write(meta)
 
-            if result.selftext_html:
-                f.write(html2org(result.selftext_html) + "\n\n")
+                if result.selftext_html:
+                    f.write(html2org(result.selftext_html) + "\n\n")
 
-            process_comment(f, result.comments, lv)
-        print(f"wrote {f_name}", file=sys.stderr, flush=True)
+                    while True:
+                        try:
+                            result.comments.replace_more(limit=None)
+                            break
+                        except DuplicateReplaceException:
+                            pass
+                        except:
+                            print(traceback.format_exc())
+                            time.sleep(1)
+
+                process_comment(f, result.comments, lv)
+            print(f"wrote {f_name}", file=sys.stderr, flush=True)
+
+        except:
+            print(traceback.format_exc())
+            embed()
