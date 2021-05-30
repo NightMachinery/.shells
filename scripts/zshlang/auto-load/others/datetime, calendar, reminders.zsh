@@ -271,13 +271,14 @@ function rem-today() {
             local ext="${f:e}"
             if [[ "$ext" == zsh ]] ; then
                 if test -n "$deleteMode" ; then # only run the code once
-                local out
-                ##
-                # out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
-                # Run clean zsh so that  our env doesn't pollute it.
-                out=$'\n\n'"$(FORCE_INTERACTIVE='' FORCE_NONINTERACTIVE=y zsh "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
-                ##
-                text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
+                    local out
+                    ##
+                    # out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                    # Run clean zsh so that  our env doesn't pollute it.
+                    ecbold "$0: running $(gq "$f")"
+                    out=$'\n\n'"$(FORCE_INTERACTIVE='' FORCE_NONINTERACTIVE=y zsh "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                    ##
+                    text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
             elif [[ "$ext" == bak ]] ; then
                 res="$0: Skipped: $f"
