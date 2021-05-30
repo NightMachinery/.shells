@@ -123,15 +123,35 @@ else:
             if l != i:
                 f.write("\n")
 
+    def utf8len(s):
+        return len(s.encode('utf-8'))
 
     for result in results:
         try:
             # embed() ; exit()
 
-            # if not "The New Humans" in result.title:
+            # if not "looking at this sub" in result.title:
             #     continue
 
-            f_name = z("ecn {result.title} | str2filename").outrs + f".{result.id}" + ".org"
+            f_name = z("ecn {result.title} | str2filename").outrs
+            f_name = f_name[0:230]
+            if utf8len(f_name) > 240:
+                f_name = f_name[0:100]
+
+            if utf8len(f_name) > 240:
+                f_name = f_name[0:60]
+
+            # BTRFS   255 bytes
+            # exFAT   255 UTF-16 characters
+            # ext2    255 bytes
+            # ext3    255 bytes
+            # ext3cow 255 bytes
+            # ext4    255 bytes
+            # FAT32   8.3 (255 UCS-2 code units with VFAT LFNs)
+            # NTFS    255 characters
+            # XFS     255 bytes
+
+            f_name += f".{result.id}.org"
             with open(f_name, "w") as f:
                 lv = 1
                 f.write(f"#+TITLE: {result.title}\n\n")

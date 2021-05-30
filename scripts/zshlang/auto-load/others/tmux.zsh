@@ -88,9 +88,9 @@ function ivy() {
 
     various-darwin.zsh
 
-    ivy-self
-
     ivy-convenience
+
+    ivy-self # attaches and blocks, I think
 }
 function ivy-self() {
     local -x DISABLE_DEFER=y
