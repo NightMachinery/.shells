@@ -276,7 +276,10 @@ function rem-today() {
                     # out="$(fnswap isI false source "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
                     # Run clean zsh so that  our env doesn't pollute it.
                     ecbold "$0: running $(gq "$f")"
-                    out=$'\n\n'"$(FORCE_INTERACTIVE='' FORCE_NONINTERACTIVE=y zsh "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+
+                    out=$'\n\n'"$(env-clean FORCE_INTERACTIVE='' FORCE_NONINTERACTIVE=y zsh "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+
+                    ecbold "$0: finished $(gq "$f")"
                     ##
                     text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
@@ -433,19 +436,27 @@ remnd() {
 function rem-rec() {
     local rem_dest=''
     local cmd="$(gq "$@")"
+
+    fnswap isColor true ectrace "$0: started" &>/dev/tty
+
     fnswap rem-sync true eval "$cmd"
     if test -n "$rem_dest" ; then
         # we can use reminday_store here to be more verbose, but I doubt we'd want that.
-        ec "$0 $cmd" >> "${rem_dest:r}.zsh" || ecerr "$0: Failed to write the recursion with $?"
+
+        local o="${rem_dest:r}.zsh"
+        ec "$0 $cmd" >> "$o" || ecerr "$0: Failed to write the recursion with $?"
+        fnswap isColor true ecbold "$0: appended $(gq "$0" "$cmd") to $o" &>/dev/tty
     else
         ecerr "$0: rem_dest has not been set by the cmd."
         return 1
     fi
 
     # @warn /dev/tty should be open for writing or this will fail:
-    rem-sync >&/dev/tty || {
+    fnswap isColor true ecbold "$0: rem-sync" &>/dev/tty
+    fnswap isColor true rem-sync >&/dev/tty || {
         ecerr "$0: rem-sync returned $?"
     }
+    fnswap isColor true ecbold "$0: finished" &>/dev/tty
 }
 function rem-reclater() {
     local later="${1:? later required}" ; shift
