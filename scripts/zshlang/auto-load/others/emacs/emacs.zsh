@@ -174,6 +174,7 @@ aliasfn emc-quote lisp-quote
 function emc-nowait2() {
     local f="$1"
     assert-args f @RET
+    f="$(grealpath -e "$f")" @TRET
     
     emc-eval "(find-file $(emc-quote "$f"))"
     # throws useless error 'Invalid read syntax: "#"', but works anyway

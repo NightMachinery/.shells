@@ -1,5 +1,5 @@
 function ntl() {
-    typeset -a ntsearch_rg_opts
+    typeset -ag ntsearch_rg_opts
 
     local opts=()
     local i
@@ -94,7 +94,7 @@ function rem-fz() {
     local cday="$now[3]"
     local ntsearch_additional_paths=( "$remindayBakDir/$cyear/$cmonth/$cday"^*.zsh(N.) )
 
-    typeset -a ntsearch_rg_opts
+    typeset -ag ntsearch_rg_opts
     ntsearch_glob='' ntsearch_rg_opts=("$ntsearch_rg_opts[@]" --iglob '!*.zsh') ntl-fzf "$query_pre $query"
 }
 aliasfn ntrem rem-fz
@@ -180,6 +180,12 @@ function ntsearch-whole() {
     @opts engine ntsearch pattern '(.*)\n' @ ntsearch-lines
 }
 alias nts='\noglob ntsearch-whole'
+
+function ntsearch-whole-rg() {
+    : '@untested @experimental'
+
+    ntsearch_rg_opts=( --multiline --multiline-dotall ) ntsearch_query_rg="$*" ntsearch-lines
+}
 ##
 function ntsearch-lines-engine() {
     ntLines=y ntsearch "$@"
@@ -199,12 +205,22 @@ function ntsearch-lines() {
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
     # outFiles is no longer used by anything except `vnt`?
-    reval "$engine[@]" "$@" > /dev/null  || return 88 # Beware forking here! We need the global vars out and acceptor
+    ntsearch_lines_pattern="$pattern" reval "$engine[@]" "$@" > /dev/null  || return 88 # Beware forking here! We need the global vars out and acceptor
 
     if ! isI && test -n "$ni_noprocess" ; then
         ec "${(@F)out}"
         return 0
     fi
+
+    ntsearch-postprocess
+}
+##
+function ntsearch-postprocess-h1 {
+    nightNotes="$1" pattern="$2" out="$3" force_editor=y no_wait=y ntsearch-postprocess
+}
+function ntsearch-postprocess {
+    # @input nightNotes out pattern acceptor ntsearch_injector force_editor no_wait EDITOR
+    ##
     local i files=() linenumbers=() lines=() file
     for i in "${out[@]}" ; do
         unset match
@@ -280,7 +296,13 @@ function ntsearch-lines() {
             # The first time we use this in a zsh session, the highlight sometimes does not work. Idk why.
             cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h) "
             cmd+=')'
-            revaldbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
+
+            if test -n "$no_wait" ; then
+                revaldbg emc-eval "$cmd"
+            else
+                revaldbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
+            fi
+
             if test -n "$no_wait" ; then
                 emc-focus
             fi
@@ -296,6 +318,7 @@ function ntsearch-lines() {
         fi
     fi
 }
+##
 function ntsearch() {
     : "GLOBAL: out outFiles"
 
@@ -340,7 +363,7 @@ function ntsearch() {
 }
 function ntsearch_() {
     : "See vnt, ntsearch-lines"
-    : "INPUT: ntsearch_query_rg, ntsearch_query_fzf, ntsearch_additional_paths, nightNotes, ntLines , GLOBAL: acceptor out"
+    : "INPUT: ntsearch_lines_pattern, ntsearch_query_rg, ntsearch_query_fzf, ntsearch_additional_paths, nightNotes, ntLines , GLOBAL: acceptor out"
 
     acceptor=''
     out=''
@@ -392,6 +415,7 @@ function ntsearch_() {
         preview_header_lines=3
         hidden='nohidden'
 
+        fzopts+=(--bind 'alt-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"$(gq "$nightNotes") $(gq "$ntsearch_lines_pattern")"' {})')
         if test -z "$fzp_ug" ; then
             fzopts+=(--read0 --delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
         else
@@ -507,4 +531,8 @@ function nt-lucene() {
     revaldbg lmgrep '--case-sensitive?' false --hyperlink "$opts[@]" -q "$q" "$files[@]"
 }
 alias ntc='\noglob nt-lucene'
+
+function nt-lucene. {
+    nightNotes="$PWD" nt-lucene "$@"
+}
 ##
