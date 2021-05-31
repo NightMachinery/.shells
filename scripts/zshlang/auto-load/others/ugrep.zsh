@@ -41,6 +41,13 @@ function ug-ic() {
     #  --break  Adds a line break between results from different files.
     #  --heading, -+ Group matches per file.  Adds a heading and a line break between results from different files.
 }
+function ugc {
+    # non-interactive ugrep with context
+
+    local r="${@[-1]}" opts=("${@[1,-2]}")
+
+    ugrep --heading --color=always --pretty --context=3 --recursive --bool --smart-case '--sort=best' --no-confirm --perl-regexp --hidden '--binary-files=without-match' "$opts[@]" --regexp="$r" | less -n
+}
 function ugm() {
     ug-ic "$*"
 }

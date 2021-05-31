@@ -65,11 +65,17 @@ else:
         return "*" * lv + " "
 
     def html2org(html):
-        tmp = "tmp.html"
+        # tmp = "tmp.html"
+        tmp = z("mktemp").outrs
+
         res = z("cat > {tmp}", cmd_stdin=html)
         assert res
+
+        # @todo2 do not put blocks in headings (e.g., #+begin_quote)
         res = z("html2org {tmp}")
         assert res
+
+        z("command rm {tmp}")
 
         return res.outrs
 
@@ -92,6 +98,10 @@ else:
 
         if hasattr(c, "created_utc") and c.created_utc:
             meta+=f"\n:DateUnix: {c.created_utc}"
+            res = z('gdate -d "@"{c.created_utc} +"%Y-%b-%d"')
+            if res:
+                meta+=f"\n:DateShort: {res.outrs}"
+
 
         if getattr(c, "link_flair_text", None):
             meta+=f"\n:FlairText: {c.link_flair_text}"

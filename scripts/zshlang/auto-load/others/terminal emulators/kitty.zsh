@@ -4,14 +4,19 @@ function kitty-remote() {
     if isKitty && ! isTmux ; then
         kitty @ "$@"
     else
-        local s i
+        local s i ret=1
         s=("$HOME/tmp/.kitty"*(DN)) # do NOT use '.' glob as these aren't 'files'
         if (( $#s >= 1 )) ; then
             # dead kitties can leave trash sockets behind
             for i in ${s[@]} ; do
-                kitty @ --to unix:${i} "$@"
+                kitty @ --to unix:${i} "$@" && ret=0 || true
             done
         fi
+
+        if (( ret != 0 )) ; then
+            ecerr "$0: could not send commands to any Kitty instance"
+        fi
+        return $ret
     fi
 }
 function kitty-send() {
