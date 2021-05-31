@@ -55,9 +55,17 @@ function kitty-tab-get-emacs() {
     kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].foreground_processes[0].cmdline[0] | contains("emacs") ) | .id'
 }
 function kitty-emacs-focus() {
-    local id
-    id="$(kitty-tab-get-emacs | ghead -n 1)" @TRET
+    local id=5
+
+    ## disabled for perf reasons:
+    # id="$(kitty-tab-get-emacs | ghead -n 1)" @TRET
+    ##
+
     kitty-tab-activate "$id"
+    ## perf:
+    # `time2 kitty-emacs-focus` 0.50343608856201172
+    # `time2 kitty-tab-activate 5 ` -> 0.165s
+    ##
 }
 
 function kitty-tab-is-focused() {

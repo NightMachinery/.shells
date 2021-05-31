@@ -298,14 +298,12 @@ function ntsearch-postprocess {
             cmd+=')'
 
             if test -n "$no_wait" ; then
-                revaldbg emc-eval "$cmd"
+                revaldbg emc-eval "$cmd" & # this decreases the latency but can sometimes open emacs too soon (before it has jumped to the desired location)
+                emc-focus
             else
                 revaldbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
             fi
 
-            if test -n "$no_wait" ; then
-                emc-focus
-            fi
         else
             # should work with both emacs and vim
             # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
