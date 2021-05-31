@@ -12,7 +12,7 @@ argerrainbow() {
 argerng() {
     clipboard-add-quoted "$@"
 
-    { test -n "$jahmode" || isI } && ecalternate "$@" || arger "$@"
+    { test -n "$jahmode" || isColor } && ecalternate "$@" || arger "$@"
 }
 ecdbg() {
     isNotDbg || {
@@ -230,7 +230,7 @@ function ectrace() {
     {
         ##
         # doesn't work (can't get the pipe)
-        # retmsg="$(fnswap isI false retcode 2>&1 | prefixer --skip-empty)" # making it local loses the retcode :|
+        # retmsg="$(fnswap isColor false retcode 2>&1 | prefixer --skip-empty)" # making it local loses the retcode :|
         ##
         local ret_orig="${(j.|.)pipestatus[@]}" retmsg
         local ret="${ectrace_ret}" exc="$1" msg="${@[2,-1]}" notrace="${ectrace_notrace}"
@@ -253,7 +253,7 @@ function ectrace() {
         else
             assert_global_lock=''
             throw_ret=$ret throw "$exc" "$msg" | {
-                if isI ; then
+                if isColor ; then
                     cat
                 else
                     # @todo2 make crash.zsh use our own color infra
