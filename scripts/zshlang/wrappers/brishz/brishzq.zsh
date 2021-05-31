@@ -9,10 +9,16 @@ path+=( /usr/local/bin )
 . ~/.privateShell
 
 alias ec='print -r --'
-alias gq=gquote
-gquote () {
-    print -r -- "${(q+@)@}"
+function gquote() {
+    ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
 }
+alias gq=gquote
+
+function gquote-sq() {
+    # uses single-quotes
+    ec "${(qq@)@}"
+}
+
 isDbg () {
     test -n "$DEBUGME"
 }
@@ -43,8 +49,10 @@ isDbg () {
 local copy_cmd="$brishz_copy"
 local session="${brishz_session}"
 local nolog="${brishz_nolog}"
+
 local input_cmd=( "$@" )
-test -z "$brishz_noquote" && input_cmd="$(gq "${(@)input_cmd}")"
+test -z "$brishz_noquote" && input_cmd="cd $(gquote-sq "$PWD") ; $(gq "${(@)input_cmd}") ; ret=\$? ; cd /tmp ; (exit \$ret) "
+
 local stdin="$brishz_in"
 [[ "$stdin" == 'MAGIC_READ_STDIN' ]] && stdin="$(</dev/stdin)"
 

@@ -71,7 +71,6 @@ else:
         res = z("cat > {tmp}", cmd_stdin=html)
         assert res
 
-        # @todo2 do not put blocks in headings (e.g., #+begin_quote)
         res = z("html2org {tmp}")
         assert res
 
@@ -109,7 +108,7 @@ else:
         meta+="\n:END:\n"
         return meta
         
-    def process_comment(f, comments, lv):
+    def process_comment(f, comments, lv, shortname):
         while True:
             try:
                 comments.replace_more(limit=None)
@@ -133,15 +132,33 @@ else:
             # meta+=": "
             ##
             meta = meta_get_props(c)
+            # Properties are key--value pairs. When they are associated with a single entry or with a tree they need to be inserted into a special drawer (see [[https://orgmode.org/manual/Drawers.html#Drawers][Drawers]]) with the name ‘=PROPERTIES=', which has to be located right below a headline, and its planning line (see [[https://orgmode.org/manual/Deadlines-and-Scheduling.html#Deadlines-and-Scheduling][Deadlines and Scheduling]]) when applicable.
+            #
+            # Still, putting the props after the heading is no fun; We can rename our drawer to :METADATA:, but why bother?
             ##
 
             head = "EMPTY_COMMENT"
+            c_id = c.id or z("uuidm").outrs
+            shortname += f"/{c_id}"
             if c.body_html:
                 head = (html2org(c.body_html) or "EMPTY_COMMENT")
+                index_file = f'indices/{shortname}/{c_id}.org'
+                z("ensure-dir {index_file}")
+                with open(index_file, "w") as f2:
+                    f2.write(f"{meta}\n{head}")
+
+                if head.startswith("#+"):
+                    # do not put blocks in headings (e.g., #+begin_quote)
+
+                    author = "deleted"
+                    if c.author:
+                        author = c.author.name or author
+
+                    head = f"u/{author}:\n{head}"
 
             f.write("\n" + stars(lv_c) + head + "\n" + meta)
             lv_c += 1
-            process_comment(f, c.replies, lv_c)
+            process_comment(f, c.replies, lv_c, shortname)
             if l != i:
                 f.write("\n")
 
@@ -177,7 +194,9 @@ else:
             # XFS     255 bytes
             ##
 
-            f_name += f".{result.id}.org"
+            shortname = f"{f_name}.{result.id}"
+            f_name = f"posts/{shortname}.org"
+            z("ensure-dir {f_name}")
             with open(f_name, "w") as f:
                 lv = 1
                 f.write(f"#+TITLE: {result.title}\n\n")
@@ -196,8 +215,8 @@ else:
                 if result.selftext_html:
                     f.write(html2org(result.selftext_html) + "\n\n")
 
-                process_comment(f, result.comments, lv)
-            print(f"wrote {f_name}", file=sys.stderr, flush=True)
+                process_comment(f, result.comments, lv, shortname)
+            print(f"wrote {f_name}\n", file=sys.stderr, flush=True)
 
         except:
             print(traceback.format_exc())
