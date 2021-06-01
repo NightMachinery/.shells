@@ -54,11 +54,20 @@ function kitty-tab-get() {
 function kitty-tab-get-emacs() {
     kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].foreground_processes[0].cmdline[0] | contains("emacs") ) | .id'
 }
+##
+# if isIReally && isKitty ; then
+#     typeset -g kitty_emacs_id="$(kitty-tab-get-emacs | ghead -n 1)"
+# fi
 function kitty-emacs-focus() {
     local id=5
 
-    ## disabled for perf reasons:
-    # id="$(kitty-tab-get-emacs | ghead -n 1)" @TRET
+    ## cached for perf reasons:
+    if isDeus || test -z "$kitty_emacs_id" ; then
+        id="$(kitty-tab-get-emacs | ghead -n 1)" @TRET
+        typeset -g kitty_emacs_id="$id"
+    else
+        id="$kitty_emacs_id"
+    fi
     ##
 
     kitty-tab-activate "$id"

@@ -26,7 +26,7 @@ alias btz='bt --language zsh'
 alias dbg='DEBUGME=d'
 ##
 # alias l='exa -a' # --oneline
-# alias ll='exa -a -l'
+# alias ll='exa -a -l --blocks'
 # alias lt='exa -a -T'
 alias lc='l -s created'
 alias lm='l -s modified'

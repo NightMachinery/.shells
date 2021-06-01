@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Usage:
-# `tmuxnewsh2 reddit indir ~dl/rational reddit_sub_posts_urls_pushshift.py rational 1000000000`
+# `tmuxnewsh2 reddit indir ~dl/rational subreddit2org.py rational 1000000000`
 #
 # Old usage:
 # `reddit_sub_posts_urls_pushshift.py rational 100000000 > rational.txt`
@@ -143,11 +143,15 @@ else:
             ##
 
             head = "EMPTY_COMMENT"
-            c_id = c.id or z("uuidm").outrs
+
+            # @todo3 using IDs creates too long paths. It's better if just use a counter that goes from 0 to N.
+            c_id_old = c.id or z("uuidm").outrs[0:6]
+            c_id = i
             shortname += f"/{c_id}"
+
             if c.body_html:
                 head = (html2org(c.body_html) or "EMPTY_COMMENT")
-                index_file = f'indices/{shortname}/{c_id}.org'
+                index_file = f'indices/{shortname}/{c_id_old}.org'
                 z("ensure-dir {index_file}")
                 with open(index_file, "w") as f2:
                     f2.write(f"{meta}\n{head}")
@@ -179,25 +183,12 @@ else:
 
             f_name = z("ecn {result.title} | str2filename").outrs
             f_name = f_name[0:230]
+            # [[id:a36bb01f-9b9b-40c9-816a-c762281c43c3][filesystem/filenames.org:maximum allowed length for filenames and paths]]
             if utf8len(f_name) > 240:
                 f_name = f_name[0:100]
 
             if utf8len(f_name) > 240:
                 f_name = f_name[0:60]
-
-            ## max file name length (this is different from max path length, which is usually 4096 bytes)
-            # @linux `getconf NAME_MAX /dev/sda1`, `getconf PATH_MAX /dev/sda1`
-            #
-            # BTRFS   255 bytes
-            # exFAT   255 UTF-16 characters
-            # ext2    255 bytes
-            # ext3    255 bytes
-            # ext3cow 255 bytes
-            # ext4    255 bytes
-            # FAT32   8.3 (255 UCS-2 code units with VFAT LFNs)
-            # NTFS    255 characters
-            # XFS     255 bytes
-            ##
 
             shortname = f"{f_name}.{result.id}"
             f_name = f"posts/{shortname}.org"
