@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # Usage:
+# `tmuxnewsh2 reddit indir ~dl/rational reddit_sub_posts_urls_pushshift.py rational 1000000000`
+#
+# Old usage:
 # `reddit_sub_posts_urls_pushshift.py rational 100000000 > rational.txt`
-# `tmuxnewsh2 reddit reddit_sub_posts_urls_pushshift.py rational 100000000`
 #
 # Docs:
 # - https://github.com/praw-dev/praw
@@ -122,8 +124,11 @@ else:
 
         l = len(comments) - 1
 
+        shortname_orig = shortname
+
         for i, c in enumerate(comments):
             lv_c = lv
+            shortname = shortname_orig
 
             # if isinstance(c, MoreComments):
             #     pass
