@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Usage:
-# `tmuxnewsh2 reddit indir ~dl/rational subreddit2org.py rational 1000000000`
+# `tmuxnewsh2 reddit indir ~dl/subreddits/rational subreddit2org.py rational 1000000000`
+# `tmuxnewsh2 reddit indir ~dl/subreddits/HPfanfiction subreddit2org.py HPfanfiction 1000000000`
 #
 # Old usage:
 # `reddit_sub_posts_urls_pushshift.py rational 100000000 > rational.txt`

@@ -216,7 +216,10 @@ function ntsearch-lines() {
 }
 ##
 function ntsearch-postprocess-h1 {
-    nightNotes="$1" pattern="$2" out="$3" force_editor=y no_wait=y ntsearch-postprocess
+    local out="$3"
+    # cp "$out" ~/tmp/a.txt @TRET
+    out="$(cat "$out")" @TRET
+    nightNotes="$1" pattern="$2" out="$out" force_editor=y no_wait=y ntsearch-postprocess
 }
 function ntsearch-postprocess {
     # @input nightNotes out pattern acceptor ntsearch_injector force_editor no_wait EDITOR
@@ -413,7 +416,6 @@ function ntsearch_() {
         preview_header_lines=3
         hidden='nohidden'
 
-        fzopts+=(--bind 'alt-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"$(gq "$nightNotes") $(gq "$ntsearch_lines_pattern")"' {})')
         if test -z "$fzp_ug" ; then
             fzopts+=(--read0 --delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
         else
@@ -432,6 +434,10 @@ function ntsearch_() {
         # previewcode="cat $(gq $nightNotes)/{1} || printf -- error5"
         ###
     fi
+
+
+    fzopts+=(--bind 'ctrl-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"$(gq "$nightNotes") $(gq "$ntsearch_lines_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it
+
 
     ##
     # we no longer need caching, it's fast enough
