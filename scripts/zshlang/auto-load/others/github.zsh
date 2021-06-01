@@ -1,12 +1,48 @@
-function gh-release-get() {
+##
+function gh-size {
+    # @docs https://docs.github.com/en/rest/reference/repos
+    #
+    # https://stackoverflow.com/questions/8646517/how-can-i-see-the-size-of-a-github-repository-before-cloning-it
+    # The size is indeed expressed in kilobytes based on the disk usage of the server-side bare repository. However, in order to avoid wasting too much space with repositories with a large network, GitHub relies on Git Alternates. In this configuration, calculating the disk usage against the bare repository doesn't account for the shared object store and thus returns an "incomplete" value through the API call.
+    #
+    # @alt If you own the repository, you can find the exact size by opening your /Account Settings/ → /Repositories/ ([[https://github.com/settings/repositories]]), and the repository size is displayed next to its designation.
+    #
+    # If you do not own the repository, you can fork it and then check the in the same place.
+    #
+    # This size is the same as the one reported by the API, i.e., it's less than the actual size by an unknown amount.
+    ##
+    local url="$1"
+    local repo
+    repo="$(gh-url2repo "$url")" @RET # asserts the nonemptiness of url itself
+
+    local d
+    d="$(gurl https://api.github.com/repos/"$repo")" @TRET
+
+    local s
+    s="$(ec $d | jqm .size)"
+    s=$(( s * 1024 ))
+    ec "$s" | numfmt-bytes
+}
+
+##
+function gh-url2repo {
     local url="$1"
     local repo="$url"
-    local tag="${gh_release_get_tag}"
     assert-args repo @RET
     if [[ "$repo" =~ '(?:https://)?github.com/([^/]+/[^/]+)' ]] ; then
         repo="$match[1]"
         # dvar repo
     fi
+
+    ec "$repo"
+}
+##
+function gh-release-get() {
+    local url="$1"
+    local repo
+    repo="$(gh-url2repo "$url")" @RET # asserts the nonemptiness of url itself
+
+    local tag="${gh_release_get_tag}"
     local desired="${gh_release_get_desired}" # regex
     if test -z "$desired" ; then
         if isDarwin ; then
