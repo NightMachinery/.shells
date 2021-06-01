@@ -10,6 +10,7 @@
 	default = matching
 [core]
 	excludesfile = ~/.gitignore_global
+	longpaths = true
 	autocrlf = input
 	pager = LESS='-RiF --mouse --wheel-lines=3' delta --light --theme 'Solarized (light)'
 	# ignorecase = false

@@ -70,10 +70,12 @@ lv-sorted() { ntag-lv | tac }
 lv-simple2() { @opts nopriority y @ ntag-lv | tac }
 function ntag-ll() {
     if isI && istty ; then
-        exa -a -l --color always "$@" | ntag-color | rtl-reshaper
+        exa -a -l --blocks --color always "$@" | ntag-color | rtl-reshaper
     else
-        exa -a -l "$@"
+        exa -a -l --blocks "$@"
     fi
+    ##
+    # -- blocks: List each file's number of file system blocks (512 bytes each?)
 }
 aliasfn ll ntag-ll
 # aliasfn lll ntag-ll
