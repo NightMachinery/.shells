@@ -49,9 +49,16 @@ isDbg () {
 local copy_cmd="$brishz_copy"
 local session="${brishz_session}"
 local nolog="${brishz_nolog}"
+local endpoint="${bshEndpoint:-http://127.0.0.1:$GARDEN_PORT}/zsh/"
 
 local input_cmd=( "$@" )
-test -z "$brishz_noquote" && input_cmd="cd $(gquote-sq "$PWD") ; $(gq "${(@)input_cmd}") ; ret=\$? ; cd /tmp ; (exit \$ret) "
+if test -z "$brishz_noquote" ; then
+    input_cmd="$(gq "${(@)input_cmd}")"
+
+    if [[ "$endpoint" =~ '^https?://127.0.0.1' ]] ; then
+        input_cmd="cd $(gquote-sq "$PWD") ; ${input_cmd} ; ret=\$? ; cd /tmp ; (exit \$ret) "
+    fi
+fi
 
 local stdin="$brishz_in"
 [[ "$stdin" == 'MAGIC_READ_STDIN' ]] && stdin="$(</dev/stdin)"
@@ -66,7 +73,6 @@ local opts=()
 # isDbg && opts+=(verbose=1)
 # http --body POST http://127.0.0.1:8000/zsh/ cmd="$(gq "$@")" $opts[@]
 ##
-local endpoint="${bshEndpoint:-http://127.0.0.1:$GARDEN_PORT}/zsh/"
 if test -n "$nolog" ; then
     endpoint+="nolog/"
 fi
