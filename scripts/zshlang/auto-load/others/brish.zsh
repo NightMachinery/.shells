@@ -64,7 +64,6 @@ function brishz-all() {
 function brishzr-all() {
     brishz_noquote=y @opts bell bell-sc2-activating_bots @ reval-bell brishzr "%GARDEN_ALL $(gquote-simple "$@")"
 }
-aliasfn brishzr-all  brishzr %GARDEN_ALL
 aliasfn brishz-restart brishz-all %BRISH_RESTART
 aliasfn brishzr-restart brishzr-all %BRISH_RESTART
 aliasfn xl brishz-restart

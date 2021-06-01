@@ -1037,7 +1037,13 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
     local html
     html="${html}"
     if test -z "$html" ; then
-        html=$(full-html2 "$url") || { ectrace "" "fhMode: ${fhMode}, URL: $(gq "$url"), retcode: $?"; return 1 }
+        html=$(full-html2 "$url") || {
+            local msg="fhMode: ${fhMode}, URL: $(gq "$url"), retcode: $?"
+            ectrace "$msg"
+
+            # return 1
+            true # when we encounter, e.g., captchas, usually the =meta= tags we need can be downloaded without problems; So ignoring the error seems the best tradeoff.
+        }
     fi
     local reqs=("${@:2}")
     <<<"$html" assert htmlmetadata $reqs[@] || {
