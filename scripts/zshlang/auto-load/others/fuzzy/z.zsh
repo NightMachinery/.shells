@@ -25,6 +25,35 @@ function z-add-pwd() {
 function z-list() {
     redism SMEMBERS "$ZDIRS_NAME"
 }
+
+function z-list0() {
+    redis_smembers0.py "$ZDIRS_NAME"
+}
+function z-cleanup {
+    local d dp
+    typeset -A seen_heads
+
+    for d in "${(@0)$(z-list0)}" ; do
+        if [[ "$d" =~ '^(~vol/+[^/]+)' ]] ; then
+            local head
+            head="$(path-unabbrev "${match[1]}")" @TRET
+
+            if ! test -e "$head" ; then
+                if test -z "${seen_heads[$head]}" ; then
+                    ecgray "$0: mount point $(gq "$head") doesn't exist, skipping ..."
+                    seen_heads[$head]=y
+                fi
+                continue # the mount point doesn't exist, we should preserve its saved dirs
+            fi
+        fi
+
+        dp="$(path-unabbrev "$d")" @TRET
+        dp="$(ntag-recoverpath "$dp")"
+        if ! test -e "$dp" ; then
+            reval-ec redism SREM "$ZDIRS_NAME" "$d"
+        fi
+    done
+}
 ##
 export _ZO_DATA_DIR="$HOME/.z.dir"
 if ! bool "$ZDIRS_ENABLED" && isExpensive && isIReally ; then

@@ -183,7 +183,16 @@ aliasfn path2tilde path-abbrev
 function path-unabbrev() {
     @inargsf
 
-    arrN ${~@} # do NOT quote this
+    local i head tail
+    for i in $@; do
+        if [[ "$i" =~ '^(~[^/]*)(.*)' ]] ; then
+            head="${match[1]}"
+            tail="${match[2]}"
+            ec ${~${head}}"${tail}" # do NOT quote this
+        else
+            ec "$i"
+        fi
+    done
 }
 aliasfn tilde2path path-unabbrev
 
