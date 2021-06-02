@@ -150,7 +150,7 @@ else:
 
             ##
             if lv_c <= 4:
-                c_id = f"i_{c_id_old}"
+                c_id = f"{i}_{c_id_old}"
             else:
                 c_id = i
                 # using this in different runs is unreliable, as the comments ordering can change. But since we use the comments' ID as their filenames, this won't result in data loss, but it can cause data duplication and a flawed comment hierarchy.
