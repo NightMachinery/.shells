@@ -121,7 +121,7 @@ function vcnpp() {
         assert vcn-with git add ~/scripts/ @RET
         assert vcn-with @opts noadd y @ gsync "$msg" @RET
 
-        brishr-restart
+        brishz-restart
 
         brishzr-repeat
         true
