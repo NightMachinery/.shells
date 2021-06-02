@@ -76,6 +76,12 @@ function indir() {
     }
 }
 alias in=indir # best reserved for interactive use
+
+function indir-mkdir {
+    mkdir -p "$1" @TRET
+    indir "$@"
+}
+aliasfn indirm indir-mkdir
 ##
 typeset -ag exit_traps=( 0 INT TERM HUP EXIT ) # '0' alone seems enough though https://stackoverflow.com/questions/8122779/is-it-necessary-to-specify-traps-other-than-exit
 alias trapexits='setopt localtraps ; trap "" $exit_traps[@]'

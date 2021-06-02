@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Usage:
-# `tmuxnewsh2 reddit indir ~dl/subreddits/rational subreddit2org.py rational 1000000000`
-# `tmuxnewsh2 reddit indir ~dl/subreddits/HPfanfiction subreddit2org.py HPfanfiction 1000000000`
+# `tmuxnewsh2 r_rational indirm ~dl/subreddits/rational subreddit2org.py rational 1000000000`
+# `tmuxnewsh2 r_HPfanfiction indirm ~dl/subreddits/HPfanfiction subreddit2org.py HPfanfiction 1000000000`
 #
 # Old usage:
 # `reddit_sub_posts_urls_pushshift.py rational 100000000 > rational.txt`
@@ -147,7 +147,18 @@ else:
 
             # @todo3 using IDs creates too long paths. It's better if just use a counter that goes from 0 to N.
             c_id_old = c.id or z("uuidm").outrs[0:6]
-            c_id = i
+
+            ##
+            if lv_c <= 4:
+                c_id = c_id_old
+            else:
+                c_id = i
+                # using this in different runs is unreliable, as the comments ordering can change. But since we use the comments' ID as their filenames, this won't result in data loss, but it can cause data duplication and a flawed comment hierarchy.
+                # workarounds:
+                # - delete the indices directory and re-run the whole scraping from scratch on every update
+                # - @done use the first-n-level comments' ID as well
+            ##
+
             shortname += f"/{c_id}"
 
             if c.body_html:
