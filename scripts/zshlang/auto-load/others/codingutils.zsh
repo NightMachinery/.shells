@@ -32,20 +32,21 @@ whichm() {
     local items=("$@")
     unset out
     local nextItems=()
-    local item output var
+    local item output var res
     for item in "$items[@]"
     do
         nextItems+="${item%%+}"
 
         if ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) ; then
             if (( ${+builtins[$item]} )) ; then
-            ec "## $(which -- $item)"
-            continue
+                res="$(which -- $item)" && ec "## ${res}"
+                continue
             elif ! (( ${+commands[$item]} )) ; then
                 if var="$(serr typeset -p "$item")" ; then
                     ec "$var" # the output of typeset is eval-able :D
                 else
-                    ec "## $(which -- "$item")" # might be a global alias
+                res="$(which -- $item)" && ec "## ${res}"
+                # might be a global alias
                 fi
                 continue
             fi
@@ -56,11 +57,29 @@ whichm() {
         output="${aliases[$item]}" ; test -n "$output" && {
             output="$(gq "$output")"
             ec "alias $item=$output"
-            nextItems+=( $output ${$(fnswap expand-aliases expand-alias expand-alias-strip "$item")[1]} )
+
+            local alias_parts=( ${=$(fnswap expand-aliases expand-alias expand-alias-strip "$item")} )
+            local head
+            head="${alias_parts[1]}"
+            ## already done in expand-alias-strip:
+            # head=''
+            # for head in ${alias_parts[@]} ; do
+            #     if ! [[ "$head" =~ '\?noglob|re|run-on-each' ]] ; then
+            #         break
+            #     fi
+            # done
+            ##
+
+            nextItems+=( $output $head )
             continue
         }
 
-        output="$(which -- "$item")" && ! [[ "$output" =~ '^\s*\w+: suffix aliased to' ]] && {
+        if output="$(which -- "$item")"; then
+            if [[ "$output" =~ '^\s*\w+: suffix aliased to' ]] ; then
+                # @idk how this condition is triggered
+                # @alt =alias -s=
+                ec "## ${output}"
+            else
                 test -e "/$output" && {
                     test -n "$whdeep_gen_mode" && {
                         [[ "$output" =~ "^\s*\Q$NIGHTDIR\E" ]] && cp "$output" ./autobin/
@@ -74,7 +93,8 @@ whichm() {
                     done
                 }
                 ec $output
-            }
+            fi
+        fi
     done
 
     nextItems=(${(u@)nextItems:|items})
