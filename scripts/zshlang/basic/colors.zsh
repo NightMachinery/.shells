@@ -107,7 +107,7 @@ function random-color-arr() {
 ##
 function ecrainbow-n() {
     local hue="$(random-color -f hex)"
-    print -nr -- "$(colorfg $(random-color-arr -l dark --hue "$hue"))$(colorbg $(random-color-arr -l light --hue "$hue"))""$@"
+    print -nr -- "$(colorfg $(random-color-arr -l dark --hue "$hue"))$(colorbg $(random-color-arr -l light --hue "$hue"))""$@" >&2
 }
 function ecrainbow() { ecrainbow-n "$@" ; echo }
 function ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
@@ -126,13 +126,15 @@ function h_ecalternate() {
     $0 "$@"
 }
 function ecalternate() {
-    local o
-    o="$(h_ecalternate "$@")" @RET
-    if isColor ; then
-        # Removes last whitespace  char:
-        ecn "${o[1,-7]}" ; resetcolor ; ec
-    else
-        ec "$o"
-    fi
+    {
+        local o
+        o="$(h_ecalternate "$@")" @RET
+        if isColor ; then
+            # Removes last whitespace  char:
+            ecn "${o[1,-7]}" ; resetcolor ; ec
+        else
+            ec "$o"
+        fi
+    } >&2
 }
 ##

@@ -1,13 +1,20 @@
-arger() { re 'ec arg:' "$@" }
-argerrainbow() {
-	local arg
-	for arg in "$@"
-	do
-	#	fnswap chalk 'command chalk --color 16m' colorfb-r "$arg" | tr -d '\n'
-		ecrainbow-n "${arg:-EMPTY_ELEMENT} "
-	done
-	resetcolor
-	echo
+function arger() {
+    local i
+    for i in "$@" ; do
+        ecbold "arg: $i"
+    done
+}
+function argerrainbow() {
+    {
+        local arg
+        for arg in "$@"
+        do
+            #   fnswap chalk 'command chalk --color 16m' colorfb-r "$arg" | tr -d '\n'
+            ecrainbow-n "${arg:-EMPTY_ELEMENT} "
+        done
+        resetcolor
+        echo
+    } >&2
 }
 argerng() {
     clipboard-add-quoted "$@"
@@ -29,7 +36,7 @@ fsaydbg() {
 }
 dact() {
     doc DEBUG Act
-    isNotDbg || eval "$(gquote "$@")"
+    isNotDbg || eval "$(gquote "$@")" >&2
 }
 ##
 function ecnerr-raw() {
@@ -110,6 +117,7 @@ dvar () {
     ecdbg "$pre$1 in env: $(printenv "$1")"
 }
 function raise-blood() ceer rederr.zsh source
+##
 function retcode() {
     local r=$? ps=("$pipestatus[@]") name="${1:-${$(fn-name 3):-NA}}"
 
@@ -121,6 +129,7 @@ function retcode() {
     return $r
 }
 alias e='retcode'
+##
 function argerdbg() {
     isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")

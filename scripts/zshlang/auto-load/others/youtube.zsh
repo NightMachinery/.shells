@@ -11,7 +11,11 @@ function youtube-dl() {
         transformer urlfinalg "revaldbg $proxycmd youtube-dl $opts[@]" "$@" "$ytdl_opts[@]"
     else
         # urlfinalg takes too much time on Iran's net.
-        revaldbg $proxycmd youtube-dl "$opts[@]" "$@" "$ytdl_opts[@]"
+
+        ##
+        # revaldbg $proxycmd youtube-dl "$opts[@]" "$@" "$ytdl_opts[@]"
+        ##
+        revaldbg $proxyenv command youtube-dl "$opts[@]" "$@" "$ytdl_opts[@]"
     fi
 }
 ##
@@ -30,17 +34,24 @@ noglobfn ylist
 function ytitle() {
     youtube-dl --get-filename -o "%(title)s" "$@"
 }
+##
 function ytrans() {
-    doc "youtube transcribe"
+    doc "youtube transcript"
+    doc "@alt night/org-insert-youtube-video-with-transcript"
+    ##
     local url="$1"
     local title=("${(@f)$(youtube-dl --get-filename -o "%(title)s" "$url")}")
     # local u="$(md5m "$title")"
     pushf "$title"
-    youtube-dl --convert-subs vtt --write-auto-sub --skip-download --sub-lang en "$1"
-    vtt2txt2.py *.vtt | gtr $'\n' ' ' > ../"$title.txt"
-    popf
+    {
+        youtube-dl --convert-subs vtt --write-auto-sub --skip-download --sub-lang en "$1"
+        vtt2txt2.py *.vtt | gtr $'\n' ' ' > ../"$title.txt"
+    } always {
+        popf
+    }
     command rm -r "$title"
-    t2e "$title" "$title.txt"
+
+    t2e "$title" "$title.txt" # txt2epub
 }
 renog ytrans
 ##

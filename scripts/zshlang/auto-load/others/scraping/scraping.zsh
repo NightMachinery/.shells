@@ -263,7 +263,11 @@ function full-html2() {
         mode='curlfull'
     fi
 
-    [[ "$mode" =~ '^curlfast$' ]] &&  { $proxyenv curl --silent --fail --location -o /dev/stdout "$url" ; return $? }
+    [[ "$mode" =~ '^(gurl|curlfast)$' ]] &&  {
+        # $proxyenv curl --silent --fail --location -o /dev/stdout "$url"
+        gurl "$url"
+        return $?
+    }
     [[ "$mode" =~ '^curlfullzero$' ]] &&  { cfTimeout=0 $proxyenv curlfull.js "$url" ; return $? } # not really usable
     [[ "$mode" =~ '^curlfullshorter$' ]] &&  { cfTimeout=0.5 $proxyenv curlfull.js "$url" ; return $? } # not really usable
     [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$url" ; return $? }
@@ -1403,7 +1407,13 @@ function readmoz-md() {
     local format="${readmoz_md_to:-md}"
     assert-args url @RET
 
-    @opts from html-native_divs to "$format" @ pandoc-convert =(readmoz "$url") "${@[2,-1]}"
+    local tmp
+    tmp="$(gmktemp)" @TRET
+    {
+    readmoz "$url" > $tmp @TRET
+
+    @opts from html-native_divs to "$format" @ pandoc-convert "$tmp" "${@[2,-1]}"
+    } always { silent trs-rm "$tmp" }
 }
 noglobfn readmoz-md
 
