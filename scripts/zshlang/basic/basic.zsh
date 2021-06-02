@@ -63,6 +63,10 @@ function ec_bash() {
     fi
 }
 ##
+function return-code {
+    return "$1"
+}
+##
 function gquote-simple() {
     ec "${(q+@)@}"
     # @warn This doesn't quote global aliases:

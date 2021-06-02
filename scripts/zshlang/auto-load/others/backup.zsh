@@ -14,14 +14,41 @@ function backup-rsync-greencase() {
 function backup-startupSh() {
     local d="$nightNotes/private/configs/$(hostname)/$(whoami)"
     mkdir -p "$d"
-    cp /Users/Shared/bin/startup.sh "${d}/"
+    cp /Users/Shared/bin/startup.sh ~/.privateStartup.sh "${d}/"
 }
 ##
 function backup-cron() {
     # aka cellar-getcron
+    ##
+    if ! { isLocal || isLilf } ; then
+        return 1
+    fi
+
     local d="$nightNotes/private/backups/crontabs/$(hostname)"
     mkdir -p "$d"
     crontab -l > "${d}/$(whoami)"
+}
+##
+function backup-private-common {
+    if isLocal ; then
+        if ! ask "$0: This is a local computer. Are you sure you want to proceed?" N ; then
+            return 1
+        fi
+    fi
+
+    assert test -e "$nightNotes" @RET
+
+    local d="$nightNotes/private/backups/$(hostname)_$(whoami)/private-common"
+
+    pushf "$d"
+    {
+        local i
+        for i in ~/.privateShell ~/.private-config.el ; do
+            if test -e "$i" ; then
+                reval-ec cp "$i" "$d"/
+            fi
+        done
+    } always { popf }
 }
 ##
 function backup-file() {
@@ -53,6 +80,8 @@ function ziib-all() {
             ecerr "$0: Could not download https://discourse.lilf.ir/admin/site_settings.json"
         fi
 
+
+        assert ssh zii@51.178.215.202 crontab -l > ./crontab
 
         assert scp zii@51.178.215.202:/home/zii/.muttrc .
         assert scp zii@51.178.215.202:/home/zii/Caddyfile .

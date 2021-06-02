@@ -56,7 +56,7 @@ if test -z "$brishz_noquote" ; then
     input_cmd="$(gq "${(@)input_cmd}")"
 
     if [[ "$endpoint" =~ '^https?://127.0.0.1' ]] ; then
-        input_cmd="cd $(gquote-sq "$PWD") ; ${input_cmd} ; ret=\$? ; cd /tmp ; (exit \$ret) "
+        input_cmd="cd $(gquote-sq "$PWD") ; ${input_cmd} ; ret=\$? ; cd /tmp ; return-code \$ret "
     fi
 fi
 

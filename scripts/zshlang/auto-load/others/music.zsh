@@ -171,7 +171,7 @@ songd() {
     test "$bp" = "-d" && {
         trs "$(realpath "$spath")"
         trs "$spath"
-        (exit 0)
+        true
     } || {
         { test -n "$q" && test -e "$spath" } && {
             ecdbg Cache found
@@ -179,10 +179,11 @@ songd() {
             eval 'touch-tracks "$spath"/*' || {
                 ecdbg Could not TOUCH tracks, probably no tracks are available.
                 trs "$spath"
-                (exit 1)
+                false
             } && {
                 hear "${@:1:-1}" "$spath"
-                (exit 0) }
+                true
+            }
         } || {
             local usedCache=''
             [[ "$q" =~ "^http" ]] || {

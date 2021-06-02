@@ -26,6 +26,7 @@ tmuxnew julia "dash -c 'cd $(gq $borgdir) && $(gq "$(realpath2 python3)") $(gq $
 tmuxnew julia_jlib "dash -c 'cd $(gq $borgdir) && borg_session=session_jlib borg_plugin_path=jlib_plugins borg_brish_count=10 $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
 tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(realpath2 python3)") $(gq $borgdir/inline.py)'"
 ##
+# @see 'lnc-epub' for non-interactive usage
 tmuxnewsh2 lightnovel-crawler PUBLIC_DATA_PATH=$HOME/Downloads/tmp PUBLIC_ADDRESS=https://files.lilf.ir/tmp/  BOT=telegram TELEGRAM_TOKEN=$TELEGRAM_TOKEN_OCEAN lightnovel-crawler
 ##
 if test -e ~/code/kotlin/smsq/go/config.json ; then

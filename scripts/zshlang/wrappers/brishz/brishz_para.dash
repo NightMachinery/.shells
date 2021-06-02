@@ -10,7 +10,7 @@ echo() {
     printf -- "%s\n" "$*"
 }
 
-out="$(brishz_json_output=1 brishz_quote=y brishz.dash "cd $(command gprintf '%q' "$PWD") ; " "$@" " ; ret=\$? ; cd /tmp ; (exit \$ret) ")" || return $?
+out="$(brishz_json_output=1 brishz_quote=y brishz.dash "cd $(command gprintf '%q' "$PWD") ; " "$@" " ; ret=\$? ; cd /tmp ; return-code \$ret ")" || return $?
 
 echo "$out" | jq -rje .out
 echo "$out" | jq -rje .err >&2

@@ -47,6 +47,7 @@ else:
 
     api = PushshiftAPI(r)
 
+print(f"Getting the submissions from the subreddit {subreddit} (limit={limit}) ...\n", file=sys.stderr, flush=True)
 gen = api.search_submissions(subreddit=subreddit, limit=limit)
 results = list(gen)
 
