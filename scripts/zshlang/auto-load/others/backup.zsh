@@ -67,6 +67,11 @@ function ziib-all() {
         mkdir -p mailu
         assert scp root@51.178.215.202:/mailu/docker-compose.yml ./mailu/
         assert scp root@51.178.215.202:/mailu/mailu.env ./mailu/
+
+        mkdir -p .thelounge
+        assert scp root@51.178.215.202:/home/zii/.thelounge/config.js ./.thelounge/
+        assert scp -r root@51.178.215.202:/home/zii/.thelounge/users ./.thelounge/
+
     } always { popf }
 }
 ###
