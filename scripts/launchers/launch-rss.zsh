@@ -29,7 +29,7 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_c=(rss-ctitle) rc_t=(-v 'Ansi Common Lisp') 
 
 
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(tsend-rssln $ephemeral) rt_notel=y rt_id=$arista" tmuxnewsh rss-techmeme rss-tsend 'https://www.techmeme.com/feed.xml'
-tmuxnewshenv="rt_skip='$rt_skip' rt_e=true rt_id=$arista rt_duplicates_key=hn" tmuxnewsh rss-hn rss-tsend 'http://hnapp.com/rss?q=score%3E500'
+tmuxnewshenv="rt_skip='$rt_skip' rt_e=true rt_id=$arista rt_duplicates_key=hn rt_eud=0" tmuxnewsh rss-hn rss-tsend 'http://hnapp.com/rss?q=score%3E500'
 # tmuxnewshenv="rt_skip='$rt_skip' rt_e=true rt_id=$arista rt_eid=$((3600*3))" tmuxnewsh rss-lobsters rss-tsend 'https://lobste.rs/top/rss'
 
 # tmuxnewshenv="rt_skip='$rt_skip' rt_c=(rss-ctitle) rc_t='Renegade Immortal' " tmuxnewsh rss-wuxia 'https://www.wuxiaworld.com/feed/chapters'

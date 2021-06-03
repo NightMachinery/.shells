@@ -9,11 +9,11 @@ function borg-tt-mark() {
         return $?
     fi
 
-	local out
-	out="$(ec "$*" | text2num | jq --raw-input --arg received_at "$received_at" --slurp --null-input --compact-output 'inputs as $i | {"name": $i, "received_at": $received_at}' | borg-req timetracker/mark/)" || return $?
-	test -z "$out" && return 1
-	ec $out
-	[[ "$out" == *("cold shoulder"|"Julia encountered an exception.")* ]] && return 1 || true
+    local out
+    out="$(ec "$*" | text2num | jq --raw-input --arg received_at "$received_at" --slurp --null-input --compact-output 'inputs as $i | {"name": $i, "received_at": $received_at}' | borg-req timetracker/mark/)" || return $?
+    test -z "$out" && return 1
+    ec $out
+    [[ "$out" =~ 'cold shoulder|Julia encountered an exception\.' ]] && return 1 || true
 }
 
 function borg-tt-last() {

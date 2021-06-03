@@ -61,7 +61,7 @@ function kitty-tab-get-emacs() {
 function kitty-emacs-focus() {
     local id=5
 
-    ## cached for perf reasons:
+    ## cached for perf reasons: (the cache needs to invalidated each time 'kemc' is called
     if isDeus || test -z "$kitty_emacs_id" ; then
         id="$(kitty-tab-get-emacs | ghead -n 1)" @TRET
         typeset -g kitty_emacs_id="$id"
@@ -70,8 +70,13 @@ function kitty-emacs-focus() {
     fi
     ##
 
-    kitty-tab-activate "$id"
+    if ! kitty-tab-activate "$id" ; then
+        if ! isDeus ; then
+            deus "$0" "$@"
+        fi
+    fi
     ## perf:
+    # `time (kitty-tab-get-emacs | ghead -n 1)` 0.2s
     # `time2 kitty-emacs-focus` 0.50343608856201172
     # `time2 kitty-tab-activate 5 ` -> 0.165s
     ##

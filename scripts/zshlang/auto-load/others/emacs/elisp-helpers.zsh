@@ -19,9 +19,9 @@ function wh-docstring() {
     local res
     res="$({
     if (( ${+functions[$s]} )) ; then
-        ecn "fn: ${functions[$s]}"
+        ecn $'fn\n'"${functions[$s]}"
     elif (( ${+aliases[$s]} )) ; then
-        ecn "alias: ${aliases[$s]}"
+        ecn $'alias\n'"${aliases[$s]}"
     elif (( ${+commands[$s]} )) ; then
         ecn "${commands[$s]}"
     else
@@ -30,7 +30,7 @@ function wh-docstring() {
           ecn "${match[1]}"
         fi
     fi
-    } | gtr $'\n' " " )"
+    } sd '^\s*(\\?noglob)?\s+' '' | prefixer -o '; ' --skip-empty)"
 
     if test -z "$res" ; then
         ## disabled as it was unnecessary
