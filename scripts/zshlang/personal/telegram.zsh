@@ -22,9 +22,10 @@ function alice() {
         # ec "Alicized successfully: $i"
         true
     else
-            ecdate-err "Alicization failed"'!'
-            redo2 2 tts-glados1-cached Alicization has failed
-            return 1
+        ec "$res"
+        ecdate-err "Alicization failed"'!'
+        redo2 2 tts-glados1-cached Alicization has failed
+        return 1
     fi
 }
 noglobfn alice

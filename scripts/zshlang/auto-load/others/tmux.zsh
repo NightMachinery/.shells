@@ -112,6 +112,9 @@ function ivy-convenience() {
     tmuxnewsh2 zii1 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
     tmuxnewsh2 zii2 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
 
+    tmuxnewsh2 eva1 mosh eva@82.102.11.148 -- zsh
+    # tmuxnewsh2 eva2 mosh eva@82.102.11.148 -- zsh
+
     tmuxnew julia_repl julia
 
     tmuxnew ipython_repl ipython
