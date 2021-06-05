@@ -71,7 +71,7 @@ function ntt-org1() {
 function h_org_unt {
     local i
     for i in $@ ; do
-        unt "$i"
+        reval-ec unt "$i" # errors are implicitly ignored
         ec $'\n'
     done
 }
@@ -83,7 +83,7 @@ function links2org-dir {
 
     rget "$nightUrlRegex" "$dir" | unalix | prefixer --skip-empty | by-freq --reverse > "$o" @RET
 
-    cat "$o" | awkn 2 | ghead -n 3000 | para -k h_org_unt ::: > "${o:r}.org"
+    cat "$o" | awkn 2 | ghead -n 3000 | parallel_jobs=0 para -k h_org_unt ::: > "${o:r}.org"
 
     notif "finished org-links-by-freq $(retcode 2>&1)"
 }
