@@ -3,6 +3,8 @@ function match-url-rg() {
     # FNSWAP: rg
     rg --engine pcre2 -e "$nightUrlRegex" "$@"
 }
+aliasfn url-match-rg match-url-rg
+
 function match-url2() {
     ec "$*" | ghead -n 1 | silent match-url-rg
 }

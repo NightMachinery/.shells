@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
 (async () => {
+
+// let getStdin = await import('get-stdin');
 const getStdin = require('get-stdin');
+
 const readTimeEstimate = require('read-time-estimate');
 var doc = await getStdin();
 est = readTimeEstimate.default(doc, 200, 0, 0, ['img', 'Image']); // this '.default' wasn't in the original code

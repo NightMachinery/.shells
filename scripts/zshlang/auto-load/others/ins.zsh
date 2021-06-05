@@ -118,14 +118,22 @@ function pig() {
 }
 renog pig
 ##
-npmupdateg() {
-    doc alt: npm-check -u -g
+function npm-update-all-g() {
+    : "@alt npm-check -u -g"
 
     # npm outdated -g --depth=0 produces output according to the header → current | wanted | latest
     # npm outdated -g --depth=0 --parseable produces output in a different order → wanted | current | latest
+    local package
     for package in $(npm -g outdated --parseable --depth=0 | cut -d: -f4)
     do
         ec npm -g install "$package"
+    done
+}
+
+function npm-reinstall-all-g {
+    local pkg
+    for pkg in ${(@f)"$(npm ls -g --depth=0 --parseable | gsed 1d)"} ; do
+        reval-ec npm install -g "${pkg:t}"
     done
 }
 ##

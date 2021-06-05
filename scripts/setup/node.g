@@ -15,7 +15,6 @@ emoji-finder
 empty-trash-cli
 fkill-cli
 fuzzyset
-get-stdin
 git+https://github.com/NightMachinary/readability-cli.git
 html-table-to-json
 html-to-text

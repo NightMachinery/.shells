@@ -104,6 +104,11 @@ function isIReally() {
 }
 
 function isColor() {
+    if test -n "$isColor_override" ; then
+        bool "$isColor_override"
+        return $?
+    fi
+
     isBrishOrg || isI
 }
 ##

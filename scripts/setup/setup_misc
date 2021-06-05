@@ -27,6 +27,9 @@ nimble install --accept https://github.com/NightMachinary/htmlmetadata
 
 nimble install --accept "git://github.com/AmanoTeam/Unalix-nim"
 ##
+npmi unibeautify @unibeautify/beautifier-prettydiff @unibeautify/cli
+npmi get-stdin@8
+##
 brew tap v2ray/v2ray
 brew install v2ray-core
 

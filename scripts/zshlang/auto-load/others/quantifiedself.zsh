@@ -1,7 +1,15 @@
+##
+function by-freq {
+    : "-r, --reverse"
+
+    gsort | uniq -c | gsort -n "$@"
+}
+##
 candidate-aliases() {
-    fc -l 1 9999999 | awk '{print $2" "$3}' | sort | uniq -c | sort -n
+    fc -l 1 9999999 | awk '{print $2" "$3}' | by-freq
     # fc -l 1 = history (in bash?)
 }
+##
 char-usage() {
     # local text="$(arrN "$@" | xargs cat)"
     local groupby="${cuG:-1}"
@@ -68,3 +76,4 @@ function tokei-percent() {
     done
     table-print "$headers[@]" -- "$newline[@]"
 }
+##

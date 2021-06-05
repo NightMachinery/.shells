@@ -210,11 +210,18 @@ function h_@opts() {
         varname="${prefix}${varval}"
         varname="${varname//-/_}"
         unset "$varname"
+        ##
         if (( ${#var2val} == 1 )) ; then
             setcmd="local -x ${varname}=$(gq "$var2val[@]")"
+            # @warn using `typeset -ag var` will reset the single var
         else
-            setcmd="local -x -a ${varname}=( $(gq "$var2val[@]") )"
+            setcmd="local -a ${varname}=( $(gq "$var2val[@]") )"
+            # can't export arrays: `a=(1 2 3) zsh -fc 'typeset -p a'`
         fi
+        ##
+        # setcmd="typeset -x -T ${varname} ${varname:u}=( $(gq "$var2val[@]") ) $'\n'" # @docs `man zshbuiltins`
+        # @warn using `typeset -ag var` will reset this
+        ##
         ecdbg "setcmd: $setcmd"
         eval "$setcmd" || {
             ecerr "$0: Assigning the key '$varval' failed. setcmd: $setcmd"$'\n'"Aborting."

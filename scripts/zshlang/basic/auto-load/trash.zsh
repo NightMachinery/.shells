@@ -18,7 +18,7 @@ function trs() {
     done
 }
 function trs-empty {
-    rm -r -- "${TRASH_DIR}" || true
+    trs-rm "${TRASH_DIR}" || true
     assert empty-trash @RET
 }
 ##

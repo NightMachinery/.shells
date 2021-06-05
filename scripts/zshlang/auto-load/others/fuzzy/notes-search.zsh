@@ -1,5 +1,5 @@
 function ntl() {
-    typeset -ag ntsearch_rg_opts
+    ensure-array ntsearch_rg_opts
 
     local opts=()
     local i
@@ -94,7 +94,7 @@ function rem-fz() {
     local cday="$now[3]"
     local ntsearch_additional_paths=( "$remindayBakDir/$cyear/$cmonth/$cday"^*.zsh(N.) )
 
-    typeset -ag ntsearch_rg_opts
+    ensure-array ntsearch_rg_opts
     ntsearch_glob='' ntsearch_rg_opts=("$ntsearch_rg_opts[@]" --iglob '!*.zsh') ntl-fzf "$query_pre $query"
 }
 aliasfn ntrem rem-fz
