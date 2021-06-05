@@ -95,6 +95,8 @@ alias popu='pbpaste-urls'
 function pbadd() {
     osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
 }
+alias pa=pbadd
+
 function pbpaste-plus() {
     # GLOBAL out: paste
     unset paste

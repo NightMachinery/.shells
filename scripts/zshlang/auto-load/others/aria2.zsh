@@ -27,6 +27,10 @@ aa-raw() {
         fi
     done
 
+    if ! isColor ; then
+        opts+=( --enable-color=false )
+    fi
+
     aria2c --user-agent "$useragent_chrome" --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false  $opts[@] "$@"
     local ret=$?
     #-Z has some unsavory sideeffects so I have not included it in this.

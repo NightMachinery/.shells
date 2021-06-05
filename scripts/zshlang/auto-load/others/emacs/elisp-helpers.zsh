@@ -30,7 +30,7 @@ function wh-docstring() {
           ecn "${match[1]}"
         fi
     fi
-    } sd '^\s*(\\?noglob)?\s+' '' | prefixer -o '; ' --skip-empty)"
+    } | sd '^\s*(\\?noglob)?\s+' '' | prefixer -o '; ' --skip-empty)"
 
     if test -z "$res" ; then
         ## disabled as it was unnecessary

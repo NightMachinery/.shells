@@ -39,7 +39,20 @@ dact() {
     isNotDbg || eval "$(gquote "$@")" >&2
 }
 ##
+function color-override-err {
+    if test -z "$isColor_override" ; then
+        if isErrTty ; then
+            isColor_override=y
+        else
+            isColor_override=n
+        fi
+    fi
+}
+##
 function ecnerr-raw() {
+    local isColor_override="$isColor_override"
+    color-override-err
+    ##
     local trace="${ecerr_trace}"
     if bool "$trace" && ! bool "$ectrace_notrace" ; then
         # ectrace uses ecerr when tracing is disabled, so we need to disable notrace or there will be an inf loop
@@ -52,9 +65,15 @@ function ecerr-raw() {
     ecnerr-raw "$@"$'\n'
 }
 function ecerr() {
+    local isColor_override="$isColor_override"
+    color-override-err
+    ##
     ecerr-raw "$(colorfg 255 43 244)$@$(colorreset)"
 }
 function ecnerr() {
+    local isColor_override="$isColor_override"
+    color-override-err
+    ##
     # we can alsoo use `ecnerr-raw`, but that might break stuff, as ecn is supposed not to add newlines, but the traceback inserts tons of stuff
     ecn "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
 }

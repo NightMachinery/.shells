@@ -122,10 +122,12 @@ function emc-focus() {
     bella_zsh_disable1=y
 }
 function emc-nowait() {
+    @deprecated # emc-nowait2
+
     emc-gateway --no-wait "$@"
     emc-focus
 }
-alias emcnw='emc-nowait'
+alias emcnw='emc-nowait2'
 
 ialias emcg="emacsclient -c"
 ##
@@ -197,7 +199,8 @@ function emc-less() {
         fi
     done | {
         if test -n "$parser" ; then
-            prettier --parser "$parser"
+            # assert prettier --parser "$parser"
+            assert unibeautify -l "$parser" -f
         else
             cat
         fi
@@ -211,7 +214,8 @@ function emc-less-jq() {
 alias elj="emc-less-jq"
 
 function emc-less-html() {
-    @opts parser html s .html @ emc-less "$@"
+    # @opts parser html s .html @ emc-less "$@"
+    @opts parser HTML s .html @ emc-less "$@"
 }
 alias elh="emc-less-html"
 ##

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-
+# if it says 'output is not a terminal', try resetting your TTY
+##
 import sys, os
 import readline
 

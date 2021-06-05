@@ -1,4 +1,19 @@
 ##
+function reddit2old {
+   @inargsf
+
+   arrN "$@" | sdlit 'https://www.reddit.com' 'https://old.reddit.com'
+}
+##
+function reddit-sub-age {
+    local url="$1"
+    assert-args url @RET
+
+    url="$(reddit2old "$url")"
+
+    full-html2 "$url" | pup '.age' | html2org /dev/stdin
+}
+##
 function reddit2org {
     local permalink="$1"
     assert-args permalink @RET
@@ -63,3 +78,4 @@ function reddit-sub-posts-urls {
         # sleep 0.1
     done
 }
+##

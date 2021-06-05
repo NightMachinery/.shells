@@ -768,11 +768,20 @@ function url-clean-unalix() {
             fi
         }
 
+    if test -n "$uf_idem" ; then
+        arrN $inargs[@]
+        return $?
+    fi
+
     local opts=()
     if bool $redirects ; then
         opts+='--unshort'
     fi
-    arrN "$inargs[@]" | unalix "$opts[@]"
+    {
+        arrN $inargs[@] | url-match-rg | unalix "$opts[@]"
+        ec
+        arrN $inargs[@] | url-match-rg -v
+    } | prefixer --skip-empty
 
     ## tests:
     # `pop | { tee /dev/tty ; ec '======' > /dev/tty } | unalix`
@@ -1256,14 +1265,16 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     # old: # meta=( "${(@0)$(urlmeta $url all)}" ) # takes ~0.475s
     meta=( "${(@0)$(urlmeta2 $url title description image author)}" ) # takes ~0.04s
     title="${url2note_override_title:-$meta[1]}"
-    title="$(ecn "$title" | prefixer -o ' ' --skip-empty)"
+    title="$(ecn "$title" | prefixer -o ' ' --skip-empty | str2orgtitle)"
     desc="${meta[2]}"
     desc="$(<<<$desc html2utf.py)"
     desc="$(ecn "$desc" | prefixer -o ' ' --skip-empty)"
     img="${meta[3]:-$img}"
     author="$meta[4]"
     readest=""
-    [[ "$cleanedhtml" != no ]] && readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)" # takes ~0.25s
+    if [[ "$cleanedhtml" != no ]] ; then
+        readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)" @TRET # takes ~0.25s
+    fi
 
     local maxDesc=600
     if (( ${#desc} > $maxDesc )) ; then
@@ -1287,9 +1298,9 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
             indent=""
             ec "[[$(ec $url| url-encode.py)][${title:-$url}]]"
         fi
-        test -z "$author" || ec "${indent}By: $author"
-        test -z "$readest" || ec "${indent}$readest"
-        test -z "$desc" || ec "${indent}$desc"
+        test -n "$author" && ec "${indent}By: $author"
+        test -n "$readest" && ec "${indent}$readest"
+        test -n "$desc" && ec "${indent}$desc"
         ##
         if test -n "$imgMode" && test -n "$img" ; then
             # ec "${indent}[[img$img]]"
@@ -1320,9 +1331,15 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
 
 }
 noglobfn url2note
+
 function url2org() { url2note "$1" org }
 renog url2org
 @opts-setprefix url2org url2note
+
+function str2orgtitle {
+    gtr '[]' '{}'
+}
+
 function url2md() { url2note "$1" md }
 @opts-setprefix url2md url2note
 reify url2md

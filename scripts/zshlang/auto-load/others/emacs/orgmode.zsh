@@ -68,3 +68,23 @@ function ntt-org1() {
     } | sd --flags=i "$q" "$(ecn "$q" | mimic -m 100)"
 }
 ##
+function h_org_unt {
+    local i
+    for i in $@ ; do
+        unt "$i"
+        ec $'\n'
+    done
+}
+
+function links2org-dir {
+    local dir="${1}" o="${2}"
+
+    assert-args dir o @RET
+
+    rget "$nightUrlRegex" "$dir" | unalix | prefixer --skip-empty | by-freq --reverse > "$o" @RET
+
+    cat "$o" | awkn 2 | ghead -n 3000 | para -k h_org_unt ::: > "${o:r}.org"
+
+    notif "finished org-links-by-freq $(retcode 2>&1)"
+}
+##

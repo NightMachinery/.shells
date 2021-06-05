@@ -55,7 +55,7 @@ function emcrg() {
 function rgbase() {
     local opts=()
 
-    if isI ; then
+    if isColor ; then
         opts+=( --color always )
     fi
 
