@@ -27,6 +27,8 @@ tmuxnew v2ray v2ray -config /usr/local/etc/v2ray/config.json
 tmuxnew naive-eva naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
 tmuxnewsh2 socks2http hpts --level info -s 127.0.0.1:1078 -p 1088 # https://github.com/oyyd/http-proxy-to-socks
 ##
+tmuxnew znc znc --foreground
+##
 launch-musicf.zsh
 ##
 chronic-all

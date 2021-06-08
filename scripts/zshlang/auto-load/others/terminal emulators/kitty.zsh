@@ -52,7 +52,11 @@ function kitty-tab-get() {
     kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].id == ($wid | tonumber))'
 }
 function kitty-tab-get-emacs() {
-    kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].foreground_processes[0].cmdline[0] | contains("emacs") ) | .id'
+    kitty-remote ls | {
+        # jq -r '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].foreground_processes[0].cmdline[0] | contains("emacs") ) | .id'
+        ##
+        jq -r '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].cmdline[]  | (contains("emc-gateway") and (contains("withemc") | not)) ) | .id'
+    }
 }
 ##
 # if isIReally && isKitty ; then
@@ -105,6 +109,13 @@ function kitty-launch-emc() {
     ##
 }
 alias kemc='kitty-launch-emc'
+
+aliasfn withemc1 'EMACS_SOCKET_NAME="$EMACS_ALT1_SOCKET_NAME" emacs_night_server_name="$EMACS_ALT1_SOCKET_NAME"' reval
+function kemc1 {
+    # withemc1 kemc "$@"
+    ##
+    kitty-remote launch '--type=tab' "${commands[zsh]}" -c 'withemc1 emc-gateway'
+}
 ##
 function kitty-launch-icat() {
     ##

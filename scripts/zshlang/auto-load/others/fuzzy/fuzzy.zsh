@@ -235,4 +235,5 @@ function fzinw() {
     res="$(iaIFS=$' \t\n\C-@'"'"'(){}"[]' inargss arrN | fzp "$q")" || return 1
     ec-copy "$res"
 }
+aliasfn ffin-words fzinw
 ##

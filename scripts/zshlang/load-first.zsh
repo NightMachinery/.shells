@@ -8,7 +8,7 @@ source-basic() {
 }
 source-basic basic
 # malice is the alias module. :D
-source-basic variables magicmacros cached conditions crossplatform args colors debug text-manipulation ssh malice history eval enhancers redirections functional macros redis
+source-basic variables compatibility magicmacros cached conditions crossplatform args colors debug text-manipulation ssh malice history eval enhancers redirections functional macros redis
 for i in "$NIGHTDIR"/zshlang/basic/auto-load/**/*.zsh(.) ; do
     source "$i"
 done

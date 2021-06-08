@@ -77,13 +77,18 @@ function h_org_unt {
 }
 
 function links2org-dir {
+    # @examples
+    # `links2org-dir ./posts/ ./analysis/links-by-frequency.txt`
+    ##
     local dir="${1}" o="${2}"
 
     assert-args dir o @RET
 
-    rget "$nightUrlRegex" "$dir" | unalix | prefixer --skip-empty | by-freq --reverse > "$o" @RET
+    assert ensure-dir "$o" @RET
 
-    cat "$o" | awkn 2 | ghead -n 3000 | parallel_jobs=0 para -k h_org_unt ::: > "${o:r}.org"
+    rget "$nightUrlRegex" "$dir" | unalix | prefixer --skip-empty | by-freq --reverse > "$o" @TRET
+
+    cat "$o" | awkn 2 | ghead -n 3000 | parallel_halt='soon,fail=5%' parallel_jobs=100 para -k h_org_unt ::: > "${o:r}.org" || ectrace "$0: failed"
 
     notif "finished org-links-by-freq $(retcode 2>&1)"
 }

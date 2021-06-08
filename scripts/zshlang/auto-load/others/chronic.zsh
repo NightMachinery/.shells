@@ -4,7 +4,15 @@ function chronic-all() {
     chronic-backup
     chronic-update
     chronic-anticreep
+    chronic-certs
 }
+
+function chronic-certs {
+    if test -d ~/.znc ; then
+        assert cat $HOME/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/irc*.lilf.ir/*.(key|crt) > ~/.znc/znc.pem @RET
+    fi
+}
+
 function chronic-update() {
     brew update
     re 'brew upgrade' googler
