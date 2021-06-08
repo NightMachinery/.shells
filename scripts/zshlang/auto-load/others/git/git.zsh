@@ -463,3 +463,11 @@ function git-pristine() {
 }
 
 ##
+function gp-incremental {
+  local i
+  for i in $@ ; do
+    reval-ec ga "$i"
+    git_commitmsg_ask=n gsync_noadd=y gsync "$0: $i"
+  done
+}
+##

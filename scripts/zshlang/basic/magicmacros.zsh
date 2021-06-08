@@ -6,7 +6,7 @@ alias -g ......='../../../../..'
 
 alias -g '@f'=' | inargsf rgeval '
 alias -g '@ff'=' | fz | inargsf rgeval '
-alias -g '@w'=' | fzinw rgeval '
+alias -g '@w'=' | fzinw | inargsf rgeval '
 ##
 # alias -g 'MAGIC'='| { eval "$(read -d "" -r -E)" }'
 alias -g 'MAGIC'='| { eval "$(< /dev/stdin)" }'

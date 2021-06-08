@@ -19,7 +19,6 @@ alias norg="gron --ungron"
 alias ungron="gron --ungron"
 alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
-alias nn='LESS="-RiN" nnn -d'
 alias bat='bat --theme OneHalfLight --pager="less -FRXn"'
 alias bt='bat --style=plain'
 alias btz='bt --language zsh'

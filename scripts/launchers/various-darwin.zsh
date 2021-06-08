@@ -28,8 +28,10 @@ tmuxnewsh2 shared_ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56
 # needs to run by cron # tmux new -d -s books "$NIGHTDIR/zshlang/book-checker.zsh"
 
 ###
-# tmuxnew v2ray v2ray -config /Users/evar/cellar/notes/private/configs/zii/v2ray/v1.zii.json
-
+# tmuxnew v2ray v2ray -config $nightNotes/private/configs/zii/v2ray/v1.zii.json
+##
+# tmuxnew v2ray-behy v2ray -config $nightNotes/private/configs/behy/v2ray/client.json
+##
 # orig 1080
 tmuxnew naive-zii naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.zii.lilf.ir" --log  --concurrency=4
 

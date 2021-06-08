@@ -16,7 +16,8 @@ if test -z "$NIGHTDIR" ; then
 fi
 ##
 # export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
-export EMACS_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server"
+export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
+EMACS_ALT1_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server_alt1"
 ###
 if true ; then # ! command -v brew &> /dev/null ; then
     # Sometimes brew itself is in path but its dirs are not.

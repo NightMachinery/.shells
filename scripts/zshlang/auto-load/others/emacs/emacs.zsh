@@ -18,9 +18,17 @@ function emcpe() {
     bella_zsh_disable1=y
     local fz_opts=( $fz_opts[@] -1 )
     # ffkill -SIGUSR2 \'emacs \'daemon
-    ffkill -SIGUSR2 emacs daemon
+    ffkill -SIGUSR2 emacs daemon '!alt'
     emacsclient -e '(setq debug-on-quit nil)'
 }
+alias pe='emcpe'
+alias pe2='redo2 10 reval-timeout 1 emcpe'
+
+function emc-kill {
+    ffkill -9 emacs daemon '!alt' '!emacsclient'
+}
+alias pek='emc-kill'
+##
 function emn() {
     bella_zsh_disable1=y
     emc-gateway -e '(helm-man-woman "")' # can't input to helm using its arg. why?
@@ -55,7 +63,22 @@ aliasfn emc-open bicon-emc
 alias emc='emc-open'
 function emc-gateway() {
     bella_zsh_disable1=y
-    fnswap isI true tty-title emacs
+
+    local title=emacs
+    if test -n "$emacs_night_server_name" ; then
+        title="${emacs_night_server_name:t}"
+        if [[ "$title" == 'server_alt1' ]] ; then
+            title="IRC"
+        fi
+
+    fi
+    if test -z "$title" ; then
+        title='emc'
+    fi
+
+    fnswap isI true tty-title "$title"
+
+
     local my_term="$TERM"
     if isKitty || isiTerm ; then
         my_term='xterm-24bits'
@@ -246,4 +269,7 @@ function emc-html-viewer() {
     emc "$tmp"
 }
 ##
+function irc-sees {
+    indir "${nightNotes}/private/configs/zii/.znc/moddata/log/greyrat/" seesall "$@"
+}
 ##

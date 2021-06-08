@@ -100,7 +100,23 @@ function ziib-all() {
         mkdir -p .thelounge
         assert scp root@51.178.215.202:/home/zii/.thelounge/config.js ./.thelounge/
         assert scp -r root@51.178.215.202:/home/zii/.thelounge/users ./.thelounge/
+    } always { popf }
 
+    reval-ec ziib-znc
+}
+
+function ziib-znc {
+    assert-net @RET
+
+    assert pushf $nightNotes/private/configs/zii/ @RET
+    {
+        # ZNC
+        assert reval-ec rsp-dl root@51.178.215.202:/home/zii/.znc ./ # includes logs
+        # trs ./.znc/moddata/log || true # chat logs
+        trs ./.znc/modules/ || true # the external, binary modules
+        trs ./.znc/znc.pem || true # the SSL certs
+        # @note I've also added these deleted files to the =.gitignore= file, to avoid race conditions
     } always { popf }
 }
+
 ###
