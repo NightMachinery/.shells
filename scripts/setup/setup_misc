@@ -6,9 +6,9 @@ tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
 curl https://cht.sh/:cht.sh > ~/bin/cht.sh
 chmod +x ~/bin/cht.sh
 ###
-conda install -c eumetsat expect
-conda install -c plotly plotly-orca # also can be installed via npm
-conda install -c numba icc_rt
+conda install -y -c eumetsat expect
+conda install -y -c plotly plotly-orca # also can be installed via npm
+conda install -y -c numba icc_rt
 ##
 gem specific_install -l https://github.com/NightMachinary/fyodor.git
 ##

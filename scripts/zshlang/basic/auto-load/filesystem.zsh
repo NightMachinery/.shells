@@ -55,7 +55,10 @@ reify ensure-dir
 function lnrp() {
     local f="${1:?}" d="${2:?}"
 
-    ln -i -s "$(realpath2 "$f")" "$d"
+    local i
+    i="$(realpath2 "$f")" @TRET
+
+    ln -i -s "$i" "$d"
 }
 function rmdir-empty() {
     : "Removes all recursively empty directories from <root-dir>"

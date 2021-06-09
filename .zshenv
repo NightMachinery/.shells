@@ -58,9 +58,12 @@ isNotExpensive || {
         NIGHT_NO_EXPENSIVE=y
     }
     function realpath2() {
-        test -e "$1" && realpath "$1" || {
-                (( ${+commands[$1]} )) && realpath "${commands[$1]}"
+        test -e "$1" && realpath -e "$1" || {
+                (( ${+commands[$1]} )) && realpath -e "${commands[$1]}"
             }
+        ##
+        # -e, --canonicalize-existing: all components of the path must exist
+        ##
     }
     function rp() {
         realpath2 "$@"

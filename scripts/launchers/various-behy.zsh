@@ -6,7 +6,9 @@ tmuxnew () {
     tmux new -d -s "$@"
 }
 ##
-tmuxnew ss ss-server -c /root/ss.json
+tmuxnew redis redis-server
+##
+tmuxnew ss sudo ss-server -c /root/ss.json
 # @reboot tmux new -d -s ss ss-server -c /root/ss.json
 ##
 tmuxnew caddy-serve caddy run --config /home/walle/Caddyfile
