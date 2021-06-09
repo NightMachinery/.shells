@@ -124,7 +124,9 @@ function ffz-get() {
             list_dirs_d=3 list-dirs "$PWD"
             # 'list_dirs_d=3 time2 silence list-dirs ~/' takes 0.12s, using depth=4 takes 0.28s
 
-            list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads # takes ~0.2s
+            list_dirs_d=3 list-dirs ~/Downloads
+
+            list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls # takes ~0.2s
             memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
             true
             } | fzp "$query " | ghead -n 1 || retcode)" ||  {
