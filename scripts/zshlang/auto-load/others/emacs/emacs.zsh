@@ -197,14 +197,18 @@ function lisp-quote() {
 aliasfn emc-quote lisp-quote
 ##
 function emc-nowait2() {
-    local f="$1"
+    local f="$1" cmd="${emc_nowait2_cmd:-find-file}"
     assert-args f @RET
     f="$(grealpath -e "$f")" @TRET
     
-    emc-eval "(find-file $(emc-quote "$f"))"
+    emc-eval "(${cmd} $(emc-quote "$f"))"
     # throws useless error 'Invalid read syntax: "#"', but works anyway
 
     emc-focus
+}
+
+function emc-literally {
+    @opts cmd find-file-literally @ emc-nowait2 "$@"
 }
 ##
 function emc-less() {
