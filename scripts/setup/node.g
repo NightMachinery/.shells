@@ -50,3 +50,4 @@ wikit
 youtube-dl-interactive
 zooqle
 composerize
+puppeteer-extra-plugin-user-preferences

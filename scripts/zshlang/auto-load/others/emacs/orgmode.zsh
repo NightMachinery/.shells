@@ -88,7 +88,7 @@ function links2org-dir {
 
     rget "$nightUrlRegex" "$dir" | unalix | prefixer --skip-empty | by-freq --reverse > "$o" @TRET
 
-    cat "$o" | awkn 2 | ghead -n 3000 | parallel_halt='soon,fail=5%' parallel_jobs=100 para -k h_org_unt ::: > "${o:r}.org" || ectrace "$0: failed"
+    cat "$o" | awkn 2 | ghead -n 3000 | parallel_halt='soon,fail=99%' parallel_jobs=100 para -k h_org_unt ::: > "${o:r}.org" || ectrace "$0: failed"
 
     notif "finished org-links-by-freq $(retcode 2>&1)"
 }
