@@ -1,5 +1,20 @@
 #!/usr/bin/env zsh
+##
 tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
+# https://www.gnu.org/software/emacs/manual/html_node/efaq/Colors-on-a-TTY.html
+#
+# https://gist.github.com/algal/9fc1d9a1b3f35f84e94937eef90887c7
+# if your system already has the terminal
+# type `xterm-direct` installed (which you can check with `toe -a`),
+# then you can get 24 bit color by setting the environment
+# variable `TERM=xterm-direct` before running emacs.
+#
+# ❯ TERM=xterm-direct emacsclient -t
+# *ERROR*: Cannot open terminfo database file
+# https://emacs.stackexchange.com/questions/51100/emacs-cannot-open-terminfo-database-file
+# https://github.com/kovidgoyal/kitty/issues/423
+# The way to test if terminfo is accessible is to run `TERM=xterm-direct infocmp`. If it outputs the terminal description, it is accessible. If it does not then you have to install it. On local machines it is always accessible, since kitty sets the TERMINFO env var to its location, unless you override the TERMINFO env var in your shell startup scripts.
+##
 
 # git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
 

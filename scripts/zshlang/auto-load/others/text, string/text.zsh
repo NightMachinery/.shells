@@ -105,6 +105,12 @@ function char2unicode() {
     # UTF-8
     perl -CA -le 'print ord shift' "$1"
 }
+function char2octal {
+    perl -e '(printf "%o\n", ord $_) foreach @ARGV' "$@"
+}
+function char2hex {
+    perl -e '(printf "0x%X\n", ord $_) foreach @ARGV' "$@"
+}
 function unicode2char() {
     # works with emojis
     printf "\U$(printf %08x "${1}")\n"

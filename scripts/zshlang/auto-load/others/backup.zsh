@@ -119,4 +119,28 @@ function ziib-znc {
     } always { popf }
 }
 
+### behy
+function backup-behy-all() {
+    assert-net @RET
+
+    local ip=51.89.107.137
+
+    assert pushf $nightNotes/private/configs/behy/ @RET
+    {
+        assert reval-ec ssh "walle@$ip" crontab -l > ./crontab
+
+        assert reval-ec rsp-dl "walle@$ip":/home/walle/Caddyfile .
+        assert reval-ec rsp-dl "walle@$ip":/home/walle/.privateShell .
+
+        mkdir -p v2ray
+        assert reval-ec rsp-dl "walle@$ip":/usr/local/etc/v2ray/config.json ./v2ray/
+
+        mkdir -p trojan
+        assert reval-ec rsp-dl "walle@$ip":/usr/local/etc/trojan/config.json ./trojan/
+    } always { popf }
+}
 ###
+function backup-vimium {
+    assert reval-ec mv ~dl/vimium_c*.json ~nt/private/backups/'Vimium C'/vimium_c.json @RET
+}
+##
