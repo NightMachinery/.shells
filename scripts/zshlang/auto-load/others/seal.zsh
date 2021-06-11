@@ -110,6 +110,7 @@ exor() {
             cat -v <<<"$i"
             # sd --string-mode "$i" '' "$attic" #--flags m 
             FROM="$i" perl -0777 -pi -e 's/(|\A)\Q$ENV{FROM}\E(?<sep>|\Z)/$+{sep}/gm' "$attic"
+            # -0: Any octal value of 400 and above will cause the entire input to be slurped as a single string. Idiomatically, 777 is used. This is same as setting $/ = undef. (https://learnbyexample.github.io/learn_perl_oneliners/record-separators.html)
             # comment "This actually doesn't do the 'g' part completely. It removes some occurences, but not all."
             # comment "because each replacement eats both the NUL before and after the match, so when perl resumes searching for the next match, it won't find the immediately following match because of NUL before it missing. You'd need to use a look-ahead operator that don't eat the NULs but still check they're there."
             # FROM="$i" perl -0lni -e 'print if $_ ne $ENV{FROM}' -- "$attic"

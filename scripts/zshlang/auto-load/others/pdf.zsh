@@ -133,3 +133,39 @@ function pdf-compress-gray() {
         -sOutputFile="$out" "$input"
 }
 ##
+function pdf-numberme {
+    ensure-dep1 pdftk brew install pdftk-java @RET
+    ##
+    local input output
+    input="$1"
+    output="${1%.pdf}-header.pdf"
+
+    local pagenum
+    pagenum=$(pdftk "$input" dump_data | grep "NumberOfPages" | cut -d":" -f2)
+
+    {
+        # enscript -L1 --header='||Page $% of $=' --output - < <(for i in $(seq "$pagenum"); do echo; done) | ps2pdf -
+        # adds the page numbers to the top right
+        ##
+        # a page size of 595x842 PostScript points (a.k.a. A4 size), and the font Helvetica in 12 pt size
+        local x y
+        x=$(( int(595 / 2) - 35 ))
+        y=60 # 0 is the bottom
+
+        command gs -o -    \
+            -sDEVICE=pdfwrite        \
+            -g5950x8420              \
+            -c "/Helvetica findfont  \
+            12 scalefont setfont \
+            1 1  ${pagenum} {      \
+            /PageNo exch def     \
+            ${x} ${y} moveto        \
+            (Page ) show         \
+            PageNo 3 string cvs  \
+            show                 \
+            ( of ${pagenum}) show  \
+            showpage             \
+            } for"
+    } | pdftk "$input" multistamp - output $output
+}
+##
