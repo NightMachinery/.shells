@@ -1,6 +1,6 @@
 ### set max open files, etc
 # The "hard limit" (`-H`) could also be set, but only to a value less than the current one, and only to a value not less than the "soft limit" (`-S`).
-ulimit -S -n 50000 || ulimit -S -n 10240
+ulimit -S -n 50000 >&/dev/null || ulimit -S -n 10240 # the first one fails on a non-configured macOS
 ##
 maxproc="$(ulimit -Hu)" # local not allowed on some shells
 maxproc=$(( maxproc - 100 )) # give some slack to the OS
@@ -75,8 +75,9 @@ isDarwin && {
     export ELM_HOME="/usr/local/bin/"
 
     # Use `brew info openjdk` to link java properly.
-    export JAVA_HOME15="`/usr/libexec/java_home --version 15`"
-    export JAVA_HOME=$JAVA_HOME15
+    # export JAVA_HOME15="$(/usr/libexec/java_home --version 15)"
+    # export JAVA_HOME=$JAVA_HOME15
+    export JAVA_HOME="$(/usr/libexec/java_home)"
     addToPATH $JAVA_HOME
 
     export ANDROID_SDK_ROOT="$HOME/Library/Android/sdk"
