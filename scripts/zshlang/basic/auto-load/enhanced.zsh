@@ -1,7 +1,7 @@
 re 'self-enh enh-mkdest' ln
 ##
 cp() {
-    local emd_c='command gcp'
+    local emd_c='command gcp --reflink=auto' # --reflink=auto does copy-on-write copies
     enh-mkdest "$@"
 }
 ##

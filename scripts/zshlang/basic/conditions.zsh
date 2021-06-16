@@ -60,11 +60,17 @@ function isTmux() {
     test -n "$TMUX"
 }
 ##
+function isGuest {
+    [[ "$(hostname)" == 'amadeus.local' ]]
+}
+##
 function isKitty() {
-    true # @surprise
-    
-    # test -n "$KITTY_WINDOW_ID"
-    # the var can be set incorrectly in tmux
+    if  isGuest || ( isLocal && ! isTmux ) ; then
+        test -n "$KITTY_WINDOW_ID"
+        # the var can be set incorrectly in tmux
+    else
+        true # @surprise
+    fi
 }
 iskitty() { isKitty "$@" ; }
 function isAppleTerminal() {

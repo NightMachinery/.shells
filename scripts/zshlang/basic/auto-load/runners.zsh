@@ -134,21 +134,23 @@ function env-clean() {
     @opts clean y @ reval-env "$@"
 }
 ##
-function sudo() {
-    unset -f sudo
-    if [[ "$(uname)" == 'Darwin' ]] ; then
-        if ! command grep 'pam_tid.so' /etc/pam.d/sudo --silent; then
-            # Enables touch ID for sudo:
-            command sudo sed -i -e '1s;^;auth       sufficient     pam_tid.so\n;' /etc/pam.d/sudo
-        fi
-        if ! command grep 'pam_reattach.so' /etc/pam.d/sudo --silent; then
-            # needs https://github.com/fabianishere/pam_reattach
-            # Reattach to the user's GUI session on macOS during authentication (for Touch ID support in tmux)
-            command sudo sed -i -e '1s;^;auth     optional     pam_reattach.so\n;' /etc/pam.d/sudo
-        fi
-    fi
-    command sudo "$@"
-}
+# function sudo() {
+#     unset -f sudo
+#     if [[ "$(uname)" == 'Darwin' ]] ; then
+#         # @warn these corrupted /etc/pam.d/sudo on Aeirya's computer. Add the lines manually and keep the editor open. It's not trivial to fix a broken PAM file. (https://superuser.com/questions/1368246/accidentally-added-a-character-outside-of-a-comment-in-sudo-file-on-mac-sudo-no)
+#         if ! command grep 'pam_tid.so' /etc/pam.d/sudo --silent; then
+#             # Enables touch ID for sudo:
+#             command sudo sed -i -e '1s;^;auth       sufficient     pam_tid.so\n;' /etc/pam.d/sudo
+#         fi
+#         if ! command grep 'pam_reattach.so' /etc/pam.d/sudo --silent; then
+#             # needs https://github.com/fabianishere/pam_reattach
+#             # Reattach to the user's GUI session on macOS during authentication (for Touch ID support in tmux)
+#             command sudo sed -i -e '1s;^;auth     optional     pam_reattach.so\n;' /etc/pam.d/sudo
+#         fi
+#     fi
+#     command sudo "$@"
+# }
+##
 function sud() {
     ## test
     # alias bb='bash -c'
