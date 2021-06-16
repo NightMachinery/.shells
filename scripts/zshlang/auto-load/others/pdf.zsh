@@ -138,7 +138,9 @@ function pdf-numberme {
     ##
     local input output
     input="$1"
-    output="${1%.pdf}-header.pdf"
+    output="${2:-${1:r}_numbered.pdf}"
+    [[ "$output" == *.pdf ]] || output+='.pdf'
+    assert-args input @RET
 
     local pagenum
     pagenum=$(pdftk "$input" dump_data | grep "NumberOfPages" | cut -d":" -f2)
@@ -166,6 +168,6 @@ function pdf-numberme {
             ( of ${pagenum}) show  \
             showpage             \
             } for"
-    } | pdftk "$input" multistamp - output $output
+    } | pdftk "$input" multistamp - output $output # will overwrite the output
 }
 ##

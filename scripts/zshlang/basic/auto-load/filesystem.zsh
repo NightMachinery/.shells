@@ -83,6 +83,8 @@ function append-f2f() {
 ##
 function  mv-merge() {
     # https://unix.stackexchange.com/questions/127712/merging-folders-with-mv/172402
+    # https://unix.stackexchange.com/questions/654481/gnu-cp-whats-the-difference-between-link-and-reflink-always
+    ##
     local paths=() i opts_end
     for i in "$@" ; do
         if [[ -n "$opts_end" || "$i" != '-'* ]] ; then
