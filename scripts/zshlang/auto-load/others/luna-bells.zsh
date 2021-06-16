@@ -468,7 +468,7 @@ function bell-ringer() {
 function bell-lm-maker() {
     local name="${1}" fs=("${@[2,-1]}")
 
-    if isServer ; then
+    if isServer || ! test -e "$GREENCASE_DIR" ; then
         fndef "bell-lm-$name" true
     else
         assert-args name fs @RET
@@ -487,7 +487,7 @@ function bell-lm-maker() {
 function bell-lm-maker-dir() {
     local name="${1}" f="${2}"
 
-    if isServer ; then
+    if isServer || ! test -e "$GREENCASE_DIR" ; then
         fndef "bell-lm-$name" true
     else
         assert-args name f @RET
