@@ -118,7 +118,7 @@ function kemc1 {
 }
 ##
 function kitty-launch-icat() {
-    ##
+    ## use this for troubleshooting:
     # kitty @ launch --type=tab env PATH="$PATH" "$(which wait4user.sh)" "$(which kitty)" +kitten icat "$@"
     # @raceCondition sometimes this does not work, no idea why
     ##
@@ -128,7 +128,7 @@ function kitty-launch-icat() {
     done
 
     # @see icat-kitty-single
-    revaldbg kitty-remote launch --type=overlay "$(which kitty)" +kitten icat --hold --place "${COLUMNS}x${LINES}@0x0" --scale-up "$fs[@]"
+    revaldbg serrdbg kitty-remote launch --type=overlay env PATH="$PATH" "$(which kitty)" +kitten icat --hold --place "${COLUMNS}x${LINES}@0x0" --scale-up "$fs[@]"
     ##
 }
 ##

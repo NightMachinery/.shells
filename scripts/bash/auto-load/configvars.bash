@@ -11,7 +11,7 @@ export DING="$GREENCASE_DIR/LittleMisfortune/flac/26.1_16_MI_thetrainishere..blu
 # unsupported key: ctrl-enter
 export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-s:select-all,alt-enter:print-query' --color=light --multi --hscroll-off 99999"
 ##
-export FZF_DEFAULT_COMMAND="fd --hidden" # fzf runs this when input is a tty
+export FZF_DEFAULT_COMMAND="fd --hidden --follow" # fzf runs this when input is a tty
 export SHELL=/bin/dash #"${commands[dash]}" # fzf uses this shell to run the default command
 # It might be problematic to set SHELL, but who knows ...
 export FZF_SHELL="$SHELL" # night.sh's variable

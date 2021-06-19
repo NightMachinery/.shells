@@ -1,7 +1,7 @@
 function sly-doc-oneline() {
     local doc="$1"
 
-    doc="$(ecn "$doc" | gsed '4,$p' | gtr $'\n' " ")"
+    doc="$(ecn "$doc" | gsed -n '5,$p' | gtr $'\n' " ")"
 
     if [[ "$doc" =~ '\s*Documentation:\s+(.*)' ]] ; then
         doc="$match[1]"
