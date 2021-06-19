@@ -538,7 +538,7 @@ function reval-bell() {
             reval "$@"
         )
     } always {
-        silent reval "$bell[@]"
+        bell_awaysh=n silent reval "$bell[@]" # bell_awaysh seems to not work when we use 'xl', idk why
     }
 }
 aliasfn reval-bell-lm-mhm @opts bell bell-lm-mhm @ reval-bell

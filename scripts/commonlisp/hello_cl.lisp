@@ -1,7 +1,19 @@
 #!/usr/bin/env -S sbcl --script
 
+
 (write-line "Hello CL!")
 
+;;;
+(let ((init-file (merge-pathnames ".sbclrc"
+                                       (user-homedir-pathname))))
+  (when (probe-file init-file)
+    (load init-file)))
+
+(ql:system-apropos "jzon")
+(ql:system-apropos "heredoc")
+(ql:system-apropos "alexandria")
+(ql:quickload "alexandria")
+(alexandria:read-stream-content-into-string)
 ;;; @broken
 (defun find-symbol-or-lose (name &optional package)
   (if package

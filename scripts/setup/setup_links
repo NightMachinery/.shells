@@ -32,6 +32,7 @@ lnrp bicon_zsh.dash /usr/local/bin/
 
 lnrp ffscrollback.sh /usr/local/bin/
 lnrp emacs_scrollback.sh /usr/local/bin/
+lnrp wait4user.sh /usr/local/bin/
 
 lnrp brishz.dash /usr/local/bin/
 lnrp brishz2.dash /usr/local/bin/

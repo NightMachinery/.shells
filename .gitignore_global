@@ -1,6 +1,8 @@
 # -*- mode: gitignore; -*-
 
 ## My own
+**/*..nogit..*
+
 *.pbak
 
 # python

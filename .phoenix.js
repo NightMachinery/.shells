@@ -71,7 +71,8 @@ quakeApp({
   // position: topHalf,
   position: full,
   followsMouse: true,
-  hideOnBlur: false, // false for sudo prompts
+  // hideOnBlur: false, // set to false for sudo prompts
+  hideOnBlur: true, // set to true for opening URLs easily
   preCommands: [
     // ["kitty_focused_set", "1"],
   ],

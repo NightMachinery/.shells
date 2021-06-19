@@ -1,9 +1,15 @@
+function epub2org() {
+    @opts from epub to org trim_extra n @ pandoc-convert "$@"
+}
+
 function md2org() {
     @opts from markdown to org @ pandoc-convert "$@"
 }
+
 function org2md() {
     @opts from org to markdown @ pandoc-convert "$@"
 }
+
 function html2org() {
     local input="${1}"
     if test -z "$input" ; then
@@ -13,8 +19,9 @@ function html2org() {
 
     @opts from html to org @ pandoc-convert "$input" "${@[2,-1]}"
 }
+
 function pandoc-convert() {
-    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}"
+    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra-y}"
     assert-args from to @RET
 
     if test -z "$input" ; then
@@ -24,7 +31,20 @@ function pandoc-convert() {
     tmp_o="$(gmktemp)" @TRET
 
 
-    pandoc --wrap=none --from "$from" --to "$to" "$input" -o "-" | pandoc-normalize-whitespace > "$tmp_o" @TRET
+    pandoc --wrap=none --from "$from" --to "$to" "$input" -o "-" | {
+        if [[ "$to" == org ]] ; then
+            pandoc-normalize-whitespace | {
+                if bool $trim_extra ; then
+                    perl -0777 -pe 's/(?:\n|\A)\h*(?:(?::PROPERTIES:(?:.|\n)*?:END:)|(?:<<.*?>>))\h*//g'
+                    # [[nightNotes:private/playgrounds/pandoc.zsh::perl -0777 -pe][perl]]
+                else
+                    cat
+                fi
+            }
+        else
+            cat
+        fi
+    } > "$tmp_o" @TRET # noflycheck
 
     if [[ "$output" != '-' ]] ; then
         assert command mv "$tmp_o" "$output" @RET
@@ -39,6 +59,8 @@ function pandoc-convert() {
 function pandoc-normalize-whitespace() {
     gsed 's/ / /g'
     # pandoc uses some bad whitespace that cannot be read by org-mode
+    #
+    # https://superuser.com/questions/517847/use-sed-to-replace-nbsp-160-hex-00a0-octal-240-non-breaking-space
 }
 
 ## Deprecated as html2org does this already:

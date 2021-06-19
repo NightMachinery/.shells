@@ -55,6 +55,10 @@ function ot-rep() {
     #     ot-loadovertone
     # fi
     ##
+    if isServer || isGuest ; then
+        return 0
+    fi
+
     local code="$(in-or-args "$@")"
     local cmd=(rep --port "$OVERTONE_PORT" "$code")
     local noretry="$ot_rep_noretry"

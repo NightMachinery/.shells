@@ -1421,7 +1421,7 @@ noglobfn readmoz-mdarc
 
 function readmoz-md() {
     local url="$1"
-    local format="${readmoz_md_to:-md}"
+    local format="${readmoz_md_to:-markdown}"
     assert-args url @RET
 
     local tmp
