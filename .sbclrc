@@ -7,3 +7,58 @@
     (load quicklisp-init)))
 ;;;
 (setf sb-impl::*default-external-format* :utf-8)
+;;;
+(defmacro comment (&rest ignored)
+  nil)
+;;;
+(defun concat (&rest strings)
+  "@example (concat \"hi \" \"hmm \" \"()\")"
+  (apply #'concatenate 'string strings))
+;;;
+(defstruct cmd-result
+  out
+  outrs
+  err
+  retcode
+  prc)
+
+(defun brishz-ll (&key (session "") (input nil) args)
+  "brishz low-level API."
+  (let* (
+         (out (make-array '(0) :element-type 'base-char
+                               :fill-pointer 0 :adjustable t))
+         (err (make-array '(0) :element-type 'base-char
+                               :fill-pointer 0 :adjustable t))
+         (input (cond
+                  ((stringp input)
+                   ;; @placeholder convert input to a stream
+                   (make-string-input-stream input))
+                  (t input)))
+         (res
+           (with-output-to-string (out-stream out)
+             (with-output-to-string (err-stream err)
+               (run-program "/usr/local/bin/brishzq.zsh" args
+                            :output out-stream :error err-stream
+                            :input input
+                            :environment (list
+                                          (format nil "brishz_session=~a" session)
+                                          (format nil "brishz_in=~a"
+                                                  (if input
+                                                      "MAGIC_READ_STDIN"
+                                                      ""))))))))
+    (make-cmd-result :out out :outrs (string-right-trim
+                                      '(#\Newline)
+                                      ;; '(#\Space #\Tab #\Newline)
+                                      out) :err err :retcode (process-exit-code res) :prc res)))
+
+(defun brishz (&rest args)
+  (brishz-ll :args args))
+
+(comment
+  (with-input-from-string (i (format nil "1. bat~%2.fruit~%3. end"))
+    (brishz-ll :args '("eval" "ec hi ; cat >&2") :session "emacs" :input i))
+
+  (brishz-ll :args '("eval" "ec hi ; cat >&2") :session "emacs" :input "wow")
+
+  (brishz "eval" "ec hi ; ecerr warning ; return 56"))
+;;;

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S sbcl --script
 
-(defvar repl-mode nil)
+(defparameter repl-mode nil)
 ;; (setq repl-mode t)
 ;;;
 (let ((init-file (merge-pathnames ".sbclrc"
@@ -17,12 +17,12 @@
   (ql:quickload "cl-heredoc"))
 
 (set-dispatch-macro-character #\# #\> #'cl-heredoc:read-heredoc)
-;; (defvar in #>eof>Write whatever (you) "want",
+;; (defparameter in #>eof>Write whatever (you) "want",
 ;;   no matter how many lines or what characters until
 ;; the magic end sequence has been reached!eof)
 ;;;
 (if repl-mode
-    (defvar in #>eof666>{
+    (defparameter in #>eof666>{
           "ao3categories":"F/M, Gen",
           "author":"IAM_Kneazle (writing_as_tracey), writing_as_tracey",
           "authorHTML":"<a class='authorlink' href='https://archiveofourown.org/users/writing_as_tracey/pseuds/IAM_Kneazle'>IAM_Kneazle (writing_as_tracey)</a>, <a class='authorlink' href='https://archiveofourown.org/users/writing_as_tracey/pseuds/writing_as_tracey'>writing_as_tracey</a>",
@@ -297,35 +297,58 @@
           }
           eof666)
 
-    (defvar in (alexandria:read-stream-content-into-string *standard-input*)))
+    (defparameter in (alexandria:read-stream-content-into-string *standard-input*)))
 
-(defvar d (jsown:parse in))
+(defparameter d (jsown:parse in))
 ;; (serapeum:defalias v #'jsown:val-safe)
 (defun v (key)
   (jsown:val-safe d key))
 ;;;
 ;; (v "author")
-;; (defvar author (v "author"))
+;; (defparameter author (v "author"))
 
 (progn
   (write-line (concatenate 'string
                            "[[" (v "storyUrl") "]["
-                           (v "title")  ;; @todo use str2orgtitle
+                           (cmd-result-outrs
+                            (brishz-ll :args '("str2orgtitle")
+                                       :input (v "title")))
                            "]]"))
   (format *standard-output* ":PROPERTIES:~%")
-  (dolist (p '("author" "authorUrl" "series" "status" "numWords" "chapterslashtotal" "datePublished" "dateUpdated" "hits" "kudos" "ships" "fandoms" "ao3categories" "freeformtags" "genre" "rating" "characters" "storyId"))
+  (dolist (p '("author" "authorUrl"
+               "series" "seriesUrl"
+               "status" "numWords" "chapterslashtotal" "numChapters"
+               "datePublished" "dateUpdated"
+               "stars" "likes" "dislikes" "kudos" "reviews" "favs" "follows"
+               "views" "total_views" "hits"
+               "ships"
+               "fandoms"
+               "ao3categories"
+               "freeformtags" "genre" "extratags" ;; `freefromtags' is a compat-shim for `freeformtags'
+               "rating"
+               "characters"
+               "short_description"
+               "groups"
+               "prequel" "sequels"
+               ;; "comment_count"
+               "authorLastLogin"
+               "storyId"
+               "cover_image"))
     (let ((val (v p)))
       (when (and val (not (equalp val "")))
         (format *standard-output* "~a" (concatenate 'string
                                                     ":" p ": "
                                                     val ;; @assumes val contains no newlines
-                                                    (string  #\newline))))))
+                                                    (string #\newline))))))
   (format *standard-output* ":visibility: folded~%")
   (write-line ":END:")
   (let ((desc (v "description")))
     (when desc
-      (format *standard-output* "~%#+BEGIN_EXPORT html~%~a~%#+END_EXPORT~%"
-              desc
-              ;; @todo0 convert this from HTML to org
-              ))))
+      (format *standard-output*
+              "~%#+BEGIN_QUOTE~%~a~%#+END_QUOTE~%"
+              (cmd-result-outrs (brishz-ll :args '("html2org" "/dev/stdin") :input desc)))
+
+      (comment
+        (format *standard-output* "~%#+BEGIN_EXPORT html~%~a~%#+END_EXPORT~%"
+                desc)))))
 ;;;
