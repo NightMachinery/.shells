@@ -29,6 +29,7 @@ function org-update-files-all() {
     # fd --extension org --type f . "$nightNotes" | emc_eval_in=y emc-eval '(apply night/update-files lines)'
     ##
     fd --extension org --extension org_archive --type f . "$nightNotes" | inargsf org-update-files
+    # emc-eval "(org-id-locations-save)" # @idk if this is needed, I think it's done automatically
     ##
     # org-update-files "$nightNotes"/**/*.org
     ##

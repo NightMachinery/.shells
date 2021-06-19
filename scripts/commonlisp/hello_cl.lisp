@@ -5,7 +5,7 @@
 
 ;;;
 (let ((init-file (merge-pathnames ".sbclrc"
-                                       (user-homedir-pathname))))
+                                  (user-homedir-pathname))))
   (when (probe-file init-file)
     (load init-file)))
 
@@ -31,7 +31,8 @@
 
 (let ((res
         (run-program "/usr/local/bin/brishzq.zsh" '("ec" "hello") :output *standard-output*)))
-  (describe res))
+  (describe res)
+  (process-exit-code res))
 
 (let* ((res
          (run-program "/usr/local/bin/brishzq.zsh" '("ec" "hello") :output :stream))
@@ -53,8 +54,7 @@
        (res
          (with-output-to-string (out-stream out)
            (with-output-to-string (err-stream err)
-             (run-program "/usr/local/bin/brishzq.zsh" '("eval" "ec hello && ecerr bad && ec jungle ; bello") :output out-stream :error err-stream))))
-       )
+             (run-program "/usr/local/bin/brishzq.zsh" '("eval" "ec hello && ecerr bad && ec jungle ; bello") :output out-stream :error err-stream)))))
   (concatenate 'string (format nil "out: ~a##~%" out)
-               (format nil "err: ~a##~%" err))
-  )
+               (format nil "err: ~a##~%" err)))
+;;;
