@@ -245,6 +245,12 @@ function emc-less-jq() {
 }
 alias elj="emc-less-jq"
 
+
+function emc-less-org() {
+    @opts s .org @ emc-less "$@"
+}
+alias elo="emc-less-org"
+
 function emc-less-html() {
     # @opts parser html s .html @ emc-less "$@"
     @opts parser HTML s .html @ emc-less "$@"
