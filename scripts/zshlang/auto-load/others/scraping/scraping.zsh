@@ -552,8 +552,11 @@ function web2epub() {
     local strict="$we_strict"
 
     local dled_files=()
+    local urls
     # FNSWAP: urlfinalg
-    for url in "${(@f)$(urlfinalg "${@:2}")}"
+    urls=("${(@f)$(urlfinalg "${@:2}")}") @TRET
+
+    for url in $urls[@]
     do
         local bname="$(url-tail "$url")"  #"${url##*/}"
         #test -z "$bname" && bname="u$i"
@@ -776,9 +779,10 @@ function url-clean-unalix() {
     local opts=()
     if bool $redirects ; then
         opts+='--unshort'
+        # @todo0 @urgent5 -s was removed in the latest version https://github.com/AmanoTeam/Unalix-nim/issues/3
     fi
     {
-        arrN $inargs[@] | url-match-rg | unalix "$opts[@]"
+        arrN $inargs[@] | { url-match-rg || true } | assert unalix "$opts[@]" @RET
         ec
         arrN $inargs[@] | url-match-rg -v
     } | prefixer --skip-empty
@@ -838,7 +842,7 @@ function urlfinalg1() {
         return 0
     }
     local u="$URL"
-    u="$(url-final-google "$u")" @TRET
+    u="$(url-clean-google "$u")" @TRET
 
     url-final "$u" #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
 }

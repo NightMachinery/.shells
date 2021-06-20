@@ -25,9 +25,9 @@
 (defun brishz-ll (&key (session "") (input nil) args)
   "brishz low-level API."
   (let* (
-         (out (make-array '(0) :element-type 'base-char
-                               :fill-pointer 0 :adjustable t))
-         (err (make-array '(0) :element-type 'base-char
+         (out (make-array '(0) :element-type 'extended-char ;; 'character
+                          :fill-pointer 0 :adjustable t))
+         (err (make-array '(0) :element-type 'extended-char
                                :fill-pointer 0 :adjustable t))
          (input (cond
                   ((stringp input)
@@ -46,10 +46,12 @@
                                                   (if input
                                                       "MAGIC_READ_STDIN"
                                                       ""))))))))
-    (make-cmd-result :out out :outrs (string-right-trim
-                                      '(#\Newline)
-                                      ;; '(#\Space #\Tab #\Newline)
-                                      out) :err err :retcode (process-exit-code res) :prc res)))
+    (make-cmd-result :out out
+                     ;; @todo1 make this a method of cmd-result, not a cached property
+                     :outrs (string-right-trim
+                             '(#\Newline)
+                             ;; '(#\Space #\Tab #\Newline)
+                             out) :err err :retcode (process-exit-code res) :prc res)))
 
 (defun brishz (&rest args)
   (brishz-ll :args args))
@@ -58,7 +60,8 @@
   (with-input-from-string (i (format nil "1. bat~%2.fruit~%3. end"))
     (brishz-ll :args '("eval" "ec hi ; cat >&2") :session "emacs" :input i))
 
-  (brishz-ll :args '("eval" "ec hi ; cat >&2") :session "emacs" :input "wow")
+  (brishz-ll :args '("eval" "ec '{}hi[]' ; cat >&2") :session "emacs" :input "wow “The wizards?”")
 
   (brishz "eval" "ec hi ; ecerr warning ; return 56"))
 ;;;
+;; (describe #\LEFT_DOUBLE_QUOTATION_MARK)

@@ -47,7 +47,7 @@
   )
 
 (let* (
-       (out (make-array '(0) :element-type 'base-char
+       (out (make-array '(0) :element-type 'extended-char
                              :fill-pointer 0 :adjustable t))
        (err (make-array '(0) :element-type 'base-char
                              :fill-pointer 0 :adjustable t))
