@@ -5,6 +5,7 @@ function set-defaults() {
     local cf_emacs=org.gnu.Emacs
     local cf_iterm=com.googlecode.iterm2
     local cf_zopen=org.evar.Zopen
+    local cf_mpv='io.mpv'
 
     ## Emacs
     duti -s $cf_emacs "public.plain-text" editor
@@ -45,6 +46,12 @@ function set-defaults() {
     duti -s $cf_zopen "com.yacreader.yacreader.cbz" all
     duti -s $cf_zopen .pdf all
     duti -s $cf_zopen "com.adobe.pdf" all
+    ## mpv
+    duti -s $cf_mpv .mp4 all
+    duti -s $cf_mpv .m4v all
+    duti -s $cf_mpv .mkv all
+    duti -s $cf_mpv .avi all
+    ##
 
 }
 

@@ -2,7 +2,9 @@
 
 
 (write-line "Hello CL!")
-
+;;;
+;; https://lispcookbook.github.io/cl-cookbook/packages.html
+(use-package :ql)
 ;;;
 (let ((init-file (merge-pathnames ".sbclrc"
                                   (user-homedir-pathname))))
@@ -10,6 +12,7 @@
     (load init-file)))
 
 (ql:system-apropos "jzon")
+(system-apropos "json")
 (ql:system-apropos "heredoc")
 (ql:system-apropos "alexandria")
 (ql:quickload "alexandria")
