@@ -120,7 +120,7 @@ function icat() {
     isI || return 0
 
     if (( $#@ == 0 )) ; then
-        local images=( ${~imageglob} *.pdf(N) )
+        local images=( ${~imageglob} *.pdf(Nn) )
         if (( ${#images} )) ; then
             icat "$images[@]"
             return $?

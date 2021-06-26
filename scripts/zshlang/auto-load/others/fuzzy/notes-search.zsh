@@ -308,9 +308,14 @@ function ntsearch-postprocess {
             fi
 
         else
+            ##
             # should work with both emacs and vim
             # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
             # I don't know about opening multiple files on vscode (we can always run the command multiple times)
+            ##
+            # [[id:dc56c812-14ba-4f42-8484-18456dc9132b][vim/tabs.org]]
+            # EDITOR='nvim -p'
+            ##
             local cmd="$EDITOR "
             for i in {1..$#files} ; do
                 cmd+="+${linenumbers[$i]} $(gq "${files[$i]}") "

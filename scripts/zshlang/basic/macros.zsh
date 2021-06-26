@@ -89,7 +89,7 @@ function createglob() {
         ecerr "$0: insuffient arguments supplied. (needs 2)"
         return 1
     }
-    eval $to'="*.(${(j.|.)'$from'})(.DN)"'
+    eval $to'="*.(${(j.|.)'$from'})(.DNn)"' # n sorts numerically: =b-3.png= comes before =b-10.png=
 }
 ##
 function h_@gather() {

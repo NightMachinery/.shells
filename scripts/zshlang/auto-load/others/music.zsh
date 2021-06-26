@@ -127,14 +127,33 @@ playlistc() {
 playlister() {
     bella_zsh_disable1=y
 
-    find-music "$@" | fz -q "'.mp3 | '.m4a | '.flac " #--history "$music_dir/.fzfhist" # -q "$1"
-    comment By adding the extensions to the query, we force it to show paths from the end.
+    local fz_q=''
+    local first=y
+    for ext in $media_formats[@]; do
+        if test -z "$first"; then
+            fz_q+="| "
+        fi
+        fz_q+="'.$ext "
+        first=''
+    done
+    fz_q+=' !workout ' # @personal
+
+    # @warn fzp can cause a broken pipe in non-interactive mode
+    find-music "$@" | fzp --history "$music_dir/.fzfhist" "$fz_q" | sponge
+    # @workaround By adding the extensions to the query, we force it to show paths from the end.
+    # --keep-right: Keep the right end of the line visible when it's too long. Effective only when the query string is empty.
 }
 find-music() {
     bella_zsh_disable1=y
 
     local fd_pat='.'
-    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow -e m4a -e mp3 -e flac --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" | ugbool "$*"
+    local opts=()
+
+    for ext in $media_formats[@] ; do
+        opts+=(-e "$ext")
+    done
+
+    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" | ugbool "$*"
     # Do NOT use --absolute-path, as we want relative-path playlists
 }
 songd() {
