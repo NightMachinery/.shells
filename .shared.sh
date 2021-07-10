@@ -62,13 +62,24 @@ addToPATH ~/.cargo/bin/
 addToPATH ~/bin
 
 ## perl
-addToPATH "${HOME}/perl5/bin"
-PERL5LIB="${HOME}/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
-PERL_LOCAL_LIB_ROOT="${HOME}/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
-PERL_MB_OPT="--install_base \"${HOME}/perl5\""; export PERL_MB_OPT;
-PERL_MM_OPT="INSTALL_BASE=${HOME}/perl5"; export PERL_MM_OPT;
-##
+# [[id:162e013e-ce1b-405a-9d45-e0e223f56d6d][perl/cpanm.org]]
+if false; then
+    ##
+    # can cause a `ListUtil.c: loadable library and perl binaries are mismatched (got handshake key 0xfa80080, needed 0xf880080)` error
+    ##
+    addToPATH "${HOME}/perl5/bin"
+    PERL5LIB="${HOME}/perl5/lib/perl5${PERL5LIB:+:${PERL5LIB}}"; export PERL5LIB;
+    PERL_LOCAL_LIB_ROOT="${HOME}/perl5${PERL_LOCAL_LIB_ROOT:+:${PERL_LOCAL_LIB_ROOT}}"; export PERL_LOCAL_LIB_ROOT;
+    PERL_MB_OPT="--install_base \"${HOME}/perl5\""; export PERL_MB_OPT;
+    PERL_MM_OPT="INSTALL_BASE=${HOME}/perl5"; export PERL_MM_OPT;
+else
+    if isDarwin ; then
+        # addToPATH /usr/local/Cellar/perl/*/bin
 
+        addToPATH /usr/local/Cellar/perl/5.34.0/bin # @hardcoded
+    fi
+fi
+##
 isDarwin && {
     addToPATH /Users/Shared/bin
     export MONO_GAC_PREFIX="/usr/local"

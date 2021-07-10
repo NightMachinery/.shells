@@ -1,4 +1,0 @@
-#!/usr/bin/env zsh
-p2k "$3"
-# \rm -f "$3"
-# \rm -f "${3:r}.mobi"

@@ -13,6 +13,8 @@ function pdc() {
 function ffdict() {
     local q="${*}" engine=("${ffdict_e[@]:-sdc}") autopaste="${ffdict_autopaste}"
 
+    bella_zsh_disable1=y
+
     local w words
     if test -n "$autopaste" && test -z "$q" ; then
         words=("$(strip "$(pbpaste)" '\s+')")
@@ -40,6 +42,7 @@ function wordnet() {
 function ffdict-wn() {
     @opts e wordnet @ ffdict "$@"
 }
+
 aliasfn di ffdict
 aliasfn spi ffdict_e=true ffdict
 aliasfn dwn ffdict-wn
@@ -49,6 +52,6 @@ function sp() {
         spi
         return $?
     fi
-    ispell<<<"$*"
+    arrN "$@" | ispell
 }
 ##

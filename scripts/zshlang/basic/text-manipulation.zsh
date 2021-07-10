@@ -38,3 +38,7 @@ function text-wrap() {
 }
 alias foldm='text-wrap'
 ##
+function erase-nonascii {
+    perl -ple 's/[^[:ascii:]]//g'
+}
+##

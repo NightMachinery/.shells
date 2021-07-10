@@ -81,7 +81,7 @@ function till-file() {
 
     while true ; do
         test -e "$file" && { 
-            command rm "$file"
+            command rm -f "$file"
             break
         }
         ecerr "$0: File '$file' does not yet exist ..."

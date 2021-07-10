@@ -45,8 +45,8 @@ function h_aliasfnq() {
         fi
     done
 
-    fnswap enh-savename true h_aliasfn "$name" "$qbody"
     enh-savename "$name" "$goesto" || true
+    h_aliasfn "$name" "$qbody" # do not use `fnswap enh-savename true`, it causes a slowdown
 }
 alias aliasfnq='\noglob h_aliasfnq'
 

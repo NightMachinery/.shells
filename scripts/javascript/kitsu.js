@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 const Kitsu = require('kitsu')
+// https://github.com/wopian/kitsu/issues/562
+// npmi kitsu@9
+
 const api = new Kitsu()
 
 

@@ -112,7 +112,10 @@ function ziib-znc {
     {
         # ZNC
         assert reval-ec rsp-dl root@51.178.215.202:/home/zii/.znc ./ # includes logs
+
         # trs ./.znc/moddata/log || true # chat logs
+        trs ./.znc/moddata/log/**/('##chat'|'##chat-overflow'|'##news'|'##politics'|'#libera')(DN) # these take too much space
+
         trs ./.znc/modules/ || true # the external, binary modules
         trs ./.znc/znc.pem || true # the SSL certs
         # @note I've also added these deleted files to the =.gitignore= file, to avoid race conditions

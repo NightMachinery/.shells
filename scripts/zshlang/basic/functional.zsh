@@ -40,8 +40,8 @@ function labeled() {
 }
 ##
 function fnrep() {
-    : 'Replaces a function temporarily during <cmd>: <fn> <new body> <cmd>'
-    : 'WARNING: Currently does not accommodate our own macro-enhancers like reify.'
+    # : 'Replaces a function temporarily during <cmd>: <fn> <new body> <cmd>'
+    # : 'WARNING: Currently does not accommodate our own macro-enhancers like reify.'
 
     local fn="$1"
     local body="$2"

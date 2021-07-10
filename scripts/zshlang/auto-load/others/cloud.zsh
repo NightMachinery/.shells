@@ -177,6 +177,7 @@ function trr-count {
     }
     ec $(($count - 3)) # 2 extras at top and 1 at buttom
 }
+
 function rcraa() {
     # leaves ./aa.log behind
     local aaMark="$(uuidm)"
@@ -184,6 +185,7 @@ function rcraa() {
     till-file "$aaMark"
 }
 renog rcraa
+
 function rcrtrr() {
     local torrent="$1"
     local start="${2:-1}" # this is the only way to resume this process

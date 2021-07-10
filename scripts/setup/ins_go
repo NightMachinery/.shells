@@ -12,6 +12,7 @@ github.com/caddyserver/xcaddy/cmd/xcaddy
 github.com/ciehanski/libgen-cli
 github.com/cosmos72/gomacro
 github.com/ericchiang/pup
+github.com/erning/gorun
 github.com/jesseduffield/lazygit
 github.com/mholt/archiver/cmd/arc
 github.com/muesli/duf
@@ -21,4 +22,3 @@ github.com/olivere/iterm2-imagetools/cmd/imgls
 github.com/sethvargo/go-password/password
 github.com/tigrawap/slit/cmd/slit
 github.com/trashhalo/imgcat
-github.com/erning/gorun
