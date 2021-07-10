@@ -60,16 +60,25 @@ function isTmux() {
     test -n "$TMUX"
 }
 ##
-function isGuest {
-    [[ "$(hostname)" == 'amadeus.local' ]]
-}
+if iszsh ; then
+    function isGuest {
+        [[ "$HOSTNAME" == 'amadeus.local' ]]
+    }
+else
+    function isGuest {
+        [[ "$(hostname)" == 'amadeus.local' ]]
+    }
+fi
 ##
 function isKitty() {
-    if  isGuest || ( isLocal && ! isTmux ) ; then
+    if isMBP ; then
+        return 0 # @surprise
+    fi
+
+    if true || isGuest || ( isLocal && ! isTmux ) ; then
         test -n "$KITTY_WINDOW_ID"
         # the var can be set incorrectly in tmux
-    else
-        true # @surprise
+        # we have also unexported this var in auto-load/env.zsh
     fi
 }
 iskitty() { isKitty "$@" ; }

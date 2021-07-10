@@ -324,7 +324,7 @@
                "ships"
                "fandoms"
                "ao3categories"
-               "freeformtags" "genre" "extratags" ;; `freefromtags' is a compat-shim for `freeformtags'
+               "freeformtags" "forumtags" "genre" "extratags" ;; `freefromtags' is a compat-shim for `freeformtags'
                "rating"
                "characters"
                "short_description"

@@ -113,3 +113,10 @@ if test -n "${commands[kitty]}" ; then
     kitty + complete setup zsh | source /dev/stdin
 fi
 ##
+function _words {
+    # @bug "$words[-1]" always selects the last arg, but we want the current arg instead
+
+    _values 'words' "${(f@)$(cat /usr/share/dict/words | rg "$words[-1]")}"
+}
+compdef _words sp spi ffdict ffdict-wn sdc di dwn
+##

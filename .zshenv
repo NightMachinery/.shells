@@ -20,6 +20,12 @@ fi
 ##
 test -z "$ZSH_PROFILEME" || zmodload zsh/zprof # use zprof -c to reset counters
 # Does not profile internals of functions well.
+#
+# `ZSH_PROFILEME=y zsh -c 'zprof > ~/tmp/a'`
+#
+# Visualize:
+#  `zprof  | gprof2dot -f perf | dot -Tpng -o output.png`
+#  Did not work because of a unicode error :shrugs:
 ##
 # module_path+=( "/Users/evar/.zinit/mod-bin/zmodules/Src" )
 # zmodload zdharma/zplugin

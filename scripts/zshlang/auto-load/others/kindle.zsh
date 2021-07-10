@@ -16,24 +16,33 @@ function 2m2k() {
     fi
     2kindle "$1"
 }
+
 function mv2ko() {
     jej
     mv * "$1"
     2ko *
 }
+
 function aacrop() {
     aa "$@" --on-download-complete aa-crop
 }
+
 function aap() {
     aa "$@" --on-download-complete aa-pToKindle
 }
+
 function aab() {
-    aa "$@" --on-download-complete aa-toKindle
+    local aaMark="$(uuidm)"
+    aaMark="$aaMark" aa --on-download-complete aa-toKindle.zsh "$1"
+    till-file "$aaMark"
 }
+renog aab
+
 function 2kindle() {
     jglob
     mutt -s "${2:-convert}" -a "$1" -- "${3:-$kindle_email}" <<<hi
 }
+
 function 2ko() {
     mdoc "2kindle-original; Sends to Kindle without conversion.
 Usage: $0 <file> [<kindle-email>]

@@ -9,6 +9,7 @@ chrome-remote-interface
 chrono-node
 cliflix
 commander
+composerize
 dockly
 emma-cli
 emoji-finder
@@ -38,6 +39,7 @@ puppeteer
 puppeteer-extra
 puppeteer-extra-plugin-repl
 puppeteer-extra-plugin-stealth
+puppeteer-extra-plugin-user-preferences
 random-word-cli
 randomcolor
 read-time-estimate
@@ -49,5 +51,3 @@ wikiquote-cli
 wikit
 youtube-dl-interactive
 zooqle
-composerize
-puppeteer-extra-plugin-user-preferences
