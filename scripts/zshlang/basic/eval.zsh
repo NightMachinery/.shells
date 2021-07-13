@@ -77,13 +77,21 @@ function reval() {
     test -z "$*" && return 0 # Don't throw an error, it throws some other stuff up :|
     eval "$cmd"
 }
+
 function reval-true() {
     reval "$@" || true
 }
+
+function reval-not {
+    ! reval "$@"
+}
+alias not='reval-not'
+
 function reval-withstdin() {
     ecn "$1" | reval "${@[2,-1]}"
 }
 alias rin='reval-withstdin'
+
 function rgeval() {
     geval "$(gquote "$@")"
 }
