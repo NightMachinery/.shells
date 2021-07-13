@@ -315,9 +315,12 @@
                                        :input (v "title")))
                            "]]"))
   (format *standard-output* ":PROPERTIES:~%")
-  (dolist (p '("author" "authorUrl"
+  (dolist (p '( ;; "threadmarks_title"
+               "author" "authorUrl"
                "series" "seriesUrl"
-               "status" "numWords" "chapterslashtotal" "numChapters"
+               "status" "threadmarks_status"
+               "numWords" "estimatedWords"
+               "chapterslashtotal" "numChapters"
                "datePublished" "dateUpdated"
                "stars" "likes" "dislikes" "kudos" "reviews" "favs" "follows"
                "views" "total_views" "hits"
@@ -327,7 +330,7 @@
                "freeformtags" "forumtags" "genre" "extratags" ;; `freefromtags' is a compat-shim for `freeformtags'
                "rating"
                "characters"
-               "short_description"
+               "short_description" "threadmarks_description"
                "groups"
                "prequel" "sequels"
                ;; "comment_count"
