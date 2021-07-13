@@ -42,3 +42,10 @@ function erase-nonascii {
     perl -ple 's/[^[:ascii:]]//g'
 }
 ##
+function isSpace {
+    local inargs
+    in-or-args2 "$@"
+
+    ecn "$inargs[*]" | perl -0777 -ne '/\A\s*\Z/ && exit 0 || exit 1'
+}
+##
