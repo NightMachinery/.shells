@@ -12,7 +12,7 @@ function borg-tt-mark() {
     local out
     out="$(ec "$*" | text2num | jq --raw-input --arg received_at "$received_at" --slurp --null-input --compact-output 'inputs as $i | {"name": $i, "received_at": $received_at}' | borg-req timetracker/mark/)" @TRET
 
-    aasert test -z "$out" @RET
+    assert test -z "$out" @RET
 
     if [[ "$out" =~ 'cold shoulder|Julia encountered an exception\.' ]] ; then
         ecerr "$0: Encountered an error"$'\n'"$out"

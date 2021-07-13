@@ -15,7 +15,7 @@ function alice() {
     local i="$*"
 
     local res
-    if res="$(brishzr borg-tt-mark "$i")" && test -n "$res" ; then
+    if res="$(borg-tt-mark "$i")" && test -n "$res" ; then # brishzr is invoked for 'borg-tt-mark' on isLocal automatically
         ec "$res"
         bell-pp-electricity
         @opts dur 10 @ alert "$res"
