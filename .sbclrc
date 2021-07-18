@@ -16,9 +16,6 @@
 (defmacro comment (&rest ignored)
   nil)
 ;;;
-(defun identity (x)
-  x)
-;;;
 (defun concat (&rest strings)
   "@example (concat \"hi \" \"hmm \" \"()\")"
   (apply #'concatenate 'string strings))
