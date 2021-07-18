@@ -200,5 +200,8 @@ function ceer() {
 function mn() {
     local LESS=$LESSMIN
     export LESS
+
+    bella_zsh_disable1=y
+
     man "$@" || lesh "$@"
 }

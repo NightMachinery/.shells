@@ -11,7 +11,7 @@
   (when (probe-file init-file)
     (load init-file)))
 
-(ql:system-apropos "jzon")
+(ql:system-apropos "progress")
 (system-apropos "json")
 (ql:system-apropos "heredoc")
 (ql:system-apropos "alexandria")
