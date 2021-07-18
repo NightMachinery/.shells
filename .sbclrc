@@ -5,11 +5,19 @@
                                        (user-homedir-pathname))))
   (when (probe-file quicklisp-init)
     (load quicklisp-init)))
+
+(with-output-to-string (*standard-output* nil)
+  ;; (ql:quickload "unix-opts")
+  (ql:quickload :cl-ppcre)
+  )
 ;;;
 (setf sb-impl::*default-external-format* :utf-8)
 ;;;
 (defmacro comment (&rest ignored)
   nil)
+;;;
+(defun identity (x)
+  x)
 ;;;
 (defun concat (&rest strings)
   "@example (concat \"hi \" \"hmm \" \"()\")"
@@ -65,3 +73,28 @@
   (brishz "eval" "ec hi ; ecerr warning ; return 56"))
 ;;;
 ;; (describe #\LEFT_DOUBLE_QUOTATION_MARK)
+;;;
+(comment (defun org-title-escape (str)
+   (substitute #\} #\]
+               (substitute #\{ #\[ str))))
+
+(defun org-title-escape (str)
+  (ppcre:regex-replace-all "\\\\*\\]"
+                           (ppcre:regex-replace-all "\\\\*\\[" str "{")
+                           "}"))
+
+(defun org-link-escape (str)
+  (ppcre:regex-replace-all "(?<!\\\\)\\]" ;; negative lookbehind
+                           (ppcre:regex-replace-all "(?<!\\\\)\\[" str "\\[")
+                           "\\]"))
+
+(comment
+ (org-title-escape "Hi! [981][]")
+ (org-link-escape "Hi! [981][]"))
+;;;
+(defun symlinkp (some-pathname)
+  ;; @SBCLOnly
+  ;; osicat:file-kind does not work when the path contains a trailing slash :|
+  (ignore-errors
+   (sb-posix:s-islnk (sb-posix:stat-mode (sb-posix:lstat (pathname some-pathname))))))
+;;;

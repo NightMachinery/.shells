@@ -105,9 +105,19 @@ insubshell-eval() {
 }
 function mark-me() {
     local mark
-    mark="$(ec "${${1:u}:-NA}" | gtr '-' '_')" @RET
-    [[ "$mark" =~ '_MARKER$' ]] || mark+=_MARKER
+    mark="$(marker-preprocess "$1")" @RET
+
     jobs -Z "zsh $mark $(gq "${@[2,-1]}")"
+}
+
+function marker-preprocess {
+    local mark="$1"
+    assert-args mark @RET
+
+    mark="$(ec "${${mark:u}:-NA}" | gtr '-' '_')" @TRET
+    [[ "$mark" =~ '_MARKER$' ]] || mark+=_MARKER
+
+    ec "$mark"
 }
 ##
 function awaysh-exit() {
@@ -209,6 +219,14 @@ function awaysh-bnamed-rp() {
     #     awaysh-bnamed "$name" "$cmd[@]"
     ##
 }
+
+function awaysh-oneinstance {
+    local id="$1"
+    assert-args id @RET ; shift
+
+    kill-marker "$id"
+    awaysh-named "$id" "$@"
+}
 ##
 function insubshell-named() {
     @opts marker "$1" @ insubshell "${@:2}"
@@ -226,10 +244,15 @@ function away() {
 }
 ##
 function kill-marker() {
-    local id="${1}" ; shift
-    assert-args id @RET
+    local id="${1}"
+    assert-args id @RET ; shift
 
-    { pgrep -f "$id" || pgrep -f "${id:u}" } | inargsf kill-withchildren "$@"
+    {
+        pgrep -f "$id"
+
+        id="$(marker-preprocess "$id")" @RET
+        pgrep -f "$id" || true
+    } | inargsf kill-withchildren "$@"
 }
 ##
 killjobs() {
