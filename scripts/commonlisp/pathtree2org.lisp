@@ -1,6 +1,9 @@
 #!/usr/bin/env -S sbcl --script
 ;;
 ;; [[id:bed6cce4-3280-42d4-8dbb-ebdf8afc64dc][orgmode/youtube.org:Use =..inline_links..= in the file name to force links to preview]]
+;;
+;; * @todo9
+;; ** Add env var option to follow symlinks
 ;;;
 (let ((init-file (merge-pathnames ".sbclrc"
                                   (user-homedir-pathname))))

@@ -54,3 +54,35 @@ function borg-tt-cmdlog() {
         ec
     fi
 }
+##
+function cmdlog {
+    local log="$cmdlog"
+    assert-args log @RET
+
+    ensure-dir "$log"
+
+    cmdlog.py "$@" >&1 >> $log @TRET
+}
+
+function cmdlog-archive-current {
+    local log="$cmdlog"
+    assert-args log @RET
+
+    if test -e "$log" ; then
+        assert gmv --verbose --backup=numbered --suffix='.old' "$log" "${log:h}/oldlog_$(dateshort)" @RET
+    else
+        ecerr "$0: no current cmdlog exists"
+    fi
+}
+
+function cmdlog-apply {
+    local log="$cmdlog"
+    assert-args log @RET
+
+    assert test -e "$log" @RET
+
+    cat "$log" | borg-tt-cmdlog @TRET
+
+    reval-ec cmdlog-archive-current
+}
+##

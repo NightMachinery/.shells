@@ -55,7 +55,9 @@ test -z "$attic_quotes" && attic_quotes="$attic_dir/.quotes"
 test -z "$attic_emails" && attic_emails="$attic_private_dir/.emails"
 ##
 export borgEndpoint="http://127.0.0.1:5922"
+
 export timetracker_db="${attic_private_dir:?}/timetracker.db"
+export cmdlog="${attic_private_dir:?}/cmdlogs/cmdlog.txt"
 ##
 export remindayDir="$nightNotes/reminders"
 export remindayBakDir="$cellar/reminders_bak"
