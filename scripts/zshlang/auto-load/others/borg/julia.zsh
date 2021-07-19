@@ -220,8 +220,8 @@ function h_1jma() {
     local p=~/Downloads/"$u"/
     mkdir "$p"
     deluge-console add --move-path "$p" "$1"
-    sleep "${jm_s:-60}"
-    cp -r "$p" .
+    sleep "${jm_s:-300}"
+    gcp --verbose -r "$p" .
 }
 function jma() {
     jee
