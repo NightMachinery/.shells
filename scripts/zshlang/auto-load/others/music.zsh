@@ -44,7 +44,15 @@ function hearinvisible-playfast() {
         vol_orig="$(volume-get)"
         volume-set 100
     fi
-    ( assert-dbg silent play "$@" -G gain "$vol" )
+    (
+        local file="${@[-1]}" # @hack
+        local ext="${file:e}"
+        if [[ "$ext" = m4a ]] ; then # play (from sox) does not support m4a (with our compile options at least)
+            arr0 "$@" | filter0 test -e | inargs0 assert-dbg silent hear
+        else
+            assert-dbg silent play "$@" -G gain "$vol"
+        fi
+    )
     # faster startup than ffplay (play from sox)
     } always {
         if bool $loudidle ; then

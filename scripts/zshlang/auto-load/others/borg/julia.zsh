@@ -215,6 +215,7 @@ function vsox() {
     local inp=(*)
     sox "$inp" "${inp:r}_c.mp3" -G "$@"
 }
+##
 function h_1jma() {
     local u="$(uuidgen)"
     local p=~/Downloads/"$u"/
@@ -223,6 +224,7 @@ function h_1jma() {
     sleep "${jm_s:-300}"
     gcp --verbose -r "$p" .
 }
+
 function jma() {
     jee
     zargs --max-procs 60 -n 1 -- "$@" -- h_1jma
@@ -230,6 +232,7 @@ function jma() {
     dir2k
 }
 noglobfn jma
+##
 function jah() {
     jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
 }
@@ -237,13 +240,16 @@ function jahun() {
     # unbuffer needs expect
     jah ruu unbuffer "$@"
 }
+##
 jepubsplit() {
     jej
     jah dbg epubsplit $jufile
     rm $jufile
     dir2k
 }
+##
 function jy() {
+    # youtube-dl to gdrive
     local engine=("${jyE[@]:-y}")
     jee
     sout "$engine[@]" "$@"
@@ -251,7 +257,9 @@ function jy() {
     rm *
 }
 noglobfn jy
+
 alias jys="jyE=ysmall jy"
+
 function jyl() {
     # jylist
     ylist "$1" | jrabbit="${*[2,-1]}" inargsf re jys # re is needed to free up space
@@ -260,10 +268,10 @@ alifn jylist=jyl
 noglobfn jyl jylist
 ##
 function reval-2json() {
-	local out="$(gmktemp)"
-	local err="$(gmktemp)"
-	FORCE_NONINTERACTIVE=y reval "$@" > "$out" 2> "$err"
-	local ret=$?
-	cat "$out" | jq --raw-input --slurp --null-input --arg ret "$ret" --slurpfile err <(cat "$err" | jq --raw-input .) 'inputs as $i | {"retcode": $ret, "stdout": $i, "stderr": $err}' # --compact-output
+    local out="$(gmktemp)"
+    local err="$(gmktemp)"
+    FORCE_NONINTERACTIVE=y reval "$@" > "$out" 2> "$err"
+    local ret=$?
+    cat "$out" | jq --raw-input --slurp --null-input --arg ret "$ret" --slurpfile err <(cat "$err" | jq --raw-input .) 'inputs as $i | {"retcode": $ret, "stdout": $i, "stderr": $err}' # --compact-output
 }
 ##

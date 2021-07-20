@@ -97,6 +97,7 @@ function links2org-dir {
 function pathtree2org {
     local dir="$1"
     assert-args dir @RET ; shift
+    assert test -d "$dir" @RET
 
     local err_skip
     if isI; then
