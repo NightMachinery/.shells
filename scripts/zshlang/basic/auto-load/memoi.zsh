@@ -3,10 +3,15 @@ alias deus='deusvult=y '
 ## Vars
 memoi_expire=$(( 3600*24*7 ))
 ## Functions
-function isDeus() { test -n "$deusvult" }
+function isDeus() {
+  test -n "$deusvult"
+}
 aliasfn isdeus isDeus
 
-function expirein() { memoi_expire=$(( $1 * 60 )) reval "$@" }
+function expirein() {
+  memoi_expire=$(( $1 * 60 )) reval "$@"
+}
+
 function memoi-eval() {
 ###
 # GLOBAL OUT (as always these do not survive  a fork): memoi_cache_used
@@ -101,8 +106,17 @@ function memoi-eval() {
     ##
     return $retcode
 }
-function eval-memoi() { memoi-eval "$@" }
-enh-savename eval-memoi memoi-eval
 @opts-setprefix memoi-eval memoi
+
+function eval-memoi() {
+  memoi-eval "$@"
+}
+enh-savename eval-memoi memoi-eval
 @opts-setprefix eval-memoi memoi
+
+function me() {
+  memoi-eval "$@"
+}
+enh-savename me memoi-eval
+@opts-setprefix me memoi
 ##

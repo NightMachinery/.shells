@@ -99,15 +99,20 @@ p2ko() {
         sout 2ko "$@"
     }
 }
+##
 function getpdfs() {
     zargs -i _ -- "$@" -- getlinks _ '\.pdf$' | inargsf aacrop -Z
 }
 noglobfn getpdfs
+##
 function jgetktmp() {
     local num="${1:-3}"
     ktmp
     lm|filter testre '\.epub$' | tail -n "$num" |inargsf rexa 'cp _ $jd'
 }
+aliasfn ktmp-get jgetktmp
+aliasfn ktmpg jgetktmp
+##
 function 2pdf() {
   jglob
   local f="$1"
