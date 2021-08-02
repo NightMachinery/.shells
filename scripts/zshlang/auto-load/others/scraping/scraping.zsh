@@ -802,7 +802,7 @@ aliasfn url-clean url-clean-unalix
 noglobfn url-clean
 
 function url-clean-google() {
-    # DEPRECATED Use url-clean
+    # @alt url-clean
     ##
     local URL="$1"
     assert-args URL @RET
@@ -821,15 +821,13 @@ function url-clean-google() {
 }
 renog url-clean-google
 
-function urlfinalg() {
+function urlfinalg2() {
     # @regressionDanger calling this with zero args now waits on stdin
     @opts redirects y @ url-clean "$@"
 }
-noglobfn urlfinalg
-aliasfn url-final-gateway urlfinalg
+noglobfn urlfinalg2
 
 function urlfinalg1() {
-    # DEPRECATED
     # aka: url-final-gateway
     # supports Google redirects.
     # Set uf_idem to y to return original.
@@ -847,6 +845,10 @@ function urlfinalg1() {
     url-final "$u" #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
 }
 renog urlfinalg1
+
+noglobfn urlfinalg
+aliasfn urlfinalg urlfinalg1
+aliasfn url-final-gateway urlfinalg
 ##
 function getlinksfull2() {
     mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
