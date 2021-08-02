@@ -564,7 +564,8 @@ function web2epub() {
         i=$((i+1))
 
         # API Change; old: "${we_dler:-wread}"
-        if retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" '>' "$bname:q" && ec "Downloaded $url ..." ; then
+        if retry-limited-eval "${we_retry:-10}" "${we_dler:-readmoz}" "$url:q" '>' "$bname:q" ; then
+            ec "Downloaded $url ..."
             dled_files+="$bname"
         else
             command rm "$bname" # delete partial or empty files
@@ -584,6 +585,8 @@ function web2epub() {
     if (( $#dled_files == 0 )) ; then
         ecerr "$0: No files were downloaded successfully."
         # cd '../' # idk if this'd be good
+
+        return 1
     else
         ec "Converting to epub ..."
         revaldbg html2epub "$title" "$author" "$dled_files[@]"
@@ -846,9 +849,9 @@ function urlfinalg1() {
 }
 renog urlfinalg1
 
-noglobfn urlfinalg
-aliasfn urlfinalg urlfinalg1
 aliasfn url-final-gateway urlfinalg
+aliasfn urlfinalg urlfinalg1
+noglobfn urlfinalg
 ##
 function getlinksfull2() {
     mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
