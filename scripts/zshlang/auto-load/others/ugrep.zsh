@@ -20,7 +20,8 @@ function ugbase() {
 function ugbool() {
     ugbase --bool "$*"
 }
-alias ugb='ugbool'
+noglobfn ugbool
+alias ugb='\noglob ugbool'
 ##
 function ug-i() {
     : "oneliner: ugrep --bool --smart-case '--sort=best' --no-confirm --perl-regexp --hidden '--binary-files=without-match' --query=1"

@@ -80,9 +80,12 @@ function sharif-dep-save() {
     if test -n "$oldjson" ; then
         local diff="$(marked_courses='[9999,9998,44737]' sharif_diff.js =(ec "$oldjson") "$destjson")"
         if test -n "$diff" ; then
-            # EDU_DIFF channel
-            # @idea also send to channel based on dep ID, to reduce the clutter
-            tsend -- -1001472917717 "${dest:t:r}"$'\n'"$diff"
+            if false ; then
+                # EDU_DIFF channel
+                # @idea also send to channel based on dep ID, to reduce the clutter
+                tsend -- -1001472917717 "${dest:t:r}"$'\n'"$diff"
+            fi
+
             color blue "$diff"
         fi
     fi
@@ -121,6 +124,7 @@ function sharif-dep-save-all() {
     aa --allow-overwrite=true https://edu.sharif.edu/css/default.css # to backup the CSS as well.
     return $ret
 }
+
 function sharif-dep-git-update() {
     sharif-login
 

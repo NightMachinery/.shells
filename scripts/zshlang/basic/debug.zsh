@@ -164,6 +164,19 @@ function revaldbg() {
 }
 echo-fin() { arger "$fin[@]" } # Useful for debugging env
 ##
+function silencedbg() {
+    local cmd=("$@")
+    if isDbg
+    then
+        reval "${cmd[@]}"
+    else
+        silence "${cmd[@]}"
+    fi
+}
+function sdbg {
+    silencedbg "$@"
+}
+
 function dbgserr() {
     local cmd=("$@")
     if isDbg
@@ -176,6 +189,7 @@ function dbgserr() {
 function serrdbg() {
     dbgserr "$@"
 }
+
 function dbgsout() {
     local cmd=("$@")
     if isDbg

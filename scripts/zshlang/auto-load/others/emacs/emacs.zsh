@@ -203,10 +203,13 @@ aliasfn emc-quote lisp-quote
 function emc-nowait2() {
     local f="$1" cmd="${emc_nowait2_cmd:-find-file}"
     assert-args f @RET
-    local tmp
-    tmp="$(serr grealpath -e "$f")" && f="$tmp" || true # can be, e.g., an scp path
+
+    ## @redunddant
+    # local tmp
+    # tmp="$(serr grealpath -e "$f")" && f="$tmp" || true # can be, e.g., an scp path
+    ##
     
-    emc-eval "(${cmd} $(emc-quote "$f"))"
+    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (${cmd} $(emc-quote "$f")))"
     # throws useless error 'Invalid read syntax: "#"', but works anyway
 
     emc-focus

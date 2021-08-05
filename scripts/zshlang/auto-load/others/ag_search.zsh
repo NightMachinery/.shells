@@ -102,3 +102,16 @@ function agr {
     ag -0 -l "$opts[@]" -- "$from" "${@}" | pre-files "$from" "$to"
 }
 ##
+function pathtree-search {
+    revaldbg indir pathtree ugbool "$@"
+}
+noglobfn pathtree-search
+alias pts='\noglob pathtree-search'
+
+function pathtree-video {
+    pathtree-search "\.${(j/|\./)video_formats} $*"
+}
+noglobfn pathtree-video
+aliasfn ptv pathtree-video
+noglobfn ptv
+##
