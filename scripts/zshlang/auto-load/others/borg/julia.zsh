@@ -234,6 +234,8 @@ function jma() {
 noglobfn jma
 ##
 function jah() {
+    # ansi2html
+    ##
     jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
 }
 function jahun() {
@@ -245,10 +247,16 @@ function ansi2img {
     local ugrep_opts=( $ugrep_opts[@] --color=always ) # can be problematic, but whatever
 
     local out="${PWD}/ansi" # .000.png is added by deark
-    sdbg deark -m ansiart -opt char:output=image =(fnswap isColor true "$@") -o :$out
+    sdbg deark -m ansiart -opt char:output=image =(fnswap isColor true "$@") -o $out
 
-    alpha2black "${out}"*.png # @idk why, but this causes the output image to be sent via Telegram without triggering our white padding
+    local out
+    out=("${out}"*.png(.DN))
+
+    re alpha2black "$out[@]" # @idk why, but this causes the output image to be sent via Telegram without triggering our white padding
+
+    sdbg trs-rm "$out[@]"
 }
+alias a2i='ansi2img'
 ##
 jepubsplit() {
     jej
