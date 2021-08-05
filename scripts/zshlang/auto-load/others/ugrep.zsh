@@ -1,4 +1,5 @@
-typeset -ag ugrep_opts=(--bool --smart-case --sort=best --no-confirm --perl-regexp --hidden --binary-files=without-match)
+typeset -ag ugrep_opts=(--bool --smart-case --sort=best --no-confirm --perl-regexp --hidden --binary-files=without-match --dereference-recursive)
+# --dereference-recursive : recursive dirs, follows symlinks
 ##
 function ugbase() {
     local sel ret opts=()

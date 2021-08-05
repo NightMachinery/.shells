@@ -240,6 +240,10 @@ function jahun() {
     # unbuffer needs expect
     jah ruu unbuffer "$@"
 }
+
+function ansi2img {
+    sdbg deark -m ansiart -opt char:output=image =(fnswap isColor true "$@") -o "${PWD}/ansi.png"
+}
 ##
 jepubsplit() {
     jej
