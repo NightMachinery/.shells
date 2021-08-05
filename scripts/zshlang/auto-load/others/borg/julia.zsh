@@ -242,7 +242,12 @@ function jahun() {
 }
 
 function ansi2img {
-    sdbg deark -m ansiart -opt char:output=image =(fnswap isColor true "$@") -o "${PWD}/ansi.png"
+    local ugrep_opts=( $ugrep_opts[@] --color=always ) # can be problematic, but whatever
+
+    local out="${PWD}/ansi" # .000.png is added by deark
+    sdbg deark -m ansiart -opt char:output=image =(fnswap isColor true "$@") -o :$out
+
+    alpha2black "${out}"*.png # @idk why, but this causes the output image to be sent via Telegram without triggering our white padding
 }
 ##
 jepubsplit() {

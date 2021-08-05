@@ -3,7 +3,7 @@ typeset -ag ugrep_opts=(--bool --smart-case --sort=best --no-confirm --perl-rege
 ##
 function ugbase() {
     local sel ret opts=()
-    if isOutTty  ; then
+    if isColor && isOutTty  ; then
         opts+='--color=always'
     fi
     sel="$(command ugrep "$ugrep_opts[@]" "$opts[@]" "$@")"
