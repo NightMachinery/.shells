@@ -113,6 +113,13 @@ function pathtree-video {
     pathtree-search "\.${(j/|\./)video_formats} $*"
 }
 noglobfn pathtree-video
-aliasfn ptv pathtree-video
+
+function ptv {
+    if isBorg ; then
+        ansi2img pathtree-video "$@"
+    else
+        pathtree-video "$@"
+    fi
+}
 noglobfn ptv
 ##
