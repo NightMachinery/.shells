@@ -83,3 +83,11 @@ function podcast2tel() {
     tsend-url "$dest" "$l" "$title"
 }
 ##
+function md2tlg {
+    tsend --parse-mode=md -- "${me_tel}" "$(pbpaste)"
+}
+
+function org2tlg {
+    tsend --parse-mode=md -- "${me_tel}" "$(org2md)"
+}
+##

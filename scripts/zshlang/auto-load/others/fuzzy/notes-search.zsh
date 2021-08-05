@@ -301,10 +301,10 @@ function ntsearch-postprocess {
             cmd+=')'
 
             if test -n "$no_wait" ; then
-                revaldbg emc-eval "$cmd" & # this decreases the latency but can sometimes open emacs too soon (before it has jumped to the desired location)
-                emc-focus
+                revaldbg sdbg emc-eval "$cmd" & # this decreases the latency but can sometimes open emacs too soon (before it has jumped to the desired location)
+                sdbg emc-focus
             else
-                revaldbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
+                revaldbg sdbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
             fi
 
         else
