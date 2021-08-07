@@ -104,6 +104,12 @@ function agr {
 ##
 function pathtree-search {
     # @hiddenDep --dereference-recursive should be in ugrep_opts
+    ##
+    if isColor && isOutTty
+    then
+        ugrep_opts+='--color=always'
+    fi
+
     revaldbg indir pathtree ugbool "$@" < /dev/null | prefixer -o $'\n\n' # closing the stdin forces ugrep to search in the file tree
 }
 noglobfn pathtree-search

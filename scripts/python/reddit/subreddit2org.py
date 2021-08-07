@@ -178,6 +178,8 @@ else:
 
                     head = f"u/{author}:\n{head}"
 
+                head = head or "_" # empty headers are invalid org-mode
+
             f.write("\n" + stars(lv_c) + head + "\n" + meta)
             lv_c += 1
             process_comment(f, c.replies, lv_c, shortname)
