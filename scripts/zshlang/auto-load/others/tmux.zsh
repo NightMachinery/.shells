@@ -32,6 +32,7 @@ function tmuxnewsh2() {
     tmuxnewshenv="${tmuxnewshenv[*]} $env[*]" tmuxnewsh "$name" "$@"
 }
 aliasfn tsh tmuxnewsh2
+
 function tmuxdaemon() {
     local key="$tdKey"
     local cmd="$(gq "$@")"
@@ -42,6 +43,7 @@ function tmuxdaemon() {
     silent tmux kill-session -t "$name"  && ecerr "Killed already existing session '$name' to run the new command '$cmd'" # is killing it redundant?
     tmuxnewsh2 "$name" "$@" && ec "Created session '$name'"
 }
+aliasfn tshd tmuxdaemon
 ##
 function tmuxzombie-ls() {
     tmux list-panes -a -F "#{pane_dead} #{pane_id}" | awk '/^1/ { print $2 }'

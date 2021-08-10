@@ -202,11 +202,13 @@ function _crash_global_exception_handler() {
   return $state_code
 }
 ##
-typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 p )
+typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 p command_not_found_handler )
 typeset -ag funcstack_excluded_prefixes=( reval eval geval rgeval seval memoi-eval ensure assert ec- ecdate ecerr ecnerr redo- )
+
 function funcstack_excluded_prefixes_glob() {
   ec "(${(@j.|.)funcstack_excluded_prefixes})*"
 }
+
 function funcstack-isExcluded() {
   local name=("$1")
   name=(${(@)name:|funcstack_excluded_names})

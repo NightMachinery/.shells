@@ -4,6 +4,7 @@ function arger() {
         ecbold "arg: $i"
     done
 }
+
 function argerrainbow() {
     {
         local arg
@@ -16,11 +17,13 @@ function argerrainbow() {
         echo
     } >&2
 }
+
 argerng() {
     clipboard-add-quoted "$@"
 
     { test -n "$jahmode" || isColor } && ecalternate "$@" || arger "$@"
 }
+
 ecdbg() {
     isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")
@@ -28,12 +31,14 @@ ecdbg() {
         # errcol=("${debugcol[@]:-cyan}") rederr ecerr "$@"
     }
 }
+
 fsaydbg() {
     isNotDbg || {
         ecdbg "$@"
         fsay "$@"
     }
 }
+
 dact() {
     doc DEBUG Act
     isNotDbg || eval "$(gquote "$@")" >&2
@@ -61,15 +66,18 @@ function ecnerr-raw() {
         ecn "$*" 1>&2
     fi
 }
+
 function ecerr-raw() {
     ecnerr-raw "$@"$'\n'
 }
+
 function ecerr() {
     local isColor_override="$isColor_override"
     color-override-err
     ##
     ecerr-raw "$(colorfg 255 43 244)$@$(colorreset)"
 }
+
 function ecnerr() {
     local isColor_override="$isColor_override"
     color-override-err
@@ -77,6 +85,7 @@ function ecnerr() {
     # we can alsoo use `ecnerr-raw`, but that might break stuff, as ecn is supposed not to add newlines, but the traceback inserts tons of stuff
     ecn "$(colorfg 255 43 244)$@$(colorreset)" 1>&2
 }
+
 function ecgray() {
     { colorfg "$gray[@]" ; ec "${@}" ; resetcolor } 1>&2
 }
@@ -93,6 +102,7 @@ function ecdate-err() {
 function ecnbold() {
    { Bold ; colorfg 40 200 30 ; Bold ; ecn "$@" ; resetcolor } >&2
 }
+
 function ecbold() {
     ecnbold "$*"$'\n'
 }
@@ -108,12 +118,14 @@ function rederr-old() {
     cat "$out"
     silent \rm "$out"
 }
+
 rederr() {
     comment this is basically raise-blood but for just one command
     exec 3>&2 2> >(color_err)
     reval "$@"
     exec 2>&3 3>&-
 }
+
 color_err () {
     ## sysread & syswrite are part of zsh/system
     while sysread std_err_color
@@ -122,6 +134,7 @@ color_err () {
         color "${errcol[@]:-red}" "$std_err_color"
     done
 }
+
 dvar () {
     local debugcol
     # eval ecdbg "$1": '$"'"$1"'"'
@@ -135,6 +148,7 @@ dvar () {
     test -z "$dvar_col2" && debugcol=(0 120 255)
     ecdbg "$pre$1 in env: $(printenv "$1")"
 }
+
 function raise-blood() ceer rederr.zsh source
 ##
 function retcode() {

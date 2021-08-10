@@ -56,7 +56,10 @@ function lnrp() {
     local f="${1:?}" d="${2:?}"
 
     local i
-    i="$(realpath2 "$f")" @TRET
+    if ! i="$(realpath2 "$f")" ; then
+        ectrace "$0: failed to get the realpath of $(gquote-sq "$f")"
+        return 1
+    fi
 
     ln -i -s "$i" "$d"
 }

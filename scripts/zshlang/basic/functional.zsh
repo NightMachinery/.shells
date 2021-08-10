@@ -83,9 +83,23 @@ function fnrep() {
     # `fnrep arrN 'ecn "<" ; fnsuper "$@" ; ecn ">" ' fnrep arrN 'ecn "before|" ; fnsuper "$@" ; ecn "|after" ' arrN Hi, $'\t'Alice'!'`
     ##
 }
+
 function fnswap() {
     fnrep "$1" "$2 "'"$@"' "$@[3,-1]"
 }
+
+function fnrestore {
+    local name="$1" body="$2"
+    assert-args name @RET
+
+    if test -z "$body" ; then
+        unfunction "$name"
+    else
+        functions[$name]="$body"
+    fi
+}
+alias fn-restore='fnrestore'
+
 function fnrepvc() {
     fnrep git "vcsh $1"' "$@"' "${@[2,-1]}"
 }
