@@ -126,6 +126,14 @@ function isColor() {
 
     isBrishOrg || isI
 }
+
+function isColorTty {
+    isColor && isOutTty
+}
+
+function isColorErrTty {
+    isColor && isErrTty
+}
 ##
 function isOutTty() {
     [ -t 1 ]

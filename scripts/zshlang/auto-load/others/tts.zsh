@@ -3,6 +3,11 @@ function tts-gateway() {
 
     bella_zsh_disable1=y
 
+    if isServer ; then
+        ecdbg "$0: skipped because this is a server."
+        return 0
+    fi
+
     ##
     # local tmp="$(gmktemp --suffix .wav)"
     # <<<"$text" ESPnet2-TTS.py > "$tmp"

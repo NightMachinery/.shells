@@ -27,8 +27,21 @@ function rip {
 }
 
 function trs-restore {
+    rip -u "$@"
+    # -s, --seance       Prints files that were sent under the current directory
+    #
+    # u, --unbury <target>       Undo the last removal by the current user, or specify some file(s) in the graveyard.  Combine with -s to restore everything printed by -s.
+}
+
+function trs-restore-current-dir {
     rip -su
     # -s, --seance       Prints files that were sent under the current directory
     #
     # u, --unbury <target>       Undo the last removal by the current user, or specify some file(s) in the graveyard.  Combine with -s to restore everything printed by -s.
 }
+
+function trs-log-current-dir {
+    rip -s
+    # -s, --seance       Prints files that were sent under the current directory
+}
+##

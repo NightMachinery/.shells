@@ -8,14 +8,24 @@ function zsh_directory_name_1() {
         # e.g., `ll ~[dl]`
 
         # re typ type arg
-        local o="${aliased_dirs[$arg]}"
-        if test -d "$o" ; then
-        elif test -n "$z_mode" ; then
-            o="$(ffz-get "$arg")" @RET
-            # re typ arg o
-        else
-            return 1
-        fi
+        ##
+        local o
+        case "$arg" in
+            DATE)
+                o="$(date)"
+                ;;
+            *)
+                o="${aliased_dirs[$arg]}"
+                if test -d "$o" ; then
+                elif test -n "$z_mode" ; then
+                    o="$(ffz-get "$arg")" @RET
+                    # re typ arg o
+                else
+                    return 1
+                fi
+                ;;
+        esac
+
         typeset -ga reply
         reply=("$o")
         return 0

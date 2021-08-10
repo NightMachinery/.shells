@@ -1,11 +1,19 @@
-typeset -ag ugrep_opts=(--bool --smart-case --sort=best --no-confirm --perl-regexp --hidden --binary-files=without-match --dereference-recursive)
+typeset -ag ugrep_opts=(--bool --smart-case --sort=best --no-confirm --perl-regexp --hidden --binary-files=without-match)
 # --dereference-recursive : recursive dirs, follows symlinks
 ##
 function ugbase() {
+    local follow_sym="${ugbase_follow:-y}"
+
     local sel ret opts=()
-    if isColor && isOutTty  ; then
+
+    if isColorTty ; then
         opts+='--color=always'
     fi
+
+    if bool "$follow_sym" ; then
+        opts+='--dereference-recursive'
+    fi
+
     sel="$(command ugrep "$ugrep_opts[@]" "$opts[@]" "$@")"
     # don't add pretty as it adds line numbers to the output
     ret=$?
@@ -50,6 +58,7 @@ function ugc {
 
     ugrep --heading --color=always --pretty --context=3 --recursive --bool --smart-case '--sort=best' --no-confirm --perl-regexp --hidden '--binary-files=without-match' "$opts[@]" --regexp="$r" | less -n
 }
+
 function ugm() {
     ug-ic "$*"
 }
@@ -70,9 +79,11 @@ function ugnt() {
 function ugfz-i0() {
     prefixer -i '\x00' -o $'\n' | ugfz "$@"
 }
+
 function ugfz-i0o0() {
     prefixer -i '\x00' -o $'\n' | ugfz "$@" | prefixer -i $'\n' -o '\x00'
 }
+
 function ugfz-o0() {
     ugfz "$@" | prefixer -i $'\n' -o '\x00'
 }

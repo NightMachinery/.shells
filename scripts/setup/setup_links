@@ -21,32 +21,51 @@ else
     lnrp $NIGHTDIR/configFiles/ranger ~/.config/ranger
 fi
 ##
+if isDarwin; then
+    lnrp /usr/local/bin/pandoc ~/bin # anaconda also has an old pandoc binary, so we need to prioritize the one installed by brew
+fi
+##
 ln -s "$HOME/Downloads/" ~/"$music_dir"/d
 # ln -s "$HOME/Downloads/Telegram Desktop/" ~/"$music_dir"/td
 ##
 # ln -s /home/linuxbrew/.linuxbrew/bin/nvim /usr/local/bin/nvim
 ##
-lnrp zshplain.dash /usr/local/bin/
+local ln_orig="$functions[ln]"
+{
+    if isLinux; then
+        # the owner and group of /usr/local and all subdirectories (including bin) should be root.root and the permissions should be rwxr-xr-x. This means that users of the system can read and execute in (and from) this directory structure, but cannot create or edit files there.
 
-lnrp bicon_zsh.dash /usr/local/bin/
+        functions[ln]='sudo ln "$@"'
+    fi
 
-lnrp ffscrollback.sh /usr/local/bin/
-lnrp emacs_scrollback.sh /usr/local/bin/
-lnrp wait4user.sh /usr/local/bin/
+    lnrp zshplain.dash /usr/local/bin/
 
-lnrp brishz.dash /usr/local/bin/
-lnrp brishz2.dash /usr/local/bin/
-lnrp brishz_para.dash /usr/local/bin/
-lnrp brishzrb.dash /usr/local/bin/
-lnrp brishzq.zsh /usr/local/bin/
-lnrp bsh.dash /usr/local/bin/
+    lnrp bicon_zsh.dash /usr/local/bin/
 
-lnrp fzf_mru.sh /usr/local/bin/
+    lnrp ffscrollback.sh /usr/local/bin/
+    lnrp emacs_scrollback.sh /usr/local/bin/
+    lnrp wait4user.sh /usr/local/bin/
 
-lnrp ~/.cargo/bin/input_lang_get_icon /usr/local/bin/
+    lnrp brishz.dash /usr/local/bin/
+    lnrp brishz2.dash /usr/local/bin/
+    lnrp brishz_para.dash /usr/local/bin/
+    lnrp brishzrb.dash /usr/local/bin/
+    lnrp brishzq.zsh /usr/local/bin/
+    lnrp bsh.dash /usr/local/bin/
+
+    lnrp fzf_mru.sh /usr/local/bin/
+
+    if isDarwin ; then
+        lnrp ~/.cargo/bin/input_lang_get_icon /usr/local/bin/
+    fi
+} always {
+    if isLinux; then
+        fnrestore ln "$ln_orig"
+    fi
+}
 ##
 if isLinux ; then
-    ln -s "$(rp sed)" ~/bin/gsed
+    ln -s "$(realpath2 sed)" ~/bin/gsed
 fi
 ## blcs
 # blc tag-ag tag tag-ag
