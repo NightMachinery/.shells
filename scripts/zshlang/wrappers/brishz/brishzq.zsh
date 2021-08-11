@@ -49,7 +49,7 @@ isDbg () {
 local copy_cmd="$brishz_copy"
 local session="${brishz_session}"
 local nolog="${brishz_nolog}"
-local endpoint="${bshEndpoint:-http://127.0.0.1:$GARDEN_PORT}/zsh/"
+local endpoint="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}/zsh/"
 
 local input_cmd=( "$@" )
 if test -z "$brishz_noquote" ; then
