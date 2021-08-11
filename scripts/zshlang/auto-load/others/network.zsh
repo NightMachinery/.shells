@@ -1,4 +1,43 @@
 ###
+function curl-ip {
+    local opts
+    opts=( --progress-bar --retry 120 --retry-delay 1 "$@" )
+
+    local res
+    res="$(curl "$opts[@]" https://ipinfo.io)" @TRET
+
+    local jq_opts=()
+    if isColorTty ; then
+        jq_opts+='--color-output'
+    fi
+
+    local res_json
+    if res_json="$(ec $res | serr jq -e "$jq_opts[@]" .)" ; then
+        ec $res_json
+    else # ipinfo blocks Iranian IPs
+        curl "$opts[@]" http://checkip.amazonaws.com
+        ##
+        # ec $res | html2text
+    fi
+}
+alias ci='curl-ip'
+# socks5h resolves hostname through proxy (I think). It's faster for my youtube test reqs:
+# curl -x socks5h://127.0.0.1:1081 -o /dev/null -w %{url_effective}  'https://www.youtube.com/'
+# curl -x http://127.0.0.1:1087 -o /dev/null -w %{url_effective}  'https://www.ipinfo.io/'
+# curl -x socks5h://172.17.0.1:1081 -o /dev/null -w %{url_effective}  'https://www.ipinfo.io'
+# curl -x http://172.17.0.1:1087 -o /dev/null -w %{url_effective}  'https://www.ipinfo.io/'
+# time2 brishzr curl -o /dev/null -w %{url_effective}  'https://www.youtube.com/watch?v=5X5v7vRYQjc&list=PL-uRhZ_p-BM7dYrgeHz4r3u74L9xwyXmL'
+# time2 curl -x socks5h://127.0.0.1:1078 -o /dev/null -w %{url_effective}  'https://www.ipinfo.io/'
+
+aliasfn ci78 curl-ip -x 'socks5h://127.0.0.1:1078'
+aliasfn ci79 curl-ip -x 'socks5h://127.0.0.1:1079'
+aliasfn ci80 curl-ip -x 'socks5h://127.0.0.1:1080'
+aliasfn ci81 curl-ip -x 'socks5h://127.0.0.1:1081'
+aliasfn ci90 curl-ip -x 'socks5h://127.0.0.1:1090'
+
+aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
+aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
+##
 alias myip-amazon='curlm http://checkip.amazonaws.com'
 alias myip-ipinfo='curlm https://ipinfo.io/ip'
 ##
@@ -25,11 +64,13 @@ function myip-stun() {
         stunclient 64.233.163.127 19302 # stun1.l.google.com 972.6 ms ± 218.9 ms
     } | rg --only-matching --replace='$1' 'Mapped address:\s+([^:]*):'
 }
+
 function myip-linux() {
     # @serveronly ? https://apple.stackexchange.com/questions/93533/how-to-obtain-the-external-ipv4-address-via-terminal
     hostname -I | awk '{print $1}'
 }
-myip() {
+
+function myip() {
     # these are all slow in Iran. If we could find some bloody Iranian service ...
     # https://iranwebmaster.net/t/ip/260
     

@@ -357,15 +357,19 @@ function gr-isLocal() {
   done
   return 1
 }
-ghttp() { git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat }
+
+function ghttp() {
+  git remote -v |awk '{print $2}'|inargsf git2http| gsort -u > >(pbcopy) | cat
+}
 ##
-guc() {
+function git-undo-commits() {
   mdoc "$0 [<how-many>=1]
 Undoes last commits without changing files." MAGIC
 
   git reset --soft HEAD~"${1:-1}"
 }
-_git2http() {
+##
+function _git2http() {
   mdoc "Usage: git2http <git-ssh-url> ...
 cat <file-with-ssh-urls> | git2http
 
@@ -379,24 +383,25 @@ then
     <<<"$*" gsed -e 's|:|/|' -e 's|git@|https://|'
   fi
 }
-alias git2http='noglob inargsEf "re _git2http"'
-git-resolve() {
+alias git2http='\noglob reval inargsEf "re _git2http"'
+##
+function git-resolve() {
   local git=("${=gitbinary:-git}")
   STRATEGY="$1"
   FILE_PATH="$2"
 
   if [ -z "$FILE_PATH" ] || [ -z "$STRATEGY" ]; then
-echo "Usage:   <strategy> <file>"
-echo ""
-echo "Example: --ours package.json"
-echo "Example: --union package.json"
-echo "Example: --theirs package.json"
-return
+  echo "Usage:   <strategy> <file>"
+  echo ""
+  echo "Example: --ours package.json"
+  echo "Example: --union package.json"
+  echo "Example: --theirs package.json"
+  return
   fi
 
   if [ ! -e "$FILE_PATH" ]; then
-echo "$FILE_PATH does not exist; aborting."
-return
+  echo "$FILE_PATH does not exist; aborting."
+  return
   fi
 
   # remove leading ./ if present, to match the output of $git[@] diff --name-only
@@ -404,8 +409,8 @@ return
   FILE_PATH_FOR_GREP=${FILE_PATH#./}
   # grep -Fxq: match string (F), exact (x), quiet (exit with code 0/1) (q)
   if ! $git[@] diff --name-only --diff-filter=U | grep -Fxq "$FILE_PATH_FOR_GREP"; then
-echo "$FILE_PATH is not in conflicted state; aborting."
-return
+  echo "$FILE_PATH is not in conflicted state; aborting."
+  return
   fi
 
   $git[@] show :1:"$FILE_PATH" > ./tmp.common
@@ -419,7 +424,8 @@ return
   rm ./tmp.ours
   rm ./tmp.theirs
 }
-git-listblobs() {
+
+function git-listblobs() {
   mdoc List blobs sorted by size. MAGIC
   git rev-list --objects --all \
     | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' \
