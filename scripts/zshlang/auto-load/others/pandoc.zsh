@@ -11,13 +11,24 @@ function org2md() {
 }
 
 function html2org() {
-    local input="${1}"
+    local input="${1}" o_format="${html2org_f:-org}"
     if test -z "$input" ; then
         input="$(gmktemp)"
         pbpaste-html > "$input" @RET
     fi
 
-    @opts from html to org @ pandoc-convert "$input" "${@[2,-1]}"
+    @opts from html to "$o_format" @ pandoc-convert "$input" "${@[2,-1]}"
+}
+
+function html2md {
+    @opts f markdown @ html2org "$@"
+}
+# @opts-setprefix html2md html2org
+
+function html2text() {
+    # @alt/worse html2text (python)
+    ##
+    html2org =(cat)
 }
 
 function pandoc-convert() {
