@@ -125,6 +125,7 @@ function vcndiff() {
 }
 function vcnpp() {
     local msg="${*}"
+    assert-args msg @RET
 
     pushf ~/
     {
