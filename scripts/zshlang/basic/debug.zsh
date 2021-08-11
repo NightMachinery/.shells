@@ -263,7 +263,7 @@ function assert() {
     # if a nested assert call resets this, we won't print the trace again
     # of course, forked processes can't touch this
     # assert_global_lock is also reset by ectrace (when it actually prints the trace).. We can go and reset it in 'throw' itself ...
-    reval "$@"
+    reval "$@" && true
     local ret=$?
     if test -n "$assert_global_lock" && (( ret != 0 ))  ; then
         head="${head:-${$(fn-name):-${funcstack[2]:-assert}}}" # fn-name takes  ~9ms
