@@ -38,6 +38,8 @@ else:
             continue
         if link.startswith('http'):
             page_links.append(link)
+        elif link.startswith('//'): # e.g., DDG's image search pages
+            page_links.append(parts.scheme + ':' + link)
         elif link.startswith('/'):
             page_links.append(parts.scheme + '://' + parts.netloc + link)
         else:

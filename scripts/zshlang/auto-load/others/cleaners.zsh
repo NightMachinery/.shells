@@ -35,8 +35,13 @@ function rm-caches() {
     trs-empty
 }
 function rm-caches-all() {
-    rm-caches-sudo
     rm-caches
+
+    if isSudo || isI; then
+        rm-caches-sudo
+    else
+        ecgray "$0: sudo needed for rm-caches-sudo; skipped"
+    fi
 }
 ##
 function cleanup() {

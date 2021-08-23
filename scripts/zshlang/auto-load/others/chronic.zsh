@@ -5,6 +5,8 @@ function chronic-all() {
     chronic-update
     chronic-anticreep
     chronic-certs
+
+    cleanup
 }
 
 function chronic-certs {
@@ -16,12 +18,18 @@ function chronic-certs {
 function chronic-update() {
     brew update
     re 'brew upgrade' googler
-    re 'pip install -U' ddgr youtube-dl fanficfare cloudscraper
+
+    pip install --upgrade ddgr fanficfare cloudscraper
+    pip install --upgrade --force pytube ytmusicapi youtube-dl spotipy spotdl
+
     tldr --update
+
     if isServer ; then
         brew upgrade
+        brew cleanup
     fi
 }
+
 function chronic-backup() {
     if isLilf ; then
         backup-private-common

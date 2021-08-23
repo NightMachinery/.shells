@@ -22,3 +22,14 @@ function rename-depth() {
     # --regex : idk what this does really
     # --test : dry-run
 }
+##
+function mv-date() {
+    local f="$1"
+    assert test -e "$f" @RET
+
+    local ext="$(ecn $f | rget '(\.[^.]*$)')"
+
+    gmv -v -i "$f" "${f:r}_$(gdate +"%Y-%b-%d")${ext}"
+}
+reify mv-date
+##

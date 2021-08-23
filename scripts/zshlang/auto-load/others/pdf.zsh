@@ -84,18 +84,21 @@ k2pdf-split() {
         i=$[i+1]
     done
 }
-function pdf-crop-margins () {
+##
+function pdf-crop-margins-inplace () {
     local u="$(uuidgen)"
-    command pdf-crop-margins -p 1 "$@" -o "$u"
+    command pdf-crop-margins -p 1 "$@" -o "$u" # -p percent of margins retained
     # -p is percent retained of margins.
-    \rm "${@[-1]}"
-    \mv "$u" "${@[-1]}"
+    silent trs-rm "${@[-1]}"
+    command mv "$u" "${@[-1]}"
 }
-pdfcrop() {
+
+function pdfcrop-inplace() {
     jglob
-    re pdf-crop-margins "$@"
+    re pdf-crop-margins-inplace "$@"
 }
-aliasfn pcr pdfcrop
+aliasfn pcr pdfcrop-inplace
+##
 pdfoutline() { jglob ; mutool show "$1" outline }
 
 function pdf-getpages() {

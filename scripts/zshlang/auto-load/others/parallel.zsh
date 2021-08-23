@@ -1,5 +1,6 @@
 function parallel() {
     PARALLEL_SHELL="${PARALLEL_SHELL:-brishz_para.dash}" command parallel --will-cite "$@"
+    # it seems parallel quotes the command arguments itself, as it IS expecting a shell
 }
 function parallelm() {
     local disable_opts="${parallel_d}"
@@ -33,6 +34,7 @@ function parallelm() {
 @opts-setprefix parallelm parallel
 aliasfn para parallelm
 @opts-setprefix para parallel
+
 function para-dash() {
     PARALLEL_SHELL="$(which dash)" parallel_jobs="${parallel_jobs:-+32}" para "$@"
 }

@@ -80,3 +80,12 @@ function open() {
   fi
 }
 ##
+function mega-get() {
+  if isBicon ; then
+    ecgray "$0: mega-get sometimes hangs when run in Bicon; Wrapping it in a tmux session."
+    tshd command mega-get "$@"
+  else
+    command mega-get "$@"
+  fi
+}
+##

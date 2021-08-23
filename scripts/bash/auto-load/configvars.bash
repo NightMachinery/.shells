@@ -20,20 +20,29 @@ export ITERMMAGIC=ITERM_MAGIC
 export iterm_socket="$HOME/tmp/.iterm_socket"
 ##
 dl_base_url='https://files.lilf.ir'
+
 fd_default=( --hidden --no-ignore )
+
 h2ed='html2epub-pandoc'
+
 export PURGATORY="$HOME/purgatory"
 mkdir -p "$PURGATORY"
+
 export cellar=~/cellar
+
 export music_dir="$HOME/my-music"
-to_dirtouch=y
-export logdir="$HOME/logs"
+export playlist_dir="$HOME/playlists"
 PRUNE_SONGD_DAYS="+120"
+export GREENCASE_DIR="$BASE_DIR/music/greencase"
+
+export logdir="$HOME/logs"
+
 export deleteus=~/.deleteus
 export deleteusdir=~/tmp/deleteus
+
 export codedir="$HOME/code"
+
 export BASE_DIR="$HOME/base"
-export GREENCASE_DIR="$BASE_DIR/music/greencase"
 ##
 export nightNotes="$cellar/notes/" # keep the trailing '/', it is important when removing prefixes
 export orgdir="$nightNotes/org"

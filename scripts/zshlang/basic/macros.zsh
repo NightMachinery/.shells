@@ -213,7 +213,7 @@ function h_@opts() {
         ##
         if (( ${#var2val} == 1 )) ; then
             setcmd="local -x ${varname}=$(gq "$var2val[@]")"
-            # @warn using `typeset -ag var` will reset the single var
+            # @warn using `typeset -ag var` will reset the single var; Use ensure-array-var instead.
         else
             setcmd="local -a ${varname}=( $(gq "$var2val[@]") )"
             # can't export arrays: `a=(1 2 3) zsh -fc 'typeset -p a'`
@@ -266,5 +266,14 @@ function opts-test2() {
     ec "${lily_extension:-${lily_e:-default}}"
     typeset -p lily_animal
     arger "$@"
+}
+##
+function ensure-array-var() {
+    local v="$1"
+    assert-args v @RET
+
+    if (( ${#${(P)v}} == 0 )) ; then
+        eval "typeset -ga ${v}=()" # @unquotedEval ; quoting will cause a syntax error.
+    fi
 }
 ##
