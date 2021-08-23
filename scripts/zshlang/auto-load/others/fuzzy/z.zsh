@@ -119,7 +119,7 @@ function ffz-get() {
             arrN ~/*(/N)
             arrN ~/base/*(/N)
             arrN /Volumes/*(/N)
-            arrN /Volumes/*/*(/N)
+            # arrN /Volumes/*/*(/N) # I think this reads the external drives and so causes a delay
 
             list_dirs_d=3 list-dirs "$PWD"
             # 'list_dirs_d=3 time2 silence list-dirs ~/' takes 0.12s, using depth=4 takes 0.28s

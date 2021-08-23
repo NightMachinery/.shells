@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const timeout = ((process.env.cfTimeout) || 20) * 1000
+const scrollDown = ((process.env.cfScrollDown) || 0)
 
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
@@ -37,6 +38,26 @@ puppeteer.use(StealthPlugin());
 
     //const title = await page.title();
     //console.log(title);
+
+    if (scrollDown > 0) {
+        let i = 0
+        try {
+            let previousHeight;
+            let scrollDelay = 1000 // in milliseconds
+            while (i < scrollDown) {
+                previousHeight = await page.evaluate('document.body.scrollHeight');
+                await page.evaluate('window.scrollTo(0, document.body.scrollHeight)');
+                await page.waitForFunction(`document.body.scrollHeight > ${previousHeight}`); // functions that evaluate JavaScript on the page like page.waitForFunction generally have a 30 second timeout
+                await page.waitForTimeout(scrollDelay);
+
+                i += 1
+            }
+        } catch(e) {
+            console.error(`Scrolling down failed at i=${i} with:\n`)
+            console.error(e)
+        }
+    }
+
     const html = await page.content();
     console.log(html);
 

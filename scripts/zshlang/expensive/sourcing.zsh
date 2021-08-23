@@ -8,7 +8,9 @@ function nix-source() {
 }
 ##
 function rvm-source() {
-    psource ~/.rvm/scripts/rvm
+    if ! isSudo; then
+        psource ~/.rvm/scripts/rvm
+    fi
 }
 rvm-source # takes ~0.3s
 ##

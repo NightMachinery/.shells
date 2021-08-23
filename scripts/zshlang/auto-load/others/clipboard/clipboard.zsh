@@ -1,4 +1,5 @@
 export CLIPBOARD_RECORD_FILE=~/tmp/.clipboard
+##
 function clipboard-record() {
     ##
     # @codetoread https://github.com/ms-jpq/isomorphic_copy
@@ -23,6 +24,9 @@ function clipboard-record() {
         fi
         if (( counter == 7200 )) ; then
             counter=0
+
+            ecdate "Maintenance: Deleting duplicates ..."
+
             clipboard-removedups
         else
             counter=$(( counter + 1 ))
@@ -30,6 +34,7 @@ function clipboard-record() {
         sleep $sleep
     done
 }
+
 function clipboard-add() {
     local i="$*" file="$CLIPBOARD_RECORD_FILE"
     assert-args file @RET
@@ -43,8 +48,9 @@ function clipboard-add() {
         clipboard-init
     fi
 
-    sync-append "$file" $'\0'"$i" || ectrace
+    sync-append "$file" $'\0'"$i" @TRET
 }
+
 function clipboard-delall() {
     local file="$CLIPBOARD_RECORD_FILE"
     assert-args file @RET
@@ -52,6 +58,7 @@ function clipboard-delall() {
     reval-ec command rm -rf "$file"
     # reval-ec clipboard-init
 }
+
 function clipboard-init() {
     local file="$CLIPBOARD_RECORD_FILE"
     touch "$file" # ensures that we won't get into a loop
@@ -61,6 +68,7 @@ function clipboard-init() {
         # ectrace
         reval-ec clipboard-add "$(trim "$i")"
     done
+
     for i in "${(@ps.\C-^.)$(cat "$attic_temoji")}" ; do
         i=( "${(@f)i}" )
         clipboard-add "${i[1]}"$'\C-^\t\t'"${i[2]}"
@@ -75,6 +83,7 @@ function clipboard-init() {
         ectrace "emoji_trace does not exist" "$emoji_json"
     fi
 }
+
 function clipboard-removedups() {
     local file="$CLIPBOARD_RECORD_FILE"
     assert-args file @RET

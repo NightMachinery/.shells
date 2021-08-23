@@ -97,27 +97,32 @@ function songc() {
     fi
     local f2="$(playlister "$p")"
     f+=( ${(@f)f2} )
-    local autopl="${playlist_dir:-$HOME/playlists}/autopl/"
+    local autopl="${playlist_dir}/autopl/"
     mkdir -p "$autopl"
     gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
     test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
     # re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
     ! test -z "$f" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
-touch-tracks() {
+
+function touch-tracks() {
     comment "songd dir-touches using touch-tracks, but songc does not. We can of course add an env var and dir-touch here ... Using 'mus' (so songd) might also work ..."
-    test -z "$to_dirtouch" && touch-tracks_ "$@" || {
-            local f tt i
-            tt=()
-            typeset -U tt
-            f=( "$@" )
-            for i in "$f[@]"
-            do
-                tt+=( "$(bottomdir "$i")"/*(DN) )
-            done
-            touch-tracks_ "$tt[@]"
-        }
+
+    if bool "${touch_tracks_recursive:-y}" ; then
+        local f tt i
+        tt=()
+        typeset -U tt
+        f=( "$@" )
+        for i in "$f[@]"
+        do
+            tt+=( "$(bottomdir "$i")"/*(DN) )
+        done
+        touch-tracks_ "$tt[@]"
+    else
+        touch-tracks_ "$@"
+    fi
 }
+
 touch-tracks_() {
     local track
     for track in "$@"
@@ -126,13 +131,22 @@ touch-tracks_() {
         test -e "$track" && serr touch "$track" #"$(bottomdir "$track")"
     done
 }
+
 playlistc() {
+    : "fuzzy choose between existing playlists"
+
     bella_zsh_disable1=y
 
-    local pl="$(fd --follow -t f '.' "${playlist_dir:-$HOME/playlists/}" | fz -q "$*")"
-    test -z "$pl" || { ec "Playing playlist(s) $pl" && hearp +s "${(@f)pl}" }
+    local pl
+    pl="$(fd --follow -t f '.' "${playlist_dir}" | fz -q "$*")" @RET
+
+    ec "Playing playlist(s) $pl"
+    hearp +s "${(@f)pl}"
 }
+
 playlister() {
+    : "outputs a list of files (a playlist) on stdout"
+
     bella_zsh_disable1=y
 
     local fz_q=''
@@ -151,6 +165,7 @@ playlister() {
     # @workaround By adding the extensions to the query, we force it to show paths from the end.
     # --keep-right: Keep the right end of the line visible when it's too long. Effective only when the query string is empty.
 }
+
 find-music() {
     bella_zsh_disable1=y
 
@@ -161,7 +176,7 @@ find-music() {
         opts+=(-e "$ext")
     done
 
-    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" | ugbool "$*"
+    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" | sponge | ugbool "$*"
     # Do NOT use --absolute-path, as we want relative-path playlists
 }
 songd() {
@@ -290,7 +305,9 @@ muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*" }
 ##
 function playlist-save() {
     # Save Playlist save-playlist save-pl
-    mv "$(last-created "${playlist_dir:-$HOME/playlists}/autopl")" "${playlist_dir:-$HOME/playlists}/$1"
+    local autopl="${playlist_dir}/autopl/"
+
+    mv "$(last-created "$autopl")" "${playlist_dir}/$1"
 }
 aliasfn pls playlist-save
 ##

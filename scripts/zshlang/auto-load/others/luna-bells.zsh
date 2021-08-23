@@ -16,6 +16,8 @@ luna() {
 }
 ##
 lunas() {
+    # local lo_min="${1:-$lo_min}"
+
     lunar luna-advanced-bell
     display-gray-off # probably redundant
 }
@@ -219,7 +221,7 @@ function deluna() {
     while oneinstance $0 $nonce
     do
         (( $(idle-get) >= $timeout || $(lastunlock-get) <= 80 )) && {
-            edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get))")"
+            edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get-min))")"
             lunaquit " via deluna"
             kill-marker-luna-timer-late
             luna_skipped_set 0

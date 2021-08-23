@@ -16,8 +16,12 @@ redism() {
     if (( r == 141 )) ; then
         local cmd="$(gq "$0" "$@")"
         local msg="$0: redis returned $r (is stdout a bad pipe?). Cmd: $cmd"
-        ecerr $msg
-        ectty $msg
+        ##
+        # ecerr $msg
+        # ectty $msg
+        ##
+        ectrace_ret=$r ectrace "$msg"
+        ##
         # eval "$cmd"
         return $r
     fi

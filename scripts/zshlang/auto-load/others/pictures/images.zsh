@@ -168,3 +168,15 @@ function resize4ipad-pad() {
     pad2square "$o" "$o"
 }
 ##
+function img-rotate() {
+    ## usage tips
+    # - select the files that need to be rotated in Finder
+    # - =pf re 'o d -90 @ img-rotate'=
+    ##
+    local input="$1" degree="${img_rotate_d:--90}"
+    assert test -e "$input" @RET
+    local out="${2:-${input:r}_r${degree}.${input:e}}"
+
+    assert magick convert "$input" -rotate "$degree" "$out" @RET
+}
+##

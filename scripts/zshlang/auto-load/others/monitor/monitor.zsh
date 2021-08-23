@@ -124,7 +124,7 @@ function lastunlock-get() {
 
     # Using lower precision helps a lot with performance
     # hyperfine --warmup 5 "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 3h" "log show --style syslog --predicate 'process == \"loginwindow\"' --debug --info --last 30h"
-    local precision="${1:-1h}" # can only spot the last unlock in this timeframe
+    local precision="${1:-2h}" # can only spot the last unlock in this timeframe
     [[ "$precision" =~ '^\d+$' ]] && precision+=h
 
     unset date

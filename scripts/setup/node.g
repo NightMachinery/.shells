@@ -40,6 +40,7 @@ puppeteer-extra
 puppeteer-extra-plugin-repl
 puppeteer-extra-plugin-stealth
 puppeteer-extra-plugin-user-preferences
+puppeteer-extra-plugin-user-data-dir
 random-word-cli
 randomcolor
 read-time-estimate

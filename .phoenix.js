@@ -251,7 +251,12 @@ function quakeApp({
 
         if (hideOnBlur) {
           const identifier = Event.on("appDidActivate", async function (activatedApp) {
-            if (app.name() !== activatedApp.name()) {
+            appName2 = app.name()
+            activatedName = activatedApp.name()
+            if (appName2 !== activatedName && activatedName !== "SecurityAgent" /* SecurityAgent is the name of the sudo touchID dialog */ && activatedName !== "Maccy") {
+
+              // brishz_log('wanted: ' + appName2, 'activated: ' + activatedName)
+
               /// @duplicatedCode3581
               app.hide();
               if (postCommands && postCommands.length >= 1) {
@@ -514,12 +519,18 @@ function brishz(...args) {
     })
   );
 }
-///
+
 function brishz_sync(...args) {
   (async () => {
     await brishz(...args)
   }
   )();
+}
+
+function brishz_log(...args) {
+  cmd = ["alert"]
+  cmd.push(args.join("\n"))
+  brishz_sync(cmd)
 }
 ///
 // brishz_sync(["bell-sc2-evil-laugh"])

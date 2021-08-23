@@ -1,4 +1,6 @@
 function tts-gateway() {
+    # Use tts-say, it's the best of them.
+    ##
     local text="${*:?}" engine=("${tts_gateway_engine[@]:-${tts_gateway_e[@]:-tts-espnet}}") postproc=("${tts_gateway_postproc[@]}") ext="${tts_gateway_ext:-wav}"
 
     bella_zsh_disable1=y
@@ -63,6 +65,7 @@ function fsay() {
 
     say -v $voice -r $rate "$@"
 }
+
 function tts-say() {
     local text="${1}" output="${2}"
     assert-args output @RET
@@ -73,12 +76,15 @@ function tts-say() {
         tts-espnet "$@"
     fi
 }
+
 aliasfn tts-say-cached @opts ext aiff e tts-say @ tts-gateway
+
 function tts-say-i1() {
-    local fsay_r=50
+    local fsay_r=5 # the range 1-50 is indistinguishable to me
 
     @opts e tts-say ext aiff postproc audiofx-infantilize1 @ tts-gateway "$@"
 }
+
 function tts-say-i2() {
     local fsay_r=80
 

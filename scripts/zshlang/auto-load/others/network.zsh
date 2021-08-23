@@ -15,7 +15,10 @@ function curl-ip {
     if res_json="$(ec $res | serr jq -e "$jq_opts[@]" .)" ; then
         ec $res_json
     else # ipinfo blocks Iranian IPs
-        curl "$opts[@]" http://checkip.amazonaws.com
+        local ip
+        ip="$(curl "$opts[@]" http://checkip.amazonaws.com)" @RET
+        ec "$ip"
+        ip-geolocate "$ip" @RET
         ##
         # ec $res | html2text
     fi

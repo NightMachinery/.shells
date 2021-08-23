@@ -178,3 +178,12 @@ function isNet() {
     fi
 }
 ##
+function isSudo() {
+    # The $EUID environment variable (or `id -u`) holds the current user's UID. Root's UID is 0.
+
+    [ "${EUID:-$(id -u)}" -eq 0 ]
+}
+function isRoot() {
+    isSudo "$@"
+}
+##

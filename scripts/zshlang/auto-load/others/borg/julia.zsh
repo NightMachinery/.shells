@@ -107,7 +107,7 @@ jdlc() {
     # silence popd
 }
 jdl-helper() {
-    local subdir="${jdl_subdir:-tmp}"
+    local subdir="${jdl_subdir:-${jdl_d:-tmp}}"
 
     mkdir -p ~/Downloads/$subdir/
     cp "$1" ~/Downloads/$subdir/
@@ -169,7 +169,8 @@ jup() {
     globexists ./**/*(.D) || return 0
     command mv --update ./**/*(.D) "${1:-./}"
 }
-jimg() {
+##
+function j-image-dl-google() {
     test "$1" = "-h" && {
         ec 'googleimagesdownload --keywords "Polar bears, baloons, Beaches" --limit 20
 googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
@@ -188,6 +189,8 @@ googleimagesdownload -k "Polar bears, baloons, Beaches" -l 20
     }
     googleimagesdownload "$@" && jup
 }
+
+alias jimg='j-image-dl-google'
 ##
 function tsox() {
     # @alt audiofx-sox
@@ -246,15 +249,22 @@ function jahun() {
 function ansi2img {
     local ugrep_opts=( $ugrep_opts[@] --color=always ) # can be problematic, but whatever
 
+    local tmp r
+    tmp="$(gmktemp)" @TRET
+    fnswap isColor true "$@" &> $tmp
+    r=$?
+
     local out="${PWD}/ansi" # .000.png is added by deark
-    sdbg deark -m ansiart -opt char:output=image =(fnswap isColor true "$@") -o $out
+    assert sdbg deark -m ansiart -opt char:output=image $tmp -o $out @RET
 
     local out
     out=("${out}"*.png(.DN))
 
-    re alpha2black "$out[@]" # @idk why, but this causes the output image to be sent via Telegram without triggering our white padding
+    assert re alpha2black "$out[@]" @RET # @idk why, but this causes the output image to be sent via Telegram without triggering our white padding
 
-    sdbg trs-rm "$out[@]"
+    assert sdbg trs-rm "$out[@]" @RET
+
+    return $r
 }
 alias a2i='ansi2img'
 ##

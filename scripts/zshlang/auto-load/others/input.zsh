@@ -8,6 +8,10 @@ function ask() {
     # forked from https://gist.github.com/davejamesmiller/1965569
     local prompt default reply
 
+    if isBrish ; then
+        tts-glados1-cached "Brish is asking you a question"
+    fi
+
     if [ "${2:l}" = "y" ]; then
         prompt="Y/n"
         default=Y

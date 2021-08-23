@@ -2,7 +2,7 @@ typeset -ag ugrep_opts=(--bool --smart-case --sort=best --no-confirm --perl-rege
 # --dereference-recursive : recursive dirs, follows symlinks
 ##
 function ugbase() {
-    local follow_sym="${ugbase_follow:-y}"
+    local follow_sym="${ugbase_follow}"
 
     local sel ret opts=()
 
@@ -12,6 +12,7 @@ function ugbase() {
 
     if bool "$follow_sym" ; then
         opts+='--dereference-recursive'
+        # @warn this causes ugrep to search files given on stdin!
     fi
 
     sel="$(command ugrep "$ugrep_opts[@]" "$opts[@]" "$@")"
@@ -27,7 +28,9 @@ function ugbase() {
 }
 ##
 function ugbool() {
-    ugbase --bool "$*"
+    local q="${*:-.}"
+
+    ugbase --bool "$q"
 }
 noglobfn ugbool
 alias ugb='\noglob ugbool'

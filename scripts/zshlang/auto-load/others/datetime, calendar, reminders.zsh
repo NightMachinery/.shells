@@ -437,7 +437,9 @@ function rem-rec() {
     local rem_dest=''
     local cmd="$(gq "$@")"
 
-    fnswap isColor true ectrace "$0: started" &>/dev/tty
+    ## @verbose
+    # fnswap isColor true ectrace "$0: started" &>/dev/tty
+    ##
 
     fnswap rem-sync true eval "$cmd"
     if test -n "$rem_dest" ; then

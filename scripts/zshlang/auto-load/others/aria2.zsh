@@ -148,8 +148,11 @@ function aa-remotename() {
     : "supports only a single URL"
     local url="${@[-1]}" rename="${aa_rename}"
 
-    local name=''
-    name="$(url-filename "$url")"
+    local name="${aa_out_name}"
+    if test -z "$name" ; then
+        name="$(url-filename "$url")"
+    fi
+
     if test -n "$name" ; then
         # When the --force-sequential (-Z) option is used, --out is ignored.
 
@@ -169,4 +172,26 @@ function aa-remotename() {
     fi
 }
 @opts-setprefix aa-remotename aa
+
+function aa-hash-name() {
+    : "supports only a single URL"
+    local url="${@[-1]}"
+
+    local name="${aa_out_name}"
+    if test -z "$name" ; then
+        name="$(url-filename "$url")"
+    fi
+
+    local hash
+    hash="$(md5m "$url")" @TRET
+
+    if test -n "$name" ; then
+        name="${name:r}_${hash}.${name:e}"
+    else
+        name="$hash"
+    fi
+
+    aa-gateway --conditional-get=true --out="$name" "$@" @RET
+}
+@opts-setprefix aa-hash-name aa
 ##
