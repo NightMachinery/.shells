@@ -89,6 +89,7 @@ function input-lang-set-darwin-old() {
     # cliclick kd:ctrl kp:space ku:ctrl # takes ~0.4
     ##
 }
+
 function input-lang-set-darwin() {
     # `hyperfine --warmup 5 'xkbswitch -se US' "hs -c 'langSetEn()'"` 72 vs 29
     local wanted="${1:l}"
@@ -99,20 +100,32 @@ function input-lang-set-darwin() {
         *) ecerr "Not supported" ; return 1 ;;
     esac
 }
+
 function input-lang-set() {
     # @darwinonly
     local nopopreset="$input_lang_set_nopopreset"
 
     if isDarwin ; then
         input-lang-set-darwin "$@"
+
+        btt-refresh 623FC96A-0BD0-4463-B186-D4E55024A637
     else
-        return 6
+        @NA
     fi
-    btt-refresh 623FC96A-0BD0-4463-B186-D4E55024A637
+
     if test -z "$nopopreset" ; then
         input_lang_push_lang_del
     fi
 }
+
+function input-lang-toggle() {
+    if isDarwin ; then
+        input-lang-set-darwin toggle
+    else
+        @NA
+    fi
+}
+
 function input-lang-get-darwin-fast() {
     # bug: not updated instantaneously
     ## Perf: (8.5x faster)
@@ -131,7 +144,7 @@ function input-lang-get-darwin() {
     ## hammerspoon is quite fast:
     # `hyperfine --warmup 5 "hs -c 'hs.keycodes.currentSourceID()'" "xkbswitch -ge" "input_lang_get_objc"` 28ms vs 71ms
     ##
-    if false && [[ "$(hammerspoon -A -c 'hs.keycodes.currentSourceID()')" =~ 'com.apple.keylayout\.(.*)' ]] ; then
+    if test -z "$input_lang_get_darwin_noHS" && [[ "$(hammerspoon -A -c 'hs.keycodes.currentSourceID()')" =~ 'com.apple.keylayout\.(.*)' ]] ; then
         ec "${match[1]}"
     else
         # @warn this macOS API has an unknown bug that can cause it to be very slow
@@ -155,6 +168,13 @@ function input-lang-get() {
     esac
 
 }
+
+function input-lang-show() {
+    alert "$(input_lang_get_darwin_noHS=y input-lang-get)"
+    # using hammerspoon can cause a deadlock as this function is called from within hammerspoon
+    # for the same reason, we can not call this function from hammerpoon
+}
+
 function input-lang-get-icon() {
     ##
     # `hyperfine --warmup 5 "input_lang_get_icon" 'brishz.dash input-lang-get-icon'`

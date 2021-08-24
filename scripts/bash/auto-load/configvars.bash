@@ -25,6 +25,8 @@ fd_default=( --hidden --no-ignore )
 
 h2ed='html2epub-pandoc'
 
+export BASE_DIR="$HOME/base"
+
 export PURGATORY="$HOME/purgatory"
 mkdir -p "$PURGATORY"
 
@@ -42,7 +44,7 @@ export deleteusdir=~/tmp/deleteus
 
 export codedir="$HOME/code"
 
-export BASE_DIR="$HOME/base"
+export chat_logs_dir="$BASE_DIR/documents/chat_logs"
 ##
 export nightNotes="$cellar/notes/" # keep the trailing '/', it is important when removing prefixes
 export orgdir="$nightNotes/org"
@@ -112,4 +114,4 @@ else
     # test -e ~/.SpaceVim && veditor=(svi -p) ||
     veditor=(vim -p) # doc '-o opens in split view, -p in tabs. Use gt, gT, <num>gt to navigate tabs.'
 fi
-
+##

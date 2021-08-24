@@ -15,24 +15,25 @@
 	pager = LESS='-RiF --mouse --wheel-lines=3' delta --light --theme 'Solarized (light)'
 	# ignorecase = false
 [color]
-  branch = auto
-  diff = auto
-  interactive = auto
-  status = auto
+	branch = auto
+	diff = auto
+	interactive = auto
+	status = auto
 [http]
-  sslVerify = true
-	proxy = socks5h://127.0.0.1:1081
+	sslVerify = true
+	proxy = http://127.0.0.1:1088
+	# proxy = socks5h://127.0.0.1:1081 # incompatible with git-credential-manager-core
 [pull]
 	rebase = false
 [difftool]
-    prompt = false
-    # trustExitCode = true
+	prompt = false
+	# trustExitCode = true
 [difftool "kitty"]
-    cmd = kitty +kitten diff $LOCAL $REMOTE
+	cmd = kitty +kitten diff $LOCAL $REMOTE
 	# submodule = diff
 	# submodules don't work :(
 [difftool "kitty.gui"]
-    cmd = kitty kitty +kitten diff $LOCAL $REMOTE
+	cmd = kitty kitty +kitten diff $LOCAL $REMOTE
 [receive]
 	denyCurrentBranch = updateInstead
 # [url "ssh://git@github.com/"]
@@ -48,3 +49,8 @@
 	defaultBranch = master
 [commit]
 	gpgSign = true
+[credential] # @darwinOnly
+	helper = 
+	helper = /usr/local/share/gcm-core/git-credential-manager-core
+[credential "https://dev.azure.com"]
+	useHttpPath = true
