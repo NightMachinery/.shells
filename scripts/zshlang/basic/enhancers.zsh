@@ -15,6 +15,27 @@ function enh-savename() {
         enhSavedNames[$n1]="$n2"
     }
 }
+
+function preEnhNames() {
+    unset out
+    : "usage: args ...
+Replaces any arg that is in enhSavedNames with its original name. Outputs in \$out.
+Update: Actually adds, not replaces. Also removes duplicates."
+
+    local items=( "$@" )
+    local itemsP=()
+    for item in "$items[@]"
+    do
+        local on="$enhSavedNames[$item]"
+        itemsP+="$item"
+        if test -n "$on" ; then
+            itemsP+="$on"
+        else
+
+        fi
+    done
+    out=("${(u@)itemsP}")
+}
 ##
 function enh-mkdest() {
     doc enhances commands by creating directories for destination.
