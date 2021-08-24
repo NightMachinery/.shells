@@ -43,7 +43,7 @@ pxa-create
 # alias pxa-maybe='isIran && pxa-local'
 alias pxa-maybe='isLocal && pxa-local'
 function reval-pxa() {
-    reval pxa "$@"
+    pxa reval "$@"
 }
 ##
 v2-on() {

@@ -239,3 +239,21 @@ function ps-zombies() {
     command ps axo pid=,stat= | gawk '$2~/^Z/ { print $1 }'
 }
 ##
+function cpu-get() {
+    if isDarwin ; then
+        # [[https://stackoverflow.com/questions/65259300/detect-apple-silicon-from-command-line][bash - Detect Apple Silicon from command line - Stack Overflow]]
+        ##
+        sysctl -n machdep.cpu.vendor
+        sysctl -n machdep.cpu.brand_string # outputs 'Apple M1' on my M1 Mac Mini
+    else
+        # [[https://askubuntu.com/questions/806532/getting-information-about-cpu][cpuinfo - Getting information about CPU - Ask Ubuntu]]
+        ##
+        cat /proc/cpuinfo
+
+        cat /proc/cpuinfo | rg 'model name'
+    fi
+
+    reval-ec uname -m # 'arm64' on M1
+    # @warn M1 users can run Terminal in Rosetta mode. In this case "uname -m" returns "x86_64".
+}
+##

@@ -113,9 +113,18 @@ function ziib-znc {
         # ZNC
         assert reval-ec rsp-dl root@51.178.215.202:/home/zii/.znc ./ # includes logs
 
-        # trs ./.znc/moddata/log || true # chat logs
-        trs ./.znc/moddata/log/**/('##chat'|'##chat-overflow'|'##news'|'##politics'|'#libera')(DN) # these take too much space
-
+        ## chat logs
+        local ld=./.znc/moddata/log
+        trs ${ld}/**/('##chat'|'##chat-overflow'|'##news'|'##politics'|'#libera')(DN) # these take too much space
+        if test -e "$chat_logs_dir" ; then
+            local dest=${chat_logs_dir}/znc/
+            mkdir -p "$dest"
+            mv-merge $ld "$dest"
+        else
+            ecerr "chat_logs_dir does not exists. Deleting the chat logs instead"'!'
+            trs $ld
+        fi
+        ##
         trs ./.znc/modules/ || true # the external, binary modules
         trs ./.znc/znc.pem || true # the SSL certs
         # @note I've also added these deleted files to the =.gitignore= file, to avoid race conditions

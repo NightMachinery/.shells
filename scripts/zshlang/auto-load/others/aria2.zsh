@@ -8,9 +8,11 @@ function aaserver() {
     mkdir -p ~/Downloads/aas/
     aria2c --rpc-secret "$ARIA_SECRET" --enable-rpc --log-level debug -l ~/Downloads/aas/aria.log -d ~/Downloads/aas/ -D
 }
+
 function aac() {
     aria2p --secret "$ARIA_SECRET" "$@"
 }
+##
 aa-raw() {
     local opts=('--stderr=true')
     # Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
@@ -31,7 +33,15 @@ aa-raw() {
         opts+=( --enable-color=false )
     fi
 
-    aria2c --user-agent "$useragent_chrome" --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false  $opts[@] "$@"
+    if [[ "${@[-1]}" =~ '\.torrent$' ]] ; then
+        ecgray "$0: torrent detected"
+        # opts=("${opts[@]}")
+    else
+        opts=(--user-agent "$useragent_chrome" "${opts[@]}")
+        # --user-agent will cause problems (immediately abort them) with torrent downloads
+    fi
+
+    aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@"
     local ret=$?
     #-Z has some unsavory sideeffects so I have not included it in this.
 

@@ -224,11 +224,25 @@ hs.dockicon.hide() -- to appear above full-screen windows you must hide the Hamm
 function langSetPer()
   hs.keycodes.currentSourceID(inputPersian)
 end
+
 function langSetEn()
   hs.keycodes.currentSourceID(inputEnglish)
 end
+
+function langEnIs()
+  return hs.keycodes.currentSourceID() == inputEnglish
+end
+
+function langGet()
+  if langEnIs() then
+    return "En"
+  else
+    return "Fa"
+  end
+end
+
 function langSetToggle()
-  if hs.keycodes.currentSourceID() == inputEnglish then
+  if langEnIs() then
     langSetPer()
   else
     langSetEn()
@@ -494,6 +508,12 @@ hs.hotkey.bind(hyper, "g", anycomplete)
 --   -- app:mainWindow():moveToUnit'[100,50,0,0]'
 --   -- app:mainWindow().setShadows(false)
 -- end)
+---
+hs.hotkey.bind(hyper, "i", function()
+                 langSetToggle()
+                 hs.alert(langGet(), 1)
+                 brishzeval('input_lang_push_lang_del')
+end)
 ---
 function appHotkey(o)
   hs.hotkey.bind(o.modifiers or hyper, o.key, function()

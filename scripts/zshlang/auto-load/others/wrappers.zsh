@@ -1,8 +1,10 @@
 function '$'() { eval "$(gquote "$@")" ; }
+##
 function hammerspoon() {
   # -t timeout (default 4)
-  gtimeout 30s hs -A -t 5 "$@"
+  assert gtimeout 30s hs -A -t 5 "$@" @RET
 }
+##
 function mcli-getexecpath_h() {
   brew unlink m-cli
   
@@ -87,5 +89,9 @@ function mega-get() {
   else
     command mega-get "$@"
   fi
+}
+##
+function mipsi-stdin() {
+  mipsi =(cat)
 }
 ##

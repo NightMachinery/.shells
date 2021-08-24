@@ -8,6 +8,11 @@ if isDarwin ; then
     brew install fabianishere/personal/pam_reattach
 
     brew install --cask corelocationcli
+
+    # credential manager for HTTPS logins
+    # https://docs.github.com/en/get-started/getting-started-with-git/caching-your-github-credentials-in-git
+    brew tap microsoft/git
+    brew install --cask git-credential-manager-core
     ## Fonts:
     brew install --cask font-fira-code font-fira-mono
     brew install --cask font-victor-mono
