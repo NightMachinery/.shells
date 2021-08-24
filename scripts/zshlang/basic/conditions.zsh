@@ -63,6 +63,7 @@ function isTmux() {
 if iszsh ; then
     function isGuest {
         [[ "$HOSTNAME" == 'amadeus.local' ]]
+        # amadeus.local is Aeirya's
     }
 else
     function isGuest {

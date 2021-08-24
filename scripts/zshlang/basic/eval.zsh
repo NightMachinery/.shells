@@ -95,9 +95,3 @@ alias rin='reval-withstdin'
 function rgeval() {
     geval "$(gquote "$@")"
 }
-function psource()
-{
-    if [[ -r "$1" ]]; then
-        source "$1"
-    fi
-}
