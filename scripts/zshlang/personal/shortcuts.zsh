@@ -125,7 +125,9 @@ function vcndiff() {
 }
 function vcnpp() {
     local msg="${*}"
-    assert-args msg @RET
+    if isIReally ; then
+        assert-args msg @RET
+    fi
 
     pushf ~/
     {

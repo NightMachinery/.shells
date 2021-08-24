@@ -152,8 +152,14 @@ function isInTty() {
     # -t fd True if file descriptor fd is open and refers to a terminal.
 }
 ##
-alias isExpensive='[[ -z "$NIGHT_NO_EXPENSIVE" ]]'
-alias isNotExpensive='[[ -n "$NIGHT_NO_EXPENSIVE" ]]'
+function isExpensive() {
+    [[ -z "$NIGHT_NO_EXPENSIVE" ]]
+}
+
+function  isNotExpensive() {
+    [[ -n "$NIGHT_NO_EXPENSIVE" ]]
+}
+
 function isRcLoaded() {
     test -n "$rcLoaded"
 }

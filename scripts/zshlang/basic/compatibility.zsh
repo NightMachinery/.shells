@@ -4,6 +4,18 @@ function isdefined() {
 
     test -n "$sym" && (( $+commands[$sym] || $+functions[$sym] || $+aliases[$sym] ))
 }
+alias isDefined=isdefined
+
+function ifdefined() {
+    local cmd_head="$1"
+
+    if isdefined "$cmd_head" ; then
+        reval "$@"
+    else
+        return 1270 # == 246
+    fi
+}
+
 function cmd-sub() {
     local cmd="$1" sub="$2"
 
