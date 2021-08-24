@@ -75,7 +75,26 @@ isNotExpensive || {
         realpath2 "$@"
     }
 }
-test -n "$NO_AUTOLOAD_BASH" || zsh-defer source "$NIGHTDIR"/bash/load-others.bash
+
+function nightsh-load-bash() {
+    zsh-defer source "$NIGHTDIR"/bash/load-others.bash
+}
+
+if isGuest || test -n "$NO_AUTOLOAD_BASH" ; then
+    nightsh-load-bash
+else
+    function nsh() {
+        nightsh-load-bash
+        unfunction "$0"
+    }
+fi
+
+if [ -e ~/.localScripts ] ; then
+    re psource ~/.localScripts/**/*.zsh
+fi
+psource "$HOME/.privateShell"
+
+typeset -Ug path
 
 if isKitty ; then
     function kitty-fix-path() {
