@@ -1,6 +1,12 @@
 ###
 alias zsh-defer=''
 
+function psource() {
+    if [[ -r "$1" ]]; then # -r: readable file
+        source "$1"
+    fi
+}
+
 function nightsh-load-zshenv() {
     ZSH_PWD_CACHE=~/tmp/.zsh_pwd
     function zsh-pwd-save() {
@@ -61,7 +67,7 @@ function nightsh-load-zshenv() {
         DISABLE_DEFER=y
         # Won't defer if not interactive or disabled explicitly
         if { [[ -o interactive ]] && test -z "$DISABLE_DEFER" } ; then
-            unalias zsh-defer
+            unalias zsh-defer # @warn this is too late to affect the code already loaded
             antibody bundle romkatv/zsh-defer
         fi
 
@@ -90,13 +96,13 @@ function nightsh-load-zshenv() {
     }
 
     function nightsh-basic-p() {
-        isGuest || test -n "$NO_AUTOLOAD_BASH"
+        test -n "$NIGHTSH_NO_AUTOLOAD_BASH"
     }
 
     if nightsh-basic-p ; then
         ## tests
-        # `env-clean NO_AUTOLOAD_BASH=y zsh`
-        # `time2 env-clean NO_AUTOLOAD_BASH=y zsh -c true` takes about 0.37
+        # `env-clean NIGHTSH_NO_AUTOLOAD_BASH=y zsh`
+        # `time2 env-clean NIGHTSH_NO_AUTOLOAD_BASH=y zsh -c true` takes about 0.37
         ##
         function nsh() {
             nightsh-load-bash
@@ -105,13 +111,6 @@ function nightsh-load-zshenv() {
     else
         nightsh-load-bash
     fi
-
-    if [ -e ~/.localScripts ] ; then
-        re psource ~/.localScripts/**/*.zsh
-    fi
-    psource "$HOME/.privateShell"
-
-    typeset -Ug path
 
     if isKitty ; then
         function kitty-fix-path() {
@@ -133,3 +132,11 @@ if test -e "$nightsh_private_first" && ! source "$nightsh_private_first" ; then
 else
     nightsh-load-zshenv
 fi
+
+function nightsh-load-local-last() {
+    if [ -e ~/.localScripts ] ; then
+        re psource ~/.localScripts/**/*.zsh(ND)
+    fi
+    psource "$HOME/.privateShell"
+}
+nightsh-load-local-last
