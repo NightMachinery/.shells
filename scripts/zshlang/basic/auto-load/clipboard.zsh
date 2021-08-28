@@ -81,11 +81,69 @@ function pbpaste() {
 
 function pbpaste-html() {
     assert isDarwin @RET
-
-    command pbv public.html public.utf8-plain-text
-    # https://stackoverflow.com/questions/17217450/how-to-get-html-data-out-of-of-the-os-x-pasteboard-clipboard
+    if isDarwin ; then
+        command pbv public.html public.utf8-plain-text
+        # https://stackoverflow.com/questions/17217450/how-to-get-html-data-out-of-of-the-os-x-pasteboard-clipboard
+    else
+        @NA
+        # See
+        # - https://unix.stackexchange.com/questions/78395/save-html-from-clipboard-as-markdown-text
+    fi
 }
 alias poph='pbpaste-html'
+
+function pbcopy-html() {
+    # @alt copy_as_html.swift can set the plain and HTML clipboard simultaneously.
+    #
+    # Can be pasted in Excel, TextEdit, but surprisingly not in much else
+    # test with `<b>bold text</b>`
+    #
+    # Further tests seem to indicate that I was mistaken in my assumption that pasting rich text is possible in most web apps on Chrome. Gmail works though.
+    #
+    # - @me https://stackoverflow.com/questions/68937989/macos-copy-html-to-the-clipboard
+    # - @me https://github.com/chbrown/macos-pasteboard/issues/8
+    # - https://github.com/jkitchin/ox-clip/issues/13
+    # - https://assortedarray.com/posts/copy-rich-text-cmd-mac/
+    #
+    # Less relevant:
+    # - https://unix.stackexchange.com/a/84952
+    # - https://superuser.com/questions/912712/how-to-send-rich-text-to-the-clipboard-from-command-line
+    # - https://stackoverflow.com/questions/6095497/how-can-i-generate-a-rich-text-link-for-pbcopy/6100348#6100348
+    # - https://stackoverflow.com/questions/67500279/copy-rich-text-with-image-to-nspasteboard-and-paste-in-word
+    #
+    ##
+    local html="$(cat)"
+
+    # html="<meta charset=\"utf-8\"> $html"
+    ec "$html"
+
+    if isDarwin ; then
+        local hex
+        hex="$(arrN "$html" | hexdump -ve '1/1 "%.2x"')" @TRET
+        osascript -e "set the clipboard to {text:\" \", «class HTML»:«data HTML${hex}»}"
+    else
+        # See https://github.com/jkitchin/ox-clip for other platforms
+
+        ec "$html" | xclip -t text/html
+    fi
+}
+
+function pbcopy-rtf() {
+    local rtf
+    rtf="$(cat)" @RET
+
+    if isDarwin ; then
+        command pbcopy -Prefer rtf
+        # The  input is  placed  in  the pasteboard as plain text data unless it begins with the Encapsulated PostScript (EPS) file header or the Rich Text Format  (RTF)  file  header,  in which case it is placed in the pasteboard as one of those data types.
+        #
+        # Using pandoc's RTF output doesn't seem to work (using `-s` with pandoc might fix this), but using html2rtf-textutil works.
+        #
+        # The output is still only usable where pbcopy-html works.
+    else
+        @NA
+    fi
+}
+
 
 function pbpaste-urls() {
     pbpaste-html | urls-extract

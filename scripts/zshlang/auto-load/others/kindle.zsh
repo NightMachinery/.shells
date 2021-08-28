@@ -3,8 +3,11 @@ function 2mobi() {
     jglob
     ebook-convert "$1" "${1:r}.mobi" "${@:2}"
 }
+alias 2m='2mobi'
+
 function 2m2k() {
-    doc usage: FILE calibre-options
+    doc usage: FILE calibre-options ...
+
     jglob
     [[ "$1" =~ 'mobi.az1$' ]] && {
         mv "$1" "${1:r}"
@@ -80,17 +83,24 @@ function p2k() {
 
     [[ -n "$pk_no" ]] || {
         sout 2m2k "$@"
-        [[ "$1" =~ '.*\.mobi' ]] || \rm "${1:r}.mobi"
+        if ! [[ "$1" =~ '.*\.mobi$' ]] ; then
+            silent trs-rm "${1:r}.mobi"
+        fi
     }
-    test -z "$delOrig" && {
+
+    if test -z "$delOrig" ; then
         silent ebook-cover $1 "${1:r}".jpg
         local nn="$(rename-ebook "$1")"
         # Telegram or Telethon doesn't support filenames bigger than 64.
         local nnt="$nn:t"
         ecdbg "nnt: $nnt"
-        (( ${#nnt} <= 64 )) || assert command mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trimsed).$nn:e" || return $?
+        if (( ${#nnt} > 64 )) ; then
+            assert command mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trimsed).${nn:e}" @RET
+        fi
         return 0
-    } || command rm "$1"
+    else
+        silent trs-rm "$1"
+    fi
 }
 p2ko() {
     doc possibly send to kindle

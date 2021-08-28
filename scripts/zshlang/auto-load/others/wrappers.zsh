@@ -95,3 +95,17 @@ function mipsi-stdin() {
   mipsi =(cat)
 }
 ##
+function ssh-p() {
+  local password
+  vared -p 'Password:' password @RET
+  # typeset -g ssh_pass="$password" # @naughty
+
+  if isDarwin ; then
+    # https://stackoverflow.com/questions/32255660/how-to-install-sshpass-on-mac/62623099#62623099
+    ##
+    ssh "$@"
+  else
+    sshpass -p "$pass" ssh "$@"
+  fi
+}
+##

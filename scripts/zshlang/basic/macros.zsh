@@ -29,6 +29,7 @@ function h_aliasfn() {
 }
 # enh-savename aliasfn h_aliasfn # redundant, we will auto-erase noglob ourselves
 alias aliasfn='\noglob h_aliasfn'
+
 function h_aliasfnq() {
     local name="$1"
     local goesto=""
@@ -55,6 +56,7 @@ function h_aliasfn-ng() {
     noglobfn "$1"
 }
 alias aliasfn-ng='\noglob h_aliasfn-ng'
+
 function h_aliasfnq-ng() {
     aliasfnq "$@"
     noglobfn "$1"
@@ -266,14 +268,5 @@ function opts-test2() {
     ec "${lily_extension:-${lily_e:-default}}"
     typeset -p lily_animal
     arger "$@"
-}
-##
-function ensure-array-var() {
-    local v="$1"
-    assert-args v @RET
-
-    if (( ${#${(P)v}} == 0 )) ; then
-        eval "typeset -ga ${v}=()" # @unquotedEval ; quoting will cause a syntax error.
-    fi
 }
 ##

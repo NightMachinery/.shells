@@ -6,8 +6,33 @@ function md2org() {
     @opts from markdown to org @ pandoc-convert "$@"
 }
 
+function md2plain() {
+    @opts from markdown to plain @ pandoc-convert "$@"
+}
+
 function org2md() {
     @opts from org to markdown @ pandoc-convert "$@"
+}
+
+function org2plain() {
+    @opts from org to plain @ pandoc-convert "$@"
+}
+
+function org2html() {
+    @opts from org to html @ pandoc-convert "$@"
+}
+
+function org2rtf() {
+    @opts from org to rtf @ pandoc-convert "$@"
+}
+
+function html2rtf-textutil() {
+    # @darwinOnly?
+    textutil -stdin -stdout -format html -convert rtf
+}
+
+function rtf2txt-1() {
+    unrtf "$@" | html2text
 }
 
 function html2org() {
@@ -18,6 +43,10 @@ function html2org() {
     fi
 
     @opts from html to "$o_format" @ pandoc-convert "$input" "${@[2,-1]}"
+}
+
+function html2plain {
+    @opts f plain @ html2org "$@"
 }
 
 function html2md {
@@ -32,8 +61,17 @@ function html2text() {
 }
 
 function pandoc-convert() {
-    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra-y}"
+    ensure-array pandoc_opts
+    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra:-y}" opts=("$pandoc_opts[@]") delink="${pandoc_delink}"
     assert-args from to @RET
+    if bool $delink ; then
+        ##
+        # opts+=(--filter 'delink.hs') # must be on PATH
+        ##
+        # opts+=(--filter 'pandoc_delink.py') # must be on PATH
+        ##
+        opts+=(--filter 'panflute_delink.py') # must be on PATH
+    fi
 
     if test -z "$input" ; then
         input="$(gmktemp)" @TRET
@@ -42,16 +80,23 @@ function pandoc-convert() {
     tmp_o="$(gmktemp)" @TRET
 
 
-    pandoc --wrap=none --from "$from" --to "$to" "$input" -o "-" | {
+    pandoc --wrap=none "$opts[@]" --from "$from" --to "$to" "$input" -o "-" | {
         if [[ "$to" == org ]] ; then
             pandoc-normalize-whitespace | {
                 if bool $trim_extra ; then
                     perl -0777 -pe 's/(?:\n|\A)\h*(?:(?::PROPERTIES:(?:.|\n)*?:END:)|(?:<<.*?>>))\h*//g'
+
                     # [[nightNotes:private/playgrounds/pandoc.zsh::perl -0777 -pe][perl]]
                 else
                     cat
                 fi
             }
+        elif [[ "$to" == markdown ]] && bool $trim_extra ; then
+            perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g'
+            # trying to remove header_attributes, fenced_code_attributes, inline_code_attributes, etc
+            # @alt https://stackoverflow.com/questions/42070656/pandoc-html-to-markdown-remove-all-attributes
+            # @alt i always converted from markdown, but never to. maybe the same pattern: target+ext1-ext2. if not, maybe select another output format like markdown_strict.
+            # @example Is `item_tfms`{.verbatim} applied separately on each epoch?
         else
             cat
         fi
