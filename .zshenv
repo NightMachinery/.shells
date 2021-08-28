@@ -61,14 +61,55 @@ function nightsh-load-zshenv() {
         isLinux && export TCLLIBPATH="$TCLLIBPATH /home/linuxbrew/.linuxbrew/lib"
         isDarwin && export TCLLIBPATH="/usr/local/lib" # for expect to work
         ##
-        source <(antibody init)
-        ANTIBODY_HOME="$(antibody home)"
+        typeset -g antibody_enabled=''
+        if test -n "$antibody_enabled" ; then
+            source <(antibody init)
+            typeset -g ANTIBODY_HOME="$(antibody home)"
+            typeset -g plugin_dir="$ANTIBODY_HOME"
+        fi
 
-        DISABLE_DEFER=y
+        function zinit-start() {
+            if [[ ! -f $HOME/.zinit/bin/zinit.zsh ]]; then
+                print -P "%F{33}▓▒░ %F{220}Installing %F{33}DHARMA%F{220} Initiative Plugin Manager (%F{33}zdharma/zinit%F{220})…%f"
+                command mkdir -p "$HOME/.zinit" && command chmod g-rwX "$HOME/.zinit"
+                command git clone https://github.com/zdharma/zinit "$HOME/.zinit/bin" && \
+                    print -P "%F{33}▓▒░ %F{34}Installation successful.%f%b" || \
+                    print -P "%F{160}▓▒░ The clone has failed.%f%b"
+            fi
+
+            source "$HOME/.zinit/bin/zinit.zsh"
+            autoload -Uz _zinit
+            (( ${+_comps} )) && _comps[zinit]=_zinit
+
+            typeset -g plugin_dir="$HOME/.zinit/plugins/"
+        }
+
+        function zinit-update() {
+            local job_count="$1" # @optional
+
+            zinit self-update
+            zinit update --parallel $job_count
+        }
+
+
+        typeset -g zinit_enabled='y'
+        if test -n "$zinit_enabled" ; then
+            zinit-start
+        fi
+
+        function source-plugin() {
+            if test -n "$antibody_enabled" ; then
+                antibody bundle "$@"
+            elif test -n "$zinit_enabled" ; then
+                zinit light "$@"
+            fi
+        }
+
+        typeset -g DISABLE_DEFER=y
         # Won't defer if not interactive or disabled explicitly
         if { [[ -o interactive ]] && test -z "$DISABLE_DEFER" } ; then
             unalias zsh-defer # @warn this is too late to affect the code already loaded
-            antibody bundle romkatv/zsh-defer
+            source-plugin romkatv/zsh-defer
         fi
 
         function source-interactive-all() {

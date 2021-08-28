@@ -81,7 +81,7 @@ agf() {
 }
 agi() {
     doc ag internals of zsh
-    agm "$@" ~/.oh-my-zsh/ $ANTIBODY_HOME
+    agm "$@" ~/.oh-my-zsh/ $plugin_dir
 }
 agcell() {
     agm -uuu --iglob '!.git' "$@" $cellar # --binary --hidden don't work with -C somehow, so we use -uuu :D

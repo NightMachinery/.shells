@@ -34,7 +34,7 @@ aa-raw() {
     fi
 
     if [[ "${@[-1]}" =~ '\.torrent$' ]] ; then
-        ecgray "$0: torrent detected"
+        ecgray "$0: torrent detected; @warn torrents no longer seem resumeable by 'aa' at least. Try 'aria2c --seed-time=0 ...'?"
         # opts=("${opts[@]}")
     else
         opts=(--user-agent "$useragent_chrome" "${opts[@]}")
