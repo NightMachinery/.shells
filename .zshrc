@@ -136,7 +136,7 @@ function nightsh-load-zshrc() {
     # usable but noticably slow
     # https://github.com/jeffreytse/zsh-vi-mode
     export ZVM_LAZY_KEYBINDINGS=false
-    antibody bundle jeffreytse/zsh-vi-mode
+    source-plugin jeffreytse/zsh-vi-mode
     ZVM_LAZY_KEYBINDINGS=false
     ZVM_LINE_INIT_MODE=$ZVM_MODE_INSERT
     ZVM_VI_HIGHLIGHT_BACKGROUND='#c2e4ff'
@@ -227,8 +227,8 @@ function nightsh-load-zshrc() {
   }
   zle-enable-url-quote # @warn needs to be before stuff like syntax highlighters
   ##
-  antibody bundle mafredri/zsh-async
-  zsh-defer antibody bundle zdharma/zui
+  source-plugin mafredri/zsh-async
+  zsh-defer source-plugin zdharma/zui
 
   # re source "$NIGHTDIR"/zshlang/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
 
@@ -306,8 +306,8 @@ function nightsh-load-zshrc() {
 
   # zsh-defer psource ~/Library/Preferences/org.dystroy.broot/launcher/bash/br
   ##
-  # antibody bundle intelfx/pure
-  antibody bundle sindresorhus/pure
+  # source-plugin intelfx/pure
+  source-plugin sindresorhus/pure
 
   bella_zsh_disable1=''
   function prompt_pure_check_cmd_exec_time () {
@@ -330,21 +330,21 @@ function nightsh-load-zshrc() {
     chpwd_functions+="z-add-pwd"
   fi
   ##
-  # antibody bundle denysdovhan/spaceship-prompt
-  # antibody bundle Tarrasch/zsh-bd
-  # antibody bundle Tarrasch/zsh-colors
-  # antibody bundle Vifon/deer
-  zsh-defer antibody bundle unixorn/git-extra-commands
+  # source-plugin denysdovhan/spaceship-prompt
+  # source-plugin Tarrasch/zsh-bd
+  # source-plugin Tarrasch/zsh-colors
+  # source-plugin Vifon/deer
+  zsh-defer source-plugin unixorn/git-extra-commands
 
   ##
-  # zsh-defer antibody bundle zdharma/zzcomplete # binds C-f, ^F
+  # zsh-defer source-plugin zdharma/zzcomplete # binds C-f, ^F
   # does not support light themes https://github.com/zdharma/zzcomplete/issues/1
   ##
 
   if test -n "$bicon_force_plugins" || ! isBicon ; then
     ##
     export ZSH_AUTOSUGGEST_USE_ASYNC=y # idk if export is necessary
-    zsh-defer antibody bundle zsh-users/zsh-autosuggestions
+    zsh-defer source-plugin zsh-users/zsh-autosuggestions
 
     typeset -g ZSH_AUTOSUGGEST_STRATEGY
     ZSH_AUTOSUGGEST_STRATEGY=(history completion)
@@ -358,18 +358,18 @@ function nightsh-load-zshrc() {
     ##
   fi
   silent unalias =
-  # antibody bundle zsh-users/zsh-syntax-highlighting
-  antibody bundle zsh-users/zsh-completions #undeferable
+  # source-plugin zsh-users/zsh-syntax-highlighting
+  source-plugin zsh-users/zsh-completions #undeferable
   ##
   export YSU_MESSAGE_POSITION="after"
   export YSU_MESSAGE_FORMAT="$(tput setaf 1)found %alias_type for %command: %alias$(tput sgr0)"
   export YSU_MODE=ALL #BESTMATCH or ALL
   export YSU_IGNORED_ALIASES=("g" "ll")
-  zsh-defer antibody bundle "MichaelAquilina/zsh-you-should-use"
+  zsh-defer source-plugin "MichaelAquilina/zsh-you-should-use"
   ##
 
   ##
-  # antibody bundle djui/alias-tips # incompatible with our own alias module
+  # source-plugin djui/alias-tips # incompatible with our own alias module
   # export ZSH_PLUGINS_ALIAS_TIPS_EXCLUDES="_ ll vi"
   # export ZSH_PLUGINS_ALIAS_TIPS_REVEAL_EXCLUDES=(_ ll vi)
   # alias revealaliases='export ZSH_PLUGINS_ALIAS_TIPS_REVEAL=1'
@@ -443,7 +443,7 @@ function nightsh-load-zshrc() {
   zstyle ':fzf-tab:*' group-colors $FZF_TAB_GROUP_COLORS
   ##
 
-  antibody bundle Aloxaf/fzf-tab # should come after all tab keybindings
+  source-plugin Aloxaf/fzf-tab # should come after all tab keybindings
   ## fzf-tab has abandoned this API
   # fzf-tab-partial-and-complete() {  # @overrides
   #     if [[ $LASTWIDGET = 'fzf-tab-partial-and-complete' ]]; then
@@ -488,9 +488,9 @@ function nightsh-load-zshrc() {
   # https://github.com/dim-an/cod/issues/24
   ###
   if test -n "$bicon_force_plugins" || ! isBicon ; then
-    zsh-defer antibody bundle zdharma/fast-syntax-highlighting #should be last
+    zsh-defer source-plugin zdharma/fast-syntax-highlighting #should be last
   fi
-  zsh-defer antibody bundle zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
+  zsh-defer source-plugin zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
   ##
   # DISABLE_AUTO_TITLE="true" # disables omz setting the title
   omz_termsupport_precmd () {

@@ -70,7 +70,7 @@ if ! bool "$ZDIRS_ENABLED" && isExpensive && isIReally ; then
     ##
     # export _ZL_ADD_ONCE=1
     # export _ZL_MATCH_MODE=1
-    # antibody bundle skywind3000/z.lua
+    # source-plugin skywind3000/z.lua
     ##
     ialiases[z]=y
     ## these are for zlua

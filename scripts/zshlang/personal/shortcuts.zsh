@@ -54,7 +54,7 @@ zsh_directory_name_functions+='zsh_directory_name_1'
 #     fnswap alias aliassafe diraction-batch-create --create-missing-dir <<< "
 # "
 # }
-# antibody bundle "adrieankhisbe/diractions"
+# source-plugin "adrieankhisbe/diractions"
 ##
 typeset -Ag aliased_dirs
 function aliasdir() {
