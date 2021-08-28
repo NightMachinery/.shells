@@ -29,6 +29,11 @@ function seev() {
 }
 noglobfn seev
 ##
+function bookmark-search() {
+    nightNotes="${nightNotes}/private/backups/web bookmarks/" ntsearch_glob="*.org" ntl-rg "$@"
+}
+alias bks='bookmark-search'
+##
 aliasfn-ng agsi ugbase_follow=n nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
 function agfi1() {
     ##

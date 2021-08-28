@@ -10,9 +10,16 @@ function var-set-p {
 function ensure-array {
     local i
     for i in $@ ; do
-        if ! var-set-p "$i" ; then
+        # if ! var-set-p "$i" ; then
+        if (( ${#${(P)v}} == 0 )) ; then
             typeset -ag "$i"
         fi
     done
 }
+
+function ensure-array-var() {
+    ensure-array "$@"
+}
+##
+
 ##

@@ -19,10 +19,16 @@ fi
 export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
 EMACS_ALT1_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server_alt1"
 ###
-if true ; then # ! command -v brew &> /dev/null ; then
+if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not check
     # Sometimes brew itself is in path but its dirs are not.
-    test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
-    test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+    if isLinux; then
+        test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
+        test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+    elif isDarwin ; then
+        if isArm ; then
+            test -d /opt/homebrew/bin && eval $(/opt/homebrew/bin/brew shellenv)
+        fi
+    fi
 fi
 
 addToPATH /usr/sbin

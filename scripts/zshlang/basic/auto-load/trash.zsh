@@ -1,6 +1,8 @@
 typeset -g TRASH_DIR=~/.trash_rip
 ##
 function trs() {
+    : "@warn using 'symlinked_dir/' will delete the underlying dir, not the symlink."
+
     local i
     for i in "$@"
     do

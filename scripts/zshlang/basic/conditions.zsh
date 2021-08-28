@@ -4,33 +4,48 @@ function iszsh() {
     [[ -n $ZSH_VERSION ]]
 }
 isZsh() { iszsh ; }
+
 function isbash() {
     [[ -n $BASH_VERSION ]]
 }
 isBash() { isbash ; }
+##
 function isDarwin() {
-    [[ "$uname" == "Darwin" ]]
+    # idk who is setting this, the OS?
+    # `env -i zsh -fc 'echo $uname'` is empty
+    ##
+    if test -n "$uname" ; then
+        [[ "$uname" == "Darwin" ]]
+    else
+        # works with bash, too, but the output can be a little different
+        # `env -i bash -fc 'echo $OSTYPE'`
+        ##
+        [[ "$OSTYPE" == "darwin"* ]]
+    fi
 }
 alias isD=isDarwin
+
+function isArm() {
+    if test -z "$uname_m_cached" ; then
+        uname_m_cached="$(uname -m)"
+    fi
+
+    [[ "$uname_m_cached" == "arm64" ]]
+}
+
+function isArmDarwin() {
+    isDarwin && isArm
+}
+
 function isLinux() {
-    [[ "$uname" == "Linux" ]]
+    if test -n "$uname" ; then
+        [[ "$uname" == "Linux" ]]
+    else
+        [[ "$OSTYPE" == "linux"* ]]
+    fi
 }
 alias isL=isLinux
-if iszsh ; then
-    function isMBP() {
-        [[ "$HOST" == 'Fereidoons-MacBook-Pro.local' ]]
-    }
-else
-    function isMBP() {
-        [[ "$(hostname)" == 'Fereidoons-MacBook-Pro.local' ]]
-    }
-fi
-function isLilf() {
-    [[ "$(hostname)" == 'lilf.ir' ]]
-}
-function isZii() {
-    [[ "$(hostname)" == 'mail2.lilf.ir' ]]
-}
+##
 function isLocal() {
     # @darwinonly0
     isDarwin
@@ -60,16 +75,44 @@ function isTmux() {
     test -n "$TMUX"
 }
 ##
-if iszsh ; then
-    function isGuest {
-        [[ "$HOSTNAME" == 'amadeus.local' ]]
-        # amadeus.local is Aeirya's
-    }
-else
-    function isGuest {
-        [[ "$(hostname)" == 'amadeus.local' ]]
-    }
-fi
+function isLilf() {
+    [[ "$(hostname)" == 'lilf.ir' ]]
+}
+
+function isZii() {
+    [[ "$(hostname)" == 'mail2.lilf.ir' ]]
+}
+
+function isMBP() {
+    local host="$HOST"
+    if test -z "$host"; then # for bash
+        host="$(hostname)"
+    fi
+
+    [[ "$host" == 'Fereidoons-MacBook-Pro.local' ]]
+}
+
+function isGrayfur {
+    local host="$HOST"
+    if test -z "$host"; then # for bash
+        host="$(hostname)"
+    fi
+
+    [[ "$host" == 'Parias-MacBook-Air.local' ]]
+}
+
+function isAeirya {
+    local host="$HOST"
+    if test -z "$host"; then # for bash
+        host="$(hostname)"
+    fi
+
+    [[ "$host" == 'amadeus.local' ]]
+}
+
+function isGuest {
+    isAeirya || isGrayfur
+}
 ##
 function isKitty() {
     if isMBP ; then

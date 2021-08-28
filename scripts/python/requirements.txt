@@ -51,6 +51,7 @@ numpy
 ocrmypdf
 opencv-python
 orger
+pandocfilters
 passlib[bcrypt,argon2,totp]
 pdfCropMargins
 peewee

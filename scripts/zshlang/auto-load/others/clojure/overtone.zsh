@@ -155,6 +155,8 @@ function ot-play-diwhite() {
     if test -z "$vol" ; then
       if  (( $(volume-get) <= 60 )) ; then
         vol=30000
+      elif  (( $(volume-get) <= 80 )) ; then
+        vol=1
       else
         vol=0.07 # lower is better on the ears but it might not be heard then?
       fi

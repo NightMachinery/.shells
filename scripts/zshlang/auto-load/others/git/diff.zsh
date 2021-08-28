@@ -18,6 +18,9 @@ function git-diff-kitty() {
 function git-diff() {
     if (( $#@ == 0 )) ; then
         set -- 'HEAD~0'
+        # without this, it will only show unstaged changes
+        # https://stackoverflow.com/questions/13057457/show-both-staged-working-tree-in-git-diff
+        # use `git diff --staged` to see only the staged changes
     elif [[ "$1" =~ '^\d+$' ]] ; then
         set -- "HEAD~$1"
     fi
