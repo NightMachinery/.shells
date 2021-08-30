@@ -35,8 +35,10 @@ ln -s "$HOME/Downloads/" ~/"$music_dir"/d
 ##
 local ln_orig="$functions[ln]"
 {
-    if isLinux; then
-        # the owner and group of /usr/local and all subdirectories (including bin) should be root.root and the permissions should be rwxr-xr-x. This means that users of the system can read and execute in (and from) this directory structure, but cannot create or edit files there.
+    if ! isMBP ; then
+        # @linux the owner and group of /usr/local and all subdirectories (including bin) should be root.root and the permissions should be rwxr-xr-x. This means that users of the system can read and execute in (and from) this directory structure, but cannot create or edit files there.
+        #
+        # @me I have changed the perms of this dir so that it is owned by me.
 
         functions[ln]='sudo ln "$@"'
     fi

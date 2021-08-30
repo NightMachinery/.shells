@@ -32,14 +32,15 @@ function erase-ansi-old() {
 function erase-ansi() {
     # @alt http://www.andre-simon.de/doku/ansifilter/en/ansifilter.php
     ##
-    if isdefined strip-ansi; then
+    if test -n "${commands[strip-ansi]}" ; then
         command strip-ansi
     else
         erase-ansi-old
     fi
 }
 
-function eea() {
+function reval-erase-ansi() {
     reval "$@" | erase-ansi
 }
+alias rea='reval-erase-ansi'
 ##
