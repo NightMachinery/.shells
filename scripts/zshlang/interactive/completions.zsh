@@ -50,7 +50,7 @@ function comp-set() {
 }
 comp-wh-set cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp tldr agf agfi ags h_noglob_agsi # realpath2
 
-comp-set '=eval' ruu reval rgeval revaldbg reval-ec reval-copy seval geval eval-memoi memoi-eval eval-timeout reval-timeout fi-rec assert hyperfine hfd hfz para parad brishz bsh onlc onlm printz-quoted run-on-each re-async redo inargs-gen inargsE-gen filterE-gen filter filter0 p enh-addfinder pf pope clipboard-add-quoted pz pf px proxychains4 bell-auto bell-repeat time2 silence serr sout sdbgerr soutdbg soutdbg serrdbg mn lesh
+comp-set '=eval' ruu reval rgeval revaldbg reval-ec reval-copy seval geval eval-memoi memoi-eval eval-timeout reval-timeout reval-2json reval-retcode fi-rec assert hyperfine hfd hfz para parad brishz bsh onlc onlm printz-quoted run-on-each re-async redo inargs-gen inargsE-gen filterE-gen filter filter0 p enh-addfinder pf pope clipboard-add-quoted pz pf px proxychains4 bell-auto bell-repeat time2 silence serr sout sdbgerr soutdbg soutdbg serrdbg mn lesh
 ##
 rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 # rexa "compdef _=man" mn # @alt =eval

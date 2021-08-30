@@ -301,4 +301,9 @@ function reval-2json() {
     local ret=$?
     cat "$out" | jq --raw-input --slurp --null-input --arg ret "$ret" --slurpfile err <(cat "$err" | jq --raw-input .) 'inputs as $i | {"retcode": $ret, "stdout": $i, "stderr": $err}' # --compact-output
 }
+
+function reval-retcode {
+    silent reval "$@"
+    ec $?
+}
 ##

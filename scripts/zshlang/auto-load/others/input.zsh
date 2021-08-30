@@ -1,6 +1,7 @@
 function vared-py() {
     vared.py "$@" # </dev/tty # incompatible with prompt_toolkit
 }
+##
 function ask() {
     doc 'This is a general-purpose function to ask Yes/No questions in Bash, either with or without a default answer. It keeps repeating the question until it gets a valid answer.'
     : "usage: prompt [default]"
@@ -8,7 +9,7 @@ function ask() {
     # forked from https://gist.github.com/davejamesmiller/1965569
     local prompt default reply
 
-    if isBrish ; then
+    if isBrish && isMe ; then
         tts-glados1-cached "Brish is asking you a question"
     fi
 
@@ -44,3 +45,4 @@ function ask() {
 
     done
 }
+##

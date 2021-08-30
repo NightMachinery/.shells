@@ -169,15 +169,19 @@ function speedtest-i() {
     speedtest-py --server "$(speedtest-py --list | fzp "$q" | ghead -n 1 | cut -d ')' -f1 | trimsed)"
 }
 ##
+typeset -g maxmind_db_1="$nightNotes/private/resources/databases/ip_geolocation_maxmind/GeoLite2-City.mmdb"
+
 function ip-geolocate-mm-country() {
     ip-geolocate-mm "$@" | jqm '.[].Records[].Record | .country.names.en'
 }
+
 function ip-geolocate-mm() {
     local ip="${1:?}"
 
-    local db="$nightNotes/private/resources/databases/ip_geolocation_maxmind/GeoLite2-City.mmdb"
+    local db="${maxmind_db_1}"
     mmdbinspect -db "$db" "$ip"
 }
+
 function ip-geolocate-mm1() {
     # https://unix.stackexchange.com/questions/7399/ip-to-country-console-command
     # https://dev.maxmind.com/geoip/geoipupdate/
@@ -185,26 +189,32 @@ function ip-geolocate-mm1() {
     # use `man mmdblookup` for the lookup args
     local ip="${1:?}" lookup=("${@[2,-1]}")
 
-    local db="$nightNotes/private/resources/databases/ip_geolocation_maxmind/GeoLite2-City.mmdb"
-    revaldbg  mmdblookup --file $db --ip "$ip" $lookup[@]
+    local db="${maxmind_db_1}"
+    revaldbg mmdblookup --file $db --ip "$ip" $lookup[@]
 }
+
 function ip-geolocate2() {
     local ip="${1:?}"
 
     gurl ipinfo.io/"$ip"/geo
+    # ipinfo has a rate limit. ifconfig.me provides a similar service (plus a REST-like API). Also ifonfo.io has blocked Iran.
 }
+
 function ip-geolocate1() {
     local ip="${1:?}"
 
     geo.bash -a "$ip" -o country
 }
-aliasfn ip-geolocate ip-geolocate-mm-country
-##
 
+function ip-geolocate() {
+    if test -e "${maxmind_db_1}" ; then
+        ip-geolocate-mm-country "$@"
+    else
+        ip-geolocate1 "$@"
+    fi
+}
 ##
-# ipinfo has a rate limit. ifconfig.me provides a similar service (plus a REST-like API). Also ifonfo.io
-# alias mycountry='gurl ipinfo.io/country' # ~1.3s
-mycountry() {
+function mycountry() {
     local ip
     ip="$(myip)" || {
         ecerr "$0: No net"
@@ -215,7 +225,7 @@ mycountry() {
 # alias mycountry='geo.bash -o country' # ~2.4s
 # `whois "$(myip)"` has lots of info but is even more slow
 ##
-isIran() {
+function isIran() {
     # @alt isIranTLS
     # https://superuser.com/questions/1629020/whats-a-quick-way-to-check-if-a-tls-handshake-is-possible-with-twitter-com
 
@@ -225,11 +235,13 @@ isIran() {
     # ! ping -q -c 1 -W 1 facebook.com &>/dev/null #  faster when it succeeds
     # ! ping -q -c 1 -W 1 69.171.250.35 &>/dev/null # (facebook's ip) succeeds even in Iran
 }
-isIranTLS() {
+
+function isIranTLS() {
     # takes 1.3s even if it succeeds, as openssl is blocking
     ! { { gtimeout 1.3s openssl s_client -connect www.youtube.com:443 ; true }  | rg -F 'BEGIN CERTIFICATE' }
 }
-isIranHTTP() {
+
+function isIranHTTP() {
     # this works with any blocked HTTP website
     curl -s http://whatismyip.akamai.com/ | silent rg -F 'peyvandha.ir'
 }
