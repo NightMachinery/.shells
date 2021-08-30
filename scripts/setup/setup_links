@@ -73,9 +73,11 @@ fi
 ## blcs
 # blc tag-ag tag tag-ag
 ##
-if isLocal ; then
-    lnrp "$NIGHTDIR/symlinkme/local/.gitconfig" ~/.gitconfig
-else
-    lnrp "$NIGHTDIR/symlinkme/servers/.gitconfig" ~/.gitconfig
+if ! isMe ; then
+    if isLocal ; then
+        lnrp "$NIGHTDIR/symlinkme/local/.gitconfig" ~/.gitconfig
+    else
+        lnrp "$NIGHTDIR/symlinkme/servers/.gitconfig" ~/.gitconfig
+    fi
 fi
 ##
