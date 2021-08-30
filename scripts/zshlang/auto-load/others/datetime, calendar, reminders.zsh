@@ -8,6 +8,10 @@
 @opts-setprefix remnd reminday_store
 @opts-setprefix rem-sync reminday_store
 ##
+function rem-enabled-p {
+    test -d "$remindayDir"
+}
+##
 function rem-sync() {
     local nosync="${reminday_store_nosync}"
 

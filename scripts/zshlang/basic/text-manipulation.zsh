@@ -49,3 +49,9 @@ function isSpace {
     ecn "$inargs[*]" | perl -0777 -ne '/\A\s*\Z/ && exit 0 || exit 1'
 }
 ##
+function count-lines {
+    rg --fixed-strings --count ''
+    # wc will not count the last line if it does not end with '\n':
+    # https://stackoverflow.com/questions/28038633/wc-l-is-not-counting-last-of-the-file-if-it-does-not-have-end-of-line-character
+}
+##

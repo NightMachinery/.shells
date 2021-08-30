@@ -1,3 +1,4 @@
+##
 function wallpaper-overlay() {
     local input="$1" overlay_rem="y" overlay_weather="${wallpaper_overlay_weather:-y}"
     local o="${2:-${1:r}_overlay.png}"
@@ -15,7 +16,7 @@ function wallpaper-overlay() {
 
     (
         renice-me
-        if [[ "$overlay_rem" == y ]] ; then
+        if [[ "$overlay_rem" == y ]] && rem-enabled-p; then
             local t="$(gmktemp --suffix .png)"
             # https://stackoverflow.com/questions/66629425/pillow-how-to-draw-text-with-the-inverse-color-of-the-underlying-image
             local font="$Font_CourierNew_Symbola" # monospace

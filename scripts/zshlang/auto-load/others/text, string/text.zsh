@@ -81,10 +81,20 @@ function double-newlines() {
     prefixer -o $'\n\n'
     ##
 }
+
 function p-double-newlines() {
     pbpaste | double-newlines | pbcopy
 }
 alias pdn='p-double-newlines'
+##
+function newline2space {
+    sd '\n\s*' ' '
+}
+
+function p-newline2space {
+    pbpaste | newline2space | pbcopy
+}
+alias pns='p-newline2space'
 ##
 function char2ascii() {
     ##
