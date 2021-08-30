@@ -55,7 +55,9 @@ function tlwb() {
 noglobfn tlwb
 ##
 function wgetm() {
-    $proxyenv wget --header "$useragent_chrome" --header "$(cookies)" "$@"
+    : "Using --continue will assume any smaller already present file is an incomplete version of the server's file, and wget will try to resume it."
+
+    $proxyenv wget -e robots=off --header "$useragent_chrome" --header "$(cookies)" "$@"
 }
 function wget-cookies() {
     wgetm --header "$(cookies-auto "$@")" "$@"

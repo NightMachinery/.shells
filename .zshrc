@@ -584,6 +584,11 @@ function nightsh-load-zshrc() {
   ###
   psource $HOME/.shellfishrc
   ##
+  if isGrayfur ; then
+    ec 'iceRC'
+    source ~/.shared.sh
+  fi
+  ##
   # psource ~/.xsh # @futureCron remove me if unused
   ###
   rcLoaded='loading' # Do NOT export this, or `exec zsh` will inherit it
