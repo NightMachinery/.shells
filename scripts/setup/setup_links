@@ -4,6 +4,9 @@ mkdir -p ~/bin
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
 ##
 lnrp $NIGHTDIR/configFiles/kitty/kitty.conf ~/.config/kitty/
+if isMBP ; then
+    lnrp $NIGHTDIR/configFiles/kitty/me.conf ~/.kitty_custom_1.conf
+fi
 lnrp $NIGHTDIR/configFiles/kitty/diff.conf ~/.config/kitty/
 lnrp $NIGHTDIR/configFiles/kitty/open-actions.conf ~/.config/kitty/
 
