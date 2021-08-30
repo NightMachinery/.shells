@@ -31,8 +31,12 @@ function erase-ansi-old() {
 
 function erase-ansi() {
     # @alt http://www.andre-simon.de/doku/ansifilter/en/ansifilter.php
-
-    command strip-ansi
+    ##
+    if isdefined strip-ansi; then
+        command strip-ansi
+    else
+        erase-ansi-old
+    fi
 }
 
 function eea() {

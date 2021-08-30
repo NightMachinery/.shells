@@ -137,7 +137,7 @@ function pdf-compress-gray() {
 }
 ##
 function pdf-numberme {
-    ensure-dep1 pdftk brew install pdftk-java @RET
+    ensure-dep-pdftk
     ##
     local input output
     input="$1"
