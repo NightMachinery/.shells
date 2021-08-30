@@ -1,3 +1,4 @@
+##
 sleep-neon()  {
     mdoc 'Usage: sleep-neon <seconds>' MAGIC
     integer inter="$1"
@@ -23,3 +24,18 @@ sleep-neon()  {
     done
     print -- "\rWoke up!                                                               "
 }
+##
+function erase-ansi-old() {
+    gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
+}
+
+function erase-ansi() {
+    # @alt http://www.andre-simon.de/doku/ansifilter/en/ansifilter.php
+
+    command strip-ansi
+}
+
+function eea() {
+    reval "$@" | erase-ansi
+}
+##

@@ -1,3 +1,8 @@
+##
+function terminal-supported-p {
+    ! isGuest && { isiTerm || isKitty }
+}
+##
 function terminal-unsupported() {
     if isTmux ; then
         # I don't know what else to do except ignoring this
