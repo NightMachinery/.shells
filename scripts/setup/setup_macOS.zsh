@@ -20,6 +20,7 @@ if isDarwin ; then
     brew install --cask font-iosevka
     brew install --cask font-juliamono
     ##
+    # installing pbv:
     git clone https://github.com/chbrown/macos-pasteboard
     pushf macos-pasteboard
     {
