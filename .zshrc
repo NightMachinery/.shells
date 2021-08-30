@@ -585,7 +585,7 @@ function nightsh-load-zshrc() {
   psource $HOME/.shellfishrc
   ##
   if isGrayfur ; then
-    ec 'iceRC'
+    # somehow, we need to do this to make the PATH ordering correct
     source ~/.shared.sh
   fi
   ##
