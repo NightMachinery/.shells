@@ -28,7 +28,7 @@ function cmd-sub() {
 ##
 function ensure-dep1 {
     local dep="$1" install_cmd=("${@[2,-1]}")
-    assert-args dep install_cmd @RET
+    assert-args dep install_cmd || return $?
 
     if test -z "${commands[$dep]}" ; then
         assert reval "$install_cmd[@]"
