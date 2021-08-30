@@ -24,14 +24,19 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
     if isLinux; then
         test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
         test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+
+        typeset -xg brew_bin_dir=/home/linuxbrew/.linuxbrew/bin
     elif isDarwin ; then
         if isArm ; then
             test -d /opt/homebrew/bin && eval $(/opt/homebrew/bin/brew shellenv)
             # see what this code does with:
             # `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
 
-            addToPATH /opt/homebrew/bin
+            typeset -xg brew_bin_dir=/opt/homebrew/bin
+            addToPATH "$brew_bin_dir"
             addToPATH /opt/homebrew/sbin
+        else
+            typeset -xg brew_bin_dir=/usr/local/bin
         fi
     fi
 fi

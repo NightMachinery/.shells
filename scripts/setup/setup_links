@@ -16,7 +16,10 @@ if ! test -e ~/.config/kitty/theme.conf ; then
     lnrp $NIGHTDIR/configFiles/kitty/themes/night-solarized-light.conf ~/.config/kitty/theme.conf
 fi
 ##
-lnrp $nightNotes/private/configs/gallery-dl/.gallery-dl.conf ~/.gallery-dl.conf
+gallery_dl_conf="$nightNotes/private/configs/gallery-dl/.gallery-dl.conf"
+if test -e "$gallery_dl_conf" ; then
+    lnrp $gallery_dl_conf ~/.gallery-dl.conf
+fi
 ##
 if test -e ~/.config/ranger ; then
     ecerr "~/.config/ranger exists"
@@ -25,7 +28,8 @@ else
 fi
 ##
 if isDarwin; then
-    lnrp /usr/local/bin/pandoc ~/bin # anaconda also has an old pandoc binary, so we need to prioritize the one installed by brew
+    # anaconda also has an old pandoc binary, so we need to prioritize the one installed by brew
+    lnrp "${brew_bin_dir}/pandoc" ~/bin
 fi
 ##
 ln -s "$HOME/Downloads/" ~/"$music_dir"/d
@@ -64,9 +68,7 @@ local ln_orig="$functions[ln]"
         lnrp ~/.cargo/bin/input_lang_get_icon /usr/local/bin/
     fi
 } always {
-    if isLinux; then
-        fnrestore ln "$ln_orig"
-    fi
+    fnrestore ln "$ln_orig"
 }
 ##
 if isLinux ; then
