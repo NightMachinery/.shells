@@ -80,7 +80,6 @@ function pbpaste() {
 }
 
 function pbpaste-html() {
-    assert isDarwin @RET
     if isDarwin ; then
         command pbv public.html public.utf8-plain-text
         # https://stackoverflow.com/questions/17217450/how-to-get-html-data-out-of-of-the-os-x-pasteboard-clipboard
@@ -162,9 +161,17 @@ function pbpaste-plus() {
         ectrace 'pbpaste failed'
         return 1
     }
-    local ppaths=( "${(@f)$(clipboard-to-path.nu)}" )
-    test -n "$ppaths[*]" && paste=( $ppaths[@] )
-    true
+
+    local ppaths
+    if isDarwin ; then
+        if isArm ; then
+            ecgray "$0: getting files from the clipboard are not yet supported on Apple ARM."
+        else
+            ppaths=( "${(@f)$(clipboard-to-path.nu)}" )
+        fi
+    fi
+
+    test -n "$ppaths[*]" && paste=( $ppaths[@] ) || true
 }
 ##
 clipboard-info-darwin() {
