@@ -136,16 +136,21 @@ function kitty-theme() {
     # the theme names should be stripped of '.conf' before being fed to kitty-theme, and they should not be in abs paths:
     # `kitty-theme --test Zenburn `
     ##
+    ensure-dep-kitty-theme
+
     command kitty-theme -c $NIGHTDIR/configFiles/kitty/kitty_theme_changer.conf.py "$@"
 }
+
 function kitty-theme-setup() {
     kitty-theme --setl night-solarized-light
 
     kitty-theme --setd ayu
 }
+
 function kitty-theme-toggle() {
     kitty-theme --toggle --live
 }
+
 function kitty-theme-test() {
     local theme q="$(fz-createquery "$@")"
 
@@ -156,6 +161,7 @@ function kitty-theme-test() {
 
     reval-ec kitty-theme --test "$theme"
 }
+
 function kitty-theme-reload() {
     kitty-theme --live
 }

@@ -120,7 +120,12 @@ alias ox='zdict -dt oxford'
 alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
-alias pi='\noglob pip install -U'
+##
+function pip-install {
+    pip install -U "$@"
+}
+alias pi='\noglob pip-install'
+##
 alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias eta="etlas exec eta"
 alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
