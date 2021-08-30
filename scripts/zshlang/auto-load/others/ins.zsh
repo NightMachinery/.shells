@@ -20,85 +20,111 @@ insladd() {
     test -n "$noi" ||
         ins "$1"
 }
+
 insadd() {
     ec "$1" >> "$insables"
     test -n "$noi" ||
         ins "$1"
 }
 aliasfn npmi npm install -g
+
 npmiadd() {
     ec "$1" >> "$nodables"
     test -n "$noi" ||
         npmi "$1"
 }
-brew-bundle() { ec "$1 \"$2\"" >> "$brewables" }
+
+brew-bundle() {
+    ec "$1 \"$2\"" >> "$brewables"
+}
+
 btadd() {
     brew-bundle tap "$1"
     test -n "$noi" ||
         brew tap "$1"
 }
+
 biadd() {
     brew-bundle brew "$1"
     test -n "$noi" ||
         bi "$1"
 }
+
 function piadd() {
     ec "$1" >> "$pipables"
     test -n "$noi" ||
         pi "$1"
 }
 noglobfn piadd
+
 goi() {
     comment -u update -v verbose
     test -n "$noi" ||
         reval-ec go get -u -v "$@"
 }
+
 gmi() {
     gem install "$@"
 }
+
 gmiadd() {
     ec "$1" >> "$ins_gem"
     test -n "$noi" ||
         gmi "$1"
 }
+
 goiadd() {
     ec "$1" >> "$ins_go"
     test -n "$noi" ||
         goi "$1"
 }
+
 ins-npm() {
     zargs -l 1 -- $(cat "$nodables") -- npm install -g
 }
+
 ins-pip() {
     zargs -l 1 -- "$NIGHTDIR"/python/**/requirements.txt -- pip install -U -r
 }
+
 ins-ins() {
     zargs -n 1 -- $(cat "$insables") -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
+
 ins-linux() {
+    assert isLinux @RET
+
     zargs -n 1 -- $(cat "$inslables") -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
+
 ins-brew() {
     brew bundle install --file="$brewables"
 }
+
 ins-go() {
     zargs -n 1 -- $(< "$ins_go") -- goi #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
+
 ins-gem() {
     zargs -n 1 -- $(< "$ins_gem") -- gmi #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
+
 ins-all() {
     ins-brew
-    ins-linux
+    if isLinux; then
+        ins-linux
+    fi
     ins-ins
     ins-pip
     ins-npm
     ins-go
     ins-gem
 }
+
 function ins() {
     isDarwin && brew install $1 || sudo apt install -y $1
 }
+
 function jins() {
     mdoc Add Julia package MAGIC
     julia --startup-file=no -e 'using Pkg; Pkg.add("'"$1"'"); using Dates ; Pkg.gc(collect_delay=Day(0)) ; Pkg.precompile()' # using '"$1"
