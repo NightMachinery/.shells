@@ -64,7 +64,7 @@ function ec_bash() {
 }
 ##
 function return-code {
-    return "$1"
+    return "${1:-$?}"
 }
 ##
 function gquote-simple() {

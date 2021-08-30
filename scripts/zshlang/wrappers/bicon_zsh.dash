@@ -11,8 +11,8 @@ if ! test -e "$zsh" ; then
     fi
 fi
 
-dis="$(redis-cli --raw get bicon_zsh_disabled)" || true
-if test -z "$dis" && command -v bicon.bin &>/dev/null ; then
+dis="$(redis-cli --raw get bicon_zsh_disabled)" || dis=y
+if test -z "$dis" && ( command -v bicon.bin &>/dev/null ) ; then # the subshell is needed
     BICON_MODE=y bicon.bin "$zsh" "$@"
 else
     "$zsh" "$@"
@@ -20,6 +20,7 @@ fi
 
 ## Known issues
 # breaks PWD of next sessions https://gitlab.com/gnachman/iterm2/-/issues/9601
+# [[nightNotes:subjects/hardware/Apple/Apple Silicon, M1/support/bicon.org][support/bicon.org]]
 ## perf:
 # time2 bicon_zsh.dash -f -c 'echo'
 # Took 0.027724981307983398
