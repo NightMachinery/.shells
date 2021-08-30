@@ -113,6 +113,10 @@ function isAeirya {
 function isGuest {
     isAeirya || isGrayfur
 }
+
+function isMe {
+    isMBP || isLilf
+}
 ##
 function isKitty() {
     if isMBP ; then
