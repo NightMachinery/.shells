@@ -4,6 +4,7 @@ function ensure-dep-pdftk {
 ##
 function kitty-theme-install {
     pip-install psutil 'git+git://github.com/fretboardfreak/kitty-theme-changer.git@master'
+    # psutil is needed by kitty_theme_changer.conf.py
 }
 
 function ensure-dep-kitty-theme {

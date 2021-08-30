@@ -82,6 +82,16 @@ quakeApp({
 });
 
 quakeApp({
+  key: "f12",
+  modifiers: [],
+  appName: "kitty",
+  windowId: 0,
+  position: full,
+  followsMouse: true,
+  hideOnBlur: true, // set to true for opening URLs easily
+});
+
+quakeApp({
   // key: "m",
   key: "x",
   modifiers: hyper,
