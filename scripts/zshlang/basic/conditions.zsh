@@ -124,15 +124,19 @@ function isKitty() {
     fi
 
     if true || isGuest || ( isLocal && ! isTmux ) ; then
-        test -n "$KITTY_WINDOW_ID" || [[ "$TERM" == *kitty* ]]
+        [[ "$TERM_PROGRAM" == kitty ]] || test -n "$KITTY_WINDOW_ID" || [[ "$TERM" == *kitty* ]]
         # the var KITTY_WINDOW_ID can be set incorrectly in tmux
-        # we have also unexported KITTY_WINDOW_ID in auto-load/env.zsh
+        # we might have unexported KITTY_WINDOW_ID in auto-load/env.zsh, but we also export TERM_PROGRAM there:
+        #  [[NIGHTDIR:zshlang/basic/auto-load/env.zsh::typeset +x KITTY_WINDOW_ID][auto-load/env.zsh::typeset +x KITTY_WINDOW_ID]]
+        #
     fi
 }
 iskitty() { isKitty "$@" ; }
+
 function isAppleTerminal() {
     [[ "$TERM_PROGRAM" == Apple_Terminal ]]
 }
+
 function isiTerm() {
     [[ "$TERM_PROGRAM" == iTerm.app ]]
 }

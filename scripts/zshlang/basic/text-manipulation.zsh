@@ -57,3 +57,12 @@ function count-lines {
     # https://stackoverflow.com/questions/28038633/wc-l-is-not-counting-last-of-the-file-if-it-does-not-have-end-of-line-character
 }
 ##
+function hex2ascii {
+    xxd -r -p
+    # -r tells it to convert hex to ascii as opposed to its normal mode of doing the opposite
+    # -p tells it to use a plain format.
+    ## tests:
+    # `ec '787465726d2d6b69747479' | hex2ascii`
+    ##
+}
+##
