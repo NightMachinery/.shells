@@ -14,11 +14,11 @@ function aac() {
 }
 ##
 aa-raw() {
-    local opts=('--stderr=true')
+    local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
     # Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
     isI || opts+=(--show-console-readout false --summary-interval 0)
-    test -n "$aaNoSplit" || opts+=(--enable-http-pipelining --split 6 --stream-piece-selector geom)
+    bool "$no_split" || opts+=(--enable-http-pipelining --split "$split" --stream-piece-selector geom)
 
 
     local arg
@@ -41,7 +41,7 @@ aa-raw() {
         # --user-agent will cause problems (immediately abort them) with torrent downloads
     fi
 
-    aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@"
+    revaldbg aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@"
     local ret=$?
     #-Z has some unsavory sideeffects so I have not included it in this.
 
