@@ -99,3 +99,9 @@ function tty-link() {
     ##
 }
 ##
+function term-get {
+    local term
+    term="$(printf '\eP+q544e\e\\' | escape_code_answer_read.bash)" @TRET
+    ec "${term[3,-1]}"
+}
+##

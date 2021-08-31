@@ -10,4 +10,8 @@ else
         sshd|*/sshd) amSSH=remote/ssh;;
     esac
 fi
-isSSH() test -n "$amSSH"
+
+function isSSH() {
+  test -n "$amSSH"
+}
+##

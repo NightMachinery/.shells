@@ -16,6 +16,8 @@ if isDarwin ; then
     brew tap microsoft/git
     brew install --cask git-credential-manager-core
     ## Fonts:
+    brew tap homebrew/cask-fonts
+
     brew install --cask font-fira-code font-fira-mono
     brew install --cask font-victor-mono
     brew install --cask font-vazir-code
@@ -26,7 +28,7 @@ if isDarwin ; then
     git clone https://github.com/chbrown/macos-pasteboard
     pushf macos-pasteboard
     {
-        make install
+        sudo make install
     } always {
         popf
     }
