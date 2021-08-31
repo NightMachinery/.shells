@@ -2,20 +2,30 @@ function youtube-dl() {
     local cookie_mode="${youtube_dl_c}"
     typeset -ga ytdl_opts # has priority over args
 
+    local head
+    # head='youtube-dl'
+    head='yt-dlp'
+
     local opts=()
+    if [[ "$head" == 'yt-dlp' ]] ; then
+        opts+=(--compat-options no-live-chat,no-keep-subs --abort-on-error)
+    fi
+
     isI || opts+=( --quiet --no-progress )
+
     if bool $cookie_mode ; then
         opts+=(--add-header "$(cookies-auto "$@")")
     fi
+
     if isSSH ; then
-        transformer urlfinalg "revaldbg $proxycmd youtube-dl $opts[@]" "$@" "$ytdl_opts[@]"
+        transformer urlfinalg "revaldbg $proxycmd $head $opts[@]" "$@" "$ytdl_opts[@]"
     else
         # urlfinalg takes too much time on Iran's net.
 
         ##
         # revaldbg $proxycmd youtube-dl "$opts[@]" "$@" "$ytdl_opts[@]"
         ##
-        revaldbg $proxyenv command youtube-dl "$opts[@]" "$@" "$ytdl_opts[@]"
+        revaldbg $proxyenv command "$head" "$opts[@]" "$@" "$ytdl_opts[@]"
     fi
 }
 ##

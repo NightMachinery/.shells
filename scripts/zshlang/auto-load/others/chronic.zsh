@@ -20,7 +20,7 @@ function chronic-update() {
     re 'brew upgrade' googler
 
     pip install --upgrade ddgr fanficfare cloudscraper
-    pip install --upgrade --force pytube ytmusicapi youtube-dl spotipy spotdl
+    pip install --upgrade --force pytube ytmusicapi youtube-dl yt-dlp spotipy spotdl
 
     tldr --update
 
