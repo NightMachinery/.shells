@@ -99,9 +99,31 @@ function tty-link() {
     ##
 }
 ##
-function term-get {
+function escape-code-answer-read() {
+    local timeout=''
+    if isSSH ; then
+        timeout=0.5 # even this might not be enough
+    fi
+
+    escape_code_answer_read_timeout="$timeout" escape_code_answer_read.bash "$@"
+}
+
+function h_term-get {
     local term
-    term="$(printf '\eP+q544e\e\\' | escape_code_answer_read.bash)" @TRET
+    term="$(printf '\eP+q544e\e\\' | escape-code-answer-read)" @TRET
     ec "${term[3,-1]}"
+
+    # returns 'xterm-kitty' in Kitty even if TERM is set to sth else
+}
+function term-get {
+    typeset -g term_true_name
+    if isDeus || test -z "$term_true_name" ; then
+        term_true_name="$(h_term-get)"
+        if test -z "$term_true_name" ; then
+            term_true_name='NA'
+        fi
+    fi
+
+    ec "$term_true_name"
 }
 ##
