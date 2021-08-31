@@ -136,6 +136,7 @@ function emc-sourceme() {
         ecerr "$0: file doesn't seem suitable: $f"
     fi
 }
+
 function emc-focus() {
     if isSSH ; then
         return 0
@@ -148,6 +149,7 @@ function emc-focus() {
     fi
     bella_zsh_disable1=y
 }
+
 function emc-nowait() {
     @deprecated # emc-nowait2
 
@@ -167,6 +169,7 @@ function emc-in() {
     emc-open "$t"
     # emc-colorize
 }
+
 function emc-colorize() {
     emc-eval "(when (equalp major-mode 'fundamental-mode) (xterm-color-colorize-buffer) (set-buffer-modified-p nil) (read-only-mode))"
     # xterm-color-colorize-buffer eats the ANSI codes, so if we save the file those codes will be LOST
@@ -270,6 +273,7 @@ function file-uri2unix() {
         ec "$f"
     fi
 }
+
 function trimr-hash() {
     local inargs
     in-or-args2 "$@"

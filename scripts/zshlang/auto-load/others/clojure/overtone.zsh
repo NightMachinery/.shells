@@ -1,6 +1,14 @@
 OVERTONE_DIR=~/code/Clj/i-laugh
 OVERTONE_PORT=7699
-aliasfn in-ot indir "$OVERTONE_DIR"
+
+function ot-enabled-p {
+  test -d "$OVERTONE_DIR"
+}
+
+function in-ot() {
+  indir "$OVERTONE_DIR" "$@"
+}
+
 function ot-server() {
     : "See also ot-server-daemon."
 
@@ -14,6 +22,8 @@ function ot-server() {
 ##
 redis-defvar ot_server_lock
 function ot-server-daemon() {
+  assert ot-enabled-p @RET
+
   if test -n "$(ot_server_lock_get)" ; then
     # the lock is needed to avoid continuously restarting Overtone; I.e., it gives the server the slack it needs to boot.
     tts-glados1-cached "Not restarting Overtone because of lock"
