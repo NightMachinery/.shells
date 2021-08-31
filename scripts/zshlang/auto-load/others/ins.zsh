@@ -84,6 +84,8 @@ function ins-npm() {
 }
 
 function ins-pip() {
+    pip-install pip # forces pip to be the latest version
+
     local f
     for f in "$NIGHTDIR"/python/**/requirements.txt ; do
         reval-ec pip install -U --use-deprecated=legacy-resolver --use-feature=fast-deps -r "$f"
