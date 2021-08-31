@@ -89,6 +89,8 @@ function ins-pip() {
         reval-ec pip install -U --use-deprecated=legacy-resolver --use-feature=fast-deps -r "$f"
         # fast-deps seems to download the packages metadata without downloading the packages completely (no good docs found).
         # fast-deps has no effect when used with the legacy resolver.
+
+        pip-install pip # forces pip to be the latest version
     done
 }
 
