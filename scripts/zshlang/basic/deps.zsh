@@ -24,3 +24,15 @@ function bicon-install {
     reval-ec sudo make install ||true # will error, but it will install bicon.bin
 }
 ##
+function caddy-install {
+    local d=~/bin/
+    assert mkdir -p "$d" @RET
+    assert cd "$d" @RET
+    assert xcaddy build --with github.com/mholt/caddy-webdav --with github.com/caddyserver/forwardproxy@caddy2=github.com/klzgrad/forwardproxy@naive @RET
+
+    if isLinux ; then
+        rehash
+        assert sudo setcap 'cap_net_bind_service=+ep' "$(realpath "$(which caddy)")" @RET
+    fi
+}
+##

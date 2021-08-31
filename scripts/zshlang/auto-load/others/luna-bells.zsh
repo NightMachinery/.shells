@@ -430,7 +430,7 @@ function bell-maker() {
     local name="${1}" fs=( ${@[2,-1]} )
 
     local fn="bell-$name"
-    if isServer ; then
+    if isServer || ! test -d "$GREENCASE_DIR" ; then
         fndef $fn true
     else
         assert-args name fs @RET

@@ -129,6 +129,7 @@ function isKitty() {
         # we might have unexported KITTY_WINDOW_ID in auto-load/env.zsh, but we also export TERM_PROGRAM there:
         #  [[NIGHTDIR:zshlang/basic/auto-load/env.zsh::typeset +x KITTY_WINDOW_ID][auto-load/env.zsh::typeset +x KITTY_WINDOW_ID]]
         #
+        # We can also use 'term-get', which works unless we are on mosh.
     fi
 }
 iskitty() { isKitty "$@" ; }

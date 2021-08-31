@@ -114,6 +114,7 @@ function h_term-get {
     ec "${term[3,-1]}"
 
     # returns 'xterm-kitty' in Kitty even if TERM is set to sth else
+    # works over SSH, but not over mosh
 }
 function term-get {
     typeset -g term_true_name
