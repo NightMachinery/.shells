@@ -9,6 +9,8 @@ if isDarwin ; then
 
     brew install --cask corelocationcli
 
+    brew install --cask rar # unrar
+
     # credential manager for HTTPS logins
     # https://docs.github.com/en/get-started/getting-started-with-git/caching-your-github-credentials-in-git
     brew tap microsoft/git

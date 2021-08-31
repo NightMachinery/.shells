@@ -84,8 +84,12 @@ function ins-npm() {
 }
 
 function ins-pip() {
-    zargs -l 1 -- "$NIGHTDIR"/python/**/requirements.txt -- pip install -U --use-deprecated=legacy-resolver --use-feature=fast-deps -r
-    # fast-deps seems to download the packages metadata without downloading the packages completely (no good docs found)
+    local f
+    for f in "$NIGHTDIR"/python/**/requirements.txt ; do
+        reval-ec pip install -U --use-deprecated=legacy-resolver --use-feature=fast-deps -r "$f"
+        # fast-deps seems to download the packages metadata without downloading the packages completely (no good docs found).
+        # fast-deps has no effect when used with the legacy resolver.
+    done
 }
 
 function ins-ins() {

@@ -85,6 +85,15 @@ k2pdf-split() {
     done
 }
 ##
+function pdf-crop-margins-m {
+    local i="$1" m="${2:-20}"
+    assert-args i @RET
+    local o="${pdf_crop_o:-${1:r}_m${m}.${1:e}}"
+
+    reval-ec command pdf-crop-margins -p "$m" "$i" -o "$o"
+}
+@opts-setprefix pdf-crop-margins-m pdf_crop
+
 function pdf-crop-margins-inplace () {
     local u="$(uuidgen)"
     command pdf-crop-margins -p 1 "$@" -o "$u" # -p percent of margins retained

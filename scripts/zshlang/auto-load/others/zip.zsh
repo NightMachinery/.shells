@@ -7,13 +7,18 @@ function unzip2dir() {
     local file="$1" y="${unzip2dir_y:-y}"
     file="$(grealpath -e "$file")" @TRET
 
+    local head='7z'
+    if [[ "$file" == *.rar ]] && test -n "${commands[unrar]}" ; then
+        head='unrar'
+    fi
+
     local opts=()
     if bool $y ; then
         opts+='-y'
-        # -y     Assume Yes on all queries
+        # -y     Assume Yes on all queries (works with both 7z and unrar)
     fi
 
-    assert 7z x $opts "$file" -o"${file:r}/" @RET
+    assert reval-ec "$head" x $opts "$file" -o"${file:r}/" @RET
     ##
     # unzip "$file" -d "${file:r}/"
     ##
