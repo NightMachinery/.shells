@@ -45,9 +45,6 @@ nimble install --accept "git://github.com/AmanoTeam/Unalix-nim"
 npmi unibeautify @unibeautify/beautifier-prettydiff @unibeautify/cli
 npmi get-stdin@8
 ##
-brew tap v2ray/v2ray
-brew install v2ray-core
-
 brew tap lutzifer/homebrew-tap
 brew install keyboardSwitcher
 

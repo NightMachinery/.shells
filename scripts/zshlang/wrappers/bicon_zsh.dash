@@ -12,7 +12,7 @@ if ! test -e "$zsh" ; then
 fi
 
 dis="$(redis-cli --raw get bicon_zsh_disabled)" || dis=y
-if test -z "$dis" && ( command -v bicon.bin &>/dev/null ) ; then # the subshell is needed
+if test -z "$dis" && ( command -v bicon.bin >/dev/null ) ; then # the subshell is needed
     BICON_MODE=y bicon.bin "$zsh" "$@"
 else
     "$zsh" "$@"
