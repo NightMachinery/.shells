@@ -73,21 +73,22 @@ gmiadd() {
         gmi "$1"
 }
 
-goiadd() {
+function goiadd() {
     ec "$1" >> "$ins_go"
     test -n "$noi" ||
         goi "$1"
 }
 
-ins-npm() {
+function ins-npm() {
     zargs -l 1 -- $(cat "$nodables") -- npm install -g
 }
 
-ins-pip() {
-    zargs -l 1 -- "$NIGHTDIR"/python/**/requirements.txt -- pip install -U -r
+function ins-pip() {
+    zargs -l 1 -- "$NIGHTDIR"/python/**/requirements.txt -- pip install -U --use-deprecated=legacy-resolver --use-feature=fast-deps -r
+    # fast-deps seems to download the packages metadata without downloading the packages completely (no good docs found)
 }
 
-ins-ins() {
+function ins-ins() {
     zargs -n 1 -- $(cat "$insables") -- ins #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
 
