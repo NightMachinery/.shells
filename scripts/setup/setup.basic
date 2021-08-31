@@ -1,4 +1,7 @@
 #!/usr/bin/env zsh
+local setup_dir="$NIGHTDIR/setup"
+cd "$setup_dir"
+
 . ./ins_brewe
 # . ./ins_asdf
 ins-all
