@@ -17,6 +17,6 @@ snapd
 software-properties-common
 transmission-cli
 unixodbc-dev
+unrar
 unzip
 zlib1g-dev
-unrar

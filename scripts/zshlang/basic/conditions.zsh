@@ -124,9 +124,9 @@ function isKitty() {
     fi
 
     if true || isGuest || ( isLocal && ! isTmux ) ; then
-        test -n "$KITTY_WINDOW_ID"
-        # the var can be set incorrectly in tmux
-        # we have also unexported this var in auto-load/env.zsh
+        test -n "$KITTY_WINDOW_ID" || [[ "$TERM" == *kitty* ]]
+        # the var KITTY_WINDOW_ID can be set incorrectly in tmux
+        # we have also unexported KITTY_WINDOW_ID in auto-load/env.zsh
     fi
 }
 iskitty() { isKitty "$@" ; }
