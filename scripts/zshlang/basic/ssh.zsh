@@ -1,5 +1,7 @@
 ##
 function mosh {
+  bella_zsh_disable1=y
+
   command mosh --server="TERM=$TERM TERM_PROGRAM=$TERM_PROGRAM KITTY_WINDOW_ID=$KITTY_WINDOW_ID ITERM_SESSION_ID=$ITERM_SESSION_ID BICON_MODE=$BICON_MODE mosh-server" "$@" # -- zsh
 }
 ##

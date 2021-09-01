@@ -22,10 +22,16 @@ EMACS_ALT1_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server_alt1"
 if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not check
     # Sometimes brew itself is in path but its dirs are not. Also, we want to be able to rerun the code to correct the PATH ordering
     if isLinux; then
-        test -d ~/.linuxbrew && eval $(~/.linuxbrew/bin/brew shellenv)
-        test -d /home/linuxbrew/.linuxbrew && eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+        if test -d ~/.linuxbrew ; then
+            eval $(~/.linuxbrew/bin/brew shellenv)
+        fi
 
-        typeset -xg brew_bin_dir=/home/linuxbrew/.linuxbrew/bin
+        if test -d /home/linuxbrew/.linuxbrew ; then
+            eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
+
+            typeset -xg brew_bin_dir=/home/linuxbrew/.linuxbrew/bin
+            addToPATH "$brew_bin_dir" # `brew shellenv` doesn't work on root, it seems
+        fi
     elif isDarwin ; then
         if isArm ; then
             test -d /opt/homebrew/bin && eval $(/opt/homebrew/bin/brew shellenv)

@@ -26,7 +26,16 @@ function sftpgo-portable() {
     indir "$d" reval-ec sftpgo portable -d "$serve_dir" --permissions "$perms" --username "$user" --password "$pass" --log-verbose --log-file-path "$(ecn "sftpgo__${serve_dir}.log" | gtr / _ | str2filename)" "$opts[@]"
     # --advertise-service
 }
+
 function sftpgo-serve-dl() {
-    tmuxnewsh2 sftpgo-dl @opts sftp 9003 pass "${1:?}" @ sftpgo-portable ~/Downloads
+    tmuxnewsh2 "$0" @opts sftp 9003 pass "${1:?}" @ sftpgo-portable ~/Downloads
+}
+
+function sftpgo-serve-base-writable {
+    local pass="${1:-$(passgen)}"
+    local d=~/base
+
+    mkdir -p "$d"
+    tmuxnewsh "$0" reval-ec @opts perms '*' sftp 9104 webdav 9100 pass "$pass"  @ sftpgo-portable "$d"
 }
 ##

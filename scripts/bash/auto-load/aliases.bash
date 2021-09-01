@@ -75,7 +75,6 @@ alias xlad=onxla
 alias pksay='pkill speechsynthesisd say'
 alias pkmu="pkill -f -- 'mpv.*--no-video'"
 alias c='command'
-alias ash='autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"' #IC
 alias px='ruu proxychains4'
 alias set-timezone='sudo dpkg-reconfigure tzdata'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
