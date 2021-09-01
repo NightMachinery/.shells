@@ -10,7 +10,10 @@ ashL() {
 function kitty-terminfo-install() {
     infocmp -x xterm-kitty | ssh "$@" tic -x -o \~/.terminfo/ /dev/stdin
 }
+
 function ssh() {
+  bella_zsh_disable1=y
+
   if fn-isTop && isKitty ; then
     # will install the xterm-kitty terminal definition on the remote in your home directory.
     # Only needs to run once per host
@@ -40,5 +43,11 @@ function firewall-allow-mosh-darwin() {
   reval-ec sudo "$fw" --unblockapp "$mosh_abs"
 
   reval-ec sudo "$fw" --setglobalstate on
+}
+##
+function ash() {
+    bella_zsh_disable1=y
+
+    autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" "$@"
 }
 ##

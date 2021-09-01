@@ -258,7 +258,7 @@ function clipboard-add-quoted() {
         clipboard-add "$cmd"
     fi
 }
-alias pcz='@opts os y @ clipboard-add-quoted'
+aliasfn pcz @opts os y @ clipboard-add-quoted
 ##
 function clipboard-add-files() {
     if isDarwin ; then
