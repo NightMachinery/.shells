@@ -111,23 +111,26 @@ function ziib-znc {
     assert pushf $nightNotes/private/configs/zii/ @RET
     {
         # ZNC
-        assert reval-ec rsp-dl root@51.178.215.202:/home/zii/.znc ./ # includes logs
+        assert reval-ec rsp-dl --exclude '/**/log/' --exclude 'modules/' --exclude 'znc.pem' root@51.178.215.202:/home/zii/.znc ./
+        # modules: the external, binary modules
+        # znc.pem: the SSL certs
+        # @note I've also added these files to the =.gitignore= file
 
         ## chat logs
-        local ld=./.znc/moddata/log
-        trs ${ld}/**/('##chat'|'##chat-overflow'|'##news'|'##politics'|'#libera')(DN) # these take too much space
         if test -e "$chat_logs_dir" ; then
-            local dest=${chat_logs_dir}/znc/
+            local dest=${chat_logs_dir}/znc
             mkdir -p "$dest"
-            mv-merge $ld "$dest"
+
+            local exclusions=('##chat' '##chat-overflow' '##news' '##politics' '#libera')
+            local opts=()
+            local e
+            for e in $exclusions[@] ; do
+                opts+=(--exclude "$e")
+            done
+            assert reval-ec rsp-dl "$opts[@]" root@51.178.215.202:/home/zii/.znc/moddata/log "${dest}"
         else
-            ecerr "chat_logs_dir does not exists. Deleting the chat logs instead"'!'
-            trs $ld
+            ecerr "$0: chat_logs_dir does not exists; Skipping downloading them."
         fi
-        ##
-        trs ./.znc/modules/ || true # the external, binary modules
-        trs ./.znc/znc.pem || true # the SSL certs
-        # @note I've also added these deleted files to the =.gitignore= file, to avoid race conditions
     } always { popf }
 }
 

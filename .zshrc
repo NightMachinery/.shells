@@ -361,11 +361,57 @@ function nightsh-load-zshrc() {
   # source-plugin zsh-users/zsh-syntax-highlighting
   source-plugin zsh-users/zsh-completions #undeferable
   ##
-  export YSU_MESSAGE_POSITION="after"
-  export YSU_MESSAGE_FORMAT="$(tput setaf 1)found %alias_type for %command: %alias$(tput sgr0)"
-  export YSU_MODE=ALL #BESTMATCH or ALL
-  export YSU_IGNORED_ALIASES=("g" "ll")
-  zsh-defer source-plugin "MichaelAquilina/zsh-you-should-use"
+  YSU_MESSAGE_POSITION="after"
+  YSU_MESSAGE_FORMAT="$(tput setaf 1)found %alias_type for %command: %alias$(tput sgr0)"
+  YSU_MODE=ALL #BESTMATCH or ALL
+  YSU_IGNORED_ALIASES=("g" "ll")
+  source-plugin "MichaelAquilina/zsh-you-should-use"
+
+  function _check_aliasfns() { # @dep/private
+    local typed="$1"
+    local expanded="$2"
+
+    local found_aliases
+    found_aliases=()
+    local best_match=""
+    local best_match_value=""
+    local key
+    local value
+
+    # Find alias matches
+    for key in "${(@k)aliases_fn}"; do
+        value="${aliases_fn[$key]}"
+
+        # Skip ignored aliases
+        if [[ ${YSU_IGNORED_ALIASES[(r)$key]} == "$key" ]]; then
+            continue
+        fi
+
+        if [[ "$typed" = "$value" || \
+              "$typed" = "$value "* ]]; then
+
+        # if the alias longer or the same length as its command
+        # we assume that it is there to cater for typos.
+        # If not, then the alias would not save any time
+        # for the user and so doesn't hold much value anyway
+        if [[ "${#value}" -gt "${#key}" ]]; then
+            found_aliases+="$key"
+        fi
+        fi
+    done
+
+    # Print result matches based on current mode
+    for key in ${(@ok)found_aliases}; do
+      value="${aliases_fn[$key]}"
+      ysu_message "alias_fn" "$value" "$key"
+    done
+
+    if [[ -n "$found_aliases" ]]; then
+        _check_ysu_hardcore
+    fi
+  }
+
+  add-zsh-hook preexec _check_aliasfns
   ##
 
   ##

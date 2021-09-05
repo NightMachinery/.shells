@@ -9,6 +9,13 @@ function extract-head() {
     done
     return 1
 }
+
+function h_aliasfn_save {
+    typeset -Ag aliases_fn
+    aliases_fn[$1]="$2"
+}
+
+
 function h_aliasfn() {
     : "ruu might be needed. Example: aliasfn hi ruu someVar=12"
     local name="$1"
@@ -26,6 +33,8 @@ function h_aliasfn() {
         ##
         enh-savename "$name" "$goesto"
     }
+
+    h_aliasfn_save "$name" "$body"
 }
 # enh-savename aliasfn h_aliasfn # redundant, we will auto-erase noglob ourselves
 alias aliasfn='\noglob h_aliasfn'

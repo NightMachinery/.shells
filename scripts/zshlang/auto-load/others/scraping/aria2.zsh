@@ -205,3 +205,11 @@ function aa-hash-name() {
 }
 @opts-setprefix aa-hash-name aa
 ##
+function aa-2stdout {
+    fhMode=aa full-html2 "$@"
+}
+
+function aa-2dest {
+    fhMode=curl full-html "$@"
+}
+##

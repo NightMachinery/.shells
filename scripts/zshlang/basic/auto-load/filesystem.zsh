@@ -52,17 +52,24 @@ function ensure-dir() {
     mkdir -p "$(bottomdir $1)"
 }
 reify ensure-dir
+##
 function lnrp() {
-    local f="${1:?}" d="${2:?}"
+    local f="${1}" d="${2}" opts=( "${@[3,-1]}" )
+    assert-args f d @RET
 
     local i
     if ! i="$(realpath2 "$f")" ; then
-        ectrace "$0: failed to get the realpath of $(gquote-sq "$f")"
-        return 1
+        ectrace_ret=1 ectrace "$0: failed to get the realpath of $(gquote-sq "$f")"
+        return $?
     fi
 
-    ln -i -s "$i" "$d"
+    if isIReally && isRcLoaded && fn-isTop lnrp ; then
+        opts+=( -i )
+    fi
+
+    ln "$opts[@]" -s "$i" "$d"
 }
+##
 function rmdir-empty() {
     : "Removes all recursively empty directories from <root-dir>"
 
@@ -72,7 +79,7 @@ function rmdir-empty() {
         return 1
     fi
     # From https://unix.stackexchange.com/a/107556/282382
-    gfind "$root" -mindepth 1 -type d -empty -delete
+    gfind "$root" -mindepth 1 -type d -empty -print -delete
 }
 function append-f2f() {
     local from="$(realpath "$1")" to="$(realpath --canonicalize-missing "$2")"

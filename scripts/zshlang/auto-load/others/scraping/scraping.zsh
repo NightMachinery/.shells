@@ -283,18 +283,29 @@ function full-html2() {
         return $?
         # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
     }
+
     [[ "$mode" =~ '^(c|g)url$' ]] && { $proxyenv gurl "$url" ; return $? }
+
+    [[ "$mode" =~ '^wget$' ]] && { $proxyenv wgetm -O - "$url" ; return $? }
+
     [[ "$mode" =~ '^cloudscraper$' ]] && { 
         $proxyenv cloudscraper_get.py "$url" # idk if proxyenv works for this
             return $?
     }
+
     [[ "$mode" =~ '^http(ie)?$' ]] && {
         $proxyenv dbgserr httpm "$url"
         return $?
     }
 }
+
 function full-html() {
-    fhMode="${fhMode:-curlfull}" full-html2 "$1" > "$2"
+    local url="$1" dest="$2"
+    assert-args url dest @RET
+
+    local content
+    content="$(fhMode="${fhMode:-curlfull}" full-html2 "$url")" @TRET
+    ec "$content" > "$dest"
     return "$?"
 
     # local mode="${fhMode:-curlfull}"
@@ -1261,7 +1272,10 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     local imgMode="${url2note_img}" emacsMode="${url2note_emacs}"
 
     if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com' ]] ; then
-        imgMode=y
+        if bool "$emacsMode" ; then
+            imgMode=y
+        fi
+
         if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com(?:/embed/([^/]*))' ]] ; then
             local id="$match[1]"
             img="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" # embedded videos don't set their bloody meta tags

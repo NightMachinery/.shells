@@ -33,20 +33,24 @@ function alpha2white() { rm-alpha "$1" white }
 
 combine-funcs alpha2bw alpha2black alpha2white
 ##
-function saveas-img() { # image-paste, imgpaste; used from night-org.el
+function pbpaste-image() { # image-paste, imgpaste; used from night-org.el
     local dest="$1" ; test -z "$dest" && {
         ecerr "$0: empty dest."
         return 1
     }
-    pbpaste-plus
+    pbpaste-plus @RET
 
     local f="$paste[1]" # We do not support multipastes at this point
     if test -e "$f" ; then
-        cp "$f" "$dest"
+        cp "$f" "$dest" @RET
+    elif url-match "$f" ; then
+        fhMode=curl full-html "$f" "$dest" @RET
+        # aria2 is weaker than curl, and these simple downloads don't benefit from aria2's strengths
     else
-        pngpaste "$dest"
+        pngpaste "$dest" @RET
     fi
 }
+alias saveas-img='pbpaste-image'
 ##
 function text2img-old() {
     # Doesn't work with Persian at all

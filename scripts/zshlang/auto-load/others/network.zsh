@@ -1,4 +1,10 @@
 ###
+function curl-ip-nodns {
+    assert-args lilf_ip @RET
+
+    env-clean curl --resolve lilf.ir:80:"$lilf_ip" --resolve lilf.ir:443:"$lilf_ip" https://lilf.ir/
+}
+
 function curl-ip {
     local opts
     opts=( --progress-bar --retry 120 --retry-delay 1 "$@" )

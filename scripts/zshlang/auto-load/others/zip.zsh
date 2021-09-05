@@ -3,6 +3,7 @@ function zir() {
     \rm "$dest" &> /dev/null
     zip -r "$dest" "$1"
 }
+
 function unzip2dir() {
     local file="$1" y="${unzip2dir_y:-y}"
     file="$(grealpath -e "$file")" @TRET
@@ -25,3 +26,4 @@ function unzip2dir() {
 }
 reify unzip2dir
 aliasfn uzd unzip2dir
+##

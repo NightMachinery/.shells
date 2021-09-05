@@ -1,3 +1,6 @@
+##
+typeset -g lilf_ip="82.102.11.148"
+##
 export Font_Symbola_CourierNew="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
 export Font_CourierNew_Symbola="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf" # monospace
 ##
