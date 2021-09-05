@@ -112,7 +112,7 @@ function lsofp() {
 aliasfn fflsof lsofp
 aliasfn plsof lsofp
 ##
-fftmux() {
+function fftmux() {
     local query="$*"
     local engine=(tmux a -t)
     test -n "$ftE[*]" && engine=("$ftE[@]")
@@ -122,14 +122,83 @@ fftmux() {
     for i in "${(f@)sessions}"
     do
         [[ $i =~ '([^:]*):.*' ]] && {
-            ec "acting on session $match[1]"
+            ecgray "acting on session $match[1]"
             tty-title "${match[1]}"
-            reval "${engine[@]}" "$match[1]"
+            reval-ec "${engine[@]}" "$match[1]"
         }
     done
 }
 alias fft=fftmux
-fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
+
+function fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
+
+function fftmux-name() { ftE=(ec) fftmux }
+
+function tmux-pane-list {
+    : "Usage: <session-name>"
+
+    local out="${tmux_pane_list_o:-#{pane_id}}"
+    tmux lsp -s -F"$out" -t "$@"
+}
+
+function tmux-pane-list-pid {
+    : "Usage: <session-name>"
+
+    @opts o '#{pane_pid' @ tmux-pane-list "$@"
+}
+
+function fftmux-pane-list {
+    : "Usage: <session-name>"
+
+    ftE='tmux-pane-list' fftmux
+}
+
+function fftmux-pane-list-pid {
+    : "Usage: <session-name>"
+
+    ftE='tmux-pane-list-pid' fftmux
+}
+
+function tmux-pane-restart-nokill {
+    : "Usage: <pane-id>"
+    : "This command only restarts the tmux pane; The processes might still live beyond their dead pane."
+
+    tmux respawn-pane -kt "$@"
+}
+
+function tmux-session-restart {
+    local sessions=("$@")
+
+    local s
+    for s in ${(@f)sessions} ; do
+        ecgray $'\n'"$0: restarting session $(gquote-sq "$s"):"
+        local panes
+        panes="$(tmux-pane-list "$s")"
+        pane_pids="$(tmux-pane-list-pid "$s")"
+
+        local p
+        for p in ${(@f)pane_pids} ; do
+            reval-ec kill-withchildren "$kill_opts" "$p"
+        done
+        for p in ${(@f)panes} ; do
+            reval-ec tmux-pane-restart-nokill "$p"
+        done
+    done
+}
+
+function fftmux-session-restart {
+    local kill_opts=()
+    if [[ "$1" == -* ]] ; then
+        kill_opts+="$1"
+        shift
+    fi
+    local q="$*"
+
+    local session
+    sessions="$(fftmux-name "$q")" @RET
+    tmux-session-restart "$sessions[@]"
+}
+alias fftr='fftmux-session-restart'
 ##
 ffman() {
     # mnf

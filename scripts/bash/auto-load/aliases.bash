@@ -1,6 +1,6 @@
 # Perhaps you should use aliasfn
 ###
-re unalias a l la ll map p fd ff pip sp rd pu gss gd &>/dev/null # mv cp
+re unalias a l la ll map p fd ff pip sp rd pu gss gd zi &>/dev/null # mv cp
 alias 'brishzr-repeat'='isLocal && { ec ; assert reval-ec brishzr "$0" ; ec } || true'
 alias rgjl="rgm -t julia" #"rgm --glob '*.jl'"
 alias rgpy="rgm --glob '*.py'"

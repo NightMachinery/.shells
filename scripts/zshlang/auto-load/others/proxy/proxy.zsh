@@ -46,14 +46,15 @@ function reval-pxa() {
     pxa reval "$@"
 }
 ##
-v2-on() {
+function v2-on() {
     tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
 }
-v2-off() {
+
+function v2-off() {
     tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/direct.json
 }
 ##
-pxify() {
+function pxify() {
     typeset -g proxycmd="proxychains4"
     typeset -g proxyenv="reval-pxa"
     enh-pxpy tsend
@@ -99,7 +100,7 @@ function pxify-auto() { # @gateway
     # return 0 # We now use Wireguard
     typeset -g pxified
     # local initCountry="$(serr mycountry)"
-    if test -z "$pxified" && isMBP ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
+    if test -z "$pxified" && { isMBP } ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
         pxified=y
         pxify
     fi
