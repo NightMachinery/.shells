@@ -12,7 +12,14 @@ function zerr_handler {
                 # ectrace "$0: $r ; subshell level: $ZSH_SUBSHELL" || true
 
                 if true ; then
-                    ask "CNOTFOUND; Press enter to proceed, or use C-c or C-d to manually halt the execution." Y
+                    if isBrish ; then
+                        ecerr "CNOTFOUND; Exiting ..."
+                        tts-glados1-cached "command not found" || true
+                        tts-glados1-cached "aborting" || true
+                        exit 127
+                    else
+                        ask "CNOTFOUND; Press enter to proceed, or use C-c or C-d to manually halt the execution." Y
+                    fi
                     return $r
                 else
                     # zer_handler will be triggered around 5 times on a single CNOTFOUND error, so asking the user here is infeasable.

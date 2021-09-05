@@ -116,6 +116,7 @@ function h_term-get {
     # returns 'xterm-kitty' in Kitty even if TERM is set to sth else
     # works over SSH, but not over mosh
 }
+
 function term-get {
     typeset -g term_true_name
     if isDeus || test -z "$term_true_name" ; then
@@ -126,5 +127,36 @@ function term-get {
     fi
 
     ec "$term_true_name"
+}
+##
+function h_term-cursor-change {
+    local mode="$1"
+    assert-args mode @RET
+
+    printf '\033['"$mode"' q'
+}
+
+function term-cursor-box() {
+    h_term-cursor-change 1
+}
+
+function term-cursor-underline() {
+    h_term-cursor-change 3
+}
+
+function term-cursor-beam() {
+    h_term-cursor-change 5
+}
+
+function term-cursor-box-noblink() {
+    h_term-cursor-change 0
+}
+
+function term-cursor-underline-noblink() {
+    h_term-cursor-change 4
+}
+
+function term-cursor-beam-noblink() {
+    h_term-cursor-change 6
 }
 ##
