@@ -21,7 +21,11 @@ www.lilf.ir {
 }
 
 lilf.ir {
-  respond "You see there is nothing here. You're filled with determination."
+  templates
+  header Content-Type text/plain
+  respond "You see there is nothing here. You're filled with determination.
+
+    Your IP: {{.RemoteIP}}"
 }
 
 files.lilf.ir, http://:8080 {
