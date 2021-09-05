@@ -17,11 +17,9 @@ function youtube-dl() {
         opts+=(--add-header "$(cookies-auto "$@")")
     fi
 
-    if isSSH ; then
+    if isSSH ; then # urlfinalg takes too much time on Iran's net.
         transformer urlfinalg "revaldbg $proxycmd $head $opts[@]" "$@" "$ytdl_opts[@]"
     else
-        # urlfinalg takes too much time on Iran's net.
-
         ##
         # revaldbg $proxycmd youtube-dl "$opts[@]" "$@" "$ytdl_opts[@]"
         ##
