@@ -1,4 +1,12 @@
 ##
+function borg-restart {
+    brishz awaysh tmux-session-restart julia
+}
+
+function borg-restart-remote {
+    brishzr awaysh tmux-session-restart julia
+}
+##
 jkey_expire=$((3600*24*60))
 function jtokey() {
     local key="${1?Key required}" cmd="${2?Cmd required}" jjson="${3}" jjson_btn="${4}" jdata="${5}" jaction="${6}"

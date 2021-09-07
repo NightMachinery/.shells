@@ -53,6 +53,7 @@ function backup-private-common {
 ##
 function backup-file() {
     local f="${1:?}"
+
     if test -e "$f" ; then
         cp --verbose --backup=t --suffix='.bak'  $f ~/base/backup/auto/"${f:t} $(md5m "$f")/$(dateshort)/" || {
             local ret=$?

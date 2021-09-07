@@ -97,9 +97,17 @@ date = parse(os.environ["date"])
 print((datetime.datetime.now(date.tzinfo) - date).total_seconds())'
 }
 ##
+function date-time() { date +"%H:%M:%S" }
+
+function datej-all-long-time {
+    ec "$(datej-all-long) $(date-time)"
+}
+
 function dateshort() { date +"%b %d %H:%M:%S" }
-dateshortnum() { date +"%Y/%m/%d" }
-datej() {
+
+function dateshortnum() { date +"%Y/%m/%d" }
+
+function datej() {
     # alt: Python https://github.com/fitnr/convertdate
     # jalalim tojalali "$(dateshortnum)"
     jalalicli today
@@ -171,6 +179,8 @@ function reminday_store() {
     ensure-dir "$dest" || return 1
     ec "$text" >> $dest || return $?
     ##
+    ecgray "now: $(datej-all-long-time)"
+
     if test -n "$datej" ; then
         Bold ; color 100 255 200 "$(@opts mode 1 @ datej-all "$datej")" ; resetcolor
     fi

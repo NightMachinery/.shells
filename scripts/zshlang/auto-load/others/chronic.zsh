@@ -38,7 +38,7 @@ function chronic-backup() {
     re backup-file $timetracker_db $HISTFILE
     backup-cron
 
-    if isLocal ; then
+    if isLocal && isMe ; then
         backup-startupSh
         ziib-all
         # backup-rsync
