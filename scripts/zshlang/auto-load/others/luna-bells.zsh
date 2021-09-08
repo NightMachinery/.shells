@@ -136,6 +136,7 @@ function lunaquit() {
     fi
     return 0
 }
+
 function lunaquit-monitor() {
     # @todo1 make this single-instance
 
