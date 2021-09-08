@@ -37,6 +37,7 @@ function fz-rtl1() {
 function biconm() {
   BICON_MODE=y bicon.bin "$@"
 }
+
 function bicon-emc() {
   bella_zsh_disable1=y
 
@@ -56,6 +57,11 @@ function bicon-emc() {
     }
     return $?
   fi
+  fi
+
+  if isKitty ; then
+    emcnw "$@"
+    return $?
   fi
 
   if isRtl || isKitty ; then
