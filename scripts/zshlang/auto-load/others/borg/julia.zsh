@@ -1,4 +1,21 @@
 ##
+function jcolor {
+    if isBorg ; then
+        local content
+        content="$(fnswap isColor true fnswap isOutTty true reval "$@" 2>&1)" @TRET
+
+        local lc
+        lc="$(ec $content | count-lines)" @TRET
+        if (( lc <= 60 )) ; then
+            ansi2img "$@"
+        else
+            jah "$@"
+        fi
+    else
+         reval "$@" @RET
+    fi
+}
+##
 function borg-restart {
     brishz awaysh tmux-session-restart julia
 }
@@ -247,6 +264,8 @@ noglobfn jma
 function jah() {
     # ansi2html
     ##
+    color-force-env
+
     jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
 }
 function jahun() {
@@ -254,8 +273,9 @@ function jahun() {
     jah ruu unbuffer "$@"
 }
 
+
 function ansi2img {
-    local ugrep_opts=( $ugrep_opts[@] --color=always ) # can be problematic, but whatever
+    color-force-env
 
     local tmp r
     tmp="$(gmktemp)" @TRET

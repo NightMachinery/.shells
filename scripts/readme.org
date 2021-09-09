@@ -1,0 +1,12 @@
+#+TITLE: scripts/readme
+
+* Licensing
+The code that I have written myself is dual-licensed under the MIT license and the latest GPL (whichever license is more convenient for you), but there is some bit of code I have forked from other FOSS-ish sources, which necessarily follow their parent licensing. (The comments indicate when I have forked some code from somewhere else.)
+
+There are some non-FOSS resources in this repo that I have included only for my own personal, home usage, and which you should not use. These files should be mostly obvious (if it's not mine and you don't know where they are from and what license they are under), but here is a non-exhaustive list:
+
+** =./scripts/external/=
+
+** =./scripts/bin/=
+
+** =/scripts/resources/= unless otherwise specified

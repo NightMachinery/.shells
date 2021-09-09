@@ -180,7 +180,10 @@ function img-rotate() {
     local input="$1" degree="${img_rotate_d:--90}"
     assert test -e "$input" @RET
     local out="${2:-${input:r}_r${degree}.${input:e}}"
+    dest-overwrite-p "$out" @RET
 
     assert magick convert "$input" -rotate "$degree" "$out" @RET
 }
+
+aliasfn img-rotate-inplace inplace-io img-rotate
 ##

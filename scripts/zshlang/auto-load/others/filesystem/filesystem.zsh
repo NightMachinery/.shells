@@ -209,3 +209,11 @@ function path-unabbrev-simple () {
     ec "$(in-or-args "$@")" | perl -lpe 's/^~/$ENV{HOME}/g'
 }
 ##
+function f-size {
+    local f="$1"
+    assert test -e "$f" @RET
+
+    gstat --printf="%s" "$f"
+}
+reify f-size
+##
