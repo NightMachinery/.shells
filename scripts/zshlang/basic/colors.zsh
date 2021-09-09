@@ -1,3 +1,6 @@
+##
+alias color-force-env='local isColor_override=y ; ensure-array ugrep_opts ; local ugrep_opts=("$ugrep_opts[@]" --color=always)'
+##
 autoload -U colors && colors
 ##
 typeset -ag gray=( 170 170 170 )

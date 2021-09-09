@@ -120,11 +120,7 @@ function pathtree-video {
 noglobfn pathtree-video
 
 function ptv {
-    if isBorg ; then
-        ansi2img pathtree-video "$@"
-    else
-        pathtree-video "$@"
-    fi
+    jcolor pathtree-video "$@"
 }
 noglobfn ptv
 ##

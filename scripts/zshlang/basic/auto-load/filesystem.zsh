@@ -129,3 +129,36 @@ function fd-exists-d1() {
     fd-exists --max-depth=1 "$@"
 }
 ##
+function dest-overwrite-p {
+    local dests=("$@") interactive="${dest_overwrite_p_i}" overwrite_by_default="${dest_overwrite_p_default:-y}" force_overwrite="${dest_overwrite_p_f}"
+
+    if bool "$force_overwrite" ; then
+        return 0
+    fi
+
+    local f
+    for f in $dests[@] ; do
+        if test -s "$f" ; then # file exists and has a size greater than zero
+            if test -z "$interactive" ; then
+                if isIReally ; then
+                    interactive=y
+                fi
+            fi
+
+            if bool "$interactive" ; then
+                if ask "$0: Overwrite $(gquote-sq "$f")?" N ; then
+                    return 0
+                else
+                    return 1
+                fi
+            else
+                if bool "$overwrite_by_default" ; then
+                    return 0
+                else
+                    return 1
+                fi
+            fi
+        fi
+    done
+}
+##
