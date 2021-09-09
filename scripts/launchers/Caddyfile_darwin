@@ -3,7 +3,8 @@
 
 {
     # experimental_http3
-	order webdav after basicauth
+
+	# order webdav after basicauth
 }
 
 
@@ -22,7 +23,7 @@ http://:8112, http://files.{env.MDNS_NAME}.local {
   encode zstd gzip
   file_server browse {
     hide *..hidden..*
-    root {env.HOME}/Base/shared
+    root {env.HOME}/base/shared
   }
 }
 
