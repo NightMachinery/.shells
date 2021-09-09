@@ -88,3 +88,5 @@ function gh-release-get() {
         # popf
     }
 }
+alias gh-install='gh-release-get'
+##

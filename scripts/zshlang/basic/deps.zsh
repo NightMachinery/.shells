@@ -25,6 +25,8 @@ function bicon-install {
 }
 ##
 function caddy-install {
+    assert go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest @RET
+
     local d=~/bin/
     assert mkdir -p "$d" @RET
     assert cd "$d" @RET

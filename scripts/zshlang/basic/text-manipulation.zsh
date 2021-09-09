@@ -27,7 +27,7 @@ function rget() {
 }
 ##
 function text-wrap() {
-    local w="${1:-${COLUMNS:-90}}"
+    local w="${1:-${text_wrap_columns:-${COLUMNS:-90}}}"
 
     if (( ${+commands[ansifold]} )) ; then
         ansifold --boundary=word --width="$w" --padchar=' ' "${@[2,-1]}"

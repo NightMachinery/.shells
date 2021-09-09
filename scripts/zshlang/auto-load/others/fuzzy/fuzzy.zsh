@@ -130,7 +130,9 @@ function fftmux() {
 }
 alias fft=fftmux
 
-function fftmuxkill() { ftE=(tmux kill-session -t) fftmux }
+function fftmuxkill() {
+    ftE=(tmux kill-session -t) fftmux
+}
 
 function fftmux-name() { ftE=(ec) fftmux }
 
@@ -166,7 +168,33 @@ function tmux-pane-restart-nokill {
     tmux respawn-pane -kt "$@"
 }
 
+function tmux-session-processes-kill {
+    local kill_opts=()
+    if [[ "$1" == -* ]] ; then
+        kill_opts+="$1"
+        shift
+    fi
+    local sessions=("$@")
+
+    local s
+    for s in ${(@f)sessions} ; do
+        ecgray $'\n'"$0: killing the processes of session $(gquote-sq "$s"):"
+        local panes
+        pane_pids="$(tmux-pane-list-pid "$s")"
+
+        local p
+        for p in ${(@f)pane_pids} ; do
+            reval-ec kill-withchildren "$kill_opts" "$p"
+        done
+    done
+}
+
 function tmux-session-restart {
+    local kill_opts=()
+    if [[ "$1" == -* ]] ; then
+        kill_opts+="$1"
+        shift
+    fi
     local sessions=("$@")
 
     local s
@@ -187,7 +215,7 @@ function tmux-session-restart {
 }
 
 function fftmux-session-restart {
-    local kill_opts=()
+    local engine=("${fftmux_engine[@]:-tmux-session-restart}") kill_opts=()
     if [[ "$1" == -* ]] ; then
         kill_opts+="$1"
         shift
@@ -196,9 +224,13 @@ function fftmux-session-restart {
 
     local session
     sessions="$(fftmux-name "$q")" @RET
-    tmux-session-restart "$sessions[@]"
+    "$engine[@]" "$kill_opts[@]" "$sessions[@]"
 }
 alias fftr='fftmux-session-restart'
+
+function fftmux-session-processes-kill {
+    fftmux_engine=(tmux-session-processes-kill) fftmux-session-restart "$@"
+}
 ##
 ffman() {
     # mnf

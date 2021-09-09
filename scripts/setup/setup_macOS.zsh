@@ -5,6 +5,8 @@ if isDarwin ; then
 
     brew install --cask --appdir=/Applications megacmd
 
+    brew install teamookla/speedtest/speedtest
+
     brew install fabianishere/personal/pam_reattach
 
     brew install --cask corelocationcli
