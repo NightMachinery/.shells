@@ -1,1 +1,5 @@
-sudo snap set system refresh.retain=2 
+sudo snap set system refresh.retain=2
+##
+curl -s https://install.speedtest.net/app/cli/install.deb.sh | sudo bash
+sudo apt-get install speedtest
+##

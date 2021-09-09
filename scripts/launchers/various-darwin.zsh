@@ -6,11 +6,18 @@ powersaving_status_del
 ##
 darwin-dns-set 127.0.0.1 1.1.1.1
 ##
+if test -n "$MDNS_NAME" ; then
+    mdns-init-darwin
+fi
+##
 
 brishgarden-boot
 
-if isMe ; then
+if isMe || isGrayfur ; then
     tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile_darwin
+fi
+
+if isMe ; then
     ##
     tmuxnewsh2 sftpgo_shared reval-notifexit sftpgo serve --config-file "$NIGHTDIR/launchers/sftpgo_darwin.json" --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log
     # tmuxnewsh2 shared_sftpgo indir ~/Base/keys/sftpgo sftpgo portable -d ~/Base/shared --permissions '*' --username "$SFTPGO_USER1" --password "$SFTPGO_PASS1" --webdav-port 8114 --sftpd-port 8115 --ftpd-port 8116 --log-verbose --log-file-path sftpgo.log --advertise-service

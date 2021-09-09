@@ -266,14 +266,14 @@ function jah() {
     ##
     color-force-env
 
-    jahmode=y FORCE_INTERACTIVE=y reval "$@" | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
+    jahmode=y FORCE_INTERACTIVE=y reval "$@" | text_wrap_columns=${text_wrap_columns:-50} text-wrap | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
 }
+
 function jahun() {
     # unbuffer needs expect
     jah ruu unbuffer "$@"
 }
-
-
+##
 function ansi2img {
     color-force-env
 
