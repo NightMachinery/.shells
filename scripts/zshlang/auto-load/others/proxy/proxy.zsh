@@ -75,7 +75,6 @@ function pxify() {
     # pxaify-command cargo # did not work, using CARGO_HTTP_PROXY instead
     export CARGO_HTTP_PROXY=socks5://localhost:1078
 
-    pxaify-command mpv
     pxaify-command spotdl
     pxaify-command emacs
     pxaify-command emacsclient

@@ -1,3 +1,6 @@
+# you can use `lftp -e 'set file:use-fallocate true ; set mirror:parallel-directories true ; mirror ... ; quit'` to specify options on the commandline, but I could not find a way to do it when using '-c'.
+##
+
 set file:use-fallocate true
 
 set mirror:parallel-directories true
