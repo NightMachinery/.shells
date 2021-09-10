@@ -14,6 +14,11 @@ except:
     pass
 
 try:
+    import pandas as pd
+except:
+    pass
+
+try:
     from brish import z, zp, zs, zq, bsh
 except:
     pass

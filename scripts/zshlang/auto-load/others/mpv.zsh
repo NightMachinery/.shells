@@ -6,11 +6,14 @@ export MPV_HOME="${MPV_HOME:-$HOME/.config/mpv}"
 
 ## Functions
 function mpv-manga() {
-    # shader: 1,4 are good, I chose 4.
-    # Probably because of --no-config, mpv can't expand '~~/'. So we use $MPV_HOME directly.
-    pushf "$MPV_HOME" # shader hotkeys need '~~/' to work.
+    local args=()
+    h_mpv-args "$@" @RET
+    set --
+
+    pushf "$MPV_HOME" # Probably because of --no-config, mpv can't expand '~~/'. So we use $MPV_HOME directly. (Shader hotkeys need '~~/' to work.)
     {
-        mpv_ipc=~/tmp/.mpv.manga mpv --no-config --load-scripts=no --script=$MPV_HOME/mpv-manga-reader/manga-reader.lua --image-display-duration=inf --input-conf=$MPV_HOME/input.conf --reset-on-next-file=video-pan-x,video-pan-y --video-align-x=1 --video-align-y=-1 --video-zoom=1 --fs --glsl-shaders="$MPV_HOME/shaders/Anime4K_3.0_Denoise_Bilateral_Mode.glsl:$MPV_HOME/shaders/Anime4K_3.0_Upscale_CNN_M_x2_Deblur.glsl" "$@"
+        mpv_ipc=~/tmp/.mpv.manga mpv --no-config --load-scripts=no --script=$MPV_HOME/mpv-manga-reader/manga-reader.lua --image-display-duration=inf --input-conf=$MPV_HOME/input.conf --reset-on-next-file=video-pan-x,video-pan-y --video-align-x=1 --video-align-y=-1 --video-zoom=1 --fs --glsl-shaders="$MPV_HOME/shaders/Anime4K_3.0_Denoise_Bilateral_Mode.glsl:$MPV_HOME/shaders/Anime4K_3.0_Upscale_CNN_M_x2_Deblur.glsl" "$args[@]"
+        # shader: 1,4 are good, I chose 4.
     } always { popf }
 }
 
@@ -23,6 +26,34 @@ function command-mpv() {
     fi
 }
 
+function h_mpv-args {
+    : "initialize args=() before calling me"
+    # Usage: h_mpv-args <arg> ...
+    # Global OUT: args
+    ##
+    if (( $#args > 0 )) ; then
+        ecerr "$0: args is not empty"
+        return 1
+    fi
+
+    local first
+    local i
+    for i in "$@"
+    do
+        if test -e "$i" ; then
+            if test -z "$first" ; then
+                first="${i:t}"
+            fi
+            args+="$(grealpath --canonicalize-existing -- "$i")"
+        else
+            args+="$i"
+        fi
+    done
+
+    tty-title "$first"
+}
+
+
 function mpv() {
     local isStreaming="$mpv_streaming"
 
@@ -33,21 +64,11 @@ function mpv() {
         opts+=(--script-opts-add=autotag-enabled=no)
     fi
 
-    local i args=() first
-    for i in "$@"
-    do
-        if test -e "$i" ; then
-            if test -z "$first" ; then
-                first="${i:t}"
-            fi
-            args+="$(realpath --canonicalize-existing -- "$i")"
-        else
-            args+="$i"
-        fi
-    done
+    local args=()
+    h_mpv-args "$@" @RET
+    set --
 
-    tty-title "$first"
-    revaldbg command-mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
+    revaldbg $proxyenv command-mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
 }
 aliasfn mpv-noconfig command mpv --no-config --load-scripts=no
 ###
