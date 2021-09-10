@@ -28,7 +28,7 @@ function reval-pxs() {
 }
 ##
 function pxa-create() {
-    typeset -g px_httpport="${1:-1088}"
+    typeset -g px_httpport="${1:-1087}"
     # 1087: genrouter
     # 1088: shadowsocks
     # @todo0 make this support multiple ports at the  same time
@@ -145,6 +145,11 @@ function darwin-proxies-gen() {
         eval-ec "$*"
     done
 }
+
+function darwin-proxies-get {
+    darwin-proxies-gen networksetup -getsocksfirewallproxy '$ns'
+}
+
 function darwin-proxies-set() {
     darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost "${1:-$socksport}"
 }

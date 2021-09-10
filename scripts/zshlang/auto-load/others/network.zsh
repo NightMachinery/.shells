@@ -257,7 +257,7 @@ aliasfn bwh sudo bandwhich -p -a
 function darwin-net-static-set {
     networksetup -setmanual Wi-Fi 192.168.1.56 255.255.0.0 192.168.1.1
     ##
-    # this wasn't enough for external devices. It also didn't solve the hotspot issue, and I still had to unset the static IP.
+    # This did not work. We could not reach the internet and the LAN could not reach us.
     # networksetup -setmanualwithdhcprouter Wi-Fi 192.168.1.56
 }
 
