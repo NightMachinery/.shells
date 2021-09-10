@@ -395,7 +395,9 @@ function bella-zsh-magic() {
 }
 
 function bella-zsh-gateway() {
-    if bool "$bella_zsh_disable1" || test -z "$HISTFILE" ; then
+    if { isGuest && ! isGrayfur } || bool "$bella_zsh_disable1" || test -z "$HISTFILE" ; then
+        # bella-zsh is a tad opinionated, so I am disabling it for guests.
+
         return 0
     fi
 

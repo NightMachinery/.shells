@@ -131,10 +131,12 @@ function fftmux() {
 alias fft=fftmux
 
 function fftmuxkill() {
-    ftE=(tmux kill-session -t) fftmux
+    ecgray "$0: using fftmux-session-processes-kill is usually better than this"
+
+    ftE=(tmux kill-session -t) fftmux "$@"
 }
 
-function fftmux-name() { ftE=(ec) fftmux }
+function fftmux-name() { ftE=(ec) fftmux "$@" }
 
 function tmux-pane-list {
     : "Usage: <session-name>"
@@ -231,6 +233,7 @@ alias fftr='fftmux-session-restart'
 function fftmux-session-processes-kill {
     fftmux_engine=(tmux-session-processes-kill) fftmux-session-restart "$@"
 }
+alias fftk='fftmux-session-processes-kill'
 ##
 ffman() {
     # mnf

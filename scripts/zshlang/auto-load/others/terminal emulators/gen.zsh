@@ -1,6 +1,6 @@
 ##
 function terminal-supported-p {
-    ! isGuest && { isiTerm || isKitty }
+    isiTerm || isKitty
 }
 ##
 function terminal-unsupported() {

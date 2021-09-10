@@ -1,0 +1,6 @@
+set file:use-fallocate true
+
+set mirror:parallel-directories true
+set mirror:parallel-transfer-count 16
+set mirror:use-pget-n 4
+# splits each file into these many parts for downloading
