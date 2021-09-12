@@ -308,17 +308,19 @@ function ectrace() {
             fi
         else
             assert_global_lock=''
-            throw_ret=$ret throw "$exc" "$msg" | {
+
+            # @todo make crash.zsh use stderr
+            throw_ret=$ret throw "$exc" "$msg"  2>&1 | {
                 if isColor ; then
                     cat
                 else
                     # @todo2 make crash.zsh use our own color infra
                     erase-ansi
                 fi
-            }
+            } # >&2 # @zshBug redirecting this to stderr here will cause a significant slowdown
         fi
         return $ret
-    } >&2 # @todo make crash.zsh use stderr itself
+    } >&2 
 
     ## tests:
     # `return 32 | true || ectrace`
