@@ -126,7 +126,13 @@ function enh-urlfinal() {
 ##
 function p() { # paste
     pbpaste-plus # outputs in `paste`
-    test -n "$paste[*]" && { geval "$(gq "${@}")" "$(gq "$paste[@]")" ; return $? } || >&2 color red Clipboard returned empty.
+    if test -n "$paste[*]" ; then
+        @opts e geval @ reval-env "$@" "$paste[@]"
+        return $?
+    else
+        ecerr "$0: Clipboard was empty."
+        return 1
+    fi
 }
 ##
 function enh-addfinder() {

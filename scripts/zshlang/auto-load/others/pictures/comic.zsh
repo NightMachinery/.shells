@@ -1,3 +1,4 @@
+##
 function comic-print() {
     local f enhance="${comic_print_e:-y}"
     f=("${(@f)$(finder-sel-get)}") @RET
@@ -50,3 +51,5 @@ function comic-print() {
 
     tts-glados1-cached "Processing, complete"
 }
+alias manga-print='comic-print'
+##

@@ -26,6 +26,8 @@ function timer() {
 
             notif-os "$header" ""
         fi
+
+        mark-me "TIMER"
         reval "$cmd[@]"  #eval ${(q+@)@[2,-1]:-${(z)/#/loop ot-play-happybirthday}}
     }
 }

@@ -309,7 +309,7 @@ function full-html() {
     assert-args url dest @RET
 
     local content
-    content="$(fhMode="${fhMode:-curlfull}" full-html2 "$url")" @TRET
+    content="$(fhMode="${fhMode:-curlfull}" full-html2 "$url")" @RET
     ec "$content" > "$dest"
     return "$?"
 
@@ -765,12 +765,14 @@ function getlinksfull() {
 Remember that you can customize full-html by fhMode." MAGIC
 
     local url="$1"
+
     local u
-    u="$(uuidpy)"
-    full-html "$url" "$u"
+    u="$(uuidpy)" @TRET
+    full-html "$url" "$u" @RET
     test -e "$u" || { ecerr "${0}: Couldn't download $url" ; return 1 }
     getlinks.py "$1" "$u" | trimsed | command rg "${@[2,-1]:-.*}"
-    \rm "$u"
+
+    silent trs-rm "$u"
 }
 noglobfn getlinksfull
 function lwseq() {
@@ -878,17 +880,17 @@ Uses getlinksfull (full-html) under the hood." MAGIC
     zparseopts -A opts -K -E -D -M -regex:=e e:
     local pages=("$@")
     local regex="${opts[-e]:-.*}"
-    # re dvar pages regex
+
     for page in "$pages[@]"
     do
-        getlinksfull "$page" "$regex"
+        getlinksfull "$page" "$regex" || true # errors are ignored
     done
-    # zargs is buggy with its quotation
-    # zargs --verbose -i _ -- "$pages[@]" -- getlinksfull _ "$regex"
 }
+
 function getlinks2() {
     fhMode="${fhMode:-curl}" getlinksfull2 "$@"
 }
+
 function getlinks-c() {
     # @hiddenAPI 'fhMode=aacookies' is used by aamedia to fnswap aria2c
     fhMode="${fhMode:-aacookies}" getlinksfull2 "$@"
@@ -1186,10 +1188,13 @@ function hi10-from-page() {
 }
 function libgendl-md5-main() {
     local md5="$1"
+
     # local mainmirror="http://93.174.95.29"
     local mainmirror="http://31.42.184.140"
+
     # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
     local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
+
     getlinks-c -e '\.[^/]+$' "$urls[@]" | {
         # @outdatedComment will get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
         rg -F 'cloudflare-ipfs.com'
@@ -1222,9 +1227,10 @@ function libgendl-md5() {
 
     { test -z "$lgNoBok" && libgendl-md5-bok "$md5" } || {
         test -z "$lgNoBok" && ecerr "bok failed. Trying main ..."
+
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
-          aa-multi $links[@]
+          aa-multi $links[@] @RET
         else
           ecerr "$0: No books found for md5: $md5"
           return 1
@@ -1232,12 +1238,14 @@ function libgendl-md5() {
     }
 }
 reify libgendl-md5-main libgendl-md5-bok libgendl-md5-old libgendl-md5-bok-old libgendl-md5
+
 function jlibplain() {
     # libgendl-md5-main "${(f@)$(re libgen2md5 "$@")}" | inargsf aa -Z
     libgendl-md5 "${(f@)$(libgen2md5 "$@")}"
     # serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 }
 noglobfn jlibplain
+
 function jlib() {
     jee
     jlibplain "$@" || return 1

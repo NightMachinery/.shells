@@ -102,7 +102,10 @@ function reval-notifexit() {
 function reval-env() {
     test -z "$*" && return 0
 
-    local clean_mode="$reval_env_clean"
+    local clean_mode="$reval_env_clean" eval_engine=("${reval_env_e[@]:-eval}")
+    local reval_env_clean='' reval_env_e=''
+    # unsetting the input vars locally, so as to not change the defaults for inner calls to ourselves
+    # example: `@opts e geval @ reval-env reval-env ec a`
 
     local env=()
     local i
@@ -124,12 +127,18 @@ function reval-env() {
     if bool $clean_mode ; then
         env -i "$env[@]" "$(realpath2 "$cmdhead")" "$cmdbody[@]"
     else
-        eval "$env[*] $(gq "$cmdhead" "$cmdbody[@]")"
+        local cmd="$(gq "$cmdhead" "$cmdbody[@]")"
+        if test -n "$env[*]" ; then
+            cmd="$env[*] ${cmd}"
+        fi
+
+        "$eval_engine[@]" "$cmd"
     fi
     ## tests:
     # `reval-env sth=\"67 fin='"98" !!' echo-fin`
     ##
 }
+
 function env-clean() {
     @opts clean y @ reval-env "$@"
 }
