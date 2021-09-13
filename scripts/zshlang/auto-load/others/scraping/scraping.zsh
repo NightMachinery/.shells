@@ -251,15 +251,25 @@ function httpm() {
     local c="$(cookies-auto "$@")"
     http --style solarized-light --follow --ignore-stdin --session "pink$(uuidpy)" "$@" $c
 }
+
 function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
     # seems to be because the server is messed up, but whatever:
     # http: error: Incomplete download: size=46696; downloaded=131310
 
 
-    # local mode="${fhMode:-http}"
-    local mode="${fhMode:-cloudscraper}"
     local url="$1"
+    local mode="${fhMode}"
+    if test -z "$mode" ; then
+        if [[ "$url" =~ 'https?://[^/]+\.ir' ]] ; then
+            mode='curl'
+        else
+            mode='cloudscraper'
+        fi
+    fi
+    local secure="${fhSecure:-y}" # insecure mode currently only supported by wget and gurl
+
+    local opts=()
 
     if [[ "$url" =~ '^(?:https?://)?[^/]*techcrunch\.' ]] ; then
         ecdbg "$0: Techcrunch Mode"
@@ -270,11 +280,6 @@ function full-html2() {
         mode='curlfull'
     fi
 
-    [[ "$mode" =~ '^(gurl|curlfast)$' ]] &&  {
-        # $proxyenv curl --silent --fail --location -o /dev/stdout "$url"
-        gurl "$url"
-        return $?
-    }
     [[ "$mode" =~ '^curlfullzero$' ]] &&  { cfTimeout=0 $proxyenv curlfull.js "$url" ; return $? } # not really usable
     [[ "$mode" =~ '^curlfullshorter$' ]] &&  { cfTimeout=0.5 $proxyenv curlfull.js "$url" ; return $? } # not really usable
     [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$url" ; return $? }
@@ -289,9 +294,23 @@ function full-html2() {
         # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
     }
 
-    [[ "$mode" =~ '^(c|g)url$' ]] && { $proxyenv gurl "$url" ; return $? }
+    [[ "$mode" =~ '^(c|g)url(fast)?$' ]] && {
+        if ! bool $secure ; then
+            opts+='--insecure'
+        fi
 
-    [[ "$mode" =~ '^wget$' ]] && { $proxyenv wgetm -O - "$url" ; return $? }
+        $proxyenv gurl "${opts[@]}" "$url"
+        return $?
+    }
+
+    [[ "$mode" =~ '^wgetm?$' ]] && {
+        if ! bool $secure ; then
+            opts+='--no-check-certificate'
+        fi
+
+        $proxyenv wgetm -O - "${opts[@]}" "$url"
+        return $?
+    }
 
     [[ "$mode" =~ '^cloudscraper$' ]] && { 
         $proxyenv cloudscraper_get.py "$url" # idk if proxyenv works for this
@@ -1079,8 +1098,8 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
     local html
     html="${html}"
     if test -z "$html" ; then
-        html=$(full-html2 "$url") || {
-            local msg="fhMode: ${fhMode}, URL: $(gq "$url"), retcode: $?"
+        html=$(fhSecure="${fhSecure:-n}" full-html2 "$url") || {
+            local msg="$0: full-html2 failed; fhMode: ${fhMode}, URL: $(gq "$url"), retcode: $?"
             ectrace "$msg"
 
             # return 1
