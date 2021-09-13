@@ -103,12 +103,22 @@ insubshell-eval() {
         eval "$cmd[*]"
     ) &>/dev/null </dev/null
 }
+
 function mark-me() {
     local mark
     mark="$(marker-preprocess "$1")" @RET
 
     jobs -Z "zsh $mark $(gq "${@[2,-1]}")"
+
+    typeset -g mark_current="$mark"
 }
+
+function mark-me-if-unmarked {
+    if test -z "$mark_current" ; then
+        mark-me "$@"
+    fi
+}
+
 
 function marker-preprocess {
     local mark="$1"

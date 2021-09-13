@@ -162,3 +162,16 @@ function kindle-clippings-diff() {
 }
 alias kcd=kindle-clippings-diff
 ##
+function kfx-open() {
+    assert isDarwin @RET
+
+    local f="$1"
+    assert test -e "$f" @RET
+
+    local tmp
+    tmp="$(gmktemp --suffix='.azw8')" @TRET
+
+    assert cp "$f" "$tmp" @RET
+    open -a "Kindle Previewer 3" "$tmp"
+}
+##
