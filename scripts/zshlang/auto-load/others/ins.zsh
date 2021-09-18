@@ -172,3 +172,28 @@ function npm-reinstall-all-g {
     done
 }
 ##
+function gnu-prefix-fix {
+    if isLinux ; then
+        local cmd
+        for cmd in sed grep ; do
+            if true || ! (( ${+commands[g$cmd]} )) ; then
+                local cmd_path
+                cmd_path="${brew_bin_dir}/${cmd}"
+                if ! test -e "$cmd_path" ; then
+                    cmd_path="/bin/${cmd}"
+                fi
+                if ! test -e "$cmd_path" ; then
+                    cmd_path="$(realpath2 "$cmd")" || {
+                        ecerr "$0: cmd $(gquote-sq "$cmd") not found"
+                        continue
+                    }
+                fi
+
+                local dest=~/bin/g"$cmd"
+                silent trs "$dest"
+                reval-ec ln -s "$cmd_path" "$dest"
+            fi
+        done
+    fi
+}
+##

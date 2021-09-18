@@ -71,9 +71,7 @@ local ln_orig="$functions[ln]"
     fnrestore ln "$ln_orig"
 }
 ##
-if isLinux ; then
-    ln -s "$(realpath2 sed)" ~/bin/gsed
-fi
+gnu-prefix-fix
 ## blcs
 # blc tag-ag tag tag-ag
 ##
