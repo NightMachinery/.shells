@@ -91,6 +91,8 @@ function pdf-crop-margins-m {
     local o="${pdf_crop_o:-${1:r}_m${m}.${1:e}}"
 
     reval-ec command pdf-crop-margins -p "$m" "$i" -o "$o"
+    #
+    #  Pre-crop the document by 5 points on each side before computing the bounding boxes.  Then crop retaining 50% of the computed margins.  This can be useful for difficult documents such as scanned books with page-edge noise or other "features" inside the current margins: =pdf-crop-margins -ap 5 -p 50 doc.pdf=
 }
 @opts-setprefix pdf-crop-margins-m pdf_crop
 
@@ -164,7 +166,11 @@ function pdf-numberme {
         # a page size of 595x842 PostScript points (a.k.a. A4 size), and the font Helvetica in 12 pt size
         local x y
         x=$(( int(595 / 2) - 35 ))
+        ##
         y=60 # 0 is the bottom
+        ##
+        # y=830 # on the top
+        ##
 
         command gs -o -    \
             -sDEVICE=pdfwrite        \

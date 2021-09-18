@@ -68,7 +68,7 @@ function fd() {
 ##
 function open() {
   assert isDarwin @RET
-  if [[ "$1" =~ '\.pdf$' ]] ; then
+  if false && [[ "$1" =~ '\.pdf$' ]] ; then
     ##
     # command open -a opera "$1"
     ##
@@ -81,6 +81,8 @@ function open() {
     command open "$@"
   fi
 }
+
+aliasfn opv open -a preview
 ##
 function mega-get() {
   if isBicon ; then

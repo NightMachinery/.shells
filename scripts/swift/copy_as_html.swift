@@ -1,5 +1,12 @@
-#!/usr/bin/env swift
+#!/usr/bin/env scriptisto
 
+// scriptisto-begin
+// script_src: main.swift
+// build_cmd: swiftc main.swift -o ./script
+// scriptisto-end
+
+// @broken I abandoned this, but it generally works; We only need to read the stdin on line 13, instead of hardcoding the input.
+///
 // https://github.com/chbrown/macos-pasteboard/issues/8
 ///
 

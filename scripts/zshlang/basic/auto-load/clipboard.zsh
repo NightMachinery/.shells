@@ -40,6 +40,7 @@ function pbcopy-term() {
     # OSC 52, supported by kitty, iTerm, and others
     printf "\033]52;c;$(printf "%s" "$in" | base64)\a"
 }
+
 function pbcopy() {
     ##
     # local in="$(in-or-args "$@")"
@@ -47,7 +48,10 @@ function pbcopy() {
     dact typ in
 
     if isLinux ; then
-        # we need to read the input to prevent pipe errors
+        ##
+        # =wl-copy= (Wayland)
+        # =xclip -se c -i=
+        ##
         # @NA
         return 0
     fi
@@ -149,8 +153,15 @@ function pbpaste-urls() {
 }
 alias popu='pbpaste-urls'
 ##
-function pbadd() {
+function pbadd-applescript() {
+    # @deprecated
+    ##
+
     osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
+}
+
+function pbadd {
+    copy_files.swift "${(f@)$(re realpath $@)}"
 }
 alias pa=pbadd
 
@@ -164,11 +175,14 @@ function pbpaste-plus() {
 
     local ppaths
     if isDarwin ; then
-        if isArm ; then
-            ecgray "$0: getting files from the clipboard are not yet supported on Apple ARM."
-        else
-            ppaths=( "${(@f)$(clipboard-to-path.nu)}" )
-        fi
+        ppaths=( ${(@f)"$(paste_files.swift)"} )
+        ##
+        # if isArm ; then
+        #     ecgray "$0: getting files from the clipboard are not yet supported on Apple ARM."
+        # else
+        #     ppaths=( "${(@f)$(clipboard-to-path.nu)}" )
+        # fi
+        ##
     fi
 
     test -n "$ppaths[*]" && paste=( $ppaths[@] ) || true

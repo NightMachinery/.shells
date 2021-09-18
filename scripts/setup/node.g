@@ -23,6 +23,8 @@ http-proxy-to-socks
 http-server
 jalali-moment
 janeway
+jpeg-js
+jsqr
 kaomoji
 kitsu
 libgen
@@ -34,6 +36,7 @@ npm-check
 npmlist
 oji
 peerflix-server
+pngjs
 prettier
 puppeteer
 puppeteer-extra

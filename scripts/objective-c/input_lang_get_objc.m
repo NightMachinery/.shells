@@ -1,4 +1,4 @@
-// #!/usr/bin/env scriptisto
+#!/usr/bin/env scriptisto
 
 #import <Foundation/Foundation.h>
 #include <Carbon/Carbon.h>

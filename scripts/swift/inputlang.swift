@@ -1,4 +1,9 @@
-#!/usr/bin/env swift
+#!/usr/bin/env scriptisto
+
+// scriptisto-begin
+// script_src: main.swift
+// build_cmd: swiftc main.swift -o ./script
+// scriptisto-end
 
 // Usage:
 // inputlang.swift list

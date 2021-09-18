@@ -47,6 +47,7 @@ function wallpaper-overlay() {
         rsync "$f" "$o" # ignores if same
     )
 }
+
 function wallpaper-overlay-ipad() {
     local f="$1" f_ipad="${2:-$HOME/Downloads/private/ipad.png}"
     f="$(realpath "$f")" || {
@@ -57,8 +58,9 @@ function wallpaper-overlay-ipad() {
     ensure resize4ipad-fill "$f" $f_ipad @MRET
     # if resize4ipad "$f" $f_ipad ; then
     if @opts rx 300 ry 330 rs 43 se_pos '+300+360' weather ipad weather_s 700 weather_pos '+300-0' @ wallpaper-overlay "$f_ipad" "$f_ipad" ; then
-        isLocal && { scpeva "$f_ipad" Downloads/private/"${f_ipad:t}" @RET }
-        true
+        if isLocal ; then
+            scpeva "$f_ipad" Downloads/private/"${f_ipad:t}" @RET
+        fi
     else
         ecerr "$0: resize4ipad exited $?"
         return 1

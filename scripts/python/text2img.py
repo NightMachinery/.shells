@@ -24,7 +24,7 @@ except:
 
 text = sys.stdin.read()
 try:
-    sys.stdin = open('/dev/tty')
+    sys.stdin = open('/dev/tty') # @idk why this is here, the stdin does not seem to be used later on?
 except:
     pass
 

@@ -1,0 +1,21 @@
+##
+function num-base-convert-py {
+    local n from_base="${num_base_convert_from:-16}" to_base="${num_base_convert_to:-10}"
+    n="$(in-or-args "$@")"
+    n=(${(@f)n})
+
+    local i
+    for i in $n[@] ; do
+        num_base_convert.py "$n" "$from_base" "$to_base"
+    done
+}
+@opts-setprefix num-base-convert-py num_base_convert
+
+aliasfn dice2decimal dice2decimal.py
+
+function hex2decimal-py {
+    @opts from 16 to 10 @ num-base-convert-py "$@"
+}
+
+aliasfn hex2decimal hex2decimal-py
+##
