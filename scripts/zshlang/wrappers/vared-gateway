@@ -1,0 +1,6 @@
+#!/usr/bin/env zsh -f
+local prompt="$1" default="$2"
+
+vared -p "$prompt" default
+
+print -r -- "$default"

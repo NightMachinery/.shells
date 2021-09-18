@@ -103,6 +103,14 @@ function createglob() {
     eval $to'="*.(${(j.|.)'$from'})(.DNn)"' # n sorts numerically: =b-3.png= comes before =b-10.png=
 }
 ##
+function ensure-var-name {
+    local var="$1"
+
+    # variable names can't contain '-' or '.'
+    typeset -g ${var}=${(P)var//-/_}
+    typeset -g ${var}=${(P)var//./_}
+}
+##
 function h_@gather() {
     # GLOBALS: OUTPUT: magic_cmd magic_gathered_vars magic_gathered_*
     magic_gathered_vars=() magic_cmd=() # GLOBAL
@@ -141,9 +149,11 @@ function h_@gather() {
             magic_cmd=( "$@" )
             break
         fi
+
         current_name="${VAR_PREFIX}$i"
-        current_name="${current_name//-/_}" # variables can't have - in their name
+        ensure-var-name current_name
         unset $current_name
+
         i=$(($i+1))
         if [[ "$key" == "$ARRAY_START" ]] ; then
             # ecdbg "ARRAY_START encountered"
@@ -190,8 +200,7 @@ function h_@opts() {
     unset magic_cmd
     [[ "$prefix" == magic ]] && {
         prefix="${magic_opts_prefixes[$cmd[1]]:-$cmd[1]}_"
-        # Now done for all of the variable names, so redundant here:
-        # prefix="${prefix//-/_}" # variables can't have - in their name
+        ensure-var-name prefix
     }
     ecdbg "magic opts final prefix: $prefix"
     set -- "$magic_gathered_vars[@]"
@@ -205,7 +214,8 @@ function h_@opts() {
     # ecdbg "$0 magic vars: $@"
     while (( $#@ != 0 )) ; do
         # ecdbg "entered opts loop"
-        var="${1//-/_}"
+        var="${1}"
+        ensure-var-name var
         shift
         varval=( "${(P@)var}" )
         unset "$var"
@@ -214,12 +224,14 @@ function h_@opts() {
             ecerr "$0: empty key supplied. Aborting."
             return 1
         }
-        var2="${1//-/_}"
+        var2="${1}"
+        ensure-var-name var2
         shift
         var2val=( "${(P@)var2}" )
         unset "$var2"
         varname="${prefix}${varval}"
-        varname="${varname//-/_}"
+        varname="${varname}"
+        ensure-var-name varname
         unset "$varname"
         ##
         if (( ${#var2val} == 1 )) ; then

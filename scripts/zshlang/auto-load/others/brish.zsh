@@ -28,6 +28,11 @@ function brishz() {
         print -nr -- "$stdin" | brishz_in='MAGIC_READ_STDIN' brishzq.zsh "$@"
     fi
 }
+
+function brishz-in {
+    brishz_in="$(cat)" brishz "$@"
+}
+
 aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1 # bsh eval remote
 function brishzr() {
     ensure-net "$0" || return $?

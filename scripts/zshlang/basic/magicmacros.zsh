@@ -17,7 +17,10 @@ alias -g '@MRET'='"$0" || return $?'
 alias '@inargsf'='if (( $#@ == 0 )) ; then ; inargsf re "$0" ; return $? ; fi'
 ##
 alias '@NA'='ectrace "$0: not implemented" @RET'
-alias '@deprecated'='ectrace "$0: deprecated; aborting." @RET'
+
+# alias '@deprecated'='ectrace "$0: deprecated; aborting." @RET'
+alias '@deprecated'='ecgray "$0: deprecated"'
+
 alias '@placeholder'='ectrace "$0: this code is in the middle of editing; aborting." @RET'
 ##
 function magic_h() {

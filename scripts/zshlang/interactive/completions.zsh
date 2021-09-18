@@ -62,6 +62,8 @@ rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 #     [[ -e $asdf_dir ]] && . $asdf_dir/etc/bash_completion.d/asdf.bash
 # }
 ##
+comp-set '=brew' bii
+##
 function _indir() {
     # BEWARE: This completion function has a rather creepy eval in it.
 
@@ -117,7 +119,7 @@ fi
 function _words {
     # @bug "$words[-1]" always selects the last arg, but we want the current arg instead
 
-    _values 'words' "${(f@)$(cat /usr/share/dict/words | rg "$words[-1]")}"
+    _values 'words' "${(f@)$(cat "$WORDLIST0" | rg "$words[-1]")}"
 }
 compdef _words sp spi ffdict ffdict-wn sdc di dwn
 ##

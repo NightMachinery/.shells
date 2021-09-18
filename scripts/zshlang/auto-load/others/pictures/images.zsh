@@ -183,6 +183,10 @@ function img-rotate() {
     dest-overwrite-p "$out" @RET
 
     assert magick convert "$input" -rotate "$degree" "$out" @RET
+
+    if isI && @opts p [ img-rotate ] @ fn-isTop ; then
+        icat "$out"
+    fi
 }
 
 aliasfn img-rotate-inplace inplace-io img-rotate

@@ -126,3 +126,20 @@ function unicode2char() {
     printf "\U$(printf %08x "${1}")\n"
 }
 ##
+function str-repeat {
+    local str="${@[2,-1]}" sep="${str_repeat_sep}"
+    integer n="$1"
+
+    if (( n < 1 )) ; then
+        return 0
+    fi
+
+    local i
+    for i in {1..$n} ; do
+        ecn "${str}"
+        if (( i < $n )) ; then
+            ecn "${sep}"
+        fi
+    done
+}
+##

@@ -20,7 +20,7 @@ function ffdict() {
         words=("$(strip "$(pbpaste)" '\s+')")
     else
         : "You can use our binding for print-query (currently alt-enter) to print the current query."
-        words=( ${(@f)"$(cat /usr/share/dict/words | { fz --exit-0 --query "$q " --print-query || true } | trimsed)"} )
+        words=( ${(@f)"$(cat "$WORDLIST0" | { fz --exit-0 --query "$q " --print-query || true } | trimsed)"} )
         # `--no-exit-0` has no use for us here
         # https://unix.stackexchange.com/questions/213628/where-do-the-words-in-usr-share-dict-words-come-from
 

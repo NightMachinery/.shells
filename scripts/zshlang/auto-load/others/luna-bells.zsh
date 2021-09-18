@@ -185,7 +185,7 @@ function bell-evacuate() {
     kill-marker-luna-timer-late
 
     # `x (4*46)/0.78` = 235
-    awaysh-bnamed BELL_EVACUATE_MARKER @opts redo 235 @ bell-visual-flash1 # each iter takes ~0.78 (outdated?)
+    awaysh-bnamed LUNA_BELL_EVACUATE_MARKER @opts redo 235 @ bell-visual-flash1 # each iter takes ~0.78 (outdated?)
 
     local bell_awaysh=no hear_loudidle=no i
     for i in {1..4} ; do # each iter takes ~46s
@@ -640,6 +640,10 @@ function h_warn-posture() {
     if (( o < 120 )) ; then
         tts-glados1-cached "Correct your posture. The tail should be backward."
     fi
+}
+##
+function bell-entropy-gained {
+    tts-glados1-cached "Entropy gained"
 }
 ##
 aliasfnq bell-gibberish1-long tts-gateway-g1 'An apple is an edible fruit produced by an apple tree (Malus domestica). Apple trees are cultivated worldwide and are the most widely grown species in the genus Malus. The tree originated in Central Asia, where its wild ancestor, Malus sieversii, is still found today. Apples have been grown for thousands of years in Asia and Europe and were brought to North America by European colonists. Apples have religious and mythological significance in many cultures, including Norse, Greek, and European Christian tradition.'
