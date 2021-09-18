@@ -101,14 +101,6 @@ alias ggg='googler -n 6'
 alias gg='ggg --noprompt'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias fsayd='fsay Darkness is Paramount'
-case "$(uname)" in
-    Darwin)
-        alias ggrep='ggrep  --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn}'
-        ;;
-    Linux)
-        alias ggrep='grep  --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn}'
-        ;;
-esac
 
 alias erase-nonprintables='tr -cd "[:print:]\n"'
 # alias cxc='\noglob __calc_plugin'
