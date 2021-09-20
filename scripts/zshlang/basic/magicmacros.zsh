@@ -10,8 +10,11 @@ alias -g '@w'=' | fzinw | inargsf rgeval '
 ##
 # alias -g 'MAGIC'='| { eval "$(read -d "" -r -E)" }'
 alias -g 'MAGIC'='| { eval "$(< /dev/stdin)" }'
+
 alias -g '@RET'=' || return $?'
-alias -g '@TRET'=' || { ectrace ; return $? }'
+
+alias -g '@TRET'=' || { local retcode=$? ; ectrace_single_trace=y ectrace_ret=$retcode ectrace ; return $retcode }' # "$0: TRET encountered"
+
 alias -g '@MRET'='"$0" || return $?'
 ##
 alias '@inargsf'='if (( $#@ == 0 )) ; then ; inargsf re "$0" ; return $? ; fi'

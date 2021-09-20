@@ -1,0 +1,50 @@
+% usage: pdflatex "\def\inputText{./private_min.txt} \def\inputImage{./private_min.png} \input{$NIGHTDIR/tex/image_verbatim.tex}" && ic image_verbatim.pdf
+%%
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{grffile}
+\usepackage{longtable}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{amssymb}
+\usepackage{capt-of}
+\usepackage{hyperref}
+
+\usepackage[a4paper, left=1cm, right=1cm]{geometry}
+%%
+\usepackage{fancyvrb}
+
+\usepackage{verbatim}
+%%
+\hypersetup{
+  pdfkeywords={},
+  pdfsubject={},
+  pdfcreator={Emacs 27.2 (Org mode 9.5)},
+  pdflang={English}}
+
+\begin{document}
+
+\pagenumbering{gobble}
+
+\begin{center}
+  % \centerline{some_title}
+
+  \includegraphics[width=.7\linewidth]{\inputImage}
+\end{center}
+
+
+\begin{center}
+  \begin{minipage}{16cm} % hack; this is hardcoded for the length of the following verbatim block
+    \verbatiminput{\inputText}
+  \end{minipage}
+\end{center}
+
+% \noindent A\hrulefill B % horizontal ruler to see if stuff are centered
+
+\end{document}

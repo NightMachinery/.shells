@@ -264,9 +264,24 @@ noglobfn jma
 function jah() {
     # ansi2html
     ##
+    local dest="${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
+
     color-force-env
 
-    jahmode=y FORCE_INTERACTIVE=y reval "$@" 2>&1 | text_wrap_columns=${text_wrap_columns:-50} text-wrap | aha > "${jahout:-"${jd:-.}/$(<<<"$*" sd / _)".html}"
+    jahmode=y FORCE_INTERACTIVE=y reval "$@" 2>&1 | aha > "${dest}" @RET
+
+    ##
+    # = | text_wrap_columns=${text_wrap_columns:-50} text-wrap=
+    ##
+    ec "<head>
+    <style>
+     pre {
+         white-space: pre-wrap;
+     }
+    </style>
+</head>
+" >> "${dest}" @RET
+    ##
 }
 
 function jahun() {

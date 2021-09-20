@@ -147,7 +147,7 @@ function _crash_catch_all_exception() {
 ###
 function _crash_global_exception_handler() {
   # Get the state passed to the handler
-  local state="$1"
+  local state="$1" single_trace="${ectrace_single_trace}"
   state_code=( "${(ps.|.)state}" )
   state_code="${state_code[1]}"
 
@@ -173,16 +173,17 @@ function _crash_global_exception_handler() {
 
   # If an exception is defined, print it and its message
   if [[ -n $exception ]]; then
-    echo
-    echo "  \033[1;31m$exception\033[0;m"
+  echo
+  echo "  \033[1;31m$exception\033[0;m"
   fi
   if test -n "$message" ; then
-      [[ -n $exception ]] || echo
-      echo "  \033[0;33m$message\033[0;m"
+  [[ -n $exception ]] || echo
+  echo "  \033[0;33m$message\033[0;m"
   fi
 
 
   _crash_print_one_trace "${trace[1]}" "${files[1]}" 0 ''
+
 
   # Loop backwards through the trace, printing the function
   # and file/line for each step
@@ -195,6 +196,10 @@ function _crash_global_exception_handler() {
     _crash_print_one_trace "${trace[1]}" "${files[1]}" 1 "$i"
 
     i=$(( i + 1 ))
+
+    if bool "$single_trace" ; then
+      break # only print the first trace
+    fi
   done
 
   # Exit with the same state_code as reported, to ensure any

@@ -282,6 +282,7 @@ function assert() {
     # `assert re-val assert false`
     ##
 }
+
 function ectrace() {
     {
         ##
@@ -289,7 +290,7 @@ function ectrace() {
         # retmsg="$(fnswap isColor false retcode 2>&1 | prefixer --skip-empty)" # making it local loses the retcode :|
         ##
         local ret_orig="${(j.|.)pipestatus[@]}" retmsg
-        local ret="${ectrace_ret}" exc="$1" msg="${@[2,-1]}" notrace="${ectrace_notrace}"
+        local ret="${ectrace_ret}" exc="$1" msg="${@[2,-1]}" notrace="${ectrace_notrace}" single_trace="${ectrace_single_trace}"
         if test -z "$ret" ; then
             retmsg="returned $ret_orig"
             if [[ "$ret_orig" != 0* ]] ; then
@@ -307,7 +308,9 @@ function ectrace() {
                 ecerr "$msg"
             fi
         else
-            assert_global_lock=''
+            if ! bool "$single_trace" ; then # single traces play well with nested tracebacks, so we should not reset the lock
+                assert_global_lock=''
+            fi
 
             # @todo make crash.zsh use stderr
             throw_ret=$ret throw "$exc" "$msg"  2>&1 | {
@@ -338,6 +341,7 @@ function assert-dbg() {
 function assert-args() {
     ensure-args "$@" "${funcstack[2]:-assert}"
 }
+
 function ensure-args() {
     # @deprecated Use `assert-args` instead
     if (( $#@ <= 1 )) ; then

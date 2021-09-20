@@ -75,7 +75,12 @@ function pandoc-convert() {
 
     if test -z "$input" ; then
         input="$(gmktemp)" @TRET
-        assert pbpaste > "$input" @RET
+
+        if isInTty ; then
+            assert pbpaste > "$input" @RET
+        else
+            assert cat > "$input" @RET
+        fi
     fi
     tmp_o="$(gmktemp)" @TRET
 
@@ -105,13 +110,14 @@ function pandoc-convert() {
     if [[ "$output" != '-' ]] ; then
         assert command mv "$tmp_o" "$output" @RET
     else
-        if isIReally ; then
+        if isIReally && isOutTty ; then # =@opts p [ org2 html2 md2 ] @ fn-isTop=
             cat "$tmp_o" | pbcopy @TRET
         fi
         assert cat "$tmp_o" @RET
         assert silent trs-rm "$tmp_o" @RET
     fi
 }
+
 function pandoc-normalize-whitespace() {
     gsed 's/ / /g'
     # pandoc uses some bad whitespace that cannot be read by org-mode

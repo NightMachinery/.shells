@@ -113,3 +113,49 @@ function pathtree2org {
     )
 }
 ##
+function org-rm-header-content {
+    # @alt/elisp select the region and use `keep-lines` with the pattern "^\*"
+    ##
+    perl -ne '/^(?!\*+).*\S+.*/ || print'
+}
+
+aliasfn p-org-rm-header-content pbpaste-transform org-rm-header-content
+##
+function org-header-indent {
+    local n="${1:-1}"
+
+    local i
+    for i in {1..$n} ; do
+        perl -pe 's/^(\*+\s+)/*$1/' @RET
+    done
+}
+
+function org-header-indent-to-current {
+    local lv
+    lv="$(org-header-current-level)" @TRET
+    cat | org-header-indent "$lv"
+}
+
+##
+function org-header-current-level {
+    emc-eval "(org-current-level)"
+}
+##
+function org-manning-toc() {
+    local res
+    res="$(html2org | org-rm-header-content | perl -pe 's/(\[\d+)/${1}. /' | org-header-indent)" @RET
+
+    res="* TOC${org_props_folded}${res:l}"
+
+    ec $res
+}
+
+function p-org-manning-toc() {
+    local res
+    res="$(pbpaste | org-manning-toc)" @TRET
+
+    res="$(ec $res | org-header-indent-to-current)" @TRET
+
+    ec $res | pbcopy-ask
+}
+##

@@ -68,6 +68,11 @@ function colorreset() { resetcolor }
 function helloworld() {
     colorbg 0 0 255;colorfg 0 255; ec HELLO "$(colorfg 255 100)"BRAVE"$(colorfg 0 255)" $(colorbg 100 0 255)NEW$(colorbg 0 0 255) WORLD\!;resetcolor
 }
+
+function italic-test1 {
+    Italic ; ecn hello world '<= ' ; Bold ; ec world ; colorreset ; ecn hello world '<= ' ; Bold ; ec world
+}
+
 function printcolors() {
     printf "\x1b[${bg};2;${red};${green};${blue}m\n"
     helloworld
