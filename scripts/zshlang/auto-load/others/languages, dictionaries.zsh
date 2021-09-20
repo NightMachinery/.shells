@@ -13,7 +13,7 @@ function pdc() {
 function ffdict() {
     local q="${*}" engine=("${ffdict_e[@]:-sdc}") autopaste="${ffdict_autopaste}"
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     local w words
     if test -n "$autopaste" && test -z "$q" ; then

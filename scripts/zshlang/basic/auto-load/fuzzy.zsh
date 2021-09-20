@@ -43,14 +43,16 @@ function fz() {
         fzf-gateway "$cmdbody[@]"
     fi
 }
+
 function fzf-noempty() {
     local in="$(</dev/stdin)" # So we need to wait for the whole input to finish first.
     test -z "$in" && { return 130 } || { ecn "$in" | fzf-gateway "$@" }
 }
+
 function fzf-gateway() {
     local -x SHELL="${FZF_SHELL:-${commands[dash]}}"
 
-    typeset -g bella_zsh_disable1=y
+    bella_zsh_disable1
 
     if true ; then # we might want to check tmux's version here, as fzf-tmux needs the current HEAD
         if test -z "$fzf_mru_context" ; then

@@ -39,7 +39,7 @@ function biconm() {
 }
 
 function bicon-emc() {
-  bella_zsh_disable1=y
+  bella_zsh_disable1
 
   if isBicon ; then
   if true ; then

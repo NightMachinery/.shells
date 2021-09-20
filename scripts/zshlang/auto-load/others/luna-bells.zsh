@@ -85,18 +85,18 @@ function sharif-vc-is() {
     [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]]
 }
 bell-avarice() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     # fsay "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
 }
 bell-luna-mpv() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     @opts v 100 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna_mpv/$~audioglob)"
 }
 bell-toy() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     # say "disquiet creatures of avarice have risen yet again ..."
     @opts v 140 @ hearinvisible "$(rndarr $GREENCASE_DIR/toystory2/**/$~audioglob)"
@@ -115,7 +115,7 @@ bell-greencase() {
     # time (@opts v 70 @ hearinvisible '/Users/evar/Base/Music/greencase/PC Computer - Portal 2 - Turret/turretlaunched05.wav')
     # time (hearinvisible '/Users/evar/Base/Music/greencase/PC Computer - Portal 2 - Turret/turretlaunched05.wav')
     ##
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     greencase_audio_init
     reval-ec @opts v 140 @ hearinvisible "$(rndarr $greencase_audio[@])"
@@ -304,7 +304,7 @@ function bell-auto() {
 
     # You might need to use `sleep $timeout ; ...` to test bell-auto.
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
     local bell_awaysh=no
 
     local engine=( "${@:-bello}" )
@@ -358,6 +358,14 @@ aliasfn bellj bella
 aliasfn okj bell-auto-stop
 aliasfn bello awaysh bell-diwhite # main gateway of a single alarm bell
 ##
+function bella_zsh_disable1 {
+    if (( $#@ == 0 )) ; then
+        typeset -g bella_zsh_disable1=y
+    else
+        bella_zsh_disable1=y reval "$@"
+    fi
+}
+
 aliasfn bell-zsh-start bell-sc2-I-return
 function bell-zsh1() {
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"
@@ -459,7 +467,7 @@ function bell-ringer() {
     local marker="${1}" fs=("${@[2,-1]}") awaysh="${bell_awaysh:-y}"
     assert-args marker fs
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
     if @opts p redo r y xp [ bell- tts- ] @ fn-isTop ; then
         if test -z "$bell_awaysh" ; then
             ecgray "$0: parent redo detected; Switching awaysh off."

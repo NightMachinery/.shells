@@ -86,7 +86,7 @@ function hear-rnd() {
 function songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
     local f
     f=()
     # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}"
@@ -135,7 +135,7 @@ touch-tracks_() {
 playlistc() {
     : "fuzzy choose between existing playlists"
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     local pl
     pl="$(fd --follow -t f '.' "${playlist_dir}" | fz -q "$*")" @RET
@@ -147,7 +147,7 @@ playlistc() {
 playlister() {
     : "outputs a list of files (a playlist) on stdout"
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     local fz_q=''
     local first=y
@@ -167,7 +167,7 @@ playlister() {
 }
 
 find-music() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     local fd_pat='.'
     local opts=()
@@ -187,7 +187,7 @@ songd() {
 
     # ecdbg "${0} called with: " "$@"
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     [[ "${@: -1}" =~ '--?.*' ]] && set -- "$@" ''
     local music_dir="${music_dir}/${musiccache:-cache}"
