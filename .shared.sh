@@ -96,8 +96,7 @@ if false; then
     PERL_MM_OPT="INSTALL_BASE=${HOME}/perl5"; export PERL_MM_OPT;
 else
     if isDarwin ; then
-        # addToPATH /usr/local/Cellar/perl/*/bin
-
+        # [[id:36836e3f-e409-4867-9ae5-68f16e391efe][perl/cpanm:install path]]
         addToPATH /usr/local/Cellar/perl/5.34.0/bin # @hardcoded
     fi
 fi

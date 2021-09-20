@@ -1,7 +1,11 @@
 ##
+org_props_folded=$'\n:PROPERTIES:\n:visibility: folded\n:END:\n'
+##
 typeset -g lilf_ip="82.102.11.148"
 ##
 WORDLIST0='/usr/share/dict/words'
+##
+BROTHER_IP=192.168.1.230
 ##
 export Font_Symbola_CourierNew="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
 export Font_CourierNew_Symbola="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf" # monospace

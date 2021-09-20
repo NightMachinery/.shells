@@ -40,6 +40,7 @@ function set-defaults() {
     duti -s $cf_zopen ".rar" all
     duti -s $cf_zopen "org.idpf.epub-container" all
     duti -s $cf_zopen "public.mobi" all
+    duti -s $cf_zopen ".mobi" all
     duti -s $cf_zopen ".azw3" all
     duti -s $cf_zopen ".azw" all
     duti -s $cf_zopen ".cbz" all
