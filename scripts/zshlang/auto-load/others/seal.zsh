@@ -57,7 +57,7 @@ unseal-split1() {
     ec "$res"
 }
 ## core
-seal() {
+function seal() {
     local i="$@"
     # local i="$(in-or-args "$@")"
     if test -z "$i" ; then
@@ -67,18 +67,22 @@ seal() {
 
     doc Use with 'uns' to store and retrieve one-liners
     doc Use exor to remove seals.
+
     local n=''
     ! test -e "$attic" || n=$''
     print -r -n -- "$n$i"$'\n' >> "$attic"
 }
+
 function unseal-get() {
     <"$attic[@]" "$@"
 }
 function unseal-get2note() {
     unseal-get prefixer -s -i $'\36' -o '\x00' -a "${attic}:PREFIXER_LINENUMBER:" -l /dev/null
 }
-alias uns=unseal
-unseal() {
+
+function unseal() {
+    bella_zsh_disable1=y
+
     local query="$(fz-createquery "$@")"
     
     doc unseal
@@ -95,8 +99,11 @@ unseal() {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
         ec "$l"|pbcopy
         return 0
-    } }
-exor() {
+    }
+}
+alias uns=unseal
+
+function exor() {
     doc exorcize seals :D
     local sels="$(un_p=y un_fz=( --print0 ) uns "$@")"
     test -n "$sels" && {
