@@ -545,6 +545,7 @@ html2epub-calibre() {
 txt2epub () {
     "${t2ed:-txt2epub-pandoc}" "$@"
 }
+
 txt2epub-calibre() {
     mdoc "DEPRECATED. Outputs weird like â€™ for apostrophe. Also only accepts single input.
 Use txt2epub-pandoc.
@@ -555,10 +556,12 @@ Usage: $0 <title> <authors> <txt-file>" MAGIC
         --title="$title" --epub-inline-toc --enable-heuristics
 
 }
-t2e() {
+
+function t2e() {
     txt2epub "$1" "${te_author:-night_t2e}" "${@:2}"
     p2k "$1".epub
 }
+
 function html2epub() {
     ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
     local files=( "$@[3,-1]" )
@@ -566,7 +569,8 @@ function html2epub() {
     # filter0 ishtml-file # don't do this, as we download non-html files in w2e-curl
     arr0 "$files[@]" | inargs0 "${h2ed:-html2epub-calibre}" "$1" "$2"
 }
-html2epub-pandoc() {
+
+function html2epub-pandoc() {
     # title author htmls
     local title="$1"
     local author="$2"
@@ -574,10 +578,12 @@ html2epub-pandoc() {
     PANDOC_FORMAT=html-native_divs 2epub-pandoc-byformat "$title" "$author" <(merge-html "${@:3}")
     # pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub"
 }
-h2e() {
+
+function h2e() {
     html2epub "$1" "${h2_author:-night}" "${@:2}" && ec "Book '$1' created." || ecerr "$0 failed for book: $1"
     p2k "$1".epub
 }
+##
 function web2epub() {
     doc usage: 'we_strict= we_retry= we_dler= we_author= title urls-in-order'
     local title="$(<<<$1 gtr '/' '.')"
@@ -631,35 +637,22 @@ function web2epub() {
         ec $'\n\n'"Book '$title' by '$author' has been converted (hasFailed='${hasFailed}')."$'\n\n'
     fi
 }
+
 function w2e-raw() {
     local title="$(<<<$1 gtr '/' '.')"
     web2epub "$title" "${@:2}" && p2k "$title.epub"
 }
+
 function w2e-o() {
     w2e-chrome "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 noglobfn w2e-o
+
 function w2e-wayback() {
     w2e-raw "$1" "${(@f)$(wayback-url "${@:2}")}"
 }
 noglobfn w2e-wayback
-function w2e-lw-raw() {
-    w2e-curl "$1" "${(@f)$(lw2gw "${@:2}")}"
-    # transformer lw2gw "w2e-curl $(gq "$1")" "${@:2}"
-    # transformer urlfinalg "transformer lw2gw w2e-curl $(gq "$1")" "${@:2}"
-}
-function tllw() {
-    # we can't use an alias because tl won't get the correct URLs then.
-    tll "${(@f)$(lw2gw "${@}")}"
-}
-noglobfn tllw
-function lw2gw() {
-    rgx "$1" 'lesswrong\.com' greaterwrong.com
-}
-reify lw2gw
-enh-urlfinal lw2gw
-noglobfn lw2gw
-
+##
 function code2epub() {
     mdoc "Usage: we_author=<author> $0 <title> <sourcecode> ..." MAGIC
 
@@ -684,6 +677,7 @@ function 2epub-pandoc-byformat() {
     2epub-pandoc-simple "$title" "$author" -f "$format" "$files[@]"
     # pandoc --toc -s --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub" -f "$format" "$files[@]"
 }
+
 function 2epub-pandoc-simple() {
     : "This works for any files that have the correct extension, or if you set the format explicitly."
     : "<name> <author> (<file with ext> OR <pandoc-opt>) ..."
@@ -694,6 +688,7 @@ function 2epub-pandoc-simple() {
     pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub"
 }
 aliasfn html2epub-pandoc-simple 2epub-pandoc-simple
+
 function 2epub-pandoc-byext () {
     magic mdocu "[PANDOC_EXT=txt] <title> <author> <file> ..." ; mret
     local ext="${PANDOC_EXT:-txt}"
@@ -750,11 +745,13 @@ function code2md() {
 "'```'
     done
 }
+
 function html-get-reading-estimate() {
     local est
     est="$(cat "$1" | readtime.js)"
     ec "$(ec $est|jqm .humanizedDuration) ($(ec $est|jqm .totalWords) words)"
 }
+
 function merge-html() {
     (( $# == 1 )) && {
         ec "<p>$(html-get-reading-estimate $1)</p>
@@ -772,46 +769,54 @@ $(cat "$i")
 "
     done
 }
+##
 function getlinks() {
     lynx -cfg=~/.lynx.cfg -cache=0 -dump -nonumbers -listonly $1|grep -E -i ${2:-'.*'}
 }
+
 function getlinksoup() {
     getlinks.py "$1" | command rg "${@[2,-1]:-.*}"
 }
 noglobfn getlinks getlinksoup
+
 function getlinksfull() {
     mdoc "$0 <link> [ options for rg ]
 Remember that you can customize full-html by fhMode." MAGIC
 
-    local url="$1"
+    local url="$1" query="${@[2,-1]:-.*}"
 
     local u
     u="$(uuidpy)" @TRET
     full-html "$url" "$u" @RET
     test -e "$u" || { ecerr "${0}: Couldn't download $url" ; return 1 }
-    getlinks.py "$1" "$u" | trimsed | command rg "${@[2,-1]:-.*}"
+    getlinks.py "$url" "$u" | trimsed | command rg "$query"
 
     silent trs-rm "$u"
 }
 noglobfn getlinksfull
-function lwseq() {
-    mdoc "Usage: [tl options] URL ...
-    Creates an ebook out of the sequences specified." MAGIC
-    local opts
-    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
-    re lw2gw "$@" | inargsf getlinks-c | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]:-w2e-curl}" -p "${opts[-p]}" -o "${opts[-o]:-./}"
+
+function p-getlinks {
+    local url="${1}"
+    if test -z "$url" ; then
+        url="$(browser-current-url | sd '#$' '')" @TRET
+    fi
+    assert-args url @RET
+
+    local html
+    html="$(pbpaste-html)" || true
+    if test -z "$html" ; then
+        html="$(pbpaste)" @TRET
+    fi
+    assert not isSpace html @RET
+
+    getlinks.py "$url" =(ec "$html")
 }
-noglobfn lwseq
 ##
 function url-clean-unalix() {
     # does url-clean-google itself
     local redirects="${url_clean_redirects}"
     local inargs
-    (( $# )) && inargs=( "$@" ) || {
-            if ! isInTty ; then
-                inargs="$(cat)"
-            fi
-        }
+    in-or-args2 "$@" @RET
 
     if test -n "$uf_idem" ; then
         arrN $inargs[@]
@@ -821,12 +826,12 @@ function url-clean-unalix() {
     local opts=()
     if bool $redirects ; then
         opts+='--unshort'
-        # @todo0 @urgent5 -s was removed in the latest version https://github.com/AmanoTeam/Unalix-nim/issues/3
     fi
+
     {
         arrN $inargs[@] | { url-match-rg || true } | assert unalix "$opts[@]" @RET
         ec
-        arrN $inargs[@] | url-match-rg -v
+        arrN $inargs[@] | url-match-rg -v || true
     } | prefixer --skip-empty
 
     ## tests:
@@ -863,6 +868,8 @@ function url-clean-google() {
 }
 renog url-clean-google
 
+
+
 function urlfinalg2() {
     # @regressionDanger calling this with zero args now waits on stdin
     @opts redirects y @ url-clean "$@"
@@ -888,8 +895,9 @@ function urlfinalg1() {
 }
 renog urlfinalg1
 
+# aliasfn urlfinalg urlfinalg1
+aliasfn urlfinalg urlfinalg2
 aliasfn url-final-gateway urlfinalg
-aliasfn urlfinalg urlfinalg1
 noglobfn urlfinalg
 ##
 function getlinksfull2() {
@@ -1569,6 +1577,7 @@ function tlrec() {
 function getlinks-img() {
     gl_tag=img gl_prop=src getlinks-c "$@"
 }
+##
 function urls-copy() {
     local text="$(cat)"
     <<<"$text" fnswap rg rgm match-url-rg --passthru && {
@@ -1576,9 +1585,11 @@ function urls-copy() {
         pbcopy "$urls"
     }
 }
+
 function urls-extract() {
     match-url-rg --only-matching --replace '$1'
 }
+##
 function urls-cleansharps() {
     local urls="$(in-or-args "$@")"
 
@@ -1598,6 +1609,7 @@ function urls-cleansharps() {
 }
 noglobfn urls-cleansharps
 aliasfn-ng urlc urls-cleansharps
+aliasfn-ng url-clean-hash urls-cleansharps
 ##
 function url-moddate() {
     : "Mostly useless because some sites don't have the header and others just set it incorrectly. Alt: url-date"

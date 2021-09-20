@@ -42,14 +42,19 @@ function browser-recordings-process-watch() {
     done
 }
 ##
-function browser-current-title() {
-    # @darwinonly @chromeonly
+function chrome-current-title() {
+    assert isDarwin @RET
+
     chrome-cli info | rget 'Title:\s+(.*)'
 }
-function browser-current-url() {
-    # @darwinonly @chromeonly
+aliasfn browser-current-title chrome-current-title # @darwinonly @chromeonly
+
+function chrome-current-url() {
+    assert isDarwin @RET
+
     chrome-cli info | rget 'Url:\s+(.*)'
 }
+aliasfn browser-current-url chrome-current-url # @darwinonly @chromeonly
 ##
 function chrome-open() {
     ensure isDarwin @MRET # @darwinonly

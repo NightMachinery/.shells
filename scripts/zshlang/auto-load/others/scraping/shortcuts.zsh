@@ -26,4 +26,15 @@ function w2e-dl() {
     } always { popf }
 }
 aliasfn weed w2e-dl
+
+function p-w2e-browser-html-links {
+    local title="$1"
+    if test -z "$title" ; then
+        title="$(browser-current-title)" @TRET
+
+        ecgray "$0: title automaticaly set to $(gquote-sq "$title")"
+    fi
+
+    p-getlinks | inargsf rgeval w2e "$title"
+}
 ##
