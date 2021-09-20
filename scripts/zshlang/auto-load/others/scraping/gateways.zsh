@@ -2,9 +2,9 @@
 function dl-dir {
     local i
     for i in $@ ; do
-        bella_zsh_disable1=y reval-ec lftp-dir "$i"
+        bella_zsh_disable1 reval-ec lftp-dir "$i"
         ##
-        # bella_zsh_disable1=y reval-ec wget-dir "$i"
+        # bella_zsh_disable1 reval-ec wget-dir "$i"
         ##
     done
 

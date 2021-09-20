@@ -19,7 +19,7 @@ function doom-sync() {
 }
 ##
 function emcpe() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
     local fz_opts=( $fz_opts[@] -1 )
     # ffkill -SIGUSR2 \'emacs \'daemon
     ffkill -SIGUSR2 emacs daemon '!alt'
@@ -34,7 +34,7 @@ function emc-kill {
 alias pek='emc-kill'
 ##
 function emn() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
     emc-gateway -e '(helm-man-woman "")' # can't input to helm using its arg. why?
     #"(woman \"$*\")"
 }
@@ -66,7 +66,7 @@ function emacs-vfiles() {
 aliasfn emc-open bicon-emc
 alias emc='emc-open'
 function emc-gateway() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     local title=emacs
     if test -n "$emacs_night_server_name" ; then
@@ -147,7 +147,7 @@ function emc-focus() {
     else
         terminal-activate-tab 5
     fi
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 }
 
 function emc-nowait() {

@@ -3,7 +3,7 @@ function tts-gateway() {
     ##
     local text="${*:?}" engine=("${tts_gateway_engine[@]:-${tts_gateway_e[@]:-tts-espnet}}") postproc=("${tts_gateway_postproc[@]}") ext="${tts_gateway_ext:-wav}"
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     if isServer ; then
         ecdbg "$0: skipped because this is a server."
@@ -61,7 +61,7 @@ function fsay() {
     assert isDarwin @RET
     local voice="${fsay_v:-Fiona}" rate="${fsay_r:-30}"
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     say -v $voice -r $rate "$@"
 }

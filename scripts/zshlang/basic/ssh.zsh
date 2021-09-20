@@ -1,6 +1,6 @@
 ##
 function mosh {
-  bella_zsh_disable1=y
+  bella_zsh_disable1
 
   terminfo-set-auto # with a bad terminfo, we can get the error: `terminals database is inaccessible`
 

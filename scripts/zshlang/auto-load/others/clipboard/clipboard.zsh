@@ -111,7 +111,7 @@ function clipboard-fz-raw() {
 function clipboard-fz() {
     unset out # @global
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
     out=(${(@0)"$(clipboard_fz_copy=no clipboard-fz-raw --print0 "${@:-}")"}) @RET # do NOT preserve empty elements; there are stuff with line endings in a single element in some cases
 
     local i tmp
@@ -175,7 +175,7 @@ function iloop() {
     assert-args engine @RET
 
     tty-title "$title"
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     local q sleep
     local rn=1

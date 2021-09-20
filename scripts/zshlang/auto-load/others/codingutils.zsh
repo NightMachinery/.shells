@@ -182,7 +182,7 @@ function mn() {
     local LESS=$LESSMIN
     export LESS
 
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     man "$@" || lesh "$@"
 }

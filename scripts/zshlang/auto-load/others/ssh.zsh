@@ -12,7 +12,7 @@ function kitty-terminfo-install() {
 }
 
 function ssh() {
-  bella_zsh_disable1=y
+  bella_zsh_disable1
 
   if fn-isTop && isKitty ; then
     # will install the xterm-kitty terminal definition on the remote in your home directory.
@@ -46,7 +46,7 @@ function firewall-allow-mosh-darwin() {
 }
 ##
 function ash() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" "$@"
 }

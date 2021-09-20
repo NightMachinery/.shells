@@ -7,7 +7,7 @@ alias gdt='git diff-tree --no-commit-id --name-only -r'
 alias gdw='git-diff --word-diff'
 ##
 function git-diff-kitty() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     # https://sw.kovidgoyal.net/kitty/kittens/diff.html
     # Needs some config in git
@@ -18,7 +18,7 @@ function git-diff-kitty() {
 }
 ##
 function git-diff() {
-    bella_zsh_disable1=y
+    bella_zsh_disable1
 
     if (( $#@ == 0 )) ; then
         set -- 'HEAD~0'
