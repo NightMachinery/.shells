@@ -277,6 +277,7 @@ function jah() {
     <style>
      pre {
          white-space: pre-wrap;
+         word-break: break-all;
      }
     </style>
 </head>
