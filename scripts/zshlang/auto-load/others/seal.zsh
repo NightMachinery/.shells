@@ -104,7 +104,10 @@ function unseal() {
 alias uns=unseal
 
 function exor() {
-    doc exorcize seals :D
+    : "exorcize seals :D"
+
+    bella_zsh_disable1
+
     local sels="$(un_p=y un_fz=( --print0 ) uns "$@")"
     test -n "$sels" && {
         local i items
@@ -113,7 +116,7 @@ function exor() {
         for i in "${(@0)sels}"
         do
             test -n "$i" || continue
-            ec Exorcizing 🏺
+            ec "Exorcizing 🏺"
             cat -v <<<"$i"
             # sd --string-mode "$i" '' "$attic" #--flags m 
             FROM="$i" perl -0777 -pi -e 's/(|\A)\Q$ENV{FROM}\E(?<sep>|\Z)/$+{sep}/gm' "$attic"

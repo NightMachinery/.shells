@@ -124,7 +124,7 @@ function enh-urlfinal() {
     }
 }
 ##
-function p() { # paste
+function paste-after() { # paste
     pbpaste-plus # outputs in `paste`
     if test -n "$paste[*]" ; then
         @opts e geval @ reval-env "$@" "$paste[@]"
@@ -134,6 +134,7 @@ function p() { # paste
         return 1
     fi
 }
+aliasfn p paste-after
 ##
 function enh-addfinder() {
     local sel

@@ -66,3 +66,10 @@ function hex2ascii {
     ##
 }
 ##
+function case-title {
+    local text
+    text="$(in-or-args "$@")" @RET
+
+    command titlecase "$text" # from python
+}
+##

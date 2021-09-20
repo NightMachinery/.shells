@@ -1,11 +1,16 @@
 ###
 function in-or-args2() {
-    (( $# )) && inargs=( "$@" ) || {
-            if ! isInTty ; then
-                inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
-            fi
-        }
+    if (( $# )) ; then
+        inargs=( "$@" )
+    else
+        if ! isInTty ; then
+            inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
+        else
+            return 1
+        fi
+    fi
 }
+
 function in-or-args() {
     (( $# )) && arrN "$@" || {
             if ! isInTty ; then

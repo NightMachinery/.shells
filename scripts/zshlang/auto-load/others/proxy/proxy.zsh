@@ -61,6 +61,8 @@ function pxify() {
 
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl
+    pxify-command unalix
+    pxify-command nimble
     pxify-command conda
     # pxify-command go # TLS errors with genrouter
     pxify-command manga-py
@@ -79,22 +81,27 @@ function pxify() {
     pxaify-command emacs
     pxaify-command emacsclient
 }
+##
 function pxify-command() {
     aliasfn "$1" proxychains4 "$1"
 }
 reify pxify-command
+
 function pxaify-command() {
     aliasfn "$1" pxa command "$1"
 }
 reify pxaify-command
-pxpy() {
+##
+function pxpy() {
     px python "$commands[$1]" "${@:2}"
 }
-enh-pxpy() {
+
+function enh-pxpy() {
     ge_no_hist=y geval "function $1() {
     pxpy $1 \"\$@\"
 }"
 }
+##
 function pxify-auto() { # @gateway
     # return 0 # We now use Wireguard
     typeset -g pxified
