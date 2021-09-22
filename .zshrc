@@ -180,13 +180,6 @@ function nightsh-load-zshrc() {
   bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+Return to insert a literal newline without accepting the command
 
   ##
-  # Requires special .terminfo: l.a. https://emacs.stackexchange.com/questions/32506/conditional-true-color-24-bit-color-support-for-iterm2-and-terminal-app-in-osx
-  # tic -x -o ~/.terminfo "$NIGHTDIR"/setup/terminfo-24bit.src
-
-  # isDarwin && export TERM=xterm-24bits || true
-  ##
-
-  ##
   # start typing + [Up-Arrow] - fuzzy find history forward
   if [[ "${terminfo[kcuu1]}" != "" ]]; then
     autoload -U up-line-or-beginning-search

@@ -519,17 +519,21 @@ Options:
     return $e
 }
 noglobfn tlrl-ng
+##
 outlinify() {
     mapln 'https://outline.com/$1' "$@"
 }
+##
 html2epub-calibre() {
     mdoc "Usage: $0 <title> <authors> <html-file> ..." MAGIC
-    local authors="${2:-nHight}"
-    local title="$(<<<$1 gtr '/' '.')"
+    local authors="${2:-night}"
+    local title="$1"
+    title="$(ec "$title" | str2pandoc-title)" || true
 
-    local u="$title $(uuidgen).html"
+    local u
+    u="$title $(uuidgen).html" @TRET
 
-    merge-html "${@:3}" > "$u"
+    merge-html "${@:3}" > "$u" @TRET
     ebook-convert "$u" "$title.epub" \
         --authors="$authors" \
         --level1-toc="//*[name()='h1' or name()='h2']" \
@@ -539,9 +543,13 @@ html2epub-calibre() {
         --use-auto-toc --toc-threshold=0 \
         --toc-title="The TOC" \
         --embed-all-fonts \
-        --title="$title" --epub-inline-toc --enable-heuristics
-    \rm "$u"
+        --title="$title" --epub-inline-toc --enable-heuristics >&2 @RET
+
+    silent trs-rm "$u"
+
+    ec "${title}.epub"
 }
+##
 txt2epub () {
     "${t2ed:-txt2epub-pandoc}" "$@"
 }
@@ -558,38 +566,53 @@ Usage: $0 <title> <authors> <txt-file>" MAGIC
 }
 
 function t2e() {
-    txt2epub "$1" "${te_author:-night_t2e}" "${@:2}"
-    p2k "$1".epub
+    local title="$1"
+    title="$(ec "$title" | str2pandoc-title)"  || true
+
+    txt2epub "$title" "${te_author:-night_t2e}" "${@:2}"
+    p2k "$title".epub
 }
 
 function html2epub() {
-    ecdbg calling "${h2ed:-html2epub-calibre}" "$@"
-    local files=( "$@[3,-1]" )
+    local files=( "$@[3,-1]" ) engine="${h2ed:-html2epub-calibre}"
 
     # filter0 ishtml-file # don't do this, as we download non-html files in w2e-curl
-    arr0 "$files[@]" | inargs0 "${h2ed:-html2epub-calibre}" "$1" "$2"
+    arr0 "$files[@]" | inargs0 revaldbg "${engine}" "$1" "$2"
 }
 
 function html2epub-pandoc() {
-    # title author htmls
+    # usage: title author html ...
+    ##
     local title="$1"
-    local author="$2"
+    title="$(ec "$title" | str2pandoc-title)" || true
+    local author="$2" htmls=("${@:3}")
+    assert-args title htmls @RET
 
-    PANDOC_FORMAT=html-native_divs 2epub-pandoc-byformat "$title" "$author" <(merge-html "${@:3}")
-    # pandoc --toc -s -f html-native_divs <(merge-html "${@:3}") --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub"
+    PANDOC_FORMAT=html-native_divs 2epub-pandoc-byformat "$title" "$author" <(merge-html "$htmls[@]") >&2
+
+    ec "${title}.epub"
 }
 
 function h2e() {
-    html2epub "$1" "${h2_author:-night}" "${@:2}" && ec "Book '$1' created." || ecerr "$0 failed for book: $1"
-    p2k "$1".epub
+    local out
+    if out="$(html2epub "$1" "${h2_author:-night}" "${@:2}")" ; then
+        ec "Book '${out:t}' created."
+
+        p2k "$out"
+    else
+        ecerr "$0 failed for book: $1"
+        return 1
+    fi
 }
 ##
 function web2epub() {
     doc usage: 'we_strict= we_retry= we_dler= we_author= title urls-in-order'
-    local title="$(<<<$1 gtr '/' '.')"
+
+    local title="$1"
+    title="$(ec "$title" | str2pandoc-title)"  || true
     local u="$title $(uuidgen)"
     cdm "$u"
-    local author="$(<<<${we_author:-night} gtr '/' '.')"
+    local author="$(<<<${we_author:-night} str2pandoc-title)"
     local i=0
     local hasFailed=''
     local strict="$we_strict"
@@ -638,8 +661,17 @@ function web2epub() {
     fi
 }
 
+function str2pandoc-title {
+    local title
+    title="$(in-or-args "$@")"
+    title="$(ec "$title" | gtr '/' '.' | sd '&' ' and ')" || true
+
+    ec "$title"
+}
+
 function w2e-raw() {
-    local title="$(<<<$1 gtr '/' '.')"
+    local title="$1"
+    title="$(ec "$title" | str2pandoc-title)" || true
     web2epub "$title" "${@:2}" && p2k "$title.epub"
 }
 
@@ -868,10 +900,7 @@ function url-clean-google() {
 }
 renog url-clean-google
 
-
-
 function urlfinalg2() {
-    # @regressionDanger calling this with zero args now waits on stdin
     @opts redirects y @ url-clean "$@"
 }
 noglobfn urlfinalg2
@@ -881,19 +910,25 @@ function urlfinalg1() {
     # supports Google redirects.
     # Set uf_idem to y to return original.
     ##
-    local URL="$1"
-    pxs-maybe
+    local inargs
+    inargs="$(in-or-args "$@")" @RET
+    inargs=(${(@f)inargs})
 
-    { test -n "$uf_idem" || ! match-url "$URL" || [[ "$URL" == *bloomberg.com* ]] } && {
-        ec "$URL"
-        return 0
-    }
-    local u="$URL"
-    u="$(url-clean-google "$u")" @TRET
+    local URL
+    for URL in $inargs[@] ; do
+        pxs-maybe
 
-    url-final "$u" #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
+        { test -n "$uf_idem" || ! match-url "$URL" || [[ "$URL" == *bloomberg.com* ]] } && {
+            ec "$URL"
+            return 0
+        }
+        local u="$URL"
+        u="$(url-clean-google "$u")" @TRET
+
+        url-final "$u" @TRET #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
+    done
 }
-renog urlfinalg1
+noglobfn urlfinalg1
 
 # aliasfn urlfinalg urlfinalg1
 aliasfn urlfinalg urlfinalg2

@@ -102,6 +102,7 @@ function date-time() { date +"%H:%M:%S" }
 function datej-all-long-time {
     ec "$(datej-all-long) $(date-time)"
 }
+alias now='datej-all-long-time'
 
 function dateshort() { date +"%b %d %H:%M:%S" }
 

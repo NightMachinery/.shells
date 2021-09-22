@@ -445,9 +445,7 @@ function ntsearch_() {
         ###
     fi
 
-
-    fzopts+=(--bind 'ctrl-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"$(gq "$nightNotes") $(gq "$ntsearch_lines_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it
-
+    fzopts+=(--bind 'ctrl-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"$(gq "$nightNotes") $(gq "$ntsearch_lines_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it; using silent.zsh does not seem to make any difference to the strange fzf bug that causes escape codes to be written to the query
 
     ##
     # we no longer need caching, it's fast enough

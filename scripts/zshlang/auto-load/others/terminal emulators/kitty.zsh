@@ -105,7 +105,7 @@ function kitty-launch-emc() {
     kitty-remote launch '--type=tab' "${commands[zsh]}" -c emc-gateway
     ##
     # This doesn't work, as somehow our config is not loaded. It will work if there is already a server running on EMACS_SOCKET_NAME though
-    # kitty @ launch '--type=tab' bash -c 'TERM=xterm-24bits EMACS_SOCKET_NAME=$HOME/tmp/.emacs ALTERNATE_EDITOR= emacsclient -t ; sleep 10'
+    # kitty @ launch '--type=tab' bash -c 'TERM=xterm-emacs EMACS_SOCKET_NAME=$HOME/tmp/.emacs ALTERNATE_EDITOR= emacsclient -t ; sleep 10'
     ##
 }
 alias kemc='kitty-launch-emc'

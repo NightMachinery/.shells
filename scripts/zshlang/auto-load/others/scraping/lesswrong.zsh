@@ -12,12 +12,13 @@ function tllw() {
 noglobfn tllw
 
 function lw2gw() {
+    local inargs
+    inargs="$(in-or-args "$@")" @RET
+
     local from='(lesswrong\.com|alignmentforum\.org)' to='greaterwrong.com'
 
-    rgx "$1" "$from" "$to"
+    ec "$inargs" | url-clean | sd "$from" "$to"
 }
-reify lw2gw
-enh-urlfinal lw2gw
 noglobfn lw2gw
 ##
 function lwseq() {
@@ -30,8 +31,17 @@ function lwseq() {
 noglobfn lwseq
 ##
 function p-lw-urls {
-    # tested with greaterwrong
-    ##
-    p-getlinks | rg '/posts/' | url-clean-hash | guniq
+    local urls
+    urls="$(p-getlinks)" @TRET
+    assert not isSpace urls @RET
+
+    if ! { ec $urls | rg -q 'greaterwrong\.com' } ; then # trying to make this work with lesswrong.com  and alignmentforum.org
+        urls="$(ec $urls | lw2gw)" @TRET
+        urls="$(ec $urls | urlfinalg1)" @TRET # urlfinalg2 (unalix) doesn't handle the redirects here, idk why
+        urls="$(ec $urls | rg 'greaterwrong\.com')" @TRET
+        assert not isSpace urls @RET
+    fi
+
+    ec $urls | rg '/posts/' | url-clean-hash | guniq
 }
 ##
