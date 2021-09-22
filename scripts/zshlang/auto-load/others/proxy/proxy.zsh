@@ -83,7 +83,8 @@ function pxify() {
 }
 ##
 function pxify-command() {
-    aliasfn "$1" proxychains4 "$1"
+    aliasfn "$1" proxychains4 -q "$1"
+    # -q: quiet
 }
 reify pxify-command
 

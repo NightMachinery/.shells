@@ -75,13 +75,13 @@ function wallpaper-set-darwin() {
     for i in {1..3} ; do
         # sometimes doesn't work
         ecgray "$(dateshort)"
-        reval-ec osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"' || return $?
+        reval-ec reattach-to-user-namespace osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"' || return $?
         sleep 60
     done
     ##
     # mcli wallpaper "$f" || return $?
     ##
-    # Try `killall Dock` if this didn't work.
+    # Try `killall Dock` and then set the wallpaper again if this didn't work. This is fairly disruptive so I am loath to do it automatically.
     ###
 }
 function wallpaper-set() {

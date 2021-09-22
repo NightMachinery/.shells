@@ -65,6 +65,7 @@ function emacs-vfiles() {
 ##
 aliasfn emc-open bicon-emc
 alias emc='emc-open'
+
 function emc-gateway() {
     bella_zsh_disable1
 
@@ -85,9 +86,9 @@ function emc-gateway() {
 
     local my_term="$TERM"
     if isKitty || isiTerm ; then
-        my_term='xterm-24bits'
+        my_term='xterm-emacs'
     fi
-    TERM="$my_term" $proxyenv emacsclient -t "$@"
+    reval-ec reval-env TERM="$my_term" $proxyenv emacsclient -t "$@"
 }
 function emc-eval() {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1

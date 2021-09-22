@@ -134,7 +134,9 @@ function paste-after() { # paste
         return 1
     fi
 }
-aliasfn p paste-after
+function p {
+    paste-after "$@"
+}
 ##
 function enh-addfinder() {
     local sel
