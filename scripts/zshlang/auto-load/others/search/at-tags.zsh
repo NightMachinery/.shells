@@ -6,14 +6,19 @@ function tag-filter-date-past-stdin {
 }
 
 function tag-filter-date-past {
-    ensure-array tag_filter_date_past_opts
-    local dirs=(${tag_filter_date_past_dirs[@]}) tags=(${tag_filter_date_past_tags[@]}) opts=("${tag_filter_date_past_opts[@]}")
+    local dirs=(${tag_filter_date_past_dirs[@]})
     assert-args dirs @RET
+    local dir_main="${dirs[1]}"
+
+    local tags=(${tag_filter_date_past_tags[@]})
     if (( ${#tags} == 0 )) ; then
         tags=('@futurecron')
     fi
 
-    revaldbg @opts opts [ --no-binary --smart-case --engine auto --no-messages --with-filename --line-number "$opts[@]" "$dirs[@]" ] @ rg-literal-or "$tags[@]" | tag-filter-date-past-stdin | prefix-rm "${dirs[1]}" | {
+    ensure-array tag_filter_date_past_opts
+    local opts=("${tag_filter_date_past_opts[@]}")
+
+    revaldbg @opts opts [ --no-binary --smart-case --engine auto --no-messages --with-filename --line-number "$opts[@]" "$dirs[@]" ] @ rg-literal-or "$tags[@]" | tag-filter-date-past-stdin | prefix-rm "$dir_main" | {
         if isOutTty ; then
             # @todo1 make the results TTY links to their locations, and color them
 
@@ -23,33 +28,29 @@ function tag-filter-date-past {
         fi
     }
 }
-
+##
 function tag-filter-date-past-fz {
     @opts engine [ h-tag-filter-date-fz-nts-engine "$@" ]  @ ntsearch-lines
 }
 @opts-setprefix tag-filter-date-past-fz tag-filter-date-past
 
 function h-tag-filter-date-fz-nts-engine {
-    local
-    out=(${(@f)"$(tag-filter-date-past "$@")"}) @TRET
+    local dirs=(${tag_filter_date_past_dirs[@]})
+    assert-args dirs @RET
+    local dir_main="${dirs[1]}"
+
+    tag-filter-date-past "$@" | @opts dir_main "$dir_main" @ h-ntsearch-fz
 }
 @opts-setprefix h-tag-filter-date-fz-nts-engine tag-filter-date-past
-
+##
 function nt-todos-past {
-    @opts dirs [ "$nightNotes" ~tmp/ ] @ tag-filter-date-past "$@"
+    local engine=("${nt_todos_past_engine[@]:-tag-filter-date-past}")
+
+    @opts dirs [ "$nightNotes" ~tmp/ ] @ "$engine[@]" "$@"
 }
 
-function rg-literal-or {
-    ensure-array rg_literal_or_opts
-    local patterns=("$@") opts=("${rg_literal_or_opts[@]}")
-    local engine=("${rg_literal_or[@]:-rg}")
-    # ugrep also supported, slower though. (Especially as rg seems to go instant with cache, while ugrep doesn't benefit as much.)
-    #   You might want to use '--dereference-recursive' with ugrep.
-
-    local opts_pats=() i
-    for i in "$patterns[@]" ; do
-        opts_pats+=(-e "$i")
-    done
-    revaldbg "$engine[@]" --fixed-strings "$opts_pats[@]" "$opts[@]"
+function nt-todos-past-fz {
+    @opts engine tag-filter-date-past-fz @ nt-todos-past
 }
+# @opts-setprefix nt-todos-past-fz nt-todos-past
 ##
