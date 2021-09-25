@@ -15,9 +15,10 @@ export SUDO_EDITOR="$NEDITOR"
 export VISUAL="$NEDITOR"
 export EDITOR="$VISUAL"
 ##
-export JULIA_EDITOR='emacsclient'
+# export JULIA_EDITOR='emacsclient'
+export JULIA_EDITOR='editor-open'
 # emacsclient opens in an already open client, vim is fast, nvim highlights but is slow
-# https://discourse.julialang.org/t/emacsclient-doesnt-work-with-edit/43673
+# [[file:~/Base/_Code/uni/stochastic/common/startup.jl::InteractiveUtils.define_editor("editor-open", wait=false) do cmd, path, line][startup.jl::define_editor]]
 ##
 export NODEJS_CHECK_SIGNATURES=no #for asdf's nodejs
 ##

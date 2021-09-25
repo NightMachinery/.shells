@@ -1,3 +1,4 @@
+##
 function borg-req() {
     curl --fail --silent --location --header "Content-Type: application/json" --data '@-' $borgEndpoint/"$@"
 }
@@ -85,4 +86,31 @@ function cmdlog-apply {
 
     reval-ec cmdlog-archive-current
 }
+##
+function tt-rename0 {
+    local from="$1" to="$2"
+    assert-args from to @RET
+
+    local literal="${tt_rename_literal}"
+    local reval_confirm_before=(backup-file "$timetracker_db")
+    if bool $literal ; then
+        reval-confirm sqlite3 "$timetracker_db" 'UPDATE activity SET name = REPLACE(name, '"$(gquote-dq "$from")"', '"$(gquote-dq "$to")"')'
+    else
+        local ext
+        # [[id:1967b990-6b27-4597-a215-df816a3e76c6][sqlite/extensions/regex: Collection of Extension Functions for SQLite3]]
+        if isLinux ; then
+            ext=~cod/misc/sqlite3-extras/sqlite3-extras.so
+        elif isDarwin ; then
+            ext=~cod/misc/sqlite3-extras/sqlite3-extras.dylib
+        else
+            @NA
+        fi
+        assert test -e "$ext" @RET
+
+        reval-confirm sqlite3 "$timetracker_db" "SELECT load_extension($(gquote-sq "$ext")) ; "'UPDATE activity SET name = SUB('"$(gquote-sq "$from")"', '"$(gquote-sq "$to")"', name)'
+    fi
+}
+@opts-setprefix tt-rename0 tt_rename
+
+aliasfn tt-rename tt-rename0
 ##

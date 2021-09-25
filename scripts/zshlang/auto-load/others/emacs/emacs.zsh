@@ -213,7 +213,7 @@ function emc-nowait2() {
     # tmp="$(serr grealpath -e "$f")" && f="$tmp" || true # can be, e.g., an scp path
     ##
     
-    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (${cmd} $(emc-quote "$f")))"
+    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (${cmd} $(emc-quote "$f")) t)"
     # throws useless error 'Invalid read syntax: "#"', but works anyway
 
     emc-focus

@@ -72,16 +72,21 @@ function wallpaper-set-darwin() {
     local f="$1"
     f="$(realpath "$f")" || return $?
     ###
-    for i in {1..3} ; do
+    for i in {1..2} ; do
         # sometimes doesn't work
         ecgray "$(dateshort)"
-        reval-ec reattach-to-user-namespace osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"' || return $?
+        if (( $(idle-get) >= 300 )) ; then # (( i == 1 )) &&
+            reval-ec killall Dock # This is fairly disruptive, hence the idle check
+        fi
+        reval-ec osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"' || return $?
+        # reattach-to-user-namespace actually made things worse!
+
         sleep 60
     done
     ##
     # mcli wallpaper "$f" || return $?
     ##
-    # Try `killall Dock` and then set the wallpaper again if this didn't work. This is fairly disruptive so I am loath to do it automatically.
+    # Try `killall Dock` and then set the wallpaper again if this didn't work.
     ###
 }
 function wallpaper-set() {

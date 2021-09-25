@@ -83,7 +83,7 @@ function double-newlines() {
 }
 
 function p-double-newlines() {
-    pbpaste | double-newlines | cat-copy
+    pbpaste | double-newlines | cat-copy-if-tty
 }
 alias pdn='p-double-newlines'
 ##
@@ -92,7 +92,7 @@ function newline2space {
 }
 
 function p-newline2space {
-    pbpaste | newline2space | cat-copy
+    pbpaste | newline2space | cat-copy-if-tty
 }
 alias pns='p-newline2space'
 ##

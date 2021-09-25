@@ -36,8 +36,6 @@ pi git+git://github.com/fretboardfreak/kitty-theme-changer.git@master
 
 pip install git+git://github.com/reinderien/mimic.git
 ###
-cpanm App::ansifold
-##
 nimble install --accept https://github.com/NightMachinary/htmlmetadata
 
 nimble install --accept "git://github.com/AmanoTeam/Unalix-nim"

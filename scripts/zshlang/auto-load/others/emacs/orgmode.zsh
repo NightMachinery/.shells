@@ -28,7 +28,12 @@ function org-update-files-all() {
     ##
     # fd --extension org --type f . "$nightNotes" | emc_eval_in=y emc-eval '(apply night/update-files lines)'
     ##
-    fd --extension org --extension org_archive --type f . "$nightNotes" | inargsf org-update-files
+    {
+        local d
+        for d in "$nightNotes" ~tmp/ ; do
+            fd --extension org --extension org_archive --type f . "$d"
+        done
+     } | inargsf org-update-files
     # emc-eval "(org-id-locations-save)" # @idk if this is needed, I think it's done automatically
     ##
     # org-update-files "$nightNotes"/**/*.org
@@ -157,5 +162,78 @@ function p-org-manning-toc() {
     res="$(ec $res | org-header-indent-to-current)" @TRET
 
     ec $res | pbcopy-ask
+}
+##
+function p-org-fanfic {
+    local d
+    d="$(html2org)" @TRET
+
+    local url
+    url="$(browser-current-url)" @TRET
+
+    ec $d | org-fanfic "$url" | cat-copy-if-tty
+}
+
+function org-fanfic {
+    local d url="$1"
+    assert-args url @RET
+    d="$(cat)" @RET
+
+    local title author_line author body tags=''
+    title="$(ec $d | ghead -1 | org2plain | str2orgtitle)" @TRET
+    author_line="$(ec $d | perl -ne "$. == 3 && print && exit")" @TRET
+    author_line="$(ec $author_line | sd '\s*\S+$' '')" @TRET
+    author="$(ec $author_line | rget '(\[.*\])')" @TRET
+    body="$(ec $d | perl -ne "$. > 3 && print")" @TRET
+
+    local complete_p
+    if ec $body | rg -q -- '-\s*(Status:\s*)?Complete' ; then
+        complete_p=y
+    fi
+
+    local words words_slashed
+    if words="$(ec $body | rget 'words:\s*(\S+)' | gtr -d ',')" ; then
+        words="$(ec $words | numfmt-humanfriendly)" @TRET
+        words_slashed="/${words:l}"
+    fi
+
+    local updated updated_year
+    if updated="$(ec $body | rget 'updated:\s*([^-]+)\s')" ; then
+        if updated_year="$(ec $updated | rget '(\d{4})')" ; then
+            # tags+="@updated/${updated_year} "
+        fi
+    fi
+
+    local published published_year
+    if published="$(ec $body | rget 'published:\s*([^-]+)\s')" ; then
+        if published_year="$(ec $published | rget '(\d{4})')" ; then
+            # tags+="@published/${published_year} "
+        fi
+    fi
+
+    if test -n "$published_year" ; then
+        local date_tag
+        date_tag="@${published_year}"
+        if test -n "$updated_year" && [[ "$published_year" != "$updated_year" ]] ; then
+            date_tag+="-${updated_year}"
+        fi
+        tags+="${date_tag} "
+    fi
+
+    local completion_status
+    if bool $complete_p ; then
+        completion_status='complete'
+    else
+        if test -z "$updated_year" || (( ($(now-year) - updated_year) >= 1 )) ; then
+            completion_status="abandoned"
+        else
+            completion_status="WIP"
+        fi
+    fi
+    if test -n "$completion_status" ; then
+        tags="@${completion_status}${words_slashed} ${tags}"
+    fi
+
+    ec "${tags}[[${url}][${title}]]${org_props_folded}- @author ${author}"$'\n'"#+begin_quote${body}"$'\n'"#+end_quote"
 }
 ##

@@ -19,3 +19,11 @@ function hex2decimal-py {
 
 aliasfn hex2decimal hex2decimal-py
 ##
+function numfmt-humanfriendly-bytes {
+    numfmt --to=iec-i --suffix=B "$@"
+}
+
+function numfmt-humanfriendly {
+    numfmt --to=si --round=nearest "$@"
+}
+##

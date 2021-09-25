@@ -47,6 +47,7 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
     fi
 fi
 
+addToPATH /opt/local/bin /opt/local/sbin # macports
 addToPATH /usr/sbin
 addToPATH /Applications/SuperCollider.app/Contents/Resources
 addToPATH /Applications/SuperCollider.app/Contents/MacOS

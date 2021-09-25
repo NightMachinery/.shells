@@ -965,6 +965,7 @@ function url-filename() {
     : "works with multiple URLs already"
     curlm --head "$@" | rget 'Content-Disposition:.*filename="(.*)"'
 }
+
 function url-size() {
     local size
     size="$(curlm --head "$@" | rget '^content-length\S*\s*(\d+)' | gtail -n 1)" || return $?
@@ -972,7 +973,7 @@ function url-size() {
 
     # test -z "$size" && return 1 # rget ensures it
     if isOutTty ; then
-        ec "$size" | numfmt --to=iec-i --suffix=B
+        ec "$size" | numfmt-bytes-humanfriendly
     else
         ec "$size"
     fi

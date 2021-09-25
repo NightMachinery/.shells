@@ -11,7 +11,7 @@ function ensure-array {
     local i
     for i in $@ ; do
         # if ! var-set-p "$i" ; then
-        if (( ${#${(P)v}} == 0 )) ; then
+        if (( ${#${(P)i}} == 0 )) ; then
             typeset -ag "$i"
         fi
     done
