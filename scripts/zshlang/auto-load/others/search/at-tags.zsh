@@ -39,16 +39,19 @@ function tag-filter-date-past {
 }
 ##
 function tag-filter-date-past-fz {
-    @opts engine [ h-tag-filter-date-fz-nts-engine "$@" ]  @ ntsearch-lines
+    tag_filter_date_past_fz_query=("$@") @opts engine [ h-tag-filter-date-fz-nts-engine ]  @ ntsearch-lines
 }
 @opts-setprefix tag-filter-date-past-fz tag-filter-date-past
 
 function h-tag-filter-date-fz-nts-engine {
+    local fz_query
+    fz_query="$(fz-createquery "${tag_filter_date_past_fz_query[@]}")"
     local dirs=(${tag_filter_date_past_dirs[@]})
     assert-args dirs @RET
     local dir_main="${dirs[1]}"
 
-    tag-filter-date-past "$@" | @opts dir_main "$dir_main" @ h-ntsearch-fz
+    tag-filter-date-past "$@" | @opts dir_main "$dir_main" query "$fz_query" @ h-ntsearch-fz
+    # @maybe add ugbool_query between these two
 }
 @opts-setprefix h-tag-filter-date-fz-nts-engine tag-filter-date-past
 ##
@@ -59,7 +62,7 @@ function nt-todos-past {
 }
 
 function nt-todos-past-fz {
-    @opts engine tag-filter-date-past-fz @ nt-todos-past
+    @opts engine tag-filter-date-past-fz @ nt-todos-past "$@"
 }
 # @opts-setprefix nt-todos-past-fz nt-todos-past
 ##
