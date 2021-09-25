@@ -490,6 +490,7 @@ function ntsearch_fd_h() {
     # xargs is needed to avoid argument list too long error
 
 }
+
 function ntsearch_fd() {
     : "INPUT VARS: ntsearch_injector ntsearch_rg_opts files ntLines nightNotes query_rg"
 
@@ -531,36 +532,5 @@ function ntsearch_fd() {
         # done
         ##
     fi
-}
-##
-function nt-lucene() {
-    local q="$*" 
-    # @globalInputs ntLines
-    ## https://lucene.apache.org/core/2_9_4/queryparsersyntax.html
-    # '+mustInclude'
-    # 'wildcard*'
-    # 'this is or'
-    # 'me AND you' 'me && you'
-    # '(jakarta OR apache) AND website'
-    # '"grouped words"'
-    ##
-    
-    local files opts=()
-    
-    # files=("$nightNotes"/**/${~noteglob})
-    # files=("$nightNotes"/**/${~textglob})
-
-    files=("${nightNotes%%/}/**/*.{${(j.,.)text_formats}}")
-    # glob syntax: https://docs.oracle.com/javase/8/docs/api/java/nio/file/FileSystem.html#getPathMatcher-java.lang.String-
-    
-    if ! bool "$ntLines" ; then
-        opts+=( --no-split )
-    fi
-    revaldbg lmgrep '--case-sensitive?' false --hyperlink "$opts[@]" -q "$q" "$files[@]"
-}
-alias ntc='\noglob nt-lucene'
-
-function nt-lucene. {
-    nightNotes="$PWD" nt-lucene "$@"
 }
 ##
