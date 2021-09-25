@@ -43,6 +43,20 @@ alias ffa=ffall
 alias rr=rgm
 alias rrn='rgm --line-number'
 ##
+function rg-literal-or {
+    ensure-array rg_literal_or_opts
+    local patterns=("$@") opts=("${rg_literal_or_opts[@]}")
+    local engine=("${rg_literal_or[@]:-rg}")
+    # ugrep also supported, slower though. (Especially as rg seems to go instant with cache, while ugrep doesn't benefit as much.)
+    #   You might want to use '--dereference-recursive' with ugrep.
+
+    local opts_pats=() i
+    for i in "$patterns[@]" ; do
+        opts_pats+=(-e "$i")
+    done
+    revaldbg "$engine[@]" --fixed-strings "$opts_pats[@]" "$opts[@]"
+}
+##
 aliasfn fda fd --hidden --no-ignore #ag --unrestricted -g # search in the pathnames
 function fdrp() {
     fda "$@" | inargsf re realpath

@@ -312,11 +312,6 @@ function ntsearch() {
     outFiles=()
     local nightNotes="$nightNotes"
 
-    export nightNotes="$(realpath --canonicalize-existing "$nightNotes")" || { # we need to export this because the preview shell accesses it.
-        ecerr "$0: nightNotes dir does not exist"
-        return 1
-    }
-
     local fzp_ug="$fzp_ug"
     if ! isI ; then
         # @surprise
@@ -324,19 +319,11 @@ function ntsearch() {
         # non-interactive fzf returns bad output that is ugly unprocessed, and can't be processed by our normal code
     fi
 
-    ntsearch_ "$@" > /dev/null || {
+    ntsearch_ "$@" || {
         ecerr "$0: ntsearch_ failed $?."
         unset out
         return 1
     } # don't fork here. Receiving globals vars out and acceptor.
-
-    if isI || test -z "$fzp_ug" ; then
-        # fzp_ug doesn't output zero in non-interactive usage (because fzf is not invoked), so we don't need to break these.
-        out=( "${(@0)out}" )
-        out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
-    else
-        out=( "${(@f)out}" )
-    fi
 
     if test -z "$ntLines" ; then
         ensure isI @MRET
@@ -421,8 +408,15 @@ function ntsearch_() {
     }
 }
 
+function h2-ntsearch-fz {
+    # @todoing refactor the rest of ntsearch_'s extra stuff here
+}
+@opts-setprefix h2-ntsearch-fz h-ntsearch-fz
+
 function h-ntsearch-fz {
-    : 'GLOBAL outputs: out'
+    : 'GLOBAL outputs: out, acceptor'
+    unset out
+    unset acceptor
 
     local query="${h_ntsearch_fz_query}"
     local hidden="${h_ntsearch_fz_hidden:-nohidden}"
@@ -436,7 +430,7 @@ function h-ntsearch-fz {
 
     ensure-array h_ntsearch_fz_delim_opts
     local delim_opts=("${h_ntsearch_fz_delim_opts[@]}")
-    if [[ "${delim_opts[*]}" == 'rg' ]] ; then
+    if [[ "${delim_opts[*]}" == 'rg' ]] || (( ${#delim_opts} == 0 )) ; then
         delim_opts=(--delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
     fi
 
@@ -450,7 +444,7 @@ function h-ntsearch-fz {
         dir_main_quoted="$(gq $dir_main)"
     fi
 
-    local previewcode="${h_ntsearch_fz_previewcode}"
+    local previewcode="${h_ntsearch_fz_previewcode:-ntom}"
     if [[ "$previewcode" == cat ]] ; then
         if test -z "$dir_main" ; then
             previewcode="$FZF_CAT_PREVIEW"
@@ -467,13 +461,20 @@ function h-ntsearch-fz {
 
     fzopts+=(--bind 'ctrl-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"${dir_main_quoted} $(gq "$output_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it; using silent.zsh does not seem to make any difference to the strange fzf bug that causes escape codes to be written to the query
 
-    reval-env-ec fz_empty=y fzp_dni=truncate fzp --preview-window "right,50%,wrap,${hidden},+{2}-/2,~${preview_header_lines}" --preview "$previewcode[*]" --ansi "${delim_opts[@]}" "${fzopts[@]}" --print0 --expect=alt-enter "$query" | {
-        unset acceptor
+    fz_empty=y fzp_dni=truncate fzp --preview-window "right,50%,wrap,${hidden},+{2}-/2,~${preview_header_lines}" --preview "$previewcode[*]" --ansi "${delim_opts[@]}" "${fzopts[@]}" --print0 --expect=alt-enter "$query" | {
+        acceptor=''
         if isI ; then
             read -d $'\0' -r acceptor
         fi
+
         out="$(cat)"
-        ec "$out"
+        if isI || test -z "$fzp_ug" ; then
+            # fzp_ug doesn't output zero in non-interactive usage (because fzf is not invoked), so we don't need to break these.
+            out=( "${(@0)out}" )
+            out=( "${(@)out[1,-2]}" ) # remove empty last element that \0 causes
+        else
+            out=( "${(@f)out}" )
+        fi
     } || {
         local ret=$? s="${(j.|.)pipestatus[@]}"
         ecerr "$0: failed last statement with: $s"
