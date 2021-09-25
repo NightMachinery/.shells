@@ -25,6 +25,13 @@
          (cond
            ((simple-string-p tag)
             `(:SEQUENCE (:FLAGS :CASE-INSENSITIVE-P) ,tag))
+           ((and
+             (listp tag)
+             tag
+             (simple-string-p (car tag)))
+            (cond
+              ((> (length tag) 1) `(:SEQUENCE (:FLAGS :CASE-INSENSITIVE-P) (:ALTERNATION  ,@tag)))
+              ((= (length tag) 1) `(:SEQUENCE (:FLAGS :CASE-INSENSITIVE-P)  ,(car tag)))))
            (t tag)))
        (child
          `(:GROUP
@@ -36,6 +43,8 @@
        (j-year)
        (j-month)
        (j-day))
+
+    ;; (format t "~s~%" tag) ;; @ic
 
     (progn ;; setting these at first can help @performance, as the program is waiting idly for pipe input
       (unless j-year
@@ -62,7 +71,7 @@
             ;; (format t "rec: ~s" record) ;; @ic
 
 ;;; construct the sexp regexes using these:
-            ;; (parse-string "[\t\n\f\r ]")
+            ;; (parse-string "joker|batman|crazy")
             ;; (parse-string "@((?i)tag)(?:/+([^/]+)){1,3}") ;; @upstreamBug can't handle groups in repeatitions
             ;; (parse-string "@(?:(?i)tag)(?:/+([^/]+))?(?:/+([^/]+))?(?:/+([^/]+))?")
 ;;;
@@ -95,10 +104,13 @@
 (defun main ()
   (let*
       ((argv (argv-get))
-       (tag (elt argv 0)))
+       ;; (tag (elt argv 0))
+       (tags argv)
+       )
     ;; (ec argv) ;; @ic
+    ;; (ec tags) ;; @ic
 
     (tag-filter
-     :tag tag)))
+     :tag tags)))
 
 (sb-ext:save-lisp-and-die "tag-filter-date.lispexe" :toplevel #'main :executable t)

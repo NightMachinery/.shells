@@ -1,9 +1,11 @@
 ##
 function tag-filter-date-past-stdin {
-    local tag="${1:-futureCron}"
+    local tags=(${tag_filter_date_past_tags[@]})
+    assert-args tags @RET
 
-    tag-filter-date.lispexe "$tag"
+    revaldbg tag-filter-date.lispexe "$tags[@]"
 }
+@opts-setprefix tag-filter-date-past-stdin tag-filter-date-past
 
 function tag-filter-date-past {
     local dirs=(${tag_filter_date_past_dirs[@]})
@@ -12,13 +14,20 @@ function tag-filter-date-past {
 
     local tags=(${tag_filter_date_past_tags[@]})
     if (( ${#tags} == 0 )) ; then
-        tags=('@futurecron')
+        tags=('futurecron' 'tofuture')
     fi
+
+    local i tags_with_prefix=()
+    for i in ${tags[@]} ; do
+        tags_with_prefix+="@${i}"
+    done
 
     ensure-array tag_filter_date_past_opts
     local opts=("${tag_filter_date_past_opts[@]}")
 
-    revaldbg @opts opts [ --no-binary --smart-case --engine auto --no-messages --with-filename --line-number "$opts[@]" "$dirs[@]" ] @ rg-literal-or "$tags[@]" | tag-filter-date-past-stdin | prefix-rm "$dir_main" | {
+    revaldbg @opts opts [ --no-binary --smart-case --engine auto --no-messages --with-filename --line-number "$opts[@]" "$dirs[@]" ] @ rg-literal-or "${tags_with_prefix[@]}" | {
+        @opts tags [ "$tags[@]" ] @ tag-filter-date-past-stdin
+    } | prefix-rm "$dir_main" | {
         if isOutTty ; then
             # @todo1 make the results TTY links to their locations, and color them
 
