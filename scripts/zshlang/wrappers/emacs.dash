@@ -3,24 +3,22 @@
 isKitty () {
     test -n "$KITTY_WINDOW_ID"
 }
+
 isiTerm () {
     [[ "$TERM_PROGRAM" == iTerm.app ]]
 }
+
 isDarwin () {
     [[ "$uname" == "Darwin" ]]
 }
 ##
-no_wait=''
+no_wait="${emacs_no_wait}"
 
 if test -n "$no_wait" ; then
     ##
     # @warn this mode obviously does not play well with blocking apps such as git
     ##
-    emacsclient -t --no-wait "$@"
-    ret=$?
-
-    brishz.dash kitty-emacs-focus
-
+    brishzq.zsh emc-nowait2 "$@"
     return $ret
 else
     my_term="$TERM"

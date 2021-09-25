@@ -14,6 +14,7 @@ rgx() {
     zre a "$1" "$2"
     ec "$a"
 }
+
 function sdlit() {
     # alt: `sd -s` ; perf is almost the same, but sd is probably a (very small) bit faster.
     local search="$1" replace="$2"
@@ -52,7 +53,7 @@ function isSpace {
 }
 ##
 function count-lines {
-    rg --fixed-strings --count ''
+    cat-paste-if-tty | rg --fixed-strings --count ''
     # wc will not count the last line if it does not end with '\n':
     # https://stackoverflow.com/questions/28038633/wc-l-is-not-counting-last-of-the-file-if-it-does-not-have-end-of-line-character
 }
@@ -71,5 +72,22 @@ function case-title {
     text="$(in-or-args "$@")" @RET
 
     command titlecase "$text" # from python
+}
+##
+function prefix-rm {
+    local prefixes=("$@")
+
+    # @todo @perf add multiple prefix removal to prefixer
+    local p cmd=''
+    for p in "$prefixes[@]" ; do
+        cmd+="rmprefix $(gquote $p) |"
+
+        # I want to write a function that gets a number n for its argument, and then runs a pipe n times. For example, for n=3, it should run:
+        #  cat | some-program | some-program | some-program
+        #  I can do this using 'eval', but I am loath to do that. Any eval-less (or at least eval-light) solutions?
+        #  (Obviously no temporary files. I want the whole pipe to run in parallel.)
+    done
+
+    evaldbg "${cmd[1,-2]}"
 }
 ##

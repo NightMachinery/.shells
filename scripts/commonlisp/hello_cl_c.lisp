@@ -2,4 +2,4 @@
 
 (defun main () (print "hello"))
 
-(sb-ext:save-lisp-and-die "hello_cl_c.exe" :toplevel #'main :executable t)
+(sb-ext:save-lisp-and-die "hello_cl_c.lispexe" :toplevel #'main :executable t)

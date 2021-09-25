@@ -12,6 +12,8 @@
 	excludesfile = ~/.gitignore_global
 	longpaths = true
 	autocrlf = input
+
+	# GIT_PAGER also set, so @redundant
 	pager = LESS='-RiF --mouse --wheel-lines=3' delta --light --theme 'Solarized (light)'
 	# ignorecase = false
 [color]
@@ -21,7 +23,7 @@
 	status = auto
 [http]
 	sslVerify = true
-	proxy = http://127.0.0.1:1088
+	proxy = http://127.0.0.1:1087
 	# proxy = socks5h://127.0.0.1:1081 # incompatible with git-credential-manager-core
 [pull]
 	rebase = false

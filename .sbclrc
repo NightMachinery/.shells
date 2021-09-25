@@ -16,9 +16,24 @@
 (defmacro comment (&rest ignored)
   nil)
 ;;;
+(defmacro alias-fn (to fn)
+  `(setf (fdefinition ',to) #',fn))
+
+(defmacro alias-macro (to macro)
+  "Aliases macros. Note that redefining the original will not update the alias, and you need to redefine the alias as well."
+  `(setf (macro-function ',to) (macro-function ',macro)))
+;;;
 (defun concat (&rest strings)
   "@example (concat \"hi \" \"hmm \" \"()\")"
   (apply #'concatenate 'string strings))
+
+(defun ec (&rest things)
+  (loop for thing in things do
+        (format t "~a~%" thing)))
+(comment
+ (ec "Hello" "Jungle" '(1 2 3) "hoo!"))
+;;;
+(alias-fn argv-get uiop:command-line-arguments) ;; get CLI arguments
 ;;;
 (defstruct cmd-result
   out
@@ -27,11 +42,11 @@
   retcode
   prc)
 
-(defun brishz-ll (&key (session "") (input nil) args)
+(defun brishz-ll (&key (session "") (input nil) (executable "/usr/local/bin/brishzq.zsh") args)
   "brishz low-level API."
   (let* (
          (out (make-array '(0) :element-type 'extended-char ;; 'character
-                          :fill-pointer 0 :adjustable t))
+                               :fill-pointer 0 :adjustable t))
          (err (make-array '(0) :element-type 'extended-char
                                :fill-pointer 0 :adjustable t))
          (input (cond
@@ -42,7 +57,7 @@
          (res
            (with-output-to-string (out-stream out)
              (with-output-to-string (err-stream err)
-               (run-program "/usr/local/bin/brishzq.zsh" args
+               (run-program executable args
                             :output out-stream :error err-stream
                             :input input
                             :environment (list
@@ -61,19 +76,22 @@
 (defun brishz (&rest args)
   (brishz-ll :args args))
 
+(defun brishz-fast (&rest args)
+  (brishz-ll :args args :executable "/usr/local/bin/brishz.dash"))
+
 (comment
-  (with-input-from-string (i (format nil "1. bat~%2.fruit~%3. end"))
-    (brishz-ll :args '("eval" "ec hi ; cat >&2") :session "emacs" :input i))
+ (with-input-from-string (i (format nil "1. bat~%2.fruit~%3. end"))
+   (brishz-ll :args '("eval" "ec hi ; cat >&2") :session "emacs" :input i))
 
-  (brishz-ll :args '("eval" "ec '{}hi[]' ; cat >&2") :session "emacs" :input "wow “The wizards?”")
+ (brishz-ll :args '("eval" "ec '{}hi[]' ; cat >&2") :session "emacs" :input "wow “The wizards?”")
 
-  (brishz "eval" "ec hi ; ecerr warning ; return 56"))
+ (brishz "eval" "ec hi ; ecerr warning ; return 56"))
 ;;;
 ;; (describe #\LEFT_DOUBLE_QUOTATION_MARK)
 ;;;
 (comment (defun org-title-escape (str)
-   (substitute #\} #\]
-               (substitute #\{ #\[ str))))
+           (substitute #\} #\]
+                       (substitute #\{ #\[ str))))
 
 (defun org-title-escape (str)
   (ppcre:regex-replace-all "\\\\*\\]"
@@ -94,4 +112,102 @@
   ;; osicat:file-kind does not work when the path contains a trailing slash :|
   (ignore-errors
    (sb-posix:s-islnk (sb-posix:stat-mode (sb-posix:lstat (pathname some-pathname))))))
+;;;
+(eval-when (:compile-toplevel :execute :load-toplevel)
+  (defun zip-lists (&rest alist-of-lists)
+    ;; if the number of lists is less than call-arguments-limit (minimum = 50)
+    (apply #'mapcar #'list alist-of-lists)
+    ;; (let ((lol '((1 2 3)
+    ;;              (a b c)
+    ;;              ("a" "b" "c"))))
+    ;;   (loop :with result := '()
+    ;;         :while (some (function identity) lol)
+    ;;         :do (let ((elements (mapcar (function first) lol)))
+    ;;               (push elements result)
+    ;;               (setf lol (mapcar (function rest) lol)))
+    ;;         :finally (return result)))
+    ;; --> ((3 c "c") (2 b "b") (1 a "a"))
+    ;; you can replace some by every if you want to stop on the shortest list, instead of the longuest.  mapcar and the other map functions in CL stop on the shortest.
+
+    ))
+(comment
+ (zip-lists '(1 2 3) '(a b c) '(9 8 7)))
+;;;
+(defun arger (dest &rest args)
+  (apply #'concat (loop for arg in args collect (format dest "arg: ~s~%" arg))))
+(comment
+ (arger nil 1 2 3))
+;;;
+(defmacro run-on-each-macro (m &rest args)
+  `(progn ,@(loop for arg in
+                  args collect `(,m ,arg))))
+(alias-macro re-m run-on-each-macro)
+(comment
+ (run-on-each-macro princ 1 5 4)
+ (let ((lst (list 1 2 3 "hi")))
+   (eval `(run-on-each-macro prin1 ,@lst))))
+
+(defmacro run-on-each-macro-zip ((&rest cmd) &rest arg-lists)
+  "Zips the arg-lists together and applies `cmd' on this list.
+`_' can be used in the `cmd' to mark the place where args should be inserted."
+  `(progn ,@(loop for args in
+                           (apply #'zip-lists arg-lists)
+                           ;; arg-lists
+                  collect
+                  (let* ((absent-placeholder t)
+                         (cmd-complete
+                           (apply #'append
+                                  (mapcar
+                                   (lambda (a)
+                                     (cond
+                                       ((equalp a '_)
+                                        (progn
+                                          (setq absent-placeholder nil)
+                                          args))
+                                       (t (list a))))
+                                   cmd)))
+                         (cmd-complete
+                           (cond
+                             (absent-placeholder (append cmd-complete args))
+                             (t cmd-complete))))
+                    `(,@cmd-complete)))))
+(alias-macro re-mz run-on-each-macro-zip)
+(comment
+ (append (list 1 2)
+         (list 3 4))
+ (re-mz (arger t) (1 2 3) (0 2 0) ("a" "b" "c"))
+ (re-mz (arger t "start" _ "end") (1 2 3) (0 2 0) ("a" "b" "c"))
+ )
+;;;
+(defmacro var-to-int (var &optional (default 0))
+  `(progn
+     ;; (format t "macro begin: ~s~%" ,var)
+     (setq ,var (or (ignore-errors (parse-integer ,var)) ,default))
+     ;; (format t "macro end: ~d~%" ,var)
+     ))
+(comment
+ (let ((a "1")
+       (b "2")
+       (c nil))
+   (re-m var-to-int a b c)
+   (prin1 (list a b c))
+   (re-mz (var-to-int _ nil) (a b c))
+   (prin1 (list a b c))))
+;;;
+(defmacro labeled (&body body)
+  (let* ((body-str (format nil "~s" body)))
+    `(progn
+       (let* ((val (progn ,body))
+             (val-str (format nil "~s" val))
+             (val-str
+               (with-input-from-string (s val-str)
+                 (apply #'concat
+                        (loop for line = (read-line s nil)
+                              while line collect
+                                         (format nil "~t~s~%" line))))))
+         (format t "~a~t=>~%~t~s" ,body-str val)
+         val))))
+(comment
+ (labeled * 8 7)
+ (labeled concat "Hi " "Li" (format nil "~%In the Jungle, ...")))
 ;;;

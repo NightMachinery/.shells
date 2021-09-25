@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+emacs_no_wait=y source "${0%/*}/emacs.dash" "$@"

@@ -139,6 +139,13 @@ function reval-env() {
     ##
 }
 
+function reval-env-ec {
+    reval_env_e=(eval-ec) reval-env "$@"
+}
+function reval-ec-env {
+    reval-env-ec "$@"
+}
+
 function env-clean() {
     @opts clean y @ reval-env "$@"
 }

@@ -1,13 +1,13 @@
 ##
 function pastebin-sprunge {
-    curl --progress-bar --form 'sprunge=<-' http://sprunge.us | cat-copy
+    cat-paste-if-tty | curl --progress-bar --form 'sprunge=<-' http://sprunge.us | cat-copy-if-tty
     # @alt 'f:1=<-' ix.io
 }
 
 function pastebin-gnupaste {
     local mime="${pastebin_mime:-text/plain}" expire="${pastebin_mime:-99m}"
 
-    curl --progress-bar --form 'file=@-' --form "type=${mime}" --form "expire=${expire}" https://paste.gnugen.ch | cat-copy
+    cat-paste-if-tty | curl --progress-bar --form 'file=@-' --form "type=${mime}" --form "expire=${expire}" https://paste.gnugen.ch | cat-copy-if-tty
 
     # expire: The desired expiration date. This field defaults to one year. Valid units are s(econds), h(ours), d(ays), w(eeks) and m(onths).
     # This service is provided with no guarantees of any kind. Please note that your IP address will be stored for security purposes.

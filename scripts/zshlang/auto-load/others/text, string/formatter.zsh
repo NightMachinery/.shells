@@ -1,6 +1,6 @@
 ##
 function beautifier-js {
-    unibeautify -l JavaScript | cat-copy
+    unibeautify -l JavaScript | cat-copy-if-tty
 }
 alias pretty-js='beautifier-js'
 alias formatter-js='beautifier-js'
@@ -12,7 +12,7 @@ function bookmarklet-from-js {
 }
 
 function p-bookmarklet-from-js {
-    pbpaste | bookmarklet-from-js | cat-copy
+    pbpaste | bookmarklet-from-js | cat-copy-if-tty
 }
 alias pbj='p-bookmarklet-from-js'
 ##

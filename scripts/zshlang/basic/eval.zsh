@@ -1,25 +1,56 @@
 ###
-alias seval='ge_ecdbg=y geval' #silent debuggable eval
-alias evaldbg='seval'
 alias eval-good='geval'
 alias eval-quoted='reval'
 alias greval=rgeval
+
 function eval-ec() { ge_no_hist=y geval "$@" }
+function eval-ecdbg() { ge_ecdbg=y ge_no_hist=y geval "$@" }
+alias seval='eval-ecdbg' #silent debuggable eval
+alias evaldbg='eval-ecdbg'
+
+function eval-confirm {
+    local cmd="$*"
+    if ask "eval?: $cmd" Y ; then
+        eval "$cmd"
+    fi
+}
+
+function reval-confirm {
+    local cmd default="${reval_confirm_default:-Y}" before_hook=("${reval_confirm_before[@]}")
+    local reval_confirm_default='' reval_confirm_before=''
+    cmd=("$@")
+    test -z "${cmd[*]}" && return 0
+
+    if ask "reval?: $(ecalternate "${cmd[@]}" 2>&1)" "$default" ; then
+        if test -n "${before_hook[*]}" ; then
+            reval-ec "${before_hook[@]}" @RET
+        fi
+
+        reval "${cmd[@]}"
+    else
+        return 130 # Control-C is fatal error signal 2, (130 = 128 + 2, see above)
+    fi
+}
+
 function reval-ec() {
     ## old implementation:
     # ge_no_hist=y rgeval "$@"
     ##
-    local engine="${reval_ec_e:-ecbold}"
+    local ec_engine="${reval_ec_ec_engine:-${reval_ec_e:-ecbold}}" eval_engine="${reval_ec_eval_engine:-eval}"
+    local reval_ec_ec_engine='' reval_ec_e='' reval_ec_eval_engine=''
     test -z "$*" && return 0
     local cmd cmd_simple
     cmd="$(gq "$@")" @TRET
+
     cmd_simple="$(gquote-simple "$@")" @TRET
-    "$engine" "$cmd_simple" >&2
-    eval "$cmd"
+    "$ec_engine" "$cmd_simple" >&2
+    "${eval_engine}" "$cmd"
 }
+
 function reval-ecdate() {
    reval_ec_e=ecdate reval-ec "$@"
 }
+
 function reval-rainbow() {
     argerng "$@" >&2
     reval "$@"
@@ -32,6 +63,7 @@ function geval() {
         test -z "$ge_no_ec"  && { ecbold "$cmd" } >&2
         test -z "$ge_no_hist" && hist-add-unquoted "$cmd" #Add to history
     } || ecdbg "$cmd"
+    local ge_ecdbg='' ge_no_ec='' ge_no_hist=''
     eval -- "$cmd"
 }
 ##

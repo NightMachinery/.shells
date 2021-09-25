@@ -89,6 +89,7 @@ function fromnow() {
     then="$(assert gdate --date "$date" "+%s")" || return 1
     ec $(( EPOCHSECONDS - then ))
 }
+
 function fromnow-py() {
     : "date= $0 -> seconds since \$date"
 
@@ -104,6 +105,10 @@ function datej-all-long-time {
 }
 alias now='datej-all-long-time'
 
+function now-year {
+    gdate +%Y @TRET
+}
+
 function dateshort() { date +"%b %d %H:%M:%S" }
 
 function dateshortnum() { date +"%Y/%m/%d" }
@@ -111,7 +116,19 @@ function dateshortnum() { date +"%Y/%m/%d" }
 function datej() {
     # alt: Python https://github.com/fitnr/convertdate
     # jalalim tojalali "$(dateshortnum)"
-    jalalicli today
+    jalalicli today "$@"
+}
+
+function datej-year() {
+    jalalicli today --jalali-format='yyyy' "$@"
+}
+
+function datej-month() {
+    jalalicli today --jalali-format='M' "$@"
+}
+
+function datej-day() {
+    jalalicli today --jalali-format='d' "$@"
 }
 ##
 function remj() {

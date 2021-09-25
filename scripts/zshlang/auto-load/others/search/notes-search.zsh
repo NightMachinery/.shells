@@ -37,12 +37,13 @@ alias bks='bookmark-search'
 aliasfn-ng agsi ugbase_follow=n nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
 function agfi1() {
     ##
-    # a bit faster than the ugrep mode, possibly because i0o0 wastes two invocations of prefixer
+    # a bit faster than the ugrep mode, possibly because ugrepMode=i0o0 (in fzp) wastes two invocations of prefixer
     # note that this streams the results while the ugrep mode waits for the results to finish, so this appears faster than it really is
     ##
     local f="$1"
     ntsearch_query_fzf="'$f '() | 'alias | 'alifn " agsi  # match functions or aliases
 }
+
 function agfi {
     ## PERF:
     # `FZF_DEFAULT_OPTS+=' -1'`
@@ -69,7 +70,7 @@ function agfi {
     fi
 
     isDbg && ec-copy "$q"
-    local ntsearch_lines_nw=y ntsearch_lines_fe=y fzp_ug=y ntsearch_lines_nnp=y ntsearch_query_fzf="$q"
+    local ntsearch_lines_nw=y ntsearch_lines_fe=y fzp_ug=y ntsearch_lines_nnp="${ntsearch_lines_nnp:-y}" ntsearch_query_fzf="$q"
     if isI ; then
         # We need to run this without piping in the interactive case, or else jumping to editor will break
         agsi
@@ -78,6 +79,24 @@ function agfi {
     fi
 }
 noglobfn agfi
+
+function agfi-ni {
+    local all="${agfi_all}"
+
+    if bool "$all" ; then
+        # it's hard to only jump to the first match in this approach
+        ##
+        ntsearch_lines_nnp=n fnswap isI false agfi "$@"
+    else
+        # @example the following is an example of using the jump machinary with just the location data.
+        ##
+        local location
+        location="$(fnswap isI false agfi "$@" | prefixer --skip-empty | ghead -n 1)" @TRET
+
+        ntsearch-postprocess-h1 "$NIGHTDIR" "${ntsearch_lines_pattern_default}" =(ec "$location")
+    fi
+}
+@opts-setprefix agfi-ni agfi
 ##
 function ntt() {
     local query="$(fzp_ug=ni fz-createquery "$@")"
@@ -196,6 +215,7 @@ function ntsearch-lines-engine() {
     ntLines=y ntsearch "$@"
 }
 alias snw='ntsearch_lines_nw=y '
+typeset -g ntsearch_lines_pattern_default='^([^:]*):([^:]*):(.*)'
 function ntsearch-lines() {
     : "Remember that ntsearch_ uses eval-memoi"
     : "Note that ntsearch and ntsearch_ use their input as a glob to filter files"
@@ -206,13 +226,13 @@ function ntsearch-lines() {
     if isSSH || [[ "{$no_wait:l}" == (n|no) ]] ; then
         no_wait=''
     fi
-    test -z "$pattern" && pattern='^([^:]*):([^:]*):(.*)'
+    test -z "$pattern" && pattern="${ntsearch_lines_pattern_default}"
 
     outFiles=() out=() # out and outFiles contain almost the same data when ntLines=y
     # outFiles is no longer used by anything except `vnt`?
     ntsearch_lines_pattern="$pattern" reval "$engine[@]" "$@" > /dev/null  || return 88 # Beware forking here! We need the global vars out and acceptor
 
-    if ! isI && test -n "$ni_noprocess" ; then
+    if ! isI && bool "$ni_noprocess" ; then
         ec "${(@F)out}"
         return 0
     fi
@@ -226,6 +246,7 @@ function ntsearch-postprocess-h1 {
     out="$(cat "$out")" @TRET
     nightNotes="$1" pattern="$2" out="$out" force_editor=y no_wait=y ntsearch-postprocess
 }
+
 function ntsearch-postprocess {
     # @input nightNotes out pattern acceptor ntsearch_injector force_editor no_wait EDITOR
     ##
@@ -280,53 +301,7 @@ function ntsearch-postprocess {
         return 0
     else
         ecdbg "$0: Opening editor ..."
-        if [[ "$EDITOR" =~ '^emacs' ]] ; then
-            local opts=()
-            if test -n "$no_wait" ; then
-                opts+='--no-wait'
-                # --no-wait will open stuff in the active frame, instead of opening a new frame
-            fi
-            local cmd='(progn '
-            for i in {1..$#files} ; do
-                # (forward-char $col)
-                ##
-                if (( $#files > 1 )) ; then
-                    cmd+="(tab-bar-new-tab) "
-                    if (( i == 1 )) ; then
-                        cmd+="(tab-bar-close-other-tabs) " # @weirdFeature
-                    fi
-                fi
-                cmd+="(find-file \"${files[$i]}\") (goto-line ${linenumbers[$i]}) "
-                ##
-                cmd+='(recenter) '
-            done
-            # lower than this 1.5 delay will not work. More delay might be necessary for edge cases.
-            # The first time we use this in a zsh session, the highlight sometimes does not work. Idk why.
-            cmd+="(run-at-time 0.15 nil #'+nav-flash-blink-cursor-h) "
-            cmd+=')'
-
-            if test -n "$no_wait" ; then
-                revaldbg sdbg emc-eval "$cmd" & # this decreases the latency but can sometimes open emacs too soon (before it has jumped to the desired location)
-                sdbg emc-focus
-            else
-                revaldbg sdbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
-            fi
-
-        else
-            ##
-            # should work with both emacs and vim
-            # VSCode: code --goto <file:line[:character]> Open a file at the path on the specified line and character position.--goto file:line[:col]
-            # I don't know about opening multiple files on vscode (we can always run the command multiple times)
-            ##
-            # [[id:dc56c812-14ba-4f42-8484-18456dc9132b][vim/tabs.org]]
-            # EDITOR='nvim -p'
-            ##
-            local cmd="$EDITOR "
-            for i in {1..$#files} ; do
-                cmd+="+${linenumbers[$i]} $(gq "${files[$i]}") "
-            done
-            eval "$cmd"
-        fi
+        editor_open_no_wait="$no_wait" editor_open_f=("$files[@]") editor_open_l=("${linenumbers[@]}") editor-open
     fi
 }
 ##
@@ -336,6 +311,7 @@ function ntsearch() {
     out=''
     outFiles=()
     local nightNotes="$nightNotes"
+
     export nightNotes="$(realpath --canonicalize-existing "$nightNotes")" || { # we need to export this because the preview shell accesses it.
         ecerr "$0: nightNotes dir does not exist"
         return 1
@@ -372,12 +348,14 @@ function ntsearch() {
         ec "${(@F)out}"
     fi
 }
+
 function ntsearch_() {
     : "See vnt, ntsearch-lines"
     : "INPUT: ntsearch_lines_pattern, ntsearch_query_rg, ntsearch_query_fzf, ntsearch_additional_paths, nightNotes, ntLines , GLOBAL: acceptor out"
 
     acceptor=''
     out=''
+
     bella_zsh_disable1
 
     local ntLines="$ntLines"
@@ -402,56 +380,94 @@ function ntsearch_() {
         ecerr "$0: No valid paths supplied. Aborting."
         return 1
     }
+
     local query_rg="${ntsearch_query_rg:-\S+}" # removes empty lines
     local query="$ntsearch_query_fzf"
-    # test -z "$query" || query="'$query"
-    # local pattern="."
-
-    local fzopts=()
-    local previewcode="$FZF_SIMPLE_PREVIEW"
-    local preview_header_lines
-    local hidden
-    if test -z "$ntLines" ; then
-        preview_header_lines=2
-        hidden='hidden' # preview is useless as ntsearch-whole does not track the line number info needed to scroll to the right place
-
-        if test -z "$fzp_ug" ; then
-            fzopts+='--read0'
-        else
-            ecerr "$0: ugrep does not support read0"
-            return 1
-        fi
-        previewcode="cat {f}"
-    else
-        preview_header_lines=3
-        hidden='nohidden'
-
-        if test -z "$fzp_ug" ; then
-            fzopts+=(--read0 --delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
-        else
-            fzopts+=(--delimiter : --nth '1,3..')
-        fi
-        ###
-        # https://github.com/junegunn/fzf/issues/2373 preview header
-        # remove `:+{2}-/2` from preview-window and use mode=0 to revert to the previous behavior
-        ##
-        local rtl=''
-        # rtl='| rtl_reshaper.dash' # very bad perf for large files
-        # adding ` | rtl_reshaper.dash` works fine if RTL text is not colored, it seems. It's best if ntom does the reshaping itself ...
-        ##
-        previewcode="ntom {1} {2} {s3..} $(gq $nightNotes) 1 $rtl || printf -- \"\n\n%s \" {}"
-        ##
-        # previewcode="cat $(gq $nightNotes)/{1} || printf -- error5"
-        ###
-    fi
-
-    fzopts+=(--bind 'ctrl-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"$(gq "$nightNotes") $(gq "$ntsearch_lines_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it; using silent.zsh does not seem to make any difference to the strange fzf bug that causes escape codes to be written to the query
 
     ##
     # we no longer need caching, it's fast enough
     # memoi_expire=$((3600*24)) memoi_key="${files[*]}:${ntLines}:$nightNotes:$query_rg" eval-memoi
+    ntsearch_fd | {
+        local fzopts=() delim_opts=()
+        local previewcode
+        local preview_header_lines
+        local hidden
+        if test -z "$ntLines" ; then
+            preview_header_lines=2
+            hidden='hidden' # preview is useless as ntsearch-whole does not track the line number info needed to scroll to the right place
 
-    ntsearch_fd | fz_empty=y fzp_dni=truncate fzp --preview-window "right,50%,wrap,${hidden},+{2}-/2,~${preview_header_lines}" --preview "$previewcode[*]" --ansi ${fzopts[@]} --print0 --expect=alt-enter "$query" | {   # right:hidden to hide preview
+            if test -z "$fzp_ug" ; then
+                fzopts+='--read0'
+            else
+                ecerr "$0: ugrep does not support read0"
+                return 1
+            fi
+            previewcode="cat"
+        else
+            preview_header_lines=3
+            hidden='nohidden'
+
+            if test -z "$fzp_ug" ; then
+                fzopts+='--read0'
+                delim_opts+=(rg)
+            else
+                delim_opts=(--delimiter : --nth '1,3..')
+            fi
+
+            previewcode='ntom'
+        fi
+
+        @opts query "$query" dir_main "$nightNotes" previewcode "${previewcode}" preview_header_lines "${preview_header_lines}" hidden "${hidden}" delim_opts [ "${delim_opts[@]}" ] opts [ "${fzopts[@]}" ] pattern "${ntsearch_lines_pattern}" @ h-ntsearch-fz
+    }
+}
+
+function h-ntsearch-fz {
+    : 'GLOBAL outputs: out'
+
+    local query="${h_ntsearch_fz_query}"
+    local hidden="${h_ntsearch_fz_hidden:-nohidden}"
+    local output_pattern="${h_ntsearch_fz_pattern:-${ntsearch_lines_pattern_default}}"
+
+    ##
+    local preview_header_lines="${h_ntsearch_fz_preview_header_lines:-3}"
+    # https://github.com/junegunn/fzf/issues/2373 preview header
+    # remove `:+{2}-/2` from preview-window and use mode=0 to revert to the previous behavior
+    ##
+
+    ensure-array h_ntsearch_fz_delim_opts
+    local delim_opts=("${h_ntsearch_fz_delim_opts[@]}")
+    if [[ "${delim_opts[*]}" == 'rg' ]] ; then
+        delim_opts=(--delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
+    fi
+
+    ensure-array h_ntsearch_fz_opts
+    local fzopts=("${h_ntsearch_fz_opts[@]}")
+
+    local dir_main="${h_ntsearch_fz_dir_main}" dir_main_quoted
+    if test -z "$dir_main" ; then
+        dir_main_quoted="/"
+    else
+        dir_main_quoted="$(gq $dir_main)"
+    fi
+
+    local previewcode="${h_ntsearch_fz_previewcode}"
+    if [[ "$previewcode" == cat ]] ; then
+        if test -z "$dir_main" ; then
+            previewcode="$FZF_CAT_PREVIEW"
+        else
+            previewcode="cat ${dir_main_quoted}/{1} || printf -- '${0}: error_919815'"
+        fi
+    elif [[ "$previewcode" == ntom ]] ; then
+        local rtl=''
+        # rtl='| rtl_reshaper.dash' # very bad perf for large files
+        # adding ` | rtl_reshaper.dash` works fine if RTL text is not colored, it seems. It's best if ntom does the reshaping itself ...
+        ##
+        previewcode="ntom {1} {2} {s3..} ${dir_main_quoted} 1 $rtl || printf -- \"\n\n%s \" {}"
+    fi
+
+    fzopts+=(--bind 'ctrl-\:execute-silent(brishzq.zsh ntsearch-postprocess-h1 '"${dir_main_quoted} $(gq "$output_pattern")"' {f})') # '{}' puts the current line itself, '{f}' puts a file containing it; using silent.zsh does not seem to make any difference to the strange fzf bug that causes escape codes to be written to the query
+
+    reval-env-ec fz_empty=y fzp_dni=truncate fzp --preview-window "right,50%,wrap,${hidden},+{2}-/2,~${preview_header_lines}" --preview "$previewcode[*]" --ansi "${delim_opts[@]}" "${fzopts[@]}" --print0 --expect=alt-enter "$query" | {
         unset acceptor
         if isI ; then
             read -d $'\0' -r acceptor
@@ -463,9 +479,8 @@ function ntsearch_() {
         ecerr "$0: failed last statement with: $s"
         return $ret
     }
-    # | gawk 'BEGIN { RS = "\0" ; ORS = RS  } ;  NF' # to remove empty lines (I don't know why I commented this, or if it actually works. But I now use rg itself to filter empty lines out.
-
 }
+
 function ntsearch_fd_h() {
     print -nr -- "${(@pj.\0.)files}" \
         | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] "$@" -- "$query_rg" \

@@ -7,6 +7,23 @@ function cat-copy() {
     ecn "$inargs" | pbcopy
 }
 alias pc='\noglob cat-copy'
+
+function cat-copy-if-tty {
+    if isOutTty ; then
+        cat-copy
+    else
+        cat
+    fi
+}
+
+function cat-paste-if-tty {
+    if isInTty ; then
+        pbpaste
+    else
+        cat
+    fi
+}
+
 alias pop='pbpaste'
 ##
 function tee-copy() {

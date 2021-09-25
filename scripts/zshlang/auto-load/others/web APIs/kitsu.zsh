@@ -80,6 +80,6 @@ function ffkitsu() {
 
     sel="$(ec "$d" | jq -r '.[] | .tlg_title' | fzp -1 "" | ghead -n 1)" @RET
 
-    ec "$d" | jq -r --arg t "$sel" '.[] | select(.tlg_title == $t) | .org_content' | cat-copy @TRET
+    ec "$d" | jq -r --arg t "$sel" '.[] | select(.tlg_title == $t) | .org_content' | cat-copy-if-tty @TRET
 }
 alias ffkitsu2org='ffkitsu'

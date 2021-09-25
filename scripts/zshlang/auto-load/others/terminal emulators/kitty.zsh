@@ -9,7 +9,12 @@ function kitty-remote() {
         if (( $#s >= 1 )) ; then
             # dead kitties can leave trash sockets behind
             for i in ${s[@]} ; do
-                kitty @ --to unix:${i} "$@" && ret=0 || true
+                if kitty @ --to unix:${i} "$@" ; then
+                    ret=0
+                else
+                    silent trs "$i" # garbage collecting dead sockets
+                    # @futureCron did this delete live sockets as well?
+                fi
             done
         fi
 

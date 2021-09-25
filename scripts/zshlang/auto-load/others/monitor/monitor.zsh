@@ -119,6 +119,7 @@ function idle-get() {
 
     ioreg -c IOHIDSystem | sponge | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }
+
 function lastunlock-get() {
     assert isDarwin @RET
 

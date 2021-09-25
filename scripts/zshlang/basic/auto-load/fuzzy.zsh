@@ -75,6 +75,7 @@ function fzf-gateway() {
         fzf "$@"
     fi
 }
+
 function fzp() {
     # fzp: fz potentially
 
