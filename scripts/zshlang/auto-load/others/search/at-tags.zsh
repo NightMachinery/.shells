@@ -50,7 +50,7 @@ function h-tag-filter-date-fz-nts-engine {
     assert-args dirs @RET
     local dir_main="${dirs[1]}"
 
-    tag-filter-date-past "$@" | @opts dir_main "$dir_main" query "$fz_query" @ h-ntsearch-fz
+    tag-filter-date-past "$@" | @opts dir_main "$dir_main" query "$fz_query" @ h-grep-output-to-fz
     # @maybe add ugbool_query between these two
 }
 @opts-setprefix h-tag-filter-date-fz-nts-engine tag-filter-date-past
