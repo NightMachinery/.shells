@@ -4,34 +4,34 @@ function h-grep-output-to-fz {
     unset out
     unset acceptor
 
-    local query="${h_ntsearch_fz_query}"
-    local hidden="${h_ntsearch_fz_hidden:-nohidden}"
-    local output_pattern="${h_ntsearch_fz_pattern:-${ntsearch_lines_pattern_default}}"
+    local query="${h_grep_output_to_fz_query}"
+    local hidden="${h_grep_output_to_fz_hidden:-nohidden}"
+    local output_pattern="${h_grep_output_to_fz_pattern:-${ntsearch_lines_pattern_default}}"
     assert-args output_pattern @RET
 
     ##
-    local preview_header_lines="${h_ntsearch_fz_preview_header_lines:-3}"
+    local preview_header_lines="${h_grep_output_to_fz_preview_header_lines:-3}"
     # https://github.com/junegunn/fzf/issues/2373 preview header
     # remove `:+{2}-/2` from preview-window and use mode=0 to revert to the previous behavior
     ##
 
-    ensure-array h_ntsearch_fz_delim_opts
-    local delim_opts=("${h_ntsearch_fz_delim_opts[@]}")
+    ensure-array h_grep_output_to_fz_delim_opts
+    local delim_opts=("${h_grep_output_to_fz_delim_opts[@]}")
     if [[ "${delim_opts[*]}" == 'rg' ]] || (( ${#delim_opts} == 0 )) ; then
         delim_opts=(--delimiter : --with-nth '1,3..' --nth '..') # nth only works on with-nth fields
     fi
 
-    ensure-array h_ntsearch_fz_opts
-    local fzopts=("${h_ntsearch_fz_opts[@]}")
+    ensure-array h_grep_output_to_fz_opts
+    local fzopts=("${h_grep_output_to_fz_opts[@]}")
 
-    local dir_main="${h_ntsearch_fz_dir_main}" dir_main_quoted
+    local dir_main="${h_grep_output_to_fz_dir_main}" dir_main_quoted
     if test -z "$dir_main" ; then
         dir_main_quoted="/"
     else
         dir_main_quoted="$(gq $dir_main)"
     fi
 
-    local previewcode="${h_ntsearch_fz_previewcode:-ntom}"
+    local previewcode="${h_grep_output_to_fz_previewcode:-ntom}"
     if [[ "$previewcode" == cat ]] ; then
         if test -z "$dir_main" ; then
             previewcode="$FZF_CAT_PREVIEW"
