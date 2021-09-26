@@ -99,14 +99,14 @@ function agfi-ni {
 @opts-setprefix agfi-ni agfi
 ##
 function ntt() {
-    local query="$(fzp_ug=ni fz-createquery "$@")"
+    local query="$(fzp_ug="${fzp_ug:-ni}" fz-createquery "$@")"
 
     ntsearch_query_fzf="$query" ntl
 }
 ###
 function rem-fz() {
     local query_pre="$rem_fz_q"
-    local query="$(fzp_ug=ni fz-createquery "$@")"
+    local query="$(fzp_ug="${fzp_ug:-ni}" fz-createquery "$@")"
 
     local fz_opts=( "$fz_opts[@]" --no-sort ) # no-sort is needed to get the items sorted according to their actual date
 
@@ -130,7 +130,7 @@ function remd() {
     # `fnswap isI false remd`
     # `FORCE_NONINTERACTIVE=y remd mid`
     ##
-    local query="$(fzp_ug=ni fz-createquery "$@")"
+    local query="$(fzp_ug="${fzp_ug:-ni}" fz-createquery "$@")"
 
     local ntsearch_lines_nnp=y
     
@@ -142,12 +142,12 @@ function remd() {
     if (( cmonth == 12 )) ; then
         local nextYear=$((cyear+1))
 
-        @opts q "$(fzp_ug=ni fz-createquery "$cyear/$cmonth" "|" "$nextYear/01")" @ rem-fz $query
+        @opts q "$(fzp_ug="${fzp_ug:-ni}" fz-createquery "$cyear/$cmonth" "|" "$nextYear/01")" @ rem-fz $query
     else
         typeset -Z2 nextMonth
         nextMonth=$((cmonth+1))
 
-        @opts q "$(fzp_ug=ni fz-createquery "$cyear/$cmonth" "|" "$cyear/$nextMonth")" @ rem-fz $query
+        @opts q "$(fzp_ug="${fzp_ug:-ni}" fz-createquery "$cyear/$cmonth" "|" "$cyear/$nextMonth")" @ rem-fz $query
     fi
 }
 ###
@@ -195,7 +195,7 @@ function ntl-fzf() {
     ntsearch_query_fzf="$*" ntsearch-lines
 }
 function ntl-fzfq() {
-    local query="$(fzp_ug=ni fz-createquery "$@")"
+    local query="$(fzp_ug="${fzp_ug:-ni}" fz-createquery "$@")"
 
     ntsearch_query_fzf="$query" ntsearch-lines
 }
@@ -260,8 +260,8 @@ function ntsearch-postprocess {
             test -e "$file" || {
                 # file="$(<<<$file rmprefix "$nightNotes")"
                 file="$nightNotes/$file"
-                file="$(grealpath "$file")" # needed for opening files in the editor
             }
+            file="$(grealpath "$file")" # needed for opening files in the editor
             if ! test -e "$file" ; then
                 if true || test -z "$ntsearch_injector" ; then
                     ecerr "$0: $(gq "$file") does not exist."
@@ -396,7 +396,7 @@ function ntsearch_() {
 
             if test -z "$fzp_ug" ; then
                 fzopts+='--read0'
-                delim_opts+=(rg)
+                delim_opts=(rg)
             else
                 delim_opts=(--delimiter : --nth '1,3..')
             fi
@@ -408,12 +408,8 @@ function ntsearch_() {
     }
 }
 
-function h2-ntsearch-fz {
-    # @todoing refactor the rest of ntsearch_'s extra stuff here
-}
-@opts-setprefix h2-ntsearch-fz h-ntsearch-fz
-
 function h-ntsearch-fz {
+    : 'GLOBAL inputs: fzp_ug'
     : 'GLOBAL outputs: out, acceptor'
     unset out
     unset acceptor

@@ -13,7 +13,7 @@ launch /usr/local/bin/zsh -c 'withemc1 emc-gateway'
 new_tab
 cd ~/tmp
 # launch /usr/local/bin/bicon_zsh.dash
-launch /usr/local/bin/bicon_zsh.dash -c 'mosh eva@82.102.11.148 -- zsh'
+launch /usr/local/bin/bicon_zsh.dash -c 'mosh ${lilf_user}@82.102.11.148 -- zsh'
 new_tab
 cd ~/tmp
 launch /usr/local/bin/bicon_zsh.dash

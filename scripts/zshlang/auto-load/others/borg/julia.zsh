@@ -131,19 +131,36 @@ jdlc() {
     # ge_ecdbg=y onlm get-dl-link
     # silence popd
 }
-jdl-helper() {
-    local subdir="${jdl_subdir:-${jdl_d:-tmp}}"
 
-    mkdir -p ~/Downloads/$subdir/
-    cp "$1" ~/Downloads/$subdir/
-    get-dl-link ~/Downloads/$subdir/"${1:t}"
-    ec $'\n'
+function jdl-helper() {
+    local input="$1" subdir="${jdl_subdir:-${jdl_d:-tmp}}"
+
+    local my_home=~/
+    if ! isServer ; then
+        my_home=/home/"$lilf_user"
+    fi
+
+    local dest
+    dest="${my_home}/Downloads/$subdir/${input:t}"
+    if isServer ; then
+        mkdir -p ~/Downloads/$subdir/ @TRET
+        cp "$input" "$dest" @TRET
+
+        get-dl-link "$dest" @TRET
+        ec $'\n'
+    else
+         # @todoing
+         reval-ec rsp-dl "$input" "${lilf_user}@${lilf_ip}:Downloads/${subdir}/" >&2 @TRET
+         reval-ec brishzr get-dl-link "$dest" @TRET
+    fi
 }
+
 function jdl() {
     jglob
-    # dl_base_url="http://$(myip):8080/"
-    re jdl-helper "$@"
+
+    re jdl-helper "$@" | cat-copy-if-tty
 }
+
 function jdl-private() {
     jdl_subdir="private" jdl "$@"
 }

@@ -145,7 +145,21 @@
 (comment
  (run-on-each-macro princ 1 5 4)
  (let ((lst (list 1 2 3 "hi")))
-   (eval `(run-on-each-macro prin1 ,@lst))))
+   (eval `(run-on-each-macro prin1 ,@lst))
+
+   ;; (mapcar (lambda (x) (run-on-each-macro prin1 x)) lst)
+   )
+ )
+(comment
+ (defmacro tmp-print-me (atom)
+   `(prin1 ,atom))
+ (tmp-print-me "hi")
+
+ (let ((lst (list 1 2 3 "hi")))
+   (mapcar (lambda (x) (tmp-print-me x)) lst)
+   ;; (mapcar 'tmp-print-me lst)
+   )
+ )
 
 (defmacro run-on-each-macro-zip ((&rest cmd) &rest arg-lists)
   "Zips the arg-lists together and applies `cmd' on this list.

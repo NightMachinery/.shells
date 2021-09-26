@@ -2,6 +2,7 @@
 org_props_folded=$'\n:PROPERTIES:\n:visibility: folded\n:END:\n'
 ##
 typeset -g lilf_ip="82.102.11.148"
+typeset -g lilf_user="eva"
 ##
 WORDLIST0='/usr/share/dict/words'
 ##
