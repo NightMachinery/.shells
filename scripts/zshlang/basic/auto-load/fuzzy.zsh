@@ -149,6 +149,7 @@ function fz-q() {
 
     fz --query "$query"
 }
+
 function rg-createquery() {
     local i res=''
     for i in ${@} ; do
@@ -156,6 +157,7 @@ function rg-createquery() {
     done
     ec $res
 }
+
 function fz-createquery() {
     local ugrepMode="$fzp_ug"
     if [[ "$fzp_ug" == ni ]] ; then

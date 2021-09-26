@@ -305,7 +305,7 @@ function v() {
 # this opens a new window for me when the first window opened was not by itself (perhaps a macOS bug?)
 aliasfn vc code-insiders --reuse-window --add # --add: Add a folder or multiple folders to the last active VS Code instance for a multi-root workspace.
 function coder() {
-    local p="$(<<<$1 sd "$HOME" /home/eva)"
+    local p="$(<<<$1 sd "$HOME" /home/${lilf_user})"
     rgeval code-insiders --reuse-window --remote 'ssh-remote+82.102.11.148' "$p"
 }
 aliasfn vcr coder

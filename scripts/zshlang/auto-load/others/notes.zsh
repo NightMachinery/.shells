@@ -20,7 +20,7 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
     convert $file -define jpeg:extent=150kb $compressed # 200kb didn't work
     file=$compressed
     doc use base64 from brew to ensure consistency
-    ## python base64 (might work in eva):
+    ## python base64 (might work in ${lilf_user}):
     # encoded_string= base64.b64encode(img_file.read())
     # print(encoded_string.decode('utf-8'))
 

@@ -41,7 +41,7 @@ if test -n "$NP_PASS1" ; then
     tmuxnew naive-zii naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.zii.lilf.ir" --log  --concurrency=4
 fi
 if test -n "$NP_PASS0" ; then
-    tmuxnew naive-eva naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
+    tmuxnew naive-${lilf_user} naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
 fi
 
 if isMe ; then

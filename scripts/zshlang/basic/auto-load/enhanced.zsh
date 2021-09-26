@@ -5,7 +5,7 @@ cp() {
     enh-mkdest "$@"
 }
 ##
-h_mv() {
+function h_mv() {
     local emd_c='command mv'
     if isIReally && isRcLoaded && fn-isTop mv ; then
         emd_c='mv-merge'
@@ -13,7 +13,8 @@ h_mv() {
     fi
     enh-mkdest "$@"
 }
-mv () {
+
+function mv () {
     unset out # out is GLOBAL
     args-nochromefile "$@"
     set -- "${out[@]}"
@@ -27,6 +28,8 @@ mv () {
             return 1
         }
         # bash: read -ei "$1" newfilename
+
+        mkdir -p "$(bottomdir "$newfilename")"
         command gmv -v -- "$1" "$newfilename" @RET
         out="$newfilename"
     fi

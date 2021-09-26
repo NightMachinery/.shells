@@ -14,7 +14,7 @@ function tag-filter-date-past {
 
     local tags=(${tag_filter_date_past_tags[@]})
     if (( ${#tags} == 0 )) ; then
-        tags=('futurecron' 'tofuture')
+        tags=('futurecron' 'tofuture' 'garbageCollectMe' 'GCMe' 'toGarbageCollect' 'toGC') # case-insensitive
     fi
 
     local i tags_with_prefix=()
@@ -45,7 +45,7 @@ function tag-filter-date-past-fz {
 
 function h-tag-filter-date-fz-nts-engine {
     local fz_query
-    fz_query="$(fz-createquery "${tag_filter_date_past_fz_query[@]}")"
+    fz_query="$(fzp_ug="${fzp_ug:-ni}" fz-createquery "${tag_filter_date_past_fz_query[@]}")"
     local dirs=(${tag_filter_date_past_dirs[@]})
     assert-args dirs @RET
     local dir_main="${dirs[1]}"

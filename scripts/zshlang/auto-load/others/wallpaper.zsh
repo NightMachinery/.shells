@@ -78,7 +78,10 @@ function wallpaper-set-darwin() {
         if (( $(idle-get) >= 300 )) ; then # (( i == 1 )) &&
             reval-ec killall Dock # This is fairly disruptive, hence the idle check
         fi
-        reval-ec osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"' || return $?
+        local cmd
+        cmd=(osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"')
+        reval-ec awaysh brishz "${cmd[@]}"
+        reval-ec "$cmd[@]" || return $?
         # reattach-to-user-namespace actually made things worse!
 
         sleep 60
@@ -131,7 +134,7 @@ function wallpaper-auto-bing() {
     } always { popf }
 }
 function wallpaper-auto-ipad() {
-    # takes ~9 minutes on eva
+    # takes ~9 minutes on ${lilf_user}
     fnswap wallpaper-set wallpaper-overlay-ipad wallpaper-auto
 }
 ##

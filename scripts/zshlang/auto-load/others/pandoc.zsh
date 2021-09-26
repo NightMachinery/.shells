@@ -14,6 +14,10 @@ function org2md() {
     @opts from org to markdown @ pandoc-convert "$@"
 }
 
+function org2epub() {
+    @opts from org to epub @ pandoc-convert "$@"
+}
+
 function org2plain() {
     @opts from org to plain @ pandoc-convert "$@"
 }

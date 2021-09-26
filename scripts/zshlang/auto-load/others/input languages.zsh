@@ -6,17 +6,19 @@ export persian_chars="ضصثقفغعهخحجچشسیبلاتنمکگظطزرذد
 export en_chars="qwertyuiop[]asdfghjkl;'zxcvbnm,.QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?@#\$%^&()_1234567890"
 ##
 function per2en() {
-    gsed "y/$persian_chars/$en_chars/"
+    cat-paste-if-tty | gsed "y/$persian_chars/$en_chars/" | cat-copy-if-tty
 }
 aliasfn p2e per2en
-function ppe() { pbpaste | reval-copy per2en }
+
+# function ppe() { pbpaste | reval-copy per2en }
 
 function en2per() {
-    gsed "y/$en_chars/$persian_chars/"
+    cat-paste-if-tty | gsed "y/$en_chars/$persian_chars/" | cat-copy-if-tty
 }
 aliasfn e2p en2per
-function pep() { pbpaste | reval-copy en2per }
 
+# function pep() { pbpaste | reval-copy en2per }
+##
 function lang-toggle() {
     local out="$*" to=US
     # if [[ "$persian_exc_chars" == *"${out[1]:-A}"* ]]
