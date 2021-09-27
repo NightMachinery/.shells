@@ -292,7 +292,3 @@ function emc-html-viewer() {
     emc "$tmp"
 }
 ##
-function irc-sees {
-    indir "${nightNotes}/private/configs/zii/.znc/moddata/log/greyrat/" seesall "$@"
-}
-##
