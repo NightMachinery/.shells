@@ -42,6 +42,8 @@
                  record)
 
               (re-mz (var-to-int _ 1) (year month day line-number hour minute second))
+              (setq prefix (or prefix ""))
+              (setq text (or text ""))
               (let ((msg (serapeum:dict
                           :prefix prefix
                           :chat chat
