@@ -91,7 +91,7 @@
               (text (gethash :text msg))
               (prefix (gethash :prefix msg)))
           ;; (format t "~a~%" msg)
-          (format t "~a/~a/~d-~d-~d.log:~d:[~d:~d] <~a> ~a~%" prefix chat year month day line-number hour minute sender text))))))
+          (format t "~a~a/~4,'0d-~2,'0d-~2,'0d.log:~d:[~2,'0d:~2,'0d] <~a> ~a~%" prefix chat year month day line-number hour minute sender text))))))
 ;;;
 (defun main ()
   (let*
