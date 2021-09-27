@@ -492,6 +492,7 @@ function rem-rec() {
     }
     fnswap isColor true ecbold "$0: finished" &>/dev/tty
 }
+
 function rem-reclater() {
     local later="${1:? later required}" ; shift
     local cmd="$(gq "$@")"

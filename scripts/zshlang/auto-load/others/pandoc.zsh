@@ -43,7 +43,12 @@ function html2org() {
     local input="${1}" o_format="${html2org_f:-org}"
     if test -z "$input" ; then
         input="$(gmktemp)"
-        pbpaste-html > "$input" @RET
+
+        if isInTty ; then
+            assert pbpaste-html > "$input" @RET
+        else
+            assert cat > "$input" @RET
+        fi
     fi
 
     @opts from html to "$o_format" @ pandoc-convert "$input" "${@[2,-1]}"

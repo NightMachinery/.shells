@@ -76,6 +76,10 @@ function case-title {
 ##
 function prefix-rm {
     local prefixes=("$@")
+    if (( ${#prefixes} == 0 )) ; then
+        cat
+        return $?
+    fi
 
     # @todo @perf add multiple prefix removal to prefixer
     local p cmd=''

@@ -1,4 +1,6 @@
 function h-grep-output-to-fz {
+    # @exampleUsages irc-sees
+    ##
     : 'GLOBAL inputs: fzp_ug [ntsearch_lines_pattern_default]'
     : 'GLOBAL outputs: out, acceptor'
     unset out
@@ -53,6 +55,7 @@ function h-grep-output-to-fz {
         if isI ; then
             read -d $'\0' -r acceptor
         fi
+        # dvar acceptor
 
         out="$(cat)"
         if isI || test -z "$fzp_ug" ; then
