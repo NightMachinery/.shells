@@ -7,7 +7,7 @@ function irc-chatlog-dir-get {
     local d="${znc_dir}"
     if test -z "$d" ; then
       if isServer ; then
-        d=~/.znc/moddata/log
+        d=~/.znc/moddata
       else
         d="$(ffz-get chat_logs/znc)" @TRET
       fi
