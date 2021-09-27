@@ -30,7 +30,7 @@ function ugbase() {
 function ugbool() {
     local q="${*:-.}"
 
-    ugbase --bool "$q"
+    ugbase --bool -- "$q"
 }
 noglobfn ugbool
 alias ugb='\noglob ugbool'

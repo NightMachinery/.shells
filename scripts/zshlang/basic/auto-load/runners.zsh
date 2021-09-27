@@ -46,7 +46,7 @@ aliasfn skipin skipemptyin
 ##
 function indir() {
     # we are not handling the autocompletion system at all
-    local origfile="$1" dir="$(bottomdir "$1")" cmd=("${@:2}") origPWD=$PWD
+    local origfile="$1" dir="$(bottomdir "$1")" cmd=("${@:2}") cd_engine="${indir_cd_engine:-cdz}" origPWD=$PWD
     { test -e "$origfile" && test -d "$dir" } || {
         ##
         # ecerr "$0: '$origfile' is invalid (probably doesn't exist)"
@@ -56,15 +56,15 @@ function indir() {
     }
 
     if test -z "$cmd[*]" ; then
-        cdz "$dir" || return $?
+        "${cd_engine[@]}" "$dir" || return $?
         return 0
     # elif [[ "$cmd[1]" == 'cd' ]] ; then
-    #     cdz "$dir" || return $?
+    #     "${cd_engine[@]}" "$dir" || return $?
     #     reval "${cmd[@]}"
     #     return $?
     fi
 
-    cdz "$dir" || return $?
+    "${cd_engine[@]}" "$dir" || return $?
     local dir_final=$PWD
     {
         reval "${cmd[@]}"
@@ -79,9 +79,13 @@ alias in=indir # best reserved for interactive use
 
 function indir-mkdir {
     mkdir -p "$1" @TRET
-    indir "$@"
+    indir-exists "$@"
 }
 aliasfn indirm indir-mkdir
+
+function indir-exists {
+    @opts cd_engine cd @ indir "$@" # @todoing
+}
 ##
 typeset -ag exit_traps=( 0 INT TERM HUP EXIT ) # '0' alone seems enough though https://stackoverflow.com/questions/8122779/is-it-necessary-to-specify-traps-other-than-exit
 alias trapexits='setopt localtraps ; trap "" $exit_traps[@]'

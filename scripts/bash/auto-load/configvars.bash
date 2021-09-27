@@ -1,6 +1,9 @@
 ##
 org_props_folded=$'\n:PROPERTIES:\n:visibility: folded\n:END:\n'
 ##
+typeset -g irc_networks=('Libera')
+typeset -xgT IRC_USERNAMES irc_usernames=('greyrat' 'lucerne') '|'
+##
 typeset -g lilf_ip="82.102.11.148"
 typeset -g lilf_user="eva"
 ##

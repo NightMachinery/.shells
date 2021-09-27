@@ -25,7 +25,7 @@ function tag-filter-date-past {
     ensure-array tag_filter_date_past_opts
     local opts=("${tag_filter_date_past_opts[@]}")
 
-    revaldbg @opts opts [ --no-binary --smart-case --engine auto --no-messages --with-filename --line-number "$opts[@]" "$dirs[@]" ] @ rg-literal-or "${tags_with_prefix[@]}" | {
+    revaldbg @opts opts [ --no-binary --ignore-case --engine auto --no-messages --with-filename --line-number "$opts[@]" "$dirs[@]" ] @ rg-literal-or "${tags_with_prefix[@]}" | {
         @opts tags [ "$tags[@]" ] @ tag-filter-date-past-stdin
     } | prefix-rm "$dir_main" | {
         if isOutTty ; then
@@ -39,6 +39,13 @@ function tag-filter-date-past {
 }
 ##
 function tag-filter-date-past-fz {
+    ## @duplicateCode/9b1ee07ae5a22f2541ba9353dfe72419
+    local dirs=(${tag_filter_date_past_dirs[@]})
+    assert-args dirs @RET
+    local dir_main="${dirs[1]}"
+    local nightNotes="${dir_main}"
+    ##
+
     tag_filter_date_past_fz_query=("$@") @opts engine [ h-tag-filter-date-fz-nts-engine ]  @ ntsearch-lines
 }
 @opts-setprefix tag-filter-date-past-fz tag-filter-date-past
@@ -46,9 +53,13 @@ function tag-filter-date-past-fz {
 function h-tag-filter-date-fz-nts-engine {
     local fz_query
     fz_query="$(fzp_ug="${fzp_ug:-ni}" fz-createquery "${tag_filter_date_past_fz_query[@]}")"
+
+    ## @duplicateCode/9b1ee07ae5a22f2541ba9353dfe72419
     local dirs=(${tag_filter_date_past_dirs[@]})
     assert-args dirs @RET
     local dir_main="${dirs[1]}"
+    local nightNotes="${dir_main}"
+    ##
 
     tag-filter-date-past "$@" | @opts dir_main "$dir_main" query "$fz_query" @ h-grep-output-to-fz
     # @maybe add ugbool_query between these two

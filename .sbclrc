@@ -34,6 +34,7 @@
  (ec "Hello" "Jungle" '(1 2 3) "hoo!"))
 ;;;
 (alias-fn argv-get uiop:command-line-arguments) ;; get CLI arguments
+(alias-fn getenv uiop:getenv)
 ;;;
 (defstruct cmd-result
   out
