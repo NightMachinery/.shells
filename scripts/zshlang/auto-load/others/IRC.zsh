@@ -22,7 +22,7 @@ function irc-ugb {
     local d
     d="$(irc-chatlog-dir-get)" @TRET
 
-    indir-exists "$d" @opts follow y @ ugbase --hidden '--binary-files=without-match' --with-filename --line-number --bool -- '-"-SaslServ-" -"-NickServ-" -"*** Quits:" -"*** Joins:"  greyrat|lucerne '"$query"
+    indir-exists "$d" @opts follow y @ ugbase --hidden '--binary-files=without-match' --with-filename --line-number --bool -- '-"-SaslServ-" -"-NickServ-" -"*** Quits:" -"*** Joins:" '"$IRC_USERNAMES $query" | irc-log-sort.lisp
 }
 @opts-setprefix irc-ugb irc_sees
 ##
