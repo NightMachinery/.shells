@@ -963,7 +963,9 @@ function getlinks-uniq() {
 ##
 function url-filename() {
     : "works with multiple URLs already"
-    curlm --head "$@" | rget 'Content-Disposition:.*filename="(.*)"'
+    curlm --head "$@" | \
+        @opts r '$1$2' @ rget \
+        'content-disposition:.*filename=\s*(?:"(.*)"|(.*))'
 }
 
 function url-size() {

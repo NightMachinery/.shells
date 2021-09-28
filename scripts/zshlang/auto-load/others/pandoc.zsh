@@ -14,7 +14,17 @@ function org2md() {
     @opts from org to markdown @ pandoc-convert "$@"
 }
 
+function org2json() {
+    @opts from org to json @ pandoc-convert "$@"
+}
+
+function json2org() {
+    @opts from json to org @ pandoc-convert "$@"
+}
+
 function org2epub() {
+    : "@todo0 add title and author"
+
     @opts from org to epub @ pandoc-convert "$@"
 }
 

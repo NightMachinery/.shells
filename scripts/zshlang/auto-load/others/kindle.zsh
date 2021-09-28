@@ -35,8 +35,11 @@ function aap() {
 }
 
 function aab() {
+    local url="$1"
+    assert-args url @RET;
+
     local aaMark="$(uuidm)"
-    aaMark="$aaMark" aa --on-download-complete aa-toKindle.zsh "$1"
+    aaMark="$aaMark" aa-remotename --on-download-complete aa-toKindle.zsh "$url"
     till-file "$aaMark"
 }
 renog aab
