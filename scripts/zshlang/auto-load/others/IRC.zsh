@@ -26,6 +26,14 @@ function irc-ugb {
 }
 @opts-setprefix irc-ugb irc_sees
 ##
+function irc-sees-autoupdate() { # @useme
+    local minutes="${irc_sees_mins:-30}"
+
+    : "use 'RET' to exit"
+    reval-ec retry reval-timeout $((minutes * 60)) irc-sees "$@"
+}
+@opts-setprefix irc-sees-autoupdate irc_sees
+
 function irc-sees {
     # local irc_sees_fz_query=("$@")
 

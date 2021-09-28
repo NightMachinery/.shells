@@ -148,3 +148,10 @@ function gsync-extra-private() {
 function cp2tmp() {
     rsp-dl "$@" ~"/Base/_Local TMP/"
 }
+##
+function cdtmp {
+    local name="$*"
+
+    reval-ec cdm ~tmp/"${name}_cdtmp_$(uuidm)"
+}
+##
