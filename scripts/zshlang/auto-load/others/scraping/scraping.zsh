@@ -76,8 +76,10 @@ function curlm() {
         opts+='--silent'
     fi
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
-    $proxyenv curl --header "$useragent_chrome" --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
+    # --suppress-connect-headers is needed so that `curlm --head ...` requests are parseable.
+    $proxyenv curl --suppress-connect-headers --header "$useragent_chrome" --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
 }
+
 function curl-dl() {
     ##
     # curl doesn't preallocate (see, e.g., https://curl.se/mail/archive-2014-02/0007.html)
@@ -714,11 +716,17 @@ function 2epub-pandoc-simple() {
     : "This works for any files that have the correct extension, or if you set the format explicitly."
     : "<name> <author> (<file with ext> OR <pandoc-opt>) ..."
 
-    local title="$(<<<$1 gtr '/' '.')"
-    local author="$(<<<$2 gtr '/' '.')"
+    local title
+    title="$(<<<$1 str2pandoc-title)" @TRET
+    local author
+    author="$(<<<$2 str2pandoc-title)" @TRET
+    local dest="${pandoc_convert_dest:-$title.epub}"
 
-    pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub"
+    pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$dest" >&2
+
+    grealpath -e "$dest"
 }
+@opts-setprefix 2epub-pandoc-simple pandoc_convert
 aliasfn html2epub-pandoc-simple 2epub-pandoc-simple
 
 function 2epub-pandoc-byext () {
@@ -730,14 +738,22 @@ function 2epub-pandoc-byext () {
     local txts=()
     local i
     for i in "$files[@]" ; do
-        local t="$(gmktemp --suffix ."$ext")"
-        cp "$i" "$t"
+        local t
+        t="$(gmktemp --suffix ."$ext")" @TRET
+        cp "$i" "$t" >&2 @TRET
         txts+="$t"
     done
     2epub-pandoc-simple "$title" "$author" "$txts[@]"
 }
+
 aliasfn txt2epub-pandoc PANDOC_EXT=txt 2epub-pandoc-byext
 aliasfn md2epub-pandoc PANDOC_EXT=md 2epub-pandoc-byext
+aliasfn org2epub-pandoc PANDOC_EXT=org 2epub-pandoc-byext
+# function org2epub() {
+#     @opts from org to epub @ pandoc-convert "$@"
+# }
+aliasfn org2epub org2epub-pandoc
+
 function aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
     aget "aa -Z $(gquote "${@:2}")
@@ -759,11 +775,13 @@ function w2e-code-old() {
     doc DEPRECATED: The html produced is not bad but after conversion we lose newlines which just sucks.
     we_dler=wread-code w2e "$1" "${(@f)$(gh-to-raw "${@:2}")}"
 }
+
 function w2e-code() {
     mdocu '<name> <url> ...' MAGIC
     aget aa -Z "$(gquote "${(@f)$(gh-to-raw "${@:2}")}")" \; code2epub "$1:q" '*' \; mv ${1:q}.epub ../
     p2k ${1}.epub
 }
+
 function code2md() {
     local i
     for i in "$@"
@@ -776,12 +794,6 @@ function code2md() {
  $(cat $i)
 "'```'
     done
-}
-
-function html-get-reading-estimate() {
-    local est
-    est="$(cat "$1" | readtime.js)"
-    ec "$(ec $est|jqm .humanizedDuration) ($(ec $est|jqm .totalWords) words)"
 }
 
 function merge-html() {
@@ -930,8 +942,19 @@ function urlfinalg1() {
 }
 noglobfn urlfinalg1
 
-# aliasfn urlfinalg urlfinalg1
-aliasfn urlfinalg urlfinalg2
+function urlfinalg {
+    local inargs
+    inargs="$(in-or-args "$@")" @RET
+
+    local res
+    if ! res="$(ec "$inargs" | urlfinalg2)" ; then
+        ecerr "$0: urlfinalg2 failed. Retrying with urlfinalg1 ..."
+
+        res="$(ec "$inargs" | urlfinalg1)" @TRET
+    fi
+    ec "$res"
+}
+
 aliasfn url-final-gateway urlfinalg
 noglobfn urlfinalg
 ##
@@ -961,11 +984,23 @@ function getlinks-uniq() {
     getlinks-c "$@" | gsort --unique
 }
 ##
+function http-headers-to-json() {
+    http_headers_to_json.py
+}
+
 function url-filename() {
     : "works with multiple URLs already"
+    local python_parser="${url_filename_p}"
+
     curlm --head "$@" | \
-        @opts r '$1$2' @ rget \
-        'content-disposition:.*filename=\s*(?:"(.*)"|(.*))'
+        {
+            if bool "$python_parser" ; then
+                 http-headers-to-json | jqm '."content-disposition"[0].filename'
+            else
+                @opts r '$1$2' @ rget \
+                    'content-disposition:.*filename=\s*(?:"(.*)"|(.*))'
+            fi
+        }
 }
 
 function url-size() {

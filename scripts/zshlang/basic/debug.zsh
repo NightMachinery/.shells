@@ -114,16 +114,21 @@ function rederr-old() {
     {
         # eval "$(gquote "$@")" 2>&1 1>&3|sed $'s,.*,\e[31m&\e[m,'1>&2
         eval "$(gquote "$@")" 2>&1 1>&3|color "${errcol[@]:-red}" 1>&2
+        local retcode=$?
     } 3>"$out"
     cat "$out"
-    silent \rm "$out"
+    silent trs-rm "$out"
+
+    return $retcode
 }
 
 rederr() {
     comment this is basically raise-blood but for just one command
     exec 3>&2 2> >(color_err)
     reval "$@"
+    local retcode=$?
     exec 2>&3 3>&-
+    return $retcode
 }
 
 color_err () {

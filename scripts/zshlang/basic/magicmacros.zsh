@@ -13,6 +13,9 @@ alias -g 'MAGIC'='| { eval "$(< /dev/stdin)" }'
 
 alias -g '@RET'=' || return $?'
 
+
+alias -g '@STRUE'=' || { ectrace_single_trace=y ectrace_ret=$? ectrace ; true }'
+
 alias -g '@TRET'=' || { local retcode=$? ; ectrace_single_trace=y ectrace_ret=$retcode ectrace ; return $retcode }' # "$0: TRET encountered"
 
 alias -g '@MRET'='"$0" || return $?'

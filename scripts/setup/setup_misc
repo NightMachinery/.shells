@@ -30,11 +30,14 @@ gem specific_install -l https://github.com/NightMachinary/fyodor.git
 pig https://github.com/NightMachinary/BrishGarden.git
 pig git@github.com:NightMachinary/brish.git
 
-pi git+https://github.com/n8henrie/pycookiecheat.git@dev
+pip-install git+https://github.com/n8henrie/pycookiecheat.git@dev
 
-pi git+git://github.com/fretboardfreak/kitty-theme-changer.git@master
+pip-install git+git://github.com/fretboardfreak/kitty-theme-changer.git@master
 
 pip install git+git://github.com/reinderien/mimic.git
+
+pip-install spacy
+python -m spacy download en_core_web_sm # ~14MB
 ###
 nimble install --accept https://github.com/NightMachinary/htmlmetadata
 

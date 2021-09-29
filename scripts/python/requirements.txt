@@ -7,7 +7,6 @@ convertdate
 coursera-dl
 daudin
 ddgr
-dephell[full]
 ezgmail
 fanficfare
 fastapi[all]
@@ -85,3 +84,4 @@ xkcdpass
 yapf
 yq
 zxcvbn
+kiss-headers

@@ -22,12 +22,6 @@ function json2org() {
     @opts from json to org @ pandoc-convert "$@"
 }
 
-function org2epub() {
-    : "@todo0 add title and author"
-
-    @opts from org to epub @ pandoc-convert "$@"
-}
-
 function org2plain() {
     @opts from org to plain @ pandoc-convert "$@"
 }
