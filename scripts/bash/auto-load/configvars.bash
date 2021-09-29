@@ -46,7 +46,9 @@ mkdir -p "$PURGATORY"
 export cellar=~/cellar
 
 export music_dir="$HOME/my-music"
-export playlist_dir="$HOME/playlists"
+export playlist_dir="${music_dir}/playlists"
+export playlist_auto_dir="${playlist_dir}/autopl/"
+# export songs_dir='/Volumes/hyper-diva/Songs' # @hardCoded @DarwinOnly
 PRUNE_SONGD_DAYS="+120"
 export GREENCASE_DIR="$BASE_DIR/music/greencase"
 

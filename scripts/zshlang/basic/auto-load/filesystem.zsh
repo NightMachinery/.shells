@@ -17,8 +17,32 @@ function cdm() {
 }
 ##
 function bottomdir() {
-    { { [ -e "$1" ]  && ! [ -d "$1" ] } || { ! [ -e "$1" ] && [[ "$1" != */ ]] } } && { ec "${1:h}"; } || { ec "$1"; }
+    # I have tried to output the dir without its trailing '/'
+    ##
+    local empty="${bottomdir_empty-.}"
+
+    local out
+    if [ -e "$1" ] && ! [ -d "$1" ] ; then
+        out="${1:h}"
+    else
+        if [[ "$1" =~ '^(.+)/$' ]] ; then
+            out="$match[1]"
+        elif [ -e "$1" ] ; then
+            out="$1"
+        elif [[ "$1" == */* ]] ; then
+            out="${1:h}"
+        else
+            out="$empty"
+        fi
+    fi
+
+    ec "${out}"
+    ## @bugs
+    # `bottomdir ./non-existent/..`
+    #   (The same bug exists in 'bottomfile'.)
+    ##
 }
+
 function bottomfile() {
     local name="$1"
 
@@ -26,6 +50,10 @@ function bottomfile() {
         local dir="$(bottomdir "$name")"
         ecn "$name" | prefixer -r "${dir}" | sd '^/*' ''
     fi
+    ## @bugs
+    # `bottomfile /non-existent/..`
+    #   It's hard to solve these bugs, and this usage is not really intended.
+    ##
 }
 ##
 function dir-rmprefix() {

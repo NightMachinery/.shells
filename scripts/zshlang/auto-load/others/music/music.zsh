@@ -87,22 +87,17 @@ function songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
 
     bella_zsh_disable1
-    local f
-    f=()
-    # re 'ecdbg arg:' 'start:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}"
     local p="${@: -1}"
     if test -z "${p##-*}" ; then
         set -- $@ '.' #Don't quote or you'll get ''s.
         p='.'
     fi
     local f2="$(playlister "$p")"
-    f+=( ${(@f)f2} )
-    local autopl="${playlist_dir}/autopl/"
-    mkdir -p "$autopl"
-    gfind "$autopl" -mindepth 1 -type f -mtime +3 -delete
-    test $#f -gt 1 && ec "$f2" > "$autopl/$(date)"
-    # re 'ecdbg arg:' 'end:' "all args:" "$@" '${@:1:-1}' "${@:1:-1}" "f begins" "${(@f)f}" 
-    ! test -z "$f" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
+    local f=( ${(@f)f2} )
+
+    playlist-auto-create "${f[@]}"
+
+    ! test -z "$f[*]" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
 
 function touch-tracks() {
@@ -138,13 +133,13 @@ playlistc() {
     bella_zsh_disable1
 
     local pl
-    pl="$(fd --follow -t f '.' "${playlist_dir}" | fz -q "$*")" @RET
+    pl="$(fd --follow -t f '.' "${playlist_dir}" | fz -q "$(fz-createquery "$@")")" @RET
 
     ec "Playing playlist(s) $pl"
     hearp +s "${(@f)pl}"
 }
 
-playlister() {
+function playlister() {
     : "outputs a list of files (a playlist) on stdout"
 
     bella_zsh_disable1
@@ -269,7 +264,8 @@ songd() {
         }
     }
 }
-hearp() {
+
+function hearp() {
     local shuf='--shuffle'
     test "${1}" = '+s' && {
         shuf=''
@@ -302,14 +298,6 @@ mu() {
     songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
 muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*" }
-##
-function playlist-save() {
-    # Save Playlist save-playlist save-pl
-    local autopl="${playlist_dir}/autopl/"
-
-    mv "$(last-created "$autopl")" "${playlist_dir}/$1"
-}
-aliasfn pls playlist-save
 ##
 function sdlg() {
     ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1

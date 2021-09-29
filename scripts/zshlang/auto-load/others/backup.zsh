@@ -163,4 +163,8 @@ function backup-vimium {
 function backup-stylus {
     dl onlc mv2 ~nt/private/backups/userstyles/stylus.json
 }
+
+function backup-sftpgo {
+    dl onlc mv2 ~nt/private/backups/sftpgo/sftpgo.json
+}
 ##

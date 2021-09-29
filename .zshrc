@@ -353,7 +353,7 @@ function nightsh-load-zshrc() {
   YSU_MESSAGE_POSITION="after"
   YSU_MESSAGE_FORMAT="$(tput setaf 1)found %alias_type for %command: %alias$(tput sgr0)"
   YSU_MODE=ALL #BESTMATCH or ALL
-  YSU_IGNORED_ALIASES=("g" "ll")
+  YSU_IGNORED_ALIASES=("g" "ll" "o")
   source-plugin "MichaelAquilina/zsh-you-should-use"
 
   function _check_aliasfns() { # @dep/private

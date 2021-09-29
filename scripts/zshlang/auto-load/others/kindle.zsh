@@ -77,8 +77,11 @@ dir2k() {
     skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
     skipglob "re p2ko" $dir/*.pdf(N)
 }
+
 function p2k() {
-    doc possibly send to kindle
+    : "possibly send to kindle"
+    : "stdout: the new name of the input file, if not deleted"
+
     jglob
     local delOrig="${pkDel}"
     local pk_no="${pk_no}"
@@ -92,20 +95,29 @@ function p2k() {
     }
 
     if test -z "$delOrig" ; then
-        silent ebook-cover $1 "${1:r}".jpg
-        local nn="$(rename-ebook "$1")"
-        # Telegram or Telethon doesn't support filenames bigger than 64.
+        silent ebook-cover "$1" "${1:r}".jpg
+        local nn
+        nn="$(rename-ebook "$1")" @TRET
+
+        ## Telegram or Telethon doesn't support filenames bigger than 64.
         local nnt="$nn:t"
         ecdbg "nnt: $nnt"
         if (( ${#nnt} > 64 )) ; then
-            assert command mv "$nn" "${nn:h}/$(<<<${nnt[1,59]} trimsed).${nn:e}" @RET
+            local dest
+            dest="${nn:h}/$(<<<${nnt[1,59]} trimsed).${nn:e}" @TRET
+            assert command mv "$nn" "$dest" @RET
+            nn="$dest"
         fi
+        ##
+
+        ec "$nn"
         return 0
     else
         silent trs-rm "$1"
     fi
 }
-p2ko() {
+
+function p2ko() {
     doc possibly send to kindle
     silent pdf-cover "$1"
     [[ -n "$pk_no" ]] || {
