@@ -98,6 +98,7 @@ function tty-link() {
     # `tty-link ~/tmp "Temp dir"`
     ##
 }
+aliasfn tui-link tty-link
 ##
 function escape-code-answer-read() {
     local timeout=''

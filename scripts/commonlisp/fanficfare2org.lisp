@@ -8,12 +8,8 @@
   (when (probe-file init-file)
     (load init-file)))
 ;;;
-;; (ql:system-apropos "jsown")
-;;;
 (with-output-to-string (*standard-output* nil)
-  (ql:quickload "jsown")
   (ql:quickload "alexandria")
-  (ql:quickload "serapeum")
   (ql:quickload "cl-heredoc"))
 
 (set-dispatch-macro-character #\# #\> #'cl-heredoc:read-heredoc)
@@ -299,59 +295,43 @@
 
     (defparameter in (alexandria:read-stream-content-into-string *standard-input*)))
 
-(defparameter d (jsown:parse in))
-;; (serapeum:defalias v #'jsown:val-safe)
+(defparameter d (json-parse in))
 (defun v (key)
-  (jsown:val-safe d key))
+  (json-get d key))
 ;;;
-;; (v "author")
-;; (defparameter author (v "author"))
-
 (progn
-  (write-line (concatenate 'string
-                           "[[" (v "storyUrl") "]["
-                           (cmd-result-outrs
-                            (brishz-ll :args '("str2orgtitle")
-                                       :input (v "title")))
-                           "]]"))
-  (format *standard-output* ":PROPERTIES:~%")
-  (dolist (p '( ;; "threadmarks_title"
-               "author" "authorUrl"
-               "series" "seriesUrl"
-               "status" "threadmarks_status"
-               "numWords" "estimatedWords"
-               "chapterslashtotal" "numChapters"
-               "datePublished" "dateUpdated"
-               "stars" "likes" "dislikes" "kudos" "reviews" "favs" "follows"
-               "views" "total_views" "hits"
-               "ships"
-               "fandoms"
-               "ao3categories"
-               "freeformtags" "forumtags" "genre" "extratags" ;; `freefromtags' is a compat-shim for `freeformtags'
-               "rating"
-               "characters"
-               "short_description" "threadmarks_description"
-               "groups"
-               "prequel" "sequels"
-               ;; "comment_count"
-               "authorLastLogin"
-               "storyId"
-               "cover_image"))
-    (let ((val (v p)))
-      (when (and val (not (equalp val "")))
-        (format *standard-output* "~a" (concatenate 'string
-                                                    ":" p ": "
-                                                    val ;; @assumes val contains no newlines
-                                                    (string #\newline))))))
-  (format *standard-output* ":visibility: folded~%")
-  (write-line ":END:")
-  (let ((desc (v "description")))
-    (when desc
-      (format *standard-output*
-              "~%#+BEGIN_QUOTE~%~a~%#+END_QUOTE~%"
-              (cmd-result-outrs (brishz-ll :args '("html2org" "/dev/stdin") :input desc)))
+  (let ((title (v "title"))
+        (url (v "storyUrl")))
+    (org-link-write :url url :title title)
+    (ec))
 
-      (comment
-        (format *standard-output* "~%#+BEGIN_EXPORT html~%~a~%#+END_EXPORT~%"
-                desc)))))
+  (let ((out_stream *standard-output*)
+        (accessor #'v)
+        (keys '(;; "threadmarks_title"
+                "author" "authorUrl"
+                "series" "seriesUrl"
+                "status" "threadmarks_status"
+                "numWords" "estimatedWords"
+                "chapterslashtotal" "numChapters"
+                "datePublished" "dateUpdated"
+                "stars" "likes" "dislikes" "kudos" "reviews" "favs" "follows"
+                "views" "total_views" "hits"
+                "ships"
+                "fandoms"
+                "ao3categories"
+                "freeformtags" "forumtags" "genre" "extratags" ;; `freefromtags' is a compat-shim for `freeformtags'
+                "rating"
+                "characters"
+                "short_description" "threadmarks_description"
+                "groups"
+                "prequel" "sequels"
+                ;; "comment_count"
+                "authorLastLogin"
+                "storyId"
+                "cover_image")))
+    (org-properties-write :keys keys :accessor accessor :out_stream out_stream))
+
+  (let ((desc (v "description")))
+    (org-quote-write :content (html2org desc))
+    ))
 ;;;

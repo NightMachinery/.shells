@@ -128,7 +128,7 @@ function pdf-compress-gray() {
 
     local input="${1}"
     local out="${2:-${input:r}_cg.pdf}"
-    local dpi="${pdf_compress_gray_dpi:-90}"
+    local dpi="${pdf_compress_gray_dpi:-150}"
 
         # -dEmbedAllFonts=true \
         # -dSubsetFonts=true \

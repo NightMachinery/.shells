@@ -77,7 +77,7 @@ function cdz() {
 }
 ##
 function ensure-dir() {
-    mkdir -p "$(bottomdir $1)"
+    mkdir -p -- "$(bottomdir $1)"
 }
 reify ensure-dir
 ##
@@ -187,6 +187,18 @@ function dest-overwrite-p {
                 fi
             fi
         fi
+    done
+}
+##
+function cp-tmp {
+    local files=($@)
+
+    local file tmp
+    for file in $files[@] ; do
+        tmp="$(gmktemp --suffix=".${file:e}")" @TRET
+        cp "$file" "$tmp" >&2 @TRET
+
+        ec "$tmp"
     done
 }
 ##

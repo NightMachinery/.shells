@@ -9,6 +9,7 @@
 (with-output-to-string (*standard-output* nil)
   ;; (ql:quickload "unix-opts")
   (ql:quickload :cl-ppcre)
+  (ql:quickload "jsown")
   )
 ;;;
 (setf sb-impl::*default-external-format* :utf-8)
@@ -27,14 +28,22 @@
   "@example (concat \"hi \" \"hmm \" \"()\")"
   (apply #'concatenate 'string strings))
 
+(alias-fn emptyp SB-SEQUENCE:EMPTYP)
+
 (defun ec (&rest things)
-  (loop for thing in things do
-        (format t "~a~%" thing)))
+  (cond
+    ((emptyp things) (format t "~%"))
+    (t (loop for thing in things do
+      (format t "~a~%" thing)))))
 (comment
+ (ec)
  (ec "Hello" "Jungle" '(1 2 3) "hoo!"))
 ;;;
 (alias-fn argv-get uiop:command-line-arguments) ;; get CLI arguments
 (alias-fn getenv uiop:getenv)
+;;;
+(alias-fn json-parse jsown:parse)
+(alias-fn json-get jsown:val-safe)
 ;;;
 (defstruct cmd-result
   out
@@ -90,9 +99,68 @@
 ;;;
 ;; (describe #\LEFT_DOUBLE_QUOTATION_MARK)
 ;;;
-(comment (defun org-title-escape (str)
-           (substitute #\} #\]
-                       (substitute #\{ #\[ str))))
+(defun listify-if-not (possible-lst)
+  (cond
+    ((listp possible-lst) possible-lst)
+    (t (list possible-lst))))
+(comment
+  (listify-if-not 89)
+  (listify-if-not (list 1 2)))
+;;;
+(defun html2org (html)
+  (cmd-result-outrs (brishz-ll :args '("html2org" "/dev/stdin") :input html)))
+
+(defun org-quote-write (&key content (out_stream *standard-output*))
+  (when content
+    (format out_stream
+            "#+BEGIN_QUOTE~%~a~%#+END_QUOTE~%"
+            content)))
+
+(defun org-properties-write (&key
+                               (keys)
+                               (accessor)
+                               (out_stream *standard-output*))
+  (format out_stream ":PROPERTIES:~%")
+  (dolist (p keys)
+    (let ((vals (listify-if-not (funcall accessor p)))
+          (plus_char ""))
+      (loop for val in vals
+            while (and val (not (equalp val "")))
+            do
+               (progn
+                 (format out_stream "~a"
+                         (concatenate 'string
+                                      ":" p plus_char ": "
+                                      val ;; @assumes val contains no newlines
+                                      (string #\newline)))
+                 (setq plus_char "+")))))
+  (format out_stream ":visibility: folded~%")
+  (format out_stream ":END:~%"))
+
+(defun org-link-create (url &optional title)
+  (cond
+    (title
+     (concatenate 'string
+                  "[[" url "]["
+                  (org-title-escape title)
+                  "]]"))
+    (t
+     (concatenate 'string
+                  "[[" url "]]"))))
+
+(defun org-link-write (&key url (title nil) (out_stream *standard-output*))
+  (format out_stream "~a" (org-link-create url title)))
+
+(comment
+  (defun org-title-escape (str)
+    (substitute #\} #\]
+                (substitute #\{ #\[ str)))
+
+  (defun org-title-escape (str)
+    (cmd-result-outrs
+     (brishz-ll :args '("str2orgtitle")
+                :input str))
+    ))
 
 (defun org-title-escape (str)
   (ppcre:regex-replace-all "\\\\*\\]"

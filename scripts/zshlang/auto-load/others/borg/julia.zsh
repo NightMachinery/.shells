@@ -200,16 +200,22 @@ jmv() {
 jrm() {
     test -e "$jufile" && \rm "$jufile"
 }
-jopus() {
+function jopus() {
     jglob
     local u="$1"
     ffmpeg -i "$u" -strict -2 "${u:r}.opus"
     command rm "$u"
     jvoice #actually unnecessary as Telegram sees most (size threshold probably) opus audio as voice messages:))
 }
-jup() {
-    globexists ./**/*(.D) || return 0
-    command mv --update ./**/*(.D) "${1:-./}"
+##
+function jup() {
+    local dest="${1:-./}"
+    local files=(./**/*(.DN))
+    if (( ${#files} == 0 )) ; then
+        return 0
+    fi
+
+    reval-ec command mv --update "${files[@]}" "$dest"
 }
 ##
 function j-image-dl-google() {

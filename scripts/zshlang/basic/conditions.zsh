@@ -226,7 +226,21 @@ function isNotDbg() {
 }
 ##
 function isNet() {
+    ## @alt
     # wget -q --spider http://google.com
+    ##
+    local c="${1:-3}"
+    local i
+    for i in {1..$c} ; do
+        if h-isNet ; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+function h-isNet() {
     ##
     if isDarwin ; then
         ping -q -c 1 -W 400 8.8.8.8 &>/dev/null

@@ -112,5 +112,19 @@ function tt-rename0 {
 }
 @opts-setprefix tt-rename0 tt_rename
 
-aliasfn tt-rename tt-rename0
+aliasfn tt-rename tt-reval-diff tt-rename0
+
+function tt-reval-diff {
+    test -e "$timetracker_db" @TRET
+
+    reval-ec backup-file "$timetracker_db" @TRET
+
+    local old
+    old="$(gmktemp)" @TRET
+    catsql "$timetracker_db" > "$old" @TRET
+
+    reval "$@" @RET
+
+    git-diff "$old" =(catsql "$timetracker_db")
+}
 ##

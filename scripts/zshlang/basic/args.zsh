@@ -79,4 +79,16 @@ function bool() {
         return $?
     fi
 }
+
+function bool-ask {
+    local i="${1:l}" ask_args=("${@[2,-1]}")
+
+    if [[ "${i}" == (a|ask) ]] ; then
+        ask "${ask_args[@]}"
+        return $?
+    else
+        bool "${i}"
+        return $?
+    fi
+}
 ##

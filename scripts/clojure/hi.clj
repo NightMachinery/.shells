@@ -1,3 +1,3 @@
-#! /usr/bin/env clj
+#! /usr/bin/env -S clj -M
 
 (println "Hello World!")

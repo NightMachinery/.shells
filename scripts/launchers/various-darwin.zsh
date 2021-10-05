@@ -50,9 +50,10 @@ if isMe ; then
     # tmuxnew v2ray-behy v2ray -config $nightNotes/private/configs/behy/v2ray/client.json
     ##
     # tmuxnewsh2 trojan trojan -c "$nightNotes"/private/configs/zii/trojan_client.json
-    # tmuxnew trojan-client-v1-zii trojan -c $nightNotes/private/configs/zii/trojan_client_v1.json
-
+    tmuxnew trojan-client-v1-zii trojan -c $nightNotes/private/configs/zii/trojan_client_v1.json
+    ##
     v2-on # v2ray-genrouter
+    ##
     # tmuxnewsh2 socks2http hpts --level info -s 127.0.0.1:1081 -p 1087 # https://github.com/oyyd/http-proxy-to-socks
 fi
 ###

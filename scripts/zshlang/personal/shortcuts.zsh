@@ -95,6 +95,15 @@ aliasdir nt $cellar/notes/
 aliasdir incache ~/base/cache
 aliasdir cac ~/base/cache
 ##
+aliasdir mu "$music_dir"
+
+function path-abbrev-to-music-dir {
+    in-or-args "$@" \
+        | sd '/Volumes/hyper-diva/Songs/' '~mu/Songs/' \
+        | sd "$music_dir/" '~mu/' \
+        | cat-copy-if-tty
+}
+##
 function cellp() {
     brishzr-repeat # now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
 

@@ -22,30 +22,12 @@ function hn2org {
 }
 
 function hn2epub {
-    # @todo0 refactor `org2epub-auto-metadata' out of this
-    ##
     local url="$1"
 
     local org_file
     org_file="$(reval-ec hn2org "$url")" @TRET
 
-    local title
-    title="${org_file:t:r}"
-    title="$(ec "$title" | str2pandoc-title)" @TRET
-    assert-args title @RET
-    local reading_est
-    reading_est="$(cat "$org_file" | count-words-humanfriendly)" @STRUE
-    local url_date
-    url_date="$(url-date "$url")" || true
-
-    local epub_file
-    epub_file="${org_file:h}/${title}.epub"
-    epub_file="$(reval-env-ec pandoc_convert_dest="${epub_file}" org2epub-pandoc "$title" "[${reading_est}] HN $url_date" "$org_file")" @TRET
-
-    epub_file="$(reval-ec p2k "${epub_file}")" @TRET
-
-    grealpath -e "$epub_file"
+    @opts url "$url" author 'HN' @ org2epub-auto-metadata "$org_file"
 }
-
 renog hn2epub
 ##

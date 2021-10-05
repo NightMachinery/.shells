@@ -690,3 +690,7 @@ function bell-visual-flash1() {
     }
 }
 ##
+# aliasfn bell-image-uploaded tts-glados1-cached 'image, uploaded'
+aliasfn bell-image-uploaded tts-glados1-cached 'picture, uploaded'
+# aliasfn bell-image-uploaded bell-pp-attack-rotational
+##

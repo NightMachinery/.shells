@@ -21,9 +21,15 @@ conda-init() {
     fi
 }
 aliasfn cin conda-init
-conda-activate() {
+
+function conda-activate() {
     conda-init
     conda activate "$@"
+
+    if proxy-auto-p ; then
+        # conda will source its own useless 'conda' function wrapper, which we need to again replace by our own proxifier wrapper
+        pxify-command conda
+    fi
 }
 aliasfn cina conda-activate
 ##

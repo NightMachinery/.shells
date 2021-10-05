@@ -10,6 +10,7 @@ function fr() {
     @opts query "${@[-1]}" @ fi-rec "$(gq "${@[1,-2]}")"
     hist-add-self
 }
+
 function fi-rec() {
     magic mdoc "[frConfirm='' frWidget=''] $0 <cmd> [<fd args> ...]
 This function uses eval-memoi." ; mret
@@ -17,6 +18,9 @@ This function uses eval-memoi." ; mret
     local args=("${@:2}") query="$(fz-createquery $fi_rec_query[@])"
     local cmdhead="$1"
     local dir=.
+    dir="$(realpath "$dir")" @TRET
+
+    bella_zsh_disable1
 
     {
     if test -n "$frWidget" ; then
@@ -25,7 +29,7 @@ This function uses eval-memoi." ; mret
     ##
     # reval-onhold wastes ~0.8s, so it's not worth it
     ##
-    sels=( "${(@f)$(memoi_skiperr=y memoi_override_duration=0.3 eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$(realpath "$dir")" |fz --cycle --query "$query")}" )
+    sels=( "${(@f)$(memoi_skiperr=y memoi_override_duration=0.3 eval-memoi fd "${fd_default[@]}" "${args[@]:-.}" "$dir" | prefixer --skip-empty -r "${dir}/" | fz --cycle --query "$query" | prefixer --skip-empty -a "${dir}/")}" ) @RET
 
 
     test -n "$sels" && {
@@ -56,6 +60,8 @@ function ffport() {
     local ports=("$@")
     local filter="${fpFilter:-.*}"
 
+    bella_zsh_disable1
+
     lsport "$ports[@]" | { local line
                            read -d $'\n' -r line
                            ec "$line"
@@ -63,14 +69,20 @@ function ffport() {
     } | fz --with-nth '1,3,5,8,9..' --header-lines 1 | awk '{print $2}'
 }
 aliasfn ffportl fpFilter=LISTEN ffport
+
 function ffps() {
     local query="$(fz-createquery "$@")"
+
+    bella_zsh_disable1
 
     # ps auxww: List all running processes including the full command string
     command ps auxww | fzp --with-nth '11..' --header-lines 1 "$query" | awk '{print $2}'
 }
+
 function ffps-c1() {
     local query="$(fz-createquery "$@")"
+
+    bella_zsh_disable1
 
     ps-children 1 | inargsf command ps -fp | fzp --with-nth '8..' --header-lines 1 "$query" | gawk '{print $2}'
 }
@@ -78,6 +90,8 @@ function ffps-c1() {
 function ffkill() {
     doc "alt: fkill; [fkEngine=ffps] ffkill ..."
     doc "Tip: fnswap kill 'sudo kill'"
+
+    bella_zsh_disable1
 
     local engine=("${(@)fkEngine:-ffps}")
     local kill_engine=("${(@)ffkill_ke:-kill-withchildren}")
@@ -116,6 +130,9 @@ function fftmux() {
     local query="$*"
     local engine=(tmux a -t)
     test -n "$ftE[*]" && engine=("$ftE[@]")
+
+    bella_zsh_disable1
+
     local sessions
     sessions="$(tmux ls|fz --query "$query")" || return $?
     local i
@@ -224,6 +241,8 @@ function fftmux-session-restart {
     fi
     local q="$*"
 
+    bella_zsh_disable1
+
     local session
     sessions="$(fftmux-name "$q")" @RET
     "$engine[@]" "$kill_opts[@]" "$sessions[@]"
@@ -237,6 +256,9 @@ alias fftk='fftmux-session-processes-kill'
 ##
 ffman() {
     # mnf
+    ##
+    bella_zsh_disable1
+
     man -k . | fzf_mru_context="$0" fz --prompt='Man> ' | awk '{print $1}' | rgx '\(\d+\)$' '' | gxargs -r man
 }
 alias ffm=ffman
@@ -256,6 +278,8 @@ function init-vfiles() {
 }
 aliasfn vinit init-vfiles yes
 function v() {
+    bella_zsh_disable1
+
     local q="$* "
     # local q="$(fz-createquery "$@")"
 
@@ -305,6 +329,8 @@ function v() {
 # this opens a new window for me when the first window opened was not by itself (perhaps a macOS bug?)
 aliasfn vc code-insiders --reuse-window --add # --add: Add a folder or multiple folders to the last active VS Code instance for a multi-root workspace.
 function coder() {
+    bella_zsh_disable1
+
     local p="$(<<<$1 sd "$HOME" /home/${lilf_user})"
     rgeval code-insiders --reuse-window --remote 'ssh-remote+82.102.11.148' "$p"
 }
@@ -320,6 +346,9 @@ function vp-ls() {
 }
 function vp() {
     # v pdf
+    ##
+    bella_zsh_disable1
+
     local q="$* "
     # local q="$(fz-createquery "$@")"
 
@@ -327,12 +356,18 @@ function vp() {
 }
 ##
 function fuzzy-choose() {
+    bella_zsh_disable1
+
     : "Usage: arrN <choice> ... | fuzzy-choose query # returns candidates in order"
+
     fuzzyChoose.js "$*" | jqm '.[] | .[1]'
 }
 ##
 function fzinw() {
+    bella_zsh_disable1
+
     doc 'fz in words: allows you to select the part of the output you need from a command. (alt: smenu?)'
+
     local q="$(fz-createquery "$@")"
 
     local res
