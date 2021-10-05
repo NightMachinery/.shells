@@ -91,7 +91,16 @@ function ffz-get() {
     ##
     setopt localoptions pipefail interactivecomments
 
-    local query="${*}" cd_mode="${ffz_cd}" redis_dict='zdirs_choices' nocache="$ffz_nocache"
+    ## @duplicateCode/0109e5f4b2c8c8f3e47e8e679c311e85
+    local query quote="${ffz_quote}"
+    if bool "$quote" ; then
+        query="$(fz-createquery "$@")"
+    else
+        query="${*} "
+    fi
+    ##
+
+    local cd_mode="${ffz_cd}" redis_dict='zdirs_choices' nocache="$ffz_nocache"
     if test -z "$query" ; then
         query="$ffz_last_query"
         nocache=y
@@ -172,21 +181,36 @@ aliasfn zi ffz_nocache=y ffz
 ##
 function ffz-b() {
     # z-back
-    local q="$*"
+    ## @duplicateCode/0109e5f4b2c8c8f3e47e8e679c311e85
+    local query quote="${ffz_quote}"
+    if bool "$quote" ; then
+        query="$(fz-createquery "$@")"
+    else
+        query="${*} "
+    fi
+    ##
 
     local o
-    o="$(list-dirs-parents "$PWD" | fzp "$q" | ghead -n 1)" @RET
+    o="$(list-dirs-parents "$PWD" | fzp "$query" | ghead -n 1)" @RET
     cd "$o"
 }
 alias zb='ffz-b'
 
 function ffz-r() {
     # z-recursive
-    local q="$*"
+    ## @duplicateCode/0109e5f4b2c8c8f3e47e8e679c311e85
+    local query quote="${ffz_quote}"
+    if bool "$quote" ; then
+        query="$(fz-createquery "$@")"
+    else
+        query="${*} "
+    fi
+    ##
 
     local o
-    o="$(@opts fd -uu @ list-dirs "$PWD" | fzp "$q" | ghead -n 1)" @RET
+    o="$(@opts fd -uu @ list-dirs "$PWD" | fzp "$query" | ghead -n 1)" @RET
     cd "$o"
 }
 alias zx='ffz-r'
+alias 'z.'='ffz_quote=y ffz-r'
 ##

@@ -56,21 +56,11 @@ function piadd() {
         pi "$1"
 }
 noglobfn piadd
-
-goi() {
+##
+function goi() {
     comment -u update -v verbose
     test -n "$noi" ||
         reval-ec go get -u -v "$@"
-}
-
-gmi() {
-    gem install "$@"
-}
-
-gmiadd() {
-    ec "$1" >> "$ins_gem"
-    test -n "$noi" ||
-        gmi "$1"
 }
 
 function goiadd() {
@@ -78,7 +68,19 @@ function goiadd() {
     test -n "$noi" ||
         goi "$1"
 }
+##
+function gemi() {
+    gem install "$@"
+}
+aliasfn gmi gemi
 
+function gemiadd() {
+    ec "$1" >> "$ins_gem"
+    test -n "$noi" ||
+        gmi "$1"
+}
+aliasfn gmiadd gemiadd
+##
 function ins-npm() {
     zargs -l 1 -- $(cat "$nodables") -- npm install -g
 }

@@ -210,10 +210,20 @@ function path-unabbrev-simple () {
 }
 ##
 function f-size {
-    local f="$1"
+    local f="$1" h="${f_size_h}"
     assert test -e "$f" @RET
 
-    gstat --printf="%s" "$f"
+    gstat --printf="%s" "$f" | { # in bytes
+        if bool "$h" ; then
+            numfmt-humanfriendly-bytes
+        else
+            cat
+        fi
+    }
 }
 reify f-size
+
+function f-size-labeled {
+    gdu -h --apparent-size "$@"
+}
 ##

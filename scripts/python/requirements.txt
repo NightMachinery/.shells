@@ -37,6 +37,7 @@ iredis
 jedi
 jill
 json-rpc
+kiss-headers
 libgen.py
 libgenapi
 lightnovel-crawler
@@ -84,4 +85,5 @@ xkcdpass
 yapf
 yq
 zxcvbn
-kiss-headers
+dnspython
+Unidecode

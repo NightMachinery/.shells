@@ -83,13 +83,18 @@ function emc-gateway() {
 
     fnswap isI true tty-title "$title"
 
-
     local my_term="$TERM"
     if isKitty || isiTerm ; then
         my_term='xterm-emacs'
     fi
-    reval-ec reval-env TERM="$my_term" $proxyenv emacsclient -t "$@"
+
+    reval-ec-env \
+        TERM="$my_term" \
+        KITTY_WINDOW_ID="${KITTY_WINDOW_ID}" \
+        $proxyenv \
+        emacsclient -t "$@"
 }
+
 function emc-eval() {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1
 

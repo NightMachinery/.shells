@@ -381,10 +381,12 @@ function w2e-curl() {
     we_dler=wread-curl w2e "$@"
 }
 noglobfn w2e-curl
+
 function wread-curl() {
     full-html2 "$1"
     # gurl "$1"
 }
+
 function w2e-gh() {
     h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }
@@ -400,6 +402,7 @@ function url-exists() {
     }
     return "$ret"
 }
+
 function gh-to-readme() {
     local urls=() i i2 readme url exts=(md rst org) readmes=(readme README ReadMe readMe Readme)
 
@@ -747,12 +750,43 @@ function 2epub-pandoc-byext () {
 }
 
 aliasfn txt2epub-pandoc PANDOC_EXT=txt 2epub-pandoc-byext
+
 aliasfn md2epub-pandoc PANDOC_EXT=md 2epub-pandoc-byext
+##
 aliasfn org2epub-pandoc PANDOC_EXT=org 2epub-pandoc-byext
 # function org2epub() {
 #     @opts from org to epub @ pandoc-convert "$@"
 # }
-aliasfn org2epub org2epub-pandoc
+function org2epub {
+    : "you probably want 'org2epub-auto-metadata' instead"
+
+    org2epub-pandoc "$@"
+}
+
+function org2epub-auto-metadata {
+    local org_file="$1" url="${org2epub_url}" author="${org2epub_author}"
+    assert-args org_file @RET
+    local title
+    title="${org_file:t:r}"
+    title="$(ec "$title" | str2pandoc-title)" @TRET
+    assert-args title @RET
+    local reading_est
+    reading_est="$(cat "$org_file" | count-words-humanfriendly)" @STRUE
+    local url_date=''
+    if test -n "$url" ; then
+        url_date="$(url-date "$url")" @STRUE
+    fi
+
+    local epub_file
+    epub_file="${org_file:h}/${title}.epub"
+    epub_file="$(reval-env-ec pandoc_convert_dest="${epub_file}" org2epub-pandoc "$title" "[${reading_est}] ${author} $url_date" "$org_file")" @TRET
+
+    epub_file="$(reval-ec p2k "${epub_file}")" @TRET
+
+    grealpath -e "$epub_file"
+}
+@opts-setprefix org2epub-auto-metadata org2epub
+##
 
 function aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
@@ -873,7 +907,7 @@ function url-clean-unalix() {
     fi
 
     {
-        arrN $inargs[@] | { url-match-rg || true } | assert unalix "$opts[@]" @RET
+        arrN $inargs[@] | { url-match-rg || true } | unalix "$opts[@]" @TRET
         ec
         arrN $inargs[@] | url-match-rg -v || true
     } | prefixer --skip-empty
@@ -1582,6 +1616,11 @@ function readmoz-md2() {
     readmoz "$1" | html2text "${@:2}" # --ignore-links
 }
 noglobfn readmoz-md2
+
+function readmoz-org() {
+    readmoz "$1" | html2org "${@:2}"
+}
+noglobfn readmoz-org
 
 function readmoz-txt() {
     local opts=( "${@:2}" )

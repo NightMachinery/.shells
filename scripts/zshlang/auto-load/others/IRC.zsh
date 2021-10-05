@@ -1,6 +1,6 @@
 ##
 function irc-chatlog-rmself {
-    cat-paste-if-tty | sd '^\s*('${(j.|.)irc_usernames}')\W*' ' ' | cat-copy-if-tty
+    cat-paste-if-tty | sd '^\s*('${(j.|.)irc_usernames}')\W*' '' | cat-copy-if-tty
 }
 ##
 function irc-chatlog-dir-get {

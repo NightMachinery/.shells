@@ -1,4 +1,40 @@
+##
+function rename-pipe {
+    : "@alt rename-rec"
+    : "to improve performance, filter the input to make it small"
+    : '`a="_cropped-000" ; fd $a | rename-pipe sd $a ""`'
+
+    : "@toRefactor rename-pipe-start | ... | rename-pipe-end"
+
+    local files cmd=("$@") dry_run="${rename_pipe_dry:-${rename_pipe_n}}"
+    files=(${(@f)"$(cat)"}) @TRET
+
+    if bool $dry_run ; then
+        ecgray "$0: dry run mode"
+    fi
+
+    local f new_path
+    for f in $files[@] ; do
+        new_path="$(ec "$f" | reval "$cmd[@]")" @TRET
+
+        if [[ "$new_path" != "$f" ]] ; then
+            ensure-dir "$new_path" @TRET
+
+            if bool $dry_run ; then
+                ecalternate "$f" "$new_path" @TRET
+            else
+                gmv -i -v "$f" "$new_path" </dev/tty @TRET
+            fi
+        fi
+    done
+}
+
+aliasfn rename-pipe-dryrun rename_pipe_dry=y rename-pipe
+@opts-setprefix rename-pipe-dryrun rename-pipe
+##
 function rename-rec() {
+    : "@alt rename-pipe"
+
     local max_depth="${rename_rec_max_depth:-100}"
 
     local d
@@ -10,6 +46,7 @@ function rename-rec() {
     # `rename-rec '(.*)evil([^/]*)' '{:1}happy{:2}'`
     ##
 }
+
 function rename-depth() {
     local depth="${1}" dir="${rename_depth_dir:-.}" undo="${rename_depth_undo:-undo/undo}"
     assert-args depth dir undo @RET

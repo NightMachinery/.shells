@@ -1,6 +1,6 @@
 re 'self-enh enh-mkdest' ln
 ##
-cp() {
+function cp() {
     local emd_c='command gcp --reflink=auto' # --reflink=auto does copy-on-write copies
     enh-mkdest "$@"
 }
@@ -29,19 +29,31 @@ function mv () {
         }
         # bash: read -ei "$1" newfilename
 
-        mkdir -p "$(bottomdir "$newfilename")"
+        ensure-dir "$newfilename"
         command gmv -v -- "$1" "$newfilename" @RET
         out="$newfilename"
     fi
 }
-mv2 () {
-    (( $#@ < 2 )) && { ecerr "Usage: mv2 <dest> <path> ..." ; return 1 }
-    reval-ec mv "${@[2,-1]}" "$1"
+##
+function enh-dest-shift () {
+    local opts=() engine=("${enh_dest_shift_e[@]}")
+    assert-args engine @RET
+    while [[ "$1" == -* ]] ; do
+        opts+="$1"
+        shift
+
+        if [[ "${opts[-1]}" == '--' ]] ; then
+            break
+        fi
+    done
+
+    (( $#@ < 2 )) && { ecerr "Usage: <dest> <path> ..." ; return 1 }
+
+    reval-ec "${engine[@]}" "${opts[@]}" "${@[2,-1]}" "$1"
 }
-cp2 () {
-    (( $#@ < 2 )) && { ecerr "Usage: cp2 <dest> <path> ..." ; return 1 }
-    reval-ec cp -r "${@[2,-1]}" "$1"
-}
+aliasfn ln2 enh_dest_shift_e=(ln) enh-dest-shift
+aliasfn mv2 enh_dest_shift_e=(mv) enh-dest-shift
+aliasfn cp2 enh_dest_shift_e=(cp -r) enh-dest-shift
 ##
 # alias noglob='noglob ruu ""'
 ##

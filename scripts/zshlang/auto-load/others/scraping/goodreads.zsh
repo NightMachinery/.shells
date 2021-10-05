@@ -1,3 +1,4 @@
+##
 function csv2json() {
     local f="$1"
     assert-args f @RET
@@ -36,5 +37,33 @@ function goodreads-export-backup() {
     o="${nightNotes}/private/backups/Goodreads/goodreads_export.csv"
 
     goodreads-export-dl $o
+}
+##
+function goodreads-url-to-json {
+    local url="$1"
+    assert-args url @RET
+
+    eval-memoi 'full-html2' "$url" \
+        | selectors2json.py \
+        description '#descriptionContainer span[style="display:none"]' \
+        bookFormat '[itemprop="bookFormat"]' \
+        pageCount '[itemprop="numberOfPages"]' \
+        publicationDetails '#details > div.row:nth-child(2)' \
+        title '#bookDataBox .clearFloats:nth-child(1) .infoBoxRowTitle+.infoBoxRowItem' \
+        isbn '[itemprop="isbn"]' \
+        language '[itemprop="inLanguage"]' \
+        series '#bookDataBox a[href^="/series/"]' \
+        genres '.actionLinkLite.bookPageGenreLink' \
+        | sd '\[\[/' '[[https://www.goodreads.com/' \
+        | jq '.'
+}
+
+function goodreads-url-to-org {
+    local url="$1"
+    assert-args url @RET
+
+    goodreads-url-to-json "$url" \
+        | goodreads_url_json_to_org.lisp "$url" \
+        | cat-copy-if-tty
 }
 ##

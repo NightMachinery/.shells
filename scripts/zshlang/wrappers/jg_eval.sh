@@ -5,8 +5,8 @@ if test "$1" = '-c' ; then
 fi
 
 cmd="$*"
-json_output="${jg_eval_sh_json_output}"
-quote="$jg_eval_sh_quote"
+json_output="${jg_eval_sh_json_output-y}"
+quote="${jg_eval_sh_quote-y}"
 session="${jg_eval_sh_session}"
 kernel_name="${jg_eval_sh_kernel_name}"
 kernel_session="${jg_eval_sh_kernel_session}"

@@ -1,0 +1,4 @@
+jupyter
+# qtconsole
+# use `conda install -y qtconsole`
+jupyter_kernel_gateway

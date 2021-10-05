@@ -49,9 +49,15 @@ function html2org() {
         input="$(gmktemp)"
 
         if isInTty ; then
-            assert pbpaste-html > "$input" @RET
+            pbpaste-html > "$input" @TRET
         else
-            assert cat > "$input" @RET
+            local input_text
+            input_text="$(cat)" @TRET
+            if isBrish && test -z "$input_text" ; then
+                pbpaste-html > "$input" @TRET
+            else
+                ec "$input_text" > "$input" @TRET
+            fi
         fi
     fi
 

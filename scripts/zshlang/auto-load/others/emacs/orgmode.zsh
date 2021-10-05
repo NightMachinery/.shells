@@ -19,11 +19,17 @@ function org-watch() {
 }
 
 function org-update-files() {
+    local files=($@)
+    if (( ${#files} == 0 )) ; then
+        ecgray "$0: called with zero inputs."
+    fi
+
     local cmd
-    cmd="(night/update-files $(emc-quote "$@"))"
+    cmd="(night/update-files $(emc-quote "$files[@]"))"
 
     time2 revaldbg emc-eval "$cmd"
 }
+
 function org-update-files-all() {
     ##
     # fd --extension org --type f . "$nightNotes" | emc_eval_in=y emc-eval '(apply night/update-files lines)'
@@ -235,5 +241,60 @@ function org-fanfic {
     fi
 
     ec "${tags}[[${url}][${title}]]${org_props_folded}- @author ${author}"$'\n'"#+begin_quote${body}"$'\n'"#+end_quote"
+}
+##
+function org-date-extract {
+    rget '(?:\[|<)(jalali:[^]]+)(?:\]|>)'
+}
+
+function org-date-extract-first {
+    org-date-extract "$@" | ghead -n 1
+}
+##
+function org-log-date-get {
+    : "currently, returns the first heading of the supplied orgmode files. We can do this with regexes better, so using this function is pretty useless now."
+
+    local input_files
+    input_files="$(in-or-args "$@")" @TRET
+    input_files=(${(@f)input_files})
+    assert-args input_files @RET
+    local garden="${org_log_date_get_garden:-y}"
+    local already_loaded="${org_log_date_get_al:-n}"
+    local script
+    script=~[org-log-date-get]/src/NightMachinary/org_log_date_get.clj @TRET
+
+    # @todo avoid reloading the code, it can reduce the time to ~0.9s, which is the best we can get with the Clojure kernel
+    local code=''
+    if ! bool "$already_loaded" ; then
+       code+="$(ec ; cat "$script")" @TRET
+    else
+        ecgray "$0: skipping (re)loading"
+    fi
+
+    code+=$'\n'"(do (org-log-date-get $(lisp-quote "$input_files[@]")))"
+
+    if [[ "$garden" == y ]] ; then
+        @opts kernel_name 'conda-clojupyter' session 's1' @ jg_eval.sh "$code" @TRET
+    else
+        # ecbold "$code"
+
+        ot-rep "$code" @TRET
+    fi | {
+        if [[ "$garden" == y ]] ; then
+            jqm .out
+        else
+            rep-clean
+        fi
+    }
+    ## tests
+    # `redo2 10 ec "/Users/evar/cellar/notes/private/wallet/houses/sabzevar/apartment/elevator/bills/electricity/1472555905222/log.org" | time2 org-log-date-get`
+    ##
+}
+
+function rep-clean {
+    rg -v "^(?:#?'|nil$)"
+    # removes:
+    #   `#'user/needs-reload`
+    #   `nil`
 }
 ##

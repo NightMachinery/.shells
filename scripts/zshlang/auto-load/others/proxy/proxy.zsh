@@ -103,11 +103,19 @@ function enh-pxpy() {
 }"
 }
 ##
-function pxify-auto() { # @gateway
-    # return 0 # We now use Wireguard
-    typeset -g pxified
+function proxy-auto-p {
     # local initCountry="$(serr mycountry)"
     if test -z "$pxified" && { isMBP } ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function pxify-auto() { # @gateway
+    typeset -g pxified
+
+    if proxy-auto-p ; then
         pxified=y
         pxify
     fi

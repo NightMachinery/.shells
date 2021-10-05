@@ -1,6 +1,7 @@
 function printz-quoted() {
     printz "$(gq "$@")"
 }
+
 function printz() {
     test -n "$*" && {
         if isI ; then
@@ -24,3 +25,4 @@ function plot-stdin() {
     ##
     ## asciigraph -r # usable but no stats and wrong height detection. No fixed scale. `goi github.com/guptarohit/asciigraph/cmd/asciigraph`
 }
+##

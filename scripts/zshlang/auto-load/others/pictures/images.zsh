@@ -191,3 +191,44 @@ function img-rotate() {
 
 aliasfn img-rotate-inplace inplace-io img-rotate
 ##
+function img-compress {
+    : "@alt @PNG https://pngquant.org/"
+    : "impo options: -strip -quality 70"
+
+    local i="$1"
+    local o="${2:-${i:r}_compressed.jpg}"
+    local colorspace="${img_compress_cs:-sRGB}" # 'Gray'
+    local quality="${img_compress_q:-70}" # seems to be from 100
+    local max_size="${img_compress_s}" # max size, use suffixes to change the unit
+    ensure-array img_compress_opts
+    local opts=("${img_compress_opts[@]}")
+    local resize="${img_compress_r}"
+
+    if test -n "$max_size" ; then
+        [[ "$max_size" == *b ]] || max_size+='kb'
+        opts+=(-define jpeg:extent="$max_size")
+        # this does not resize the image, so it's limited in what it can do
+    else
+        opts+=(-quality "$quality")
+    fi
+
+    if test -n "$resize" ; then
+        [[ "$resize" == *'%' ]] || resize+='%'
+        opts+=(-adaptive-resize "${resize}")
+    fi
+
+
+    opts+=(-interlace JPEG) # @idk what use these are
+
+    icat "$i"
+    magick identify "$i"
+    f-size-labeled "$i"
+
+    reval-ec magick-convert -strip -define jpeg:dct-method=float -sampling-factor 4:2:0 -colorspace "$colorspace" "$opts[@]" "$i" "$o" @TRET
+    # sampling-factor 4:2:0: What this does is reduce the chroma channel's resolution to half, without messing with the luminance resolution that your eyes latch onto.
+
+    icat "$o"
+    magick identify "$o"
+    f-size-labeled "$o"
+}
+##

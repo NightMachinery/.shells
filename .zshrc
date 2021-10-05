@@ -196,6 +196,7 @@ function nightsh-load-zshrc() {
   fi
   bindkey '^[[1;3D' backward-word # alt-left
   bindkey '^[[1;3C' forward-word # alt-right
+  bindkey '^[/' forward-word # alt-/
   ### iTerm Integration
   alias it2attention=~/.iterm2/it2attention
   alias it2check=~/.iterm2/it2check

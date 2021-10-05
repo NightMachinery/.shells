@@ -8,6 +8,17 @@ function jupytergarden-p {
     fi
 }
 ##
+function jupytergarden-boot {
+    local port="${1:-7331}" dbg="${DEBUGME}"
+
+    reval-ec tmuxnewsh2 jupyter-kernel-gateway \
+        jupyter kernelgateway \
+        --KernelGatewayApp.api=kernel_gateway.jupyter_websocket \
+        --port="$port"
+
+    reval-ec tmuxnewsh2 jupytergarden JUPYTERGARDEN_DEBUGME="$dbg" jupytergarden
+}
+##
 function jg-eval-json {
     jg_eval_sh_json_output=y jg_eval.sh "$@"
 }

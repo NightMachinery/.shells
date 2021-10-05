@@ -16,13 +16,27 @@ function pastebin-gnupaste {
 
 aliasfn pastebin pastebin-gnupaste
 
-function pastebin-png {
+function pastebin-png-jdl {
+    local ext=png
+
+    local tmp
+    tmp="$(gmktemp --suffix ".${ext}")" @TRET
+
+    pngpaste "$tmp" @TRET
+    icat "$tmp"
+    reval-ec jdl "$tmp" @TRET
+
+    bell-image-uploaded
+}
+alias ppp='pastebin-png-jdl'
+
+function pastebin-png-gnupaste {
     : "usage: cat file.png | pastebin-png"
 
     @opts mime image/png @ pastebin "$@"
 }
 
-function pastebin-jpg {
+function pastebin-jpg-gnupaste {
     : "usage: cat file.jpg | pastebin-jpg"
 
     @opts mime image/jpeg @ pastebin "$@"

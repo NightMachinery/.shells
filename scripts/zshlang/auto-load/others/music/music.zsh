@@ -3,6 +3,9 @@ export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Functions
 function hear-noipc() {
     local vol="${hear_volume:-${hear_v:-70}}"
+
+    bella_zsh_disable1
+
     command-mpv --script-opts-add=autotag-enabled=no --script=$MPV_HOME/scripts/load_renamer.lua --volume="$vol" --keep-open=no --no-video $MPV_AUDIO_NORM "$@"
 }
 @opts-setprefix hear-noipc hear
@@ -21,8 +24,11 @@ function hearinvisible-fast() {
     # For even faster startup, disable `--norm`. That option processes the whole input once before playing, which takes a second or two for minute-long files
 }
 @opts-setprefix hearinvisible-fast hear
+
 function hearinvisible-playfast() {
     local vol="${hear_volume:-${hear_v:-1}}" loudidle="${hear_loudidle}"
+
+    bella_zsh_disable1
 
     if (( vol >= 10 )) ; then
         ecgray "$0: Volume assumed to be in the 100 scale"
@@ -78,6 +84,7 @@ function hear() {
     comment '(0@) inserts empty elements with quoting'
     hear-noipc --input-ipc-server="$mpv_audio_ipc" ${(0@)"$(rpargs "$@")"} #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 }
+
 function hear-rnd() {
     hearinvisible "$(rndarr "$@")"
 }
@@ -87,6 +94,7 @@ function songc() {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
 
     bella_zsh_disable1
+
     local p="${@: -1}"
     if test -z "${p##-*}" ; then
         set -- $@ '.' #Don't quote or you'll get ''s.
@@ -146,7 +154,7 @@ function playlister() {
 
     local fz_q=''
     local first=y
-    for ext in $media_formats[@]; do
+    for ext in ${audio_formats[@]} ${video_formats[@]} ; do
         if test -z "$first"; then
             fz_q+="| "
         fi
@@ -174,7 +182,8 @@ find-music() {
     memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" | sponge | ugbool "$*"
     # Do NOT use --absolute-path, as we want relative-path playlists
 }
-songd() {
+
+function songd() {
     # music_dir=~/my-music/ ; musiccache='' # Update: Bug solved in newer versions (fine on 5.8). See https://www.zsh.org/mla/workers/2019/msg00700.html # To hardcode-circumvent zsh's unset bug.
     doc 'Use songc to play already downloaded files.
     Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
@@ -281,15 +290,20 @@ function hearp() {
     # k shuffles live in mpv (with MY config :D)
     hear --loop-playlist --playlist=<(ec "$tracks")
 }
-mut() {
+
+function mut() {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop ${*:+"$*"}
 }
-muf() songc --loop ${*:+"$*"}
-mub() {
+
+function muf() songc --loop ${*:+"$*"}
+
+function mub() {
     songc --loop-playlist ${*:+"$*"} #alBum
 }
-mup() playlistc "$@"
-mu() {
+
+function mup() playlistc "$@"
+
+function mu-gateway() {
     local bp=()
     { test "${1}" = "-d" || test "$1" = "-a" || test "$1" = "-p" } && {
         bp+="$1"
@@ -297,7 +311,8 @@ mu() {
     }
     songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
-muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*" }
+
+function muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*" }
 ##
 function sdlg() {
     ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1
