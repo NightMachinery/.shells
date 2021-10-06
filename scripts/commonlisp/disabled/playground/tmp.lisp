@@ -15,3 +15,23 @@
 (let ((year "1400"))
   (var-set "year" 1388)
   (labeled identity year))
+;;;
+(let ((a "ice")
+      (b "sun"))
+  (defparameter a a )
+  (setf (symbol-value 'b) b)
+  (concat a "_" b))
+
+(defmacro letd (bindings &body body)
+  `(let ,bindings
+     ,@(loop :for b :in bindings
+             :for symbol = (if (consp b)
+                               (first b)
+                               b)
+             :for name = (symbol-name symbol)
+             :collect `(setf (symbol-value ',(intern (format nil "~A" name))) ,symbol))
+     ,@body))
+
+(letd ((a12 "iNA"))
+  (concat a12))
+;;

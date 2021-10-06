@@ -22,7 +22,11 @@ export DING="$GREENCASE_DIR/LittleMisfortune/flac/26.1_16_MI_thetrainishere..blu
 ###
 # `preview-half-page-down` is also an option
 # unsupported key: ctrl-enter
-export FZF_DEFAULT_OPTS="--bind 'alt-n:next-history,alt-p:previous-history,shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-s:select-all,alt-enter:print-query' --color=light --multi --hscroll-off 99999"
+export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,alt-n:next-history,alt-p:previous-history,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-s:select-all,alt-enter:print-query' --color=light --multi --hscroll-off 99999"
+# ctrl-up and ctrl-down do the same thing as shift-up and shift-down
+# pageup and pagedown keys work as expected
+# `shift-up:preview-up,shift-down:preview-down,alt-up:page-up,alt-down:page-down`
+# `shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down`
 ##
 export FZF_DEFAULT_COMMAND="fd --hidden --follow" # fzf runs this when input is a tty
 export SHELL=/bin/dash #"${commands[dash]}" # fzf uses this shell to run the default command

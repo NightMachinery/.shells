@@ -46,6 +46,7 @@ function reval-ec() {
     "$ec_engine" "$cmd_simple" >&2
     "${eval_engine}" "$cmd"
 }
+function reval-ecgray { reval_ec_ec_engine=ecgray reval-ec "$@" }
 
 function reval-ecdate() {
    reval_ec_e=ecdate reval-ec "$@"

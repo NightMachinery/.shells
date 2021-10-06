@@ -294,3 +294,23 @@
  (labeled * 8 7)
  (labeled concat "Hi " "Li" (format nil "~%In the Jungle, ...")))
 ;;;
+(defmacro letd (bindings &body body)
+  ;; @todo1 condition the macro on *repl-p*, so that it won't export the vars if we are not in a repl.
+  `(let* ,bindings
+     ,@(loop :for b :in bindings
+             :for symbol = (if (consp b)
+                               (first b)
+                               b)
+             :for name = (symbol-name symbol)
+
+             ;; the symbol-value of a symbol is global
+             :collect `(setf (symbol-value ',(intern name)
+                                           ;; you can use (concat "some_prefix" name) if reusing the original names is causing problems
+                                           ) ,symbol))
+     ,@body))
+
+(comment
+ (letd ((a12 "3")
+        (b6 (concat a12 "|>")))
+   (concat b6)))
+;;;

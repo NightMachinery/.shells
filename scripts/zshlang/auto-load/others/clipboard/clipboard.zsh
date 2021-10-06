@@ -258,7 +258,15 @@ function clipboard-add-quoted() {
         clipboard-add "$cmd"
     fi
 }
-aliasfn pcz @opts os y @ clipboard-add-quoted
+
+function pbcopy-z {
+    if (( ${#@} >= 1 )) ; then
+        @opts os y @ clipboard-add-quoted "$@"
+    else
+        pbcopy "$(hist-last 1)"
+    fi
+}
+alias pcz='pbcopy-z'
 ##
 function clipboard-add-files() {
     if isDarwin ; then
