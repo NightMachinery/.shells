@@ -17,7 +17,17 @@ isSSH && LESS="-RiNF"
 export PAGER="$commands[less]"
 ##
 function jqless() {
-    jq --color-output | less
+    jq --color-output | pager-if-tty
 }
 alias jql=jqless
+##
+aliasfn pager less
+
+function pager-if-tty {
+    if isOutTty ; then
+        pager
+    else
+        cat
+    fi
+}
 ##

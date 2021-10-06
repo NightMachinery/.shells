@@ -62,7 +62,7 @@ rexa "compdef _=ls" pbadd mv # mv had a bug I think?
 #     [[ -e $asdf_dir ]] && . $asdf_dir/etc/bash_completion.d/asdf.bash
 # }
 ##
-comp-set '=brew' bii
+silent comp-set '=brew' bii # might not be present on Linux
 ##
 function _indir() {
     # BEWARE: This completion function has a rather creepy eval in it.
