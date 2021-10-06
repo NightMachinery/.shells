@@ -29,12 +29,51 @@ function paletteget() {
     echo -E ${(qqqq)${(%)color}}
 }
 ##
-colorfg() { ! isColor || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
-colorbg() { ! isColor || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
-colorb() {
+function color-name-to-hex {
+    local name="${1}"
+    assert-args name @RET
+
+    local res
+    res="$(emc-eval "(etcc--color-name-to-hex $(emc-quote "$name"))")" @TRET
+    if [[ "$res" == nil ]] ; then
+        ecerr "$0: returned nil"
+        return 1
+    fi
+
+    ec "$res" | cat-copy-if-tty
+}
+##
+function color-cursor {
+    # [help:etcc--make-cursor-color-seq]
+    ##
+    local color_hex="${1:-#00000000eeee}" # blue
+    if [[ "${color_hex}" != '#'* ]] ; then
+        color_hex="$(color-name-to-hex "$color_hex")" @TRET
+        if isOutTty ; then
+            reval-ecgray pbcopy "$color_hex"
+        fi
+    fi
+
+    if isColorTty ; then
+        printf "\x1b]12;%s\a" "$color_hex"
+
+        # ecgray "#funcstack: ${#funcstack}"
+        if (( ${#funcstack} <= 1 )) ; then # allows us to set the next prompt's color if we invoke this function directly
+            zsh_cursor_color_disable1
+        fi
+    fi
+}
+function cursor-color { color-cursor "$@" }
+
+function colorfg() { ! isColor || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
+
+function colorbg() { ! isColor || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
+
+function colorb() {
     co_f=colorbg color "$@"
 }
-color() {
+
+function color() {
     true colorfg colorbg # whdeep hack, altly we can split on :- too
     local in inargs
     local noreset="$coNr"

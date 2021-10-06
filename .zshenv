@@ -113,6 +113,7 @@ function nightsh-load-zshenv() {
         fi
 
         function source-interactive-all() {
+            source "$NIGHTDIR"/zshlang/interactive/first.zsh
             run-on-each source "$NIGHTDIR"/zshlang/interactive/auto-load/**/*(.)
             source "$NIGHTDIR"/zshlang/interactive/completions.zsh # needs to be semi-last
             typeset -g NIGHT_NO_EXPENSIVE
