@@ -45,6 +45,11 @@ function color-name-to-hex {
 ##
 function color-cursor {
     # [help:etcc--make-cursor-color-seq]
+    #
+    # * does work on tmux
+    # ** try adding =set -ga terminal-overrides ',*:Ss=\E[%p1%d q:Se=\E[2 q'= to .tmux.conf to pass cursor codes, if it doesn't already work for you
+    # * @issues
+    # ** [[https://github.com/mobile-shell/mosh/issues/352][does not currently work on mosh]]
     ##
     local color_hex="${1:-#00000000eeee}" # blue
     if [[ "${color_hex}" != '#'* ]] ; then
@@ -64,6 +69,7 @@ function color-cursor {
     fi
 }
 function cursor-color { color-cursor "$@" }
+alias cursor-color='color-cursor' # to not increase ${#funcstack}
 
 function colorfg() { ! isColor || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
 
