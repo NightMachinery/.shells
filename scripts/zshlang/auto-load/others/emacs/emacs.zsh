@@ -133,10 +133,11 @@ function emc-eval() {
     ##
 }
 aliasfnq emc-buffer-file-name emc-eval "(buffer-file-name)"
+
 function emc-sourceme() {
     local f
     f="$(emc-buffer-file-name)" @RET
-    if [[ "$f" == *.(zsh|bash) ]] ; then
+    if source-suitable-p "$f" ; then
         NIGHT_NO_EXPENSIVE='' reval-ec source "$f"
     else
         ecerr "$0: file doesn't seem suitable: $f"
