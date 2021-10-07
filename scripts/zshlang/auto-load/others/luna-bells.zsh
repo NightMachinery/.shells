@@ -106,7 +106,8 @@ function greencase_audio_init() {
         greencase_audio=( $GREENCASE_DIR/**/$~audioglob )
     }
 }
-bell-greencase() {
+
+function bell-greencase() {
     ##
     # @retiredtodo this doesn't result in a constantish duration, so we'll need additional code to check the duration in a while loop in luna-advanced-bell
     #
@@ -468,9 +469,9 @@ function bell-ringer() {
     assert-args marker fs
 
     bella_zsh_disable1
-    if @opts p redo r y xp [ bell- tts- ] @ fn-isTop ; then
+    if @opts p [ redo loop ] r y xp [ bell- tts- ] @ fn-isTop ; then
         if test -z "$bell_awaysh" ; then
-            ecgray "$0: parent redo detected; Switching awaysh off."
+            ecgray "$0: parent 'redo' (etc) detected; Switching awaysh off."
             awaysh="no"
         fi
     fi
@@ -511,6 +512,16 @@ function bell-lm-maker-dir() {
         bell-lm-maker "$name" $GREENCASE_DIR/LittleMisfortune/$f/${~audioglob}
     fi
 }
+
+typeset -ga bell_lm_MI_files=()
+function bell-lm-MI {
+    if (( ${#bell_lm_MI_files} == 0 )) ; then
+        typeset -ga bell_lm_MI_files=("${GREENCASE_DIR}"/LittleMisfortune/flac/*MI*.flac(.DN))
+    fi
+    bell-ringer $bell_lm_MI_files{@}
+}
+
+bell-lm-maker diary-search-fx 'flac/BenjaminDiarySearch.flac'
 bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
 bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
@@ -693,4 +704,10 @@ function bell-visual-flash1() {
 # aliasfn bell-image-uploaded tts-glados1-cached 'image, uploaded'
 aliasfn bell-image-uploaded tts-glados1-cached 'picture, uploaded'
 # aliasfn bell-image-uploaded bell-pp-attack-rotational
+##
+bell-maker 'p2-searching' 'PC Computer - Portal 2 - Turret/turret_search_4..blue..wav'
+
+bell-maker 'p2-target-lost' 'PC Computer - Portal 2 - Turret/turret_search_2..blue..wav'
+
+bell-maker 'p2-target-acquired' 'PC Computer - Portal 2 - Turret/turret_active_2.wav'
 ##

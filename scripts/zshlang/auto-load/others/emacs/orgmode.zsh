@@ -30,6 +30,10 @@ function org-update-files() {
     time2 revaldbg emc-eval "$cmd"
 }
 
+function fd-org {
+    fd --extension org --extension org_archive --type f "$@"
+}
+
 function org-update-files-all() {
     ##
     # fd --extension org --type f . "$nightNotes" | emc_eval_in=y emc-eval '(apply night/update-files lines)'
@@ -37,7 +41,7 @@ function org-update-files-all() {
     {
         local d
         for d in "$nightNotes" ~tmp/ ; do
-            fd --extension org --extension org_archive --type f . "$d"
+            fd-org . "$d"
         done
      } | inargsf org-update-files
     # emc-eval "(org-id-locations-save)" # @idk if this is needed, I think it's done automatically
@@ -296,5 +300,20 @@ function rep-clean {
     # removes:
     #   `#'user/needs-reload`
     #   `nil`
+}
+##
+function cutestarsabove {
+    ensure-array cutestarsabove_po
+    local query="$1" \
+        p_opts=("${cutestarsabove_po[@]}") \
+        n="${cutestarsabove_n:-4000}"
+        fd_query="${cutestarsabove_fq:-.}"
+
+    {
+    reval-ec fd-org "${fd_query}" "$PWD" | reval-ec parad -N "$n" --pipe "$p_opts" cutestarsabove.pl "$query"
+    # add --dry-run to see how many jobs it runs
+    } always {
+        bell-lm-diary-search-fx
+    }
 }
 ##

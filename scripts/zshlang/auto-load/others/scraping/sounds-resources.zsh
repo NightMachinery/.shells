@@ -34,4 +34,5 @@ function gc-tag() {
         fi
     fi
 }
+alias hear-current-save-as-bell='gc-tag'
 ##

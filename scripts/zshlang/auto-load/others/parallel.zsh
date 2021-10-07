@@ -4,6 +4,7 @@ function parallel() {
 }
 function parallelm() {
     local disable_opts="${parallel_d}"
+    local dry_run="${parallel_dry}"
     local jobs="${parallel_jobs:-12}" # use '+0' to reset it to its default value (which is the number of CPU cores available)
     ##
     local halt="${parallel_halt:-soon,fail=1}"
@@ -14,6 +15,10 @@ function parallelm() {
     ##
 
     local opts=()
+    if bool "$dry_run" ; then
+        opts+='--dry-run'
+    fi
+
     if test -z "$parallel_disable" ; then
         if test -n "$jobs" ; then
             opts+=( --jobs "$jobs" )
