@@ -529,7 +529,7 @@ outlinify() {
     mapln 'https://outline.com/$1' "$@"
 }
 ##
-html2epub-calibre() {
+function html2epub-calibre() {
     mdoc "Usage: $0 <title> <authors> <html-file> ..." MAGIC
     local authors="${2:-night}"
     local title="$1"
@@ -623,9 +623,10 @@ function web2epub() {
     local strict="$we_strict"
 
     local dled_files=()
-    local urls
+    local urls=("${@:2}")
+    assert-args urls @RET
     # FNSWAP: urlfinalg
-    urls=("${(@f)$(urlfinalg "${@:2}")}") @TRET
+    urls=("${(@f)$(urlfinalg $urls[@])}") @TRET
 
     for url in $urls[@]
     do
@@ -829,23 +830,21 @@ function code2md() {
 "'```'
     done
 }
-
+##
 function merge-html() {
-    (( $# == 1 )) && {
-        ec "<p>$(html-get-reading-estimate $1)</p>
-
-"
-        cat $1
-        return $?
-    }
-    local i
-    for i in "$@"
-    do
-        ec "<h1>$(strip $i ".html") - $(html-get-reading-estimate $i)</h1>
-
-$(cat "$i" | html-links-textualize)
-"
-    done
+    {
+        if (( $# == 1 )) ; then
+            ec "<p>$(html-get-reading-estimate $1)</p>"$'\n' @STRUE
+            cat $1 @TRET
+        else
+            local i
+            for i in "$@"
+            do
+                ec "<h1>$(strip $i ".html") - $(html-get-reading-estimate $i)</h1>"$'\n' @STRUE
+                cat "$i" @TRET
+            done
+        fi
+    } | html-links-textualize
 }
 ##
 function getlinks() {

@@ -1,12 +1,13 @@
 ###
 alias zsh-defer=''
-
+##
 function psource() {
     if [[ -r "$1" ]]; then # -r: readable file
-        source "$1"
+        source "$@"
     fi
 }
 
+##
 function nightsh-load-zshenv() {
     ZSH_PWD_CACHE=~/tmp/.zsh_pwd
     function zsh-pwd-save() {

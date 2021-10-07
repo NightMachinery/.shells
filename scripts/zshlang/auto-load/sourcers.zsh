@@ -1,3 +1,9 @@
+##
+function source-cmd {
+    local cmd="${commands[$1]}" ; shift
+    reval-ec psource "$cmd" "$@"
+}
+##
 sin() {
     FORCE_INTERACTIVE=y
     NIGHT_NO_EXPENSIVE=''
