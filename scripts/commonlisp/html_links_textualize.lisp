@@ -30,7 +30,10 @@
                                  (aref (lquery:$ a (attr "href")) 0))
                                (text
                                  (aref (lquery:$ a (text)) 0)))
-                           (when (not (uiop:string-prefix-p "#" href))
+                           (when
+                               (and href (not (string= href ""))
+                                    text (not (string= text ""))
+                                (not (uiop:string-prefix-p "#" href)))
                              (lquery:$ a
                                (text (concat "[[" (org-link-escape href) "][" (org-title-escape text) "]]"))))))
 

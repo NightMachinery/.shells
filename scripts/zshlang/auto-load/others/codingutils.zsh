@@ -168,16 +168,19 @@ serr rm "$zipdest"
     zip -r $zipdest $script ./autobin ./autodeps
     pbadd "$zipdest"
 }
+
 function cee() {
     local f
     f="$(which -- "$1")" || return $?
     cat "$f"
 }
+
 function ceer() {
     local f
     f="$(which -- "$1")" || return $?
     rgeval "${@:2}" "$f"
 }
+##
 function mn() {
     local LESS=$LESSMIN
     export LESS
