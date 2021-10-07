@@ -1,15 +1,33 @@
-function hn2org {
-    local url="$1"
+function h-org-dest-from-url {
+    local url="$1" dest="${2}"
+    if [[ "$dest" == '-' ]] ; then
+        ec "$dest"
+        return $?
+    fi
+    assert-args url @RET
+
     local title
     title="$(url-title "$url" | str2pandoc-title)" @TRET
-    local dest="${2}"
+
     if test -z "$dest" ; then
-        dest=~ktmp/hn/"$title".org
+        dest=~ktmp/org/"$title".org
         ensure-dir "$dest" @TRET
+    else
+        ensure-dir "$dest" @TRET
+        if test -d "$dest" ; then
+            dest+=/"$title".org
+        elif ! [[ "$dest" == *.org ]] ; then
+            dest+='.org'
+        fi
     fi
-    if ! { test -d "$dest" || [[ "$dest" == *.org ]] } ; then
-        dest+='.org'
-    fi
+
+    ec "$dest"
+}
+##
+function hn2org {
+    local url="$1" dest="${2}"
+    assert-args url @RET
+    dest="$(h-org-dest-from-url "$url" "$dest")" @TRET
 
     local emc_dest
     emc_dest="$(emc-eval "(hn/to-org-mode! $(emc-quote "$url") $(emc-quote "$dest"))")" @TRET

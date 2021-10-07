@@ -113,4 +113,4 @@
     (tag-filter
      :tag tags)))
 
-(sb-ext:save-lisp-and-die "tag-filter-date.lispexe" :toplevel #'main :executable t)
+(lispexe-save-and-die :name "tag-filter-date.lispexe" :toplevel #'main)
