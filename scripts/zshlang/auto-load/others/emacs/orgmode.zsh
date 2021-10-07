@@ -310,10 +310,14 @@ function cutestarsabove {
         fd_query="${cutestarsabove_fq:-.}"
 
     {
-    reval-ec fd-org "${fd_query}" "$PWD" | reval-ec parad -N "$n" --pipe "$p_opts" cutestarsabove.pl "$query"
+    reval-ec fd-org "${fd_query}" "$PWD" | reval-ec parad -N "$n" --pipe "$p_opts[@]" cutestarsabove.pl "$query"
     # add --dry-run to see how many jobs it runs
     } always {
         bell-lm-diary-search-fx
     }
+
+    ## @examples
+    # `time2 @opts fq 'recommendation' @ cutestarsabove 'time.?travel' > ../search_results/timetravel_rec..org-highlighter..org`
+    ##
 }
 ##

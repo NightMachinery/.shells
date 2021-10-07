@@ -15,19 +15,37 @@ function reddit-sub-age {
 }
 ##
 function reddit2org {
-    local permalink="$1"
+    local permalink="$1" dest="${2}"
     assert-args permalink @RET
     if ! [[ "$permalink" == http* ]] ; then
         permalink="https://old.reddit.com${permalink}"
+    else
+        permalink="$(reddit2old "$permalink")" @TRET
     fi
 
     local html
-    html="$(full-html2 "$permalink")" @TRET
+    html="$(fhSecure="${fhSecure:-n}" full-html2 "$permalink")" @TRET
+
+    dest="$(h-org-dest-from-url "$url" "$dest")" @TRET
 
     {
         ec $html | pup '.content .title, .content .usertext'
-    } | html2org /dev/stdin @TRET
+    } | html2org /dev/stdin "$dest" >&2 @TRET
+
+    ec "$dest"
 }
+
+function org2epub-from-url {
+    local url="$1" dest="${2}" engine=("${org2epub_from_url_e[@]}")
+    assert-args url engine @RET
+
+    local org_file
+    org_file="$(reval "$engine[@]" "$url" "${dest:r}")" @TRET
+
+    @opts url "$url" @ org2epub-auto-metadata "$org_file"
+}
+
+aliasfn reddit2epub org2epub_from_url_e=reddit2org org2epub-from-url
 ##
 function reddit-sub-posts-urls-pushshift {
     ecerr "$0: deprecated; Use reddit_sub_posts_urls_pushshift.py instead."

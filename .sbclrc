@@ -6,10 +6,14 @@
   (when (probe-file quicklisp-init)
     (load quicklisp-init)))
 
+(defun quickload-silent (&rest args)
+  (with-output-to-string (*standard-output* nil)
+    (apply #'ql:quickload args)))
+
 (with-output-to-string (*standard-output* nil)
   ;; (ql:quickload "unix-opts")
   (ql:quickload :cl-ppcre)
-  (ql:quickload "jsown")
+  (ql:quickload "jsown")                ;; @todo1 should not be imported for projects that don't use JSON
   )
 ;;;
 (setf sb-impl::*default-external-format* :utf-8)
@@ -42,7 +46,17 @@
 (alias-fn argv-get uiop:command-line-arguments) ;; get CLI arguments
 (alias-fn getenv uiop:getenv)
 ;;;
+;; this hack did not work:
+;; (defun json-parse (&rest args)
+;;   (quickload-silent "jsown")
+;;   (apply #'jsown:parse)
+;;   )
 (alias-fn json-parse jsown:parse)
+
+;; (defun json-get (&rest args)
+;;   (quickload-silent "jsown")
+;;   (apply #'jsown:val-safe)
+;;   )
 (alias-fn json-get jsown:val-safe)
 ;;;
 (defstruct cmd-result
@@ -313,4 +327,22 @@
  (letd ((a12 "3")
         (b6 (concat a12 "|>")))
    (concat b6)))
+;;;
+(defun lispexec-compression-get ()
+  (let ((argv (argv-get)))
+    (when (>= (length argv) 1)
+      (parse-integer (elt argv 0))))
+;; For "html_links_textualize.lispexe":
+;; using `:executable nil` did not change the size at all
+;; compression level 0: no noticeable compression (44MB)
+;; compression level 1-3: 13MB
+;; compression level 4: 12MB
+;; compression level 9: 12MB
+;; overall, the faster compilation and startup of the lower levels is worth it
+  )
+
+(defun lispexe-save-and-die (&key
+                               name toplevel
+                               (compression (lispexec-compression-get)))
+  (sb-ext:save-lisp-and-die name :toplevel toplevel :executable t :compression compression))
 ;;;

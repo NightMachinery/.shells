@@ -843,7 +843,7 @@ function merge-html() {
     do
         ec "<h1>$(strip $i ".html") - $(html-get-reading-estimate $i)</h1>
 
-$(cat "$i")
+$(cat "$i" | html-links-textualize)
 "
     done
 }
@@ -1764,4 +1764,16 @@ function url-date() {
 }
 ##
 aliasfn rss-tll rss-tl -e w2e-curl
+##
+function html-links-textualize {
+    : "usage: cat some.html | html-links-textualize > output.html"
+
+    if isdefined-cmd html_links_textualize.lispexe ; then
+        html_links_textualize.lispexe "$@"
+    else
+        ecerr "$0: html_links_textualize.lispexe not found, falling back to 'cat'"
+
+        cat
+    fi
+}
 ##
