@@ -9,12 +9,14 @@
 (defun quickload-silent (&rest args)
   (with-output-to-string (*standard-output* nil)
     (apply #'ql:quickload args)))
+(defun dep-load (&rest pkgs)
+  (dolist (pkg pkgs)
+    (quickload-silent pkg)))
 
-(with-output-to-string (*standard-output* nil)
-  ;; (ql:quickload "unix-opts")
-  (ql:quickload :cl-ppcre)
-  (ql:quickload "jsown")                ;; @todo1 should not be imported for projects that don't use JSON
-  )
+(dep-load
+ :cl-ppcre
+ "jsown"  ;; @todo1 should not be imported for projects that don't use JSON
+ )
 ;;;
 (setf sb-impl::*default-external-format* :utf-8)
 ;;;
@@ -42,6 +44,11 @@
 (comment
  (ec)
  (ec "Hello" "Jungle" '(1 2 3) "hoo!"))
+;;;
+(eval-when (:compile-toplevel :execute :load-toplevel)
+  (defparameter *repl-mode* nil)
+  (comment
+   (setq *repl-mode* t)))
 ;;;
 (alias-fn argv-get uiop:command-line-arguments) ;; get CLI arguments
 (alias-fn getenv uiop:getenv)
@@ -309,18 +316,19 @@
  (labeled concat "Hi " "Li" (format nil "~%In the Jungle, ...")))
 ;;;
 (defmacro letd (bindings &body body)
-  ;; @todo1 condition the macro on *repl-p*, so that it won't export the vars if we are not in a repl.
+  "@warn it seems that we can't set the value of a special variable created by `defparameter' globally, so use (unintern 'var_name_here) to remove the variable first."
   `(let* ,bindings
-     ,@(loop :for b :in bindings
-             :for symbol = (if (consp b)
-                               (first b)
-                               b)
-             :for name = (symbol-name symbol)
+     ,@(when *repl-mode*
+         (loop :for b :in bindings
+               :for symbol = (if (consp b)
+                                 (first b)
+                                 b)
+               :for name = (symbol-name symbol)
 
-             ;; the symbol-value of a symbol is global
-             :collect `(setf (symbol-value ',(intern name)
-                                           ;; you can use (concat "some_prefix" name) if reusing the original names is causing problems
-                                           ) ,symbol))
+               ;; the symbol-value of a symbol is global
+               :collect `(setf (symbol-value ',(intern name)
+                                             ;; you can use (concat "some_prefix" name) if reusing the original names is causing problems
+                                             ) ,symbol)))
      ,@body))
 
 (comment
@@ -328,21 +336,27 @@
         (b6 (concat a12 "|>")))
    (concat b6)))
 ;;;
+(alias-fn s-starts-with-p uiop:string-prefix-p)
+;;;
 (defun lispexec-compression-get ()
   (let ((argv (argv-get)))
     (when (>= (length argv) 1)
       (parse-integer (elt argv 0))))
-;; For "html_links_textualize.lispexe":
-;; using `:executable nil` did not change the size at all
-;; compression level 0: no noticeable compression (44MB)
-;; compression level 1-3: 13MB
-;; compression level 4: 12MB
-;; compression level 9: 12MB
-;; overall, the faster compilation and startup of the lower levels is worth it
+  ;; For "html_links_textualize.lispexe":
+  ;; using `:executable nil` did not change the size at all
+  ;; compression level 0: no noticeable compression (44MB)
+  ;; compression level 1-3: 13MB
+  ;; compression level 4: 12MB
+  ;; compression level 9: 12MB
+  ;; overall, the faster compilation and startup of the lower levels is worth it
   )
 
 (defun lispexe-save-and-die (&key
-                               name toplevel
+                               name (toplevel nil)
                                (compression (lispexec-compression-get)))
-  (sb-ext:save-lisp-and-die name :toplevel toplevel :executable t :compression compression))
+  (cond
+    (toplevel
+     (sb-ext:save-lisp-and-die name :toplevel toplevel :executable t :compression compression))
+    (t
+     (sb-ext:save-lisp-and-die name :executable t :compression compression))))
 ;;;

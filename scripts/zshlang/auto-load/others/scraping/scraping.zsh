@@ -383,15 +383,14 @@ function w2e-curl() {
 noglobfn w2e-curl
 
 function wread-curl() {
-    full-html2 "$1"
-    # gurl "$1"
+    full-html2 "$1" | html-links-textualize
 }
-
+##
 function w2e-gh() {
     h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }
 noglobfn w2e-gh
-
+##
 function url-exists() {
     local ret=1 url="$1"
 
@@ -455,11 +454,20 @@ function url-final3() {
 }
 reify url-final url-final2 url-final3
 noglobfn url-final url-final2 url-final3
+##
 function url-tail() {
     [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]" || ec "$1"
 }
 reify url-tail
 noglobfn url-tail
+
+typeset url_head_regex='(?i)\b(https?:/{1,3}[^/]+[.][^/]+)'
+function url-head() {
+    [[ "$1" =~ "$url_head_regex" ]] && ec "$match[1]" || ec "$1"
+}
+reify url-tail
+noglobfn url-tail
+##
 function tlrlu(){
     tlrl-ng "$@" -p "$(url-tailf "$1") | "
 }
@@ -1538,7 +1546,12 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
         ecerr "$url is not an HTML file. Aborting."
         return 0 # this is not exactly an error. Returning 1 might cause useless retries.
     fi
-    local cleanedhtml="$(<<<"$html" readability "$url")"
+
+    local cleanedhtml
+    cleanedhtml="$(<<<"$html" readability "$url")" @TRET
+
+    cleanedhtml="$(<<<"$cleanedhtml" html-links-absolutify "$(url-head "$url")")" @TRET
+
     if test -z "$noSummaryMode" ; then
         local prehtml="$(url2html "$url")"
         ec "$prehtml <hr> "
@@ -1764,15 +1777,7 @@ function url-date() {
 ##
 aliasfn rss-tll rss-tl -e w2e-curl
 ##
-function html-links-textualize {
-    : "usage: cat some.html | html-links-textualize > output.html"
+aliasfn html-links-textualize ifdefined-cmd-or-cat html_links_textualize.lisp
 
-    if isdefined-cmd html_links_textualize.lispexe ; then
-        html_links_textualize.lispexe "$@"
-    else
-        ecerr "$0: html_links_textualize.lispexe not found, falling back to 'cat'"
-
-        cat
-    fi
-}
+aliasfn html-links-absolutify ifdefined-cmd-or-cat html_links_absolutify.lisp
 ##

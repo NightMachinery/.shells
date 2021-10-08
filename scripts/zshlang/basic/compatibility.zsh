@@ -46,6 +46,24 @@ function cmd-sub() {
         print -nr -- "$sub"
     fi
 }
+
+function ifdefined-cmd-or-cat {
+    local cmd="$1" ; shift
+    assert-args cmd @RET
+
+    if isdefined-cmd "$cmd" ; then
+        "$cmd" "$@"
+    else
+        ecerr "$(fn-name 3): $(gquote-sq $cmd) not found, falling back to 'cat'"
+
+        cat
+    fi
+
+    ## @tests
+    # `aliasfn t-cat ifdefined-cmd-or-cat nonexistent-918982`
+    # `aliasfn t-char-count ifdefined-cmd-or-cat wc -c`
+    ##
+}
 ##
 function ensure-dep1 {
     local dep="$1" install_cmd=("${@[2,-1]}")
