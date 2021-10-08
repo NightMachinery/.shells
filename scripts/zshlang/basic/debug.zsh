@@ -355,9 +355,10 @@ function ensure-args() {
     fi
     local caller="${@[-1]}" args=("${@[1,-2]}")
 
-    local arg ret=0 failed=()
+    local arg ret=0 failed=() arg_value
     for arg in "$args[@]" ; do
-        if test -z "${(P)arg[*]}" ; then
+        arg_value="${(P)arg[*]}"
+        if test -z "$arg_value" ; then
             ##
             # ecerr "$caller: argument '$arg' is empty."
             ##

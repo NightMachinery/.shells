@@ -66,6 +66,7 @@ function pxify() {
     pxify-command conda
     # pxify-command go # TLS errors with genrouter
     pxify-command manga-py
+    pxify-command pandoc # it needs this to download images
 
     pxaify-command brew # makes downloads faster
     pxaify-command pip # makes downloads faster
