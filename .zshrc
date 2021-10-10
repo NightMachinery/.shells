@@ -603,7 +603,8 @@ function nightsh-load-zshrc() {
   ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
   ###
   # remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
-  WORDCHARS="${WORDCHARS/\//}|"
+  WORDCHARS="${WORDCHARS/\//}|'"
+  WORDCHARS="${WORDCHARS/#/}"
 
   function backward-kill-word2() {
     if [[ "$LBUFFER" =~ '(.*)\s+$' ]] ; then

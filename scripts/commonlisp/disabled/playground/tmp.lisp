@@ -34,4 +34,6 @@
 
 (letd ((a12 "iNA"))
   (concat a12))
-;;
+;;;
+(format t "a~ab" "\\n")
+;;;

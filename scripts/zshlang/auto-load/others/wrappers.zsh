@@ -111,3 +111,7 @@ function ssh-p() {
   fi
 }
 ##
+function pwd() {
+  builtin pwd | cat-copy-if-tty
+}
+##

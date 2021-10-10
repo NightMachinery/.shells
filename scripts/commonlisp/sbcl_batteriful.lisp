@@ -12,7 +12,10 @@
 ;;;
 (dep-load
  "alexandria"
+ "str"
+ "Serapeum"
  :lquery
  )
 ;;;
-(lispexe-save-and-die :name "sbcl_batteriful")
+(when (not *repl-mode*)
+  (lispexe-save-and-die :name "sbcl_batteriful"))

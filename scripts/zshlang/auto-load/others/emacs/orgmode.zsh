@@ -31,7 +31,7 @@ function org-update-files() {
 }
 
 function fd-org {
-    fd --extension org --extension org_archive --type f "$@"
+    fd --absolute-path --extension org --extension org_archive --type f "$@"
 }
 
 function org-update-files-all() {
@@ -304,13 +304,13 @@ function rep-clean {
 ##
 function cutestarsabove {
     ensure-array cutestarsabove_po
-    local query="$1" \
+    local query=("$@") \
         p_opts=("${cutestarsabove_po[@]}") \
         n="${cutestarsabove_n:-4000}"
         fd_query="${cutestarsabove_fq:-.}"
 
     {
-    reval-ec fd-org "${fd_query}" "$PWD" | reval-ec parad -N "$n" --pipe "$p_opts[@]" cutestarsabove.pl "$query"
+    reval-ec fd-org "${fd_query}" "$PWD" | reval-ec parad -N "$n" --pipe "$p_opts[@]" cutestarsabove.pl "$query[@]"
     # add --dry-run to see how many jobs it runs
     } always {
         bell-lm-diary-search-fx
@@ -320,4 +320,15 @@ function cutestarsabove {
     # `time2 @opts fq 'recommendation' @ cutestarsabove 'time.?travel' > ../search_results/timetravel_rec..org-highlighter..org`
     ##
 }
+
+function cutestarsabove-open {
+    local tmp
+    tmp="$(gmktemp --suffix="${ntag_sep}org-highlighter${ntag_sep}.org")" @TRET
+
+    cutestarsabove "$@" > "$tmp" @RET
+
+    emc-open "$tmp"
+}
+@opts-setprefix cutestarsabove-open cutestarsabove
+alias seec='cutestarsabove-open'
 ##

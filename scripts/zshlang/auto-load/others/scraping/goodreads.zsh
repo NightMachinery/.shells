@@ -40,26 +40,38 @@ function goodreads-export-backup() {
 }
 ##
 function goodreads-url-to-json {
-    local url="$1"
+    : "the output of this function needs further processing by goodreads_url_json_to_org.lisp; export JSON from that script if you want to use it elsewhere."
+
+    local url="${1:-$(pbpaste)}"
     assert-args url @RET
 
     eval-memoi 'full-html2' "$url" \
+        | html-links-absolutify 'https://www.goodreads.com' \
         | selectors2json.py \
-        description '#descriptionContainer span[style="display:none"]' \
-        bookFormat '[itemprop="bookFormat"]' \
-        pageCount '[itemprop="numberOfPages"]' \
-        publicationDetails '#details > div.row:nth-child(2)' \
-        title '#bookDataBox .clearFloats:nth-child(1) .infoBoxRowTitle+.infoBoxRowItem' \
-        isbn '[itemprop="isbn"]' \
-        language '[itemprop="inLanguage"]' \
-        series '#bookDataBox a[href^="/series/"]' \
-        genres '.actionLinkLite.bookPageGenreLink' \
-        | sd '\[\[/' '[[https://www.goodreads.com/' \
+        description '#descriptionContainer span[style="display:none"]' '->org' \
+        bookFormat '[itemprop="bookFormat"]' '' \
+        pageCount '[itemprop="numberOfPages"]' '' \
+        publicationDetails '#details > div.row:nth-child(2)' '->org' \
+        title '#bookTitle' '' \
+        authors '#bookAuthors' '->org' \
+        rating '[itemprop="ratingValue"]' '' \
+        ratingCount '[itemprop="ratingCount"]' 'attr:content' \
+        reviewCount '[itemprop="reviewCount"]' 'attr:content' \
+        isbn '[itemprop="isbn"]' '' \
+        language '[itemprop="inLanguage"]' '' \
+        series '#bookDataBox a[href^="/series/"]' '' \
+        genres '.actionLinkLite.bookPageGenreLink' '->org' \
         | jq '.'
+
+    ## old selectors:
+    # title '#bookDataBox .clearFloats:nth-child(1) .infoBoxRowTitle+.infoBoxRowItem' \
+    ## deceptive selectors:
+    # series '#bookSeries'
+    ##
 }
 
 function goodreads-url-to-org {
-    local url="$1"
+    local url="${1:-$(pbpaste)}"
     assert-args url @RET
 
     goodreads-url-to-json "$url" \
