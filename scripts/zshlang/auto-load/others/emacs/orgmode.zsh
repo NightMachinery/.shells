@@ -321,13 +321,17 @@ function cutestarsabove {
     ##
 }
 
-function cutestarsabove-open {
+function cutestarsabove-open-pipe {
     local tmp
     tmp="$(gmktemp --suffix="${ntag_sep}org-highlighter${ntag_sep}.org")" @TRET
 
-    cutestarsabove "$@" > "$tmp" @RET
+    cat > "$tmp" @RET
 
     emc-open "$tmp"
+}
+
+function cutestarsabove-open {
+    cutestarsabove "$@" | cutestarsabove-open-pipe
 }
 @opts-setprefix cutestarsabove-open cutestarsabove
 alias seec='cutestarsabove-open'
