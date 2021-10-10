@@ -15,8 +15,11 @@
 
 (dep-load
  :cl-ppcre
+ :cl-interpol
  "jsown"  ;; @todo1 should not be imported for projects that don't use JSON
  )
+
+(named-readtables:in-readtable :interpol-syntax)
 ;;;
 (setf sb-impl::*default-external-format* :utf-8)
 ;;;
@@ -127,6 +130,24 @@
 (comment
   (listify-if-not 89)
   (listify-if-not (list 1 2)))
+;;;
+(defun pandoc-normalize-whitespace (str)
+  ;; @duplicateCode/ed0e38095407ff82d0f12a431c3c10a2
+  (substitute #\Space #\NO-BREAK_SPACE str))
+
+(defun pandoc-org-trim-extra (str)
+  ;; @duplicateCode/4674af46b8f4fbbf90274bc262198216
+  ;; \h not supported here
+  (string-trim
+   (list #\Space #\Newline)
+   (ppcre::regex-replace-all
+    ;; #?/(?:\n|\A)\h*(?:(?::PROPERTIES:(?:.|\n)*?:END:)|(?:<<.*?>>))\h*/
+    "(?:\\n|\\A)\\s*(?:(?::PROPERTIES:(?:.|\\n)*?:END:)|(?:<<.*?>>))"
+
+    str "")))
+
+(defun org-trim-forced-newlines (str)
+  (ppcre:regex-replace-all "\\\\" str ""))
 ;;;
 (defun html2org (html)
   (cmd-result-outrs (brishz-ll :args '("html2org" "/dev/stdin") :input html)))
@@ -337,6 +358,8 @@
    (concat b6)))
 ;;;
 (alias-fn s-starts-with-p uiop:string-prefix-p)
+;;;
+(alias-fn nil-p null)
 ;;;
 (defun lispexec-compression-get ()
   (let ((argv (argv-get)))

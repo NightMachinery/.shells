@@ -108,9 +108,7 @@ function pandoc-convert() {
         if [[ "$to" == org ]] ; then
             pandoc-normalize-whitespace | {
                 if bool $trim_extra ; then
-                    perl -0777 -pe 's/(?:\n|\A)\h*(?:(?::PROPERTIES:(?:.|\n)*?:END:)|(?:<<.*?>>))\h*//g'
-
-                    # [[nightNotes:private/playgrounds/pandoc.zsh::perl -0777 -pe][perl]]
+                    pandoc-org-trim-extra
                 else
                     cat
                 fi
@@ -137,9 +135,20 @@ function pandoc-convert() {
     fi
 }
 
+function pandoc-org-trim-extra {
+    # @duplicateCode/4674af46b8f4fbbf90274bc262198216
+    local pandoc_org_extra_regex
+    pandoc_org_extra_regex='(?:\n|\A)\h*(?:(?::PROPERTIES:(?:.|\n)*?:END:)|(?:<<.*?>>))\h*'
+
+    perl -0777 -pe "s/${pandoc_org_extra_regex}//g"
+
+    # [[nightNotes:private/playgrounds/pandoc.zsh::perl -0777 -pe][perl]]
+}
+
 function pandoc-normalize-whitespace() {
+    # @duplicateCode/ed0e38095407ff82d0f12a431c3c10a2
     gsed 's/ / /g'
-    # pandoc uses some bad whitespace that cannot be read by org-mode
+    # pandoc uses some bad whitespace (U+00A0)(#\NO-BREAK_SPACE) that cannot be read by org-mode
     #
     # https://superuser.com/questions/517847/use-sed-to-replace-nbsp-160-hex-00a0-octal-240-non-breaking-space
 }

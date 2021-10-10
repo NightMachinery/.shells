@@ -23,21 +23,51 @@ sub org_title_escape {
 sub block_process {
     my $block = shift;
     my $start = shift;
-    my $query = shift;
+    my @queries = @{ shift; } ;
     my $file_escaped = shift;
 
-    if ($block =~ m/$query/) {
-        my $first_match_start = $start + $-[0] + 1;
-        my $file_point_head = "file_point:${file_escaped}";
+    my $file_point_head = "file_point:${file_escaped}";
+    my $block_highlighted = $block ;
 
-        my $block_highlighted = ($block =~ s/$query/"[[highlight:,,${file_point_head}::".($start + $-[0] + 1)."][".org_title_escape($&)."]]"/erg);
+    my $echo_block = 0;
+    my $match_mode = 'and';
 
-        ##
-        # $block =~ m/^(\*+)/;
-        # my $level_stars = $1;
-        # say "${level_stars} [[${file_point_head}::${first_match_start}][jump]]";
-        ##
-        # output all blocks as a first-level heading:
+    if ($match_mode eq 'and') {
+        $echo_block = 1;
+    } else {
+        $echo_block = 0;
+    }
+
+    my $first_match_start = 0;
+    for my $query (@queries) {
+        if ($block =~ m/$query/) {
+            $first_match_start = $start + $-[0] + 1;
+
+            if ($match_mode eq 'or') {
+                $echo_block = 1;
+            }
+
+            $block_highlighted =~ s/$query/"[[highlight:,,${file_point_head}::${first_match_start}][".org_title_escape($&)."]]"/eg;
+            ## @todo2 how can we get the position the match would have had in the original string?
+            #    - one way is to keep a datastructure to mark different regions of the highlighted string as 'original' and 'markup'
+            #      + this approach might fail for overlapping matches
+            #
+            #    + another solution is to get the positions for all the queries, store them, then do the replacements.
+            #      - we need to be smart about overlapping matches, and unify them:
+            #          searching for ali, ibaba in 'alibaba'
+            #            should highlight '[[highighlt:...][alibaba]]'
+            #
+            ##
+            #             $block_highlighted =~ s/$query/"[[highlight:,,${file_point_head}::".($start + $-[0] + 1)."][".org_title_escape($&)."]]"/eg;
+        } else {
+            if ($match_mode eq 'and') {
+                $echo_block = 0;
+            }
+        }
+    }
+
+    if ($echo_block) {
+        ## output all blocks as a first-level heading:
         $block_highlighted =~ s/\A(\*+)/"* |".(length $1)."|"/e ;
         # \A     Match only at beginning of string
 
@@ -45,12 +75,17 @@ sub block_process {
     }
 }
 ##
-my $query = $ARGV[0];
-if ($query =~ m/\p{Lu}/) { # smartcase
-    $query = qr/$query/;
-} else {
-    $query = qr/$query/i;
-}
+my @queries = map {
+    my $query = $_;
+    if ($query =~ m/\p{Lu}/) { # smartcase
+        $query = qr/$query/;
+    } else {
+        # print STDERR "case-insensitive: ${query}\n";
+
+        $query = qr/$query/i;
+    }
+    $query;
+} @ARGV ;
 
 while (<stdin>) {
     chomp;
@@ -91,7 +126,7 @@ while (<stdin>) {
             my $block = (substr $document, $start, $length);
             # say $block;
 
-            block_process($block, $start, $query, $file_escaped);
+            block_process($block, $start, \@queries, $file_escaped);
         }
 
         pos = $next_start;
@@ -99,5 +134,5 @@ while (<stdin>) {
 
     # say "last block";
     my $block = (substr $document, $end);
-    block_process($block, $end, $query, $file_escaped);
+    block_process($block, $end, \@queries, $file_escaped);
 }

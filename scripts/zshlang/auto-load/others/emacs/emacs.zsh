@@ -209,6 +209,10 @@ function lisp-quote() {
     ##
 }
 aliasfn emc-quote lisp-quote
+
+function lisp-quote-all {
+    cat-paste-if-tty | in-or-args "$@" | lisp-quote-all.lisp | cat-copy-if-tty
+}
 ##
 function emc-nowait2() {
     local f="$1" cmd="${emc_nowait2_cmd:-find-file}"

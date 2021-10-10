@@ -12,8 +12,8 @@ function less-min() {
 }
 
 ## @personal :
-export LESS="${LESSMIN} -N"
-isSSH && LESS="-RiNF"
+export LESS="${LESSMIN}" # -N for page numbers (this messes up word-wrapping)
+isSSH && LESS="-RiF"
 export PAGER="$commands[less]"
 ##
 function jqless() {

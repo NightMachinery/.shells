@@ -3,7 +3,7 @@ function ntl() {
 
     local opts=()
     local i
-    for i in org md txt zsh ; do
+    for i in org org_archive md txt zsh ; do
         opts+=( --iglob "*.${i}" )
     done
 
@@ -30,7 +30,7 @@ function seev() {
 noglobfn seev
 ##
 function bookmark-search() {
-    nightNotes="${nightNotes}/private/backups/web bookmarks/" ntsearch_glob="*.org" ntl-rg "$@"
+    nightNotes="${nightNotes}/private/backups/web bookmarks/" ntsearch_glob="*.(org|org_archive)" ntl-rg "$@"
 }
 alias bks='bookmark-search'
 ##
