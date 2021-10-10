@@ -604,7 +604,7 @@ function nightsh-load-zshrc() {
   ###
   # remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
   WORDCHARS="${WORDCHARS/\//}|'"
-  WORDCHARS="${WORDCHARS/#/}"
+  WORDCHARS="${WORDCHARS/\#/}"
 
   function backward-kill-word2() {
     if [[ "$LBUFFER" =~ '(.*)\s+$' ]] ; then
