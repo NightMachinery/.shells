@@ -12,12 +12,17 @@ function in-or-args2() {
 }
 
 function in-or-args() {
-    (( $# )) && arrN "$@" || {
-            if ! isInTty ; then
-                print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
-            fi
-        }
+    if (( $# )) ; then
+        arrN "$@"
+    else
+        if isInTty ; then
+            pbpaste
+        else
+            print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
+        fi
+    fi
 }
+
 function pcat() {
     possiblycat "${@:-50}"
 }

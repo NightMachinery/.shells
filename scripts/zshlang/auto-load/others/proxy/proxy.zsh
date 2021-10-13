@@ -194,11 +194,19 @@ function proxy-off() {
 }
 ##
 function proxy-is() {
-    # @darwinonly
     unset proxy_port
+
+    if isDarwin ; then
     local pxstatus="$(networksetup -getsocksfirewallproxy "$(darwin-proxy-getns-cached)")"
+
     [[ "$pxstatus" =~ 'Port:\s*(\S*)' ]] && proxy_port="$match[1]"
+
+    dact ec "$pxstatus" >&2
+
     ec $pxstatus | silent command rg 'Enabled: Yes'
+    else
+        @NA
+    fi
 }
 function proxy-toggle() {
     # silent bello &

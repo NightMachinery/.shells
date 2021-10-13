@@ -711,3 +711,6 @@ bell-maker 'p2-target-lost' 'PC Computer - Portal 2 - Turret/turret_search_2..bl
 
 bell-maker 'p2-target-acquired' 'PC Computer - Portal 2 - Turret/turret_active_2.wav'
 ##
+aliasfn bell-continuous loop bell-lm-MI
+aliasfn bellc bell-continuous
+##

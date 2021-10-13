@@ -68,6 +68,11 @@ function html2plain {
     @opts f plain @ html2org "$@"
 }
 
+function html2plain-std {
+    # somewhat faster than html2plain, but less flexible
+    pandoc --wrap=none --from html --to plain - -o -
+}
+
 function html2md {
     @opts f markdown @ html2org "$@"
 }
@@ -108,7 +113,7 @@ function pandoc-convert() {
         if [[ "$to" == org ]] ; then
             pandoc-normalize-whitespace | {
                 if bool $trim_extra ; then
-                    pandoc-org-trim-extra
+                    pandoc-org-trim-extra | org-trim-forced-newlines
                 else
                     cat
                 fi
@@ -144,6 +149,12 @@ function pandoc-org-trim-extra {
 
     # [[nightNotes:private/playgrounds/pandoc.zsh::perl -0777 -pe][perl]]
 }
+
+function org-trim-forced-newlines {
+    # @duplicateCode/1102efd8dd0367b8dc12d7e3678dca59
+    sd '\\\\' ''
+}
+
 
 function pandoc-normalize-whitespace() {
     # @duplicateCode/ed0e38095407ff82d0f12a431c3c10a2

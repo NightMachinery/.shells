@@ -5,6 +5,7 @@ function rtl-reshaper-py() {
       rtl_reshaper.py "$@"
   fi
 }
+
 function rtl-reshaper() {
     if isRtl ; then
         cat
@@ -12,6 +13,11 @@ function rtl-reshaper() {
          COLUMNS="$COLUMNS" rtl_reshaper.dash "$@"
     fi
 }
+
+function rtl-reshaper-fast {
+  COLUMNS="$COLUMNS" fribidi --nobreak "$@"
+}
+
 function reval-rtl() {
   if isRtl ; then
     # not having a pipe can make more stuff work, so this opens the possibility of you seeing bugs later (i.e., some bugs will only become visible when you use rtl-reshaper)
