@@ -32,7 +32,11 @@ function erase-ansi-old() {
 function erase-ansi() {
     # @alt http://www.andre-simon.de/doku/ansifilter/en/ansifilter.php
     ##
-    if test -n "${commands[strip-ansi]}" ; then
+    if true ; then
+        perl -MTerm::ANSIColor=colorstrip -ne 'print colorstrip($_)'
+        # Term::ANSIColor is part of the Perl core
+    elif false && test -n "${commands[strip-ansi]}" ; then
+        # too slow (nodeJS), but more reliable than erase-ansi-old
         command strip-ansi
     else
         erase-ansi-old

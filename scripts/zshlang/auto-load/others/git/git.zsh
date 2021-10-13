@@ -462,12 +462,13 @@ function git-pristine() {
   : 'Single repo: git reset --hard && git clean -dfx'
 
   git clean -dfx
+  #  -x Don't use the standard ignore rules (see gitignore(5)), but still use the ignore rules given with -e options from the command line. This allows removing all untracked files, including build products. This can be used (possibly in conjunction with git restore or git reset) to create a pristine working directory to test a clean build.
+
   git submodule foreach --recursive git clean -dfx
   git reset --hard
   git submodule foreach --recursive git reset --hard
   git submodule update --init --recursive
 }
-
 ##
 function gp-incremental {
   local i
