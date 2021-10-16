@@ -110,9 +110,9 @@ function goodreads-url-to-tlg {
     org="$(goodreads-url-to-org "$url")" @TRET
 
     ##
-    # ec "$org" | org2tlg "$dest"
+    ec "$org" | org2tlg-with-props "$dest"
     ##
-    tsend -- "$dest" "$org"
+    # tsend -- "$dest" "$org"
     ##
 }
 ##

@@ -234,8 +234,19 @@ goodreads_author_ids=(
 goodreads_author_urls=()
 local author
 for author in $goodreads_author_ids[@] ; do
-    goodreads_author_urls+=    "https://www.goodreads.com/author/list/${author}?utf8=%E2%9C%93&sort=original_publication_year"
+    goodreads_author_urls+="https://www.goodreads.com/author/list/${author}?utf8=%E2%9C%93&sort=original_publication_year"
 done
 
-tmuxnewshenv="rt_skip='$rt_skip' rt_duplicates_key=goodreads rt_nt=y rt_ge=( re goodreads-author-works-get ) rt_notel=y rt_e=(goodreads-url-to-tlg) rt_eud=0 rt_eid=$((3600*24*7))" \
-    tmuxnewsh goodreads-authors rss-tsend "$goodreads_author_urls[@]"
+local i
+for i in {0..10} ; do
+# for i in 0 ; do
+    start=$(( (i * 50) + 1 ))
+    end=$(( (i+1) * 50))
+    if (( $end > ${#goodreads_author_urls} )) ; then
+        break
+    fi
+
+    tmuxnewshenv="rt_skip='$rt_skip' rt_duplicates_key=goodreads rt_nt=y rt_ge=( re goodreads-author-works-get ) rt_notel=y rt_e=(goodreads-url-to-tlg) rt_eud=0 rt_eid=$((3600*24*7))" \
+        tmuxnewsh "goodreads-authors-${i}" rss-tsend "${(@)goodreads_author_urls[$start,$end]}"
+    # The OS limits the number of args we can feed to tmux on each subprocess call.
+done

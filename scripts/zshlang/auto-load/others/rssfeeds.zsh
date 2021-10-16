@@ -37,6 +37,7 @@ function sumgensim() {
     # elinks can be used for this too, as it also has a -dump option (and has -no-references to omit the list of links)
     text="$(w3m -dump "$1")" word_count="${2:-150}" serr python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
 }
+
 function sumym () {
     ## ALT:
     # Not that good (bad free tier, traditional algo):
@@ -98,7 +99,7 @@ function rss-tsend() {
 
         # https://github.com/flok99/rsstail
         ##
-        reval "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err > >(command ts "%d-%m-%y %H_%M_%S" >> $log) | {
+        reval-ec "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err > >(command ts "%d-%m-%y %H_%M_%S" >> $log) | {
             # protect our stdin:
             exec {fd_in}<&0
             exec </dev/null
