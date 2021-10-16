@@ -95,7 +95,7 @@ function org2tlg {
     local dest="${1:-${me_tel}}"
     assert-args dest @RET
 
-    tsend --parse-mode=md -- "${dest}" "$(cat-paste-if-tty | org2md | sd '\\'"('|\")" '$1')"
+    tsend --parse-mode=md -- "${dest}" "$(cat-paste-if-tty | org2md | sd '\\'"('|\"|#)" '$1')"
 }
 
 function org2tlg-with-props {
