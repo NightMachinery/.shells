@@ -242,7 +242,7 @@ for i in {0..10} ; do
 # for i in 0 ; do
     start=$(( (i * 50) + 1 ))
     end=$(( (i+1) * 50))
-    if (( $end > ${#goodreads_author_urls} )) ; then
+    if (( $start > ${#goodreads_author_urls} )) ; then
         break
     fi
 
