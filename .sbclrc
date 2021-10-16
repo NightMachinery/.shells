@@ -33,6 +33,11 @@
   "Aliases macros. Note that redefining the original will not update the alias, and you need to redefine the alias as well."
   `(setf (macro-function ',to) (macro-function ',macro)))
 ;;;
+(defun empty-str-to-nil (str)
+  ;; @duplicateCode/02a88ee7dd8a3c6ecfcdf7f1fc2f3827
+  (when (and str (not (string= str "")))
+    str))
+;;;
 (defun concat (&rest strings)
   "@example (concat \"hi \" \"hmm \" \"()\")"
   (apply #'concatenate 'string strings))
