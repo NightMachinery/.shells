@@ -8,5 +8,5 @@ typeset +x KITTY_WINDOW_ID
 # I don't remember why we had unexported this, but doing that will essentially force us to either hardcode 'isKitty' or re-export this var in our wrappers
 # Perhaps the unexporting helps with not having wrong IDs in the tmux sessions, which can cause problems.
 ##
-alias sbb='KITTY_WINDOW_ID=$KITTY_WINDOW_ID exec env -i ${commands[zsh]}'
+alias sbb='exec env -i KITTY_WINDOW_ID=$KITTY_WINDOW_ID TERM=$TERM ${commands[zsh]}'
 ##
