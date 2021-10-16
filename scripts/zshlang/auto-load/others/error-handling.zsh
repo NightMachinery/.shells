@@ -29,4 +29,10 @@ function failnoisily() {
         notif "$0: $(gq "$@") (returned $r) "
     fi
 }
+
+function failnoisily-if-net {
+    assert-net @RET
+
+    failnoisily "$@"
+}
 ##

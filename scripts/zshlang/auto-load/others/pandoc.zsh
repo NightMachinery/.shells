@@ -2,6 +2,10 @@ function epub2org() {
     @opts from epub to org trim_extra n @ pandoc-convert "$@"
 }
 
+function epub2plain() {
+    @opts from epub to plain @ pandoc-convert "$@"
+}
+
 function md2org() {
     @opts from markdown to org @ pandoc-convert "$@"
 }
@@ -169,4 +173,13 @@ function pandoc-normalize-whitespace() {
 #     reval-copy pandoc --from html --to org =(pbpaste) -o -
 # }
 # aliasfn p-h2o pop-html2org
+##
+function doc2org {
+    : "pandoc only supports DOCX"
+
+    local inputs=($@)
+
+    reval-ec antiword -f "$inputs[@]"
+    #        -f     Output in formatted text form. That means that  bold  text  is printed  like  *bold*,  italics  like /italics/ and underlined text as _underlined_.
+}
 ##

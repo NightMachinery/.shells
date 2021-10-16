@@ -88,3 +88,4 @@ zxcvbn
 dnspython
 Unidecode
 pytictoc
+jupytext

@@ -3,7 +3,8 @@ mkdir -p ~/log
 rt_skip="$rt_skip"
 
 ##
-source "$commands[launch-tumblr.zsh]"
+source-cmd launch-tumblr.zsh
+# source-cmd launch-goodreads-authors.zsh
 ## podcasts
 tmuxnewshenv="rt_skip='$rt_skip' rt_e=(@opts dest $tlg_podcastgen @ podcast2tel) rt_notel=y rt_ge=( rsstail -i 120 -e -n 3 -N ) rt_eud=0" tmuxnewsh rss-podcastgen rss-tsend 'https://rss.art19.com/techmeme-ridehome'
 ## uni

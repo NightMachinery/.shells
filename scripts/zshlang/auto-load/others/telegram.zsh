@@ -1,19 +1,23 @@
 alias tsmf='tsendf $me_tel'
 ###
 function tnotif() {
-    # ALT: notif
-    local msg="$*"
+    # @alt notif
+    ##
+    ensure-array tnotif_opts
+    local msg="$*" opts="${tnotif_opts[@]}"
 
     (( ${+commands[matrix-send-self]} )) && matrix-send-self "$msg"
-    tsend --parse-mode markdown -- "$tlg_notifs" "$msg"
+    tsend --parse-mode markdown "$opts[@]" -- "$tlg_notifs" "$msg"
 }
+
 function tnotif-casual() {
     # CASUAL Mode
-    local msg="$*"
-
-    tsend --parse-mode markdown -- "$tlg_notifc" "$msg"
+    ##
+    tlg_notifs="$tlg_notifc" tnotif "$@"
 }
+@opts-setprefix tnotif-casual tnotif
 aliasfn tnotifc tnotif-casual
+@opts-setprefix tnotifc tnotif
 ##
 function tsendf() {
     local f opts=()
@@ -88,6 +92,9 @@ function md2tlg {
 }
 
 function org2tlg {
-    tsend --parse-mode=md -- "${me_tel}" "$(org2md)"
+    local dest="${1:-${me_tel}}"
+    assert-args dest @RET
+
+    tsend --parse-mode=md -- "${dest}" "$(cat-paste-if-tty | org2md)"
 }
 ##

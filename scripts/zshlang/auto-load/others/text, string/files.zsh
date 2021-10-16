@@ -27,3 +27,16 @@ function pre-files() {
 }
 @opts-setprefix pre-files agr
 ##
+function f-text-split {
+  : "splits a text file into parts having the specified size"
+
+  local i="$1" size="$2"
+  assert-args i size
+  if [[ "$size" =~ '^\d+$' ]] ; then
+    size+='k' # use kilobytes by default
+  fi
+  local o="${3:-${i}_part}"
+
+  reval-ec gsplit -C "$size" --numeric-suffixes "$i" "$o"
+}
+##

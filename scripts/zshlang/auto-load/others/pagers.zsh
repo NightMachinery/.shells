@@ -1,5 +1,10 @@
 ##
-export GIT_PAGER="delta --light --theme 'Solarized (light)'"
+export GIT_PAGER="delta --light --syntax-theme 'Solarized (light)'"
+function diff-colorer {
+    command delta --light --syntax-theme 'Solarized (light)' "$@"
+    # --true-color=always
+}
+aliasfn git-pager diff-colorer
 ##
 export LESSMIN='-RiF --mouse --wheel-lines=3 -j.3'
 # F: --quit-if-one-screen ; R: maintain the ANSI colour sequences; i: smartcase searches (all lower=ignore case);  -N or --LINE-NUMBERS Causes a line number to be displayed at the beginning of each line in the display.

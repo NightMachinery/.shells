@@ -152,7 +152,13 @@ alias grhh='git reset HEAD --hard'
 alias grmv='git remote rename'
 alias grrm='git remote remove'
 alias grset='git remote set-url'
-alias grt='cd $(git rev-parse --show-toplevel || echo ".")'
+##
+alias grt='cd "$(git-root || echo ".")"'
+function git-root {
+   git rev-parse --show-toplevel
+}
+aliasfn gitroot git-root
+##
 alias gru='git reset --'
 alias grup='git remote update'
 alias grv='git remote -v'
@@ -277,7 +283,7 @@ function gsync() {
   local branch="${gsync_branch:-${gsync_b}}"
   local remote="${gsync_remote:-${gsync_r}}"
 
-  pushf "$(git rev-parse --show-toplevel)" || return 1
+  pushf "$(git-root)" || return 1
   {
     if test -z "$branch" ; then
       ##

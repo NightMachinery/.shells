@@ -75,6 +75,8 @@ function tmux-capture() {
     local target="${1:?}" limit="${2}" # empty limit seems to mean return everything
     tmux capture-pane -p -S -"$limit" -t "$target"
 }
+
+aliasfn tcgar tmux-capture BrishGarden
 ##
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 function ivy() {

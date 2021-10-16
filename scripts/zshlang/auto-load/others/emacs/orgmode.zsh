@@ -247,9 +247,31 @@ function org-fanfic {
     ec "${tags}[[${url}][${title}]]${org_props_folded}- @author ${author}"$'\n'"#+begin_quote${body}"$'\n'"#+end_quote"
 }
 ##
-function org-date-extract {
-    rget '(?:\[|<)(jalali:[^]]+)(?:\]|>)'
+function org-link-extract {
+    local link_type="$org_link_extract_type"
+
+    cat-paste-if-tty | rget '(?:\[|<)('${link_type}':[^]]+)(?:\]|>)' | cat-copy-if-tty
 }
+
+aliasfn org-link-extract-audiofile org_link_extract_type=audiofile org-link-extract
+function org-link-extract-audiofile-abs {
+    local fs
+    fs="$(org-link-extract-audiofile)" @TRET
+    fs="$(ec "$fs" | sd '^audiofile:' '')" @TRET
+    fs="$(ec "$fs" | inargsf path-unabbrev)" @TRET
+
+    ec "$fs"
+}
+
+function org-audiofile-play {
+    local fs
+    fs="$(org-link-extract-audiofile-abs)" @TRET
+
+    ec "$fs" | inargsf rgeval hear
+}
+##
+aliasfn org-link-extract-jalali org_link_extract_type=jalali org-link-extract
+aliasfn org-date-extract org-link-extract-jalali
 
 function org-date-extract-first {
     org-date-extract "$@" | ghead -n 1

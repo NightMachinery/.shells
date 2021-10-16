@@ -149,7 +149,11 @@ function paste-after() { # paste
 }
 
 function p {
-    paste-after "$@"
+    if (( $#@ == 0 )) ; then
+        pbpaste
+    else
+        paste-after "$@"
+    fi
 }
 ##
 function enh-addfinder() {

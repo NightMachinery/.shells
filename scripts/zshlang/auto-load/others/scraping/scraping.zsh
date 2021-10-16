@@ -258,7 +258,8 @@ function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
     # seems to be because the server is messed up, but whatever:
     # http: error: Incomplete download: size=46696; downloaded=131310
-
+    ##
+    # assert-net @RET # not worth the perf hit?
 
     local url="$1"
     local mode="${fhMode}"
