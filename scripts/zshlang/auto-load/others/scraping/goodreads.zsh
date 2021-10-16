@@ -49,6 +49,7 @@ function goodreads-url-to-json {
         | html-links-absolutify 'https://www.goodreads.com' \
         | selectors2json.py \
         description '#descriptionContainer span[style="display:none"]' '->org' \
+        descriptionShort '#description' '->org' \
         bookFormat '[itemprop="bookFormat"]' '' \
         pageCount '[itemprop="numberOfPages"]' '' \
         publicationDetails '#details > div.row:nth-child(2)' '->org' \

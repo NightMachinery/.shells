@@ -77,7 +77,9 @@
                      (val (ppcre:regex-replace-all "\\bby\\b" val ""))
                      (val (string-trim " " val)))
                 val))
-             ((string= key "description")
+             ((or
+               (string= key "description")
+               (string= key "descriptionShort"))
               (let* ((val (org-trim-forced-newlines val))
                      (val (ppcre:regex-replace-all "(^|(?<=\\n))\\*-\\* " val "- "))
                      ;; (val (string-trim " ()" val))
@@ -112,6 +114,11 @@
                 )))
     (org-properties-write :keys keys :accessor accessor :out_stream out_stream))
 
-  (let ((desc (v0 "description")))
+  (let* ((desc (v0 "description"))
+        (desc
+          (cond
+            ((not (empty-str-to-nil desc))
+             (v0 "descriptionShort"))
+            (t desc))))
     (org-quote-write :content desc)
     ))
