@@ -167,9 +167,15 @@ function trs-empty-files() {
 }
 ##
 function h_path-abbrev() {
+    # * @perf this is way too slow
+    # * it doesn't work for non-existent dirs
+    #
+    # @todo2 We need to reimplement this ourselves, by registering the directories in `aliasdir'.
+    ##
     @inargsf
 
-    local dir="$1"
+    local dir="${1}"
+    dir="$(bottomdir "$dir")" @TRET
     assert test -d "$dir" @RET
 
     pushf "$dir"
@@ -225,5 +231,14 @@ reify f-size
 
 function f-size-labeled {
     gdu -h --apparent-size "$@"
+}
+##
+function mktemp-exact {
+    local name="$1"
+    assert-args name @RET
+
+    local tmpdir
+    tmpdir="$(gmktemp --directory)" @TRET
+    ec "${tmpdir}/${name}"
 }
 ##

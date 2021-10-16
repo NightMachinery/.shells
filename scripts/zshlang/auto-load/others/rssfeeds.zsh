@@ -56,6 +56,7 @@ function rss-tl() {
 function rss-ctitle() {
     ggrep -P --silent "$rc_t[@]" <<< "$2"
 }
+
 function rss-tsend() {
     ensure-redis || return 1
     mkdir -p ~/logs/

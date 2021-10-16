@@ -52,7 +52,14 @@ function kitty-tab-activate() {
 ##
 function kitty-tab-get() {
     local id="${1:-$KITTY_WINDOW_ID}"
-    assert-args id @RET
+    if test -z "$id" ; then
+        if isTmux ; then
+            ecgray "$0: No 'id' supplied. tmux detected; Ignoring."
+            return 1
+        else
+            assert-args id @RET
+        fi
+    fi
 
     kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].id == ($wid | tonumber))'
 }

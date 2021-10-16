@@ -20,12 +20,15 @@
     (dolist (attr_name (list "src" "href"))
       (loop for a across
                   (lquery:$ *doc* (inline
-                                   (concat  "[" attr_name "^=\"/\"]")))
+                                   ;; (concat "[" attr_name "^=\"/\"]")
+;;;
+                                   (concat "[" attr_name "]:not([" attr_name "^=\"http\"])")
+                                   ))
             do
                (letd ((url_rel
                        (aref (lquery:$ a (attr attr_name)) 0)))
                  (lquery:$ a
-                   (attr attr_name (concat url_base url_rel))))))
+                           (attr attr_name (concat url_base "/" url_rel))))))
 
     (when t ;; (not *repl-mode*)
       (format t "~a~%"

@@ -79,3 +79,40 @@ function goodreads-url-to-org {
         | cat-copy-if-tty
 }
 ##
+function goodreads-author-works-get {
+    assert-net @RET
+
+    local url="$1"
+    assert-args url @RET
+
+    local url_base='https://www.goodreads.com'
+
+    local html
+    html="$(full-html2 "$url")" @TRET
+    html="$(ec $html | html-links-absolutify "$url_base")" @TRET
+    html="$(ec $html | htmlq 'table.tableList .bookTitle')" @TRET
+    assert not whitespace-p "$html" @RET
+
+    ##
+    # ec $html | html2org | double-newlines
+    ##
+    local urls
+    urls="$(ec $html | htmlq '*' -a href)" @TRET
+    ec "$urls"
+    ##
+}
+##
+function goodreads-url-to-tlg {
+    local url="$1" dest="${goodreads_url_to_tlg_dest:-${water}}"
+    assert-args url dest @RET
+
+    local org
+    org="$(goodreads-url-to-org "$url")" @TRET
+
+    ##
+    # ec "$org" | org2tlg "$dest"
+    ##
+    tsend -- "$dest" "$org"
+    ##
+}
+##
