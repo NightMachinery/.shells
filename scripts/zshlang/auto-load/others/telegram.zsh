@@ -97,4 +97,16 @@ function org2tlg {
 
     tsend --parse-mode=md -- "${dest}" "$(cat-paste-if-tty | org2md)"
 }
+
+function org2tlg-with-props {
+    cat-paste-if-tty \
+        | sd --flags i '^:PROPERTIES:$' '' \
+        | sd --flags i '^:END:$' '' \
+        | sd --flags i '^#\+begin_quote$' '' \
+        | sd --flags i '^#\+end_quote$' '' \
+        | sd --flags i '^:visibility: folded$' '' \
+        | sd -- '^:' '- :' \
+        | org2tlg "$@"
+    #   | double-newlines \ # inserted paragraphs between the properties which was not nice
+}
 ##

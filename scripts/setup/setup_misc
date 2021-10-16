@@ -27,8 +27,9 @@ conda install -y -c numba icc_rt
 ##
 gem specific_install -l https://github.com/NightMachinary/fyodor.git
 ##
-pig https://github.com/NightMachinary/BrishGarden.git
+pig https://github.com/NightMachinary/pynight.git
 pig git@github.com:NightMachinary/brish.git
+pig https://github.com/NightMachinary/BrishGarden.git
 
 pip-install git+https://github.com/n8henrie/pycookiecheat.git@dev
 
