@@ -16,6 +16,6 @@ aliasfn mdv2 mdview2
 aliasfn mdv3 LESS= mdless
 ##
 function md-escape-link-title {
-    gtr '[]()' '{}{}'
+    in-or-args "$@" | gtr '[]()' '{}{}'
 }
 ##
