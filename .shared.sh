@@ -57,6 +57,7 @@ addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"
 isLinux && addToPATH /snap/bin
+addToPATH "/sbin"
 addToPATH "/usr/local/bin"
 addToPATH "/usr/local/sbin"
 addToPATH "$HOME/.local/bin"

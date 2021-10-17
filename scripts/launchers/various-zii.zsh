@@ -30,5 +30,7 @@ tmuxnewsh2 socks2http hpts --level info -s 127.0.0.1:1078 -p 1088 # https://gith
 tmuxnew znc znc --foreground
 ##
 launch-musicf.zsh
+
+source-cmd launch-goodreads-authors.zsh
 ##
 chronic-all
