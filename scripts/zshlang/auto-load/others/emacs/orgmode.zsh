@@ -211,6 +211,8 @@ function org-fanfic {
     if updated="$(ec $body | rget 'updated:\s*([^-]+)\s')" ; then
         if updated_year="$(ec $updated | rget '(\d{4})')" ; then
             # tags+="@updated/${updated_year} "
+        else
+            updated_year="$(now-year)"
         fi
     fi
 
@@ -248,9 +250,34 @@ function org-fanfic {
 }
 ##
 function org-link-extract {
+    ensure-array org_link_extract_opts
+    local opts=("$org_link_extract_opts[@]")
     local link_type="$org_link_extract_type"
+    local what="${org_link_extract_what:-link}" rget_e=('ugrep_get')
+    local format
+    if true ; then
+        rget_e='ugrep_get'
+        if [[ "$what" == 'link' ]] ; then
+            format='%[2]#%~'
+        elif [[ "$what" == 'heading' ]] ; then
+            format='%[1]#%~'
+        else
+            format="${what}"
+        fi
+    else
+        rget_e='rget'
+        if [[ "$what" == 'link' ]] ; then
+            format='$2'
+        elif [[ "$what" == 'heading' ]] ; then
+            format='$1'
+        else
+            @NA
+        fi
+    fi
 
-    cat-paste-if-tty | rget '(?:\[|<)('${link_type}':[^]]+)(?:\]|>)' | cat-copy-if-tty
+    rget_replace="$format" ugrep_get_format="$format" "$rget_e[@]" "${opts[@]}" \
+        -e '(?:\s*(?:\*|-|\+)\s*)(.*(?:\[|<)('${link_type}':[^]]+)(?:\]|>).*)' \
+        | cat-copy-if-tty
 }
 
 aliasfn org-link-extract-audiofile org_link_extract_type=audiofile org-link-extract
@@ -343,7 +370,7 @@ function cutestarsabove {
     ##
 }
 
-function cutestarsabove-open-pipe {
+function emc-pager-highlighter {
     local tmp
     tmp="$(gmktemp --suffix="${ntag_sep}org-highlighter${ntag_sep}.org")" @TRET
 
@@ -351,10 +378,69 @@ function cutestarsabove-open-pipe {
 
     emc-open "$tmp"
 }
+aliasfn emc-less-highlighter emc-pager-highlighter
+aliasfn cutestarsabove-open-pipe emc-pager-highlighter
 
 function cutestarsabove-open {
     cutestarsabove "$@" | cutestarsabove-open-pipe
 }
 @opts-setprefix cutestarsabove-open cutestarsabove
 alias seec='cutestarsabove-open'
+##
+function org-date-extract-due {
+    local files
+    files=( "$@" )
+    assert-args files @RET
+
+    local what="${org_date_extract_due_what}"
+    if test -z "$what" ; then
+        what='%f%s%n%~%t%[1]#%~'
+        ##
+        # what='org-highlighter'
+    fi
+    if [[ "$what" == 'org-highlighter' ]] ; then
+        what='* [[highlight:,default,file_point:%f::%b][%f]]%~** %[1]#%~'
+        # [[https://github.com/Genivia/ugrep/issues/159][Genivia/ugrep#159 {FR} Make `%b` and `%e` accept `{NUM}` arguments for captur...]]
+    fi
+
+    # @todo1 [[https://github.com/Genivia/ugrep/issues/157][Genivia/ugrep#157 How to add ANSI escape codes to `--format`?]]
+
+    local main_dir="${org_date_extract_due_d}"
+    ensure-array org_date_extract_due_query
+    local query=("${org_date_extract_due_query[@]}")
+
+    files="$(arrNN "$files[@]" | ugbool "$query[@]")" @TRET
+    files=("${(@f)files}")
+    ##
+    local opts=(--line-number --with-filename --max-count=1)
+    if isColorTty ; then
+        opts+=(--color=always)
+    fi
+
+    if true ; then
+        {
+            org_link_extract_opts=("$opts[@]" "$files[@]") \
+                org_link_extract_what="$what" \
+                org-date-extract \
+        } || true
+    else
+        local f date
+        for f in $files[@] ; do
+            {
+                org_link_extract_opts=("$opts[@]" "$f") \
+                    org_link_extract_what="$what" \
+                    org-date-extract \
+                    } || true
+            ##
+            # date="$(cat "$f" | org-date-extract-first)" || continue
+
+            # local f_a="$f"
+            # f_a="$(ec $f_a | dir-rmprefix "$main_dir")"
+            # # f_a="$(path-abbrev "$f")" @TRET # @slow (doubles execution time)
+            # ec "$(resetcolor)${f_a}:"$'\n\t'"$(colorbg 255 255 255)$(colorfg 0 0 0)$(Bold)${date}$(resetcolor)"
+            ##
+        done
+    fi
+    ##
+}
 ##

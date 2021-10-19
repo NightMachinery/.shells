@@ -90,8 +90,8 @@ aliasdir cel $cellar
 aliasfn incell cel
 aliasdir jrl $HOME/cellar/notes/journal
 aliasdir dom $DOOMDIR
-aliasdir innt $cellar/notes/
-aliasdir nt $cellar/notes/
+aliasdir innt $cellar/notes
+aliasdir nt $cellar/notes
 aliasdir incache ~/base/cache
 aliasdir cac ~/base/cache
 ##

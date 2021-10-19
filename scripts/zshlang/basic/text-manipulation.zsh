@@ -24,7 +24,7 @@ function sdlit() {
 ##
 function rget() {
     local rep="${rget_replace:-${rget_r:-\$1}}"
-    command rg --no-filename --no-line-number --text --smart-case --only-matching --replace "$rep" "$@"
+    rgbase --no-filename --no-line-number --text --smart-case --only-matching --replace "$rep" "$@"
 }
 ##
 function text-wrap() {

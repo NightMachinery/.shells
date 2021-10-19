@@ -83,7 +83,6 @@ addToPATH "${NIGHTDIR}/zshlang/wrappers"
 addToPATH ~/anaconda/bin
 addToPATH ~/miniconda3/bin
 addToPATH ~/.cargo/bin/
-addToPATH ~/bin
 
 ## perl
 # [[id:162e013e-ce1b-405a-9d45-e0e223f56d6d][perl/cpanm.org]]
@@ -134,6 +133,7 @@ addToPATH "/usr/local/opt/curl/bin"
 
 run-on-each addToPATH "$NIGHTDIR"/**/
 addToPATH /myBin/
+addToPATH ~/bin # should be last
 
 if isZsh ; then
     typeset -Ug path

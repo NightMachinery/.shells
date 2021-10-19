@@ -24,7 +24,7 @@ function months() {
 10. October - 31 days
 11. November - 30 days
 12. December - 31 days"
-    wh monthj2en
+    wh monthj2en | cat
 }
 ##
 ch-mpv() icat $nightNotes/cheatsheets/mpv/mpbindings.png

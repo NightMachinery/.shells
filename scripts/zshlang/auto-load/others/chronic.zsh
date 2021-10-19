@@ -17,7 +17,7 @@ function chronic-certs {
 
 function chronic-update() {
     brew update
-    re 'brew upgrade' googler
+    # re 'brew upgrade' googler # triggers upgrading everything, which we can't afford on weak servers
 
     pip install --upgrade ddgr fanficfare cloudscraper
     pip install --upgrade --force pytube ytmusicapi youtube-dl yt-dlp spotipy spotdl

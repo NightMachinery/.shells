@@ -7,6 +7,8 @@ goodreads_author_ids=(
     ##
     '1221698.Neil_Gaiman'
     '3472.Margaret_Atwood'
+    ##
+    '11018.Peter_Turchin'
     ###
     "108424.Patrick_Rothfuss"
     "6952980.Daniel_C_Dennett"

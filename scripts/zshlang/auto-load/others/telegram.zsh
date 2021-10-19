@@ -4,9 +4,9 @@ function tnotif() {
     # @alt notif
     ##
     ensure-array tnotif_opts
-    local msg="$*" opts="${tnotif_opts[@]}"
+    local msg="$*" opts=("${tnotif_opts[@]}")
 
-    (( ${+commands[matrix-send-self]} )) && matrix-send-self "$msg"
+    # matrix-send-self "$msg"
     tsend --parse-mode markdown "$opts[@]" -- "$tlg_notifs" "$msg"
 }
 

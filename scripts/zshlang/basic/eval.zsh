@@ -5,8 +5,8 @@ alias greval=rgeval
 
 function eval-ec() { ge_no_hist=y geval "$@" }
 function eval-ecdbg() { ge_ecdbg=y ge_no_hist=y geval "$@" }
-alias seval='eval-ecdbg' #silent debuggable eval
-alias evaldbg='eval-ecdbg'
+function seval { eval-ecdbg "$@" } #silent debuggable eval
+function evaldbg { eval-ecdbg "$@" }
 
 function eval-confirm {
     local cmd="$*"

@@ -4,7 +4,7 @@ function zerr_handler {
     #
     # [[https://unix.stackexchange.com/questions/664117/zsh-how-to-store-the-return-code-of-a-statement-without-triggering-set-e][shell - zsh: How to store the return code of a statement without triggering `...]]
     ##
-    local r=$? skip="${zerr_skip}" # @alt `&& true` also skips zerr
+    local r=$? ps=("$pipestatus[@]") skip="${zerr_skip}" # @alt `&& true` also skips zerr
 
     if ! bool "$zerr_skip" ; then
         case $r in
@@ -35,11 +35,15 @@ function zerr_handler {
         esac
     fi
 
-    return $r
+    {
+        return $r
+    } always {
+        typeset -g pipestatus=("$ps[@]") # doesn't work
+        typeset -g pipestatus_preserved=("$ps[@]")
+    }
 }
 
 trap zerr_handler ZERR
-
 ##
 function command_not_found_handler {
     # [[https://unix.stackexchange.com/questions/664089/zsh-halt-when-command-not-found][shell script - zsh: Halt when command not found - Unix & Linux Stack Exchange]]
