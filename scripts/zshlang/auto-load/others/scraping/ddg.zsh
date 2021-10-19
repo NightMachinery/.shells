@@ -6,6 +6,7 @@ function ddg-html() {
     fhMode=curlfullshort revaldbg eval-memoi full-html2 'https://duckduckgo.com/?q='"$(ec "$query" | gtr $'\n' ' ' | url-encode.py )"'&kp=-2&kl=us-en'
     # majority of time of curlfull is spent on loading puppeteer, I guess
 }
+
 function ddg-json() {
     local q="${1}" count="${2:-10}" js_mode="${ddg_json_js}"
     test -n "$q" || return 1

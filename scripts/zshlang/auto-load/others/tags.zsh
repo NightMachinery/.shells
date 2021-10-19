@@ -595,3 +595,8 @@ function ntag-color0() {
 function air-blue() {
     ntag-add "$(hear-get)" blue
 }
+##
+function ntag-exclude-all {
+    fd -uuu --exclude="*${ntag_sep}*${ntag_sep}*"
+}
+##

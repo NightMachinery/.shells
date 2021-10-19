@@ -45,7 +45,7 @@ function goodreads-url-to-json {
     local url="${1:-$(pbpaste)}"
     assert-args url @RET
 
-    eval-memoi 'full-html2' "$url" \
+    full-html2 "$url" \
         | html-links-absolutify 'https://www.goodreads.com' \
         | selectors2json.py \
         description '#descriptionContainer span[style="display:none"]' '->org' \

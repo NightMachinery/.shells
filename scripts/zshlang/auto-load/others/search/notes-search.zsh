@@ -460,3 +460,9 @@ function ntsearch_fd() {
     fi
 }
 ##
+function sees-ug {
+    # @slow
+    # somehow does not support '^' in the query
+    fzp_ug=y fnswap fzp ugfz sees-fzf "$*"
+}
+##

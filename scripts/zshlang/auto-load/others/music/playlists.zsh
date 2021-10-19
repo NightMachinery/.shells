@@ -73,4 +73,29 @@ function playlist-relative-make() {
     # sd "$music_dir/Songs" "${songs_dir_rel}" | \
     ##
 }
+
+function playlist-old-migrate {
+    local f="$1"
+    assert test -f "$f" @RET
+    local dest="${playlist_old_migrate_dest:-${f:r}${ntag_sep}migrated${ntag_sep}m3u}"
+
+    if [[ "$f" == *.pls ]] ; then
+        cat -- "$f" | windows-newlines-to-unix | rget 'File\d+=(.*)' @TRET
+    elif [[ "$f" =~ '\.m3u8?$' ]] ; then
+        cat -- "$f" | windows-newlines-to-unix | rget '^(.:\\.*)' @TRET
+    elif [[ "$f" == *.xspf ]] ; then
+        cat -- "$f" | xml2 | rget 'file:///(.*)' @TRET
+    elif [[ "$f" == *.mpcpl ]] ; then
+        cat -- "$f" | windows-newlines-to-unix | rget 'filename,(.*)' @TRET
+    else
+        @NA
+    fi | {
+        sd '\\' '/' \
+            | sd '^:/Pocket/V/' "${music_dir}/V/" \
+            | sd '^.:/Music/' "${music_dir}/" @TRET
+    } > "$dest" @TRET
+    ecgray "$0: migrated $(gquote-dq "$f") to $(gquote-dq "$dest")"
+
+    reval-ec playlist-relative-make "$dest"
+}
 ##

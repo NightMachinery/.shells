@@ -140,11 +140,11 @@ playlistc() {
 
     bella_zsh_disable1
 
-    local pl
-    pl="$(fd --follow -t f '.' "${playlist_dir}" | fz -q "$(fz-createquery "$@")")" @RET
+    local playlists
+    playlists=("${(@f)$(fd --follow -t f '.' "${playlist_dir}" | fz -q "$(fz-createquery "$@")")}") @RET
 
-    ec "Playing playlist(s) $pl"
-    hearp +s "${(@f)pl}"
+    ec "Playing playlist(s) $playlists"
+    hearp +s "${(@)playlists}"
 }
 
 function playlister() {
@@ -274,18 +274,41 @@ function songd() {
     }
 }
 
+function playlist-absolutify {
+    local playlists=($@)
+
+    local playlist
+    for playlist in ${playlists[@]} ; do
+        local orig_dir="${playlist:h}"
+
+        local files
+        files=(${(@f)"$(cat "$playlist")"}) @TRET
+
+        local f
+        for f in $files[@] ; do
+            if [[ "$f" == /* ]] ; then
+                ec "$f"
+            else
+                grealpath -e "${orig_dir}/$f" || true # @STRUE # too slow
+            fi
+        done
+    done
+}
+
 function hearp() {
     local shuf='--shuffle'
     test "${1}" = '+s' && {
         shuf=''
         shift
     }
-    local tracks="$(mapln '$1
-' "$(cat "${@}")")"
-    test -z "$shuf" || tracks="$(ec "$tracks"|shuf)"
-    test -z "$NO_HEARP_TOUCH" && {
-        touch-tracks "${(@f)tracks}"
-    }
+    local tracks
+    tracks="$(playlist-absolutify "${@}")" @TRET
+    if test -n "$shuf" ; then
+        tracks="$(ec "$tracks"| shuf)" @TRET
+    fi
+    if test -z "$NO_HEARP_TOUCH" ; then
+        touch-tracks "${(@f)tracks}" @TRET
+    fi
     # Don't use mpv's native --shuffle since it MIGHT use autoloaded tracks, also empty string causes a harmless error
     # k shuffles live in mpv (with MY config :D)
     hear --loop-playlist --playlist=<(ec "$tracks")
@@ -323,6 +346,7 @@ function sdlg() {
             mv *.txt ./ghosts/
         }
 }
+
 function sdl() {
     ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1
 

@@ -242,3 +242,7 @@ function mktemp-exact {
     ec "${tmpdir}/${name}"
 }
 ##
+function windows-newlines-to-unix {
+    sd '\r\n' '\n'
+}
+##

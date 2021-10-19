@@ -157,7 +157,11 @@ dvar () {
 function raise-blood() ceer rederr.zsh source
 ##
 function retcode() {
-    local r=$? ps=("$pipestatus[@]") name="${1:-${$(fn-name 3):-NA}}"
+    # @duplicateCode/0043fdb53e9bf6f36a57e7570b22453b
+    local r=$? ps=("${pipestatus[@]}") ps_p=("${pipestatus_preserved[@]}") name="${1:-${$(fn-name 3):-NA}}"
+    if (( r != 0 && ${#ps} == 1 && ${#ps_p} > 1 )) ; then
+        ps=("$ps_p[@]")
+    fi
 
     if (( ${#ps} > 1 )) ; then
         ecerr $'\n'"${name}: returned ${(j.|.)ps[@]}"

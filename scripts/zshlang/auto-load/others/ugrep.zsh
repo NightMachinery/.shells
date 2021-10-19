@@ -1,8 +1,12 @@
 typeset -ag ugrep_opts=(--bool --smart-case --sort=best --no-confirm --perl-regexp --hidden --binary-files=without-match)
 # --dereference-recursive : recursive dirs, follows symlinks
+
+function ugrep-c-get {
+    ec "${ugrep_c:-3}"
+}
 ##
 function ugbase() {
-    local follow_sym="${ugbase_follow}"
+    local follow_sym="${ugbase_follow}" rtl="${ugbase_rtl:-y}"
 
     local sel ret opts=()
 
@@ -20,7 +24,11 @@ function ugbase() {
     ret=$?
 
     if test -n "$sel" ; then # exit status of ugrep is 1 when we use ESC to exit
-        ec "$sel"
+        if bool "$rtl" && isColorTty ; then
+            ec "$sel" | rtl-reshaper
+        else
+            ec "$sel"
+        fi
         return 0
     else
         return $ret
@@ -34,6 +42,11 @@ function ugbool() {
 }
 noglobfn ugbool
 alias ugb='\noglob ugbool'
+
+function ugbool-context {
+    ugrep_opts=("$ugrep_opts[@]" --context="$(ugrep-c-get)") ugbool "$@"
+}
+alias ugbc='ugbool-context'
 ##
 function ug-i() {
     : "oneliner: ugrep --bool --smart-case '--sort=best' --no-confirm --perl-regexp --hidden '--binary-files=without-match' --query=1"
@@ -49,7 +62,7 @@ function ug-ic() {
     local r="${@[-1]}" opts=("${@[1,-2]}")
     
     # https://github.com/Genivia/ugrep/issues/31
-    revaldbg ug-i --pretty --context=3 --regexp="$r" --recursive "$opts[@]"
+    revaldbg ug-i --pretty --context="$(ugrep-c-get)" --regexp="$r" --recursive "$opts[@]"
     # --fuzzy=3 (not compatible with PCRE)
     #  --break  Adds a line break between results from different files.
     #  --heading, -+ Group matches per file.  Adds a heading and a line break between results from different files.
@@ -59,7 +72,7 @@ function ugc {
 
     local r="${@[-1]}" opts=("${@[1,-2]}")
 
-    ugrep --heading --color=always --pretty --context=3 --recursive --bool --smart-case '--sort=best' --no-confirm --perl-regexp --hidden '--binary-files=without-match' "$opts[@]" --regexp="$r" | less -n
+    ugrep --heading --color=always --pretty --context="$(ugrep-c-get)" --recursive --bool --smart-case '--sort=best' --no-confirm --perl-regexp --hidden '--binary-files=without-match' "$opts[@]" --regexp="$r" | less -n
 }
 
 function ugm() {
@@ -136,3 +149,11 @@ function ugfz() {
     fi
 }
 ###
+function ugrep_get {
+    local format="${ugrep_get_format:-%[1]#%~}"
+    # format='%f%s%n%s%[1]#' # path+linenumber+match
+
+    ugrep "$ugrep_opts[@]" --perl-regexp --format="$format" "$@"
+    # `--colors='hl'` doesn't work with `--format`.
+}
+##
