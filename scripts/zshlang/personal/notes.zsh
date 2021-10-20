@@ -22,11 +22,18 @@ function nt-due {
     @opts d "$nightNotes" query [ "$query[@]" ] @ org-date-extract-due "$nightNotesDue[@]"
 }
 
-function nt-due-oh {
-    org_date_extract_due_what='org-highlighter' nt-due "$@" \
-        | if-out-tty emc-pager-highlighter
+function h-nt-due-oh {
+    org_date_extract_due_what='org-highlighter' nt-due "$@"
 }
 
+function nt-due-oh {
+    nt-due-init # can't do it in the pipeline, as forks can't change our env
+
+    h-nt-due-oh "$@" \
+        | org_sort_date \
+        | prefix="$nightNotesDueDir" perl -pe 's|(\[)\Q$ENV{prefix}\E/*([^]]+\]\])|${1}${2}|g' \
+        | if-out-tty emc-pager-highlighter
+}
 
 function nt-due-sees {
     nt-due-init # can't do it in the pipeline, as forks can't change our env
