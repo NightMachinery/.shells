@@ -24,7 +24,7 @@ function nt-due {
 
 function nt-due-oh {
     org_date_extract_due_what='org-highlighter' nt-due "$@" \
-        | emc-pager-highlighter
+        | if-out-tty emc-pager-highlighter
 }
 
 

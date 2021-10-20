@@ -1,21 +1,28 @@
 ##
-function pastebin-sprunge {
-    cat-paste-if-tty | curl --progress-bar --form 'sprunge=<-' http://sprunge.us | cat-copy-if-tty
+function h-pastebin-sprunge {
+    curl --progress-bar --form 'sprunge=<-' http://sprunge.us
     # @alt 'f:1=<-' ix.io
 }
+aliasfn pastebin-sprunge pastebin_e='h-pastebin-sprunge' pastebin
 
-function pastebin-gnupaste {
+function h-pastebin-gnupaste {
     local mime="${pastebin_mime:-text/plain}" expire="${pastebin_mime:-99m}"
 
-    cat-paste-if-tty | { tee /dev/tty ; ecbold $'\n''-----------' > /dev/tty } | curl --progress-bar --form 'file=@-' --form "type=${mime}" --form "expire=${expire}" https://paste.gnugen.ch | cat-copy-if-tty
+    curl --progress-bar --form 'file=@-' --form "type=${mime}" --form "expire=${expire}" https://paste.gnugen.ch
 
     # expire: The desired expiration date. This field defaults to one year. Valid units are s(econds), h(ours), d(ays), w(eeks) and m(onths).
     # This service is provided with no guarantees of any kind. Please note that your IP address will be stored for security purposes.
 }
+aliasfn pastebin-gnupaste pastebin_e='h-pastebin-gnupaste' pastebin
 @opts-setprefix pastebin-gnupaste pastebin
 
-aliasfn pastebin pastebin-gnupaste
+function pastebin {
+    local engine=("${pastebin_e[@]:-h-pastebin-gnupaste}")
 
+    cat-paste-if-tty | { tee /dev/tty ; ec-sep-h > /dev/tty } | "$engine[@]" "$@" | cat-copy-if-tty
+}
+alias pb='pastebin'
+##
 function pastebin-png-jdl {
     local ext=png
 
@@ -28,7 +35,7 @@ function pastebin-png-jdl {
 
     bell-image-uploaded
 }
-alias ppp='pastebin-png-jdl'
+alias pbi='pastebin-png-jdl'
 
 function pastebin-png-gnupaste {
     : "usage: cat file.png | pastebin-png"

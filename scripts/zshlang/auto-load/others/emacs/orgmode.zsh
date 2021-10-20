@@ -371,6 +371,8 @@ function cutestarsabove {
 }
 
 function emc-pager-highlighter {
+    # @todo1 rewrite this using [agfi:emc-less], with a general tag-adder
+    ##
     local tmp
     tmp="$(gmktemp --suffix="${ntag_sep}org-highlighter${ntag_sep}.org")" @TRET
 

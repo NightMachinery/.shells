@@ -14,7 +14,7 @@ function sanjesh-arshad-update {
         html="$(ec "$html" | html-links-absolutify "$url_base")" @TRET
         html="$(ec "$html" | htmlq '.boxMiddle')" @TRET
         assert not whitespace-p "$html" @RET
-        ec "$html" | html2org > arshad.org @TRET
+        ec "$html" | html2org | skipemptyin sponge arshad.org @TRET
 
         git-diff-report "$PWD"
     } always { cd "$orig_pwd" }
