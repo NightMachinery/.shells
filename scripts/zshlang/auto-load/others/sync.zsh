@@ -1,3 +1,4 @@
+##
 function sync-append() {
     # flock alts:
     # zsystem flock
@@ -7,6 +8,9 @@ function sync-append() {
 
     local file="$1"
     local text="$2"
+    if test -z "$text" ; then
+        return 0
+    fi
 
     local lock_fd
     {
@@ -20,3 +24,8 @@ function sync-append() {
         # It seems the file descriptor is automatically closed if the process is killed, so there will be no issue. (The lock will be automatically removed.)
     }
 }
+
+function sync-append-in {
+    syn-append "$1" "$(cat)"
+}
+##

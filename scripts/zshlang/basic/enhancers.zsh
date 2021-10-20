@@ -164,3 +164,11 @@ function enh-addfinder() {
 }
 alias pf='enh-addfinder'
 ##
+function if-out-tty {
+    if isOutTty ; then
+        reval "$@"
+    else
+        cat
+    fi
+}
+##

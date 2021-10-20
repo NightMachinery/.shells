@@ -75,6 +75,8 @@ function playlist-relative-make() {
 }
 
 function playlist-old-migrate {
+    # Use `sout playlist-absolutify *(.)` to see non-resolving files in the migrated playlists
+    ##
     local f="$1"
     assert test -f "$f" @RET
     local dest="${playlist_old_migrate_dest:-${f:r}${ntag_sep}migrated${ntag_sep}m3u}"
@@ -84,16 +86,16 @@ function playlist-old-migrate {
     elif [[ "$f" =~ '\.m3u8?$' ]] ; then
         cat -- "$f" | windows-newlines-to-unix | rget '^(.:\\.*)' @TRET
     elif [[ "$f" == *.xspf ]] ; then
-        cat -- "$f" | xml2 | rget 'file:///(.*)' @TRET
+        cat -- "$f" | xml2 | rget 'location=file:///(.*)' @TRET
     elif [[ "$f" == *.mpcpl ]] ; then
         cat -- "$f" | windows-newlines-to-unix | rget 'filename,(.*)' @TRET
     else
         @NA
     fi | {
         sd '\\' '/' \
-            | sd '^:/Pocket/V/' "${music_dir}/V/" \
+            | sd '^.:/Pocket/V/' "${music_dir}/V/" \
             | sd '^.:/Music/' "${music_dir}/" @TRET
-    } > "$dest" @TRET
+    } | skipemptyin sponge "$dest" @TRET
     ecgray "$0: migrated $(gquote-dq "$f") to $(gquote-dq "$dest")"
 
     reval-ec playlist-relative-make "$dest"

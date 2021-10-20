@@ -191,3 +191,8 @@ function ecalternate() {
     } >&2
 }
 ##
+function ec-sep-h {
+    ecbold $'\n''-----------'
+}
+alias seph='ec-sep-h'
+##
