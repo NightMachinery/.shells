@@ -8,13 +8,12 @@
 
 using namespace std;
 
+boost::locale::generator generator;
+std::locale locale_gregorian = generator("en_US.UTF-8");
+std::locale locale_jalali = generator("en_US.UTF-8@calendar=persian");
+
 boost::locale::date_time jalali_to_gregorian(const int& year, const int& month, const int& day)
 {
-    boost::locale::generator generator;
-
-    std::locale locale_gregorian = generator("en_US.UTF-8");
-    std::locale locale_jalali = generator("en_US.UTF-8@calendar=persian");
-
     boost::locale::date_time jalali(
         boost::locale::period::year(year)
         + boost::locale::period::month(month - 1) // @containedSurprise months are zero-based
@@ -83,14 +82,14 @@ int main(int argc, char** argv) {
             dates.push_back(date_norm);
         }
 
-        vector<boost::locale::date_time>::iterator last_date_iter = max_element(dates.begin(), dates.end());
-        if (last_date_iter==dates.end()) {
+        vector<boost::locale::date_time>::iterator selected_date_iter = min_element(dates.begin(), dates.end());
+        if (selected_date_iter==dates.end()) {
             continue;
         } else {
-            const auto& last_date = *last_date_iter;
-            // date_print(last_date); // @ic
+            const auto& selected_date = *selected_date_iter;
+            // date_print(selected_date); // @ic
 
-            blocks.emplace_back(make_tuple(block_current, last_date));
+            blocks.emplace_back(make_tuple(block_current, selected_date));
         }
     }
 

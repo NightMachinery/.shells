@@ -120,12 +120,23 @@ function icat() {
     isI || return 0
 
     if (( $#@ == 0 )) ; then
-        local images=( ${~imageglob} *.pdf(Nn) )
-        if (( ${#images} )) ; then
-            icat "$images[@]"
-            return $?
+        if isInTty ; then
+            local images=( ${~imageglob} *.pdf(Nn) )
+            if (( ${#images} )) ; then
+                icat "$images[@]"
+                return $?
+            else
+                return 0
+            fi
         else
-            return 0
+            local tmp
+            tmp="$(gmktemp)" @TRET
+            {
+                cat > $tmp @TRET
+                icat $tmp </dev/tty # icat-kitty tries to read the stdin if it is not a tty
+            } always {
+                silent trs-rm "$tmp"
+            }
         fi
     fi
 
