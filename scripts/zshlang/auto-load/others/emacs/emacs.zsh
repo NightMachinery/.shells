@@ -213,6 +213,16 @@ aliasfn emc-quote lisp-quote
 function lisp-quote-all {
     cat-paste-if-tty | in-or-args "$@" | lisp-quote-all.lisp | cat-copy-if-tty
 }
+
+function lisp-quote-safe {
+    # slower than `lisp-quote', but preserves newlines in arguments
+    ##
+    local arg
+    for arg in "$@" ; do
+        ecn "$arg" | lisp-quote-all.lisp
+    done | cat-copy-if-tty
+}
+aliasfn emc-quote-safe lisp-quote-safe
 ##
 function emc-nowait2() {
     local f="$1" cmd="${emc_nowait2_cmd:-find-file}"

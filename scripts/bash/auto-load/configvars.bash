@@ -101,7 +101,7 @@ createglob note_formats noteglob
 audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
 createglob audio_formats audioglob
 
-image_formats=(png jpg jpeg gif psd tif tiff)
+image_formats=(png jpg jpeg gif psd tif tiff avif)
 createglob image_formats imageglob
 
 video_formats=(ape avi flv mp4 mkv mov mpeg mpg rm webm)

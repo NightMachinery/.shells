@@ -76,7 +76,11 @@ function ffps() {
     bella_zsh_disable1
 
     # ps auxww: List all running processes including the full command string
-    command ps auxww | fzp --with-nth '11..' --header-lines 1 "$query" | awk '{print $2}'
+    ps-list | fzp --with-nth '11..' --header-lines 1 "$query" | awk '{print $2}'
+}
+
+function ps-list {
+    command ps auxww
 }
 
 function ffps-c1() {
