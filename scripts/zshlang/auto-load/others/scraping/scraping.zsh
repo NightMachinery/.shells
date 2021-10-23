@@ -384,7 +384,10 @@ function w2e-curl() {
 noglobfn w2e-curl
 
 function wread-curl() {
-    full-html2 "$1" | html-links-textualize
+    local url="$1"
+    assert-args url @RET
+
+    full-html2 "$url" | html-links-absolutify "$(url-head "$url")"
 }
 ##
 function w2e-gh() {
@@ -1516,11 +1519,16 @@ noglobfn url2note
 function url2org() { url2note "$1" org }
 renog url2org
 @opts-setprefix url2org url2note
-
+##
 function str2orgtitle {
-    gtr '[]' '{}'
+    in-or-args "$@" | gtr '[]' '{}'
 }
+aliasfn org-escape-title str2orgtitle
 
+function org-escape-link {
+    in-or-args "$@" | perl -pe 's/(\[|\])/\\${1}/g'
+}
+##
 function url2md() { url2note "$1" md }
 @opts-setprefix url2md url2note
 reify url2md

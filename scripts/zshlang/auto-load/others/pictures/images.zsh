@@ -182,14 +182,15 @@ function img-rotate() {
     local out="${2:-${input:r}_r${degree}.${input:e}}"
     dest-overwrite-p "$out" @RET
 
-    assert magick convert "$input" -rotate "$degree" "$out" @RET
+    reval-ec magick convert "$input" -rotate "$degree" "$out" @TRET
 
     if isI && @opts p [ img-rotate ] @ fn-isTop ; then
-        icat "$out"
+        icat "$out" || true
     fi
 }
 
 aliasfn img-rotate-inplace inplace-io img-rotate
+@opts-setprefix img-rotate-inplace img_rotate
 ##
 function img-compress {
     : "@alt @PNG https://pngquant.org/"

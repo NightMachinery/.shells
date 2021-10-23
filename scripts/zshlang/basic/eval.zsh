@@ -125,6 +125,10 @@ function reval-withstdin() {
 }
 alias rin='reval-withstdin'
 
+function reval-to-stdout {
+    reval "$@" 2>&1
+}
+
 function rgeval() {
     geval "$(gquote "$@")"
 }

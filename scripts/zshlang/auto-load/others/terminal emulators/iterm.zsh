@@ -143,26 +143,43 @@ function icat() {
     re h_icat "$@"
 }
 function h_icat() {
-    ecgray "${1:t}"
+    local i="$1"
 
-    if [[ "$1" == *.pdf ]] ; then
-        icat-pdf "$1"
+    ecgray "${i:t}"
+
+    if [[ "$i" == *.pdf ]] ; then
+        icat-pdf "$i"
         return $?
+    elif [[ "$i" == *.avif ]] ; then
+        # @toFuture/1402 Doesn't Kitty natively support AVIF now?
+        ##
+        ecgray "$0: converting $(gquote-sq "$i") to PNG ..."
+
+        local tmp
+        tmp="$(gmktemp --suffix='.png')" @TRET
+        {
+            avifdec "$i" "$tmp" @TRET
+            h_icat "$tmp"
+            return $?
+        } always { silent trs-rm "$tmp" }
     fi
 
     if isKitty ; then
-        icat-kitty2 "$@"
+        icat-kitty2 "$i"
         return $?
     fi
     if test -z "$TMUX" ; then
-        icat-autoresize "$@"
+        icat-autoresize "$i"
     else
-        icat-py "$@"
+        icat-py "$i"
         ecerr "$0: Tmux not supported."
         # @todo use ANSI https://github.com/trashhalo/imgcat
     fi
 }
 alias ic=icat
+
+aliasfn icat-big icat-kitty
+alias icb=icat-big
 ##
 # function icat-labeled() {
 #     local i
