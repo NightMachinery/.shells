@@ -62,7 +62,7 @@ function ntt-org() {
         # --line-number -T
         #  | sdlit $'\t' '   '
 
-    } | command sd '^(\s*(?:\x1b\[33m)?)(\*|#)' '$1,$2' | command sd --flags=i --string-mode "$q" "$(ecn "$q" | mimic -m 100)"
+    } | org-escape-block | command sd --flags=i --string-mode "$q" "$(ecn "$q" | mimic -m 100)"
     # -m CHANCE, --me-harder=CHANCE
     #   forward replacement percent, default 1
     #
@@ -70,6 +70,7 @@ function ntt-org() {
     #
     # @warn you still need to use quoting shenanigans when you call ntt-org itself so as to not find yourself, but it will not cause a loop at least
 }
+
 function ntt-org1() {
     # DEPRECATED
     q="${*}" metadata="${ntt_org_md:-y}"

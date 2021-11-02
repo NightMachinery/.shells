@@ -5,7 +5,12 @@ The from-to range is inclusive." MAGIC
 
     shuf -i "$1-$2" -n "${3:-1}"
 }
+
 rndarr() {
+    if (( ${#@} == 0 )) ; then
+        return 1
+    fi
+
     local i="$(rndint 1 ${#@})"
     ec "${@[$i]}"
 }

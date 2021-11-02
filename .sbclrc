@@ -81,7 +81,7 @@
   retcode
   prc)
 
-(defun brishz-ll (&key (session "") (input nil) (executable "/usr/local/bin/brishzq.zsh") args)
+(defun brishz-ll (&key (session "") (input nil) (executable "/usr/local/bin/brishzq.zsh") (failure_expected "") args)
   "brishz low-level API."
   (let* (
          (out (make-array '(0) :element-type 'extended-char ;; 'character
@@ -101,6 +101,7 @@
                             :input input
                             :environment (list
                                           (format nil "brishz_session=~a" session)
+                                          (format nil "brishz_failure_expected=~a" failure_expected)
                                           (format nil "brishz_in=~a"
                                                   (if input
                                                       "MAGIC_READ_STDIN"
@@ -115,6 +116,12 @@
 (defun brishz (&rest args)
   (brishz-ll :args args))
 
+(defun brishz-outrs (&rest args)
+  (cmd-result-outrs (apply #'brishz args)))
+
+(defun brishz-bool (&rest args)
+  (= 0 (cmd-result-retcode (brishz-ll :args args :failure_expected "y"))))
+
 (defun brishz-fast (&rest args)
   (brishz-ll :args args :executable "/usr/local/bin/brishz.dash"))
 
@@ -127,6 +134,12 @@
  (brishz "eval" "ec hi ; ecerr warning ; return 56"))
 ;;;
 ;; (describe #\LEFT_DOUBLE_QUOTATION_MARK)
+;;;
+(defun mbp-p ()
+  (brishz-bool "isMBP"))
+
+(defun server-p ()
+  (brishz-bool "isServer"))
 ;;;
 (defun listify-if-not (possible-lst)
   (cond
@@ -388,4 +401,10 @@
      (sb-ext:save-lisp-and-die name :toplevel toplevel :executable t :compression compression))
     (t
      (sb-ext:save-lisp-and-die name :executable t :compression compression))))
+;;;
+(defun path-unabbrev (path)
+    (brishz-outrs "path-unabbrev" path))
+
+(comment
+  (path-unabbrev "~cod/python/ddg2json"))
 ;;;

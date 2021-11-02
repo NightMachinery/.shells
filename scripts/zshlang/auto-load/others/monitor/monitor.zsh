@@ -3,6 +3,7 @@ function glan() {
     # --byte display network rate in byte per second
     glances --config ~/.glances --time 10 --theme-white --disable-webui --fs-free-space --byte --process-short-name "$@"
 }
+##
 function fftop() {
     # linux: top -p
     # darwin: top -pid
@@ -21,6 +22,7 @@ function in-sum() {
 function cpu-usage-get() {
     ps -A -o %cpu | awk '{s+=$1} END {print s "%"}'
 }
+
 function memory-free-get() {
     if isDarwin ; then
         ec $(( $({
@@ -51,9 +53,11 @@ function memory-free-get() {
 function  pt-cpu-get() {
     procs --or "$@" | gtail -n +3 | awk '{print $4}' | in-sum
 }
+
 function  pt-cpu-get-grep() {
     procs | rg "$@" | awk '{print $4}' | in-sum
 }
+
 function pt-cpu-get-plus() {
     local q="$*" a
     if [[ "$q" =~ '^\d+$' ]] ; then
@@ -98,16 +102,27 @@ function ppgrep() {
     esac
 }
 ##
+function jtop {
+    if isLinux ; then
+        jah top -b -n1
+    else
+        @NA
+    fi
+}
+
 function  jglan() {
     # doesn't work all that well (skips some newlines)
     fnswap glances 'gtimeout 10s unbuffer glances' glan | aha --line-fix > jglan.html # --black is worse
 }
+
 function jhtop() {
     gtimeout 1s htop | aha --line-fix --black > jhtop.html
 }
+
 function jprocs() {
     procs --pager disable --color always | aha --black > jprocs.html
 }
+
 function jprocs-pic() {
     procs "$@" | text2img "$0 $*"
     jdoc

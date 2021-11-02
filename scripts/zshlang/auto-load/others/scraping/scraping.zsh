@@ -407,22 +407,34 @@ function url-exists() {
 }
 
 function gh-to-readme() {
-    local urls=() i i2 readme url exts=(md rst org) readmes=(readme README ReadMe readMe Readme)
+    local urls=() i i2 readme url
+    local exts=(md rst org)
+    local readmes=(readme README ReadMe readMe Readme)
+    local branches=(master main develop)
 
     for i in "$@"
     do
-        ! [[ "$i" =~ 'github.com' ]] || [[ "$i" == *.(${(j.|.)~exts}) ]] ||
-            {    i2="${i}.md"
-                 comment we hope to handle wiki pages with this method, but beware that nonexistent wiki pages trigger create a new page, not the desired not existent response.
-                 unset url_exists_out
-                 re url-exists "$i2" "${i}/blob/master/${^readmes[@]}.${^exts[@]}"
-                 i="$url_exists_out"
-            }
-        url-exists "$i" && urls+="$i" || color red "$i does not seem to exist." >&2
+        if [[ "$i" =~ 'github.com' ]] || ! [[ "$i" == *.(${(j.|.)~exts}) ]] ; then
+            i2="${i}.md"
+            comment we hope to handle wiki pages with this method, but beware that nonexistent wiki pages trigger create a new page, not the desired not existent response.
+
+            local candidates=("$i2"
+                              "${i}/raw/${^branches[@]}/${^readmes[@]}.${^exts[@]}")
+            dvar candidates
+            unset url_exists_out
+            re-any url-exists $candidates[@]
+            i="$url_exists_out"
+        fi
+        url-exists "$i" && urls+="$i" || ecerr "$0: URL $(gquote-dq "$i") does not seem to exist. (Empty URL means no URL found.)"
     done
-    gh-to-raw "$urls[@]"
+
+    arrnn "$urls[@]"
 }
-function gh-to-raw() rex 'rgx _ /blob/ /raw/' "$@"
+
+function gh-to-raw() {
+    in-or-args "$@" | sd '/blob/' '/raw/'
+}
+##
 function url-final-hp() {
     # Sometimes returns wrong result:
     # https://www.arvarik.com/the-stable-marriage-problem-and-modern-datingi:
@@ -465,12 +477,19 @@ function url-tail() {
 reify url-tail
 noglobfn url-tail
 
-typeset url_head_regex='(?i)\b(https?:/{1,3}[^/]+[.][^/]+)'
+typeset -g url_head_regex='(?i)\b(https?:/{1,3}[^/]+[.][^/]+)'
 function url-head() {
-    [[ "$1" =~ "$url_head_regex" ]] && ec "$match[1]" || ec "$1"
+    local url="$1"
+    assert-args url @RET
+
+    if [[ "$url" =~ "$url_head_regex" ]] ; then
+        ec "${match[1]}"
+    else
+        ec "$url"
+    fi
 }
-reify url-tail
-noglobfn url-tail
+reify url-head
+noglobfn url-head
 ##
 function tlrlu(){
     tlrl-ng "$@" -p "$(url-tailf "$1") | "
@@ -503,6 +522,7 @@ renog url-title
 function tlrl-gh() {
     tlrl-ng -e w2e-gh -p "[$(url-tailf "$1")] " "$@"
 }
+
 function tlrl-ng() {
     mdoc "Usage: $0 [OPTIONS] <url> ...
 Description: Automatically infers the title and the author from the first URL, and feeds all URLs into 'w2e'.
@@ -523,18 +543,21 @@ Options:
         author="$wr_author"
     else
         url2note "$1" none || { ecerr "tlrl-ng: url2note failed with $? on url $1" ; return 33 }
-        title="${title:-untitled $1}"
+        title="${tlrl_title:-${title:-untitled $1}}"
+
         : 'Note that readest is obviously only for the FIRST link.'
-        author="[$readest] $author $(url-date "$1")"
+        author="[$readest] ${tlrl_author:-${author}} $(url-date "$1")"
     fi
     title="$( ec "${opts[-p]}${title}" | sd / _ )"
-    
+    title="${title[1,80]}"
+
     pushf "${opts[-o]:-$HOME/tmp-kindle}"
     we_author=$author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
     e=$?
     popf
     return $e
 }
+@opts-setprefix tlrl-ng tlrl
 noglobfn tlrl-ng
 ##
 outlinify() {
@@ -918,7 +941,7 @@ function url-clean-unalix() {
     fi
 
     {
-        arrN $inargs[@] | { url-match-rg || true } | unalix "$opts[@]" @TRET
+        arrN $inargs[@] | { url-match-rg || true } | unalix --disable-certificate-validation "$opts[@]" @TRET
         ec
         arrN $inargs[@] | url-match-rg -v || true
     } | prefixer --skip-empty
@@ -1521,12 +1544,16 @@ renog url2org
 @opts-setprefix url2org url2note
 ##
 function str2orgtitle {
-    in-or-args "$@" | gtr '[]' '{}'
+    in-or-args "$@" | gtr '[]' '{}' | cat-copy-if-tty
 }
 aliasfn org-escape-title str2orgtitle
 
 function org-escape-link {
-    in-or-args "$@" | perl -pe 's/(\[|\])/\\${1}/g'
+    in-or-args "$@" | perl -pe 's/(\[|\])/\\${1}/g' | cat-copy-if-tty
+}
+
+function org-escape-block {
+    in-or-args "$@" | sd '^(\s*(?:\x1b\[33m)?)(\*|#)' '$1,$2' | cat-copy-if-tty
 }
 ##
 function url2md() { url2note "$1" md }
@@ -1789,4 +1816,26 @@ aliasfn rss-tll rss-tl -e w2e-curl
 aliasfn html-links-textualize ifdefined-cmd-or-cat html_links_textualize.lisp
 
 aliasfn html-links-absolutify ifdefined-cmd-or-cat html_links_absolutify.lisp
+##
+function w2e-selectors {
+    # You can use =fnswap 'w2e' 'pcz w2e'= to copy the invocation.
+    ##
+    local url="${w2e_url:-${$(browser-current-url)%%/}}"
+    local title="${1:-$(browser-current-title)}" sel="${w2e_sel:-$2}"
+    assert-args url title sel @RET
+
+    full-html2 "$url" \
+        | htmlq "$sel" \
+        | html-links-absolutify "$url" \
+        | urls-extract \
+        | urls-cleansharps \
+        | inargsf w2e "$title"
+}
+@opts-setprefix w2e-selectors w2e
+
+function w2e-juliadocs {
+    @opts sel '.docs-menu' @ \
+        w2e-selectors "$@"
+}
+@opts-setprefix w2e-juliadocs w2e
 ##

@@ -129,7 +129,6 @@ function rss-tsend() {
                 test -n "$no_title" || ec "Title: $t"
 
                 labeled redism SADD $rssurls $l_norm
-                # ensurerun "150s" tsend ...
                 test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
                 sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
                 test -n "$skip_engine" || rssTitle="$t" revaldbg "$engine[@]" "$l" # "$t"

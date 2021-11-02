@@ -57,7 +57,9 @@ function v2-off() {
 function pxify() {
     typeset -g proxycmd="proxychains4"
     typeset -g proxyenv="reval-pxa"
+
     enh-pxpy tsend
+    enh-pxpy subgrab
 
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl

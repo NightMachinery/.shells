@@ -120,8 +120,9 @@ function ivy-convenience() {
     tmuxnewsh2 eva1 mosh ${lilf_user}@82.102.11.148 -- zsh
     # tmuxnewsh2 eva2 mosh ${lilf_user}@82.102.11.148 -- zsh
 
-    tmuxnew julia_repl julia
+    tmuxnew julia_repl1 env TERM="$TERM" julia
+    tmuxnew julia_repl2 env TERM="$TERM" julia
 
-    tmuxnew ipython_repl ipython
+    tmuxnew ipython_repl1 ipython
 }
 ##

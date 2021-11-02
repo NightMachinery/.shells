@@ -61,12 +61,26 @@ const full = {
 };
 
 const hyper = ["cmd", "shift", "control", "alt"]
+const KITTY_APP_NAME = "kitty"
+
 // the actual applications
+///
+// This works, but we need to first switch to the main space, and run the hotkey once there. I have no idea why.
+quakeApp({
+  key: "a",
+  modifiers: hyper,
+  appName: "racket",
+  windowId: 0,
+  position: topHalf,
+  followsMouse: true,
+  hideOnBlur: false,
+});
+///
 quakeApp({
   // key: "m",
   key: "z",
   modifiers: hyper,
-  appName: "kitty",
+  appName: KITTY_APP_NAME,
   windowId: 0,
   // position: topHalf,
   position: full,
@@ -84,7 +98,7 @@ quakeApp({
 quakeApp({
   key: "f12",
   modifiers: [],
-  appName: "kitty",
+  appName: KITTY_APP_NAME,
   windowId: 0,
   position: full,
   followsMouse: true,
@@ -95,7 +109,7 @@ quakeApp({
   // key: "m",
   key: "x",
   modifiers: hyper,
-  appName: "kitty",
+  appName: KITTY_APP_NAME,
   windowId: 1,
   // position: topHalf,
   // position: rightHalf,
@@ -175,52 +189,54 @@ function quakeApp({
         var windows = app.windows();
         var win_len = windows.length;
 
-        if ((wid == 0 && !kittyMain) || (wid == 1 && !kittyClipper)) {
-          // if ((!kittyMain) || (!kittyClipper)) {
-          if (win_len == 0) {
-            // @phoenixBug https://github.com/kasper/phoenix/issues/131
-            // Windows in other spaces are NOT returned
-            opened = true;
-            brishz_sync(['fsay', 'Zero windows encountered']);
-            app.focus();
-            windows = app.windows();
-            win_len = windows.length;
-          }
+        if (appName == KITTY_APP_NAME) {
+          if ((wid == 0 && !kittyMain) || (wid == 1 && !kittyClipper)) {
+            // if ((!kittyMain) || (!kittyClipper)) {
+            if (win_len == 0) {
+              // @phoenixBug https://github.com/kasper/phoenix/issues/131
+              // Windows in other spaces are NOT returned
+              opened = true;
+              brishz_sync(['fsay', 'Zero windows encountered']);
+              app.focus();
+              windows = app.windows();
+              win_len = windows.length;
+            }
 
-          for (var w of windows) {
-            // brishz_sync(['fsay', 'windows'])
-            var title = w.title();
-            if (appName == "kitty") {
-              if (title == "Clipper") {
-                // await brishz(["fsay", "hello"]);
-                if (wid == 1) {
-                  // windowIdTmp = i;
-                  kittyClipper = w
-                  // brishz_sync(['fsay', 'kitty Clipper set']);
-                  // w.unminimise(); // doesn't work
+            for (var w of windows) {
+              // brishz_sync(['fsay', 'windows'])
+              var title = w.title();
+              if (appName == KITTY_APP_NAME) {
+                if (title == "Clipper") {
+                  // await brishz(["fsay", "hello"]);
+                  if (wid == 1) {
+                    // windowIdTmp = i;
+                    kittyClipper = w
+                    // brishz_sync(['fsay', 'kitty Clipper set']);
+                    // w.unminimise(); // doesn't work
+                  } else {
+                    // w.minimise();
+                  }
                 } else {
-                  // w.minimise();
-                }
-              } else {
-                if (wid == 0) {
-                  // windowIdTmp = i;
-                  kittyMain = w
-                  // brishz_sync(['fsay', 'kitty main set']);
-                  // w.unminimise();
-                } else {
-                  // w.minimise();
+                  if (wid == 0) {
+                    // windowIdTmp = i;
+                    kittyMain = w
+                    // brishz_sync(['fsay', 'kitty main set']);
+                    // w.unminimise();
+                  } else {
+                    // w.minimise();
+                  }
                 }
               }
             }
-          }
-          // await brishz(["echo", title, " = title, ", i, " = i, ", wid, " = wid, ", windowIdTmp, " = widTmp"]);
+            // await brishz(["echo", title, " = title, ", i, " = i, ", wid, " = wid, ", windowIdTmp, " = widTmp"]);
 
-          i += 1;
+            i += 1;
+          }
         }
         // wid = windowIdTmp
         var window = null;
 
-        if (appName == "kitty") {
+        if (appName == KITTY_APP_NAME) {
           if (wid == 0) {
             window = kittyMain
           } else {
@@ -235,6 +251,7 @@ function quakeApp({
         // hide the app if it is active and wasn't just opened or moved to
         // a new space
         if (isActive) {
+          // brishz_sync(['fsay', 'App', appName , 'is already active'])
           /// @duplicatedCode3581
           app.hide();
           if (postCommands && postCommands.length >= 1) {
@@ -244,13 +261,20 @@ function quakeApp({
           }
           ///
         } else {
-          moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
-          app.focus(); // do NOT window.raise() before this
-          moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
-          setAppPosition(app, position, space, wid, window);
-          window.raise();
-          // app.focus();
-          window.focus();
+          if (appName == KITTY_APP_NAME) {
+            moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
+            app.focus(); // do NOT window.raise() before this
+            moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
+            setAppPosition(app, position, space, wid, window);
+            window.raise();
+            // app.focus();
+            window.focus();
+          } else {
+            moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
+            app.focus();
+            moveAppToActiveSpace(app, followsMouse, wid, window, activeSpace)
+            setAppPosition(app, position, space, wid, window);
+           }
 
           if (preCommands && preCommands.length >= 1) {
             for (var cmd of preCommands) {

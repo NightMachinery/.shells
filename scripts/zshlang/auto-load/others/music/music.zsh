@@ -16,6 +16,10 @@ function hear-noipc() {
 # mplayer -quiet
 # aliasfn hearinvisible silent ffplay -autoexit -nodisp -loglevel panic # faster startup than mpv
 function hearinvisible() {
+    if (( ${#@} == 0 )) ; then
+        return 1
+    fi
+
     hearinvisible-playfast --norm "$@"
 }
 @opts-setprefix hearinvisible hear
@@ -29,6 +33,10 @@ function hearinvisible-playfast() {
     local vol="${hear_volume:-${hear_v:-1}}" loudidle="${hear_loudidle}"
 
     bella_zsh_disable1
+
+    if (( ${#@} == 0 )) ; then
+        return 1
+    fi
 
     if (( vol >= 10 )) ; then
         ecgray "$0: Volume assumed to be in the 100 scale"

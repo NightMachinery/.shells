@@ -5,7 +5,7 @@ function emc-sudo() {
     local f
     f="$1"
 
-    assert revaldbg emcnw -e '(doom/sudo-find-file '"$(emc-quote "$f")"')' @RET
+    revaldbg emc-eval '(doom/sudo-find-file '"$(emc-quote "$f")"')' @RET
     ##
     # f="$(grealpath -e ${f} | gtr '"' '\"')" @TRET
     # revaldbg emcnw -e '(find-file "/sudo::'$f'")'

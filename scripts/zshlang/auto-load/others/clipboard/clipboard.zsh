@@ -102,12 +102,13 @@ function clipboard-fz-raw() {
     local copy="${clipboard_fz_copy:-y}"
 
     local res
-    res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --tiebreak=index --height='80%' "${@:-}")" @RET
+    res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --exact --tiebreak=index --height='80%' "${@:-}")" @RET
     if bool $copy ; then
         assert pbcopy "$res"
     fi
     ecn "$res"
 }
+
 function clipboard-fz() {
     unset out # @global
 
@@ -122,6 +123,7 @@ function clipboard-fz() {
         fi
     done
 }
+
 function clipboard-fz-widget {
     local res i tmp
 
@@ -252,6 +254,7 @@ alias pca="pbcopy-ask"
 function clipboard-add-quoted() {
     local cmd="$(gq "$@")" os_copy="${clipboard_add_quoted_os}"
 
+    ecbold "Copied: $cmd"
     if bool $os_copy ; then
         pbcopy "$cmd"
     else
@@ -263,7 +266,10 @@ function pbcopy-z {
     if (( ${#@} >= 1 )) ; then
         @opts os y @ clipboard-add-quoted "$@"
     else
-        pbcopy "$(hist-last 1)"
+        local cmd="$(hist-last 1)"
+
+        ecbold "Copied: $cmd"
+        pbcopy "$cmd"
     fi
 }
 alias pcz='pbcopy-z'
