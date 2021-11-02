@@ -48,6 +48,7 @@ isDbg () {
 ###
 local copy_cmd="$brishz_copy"
 local session="${brishz_session}"
+local failure_expected="${brishz_failure_expected}"
 local nolog="${brishz_nolog}"
 local endpoint="${bshEndpoint:-http://127.0.0.1:${GARDEN_PORT:-7230}}/zsh/"
 
@@ -80,7 +81,14 @@ if [[ "$endpoint" =~ 'garden' ]] ; then
     opts+=(--user "Alice:$GARDEN_PASS0")
 fi
 local v=1
-local req="$(print -nr -- "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg nolog "$nolog" --arg s "$session" --arg c "$input_cmd[*]" --arg v $v 'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "json_output": $v, "nolog": $nolog}')"
+local req="$(print -nr -- "$stdin" \
+    | jq --raw-input --slurp --null-input --compact-output \
+    --arg nolog "$nolog" \
+    --arg failure_expected "$failure_expected" \
+    --arg s "$session" \
+    --arg c "$input_cmd[*]" \
+    --arg v $v \
+    'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "json_output": $v, "nolog": $nolog, "failure_expected": $failure_expected}')"
 local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint )
 cmd="$(gq print -nr -- $req) | $(gq "$cmd[@]")"
 if ((${+commands[pbcopy]})) ; then

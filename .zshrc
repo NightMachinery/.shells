@@ -286,9 +286,9 @@ function nightsh-load-zshrc() {
   #
 
   zle -N fr_zle
-  bindkey '^[[Z' fr_zle # shift+tab
+  bindkey '^[[Z' fr_zle_deus # shift+tab
   zle -N fr_zle_deus
-  bindkey '^[\t' fr_zle_deus # alt+tab
+  bindkey '^[\t' fr_zle # alt+tab
 
   zle -N clipboard-fz-widget
   bindkey '^p' clipboard-fz-widget

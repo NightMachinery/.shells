@@ -125,17 +125,22 @@ aliasfn bell-luna bell-avarice
 # aliasfn bell-luna bell-greencase
 ##
 function lunaquit() {
+    : "Global outputs: out"
+    out=""
+
     local gray="${lunaquit_grayoff:-y}"
 
-    loop-startover ~/tmp/.luna "$@"
-    local pids
-    pids="$(pgrep LUNA_MARKER)" || return 1
-    [[ "$pids[*]" =~ '^\s*$' ]] && return 1
-    ec "$pids" | inargsf reval-ec serr kill-withchildren
+    loop-startover ~/tmp/.luna "$@" @TRET
+
     if bool $gray ; then
         display-gray-off
     fi
-    return 0
+
+    local pids
+    pids="$(pgrep LUNA_MARKER)" || return 0
+    [[ "$pids[*]" =~ '^\s*$' ]] && return 0
+    out="$pids"
+    ec "$pids" | inargsf reval-ec serr kill-withchildren || true
 }
 
 function lunaquit-monitor() {
@@ -205,9 +210,12 @@ function bell-evacuate() {
     done
     display-gray-off # if you're still here, I doubt keeping the display gray will be able to help you any. :(
 }
+
 function lunaquit-quick() {
     # if there is no LUNA process around, we'll do nothing:
-    if @opts grayoff no @ lunaquit ; then
+    local out
+    @opts grayoff no @ lunaquit
+    if test -n "$out" ; then
         brishz awaysh lunaquit-monitor "$@" # it marks itself
         # bell-lm-amiindanger
     fi
@@ -224,9 +232,13 @@ function deluna() {
     do
         (( $(idle-get) >= $timeout || $(lastunlock-get) <= 80 )) && {
             edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get-min))")"
-            lunaquit " via deluna"
-            kill-marker-luna-timer-late
-            luna_skipped_set 0
+            ##
+            lunaquit " via deluna" @STRUE
+            kill-marker-luna-timer-late || true
+            luna_skipped_set 0 @STRUE
+            ##
+            lock-hook
+            ##
         }
         sleep 3 # to avoid cpu usage
     done

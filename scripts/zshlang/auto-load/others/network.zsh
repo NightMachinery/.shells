@@ -22,7 +22,7 @@ function curl-ip {
         ec $res_json
     else # ipinfo blocks Iranian IPs
         local ip
-        ip="$(curl "$opts[@]" http://checkip.amazonaws.com)" @RET
+        ip="$(curl "$opts[@]" https://checkip.amazonaws.com)" @RET
         ec "$ip"
         ip-geolocate "$ip" @RET
         ##
@@ -47,7 +47,7 @@ aliasfn ci90 curl-ip -x 'socks5h://127.0.0.1:1090'
 aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
 aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
 ##
-alias myip-amazon='curlm http://checkip.amazonaws.com'
+alias myip-amazon='curlm https://checkip.amazonaws.com'
 alias myip-ipinfo='curlm https://ipinfo.io/ip'
 ##
 # opendns sometimes returns wrong results, but it is slightly faster
@@ -110,7 +110,7 @@ function myipa-akami() {
 #   Time (mean ± σ):     950.6 ms ± 475.9 ms    [User: 3.3 ms, System: 8.3 ms]
 #   Range (min … max):   435.6 ms … 1538.6 ms    10 runs
 ##
-# hyperfine --warmup 5 'curl http://checkip.amazonaws.com' 'curl https://ipinfo.io/ip' 'dig +short myip.opendns.com @resolver1.opendns.com' 'dig TXT +short o-o.myaddr.l.google.com @ns1.google.com'
+# hyperfine --warmup 5 'curl https://checkip.amazonaws.com' 'curl https://ipinfo.io/ip' 'dig +short myip.opendns.com @resolver1.opendns.com' 'dig TXT +short o-o.myaddr.l.google.com @ns1.google.com'
 # Benchmark #1: curl http://checkip.amazonaws.com
 #   Time (mean ± σ):      1.934 s ±  0.245 s    [User: 9.1 ms, System: 10.7 ms]
 #   Range (min … max):    1.576 s …  2.334 s    10 runs

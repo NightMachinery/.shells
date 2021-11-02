@@ -1,5 +1,12 @@
 #!/usr/bin/env dash
 
-# brishz.dash "$(cat)"
+tmp="$(gmktemp --suffix='.zsh')" || return $?
+cat > $tmp || return $?
+# @workaround Using a temp file protects against unicode corruption in brish
 
-brishz_session=bsh brishz_quote=y brishz.dash "cd $(command gprintf '%q\n\n%s' "$PWD" "$(cat)")"
+brishz_session=bsh brishz_quote=y brishz.dash "$(command gprintf 'cd %q\nsource %q' "$PWD" "$tmp")"
+r=$?
+
+command rm -f "$tmp" &>/dev/null &
+
+return $r
