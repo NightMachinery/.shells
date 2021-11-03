@@ -28,7 +28,7 @@ function coursera-dl() {
     ##
 }
 function coursera-auth-test() {
-    # perhaps update 'useragent_chrome'
+    # perhaps update 'useragent_header_chrome'
     curl-cookies 'https://api.coursera.org/api/memberships.v1?includes=courseId,courses.v1&q=me&showHidden=true&filter=current,preEnrolled'
 }
 ##

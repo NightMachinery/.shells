@@ -1,7 +1,9 @@
 # imports json.zsh
 ##
 export useragent_googlebot="Mozilla/5.0 (compatible; Googlebot/2.1; +http://google.com/bot.html)"
-export useragent_chrome='User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36'
+
+export useragent_chrome='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36'
+export useragent_header_chrome="User-Agent: ${useragent_chrome}"
 ### Aliases
 alias withtxt="we_dler=readmoz-txt h2ed=txt2epub " # better for tables
 alias tlcode='tlrl-code'
@@ -57,7 +59,7 @@ noglobfn tlwb
 function wgetm() {
     : "Using --continue will assume any smaller already present file is an incomplete version of the server's file, and wget will try to resume it."
 
-    $proxyenv wget -e robots=off --header "$useragent_chrome" --header "$(cookies)" "$@"
+    $proxyenv wget -e robots=off --user-agent "$useragent_chrome" --header "$(cookies)" "$@"
 
     if test -z "$bella_zsh_disable1" && isI && @opts p [ wget ] @ fn-isTop
     then
@@ -77,7 +79,7 @@ function curlm() {
     fi
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
     # --suppress-connect-headers is needed so that `curlm --head ...` requests are parseable.
-    $proxyenv curl --suppress-connect-headers --header "$useragent_chrome" --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
+    $proxyenv curl --suppress-connect-headers --header "$useragent_header_chrome" --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
 }
 
 function curl-dl() {
@@ -119,7 +121,7 @@ function curl-useragent() {
     # Copy from Chrome's network pane
     $proxyenv curl --fail --no-progress-meter \
         -H 'upgrade-insecure-requests: 1' \
-        -H "$useragent_chrome" \
+        -H "$useragent_header_chrome" \
         -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
         -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
         --compressed "$@"
