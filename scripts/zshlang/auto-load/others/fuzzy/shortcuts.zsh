@@ -49,14 +49,27 @@ function delenda() {
     ntag-filterori red green aqua teal gray grey | inargsf trs
 }
 ##
-zv() {
+function zv() {
     local q="$1" ; (( $#@ >= 1 )) && shift
     local query=("$@")
 
     if test -n "$q" ; then
         indir "$q" openv $query[@]
     else
-        @opts dirs [ ~/base/cache ~/base/Lectures ~/base/series ~/Base/'animated series' ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls ~/Downloads ] @ openv $query[@]
+        @opts dirs [ \
+            ~/base/cache \
+            ~/base/Lectures \
+            ~/base/series \
+            ~/Base/'animated series' \
+            ~/base/anime \
+            ~/"base/_Local TMP" \
+            ~/base/docu \
+            ~/base/movies \
+            ~/base/dls \
+            ~/Downloads \
+            ~vol/hyper-diva/video \
+            ] @ openv $query[@]
+        # ~/base/V \
     fi
 }
 aliasfnq zvv zv ''

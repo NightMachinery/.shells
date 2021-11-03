@@ -13,7 +13,7 @@ function aac() {
     aria2p --secret "$ARIA_SECRET" "$@"
 }
 ##
-aa-raw() {
+function aa-raw() {
     local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
     # Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
@@ -37,7 +37,7 @@ aa-raw() {
         ecgray "$0: torrent detected; @warn torrents no longer seem resumeable by 'aa' at least. Try 'aria2c --seed-time=0 ...'?"
         # opts=("${opts[@]}")
     else
-        opts=(--user-agent "$useragent_chrome" "${opts[@]}")
+        opts=(--header "$useragent_chrome" "${opts[@]}")
         # --user-agent will cause problems (immediately abort them) with torrent downloads
     fi
 
