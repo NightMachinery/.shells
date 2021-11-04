@@ -1022,9 +1022,23 @@ function urlfinalg {
 
         res="$(ec "$inargs" | urlfinalg1)" @TRET
     fi
-    ec "$res"
-}
 
+    local url tmp
+    for url in ${(@f)res} ; do
+        if [[ "$url" =~ '^https?://www.anandtech.com/.*' ]] ; then
+            if tmp="$(full-html2 "${url}" \
+                | html-links-absolutify "$url" \
+                | htmlq -a href '.print_article' \
+                | rg '/print/' )" ; then
+                url="$tmp"
+            else
+                ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
+            fi
+        fi
+
+        ec "$url"
+    done
+}
 aliasfn url-final-gateway urlfinalg
 noglobfn urlfinalg
 ##
@@ -1817,7 +1831,14 @@ aliasfn rss-tll rss-tl -e w2e-curl
 ##
 aliasfn html-links-textualize ifdefined-cmd-or-cat html_links_textualize.lisp
 
-aliasfn html-links-absolutify ifdefined-cmd-or-cat html_links_absolutify.lisp
+function html-links-absolutify {
+    local url_current="$1"
+    assert-args url_current @RET
+    local url_root
+    url_root="${2:-$(url-head "$url_current")}" @TRET
+
+    ifdefined-cmd-or-cat html_links_absolutify.lisp "$url_current" "$url_root"
+}
 ##
 function w2e-selectors {
     # You can use =fnswap 'w2e' 'pcz w2e'= to copy the invocation.

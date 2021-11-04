@@ -3,15 +3,26 @@
 ;;;
 (defun main ()
   ;; @note lquery operations are destructive, even serializing to string!
-  (letd ((url_base
-          (if *repl-mode*
-              "http://manpages.ubuntu.com"
-              (nth 0 (argv-get))))
+  (letd ((argv (argv-get))
+         (url_current
+          (cond
+            (*repl-mode* "http://manpages.ubuntu.com/sth/")
+            (t (nth 0 argv))))
+         (url_root
+          (cond
+            (*repl-mode* "http://manpages.ubuntu.com///")
+            ((>= (length argv) 2)
+             (nth 1 argv))
+            (t url_current)))
+         (url_root
+          (string-right-trim "/" url_root))
+         (url_current
+          (string-right-trim "/" url_current))
          (in
           (if *repl-mode*
               "<p><a href=\"https://bing.com\">bing!</a>
 <b><a href='/posts/internal/1.html'>mm</a></b>
-<img src='/repo/a.png' />
+<img src='repo/a.png' />
 </p><a href=\"https://google.com\">gingin</a>"
 
               (alexandria:read-stream-content-into-string *standard-input*)))
@@ -28,7 +39,14 @@
                (letd ((url_rel
                        (aref (lquery:$ a (attr attr_name)) 0)))
                  (lquery:$ a
-                           (attr attr_name (concat url_base "/" url_rel))))))
+                           (attr attr_name
+                                 (concat
+                                  (cond
+                                    ((s-starts-with-p "/" url_rel)
+                                     url_root)
+                                    (t
+                                     (concat url_current "/")))
+                                  url_rel))))))
 
     (when t ;; (not *repl-mode*)
       (format t "~a~%"
