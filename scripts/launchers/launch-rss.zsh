@@ -23,7 +23,8 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh \
     'http://www.viridiandreams.net/feed/' \
     'https://www.bloomberg.com/opinion/authors/ARbTQlRLRjE/matthew-s-levine.rss' \
     'https://www.oreilly.com/radar/topics/radar-trends/feed/index.xml' \
-    'https://blog.pragmaticengineer.com/rss/'
+    'https://blog.pragmaticengineer.com/rss/' \
+    'https://www.anandtech.com/rss/'
 # 'https://buttondown.email/hillelwayne/rss' 'https://huyenchip.com/feed.xml' 'https://tamaspapp.eu/post/index.xml'
 # Rob Henderson Newsletter (Human Nature series) https://www.amazon.com/Incentives-Motivation-Information-Donald-Campbell-dp-1107610338/dp/1107610338/ref=dp_ob_title_bk
 
