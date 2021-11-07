@@ -18,13 +18,13 @@ function argerrainbow() {
     } >&2
 }
 
-argerng() {
+function argerng() {
     clipboard-add-quoted "$@"
 
     { test -n "$jahmode" || isColor } && ecalternate "$@" || arger "$@"
 }
 
-ecdbg() {
+function ecdbg() {
     isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")
         color "$errcol[@]" "$@" >&2

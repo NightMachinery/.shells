@@ -48,7 +48,7 @@ function comp-set() {
         done
     done
 }
-comp-wh-set cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp tldr agf agfi agfi-ni ags h_noglob_agsi # realpath2
+comp-wh-set cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcommands rp tldr agf agfi agfi-ni ags h_noglob_agsi pxaify-fn pxaify-command pxify-command # realpath2
 
 comp-set '=eval' ruu reval rgeval revaldbg loop reval-ec reval-copy seval geval eval-memoi memoi-eval eval-timeout reval-timeout reval-2json reval-retcode fi-rec assert hyperfine hfd hfz para parad brishz bsh onlc onlm run-on-each re-async redo inargs-gen inargsE-gen filterE-gen filter filter0 p enh-addfinder pf pope clipboard-add-quoted pcz printz-quoted pf px proxychains4 bell-auto bell-repeat time2 silence serr sout sdbgerr soutdbg soutdbg serrdbg mn lesh inplace-io jcolor jah jahun ansi2img
 # @todo8 '@opts' needs a custom completor that feeds the items after '@' to the evil completor
