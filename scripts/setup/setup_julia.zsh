@@ -2,6 +2,8 @@
 
 function julia-setup-packages {
     local pkgs=(
+        IJulia
+
         Revise
         InteractiveUtils
         InteractiveCodeSearch

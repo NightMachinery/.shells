@@ -112,6 +112,7 @@ function ivy-self() {
     comment '-2            Force tmux to assume the terminal supports 256 colours.'
     tmux -2 attach-session -d
 }
+
 function ivy-convenience() {
     tmuxnewsh2 zii1 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
     tmuxnewsh2 zii2 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh

@@ -59,12 +59,13 @@ function pxify() {
     typeset -g proxyenv="reval-pxa"
 
     enh-pxpy tsend
-    enh-pxpy subgrab
+    # enh-pxpy subgrab
+    pxaify-command subgrab
 
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl
     pxify-command unalix
-    pxify-command nimble
+    pxify-command nimble # @broken
     pxify-command conda
     # pxify-command go # TLS errors with genrouter
     pxify-command manga-py
@@ -95,6 +96,17 @@ function pxaify-command() {
     aliasfn "$1" pxa command "$1"
 }
 reify pxaify-command
+
+function pxaify-fn() {
+    local name="$1"
+    local name_new="h_pxa_${name}"
+    assert-args name @RET
+    assert not whitespace-p "${functions[$name]}" @RET
+
+    functions[$name_new]="${functions[$name]}"
+    functions[$name]="reval-pxa ${name_new} \"\$@\""
+}
+reify pxaify-fn
 ##
 function pxpy() {
     px python "$commands[$1]" "${@:2}"
@@ -210,6 +222,7 @@ function proxy-is() {
         @NA
     fi
 }
+
 function proxy-toggle() {
     # silent bello &
     if proxy-is ; then

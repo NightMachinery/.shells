@@ -254,8 +254,8 @@ alias pca="pbcopy-ask"
 function clipboard-add-quoted() {
     local cmd="$(gq "$@")" os_copy="${clipboard_add_quoted_os}"
 
-    ecbold "Copied: $cmd"
     if bool $os_copy ; then
+        ecbold "Copied: $cmd"
         pbcopy "$cmd"
     else
         clipboard-add "$cmd"
