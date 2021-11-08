@@ -218,7 +218,7 @@ function nightsh-load-zshrc() {
   zle-enable-url-quote # @warn needs to be before stuff like syntax highlighters
   ##
   source-plugin mafredri/zsh-async
-  zsh-defer source-plugin zdharma/zui
+  zsh-defer source-plugin zdharma-continuum/zui
 
   # re source "$NIGHTDIR"/zshlang/personal/aliases.zsh "$NIGHTDIR"/bash/auto-load/aliases.bash #To make them have priority. # Sth makes zsh reload all aliases, which breaks `ialiases`.
 
@@ -327,7 +327,7 @@ function nightsh-load-zshrc() {
   zsh-defer source-plugin unixorn/git-extra-commands
 
   ##
-  # zsh-defer source-plugin zdharma/zzcomplete # binds C-f, ^F
+  # zsh-defer source-plugin zdharma-continuum/zzcomplete # binds C-f, ^F
   # does not support light themes https://github.com/zdharma/zzcomplete/issues/1
   ##
 
@@ -524,9 +524,9 @@ function nightsh-load-zshrc() {
   # https://github.com/dim-an/cod/issues/24
   ###
   if test -n "$bicon_force_plugins" || ! isBicon ; then
-    zsh-defer source-plugin zdharma/fast-syntax-highlighting #should be last
+    zsh-defer source-plugin zdharma-continuum/fast-syntax-highlighting #should be last
   fi
-  zsh-defer source-plugin zdharma/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
+  # zsh-defer source-plugin zdharma-continuum/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
   ##
   # DISABLE_AUTO_TITLE="true" # disables omz setting the title
   omz_termsupport_precmd () {

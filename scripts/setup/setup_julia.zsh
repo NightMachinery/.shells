@@ -19,6 +19,8 @@ function julia-setup-packages {
         Distributions
 
         Flux
+        Zygote
+        BSON
         StatsBase
         UnicodePlots
 
