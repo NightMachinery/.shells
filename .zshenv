@@ -99,7 +99,9 @@ function nightsh-load-zshenv() {
         fi
 
         function source-plugin() {
-            if test -n "$antibody_enabled" ; then
+            if test -n "$source_plugin_skip" ; then
+                return 0
+            elif test -n "$antibody_enabled" ; then
                 antibody bundle "$@"
             elif test -n "$zinit_enabled" ; then
                 zinit light "$@"
