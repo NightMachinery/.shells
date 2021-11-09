@@ -132,8 +132,47 @@ ins-all() {
     ins-gem
 }
 
-function ins() {
-    isDarwin && brew install $1 || sudo apt install -y $1
+##
+function install() {
+    local pkgs=("$@")
+
+    if isLinux ; then
+        sudo apt install -y "${pkgs[@]}"
+    elif isDarwin ; then
+        install-latest "$pkgs[@]"
+    else
+        return 127
+    fi
+}
+aliasfn ins install
+
+
+function install-latest {
+    local pkgs=("$@") strict="${install_latest_strict}"
+
+    if (( $+commands[brew] )) ; then
+        brew install "${pkgs[@]}"
+    else
+        if test -n "$strict" ; then
+            return 127
+        else
+            install "${pkgs[@]}"
+        fi
+    fi
+}
+
+function install-head {
+    local pkgs=("$@") strict="${install_head_strict}"
+
+    if (( $+commands[brew] )) ; then
+        brew install --head "${pkgs[@]}"
+    else
+        if test -n "$strict" ; then
+            return 127
+        else
+            install-latest "${pkgs[@]}"
+        fi
+    fi
 }
 ##
 function pig() {
