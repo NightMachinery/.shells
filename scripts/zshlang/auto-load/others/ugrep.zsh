@@ -136,7 +136,7 @@ function ugfz() {
             opts+=( --query "$INITIAL_QUERY " )
         fi
 
-        eval "$FZF_DEFAULT_COMMAND" |
+        { eval "$FZF_DEFAULT_COMMAND" ; true } |
             FZF_SIMPLE_PREVIEW='cat {f}' \
                 fz --bind "change:reload:$RG_PREFIX {q} || true" ${opts[@]}  --ansi --disabled
     else
