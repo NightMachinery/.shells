@@ -218,40 +218,40 @@ function pngpaste() {
 
     local stdout=''
     if [[ "$name" == '-' ]] ; then
-        name="$(gmktemp --suffix ".${extension}")" @RET
+        name="$(gmktemp --suffix ".${extension}")" @TRET
         stdout=y
     fi
     local dir
-    dir="$(bottomdir "$name")"
+    dir="$(bottomdir "$name")" @TRET
     if test -z "$dir" ; then
         dir="$PWD"
     fi
-    dir="$(grealpath "$dir")"
-    mkdir -p "$dir" @RET
+    dir="$(grealpath "$dir")" @TRET
+    mkdir -p "$dir" @TRET
 
     name="$(bottomfile "$name")"
     if test -z "${name}" ; then
-        name+="$(dateshort | gtr ':' '_' | str2filename)" @RET
+        name+="$(dateshort | gtr ':' '_' | str2filename)" @TRET
     fi
 
     [[ "$name" =~ '\.'${extension}'$' ]] || name+=".${extension}"
 
     local f="${dir}/${name}"
     if test -e "$f" ; then
-        command rm "$f"
+        silent trs-rm "$f" @TRET
     fi
 
     revaldbg osascript -e "tell application \"System Events\" to ¬
                   write (the clipboard as ${class}) to ¬
                           (make new file at folder \"${dir}\" with properties ¬
-                                  {name:\"${name}\"})" @RET
+                                  {name:\"${name}\"})" @TRET
     if test -n "$stdout" ; then
-        cat "$f"
-        command rm "$f"
+        cat "$f" @TRET
+        silent trs-rm "$f" @STRUE
     else
         ecgray "$0: pasted to $(gq "$f")"
         if fn-isTop ; then
-            icat "$f"
+            icat "$f" @STRUE
         fi
     fi
     ## @alt:
