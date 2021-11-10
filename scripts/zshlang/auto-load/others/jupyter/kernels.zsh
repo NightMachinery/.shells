@@ -18,7 +18,9 @@ function jupyter-kernel-launch {
         reval-ec jupyter kernel --kernel="$kernel" \
         --KernelManager.connection_file="${dir}/${name}" \
         --KernelManager.autorestart=True \
-        --KernelApp.log_level=INFO
+        --KernelApp.log_level=DEBUG \
+        --Application.log_level=DEBUG \
+        --JupyterApp.log_level=DEBUG
 }
 
 function jupyter-kernel-launch-julia {
