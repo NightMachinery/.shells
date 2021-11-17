@@ -169,7 +169,7 @@ for k,v in cookies.items():
     out += f"{k}={v};"
 print(out[:-1])
 '
-    return $?
+        return $?
     } always {
         test -n "$tmp" && command rm -f "$tmp"
     }
@@ -321,7 +321,7 @@ function full-html2() {
     [[ "$mode" =~ '^cloudscraper$' ]] && {
         # @upstreamBug Corrupts =Python’s features= to =Pythonâs features=
         $proxyenv cloudscraper_get.py "$url" # idk if proxyenv works for this
-            return $?
+        return $?
     }
 
     [[ "$mode" =~ '^http(ie)?$' ]] && {
@@ -402,7 +402,7 @@ noglobfn w2e-gh
 function url-exists() {
     local ret=1 url="$1"
 
-     # Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
+    # Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
     curl --output /dev/null --silent -r 0-0 --fail --location "$url" && {
         ret=0
         url_exists_out="${url_exists_out:-$url}" # only set it if it's not set before. This helps us try  a bunch of URLs and find the first one that exists.
@@ -1000,12 +1000,7 @@ function urlfinalg1() {
 
     local URL
     for URL in $inargs[@] ; do
-        pxs-maybe
 
-        { test -n "$uf_idem" || ! match-url "$URL" || [[ "$URL" == *bloomberg.com* ]] } && {
-            ec "$URL"
-            return 0
-        }
         local u="$URL"
         u="$(url-clean-google "$u")" @TRET
 
@@ -1015,18 +1010,29 @@ function urlfinalg1() {
 noglobfn urlfinalg1
 
 function urlfinalg {
-    local inargs
+    local inargs disabled="${uf_idem}"
     inargs="$(in-or-args "$@")" @RET
 
-    local res
-    if ! res="$(ec "$inargs" | urlfinalg2)" ; then
-        ecerr "$0: urlfinalg2 failed. Retrying with urlfinalg1 ..."
-
-        res="$(ec "$inargs" | urlfinalg1)" @TRET
+    if bool "$disabled" ; then
+        ec "$inargs"
+        return 0
     fi
 
-    local url tmp
-    for url in ${(@f)res} ; do
+    local res url tmp
+    for url in ${(@f)inargs} ; do
+
+        if ! match-url "$URL" || [[ "$URL" == *bloomberg.com* ]] ; then
+            ec "$URL"
+            continue
+        fi
+
+        if ! res="$(ec "$url" | urlfinalg2)" ; then
+            ecerr "$0: urlfinalg2 failed. Retrying with urlfinalg1 ..."
+
+            res="$(ec "$url" | urlfinalg1)" @TRET
+        fi
+        url="$res"
+
         if [[ "$url" =~ '^https?://www.anandtech.com/.*' ]] ; then
             if tmp="$(full-html2 "${url}" \
                 | html-links-absolutify "$url" \
@@ -1081,7 +1087,7 @@ function url-filename() {
     curlm --head "$@" | \
         {
             if bool "$python_parser" ; then
-                 http-headers-to-json | jqm '."content-disposition"[0].filename'
+                http-headers-to-json | jqm '."content-disposition"[0].filename'
             else
                 @opts r '$1$2' @ rget \
                     'content-disposition:.*filename=\s*(?:"(.*)"|(.*))'
@@ -1416,10 +1422,10 @@ function libgendl-md5() {
 
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
-          aa-multi $links[@] @RET
+            aa-multi $links[@] @RET
         else
-          ecerr "$0: No books found for md5: $md5"
-          return 1
+            ecerr "$0: No books found for md5: $md5"
+            return 1
         fi
     }
 }
@@ -1666,9 +1672,9 @@ function readmoz-md() {
     local tmp
     tmp="$(gmktemp)" @TRET
     {
-    readmoz "$url" > $tmp @TRET
+        readmoz "$url" > $tmp @TRET
 
-    @opts from html-native_divs to "$format" @ pandoc-convert "$tmp" "${@[2,-1]}"
+        @opts from html-native_divs to "$format" @ pandoc-convert "$tmp" "${@[2,-1]}"
     } always { silent trs-rm "$tmp" }
 }
 noglobfn readmoz-md
@@ -1780,7 +1786,7 @@ function urls-cleansharps() {
             dvar match
             newUrls+="$match[1]"
         else
-          newUrls+="$url"
+            newUrls+="$url"
         fi
     done
     arrN ${(@u)newUrls}
