@@ -77,3 +77,7 @@ function tokei-percent() {
     table-print "$headers[@]" -- "$newline[@]"
 }
 ##
+function nt-count-lines {
+    fd --absolute-path --type f --extension org --exclude 'private/archive/*' --exclude 'private/backups' . "$nightNotes" | file_line_counter.lisp | tac
+}
+##

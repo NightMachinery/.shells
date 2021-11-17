@@ -160,6 +160,10 @@ function backup-vimium {
     assert reval-ec mv ~dl/vimium_c*.json ~nt/private/backups/'Vimium C'/vimium_c.json @RET
 }
 ##
+function backup-redirector {
+    mv2 ~nt/private/backups/Redirector/ ~dl/Redirector.json
+}
+
 function backup-stylus {
     dl onlc mv2 ~nt/private/backups/userstyles/stylus.json
 }

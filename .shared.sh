@@ -4,10 +4,9 @@ ulimit -S -n 50000 >&/dev/null || ulimit -S -n 10240 # the first one fails on a 
 ##
 maxproc="$(ulimit -Hu)" # local not allowed on some shells
 maxproc=$(( maxproc - 100 )) # give some slack to the OS
-if (( maxproc < 10000 )) ; then
-    maxproc=10000
+if (( maxproc > 500 )) ; then
+    ulimit -Su "$maxproc"
 fi
-ulimit -Su "$maxproc"
 unset maxproc
 ### @duplicateCode/jhsd99wiw3i3hehiajh
 if test -z "$NIGHTDIR" ; then

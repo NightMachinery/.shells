@@ -1,4 +1,4 @@
-#!/usr/bin/env -S sbcl --script
+#!/usr/bin/env -S sbcl_batteriful --script
 
 (defclass repo ()
   ((name

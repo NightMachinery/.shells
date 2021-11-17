@@ -269,7 +269,8 @@ function full-html2() {
         if [[ "$url" =~ 'https?://[^/]+\.ir' ]] ; then
             mode='curl'
         else
-            mode='cloudscraper'
+            # mode='cloudscraper'
+            mode='curl'
         fi
     fi
     local secure="${fhSecure:-y}" # insecure mode currently only supported by wget and gurl
@@ -317,7 +318,8 @@ function full-html2() {
         return $?
     }
 
-    [[ "$mode" =~ '^cloudscraper$' ]] && { 
+    [[ "$mode" =~ '^cloudscraper$' ]] && {
+        # @upstreamBug Corrupts =Python’s features= to =Pythonâs features=
         $proxyenv cloudscraper_get.py "$url" # idk if proxyenv works for this
             return $?
     }

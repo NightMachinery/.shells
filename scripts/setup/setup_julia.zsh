@@ -18,6 +18,8 @@ function julia-setup-packages {
         Printf
         Distributions
 
+        CUDA
+        Adapt
         Flux
         Zygote
         BSON
