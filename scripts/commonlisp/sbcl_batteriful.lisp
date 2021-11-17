@@ -15,6 +15,7 @@
  "str"
  "Serapeum"
  :lquery
+ "lparallel"
  )
 ;;;
 (when (not *repl-mode*)
