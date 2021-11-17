@@ -12,9 +12,8 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_e=(@opts dest $tlg_podcastgen @ podcast2tel)
 ##
 tmuxnewsh2 rss-lw rt_skip=$rt_skip rt_e=rss-tll rss-tsend 'https://www.greaterwrong.com/users/zvi?show=posts&format=rss'
 
-tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e=(withchrome rss-tl)" tmuxnewsh \
-    rss-gen-withchrome rss-tsend \
-    'https://www.bloomberg.com/opinion/authors/ARbTQlRLRjE/matthew-s-levine.rss'
+# tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e=(withchrome rss-tl)" tmuxnewsh \
+#     rss-gen-withchrome rss-tsend \
 
 tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh \
     rss-gen rss-tsend \
@@ -23,6 +22,7 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh \
     'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' \
     'https://www.overcomingbias.com/feed' \
     'https://danluu.com/atom.xml' \
+    'https://www.bloomberg.com/opinion/authors/ARbTQlRLRjE/matthew-s-levine.rss' \
     'https://feeds2.feedburner.com/GFWReport' \
     'http://www.viridiandreams.net/feed/' \
     'https://www.oreilly.com/radar/topics/radar-trends/feed/index.xml' \
