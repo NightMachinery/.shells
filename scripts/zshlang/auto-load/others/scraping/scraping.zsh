@@ -984,12 +984,13 @@ function url-clean-google() {
 }
 renog url-clean-google
 
-function urlfinalg2() {
+function h-urlfinalg2() {
     @opts redirects y @ url-clean "$@"
 }
+aliasfn urlfinalg2 urlfinalg_e1=h-urlfinalg2 urlfinalg_e2=arrN urlfinalg
 noglobfn urlfinalg2
 
-function urlfinalg1() {
+function h-urlfinalg1() {
     # aka: url-final-gateway
     # supports Google redirects.
     # Set uf_idem to y to return original.
@@ -1007,9 +1008,12 @@ function urlfinalg1() {
         url-final "$u" @TRET #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
     done
 }
+aliasfn urlfinalg1 urlfinalg_e1=h-urlfinalg1 urlfinalg_e2=arrN urlfinalg
 noglobfn urlfinalg1
 
 function urlfinalg {
+    local engine1=("${urlfinalg_e1[@]:-h-urlfinalg2}")
+    local engine2=("${urlfinalg_e2[@]:-h-urlfinalg1}")
     local inargs disabled="${uf_idem}"
     inargs="$(in-or-args "$@")" @RET
 
@@ -1021,15 +1025,15 @@ function urlfinalg {
     local res url tmp
     for url in ${(@f)inargs} ; do
 
-        if ! match-url "$URL" || [[ "$URL" == *bloomberg.com* ]] ; then
-            ec "$URL"
+        if ! match-url "$url" || [[ "$url" == *bloomberg.com* ]] ; then
+            ec "$url"
             continue
         fi
 
-        if ! res="$(ec "$url" | urlfinalg2)" ; then
-            ecerr "$0: urlfinalg2 failed. Retrying with urlfinalg1 ..."
+        if ! res="$(ec "$url" | reval "$engine1[@]")" ; then
+            ecerr "$0: $(gq "$engine1[@]") failed. Retrying with $(gq "$engine2[@]") ..."
 
-            res="$(ec "$url" | urlfinalg1)" @TRET
+            res="$(ec "$url" | reval "$engine2[@]")" @TRET
         fi
         url="$res"
 
