@@ -60,13 +60,15 @@ function chrome-open() {
     ensure isDarwin @MRET # @darwinonly
     chrome-cli open "$@"
 }
+
 function chrome-open-file() {
     ensure isDarwin @MRET # @darwinonly
     local f="$1"
     ensure-args f @MRET
     shift
     ##
-    local url="file://$(realpath "$f")"
+    local url
+    url="$(file-unix2uri-rp "$f")" @TRET
     pbcopy "$url" && tts-glados1-cached 'copied'
     ##
     # works badly with Workona, otherwise works fine

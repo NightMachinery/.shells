@@ -156,7 +156,6 @@ alias dpans="h2ed=html2epub-pandoc-simple"
 alias carbon='carbon-now --headless --copy'
 alias jglob='test -z "$*" && { test -n "$jufile" && set -- "$jufile" || { ecerr No args and no jufile supplied to $0 ; return 1 } }'
 alias sii=nig
-alias pkno='pk_no=y '
 alias rmswp='command rm -i $NIGHTDIR/**/*.swp(D)'
 alias rmpyc='command rm -ri $NIGHTDIR/**/__pycache__'
 alias svi='nvim -u ~/.SpaceVim/vimrc'

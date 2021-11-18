@@ -264,6 +264,7 @@ function full-html2() {
     # assert-net @RET # not worth the perf hit?
 
     local url="$1"
+    local absolutify="${fhAbs:-y}"
     local mode="${fhMode}"
     if test -z "$mode" ; then
         if [[ "$url" =~ 'https?://[^/]+\.ir' ]] ; then
@@ -277,6 +278,8 @@ function full-html2() {
 
     local opts=()
 
+    local html
+    html="$(
     if [[ "$url" =~ '^(?:https?://)?[^/]*techcrunch\.' ]] ; then
         ecdbg "$0: Techcrunch Mode"
         techcrunch-curl "$url"
@@ -328,7 +331,15 @@ function full-html2() {
         $proxyenv dbgserr httpm "$url"
         return $?
     }
+    )" @RET
+
+    if bool "$absolutify" ; then
+        ec "$html" | html-links-absolutify "$url"
+    else
+        ec "$html"
+    fi
 }
+aliasfn html-get full-html2
 
 function full-html() {
     local url="$1" dest="$2"
@@ -391,7 +402,7 @@ function wread-curl() {
     local url="$1"
     assert-args url @RET
 
-    full-html2 "$url" | html-links-absolutify "$(url-head "$url")"
+    full-html2 "$url"
 }
 ##
 function w2e-gh() {
@@ -992,8 +1003,8 @@ noglobfn urlfinalg2
 
 function h-urlfinalg1() {
     # aka: url-final-gateway
-    # supports Google redirects.
-    # Set uf_idem to y to return original.
+    # Supports Google redirects.
+    # Set uf_idem to y to return the originals.
     ##
     local inargs
     inargs="$(in-or-args "$@")" @RET
@@ -1012,6 +1023,7 @@ aliasfn urlfinalg1 urlfinalg_e1=h-urlfinalg1 urlfinalg_e2=arrN urlfinalg
 noglobfn urlfinalg1
 
 function urlfinalg {
+    local print_p="${urlfinalg_print:-y}"
     local engine1=("${urlfinalg_e1[@]:-h-urlfinalg2}")
     local engine2=("${urlfinalg_e2[@]:-h-urlfinalg1}")
     local inargs disabled="${uf_idem}"
@@ -1037,14 +1049,23 @@ function urlfinalg {
         fi
         url="$res"
 
-        if [[ "$url" =~ '^https?://www.anandtech.com/.*' ]] ; then
-            if tmp="$(full-html2 "${url}" \
-                | html-links-absolutify "$url" \
-                | htmlq -a href '.print_article' \
-                | rg '/print/' )" ; then
-                url="$tmp"
-            else
-                ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
+        if bool "$print_p" ; then
+            if [[ "$url" =~ '^https?://www.anandtech.com/.*' ]] ; then
+                if tmp="$(full-html2 "${url}" \
+                    | htmlq -a href '.print_article' \
+                    | rg '/print/' )" ; then
+                    url="$tmp"
+                else
+                    ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
+                fi
+            elif [[ "$url" =~ '^https?://(?:[^/]*\.)?wikipedia.org/.*' ]] ; then
+                if tmp="$(full-html2 "${url}" \
+                    | htmlq -a href '[accesskey="p"]' \
+                    | rg '&printable=yes' )" ; then
+                    url="$tmp"
+                else
+                    ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
+                fi
             fi
         fi
 
@@ -1614,7 +1635,7 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
     local cleanedhtml
     cleanedhtml="$(<<<"$html" readability "$url")" @TRET
 
-    cleanedhtml="$(<<<"$cleanedhtml" html-links-absolutify "$(url-head "$url")")" @TRET
+    cleanedhtml="$(<<<"$cleanedhtml" html-links-absolutify "$url")" @TRET
 
     if test -z "$noSummaryMode" ; then
         local prehtml="$(url2html "$url")"
@@ -1624,6 +1645,11 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
     test -n "$summaryMode" || ec "$cleanedhtml"
 }
 noglobfn readmoz
+
+function readmoz-nosanitize {
+    readability_sanitize_disabled=y readmoz "$@"
+}
+noglobfn readmoz-nosanitize
 
 function readmozsum() {
     : "Use url2html instead? No advtanges to this."
@@ -1861,7 +1887,6 @@ function w2e-selectors {
 
     full-html2 "$url" \
         | htmlq "$sel" \
-        | html-links-absolutify "$url" \
         | urls-extract \
         | urls-cleansharps \
         | inargsf w2e "$title"

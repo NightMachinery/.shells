@@ -23,6 +23,7 @@
               "<p><a href=\"https://bing.com\">bing!</a>
 <b><a href='/posts/internal/1.html'>mm</a></b>
 <img src='repo/a.png' />
+<img src='//example.com/b.png' />
 </p><a href=\"https://google.com\">gingin</a>"
 
               (alexandria:read-stream-content-into-string *standard-input*)))
@@ -42,6 +43,13 @@
                            (attr attr_name
                                  (concat
                                   (cond
+                                    ((s-starts-with-p "//" url_rel)
+                                     (elt
+                                      (nth-value
+                                       1
+                                       (ppcre:scan-to-strings "^([^/]+:)//"
+                                                              url_root))
+                                      0))
                                     ((s-starts-with-p "/" url_rel)
                                      url_root)
                                     (t
