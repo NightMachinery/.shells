@@ -284,17 +284,6 @@ function emc-less-html() {
 }
 alias elh="emc-less-html"
 ##
-function file-uri2unix() {
-    local f="$1"
-    # assert-args f @RET
-
-    if [[ "$f" =~ 'file://[^/]*(/.*)' ]] ; then
-        ec "$match[1]" | url-decode.py
-    else
-        ec "$f"
-    fi
-}
-
 function trimr-hash() {
     local inargs
     in-or-args2 "$@"

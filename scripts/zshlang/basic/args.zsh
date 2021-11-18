@@ -40,15 +40,40 @@ alias arrnn='arrNN'
 #     (( $# )) && arrN "$@" || ec "$(</dev/stdin)"
 # }
 ###
+function file-unix2uri {
+    in-or-args "$@" | prefixer --skip-empty --add-prefix="file://"
+}
+
+function file-unix2uri-rp {
+    local inargs
+    inargs="$(in-or-args "$@")" @RET
+
+    local f
+    for f in ${(@f)inargs} ; do
+        ec "file://$(realpath "$f")" @TRET
+    done
+}
+
+function file-uri2unix() {
+    local f="$1"
+    # assert-args f @RET
+
+    if [[ "$f" =~ '^file://[^/]*(/.*)$' ]] ; then
+        ec "$match[1]" | url-decode.py @TRET
+    else
+        ec "$f"
+    fi
+}
+
 function args-nochromefile() {
-    doc 'Converts file:/// to /. Outputs in $out'
     local arg
     out=()
     for arg in "$@"
     do
-        [[ "$arg" =~ '^file://(/.*)$' ]] && out+="$match[1]" || out+="$arg"
+        out+="$(file-uri2unix "$arg")" @TRET
     done
 }
+
 function rpargs() {
     doc 'Converts all existent paths in args to their abs path. Outputs both in NUL-delimited stdout and $out.'
 

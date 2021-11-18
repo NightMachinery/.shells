@@ -1,12 +1,24 @@
+##
+function kindle-p {
+    ! bool "$kindle_disabled"
+}
+
+function without-kindle {
+    kindle_disabled=y reval-env "$@"
+}
+aliasfn pkno without-kindle
+aliasfn nokindle without-kindle
+##
 function 2mobi() {
-    doc usage: FILE calibre-options
+    : "Usage: FILE calibre-options ..."
+
     jglob
     ebook-convert "$1" "${1:r}.mobi" "${@:2}"
 }
 alias 2m='2mobi'
 
 function 2m2k() {
-    doc usage: FILE calibre-options ...
+    : "Usage: FILE calibre-options ..."
 
     jglob
     [[ "$1" =~ 'mobi.az1$' ]] && {
@@ -65,11 +77,12 @@ function 2p2k() {
 2m2k2h() { 2m2k "$@" && { trs "$1"
                           trs "${1:r}.mobi" } }
 
-2epub() {
+function 2epub() {
     jglob
     ebook-convert "$1" "${1:r}.epub" "$@[2,-1]"
 }
-dir2k() {
+
+function dir2k() {
     local dir="${1:-.}/"
     local p
     p=($dir/*.pdf(N))
@@ -84,15 +97,14 @@ function p2k() {
 
     jglob
     local delOrig="${pkDel}"
-    local pk_no="${pk_no}"
     # local delConverted="${pkDelC}"
 
-    [[ -n "$pk_no" ]] || {
+    if kindle-p ; then
         sout 2m2k "$@"
         if ! [[ "$1" =~ '.*\.mobi$' ]] ; then
             silent trs-rm "${1:r}.mobi"
         fi
-    }
+    fi
 
     if test -z "$delOrig" ; then
         silent ebook-cover "$1" "${1:r}".jpg
@@ -118,11 +130,11 @@ function p2k() {
 }
 
 function p2ko() {
-    doc possibly send to kindle
     silent pdf-cover "$1"
-    [[ -n "$pk_no" ]] || {
+
+    if kindle-p ; then
         sout 2ko "$@"
-    }
+    fi
 }
 ##
 function getpdfs() {
@@ -139,11 +151,11 @@ aliasfn ktmp-get jgetktmp
 aliasfn ktmpg jgetktmp
 ##
 function 2pdf() {
-  jglob
-  local f="$1"
-local margin=1
-local scale="${2:-1.75}"
-ebook-convert $f ${f:r}.pdf --custom-size=$((4.6/$scale))x$((6.7/$scale)) --pdf-page-margin-left=$margin --pdf-page-margin-right=$margin --pdf-page-margin-top=$margin --pdf-page-margin-bottom=$margin
+    jglob
+    local f="$1"
+    local margin=1
+    local scale="${2:-1.75}"
+    ebook-convert $f ${f:r}.pdf --custom-size=$((4.6/$scale))x$((6.7/$scale)) --pdf-page-margin-left=$margin --pdf-page-margin-right=$margin --pdf-page-margin-top=$margin --pdf-page-margin-bottom=$margin
 }
 ##
 function kindle-sdr-backup() {
