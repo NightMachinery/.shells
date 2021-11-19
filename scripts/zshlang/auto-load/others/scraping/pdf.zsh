@@ -9,7 +9,7 @@ function html-get-pdf {
         url="$(urlfinalg_print="${urlfinalg_print:-y}" urlfinalg "$url")" @TRET
 
         reval-env "$engine[@]" \
-            "$url" || {
+            "$url" | sanitize-css-external || {
             local r=$?
             ecerr "$0: Failed for URL $(gq "$url")"
             return $r
@@ -26,12 +26,12 @@ function html-get-pdf {
      }
 
     .MathJax, .mjx-math, .mwe-math-element {
-        font-size: ${full_html_math_zoom:-150}% !important;
+        font-size: ${full_html_math_zoom:-60}% !important;
     }
     .MathJax, .mjx-math, .mwe-math-element, .MathJax *, .mjx-math *, .mwe-math-element * {
         /*
         We can even set this for everything, and we'll only break stuff with even lower max-widths
-        Update: This does not shrink its children, so it seems useless?
+        Update: This does not shrink its children, so it seems useless? But it seemed to work for Wikipedia pages before we absolutified its links and thus switched to their rendered images instead of MathML.
         */
         max-width: 90vw !important;
     }
