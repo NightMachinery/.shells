@@ -28,12 +28,13 @@ function html-get-pdf {
     .MathJax, .mjx-math, .mwe-math-element {
         font-size: ${full_html_math_zoom:-60}% !important;
     }
-    .MathJax, .mjx-math, .mwe-math-element, .MathJax *, .mjx-math *, .mwe-math-element * {
+    img, .mjx-chtml, .MathJax, .mjx-math, .mwe-math-element, .MathJax *, .mjx-math *, .mwe-math-element * {
         /*
         We can even set this for everything, and we'll only break stuff with even lower max-widths
         Update: This does not shrink its children, so it seems useless? But it seemed to work for Wikipedia pages before we absolutified its links and thus switched to their rendered images instead of MathML.
         */
         max-width: 90vw !important;
+        text-align: left !important;
     }
 
     body {
@@ -76,7 +77,7 @@ function web2pdf {
         2ko "$dest" >&2 @TRET
     fi
 }
-aliasfn w2p web2pdf
+alias w2p='\noglob web2pdf'
 
 ##
 function w2p-wiki {
@@ -88,4 +89,5 @@ function w2p-wiki {
         full_html_math_zoom="${full_html_math_zoom}" \
         web2pdf "$@"
 }
+noglobfn w2p-wiki
 ##
