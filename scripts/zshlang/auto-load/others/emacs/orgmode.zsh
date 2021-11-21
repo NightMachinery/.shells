@@ -1,4 +1,17 @@
 ##
+function str2orgtitle {
+    in-or-args "$@" | gtr '[]' '{}' | cat-copy-if-tty
+}
+aliasfn org-escape-title str2orgtitle
+
+function org-escape-link {
+    in-or-args "$@" | perl -pe 's/(\[|\])/\\${1}/g' | cat-copy-if-tty
+}
+
+function org-escape-block {
+    in-or-args "$@" | sd '^(\s*(?:\x1b\[33m)?)(\*|#)' '$1,$2' | cat-copy-if-tty
+}
+##
 function org-watch() {
     local fd_in file
 

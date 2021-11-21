@@ -1,3 +1,4 @@
+##
 function youtube-dl() {
     local cookie_mode="${youtube_dl_c}"
     typeset -ga ytdl_opts # has priority over args
@@ -66,4 +67,10 @@ renog ytrans
 function streamlink-m() {
     streamlink --player='mpv' "$@" 720p,best
 }
+##
+function ygen() {
+    y --force-generic-extractor "$@"
+    rename .apt .mp4 *.apt
+}
+noglobfn ygen
 ##
