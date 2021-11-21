@@ -173,6 +173,9 @@ function emc-in() {
     local t
     t="$(gmktemp --suffix "$s")" @TRET
     cat > "$t" @TRET
+
+    # test -s "$t" @TRET #: Ensures the input is not empty.
+
     emc-open "$t"
     # emc-colorize
 }
@@ -256,7 +259,7 @@ function emc-less() {
         else
             cat "$f"
         fi
-    done | {
+    done | sponge | {
         if test -n "$parser" ; then
             # assert prettier --parser "$parser"
             assert unibeautify -l "$parser" -f

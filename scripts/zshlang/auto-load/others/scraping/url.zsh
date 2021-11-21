@@ -168,7 +168,7 @@ function url-clean-unalix() {
         arrN $inargs[@] | { url-match-rg || true } | unalix --disable-certificate-validation "$opts[@]" @TRET
         ec
         arrN $inargs[@] | url-match-rg -v || true
-    } | prefixer --skip-empty
+    } | prefixer --skip-empty | enl
 
     ## tests:
     # `pop | { tee /dev/tty ; ec '======' > /dev/tty } | unalix`
@@ -490,7 +490,7 @@ function urls-extract() {
     match-url-rg --only-matching --replace '$1'
 }
 ##
-function urls-cleansharps() {
+function urls-cleansharps1() {
     local urls="$(in-or-args "$@")"
 
     urls=( "${(@f)urls}" )
@@ -505,9 +505,14 @@ function urls-cleansharps() {
             newUrls+="$url"
         fi
     done
-    arrN ${(@u)newUrls}
+    arrNN ${(@u)newUrls}
+}
+
+function urls-cleansharps() {
+    command rg --replace '$1' '([^#]*)(#.*)?'
 }
 noglobfn urls-cleansharps
+
 aliasfn-ng urlc urls-cleansharps
 aliasfn-ng url-clean-hash urls-cleansharps
 ##

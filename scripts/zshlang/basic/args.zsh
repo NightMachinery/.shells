@@ -44,6 +44,14 @@ alias arrnn='arrNN'
 # function in-or-args-arrN() {
 #     (( $# )) && arrN "$@" || ec "$(</dev/stdin)"
 # }
+##
+function ensure-nl {
+    #: Ensures the input ends in a newline
+    local in
+    in="$(cat)" || return $?
+    ec "$in"
+}
+alias enl='ensure-nl'
 ###
 function file-unix2uri {
     in-or-args "$@" | prefixer --skip-empty --add-prefix="file://"
