@@ -26,13 +26,15 @@ function html-get-pdf {
      }
 
     .MathJax, .mjx-math, .mwe-math-element {
-        font-size: ${full_html_math_zoom:-60}% !important;
+        font-size: ${full_html_math_zoom:-50}% !important;
     }
-    img, .mjx-chtml, .MathJax, .mjx-math, .mwe-math-element, .MathJax *, .mjx-math *, .mwe-math-element * {
+
+    img, .MathJax, .MathJax *, .MathJax_Display, .MathJax_Preview, .mjx-chtml, .mjx-math, .mjx-math *, .mwe-math-element, .mwe-math-element * {
         /*
         We can even set this for everything, and we'll only break stuff with even lower max-widths
         Update: This does not shrink its children, so it seems useless? But it seemed to work for Wikipedia pages before we absolutified its links and thus switched to their rendered images instead of MathML.
         Update: good for =img= tags at least
+        See also: https://stackoverflow.com/questions/70059431/css-how-do-i-make-an-element-scale-itself-so-that-it-doesnt-overflow-its-max-w
         */
         max-width: 90vw !important;
         text-align: left !important;
@@ -69,6 +71,9 @@ function web2pdf {
         dest+="${title:-untitled}.pdf"
     fi
     local dest_html="${dest:r}.html"
+    local full_html_math_zoom="${full_html_math_zoom:-${web2pdf_mz}}"
+    local full_html_zoom="${full_html_zoom:-${web2pdf_z}}"
+
     html-get-pdf "${urls[@]}" > "$dest_html" @TRET
     html2pdf "$dest_html" > "$dest" @TRET
 
@@ -87,6 +92,7 @@ function w2p-readmoz {
         web2pdf "$@"
 }
 noglobfn w2p-readmoz
+@opts-setprefix w2p-readmoz web2pdf
 
 function w2p-wiki {
     : "AKA web2pdf-wikipedia"
@@ -97,4 +103,5 @@ function w2p-wiki {
         w2p-readmoz "$@"
 }
 noglobfn w2p-wiki
+@opts-setprefix w2p-wiki web2pdf
 ##
