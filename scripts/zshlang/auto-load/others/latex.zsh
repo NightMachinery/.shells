@@ -10,8 +10,8 @@ function tex2png {
     pnglatex.bash -b Transparent -P 2 -p "${(j.:.)pkgs}" -d "$dpi" -o "$dest" -f "$tex" @TRET
 
     if isIReally ; then
-        icat "$dest" || true
+        icat "$dest" >/dev/tty || true
     fi
 }
-alias xt='\noglob tex2png' #: =\= still needs escaping
+alias xt='\noglob silence tex2png' #: =\= still needs escaping
 ##
