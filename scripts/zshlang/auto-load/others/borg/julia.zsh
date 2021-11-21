@@ -1,4 +1,13 @@
 ##
+function mktemp-borg {
+    local opts=()
+    if isBorg ; then
+        opts+=(--tmpdir "$PWD")
+    fi
+
+    gmktemp "${opts[@]}" "$@"
+}
+##
 function jcolor {
     if isBorg ; then
         local content
