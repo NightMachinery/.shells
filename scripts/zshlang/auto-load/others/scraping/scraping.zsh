@@ -725,9 +725,10 @@ function getlinks-moz() {
 
 function getlinks-rec0() {
     local url="$1"
-    # FNSWAP: getlinks-moz
-    getlinks-moz "$url" | command rg --replace '$1' '([^#]*)(#.*)?' | command rg -v -e '.pdf$' -e '^(https?://)?(www.)?twitter.com'
+    # @fnswap getlinks-moz
+    getlinks-moz "$url" | urls-cleansharps | command rg -v -e '.pdf$' -e '^(https?://)?(www.)?twitter.com'
 }
+
 function getlinks-rec-all() {
     fnswap getlinks-moz getlinks-c getlinks-rec "$@"
 }
@@ -739,8 +740,8 @@ outputs: <out::array>, stdout::newlineArray"
 
     local url="$1"
     local r1=( $url "${(@f)$(getlinks-rec0 "$url")}" )
-    out=( "${(@u)r1}" )
-    arrN "$out[@]"
+    out=( ${(@u)r1} )
+    arrNN "$out[@]"
 }
 
 function tlrec() {

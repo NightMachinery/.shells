@@ -21,12 +21,18 @@ function lw2gw() {
 }
 noglobfn lw2gw
 ##
+function lwseq-get {
+    lw2gw "$@" | inargsf getlinks-c | command rg -F lesswrong.com/ | inargsf lw2gw
+}
+
 function lwseq() {
     mdoc "Usage: [tl options] URL ...
     Creates an ebook out of the sequences specified." MAGIC
+
     local opts
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
-    re lw2gw "$@" | inargsf getlinks-c | command rg -F lesswrong.com/ | inargsf re lw2gw |inargsf tl -e "${opts[-e]:-w2e-curl}" -p "${opts[-p]}" -o "${opts[-o]:-./}"
+
+     lwseq-get "$@" | inargsf tl -e "${opts[-e]:-w2e-curl}" -p "${opts[-p]}" -o "${opts[-o]:-./}"
 }
 noglobfn lwseq
 ##
