@@ -708,7 +708,9 @@ function ishtml-file() {
     local mime="$(mimetype2 "$1")"
     # ^(text/(html|xml)|application/xhtml\+xml)$
     if ! [[ "$mime" =~ '(html|xml)' ]] ; then
-        ecerr "$0: Mimetype of '$1' is '$mime'"
+        if isDbg ; then
+            ecerr "$0: Mimetype of '$1' is '$mime'"
+        fi
         return 1
     fi
 }
