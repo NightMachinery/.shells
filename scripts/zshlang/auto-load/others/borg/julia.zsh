@@ -2,7 +2,7 @@
 function mktemp-borg {
     local opts=()
     if isBorg ; then
-        opts+=(--tmpdir "$PWD")
+        opts+=(--tmpdir="$PWD")
     fi
 
     gmktemp "${opts[@]}" "$@"
