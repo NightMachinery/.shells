@@ -3,6 +3,14 @@ function html-get-pdf {
     local urls=( $@ )
     assert-args urls @RET
     local engine=("${html_get_pdf_e[@]:-full-html2}")
+    local math_zoom="${html_get_pdf_math_zoom:-0.3px}" # Old value: 50%
+    if [[ "$math_zoom" =~ '^\d+$' ]] ; then
+        math_zoom+='%'
+    fi
+    local zoom="${html_get_pdf_zoom:-330%}"
+    if [[ "$zoom" =~ '^\d+$' ]] ; then
+        zoom+='%'
+    fi
 
     local url
     for url in ${urls[@]}; do
@@ -26,7 +34,7 @@ function html-get-pdf {
      }
 
     .MathJax, .mjx-math, .mwe-math-element {
-        font-size: ${full_html_math_zoom:-50}% !important;
+        font-size: ${math_zoom} !important;
     }
 
     img, .MathJax, .MathJax *, .MathJax_Display, .MathJax_Preview, .mjx-chtml, .mjx-math, .mjx-math *, .mwe-math-element, .mwe-math-element * {
@@ -41,7 +49,7 @@ function html-get-pdf {
     }
 
     body {
-         font-size: ${full_html_zoom:-330}% !important;
+         font-size: ${zoom} !important;
     }
     </style>
 </head>
@@ -71,8 +79,8 @@ function web2pdf {
         dest+="${title:-untitled}.pdf"
     fi
     local dest_html="${dest:r}.html"
-    local full_html_math_zoom="${full_html_math_zoom:-${web2pdf_mz}}"
-    local full_html_zoom="${full_html_zoom:-${web2pdf_z}}"
+    local html_get_pdf_math_zoom="${html_get_pdf_math_zoom:-${web2pdf_mz}}"
+    local html_get_pdf_zoom="${html_get_pdf_zoom:-${web2pdf_z}}"
 
     html-get-pdf "${urls[@]}" > "$dest_html" @TRET
     html2pdf "$dest_html" > "$dest" @TRET
@@ -88,8 +96,8 @@ alias w2p='\noglob web2pdf'
 ##
 function w2p-readmoz {
     html_get_pdf_e=(readmoz-nosanitize) \
-    full_html_zoom="${full_html_zoom}" \
-        full_html_math_zoom="${full_html_math_zoom}" \
+    html_get_pdf_zoom="${html_get_pdf_zoom}" \
+        html_get_pdf_math_zoom="${html_get_pdf_math_zoom}" \
         web2pdf "$@"
 }
 noglobfn w2p-readmoz
@@ -99,8 +107,8 @@ function w2p-wiki {
     : "AKA web2pdf-wikipedia"
     : "@warn Wikipedia renders its MathML tags as images on the server-side, so if you like to render them locally, you have to neuter theose =<img>= tags' URLs."
 
-    full_html_zoom="${full_html_zoom}" \
-        full_html_math_zoom="${full_html_math_zoom}" \
+    html_get_pdf_zoom="${html_get_pdf_zoom}" \
+        html_get_pdf_math_zoom="${html_get_pdf_math_zoom}" \
         w2p-readmoz "$@"
 }
 noglobfn w2p-wiki
