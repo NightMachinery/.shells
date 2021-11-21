@@ -84,6 +84,7 @@ function web2pdf {
     fi
 }
 alias w2p='\noglob web2pdf'
+@opts-setprefix w2p web2pdf
 ##
 function w2p-readmoz {
     html_get_pdf_e=(readmoz-nosanitize) \
