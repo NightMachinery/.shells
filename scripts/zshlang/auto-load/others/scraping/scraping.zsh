@@ -263,7 +263,7 @@ function full-html2() {
     }
     )" @RET
 
-    if bool "$absolutify" ; then
+    if ishtml-file =(ec "$html") && bool "$absolutify" ; then
         ec "$html" | html-links-absolutify "$url"
     else
         ec "$html"
