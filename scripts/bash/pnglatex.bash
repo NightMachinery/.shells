@@ -1,0 +1,426 @@
+#!/bin/bash
+##
+# This file was forked from <https://github.com/mneri/pnglatex>.
+##
+# Copyright Massimo Neri <hello@mneri.me> and all the contributors.
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+##
+
+BACKGROUND=
+BORDER=
+DPI=
+ENVIRONMENT=
+FOREGROUND=
+FORMULA=
+HEADER=
+HELP=0
+LOGFILE=
+MARGIN=
+OPTIMIZE=0
+PACKAGES=
+PADDING=
+PNGFILE=
+SHOWVERSION=0
+SILENT=0
+SIZE=
+TEXFILE=
+declare -r VERSION=0.13
+
+# Add margin, border and padding to the image.
+function box {
+    if [ "$PADDING" ]; then
+        convert $PNGFILE -bordercolor $BACKGROUND -border $(scale $PADDING) $PNGFILE
+    fi
+
+    if [ "$BORDER" ]; then
+        convert $PNGFILE -bordercolor $BORDER -border $(scale 1) $PNGFILE
+    fi
+
+    if [ "$MARGIN" ]; then
+        convert $PNGFILE -bordercolor $BACKGROUND -border $(scale $MARGIN) $PNGFILE
+    fi
+}
+
+# Remove temporary files.
+function clean {
+    rm -rf $TMPDIR
+}
+
+# Get screen's dpi.
+#
+# @return the dpi resolution of the screen.
+function dpi {
+    local VALUE
+
+    if exists xdpyinfo; then
+        VALUE=$(xdpyinfo 2> /dev/null | grep resolution | sed -r 's/^[^0-9]+([0-9]+)x.*$/\1/')
+    fi
+
+    if [ ! "$VALUE" ]; then
+        VALUE=96
+    fi
+
+    echo $VALUE
+}
+
+# Check if the specified command is installed on the system.
+#
+# @param $1 the command to test.
+# @return true if the command is installed on the system, false otherwise.
+function exists {
+    local COMMAND=$1
+    return $(command -v $COMMAND &> /dev/null)
+}
+
+# Generate the png image.
+function generate {
+    local BEGINENV
+    local ENDENV
+    local PREFIX
+    local TMPDIR
+    local SUFFIX
+
+    TMPDIR="$(gmktemp -d)"
+    TEXFILE="$(gmktemp -p $TMPDIR tXXX.tex)"
+
+    if [ "$ENVIRONMENT" = '$' ] || [ "$ENVIRONMENT" = '$$' ]; then
+        BEGINENV=$ENVIRONMENT
+        ENDENV=$ENVIRONMENT
+    else
+        BEGINENV=$(echo $ENVIRONMENT | sed -e 's/\([^\[\{]*\)/\\begin\{\1\}/')
+        ENDENV=$(echo $ENVIRONMENT | sed -e 's/\([^\[\{]*\).*/\\end\{\1\}/')
+    fi
+
+    echo "\documentclass[${SIZE}pt]{article}\pagestyle{empty}" > $TEXFILE
+
+    {
+    IFS=":"
+
+    for P in $PACKAGES; do
+            echo $P | sed -e 's/\([^\[\{]*\)/\\usepackage\{\1\}/' >> $TEXFILE
+    done
+    }
+
+    if [ ! -z "$HEADER" ]; then
+    cat $HEADER >> $TEXFILE
+    fi
+
+    echo "\begin{document}$BEGINENV" >> $TEXFILE
+
+    if [ ! "$FORMULA" ]; then
+    cat - >> $TEXFILE
+    else
+    echo $FORMULA >> $TEXFILE
+    fi
+
+    echo "$ENDENV\end{document}" >> $TEXFILE
+
+    if [ "$LOGFILE" ]; then
+        cat $TEXFILE > $LOGFILE
+    fi
+
+    latex -halt-on-error -interaction=nonstopmode -output-directory=$TMPDIR $TEXFILE \
+        | tee -a $LOGFILE \
+        | sed -n '/^!/,/^ /p' >&2
+
+    if [ ${PIPESTATUS[0]} -ne 0 ]; then
+        clean
+        exit 1
+    fi
+
+    if [ ! "$PNGFILE" ]; then
+        PNGFILE="$(gmktemp -p $PWD fXXX.png)"
+    fi
+
+    dvipng -bg $BACKGROUND -D $DPI -fg $FOREGROUND -o $PNGFILE -q --strict -T tight ${TEXFILE%.tex}.dvi \
+        | tee -a $LOGFILE \
+        > /dev/null
+
+    if [ "$PADDING" ] || [ "$BORDER" ] || [ "$MARGIN" ]; then
+        box
+    fi
+
+    if [ $OPTIMIZE -eq 1 ]; then
+        optimize
+    fi
+
+    if [ $SILENT -eq 0 ]; then
+        greadlink -f $PNGFILE
+    fi
+
+    clean
+}
+
+# Entry point of the script.
+function main {
+    if ! exists latex || ! exists dvipng; then
+        echo "pnglatex requires latex and dvipng packages." >&2
+        exit 1
+    fi
+
+    properties
+    parse "$@"
+
+    if [ $HELP -eq 1 ]; then
+        usage
+        exit 0
+    fi
+
+    if [ $SHOWVERSION -eq 1 ]; then
+        version
+        exit 0
+    fi
+
+    if [ "$PADDING" ] || [ "$BORDER" ] || [ "$MARGIN" ]; then
+        if ! exists convert; then
+            echo "Paddings, borders and margins require imagemagick package." >&2
+            exit 1
+        fi
+    fi
+
+    if [ $OPTIMIZE -eq 1 ]; then
+        if ! exists optipng; then
+            echo "Optimization requires optipng package." >&2
+            exit 1
+        fi
+    fi
+
+    if [ ! -z "$HEADER" ] && [ ! -f "$HEADER" ]; then
+    echo "File does not exist: $HEADER" >&2
+    exit 1
+    fi
+
+    if [ -z "$BACKGROUND" ]; then
+    BACKGROUND=White
+    fi
+
+    if [ -z "$DPI" ]; then
+        DPI=$(dpi)
+    else
+    if  ! match "$DPI" '^[1-9][0-9]*$'; then
+            echo "Invalid dpi." >&2
+            exit 1
+    fi
+    fi
+
+    if [ -z "$ENVIRONMENT" ]; then
+    ENVIRONMENT=\$
+    fi
+
+    if [ -z "$FOREGROUND" ]; then
+    FOREGROUND=Black
+    fi
+
+    if [ ! -z "$MARGIN" ] && ! match "$MARGIN" '^[0-9]+(x[0-9]+)?$'; then
+        echo "Invalid margin." >&2
+        exit 1
+    fi
+
+    if [ ! -z "$PADDING" ] && ! match "$PADDING" '^[0-9]+(x[0-9]+)?$'; then
+        echo "Invalid padding." >&2
+        exit 1
+    fi
+
+    if [ -z "$SIZE" ]; then
+    SIZE=11
+    else
+    SIZE=$(echo $SIZE | sed 's/pt//')
+
+    if ! match "$SIZE" '^[1-9][0-9]*$'; then
+        echo "Invalid font size." >&2
+        exit 1
+    fi
+    fi
+
+    generate
+}
+
+# Return true if the specified string matches the specified regular expression
+#
+# @param $1 The string to test.
+# @param $2 The pattern to match.
+# @return true if the string matches the pattern, false otherwise.
+function match {
+    local PATTERN=$2
+    local TEXT=$1
+
+    return $(echo $TEXT | egrep $PATTERN &> /dev/null);
+}
+
+# Use optipng to optimize the image.
+#
+# @return echoes optipng output.
+function optimize {
+    optipng -f0-5 -quiet -zc1-9 -zm1-9 -zs0-3 $PNGFILE
+}
+
+# Parse command line arguments.
+function parse {
+    while getopts b:B:d:e:f:F:hH:l:m:Mo:Op:P:r:s:Sv ARG; do
+        case $ARG in
+            b)
+                BACKGROUND=$OPTARG
+                ;;
+            B)
+                BORDER=$OPTARG
+                ;;
+            d)
+                DPI=$OPTARG
+                ;;
+            e)
+                ENVIRONMENT=$OPTARG
+                ;;
+            f)
+                FORMULA=$OPTARG
+                ;;
+            F)
+                FOREGROUND=$OPTARG
+                ;;
+            h)
+                HELP=1
+                ;;
+            H)
+                HEADER=$OPTARG
+                ;;
+            l)
+                LOGFILE=$OPTARG
+                ;;
+            m)
+                MARGIN=$OPTARG
+                ;;
+            o)
+                PNGFILE=$OPTARG
+                ;;
+            O)
+                OPTIMIZE=1
+                ;;
+            p)
+        PACKAGES=$OPTARG
+                ;;
+            P)
+                PADDING=$OPTARG
+                ;;
+            s)
+                SIZE=$OPTARG
+                ;;
+            S)
+                SILENT=1
+                ;;
+            v)
+                SHOWVERSION=1
+                ;;
+            ?)
+                exit 1
+        esac
+    done
+}
+
+function properties {
+    local PROPERTIES=~/.pnglatex
+
+    if [ -f $PROPERTIES ]; then
+    while IFS="=" read -r KEY VALUE; do
+        case $KEY in
+        BACKGROUND)
+            BACKGROUND=$VALUE
+        ;;
+        BORDER)
+            BORDER=$VALUE
+        ;;
+        DPI)
+            DPI=$VALUE
+        ;;
+        ENVIRONMENT)
+            ENVIRONMENT=$VALUE
+        ;;
+        FOREGROUND)
+            FOREGROUND=$VALUE
+        ;;
+        HEADER)
+            HEADER=$VALUE
+        ;;
+        MARGIN)
+            MARGIN=$VALUE
+        ;;
+        OPTIMIZE)
+            OPTIMIZE=$VALUE
+        ;;
+        PACKAGES)
+            PACKAGES=$VALUE
+        ;;
+        PADDING)
+            PADDING=$VALUE
+        ;;
+        SIZE)
+                    SIZE=$(echo $VALUE | sed 's/pt//')
+        ;;
+        esac
+    done < $PROPERTIES
+    fi
+}
+
+# Scales the specified dimensions to the wanted dpi.
+#
+# @param $1 the dimension string, in the form of 'mxn', where m and n are integers.
+# @return echoes the scaled dimension string.
+function scale {
+    local BASEDPI=$(dpi)
+    local WIDTH=$(($(echo $1 | sed -r 's/x.*//') * $DPI / $BASEDPI))
+    local HEIGHT=$(($(echo $1 | sed -r 's/.*x//') * $DPI / $BASEDPI))
+
+    echo ${WIDTH}x${HEIGHT}
+}
+
+# Print usage message.
+#
+# @return echoes the usage message.
+function usage {
+    echo "pnglatex $VERSION - Write LaTeX formulas into PNG files."
+    echo "Copyright Massimo Neri <hello@mneri.me> and all the contributors."
+    echo
+    echo "List of options:"
+    echo "  -b <color>       Set the background color."
+    echo "  -B <color>       Set the border color."
+    echo "  -d <dpi>         Set the output resolution to the specified dpi."
+    echo "  -e <environment> Set the environment with [options] and {arguments}."
+    echo "  -f <formula>     The LaTeX formula."
+    echo "  -F <color>       Set the foreground color."
+    echo "  -h               Print this help message."
+    echo "  -H <file>        Insert the content of the specified file in the preamble."
+    echo "  -l <file>        Log file."
+    echo "  -m <margin>      Set the margin."
+    echo "  -o <file>        Specify the output file name."
+    echo "  -O               Optimize the image."
+    echo "  -p <packages>    A colon separated list of LaTeX package names."
+    echo "  -P <padding>     Set the padding."
+    echo "  -s <size>        Set the font size."
+    echo "  -S               Silent mode: don't print image file name."
+    echo "  -v               Show version."
+    echo
+    echo "Examples:"
+    echo "  pnglatex -f \"E=mc^2\""
+    echo "  pnglatex -e displaymath -f \"\sum_{i=0}^n i=\frac{n(n+1)}{2}\""
+    echo "  pnglatex -b Transparent -p amssymb:amsmath -P 5x5 -s 12 -f \"A\triangleq B\""
+}
+
+# Print pnglatex version.
+#
+# @return echoes the version.
+function version {
+    echo $VERSION
+}
+
+trap "clean" SIGINT SIGTERM
+main "$@"
