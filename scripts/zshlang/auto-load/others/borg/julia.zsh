@@ -193,13 +193,17 @@ ensure-ju() {
     test -e "$files" || { ecerr "jufile error: $jufile"
                           return 1 }
 }
-jmv() {
-    # No longer needed, I think. You can now touch the file to resend it.
-    test -e "$jufile" && mv "$jufile" "n_$jufile"
+##
+function jmv() {
+    local dest="${1:-n_$jufile}"
+
+    test -e "$jufile" && gmv -v "$jufile" "$dest"
 }
+
 jrm() {
-    test -e "$jufile" && \rm "$jufile"
+    test -e "$jufile" && trs-rm "$jufile"
 }
+##
 function jopus() {
     jglob
     local u="$1"
