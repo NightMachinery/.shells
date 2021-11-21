@@ -1,4 +1,0 @@
-#!/usr/bin/env zsh
-pdfcrop "$3"
-p2ko "$3"
-
