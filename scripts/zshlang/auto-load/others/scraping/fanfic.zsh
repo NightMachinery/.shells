@@ -1,3 +1,15 @@
+##
+function jfic() {
+    jee
+
+    local i
+    for i in "$@" ; do
+        silent aa -- "$(urlmeta "$i" image)"
+    done
+    re "fanficfare --non-interactive" "$@"
+    sout re p2k *.epub(ND)
+}
+##
 function fanficfare2org {
     local url="$1"
     assert-args url @RET

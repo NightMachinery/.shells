@@ -130,94 +130,7 @@ function curl-useragent() {
 function web-lastmod() {
     curlm -I "$1" 2>&1 | rg --smart-case last-modified
 }
-function cookies-copy() {
-    ec-copy "theCookies=$(gq "$(cookies-auto "$@")" "$@")"
-}
-aliasfn cook cookies-copy
-function cookies-killlock() {
-    if ask "$(fuser "$cookiesFile" | inargsf ps -fp)" ; then
-        kill "$(serr fuser "$cookiesFile")"
-    fi
-}
-function getcookies() {
-    mdoc "[cookiesFile= ] $0 <url>
-Will output Chrome's cookies for the given URL in key=val;key2=val2
-See |cookies| for higher-level API." MAGIC
-    local url="$1"
-    local cf="${cookiesFile}"
-
-    test -e "$cf" || { ecdbg "getcookies called with non-existent file: $cf" ; return 0 }
-
-    local tmp
-    if true ; then # @futureCron Did this solve the locking issue?
-        tmp="$(gmktemp)"
-        assert command cp "$cf" "$tmp" @RET
-        cf="$tmp"
-    fi
-
-    {
-        cookiesFile="$cf" url="$url" python -c '
-from pycookiecheat import chrome_cookies
-import os
-url = os.environ["url"]
-HOME = os.environ["HOME"]
-cookiesFile = os.environ["cookiesFile"]
-cookies = chrome_cookies(url, cookie_file=cookiesFile)
-#print(cookies)
-out = ""
-for k,v in cookies.items():
-    out += f"{k}={v};"
-print(out[:-1])
-'
-        return $?
-    } always {
-        test -n "$tmp" && command rm -f "$tmp"
-    }
-}
-cookies() {
-    mdoc "$0 [<cookie-or-url>=theCookies]
-Outputs in header style." MAGIC
-
-    local input="$1"
-    local env_c="$theCookies"
-
-    local c
-    if [[ "$input" =~ '^http' ]]
-    then
-        c="Cookie:$(getcookies "$input")" @RET
-    elif test -z "$input" ; then
-        test -n "$env_c" && c="Cookie:${env_c}"
-    else
-        c="Cookie:$input"
-    fi
-    ec "$c"
-}
-function cookies-auto() {
-    mdoc "Returns theCookies if present. Otherwise tries to get the cookies from the first url in args." MAGIC
-
-    test -n "$caDisableCookies" && return 0
-
-    local ci='' ret=0
-    if test -z "$theCookies"
-    then
-        local i
-        for i in $@
-        do
-            if [[ "$i" =~ '^http' ]]
-            then
-                c="$(serr cookies "$i")" && break || {
-                        ret=1
-                        break # the error is likely to be repeated anyway
-                    }
-            fi
-        done
-    else
-        c="$(cookies)"
-    fi
-
-    ecn "$c"
-    return $ret
-}
+##
 function wread() {
     mdoc "[wr_force=] $0 [--file <file>] <url> [<output-format>]
 Global output: wr_title wr_author" MAGIC
@@ -246,16 +159,17 @@ Global output: wr_title wr_author" MAGIC
     .content
 ] | join("\n\n") else null end'
 }
+
 function mercury-html() {
     doc USAGE: url html-file output-mode
     serr mercury-html.js "$@"
 }
-
+##
 function httpm() {
     local c="$(cookies-auto "$@")"
     http --style solarized-light --follow --ignore-stdin --session "pink$(uuidpy)" "$@" $c
 }
-
+##
 function full-html2() {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
     # seems to be because the server is messed up, but whatever:
@@ -264,7 +178,22 @@ function full-html2() {
     # assert-net @RET # not worth the perf hit?
 
     local url="$1"
+    assert-args url @RET
     local absolutify="${fhAbs:-y}"
+    local redirect_follow="${fhRedirect:-m}"
+    if bool "$redirect_follow" ; then
+        if [[ "$redirect_follow" == m ]] ; then
+            #: Do only minimal processing of the URL.
+            local urlfinalg_e1=cat
+            local urlfinalg_e2=cat
+        fi
+
+        local tmp
+        if tmp="$(fhRedirect=n urlfinalg "$url")" ; then
+            url="$tmp"
+        fi
+    fi
+
     local mode="${fhMode}"
     if test -z "$mode" ; then
         if [[ "$url" =~ 'https?://[^/]+\.ir' ]] ; then
@@ -274,6 +203,7 @@ function full-html2() {
             mode='curl'
         fi
     fi
+
     local secure="${fhSecure:-y}" # insecure mode currently only supported by wget and gurl
 
     local opts=()
@@ -360,38 +290,6 @@ function full-html() {
     #doc 'wait always waits the full time. Should be strictly < timeout.'
     #curl --silent "http://localhost:8050/render.html?url=$1&timeout=90&wait=${fu_wait:-10}" -o "$2"
 }
-function random-poemist() {
-    curl -s https://www.poemist.com/api/v1/randompoems |jq --raw-output '.[0].content'
-}
-xkcd() {
-    wget `wget -qO- dynamic.xkcd.com/comic/random | sed -n 's/Image URL.*: *\(\(https\?:\/\/\)\?\([\da-z\.-]\+\)\.\([a-z\.]\{2,6\}\)\([\/\w_\.-]*\)*\/\?\)/\1/p'`
-}
-##
-wayback() {
-    comment -e, --exact-url
-    comment "-t, --to TIMESTAMP Should take the format YYYYMMDDhhss, though
-                        you can omit as many of the trailing digits as you
-                        like. E.g., '201501' is valid."
-    comment '-p, --maximum-snapshot NUMBER    Maximum snapshot pages to consider (Default is 100)'
-    comment '-d, --directory PATH             Directory to save the downloaded files into
-    Default is ./websites/ plus the domain name'
-
-    wayback_machine_downloader -e -t "${wa_t:-20170505152803}" -d ./ -p 1 "$@"
-}
-wayback-out() {
-    aget "wayback $(gquote "$@") ; cat *.html"
-}
-wread-wayback() {
-    wayback-out "$1" | wread --file /dev/stdin "$@"
-}
-function wayback-url() {
-    # --to-date "${wa_t:-2017}" --from-date 2000
-    # outputs from oldest to newest
-    waybackpack --list "$1" | sponge | head -n1
-}
-# enh-urlfinal wayback-url ## old URLs often redirect to hell
-reify wayback-url
-noglobfn wayback-url
 ##
 function w2e-curl() {
     we_dler=wread-curl w2e "$@"
@@ -403,180 +301,6 @@ function wread-curl() {
     assert-args url @RET
 
     full-html2 "$url"
-}
-##
-function w2e-gh() {
-    h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
-}
-noglobfn w2e-gh
-##
-function url-exists() {
-    local ret=1 url="$1"
-
-    # Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
-    curl --output /dev/null --silent -r 0-0 --fail --location "$url" && {
-        ret=0
-        url_exists_out="${url_exists_out:-$url}" # only set it if it's not set before. This helps us try  a bunch of URLs and find the first one that exists.
-    }
-    return "$ret"
-}
-
-function gh-to-readme() {
-    local urls=() i i2 readme url
-    local exts=(md rst org)
-    local readmes=(readme README ReadMe readMe Readme)
-    local branches=(master main develop)
-
-    for i in "$@"
-    do
-        if [[ "$i" =~ 'github.com' ]] || ! [[ "$i" == *.(${(j.|.)~exts}) ]] ; then
-            i2="${i}.md"
-            comment we hope to handle wiki pages with this method, but beware that nonexistent wiki pages trigger create a new page, not the desired not existent response.
-
-            local candidates=("$i2"
-                              "${i}/raw/${^branches[@]}/${^readmes[@]}.${^exts[@]}")
-            dvar candidates
-            unset url_exists_out
-            re-any url-exists $candidates[@]
-            i="$url_exists_out"
-        fi
-        url-exists "$i" && urls+="$i" || ecerr "$0: URL $(gquote-dq "$i") does not seem to exist. (Empty URL means no URL found.)"
-    done
-
-    arrnn "$urls[@]"
-}
-
-function gh-to-raw() {
-    in-or-args "$@" | sd '/blob/' '/raw/'
-}
-##
-function url-final-hp() {
-    # Sometimes returns wrong result:
-    # https://www.arvarik.com/the-stable-marriage-problem-and-modern-datingi:
-    # HTTP/1.1 302 Moved Temporarily
-    # Location: /the-stable-marriage-problem-and-modern-dating/
-
-    local out="$(2>&1 httpm --all --follow --headers "$1" )"
-    # ec $out
-    local res
-
-    res="$(<<<"$out" command rg --only-matching --replace '$1' 'Location: (.*)'  | tail -n1 )"
-    test -n "$res" && ec $res || ec "$1"
-}
-renog url-final-hp
-function url-final() {
-    # beware curl's retries and .curlrc
-    curlm -o /dev/null -w %{url_effective} "$@" #|| ec "$@" # curl prints urls even if it fails ...
-    ec # to output newline
-}
-function url-final2() {
-    doc "This one doesn't download stuff."
-    doc 'WARNING: Can eat info. E.g., https://0bin.net/paste/5txWS7vyTdaEvNAg#QJZjwyNoWYyaV5-rqdCAcV7opxc+kyaMwoQ7wyjLjKy'
-    [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
-}
-function url-final3() {
-    ##
-    # The most reliable and expensive way.
-    # it was too expensive, so @deprecated
-    #
-    # retry-limited 3 urlfinal.js "$1" || url-final2 "$1"
-    ##
-    url-final2 "$1"
-}
-reify url-final url-final2 url-final3
-noglobfn url-final url-final2 url-final3
-##
-function url-tail() {
-    [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]" || ec "$1"
-}
-reify url-tail
-noglobfn url-tail
-
-typeset -g url_head_regex='(?i)\b(https?:/{1,3}[^/]+[.][^/]+)'
-function url-head() {
-    local url="$1"
-    assert-args url @RET
-
-    if [[ "$url" =~ "$url_head_regex" ]] ; then
-        ec "${match[1]}"
-    else
-        ec "$url"
-    fi
-}
-reify url-head
-noglobfn url-head
-##
-function tlrlu(){
-    tlrl-ng "$@" -p "$(url-tailf "$1") | "
-}
-function tlrl-code(){
-    tlrl-ng -e w2e-code -p "[$(url-tailf "$1")] " "$@"
-}
-##
-function url-normalize() {
-    local l="${1:?}"
-
-    l_norm="$(url_normalizer.js "$l")" || l_norm="$l"
-    ec  "$l_norm"
-}
-renog url-normalize
-function url-tailf() {
-    ec "$(url-tail "$(urlfinalg "$1")")"
-}
-function url-tailedtitle() {
-    ec "$(url-title "$1") $(url-tail "$(urlfinalg "$1")")"
-}
-renog url-tailedtitle
-function url-title() {
-    : "See also url-filename"
-
-    urlmeta2 "${1:?}" title
-}
-renog url-title
-##
-function tlrl-gh() {
-    tlrl-ng -e w2e-gh -p "[$(url-tailf "$1")] " "$@"
-}
-
-function tlrl-ng() {
-    mdoc "Usage: $0 [OPTIONS] <url> ...
-Description: Automatically infers the title and the author from the first URL, and feeds all URLs into 'w2e'.
-Options:
--p, --prefix-title <string>    Prepends the specified string to the title of the page. (Optional)
--e, --engine <function> Which zsh function to use for generating the book. Default is w2e-raw. (Optional)
--o, --outputdir <dir> Output directory, defaults to a tmp location. (Optional)
--v, --verbose ignored. Supported only for backwards-compatibility." MAGIC
-    local opts e
-    zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
-    # dact typeset -p opts argv
-
-    local title author
-    if false ; then
-        # Old API
-        silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
-        title="${wr_title:-$1}"
-        author="$wr_author"
-    else
-        url2note "$1" none || { ecerr "tlrl-ng: url2note failed with $? on url $1" ; return 33 }
-        title="${tlrl_title:-${title:-untitled $1}}"
-
-        : 'Note that readest is obviously only for the FIRST link.'
-        author="[$readest] ${tlrl_author:-${author}} $(url-date "$1")"
-    fi
-    title="$( ec "${opts[-p]}${title}" | sd / _ )"
-    title="${title[1,80]}"
-
-    pushf "${opts[-o]:-$HOME/tmp-kindle}"
-    we_author=$author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
-    e=$?
-    popf
-    return $e
-}
-@opts-setprefix tlrl-ng tlrl
-noglobfn tlrl-ng
-##
-outlinify() {
-    mapln 'https://outline.com/$1' "$@"
 }
 ##
 function html2epub-calibre() {
@@ -838,7 +562,6 @@ function org2epub-auto-metadata {
 }
 @opts-setprefix org2epub-auto-metadata org2epub
 ##
-
 function aa2e() {
     ecerr DEPRECATED: Use w2e-curl.
     aget "aa -Z $(gquote "${@:2}")
@@ -939,142 +662,6 @@ function p-getlinks {
     getlinks.py "$url" =(ec "$html")
 }
 ##
-function url-clean-unalix() {
-    # does url-clean-google itself
-    local redirects="${url_clean_redirects}"
-    local inargs
-    in-or-args2 "$@" @RET
-
-    if test -n "$uf_idem" ; then
-        arrN $inargs[@]
-        return $?
-    fi
-
-    local opts=()
-    if bool $redirects ; then
-        opts+='--unshort'
-    fi
-
-    {
-        arrN $inargs[@] | { url-match-rg || true } | unalix --disable-certificate-validation "$opts[@]" @TRET
-        ec
-        arrN $inargs[@] | url-match-rg -v || true
-    } | prefixer --skip-empty
-
-    ## tests:
-    # `pop | { tee /dev/tty ; ec '======' > /dev/tty } | unalix`
-    #
-    # `echo 'https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiY2ZrqxsHwAhXhB2MBHda6BUsQFjAJegQIBBAD&url=https%3A%2F%2Fapps.apple.com%2Fus%2Fapp%2Finspect-browser%2Fid1203594958&usg=AOvVaw2O_zES4FcNiKDn0veAc1bM' | unalix`
-    #
-    # `echo 'https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiY2ZrqxsHwAhXhB2MBHda6BUsQFjAJegQIBBAD&url=https%3A%2F%2Fapps.apple.com%2Fus%2Fapp%2Finspect-browser%2Fid1203594958&usg=AOvVaw2O_zES4FcNiKDn0veAc1bM'$'\n''https://www.imdb.com/title/tt7979580/?pf_rd_m=A2FGELUUNOQJNL&pf_rd_p=ea4e08e1-c8a3-47b5-ac3a-75026647c16e&pf_rd_r=J6DRF89QKAFZ76S5FZYE&pf_rd_s=center-1&pf_rd_t=15506&pf_rd_i=moviemeter&ref_=chtmvm_tt_1'$'\n''https://bitly.is/Pricing-Pop-Up' | { tee /dev/tty ; echo '======' > /dev/tty } | @opts redirects y @ url-clean-unalix`
-    #
-    # `@opts redirects y @ url-clean-unalix 'https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwiY2ZrqxsHwAhXhB2MBHda6BUsQFjAJegQIBBAD&url=https%3A%2F%2Fapps.apple.com%2Fus%2Fapp%2Finspect-browser%2Fid1203594958&usg=AOvVaw2O_zES4FcNiKDn0veAc1bM' 'https://www.imdb.com/title/tt7979580/?pf_rd_m=A2FGELUUNOQJNL&pf_rd_p=ea4e08e1-c8a3-47b5-ac3a-75026647c16e&pf_rd_r=J6DRF89QKAFZ76S5FZYE&pf_rd_s=center-1&pf_rd_t=15506&pf_rd_i=moviemeter&ref_=chtmvm_tt_1' 'https://bitly.is/Pricing-Pop-Up'`
-    ##
-}
-@opts-setprefix url-clean-unalix url-clean
-aliasfn url-clean url-clean-unalix
-noglobfn url-clean
-
-function url-clean-google() {
-    # @alt url-clean
-    ##
-    local URL="$1"
-    assert-args URL @RET
-
-    local u="$URL"
-    [[ "$URL" =~ "^(http(s)?://(www\.)?)?google\.com/.*" ]] && {
-        [[ "$URL" =~ "url=([^&]*)" ]] && u="$match[1]" || {
-                ecerr "$0: failed to decode Google url $(gq "$URL")"
-                return 1
-            }
-
-        u="$(ec $u | url-decode.py)"
-    }
-
-    ec "$u"
-}
-renog url-clean-google
-
-function h-urlfinalg2() {
-    @opts redirects y @ url-clean "$@"
-}
-aliasfn urlfinalg2 urlfinalg_e1=h-urlfinalg2 urlfinalg_e2=arrN urlfinalg
-noglobfn urlfinalg2
-
-function h-urlfinalg1() {
-    # aka: url-final-gateway
-    # Supports Google redirects.
-    # Set uf_idem to y to return the originals.
-    ##
-    local inargs
-    inargs="$(in-or-args "$@")" @RET
-    inargs=(${(@f)inargs})
-
-    local URL
-    for URL in $inargs[@] ; do
-
-        local u="$URL"
-        u="$(url-clean-google "$u")" @TRET
-
-        url-final "$u" @TRET #url-final2 sometimes edits URLs in bad ways, while url-final downloads them.
-    done
-}
-aliasfn urlfinalg1 urlfinalg_e1=h-urlfinalg1 urlfinalg_e2=arrN urlfinalg
-noglobfn urlfinalg1
-
-function urlfinalg {
-    local print_p="${urlfinalg_print:-y}"
-    local engine1=("${urlfinalg_e1[@]:-h-urlfinalg2}")
-    local engine2=("${urlfinalg_e2[@]:-h-urlfinalg1}")
-    local inargs disabled="${uf_idem}"
-    inargs="$(in-or-args "$@")" @RET
-
-    if bool "$disabled" ; then
-        ec "$inargs"
-        return 0
-    fi
-
-    local res url tmp
-    for url in ${(@f)inargs} ; do
-
-        if ! match-url "$url" || [[ "$url" == *bloomberg.com* ]] ; then
-            ec "$url"
-            continue
-        fi
-
-        if ! res="$(ec "$url" | reval "$engine1[@]")" ; then
-            ecerr "$0: $(gq "$engine1[@]") failed. Retrying with $(gq "$engine2[@]") ..."
-
-            res="$(ec "$url" | reval "$engine2[@]")" @TRET
-        fi
-        url="$res"
-
-        if bool "$print_p" ; then
-            if [[ "$url" =~ '^https?://www.anandtech.com/.*' ]] ; then
-                if tmp="$(full-html2 "${url}" \
-                    | htmlq -a href '.print_article' \
-                    | rg '/print/' )" ; then
-                    url="$tmp"
-                else
-                    ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
-                fi
-            elif [[ "$url" =~ '^https?://(?:[^/]*\.)?wikipedia.org/.*' ]] ; then
-                if tmp="$(full-html2 "${url}" \
-                    | htmlq -a href '[accesskey="p"]' \
-                    | rg '&printable=yes' )" ; then
-                    url="$tmp"
-                else
-                    ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
-                fi
-            fi
-        fi
-
-        ec "$url"
-    done
-}
-aliasfn url-final-gateway urlfinalg
-noglobfn urlfinalg
-##
 function getlinksfull2() {
     mdoc "$0 [-e,--regex <flitering-regex>] <url> ...
 Uses getlinksfull (full-html) under the hood." MAGIC
@@ -1097,6 +684,7 @@ function getlinks-c() {
     # @hiddenAPI 'fhMode=aacookies' is used by aamedia to fnswap aria2c
     fhMode="${fhMode:-aacookies}" getlinksfull2 "$@"
 }
+
 function getlinks-uniq() {
     getlinks-c "$@" | gsort --unique
 }
@@ -1104,632 +692,6 @@ function getlinks-uniq() {
 function http-headers-to-json() {
     http_headers_to_json.py
 }
-
-function url-filename() {
-    : "works with multiple URLs already"
-    local python_parser="${url_filename_p}"
-
-    curlm --head "$@" | \
-        {
-            if bool "$python_parser" ; then
-                http-headers-to-json | jqm '."content-disposition"[0].filename'
-            else
-                @opts r '$1$2' @ rget \
-                    'content-disposition:.*filename=\s*(?:"(.*)"|(.*))'
-            fi
-        }
-}
-
-function url-size() {
-    local size
-    size="$(curlm --head "$@" | rget '^content-length\S*\s*(\d+)' | gtail -n 1)" || return $?
-    # if redirects are present a URL can have multiple content-lengths, hence the tailing
-
-    # test -z "$size" && return 1 # rget ensures it
-    if isOutTty ; then
-        ec "$size" | numfmt-bytes-humanfriendly
-    else
-        ec "$size"
-    fi
-}
-##
-function aamedia() {
-    mdoc "$0 <page-url, 0 <= level of recursion <= 1 > ...
-Scrapes media and audio links from the given pages, and then downloads them. Uses cookies (might need more config)." MAGIC
-
-    local urls=( ${(u@)@} )
-
-    local formats=( ${media_formats[@]} pdf )
-    local regex='\.('"${(j.|.)formats}"')(\?[^/]*)?$'
-    local url size matched
-    for url in ${urls[@]}
-    do
-        url="$(url-final2 $url)" # url-final2 might be better as our URLs can be big files
-        matched=''
-        if [[ "$url" =~ "$regex" ]] ; then
-            ec $url
-            matched=y
-            # even a URL that ends in, e.g., '.mkv' can be actually an HTML page that links to the actual file
-        fi
-        size="$(url-size "$url")" || {
-            ecerr "$0: Could not get the size of URL '$url'"
-            if test -z "$matched" ; then
-                ecerr "$0: proceeding anyway ..."
-                size=0
-            else
-                ecerr "$0: skipping it, as it has already matched"
-                continue
-            fi
-        }
-        if (( size < 5000000 )) ; then # 5 MB
-            fnswap aria2c 'gtimeout 5m aria2c' getlinks-c -e $regex "$url"
-        else
-            ecerr "$0: Skipped big URL '$url'"
-        fi
-    done | gsort -u | { bello ; fzp } | {
-        if isDbg
-        then
-            color 150 0 255 "$(cat)"
-        else
-            inargsf aacookies -Z
-        fi
-    }
-}
-function aaCW() {
-    mdoc "$0 <url, 1 <= level of recursion <= 2 > ..." MAGIC
-    local theCookies=${theCookies:-"$(cookies $1)"} fhMode=aacookies
-    getlinks-c -e 'resource/view\.php' "$@" | inargsf aamedia
-}
-alias aaCW1='aamedia1'
-function aamedia1() {
-    : "aaCW2 <link-to-page-that-contains-media (level of recursion = 1; will support level 0 as well if its URL size is big)> ..."
-    local theCookies fhMode=aacookies
-    theCookies=${theCookies:-"$(cookies $1)"} || { ectrace ; bell-fail ; return $? }
-    local urls=( ${(u@)@} )
-
-    local formats=( ${media_formats[@]} pdf )
-    local regex='\.('"${(j.|.)formats}"')$'
-
-    typeset -ag titles=() links=() # @globalOutput
-
-    local url t l
-    for url in "${urls[@]}" ; do
-        size="$(url-size "$url")"  || {
-            ecerr "$0: Could not get the size of URL '$url'"
-            ecerr "$0: proceeding anyway ..."
-            size=0
-        }
-        if (( size > 2000000 )) ; then # 2 MB
-            ecerr "$0: Link '$url' is too big, adding it as a file instead"
-            # t="$(url-tail "$url")"
-            t=''
-            titles+="$t"
-            links+="$url"
-            continue
-        fi
-        t="$(ectrace_notrace=y url-title "$url")" || {
-            if t="$(url-filename "$url")" && [[ "${t:l}" =~ "$regex" ]] ; then
-                ecerr "$0: URL seems to be a file, proceeding with this assumption ..."
-                titles+="${t:r}" # the ext is added from the URL anyway
-                links+="$url"
-            fi
-            continue
-        }
-        l="$(getlinks-c "$url" -e "$regex" | gsort --unique)" || continue
-        for l2 in ${(@f)l} ; do
-            titles+="$t"
-            links+="$l2"
-        done
-    done
-
-    bell-dl-ready
-
-    typeset -ag sel_i=() # @globalOutput
-    for i in {1.."${#links}"} ; do
-        l="${links[$i]}"
-        t="${titles[$i]}"
-        # reval-rtl ec "${t}:"$'\n'"$l"$'\n'
-        reval-rtl ecn "${t}:"$'\t'"$l"
-        ec
-    done | sponge | fz-masked "${(@F)links}" @RET # prints selected links to stdout
-    # fz-masked needs to be the last process in the pipe or it'll fork and we will lose sel_i
-    # do not rtl-reshape the links printed here, or they won't be copy-paste-able
-    ec $'\n'"#######"$'\n'
-    rgeval aamedia1-finish
-}
-function aamedia1-finish() {
-    if test -e .aamedia1_links ; then
-        silent trs .aamedia1_links.bak # it shoould be recoverable from the trash
-        command mv .aamedia1_links .aamedia1_links.bak
-    fi
-    re typ links titles sel_i >&1 2>&2 &> .aamedia1_links # @globalInput
-    # we can source this file to recover these variables
-    ##
-    local opts
-    for i in ${sel_i[@]} ; do
-        l="${links[$i]}"
-        l="$(url-final2 "$l")" # beware not to use a downloading url-final function
-        t="${titles[$i]}"
-        test -z "$l" && continue
-        reval-rtl ec "Downloading ${t}:"$'\n'"$l" #$'\n'
-        opts=()
-        if test -n "$t" ; then
-            opts+=(-o "$(ec "${t}.${l:e}" | str2filename)")
-            revaldbg aacookies "$opts[@]" "$l"
-        else
-            revaldbg ensure aa-remotename "$opts[@]" "$l" "$0"
-            # revaldbg ensure curl-dl "$opts[@]" "$l" "$0"
-        fi
-    done
-
-    bell-dl
-    if isI && fn-isTop && fd-exists-d1 --ignore-case '\.webm$' &&ask "Run vid-fix?" Y ; then
-        re 'assert vid-fix' *.webm @RET
-        trs *.webm
-    fi
-}
-##
-function ygen() {
-    y --force-generic-extractor "$@"
-    rename .apt .mp4 *.apt
-}
-noglobfn ygen aaCW aamedia
-function hi10-jtoken() {
-    hi10jtoken.js
-
-    # doc "Doesn't work. Probably because of their custom MD5 function."
-    # local jtoken="$(head -n1 /dev/random |md5)"
-    # jtoken="${jtoken[1,5]}"
-    # local id="$(<<<"$jtoken" md5)"
-    # id="${id[1,5]}"
-    # re dvar jtoken id
-    # ec "?jtoken=${jtoken}${id}"
-}
-function urlmeta2() {
-    mdoc "[html= ] $0 <url> <req> ...
-gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
-
-    local url="$1"
-
-    # local fhMode="${fhMode:-curl}"
-
-    local html
-    html="${html}"
-    if test -z "$html" ; then
-        html=$(fhSecure="${fhSecure:-n}" full-html2 "$url") || {
-            local msg="$0: full-html2 failed; fhMode: ${fhMode}, URL: $(gq "$url"), retcode: $?"
-            ectrace "$msg"
-
-            # return 1
-            true # when we encounter, e.g., captchas, usually the =meta= tags we need can be downloaded without problems; So ignoring the error seems the best tradeoff.
-        }
-    fi
-    local reqs=("${@:2}")
-    <<<"$html" assert htmlmetadata $reqs[@] || {
-        local tmp="$(gmktemp --suffix .html)"
-        ec "$html" > $tmp
-        ecerr "$0: Copied input HTML to $(gq "$tmp")"
-        return 1
-    }
-}
-function urlmeta() {
-    mdoc "DEPRECATED: Use urlmeta2.
-[html= ] $0 <url> <req>
-gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
-
-    local url="$1"
-    local html="${html:-$(full-html2 "$url")}" f="$(mktemp)"
-    ec $html > $f # big env vars cause arg list too long
-    htmlf=$f req="${2:-title}" python3 -W ignore -c "
-import metadata_parser, os, sys
-page = metadata_parser.MetadataParser(html=open(os.environ['htmlf'], 'r').read())
-if os.environ.get('DEBUGME',''):
-   print(page.metadata, file=sys.stderr)
-   # from IPython import embed; embed()
-req=os.environ['req']
-if req == 'all' :
-    
-    print(page.get_metadata('title') or '', end='\x00')
-    print(page.get_metadata('description') or '', end='\x00')
-    print(page.get_metadata('image') or '', end='\x00')
-    print(page.get_metadata('author') or page.get_metadata('creator') or page.get_metadata('article:author') or '', end='\x00')
-else:
-    print(page.get_metadata(req) or '')
-"
-    \rm -f $f
-}
-function hi10-cook() {
-    local url="$1"
-    local title="$(urlmeta $url title|str2tmuxname)"
-    local cmd="FORCE_INTERACTIVE=y $(cook hi10-rc hi10-ng "$url")"
-    ec-copy "tmux new -s $(gq "$title") zsh -c $(gq "$cmd")"
-}
-function hi10-ng() {
-    mdoc "$0 <url-of-hi10-page> [<regex>]
-Use hi10-cook to copy the necessary command for pasting in a remote server." MAGIC
-    local url="$1" dest="${hi10_ng_dest}"
-    local regex=${2:-'\.mkv$'}
-
-    pxa-maybe
-
-    if test -z "$dest" ; then
-        local title="$(fhMode=aacookies urlmeta $url title)"
-        [[ "${$(pwd):t}" == "$title" ]] || cdm "$title"
-    else
-        cdm "$dest"
-    fi
-
-    getlinks-c "$url" -e "$regex" | inargsf hi10-multilink
-}
-function hi10-multilink() {
-    local argCount=$#
-    local pArgs=()
-    local i
-    for (( i=1; i<=$argCount; i+=1 ))
-    do
-        if [[ "$argv[i]" =~ '(https?://[^/]*hi10anime.*)' ]]; then #'.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
-            # echo $match[1]
-            pArgs[$i]="${match[1]}"
-            # pArgs[$i]='http://hi10anime'"${match[1]}$(hi10-jtoken)"
-        else
-            ecerr Invalid link: "$argv[i]"$'\n'
-        fi
-    done
-    # echo $pArgs
-    # --referer="$1" is not needed now, if needed be sure to use regex matching to give it, as the urls returned from lynx are invalid.
-    if isDbg
-    then
-        arger "${(@u)pArgs}"
-    fi
-
-    doc use fz for filtering and ordering
-
-    bell-dl-ready
-
-    arrN "${(@u)pArgs}" | fz | tee "hi10-links.txt" | hi10-dl # (u) makes the array elements unique.
-}
-function hi10-dl() {
-    magic mdoc "$0 < links.txt
-Generates jtokens for links and downloads them." ; mret
-
-    inargsf mapg '$i$(hi10-jtoken)' | inargsf rgeval aa -j2 -Z
-
-    bell-dl
-}
-function hi10-from-page() {
-    mdoc "DEPRECATED. Use hi10-ng" MAGIC
-
-    # You need to have persistent cookies in lynx, and have logged in.
-    hi10-multilink "${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly $1|grep -E -i ${2:-'.*\.mkv$'})}"
-    # eval 'hi10-multilink ${(@f)$(lynx -cfg=~/.lynx.cfg -cache=0 -dump -listonly "'"$1"'"|grep -E -i "'"${2:-.*\.mkv$}"'")}'
-}
-function libgendl-md5-main() {
-    local md5="$1"
-
-    # local mainmirror="http://93.174.95.29"
-    local mainmirror="http://31.42.184.140"
-
-    # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
-    local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
-
-    getlinks-c -e '\.[^/]+$' "$urls[@]" | {
-        # @outdatedComment will get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
-        rg -F 'cloudflare-ipfs.com'
-    }
-}
-function libgendl-md5-bok() {
-    local outs="$(libgendl-md5-bok-helper "$1" |inargsf bok.py)"
-    test -e "$outs" # we expect only a single download
-}
-function libgendl-md5-bok-helper() {
-    local md5="$1"
-    local url="https://b-ok.cc/md5/$md5"
-    getlinks-c -e '/book/' "$url" |gsort -u
-}
-function libgendl-md5-bok-old() {
-    (( ${+commands[bok.js]} )) || { ecerr 'bok.js not found.' ; return 1 }
-    libgendl-md5-bok-helper "$1" |inargsf re "gtimeout 15m bok.js"
-}
-function libgendl-md5-old() {
-    local bok="$(libgendl-md5-bok-old $1)"
-    if test -n "$bok" ; then
-        aa "$bok"
-    else
-        libgendl-md5-main "$1" |inargsf aa -Z
-    fi
-}
-function libgendl-md5() {
-    local md5="$1"
-    local lgNoBok="${lgNoBok:-y}" # bok is useless now
-
-    { test -z "$lgNoBok" && libgendl-md5-bok "$md5" } || {
-        test -z "$lgNoBok" && ecerr "bok failed. Trying main ..."
-
-        local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
-        if (( ${#links} >= 1 )) ; then
-            aa-multi $links[@] @RET
-        else
-            ecerr "$0: No books found for md5: $md5"
-            return 1
-        fi
-    }
-}
-reify libgendl-md5-main libgendl-md5-bok libgendl-md5-old libgendl-md5-bok-old libgendl-md5
-
-function jlibplain() {
-    # libgendl-md5-main "${(f@)$(re libgen2md5 "$@")}" | inargsf aa -Z
-    libgendl-md5 "${(f@)$(libgen2md5 "$@")}"
-    # serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
-}
-noglobfn jlibplain
-
-function jlib() {
-    jee
-    jlibplain "$@" || return 1
-    dir2k
-    true
-}
-function libgen2md5() {
-    [[ "$1" =~ '(\w{32})\W*$' ]] && print -r -- "$match[1]"
-}
-reify libgen2md5
-noglobfn libgen2md5
-function jfic() {
-    jee
-    local i
-    for i in "$@" ; do
-        silent aa -- "$(urlmeta "$i" image)"
-    done
-    re "fanficfare --non-interactive" "$@"
-    sout re p2k *.epub
-}
-##
-function url2note() {
-    magic mdoc "[ url2note_override_title= html= cleanedhtml= url2note_img ] $0 <url> [<mode>] ; outputs in global variables and stdout.
-Set cleanedhtml=no to disable adding the reading estimate. (This improves performance.)" ; mret
-
-    # test perf:
-    # url='https://www.newyorker.com/culture/annals-of-inquiry/slate-star-codex-and-silicon-valleys-war-against-the-media' ; html="$(full-html2 "$url")"
-
-    local url="$1"
-    test -n "$url" || {
-        return 1
-    }
-
-    url="$(url-clean "$url")"
-    # url="$(urlfinalg "$url")"
-
-    local imgMode="${url2note_img}" emacsMode="${url2note_emacs}"
-
-    if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com' ]] ; then
-        if bool "$emacsMode" ; then
-            imgMode=y
-        fi
-
-        if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com(?:/embed/([^/]*))' ]] ; then
-            local id="$match[1]"
-            img="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" # embedded videos don't set their bloody meta tags
-        fi
-    fi
-    local mode="${2:-md}"
-
-    # isLocal && local fhMode="${fhMode:-curlfast}" # servers are fast enough to work with the default fhMode
-
-    local html="${html:-$(full-html2 "$url")}"
-    local cleanedhtml="${cleanedhtml:-$(<<<"$html" readability "$url")}" # takes ~1.5s
-    
-    # old: # meta=( "${(@0)$(urlmeta $url all)}" ) # takes ~0.475s
-    meta=( "${(@0)$(urlmeta2 $url title description image author)}" ) # takes ~0.04s
-    title="${url2note_override_title:-$meta[1]}"
-    title="$(ecn "$title" | prefixer -o ' ' --skip-empty | str2orgtitle)"
-    desc="${meta[2]}"
-    desc="$(<<<$desc html2utf.py)"
-    desc="$(ecn "$desc" | prefixer -o ' ' --skip-empty)"
-    img="${meta[3]:-$img}"
-    author="$meta[4]"
-    readest=""
-    if [[ "$cleanedhtml" != no ]] ; then
-        readest="$(<<<"$cleanedhtml" html-get-reading-estimate /dev/stdin)" @TRET # takes ~0.25s
-    fi
-
-    local maxDesc=600
-    if (( ${#desc} > $maxDesc )) ; then
-        desc="${desc[1,$maxDesc]} ..."
-    fi
-
-    local indent="    "
-    if [[ "$mode" == md ]] ; then
-        ec "* [${title:-$url}]($url)"
-        test -z "$author" || ec "${indent}* By: $author"
-        test -z "$readest" || ec "${indent}* $readest"
-        test -z "$desc" || ec "${indent}* $desc"
-        #test -z "$title" || ec "${indent}* $url"
-        test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
-    elif [[ "$mode" == org ]] ; then
-        if test -z "$emacsMode" ; then
-            indent="** "
-            ec "* [[$(ecn $url| url-encode.py)][${title:-$url}]]"
-        else
-            # we insert the links with the heading already created in emacs.
-            indent=""
-            ec "[[$(ec $url| url-encode.py)][${title:-$url}]]"
-        fi
-        test -n "$author" && ec "${indent}By: $author"
-        test -n "$readest" && ec "${indent}$readest"
-        test -n "$desc" && ec "${indent}$desc"
-        ##
-        if test -n "$imgMode" && test -n "$img" ; then
-            # ec "${indent}[[img$img]]"
-            ##
-            local ext="${${img:e}:-png}"
-            local name="$(uuidm).$ext"
-            local imgdir="$orgdir/images"
-            mkdir -p "$imgdir"
-            if silent $proxyenv aa "$img" --dir "$imgdir" -o "$name" ; then
-                # local imgpath="$orgdir/images/$name"
-                local imgpath="images/$name"
-                ec "${indent}[[orgdir:$imgpath]]"
-            else
-                ecerr "$0: Failed to download: $img"
-            fi
-        fi
-        ##
-    elif [[ "$mode" == html ]] ; then
-        test -z "$title" || ec "<h1>${title}</h1>"
-        ec "<p>$url</p>"
-        test -z "$author" || ec "<p>By: $author</p>"
-        test -z "$readest" || ec "<p>${readest}</p>"
-        test -z "$desc" || ec "<p>Description: $desc</p>"
-        test -n "$imgMode" && test -n "$img" && ec "<img src=\"$img\" />"
-    elif [[ "$mode" == none ]] ; then
-
-    fi
-
-}
-noglobfn url2note
-
-function url2org() { url2note "$1" org }
-renog url2org
-@opts-setprefix url2org url2note
-##
-function str2orgtitle {
-    in-or-args "$@" | gtr '[]' '{}' | cat-copy-if-tty
-}
-aliasfn org-escape-title str2orgtitle
-
-function org-escape-link {
-    in-or-args "$@" | perl -pe 's/(\[|\])/\\${1}/g' | cat-copy-if-tty
-}
-
-function org-escape-block {
-    in-or-args "$@" | sd '^(\s*(?:\x1b\[33m)?)(\*|#)' '$1,$2' | cat-copy-if-tty
-}
-##
-function url2md() { url2note "$1" md }
-@opts-setprefix url2md url2note
-reify url2md
-noglobfn url2md
-function url2html() { url2note "$1" html }
-@opts-setprefix url2html url2note
-reify url2html
-noglobfn url2html
-##
-function readmoz() {
-    magic mdoc "[rmS= rmHtml= readmoz_nosummary=] $0 <url>
-Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rmS to only print the summary." ; mret
-
-    local url="$1"
-    local summaryMode="$rmS"
-    local noSummaryMode="${readmoz_nosummary:-$readmoz_ns}"
-
-    local html
-    html="${rmHtml:-$(full-html2 "$url")}" || {
-        ecerr "${0}: Could not download $url; aborting."
-        return 1
-    }
-    if ! ishtml-file =(ec "$html") ; then
-        ecerr "$url is not an HTML file. Aborting."
-        return 0 # this is not exactly an error. Returning 1 might cause useless retries.
-    fi
-
-    local cleanedhtml
-    cleanedhtml="$(<<<"$html" readability "$url")" @TRET
-
-    cleanedhtml="$(<<<"$cleanedhtml" html-links-absolutify "$url")" @TRET
-
-    if test -z "$noSummaryMode" ; then
-        local prehtml="$(url2html "$url")"
-        ec "$prehtml <hr> "
-        # <p> --- </p>
-    fi
-    test -n "$summaryMode" || ec "$cleanedhtml"
-}
-noglobfn readmoz
-
-function readmoz-nosanitize {
-    readability_sanitize_disabled=y readmoz "$@"
-}
-noglobfn readmoz-nosanitize
-
-function readmozsum() {
-    : "Use url2html instead? No advtanges to this."
-    rmS=y readmoz "$@"
-}
-noglobfn readmozsum
-
-function readmozsum-file() {
-    rmS=y readmoz-file "$@"
-}
-noglobfn readmozsum-file
-
-function readmoz-file() {
-    magic mdoc "$0 <file> [<url>]"
-    local file="$1" url="${2:-https://${$(basename "$file"):-empty}.google.com}"
-    local rmHtml="$(< "$file")"
-    readmoz "$url"
-}
-noglobfn readmoz-file
-
-function readmoz-mdold() {
-    arcMode=oldest transformer to-archive-is re readmoz-md "$@"
-}
-noglobfn readmoz-mdold
-
-function readmoz-mdarc() {
-    fhMode=curlfullshort transformer to-archive-is re readmoz-md "$@"
-}
-noglobfn readmoz-mdarc
-
-##
-# function readmoz-md-old() {
-#     local url="$1"
-#     local format=".${2:-md}"
-
-#     local md="$(gmktemp --suffix "$format")"
-#     # <() would not work with: readmoz-md https://github.com/google/python-fire/blob/master/docs/guide.md | cat
-#     # zsh sure is buggy :|
-#     pandoc -s -f html-native_divs =(readmoz "$url") -o $md
-#     < $md
-#     \rm $md
-# }
-##
-
-function readmoz-md() {
-    local url="$1"
-    local format="${readmoz_md_to:-markdown}"
-    assert-args url @RET
-
-    local tmp
-    tmp="$(gmktemp)" @TRET
-    {
-        readmoz "$url" > $tmp @TRET
-
-        @opts from html-native_divs to "$format" @ pandoc-convert "$tmp" "${@[2,-1]}"
-    } always { silent trs-rm "$tmp" }
-}
-noglobfn readmoz-md
-
-function readmoz-org {
-    @opts to org @ readmoz-md "$1"
-}
-noglobfn readmoz-org
-
-function readmoz-md2() {
-    readmoz "$1" | html2text "${@:2}" # --ignore-links
-}
-noglobfn readmoz-md2
-
-function readmoz-org() {
-    readmoz "$1" | html2org "${@:2}"
-}
-noglobfn readmoz-org
-
-function readmoz-txt() {
-    local opts=( "${@:2}" )
-    test -n "$opts[*]" || opts=(--ignoreHref --ignoreImage --wordwrap=false --uppercaseHeadings=false --tables=true)
-    readmoz "$1" | html-to-text "${opts[@]}" # returnDomByDefault
-}
-noglobfn readmoz-txt
 ##
 function mimetype2() {
     # TODO try using `github-linguist "$1"`, though it only works for text files.
@@ -1741,6 +703,7 @@ function mimetype2() {
         command mimetype --brief "$1"
     fi
 }
+
 function ishtml-file() {
     local mime="$(mimetype2 "$1")"
     # ^(text/(html|xml)|application/xhtml\+xml)$
@@ -1752,12 +715,14 @@ function ishtml-file() {
 function ishtml-link() {
     ishtml-file =(full-html2 "$1")
 }
+##
 function getlinks-moz() {
     doc "You probably want to use getlinks-rec. This one is too low-level."
     
     local url="$1"
     getlinks.py "$url" =(readmoz "$url")
 }
+
 function getlinks-rec0() {
     local url="$1"
     # FNSWAP: getlinks-moz
@@ -1766,6 +731,7 @@ function getlinks-rec0() {
 function getlinks-rec-all() {
     fnswap getlinks-moz getlinks-c getlinks-rec "$@"
 }
+
 function getlinks-rec() {
     doc "$0 <url>
 Gets 'useful' links from <url> recursively. (Depth=1, includes self)
@@ -1776,6 +742,7 @@ outputs: <out::array>, stdout::newlineArray"
     out=( "${(@u)r1}" )
     arrN "$out[@]"
 }
+
 function tlrec() {
     doc recursive tl
 
@@ -1792,79 +759,6 @@ function getlinks-img() {
     gl_tag=img gl_prop=src getlinks-c "$@"
 }
 ##
-function urls-copy() {
-    local text="$(cat)"
-    <<<"$text" fnswap rg rgm match-url-rg --passthru && {
-        local urls="$(<<<"${text}" urls-extract)"
-        pbcopy "$urls"
-    }
-}
-
-function urls-extract() {
-    match-url-rg --only-matching --replace '$1'
-}
-##
-function urls-cleansharps() {
-    local urls="$(in-or-args "$@")"
-
-    urls=( "${(@f)urls}" )
-    local newUrls=()
-    local url
-    for url in $urls[@] ; do
-        dvar url
-        if [[ "$url" =~ '^(.*)\#.*$' ]] ; then
-            dvar match
-            newUrls+="$match[1]"
-        else
-            newUrls+="$url"
-        fi
-    done
-    arrN ${(@u)newUrls}
-}
-noglobfn urls-cleansharps
-aliasfn-ng urlc urls-cleansharps
-aliasfn-ng url-clean-hash urls-cleansharps
-##
-function url-moddate() {
-    : "Mostly useless because some sites don't have the header and others just set it incorrectly. Alt: url-date"
-
-    local url="${1:?URL Required}"
-
-    curlm --head "$url" | awk '/last-modified/{print}' | gcut -d ' ' -f2-
-}
-function url-goometa() {
-    : "Usually contains the date."
-    # https://stackoverflow.com/a/47037351/1410221
-
-    local url="${1:?URL Required}"
-
-    # `--time y19` makes it more likely that Google returns the date. We can't use a higher value than 19 years.
-    local search="$(googler-en --time y19 --json --count "1" "$url")"
-    # dact ec $search
-    <<<$search jqm ' .[] | .metadata'
-}
-function url-date-wayback() {
-    local url="$1"
-
-    local first
-    first="$(wayback-url "$url")" # || return 1
-
-    # YYYYMMDDhhmmss
-    if [[ "$first" =~ 'https://web.archive.org/web/(\d{4})(\d{2})(\d{2})\d*/' ]] ; then
-        # gdate --date "$match[1]" "+%F"
-        ec "${match[1]}-${match[2]}-${match[3]}"
-    fi
-}
-function url-date() {
-    local url="$1" date
-
-    date="$(url-goometa "$url")" # Google's metadata can contain irrelevant stuff, but if they usually contain the date, and are more accurate than wayback's.
-    if [[ "$date" =~ '^\s*$' ]] ; then
-        date="$(url-date-wayback "$url")"
-    fi
-    ec $date
-}
-##
 aliasfn rss-tll rss-tl -e w2e-curl
 ##
 aliasfn html-links-textualize ifdefined-cmd-or-cat html_links_textualize.lisp
@@ -1877,25 +771,4 @@ function html-links-absolutify {
 
     ifdefined-cmd-or-cat html_links_absolutify.lisp "$url_current" "$url_root"
 }
-##
-function w2e-selectors {
-    # You can use =fnswap 'w2e' 'pcz w2e'= to copy the invocation.
-    ##
-    local url="${w2e_url:-${$(browser-current-url)%%/}}"
-    local title="${1:-$(browser-current-title)}" sel="${w2e_sel:-$2}"
-    assert-args url title sel @RET
-
-    full-html2 "$url" \
-        | htmlq "$sel" \
-        | urls-extract \
-        | urls-cleansharps \
-        | inargsf w2e "$title"
-}
-@opts-setprefix w2e-selectors w2e
-
-function w2e-juliadocs {
-    @opts sel '.docs-menu' @ \
-        w2e-selectors "$@"
-}
-@opts-setprefix w2e-juliadocs w2e
 ##
