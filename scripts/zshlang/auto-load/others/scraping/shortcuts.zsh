@@ -12,16 +12,17 @@ function w2e-rpaste() {
 function w2e-dl() {
     pushf ~/tmp/
     {
-        local file=( ~/Downloads/*.html(om) ) # Let it fail
+        local file=( ~/Downloads/*.html(DNom) )
         file=$file[1]
-        ishtml-file "$file" || {
-            return 1
-        }
+        test -n "$file" @TRET
+        ishtml-file "$file" @TRET
+
         local name="${file:t:r}"
         test -z "$name" && {
             ecerr "$0: Empty name for file: $file"
             return 1
         }
+
         reval-ec h2e "$name" "$file"
     } always { popf }
 }
