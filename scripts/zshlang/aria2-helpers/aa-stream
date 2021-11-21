@@ -1,4 +1,6 @@
 #!/usr/bin/env zsh
-#Use aas. This is the helper.
+
+#: Use aas. This is the helper.
+
 mv "$3" "${3:h:h}"
-\rm -r "${3:h}"
+silent trs-rm "${3:h}"

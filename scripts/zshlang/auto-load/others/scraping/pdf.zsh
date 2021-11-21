@@ -32,6 +32,7 @@ function html-get-pdf {
         /*
         We can even set this for everything, and we'll only break stuff with even lower max-widths
         Update: This does not shrink its children, so it seems useless? But it seemed to work for Wikipedia pages before we absolutified its links and thus switched to their rendered images instead of MathML.
+        Update: good for =img= tags at least
         */
         max-width: 90vw !important;
         text-align: left !important;
@@ -78,16 +79,22 @@ function web2pdf {
     fi
 }
 alias w2p='\noglob web2pdf'
-
 ##
+function w2p-readmoz {
+    html_get_pdf_e=(readmoz-nosanitize) \
+    full_html_zoom="${full_html_zoom}" \
+        full_html_math_zoom="${full_html_math_zoom}" \
+        web2pdf "$@"
+}
+noglobfn w2p-readmoz
+
 function w2p-wiki {
     : "AKA web2pdf-wikipedia"
     : "@warn Wikipedia renders its MathML tags as images on the server-side, so if you like to render them locally, you have to neuter theose =<img>= tags' URLs."
 
-    html_get_pdf_e=(readmoz-nosanitize) \
-    full_html_zoom="${full_html_zoom:-330}" \
+    full_html_zoom="${full_html_zoom}" \
         full_html_math_zoom="${full_html_math_zoom}" \
-        web2pdf "$@"
+        w2p-readmoz "$@"
 }
 noglobfn w2p-wiki
 ##

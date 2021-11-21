@@ -37,25 +37,36 @@ function mv2ko() {
     mv * "$1"
     2ko *
 }
+##
+function h-aacrop {
+    local input="$f"
+    assert-args input @RET
+
+    pdfcrop "$input"
+    p2ko "$input"
+}
 
 function aacrop() {
-    aa "$@" --on-download-complete aa-crop
+    aa_helper_e="h-aacrop" aa-book "$@"
 }
+aliasfn aa-crop aacrop
 
-function aap() {
-    aa "$@" --on-download-complete aa-pToKindle
+function aa-k2pdf() {
+    aa_helper_e="2p2k" aa-book "$@"
 }
+alias aap='\noglob aa-k2pdf'
 
-function aab() {
+function aa-book() {
     local url="$1"
     assert-args url @RET;
 
     local aaMark="$(uuidm)"
-    aaMark="$aaMark" aa-remotename --on-download-complete aa-toKindle.zsh "$url"
+    aaMark="$aaMark" aa-remotename --on-download-complete aa-helper-gen.zsh "$url"
     till-file "$aaMark"
 }
-renog aab
-
+renog aa-book
+alias aab='aa-book'
+##
 function 2kindle() {
     jglob
     mutt -s "${2:-convert}" -a "$1" -- "${3:-$kindle_email}" <<<hi
