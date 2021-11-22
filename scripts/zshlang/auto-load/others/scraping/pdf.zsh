@@ -5,7 +5,7 @@ function html-get-pdf {
     local engine=("${html_get_pdf_e[@]:-full-html2}")
     local math_zoom="${html_get_pdf_math_zoom}"
     if test -z "$math_zoom" ; then
-        math_zoom='0.6'
+        math_zoom='0.5'
     fi
     local zoom="${html_get_pdf_zoom:-330%}"
     if [[ "$zoom" =~ '^\d+$' ]] ; then
@@ -39,15 +39,17 @@ function html-get-pdf {
     }
 
     img, .MathJax, .MathJax *, .MathJax_Display, .MathJax_Preview, .mjx-chtml, .mjx-math, .mjx-math *, .mwe-math-element, .mwe-math-element * {
+        text-align: left !important;
+    }
+
+    * {
         /*
-        We can even set this for everything, and we'll only break stuff with even lower max-widths
         Update: This does not shrink its children, so it seems useless? But it seemed to work for Wikipedia pages before we absolutified its links and thus switched to their rendered images instead of MathML.
         Update: good for =img= tags at least
         See also: https://stackoverflow.com/questions/70059431/css-how-do-i-make-an-element-scale-itself-so-that-it-doesnt-overflow-its-max-w
         */
-        max-width: 90vw !important;
-        text-align: left !important;
-    }
+        max-width: 100vw !important;
+     }
 
     body {
          font-size: ${zoom} !important;
