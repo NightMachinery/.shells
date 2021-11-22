@@ -50,9 +50,39 @@ function html-get-pdf {
         text-align: left !important;
     }
 
+    img {
+        max-width: 100vw !important;
+        text-align: left !important;
+    }
+
+    table {
+          margin: 0 !important;
+          width: 100vw !important;
+    }
+    /* This did not work, as the elements took less width than their actual content. (@idk why.) It also breaks some equations.
+    table * {
+          width: fit-content !important;
+    }
+    */
+
     body {
          font-size: ${zoom} !important;
     }
+
+    /** arxiv-vanity */
+    .ltx_align_right {
+        text-align: right !important;
+
+        /* zoom: ${math_zoom} !important; */
+    }
+
+    .ltx_Math {
+        padding-right: 10%;
+        /* These elements can have the wrong width. I don't know how to fix this, so I am just adding some padding as a margin of error.
+        @userConfig/tradeoff @toFuture/1402 The padding makes the majority of cases ugly though, and the cases it helps with (long inline equations) might not common enough to be worth it.
+        */
+    }
+    /** */
     </style>
 </head>
 EOF
