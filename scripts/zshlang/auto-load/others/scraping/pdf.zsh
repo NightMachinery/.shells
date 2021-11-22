@@ -38,18 +38,17 @@ function html-get-pdf {
         zoom: ${math_zoom} !important;
     }
 
-    img, .MathJax, .MathJax *, .MathJax_Display, .MathJax_Preview, .mjx-chtml, .mjx-math, .mjx-math *, .mwe-math-element, .mwe-math-element * {
-        text-align: left !important;
-    }
-
-    * {
+    table, img, .MathJax, .MathJax *, .MathJax_Display, .MathJax_Preview, .mjx-chtml, .mjx-math, .mjx-math *, .mwe-math-element, .mwe-math-element * {
         /*
+        Warning: Do not set max-width for all elements; it constrained the text elements to a ~60% share of the screen width. (Perhaps the screen width is not set correctly in puppeteer? It rendered correctly when I opened it in Chrome.).
+        Issue: doesn't seem to work for =table=s.
         Update: This does not shrink its children, so it seems useless? But it seemed to work for Wikipedia pages before we absolutified its links and thus switched to their rendered images instead of MathML.
         Update: good for =img= tags at least
         See also: https://stackoverflow.com/questions/70059431/css-how-do-i-make-an-element-scale-itself-so-that-it-doesnt-overflow-its-max-w
         */
         max-width: 100vw !important;
-     }
+        text-align: left !important;
+    }
 
     body {
          font-size: ${zoom} !important;
