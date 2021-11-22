@@ -3,9 +3,9 @@ function html-get-pdf {
     local urls=( $@ )
     assert-args urls @RET
     local engine=("${html_get_pdf_e[@]:-full-html2}")
-    local math_zoom="${html_get_pdf_math_zoom:-0.3px}" # Old value: 50%
-    if [[ "$math_zoom" =~ '^\d+$' ]] ; then
-        math_zoom+='%'
+    local math_zoom="${html_get_pdf_math_zoom}"
+    if test -z "$math_zoom" ; then
+        math_zoom='0.6'
     fi
     local zoom="${html_get_pdf_zoom:-330%}"
     if [[ "$zoom" =~ '^\d+$' ]] ; then
@@ -34,7 +34,8 @@ function html-get-pdf {
      }
 
     .MathJax, .mjx-math, .mwe-math-element {
-        font-size: ${math_zoom} !important;
+        /* font-size: ${math_size} !important; */
+        zoom: ${math_zoom} !important;
     }
 
     img, .MathJax, .MathJax *, .MathJax_Display, .MathJax_Preview, .mjx-chtml, .mjx-math, .mjx-math *, .mwe-math-element, .mwe-math-element * {
@@ -108,7 +109,7 @@ function w2p-wiki {
     : "@warn Wikipedia renders its MathML tags as images on the server-side, so if you like to render them locally, you have to neuter theose =<img>= tags' URLs."
 
     html_get_pdf_zoom="${html_get_pdf_zoom}" \
-        html_get_pdf_math_zoom="${html_get_pdf_math_zoom}" \
+        html_get_pdf_math_zoom="${html_get_pdf_math_zoom:-1}" \
         w2p-readmoz "$@"
 }
 noglobfn w2p-wiki
