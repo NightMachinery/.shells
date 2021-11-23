@@ -13,13 +13,11 @@ for i in "$NIGHTDIR"/zshlang/basic/auto-load/**/*.zsh(.) ; do
     source "$i"
 done
 function jinit() {
-    [[ "$(pwd)" != *borg* ]] || {
-        # For use with the Julia module.
-        unset jufile j jd
-        export jufile=""
-        silence eval 'export jufile=(*)' && export j="$jufile" || export j=""
-        export jd="$(pwd)"
-    }
+    if [[ "$PWD" == *borg*/dls/* ]] ; then
+        export jufile=(*(.DN))
+        export j=(${jufile[@]})
+        export jd="$PWD"
+    fi
 }
 jinit
 ##
