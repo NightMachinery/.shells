@@ -15,7 +15,7 @@ alias grep='grep --color=auto'
 ialias plc=playlistc
 ##
 alias b='builtin'
-alias typ='typeset -p'
+alias typ='>&2 typeset -p'
 alias n='noglob'
 ##
 alias pym='python -m'

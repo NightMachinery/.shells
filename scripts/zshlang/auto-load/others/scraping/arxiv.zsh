@@ -32,7 +32,9 @@ function arxiv-dl {
 renog arxiv-dl
 
 aliasfn-ng arxiv-vanity arxiv_dl_mode=vanity arxiv-dl
+@opts-setprefix arxiv-vanity web2pdf
 aliasfn-ng arxv arxiv-vanity
+@opts-setprefix arxv web2pdf
 
 function arxiv-k2 {
     local url="${1}"
