@@ -86,8 +86,8 @@ function aget() {
     }
     cd "$u"
     test -e "$ag_f" && {
-        jufile=(./*(D))
-        j="$jufile"
+        jufile=(*(.DN))
+        j=(${jufile[@]})
     }
     ecdbg jufile: "$jufile"
     if eval "$cmd[@]" ; then
