@@ -7,6 +7,7 @@ function html-get-pdf {
     if test -z "$math_zoom" ; then
         math_zoom='0.5'
     fi
+    local math_zoom_inv="$(( 1.0/math_zoom ))0" #: zsh outputs integer floats ala =1.= which CSS does not accept, so we are explicitly adding a zero
     local zoom="${html_get_pdf_zoom:-330%}"
     if [[ "$zoom" =~ '^\d+$' ]] ; then
         zoom+='%'
@@ -77,10 +78,12 @@ function html-get-pdf {
     }
 
     .ltx_Math {
-        padding-right: 10%;
+        padding-right: 1%;
         /* These elements can have the wrong width. I don't know how to fix this, so I am just adding some padding as a margin of error.
         @userConfig/tradeoff @toFuture/1402 The padding makes the majority of cases ugly though, and the cases it helps with (long inline equations) might not common enough to be worth it.
         */
+
+        zoom: ${math_zoom_inv}; /* Canceling out the math zoom for these (presumably) inline equations. */
     }
     /** */
     </style>
