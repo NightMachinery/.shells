@@ -5,7 +5,7 @@ function tex2png {
     local dpi="${tex2png_dpi:-1500}"
     local dest
     dest="${tex2png_o:-$(mktemp-borg --suffix='.png')}" @TRET
-    local pkgs=( ${tex2png_pkgs[@]} amsmath )
+    local pkgs=( ${tex2png_pkgs[@]} amsmath amssymb )
 
     pnglatex.bash -b Transparent -P 2 -p "${(j.:.)pkgs}" -d "$dpi" -o "$dest" -f "$tex" @TRET
 
