@@ -509,7 +509,9 @@ function urls-cleansharps1() {
 }
 
 function urls-cleansharps() {
-    command rg --replace '$1' '([^#]*)(#.*)?'
+    local urls
+    urls=(${(@fu)"$(command rg --replace '$1' '([^#]*)(#.*)?')"}) @TRET
+    arrNN $urls[@]
 }
 noglobfn urls-cleansharps
 

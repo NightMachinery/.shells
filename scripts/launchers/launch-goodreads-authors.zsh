@@ -10,6 +10,7 @@ goodreads_author_ids=(
     '6540057.Andy_Weir'
     ##
     '11018.Peter_Turchin'
+    '15461.Jeff_Hawkins'
     ###
     "108424.Patrick_Rothfuss"
     "6952980.Daniel_C_Dennett"
