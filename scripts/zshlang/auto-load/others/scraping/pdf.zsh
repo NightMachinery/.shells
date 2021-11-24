@@ -34,7 +34,10 @@ function html-get-pdf {
          word-break: break-all;
      }
 
-    .MathJax, .mjx-math, .mwe-math-element {
+    /* We try here not to match inline equations.
+       Refresher: A space selector will select all deep descendants whereas a greater than > selector will only select all immediate descendants.
+    */
+    table, div > .MathJax { /* , .mjx-math, .mwe-math-element */
         /* font-size: ${math_size} !important; */
         zoom: ${math_zoom} !important;
     }
@@ -83,7 +86,8 @@ function html-get-pdf {
         @userConfig/tradeoff @toFuture/1402 The padding makes the majority of cases ugly though, and the cases it helps with (long inline equations) might not common enough to be worth it.
         */
 
-        zoom: ${math_zoom_inv}; /* Canceling out the math zoom for these (presumably) inline equations. */
+        /* zoom: ${math_zoom_inv}; */
+        /* Canceling out the math zoom for these (presumably) inline equations. */
     }
     /** */
     </style>
