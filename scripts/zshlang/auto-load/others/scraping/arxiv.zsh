@@ -6,7 +6,10 @@ function arxiv-dl {
     local mode="${arxiv_dl_mode:-pdf}"
 
     local id url_pdf url_abs url_vanity title
-    if [[ "$url" =~ '/(?:abs|pdf)/([^/]+?)(?:\.pdf)?/*$' ]] ; then
+    if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
+          || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
+          || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
+        ]] ; then
         id="${match[1]}"
         url_pdf="https://arxiv.org/pdf/${id}"
         url_abs="https://arxiv.org/abs/${id}"

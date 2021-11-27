@@ -18,7 +18,9 @@ function html-get-pdf {
         url="$(urlfinalg_print="${urlfinalg_print:-y}" urlfinalg "$url")" @TRET
 
         reval-env "$engine[@]" \
-            "$url" | sanitize-css-external || {
+            "$url" | {
+            sanitize-css-external
+        } || {
             local r=$?
             ecerr "$0: Failed for URL $(gq "$url")"
             return $r
