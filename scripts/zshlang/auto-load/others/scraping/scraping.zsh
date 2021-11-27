@@ -714,6 +714,7 @@ function ishtml-file() {
         return 1
     fi
 }
+
 function ishtml-link() {
     ishtml-file =(full-html2 "$1")
 }
