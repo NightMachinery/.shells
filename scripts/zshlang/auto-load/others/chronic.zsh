@@ -44,7 +44,10 @@ function chronic-backup() {
         # backup-rsync
     fi
 }
+
 function chronic-anticreep() {
+    ansifold-path-fix @STRUE
+    ##
     pip uninstall -y enum34 # Since python 3.6 the enum34 library is no longer compatible with the standard library.
     pip uninstall -y typing # same
     pip uninstall -y dataclasses # same

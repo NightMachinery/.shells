@@ -1,35 +1,56 @@
 ##
+function arxiv-url-get {
+    ## @global/outputs
+    ids=()
+    urls_pdf=()
+    urls_abs=()
+    urls_vanity=()
+    ##
+    local urls
+    urls="$(in-or-args "$@")" @RET
+    urls=(${(@f)urls})
+
+    local url id retcode=0
+    for url in $urls[@] ; do
+        id=""
+        if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
+              || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
+              || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
+            ]] ; then
+            id="${match[1]}"
+        else
+            ecerr "$0: bad URL $(gq "$url")"
+            retcode=1
+        fi
+        ids+="$id"
+        urls_pdf+="https://arxiv.org/pdf/${id}"
+        urls_abs+="https://arxiv.org/abs/${id}"
+        urls_vanity+="https://arxiv-vanity.com/papers/${id}"
+    done
+
+    arrnn ${(@)urls_abs} | cat-copy-if-tty @RET
+
+    return $retcode
+}
+
 function arxiv-dl {
     local url="${1}" #: Example: =https://arxiv.org/abs/2109.02355=
     assert-args url @RET
     local dest="${arxiv_dl_o}"
     local mode="${arxiv_dl_mode:-pdf}"
 
-    local id url_pdf url_abs url_vanity title
-    if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
-          || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
-          || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
-        ]] ; then
-        id="${match[1]}"
-        url_pdf="https://arxiv.org/pdf/${id}"
-        url_abs="https://arxiv.org/abs/${id}"
-        url_vanity="https://arxiv-vanity.com/papers/${id}"
-
-
-        if [[ "$mode" == 'pdf' ]] ; then
-            if test -z "$dest" ; then
-                title="$(url-title "$url" | str2filename)" @TRET
-                dest="${title}.pdf"
-            fi
-
-            revaldbg aa-2dest "$url_pdf" "$dest" >&2 @TRET
-            ec "$dest"
-        elif [[ "$mode" == 'vanity' ]] ; then
-            web2pdf "$url_vanity"
+    local ids urls_pdf urls_abs urls_vanity title
+    arxiv-url-get "$url" @RET
+    if [[ "$mode" == 'pdf' ]] ; then
+        if test -z "$dest" ; then
+            title="$(url-title "$url" | str2filename)" @TRET
+            dest="${title}.pdf"
         fi
-    else
-        ecerr "$0: Bad URL $(gq "$url")"
-        return 1
+
+        revaldbg aa-2dest "${urls_pdf[1]}" "$dest" >&2 @TRET
+        ec "$dest"
+    elif [[ "$mode" == 'vanity' ]] ; then
+        web2pdf "${urls_vanity[1]}"
     fi
 }
 renog arxiv-dl
@@ -51,5 +72,5 @@ function arxiv-k2 {
     assert test -e "$converted" @RET
     2ko "$converted" @TRET
 }
-renog arxiv2k
+renog arxiv-k2
 ##

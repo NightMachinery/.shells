@@ -10,7 +10,8 @@ function rtl-reshaper() {
     if isRtl ; then
         cat
     else
-         COLUMNS="$COLUMNS" rtl_reshaper.dash "$@"
+        #: Very slow (because of ansifold)
+        COLUMNS="$COLUMNS" rtl_reshaper.dash "$@"
     fi
 }
 
@@ -89,3 +90,4 @@ function bicon-zsh() {
 function erase-bicon() {
   gtr -d '\000'
 }
+##

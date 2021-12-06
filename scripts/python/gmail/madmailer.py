@@ -104,9 +104,11 @@ try:
         # msg.addLabel(lblTest)
         msg.addLabel(lblProcessed)
 
-    ## https://www.ben-evans.com/newsletter
+    ## Generic email to kidnle
+    #  - https://www.ben-evans.com/newsletter
+    #  - thebatch@deeplearning.ai
     text2kindle = g.search(
-            f"after:{cutoff_date} AND ((from:ben-evans.com) AND NOT label:auto/processed)", maxResults=100
+            f"after:{cutoff_date} AND (((from:thebatch@deeplearning.ai) OR (from:ben-evans.com)) AND NOT label:auto/processed)", maxResults=100
     )
 
     for t in reversed(text2kindle):

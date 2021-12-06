@@ -58,7 +58,7 @@ function ntag-filter-or-add() {
 ##
 function ntag-l() {
     if isI && istty ; then
-        exa -a --color always "$@" | ntag-color | rtl-reshaper
+        exa -a --color always "$@" | ntag-color | rtl-reshaper-fast
     else
         exa -a "$@"
     fi
@@ -70,7 +70,7 @@ lv-sorted() { ntag-lv | tac }
 lv-simple2() { @opts nopriority y @ ntag-lv | tac }
 function ntag-ll() {
     if isI && istty ; then
-        exa -a -l --blocks --color always "$@" | ntag-color | rtl-reshaper
+        exa -a -l --blocks --color always "$@" | ntag-color | rtl-reshaper-fast
     else
         exa -a -l --blocks "$@"
     fi
@@ -81,7 +81,7 @@ aliasfn ll ntag-ll
 # aliasfn lll ntag-ll
 function ntag-lt() {
     if isI && istty ; then
-        exa -a -T --color always "$@" | ntag-color | rtl-reshaper
+        exa -a -T --color always "$@" | ntag-color | rtl-reshaper-fast
     else
         exa -a -T "$@"
     fi
