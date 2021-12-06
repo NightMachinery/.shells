@@ -141,3 +141,17 @@ function rss-tsend() {
     done
     ecdate Exiting. This is a bug.
 }
+##
+function rss-find1 {
+    local urls
+    urls="$(in-or-args "$@")" @RET
+    urls=(${(@f)urls})
+
+    local url cmd
+    cmd="from feed_seeker import find_feed_url"$'\n\n'
+    for url in $urls[@] ; do
+        cmd+="print(find_feed_url($(gquote-dq "$url")))"$'\n'
+    done
+    revaldbg python -c "$cmd" | cat-copy-if-tty
+}
+##

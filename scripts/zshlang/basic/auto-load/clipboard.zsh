@@ -3,7 +3,7 @@ function cat-copy() {
     local inargs
     in-or-args2 "$@"
 
-    ec "$inargs" # yes, we are adding a newline here
+    ec "$inargs" # Yes, we are adding a newline here, to work around some functions which do not output their trailing newline.
     ecn "$inargs" | pbcopy
 }
 alias pc='\noglob cat-copy'

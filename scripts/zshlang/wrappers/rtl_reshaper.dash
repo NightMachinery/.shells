@@ -10,12 +10,16 @@ rtl_reshaper() {
     ##
 }
 
+if command -v ansifold 2>/dev/null >/dev/null ; then
 # wrapping text with ANSI codes https://stackoverflow.com/questions/66986819/how-do-i-wrap-unicode-text-containing-ansi-color-codes-at-word-boundaries
 # ansifold still breaks some ANSI codes, but it is good enough
-ansifold --boundary=word --width="$w" | rtl_reshaper
+    ansifold --boundary=word --width="$w" | rtl_reshaper
+else
+    rtl_reshaper
+    # command ggrep -Eo ".{1,$w}" | rtl_reshaper
+fi
 
-# command ggrep -Eo ".{1,$w}" | rtl_reshaper
-## optionally erase the binary data:
+# optionally erase the binary data:
 # gtr -d '\000'
 # gtr -cd "[:print:]\n"
 # gsed -e 's/[;,()'\'']/ /g;s/  */ /g'
