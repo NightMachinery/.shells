@@ -177,6 +177,17 @@
             "#+BEGIN_QUOTE~%~a~%#+END_QUOTE~%"
             content)))
 
+(defun org-example-write (&key (headers nil) content (out_stream *standard-output*))
+  (let* ((headers (empty-str-to-nil headers)))
+    (when content
+      (format out_stream
+              "#+BEGIN_EXAMPLE~a~%~a~%#+END_EXAMPLE~%"
+              (cond
+                (headers
+                 (concat " " headers))
+                (t ""))
+              content))))
+
 (defun org-properties-write (&key
                                (keys)
                                (accessor)
@@ -407,4 +418,16 @@
 
 (comment
   (path-unabbrev "~cod/python/ddg2json"))
+;;;
+(defun rget (regex text)
+  (let ((res (nth-value 1
+                        (ppcre:scan-to-strings regex text))))
+    (when res
+      (elt
+       res
+       0))))
+
+(comment
+ (rget "(\\d{4})" "30 April 2014")
+ (rget "(\\d{4})" "30 April 201"))
 ;;;
