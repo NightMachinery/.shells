@@ -1,10 +1,17 @@
 ##
+function semantic-scholar-url-get {
+    local urls_semantic_scholar=()
+    sout arxiv-url-get "$@" @TRET
+    arrNN $urls_semantic_scholar[@] | cat-copy-if-tty
+}
+
 function arxiv-url-get {
     ## @global/outputs
     ids=()
     urls_pdf=()
     urls_abs=()
     urls_vanity=()
+    urls_semantic_scholar=()
     ##
     local urls
     urls="$(in-or-args "$@")" @RET
@@ -26,6 +33,7 @@ function arxiv-url-get {
         urls_pdf+="https://arxiv.org/pdf/${id}"
         urls_abs+="https://arxiv.org/abs/${id}"
         urls_vanity+="https://arxiv-vanity.com/papers/${id}"
+        urls_semantic_scholar+="https://api.semanticscholar.org/arXiv:${id}"
     done
 
     arrnn ${(@)urls_abs} | cat-copy-if-tty @RET
