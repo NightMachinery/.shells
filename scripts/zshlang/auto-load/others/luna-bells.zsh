@@ -11,6 +11,7 @@ function lunar() {
     # lo_min should include the rest time as well, as the bells are sounded in the background currently.
     lo_s=$((60*${lo_min:-50})) lo_noinit=y lo_p=${lo_p:-~/tmp/.luna} loop "$@"
 }
+
 luna() {
     lunar pmset displaysleepnow
 }

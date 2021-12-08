@@ -11,6 +11,8 @@ function loop() {
     If you need to be able to ctrl-c to just cancel the loop command (not the whole loop), you'll need to support it in your loop command. See the source of luna-advanced-bell for what needs to be done.
 " MAGIC
 
+    bella_zsh_disable1
+
     setopt localoptions localtraps
     # Well I couldn't debug this. Setting set +m is enough to cause bugs, but the other lines make things progressively worse ...
     # set +m
