@@ -6,6 +6,10 @@ function epub2plain() {
     @opts from epub to plain @ pandoc-convert "$@"
 }
 
+function docx2org() {
+    @opts from docx to org @ pandoc-convert "$@"
+}
+
 function md2org() {
     @opts from markdown to org @ pandoc-convert "$@"
 }

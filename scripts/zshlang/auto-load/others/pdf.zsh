@@ -1,3 +1,4 @@
+##
 function k2pdf() {
     local rtl="${k2pdf_rtl}"
 
@@ -50,26 +51,28 @@ function pdf2png-mutool() {
 }
 @opts-setprefix pdf2png-mutool pdf2png
 aliasfn pdf2png pdf2png-mutool
+
 function icat-pdf() {
-    local i="${1}"
+    local i="${1}" pages="${icat_p:-1}"
     assert-args i @RET
 
     local tmp
     tmp="$(gmktemp --suffix .png)" @TRET
     {
-        assert @opts o "$tmp" @ pdf2png-mutool -w "$(screen-width)" "$i" 1 @RET
+        assert @opts o "$tmp" @ pdf2png-mutool -w "$(screen-width)" "$i" "$pages" @RET
         icat-realsize "$tmp"
     } always {
         silent trs-rm "$tmp"
     }
 }
-
+@opts-setprefix icat-pdf icat
 ##
-pdf-count() {
+function pdf-count() {
   setopt local_options pipefail
  { pdfinfo "$1" | grep Pages || { ecerr "$0 failed" ; return 1 } } |awk '{print $2}'
 }
-k2pdf-split() {
+
+function k2pdf-split() {
     doc usage: pdf k2pdf-options
     local s=0 pc p
     pc="$(pdf-count "$1")" || return 1

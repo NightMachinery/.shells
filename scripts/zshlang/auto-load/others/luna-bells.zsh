@@ -724,6 +724,12 @@ bell-maker 'p2-target-lost' 'PC Computer - Portal 2 - Turret/turret_search_2..bl
 
 bell-maker 'p2-target-acquired' 'PC Computer - Portal 2 - Turret/turret_active_2.wav'
 ##
+bell-maker "attention-needed-rk" "${NIGHTDIR}/resources/audio/tts/15.ai/Rise Kujikawa/Your attention is needed.wav"
+
+bell-maker "attention-needed-st" "${NIGHTDIR}/resources/audio/tts/15.ai/sentry\ turret/Your\ attention\ is\ needed.wav"
+
+aliasfn bell-attention-needed bell-attention-needed-st
+##
 aliasfn bell-continuous loop bell-lm-MI
 aliasfn bellc bell-continuous
 ##
