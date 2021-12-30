@@ -90,7 +90,7 @@ function clipboard-removedups() {
 
     # `gtac --separator='\0'` was buggy :|
     local tmp="$(gmktemp)"
-    cat "$file" | sponge | prefixer -i '\x00' -o '\x00' --tac --skip-empty | gawk 'BEGIN { RS="\0";  ORS="\0" } NF && !seen[$0]++' | prefixer -i '\x00' -o '\x00' --tac --skip-empty > "$tmp" || {
+    cat "$file" | sponge | duplicates-clean-nul > "$tmp" || {
         ectrace
         return $?
     }

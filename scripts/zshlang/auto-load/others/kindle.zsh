@@ -95,11 +95,15 @@ function 2epub() {
 
 function dir2k() {
     local dir="${1:-.}/"
-    local p
-    p=($dir/*.pdf(N))
+
+    skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(.DN)
+
+    ##
+    # local p
+    # p=($dir/*.pdf(.DN))
     # skipglob "re pdf-crop-margins-inplace" "${(@)p}"
-    skipglob "re p2k" $dir/*.(epub|mobi|azw(|?))(N)
-    skipglob "re p2ko" $dir/*.pdf(N)
+    ##
+    skipglob "re p2ko" $dir/*.pdf(.DN)
 }
 
 function p2k() {

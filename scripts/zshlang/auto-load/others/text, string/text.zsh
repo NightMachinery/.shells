@@ -11,8 +11,24 @@ function whitespace-p() {
 }
 aliasfn whitespace-is whitespace-p
 ##
-function clean-dups() {
-    sort -u "$1" | sponge "$1"
+function duplicates-clean-sort-file-inplace {
+    local f="$1"
+    test -e "$f" @TRET
+
+    gsort -u "$f" | sponge "$f"
+}
+
+function duplicates-clean {
+    prefixer --tac --skip-empty \
+        | gawk 'NF && !seen[$0]++' \
+        | prefixer --tac --skip-empty @RET
+    ec #: add an end separator
+}
+aliasfn duplicates-clean-file-inplace inplace_io_m=last_stdin_stdout inplace-io duplicates-clean
+function duplicates-clean-nul {
+    prefixer -i '\x00' -o '\x00' --tac --skip-empty \
+        | gawk 'BEGIN { RS="\0";  ORS="\0" } NF && !seen[$0]++' \
+        | prefixer -i '\x00' -o '\x00' --tac --skip-empty
 }
 ##
 function prefix-if-ne() {
