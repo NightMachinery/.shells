@@ -41,3 +41,18 @@ function ficwad {
     ##
 }
 ##
+function jfichub {
+    jee
+
+    local urls=($@)
+
+    local url
+    for url in "$urls[@]" ; do
+        if ! fichub_cli --format epub --out-dir . --url "$url" ; then
+            ecerr "$0: URL $(gquote-sq "$url") failed. Continuing."
+        fi
+    done
+
+    dir2k .
+}
+##

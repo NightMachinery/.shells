@@ -15,11 +15,21 @@ function aac() {
 ##
 function aa-raw() {
     local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
-    # Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
+    #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
+    local top_p=''
     isI || opts+=(--show-console-readout false --summary-interval 0)
-    bool "$no_split" || opts+=(--enable-http-pipelining --split "$split" --stream-piece-selector geom)
+    if isI && @opts p [ aa- ] @ fn-isTop aa aacookies ; then
+        top_p=y
+    fi
 
+    local save_invocation="${aa_si}"
+    if test -z "$save_invocation" && bool "$top_p" ; then
+        #: Saving the invocation all the time can create junk files when 'aa' is used by other functions, so we are only doing it without an explicit request if 'aa' is being invoked interactively.
+        save_invocation=y
+    fi
+
+    bool "$no_split" || opts+=(--enable-http-pipelining --split "$split" --stream-piece-selector geom)
 
     local arg
     for arg in $@ ; do
@@ -41,28 +51,30 @@ function aa-raw() {
         # --user-agent will cause problems (immediately abort them) with torrent downloads
     fi
 
-    revaldbg aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@"
+    local cmd
+    cmd=(aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@")
+    if bool "$save_invocation" ; then
+        { gquote "$cmd[@]" ; ec } >> aa_invocations.txt
+    fi
+    revaldbg "$cmd[@]"
     local ret=$?
     #-Z has some unsavory sideeffects so I have not included it in this.
 
-    # arger "${funcstack[@]}"
-    if isI && @opts p [ aa- ] @ fn-isTop aa aacookies ; then
-        ##
-        # @done think of some way to only trigger this when we use `aa` directly on the shell.
-        # one way is to rename all usages of aa to aa-gateway and then add the bell to aa itself.
-        ##
+    if bool "$top_p" ; then
         bell-dl
     fi
     return $ret
 }
-aagh() { aa "${(@f)$(gh-to-raw "$@")}" }
-aacookies() {
+
+function aacookies() {
     mdoc "$0 <aa-args>
 Uses |theCookies| var or else feeds first URL to |cookies|." MAGIC
 
     aa-raw --header="$(cookies-auto "$@")" $@
 }
-
+##
+function aagh() { aa "${(@f)$(gh-to-raw "$@")}" }
+##
 function aas() {
     : "@deprecated Use y-stream instead."
 
@@ -71,9 +83,11 @@ function aas() {
     sleep 10
     retry-mpv "'$out'/*" || kill %
 }
+##
 function aac-getlen() {
     aac call aria2.tellStatus -P "$1" | jqm .completedLength
 }
+##
 function y-stream-pipe() {
     # https://github.com/mpv-player/mpv/issues/7716
     # https://github.com/ytdl-org/youtube-dl/issues/25344
@@ -97,6 +111,7 @@ Shows you how much is downloaded at least.' ; mret
 
     ybase -f best "$url" -o - | tee "$name" | mpv-cache -
 }
+
 function y-stream() {
     magic mdoc 'y-stream <url>
 Alt: ys.py, y-stream-pipe' ; mret
@@ -149,6 +164,7 @@ Alt: ys.py, y-stream-pipe' ; mret
     #     # kill $! is your friend :))
     # }
 }
+##
 function aaimg() {
     # do not use aa, as it will retry bad links forever
     getlinks-img "$@" | inargsf sout aria2c -Z

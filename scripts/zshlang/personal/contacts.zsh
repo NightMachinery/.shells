@@ -2,7 +2,7 @@
 function contacts-see {
     local files
     files=(
-        ~[big_wallet]/'me/contacts/main.vcf'
+        ~[big_wallet]/'me, self/contacts/main.vcf'
     )
 
     ##

@@ -49,6 +49,7 @@ tmuxnewshenv="rt_skip='y' rt_id='-1001334871190' rt_eud=1 rt_e='true'" tmuxnewsh
     'https://mchromiak.github.io/feeds/all.atom.xml' \
     'https://ruder.io/rss/index.rss' \
     'https://bmk.sh/atom.xml' \
+    'http://googleaiblog.blogspot.com/atom.xml' \
     'https://newsletter.ruder.io/?format=rss' \
     'https://sebastianraschka.com/rss_feed.xml' \
     'https://www.youtube.com/feeds/videos.xml?channel_id=UCYO_jab_esuFRV4b17AJtAw' \

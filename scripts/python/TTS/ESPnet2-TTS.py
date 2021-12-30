@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-
+##
 # Adapted from https://colab.research.google.com/github/espnet/notebook/blob/master/espnet2_tts_realtime_demo.ipynb#scrollTo=MuhqhYSToxl7
 # Installation:
 # pip3 install torch torchvision espnet==0.9.7 parallel_wavegan==0.4.8 espnet_model_zoo
 #
 # Usage:
 # echo some text | ESPnet2-TTS.py > output.wav
+##
 
 fs, lang = 22050, "English"
 
@@ -20,6 +21,7 @@ fs, lang = 22050, "English"
 # tag = "kan-bayashi/ljspeech_fastspeech"
 # tag = "kan-bayashi/ljspeech_fastspeech2"
 tag = "kan-bayashi/ljspeech_conformer_fastspeech2"
+# tag = "kan-bayashi/ljspeech_joint_finetune_conformer_fastspeech2_hifigan"
 
 # tag = "kan-bayashi/ljspeech_tts_train_tacotron2_raw_phn_tacotron_g2p_en_no_space_train.loss.best" # slower speech, more old lady like
 

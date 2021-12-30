@@ -53,6 +53,16 @@ function md5m() {
         return 1
     }
 }
+
+function md5-file {
+    local f="$1"
+    assert-args f @RET
+
+    md5sum -- $f | awkn 1
+    ##
+    # command md5 -q "$f" #: This was Darwin-only.
+    ##
+}
 ##
 function ec_bash() {
     # deprecated. Use the alias ec.

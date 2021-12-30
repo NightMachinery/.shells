@@ -5,6 +5,8 @@
 
 *.pbak
 
+.auctex-auto/
+
 # python
 /.python/
 /.mypy_cache/

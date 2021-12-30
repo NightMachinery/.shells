@@ -118,6 +118,7 @@ function wallpaper-auto() {
 
     ec $'\n'"===================================" >> "$log"
 }
+
 function wallpaper-auto-bing() {
     assert-net || {
         return 0
@@ -127,6 +128,10 @@ function wallpaper-auto-bing() {
     {
         local dest="$(uuidm).jpg"
         reval-ec aa "$(bing-wallpaper-get)" -o "$dest" @RET
+        local src="$dest"
+        dest="$(md5-file "$src").${src:e}" @TRET
+        #: necessary for not having duplicate copies of the same wallpaper
+        mv "$src" "$dest"
         reval-ec wallpaper-set "$dest" || {
             notif "$0: setting wallpaper returned $?"
             return 1
