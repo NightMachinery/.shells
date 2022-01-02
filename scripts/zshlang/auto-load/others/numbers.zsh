@@ -12,11 +12,17 @@ function num-base-convert-py {
 @opts-setprefix num-base-convert-py num_base_convert
 
 aliasfn dice2decimal dice2decimal.py
+##
+function decimal2hex-py {
+    # @todo1 @broken
+    ##
+    @opts from 10 to 16 @ num-base-convert-py "$@"
+}
+aliasfn decimal2hex decimal2hex-py
 
 function hex2decimal-py {
     @opts from 16 to 10 @ num-base-convert-py "$@"
 }
-
 aliasfn hex2decimal hex2decimal-py
 ##
 function numfmt-humanfriendly-bytes {

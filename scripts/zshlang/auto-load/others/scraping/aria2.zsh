@@ -29,26 +29,29 @@ function aa-raw() {
         save_invocation=y
     fi
 
-    bool "$no_split" || opts+=(--enable-http-pipelining --split "$split" --stream-piece-selector geom)
-
-    local arg
-    for arg in $@ ; do
-        if url-match "$arg" ; then
-            opts+=( --referer "$arg" )
-            break
-        fi
-    done
-
     if ! isColor ; then
         opts+=( --enable-color=false )
     fi
 
-    if [[ "${@[-1]}" =~ '\.torrent$' ]] ; then
+    if [[ "${@[-1]}" =~ '(^magnet:\?|\.torrent$)' ]] ; then
         ecgray "$0: torrent detected; @warn torrents no longer seem resumeable by 'aa' at least. Try 'aria2c --seed-time=0 ...'?"
         # opts=("${opts[@]}")
     else
+        if ! bool "$no_split" ; then
+            opts+=(--enable-http-pipelining --split "$split" --stream-piece-selector geom)
+            #: @idk if the split options work for torrents or not, but it seems very unlikely, as torrents are naturally downloaded in chunks.
+        fi
+
         opts=(--user-agent "$useragent_chrome" "${opts[@]}")
-        # --user-agent will cause problems (immediately abort them) with torrent downloads
+        #: --user-agent will throw an error with torrent downloads
+
+        local arg
+        for arg in $@ ; do
+            if url-match "$arg" ; then
+                opts+=( --referer "$arg" )
+                break
+            fi
+        done
     fi
 
     local cmd

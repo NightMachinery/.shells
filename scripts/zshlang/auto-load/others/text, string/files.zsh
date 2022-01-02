@@ -33,10 +33,16 @@ function f-text-split {
   local i="$1" size="$2"
   assert-args i size
   if [[ "$size" =~ '^\d+$' ]] ; then
-    size+='k' # use kilobytes by default
+    size+='k' #: use kilobytes by default
   fi
-  local o="${3:-${i}_part}"
+  local o="${3:-${i:r}_part}"
 
-  reval-ec gsplit -C "$size" --numeric-suffixes "$i" "$o"
+  local opts=()
+  local ext="${i:e}"
+  if test -n "$ext" ; then
+    opts+=( --additional-suffix=".${ext}")
+  fi
+
+  reval-ec gsplit "$opts[@]" -C "$size" --numeric-suffixes "$i" "$o"
 }
 ##

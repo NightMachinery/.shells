@@ -506,7 +506,7 @@ threshy2=$thresh1
 # get cropped height
 hhcc=`convert xc: -format "%[fx:$yy2-$yy1+1]" info:`
 # get new yoffset
-yc=$(($y1+$yy1))
+yc=$(($y1 + $yy1))
 procVertHoriz "horizontal" "$wwc" "$hhcc" "$x1" "$yc" "$threshx2" "$biasx2"
 xx1=$v1
 xx2=$v2
