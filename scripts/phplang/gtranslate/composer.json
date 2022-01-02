@@ -1,0 +1,5 @@
+{
+    "require": {
+        "vielhuber/stringhelper": "^4.8"
+    }
+}

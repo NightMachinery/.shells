@@ -1,4 +1,10 @@
 ##
+function pdf-vspace-rm {
+    #: Good for removing unwanted vertical space (newlines) in text extracted from PDFs. This is especially useful when one wants to use Google Translate on these files.
+    ##
+    perl -0777 -pe 's/\s*\x{C}\s*/ /g ; s/(?<!\R)\R(?!\R)/ /g'
+}
+##
 function k2pdf() {
     local rtl="${k2pdf_rtl}"
 

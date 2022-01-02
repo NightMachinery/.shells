@@ -1,0 +1,60 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "60b2f9d8d4a89a18ee8dc3307a60c595",
+    "packages": [
+        {
+            "name": "vielhuber/stringhelper",
+            "version": "4.8.5",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/vielhuber/stringhelper.git",
+                "reference": "cf954cf06ffc97c1efdc1df91d32738a49dc59eb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/vielhuber/stringhelper/zipball/cf954cf06ffc97c1efdc1df91d32738a49dc59eb",
+                "reference": "cf954cf06ffc97c1efdc1df91d32738a49dc59eb",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": ">=6.5",
+                "vlucas/phpdotenv": ">=4.1"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "vielhuber\\stringhelper\\": "src/"
+                },
+                "files": [
+                    "src/functions.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Collection of useful shorthand string related functions in PHP.",
+            "support": {
+                "issues": "https://github.com/vielhuber/stringhelper/issues",
+                "source": "https://github.com/vielhuber/stringhelper/tree/4.8.5"
+            },
+            "time": "2021-12-23T15:31:12+00:00"
+        }
+    ],
+    "packages-dev": [],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": [],
+    "prefer-stable": false,
+    "prefer-lowest": false,
+    "platform": [],
+    "platform-dev": [],
+    "plugin-api-version": "2.2.0"
+}

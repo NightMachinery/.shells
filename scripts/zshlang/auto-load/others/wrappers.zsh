@@ -1,4 +1,6 @@
-function '$'() { eval "$(gquote "$@")" ; }
+function '$' {
+  reval "$@"
+}
 ##
 function hammerspoon() {
   # -t timeout (default 4)

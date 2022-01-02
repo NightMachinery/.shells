@@ -1,0 +1,50 @@
+{
+    "packages": [
+        {
+            "name": "vielhuber/stringhelper",
+            "version": "4.8.5",
+            "version_normalized": "4.8.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/vielhuber/stringhelper.git",
+                "reference": "cf954cf06ffc97c1efdc1df91d32738a49dc59eb"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/vielhuber/stringhelper/zipball/cf954cf06ffc97c1efdc1df91d32738a49dc59eb",
+                "reference": "cf954cf06ffc97c1efdc1df91d32738a49dc59eb",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": ">=6.5",
+                "vlucas/phpdotenv": ">=4.1"
+            },
+            "time": "2021-12-23T15:31:12+00:00",
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "vielhuber\\stringhelper\\": "src/"
+                },
+                "files": [
+                    "src/functions.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "Collection of useful shorthand string related functions in PHP.",
+            "support": {
+                "issues": "https://github.com/vielhuber/stringhelper/issues",
+                "source": "https://github.com/vielhuber/stringhelper/tree/4.8.5"
+            },
+            "install-path": "../vielhuber/stringhelper"
+        }
+    ],
+    "dev": true,
+    "dev-package-names": []
+}

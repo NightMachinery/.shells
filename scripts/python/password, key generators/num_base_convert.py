@@ -10,7 +10,12 @@ def decimal_to_base(n, b):
         return [0]
     digits = []
     while n:
-        digits.append(int(n % b))
+        new_digit = int(n % b)
+        if new_digit >= 10:
+            #: 65 is the ASCII code for 'A'.
+            new_digit = chr(65 + (new_digit - 10))
+
+        digits.append(new_digit)
         n //= b
     return digits[::-1]
 
