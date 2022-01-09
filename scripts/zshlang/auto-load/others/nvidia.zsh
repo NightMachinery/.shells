@@ -2,7 +2,7 @@
 function nvtop-install {
     #: https://github.com/Syllo/nvtop#distribution-specific-installation-process
 
-    sudo apt install cmake libncurses5-dev libncursesw5-dev git
+    sudo apt-get install -y cmake libncurses5-dev libncursesw5-dev git
 
     cdm ~/code/misc
     git clone https://github.com/Syllo/nvtop.git

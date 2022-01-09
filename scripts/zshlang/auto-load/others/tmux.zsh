@@ -46,9 +46,12 @@ function tmuxdaemon() {
 aliasfn tshd tmuxdaemon
 ##
 function tmuxzombie-ls() {
-    tmux list-panes -a -F "#{pane_dead} #{pane_id}" | awk '/^1/ { print $2 }'
+    tmux list-panes -a -F "#{pane_dead} #{pane_id} #{session_name}" \
+        > >(gawk '/^1/ { print $2 }') \
+        > >(perl -ne 's/^1\s+\S+\s+(.*)$/$1/ && print' >&2)
 }
 aliasfn tzls tmuxzombie-ls
+
 function tmuxzombie-kill() {
     local fd1
     {
@@ -57,7 +60,8 @@ function tmuxzombie-kill() {
     } always { exec {fd1}>&- }
 }
 aliasfn tzkill tmuxzombie-kill
-tmuxzombie() {
+
+function tmuxzombie() {
     # kills the pane of a session, thus turning it to a "dead pane"
     tmux list-panes  -s -F '#{pane_pid}' -t "$1" | inargsf serr kill
 }

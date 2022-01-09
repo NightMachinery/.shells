@@ -8,6 +8,8 @@ goodreads_author_ids=(
     '1221698.Neil_Gaiman'
     '3472.Margaret_Atwood'
     '6540057.Andy_Weir'
+    '545.Neal_Stephenson'
+    '18310150.Gu_Zhen_Ren'
     ##
     '11018.Peter_Turchin'
     '15461.Jeff_Hawkins'

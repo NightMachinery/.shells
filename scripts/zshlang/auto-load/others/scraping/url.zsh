@@ -260,13 +260,20 @@ function urlfinalg {
                 else
                     ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
                 fi
-            elif [[ "$url" =~ '^https?://(?:[^/]*\.)?wikipedia.org/.*' ]] ; then
-                if tmp="$(full-html2 "${url}" \
-                    | htmlq -a href '[accesskey="p"]' \
-                    | rg '&printable=yes' )" ; then
-                    url="$tmp"
+            elif [[ "$url" =~ '^https?://(?:[^/]*\.)?wikipedia\.org/+(?:wiki/+)?([^/]*)(/+.*)?' ]] ; then
+                if true ; then
+                    local title="${match[1]}"
+                    # title="$(ecn $title | url-decode | url-encode)" #: not needed, the title should already be URL-encoded in the first place
+                    url="https://en.wikipedia.org/w/index.php?title=${title}&printable=yes"
                 else
-                    ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
+                    #: The print link is no longer present in the scraped HTML (though it is still available in Chrome), IDK why.
+                    if tmp="$(full-html2 "${url}" \
+                        | htmlq -a href '[accesskey="p"]' \
+                        | rg '&printable=yes' )" ; then
+                        url="$tmp"
+                    else
+                        ecgray "$0: Could not get the print version of the URL $(gquote-dq "$url") (IGNORED)"
+                    fi
                 fi
             fi
         fi
