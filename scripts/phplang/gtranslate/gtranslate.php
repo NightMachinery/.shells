@@ -1,5 +1,7 @@
 <?php
 // Forked from https://vielhuber.de/en/blog/google-translation-api-hacking/
+//
+// @broken https://github.com/vielhuber/stringhelper/issues/1
 ///
 require_once __DIR__ . '/vendor/autoload.php';
 use vielhuber\stringhelper\__;

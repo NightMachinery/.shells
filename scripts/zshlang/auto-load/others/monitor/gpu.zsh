@@ -1,6 +1,8 @@
+##
 function gpu-usage-darwin() {
     sudo powermetrics --samplers gpu_power -n1 -i200 | rg 'GPU Busy'
 }
+
 function gpu-usage-graph() {
     assert isDarwin @RET
     (
@@ -10,3 +12,4 @@ function gpu-usage-graph() {
         done | plot-stdin || exit $?
     )
 }
+##
