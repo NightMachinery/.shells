@@ -67,7 +67,7 @@ const KITTY_APP_NAME = "kitty"
 ///
 // This works, but we need to first switch to the main space, and run the hotkey once there. I have no idea why.
 quakeApp({
-  key: "a",
+  key: "_",
   modifiers: hyper,
   appName: "racket",
   windowId: 0,

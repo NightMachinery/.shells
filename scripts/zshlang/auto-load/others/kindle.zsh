@@ -6,8 +6,8 @@ function kindle-p {
 function without-kindle {
     kindle_disabled=y reval-env "$@"
 }
-aliasfn pkno without-kindle
-aliasfn nokindle without-kindle
+aliasfn-ng pkno without-kindle
+aliasfn-ng nokindle without-kindle
 ##
 function 2mobi() {
     : "Usage: FILE calibre-options ..."
