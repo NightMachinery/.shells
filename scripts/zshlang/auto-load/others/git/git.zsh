@@ -228,7 +228,7 @@ function git-status-summary2() {
 aliasfn gss2 git-status-summary2
 @opts-setprefixas gss2 git-status-summary2
 function h_gss_tail() {
-  # @todo0 @design we can also accumulate the changes into single directives: 'modified: x\nmodified: y' -> 'modified: x, y' (quote x and y using gq)
+  # @todo1 @design we can also accumulate the changes into single directives: 'modified: x\nmodified: y' -> 'modified: x, y' (quote x and y using gq)
   local line
   for line in "${(@f)$(cat)}" ; do
     if [[ "$line" =~ '^\s*(\S*)\s*(.*)$' ]] ; then
@@ -236,6 +236,7 @@ function h_gss_tail() {
     fi
   done
 }
+
 function git-commitmsg() {
   ## alts
   # git diff --cached --diff-filter='M' --name-only # gives names of modified files

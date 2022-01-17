@@ -22,14 +22,15 @@ function in-sum() {
 function cpu-usage-get() {
     ps -A -o %cpu | awk '{s+=$1} END {print s "%"}'
 }
-
+##
 function memory-free-get() {
+    local free_ram
     if isDarwin ; then
-        ec $(( $({
+        free_ram=$(( $({
                     vm_stat | rget 'Pages free:\s+(\d+)\.'
                     vm_stat | rget 'Pages speculative:\s+(\d+)\.'
                     vm_stat | rget 'Pages inactive:\s+(\d+)\.'
-                } | in-sum) * $(vm_stat | rget 'page size of (\d+)') )) | numfmt-bytes
+                } | in-sum) * $(vm_stat | rget 'page size of (\d+)') ))
         ##
         # https://developer.apple.com/library/archive/documentation/Performance/Conceptual/ManagingMemory/Articles/AboutMemory.html
         #
@@ -45,10 +46,16 @@ function memory-free-get() {
         #
         # By using purgeable memory, you allow the system to quickly recover memory if it needs to, thereby increasing performance. Memory that is marked as purgeable is not paged to disk when it is reclaimed by the virtual memory system because paging is a time-consuming process. Instead, the data is discarded, and if needed later, it will have to be recomputed.
     else
-        @NA
+        free_ram="$(command free --bytes | rg 'Mem: '| awkn 7)" @TRET
+        ## @backends
+        # - =cat /proc/meminfo=
+        # - =free=
+        # - =vmstat=
+        ##
     fi
-}
 
+    ec "$free_ram" | numfmt-humanfriendly-bytes
+}
 ##
 function  pt-cpu-get() {
     procs --or "$@" | gtail -n +3 | awk '{print $4}' | in-sum

@@ -167,6 +167,7 @@ sharif_tmp_dir=~/tmp/shariflogin
 sharif_dir="$codedir/data/sharif_course_list"
 sharif_cjar="$sharif_tmp_dir/cjar.txt"
 sharif_curl_opts=(--silent --fail --no-progress-meter --cookie $sharif_cjar --cookie-jar $sharif_cjar --max-time 10 --retry 20 --retry-delay 1)
+
 function sharif-login() {
     # pushf ~/tmp/"$(uuidm)"
     pushf $sharif_tmp_dir || return $?
@@ -203,7 +204,10 @@ function sharif-login() {
             retries=$((retries+1))
 
             curl "$sharif_curl_opts[@]" "$jcaptcha" -o jc.jpg # downloading the image resets the captcha
-            @opts height 50 @ icat-go jc.jpg
+
+            # @opts height 50 @ icat-go jc.jpg
+            icat jc.jpg
+
             local solved_captcha="$(tesseract jc.jpg stdout -c tessedit_char_whitelist=0123456789 |trimsed)"
 
             typ solved_captcha

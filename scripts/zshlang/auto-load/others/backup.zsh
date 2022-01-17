@@ -52,10 +52,12 @@ function backup-private-common {
 }
 ##
 function backup-file() {
+    assert isdefined-cmd gdate @RET
+
     local f="${1:?}"
 
     if test -e "$f" ; then
-        cp --verbose --backup=t --suffix='.bak'  $f ~/base/backup/auto/"${f:t} $(md5m "$f")/$(dateshort)/" || {
+        cp --verbose --backup=t --suffix='.bak'  $f ~/base/backup/auto/"${f:t} $(md5m "$f")/$(gdate +"%Y %b %d %H:%M:%S")/" || {
             local ret=$?
             ecerr "$0: Failed with '$ret' for '$f'"
             return $ret
