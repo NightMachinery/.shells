@@ -11,6 +11,9 @@ function sync-append() {
     if test -z "$text" ; then
         return 0
     fi
+    assert-args file @RET
+
+    ensure-dir "${file}"
 
     local lock_fd
     {

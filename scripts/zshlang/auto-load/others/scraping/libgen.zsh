@@ -1,6 +1,7 @@
 ##
 function libgendl-md5-main() {
     local md5="$1"
+    local ipfs_mirror="${libgen_ipfs:-cloudflare}"
 
     # local mainmirror="http://93.174.95.29"
     local mainmirror="http://31.42.184.140"
@@ -8,9 +9,19 @@ function libgendl-md5-main() {
     # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
     local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
 
+    if [[ "$ipfs_mirror" == "cloudflare" || "$ipfs_mirror" == 'cf' ]] ; then
+        ipfs_mirror='cloudflare-ipfs.com/'
+    elif [[ "$ipfs_mirror" =~ '^ipfs(\.io)?$' ]] ; then
+        ipfs_mirror='ipfs.io/'
+    elif [[ "$ipfs_mirror" =~ '^infura(\.io)?$' ]] ; then
+        ipfs_mirror='infura.io/'
+    elif [[ "$ipfs_mirror" =~ '^pinata$' ]] ; then
+        ipfs_mirror='pinata.cloud/'
+    fi
+
     getlinks-c -e '\.[^/]+$' "$urls[@]" | {
         # @outdatedComment will get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
-        rg -F 'cloudflare-ipfs.com'
+        rg -F "$ipfs_mirror"
     }
 }
 
@@ -43,8 +54,8 @@ function libgendl-md5() {
     local md5="$1"
     local lgNoBok="${lgNoBok:-y}" # bok is useless now
 
-    { test -z "$lgNoBok" && libgendl-md5-bok "$md5" } || {
-        test -z "$lgNoBok" && ecerr "bok failed. Trying main ..."
+    { { ! bool "$lgNoBok" } && libgendl-md5-bok "$md5" } || {
+        { ! bool "$lgNoBok" } && ecerr "bok failed. Trying main ..."
 
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
@@ -63,6 +74,7 @@ function jlibplain() {
     # serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 }
 noglobfn jlibplain
+@opts-setprefix jlibplain libgen
 
 function jlib() {
     jee
@@ -70,6 +82,7 @@ function jlib() {
     dir2k
     true
 }
+@opts-setprefix jlib libgen
 
 function libgen2md5() {
     [[ "$1" =~ '(\w{32})\W*$' ]] && print -r -- "$match[1]"

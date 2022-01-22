@@ -34,19 +34,23 @@ function tsendf-discrete() {
         tsend -f "$f" -- "$1" ''
     done
 }
+
 function tsend-url() {
     local dest="${1:?}" url="${2:?}" msg="$3"
 
     local tmp=~/tmp/"$(uuidm)"
     pushf $tmp || return $?
     {
-        aacookies "$url" || return $?
+        aa-insecure "$url" || return $?
         tsend --file * -- $dest "${msg:-$url}"
     } always { popf ; command rm -rf "$tmp" }
 }
 ##
-air() { zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(hear-get)"}
-function reval-tlg() {
+function air {
+    zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(hear-get)"
+}
+##
+function reval-tlg {
     local rec="${reval_tlg_receiver:-${reval_tlg_r:-$me}}"
     local out="$(eval "$(gquote "$@")" 2>&1)"
 
@@ -54,6 +58,7 @@ function reval-tlg() {
     tsend -- "$rec" "$out"
 }
 # aliasfn reval-tlg enve
+
 function tlg-file-captioned() {
     local files=("$@") file
     local rec="$me"
