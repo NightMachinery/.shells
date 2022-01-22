@@ -83,6 +83,7 @@ function tmux-capture() {
 aliasfn tcgar tmux-capture BrishGarden
 ##
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
+
 function ivy() {
     ## ivy acts as the terminal emulator's startup hook, as well
     phoenix-reload
@@ -100,6 +101,7 @@ function ivy() {
 
     ivy-self # attaches and blocks, I think
 }
+
 function ivy-self() {
     local -x DISABLE_DEFER=y
 
@@ -118,16 +120,24 @@ function ivy-self() {
 }
 
 function ivy-convenience() {
-    tmuxnewsh2 zii1 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
-    tmuxnewsh2 zii2 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
-    tmuxnewsh2 zii3 mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
+    local i
 
-    tmuxnewsh2 eva1 mosh ${lilf_user}@82.102.11.148 -- zsh
-    # tmuxnewsh2 eva2 mosh ${lilf_user}@82.102.11.148 -- zsh
+    for i in {1..3} ; do
+        tmuxnewsh2 "zii$i" mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
+    done
 
-    tmuxnew julia_repl1 env TERM="$TERM" julia
-    tmuxnew julia_repl2 env TERM="$TERM" julia
 
-    tmuxnew ipython_repl1 ipython
+    for i in {1..1} ; do
+        tmuxnewsh2 "eva$i" mosh ${lilf_user}@82.102.11.148 -- zsh
+    done
+
+    for i in {1..2} ; do
+        tmuxnew "julia_repl$i" env TERM="$TERM" PATH="$PATH" julia
+    done
+
+
+    for i in {1..1} ; do
+        tmuxnew "ipython_repl$i" ipython
+    done
 }
 ##

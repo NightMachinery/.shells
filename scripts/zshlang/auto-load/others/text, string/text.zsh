@@ -237,4 +237,8 @@ function utf8-to-ascii-pyunidecode {
 # aliasfn utf8-to-ascii utf8-to-ascii-iconv
 aliasfn utf8-to-ascii utf8-to-ascii-pyunidecode
 aliasfn str-normalize utf8-to-ascii
+
+function newline-normalize {
+    perl -0777 -pe 's/\R/\n/g'
+}
 ##

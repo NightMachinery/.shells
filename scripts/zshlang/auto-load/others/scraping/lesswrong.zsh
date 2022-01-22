@@ -17,7 +17,7 @@ function lw2gw() {
 
     local from='(lesswrong\.com|alignmentforum\.org)' to='greaterwrong.com'
 
-    ec "$inargs" | url-clean | sd "$from" "$to"
+    ec "$inargs" | url-clean | sd "$from" "$to" | cat-copy-if-tty
 }
 noglobfn lw2gw
 ##

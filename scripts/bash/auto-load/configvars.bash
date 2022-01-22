@@ -50,6 +50,7 @@ mkdir -p "$PURGATORY"
 export cellar=~/cellar
 
 export music_dir="$HOME/my-music"
+export mpv_bookmarks="${music_dir}/bookmarks/default"
 export playlist_dir="${music_dir}/playlists"
 export playlist_auto_dir="${playlist_dir}/autopl/"
 # export songs_dir='/Volumes/hyper-diva/Songs' # @hardCoded @DarwinOnly

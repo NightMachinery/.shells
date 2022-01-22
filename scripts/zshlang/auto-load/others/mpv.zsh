@@ -174,14 +174,50 @@ function mpv-partial() {
     return 0
 }
 ##
-playtmp() {
+function playtmp() {
     mkdir -p ~/tmp/delme/
     cp "$1" ~/tmp/delme/
     color 0 200 0 Copied "$1" to tmp
     fsay Copied to tmp
     pat ~/tmp/delme/"$1:t"
 }
+
 function mpv-imgseq() {
     mpv "mf://*.png" --mf-fps 30
 }
 aliasfn mpvi mpv-imgseq
+##
+function h_mpv-bookmark {
+    local file="${1}" time="${2}"
+    assert-args file time @RET
+
+    local bookmark_file="${mpv_bookmarks}"
+    # bookmark_file="${file:r}.bkm"
+
+    sync-append "$bookmark_file" "$time $file"$'\n' @TRET
+
+    bell-p2-target-acquired
+
+    ec "added bookmark for time $time and file $(gquote-dq $file)"
+}
+
+function mpv-bookmark-fz {
+    local bookmark_file="${mpv_bookmarks}"
+
+    local bookmarks
+    bookmarks="$(cat "$bookmark_file")" @TRET
+
+    bookmarks="$(ec "$bookmarks" | fz --tac --no-sort)" @RET
+
+    local timestamps
+    timestamps=(${(@f)"$(ec "$bookmarks" | awkn 1)"}) @TRET
+    local files
+    files=(${(@f)"$(ec "$bookmarks" | perl -anE 'say "@F[1 .. $#F]"')"}) @TRET
+
+    if (( ${#files} > 1 )); then
+        ecerr "$0: multiple selections not supported"
+    fi
+
+    reval-ec hear --start="${timestamps[1]}" "${files[1]}"
+}
+##
