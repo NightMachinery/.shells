@@ -117,3 +117,9 @@ function pwd() {
   builtin pwd | cat-copy-if-tty
 }
 ##
+function titlecase {
+  #: @install/pip
+  ##
+  cat-paste-if-tty | command titlecase "$@" | cat-copy-if-tty
+}
+##
