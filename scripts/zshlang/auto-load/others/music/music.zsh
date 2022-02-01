@@ -177,7 +177,7 @@ function playlister() {
     # --keep-right: Keep the right end of the line visible when it's too long. Effective only when the query string is empty.
 }
 
-find-music() {
+function find-music {
     bella_zsh_disable1
 
     local fd_pat='.'
