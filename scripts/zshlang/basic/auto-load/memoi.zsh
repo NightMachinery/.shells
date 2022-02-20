@@ -114,6 +114,12 @@ function eval-memoi() {
 enh-savename eval-memoi memoi-eval
 @opts-setprefix eval-memoi memoi
 
+function reval-memoi() {
+  memoi-eval "$@"
+}
+enh-savename reval-memoi memoi-eval
+@opts-setprefix reval-memoi memoi
+
 function me() {
   memoi-eval "$@"
 }

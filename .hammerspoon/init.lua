@@ -32,6 +32,7 @@ function has_value (tab, val)
 
   return false
 end
+
 -- Scroll functionality forked from https://github.com/trishume/dotfiles/blob/master/hammerspoon/hammerspoon.symlink/init.lua
 function newScroller(delay, tick)
   return { delay = delay, tick = tick, timer = nil, mode = "pixel" }
@@ -552,6 +553,31 @@ appHotkey{ key='a', appName='com.adobe.Reader' }
 hs.hotkey.bind(hyper, "d", function()
                  brishzeval("notif-dismiss.as")
                  end)
+---
+acrobatScrollStep = 20
+
+acrobatHotkeyDown = hs.hotkey.new({}, 'b', function()
+    ---
+    hs.eventtap.scrollWheel({0, -acrobatScrollStep}, {}, "line")
+    ---
+    -- for i = 1, 5 do -- @slow
+    --   hs.eventtap.keyStroke({}, "down")
+    -- end
+  end)
+
+acrobatHotkeyUp = hs.hotkey.new({}, 'v', function()
+    hs.eventtap.scrollWheel({0, acrobatScrollStep}, {}, "line")
+  end)
+
+hs.window.filter.new('Acrobat Reader')
+  :subscribe(hs.window.filter.windowFocused,function()
+               acrobatHotkeyDown:enable()
+               acrobatHotkeyUp:enable()
+            end)
+  :subscribe(hs.window.filter.windowUnfocused,function()
+               acrobatHotkeyDown:disable()
+               acrobatHotkeyUp:disable()
+            end)
 ---
 function reloadConfig(files)
   doReload = false

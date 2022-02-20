@@ -41,6 +41,7 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tll'" tmuxnewsh rss-gen-tll 
 tmuxnewshenv="rt_skip='y' rt_id='-1001334871190' rt_eud=1 rt_e='true'" tmuxnewsh \
     rss-tlg-gen rss-tsend \
     'http://jalammar.github.io/feed.xml' \
+    'https://hf.co/blog/feed.xml' \
     'http://distill.pub/rss.xml' \
     'https://explosion.ai/feed' \
     'https://mbernste.github.io/feed.xml' \

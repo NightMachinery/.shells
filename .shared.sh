@@ -49,11 +49,16 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
     fi
 fi
 
+
+if isDarwin ; then
+    addToPATH /Applications/SuperCollider.app/Contents/Resources
+    addToPATH /Applications/SuperCollider.app/Contents/MacOS
+    addToPATH /Applications/MEGAcmd.app/Contents/MacOS
+    addToPATH ~/'Library/Application Support/Coursier/bin'
+fi
+
 addToPATH /opt/local/bin /opt/local/sbin # macports
 addToPATH /usr/sbin
-addToPATH /Applications/SuperCollider.app/Contents/Resources
-addToPATH /Applications/SuperCollider.app/Contents/MacOS
-addToPATH /Applications/MEGAcmd.app/Contents/MacOS
 addToPATH ~/.emacs.d.doom/bin
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"

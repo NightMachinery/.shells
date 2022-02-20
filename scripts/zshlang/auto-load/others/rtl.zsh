@@ -7,16 +7,24 @@ function rtl-reshaper-py() {
 }
 
 function rtl-reshaper() {
-    if isRtl ; then
-        cat
+  local wrap_p="${rtl_reshaper_wrap_p:-y}"
+
+  if isRtl ; then
+    cat
+  else
+    local -x COLUMNS="$COLUMNS"
+
+    if bool "$wrap_p" ; then
+      #: Very slow (because of ansifold)
+      rtl_reshaper.dash "$@"
     else
-        #: Very slow (because of ansifold)
-        COLUMNS="$COLUMNS" rtl_reshaper.dash "$@"
+      fribidi --nobreak
     fi
+  fi
 }
 
 function rtl-reshaper-fast {
-  COLUMNS="$COLUMNS" fribidi --nobreak "$@"
+  rtl_reshaper_wrap_p=n rtl-reshaper "$@"
 }
 
 function reval-rtl() {
