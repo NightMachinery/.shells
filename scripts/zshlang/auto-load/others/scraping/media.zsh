@@ -90,8 +90,7 @@ function aamedia1() {
     for i in {1.."${#links}"} ; do
         l="${links[$i]}"
         t="${titles[$i]}"
-        # reval-rtl ec "${t}:"$'\n'"$l"$'\n'
-        reval-rtl ecn "${t}:"$'\t'"$l"
+        rtl_reshaper_wrap_p=n reval-rtl ecn "${t}:"$'\t'"$l"
         ec
     done | sponge | fz-masked "${(@F)links}" @RET # prints selected links to stdout
     # fz-masked needs to be the last process in the pipe or it'll fork and we will lose sel_i

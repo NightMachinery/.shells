@@ -12,6 +12,7 @@ dnspython
 ezgmail
 fanficfare
 fastapi[all]
+fichub-cli
 fire
 gallery-dl
 gay
@@ -89,4 +90,3 @@ xkcdpass
 yapf
 yq
 zxcvbn
-fichub-cli
