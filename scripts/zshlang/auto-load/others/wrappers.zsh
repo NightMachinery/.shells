@@ -123,3 +123,7 @@ function titlecase {
   cat-paste-if-tty | command titlecase "$@" | cat-copy-if-tty
 }
 ##
+function spotdl {
+  @opts engine bell-dl @ reval-bell command spotdl "$@"
+}
+##

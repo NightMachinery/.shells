@@ -46,6 +46,7 @@ artists['Coldplay']='https://open.spotify.com/artist/4gzpq5DPGxSnKTe4SA8HAU'
 artists['Tim Minchin']='https://open.spotify.com/artist/4adgHnoK84DgtLot2jxrp2'
 artists['Flyleaf']='https://open.spotify.com/artist/4IliztYDlfMvzQzbx50o60'
 artists['AWOLNATION']='https://open.spotify.com/artist/4njdEjTnLfcGImKZu1iSrz'
+artists['Twenty One Pilots']='https://open.spotify.com/artist/3YQKmKGau1PzlVlkL1iodx'
 ###
 artists['Halou']='https://open.spotify.com/artist/3rNX4fCtNvNyDcLhfpA1NN'
 artists['Rihanna']='https://open.spotify.com/artist/5pKCCKE2ajJHZ9KAiaK11H'
