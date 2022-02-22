@@ -210,10 +210,6 @@ function popclickInit()
   ---
   brishzeval('awaysh hs-popclick-btt-refresh')
 end
-function install()
-  -- @bootstrap
-  hs.ipc.cliInstall()
-end
 ---
 local inputEnglish = "com.apple.keylayout.US"
 local inputPersian = "com.apple.keylayout.Persian-ISIRI2901"
@@ -579,6 +575,14 @@ hs.window.filter.new('Acrobat Reader')
                acrobatHotkeyUp:disable()
             end)
 ---
+function install()
+  -- @bootstrap installs the CLI binary
+  -- https://www.hammerspoon.org/docs/hs.ipc.html#cliInstall
+  hs.ipc.cliUninstall()
+  hs.ipc.cliInstall()
+end
+-- install()
+---
 function reloadConfig(files)
   doReload = false
   for _,file in pairs(files) do
@@ -592,4 +596,4 @@ function reloadConfig(files)
 end
 myWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", reloadConfig):start()
 brishzeval("bell-lm-eternalhappiness")
----
+--- @end
