@@ -369,3 +369,12 @@ function sdl() {
     }
 }
 ##
+function hear-rm {
+    local i
+    i="$(hear-get)" @TRET
+
+    if ask "Delete $(gq "$i")?" Y ; then
+        trs "$i"
+    fi
+}
+##
