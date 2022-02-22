@@ -128,10 +128,12 @@ function vcns() {
         vcn-with gss -uno
     } always { popf }
 }
+
 function vcndiff() {
-    vcn-with git add ~/scripts/
+    vcn-with git add --intent-to-add ~/scripts/
     vcn-with git-diff HEAD~"${1:-0}"
 }
+
 function vcnpp() {
     local msg="${*}"
     if isIReally ; then
