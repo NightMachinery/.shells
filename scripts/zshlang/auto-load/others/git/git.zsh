@@ -485,3 +485,12 @@ function gp-incremental {
   done
 }
 ##
+function git-conflicts {
+  git ls-files --unmerged
+  #: --unmerged: show unmerged files in the output (forces --stage)
+}
+
+function git-conflicts-s {
+  git ls-files --unmerged | awk '{print $4}' | sort -u
+}
+##
