@@ -11,6 +11,17 @@ function org-escape-link {
 function org-escape-block {
     in-or-args "$@" | sd '^(\s*(?:\x1b\[33m)?)(\*|#)' '$1,$2' | cat-copy-if-tty
 }
+
+function org-link-create {
+    local url="$1" title="$2"
+    assert-args url @RET
+
+    if test -z "$title" ; then
+        ec "[[$(org-escape-link "$url")]]"
+    else
+        ec "[[$(org-escape-link "$url")][$(org-escape-title "$title")]]"
+    fi
+}
 ##
 function org-watch() {
     local fd_in file
@@ -458,5 +469,10 @@ function org-date-extract-due {
         done
     fi
     ##
+}
+##
+function org-link-browser-current {
+    org-link-create "$(browser-current-url)" "$(browser-current-title)" \
+        | cat-copy-if-tty
 }
 ##
