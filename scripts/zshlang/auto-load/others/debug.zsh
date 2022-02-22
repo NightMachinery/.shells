@@ -15,7 +15,6 @@ function zerr_handler {
                     if isBrish ; then
                         ecerr "CNOTFOUND; Exiting ..."
                         tts-glados1-cached "command not found" || true
-                        tts-glados1-cached "aborting" || true
                         exit 127
                     else
                         ask "CNOTFOUND; Press enter to proceed, or use C-c or C-d to manually halt the execution." Y

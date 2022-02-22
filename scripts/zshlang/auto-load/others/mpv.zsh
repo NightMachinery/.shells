@@ -72,10 +72,26 @@ function mpv() {
 }
 aliasfn mpv-noconfig command mpv --no-config --load-scripts=no
 ###
-function hear-get() {
+function hear-prev {
+    hear-do playlist-prev @RET
+
+    hear-get
+}
+
+function hear-next {
+    hear-do playlist-next @RET
+
+    hear-get
+}
+
+aliasfn mpv-prev fnswap hear-do mpv-do hear-prev
+aliasfn mpv-next fnswap hear-do mpv-do hear-next
+##
+function hear-get {
     hear-do get_property "${1:-path}" | jq --raw-output -e .data
 }
-function mpv-get() {
+
+function mpv-get {
     mpv-do get_property "${1:-path}" | jq --raw-output -e .data
 }
 ##
@@ -103,12 +119,8 @@ function mpv-rpc () {
 alias mpv-rpc-audio='mpv_rpc_socket="$mpv_audio_ipc" '
 aliasfn hear-do mpv-rpc-audio mpv-do
 
-aliasfn mpv-prev mpv-do playlist-prev
-aliasfn mpv-next mpv-do playlist-next
 aliasfn mpv-play-toggle mpv-do keypress space
 
-aliasfn hear-prev hear-do playlist-prev
-aliasfn hear-next hear-do playlist-next
 aliasfn hear-play-toggle hear-do keypress space
 aliasfn hear-shuffle hear-do playlist-shuffle # or just press 'k'
 ###

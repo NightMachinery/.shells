@@ -60,6 +60,9 @@ function pxify() {
 
     enh-pxpy tsend
     # enh-pxpy subgrab
+
+    pxaify-fn spotdl
+
     pxaify-command subgrab
 
     # keeping the shell bare-bones seem wiser
@@ -81,7 +84,6 @@ function pxify() {
     # pxaify-command cargo # did not work, using CARGO_HTTP_PROXY instead
     export CARGO_HTTP_PROXY=socks5://localhost:1078
 
-    pxaify-command spotdl
     pxaify-command emacs
     pxaify-command emacsclient
 }
@@ -135,7 +137,6 @@ function pxify-auto() { # @gateway
         pxify
     fi
 }
-silent pxify-auto
 ##
 function darwin-proxy-getns() {
     # get the active network service
