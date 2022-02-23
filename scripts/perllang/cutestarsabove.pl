@@ -13,6 +13,25 @@ use constant true  => 1;
 use JSON::PP qw(encode_json);
 use Storable qw(dclone);
 # use List::Util qw(max);
+## @inputs :
+my $print_children = $ENV{"cutestarsabove_print_children"};
+
+my @queries = map {
+    my $query = $_;
+    if ($query =~ m/\p{Lu}/) { # smartcase
+        $query = qr/$query/;
+    } else {
+        # print STDERR "case-insensitive: ${query}\n";
+
+        $query = qr/$query/i;
+    }
+    $query;
+} @ARGV ;
+my @constraints = ('and', @queries);
+## @tests
+# @constraints = ('and', qr/\@great/i, ['or', qr/black/i, qr/horror/i]);
+# @queries = queries_from_constraints(\@constraints);
+# say STDERR "queries: @queries";
 ##
 sub org_link_escape {
     my $str = shift;
@@ -116,13 +135,7 @@ sub block_process {
     my $file_point_head = "file_point:${file_escaped}";
     my $block_highlighted = $block ;
 
-    my $echo_block = 0;
-    # my $match_mode = 'and';
-    # if ($match_mode eq 'and') {
-    #     $echo_block = 1;
-    # } else {
-    #     $echo_block = 0;
-    # }
+    my $echo_block = 1;
 
     my $first_match_start = 0;
     my @matches;
@@ -137,18 +150,11 @@ sub block_process {
 
         if ($match_count > 0) {
             constraints_satisfy1(\@constraints, $query);
-            ##
-            # if ($match_mode eq 'or') {
-            #     $echo_block = 1;
-            # }
-        } else {
-            # if ($match_mode eq 'and') {
-            #     $echo_block = 0;
-            # }
         }
     }
 
-    $echo_block = constraints_satisfied_p(\@constraints);
+    my $block_satisfies = constraints_satisfied_p(\@constraints);
+    $echo_block = $echo_block && ($block_satisfies || ($in_matching_subtree && $print_children));
 
     if ($echo_block) {
         ## DONE how can we get the position the match would have had in the original string?
@@ -223,27 +229,8 @@ sub block_process {
         say_block $block_highlighted;
     }
 
-    return scalar(@matches);
+    return $block_satisfies;
 }
-## @inputs :
-my $print_children = $ENV{"cutestarsabove_print_children"};
-
-my @queries = map {
-    my $query = $_;
-    if ($query =~ m/\p{Lu}/) { # smartcase
-        $query = qr/$query/;
-    } else {
-        # print STDERR "case-insensitive: ${query}\n";
-
-        $query = qr/$query/i;
-    }
-    $query;
-} @ARGV ;
-my @constraints = ('and', @queries);
-## @tests
-# @constraints = ('and', qr/\@great/i, ['or', qr/black/i, qr/horror/i]);
-# @queries = queries_from_constraints(\@constraints);
-# say STDERR "queries: @queries";
 ##
 #: top-level =my= => global var
 my $document;
@@ -281,11 +268,10 @@ sub block_process_initial {
         $in_matching_subtree = false;
     }
 
-    my $match_count = block_process($block, $level, $start, \@queries, \@constraints, $file_escaped, $in_matching_subtree);
-    # say STDERR "match_count: $match_count";
+    my $block_satisfies = block_process($block, $level, $start, \@queries, \@constraints, $file_escaped, $in_matching_subtree);
 
     if ($level >= 1) {
-        if ($match_count > 0) {
+        if ($block_satisfies) {
             if (! $in_matching_subtree) {
                 $level_matched_root = $level;
 
@@ -293,10 +279,6 @@ sub block_process_initial {
             }
 
             $in_matching_subtree = true;
-        } else {
-            if ($in_matching_subtree && $print_children) {
-                say_block $block;
-            }
         }
     }
 }
