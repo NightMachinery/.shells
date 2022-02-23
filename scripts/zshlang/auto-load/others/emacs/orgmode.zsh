@@ -413,6 +413,7 @@ function cutestarsabove-open {
 }
 @opts-setprefix cutestarsabove-open cutestarsabove
 alias seec='cutestarsabove-open'
+alias 'seec-pc'='cutestarsabove_print_children=y cutestarsabove-open'
 ##
 function org-date-extract-due {
     local files
