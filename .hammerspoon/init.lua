@@ -559,10 +559,14 @@ acrobatHotkeyDown = hs.hotkey.new({}, 'b', function()
     -- for i = 1, 5 do -- @slow
     --   hs.eventtap.keyStroke({}, "down")
     -- end
+    ---
+    -- hs.eventtap.keyStroke({}, 'b') -- @todo1 @infLoop
   end)
 
 acrobatHotkeyUp = hs.hotkey.new({}, 'v', function()
     hs.eventtap.scrollWheel({0, acrobatScrollStep}, {}, "line")
+    ---
+    -- hs.eventtap.keyStroke({}, 'v') -- @infLoop
   end)
 
 hs.window.filter.new('Acrobat Reader')
