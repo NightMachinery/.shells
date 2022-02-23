@@ -106,6 +106,7 @@ sub constraints_satisfy1 {
 
 sub block_process {
     my $block = shift;
+    my $level = shift;
     my $start = shift;
     \my @queries = shift ;
     \my @constraints = dclone shift ;
@@ -209,10 +210,14 @@ sub block_process {
             $offset += length $link_post;
         }
 
-        if (! $in_matching_subtree) {
-            ## output all blocks as a first-level heading:
-            $block_highlighted =~ s/\A(\*+)/"* |".(length $1)."|"/e ;
-            #: \A     Match only at beginning of string
+        if ($level == 0) {
+            say "* |0|"
+        } else {
+            if (! $in_matching_subtree) {
+                #: output all blocks as a first-level heading
+                $block_highlighted =~ s/\A(\*+)/"* |".(length $1)."|"/e ;
+                #: \A     Match only at beginning of string
+            }
         }
 
         say_block $block_highlighted;
@@ -262,26 +267,24 @@ sub block_process_initial {
 
     # say "level_next: $level_next ; level: $level ; level_prev: $level_prev";
 
-    if ($start > 0) {
-        #: I think this skips the section before the first setting. I don't know why I did this; possibly to make the processing uniform?
+    my $length = ($end - $start);
 
-        my $length = ($end - $start);
+    # say "start: $start, end: $end";
+    my $block = (substr $document, $start, $length);
+    # say $block;
 
-        # say "start: $start, end: $end";
-        my $block = (substr $document, $start, $length);
-        # say $block;
+    if ($level_matched_root >= $level) {
+        #: We are in a new subtree.
+        # say "In new tree! level=$level";
 
-        if ($level_matched_root >= $level) {
-            #: We are in a new subtree.
-            # say "In new tree! level=$level";
+        $level_matched_root = $level;
+        $in_matching_subtree = false;
+    }
 
-            $level_matched_root = $level;
-            $in_matching_subtree = false;
-        }
+    my $match_count = block_process($block, $level, $start, \@queries, \@constraints, $file_escaped, $in_matching_subtree);
+    # say STDERR "match_count: $match_count";
 
-        my $match_count = block_process($block, $start, \@queries, \@constraints, $file_escaped, $in_matching_subtree);
-        # say STDERR "match_count: $match_count";
-
+    if ($level >= 1) {
         if ($match_count > 0) {
             if (! $in_matching_subtree) {
                 $level_matched_root = $level;
