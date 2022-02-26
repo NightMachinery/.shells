@@ -561,6 +561,7 @@ acrobatHotkeyDown = hs.hotkey.new({}, 'b', function()
     -- end
     ---
     -- hs.eventtap.keyStroke({}, 'b') -- @todo1 @infLoop
+    -- [[https://github.com/Hammerspoon/hammerspoon/discussions/3130][How do I make the keybinding be detected but not intercepted? · Discussion #3130 · Hammerspoon/hammerspoon]]
   end)
 
 acrobatHotkeyUp = hs.hotkey.new({}, 'v', function()
