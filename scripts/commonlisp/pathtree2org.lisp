@@ -1,30 +1,16 @@
-#!/usr/bin/env -S sbcl --script
+#!/usr/bin/env -S sbcl_batteriful --script
 ;;
 ;; [[id:bed6cce4-3280-42d4-8dbb-ebdf8afc64dc][orgmode/youtube.org:Use =..inline_links..= in the file name to force links to preview]]
 ;;
 ;; * @todo9
 ;; ** Add env var option to follow symlinks
 ;;;
-(let ((init-file (merge-pathnames ".sbclrc"
-                                  (user-homedir-pathname))))
-  (when (probe-file init-file)
-    (load init-file)))
-;;;
-(with-output-to-string (*standard-output* nil)
-  ;; (ql:quickload "unix-opts")
-  (ql:quickload "iterate")
-  (ql:quickload "cl-fad")
-  (ql:quickload "cl-ppcre")
-  (ql:quickload "osicat")
-  )
-
-;;;
 ;; (defpackage #:dummy-package
 ;;   (:use #:cl #:iterate))
 ;; (in-package #:dummy-package)
 ;;;
-(in-package #:cl-user)
-(use-package :iterate)
+;; (in-package #:cl-user)
+;; (use-package :iterate)
 ;;;
 (defparameter *repl-mode* nil)
 ;; (setq *repl-mode* t)
@@ -37,8 +23,8 @@
 
 (comment (heading 3 "Two guns ...")
 
-         (format t "~{~A, ~}" (iter (for i from 1 to 10)
-                                (collect "*"))))
+         (format t "~{~A, ~}" (iterate:iter (iterate:for i from 1 to 10)
+                                (iterate:collect "*"))))
 
 (defmacro w (&rest args)
   `(write-string ,args)
@@ -68,12 +54,12 @@
            (fs (cl-fad:list-directory dir :follow-symlinks nil))
            (fs-len (length fs)))
 
-      (iter (for f in
+      (iterate:iter (iterate:for f in
                  fs
                  ;; (append (uiop:directory-files dir)
                  ;;         (uiop:subdirectories dir))
                  )
-        (for i from 1)
+        (iterate:for i from 1)
 
         (let* ((f-string (namestring f)) ;; '[' is somehow escaped to '\['
                (fn (file-namestring f))  ;; '[' is somehow escaped to '\['
@@ -81,7 +67,7 @@
                        (first (last (pathname-directory f)))
                        fn))
                (skip-me nil))
-          (iter (for exc in *skip*)
+          (iterate:iter (iterate:for exc in *skip*)
             (when (ppcre:scan exc f-string)
               (setq skip-me t)))
           (if skip-me

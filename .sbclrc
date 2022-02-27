@@ -16,7 +16,10 @@
 (dep-load
  :cl-ppcre
  :cl-interpol
- "jsown"  ;; @todo1 should not be imported for projects that don't use JSON
+ :cl-fad
+ :osicat
+ :iterate
+ "jsown" ;; @todo1 should not be imported for projects that don't use JSON
  )
 
 (named-readtables:in-readtable :interpol-syntax)
