@@ -6,28 +6,31 @@ if isNotExpensive ; then
     return 0
 fi
 ###
-function lunar() {
+function lunar {
     tmuxnewsh2 deluna reval-notifexit deluna ${deluna} # timeout of deluna
     # lo_min should include the rest time as well, as the bells are sounded in the background currently.
     lo_s=$((60*${lo_min:-50})) lo_noinit=y lo_p=${lo_p:-~/tmp/.luna} loop "$@"
 }
 
-luna() {
+function luna {
     lunar pmset displaysleepnow
 }
 ##
-lunas() {
+function lunas {
     # local lo_min="${1:-$lo_min}"
 
     lunar luna-advanced-bell
     display-gray-off # probably redundant
 }
-luna-advanced-bell() {
+
+function luna-advanced-bell {
     awaysh-bnamed LUNA_MARKER h_luna-advanced-bell
 }
+
 redis-defvar luna_signal1
 redis-defvar luna_skipped
-h_luna-advanced-bell() {
+
+function h_luna-advanced-bell {
     setopt localtraps
     # So I don't understand these all that well, but here is my guess:
     trap "" INT # disables INT handling in this function, so we don't quit by INT
@@ -82,33 +85,38 @@ h_luna-advanced-bell() {
     luna_skipped_set 0
     ecdate "Luna iterated."
 }
-function sharif-vc-is() {
+
+function sharif-vc-is {
     [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]]
 }
-bell-avarice() {
+
+function bell-avarice {
     bella_zsh_disable1
 
     # fsay "disquiet creatures of avarice have risen yet again ..."
     @opts v 70 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna/$~audioglob)"
 }
-bell-luna-mpv() {
+
+function bell-luna-mpv {
     bella_zsh_disable1
 
     @opts v 100 @ hearinvisible-mpv "$(rndarr $NIGHTDIR/resources/audio/luna_mpv/$~audioglob)"
 }
-bell-toy() {
+
+function bell-toy {
     bella_zsh_disable1
 
     # say "disquiet creatures of avarice have risen yet again ..."
     @opts v 140 @ hearinvisible "$(rndarr $GREENCASE_DIR/toystory2/**/$~audioglob)"
 }
-function greencase_audio_init() {
+
+function greencase_audio_init {
     { test -z "$greencase_audio_init" || test -n "$*" } && {
         greencase_audio=( $GREENCASE_DIR/**/$~audioglob )
     }
 }
 
-function bell-greencase() {
+function bell-greencase {
     ##
     # @retiredtodo this doesn't result in a constantish duration, so we'll need additional code to check the duration in a while loop in luna-advanced-bell
     #
@@ -122,10 +130,11 @@ function bell-greencase() {
     greencase_audio_init
     reval-ec @opts v 140 @ hearinvisible "$(rndarr $greencase_audio[@])"
 }
+
 aliasfn bell-luna bell-avarice
 # aliasfn bell-luna bell-greencase
 ##
-function lunaquit() {
+function lunaquit {
     : "Global outputs: out"
     out=""
 
