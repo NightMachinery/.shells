@@ -306,7 +306,7 @@ function url-size() {
 
     # test -z "$size" && return 1 # rget ensures it
     if isOutTty ; then
-        ec "$size" | numfmt-bytes-humanfriendly
+        ec "$size" | numfmt-humanfriendly-bytes
     else
         ec "$size"
     fi
