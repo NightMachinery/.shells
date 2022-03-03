@@ -409,13 +409,24 @@ function moveAppToActiveSpace(app, followsMouse, wid = 0, window = null, space =
     if (moved) {
       // otherwise remove the main window from the spaces it is in
 
-      // brishz_sync(['fsay', 'red'])
-      mainWindow.spaces().forEach((space) => {
-        // brishz_sync(['fsay', 'moved internal', moved])
-        space.removeWindows([mainWindow]);
-      });
-      // add window to active space
-      activeSpace.addWindows([mainWindow]);
+      if (true) {
+        //: API for macOS 12+
+        //: @broken
+        //: - https://github.com/kasper/phoenix/issues/289
+        //: - https://kasper.github.io/phoenix/api/space#300
+
+        activeSpace.moveWindows([mainWindow]);
+
+        // activeSpace.moveWindows(app.windows());
+
+        // brishz_sync(['fsay', 'moved windows'])
+      } else {
+        mainWindow.spaces().forEach((space) => {
+          space.removeWindows([mainWindow]);
+        });
+        // add window to active space
+        activeSpace.addWindows([mainWindow]);
+      }
     }
   }
   return { moved, space: activeSpace };
