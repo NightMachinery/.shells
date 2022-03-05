@@ -10,6 +10,7 @@
 // See also:
 // * https://github.com/fabiospampinato/phoenix (has reload)
 // * https://github.com/kasper/phoenix/wiki#stable-22
+//
 /// Forked from https://github.com/lukesmurray/bootstrap/blob/master/.phoenix.js
 // Guake Style Applications
 // Must use the following setting
