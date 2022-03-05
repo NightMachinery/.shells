@@ -139,9 +139,9 @@ function pxify-auto() { # @gateway
 }
 ##
 function darwin-proxy-getns() {
-    # get the active network service
-    # From https://apple.stackexchange.com/a/223446/282215
-    
+    #: get the active network service
+    #: from https://apple.stackexchange.com/a/223446/282215
+    ##
     while read -r line; do
         sname=$(echo "$line" | awk -F  "(, )|(: )|[)]" '{print $2}')
         sdev=$(echo "$line" | awk -F  "(, )|(: )|[)]" '{print $4}')
@@ -169,9 +169,21 @@ function darwin-proxy-getns() {
 
 aliasfn darwin-proxy-getns-cached memoi_expire=0 memoi-eval darwin-proxy-getns
 
-function darwin-proxies-gen() {
+function darwin-proxies-gen {
+    local networks
+    networks=(
+        ${(@f)"$(darwin-proxy-getns-cached)"}
+
+        #: having invalid/inactive entries here is okay
+        Wi-Fi
+        'iPhone USB'
+        'iPad USB'
+
+        # "${(@f)$(networksetup -listallnetworkservices | gsed 1d)}"
+    )
+
     local ns
-    for ns in "$(darwin-proxy-getns-cached)" ; do # "${(@f)$(networksetup -listallnetworkservices | gsed 1d)}" ; do
+    for ns in ${(@u)networks} ; do
         ec "ns: $ns"
         eval-ec "$*"
     done
@@ -199,6 +211,7 @@ function proxy-on() {
     # proxy-widget-refresh
     btt-update $proxy_widget_uuid $proxy_widget_on
 }
+
 function proxy-off() {
     # proxy off
     # @darwinonly
