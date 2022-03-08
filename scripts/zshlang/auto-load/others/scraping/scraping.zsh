@@ -56,20 +56,6 @@ function tlwb() {
 }
 noglobfn tlwb
 ##
-function wgetm() {
-    : "Using --continue will assume any smaller already present file is an incomplete version of the server's file, and wget will try to resume it."
-
-    $proxyenv wget -e robots=off --user-agent "$useragent_chrome" --header "$(cookies)" "$@"
-
-    if test -z "$bella_zsh_disable1" && isI && @opts p [ wget ] @ fn-isTop
-    then
-        bell-dl
-    fi
-}
-function wget-cookies() {
-    wgetm --header "$(cookies-auto "$@")" "$@"
-}
-##
 function curlm() {
     local nosilent="${curlm_ns}"
 

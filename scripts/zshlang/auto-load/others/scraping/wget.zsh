@@ -1,3 +1,29 @@
+##
+function wgetm() {
+    : "--continue (not enabled here) will assume any smaller already present file is an incomplete version of the server's file, and wget will try to resume it."
+
+    local opts=()
+
+    opts+='--content-disposition'
+    #: --content-disposition If this is set to on, experimental (not fully-functional) support for "Content-Disposition" headers is enabled. This can currently result in extra round-trips to the server for a "HEAD" request, and is known to suffer from a few bugs, which is why it is not currently enabled by default.
+    #: This option is useful for some file-downloading CGI programs that use "Content-Disposition" headers to describe what the name of a downloaded file should be.
+    #: When combined with --metalink-over-http and --trust-server-names, a Content-Type: application/metalink4+xml file is named using the "Content-Disposition" filename field, if available.
+
+    opts+='--trust-server-names'
+    #: --trust-server-names: If this is set, on a redirect, the local file name will be based on the redirection URL.  By default the local file name is based on the original URL.  When doing recursive retrieving this can be helpful because in many web sites redirected URLs correspond to an underlying file structure, while link URLs do not.
+
+    $proxyenv wget -e robots=off --user-agent "$useragent_chrome" --header "$(cookies)" "$opts[@]" "$@"
+
+    if test -z "$bella_zsh_disable1" && isI && @opts p [ wget ] @ fn-isTop
+    then
+        bell-dl
+    fi
+}
+
+function wget-cookies() {
+    wgetm --header "$(cookies-auto "$@")" "$@"
+}
+##
 function url-dir-count {
     local url="$1"
 
@@ -46,4 +72,9 @@ function wget-dir {
     # When running Wget with -N, with or without -r or -p, the decision as to whether or not to download a newer copy of a file depends on the local and remote timestamp and size of the file.  -nc may not be specified at the same time as -N.
     ##
 }
+##
+function wget-multi {
+    wgetm --continue "$@"
+}
+aliasfn dl-multi wget-multi
 ##
