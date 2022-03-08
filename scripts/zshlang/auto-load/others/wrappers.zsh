@@ -124,6 +124,10 @@ function titlecase {
 }
 ##
 function spotdl {
-  @opts engine bell-dl @ reval-bell command spotdl "$@"
+  local args=("$@")
+
+  invocation-save "$0" "${args[@]}"
+
+  @opts engine bell-dl @ reval-bell command spotdl "${args[@]}"
 }
 ##

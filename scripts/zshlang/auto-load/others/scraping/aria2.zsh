@@ -9,11 +9,11 @@ function aaserver() {
     aria2c --rpc-secret "$ARIA_SECRET" --enable-rpc --log-level debug -l ~/Downloads/aas/aria.log -d ~/Downloads/aas/ -D
 }
 
-function aac() {
+function aac {
     aria2p --secret "$ARIA_SECRET" "$@"
 }
 ##
-function aa-raw() {
+function aa-raw {
     local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
     #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
@@ -56,10 +56,11 @@ function aa-raw() {
 
     local cmd
     cmd=(aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@")
+
     if bool "$save_invocation" ; then
-        { gquote "$cmd[@]" ; ec } >> aa_invocations.txt
-        duplicates-clean-file-inplace aa_invocations.txt
+        invocation-save aa_invocations.txt "${cmd[@]}"
     fi
+
     revaldbg "$cmd[@]"
     local ret=$?
     #-Z has some unsavory sideeffects so I have not included it in this.
@@ -67,6 +68,7 @@ function aa-raw() {
     if bool "$top_p" ; then
         bell-dl
     fi
+
     return $ret
 }
 
