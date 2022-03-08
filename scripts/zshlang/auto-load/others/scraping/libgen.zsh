@@ -59,7 +59,7 @@ function libgendl-md5() {
 
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
-            aa-multi $links[@] @RET
+            dl-multi $links[@] @RET
         else
             ecerr "$0: No books found for md5: $md5"
             return 1
