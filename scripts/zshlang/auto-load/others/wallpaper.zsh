@@ -72,12 +72,18 @@ function wallpaper-set-darwin() {
     local f="$1"
     f="$(realpath "$f")" || return $?
     ###
-    for i in {1..2} ; do
-        # sometimes doesn't work
+    # for i in {1..2} ; do
+    for i in 1 ; do
+        #: sometimes doesn't work
+
         ecgray "$(dateshort)"
-        if (( $(idle-get) >= 300 )) ; then # (( i == 1 )) &&
-            reval-ec killall Dock # This is fairly disruptive, hence the idle check
+
+        if false ; then
+            if (( $(idle-get) >= 300 )) ; then # (( i == 1 )) &&
+                reval-ec killall Dock # This is fairly disruptive, hence the idle check
+            fi
         fi
+
         local cmd
         cmd=(osascript -e 'tell application "Finder" to set desktop picture to POSIX file "'$f'"')
         reval-ec awaysh brishz "${cmd[@]}"
