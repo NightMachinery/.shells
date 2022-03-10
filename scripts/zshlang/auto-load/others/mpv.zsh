@@ -124,6 +124,23 @@ aliasfn mpv-play-toggle mpv-do keypress space
 
 aliasfn hear-play-toggle hear-do keypress space
 aliasfn hear-shuffle hear-do playlist-shuffle # or just press 'k'
+
+function hear-loadfile {
+    local url="$1"
+    local mode="${mpv_loadfile_mode:-replace}"
+    #: * =replace=: Stop playback of the current file, and play the new file immediately.
+    #: * =append-play=: Append the file, and if nothing is currently playing, start playback. (Always starts with the added file, even if the playlist was not empty before running this command.) This will not skip the currently playing file.
+    #: * =append=: Append the file to the playlist.
+    #:
+    #: The append modes add all the other files of the dir to the playnext, too (possibly because of my scripts).
+
+    assert-args url
+
+    hear-do loadfile "${url}" "$mode"
+}
+aliasfn hear-open hear-loadfile
+aliasfn mpv-loadfile fnswap hear-do mpv-do hear-loadfile
+aliasfn mpv-open mpv-loadfile
 ###
 function play-and-trash(){
     #aliased to pat
