@@ -582,3 +582,4 @@ function brishz_log(...args) {
 // brishz_sync(["bell-sc2-evil-laugh"])
 // brishz_sync(["fsay", "Phoenix reloaded"])
 brishz_sync(['tts-glados1-cached', 'Phoenix flies']);
+///

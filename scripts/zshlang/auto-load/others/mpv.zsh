@@ -95,8 +95,9 @@ function mpv-get {
     mpv-do get_property "${1:-path}" | jq --raw-output -e .data
 }
 ##
-function mpv-do () {
+function mpv-do {
     : "See https://mpv.io/manual/stable/#list-of-input-commands"
+
     local cmd
     cmd="$(arrJ "$@")" @RET
 
