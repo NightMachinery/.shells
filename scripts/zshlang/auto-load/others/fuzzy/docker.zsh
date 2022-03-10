@@ -13,6 +13,7 @@ function ffdocker-ps() {
 function ffdocker-gen() {
     ensure-array-var ffdocker_gen_post_cmd
     local cmd=("${(@)ffdocker_gen_cmd:?}") post_cmd=("${(@)ffdocker_gen_post_cmd}")
+
     local ps i
     ps=("${(@f)$(ffdocker-ps "$@")}") || return 1
     for i in "$ps[@]" ; do

@@ -92,6 +92,7 @@ function wallpaper-set-darwin() {
     # Try `killall Dock` and then set the wallpaper again if this didn't work.
     ###
 }
+
 function wallpaper-set() {
     local f="$1"
     f="$(realpath "$f")" || return $?

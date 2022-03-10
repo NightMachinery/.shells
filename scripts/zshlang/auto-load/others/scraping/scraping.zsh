@@ -383,9 +383,10 @@ function web2epub() {
     local strict="$we_strict"
 
     local dled_files=()
+
     local urls=("${@:2}")
     assert-args urls @RET
-    # FNSWAP: urlfinalg
+    #: @fnswap urlfinalg
     urls=("${(@f)$(urlfinalg $urls[@])}") @TRET
 
     for url in $urls[@]
