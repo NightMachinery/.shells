@@ -186,11 +186,3 @@ function ceer() {
     rgeval "${@:2}" "$f"
 }
 ##
-function mn() {
-    local LESS=$LESSMIN
-    export LESS
-
-    bella_zsh_disable1
-
-    man "$@" || lesh "$@"
-}
