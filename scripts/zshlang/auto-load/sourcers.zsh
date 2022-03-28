@@ -58,3 +58,16 @@ function rust-setup() {
         export RUST_SRC_PATH="$(memoi_skiperr=y memoi-eval rustc --print sysroot)/lib/rustlib/src/rust/library"
     }
 }
+##
+function phpbrew-source {
+    #: @broken @upstreamBugs
+    ##
+    source ~/.phpbrew/bashrc @TRET
+
+    if isDarwin ; then
+        phpbrew lookup-prefix homebrew
+    elif isUbuntu ; then
+        phpbrew lookup-prefix ubuntu
+    fi
+}
+##
