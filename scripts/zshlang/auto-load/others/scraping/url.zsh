@@ -422,12 +422,16 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
 
     local indent="    "
     if [[ "$mode" == md ]] ; then
-        ec "* [${title:-$url}]($url)"
-        test -z "$author" || ec "${indent}* By: $author"
-        test -z "$readest" || ec "${indent}* $readest"
-        test -z "$desc" || ec "${indent}* $desc"
-        #test -z "$title" || ec "${indent}* $url"
-        test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
+        if true; then
+            ec "[${title:-$url}]($url)"
+        else
+            ec "* [${title:-$url}]($url)"
+            test -z "$author" || ec "${indent}* By: $author"
+            test -z "$readest" || ec "${indent}* $readest"
+            test -z "$desc" || ec "${indent}* $desc"
+            #test -z "$title" || ec "${indent}* $url"
+            test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
+        fi
     elif [[ "$mode" == org ]] ; then
         if test -z "$emacsMode" ; then
             indent="** "
