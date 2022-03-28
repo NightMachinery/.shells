@@ -1,0 +1,96 @@
+# noise here to stop emacs from thinking this is C code
+# `caddy fmt -overwrite Caddyfile`
+{
+	# auto_https off
+	# auto_https disable_redirects
+}
+
+files.zii.lilf.ir {
+	encode zstd gzip
+	file_server browse {
+		root {env.HOME}/Downloads
+	}
+}
+
+searx.zii.lilf.ir {
+	encode zstd gzip
+	reverse_proxy localhost:4004
+}
+
+discourse.lilf.ir {
+	#  encode zstd gzip
+	reverse_proxy localhost:8011 #unix//sock/nginx.http.sock 
+}
+
+mail2.lilf.ir {
+	reverse_proxy localhost:8010
+}
+
+code.zii.lilf.ir {
+    # respond "Empty."
+
+    root * {env.HOME}/scripts/phplang/tldr_wrapper/
+
+	php_fastcgi unix/{env.HOME}/tmp/.php_fpm_1_socket
+    file_server
+    encode gzip
+}
+
+zii.lilf.ir {
+    root /ptop {env.HOME}/scripts/phplang/hello/
+    root /ptldr/ {env.HOME}/scripts/phplang/tldr_wrapper/
+    #: tldr does not work; the routing is a mess. This technique is only good for single page read-only pages.
+
+	php_fastcgi unix/{env.HOME}/tmp/.php_fpm_1_socket
+    # file_server
+    encode gzip
+}
+
+irc.zii.lilf.ir {
+	# encode zstd gzip
+	reverse_proxy localhost:9000
+}
+
+hound.zii.lilf.ir {
+	# encode zstd gzip
+	reverse_proxy localhost:6481
+}
+
+# amirasghary.ir {
+# 	reverse_proxy localhost:2096
+# }
+
+v1.zii.lilf.ir, http://v1.zii.lilf.ir {
+	reverse_proxy /shark 127.0.0.1:2001 {
+		transport http {
+			versions h2c
+		}
+	}
+
+	file_server browse {
+		root {env.HOME}/Downloads
+	}
+}
+
+(np) {
+	route {
+		forward_proxy {
+			basic_auth alice {$NP_PASS1}
+			probe_resistance secret.com
+			hide_ip
+			hide_via
+		}
+		file_server browse {
+			root {env.HOME}/Downloads
+		}
+		# respond "pained gold spots accumulated"
+		}
+	}
+
+	:443 { # @upstreambug https://caddy.community/t/caddy-suddenly-directs-my-site-to-the-wrong-directive/11597/2
+		import np
+	}
+
+	np.zii.lilf.ir {
+		import np
+	}

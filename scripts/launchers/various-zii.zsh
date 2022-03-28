@@ -3,7 +3,7 @@
 ##
 brishgarden-boot
 ##
-tmuxnewsh2 serve-dl caddy run --config ~/Caddyfile
+tmuxnewsh2 serve-dl caddy run --config "${NIGHTDIR}/launchers/Caddyfile_zii"
 
 sftpgo-serve-dl 'fall in love'
 
