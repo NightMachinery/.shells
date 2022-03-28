@@ -45,6 +45,7 @@ function isLinux() {
     fi
 }
 alias isL=isLinux
+alias isUbuntu=isLinux
 ##
 function isLocal() {
     # @darwinonly0
