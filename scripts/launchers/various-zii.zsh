@@ -1,5 +1,8 @@
 #!/usr/bin/env zsh
 
+##
+brishgarden-boot
+##
 tmuxnewsh2 serve-dl caddy run --config ~/Caddyfile
 
 sftpgo-serve-dl 'fall in love'
@@ -34,5 +37,6 @@ launch-musicf.zsh
 source-cmd launch-goodreads-authors.zsh
 ##
 tmuxnew php-fpm php-fpm --nodaemonize --fpm-config "${NIGHTDIR}/launchers/php_fpm_1.conf"
+#: Using =tmuxnewsh2= does not solve the forgetting of PATH in the PHP scripts
 ##
 chronic-all

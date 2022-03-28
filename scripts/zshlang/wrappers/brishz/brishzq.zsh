@@ -5,7 +5,7 @@ if test "$1" = '-c' ; then
    shift
 fi
 
-path+=( /usr/local/bin )
+path+=( /usr/local/bin /opt/homebrew/bin /home/linuxbrew/.linuxbrew/bin )
 . ~/.privateShell
 
 alias ec='print -r --'
