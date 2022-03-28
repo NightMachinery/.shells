@@ -138,7 +138,10 @@ export BOOT_CLOJURE_VERSION='1.9.0'
 
 addToPATH "/usr/local/opt/curl/bin"
 
-run-on-each addToPATH "$NIGHTDIR"/**/
+if test -z "$NIGHTDIR_PATH_MODE" ; then
+    run-on-each addToPATH "$NIGHTDIR"/**/
+fi
+
 addToPATH /myBin/
 addToPATH ~/bin # should be last
 

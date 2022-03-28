@@ -18,6 +18,7 @@ if isBash ; then
         shopt -s globstar
     fi
 fi
+
 function run-on-each() {
     local i98765
     for i98765 in "${@:2}"
@@ -26,6 +27,7 @@ function run-on-each() {
     done
 }
 alias re=run-on-each
+
 function addToPATH {
     export PATH="$1:$PATH"
 }
