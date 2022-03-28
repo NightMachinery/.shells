@@ -104,7 +104,7 @@ function path-abbrev-to-music-dir {
         | cat-copy-if-tty
 }
 ##
-function cellp() {
+function cellp {
     brishzr-repeat # now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
 
     trs-empty-files $nightNotes

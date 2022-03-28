@@ -81,12 +81,15 @@ function whichm() {
     nextItems=(${(u@)nextItems:|items})
     (( ${#nextItems} == 0 )) || $0 "${(@)nextItems}"
 }
+
 function wh() { whichm "$@" | btz }
+
 function whh() {
     preEnhNames "$@"
     wwNight=y whdeep-words "$out[@]"
     wh "${(@)out}"
 }
+
 function whdeep-words() {
     out=()
     local input=("$@")
@@ -109,6 +112,7 @@ function whdeep-words() {
         test -e "/$word" || out+=$word
     done
 }
+
 function whdeep() {
     local oldwords=("$@")
     out=("$@")
@@ -127,6 +131,7 @@ alias m_doc=':'
 "
     whichm "$out[@]"
 }
+
 function whdeep2script() {
     mdoc "$0 <function> [<script-name>]
 Generates a standalone script that runs the given function." MAGIC
