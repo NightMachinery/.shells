@@ -121,8 +121,12 @@ alias mpv-rpc-audio='mpv_rpc_socket="$mpv_audio_ipc" '
 aliasfn hear-do mpv-rpc-audio mpv-do
 
 aliasfn mpv-play-toggle mpv-do keypress space
-
 aliasfn hear-play-toggle hear-do keypress space
+aliasfn hear-play-on hear-do set pause no
+aliasfn hear-play-off hear-do set pause yes
+aliasfn mpv-play-on fnswap hear-do mpv-do hear-play-on
+aliasfn mpv-play-off fnswap hear-do mpv-do hear-play-off
+
 aliasfn hear-shuffle hear-do playlist-shuffle # or just press 'k'
 
 function hear-loadfile {
@@ -137,6 +141,7 @@ function hear-loadfile {
     assert-args url
 
     hear-do loadfile "${url}" "$mode"
+    hear-play-on
 }
 aliasfn hear-open hear-loadfile
 aliasfn mpv-loadfile fnswap hear-do mpv-do hear-loadfile
@@ -249,5 +254,11 @@ function mpv-bookmark-fz {
     fi
 
     reval-ec hear --start="${timestamps[1]}" "${files[1]}"
+}
+##
+function mpv-tui {
+    : "@seeAlso command mpv --no-config ..."
+
+    mpv-notag --profile=sw-fast --vo=tct "$@"
 }
 ##
