@@ -167,10 +167,20 @@ function lastunlock-get-min() {
     ec $(( $(lastunlock-get "$@") / 60 ))
 }
 ##
-function load5() {
-    # 1 5 15 minutes
-    sysctl -n vm.loadavg | awk '{print $3}'
+function load-average {
+    #: 1 5 15 minutes
+
+    if isDarwin ; then
+        sysctl -n vm.loadavg | gtr -d '{}'
+    else
+        uptime | rget 'load average:\s*(.*)' | gtr -d ','
+    fi | trim
 }
+
+function load5() {
+    load-average | awk '{print $3}'
+}
+##
 function lsport() {
     local p opts=()
     for p in "$@" ; do
