@@ -33,4 +33,6 @@ launch-musicf.zsh
 
 source-cmd launch-goodreads-authors.zsh
 ##
+tmuxnew php-fpm php-fpm --nodaemonize --fpm-config "${NIGHTDIR}/launchers/php_fpm_1.conf"
+##
 chronic-all
