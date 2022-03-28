@@ -340,7 +340,7 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
     }
 }
 
-function urlmeta() {
+function urlmeta {
     mdoc "DEPRECATED: Use urlmeta2.
 [html= ] $0 <url> <req>
 gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
@@ -367,7 +367,7 @@ else:
     silent trs-rm "$f"
 }
 ##
-function url2note() {
+function url2note {
     magic mdoc "[ url2note_override_title= html= cleanedhtml= url2note_img ] $0 <url> [<mode>] ; outputs in global variables and stdout.
 Set cleanedhtml=no to disable adding the reading estimate. (This improves performance.)" ; mret
 
@@ -471,11 +471,15 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
 }
 noglobfn url2note
 
-function url2org() { url2note "$1" org }
+function url2org {
+    url2note "$1" org
+}
 renog url2org
 @opts-setprefix url2org url2note
 
-function url2md() { url2note "$1" md }
+function url2md {
+    url2note "$1" md
+}
 @opts-setprefix url2md url2note
 reify url2md
 noglobfn url2md

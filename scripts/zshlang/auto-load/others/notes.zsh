@@ -9,6 +9,7 @@ function jrlt() {
     }
     ! isI || $EDITOR[@] $dest
 }
+##
 function img2md() {
     mdoc "$0 <picture-file> [<description>]
 Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB) will probably crash the system though." MAGIC
@@ -27,6 +28,7 @@ Outputs the image in markdown format, hardcoded in base64. Large images (~0.3 MB
     # somehow breaks in eva_aget ...
     print -r -- "![$desc](data:$(file -b --mime-type $file);base64,$(base64 "$file" | tr -d '\r\n'))"
 }
+
 function img2md-imgur() {
     mdoc "$0 <picture-file> [<description>]
 Outputs the image in markdown format, hosted on imgur." MAGIC

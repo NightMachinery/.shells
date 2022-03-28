@@ -1,3 +1,4 @@
+##
 function les() {
     if (( ${#@} == 0 )) ; then
         eval-ec "$(hist-last 1)" |& less
@@ -7,3 +8,4 @@ function les() {
 }
 
 function lesh() { les "$@" --help }
+##

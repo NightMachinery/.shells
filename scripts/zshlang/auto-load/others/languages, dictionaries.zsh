@@ -1,6 +1,13 @@
-function transi() { trans "$*" | erase-ansi }
+##
+function transi() {
+    bella_zsh_disable1
 
+    trans "$*" | erase-ansi
+}
+##
 function sdc() {
+    bella_zsh_disable1
+
     local q="$(in-or-args $*)"
     q="$(ec "$q" | trim)"
 

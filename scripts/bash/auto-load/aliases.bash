@@ -128,19 +128,32 @@ alias weather="wego | less-min -r"
 ##
 # https://github.com/ytdl-org/youtube-dl#format-selection-examples
 alias ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
+
 alias y="ybase --embed-subs --add-metadata --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'" #  --embed-thumbnail errs: Only mp3 and m4a/mp4 are supported for thumbnail embedding for now. Causes only the first URL to be downloaded (possibly because of the error.)
+
 alias 'y@pl'="ytdl_opts=(--yes-playlist  -o '%(playlist_index)03d. %(title)s.%(ext)s') "
+
 alias ysmall="y -f '(bestvideo[height<=800]+bestaudio/best[height<=800]/best)[protocol^=http]'"
 alias ys="ysmall"
+# youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
+
+alias y1080="y -f '(bestvideo[height<=1100]+bestaudio/best[height<=1100]/best)'"
+
 # ysmp4 still can output an mkv. Probably because of merging?
 alias ysmp4="y -f '(bestvideo[ext=mp4][height<=800]+bestaudio/best[ext=mp4][height<=800]/best[ext=mp4]/best)'"
-# youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
-alias yarc="noglob retry ysmall --download-archive ~/.yarchive"
-alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
+
 alias ymp4="y -f 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'"
+
+alias yarc="noglob retry ysmall --download-archive ~/.yarchive"
+
+alias yic='y --ignore-config' #--external-downloader-args "-s 4"'
+
 alias yaudio="noglob youtube-dl --no-playlist -f 'bestaudio[ext=m4a]/bestaudio'"
+
 alias yaudio-playlist='yaudio --yes-playlist'
+
 alias ymp3='noglob youtube-dl --no-playlist --prefer-ffmpeg --extract-audio --audio-format mp3'
+
 alias ymp3-playlist='ymp3 --yes-playlist'
 # `-f best` to download single file
 ##

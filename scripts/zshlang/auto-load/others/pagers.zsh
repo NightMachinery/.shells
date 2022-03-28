@@ -1,5 +1,5 @@
 ##
-export GIT_PAGER="delta  --hyperlinks --light --syntax-theme 'Solarized (light)'"
+export GIT_PAGER="delta --hyperlinks --light --syntax-theme 'Solarized (light)' --line-numbers"
 function diff-colorer {
     command delta --light --syntax-theme 'Solarized (light)' "$@"
     # --true-color=always
