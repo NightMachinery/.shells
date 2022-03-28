@@ -39,23 +39,40 @@ Outputs the image in markdown format, hosted on imgur." MAGIC
     print -r -- "![$desc]($(imgurNoD=y imgur.bash $file))"
 }
 ##
-function unt() {
+function unt {
+    bella_zsh_disable1
+
     local engine=("${(@)url2note_e:-url2org}")
 
-    test -z "$*" && set -- "$(pbpaste)" # || set -- "$(trim "$1")" # we are using urls-extract so ne need
+    test -z "$*" && set -- "$(pbpaste)"
+    # set -- "$(trim "$1")" #: we are using urls-extract so ne need
     local note="$(cleanedhtml=no "${engine[@]}" "${(f@)$(<<<"$*" urls-extract)}")"
     ec $note
     if isI ; then
         pbcopy $note
+
+        tts-glados1-cached 'link copied'
     fi
 }
 @opts-setprefix unt url2note
 noglobfn unt
-aliasfn-ng untr brishzr unt # the server can do a unt almost instantaneously, so we will benefit from proxying to it. Besides, this bypasses the small firewall.
+
+function untr {
+    local engine=("${(@)untr_e:-unt}")
+    test -z "$*" && set -- "$(pbpaste)"
+
+    reval-ec brishzr "${engine[@]}" "$*" | cat-copy-if-tty
+    #: the server can do a unt almost instantaneously, so we will benefit from proxying to it. Besides, this bypasses the small firewall.
+}
+noglobfn untr
 
 function unt-md {
     url2note_e=(url2md) unt "$@"
 }
 noglobfn unt-md
-aliasfn-ng untr-md brishzr unt-md
+
+function untr-md {
+    untr_e=(unt-md) untr "$@"
+}
+noglobfn untr-md
 ##
