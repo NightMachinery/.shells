@@ -38,3 +38,15 @@ function caddy-install {
     fi
 }
 ##
+function epubmerge-install {
+    local dest=~/bin/epubmerge.py
+
+    ensure-dir "$dest" @TRET
+
+    gurl 'https://github.com/JimmXinu/EpubMerge/raw/main/epubmerge.py' > "$dest" @TRET
+    chmod +x "$dest" @TRET
+
+    rehash
+    reval-ec epubmerge.py --help
+}
+##
