@@ -12,6 +12,9 @@ boost::locale::generator generator;
 std::locale locale_gregorian = generator("en_US.UTF-8");
 std::locale locale_jalali = generator("en_US.UTF-8@calendar=persian");
 
+/**
+ * Converts a Jalali date to a Gregorian one, using {@link boost::locale::date_time}.
+ */
 boost::locale::date_time jalali_to_gregorian(const int& year, const int& month, const int& day)
 {
     boost::locale::date_time jalali(
@@ -35,6 +38,10 @@ void date_print(const boost::locale::date_time& date) {
         << std::endl;
 }
 
+/**
+ * Sorts org first-level trees using the first date it finds in them. Uses {@link jalali_to_gregorian}.
+ * @param argc argc is an integer ( int ) parameter, and it is the number of arguments passed to the program. The program name is always the first argument, so there will be at least one argument to a program and the minimum value of argc will be one.
+ */
 int main(int argc, char** argv) {
     std::istreambuf_iterator<char> begin{std::cin}, end;
     string s{begin, end};
