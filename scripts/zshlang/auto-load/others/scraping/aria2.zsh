@@ -58,7 +58,7 @@ function aa-raw {
     cmd=(aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@")
 
     if bool "$save_invocation" ; then
-        invocation-save aa_invocations.txt "${cmd[@]}"
+        invocation-save aa "${cmd[@]}"
     fi
 
     revaldbg "$cmd[@]"
