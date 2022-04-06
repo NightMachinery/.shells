@@ -290,7 +290,7 @@ killjobs() {
     fi
 }
 ##
-function eval-timeout() {
+function eval-timeout {
     local time="$1" cmd="${@[2,-1]}" timeout_code=404
 
     assert-args time @RET
