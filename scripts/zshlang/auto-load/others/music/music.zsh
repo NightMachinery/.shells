@@ -187,11 +187,14 @@ function find-music {
         opts+=(-e "$ext")
     done
 
-    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" | sponge | ugbool "$*"
+    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" |
+        gsort |
+        sponge |
+        ugbool "$*"
     # Do NOT use --absolute-path, as we want relative-path playlists
 }
 
-function songd() {
+function songd {
     # music_dir=~/my-music/ ; musiccache='' # Update: Bug solved in newer versions (fine on 5.8). See https://www.zsh.org/mla/workers/2019/msg00700.html # To hardcode-circumvent zsh's unset bug.
     doc 'Use songc to play already downloaded files.
     Set PRUNE_SONGD_DAYS to, e.g., +120 to remove files older (measured by access time) than 120 days from the cache.'
