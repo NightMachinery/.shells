@@ -277,7 +277,7 @@ function git-branch-name() {
   ##
 }
 ##
-function gsync() {
+function gsync {
   local msg="${*}"
   local noadd="${gsync_noadd}"
   local pull_only="${gsync_p}"

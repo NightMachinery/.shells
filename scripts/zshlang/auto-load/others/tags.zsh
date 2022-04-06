@@ -56,7 +56,7 @@ function ntag-filter-or-add() {
     fi
 }
 ##
-function ntag-l() {
+function ntag-l {
     if isI && istty ; then
         exa -a --color always "$@" | ntag-color | rtl-reshaper-fast
     else
