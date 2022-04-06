@@ -300,18 +300,18 @@ function gsync {
       ##
     fi
     test -z "$noadd" && {
-      git submodule foreach git add --all
-      git add --all
+      git submodule foreach git add --all @TRET
+      git add --all @TRET
     }
-    git submodule update --recursive # idk what this does really. Fetching? Don't use `--remote` here.
+    git submodule update --recursive @TRET # idk what this does really. Fetching? Don't use `--remote` here.
 
     git-status-summary -uno
 
     if ! bool $pull_only ; then
       msg="${msg:-$(git-commitmsg)}"
-      git submodule foreach git commit -uno -a -m "${msg}"
+      git submodule foreach git commit -uno -a -m "${msg}" @STRUE
       ec "Main repo"
-      git commit -uno -a -m "${msg}"
+      git commit -uno -a -m "${msg}" @STRUE
     fi
 
     local remotes
@@ -327,8 +327,8 @@ function gsync {
       ec
       if gr-isLocal "$remote" || isNet ; then
         # @todo @maybe get the remotes from the submodule itself. The submodules' remotes don't necessarily match the main repo's, such as when the submodule only has an 'upstream' remote.
-        reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit
-        reval-ec git pull "$remote" "$branch" --no-edit
+        reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit --rebase=false @TRET
+        reval-ec git pull "$remote" "$branch" --no-edit --rebase=false @TRET
       else
         ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."
       fi
@@ -340,8 +340,8 @@ function gsync {
       do
         ec
         if gr-isLocal "$remote" || isNet ; then
-          reval-ec git submodule foreach git push "$remote" "$branch"
-          reval-ec git push "$remote" "$branch"
+          reval-ec git submodule foreach git push "$remote" "$branch" @STRUE
+          reval-ec git push "$remote" "$branch" @STRUE
         else
           ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."
         fi
