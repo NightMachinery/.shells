@@ -156,7 +156,7 @@ function gsync-extra-private() {
     fnswap git 'vcsh extra-private' @opts noadd y @ gsync "$@"
 }
 ##
-function cp2tmp() {
+function cp2ltmp() {
     rsp-dl "$@" ~"/Base/_Local TMP/"
 }
 ##
