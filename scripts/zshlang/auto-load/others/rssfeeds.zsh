@@ -158,3 +158,96 @@ function rss-find1 {
     revaldbg python -c "$cmd" | cat-copy-if-tty
 }
 ##
+function deus-rss2json {
+        rss2json.py \
+        =(fhMode='aa' fhProgress=y reval-ec full-html2 "$url")
+        # =(curlm_ns=y gurl --progress-bar "$url")
+}
+
+function rss2json {
+    @opts expire $((3600*12)) inheriterr y @ memoi-eval \
+        deus-rss2json "$@"
+}
+
+function rss-json-urls {
+    jqm '.entries[].links[] | select(.rel | contains("enclosure")) | .href'
+}
+
+function rss-json-titles {
+    jqm '.entries[] | .title + " (" + .published + ")"'
+}
+
+function rss-fz {
+    local url="$1"
+    assert-args url @RET
+
+    local json
+    # json="$(rss2json "$url")" @TRET
+    json="$(rss2json "$url")" @TRET
+
+    local titles
+    titles="$(ec "$json" | rss-json-titles)" @TRET
+    local urls_rss
+    urls_rss="$(ec "$json" | rss-json-urls)" @TRET
+
+    ecn "$titles" | fz-masked "$urls_rss"
+}
+
+function rss-dl-fz {
+    local urls engine=("${rss_dl_e[@]:-aa-multi}")
+    urls="$(rss-fz "$@")" @RET
+
+    urls=(${(@f)urls})
+    if (( ${#urls} == 0 )) ; then
+        ecerr "$0: no urls selected"
+        return 1
+    fi
+
+    reval "$engine[@]" "$urls[@]"
+}
+@opts-setprefix rss-dl-fz rss_dl
+
+function rss-dl-multi-fz {
+    local urls=($@)
+    assert-args urls @RET
+
+    local urls_processed=() titles=()
+
+    local url title
+    for url in $urls[@] ; do
+        json="$(rss2json "$url")" @TRET
+        title="$(ec $json | jqm '.feed.title')" || {
+            ecerr "$0: url $(gq "$url") has no title?!"
+            continue
+        }
+
+        urls_processed+="$url"
+        titles+="$title"
+    done
+
+    local sel_i i
+    arrn "$titles[@]" | sout fz-masked "${(F)urls_processed}" @RET
+    for i in $sel_i{@}; do
+        title="$titles[$i]"
+        url="$urls_processed[$i]"
+
+        ecbold "$title"
+
+        pushf "$title"
+        {
+            @opts e [ \
+                reval-ec tsh "$(ec "aa podcast $title ($(dateshort))" | str2tmuxname)" aa-multi \
+                ] @ \
+                rss-dl-fz "$url" || true
+            } always { popf }
+    done
+}
+
+function podcast-dl-omni {
+    local podcasts_extras=($@)
+
+    indir-exists "$podcast_dir" \
+        revaldbg rss-dl-multi-fz $podcasts_extras[@] ${(@v)podcasts_urls_my} @RET
+}
+alias pdcdl='podcast-dl-omni'
+##
