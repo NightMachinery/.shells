@@ -129,7 +129,7 @@ function fzp() {
     fi
 }
 ##
-function fz-masked() {
+function fz-masked {
     : "GLOBAL sel_i"
     unset sel_i
     local masks="$(cat)" input="${@[-1]}" opts=("${@[1,-2]}")
@@ -139,12 +139,13 @@ function fz-masked() {
     sel_i=(${(@f)sel_i})
 }
 ##
-function fzp-q() {
+function fzp-q {
     local query="$(fz-createquery "$@")"
 
     fzp "$query"
 }
-function fz-q() {
+
+function fz-q {
     local query="$(fz-createquery "$@")"
 
     fz --query "$query"

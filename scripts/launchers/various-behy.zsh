@@ -2,6 +2,8 @@
 
 setopt interactive_comments
 tmuxnew () {
+    #: @todo0 integrate =str2tmuxname=
+    ##
     tmux kill-session -t "$1" &> /dev/null
     tmux new -d -s "$@"
 }

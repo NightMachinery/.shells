@@ -27,7 +27,7 @@ function memoi-eval() {
     # zmodload zsh/zprof
 
     unset memoi_cache_used
-    # needs zmodload zsh/datetime loaded
+    #: needs zmodload zsh/datetime loaded
     local now=$EPOCHREALTIME #"$(date +%s)"
     local cmd="$(gquote "$@")"
     local custom_key="$memoi_key"
@@ -36,7 +36,11 @@ function memoi-eval() {
     local skiperr="$memoi_skiperr"
     local aborterr="$memoi_aborterr"
     # test -n "$deusvult" && skiperr='' # uncommenting this can help make `deus` transparently undo the memoi effect. But I am not sure we want that.
-    local inheriterr="${memoi_inheriterr:-$skiperr}" # skipping forces inheritance, because why not?
+
+    local inheriterr="${memoi_inheriterr:-$skiperr}"
+    #: 'inheriterr' skips storing the stderr.
+    #: skipping forces inheritance, because why not?
+
     local override_duration="${memoi_override_duration:-${memoi_od:-0.12}}" # 0.12
 
     local retcode=0 # If skiperr, we will return the correct exit code if the cache is not used. (We rely on this behavior in, e.g., `ffz`.

@@ -45,10 +45,10 @@ function rm-caches-all() {
     fi
 }
 ##
-function cleanup() {
-    trs-empty
-    isLocal && clean-deps
-    brew cleanup
-    rm-caches-all
+function cleanup {
+    reval-ec rm-caches-all
+    reval-ec trs-empty
+    isLocal && reval-ec clean-deps
+    reval-ec brew cleanup
 }
 ##

@@ -65,7 +65,15 @@ function curlm() {
     fi
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
     # --suppress-connect-headers is needed so that `curlm --head ...` requests are parseable.
-    $proxyenv curl --suppress-connect-headers --header "$useragent_header_chrome" --header "$(cookies)" --fail --location --cookie-jar /dev/null "$opts[@]" "$@"
+    $proxyenv curl \
+        --suppress-connect-headers \
+        --header "$useragent_header_chrome" \
+        --header "$(cookies)" \
+        --fail \
+        --location \
+        --cookie-jar /dev/null \
+        --styled-output \
+        "$opts[@]" "$@"
 }
 
 function curl-dl() {
@@ -165,7 +173,16 @@ function full-html2() {
 
     local url="$1"
     assert-args url @RET
+
     local absolutify="${fhAbs:-y}"
+
+    local progress_p="${fhProgress}"
+    #: currently only supported for 'aa'
+    local progress_serr='dbgserr'
+    if bool "$progress_p" ; then
+        progress_serr='reval'
+    fi
+
     local redirect_follow="${fhRedirect:-m}"
     if bool "$redirect_follow" ; then
         if [[ "$redirect_follow" == m ]] ; then
@@ -213,7 +230,7 @@ function full-html2() {
     [[ "$mode" =~ '^aa(cookies)?$' ]] && {
         local tmp="$(uuidgen)"
         local tmpdir="$(get-tmpdir)"
-        $proxyenv dbgserr aacookies "$url" --dir "$tmpdir" -o "$tmp" || return $?
+        aa_top_p="${aa_top_p:-n}" $proxyenv $progress_serr aacookies "$url" --dir "$tmpdir" -o "$tmp" || return $?
         < "$tmpdir/$tmp"
         return $?
         # Note that -o accepts basenames not paths which makes it incompatible with any /dev/* or other special shenanigans
@@ -249,7 +266,7 @@ function full-html2() {
     }
     )" @RET
 
-    if ishtml-file =(ec "$html") && bool "$absolutify" ; then
+    if bool "$absolutify" && ishtml-file =(ec "$html") ; then
         ec "$html" | html-links-absolutify "$url"
     else
         ec "$html"

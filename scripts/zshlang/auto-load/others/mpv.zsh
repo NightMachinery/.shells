@@ -139,6 +139,9 @@ function hear-loadfile {
     #: The append modes add all the other files of the dir to the playnext, too (possibly because of my scripts).
 
     assert-args url
+    if test -e "$url" ; then
+        url="$(grealpath "$url")" @TRET
+    fi
 
     hear-do loadfile "${url}" "$mode"
     hear-play-on

@@ -476,6 +476,8 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
 noglobfn url2note
 
 function url2org {
+    : "@seeAlso readmoz-org"
+
     url2note "$1" org
 }
 renog url2org

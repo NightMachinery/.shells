@@ -1,6 +1,9 @@
-alias aacert='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
+##
 alias ysp='y-stream-pipe'
 aliasfn aa-gateway aacookies
+aliasfn aa aa-gatewy
+alias aa='\noglob aa-gateway'
+alias aacert='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 aliasfn aa-insecure aa-gateway --check-certificate=false
 aliasfnq aa-multi run-on-each 'aa-gateway --conditional-get=true --allow-overwrite=true' # allows duplicate links without errors
 ###
@@ -17,9 +20,9 @@ function aa-raw {
     local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
     #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
-    local top_p=''
+    local top_p="${aa_top_p}"
     isI || opts+=(--show-console-readout false --summary-interval 0)
-    if isI && @opts p [ aa- ] @ fn-isTop aa aacookies ; then
+    if test -z "$top_p" && isI && @opts p [ aa- ] @ fn-isTop aa aacookies ; then
         top_p=y
     fi
 

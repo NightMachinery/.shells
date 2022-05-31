@@ -84,7 +84,7 @@ alias brm="reval-ec brew remove"
 alias bri="brew reinstall"
 alias apup="sudo apt update"
 alias reeb='run-on-each rename-ebook'
-alias aa='\noglob aacookies'
+##
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias ch='cht.sh'
 alias powerdecay="sudo powermetrics -i 1000 --poweravg 1 | grep 'Average cumulatively decayed power score' -A 20"

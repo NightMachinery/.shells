@@ -28,6 +28,10 @@ function chronic-update() {
         brew upgrade
         brew cleanup
     fi
+
+    if isLocal ; then
+        # brew upgrade microsoft-edge @STRUE #: needs @sudo
+    fi
 }
 
 function chronic-backup() {

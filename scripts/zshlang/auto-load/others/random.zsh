@@ -14,8 +14,9 @@ rndarr() {
     local i="$(rndint 1 ${#@})"
     ec "${@[$i]}"
 }
-arr-rnd() { rndarr "$@" }
-arrrnd() { rndarr "$@" }
+aliasfn rndarr array-random
+aliasfn arrrnd array-random
+aliasfn arr-rnd array-random
 ##
 function rnd-b64() {
     doc "<BYTE-LENGTH> [<OUTPUT-FORMAT>=base64,hex]"

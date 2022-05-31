@@ -35,12 +35,15 @@ function seal-history-append() {
 
     sync-append "$UHIST_FILE" $'\n'"${*}"$'\n'
 }
+
 function seal-history-unquoted() {
     seal-history-append "hist-add-unquoted $(gq "$*")"
 }
+
 function seal-history() {
     seal-history-append "hist-add $(gq "$@")"
 }
+
 function seal-history-literal-fc() {
     local line="$(hist-last 0)"
     if [[ "$line" =~ '^\s*(?:dbg\s+)?(?:(?:[^#]*#+)|shl|seal-history-literal)\s+((?:.|\n)*)\s*$' ]] ; then
@@ -70,9 +73,11 @@ function hist-add-universal-unquoted() {
     #  function scope is exited
     hist-add-unquoted "$@"
 }
+
 function hist-add-universal() {
     hist-add-universal-unquoted "$(gq "$@")"
 }
+
 function seal-history-last-fc() {
     reval-ec hist-add-universal-unquoted "$(hist-last 1)"
 }
@@ -83,6 +88,7 @@ function hist-inject() {
 
     source "$UHIST_FILE"
 }
+
 function hist-inject-fc() {
     assert test -e "$UHIST_FILE_FC" @RET
 

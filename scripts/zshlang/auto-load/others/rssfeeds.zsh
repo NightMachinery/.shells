@@ -1,3 +1,4 @@
+##
 function tsend-rssln() {
     local rec="${1:?}" link="${2:?}" title="$rssTitle"
 
@@ -15,6 +16,7 @@ function tsend-rssln() {
     ##
     tsend --link-preview --parse-mode markdown -- "$rec" $item
 }
+
 function rssln2k() {
     local acc="$PURGATORY/rssln.md"
     test -e "$acc" || { ec "$0: Doesn't exist: $acc" ; return 0 }
@@ -55,6 +57,7 @@ function sumym () {
 function rss-tl() {
     tl -p "$rssTitle | " "$@"
 }
+
 function rss-ctitle() {
     ggrep -P --silent "$rc_t[@]" <<< "$2"
 }
