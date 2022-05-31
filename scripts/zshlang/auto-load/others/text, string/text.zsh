@@ -103,7 +103,11 @@ function p-double-newlines() {
 alias pdn='p-double-newlines'
 ##
 function newline2space {
-    cat-paste-if-tty | sd '\n\s*' ' ' | cat-copy-if-tty
+    cat-paste-if-tty |
+        perl -pe 's/\R\s*/ /g' |
+        cat-copy-if-tty
+
+    # sd '\n\s*' ' ' |
 }
 
 function p-newline2space {

@@ -201,28 +201,28 @@ function pdf-numberme {
 }
 ##
 function pdf-merge-poppler {
-    local in=("${@[1,-2]}") out="${@[-1}}"
+    local in=("${@[1,-2]}") out="${@[-1]}"
     assert-args in out @RET
     ensure-dir "$out" @RET
 
-    pdfunite "${in[@]}" "${out}"
+    reval-ec pdfunite "${in[@]}" "${out}"
 }
 
 function pdf-merge-gs {
-    local in=("${@[1,-2]}") out="${@[-1}}"
+    local in=("${@[1,-2]}") out="${@[-1]}"
     assert-args in out @RET
     ensure-dir "$out" @RET
 
-    command gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress -sOutputFile="$out" "${in[@]}"
+    reval-ec command gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -dPDFSETTINGS=/prepress -sOutputFile="$out" "${in[@]}"
     #: -dPDFSETTINGS=/prepress has the effect of rotating pages that are too wide and force annoying horizontal scroll bars.
 }
 
 function pdf-merge-pdftk {
-    local in=("${@[1,-2]}") out="${@[-1}}"
+    local in=("${@[1,-2]}") out="${@[-1]}"
     assert-args in out @RET
     ensure-dir "$out" @RET
 
-    pdftk "${in[@]}" cat output "$out"
+    reval-ec pdftk "${in[@]}" cat output "$out"
 }
 
 aliasfn pdf-merge pdf-merge-pdftk

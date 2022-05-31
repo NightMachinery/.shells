@@ -100,14 +100,21 @@ function clipboard-removedups() {
 ##
 function clipboard-fz-raw() {
     local copy="${clipboard_fz_copy:-y}"
+    local opts=("${@:-}")
+    if [[ "$opts[-1]" == -* ]] ; then
+        #: `fzp' needs the last arg to be a query.
+        opts+=''
+    fi
 
     local res
-    res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --exact --tiebreak=index --height='80%' "${@:-}")" @RET
+    res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --exact --tiebreak=index --height='80%' "${opts[@]}")" @RET
+
     if bool $copy ; then
         assert pbcopy "$res"
     fi
     ecn "$res"
 }
+alias cl='clipboard-fz-raw --height="100%"'
 
 function clipboard-fz() {
     unset out # @global
@@ -147,10 +154,12 @@ function clipboard-fz-widget {
 function iloop-clipboard() {
     @opts e clipboard-fz en y t Clipper @ iloop "$@"
 }
+
 function activate-iloop2-clipboard() {
     kitty-send $'\C-c\n'"iloop2-clipboard"
     input-lang-push en
 }
+
 function iloop2-clipboard() {
     sout clipboard-fz --height='100%' "${@:-}" @RET
     out="${(j..)out}"
@@ -166,6 +175,7 @@ function iloop2-clipboard() {
         hs-cmd-v
     fi
 }
+##
 function iloop-chis() {
     : "@alt omnibar (o, O) of vimium does pretty much the same thing"
     : "@design we can also use polling and record Chrome's history ourselves ala clipboard-record."

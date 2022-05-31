@@ -2,11 +2,10 @@
 
 PATH="$HOME/scripts/zshlang/wrappers/brishz/:$PATH"
 brishz.dash rem-today-notify
-## @startup-darwin yeah this file has been named badly <_<
+## @startup/Darwin yeah this file has been named badly <_<
 brishz.dash brew update
 
 # brishz.dash tmuxnewsh2 sharif-dep-git-update sharif-dep-git-update
 
 brishz.dash tmuxnewsh2 sanjesh-arshad-update failnoisily-if-net sanjesh-arshad-update
 
-brishz.dash tmuxnewsh2 pooran-pajooh-update failnoisily-if-net pooran-pajooh-update

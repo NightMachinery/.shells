@@ -10,7 +10,7 @@ function curl-ip {
     opts=( --progress-bar --retry 120 --retry-delay 1 "$@" )
 
     local res
-    res="$(curl "$opts[@]" https://ipinfo.io)" @TRET
+    res="$(reval-ec curl "$opts[@]" https://ipinfo.io)" @TRET
 
     local jq_opts=()
     if isColorTty ; then
@@ -22,7 +22,7 @@ function curl-ip {
         ec $res_json
     else # ipinfo blocks Iranian IPs
         local ip
-        ip="$(curl "$opts[@]" https://checkip.amazonaws.com)" @RET
+        ip="$(reval-ec curl "$opts[@]" https://checkip.amazonaws.com)" @RET
         ec "$ip"
         ip-geolocate "$ip" @RET
         ##

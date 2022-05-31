@@ -1,14 +1,18 @@
 ##
-tmuxnew() {
+function tmuxnew {
+    #: @todo0 integrate =str2tmuxname=
+    ##
     silent tmux kill-session -t "$1"
     tmux new -d -s "$@"
 }
-tmuxnewsh() {
+
+function tmuxnewsh {
     doc "Use tsh instead."
     
     revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${tmuxnewshenv[*]} $(gq "${@[2,-1]}")")"
 }
-function tmuxnewsh2() {
+
+function tmuxnewsh2 {
     doc "Supports simple env vars automatically"
 
     local name="$1"
@@ -122,12 +126,11 @@ function ivy-self() {
 function ivy-convenience() {
     local i
 
-    for i in {1..3} ; do
-        tmuxnewsh2 "zii$i" mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
-    done
+    # for i in {1..3} ; do
+    #     tmuxnewsh2 "zii$i" mosh zii@51.178.215.202 -- /home/linuxbrew/.linuxbrew/bin/zsh
+    # done
 
-
-    for i in {1..1} ; do
+    for i in {1..2} ; do
         tmuxnewsh2 "eva$i" mosh ${lilf_user}@82.102.11.148 -- zsh
     done
 
