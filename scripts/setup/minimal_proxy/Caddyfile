@@ -1,0 +1,18 @@
+{
+  local_certs
+}
+
+:443 {
+    log
+
+    @websockets {
+        header Connection *Upgrade*
+        header Upgrade websocket
+
+        #: https://caddy.community/t/caddy-v2-how-to-proxy-websoket-v2ray-websocket-tls/7040/13
+    }
+
+    reverse_proxy @websockets localhost:10000 {
+      header_up -Origin
+    }
+}

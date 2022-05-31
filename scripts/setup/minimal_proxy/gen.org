@@ -1,0 +1,32 @@
+#+TITLE: minimal_proxy/gen
+
+* Caddy
+#+begin_example zsh
+tmux new -d -s 'serve-dl-caddy' caddy run --config ~/Caddyfile
+#+end_example
+
+#+begin_src bsh.dash :results verbatim :exports both :wrap results
+reval-ec rsp-safe Caddyfile ubuntu@185.235.42.146:
+#+end_src
+
+#+RESULTS:
+#+begin_results
+rsp-safe Caddyfile ubuntu@185.235.42.146:
+
+            306 100%    0.00kB/s    0:00:00
+            306 100%    0.00kB/s    0:00:00 (xfr#1, to-chk=0/1)
+            306 100%    0.00kB/s    0:00:00 (xfr#1, to-chk=0/1)
+#+end_results
+
+* v2ray
+#+begin_example zsh
+tmux new -d -s v2ray v2ray -config /usr/local/etc/v2ray/config.json
+#+end_example
+
+#+begin_example zsh
+sudo cp ~/v2_server.json /usr/local/etc/v2ray/config.json
+#+end_example
+
+#+begin_src bsh.dash :results verbatim :exports both :wrap results
+# reval-ec rsp-safe ./*.json ubuntu@185.235.42.146:
+#+end_src
