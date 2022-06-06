@@ -67,7 +67,9 @@ function backup-file() {
     fi
 }
 ### zii
-function ziib-all() {
+function ziib-all {
+    ecerr "$0: zii currently dead" ; return 0
+
     assert-net @RET
 
     assert pushf $nightNotes/private/configs/zii/ @RET
