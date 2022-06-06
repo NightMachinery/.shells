@@ -15,7 +15,7 @@ function chronic-certs {
     fi
 }
 
-function chronic-update() {
+function chronic-update {
     brew update
     # re 'brew upgrade' googler # triggers upgrading everything, which we can't afford on weak servers
 
@@ -34,7 +34,7 @@ function chronic-update() {
     fi
 }
 
-function chronic-backup() {
+function chronic-backup {
     if isLilf ; then
         backup-private-common
     fi
