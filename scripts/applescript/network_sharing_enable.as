@@ -1,4 +1,6 @@
 #!/usr/bin/env osascript
+-- This doesn't quite work.
+---
 
 tell application "System Preferences" to set current pane to pane "com.apple.preferences.sharing"
 delay 1
