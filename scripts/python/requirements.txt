@@ -90,3 +90,4 @@ xkcdpass
 yapf
 yq
 zxcvbn
+nbdime

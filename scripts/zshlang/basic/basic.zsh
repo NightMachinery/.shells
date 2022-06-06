@@ -24,31 +24,36 @@ ectty() ec-tty "$@"
 ## Vars
 zshword='[a-zA-Z0-9!_-]' #unused, I opted for simpler solutions
 ##
-alias doc='\noglob :'
 alias comment='\noglob :'
-function comment() {
-
+function comment {
+    #: used as a nop for documentation
 }
-function doc() {
-    #Used for documentation
+
+alias doc='\noglob :'
+function doc {
+    #: used as a nop for documentation
 }
 ##
-function uuidpy() {
-    python3 -c 'import uuid ; print(uuid.uuid4().hex)'
+function uuidpy {
+    python3 -c 'import uuid ; print(uuid.uuid4().hex)' |
+        cat-copy-if-tty
 }
-function uuidm() {
-    doc "This is the official interface to create new UUIDs"
 
-    ##
-    # You need to `gtr -d '\n'` on bigger outputs
-    xxd -l 16 -p /dev/urandom
-    ## Alt:
-    # uuidgen | gtr -d '-' # '-' causes problems with some usages
-    ##
+function uuidm {
+    doc "This is the official interface to create new UUIDs."
+
+    {
+        ##
+        # You need to `gtr -d '\n'` on bigger outputs
+        xxd -l 16 -p /dev/urandom
+        ## Alt:
+        # uuidgen | gtr -d '-' # '-' causes problems with some usages
+        ##
+    } | cat-copy-if-tty
 }
 ##
-function md5m() {
-    print -nr -- "$1" | md5sum | awk '{print $1}' || {
+function md5m {
+    print -nr -- "$1" | md5sum | awk '{print $1}' | cat-copy-if-tty || {
         echo "Could not get md5 of '$1'" >&2
         return 1
     }
@@ -58,7 +63,7 @@ function md5-file {
     local f="$1"
     assert-args f @RET
 
-    md5sum -- $f | awkn 1
+    md5sum -- $f | awkn 1 | cat-copy-if-tty
     ##
     # command md5 -q "$f" #: This was Darwin-only.
     ##
