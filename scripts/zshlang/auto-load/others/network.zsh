@@ -252,7 +252,11 @@ function isIranHTTP() {
     curl -s http://whatismyip.akamai.com/ | silent rg -F 'peyvandha.ir'
 }
 ##
-aliasfn bwh sudo bandwhich -p -a
+function bwh {
+    bella_zsh_disable1
+
+    sudo bandwhich -p -a "$@"
+}
 ##
 function darwin-net-static-set {
     networksetup -setmanual Wi-Fi 192.168.1.56 255.255.0.0 192.168.1.1

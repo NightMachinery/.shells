@@ -1,5 +1,5 @@
 ##
-typeset -g podcast_dir=~mu/podcasts
+typeset -g podcast_dir="${music_dir}/podcasts"
 ##
 typeset -Ag podcasts_urls_my
 

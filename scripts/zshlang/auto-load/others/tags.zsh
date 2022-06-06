@@ -29,6 +29,7 @@ function h_aliastag() {
     ##
 }
 re h_aliastag $ntag_colors[@] @todo @todo{0..9} # You can use `fd ..@todo` to prefix-search.
+unfunction black #: conflicts with the python formatter
 ##
 # aliasfnq gray ntag-filter "gray | 'grey"
 function gray() {
