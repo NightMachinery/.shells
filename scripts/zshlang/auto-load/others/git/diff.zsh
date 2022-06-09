@@ -6,7 +6,7 @@ alias gdct='git describe --tags `git rev-list --tags --max-count=1`'
 alias gdt='git diff-tree --no-commit-id --name-only -r'
 alias gdw='git-diff --word-diff'
 ##
-function git-diff-kitty() {
+function git-diff-kitty {
     bella_zsh_disable1
 
     # https://sw.kovidgoyal.net/kitty/kittens/diff.html

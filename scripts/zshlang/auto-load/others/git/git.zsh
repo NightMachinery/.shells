@@ -327,7 +327,7 @@ function gsync {
       ec
       if gr-isLocal "$remote" || isNet ; then
         # @todo @maybe get the remotes from the submodule itself. The submodules' remotes don't necessarily match the main repo's, such as when the submodule only has an 'upstream' remote.
-        reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit --rebase=false @TRET
+        reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit --rebase=false @STRUE
         reval-ec git pull "$remote" "$branch" --no-edit --rebase=false @TRET
       else
         ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."

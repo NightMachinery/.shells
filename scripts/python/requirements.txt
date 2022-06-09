@@ -48,6 +48,7 @@ lightnovel-crawler
 magic-wormhole
 metadata-parser
 metadata_parser
+nbdime
 neovim
 nest_asyncio
 numba
@@ -90,4 +91,3 @@ xkcdpass
 yapf
 yq
 zxcvbn
-nbdime
