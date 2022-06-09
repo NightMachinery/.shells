@@ -8,7 +8,7 @@ use v5.34.0;
 # use feature 'refaliasing';
 # no warnings 'experimental::refaliasing';
 ##
-chomp(my @l=<>); #: @input stdin
+chomp(my @l=<STDIN>); #: @input stdin
 my $n = 2; #: @input number of grouped records
 
 my $i = $#l + 1;
