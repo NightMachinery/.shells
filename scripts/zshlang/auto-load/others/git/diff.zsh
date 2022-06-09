@@ -17,15 +17,15 @@ function git-diff-kitty {
     # --dir-diff : concats all the files into a single diff.
 }
 ##
-function git-diff() {
+function git-diff {
     bella_zsh_disable1
 
     if (( $#@ == 0 )) ; then
         set -- 'HEAD~0'
-        # without this, it will only show unstaged changes
-        # https://stackoverflow.com/questions/13057457/show-both-staged-working-tree-in-git-diff
-        # use `git diff --staged` to see only the staged changes
-    elif [[ "$1" =~ '^\d+$' ]] ; then
+        #: without this, it will only show unstaged changes
+        #: https://stackoverflow.com/questions/13057457/show-both-staged-working-tree-in-git-diff
+        #: use `git diff --staged` to see only the staged changes
+    elif (( $#@ == 1 )) && [[ "$1" =~ '^\d+$' ]] ; then
         set -- "HEAD~$1"
     fi
 
@@ -33,6 +33,7 @@ function git-diff() {
         git-diff-kitty "$@"
     else
         git diff --submodule=diff "$@"
+	#: When --submodule=diff is specified, the diff format is used. This format shows an inline diff of the changes in the submodule contents between the commit range.
     fi
 }
 ##
