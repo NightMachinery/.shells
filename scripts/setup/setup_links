@@ -75,11 +75,18 @@ gnu-prefix-fix
 ## blcs
 # blc tag-ag tag tag-ag
 ##
-if ! isMe ; then
+if isMe ; then
+    local symlinkme_dir="$NIGHTDIR/symlinkme"
+    local symlinkme_all_dir="${symlinkme_dir}/all"
+    local symlinkme_local_dir="${symlinkme_dir}/local"
+    local symlinkme_server_dir="${symlinkme_dir}/servers"
+
     if isLocal ; then
-        lnrp "$NIGHTDIR/symlinkme/local/.gitconfig" ~/.gitconfig
+        lnrp "${symlinkme_local_dir}/.gitconfig" ~/.gitconfig
     else
-        lnrp "$NIGHTDIR/symlinkme/servers/.gitconfig" ~/.gitconfig
+        lnrp "${symlinkme_server_dir}/.gitconfig" ~/.gitconfig
     fi
+
+    lnrp "${symlinkme_all_dir}/power_shell/profile.ps1" ~/.config/powershell/profile.ps1
 fi
 ##
