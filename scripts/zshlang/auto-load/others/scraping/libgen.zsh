@@ -1,10 +1,11 @@
 ##
-function libgendl-md5-main() {
+function libgendl-md5-main {
     local md5="$1"
-    local ipfs_mirror="${libgen_ipfs:-cloudflare}"
+    local ipfs_mirror="${libgen_ipfs:-main}"
 
     # local mainmirror="http://93.174.95.29"
-    local mainmirror="http://31.42.184.140"
+    # local mainmirror="http://31.42.184.140"
+    local mainmirror="http://62.182.86.140"
 
     # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
     local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
@@ -17,6 +18,8 @@ function libgendl-md5-main() {
         ipfs_mirror='infura.io/'
     elif [[ "$ipfs_mirror" =~ '^pinata$' ]] ; then
         ipfs_mirror='pinata.cloud/'
+    elif [[ "$ipfs_mirror" =~ '^main$' ]] ; then
+        ipfs_mirror="$mainmirror"
     fi
 
     getlinks-c -e '\.[^/]+$' "$urls[@]" | {
