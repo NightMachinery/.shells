@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
 
+until silent redis-cli ping ; do ; sleep 2 ; done
 ##
 # run=create+start+attach
 # docker: run --rm to automatically delete it when it exits

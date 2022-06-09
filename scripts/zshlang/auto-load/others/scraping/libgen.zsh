@@ -25,23 +25,23 @@ function libgendl-md5-main() {
     }
 }
 
-function libgendl-md5-bok() {
+function libgendl-md5-bok {
     local outs="$(libgendl-md5-bok-helper "$1" |inargsf bok.py)"
     test -e "$outs" # we expect only a single download
 }
 
-function libgendl-md5-bok-helper() {
+function libgendl-md5-bok-helper {
     local md5="$1"
     local url="https://b-ok.cc/md5/$md5"
     getlinks-c -e '/book/' "$url" |gsort -u
 }
 
-function libgendl-md5-bok-old() {
+function libgendl-md5-bok-old {
     (( ${+commands[bok.js]} )) || { ecerr 'bok.js not found.' ; return 1 }
     libgendl-md5-bok-helper "$1" |inargsf re "gtimeout 15m bok.js"
 }
 
-function libgendl-md5-old() {
+function libgendl-md5-old {
     local bok="$(libgendl-md5-bok-old $1)"
     if test -n "$bok" ; then
         aa "$bok"
@@ -50,7 +50,7 @@ function libgendl-md5-old() {
     fi
 }
 
-function libgendl-md5() {
+function libgendl-md5 {
     local md5="$1"
     local lgNoBok="${lgNoBok:-y}" # bok is useless now
 
