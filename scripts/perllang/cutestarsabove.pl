@@ -14,6 +14,7 @@ use JSON::PP qw(encode_json);
 use Storable qw(dclone);
 # use List::Util qw(max);
 ## @inputs :
+my $print_parents = $ENV{"cutestarsabove_print_parents"};
 my $print_children = $ENV{"cutestarsabove_print_children"};
 
 my @queries = map {
@@ -51,7 +52,7 @@ sub say_block {
     my $block = shift;
 
     $block =~ s/(?:\A\R+|\R+\z)//g;
-    say "${block}\n";
+    say "${block}";
 }
 ##
 sub queries_from_constraints {
@@ -124,6 +125,8 @@ sub constraints_satisfy1 {
 }
 
 sub block_process {
+    \my $document = shift ;
+    \my $prefix = shift ;
     my $block = shift;
     my $level = shift;
     my $start = shift;
@@ -131,11 +134,12 @@ sub block_process {
     \my @constraints = dclone shift ;
     my $file_escaped = shift;
     my $in_matching_subtree = shift;
+    my $echo_block = shift;
+    \my @parent_blocks = shift ;
 
     my $file_point_head = "file_point:${file_escaped}";
     my $block_highlighted = $block ;
 
-    my $echo_block = 1;
 
     my $first_match_start = 0;
     my @matches;
@@ -157,6 +161,21 @@ sub block_process {
     $echo_block = $echo_block && ($block_satisfies || ($in_matching_subtree && $print_children));
 
     if ($echo_block) {
+        ##
+        if ($print_parents) {
+            # say(">->>");
+            for my $pb_ref (@parent_blocks) {
+                my $pb_block = (substr $document, ${$pb_ref}{'start'}, ${$pb_ref}{'length'});
+                # say("->>");
+
+                block_process(\$document, \${$pb_ref}{'prefix'}, $pb_block, ${$pb_ref}{'level'}, ${$pb_ref}{'start'}, \@queries, [], $file_escaped, 1, 1, []);
+                #: This prints the block with the matches highlighted.
+
+                # say("<<-");
+            }
+            @parent_blocks = ();
+        }
+        # say("<<-<");
         ## DONE how can we get the position the match would have had in the original string?
         #    - one way is to keep a datastructure to mark different regions of the highlighted string as 'original' and 'markup'
         #      + this approach might fail for overlapping matches
@@ -218,7 +237,7 @@ sub block_process {
 
         if ($level == 0) {
             say "* |0|"
-        } else {
+        } elsif (! $print_parents) {
             if (! $in_matching_subtree) {
                 #: output all blocks as a first-level heading
                 $block_highlighted =~ s/\A(\*+)/"* |".(length $1)."|"/e ;
@@ -226,6 +245,7 @@ sub block_process {
             }
         }
 
+        print $prefix;
         say_block $block_highlighted;
     }
 
@@ -247,6 +267,8 @@ my $level_next ;
 my $level_prev ; #: @notUsed
 my $level_matched_root ;
 my $in_matching_subtree ;
+my @parent_blocks ;
+my $prefix = "";
 
 sub block_process_initial {
     $level_prev = $level;
@@ -260,15 +282,35 @@ sub block_process_initial {
     my $block = (substr $document, $start, $length);
     # say $block;
 
+    if ($level == $level_prev + 1) { #: @tradeOff We can use =${$parent_blocks[-1]}{'level'}= instead, but then we would have to populate that stack even when =print_parents= is false.
+        $prefix = "";
+    } else {
+        $prefix = "\n";
+    }
+
+    if ($print_parents) {
+        if ($level <= $level_prev) {
+            #: We are not in a child of the previous subtree.
+            while ($#parent_blocks >= 0) {
+                my $pb_ref = $parent_blocks[-1];
+                if (${$pb_ref}{'level'} < $level) {
+                    last;
+                } else {
+                    pop @parent_blocks;
+                }
+            }
+        }
+    }
+
     if ($level_matched_root >= $level) {
-        #: We are in a new subtree.
+        #: We have exited the matched subtree.
         # say "In new tree! level=$level";
 
         $level_matched_root = $level;
         $in_matching_subtree = false;
     }
 
-    my $block_satisfies = block_process($block, $level, $start, \@queries, \@constraints, $file_escaped, $in_matching_subtree);
+    my $block_satisfies = block_process(\$document, \$prefix, $block, $level, $start, \@queries, \@constraints, $file_escaped, $in_matching_subtree, 1, \@parent_blocks);
 
     if ($level >= 1) {
         if ($block_satisfies) {
@@ -279,6 +321,11 @@ sub block_process_initial {
             }
 
             $in_matching_subtree = true;
+        }
+
+        if ($print_parents && ! $in_matching_subtree) {
+            my $block_info = {"level" => $level, "start" => $start, "length" => $length, "prefix" => $prefix};
+            push @parent_blocks, $block_info;
         }
     }
 }
