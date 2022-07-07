@@ -206,14 +206,19 @@ function git-status-summary() {
   ec "$out"
 }
 aliasfn gss git-status-summary
-function git-status-summary2() {
+
+function h-git-status-remove-unstaged {
+  perl -ne 'm/\s*\QChanges not staged for commit:\E/ && ($skip = 1) ; m/\s*\QChanges to be committed:\E/ && ($skip = 0) ; $skip || print'
+}
+
+function git-status-summary2 {
   # @alt gss [-uno]
   local args=("$@") tail_mode="${gss_tail}"
 
   {
-    git -c color.status=false submodule foreach git -c color.status=false status "$args[@]"| prefixer -a 'Submodules: '
+    git -c color.status=false submodule foreach git -c color.status=false status "$args[@]" | prefixer -a 'Submodules: '
     git -c color.status=false status "$args[@]"
-  } | {
+  } | h-git-status-remove-unstaged | {
     command rg --color never -e 'deleted:' -e 'modified:' -e 'new file:'| trimsed | {
       if test -n "$tail_mode" ; then
         h_gss_tail
