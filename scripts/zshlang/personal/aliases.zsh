@@ -1,7 +1,7 @@
 ialias zshrc='$=EDITOR ~/.zshrc'
 ialias zshenv='$=EDITOR ~/.zshenv'
 ##
-alias sb=". ~/.zshenv ; bell-zsh-start"
+alias sb=". ~/.zshenv ; conda-reactivate ; bell-zsh-start"
 alias ss='emc-sourceme'
 alias sbp='eval "$(pbpaste)"'
 alias sbi="sb ; source-interactive-all"

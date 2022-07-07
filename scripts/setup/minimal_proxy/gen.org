@@ -1,5 +1,10 @@
 #+TITLE: minimal_proxy/gen
 
+* tmux
+#+begin_example zsh
+rsp-safe ~/.tmux.conf 'ubuntu@185.235.42.146:'
+#+end_example
+
 * Caddy
 #+begin_example zsh
 tmux new -d -s 'serve-dl-caddy' caddy run --config ~/Caddyfile

@@ -1,5 +1,5 @@
 [user]
-	name = NightMachinary
+	name = NightMachinery
 	email = rudiwillalwaysloveyou@gmail.com
 [alias]
 	co = checkout
@@ -22,12 +22,12 @@
 [pull]
 	rebase = false
 [difftool]
-    prompt = false
-    # trustExitCode = true
+	prompt = false
+	# trustExitCode = true
 [difftool "kitty"]
-    cmd = kitty +kitten diff $LOCAL $REMOTE
+	cmd = kitty +kitten diff $LOCAL $REMOTE
 [difftool "kitty.gui"]
-    cmd = kitty kitty +kitten diff $LOCAL $REMOTE
+	cmd = kitty kitty +kitten diff $LOCAL $REMOTE
 [receive]
 	denyCurrentBranch = updateInstead
 [url "https://github.com/"]

@@ -1,13 +1,13 @@
 ##
 alias ysp='y-stream-pipe'
 aliasfn aa-gateway aacookies
-aliasfn aa aa-gatewy
+aliasfn aa aa-gateway
 alias aa='\noglob aa-gateway'
 alias aacert='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 aliasfn aa-insecure aa-gateway --check-certificate=false
 aliasfnq aa-multi run-on-each 'aa-gateway --conditional-get=true --allow-overwrite=true' # allows duplicate links without errors
 ###
-function aaserver() {
+function aaserver {
     mkdir -p ~/Downloads/aas/
     aria2c --rpc-secret "$ARIA_SECRET" --enable-rpc --log-level debug -l ~/Downloads/aas/aria.log -d ~/Downloads/aas/ -D
 }

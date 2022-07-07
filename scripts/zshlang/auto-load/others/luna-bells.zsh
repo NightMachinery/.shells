@@ -460,7 +460,7 @@ function bella-zsh-maybe() {
 ##
 aliasfn bell-dl tts-glados1-cached 'Download, complete'
 ##
-function bell-maker() {
+function bell-maker {
     local name="${1}" fs=( ${@[2,-1]} )
 
     local fn="bell-$name"
@@ -486,7 +486,8 @@ function bell-maker() {
         fndef $fn bell-ringer "BELL_$(ec ${name:u} | gtr '-' '_')_MARKER" "$fs[@]"
     fi
 }
-function bell-ringer() {
+
+function bell-ringer {
     local marker="${1}" fs=("${@[2,-1]}") awaysh="${bell_awaysh:-y}"
     assert-args marker fs
 
@@ -504,7 +505,7 @@ function bell-ringer() {
     fi
 }
 ## Little Misfortune
-function bell-lm-maker() {
+function bell-lm-maker {
     local name="${1}" fs=("${@[2,-1]}")
 
     if isServer || ! test -e "$GREENCASE_DIR" ; then
@@ -659,6 +660,7 @@ bell-maker sc-error 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Bro
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
 ## HP3:
 bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 12/Dialog part 1/pc_her_Adv6_7_be careful harry..blue..wav'
+bell-maker hp3-water-trickle "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/"water_trickle*.wav
 ## Sonic:
 bell-maker sonic-fx-ready 'Sonic and SEGA All-Stars Racing/PC Computer - Sonic and SEGA All-Stars Racing - General Sound Effects/Sonic and Sega All-Stars Racing/General SFX/FE_READY.wav'
 ##

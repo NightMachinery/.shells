@@ -32,7 +32,7 @@ function rename-pipe {
 aliasfn rename-pipe-dryrun rename_pipe_dry=y rename-pipe
 @opts-setprefix rename-pipe-dryrun rename-pipe
 ##
-function rename-rec() {
+function rename-rec {
     : "@alt rename-pipe"
 
     local max_depth="${rename_rec_max_depth:-100}"

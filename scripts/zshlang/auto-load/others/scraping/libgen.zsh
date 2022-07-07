@@ -23,13 +23,13 @@ function libgendl-md5-main {
     fi
 
     getlinks-c -e '\.[^/]+$' "$urls[@]" | {
-        # @outdatedComment will get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
+        # The main mirror (not the IPFS ones) might get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
         rg -F "$ipfs_mirror"
     }
 }
 
 function libgendl-md5-bok {
-    local outs="$(libgendl-md5-bok-helper "$1" |inargsf bok.py)"
+    local outs="$(libgendl-md5-bok-helper "$1" | inargsf bok.py)"
     test -e "$outs" # we expect only a single download
 }
 

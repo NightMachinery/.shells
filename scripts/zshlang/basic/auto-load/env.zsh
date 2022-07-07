@@ -8,6 +8,6 @@ typeset +x KITTY_WINDOW_ID
 # I don't remember why we had unexported this, but doing that will essentially force us to either hardcode 'isKitty' or re-export this var in our wrappers
 # Perhaps the unexporting helps with not having wrong IDs in the tmux sessions, which can cause problems.
 ##
-alias sbb='exec env KITTY_WINDOW_ID=$KITTY_WINDOW_ID TERM=$TERM ${commands[zsh]}'
+alias sbb='exec env -i HOME="$HOME" KITTY_WINDOW_ID=$KITTY_WINDOW_ID TERM=$TERM ${commands[zsh]}'
 # [jalali:1400/08/18/15:16] Disabled =-i=, as it deletes important env variables such as =SSH_CLIENT=. Perhaps we can find a safe whitelist of vars to allow?
 ##

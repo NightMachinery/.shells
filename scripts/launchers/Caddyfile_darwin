@@ -1,5 +1,5 @@
-#
-# noise here to stop emacs from thinking this is C code
+#:
+#: noise here to stop emacs from thinking this is C code
 
 {
     # experimental_http3
@@ -13,7 +13,7 @@
 # http://fereidoons-macbook-pro.local:8112, http://192.168.1.56:8112 {
 #  , http://files.{env.MDNS_NAME}.local  
 http://:8112 {
-  # https://caddy.community/t/how-to-reuse-matchers-between-site-blocks/13599
+  #: https://caddy.community/t/how-to-reuse-matchers-between-site-blocks/13599
   @nonLocal {
     not remote_ip 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8 127.0.0.1/32
   }
