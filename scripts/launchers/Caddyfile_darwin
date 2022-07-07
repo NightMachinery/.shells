@@ -34,3 +34,27 @@ http://:8112 {
 #     root {env.HOME}/Base/shared
 #   }
 # }
+
+http://:9000 {
+    handle_path /api/* {
+        # reverse_proxy 127.0.0.1:7260 #: blackbutler
+        reverse_proxy 127.0.0.1:9102 #: blackbutler
+    }
+
+    handle {
+        ##
+        # reverse_proxy 127.0.0.1:3000
+        ##
+        # root * {env.HOME}/Base/_Code/javascript/sveltejs/seed/dist
+        # root * {env.HOME}/Base/_Code/javascript/sveltejs/chiseed/build
+        root * {env.HOME}/Base/_Code/javascript/sveltejs/soup/build
+
+        rewrite /test.html/* /test.html
+        rewrite /dyn2/* /dyn2
+        rewrite /lobby/* /lobby
+        rewrite /play/* /play
+        try_files {path} {path}.html /spa_router.html
+        file_server browse
+        ##
+    }
+}
