@@ -90,7 +90,6 @@ alias reeb='run-on-each rename-ebook'
 ##
 alias anki='/Applications/Anki.app/Contents/MacOS/Anki -b /Base/_GDrive/Anki'
 alias ch='cht.sh'
-alias powerdecay="sudo powermetrics -i 1000 --poweravg 1 | grep 'Average cumulatively decayed power score' -A 20"
 alias bu='brew upgrade'
 alias bcu='brew upgrade --cask'
 alias bcrm='brew cask remove'
