@@ -273,32 +273,34 @@ popclickInit()
 --                    -- alert.show("popclickListening: " .. tostring(popclickListening))
 -- end)
 ---
-hs.hotkey.bind(hyper, "p", function()
-                 appName = application.frontmostApplication():name()
-                 -- brishzeval("true " .. hs.pasteboard.getContents())
-                 if appName == "Screen Sharing" then
-                   -- Doesn't work, test with `sleep 2 ; hs -c 'hs.eventtap.keyStrokes("hi jungle")'`
-                   -- hs.eventtap.keyStrokes(hs.pasteboard.getContents())
-                 else
-                   -- This was slow even with input-lang-get-darwin-fast, so the fault is probably with hammerspoon itself?
-
-                   -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
-                   -- eventtap.keyStroke({"cmd"}, 'a')
-                   -- eventtap.keyStroke({"cmd"}, 'c')
-                   eventtap.keyStroke({"cmd"}, 0)
-                   eventtap.keyStroke({"cmd"}, 8)
-                   local res
-                   -- res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
-                   if hs.keycodes.currentSourceID() == inputEnglish then
-                     res = brishzeval2(("ecn %q | en2per"):format(hs.pasteboard.getContents()))
-                     langSetPer()
+if false then
+  hs.hotkey.bind(hyper, "p", function()
+                   appName = application.frontmostApplication():name()
+                   -- brishzeval("true " .. hs.pasteboard.getContents())
+                   if appName == "Screen Sharing" then
+                     -- Doesn't work, test with `sleep 2 ; hs -c 'hs.eventtap.keyStrokes("hi jungle")'`
+                     -- hs.eventtap.keyStrokes(hs.pasteboard.getContents())
                    else
-                     res = brishzeval2(("ecn %q | per2en"):format(hs.pasteboard.getContents()))
-                     langSetEn()
+                     -- This was slow even with input-lang-get-darwin-fast, so the fault is probably with hammerspoon itself?
+
+                     -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
+                     -- eventtap.keyStroke({"cmd"}, 'a')
+                     -- eventtap.keyStroke({"cmd"}, 'c')
+                     eventtap.keyStroke({"cmd"}, 0)
+                     eventtap.keyStroke({"cmd"}, 8)
+                     local res
+                     -- res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
+                     if hs.keycodes.currentSourceID() == inputEnglish then
+                       res = brishzeval2(("ecn %q | en2per"):format(hs.pasteboard.getContents()))
+                       langSetPer()
+                     else
+                       res = brishzeval2(("ecn %q | per2en"):format(hs.pasteboard.getContents()))
+                       langSetEn()
+                     end
+                     hs.eventtap.keyStrokes(tostring(res))
                    end
-                   hs.eventtap.keyStrokes(tostring(res))
-                 end
-end)
+  end)
+end
 ---
 function chis()
   -- https://www.hammerspoon.org/docs/hs.chooser.html
