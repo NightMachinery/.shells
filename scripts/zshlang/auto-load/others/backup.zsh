@@ -138,7 +138,35 @@ function ziib-znc {
         fi
     } always { popf }
 }
+### arvan_1
+function arvan_1-all {
+    local name="arvan_1" user="ubuntu"
+    local ssh_add="${user}@nightmachinery.ir"
 
+    assert-net @RET
+
+    assert pushf "$nightNotes/private/configs/$name/" @RET
+    {
+        assert ssh $ssh_add crontab -l > ./crontab
+
+        # assert scp $ssh_add:/home/$user/.muttrc .
+        assert scp $ssh_add:/home/$user/Caddyfile .
+        assert scp $ssh_add:/home/$user/various.zsh .
+        assert scp $ssh_add:/home/$user/.privateShell .
+
+        mkdir -p v2ray
+        assert scp $ssh_add:/usr/local/etc/v2ray/config.json ./v2ray/
+
+        mkdir -p trojan/server
+        assert scp $ssh_add:/usr/local/etc/trojan/config.json ./trojan/server/
+
+        # mkdir -p .thelounge
+        # assert scp $ssh_add:/home/$user/.thelounge/config.js ./.thelounge/
+        # assert scp -r $ssh_add:/home/$user/.thelounge/users ./.thelounge/
+    } always { popf }
+
+    # reval-ec arvan_1-znc
+}
 ### behy
 function backup-behy-all() {
     assert-net @RET
