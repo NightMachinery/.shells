@@ -5,16 +5,20 @@ import os
 import sys
 import re
 import random
+import math
 import logging
 
 logger = logging.getLogger("ipy")
+
 try:
-    import numpy as np
+    import numpy
+    np = numpy
 except:
     pass
 
 try:
-    import pandas as pd
+    import pandas
+    pd = pandas
 except:
     pass
 
