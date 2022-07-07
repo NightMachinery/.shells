@@ -18,12 +18,15 @@ function rename-pipe {
         new_path="$(ec "$f" | reval "$cmd[@]")" @TRET
 
         if [[ "$new_path" != "$f" ]] ; then
-            ensure-dir "$new_path" @TRET
-
-            if bool $dry_run ; then
-                ecalternate "$f" "$new_path" @TRET
+            if test -e "$f" ; then
+                if bool $dry_run ; then
+                    ecalternate "$f" "$new_path" @TRET
+                else
+                    ensure-dir "$new_path" @TRET
+                    reval-ec gmv -i -v "$f" "$new_path" </dev/tty @TRET
+                fi
             else
-                gmv -i -v "$f" "$new_path" </dev/tty @TRET
+                ecbold "Path no longer exists: $f"
             fi
         fi
     done
