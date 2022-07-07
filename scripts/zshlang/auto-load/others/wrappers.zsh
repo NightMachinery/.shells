@@ -131,3 +131,9 @@ function spotdl {
   @opts engine bell-dl @ reval-bell command spotdl "${args[@]}"
 }
 ##
+function vcard-to-json {
+  # ~[vcard-to-json]/vcard-to-json-0.1.0-SNAPSHOT "$@" |
+  java -jar ~[vcard-to-json]/target/vcard-to-json-0.1.0-SNAPSHOT.jar "$@" |
+    jq-rtl . #: needed to, e.g., normalize strings
+}
+##
