@@ -23,7 +23,7 @@ if isMe ; then
     # tmuxnewsh2 shared_sftpgo indir ~/Base/keys/sftpgo sftpgo portable -d ~/Base/shared --permissions '*' --username "$SFTPGO_USER1" --password "$SFTPGO_PASS1" --webdav-port 8114 --sftpd-port 8115 --ftpd-port 8116 --log-verbose --log-file-path sftpgo.log --advertise-service
     ##
     # tmuxnewsh2 shared_smb loop reval-notifexit sudo /usr/sbin/smbd -no-symlinks false -stdout -debug
-    tmuxnewsh2 shared_ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/_Books --debug
+    # tmuxnewsh2 shared_ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/_Books --debug
     ##
     # @warn dav has no pass set on writable
     # @fatal wsgidav consumes way too much CPU (was at 98% even with no WiFi connected), and might even be hanging the laptop
@@ -38,8 +38,11 @@ if ot-enabled-p ; then
 fi
 ###
 if test -n "$NP_PASS1" ; then
-    tmuxnew naive-zii naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.zii.lilf.ir" --log  --concurrency=4
+    # tmuxnew naive-zii naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.zii.lilf.ir" --log  --concurrency=4
+    ##
+    tmuxnew naive-arvan_1 naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.nightmachinery.ir" --log  --concurrency=4
 fi
+
 if test -n "$NP_PASS0" ; then
     tmuxnew naive-${lilf_user} naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
 fi
@@ -50,7 +53,9 @@ if isMe ; then
     # tmuxnew v2ray-behy v2ray -config $nightNotes/private/configs/behy/v2ray/client.json
     ##
     # tmuxnewsh2 trojan trojan -c "$nightNotes"/private/configs/zii/trojan_client.json
-    tmuxnew trojan-client-v1-zii trojan -c $nightNotes/private/configs/zii/trojan_client_v1.json
+    # tmuxnew trojan-client-v1-zii trojan -c $nightNotes/private/configs/zii/trojan_client_v1.json
+    ##
+    tmuxnew trojan-client-arvan_1 trojan -c $nightNotes/private/configs/arvan_1/trojan/client.json
     ##
     v2-on # v2ray-genrouter
     ##

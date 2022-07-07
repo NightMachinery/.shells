@@ -28,7 +28,8 @@ alias lc='l -s created'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
 alias lac='l -s accessed'
-function last-exa() {
+
+function last-exa {
     # Usage:
     # last-exa created
     # last-exa created SOME_DIR
@@ -44,17 +45,19 @@ function last-exa() {
     fi
     ec "$rs"
 }
-function last-created() {
+
+function last-created {
     if isDarwin ; then
-        last-exa created
+        last-exa created "$@"
     else
         ecerr "$0: creation time is not supported on Linux. Using mod date instead."
-        last-modified
+        last-modified "$@"
     fi
 }
+
 alias last-accessed='last-exa accessed'
 alias last-modified='last-exa modified'
-alias last-added='ls-by-added |head -n1' #macOS only
+alias last-added='ls-by-added | head -n1' #: @darwinOnly
 alias l-c=last-created
 alias l-ac=last-accessed
 alias l-a=last-added

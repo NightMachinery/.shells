@@ -1,3 +1,4 @@
+##
 function battery-status-darwin-full() {
     assert isDarwin @RET
 

@@ -119,9 +119,13 @@ function append-f2f() {
     cat "$from" | sponge -a "$to"
 }
 ##
-function  mv-merge() {
+function mv-merge {
+    ##
     # https://unix.stackexchange.com/questions/127712/merging-folders-with-mv/172402
     # https://unix.stackexchange.com/questions/654481/gnu-cp-whats-the-difference-between-link-and-reflink-always
+    ##
+    # * Known bugs:
+    # ** =mv-merge some_dir . = will delete some_dir.
     ##
     local paths=() i opts_end
     for i in "$@" ; do

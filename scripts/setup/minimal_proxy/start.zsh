@@ -4,10 +4,17 @@ setopt pipefail errexit
 ##
 USER_BIN="$HOME/bin"
 mkdir -p "$USER_BIN"
+
+mkdir -p ~/Downloads
 ##
 print -r -- 'export PATH="${USER_BIN}:$PATH"' >> ~/.zshenv
+
+touch ~/.privateShell
+print -r -- 'source ~/.privateShell' >> ~/.zshenv
 ##
 pkgs=(
+    mosh
+
     trojan
 
     libnss3-tools

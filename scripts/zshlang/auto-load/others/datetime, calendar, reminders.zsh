@@ -248,14 +248,15 @@ function datenat-full2() {
 }
 aliasfn datenat-full2-future datenat_nopast=y datenat-full2
 ##
-function remn() {
+function remn {
     local text="$1" natdate="${@:2}"
     [[ "$text" == '-' ]] && text="$(</dev/stdin)"
     local dest
     dest="$remindayDir/$(datenat-full1-future "$natdate")" || return $?
     @opts datej "$(datenatj-future "$natdate")" @ reminday_store "$dest" "$text"
 }
-function remn-interactive() {
+
+function remn-interactive {
     local text="$*"
     
     local natdate=""
@@ -285,7 +286,8 @@ function rem_extract-date-path() {
         return 1
     fi
 }
-function rem-today() {
+
+function rem-today {
     local deleteMode="${rem_today_delete:-$rem_today_d}"
     unset rem_today_delete # stop propagating these to inner calls of rem-today SHUDDERS
     unset rem_today_d
@@ -329,7 +331,7 @@ function rem-today() {
                 if [[ "$ext" == zsh ]] ; then
                     bak+=".bak"
                 fi
-                serr append-f2f "$f" "$bak" && command rm "$f" # not deleting if the source is the same as the dest
+                serr append-f2f "$f" "$bak" && command rm "$f" #: not deleting if the source is the same as the dest
             fi
         fi
     done
@@ -337,6 +339,7 @@ function rem-today() {
 
     trim "$text"
 }
+
 function rem-today-d() {
     local day="${1:-1}"
     fnrep datej "datenatj-future $day day later" rem-today
@@ -365,6 +368,7 @@ function tlg-reminday() {
 
     tsend --parse-mode markdown -- "$rec" "$text"
 }
+
 function rem-summary() {
     local deleteMode="$rem_summary_delete" notifMode="$rem_summary_notif" markdownMode="${rem_summary_md}"
 

@@ -23,7 +23,7 @@ function org-link-create {
     fi
 }
 ##
-function org-watch() {
+function org-watch {
     local fd_in file
 
     fswatch --exclude='.' --include='\.org$' "$nightNotes" | {

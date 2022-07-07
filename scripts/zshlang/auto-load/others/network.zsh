@@ -43,6 +43,7 @@ aliasfn ci79 curl-ip -x 'socks5h://127.0.0.1:1079'
 aliasfn ci80 curl-ip -x 'socks5h://127.0.0.1:1080'
 aliasfn ci81 curl-ip -x 'socks5h://127.0.0.1:1081'
 aliasfn ci90 curl-ip -x 'socks5h://127.0.0.1:1090'
+aliasfn ci91 curl-ip -x 'socks5h://127.0.0.1:1091'
 
 aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
 aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
@@ -54,8 +55,12 @@ alias myip-ipinfo='curlm https://ipinfo.io/ip'
 alias myip-opendns='dig +short myip.opendns.com @208.67.222.222' # @resolver1.opendns.com
 alias myip4-opendns='dig @resolver4.opendns.com myip.opendns.com +short -4'
 alias myip6-opendns='dig @resolver1.ipv6-sandbox.opendns.com AAAA myip.opendns.com +short -6'
+
+function myip-dnstoys {
+    dig '+short' ip @dns.toys | gtr -d '"'
+}
 ##
-function myip-google1() {
+function myip-google1 {
     dig TXT +short o-o.myaddr.l.google.com @ns1.google.com | gtr -d '"'
 }
 function myip-google() {
@@ -146,22 +151,25 @@ function myipa-akami() {
 #   Time (mean ± σ):      1.670 s ±  0.644 s    [User: 2.0 ms, System: 3.4 ms]
 # Range (min … max):    0.845 s …  2.585 s    10 runs
 ###
-function ncp() {
+function ncp {
     cat | gnc -c localhost 2000
 }
-function ip-internal-get() {
+##
+function ip-internal-get {
     : "Use 'ipconfig getifaddr en1' for wireless, or 'ipconfig getifaddr en0' for ethernet."
 
     ifconfig | grep "inet "
 }
-function ip-internal-get1() {
-    ip-internal-get | gsed 1d | rget '(\d+\.\d+\.\d+\.\d+)'
+
+function ip-internal-get1 {
+    ip-internal-get | gsed 1d | rget 'inet\s+(\d+\.\d+\.\d+\.\d+)'
 }
 ##
-function http-static-py() {
+function http-static-py {
     python -m http.server "${1:-8000}"
 }
-function http-static-caddy() {
+##
+function http-static-caddy {
     caddy file-server -browse -listen "${2:-0.0.0.0}:${1:-8000}"
 }
 aliasfn http-static http-static-caddy
