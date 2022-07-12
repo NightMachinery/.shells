@@ -178,6 +178,9 @@ function rss-json-titles {
 }
 
 function rss-fz {
+    typeset -g titles=()
+    typeset -g urls_rss=()
+
     local url="$1"
     assert-args url @RET
 
@@ -185,25 +188,42 @@ function rss-fz {
     # json="$(rss2json "$url")" @TRET
     json="$(rss2json "$url")" @TRET
 
-    local titles
     titles="$(ec "$json" | rss-json-titles)" @TRET
-    local urls_rss
     urls_rss="$(ec "$json" | rss-json-urls)" @TRET
 
-    ecn "$titles" | fz-masked "$urls_rss"
+    ecn "$titles" | fz-masked "$urls_rss" #: exports `sel_i' globally
 }
 
 function rss-dl-fz {
-    local urls engine=("${rss_dl_e[@]:-aa-multi}")
-    urls="$(rss-fz "$@")" @RET
+    local urls engine=("${rss_dl_e[@]:-dl-named}")
+    ##
+    local titles urls_rss sel_i #: set by 'rss-fz'
+    sout rss-fz "$@"
+    titles=("${(f@)titles}")
+    urls_rss=("${(f@)urls_rss}")
+    # re typ titles urls_rss sel_i
+    local i urls=() titles_sel=()
+    for i in ${sel_i[@]} ; do
+        urls+="${urls_rss[$i]}"
+        titles_sel+="${titles[$i]}"
+    done
+    ##
+    # urls="$(rss-fz "$@")" @RET
+    # urls=(${(@f)urls})
+    ##
 
-    urls=(${(@f)urls})
     if (( ${#urls} == 0 )) ; then
         ecerr "$0: no urls selected"
         return 1
     fi
 
-    reval "$engine[@]" "$urls[@]"
+    ##
+    # reval "$engine[@]" "$urls[@]"
+    ##
+    for i in {1..${#urls}} ; do
+        reval "$engine[@]" "$urls[$i]" "${titles_sel[$i]}"
+    done
+    ##
 }
 @opts-setprefix rss-dl-fz rss_dl
 
@@ -235,10 +255,7 @@ function rss-dl-multi-fz {
 
         pushf "$title"
         {
-            @opts e [ \
-                reval-ec tsh "$(ec "aa podcast $title ($(dateshort))" | str2tmuxname)" aa-multi \
-                ] @ \
-                rss-dl-fz "$url" || true
+            dl_named_daemon_p=y rss-dl-fz "$url" || true
             } always { popf }
     done
 }

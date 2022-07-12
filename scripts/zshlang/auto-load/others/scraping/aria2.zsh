@@ -7,6 +7,25 @@ alias aacert='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 aliasfn aa-insecure aa-gateway --check-certificate=false
 aliasfnq aa-multi run-on-each 'aa-gateway --conditional-get=true --allow-overwrite=true' # allows duplicate links without errors
 ###
+function dl-named {
+    local url="$1" title="$2" daemon_p="${dl_named_daemon_p}"
+    assert-args url title @RET
+
+    local ext=""
+    ext="$(url-extension-get "$url")" || true
+    if test -n "${ext}" ; then
+        title="${title}.${ext}"
+    fi
+
+    local cmd=()
+    if bool "$daemon_p" ; then
+        cmd=(tmuxnewsh2 "$(ec "dl-named $title ($(dateshort))" | str2tmuxname)")
+    fi
+    cmd+=(aa-gateway --conditional-get=true --allow-overwrite=true --out="${title}" "$url")
+
+    reval-ec "${cmd[@]}"
+}
+##
 function aaserver {
     mkdir -p ~/Downloads/aas/
     aria2c --rpc-secret "$ARIA_SECRET" --enable-rpc --log-level debug -l ~/Downloads/aas/aria.log -d ~/Downloads/aas/ -D
