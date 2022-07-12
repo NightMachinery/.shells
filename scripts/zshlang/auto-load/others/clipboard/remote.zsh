@@ -1,4 +1,4 @@
-function cp2eva() {
+function cp2eva {
     local inargs=''
     in-or-args2 "$@"
     local tmp
