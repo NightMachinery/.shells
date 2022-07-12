@@ -13,7 +13,14 @@ function jq-rtl {
     fi
 }
 ##
-function jq-quote() {
+function json-rm-keys-empty {
+    #: This might only work on simple JSONs, IDK.
+    ##
+    jq '. |= map(with_entries(select(.value | . != "" and . != null)))'
+    #: =map(x)= is equivalent to =[.[] | x]=
+}
+##
+function jq-quote {
     local i
     i="$(in-or-args "$@")" @TRET # this trim-rights the input, which seems desirable
     ecn "$i" | jq --raw-input --slurp --null-input --compact-output 'inputs'
