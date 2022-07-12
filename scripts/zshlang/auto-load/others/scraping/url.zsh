@@ -564,3 +564,20 @@ function url-date() {
     ec $date
 }
 ##
+function url-extension-get {
+    local inargs
+    in-or-args3 "$@" @RET
+    local urls=("${inargs[@]}")
+    assert-args urls @RET
+
+    local ext
+    for url in "$urls[@]" ; do
+        if [[ "$url" =~ '\.([^./?]+)(?:\?[^/]*)?/?$' ]] ; then
+            ext="$match[1]"
+        else
+            ext=""
+        fi
+        ec "$ext"
+    done
+}
+##

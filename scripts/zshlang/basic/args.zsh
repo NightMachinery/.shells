@@ -1,9 +1,13 @@
 ###
-function in-or-args2() {
+function in-or-args2 {
+    in_or_args_in_p=''
+
     if (( $# )) ; then
         inargs=( "$@" )
     else
         if ! isInTty ; then
+            in_or_args_in_p=y
+
             inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
         else
             return 1
@@ -11,7 +15,14 @@ function in-or-args2() {
     fi
 }
 
-function in-or-args() {
+function in-or-args3 {
+    in-or-args2 "$@" @RET
+    if bool "$in_or_args_in_p" ; then
+        inargs=("${(@f)inargs}")
+    fi
+}
+
+function in-or-args {
     if (( $# )) ; then
         arrN "$@"
     else
