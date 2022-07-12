@@ -1,9 +1,11 @@
 ##
-function csv2json() {
+function csv2json {
     local f="$1"
     assert-args f @RET
 
-    mlr --icsv --ojson --jlistwrap cat "$f" | jq '.'
+    mlr --icsv --ojson --jlistwrap cat "$f" |
+        json-rm-keys-empty |
+        jq '.'
     # --jlistwrap Wrap JSON output in outermost [ ].
 }
 ##
