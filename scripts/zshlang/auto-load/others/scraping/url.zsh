@@ -317,6 +317,7 @@ function urlmeta2() {
 gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
 
     local url="$1"
+    local reqs=("${@:2}")
 
     # local fhMode="${fhMode:-curl}"
 
@@ -331,7 +332,7 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
             true # when we encounter, e.g., captchas, usually the =meta= tags we need can be downloaded without problems; So ignoring the error seems the best tradeoff.
         }
     fi
-    local reqs=("${@:2}")
+
     <<<"$html" assert htmlmetadata $reqs[@] || {
         local tmp="$(gmktemp --suffix .html)"
         ec "$html" > $tmp
