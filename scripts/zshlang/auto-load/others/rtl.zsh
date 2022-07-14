@@ -1,4 +1,5 @@
-function rtl-reshaper-py() {
+##
+function rtl-reshaper-py {
   if isRtl ; then
       cat
   else
@@ -6,7 +7,7 @@ function rtl-reshaper-py() {
   fi
 }
 
-function rtl-reshaper() {
+function rtl-reshaper {
   local wrap_p="${rtl_reshaper_wrap_p:-y}"
 
   if isRtl ; then
@@ -27,7 +28,7 @@ function rtl-reshaper-fast {
   rtl_reshaper_wrap_p=n rtl-reshaper "$@"
 }
 
-function reval-rtl() {
+function reval-rtl {
   if isRtl ; then
     # not having a pipe can make more stuff work, so this opens the possibility of you seeing bugs later (i.e., some bugs will only become visible when you use rtl-reshaper)
     # but still, seeing bugs later is also a blessing, right? ;)
@@ -38,22 +39,26 @@ function reval-rtl() {
 }
 aliasfn rtl reval-rtl
 ##
-function fz-rtl() {
+function fz-rtl {
     fz "$@" --preview "$FZF_RTL_PREVIEW"
 }
-function fz-rtl1() {
-    # @warn The reshaped Persian text seemingly uses special chars so we can no longer search it using our normal Persian keyboard.
+
+function fz-rtl1 {
+    #: @warn The reshaped Persian text seemingly uses special chars so we can no longer search it using our normal Persian keyboard.
+    #:
+    #: https://github.com/junegunn/fzf/issues/2875
+    ##
     local input="$(cat)" q="$1" opts=("${@[2,-1]}")
 
     local sels_i="$(ec "$input" | rtl-reshaper | cat -n | fz --with-nth 2.. --query "$q" "$opts[@]" | gawk '{print $1}')"
     gawk 'NR == FNR {nums[$1]; next} FNR in nums' <(ec "$sels_i") <(ec "$input")
 }
 ##
-function biconm() {
+function biconm {
   BICON_MODE=y bicon.bin "$@"
 }
 
-function bicon-emc() {
+function bicon-emc {
   bella_zsh_disable1
 
   if isBicon ; then
@@ -90,12 +95,12 @@ function bicon-emc() {
 ##
 redis-defvar bicon_zsh_disabled
 # Use bicon_zsh_disabled_del to enable bicon mode by default
-function bicon-zsh() {
+function bicon-zsh {
   biconm zsh
   reset
 }
 ##
-function erase-bicon() {
+function erase-bicon {
   gtr -d '\000'
 }
 ##
