@@ -741,6 +741,8 @@ bell-maker "attention-needed-st" "${NIGHTDIR}/resources/audio/tts/15.ai/sentry\ 
 
 aliasfn bell-attention-needed bell-attention-needed-st
 ##
-aliasfn bell-continuous loop bell-lm-MI
+function bell-continuous {
+    bell_awaysh=n loop bell-lm-MI
+}
 aliasfn bellc bell-continuous
 ##

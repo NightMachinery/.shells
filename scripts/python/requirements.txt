@@ -9,6 +9,7 @@ coursera-dl
 daudin
 ddgr
 dnspython
+executing
 ezgmail
 fanficfare
 fastapi[all]
@@ -91,4 +92,3 @@ xkcdpass
 yapf
 yq
 zxcvbn
-executing

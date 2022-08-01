@@ -1,7 +1,7 @@
 ## Vars
 export mpv_audio_ipc=~/tmp/.mpv_audio_ipc
 ## Functions
-function hear-noipc() {
+function hear-noipc {
     local vol="${hear_volume:-${hear_v:-70}}"
 
     bella_zsh_disable1
@@ -44,7 +44,7 @@ function hearinvisible-playfast() {
     fi
 
     if bool $loudidle ; then
-        if (( $(idle-get) >= 20 )) && ! sharif-vc-is ; then
+        if (( $(idle-get) >= 20 )) && (( $(volume-get) >= 20 )) && ! sharif-vc-is ; then
             loudidle=y
             trapexits
         else
@@ -87,7 +87,7 @@ aliasfn heari hearinvisible
 aliasfn hearinvisible-mpv silent hear-noipc --no-terminal --load-scripts=no
 @opts-setprefix hearinvisible-mpv hear
 ##
-function hear() {
+function hear {
     # arger "${(0@)$(rpargs "$@")}"
     comment '(0@) inserts empty elements with quoting'
     hear-noipc --input-ipc-server="$mpv_audio_ipc" ${(0@)"$(rpargs "$@")"} #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
