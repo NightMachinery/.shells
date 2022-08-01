@@ -305,11 +305,19 @@ function org-link-extract {
         | cat-copy-if-tty
 }
 
-aliasfn org-link-extract-audiofile org_link_extract_type=audiofile org-link-extract
+function org-link-extract-url {
+    local link_type="$org_link_extract_type"
+
+    #: We can also change the regex used in org-link-extract to directly capture the link URL, but this is more backwards compatible.
+    org-link-extract "$@" | prefixer --remove-prefix="${link_type}:"
+}
+@opts-setprefixas org-link-extract-url org-link-extract
+##
+aliasfn org-link-extract-audiofile org_link_extract_type=audiofile org-link-extract-url
+
 function org-link-extract-audiofile-abs {
     local fs
     fs="$(org-link-extract-audiofile)" @TRET
-    fs="$(ec "$fs" | sd '^audiofile:' '')" @TRET
     fs="$(ec "$fs" | inargsf path-unabbrev)" @TRET
 
     ec "$fs"
@@ -475,5 +483,15 @@ function org-date-extract-due {
 function org-link-browser-current {
     org-link-create "$(browser-current-url)" "$(browser-current-title)" \
         | cat-copy-if-tty
+}
+##
+function org-toman-get {
+    : 'Use with "| in-sum | numfmt-humanfriendly"'
+
+    ##
+    # rget '\[toman:(\d+)\]'
+    ##
+    org_link_extract_type='toman' org-link-extract-url "$@"
+    ##
 }
 ##
