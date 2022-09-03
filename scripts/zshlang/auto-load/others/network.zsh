@@ -277,3 +277,11 @@ function darwin-net-static-unset {
     networksetup -setdhcp Wi-Fi
 }
 ##
+function net-local-wifi-enable-darwin {
+    reval-ec networksetup -setnetworkserviceenabled FakeNet on
+}
+
+function net-local-wifi-disable-darwin {
+    reval-ec networksetup -setnetworkserviceenabled FakeNet off
+}
+##
