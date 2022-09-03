@@ -242,6 +242,10 @@ function utf8-to-ascii-pyunidecode {
 aliasfn utf8-to-ascii utf8-to-ascii-pyunidecode
 aliasfn str-normalize utf8-to-ascii
 
+function str-normalize2 {
+    unicode_normalizer_hf.py "$@" | cat-copy-if-tty
+}
+
 function newline-normalize {
     perl -0777 -pe 's/\R/\n/g'
 }
