@@ -1,9 +1,51 @@
 ##
+function semantic-scholar-to-json-api {
+    #: @docs https://api.semanticscholar.org/api-docs/graph#tag/Paper-Data/operation/get_graph_get_paper
+    ##
+    local paper_id="${1}" #: e.g., arXiv:1705.10311
+    if [[ "$paper_id" =~ '^https://api.semanticscholar.org/((?:arXiv|CorpusID):[^/]+)$' ]] ; then
+        paper_id="${match[1]}"
+
+        # typ paper_id
+    fi
+
+    revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,tldr" |
+        jq .
+}
+
 function semantic-scholar-to-json {
     # @alt https://www.semanticscholar.org/product/api
     ##
     local url="${1:-$(pbpaste)}"
     assert-args url @RET
+    url="$(semantic-scholar-url-get "$url")" @TRET
+
+    local json_scraped
+    json_scraped="$(semantic-scholar-to-json-scraping "$url")" @TRET
+
+    local json_api
+    json_api="$(semantic-scholar-to-json-api "$url")" @TRET
+
+    if false ; then
+        {
+            ec "$json_scraped" | jq .
+            ec '----------'
+            ec "$json_api" | jq .
+            ec '----------'
+        } >&2
+    fi
+
+    jq -s '.[0] * .[1]' <(ec "$json_scraped") <(ec "$json_api" |
+                                                    json-listify-first-level |
+                                                    json-stringify-atoms)
+}
+
+function semantic-scholar-to-json-scraping {
+    # @alt =semantic-scholar-to-json-api=
+    ##
+    local url="${1:-$(pbpaste)}"
+    assert-args url @RET
+    url="$(semantic-scholar-url-get "$url")" @TRET
 
     eval-memoi full-html2 "$url" \
         | selectors2json.py \
@@ -12,28 +54,29 @@ function semantic-scholar-to-json {
         doi '[data-selenium-selector="paper-doi"] .doi__link' 'attr:href' \
         corpusID '[data-selenium-selector="corpus-id"]' '' \
         date '[data-selenium-selector="paper-year"]' '' \
-        authors 'meta[name="citation_author"]' 'attr:content' \
-        journal '[data-heap-id="paper-meta-journal"]' '' \
+        authors_names 'meta[name="citation_author"]' 'attr:content' \
+        journal_name '[data-heap-id="paper-meta-journal"]' '' \
         abstract 'meta[name="description"]' 'attr:content' \
         links '[data-selenium-selector="paper-link"]' 'attr:href' \
         topics '[data-selenium-selector="entity-name"]' '' \
-        citations '[data-heap-nav="citing-papers"]' '' \
-        references '[data-heap-nav="references"]' '' \
+        referenceCount '[data-heap-nav="references"]' '' \
         | jq '.'
 
     ##
     # abstract '[data-selenium-selector="abstract-text"]' '->org' \
     # authors '.author-list' '->org' \
     # '+1 author' appears in the authors list.
+    # citationCount '[data-heap-nav="citing-papers"]' '' \
     ##
 }
 
 function semantic-scholar-to-org {
     local url="${1:-$(pbpaste)}"
     assert-args url @RET
+    url="$(semantic-scholar-url-get "$url")" @TRET
 
-    semantic-scholar-to-json "$url" \
-        | semantic_scholar_json_to_org.lisp "$url" \
+    revaldbg semantic-scholar-to-json "$url" \
+        | revaldbg semantic_scholar_json_to_org.lisp "$url" \
         | cat-copy-if-tty
 }
 ##
