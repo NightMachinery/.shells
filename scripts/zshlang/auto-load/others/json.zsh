@@ -29,12 +29,18 @@ function jq-quote {
     ##
 }
 ##
-json-beautify() {
+function json-beautify {
     if isI ; then
         jq --color-output . | less
     else
         jq .
     fi
+}
+
+function json-beautify2 {
+    : "also works with Python dictionaries"
+
+    prettier --parser=json5
 }
 ##
 function arrJ-noquote() {
@@ -52,5 +58,17 @@ function arrJ() {
 function arrJ-in() {
     # From https://github.com/stedolan/jq/issues/563
     jq --raw-input --null-input '[inputs | select(length>0)]'
+}
+##
+function json-listify-first-level {
+    jq '.[] |= if type == "array" then . else [.] end'
+}
+
+function json-listify-first-level-py {
+    json_listify_first_level.py
+}
+##
+function json-stringify-atoms {
+    json_stringify_atoms.py
 }
 ##
