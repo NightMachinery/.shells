@@ -123,7 +123,7 @@ function ivy-self() {
     tmux -2 attach-session -d
 }
 
-function ivy-convenience() {
+function ivy-convenience {
     local i
 
     # for i in {1..3} ; do
@@ -142,5 +142,8 @@ function ivy-convenience() {
     for i in {1..1} ; do
         tmuxnew "ipython_repl$i" ipython
     done
+    ##
+    tmuxnew ipython_p310 conda run --no-capture-output --live-stream -n p310 ipython
+    ##
 }
 ##

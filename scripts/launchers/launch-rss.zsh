@@ -25,12 +25,12 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh \
     'https://www.scottaaronson.com/blog/?feed=rss2' \
     'https://julialang.org/feed.xml' \
     'https://discourse.julialang.org/u/davidanthoff/activity/topics.rss' \
-    'https://www.overcomingbias.com/feed' \
     'https://feeds2.feedburner.com/GFWReport' \
     'http://www.viridiandreams.net/feed/' \
     'https://www.oreilly.com/radar/topics/radar-trends/feed/index.xml' \
-    'https://blog.pragmaticengineer.com/rss/' \
-    'https://www.anandtech.com/rss/'
+    # 'https://blog.pragmaticengineer.com/rss/' \
+    # 'https://www.anandtech.com/rss/' \
+    # 'https://www.overcomingbias.com/feed' \
 
 # 'https://danluu.com/atom.xml' \ #: the urls seem to change and thus trigger mass downloads on our part
 # 'https://buttondown.email/hillelwayne/rss' 'https://huyenchip.com/feed.xml' 'https://tamaspapp.eu/post/index.xml'
@@ -39,8 +39,9 @@ tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tl'" tmuxnewsh \
 tmuxnewshenv="rt_skip='$rt_skip' rt_eud=1 rt_e='rss-tll'" tmuxnewsh rss-gen-tll rss-tsend 'https://medium.com/feed/@superwuster'
 # 'https://www.themoneyillusion.com/feed/'
 
+#: Alice does ML: '-1001334871190'
 tmuxnewshenv="rt_skip='y' rt_id='-1001334871190' rt_eud=1 rt_e='true'" tmuxnewsh \
-    rss-tlg-gen rss-tsend \
+    rss-tlg-ml rss-tsend \
     'http://jalammar.github.io/feed.xml' \
     'https://hf.co/blog/feed.xml' \
     'http://distill.pub/rss.xml' \

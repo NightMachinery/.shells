@@ -1,4 +1,5 @@
 brew "dark-mode"
+brew "discoteq/discoteq/flock"
 brew "duti"
 brew "m-cli"
 brew "nu"

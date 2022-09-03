@@ -25,6 +25,11 @@ function arxiv-url-get {
               || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
             ]] ; then
             id="${match[1]}"
+        ##
+        elif [[ "$url" =~ '^https://(?:www\.)?api\.semanticscholar\.org' ]] ; then
+            urls_semantic_scholar+="$url"
+            continue
+        ##
         else
             ecerr "$0: bad URL $(gq "$url")"
             retcode=1
