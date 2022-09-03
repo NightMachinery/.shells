@@ -1,5 +1,12 @@
 #!/usr/bin/env -S sbcl_batteriful --script
 
+(defparameter citations_count_key "citationCount")
+(defparameter references_count_key "referenceCount")
+(defparameter date_key "date")
+;; (defparameter year_key "year")
+(defparameter authors_names_key "authors_name")
+(defparameter topics_key "fieldsOfStudy")
+
 (defparameter in
   (if *repl-mode*
       ""
@@ -26,10 +33,10 @@
                    (cond
                      ((string= key "corpusID")
                       (ppcre:regex-replace-all "\\s*Corpus\\s*ID:\\s*" val ""))
-                     ((member key (list
-                                   "citations"
-                                   "references") :test #'string=)
-                      (ppcre:regex-replace-all "\\D+" val ""))
+                     ;; ((member key (list
+                     ;;               citations_count_key
+                     ;;               references_count_key) :test #'string=)
+                     ;;  (ppcre:regex-replace-all "\\D+" val ""))
                      ((string= key "links")
                       (when (ppcre:scan "^https?://([^/]+\.)?arxiv.org/" val)
                         (setq arxiv-url
@@ -37,8 +44,11 @@
                                (brishz-outrs "arxiv-url-get" val))))
                       val)
                      (t val)))
-                 (val (pandoc-org-trim-extra
-                       (pandoc-normalize-whitespace val))))
+                 (val (cond
+                        ((stringp val)
+                         (pandoc-org-trim-extra
+                          (pandoc-normalize-whitespace val)))
+                        (t val))))
             (cond
               (t val))))))))
 
@@ -47,7 +57,7 @@
     ((string= key "arxiv")
      (listify-if-not arxiv-url))
     ((string= key "date_tag")
-     (let* ((date (v0 "date"))
+     (let* ((date (v0 date_key))
             (year
               (rget "(\\d{4})" date))
             (month
@@ -67,7 +77,7 @@
   (let ((title (v0 "title"))
         (url (car (argv-get))))
     (format t "@citations/~a ~a "
-            (v0 "citations")
+            (v0 citations_count_key)
             (v0 "date_tag"))
     (org-link-write :url url :title title)
     (ec))
@@ -76,14 +86,18 @@
         (accessor #'v)
         (keys '(
                 "arxiv"
-                "date"
-                "citations"
-                "references"
-                "journal"
-                "authors"
+                date_key
+                "year"
+                citations_count_key
+                "influentialCitationCount"
+                references_count_key
+                "venue"
+                "journal_name"
+                authors_names_key
                 "links"
                 "doi"
-                "topics"
+                topics_key
+                "isOpenAccess"
                 "corpusID")))
     (org-properties-write :keys keys :accessor accessor :out_stream out_stream))
 
