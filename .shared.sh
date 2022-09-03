@@ -59,7 +59,8 @@ fi
 
 addToPATH /opt/local/bin /opt/local/sbin # macports
 addToPATH /usr/sbin
-addToPATH ~/.emacs.d.doom/bin
+# addToPATH ~/.emacs.d.doom/bin
+addToPATH ~/.emacs.d/bin
 addToPATH "$HOME/.dotnet/tools"
 addToPATH "/Library/TeX/texbin"
 addToPATH "$HOME/.cargo/bin"

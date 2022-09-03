@@ -129,7 +129,7 @@ function pdfoutline {
 ##
 function pdf-getpages {
     local f="$1" from="$2" to="$3"
-    local o="${4:-${1:r}_$from_${to}.pdf}"
+    local o="${4:-${1:r}_${from}_${to}.pdf}"
     pdftk A=$f cat A$from-$to output "$o"
 }
 

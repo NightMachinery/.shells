@@ -1,10 +1,10 @@
 ##
 function emc-launch-gui {
     local emacs_dir
-    emacs_dir="$(eval-memoi brew --cellar emacs-plus)"
+    emacs_dir="$(eval-memoi brew --cellar emacs-plus@29)"
     if ! test -d "$emacs_dir" ; then
         if true || isDeus ; then # doing deus will make the common case very slow, as =brew --cellar emacs-plus= keeps returning a non-existent directory
-            emacs_dir="$(eval-memoi brew --cellar emacs-plus@28)" # @hardcoded
+            emacs_dir="$(eval-memoi brew --cellar emacs-plus@29)" # @hardcoded
         else
             reval-ec deus "$0" "$@"
             return $?
@@ -21,6 +21,6 @@ function emc-launch-gui {
         emacs_app="${emacs_app[1]}"
     fi
 
-    tmuxnewsh2 emacs-gui $proxyenv "${emacs_app}"
+    reval-ec tmuxnewsh2 emacs-gui $proxyenv "${emacs_app}" # --debug-init
 }
 ##

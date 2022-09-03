@@ -65,7 +65,7 @@ fi
 if isMe ; then
     # tmuxnewsh2 hotwords-porc porc-listen
     ##
-    tmuxnewsh2 browser-recordings-process-watch browser-recordings-process-watch
+    # tmuxnewsh2 browser-recordings-process-watch browser-recordings-process-watch
     ## These two might not load properly in the cron context
     # iterm-boot
     ##

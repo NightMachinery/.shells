@@ -47,12 +47,16 @@ function h_luna-advanced-bell {
 
         local bell_awaysh=no hear_loudidle=no i
         if sharif-vc-is ; then
-            if (( skipped >= 1 )) ; then
+            if false ; then
+                if (( skipped >= 1 )) ; then
                     tts-gateway "CRITICAL: You are at your ${skipped}th skip"
+                fi
+                @opts redo 1 @ bell-visual-flash1
+                sleep 10 #: keeps screen gray
             fi
-            @opts redo 1 @ bell-visual-flash1
-            sleep 10 # keeps screen gray
         else
+            sleep 20 #: gives us time to finish our work or cancel the alarms
+
             if (( skipped >= 1 )) ; then
                 brishz awaysh lunaquit-monitor '' ''
                 for i in {1..3} ; do
@@ -660,7 +664,7 @@ bell-maker sc-error 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Bro
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
 ## HP3:
 bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 12/Dialog part 1/pc_her_Adv6_7_be careful harry..blue..wav'
-bell-maker hp3-water-trickle "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/"water_trickle*.wav
+bell-maker hp3-water-trickle "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/"water_trickle*.wav(.N)
 ## Sonic:
 bell-maker sonic-fx-ready 'Sonic and SEGA All-Stars Racing/PC Computer - Sonic and SEGA All-Stars Racing - General Sound Effects/Sonic and Sega All-Stars Racing/General SFX/FE_READY.wav'
 ##
