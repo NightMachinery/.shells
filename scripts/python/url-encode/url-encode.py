@@ -2,7 +2,9 @@
 import fileinput
 import urllib.parse
 import sys
+import os
 
+safe_chars = os.environ.get("url_encode_safe", '/:?=&')
 lines = sys.stdin.readlines()
 
 lines[-1] = lines[-1].rstrip()
@@ -11,7 +13,7 @@ lines[-1] = lines[-1].rstrip()
 # else:
 #     print(repr(lines[-1]))
 
-print(urllib.parse.quote(''.join(lines), safe='/:?=&'))
+print(urllib.parse.quote(''.join(lines), safe=safe_chars))
 ##
 # for line in fileinput.input():
 #     print(urllib.parse.quote(line.rstrip(), safe='/:?=&'))
