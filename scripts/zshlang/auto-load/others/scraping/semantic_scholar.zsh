@@ -92,3 +92,29 @@ function semantic-scholar-to-org {
         | cat-copy-if-tty
 }
 ##
+function semantic-scholar-dl-from-org {
+    local org
+    org="$(cat-paste-if-tty)" @TRET
+
+    local urls
+    urls="$(ec "$org" | urls-extract | rg '\.pdf$')" @TRET
+    urls=(${(@f)urls})
+
+    local url
+    url="${urls[1]}"
+
+    local name
+    name="$(
+    ec "$org" |
+    org-link-extract-title |
+    ghead -n 1
+    )" @TRET
+
+    local dest
+    dest="${name}.pdf"
+
+    reval-ec aa-gateway "$url" -o "${dest}" @RET
+
+    reval-ec tsendf-book "$dest"
+}
+##

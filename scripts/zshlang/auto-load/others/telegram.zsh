@@ -19,7 +19,22 @@ function tnotif-casual() {
 aliasfn tnotifc tnotif-casual
 @opts-setprefix tnotifc tnotif
 ##
-function tsendf() {
+function tsendf-book {
+    local dest="${tsend_dest:--1001304139500}"
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local tmp
+    for f in ${inargs[@]} ; do
+        tmp="$(gmktemp --suffix='.png')"
+        ebook-cover "$f" "$tmp" @RET
+
+        reval-ec tsendf-discrete "$dest" "$f" "$tmp"
+    done
+}
+@opts-setprefix tsendf-book tsend
+##
+function tsendf {
     local f opts=()
     for f in "${@:2}"
     do
