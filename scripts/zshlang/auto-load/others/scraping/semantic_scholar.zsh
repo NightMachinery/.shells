@@ -3,13 +3,20 @@ function semantic-scholar-to-json-api {
     #: @docs https://api.semanticscholar.org/api-docs/graph#tag/Paper-Data/operation/get_graph_get_paper
     ##
     local paper_id="${1}" #: e.g., arXiv:1705.10311
+    local corpus_id="${semantic_scholar_corpus_id}"
+
     if [[ "$paper_id" =~ '^https://api.semanticscholar.org/((?:arXiv|CorpusID):[^/]+)$' ]] ; then
         paper_id="${match[1]}"
 
         # typ paper_id
+    elif [[ "$paper_id" =~ '^http' ]] && test -n "$corpus_id" ; then
+        paper_id="CorpusID:${corpus_id}"
     fi
 
-    revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,tldr" |
+    local json
+    json="$(revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,tldr")" @TRET
+
+    ec "$json" |
         jq .
 }
 
@@ -23,8 +30,12 @@ function semantic-scholar-to-json {
     local json_scraped
     json_scraped="$(semantic-scholar-to-json-scraping "$url")" @TRET
 
+    corpus_id="$(ec "$json_scraped" |
+                    jqm '.corpusID' |
+                    rget '(?:Corpus\s*ID:\s*)?(\d+)')" || true
+
     local json_api
-    json_api="$(semantic-scholar-to-json-api "$url")" @TRET
+    json_api="$(semantic_scholar_corpus_id="$corpus_id" semantic-scholar-to-json-api "$url")" @TRET
 
     if false ; then
         {
@@ -58,6 +69,7 @@ function semantic-scholar-to-json-scraping {
         journal_name '[data-heap-id="paper-meta-journal"]' '' \
         abstract 'meta[name="description"]' 'attr:content' \
         links '[data-selenium-selector="paper-link"]' 'attr:href' \
+        pdf_urls 'meta[name="citation_pdf_url"]' 'attr:content' \
         topics '[data-selenium-selector="entity-name"]' '' \
         referenceCount '[data-heap-nav="references"]' '' \
         | jq '.'

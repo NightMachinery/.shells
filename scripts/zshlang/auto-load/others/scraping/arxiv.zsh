@@ -26,7 +26,7 @@ function arxiv-url-get {
             ]] ; then
             id="${match[1]}"
         ##
-        elif [[ "$url" =~ '^https://(?:www\.)?api\.semanticscholar\.org' ]] ; then
+        elif [[ "$url" =~ '^https://(?:www\.)?(?:api\.)?semanticscholar\.org' ]] ; then
             urls_semantic_scholar+="$url"
             continue
         ##
