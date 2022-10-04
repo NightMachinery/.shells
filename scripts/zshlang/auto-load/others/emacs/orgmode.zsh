@@ -274,10 +274,18 @@ function org-fanfic {
     ec "${tags}[[${url}][${title}]]${org_props_folded}- @author ${author}"$'\n'"#+begin_quote${body}"$'\n'"#+end_quote"
 }
 ##
+function org-link-extract-title {
+    rget "(?<!\\)\[(?<!\\)\[(?:[^][]|\\\[|\\\])+(?<!\\)\](?<!\\)\[((?:[^][]|\\\[|\\\])+)(?<!\\)\](?<!\\)\]"
+}
+
 function org-link-extract {
     ensure-array org_link_extract_opts
     local opts=("$org_link_extract_opts[@]")
     local link_type="$org_link_extract_type"
+    if test -n "$link_type" && [[ "$link_type" != *: ]] ; then
+        link_type+=":"
+    fi
+
     local what="${org_link_extract_what:-link}" rget_e=('ugrep_get')
     local format
     if true ; then
@@ -300,8 +308,8 @@ function org-link-extract {
         fi
     fi
 
-    rget_replace="$format" ugrep_get_format="$format" "$rget_e[@]" "${opts[@]}" \
-        -e '(?:\s*(?:\*|-|\+)\s*)(.*(?:\[|<)('${link_type}':[^]]+)(?:\]|>).*)' \
+    rget_replace="$format" ugrep_get_format="$format" revaldbg "$rget_e[@]" "${opts[@]}" \
+        -e '(?:\s*(?:\*|-|\+)\s*)(.*(?<!\\)(?:\[|<)('${link_type}'(?:[^][]|\\\[|\\\])+)(?<!\\)(?:\]|>).*)' \
         | cat-copy-if-tty
 }
 
