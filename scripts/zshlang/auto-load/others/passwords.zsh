@@ -28,7 +28,7 @@ function passgen-words {
         fi
     done
 
-    ec "${(j.-.)words[@]}"
+    ec "${(j.-.)words[@]}" | cat-copy-if-tty
 }
 ##
 function with-dice-i {

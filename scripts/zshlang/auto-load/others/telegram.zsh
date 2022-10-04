@@ -27,6 +27,7 @@ function tsendf() {
     done
     revaldbg tsend "$opts[@]" -- "$1" ''
 }
+
 function tsendf-discrete() {
     local f
     for f in "${@:2}"

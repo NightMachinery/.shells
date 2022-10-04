@@ -9,7 +9,8 @@ typeset -g lilf_user="eva"
 ##
 WORDLIST0='/usr/share/dict/words'
 ##
-BROTHER_IP=192.168.1.230
+# BROTHER_IP=192.168.1.230
+BROTHER_IP=192.168.1.238
 ##
 export Font_Symbola_CourierNew="$NIGHTDIR/resources/fonts/Symbola_CourierNew.ttf"
 export Font_CourierNew_Symbola="$NIGHTDIR/resources/fonts/CourierNew_Symbola.ttf" # monospace

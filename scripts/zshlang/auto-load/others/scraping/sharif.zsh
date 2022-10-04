@@ -168,7 +168,7 @@ sharif_dir="$codedir/data/sharif_course_list"
 sharif_cjar="$sharif_tmp_dir/cjar.txt"
 sharif_curl_opts=(--silent --fail --no-progress-meter --cookie $sharif_cjar --cookie-jar $sharif_cjar --max-time 10 --retry 20 --retry-delay 1)
 
-function sharif-login() {
+function sharif-login {
     # pushf ~/tmp/"$(uuidm)"
     pushf $sharif_tmp_dir || return $?
     {
@@ -232,6 +232,10 @@ function sharif-login() {
                 -H 'accept-language: en-US,en;q=0.9,fa;q=0.8,ru;q=0.7,ur;q=0.6' \
                 --data-raw 'username='$sharif_username'&password='$sharif_password'&jcaptcha='$solved_captcha'&x=0&y=0&command=login&captcha_key_name=null&captchaStatus=false' \
                 --compressed > l2.html
+
+            # open l2.html
+            # sleep 5
+
             if < l2.html command rg --quiet 'کاربر جاری' ; then
                 ec login successful
                 break

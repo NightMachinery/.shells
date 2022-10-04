@@ -67,6 +67,7 @@ function pxify() {
 
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl
+    pxify-command kaggle
     pxify-command unalix
     pxify-command nimble # @broken
     pxify-command conda

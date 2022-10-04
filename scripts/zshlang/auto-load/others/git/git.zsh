@@ -446,7 +446,8 @@ function git-listblobs() {
     | cut -c 1-12,41- \
     | $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
 }
-function git_sparse_clone() (
+
+function git_sparse_clone {
   # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
   rurl="$1" localdir="$2" && shift 2
 
@@ -465,12 +466,15 @@ function git_sparse_clone() (
   done
 
   git pull origin master
-)
-function github-dir() {
+}
+
+function github-dir {
+  : "@? downloads the given URL of a Github directory to the given destination."
+
   svn export "$(sed 's/tree\/master/trunk/' <<< "$1")" "$2"
 }
 ##
-function git-pristine() {
+function git-pristine {
   : 'Single repo: git reset --hard && git clean -dfx'
 
   git clean -dfx

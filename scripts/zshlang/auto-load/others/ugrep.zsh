@@ -153,7 +153,7 @@ function ugrep_get {
     local format="${ugrep_get_format:-%[1]#%~}"
     # format='%f%s%n%s%[1]#' # path+linenumber+match
 
-    ugrep "$ugrep_opts[@]" --perl-regexp --format="$format" "$@"
+    revaldbg ugrep "$ugrep_opts[@]" --perl-regexp --format="$format" "$@"
     # `--colors='hl'` doesn't work with `--format`.
 }
 ##
