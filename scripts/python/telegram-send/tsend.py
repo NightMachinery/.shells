@@ -105,5 +105,7 @@ def parse_tsend(argv):
 if __name__ == '__main__':
     argv = sys.argv[1:]
     arguments = parse_tsend(argv)
-    loop = asyncio.get_event_loop()
+
+    # loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
     loop.run_until_complete(tsend(arguments))
