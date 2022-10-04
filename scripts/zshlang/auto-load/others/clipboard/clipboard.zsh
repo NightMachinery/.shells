@@ -99,7 +99,7 @@ function clipboard-removedups() {
 }
 ##
 function clipboard-fz-raw() {
-    local copy="${clipboard_fz_copy:-y}"
+    local copy="${clipboard_fz_copy}"
     local opts=("${@:-}")
     if [[ "$opts[-1]" == -* ]] ; then
         #: `fzp' needs the last arg to be a query.
@@ -109,10 +109,15 @@ function clipboard-fz-raw() {
     local res
     res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --exact --tiebreak=index --height='80%' "${opts[@]}")" @RET
 
-    if bool $copy ; then
-        assert pbcopy "$res"
+    if test -z "$copy" ; then
+        ecn "$res" | cat-copy-if-tty
+    else
+        if bool $copy ; then
+            assert pbcopy "$res"
+        fi
+
+        ecn "$res"
     fi
-    ecn "$res"
 }
 alias cl='clipboard-fz-raw --height="100%"'
 

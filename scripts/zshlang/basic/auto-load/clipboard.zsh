@@ -112,7 +112,7 @@ function pbpaste-html() {
 }
 alias poph='pbpaste-html'
 
-function pbcopy-html() {
+function pbcopy-html {
     # @alt copy_as_html.swift can set the plain and HTML clipboard simultaneously.
     #
     # Can be pasted in Excel, TextEdit, but surprisingly not in much else
@@ -148,7 +148,7 @@ function pbcopy-html() {
     fi
 }
 
-function pbcopy-rtf() {
+function pbcopy-rtf {
     local rtf
     rtf="$(cat)" @RET
 

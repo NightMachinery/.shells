@@ -11,15 +11,15 @@ function kitty-terminfo-install() {
     infocmp -x xterm-kitty | ssh "$@" tic -x -o \~/.terminfo/ /dev/stdin
 }
 
-function ssh() {
+function ssh-kitty {
   bella_zsh_disable1
 
   if fn-isTop && isKitty ; then
     # will install the xterm-kitty terminal definition on the remote in your home directory.
     # Only needs to run once per host
-    kitty +kitten ssh "$@"
+    ecbold kitty +kitten ssh "$@"
   else
-    command ssh "$@"
+    ecbold command ssh "$@"
   fi
 }
 ##
