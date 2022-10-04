@@ -4,7 +4,7 @@
 (defparameter references_count_key "referenceCount")
 (defparameter date_key "date")
 ;; (defparameter year_key "year")
-(defparameter authors_names_key "authors_name")
+(defparameter authors_names_key "authors_names")
 (defparameter topics_key "fieldsOfStudy")
 
 (defparameter in
@@ -84,7 +84,7 @@
 
   (let ((out_stream *standard-output*)
         (accessor #'v)
-        (keys '(
+        (keys (list
                 "arxiv"
                 date_key
                 "year"
@@ -95,6 +95,7 @@
                 "journal_name"
                 authors_names_key
                 "links"
+                "pdf_urls"
                 "doi"
                 topics_key
                 "isOpenAccess"
