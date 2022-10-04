@@ -254,3 +254,64 @@ function sharif-login {
     }
 }
 ##
+function sharif-register-course {
+    local dest=~/tmp/reg_ans.html
+    local course_id="${1}"
+    assert-args course_id @RET
+
+    ecbold "course_id: ${course_id}"
+
+    reval-ec sharif-login @RET
+
+    reval-ec sharif-goto-register @RET
+
+    curl "$sharif_curl_opts[@]" \
+        'https://edu.sharif.edu/register.do?command=add' \
+        -H 'authority: edu.sharif.edu' \
+        -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
+        -H 'accept-language: en-US,en;q=0.9,fa;q=0.8' \
+        -H 'cache-control: no-cache' \
+        -H 'content-type: application/x-www-form-urlencoded' \
+        -H 'dnt: 1' \
+        -H 'origin: https://edu.sharif.edu' \
+        -H 'pragma: no-cache' \
+        -H 'referer: https://edu.sharif.edu/register.do?command=add' \
+        -H 'sec-ch-ua: "Chromium";v="104", " Not A;Brand";v="99", "Google Chrome";v="104"' \
+        -H 'sec-ch-ua-mobile: ?0' \
+        -H 'sec-ch-ua-platform: "macOS"' \
+        -H 'sec-fetch-dest: document' \
+        -H 'sec-fetch-mode: navigate' \
+        -H 'sec-fetch-site: same-origin' \
+        -H 'sec-fetch-user: ?1' \
+        -H 'upgrade-insecure-requests: 1' \
+        -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36' \
+        --data-raw "lessonID=${course_id}&groupID=&unit=" \
+        --compressed > "$dest" @STRUE
+
+    open "$dest"
+}
+
+function sharif-goto-register {
+    curl "$sharif_curl_opts[@]" 'https://edu.sharif.edu/action.do' \
+        -H 'authority: edu.sharif.edu' \
+        -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9' \
+        -H 'accept-language: en-US,en;q=0.9,fa;q=0.8' \
+        -H 'cache-control: no-cache' \
+        -H 'content-type: application/x-www-form-urlencoded' \
+        -H 'dnt: 1' \
+        -H 'origin: https://edu.sharif.edu' \
+        -H 'pragma: no-cache' \
+        -H 'referer: https://edu.sharif.edu/action.do' \
+        -H 'sec-ch-ua: "Chromium";v="104", " Not A;Brand";v="99", "Google Chrome";v="104"' \
+        -H 'sec-ch-ua-mobile: ?0' \
+        -H 'sec-ch-ua-platform: "macOS"' \
+        -H 'sec-fetch-dest: document' \
+        -H 'sec-fetch-mode: navigate' \
+        -H 'sec-fetch-site: same-origin' \
+        -H 'sec-fetch-user: ?1' \
+        -H 'upgrade-insecure-requests: 1' \
+        -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36' \
+        --data-raw 'changeMenu=OnlineRegistration*registerJustStudent&isShowMenu=&id=&commandMessage=&defaultCss=' \
+        --compressed
+}
+##
