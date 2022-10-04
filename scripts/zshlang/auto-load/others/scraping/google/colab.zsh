@@ -1,4 +1,5 @@
 function colab-from-github {
+    local user="${colab_google_user:-5}"
     local inargs
     inargs="$(in-or-args "$@")" @RET
 
@@ -7,6 +8,6 @@ function colab-from-github {
 
     ec "$inargs" |
         perl -pe "s|^https://github.com/|https://colab.research.google.com/github/|g" |
-        prefixer --skip-empty |
+        prefixer --skip-empty --add-postfix="?authuser=${user}" |
         cat-copy-if-tty
 }
