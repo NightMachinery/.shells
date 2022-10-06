@@ -391,3 +391,13 @@ function reval-retcode {
     ec $?
 }
 ##
+function pdf-margins-add {
+    jglob
+    local input="${1}"
+    assert-args input @RET
+    local o="${1:r}_wm.${1:e}"
+
+    command pdf-crop-margins -o "$o" -p 100 -a4 -300 -100 -300 -100 "$input"
+}
+aliasfn jpma pdf-margins-add
+##
