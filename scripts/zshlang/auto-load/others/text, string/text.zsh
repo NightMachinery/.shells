@@ -104,7 +104,7 @@ alias pdn='p-double-newlines'
 ##
 function newline2space {
     cat-paste-if-tty |
-        perl -pe 's/\R\s*/ /g' |
+        perl -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ; s/\R\s*/ /g' |
         cat-copy-if-tty
 
     # sd '\n\s*' ' ' |

@@ -83,10 +83,11 @@ function pbcopy {
         silent copyq copy -- "$in"
     } || {
         (( $+commands[pbcopy] )) && {
-            print -nr -- "$in" | command pbcopy
+            print -nr -- "$in" | LANG=en_US.UTF-8 command pbcopy
         }
     }
 }
+
 function pbpaste() {
     # if isKitty ; then
     #     kitty +kitten clipboard --get-clipboard
