@@ -20,6 +20,8 @@ tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
 tmuxnew vless xray -config ~/vless.json
 
 tmuxnew gost-ssh gost -L ssh://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8104
+# tmuxnew gost-wss gost -L 'http+wss://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8103'
+tmuxnew gost-relay gost -L relay+tls://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8500
 ##
 tmuxnewsh2 hi10-notify hi10-new-notify 'mahouka|Mushoku Tensei|tokyo revenger|kumo desu ga'
 ##
