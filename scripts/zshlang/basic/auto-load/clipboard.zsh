@@ -58,7 +58,7 @@ function pbcopy-term() {
     printf "\033]52;c;$(printf "%s" "$in" | base64)\a"
 }
 
-function pbcopy() {
+function pbcopy {
     ##
     # local in="$(in-or-args "$@")"
     local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"

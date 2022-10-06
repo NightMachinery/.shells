@@ -18,6 +18,8 @@ tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
 # tmuxnewsh2 v2-socks v2ray -config $NIGHTDIR/configFiles/v2ray/socks_eva.json
 
 tmuxnew vless xray -config ~/vless.json
+
+tmuxnew gost-ssh gost -L ssh://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8104
 ##
 tmuxnewsh2 hi10-notify hi10-new-notify 'mahouka|Mushoku Tensei|tokyo revenger|kumo desu ga'
 ##
