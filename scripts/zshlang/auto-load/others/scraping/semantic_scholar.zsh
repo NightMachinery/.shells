@@ -13,6 +13,10 @@ function semantic-scholar-to-json-api {
         paper_id="CorpusID:${corpus_id}"
     fi
 
+    if [[ "$paper_id" =~ '^(arXiv:[^/]+)v\d{1,2}$' ]] ; then
+        paper_id="${match[1]}"
+    fi
+
     local json
     json="$(revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,tldr")" @TRET
 
