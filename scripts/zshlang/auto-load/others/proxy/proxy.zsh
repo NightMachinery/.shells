@@ -180,13 +180,20 @@ function darwin-proxies-gen {
     networks=(
         ${(@f)"$(darwin-proxy-getns-cached)"}
 
+        ##
         #: having invalid/inactive entries here is okay
-        Wi-Fi
-        'iPhone USB'
-        'iPad USB'
-
-        # "${(@f)$(networksetup -listallnetworkservices | gsed 1d)}"
+        # Wi-Fi
+        # 'iPhone USB'
+        # 'iPad USB'
+        ##
     )
+
+    excluded=(
+        'Loopback'
+        'FakeNet'
+    )
+
+    networks=(${(@)networks:|excluded})
 
     local ns
     for ns in ${(@u)networks} ; do
