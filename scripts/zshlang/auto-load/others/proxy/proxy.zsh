@@ -139,7 +139,11 @@ function pxify-auto() { # @gateway
     fi
 }
 ##
-function darwin-proxy-getns() {
+function darwin-proxy-getns {
+    networksetup -listnetworkserviceorder | rget '^\((?:\*|\d+)\)\s+(.*)$'
+}
+
+function darwin-proxy-getns-v1 {
     #: get the active network service
     #: from https://apple.stackexchange.com/a/223446/282215
     ##
@@ -168,7 +172,8 @@ function darwin-proxy-getns() {
     fi
 }
 
-aliasfn darwin-proxy-getns-cached memoi_expire=0 memoi-eval darwin-proxy-getns
+# aliasfn darwin-proxy-getns-cached memoi_expire=0 memoi-eval darwin-proxy-getns
+aliasfn darwin-proxy-getns-cached darwin-proxy-getns #: no longer needs caching
 
 function darwin-proxies-gen {
     local networks
