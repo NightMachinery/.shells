@@ -2,6 +2,7 @@
 
 const timeout = ((process.env.cfTimeout) || 20) * 1000
 const scrollDown = ((process.env.cfScrollDown) || 0)
+const urlFinal = ((process.env.cfUrlFinal) || 0)
 
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
@@ -38,6 +39,14 @@ puppeteer.use(StealthPlugin());
 
     //const title = await page.title();
     //console.log(title);
+
+    if (urlFinal > 0) {
+        const finalurl = await page.url();
+        console.log(finalurl);
+
+        browser.close();
+        return;
+    }
 
     if (scrollDown > 0) {
         let i = 0

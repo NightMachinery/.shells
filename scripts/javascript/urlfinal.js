@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @deprecated Use `cfUrlFinal=1 curlfull.js`.
+///
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
 puppeteer.use(require('puppeteer-extra-plugin-repl')())

@@ -105,14 +105,14 @@ function url-final2() {
     [[ "$(2>&1 wgetm --no-verbose --spider "$1" )" =~ '.* URL: (.*) 200 .*' ]] && ec "$match[1]" || url-final "$1"
 }
 
-function url-final3() {
+function url-final3 {
     ##
     # The most reliable and expensive way.
     # it was too expensive, so @deprecated
     #
-    # retry-limited 3 urlfinal.js "$1" || url-final2 "$1"
+    cfUrlFinal=1 cfTimeout="${cfTimeout:-1}" retry-limited 3 curlfull.js "$1" # || url-final2 "$1"
     ##
-    url-final2 "$1"
+    # url-final2 "$1"
 }
 reify url-final url-final2 url-final3
 noglobfn url-final url-final2 url-final3
