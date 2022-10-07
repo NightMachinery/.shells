@@ -321,6 +321,36 @@ function org-link-extract-url {
 }
 @opts-setprefixas org-link-extract-url org-link-extract
 ##
+aliasfn org-link-extract-file org_link_extract_type=file org-link-extract-url
+aliasfn org-link-extract-id org_link_extract_type=id org-link-extract-url
+
+function org-export-recursive {
+    local fs=($@)
+
+    local f f_q id_link file_link text
+    for f in ${fs[@]} ; do
+        f_q="$(emc-quote "$f")" @TRET
+
+        # ecbold "exporting $f"
+
+        reval-ec emc-eval "(night/org-export-file-to-html ${f_q})" @RET
+
+        text="$(cat "$f")" @TRET
+
+        id_links=( ${(@f)"$(ec "$text" | { org-link-extract-id || true } )"}) @TRET
+        for id_link in ${id_links[@]} ; do
+            file_link="$(emc-eval "(night/org-id-path-get $(emc-quote "$id_link"))")" @TRET
+
+            org-export-recursive "$file_link" @RET
+        done
+
+        file_links=( ${(@f)"$(ec "$text" | { org-link-extract-file || true } | { rg '\.org(?:::.*)?$' || true } )"}) @TRET
+        for file_link in ${file_links[@]} ; do
+            org-export-recursive "$file_link" @RET
+        done
+    done
+}
+##
 aliasfn org-link-extract-audiofile org_link_extract_type=audiofile org-link-extract-url
 
 function org-link-extract-audiofile-abs {
