@@ -51,7 +51,7 @@ function dedent() {
     sd --flags m '^\s*' ''
 }
 
-function trim() {
+function trim {
     : "Doesn't trim whitepsace in each line separately, use trimsed for that"
 
     local out="$(in-or-args "$@")"
@@ -66,6 +66,10 @@ function trimsed() {
 function trimpy() {
     python3 -c 'import sys
 for line in sys.stdin: print(line.strip())'
+}
+
+function trim-extension {
+    perl -ple 's/\.[^.]+$//g'
 }
 
 function removeTrailingSlashes() {
