@@ -157,6 +157,10 @@ function lunaquit {
     ec "$pids" | inargsf reval-ec serr kill-withchildren || true
 }
 
+function lunaquit-force {
+    lunaquit ; pkill LUNA ; sleep 1 && kill-marker-luna-timer-late
+}
+
 function lunaquit-monitor() {
     # @todo1 make this single-instance
 

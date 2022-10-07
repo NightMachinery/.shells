@@ -110,7 +110,7 @@ function url-final3 {
     # The most reliable and expensive way.
     # it was too expensive, so @deprecated
     #
-    cfUrlFinal=1 cfTimeout="${cfTimeout:-1}" retry-limited 3 curlfull.js "$1" # || url-final2 "$1"
+    cfUrlFinal=1 cfTimeout="${cfTimeout:-1}" retry-limited 5 curlfull.js "$1" # || url-final2 "$1"
     ##
     # url-final2 "$1"
 }
