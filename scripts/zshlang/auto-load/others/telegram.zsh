@@ -51,15 +51,34 @@ function tsendf-discrete() {
     done
 }
 
-function tsend-url() {
+function tsend-url {
     local dest="${1:?}" url="${2:?}" msg="$3"
 
     local tmp=~/tmp/"$(uuidm)"
     pushf $tmp || return $?
     {
         aa-insecure "$url" || return $?
-        tsend --file * -- $dest "${msg:-$url}"
+        local f fs=(*(DN))
+        for f in ${fs[@]} ; do
+            if test -z "$msg" ; then
+               msg="${url}"
+            elif [[ "$msg" == 'MAGIC_FILE_TAIL' ]] ; then
+               msg="${f:t}"
+            fi
+
+            tsend --file $f -- $dest "${msg}"
+        done
     } always { popf ; command rm -rf "$tmp" }
+}
+
+function tsend-urls {
+    local dest="${1}" urls=("${@[2,-1]}")
+    assert-args dest urls @RET
+
+    local url
+    for url in ${urls[@]} ; do
+        reval-ec tsend-url "$dest" "$url" 'MAGIC_FILE_TAIL'
+    done
 }
 ##
 function air {
