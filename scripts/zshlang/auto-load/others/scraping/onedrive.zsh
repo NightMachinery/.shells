@@ -8,6 +8,8 @@ function onedrive-dl-link {
 }
 
 function onedrive-dl {
+    : "transformer url-final3 onedrive-dl ..."
+
     local urls=($@)
 
     onedrive-dl-link "${urls[@]}" | inargsf reval-ec aa-gateway -Z
