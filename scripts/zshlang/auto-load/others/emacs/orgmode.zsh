@@ -324,16 +324,44 @@ function org-link-extract-url {
 aliasfn org-link-extract-file org_link_extract_type=file org-link-extract-url
 aliasfn org-link-extract-id org_link_extract_type=id org-link-extract-url
 
+
 function org-export-recursive {
+    local storage_key_root='org_export_rec'
+    local storage_key_hashes="${storage_key_root}_hashes"
+    local storage_key_outs="${storage_key_root}_outs"
+
+    if isDeus ; then
+        #: @warning This removes the cache for all files, not just the ones affected by the current job. We can make `storage_key_hashes' dependent on our inputs here, but I think the complexity is not worth it.
+        assert sout redism del "$storage_key_hashes" @RET
+    fi
+
+    h-org-export-recursive "$@"
+}
+
+function h-org-export-recursive {
+    #: This function cannot be directly called. Use `org-export-recursive'.
+    assert test -n "$storage_key_root" @RET
+
     local fs=($@)
 
-    local f f_q id_link file_link text
+    local f f_hashed f_q id_link file_link text h outs
     for f in ${fs[@]} ; do
+        f_hashed="$(md5m "$f")" @TRET
+        h="$(md5-file "$f")" @TRET
+        h_last="$(redism hget "${storage_key_hashes}" "${f_hashed}")" || true
+        if [[ "$h" == "$h_last" ]] ; then
+            ecgray "skipped $(gquote-dq $f)"
+            assert redism hget "${storage_key_outs}" "${f_hashed}" @RET
+            continue
+        fi
+        assert sout redism hset "${storage_key_hashes}" "${f_hashed}" "${h}" @RET
         f_q="$(emc-quote "$f")" @TRET
 
-        # ecbold "exporting $f"
+        ecbold "exporting ${f_q}"
+        outs="$(emc-eval "(night/org-export-file-to-html ${f_q})")"$'\n' @TRET
+        assert sout redism hset "${storage_key_outs}" "${f_hashed}" "" @RET
 
-        reval-ec emc-eval "(night/org-export-file-to-html ${f_q})" @RET
+        assert sout redism hset "${storage_key_hashes}" "${f_hashed}" "${h}" @RET
 
         text="$(cat "$f")" @TRET
 
@@ -341,13 +369,17 @@ function org-export-recursive {
         for id_link in ${id_links[@]} ; do
             file_link="$(emc-eval "(night/org-id-path-get $(emc-quote "$id_link"))")" @TRET
 
-            org-export-recursive "$file_link" @RET
+            outs+="$("$0" "$file_link")"$'\n' @TRET
         done
 
         file_links=( ${(@f)"$(ec "$text" | { org-link-extract-file || true } | { rg '\.org(?:::.*)?$' || true } )"}) @TRET
         for file_link in ${file_links[@]} ; do
-            org-export-recursive "$file_link" @RET
+            outs+="$("$0" "$file_link")"$'\n' @TRET
         done
+
+        outs="$(ec "$outs" | duplicates-clean)"$'\n' @TRET
+        assert sout redism hset "${storage_key_outs}" "${f_hashed}" "${outs}" @RET
+        ec "$outs"
     done
 }
 ##
