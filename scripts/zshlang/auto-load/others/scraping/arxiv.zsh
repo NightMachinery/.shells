@@ -1,6 +1,6 @@
 ##
 function semantic-scholar-url-get {
-    local urls_semantic_scholar=()
+    local urls_semantic_scholar=() doi_ids=()
     sout arxiv-url-get "$@" @TRET
     arrNN $urls_semantic_scholar[@] | cat-copy-if-tty
 }
@@ -12,12 +12,13 @@ function arxiv-url-get {
     urls_abs=()
     urls_vanity=()
     urls_semantic_scholar=()
+    doi_ids=()
     ##
     local urls
     urls="$(in-or-args "$@")" @RET
     urls=(${(@f)urls})
 
-    local url id retcode=0
+    local url id doi_id retcode=0
     for url in $urls[@] ; do
         id=""
         if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
@@ -30,6 +31,22 @@ function arxiv-url-get {
             urls_semantic_scholar+="$url"
             continue
         ##
+        elif [[ "$url" =~ '^https://(?:www\.)?doi\.org/(.*)' ]] ; then
+            #: @example https://doi.org/10.18653/v1/D19-1221
+
+            doi_id="${match[1]}"
+
+            doi_ids+="${doi_id}"
+            # urls_semantic_scholar+="https://api.semanticscholar.org/graph/v1/paper/${doi_id}"
+            urls_semantic_scholar+="https://api.semanticscholar.org/${doi_id}"
+            continue
+        elif [[ "$url" =~ '^https://(?:www\.)?aclanthology\.org/([^/]*)' || "$url" =~ '^https://(?:www\.)?aclweb\.org/anthology/(?:.*/)?([^/]+)' ]] ; then
+            #: @example https://aclanthology.org/2020.acl-main.431/
+            #: @example https://www.aclweb.org/anthology/P19-1580/
+            #: @example https://aclweb.org/anthology/papers/N/N19/N19-1357/
+
+            urls_semantic_scholar+="https://api.semanticscholar.org/ACL:${match[1]}"
+            continue
         else
             ecerr "$0: bad URL $(gq "$url")"
             retcode=1
