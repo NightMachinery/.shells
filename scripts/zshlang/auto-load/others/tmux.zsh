@@ -88,7 +88,7 @@ aliasfn tcgar tmux-capture BrishGarden
 ##
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 
-function ivy() {
+function ivy {
     ## ivy acts as the terminal emulator's startup hook, as well
     phoenix-reload
     ##
