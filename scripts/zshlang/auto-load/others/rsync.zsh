@@ -13,6 +13,11 @@ function rsp-notes-export {
     local rsp_include
     rsp_include=(${(@f)"$(org-export-recursive "${@}" | trim-extension)"}) @TRET
 
+    if (( ${#rsp_include} == 0 )) ; then
+        ecerr "$0: no files included"
+        return 1
+    fi
+
     ec $'\n\n#####################\n\n'
 
     reval-ec rsp-notes ~nt/ --rsh="ssh -J walle@193.151.136.67"
