@@ -326,6 +326,8 @@ aliasfn org-link-extract-id org_link_extract_type=id org-link-extract-url
 
 
 function org-export-recursive {
+    #: stdout: the paths of exported files
+    ##
     local storage_key_root='org_export_rec'
     local storage_key_hashes="${storage_key_root}_hashes"
     local storage_key_outs="${storage_key_root}_outs"
@@ -351,7 +353,10 @@ function h-org-export-recursive {
         h_last="$(redism hget "${storage_key_hashes}" "${f_hashed}")" || true
         if [[ "$h" == "$h_last" ]] ; then
             ecgray "skipped $(gquote-dq $f)"
+
             assert redism hget "${storage_key_outs}" "${f_hashed}" @RET
+            #: This will not return an error even if the key does not exist.
+
             continue
         fi
         assert sout redism hset "${storage_key_hashes}" "${f_hashed}" "${h}" @RET
@@ -359,7 +364,9 @@ function h-org-export-recursive {
 
         ecbold "exporting ${f_q}"
         outs="$(emc-eval "(night/org-export-file-to-html ${f_q})")"$'\n' @TRET
+
         assert sout redism hset "${storage_key_outs}" "${f_hashed}" "" @RET
+        #: Deleting/resetting this key will potentially make parallel executions of this function problematic. But not deleting it can leak deleted links, which is more dangerous.
 
         assert sout redism hset "${storage_key_hashes}" "${f_hashed}" "${h}" @RET
 
