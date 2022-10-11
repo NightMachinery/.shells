@@ -60,6 +60,7 @@ if isMe ; then
     v2-on # v2ray-genrouter
     ##
     # tmuxnewsh2 socks2http hpts --level info -s 127.0.0.1:1081 -p 1087 # https://github.com/oyyd/http-proxy-to-socks
+    ##
 fi
 ###
 if isMe ; then
@@ -80,5 +81,7 @@ if isMe ; then
 fi
 ##
 tmuxnewsh2 clipboard-record clipboard-record
+##
+psource ~/.startup..private..zsh
 ##
 chronic-all

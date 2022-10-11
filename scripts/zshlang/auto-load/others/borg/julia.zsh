@@ -204,13 +204,13 @@ ensure-ju() {
                           return 1 }
 }
 ##
-function jmv() {
-    local dest="${1:-n_$jufile}"
+function jmv {
+    local dest="${*:-n_$jufile}"
 
     test -e "$jufile" && gmv -v "$jufile" "$dest"
 }
 
-jrm() {
+function jrm {
     test -e "$jufile" && trs-rm "$jufile"
 }
 ##
