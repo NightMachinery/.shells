@@ -111,19 +111,23 @@ function pxaify-fn {
 }
 reify pxaify-fn
 ##
-function pxpy() {
+function pxpy {
     px python "$commands[$1]" "${@:2}"
 }
 
-function enh-pxpy() {
+function enh-pxpy {
     ge_no_hist=y geval "function $1() {
     pxpy $1 \"\$@\"
 }"
 }
 ##
+function proxy-p {
+    test -z "$pxified" && { isMBP }
+}
+
 function proxy-auto-p {
     # local initCountry="$(serr mycountry)"
-    if test -z "$pxified" && { isMBP } ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
+    if proxy-p ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
         return 0
     else
         return 1
