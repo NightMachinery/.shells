@@ -29,12 +29,17 @@ function in-or-args {
         if isInTty ; then
             pbpaste
         else
-            print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
+            ##
+            #: @idk why we ever used this  ¯\_(ツ)_/¯
+            # print -nr -- "${$(</dev/stdin ; print -n .)[1,-2]}"
+            ##
+            cat
+            ##
         fi
     fi
 }
 
-function pcat() {
+function pcat {
     possiblycat "${@:-50}"
 }
 ##

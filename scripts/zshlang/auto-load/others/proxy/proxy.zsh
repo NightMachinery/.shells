@@ -54,7 +54,7 @@ function v2-off() {
     tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/direct.json
 }
 ##
-function pxify() {
+function pxify {
     typeset -g proxycmd="proxychains4"
     typeset -g proxyenv="reval-pxa"
 
@@ -89,18 +89,18 @@ function pxify() {
     pxaify-command emacsclient
 }
 ##
-function pxify-command() {
+function pxify-command {
     aliasfn "$1" proxychains4 -q "$1"
     # -q: quiet
 }
 reify pxify-command
 
-function pxaify-command() {
+function pxaify-command {
     aliasfn "$1" pxa command "$1"
 }
 reify pxaify-command
 
-function pxaify-fn() {
+function pxaify-fn {
     local name="$1"
     local name_new="h_pxa_${name}"
     assert-args name @RET

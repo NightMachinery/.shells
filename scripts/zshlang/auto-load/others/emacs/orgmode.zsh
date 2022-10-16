@@ -327,6 +327,7 @@ aliasfn org-link-extract-id org_link_extract_type=id org-link-extract-url
 
 function org-export-recursive {
     #: stdout: the paths of exported files
+    #: The caching system is only sensitive to the roots. If a leave changes, we won't detect the change.
     ##
     local storage_key_root='org_export_rec'
     local storage_key_hashes="${storage_key_root}_hashes"

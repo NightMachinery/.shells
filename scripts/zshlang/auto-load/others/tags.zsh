@@ -303,7 +303,7 @@ function ntag-rm() {
     fi
 }
 ###
-function ntag-toapple() {
+function ntag-toapple {
     local f="$1"
     test -e "$f" || {
         ecerr "$0: Nonexistent file: $f"
@@ -321,8 +321,12 @@ function ntag-toapple() {
             blue) revaldbg command tag --add Blue "$f" ;;
             purple) revaldbg command tag --add Purple "$f" ;;
             gray|grey) revaldbg command tag --add Gray "$f" ;;
+            ##
             # Uncomment this line to transfer all tags to the Apple tag system. Note that ntag-from-apple-force only removes colored tags currently, so you can not sync back custom tag removal from the Apple side.
             # *) revaldbg command tag --add "$tag" "$f" ;; # clutters things
+            ##
+            *) ecgray "tag skipped: $tag"
+            ##
         esac
     done
 }

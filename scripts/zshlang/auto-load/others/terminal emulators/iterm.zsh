@@ -134,6 +134,8 @@ function icat() {
             {
                 cat > $tmp @TRET
                 icat $tmp </dev/tty # icat-kitty tries to read the stdin if it is not a tty
+
+                gsleep 0.05 #: to allow us to cancel the loop
             } always {
                 silent trs-rm "$tmp"
             }

@@ -24,6 +24,8 @@ function rsp-notes-export {
 }
 
 function rsp-notes {
+    bella_zsh_disable1
+
     local src="$1"
     src="$(realpath "$src")" @TRET
 
@@ -59,6 +61,7 @@ function rsp-notes {
         opts+=(--extension "$ext")
     done
 
+    {
     #: @warning These paths seem to be relative to all included directories. So having 'notes' will cause 'x/notes' to also be included. But I think this will at most cause some empty directories to be copied in our situation, and not files.
     reval-ec fd -uuu --type=file --full-path \
         "${opts[@]}" \
@@ -75,6 +78,7 @@ function rsp-notes {
         reval-ec rsp-safe --include-from=- --exclude='*' \
             "${rsync_opts[@]}" \
             "$src" "$dest"
+    } always { bell-hp3-star-pickup }
 }
 @opts-setprefix rsp-notes rsp
 ##

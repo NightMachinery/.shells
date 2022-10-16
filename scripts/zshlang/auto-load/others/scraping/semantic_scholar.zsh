@@ -62,7 +62,7 @@ function semantic-scholar-to-json-scraping {
     assert-args url @RET
     url="$(semantic-scholar-url-get "$url")" @TRET
 
-    eval-memoi full-html2 "$url" \
+    full-html2 "$url" \
         | selectors2json.py \
         title '[data-selenium-selector="paper-detail-title"]' '' \
         bibtex '.bibtex-citation' '' \
