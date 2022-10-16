@@ -2,7 +2,7 @@
 
 """telegram-send
 Usage:
-  tsend.py [--file=<file>]... [--force-document --link-preview --parse-mode=<parser>] [--] <receiver> <message>
+  tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
 
@@ -26,18 +26,20 @@ import asyncio
 from telethon import TelegramClient, events
 from IPython import embed
 import re
+
 # import logging
 # logging.basicConfig(level=logging.DEBUG)
 
 
 # os.chdir(os.path.dirname(os.path.realpath(sys.argv[0]))) #Changes pwd to real path, useful for using symlinks for the script.
 # This behavior was disabled because it made sending files inconvenient.
-with open(str(Path.home()) + '/.telegram-config') as f:
+with open(str(Path.home()) + "/.telegram-config") as f:
     api_id = int(f.readline())
     api_hash = f.readline().rstrip()
     token = f.readline().rstrip()
     backend = int(f.readline())
-    #print(f"id: {api_id} hash: {api_hash} token: {token} backend: {backend}")
+    # print(f"id: {api_id} hash: {api_hash} token: {token} backend: {backend}")
+
 
 def p2int(p):
     try:
@@ -45,7 +47,35 @@ def p2int(p):
     except:
         return p
 
-async def discreet_send(client, receiver, message, file=None, force_document=False, parse_mode=None, reply_to=None, link_preview=False):
+
+async def discreet_send(
+    client,
+    receiver,
+    message,
+    file=None,
+    force_document=False,
+    parse_mode=None,
+    reply_to=None,
+    link_preview=False,
+    album_mode=True,
+):
+    if file and len(file) > 1 and album_mode == False:
+        res = None
+        for f in file:
+            res = await discreet_send(
+                client,
+                receiver,
+                message,
+                f,
+                force_document,
+                parse_mode,
+                reply_to,
+                link_preview,
+                album_mode=True,
+            )
+
+        return res
+
     message = message.strip()
     last_msg = reply_to
 
@@ -54,55 +84,90 @@ async def discreet_send(client, receiver, message, file=None, force_document=Fal
 
     if len(message) == 0:
         if file:
-            last_msg = await client.send_file(receiver, file, reply_to=(last_msg), allow_cache=False)
+            last_msg = await client.send_file(
+                receiver, file, reply_to=(last_msg), allow_cache=False
+            )
         return last_msg
     else:
         length = len(message)
         if length <= 12000:
             s = 0
             e = 4000
-            while (length > s):
-                last_msg = await client.send_message(receiver, message[s:e], file=file, force_document=force_document, parse_mode=parse_mode, link_preview=link_preview, reply_to=(last_msg))
+            while length > s:
+                last_msg = await client.send_message(
+                    receiver,
+                    message[s:e],
+                    file=file,
+                    force_document=force_document,
+                    parse_mode=parse_mode,
+                    link_preview=link_preview,
+                    reply_to=(last_msg),
+                )
 
                 s = e
                 e = s + 4000
         else:
             from brish import z
-            f = z('''
+
+            f = z(
+                """
             local f="$(gmktemp --suffix .txt)"
             ec {message} > "$f"
             ec "$f"
-            ''').outrs
-            last_msg = await client.send_file(receiver, f, reply_to=last_msg, allow_cache=False, caption='This message is too long, so it has been sent as a text file.')
-            z('command rm {f}')
+            """
+            ).outrs
+            last_msg = await client.send_file(
+                receiver,
+                f,
+                reply_to=last_msg,
+                allow_cache=False,
+                caption="This message is too long, so it has been sent as a text file.",
+            )
+            z("command rm {f}")
             if file:
-                last_msg = await client.send_file(receiver, file, reply_to=(last_msg), allow_cache=False)
+                last_msg = await client.send_file(
+                    receiver, file, reply_to=(last_msg), allow_cache=False
+                )
         return last_msg
 
+
 async def tsend(arguments):
-    arguments['<message>'] = str(arguments['<message>'])
+    arguments["<message>"] = str(arguments["<message>"])
     if backend == 2:
-        #print("backend 2 used")
+        # print("backend 2 used")
         import telegram
+
         bot = telegram.Bot(token=token)
-        bot.send_message(p2int(arguments['<receiver>']), arguments['<message>'])
+        bot.send_message(p2int(arguments["<receiver>"]), arguments["<message>"])
     else:
-        #print("telethon used")
+        # print("telethon used")
         async with TelegramClient(
-            str(Path.home()) + '/alice_is_happy',
-            api_id,
-            api_hash) as client:
+            str(Path.home()) + "/alice_is_happy", api_id, api_hash
+        ) as client:
 
             # print(arguments)
-            if arguments['--parse-mode'] == 'html':
-                arguments['<message>'] = re.sub(r"(<(br|p)\s*/?>)", r'\1' + '\n', arguments['<message>'])
+            if arguments["--parse-mode"] == "html":
+                arguments["<message>"] = re.sub(
+                    r"(<(br|p)\s*/?>)", r"\1" + "\n", arguments["<message>"]
+                )
 
-            await discreet_send(client, p2int(arguments['<receiver>']), arguments['<message>'], file=(arguments['--file'] or None), force_document=arguments['--force-document'], parse_mode=arguments['--parse-mode'], link_preview=arguments['--link-preview'])
+            await discreet_send(
+                client,
+                p2int(arguments["<receiver>"]),
+                arguments["<message>"],
+                file=(arguments["--file"] or None),
+                force_document=arguments["--force-document"],
+                parse_mode=arguments["--parse-mode"],
+                link_preview=arguments["--link-preview"],
+                album_mode=(not arguments["--no-album"]),
+            )
+
 
 def parse_tsend(argv):
-    return docopt(__doc__, version='telegram-send 0.1', argv=argv)
+    return docopt(__doc__, version="telegram-send 0.1", argv=argv)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     argv = sys.argv[1:]
     arguments = parse_tsend(argv)
 

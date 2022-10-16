@@ -35,20 +35,30 @@ function tsendf-book {
 @opts-setprefix tsendf-book tsend
 ##
 function tsendf {
-    local f opts=()
-    for f in "${@:2}"
+    local fs=("${@:2}")
+    local album_p="${tsend_album_p:-y}"
+
+    local opts=()
+    if ! bool "$album_p" ; then
+       opts+="--no-album"
+    fi
+
+    local f
+    for f in ${fs[@]}
     do
         opts+=(--file "$f")
     done
+
     revaldbg tsend "$opts[@]" -- "$1" ''
 }
 
-function tsendf-discrete() {
-    local f
-    for f in "${@:2}"
-    do
-        tsend -f "$f" -- "$1" ''
-    done
+function tsendf-discrete {
+    tsend_album_p=n tsendf "$@"
+    # local f
+    # for f in "${@:2}"
+    # do
+    #     tsend -f "$f" -- "$1" ''
+    # done
 }
 
 function tsend-url {
