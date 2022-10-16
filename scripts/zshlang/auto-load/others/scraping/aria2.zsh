@@ -1,10 +1,15 @@
 ##
 alias ysp='y-stream-pipe'
+
 aliasfn aa-gateway aacookies
 aliasfn aa aa-gateway
 alias aa='\noglob aa-gateway'
+
 alias aacert='aa --ca-certificate=/etc/ssl/certs/ca-certificates.crt'
 aliasfn aa-insecure aa-gateway --check-certificate=false
+aliasfn aainsecure aa-insecure
+aliasfn aai aa-insecure
+
 aliasfnq aa-multi run-on-each 'aa-gateway --conditional-get=true --allow-overwrite=true' # allows duplicate links without errors
 ###
 function dl-named {

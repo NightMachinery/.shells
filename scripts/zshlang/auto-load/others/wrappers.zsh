@@ -84,7 +84,7 @@ function open() {
   fi
 }
 
-aliasfn opv open -a preview
+aliasfn opv open -a preview --
 ##
 function mega-get() {
   if isBicon ; then

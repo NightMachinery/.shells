@@ -28,7 +28,7 @@ aliasfn fz-grep fz --no-sort --filter #Filter mode. Do not start interactive fin
 function fz-empty() {
     fz_empty='y' fz "$@"
 }
-function fz() {
+function fz {
     # "Use `fnswap fzf-gateway gq fz` to get the final command for use in other envs
     local opts emptyMode="${fz_empty}"
     opts=(${(@)fz_opts} --exit-0) #Don't quote it or it'll insert empty args
@@ -44,7 +44,7 @@ function fz() {
     fi
 }
 
-function fzf-noempty() {
+function fzf-noempty {
     local in="$(</dev/stdin)" # So we need to wait for the whole input to finish first.
     test -z "$in" && { return 130 } || { ecn "$in" | fzf-gateway "$@" }
 }

@@ -18,6 +18,12 @@ function youtube-dl() {
         opts+=(--add-header "$(cookies-auto "$@")")
     fi
 
+    ##
+    # if proxy-p ; then
+    #     opts+=(--proxy 'socks5://127.0.0.1:1081')
+    # fi
+    ##
+
     if isSSH ; then # urlfinalg takes too much time on Iran's net.
         transformer urlfinalg "revaldbg $proxycmd $head $opts[@]" "$@" "$ytdl_opts[@]"
     else
