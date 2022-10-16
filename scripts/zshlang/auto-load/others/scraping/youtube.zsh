@@ -80,3 +80,24 @@ function ygen() {
 }
 noglobfn ygen
 ##
+function yt-from-id {
+    #: @idempotent
+    ##
+    in-or-args "$@" |
+        perl -pe 's|^(?!https://)|https://www.youtube.com/watch?v=|g' |
+        cat-copy-if-tty
+}
+
+function yt-extract-id {
+    in-or-args "$@" |
+        rget '(?:\[)(.{11})(?:\])' |
+        cat-copy-if-tty
+}
+
+function yt-from-name {
+    cat-fdz-if-tty "$@" |
+        yt-extract-id |
+        yt-from-id |
+        cat-copy-if-tty
+}
+##
