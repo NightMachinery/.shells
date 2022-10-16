@@ -197,3 +197,16 @@ function fz-createquery() {
     ec "$res"
 }
 ##
+function cat-fdz-if-tty {
+    if (( $# ))
+    then
+        arrN "$@"
+    else
+        if isInTty ; then
+            fd | fz
+        else
+            cat
+        fi
+    fi
+}
+##
