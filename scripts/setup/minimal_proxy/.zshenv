@@ -9,6 +9,7 @@ export GOBIN="$GOPATH/bin"
 export PATH="$PATH:/usr/local/go/bin"
 export PATH="${PATH}:${GOBIN}"
 export PATH="${PATH}:${HOME}/bin"
+export PATH="${PATH}:${HOME}/.local/bin"
 ###
 tmuxnew () {
     tmux kill-session -t "$1" &> /dev/null
