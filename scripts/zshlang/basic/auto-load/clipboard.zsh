@@ -17,11 +17,15 @@ function cat-copy-if-tty {
 }
 
 function cat-paste-if-tty {
-    if isInTty ; then
-        pbpaste
-    else
-        cat
-    fi
+    ##
+    # if isInTty ; then
+    #     pbpaste
+    # else
+    #     cat
+    # fi
+    ##
+    in-or-args "$@"
+    ##
 }
 
 alias pop='pbpaste'
