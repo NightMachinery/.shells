@@ -28,7 +28,7 @@ function in-or-args3 {
 
 function in-or-args {
     if (( $# )) ; then
-        arrN "$@"
+        arrNN "$@"
     else
         if isInTty ; then
             pbpaste
