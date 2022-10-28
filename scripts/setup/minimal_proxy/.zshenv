@@ -1,4 +1,6 @@
 ###
+export TERM="xterm-256color"
+###
 setopt interactivecomments
 ###
 export VISUAL="vim"
