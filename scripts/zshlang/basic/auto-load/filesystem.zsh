@@ -109,6 +109,7 @@ function rmdir-empty() {
     # From https://unix.stackexchange.com/a/107556/282382
     gfind "$root" -mindepth 1 -type d -empty -print -delete
 }
+##
 function append-f2f() {
     local from="$(realpath "$1")" to="$(realpath --canonicalize-missing "$2")"
     if [[ "${from:l}" == "${to:l}" ]] ; then # realpath --canonicalize-missing does not normalize the case in macOS, so we are forcing them both to lowercase.

@@ -1,6 +1,7 @@
 [user]
 	name = NightMachinery
-	email = rudiwillalwaysloveyou@gmail.com
+	# email = rudiwillalwaysloveyou@gmail.com
+	email = feraidoonmehri@gmail.com
 	signingKey = 6156FCADABAFE9E8BC468F55C567089D40CA8367
 [alias]
 	co = checkout

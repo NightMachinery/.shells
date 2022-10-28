@@ -1,5 +1,5 @@
 # alias pc='pbcopy'
-function cat-copy() {
+function cat-copy {
     local inargs
     in-or-args2 "$@"
 
