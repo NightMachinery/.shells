@@ -29,6 +29,6 @@ function sync-append() {
 }
 
 function sync-append-in {
-    syn-append "$1" "$(cat)"
+    sync-append "$1" "${$(cat ; ecn .)[1,-2]}"
 }
 ##
