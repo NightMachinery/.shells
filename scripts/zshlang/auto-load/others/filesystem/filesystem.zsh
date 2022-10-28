@@ -170,42 +170,46 @@ function h_path-abbrev {
     # * @perf this is way too slow
     # * it doesn't work for non-existent dirs
     #
-    # @todo2 We need to reimplement this ourselves, by registering the directories in `aliasdir'.
+    # @todo2 We need to reimplement this ourselves, by registering the directories in `aliasdir'. We can then also have a version ala '${my_dir}/...' instead of '~my_dir/...', as well. This version is easier to use when copy-pasting to the terminal.
     ##
-    @inargsf
+    local inargs
+    in-or-args3 "$@" @RET
 
-    local f="$1"
-    local dir="${f}" tail=""
-    if ! test -d "$dir"; then
-        dir="${f:h}"
-        tail="${f:t}"
-    fi
-    assert test -d "$dir" @RET
-
-    pushf "$dir"
-    {
-        local dir_abbrev
-        dir_abbrev="$(eval 'ec ${(%):-%~}')" @TRET #: supports named directories
-
-        if test -n "$tail" ; then
-            ec "${dir_abbrev}/${tail}"
-        else
-            if [[ "${f[-1]}" == '/' ]] ; then
-                ec "${dir_abbrev}/"
-            else
-                ec "${dir_abbrev}"
-            fi
+    local f
+    for f in ${inargs[@]} ; do
+        local dir="${f}" tail=""
+        if ! test -d "$dir"; then
+            dir="${f:h}"
+            tail="${f:t}"
         fi
-    } always { popf }
+        assert test -d "$dir" @RET
+
+        pushf "$dir"
+        {
+            local dir_abbrev
+            dir_abbrev="$(eval 'ec ${(%):-%~}')" @TRET #: supports named directories
+
+            if test -n "$tail" ; then
+                ec "${dir_abbrev}/${tail}"
+            else
+                if [[ "${f[-1]}" == '/' ]] ; then
+                    ec "${dir_abbrev}/"
+                else
+                    ec "${dir_abbrev}"
+                fi
+            fi
+        } always { popf }
+    done | cat-copy-if-tty
 }
 aliasfn path-abbrev fnswap z-add true h_path-abbrev # using 'cd' triggers z-add which causes an infinite loop
 aliasfn path2tilde path-abbrev
 
-function path-unabbrev() {
-    @inargsf
+function path-unabbrev {
+    local inargs
+    in-or-args3 "$@" @RET
 
     local i head tail
-    for i in $@; do
+    for i in ${inargs[@]}; do
         if [[ "$i" =~ '^(~[^/]*)(.*)' ]] ; then
             head="${match[1]}"
             tail="${match[2]}"
@@ -213,12 +217,11 @@ function path-unabbrev() {
         else
             ec "$i"
         fi
-    done
+    done | cat-copy-if-tty
 }
 aliasfn tilde2path path-unabbrev
 
-
-function path-abbrev-simple () {
+function path-abbrev-simple {
     ec "$(in-or-args "$@")" | perl -lpe 's/^\Q$ENV{HOME}\E/~/g'
     ## tests:
     # `path2tilde $PWD | tee /dev/tty | tilde2path`
