@@ -174,13 +174,28 @@ function h_path-abbrev {
     ##
     @inargsf
 
-    local dir="${1}"
-    dir="$(bottomdir "$dir")" @TRET
+    local f="$1"
+    local dir="${f}" tail=""
+    if ! test -d "$dir"; then
+        dir="${f:h}"
+        tail="${f:t}"
+    fi
     assert test -d "$dir" @RET
 
     pushf "$dir"
     {
-        eval 'ec ${(%):-%~}' # supports named directories
+        local dir_abbrev
+        dir_abbrev="$(eval 'ec ${(%):-%~}')" @TRET #: supports named directories
+
+        if test -n "$tail" ; then
+            ec "${dir_abbrev}/${tail}"
+        else
+            if [[ "${f[-1]}" == '/' ]] ; then
+                ec "${dir_abbrev}/"
+            else
+                ec "${dir_abbrev}"
+            fi
+        fi
     } always { popf }
 }
 aliasfn path-abbrev fnswap z-add true h_path-abbrev # using 'cd' triggers z-add which causes an infinite loop
