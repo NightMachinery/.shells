@@ -98,6 +98,10 @@ function lnrp() {
     ln "$opts[@]" -s "$i" "$d"
 }
 ##
+function rm-empty {
+    fd --type=empty "$@" | inargsf trs-rm
+}
+
 function rmdir-empty() {
     : "Removes all recursively empty directories from <root-dir>"
 
