@@ -377,6 +377,12 @@ function h-org-export-recursive {
         for id_link in ${id_links[@]} ; do
             file_link="$(emc-eval "(night/org-id-path-get $(emc-quote "$id_link"))")" @TRET
 
+            if [[ "$file_link" == nil ]] ; then
+                ecerr "$0: got a nil file_link for id: ${id_link}"
+                return 1
+            fi
+
+
             outs+="$("$0" "$file_link")"$'\n' @TRET
         done
 
