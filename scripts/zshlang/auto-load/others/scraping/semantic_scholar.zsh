@@ -101,7 +101,13 @@ function semantic-scholar-dl-from-org {
     org="$(cat-paste-if-tty)" @TRET
 
     local urls
-    urls="$(ec "$org" | urls-extract | rg '\.pdf$')" @TRET
+    if ! urls="$(ec "$org" | urls-extract | rg '\.pdf$')" ; then
+        if urls="$(ec "$org" | urls-extract | rget '^https://api.semanticscholar.org/arXiv:([^/]+)$' | head -n 1)" ; then
+            urls="https://arxiv.org/pdf/${urls}.pdf"
+        else
+            urls="$(ec "$org" | rget '^\s*:pdf_urls:\s+(.*?)\s*$')" @TRET
+        fi
+    fi
     urls=(${(@f)urls})
 
     local url
