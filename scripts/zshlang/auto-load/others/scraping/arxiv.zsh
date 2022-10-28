@@ -18,7 +18,7 @@ function arxiv-url-get {
     urls="$(in-or-args "$@")" @RET
     urls=(${(@f)urls})
 
-    local url id doi_id retcode=0
+    local url id doi_id acl_id retcode=0
     for url in $urls[@] ; do
         id=""
         if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
@@ -44,8 +44,9 @@ function arxiv-url-get {
             #: @example https://aclanthology.org/2020.acl-main.431/
             #: @example https://www.aclweb.org/anthology/P19-1580/
             #: @example https://aclweb.org/anthology/papers/N/N19/N19-1357/
-
-            urls_semantic_scholar+="https://api.semanticscholar.org/ACL:${match[1]}"
+            acl_id="${match[1]}"
+            acl_id="$(ec "$acl_id" | perl -ple 's/\.pdf$//g' )" @TRET
+            urls_semantic_scholar+="https://api.semanticscholar.org/ACL:${acl_id}"
             continue
         else
             ecerr "$0: bad URL $(gq "$url")"
