@@ -545,6 +545,7 @@ appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 appHotkey{ key='t', appName='com.tdesktop.Telegram' }
 appHotkey{ key='e', appName='org.gnu.Emacs' }
 appHotkey{ key='a', appName='com.adobe.Reader' }
+appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
 

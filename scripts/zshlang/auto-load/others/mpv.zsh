@@ -256,7 +256,7 @@ function mpv-bookmark-fz {
         ecerr "$0: multiple selections not supported"
     fi
 
-    reval-ec hear --start="${timestamps[1]}" "${files[1]}"
+    reval-ec hear-noipc --start="${timestamps[1]}" "${files[1]}"
 }
 ##
 function mpv-tui {

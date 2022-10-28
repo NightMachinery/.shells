@@ -226,7 +226,7 @@ function path-abbrev-simple () {
     ##
 }
 
-function path-unabbrev-simple () {
+function path-unabbrev-simple {
     ec "$(in-or-args "$@")" | perl -lpe 's/^~/$ENV{HOME}/g'
 }
 ##
