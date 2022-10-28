@@ -5,13 +5,17 @@ function in-or-args2 {
     if (( $# )) ; then
         inargs=( "$@" )
     else
-        if ! isInTty ; then
-            in_or_args_in_p=y
+        ##
+        in_or_args_in_p=y
+        inargs="${$(in-or-args ; print -n .)[1,-2]}" @RET
+        ##
+        # if ! isInTty ; then
 
-            inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
-        else
-            return 1
-        fi
+        #     inargs="${$(</dev/stdin ; print -n .)[1,-2]}"
+        # else
+        #     return 1
+        # fi
+        ##
     fi
 }
 
@@ -38,7 +42,7 @@ function in-or-args {
         fi
     fi
 }
-
+##
 function pcat {
     possiblycat "${@:-50}"
 }

@@ -381,7 +381,9 @@ Undoes last commits without changing files." MAGIC
   git reset --soft HEAD~"${1:-1}"
 }
 ##
-function _git2http() {
+function h_git2http {
+  #: @deprecated
+  ##
   mdoc "Usage: git2http <git-ssh-url> ...
 cat <file-with-ssh-urls> | git2http
 
@@ -395,9 +397,15 @@ then
     <<<"$*" gsed -e 's|:|/|' -e 's|git@|https://|'
   fi
 }
-alias git2http='\noglob reval inargsEf "re _git2http"'
+alias git2http-v0='\noglob reval inargsEf "re h_git2http"'
+
+function git2http {
+  in-or-args "$@" |
+    perl -ple 's|^git@([^:]+):|https://$1/|g' |
+    cat-paste-if-tty
+}
 ##
-function git-resolve() {
+function git-resolve {
   local git=("${=gitbinary:-git}")
   STRATEGY="$1"
   FILE_PATH="$2"

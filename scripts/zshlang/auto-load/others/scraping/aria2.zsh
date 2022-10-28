@@ -1,7 +1,9 @@
 ##
 alias ysp='y-stream-pipe'
 
-aliasfn aa-gateway aacookies
+function aa-gateway {
+    $proxyenv aacookies "$@"
+}
 aliasfn aa aa-gateway
 alias aa='\noglob aa-gateway'
 
@@ -14,6 +16,7 @@ aliasfnq aa-multi run-on-each 'aa-gateway --conditional-get=true --allow-overwri
 ###
 function dl-named {
     local url="$1" title="$2" daemon_p="${dl_named_daemon_p}"
+    title="$(ec "$title" | str2filename)" @TRET
     assert-args url title @RET
 
     local ext=""
@@ -26,7 +29,7 @@ function dl-named {
     if bool "$daemon_p" ; then
         cmd=(tmuxnewsh2 "$(ec "dl-named $title ($(dateshort))" | str2tmuxname)")
     fi
-    cmd+=(aa-gateway --conditional-get=true --allow-overwrite=true --out="${title}" "$url")
+    cmd+=(all_proxy="$all_proxy" aa-gateway --conditional-get=true --allow-overwrite=true --out="${title}" "$url")
 
     reval-ec "${cmd[@]}"
 }
@@ -43,6 +46,13 @@ function aac {
 function aa-raw {
     local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
     #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
+
+    if isDbg ; then
+        opts+=(--log='-')
+        #: outputs the log to the stdout
+        #: the log is by default disabled
+        #: very verbose
+    fi
 
     local top_p="${aa_top_p}"
     isI || opts+=(--show-console-readout false --summary-interval 0)
@@ -99,7 +109,7 @@ function aa-raw {
     return $ret
 }
 
-function aacookies() {
+function aacookies {
     mdoc "$0 <aa-args>
 Uses |theCookies| var or else feeds first URL to |cookies|." MAGIC
 
@@ -203,7 +213,7 @@ function aaimg() {
     getlinks-img "$@" | inargsf sout aria2c -Z
 }
 ##
-function aa-remotename() {
+function aa-remotename {
     : "supports only a single URL"
     local url="${@[-1]}" rename="${aa_rename}"
 
@@ -232,7 +242,7 @@ function aa-remotename() {
 }
 @opts-setprefix aa-remotename aa
 
-function aa-hash-name() {
+function aa-hash-name {
     : "supports only a single URL"
     local url="${@[-1]}"
 

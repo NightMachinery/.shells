@@ -34,12 +34,12 @@ function brishz-in {
 }
 
 aliasfn bsh-er bshEndpoint=https://garden.lilf.ir/api/v1 # bsh eval remote
-function brishzr() {
+function brishzr {
     ensure-net "$0" || return $?
     if isLilf ; then
         reval "$@"
     else
-        bsh-er brishz "$@"
+        $proxyenv bsh-er brishz "$@"
     fi
 }
 ## @security @tests

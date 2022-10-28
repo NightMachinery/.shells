@@ -166,7 +166,7 @@ function trs-empty-files() {
     gfind "$d" -empty | inargsf trs
 }
 ##
-function h_path-abbrev() {
+function h_path-abbrev {
     # * @perf this is way too slow
     # * it doesn't work for non-existent dirs
     #

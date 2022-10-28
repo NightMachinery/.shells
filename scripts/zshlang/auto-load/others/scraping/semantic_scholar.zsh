@@ -119,6 +119,6 @@ function semantic-scholar-dl-from-org {
 
     reval-ec aa-gateway "$url" -o "${dest}" @RET
 
-    reval-ec tsendf-book "$dest"
+    reval-env-ec retry_sleep=10 retry-limited 10 tsendf-book "$dest"
 }
 ##

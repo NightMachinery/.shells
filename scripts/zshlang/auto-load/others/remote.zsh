@@ -1,9 +1,10 @@
 ##
-get-dl-link() {
-    print -rn -- "${dl_base_url}/$(realpath --relative-to ~/Downloads "$1")"|url-encode.py
+function lilf-link {
+    print -rn -- "${dl_base_url}/$(grealpath --relative-to ~/Downloads "$1")"|url-encode.py
 }
+aliasfn get-dl-link lilf-link
 ##
-function scp-lilf() {
+function scp-lilf {
     (( $#@ >= 2 )) || return 1
     ensure-net @MRET
     local files=(${@[1,-2]}) o="${@[-1]}"
