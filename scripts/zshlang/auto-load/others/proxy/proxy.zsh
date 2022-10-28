@@ -27,23 +27,35 @@ function reval-pxs() {
     reval pxs "$@"
 }
 ##
-function pxa-create() {
-    typeset -g px_httpport="${1:-1087}"
+function pxa-create {
+    local px_httpport="${1:-1087}" name="${2:-pxa}"
     # 1087: genrouter
     # 1088: shadowsocks
     # @todo0 make this support multiple ports at the  same time
 
-    export pxa_env="ALL_PROXY=http://127.0.0.1:${px_httpport} http_proxy=http://127.0.0.1:${px_httpport} https_proxy=http://127.0.0.1:${px_httpport} HTTP_PROXY=http://127.0.0.1:${px_httpport} HTTPS_PROXY=http://127.0.0.1:${px_httpport}"
-    silent re unalias pxa pxa-local
-    alias pxa="$pxa_env"
-    alias pxa-local="local -x $pxa_env"
+    local v="${name}_env"
+    export "$v"="ALL_PROXY=http://127.0.0.1:${px_httpport} all_proxy=http://127.0.0.1:${px_httpport} http_proxy=http://127.0.0.1:${px_httpport} https_proxy=http://127.0.0.1:${px_httpport} HTTP_PROXY=http://127.0.0.1:${px_httpport} HTTPS_PROXY=http://127.0.0.1:${px_httpport}"
+
+    # silent re unalias pxa pxa-local
+    #: @redundant
+
+    alias "${name}"="${(P)v}"
+    alias "${name}-local"="local -x ${(P)v}"
 }
 pxa-create
+pxa-create 2041 pxa41
 
 # alias pxa-maybe='isIran && pxa-local'
 alias pxa-maybe='isLocal && pxa-local'
-function reval-pxa() {
+function reval-pxa {
     pxa reval "$@"
+}
+function reval-pxa-if-no-proxy {
+    if test -z "${ALL_PROXY}${all_proxy}${HTTP_PROXY}${http_proxy}${HTTPS_PROXY}${https_proxy}${FTP_PROXY}${ftp_proxy}"  ; then
+        pxa reval "$@"
+    else
+        reval "$@"
+    fi
 }
 ##
 function v2-on() {
@@ -56,7 +68,7 @@ function v2-off() {
 ##
 function pxify {
     typeset -g proxycmd="proxychains4"
-    typeset -g proxyenv="reval-pxa"
+    typeset -g proxyenv="reval-pxa-if-no-proxy"
 
     enh-pxpy tsend
     # enh-pxpy subgrab
