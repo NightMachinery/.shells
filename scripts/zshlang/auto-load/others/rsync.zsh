@@ -9,6 +9,22 @@ function path-parent-dirs {
     awk '{print; while(/\//) {sub("/[^/]*$", ""); print}}'
 }
 ##
+function lilf-link-notes {
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local i i_html
+    for i in ${inargs[@]} ; do
+        i_html="${i:r}.html"
+        if [[ "$i" == *.org ]] && test -e "${i_html}" ; then
+            i="$i_html"
+        fi
+
+        ec "${dl_base_url}/static/notes/$(grealpath --relative-to "$nightNotes" "$i")"  | url-encode
+        #: url-encode encodes newlines, so we need to apply it per link.
+    done | cat-copy-if-tty
+}
+
 function rsp-notes-export {
     local rsp_include
     rsp_include=(${(@f)"$(org-export-recursive "${@}" | trim-extension)"}) @TRET
