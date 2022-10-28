@@ -579,3 +579,28 @@ function org-toman-get {
     ##
 }
 ##
+function h-org-cp-file {
+    local prefix_arg="${1}" files=(${@[2,-2]}) dest="${@[-1]}"
+    assert-args files dest
+
+    assert ensure-dir "$dest" @RET
+
+    if bool "$prefix_arg" ; then
+        assert gmv --backup='numbered' --verbose "${files[@]}" "${dest}" @RET
+
+        bell-files-moved
+    else
+        assert gcp --archive --backup='numbered' --link --verbose "${files[@]}" "${dest}" @RET
+    fi
+
+    bell-hp3-platform-movement
+
+    assert h-org-mark-redundant "${files[@]}" @RET
+}
+
+function h-org-mark-redundant {
+    in-or-args "$@" |
+        path-abbrev |
+        sync-append-in "${nightNotes}/private/internal/redundant.txt"
+}
+##
