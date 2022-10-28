@@ -239,6 +239,16 @@ function h_mpv-bookmark {
     ec "added bookmark for time $time and file $(gquote-dq $file)"
 }
 
+function mpv-bookmark-cleanup {
+    local bookmark_file="${mpv_bookmarks}"
+
+    cat "${bookmark_file}" |
+        tac |
+        perl -nle 'm/^\S+\s*(.+)$/ && !$seen{$1}++ && print $_' |
+        tac |
+        sponge "${bookmark_file}"
+}
+
 function mpv-bookmark-fz {
     local bookmark_file="${mpv_bookmarks}"
 

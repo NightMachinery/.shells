@@ -19,6 +19,8 @@ function duplicates-clean-sort-file-inplace {
 }
 
 function duplicates-clean {
+    #: @seeAlso [agfi:mpv-bookmark-cleanup]
+    ##
     prefixer --tac --skip-empty \
         | gawk 'NF && !seen[$0]++' \
         | prefixer --tac --skip-empty @RET
