@@ -20,43 +20,51 @@ function arxiv-url-get {
 
     local url id doi_id acl_id retcode=0
     for url in $urls[@] ; do
-        id=""
-        if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
-              || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
-              || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
-            ]] ; then
-            id="${match[1]}"
-        ##
-        elif [[ "$url" =~ '^https://(?:www\.)?(?:api\.)?semanticscholar\.org' ]] ; then
-            urls_semantic_scholar+="$url"
-            continue
-        ##
-        elif [[ "$url" =~ '^https://(?:www\.)?doi\.org/(.*)' ]] ; then
-            #: @example https://doi.org/10.18653/v1/D19-1221
+        local redirected_p=''
+        while true ; do
+            id=""
+            if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
+                  || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
+                  || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
+                  || "$url" =~ '^https://(?:www\.)?doi\.org(?:.*)/arXiv\.([^/]+)'
+                ]] ; then
+                #: @example https://doi.org/10.48550/arXiv.2012.07532
+                id="${match[1]}"
+            elif [[ "$url" =~ '^https://(?:www\.)?(?:api\.)?semanticscholar\.org' ]] ; then
+                urls_semantic_scholar+="$url"
+                break
+            elif [[ "$url" =~ '^https://(?:www\.)?doi\.org/(.*)' ]] ; then
+                #: @example https://doi.org/10.18653/v1/D19-1221
 
-            doi_id="${match[1]}"
+                doi_id="${match[1]}"
 
-            doi_ids+="${doi_id}"
-            # urls_semantic_scholar+="https://api.semanticscholar.org/graph/v1/paper/${doi_id}"
-            urls_semantic_scholar+="https://api.semanticscholar.org/${doi_id}"
-            continue
-        elif [[ "$url" =~ '^https://(?:www\.)?aclanthology\.org/([^/]*)' || "$url" =~ '^https://(?:www\.)?aclweb\.org/anthology/(?:.*/)?([^/]+)' ]] ; then
-            #: @example https://aclanthology.org/2020.acl-main.431/
-            #: @example https://www.aclweb.org/anthology/P19-1580/
-            #: @example https://aclweb.org/anthology/papers/N/N19/N19-1357/
-            acl_id="${match[1]}"
-            acl_id="$(ec "$acl_id" | perl -ple 's/\.pdf$//g' )" @TRET
-            urls_semantic_scholar+="https://api.semanticscholar.org/ACL:${acl_id}"
-            continue
-        else
-            ecerr "$0: bad URL $(gq "$url")"
-            retcode=1
-        fi
-        ids+="$id"
-        urls_pdf+="https://arxiv.org/pdf/${id}"
-        urls_abs+="https://arxiv.org/abs/${id}"
-        urls_vanity+="https://arxiv-vanity.com/papers/${id}"
-        urls_semantic_scholar+="https://api.semanticscholar.org/arXiv:${id}"
+                doi_ids+="${doi_id}"
+                # urls_semantic_scholar+="https://api.semanticscholar.org/graph/v1/paper/${doi_id}"
+                urls_semantic_scholar+="https://api.semanticscholar.org/${doi_id}"
+                break
+            elif [[ "$url" =~ '^https://(?:www\.)?aclanthology\.org/([^/]*)' || "$url" =~ '^https://(?:www\.)?aclweb\.org/anthology/(?:.*/)?([^/]+)' ]] ; then
+                #: @example https://aclanthology.org/2020.acl-main.431/
+                #: @example https://www.aclweb.org/anthology/P19-1580/
+                #: @example https://aclweb.org/anthology/papers/N/N19/N19-1357/
+                acl_id="${match[1]}"
+                acl_id="$(ec "$acl_id" | perl -ple 's/\.pdf$//g' )" @TRET
+                urls_semantic_scholar+="https://api.semanticscholar.org/ACL:${acl_id}"
+                break
+            elif ! bool "$redirected_p" ; then
+                url="$(urlfinalg "$url")" @TRET
+                continue
+            else
+                ecerr "$0: bad URL $(gq "$url")"
+                retcode=1
+            fi
+            ids+="$id"
+            urls_pdf+="https://arxiv.org/pdf/${id}"
+            urls_abs+="https://arxiv.org/abs/${id}"
+            urls_vanity+="https://arxiv-vanity.com/papers/${id}"
+            urls_semantic_scholar+="https://api.semanticscholar.org/arXiv:${id}"
+
+            break
+        done
     done
 
     arrnn ${(@)urls_abs} | cat-copy-if-tty @RET
