@@ -13,6 +13,10 @@ function jq-rtl {
     fi
 }
 ##
+function jq-len {
+    jq -re '. | length'
+}
+##
 function json-rm-keys-empty {
     #: This might only work on simple JSONs, IDK.
     ##
