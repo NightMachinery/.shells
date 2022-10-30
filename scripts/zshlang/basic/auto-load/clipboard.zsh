@@ -120,10 +120,10 @@ alias poph='pbpaste-html'
 function pbcopy-html {
     # @alt copy_as_html.swift can set the plain and HTML clipboard simultaneously.
     #
-    # Can be pasted in Excel, TextEdit, but surprisingly not in much else
-    # test with `<b>bold text</b>`
+    # Can be pasted in Excel, TextEdit, but surprisingly not in much else.
+    # Test with `<b>bold text</b>`.
     #
-    # Further tests seem to indicate that I was mistaken in my assumption that pasting rich text is possible in most web apps on Chrome. Gmail works though.
+    # @useme Further tests seem to indicate that I was mistaken in my assumption that pasting rich text is possible in most web apps on Chrome. Gmail and Google Docs work though.
     #
     # - @me https://stackoverflow.com/questions/68937989/macos-copy-html-to-the-clipboard
     # - @me https://github.com/chbrown/macos-pasteboard/issues/8

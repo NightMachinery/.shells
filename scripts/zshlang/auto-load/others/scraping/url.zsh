@@ -279,7 +279,7 @@ function urlfinalg {
         fi
 
         ec "$url"
-    done
+    done | cat-copy-if-tty
 }
 aliasfn url-final-gateway urlfinalg
 noglobfn urlfinalg
