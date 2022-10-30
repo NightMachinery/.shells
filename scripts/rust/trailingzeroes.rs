@@ -11,6 +11,8 @@
 //     [dependencies]
 // scriptisto-end
 
+// @alt `sed '$ s/\x30*$//'`
+//
 // https://users.rust-lang.org/t/count-trailing-zero-bytes-of-a-binary-file/42503/4
 
 use std::env;

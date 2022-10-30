@@ -34,7 +34,10 @@ function bookmark-search() {
 }
 alias bks='bookmark-search'
 ##
+#: @duplicateCode/9bd35fded6a091a2124673d5d0ec11b2
+#: [help:night/agsi]
 aliasfn-ng agsi ugbase_follow=n nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
+##
 function agfi1() {
     ##
     # a bit faster than the ugrep mode, possibly because ugrepMode=i0o0 (in fzp) wastes two invocations of prefixer
