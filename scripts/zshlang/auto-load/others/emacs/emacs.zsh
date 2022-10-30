@@ -246,10 +246,17 @@ function emc-literally {
     @opts cmd find-file-literally @ emc-nowait2 "$@"
 }
 ##
-function emc-less() {
+function emc-less {
     local fs=( $@ ) jq_force="$emc_less_jq" parser="$emc_less_parser" suffix="${emc_less_s}"
     if (( $#@ == 0 )) ; then
-        fs+=/dev/stdin
+        if isInTty ; then
+            local tmp
+            tmp="$(mktemp)" @TRET
+            cat-paste-if-tty > "$tmp" @RET
+            fs+="$tmp"
+        else
+            fs+=/dev/stdin
+        fi
     fi
 
     local f
