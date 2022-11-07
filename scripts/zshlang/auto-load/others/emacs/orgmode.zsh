@@ -627,3 +627,69 @@ function h-org-mark-redundant {
         sync-append-in "${nightNotes}/private/internal/redundant.txt"
 }
 ##
+function org-header-indent-v0 {
+    local n="${1:-1}"
+
+    local i
+    for i in {1..$n} ; do
+        perl -pe 's/^(\*+\s+)/*$1/' @RET
+    done
+}
+
+function org-header-indent {
+    local lv="${1:-1}"
+
+    local -x prefix
+    prefix="$(str_repeat_sep='' str-repeat "$lv" "*")" @TRET
+    perl -lpe 's/^(?=\*+\s+)/$ENV{prefix}/g'
+}
+
+function org-header-indent-to-current {
+    #: * @seeAlso
+    #:  ** [help:night/org-insert-and-fix-levels]
+    #:  *** [agfi:h-org-insert-and-fix-levels]
+    ##
+    local lv
+    lv="$(org-header-current-level)" @TRET
+    h-org-insert-and-fix-levels "$lv"
+}
+
+function h-org-insert-and-fix-levels {
+    local text lv="$1"
+    assert-args lv @RET
+    text="$(cat)" @RET
+
+    text="$(ec "$text" | org-header-rm-shared-level)" @TRET
+
+    ec "$text" |
+        if (( $lv > 0 )) ; then
+            org-header-indent "$lv"
+        else
+            cat
+        fi |
+        cat-copy-if-tty
+}
+
+function org-header-rm-shared-level {
+    local text
+    text="$(in-or-args "$@")" @TRET
+
+    local min_level
+    if min_level="$(ec "$text" | perl -lne 'm/^(\*+)/ && print length $1' | num-min)" ; then
+       min_level=$(( min_level - 1 ))
+
+       local min_heading=''
+       while (( $min_level > 0 )) ; do
+           min_level=$(( min_level - 1 ))
+
+           min_heading+='*'
+       done
+
+       if test -n "$min_heading" ; then
+          text="$(ec "$text" | prefixer --remove-prefix="$min_heading")" @TRET
+       fi
+    fi
+
+    ec "$text" | cat-copy-if-tty
+}
+##
