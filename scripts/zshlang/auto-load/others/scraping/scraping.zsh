@@ -776,7 +776,18 @@ function html-links-absolutify {
     assert-args url_current @RET
     local url_root
     url_root="${2:-$(url-head "$url_current")}" @TRET
+    local -x html_links_absolutify_p="${html_links_absolutify_p:-y}"
 
     ifdefined-cmd-or-cat html_links_absolutify.lisp "$url_current" "$url_root"
+}
+
+function html-links-urlfinal {
+    local url_current="$1"
+    if test -z "$url_current" ; then
+        url_current='https://dummy_url.com'
+        local html_links_absolutify_p='n'
+    fi
+
+    html_links_url_final_p=y html-links-absolutify "${url_current}" "${@[2,-1]}"
 }
 ##
