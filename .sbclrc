@@ -468,3 +468,23 @@
  (rget "(\\d{4})" "30 April 2014")
  (rget "(\\d{4})" "30 April 201"))
 ;;;
+(defun s-truncate (len s &optional ellipsis)
+  "If S is longer than LEN, cut it down and add ELLIPSIS to the end.
+
+The resulting string, including ellipsis, will be LEN characters
+long.
+
+When not specified, ELLIPSIS defaults to ‘...’.
+
+Ported from s.el's [help:s-truncate]."
+  (declare (pure t) (side-effect-free t))
+  (unless ellipsis
+    (setq ellipsis "..."))
+  (if (> (length s) len)
+      (concat (subseq s 0 (- len (length ellipsis))) ellipsis)
+      s))
+
+(comment
+ (s-truncate 6 "A123456789")
+ (s-truncate 699 "A123456789"))
+;;;
