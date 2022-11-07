@@ -161,22 +161,6 @@ function org-rm-header-content {
 
 aliasfn p-org-rm-header-content pbpaste-transform org-rm-header-content
 ##
-function org-header-indent {
-    local n="${1:-1}"
-
-    local i
-    for i in {1..$n} ; do
-        perl -pe 's/^(\*+\s+)/*$1/' @RET
-    done
-}
-
-function org-header-indent-to-current {
-    local lv
-    lv="$(org-header-current-level)" @TRET
-    cat | org-header-indent "$lv"
-}
-
-##
 function org-header-current-level {
     emc-eval "(org-current-level)"
 }
@@ -347,7 +331,7 @@ function h-org-export-recursive {
 
     local fs=($@)
 
-    local f f_hashed f_q id_link file_link text h outs
+    local f f_hashed f_q id_link file_link text h outs exported_file
     for f in ${fs[@]} ; do
         f_hashed="$(md5m "$f")" @TRET
         h="$(md5-file "$f")" @TRET
@@ -360,12 +344,19 @@ function h-org-export-recursive {
 
             continue
         fi
-        assert sout redism hset "${storage_key_hashes}" "${f_hashed}" "${h}" @RET
+
         f_q="$(emc-quote "$f")" @TRET
-
         ecbold "exporting ${f_q}"
-        outs="$(emc-eval "(night/org-export-file-to-html ${f_q})")"$'\n' @TRET
+        exported_file="$(emc-eval "(night/org-export-file-to-html ${f_q})")" @TRET
+        assert test -e "$exported_file" @RET
 
+        outs="${exported_file}"$'\n'
+
+        cat "$exported_file" |
+            org-html-postprocess |
+            sponge "$exported_file" @RET
+
+        assert sout redism hset "${storage_key_hashes}" "${f_hashed}" "${h}" @RET
         assert sout redism hset "${storage_key_outs}" "${f_hashed}" "" @RET
         #: Deleting/resetting this key will potentially make parallel executions of this function problematic. But not deleting it can leak deleted links, which is more dangerous.
 
@@ -395,6 +386,39 @@ function h-org-export-recursive {
         ec "$outs"
     done
 }
+##
+function org-html-postprocess {
+    #: [[file:~/code/hugo/notes-hugo/themes/cortex/assets/js/page.js::function highlighterReplacer(text) {][js/page.js::function highlighterReplacer(text)]]
+    #: @idempotent
+    ##
+    #: * @tests
+    #: ** `ec '<h3 id="@org6d5682c"><span class="s@ection-number-3">@1.3.</span>@hi @seeAlso</h3>'|org-html-postprocess|org-html-postprocess`
+    #:
+    #: * @performance
+    #: `hfd "cat '/Users/evar/cellar/notes/subjects/math/AI/ML/NLP/attention, transformers/papers/GlobEnc/gen.html' | org_html_postprocess.pl" "cat '/Users/evar/cellar/notes/subjects/math/AI/ML/NLP/attention, transformers/papers/GlobEnc/gen.html' | org_html_postprocess.py"`
+    #:
+    #: The perl version is 1.2 times faster (680ms vs 736ms).
+    ##
+    cat-paste-if-tty |
+        org_html_postprocess.py |
+        cat-copy-if-tty
+    ##
+    #: @works @deprecated
+
+    # cat-paste-if-tty |
+    #     perl -CS "${commands[org_html_postprocess.pl]}" |
+    #     cat-copy-if-tty
+    ##
+    #: @works @deprecated
+
+    #: perl v5.34: Lookbehind longer than 255 not implemented
+    # cat-paste-if-tty |
+    #     perl -CS -Mexperimental=vlb -ple \
+    #         's/(?<=\s|(*nlb:class="(?:[^"]{0,75}\s)?todo(?:\s[^"]{0,75})?"[^>]{0,75})>)(@(?:\w|\/|\d|[][(),.;'\''])+)(?=\s|<)/<span class="todo at_tag">$1<\/span>/g' |
+    #     cat-copy-if-tty
+    ##
+}
+
 ##
 aliasfn org-link-extract-audiofile org_link_extract_type=audiofile org-link-extract-url
 
