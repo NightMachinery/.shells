@@ -63,6 +63,17 @@ alias l-ac=last-accessed
 alias l-a=last-added
 alias l-m=last-modified
 ##
+function absolutify-in {
+    in-or-args "$@" |
+        inargsf grealpath |
+        cat-copy-if-tty
+}
+
+function reval-absolutify {
+    reval "$@" | absolutify-in
+}
+aliasfn abs reval-absolutify
+##
 alias em="emc-gateway -e '(counsel-recentf)'" # helm-recentf
 alias dmy='DEBUGME=y'
 alias a=aget
