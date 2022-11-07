@@ -59,7 +59,9 @@
     ((string= key "date_tag")
      (let* ((date (v0 date_key))
             (year
-              (rget "(\\d{4})" date))
+              (or
+               (rget "(\\d{4})" date)
+               (v0 "year")))
             (month
               (rget "([a-zA-Z]+)" date)))
        (listify-if-not
@@ -82,29 +84,39 @@
     (org-link-write :url url :title title)
     (ec))
 
-  (let ((out_stream *standard-output*)
-        (accessor #'v)
-        (keys (list
-                "arxiv"
-                date_key
-                "year"
-                citations_count_key
-                "influentialCitationCount"
-                references_count_key
-                "venue"
-                "journal_name"
-                authors_names_key
-                "links"
-                "pdf_urls"
-                "doi"
-                topics_key
-                "isOpenAccess"
-                "corpusID")))
-    (org-properties-write :keys keys :accessor accessor :out_stream out_stream))
+  (let
+      ((out_stream *standard-output*))
+    (let ((accessor #'v)
+          (keys (list
+                 "arxiv"
+                 date_key
+                 "year"
+                 citations_count_key
+                 "influentialCitationCount"
+                 references_count_key
+                 "venue"
+                 "journal_name"
+                 authors_names_key
+                 "links"
+                 "pdf_urls"
+                 "doi"
+                 topics_key
+                 "isOpenAccess"
+                 "corpusID")))
+      (org-properties-write
+       :keys keys
+       :accessor accessor
+       :out_stream out_stream
+       :folded_p nil))
 
-  (let ((desc (v0 "abstract"))
-        (bibtex (v0 "bibtex")))
-    (org-quote-write :content desc)
-    (ec)
-    (org-example-write :headers "bibtex" :content bibtex)
-    ))
+    (let ((desc (v0 "abstract"))
+          (bibtex (v0 "bibtex")))
+      (format out_stream "* @abstract~%")
+      (org-properties-write
+       :keys nil
+       :accessor nil
+       :out_stream out_stream
+       :folded_p t)
+      (org-quote-write :content desc)
+      (ec)
+      (org-example-write :headers "bibtex" :content bibtex))))
