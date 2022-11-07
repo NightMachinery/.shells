@@ -1,3 +1,14 @@
+##
+function rm-empty {
+    fd --type=empty "$@" | inargsf trs-rm
+}
+##
+function file-unix2uri-rp-v2 {
+    in-or-args "$@" |
+        inargsf grealpath -- |
+        file-unix2uri
+}
+##
 function realpath-ife() {
     if test -e "$1" ; then
         realpath "$1"
