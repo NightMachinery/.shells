@@ -19,7 +19,10 @@ fi
 ##
 # export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
 export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
+
 EMACS_ALT1_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server_alt1"
+
+EMACS_GUI_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server_gui"
 ###
 if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not check
     # Sometimes brew itself is in path but its dirs are not. Also, we want to be able to rerun the code to correct the PATH ordering

@@ -66,7 +66,7 @@ function emacs-vfiles() {
 aliasfn emc-open bicon-emc
 alias emc='emc-open'
 
-function emc-gateway() {
+function emc-gateway {
     bella_zsh_disable1
 
     local title=emacs
@@ -90,12 +90,13 @@ function emc-gateway() {
 
     reval-ec-env \
         TERM="$my_term" \
+        LOGNAME="$(whoami)" \
         KITTY_WINDOW_ID="${KITTY_WINDOW_ID}" \
         $proxyenv \
         emacsclient -t "$@"
 }
 
-function emc-eval() {
+function emc-eval {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1
 
     local cmd stdin="${emc_eval_in}"
