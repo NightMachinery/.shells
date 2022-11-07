@@ -226,7 +226,8 @@
 (defun org-properties-write (&key
                                (keys)
                                (accessor)
-                               (out_stream *standard-output*))
+                               (out_stream *standard-output*)
+                               (folded_p t))
   (format out_stream ":PROPERTIES:~%")
   (dolist (p keys)
     (let ((vals (listify-if-not (funcall accessor p)))
@@ -241,7 +242,8 @@
                                       val ;; @assumes val contains no newlines
                                       (string #\newline)))
                  (setq plus_char "+")))))
-  (format out_stream ":visibility: folded~%")
+  (when folded_p
+    (format out_stream ":visibility: folded~%"))
   (format out_stream ":END:~%"))
 
 (defun org-link-create (url &optional title)
