@@ -452,11 +452,14 @@ function datej-all() {
     elif (( mode == 1 )) ; then
         local dateg="$(jalalicli togregorian --gregorian-format='Monday January1/2/2006' "$datej")"
         ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg"
+    elif (( mode == 2 )) ; then
+        ec "$cyear/$(monthj2en $cmonth)/$cday"
     else
         ecerr "$0: Unsupported mode '$mode'"
     fi
 }
 aliasfn datej-all-long @opts mode 1 @ datej-all
+aliasfn datej-named @opts mode 2 @ datej-all
 ##
 remnd() {
     : readmeall
