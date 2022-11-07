@@ -1,3 +1,22 @@
+##
+function browser-recording-postprocess {
+    local f="$1"
+    local name="${2-${f:r}}"
+    assert-args f @RET
+
+    if test -n "$name" ; then
+        name+='_'
+    fi
+    name+="$(datej-named | str2filename)"
+    name+=".${f:e}"
+
+    gmv --verbose "$f" "$name" @RET
+    ecbold '--------------'
+
+    ffmpeg-to265 "$name" @RET
+}
+aliasfn viddate browser-recording-postprocess
+##
 browser_rec_dir=~/Downloads
 
 function browser-recordings-process() {
