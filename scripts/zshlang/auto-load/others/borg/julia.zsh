@@ -71,11 +71,43 @@ function jiarr() {
     arrJ-noquote "$results[@]"
 }
 ##
-function html-esc() {
-    gsed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
-    # ALT: recode ascii..html
+function html-escape-sed {
+    in-or-args "$@" |
+        gsed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g' |
+        cat-copy-if-tty
 }
 
+function html-escape-recode {
+    in-or-args "$@" |
+        recode ascii..html |
+        cat-copy-if-tty
+}
+
+aliasfn html-escape html-escape-sed
+aliasfn html-esc html-escape
+aliasfn html-encode html-escape
+
+function html-unescape-py {
+    in-or-args "$@" |
+        python3 -c 'import html, sys; [print(html.unescape(l), end="") for l in sys.stdin]' |
+        cat-copy-if-tty
+}
+
+function html-unescape-recode {
+    in-or-args "$@" |
+        recode html..ascii |
+        cat-copy-if-tty
+}
+
+function html-unescape-perl {
+    in-or-args "$@" |
+        perl -MHTML::Entities -le 'print decode_entities($string)' |
+        cat-copy-if-tty
+}
+
+aliasfn html-unescape html-unescape-py
+aliasfn html-decode html-unescape
+##
 function jigoo() {
     local query="$*"
 
