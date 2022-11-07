@@ -113,9 +113,20 @@ function pbpaste-html {
         @NA
         # See
         # - https://unix.stackexchange.com/questions/78395/save-html-from-clipboard-as-markdown-text
-    fi
+    fi |
+        cat-copy-if-tty
 }
 alias poph='pbpaste-html'
+
+function pbpaste-html-urlfinal {
+    local urli=''
+    url="${1:-$(browser-current-url)}" @STRUE
+
+    pbpaste-html |
+        html-links-urlfinal "$url" |
+        cat-copy-if-tty
+}
+
 
 function pbcopy-html {
     # @alt copy_as_html.swift can set the plain and HTML clipboard simultaneously.
