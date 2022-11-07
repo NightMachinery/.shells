@@ -77,7 +77,12 @@ tramp
 # Swap
 [._]*.s[a-v][a-z]
 [._]*.sw[a-p]
+
 [._]s[a-rt-v][a-z]
+![._]s[a-rt-v][a-z]/
+#: but don't ignore these paths if they are directories.
+#: [[https://stackoverflow.com/questions/16770282/how-to-gitignore-only-files][git - How to gitignore *only* files? - Stack Overflow]]
+
 [._]ss[a-gi-z]
 [._]sw[a-p]
 
