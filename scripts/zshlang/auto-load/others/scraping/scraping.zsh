@@ -608,7 +608,14 @@ function code2md() {
     done
 }
 ##
-function merge-html() {
+function merge-html {
+    ensure-array merge_html_postprocessors
+    local postprocessors=(${merge_html_postprocessors[@]})
+    if (( ${#postprocessors} == 0 )) ; then
+        postprocessors+='html-links-textualize'
+        #: so adding a simple 'cat' will disable these default postprocessors.
+    fi
+
     {
         if (( $# == 1 )) ; then
             ec "<p>$(html-get-reading-estimate $1)</p>"$'\n' @STRUE
@@ -621,7 +628,7 @@ function merge-html() {
                 cat "$i" @TRET
             done
         fi
-    } | html-links-textualize
+    } | cat-postprocess "${postprocessors[@]}"
 }
 ##
 function getlinks() {

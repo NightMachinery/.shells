@@ -132,3 +132,17 @@ function reval-to-stdout {
 function rgeval() {
     geval "$(gquote "$@")"
 }
+##
+function cat-postprocess {
+    #: * @tests
+    #: ** `arrnn {1..10} | cat-postprocess 'prefixer -a hi' 'cat -vte'`
+    ##
+    local postprocessors=($@)
+
+    if (( ${#postprocessors} == 0 )) ; then
+        cat
+    else
+        "${=postprocessors[1]}" | cat-postprocess "${(@)postprocessors[2,-1]}"
+    fi
+}
+##

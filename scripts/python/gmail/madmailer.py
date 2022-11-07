@@ -6,6 +6,7 @@ try:
 
     from brish import z, zq, zs, zp
     z('cdm ~/tmp/delme/')
+    z('merge_html_postprocessors=( html-links-urlfinal html-links-textualize )')
 
     import datetime
     now = datetime.datetime.now()
