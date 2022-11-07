@@ -98,12 +98,9 @@ function lnrp() {
     ln "$opts[@]" -s "$i" "$d"
 }
 ##
-function rm-empty {
-    fd --type=empty "$@" | inargsf trs-rm
-}
-
 function rmdir-empty() {
     : "Removes all recursively empty directories from <root-dir>"
+    : "@alt [agfi:rm-empty]"
 
     local root="$1"
     if ! test -d "$root" ; then

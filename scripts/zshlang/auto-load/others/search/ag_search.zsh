@@ -62,21 +62,36 @@ function fdrp() {
     fda "$@" | inargsf re realpath
 }
 ##
-function emcrg() {
-    emc-gateway -e "(night/search-dir \"$(pwd)\")"
+function emc-search {
+    local d="${emc_search_d:-$PWD}" q="${*}"
+    assert-args d @RET
+
+    local cmd
+    if false ; then
+        cmd=(emc-gateway -e)
+    else
+        cmd=(awaysh-fast emc-eval)
+        emc-focus
+    fi
+
+    reval-ec "${cmd[@]}" "(night/search-dir :dir $(lisp-quote "$d") :query $(lisp-quote "$q"))"
 }
-# aliasfn rd emcrg
-function rgbase() {
+aliasfn sees-emc emc-search
+# aliasfn rd emc-search
+
+function rgbase {
     local opts=()
 
     if isColorTty ; then
         opts+=( --color always )
     fi
 
-    command rg --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto --hidden "$opts[@]" "$@" # (use PCRE2 only if needed). --colors "match:bg:255,228,181" # This should've been on the personal list, but then it would not be loaded when needed by functions
+    command rg --no-ignore-global --smart-case --colors "match:none" --colors "match:fg:255,120,0" --colors "match:bg:255,255,255" --colors "match:style:nobold" --engine auto --hidden "$opts[@]" "$@"
+    #: --engine auto: use PCRE2 only if needed
+    #: --colors "match:bg:255,228,181"
 }
 
-function rgcontext() {
+function rgcontext {
     rgbase -C ${agC:-1} "$@"
 }
 

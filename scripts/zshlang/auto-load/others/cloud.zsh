@@ -182,7 +182,7 @@ function rcraa() {
     # leaves ./aa.log behind
     local aaMark="$(uuidm)"
     aaMark="$aaMark" aa --on-download-complete aa-2drive.zsh "$1"
-    till-file "$aaMark"
+    till_file_del_p=y till-file "$aaMark"
 }
 renog rcraa
 
@@ -208,7 +208,7 @@ function rcrtrr() {
     for i in {$start..$count} ; do
         local aaMark="$(uuidm)"
         aaMark=$aaMark aa --on-download-complete aa-2drive.zsh --select-file=$i --bt-remove-unselected-file=true "$torrent"
-        till-file "$aaMark" # necessary; otherwise the next download will delete the current file.
+        till_file_del_p=y till-file "$aaMark" # necessary; otherwise the next download will delete the current file.
         ec "The ${i}th file has been downloaded" >> aa.log | cat
         sleep 1 # to be able to CTRL-C. You might also want a delay here not to trigger a spam ban ...
     done

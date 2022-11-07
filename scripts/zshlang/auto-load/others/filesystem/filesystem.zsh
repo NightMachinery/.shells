@@ -6,6 +6,7 @@ function realpath-ife() {
     fi
 }
 reify realpath-ife
+
 function get-tmpdir() {
     dirname "$(gmktemp -u)"
 }
@@ -75,19 +76,25 @@ function check-for-partial-files() {
     pushf $dir
     { lm | serr inargsf re 'labeled trailingzeroes.rs' } always { popf }
 }
-function till-file() {
+
+function till-file {
     local file="$1"
     local time="${2:-30}"
+    local del_p="${till_file_del_p}"
 
     while true ; do
-        test -e "$file" && { 
-            command rm -f "$file"
+        test -e "$file" && {
+            if bool "$del_p" ; then
+                command rm -f "$file"
+            fi
+
             break
         }
         ecerr "$0: File '$file' does not yet exist ..."
         sleep "$time" 
     done
 }
+
 function ext-all() {
     # useful for, e.g., seeing what to track with git lfs
     fd . | inargsf mapg '${i:e}' | gsort --uniq

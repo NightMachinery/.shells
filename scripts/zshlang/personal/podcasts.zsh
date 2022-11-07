@@ -10,4 +10,6 @@ podcasts_urls_my['Slate Star Codex']='https://sscpodcast.libsyn.com/rss'
 podcasts_urls_my['EconTalk']='http://files.libertyfund.org/econtalk/EconTalk.xml'
 # podcasts_urls_my['TWIML']='https://twimlai.libsyn.com/rss'
 podcasts_urls_my['TWIML']='https://feeds.megaphone.fm/MLN2155636147'
+podcasts_urls_my['NLP Highlights by AllenAI']='https://feeds.soundcloud.com/users/soundcloud:users:306749289/sounds.rss'
+podcasts_urls_my['Lex Fridman']='https://lexfridman.com/feed/podcast/'
 ##

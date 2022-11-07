@@ -68,23 +68,27 @@ function fd() {
   command fd -u "$@"
 }
 ##
-function open() {
-  assert isDarwin @RET
-  if false && [[ "$1" =~ '\.pdf$' ]] ; then
-    ##
-    # command open -a opera "$1"
-    ##
-    assert chrome-open-pdf "$1"
-    ##
-    shift
-    "$0" "$@"
-    return $?
-  elif (( $#@ >= 1 )) ; then
-    command open "$@"
-  fi
-}
+# function open() {
+#   assert isDarwin @RET
+#   if false && [[ "$1" =~ '\.pdf$' ]] ; then
+#     ##
+#     # command open -a opera "$1"
+#     ##
+#     assert chrome-open-pdf "$1"
+#     ##
+#     shift
+#     "$0" "$@"
+#     return $?
+#   elif (( $#@ >= 1 )) ; then
+#     command open "$@"
+#   fi
+# }
 
-aliasfn opv open -a preview --
+function opv {
+  in-or-args "$@" |
+    inargsf grealpath -- |
+    inargsf reval-ec open -a preview --
+}
 ##
 function mega-get() {
   if isBicon ; then

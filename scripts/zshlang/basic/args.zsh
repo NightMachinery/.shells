@@ -87,7 +87,7 @@ function file-unix2uri-rp {
     done
 }
 
-function file-uri2unix() {
+function file-uri2unix {
     local f="$1"
     # assert-args f @RET
 

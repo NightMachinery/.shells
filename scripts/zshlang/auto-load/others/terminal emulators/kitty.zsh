@@ -113,8 +113,8 @@ function kitty-is-focused() {
     ##
 }
 ##
-function kitty-launch-emc() {
-    kitty-remote launch '--type=tab' "${commands[zsh]}" -c "fnswap isColor true retry-limited 2 $@ emc-gateway"
+function kitty-launch-emc {
+    kitty-remote launch '--type=tab' "${commands[zsh]}" -c "proxy_disabled=$proxy_disabled fnswap isColor true retry-limited 2 $@ emc-gateway"
     # The retry is to work around the recent emacs/doom issue that kills the starting frame (and sometimes all the frames, when doom themes are used).
     ##
     # This doesn't work, as somehow our config is not loaded. It will work if there is already a server running on EMACS_SOCKET_NAME though
@@ -123,7 +123,7 @@ function kitty-launch-emc() {
 }
 alias kemc='kitty-launch-emc'
 
-aliasfn withemc1 'EMACS_SOCKET_NAME="$EMACS_ALT1_SOCKET_NAME" emacs_night_server_name="$EMACS_ALT1_SOCKET_NAME"' reval
+aliasfn withemc1 'EMACS_SOCKET_NAME="$EMACS_ALT1_SOCKET_NAME" emacs_night_server_name="$EMACS_ALT1_SOCKET_NAME"' reval-env
 function kemc1 {
     kitty-launch-emc withemc1
 }

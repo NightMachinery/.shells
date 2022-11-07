@@ -29,7 +29,7 @@ function dl-named {
     if bool "$daemon_p" ; then
         cmd=(tmuxnewsh2 "$(ec "dl-named $title ($(dateshort))" | str2tmuxname)")
     fi
-    cmd+=(all_proxy="$all_proxy" aa-gateway --conditional-get=true --allow-overwrite=true --out="${title}" "$url")
+    cmd+=(all_proxy="$all_proxy" retry aa-gateway --conditional-get=true --allow-overwrite=true --out="${title}" "$url")
 
     reval-ec "${cmd[@]}"
 }

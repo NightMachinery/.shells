@@ -157,21 +157,25 @@ function awaysh-exit() {
     # exit 0
     ##
 }
+
 function awaysh-doublefork() {
     # https://stackoverflow.com/questions/66936760/shell-fork-daemonize-a-subshell-such-that-it-survives-the-death-of-its-tmux-s
     awaysh1 awaysh-exit "$@"
 }
+
 function awaysh() {
     ( awaysh1 "$@" ) &>/dev/null </dev/null
     # subshell needed to silence messages generated from MONITOR (e.g., `[9] 5152`)
     # also, weirdly, with this subshell, we no longer need MONITOR in the first place :|
 }
+
 function awaysh-sure() {
     # @broken completely
     awaysh-doublefork "$@"
     # ( awaysh-exit "$@" )
     sleep 1 # give it time to fork
 }
+
 function awaysh1() {
     local cmd="$(gquote "$@")"
 
@@ -194,6 +198,8 @@ function awaysh1() {
     # disown-true
     ##
 }
+aliasfn awaysh-fast awaysh1
+
 function disown-true() {
     disown &>/dev/null || true  # Prevent whine if job has already completed
 }

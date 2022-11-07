@@ -194,8 +194,6 @@ function p-org-manning-toc() {
     local res
     res="$(pbpaste | org-manning-toc)" @TRET
 
-    res="$(ec $res | org-header-indent-to-current)" @TRET
-
     ec $res | pbcopy-ask
 }
 ##
@@ -328,6 +326,8 @@ aliasfn org-link-extract-id org_link_extract_type=id org-link-extract-url
 function org-export-recursive {
     #: stdout: the paths of exported files
     #: The caching system is only sensitive to the roots. If a leave changes, we won't detect the change.
+    #:
+    #: @warning This function exports links that are in =:noexport:= subtrees!
     ##
     local storage_key_root='org_export_rec'
     local storage_key_hashes="${storage_key_root}_hashes"
@@ -381,7 +381,6 @@ function h-org-export-recursive {
                 ecerr "$0: got a nil file_link for id: ${id_link}"
                 return 1
             fi
-
 
             outs+="$("$0" "$file_link")"$'\n' @TRET
         done

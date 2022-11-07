@@ -62,7 +62,7 @@ function aa-book() {
 
     local aaMark="$(uuidm)"
     aaMark="$aaMark" aa-remotename --on-download-complete aa-helper-gen.zsh "$url"
-    till-file "$aaMark"
+    till_file_del_p=y till-file "$aaMark"
 }
 renog aa-book
 alias aab='aa-book'

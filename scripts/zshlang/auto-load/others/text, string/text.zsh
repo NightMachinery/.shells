@@ -110,10 +110,10 @@ alias pdn='p-double-newlines'
 ##
 function newline2space {
     cat-paste-if-tty |
-        perl -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ; s/\R\s*/ /g' |
+        perl -CS -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ; s/\x{2}//g ; s/\R\s*/ /g' |
         cat-copy-if-tty
 
-    # sd '\n\s*' ' ' |
+    #: =\x{2}= is the ASCII character two, which in emacs shows as =^B= and can be inserted using [kbd:C-q C-b].
 }
 
 function p-newline2space {
@@ -138,8 +138,10 @@ function ascii2char() {
     printf "\\$(printf '%03o' "$1")" | cat-copy-if-tty
 }
 ##
-function char2unicode() {
-    # UTF-8
+function char2unicode {
+    : "@alt [help:describe-char]"
+
+    : "UTF-8"
     perl -CA -le 'print ord shift' "$1" | cat-copy-if-tty
 }
 

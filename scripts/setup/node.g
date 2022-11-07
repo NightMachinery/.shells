@@ -53,5 +53,4 @@ terminal-image-cli
 trash-cli
 wikiquote-cli
 wikit
-youtube-dl-interactive
 zooqle
