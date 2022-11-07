@@ -19,7 +19,9 @@
  :cl-fad
  :osicat
  :iterate
- "jsown" ;; @todo1 should not be imported for projects that don't use JSON
+ "jsown"
+ "alexandria"
+ :lquery
  )
 
 (named-readtables:in-readtable :interpol-syntax)
@@ -63,6 +65,7 @@
 ;;;
 (alias-fn argv-get uiop:command-line-arguments) ;; get CLI arguments
 (alias-fn getenv uiop:getenv)
+(alias-fn getenvp uiop:getenvp)
 ;;;
 ;; this hack did not work:
 ;; (defun json-parse (&rest args)
@@ -135,6 +138,35 @@
  (brishz-ll :args '("eval" "ec '{}hi[]' ; cat >&2") :session "emacs" :input "wow “The wizards?”")
 
  (brishz "eval" "ec hi ; ecerr warning ; return 56"))
+
+(defun boolsh (str)
+  (and
+   str
+   (not
+    (or
+     (equalp str "")
+     (equalp str "n")
+     (equalp str "no")
+     (equalp str "0")))))
+
+(defun boolsh-env (env_var &optional default)
+  "This treats empty strings as not given. Use `getenvp' otherwise."
+
+  (or
+   (boolsh
+    (or
+     (empty-str-to-nil
+      (getenv env_var))
+     default))))
+
+(defun boolsh-env-y (env_var)
+  (boolsh-env env_var T))
+
+(comment
+ (boolsh "no")
+ (boolsh-env "nonexistent_7191")
+ (boolsh-env-y "nonexistent_7191")
+ (boolsh-env-y "NODEJS_CHECK_SIGNATURES"))
 ;;;
 ;; (describe #\LEFT_DOUBLE_QUOTATION_MARK)
 ;;;
