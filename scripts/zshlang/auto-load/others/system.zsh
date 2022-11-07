@@ -60,10 +60,7 @@ function mute-external() {
 
 	{ lo_s=0 loop mute-external_ "$lev" }  always { volset 0 }
 }
-function display-off() {
-	# @darwinonly
-	watch -n ${1:-1} brightness 0
-}
+##
 function resetdns-darwin() {
 	sudo dscacheutil -flushcache
 }

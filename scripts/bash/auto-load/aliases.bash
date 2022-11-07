@@ -17,7 +17,6 @@ ialias re='run-on-each' #duplicate, to make it ialias
 ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
 alias ungron="gron --ungron"
-alias displaysleep='pmset displaysleepnow'
 alias gis='gist --copy  --shorten'
 alias dbg='DEBUGME=d'
 ##

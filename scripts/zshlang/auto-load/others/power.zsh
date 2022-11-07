@@ -1,8 +1,31 @@
-function sleepnow() ( sleep "${1:-7}"; pmset sleepnow )
-function sleepforce() {
+##
+aliasfn displaysleep-darwin pmset displaysleepnow
+aliasfn displaysleep displaysleep-darwin
+##
+function display-off-brightness {
+	local dur="${1:-1}"
+
+	lo_s="$dur" loop brightness-set 0
+}
+
+function display-off {
+	local after="${1:-0}"
+
+	sleep-neon "$after"
+    displaysleep
+	#: causes display to go to sleep immediately.
+}
+##
+function sleepnow {
+    sleep "${1:-7}"
+    pmset sleepnow
+}
+
+function sleepforce {
     lo_s=60 lo_p=${1:-~/tmp/.sleepforce} loop sleepnow 10
 }
-function sleepifidle() {
+
+function sleepifidle {
     while (( $(load5) >= ${1:-7} ))
     do
         sleep 150
