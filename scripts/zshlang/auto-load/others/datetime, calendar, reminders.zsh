@@ -430,6 +430,7 @@ function monthj2fa() {
         *) ecerr "$0: Invalid month: $1";;
     esac
 }
+
 function datej-all() {
     ## test:
     # datej-all 1380/06/20

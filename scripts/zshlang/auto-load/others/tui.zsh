@@ -1,7 +1,12 @@
 ##
-sleep-neon()  {
+function sleep-neon  {
     mdoc 'Usage: sleep-neon <seconds>' MAGIC
+
     integer inter="$1"
+
+    if (( inter <= 0 )) ; then
+        return 0
+    fi
 
     ##
     # chalk-animation neon --duration $((inter*1000)) "Sleeping for $(seconds-fmt $inter) ..."
@@ -22,7 +27,7 @@ sleep-neon()  {
         sleep 1
         inter=$((inter-1))
     done
-    print -- "\rWoke up!                                                               "
+    print -- "\rSleep Done!                                                               "
 }
 ##
 function erase-ansi-old() {

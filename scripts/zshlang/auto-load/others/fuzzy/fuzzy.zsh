@@ -4,11 +4,11 @@
 # alias frc='frConfirm=y '
 # alias cf='frc fi-d1'
 # alias cfr='frc fi-rec'
-function fr() {
+function fr {
     (( $#@ == 0 )) && return 1
     (( $#@ == 1 )) && set -- "$@" ''
     @opts query "${@[-1]}" @ fi-rec "$(gq "${@[1,-2]}")"
-    hist-add-self
+    # hist-add-self
 }
 
 function fi-rec() {

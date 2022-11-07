@@ -72,7 +72,8 @@ function rsp-notes {
 
     local opts=()
 
-    local ext exts=( ${image_formats[@]} html css )
+    local exts=( ${image_formats[@]} html css ) #: @Warning Do NOT add org to this list, as then our private :noexport: subtrees will be exposed!
+    local ext
     for ext in ${exts[@]} ; do
         opts+=(--extension "$ext")
     done
@@ -83,7 +84,7 @@ function rsp-notes {
         "${opts[@]}" \
         "$pattern" \
         "$src" |
-        "${includes_cmd[@]}" |
+        revaldbg "${includes_cmd[@]}" |
         prefixer -r "$starting_dir" |
         prefixer -r "/" |
         {

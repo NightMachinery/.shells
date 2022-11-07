@@ -42,17 +42,19 @@ function browser-recordings-process-watch() {
     done
 }
 ##
-function chrome-current-title() {
+function chrome-current-title {
     assert isDarwin @RET
 
     chrome-cli info | rget 'Title:\s+(.*)' | cat-copy-if-tty
 }
 aliasfn browser-current-title chrome-current-title # @darwinonly @chromeonly
 
-function chrome-current-url() {
+function chrome-current-url {
     assert isDarwin @RET
 
-    chrome-cli info | rget 'Url:\s+(.*)'
+    chrome-cli info |
+        rget 'Url:\s+(.*)' |
+        cat-copy-if-tty
 }
 aliasfn browser-current-url chrome-current-url # @darwinonly @chromeonly
 ##

@@ -52,9 +52,6 @@ export cellar=~/cellar
 
 export music_dir="$HOME/my-music"
 
-# export mpv_bookmarks="${music_dir}/bookmarks/default"
-export mpv_bookmarks="${nightNotes}/private/configs/mpv/bookmarks/default"
-
 export playlist_dir="${music_dir}/playlists"
 export playlist_auto_dir="${playlist_dir}/autopl/"
 # export songs_dir='/Volumes/hyper-diva/Songs' # @hardCoded @DarwinOnly
@@ -74,6 +71,9 @@ export nightNotes="$cellar/notes/" # keep the trailing '/', it is important when
 export orgdir="$nightNotes/org"
 export memorydir="$nightNotes/private/memories"
 export peopledir="$nightNotes/private/memories/people"
+
+# export mpv_bookmarks="${music_dir}/bookmarks/default"
+export mpv_bookmarks="${nightNotes}/private/configs/mpv/bookmarks/default"
 
 typeset -g UHIST_FILE="$nightNotes/bookmarks/useme/zsh/universal_history.zsh"
 typeset -g UHIST_FILE_FC="$nightNotes/bookmarks/useme/zsh/universal_history_fc.zsh"

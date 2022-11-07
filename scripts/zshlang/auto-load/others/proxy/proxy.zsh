@@ -47,18 +47,22 @@ pxa-create 2041 pxa41
 
 # alias pxa-maybe='isIran && pxa-local'
 alias pxa-maybe='isLocal && pxa-local'
+
 function reval-pxa {
     pxa reval "$@"
 }
+
 function reval-pxa-if-no-proxy {
-    if test -z "${ALL_PROXY}${all_proxy}${HTTP_PROXY}${http_proxy}${HTTPS_PROXY}${https_proxy}${FTP_PROXY}${ftp_proxy}"  ; then
-        pxa reval "$@"
+    #: The env var `no_proxy' is actually used by some Unix programs to exclude some IPs.
+
+    if test -z "${proxy_disabled}${ALL_PROXY}${all_proxy}${HTTP_PROXY}${http_proxy}${HTTPS_PROXY}${https_proxy}${FTP_PROXY}${ftp_proxy}"  ; then
+        pxa reval-env "$@"
     else
-        reval "$@"
+        reval-env "$@"
     fi
 }
 ##
-function v2-on() {
+function v2-on {
     tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
 }
 
@@ -95,10 +99,10 @@ function pxify {
     pxaify-command dart
 
     # pxaify-command cargo # did not work, using CARGO_HTTP_PROXY instead
-    export CARGO_HTTP_PROXY=socks5://localhost:1078
+    export CARGO_HTTP_PROXY=socks5://localhost:1081
 
-    pxaify-command emacs
-    pxaify-command emacsclient
+    # pxaify-command emacs
+    # pxaify-command emacsclient
 }
 ##
 function pxify-command {
@@ -207,6 +211,9 @@ function darwin-proxies-gen {
     excluded=(
         'Loopback'
         'FakeNet'
+        'Sharif1'
+        'eva-1'
+        'VPN (Cisco IPSec)'
     )
 
     networks=(${(@)networks:|excluded})

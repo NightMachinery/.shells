@@ -1,5 +1,7 @@
 #+TITLE: minimal_proxy/gen
 
+* [[https://github.com/webinstall/webi-installers][webinstall/webi-installers: Primary and community-submitted packages for webinstall.dev]]
+
 * tmux
 #+begin_example zsh
 rsp-safe ~/.tmux.conf 'ubuntu@185.235.42.146:'

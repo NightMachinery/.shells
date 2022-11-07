@@ -7,7 +7,7 @@ powersaving_status_del
 darwin-dns-set 127.0.0.1 1.1.1.1
 ##
 if test -n "$MDNS_NAME" ; then
-    mdns-init-darwin
+    # mdns-init-darwin
 fi
 ##
 
@@ -40,7 +40,7 @@ fi
 if test -n "$NP_PASS1" ; then
     # tmuxnew naive-zii naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.zii.lilf.ir" --log  --concurrency=4
     ##
-    tmuxnew naive-arvan_1 naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.nightmachinery.ir" --log  --concurrency=4
+    # tmuxnew naive-arvan_1 naive --listen="socks://127.0.0.1:1080" --proxy="https://alice:$NP_PASS1@np.nightmachinery.ir" --log  --concurrency=4
 fi
 
 if test -n "$NP_PASS0" ; then

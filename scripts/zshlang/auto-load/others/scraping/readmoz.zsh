@@ -78,8 +78,7 @@ noglobfn readmoz-mdarc
 #     \rm $md
 # }
 ##
-
-function readmoz-md() {
+function readmoz-md {
     local url="$1"
     local format="${readmoz_md_to:-markdown}"
     assert-args url @RET

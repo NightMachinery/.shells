@@ -18,7 +18,15 @@ function md2plain() {
     @opts from markdown to plain @ pandoc-convert "$@"
 }
 
-function org2md() {
+function org2md {
+    perl -lpe 's/^(#\+[a-zA-Z]+_example)\s+.*/$1/gi' | #: @upstreamBug pandoc doesn't convert example blocks correctly
+        org2md-raw "$@" |
+        perl -lpe 's/^(```)\s+example$/$1/g' |
+        perl -lpe 's/\\([][@])/$1/g' |
+        cat-copy-if-tty
+}
+
+function org2md-raw {
     @opts from org to markdown @ pandoc-convert "$@"
 }
 
@@ -47,11 +55,11 @@ function html2rtf-textutil() {
     textutil -stdin -stdout -format html -convert rtf
 }
 
-function rtf2txt-1() {
+function rtf2txt-1 {
     unrtf "$@" | html2text
 }
-
-function html2org() {
+##
+function html2org {
     local input="${1}" o_format="${html2org_f:-org}"
     if test -z "$input" ; then
         input="$(gmktemp)"
@@ -91,8 +99,8 @@ function html2text() {
     ##
     html2org =(cat)
 }
-
-function pandoc-convert() {
+##
+function pandoc-convert {
     ensure-array pandoc_opts
     local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra:-y}" opts=("$pandoc_opts[@]") delink="${pandoc_delink}"
     assert-args from to @RET
@@ -147,7 +155,7 @@ function pandoc-convert() {
         assert silent trs-rm "$tmp_o" @RET
     fi
 }
-
+##
 function pandoc-org-trim-extra {
     # @duplicateCode/4674af46b8f4fbbf90274bc262198216
     local pandoc_org_extra_regex

@@ -44,7 +44,7 @@ function skipemptyin() {
 }
 aliasfn skipin skipemptyin
 ##
-function indir() {
+function indir {
     # we are not handling the autocompletion system at all
     local origfile="$1" dir="$(bottomdir "$1")" cmd=("${@:2}") cd_engine="${indir_cd_engine:-cdz}" origPWD=$PWD
     { test -e "$origfile" && test -d "$dir" } || {
@@ -67,7 +67,7 @@ function indir() {
     "${cd_engine[@]}" "$dir" || return $?
     local dir_final=$PWD
     {
-        reval "${cmd[@]}"
+        reval-env "${cmd[@]}"
     } always {
         if [[ "$PWD" == "$dir_final" ]] ; then
             # if we are still in the directory that indir started in, go back to the original directory of the caller:
