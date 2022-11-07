@@ -20,12 +20,19 @@
 ;;;
 (defun main ()
   ;; @note lquery operations are destructive, even serializing to string!
-  (let* ((in
-          (if *repl-mode*
-              "<p><a href=\"https://bing.com\">bing!</a></p><a href=\"https://google.com\">gingin</a>"
+  (let* (
+         (truncate-p (or
+                        (boolsh-env-y
+                         "html_links_textualize_truncate_p")))
+         (in
+           (if *repl-mode*
+               "<p><a href=\"https://bing.com\">bing!</a></p><a href=\"https://google.com\">gingin</a>
 
-              (alexandria:read-stream-content-into-string *standard-input*)))
-        (*doc* (lquery:$ (initialize in))))
+<a href=\"https://google.com/123456789101112131415161718192021222324252627282930/123456789101112131415161718192021222324252627282930\">loooong</a>
+"
+
+               (alexandria:read-stream-content-into-string *standard-input*)))
+         (*doc* (lquery:$ (initialize in))))
 
     (loop for a across (lquery:$ *doc*
                          "a")
@@ -39,7 +46,15 @@
                         text (not (string= text ""))
                         (not (s-starts-with-p "#" href)))
                  (lquery:$ a
-                   (text (concat "[[" (org-link-escape href) "][" (org-title-escape text) "]]"))))))
+                   (text (concat
+                          "[["
+                          (org-link-escape
+                           (cond
+                             (truncate-p
+                              (s-truncate 80 href))
+                             (t href))
+                           )
+                          "][" (org-title-escape text) "]]"))))))
 
     (format t "~a~%"
             (aref
