@@ -411,9 +411,12 @@ function ntsearch_() {
     }
 }
 
-function ntsearch_fd_h() {
+function ntsearch_fd_h {
+    ensure-array ntsearch_rg_opts @RET
+    local ntsearch_rg_opts=(--no-ignore-global "$ntsearch_rg_opts[@]")
+
     print -nr -- "${(@pj.\0.)files}" \
-        | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path $ntsearch_rg_opts[@] "$@" -- "$query_rg" \
+        | gxargs -0 rg --no-binary --smart-case --engine auto --no-messages --with-filename --line-number --sort path "$ntsearch_rg_opts[@]" "$@" -- "$query_rg" \
         | prefixer --skip-empty -r "$nightNotes" -i $'\n' -o "$osep"
     # no-messages suppresses IO errors
     # xargs is needed to avoid argument list too long error
