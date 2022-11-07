@@ -144,8 +144,18 @@ function md2tlg {
 function org2tlg {
     local dest="${1:-${me_tel}}"
     assert-args dest @RET
+    local text
+    text="$(cat-paste-if-tty)" @TRET
+    text="$(ec "$text" | org-header-rm-shared-level)" @TRET
 
-    tsend --parse-mode=md -- "${dest}" "$(cat-paste-if-tty | org2md | sd '\\'"('|\"|#)" '$1')"
+    if false ; then
+       ensure-array pandoc_opts
+       local pandoc_opts=("${pandoc_opts[@]}" --markdown-headings=setext)
+       #: =setext= means headers are marked with `====`s and `----`s.
+       #: It doesn't look pretty in Telegram, as the underline wraps and becomes multiple lines.
+    fi
+
+    tsend --parse-mode=md -- "${dest}" "$(ec "$text" | org2md | sd '\\'"('|\"|#)" '$1')"
 }
 
 function org2tlg-with-props {
