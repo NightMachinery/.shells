@@ -5,15 +5,19 @@ export persian_exc_chars="ضصثقفغعهخحجچشسیبلاتنمکگظطزر
 export persian_chars="ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو.ًٌٍَُِّْ][}{|ؤئيإأآة»«:؛كٓژٰ‌ٔء<>؟٬٫﷼٪×،)(ـ۱۲۳۴۵۶۷۸۹۰"
 export en_chars="qwertyuiop[]asdfghjkl;'zxcvbnm,.QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?@#\$%^&()_1234567890"
 ##
-function per2en() {
-    cat-paste-if-tty | gsed "y/$persian_chars/$en_chars/" | cat-copy-if-tty
+function per2en {
+    in-or-args "$@" |
+        gsed "y/$persian_chars/$en_chars/" |
+        cat-copy-if-tty
 }
 aliasfn p2e per2en
 
-# function ppe() { pbpaste | reval-copy per2en }
+# function ppe { pbpaste | reval-copy per2en }
 
-function en2per() {
-    cat-paste-if-tty | gsed "y/$en_chars/$persian_chars/" | cat-copy-if-tty
+function en2per {
+    in-or-args "$@" |
+        gsed "y/$en_chars/$persian_chars/" |
+        cat-copy-if-tty
 }
 aliasfn e2p en2per
 

@@ -18,7 +18,7 @@ function sdc() {
 
 function sdcfa {
     local res
-    if ! res="$(sdc "$@")" ; then
+    if ! res="$(transformer en2per sdc "$@")" ; then
         ec "$res" >&2
         return 1
     fi
