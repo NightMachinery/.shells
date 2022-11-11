@@ -157,9 +157,8 @@ function pandoc-convert {
 }
 ##
 function pandoc-org-trim-extra {
-    # @duplicateCode/4674af46b8f4fbbf90274bc262198216
     local pandoc_org_extra_regex
-    pandoc_org_extra_regex='(?:\n|\A)\h*(?:(?::PROPERTIES:(?:.|\n)*?:END:)|(?:<<.*?>>))\h*'
+    pandoc_org_extra_regex='(?:\n|\A)\h*(?:(?::PROPERTIES:(?:.|\n)*?:END:)|(?:<<.*?>>))\h*|\^\{\/\/\}'
 
     perl -0777 -pe "s/${pandoc_org_extra_regex}//g"
 
