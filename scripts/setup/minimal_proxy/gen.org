@@ -1,6 +1,15 @@
 #+TITLE: minimal_proxy/gen
 
 * [[https://github.com/webinstall/webi-installers][webinstall/webi-installers: Primary and community-submitted packages for webinstall.dev]]
+#+begin_example zsh
+curl -sS https://webi.sh/webi | sh
+#+end_example
+
+#+begin_example zsh
+curl -sS https://webi.sh/golang | sh
+curl -sS https://webi.sh/go-essentials | sh
+#+end_example
+
 
 * tmux
 #+begin_example zsh
