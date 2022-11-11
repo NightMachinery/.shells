@@ -110,7 +110,9 @@ alias pdn='p-double-newlines'
 ##
 function newline2space {
     cat-paste-if-tty |
-        perl -CS -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ; s/\x{2}//g ; s/\R\s*/ /g' |
+        perl -CS -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ;
+        s/^\h+//g if $. == 1 ;
+ s/\x{2}//g ; s/\R\s*/ /g' |
         cat-copy-if-tty
 
     #: =\x{2}= is the ASCII character two, which in emacs shows as =^B= and can be inserted using [kbd:C-q C-b].
