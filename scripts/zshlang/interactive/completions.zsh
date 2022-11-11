@@ -28,6 +28,7 @@ compdef _gnu_generic aria2c
 function comp-wh-set() {
     comp-set '=which' "$@"
 }
+
 function comp-set() {
     (( $#@ >= 1 )) || {
         ectrace "Not enough args"

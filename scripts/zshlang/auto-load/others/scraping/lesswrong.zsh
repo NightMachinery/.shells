@@ -5,7 +5,7 @@ function w2e-lw-raw() {
     # transformer urlfinalg "transformer lw2gw w2e-curl $(gq "$1")" "${@:2}"
 }
 
-function tllw() {
+function tllw {
     # we can't use an alias because tl won't get the correct URLs then.
     tll "${(@f)$(lw2gw "${@}")}"
 }
