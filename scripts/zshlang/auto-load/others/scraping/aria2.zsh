@@ -47,7 +47,7 @@ function aa-raw {
     local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
     #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
-    if isDbg ; then
+    if bool "${aa_log_p}" ; then
         opts+=(--log='-')
         #: outputs the log to the stdout
         #: the log is by default disabled
@@ -271,4 +271,11 @@ function aa-2stdout {
 function aa-2dest {
     fhMode=curl full-html "$@"
 }
+##
+function aa2tlg-book {
+    local aaMark="$(uuidm)"
+    aaMark="$aaMark" aa_helper_e='tsendf-book' aa-gateway --on-download-complete aa-helper-gen.zsh "$@"
+    till_file_del_p=y till-file "$aaMark"
+}
+renog aa2tlg-book
 ##
