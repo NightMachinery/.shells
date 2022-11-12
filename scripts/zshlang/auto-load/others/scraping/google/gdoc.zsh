@@ -1,10 +1,25 @@
 ## Google Docs
-function gdoc-epub() {
-    local id url="$1"
-    [[ "$url" =~ '/document(?:/.*)?/d/([^/]*)/' ]] && id="$match[1]" || { ecerr "couldn't find gdoc id in the url $url" ; return 1 }
-    gdoc-epub-byid "$id"
+function gdoc-url {
+    #: * gives the export URL for the given Google Docs URLs
+    #: * @exampls
+    #: ** 'https://docs.google.com/presentation/d/1fV_fGIFyUgXNU70xmIt6pb6ek6wSp-O1_esuXR2pomI/edit#slide=id.p'
+    ##
+    local -x format="${gdoc_f:-pdf}"
+
+    in-or-args "$@" |
+        perl -nle  'BEGIN { use v5.30 } ; (m{/(?<type>document|presentation)(?:/.*)?/d/(?<id>[^/]*)/} && print "https://docs.google.com/$+{type}/u/0/export?format=$ENV{format}&id=$+{id}") || say STDERR "gdoc-url: could not parse URL: $_"' |
+        cat-copy-if-tty
 }
-function gdoc-epub-byid() {
-    local id="$1"
-    aab 'https://docs.google.com/document/u/0/export?format=epub&id='"$id"
+
+function gdoc-epub {
+    in-or-args "$@" |
+        gdoc_f='epub' gdoc-url |
+        inargsf revaldbg aab
 }
+
+function gdoc-pdf {
+    in-or-args "$@" |
+        gdoc_f='pdf' gdoc-url |
+        inargsf revaldbg aa2tlg-book
+}
+##
