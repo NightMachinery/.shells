@@ -10,7 +10,10 @@ function browser-recording-postprocess {
     name+="$(datej-named | str2filename)"
     name+=".${f:e}"
 
-    gmv --verbose "$f" "$name" @RET
+    if [[ "$f" != "$name" ]] ; then
+        gmv --verbose "$f" "$name" @RET
+    fi
+
     ecbold '--------------'
 
     ffmpeg-to265 "$name" @RET

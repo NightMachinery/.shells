@@ -123,7 +123,7 @@ function semantic-scholar-dl-from-org {
     local dest
     dest="${name}.pdf"
 
-    reval-ec aa-gateway "$url" -o "${dest}" @RET
+    reval-ec retry aa-gateway "$url" -o "${dest}" @RET
 
     reval-env-ec retry_sleep=10 retry-limited 10 tsendf-book "$dest"
 }
