@@ -23,6 +23,7 @@ function org2md {
         org2md-raw "$@" |
         perl -lpe 's/^(```)\s+example$/$1/g' |
         perl -lpe 's/\\([][@])/$1/g' |
+        perl -lpe 's/\[{1,2}jalali:([^][]+)\]{1,2}/$1/g' |
         cat-copy-if-tty
 }
 
