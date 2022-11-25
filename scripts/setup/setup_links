@@ -1,6 +1,8 @@
 #!/usr/bin/env zsh
 mkdir -p ~/bin
 
+mkdir -p ~/.ssh/sockets/
+
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
 ##
 lnrp $NIGHTDIR/configFiles/kitty/kitty.conf ~/.config/kitty/
