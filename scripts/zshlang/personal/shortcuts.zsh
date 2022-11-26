@@ -129,16 +129,16 @@ function vcns() {
     } always { popf }
 }
 
-function vcndiff() {
+function vcndiff {
     vcn-with git add --intent-to-add ~/scripts/
     vcn-with git-diff HEAD~"${1:-0}"
 }
 
-function vcnpp() {
-    local msg="${*}"
-    if isIReally ; then
-        assert-args msg @RET
-    fi
+function vcnpp {
+    local msg="${*:-${$(vcn-with git-commitmsg):-.}}"
+    # if isIReally ; then
+    #     assert-args msg @RET
+    # fi
 
     pushf ~/
     {
