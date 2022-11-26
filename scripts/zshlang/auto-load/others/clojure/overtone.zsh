@@ -2,14 +2,18 @@ OVERTONE_DIR=~/code/Clj/i-laugh
 OVERTONE_PORT=7699
 
 function ot-enabled-p {
-  test -d "$OVERTONE_DIR"
+  if ! test -d "$OVERTONE_DIR" || isServer || isGuest ; then
+   return 1
+  fi
+
+  bool "${OVERTONE_ENABLED:-y}"
 }
 
-function in-ot() {
+function in-ot {
   indir "$OVERTONE_DIR" "$@"
 }
 
-function ot-server() {
+function ot-server {
     : "See also ot-server-daemon."
 
     local dettach="${ot_server_d}"
@@ -21,7 +25,7 @@ function ot-server() {
 }
 ##
 redis-defvar ot_server_lock
-function ot-server-daemon() {
+function ot-server-daemon {
   assert ot-enabled-p @RET
 
   if test -n "$(ot_server_lock_get)" ; then
@@ -51,7 +55,8 @@ function ot-loadovertone() {
     ot-play-beeps1 3
   }
 }
-function ot-rep() {
+
+function ot-rep {
     ##
     # This needs redis to work, and it's not really necessary as rep errors out itselt.
     # if test -z "$OVERTONE_SERVER_STARTED" ; then
@@ -65,7 +70,7 @@ function ot-rep() {
     #     ot-loadovertone
     # fi
     ##
-    if isServer || isGuest ; then
+    if ! ot-enabled-p ; then
         return 0
     fi
 
