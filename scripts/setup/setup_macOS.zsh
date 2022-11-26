@@ -42,4 +42,6 @@ if isDarwin ; then
     mkdir -p ~/code/misc && cd ~/code/misc && git clone https://github.com/nriley/brightness.git && cd brightness && make && sudo make install 
     #: Homebrew is not up-to-date: https://github.com/nriley/brightness/issues/43
     ##
+    brew install --cask hammerspoon && ln -s /Applications/Hammerspoon.app/Contents/Frameworks/hs/hs ~/bin/ 
+    ##
 fi

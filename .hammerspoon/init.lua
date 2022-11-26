@@ -608,7 +608,7 @@ function kittyHandler()
       end
   end
 
-  app:mainWidnow().setShadows(false)
+  -- app:mainWidnow().setShadows(false)
 end
 
 hs.hotkey.bind(hyper, 'z', kittyHandler)
@@ -617,8 +617,11 @@ hs.hotkey.bind({}, 'F12', kittyHandler)
 function install()
   -- @bootstrap installs the CLI binary
   -- https://www.hammerspoon.org/docs/hs.ipc.html#cliInstall
+  -- This needs some dirs to be user-writable (see the docs), so using `ln -s /Applications/Hammerspoon.app/Contents/Frameworks/hs/hs ~/bin/` directly is better,
   hs.ipc.cliUninstall()
-  hs.ipc.cliInstall()
+  res = hs.ipc.cliInstall()
+  -- res = hs.ipc.cliInstall('/Users/evar/bin', false)
+  -- brishzeval(string.format("echo hs cli result: %s", res))
 end
 -- install()
 ---
