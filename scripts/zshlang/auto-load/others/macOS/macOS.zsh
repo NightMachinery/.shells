@@ -28,10 +28,21 @@ function screen-gray-set-darwin () {
 
 }
 ##
-function frontapp-get() {
-    # @darwinonly
+function frontapp-get {
     if isDarwin ; then
-        lsappinfo info "$(lsappinfo front)" | command rg --only-matching --replace='$1' 'bundleID="([^"]*)"'
+      local info
+      info="$(lsappinfo info "$(lsappinfo front)")" @TRET
+
+      local bundle_id
+      if bundle_id="$(ec "$info" | command rg --only-matching --replace='$1' 'bundleID\s*=\s*"([^"]*)"\s*$')" ; then
+        ec "$bundle_id"
+	return 0
+      fi
+
+      local bundle_path
+      if bundle_path="$(ec "$info" | command rg --only-matching --replace='$1' 'bundle\s*path="([^"]*)"')" ; then
+        ec "$bundle_path"
+      fi
     else
         ectrace "Linux not supported"
         return 1
@@ -61,7 +72,7 @@ function nightshift-auto() {
 
     local  app="$(frontapp-get)"
     case "$app" in
-        io.mpv|mpv)
+        io.mpv|mpv|*/bin/mpv)
             nightshift-off
             ;;
         *) nightshift-on ;
