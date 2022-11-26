@@ -37,4 +37,8 @@ if isDarwin ; then
     ##
     brew install pinentry-mac gpg
     sudo ln -s /opt/homebrew/bin/pinentry-mac /usr/local/bin/pinentry-mac 
+    ##
+    mkdir -p ~/code/misc && cd ~/code/misc && git clone https://github.com/nriley/brightness.git && cd brightness && make && sudo make install 
+    #: Homebrew is not up-to-date: https://github.com/nriley/brightness/issues/43
+    ##
 fi
