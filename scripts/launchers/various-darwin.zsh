@@ -11,7 +11,7 @@ if test -n "$MDNS_NAME" ; then
 fi
 ##
 
-brishgarden-boot
+brishgarden-boot 64
 
 if isMe || isGrayfur ; then
     tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile_darwin

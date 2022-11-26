@@ -57,13 +57,21 @@ function piadd() {
 }
 noglobfn piadd
 ##
-function goi() {
+function go-install {
     comment -u update -v verbose
     test -n "$noi" ||
-        reval-ec go get -u -v "$@"
+        {
+            ##
+            reval-ec go install "${*}@latest"
+            ##
+            #: no longer works
+            # reval-ec go get -u -v "$@"
+            ##
+        }
 }
+aliasfn goi go-install
 
-function goiadd() {
+function goiadd {
     ec "$1" >> "$ins_go"
     test -n "$noi" ||
         goi "$1"
@@ -81,11 +89,11 @@ function gemiadd() {
 }
 aliasfn gmiadd gemiadd
 ##
-function ins-npm() {
+function ins-npm {
     zargs -l 1 -- $(cat "$nodables") -- npm install -g
 }
 
-function ins-pip() {
+function ins-pip {
     pip-install pip # forces pip to be the latest version
 
     local f

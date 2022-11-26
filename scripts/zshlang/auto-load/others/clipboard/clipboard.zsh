@@ -51,7 +51,7 @@ function clipboard-add() {
     sync-append "$file" $'\0'"$i" @TRET
 }
 
-function clipboard-delall() {
+function clipboard-delall {
     local file="$CLIPBOARD_RECORD_FILE"
     assert-args file @RET
 
@@ -59,32 +59,51 @@ function clipboard-delall() {
     # reval-ec clipboard-init
 }
 
-function clipboard-init() {
+function clipboard-init {
     local file="$CLIPBOARD_RECORD_FILE"
     touch "$file" # ensures that we won't get into a loop
 
     local i
-    for i in "${(@ps.\C-^.)$(cat "$attic_emails")}" ; do
-        # ectrace
-        reval-ec clipboard-add "$(trim "$i")"
-    done
 
-    for i in "${(@ps.\C-^.)$(cat "$attic_temoji")}" ; do
-        i=( "${(@f)i}" )
-        clipboard-add "${i[1]}"$'\C-^\t\t'"${i[2]}"
-    done
-
-    local emoji_json=~/Base/_Code/Misc/unicode-emoji-json/data-by-emoji.json
-    # https://github.com/muan/unicode-emoji-json
-    # https://gitlab.com/NightMachinary/unicode-emoji-json
-    if test -e "$emoji_json" ; then
-        clipboard-add "$(cat "$emoji_json" | jq -r --nul-output --arg sep $'\C-^\t\t' 'keys[] as $k | "\($k)\($sep)\(.[$k] | .name + " (" + .group +" EMOJIS)" )"')"
-    else
-        ectrace "emoji_trace does not exist" "$emoji_json"
+    if test -e "$attic_emails"; then
+        for i in "${(@ps.\C-^.)$(cat "$attic_emails")}" ; do
+            reval-ec clipboard-add "$(trim "$i")"
+        done
     fi
+
+    if test -e "$attic_temoji"; then
+        for i in "${(@ps.\C-^.)$(cat "$attic_temoji")}" ; do
+            i=( "${(@f)i}" )
+            clipboard-add "${i[1]}"$'\C-^\t\t'"${i[2]}"
+        done
+    fi
+
+    while true ; do
+        local emoji_json
+        # emoji_json="$(ffz-get unicode-emoji-json)/data-by-emoji.json" @TRET
+        emoji_json=~cod/misc/unicode-emoji-json/data-by-emoji.json
+        if  test -e "$emoji_json" ; then
+            # https://github.com/muan/unicode-emoji-json
+            # https://gitlab.com/NightMachinary/unicode-emoji-json
+            if test -e "$emoji_json" ; then
+                clipboard-add "$(cat "$emoji_json" | jq -r --nul-output --arg sep $'\C-^\t\t' 'keys[] as $k | "\($k)\($sep)\(.[$k] | .name + " (" + .group +" EMOJIS)" )"')"
+            else
+                ectrace "emoji_trace does not exist" "$emoji_json"
+            fi
+
+            break
+        elif isMe ; then
+            pushf ~cod/misc @RET
+            {
+                assert git clone https://gitlab.com/NightMachinary/unicode-emoji-json @RET
+                assert z-add "$(realpath ./unicode-emoji-json)" @RET
+            } always { popf }
+        else
+            break
+        fi
 }
 
-function clipboard-removedups() {
+function clipboard-removedups {
     local file="$CLIPBOARD_RECORD_FILE"
     assert-args file @RET
 

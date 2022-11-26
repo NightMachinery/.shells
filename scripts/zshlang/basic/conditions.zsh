@@ -84,13 +84,22 @@ function isZii() {
     [[ "$(hostname)" == 'mail2.lilf.ir' ]]
 }
 
-function isMBP() {
+function isMBP {
     local host="$HOST"
     if test -z "$host"; then # for bash
         host="$(hostname)"
     fi
 
     [[ "$host" == 'Fereidoons-MacBook-Pro.local' ]]
+}
+
+function isMB2 {
+    local host="$HOST"
+    if test -z "$host"; then # for bash
+        host="$(hostname)"
+    fi
+
+    [[ "$host" == 'Feraidoons-MacBook-Air.local' ]]
 }
 
 function isGrayfur {
@@ -116,10 +125,10 @@ function isGuest {
 }
 
 function isMe {
-    isMBP || isLilf
+    isMB2 || isMBP || isLilf
 }
 ##
-function isKitty() {
+function isKitty {
     if isMBP ; then
         return 0 # @surprise
     fi
