@@ -583,6 +583,37 @@ hs.window.filter.new('Acrobat Reader')
                acrobatHotkeyUp:disable()
             end)
 ---
+function kittyHandler()
+  local app = hs.application.get("kitty")
+  local win = app:focusedWindow()
+  local appscreen = win:screen() 
+  local mousescreen = hs.mouse.getCurrentScreen()
+
+  if app then
+      if appscreen == mousescreen then
+        if app:isFrontmost() then 
+          app:hide()
+      	else
+          app:activate()
+	  app:mainWindow():moveToUnit'[100,0,0,100]'
+      	end
+      else
+        win:moveToScreen(mousescreen)
+
+	if app:isHidden() then 
+          app:activate()
+	  app:mainWindow():moveToUnit'[100,0,0,100]'
+      	end
+
+      end
+  end
+
+  app:mainWidnow().setShadows(false)
+end
+
+hs.hotkey.bind(hyper, 'z', kittyHandler)
+hs.hotkey.bind({}, 'F12', kittyHandler)
+---
 function install()
   -- @bootstrap installs the CLI binary
   -- https://www.hammerspoon.org/docs/hs.ipc.html#cliInstall
