@@ -101,6 +101,7 @@ function clipboard-init {
         else
             break
         fi
+        done
 }
 
 function clipboard-removedups {
