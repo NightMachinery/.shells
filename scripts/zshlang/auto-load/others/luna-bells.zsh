@@ -140,6 +140,9 @@ aliasfn bell-luna bell-avarice
 ##
 function lunaquit {
     : "Global outputs: out"
+
+    bella_zsh_disable1
+
     out=""
 
     local gray="${lunaquit_grayoff:-y}"
@@ -311,7 +314,8 @@ function bell-helicopter() {
         trapexits-release
     }
 }
-function bell-diwhite() {
+
+function bell-diwhite {
     ot-play-diwhite "${1:-1}" "${@[2,-1]}"
 }
 ##
@@ -387,7 +391,10 @@ aliasfn bella-gc bell-auto bell-greencase
 aliasfn bella bella-toy
 aliasfn bellj bella
 aliasfn okj bell-auto-stop
-aliasfn bello awaysh bell-diwhite # main gateway of a single alarm bell
+
+#: main gateway of a single alarm bell
+# aliasfn bello awaysh bell-diwhite
+aliasfn bello awaysh bell-ReichPhase
 ##
 function bella_zsh_disable1 {
     if (( $#@ == 0 )) ; then

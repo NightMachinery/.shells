@@ -112,16 +112,27 @@ function cellp {
     git_commitmsg_ask=no reval-ec incell gsync
 }
 ##
-function vcn-getrepo() {
+function vcn-getrepo {
     local repo=night.sh
     isMBP && repo=.shells
     ec $repo
 }
-function vcn-with() {
-    local repo="$(vcn-getrepo)"
+
+function vc-with {
+    local repo="$1" ; shift
+    assert-args repo @RET
+
     fnswap git "vcsh $(gq "$repo")" "$@"
 }
-function vcns() {
+
+function vcn-with {
+    local repo
+    repo="$(vcn-getrepo)" @TRET
+
+    vc-with "$repo" "$@"
+}
+
+function vcns {
     pushf ~/ # to have nice paths in git's output
     {
         vcn-with git add "$NIGHTDIR" # To see newly added files in the status
@@ -129,21 +140,21 @@ function vcns() {
     } always { popf }
 }
 
-function vcndiff() {
+function vcndiff {
     vcn-with git add --intent-to-add ~/scripts/
     vcn-with git-diff HEAD~"${1:-0}"
 }
 
-function vcnpp() {
+function vcnpp {
     local msg="${*}"
-    if isIReally ; then
-        assert-args msg @RET
-    fi
+    # if isIReally ; then
+    #     assert-args msg @RET
+    # fi
 
     pushf ~/
     {
-        assert vcn-with git add ~/scripts/ @RET
-        assert vcn-with @opts noadd y @ gsync "$msg" @RET
+        assert reval-ec vcn-with git add ~/scripts/ @RET
+        assert reval-ec vcn-with @opts noadd y @ gsync "$msg" @RET
 
         brishz-restart
 
