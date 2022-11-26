@@ -35,4 +35,6 @@ if isDarwin ; then
         popf
     }
     ##
+    brew install pinentry-mac gpg
+    sudo ln -s /opt/homebrew/bin/pinentry-mac /usr/local/bin/pinentry-mac 
 fi
