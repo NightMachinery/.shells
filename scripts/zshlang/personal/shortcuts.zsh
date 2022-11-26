@@ -118,9 +118,18 @@ function vcn-getrepo {
     ec $repo
 }
 
-function vcn-with {
-    local repo="$(vcn-getrepo)"
+function vc-with {
+    local repo="$1" ; shift
+    assert-args repo @RET
+
     fnswap git "vcsh $(gq "$repo")" "$@"
+}
+
+function vcn-with {
+    local repo
+    repo="$(vcn-getrepo)" @TRET
+
+    vc-with "$repo" "$@"
 }
 
 function vcns {
