@@ -477,7 +477,7 @@ long.
 When not specified, ELLIPSIS defaults to ‘...’.
 
 Ported from s.el's [help:s-truncate]."
-  (declare (pure t) (side-effect-free t))
+  ;; (declare (pure t) (side-effect-free t))
   (unless ellipsis
     (setq ellipsis "..."))
   (if (> (length s) len)
