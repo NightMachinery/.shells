@@ -17,7 +17,7 @@ cronenable() {
 	}
 	crontab -u $user "$cronpath"
 	mv "$cronpath" "${cronpath}.bak"
-}		
+}
 ##
 #: * @alt [[https://www.hammerspoon.org/docs/hs.audiodevice.html][Hammerspoon docs: hs.audiodevice]]
 
@@ -347,8 +347,29 @@ function brightness-set {
 		return 1
 	fi
 }
+
+function brightness-inc {
+    local inc="${1:-0.025}"
+
+    local curr
+    curr="$(brightness-get)" @TRET
+
+    local n=$((curr+inc))
+    if (( n > 1 )) ; then
+        n=1
+    elif (( n < 0 )) ; then
+        n=0
+    fi
+
+    brightness-set "$n"
+}
+
+function brightness-dec {
+    local amount="${1:-0.025}"
+    brightness-inc $((amount*-1))
+}
 ##
-function brightness-screen() {
+function brightness-screen {
 	local mode="${1:-1}"
 
 	local screen="$(gmktemp --suffix .png)"
