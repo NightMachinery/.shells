@@ -234,7 +234,6 @@ function iloop() {
                     # (input-lang-push en)
                     q="$(ecn "$q" | per2en)"
                 fi
-                # typ q
                 sleep=''
             fi
             if [[ "${q[1]}" == ('^'|'\') ]] ; then
