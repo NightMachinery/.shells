@@ -281,21 +281,52 @@ function screen-gamma-set-dur {
 	invert_darwin.c "$dur" "$t1" "$t2"
 }
 aliasfn screen-invert-dur screen-gamma-set-dur
-## @darwinonly
-function display-gray-is() {
+### @darwinonly
+#: * @alt [[https://www.hammerspoon.org/docs/hs.screen.html#setForceToGray]]
+#: ** https://github.com/Hammerspoon/hammerspoon/issues/3329
+
+function display-gray-is-v0 {
 	[[ "$(gray_darwin.c s)" == "Grayscale is now: 1" ]]
 }
-function display-gray-toggle() {
+
+function display-gray-toggle-v0 {
 	gray_darwin.c
 }
-function display-gray-off() {
+
+function display-gray-off-v0 {
+    #: no longer works
 	gray_darwin.c n
 }
-function display-gray-on() {
+
+function display-gray-on-v0 {
+    #: no longer works
 	gray_darwin.c y
 }
 ##
-function brightness-get() {
+SCREEN_GRAY_MARKER='SCREEN_GRAY_MARKER'
+function display-gray-is {
+    sout pgrep "$SCREEN_GRAY_MARKER"
+}
+
+function display-gray-toggle {
+    if display-gray-is ; then
+        display-gray-off
+    else
+        display-gray-on
+    fi
+}
+
+function display-gray-off {
+    kill-marker "$SCREEN_GRAY_MARKER" || true
+}
+
+function display-gray-on {
+    display-gray-is && return 0
+
+    awaysh-bnamed "$SCREEN_GRAY_MARKER" screen-gamma-set-dur 99999999 0.4 1
+}
+##
+function brightness-get {
 	if isDarwin ; then # @darwinonly
 		if [[ "$(brightness -l)" =~ 'display 0: brightness (\S+)' ]] ; then
 			ec "$match[1]"
