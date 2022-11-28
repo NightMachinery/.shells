@@ -19,19 +19,197 @@ cronenable() {
 	mv "$cronpath" "${cronpath}.bak"
 }		
 ##
-function volget() {
-	: "0-100"
+#: * @alt [[https://www.hammerspoon.org/docs/hs.audiodevice.html][Hammerspoon docs: hs.audiodevice]]
 
-	assert isDarwin @RET # @darwinonly
+function volume-mute-p-hs {
+  local what="${volume_what:-output}"
 
-	osascript -e 'set ovol to output volume of (get volume settings)'
+  local whatC="$what"
+  whatC[1]="${whatC[1]:u}"
+
+  local res
+  res="$(revaldbg hammerspoon -c "hs.audiodevice.default${whatC}Device():${what}Muted()")" @TRET
+  dact typ res
+
+  if [[ "$res" == true ]] ; then
+    return 0
+  else
+    return 1
+  fi
 }
-function volset() {
+
+function volume-get-hs {
+  local what="${volume_what:-output}"
+
+  local whatC="$what"
+  whatC[1]="${whatC[1]:u}"
+
+  revaldbg hammerspoon -c "hs.audiodevice.default${whatC}Device():${what}Volume()"
+}
+
+function volume-mute-hs {
+  local v="${volume_what_v:-true}"
+
+  local what="${volume_what:-output}"
+
+  local whatC="$what"
+  whatC[1]="${whatC[1]:u}"
+
+  if [[ "$(revaldbg hammerspoon -c "hs.audiodevice.default${whatC}Device():set${whatC}Muted($v)")" == true ]] ; then
+    return 0
+  else
+    return 1
+  fi
+}
+aliasfn volume-unmute-hs volume_what_v=false volume-mute-hs
+
+function volume-mute-toggle-hs {
+  if volume-mute-p-hs ; then
+    volume-unmute-hs
+  else
+    volume-mute-hs
+  fi
+}
+
+function volume-inc-hs {
+  local amount="${1:-5}"
+  local what="${volume_what:-output}"
+
+  local whatC="$what"
+  whatC[1]="${whatC[1]:u}"
+
+  revaldbg hammerspoon -c "volumeInc(${amount}, hs.audiodevice.default${whatC}Device())"
+}
+
+function volume-dec-hs {
+    local amount="${1:-5}"
+
+    volume-inc-hs $((amount*-1))
+}
+
+function volume-mute-p {
+  local what="${volume_what:-output}"
+
+  if isDarwin ; then
+    if [[ "$what" == input ]] ; then
+        local vol
+        vol="$(volume-get)" @TRET
+
+        if (( vol == 0 )) ; then
+            return 0
+        else
+            return 1
+        fi
+    else
+        local res
+        res="$(osascript -e "output muted of (get volume settings)")" @TRET
+        if [[ "$res" == true ]] ; then
+          return 0
+        else
+          return 1
+        fi
+    fi
+  else
+    @NA
+  fi
+}
+
+function volume-mute {
+  local what="${volume_what:-output}"
+
+  if isDarwin ; then
+    if [[ "$what" == input ]] ; then
+      local vol
+      vol="$(volume-get)" @TRET
+      input_volume_cached_set "$vol" @STRUE
+
+      volume-set 0
+    else
+      osascript -e "set volume with ${what} muted"
+    fi
+  else
+    @NA
+  fi
+}
+
+redis-defvar input_volume_cached
+function volume-unmute {
+  local what="${volume_what:-output}"
+
+  if isDarwin ; then
+    if [[ "$what" == input ]] ; then
+      volume-set "${$(input_volume_cached_get):-75}"
+    else
+      osascript -e "set volume without ${what} muted"
+    fi
+  else
+    @NA
+  fi
+}
+
+function volume-mute-toggle {
+  local what="${volume_what:-output}"
+
+  local alert_dur=0.5
+
+  if volume-mute-p ; then
+    volume-unmute
+
+    awaysh-fast alert "$what volume UNMUTED"
+  else
+    volume-mute
+
+    awaysh-fast alert "$what volume muted"
+  fi
+}
+
+function input-volume-mute-toggle {
+    {
+      ##
+      # with-input-volume volume-mute-toggle @TRET
+      ##
+      with-input-volume volume-mute-toggle-hs @TRET
+      ##
+    } always {
+      local alert_dur=2
+      ##
+      if with-input-volume volume-mute-p-hs  ; then
+        alert "input muted"
+      else
+        alert "INPUT UNMUTED"
+      fi
+      ##
+      # awaysh-fast alert "input-volume: $(with-input-volume volume-get)"
+    }
+}
+
+function volget {
+  : "0-100"
+
+  local what="${volume_what:-output}"
+
+  if isDarwin ; then
+	  osascript -e "set ovol to ${what} volume of (get volume settings)"
+  else
+    @NA
+  fi
+}
+
+function volset {
 	: "0-100"
 
-	assert isDarwin @RET # @darwinonly
+    local v="${1}"
+    assert-args v @RET
+    local what="${volume_what:-output}"
 
-	osascript -e "set volume output volume $1"
+    if isDarwin ; then
+        osascript -e "set volume ${what} volume $v"
+
+        # alert_dur=0.5 awaysh-fast alert "${what}-volume: $(volume-get)"
+        # notif-kitty "${what}-volume" "$(volume-get)"
+    else
+        @NA
+    fi
 }
 aliasfn setv volset
 aliasfn set-volume volset
@@ -39,6 +217,21 @@ aliasfn volume-set volset
 aliasfn get-volume volget
 aliasfn volume-get volget
 aliasfn getv volget
+aliasfn with-input-volume volume_what=input
+
+function volume-inc {
+  local amount="${1:-5}"
+
+  local vol
+  vol="$(volume-get)" @TRET
+  reval-ec volume-set $(( vol+amount ))
+}
+
+function volume-dec {
+  local amount="${1:-5}"
+
+  volume-inc $((amount*-1))
+}
 ##
 function mute-external_() {
 	: "You probably want to use mute-external which calls this in a loop.
