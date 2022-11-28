@@ -18,7 +18,12 @@ function cpu-usage-get() {
     ps -A -o %cpu | awk '{s+=$1} END {print s "%"}'
 }
 ##
-function memory-free-get() {
+function vm_stat-h {
+    vm_stat |
+        perl -ne '/page size of (\d+)/ and $size=$1; /Pages\s+([^:]+)[^\d]+(\d+)/ and printf("%-16s % 16.2f Mi\n", "$1:", $2 * $size / 1048576);'
+}
+
+function memory-free-get {
     local free_ram
     if isDarwin ; then
         free_ram=$(( $({
