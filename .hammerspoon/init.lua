@@ -583,17 +583,97 @@ hs.window.filter.new('Acrobat Reader')
                acrobatHotkeyUp:disable()
             end)
 ---
+-- You can set hyper+F5 to the dictation command in macOS settings.
+hs.hotkey.bind(hyper, "5", function()
+                 brishzeval('awaysh-fast input-volume-mute-toggle')
+                 -- @needed awaysh-fast
+end)
+
+hs.hotkey.bind(hyper, "F1", function()
+                 brishzeval('awaysh-fast brightness-dec')
+end)
+
+hs.hotkey.bind(hyper, "F2", function()
+                 brishzeval('awaysh-fast brightness-inc')
+end)
+
+hs.hotkey.bind(hyper, "F6", function()
+                 brishzeval('awaysh-fast focus-do-not-disturb-toggle')
+end)
+
+hs.hotkey.bind(hyper, "F7", function()
+                 brishzeval('awaysh-fast hear-prev')
+end)
+
+hs.hotkey.bind(hyper, "F8", function()
+                 brishzeval('awaysh-fast hear-play-toggle')
+end)
+
+hs.hotkey.bind(hyper, "F9", function()
+                 brishzeval('awaysh-fast hear-next')
+end)
+
+hs.hotkey.bind(hyper, "F10", function()
+                 brishzeval('awaysh-fast volume-mute-toggle')
+end)
+
+function volumeInc(v, device)
+  v = v or 5
+
+  d = device or hs.audiodevice.defaultOutputDevice()
+  v = d:outputVolume() + v
+  if v > 100 then
+    v = 100
+  end
+  if v < 0 then
+    v = 0
+  end
+
+  d:setOutputVolume(v)
+
+  hs.alert("vol: " .. math.floor(v + 0.5), 0.4)
+end
+
+hs.hotkey.bind(hyper, "F11", function()
+                 ---
+                 -- brishzeval('awaysh-fast volume-dec')
+                 ---
+                 volumeInc(-5)
+                 ---
+end)
+
+hs.hotkey.bind(hyper, "F12", function()
+                 ---
+                 -- brishzeval('awaysh-fast volume-inc')
+                 ---
+                 volumeInc(5)
+                 ---
+end)
+--
+kitty_prev_app = nil
 function kittyHandler()
   local app = hs.application.get("kitty")
   local win = app:focusedWindow()
   local appscreen = win:screen() 
   local mousescreen = hs.mouse.getCurrentScreen()
+  local mouseSpace = hs.spaces.focusedSpace()
 
   if app then
       if appscreen == mousescreen then
         if app:isFrontmost() then 
           app:hide()
+	  kitty_prev_app:activate() 
+	  -- sometimes works without this, too, but it's better to explicitly include this.
       	else
+	  kitty_prev_app = application.frontmostApplication()
+
+          space_res = hs.spaces.moveWindowToSpace(win, mouseSpace)
+	  -- https://www.hammerspoon.org/docs/hs.spaces.html#moveWindowToSpace
+	  -- a window can only be moved from a user space to another user space -- you cannot move the window of a full screen (or tiled) application to another space and you cannot move a window to the same space as a full screen application.
+	  -- @toFuture/1401/12 This merged PR solves this: https://github.com/Hammerspoon/hammerspoon/pull/3298
+
+	  -- hs.alert.show(string.format("moving to space %s: %s", mouseSpace, space_res))
+
           app:activate()
 	  app:mainWindow():moveToUnit'[100,0,0,100]'
       	end
