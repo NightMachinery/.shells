@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 
 ##
-# install: `pip install --upgrade arabic-reshaper python-bidi Pillow numpy blend_modes`
-# usage: echo <text> | text2img.py <font> <output>
+# * install: `pip install --upgrade arabic-reshaper python-bidi Pillow numpy blend_modes`
+# ** You might need to install Pillow manually to add RAQM support for RTL layouts:
+# *** [[https://pillow.readthedocs.io/en/stable/installation.html][Installation - Pillow (PIL Fork) 9.3.0 documentation]]
+#
+# * usage: echo <text> | text2img.py <font> <output>
 ##
 
 import arabic_reshaper
@@ -36,7 +39,7 @@ if len(sys.argv) >= 4:
     imageIn = sys.argv[3]
 ###
 s = int(os.environ.get("text2img_s", 40))
-font = ImageFont.truetype(fontFile, s, encoding='unic', layout_engine=ImageFont.LAYOUT_RAQM)
+font = ImageFont.truetype(fontFile, s, encoding='unic', layout_engine=ImageFont.Layout.RAQM)
 ##
 # `encoding=...` might not be necessary (idk what it does)
 ## color emoji:
