@@ -1,7 +1,8 @@
 ##
-function var-show {
-    >&2 typeset -p "$@"
-}
+# function var-show {
+#     >&2 typeset -p "$@"
+# }
+alias var-show='>&2 typeset -p'
 alias typ='var-show'
 ##
 function arger() {
