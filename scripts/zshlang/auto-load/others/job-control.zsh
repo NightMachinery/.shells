@@ -200,7 +200,7 @@ function awaysh1() {
 }
 aliasfn awaysh-fast awaysh1
 
-function disown-true() {
+function disown-true {
     disown &>/dev/null || true  # Prevent whine if job has already completed
 }
 @opts-setprefix awaysh insubshell-eval

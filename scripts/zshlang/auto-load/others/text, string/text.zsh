@@ -1,16 +1,6 @@
 ### Module Text Manipulation
 ### This module specializes in functions that do not touch the disk.
 ###
-function whitespace-p() {
-    in-or-args2 "$@"
-    if ecn "$inargs[*]" | silent command rg '\S' ; then
-        return 1
-    else
-        return 0
-    fi
-}
-aliasfn whitespace-is whitespace-p
-##
 function duplicates-clean-sort-file-inplace {
     local f="$1"
     test -e "$f" @TRET

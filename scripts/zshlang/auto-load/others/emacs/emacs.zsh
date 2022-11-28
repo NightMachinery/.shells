@@ -52,8 +52,8 @@ function emn() {
 #     emc-openclose "${vfiles[@]}"
 # }
 ##
-function emacs-vfiles() {
-    : "Paste the result into the recentf list of emacs (For me at: ~/.emacs.d.doom/.local/cache/recentf). You'll need to have set the max limit appropriately, as I have done."
+function emacs-vfiles {
+    : "Paste the result into the recentf list of emacs (For me at: ~/.emacs.d/.local/cache/recentf). You'll need to have set the max limit appropriately, as I have done."
 
     init-vfiles yes
     local i res=()

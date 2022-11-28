@@ -9,7 +9,10 @@
 @opts-setprefix rem-sync reminday_store
 ##
 function rem-enabled-p {
-    test -d "$remindayDir"
+    #: The directory itself seems to be created even when it doesn't exist by our own functions. So I am checking its children.
+    local candidates=("$remindayDir"/14*(DN/))
+
+    (( ${#candidates} >= 1 ))
 }
 ##
 function rem-sync() {

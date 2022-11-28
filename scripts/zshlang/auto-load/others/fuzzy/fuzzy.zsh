@@ -267,7 +267,7 @@ ffman() {
 }
 alias ffm=ffman
 ###
-function init-vfiles() {
+function init-vfiles {
     : GLOBAL vfiles
 
     if test -n "$*" || test -z "$vfiles[1]" ; then

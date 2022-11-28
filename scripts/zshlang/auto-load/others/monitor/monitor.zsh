@@ -1,3 +1,6 @@
+##
+aliasfn asitop TERM=xterm-256color sudo asitop
+##
 function glan() {
     # --time sets the refresh delay in seconds
     # --byte display network rate in byte per second

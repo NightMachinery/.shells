@@ -76,8 +76,11 @@ function logout-darwin2() {
 	osascript -e 'tell application \"System Events\" to log out'
 }
 ##
-function screen-gamma-set-dur() {
-	# @darwinonly, see https://stackoverflow.com/questions/3552037/how-to-programmatically-invert-screen-colors-in-linux
+function screen-gamma-set-dur {
+	#: @darwinonly, see https://stackoverflow.com/questions/3552037/how-to-programmatically-invert-screen-colors-in-linux
+    #: @alt [[https://www.hammerspoon.org/docs/hs.screen.html#setGamma]]
+    #: @alt `hammerspoon -c "hs.screen.setInvertedPolarity(true)"`
+    ##
 	local dur="${1:-3}" # duration in seconds
 	local t1="${2:-1}"
 	local t2="${3:-0}"
@@ -110,7 +113,8 @@ function brightness-get() {
 		return 1
 	fi
 }
-function brightness-set() {
+
+function brightness-set {
 	local i="$1"
 
 	if isDarwin ; then # @darwinonly
@@ -129,7 +133,8 @@ function brightness-screen() {
 	command rm $screen
 	ec $screen_brightness
 }
-function brightness-auto() {
+
+function brightness-auto {
 	local darkest="${1:-0.5}"
 
 	local screen_brightness="$(brightness-screen)"
@@ -142,13 +147,14 @@ function brightness-auto() {
 	dvar to
 	brightness $to
 }
-function brightness-auto-loop() {
+
+function brightness-auto-loop {
 	# brightness-auto takes ~0.85s
 	serr @opts s "${lo_s:-3}" @ loop brightness-auto "${@:-0.3}"
 }
 @opts-setprefix brightness-auto-loop lo
 ##
-function open_command() {
+function open_command {
   # forked from OMZ
   local open_cmd
 
