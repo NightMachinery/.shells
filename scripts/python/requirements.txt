@@ -1,6 +1,9 @@
+Pillow
 PyPDF2
 Unidecode
 amzqr
+arabic_reshaper
+blend_modes
 catsql
 cloudscraper
 colorama
@@ -69,6 +72,7 @@ plumbum
 praw
 psaw
 pypyp
+python-bidi
 python-jose[cryptography]
 python-multipart
 python-telegram-bot

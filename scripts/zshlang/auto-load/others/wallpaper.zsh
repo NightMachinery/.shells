@@ -1,5 +1,5 @@
 ##
-function wallpaper-overlay() {
+function wallpaper-overlay {
     local input="$1" overlay_rem="y" overlay_weather="${wallpaper_overlay_weather:-y}"
     local o="${2:-${1:r}_overlay.png}"
     ensure-args input @MRET
@@ -29,12 +29,14 @@ function wallpaper-overlay() {
                     ecerr "$0: Failed to overlay addons with $?"
                 }
         fi
+
         if isNet && [[ "$overlay_weather" == (y|ipad) ]] ; then
             t="$(gmktemp --suffix .png)"
             local loc
-            loc="$(serr location-get | prefixer -o , --skip-empty)" || loc='Sabzevar,Iran'
+            loc="$(serr location-get | prefixer -o , --skip-empty)" || loc="${location_my:-Tehran,Iran}"
+
             # https://wttr.in/:help
-            # @todo2 use a transparent image instead if req failed
+            # @todo use a transparent image instead if req failed
             gurl "wttr.in/${loc}_transparency=255_mQ0_lang=en.png" > "$t" && {
                 #  -channel RGB -negate
                 # dark: plus > negate > screen; overlay, lighten, diff, add are very bad
@@ -48,7 +50,7 @@ function wallpaper-overlay() {
     )
 }
 
-function wallpaper-overlay-ipad() {
+function wallpaper-overlay-ipad {
     local f="$1" f_ipad="${2:-$HOME/Downloads/private/ipad.png}"
     f="$(realpath "$f")" || {
         ecerr "$0: Does the input file exist?"
@@ -67,8 +69,9 @@ function wallpaper-overlay-ipad() {
     fi
 }
 ##
-function wallpaper-set-darwin() {
+function wallpaper-set-darwin {
     ensure isDarwin @MRET
+
     local f="$1"
     f="$(realpath "$f")" || return $?
     ###
@@ -99,7 +102,7 @@ function wallpaper-set-darwin() {
     ###
 }
 
-function wallpaper-set() {
+function wallpaper-set {
     local f="$1"
     f="$(realpath "$f")" || return $?
     ##
@@ -115,7 +118,7 @@ function wallpaper-set() {
     assert wallpaper-set-darwin "$f" @RET
 }
 ##
-function wallpaper-auto() {
+function wallpaper-auto {
     local log=~/logs/wallpaper-auto
     ensure-dir "$log"
 
@@ -126,7 +129,7 @@ function wallpaper-auto() {
     ec $'\n'"===================================" >> "$log"
 }
 
-function wallpaper-auto-bing() {
+function wallpaper-auto-bing {
     assert-net || {
         return 0
     }
@@ -145,8 +148,10 @@ function wallpaper-auto-bing() {
         }
     } always { popf }
 }
-function wallpaper-auto-ipad() {
-    # takes ~9 minutes on ${lilf_user}
+
+function wallpaper-auto-ipad {
+    #: takes ~9 minutes on ${lilf_user}
+    ##
     fnswap wallpaper-set wallpaper-overlay-ipad wallpaper-auto
 }
 ##
