@@ -1,3 +1,9 @@
+##
+function var-show {
+    >&2 typeset -p "$@"
+}
+alias typ='var-show'
+##
 function arger() {
     local i
     for i in "$@" ; do

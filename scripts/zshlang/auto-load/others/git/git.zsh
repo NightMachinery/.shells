@@ -381,6 +381,28 @@ Undoes last commits without changing files." MAGIC
   git reset --soft HEAD~"${1:-1}"
 }
 ##
+function http2git {
+  in-or-args "$@" |
+    perl -ple 's|^https://([^/]+)/|git\@$1:| && s|(?:\.git)?$|.git|' |
+    cat-copy-if-tty
+}
+
+function git-remote-2ssh {
+  local remotes=($@)
+
+  if (( ${#@} == 0 )) ; then
+    remotes=(${(@f)"$(git remote)"})
+  fi
+
+  local remote url url_ssh
+  for remote in ${remotes[@]} ; do
+    url="$(git remote get-url "$remote")" @TRET
+    dact var-show url
+    url_ssh="$(http2git "$url")" @TRET
+    reval-ec git remote set-url "$remote" "$url_ssh" @TRET
+  done
+}
+
 function h_git2http {
   #: @deprecated
   ##
