@@ -1,8 +1,14 @@
-## See $nightNotes/cheatsheets/zsh/bells.org
+##
+#: * See $nightNotes/cheatsheets/zsh/bells.org
+#:
+#: * We cache the results of some of the expensive macros like this:
+#: =wh bell-lm-mhm| perl -ple 's|\Q$ENV{GREENCASE_DIR}\E|\$GREENCASE_DIR|gi'" ; s/'/\"/g "|cat-copy=
 ###
+# return 0
 if isNotExpensive ; then
-    # This single file costs a second of loading time :|
-    # Update: now ~7s
+    #: This single file costs a second of loading time :|
+    #: [jalali:1401/09/07/02:19] @M2 after some optimizations, takes ~0.5s
+    #: Update: now ~7s
     return 0
 fi
 ###
@@ -115,8 +121,11 @@ function bell-toy {
 }
 
 function greencase_audio_init {
+    typeset -g greencase_audio_init
+
     { test -z "$greencase_audio_init" || test -n "$*" } && {
         greencase_audio=( $GREENCASE_DIR/**/$~audioglob )
+        greencase_audio_init=y
     }
 }
 
@@ -265,7 +274,8 @@ function deluna() {
     done
     ec deluna exited "(nonce: $nonce)"
 }
-function notnowluna() {
+
+function notnowluna {
     mdoc "DEPRECATED: Using lunaquit handles this usecase as well nowadays.
 Not Now Luna!" MAGIC
     local vol="$(get-volume)"
@@ -475,18 +485,32 @@ function bella-zsh-maybe() {
 ##
 aliasfn bell-dl tts-glados1-cached 'Download, complete'
 ##
+function bell-enabled-p {
+    if isMBP || isMB2 ; then
+        return 0
+    fi
+
+    if isServer || ! test -d "$GREENCASE_DIR" ; then
+        return 1
+    else
+        return 0
+    fi
+}
+
 function bell-maker {
+    #: @warning This function gets called a lot, so do not create subshells in it.
+    ##
     local name="${1}" fs=( ${@[2,-1]} )
 
     local fn="bell-$name"
-    if isServer || ! test -d "$GREENCASE_DIR" ; then
+    if (( ${#fs} == 0 )) || ! bell-enabled-p ; then
         fndef $fn true
     else
         assert-args name fs @RET
         local i
         for i in {1..${#fs}} ; do
             local f="${fs[$i]}"
-            ## This is too expensive:
+            ##: This is too expensive:
             # if ! test -e "$f" ; then
             #     fs[$i]="$GREENCASE_DIR/$f"
             # fi
@@ -498,7 +522,11 @@ function bell-maker {
             ##
         done
 
-        fndef $fn bell-ringer "BELL_$(ec ${name:u} | gtr '-' '_')_MARKER" "$fs[@]"
+        local marker
+        marker="BELL_${${name:u}//-/_}_MARKER"
+        # marker="BELL_${name:u}_MARKER"
+
+        fndef $fn bell-ringer "$marker" "$fs[@]"
     fi
 }
 
@@ -523,7 +551,7 @@ function bell-ringer {
 function bell-lm-maker {
     local name="${1}" fs=("${@[2,-1]}")
 
-    if isServer || ! test -e "$GREENCASE_DIR" ; then
+    if (( ${#fs} == 0 )) || ! bell-enabled-p ; then
         fndef "bell-lm-$name" true
     else
         assert-args name fs @RET
@@ -539,7 +567,8 @@ function bell-lm-maker {
         bell-maker "lm-$name" "$fs[@]"
     fi
 }
-function bell-lm-maker-dir() {
+
+function bell-lm-maker-dir {
     local name="${1}" f="${2}"
 
     if isServer || ! test -e "$GREENCASE_DIR" ; then
@@ -568,7 +597,11 @@ bell-lm-maker amiindanger flac/06.4_04_MI_amiindanger.flac
 bell-lm-maker shouldisitdown flac/16-1_15_MI_shouldisitdown.flac
 bell-maker lm-fail LittleMisfortune/flac/10.4_27_MI_fail1..blue..flac
 aliasfn bell-fail bell-lm-fail
-bell-lm-maker-dir mhm mhm
+##
+# bell-lm-maker-dir mhm mhm
+function bell-lm-mhm {
+	bell-ringer "BELL_LM_MHM_MARKER" "$GREENCASE_DIR/LittleMisfortune/mhm/16_31_MI_mhm..blue..flac" "$GREENCASE_DIR/LittleMisfortune/mhm/16_36_MI_mmhm..blue..flac" "$GREENCASE_DIR/LittleMisfortune/mhm/17.2_08_MI_mmhmm..blue..flac" "$GREENCASE_DIR/LittleMisfortune/mhm/18_09_MI_mmhmm..blue..flac"
+}
 ##
 bell-lm-maker mo-welldone flac/17.1_11_MO_welldone.flac
 # `fr heari 'flac/ MI cool'`
@@ -678,7 +711,11 @@ bell-maker hp3-platform-movement 'HP3/PC Computer - Harry Potter & the Prisoner 
 
 bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 12/Dialog part 1/pc_her_Adv6_7_be careful harry..blue..wav'
 
-bell-maker hp3-water-trickle "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/"water_trickle*.wav(.N)
+bell-maker hp3-water-trickle \
+    "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/water_trickle01.wav" \
+    "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/water_trickle02.wav" \
+    "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/water_trickle03.wav" \
+    "$GREENCASE_DIR/HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/ambience/water_trickle04.wav" \
 
 bell-maker hp3-star-pickup 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/Magic/pickup_star1..blue..wav'
 ## Sonic:

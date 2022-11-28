@@ -632,7 +632,7 @@ function nightsh-load-zshrc() {
   zsh-defer typeset -g rcLoaded='yes'
 
   # tty-statusbar-enable
-  ifdefined bell-zsh-start || true
+  isdefined bell-zsh-start && inbg bell-zsh-start || true
 }
 ###
 if nightsh-basic-p || { test -e "$nightsh_private_first" && ! source "$nightsh_private_first" } ; then
