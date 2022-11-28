@@ -50,7 +50,7 @@ function kitty-tab-activate() {
     # https://sw.kovidgoyal.net/kitty/remote-control.html#kitty-focus-tab"
 }
 ##
-function kitty-tab-get() {
+function kitty-tab-get {
     local id="${1:-$KITTY_WINDOW_ID}"
     if test -z "$id" ; then
         if isTmux ; then
@@ -63,6 +63,7 @@ function kitty-tab-get() {
 
     kitty-remote ls | jq -r --arg wid "$id" '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].id == ($wid | tonumber))'
 }
+
 function kitty-tab-get-emacs() {
     kitty-remote ls | {
         # jq -r '.[] | select(.is_focused == true) | .tabs[] | select(.windows[0].foreground_processes[0].cmdline[0] | contains("emacs") ) | .id'
@@ -98,8 +99,11 @@ function kitty-emacs-focus() {
     ##
 }
 
-function kitty-tab-is-focused() {
-    [[ "$(kitty-tab-get | jq -r '.is_focused')" == 'true' ]]
+function kitty-tab-is-focused {
+    local res
+    res="$(serr kitty-tab-get)" @RET
+
+    [[ "$(ec "$res" | jq -r '.is_focused')" == 'true' ]]
 }
 ##
 # redis-defvar kitty_focused
