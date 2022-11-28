@@ -1,0 +1,41 @@
+#!/usr/bin/osascript -l JavaScript
+// * @broken on macOS Ventura
+//
+// * @forkedFrom https://gist.github.com/drewkerr/c383ec799b05ac2db4121f5f2dfebd0a
+//
+// * @alt Define a Siri shortcut to set the desired focus and run it like `shortcuts run 'Focus Set: Do Not Disturb'`.
+///
+ObjC.import('Foundation')
+const argv = $.NSProcessInfo.processInfo.arguments.js
+
+var focus = "Do Not Disturb"
+if (argv.length >= 5) {
+    focus = argv[4].js
+}
+
+console.log("setting focus: " + focus)
+///
+function toggleFocus(focus) {
+
+	const app = Application("System Preferences")
+	const pane = app.panes.byId("com.apple.preference.notifications").anchors.byName("Focus")
+	app.reveal(pane) // Open the preference pane
+
+	// Useful way of inspecting the UI hierarchy of an open app:
+	// Application("System Events").applicationProcesses.byName("System Preferences").entireContents()
+	const ui = Application("System Events").applicationProcesses.byName("System Preferences").windows.byName("Notifications & Focus").tabGroups.at(0)
+
+	delay(0.5) // Ensure the UI has loaded
+
+	const rows = ui.scrollAreas.at(0).tables.at(0).rows()
+	rows.forEach(row => {
+		let name = row.uiElements.at(0).staticTexts.name()
+		if (name == focus) {
+			row.select() // Select the focus mode, if found...
+			ui.groups.at(0).checkboxes.at(0).click() // ... and toggle the switch
+		}
+	})
+	app.quit()
+}
+
+toggleFocus(focus)
