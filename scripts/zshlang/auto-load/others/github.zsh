@@ -37,7 +37,7 @@ function gh-url2repo {
     ec "$repo"
 }
 ##
-function gh-release-get() {
+function gh-release-get {
     local url="$1"
     local repo
     repo="$(gh-url2repo "$url")" @RET # asserts the nonemptiness of url itself
@@ -89,4 +89,5 @@ function gh-release-get() {
     }
 }
 alias gh-install='gh-release-get'
+alias github-install='gh-release-get'
 ##

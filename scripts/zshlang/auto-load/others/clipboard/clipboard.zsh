@@ -95,7 +95,7 @@ function clipboard-init {
         elif isMe ; then
             pushf ~cod/misc @RET
             {
-                assert git clone https://gitlab.com/NightMachinary/unicode-emoji-json @RET
+                assert git clone git@gitlab.com:NightMachinary/unicode-emoji-json.git @RET
                 assert z-add "$(realpath ./unicode-emoji-json)" @RET
             } always { popf }
         else

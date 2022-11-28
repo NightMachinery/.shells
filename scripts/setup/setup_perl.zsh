@@ -12,3 +12,5 @@ local i
 for i in $perl_installables[@] ; do
     cpanm "$i"
 done
+
+ansifold-path-fix

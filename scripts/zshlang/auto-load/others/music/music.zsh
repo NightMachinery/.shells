@@ -29,8 +29,11 @@ function hearinvisible-fast() {
 }
 @opts-setprefix hearinvisible-fast hear
 
-function hearinvisible-playfast() {
+function hearinvisible-playfast {
     local vol="${hear_volume:-${hear_v:-1}}" loudidle="${hear_loudidle}"
+    if volume-mute-p ; then
+      loudidle=n
+    fi
 
     bella_zsh_disable1
 

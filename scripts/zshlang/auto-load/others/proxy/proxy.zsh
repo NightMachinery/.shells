@@ -138,7 +138,7 @@ function enh-pxpy {
 }
 ##
 function proxy-p {
-    test -z "$pxified" && { isMBP }
+    test -z "$pxified" && { isLocal && isMe }
 }
 
 function proxy-auto-p {
@@ -150,7 +150,7 @@ function proxy-auto-p {
     fi
 }
 
-function pxify-auto() { # @gateway
+function pxify-auto { # @gateway
     typeset -g pxified
 
     if proxy-auto-p ; then

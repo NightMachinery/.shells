@@ -129,7 +129,7 @@ function isMe {
 }
 ##
 function isKitty {
-    if isMBP ; then
+    if isLocal && isMe ; then
         return 0 # @surprise
     fi
 

@@ -62,28 +62,30 @@ function semantic-scholar-to-json-scraping {
     assert-args url @RET
     url="$(semantic-scholar-url-get "$url")" @TRET
 
-    full-html2 "$url" \
-        | selectors2json.py \
-        title '[data-selenium-selector="paper-detail-title"]' '' \
-        bibtex '.bibtex-citation' '' \
-        doi '[data-selenium-selector="paper-doi"] .doi__link' 'attr:href' \
-        corpusID '[data-selenium-selector="corpus-id"]' '' \
-        date '[data-selenium-selector="paper-year"]' '' \
-        authors_names 'meta[name="citation_author"]' 'attr:content' \
-        journal_name '[data-heap-id="paper-meta-journal"]' '' \
-        abstract 'meta[name="description"]' 'attr:content' \
-        links '[data-selenium-selector="paper-link"]' 'attr:href' \
-        pdf_urls 'meta[name="citation_pdf_url"]' 'attr:content' \
-        topics '[data-selenium-selector="entity-name"]' '' \
-        referenceCount '[data-heap-nav="references"]' '' \
-        | jq '.'
+    local html
+    html="$(full-html2 "$url")" @TRET
+    ec "$html" |
+        selectors2json.py \
+            title '[data-selenium-selector="paper-detail-title"]' '' \
+            bibtex '.bibtex-citation' '' \
+            doi '[data-selenium-selector="paper-doi"] .doi__link' 'attr:href' \
+            corpusID '[data-selenium-selector="corpus-id"]' '' \
+            date '[data-selenium-selector="paper-year"]' '' \
+            authors_names 'meta[name="citation_author"]' 'attr:content' \
+            journal_name '[data-heap-id="paper-meta-journal"]' '' \
+            abstract 'meta[name="description"]' 'attr:content' \
+            links '[data-selenium-selector="paper-link"]' 'attr:href' \
+            pdf_urls 'meta[name="citation_pdf_url"]' 'attr:content' \
+            topics '[data-selenium-selector="entity-name"]' '' \
+            referenceCount '[data-heap-nav="references"]' '' \
+            | jq '.'
 
     ##
     # abstract '[data-selenium-selector="abstract-text"]' '->org' \
-    # authors '.author-list' '->org' \
-    # '+1 author' appears in the authors list.
+        # authors '.author-list' '->org' \
+        # '+1 author' appears in the authors list.
     # citationCount '[data-heap-nav="citing-papers"]' '' \
-    ##
+        ##
 }
 
 function semantic-scholar-to-org {
