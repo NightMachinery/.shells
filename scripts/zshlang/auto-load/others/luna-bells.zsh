@@ -486,6 +486,23 @@ function bella-zsh-maybe() {
 aliasfn bell-dl tts-glados1-cached 'Download, complete'
 ##
 function bell-enabled-p {
+    typeset -g bell_enabled_p
+
+    if test -n "$bell_enabled_p" ; then
+        bool "$bell_enabled_p"
+        return $?
+    else
+        if h-bell-enabled-p; then
+            bell_enabled_p=y
+            return 0
+        else
+            bell_enabled_p=n
+            return 1
+        fi
+    fi
+}
+
+function h-bell-enabled-p {
     if isMBP || isMB2 ; then
         return 0
     fi
