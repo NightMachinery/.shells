@@ -110,3 +110,22 @@ function nightshift-auto() {
 # }
 # ###
 ####
+function macos-version {
+    if isDarwin ; then
+    command sw_vers |
+        rget 'ProductVersion:\s+(\S+)'
+    else
+        return 1
+    fi
+}
+
+function macos-version-major {
+    macos-version | rget '^(\d+)'
+}
+
+function macos-ventura-or-higher-p {
+    local v
+    v="$(macos-version-major)" @RET
+    (( v >= 13 ))
+}
+##
