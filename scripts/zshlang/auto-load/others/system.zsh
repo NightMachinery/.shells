@@ -422,11 +422,17 @@ function open_command {
   fi
 }
 ##
-function location-get-darwin() {
+function location-get-darwin {
 	ensure isDarwin @MRET
+
 	CoreLocationCLI -json | jq .
 }
-function location-get() {
-	# @darwinonly
-	location-get-darwin | jqm '.latitude, .longitude'
+
+function location-get {
+  if isDarwin ; then
+	  location-get-darwin | jqm '.latitude, .longitude'
+  else
+    @NA
+  fi
 }
+##
