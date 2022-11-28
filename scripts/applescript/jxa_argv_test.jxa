@@ -1,0 +1,11 @@
+#!/usr/bin/osascript -l JavaScript
+
+ObjC.import('Foundation')
+
+const argv = $.NSProcessInfo.processInfo.arguments.js
+argv.forEach(function(arg, idx) {
+    if( idx < 4 ) return
+    console.log( arg.js )
+})
+
+
