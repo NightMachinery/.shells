@@ -103,14 +103,18 @@ function emc-eval {
 
     cmd="(progn
      (require 'server)
+     (let* (
+       (server-name (concat (getenv \"EMACS_SOCKET_NAME\")))
+       ;; My HEAD emacs server-eval-at is ignoring its server input and using the server-name variable instead. This should work with both the buggy and the correct emacs versions.
+      )
      (princ
        (format \"%s\\n\"
-         (server-eval-at (concat (getenv \"EMACS_SOCKET_NAME\")) '(with-current-buffer (window-buffer (selected-window))
+         (server-eval-at server-name '(with-current-buffer (window-buffer (selected-window))
                                          "${*}")
      )
          )
 )
-     )"
+))"
 
     if bool "$stdin" ; then
         ecgray "$0: stdin does NOT work."
