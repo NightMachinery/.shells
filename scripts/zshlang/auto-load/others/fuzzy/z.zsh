@@ -82,7 +82,7 @@ if ! bool "$ZDIRS_ENABLED" && isExpensive && isIReally ; then
 fi
 ##
 ffz_last_query=''
-function ffz-get() {
+function ffz-get {
     ## Performance:
     # Note that piping a lot of stuff into fzp itself seems to be slow, even when the result is cached. To be sure, control the amount of feeded dirs, and run 'deus z' to refresh the caches. Note that older clients might poison the caches again ...
     ##
@@ -172,7 +172,9 @@ function ffz-get() {
 }
 @opts-setprefix ffz-get ffz
 
-function ffz() {
+function ffz {
+    bella_zsh_disable1
+
     ffz_cd=y ffz-get "$@"
     # avoid forking here, ffz-get needs to save 'ffz_last_query'
 }

@@ -135,14 +135,23 @@ function jprocs-pic() {
     jdoc
 }
 ##
-function idle-get() {
+function lid-opened-log {
+    #: pretty useless?
+    pmset -g log | rg --smart-case lidopen
+}
+
+function sleep-log-darwin {
+    pmset -g log | rg -e '\sSleep\s{2}' -e '\s(?:Dark)?Wake\s{2}'
+}
+
+function idle-get {
     # output in seconds
     assert isDarwin @RET
 
     ioreg -c IOHIDSystem | sponge | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }
 
-function lastunlock-get() {
+function lastunlock-get {
     assert isDarwin @RET
 
     # Using lower precision helps a lot with performance
@@ -163,7 +172,8 @@ function lastunlock-get() {
         return 1
     }
 }
-function lastunlock-get-min() {
+
+function lastunlock-get-min {
     ec $(( $(lastunlock-get "$@") / 60 ))
 }
 ##
@@ -188,13 +198,23 @@ function lsport() {
     done
     ((${#opts})) && sudo lsof -n $opts[@]
 }
-function headphones-is() {
+##
+function headphones-p {
     # @alt `hs.audiodevice.current().name`
-    system_profiler SPAudioDataType | command rg --quiet Headphones
+    # @darwinOnly
+    ##
+    if isDarwin ; then
+        system_profiler SPAudioDataType |
+            perl -0777 -ne 'm/(?:headphones|buds|pods):\s+Default Output Device: Yes/i && exit 0 || exit 1'
+    else
+        ecgray "$0: NA"
+        return 1
+    fi
 }
+aliasfn headphones-is headphones-p
 aliasfn is-headphones headphones-is
 ##
-function lsof-openfiles() {
+function lsof-openfiles {
     local user="$(whoami)"
     ec "Total open files for $user: $(lsof -u "$user" | wc -l)"
     

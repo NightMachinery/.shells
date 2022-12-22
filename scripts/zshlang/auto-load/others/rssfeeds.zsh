@@ -159,9 +159,12 @@ function rss-find1 {
 }
 ##
 function deus-rss2json {
-        rss2json.py \
+    local url="$1"
+    assert-args url @RET
+
+    rss2json.py \
         =(fhMode='aa' fhProgress=y reval-ec full-html2 "$url")
-        # =(curlm_ns=y gurl --progress-bar "$url")
+    # =(curlm_ns=y gurl --progress-bar "$url")
 }
 
 function rss2json {
@@ -228,6 +231,8 @@ function rss-dl-fz {
 @opts-setprefix rss-dl-fz rss_dl
 
 function rss-dl-multi-fz {
+    bella_zsh_disable1
+
     local urls=($@)
     assert-args urls @RET
 

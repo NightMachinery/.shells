@@ -1,4 +1,6 @@
 ###
+typeset -g youtube_url_regex='(?:https?://)?[^/]*(?:youtube\.com|youtu\.be)'
+##
 # adapted from https://gist.github.com/gruber/8891611
 # matches web URLs -- http, https
 IFS=$'\n' read -r -d '' nightUrlRegex <<'EOF'

@@ -44,7 +44,7 @@ function gh-release-get {
 
     local tag="${gh_release_get_tag}"
     local desired="${gh_release_get_desired}" # regex
-    if test -z "$desired" ; then
+    if false && test -z "$desired" ; then
         if isDarwin ; then
             # desired="macos"
             desired="mac|darwin|\.dmg"

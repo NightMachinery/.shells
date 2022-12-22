@@ -44,6 +44,7 @@ function pxa-create {
 }
 pxa-create
 pxa-create 2041 pxa41
+pxa-create 2032 pxa32
 
 # alias pxa-maybe='isIran && pxa-local'
 alias pxa-maybe='isLocal && pxa-local'
@@ -64,10 +65,15 @@ function reval-pxa-if-no-proxy {
 ##
 function v2-on {
     tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
+    # tmuxnew v2ray-genrouter xray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
 }
 
-function v2-off() {
-    tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/direct.json
+function v2-off {
+    ##
+    # tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/direct.json
+    ##
+    tmuxnew v2ray-genrouter gost -L socks5://127.0.0.1:1081 -L http://127.0.0.1:1087
+    ##
 }
 ##
 function pxify {
@@ -86,15 +92,15 @@ function pxify {
     pxify-command kaggle
     pxify-command unalix
     pxify-command nimble # @broken
-    pxify-command conda
+    # pxify-command conda
     # pxify-command go # TLS errors with genrouter
     pxify-command manga-py
     pxify-command pandoc # it needs this to download images
 
-    pxaify-command brew # makes downloads faster
-    pxaify-command pip # makes downloads faster
+    # pxaify-command brew # makes downloads faster
+    # pxaify-command pip # makes downloads faster
     # pxaify-command git # use git's own config
-    pxaify-command npm
+    # pxaify-command npm
     pxaify-command go
     pxaify-command dart
 
@@ -229,7 +235,7 @@ function darwin-proxies-get {
     darwin-proxies-gen networksetup -getsocksfirewallproxy '$ns'
 }
 
-function darwin-proxies-set() {
+function darwin-proxies-set {
     darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost "${1:-$socksport}"
 }
 aliasfnq darwin-proxies-on darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' on

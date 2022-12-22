@@ -16,6 +16,8 @@ function youtube-dl() {
 
     if bool $cookie_mode ; then
         opts+=(--add-header "$(cookies-auto "$@")")
+        # opts+=(--add-header "$(referer-auto "$@")")
+        opts+=(--add-header "Referer: $(browser-current-url)")
     fi
 
     ##
@@ -34,14 +36,21 @@ function youtube-dl() {
     fi
 }
 ##
-function yf() {
-    # GISTME
-    local ffull="$(youtube-dl -F "$@" | fz)"
-    local f="$(<<<$ffull gawk '{print $1}')"
-    test -z "$f" && return 1
+function youtube-dl-format-fz {
+    local ffull
+    ffull="$(youtube-dl -F --quiet "$@")" @TRET
+    ffull="$(ec "$ffull" | fz --header-lines=2)" @RET
+
+    local f
+    f="$(<<<$ffull gawk '{print $1}')" @TRET
+    assert test -n "$f" @RET
+
     [[ "$ffull" =~ 'video only' ]] && f+="+bestaudio"
-    rgeval y -f "$f" "$@"
+
+    rgeval retry youtube-dl -f "$f" "$@"
 }
+alias yf='youtube-dl-format-fz'
+
 function ylist() {
     youtube-dl -j --flat-playlist "$@" | jq -r '"https://youtu.be/\(.id)"'
 }

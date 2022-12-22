@@ -1,3 +1,4 @@
+##
 function sly-doc-oneline() {
     local doc="$1"
 
@@ -44,5 +45,15 @@ function wh-docstring() {
     else
         ecn "${res[1,80]}"
     fi
+}
+##
+function h-emc-paste-img {
+  local dest="$1" prefix_arg="$2"
+  assert-args dest @RET
+
+  pbpaste-image "$dest" @RET
+  if test -z "$prefix_arg"; then
+      inplace-io img-background2transparent "$dest" @RET
+  fi
 }
 ##

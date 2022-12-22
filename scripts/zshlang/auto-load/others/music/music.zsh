@@ -31,7 +31,7 @@ function hearinvisible-fast() {
 
 function hearinvisible-playfast {
     local vol="${hear_volume:-${hear_v:-1}}" loudidle="${hear_loudidle}"
-    if volume-mute-p ; then
+    if volume-mute-p || headphones-p ; then
       loudidle=n
     fi
 
@@ -380,7 +380,15 @@ function hear-rm {
     i="$(hear-get)" @TRET
 
     if ask "Delete $(gq "$i")?" Y ; then
+        hear-next || true
         trs "$i"
     fi
+}
+##
+function hear-mv {
+    local i
+    i="$(hear-get)" @TRET
+
+    mv "$i" "$@"
 }
 ##

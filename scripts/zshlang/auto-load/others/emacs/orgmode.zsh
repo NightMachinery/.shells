@@ -291,7 +291,7 @@ function org-link-extract {
     fi
 
     rget_replace="$format" ugrep_get_format="$format" revaldbg "$rget_e[@]" "${opts[@]}" \
-        -e '(?:\s*(?:\*|-|\+)\s*)(.*(?<!\\)(?:\[|<)('${link_type}'(?:[^][]|\\\[|\\\])+)(?<!\\)(?:\]|>).*)' \
+        -e '(?:\s*(?:\*|-|\+)\s*)?(.*(?<!\\)(?:\[|<)('${link_type}'(?:[^][]|\\\[|\\\])+)(?<!\\)(?:\]|>).*)' \
         | cat-copy-if-tty
 }
 
@@ -691,5 +691,72 @@ function org-header-rm-shared-level {
     fi
 
     ec "$text" | cat-copy-if-tty
+}
+##
+function url2org {
+    : "@seeAlso readmoz-org"
+
+    url2note "$1" org
+}
+renog url2org
+@opts-setprefix url2org url2note
+
+function url2org-emc {
+    url2note_emacs=y cmd=(url2org) no_newline_before_first_child=y h-reval-to-org-headings "$@"
+}
+
+function fanficfare2org-emc {
+    cmd=(fanficfare2org) no_newline_before_first_child=n h-reval-to-org-headings "$@"
+}
+
+function semantic-scholar-to-org-emc {
+    cmd=(semantic-scholar-to-org) no_newline_before_first_child=n h-reval-to-org-headings "$@"
+}
+
+function h-reval-to-org-headings {
+    local cmd=("${cmd[@]}") second_p="${no_newline_before_first_child:-y}"
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local arg ret=0 first_p=y
+    for arg in ${inargs[@]} ; do
+        if ! bool "$first_p" ; then
+            if bool "$second_p"; then
+                second_p=''
+            else
+                ec
+            fi
+            ecn "* "
+        fi
+
+        reval "${cmd[@]}" "$arg" || ret=$?
+
+        first_p=''
+    done
+
+    return $ret
+}
+##
+function org-img-unused {
+    #: @usage =p org-img-unused @ff trs=
+    ##
+    local fs=($@)
+
+    local f text files used i
+    for f in ${fs[@]} ; do
+        text="$(cat "$f")" @TRET
+        files=("${f}_imgs"/*(D.N))
+        files=(${(@f)"$(arrnn "${files[@]}" |
+                          inargsf re realpath)"})
+
+        used=(${(@f)"$(ec "$text" |
+                         org-link-extract-file |
+                         { cd "${f:h}" && inargsf re realpath })"}) @TRET
+
+        # dact var-show files
+        # dact var-show used
+
+        arrnn ${(@)files:|used}
+    done
 }
 ##

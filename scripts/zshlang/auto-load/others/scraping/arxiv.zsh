@@ -24,15 +24,23 @@ function arxiv-url-get {
         while true ; do
             id=""
             if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
-                  || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
-                  || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
-                  || "$url" =~ '^https://(?:www\.)?doi\.org(?:.*)/arXiv\.([^/]+)'
-                ]] ; then
+                    || "$url" =~ '(?i)arxiv:([^/]+?)(?:\.pdf)?/*$'
+                    || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
+                    || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
+                    || "$url" =~ '^https://(?:www\.)?doi\.org(?:.*)/arXiv\.([^/]+)'
+                  ]] ; then
                 #: @example https://doi.org/10.48550/arXiv.2012.07532
                 id="${match[1]}"
-            elif [[ "$url" =~ '^https://(?:www\.)?(?:api\.)?semanticscholar\.org' ]] ; then
-                urls_semantic_scholar+="$url"
+            elif [[ "$url" =~ '^(https://(?:www\.)?(?:api\.)?semanticscholar\.org/[^?]+)' ]] ; then
+                urls_semantic_scholar+="${match[1]}"
                 break
+            elif [[ "$url" =~ '^https://(?:www\.)?scholar\.google\.' ]] ; then
+                local html
+                html="$(full-html2 "$url")" @TRET
+                if id="$(ec "$html" | rget '(?i)https?://arxiv.org/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?(?:/|")' | head -n 1)" ; then
+                else
+                    break
+                fi
             elif [[ "$url" =~ '^https://(?:www\.)?doi\.org/(.*)' ]] ; then
                 #: @example https://doi.org/10.18653/v1/D19-1221
 

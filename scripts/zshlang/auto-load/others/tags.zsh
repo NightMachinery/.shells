@@ -526,7 +526,8 @@ function ntag-gethead() {
     local orighead="$(<<<${orig:r} prefixer -i .. | ghead -n1)"
     ec "${orighead}"
 }
-function ntag-recoverpath() {
+
+function ntag-recoverpath {
     local orig="$1"
     if test -e "$orig" ; then
         ec $orig
@@ -598,9 +599,13 @@ function ntag-color0() {
     done
 }
 ##
-function air-blue() {
-    ntag-add "$(hear-get)" blue
+function hear-tag {
+    local tags=($@)
+    ntag-add "$(hear-get)"  "${tags[@]}"
 }
+aliasfn hear-blue hear-tag blue
+aliasfn hear-gray hear-tag gray
+aliasfn air-blue hear-blue
 ##
 function ntag-exclude-all {
     fd -uuu --exclude="*${ntag_sep}*${ntag_sep}*"

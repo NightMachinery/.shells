@@ -6,7 +6,7 @@ function retry-limited() {
     retry-limited-eval "$1" "$(gquote "${@:2}")"
 }
 function retry-limited-eval() {
-    local retry_sleep="${retry_sleep:-0.1}"
+    local retry_sleep="${retry_sleep:-0.5}"
 
     local limit=0
     local ecode=0

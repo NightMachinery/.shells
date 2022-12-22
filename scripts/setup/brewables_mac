@@ -1,9 +1,11 @@
+# brew "discoteq/discoteq/flock"
+# brew "slhck/moreutils/moreutils", args: ["without-parallel"]
+brew "briss"
+brew "caddy"
 brew "chrome-cli"
 brew "dark-mode"
-brew "discoteq/discoteq/flock"
 brew "duti"
 brew "m-cli"
 brew "nu"
-brew "slhck/moreutils/moreutils", args: ["without-parallel"]
 brew "tag"
 brew "ucg"

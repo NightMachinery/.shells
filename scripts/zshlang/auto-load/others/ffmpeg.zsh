@@ -59,13 +59,51 @@ function 2mp3 {
 }
 ##
 function ffmpeg-to264 {
-    reval-ec ffmpeg -i "$1" -map 0 -c:s copy -c:v libx264 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x264.mkv"
-    #-map_metadata 0
+    ffmpeg_f=x264 ffmpeg-convert "$@"
 }
 
 function ffmpeg-to265 {
-    reval-ec ffmpeg -i "$1" -map 0 -c:s copy -c:v libx265 -crf "${2:-18}" -c:a copy -preset "${3:-medium}" "${1:r}_x265.mkv"
-    #-map_metadata 0
+    ffmpeg_f=x265 ffmpeg-convert "$@"
+}
+
+function ffmpeg-convert {
+    #: @alt [agfi:hb265]
+    ##
+    local input="$1" crf="${2:-18}" preset="${3:-medium}"
+    local encoder_family="${ffmpeg_f:-x265}"
+    local dest="${ffmpeg_o:-${1:r}_${encoder_family}.mkv}"
+    local hw_decode_p="${ffmpeg_hw_decode_p:-y}"
+    #: =-hwaccel auto= enables hardware acceleration for input decoding. It might not actually help performance in my testing on Air M2.
+
+    local hw_encode_p="${ffmpeg_hw_encode_p:-n}"
+    #: > It is hard to get an objective apples to apples comparison when it comes to quality of Handbrake's SW and HW encoding settings, but when I tried to get a similar quality encode Handbrake SW and HW encoding, the file size of the HW encode was a lot larger than the SW encode.
+
+    local opts=() encoder
+    if [[ "$encoder_family" == 'x265' ]] ; then
+        if bool "$ffmpeg_hw_encode_p" && isAppleSilicon ; then
+            encoder='hevc_videotoolbox'
+            opts+=(-b:v 412k)
+            #: VideoToolbox does not support constant quality (CRF) encoding. Bit rate, =-b:v ...=, is your main lever to balance size vs quality
+        else
+            encoder='libx265'
+        fi
+    elif [[ "$encoder_family" == 'x264' ]] ; then
+         if bool "$ffmpeg_hw_encode_p" && isAppleSilicon ; then
+            encoder='h264_videotoolbox'
+        else
+            encoder='libx264'
+        fi
+    else
+        @NA
+    fi
+
+    local opts_input=()
+    if bool "$hw_decode_p" ; then
+        opts_input+=(-hwaccel auto)
+    fi
+
+    reval-ec ffmpeg "${opts_input[@]}" -i "$input" -map 0 -c:s copy -c:v "$encoder" -crf "$crf" -c:a copy -preset "$preset" "${opts[@]}" "$dest"
+    # -map_metadata 0
 }
 ##
 function mp3-to-mp4 {

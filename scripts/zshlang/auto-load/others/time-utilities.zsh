@@ -43,7 +43,7 @@ function alarm-at {
     ec "${commands[brishzq.zsh]} awaysh-named ${marker_alarm_at} @opts msg $(gquote-sq "$msg") @ timer 0" | at "${=at}"
 }
 ##
-function h_timer-late() {
+function h_timer-late {
     local i="${prv_loop_iteration}" i_dur="$lo_s"
 
     ##

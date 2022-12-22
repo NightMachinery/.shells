@@ -14,7 +14,7 @@ function h_mv() {
     enh-mkdest "$@"
 }
 
-function mv () {
+function mv {
     unset out # out is GLOBAL
     args-nochromefile "$@"
     set -- "${out[@]}"

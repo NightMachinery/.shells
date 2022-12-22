@@ -19,6 +19,7 @@ function md2plain() {
 }
 
 function org2md {
+    in-or-args "$@" |
     perl -lpe 's/^(#\+[a-zA-Z]+_example)\s+.*/$1/gi' | #: @upstreamBug pandoc doesn't convert example blocks correctly
         org2md-raw "$@" |
         perl -lpe 's/^(```)\s+example$/$1/g' |
@@ -43,8 +44,13 @@ function org2plain() {
     @opts from org to plain @ pandoc-convert "$@"
 }
 
-function org2html() {
+function org2html {
     @opts from org to html @ pandoc-convert "$@"
+}
+
+function pbcopy-org2html {
+    org2html "$@" |
+        pbcopy-html
 }
 
 function org2rtf() {

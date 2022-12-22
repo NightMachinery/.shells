@@ -18,7 +18,8 @@ function semantic-scholar-to-json-api {
     fi
 
     local json
-    json="$(revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,tldr")" @TRET
+    json="$(revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds")" @TRET
+    #: =tldr= sometimes isn't available for the newer papers, and we aren't currently using it, so I have omitted it from the request above. (It will trow an error if tldr is not available.)
 
     ec "$json" |
         jq .
@@ -99,11 +100,13 @@ function semantic-scholar-to-org {
 }
 ##
 function semantic-scholar-dl-from-org {
+    local tlg_dest="${tlg_dest:-$tlg_ch_books}"
+
     local org
     org="$(cat-paste-if-tty)" @TRET
 
     local urls
-    if ! urls="$(ec "$org" | urls-extract | rg '\.pdf$')" ; then
+    if ! urls="$(ec "$org" | urls-extract | rg '(?:\.pdf$|^https?://dl.acm.org/doi/pdf/)')" ; then
         if urls="$(ec "$org" | urls-extract | rget '^https://api.semanticscholar.org/arXiv:([^/]+)$' | head -n 1)" ; then
             urls="https://arxiv.org/pdf/${urls}.pdf"
         else
@@ -123,10 +126,16 @@ function semantic-scholar-dl-from-org {
     )" @TRET
 
     local dest
-    dest="${name}.pdf"
+    dest="${name}"
+    [[ "$dest" == *.pdf ]] || dest+=".pdf"
+    dest="$(ec "$dest" | str2filename-ascii)"
 
     reval-ec retry aa-gateway "$url" -o "${dest}" @RET
 
-    reval-env-ec retry_sleep=10 retry-limited 10 tsendf-book "$dest"
+    ec "$org" |
+        perl -ple 's/\@(?:toread\S+|CR\b)\s?//g' |
+        org2tlg "$tlg_dest"
+
+    reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
 }
 ##

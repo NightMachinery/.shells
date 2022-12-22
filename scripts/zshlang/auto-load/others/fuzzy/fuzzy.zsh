@@ -70,7 +70,7 @@ function ffport() {
 }
 aliasfn ffportl fpFilter=LISTEN ffport
 
-function ffps() {
+function ffps {
     local query="$(fz-createquery "$@")"
 
     bella_zsh_disable1
@@ -91,7 +91,7 @@ function ffps-c1() {
     ps-children 1 | inargsf command ps -fp | fzp --with-nth '8..' --header-lines 1 "$query" | gawk '{print $2}'
 }
 ##
-function ffkill() {
+function ffkill {
     doc "alt: fkill; [fkEngine=ffps] ffkill ..."
     doc "Tip: fnswap kill 'sudo kill'"
 

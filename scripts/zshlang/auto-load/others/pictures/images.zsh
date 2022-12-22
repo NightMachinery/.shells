@@ -233,3 +233,14 @@ function img-compress {
     f-size-labeled "$o"
 }
 ##
+function img-background2transparent {
+    local i="$1"
+    local o="${2:-${i:r}_transparent.png}"
+    local fuzz_percent="${img_bg_rm_f:-5}"
+    assert-args i @RET
+
+    local x=1 y=1
+
+    magicwand.bash "${x},${y}" -t "$fuzz_percent" -f image -r outside -m overlay -o 0 "$i" "$o"
+}
+##

@@ -246,21 +246,44 @@ function langSetToggle()
   end
 end
 ---
-enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv" } -- "Emacs",
-function appWatch(appName, event, app)
-  -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
-  local bshcode = ''
-  if event == hs.application.watcher.activated then
-    bshcode = bshcode .. 'nightshift-auto ; '
-    if has_value(enOnly, appName) then
-      bshcode = bshcode .. "input-lang-push en ; "
-    else
-      bshcode = bshcode .. "input-lang-pop ; "
+enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv", "zathura" } -- "Emacs",
+if false then
+  function appWatch(appName, event, app)
+    -- @deprecated as it was too slow. In general, calling Zsh functions that will then call Hammerspoon functions is a bad idea.
+    ---
+    -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
+    local bshcode = ''
+    if event == hs.application.watcher.activated then
+      bshcode = bshcode .. 'nightshift-auto ; '
+      if has_value(enOnly, appName) then
+        bshcode = bshcode .. "input-lang-push en ; "
+      else
+        bshcode = bshcode .. "input-lang-pop ; "
+      end
+    end
+    if bshcode ~= '' then
+      bshcode = "{ " .. bshcode .. " } &>/dev/null & # appName: " .. appName .. ", event: " .. tostring(event)
+      brishzeval(bshcode)
     end
   end
-  if bshcode ~= '' then
-    bshcode = "{ " .. bshcode .. " } &>/dev/null & # appName: " .. appName .. ", event: " .. tostring(event)
-    brishzeval(bshcode)
+else
+  input_lang_push_lang = nil
+  function appWatch(appName, event, app)
+    -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
+    if event == hs.application.watcher.activated then
+      if has_value(enOnly, appName) then
+        if input_lang_push_lang == nil then
+          input_lang_push_lang = hs.keycodes.currentSourceID()
+        end
+
+        langSetEn()
+      else
+        if not (input_lang_push_lang == nil) then
+          hs.keycodes.currentSourceID(input_lang_push_lang)
+          input_lang_push_lang = nil
+        end
+      end
+    end
   end
 end
 appWatcher = hs.application.watcher.new(appWatch)
@@ -512,6 +535,7 @@ hs.hotkey.bind(hyper, "i", function()
                  langSetToggle()
                  hs.alert(langGet(), 1)
                  brishzeval('input_lang_push_lang_del')
+                 input_lang_push_lang = nil
 end)
 ---
 function appHotkey(o)
@@ -545,7 +569,9 @@ appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 appHotkey{ key='t', appName='com.tdesktop.Telegram' }
 appHotkey{ key='e', appName='org.gnu.Emacs' }
 appHotkey{ key='a', appName='com.adobe.Reader' }
-appHotkey{ key='b', appName='com.apple.Preview' }
+-- appHotkey{ key='b', appName='com.apple.Preview' }
+appHotkey{ key='b', appName='zathura' }
+appHotkey{ key='s', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
 

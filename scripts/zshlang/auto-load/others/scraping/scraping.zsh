@@ -2,7 +2,8 @@
 ##
 export useragent_googlebot="Mozilla/5.0 (compatible; Googlebot/2.1; +http://google.com/bot.html)"
 
-export useragent_chrome='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36'
+export useragent_chrome='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
+# export useragent_chrome='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.54 Safari/537.36'
 export useragent_header_chrome="User-Agent: ${useragent_chrome}"
 ### Aliases
 alias withtxt="we_dler=readmoz-txt h2ed=txt2epub " # better for tables
@@ -164,7 +165,7 @@ function httpm() {
     http --style solarized-light --follow --ignore-stdin --session "pink$(uuidpy)" "$@" $c
 }
 ##
-function full-html2() {
+function full-html2 {
     # wget, aa, curl fail for https://www.fanfiction.net/s/11191235/133/Harry-Potter-and-the-Prince-of-Slytherin
     # seems to be because the server is messed up, but whatever:
     # http: error: Incomplete download: size=46696; downloaded=131310

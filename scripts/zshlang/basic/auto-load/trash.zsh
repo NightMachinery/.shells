@@ -1,6 +1,6 @@
 typeset -g TRASH_DIR=~/.trash_rip
 ##
-function trs() {
+function trs {
     : "@warn using 'symlinked_dir/' will delete the underlying dir, not the symlink."
 
     local i
@@ -9,12 +9,13 @@ function trs() {
         [[ -e "$i" ]] && {
             ec Trying to remove "$i"
             if (( ${+commands[rip]} )) ; then
-                assert rip -- "$i" @RET
+                assert command rip -- "$i" @RET
             elif (( ${+commands[trash]} )) ; then
-                assert trash -- "$i" @RET # bloody slow
+                assert command trash -- "$i" @RET # bloody slow
             else
-                ecerr "WARNING: 'trash' or 'rip' commands not found, switching to 'rm'."
-                assert rm -r -- "$i" @RET
+                ecgray "WARNING: 'trash' or 'rip' commands not found, switching to 'rm'."
+
+                assert command rm -r -- "$i" @RET
             fi
         }
     done

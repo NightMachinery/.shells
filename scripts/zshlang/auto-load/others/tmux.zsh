@@ -8,8 +8,23 @@ function tmuxnew {
 
 function tmuxnewsh {
     doc "Use tsh instead."
-    
-    revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${tmuxnewshenv[*]} $(gq "${@[2,-1]}")")"
+
+    local env="${tmuxnewshenv[*]}"
+    local proxy_forward_p="${tmuxnewsh_proxy_forward_p:-n}"
+    if bool "$proxy_forward_p" ; then
+        env=(
+            proxy_disabled="${proxy_disabled}"
+            all_proxy="${all_proxy}"
+            ALL_PROXY="${ALL_PROXY}"
+            http_proxy="${http_proxy}"
+            https_proxy="${https_proxy}"
+            HTTP_PROXY="${HTTP_PROXY}"
+            HTTPS_PROXY="${HTTPS_PROXY}"
+            "${env}"
+        )
+    fi
+
+    revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${env[*]} $(gq "${@[2,-1]}")")"
 }
 
 function tmuxnewsh2 {
@@ -72,11 +87,20 @@ function tmuxzombie() {
 ##
 function str2tmuxname() {
     # this might be too restrictive
-    gtr -cd ' [a-zA-Z0-9]_-'
+    in-or-args "$@" |
+        gtr -cd ' [a-zA-Z0-9]_-'
 }
-function str2filename() {
+
+function str2filename {
     # this might be too restrictive
-    gtr '/' '_' | gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t'
+    in-or-args "$@" |
+        gtr '/' '_' |
+        gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t'
+}
+
+function str2filename-ascii {
+    str2filename "$@" |
+        utf8-to-ascii
 }
 ##
 function tmux-capture() {

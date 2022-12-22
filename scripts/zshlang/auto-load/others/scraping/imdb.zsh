@@ -6,7 +6,7 @@ function imdb-ids-get {
     local ids=()
     local url r=0
     for url in $urls[@] ; do
-        if [[ "$url" =~ 'https://www.imdb.com/title/(tt\d+)/*' ]] ; then
+        if [[ "$url" =~ 'https?://(?:www\.)?imdb\.[^/]+/title/(tt\d+)/*' ]] ; then
             ids+="${match[1]}"
         else
             ecerr "$0: could not parse URL $(gq "$url")"

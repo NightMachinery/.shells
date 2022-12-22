@@ -148,7 +148,7 @@ function url-exists() {
     return "$ret"
 }
 ##
-function url-clean-unalix() {
+function url-clean-unalix {
     # does url-clean-google itself
     local redirects="${url_clean_redirects}"
     local inargs
@@ -165,7 +165,16 @@ function url-clean-unalix() {
     fi
 
     {
-        arrN $inargs[@] | { url-match-rg || true } | unalix --disable-certificate-validation "$opts[@]" @TRET
+        local unalix=()
+        if bool "$pxified" ; then
+            unalix+=(proxychains4 -q)
+        fi
+        unalix+=(unalix)
+
+        arrN $inargs[@] | { url-match-rg || true } | revaldbg gtimeout --verbose --kill-after=10s 30s "$unalix[@]" --disable-certificate-validation "$opts[@]" @TRET
+        #: =unalix= is buggy and can eat up system resources if not stopped by a timeout!
+        #: We might be better off switching to the [[https://github.com/AmanoTeam/Unalix][Python version]].
+
         ec
         arrN $inargs[@] | url-match-rg -v || true
     } | prefixer --skip-empty | enl
@@ -385,12 +394,12 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
 
     local imgMode="${url2note_img}" emacsMode="${url2note_emacs:-y}"
 
-    if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com' ]] ; then
+    if [[ "$url" =~ "${youtube_url_regex}"'/' ]] ; then
         if bool "$emacsMode" ; then
             imgMode=y
         fi
 
-        if [[ "$url" =~ '^(?:https?://)?[^/]*youtube.com(?:/embed/([^/]*))' ]] ; then
+        if [[ "$url" =~ "^${youtube_url_regex}"'(?:/embed/([^/]*))' ]] ; then
             local id="$match[1]"
             img="https://i.ytimg.com/vi/${id}/maxresdefault.jpg" # embedded videos don't set their bloody meta tags
         fi
@@ -451,13 +460,19 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
             # ec "${indent}[[img$img]]"
             ##
             local ext="${${img:e}:-png}"
-            local name="$(uuidm).$ext"
-            local imgdir="$orgdir/images"
+            local tmp
+            tmp="$(gmktemp --suffix=".${ext}")" @TRET
+
+            local imgdir="$org_img_dir"
             mkdir -p "$imgdir"
-            if silent $proxyenv aa "$img" --dir "$imgdir" -o "$name" ; then
-                # local imgpath="$orgdir/images/$name"
-                local imgpath="images/$name"
-                ec "${indent}[[orgdir:$imgpath]]"
+            if silent wgetm "$img" -O "$tmp" ; then
+                local name="$(md5-file "$tmp").$ext"
+                local imgpath="${imgdir}/$name"
+                assert command gmv "$tmp" "$imgpath" @RET
+                local img_path_rel
+                img_path_rel="$(grealpath --relative-to "$imgdir" "$imgpath")" @TRET
+                ec "#+ATTR_HTML: :width 900"
+                ec "[[org_image_dir:$(org-escape-link ${img_path_rel})]]" @TRET
             else
                 ecerr "$0: Failed to download: $img"
             fi
@@ -476,14 +491,6 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
 
 }
 noglobfn url2note
-
-function url2org {
-    : "@seeAlso readmoz-org"
-
-    url2note "$1" org
-}
-renog url2org
-@opts-setprefix url2org url2note
 
 function url2md {
     url2note "$1" md

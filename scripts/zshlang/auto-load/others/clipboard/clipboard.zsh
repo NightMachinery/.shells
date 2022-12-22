@@ -1,11 +1,15 @@
 export CLIPBOARD_RECORD_FILE=~/tmp/.clipboard
 ##
-function clipboard-record() {
+function clipboard-record {
     ##
     # @codetoread https://github.com/ms-jpq/isomorphic_copy
     # might have a better way than polling
     ##
-    local sleep=0.25
+    local sleep_power sleep_battery #: @batteryPerformance
+    sleep_power=0.25
+    sleep_battery=1
+
+    local battery_p=''
 
     ecdate "$0: Started; file=$(gq $CLIPBOARD_RECORD_FILE)"
     clipboard-removedups
@@ -22,7 +26,18 @@ function clipboard-record() {
             done
             old="$paste[*]"
         fi
-        if (( counter == 7200 )) ; then
+
+        if (( counter % 307 == 0 )) ; then
+            if battery-p ; then
+                battery_p=y
+            else
+                battery_p=''
+            fi
+
+            var-show battery_p
+        fi
+
+        if (( counter == 28800 )) ; then
             counter=0
 
             ecdate "Maintenance: Deleting duplicates ..."
@@ -31,11 +46,16 @@ function clipboard-record() {
         else
             counter=$(( counter + 1 ))
         fi
-        sleep $sleep
+
+        if test -n "$battery_p" ; then
+            sleep $sleep_battery
+        else
+            sleep $sleep_power
+        fi
     done
 }
 
-function clipboard-add() {
+function clipboard-add {
     local i="$*" file="$CLIPBOARD_RECORD_FILE"
     assert-args file @RET
     if test -z "$i" ; then

@@ -20,7 +20,7 @@ aliasfn tnotifc tnotif-casual
 @opts-setprefix tnotifc tnotif
 ##
 function tsendf-book {
-    local dest="${tsend_dest:--1001304139500}"
+    local dest="${tlg_dest:-$tlg_ch_books}"
     local inargs
     in-or-args3 "$@" @RET
 
@@ -155,7 +155,10 @@ function org2tlg {
        #: It doesn't look pretty in Telegram, as the underline wraps and becomes multiple lines.
     fi
 
-    tsend --parse-mode=md -- "${dest}" "$(ec "$text" | org2md | sd '\\'"('|\"|#)" '$1')"
+    local text_md
+    text_md="$(ec "$text" | org2md | sd '\\'"('|\"|#|\|)" '$1')" @TRET
+
+    tsend --parse-mode=md -- "${dest}" "$text_md" @RET
 }
 
 function org2tlg-with-props {

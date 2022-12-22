@@ -103,7 +103,7 @@ function wallpaper-set-darwin {
 }
 
 function wallpaper-set {
-    local f="$1"
+    local f="$1" overlay_p="${wallpaer_set_overlay_p:-n}"
     f="$(realpath "$f")" || return $?
     ##
     local ipad=''
@@ -112,10 +112,16 @@ function wallpaper-set {
         # errors ignored
     fi
     ##
-    local t="$(gmktemp --suffix .png)"
-    assert wallpaper-overlay "$f" "$t" && f="$t" || return $?
+    if bool "$overlay_p" ; then
+        local t="$(gmktemp --suffix .png)"
+        assert wallpaper-overlay "$f" "$t" && f="$t" || return $?
+    fi
 
-    assert wallpaper-set-darwin "$f" @RET
+    if isDarwin ; then
+        assert wallpaper-set-darwin "$f" @RET
+    else
+        @NA
+    fi
 }
 ##
 function wallpaper-auto {

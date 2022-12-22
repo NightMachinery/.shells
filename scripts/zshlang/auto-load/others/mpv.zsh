@@ -5,7 +5,9 @@ typeset -g MPV_AUDIO_NORM=--af-add='dynaudnorm=g=5:f=250:r=0.9:p=0.5'     # audi
 export MPV_HOME="${MPV_HOME:-$HOME/.config/mpv}"
 
 ## Functions
-function mpv-manga() {
+function mpv-manga {
+    bella_zsh_disable1
+
     local args=()
     h_mpv-args "$@" @RET
     set --
@@ -17,13 +19,15 @@ function mpv-manga() {
     } always { popf }
 }
 
-function command-mpv() {
+function command-mpv {
+    bella_zsh_disable1
+
     # kitty injects its corrupt PATH into our shells
-    if test -e /Applications/mpv.app/Contents/MacOS/mpv ; then
-        command /Applications/mpv.app/Contents/MacOS/mpv "$@"
-    else
+    # if test -e /Applications/mpv.app/Contents/MacOS/mpv ; then
+        # command /Applications/mpv.app/Contents/MacOS/mpv "$@"
+    # else
         command mpv "$@"
-    fi
+    # fi
 }
 
 function h_mpv-args {
@@ -54,7 +58,9 @@ function h_mpv-args {
 }
 
 
-function mpv() {
+function mpv {
+    bella_zsh_disable1
+
     local isStreaming="$mpv_streaming"
 
     local opts=()
@@ -62,6 +68,10 @@ function mpv() {
 
     if ! { isLocal && isMe } ; then
         opts+=(--script-opts-add=autotag-enabled=no)
+    fi
+
+    if isAppleSilicon ; then
+        opts+=(--macos-force-dedicated-gpu=yes)
     fi
 
     local args=()
@@ -76,19 +86,30 @@ function hear-prev {
     hear-do playlist-prev @RET
 
     hear-get
+    #: @raceCondition This usually returns the file that was playing before this command.
 }
 
 function hear-next {
     hear-do playlist-next @RET
 
     hear-get
+    #: @raceCondition This usually returns the file that was playing before this command.
 }
 
 aliasfn mpv-prev fnswap hear-do mpv-do hear-prev
 aliasfn mpv-next fnswap hear-do mpv-do hear-next
 ##
 function hear-get {
-    hear-do get_property "${1:-path}" | jq --raw-output -e .data
+    local prop="${1:-path}"
+
+    local res
+    res="$(hear-do get_property "$prop" | jq --raw-output -e .data)" @RET
+
+    if [[ "$prop" == 'path' ]] ; then
+        res="$(ntag-recoverpath "$res")" @STRUE
+    fi
+
+    ec "$res"
 }
 
 function mpv-get {
@@ -154,6 +175,7 @@ function play-and-trash(){
     #aliased to pat
     mpv "$@" && trs "$1"
 }
+aliasfn mpv-tag mpv --script-opts-add=autotag-enabled=yes
 aliasfn mpv-notag mpv --script-opts-add=autotag-enabled=no
 aliasfn mpvn awaysh mpv-notag
 function mpv-noidle() {
@@ -267,7 +289,8 @@ function mpv-bookmark-fz {
     local timestamps
     timestamps=(${(@f)"$(ec "$bookmarks" | awkn 1)"}) @TRET
     local files
-    files=(${(@f)"$(ec "$bookmarks" | perl -anE 'say "@F[1 .. $#F]"')"}) @TRET
+    files=(${(@f)"$(ec "$bookmarks" | perl -lne '@F = split(/ /, $_, -1) ; print "@F[1 .. $#F]"')"}) @TRET
+    #: The perl oneliner drops the first field when split on whitespace/
 
     if (( ${#files} > 1 )); then
         ecerr "$0: multiple selections not supported"
