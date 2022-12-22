@@ -57,16 +57,32 @@ function audiofx-sox() {
     sox "$i" "$o" -G "$@"
 }
 ##
-function fsay() {
+function fsay {
     assert isDarwin @RET
-    local voice="${fsay_v:-Fiona}" rate="${fsay_r:-30}"
+
+    local voice="${fsay_v}" rate="${fsay_r}"
+    if test -z "$voice" ; then
+        if macos-ventura-or-higher-p ; then
+            # voice='Samantha'
+            voice='Moira'
+        else
+            voice='Fiona'
+        fi
+    fi
+    if test -z "$rate" ; then
+        if macos-ventura-or-higher-p ; then
+            rate='185'
+        else
+            rate='30'
+        fi
+    fi
 
     bella_zsh_disable1
 
     say -v $voice -r $rate "$@"
 }
 
-function tts-say() {
+function tts-say {
     local text="${1}" output="${2}"
     assert-args output @RET
 
@@ -79,14 +95,15 @@ function tts-say() {
 
 aliasfn tts-say-cached @opts ext aiff e tts-say @ tts-gateway
 
-function tts-say-i1() {
-    local fsay_r=5 # the range 1-50 is indistinguishable to me
+function tts-say-i1 {
+    #: fsay_r is interpreted differently in different macOS versions, so it's better to just go with the default.
+    # local fsay_r=5 # the range 1-50 is indistinguishable to me
 
     @opts e tts-say ext aiff postproc audiofx-infantilize1 @ tts-gateway "$@"
 }
 
-function tts-say-i2() {
-    local fsay_r=80
+function tts-say-i2 {
+    # local fsay_r=80
 
     @opts e tts-say ext aiff postproc audiofx-infantilize2 @ tts-gateway "$@"
 }

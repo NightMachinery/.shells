@@ -284,6 +284,22 @@ aliasfn screen-invert-dur screen-gamma-set-dur
 ### @darwinonly
 #: * @alt [[https://www.hammerspoon.org/docs/hs.screen.html#setForceToGray]]
 #: ** https://github.com/Hammerspoon/hammerspoon/issues/3329
+#: * [[https://github.com/rkbhochalya/grayscale-mode][rkbhochalya/grayscale-mode: A macOS menu bar app that gives you more control over Grayscale Mode.]]
+function display-gray-toggle-v1 {
+  screen_color_filter_color=gray screen_color_filter_enable_p='toggle' screen_color_filter.py
+}
+
+function display-gray-on-v1 {
+  screen_color_filter_color=gray screen_color_filter_enable_p='y' screen_color_filter.py
+}
+
+function display-gray-off-v1 {
+  screen_color_filter_color=gray screen_color_filter_enable_p='n' screen_color_filter.py
+}
+
+function display-gray-is-v1 {
+  screen_color_filter_color=gray screen_color_filter_enable_p='return' screen_color_filter.py
+}
 
 function display-gray-is-v0 {
 	[[ "$(gray_darwin.c s)" == "Grayscale is now: 1" ]]

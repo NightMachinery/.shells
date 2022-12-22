@@ -83,7 +83,7 @@ export GEM_HOME="$HOME/.gem"
 addToPATH "$GEM_HOME/bin"
 addToPATH "$HOME/.poetry/bin"
 addToPATH ~/.nimble/bin
-addToPATH /Applications/mpv.app/Contents/MacOS
+# addToPATH /Applications/mpv.app/Contents/MacOS
 addToPATH "${NIGHTDIR}/zshlang/wrappers"
 
 # psource ~/anaconda/etc/profile.d/conda.sh

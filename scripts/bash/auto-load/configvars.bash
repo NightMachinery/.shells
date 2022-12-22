@@ -69,6 +69,7 @@ export chat_logs_dir="$BASE_DIR/documents/chat_logs"
 ##
 export nightNotes="$cellar/notes/" # keep the trailing '/', it is important when removing prefixes
 export orgdir="$nightNotes/org"
+export org_img_dir="$orgdir/images"
 export memorydir="$nightNotes/private/memories"
 export peopledir="$nightNotes/private/memories/people"
 
@@ -118,7 +119,7 @@ createglob office_formats officeglob
 media_formats=( ${audio_formats[@]} ${video_formats[@]} ${(@)office_formats} )
 createglob media_formats mediaglob
 
-code_formats=( m cpp h c applescript as osa nu nush el ss scm lisp rkt py jl scala sc kt kotlin java clj cljs rkt js jxa dart rs rb cr crystal zsh dash bash sh ml php lua glsl frag go )
+code_formats=( m cpp h c swift applescript as osa nu nush el ss scm lisp rkt py jl scala sc kt kotlin java clj cljs rkt js jxa dart rs rb cr crystal zsh dash bash sh ml php lua glsl frag go )
 createglob code_formats codeglob
 
 config_formats=( ini json cson toml conf plist xml )

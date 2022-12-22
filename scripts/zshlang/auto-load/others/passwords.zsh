@@ -1,7 +1,11 @@
-function passgen() {
+function passgen {
     : "@alt passgen.go"
 
     reval-copy openssl rand -base64 "${1:-16}"
+}
+
+function passgen-hex {
+    reval-copy openssl rand -hex "${1:-16}"
 }
 
 function passgen-numerical {

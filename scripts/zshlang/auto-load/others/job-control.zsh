@@ -117,7 +117,7 @@ insubshell-eval() {
     ) &>/dev/null </dev/null
 }
 
-function mark-me() {
+function mark-me {
     local mark
     mark="$(marker-preprocess "$1")" @RET
 
@@ -298,6 +298,7 @@ killjobs() {
 ##
 function eval-timeout {
     local time="$1" cmd="${@[2,-1]}" timeout_code=404
+    #: time in seconds
 
     assert-args time @RET
 

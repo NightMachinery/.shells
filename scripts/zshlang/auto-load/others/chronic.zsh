@@ -55,5 +55,9 @@ function chronic-anticreep() {
     pip uninstall -y enum34 # Since python 3.6 the enum34 library is no longer compatible with the standard library.
     pip uninstall -y typing # same
     pip uninstall -y dataclasses # same
+
+    pip uninstall -y pyOpenSSL
+    #: https://github.com/aws/aws-cli/issues/7325
+    #: makes BrishGarden not work
 }
 ##

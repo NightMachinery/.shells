@@ -131,7 +131,6 @@ alias milli="mill mill.scalalib.GenIdeaModule/idea"
 alias eta="etlas exec eta"
 alias eta7="~/.etlas/binaries/cdnverify.eta-lang.org/eta-0.7.0.2/binaries/x86_64-osx/eta"
 alias ls="gls --hyperlink=auto --color=auto --all"
-alias ocr="pngpaste - | tesseract stdin stdout | pbcopy; pbpaste"
 alias cask="brew cask"
 alias bi="brew install" # `--force-bottle` now causes problems when no bottle is available
 alias bci="brew install --cask --no-quarantine"

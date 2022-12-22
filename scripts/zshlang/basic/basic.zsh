@@ -68,6 +68,15 @@ function md5-file {
     # command md5 -q "$f" #: This was Darwin-only.
     ##
 }
+
+function md5-file-first-bytes {
+    local f="$1" bytes="$2"
+    assert-args f bytes @RET
+
+    command dd if="$f" bs="$bytes" count=1 2>/dev/null |
+        md5sum |
+        awkn 1 | cat-copy-if-tty
+}
 ##
 function ec_bash() {
     # deprecated. Use the alias ec.

@@ -35,11 +35,11 @@ function sleepifidle {
 }
 ##
 redis-defvar powersaving_status
-powersaving_apps=(iterm chrome Insiders scsynth Telegram java podcast Finder ActivityWatch aw-watcher aw-server Notion) # bettertouch tmux hammersp bettert
+powersaving_apps=(chrome Insiders bettertouch ActivityWatch) # aw-watcher aw-server iterm tmux hammersp Notion Finder scsynth java podcast Telegram
 # seems that -SIGSTOP is useless for scsynth
 # btt starts itself up again after a minute or two (even with sudo kill)
 # emacs daemon can't handle SIGSTOP
-function powersaving-off() {
+function powersaving-off {
     # ffkill -SIGCONT $powersaving_apps
     pgrep -i "${(j.|.)powersaving_apps}" | inargsf sudo kill -SIGCONT
 
@@ -52,18 +52,16 @@ function powersaving-off() {
     powersaving_status_set off
     powersaving-widget-refresh
 }
-function powersaving-on() {
-    # wgu
-    # proxy-off
-    
+
+function powersaving-on {
     # ffkill -SIGSTOP $powersaving_apps
     pgrep -i "${(j.|.)powersaving_apps}" | inargsf sudo kill -SIGSTOP
-    # pgrep -i "bettertouch" | inargsf sudo kill
     ##
     powersaving_status_set on
-    powersaving-widget-refresh
+    # powersaving-widget-refresh
 }
-function powersaving-toggle() {
+
+function powersaving-toggle {
     if powersaving-is ; then
         powersaving-off
     else

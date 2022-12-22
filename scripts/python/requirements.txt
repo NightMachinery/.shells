@@ -16,8 +16,10 @@ executing
 ezgmail
 fanficfare
 fastapi[all]
+feedparser
 fichub-cli
 fire
+flake8
 gallery-dl
 gay
 gensim
@@ -87,12 +89,14 @@ sumy
 syncer
 text2num
 tgcrypto
+titlecase
 tqdm
 waybackpack
 wifi-password
 wikipedia
 wikiquotes
 xkcdpass
+xmltodict
 yapf
 yq
 zxcvbn

@@ -81,7 +81,16 @@ function ensure-dir() {
 }
 reify ensure-dir
 ##
-function lnrp() {
+function lnrp-re {
+    local fs=("${@}") d="${@[-1]}"
+
+    local f
+    for f in ${fs[@]} ; do
+        lnrp "$f" "$d"
+    done
+}
+
+function lnrp {
     local f="${1}" d="${2}" opts=( "${@[3,-1]}" )
     assert-args f d @RET
 
@@ -91,11 +100,11 @@ function lnrp() {
         return $?
     fi
 
-    if isIReally && isRcLoaded && fn-isTop lnrp ; then
+    if isIReally && isRcLoaded && fn-isTop lnrp lnrp-re ; then
         opts+=( -i )
     fi
 
-    ln "$opts[@]" -s "$i" "$d"
+    reval-ec ln "$opts[@]" -s "$i" "$d"
 }
 ##
 function rmdir-empty() {

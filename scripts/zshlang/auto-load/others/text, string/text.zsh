@@ -250,3 +250,9 @@ function newline-normalize {
     perl -0777 -pe 's/\R/\n/g'
 }
 ##
+function str-bad-characters-rm {
+    in-or-args "$@" |
+        perl -CS -ple 's/\h+\\xb.\h*/ /g' |
+        cat-copy-if-tty
+}
+##

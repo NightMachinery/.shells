@@ -1,5 +1,22 @@
 ##
-function battery-status-darwin-full() {
+function battery-p {
+    if isServer ; then
+        return 1
+    fi
+
+    if isDarwin ; then
+        battery-p-darwin
+        return $?
+    else
+        @NA
+    fi
+}
+
+function battery-p-darwin {
+    pmset -g batt | command rg -q -F "drawing from 'Battery Power'"
+}
+
+function battery-status-darwin-full {
     assert isDarwin @RET
 
     pmset -g batt | command rg InternalBattery | command column -t
@@ -7,7 +24,7 @@ function battery-status-darwin-full() {
     # mcli battery status
 }
 
-function battery-status-darwin() {
+function battery-status-darwin {
     battery-status-darwin-full | rget '(\d+%);'
 }
 ##

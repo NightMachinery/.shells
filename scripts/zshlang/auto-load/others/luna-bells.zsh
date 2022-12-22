@@ -60,6 +60,8 @@ function h_luna-advanced-bell {
                 @opts redo 1 @ bell-visual-flash1
                 sleep 10 #: keeps screen gray
             fi
+        elif true ; then
+            sleep 180
         else
             sleep 20 #: gives us time to finish our work or cancel the alarms
 
@@ -253,14 +255,14 @@ function lunaquit-quick() {
 }
 aliasfn lq lunaquit-quick
 ##
-function deluna() {
+function deluna {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
     local timeout="${1:-240}" # 150 is good for PC work, but 800 might be better for reading, as the screen dims in 10 minutes
     ec "deluna (nonce: $nonce) started with timeout $timeout"
     while oneinstance $0 $nonce
     do
-        (( $(idle-get) >= $timeout || $(lastunlock-get) <= 80 )) && {
+        (( $(idle-get) >= $timeout || $(lastunlock-get) <= 120 )) && {
             edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get-min))")"
             ##
             lunaquit " via deluna" @STRUE
@@ -270,7 +272,7 @@ function deluna() {
             lock-hook
             ##
         }
-        sleep 3 # to avoid cpu usage
+        sleep 30 # to avoid cpu usage
     done
     ec deluna exited "(nonce: $nonce)"
 }
@@ -414,7 +416,9 @@ function bella_zsh_disable1 {
     fi
 }
 
-aliasfn bell-zsh-start bell-sc2-I-return
+# aliasfn bell-zsh-start bell-sc2-I-return
+aliasfn bell-zsh-start bell-lm-mhm
+
 function bell-zsh1() {
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"
 }
@@ -433,7 +437,28 @@ function bell-zsh() {
             fi
             if test -n "$head" ; then
                 local msg="Completed: $head"
-                bell_awaysh=no redo2 2 tts-say-i1 $msg
+                dact var-show msg
+
+                if isDarwin ; then
+                    # bell_awaysh=no redo2 2 tts-say-i1 $msg
+                    ##
+                    local fsay_v fsay_r
+                    fsay_r=140
+                    ##
+                    #: @bad
+                    # fsay_v=Bubbles
+                    # fsay_v=Boing
+                    ##
+                    # fsay_v=Sandy
+                    # fsay_v=Trinoids
+                    # fsay_v=Zarvox
+                    # fsay_v=Whisper
+                    fsay_v=Cellos
+                    # fsay_v='Good News'
+                    # fsay_v=Organ
+                    # bell_awaysh=no redo2 2 fsay $msg
+                    fsay "$msg, $msg"
+                fi
             fi
         fi
 }
@@ -445,12 +470,12 @@ aliasfn bella-zsh bell-auto bell-zsh
 # If this is a big issue, add a UID to the magic commands, and store them in redis. Don't run commands for duplicate IDs. Periodically clean the stored IDs to minimize conflict chance.
 aliasfnq bella-magic ec $'\n'"${ITERMMAGIC}_BELLA" # slow activation is due to iTerm. The bell 'rings' almost immediately once it reaches BrishGarden.
 
-function bella-zsh-magic() {
+function bella-zsh-magic {
     test -z "$ITERM_SESSION_ID" && return 1
     ec $'\n'"${ITERMMAGIC}_ZSH_BELLA_${ITERM_SESSION_ID}"
 }
 
-function bella-zsh-gateway() {
+function bella-zsh-gateway {
     if { isGuest && ! isGrayfur } || bool "$bella_zsh_disable1" || test -z "$HISTFILE" ; then
         # bella-zsh is a tad opinionated, so I am disabling it for guests.
 
@@ -458,13 +483,13 @@ function bella-zsh-gateway() {
     fi
 
     if isSSH ; then
-        bella-zsh-magic
+        # bella-zsh-magic
     elif terminal-supported-p ; then
         bella-zsh-maybe
     fi
 }
 
-function bella-zsh-maybe() {
+function bella-zsh-maybe {
     # @notcrossplatform
     # this is called via BrishGarden by iTerm
 
@@ -825,4 +850,21 @@ function bell-continuous {
     bell_awaysh=n loop bell-lm-MI
 }
 aliasfn bellc bell-continuous
+##
+function bell-ddd {
+    if isDarwin ; then
+        command say -v cello "di di di di di di di di di di di di di di di di di di di di di di di di di di"
+    else
+        return 1
+    fi
+}
+
+function bell-pi {
+    if isDarwin ; then
+        command say -v cello 3.14159265358979323846264
+        #: 3.141592653589793
+    else
+        return 1
+    fi
+}
 ##

@@ -2,7 +2,8 @@
 alias ysp='y-stream-pipe'
 
 function aa-gateway {
-    $proxyenv aacookies "$@"
+    aacookies "$@"
+    #: $proxyenv
 }
 aliasfn aa aa-gateway
 alias aa='\noglob aa-gateway'
@@ -27,11 +28,11 @@ function dl-named {
 
     local cmd=()
     if bool "$daemon_p" ; then
-        cmd=(tmuxnewsh2 "$(ec "dl-named $title ($(dateshort))" | str2tmuxname)")
+        cmd=(tmuxnewsh_proxy_forward_p=y tmuxnewsh2 "$(ec "dl-named $title ($(dateshort))" | str2tmuxname)")
     fi
-    cmd+=(all_proxy="$all_proxy" retry aa-gateway --conditional-get=true --allow-overwrite=true --out="${title}" "$url")
+    cmd+=(reval-ec retry aa-gateway --conditional-get=true --allow-overwrite=true --out="${title}" "$url")
 
-    reval-ec "${cmd[@]}"
+    reval-env-ec "${cmd[@]}"
 }
 ##
 function aaserver {
@@ -45,6 +46,7 @@ function aac {
 ##
 function aa-raw {
     local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
+    local browser_refer_p="${aa_browser_refer_p}"
     #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
     if bool "${aa_log_p}" ; then
@@ -82,13 +84,18 @@ function aa-raw {
         opts=(--user-agent "$useragent_chrome" "${opts[@]}")
         #: --user-agent will throw an error with torrent downloads
 
-        local arg
-        for arg in $@ ; do
-            if url-match "$arg" ; then
-                opts+=( --referer "$arg" )
-                break
-            fi
-        done
+        if bool "$browser_refer_p" ; then
+            opts+=(--referer "$(browser-current-url)")
+            ecgray "$0: --referer $(browser-current-url)"
+        else
+            local arg
+            for arg in $@ ; do
+                if url-match "$arg" ; then
+                    opts+=( --referer "$arg" )
+                    break
+                fi
+            done
+        fi
     fi
 
     local cmd

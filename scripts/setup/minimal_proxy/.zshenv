@@ -1,5 +1,8 @@
 ###
 export TERM="xterm-256color"
+
+export HISTFILE="${HOME}/.zsh_history"
+export HISTSIZE=100000
 ###
 setopt interactivecomments
 ###
@@ -27,3 +30,7 @@ tmuxnew () {
     tmux new -d -s "$@"
 }
 ###
+http-static-py () {
+    python -m http.server "${1:-8000}"
+}
+##

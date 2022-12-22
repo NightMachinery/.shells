@@ -3,13 +3,22 @@
 if isDarwin ; then
     objc-compile "$NIGHTDIR/objective-c/input_lang_get_objc.m"
 
+    brew install --cask mactex
+    brew install --cask handbrake
+    brew install --cask adobe-acrobat-reader skim # foxit-pdf-editor
+
+    brew unlink mpv || true
+    brew install --cask mpv iina
+
     brew install --cask --appdir=/Applications megacmd
 
     brew install teamookla/speedtest/speedtest
 
     brew install fabianishere/personal/pam_reattach
 
-    brew install --cask corelocationcli
+    brew install --cask corelocationcli &&
+        rehash &&
+        sudo location_permission_allow_darwin.sh "${commands[CoreLocationCLI]}"
 
     brew install --cask rar # unrar
 

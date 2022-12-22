@@ -5,7 +5,7 @@ Saves the cover of the given ebook to <output>.' MAGIC
     local in="${1:-$jufile}" 
     local out="${2:-${in:r}.png}"
 
-    if ! { sout ebook-meta --get-cover "$out" "$in" && test -e "$out" } ; then
+    if ! { sout ebook-meta --get-cover "$out" "$in" && test -s "$out" } ; then
         ecerr "$0: trying pdf2png-mutool instead ..."
         reval-ec @opts o "$out" @ pdf2png-mutool "$in"
     fi

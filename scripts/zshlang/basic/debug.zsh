@@ -283,7 +283,7 @@ function assert() {
     local ret=$?
     if test -n "$assert_global_lock" && (( ret != 0 ))  ; then
         head="${head:-${$(fn-name):-${funcstack[2]:-assert}}}" # fn-name takes  ~9ms
-        test -z "$msg" && msg="$(ecalternate "${@}")" # "(exited $ret)"
+        test -z "$msg" && msg="$(gq "$@")"$'\n\t'"$(ecalternate "${@}" 2>&1)" # "(exited $ret)"
         msg="${head}: $msg"
 
         clipboard-add-quoted "$@"

@@ -198,6 +198,20 @@ function pbadd {
 }
 alias pa=pbadd
 
+function pbcopy-img-darwin {
+    #: Usage: pbcopy-img <path>
+    ##
+    pbcopy_image.m "$@"
+}
+
+function pbcopy-img {
+    if isDarwin ; then
+        pbcopy-img-darwin "$@"
+    else
+        @NA
+    fi
+}
+
 function pbpaste-plus() {
     # GLOBAL out: paste
     unset paste

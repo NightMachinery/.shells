@@ -533,3 +533,7 @@ function git-conflicts-s {
   git ls-files --unmerged | awk '{print $4}' | sort -u
 }
 ##
+function git-current-commit {
+  git rev-parse "${1:-HEAD}"
+}
+##

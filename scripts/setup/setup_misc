@@ -43,7 +43,7 @@ python -m spacy download en_core_web_sm # ~14MB
 ###
 nimble install --accept https://github.com/NightMachinary/htmlmetadata
 
-nimble install --accept "git://github.com/AmanoTeam/Unalix-nim"
+nimble install --accept "https://github.com/AmanoTeam/Unalix-nim"
 ##
 npmi unibeautify @unibeautify/beautifier-prettydiff @unibeautify/cli
 npmi get-stdin@8

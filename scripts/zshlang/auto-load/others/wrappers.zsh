@@ -141,3 +141,17 @@ function vcard-to-json {
     jq-rtl . #: needed to, e.g., normalize strings
 }
 ##
+function zathura {
+  local name="${1:r}" args=()
+  name="zathura $(str2tmuxname "$name")" @TRET
+  for arg in "$@" ; do
+    if test -e "$arg" ; then
+      args+="$(realpath "$arg")" @TRET
+    else
+      args+="$arg"
+    fi
+  done
+
+  reval-ec tmuxnew "$name" command zathura "${args[@]}"
+}
+##

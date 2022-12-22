@@ -68,7 +68,7 @@ function geval() {
     eval -- "$cmd"
 }
 ##
-function aget() {
+function aget {
     ##
     # "aget does not wait for all forked processed. Probably unsolvable unless we invoke zsh -c"
     # `zsh -f -c 'sleep 3 &'` doesn't wait for them either. We had this problem in borg's old forking system as well.
@@ -103,7 +103,8 @@ function aget() {
         return "$err"
     fi
 }
-function reval() {
+##
+function reval {
     # ecdbg revaling "$(gquote "$@")"
     # Don't put stuff here, reval is used in ecdbg itself!
     local cmd="$(gquote "$@")"
@@ -111,7 +112,7 @@ function reval() {
     eval "$cmd"
 }
 
-function reval-true() {
+function reval-true {
     reval "$@" || true
 }
 
@@ -125,12 +126,22 @@ function reval-withstdin {
 }
 alias rin='reval-withstdin'
 
+function reval-paste {
+    pbpaste | reval "$@"
+}
+
 function reval-to-stdout {
     reval "$@" 2>&1
 }
+alias reval-err-to-out='reval-to-stdout'
 
-function rgeval() {
+function rgeval {
     geval "$(gquote "$@")"
+}
+##
+function reval-out-to {
+    local out_dest="${1}" ; shift
+    reval-env "$@" > "$out_dest"
 }
 ##
 function cat-postprocess {

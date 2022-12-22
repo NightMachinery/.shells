@@ -1,0 +1,83 @@
+#: =man zathurarc=
+##
+# * misc
+set adjust-open width
+
+# * clipboard
+set selection-clipboard clipboard
+
+# map t toggle_fullscreen
+
+# * zoom
+map = zoom in
+set zoom-step 3
+
+# * scrolling
+set scroll-full-overlap 0.4
+
+#map <Button1> scroll full-down
+map d scroll full-down
+map <Down> scroll full-down
+#half-down
+map <A-Down> scroll down
+map j scroll full-down
+map <A-j> scroll down
+
+map J jumplist forward
+
+map <Button3> scroll full-up
+map u scroll full-up
+map <Up> scroll full-up
+map <A-Up> scroll up
+map k scroll full-up
+map <A-k> scroll up
+
+map K jumplist backward
+
+map <Left> scroll left
+map <Right> scroll right
+map <A-Left> scroll left
+map <A-Right> scroll right
+map <S-Left> scroll half-left
+map <S-Right> scroll half-right
+set scroll-hstep 10
+#: good for keyboard
+
+set scroll-step 40
+#: 40 is good for keyboard but awful for trackpad. (1 is good for trackpad.)
+#: Currently we are mostly using page scroll commands for the keyboard shortcuts.
+
+# set smooth-scroll "true" #: bad for keyboard, good for trackpad
+set smooth-scroll "false"
+
+# * UI
+set font "inconsolata 30" #: font text UI size
+
+set default-bg "#000000" #00
+set default-fg "#F7F7F6" #01
+
+set statusbar-fg "#B0B0B0" #04
+set statusbar-bg "#202020" #01
+
+set inputbar-bg "#151515" #00 currently not used
+set inputbar-fg "#FFFFFF" #02
+
+set notification-error-bg "#AC4142" #08
+set notification-error-fg "#151515" #00
+
+set notification-warning-bg "#AC4142" #08
+set notification-warning-fg "#151515" #00
+
+set highlight-color "#F4BF75" #0A
+set highlight-active-color "#6A9FB5" #0D
+
+set completion-highlight-fg "#151515" #02
+set completion-highlight-bg "#90A959" #0C
+
+set completion-bg "#303030" #02
+set completion-fg "#E0E0E0" #0C
+
+set notification-bg "#90A959" #0B
+set notification-fg "#151515" #00
+
+# * end

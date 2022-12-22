@@ -19,8 +19,20 @@ fi
 
 if isMe ; then
     ##
-    tmuxnewsh2 sftpgo_shared reval-notifexit sftpgo serve --config-file "$NIGHTDIR/launchers/sftpgo_darwin.json" --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log
-    # tmuxnewsh2 shared_sftpgo indir ~/Base/keys/sftpgo sftpgo portable -d ~/Base/shared --permissions '*' --username "$SFTPGO_USER1" --password "$SFTPGO_PASS1" --webdav-port 8114 --sftpd-port 8115 --ftpd-port 8116 --log-verbose --log-file-path sftpgo.log --advertise-service
+    if isdefined-cmd sftpgo ; then
+        local sftpgo_config=''
+        if isMBP ; then
+            sftpgo_config="$NIGHTDIR/launchers/sftpgo/MBP.json"
+        elif isMB2 ; then
+            sftpgo_config="$NIGHTDIR/launchers/sftpgo/MB2.json"
+        fi
+
+        if test -n "$sftpgo_config" ; then
+            tmuxnewsh2 sftpgo_shared reval-notifexit sftpgo serve --config-file "$sftpgo_config" --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log
+        fi
+
+        # tmuxnewsh2 shared_sftpgo indir ~/Base/keys/sftpgo sftpgo portable -d ~/Base/shared --permissions '*' --username "$SFTPGO_USER1" --password "$SFTPGO_PASS1" --webdav-port 8114 --sftpd-port 8115 --ftpd-port 8116 --log-verbose --log-file-path sftpgo.log --advertise-service
+    fi
     ##
     # tmuxnewsh2 shared_smb loop reval-notifexit sudo /usr/sbin/smbd -no-symlinks false -stdout -debug
     # tmuxnewsh2 shared_ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/_Books --debug
@@ -44,10 +56,13 @@ if test -n "$NP_PASS1" ; then
 fi
 
 if test -n "$NP_PASS0" ; then
-    tmuxnew naive-${lilf_user} naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
+    # tmuxnew naive-${lilf_user} naive --listen="socks://127.0.0.1:1078" --proxy="https://alice:$NP_PASS0@np.lilf.ir" --log  --concurrency=4
 fi
 
 if isMe ; then
+    ##
+    tmuxnew direct-proxy gost -L socks5://0.0.0.0:3081 -L http://0.0.0.0:3087
+    ##
     # tmuxnew v2ray v2ray -config $nightNotes/private/configs/zii/v2ray/v1.zii.json
     ##
     # tmuxnew v2ray-behy v2ray -config $nightNotes/private/configs/behy/v2ray/client.json
@@ -55,7 +70,7 @@ if isMe ; then
     # tmuxnewsh2 trojan trojan -c "$nightNotes"/private/configs/zii/trojan_client.json
     # tmuxnew trojan-client-v1-zii trojan -c $nightNotes/private/configs/zii/trojan_client_v1.json
     ##
-    tmuxnew trojan-client-arvan_1 trojan -c $nightNotes/private/configs/arvan_1/trojan/client.json
+    # tmuxnew trojan-client-arvan_1 trojan -c $nightNotes/private/configs/arvan_1/trojan/client.json
     ##
     v2-on # v2ray-genrouter
     ##

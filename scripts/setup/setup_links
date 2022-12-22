@@ -5,8 +5,13 @@ mkdir -p ~/.ssh/sockets/
 
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
 ##
+zsh_alt_path='/opt/homebrew/bin/zsh'
+if isArm && test -e "$zsh_alt_path" ; then
+    sudo ln -fs "${zsh_alt_path}" /usr/local/bin/zsh
+fi
+##
 lnrp $NIGHTDIR/configFiles/kitty/kitty.conf ~/.config/kitty/
-if isMBP ; then
+if isMe ; then
     lnrp $NIGHTDIR/configFiles/kitty/me.conf ~/.kitty_custom_1.conf
 fi
 lnrp $NIGHTDIR/configFiles/kitty/diff.conf ~/.config/kitty/
@@ -90,5 +95,7 @@ if isMe ; then
     fi
 
     lnrp "${symlinkme_all_dir}/power_shell/profile.ps1" ~/.config/powershell/profile.ps1
+
+    lnrp "${symlinkme_all_dir}/zathura/zathurarc" ~/.config/zathura/zathurarc
 fi
 ##

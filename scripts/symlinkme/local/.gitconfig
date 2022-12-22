@@ -16,6 +16,7 @@
 
 	# GIT_PAGER also set, so @redundant
 	pager = LESS='-RiF --mouse --wheel-lines=3' delta --light --theme 'Solarized (light)'
+	eol = lf
 	# ignorecase = false
 [color]
 	branch = auto

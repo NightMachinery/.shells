@@ -36,6 +36,9 @@ function isArm() {
 function isArmDarwin() {
     isDarwin && isArm
 }
+function isAppleSilicon() {
+    isArmDarwin
+}
 
 function isLinux() {
     if test -n "$uname" ; then
@@ -63,6 +66,10 @@ function isBorg() {
 isJulia() { isBorg "$@" ; }
 # isborg() { isBorg "$@" ; }
 # isjulia() { isBorg "$@" ; }
+##
+function isEmacs() {
+    [[ -n "${NIGHT_EMACS_P}" ]]
+}
 ##
 function isBrish() {
     [[ -n "${brish_server_index}" ]]

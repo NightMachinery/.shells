@@ -9,9 +9,10 @@ ins_gem="$NIGHTDIR/setup/ins_gem"
 ### Aliases
 alias bmac='brewables="$brewables_mac" '
 ###
-function clean-deps {
+function deps-clean {
     re duplicates-clean-sort-file-inplace "$insables" "$inslables" "$nodables" "$brewables" "$brewables_mac" "$pipables" "$ins_go" "$ins_gem"
 }
+aliasfn clean-deps deps-clean
 ##
 alias bnu='HOMEBREW_NO_AUTO_UPDATE=1'
 
