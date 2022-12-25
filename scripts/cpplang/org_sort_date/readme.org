@@ -1,0 +1,7 @@
+#+TITLE: org_sort_date
+
+* install
+#+begin_example zsh
+cmake .
+make #: generates the binary at PWD
+#+end_example
