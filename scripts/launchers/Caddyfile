@@ -126,26 +126,44 @@ android.lilf.ir:8443, api.android.lilf.ir:8443, hook.android.lilf.ir:8443 {
 # :8060 {
 #   reverse_proxy https://google.com
 # }
+##
+# (np) {
+# 	route {
+# 		forward_proxy {
+# 			basic_auth alice {$NP_PASS0}
+# 			probe_resistance secret.com
+# 			hide_ip
+# 			hide_via
+# 		}
+# 		file_server browse {
+# 			root {env.HOME}/Downloads
+# 		}
+# 		# respond "pained gold spots accumulated"
+# 		}
+# 	}
 
-(np) {
-	route {
-		forward_proxy {
-			basic_auth alice {$NP_PASS0}
-			probe_resistance secret.com
-			hide_ip
-			hide_via
-		}
-		file_server browse {
-			root {env.HOME}/Downloads
-		}
-		# respond "pained gold spots accumulated"
+# 	:443 { # @upstreambug https://caddy.community/t/caddy-suddenly-directs-my-site-to-the-wrong-directive/11597/2
+# 		import np
+# 	}
+
+# 	np.lilf.ir {
+# 		import np
+# 	}
+##
+np.lilf.ir {
+	@grpc {
+		protocol grpc
+		path /sky* # @customizable
+        # [[https://caddyserver.com/docs/caddyfile/matchers#path][Request matchers (Caddyfile) — Caddy Documentation]]
+	}
+	reverse_proxy @grpc 127.0.0.1:5131 {
+		transport http {
+			versions h2c
 		}
 	}
 
-	:443 { # @upstreambug https://caddy.community/t/caddy-suddenly-directs-my-site-to-the-wrong-directive/11597/2
-		import np
-	}
-
-	np.lilf.ir {
-		import np
-	}
+    file_server browse {
+        root {env.HOME}/Downloads
+    }
+}
+##
