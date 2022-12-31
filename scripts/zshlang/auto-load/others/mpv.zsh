@@ -98,6 +98,10 @@ function hear-next {
 
 aliasfn mpv-prev fnswap hear-do mpv-do hear-prev
 aliasfn mpv-next fnswap hear-do mpv-do hear-next
+
+function hear-seek-begin {
+    hear-do seek 0 absolute-percent
+}
 ##
 function hear-get {
     local prop="${1:-path}"
@@ -164,12 +168,18 @@ function hear-loadfile {
         url="$(grealpath "$url")" @TRET
     fi
 
-    hear-do loadfile "${url}" "$mode"
-    hear-play-on
+    revaldbg hear-do loadfile "${url}" "$mode"
+    revaldbg hear-play-on
 }
 aliasfn hear-open hear-loadfile
 aliasfn mpv-loadfile fnswap hear-do mpv-do hear-loadfile
 aliasfn mpv-open mpv-loadfile
+
+function hear-loadfile-begin {
+    hear-loadfile "$@" @RET
+    sleep 0.2 && #: @raceCondition can't seek until the file has been loaded; @alt retry until success after smaller delay
+        revaldbg hear-seek-begin
+}
 ###
 function play-and-trash(){
     #aliased to pat
