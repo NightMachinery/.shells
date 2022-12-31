@@ -1,5 +1,9 @@
 alias tsmf='tsendf $me_tel'
 ###
+function tsend-retry {
+    retry tsend "$@"
+}
+###
 function tnotif() {
     # @alt notif
     ##
@@ -158,7 +162,7 @@ function org2tlg {
     local text_md
     text_md="$(ec "$text" | org2md | sd '\\'"('|\"|#|\|)" '$1')" @TRET
 
-    tsend --parse-mode=md -- "${dest}" "$text_md" @RET
+    tsend-retry --parse-mode=md -- "${dest}" "$text_md" @RET
 }
 
 function org2tlg-with-props {

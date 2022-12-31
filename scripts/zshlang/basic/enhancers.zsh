@@ -38,7 +38,7 @@ Update: Actually adds, not replaces. Also removes duplicates."
     out=("${(u@)itemsP}")
 }
 ##
-function enh-mkdest() {
+function enh-mkdest {
     doc enhances commands by creating directories for destination.
 
     local dest="${@: -1}"

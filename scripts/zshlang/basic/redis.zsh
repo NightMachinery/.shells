@@ -10,8 +10,9 @@ ensure-redis() {
         return 1
     }
 }
-redism() {
-    redis-cli --raw "$@"
+
+function redism {
+    revaldbg redis-cli --raw "$@"
     local r=$?
     if (( r == 141 )) ; then
         local cmd="$(gq "$0" "$@")"
