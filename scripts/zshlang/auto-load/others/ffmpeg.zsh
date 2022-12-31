@@ -168,3 +168,19 @@ function vid2gif() {
     ffmpeg -i $i -vf "fps=10,scale=320:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" -loop 0 "$o"
 }
 ##
+function ffmpeg-speed {
+    local input="${1}" speedup_factor="${2:-2}"
+    local output="${3:-${input:r}_s${speedup_factor}.${input:e}}"
+    assert-args input speedup_factor output @RET
+
+    if (( speedup_factor > 2 )) ; then
+        ecerr "$0: The atempo filter is limited to using values between 0.5 and 2.0 (so it can slow it down to no less than half the original speed, and speed up to no more than double the input). If you need to, you can get around this limitation by stringing multiple atempo filters together manually. Continuing anyway ..."
+    fi
+
+    local speedup_factor_inv=$((1/speedup_factor))
+
+    reval-ec ffmpeg -i "$input" \
+        -filter_complex "[0:v]setpts=${speedup_factor_inv}*PTS[v];[0:a]atempo=${speedup_factor}[a]" \
+        -map "[v]" -map "[a]" "$output"
+}
+##
