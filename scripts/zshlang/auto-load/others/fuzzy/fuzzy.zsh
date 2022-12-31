@@ -121,6 +121,19 @@ aliasfnq fk-joker ffkill "'JOKER_MARKER"
 aliasfn ffportkill fkEngine=ffport ffkill
 aliasfn ffportlkill fkEngine=ffportl ffkill
 aliasfn killport ffportkill
+
+function killport-fuser {
+    local port="$1"
+    assert-args port @RET
+
+    if isLinux ; then
+    else
+        ecerr "$0: This is probably Linux-only!"
+    fi
+
+    sudo fuser --kill "${port}/tcp"
+}
+reify killport-fuser
 ##
 function lsofp() {
     ffps "$@" | inargsf re "lsof -p" | less
@@ -281,6 +294,7 @@ function init-vfiles {
     # --ignore-file seems not working
 }
 aliasfn vinit init-vfiles yes
+
 function v() {
     bella_zsh_disable1
 
