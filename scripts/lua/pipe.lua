@@ -109,10 +109,13 @@ end
 function trim1(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
+
 function brishz(cmd)
-  cmdq = "/usr/local/bin/brishzq.zsh " .. cmd
+  -- @duplicateCode/e0d4c801e9f8b4200d78468857610ae1 (mpv_shared.lua)
+  cmdq = "brishz_eval_file_p=y /usr/local/bin/brishzq.zsh " .. cmd
   return exec(cmdq)
 end
+
 function brishzeval(cmd)
   local cmdq = ("/usr/local/bin/brishz.dash %q"):format(cmd)
   return exec(cmdq)
