@@ -336,7 +336,7 @@ function v() {
     # sort files by modification date
     # %Y     time of last data modification, seconds since Epoch
     # reing gstat is needed if the files get too numerous, but then things will be too slow
-    files=( ${(0@)"$(gstat  --printf='%040.18Y:%n\0' "${(@)files:|excluded}" | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"} ${(@)excluded} ) #Don't quote this there is always a final empty element
+    files=( ${(0@)"$(arr0 "${(@)files:|excluded}" | gxargs -0 gstat  --printf='%040.18Y:%n\0' | gsort --reverse --zero-terminated --unique | gcut -z -d':' -f2-)"} ${(@)excluded} ) #Don't quote this there is always a final empty element
     files=( ${(0@)"$(<<<"${(F)files}" fzf_mru_context="$0" fz --print0 --query "$q")"} ) || return 1
     local ve="$ve"
     reval "${veditor[@]}" "${(@)files}"
