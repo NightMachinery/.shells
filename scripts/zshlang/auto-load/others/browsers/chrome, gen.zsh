@@ -16,7 +16,8 @@ function browser-recording-postprocess {
 
     ecbold '--------------'
 
-    ffmpeg-to265 "$name" @RET
+    # ffmpeg-to265 "$name" @RET
+    hb265 "$name" @RET
 }
 aliasfn viddate browser-recording-postprocess
 ##

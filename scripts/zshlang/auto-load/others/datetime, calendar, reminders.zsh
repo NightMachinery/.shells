@@ -527,3 +527,7 @@ function h-rem-reclater {
     @opts ext zsh @ remn "rem-rec ${cmd_q}" "$later"
 }
 ##
+function date-unix {
+    command date "+%s"
+}
+##

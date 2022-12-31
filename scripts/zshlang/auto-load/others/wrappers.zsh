@@ -38,11 +38,7 @@ function exa() {
     command exa "$@"
   fi
 }
-# function tsend() {
-#   unfunction "$0"
-#   pxify-auto
-#   tsend "$@"
-# }
+
 function k2pdfopt() {
     if isDarwin ; then
         command k2pdfopt_darwin "$@"

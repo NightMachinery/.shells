@@ -101,7 +101,7 @@ function hear-rnd() {
 }
 @opts-setprefix hear-rnd hear # @inuse
 ##
-function songc() {
+function songc {
     # Please note that I am relying on the auto-load plugin of mpv to load all files in a folder. If you don't have that, remove the `-e EXT` filters of fd in this function.
 
     bella_zsh_disable1
@@ -190,7 +190,7 @@ function find-music {
         opts+=(-e "$ext")
     done
 
-    memoi_expire="${fm_expire:-$memoi_expire}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" |
+    memoi_expire="${fm_expire:-0}" memoi_skiperr=y memoi-eval fd -c never --follow "$opts[@]" --full-path "$fd_pat" "${music_dir:-$HOME/my-music}" |
         gsort |
         sponge |
         ugbool "$*"
@@ -349,7 +349,9 @@ function mu-gateway() {
     songd "$bp[@]" --loop-playlist ${*:+"$*"} #Download
 }
 
-function muc() { fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*" }
+function muc {
+    fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*"
+}
 ##
 function sdlg() {
     ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1

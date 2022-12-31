@@ -1,11 +1,13 @@
 re 'self-enh enh-mkdest' ln
 ##
-function cp() {
-    local emd_c='command gcp --reflink=auto' # --reflink=auto does copy-on-write copies
+function cp {
+    local emd_c='command gcp --reflink=auto'
+    #: --reflink=auto does copy-on-write copies
+
     enh-mkdest "$@"
 }
 ##
-function h_mv() {
+function h_mv {
     local emd_c='command mv'
     if isIReally && isRcLoaded && fn-isTop mv ; then
         emd_c='mv-merge'

@@ -69,7 +69,7 @@ loop-startover() {
 }
 alias loops='loop-startover' #Oops :D
 ##
-function oneinstance-setup() {
+function oneinstance-setup {
     ensure-redis || return 1
     
     local someNonce="${1}"
@@ -85,7 +85,8 @@ function oneinstance-setup() {
     sout redis-cli set $someNonce $nonce
     ec $nonce
 }
-oneinstance() {
+
+function oneinstance {
     local nonce="$2"
     test -z "$nonce" && { ecerr nonce is empty. ; return 1 }
 
