@@ -159,7 +159,7 @@ function vcnpp {
 
         brishz-restart
 
-        brishzr-repeat
+        # brishzr-repeat
         true
     } always { popf }
 }
