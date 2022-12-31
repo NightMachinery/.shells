@@ -28,6 +28,17 @@ function redism {
     fi
     return $r
 }
+
+function redism-bool {
+    local o
+    o="$(redism "$@")" @TRET
+
+    if (( o == 1 )) ; then #: success
+        return 0
+    else
+        return 13
+    fi
+}
 ##
 function redis-defvar() {
     local name="${1:?}"
