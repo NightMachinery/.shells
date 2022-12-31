@@ -97,6 +97,33 @@ function oneinstance {
     [[ "$nonce" == "$(redism get $someNonce)" ]]
 }
 ##
+function lock-aquire-redis-retry {
+    retry_sleep="${retry_sleep:-3}" fnswap ecerr ecgray retry lock-aquire-redis "$@"
+}
+
+function lock-aquire-redis {
+    local lock_id="$1" timeout="${2:-600}"
+    #: timeout is in seconds
+    assert-args lock_id @RET
+    lock_id="lock_${lock_id}"
+
+    {
+        revaldbg redism-bool setnx "${lock_id}" "$(date-unix)" @RET
+    } always {
+        silent redism expire "${lock_id}" "${timeout}" LT
+        #: LT -- Set expiry only when the new expiry is less than current one
+    }
+}
+
+function lock-release-redis {
+    local lock_id="$1"
+    assert-args lock_id @RET
+    lock_id="lock_${lock_id}"
+
+    assert silent redism del "$lock_id" @RET
+    #: redis returns the number of keys removed, so we can't distinguish between a nonexistent key and a failed operation.
+}
+##
 # function cancelable() {
 #     # @todo0 @design make zsh functions cancelable. Useful for zopen.
 # }
