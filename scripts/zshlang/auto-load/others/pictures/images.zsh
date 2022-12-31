@@ -244,3 +244,20 @@ function img-background2transparent {
     magicwand.bash "${x},${y}" -t "$fuzz_percent" -f image -r outside -m overlay -o 0 "$i" "$o"
 }
 ##
+function img-to-data-uri {
+    local f="$1"
+    assert-args f @RET
+
+    local mimetype content
+    mimetype="$(file -bN --mime-type "$f")" @TRET
+
+    content="$(gbase64 --wrap=0 < "$f")" @TRET
+    #: no line wrapping
+
+    ec "data:${mimetype};base64,${content}" |
+        cat-copy-if-tty
+    if isOutTty ; then
+        icat "$f" || true
+    fi
+}
+##
