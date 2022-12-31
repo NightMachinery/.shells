@@ -246,7 +246,7 @@ function langSetToggle()
   end
 end
 ---
-enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv", "zathura" } -- "Emacs",
+enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv", "zathura", "sioyek" } -- "Emacs",
 if false then
   function appWatch(appName, event, app)
     -- @deprecated as it was too slow. In general, calling Zsh functions that will then call Hammerspoon functions is a bad idea.
@@ -295,6 +295,54 @@ popclickInit()
 --                    popclickPlayPause()
 --                    -- alert.show("popclickListening: " .. tostring(popclickListening))
 -- end)
+---
+-- * [[https://www.hammerspoon.org/docs/hs.eventtap.event.html#newSystemKeyEvent][Hammerspoon docs: hs.eventtap.event]]
+-- ** DONE [[https://github.com/Hammerspoon/hammerspoon/issues/3350][`hs.eventtap.event.newSystemKeyEvent`: keeps pressing the keys indefintely · Issue #3350 · Hammerspoon/hammerspoon]]
+
+function systemKey(key, repeatDelay)
+    -- REPEAT_FASTER = 10 * 1000
+    REPEAT_FASTER = 5
+
+    hs.eventtap.event.newSystemKeyEvent(key, true):post()
+
+    if not repeatDelay or repeatDelay <= 0 then
+        repeatDelay = REPEAT_FASTER
+    end
+    hs.timer.usleep(repeatDelay)
+    hs.eventtap.event.newSystemKeyEvent(key, false):post()
+end
+
+function mediaPlayPauseKey()
+  systemKey("PLAY")
+end
+
+function mediaPreviousKey()
+  systemKey("PREVIOUS")
+end
+
+function mediaNextKey()
+  systemKey("NEXT")
+end
+
+function volumeIncKey()
+  systemKey("SOUND_UP")
+end
+
+function volumeDecKey()
+  systemKey("SOUND_DOWN")
+end
+
+function volumeMuteKey()
+  systemKey("MUTE")
+end
+
+function brightnessIncKey()
+  systemKey("BRIGHTNESS_UP")
+end
+
+function brightnessDecKey()
+  systemKey("BRIGHTNESS_DOWN")
+end
 ---
 if false then
   hs.hotkey.bind(hyper, "p", function()
@@ -570,7 +618,8 @@ appHotkey{ key='t', appName='com.tdesktop.Telegram' }
 appHotkey{ key='e', appName='org.gnu.Emacs' }
 appHotkey{ key='a', appName='com.adobe.Reader' }
 -- appHotkey{ key='b', appName='com.apple.Preview' }
-appHotkey{ key='b', appName='zathura' }
+-- appHotkey{ key='b', appName='zathura' }
+appHotkey{ key='b', appName='info.sioyek.sioyek' }
 appHotkey{ key='s', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
@@ -628,19 +677,23 @@ hs.hotkey.bind(hyper, "F6", function()
 end)
 
 hs.hotkey.bind(hyper, "F7", function()
-                 brishzeval('awaysh-fast hear-prev')
+                 -- brishzeval('awaysh-fast hear-prev')
+                 mediaPreviousKey()
 end)
 
 hs.hotkey.bind(hyper, "F8", function()
-                 brishzeval('awaysh-fast hear-play-toggle')
+                 -- brishzeval('awaysh-fast hear-play-toggle')
+                 mediaPlayPauseKey()
 end)
 
 hs.hotkey.bind(hyper, "F9", function()
-                 brishzeval('awaysh-fast hear-next')
+                 -- brishzeval('awaysh-fast hear-next')
+                 mediaNextKey()
 end)
 
 hs.hotkey.bind(hyper, "F10", function()
-                 brishzeval('awaysh-fast volume-mute-toggle')
+                 -- brishzeval('awaysh-fast volume-mute-toggle')
+                 volumeMuteKey()
 end)
 
 function volumeInc(v, device)
@@ -664,7 +717,8 @@ hs.hotkey.bind(hyper, "F11", function()
                  ---
                  -- brishzeval('awaysh-fast volume-dec')
                  ---
-                 volumeInc(-5)
+                 -- volumeInc(-5)
+                 volumeDecKey()
                  ---
 end)
 
@@ -672,7 +726,8 @@ hs.hotkey.bind(hyper, "F12", function()
                  ---
                  -- brishzeval('awaysh-fast volume-inc')
                  ---
-                 volumeInc(5)
+                 -- volumeInc(5)
+                 volumeIncKey()
                  ---
 end)
 --
