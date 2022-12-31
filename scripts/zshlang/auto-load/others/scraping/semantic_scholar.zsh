@@ -130,12 +130,22 @@ function semantic-scholar-dl-from-org {
     [[ "$dest" == *.pdf ]] || dest+=".pdf"
     dest="$(ec "$dest" | str2filename-ascii)"
 
-    reval-ec retry aa-gateway "$url" -o "${dest}" @RET
+    # reval-ec retry aa-gateway "$url" -o "${dest}" @RET
+    # reval-ec retry wget "$url" -O "${dest}" @RET
+    curlm_ns=y reval-ec retry curlm "$url" -o "${dest}" @RET
 
-    ec "$org" |
-        perl -ple 's/\@(?:toread\S+|CR\b)\s?//g' |
-        org2tlg "$tlg_dest"
+    local lock_id="$0"
+    retry_sleep=15 lock-aquire-redis-retry "${lock_id}" $((30*60)) @RET
+    {
+        {
+            ec "$org" |
+                perl -ple 's/\@(?:toread\S+|CR\b)\s?//g' |
+                org2tlg "$tlg_dest"
+        } @RET
 
-    reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
+        reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
+    } always {
+        lock-release-redis "${lock_id}"
+    }
 }
 ##
