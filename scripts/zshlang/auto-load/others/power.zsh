@@ -34,6 +34,26 @@ function sleepifidle {
     sleepforce
 }
 ##
+function battery-low-power-mode-enable {
+    #: [[https://apple.stackexchange.com/questions/452488/how-can-i-set-the-low-power-mode-to-only-on-battery-programmatically][macos - How can I set the low power mode to "Only On Battery" programmatically? - Ask Different]]
+    ecgray "@seeAlso powersaving-on"
+    ##
+
+    sudo pmset -b lowpowermode 1
+    #: The -a, -b, -c, -u flags determine whether the settings apply to battery ( -b ), charger (wall power) ( -c ), UPS ( -u ) or all ( -a ).
+}
+
+function battery-low-power-mode-disable {
+    sudo pmset -a lowpowermode 0
+}
+
+function battery-low-power-mode-p {
+    local s
+    s="$(pmset -g | rget 'lowpowermode\s+(\d+)')" @TRET
+
+    (( s == 1 )) #: 1: lowpowermode 0: off
+}
+
 redis-defvar powersaving_status
 powersaving_apps=(chrome Insiders bettertouch ActivityWatch) # aw-watcher aw-server iterm tmux hammersp Notion Finder scsynth java podcast Telegram
 # seems that -SIGSTOP is useless for scsynth
