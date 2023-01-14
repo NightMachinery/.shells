@@ -16,9 +16,9 @@ export VISUAL="$NEDITOR"
 export EDITOR="$VISUAL"
 ##
 # export JULIA_EDITOR='emacsclient'
-export JULIA_EDITOR='editor-open'
+export JULIA_EDITOR='editor-open-adv'
 # emacsclient opens in an already open client, vim is fast, nvim highlights but is slow
-# [[file:~/Base/_Code/uni/stochastic/common/startup.jl::InteractiveUtils.define_editor("editor-open", wait=false) do cmd, path, line][startup.jl::define_editor]]
+# [[file:~/Base/_Code/uni/stochastic/common/startup.jl::InteractiveUtils.define_editor("editor-open-adv", wait=false) do cmd, path, line][startup.jl::define_editor]]
 ##
 export NODEJS_CHECK_SIGNATURES=no #for asdf's nodejs
 ##

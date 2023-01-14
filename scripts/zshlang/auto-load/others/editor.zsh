@@ -1,5 +1,9 @@
 ##
 function editor-open {
+    editor_open_f=($@) editor_open_no_wait=y editor-open-adv
+}
+
+function editor-open-adv {
     local files=("${editor_open_f[@]}") linenumbers=("${editor_open_l[@]}") no_wait="${editor_open_no_wait}" editor="${editor_open_e:-$EDITOR}"
 
     if [[ "$editor" =~ '^emacs' ]] ; then
@@ -18,7 +22,10 @@ function editor-open {
                         cmd+="(tab-bar-close-other-tabs) " # @weirdFeature
                     fi
                 fi
-                cmd+="(find-file \"${files[$i]}\") (goto-line ${linenumbers[$i]}) "
+                cmd+="(find-file \"${files[$i]}\") "
+                if test -n "${linenumbers[$i]}" ; then
+                    cmd+="(goto-line ${linenumbers[$i]}) "
+                fi
                 ##
                 cmd+='(recenter) '
             done
@@ -44,7 +51,10 @@ function editor-open {
             ##
             local cmd="$editor "
             for i in {1..$#files} ; do
-                cmd+="+${linenumbers[$i]} $(gq "${files[$i]}") "
+                if test -n "${linenumbers[$i]}" ; then
+                    cmd+="+${linenumbers[$i]} "
+                fi
+                cmd+="$(gq "${files[$i]}") "
             done
             eval "$cmd"
         fi
