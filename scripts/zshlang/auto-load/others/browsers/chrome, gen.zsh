@@ -4,20 +4,26 @@ function browser-recording-postprocess {
     local name="${2-${f:r}}"
     assert-args f @RET
 
-    if test -n "$name" ; then
-        name+='_'
+    if ! [[ "$name" =~ '_\d\d$' ]] ; then #: if it doesn't end with a date already
+        if test -n "$name" ; then
+            name+='_'
+        fi
+        name+="$(datej-named | str2filename)"
     fi
-    name+="$(datej-named | str2filename)"
     name+=".${f:e}"
 
     if [[ "$f" != "$name" ]] ; then
         gmv --verbose "$f" "$name" @RET
     fi
 
+    local path_fixed="${name:r}_fixed.mp4"
+    vid-fix "$name" "$path_fixed" @RET
+    command yes n | trs "$name"
+
     ecbold '--------------'
 
-    # ffmpeg-to265 "$name" @RET
-    hb265 "$name" @RET
+    local o="${name:r}.mp4"
+    hb265 "${path_fixed}" "${o}" @RET
 }
 aliasfn viddate browser-recording-postprocess
 ##

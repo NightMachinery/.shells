@@ -69,14 +69,14 @@ function set-defaults() {
         duti -s $cf_mpv .webm all
     fi
     ##
-    if false && test -e /Applications/Skim.app ; then
+    if true && test -e /Applications/Skim.app ; then
         local cf_skim='net.sourceforge.skim-app.skim'
 
         duti -s $cf_skim .pdf all
         duti -s $cf_skim "com.adobe.pdf" all
     fi
 
-    if test -e /Applications/sioyek.app ; then
+    if false && test -e /Applications/sioyek.app ; then
         local cf_sioyek='info.sioyek.sioyek'
 
         duti -s $cf_sioyek .pdf all

@@ -43,6 +43,8 @@ function pxa-create {
     alias "${name}-local"="local -x ${(P)v}"
 }
 pxa-create
+pxa-create 2091 pxa91
+pxa-create 2092 pxa92
 pxa-create 2041 pxa41
 pxa-create 2032 pxa32
 

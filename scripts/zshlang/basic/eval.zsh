@@ -57,7 +57,7 @@ function reval-rainbow() {
     reval "$@"
 }
 ###
-function geval() {
+function geval {
     test -z "$*" && return 0
     local cmd="$@"
     test -z "$ge_ecdbg" && {

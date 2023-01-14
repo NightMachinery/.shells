@@ -139,7 +139,7 @@ function semantic-scholar-dl-from-org {
     {
         {
             ec "$org" |
-                perl -ple 's/\@(?:toread\S+|CR\b)\s?//g' |
+                perl -ple 's/\@(?:toread\S*|tosee\S*|CR\b)\s?//g' |
                 org2tlg "$tlg_dest"
         } @RET
 

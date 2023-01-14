@@ -154,12 +154,25 @@ function emc-focus() {
         return 0
     fi
 
+    if [[ "$EMACS_SOCKET_NAME" == "$EMACS_GUI_SOCKET_NAME" ]] ; then
+        emc-focus-gui
+        return $?
+    fi
+
     if isKitty ; then
         kitty-emacs-focus
     else
         terminal-activate-tab 5
     fi
     bella_zsh_disable1
+}
+
+function emc-focus-gui {
+    if isDarwin ; then
+        reval-ec hammerspoon -c "toggleFocus(emacsAppName)"
+    else
+        return 1
+    fi
 }
 
 function emc-nowait() {

@@ -48,7 +48,7 @@ function jfichub {
 
     local url
     for url in "$urls[@]" ; do
-        if ! fichub_cli --format epub --out-dir . --url "$url" ; then
+        if ! $proxyenv revaldbg fichub_cli --format epub -o . --url "$url" ; then
             ecerr "$0: URL $(gquote-sq "$url") failed. Continuing."
         fi
     done

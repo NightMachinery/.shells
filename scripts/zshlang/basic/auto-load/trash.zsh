@@ -7,21 +7,21 @@ function trs {
     for i in "$@"
     do
         [[ -e "$i" ]] && {
-            ec Trying to remove "$i"
+            # ec Trying to remove "$i"
             if (( ${+commands[rip]} )) ; then
-                assert command rip -- "$i" @RET
+                assert reval-ec rip -- "$i" @RET
             elif (( ${+commands[trash]} )) ; then
-                assert command trash -- "$i" @RET # bloody slow
+                assert reval-ec command trash -- "$i" @RET # bloody slow
             else
                 ecgray "WARNING: 'trash' or 'rip' commands not found, switching to 'rm'."
 
-                assert command rm -r -- "$i" @RET
+                assert reval-ec command rm -r -- "$i" @RET
             fi
         }
     done
 }
 function trs-empty {
-    trs-rm "${TRASH_DIR}" || true
+    trs-rm "${TRASH_DIR}" /tmp/graveyard-*(DN) || true
     assert empty-trash @RET
 }
 ##

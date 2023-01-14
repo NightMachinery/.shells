@@ -322,7 +322,7 @@ function gsync {
     local remotes
     if test -z "$remote" ; then
       local excludedRemotes=(upstream)
-      remotes=("${(@)${(@f)$(git remote)}:|excludedRemotes}")
+      remotes=("${(@)${(@f)$(git remote | command rg -v -e '^_')}:|excludedRemotes}") #: also excludes remotes starting with '_'
     else
       remotes=("$remote")
     fi
@@ -529,8 +529,13 @@ function git-conflicts {
   #: --unmerged: show unmerged files in the output (forces --stage)
 }
 
-function git-conflicts-s {
-  git ls-files --unmerged | awk '{print $4}' | sort -u
+function git-conflicts-paths {
+  ##
+  # git ls-files --unmerged | awk '{print $4}' | sort -u
+  ##
+  git diff --name-only --diff-filter=U --relative |
+    inargsf realpath --
+  ##
 }
 ##
 function git-current-commit {

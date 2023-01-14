@@ -23,8 +23,9 @@ function arxiv-url-get {
         local redirected_p=''
         while true ; do
             id=""
-            if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?/*$'
+            if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?(?:#.*)?/*$'
                     || "$url" =~ '(?i)arxiv:([^/]+?)(?:\.pdf)?/*$'
+                    || "$url" =~ '(?i)ar5iv.labs.arxiv.org/html/(\d+\.\d+)'
                     || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
                     || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
                     || "$url" =~ '^https://(?:www\.)?doi\.org(?:.*)/arXiv\.([^/]+)'

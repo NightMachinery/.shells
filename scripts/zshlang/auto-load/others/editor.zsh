@@ -33,7 +33,6 @@ function editor-open {
             else
                 revaldbg sdbg emacsclient "${opts[@]}" -a '' -t -e "$cmd"
             fi
-
         else
             ##
             # should work with both emacs and vim
