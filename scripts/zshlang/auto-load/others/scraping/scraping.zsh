@@ -57,13 +57,16 @@ function tlwb() {
 }
 noglobfn tlwb
 ##
-function curlm() {
+function curlm {
     local nosilent="${curlm_ns}"
 
     local opts=()
     if test -z "$nosilent" ; then
         opts+='--silent'
     fi
+
+    opts+=(--continue-at -) #: automatically find out where/how to resume the transfer. It uses the given output/input files to figure that out.
+
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
     # --suppress-connect-headers is needed so that `curlm --head ...` requests are parseable.
     $proxyenv curl \
