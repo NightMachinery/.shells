@@ -10,8 +10,15 @@ try {
     const input = process.argv[2];
     const nopast = process.env.datenat_nopast;
     const unixMode = process.env.datenat_unix;
+    const hardCodeTime = process.env.datenat_hardcode_time;
 
     var currentTime = new Date();
+    if (hardCodeTime) {
+        currentTime.setUTCHours(9,29,59,0)
+		// equivalent to '12:59:59' in Iran's timezone
+        // This value is being used by [agfi:h-unix-allday-p]
+    }
+
     var res
     if (nopast) {
         res = chrono.parseDate(input, currentTime, { forwardDate: true })
