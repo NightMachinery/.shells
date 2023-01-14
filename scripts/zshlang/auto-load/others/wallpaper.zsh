@@ -1,6 +1,8 @@
 ##
+typeset -g wallpaper_reminder_p=n
+
 function wallpaper-overlay {
-    local input="$1" overlay_rem="y" overlay_weather="${wallpaper_overlay_weather:-y}"
+    local input="$1" overlay_rem="${wallpaper_reminder_p:-n}" overlay_weather="${wallpaper_overlay_weather:-y}"
     local o="${2:-${1:r}_overlay.png}"
     ensure-args input @MRET
     local rem_x="${wallpaper_overlay_rx:-160}"

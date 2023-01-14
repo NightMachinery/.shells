@@ -15,25 +15,29 @@ function rem-enabled-p {
     (( ${#candidates} >= 1 ))
 }
 ##
-function rem-sync() {
+function rem-sync {
     local nosync="${reminday_store_nosync}"
 
-    test -n "$nosync" || {
+    if ! bool "$nosync" ; then
         ec $'\n'
         cellp
         awaysh iwidget-rem-refresh
-    }
+    fi
 }
-function iwidget-rem-refresh() {
+
+function iwidget-rem-refresh {
     if [[ "$remindayDir" == "$remindayCDir" ]] ; then
         ecerr "$0: remindayDir is set to remindayCDir; Skipping refresh."
         return 0
     fi
 
-    deus iwidget-rem # refresh the cache
+    deus iwidget-rem #: refresh the cache
     if isLocal ; then
-        awaysh wallpaper-auto
-        brishzr awaysh deus iwidget-rem-refresh # refresh the cache
+        if bool "$wallpaper_reminder_p" ; then
+            awaysh wallpaper-auto
+        fi
+
+        brishzr awaysh deus iwidget-rem-refresh #: refresh the cache
     fi
 }
 ##
