@@ -28,6 +28,14 @@ function rtl-reshaper-fast {
   rtl_reshaper_wrap_p=n rtl-reshaper "$@"
 }
 
+function rtl-reshaper-streaming {
+  local line
+  #: read stdin line by line
+  while read -r line ; do
+    ec "$line" | rtl-reshaper-fast
+  done
+}
+
 function reval-rtl {
   if isRtl ; then
     # not having a pipe can make more stuff work, so this opens the possibility of you seeing bugs later (i.e., some bugs will only become visible when you use rtl-reshaper)
