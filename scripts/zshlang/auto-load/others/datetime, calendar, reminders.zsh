@@ -136,7 +136,68 @@ function datej-day() {
     jalalicli today --jalali-format='d' "$@"
 }
 ##
-function remj() {
+function date-unix-to-3339 {
+    local date_unix="$1"
+
+    gdate -d "@${date_unix}" --rfc-3339=s
+}
+reify date-unix-to-3339
+
+function h-unix-allday-p {
+    #: sees if the unix timestamp has hour:minute resolution or is only accurate to the day
+    #: [[zf:~\[jalalicli\]/jalalicli.go::pt = ptime.Date(year, ptime.Month(month), day, 12, 59, 59, 0, ptime.Iran())]]
+    #: [[NIGHTDIR:javascript/datenat.js::currentTime.setUTCHours(9,29,59,0)]]
+    ##
+    time_start='' #: @globalOut
+    time_end='' #: @globalOut
+
+    local date_unix="$1" verbose="${h_unix_allday_p_v:-y}"
+    local date_nat="${reminday_store_date_nat}"
+
+    local time
+    time="$(gdate --utc -d "@${date_unix}" '+%H:%M:%S')" @TRET
+    # typ time
+
+    local res
+    if test -z "$date_nat" ; then
+        #: @assumption The only way we could have specified the exact time is using 'remn' currently, so if no natural date provided, it should be an allday event.
+
+        res=0
+    else
+        if [[ "$time" == '09:29:59' ]] ; then
+            res=0
+        elif [[ "$time" == '08:30:00' ]] ; then
+            #: 12 PM in Iran's timezone
+            #: This is the default time of the datenat parser for days other than today.
+            if [[ "$date_nat" =~ '(?i)12(?::|\d)*\s*pm' ]] ; then
+                res=1
+            else
+                res=0
+            fi
+        else
+            res=1
+        fi
+    fi
+
+    if (( res == 1 )) ; then
+        time_start="$(gdate -d "@${date_unix}" '+%H:%M')" @TRET
+
+
+        if test -n "${gcal_dur}" ; then
+            duration="$(gcal_allday="n" h-gcal-dur-preprocess "$gcal_dur")" @TRET
+            duration=$(( duration * 60 )) #: converted duration from min to sec
+            time_end="$(gdate -d "@$((date_unix + duration))" '+%H:%M')" @TRET
+        fi
+
+        if bool "$verbose" ; then
+            ecgray "target time: ${time_start}" || true
+        fi
+    fi
+
+    return $res
+}
+##
+function remj {
     (($+commands[jalalicli])) || {
         ecerr "$0: jalalicli not found."
         return 1
@@ -182,94 +243,185 @@ function remj() {
     fi
     local target_date_unix
     target_date_unix="$(jalalicli togregorian "$target_date" -g unix -y "$Y" -m "$M" -d "$D")" || return $?
-    target_date="$(jalalicli tojalali "$target_date_unix" -g 'unix')" || return $?
-    local gdate="$(jalalicli togregorian "$target_date" -g 'Mon 2006_01_02')"
-    local dest="$remindayDir/$target_date $gdate"
-    @opts datej "$target_date" @ reminday_store "$dest" "$text"
+
+    @opts \
+        date_unix "${target_date_unix}" \
+        @ reminday-store-unix "$text"
 }
-function reminday_store() {
+
+function reminday-store-unix {
+    local opts=("$@") #: should only include 1 arg for 'text'
+    local target_date_unix="${reminday_store_date_unix}"
+    assert-args target_date_unix @RET
+    local date_nat="${reminday_store_date_nat}"
+
+    target_date="$(jalalicli tojalali "$target_date_unix" -g 'unix')" || return $?
+    local dateg="$(jalalicli togregorian "$target_date" -g 'Mon 2006_01_02')"
+    local dest="${remindayDir}/${target_date} ${dateg}"
+    @opts \
+        datej "$target_date" \
+        dateg "$dateg" \
+        date_unix "${target_date_unix}" \
+        @ reminday_store "$dest" "${opts[@]}"
+}
+@opts-setprefix reminday-store-unix reminday_store
+
+function reminday_store {
     unset rem_dest
-    local dest="${1}" text="$(trim "$2")" nosync="${reminday_store_nosync}" ext="${reminday_store_ext:-.md}" datej="${reminday_store_datej}"
+    local dest="${1}"
+    local text
+    text="$(trim "$2")" @TRET
+    local text_timed="${text}"
+    local filesystem_backend_p="${reminday_store_fs_p:-y}"
+    local nosync="${reminday_store_nosync}" ext="${reminday_store_ext:-.md}"
+    local date_unix="${reminday_store_date_unix}"
+    local datej="${reminday_store_datej}"
+    local dateg="${reminday_store_dateg}"
 
-    if [[ "$ext" != .* ]] ; then
-        ext=".$ext"
-    fi
-
-    test -z "$dest" && return 1
     test -z "$text" && return 1
 
-    dest="${dest}${ext}"
-    ensure-dir "$dest" || return 1
-    ec "$text" >> $dest || return $?
+    local allday time_start='' time_end=''
+    if reminday_store_date_nat="${date_nat}" h-unix-allday-p "${date_unix}" ; then
+        allday=y
+    else
+        allday=n
+
+        text_timed="${text} ${time_start}"
+        if test -n "${time_end}" ; then
+            text_timed+="->${time_end}"
+            #: alternative unicode symbols:
+            # ➡
+            # →
+            # →
+            # ⟶
+            # ⟾
+            # ↝
+            # ⇒
+            # ➙
+            # ...
+        fi
+    fi
+
+    if bool "${filesystem_backend_p}" ; then
+        if [[ "$ext" != .* ]] ; then
+            ext=".$ext"
+        fi
+
+        test -z "$dest" && return 1
+
+        dest="${dest}${ext}"
+        ensure-dir "$dest" || return 1
+        ec "${text_timed}" >> $dest || return $?
+    fi
     ##
     ecgray "now: $(datej-all-long-time)"
 
     if test -n "$datej" ; then
         Bold ; color 100 255 200 "$(@opts mode 1 @ datej-all "$datej")" ; resetcolor
     fi
-    ecn "$dest : " ; Bold ; color 100 200 255 "$text" ; resetcolor
+    if bool "${filesystem_backend_p}" ; then
+        ecn "$dest : " ; Bold ; color 100 200 255 "$text" ; resetcolor
+    fi
     ##
-    rem-sync
-    rem_dest="$dest"
+    @opts \
+        title "ϟ $text" \
+        when "@${date_unix}" \
+        allday "$allday" \
+        @ gcal-add @STRUE
+    # desc "added by reminday" \
+        ##
+    if bool "${filesystem_backend_p}" ; then
+        rem-sync
+        rem_dest="$dest"
+    fi
 }
 ##
-function datenat() {
-    datenat.js "$@"
+function datenat {
+    datenat.js "$*"
 }
 aliasfn datenat-future datenat_nopast=y datenat
-function datenatj() {
-    : "GLOBAL OUT: datenatj_date datenatj_datej"
+aliasfn datenat-unix datenat_unix=y datenat
+aliasfn datenat-future-unix datenat_nopast=y datenat_unix=y datenat
 
+function datenatj {
+    : "GLOBAL OUT: datenatj_unix datenatj_date datenatj_datej"
+
+    unset datenatj_unix
     unset datenatj_date
     unset datenatj_datej
     local natdate="$*"
 
-    local gdate
-    gdate="$(datenat $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
-    datenatj_date="$gdate"
-    datenatj_datej="$(jalalicli tojalali "$gdate")"
+    datenatj_unix="$(datenat_unix=y datenat $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
+    datenatj_datej="$(jalalicli tojalali "$datenatj_unix" -g 'unix')" || return $?
+    datenatj_date="$(jalalicli togregorian "$datenatj_datej" -g 'Mon 2006_01_02')"
     ecn "$datenatj_datej"
 }
 aliasfn datenatj-future datenat_nopast=y datenatj
-function datenat-full1() {
+
+function datenat-full1 {
     # Used in 'remn'
     local natdate="$*"
 
     local jdate
     sout datenatj "$natdate" || return 1
     jdate="$datenatj_datej" # OUT: datenatj_datej is used in 'remn'
-    local gdate="$(gdate --date "$datenatj_date" +'%a %Y_%m_%d')"
+    local gdate="$(gdate --date "@${datenatj_unix}" +'%a %Y_%m_%d')"
     ec "$jdate $gdate"
 }
 aliasfn datenat-full1-future datenat_nopast=y datenat-full1
-function datenat-full2() {
+
+function datenat-full2 {
     local natdate="$*"
 
     local jdate
     sout datenatj "$natdate" || return 1
     jdate="$datenatj_datej"
+    date_unix="$datenatj_unix"
 
-    @opts mode 1 @ datej-all "$jdate"
+    local datej_all time
+    datej_all="$(@opts mode 1 @ datej-all "$jdate")" @TRET
+    time="$(gdate --date "@${datenatj_unix}" +"%H:%M:%S")" @TRET
+    ec "${datej_all} ${time}"
 }
 aliasfn datenat-full2-future datenat_nopast=y datenat-full2
+
+function h-datenatj-rem-summary {
+    local natdate="$*"
+
+    local jdate
+    sout datenatj "$natdate" || return 1
+    jdate="$datenatj_datej"
+    local gdate="$(gdate --date "@${datenatj_unix}" +'%a')"
+    ec "$gdate ${jdate#14*/}"
+}
 ##
 function remn {
     local text="$1" natdate="${@:2}"
+    local -x datenat_hardcode_time=y
     [[ "$text" == '-' ]] && text="$(</dev/stdin)"
-    local dest
-    dest="$remindayDir/$(datenat-full1-future "$natdate")" || return $?
-    @opts datej "$(datenatj-future "$natdate")" @ reminday_store "$dest" "$text"
+
+    @opts \
+        date_unix "$(datenat-future-unix "$natdate")" \
+        date_nat "$natdate" \
+        @ reminday-store-unix "$text"
 }
 
 function remn-interactive {
     local text="$*"
+
+    local -x datenat_hardcode_time=y
     
     local natdate=""
     # @warn brishz.dash does not quote its arguments, so we essentially have an @unsafeEval here. I think it's worth the speed boost, though I have noot profiled it.
-    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash reval-true serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
+    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long-time ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash reval-true serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
     remn "$text" "$natdate"
 }
-aliasfn ri remn-interactive
+aliasfn ri reminday_store_nosync=y remn-interactive
+
+function gcal-add-interactive {
+    reminday_store_nosync=y reminday_store_fs_p=n remn-interactive "$@"
+}
+@opts-setprefix gcal-add-interactive gcal
 ##
 function rem-todaypaths() {
     unset today
@@ -333,12 +485,7 @@ function rem-today {
                 text+=$'\n\n'"$(<$f)" #"${$(<$f ; ec .)[1,-2]}"
             fi
             if test -n "$deleteMode" ; then
-                bak="$(rem_extract-date-path "$f")"
-                bak="${remindayBakDir}/$bak"
-                if [[ "$ext" == zsh ]] ; then
-                    bak+=".bak"
-                fi
-                serr append-f2f "$f" "$bak" && command rm "$f" #: not deleting if the source is the same as the dest
+                rem-trs "$f"
             fi
         fi
     done
@@ -347,10 +494,32 @@ function rem-today {
     trim "$text"
 }
 
-function rem-today-d() {
-    local day="${1:-1}"
-    fnrep datej "datenatj-future $day day later" rem-today
+function rem-trs {
+    local fs=($@)
+
+    local f
+    for f in "${fs[@]}" ; do
+        bak="$(rem_extract-date-path "$f")"
+        bak="${remindayBakDir}/$bak"
+        if [[ "$ext" == zsh ]] ; then
+            bak+=".bak"
+        fi
+        revaldbg serr append-f2f "$f" "$bak" && revaldbg silent trs-rm "$f" #: not deleting if the source is the same as the dest
+    done
 }
+
+function rem-today-d {
+    local day="${1:-1}"
+    fnrep datej "datej-daylater '$day'" rem-today
+}
+
+function datej-daylater {
+    local day="${1:-1}"
+
+    datenatj-future "$day" day later
+    #: datenatj doesn't work with negative values, so we might as well use datenatj-future
+}
+
 function rem-today-notify() {
     ensure-dir ~/logs/
     {
