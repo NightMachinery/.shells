@@ -1,5 +1,9 @@
 ##
-function jfic() {
+function fanficfare-m {
+    $proxyenv fanficfare --non-interactive -f mobi "$@"
+}
+
+function jfic {
     jee
 
     local i
@@ -41,6 +45,12 @@ function ficwad {
     ##
 }
 ##
+function fichub {
+    local url="$1"
+
+    $proxyenv reval-ec fichub_cli --format mobi --url "$url"
+}
+
 function jfichub {
     jee
 
