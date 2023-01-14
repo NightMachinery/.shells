@@ -586,25 +586,28 @@ hs.hotkey.bind(hyper, "i", function()
                  input_lang_push_lang = nil
 end)
 ---
+function toggleFocus(appName)
+  local app = hs.application.get(appName)
+
+  if app then
+    if app:isFrontmost() then
+      app:hide()
+    else
+      app:activate()
+    end
+  else
+    if o.launch then
+      hs.application.launchOrFocus(appName)
+      app = hs.application.get(appName)
+    end
+  end
+end
+
 function appHotkey(o)
   hs.hotkey.bind(o.modifiers or hyper, o.key, function()
-                   appName = o.appName
+                   toggleFocus(o.appName)
                    -- use `sleep 2 ; reval-copy frontapp-get ; fsay hi` to get this
 
-                   local app = hs.application.get(appName)
-
-                   if app then
-                     if app:isFrontmost() then
-                       app:hide()
-                     else
-                       app:activate()
-                     end
-                   else
-                     if o.launch then
-                       hs.application.launchOrFocus(appName)
-                       app = hs.application.get(appName)
-                     end
-                   end
   end)
 end
   -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
@@ -615,7 +618,8 @@ appHotkey{ key='w', appName='com.google.Chrome' }
 
 appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 appHotkey{ key='t', appName='com.tdesktop.Telegram' }
-appHotkey{ key='e', appName='org.gnu.Emacs' }
+emacsAppName = 'org.gnu.Emacs'
+appHotkey{ key='e', appName=emacsAppName }
 appHotkey{ key='a', appName='com.adobe.Reader' }
 -- appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='b', appName='zathura' }
