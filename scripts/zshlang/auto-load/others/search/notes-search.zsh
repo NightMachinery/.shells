@@ -306,7 +306,7 @@ function ntsearch-postprocess {
         return 0
     else
         ecdbg "$0: Opening editor ..."
-        editor_open_no_wait="$no_wait" editor_open_f=("$files[@]") editor_open_l=("${linenumbers[@]}") editor-open
+        editor_open_no_wait="$no_wait" editor_open_f=("$files[@]") editor_open_l=("${linenumbers[@]}") editor-open-adv
     fi
 }
 ##
