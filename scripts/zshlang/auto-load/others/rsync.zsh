@@ -48,8 +48,15 @@ function rsp-notes {
     local src="$1"
     src="$(realpath "$src")" @TRET
 
-    local rsync_opts=("${@[2,-1]}")
+    local rsync_opts=(
+        ## @tmp
+        --rsh="ssh -p 4300"
+        # --rsh="ssh -J walle@193.151.136.67"
+        ##
+        "${@[2,-1]}"
+    )
 
+    local lilf_ip=193.151.136.67 #: @tmp
     local dest="${rsp_dest:-${lilf_user}@${lilf_ip}:Downloads/static}"
     local pattern="${rsp_pat:-.}"
     assert-args src dest pattern @RET

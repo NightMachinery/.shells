@@ -18,7 +18,11 @@ ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
 alias ungron="gron --ungron"
 alias gis='gist --copy  --shorten'
+
 alias dbg='DEBUGME=d'
+function reval-dbg {
+    DEBUGME=d reval "$@"
+}
 ##
 # alias l='exa -a' # --oneline
 # alias ll='exa -a -l --blocks'
@@ -149,7 +153,8 @@ alias ysmall="y -f '(bestvideo[height<=800]+bestaudio/best[height<=800]/best)[pr
 alias ys="ysmall"
 # youtube-dl sometimes exits on error instead of retrying (possibly always) # aria2 will not get used for DASH
 
-alias y1080="y -f '(bestvideo[height<=1100]+bestaudio/best[height<=1100]/best)'"
+alias y1080="y -f '(bestvideo[height<=1200]+bestaudio/best[height<=1200]/best)'"
+alias yy='y1080'
 
 # ysmp4 still can output an mkv. Probably because of merging?
 alias ysmp4="y -f '(bestvideo[ext=mp4][height<=800]+bestaudio/best[ext=mp4][height<=800]/best[ext=mp4]/best)'"

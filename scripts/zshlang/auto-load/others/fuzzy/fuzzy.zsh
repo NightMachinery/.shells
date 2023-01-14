@@ -346,7 +346,7 @@ function v() {
 # vc: Visual Code
 # this opens a new window for me when the first window opened was not by itself (perhaps a macOS bug?)
 aliasfn vc code-insiders --reuse-window --add # --add: Add a folder or multiple folders to the last active VS Code instance for a multi-root workspace.
-function coder() {
+function coder {
     bella_zsh_disable1
 
     local p="$(<<<$1 sd "$HOME" /home/${lilf_user})"

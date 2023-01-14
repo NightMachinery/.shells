@@ -154,12 +154,12 @@ function vcnpp {
 
     pushf ~/
     {
-        assert reval-ec vcn-with git add ~/scripts/ @RET
+        assert reval-ec vcn-with git add "${NIGHTDIR}" @RET
         assert reval-ec vcn-with @opts noadd y @ gsync "$msg" @RET
 
         brishz-restart
 
-        # brishzr-repeat
+        # brishzr-repeat #: runs the same command on the default server
         true
     } always { popf }
 }

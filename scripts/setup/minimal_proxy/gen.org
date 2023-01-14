@@ -1,15 +1,36 @@
 #+TITLE: minimal_proxy/gen
 
 * [[https://github.com/webinstall/webi-installers][webinstall/webi-installers: Primary and community-submitted packages for webinstall.dev]]
+** brew
+#+begin_example zsh
+curl -sS https://webi.sh/brew | sh
+#+end_example
+
+Or:
+#+begin_example zsh
+tmuxnew brew-install zsh -c 'curl -sS https://webi.sh/brew | sh'
+#+end_example
+
+*** PATH
+#+begin_example zsh
+export PATH="${PATH}:${HOME}/.local/opt/brew/bin"
+#+end_example
+
+** others
 #+begin_example zsh
 curl -sS https://webi.sh/webi | sh
-#+end_example
 
-#+begin_example zsh
 curl -sS https://webi.sh/golang | sh
 curl -sS https://webi.sh/go-essentials | sh
-#+end_example
 
+curl -sS https://webi.sh/ffmpeg | sh
+
+curl -sS https://webi.sh/fd | sh
+
+curl -sS https://webi.sh/fzf | sh
+
+curl -sS https://webi.sh/jq | sh
+#+end_example
 
 * tmux
 #+begin_example zsh

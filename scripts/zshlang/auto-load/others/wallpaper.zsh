@@ -16,7 +16,7 @@ function wallpaper-overlay {
 
     (
         renice-me
-        if [[ "$overlay_rem" == y ]] && rem-enabled-p; then
+        if bool "$overlay_rem" && rem-enabled-p; then
             local t="$(gmktemp --suffix .png)"
             # https://stackoverflow.com/questions/66629425/pillow-how-to-draw-text-with-the-inverse-color-of-the-underlying-image
             local font="$Font_CourierNew_Symbola" # monospace
@@ -103,7 +103,7 @@ function wallpaper-set-darwin {
 }
 
 function wallpaper-set {
-    local f="$1" overlay_p="${wallpaer_set_overlay_p:-n}"
+    local f="$1" overlay_p="${wallpaper_set_overlay_p:-n}"
     f="$(realpath "$f")" || return $?
     ##
     local ipad=''

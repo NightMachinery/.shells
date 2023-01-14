@@ -834,6 +834,8 @@ function bell-visual-flash1() {
 aliasfn bell-image-uploaded tts-glados1-cached 'picture, uploaded'
 # aliasfn bell-image-uploaded bell-pp-attack-rotational
 ##
+bell-maker 'batman-cave-open' 'batman/PlayStation 2 - LEGO Batman - Sound Effects/BATCAVE_BIGDOOR_OPEN.wav'
+##
 bell-maker 'p2-searching' 'PC Computer - Portal 2 - Turret/turret_search_4..blue..wav'
 
 bell-maker 'p2-target-lost' 'PC Computer - Portal 2 - Turret/turret_search_2..blue..wav'
@@ -852,6 +854,8 @@ function bell-continuous {
 aliasfn bellc bell-continuous
 ##
 function bell-ddd {
+    bella_zsh_disable1
+
     if isDarwin ; then
         command say -v cello "di di di di di di di di di di di di di di di di di di di di di di di di di di"
     else
@@ -860,9 +864,21 @@ function bell-ddd {
 }
 
 function bell-pi {
+    bella_zsh_disable1
+
     if isDarwin ; then
         command say -v cello 3.14159265358979323846264
         #: 3.141592653589793
+    else
+        return 1
+    fi
+}
+##
+function bell-great-evil {
+    bella_zsh_disable1
+
+    if isDarwin ; then
+        fsay_r=140 fsay_v=Trinoids fsay "Great Evil"
     else
         return 1
     fi

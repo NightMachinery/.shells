@@ -80,11 +80,18 @@ function fd() {
 #   fi
 # }
 
-function opv {
+function open-with {
+  local app="$1" ; shift
+  assert-args app @RET
+
   in-or-args "$@" |
     inargsf grealpath -- |
-    inargsf reval-ec open -a preview --
+    inargsf reval-ec open -a "$app" --
 }
+
+aliasfn opv open-with preview
+aliasfn ops open-with Skim
+aliasfn opy open-with sioyek
 ##
 function mega-get() {
   if isBicon ; then

@@ -1,12 +1,12 @@
 ##
-function vid-fix() {
+function vid-fix {
     local i="${1:?}" o="$2"
 
     if test -z "$o" ; then
         # o="${i:r}_fixed.${i:e}"
-        o="${i:r}_fixed.${vid_fix_ext:-mkv}" # forcing mkv is better
+        o="${i:r}_fixed.${vid_fix_ext:-mp4}"
     fi
-    ffmpeg -err_detect ignore_err -i "$i" -c copy "$o"
+    reval-ec ffmpeg -err_detect ignore_err -i "$i" -c copy -movflags faststart "$o"
 }
 ##
 function merge-mp3() {
@@ -71,7 +71,7 @@ function ffmpeg-convert {
     ##
     local input="$1" crf="${2:-18}" preset="${3:-medium}"
     local encoder_family="${ffmpeg_f:-x265}"
-    local dest="${ffmpeg_o:-${1:r}_${encoder_family}.mkv}"
+    local dest="${ffmpeg_o:-${1:r}_${encoder_family}.mp4}"
     local hw_decode_p="${ffmpeg_hw_decode_p:-y}"
     #: =-hwaccel auto= enables hardware acceleration for input decoding. It might not actually help performance in my testing on Air M2.
 
@@ -102,7 +102,7 @@ function ffmpeg-convert {
         opts_input+=(-hwaccel auto)
     fi
 
-    reval-ec ffmpeg "${opts_input[@]}" -i "$input" -map 0 -c:s copy -c:v "$encoder" -crf "$crf" -c:a copy -preset "$preset" "${opts[@]}" "$dest"
+    reval-ec ffmpeg "${opts_input[@]}" -i "$input" -map 0 -c:s copy -c:v "$encoder" -crf "$crf" -c:a copy -movflags faststart -preset "$preset" "${opts[@]}" "$dest"
     # -map_metadata 0
 }
 ##

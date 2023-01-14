@@ -126,7 +126,7 @@ function rem-fz() {
 }
 aliasfn ntrem rem-fz
 aliasfn rem rem-fz
-function remd() {
+function remd {
     ## tests:
     # `fnrep datej "ec 1399/12/03" remd`
     # `fnswap isI false fnrep datej "ec 1399/12/03" remd`
@@ -194,9 +194,11 @@ function vnt() {
 function ntl-rg() {
     ntsearch_query_rg="$*" ntsearch-lines
 }
+
 function ntl-fzf() {
     ntsearch_query_fzf="$*" ntsearch-lines
 }
+
 function ntl-fzfq() {
     local query="$(fzp_ug="${fzp_ug:-ni}" fz-createquery "$@")"
 

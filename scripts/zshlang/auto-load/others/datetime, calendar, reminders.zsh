@@ -101,7 +101,9 @@ date = parse(os.environ["date"])
 print((datetime.datetime.now(date.tzinfo) - date).total_seconds())'
 }
 ##
-function date-time() { date +"%H:%M:%S" }
+function date-time {
+    gdate +"%H:%M:%S"
+}
 
 function datej-all-long-time {
     ec "$(datej-all-long) $(date-time)"
@@ -281,7 +283,9 @@ function rem-todaypaths() {
     today=( "$remindayBakDir/$cyear/$cmonth/$cday"*(N.) "$remindayDir/$cyear/$cmonth/$cday"*(N.) ) # backups should be first, as the normal ones get appended to them (and so can cause duplicates if they come first)
 }
 function rem_extract-date-path() {
-    local f="$(realpath "$1")"
+    local f="$1"
+    f="$(realpath "$f")" @TRET
+
     if [[ "$f" =~ '(\d\d\d\d/\d\d/\d\d.*)' ]] ; then
         ec "$match[1]"
     else
@@ -372,7 +376,7 @@ function tlg-reminday() {
     tsend --parse-mode markdown -- "$rec" "$text"
 }
 
-function rem-summary() {
+function rem-summary {
     local deleteMode="$rem_summary_delete" notifMode="$rem_summary_notif" markdownMode="${rem_summary_md}"
 
     local text="$(@opts delete "$deleteMode" @ rem-today)"
@@ -395,6 +399,7 @@ function rem-summary() {
     text+="$(prefix-if-ne $'\n\n' "$(rem-comingup)")"
     trim "$text"
 }
+
 function monthj2en() {
     local m=$(( ${1:?Month required} ))
 

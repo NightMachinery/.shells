@@ -23,6 +23,8 @@ function latex-url-escape {
 ##
 function pdflatex-m {
     local opts=("${@[1,-2]}") f="${@[-1]}"
+    assert-args f @RET
+
     typeset -A tex_vars=()
     if (( ${#latex_vars} > 0 )) ; then
         tex_vars=("${latex_vars[@]}") #: [key var] ...

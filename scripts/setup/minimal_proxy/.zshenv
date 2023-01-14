@@ -15,6 +15,7 @@ export PATH="$PATH:/usr/local/go/bin"
 export PATH="${PATH}:${GOBIN}"
 export PATH="${PATH}:${HOME}/bin"
 export PATH="${PATH}:${HOME}/.local/bin"
+export PATH="${PATH}:${HOME}/.local/opt/brew/bin"
 ###
 function retry {
     local retry_sleep="${retry_sleep:-0.1}"
