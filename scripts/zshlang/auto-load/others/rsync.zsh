@@ -29,8 +29,8 @@ function lilf-link-notes {
 }
 
 function rsp-notes-export {
-    local rsp_include
-    rsp_include=(${(@f)"$(org-export-recursive "${@}" | trim-extension)"}) @TRET
+    local rsp_include entries=("${@}")
+    rsp_include=(${(@f)"$(org-export-recursive "${entries[@]}" | trim-extension)"}) @TRET
 
     if (( ${#rsp_include} == 0 )) ; then
         ecerr "$0: no files included"
@@ -38,8 +38,10 @@ function rsp-notes-export {
     fi
 
     ec $'\n\n#####################\n\n'
+    reval-ec rsp-notes ~nt/ @RET
 
-    reval-ec rsp-notes ~nt/ --rsh="ssh -J walle@193.151.136.67"
+    ec $'\n\n#####################\n\n'
+    lilf-link-notes "${entries[@]}"
 }
 
 function rsp-notes {
