@@ -63,11 +63,11 @@ function remc-today() {
 aliasfn remc-today-d withremc rem-today-d
 aliasfn remc-comingup withremc rem-comingup
 ##
-function rem-comingup() {
+function rem-comingup {
     local out='' i pre
 
     for i in {1..31} ; do
-        pre="$i day(s) later:"
+        pre="$i day(s) later: ($(h-datenatj-rem-summary "${i} day later"))"
         # bidi chars: https://www.w3.org/International/questions/qa-bidi-unicode-controls.en
         out+="$(prefix-if-ne $'\n\n'"$pre"$'\n' "$(rem-today-d "$i" | prefixer --skip-empty -a $'\U202A''  ' --add-postfix $'\U202C')")"
     done
