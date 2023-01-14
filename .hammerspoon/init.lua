@@ -662,17 +662,31 @@ hs.window.filter.new('Acrobat Reader')
                acrobatHotkeyUp:disable()
             end)
 ---
+function bindWithRepeat(mods, key, pressedfn)
+  hs.hotkey.bind(mods, key, pressedfn, nil, pressedfn)
+end
+----
+function pressPageUp()
+  eventtap.keyStroke({}, hs.keycodes.map['pageup'])
+end
+
+bindWithRepeat(hyper, "up", pressPageUp)
+
+bindWithRepeat(hyper, "down", function()
+                 eventtap.keyStroke({}, hs.keycodes.map['pagedown'])
+end)
+
 -- You can set hyper+F5 to the dictation command in macOS settings.
 hs.hotkey.bind(hyper, "5", function()
                  brishzeval('awaysh-fast input-volume-mute-toggle')
                  -- @needed awaysh-fast
 end)
 
-hs.hotkey.bind(hyper, "F1", function()
+bindWithRepeat(hyper, "F1", function()
                  brishzeval('awaysh-fast brightness-dec')
 end)
 
-hs.hotkey.bind(hyper, "F2", function()
+bindWithRepeat(hyper, "F2", function()
                  brishzeval('awaysh-fast brightness-inc')
 end)
 
@@ -717,7 +731,7 @@ function volumeInc(v, device)
   hs.alert("vol: " .. math.floor(v + 0.5), 0.4)
 end
 
-hs.hotkey.bind(hyper, "F11", function()
+bindWithRepeat(hyper, "F11", function()
                  ---
                  -- brishzeval('awaysh-fast volume-dec')
                  ---
@@ -726,7 +740,7 @@ hs.hotkey.bind(hyper, "F11", function()
                  ---
 end)
 
-hs.hotkey.bind(hyper, "F12", function()
+bindWithRepeat(hyper, "F12", function()
                  ---
                  -- brishzeval('awaysh-fast volume-inc')
                  ---
