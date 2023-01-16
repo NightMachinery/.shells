@@ -78,16 +78,18 @@ function goiadd {
         goi "$1"
 }
 ##
-function gemi() {
+function gem-install {
     gem install "$@"
 }
-aliasfn gmi gemi
+aliasfn gemi gem-install
+aliasfn gmi gem-install
 
-function gemiadd() {
+function gem-install-add {
     ec "$1" >> "$ins_gem"
     test -n "$noi" ||
         gmi "$1"
 }
+aliasfn gemiadd gem-install-add
 aliasfn gmiadd gemiadd
 ##
 function ins-npm {

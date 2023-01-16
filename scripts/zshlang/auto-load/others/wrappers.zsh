@@ -120,8 +120,12 @@ function ssh-p() {
   fi
 }
 ##
-function pwd() {
-  builtin pwd | cat-copy-if-tty
+function pwd {
+  if isOutTty ; then
+    ecn "${PWD}/" | pbcopy || true
+  fi
+
+  builtin pwd
 }
 ##
 function titlecase {

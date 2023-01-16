@@ -13,7 +13,7 @@ function printz() {
     }
 }
 ##
-function plot-stdin() {
+function plot-stdin {
     # https://github.com/seenaburns/stag
     ##
     # ttyplot -s 20 -u '%' # mediocre, buggy
