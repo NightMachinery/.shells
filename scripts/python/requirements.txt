@@ -22,6 +22,7 @@ fire
 flake8
 gallery-dl
 gay
+gcalcli
 gensim
 git+https://github.com/NightMachinary/BrishGarden.git
 git+https://github.com/NightMachinary/brish.git

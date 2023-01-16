@@ -333,7 +333,7 @@ function reminday_store {
         Bold ; color 100 255 200 "$(@opts mode 1 @ datej-all "$datej")" ; resetcolor
     fi
     if bool "${filesystem_backend_p}" ; then
-        ecn "$dest : " ; Bold ; color 100 200 255 "$text" ; resetcolor
+        ecn "$dest : " ; Bold ; color 100 200 255 "${text_timed}" ; resetcolor
     fi
     ##
     if bool "${gcal_backend_p}" ; then

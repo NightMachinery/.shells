@@ -737,8 +737,12 @@ function h-reval-to-org-headings {
     return $ret
 }
 ##
+function org-img-unused-trs-i {
+    p org-img-unused | fz | inargsf trs
+}
+
 function org-img-unused {
-    #: @usage =p org-img-unused @ff trs=
+    #: @seeAlso [agfi:org-img-unused-trs-i]
     ##
     local fs=($@)
 
