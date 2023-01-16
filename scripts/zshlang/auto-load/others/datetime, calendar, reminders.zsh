@@ -277,10 +277,19 @@ function reminday_store {
     text="$(trim "$2")" @TRET
     local text_timed="${text}"
     local filesystem_backend_p="${reminday_store_fs_p:-y}"
+    local gcal_backend_p="${reminday_store_gcal_p}"
     local nosync="${reminday_store_nosync}" ext="${reminday_store_ext:-.md}"
     local date_unix="${reminday_store_date_unix}"
     local datej="${reminday_store_datej}"
     local dateg="${reminday_store_dateg}"
+
+    if test -z "${gcal_backend_p}" ; then
+        if isServer ; then
+            gcal_backend_p='n'
+        elif isMe ; then
+            gcal_backend_p='y'
+        fi
+    fi
 
     test -z "$text" && return 1
 
@@ -327,13 +336,15 @@ function reminday_store {
         ecn "$dest : " ; Bold ; color 100 200 255 "$text" ; resetcolor
     fi
     ##
-    @opts \
-        title "ϟ $text" \
-        when "@${date_unix}" \
-        allday "$allday" \
-        @ gcal-add @STRUE
-    # desc "added by reminday" \
-        ##
+    if bool "${gcal_backend_p}" ; then
+        @opts \
+            title "ϟ $text" \
+            when "@${date_unix}" \
+            allday "$allday" \
+            @ gcal-add @STRUE
+        # desc "added by reminday"
+    fi
+    ##
     if bool "${filesystem_backend_p}" ; then
         rem-sync
         rem_dest="$dest"
