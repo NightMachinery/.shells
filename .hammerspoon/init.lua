@@ -627,6 +627,7 @@ appHotkey{ key='b', appName='info.sioyek.sioyek' }
 appHotkey{ key='s', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
+appHotkey{ key='l', appName='com.apple.iCal' }
 
 hs.hotkey.bind(hyper, "d", function()
                  brishzeval("notif-dismiss.as")
