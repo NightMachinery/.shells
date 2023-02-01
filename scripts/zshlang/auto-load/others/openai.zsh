@@ -1,7 +1,7 @@
 ##
 function openai-complete {
     local input
-    input="$(in-or-args "$@")" @RET
+    input="$(in-or-args "${@}")" @RET
     local model="${openai_model:-text-davinci-003}"
     local temperature="${openai_temperature:-0}"
     local max_tokens="${openai_max_tokens:-256}"
@@ -35,6 +35,23 @@ function openai-complete {
         jqm "${output_path}"
 }
 @opts-setprefix openai-complete openai
+
+function davinci-text-3 {
+    openai_model='text-davinci-003' openai-complete "$@"
+}
+# @openai-complete davinci-text-3 openai
+aliasfn davinci-text davinci-text-3
+# @openai-complete davinci-text openai
+
+function davinci-code-2 {
+    openai_model='code-davinci-002' openai-complete "$@"
+}
+# @openai-complete davinci-code-2 openai
+aliasfn davinci-code davinci-code-2
+# @openai-complete davinci-code openai
+
+alias xx='\noglob davinci-text'
+alias xc='\noglob davinci-code'
 ##
 function chatgpt-postprocess {
     html2org |
