@@ -1,4 +1,10 @@
 ##
+function phone-number-ir-to-98 {
+    in-or-args "$@" |
+        sd '^0' '+98' |
+        cat-copy-if-tty
+}
+##
 function contacts-see {
     local files
     files=(
