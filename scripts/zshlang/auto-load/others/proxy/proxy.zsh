@@ -94,13 +94,13 @@ function pxify {
     pxify-command kaggle
     pxify-command unalix
     pxify-command nimble # @broken
-    # pxify-command conda
     # pxify-command go # TLS errors with genrouter
     pxify-command manga-py
     pxify-command pandoc # it needs this to download images
 
-    # pxaify-command brew # makes downloads faster
-    # pxaify-command pip # makes downloads faster
+    pxaify-command brew # makes downloads faster
+    pxaify-command pip # makes downloads faster
+    pxify-command conda
     # pxaify-command git # use git's own config
     # pxaify-command npm
     pxaify-command go

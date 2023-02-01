@@ -100,6 +100,7 @@ aliasdir mu "$music_dir"
 function path-abbrev-to-music-dir {
     in-or-args "$@" \
         | sd '/Volumes/hyper-diva/Songs/' '~mu/Songs/' \
+        | sd '/Volumes/hyper-diva/video/V' '~mu/V/' \
         | sd '/Volumes/Yellow Fruit/Music/' '~mu/' \
         | sd "$music_dir/" '~mu/' \
         | cat-copy-if-tty

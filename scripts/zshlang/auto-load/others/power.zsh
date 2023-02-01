@@ -55,7 +55,7 @@ function battery-low-power-mode-p {
 }
 
 redis-defvar powersaving_status
-powersaving_apps=(chrome Insiders bettertouch ActivityWatch) # aw-watcher aw-server iterm tmux hammersp Notion Finder scsynth java podcast Telegram
+powersaving_apps=(chrome Insiders bettertouch ActivityWatch OBS) # aw-watcher aw-server iterm tmux hammersp Notion Finder scsynth java podcast Telegram
 # seems that -SIGSTOP is useless for scsynth
 # btt starts itself up again after a minute or two (even with sudo kill)
 # emacs daemon can't handle SIGSTOP

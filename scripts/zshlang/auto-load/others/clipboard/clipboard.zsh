@@ -287,10 +287,11 @@ function iloop() {
     }
 }
 ##
-function pbpaste-transform() {
-    pbpaste | reval "$@" | pbcopy-ask
+function reval-paste-copy {
+    cat-paste-if-tty | reval "$@" | pbcopy-ask
 }
-alias pope="pbpaste-transform"
+aliasfn pbpaste-transform reval-paste-copy
+alias pope="reval-paste-copy"
 
 function pbcopy-ask() {
     in-or-args2 "$@"

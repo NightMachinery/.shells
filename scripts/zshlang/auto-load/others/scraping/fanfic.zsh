@@ -48,7 +48,7 @@ function ficwad {
 function fichub {
     local url="$1"
 
-    $proxyenv reval-ec fichub_cli --format mobi --url "$url"
+    reval-true command yes | $proxyenv reval-ec fichub_cli --format mobi --url "$url"
 }
 
 function jfichub {

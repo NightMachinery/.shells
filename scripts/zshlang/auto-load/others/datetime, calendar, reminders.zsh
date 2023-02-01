@@ -122,10 +122,11 @@ function dateshort() { date +"%b %d %H:%M:%S" }
 
 function dateshortnum() { date +"%Y/%m/%d" }
 
-function datej() {
+function datej {
     # alt: Python https://github.com/fitnr/convertdate
     # jalalim tojalali "$(dateshortnum)"
-    jalalicli today "$@"
+    jalalicli today "$@" |
+        cat-copy-if-tty
 }
 
 function datej-year() {

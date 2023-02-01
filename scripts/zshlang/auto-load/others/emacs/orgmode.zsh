@@ -738,7 +738,9 @@ function h-reval-to-org-headings {
 }
 ##
 function org-img-unused-trs-i {
-    p org-img-unused | fz | inargsf trs
+    in-or-args "$@" |
+        inargsf org-img-unused |
+        fz | inargsf trs
 }
 
 function org-img-unused {
