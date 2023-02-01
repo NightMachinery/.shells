@@ -40,20 +40,24 @@ function h_luna-advanced-bell {
     setopt localtraps
     # So I don't understand these all that well, but here is my guess:
     trap "" INT # disables INT handling in this function, so we don't quit by INT
+
+    local signal1="$(luna_signal1_get)"
+    luna_signal1_del
+    local skipped="${$(luna_skipped_get):-0}"
+    local res
+    res=$(( skipped + 1 )) || ectrace
+    assert luna_skipped_set "$res"
+
     (
-        local signal1="$(luna_signal1_get)"
-        luna_signal1_del
-        local skipped="${$(luna_skipped_get):-0}"
-        local res
-        res=$(( skipped + 1 )) || ectrace
-        assert luna_skipped_set "$res"
-
-        display-gray-on
-
-
         local bell_awaysh=no hear_loudidle=no i
         if sharif-vc-is ; then
-            if false ; then
+            display-gray-on
+
+            if true ; then
+                if (( skipped >= 1 )) ; then
+                    alert_dur=0.5 alert "LUNA/skip: ${skipped}"
+                fi
+            else
                 if (( skipped >= 1 )) ; then
                     tts-gateway "CRITICAL: You are at your ${skipped}th skip"
                 fi
@@ -61,8 +65,17 @@ function h_luna-advanced-bell {
                 sleep 10 #: keeps screen gray
             fi
         elif true ; then
+            if (( skipped >= 1 )) ; then
+                display-gray-on-v1
+                sleep 2 #: to wait for the macOS popup to fade
+                alert_dur=4 alert "LUNA/skip: ${skipped}"
+            else
+                display-gray-on
+            fi
+
             sleep 180
         else
+            display-gray-on
             sleep 20 #: gives us time to finish our work or cancel the alarms
 
             if (( skipped >= 1 )) ; then
@@ -93,6 +106,9 @@ function h_luna-advanced-bell {
     # 25  1:23.87 total
     # each is about 3.5s
 
+
+
+    display-gray-off-v1
     display-gray-off
     luna_skipped_set 0
     ecdate "Luna iterated."
@@ -161,6 +177,7 @@ function lunaquit {
     loop-startover ~/tmp/.luna "$@" @TRET
 
     if bool $gray ; then
+        display-gray-off-v1
         display-gray-off
     fi
 
