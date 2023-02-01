@@ -125,22 +125,24 @@ function sharif-dep-save-all() {
     return $ret
 }
 
-function sharif-dep-git-update() {
-    sharif-login
+function sharif-dep-git-update {
+    assert sharif-login @RET
 
     pushf "$sharif_dir" || return $?
     {
-        sharif-dep-save-all
-        git add --all
+        { sharif-dep-save-all | rtl-reshaper-streaming } @TRET
+        git add --all @TRET
         if test -n "$(git status --porcelain)" ; then
-            local timestamp="$(jalalicli today -j 'yyyy/MM/dd HH:mm:ss')"
-            dirindex_gen.py --skipmod --filter '*.html'
-            git commit -a -m "Updated at: $timestamp" || return $?
+            local timestamp
+            timestamp="$(jalalicli today -j 'yyyy/MM/dd HH:mm:ss')" @TRET
+            dirindex_gen.py --skipmod --filter '*.html' @TRET
+            git commit -a -m "Updated at: $timestamp" @TRET
         fi
-        git push --set-upstream origin master
+        git push --set-upstream origin master @TRET
     } always { popf }
 }
-function sharif-dep-update-continuous() {
+
+function sharif-dep-update-continuous {
     local sleep="${1:-600}"
 
     local m s
@@ -240,13 +242,19 @@ function sharif-login {
                 ec login successful
                 break
             else
-                if (( retries <= 20 )) ; then
-                    continue
+                if ask 'retry?' ; then
+                        continue
                 else
-                    retries=0
-                    reval-ecdate sleep-neon 900
-                    continue
+                    return 1
                 fi
+
+                # if (( retries <= 20 )) ; then
+                #     continue
+                # else
+                #     retries=0
+                #     reval-ecdate sleep-neon 900
+                #     continue
+                # fi
             fi
         done
     } always {
