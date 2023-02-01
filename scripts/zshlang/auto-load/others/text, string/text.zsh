@@ -102,10 +102,11 @@ function newline2space {
     cat-paste-if-tty |
         perl -CS -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ;
         s/^\h+//g if $. == 1 ;
- s/\x{2}//g ; s/\R\s*/ /g ; s/\h+/ /g' |
+ s/\x{2}//g ; s/\R\s*/ /g ; s/\h+/ /g ; s/(*plb:\w)-\h//g' |
         cat-copy-if-tty
 
     #: =\x{2}= is the ASCII character two, which in emacs shows as =^B= and can be inserted using [kbd:C-q C-b].
+    #: =(*plb:\w)-\h= changes, e.g., =com- ponent= to =component=
 }
 
 function p-newline2space {

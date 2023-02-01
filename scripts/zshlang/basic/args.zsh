@@ -26,12 +26,23 @@ function in-or-args3 {
     fi
 }
 
+
+function in-or-args-pns {
+    in_or_args_pns_p=y in-or-args "$@"
+}
+
 function in-or-args {
+    local pns_p="${in_or_args_pns_p}"
+
     if (( $# )) ; then
         arrNN "$@"
     else
         if isInTty ; then
-            pbpaste
+            if bool "$pns_p" ; then
+                p-newline2space
+            else
+                pbpaste
+            fi
         else
             ##
             #: @idk why we ever used this  ¯\_(ツ)_/¯
