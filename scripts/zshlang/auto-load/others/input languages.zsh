@@ -4,7 +4,16 @@
 export persian_exc_chars="ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپوؤئيإأآة»«؛كٓژٰ‌ٔء؟٬٫﷼٪×،ـ۱۲۳۴۵۶۷۸۹۰"
 export persian_chars="ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو.ًٌٍَُِّْ][}{|ؤئيإأآة»«:؛كٓژٰ‌ٔء<>؟٬٫﷼٪×،)(ـ۱۲۳۴۵۶۷۸۹۰"
 export en_chars="qwertyuiop[]asdfghjkl;'zxcvbnm,.QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?@#\$%^&()_1234567890"
+
+export persian_digits='۰۱۲۳۴۵۶۷۸۹'
+export en_digits='0123456789'
 ##
+function per2en-digits {
+    in-or-args "$@" |
+        gsed "y/$persian_digits/$en_digits/" |
+        cat-copy-if-tty
+}
+
 function per2en {
     in-or-args "$@" |
         gsed "y/$persian_chars/$en_chars/" |
