@@ -137,7 +137,7 @@ function enh-urlfinal {
     }
 }
 ##
-function paste-after() { # paste
+function paste-after { # paste
     pbpaste-plus # outputs in `paste`
     if test -n "$paste[*]" ; then
         @opts e geval @ reval-env "$@" "$paste[@]"
@@ -155,6 +155,19 @@ function p {
         paste-after "$@"
     fi
 }
+
+
+function paste-after-trim {
+    local text
+    text="$(pbpaste | trimsed)" @TRET
+
+    if (( $#@ == 0 )) ; then
+        ec "$text"
+    else
+        @opts e geval @ reval-env "$@" "${text}"
+    fi
+}
+alias pt='paste-after-trim'
 ##
 function enh-addfinder() {
     local sel

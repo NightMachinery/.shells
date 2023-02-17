@@ -7,12 +7,12 @@ function glan() {
     glances --config ~/.glances --time 10 --theme-white --disable-webui --fs-free-space --byte --process-short-name "$@"
 }
 ##
-function fftop() {
+function fftop {
     # linux: top -p
     # darwin: top -pid
     htop -p "${(j.,.)${(@f)$(ffps "$@")}}"
 }
-aliasfn pt fftop # process-top
+# aliasfn pt fftop # process-top
 ##
 function cpu-usage-get() {
     ps -A -o %cpu | awk '{s+=$1} END {print s "%"}'
