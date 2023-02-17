@@ -8,6 +8,30 @@ function cat-copy {
 }
 alias pc='\noglob cat-copy'
 
+function cat-rtl-if-tty {
+    if isOutTty ; then
+        rtl-reshaper-fast
+    else
+        cat
+    fi
+}
+
+function cat-rtl-streaming-if-tty {
+    if isOutTty ; then
+        rtl-reshaper-streaming
+    else
+        cat
+    fi
+}
+
+function cat-copy-rtl-if-tty {
+    if isOutTty ; then
+        cat-copy | rtl-reshaper-streaming
+    else
+        cat
+    fi
+}
+
 function cat-copy-if-tty {
     if isOutTty ; then
         cat-copy
@@ -102,7 +126,7 @@ function pbpaste {
         copyq clipboard
     } || {
         (( $+commands[pbpaste] )) && command pbpaste
-    }
+    } | cat-rtl-if-tty
 }
 
 function pbpaste-html {
