@@ -2,7 +2,17 @@
 function openai-complete {
     local input
     input="$(in-or-args "${@}")" @RET
+    local input_append_p="${openai_iappend_p}"
     local model="${openai_model:-text-davinci-003}"
+    if bool "$input_append_p" ; then
+        input="${openai_last_input} ${input}"
+        model="${openai_last_model}"
+
+        ecgray "$model"$'\n''-----------'$'\n'"$input"
+    fi
+    typeset -g openai_last_input="${input}"
+    typeset -g openai_last_model="${model}"
+
     local temperature="${openai_temperature:-0}"
     local max_tokens="${openai_max_tokens:-256}"
     local output_path="${openai_output_path:-.choices[0].text}"
@@ -52,7 +62,15 @@ aliasfn davinci-code davinci-code-2
 # @openai-complete davinci-code openai
 
 alias xx='\noglob davinci-text'
+alias xz='openai_iappend_p=y \noglob openai-complete'
 alias xc='\noglob davinci-code'
+
+function openai-complete-with-prompt {
+    local prompt
+    prompt="$(reval "$@")" @TRET
+
+    davinci-text "$prompt"
+}
 ##
 function chatgpt-postprocess {
     html2org |
