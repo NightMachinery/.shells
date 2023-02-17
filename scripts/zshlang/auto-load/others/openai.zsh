@@ -32,7 +32,8 @@ function openai-complete {
 
     typeset -g openai_last_res="${res}"
     ec "$res" |
-        jqm "${output_path}"
+        jqm "${output_path}" |
+        cat-copy-if-tty
 }
 @opts-setprefix openai-complete openai
 

@@ -92,7 +92,7 @@ function pbcopy {
     }
 }
 
-function pbpaste() {
+function pbpaste {
     # if isKitty ; then
     #     kitty +kitten clipboard --get-clipboard
     #     return $?
