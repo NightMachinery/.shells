@@ -2,6 +2,11 @@
 # import torch.nn.functional as F
 import jax.nn as jnn
 ##
+from rich import inspect
+
+def h(x, **kwargs):
+    return inspect(x, help=True, **kwargs)
+##
 from datetime import datetime, timedelta
 import pathlib
 from pathlib import Path
