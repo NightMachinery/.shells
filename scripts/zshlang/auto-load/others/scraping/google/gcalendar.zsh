@@ -1,5 +1,7 @@
 ##
 function gcalcli-m {
+    #: `gcalcli-m --calendar feraidoonmehri@gmail.com --noauth_local_webserver list`
+    ##
     assert-args gcal_client_id gcal_client_secret @RET
 
     command gcalcli \

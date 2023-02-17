@@ -150,13 +150,14 @@ function clipboard-fz-raw() {
     res="$(<$CLIPBOARD_RECORD_FILE fzp --read0 --tac --exact --tiebreak=index --height='80%' "${opts[@]}")" @RET
 
     if test -z "$copy" ; then
-        ecn "$res" | cat-copy-if-tty
+        ecn "$res" | cat-copy-rtl-if-tty
     else
         if bool $copy ; then
             assert pbcopy "$res"
         fi
 
-        ecn "$res"
+        ecn "$res" |
+            cat-rtl-streaming-if-tty
     fi
 }
 alias cl='clipboard-fz-raw --height="100%"'

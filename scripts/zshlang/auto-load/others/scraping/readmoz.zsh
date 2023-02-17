@@ -22,7 +22,7 @@ Outputs a summary of the URL and a cleaned HTML of the webpage to stdout. Set rm
 
     cleanedhtml="$(<<<"$cleanedhtml" html-links-absolutify "$url")" @TRET
 
-    if test -z "$noSummaryMode" ; then
+    if ! bool "$noSummaryMode" ; then
         local prehtml="$(url2html "$url")"
         ec "$prehtml <hr> "
         # <p> --- </p>
