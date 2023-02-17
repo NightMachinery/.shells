@@ -88,7 +88,7 @@ function web2audio-auto {
 
     local out_m4a="${out:r}.m4a"
 
-    assert reval-ec ffmpeg -y -i "$out" "$out_m4a" @RET
+    assert reval-ec ffmpeg -loglevel warning -y -i "$out" "$out_m4a" @RET
     #: -y: Overwrite output files without asking.
     trs "$out"
 
