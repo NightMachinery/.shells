@@ -901,3 +901,7 @@ function bell-great-evil {
     fi
 }
 ##
+function bell-awaiting-commands {
+    fsay2 'Awaiting commands!'
+}
+##

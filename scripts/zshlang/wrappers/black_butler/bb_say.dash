@@ -5,5 +5,17 @@ endpoint="${BLACKBUTLER_API_ROOT:-http://127.0.0.1:${BLACKBUTLER_PORT:-7260}}/sa
 
 stdin="$(cat)"
 
-req="$(printf -- "%s " "$stdin" | jq --raw-input --slurp --null-input --compact-output 'inputs as $i | {"text": $i}')"
-printf -- "%s" "$req" | curl --fail --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
+speed="${bb_say_speed:-1.2}"
+mode="${bb_say_mode}"
+split_mode="${bb_say_split_mode:-sentence}"
+
+output_path="${bb_say_out}"
+if test -n "${output_path}" ; then
+    output_path="$(grealpath "$output_path")" || (
+        echo "failed: grealpath \"$output_path\"" >&2
+        return 1
+    )
+fi
+
+req="$(printf -- "%s " "$stdin" | jq --arg speed "$speed" --arg output_path "$output_path" --arg mode "$mode" --arg split_mode "${split_mode}" --raw-input --slurp --null-input --compact-output 'inputs as $i | {"text": $i, "mode": $mode, "split_mode": $split_mode, "speed": $speed, "output_path": $output_path}')"
+printf -- "%s" "$req" | curl --silent --fail --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint

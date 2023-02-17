@@ -1,5 +1,5 @@
 ##
-function brishgarden-boot() {
+function brishgarden-boot {
     tmuxnewsh2 BrishGarden BRISHGARDEN_DEBUGME="$BRISHGARDEN_DEBUGME" BRISHGARDEN_N="${1:-256}" brishgarden "${@[2,-1]}" # using the shell to increase max open files
     ## tests:
     # `time (parallel_jobs=0 para 'sleep 1 ; ec {}' ::: {1..100} >/dev/null)`
@@ -8,6 +8,7 @@ function brishgarden-boot() {
     # `parallel_jobs=0 time2 para 'ec ${brish_server_index}: {}' ::: {1..200}`
     ##
 }
+
 function brishgarden-count() {
     fnswap isI false ffps BRIIIII | wc -l
 }

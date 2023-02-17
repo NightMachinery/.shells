@@ -19,6 +19,8 @@ fi
 
 if isMe ; then
     ##
+    blackbutler-boot
+    ##
     if isdefined-cmd sftpgo ; then
         local sftpgo_config=''
         if isMBP ; then

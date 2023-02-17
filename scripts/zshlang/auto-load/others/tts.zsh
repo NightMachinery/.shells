@@ -82,6 +82,19 @@ function fsay {
     say -v $voice -r $rate "$@"
 }
 
+function fsay2 {
+    local text
+    text="$(in-or-args "$@")" @RET
+
+    if butler-p ; then
+        bb-say "$text"
+    elif isDarwin ; then
+        fsay "$text"
+    else
+        @NA
+    fi
+}
+
 function tts-say {
     local text="${1}" output="${2}"
     assert-args output @RET
