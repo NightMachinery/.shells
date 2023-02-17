@@ -124,7 +124,7 @@ reify url-tail
 noglobfn url-tail
 
 typeset -g url_head_regex='(?i)\b(https?:/{1,3}[^/]+[.][^/]+)'
-function url-head() {
+function url-head {
     local url="$1"
     assert-args url @RET
 
@@ -136,6 +136,12 @@ function url-head() {
 }
 reify url-head
 noglobfn url-head
+
+function url-domain {
+    in-or-args "$@" |
+    perl -lne 'm{^.*?/{1,3}(?:www\.)?([^/]+\.[^/]+)/} && print $1' |
+        cat-copy-if-tty
+}
 ##
 function url-exists() {
     local ret=1 url="$1"

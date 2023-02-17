@@ -5,7 +5,7 @@ endpoint="${BLACKBUTLER_API_ROOT:-http://127.0.0.1:${BLACKBUTLER_PORT:-7260}}/sa
 
 stdin="$(cat)"
 
-speed="${bb_say_speed:-1.2}"
+speed="${bb_say_speed:-1.12}"
 mode="${bb_say_mode}"
 split_mode="${bb_say_split_mode:-sentence}"
 

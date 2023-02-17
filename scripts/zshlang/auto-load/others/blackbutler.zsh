@@ -46,6 +46,16 @@ function h-web2audio-fetch {
     cat "$plain_tmp"
 }
 
+function bb-text2audio {
+    local out="$1" #: output_path
+
+    perl -lpe 's/\bAI\b/Artificial Intelligence/g' |
+        bb_say_split_mode="${bb_say_split_mode:-sentence}" \
+            bb_say_speed="${bb_say_speed:-1}" \
+            bb_say_out="${out}" \
+            bb-say
+}
+
 function bb-web2audio {
     local out="$1" #: output_path
     shift @RET
@@ -56,9 +66,33 @@ function bb-web2audio {
     text="$(reval-memoi h-web2audio-fetch "${urls[@]}")" @TRET
 
     ec "$text" |
-        bb_say_split_mode="${bb_say_split_mode:-sentence}" \
-        bb_say_speed="${bb_say_speed:-1}" \
-            bb_say_out="${out}" \
-            bb-say
+        bb-text2audio "$out"
 }
+
+function web2audio-auto {
+    local urls=($@)
+    assert-args urls @RET
+
+    local title
+    title="$(reval-memoi url-title "${urls[1]}")" @TRET
+    title="$(ec "$title" | str2filename)" @TRET
+
+    local domain
+    domain="$(url-domain "${urls[1]}")" @TRET
+
+    local out
+    out="${podcast_dir}/web2audio/${domain}/${title}.wav"
+    assert ensure-dir "$out" @RET
+
+    assert reval-ec bb-web2audio "$out" "${urls[@]}" @RET
+
+    local out_m4a="${out:r}.m4a"
+
+    assert reval-ec ffmpeg -y -i "$out" "$out_m4a" @RET
+    #: -y: Overwrite output files without asking.
+    trs "$out"
+
+    ecgray "out_m4a:"$'\n\t'"$out_m4a"
+}
+alias w2a='\noglob web2audio-auto'
 ##

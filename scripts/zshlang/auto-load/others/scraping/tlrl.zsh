@@ -23,7 +23,7 @@ function tlrl-gh() {
     tlrl-ng -e w2e-gh -p "[$(url-tailf "$1")] " "$@"
 }
 
-function tlrl-ng() {
+function tlrl-ng {
     mdoc "Usage: $0 [OPTIONS] <url> ...
 Description: Automatically infers the title and the author from the first URL, and feeds all URLs into 'w2e'.
 Options:
