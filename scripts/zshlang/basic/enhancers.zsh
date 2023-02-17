@@ -123,7 +123,7 @@ function renog() {
     done
 }
 ##
-function enh-urlfinal() {
+function enh-urlfinal {
     doc "Run urlfinalg on args on the given function automatically."
 
     test -n "$functions[$1]" || { ecerr "Function '$1' is empty or doesn't exist." ; return 1 }
