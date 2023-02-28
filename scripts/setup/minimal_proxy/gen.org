@@ -1,6 +1,10 @@
 #+TITLE: minimal_proxy/gen
 
 * [[https://github.com/webinstall/webi-installers][webinstall/webi-installers: Primary and community-submitted packages for webinstall.dev]]
+#+begin_example zsh
+source ~/.config/envman/PATH.env
+#+end_example
+
 ** brew
 #+begin_example zsh
 curl -sS https://webi.sh/brew | sh
@@ -30,6 +34,8 @@ curl -sS https://webi.sh/fd | sh
 curl -sS https://webi.sh/fzf | sh
 
 curl -sS https://webi.sh/jq | sh
+
+# curl -sS https://webi.sh/docker | sh # NA
 #+end_example
 
 * tmux

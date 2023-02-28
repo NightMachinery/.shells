@@ -61,7 +61,16 @@ function davinci-code-2 {
 aliasfn davinci-code davinci-code-2
 # @openai-complete davinci-code openai
 
-alias xx='\noglob davinci-text'
+function davinci-text-i {
+    local input
+    input="$(in-or-args "$@")" @RET
+
+    pbcopy "$input" @STRUE
+
+    davinci-text "$input" @RET
+}
+
+alias xx='\noglob davinci-text-i'
 alias xz='openai_iappend_p=y \noglob openai-complete'
 alias xc='\noglob davinci-code'
 

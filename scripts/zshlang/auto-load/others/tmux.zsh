@@ -137,7 +137,7 @@ function ivy-self() {
     tmux new-session -s ivy -d 'zsh'
     tmux send-keys "muc " # 'mu' could also download, but it needs to be updated
     tmux split-window -h  'zsh'
-    tmux send-keys "lunas
+    tmux send-keys " lunas
 "
     tmux split-window -v 'zsh'
     # tmux split-window -v 'salice.py'

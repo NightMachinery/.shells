@@ -49,7 +49,8 @@ function h-web2audio-fetch {
 function bb-text2audio {
     local out="$1" #: output_path
 
-    perl -lpe 's/\bAI\b/Artificial Intelligence/g' |
+    perl -lpe 's/\bAI(s?)\b/Artificial Intelligence$1/g &&
+s/\bXiao\h+An\b/Little Anne/g' |
         bb_say_split_mode="${bb_say_split_mode:-sentence}" \
             bb_say_speed="${bb_say_speed:-1}" \
             bb_say_out="${out}" \
@@ -80,19 +81,24 @@ function web2audio-auto {
     local domain
     domain="$(url-domain "${urls[1]}")" @TRET
 
+    local format="${web2audio_auto_format:-mp3}"
     local out
-    out="${podcast_dir}/web2audio/${domain}/${title}.wav"
+    out="${podcast_dir}/web2audio/${domain}/${title}.${format}"
     assert ensure-dir "$out" @RET
 
     assert reval-ec bb-web2audio "$out" "${urls[@]}" @RET
 
-    local out_m4a="${out:r}.m4a"
+    if [[ "$out" =~ '\.wav$' ]] ; then
+        local out_m4a="${out:r}.m4a"
 
-    assert reval-ec ffmpeg -loglevel warning -y -i "$out" "$out_m4a" @RET
-    #: -y: Overwrite output files without asking.
-    trs "$out"
+        assert reval-ec ffmpeg -loglevel warning -y -i "$out" "$out_m4a" @RET
+        #: -y: Overwrite output files without asking.
+        trs "$out"
 
-    ecgray "out_m4a:"$'\n\t'"$out_m4a"
+        ecgray "out_m4a:"$'\n\t'"$out_m4a"
+    else
+        ecgray "out:"$'\n\t'"$out"
+    fi
 }
-alias w2a='\noglob web2audio-auto'
+alias w2a='\noglob transformer lw2gw web2audio-auto'
 ##

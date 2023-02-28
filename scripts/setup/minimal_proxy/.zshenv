@@ -9,6 +9,8 @@ setopt interactivecomments
 export VISUAL="vim"
 export EDITOR="${VISUAL}"
 ##
+source ~/.config/envman/PATH.env
+
 export GOPATH="$HOME/go"
 export GOBIN="$GOPATH/bin"
 export PATH="$PATH:/usr/local/go/bin"
