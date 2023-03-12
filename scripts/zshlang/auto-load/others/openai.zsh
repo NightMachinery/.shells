@@ -51,7 +51,9 @@ function davinci-text-3 {
     openai_model='text-davinci-003' openai-complete "$@"
 }
 # @openai-complete davinci-text-3 openai
+
 aliasfn davinci-text davinci-text-3
+# aliasfn davinci-text gpt-3.5-turbo
 # @openai-complete davinci-text openai
 
 function davinci-code-2 {
@@ -87,3 +89,43 @@ function chatgpt-postprocess {
         cat-copy-if-tty
 }
 ##
+function openai-chatgpt {
+    #: @doing
+
+    local input
+    input="$(in-or-args "${@}")" @RET
+    local input_append_p="${openai_iappend_p}"
+    local model="${openai_model:-gpt-3.5-turbo}"
+
+    local temperature="${openai_temperature:-0}"
+    local max_tokens="${openai_max_tokens:-256}"
+    local output_path="${openai_output_path:-.choices[0].text}"
+    local api_key="${openai_api_key}"
+    assert-args api_key @RET
+
+    local opts=()
+
+    local req
+    req="$(printf -- "%s " "$input" |
+                  jq --raw-input --slurp --null-input --compact-output --arg model "$model" --arg temperature "$temperature" --arg max_tokens "$max_tokens" 'inputs as $i | {"model": $model, "prompt": $i, "temperature": ($temperature|tonumber), "max_tokens": ($max_tokens|tonumber)}')" @TRET
+
+    if isDbg ; then
+        ec "$req" | jq .
+    else
+        opts+=('--silent')
+    fi
+
+    local res
+    res="$(revaldbg curl --fail-with-body \
+        --header 'Content-Type: application/json' \
+        --header "Authorization: Bearer ${api_key}" \
+        --request POST \
+        --data "$req" \
+        "${opts[@]}" \
+        "https://api.openai.com/v1/completions")" @TRET
+
+    typeset -g openai_last_res="${res}"
+    ec "$res" |
+        jqm "${output_path}" |
+        cat-copy-if-tty
+}

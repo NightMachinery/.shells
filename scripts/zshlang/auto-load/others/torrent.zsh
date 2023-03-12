@@ -14,7 +14,7 @@ function torrent2magnet() {
 }
 alifn t2m=torrent2magnet
 function magnet2torrent() {
-    aria2c -d "${2:-.}" --bt-metadata-only=true --bt-save-metadata=true "$(hash2magnet "$1")"
+    reval-ec aria2c -d "${2:-.}" --bt-metadata-only=true --bt-save-metadata=true "$(hash2magnet "$1")"
 }
 alifn m2t=magnet2torrent
 hash2magnet() {

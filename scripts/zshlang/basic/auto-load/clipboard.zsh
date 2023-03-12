@@ -8,6 +8,17 @@ function cat-copy {
 }
 alias pc='\noglob cat-copy'
 
+function cat-copy-as-file {
+    local suffix="${1}"
+
+    local tmp
+    tmp="$(gmktemp --suffix="$suffix")" @TRET
+
+    cat-copy > "$tmp" @RET
+
+    reval-ec pbadd "$tmp"
+}
+
 function cat-rtl-if-tty {
     if isOutTty ; then
         rtl-reshaper-fast
