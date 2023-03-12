@@ -52,13 +52,13 @@ function rsp-notes {
 
     local rsync_opts=(
         ## @tmp
-        --rsh="ssh -p 4300"
+        --rsh="ssh -p 4300 -vvv"
         # --rsh="ssh -J walle@193.151.136.67"
         ##
         "${@[2,-1]}"
     )
 
-    local lilf_ip=193.151.136.67 #: @tmp
+    # local lilf_ip=193.151.136.67 #: @tmp
     local dest="${rsp_dest:-${lilf_user}@${lilf_ip}:Downloads/static}"
     local pattern="${rsp_pat:-.}"
     assert-args src dest pattern @RET

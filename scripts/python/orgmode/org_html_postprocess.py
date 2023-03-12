@@ -17,7 +17,7 @@ soup = BeautifulSoup(html, features='lxml')
 
 at_re = re.compile(r'''(?:(?<=\s)|(?<=^))(@(?:\w|/|\d|[][(),.;'])+)(?=\s|$)''')
 
-for n in soup.find_all(text=at_re):
+for n in soup.find_all(string=at_re): #: =string= used to be =text=
     parent = n.parent
 
     # ic(type(n), n, parent)
