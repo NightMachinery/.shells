@@ -585,7 +585,7 @@ function rem-summary {
     trim "$text"
 }
 
-function monthj2en() {
+function monthj2en {
     local m=$(( ${1:?Month required} ))
 
     case "$m" in

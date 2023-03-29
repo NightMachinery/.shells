@@ -22,18 +22,7 @@ if isMe ; then
     blackbutler-boot
     ##
     if isdefined-cmd sftpgo ; then
-        local sftpgo_config=''
-        if isMBP ; then
-            sftpgo_config="$NIGHTDIR/launchers/sftpgo/MBP.json"
-        elif isMB2 ; then
-            sftpgo_config="$NIGHTDIR/launchers/sftpgo/MB2.json"
-        fi
-
-        if test -n "$sftpgo_config" ; then
-            tmuxnewsh2 sftpgo_shared reval-notifexit sftpgo serve --config-file "$sftpgo_config" --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log
-        fi
-
-        # tmuxnewsh2 shared_sftpgo indir ~/Base/keys/sftpgo sftpgo portable -d ~/Base/shared --permissions '*' --username "$SFTPGO_USER1" --password "$SFTPGO_PASS1" --webdav-port 8114 --sftpd-port 8115 --ftpd-port 8116 --log-verbose --log-file-path sftpgo.log --advertise-service
+        sftpgo-boot || true
     fi
     ##
     # tmuxnewsh2 shared_smb loop reval-notifexit sudo /usr/sbin/smbd -no-symlinks false -stdout -debug

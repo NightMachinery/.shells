@@ -257,3 +257,9 @@ function str-bad-characters-rm {
         cat-copy-if-tty
 }
 ##
+function bullets-to-dash {
+    in-or-args "$@" |
+    sd '•' '-' |
+        cat-copy-if-tty
+}
+##

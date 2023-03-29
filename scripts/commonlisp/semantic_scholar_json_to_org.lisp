@@ -2,7 +2,10 @@
 
 (defparameter citations_count_key "citationCount")
 (defparameter references_count_key "referenceCount")
-(defparameter date_key "date")
+(defparameter date_key
+  ;; "date"
+  "publicationDate"
+  )
 ;; (defparameter year_key "year")
 (defparameter authors_names_key "authors_names")
 (defparameter topics_key "fieldsOfStudy")
@@ -63,11 +66,13 @@
                (rget "(\\d{4})" date)
                (v0 "year")))
             (month
-              (rget "([a-zA-Z]+)" date)))
+              (or (rget "([a-zA-Z]+)" date)
+                  (month-number-to-name (rget "\\d{4}-(\\d{2})" date)))))
        (listify-if-not
         (when year
           (let ((tag (concat "@" year)))
-            (if month
+            (if (and month
+                     (not (string= month "")))
                 (concat tag "/" month)
                 tag))))))
     (t (json-get d key))))
@@ -88,9 +93,9 @@
       ((out_stream *standard-output*))
     (let ((accessor #'v)
           (keys (list
+                 "paperId"
                  "arxiv"
                  date_key
-                 "year"
                  citations_count_key
                  "influentialCitationCount"
                  references_count_key
@@ -98,11 +103,14 @@
                  "journal_name"
                  authors_names_key
                  "links"
+                 "openAccessPdf"
                  "pdf_urls"
                  "doi"
                  topics_key
                  "isOpenAccess"
-                 "corpusID")))
+                 "corpusID"
+                 "year"
+                 )))
       (org-properties-write
        :keys keys
        :accessor accessor

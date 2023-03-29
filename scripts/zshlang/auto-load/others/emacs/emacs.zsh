@@ -18,12 +18,18 @@ function doom-sync() {
     doom sync "$@"
 }
 ##
-function emcpe() {
+function emcpe {
     bella_zsh_disable1
     local fz_opts=( $fz_opts[@] -1 )
     # ffkill -SIGUSR2 \'emacs \'daemon
-    ffkill -SIGUSR2 emacs daemon '!alt'
-    emacsclient -e '(setq debug-on-quit nil)'
+    if emc-gui-p ; then
+        ffkill -SIGUSR2 'Emacs.app/Contents/MacOS/Emacs' '!daemon' '!batch' '!zsh' '!alt'
+    else
+        ffkill -SIGUSR2 emacs daemon '!alt'
+    fi
+
+    # emacsclient -e '(setq debug-on-quit nil)'
+    emc-eval '(setq debug-on-quit nil)'
 }
 alias pe='emcpe'
 alias pe2='redo2 10 reval-timeout 1 emcpe'
@@ -149,12 +155,16 @@ function emc-sourceme() {
     fi
 }
 
+function emc-gui-p {
+    [[ "$EMACS_SOCKET_NAME" == "$EMACS_GUI_SOCKET_NAME" ]]
+}
+
 function emc-focus() {
     if isSSH ; then
         return 0
     fi
 
-    if [[ "$EMACS_SOCKET_NAME" == "$EMACS_GUI_SOCKET_NAME" ]] ; then
+    if emc-gui-p ; then
         emc-focus-gui
         return $?
     fi

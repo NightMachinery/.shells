@@ -152,7 +152,7 @@ playlistc() {
     bella_zsh_disable1
 
     local playlists
-    playlists=("${(@f)$(fd --follow -t f '.' "${playlist_dir}" | fz -q "$(fz-createquery "$@")")}") @RET
+    playlists=("${(@f)$(fd --exclude .git --follow -t f '.' "${playlist_dir}" | fz -q "$(fz-createquery "$@")")}") @RET
 
     ec "Playing playlist(s) $playlists"
     hearp +s "${(@)playlists}"

@@ -52,7 +52,7 @@ function rsp-notes {
 
     local rsync_opts=(
         ## @tmp
-        --rsh="ssh -p 4300 -vvv"
+        --rsh="ssh -p 4300 -o ControlMaster=no -vvv"
         # --rsh="ssh -J walle@193.151.136.67"
         ##
         "${@[2,-1]}"

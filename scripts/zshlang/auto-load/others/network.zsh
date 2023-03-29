@@ -50,6 +50,7 @@ aliasfn ci80 curl-ip -x 'socks5h://127.0.0.1:1080'
 aliasfn ci81 curl-ip -x 'socks5h://127.0.0.1:1081'
 aliasfn ci82 curl-ip -x 'socks5h://127.0.0.1:1082'
 aliasfn ci2082 curl-ip -x 'http://127.0.0.1:2082'
+aliasfn ci89 curl-ip -x 'socks5h://127.0.0.1:1089'
 aliasfn ci90 curl-ip -x 'socks5h://127.0.0.1:1090'
 aliasfn ci91 curl-ip -x 'socks5h://127.0.0.1:1091'
 aliasfn ci92 curl-ip -x 'socks5h://127.0.0.1:1092'
@@ -284,7 +285,13 @@ function bwh {
 }
 ##
 function darwin-net-static-set {
-    networksetup -setmanual Wi-Fi 192.168.1.56 255.255.0.0 192.168.1.1
+    if isMBP ; then
+        reval-ec networksetup -setmanual Wi-Fi 192.168.1.56 255.255.0.0 192.168.1.1
+    elif isMB2 ; then
+        reval-ec networksetup -setmanual Wi-Fi 192.168.1.57 255.255.0.0 192.168.1.1
+    else
+        @NA
+    fi
     ##
     # This did not work. We could not reach the internet and the LAN could not reach us.
     # networksetup -setmanualwithdhcprouter Wi-Fi 192.168.1.56
