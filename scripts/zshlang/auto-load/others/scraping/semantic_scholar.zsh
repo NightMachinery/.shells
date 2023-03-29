@@ -163,3 +163,19 @@ function semantic-scholar-dl-from-org {
     }
 }
 ##
+function semantic-scholar-id-get {
+    in-or-args "$@" |
+        perl -lne '(m|^([^/]{40})$| || m|^(?:https://www.semanticscholar.org/paper/\|https://www.connectedpapers.com/main/)(?:(?:[^/]+)/)?([^/]{40})(?:/\|$)| ) && print $1' |
+        cat-copy-if-tty
+}
+
+function connectedpapers-from-ss-id {
+    local inargs
+    inargs=("${(@f)$(in-or-args "$@" | semantic-scholar-id-get)}") @TRET
+
+    for ss_id in ${(@)inargs} ; do
+        ec "https://www.connectedpapers.com/main/${ss_id}"
+    done |
+        cat-copy-if-tty
+}
+##
