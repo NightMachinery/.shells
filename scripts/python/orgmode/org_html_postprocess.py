@@ -25,8 +25,9 @@ def replacer(match):
     tag_raw = match.group("tag_raw")
     tag = match.group("tag")
 
-    tag = re.sub(r"\W", "_", tag)
-    return f"""<span class="todo at_tag at_{tag}">{tag_raw}</span>"""
+    tag = re.sub(r'''"''', """'""", tag)
+    tag = re.sub(r'''\\''', """_""", tag)
+    return f"""<span class="todo at_tag" at_tag="{tag}">{tag_raw}</span>"""
 
 
 for n in soup.find_all(string=at_re):  #: =string= used to be =text=
