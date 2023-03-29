@@ -1,4 +1,6 @@
 ##
+typeset -g openai_completion_engine=(openai-chatgpt)
+##
 function openai-complete {
     local input
     input="$(in-or-args "${@}")" @RET
@@ -72,60 +74,39 @@ function davinci-text-i {
     davinci-text "$input" @RET
 }
 
-alias xx='\noglob davinci-text-i'
-alias xz='openai_iappend_p=y \noglob openai-complete'
-alias xc='\noglob davinci-code'
+# alias xx='\noglob davinci-text-i'
+# alias xz='openai_iappend_p=y \noglob openai-complete'
+# alias xc='\noglob davinci-code'
 
 function openai-complete-with-prompt {
+    local engine=("${openai_completion_engine[@]}")
     local prompt
     prompt="$(reval "$@")" @TRET
 
-    davinci-text "$prompt"
+    reval-ec "${engine[@]}" "$prompt"
 }
 ##
-function chatgpt-postprocess {
-    html2org |
-        sd '^\[+.*' '_______' |
-        cat-copy-if-tty
-}
+# function chatgpt-postprocess {
+#     html2org |
+#         sd '^\[+.*' '_______' |
+#         cat-copy-if-tty
+# }
 ##
 function openai-chatgpt {
-    #: @doing
-
-    local input
-    input="$(in-or-args "${@}")" @RET
-    local input_append_p="${openai_iappend_p}"
-    local model="${openai_model:-gpt-3.5-turbo}"
-
-    local temperature="${openai_temperature:-0}"
-    local max_tokens="${openai_max_tokens:-256}"
-    local output_path="${openai_output_path:-.choices[0].text}"
-    local api_key="${openai_api_key}"
-    assert-args api_key @RET
-
-    local opts=()
-
-    local req
-    req="$(printf -- "%s " "$input" |
-                  jq --raw-input --slurp --null-input --compact-output --arg model "$model" --arg temperature "$temperature" --arg max_tokens "$max_tokens" 'inputs as $i | {"model": $model, "prompt": $i, "temperature": ($temperature|tonumber), "max_tokens": ($max_tokens|tonumber)}')" @TRET
-
-    if isDbg ; then
-        ec "$req" | jq .
-    else
-        opts+=('--silent')
+    local proxy=()
+    if isLocal && test -z "${proxy_disabled}" ; then
+        proxy=(pxa91)
     fi
 
-    local res
-    res="$(revaldbg curl --fail-with-body \
-        --header 'Content-Type: application/json' \
-        --header "Authorization: Bearer ${api_key}" \
-        --request POST \
-        --data "$req" \
-        "${opts[@]}" \
-        "https://api.openai.com/v1/completions")" @TRET
+    local input
+    input="$(in-or-args "$@")" @RET
 
-    typeset -g openai_last_res="${res}"
-    ec "$res" |
-        jqm "${output_path}" |
+    pbcopy "$input" @STRUE
+
+    ec "$input" |
+        reval "${proxy[@]}" openai_chatgpt.py |
         cat-copy-if-tty
 }
+
+alias xx='\noglob openai-chatgpt'
+##
