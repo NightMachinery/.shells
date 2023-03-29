@@ -204,7 +204,8 @@ function pbcopy-rtf {
     rtf="$(cat)" @RET
 
     if isDarwin ; then
-        command pbcopy -Prefer rtf
+        ec "$rtf" |
+            command pbcopy -Prefer rtf
         # The  input is  placed  in  the pasteboard as plain text data unless it begins with the Encapsulated PostScript (EPS) file header or the Rich Text Format  (RTF)  file  header,  in which case it is placed in the pasteboard as one of those data types.
         #
         # Using pandoc's RTF output doesn't seem to work (using `-s` with pandoc might fix this), but using html2rtf-textutil works.

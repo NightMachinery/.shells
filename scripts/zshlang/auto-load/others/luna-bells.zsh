@@ -905,3 +905,7 @@ function bell-awaiting-commands {
     fsay2 'Awaiting commands!'
 }
 ##
+function bell-gpt {
+    awaysh command say -v Whisper -r 90 "GPT"
+}
+##

@@ -325,13 +325,27 @@ function org-export-recursive {
     h-org-export-recursive "$@"
 }
 
+function org-export-raw {
+    local ret=0 inargs=()
+    in-or-args3 "$@" @RET
+
+    local f f_q
+    for f in ${inargs[@]} ; do
+        f_q="$(emc-quote "$f")" @TRET
+
+        emc-eval "(night/org-export-file-to-html ${f_q})" || ret=$?
+    done
+
+    return $ret
+}
+
 function h-org-export-recursive {
     #: This function cannot be directly called. Use `org-export-recursive'.
     assert test -n "$storage_key_root" @RET
 
     local fs=($@)
 
-    local f f_hashed f_q id_link file_link text h outs exported_file
+    local f f_hashed id_link file_link text h outs exported_file
     for f in ${fs[@]} ; do
         f_hashed="$(md5m "$f")" @TRET
         h="$(md5-file "$f")" @TRET
@@ -345,9 +359,8 @@ function h-org-export-recursive {
             continue
         fi
 
-        f_q="$(emc-quote "$f")" @TRET
-        ecbold "exporting ${f_q}"
-        exported_file="$(emc-eval "(night/org-export-file-to-html ${f_q})")" @TRET
+        ecbold "exporting ${f}"
+        exported_file="$(org-export-raw "$f")" @TRET
         assert test -e "$exported_file" @RET
 
         outs="${exported_file}"$'\n'
@@ -757,6 +770,7 @@ function org-img-unused {
 
         used=(${(@f)"$(ec "$text" |
                          org-link-extract-file |
+                         rg "\.(${(j.|.)image_formats})\$" |
                          { cd "${f:h}" && inargsf re realpath })"}) @TRET
 
         # dact var-show files

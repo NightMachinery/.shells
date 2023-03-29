@@ -1,14 +1,25 @@
 ##
+# * @todo We can implement a fuzzy search for papers using this API:
+# ** https://api.semanticscholar.org/api-docs/graph#tag/Paper-Data/operation/get_graph_get_paper_autocomplete
+#
+# https://api.semanticscholar.org/graph/v1/paper/autocomplete?query=bert
+#
+# ** https://api.semanticscholar.org/api-docs/graph#tag/Paper-Data/operation/get_graph_get_paper_search
+# https://api.semanticscholar.org/graph/v1/paper/search?query=bert
+##
 function semantic-scholar-to-json-api {
     #: @docs https://api.semanticscholar.org/api-docs/graph#tag/Paper-Data/operation/get_graph_get_paper
     ##
     local paper_id="${1}" #: e.g., arXiv:1705.10311
     local corpus_id="${semantic_scholar_corpus_id}"
 
-    if [[ "$paper_id" =~ '^https://api.semanticscholar.org/((?:arXiv|CorpusID):[^/]+)$' ]] ; then
+    if [[ "$paper_id" =~ '^https://api.semanticscholar.org/((?:arXiv|CorpusID|ACL):[^/]+)$' ]] ; then
         paper_id="${match[1]}"
 
-        # typ paper_id
+    ##
+    # elif [[ "$paper_id" =~ '^https://www.semanticscholar.org/paper/(?:(?:[^/]+)/)?([^/]{40})(?:/)?$' ]] ; then
+    elif tmp="$(semantic-scholar-id-get "$paper_id")" && test -n "$tmp" ; then
+        paper_id="${tmp}"
     elif [[ "$paper_id" =~ '^http' ]] && test -n "$corpus_id" ; then
         paper_id="CorpusID:${corpus_id}"
     fi
@@ -18,7 +29,7 @@ function semantic-scholar-to-json-api {
     fi
 
     local json
-    json="$(revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds")" @TRET
+    json="$(revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,openAccessPdf")" @TRET
     #: =tldr= sometimes isn't available for the newer papers, and we aren't currently using it, so I have omitted it from the request above. (It will trow an error if tldr is not available.)
 
     ec "$json" |
@@ -74,13 +85,16 @@ function semantic-scholar-to-json-scraping {
             date '[data-selenium-selector="paper-year"]' '' \
             authors_names 'meta[name="citation_author"]' 'attr:content' \
             journal_name '[data-heap-id="paper-meta-journal"]' '' \
-            abstract 'meta[name="description"]' 'attr:content' \
+            abstract_scraped 'meta[name="description"]' 'attr:content' \
             links '[data-selenium-selector="paper-link"]' 'attr:href' \
             pdf_urls 'meta[name="citation_pdf_url"]' 'attr:content' \
             topics '[data-selenium-selector="entity-name"]' '' \
             referenceCount '[data-heap-nav="references"]' '' \
             | jq '.'
 
+    #: * [jalali:1402/01/09/03:46]
+    #: ** pdf_urls which is extracted using the meta tags might be the best that is scrapable without using a headless browser.
+    #: ** The only PDF url the API might offer is 'openAccessPdf'.
     ##
     # abstract '[data-selenium-selector="abstract-text"]' '->org' \
         # authors '.author-list' '->org' \
@@ -106,12 +120,12 @@ function semantic-scholar-dl-from-org {
     org="$(cat-paste-if-tty)" @TRET
 
     local urls
-    if ! urls="$(ec "$org" | urls-extract | rg '(?:\.pdf$|^https?://dl.acm.org/doi/pdf/)')" ; then
-        if urls="$(ec "$org" | urls-extract | rget '^https://api.semanticscholar.org/arXiv:([^/]+)$' | head -n 1)" ; then
-            urls="https://arxiv.org/pdf/${urls}.pdf"
-        else
-            urls="$(ec "$org" | rget '^\s*:pdf_urls:\s+(.*?)\s*$')" @TRET
-        fi
+    if urls="$(ec "$org" | rget '^\s*:openAccessPdf:\s+(.*?)\s*$')" ; then
+    elif urls="$(ec "$org" | urls-extract | rg '(?:\.pdf$|^https?://dl.acm.org/doi/pdf/)')" ; then
+    elif urls="$(ec "$org" | urls-extract | rget '^https://api.semanticscholar.org/arXiv:([^/]+)$' | head -n 1)" ; then
+        urls="https://arxiv.org/pdf/${urls}.pdf"
+    else
+        urls="$(ec "$org" | rget '^\s*:pdf_urls:\s+(.*?)\s*$')" @TRET
     fi
     urls=(${(@f)urls})
 
