@@ -52,3 +52,12 @@ function pdflatex-m {
 }
 @opts-setprefix pdflatex-m latex
 ##
+function bibtex2apa {
+    local tmp
+    tmp="$(gmktemp --suffix .bib)" @TRET
+    cat-paste-if-tty > "$tmp" @RET
+
+    #: add =-q= to disable verbosity
+    bibtex2html -nokeys -o - -s apa -nodoc "$tmp"
+}
+##
