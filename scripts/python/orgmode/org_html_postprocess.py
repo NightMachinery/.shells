@@ -26,7 +26,7 @@ def replacer(match):
     tag = match.group("tag")
 
     tag = re.sub(r'''"''', """'""", tag)
-    tag = re.sub(r'''\\''', """_""", tag)
+    tag = re.sub('''\\''', """_""", tag)
     return f"""<span class="todo at_tag" at_tag="{tag}">{tag_raw}</span>"""
 
 
