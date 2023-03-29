@@ -456,6 +456,16 @@
 (comment
   (path-unabbrev "~cod/python/ddg2json"))
 ;;;
+(defun month-number-to-name (number)
+  (brishz-outrs "month-number-to-name"
+                (princ-to-string number)))
+
+(comment
+ (month-number-to-name 6)
+ (princ-to-string 6)
+ (princ-to-string "6")
+ (month-number-to-name "6"))
+;;;
 (defun rget (regex text)
   (let ((res (nth-value 1
                         (ppcre:scan-to-strings regex text))))

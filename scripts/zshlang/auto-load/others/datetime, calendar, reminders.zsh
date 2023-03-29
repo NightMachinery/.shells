@@ -8,6 +8,25 @@
 @opts-setprefix remnd reminday_store
 @opts-setprefix rem-sync reminday_store
 ##
+typeset -gA months2name
+months2name[1]='January'
+months2name[2]='February'
+months2name[3]='March'
+months2name[4]='April'
+months2name[5]='May'
+months2name[6]='June'
+months2name[7]='July'
+months2name[8]='August'
+months2name[9]='September'
+months2name[10]='October'
+months2name[11]='November'
+months2name[12]='December'
+
+function month-number-to-name {
+    typeset -i n="${1}"
+    ec "${months2name[$n]}"
+}
+##
 function rem-enabled-p {
     #: The directory itself seems to be created even when it doesn't exist by our own functions. So I am checking its children.
     local candidates=("$remindayDir"/14*(DN/))
