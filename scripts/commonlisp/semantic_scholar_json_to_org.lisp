@@ -55,10 +55,21 @@
             (cond
               (t val))))))))
 
+(defun simple-obj-get (data attr)
+  (when data
+    (alexandria:when-let*
+     ((obj-assoc (assoc :OBJ data))
+      (url-assoc (assoc attr (cdr obj-assoc) :test #'equal)))
+     (cdr url-assoc))))
+
 (defun v (key)
   (cond
     ((string= key "arxiv")
      (listify-if-not arxiv-url))
+    ((string= key "openAccessPdf")
+     (simple-obj-get
+      (json-get d "openAccessPdf")
+      "url"))
     ((string= key "date_tag")
      (let* ((date (v0 date_key))
             (year
