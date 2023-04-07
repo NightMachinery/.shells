@@ -1,5 +1,5 @@
 function colab-from-github {
-    local user="${colab_google_user:-5}"
+    local user="${colab_google_user:-feraidoonmehri@gmail.com}"
     local inargs
     inargs="$(in-or-args "$@")" @RET
 

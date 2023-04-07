@@ -9,16 +9,14 @@ function curl-ip {
     local opts
     opts=( --progress-bar --retry 120 --retry-delay 1 "$@" )
 
-    local res
-    res="$(reval-ec curl "$opts[@]" https://ipinfo.io)" @TRET
 
     local jq_opts=()
     if isColorTty ; then
         jq_opts+='--color-output'
     fi
 
-    local res_json
-    if res_json="$(ec $res | serr jq -e "$jq_opts[@]" .)" ; then
+    local res res_json
+    if bool "${ipinfo:-y}" && res="$(reval-ec curl "$opts[@]" https://ipinfo.io)" && res_json="$(ec $res | serr jq -e "$jq_opts[@]" .)" ; then
         ec $res_json
     else # ipinfo blocks Iranian IPs
         local ip
