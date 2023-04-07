@@ -8,7 +8,10 @@ export LC_ALL="en_US.UTF-8" #set locale; use sudo locale-gen to create them. upd
 export LPASS_AUTO_SYNC_TIME=$((3600*24*7))
 export LPASS_AGENT_TIMEOUT=$((3600*24*7))
 export VCSH_GITATTRIBUTES=y
-export kindle_email=fifya@kindle.com #PERSONALINFO
+
+# export kindle_email=fifya@kindle.com #: @personalInfo
+export kindle_email=Azadi4Baran@kindle.com #: @personalInfo
+
 isLocal && export NEDITOR='emacs.dash' || export NEDITOR='vim'
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
 export SUDO_EDITOR="$NEDITOR"
