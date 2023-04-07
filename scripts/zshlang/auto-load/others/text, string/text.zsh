@@ -263,3 +263,19 @@ function bullets-to-dash {
         cat-copy-if-tty
 }
 ##
+function tab2space {
+    integer space_count="${1:-4}"
+
+    cat-paste-if-tty |
+        revaldbg perl -CS -lpe 's/^\t+/(" " x '${space_count}') x length($&)/e' |
+        cat-copy-if-tty
+}
+
+function space2tab {
+    integer space_count="${1:-4}"
+
+    cat-paste-if-tty |
+        revaldbg perl -CS -lpe 's<^( {'${space_count}'})+><("\t") x int(length($&)/'${space_count}')>e' |
+        cat-copy-if-tty
+}
+##
