@@ -28,3 +28,12 @@ function prompt-tex-yc {
         cat-copy-if-tty
 }
 ##
+function prompt-correct-grammar {
+    local input
+    input="$(in-or-args "$@")" @RET
+
+    ec 'Correct grammatical and spelling mistakes in the following text:'$'\n\n'"$input" |
+        cat-copy-if-tty
+
+}
+##
