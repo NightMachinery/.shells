@@ -9,16 +9,28 @@ function without-kindle {
 aliasfn-ng pkno without-kindle
 aliasfn-ng nokindle without-kindle
 ##
-function 2mobi() {
+function 2mobi {
     : "Usage: FILE calibre-options ..."
 
     jglob
     ebook-convert "$1" "${1:r}.mobi" "${@:2}"
 }
-alias 2m='2mobi'
+# alias 2m='2mobi'
 
-function 2m2k() {
+function 2epub2kindle {
     : "Usage: FILE calibre-options ..."
+
+    jglob
+    if test "${1:e}" != epub ; then
+        2epub "$@"
+        set -- "${1:r}.epub"
+    fi
+    2kindle "$1"
+}
+
+function 2mobi2kindle {
+    : "Usage: FILE calibre-options ..."
+    @deprecated
 
     jglob
     [[ "$1" =~ 'mobi.az1$' ]] && {
@@ -31,8 +43,18 @@ function 2m2k() {
     fi
     2kindle "$1"
 }
+aliasfn 2m2k 2mobi2kindle
 
-function mv2ko() {
+function 2m2k2h {
+    @deprecated
+
+    2m2k "$@" && {
+        trs "$1"
+        trs "${1:r}.mobi"
+    }
+}
+##
+function mv2ko {
     jej
     mv * "$1"
     2ko *
@@ -80,13 +102,12 @@ Uses 2kindle under the hood." MAGIC
     jglob
     2kindle "$1" "some_subject" "$2"
 }
+
 function 2p2k() {
     jglob
     k2pdf "$1"
     2ko "${1:r}_k2opt.pdf"
 }
-2m2k2h() { 2m2k "$@" && { trs "$1"
-                          trs "${1:r}.mobi" } }
 
 function 2epub() {
     jglob
@@ -106,7 +127,7 @@ function dir2k() {
     skipglob "re p2ko" $dir/*.pdf(.DN)
 }
 
-function p2k() {
+function p2k {
     : "possibly send to kindle"
     : "stdout: the new name of the input file, if not deleted"
 
@@ -115,9 +136,16 @@ function p2k() {
     # local delConverted="${pkDelC}"
 
     if kindle-p ; then
-        sout 2m2k "$@"
-        if ! [[ "$1" =~ '.*\.mobi$' ]] ; then
-            silent trs-rm "${1:r}.mobi"
+        if true ; then
+            sout 2epub2kindle "$@"
+            if ! [[ "$1" =~ '.*\.epub$' ]] ; then
+                silent trs-rm "${1:r}.epub"
+            fi
+        else
+            sout 2mobi2kindle "$@"
+            if ! [[ "$1" =~ '.*\.mobi$' ]] ; then
+                silent trs-rm "${1:r}.mobi"
+            fi
         fi
     fi
 
