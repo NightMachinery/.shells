@@ -114,7 +114,23 @@ function semantic-scholar-to-org {
 }
 ##
 function semantic-scholar-dl-from-org {
+    if should-proxy-p ; then
+        pxa89-local
+    fi
+
     local tlg_dest="${tlg_dest:-$tlg_ch_books}"
+
+    local dir="${ss_dl_dir}"
+    if test -z "$dir" ; then
+        if isBorg ; then
+            dir="$(gmktemp -d)" @TRET
+        else
+            dir=~base/_Books/papers
+            if ! test -d "$dir" ; then
+                dir="."
+            fi
+        fi
+    fi
 
     local org
     org="$(cat-paste-if-tty)" @TRET
@@ -146,7 +162,8 @@ function semantic-scholar-dl-from-org {
 
     # reval-ec retry aa-gateway "$url" -o "${dest}" @RET
     # reval-ec retry wget "$url" -O "${dest}" @RET
-    curlm_ns=y reval-ec retry curlm "$url" -o "${dest}" @RET
+    curlm_ns=y reval-ec retry curlm "$url" --output-dir "$dir" --create-dirs -o "${dest}" @RET
+    dest="${dir}/${dest}"
 
     local lock_id="$0"
     retry_sleep=15 lock-aquire-redis-retry "${lock_id}" $((30*60)) @RET
