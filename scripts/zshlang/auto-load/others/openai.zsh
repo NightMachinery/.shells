@@ -91,11 +91,25 @@ function davinci-text-i {
 
 function openai-complete-with-prompt {
     local engine=("${openai_completion_engine[@]}")
+    local verbose="${openai_completion_v}"
+    if test -z "$verbose" ; then
+        if isOutTty ; then
+            verbose=y
+        fi
+    fi
+
     local prompt
     prompt="$(reval "$@")" @TRET
 
-    reval-ec "${engine[@]}" "$prompt"
+    if bool "$verbose" ; then
+        ec "$(colorfg "$gray[@]" ; Bold)${engine[@]}:$(colorreset)"$'\n'"$prompt"
+
+        ec-sep-h ; ec
+    fi
+
+    reval "${engine[@]}" "$prompt"
 }
+alias xc='openai-complete-with-prompt'
 ##
 # function chatgpt-postprocess {
 #     html2org |
