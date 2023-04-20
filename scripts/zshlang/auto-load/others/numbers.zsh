@@ -33,4 +33,10 @@ aliasfn numfmt-bytes numfmt-humanfriendly-bytes
 function numfmt-humanfriendly {
     numfmt --to=si --round=nearest "$@"
 }
+
+function numtfmt-comma {
+    in-or-args "$@" |
+        perl -lpe 's/(?<=\d)(?=(\d{3})+\b)/,/g' |
+        cat-copy-if-tty
+}
 ##
