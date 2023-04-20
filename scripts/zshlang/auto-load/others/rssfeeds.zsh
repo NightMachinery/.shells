@@ -82,7 +82,7 @@ function summarize-text {
 
     if [[ "$mode" == 'gpt3.5' ]] ; then
         ec "$input" |
-            openai-complete-with-prompt prompt-summarize-text
+            openai_truncation_length=3500 openai-complete-with-prompt prompt-summarize-text
     elif [[ "$mode" == 'sumy' ]] ; then
         ec "$input" |
             sumy-text

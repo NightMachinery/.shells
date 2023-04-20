@@ -101,3 +101,5 @@ xmltodict
 yapf
 yq
 zxcvbn
+
+tiktoken
