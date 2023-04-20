@@ -6,10 +6,24 @@ function openai-p {
 }
 ##
 function openai-models-list {
-    curl -sf -X GET \
+    curl --silent --fail -X GET \
         "https://api.openai.com/v1/models" \
         -H "Authorization: Bearer ${openai_api_key}" |
         jq '.data[].id' -r
+}
+##
+function openai-billing-limits {
+    "$proxyenv" revaldbg curl --silent --fail -X GET \
+        "https://api.openai.com/dashboard/billing/subscription" \
+        -H "Authorization: Bearer ${openai_api_key}" |
+        jq .
+}
+
+function h-openai-billing-usage {
+    "$proxyenv" revaldbg curl --silent --fail -X GET \
+        "https://api.openai.com/dashboard/billing/usage?start_date=2023-04-11&end_date=$(gdate '+%Y-%m-%d')" \
+        -H "Authorization: Bearer ${openai_api_key}" |
+        jq .
 }
 ##
 function openai-complete {
