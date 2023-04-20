@@ -146,13 +146,19 @@ function enh-pxpy {
 }"
 }
 ##
-function proxy-p {
-    test -z "$pxified" && { isLocal && isMe }
+function pxified-p {
+    bool "${pxified}"
+}
+
+function should-proxy-p {
+    #: This predicate can be used by programs to turn on a proxy by themselves.
+    ##
+    test -z "${proxy_disabled}${ALL_PROXY}${all_proxy}${HTTP_PROXY}${http_proxy}${HTTPS_PROXY}${https_proxy}${FTP_PROXY}${ftp_proxy}" && pxified-p
 }
 
 function proxy-auto-p {
     # local initCountry="$(serr mycountry)"
-    if proxy-p ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
+    if { isLocal && isMe } ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
         return 0
     else
         return 1
@@ -162,7 +168,7 @@ function proxy-auto-p {
 function pxify-auto { # @gateway
     typeset -g pxified
 
-    if proxy-auto-p ; then
+    if { ! pxified-p } && proxy-auto-p ; then
         pxified=y
         pxify
     fi

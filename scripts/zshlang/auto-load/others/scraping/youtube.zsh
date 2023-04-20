@@ -53,7 +53,7 @@ function youtube-dl() {
     fi
 
     ##
-    # if proxy-p ; then
+    # if should-proxy-p ; then
     #     opts+=(--proxy 'socks5://127.0.0.1:1081')
     # fi
     ##
