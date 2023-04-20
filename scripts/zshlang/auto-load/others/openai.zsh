@@ -1,6 +1,17 @@
 ##
 typeset -g openai_completion_engine=(openai-chatgpt)
 ##
+function openai-p {
+    test -n "${openai_api_key}"
+}
+##
+function openai-models-list {
+    curl -sf -X GET \
+        "https://api.openai.com/v1/models" \
+        -H "Authorization: Bearer ${openai_api_key}" |
+        jq '.data[].id' -r
+}
+##
 function openai-complete {
     local input
     input="$(in-or-args "${@}")" @RET
