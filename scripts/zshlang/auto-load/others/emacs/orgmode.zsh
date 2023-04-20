@@ -780,3 +780,9 @@ function org-img-unused {
     done
 }
 ##
+function strip-prefixed-colons {
+    in-or-args "$@" |
+        perl -CS -lpe 's/^: //g' |
+        cat-copy-if-tty
+}
+##
