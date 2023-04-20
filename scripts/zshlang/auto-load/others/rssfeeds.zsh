@@ -41,17 +41,63 @@ function sumgensim() {
     text="$(w3m -dump "$1")" word_count="${2:-150}" serr python -c 'from gensim.summarization import summarize ; import os; print(summarize(os.environ["text"], word_count=int(os.environ["word_count"])))'
 }
 
-function sumym () {
+function sumy-text {
     ## ALT:
-    # Not that good (bad free tier, traditional algo):
-    # https://smmry.com/https://www.theverge.com/2020/11/18/21573109/epic-tim-sweeney-apple-app-store-fee-cut-reduction-criticize#&SM_LENGTH=5
+    #: Not that good (bad free tier, traditional algo):
+    #: https://smmry.com/https://www.theverge.com/2020/11/18/21573109/epic-tim-sweeney-apple-app-store-fee-cut-reduction-criticize#&SM_LENGTH=5
     ##
-    local url="$1"
+    #: https://pypi.org/project/sumy/
+    ##
+    local mode="${sumy_mode:-lex-rank}"
+    #: lex-rank, text-rank
+    #: kl can be crazy on CPU. It also is probably worse than lex-rank.
 
-    # https://pypi.org/project/sumy/
-    # lex-rank, text-rank
-    # kl can be crazy on CPU. It also is probably worse than lex-rank.
-    sumy "${2:-lex-rank}" --length=4 --file =(readmoz-txt "$url") --format=plaintext
+    local input
+    input="$(in-or-args "$@")" @RET
+
+    sumy "$mode" --length=4 --file =(ec "$input") --format=plaintext
+}
+
+function sumy-url {
+    summarize_mode='sumy' summarize_url_engine=(readmoz-txt) summarize-url "$@"
+}
+
+function summarize-text {
+    local show_mode_p="${summarize_show_mode_p:-n}"
+    local mode="${summarize_mode}"
+    local input
+    input="$(in-or-args "$@")" @RET
+
+    if test -z "${mode}" ; then
+        if openai-p ; then
+            mode='gpt3.5'
+        else
+            mode='sumy'
+        fi
+    fi
+
+    if bool "$show_mode_p" ; then
+        ec "${mode}: "
+    fi
+
+    if [[ "$mode" == 'gpt3.5' ]] ; then
+        ec "$input" |
+            openai-complete-with-prompt prompt-summarize-text
+    elif [[ "$mode" == 'sumy' ]] ; then
+        ec "$input" |
+            sumy-text
+    else
+        ecerr "$0: unknown mode: ${mode}"
+        return 1
+    fi
+}
+
+function summarize-url {
+    local url="$1" url_get_engine=("${summarize_url_engine[@]:-readmoz-md}") ; shift
+    assert-args url @RET
+
+    reval "${url_get_engine[@]}" "$url" |
+        summarize-text
 }
 ##
 function rss-tl() {
@@ -81,7 +127,7 @@ function rss-tsend() {
     local id="${rt_id:-$water}"
     local rssurls="rssurls_${rt_duplicates_key}" # used for storing dup links in redis
 
-    local c t l l_norm fd_in
+    local c t l l_norm fd_in summary processed_p
     local url
     local urls=()
     for url in "$@"
@@ -131,9 +177,20 @@ function rss-tsend() {
                 done
                 test -n "$no_title" || ec "Title: $t"
 
-                labeled redism SADD $rssurls $l_norm
-                test -n "$notel" || tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n'"Lex-rank: $(sumym "$l")"
-                sleep "$each_url_delay" #because wuxia sometimes sends unupdated pages
+                processed_p=''
+                summary=''
+                if ! bool "$notel" ; then
+                    summary="$(summarize_show_mode_p=n summarize-url "$l")" || summary="Summary generation failed with ${?}."
+
+                    tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n\n'"${summary}" && processed_p=y
+                else
+                    processed_p=y
+                fi
+                if bool "${processed_p}" ; then
+                    labeled redism SADD $rssurls $l_norm
+                fi
+
+                sleep "$each_url_delay" #: because wuxia sometimes sends unupdated pages
                 test -n "$skip_engine" || rssTitle="$t" revaldbg "$engine[@]" "$l" # "$t"
             done
         } always {
