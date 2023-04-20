@@ -308,3 +308,12 @@ function net-local-wifi-disable-darwin {
     reval-ec networksetup -setnetworkserviceenabled FakeNet off
 }
 ##
+function vpn-restart {
+    local timeout=10
+
+    fz_opts=(-1) fftr trojan-client-aeirya && reval-timeout "$timeout" ci91
+
+    # fz_opts=(-1) fftr dreamer-1035 && reval-timeout "$timeout" ci35
+}
+aliasfn 'zz' vpn-restart
+##
