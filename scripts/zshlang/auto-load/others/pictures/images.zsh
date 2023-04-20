@@ -24,14 +24,29 @@ function cpsdt() {
 function psd2telg() {
     tsend ${me:-me} '' -f "$(cpsdt "$@")" --force-document
 }
+##
 function rm-alpha() {
     local B=$(basename "$1"); local D=$(dirname "$1");
     convert "$1" -background "$2" -alpha remove "$D/${B%.*}_$2.png"
 }
 function alpha2black() { rm-alpha "$1" black }
 function alpha2white() { rm-alpha "$1" white }
-
 combine-funcs alpha2bw alpha2black alpha2white
+
+function img-color2color {
+    local input="$1" from="${2:-black}" to="${3:-white}"
+    local output="${4:-${input:r}_${from}2${to}.${input:e}}"
+    local fuzz="${img_color2color_fuzz:-20}"
+
+    reval-ec magick "$input" -fuzz "${fuzz}%" -fill "$to" -opaque "${from}" "${output}"
+}
+
+function img-black2white {
+    local input="$1" rest=("${@[2,-1]}")
+
+    img-color2color "$input" black white "${rest[@]}"
+}
+@opts-setprefix img-black2white img_color2color
 ##
 function pbpaste-image() { # image-paste, imgpaste; used from night-org.el
     local dest="$1" ; test -z "$dest" && {
