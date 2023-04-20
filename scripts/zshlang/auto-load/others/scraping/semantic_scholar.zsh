@@ -179,6 +179,28 @@ function semantic-scholar-dl-from-org {
         lock-release-redis "${lock_id}"
     }
 }
+aliasfn ssdl semantic-scholar-dl-from-org
+
+function semantic-scholar-get-and-dl {
+    if should-proxy-p ; then
+        pxa89-local
+    fi
+
+    local inargs=() ret=0
+    in-or-args3 "$@" @RET
+
+    local url
+    for url in ${inargs[@]} ; do
+        { semantic-scholar-to-org "$url" |
+              semantic-scholar-dl-from-org } || {
+            ret=$?
+            ecerr "$0: URL failed: ${url}"
+        }
+    done
+
+    return ${ret}
+}
+aliasfn jss semantic-scholar-get-and-dl
 ##
 function semantic-scholar-id-get {
     in-or-args "$@" |
