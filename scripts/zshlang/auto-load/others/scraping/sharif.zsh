@@ -323,3 +323,25 @@ function sharif-goto-register {
         --compressed
 }
 ##
+typeset -g sharif_vpn_url_normal='https://net2.sharif.edu'
+typeset -g sharif_vpn_url_ip='https://172.17.1.214'
+typeset -g sharif_vpn_url="${sharif_vpn_url_ip}"
+
+function with-sharif-vpn-url-ip {
+    sharif_vpn_url="${sharif_vpn_url_ip}" reval-env "$@"
+}
+
+function sharif-vpn-login-status {
+    curl --insecure -s "${sharif_vpn_url}/status" | ggrep -oP '<td(?:\s[^>]*)?>\K.*?(?=</td>)'
+}
+
+function sharif-vpn-login {
+    curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/login" > /dev/null
+    sharif-vpn-login-status
+}
+
+function sharif-vpn-logout {
+    curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/logout"
+    sharif-vpn-login-status
+}
+##
