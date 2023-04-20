@@ -1,4 +1,12 @@
 ##
+function gpu-list {
+    if isLinux ; then
+         lspci | egrep 'VGA|3D'
+    else
+        @NA
+    fi
+}
+##
 function gpu-usage-darwin() {
     sudo powermetrics --samplers gpu_power -n1 -i200 | rg 'GPU Busy'
 }
