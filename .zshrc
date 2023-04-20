@@ -179,6 +179,10 @@ function nightsh-load-zshrc() {
 
   bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+Return to insert a literal newline without accepting the command
 
+  #: self-insert-unmeta causes ={=, =}= to not be escaped when typed in the middle of, e.g., a URL. I don't understand why this happens. My guess is that one of my plugins is hooking into =self-insert= to insert the escape, but =self-insert-unmeta= is not hooked.
+  #: self-insert-unmeta: Insert a character into the buffer after stripping the meta bit and  converting ^M to ^J.
+  bindkey -v '\{' self-insert-unmeta
+  bindkey -v '\}' self-insert-unmeta
   ##
   # start typing + [Up-Arrow] - fuzzy find history forward
   if [[ "${terminfo[kcuu1]}" != "" ]]; then
