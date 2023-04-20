@@ -22,7 +22,7 @@ function fanficfare2org {
     # fanficfare still creates a junk epub file with --meta-only
     d="$(indir "$(gmktemp -d)" fanficfare --meta-only --json-meta "$url")" @TRET
 
-    ec "$d" | fanficfare2org.lisp @TRET
+    { ec "$d" | fanficfare2org.lisp | cat-copy-if-tty } @TRET
 }
 
 ##

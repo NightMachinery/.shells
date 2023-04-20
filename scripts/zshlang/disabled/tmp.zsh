@@ -1,3 +1,4 @@
+##
 function fz-rtl1() {
     local input="$(cat)" q="$1" opts=("${@[2,-1]}")
 

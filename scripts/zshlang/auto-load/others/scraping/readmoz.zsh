@@ -98,12 +98,12 @@ function readmoz-org {
 }
 noglobfn readmoz-org
 
-function readmoz-md2() {
-    readmoz "$1" | html2text "${@:2}" # --ignore-links
+function readmoz-md2 {
+    readmoz "$1" | html2md "${@:2}" # --ignore-links
 }
 noglobfn readmoz-md2
 
-function readmoz-org() {
+function readmoz-org {
     readmoz "$1" | html2org "${@:2}"
 }
 noglobfn readmoz-org

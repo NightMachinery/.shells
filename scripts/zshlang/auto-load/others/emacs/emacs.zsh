@@ -159,7 +159,7 @@ function emc-gui-p {
     [[ "$EMACS_SOCKET_NAME" == "$EMACS_GUI_SOCKET_NAME" ]]
 }
 
-function emc-focus() {
+function emc-focus {
     if isSSH ; then
         return 0
     fi

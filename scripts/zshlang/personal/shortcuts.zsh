@@ -124,7 +124,7 @@ function vc-with {
     local repo="$1" ; shift
     assert-args repo @RET
 
-    fnswap git "vcsh $(gq "$repo")" "$@"
+    gsync_noadd="${gsync_noadd:-y}" fnswap git "vcsh $(gq "$repo")" "$@"
 }
 
 function vcn-with {
