@@ -360,17 +360,26 @@ aliasfn ve-emc veditor=(emc-gateway)
 aliasfn vv ve-emc v
 ###
 function vp-ls() {
-    arrN ~/Downloads/**/*.pdf ~/Base/_Books/**/*.pdf
+    arrN ~/Downloads/**/*.pdf ~base/_Books/**/*.pdf ~base/documents/course_materials/**/*.pdf
 }
-function vp() {
+
+function vp {
     # v pdf
     ##
     bella_zsh_disable1
 
+    local opener=("${pdf_opener[@]}")
+    if test -z "${opener[*]}" ; then
+        opener=(open -a sioyek)
+    fi
+
     local q="$* "
     # local q="$(fz-createquery "$@")"
 
-    vp-ls | fzf_mru_context="$0" fz-rtl --query "$q" | sponge | inargsf open
+    vp-ls |
+        fzf_mru_context="$0" fz-rtl --query "$q" |
+        sponge |
+        inargsf "${opener[@]}"
 }
 ##
 function fuzzy-choose() {
