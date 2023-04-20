@@ -4,6 +4,7 @@ function semantic-scholar-url-get {
     sout arxiv-url-get "$@" @TRET
     arrNN $urls_semantic_scholar[@] | cat-copy-if-tty
 }
+aliasfn ssu semantic-scholar-url-get
 
 function arxiv-url-get {
     ## @global/outputs

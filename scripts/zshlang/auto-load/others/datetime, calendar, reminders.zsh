@@ -307,7 +307,8 @@ function reminday_store {
         if isServer ; then
             gcal_backend_p='n'
         elif isMe ; then
-            gcal_backend_p='y'
+            # gcal_backend_p='y'
+            gcal_backend_p='n' #: gcalcli needs to login every week!
         fi
     fi
 

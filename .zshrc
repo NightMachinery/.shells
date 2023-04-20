@@ -208,7 +208,7 @@ function nightsh-load-zshrc() {
   alias it2ul=~/.iterm2/it2ul
   alias it2universion=~/.iterm2/it2universion
   ###
-  function zle-enable-url-quote() {
+  function zle-enable-url-quote {
     # @warn this also quotes if you're pasting in quotes, which obviously ruins the result
     autoload -Uz url-quote-magic
     zle -N self-insert url-quote-magic

@@ -304,10 +304,12 @@ function gsync {
         branch="$(git-branch-name)" || branch=master
       ##
     fi
-    test -z "$noadd" && {
+
+    if ! bool "$noadd" ; then
       git submodule foreach git add --all @TRET
       git add --all @TRET
-    }
+    fi
+
     git submodule update --recursive @TRET # idk what this does really. Fetching? Don't use `--remote` here.
 
     git-status-summary -uno

@@ -75,7 +75,7 @@ function kitty-tab-get-emacs() {
 # if isIReally && isKitty ; then
 #     typeset -g kitty_emacs_id="$(kitty-tab-get-emacs | ghead -n 1)"
 # fi
-function kitty-emacs-focus() {
+function kitty-emacs-focus {
     local id=5
 
     ## cached for perf reasons: (the cache needs to invalidated each time 'kemc' is called

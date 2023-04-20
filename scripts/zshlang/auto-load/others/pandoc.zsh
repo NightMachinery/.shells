@@ -10,8 +10,16 @@ function docx2org() {
     @opts from docx to org @ pandoc-convert "$@"
 }
 
-function md2org() {
+function md2org {
     @opts from markdown to org @ pandoc-convert "$@"
+}
+
+function mediawiki2md {
+    @opts from mediawiki to markdown @ pandoc-convert "$@"
+}
+
+function mediawiki2org {
+    @opts from mediawiki to org @ pandoc-convert "$@"
 }
 
 function md2plain() {

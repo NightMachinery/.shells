@@ -60,6 +60,11 @@ if isDarwin ; then
     addToPATH ~/'Library/Application Support/Coursier/bin'
 fi
 
+if isLinux ; then
+    addToPATH /usr/local/cuda/bin
+    export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+fi
+
 addToPATH /opt/local/bin /opt/local/sbin # macports
 addToPATH /usr/sbin
 # addToPATH ~/.emacs.d.doom/bin

@@ -38,6 +38,7 @@ alias ci='curl-ip'
 
 aliasfn ci30 curl-ip -x 'socks5h://127.0.0.1:1030'
 aliasfn ci31 curl-ip -x 'socks5h://127.0.0.1:1031'
+aliasfn ci35 curl-ip -x 'socks5h://127.0.0.1:1035'
 aliasfn ci40 curl-ip -x 'socks5h://127.0.0.1:1040'
 aliasfn ci41 curl-ip -x 'socks5h://127.0.0.1:1041'
 aliasfn ci2041 curl-ip -x 'http://127.0.0.1:2041'
