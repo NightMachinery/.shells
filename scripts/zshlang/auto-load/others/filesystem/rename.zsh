@@ -73,3 +73,31 @@ function mv-date() {
 }
 reify mv-date
 ##
+function rename-audio-auto {
+  local input_file="$1"
+  local format="${input_file:e}"
+  assert-args input_file @RET
+
+  title="$(ffmpeg -i "$input_file" |& rget '^\s*title\s*:\s*(.+)')" || true
+  assert test -n "$title" @RET
+
+  artist="$(ffmpeg -i "$input_file" |& rget '^\s*artists?\s*:\s*(.+)')" || true
+
+  local new_filename="${title}"
+
+  if test -n "$artist" ; then
+      new_filename+=" by ${artist}"
+  fi
+
+  new_filename="$(str-normalize "${new_filename}")" @TRET
+  new_filename="$(str2filename "${new_filename}")" @TRET
+  # re var-show title artist new_filename
+  assert test -n "${new_filename}" @RET
+
+  if test -n "$format" ; then
+      new_filename+=".${format}"
+  fi
+
+  revaldbg command gmv -v -i "$input_file" "$new_filename"
+}
+##
