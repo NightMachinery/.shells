@@ -95,6 +95,12 @@ function fsay2 {
     fi
 }
 
+function fsay-noidle {
+    if ! idle-p 15 ; then
+        fsay2 "$@"
+    fi
+}
+
 function tts-say {
     local text="${1}" output="${2}"
     assert-args output @RET
