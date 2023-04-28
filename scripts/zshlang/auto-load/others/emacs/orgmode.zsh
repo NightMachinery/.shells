@@ -785,4 +785,16 @@ function strip-prefixed-colons {
         perl -CS -lpe 's/^: //g' |
         cat-copy-if-tty
 }
+
+function strip-prefixed-ge {
+    in-or-args "$@" |
+        perl -CS -lpe 's/^>+ //g' |
+        cat-copy-if-tty
+}
+
+function strip-prefixed-dollar {
+    in-or-args "$@" |
+        perl -CS -lpe 's/^\s*\$ //g' |
+        cat-copy-if-tty
+}
 ##
