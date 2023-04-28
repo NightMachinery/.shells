@@ -183,7 +183,9 @@ function h-unix-allday-p {
     # typ time
 
     local res
-    if test -z "$date_nat" ; then
+    if true || test -z "$date_nat" ; then
+        #: @update [jalali:1402/02/05/12:48] datenat parser seems to return other times than 12 PM, so this whole strategy doesn't seem workable.
+        #:
         #: @assumption The only way we could have specified the exact time is using 'remn' currently, so if no natural date provided, it should be an allday event.
 
         res=0

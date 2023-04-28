@@ -234,7 +234,9 @@ function utf8-to-ascii-pyunidecode {
     #
     # `pip-install Unidecode`
     ##
-    python -c 'from unidecode import unidecode ; import sys ; print(unidecode(sys.stdin.read()))' | cat-copy-if-tty
+    in-or-args "$@" |
+        python -c 'from unidecode import unidecode ; import sys ; print(unidecode(sys.stdin.read()))' |
+        cat-copy-if-tty
 
     # You can also specify an errors argument to unidecode() that determines what Unidecode does with characters that are not present in its transliteration tables. The default is 'ignore' meaning that Unidecode will ignore those characters (replace them with an empty string). 'strict' will raise a UnidecodeError. The exception object will contain an index attribute that can be used to find the offending character. 'replace' will replace them with '?' (or another string, specified in the replace_str argument). 'preserve' will keep the original, non-ASCII character in the string. Note that if 'preserve' is used the string returned by unidecode() will not be ASCII-encodable!
 }
@@ -244,7 +246,9 @@ aliasfn utf8-to-ascii utf8-to-ascii-pyunidecode
 aliasfn str-normalize utf8-to-ascii
 
 function str-normalize2 {
-    unicode_normalizer_hf.py "$@" | cat-copy-if-tty
+    in-or-args "$@" |
+        unicode_normalizer_hf.py "$@" |
+        cat-copy-if-tty
 }
 
 function newline-normalize {
