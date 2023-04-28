@@ -87,6 +87,14 @@ function chrome-current-url {
 }
 aliasfn browser-current-url chrome-current-url # @darwinonly @chromeonly
 ##
+function with-edge {
+    CHROME_BUNDLE_IDENTIFIER='com.microsoft.edgemac' reval-env "$@"
+}
+
+aliasfn edge-current-url with-edge chrome-current-url
+aliasfn edge-current-title with-edge chrome-current-title
+aliasfn org-link-edge-current with-edge org-link-browser-current
+##
 function chrome-open() {
     ensure isDarwin @MRET # @darwinonly
     chrome-cli open "$@"
