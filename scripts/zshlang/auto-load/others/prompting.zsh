@@ -19,6 +19,10 @@ function prompt-missing-spaces {
     prompt-instruction-input "Add the missing spaces in the following text:" "$@"
 }
 ##
+function prompt-html2orgtex {
+    prompt_code_block_p=y prompt-instruction-input "Write the following HTML snippet as org-mode with inline LaTeX." "$@"
+}
+
 function prompt-tex {
     prompt-instruction-input 'Write the following snippet using inline LaTeX.' "$@"
     # @bad 'with `(` and `)`. Do not use `$`!'
@@ -71,6 +75,13 @@ function prompt-summarize-url {
         prompt-summarize-text
 }
 ##
+function prompt-pronunciation {
+    prompt_code_block_p=y prompt-instruction-input "How is the following pronounced? Include IPA." "$@"
+    #
+    # prompt_code_block_p=y prompt-instruction-input "Define the following, and include its IPA pronunciation in American English." "$@"
+}
+aliasfn prompt-say prompt-pronunciation
+
 function prompt-meaning {
     prompt_code_block_p=y prompt-instruction-input 'What does the following text mean?' "$@"
 }
@@ -95,5 +106,9 @@ The `IPA_American` should be the pronunciation of this word in American English 
 The `example_usages` field should include example sentences that use this word in the defined sense.
 
 The following:' "$@"
+}
+##
+function prompt-explain-code {
+    prompt_code_block_p=y prompt-instruction-input 'Explain the following code:'
 }
 ##
