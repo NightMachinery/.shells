@@ -151,6 +151,13 @@ function idle-get {
     ioreg -c IOHIDSystem | sponge | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 }
 
+function idle-p {
+    local timeout="${1:-120}"
+
+    (( "$(idle-get)" >= "$timeout" ))
+}
+
+
 function lastunlock-get {
     assert isDarwin @RET
 
