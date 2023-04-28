@@ -1,6 +1,8 @@
 ##
 function fanficfare-m {
-    $proxyenv fanficfare --non-interactive -f mobi "$@"
+    local format="${fanficfare_format:-epub}"
+
+    $proxyenv fanficfare --non-interactive -f "$format" "$@"
 }
 
 function jfic {
