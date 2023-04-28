@@ -107,11 +107,25 @@ function path-abbrev-to-music-dir {
 }
 ##
 function cellp {
-    brishzr-repeat # now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
+    assert-net @RET
 
-    trs-empty-files $nightNotes
+    pushf ~cel/
+    {
+        if git-merge-p ; then
+            local err="git merge already in progress"
+            ecerr "$0: $err"
 
-    git_commitmsg_ask=no reval-ec incell gsync
+            fsay-noidle "$err in the cellar"
+
+            return 3
+        fi
+
+        brishzr-repeat # now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
+
+        trs-empty-files $nightNotes
+
+        git_commitmsg_ask=no reval-ec gsync
+    } always { popf }
 }
 ##
 function vcn-getrepo {
