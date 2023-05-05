@@ -44,6 +44,11 @@ function rem-sync {
     fi
 }
 
+function rem-sync-ni {
+    gsync_commit_pre_opts=(-c commit.gpgsign=false) log-to ~/logs/rem_sync rem-sync "$@"
+    #: gpg signing will interactively ask for the passphrase when run in cron or tmux
+}
+
 function iwidget-rem-refresh {
     if [[ "$remindayDir" == "$remindayCDir" ]] ; then
         ecerr "$0: remindayDir is set to remindayCDir; Skipping refresh."
