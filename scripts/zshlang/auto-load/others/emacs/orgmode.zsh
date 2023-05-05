@@ -802,4 +802,10 @@ function strip-prefixed-dollar {
         perl -CS -lpe 's/^\s*\$ //g' |
         cat-copy-if-tty
 }
+
+function strip-ic {
+    in-or-args "$@" |
+        perl -CS -lne 'm/^ic\|\s/ || print' |
+        cat-copy-if-tty
+}
 ##
