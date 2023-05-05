@@ -146,6 +146,10 @@ function dateshort() { date +"%b %d %H:%M:%S" }
 
 function dateshortnum() { date +"%Y/%m/%d" }
 
+function date-tehran {
+    TZ='Asia/Tehran' date +'%Y-%m-%d %A %H:%M:%S'
+}
+
 function datej {
     # alt: Python https://github.com/fitnr/convertdate
     # jalalim tojalali "$(dateshortnum)"
