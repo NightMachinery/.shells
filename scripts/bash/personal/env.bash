@@ -10,7 +10,8 @@ export LPASS_AGENT_TIMEOUT=$((3600*24*7))
 export VCSH_GITATTRIBUTES=y
 
 # export kindle_email=fifya@kindle.com #: @personalInfo
-export kindle_email=Azadi4Baran@kindle.com #: @personalInfo
+# export kindle_email=Azadi4Baran@kindle.com #: @personalInfo
+export kindle_email=jkajskjsoqw61azadi4baran@kindle.com #: @personalInfo
 
 isLocal && export NEDITOR='emacs.dash' || export NEDITOR='vim'
 export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
