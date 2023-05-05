@@ -1,4 +1,46 @@
-function h_timer-bell() {
+##
+alias timezone-set-i-linux='sudo dpkg-reconfigure tzdata'
+
+function timezone-set {
+    local tz="${1:-Asia/Tehran}" force="${timezone_force}"
+    assert-args tz @RET
+
+    if isLinux ; then
+        sudo timedatectl set-timezone "$tz"
+        #: This doesn't work in some containers:
+        #: https://stackoverflow.com/questions/43907925/ubuntu-timedatectl-fails-in-docker-container
+
+        if bool "$force" ; then
+            sudo dash -c 'echo "$timezone" > /etc/timezone'
+            sudo mv /etc/localtime /etc/localtime.bak
+            sudo dpkg-reconfigure -f noninteractive tzdata
+        fi
+    else
+        @NA
+    fi
+}
+
+function timezone-get {
+    local mode="${1:-long}"
+
+    if isLinux ; then
+        if [[ "$mode" == 'long' ]] ; then
+            timedatectl | rget "^\s*Time zone:\s+(.*)"
+        elif [[ "$mode" == 'numeric' ]] ; then
+            timedatectl | rget "^\s*Time zone:.*\((\+\d+)"
+        elif [[ "$mode" == 'name' ]] ; then
+            timedatectl | rget "^\s*Time zone:\s+(\S+)"
+        fi
+    else
+        @NA
+    fi
+}
+
+function TZ-set-from-system {
+    export TZ="$(timezone-get name)"
+}
+##
+function h_timer-bell {
     tts-glados1-cached "The time is now up, commander"
     awaysh @opts redo 2 @ bell-visual-flash1
     ##
