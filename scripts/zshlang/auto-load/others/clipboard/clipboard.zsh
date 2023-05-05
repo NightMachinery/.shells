@@ -345,3 +345,8 @@ function clipboard-add-files() {
 }
 alias pba='clipboard-add-files'
 ##
+function clipboard-send-6030 {
+    in-or-args "$@" |
+        socat - TCP:127.0.0.1:6030
+}
+##
