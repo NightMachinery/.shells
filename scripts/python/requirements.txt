@@ -1,3 +1,4 @@
+
 Pillow
 PyPDF2
 Unidecode
@@ -90,6 +91,7 @@ sumy
 syncer
 text2num
 tgcrypto
+tiktoken
 titlecase
 tqdm
 waybackpack
@@ -101,5 +103,3 @@ xmltodict
 yapf
 yq
 zxcvbn
-
-tiktoken
