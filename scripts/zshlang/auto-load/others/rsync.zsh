@@ -33,8 +33,14 @@ function rsp-notes-export {
     rsp_include=(${(@f)"$(org-export-recursive "${entries[@]}" | trim-extension)"}) @TRET
 
     if (( ${#rsp_include} == 0 )) ; then
+        ##
+        # rsp_include=("${entries[@]}")
+        #: This wouldn't move the images.
+        #: Just edit the files for now to make their old stored hashes invalid.
+        ##
         ecerr "$0: no files included"
         return 1
+        ##
     fi
 
     ec $'\n\n#####################\n\n'

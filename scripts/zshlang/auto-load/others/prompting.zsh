@@ -41,6 +41,10 @@ function prompt-fluent {
     prompt-instruction-input 'Make the following text more fluent:' "$@"
 }
 ##
+function prompt-issue-rewrite {
+    prompt-instruction-input 'Rewrite the following issue more clearly. Suggest a title for the issue.' "$@"
+}
+##
 function prompt-idea-rewrite {
     prompt-instruction-input 'Rewrite the following ML research proposal more clearly. Be concise.' "$@"
 }
@@ -110,5 +114,14 @@ The following:' "$@"
 ##
 function prompt-explain-code {
     prompt_code_block_p=y prompt-instruction-input 'Explain the following code:'
+}
+##
+function prompt-shell-long-args {
+    prompt_code_block_p=y prompt-instruction-input 'Rewrite the following shell code using long argument forms instead of short ones. E.g.,
+
+Q: `curl -I ...`
+A: `curl --head ...`
+
+Only output the rewritten code.'
 }
 ##

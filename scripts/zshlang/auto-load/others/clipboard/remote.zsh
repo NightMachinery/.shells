@@ -1,4 +1,5 @@
-function cp2eva {
+##
+function pbcopy-lilf {
     local inargs=''
     in-or-args2 "$@"
     local tmp
@@ -6,13 +7,20 @@ function cp2eva {
     {
         ecn "${inargs[*]}" > $tmp @RET
 
-        assert scp -C "$tmp" ${lilf_user}@82.102.11.148:tmp/.remote_cp @RET
+        assert scp -C "$tmp" ${lilf_user}@${lilf_ip}:tmp/.remote_cp @RET
         # -C      Compression
     } always {
         silent trs-rm "$tmp"
     }
 }
-function pbpaste-remote() {
+
+function pbpaste-lilf {
+    assert scp -C ${lilf_user}@${lilf_ip}:tmp/.remote_cp ~/tmp/.remote_cp @RET
+
+    pbpaste-remote
+}
+
+function pbpaste-remote {
     cat ~/tmp/.remote_cp @RET
 }
 aliasfn popr pbpaste-remote
