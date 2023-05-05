@@ -604,6 +604,11 @@ function org-link-browser-current {
     org-link-create "$(browser-current-url)" "$(browser-current-title)" \
         | cat-copy-if-tty
 }
+
+function md-link-browser-current {
+    org-link-browser-current "$@" |
+        org2md
+}
 ##
 function org-toman-get {
     : 'Use with "| in-sum | numfmt-humanfriendly"'

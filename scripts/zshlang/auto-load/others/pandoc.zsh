@@ -148,7 +148,9 @@ function pandoc-convert {
                 else
                     cat
                 fi
-            }
+            } |
+                perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g'
+
         elif [[ "$to" == markdown ]] && bool $trim_extra ; then
             perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g'
             # trying to remove header_attributes, fenced_code_attributes, inline_code_attributes, etc

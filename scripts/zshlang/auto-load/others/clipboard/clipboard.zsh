@@ -294,9 +294,9 @@ function reval-paste-copy {
 aliasfn pbpaste-transform reval-paste-copy
 alias pope="reval-paste-copy"
 
-function pbcopy-ask() {
+function pbcopy-ask {
     in-or-args2 "$@"
-    ec '==================='$'\n'
+    ec-sep-h
     ecn "$inargs[*]" | bat --style=plain
     if ask "Copy?" Y ; then
         pbcopy "$inargs[*]"

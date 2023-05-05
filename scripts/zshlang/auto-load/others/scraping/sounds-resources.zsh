@@ -1,4 +1,4 @@
-function sounds-resources-dl() {
+function sounds-resources-dl {
     local urls=("$@") # e.g., https://www.sounds-resource.com/pc_computer/starcraftiiheartoftheswarm/
 
     local noconfirm

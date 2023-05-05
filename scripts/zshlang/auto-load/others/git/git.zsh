@@ -288,6 +288,8 @@ function gsync {
   local pull_only="${gsync_p}"
   local branch="${gsync_branch:-${gsync_b}}"
   local remote="${gsync_remote:-${gsync_r}}"
+  ensure-array gsync_commit_pre_opts
+  local commit_pre_opts=("${gsync_commit_pre_opts[@]}")
 
   pushf "$(git-root)" || return 1
   {
@@ -316,9 +318,9 @@ function gsync {
 
     if ! bool $pull_only ; then
       msg="${msg:-$(git-commitmsg)}"
-      git submodule foreach git commit -uno -a -m "${msg}" @STRUE
+      git submodule foreach git "${commit_pre_opts[@]}" commit -uno -m "${msg}" @STRUE
       ec "Main repo"
-      git commit -uno -a -m "${msg}" @STRUE
+      git "${commit_pre_opts[@]}" commit -uno -m "${msg}" @STRUE
     fi
 
     local remotes
@@ -334,8 +336,8 @@ function gsync {
       ec
       if gr-isLocal "$remote" || isNet ; then
         # @todo @maybe get the remotes from the submodule itself. The submodules' remotes don't necessarily match the main repo's, such as when the submodule only has an 'upstream' remote.
-        reval-ec git submodule foreach git pull "$remote" "$branch" --no-edit --rebase=false @STRUE
-        reval-ec git pull "$remote" "$branch" --no-edit --rebase=false @TRET
+        reval-ec git "${commit_pre_opts[@]}" submodule foreach git pull "$remote" "$branch" --no-edit --rebase=false @STRUE
+        reval-ec git "${commit_pre_opts[@]}" pull "$remote" "$branch" --no-edit --rebase=false @TRET
       else
         ecerr "$0: Remote '$remote' is not local and there is no internet access. Skipping it."
       fi

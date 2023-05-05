@@ -91,7 +91,6 @@ alias pksay='pkill speechsynthesisd say'
 alias pkmu="pkill -f -- 'mpv.*--no-video'"
 alias c='command'
 alias px='ruu proxychains4'
-alias set-timezone='sudo dpkg-reconfigure tzdata'
 alias zsh-to-shells='command -v zsh | sudo tee -a /etc/shells'
 alias pat='play-and-trash'
 alias vi='nvim -u NONE'

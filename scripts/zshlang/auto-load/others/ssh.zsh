@@ -1,4 +1,5 @@
-ashL() {
+##
+function ashL {
     local a=() i
     for i in "$@[2,-1]"
     do

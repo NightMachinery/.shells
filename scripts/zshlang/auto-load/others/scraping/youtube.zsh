@@ -31,7 +31,7 @@ aliassafe ymp3='noglob youtube-dl --no-playlist --prefer-ffmpeg --extract-audio 
 aliassafe ymp3-playlist='ymp3 --yes-playlist'
 # `-f best` to download single file
 ##
-function youtube-dl() {
+function youtube-dl {
     local cookie_mode="${youtube_dl_c}"
     typeset -ga ytdl_opts # has priority over args
 
@@ -39,9 +39,9 @@ function youtube-dl() {
     # head='youtube-dl'
     head='yt-dlp'
 
-    local opts=()
+    local opts=(--no-abort-on-error)
     if [[ "$head" == 'yt-dlp' ]] ; then
-        opts+=(--compat-options no-live-chat,no-keep-subs --abort-on-error)
+        opts+=(--compat-options no-live-chat,no-keep-subs)
     fi
 
     isI || opts+=( --quiet --no-progress )

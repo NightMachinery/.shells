@@ -69,7 +69,12 @@ function emacs-vfiles {
     ec-copy "${(u@F)res}"
 }
 ##
-aliasfn emc-open bicon-emc
+function emc-open {
+    #: @seeAlso [agfi:bicon-emc]
+    ##
+    emc-nowait2 "$@"
+}
+
 alias emc='emc-open'
 
 function emc-gateway {
@@ -179,13 +184,20 @@ function emc-focus {
 
 function emc-focus-gui {
     if isDarwin ; then
-        reval-ec hammerspoon -c "toggleFocus(emacsAppName)"
+        if [[ "$(frontapp-get)" =~ '(?i).*emacs.*' ]] ; then
+            #: already in focus
+
+            return 0
+        else
+            reval-ec hammerspoon -c "toggleFocus(emacsAppName)"
+            return $?
+        fi
     else
         return 1
     fi
 }
 
-function emc-nowait() {
+function emc-nowait {
     @deprecated # emc-nowait2
 
     emc-gateway --no-wait "$@"
@@ -220,7 +232,7 @@ function icat-emc() {
 }
 alias icc='icat-emc'
 ##
-function lisp-quote() {
+function lisp-quote {
     ##
     in-or-args "$@" | lisp-quote.lisp
     ##
@@ -255,11 +267,11 @@ function lisp-quote-safe {
 }
 aliasfn emc-quote-safe lisp-quote-safe
 ##
-function emc-nowait2() {
+function emc-nowait2 {
     local f="$1" cmd="${emc_nowait2_cmd:-find-file}"
     assert-args f @RET
 
-    ## @redunddant
+    ## @redundant
     # local tmp
     # tmp="$(serr grealpath -e "$f")" && f="$tmp" || true # can be, e.g., an scp path
     ##
