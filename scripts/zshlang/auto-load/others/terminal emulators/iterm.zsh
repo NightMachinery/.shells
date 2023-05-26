@@ -167,7 +167,9 @@ function h_icat() {
     fi
 
     if isKitty ; then
-        icat-kitty2 "$i"
+        icat-kitty "$i"
+        # icat-kitty2 "$i"
+
         return $?
     fi
     if test -z "$TMUX" ; then

@@ -15,6 +15,8 @@ function curl-ip {
         jq_opts+='--color-output'
     fi
 
+    pbcopy "$(gq curl "$opts[@]" https://checkip.amazonaws.com)"
+
     local res res_json
     if bool "${ipinfo:-y}" && res="$(reval-ec curl "$opts[@]" https://ipinfo.io)" && res_json="$(ec $res | serr jq -e "$jq_opts[@]" .)" ; then
         ec $res_json
@@ -36,9 +38,11 @@ alias ci='curl-ip'
 # time2 brishzr curl -o /dev/null -w %{url_effective}  'https://www.youtube.com/watch?v=5X5v7vRYQjc&list=PL-uRhZ_p-BM7dYrgeHz4r3u74L9xwyXmL'
 # time2 curl -x socks5h://127.0.0.1:1078 -o /dev/null -w %{url_effective}  'https://www.ipinfo.io/'
 
+aliasfn citeias curl-ip -x 'socks5h://10.2.32.28:10808'
 aliasfn ci30 curl-ip -x 'socks5h://127.0.0.1:1030'
 aliasfn ci31 curl-ip -x 'socks5h://127.0.0.1:1031'
 aliasfn ci35 curl-ip -x 'socks5h://127.0.0.1:1035'
+aliasfn ci2035 curl-ip -x 'http://127.0.0.1:2035'
 aliasfn ci40 curl-ip -x 'socks5h://127.0.0.1:1040'
 aliasfn ci41 curl-ip -x 'socks5h://127.0.0.1:1041'
 aliasfn ci2041 curl-ip -x 'http://127.0.0.1:2041'
@@ -50,6 +54,7 @@ aliasfn ci81 curl-ip -x 'socks5h://127.0.0.1:1081'
 aliasfn ci82 curl-ip -x 'socks5h://127.0.0.1:1082'
 aliasfn ci2082 curl-ip -x 'http://127.0.0.1:2082'
 aliasfn ci89 curl-ip -x 'socks5h://127.0.0.1:1089'
+aliasfn ci2089 curl-ip -x 'http://127.0.0.1:2089'
 aliasfn ci90 curl-ip -x 'socks5h://127.0.0.1:1090'
 aliasfn ci91 curl-ip -x 'socks5h://127.0.0.1:1091'
 aliasfn ci92 curl-ip -x 'socks5h://127.0.0.1:1092'
@@ -58,6 +63,7 @@ aliasfn ci94 curl-ip -x 'socks5h://127.0.0.1:1094'
 aliasfn ci95 curl-ip -x 'socks5h://127.0.0.1:1095'
 aliasfn ci195 curl-ip -x 'socks5h://127.0.0.1:1195'
 aliasfn ci96 curl-ip -x 'socks5h://127.0.0.1:1096'
+aliasfn ci2096 curl-ip -x 'http://127.0.0.1:2096'
 aliasfn ci97 curl-ip -x 'socks5h://127.0.0.1:1097'
 aliasfn ci98 curl-ip -x 'socks5h://127.0.0.1:1098'
 aliasfn ci99 curl-ip -x 'socks5h://127.0.0.1:1099'

@@ -1,6 +1,9 @@
 ##
 # import torch.nn.functional as F
-import jax.nn as jnn
+try:
+    import jax.nn as jnn
+except:
+    pass
 ##
 from rich import inspect
 

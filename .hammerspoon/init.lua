@@ -617,6 +617,8 @@ appHotkey{ key='w', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 
 appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
+appHotkey{ key='x', appName='com.jetbrains.pycharm' }
+
 appHotkey{ key='t', appName='com.tdesktop.Telegram' }
 emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='e', appName=emacsAppName }

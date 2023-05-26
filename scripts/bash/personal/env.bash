@@ -14,7 +14,7 @@ export VCSH_GITATTRIBUTES=y
 export kindle_email=jkajskjsoqw61azadi4baran@kindle.com #: @personalInfo
 
 isLocal && export NEDITOR='emacs.dash' || export NEDITOR='vim'
-export ALTERNATE_EDITOR="" #Causes Emacs to start a daemon if one is not found.
+export ALTERNATE_EDITOR="" #: Causes Emacs to start a daemon if one is not found.
 export SUDO_EDITOR="$NEDITOR"
 export VISUAL="$NEDITOR"
 export EDITOR="$VISUAL"

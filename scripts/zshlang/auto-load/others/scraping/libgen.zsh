@@ -71,7 +71,7 @@ function libgendl-md5 {
 }
 reify libgendl-md5-main libgendl-md5-bok libgendl-md5-old libgendl-md5-bok-old libgendl-md5
 
-function jlibplain() {
+function jlibplain {
     # libgendl-md5-main "${(f@)$(re libgen2md5 "$@")}" | inargsf aa -Z
     libgendl-md5 "${(f@)$(libgen2md5 "$@")}"
     # serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
