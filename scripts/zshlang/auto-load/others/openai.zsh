@@ -134,7 +134,7 @@ alias xc='openai-complete-with-prompt'
 function openai-chatgpt {
     local proxy=()
     if isLocal && test -z "${proxy_disabled}" ; then
-        proxy=(pxa89)
+        proxy=(pxa)
     fi
 
     local input

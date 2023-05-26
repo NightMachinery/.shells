@@ -51,7 +51,7 @@ function h_timer-bell {
     # bell-visual-flash1
 }
 
-function timer() {
+function timer {
     doc aliased to timer with noglob
     local t=$1 cmd=("${@[2,-1]}") notify="${timer_notify:-y}" msg="${timer_msg}"
     test -z "$cmd[*]" && cmd=(eval lo_s=20 loop h_timer-bell)

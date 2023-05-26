@@ -1,5 +1,11 @@
 #+TITLE: minimal_proxy/gen
 
+* rsync
+#+begin_example zsh
+rsp-safe  ~/scripts/setup/minimal_proxy/.shared.sh x@y:
+rsp-safe  ~/.inputrc x@y:
+#+end_example
+
 * [[https://github.com/webinstall/webi-installers][webinstall/webi-installers: Primary and community-submitted packages for webinstall.dev]]
 #+begin_example zsh
 source ~/.config/envman/PATH.env

@@ -114,9 +114,9 @@ function semantic-scholar-to-org {
 }
 ##
 function semantic-scholar-dl-from-org {
-    if should-proxy-p ; then
-        pxa89-local
-    fi
+    # if should-proxy-p ; then
+    #     pxa89-local
+    # fi
 
     local tlg_dest="${tlg_dest:-$tlg_ch_books}"
 
@@ -182,9 +182,9 @@ function semantic-scholar-dl-from-org {
 aliasfn ssdl semantic-scholar-dl-from-org
 
 function semantic-scholar-get-and-dl {
-    if should-proxy-p ; then
-        pxa89-local
-    fi
+    # if should-proxy-p ; then
+    #     pxa89-local
+    # fi
 
     local inargs=() ret=0
     in-or-args3 "$@" @RET

@@ -138,7 +138,7 @@ function clipboard-removedups {
     ecgray "$0: completed"
 }
 ##
-function clipboard-fz-raw() {
+function clipboard-fz-raw {
     local copy="${clipboard_fz_copy}"
     local opts=("${@:-}")
     if [[ "$opts[-1]" == -* ]] ; then

@@ -50,7 +50,7 @@ function ficwad {
 function fichub {
     local url="$1"
 
-    reval-true command yes | $proxyenv reval-ec fichub_cli --format mobi --url "$url"
+    reval-true command yes | $proxyenv reval-ec fichub_cli --format epub --url "$url"
 }
 
 function jfichub {

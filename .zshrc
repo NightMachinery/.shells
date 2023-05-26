@@ -528,7 +528,7 @@ function nightsh-load-zshrc() {
   # https://github.com/dim-an/cod/issues/24
   ###
   if test -n "$bicon_force_plugins" || ! isBicon ; then
-    zsh-defer source-plugin zdharma-continuum/fast-syntax-highlighting #should be last
+    zsh-defer source-plugin zdharma-continuum/fast-syntax-highlighting #: should be last
   fi
   # zsh-defer source-plugin zdharma-continuum/zbrowse # ^b # should be after fast-syntax, idk why but errors out otherwise
   ##

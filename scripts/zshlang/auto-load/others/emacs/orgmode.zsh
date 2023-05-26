@@ -793,7 +793,7 @@ function strip-prefixed-colons {
 
 function strip-prefixed-ge {
     in-or-args "$@" |
-        perl -CS -lpe 's/^>+ //g' |
+        perl -CS -lpe 's/^>+//g' |
         cat-copy-if-tty
 }
 

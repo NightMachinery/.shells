@@ -27,14 +27,19 @@ function reval-pxs() {
     reval pxs "$@"
 }
 ##
+proxy-env-unset () {
+    unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+}
+
 function pxa-create {
     local px_httpport="${1:-1087}" name="${2:-pxa}"
+    local px_http_ip="${3:-127.0.0.1}"
     # 1087: genrouter
     # 1088: shadowsocks
     # @todo0 make this support multiple ports at the  same time
 
     local v="${name}_env"
-    export "$v"="ALL_PROXY=http://127.0.0.1:${px_httpport} all_proxy=http://127.0.0.1:${px_httpport} http_proxy=http://127.0.0.1:${px_httpport} https_proxy=http://127.0.0.1:${px_httpport} HTTP_PROXY=http://127.0.0.1:${px_httpport} HTTPS_PROXY=http://127.0.0.1:${px_httpport}"
+    export "$v"="ALL_PROXY=http://${px_http_ip}:${px_httpport} all_proxy=http://${px_http_ip}:${px_httpport} http_proxy=http://${px_http_ip}:${px_httpport} https_proxy=http://${px_http_ip}:${px_httpport} HTTP_PROXY=http://${px_http_ip}:${px_httpport} HTTPS_PROXY=http://${px_http_ip}:${px_httpport}"
 
     # silent re unalias pxa pxa-local
     #: @redundant
@@ -48,6 +53,8 @@ pxa-create 2092 pxa92
 pxa-create 2041 pxa41
 pxa-create 2032 pxa32
 pxa-create 2089 pxa89
+pxa-create 2096 pxa2096
+pxa-create 10809 pxateias 10.2.32.28
 
 # alias pxa-maybe='isIran && pxa-local'
 alias pxa-maybe='isLocal && pxa-local'
@@ -67,7 +74,7 @@ function reval-pxa-if-no-proxy {
 }
 ##
 function v2-on {
-    tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
+    tmuxnew v2ray-genrouter xray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
     # tmuxnew v2ray-genrouter xray -config $nightNotes/private/configs/zii/v2ray/genrouter.json
 }
 
@@ -245,7 +252,7 @@ function darwin-proxies-get {
 }
 
 function darwin-proxies-set {
-    darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' localhost "${1:-$socksport}"
+    darwin-proxies-gen networksetup -setsocksfirewallproxy '$ns' "${2:-${ip:-localhost}}" "${1:-$socksport}"
 }
 aliasfnq darwin-proxies-on darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' on
 aliasfnq darwin-proxies-off darwin-proxies-gen networksetup -setsocksfirewallproxystate '$ns' off
@@ -253,7 +260,7 @@ aliasfnq darwin-proxies-off darwin-proxies-gen networksetup -setsocksfirewallpro
 aliasfnq darwin-dns-get darwin-proxies-gen networksetup -getdnsservers '$ns'
 aliasfnq darwin-dns-set darwin-proxies-gen networksetup -setdnsservers '$ns'
 ##
-function proxy-on() {
+function proxy-on {
     # proxy on
     # @darwinonly
     darwin-proxies-set
