@@ -350,7 +350,7 @@ function mu-gateway() {
 }
 
 function muc {
-    fz_opts=("$fz_opts[@]" --no-sort) songc --loop-playlist "$*"
+    fz_opts=("$fz_opts[@]" --no-sort) deus songc --loop-playlist "$*"
 }
 ##
 function sdlg() {

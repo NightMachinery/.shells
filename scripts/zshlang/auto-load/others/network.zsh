@@ -193,7 +193,7 @@ function http-static-py {
 }
 ##
 function http-static-caddy {
-    caddy file-server -browse -listen "${2:-0.0.0.0}:${1:-8000}"
+    caddy file-server --browse --listen "${2:-0.0.0.0}:${1:-8000}"
 }
 aliasfn http-static http-static-caddy
 ##

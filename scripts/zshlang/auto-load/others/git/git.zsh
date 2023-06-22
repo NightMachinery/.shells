@@ -481,6 +481,30 @@ function git-listblobs() {
     | $(command -v gnumfmt || echo numfmt) --field=2 --to=iec-i --suffix=B --padding=7 --round=nearest
 }
 
+function git-clone-nonempty-dir {
+  local repo_url="$1"
+  local dir_path="${2:-.}"
+  local branch="${git_branch:-master}"
+  assert-args repo_url dir_path
+
+  if [ ! -d "$dir_path" ]; then
+    echo "Directory $(gquote-dq $dir_path) does not exist."
+    return 1
+  fi
+
+  pushf "$dir_path" @RET
+  {
+    reval-ec git init
+    reval-ec git remote add origin "$repo_url"
+    reval-ec git fetch
+    reval-ec git reset origin/"${branch}"
+    reval-ec git branch --set-upstream-to=origin/"${branch}"
+
+    ecbold "Restoring deleted files ..."
+    git ls-files -z --deleted | xargs -0 git checkout --
+  } always { popf }
+}
+
 function git_sparse_clone {
   # git_sparse_clone "http://github.com/tj/n" "./local/location" "/bin"
   rurl="$1" localdir="$2" && shift 2

@@ -2,12 +2,21 @@
 aliasfn cat-random cat_random.pl
 aliasfn cat-rnd cat-random
 ##
-function rndint {
+function random-int {
     mdoc "Usage: $0 <from> <to> <how-many>
 Doesn't output duplicates. (Outputs permutations.)
 The from-to range is inclusive." MAGIC
+    local from="$1" to="$2" n="${3:-1}"
+    assert-args from to n
 
-    shuf -i "$1-$2" -n "${3:-1}"
+    shuf -i "${from}-${to}" -n "$n"
+}
+aliasfn rndint random-int
+
+function random-int2 {
+    command dd if=/dev/urandom count=1 2> /dev/null |
+        command cksum |
+        awkn 1
 }
 ##
 function array-random {

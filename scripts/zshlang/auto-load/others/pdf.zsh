@@ -232,3 +232,16 @@ function pdf-merge-pdftk {
 
 aliasfn pdf-merge pdf-merge-pdftk
 ##
+function open-zip-pdf {
+    local f="$1"
+
+    if [[ "$f" =~ '.*\.pdf$' ]] ; then
+        open "$f"
+    elif [[ "$f" =~ '.*\.(rar|zip)$' ]] ; then
+        local tmp
+        tmp="$(gmktemp -d)"
+        7z x -o"${tmp}/" "$f"
+        re 'reval-ec open' "${tmp}/"*.pdf
+    fi
+}
+##

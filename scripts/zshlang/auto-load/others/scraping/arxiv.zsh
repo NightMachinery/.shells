@@ -30,6 +30,7 @@ function arxiv-url-get {
                     || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
                     || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
                     || "$url" =~ '^https://(?:www\.)?doi\.org(?:.*)/arXiv\.([^/]+)'
+                    || "$url" =~ '.*/(\d+\.\d+)\.pdf$'
                   ]] ; then
                 #: @example https://doi.org/10.48550/arXiv.2012.07532
                 id="${match[1]}"

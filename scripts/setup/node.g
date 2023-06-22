@@ -54,3 +54,4 @@ trash-cli
 wikiquote-cli
 wikit
 zooqle
+prettydiff2

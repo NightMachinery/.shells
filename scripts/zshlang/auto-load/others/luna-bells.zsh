@@ -188,12 +188,23 @@ function lunaquit {
     ec "$pids" | inargsf reval-ec serr kill-withchildren || true
 }
 
-function lunaquit-force {
+function h-lunaquit-force {
     lunaquit ; pkill LUNA ; sleep 1 && kill-marker-luna-timer-late
 }
 
-function lunaquit-monitor() {
-    # @todo1 make this single-instance
+function h-lunaquit-force-dynamic {
+    bb_say_speed=1 fsay2 'sustain not crucify; great evil lies ahead!'
+
+    h-lunaquit-force
+}
+
+function lunaquit-force {
+    #: This forces the updated version to be used, which allows us to dynamically swap the function called from any terminal session.
+    brishz h-lunaquit-force-dynamic
+}
+
+function lunaquit-monitor {
+    # @todo make this single-instance
 
     local finished=''
     trapexits

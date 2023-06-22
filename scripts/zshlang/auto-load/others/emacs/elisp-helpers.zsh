@@ -48,11 +48,11 @@ function wh-docstring() {
 }
 ##
 function h-emc-paste-img {
-  local dest="$1" prefix_arg="$2"
+  local dest="$1" alpha_p="$2"
   assert-args dest @RET
 
   pbpaste-image "$dest" @RET
-  if test -z "$prefix_arg"; then
+  if bool "$alpha_p"; then
       inplace-io img-background2transparent "$dest" @RET
   fi
 }

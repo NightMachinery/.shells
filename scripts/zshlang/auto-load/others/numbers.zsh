@@ -26,15 +26,21 @@ function hex2decimal-py {
 aliasfn hex2decimal hex2decimal-py
 ##
 function numfmt-humanfriendly-bytes {
-    numfmt --to=iec-i --suffix=B "$@"
+    local inargs
+    in-or-args3 "$@" @RET
+
+    numfmt --to=iec-i --suffix=B "${inargs[@]}"
 }
 aliasfn numfmt-bytes numfmt-humanfriendly-bytes
 
 function numfmt-humanfriendly {
-    numfmt --to=si --round=nearest "$@"
+    local inargs
+    in-or-args3 "$@" @RET
+
+    numfmt --to=si --round=nearest  "${inargs[@]}"
 }
 
-function numtfmt-comma {
+function numfmt-comma {
     in-or-args "$@" |
         perl -lpe 's/(?<=\d)(?=(\d{3})+\b)/,/g' |
         cat-copy-if-tty

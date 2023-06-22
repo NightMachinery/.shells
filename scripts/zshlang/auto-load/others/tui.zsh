@@ -30,22 +30,28 @@ function sleep-neon  {
     print -- "\rSleep Done!                                                               "
 }
 ##
-function erase-ansi-old() {
-    gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g"
+function erase-ansi-old {
+    in-or-args "$@" |
+        gsed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[mGK]//g" |
+        cat-copy-if-tty
 }
 
-function erase-ansi() {
+function erase-ansi {
     # @alt http://www.andre-simon.de/doku/ansifilter/en/ansifilter.php
     ##
-    if true ; then
-        perl -MTerm::ANSIColor=colorstrip -ne 'print colorstrip($_)'
-        # Term::ANSIColor is part of the Perl core
-    elif false && test -n "${commands[strip-ansi]}" ; then
-        # too slow (nodeJS), but more reliable than erase-ansi-old
-        command strip-ansi
-    else
-        erase-ansi-old
-    fi
+    in-or-args "$@" |
+        {
+            if true ; then
+                perl -MTerm::ANSIColor=colorstrip -ne 'print colorstrip($_)'
+                # Term::ANSIColor is part of the Perl core
+            elif false && test -n "${commands[strip-ansi]}" ; then
+                # too slow (nodeJS), but more reliable than erase-ansi-old
+                command strip-ansi
+            else
+                erase-ansi-old
+            fi
+        } |
+        cat-copy-if-tty
 }
 
 function reval-erase-ansi() {
