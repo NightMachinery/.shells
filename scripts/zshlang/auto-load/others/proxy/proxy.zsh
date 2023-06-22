@@ -52,6 +52,7 @@ pxa-create 2091 pxa91
 pxa-create 2092 pxa92
 pxa-create 2041 pxa41
 pxa-create 2032 pxa32
+pxa-create 2035 pxa35
 pxa-create 2089 pxa89
 pxa-create 2096 pxa2096
 pxa-create 10809 pxateias 10.2.32.28
@@ -63,10 +64,14 @@ function reval-pxa {
     pxa reval "$@"
 }
 
+function proxy-active-p {
+    test -n "${proxy_disabled}${ALL_PROXY}${all_proxy}${HTTP_PROXY}${http_proxy}${HTTPS_PROXY}${https_proxy}${FTP_PROXY}${ftp_proxy}"
+}
+
 function reval-pxa-if-no-proxy {
     #: The env var `no_proxy' is actually used by some Unix programs to exclude some IPs.
 
-    if test -z "${proxy_disabled}${ALL_PROXY}${all_proxy}${HTTP_PROXY}${http_proxy}${HTTPS_PROXY}${https_proxy}${FTP_PROXY}${ftp_proxy}"  ; then
+    if ! proxy-active-p ; then
         pxa reval-env "$@"
     else
         reval-env "$@"
@@ -84,6 +89,13 @@ function v2-off {
     ##
     tmuxnew v2ray-genrouter gost -L socks5://127.0.0.1:1081 -L http://127.0.0.1:1087
     ##
+}
+##
+function httpify-socks5 {
+    local socks="${1}"
+    local http="${2}"
+
+    reval-ec tmuxnew "httpify-socks-${socks}-to-${http}" gost -F "socks5://127.0.0.1:${socks}" -L "http://127.0.0.1:${http}"
 }
 ##
 function pxify {

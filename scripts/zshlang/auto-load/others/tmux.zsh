@@ -158,7 +158,7 @@ function ivy-convenience {
         tmuxnewsh2 "eva$i" mosh ${lilf_user}@82.102.11.148 -- zsh
     done
 
-    for i in {1..2} ; do
+    for i in {1..1} ; do
         tmuxnew "julia_repl$i" env TERM="$TERM" PATH="$PATH" julia
     done
 
@@ -167,7 +167,7 @@ function ivy-convenience {
         tmuxnew "ipython_repl$i" ipython
     done
     ##
-    tmuxnew ipython_p310 conda run --no-capture-output --live-stream -n p310 ipython
+    # tmuxnew ipython_p310 conda run --no-capture-output --live-stream -n p310 ipython
     ##
 }
 ##

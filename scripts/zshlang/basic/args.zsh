@@ -33,12 +33,15 @@ function in-or-args-pns {
 
 function in-or-args {
     local pns_p="${in_or_args_pns_p}"
+    local html_p="${in_or_args_html_p}"
 
     if (( $# )) ; then
         arrNN "$@"
     else
         if isInTty ; then
-            if bool "$pns_p" ; then
+            if bool "$html_p" ; then
+                pbpaste-html
+            elif bool "$pns_p" ; then
                 p-newline2space
             else
                 pbpaste
@@ -75,6 +78,14 @@ alias arrnn='arrNN'
 # function in-or-args-arrN() {
 #     (( $# )) && arrN "$@" || ec "$(</dev/stdin)"
 # }
+##
+function head-tail {
+    local from="${1}" to="${2}"
+    assert-args from to @RET
+
+    integer len=$((to - (from - 1)))
+    head -n "${to}" | tail -n "${len}"
+}
 ##
 function ensure-nl {
     #: Ensures the input ends in a newline

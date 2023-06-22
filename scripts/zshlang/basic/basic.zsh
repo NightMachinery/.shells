@@ -135,6 +135,19 @@ function run-on-each() {
 alias re='run-on-each'
 function re() { run-on-each "$@" }
 
+function re-sleep() {
+    local secs="${1}" ; shift
+
+    # Use unusual name not to shadow actual vars
+    local i98765 ret98765=0
+    for i98765 in "${@:2}"
+    do
+        eval "$1 $(gquote "$i98765")" || ret98765=$?
+        sleep "${secs}"
+    done
+    return $ret98765
+}
+
 function re-any() {
     # Use unusual name not to shadow actual vars
     local i98765 ret98765=1

@@ -803,9 +803,21 @@ function strip-prefixed-dollar {
         cat-copy-if-tty
 }
 
-function strip-ic {
+function strip-prefixed-ic {
+    in-or-args "$@" |
+        perl -CS -lpe 's/^ic\| //g' |
+        cat-copy-if-tty
+}
+
+function strip-ic-lines {
     in-or-args "$@" |
         perl -CS -lne 'm/^ic\|\s/ || print' |
+        cat-copy-if-tty
+}
+##
+function strip-wikipedia-citations {
+     in-or-args "$@" |
+        perl -CS -lpe 's/\[\d+\]//g' |
         cat-copy-if-tty
 }
 ##

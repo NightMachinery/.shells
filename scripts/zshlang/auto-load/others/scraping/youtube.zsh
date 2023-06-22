@@ -32,6 +32,7 @@ aliassafe ymp3-playlist='ymp3 --yes-playlist'
 # `-f best` to download single file
 ##
 function youtube-dl {
+    local invocation_save_p="${youtube_dl_inv_save_p:-y}"
     local cookie_mode="${youtube_dl_c}"
     typeset -ga ytdl_opts # has priority over args
 
@@ -57,6 +58,10 @@ function youtube-dl {
     #     opts+=(--proxy 'socks5://127.0.0.1:1081')
     # fi
     ##
+
+    if bool "${invocation_save_p}" ; then
+        invocation-save yt "$0" "${@}"
+    fi
 
     if isSSH ; then # urlfinalg takes too much time on Iran's net.
         transformer urlfinalg "revaldbg $proxycmd $head $opts[@]" "$@" "$ytdl_opts[@]"

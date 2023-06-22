@@ -28,6 +28,11 @@ function reval-dbg {
 # alias ll='exa -a -l --blocks'
 # alias lt='exa -a -T'
 alias lc='l -s created'
+function lc-rp {
+    lc "$@" |
+        inargsf-cmd realpath
+}
+
 alias lcl='lc -l'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'

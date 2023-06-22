@@ -107,3 +107,30 @@ function timer-late() {
 }
 noglobfn timer-late
 ##
+function stopwatch {
+    local precision="${1:-3}"
+    if [ "$precision" -eq 0 ]; then
+        start="$(gdate '+%s')"
+    else
+        start="$(gdate "+%s%${precision}N")"
+    fi
+
+    {
+        # colorfg 40 200 30 ;
+        Bold
+        while true; do
+            if [ "$precision" -eq 0 ]; then
+                now="$(gdate '+%s')"
+                time="$((now - start))"
+                printf "%s\r" "$(gdate -u -d "@$time" '+%H:%M:%S')"
+            else
+                now="$(gdate "+%s%${precision}N")"
+                time="$((now - start))"
+                seconds="$((time / 10**precision))"
+                subseconds="$((time % 10**precision))"
+                printf "%s.%0${precision}d\r" "$(gdate -u -d "@$seconds" '+%H:%M:%S')" "$subseconds"
+            fi
+        done
+    } always { resetcolor }
+}
+##

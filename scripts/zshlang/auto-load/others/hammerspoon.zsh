@@ -121,3 +121,11 @@ function hs-hyper-m() {
 function hs-cmd-v() {
     hammerspoon -c 'eventtap.keyStroke({"cmd"}, 9)'
 }
+##
+function hs-type {
+    local input
+    input="$(in-or-args "$@")" @RET
+
+    reval-ec hammerspoon -c "hs.eventtap.keyStrokes($(gquote-dq "$input"))"
+}
+##

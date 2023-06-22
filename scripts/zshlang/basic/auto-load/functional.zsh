@@ -49,6 +49,7 @@ inargsE-gen() {
     fi
 }
 alias inargsf="fsep=$'\n' inargs-gen"
+alias inargsf-cmd="gxargs -d'\\n' --"
 alias inargs0="fsep=$'\0' inargs-gen"
 alias inargsc="fsep='' inargs-gen" # splits by char
 alias inargss="fsep='IFS' inargs-gen"

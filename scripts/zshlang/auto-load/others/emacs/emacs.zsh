@@ -207,7 +207,7 @@ alias emcnw='emc-nowait2'
 
 ialias emcg="emacsclient -c"
 ##
-function emc-in() {
+function emc-in {
     local s="${1:-.log}"
 
     local t
@@ -220,8 +220,9 @@ function emc-in() {
     # emc-colorize
 }
 
-function emc-colorize() {
-    emc-eval "(when (equalp major-mode 'fundamental-mode) (xterm-color-colorize-buffer) (set-buffer-modified-p nil) (read-only-mode))"
+function emc-colorize {
+    emc-eval "(when t ;; (equalp major-mode 'fundamental-mode)
+ (xterm-color-colorize-buffer) (set-buffer-modified-p nil) (read-only-mode))"
     # xterm-color-colorize-buffer eats the ANSI codes, so if we save the file those codes will be LOST
     #
     # this whole command is a raceCondition but it should be harmless
@@ -270,13 +271,25 @@ aliasfn emc-quote-safe lisp-quote-safe
 function emc-nowait2 {
     local f="$1" cmd="${emc_nowait2_cmd:-find-file}"
     assert-args f @RET
+    local colorize_p="${emc_nowait2_colorize_p}"
+    local other_commands=""
+
+    if bool "${colorize_p}"; then
+        other_commands+='(xterm-color-colorize-buffer)'
+
+        if [[ "${colorize_p}" == 'non-modified' ]] ; then
+            other_commands+='(set-buffer-modified-p nil)'
+        elif [[ "${colorize_p}" == 'read-only' ]] ; then
+            other_commands+='(set-buffer-modified-p nil) (read-only-mode)'
+        fi
+    fi
 
     ## @redundant
     # local tmp
     # tmp="$(serr grealpath -e "$f")" && f="$tmp" || true # can be, e.g., an scp path
     ##
     
-    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (${cmd} $(emc-quote "$f")) t)"
+    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (${cmd} $(emc-quote "$f")) ${other_commands} t)"
     # throws useless error 'Invalid read syntax: "#"', but works anyway
 
     emc-focus

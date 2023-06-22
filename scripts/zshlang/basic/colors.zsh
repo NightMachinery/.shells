@@ -14,7 +14,7 @@ Flash () { ! isColor || print -n -- '\e[5m' } # doesn't work on my iTerm
 Invert () { ! isColor || print -n -- '\e[7m' }
 Invisible () { ! isColor || print -n -- '\e[8m' } # again doesn't work
 ##
-function palette() {
+function palette {
     local i
     local -a colors
     for i in {000..255}; do
@@ -22,7 +22,9 @@ function palette() {
     done
     print -cP $colors
 }
-function paletteget() {
+alias tui-color256-test='palette'
+
+function paletteget {
     magic mdocu '<COLOR_CODE>' ; mret
 
     local color="%F{$1}"
@@ -79,7 +81,7 @@ function colorb() {
     co_f=colorbg color "$@"
 }
 
-function color() {
+function color {
     true colorfg colorbg # whdeep hack, altly we can split on :- too
     local in inargs
     local noreset="$coNr"

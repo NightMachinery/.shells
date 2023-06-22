@@ -45,6 +45,10 @@ function rem-sync {
 }
 
 function rem-sync-ni {
+    if battery-p ; then
+        log-to ~/logs/rem_sync ecerr "$0: aborting because on battery"
+    fi
+
     gsync_commit_pre_opts=(-c commit.gpgsign=false) log-to ~/logs/rem_sync rem-sync "$@"
     #: gpg signing will interactively ask for the passphrase when run in cron or tmux
 }
@@ -751,4 +755,31 @@ function h-rem-reclater {
 function date-unix {
     command date "+%s"
 }
+##
+function str-center-justify {
+  local str="$1"
+  local width="$2"
+  local str_len=${#str}
+
+  if (( width <= str_len )); then
+    echo "$str"  # No need for justification, width is smaller than or equal to string length
+  else
+    local left_padding=$(( (width - str_len) / 2 ))
+    local right_padding=$(( width - str_len - left_padding ))
+
+    printf "%*s%s%*s\n" "$left_padding" "" "$str" "$right_padding" ""
+  fi
+}
+
+function jalali-calendar {
+    local opts=()
+
+    #: =$array[(I)foo]= returns the index of the last occurrence of =foo= in =$array= and 0 if not found. The =e= flag is for it to be an exact match instead of a pattern match.
+    if (( ${@[(Ie)--no-true-color]} == 0 )); then
+        opts+=("--true-color")
+    fi
+
+    command jalali-calendar "$@" "${opts[@]}"
+}
+alias jcal='jalali-calendar'
 ##

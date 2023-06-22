@@ -283,3 +283,9 @@ function space2tab {
         cat-copy-if-tty
 }
 ##
+function whitespace-shared-rm {
+    cat-paste-if-tty |
+        whitespace_shared_rm.pl "$@" |
+        cat-copy-if-tty
+}
+##

@@ -29,7 +29,13 @@ function semantic-scholar-to-json-api {
     fi
 
     local json
-    json="$(revaldbg gurl "https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,openAccessPdf")" @TRET
+    local url
+    url="https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,openAccessPdf"
+    json="$(revaldbg gurl "$url")" || {
+        ecerr "$0: curl-ing the API failed with $?"$'\n'"URL: ${url}"
+        pbcopy "$url"
+        return 1
+    }
     #: =tldr= sometimes isn't available for the newer papers, and we aren't currently using it, so I have omitted it from the request above. (It will trow an error if tldr is not available.)
 
     ec "$json" |
@@ -75,7 +81,9 @@ function semantic-scholar-to-json-scraping {
     url="$(semantic-scholar-url-get "$url")" @TRET
 
     local html
-    html="$(full-html2 "$url")" @TRET
+    html="$(fhMode="${fhMode:-aa}" full-html2 "$url")" @TRET
+    #: fhMode=curl,wgetm did not work with genrouter for some reason
+
     ec "$html" |
         selectors2json.py \
             title '[data-selenium-selector="paper-detail-title"]' '' \
@@ -108,10 +116,14 @@ function semantic-scholar-to-org {
     assert-args url @RET
     url="$(semantic-scholar-url-get "$url")" @TRET
 
-    revaldbg semantic-scholar-to-json "$url" \
-        | revaldbg semantic_scholar_json_to_org.lisp "$url" \
-        | cat-copy-if-tty
+    local json
+    json="$(revaldbg semantic-scholar-to-json "$url")" @TRET
+
+    ec "$json" |
+        revaldbg semantic_scholar_json_to_org.lisp "$url" |
+        cat-copy-if-tty
 }
+aliasfn ssorg semantic-scholar-to-org
 ##
 function semantic-scholar-dl-from-org {
     # if should-proxy-p ; then

@@ -32,3 +32,15 @@ function unzip2dir() {
 reify unzip2dir
 aliasfn uzd unzip2dir
 ##
+function archive-list {
+    local input="$1"
+
+    ##
+    7z l "$input"
+    ##
+    # unzip -l "$input"
+    ##
+    # unrar l "$input"
+    ##
+}
+##

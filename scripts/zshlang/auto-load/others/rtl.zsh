@@ -31,7 +31,7 @@ function rtl-reshaper-fast {
 function rtl-reshaper-streaming {
   local line
   #: read stdin line by line
-  while read -r line ; do
+  while IFS= read -r line ; do
     ec "$line" | rtl-reshaper-fast
   done
 }

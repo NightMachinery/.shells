@@ -59,16 +59,42 @@ function icat-py() {
     python -m imgcat --height "${icat_h:-30}" "$@" # This will zoom, too, but that's actually good in most cases!
 }
 ##
-function icat-kitty() {
-    kitty +kitten icat "$@"
+function icat-kitty {
+    kitty +kitten icat --scale-up "$@"
 }
-function icat-kitty-single() {
+aliasfn islideshow-kitty2 icat-kitty --hold # press a key to go to next image
+
+function icat-kitty-single {
     icat-kitty --clear
     icat-kitty --place "${COLUMNS}x${LINES}@0x0" --scale-up "$@"
     # @see kitty-launch-icat
 }
+
 aliasfn icat-kitty2 pixcat fit-screen --enlarge --vertical-margin 60 # accepts dirs, too
-aliasfn islideshow-kitty icat-kitty2 --hang # press ENTER to go to next image
+aliasfn islideshow-kitty2 icat-kitty2 --hang # press ENTER to go to next image
+##
+function icat-kitty-fit-width {
+  # Get terminal width
+  local terminal_width=$(tput cols)
+
+  # Use kitty +kitten icat to display image
+  for img in "$@"; do
+    # Use ImageMagick to identify the image dimensions
+    local img_dimensions=$(magick identify -format "%wx%h" "$img")
+    local img_width="$(echo $img_dimensions | cut -d 'x' -f 1)"
+    local img_height="$(echo $img_dimensions | cut -d 'x' -f 2)"
+
+    # Calculate scale factor and new height
+    local scale_factor="$(echo "$terminal_width / $img_width" | command bc -l)"
+    local new_height="$(echo "$img_height * $scale_factor" | command bc)"
+    new_height="${new_height%.*}"  # Remove decimal part
+
+    # Display the image
+    kitty +kitten icat --place=${terminal_width}x${new_height}@0x0 --scale-up "$img"
+
+    redo2 "$((new_height / 2))" ec
+  done
+}
 ##
 function icat-realsize() {
     isI || return 0
