@@ -11,7 +11,7 @@ function file-unix2uri-rp-v2 {
 ##
 function realpath-ife() {
     if test -e "$1" ; then
-        realpath "$1"
+        grealpath -- "$1"
     else
         ec "$1"
     fi

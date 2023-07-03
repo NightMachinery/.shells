@@ -160,12 +160,14 @@ function jsummon() {
     mkdir -p ~/julia_tmp/
     local u=(*)
     mv "$u" ~/julia_tmp/
-    realpath ~/julia_tmp/"$u"
+    grealpath -- ~/julia_tmp/"$u"
 }
+
 function junsummon() {
     \rm -r ~/julia_tmp
 }
-jdlc() {
+
+function jdlc {
     cp -r "$(last-modified ~/Downloads/)" ./
     jup
     # silence pushd ~/Downloads/

@@ -134,7 +134,7 @@ function wread() {
 Global output: wr_title wr_author" MAGIC
     local file=''
     [[ "$1" == '--file' ]] && {
-        test -e "$2" && file="$(realpath "$2")" || { ecerr "wread called with nonexistent file." ; return 33 }
+        test -e "$2" && file="$(grealpath -- "$2")" || { ecerr "wread called with nonexistent file." ; return 33 }
         shift 2
     }
     setopt local_options pipefail
@@ -510,7 +510,7 @@ function 2epub-pandoc-simple() {
 
     pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$dest" >&2
 
-    grealpath -e "$dest"
+    grealpath -e -- "$dest"
 }
 @opts-setprefix 2epub-pandoc-simple pandoc_convert
 aliasfn html2epub-pandoc-simple 2epub-pandoc-simple
@@ -566,7 +566,7 @@ function org2epub-auto-metadata {
 
     epub_file="$(reval-ec p2k "${epub_file}")" @TRET
 
-    grealpath -e "$epub_file"
+    grealpath -e -- "$epub_file"
 }
 @opts-setprefix org2epub-auto-metadata org2epub
 ##

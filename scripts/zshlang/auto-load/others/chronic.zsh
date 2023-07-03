@@ -1,3 +1,4 @@
+##
 function chronic-all() {
     tmuxzombie-kill
     rm-caches
@@ -59,5 +60,19 @@ function chronic-anticreep() {
     pip uninstall -y pyOpenSSL
     #: https://github.com/aws/aws-cli/issues/7325
     #: makes BrishGarden not work
+}
+##
+function cron-commands-reboot-get {
+    crontab -l |
+        perl -nle 'print $1 if /^\s*\@reboot\s+(.+)/'
+}
+
+function cron-commands-reboot-run {
+    local cmds
+    cmds=(${(@f)"$(cron-commands-reboot-get)"})
+
+    for cmd in $cmds[@] ; do
+        eval-ec "$cmd"
+    done
 }
 ##

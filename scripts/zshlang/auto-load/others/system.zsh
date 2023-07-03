@@ -365,7 +365,7 @@ function brightness-set {
 }
 
 function brightness-inc {
-    local inc="${1:-0.02}"
+    local inc="${1:-0.01}"
 
     local curr
     curr="$(brightness-get)" @TRET
@@ -381,7 +381,7 @@ function brightness-inc {
 }
 
 function brightness-dec {
-    local amount="${1:-0.02}"
+    local amount="${1:-0.01}"
     brightness-inc $((amount*-1))
 }
 ##

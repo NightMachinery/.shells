@@ -88,7 +88,7 @@ function tty-link() {
     local desc="${2:-${link:t}}"
 
     if test -e "$link" ; then
-        link="file://$(hostname)$(grealpath "$link")"
+        link="file://$(hostname)$(grealpath -- "$link")"
     fi
 
     printf '\e]8;;%s\e\\%s\e]8;;\e\\\n' "$link" "$desc"

@@ -227,9 +227,9 @@ function songd {
     local q="${@: -1}"
     local spath="$music_dir/${q:gs#/# }/"
     ecdbg "spath: $spath"
-    ecdbg "real spath:"  "$(realpath "$spath")"
+    ecdbg "real spath:"  "$(grealpath -- "$spath")"
     test "$bp" = "-d" && {
-        trs "$(realpath "$spath")"
+        trs "$(grealpath -- "$spath")"
         trs "$spath"
         true
     } || {
@@ -303,7 +303,7 @@ function playlist-absolutify {
             if [[ "$f" == /* ]] ; then
                 ec "$f"
             else
-                grealpath -e "${orig_dir}/$f" || true # @STRUE # too slow
+                grealpath -e -- "${orig_dir}/$f" || true # @STRUE # too slow
             fi
         done
     done

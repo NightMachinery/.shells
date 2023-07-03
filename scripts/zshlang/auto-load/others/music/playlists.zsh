@@ -61,7 +61,7 @@ function playlist-relative-make() {
     ecgray "$0: $(gquote-sq "$input") -(not deleted)-> $(gquote-sq "$out")"
 
     local music_dir_rel
-    music_dir_rel="$(grealpath --relative-to "$out_dir" "$music_dir")" @TRET
+    music_dir_rel="$(grealpath --relative-to "$out_dir" -- "$music_dir")" @TRET
     local shared_dir_rel="${music_dir_rel}/.."
 
     cat "$input" | \

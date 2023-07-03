@@ -6,7 +6,7 @@ function zir {
 
 function unzip2dir() {
     local file="$1" y="${unzip2dir_y:-y}"
-    file="$(grealpath -e "$file")" @TRET
+    file="$(grealpath -e -- "$file")" @TRET
 
     local head
     local opts=()

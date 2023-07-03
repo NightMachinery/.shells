@@ -8,6 +8,7 @@ gquote () {
 }
 
 source ~/.shared.sh
+psource ~/base/bootstrap/lib.zsh
 ###
 export HISTFILE="${HOME}/.zsh_history"
 export HISTSIZE=1000000
@@ -23,4 +24,19 @@ unsetopt autopushd
 unsetopt AUTO_NAME_DIRS
 unsetopt BG_NICE # Run all background jobs at a lower priority.
 # having this enabled will cause some failures in BTT-issued background brishz commands
+###
+function cron-commands-reboot-get {
+    crontab -l |
+        perl -nle 'print $1 if /^\s*\@reboot\s+(.+)/'
+}
+
+function cron-commands-reboot-run {
+    local cmds
+    cmds=(${(@f)"$(cron-commands-reboot-get)"})
+
+    for cmd in $cmds[@] ; do
+        echo "$cmd"
+        eval "$cmd"
+    done
+}
 ###

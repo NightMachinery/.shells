@@ -18,7 +18,7 @@ This function uses eval-memoi." ; mret
     local args=("${@:2}") query="$(fz-createquery $fi_rec_query[@])"
     local cmdhead="$1"
     local dir=.
-    dir="$(realpath "$dir")" @TRET
+    dir="$(grealpath -- "$dir")" @TRET
 
     bella_zsh_disable1
 

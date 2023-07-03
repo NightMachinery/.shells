@@ -149,7 +149,8 @@ function pandoc-convert {
                     cat
                 fi
             } |
-                perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g'
+                perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g' |
+                perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g'
 
         elif [[ "$to" == markdown ]] && bool $trim_extra ; then
             perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g'

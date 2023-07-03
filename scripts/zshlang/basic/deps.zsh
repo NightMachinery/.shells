@@ -55,7 +55,7 @@ function caddy-install {
 
     if isLinux ; then
         rehash
-        assert sudo setcap 'cap_net_bind_service=+ep' "$(realpath "$(which caddy)")" @RET
+        assert sudo setcap 'cap_net_bind_service=+ep' "$(grealpath -- "$(which caddy)")" @RET
     fi
 }
 ##

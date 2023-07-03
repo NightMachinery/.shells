@@ -90,7 +90,7 @@ function indir-exists {
 typeset -ag exit_traps=( 0 INT TERM HUP EXIT ) # '0' alone seems enough though https://stackoverflow.com/questions/8122779/is-it-necessary-to-specify-traps-other-than-exit
 alias trapexits='setopt localtraps ; trap "" $exit_traps[@]'
 alias trapexits-release='trap - $exit_traps[@]'
-function reval-notifexit() {
+function reval-notifexit {
     # always alone is not sufficient. Test with `zsh -c 'reval-notifexit iterm_focus.py'`.
     # But now always is most probably redundant.
     trapexits
@@ -103,7 +103,7 @@ function reval-notifexit() {
     }
 }
 ##
-function reval-env() {
+function reval-env {
     test -z "$*" && return 0
 
     local clean_mode="$reval_env_clean" eval_engine=("${reval_env_e[@]:-eval}")
@@ -143,9 +143,14 @@ function reval-env() {
     ##
 }
 
+function rgeval-env {
+    reval_env_e=(geval) reval-env "$@"
+}
+
 function reval-env-ec {
     reval_env_e=(eval-ec) reval-env "$@"
 }
+
 function reval-ec-env {
     reval-env-ec "$@"
 }

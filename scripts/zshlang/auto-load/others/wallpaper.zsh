@@ -14,7 +14,7 @@ function wallpaper-overlay {
     local weather_s="${wallpaper_overlay_weather_s:-400}"
 
     local f
-    f="$(realpath "$input")" || return $?
+    f="$(grealpath -- "$input")" || return $?
 
     (
         renice-me
@@ -54,7 +54,7 @@ function wallpaper-overlay {
 
 function wallpaper-overlay-ipad {
     local f="$1" f_ipad="${2:-$HOME/Downloads/private/ipad.png}"
-    f="$(realpath "$f")" || {
+    f="$(grealpath -- "$f")" || {
         ecerr "$0: Does the input file exist?"
         return 1
     }
@@ -75,7 +75,7 @@ function wallpaper-set-darwin {
     ensure isDarwin @MRET
 
     local f="$1"
-    f="$(realpath "$f")" || return $?
+    f="$(grealpath -- "$f")" || return $?
     ###
     # for i in {1..2} ; do
     for i in 1 ; do
@@ -106,7 +106,7 @@ function wallpaper-set-darwin {
 
 function wallpaper-set {
     local f="$1" overlay_p="${wallpaper_set_overlay_p:-n}"
-    f="$(realpath "$f")" || return $?
+    f="$(grealpath -- "$f")" || return $?
     ##
     local ipad=''
     if test -n "$ipad" ; then

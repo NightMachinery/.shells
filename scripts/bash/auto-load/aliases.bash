@@ -30,7 +30,7 @@ function reval-dbg {
 alias lc='l -s created'
 function lc-rp {
     lc "$@" |
-        inargsf-cmd realpath
+        inargsf-cmd grealpath --
 }
 
 alias lcl='lc -l'
@@ -74,7 +74,7 @@ alias l-m=last-modified
 ##
 function absolutify-in {
     in-or-args "$@" |
-        inargsf grealpath |
+        inargsf grealpath -- |
         cat-copy-if-tty
 }
 

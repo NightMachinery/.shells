@@ -77,7 +77,7 @@ function aget {
 
     local u="./$(uuidgen)" erri jufile j jd
     mkdir -p "$u"
-    u="$(realpath "$u")"
+    u="$(grealpath -- "$u")"
     jd="$u"
     ec $u >> "$deleteus"
     test -e "$ag_f" && {

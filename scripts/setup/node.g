@@ -38,6 +38,7 @@ oji
 peerflix-server
 pngjs
 prettier
+prettydiff2
 puppeteer
 puppeteer-extra
 puppeteer-extra-plugin-repl
@@ -54,4 +55,3 @@ trash-cli
 wikiquote-cli
 wikit
 zooqle
-prettydiff2

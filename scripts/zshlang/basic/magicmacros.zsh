@@ -4,9 +4,9 @@ alias -g ....='../../..'
 alias -g .....='../../../..'
 alias -g ......='../../../../..'
 
-alias -g '@f'=' | inargsf rgeval '
-alias -g '@ff'=' | fz | inargsf rgeval '
-alias -g '@w'=' | fzinw | inargsf rgeval '
+alias -g '@f'=' | inargsf rgeval-env '
+alias -g '@ff'=' | fz | inargsf rgeval-env '
+alias -g '@w'=' | fzinw | inargsf rgeval-env '
 ##
 # alias -g 'MAGIC'='| { eval "$(read -d "" -r -E)" }'
 alias -g 'MAGIC'='| { eval "$(< /dev/stdin)" }'

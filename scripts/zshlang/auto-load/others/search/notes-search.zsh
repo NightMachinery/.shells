@@ -266,7 +266,7 @@ function ntsearch-postprocess {
                 # file="$(<<<$file rmprefix "$nightNotes")"
                 file="$nightNotes/$file"
             }
-            file="$(grealpath "$file")" # needed for opening files in the editor
+            file="$(grealpath -- "$file")" # needed for opening files in the editor
             if ! test -e "$file" ; then
                 if true || test -z "$ntsearch_injector" ; then
                     ecerr "$0: $(gq "$file") does not exist."

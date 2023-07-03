@@ -104,7 +104,7 @@ function _crash_format_trace_info() {
       if test -n "$node" ; then
          if builtin type grealpath >/dev/null 2>&1 ; then
              local res
-             res="$(serr grealpath -e "$node")" && node="$res"
+             res="$(serr grealpath -e -- "$node")" && node="$res"
          fi
       else
           node="NA"

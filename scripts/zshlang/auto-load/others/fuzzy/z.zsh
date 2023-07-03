@@ -7,7 +7,7 @@ function z-add() {
 
     local dir="${1}"
     if test -n "$dir" ; then
-        dir="$(grealpath -e "$dir")" @TRET
+        dir="$(grealpath -e -- "$dir")" @TRET
 
         local res
         res="$(redism SADD "$ZDIRS_NAME" "$(path-abbrev "$dir")")" @TRET

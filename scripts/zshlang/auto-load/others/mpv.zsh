@@ -165,7 +165,7 @@ function hear-loadfile {
 
     assert-args url
     if test -e "$url" ; then
-        url="$(grealpath "$url")" @TRET
+        url="$(grealpath -- "$url")" @TRET
     fi
 
     revaldbg hear-do loadfile "${url}" "$mode"
@@ -215,18 +215,20 @@ Searches Youtube and plays the result as audio." MAGIC
 
     mpv --ytdl-format=bestaudio ytdl://ytsearch:"$*"
 }
-function mpv-cache() {
+
+function mpv-cache {
     mpv --force-seekable=yes --cache=yes --cache-secs=99999999 "$@"
 }
-function mpv-stream() {
-    local file="$(realpath "$@[-1]")"
+
+function mpv-stream {
+    local file="$(grealpath -- "$@[-1]")"
     local opts=( "${@[1,-2]}" )
     # cache has been disabled in mpv.conf
     mpv_streaming=y mpv-notag $opts[@] appending://"$file"
 }
 aliasfn mpvs mpv-stream
 ##
-function retry-mpv() {
+function retry-mpv {
     # retry-eval "sleep 5 ; mpv --quiet $@ |& tr '\n' ' ' |ggrep -v 'Errors when loading file'"
     retry mpv-partial "${(Q)@}"
 }

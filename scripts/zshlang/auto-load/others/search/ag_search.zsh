@@ -39,6 +39,14 @@ function ffall() {
     } | fzp "$query"
 }
 alias ffa=ffall
+
+function function-rg {
+    {
+        print -r -- "${(Fk)functions}"
+        print -r -- "${(Fk)aliases}"
+    } | rg "$@"
+}
+alias frg='function-rg'
 ##
 alias rr=rgm
 alias rrn='rgm --line-number'
@@ -58,8 +66,8 @@ function rg-literal-or {
 }
 ##
 aliasfn fda fd --hidden --no-ignore #ag --unrestricted -g # search in the pathnames
-function fdrp() {
-    fda "$@" | inargsf re realpath
+function fdrp {
+    fda "$@" | inargsf re 'grealpath --'
 }
 ##
 function emc-search {

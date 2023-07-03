@@ -36,7 +36,7 @@ function hn2org {
         dest="$emc_dest"
     fi
 
-    grealpath -e "$dest"
+    grealpath -e -- "$dest"
 }
 
 function hn2epub {

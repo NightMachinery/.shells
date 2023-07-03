@@ -1,9 +1,9 @@
-function realpath-relchild() {
+function realpath-relchild {
     local dir="$1" mypath="$2"
 
-    local rel="$(realpath --relative-to "$dir" "$mypath")"
+    local rel="$(grealpath --relative-to "$dir" -- "$mypath")"
     if [[ "$rel" =~ '^../' ]] ; then
-        realpath "$mypath"
+        grealpath -- "$mypath"
     else
         ec "$rel"
     fi
@@ -120,9 +120,9 @@ function rmdir-empty() {
     gfind "$root" -mindepth 1 -type d -empty -print -delete
 }
 ##
-function append-f2f() {
-    local from="$(realpath "$1")" to="$(realpath --canonicalize-missing "$2")"
-    if [[ "${from:l}" == "${to:l}" ]] ; then # realpath --canonicalize-missing does not normalize the case in macOS, so we are forcing them both to lowercase.
+function append-f2f {
+    local from="$(grealpath -- "$1")" to="$(grealpath --canonicalize-missing -- "$2")"
+    if [[ "${from:l}" == "${to:l}" ]] ; then # grealpath --canonicalize-missing does not normalize the case in macOS, so we are forcing them both to lowercase.
         ecerr "$0: Destination is the same as the source. Aborting."
         return 1 # We rely on this not being zero
     fi

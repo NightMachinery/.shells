@@ -268,7 +268,7 @@ function awaysh-bnamed-rp() {
     #     for i in "$args[@]" ; do
     #         if test -e "$i" ; then
     #             ec "Realpathing: $i"
-    #             cmd+="$(realpath "$i")"
+    #             cmd+="$(grealpath -- "$i")"
     #         else
     #             cmd+="$i"
     #         fi

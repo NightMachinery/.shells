@@ -53,7 +53,7 @@ function ipynb2org {
         assert revaldbg jupyter nbconvert "$input" --stdout "${opts[@]}" --to markdown > "$tmp" @RET
         { cat "$tmp" | md2org | orgbabel-src-python-reset > "$dest" } @TRET
 
-        realpath "$dest"
+        grealpath -- "$dest"
     } always { silent trs-rm "$tmp" }
 }
 
@@ -66,5 +66,12 @@ function emc-ipynb {
     ipynb_output_clear_p="${ipynb_output_clear_p:-n}" ipynb2org "$f" "$dest"
 
     emc_nowait2_colorize_p='non-modified' reval-ec emc-nowait2 "$dest"
+}
+##
+function jupyter-output-clear {
+    local i="$1"
+    assert-args i @RET
+
+    jupyter nbconvert --to notebook --clear-output --inplace "$i"
 }
 ##

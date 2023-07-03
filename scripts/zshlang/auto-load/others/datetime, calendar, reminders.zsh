@@ -161,7 +161,7 @@ function datej {
         cat-copy-if-tty
 }
 
-function datej-year() {
+function datej-year {
     jalalicli today --jalali-format='yyyy' "$@"
 }
 
@@ -487,7 +487,7 @@ function rem-todaypaths() {
 }
 function rem_extract-date-path() {
     local f="$1"
-    f="$(realpath "$f")" @TRET
+    f="$(grealpath -- "$f")" @TRET
 
     if [[ "$f" =~ '(\d\d\d\d/\d\d/\d\d.*)' ]] ; then
         ec "$match[1]"
@@ -782,4 +782,14 @@ function jalali-calendar {
     command jalali-calendar "$@" "${opts[@]}"
 }
 alias jcal='jalali-calendar'
+
+function jcal-all {
+    #: @seeAlso `python -m calendar`
+    ##
+    local year
+    year="${1:-$(datej-year)}" @TRET
+
+    jcal_all.pl "$year"
+}
+alias jcala='jcal-all'
 ##

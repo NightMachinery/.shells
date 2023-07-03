@@ -153,7 +153,7 @@ function zathura {
   name="zathura $(str2tmuxname "$name")" @TRET
   for arg in "$@" ; do
     if test -e "$arg" ; then
-      args+="$(realpath "$arg")" @TRET
+      args+="$(grealpath -- "$arg")" @TRET
     else
       args+="$arg"
     fi
