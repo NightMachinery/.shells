@@ -181,8 +181,8 @@ function nightsh-load-zshrc() {
 
   #: self-insert-unmeta causes ={=, =}= to not be escaped when typed in the middle of, e.g., a URL. I don't understand why this happens. My guess is that one of my plugins is hooking into =self-insert= to insert the escape, but =self-insert-unmeta= is not hooked.
   #: self-insert-unmeta: Insert a character into the buffer after stripping the meta bit and  converting ^M to ^J.
-  bindkey -v '\{' self-insert-unmeta
-  bindkey -v '\}' self-insert-unmeta
+  bindkey '\{' self-insert-unmeta
+  bindkey '\}' self-insert-unmeta
   ##
   # start typing + [Up-Arrow] - fuzzy find history forward
   if [[ "${terminfo[kcuu1]}" != "" ]]; then
@@ -607,7 +607,7 @@ function nightsh-load-zshrc() {
   ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
   ###
   # remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
-  WORDCHARS="${WORDCHARS/\//}|'"
+  # WORDCHARS="${WORDCHARS/\//}|'"
   WORDCHARS="${WORDCHARS/\#/}"
   WORDCHARS="${WORDCHARS/\./}"
   WORDCHARS+='ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو۱۲۳۴۵۶۷۸۹۰'

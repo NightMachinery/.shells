@@ -208,7 +208,7 @@ function popclickInit()
   --- @workaround_lisflag we use the flag to control acting on the events to work around the bug that sometimes starting the listener can take ~6 seconds. Update: When that bug happens, it doesn't seem that listener can listen at all! Restarting hammerspoon completely seems to solve this issue.
   -- listener:start()
   ---
-  brishzeval('awaysh hs-popclick-btt-refresh')
+  -- brishzeval('awaysh hs-popclick-btt-refresh')
 end
 ---
 local inputEnglish = "com.apple.keylayout.US"
