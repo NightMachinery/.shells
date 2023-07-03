@@ -8,18 +8,27 @@ function psource() {
 }
 
 ##
-function nightsh-load-zshenv() {
+function nightsh-load-zshenv {
     ZSH_PWD_CACHE=~/tmp/.zsh_pwd
-    function zsh-pwd-save() {
+    function zsh-pwd-save {
         if test -z "$HISTFILE" ; then
             return 0
         fi
 
         print -r -- $PWD > "$ZSH_PWD_CACHE"
     }
-    function zsh-pwd-load() {
+    function zsh-pwd-load {
         local d
-        d="$(cat "$ZSH_PWD_CACHE" 2>/dev/null)" || return 0
+
+        ##
+        d="${ZSH_PWD}"
+        unset ZSH_PWD
+        ##
+
+        if test -z "$d" ; then
+            d="$(cat "$ZSH_PWD_CACHE" 2>/dev/null)" || return 0
+        fi
+
         if test -d "$d" ; then
             cd -- "$d"
         fi
@@ -123,9 +132,9 @@ function nightsh-load-zshenv() {
             NIGHT_NO_EXPENSIVE=y
         }
 
-        function realpath2() {
-            test -e "$1" && realpath -e "$1" || {
-                    (( ${+commands[$1]} )) && realpath -e "${commands[$1]}"
+        function realpath2 {
+            test -e "$1" && grealpath -e -- "$1" || {
+                    (( ${+commands[$1]} )) && grealpath -e -- "${commands[$1]}"
                 }
             ##
             # -e, --canonicalize-existing: all components of the path must exist

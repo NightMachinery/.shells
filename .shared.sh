@@ -17,6 +17,8 @@ if test -z "$NIGHTDIR" ; then
     fi
 fi
 ##
+export GCM_TRACE=~/tmp/gcm.log
+##
 # export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
 export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
 
