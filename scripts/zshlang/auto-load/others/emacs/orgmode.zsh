@@ -771,12 +771,12 @@ function org-img-unused {
         text="$(cat "$f")" @TRET
         files=("${f}_imgs"/*(D.N))
         files=(${(@f)"$(arrnn "${files[@]}" |
-                          inargsf re realpath)"})
+                          inargsf re 'grealpath --')"})
 
         used=(${(@f)"$(ec "$text" |
                          org-link-extract-file |
                          rg "\.(${(j.|.)image_formats})\$" |
-                         { cd "${f:h}" && inargsf re realpath })"}) @TRET
+                         { cd "${f:h}" && inargsf re 'grealpath --' })"}) @TRET
 
         # dact var-show files
         # dact var-show used

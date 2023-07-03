@@ -30,7 +30,7 @@ function gc-tag() {
         ntag-add "$f" $tag blue @RET
         vared -p "bell-maker: " tag || tag=''
         if test -n "$tag" ; then
-            reval-copy gquote bell-maker "${tag}" "$(grealpath "${ntag_add_dest}" | dir-rmprefix "$(grealpath "$GREENCASE_DIR")")"
+            reval-copy gquote bell-maker "${tag}" "$(grealpath -- "${ntag_add_dest}" | dir-rmprefix "$(grealpath "$GREENCASE_DIR")")"
         fi
     fi
 }

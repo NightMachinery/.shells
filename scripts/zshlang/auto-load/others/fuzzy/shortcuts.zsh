@@ -3,7 +3,7 @@ function play-tag() {
     local f="$1"
     # tag --add green "$f"
     ntag-add "$f" green
-    rgeval awaysh mpv "$(realpath "$ntag_add_dest")" # realpath to unbreak rgeval's usefulness because we use this via `indir`.
+    rgeval awaysh mpv "$(grealpath -- "$ntag_add_dest")" # realpath to unbreak rgeval's usefulness because we use this via `indir`.
 }
 function ntag-lv-nocolor() {
     local fd_args=("$@") noprioMode="${ntag_lv_nopriority}"

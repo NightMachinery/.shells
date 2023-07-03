@@ -226,11 +226,11 @@ function pbadd-applescript() {
     # @deprecated
     ##
 
-    osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re realpath $@)}" > /dev/null
+    osascript "$NIGHTDIR"'/applescript/path-copy.applescript' "${(f)$(re 'grealpath --' $@)}" > /dev/null
 }
 
 function pbadd {
-    copy_files.swift "${(f@)$(re realpath $@)}"
+    copy_files.swift "${(f@)$(re 'grealpath --' $@)}"
 }
 alias pa=pbadd
 
@@ -292,7 +292,7 @@ function pngpaste() {
     if test -z "$dir" ; then
         dir="$PWD"
     fi
-    dir="$(grealpath "$dir")" @TRET
+    dir="$(grealpath -- "$dir")" @TRET
     mkdir -p "$dir" @TRET
 
     name="$(bottomfile "$name")"

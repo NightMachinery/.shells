@@ -428,7 +428,7 @@ alias git2http-v0='\noglob reval inargsEf "re h_git2http"'
 function git2http {
   in-or-args "$@" |
     perl -ple 's|^git@([^:]+):|https://$1/|g' |
-    cat-paste-if-tty
+    cat-copy-if-tty
 }
 ##
 function git-resolve {
@@ -562,7 +562,7 @@ function git-conflicts-paths {
   # git ls-files --unmerged | awk '{print $4}' | sort -u
   ##
   git diff --name-only --diff-filter=U --relative |
-    inargsf realpath --
+    inargsf grealpath --
   ##
 }
 ##

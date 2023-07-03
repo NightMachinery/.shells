@@ -149,3 +149,8 @@ function openai-chatgpt {
 
 alias xx='\noglob openai-chatgpt'
 ##
+function openai-token-count {
+    in-or-args "$@" |
+        openai_token_count.py
+}
+##

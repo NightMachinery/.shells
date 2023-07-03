@@ -2,9 +2,74 @@
 
 * rsync
 #+begin_example zsh
-rsp-safe  ~/scripts/setup/minimal_proxy/.shared.sh x@y:
-rsp-safe  ~/.inputrc x@y:
+rsp-safe ~/scripts/setup/minimal_proxy/.shared.sh x@y:
+rsp-safe ~/.tmux.conf ~/.inputrc x@y:
+
+rsp-safe ~/.tmux.conf ~/.inputrc ~/scripts/setup/minimal_proxy/*.(zsh|zshenv|zshrc|bashrc|bash|sh)(D) x@y:
 #+end_example
+
+* Add User
+:PROPERTIES:
+:visibility: folded
+:END:
+#+begin_example zsh
+function sudoer-add-user {
+  local user="${1:?}"
+  sudo perl - "$user" << 'EOF'
+use strict;
+use warnings;
+use File::Temp 'tempfile';
+
+# Get the user from command line arguments
+my $user = $ARGV[0];
+
+# Path to the sudoers file
+my $sudoers_file = '/etc/sudoers';
+
+# The line to add
+my $line_to_add = "$user ALL=(ALL:ALL) ALL";
+
+# Create a temporary file
+my ($fh, $filename) = tempfile();
+
+# Open the sudoers file
+open my $in, '<', $sudoers_file or die $!;
+
+# Flag to check if the line is already in the file
+my $found = 0;
+
+while (<$in>) {
+    # If the line is found, set the flag
+    if ($_ =~ /^$line_to_add$/) {
+        $found = 1;
+    }
+
+    # Write the line to the temporary file
+    print $fh $_;
+}
+
+# If the line was not found, add it
+if (not $found) {
+    print $fh "$line_to_add\n";
+}
+
+close $in;
+close $fh;
+
+# Use visudo to check and move the file
+system("visudo -c -f $filename") == 0 or die $!;
+
+# If the check was successful, replace the sudoers file
+rename $filename, $sudoers_file or die $!;
+EOF
+}
+#+end_example
+
+
+* install
+** [[id:6de074b1-51c0-4282-9dac-4056c60978c8][starship/starship: ☄🌌️ The minimal, blazing-fast, and infinitely customizable prompt for any shell!]]
+
+** [[id:d139edf6-3aa9-46fb-8da3-3c68eb3885a5][ajeetdsouza/zoxide: A smarter cd command. Supports all major shells.]]
 
 * [[https://github.com/webinstall/webi-installers][webinstall/webi-installers: Primary and community-submitted packages for webinstall.dev]]
 #+begin_example zsh
@@ -31,10 +96,20 @@ tmuxnew brew-install zsh -c 'curl -sS https://webi.sh/brew | sh'
 export PATH="${PATH}:${HOME}/.local/opt/brew/bin"
 #+end_example
 
+*** install
+#+begin_example zsh
+brew install zsh tealdeer progress bandwhich ncdu
+#+end_example
+
 ** pip
 #+begin_example zsh
-pip3 install -U speedtest-cli
+pip3 install -U speedtest-cli nvitop
 #+end_example
+
+#+begin_example zsh
+pip install -U jupyter jupyterlab
+#+end_example
+
 
 ** others
 #+begin_example zsh
@@ -52,11 +127,6 @@ curl -sS https://webi.sh/fzf | sh
 curl -sS https://webi.sh/jq | sh
 
 # curl -sS https://webi.sh/docker | sh # NA
-#+end_example
-
-* tmux
-#+begin_example zsh
-rsp-safe ~/.tmux.conf 'ubuntu@185.235.42.146:'
 #+end_example
 
 * Caddy
@@ -89,3 +159,23 @@ sudo cp ~/v2_server.json /usr/local/etc/v2ray/config.json
 #+begin_src bsh.dash :results verbatim :exports both :wrap results
 # reval-ec rsp-safe ./*.json ubuntu@185.235.42.146:
 #+end_src
+
+
+* borg
+#+begin_example zsh
+mkdir -p ~/code/
+cd ~/code/
+# git clone git@github.com:NightMachinery/betterborg.git
+git clone https://github.com/NightMachinery/betterborg.git
+
+cd betterborg
+pip install -r requirements.txt 
+#+end_example
+
+#+begin_example zsh
+tmuxnew julia-borg bash -c 'cd ~/code/betterborg/ && borgp=1096 python3 stdborg.py'
+#+end_example
+
+* Zsh
+** escape codes for hotkeys
+*** Make Zsh understand that =^[[1;3C= means =alt + right arrow=.

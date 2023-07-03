@@ -54,7 +54,7 @@ function rsp-notes {
     bella_zsh_disable1
 
     local src="$1"
-    src="$(realpath "$src")" @TRET
+    src="$(grealpath -- "$src")" @TRET
 
     local rsync_opts=(
         ## @tmp

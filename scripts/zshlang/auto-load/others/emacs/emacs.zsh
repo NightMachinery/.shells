@@ -7,7 +7,7 @@ function emc-sudo() {
 
     revaldbg emc-eval '(doom/sudo-find-file '"$(emc-quote "$f")"')' @RET
     ##
-    # f="$(grealpath -e ${f} | gtr '"' '\"')" @TRET
+    # f="$(grealpath -e -- ${f} | gtr '"' '\"')" @TRET
     # revaldbg emcnw -e '(find-file "/sudo::'$f'")'
 }
 ##
@@ -286,7 +286,7 @@ function emc-nowait2 {
 
     ## @redundant
     # local tmp
-    # tmp="$(serr grealpath -e "$f")" && f="$tmp" || true # can be, e.g., an scp path
+    # tmp="$(serr grealpath -e -- "$f")" && f="$tmp" || true # can be, e.g., an scp path
     ##
     
     revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (${cmd} $(emc-quote "$f")) ${other_commands} t)"

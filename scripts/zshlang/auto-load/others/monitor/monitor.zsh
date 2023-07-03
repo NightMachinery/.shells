@@ -198,7 +198,9 @@ function load5() {
     load-average | awk '{print $3}'
 }
 ##
-function lsport() {
+function lsport {
+    #: @alt `command ss -tuln | grep $port`
+    ##
     local p opts=()
     for p in "$@" ; do
         opts+=(-i :"$p")

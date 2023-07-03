@@ -8,7 +8,7 @@ function nt-link() {
     s="$(fd --base-directory "$nightNotes" | fzp --select-1 "$q")" @RET
     for i in "${(@f)s}" ; do
         # fd is already returning paths relative to its root dir
-        # ec "[[nightNotes:$(realpath --relative-to "$nightNotes" "$i")]]"
+        # ec "[[nightNotes:$(grealpath --relative-to "$nightNotes" "$i")]]"
         ecn "[[nightNotes:$i]]"
     done > >(pbcopy) | cat
 }

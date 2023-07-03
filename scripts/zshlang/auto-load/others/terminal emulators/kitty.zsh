@@ -139,7 +139,7 @@ function kitty-launch-icat() {
     ##
     local f fs=()
     for f in $@ ; do
-        fs+="$(grealpath -e "$f")" @TRET
+        fs+="$(grealpath -e -- "$f")" @TRET
     done
 
     # @see icat-kitty-single

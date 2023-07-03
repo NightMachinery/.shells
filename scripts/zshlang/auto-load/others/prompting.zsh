@@ -1,7 +1,6 @@
 ##
 function prompt-instruction-input {
     local instruction="$1" ; shift
-    assert-args instruction @RET
     local code_block_p="${prompt_code_block_p}"
     local qa_p="${prompt_qa_p}"
     local preambles=(${prompt_preambles[@]})
@@ -36,6 +35,10 @@ function prompt-instruction-input-coding {
     prompt_code_block_p="${prompt_code_block_p:-y}" \
     prompt_preambles=(${prompt_preambles[@]} preamble-coding) \
         prompt-instruction-input "$@"
+}
+
+function prompt-blockify {
+    prompt_code_block_p=y prompt-instruction-input ''
 }
 ##
 function preamble-gen1 {
@@ -285,5 +288,17 @@ function prompt-rewrite-formal {
 ##
 function prompt-2json {
     prompt_code_block_p=y prompt-instruction-input "Convert the following data into JSON:"
+}
+##
+function prompt-2jax {
+    prompt_code_block_p=y prompt-instruction-input "Rewrite the following code to use JAX (Flax) instead."
+}
+##
+function prompt-tests-gen {
+    prompt_code_block_p=y prompt-instruction-input "Write tests for the following code."
+}
+
+function prompt-tests-gen-human {
+    prompt_code_block_p=y prompt-instruction-input "Write tests for the following code. These tests should print the computed results along with the expected result. The tests are intended for manual human inspection."
 }
 ##

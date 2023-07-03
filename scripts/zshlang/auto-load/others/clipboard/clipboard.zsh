@@ -116,7 +116,7 @@ function clipboard-init {
             pushf ~cod/misc @RET
             {
                 assert git clone git@gitlab.com:NightMachinary/unicode-emoji-json.git @RET
-                assert z-add "$(realpath ./unicode-emoji-json)" @RET
+                assert z-add "$(grealpath -- ./unicode-emoji-json)" @RET
             } always { popf }
         else
             break
@@ -330,14 +330,14 @@ function pbcopy-z {
 }
 alias pcz='pbcopy-z'
 ##
-function clipboard-add-files() {
+function clipboard-add-files {
     if isDarwin ; then
         pbadd $@
         # will be added to our own clipboard via the recorder
     else
         local i
         for i in $@ ; do
-            i="$(grealpath -e "$i")" @TRET
+            i="$(grealpath -e -- "$i")" @TRET
 
             clipboard-add "$i"
         done

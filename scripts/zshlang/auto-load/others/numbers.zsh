@@ -37,7 +37,7 @@ function numfmt-humanfriendly {
     local inargs
     in-or-args3 "$@" @RET
 
-    numfmt --to=si --round=nearest  "${inargs[@]}"
+    numfmt --to=si --round=nearest  ${inargs[@]}
 }
 
 function numfmt-comma {

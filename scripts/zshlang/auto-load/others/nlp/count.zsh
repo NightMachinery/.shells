@@ -2,7 +2,7 @@ function count-words-spacy {
     local f garden="${count_words_garden:-$(jupytergarden-p)}"
     if (( ${#@} >= 1 )) ; then
         f="$1"
-        f="$(grealpath "$f")" @TRET
+        f="$(grealpath -- "$f")" @TRET
     else
         f="$(gmktemp)" @TRET
         cat > "$f" @TRET

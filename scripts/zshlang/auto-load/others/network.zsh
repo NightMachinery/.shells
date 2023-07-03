@@ -199,7 +199,9 @@ aliasfn http-static http-static-caddy
 ##
 aliasfn wifi-info wifi network # @darwinonly
 ##
-aliasfn speedtest-py pipx run speedtest-cli
+# aliasfn speedtest-py pipx run speedtest-cli
+aliasfn speedtest-py python -m speedtest
+
 function speedtest-i() {
     local q="$(fz-createquery "$@")"
 

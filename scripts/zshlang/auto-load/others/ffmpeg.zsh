@@ -45,7 +45,7 @@ audio-join2() {
     shift
 
     local concat="$(gmktemp)"
-    {  for f in "$@"; do echo "file ${(qq)$(realpath $f)}"; done } > $concat # https://www.ffmpeg.org/ffmpeg-utils.html#Quoting-and-escaping
+    {  for f in "$@"; do echo "file ${(qq)$(grealpath -- $f)}"; done } > $concat # https://www.ffmpeg.org/ffmpeg-utils.html#Quoting-and-escaping
     revaldbg ffmpeg -f concat -safe 0 -i "$concat"  -c copy "$aj_out"
     dact cat $concat
     command rm "$concat"
@@ -144,7 +144,7 @@ function imgdirs2vid() {
             ecerr "$0: Directory '$dir' does not exist. Skipping."
             continue
         fi
-        dir="$(realpath "$dir")"
+        dir="$(grealpath -- "$dir")"
         pushf $dir
 
         local out="${dir}.mp4"

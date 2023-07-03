@@ -11,8 +11,8 @@ split_mode="${bb_say_split_mode:-sentence}"
 
 output_path="${bb_say_out}"
 if test -n "${output_path}" ; then
-    output_path="$(grealpath "$output_path")" || (
-        echo "failed: grealpath \"$output_path\"" >&2
+    output_path="$(grealpath -- "$output_path")" || (
+        echo "failed: grealpath -- \"$output_path\"" >&2
         return 1
     )
 fi

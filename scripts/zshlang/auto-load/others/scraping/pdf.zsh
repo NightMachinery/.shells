@@ -126,7 +126,7 @@ function web2pdf {
     html-get-pdf "${urls[@]}" > "$dest_html" @TRET
     html2pdf "$dest_html" > "$dest" @TRET
 
-    realpath "$dest" @TRET
+    grealpath -- "$dest" @TRET
 
     if kindle-p ; then
         2ko "$dest" >&2 @TRET

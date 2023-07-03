@@ -105,7 +105,7 @@ function file-unix2uri-rp {
 
     local f
     for f in ${(@f)inargs} ; do
-        ec "file://$(realpath "$f")" @TRET
+        ec "file://$(grealpath -- "$f")" @TRET
     done
 }
 
@@ -138,7 +138,7 @@ function rpargs() {
     args=()
     for i in "$@"
     do
-        test -e "$i" && args+="$(realpath --canonicalize-existing -- "$i")" || args+="$i"
+        test -e "$i" && args+="$(grealpath --canonicalize-existing -- "$i")" || args+="$i"
     done
     out=( "${args[@]}" )
     re "printf '%s\0'" "$args[@]"

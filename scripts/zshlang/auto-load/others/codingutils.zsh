@@ -148,7 +148,7 @@ export AUTO_WHDEEP_MODE=y
   echo You need "realpath" from coreutils installed.
   exit 1
 }
-export MYDIR="$(realpath "${0:h}")/"
+export MYDIR="$(grealpath -- "${0:h}")/"
 PATH="${MYDIR}autobin/:$PATH"
 
 ### Automatically generated code starts

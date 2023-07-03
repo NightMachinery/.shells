@@ -6,7 +6,7 @@ function sub-dl {
     assert-args f @RET
 
     local tmp d
-    if tmp="$(grealpath -e "$f")" ; then
+    if tmp="$(grealpath -e -- "$f")" ; then
         f="$tmp"
         d="${f:h}"
     else

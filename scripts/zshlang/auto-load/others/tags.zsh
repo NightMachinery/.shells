@@ -385,7 +385,7 @@ function ntag-gen-rec() {
             ecerr "$0: Nonexistent path: $f"
             continue
         }
-        f="$(realpath "$f")"
+        f="$(grealpath -- "$f")"
         if test -d "$f" ; then
             local dir="${f}"
             fd ${ntag_fd_opts[@]} --type file --type symlink --type socket . "$dir" | inargsf re "$engine_q"

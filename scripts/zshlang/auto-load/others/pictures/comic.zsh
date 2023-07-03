@@ -42,7 +42,7 @@ function comic-print() {
             fi
             ##
 
-            arrN ${~imageglob} | gsort >&1 >&2 | inargsf re "assert grealpath -e"
+            arrN ${~imageglob} | gsort >&1 >&2 | inargsf re "assert grealpath -e --"
         } always { popf }
     done | sponge | inargsf open || {
         retcode

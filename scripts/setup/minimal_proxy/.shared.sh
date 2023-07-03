@@ -32,6 +32,10 @@ export PATH="${HOME}/.emacs.d/bin:${PATH}"
 export PATH="${HOME}/.local/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/sbin:${PATH}"
+export HOMEBREW_CURLRC="${HOME}/.curlrc"
+
+export PATH="${HOME}/anaconda/bin:${PATH}"
+export PATH="${HOME}/miniconda3/bin:${PATH}"
 ##
 alias wh='which'
 
@@ -61,6 +65,8 @@ reval() {
 proxy-env-unset () {
     unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 }
+
+alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096'
 ##
 tmuxnew () {
     tmux kill-session -t "$1" &> /dev/null
