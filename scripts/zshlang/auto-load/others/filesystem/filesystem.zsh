@@ -282,3 +282,16 @@ function windows-newlines-to-unix {
     sd '\r\n' '\n'
 }
 ##
+function find-other-writable-dirs {
+  local dir="${1:-"."}"
+  shift  # shift arguments, so $@ contains only regexes
+
+  local find_cmd=("find" "$dir" "-type" "d" "-perm" "-002")
+
+  for regex in "$@"; do
+    find_cmd+=("-not" "-regex" "$regex")
+  done
+
+  reval "${find_cmd[@]}"
+}
+##
