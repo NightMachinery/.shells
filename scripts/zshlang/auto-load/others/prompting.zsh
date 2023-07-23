@@ -28,6 +28,7 @@ function prompt-instruction-input {
             ec $'\n'"$input"
         fi
     } |
+        strip-blank-lines-start-end |
         cat-copy-if-tty
 }
 

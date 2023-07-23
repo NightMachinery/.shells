@@ -98,3 +98,11 @@ function prefix-rm {
     evaldbg "${cmd[1,-2]}"
 }
 ##
+function strip-blank-lines-start-end {
+    #: reads stdin
+    ##
+    cat-paste-if-tty |
+        strip_blank_lines_start_end.pl |
+        cat-copy-if-tty
+}
+##
