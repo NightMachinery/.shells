@@ -162,3 +162,7 @@ function zathura {
   reval-ec tmuxnew "$name" command zathura "${args[@]}"
 }
 ##
+function tidy-viewer {
+  command tidy-viewer --color 5 "$@"
+}
+##

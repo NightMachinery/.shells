@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 # encoding: utf-8
+##
+# [[https://github.com/amsehili/genRSS][amsehili/genRSS: genRSS generates an RSS 2.0 feed from media files in a directory]]
 '''
 genRSS -- generate a RSS 2 feed from media files in a directory.
 

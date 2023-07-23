@@ -246,7 +246,7 @@ function langSetToggle()
   end
 end
 ---
-enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv", "zathura", "sioyek" } -- "Emacs",
+enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv", "zathura", "sioyek", "Maccy" } --
 if false then
   function appWatch(appName, event, app)
     -- @deprecated as it was too slow. In general, calling Zsh functions that will then call Hammerspoon functions is a bad idea.
@@ -612,28 +612,35 @@ function appHotkey(o)
 end
   -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
-appHotkey{ key='w', appName='com.google.Chrome' }
+appHotkey{ key='.', appName='com.microsoft.edgemac' }
+appHotkey{ key='/', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 
 appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
-appHotkey{ key='x', appName='com.jetbrains.pycharm' }
+appHotkey{ key='p', appName='com.jetbrains.pycharm' }
 
-appHotkey{ key='t', appName='com.tdesktop.Telegram' }
 emacsAppName = 'org.gnu.Emacs'
-appHotkey{ key='e', appName=emacsAppName }
-appHotkey{ key='a', appName='com.adobe.Reader' }
+appHotkey{ key='x', appName=emacsAppName }
+
+appHotkey{ key='\\', appName='com.tdesktop.Telegram' }
+
 -- appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='b', appName='zathura' }
-appHotkey{ key='b', appName='info.sioyek.sioyek' }
-appHotkey{ key='s', appName='net.sourceforge.skim-app.skim' }
+appHotkey{ key='a', appName='com.adobe.Reader' }
+appHotkey{ key='p', appName='com.apple.Preview' }
+appHotkey{ key='[', appName='net.sourceforge.skim-app.skim' }
+appHotkey{ key=']', appName='info.sioyek.sioyek' }
+
+appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
 appHotkey{ key='l', appName='com.apple.iCal' }
 appHotkey{ key=',', appName='mpv' }
-appHotkey{ key='.', appName='com.microsoft.edgemac' }
-appHotkey{ key='/', appName='com.quora.app.Experts' }
+-- appHotkey{ key='/', appName='com.quora.app.Experts' }
 appHotkey{ key='n', appName='com.microsoft.Powerpoint' }
+appHotkey{ key='=', appName='com.fortinet.FortiClient' }
+
 
 hs.hotkey.bind(hyper, "d", function()
                  brishzeval("notif-dismiss.as")

@@ -290,16 +290,19 @@ function org-link-extract {
         fi
     fi
 
-    rget_replace="$format" ugrep_get_format="$format" revaldbg "$rget_e[@]" "${opts[@]}" \
-        -e '(?:\s*(?:\*|-|\+)\s*)?(.*(?<!\\)(?:\[|<)('${link_type}'(?:[^][]|\\\[|\\\])+)(?<!\\)(?:\]|>).*)' \
-        | cat-copy-if-tty
+    cat-paste-if-tty |
+        rget_replace="$format" ugrep_get_format="$format" revaldbg "$rget_e[@]" "${opts[@]}" \
+        -e '(?:\s*(?:\*|-|\+)\s*)?(.*(?<!\\)(?:\[|<)('${link_type}'(?:[^][]|\\\[|\\\])+)(?<!\\)(?:\]|>).*)' |
+        cat-copy-if-tty
 }
 
 function org-link-extract-url {
     local link_type="$org_link_extract_type"
 
     #: We can also change the regex used in org-link-extract to directly capture the link URL, but this is more backwards compatible.
-    org-link-extract "$@" | prefixer --remove-prefix="${link_type}:"
+    org-link-extract "$@" |
+        prefixer --remove-prefix="${link_type}:" |
+        cat-copy-if-tty
 }
 @opts-setprefixas org-link-extract-url org-link-extract
 ##

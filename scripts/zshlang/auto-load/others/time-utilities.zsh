@@ -54,7 +54,7 @@ function h_timer-bell {
 function timer {
     doc aliased to timer with noglob
     local t=$1 cmd=("${@[2,-1]}") notify="${timer_notify:-y}" msg="${timer_msg}"
-    test -z "$cmd[*]" && cmd=(eval lo_s=20 loop h_timer-bell)
+    test -z "$cmd[*]" && cmd=(reval-env lo_s=20 loop h_timer-bell)
 
     sleep-neon $(($t * 60)) && {
         if bool $notify ; then
@@ -70,7 +70,8 @@ function timer {
         fi
 
         mark-me-if-unmarked "TIMER"
-        reval "$cmd[@]"  #eval ${(q+@)@[2,-1]:-${(z)/#/loop ot-play-happybirthday}}
+        reval "$cmd[@]"
+        # eval ${(q+@)@[2,-1]:-${(z)/#/loop ot-play-happybirthday}}
     }
 }
 noglobfn timer

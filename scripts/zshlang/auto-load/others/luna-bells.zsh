@@ -272,10 +272,12 @@ function bell-evacuate() {
     display-gray-off # if you're still here, I doubt keeping the display gray will be able to help you any. :(
 }
 
-function lunaquit-quick() {
+function lunaquit-quick {
     # if there is no LUNA process around, we'll do nothing:
     local out
-    @opts grayoff no @ lunaquit
+    # @opts grayoff no @ lunaquit
+    lunaquit
+
     if test -n "$out" ; then
         brishz awaysh lunaquit-monitor "$@" # it marks itself
         # bell-lm-amiindanger

@@ -15,4 +15,5 @@ function pyblack-cat {
     cat "$tmp" |
         cat-copy-if-tty
 }
+aliasfn blk pyblack-cat
 ##

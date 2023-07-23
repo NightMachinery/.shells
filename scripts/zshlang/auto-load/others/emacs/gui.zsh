@@ -4,6 +4,12 @@ aliasfn withemcgui 'EMACS_SOCKET_NAME="$EMACS_GUI_SOCKET_NAME" emacs_night_serve
 function emc-launch-gui {
     local env_setters=("${emc_env_setters[@]:-withemcgui}")
 
+    local opts=()
+
+    if isDbg ; then
+        opts+='--debug-init'
+    fi
+
     local emacs_dir
     emacs_dir="$(eval-memoi brew --cellar emacs-plus@29)"
     if ! test -d "$emacs_dir" ; then
@@ -25,6 +31,6 @@ function emc-launch-gui {
         emacs_app="${emacs_app[1]}"
     fi
 
-    reval-ec tmuxnewsh2 emacs-gui reval-env-ec LOGNAME="$(whoami)" proxy_disabled="$proxy_disabled" DOOMDIR="$DOOMDIR" $proxyenv "${env_setters[@]}" "${emacs_app}" # --debug-init
+    reval-ec tmuxnewsh2 emacs-gui reval-env-ec LOGNAME="$(whoami)" proxy_disabled="$proxy_disabled" DOOMDIR="$DOOMDIR" $proxyenv "${env_setters[@]}" "${emacs_app}" "${opts[@]}"
 }
 ##

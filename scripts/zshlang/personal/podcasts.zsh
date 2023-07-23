@@ -15,6 +15,9 @@ podcasts_urls_my['Lex Fridman']='https://lexfridman.com/feed/podcast/'
 # podcasts_urls_my['Dithering']='https://rss.stratechery.com/1.0.0/members/-/feed?series_id=f11ecf82-58b0-4824-871f-073a42fe9b38' #: @dead?
 podcasts_urls_my['Sharp Tech']='https://sharptech.fm/feed/podcast'
 podcasts_urls_my['80000 Hours']='http://feeds.backtracks.fm/feeds/80000hours/80000-hours-podcast-with-rob-wiblin/feed.xml?1662750094'
+
+podcasts_urls_my['Radio Daal']='https://radiodaal.ir/podcast.rss'
+podcasts_urls_my['Samtalk']='http://rss.castbox.fm/everest/d27f96552cc241c5bbcb803790610710.xml'
 ##
 typeset -Ag podcasts_urls_others
 
@@ -36,7 +39,6 @@ podcasts_urls_others['DeepMind: The Podcast']=https://feeds.simplecast.com/JT6pb
 podcasts_urls_others['AI with AI: Artificial Intelligence with Andy Ilachinski']=https://aionai.libsyn.com/rss
 podcasts_urls_my['Rationally Speaking Podcast']=https://rationallyspeakingpodcast.libsyn.com/rss
 podcasts_urls_others['Economics Detective Radio']=https://economicsdetective.libsyn.com/rss
-podcasts_urls_my[EconTalk]=https://feeds.simplecast.cmy/wgl4xEgL
 podcasts_urls_others['Planet Money']=https://feeds.npr.org/510289/podcast.xml
 podcasts_urls_others['Signals and Threads']=https://feeds.simplecast.com/L9810DOa
 podcasts_urls_others['The Changelog: Software Development, Open Source']=https://changelog.com/podcast/feed

@@ -67,13 +67,50 @@ EOF
 
 
 * install
+** [[id:7be66ef4-f0a4-49c9-9d61-fce8ead929c2][zsh/install]]
+
 ** [[id:6de074b1-51c0-4282-9dac-4056c60978c8][starship/starship: ☄🌌️ The minimal, blazing-fast, and infinitely customizable prompt for any shell!]]
 
 ** [[id:d139edf6-3aa9-46fb-8da3-3c68eb3885a5][ajeetdsouza/zoxide: A smarter cd command. Supports all major shells.]]
 
+** [[id:4290bea9-23d5-4359-84e1-4e0d091ebad6][@install micromamba]]
+
+** [[id:3eed54eb-4ff0-4c77-8d87-7ade88f9fdb4][@install gost]]
+
+* [[id:cef1b558-0642-4d7e-b94b-b357e2e6bf48][Adding a new SSH key to your GitHub account - GitHub Docs]]
+
 * [[https://github.com/webinstall/webi-installers][webinstall/webi-installers: Primary and community-submitted packages for webinstall.dev]]
+** [[https://github.com/webinstall/webi-installer-requests/issues?q=+sort%3Aupdated-desc+author%3ANightMachinery+][Issues · webinstall/webi-installer-requests]]
+
+** setting up the PATH for =webi= installed binaries
 #+begin_example zsh
 source ~/.config/envman/PATH.env
+#+end_example
+
+** others
+#+begin_example zsh
+curl -sS https://webi.sh/webi | sh
+
+curl -sS https://webi.sh/golang | sh
+curl -sS https://webi.sh/go-essentials | sh
+
+curl -sS https://webi.sh/ffmpeg | sh
+
+curl -sS https://webi.sh/gh | sh
+curl -sS https://webi.sh/rg | sh
+curl -sS https://webi.sh/fd | sh
+curl -sS https://webi.sh/fzf | sh
+curl -sS https://webi.sh/jq | sh
+
+# curl -sS https://webi.sh/docker | sh # NA
+#+end_example
+
+** pip
+#+begin_example zsh
+pip install --upgrade pipx
+pipx install -U speedtest-cli nvitop
+
+pip install -U jupyter jupyterlab
 #+end_example
 
 ** apt
@@ -98,35 +135,7 @@ export PATH="${PATH}:${HOME}/.local/opt/brew/bin"
 
 *** install
 #+begin_example zsh
-brew install zsh tealdeer progress bandwhich ncdu
-#+end_example
-
-** pip
-#+begin_example zsh
-pip3 install -U speedtest-cli nvitop
-#+end_example
-
-#+begin_example zsh
-pip install -U jupyter jupyterlab
-#+end_example
-
-
-** others
-#+begin_example zsh
-curl -sS https://webi.sh/webi | sh
-
-curl -sS https://webi.sh/golang | sh
-curl -sS https://webi.sh/go-essentials | sh
-
-curl -sS https://webi.sh/ffmpeg | sh
-
-curl -sS https://webi.sh/fd | sh
-
-curl -sS https://webi.sh/fzf | sh
-
-curl -sS https://webi.sh/jq | sh
-
-# curl -sS https://webi.sh/docker | sh # NA
+brew install zsh tealdeer progress bandwhich ncdu rm-improved
 #+end_example
 
 * Caddy

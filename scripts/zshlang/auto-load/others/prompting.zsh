@@ -40,6 +40,7 @@ function prompt-instruction-input-coding {
 function prompt-blockify {
     prompt_code_block_p=y prompt-instruction-input ''
 }
+alias xb='prompt-blockify'
 ##
 function preamble-gen1 {
     local field="$1"
@@ -72,8 +73,12 @@ function preamble-coding-rewriter {
         cat-copy-if-tty
 }
 ##
+function prompt-coding-rewrite-performant {
+    prompt_code_block_p=y prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.'
+}
+##
 function prompt-coding-correct-mistakes {
-    prompt-instruction-input-coding "Correct any mistakes in the following code and suggest ways it can be optimized to run faster or be written more idiomatically and cleanly." "$@" |
+    prompt_code_block_p=y prompt-instruction-input "Correct any mistakes in the following code and suggest ways it can be optimized to run faster or be written more idiomatically and cleanly." "$@" |
         cat-copy-if-tty
 }
 ##
@@ -300,5 +305,22 @@ function prompt-tests-gen {
 
 function prompt-tests-gen-human {
     prompt_code_block_p=y prompt-instruction-input "Write tests for the following code. These tests should print the computed results along with the expected result. The tests are intended for manual human inspection."
+}
+
+function prompt-examples-gen {
+    prompt_code_block_p=y prompt-instruction-input "Write examples of using the following code."
+}
+#
+##
+function prompt-org2md {
+    prompt_code_block_p=y prompt-instruction-input "Convert the following from org-mode to markdown:"
+}
+##
+function prompt-2bash {
+    prompt_code_block_p=y prompt-instruction-input "Convert the following code into Bash:"
+}
+
+function prompt-zsh2bash {
+    prompt_code_block_p=y prompt-instruction-input "Convert the following code from Zsh into Bash:"
 }
 ##
