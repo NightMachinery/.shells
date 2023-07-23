@@ -117,7 +117,7 @@ function html2text() {
 ##
 function pandoc-convert {
     ensure-array pandoc_opts
-    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra:-y}" opts=("$pandoc_opts[@]") delink="${pandoc_delink}"
+    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra:-y}" opts=("$pandoc_opts[@]") delink="${pandoc_delink}" postprocess_p="${pandoc_convert_postprocess_p:-y}"
     assert-args from to @RET
     if bool $delink ; then
         ##
@@ -141,23 +141,31 @@ function pandoc-convert {
 
 
     pandoc --wrap=none "$opts[@]" --from "$from" --to "$to" "$input" -o "-" | {
-        if [[ "$to" == org ]] ; then
-            pandoc-normalize-whitespace | {
-                if bool $trim_extra ; then
-                    pandoc-org-trim-extra | org-trim-forced-newlines
-                else
-                    cat
-                fi
-            } |
-                perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g' |
-                perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g'
+        if bool ${postprocess_p} ; then
+            if [[ "$to" == org ]] ; then
+                pandoc-normalize-whitespace | {
+                    if bool $trim_extra ; then
+                        pandoc-org-trim-extra | org-trim-forced-newlines
+                    else
+                        cat
+                    fi
+                } |
+                    perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g' |
+                    perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g'
 
-        elif [[ "$to" == markdown ]] && bool $trim_extra ; then
-            perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g'
-            # trying to remove header_attributes, fenced_code_attributes, inline_code_attributes, etc
-            # @alt https://stackoverflow.com/questions/42070656/pandoc-html-to-markdown-remove-all-attributes
-            # @alt i always converted from markdown, but never to. maybe the same pattern: target+ext1-ext2. if not, maybe select another output format like markdown_strict.
-            # @example Is `item_tfms`{.verbatim} applied separately on each epoch?
+            elif [[ "$to" == markdown ]] && bool $trim_extra ; then
+                perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g'
+                # trying to remove header_attributes, fenced_code_attributes, inline_code_attributes, etc
+                # @alt https://stackoverflow.com/questions/42070656/pandoc-html-to-markdown-remove-all-attributes
+                # @alt i always converted from markdown, but never to. maybe the same pattern: target+ext1-ext2. if not, maybe select another output format like markdown_strict.
+                # @example Is `item_tfms`{.verbatim} applied separately on each epoch?
+            elif [[ "$to" == plain ]] ; then
+                perl -CS -lpe 's{\x{2013}}{--}g'
+                #: -> perl -CS -lpe 's{–}{--}g'
+                #: pandoc somehow changes '--' even when in example blocks
+            else
+                cat
+            fi
         else
             cat
         fi
