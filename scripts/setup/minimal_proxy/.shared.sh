@@ -10,11 +10,24 @@ export ALTERNATE_EDITOR="" #: Causes Emacs to start a daemon if one is not found
 export DOOMDIR=~/doom.d
 
 export LESSMIN='-RiF --mouse --wheel-lines=3 -j.3'
+
+export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,alt-n:next-history,alt-p:previous-history,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-s:select-all,alt-enter:print-query,shift-right:replace-query' --color=light --multi --hscroll-off 99999"
 ##
 psource () {
     if [[ -r "$1" ]]
     then
         source "$@"
+    fi
+}
+
+bool () {
+    local i=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    if [[ "${i}" == "n" ]] || [[ "${i}" == "no" ]] || [[ "${i}" == "0" ]]
+    then
+        return 1
+    else
+        test -n "${i}"
+        return $?
     fi
 }
 ##
@@ -32,6 +45,8 @@ export PATH="${HOME}/.emacs.d/bin:${PATH}"
 export PATH="${HOME}/.local/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/sbin:${PATH}"
+export PATH="/home/linuxbrew/.linuxbrew/bin:${PATH}"
+export PATH="/home/linuxbrew/.linuxbrew/sbin:${PATH}"
 export HOMEBREW_CURLRC="${HOME}/.curlrc"
 
 export PATH="${HOME}/anaconda/bin:${PATH}"
@@ -66,7 +81,9 @@ proxy-env-unset () {
     unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 }
 
+alias pxa87='ALL_PROXY=http://127.0.0.1:1087 all_proxy=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096'
+# export ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096
 ##
 tmuxnew () {
     tmux kill-session -t "$1" &> /dev/null
@@ -104,3 +121,31 @@ retry () {
     done
 }
 ##
+pbcopy-remote() {
+    local port="${copy_port:-6030}"
+
+    socat - "tcp:127.0.0.1:${port}"
+}
+
+bell-call-remote () {
+    local bell_name="${1}"
+    local port="${bell_port:-6030}"
+
+    echo "MAGIC_BELL_${bell_name}" |
+        copy_port="$port" pbcopy-remote
+}
+##
+python-package-version () {
+	local import_p="${import_p:-y}"
+	if bool "$import_p"
+	then
+		import_p=True
+	else
+		import_p=False
+	fi
+
+	python -c "import sys ; import json ; from pynight.common_package import packages_commit_get ; print(json.dumps(packages_commit_get(sys.argv[1:], import_p=${import_p},), indent=2))" "$@"
+}
+##
+
+psource ~/.privateShell

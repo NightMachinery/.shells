@@ -27,6 +27,28 @@ bindkey '^[[1;3D' backward-word # alt-left
 bindkey '^[[1;3C' forward-word # alt-right
 bindkey '^[/' forward-word # alt-/
 ##
+# remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
+WORDCHARS+="|'"
+WORDCHARS="${WORDCHARS/\//}"
+WORDCHARS="${WORDCHARS/\[/}"
+WORDCHARS="${WORDCHARS/\]/}"
+WORDCHARS="${WORDCHARS/\#/}"
+WORDCHARS="${WORDCHARS/\./}"
+WORDCHARS+='ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو۱۲۳۴۵۶۷۸۹۰'
+
+function backward-kill-word2() {
+if [[ "$LBUFFER" =~ '(.*)\s+$' ]] ; then
+    LBUFFER="$match[1]"
+else
+    ## if you want to customize WORDCHARS per function:
+    local WORDCHARS="${WORDCHARS}"
+    zle backward-kill-word
+fi
+}
+zle -N backward-kill-word2
+bindkey '^W' backward-kill-word2 # C-w
+bindkey '^[^?' backward-kill-word2 # alt-backspace alt-delete
+##
 eval "$(zoxide init zsh)"
 ##
 ### Added by Zinit's installer
@@ -53,6 +75,8 @@ zinit light zdharma-continuum/fast-syntax-highlighting
 #: fast-syntax-highlighting should be last
 ##
 ###
+psource ~/.zshrc.private
+
 cd ~/
 #: @workaround [[id:3c5c3e16-9ae8-483b-82c8-bf1a333b058f][{bug}: loading plugins changes PWD · Issue #543 · zdharma-continuum/zinit]]
 ###

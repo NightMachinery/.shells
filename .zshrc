@@ -607,7 +607,7 @@ function nightsh-load-zshrc() {
   ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
   ###
   # remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
-  # WORDCHARS="${WORDCHARS/\//}|'"
+  WORDCHARS="${WORDCHARS/\//}|'"
   WORDCHARS="${WORDCHARS/\#/}"
   WORDCHARS="${WORDCHARS/\./}"
   WORDCHARS+='ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو۱۲۳۴۵۶۷۸۹۰'
@@ -625,7 +625,7 @@ function nightsh-load-zshrc() {
   bindkey '^W' backward-kill-word2 # C-w
   bindkey '^[^?' backward-kill-word2 # alt-backspace alt-delete
   ###
-  psource $HOME/.shellfishrc
+  # psource $HOME/.shellfishrc
   ##
   if isGrayfur ; then
     # somehow, we need to do this to make the PATH ordering correct

@@ -297,7 +297,7 @@ alias pope="reval-paste-copy"
 function pbcopy-ask {
     in-or-args2 "$@"
     ec-sep-h
-    ecn "$inargs[*]" | bat --style=plain
+    ec "$inargs[*]" | bat --style=plain --paging=never
     if ask "Copy?" Y ; then
         pbcopy "$inargs[*]"
         return $?

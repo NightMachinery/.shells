@@ -1,10 +1,28 @@
 ##
+alias -g '@RET'=' || { retcode=$? ; print -r -- "exited ${retcode}" ; return $retcode } '
+
 ec() {
     print -r -- "$@"
 }
 
 gquote () {
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
+}
+
+function export-from-alias {
+  local name="${1:?}"
+
+  local code="${aliases[$name]}"
+  if test -n "$code" ; then
+    eval export "${code}"
+  fi
+  ##
+  # This is safe:
+  #
+  # ❯ alias hi='tmp="a ;b; c"'
+  # ❯ ec ${aliases[hi]}
+  # tmp="a ;b; c"
+  ##
 }
 
 source ~/.shared.sh
@@ -39,4 +57,6 @@ function cron-commands-reboot-run {
         eval "$cmd"
     done
 }
+##
+alias rh=rehash
 ###

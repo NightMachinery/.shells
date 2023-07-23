@@ -180,7 +180,7 @@ function rss-tsend() {
                 processed_p=''
                 summary=''
                 if ! bool "$notel" ; then
-                    summary="$(summarize_show_mode_p=n summarize-url "$l")" || summary="Summary generation failed with ${?}."
+                    summary="$(summarize_show_mode_p=n retry_sleep=30 retry-limited 5 summarize-url "$l")" || summary="Summary generation failed with ${?}."
 
                     tsend --link-preview -- "${id}" "$t"$'\n'"${l}"$'\n\n'"${summary}" && processed_p=y
                 else
@@ -325,6 +325,7 @@ function rss-dl-multi-fz {
 function podcast-dl-omni {
     local podcasts_extras=($@)
 
+    FZF_CAT_PREVIEW="${FZF_CAT_RTL_PREVIEW}" \
     indir-exists "$podcast_dir" \
         revaldbg rss-dl-multi-fz $podcasts_extras[@] ${(@v)podcasts_urls_my} @RET
 }

@@ -44,6 +44,8 @@ fi
 ##
 # tmuxnewsh2 notes-hugo indir ~cod/hugo/notes-hugo hugo --bind="127.0.0.1" --baseURL="https://notes.lilf.ir" --appendPort=false --gc --port 1313 serve
 ##
+tmuxnew email-aggregator-bot zsh -c "API_TOKEN=${emailaggbot_api_token} DATABASE_NAME=~/mail_gather_database.db mail-gather-bot"
+##
 # launch-musicf.zsh
 ##
 chronic-all
