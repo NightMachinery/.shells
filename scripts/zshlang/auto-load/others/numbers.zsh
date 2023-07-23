@@ -46,3 +46,13 @@ function numfmt-comma {
         cat-copy-if-tty
 }
 ##
+function rial2human {
+    local inargs
+    in-or-args3 "$@" @RET
+    re rial2human.py ${inargs[@]}
+}
+
+function human2rial {
+    human2number.py --rial "$@" > >( { colorfg "$gray[@]" ; rial2human ; resetcolor } >&2) | cat-copy-if-tty
+}
+##
