@@ -65,8 +65,26 @@ expand-alias-space() {
     [[ -n "$RBUFFER" ]] || isNotMalice || (( $+ialiases[$LBUFFER] )) || { (( $+aliases[$LBUFFER] )) && zle expand-aliases-widget } #_expand_alias
     [[ "$insertBlank" = "0" ]] || zle self-insert
 }
+
 isNotMalice || {
     zle -N expand-alias-space
     bindkey " " expand-alias-space
     bindkey -M isearch " " magic-space
 }
+##
+function export-from-alias {
+  local name="${1:?}"
+
+  local code="${aliases[$name]}"
+  if test -n "$code" ; then
+    eval export "${code}"
+  fi
+  ##
+  # This is safe:
+  #
+  # ❯ alias hi='tmp="a ;b; c"'
+  # ❯ ec ${aliases[hi]}
+  # tmp="a ;b; c"
+  ##
+}
+##
