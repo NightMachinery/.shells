@@ -62,6 +62,8 @@ function clipboard-add {
         return 0
     fi
 
+    awaysh pbcopy-remote-from-local
+    #: @securityRisk This can send sensitive info to remote servers.
 
     if ! test -e "$file" ; then
         touch "$file"
