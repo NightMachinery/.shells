@@ -145,6 +145,7 @@ function mpv-rpc () {
 alias mpv-rpc-audio='mpv_rpc_socket="$mpv_audio_ipc" '
 aliasfn hear-do mpv-rpc-audio mpv-do
 
+aliasfn hear-shuffle hear-do playlist-shuffle
 aliasfn mpv-play-toggle mpv-do keypress space
 aliasfn hear-play-toggle hear-do keypress space
 aliasfn hear-play-on hear-do set pause no
@@ -315,5 +316,9 @@ function mpv-tui {
     : "@seeAlso command mpv --no-config ..."
 
     mpv-notag --profile=sw-fast --vo=tct "$@"
+}
+##
+function mpv-cheatsheet {
+    icat "${nightNotes}/cheatsheets/mpv/mpbindings_big.png"
 }
 ##
