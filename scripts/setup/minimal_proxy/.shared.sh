@@ -147,5 +147,13 @@ python-package-version () {
 	python -c "import sys ; import json ; from pynight.common_package import packages_commit_get ; print(json.dumps(packages_commit_get(sys.argv[1:], import_p=${import_p},), indent=2))" "$@"
 }
 ##
+clipboard-remote-listen-2file() {
+    local port="${1:-6070}"
+
+    tmuxnew "clipboard-listen-2file-${port}" \
+        socat -u "TCP-LISTEN:${port},bind=127.0.0.1,fork" 'EXEC:tee '"${HOME}/.remote_clipboard"
+    # 'EXEC:zsh -fc \"tee >(pbcopy)\"'
+}
+##
 
 psource ~/.privateShell
