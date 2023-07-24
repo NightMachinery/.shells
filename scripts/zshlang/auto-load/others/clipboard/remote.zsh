@@ -26,7 +26,7 @@ function pbpaste-remote {
 aliasfn popr pbpaste-remote
 ##
 function clipboard-remote-listen {
-    local port="${1:-6030}"
+    local port="${1:-6070}"
 
     tmuxnew "clipboard-listen-${port}" \
         socat -u "TCP-LISTEN:${port},bind=127.0.0.1,fork" 'EXEC:env brishz_in=MAGIC_READ_STDIN brishzq.zsh h-clipboard-remote-listen'
@@ -58,9 +58,16 @@ function h-clipboard-remote-listen {
 }
 ##
 pbcopy-remote() {
+    #: immediately and verbosely fails if nobody's listening on the port
+    #: `echo test | copy_port=18023 pbcopy-remote`
+    ##
     local port="${copy_port:-6030}"
 
     socat - "tcp:127.0.0.1:${port}"
+}
+
+pbcopy-remote-from-local() {
+    pbpaste | pbcopy-remote
 }
 
 bell-call-remote() {
