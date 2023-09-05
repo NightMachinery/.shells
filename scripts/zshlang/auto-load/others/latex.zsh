@@ -25,6 +25,9 @@ function pdflatex-m {
     local opts=("${@[1,-2]}") f="${@[-1]}"
     assert-args f @RET
 
+    local cv_dir
+    cv_dir="${nightNotes}/private/subjects/resume, CV"
+
     typeset -A tex_vars=()
     if (( ${#latex_vars} > 0 )) ; then
         tex_vars=("${latex_vars[@]}") #: [key var] ...
@@ -33,7 +36,7 @@ function pdflatex-m {
     local tex=""
 
     tex+="\def\mypwd{${f:h}}"
-    tex+="\def\CVDir{${nightNotes}/private/subjects/resume, CV}"
+    tex+="\def\CVDir{${cv_dir}}"
 
     for k in ${(k@)latex_vars} ; do
         tex+="\def\${k}{${latex_vars[$k]}}"
@@ -48,7 +51,14 @@ function pdflatex-m {
 
     dact emc "$tex_f"
 
-    reval-ec pdflatex "${opts[@]}" "$tex_f"
+    #: [[https://tex.stackexchange.com/questions/450863/using-bibtex-with-pdflatex][pdftex - Using BibTex with pdfLaTeX - TeX - LaTeX Stack Exchange]]
+    assert reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
+
+    assert gcp -v "${cv_dir}/"*.bib . @RET
+    assert reval-ec bibtex *.aux @RET
+
+    assert reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
+    assert reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
 }
 @opts-setprefix pdflatex-m latex
 ##
