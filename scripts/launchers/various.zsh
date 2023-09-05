@@ -32,6 +32,7 @@ tmuxnewsh2 hi10-notify hi10-new-notify 'mahouka|Mushoku Tensei|tokyo revenger|ku
 borgdir=~/code/betterborg/
 # tmuxnewsh2 juliaX borg_brish_count=0 python stdborg.py # for testing iterations quickly
 tmuxnew julia "dash -c 'cd $(gq $borgdir) && $(gq "$(realpath2 python3)") $(gq $borgdir/start_server.py)'"
+tmuxnew julia_papersonegai "dash -c 'cd $(gq $borgdir) && borg_session=session_papersonegai borg_plugin_path=papersonegai_plugins borg_brish_count=1 $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
 tmuxnew julia_jlib "dash -c 'cd $(gq $borgdir) && borg_session=session_jlib borg_plugin_path=jlib_plugins borg_brish_count=10 $(gq "$(realpath2 python3)") $(gq $borgdir/stdborg.py)'"
 tmuxnew julia_inline "dash -c 'cd $(gq $borgdir) && TELEGRAM_TOKEN=$(gq $TELEGRAM_TOKEN) $(gq "$(realpath2 python3)") $(gq $borgdir/inline.py)'"
 ##
