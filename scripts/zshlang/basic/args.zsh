@@ -32,11 +32,16 @@ function in-or-args-pns {
 }
 
 function in-or-args {
+    local end_newline_p="${in_or_args_newline_p-y}"
     local pns_p="${in_or_args_pns_p}"
     local html_p="${in_or_args_html_p}"
 
     if (( $# )) ; then
-        arrNN "$@"
+        if test -n "$end_newline_p" ; then
+            arrNN "$@"
+        else
+            arrN "$@"
+        fi
     else
         if isInTty ; then
             if bool "$html_p" ; then

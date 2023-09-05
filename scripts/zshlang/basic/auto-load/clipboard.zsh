@@ -100,8 +100,8 @@ function pbcopy-term() {
 function pbcopy {
     ##
     # local in="$(in-or-args "$@")"
-    local in="${$(in-or-args "$@" ; print -n .)[1,-2]}"
-    dact typ in
+    local in="${$(in_or_args_newline_p= in-or-args "$@" ; print -n .)[1,-2]}"
+    dact var-show in
 
     if isLinux ; then
         ##
