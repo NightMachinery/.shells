@@ -45,7 +45,7 @@ function title {
     } >/dev/tty
 }
 
-function tty-title() {
+function tty-title {
     isI || return
     local text="$@"
 
