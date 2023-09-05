@@ -1,4 +1,3 @@
-
 Pillow
 PyPDF2
 Unidecode
