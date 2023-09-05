@@ -28,7 +28,7 @@ swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
 
-audio-join() {
+function audio-join {
     : "@alt audio-join2"
     mdocu '<output> <audio-file> ...
 Joins the <audio-file>s into <output>. Automatically sets the extension of <output>.
