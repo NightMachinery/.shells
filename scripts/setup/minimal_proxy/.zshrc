@@ -7,6 +7,8 @@ bindkey '^[^M' self-insert-unmeta # You can use self-insert-unmeta to bind Alt+R
 #: self-insert-unmeta: Insert a character into the buffer after stripping the meta bit and  converting ^M to ^J.
 bindkey '\{' self-insert-unmeta
 bindkey '\}' self-insert-unmeta
+
+bindkey "^U" backward-kill-line
 ##
 # start typing + [Up-Arrow] - fuzzy find history forward
 if [[ "${terminfo[kcuu1]}" != "" ]]; then

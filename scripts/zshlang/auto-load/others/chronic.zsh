@@ -17,13 +17,16 @@ function chronic-certs {
 }
 
 function chronic-update {
-    brew update
-    # re 'brew upgrade' googler # triggers upgrading everything, which we can't afford on weak servers
-
     pip install --upgrade ddgr fanficfare cloudscraper
-    pip install --upgrade --force pytube ytmusicapi youtube-dl yt-dlp spotipy spotdl
+    pip install --upgrade --force pytube ytmusicapi youtube-dl spotipy spotdl
+
+    # pip install -U yt-dlp
+    $proxyenv yt-dlp --update-to nightly
 
     tldr --update
+
+    ##
+    brew update
 
     if isServer ; then
         brew upgrade
@@ -31,8 +34,11 @@ function chronic-update {
     fi
 
     if isLocal ; then
+        # re 'brew upgrade' googler # triggers upgrading everything, which we can't afford on weak servers
+
         # brew upgrade microsoft-edge @STRUE #: needs @sudo
     fi
+    ##
 }
 
 function chronic-backup {

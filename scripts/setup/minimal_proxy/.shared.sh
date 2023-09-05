@@ -3,6 +3,8 @@ export TERM="xterm-256color"
 
 export TZ='Asia/Tehran'
 
+export LESS='-RiF --mouse --wheel-lines=3 -j.3'
+
 export VISUAL="vim"
 export EDITOR="${VISUAL}"
 export ALTERNATE_EDITOR="" #: Causes Emacs to start a daemon if one is not found.
@@ -18,6 +20,11 @@ psource () {
     then
         source "$@"
     fi
+}
+
+cdm () {
+    local d="$*"
+    mkdir -p -- "$d" && cd -P -- "$d"
 }
 
 bool () {
@@ -68,6 +75,7 @@ alias gl='git pull'
 alias gp='git push'
 alias grv='git remote -v'
 alias gss='git status'
+alias gd='git diff'
 
 glola () {
     LESS=$LESSMIN git log --graph --pretty=format:'%Cred%h%Creset %C(yellow)%ad%Creset %Cgreen(%cr)%Creset %s %C(yellow)%d%Creset %C(bold blue)<%an>%Creset' --date=short --abbrev-commit --all
@@ -84,6 +92,7 @@ proxy-env-unset () {
 alias pxa87='ALL_PROXY=http://127.0.0.1:1087 all_proxy=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096'
 # export ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096
+alias pxateias='ALL_PROXY=http://10.2.32.28:10809 all_proxy=http://10.2.32.28:10809 http_proxy=http://10.2.32.28:10809 https_proxy=http://10.2.32.28:10809 HTTP_PROXY=http://10.2.32.28:10809 HTTPS_PROXY=http://10.2.32.28:10809'
 ##
 tmuxnew () {
     tmux kill-session -t "$1" &> /dev/null
@@ -154,6 +163,13 @@ clipboard-remote-listen-2file() {
         socat -u "TCP-LISTEN:${port},bind=127.0.0.1,fork" 'EXEC:tee '"${HOME}/.remote_clipboard"
     # 'EXEC:zsh -fc \"tee >(pbcopy)\"'
 }
+##
+http-static-caddy () {
+    caddy file-server --browse --listen "${2:-0.0.0.0}:${1:-8000}"
+}
+##
+alias rsp-safe='rsync --verbose --checksum --protect-args --human-readable --xattrs --times --info=progress2 --partial-dir=.rsync-partial -r'
+# partial-dir supports resume
 ##
 
 psource ~/.privateShell
