@@ -136,3 +136,19 @@ function stopwatch {
     } always { resetcolor }
 }
 ##
+function time-from-human {
+    local days="${time_from_human_days:-${time_from_human_day:-${time_from_human_d:-0}}}"
+    local hours="${time_from_human_hours:-${time_from_human_hour:-${time_from_human_h:-0}}}"
+    local minutes="${time_from_human_mins:-${time_from_human_min:-${time_from_human_m:-0}}}"
+    local secs="${time_from_human_secs:-${time_from_human_sec:-${time_from_human_s:-0}}}"
+
+    local total_secs=$((days*24*60*60 + hours*60*60 + minutes*60 + secs))
+    local date_in_time=$(( EPOCHSECONDS + total_secs ))
+
+    ecbold "Days: $days, Hours: $hours, Minutes: $minutes, Seconds: $secs"
+    ecbold "$(TZ="${TZ:-Asia/Tehran}" gdate -d "@${date_in_time}" +'%Y-%m-%d %A %H:%M:%S')"
+
+    ec "$total_secs" |
+        cat-copy-if-tty
+}
+##
