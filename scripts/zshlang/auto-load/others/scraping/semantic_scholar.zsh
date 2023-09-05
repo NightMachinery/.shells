@@ -91,11 +91,11 @@ function semantic-scholar-to-json-scraping {
             doi '[data-selenium-selector="paper-doi"] .doi__link' 'attr:href' \
             corpusID '[data-selenium-selector="corpus-id"]' '' \
             date '[data-selenium-selector="paper-year"]' '' \
-            authors_names 'meta[name="citation_author"]' 'attr:content' \
+            authors_names 'meta[name="citation_author"], meta[property="citation_author"]' 'attr:content' \
             journal_name '[data-heap-id="paper-meta-journal"]' '' \
-            abstract_scraped 'meta[name="description"]' 'attr:content' \
+            abstract_scraped 'meta[name="description"], meta[property="description"]' 'attr:content' \
             links '[data-selenium-selector="paper-link"]' 'attr:href' \
-            pdf_urls 'meta[name="citation_pdf_url"]' 'attr:content' \
+            pdf_urls 'meta[name="citation_pdf_url"], meta[property="citation_pdf_url"]' 'attr:content' \
             topics '[data-selenium-selector="entity-name"]' '' \
             referenceCount '[data-heap-nav="references"]' '' \
             | jq '.'
