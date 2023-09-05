@@ -1,5 +1,5 @@
 ##
-function wgetm() {
+function wgetm {
     : "--continue (not enabled here) will assume any smaller already present file is an incomplete version of the server's file, and wget will try to resume it."
 
     local opts=()
@@ -12,12 +12,14 @@ function wgetm() {
     opts+='--trust-server-names'
     #: --trust-server-names: If this is set, on a redirect, the local file name will be based on the redirection URL.  By default the local file name is based on the original URL.  When doing recursive retrieving this can be helpful because in many web sites redirected URLs correspond to an underlying file structure, while link URLs do not.
 
-    $proxyenv wget -e robots=off --user-agent "$useragent_chrome" --header "$(cookies)" "$opts[@]" "$@"
-
-    if test -z "$bella_zsh_disable1" && isI && @opts p [ wget ] @ fn-isTop
-    then
-        bell-dl
-    fi
+    {
+        $proxyenv wget -e robots=off --user-agent "$useragent_chrome" --header "$(cookies)" "$opts[@]" "$@" @RET
+    } always {
+        if test -z "$bella_zsh_disable1" && isI && @opts p [ wget ] @ fn-isTop
+        then
+            bell-dl
+        fi
+    }
 }
 
 function wget-cookies() {
