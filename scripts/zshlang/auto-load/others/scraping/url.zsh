@@ -143,7 +143,7 @@ function url-domain {
         cat-copy-if-tty
 }
 ##
-function url-exists() {
+function url-exists {
     local ret=1 url="$1"
 
     # Don't use --head, it doesn't work with some urls, e.g., https://github.com/Radarr/Radarr/wiki/Setup-Guide.md . Use `-r 0.0` to request only the first byte of the file.
