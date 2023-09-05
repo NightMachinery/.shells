@@ -793,3 +793,21 @@ function jcal-all {
 }
 alias jcala='jcal-all'
 ##
+function jalali-from-natural {
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local gregorian
+    for date_nat in ${inargs[@]} ; do
+        gregorian="$(datenat "${date_nat}")" || {
+            ecerr "$0: could not parse: ${date_nat}"
+            continue
+        }
+
+        ecbold "${date_nat} -> ${gregorian}"
+        jalalicli tojalali "${gregorian}"
+    done |
+        cat-copy-if-tty
+}
+aliasfn jalalinat jalali-from-natural
+##
