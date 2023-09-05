@@ -130,3 +130,48 @@ function arxiv-k2 {
 }
 renog arxiv-k2
 ##
+function arxiv-latex-dl {
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local paper_dir
+    paper_dir="$(ffz-get 'paper')" @TRET
+
+    local url paper_id api_url paper_title
+    for url in ${inargs[@]}; do
+        paper_id="$(ec "$url" | perl -nE 'say /\/(\d+\.\d+)$/')" @TRET
+
+        # Fetch paper's title using arXiv API
+        api_url="http://export.arxiv.org/api/query?id_list=${paper_id}"
+        paper_title="$(gurl "${api_url}")" @TRET
+
+        if isDbg ; then
+            i="${paper_title}"
+
+            ec-sep-h
+            ecgray "${paper_title}"
+            ec-sep-h
+        fi
+
+        # Use jq to extract the title
+
+        paper_title="$(ec "${paper_title}" | xml2 | rget '/feed/entry/title=(.+)' | str2filename)" @TRET
+
+        local save_dir="${paper_dir}/latex/${paper_title}"
+        mkdir-m "${save_dir}"
+
+        # Download LaTeX source
+        local download_url="https://export.arxiv.org/e-print/${paper_id}"
+        local archive="${save_dir}/src.tar.gz"
+        assert reval-ec wgetm -q "${download_url}" -O "${archive}" @RET
+
+        # Unzip the content
+        assert command tar -xzvf "${archive}" -C "${save_dir}" @RET
+
+        # Remove the downloaded tar.gz file
+        trs-rm "${archive}" @STRUE
+
+        ecgray "Downloaded and extracted to ${save_dir}"
+    done
+}
+##
