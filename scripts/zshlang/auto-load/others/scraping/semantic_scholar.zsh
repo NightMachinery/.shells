@@ -151,10 +151,11 @@ function semantic-scholar-dl-from-org {
     if urls="$(ec "$org" | rget '^\s*:openAccessPdf:\s+(.*?)\s*$')" ; then
     elif urls="$(ec "$org" | urls-extract | rg '(?:\.pdf$|^https?://dl.acm.org/doi/pdf/)')" ; then
     elif urls="$(ec "$org" | urls-extract | rget '^https://api.semanticscholar.org/arXiv:([^/]+)$' | head -n 1)" ; then
-        urls="https://arxiv.org/pdf/${urls}.pdf"
+        urls="https://export.arxiv.org/pdf/${urls}.pdf"
     else
         urls="$(ec "$org" | rget '^\s*:pdf_urls:\s+(.*?)\s*$')" @TRET
     fi
+    urls="$(ec "${urls}" | arxiv-exportify)"
     urls=(${(@f)urls})
 
     local url
@@ -164,6 +165,7 @@ function semantic-scholar-dl-from-org {
     name="$(
     ec "$org" |
     org-link-extract-title |
+    arxiv-exportify |
     ghead -n 1
     )" @TRET
 
