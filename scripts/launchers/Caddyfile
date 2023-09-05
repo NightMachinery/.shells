@@ -32,6 +32,9 @@ files.lilf.ir, http://:8080 {
   basicauth /private/* scrypt {
 	Alice {env.GARDEN_HASHED0} {env.GARDEN_SALT0_B64}
   }
+  basicauth /static/notes/* bcrypt {
+	Bunny {env.BUNNY_HASHED}
+  }
   encode zstd gzip
   file_server browse {
     hide *..hidden..*
