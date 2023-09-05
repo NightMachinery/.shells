@@ -51,11 +51,11 @@ function trim {
     print -nr -- "$out"
 }
 
-function trimsed() {
+function trimsed {
     gsed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
-function trimpy() {
+function trimpy {
     python3 -c 'import sys
 for line in sys.stdin: print(line.strip())'
 }
@@ -288,4 +288,5 @@ function whitespace-shared-rm {
         whitespace_shared_rm.pl "$@" |
         cat-copy-if-tty
 }
+aliasfn strip-prefixed-whitespace whitespace-shared-rm
 ##

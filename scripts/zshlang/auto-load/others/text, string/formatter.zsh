@@ -1,6 +1,8 @@
 ##
 function beautifier-js {
-    unibeautify -l JavaScript | cat-copy-if-tty
+    cat-paste-if-tty |
+        unibeautify -l JavaScript |
+        cat-copy-if-tty
 }
 alias pretty-js='beautifier-js'
 alias formatter-js='beautifier-js'
