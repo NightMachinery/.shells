@@ -1,6 +1,11 @@
 ##
 function rm-empty {
-    fd --type=empty "$@" | inargsf trs-rm
+    local dirs=($@)
+
+    local dir
+    for dir in ${dirs[@]} ; do
+        fd --type=directory --type=empty . "$dir" | inargsf trs-rm
+    done
 }
 ##
 function file-unix2uri-rp-v2 {
