@@ -807,6 +807,25 @@ end
 hs.hotkey.bind(hyper, 'z', kittyHandler)
 hs.hotkey.bind({}, 'F12', kittyHandler)
 ---
+function pasteBlockified()
+  -- Get the clipboard content
+  local clipboardContent = hs.pasteboard.getContents()
+
+  -- Wrap the clipboard content in Markdown's code blocks
+  local markdownContent = "```\n" .. clipboardContent .. "\n```"
+
+  -- Put the markdownContent back to clipboard
+  hs.pasteboard.setContents(markdownContent)
+
+  -- Trigger a "paste" event
+  hs.eventtap.keyStroke({"cmd"}, "v")
+
+  -- Set the original clipboard content back to clipboard after some delay (in seconds)
+  hs.timer.doAfter(0.2, function() hs.pasteboard.setContents(clipboardContent) end)
+end
+
+hs.hotkey.bind(hyper, ",", pasteBlockified)
+---
 function install()
   -- @bootstrap installs the CLI binary
   -- https://www.hammerspoon.org/docs/hs.ipc.html#cliInstall
