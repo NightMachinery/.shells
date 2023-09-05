@@ -54,4 +54,21 @@ for n in soup.find_all(string=at_re):  #: =string= used to be =text=
 
         # ic(type(n2_soup), n2_soup)
 
+for element in soup.find_all(True):
+    if "dir" not in element.attrs:
+        #: Get the first character of the element's text
+        text = element.get_text() or 'empty'
+        first_char = text[0]
+
+        #: Check if the first character is an RTL character
+        if ord(first_char) >= 0x590 and ord(first_char) <= 0x6ff:
+            element["dir"] = "rtl"
+
+            if "class" in element.attrs:
+                element["class"].append("night_rtl")
+            else:
+                element["class"] = ["night_rtl"]
+        else:
+            element["dir"] = "auto"
+
 print(soup)
