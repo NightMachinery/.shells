@@ -229,6 +229,8 @@ function full-html2 {
     [[ "$mode" =~ '^curlfullzero$' ]] &&  { cfTimeout=0 $proxyenv curlfull.js "$url" ; return $? } # not really usable
     [[ "$mode" =~ '^curlfullshorter$' ]] &&  { cfTimeout=0.5 $proxyenv curlfull.js "$url" ; return $? } # not really usable
     [[ "$mode" =~ '^curlfullshort$' ]] &&  { cfTimeout=1 $proxyenv curlfull.js "$url" ; return $? }
+    [[ "$mode" =~ '^curlfull_s5$' ]] &&  { cfTimeout=5 $proxyenv curlfull.js "$url" ; return $? }
+    [[ "$mode" =~ '^curlfull_s10$' ]] &&  { cfTimeout=10 $proxyenv curlfull.js "$url" ; return $? }
     [[ "$mode" =~ '^curlfull$' ]] && { cfTimeout=20 $proxyenv curlfull.js "$url" ; return $? }
     [[ "$mode" =~ '^curlfulllong$' ]] && { cfTimeout=900 $proxyenv curlfull.js "$url" ; return $? }
     [[ "$mode" =~ '^aa(cookies)?$' ]] && {

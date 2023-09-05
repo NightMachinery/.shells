@@ -81,7 +81,7 @@ function semantic-scholar-to-json-scraping {
     url="$(semantic-scholar-url-get "$url")" @TRET
 
     local html
-    html="$(fhMode="${fhMode:-aa}" full-html2 "$url")" @TRET
+    html="$(fhMode="${fhMode:-curlfull_s5}" full-html2 "$url")" @TRET
     #: fhMode=curl,wgetm did not work with genrouter for some reason
 
     ec "$html" |
