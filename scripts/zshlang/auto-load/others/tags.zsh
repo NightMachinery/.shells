@@ -80,11 +80,13 @@ function ntag-ll() {
 }
 aliasfn ll ntag-ll
 # aliasfn lll ntag-ll
-function ntag-lt() {
+function ntag-lt {
+    local opts=(--ignore-glob '.git' -a -T)
+
     if isI && istty ; then
-        exa -a -T --color always "$@" | ntag-color | rtl-reshaper-fast
+        exa "${opts[@]}" --color always "$@" | ntag-color | rtl-reshaper-fast
     else
-        exa -a -T "$@"
+        exa "${opts[@]}" -a -T "$@"
     fi
 }
 aliasfn lt ntag-lt
