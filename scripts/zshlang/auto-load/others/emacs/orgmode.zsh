@@ -306,6 +306,7 @@ function org-link-extract-url {
 }
 @opts-setprefixas org-link-extract-url org-link-extract
 ##
+aliasfn org-link-extract-http org_link_extract_type='https?' org-link-extract
 aliasfn org-link-extract-file org_link_extract_type=file org-link-extract-url
 aliasfn org-link-extract-id org_link_extract_type=id org-link-extract-url
 
