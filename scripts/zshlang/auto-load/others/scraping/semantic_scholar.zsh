@@ -181,6 +181,8 @@ function semantic-scholar-dl-from-org {
 
     local lock_id="$0"
     retry_sleep=15 lock-aquire-redis-retry "${lock_id}" $((30*60)) @RET
+    setopt localtraps
+    trap "" $exit_traps[@]
     {
         {
             ec "$org" |
@@ -191,6 +193,7 @@ function semantic-scholar-dl-from-org {
         reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
     } always {
         lock-release-redis "${lock_id}"
+        trap - $exit_traps[@]
     }
 }
 aliasfn ssdl semantic-scholar-dl-from-org
