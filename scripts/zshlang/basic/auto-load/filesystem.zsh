@@ -76,7 +76,14 @@ function cdz() {
     fi
 }
 ##
-function ensure-dir() {
+function mkdir-m {
+    local d
+    for d in $@ ; do
+        mkdir -p -- "$d"
+    done
+}
+
+function ensure-dir {
     mkdir -p -- "$(bottomdir $1)"
 }
 reify ensure-dir
