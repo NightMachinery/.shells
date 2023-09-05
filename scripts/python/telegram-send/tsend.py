@@ -2,23 +2,26 @@
 
 """telegram-send
 Usage:
-  tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [--] <receiver> <message>
+  tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
 
 Options:
-  -f <file> --file=<file>   Sends a file, with message as its caption. (Can be specified multiple times, and sends all the files as an album. So they have to be the same kind of 'media'.)
-  --force_document Whether to send the given file as a document or not.
-  --link_preview Whether to show a preview of web links.
-  --parse_mode <parser> Which parser to use for the message.
-  -h --help     Show this screen.
-  --version     Show version.
+  -f <file> --file=<file>  Sends a file, with message as its caption. (Can be specified multiple times, and sends all the files as an album. So they have to be the same kind of 'media'.)
+  --force_document  Whether to send the given file as a document or not.
+  --link_preview  Whether to show a preview of web links.
+  --parse_mode <parser>  Which parser to use for the message.
+  --lock-timeout <seconds>  How long to wait for lock file to be released, in seconds [default: 30].
+  --lock-path <lockpath>  Path to lock file.
+  --album  Send files as an album. (This flag has not been implemented for the first backend!)
+  -h --help  Show this screen.
+  --version  Show version.
 
 Examples:
   tsend.py some_friend "I love you ^_^" --file ~/pics/big_heart.png
 
 Dependencies:
-  pip install -U docopt telethon python-telegram-bot
+  pip install -U pynight IPython aiofile docopt telethon python-telegram-bot
 
 Created by Fereidoon Mehri. I release my contribution to this program to the public domain (CC0).
 """
@@ -26,10 +29,15 @@ from docopt import docopt
 import os
 from os import getenv
 import sys
+import asyncio
 from pathlib import Path
 import asyncio
 from IPython import embed
 import re
+from pynight.common_lock_async import (
+    lock_acquire,
+    lock_release,
+)
 
 try:
     from icecream import ic, colorize as ic_colorize
@@ -108,7 +116,11 @@ async def discreet_send(
     if len(message) == 0:
         if file:
             last_msg = await client.send_file(
-                receiver, file, reply_to=(last_msg), allow_cache=False
+                receiver,
+                file,
+                reply_to=(last_msg),
+                allow_cache=False,
+                force_document=force_document,
             )
         return last_msg
     else:
@@ -154,101 +166,216 @@ async def discreet_send(
         return last_msg
 
 
-async def ptb_send_file(bot, arguments, max_retries=20):
-    #: @todo read parse mode from arguments
-    ##
+async def ptb_send_files(
+    bot,
+    files,
+    chat_id,
+    caption,
+    parse_mode,
+    max_retries=20,
+    verbosity=1,
+    album_p=True,
+    force_document=False,
+):
+    from telegram import InputMediaPhoto, InputMediaDocument
+
+    media_group_photos = []
+    media_group_docs = []
+
+    async def send_media_group(media_group, is_image):
+        attempt = 0
+
+        async def handle(e):
+            if verbosity >= 2:
+                print(f"Error sending media group (attempt {attempt + 1}): {e}")
+
+            if attempt == max_retries - 1:  # if it's the last attempt
+                if verbosity >= 1:
+                    print(f"Failed to send media group after {max_retries} attempts.")
+            else:
+                await asyncio.sleep(10)
+
+        if 2 <= len(media_group) <= 10 and album_p:
+            for attempt in range(max_retries):
+                try:
+                    await bot.send_media_group(
+                        chat_id=chat_id,
+                        media=media_group,
+                        caption=caption,
+                        parse_mode=parse_mode,
+                    )
+                    break
+                except Exception as e:
+                    await handle(e)
+        else:  # if album_p is False or there's only one file, send files individually
+            for media in media_group:
+                for attempt in range(max_retries):
+                    try:
+                        if not force_document and is_image:
+                            await bot.send_photo(
+                                chat_id=chat_id,
+                                photo=media.media,
+                                caption=caption,
+                                parse_mode=parse_mode,
+                            )
+                        else:
+                            await bot.send_document(
+                                chat_id=chat_id,
+                                document=media.media,
+                                caption=caption,
+                                parse_mode=parse_mode,
+                            )
+                        break
+                    except Exception as e:
+                        await handle(e)
+        media_group.clear()
+
+    for f in files:
+        is_image = False
+        try:
+            file_type = os.path.splitext(f)[1].lower()  # get file extension
+            is_image = file_type in [".jpg", ".jpeg", ".png"]
+        except:
+            pass
+
+        with open(f, "rb") as file:
+            if is_image:
+                media = InputMediaPhoto(
+                    media=file, caption=caption, parse_mode=parse_mode
+                )
+                media_group_photos.append(media)
+            else:
+                media = InputMediaDocument(
+                    media=file, caption=caption, parse_mode=parse_mode
+                )
+                media_group_docs.append(media)
+
+        # When media_group reaches 10 items, send them as a group
+        if len(media_group_photos) == 10:
+            await send_media_group(media_group_photos, is_image=True)
+        if len(media_group_docs) == 10:
+            await send_media_group(media_group_docs, is_image=False)
+
+    # If media_groups contains between 1 and 9 items, send them as a group or individually
+    if media_group_photos:
+        await send_media_group(media_group_photos, is_image=True)
+    if media_group_docs:
+        await send_media_group(media_group_docs, is_image=False)
+
+
+def get_parse_mode(mode_str):
+    if mode_str:
+        mode_str = mode_str.lower()
+
     from telegram.constants import ParseMode
 
+    parse_modes = {
+        "markdown": ParseMode.MARKDOWN,
+        "html": ParseMode.HTML,
+        "none": None,
+    }
+
+    return parse_modes.get(mode_str, ParseMode.MARKDOWN)
+
+
+async def ptb_send_files_v1(bot, arguments, **kwargs):
     chat_id = p2int(arguments["<receiver>"])
     caption = arguments["<message>"]
+    files = arguments["--file"]
+    album_p = not arguments["--no-album"]
 
-    for f in arguments["--file"]:
-        for attempt in range(max_retries):
-            is_image = False
-            try:
-                file_type = os.path.splitext(f)[1].lower()  # get file extension
-                is_image = file_type in [".jpg", ".jpeg", ".png"]
-            except:
-                pass
+    parse_mode = get_parse_mode(arguments.get("--parse-mode", "markdown"))
 
-            try:
-                with open(f, "rb") as file:
-                    if is_image:
-                        await bot.send_photo(
-                            chat_id=chat_id,
-                            photo=file,
-                            caption=caption,
-                            parse_mode=ParseMode.MARKDOWN,
-                        )
-                    else:
-                        await bot.send_document(
-                            chat_id=chat_id,
-                            document=file,
-                            caption=caption,
-                            parse_mode=ParseMode.MARKDOWN,
-                        )
-
-                    break
-            except Exception as e:
-                print(f"Error sending {f} (attempt {attempt + 1}): {e}")
-                if attempt == max_retries - 1:  # if it's the last attempt
-                    print(f"Failed to send {f} after {max_retries} attempts.")
-                else:
-                    await asyncio.sleep(
-                        1
-                    )  # sleep for a while before retrying, you can adjust the time as needed
+    await ptb_send_files(
+        bot=bot,
+        files=files,
+        chat_id=chat_id,
+        caption=caption,
+        parse_mode=parse_mode,
+        album_p=album_p,
+        force_document=arguments["--force-document"],
+        **kwargs,
+    )
 
 
 async def tsend(arguments):
-    arguments["<message>"] = str(arguments["<message>"])
-    if backend == 2:
-        # print("backend 2 used")
-        import telegram
-        from telegram.ext import ApplicationBuilder
+    lock_timeout = float(arguments.get("--lock-timeout") or 10)
+    lock_path = arguments.get("--lock-path")
+    lock_name = None
+    lock = None
+    if lock_path:
+        if not lock_path.startswith("/"):
+            lock_name = lock_path
+            lock_path = None
 
-        proxy_url = os.environ.get("HTTP_PROXY")
-        if proxy_url:
-            app = (
-                ApplicationBuilder()
-                .token(token)
-                .proxy_url(proxy_url)
-                .get_updates_proxy_url(proxy_url)
-                .build()
-            )
-            bot = app.bot
-        else:
-            bot = telegram.Bot(token)
+        lock = await lock_acquire(
+            lock_path=lock_path,
+            lock_name=lock_name,
+            timeout=60,
+            verbose_p=False,
+            force_after_timeout_p=True,
+        )
+        # ic(lock.lock_path)
 
-        async with bot:
-            if arguments["--file"]:
-                await ptb_send_file(bot, arguments)
+    try:
+        arguments["<message>"] = str(arguments["<message>"])
+        if backend == 2:
+            # print("backend 2 used")
+            import telegram
+            from telegram.ext import ApplicationBuilder
+
+            proxy_url = os.environ.get("HTTP_PROXY")
+            if proxy_url:
+                app = (
+                    ApplicationBuilder()
+                    .token(token)
+                    .proxy_url(proxy_url)
+                    .get_updates_proxy_url(proxy_url)
+                    .build()
+                )
+                bot = app.bot
             else:
-                await bot.send_message(
-                    chat_id=p2int(arguments["<receiver>"]), text=arguments["<message>"]
+                bot = telegram.Bot(token)
+
+            async with bot:
+                if arguments["--file"]:
+                    await ptb_send_files_v1(bot, arguments)
+                else:
+                    await bot.send_message(
+                        chat_id=p2int(arguments["<receiver>"]),
+                        text=arguments["<message>"],
+                    )
+        else:
+            from telethon import TelegramClient
+
+            # print("telethon used")
+            async with TelegramClient(
+                str(Path.home()) + "/alice_is_happy", api_id, api_hash
+            ) as client:
+
+                # print(arguments)
+                if arguments["--parse-mode"] == "html":
+                    arguments["<message>"] = re.sub(
+                        r"(<(br|p)\s*/?>)", r"\1" + "\n", arguments["<message>"]
+                    )
+
+                await discreet_send(
+                    client,
+                    p2int(arguments["<receiver>"]),
+                    arguments["<message>"],
+                    file=(arguments["--file"] or None),
+                    force_document=arguments["--force-document"],
+                    parse_mode=arguments["--parse-mode"],
+                    link_preview=arguments["--link-preview"],
+                    album_mode=(not arguments["--no-album"]),
                 )
-    else:
-        from telethon import TelegramClient
-
-        # print("telethon used")
-        async with TelegramClient(
-            str(Path.home()) + "/alice_is_happy", api_id, api_hash
-        ) as client:
-
-            # print(arguments)
-            if arguments["--parse-mode"] == "html":
-                arguments["<message>"] = re.sub(
-                    r"(<(br|p)\s*/?>)", r"\1" + "\n", arguments["<message>"]
-                )
-
-            await discreet_send(
-                client,
-                p2int(arguments["<receiver>"]),
-                arguments["<message>"],
-                file=(arguments["--file"] or None),
-                force_document=arguments["--force-document"],
-                parse_mode=arguments["--parse-mode"],
-                link_preview=arguments["--link-preview"],
-                album_mode=(not arguments["--no-album"]),
+    finally:
+        if lock:
+            await lock_release(
+                lock_path=lock.lock_path,
+                # check_pid_p=True,
+                check_pid_p=False,
+                verbose_p=False,
             )
 
 
