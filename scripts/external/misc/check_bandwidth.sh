@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 ##
-# @forkedFrom [[https://github.com/bdossantos/nagios-plugins/blob/master/check_bandwidth.sh][nagios-plugins/check_bandwidth.sh at master · bdossantos/nagios-plugins · GitHub]]
+# * @forkedFrom [[https://github.com/bdossantos/nagios-plugins/blob/master/check_bandwidth.sh][nagios-plugins/check_bandwidth.sh at master · bdossantos/nagios-plugins · GitHub]]
+#
+# * Use =ip link show= to get the interface names.
 ##
 # Check bandwidth plugin for Nagios
 #
