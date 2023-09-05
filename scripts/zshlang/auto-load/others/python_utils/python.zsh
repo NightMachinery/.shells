@@ -15,4 +15,10 @@ function comment-rm-py {
         perl -CS -lne 'm/^\s*#/ || print' |
         cat-copy-if-tty
 }
+
+function comment-rm-latex {
+    cat-paste-if-tty |
+        perl -CS -lne 'm/^\s*%/ || print' |
+        cat-copy-if-tty
+}
 ##
