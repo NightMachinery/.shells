@@ -23,10 +23,12 @@ function luna {
 }
 ##
 function lunas {
+    : "lo_min=20 luna_duration=60 lunas"
+
     # local lo_min="${1:-$lo_min}"
 
     lunar luna-advanced-bell
-    display-gray-off # probably redundant
+    display-gray-off #: probably redundant
 }
 
 function luna-advanced-bell {
@@ -41,6 +43,7 @@ function h_luna-advanced-bell {
     # So I don't understand these all that well, but here is my guess:
     trap "" INT # disables INT handling in this function, so we don't quit by INT
 
+    local duration="${luna_duration:-180}"
     local signal1="$(luna_signal1_get)"
     luna_signal1_del
     local skipped="${$(luna_skipped_get):-0}"
@@ -73,7 +76,7 @@ function h_luna-advanced-bell {
                 display-gray-on
             fi
 
-            sleep 180
+            sleep "${duration}"
         else
             display-gray-on
             sleep 20 #: gives us time to finish our work or cancel the alarms
