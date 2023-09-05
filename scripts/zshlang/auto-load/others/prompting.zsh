@@ -39,6 +39,8 @@ function prompt-instruction-input-coding {
 }
 
 function prompt-blockify {
+    : "Use our Hammerspoon function 'pasteBlockified' instead"
+
     prompt_code_block_p=y prompt-instruction-input ''
 }
 alias xb='prompt-blockify'
