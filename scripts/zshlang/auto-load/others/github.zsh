@@ -91,3 +91,8 @@ function gh-release-get {
 alias gh-install='gh-release-get'
 alias github-install='gh-release-get'
 ##
+function gh-pr-pip {
+    gh_pr_pip.py "$@" |
+        cat-copy-if-tty
+}
+##
