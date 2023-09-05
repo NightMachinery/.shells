@@ -1,4 +1,10 @@
 ##
+function arxiv-exportify {
+    in-or-args "$@" |
+        perl -lpe 's|^https://(arxiv\.org)|https://export.$1|gi' |
+        cat-copy-if-tty
+}
+
 function semantic-scholar-url-get {
     local urls_semantic_scholar=() doi_ids=()
     sout arxiv-url-get "$@" @TRET
@@ -69,8 +75,8 @@ function arxiv-url-get {
                 retcode=1
             fi
             ids+="$id"
-            urls_pdf+="https://arxiv.org/pdf/${id}"
-            urls_abs+="https://arxiv.org/abs/${id}"
+            urls_pdf+="https://export.arxiv.org/pdf/${id}"
+            urls_abs+="https://export.arxiv.org/abs/${id}"
             urls_vanity+="https://arxiv-vanity.com/papers/${id}"
             urls_semantic_scholar+="https://api.semanticscholar.org/arXiv:${id}"
 
