@@ -168,6 +168,14 @@ function prompt-rewrite-fluent {
     prompt-instruction-input 'Make the following text more fluent:' "$@"
 }
 
+function prompt-rewrite-fluent-orgmode {
+    prompt_code_block_p=y prompt-instruction-input 'Make the following org-mode text more fluent:' "$@"
+}
+
+function prompt-rewrite-fluent-orgbeamer {
+    prompt_code_block_p=y prompt-instruction-input 'Make the following org-mode beamer presentation more fluent:' "$@"
+}
+
 function prompt-rewrite-fluent-selective {
     prompt-instruction-input 'Make the following text more fluent by editing the part marked with `{ ... }`:' "$@"
 }
@@ -245,6 +253,10 @@ The following:' "$@"
 ##
 function prompt-explain-code {
     prompt_code_block_p=y prompt-instruction-input 'Explain the following code:' "$@"
+}
+
+function prompt-simplify-code {
+    prompt_code_block_p=y prompt-instruction-input 'Simplify the following code:' "$@"
 }
 ##
 function prompt-refactor-to-functions {
@@ -325,5 +337,23 @@ function prompt-2bash {
 
 function prompt-zsh2bash {
     prompt_code_block_p=y prompt-instruction-input "Convert the following code from Zsh into Bash:"
+}
+##
+function prompt-code-rewrite-idiomatic {
+    prompt_code_block_p=y prompt-instruction-input 'Rewrite the following code to make it more idiomatic and optimized:' "$@"
+}
+##
+function snippet-night-namespace {
+    ec "Prefix all of our new function names' with \`night/\` to namespace them properly." |
+        cat-copy-if-tty
+}
+##
+function snippet-debug-add-prints {
+    ec "Add print statements for debugging purposes." |
+        cat-copy-if-tty
+}
+##
+function prompt-slide-complete-orgbeamer {
+    prompt_code_block_p=y prompt-instruction-input 'Complete the following org-mode beamer presentation:' "$@"
 }
 ##
