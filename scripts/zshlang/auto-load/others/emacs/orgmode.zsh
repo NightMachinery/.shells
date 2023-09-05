@@ -404,6 +404,49 @@ function h-org-export-recursive {
     done
 }
 ##
+function org-id-line-get-all {
+    local text
+    text="$(in-or-args "$@")" @RET
+
+    id_links=( ${(@f)"$(ec "$text" | { org-link-extract-id || true } )"}) @TRET
+    for id_link in ${id_links[@]} ; do
+        line="$(emc-eval "(night/org-id-line-get $(emc-quote "$id_link"))")" @TRET
+
+        if [[ "$line" == nil ]] ; then
+            ecerr "$0: got a nil line for id: ${id_link}"
+            return 1
+        fi
+
+        ec "$line"
+    done
+}
+
+function org-id2ss {
+    local text
+    text="$(in-or-args "$@" | rg -v '^\s*url=\{')" @RET
+    #: '  url={' lines indicate the URL in bibtex.
+
+    local semanticscholar_url_regex
+    semanticscholar_url_regex='^https?://(?:[^/]+\.)*semanticscholar\.org/'
+
+    local line m
+    {
+        for line in "${(@f)text}" ; do
+            #: @assumes each line contains either an SS URL or an ID link, not both
+            if m="$(ec "$line" | urls-extract | rg "${semanticscholar_url_regex}")" ; then
+                ec "$m"
+            else
+                ec "$line" |
+                    org-id-line-get-all |
+                    org-link-extract-http |
+                    { rg "${semanticscholar_url_regex}" || true }
+            fi
+        done
+     } |
+        duplicates-clean |
+        cat-copy-if-tty
+}
+##
 function org-html-postprocess {
     #: [[file:~/code/hugo/notes-hugo/themes/cortex/assets/js/page.js::function highlighterReplacer(text) {][js/page.js::function highlighterReplacer(text)]]
     #: @idempotent
