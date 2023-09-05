@@ -95,7 +95,8 @@ function str2filename {
     # this might be too restrictive
     in-or-args "$@" |
         gtr '/' '_' |
-        gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t'
+        gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t' |
+        trimsed
 }
 
 function str2filename-ascii {
