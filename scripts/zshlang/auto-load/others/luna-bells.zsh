@@ -4,6 +4,8 @@
 #: * We cache the results of some of the expensive macros like this:
 #: =wh bell-lm-mhm| perl -ple 's|\Q$ENV{GREENCASE_DIR}\E|\$GREENCASE_DIR|gi'" ; s/'/\"/g "|cat-copy=
 ###
+typeset -g LUNA_LOG=~/tmp/.luna_log
+###
 # return 0
 if isNotExpensive ; then
     #: This single file costs a second of loading time :|
@@ -12,6 +14,22 @@ if isNotExpensive ; then
     return 0
 fi
 ###
+function luna-log-tail {
+    tail -f "${LUNA_LOG}"
+}
+aliasfn lunalog luna-log-tail
+aliasfn llog luna-log-tail
+
+function luna-skip-reset {
+    luna_skipped_set 0
+}
+
+function lunaquit-force-skip-reset {
+    lunaquit-force
+    luna-skip-reset
+}
+alias lqs='lunaquit-force-skip-reset'
+##
 function lunar {
     tmuxnewsh2 deluna reval-notifexit deluna ${deluna} # timeout of deluna
     # lo_min should include the rest time as well, as the bells are sounded in the background currently.
@@ -76,7 +94,7 @@ function h_luna-advanced-bell {
                 display-gray-on
             fi
 
-            sleep-neon "${duration}"
+            fnswap isColor True sleep-neon "${duration}" > "${LUNA_LOG}"
         else
             display-gray-on
             sleep 20 #: gives us time to finish our work or cancel the alarms
