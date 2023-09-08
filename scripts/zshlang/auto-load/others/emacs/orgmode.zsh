@@ -446,6 +446,16 @@ function org-id2ss {
         duplicates-clean |
         cat-copy-if-tty
 }
+
+function id2ss-csv {
+    bella_zsh_disable1
+
+    withemcgui org-id2ss "$@" |
+    inargsf semantic-scholar-get --adder FM --format csv --flat |
+    pbcopy
+
+    bello
+}
 ##
 function org-html-postprocess {
     #: [[file:~/code/hugo/notes-hugo/themes/cortex/assets/js/page.js::function highlighterReplacer(text) {][js/page.js::function highlighterReplacer(text)]]
