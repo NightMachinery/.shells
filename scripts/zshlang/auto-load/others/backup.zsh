@@ -66,7 +66,24 @@ function backup-file() {
         # suffix somehow doesn't seem to work
     fi
 }
-### zii
+### * eva
+function eva-backup1 {
+    assert-net @RET
+
+    local ssh_host=eva
+
+    assert pushf $nightNotes/private/configs/eva/misc @RET
+    {
+        assert ssh "${ssh_host}" crontab -l > ./crontab
+
+        assert rsp-safe "${ssh_host}":.privateShell .
+
+        mkdir -p .thelounge
+        assert rsp-safe "${ssh_host}":.thelounge/config.js ./.thelounge/
+        assert rsp-safe "${ssh_host}":.thelounge/users ./.thelounge/
+    } always { popf }
+}
+### * zii
 function ziib-all {
     ecerr "$0: zii currently dead" ; return 0
 
