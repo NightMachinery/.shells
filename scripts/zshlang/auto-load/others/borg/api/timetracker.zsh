@@ -97,7 +97,7 @@ function tt-rename0 {
         reval-confirm sqlite3 "$timetracker_db" 'UPDATE activity SET name = REPLACE(name, '"$(gquote-dq "$from")"', '"$(gquote-dq "$to")"')'
     else
         if true ; then
-            reval-confirm tt_renamer.py --path "${timetracker_db}" \
+            reval-confirm tt_renamer.py --interactive --path "${timetracker_db}" \
                 --from "$from" --to "$to"
         else;
             local ext
