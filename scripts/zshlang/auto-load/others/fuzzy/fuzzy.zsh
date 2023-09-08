@@ -11,11 +11,11 @@ function fr {
     # hist-add-self
 }
 
-function fi-rec() {
+function fi-rec {
     magic mdoc "[frConfirm='' frWidget=''] $0 <cmd> [<fd args> ...]
 This function uses eval-memoi." ; mret
 
-    local args=("${@:2}") query="$(fz-createquery $fi_rec_query[@])"
+    local args=("${@:2}") query="!.git !.idea $(fz-createquery $fi_rec_query[@])"
     local cmdhead="$1"
     local dir=.
     dir="$(grealpath -- "$dir")" @TRET
