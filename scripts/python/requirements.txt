@@ -102,3 +102,4 @@ xmltodict
 yapf
 yq
 zxcvbn
+aiofile
