@@ -1,5 +1,7 @@
-function sqlite-cat() {
+##
+function sqlite-cat {
     : "@alt catsql"
+    #: [[id:3570342b-34e2-4891-a443-d5637630fb8c][@SQLViewer paulfitz/catsql: cat for sql dbs]]
 
     sqlite3 "$1" .dump
 }

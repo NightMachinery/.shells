@@ -76,7 +76,7 @@ function h_luna-advanced-bell {
                 display-gray-on
             fi
 
-            sleep "${duration}"
+            sleep-neon "${duration}"
         else
             display-gray-on
             sleep 20 #: gives us time to finish our work or cancel the alarms
