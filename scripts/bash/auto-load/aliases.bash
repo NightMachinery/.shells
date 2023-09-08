@@ -25,7 +25,7 @@ function reval-dbg {
 }
 ##
 # alias l='exa -a' # --oneline
-# alias ll='exa -a -l --blocks'
+# alias ll='exa -a -l --blocksize'
 # alias lt='exa -a -T'
 alias lc='l -s created'
 function lc-rp {
