@@ -86,7 +86,7 @@ function ntag-lt {
     if isI && istty ; then
         exa "${opts[@]}" --color always "$@" | ntag-color | rtl-reshaper-fast
     else
-        exa "${opts[@]}" -a -T "$@"
+        exa "${opts[@]}" "$@"
     fi
 }
 aliasfn lt ntag-lt
