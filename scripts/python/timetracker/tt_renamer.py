@@ -39,10 +39,14 @@ def rename_in_db(db_path, from_pattern, to, interactive_p=False):
                         f"{msg}",
                         default=True,
                     )
-                else:
-                    updates[update] = True
 
-                print(msg, file=sys.stderr)
+                    if not updates[update]:
+                        print(f"skipped: {msg}", file=sys.stderr)
+
+                else:
+                    print(msg, file=sys.stderr)
+
+                    updates[update] = True
 
             if not updates[update]:
                 continue
