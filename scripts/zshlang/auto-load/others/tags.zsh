@@ -69,11 +69,17 @@ aliasfn lv-simple ntag-l -- '${~videoglob}'
 aliasfn lv lv-simple2
 lv-sorted() { ntag-lv | tac }
 lv-simple2() { @opts nopriority y @ ntag-lv | tac }
-function ntag-ll() {
+
+function ntag-ll {
+    local opts
+    opts=(-a -l --blocksize)
+
     if isI && istty ; then
-        exa -a -l --blocks --color always "$@" | ntag-color | rtl-reshaper-fast
+        exa "${opts[@]}" --color always "$@" |
+            ntag-color |
+            rtl-reshaper-fast
     else
-        exa -a -l --blocks "$@"
+        exa "${opts[@]}" "$@"
     fi
     ##
     # -- blocks: List each file's number of file system blocks (512 bytes each?)
