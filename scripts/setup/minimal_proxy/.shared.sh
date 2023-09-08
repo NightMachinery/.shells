@@ -54,11 +54,15 @@ export PATH="${HOME}/.local/opt/brew/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/sbin:${PATH}"
 export PATH="/home/linuxbrew/.linuxbrew/bin:${PATH}"
 export PATH="/home/linuxbrew/.linuxbrew/sbin:${PATH}"
+
 export PATH="${HOME}/.config/guix/current/bin:${PATH}"
-export HOMEBREW_CURLRC="${HOME}/.curlrc"
+GUIX_PROFILE="${HOME}/.guix-profile"
+psource "$GUIX_PROFILE/etc/profile"
 
 export PATH="${HOME}/anaconda/bin:${PATH}"
 export PATH="${HOME}/miniconda3/bin:${PATH}"
+##
+export HOMEBREW_CURLRC="${HOME}/.curlrc"
 ##
 alias wh='which'
 

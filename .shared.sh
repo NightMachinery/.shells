@@ -8,6 +8,15 @@ if (( maxproc > 500 )) ; then
     ulimit -Su "$maxproc"
 fi
 unset maxproc
+###
+psource () {
+    #: @duplicateCode see [[~/.zshenv]] for the original
+    ##
+    if [[ -r "$1" ]]
+    then
+        source "$@"
+    fi
+}
 ### @duplicateCode/jhsd99wiw3i3hehiajh
 if test -z "$NIGHTDIR" ; then
     NIGHTDIR=~/scripts # @hardcoded bash/'zsh -f' have no way of determining this by themselves
@@ -94,6 +103,8 @@ addToPATH ~/.nimble/bin
 addToPATH "${NIGHTDIR}/zshlang/wrappers"
 
 addToPATH "${HOME}/.config/guix/current/bin"
+GUIX_PROFILE="${HOME}/.guix-profile"
+psource "$GUIX_PROFILE/etc/profile"
 
 # psource ~/anaconda/etc/profile.d/conda.sh
 # silence conda deactivate #this is necessary try sbing and you'll see
