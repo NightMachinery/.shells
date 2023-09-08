@@ -50,13 +50,17 @@ function lunas {
 }
 
 function luna-advanced-bell {
-    awaysh-bnamed LUNA_MARKER h_luna-advanced-bell
+    awaysh-bnamed LUNA_MARKER reval-env \
+        luna_duration="${luna_duration}" \
+        h_luna-advanced-bell
 }
 
 redis-defvar luna_signal1
 redis-defvar luna_skipped
 
 function h_luna-advanced-bell {
+    #: @warn Env vars should be forwarded in [[agfi:luna-advanced-bell]]
+    ##
     setopt localtraps
     # So I don't understand these all that well, but here is my guess:
     trap "" INT # disables INT handling in this function, so we don't quit by INT
