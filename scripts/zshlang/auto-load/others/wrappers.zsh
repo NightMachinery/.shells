@@ -25,7 +25,13 @@ function tldr() {
   isDarwin && { command tldr "$@" || command tldr -p linux "$@" ; return $? }
   command tldr "$@" | bt
 }
-function exa() {
+
+function eza {
+  local exa_command='exa'
+  if isdefined-cmd eza ; then
+    exa_command='eza'
+  fi
+
   local arg long=''
   for arg in "$@"
   do
@@ -33,11 +39,12 @@ function exa() {
   done
   if test -z "$long"
   then
-    command exa -1 "$@"
+    revaldbg command "${exa_command}" -1 "$@"
   else
-    command exa "$@"
+    revaldbg command "${exa_command}" "$@"
   fi
 }
+aliasfn exa eza
 
 function k2pdfopt() {
     if isDarwin ; then
