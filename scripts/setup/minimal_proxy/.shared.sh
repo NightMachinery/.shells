@@ -54,6 +54,7 @@ export PATH="${HOME}/.local/opt/brew/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/sbin:${PATH}"
 export PATH="/home/linuxbrew/.linuxbrew/bin:${PATH}"
 export PATH="/home/linuxbrew/.linuxbrew/sbin:${PATH}"
+export PATH="${HOME}/.config/guix/current/bin:${PATH}"
 export HOMEBREW_CURLRC="${HOME}/.curlrc"
 
 export PATH="${HOME}/anaconda/bin:${PATH}"

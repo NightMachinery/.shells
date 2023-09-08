@@ -93,6 +93,8 @@ addToPATH ~/.nimble/bin
 # addToPATH /Applications/mpv.app/Contents/MacOS
 addToPATH "${NIGHTDIR}/zshlang/wrappers"
 
+addToPATH "${HOME}/.config/guix/current/bin"
+
 # psource ~/anaconda/etc/profile.d/conda.sh
 # silence conda deactivate #this is necessary try sbing and you'll see
 # silence conda activate base
