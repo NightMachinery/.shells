@@ -72,6 +72,8 @@ alias pi='pip install --upgrade'
 alias ll='ls -alh'
 alias l='ls -ah'
 
+alias ncdu='ncdu --color off'
+
 alias gcl='git clone --recursive'
 alias ga='git add'
 alias gc='git commit'
@@ -111,7 +113,7 @@ http-static-py () {
 export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
 
 emc-gateway () {
-    ALTERNATE_EDITOR="" LOGNAME="$(whoami)" DOOMDIR=~/doom.d emacsclient -t
+    ALTERNATE_EDITOR="" LOGNAME="$(whoami)" DOOMDIR=~/doom.d emacsclient -t "$@"
 }
 ##
 function redo2 {

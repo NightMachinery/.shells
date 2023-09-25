@@ -3,6 +3,8 @@
 ###
 # Some vars are defined in configvars
 ###
+alias withcanada="TZ='America/Toronto'"
+##
 @opts-setprefix remj reminday_store
 @opts-setprefix remn reminday_store
 @opts-setprefix remnd reminday_store
@@ -92,9 +94,17 @@ aliasfn remc-today-d withremc rem-today-d
 aliasfn remc-comingup withremc rem-comingup
 ##
 function rem-comingup {
+    local days="${rem_comingup_days:-366}"
+
+    goremind comingup --days "$days"
+}
+
+function rem-comingup-v1 {
+    local days="${rem_comingup_days:-31}"
+
     local out='' i pre
 
-    for i in {1..31} ; do
+    for i in {1..${days}} ; do
         pre="$i day(s) later: ($(h-datenatj-rem-summary "${i} day later"))"
         # bidi chars: https://www.w3.org/International/questions/qa-bidi-unicode-controls.en
         out+="$(prefix-if-ne $'\n\n'"$pre"$'\n' "$(rem-today-d "$i" | prefixer --skip-empty -a $'\U202A''  ' --add-postfix $'\U202C')")"
@@ -388,7 +398,12 @@ function reminday_store {
 }
 ##
 function datenat {
-    datenat.js "$*"
+    local text="$*"
+
+    #: Making time zones understandable by datenat.js:
+    text="$(ec "$text" | perl -lpe 's/Pacific Time/PT/g')"
+
+    datenat.js "$text"
 }
 aliasfn datenat-future datenat_nopast=y datenat
 aliasfn datenat-unix datenat_unix=y datenat
@@ -618,6 +633,7 @@ function rem-summary {
     fi
     text+="$(prefix-if-ne $'\n\n' "$(rem-comingup)")"
     trim "$text"
+    ec
 }
 
 function monthj2en {

@@ -15,7 +15,27 @@ if isNotExpensive ; then
 fi
 ###
 function luna-log-tail {
-    tail -f "${LUNA_LOG}"
+    (
+        tail -f "${LUNA_LOG}" |
+            {
+                perl -e '
+                    $| = 1; #: Disable output buffering for STDOUT
+                    my $buf = "";
+                    my $line = "";
+                    while (sysread(STDIN, $buf, 1)) {
+                        if ($buf eq "\r" || $buf eq "\n") {
+                            print $buf;
+                            exit 0 if $line =~ /(?i)done/;
+                            $line = "";
+                        } else {
+                            $line .= $buf;
+                            print $buf;
+                        }
+                    }
+                '
+                exit
+            }
+    )
 }
 aliasfn lunalog luna-log-tail
 aliasfn llog luna-log-tail

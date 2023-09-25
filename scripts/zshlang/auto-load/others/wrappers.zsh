@@ -170,6 +170,6 @@ function zathura {
 }
 ##
 function tidy-viewer {
-  command tidy-viewer --color 5 "$@"
+  command tidy-viewer --extend-width-and-length --color 5 -n 999 --upper-column-width 999 "$@"
 }
 ##

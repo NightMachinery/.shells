@@ -1,9 +1,11 @@
-#!/usr/bin/env bash
+#!/opt/homebrew/bin/bash
+# #!/usr/bin/env bash
 # * @forkedFrom https://xbarapp.com/docs/plugins/Time/date-picker.1m.sh.html
 # * @usage
-# ** `lnrp "${NIGHTDIR}/zshlang/menubar/date.sh" ~/'Library/Application Support/xbar/plugins/date.1h.bash'`
+# ** `lnrp "${NIGHTDIR}/zshlang/menubar/date.sh" ~/'Library/Application Support/xbar/plugins/date.1m.bash'`
+# *** would refresh every minute (=1m=)
 # *** would refresh every hour (=1h=)
-##
+## * @bootstrap
 # Display todays date and time in various formats including ISO8601 and allows copying to clipboard.
 
 # Comment out the dates you don't need.
@@ -16,10 +18,39 @@
 # <xbar.dependencies></xbar.dependencies>
 # <xbar.image>https://i.imgur.com/GVSUqFX.png</xbar.image>
 
+source ~/.bashrc
 export PATH="$PATH:/usr/local/bin"
 
+## ** =lastunlock=
+function fromnow {
+    local then
+    then="$(gdate --date "$date" "+%s")" || return 1
+    echo $(( EPOCHSECONDS - then ))
+}
+
+function lastunlock-get {
+    # Using lower precision helps a lot with performance
+    local precision="${1:-2h}" # can only spot the last unlock in this timeframe
+
+    unset date
+    date="$(command log show --style syslog --predicate 'process == "loginwindow"' --debug --info --last "$precision" | command rg "going inactive, create activity semaphore|releasing the activity semaphore" | tail -n1 |cut -c 1-31)" || {
+        # This means the last login was before the precision set
+        echo 9999998
+        return 0
+    }
+    >&2 echo "date: $date"
+
+    date="$date" fromnow || {
+        echo 9999999
+        return 1
+    }
+}
+function lastunlock-get-min {
+    echo $(( $(lastunlock-get "$@") / 60 ))
+}
+## * menubar
 # Appears in the menubar YYYY-MM-DD
-date "+%b%-m/%d"
+echo "$(lastunlock-get-min) ¦ $(date "+%b%-m/%d")"
 echo "---"
 
 #---IR

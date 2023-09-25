@@ -91,8 +91,18 @@
 (defun v0 (key)
   (car (v key)))
 
-(defun camel-case (str)
+(defun camel-case-v1 (str)
   (reduce (lambda (acc word) (concatenate 'string acc (string-capitalize word)))
+          (split-sequence:split-sequence #\Space str)
+          :initial-value ""))
+
+(defun capitalize-first-letter (str)
+  (if (zerop (length str))
+      ""
+      (concatenate 'string (string (char-upcase (elt str 0))) (subseq str 1))))
+
+(defun camel-case (str)
+  (reduce (lambda (acc word) (concatenate 'string acc (capitalize-first-letter word)))
           (split-sequence:split-sequence #\Space str)
           :initial-value ""))
 
@@ -123,6 +133,7 @@
     ((cl-ppcre:scan "(?i)Workshop on Machine Learning for Creativity and Design" str) "ML4AD")
     ;;
     ((cl-ppcre:scan "(?i)(?:Conference on )?Computer Vision and Pattern Recognition" str) "CVPR")
+    ((cl-ppcre:scan "(?i)(?:Conference on )?Empirical Methods in Natural Language Processing" str) "EMNLP")
     ((cl-ppcre:scan "(?i)International Conference on Computer Vision" str) "ICCV")
     ((cl-ppcre:scan "(?i)European Conference on Computer Vision" str) "ECCV")
     ((cl-ppcre:scan "(?i)Neural Information Processing Systems" str) "NeurIPS")
