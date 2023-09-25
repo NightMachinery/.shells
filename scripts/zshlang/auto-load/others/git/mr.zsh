@@ -6,6 +6,8 @@ if isMB2 ; then
         ~cod/python/PyNight
 
         ~cod/orgmode-styles
+
+        ~base/_Books/papers
     )
 fi
 

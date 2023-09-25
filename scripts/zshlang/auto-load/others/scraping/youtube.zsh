@@ -2,7 +2,10 @@
 # https://github.com/ytdl-org/youtube-dl#format-selection-examples
 aliassafe ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
 
-aliassafe y="ybase --embed-subs --add-metadata --external-downloader aria2c --external-downloader-args '-c -j 3 -x 3 -s 3 -k 1M'" #  --embed-thumbnail errs: Only mp3 and m4a/mp4 are supported for thumbnail embedding for now. Causes only the first URL to be downloaded (possibly because of the error.)
+aliassafe y="ybase --embed-subs --add-metadata --downloader aria2c --downloader-args 'aria2c:--continue --max-concurrent-downloads=30 --max-connection-per-server=16 --split=30 --min-split-size=1M'" #  --embed-thumbnail errs: Only mp3 and m4a/mp4 are supported for thumbnail embedding for now. Causes only the first URL to be downloaded (possibly because of the error.)
+#: -x, --max-connection-per-server=NUM The maximum number of connections to one  server for each download. (Possible Values: 1-16)
+#: --downloader: Name or path of the external downloader to use (optionally) prefixed  by the protocols (http, ftp, m3u8, dash, rstp, rtmp, mms) to use it  for. Currently supports native, aria2c, avconv, axel, curl, ffmpeg,  httpie, wget. You can use this option multiple times to set  different downloaders for different protocols. E.g. --downloader  aria2c --downloader "dash,m3u8:native" will use aria2c for http/ftp  downloads, and the native downloader for dash/m3u8 downloads (Alias:  --external-downloader)
+#: [[https://github.com/yt-dlp/yt-dlp/issues/262][{Feature Request} Download m3u8/dash live video natively · Issue #262 · yt-dlp/yt-dlp]]
 
 aliassafe 'y@pl'="ytdl_opts=(--yes-playlist  -o '%(playlist_index)03d. %(title)s.%(ext)s') "
 

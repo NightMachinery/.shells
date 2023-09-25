@@ -56,5 +56,8 @@
 [credential] # @darwinOnly
 	helper = 
 	helper = /usr/local/share/gcm-core/git-credential-manager
+	# trace = /Users/evar/tmp/gcm.log
 [credential "https://dev.azure.com"]
 	useHttpPath = true
+[credential "https://github.com"]
+	NightMachinery = NightMachinery

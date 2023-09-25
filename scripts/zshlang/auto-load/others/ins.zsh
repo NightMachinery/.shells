@@ -58,6 +58,14 @@ function piadd() {
 }
 noglobfn piadd
 ##
+function go-install-local {
+    local d="${1:?}"
+    pushf "$d" && {
+        ecbold "$0: $d"
+        go install
+    } always { popf }
+}
+
 function go-install {
     comment -u update -v verbose
     test -n "$noi" ||

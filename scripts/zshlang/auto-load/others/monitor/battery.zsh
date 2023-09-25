@@ -31,4 +31,5 @@ function battery-status-darwin {
 function power-monitor-darwin {
     sudo powermetrics -i 1000 --poweravg 1 | grep 'Average cumulatively decayed power score' -A 20
 }
+alias energy-monitor-darwin='power-monitor-darwin'
 ##

@@ -98,7 +98,7 @@ function oneinstance {
 }
 ##
 function lock-aquire-redis-retry {
-    retry_sleep="${retry_sleep:-3}" fnswap ecerr ecgray retry lock-aquire-redis "$@"
+    retry_sleep="${retry_sleep:-3}" assert fnswap ecerr ecgray retry lock-aquire-redis "$@" @RET
 }
 
 function lock-aquire-redis {

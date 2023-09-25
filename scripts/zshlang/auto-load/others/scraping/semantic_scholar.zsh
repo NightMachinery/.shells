@@ -180,7 +180,7 @@ function semantic-scholar-dl-from-org {
     dest="${dir}/${dest}"
 
     local lock_id="$0"
-    retry_sleep=15 lock-aquire-redis-retry "${lock_id}" $((30*60)) @RET
+    retry_sleep=15 assert lock-aquire-redis-retry "${lock_id}" $((30*60)) @RET
     setopt localtraps
     trap "" $exit_traps[@]
     {
@@ -188,7 +188,10 @@ function semantic-scholar-dl-from-org {
             ec "$org" |
                 perl -ple 's/\@(?:toread\S*|tosee\S*|CR\b)\s?//g' |
                 org2tlg "$tlg_dest"
-        } @RET
+        } || {
+            ecerr "$0: failed to send the description to Telegram"
+            return 1
+        }
 
         reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
     } always {
@@ -221,7 +224,7 @@ aliasfn jss semantic-scholar-get-and-dl
 ##
 function semantic-scholar-id-get {
     in-or-args "$@" |
-        perl -lne '(m|^([^/]{40})$| || m|^(?:https://www.semanticscholar.org/paper/\|https://www.connectedpapers.com/main/)(?:(?:[^/]+)/)?([^/]{40})(?:/\|$)| ) && print $1' |
+        perl -lne '(m|^(?::paperId:\s*)?([^/]{40})$| || m|(?:https://www.semanticscholar.org/paper/\|https://www.connectedpapers.com/main/)(?:(?:[^/]+)/)?([^/]{40})(?:/\|$)| ) && print $1' |
         cat-copy-if-tty
 }
 

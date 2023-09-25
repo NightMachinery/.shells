@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* tests
-gdate --date="@$(datenat_unix=y datenat.js 'fri 6:12 AM')"
+  gdate --date="@$(datenat_unix=y datenat.js 'fri 6:12 AM')"
 */
 
 try {
@@ -15,13 +15,16 @@ try {
     var currentTime = new Date();
     if (hardCodeTime) {
         currentTime.setUTCHours(9,29,59,0)
-		// equivalent to '12:59:59' in Iran's timezone
+        // equivalent to '12:59:59' in Iran's timezone
         // This value is being used by [agfi:h-unix-allday-p]
     }
 
+    // Timezones are also supported. See [[https://www.npmjs.com/package/chrono-node][chrono-node - npm]]
     var res
     if (nopast) {
-        res = chrono.parseDate(input, currentTime, { forwardDate: true })
+        res = chrono.parseDate(input, currentTime, {
+            forwardDate: true
+        })
     } else {
         res = chrono.parseDate(input, currentTime)
     }
