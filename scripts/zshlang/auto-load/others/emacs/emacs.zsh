@@ -19,13 +19,20 @@ function doom-sync() {
 }
 ##
 function emcpe {
+    local opts=()
+    if (( ${#@} >= 1 )) ; then
+        opts=("$@")
+    else
+        opts=(-SIGUSR2)
+    fi
+
     bella_zsh_disable1
     local fz_opts=( $fz_opts[@] -1 )
     # ffkill -SIGUSR2 \'emacs \'daemon
     if emc-gui-p ; then
-        ffkill -SIGUSR2 'Emacs.app/Contents/MacOS/Emacs' '!daemon' '!batch' '!zsh' '!alt'
+        ffkill "${opts[@]}" 'Emacs.app/Contents/MacOS/Emacs' '!daemon' '!batch' '!zsh' '!alt'
     else
-        ffkill -SIGUSR2 emacs daemon '!alt'
+        ffkill "${opts[@]}" emacs daemon '!alt'
     fi
 
     # emacsclient -e '(setq debug-on-quit nil)'

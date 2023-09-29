@@ -2,6 +2,7 @@
 function sanjesh-phd-update {
     #: =sanjesh-arshad-update=
     ##
+    assert-not-battery @RET
     assert-net @RET
 
     # local url='http://sanjesh.org/group.aspx?gid=2'

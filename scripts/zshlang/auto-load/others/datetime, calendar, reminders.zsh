@@ -586,12 +586,12 @@ function datej-daylater {
     #: datenatj doesn't work with negative values, so we might as well use datenatj-future
 }
 
-function rem-today-notify() {
+function rem-today-notify {
     ensure-dir ~/logs/
     {
         ec "---"
         date
-        rem-sync
+        # rem-sync
         local text="$(rem-today ; ec ; remc-today)"
         if test -n "$text" ; then
             reval-ec notif-os "$(datej)" "$text"

@@ -147,7 +147,8 @@ function rss-tsend() {
         # ' "$@"
         # python's rsstail sucks
 
-        # https://github.com/flok99/rsstail
+        # @dead https://github.com/flok99/rsstail
+        # https://github.com/folkertvanheusden/rsstail
         ##
         reval-ec "$get_engine[@]" "${urls[@]}" 2>&2 2>> $log_err > >(command ts "%d-%m-%y %H_%M_%S" >> $log) | {
             # protect our stdin:

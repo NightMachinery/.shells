@@ -357,3 +357,7 @@ function prompt-slide-complete-orgbeamer {
     prompt_code_block_p=y prompt-instruction-input 'Complete the following org-mode beamer presentation:' "$@"
 }
 ##
+function prompt-t2i-expand {
+    prompt_code_block_p=y prompt-instruction-input 'Create a detailed description for a text2image prompt from this preliminary prompt:' "$@"
+}
+##

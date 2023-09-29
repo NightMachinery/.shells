@@ -55,6 +55,8 @@ pxa-create 2032 pxa32
 pxa-create 2035 pxa35
 pxa-create 2089 pxa89
 pxa-create 2096 pxa2096
+pxa-create 2098 pxa98
+pxa-create 2098 pxa2098
 pxa-create 10809 pxateias 10.2.32.28
 
 # alias pxa-maybe='isIran && pxa-local'
