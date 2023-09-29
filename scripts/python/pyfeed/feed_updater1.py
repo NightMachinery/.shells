@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# `pip install -U aiohttp aioredis feedparser pypandoc`
+# `pip install -U python-telegram-bot aiohttp httpx twisted aioredis feedparser pypandoc`
 ##
 import asyncio
 import pynight.common_telegram as tlg
