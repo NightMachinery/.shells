@@ -38,6 +38,8 @@ function gh-url2repo {
 }
 ##
 function gh-release-get {
+    #: Use =deus= to interactively select the version.
+    ##
     local url="$1"
     local repo
     repo="$(gh-url2repo "$url")" @RET # asserts the nonemptiness of url itself
@@ -58,13 +60,18 @@ function gh-release-get {
     local releases
     releases="$(revaldbg gurl https://api.github.com/repos/"$repo"/releases)" @TRET
 
+
     if test -z "$tag" ; then
         if [[ "$url" =~ 'tag/([^/?]+)' ]] ; then
             tag="${match[1]}"
         fi
         if test -z "$tag" ; then
-            tag="$(ec "$releases" | jq -r ".[].tag_name"  | gsort --version-sort --reverse | ghead -n 1)" @TRET
-            # @warn some repos have messed up version numbers where this won't work.
+            if isDeus ; then
+                tag="$(ec "$releases" | jq -r ".[].tag_name"  | gsort --version-sort --reverse | fz)" @RET
+            else
+                tag="$(ec "$releases" | jq -r ".[].tag_name"  | gsort --version-sort --reverse | ghead -n 1)" @TRET
+                # @warn some repos have messed up version numbers where this won't work.
+            fi
         fi
     fi
     ecgray "$0: selected tag: $(gq "$tag")"

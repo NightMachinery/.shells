@@ -41,6 +41,7 @@ def filter_csv(
     input_stream,
     include_patterns=None,
     exclude_patterns=None,
+    exclude_row_fn=None,
     include_row_patterns=None,
     exclude_row_patterns=None,
     sort_specs=None,
@@ -76,6 +77,40 @@ def filter_csv(
 
     all_rows = [row for row in reader]
 
+    filtered_rows = []
+    for row in all_rows:
+        row_dict = {col: row[header.index(col)] for col in columns_to_write}
+
+        if include_row_patterns:
+            include_row = all(
+                re.search(pat.pattern, row[header.index(pat.column_name)])
+                for pat in include_row_patterns
+            )
+            if not include_row:
+                continue
+
+        if exclude_row_patterns:
+            exclude_row = any(
+                re.search(pat.pattern, row[header.index(pat.column_name)])
+                for pat in exclude_row_patterns
+            )
+            if exclude_row:
+                continue
+
+        if exclude_row_fn:
+            should_exclude = eval(
+                exclude_row_fn,
+                {
+                    **globals(),
+                    "row": row_dict,
+                },
+            )
+            # ic(row_dict, should_exclude)
+            if should_exclude:
+                continue
+
+        filtered_rows.append([row[header.index(col)] for col in columns_to_write])
+
     if preprocess_fns:
         for preprocess_fn in preprocess_fns:
             # Check if the current preprocessing function should be applied to this file
@@ -83,11 +118,11 @@ def filter_csv(
                 # ic(preprocess_fn.file_include_pattern, input_name)
 
                 # Iterate over each column in the header
-                for index, column_name in enumerate(header):
+                for index, column_name in enumerate(columns_to_write):
                     # Check if the column name matches the regex pattern in preprocess_fn
                     if re.search(preprocess_fn.column, column_name):
-                        column_values = [try_float(row[index]) for row in all_rows]
-                        for row in all_rows:
+                        column_values = [try_float(row[index]) for row in filtered_rows]
+                        for row in filtered_rows:
                             current_value = try_float(row[index])
                             new_value = eval(
                                 preprocess_fn.code,
@@ -105,27 +140,7 @@ def filter_csv(
                                 row[index] = new_value
 
     if sort_specs:
-        all_rows = sort_rows(all_rows, header, sort_specs)
-
-    filtered_rows = []
-    for row in all_rows:
-        if include_row_patterns:
-            include_row = all(
-                re.search(pat.pattern, row[header.index(pat.column_name)])
-                for pat in include_row_patterns
-            )
-            if not include_row:
-                continue
-
-        if exclude_row_patterns:
-            exclude_row = any(
-                re.search(pat.pattern, row[header.index(pat.column_name)])
-                for pat in exclude_row_patterns
-            )
-            if exclude_row:
-                continue
-
-        filtered_rows.append([row[header.index(col)] for col in columns_to_write])
+        filtered_rows = sort_rows(filtered_rows, header, sort_specs)
 
     return columns_to_write, filtered_rows
 
@@ -217,6 +232,13 @@ def main():
         action="append",
         help="Pattern to exclude rows based on a specific column. Format: '<column_name>:<pattern>'.",
     )
+    parser.add_argument(
+        "--exclude-row-fn",
+        type=str,
+        help="Python code to run for excluding rows. It will be run in a lambda that has access to a dictionary `row` containing the current row's data.",
+    )
+    #: Add =--exclude-fn="<code>"= where =<code>= is run a lambda that has access to a dictionary =row= which has the data of the current row in a dict format.
+
     parser.add_argument(
         "-s",
         "--sort",
@@ -339,6 +361,7 @@ def main():
             exclude_patterns=args.exclude_patterns,
             include_row_patterns=include_row_patterns,
             exclude_row_patterns=exclude_row_patterns,
+            exclude_row_fn=args.exclude_row_fn,
             sort_specs=None,  #: No sorting here
             preprocess_fns=preprocess_fns,
         )

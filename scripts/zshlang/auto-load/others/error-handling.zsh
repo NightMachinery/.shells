@@ -55,4 +55,11 @@ function failnoisily-if-net {
 
     failnoisily "$@"
 }
+
+function failnoisily-if-net-battery {
+    assert-not-battery @RET
+    assert-net @RET
+
+    failnoisily "$@"
+}
 ##

@@ -383,9 +383,11 @@ function ensure-args() {
     fi
     return $ret
 }
+
 function assert-net() {
     ensure-net "$@" "${funcstack[2]:-assert}"
 }
+
 function ensure-net() {
     # @deprecated Use `assert-net` instead
     local ensure_msg="No internet access"
@@ -394,5 +396,12 @@ function ensure-net() {
 #         ecerr "${1:-$0}: $ensure_msg"
 #         return 1
 #     fi
+}
+##
+function assert-not-battery {
+    if battery-p && ! isDeus ; then
+        ecerr "$(fn-name): not running on battery unless deus"
+        return 1
+    fi
 }
 ##

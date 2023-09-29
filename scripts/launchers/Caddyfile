@@ -42,29 +42,29 @@ files.lilf.ir, http://:8080 {
   }
 }
 
-sg.lilf.ir {
-  encode zstd gzip
-  reverse_proxy localhost:7080
-}
+# sg.lilf.ir {
+#   encode zstd gzip
+#   reverse_proxy localhost:7080
+# }
 
-searx.lilf.ir {
-  encode zstd gzip
-  reverse_proxy localhost:4004
-}
+# searx.lilf.ir {
+#   encode zstd gzip
+#   reverse_proxy localhost:4004
+# }
 
-code.lilf.ir {
-  # encode zstd gzip
-  reverse_proxy localhost:7451
-}
+# code.lilf.ir {
+#   # encode zstd gzip
+#   reverse_proxy localhost:7451
+# }
 
-notes.lilf.ir {
-  encode zstd gzip
-  # reverse_proxy localhost:1313
-  file_server browse {
-    hide *..hidden..*
-    root {env.hugo_base_dir}/public
-  }
-}
+# notes.lilf.ir {
+#   encode zstd gzip
+#   # reverse_proxy localhost:1313
+#   file_server browse {
+#     hide *..hidden..*
+#     root {env.hugo_base_dir}/public
+#   }
+# }
 
 https://garden.lilf.ir {
 #  @protected /api/*
@@ -153,20 +153,20 @@ android.lilf.ir:8443, api.android.lilf.ir:8443, hook.android.lilf.ir:8443 {
 # 		import np
 # 	}
 ##
-np.lilf.ir {
-	@grpc {
-		protocol grpc
-		path /sky* # @customizable
-        # [[https://caddyserver.com/docs/caddyfile/matchers#path][Request matchers (Caddyfile) — Caddy Documentation]]
-	}
-	reverse_proxy @grpc 127.0.0.1:5131 {
-		transport http {
-			versions h2c
-		}
-	}
+# np.lilf.ir {
+# 	@grpc {
+# 		protocol grpc
+# 		path /sky* # @customizable
+#         # [[https://caddyserver.com/docs/caddyfile/matchers#path][Request matchers (Caddyfile) — Caddy Documentation]]
+# 	}
+# 	reverse_proxy @grpc 127.0.0.1:5131 {
+# 		transport http {
+# 			versions h2c
+# 		}
+# 	}
 
-    file_server browse {
-        root {env.HOME}/Downloads
-    }
-}
+#     file_server browse {
+#         root {env.HOME}/Downloads
+#     }
+# }
 ##

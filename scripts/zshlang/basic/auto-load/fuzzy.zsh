@@ -139,6 +139,10 @@ function fz-masked {
     sel_i=(${(@f)sel_i})
 }
 ##
+function fzf-exact-p {
+    [[ "${FZF_DEFAULT_OPTS}" =~ '--exact\b' ]]
+}
+##
 function fzp-q {
     local query="$(fz-createquery "$@")"
 
@@ -159,7 +163,7 @@ function rg-createquery() {
     ec $res
 }
 
-function fz-createquery() {
+function fz-createquery {
     local ugrepMode="$fzp_ug"
     if [[ "$fzp_ug" == ni ]] ; then
         if isI ; then
@@ -187,8 +191,13 @@ function fz-createquery() {
                 fi
             fi
         else
+            local exact_prefix=''
+            if ! fzf-exact-p ; then
+                exact_prefix="'"
+            fi
+
             if test -z "$ugrepMode" ; then
-                res+="'$i "
+                res+="${exact_prefix}$i "
             else
                 res+="$i "
             fi

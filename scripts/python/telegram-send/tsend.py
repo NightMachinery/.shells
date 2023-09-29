@@ -26,6 +26,11 @@ Dependencies:
 Created by Fereidoon Mehri. I release my contribution to this program to the public domain (CC0).
 """
 from docopt import docopt
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
+from urllib.request import urlopen
+import mimetypes
+import tempfile
 import os
 from os import getenv
 import sys
@@ -77,6 +82,51 @@ def p2int(p):
         return int(p)
     except:
         return p
+
+
+def sanitize_telegram_html(message):
+    allowed_tags = ["b", "i", "u", "s", "code", "pre", "a"]
+
+    soup = BeautifulSoup(message, "html.parser")
+    saved_images = []
+
+    # Save images to temp files
+    for img_tag in soup.find_all("img"):
+        img_url = img_tag["src"]
+
+        # Determine the file extension from the URL or from the content-type
+        file_extension = os.path.splitext(urlparse(img_url).path)[1]
+        if not file_extension:
+            response = urlopen(img_url)
+            content_type = response.headers.get("content-type")
+            file_extension = mimetypes.guess_extension(content_type)
+            img_data = response.read()
+        else:
+            with urlopen(img_url) as response:
+                img_data = response.read()
+
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=file_extension
+        ) as tmp_file:
+            tmp_file.write(img_data)
+            saved_images.append(tmp_file.name)
+
+        img_tag.decompose()  # Remove the img tag
+
+    # Remove all tags that are not in the allowed list
+    for tag in soup.find_all(True):
+        if tag.name not in allowed_tags:
+            tag.unwrap()
+
+    # Special case: Ensure 'a' tags have 'href' attribute
+    for a_tag in soup.find_all("a"):
+        if "href" not in a_tag.attrs:
+            a_tag.unwrap()
+
+    return dict(
+        html=str(soup),
+        image_files=saved_images,
+    )
 
 
 async def discreet_send(
@@ -166,12 +216,12 @@ async def discreet_send(
         return last_msg
 
 
-async def ptb_send_files(
+async def ptb_send(
     bot,
-    files,
     chat_id,
-    caption,
     parse_mode,
+    message="",
+    files=None,
     max_retries=20,
     verbosity=1,
     album_p=True,
@@ -179,21 +229,33 @@ async def ptb_send_files(
 ):
     from telegram import InputMediaPhoto, InputMediaDocument
 
+    async def handle(e, attempt):
+        if verbosity >= 2:
+            print(f"Error sending (attempt {attempt + 1}): {e}")
+
+        if attempt == max_retries - 1:  # if it's the last attempt
+            if verbosity >= 1:
+                print(f"Failed after {max_retries} attempts.")
+        else:
+            await asyncio.sleep(10)
+
+    # If no files are provided, just send the message with retry logic
+    if not files:
+        for attempt in range(max_retries):
+            try:
+                await bot.send_message(
+                    chat_id=chat_id, text=message, parse_mode=parse_mode
+                )
+                break
+            except Exception as e:
+                await handle(e, attempt)
+        return
+
     media_group_photos = []
     media_group_docs = []
 
     async def send_media_group(media_group, is_image):
         attempt = 0
-
-        async def handle(e):
-            if verbosity >= 2:
-                print(f"Error sending media group (attempt {attempt + 1}): {e}")
-
-            if attempt == max_retries - 1:  # if it's the last attempt
-                if verbosity >= 1:
-                    print(f"Failed to send media group after {max_retries} attempts.")
-            else:
-                await asyncio.sleep(10)
 
         if 2 <= len(media_group) <= 10 and album_p:
             for attempt in range(max_retries):
@@ -201,7 +263,7 @@ async def ptb_send_files(
                     await bot.send_media_group(
                         chat_id=chat_id,
                         media=media_group,
-                        caption=caption,
+                        caption=message,
                         parse_mode=parse_mode,
                     )
                     break
@@ -215,19 +277,20 @@ async def ptb_send_files(
                             await bot.send_photo(
                                 chat_id=chat_id,
                                 photo=media.media,
-                                caption=caption,
+                                caption=message,
                                 parse_mode=parse_mode,
                             )
                         else:
                             await bot.send_document(
                                 chat_id=chat_id,
                                 document=media.media,
-                                caption=caption,
+                                caption=message,
                                 parse_mode=parse_mode,
                             )
                         break
                     except Exception as e:
-                        await handle(e)
+                        await handle(e, attempt)
+
         media_group.clear()
 
     for f in files:
@@ -241,12 +304,12 @@ async def ptb_send_files(
         with open(f, "rb") as file:
             if is_image:
                 media = InputMediaPhoto(
-                    media=file, caption=caption, parse_mode=parse_mode
+                    media=file, caption=message, parse_mode=parse_mode
                 )
                 media_group_photos.append(media)
             else:
                 media = InputMediaDocument(
-                    media=file, caption=caption, parse_mode=parse_mode
+                    media=file, caption=message, parse_mode=parse_mode
                 )
                 media_group_docs.append(media)
 
@@ -270,27 +333,31 @@ def get_parse_mode(mode_str):
     from telegram.constants import ParseMode
 
     parse_modes = {
+        # "markdown": ParseMode.MARKDOWN_V2,
         "markdown": ParseMode.MARKDOWN,
         "html": ParseMode.HTML,
         "none": None,
     }
 
-    return parse_modes.get(mode_str, ParseMode.MARKDOWN)
+    return parse_modes.get(mode_str, parse_modes["markdown"])
 
 
-async def ptb_send_files_v1(bot, arguments, **kwargs):
+async def ptb_send_files_v1(
+    bot,
+    arguments,
+    message,
+    parse_mode=None,
+    **kwargs,
+):
     chat_id = p2int(arguments["<receiver>"])
-    caption = arguments["<message>"]
     files = arguments["--file"]
     album_p = not arguments["--no-album"]
 
-    parse_mode = get_parse_mode(arguments.get("--parse-mode", "markdown"))
-
-    await ptb_send_files(
+    await ptb_send(
         bot=bot,
         files=files,
         chat_id=chat_id,
-        caption=caption,
+        message=message,
         parse_mode=parse_mode,
         album_p=album_p,
         force_document=arguments["--force-document"],
@@ -299,6 +366,11 @@ async def ptb_send_files_v1(bot, arguments, **kwargs):
 
 
 async def tsend(arguments):
+    parse_mode_str = arguments.get("--parse-mode", "markdown")
+
+    arguments["<message>"] = str(arguments["<message>"])
+    message = arguments["<message>"]
+
     lock_timeout = float(arguments.get("--lock-timeout") or 10)
     lock_path = arguments.get("--lock-path")
     lock_name = None
@@ -318,7 +390,6 @@ async def tsend(arguments):
         # ic(lock.lock_path)
 
     try:
-        arguments["<message>"] = str(arguments["<message>"])
         if backend == 2:
             # print("backend 2 used")
             import telegram
@@ -338,12 +409,32 @@ async def tsend(arguments):
                 bot = telegram.Bot(token)
 
             async with bot:
+                parse_mode = get_parse_mode(parse_mode_str)
+
+                # ic(parse_mode_str)
+                if parse_mode_str == "html":
+                    #: Sanitize the message to contain only HTML tags supported by Telegram
+                    res = sanitize_telegram_html(message)
+                    message = res["html"]
+                    for img_file in res["image_files"]:
+                        arguments["--file"].append(img_file)  # Add saved images to the list of files to send
+
+
+                    # ic(message)
+
                 if arguments["--file"]:
-                    await ptb_send_files_v1(bot, arguments)
+                    await ptb_send_files_v1(
+                        bot,
+                        arguments,
+                        message=message,
+                        parse_mode=parse_mode,
+                    )
                 else:
-                    await bot.send_message(
+                    await ptb_send(
+                        bot,
                         chat_id=p2int(arguments["<receiver>"]),
-                        text=arguments["<message>"],
+                        message=message,
+                        parse_mode=parse_mode,
                     )
         else:
             from telethon import TelegramClient

@@ -1,4 +1,4 @@
-export me_tel="Arstar"
+export me_tel="195391705"
 me="$me_tel"
 export alice='-1001179162919'
 export arista='-1001154785017'
