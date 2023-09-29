@@ -49,6 +49,8 @@ fi
 ##
 tmuxnew email-aggregator-bot zsh -c "API_TOKEN=${emailaggbot_api_token} DATABASE_NAME=~/mail_gather_database.db mail-gather-bot"
 ##
+tmuxnew feed_updater1 env TSEND_TOKEN="${TSEND_TOKEN}" TSEND_BACKEND="${TSEND_BACKEND}" "${commands[python]}" "${commands[feed_updater1.py]}"
+##
 # launch-musicf.zsh
 ##
 chronic-all

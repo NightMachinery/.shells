@@ -64,11 +64,6 @@ tmuxnewshenv="rt_skip='y' rt_id='-1001334871190' rt_eud=1 rt_e='true'" tmuxnewsh
     'https://www.youtube.com/feeds/videos.xml?channel_id=UCZHmQk67mSJgfCCTn7xBfew'
 # The Youtube channels are listed on [[id:03eb072e-ca5f-4eda-846b-7d148c124dd7][ML/learn/video]]
 ##
-#: Twitter ML: '-1001988139493'
-tmuxnewshenv="rt_skip='y' rt_id='-1001988139493' rt_eud=1 rt_e='true'" tmuxnewsh \
-    rss-tlg-twitter-ml rss-tsend \
-    'https://nitter.cz/_akhaliq/rss'
-##
 # tmuxnewshenv="rt_skip='$rt_skip' rt_e=tlrlu" tmuxnewsh rss-genu rss-tsend 'https://www.novelupdates.com/rss.php?uid=145566&unq=5c39d8aba43cc&type=0&lid=local'
 ##
 #tmuxnewshenv="rt_skip='$rt_skip' " tmuxnewsh rss-royalroad rss-tsend 'https://www.royalroad.com/syndication/21322/'
