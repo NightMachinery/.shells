@@ -259,7 +259,7 @@ function ensure-dbg() {
 ##
 function assert() {
     # Usage: assert true @RET
-    # See [[~/cellar/notes/bookmarks/useme/zsh/debugging, stacktraces, exceptions.org]] for tests
+    # See [[zf:~nt/public/bookmarks/useme/zsh/debugging, stacktraces, exceptions.org]] for tests
     ##
     # `@opts-setprefix assert ensure` is in load-first.zsh
     local msg="${ensure_msg:-$ensure_m}"

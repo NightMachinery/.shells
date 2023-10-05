@@ -300,3 +300,12 @@ function find-other-writable-dirs {
   reval "${find_cmd[@]}"
 }
 ##
+function fd-size {
+    local opts=("$@")
+
+    # Use fd to list files, respecting .gitignore by default, then pass to xargs for size calculation
+    command fd --type f --hidden --ignore-vcs --exclude '.git' -0 "${opts[@]}" |
+        xargs -0 gdu -h |
+        gsort -rh | tac
+}
+##

@@ -184,16 +184,19 @@ function semantic-scholar-dl-from-org {
     setopt localtraps
     trap "" $exit_traps[@]
     {
-        {
-            ec "$org" |
-                perl -ple 's/\@(?:toread\S*|tosee\S*|CR\b)\s?//g' |
-                org2tlg "$tlg_dest"
-        } || {
-            ecerr "$0: failed to send the description to Telegram"
-            return 1
-        }
+        #: The subshell allows us to exit via C-c, which we have otherwise disabled via the trap above.
+        (
+            {
+                ec "$org" |
+                    perl -ple 's/\@(?:toread\S*|tosee\S*|CR\b)\s?//g' |
+                    org2tlg "$tlg_dest"
+            } || {
+                ecerr "$0: failed to send the description to Telegram"
+                return 1
+            }
 
-        reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
+            reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
+        )
     } always {
         lock-release-redis "${lock_id}"
         trap - $exit_traps[@]

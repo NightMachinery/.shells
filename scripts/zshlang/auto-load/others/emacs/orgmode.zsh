@@ -465,7 +465,7 @@ function org-html-postprocess {
     #: ** `ec '<h3 id="@org6d5682c"><span class="s@ection-number-3">@1.3.</span>@hi @seeAlso</h3>'|org-html-postprocess|org-html-postprocess`
     #:
     #: * @performance
-    #: `hfd "cat '/Users/evar/cellar/notes/subjects/math/AI/ML/NLP/attention, transformers/papers/GlobEnc/gen.html' | org_html_postprocess.pl" "cat '/Users/evar/cellar/notes/subjects/math/AI/ML/NLP/attention, transformers/papers/GlobEnc/gen.html' | org_html_postprocess.py"`
+    #: `hfd "cat '${nightNotesPublic}/subjects/math/AI/ML/NLP/attention, transformers/papers/GlobEnc/gen.html' | org_html_postprocess.pl" "cat '${nightNotesPublic}/subjects/math/AI/ML/NLP/attention, transformers/papers/GlobEnc/gen.html' | org_html_postprocess.py"`
     #:
     #: The perl version is 1.2 times faster (680ms vs 736ms).
     ##
@@ -550,7 +550,7 @@ function org-log-date-get {
         fi
     }
     ## tests
-    # `redo2 10 ec "/Users/evar/cellar/notes/private/wallet/houses/sabzevar/apartment/elevator/bills/electricity/1472555905222/log.org" | time2 org-log-date-get`
+    # `redo2 10 ec "${nightNotesPrivate}/wallet/houses/sabzevar/apartment/elevator/bills/electricity/1472555905222/log.org" | time2 org-log-date-get`
     ##
 }
 

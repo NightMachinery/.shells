@@ -113,7 +113,8 @@ function hear-get {
         res="$(ntag-recoverpath "$res")" @STRUE
     fi
 
-    ec "$res"
+    ec "$res" |
+        cat-copy-if-tty
 }
 
 function mpv-get {

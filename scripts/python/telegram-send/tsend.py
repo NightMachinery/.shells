@@ -223,7 +223,7 @@ async def ptb_send(
     message="",
     files=None,
     max_retries=20,
-    verbosity=1,
+    verbosity=2,
     album_p=True,
     force_document=False,
 ):

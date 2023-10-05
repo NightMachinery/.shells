@@ -84,7 +84,7 @@ https://garden.lilf.ir {
   # prefix /api/webdav/dl
   # }
   # webdav /api/webdav/notes/* {
-  # root {env.HOME}/cellar/notes
+  # root {env.nightNotes}/
   # prefix /api/webdav/notes
   # }
   # webdav /api/webdav/scripts/* {
