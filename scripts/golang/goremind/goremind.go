@@ -36,17 +36,13 @@ func remComingUp(remindersDir string, until int) string {
 			defer wg.Done()
 
 			futureDate := today.AddDate(0, 0, i)
+
 			jalaliDate := ptime.New(futureDate)
 			jalaliYear, jalaliMonth, jalaliDay := jalaliDate.Year(), jalaliDate.Month(), jalaliDate.Day()
+			jalaliMonthName := getJalaliMonthName(int(jalaliMonth))
 
 			gregorianYear, gregorianMonth, gregorianDay := futureDate.Year(), futureDate.Month(), futureDate.Day()
 			gregorianWeekDay := futureDate.Weekday().String()
-
-			// Using the integer month value to get the string representation of the Jalali month
-			// This assumes you have a function or map to convert the month number to its Jalali name.
-			// If ptime provides this, you can use that. Otherwise, you might need to manually map month numbers to their names.
-			jalaliMonthName := getJalaliMonthName(int(jalaliMonth))
-
 			gregorianMonthName := gregorianMonth.String()
 
 			futureText := fmt.Sprintf("%d day(s) later: %d/%s%d/%d %s %s%d/%d/%d",
