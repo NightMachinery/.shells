@@ -109,23 +109,28 @@ function path-abbrev-to-music-dir {
 function cellp {
     assert-net @RET
 
-    pushf ~cel/
-    {
-        if git-merge-p ; then
-            local err="git merge already in progress"
-            ecerr "$0: $err"
+    for root in "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" ; do
+        ec-sep-h
+        ecbold "* ${root}"
+        pushf "$root"
+        {
+            if git-merge-p ; then
+                local err="git merge already in progress"
+                ecerr "$0 (${root}): $err"
 
-            fsay-noidle "$err in the cellar"
+                fsay-noidle "$err in the ${root:t}"
 
-            return 3
-        fi
+                # return 3
+                continue
+            fi
 
-        brishzr-repeat # now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
+            brishzr-repeat # now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
 
-        trs-empty-files $nightNotes
+            reval-ec trs-empty-files "$root"
 
-        git_commitmsg_ask=no reval-ec gsync
-    } always { popf }
+            git_commitmsg_ask=no reval-ec gsync
+        } always { popf }
+    done
 }
 ##
 function vcn-getrepo {
