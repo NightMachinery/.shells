@@ -33,7 +33,9 @@ function alice() {
 noglobfn alice
 alias al=alice #NAMECONFLICT: ../Cellar/mono/6.8.0.105/bin/al
 
-function alicedate() {
+function alicedate {
+    local rem_comingup_days="${rem_comingup_days:-14}"
+
     local log
     log="$(cellp 2>&1)" || { # to update reminders
         remj "$0, $(hostname), $(dateshort): cellp failed with $?: $log"

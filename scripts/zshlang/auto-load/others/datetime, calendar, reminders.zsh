@@ -609,7 +609,6 @@ function tlg-reminday() {
 }
 
 function rem-summary {
-    local rem_comingup_days="${rem_comingup_days:-14}"
     local deleteMode="$rem_summary_delete" notifMode="$rem_summary_notif" markdownMode="${rem_summary_md}"
 
     local text="$(@opts delete "$deleteMode" @ rem-today)"
