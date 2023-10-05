@@ -14,6 +14,17 @@ import (
 	ptime "github.com/yaa110/go-persian-calendar"
 )
 
+func getJalaliMonthName(month int) string {
+	monthNames := []string{
+		"Farvardin", "Ordibehesht", "Khordad", "Tir", "Mordad", "Shahrivar",
+		"Mehr", "Aban", "Azar", "Dey", "Bahman", "Esfand",
+	}
+	if month < 1 || month > 12 {
+		return "Unknown"  // handle error or fallback case
+	}
+	return monthNames[month-1]
+}
+
 func remComingUp(remindersDir string, until int) string {
 	today := time.Now()
 	results := make([]string, until)
@@ -25,7 +36,24 @@ func remComingUp(remindersDir string, until int) string {
 			defer wg.Done()
 
 			futureDate := today.AddDate(0, 0, i)
-			futureText := fmt.Sprintf("%d day(s) later: %s", i, futureDate.Format("2006/01/02 (Mon)"))
+			jalaliDate := ptime.New(futureDate)
+			jalaliYear, jalaliMonth, jalaliDay := jalaliDate.Year(), jalaliDate.Month(), jalaliDate.Day()
+
+			gregorianYear, gregorianMonth, gregorianDay := futureDate.Year(), futureDate.Month(), futureDate.Day()
+			gregorianWeekDay := futureDate.Weekday().String()
+
+			// Using the integer month value to get the string representation of the Jalali month
+			// This assumes you have a function or map to convert the month number to its Jalali name.
+			// If ptime provides this, you can use that. Otherwise, you might need to manually map month numbers to their names.
+			jalaliMonthName := getJalaliMonthName(int(jalaliMonth))
+
+			gregorianMonthName := gregorianMonth.String()
+
+			futureText := fmt.Sprintf("%d day(s) later: %d/%s%d/%d %s %s%d/%d/%d",
+				i,
+				jalaliYear, jalaliMonthName, jalaliMonth, jalaliDay,
+				gregorianWeekDay, gregorianMonthName, gregorianMonth, gregorianDay, gregorianYear)
+			// futureText := fmt.Sprintf("%d day(s) later: %s", i, futureDate.Format("2006/01/02 (Mon)"))
 
 			remToday := getRemToday(futureDate, remindersDir)
 			if remToday != "" {
