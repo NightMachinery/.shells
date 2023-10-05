@@ -451,9 +451,21 @@ function nightsh-load-zshrc() {
     # --height='${FZF_TMUX_HEIGHT:=75%}'
     # --sync # did not solve the weird fzf bug
   )
-  function fztab() {
+  function fztab {
     ##
-    command fzf "$@" "$FZTAB_OPTS[@]"
+    local query opts=()
+    for arg in "$@" ; do
+        if [[ "$arg" =~ '^(?:--query|-q)=(.*)' ]] ; then
+          query="${match[1]}"
+          query="$(fz-createquery "$query")" @TRET
+
+          opts+="--query=${query}"
+        else
+          opts+="$arg"
+        fi
+    done
+
+    command fzf "${opts[@]}" "$FZTAB_OPTS[@]"
 
     # fnswap isI true ugfz "$@" "$FZTAB_OPTS[@]" ""
     ##
