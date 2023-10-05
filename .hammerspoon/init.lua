@@ -636,7 +636,7 @@ appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
 appHotkey{ key='l', appName='com.apple.iCal' }
-appHotkey{ key=',', appName='mpv' }
+appHotkey{ key='m', appName='mpv' }
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
 appHotkey{ key='n', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }

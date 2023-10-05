@@ -54,7 +54,11 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
             # see what this code does with:
             # `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
 
-            typeset -xg brew_bin_dir=/opt/homebrew/bin
+            if isBash ; then
+                export brew_bin_dir=/opt/homebrew/bin
+            else
+                typeset -xg brew_bin_dir=/opt/homebrew/bin
+            fi
             addToPATH "$brew_bin_dir"
             addToPATH /opt/homebrew/sbin
         else
