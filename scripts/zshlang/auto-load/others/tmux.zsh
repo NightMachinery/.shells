@@ -92,11 +92,13 @@ function str2tmuxname() {
 }
 
 function str2filename {
-    # this might be too restrictive
+    #: This function might be too restrictive ...
+    ##
     in-or-args "$@" |
         gtr '/' '_' |
         gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t' |
-        trimsed
+        trimsed |
+        cat-copy-if-tty
 }
 
 function str2filename-ascii {

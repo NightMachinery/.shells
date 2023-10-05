@@ -36,7 +36,7 @@ alias bks='bookmark-search'
 ##
 #: @duplicateCode/9bd35fded6a091a2124673d5d0ec11b2
 #: [help:night/agsi]
-aliasfn-ng agsi ugbase_follow=n nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
+aliasfn-ng agsi ugbase_follow=n nightNotes="$NIGHTDIR" ntsearch_additional_paths=(~/.zshenv ~/.zshrc ~/.shared.sh ~/.localScripts ~/.glances ~/.vimrc ~/.ideavimrc ~/.tmux.conf ~/.privateBTT.sh ~/.privateShell ~/.privateStartup.sh ~/.startup..private..zsh ~/test_nonexistent) ntsearch_glob='' ntl-rg # ntsearch_glob=$textglob
 ##
 function agfi1() {
     ##

@@ -166,9 +166,13 @@ function mv-merge {
     fi
     local opts=()
     isIReally && opts+='--interactive'
-    assert command gcp -r --link --archive --verbose "${opts[@]}" "$@" >&2 || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
+    assert cp-link --verbose "${opts[@]}" "$@" >&2 || return $? #  --link option of the cp command, which creates hard links of files on the same filesystem instead of full-data copies. --archive preserve all metadata
 
     { colorfg "$gray[@]" ; trs "${(@)paths[1,-2]}" ; resetcolor } >&2
+}
+
+function cp-link {
+    reval-ec command gcp -r --link --archive --verbose "$@"
 }
 ##
 function fd-exists() {

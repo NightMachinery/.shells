@@ -67,23 +67,32 @@ export codedir="$HOME/code"
 
 export chat_logs_dir="$BASE_DIR/documents/chat_logs"
 ##
-export nightNotes="$cellar/notes/" # keep the trailing '/', it is important when removing prefixes
-export orgdir="$nightNotes/org"
+export nightNotesN="${HOME}/notes"
+export nightNotes="${nightNotesN}/"
+# export nightNotes="$cellar/notes/"
+#: Keep the trailing '/', it is important when removing prefixes. =nightNotesN= is useful for =aliasdir=.
+
+export nightNotesPrivate="$nightNotes/private"
+export nightNotesPublic="$nightNotes/public"
+export orgdir="$nightNotesPublic/org"
 export org_img_dir="$orgdir/images"
-export memorydir="$nightNotes/private/memories"
-export peopledir="$nightNotes/private/memories/people"
+export memorydir="$nightNotesPrivate/memories"
+export peopledir="$nightNotesPrivate/memories/people"
 
 # export mpv_bookmarks="${music_dir}/bookmarks/default"
-export mpv_bookmarks="${nightNotes}/private/configs/mpv/bookmarks/default"
+export mpv_bookmarks="${nightNotesPrivate}/configs/mpv/bookmarks/default"
 
-typeset -g UHIST_FILE="$nightNotes/bookmarks/useme/zsh/universal_history.zsh"
-typeset -g UHIST_FILE_FC="$nightNotes/bookmarks/useme/zsh/universal_history_fc.zsh"
+typeset -g UHIST_FILE="$nightNotesPublic/bookmarks/useme/zsh/universal_history.zsh"
+typeset -g UHIST_FILE_FC="$nightNotesPublic/bookmarks/useme/zsh/universal_history_fc.zsh"
 
-typeset -g kindle_clippings_dir="${nightNotes}/private/backups/Kindle/clippings"
+typeset -g kindle_clippings_dir="${nightNotesPrivate}/backups/Kindle/clippings"
 typeset -g kindle_clippings_org_dir="${kindle_clippings_dir}/orgified"
 ##
-test -z "$attic_dir" && export attic_dir="$cellar/attic/"
-export attic_private_dir="$cellar/attic_private/"
+test -z "$attic_dir" && {
+    export attic_dir="$nightNotesPublic/attic/"
+    # export attic_dir="$cellar/attic/"
+}
+export attic_private_dir="$nightNotesPrivate/attic/"
 test -z "$attic" && attic="$attic_dir/.darkattic"
 test -z "$attic_todo" && attic_todo="$attic_private_dir/.attic_todo"
 test -z "$attic_temoji" && attic_temoji="$attic_dir/.temojis"
@@ -92,15 +101,22 @@ test -z "$attic_emails" && attic_emails="$attic_private_dir/.emails"
 ##
 export borgEndpoint="http://127.0.0.1:5922"
 
-export timetracker_db="${attic_private_dir:?}/timetracker.db"
-export cmdlog="${attic_private_dir:?}/cmdlogs/cmdlog.txt"
+export timetracker_dir="${HOME}/.timetracker"
+export timetracker_db="${timetracker_dir}/timetracker.db"
+export cmdlog="${timetracker_dir}/cmdlogs/cmdlog.txt"
 ##
-export remindayDir="$nightNotes/reminders"
-export remindayBakDir="$cellar/reminders_bak"
+export remindayRootDir="${nightNotes}/rem"
+export remindayDir="${remindayRootDir}/reminders"
+export remindayBakDir="${remindayRootDir}/reminders_bak"
+
+export remindayCDir="${remindayRootDir}/remindersC"
+export remindayBakCDir="${remindayRootDir}/remindersC_bak" # moving these to a local location will cause one server to lose out on it.
+# export remindayBakCDir="$HOME/tmp/remindersC_bak"
 ##
-export ZETTLE_DIR="$nightNotes/zettle"
+export ZETTLE_DIR="$nightNotesPublic/zettle"
 export ZETTLE_DIR="${ZETTLE_DIR:a}"
-export nightJournal="$nightNotes/journal/j0/"
+export nightJournal="$nightNotesPrivate/journal/j0/"
+##
 note_formats=( txt md org )
 createglob note_formats noteglob
 ##

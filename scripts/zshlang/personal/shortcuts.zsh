@@ -88,10 +88,10 @@ aliasdir jtmp $HOME/julia_tmp
 aliasdir ktmp $HOME/tmp-kindle
 aliasdir cel $cellar
 aliasfn incell cel
-aliasdir jrl $HOME/cellar/notes/journal
+aliasdir jrl "${nightNotesPrivate}/journal"
 aliasdir dom $DOOMDIR
-aliasdir innt $cellar/notes
-aliasdir nt $cellar/notes
+aliasdir innt "${nightNotesN}"
+aliasdir nt "${nightNotesN}"
 aliasdir incache ~/base/cache
 aliasdir cac ~/base/cache
 ##
