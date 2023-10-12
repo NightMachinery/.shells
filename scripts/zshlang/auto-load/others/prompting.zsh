@@ -6,7 +6,7 @@ function prompt-instruction-input {
     local preambles=(${prompt_preambles[@]})
 
     local input
-    input="$(in-or-args "$@")" @RET
+    input="$(in-or-args "$@" | erase-ansi)" @RET
 
     if test -n "$input" ; then
         if bool "$code_block_p" ; then

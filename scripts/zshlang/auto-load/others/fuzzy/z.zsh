@@ -113,7 +113,7 @@ function ffz-get {
     if test -z "$nocache" && test -n "$redis_key" && silence redism hexists "$redis_dict" "$redis_key" ; then
         sel="$(redism hget "$redis_dict" "$redis_key")" @TRET
     else
-        local fz_opts=( $fz_opts[@] --prompt "Z> ")
+        local fz_opts=( $fz_opts[@] --no-exact --prompt "Z> ")
 
         sel="$( {
             if bool "$ZDIRS_ENABLED" ; then

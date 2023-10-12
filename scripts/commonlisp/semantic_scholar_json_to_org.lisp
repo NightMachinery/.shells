@@ -102,9 +102,12 @@
       (concatenate 'string (string (char-upcase (elt str 0))) (subseq str 1))))
 
 (defun camel-case (str)
-  (reduce (lambda (acc word) (concatenate 'string acc (capitalize-first-letter word)))
-          (split-sequence:split-sequence #\Space str)
-          :initial-value ""))
+  ;; Split the string on spaces and hyphens using a regex
+  (let ((words (cl-ppcre:split "[ -]" str)))
+    ;; Capitalize the first letter of each word and concatenate
+    (reduce (lambda (acc word) (concatenate 'string acc (capitalize-first-letter word)))
+            words
+            :initial-value "")))
 
 (defun venue-name-get (str)
   ;; Check for known journals and return their abbreviation

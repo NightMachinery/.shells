@@ -217,8 +217,11 @@ function pbcopy-rtf {
 }
 
 
-function pbpaste-urls() {
-    pbpaste-html | urls-extract
+function pbpaste-urls {
+    pbpaste-html |
+        urls-extract |
+        duplicates-clean |
+        cat-copy-if-tty
 }
 alias popu='pbpaste-urls'
 ##

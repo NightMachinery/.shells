@@ -109,7 +109,11 @@ function path-abbrev-to-music-dir {
 function cellp {
     assert-net @RET
 
-    for root in "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" ; do
+    brishzr-repeat
+    #: @outdated? now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
+    #: lilf is no longer a remote, I think.
+
+    for root in "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${resources_dir}" ; do
         ec-sep-h
         ecbold "* ${root}"
         pushf "$root"
@@ -123,8 +127,6 @@ function cellp {
                 # return 3
                 continue
             fi
-
-            brishzr-repeat # now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
 
             reval-ec trs-empty-files "$root"
 
