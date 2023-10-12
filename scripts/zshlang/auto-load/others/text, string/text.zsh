@@ -11,11 +11,15 @@ function duplicates-clean-sort-file-inplace {
 function duplicates-clean {
     #: @seeAlso [agfi:mpv-bookmark-cleanup]
     ##
-    prefixer --tac --skip-empty \
-        | gawk 'NF && !seen[$0]++' \
-        | prefixer --tac --skip-empty @RET
-    ec #: add an end separator
+    {
+        cat-paste-if-tty |
+            prefixer --tac --skip-empty \
+                | gawk 'NF && !seen[$0]++' \
+                | prefixer --tac --skip-empty @RET
+        ec #: add an end separator
+    } | cat-copy-if-tty
 }
+aliasfn duplicates-rm duplicates-clean
 aliasfn duplicates-clean-file-inplace inplace_io_m=last_stdin_stdout inplace-io duplicates-clean
 function duplicates-clean-nul {
     prefixer -i '\x00' -o '\x00' --tac --skip-empty \

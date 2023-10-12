@@ -7,14 +7,12 @@ function nt-due-init {
         typeset -g nightNotesDueDir=(~nt/private/wallet)
         typeset -ag nightNotesDue=(
             "$nightNotesDueDir"/**/*bills/**/(log|gen).org
+            #: Use =finished log.org= to exclude from here.
         )
     fi
 }
 
 function nt-due {
-    # @todo1 sort by date
-    # @todo1 add tty-link to jump to source
-    ##
     nt-due-init
 
     local query=("$@")

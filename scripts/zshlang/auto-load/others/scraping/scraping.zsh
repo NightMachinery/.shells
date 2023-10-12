@@ -689,7 +689,7 @@ Uses getlinksfull (full-html) under the hood." MAGIC
 
     for page in "$pages[@]"
     do
-        getlinksfull "$page" "$regex" || true # errors are ignored
+        revaldbg getlinksfull "$page" "$regex" || true # errors are ignored
     done
 }
 

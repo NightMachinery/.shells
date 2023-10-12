@@ -9,6 +9,26 @@ function vid-fix {
     reval-ec ffmpeg -err_detect ignore_err -i "$i" -c copy -movflags faststart "$o"
 }
 ##
+typeset -g h_vid_crop_vclass="crop=in_w-325:in_h-100:0:100"
+
+function vid-crop-vclass {
+    local i="${1}" o="$2"
+    assert-args i @RET
+
+    if test -z "$o"
+    then
+        o="${i%.*}_cropped.${vid_crop_ext:-mp4}"
+    fi
+
+    reval-ec ffmpeg -i "$i" -vf "${h_vid_crop_vclass}" -c:a copy -movflags faststart "$o"
+}
+
+function vid-crop-vclass-preview {
+    local i="${1:?}"
+    # Preview the cropped video using ffplay
+    ffplay -i "$i" -vf "$h_vid_crop_vclass"
+}
+##
 function merge-mp3() {
     local out="${merge_mp3_out:-${merge_mp3_o:-merged.mp3}}"
     { test -z "$out" } && { # redundant

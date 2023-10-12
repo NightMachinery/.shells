@@ -99,6 +99,8 @@ test -z "$attic_temoji" && attic_temoji="$attic_dir/.temojis"
 test -z "$attic_quotes" && attic_quotes="$attic_dir/.quotes"
 test -z "$attic_emails" && attic_emails="$attic_private_dir/.emails"
 ##
+export resources_dir="${nightNotes}/resources"
+##
 export borgEndpoint="http://127.0.0.1:5922"
 
 export timetracker_dir="${HOME}/.timetracker"
