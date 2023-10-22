@@ -203,7 +203,7 @@ function fz-createquery {
             fi
         fi
     done
-    ec "$res"
+    ec "$res" | perl -lpe 's/\\/\\\\/g'
 }
 ##
 function cat-fdz-if-tty {
