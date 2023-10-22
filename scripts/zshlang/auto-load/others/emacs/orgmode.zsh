@@ -826,7 +826,7 @@ function org-img-unused {
     local f text files used i
     for f in ${fs[@]} ; do
         text="$(cat "$f")" @TRET
-        files=("${f}_imgs"/*(D.N))
+        files=({"${f}_imgs",.ob-jupyter}/*(D.N))
         files=(${(@f)"$(arrnn "${files[@]}" |
                           inargsf re 'grealpath --')"})
 
