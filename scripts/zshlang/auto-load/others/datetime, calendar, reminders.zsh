@@ -633,6 +633,10 @@ function rem-summary {
     ec
 }
 
+function rem-summary-today {
+    rem_comingup_days=0 rem-summary
+}
+
 function monthj2en {
     local m=$(( ${1:?Month required} ))
 
