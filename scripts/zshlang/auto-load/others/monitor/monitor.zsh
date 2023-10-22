@@ -319,3 +319,7 @@ function cpu-get() {
     # @warn M1 users can run Terminal in Rosetta mode. In this case "uname -m" returns "x86_64".
 }
 ##
+function firmware-version-get-darwin {
+    system_profiler SPHardwareDataType | rg --smart-case firmware
+}
+##
