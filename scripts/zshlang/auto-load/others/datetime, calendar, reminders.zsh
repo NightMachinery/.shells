@@ -637,6 +637,13 @@ function rem-summary-today {
     rem_comingup_days=0 rem-summary
 }
 
+function iwidget-rem-oneliner {
+    ec "$(datej-all-short): $(rem-summary-today)"
+}
+function iwidget-rem-short {
+    ec "$(datej-all-short)"$'\n'"$(rem-summary-today)"
+}
+
 function monthj2en {
     local m=$(( ${1:?Month required} ))
 
@@ -676,7 +683,7 @@ function monthj2fa() {
     esac
 }
 
-function datej-all() {
+function datej-all {
     ## test:
     # datej-all 1380/06/20
     # 80/Shahrivar6/20 Tue Sep9/11
@@ -699,12 +706,16 @@ function datej-all() {
         ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg"
     elif (( mode == 2 )) ; then
         ec "$cyear/$(monthj2en $cmonth)/$cday"
+    elif (( mode == 3 )) ; then
+        local dateg="$(jalalicli togregorian --gregorian-format='Mon Jan1/2' "$datej")"
+        ec "$(monthj2en $cmonth)/$cday $dateg"
     else
         ecerr "$0: Unsupported mode '$mode'"
     fi
 }
 aliasfn datej-all-long @opts mode 1 @ datej-all
 aliasfn datej-named @opts mode 2 @ datej-all
+aliasfn datej-all-short @opts mode 3 @ datej-all
 ##
 remnd() {
     : readmeall
