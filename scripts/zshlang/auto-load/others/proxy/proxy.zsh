@@ -104,7 +104,9 @@ function pxify {
     typeset -g proxycmd="proxychains4"
     typeset -g proxyenv="reval-pxa-if-no-proxy"
 
-    enh-pxpy tsend
+    pxaify-command tsend
+    # enh-pxpy tsend
+
     # enh-pxpy subgrab
 
     pxaify-fn spotdl
