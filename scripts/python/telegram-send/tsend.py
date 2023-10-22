@@ -21,7 +21,7 @@ Examples:
   tsend.py some_friend "I love you ^_^" --file ~/pics/big_heart.png
 
 Dependencies:
-  pip install -U pynight IPython aiofile docopt telethon python-telegram-bot
+  pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot
 
 Created by Fereidoon Mehri. I release my contribution to this program to the public domain (CC0).
 """
@@ -39,6 +39,7 @@ from pathlib import Path
 import asyncio
 from IPython import embed
 import re
+from pynight.common_proxy import pysocks_proxy_from_env
 from pynight.common_lock_async import (
     lock_acquire,
     lock_release,
@@ -129,6 +130,17 @@ def sanitize_telegram_html(message):
     )
 
 
+async def handle(e, attempt, max_retries, verbosity):
+    if verbosity >= 2:
+        print(f"Error sending (attempt {attempt + 1}): {e}")
+
+    if attempt == max_retries - 1:  # if it's the last attempt
+        if verbosity >= 1:
+            print(f"Failed after {max_retries} attempts.")
+    else:
+        await asyncio.sleep(10)
+
+
 async def discreet_send(
     client,
     receiver,
@@ -139,6 +151,8 @@ async def discreet_send(
     reply_to=None,
     link_preview=False,
     album_mode=True,
+    max_retries=30,
+    verbosity=1,
 ):
     if file and len(file) > 1 and album_mode == False:
         res = None
@@ -165,13 +179,19 @@ async def discreet_send(
 
     if len(message) == 0:
         if file:
-            last_msg = await client.send_file(
-                receiver,
-                file,
-                reply_to=(last_msg),
-                allow_cache=False,
-                force_document=force_document,
-            )
+            for attempt in range(max_retries):
+                try:
+                    last_msg = await client.send_file(
+                        receiver,
+                        file,
+                        reply_to=(last_msg),
+                        allow_cache=False,
+                        force_document=force_document,
+                    )
+                    break
+                except Exception as e:
+                    await handle(e, attempt, max_retries, verbosity)
+
         return last_msg
     else:
         length = len(message)
@@ -179,15 +199,20 @@ async def discreet_send(
             s = 0
             e = 4000
             while length > s:
-                last_msg = await client.send_message(
-                    receiver,
-                    message[s:e],
-                    file=file,
-                    force_document=force_document,
-                    parse_mode=parse_mode,
-                    link_preview=link_preview,
-                    reply_to=(last_msg),
-                )
+                for attempt in range(max_retries):
+                    try:
+                        last_msg = await client.send_message(
+                            receiver,
+                            message[s:e],
+                            file=file,
+                            force_document=force_document,
+                            parse_mode=parse_mode,
+                            link_preview=link_preview,
+                            reply_to=(last_msg),
+                        )
+                        break
+                    except Exception as e:
+                        await handle(e, attempt, max_retries, verbosity)
 
                 s = e
                 e = s + 4000
@@ -229,16 +254,6 @@ async def ptb_send(
 ):
     from telegram import InputMediaPhoto, InputMediaDocument
 
-    async def handle(e, attempt):
-        if verbosity >= 2:
-            print(f"Error sending (attempt {attempt + 1}): {e}")
-
-        if attempt == max_retries - 1:  # if it's the last attempt
-            if verbosity >= 1:
-                print(f"Failed after {max_retries} attempts.")
-        else:
-            await asyncio.sleep(10)
-
     # If no files are provided, just send the message with retry logic
     if not files:
         for attempt in range(max_retries):
@@ -248,7 +263,7 @@ async def ptb_send(
                 )
                 break
             except Exception as e:
-                await handle(e, attempt)
+                await handle(e, attempt, max_retries, verbosity)
         return
 
     media_group_photos = []
@@ -268,7 +283,7 @@ async def ptb_send(
                     )
                     break
                 except Exception as e:
-                    await handle(e)
+                    await handle(e, attempt, max_retries, verbosity)
         else:  # if album_p is False or there's only one file, send files individually
             for media in media_group:
                 for attempt in range(max_retries):
@@ -289,7 +304,7 @@ async def ptb_send(
                             )
                         break
                     except Exception as e:
-                        await handle(e, attempt)
+                        await handle(e, attempt, max_retries, verbosity)
 
         media_group.clear()
 
@@ -417,8 +432,9 @@ async def tsend(arguments):
                     res = sanitize_telegram_html(message)
                     message = res["html"]
                     for img_file in res["image_files"]:
-                        arguments["--file"].append(img_file)  # Add saved images to the list of files to send
-
+                        arguments["--file"].append(
+                            img_file
+                        )  # Add saved images to the list of files to send
 
                     # ic(message)
 
@@ -440,8 +456,12 @@ async def tsend(arguments):
             from telethon import TelegramClient
 
             # print("telethon used")
+            proxy = pysocks_proxy_from_env()
             async with TelegramClient(
-                str(Path.home()) + "/alice_is_happy", api_id, api_hash
+                str(Path.home()) + "/alice_is_happy",
+                api_id,
+                api_hash,
+                proxy=proxy,
             ) as client:
 
                 # print(arguments)
