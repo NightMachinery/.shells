@@ -13,6 +13,10 @@ fi
 
 brishgarden-boot 64
 
+if isMB2 ; then
+    battery-charge-limit-enable
+fi
+
 if isMe || isGrayfur ; then
     tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile_darwin
 fi
