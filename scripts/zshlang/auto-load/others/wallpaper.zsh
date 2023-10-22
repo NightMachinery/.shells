@@ -32,7 +32,10 @@ function wallpaper-overlay {
                 }
         fi
 
-        if isNet && [[ "$overlay_weather" == (y|ipad) ]] ; then
+        if isNet && [[ "$overlay_weather" == y ]] ; then
+            #: == (y|ipad)
+            #: Nowadays iOS supports weather widgets itself.
+            ##
             t="$(gmktemp --suffix .png)"
             local loc
             loc="$(serr location-get | prefixer -o , --skip-empty)" || loc="${location_my:-Tehran,Iran}"
@@ -42,7 +45,7 @@ function wallpaper-overlay {
             gurl "wttr.in/${loc}_transparency=255_mQ0_lang=en.png" > "$t" && {
                 #  -channel RGB -negate
                 # dark: plus > negate > screen; overlay, lighten, diff, add are very bad
-                if magick convert \( "$f" \( -background none -font "$font" -pointsize 30 -fill 'rgba(0,255,0,255)' label:"$(crypto-prices)" \) -gravity southeast -geometry $se_pos -compose plus -composite \) \( "$t" -channel RGB -resize "${weather_s}x" \) -gravity east -geometry $weather_pos -compose plus -composite "$t" ; then
+                if revaldbg magick convert \( "$f" \( -background none -font "$font" -pointsize 30 -fill 'rgba(0,255,0,255)' label:"$(crypto-prices)" \) -gravity southeast -geometry $se_pos -compose plus -composite \) \( "$t" -channel RGB -resize "${weather_s}x" \) -gravity east -geometry $weather_pos -compose plus -composite "$t" ; then
                     f="$t"
                 else
                     ecerr "$0: adding the weather data failed"
@@ -164,6 +167,10 @@ function wallpaper-auto-bing {
 function wallpaper-auto-ipad {
     #: takes ~9 minutes on ${lilf_user}
     ##
-    fnswap wallpaper-set wallpaper-overlay-ipad wallpaper-auto
+    if ! isDeus ; then
+        ecgray "$0: no longer in use, skipping unless deus"
+    else
+        fnswap wallpaper-set wallpaper-overlay-ipad wallpaper-auto
+    fi
 }
 ##
