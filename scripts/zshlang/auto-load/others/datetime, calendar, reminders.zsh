@@ -641,7 +641,7 @@ function iwidget-rem-oneliner {
     ec "$(datej-all-short): $(rem-summary-today)"
 }
 function iwidget-rem-short {
-    ec "$(datej-all-short)"$'\n'"$(rem-summary-today)"
+    ec "$(datej_all_mode=4 datej-all)"$'\n'"$(rem_comingup_days=1 rem-summary)"
 }
 
 function monthj2en {
@@ -709,6 +709,9 @@ function datej-all {
     elif (( mode == 3 )) ; then
         local dateg="$(jalalicli togregorian --gregorian-format='Mon Jan1/2' "$datej")"
         ec "$(monthj2en $cmonth)/$cday $dateg"
+    elif (( mode == 4 )) ; then
+        local dateg="$(jalalicli togregorian --gregorian-format='Jan1/2' "$datej")"
+        ec "$(monthj2fa $cmonth)/$cday $dateg"
     else
         ecerr "$0: Unsupported mode '$mode'"
     fi
