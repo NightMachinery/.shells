@@ -641,7 +641,7 @@ function iwidget-rem-oneliner {
     ec "$(datej-all-short): $(rem-summary-today)"
 }
 function iwidget-rem-short {
-    ec "$(datej_all_mode=4 datej-all)"$'\n'"$(rem_comingup_days=1 rem-summary)"
+    ec "$(datej_all_mode=4 datej-all)"$'\n'"$(rem_comingup_days=0 rem-summary)"
 }
 
 function monthj2en {
