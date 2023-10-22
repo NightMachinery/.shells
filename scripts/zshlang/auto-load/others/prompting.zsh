@@ -287,7 +287,11 @@ function prompt-py-to-kwargs {
 }
 ##
 function prompt-rewrite-as-script {
-    prompt-instruction-input "Rewrite the following as a noninteractive Zsh script. Your reply should be a single code block contaning the Zsh script." "$@"
+    prompt_code_block_p=y prompt-instruction-input "Rewrite the following as a noninteractive Zsh script. Your reply should be a single code block contaning the Zsh script." "$@"
+}
+
+function prompt-rewrite-zsh-as-standalone {
+    prompt_code_block_p=y prompt-instruction-input "Rewrite the above Zsh functions to make the usable without the special functions and aliases defined in my setup." "$@"
 }
 ##
 function prompt-docstring-write {
@@ -359,5 +363,32 @@ function prompt-slide-complete-orgbeamer {
 ##
 function prompt-t2i-expand {
     prompt_code_block_p=y prompt-instruction-input 'Create a detailed description for a text2image prompt from this preliminary prompt:' "$@"
+}
+##
+function prompt-coco2imagenet {
+    local coco_label="$1"
+    assert-args coco_label @RET
+
+    {
+        ec "Here are the ImageNet labels:"
+        cat "${nightNotesPublic}/subjects/ML/vision/datasets/ImageNet/imagenet-simple-labels.json" | jqm '.[]' | prompt-blockify
+
+        cat << EOF
+I want to map MS-COCO labels to ImageNet labels.
+
+For example, for the MS-COCO label "elephant":
+\`\`\`
+1. Indian elephant, Elephas maximus
+2. African elephant, Loxodonta africana
+3. tusker
+\`\`\`
+
+What are the top 10 (or more if available) nearest ImageNet labels for the COCO label "${coco_label}"?
+
+EOF
+
+        # Add the mapping for the COCO label "${coco_label}".
+        # I have attached the file "ilsvrc2012_wordnet_lemmas.txt" that contains ImageNet labels.
+    } |  cat-copy-if-tty
 }
 ##
