@@ -149,7 +149,7 @@ function pathtree-search {
         ugrep_opts+='--color=always'
     fi
 
-    ugbase_follow=y revaldbg indir pathtree ugbase --bool -- "$@" ./ <&- | prefixer -o $'\n\n' # closing the stdin forces ugrep to search in the file tree
+    ugbase_follow=y revaldbg indir pathtree ugbase --bool -- "$*" ./ <&- | prefixer -o $'\n\n' # closing the stdin forces ugrep to search in the file tree
 }
 noglobfn pathtree-search
 alias pts='\noglob pathtree-search'

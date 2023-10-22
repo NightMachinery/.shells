@@ -42,7 +42,11 @@ function wallpaper-overlay {
             gurl "wttr.in/${loc}_transparency=255_mQ0_lang=en.png" > "$t" && {
                 #  -channel RGB -negate
                 # dark: plus > negate > screen; overlay, lighten, diff, add are very bad
-                convert \( "$f" \( -background none -font "$font" -pointsize 30 -fill 'rgba(0,255,0,255)' label:"$(crypto-prices)" \) -gravity southeast -geometry $se_pos -compose plus -composite \) \( "$t" -channel RGB -resize "${weather_s}x" \) -gravity east -geometry $weather_pos -compose plus -composite "$t" && f="$t"
+                if magick convert \( "$f" \( -background none -font "$font" -pointsize 30 -fill 'rgba(0,255,0,255)' label:"$(crypto-prices)" \) -gravity southeast -geometry $se_pos -compose plus -composite \) \( "$t" -channel RGB -resize "${weather_s}x" \) -gravity east -geometry $weather_pos -compose plus -composite "$t" ; then
+                    f="$t"
+                else
+                    ecerr "$0: adding the weather data failed"
+                fi
                 # box the text: `-bordercolor 'rgba(0,0,255,100)' -border 1`
                 # bolden the text: `-stroke 'rgba(0,255,0,255)' -strokewidth 2`
             }

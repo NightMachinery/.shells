@@ -1,6 +1,7 @@
 Pillow
 PyPDF2
 Unidecode
+aiofile
 amzqr
 arabic_reshaper
 blend_modes
@@ -44,6 +45,7 @@ instaloader
 ipydex
 ipython
 iredis
+jdatetime
 jedi
 jill
 json-rpc
@@ -102,4 +104,3 @@ xmltodict
 yapf
 yq
 zxcvbn
-aiofile

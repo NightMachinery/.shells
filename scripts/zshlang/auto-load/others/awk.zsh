@@ -1,5 +1,6 @@
-function awkn() {
-    gawk "{ print \$${1} }"
+function awkn {
+    cat-paste-if-tty |
+        gawk "{ print \$${1} }"
 }
 alias a1='awkn 1'
 alias a2='awkn 2'
