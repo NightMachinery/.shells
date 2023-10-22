@@ -37,7 +37,7 @@ function alicedate {
     local rem_comingup_days="${rem_comingup_days:-14}"
 
     local log
-    log="$(cellp 2>&1)" || { # to update reminders
+    log="$(cellp 2>&1 | erase-ansi)" || { # to update reminders
         remj "$0, $(hostname), $(dateshort): cellp failed with $?: $log"
     }
     tlg-reminday "$alice"
