@@ -200,9 +200,29 @@ function isIReally {
     fi
 }
 
-function isColor {
+function h-color-p-override {
+    if test -n "$color_p" ; then
+        if bool "$color_p" ; then
+            ec y
+        else
+            ec n
+        fi
+    fi
+
     if test -n "$isColor_override" ; then
-        bool "$isColor_override"
+        if bool "$isColor_override" ; then
+            ec y
+        else
+            ec n
+        fi
+    fi
+}
+
+function isColor {
+    local color_p
+    color_p="$(h-color-p-override)" @TRET
+    if test -n "$color_p" ; then
+        bool "$color_p"
         return $?
     fi
 
