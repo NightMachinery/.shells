@@ -22,7 +22,7 @@ use clap::{App, Arg};
 
 fn main() {
     // Set up CLI arguments using clap.
-    let matches = App::new("Reminday script")
+    let matches = App::new("reminders_old_ls: lists old reminders\nUse from the Zsh wrapper 'reminders-old-ls'")
         .arg(
             Arg::with_name("end-pattern")
                 .long("end-pattern")
