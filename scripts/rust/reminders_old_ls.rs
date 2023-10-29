@@ -15,7 +15,7 @@
 // scriptisto-end
 
 use std::env;
-use std::path::Path;
+use std::fs;
 use walkdir::WalkDir;
 use regex::Regex;
 use clap::{App, Arg};
@@ -34,11 +34,16 @@ fn main() {
     let end_pattern = matches.value_of("end-pattern").unwrap_or(r"\.(md|org|txt|zsh)");
 
     // Retrieve the remindayRootDir environment variable.
-    let reminday_root_dir = env::var("remindayRootDir").expect("remindayRootDir is not set!");
+    let reminday_root_dir_raw = env::var("remindayRootDir").expect("remindayRootDir is not set!");
+    let reminday_root_dir = fs::canonicalize(reminday_root_dir_raw).unwrap().to_str().unwrap().to_string();
+
 
     // Retrieve the directories to exclude from environment variables.
-    let reminday_bak_c_dir = env::var("remindayBakCDir").expect("remindayBakCDir is not set!");
-    let reminday_bak_dir = env::var("remindayBakDir").expect("remindayBakDir is not set!");
+    let reminday_bak_c_dir_raw = env::var("remindayBakCDir").expect("remindayBakCDir is not set!");
+    let reminday_bak_c_dir = fs::canonicalize(reminday_bak_c_dir_raw).unwrap().to_str().unwrap().to_string();
+
+    let reminday_bak_dir_raw = env::var("remindayBakDir").expect("remindayBakDir is not set!");
+    let reminday_bak_dir = fs::canonicalize(reminday_bak_dir_raw).unwrap().to_str().unwrap().to_string();
 
     // Retrieve today's date from the environment variable `datej`.
     let today = env::var("datej").expect("datej is not set!");
@@ -52,7 +57,8 @@ fn main() {
     let file_regex = Regex::new(&file_regex_str).unwrap();
 
     for entry in WalkDir::new(reminday_root_dir).into_iter().filter_map(|e| e.ok()) {
-        let path_str = entry.path().to_str().unwrap();
+        let normalized_path = fs::canonicalize(entry.path()).unwrap();
+        let path_str = normalized_path.to_str().unwrap();
 
         if path_str.starts_with(&reminday_bak_c_dir) || path_str.starts_with(&reminday_bak_dir) {
             continue;  // Skip the excluded directories
@@ -66,8 +72,8 @@ fn main() {
             if file_year < year
                 || (file_year == year && file_month < month)
                 || (file_year == year && file_month == month && file_day < day) {
-                println!("{}", path_str);
-            }
+                    println!("{}", path_str);
+                }
         }
     }
 }
