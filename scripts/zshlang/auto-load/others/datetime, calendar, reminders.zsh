@@ -877,8 +877,11 @@ function reminders-old-cat {
         color=true
     fi
 
+    local reminders
+    reminders="$(reminders-old-ls "$@")"
+
     local r r_colored content
-    for r in ${(@f)"$(reminders-old-ls "$@")"} ; do
+    for r in ${(@f)reminders} ; do
         content="$(cat "$r")" @TRET
         if [[ "$color" == true ]] ; then
             r_colored="$(ecn ${r} | remiday_color=y reminday-path-colorize)"
@@ -890,8 +893,16 @@ function reminders-old-cat {
 }
 
 function reminders-old-ask {
+    local color=false
+    if isColorTty ; then
+        color=true
+    fi
+
+    local reminders
+    reminders="$(reminders-old-ls "$@")"
+
     local r content
-    for r in ${(@f)"$(reminders-old-ls "$@")"} ; do
+    for r in ${(@f)reminders} ; do
         content="$(cat "$r")" @TRET
         if [[ "$color" == true ]] ; then
             r_colored="$(ecn ${r} | remiday_color=y reminday-path-colorize)"
