@@ -596,7 +596,8 @@ function rem-today-notify {
         ec "---"
     } >> ~/logs/rem-today-notify.txt  2>&1 | cat
 }
-function tlg-reminday() {
+
+function tlg-reminday {
     local rec="$1"
     test -z "$rec" && {
         ecerr "$0: Empty receiver."
@@ -604,6 +605,7 @@ function tlg-reminday() {
     }
     local text="$(@opts delete y notif y md y @ rem-summary)"
     text="$text"$'\n\n'"$(datej-all)"
+    text="$text"$'\n\n'"$(reminders-old-cat)"
 
     tsend --parse-mode markdown -- "$rec" "$text"
 }
@@ -841,4 +843,32 @@ function jalali-from-natural {
         cat-copy-if-tty
 }
 aliasfn jalalinat jalali-from-natural
+##
+function reminders-old-ls {
+    datej="$(datej)" reminders_old_ls.rs "$@"
+}
+
+function reminders-old-notes-ls {
+    reminders-old-ls --end-pattern '\.('"${(j.|.)note_formats}"')' "$@"
+}
+
+function reminders-old-cat {
+    reminders-old-ls "$@" |
+        inargsf re 'reval-ec cat'
+}
+
+function reminders-old-notes-cat {
+    reminders-old-notes-ls "$@" |
+        inargsf re 'reval-ec cat'
+}
+
+function reminders-old-ask {
+    local r content
+    for r in ${(@f)"$(reminders-old-ls "$@")"} ; do
+        content="$(cat "$r")" @TRET
+        if ask "* ${r}:"$'\n\n'"${content}"$'\n\n'"Delete? " y ; then
+           trs "$r" @TRET
+        fi
+    done
+}
 ##
