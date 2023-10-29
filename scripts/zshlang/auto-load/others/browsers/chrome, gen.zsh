@@ -85,7 +85,15 @@ function chrome-current-url {
         rget 'Url:\s+(.*)' |
         cat-copy-if-tty
 }
-aliasfn browser-current-url chrome-current-url # @darwinonly @chromeonly
+aliasfn h-browser-current-url chrome-current-url # @darwinonly @chromeonly
+function browser-current-url {
+    local url
+    url="$(h-browser-current-url)" @RET
+
+    ec "$url" |
+        url_clean_redirects=n url-clean-unalix
+    #: Or we can only use =url-clean-unalix= if the URL matches certain patterns, e.g., IMDB.
+}
 ##
 function with-edge {
     CHROME_BUNDLE_IDENTIFIER='com.microsoft.edgemac' reval-env "$@"
