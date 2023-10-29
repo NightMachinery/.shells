@@ -60,15 +60,24 @@ function audiofx-sox() {
 function fsay {
     assert isDarwin @RET
 
+    local opts=()
+
     local voice="${fsay_v}" rate="${fsay_r}"
     if test -z "$voice" ; then
         if macos-ventura-or-higher-p ; then
             # voice='Samantha'
-            voice='Moira'
+            # voice='Moira'
+            ##
+            #: [[https://stackoverflow.com/questions/61122378/make-the-say-terminal-utility-and-nsspeechsynthesizer-work-with-siri-voices][macos - Make the `say` terminal utility and NSSpeechSynthesizer work with Siri voices - Stack Overflow]]
+            #: Selecting a Siri voice as the system default under  ⇾ System settings... ⇾ Accessibility ⇾ Spoken Content ⇾ System voice ⇾ Manage voices... ⇾ [select a downloaded siri voice] ⇾ click Ok, and then use e.g. `say 'sth'` (without -v).
         else
             voice='Fiona'
         fi
     fi
+    if test -n "$voice" ; then
+        opts+=(-v "$voice")
+    fi
+
     if test -z "$rate" ; then
         if macos-ventura-or-higher-p ; then
             rate='185'
@@ -79,7 +88,7 @@ function fsay {
 
     bella_zsh_disable1
 
-    say -v $voice -r $rate "$@"
+    revaldbg command say "${opts[@]}" -r $rate "$@"
 }
 
 function fsay2 {
