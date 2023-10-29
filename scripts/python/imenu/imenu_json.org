@@ -1,0 +1,180 @@
+#+TITLE: imenu/imenu_json
+
+* Using emacs itself:
+#+begin_example elisp
+(progn
+(defun json-imenu-get-tree ()
+    "Produce the index for Imenu for JSON files."
+    (let (tree)
+    (goto-char (point-min))
+    (let ((json-object (json-read)))
+        (setq tree (json-imenu-process-json json-object)))
+    tree))
+
+(defun json-imenu-process-json (json-object &optional prefix)
+    "Process a JSON OBJECT and produce an imenu tree.
+PREFIX is used for nested objects or arrays."
+    (let ((case-fold-search nil)
+        tree)
+    (cond
+    ((listp json-object) ;; JSON object (alist in elisp)
+        (dolist (pair json-object)
+        (let* ((key (if (symbolp (car pair)) (symbol-name (car pair)) (car pair)))
+                (value (cdr pair))
+                (full-key (if prefix (concat prefix "." key) key))
+                (pos (save-excursion
+                        (search-forward (concat "\"" key "\"") nil t)
+                        (point))))
+            (cond
+            ((or (listp value) (vectorp value))
+            (push (cons full-key (json-imenu-process-json value full-key)) tree))
+            (t
+            (push (cons full-key (copy-marker pos)) tree))))))
+    ((vectorp json-object) ;; JSON array
+        (dotimes (i (length json-object))
+        (let* ((value (aref json-object i))
+                (key (number-to-string i))
+                (full-key (if prefix (concat prefix "[" key "]") key))
+                (pos (save-excursion
+                        (search-forward (concat "\"" key "\"") nil t)
+                        (point))))
+            (cond
+            ((or (listp value) (vectorp value))
+            (push (cons full-key (json-imenu-process-json value full-key)) tree))
+            (t
+            (push (cons full-key (copy-marker pos)) tree)))))))
+    (nreverse tree)))
+
+(defun night/imenu-json-setup ()
+    "Set up imenu for JSON."
+    (interactive)
+    (setq-local imenu-create-index-function #'json-imenu-get-tree)))
+#+end_example
+
+* Using external position-aware parser
+#+begin_example elisp
+(progn
+;; @GPT4 @broken
+;; The index is not output correctly.
+(defun json5-imenu-get-tree ()
+"Produce the index for Imenu for JSON5 files."
+(let ((output (with-current-buffer (current-buffer)
+                (shell-command-on-region (point-min) (point-max) "imenu_json.py"))))
+(message "index:\n%s" output)
+(json5-imenu-process-output output)))
+
+(defun json5-imenu-process-output (output)
+    "Process the output of the Python script to generate the imenu index."
+    (let ((data (json-read-from-string output))
+        tree)
+    (dolist (entry data)
+        (let ((key (car entry))
+            (subindex (cadr entry)))
+        (if subindex
+            (push (cons key (json5-imenu-process-output (json-encode subindex))) tree)
+            (push (cons key (point)) tree)))) ;; here we're simply using the current point, but you may need to adjust this depending on how you want to handle positions
+    tree))
+
+(defun night/imenu-json-setup ()
+    "Set up imenu for JSON5."
+    (interactive)
+    (setq-local imenu-create-index-function #'json5-imenu-get-tree)))
+#+end_example
+
+** @LLM/query
+#+begin_example
+imenu-default-create-index-function
+
+Buffer values Global value Set
+
+Documentation
+The function to use for creating an index alist of the current buffer.
+
+It should be a function that takes no arguments and returns
+an index alist of the current buffer.  The function is
+called within a save-excursion.
+
+See imenu--index-alist for the format of the buffer index alist.
+
+#+end_example
+
+#+begin_example
+imenu--index-alist is a buffer-local variable defined in imenu.el.
+
+Global Value
+nil
+
+Buffer values Global value Toggle Set
+
+Documentation
+The buffer index alist computed for this buffer in Imenu.
+
+Simple elements in the alist look like (INDEX-NAME . POSITION).
+POSITION is the buffer position of the item; to go to the item
+is simply to move point to that position.
+
+POSITION is passed to imenu-default-goto-function, so it can be
+a non-number if that variable has been changed (e.g. Semantic
+uses overlays for POSITIONs).
+
+Special elements look like
+(INDEX-NAME POSITION FUNCTION ARGUMENTS...).
+To "go to" a special element means applying FUNCTION to
+INDEX-NAME, POSITION, and the ARGUMENTS.
+
+A nested sub-alist element looks like (INDEX-NAME . SUB-ALIST).
+The function imenu--subalist-p tests an element and returns t
+if it is a sub-alist.
+
+There is one simple element with negative POSITION; selecting that
+element recalculates the buffer's index alist.
+
+#+end_example
+
+#+begin_example
+#!/usr/bin/env python3
+
+import sys
+import json5
+from collections.abc import Iterable
+
+
+def generate_imenu_index(json_object, prefix=None):
+    """Generate imenu index for a given JSON object."""
+    result = []
+
+    if isinstance(json_object, dict):
+        for key, value in json_object.items():
+            full_key = key if prefix is None else f"{prefix}.{key}"
+            if isinstance(value, (dict, list)):
+                result.append((full_key, generate_imenu_index(value, full_key)))
+            else:
+                result.append((full_key, None))
+    elif isinstance(json_object, list):
+        for i, value in enumerate(json_object):
+            full_key = str(i) if prefix is None else f"{prefix}[{i}]"
+            if isinstance(value, (dict, list)):
+                result.append((full_key, generate_imenu_index(value, full_key)))
+            else:
+                result.append((full_key, None))
+    return result
+
+
+if __name__ == "__main__":
+    data = json5.loads(sys.stdin.read())
+    index = generate_imenu_index(data)
+    print(index)
+#+end_example
+
+#+begin_example
+❯ echo '{
+    "driving-woman-man": {
+        // kjsjsj
+        "main": 1
+    }
+}' | imenu_json.py
+[('driving-woman-man', [('driving-woman-man.main', None)])]
+#+end_example
+
+=imenu_json.py= should return the index correctly including its position.
+
