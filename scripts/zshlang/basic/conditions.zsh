@@ -230,51 +230,65 @@ function isColor {
 }
 
 function isColorTty {
+    local color_p
+    color_p="$(h-color-p-override)" @TRET
+    if test -n "$color_p" ; then
+        bool "$color_p"
+        return $?
+    fi
+
     isColor && isOutTty
 }
 
 function isColorErrTty {
+    local color_p
+    color_p="$(h-color-p-override)" @TRET
+    if test -n "$color_p" ; then
+        bool "$color_p"
+        return $?
+    fi
+
     isColor && isErrTty
 }
 ##
-function isOutTty() {
+function isOutTty {
     [ -t 1 ]
     # -t fd True if file descriptor fd is open and refers to a terminal.
 }
 alias istty=isOutTty # NOTE: aliases are not fnswappable
 alias isTty=isOutTty
 
-function isErrTty() {
+function isErrTty {
     [ -t 2 ]
     # -t fd True if file descriptor fd is open and refers to a terminal.
 }
 
-function isInTty() {
+function isInTty {
     [ -t 0 ]
     # -t fd True if file descriptor fd is open and refers to a terminal.
 }
 ##
-function isExpensive() {
+function isExpensive {
     [[ -z "$NIGHT_NO_EXPENSIVE" ]]
 }
 
-function  isNotExpensive() {
+function isNotExpensive {
     [[ -n "$NIGHT_NO_EXPENSIVE" ]]
 }
 
-function isRcLoaded() {
+function isRcLoaded {
     test -n "$rcLoaded"
 }
 ##
-function isDbg() {
+function isDbg {
     test -n "$DEBUGME"
 }
 alias isdbg=isDbg
-function isNotDbg() {
+function isNotDbg {
     ! isDbg
 }
 ##
-function isNet() {
+function isNet {
     ## @alt
     # wget -q --spider http://google.com
     ##
@@ -289,7 +303,7 @@ function isNet() {
     return 1
 }
 
-function h-isNet() {
+function h-isNet {
     ##
     if isDarwin ; then
         ping -q -c 1 -W 400 8.8.8.8 &>/dev/null
@@ -300,12 +314,12 @@ function h-isNet() {
     fi
 }
 ##
-function isSudo() {
+function isSudo {
     # The $EUID environment variable (or `id -u`) holds the current user's UID. Root's UID is 0.
 
     [ "${EUID:-$(id -u)}" -eq 0 ]
 }
-function isRoot() {
+function isRoot {
     isSudo "$@"
 }
 ##
