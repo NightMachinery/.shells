@@ -109,6 +109,7 @@ function path-abbrev-to-music-dir {
 function cellp {
     assert-net @RET
 
+    #: Use =fnswap brishzr true= to disable this:
     brishzr-repeat
     #: @outdated? now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
     #: lilf is no longer a remote, I think.

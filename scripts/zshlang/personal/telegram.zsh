@@ -5,9 +5,11 @@ export arista='-1001154785017'
 export water='-1001293952668'
 export ephemeral='-1001404743282'
 export tlogs='-1001460496622'
+##
 export tlg_notifs='-1001185370891'
-export tlg_notifc="$water"
-# export tlg_amar='-1001286597974'
+export tlg_notifc="${tlg_notifs}"
+# export tlg_notifc="$water"
+##
 export tlg_amar="$water"
 export tlg_podcastgen='-1001222930214'
 export tlg_ch_books='-1001304139500'
