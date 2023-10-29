@@ -103,27 +103,34 @@ function rgcontext {
     rgbase -C ${agC:-1} "$@"
 }
 
-function rgm() {
-    fnswap isColorTty true rgcontext --heading "$@" | less-min
+function rgm {
+    local color=false
+    if isColorTty ; then
+        color=true
+    fi
+
+    fnswap isColorTty "$color" rgcontext --heading "$@" | less-min
 }
 
-agm() rgm "$@" #alias agm='rg' #'ag -C "${agC:-1}" --nonumbers'
+function agm {
+    rgm "$@" #alias agm='rg' #'ag -C "${agC:-1}" --nonumbers'
+}
 
-aga() {
+function aga {
     # agm "$@" "$NIGHTDIR"/**/*alias*(.)
     builtin alias|agm "$@"
 }
-ags() {
+function ags {
     agm "$@" ~/.zshenv ~/.zshrc "$NIGHTDIR"/**/*(.) ~/.bashrc ~/.profile ~/.bashrc ~/.bash_profile
 }
-agf() {
+function agf {
     ags "$@"'\s*\(\)'
 }
-agi() {
+function agi {
     doc ag internals of zsh
     agm "$@" ~/.oh-my-zsh/ $plugin_dir
 }
-agcell() {
+function agcell {
     agm -uuu --iglob '!.git' "$@" $cellar # --binary --hidden don't work with -C somehow, so we use -uuu :D
 }
 ##
