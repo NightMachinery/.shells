@@ -168,7 +168,7 @@ function opts-urls() {
 function bool() {
     local i="${1:l}"
 
-    if [[ "${i}" == (n|no|0) ]] ; then
+    if [[ "${i}" == (n|no|0|false) ]] ; then
         return 1
     else
         test -n "${i}"
