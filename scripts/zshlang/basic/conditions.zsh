@@ -67,7 +67,9 @@ function isServer {
 function isBorg {
     [[ -n "$JBRISH" ]]
 }
-isJulia { isBorg "$@" ; }
+function isJulia {
+    isBorg "$@"
+}
 # isborg() { isBorg "$@" ; }
 # isjulia() { isBorg "$@" ; }
 ##
