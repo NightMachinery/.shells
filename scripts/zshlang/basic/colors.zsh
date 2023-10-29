@@ -6,13 +6,13 @@ autoload -U colors && colors
 typeset -ag gray=( 170 170 170 )
 ## Functions
 # @See terminal-ansi-test for more good stuff
-Bold () { ! isColor || print -n -- '\e[1m' }
-Italic () { ! isColor || print -n -- '\e[3m' }
-Underline () { ! isColor || print -n -- '\e[4m' }
-Strikethrough () { ! isColor || print -n -- '\e[9m' }
-Flash () { ! isColor || print -n -- '\e[5m' } # doesn't work on my iTerm
-Invert () { ! isColor || print -n -- '\e[7m' }
-Invisible () { ! isColor || print -n -- '\e[8m' } # again doesn't work
+Bold () { ! isColorTty || print -n -- '\e[1m' }
+Italic () { ! isColorTty || print -n -- '\e[3m' }
+Underline () { ! isColorTty || print -n -- '\e[4m' }
+Strikethrough () { ! isColorTty || print -n -- '\e[9m' }
+Flash () { ! isColorTty || print -n -- '\e[5m' } # doesn't work on my iTerm
+Invert () { ! isColorTty || print -n -- '\e[7m' }
+Invisible () { ! isColorTty || print -n -- '\e[8m' } # again doesn't work
 ##
 function palette {
     local i
@@ -73,9 +73,9 @@ function color-cursor {
 function cursor-color { color-cursor "$@" }
 alias cursor-color='color-cursor' # to not increase ${#funcstack}
 
-function colorfg() { ! isColor || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
+function colorfg() { ! isColorTty || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
 
-function colorbg() { ! isColor || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
+function colorbg() { ! isColorTty || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
 
 function colorb() {
     co_f=colorbg color "$@"
@@ -95,7 +95,7 @@ function color {
         } || {
             # in="$(in-or-args "${@[2,-1]}")"
             in-or-args2 "${@[2,-1]}"
-            isColor && printf %s "$fg[$1]"
+            isColorTty && printf %s "$fg[$1]"
         }
     in="$inargs"
     print -nr -- "$in"
@@ -108,7 +108,7 @@ function resetcolor() {
     if test -z "$reset_color" ; then
         typeset -g reset_color=$'\C-[[00m'
     fi
-    ! isColor || printf %s "$reset_color"
+    ! isColorTty || printf %s "$reset_color"
 }
 function colorreset() { resetcolor }
 ##
@@ -168,7 +168,7 @@ function ecrainbow() { ecrainbow-n "$@" ; echo }
 function ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
 function ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
 function h_ecalternate() {
-    if ! isColor ; then
+    if ! isColorTty ; then
         ec "$(gq "$@")"
         return 0
     fi
@@ -184,7 +184,7 @@ function ecalternate() {
     {
         local o
         o="$(h_ecalternate "$@")" @RET
-        if isColor ; then
+        if isColorTty ; then
             # Removes last whitespace  char:
             ecn "${o[1,-7]}" ; resetcolor ; ec
         else

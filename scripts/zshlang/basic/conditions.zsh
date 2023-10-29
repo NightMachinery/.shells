@@ -192,7 +192,7 @@ function isIReally() {
     fi
 }
 
-function isColor() {
+function isColor {
     if test -n "$isColor_override" ; then
         bool "$isColor_override"
         return $?
