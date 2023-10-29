@@ -325,6 +325,11 @@ function reminday_store {
     local datej="${reminday_store_datej}"
     local dateg="${reminday_store_dateg}"
 
+    local color=false
+    if isColorTty ; then
+        color=true
+    fi
+
     if test -z "${gcal_backend_p}" ; then
         if isServer ; then
             gcal_backend_p='n'
@@ -376,7 +381,7 @@ function reminday_store {
         Bold ; color 100 255 200 "$(@opts mode 1 @ datej-all "$datej")" ; resetcolor
     fi
     if bool "${filesystem_backend_p}" ; then
-        ecn "$dest : " ; Bold ; color 100 200 255 "${text_timed}" ; resetcolor
+        ecn "$(remiday_color="$color" reminday-path-colorize $dest): " ; Bold ; color 100 200 255 "${text_timed}" ; resetcolor
     fi
     ##
     if bool "${gcal_backend_p}" ; then
@@ -605,7 +610,7 @@ function tlg-reminday {
     }
     local text="$(@opts delete y notif y md y @ rem-summary)"
     text="$text"$'\n\n'"$(datej-all)"
-    text="$text"$'\n\n'"$(reminders-old-cat)"
+    text="$text"$'\n\n'"$(reminders-old-cat | erase-ansi)"
 
     tsend --parse-mode markdown -- "$rec" "$text"
 }
@@ -843,23 +848,45 @@ function jalali-from-natural {
         cat-copy-if-tty
 }
 aliasfn jalalinat jalali-from-natural
-##
+###
+function reminday-path-colorize {
+    local colorMode="${remiday_color}"
+
+    local res
+    res="$(in-or-args "$@")" @RET
+
+    if { test -z "$colorMode" && isColorTty } || bool "$colorMode" ; then
+        ec $res | rg --passthrough --color always --colors 'match:bg:255,255,255' --colors 'match:fg:40,200,30' --colors 'match:style:bold' '(?P<year>\d+)/(?P<month>\d+)/(?P<day>\d+)[^/]*'
+    else
+        ec $res
+    fi
+}
+
 function reminders-old-ls {
     datej="$(datej)" reminders_old_ls.rs "$@"
 }
 
-function reminders-old-notes-ls {
-    reminders-old-ls --end-pattern '\.('"${(j.|.)note_formats}"')' "$@"
-}
-
-function reminders-old-cat {
+function reminders-old-cat-v1 {
     reminders-old-ls "$@" |
         inargsf re 'reval-ec cat'
 }
 
-function reminders-old-notes-cat {
-    reminders-old-notes-ls "$@" |
-        inargsf re 'reval-ec cat'
+function reminders-old-cat {
+    local color=false
+    if isColorTty ; then
+        color=true
+    fi
+
+    local r r_colored content
+    for r in ${(@f)"$(reminders-old-ls "$@")"} ; do
+        content="$(cat "$r")" @TRET
+        if [[ "$color" == true ]] ; then
+            r_colored="$(ecn ${r} | remiday_color=y reminday-path-colorize)"
+        else
+            r_colored="$r"
+        fi
+        ec "* ${r_colored}:"$'\n\n'"${content}"$'\n'
+    done
 }
 
 function reminders-old-ask {
@@ -872,3 +899,11 @@ function reminders-old-ask {
     done
 }
 ##
+function reminders-old-notes-ls {
+    reminders-old-ls --end-pattern '\.('"${(j.|.)note_formats}"')' "$@"
+}
+
+function reminders-old-notes-cat {
+    reminders-old-cat --end-pattern '\.('"${(j.|.)note_formats}"')' "$@"
+}
+###
