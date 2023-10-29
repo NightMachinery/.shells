@@ -54,22 +54,6 @@ function rem-sync-ni {
     gsync_commit_pre_opts=(-c commit.gpgsign=false) log-to ~/logs/rem_sync rem-sync "$@"
     #: gpg signing will interactively ask for the passphrase when run in cron or tmux
 }
-
-function iwidget-rem-refresh {
-    if [[ "$remindayDir" == "$remindayCDir" ]] ; then
-        ecerr "$0: remindayDir is set to remindayCDir; Skipping refresh."
-        return 0
-    fi
-
-    deus iwidget-rem #: refresh the cache
-    if isLocal ; then
-        if bool "$wallpaper_reminder_p" ; then
-            awaysh wallpaper-auto
-        fi
-
-        brishzr awaysh deus iwidget-rem-refresh #: refresh the cache
-    fi
-}
 ##
 alias withremc='remindayDir="$remindayCDir" remindayBakDir="$remindayBakCDir" '
 
@@ -642,13 +626,6 @@ function rem-summary {
 
 function rem-summary-today {
     rem_comingup_days=0 rem-summary
-}
-
-function iwidget-rem-oneliner {
-    ec "$(datej-all-short): $(rem-summary-today)"
-}
-function iwidget-rem-short {
-    ec "$(datej_all_mode=4 datej-all)"$'\n'"$(rem_comingup_days=0 rem-summary)"
 }
 
 function monthj2en {

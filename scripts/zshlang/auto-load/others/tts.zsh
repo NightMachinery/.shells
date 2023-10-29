@@ -106,7 +106,7 @@ function fsay2 {
 
 function fsay-noidle {
     if ! idle-p 15 ; then
-        fsay2 "$@"
+        fsay "$@"
     fi
 }
 
