@@ -201,6 +201,8 @@ function isIReally {
 }
 
 function h-color-p-override {
+    #: Be careful not to override =color_p= accidentally!
+    ##
     if test -n "$color_p" ; then
         if bool "$color_p" ; then
             ec y
@@ -219,10 +221,10 @@ function h-color-p-override {
 }
 
 function isColor {
-    local color_p
-    color_p="$(h-color-p-override)" @TRET
-    if test -n "$color_p" ; then
-        bool "$color_p"
+    local my_color_p
+    my_color_p="$(h-color-p-override)" @TRET
+    if test -n "$my_color_p" ; then
+        bool "$my_color_p"
         return $?
     fi
 
@@ -230,10 +232,10 @@ function isColor {
 }
 
 function isColorTty {
-    local color_p
-    color_p="$(h-color-p-override)" @TRET
-    if test -n "$color_p" ; then
-        bool "$color_p"
+    local my_color_p
+    my_color_p="$(h-color-p-override)" @TRET
+    if test -n "$my_color_p" ; then
+        bool "$my_color_p"
         return $?
     fi
 
@@ -241,10 +243,10 @@ function isColorTty {
 }
 
 function isColorErrTty {
-    local color_p
-    color_p="$(h-color-p-override)" @TRET
-    if test -n "$color_p" ; then
-        bool "$color_p"
+    local my_color_p
+    my_color_p="$(h-color-p-override)" @TRET
+    if test -n "$my_color_p" ; then
+        bool "$my_color_p"
         return $?
     fi
 
