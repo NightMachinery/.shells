@@ -885,7 +885,7 @@ function reminders-old-cat {
         else
             r_colored="$r"
         fi
-        ec "* ${r_colored}:"$'\n\n'"${content}"$'\n'
+        ec "* ${r_colored}:"$'\n'"${content}"$'\n'
     done
 }
 
@@ -893,7 +893,7 @@ function reminders-old-ask {
     local r content
     for r in ${(@f)"$(reminders-old-ls "$@")"} ; do
         content="$(cat "$r")" @TRET
-        if ask "* ${r}:"$'\n\n'"${content}"$'\n\n'"Delete? " y ; then
+        if ask "* ${r}:"$'\n'"${content}"$'\n\n'"Delete? " y ; then
            trs "$r" @TRET
         fi
     done
