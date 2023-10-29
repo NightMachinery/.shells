@@ -92,12 +92,14 @@ function head-tail {
     head -n "${to}" | tail -n "${len}"
 }
 ##
-function ensure-nl {
+function ensure-ends-with-newline {
     #: Ensures the input ends in a newline
+    ##
     local in
     in="$(cat)" || return $?
     ec "$in"
 }
+alias ensure-nl='ensure-ends-with-newline'
 alias enl='ensure-nl'
 ###
 function file-unix2uri {
