@@ -111,8 +111,7 @@ function cellp {
 
     #: Use =fnswap brishzr true= to disable this:
     brishzr-repeat
-    #: @outdated? now that ${lilf_user} is a remote, we just need to make sure things are clean and committed there
-    #: lilf is no longer a remote, I think.
+    #: to commit remote stuff so that we can pull them
 
     for root in "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${resources_dir}" ; do
         ec-sep-h
@@ -134,6 +133,9 @@ function cellp {
             git_commitmsg_ask=no reval-ec gsync
         } always { popf }
     done
+
+    brishzr-repeat
+    #: to pull the new changes
 }
 ##
 function vcn-getrepo {
