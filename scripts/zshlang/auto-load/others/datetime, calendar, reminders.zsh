@@ -909,7 +909,7 @@ function reminders-old-ask {
         else
             r_colored="$r"
         fi
-        if ask "* ${r_colored}:"$'\n'"${content}"$'\n\n'"Delete? " y ; then
+        if ask $'\n'"* ${r_colored}:"$'\n'"${content}"$'\n\n'"Delete? " y ; then
            trs "$r" @TRET
         fi
     done
