@@ -1,16 +1,20 @@
 ### BASH COMPATIBLE (Gets sourced by .shared.sh)
 ### Bash doesn't support aliases in scripts.
-function iszsh() {
+function iszsh {
     [[ -n $ZSH_VERSION ]]
 }
-isZsh() { iszsh ; }
+function isZsh {
+    iszsh
+}
 
-function isbash() {
+function isbash {
     [[ -n $BASH_VERSION ]]
 }
-isBash() { isbash ; }
+function isBash {
+    isbash
+}
 ##
-function isDarwin() {
+function isDarwin {
     # idk who is setting this, the OS?
     # `env -i zsh -fc 'echo $uname'` is empty
     ##
@@ -25,7 +29,7 @@ function isDarwin() {
 }
 alias isD=isDarwin
 
-function isArm() {
+function isArm {
     if test -z "$uname_m_cached" ; then
         uname_m_cached="$(uname -m)"
     fi
@@ -33,14 +37,14 @@ function isArm() {
     [[ "$uname_m_cached" == "arm64" ]]
 }
 
-function isArmDarwin() {
+function isArmDarwin {
     isDarwin && isArm
 }
-function isAppleSilicon() {
+function isAppleSilicon {
     isArmDarwin
 }
 
-function isLinux() {
+function isLinux {
     if test -n "$uname" ; then
         [[ "$uname" == "Linux" ]]
     else
@@ -50,44 +54,44 @@ function isLinux() {
 alias isL=isLinux
 alias isUbuntu=isLinux
 ##
-function isLocal() {
+function isLocal {
     # @darwinonly0
     isDarwin
 }
-function isServer() {
+function isServer {
     # @darwinonly0
     # This is actually isLinuxServer, but since macOS servers are rare, I have simplified
     isLinux
 }
 ##
-function isBorg() {
+function isBorg {
     [[ -n "$JBRISH" ]]
 }
-isJulia() { isBorg "$@" ; }
+isJulia { isBorg "$@" ; }
 # isborg() { isBorg "$@" ; }
 # isjulia() { isBorg "$@" ; }
 ##
-function isEmacs() {
+function isEmacs {
     [[ -n "${NIGHT_EMACS_P}" ]]
 }
 ##
-function isBrish() {
+function isBrish {
     [[ -n "${brish_server_index}" ]]
 }
 
-function isBrishOrg() {
+function isBrishOrg {
     [[ "$GARDEN_SESSION" == bsh ]]
 }
 ##
-function isTmux() {
+function isTmux {
     test -n "$TMUX"
 }
 ##
-function isLilf() {
+function isLilf {
     [[ "$(hostname)" == 'lilf.ir' ]]
 }
 
-function isZii() {
+function isZii {
     [[ "$(hostname)" == 'mail2.lilf.ir' ]]
 }
 
@@ -149,21 +153,23 @@ function isKitty {
         # We can also use 'term-get', which works unless we are on mosh.
     fi
 }
-iskitty() { isKitty "$@" ; }
+function iskitty {
+    isKitty "$@"
+}
 
-function isAppleTerminal() {
+function isAppleTerminal {
     [[ "$TERM_PROGRAM" == Apple_Terminal ]]
 }
 
-function isiTerm() {
+function isiTerm {
     [[ "$TERM_PROGRAM" == iTerm.app ]]
 }
 ##
-function isBicon() {
+function isBicon {
     test -n "$BICON_MODE"
 }
 
-function isRtl() {
+function isRtl {
     ##
     isBicon
     ##
@@ -174,7 +180,7 @@ function isRtl() {
     ##
 }
 ##
-function isI() {
+function isI {
     if test -n "$FORCE_NONINTERACTIVE" ; then
         return 1
     fi
@@ -184,7 +190,7 @@ function isI() {
 
     isIReally
 }
-function isIReally() {
+function isIReally {
     if isBash ; then
         [[ $- == *i* ]]
     else
