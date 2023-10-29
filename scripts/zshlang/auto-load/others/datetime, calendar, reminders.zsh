@@ -893,7 +893,12 @@ function reminders-old-ask {
     local r content
     for r in ${(@f)"$(reminders-old-ls "$@")"} ; do
         content="$(cat "$r")" @TRET
-        if ask "* ${r}:"$'\n'"${content}"$'\n\n'"Delete? " y ; then
+        if [[ "$color" == true ]] ; then
+            r_colored="$(ecn ${r} | remiday_color=y reminday-path-colorize)"
+        else
+            r_colored="$r"
+        fi
+        if ask "* ${r_colored}:"$'\n'"${content}"$'\n\n'"Delete? " y ; then
            trs "$r" @TRET
         fi
     done
