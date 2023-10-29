@@ -1,8 +1,15 @@
 ##
+function json5-to-json {
+    cat-paste-if-tty |
+        json5_to_json.py |
+        cat-copy-if-tty
+}
+##
 function jqm {
     # --raw-output / -r: With this option, if the filter's result is a string then it will be written directly to standard output rather than being formatted as a JSON string with quotes. This can be useful for making jq filters talk to non-JSON-based systems.
     # --join-output / -j: Like -r but jq won't print a newline after each output.
-    jq -re "$@[1,-2]" "$@[-1] // empty"
+    json5-to-json |
+        jq -re "$@[1,-2]" "$@[-1] // empty"
 }
 
 function jq-rtl {
