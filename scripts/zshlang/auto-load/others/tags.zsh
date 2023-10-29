@@ -467,7 +467,7 @@ function ntag-exclude() {
 }
 aliasfn lx ntag-exclude
 ###
-function ntag_filter_rg() {
+function ntag_filter_rg {
     local pattern="$1" bg="${2:-0,0,0}" fg="${3:-255,255,255}"
 
     # We need to limit highlighting ntag_sep, as the color codes will impede further matches
@@ -476,7 +476,8 @@ function ntag_filter_rg() {
     return 0
 }
 aliasfn ntag-color ntagcolor
-function ntag-color1() {
+
+function ntag-color1 {
     # INPUT: stdin
     ## @perf
     # `ll --color always | time (ntag-color)` 115ms
@@ -499,7 +500,7 @@ function ntag-color1() {
     return 0
 }
 
-function ntag-filter() {
+function ntag-filter {
     : "Alt: Use ntag-grep if you never want the coloring."
     ## perf
     # `time (@opts or yes @ green red)` ~ 120ms
@@ -509,7 +510,7 @@ function ntag-filter() {
 
     local res
     res="$(ntag-grep "$@")" || return 1
-    if test -n "$colorMode" || { isI && istty } ; then
+    if { test -z "$colorMode" && isColorTty } || bool "$colorMode" ; then
         ec $res | ntag-color
     else
         ec $res
