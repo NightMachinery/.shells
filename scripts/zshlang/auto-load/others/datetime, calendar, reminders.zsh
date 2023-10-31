@@ -529,8 +529,10 @@ function rem-today {
                     text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
             elif [[ "$ext" == bak ]] ; then
+                #: These are always =.zsh.bak= files, as we don't add the =.bak= suffix for text files in [agfi:rem-trs].
+                ##
                 res="$0: Skipped: $f"
-                ecerr "$res"
+                # ecerr "$res"
                 # text+=$'\n\n'"$res"
             else
                 # text+=$'\n\n'"$0: Unsupported file: $f"
