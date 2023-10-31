@@ -39,7 +39,7 @@ function labeled() {
     # ec "${@[2,-1]}: $(reval "$@")"
 }
 ##
-function fnrep() {
+function fnrep {
     # : 'Replaces a function temporarily during <cmd>: <fn> <new body> <cmd>'
     # : 'WARNING: Currently does not accommodate our own macro-enhancers like reify.'
 
@@ -62,8 +62,11 @@ function fnrep() {
         unalias $fn &>/dev/null
 
         alias fnsuper="$origfn"
+        #: We can't use =fnswap sth 'reval-ec fnsuper'= as the alias doesn't get registered. So we should also register a global alias.
+        alias -g '@fnsuper'="$origfn"
         functions[$fn]=$body
         # ec "fn: $functions[$fn]"
+        unalias '@fnsuper'
         unalias fnsuper
 
         reval "${cmd[@]}"
@@ -84,7 +87,7 @@ function fnrep() {
     ##
 }
 
-function fnswap() {
+function fnswap {
     fnrep "$1" "$2 "'"$@"' "$@[3,-1]"
 }
 
