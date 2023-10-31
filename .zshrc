@@ -622,6 +622,7 @@ function nightsh-load-zshrc() {
   WORDCHARS="${WORDCHARS/\//}|'"
   WORDCHARS="${WORDCHARS/\#/}"
   WORDCHARS="${WORDCHARS/\./}"
+  WORDCHARS="${WORDCHARS/\-/}"
   WORDCHARS+='ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو۱۲۳۴۵۶۷۸۹۰'
 
   function backward-kill-word2() {
