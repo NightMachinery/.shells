@@ -98,6 +98,9 @@ function emc-gateway {
     if test -z "$title" ; then
         title='emc'
     fi
+    if test -z "${emacs_night_server_name}" && test -n "${EMACS_SOCKET_NAME}" ; then
+        local -x emacs_night_server_name="${EMACS_SOCKET_NAME}"
+    fi
 
     fnswap isI true tty-title "$title"
 
