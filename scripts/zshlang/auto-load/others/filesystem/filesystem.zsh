@@ -284,7 +284,9 @@ function mktemp-exact {
 }
 ##
 function windows-newlines-to-unix {
-    sd '\r\n' '\n'
+    cat-paste-if-tty |
+        sd '\r\n' '\n' |
+        cat-copy-if-tty
 }
 ##
 function find-other-writable-dirs {
