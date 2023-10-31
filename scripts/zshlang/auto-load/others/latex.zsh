@@ -7,7 +7,7 @@ function tex2png {
     dest="${tex2png_o:-$(mktemp-borg --suffix='.png')}" @TRET
     local pkgs=( ${tex2png_pkgs[@]} amsmath amssymb )
 
-    pnglatex.bash -b Transparent -P 2 -p "${(j.:.)pkgs}" -d "$dpi" -o "$dest" -f "$tex" @TRET
+    assert pnglatex.bash -b Transparent -P 2 -p "${(j.:.)pkgs}" -d "$dpi" -o "$dest" -f "$tex" @RET
 
     if isIReally ; then
         icat "$dest" >/dev/tty || true
