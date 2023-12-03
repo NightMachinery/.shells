@@ -6,12 +6,21 @@ function openai-p {
 }
 ##
 function openai-models-list {
-    curl --silent --fail -X GET \
-        "https://api.openai.com/v1/models" \
-        -H "Authorization: Bearer ${openai_api_key}" |
-        jq '.data[].id' -r
+    llm openai models
+    ##
+    # curl --silent --fail -X GET \
+    #     "https://api.openai.com/v1/models" \
+    #     -H "Authorization: Bearer ${openai_api_key}" |
+    #     jq '.data[].id' -r
+    ##
 }
 ##
+function openai-billing-remaining {
+    pxa curl -X GET https://api.openai.com/dashboard/billing/credit_grants \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer ${openai_api_key}"
+}
+
 function openai-billing-limits {
     "$proxyenv" revaldbg curl --silent --fail -X GET \
         "https://api.openai.com/dashboard/billing/subscription" \
@@ -123,7 +132,7 @@ function openai-complete-with-prompt {
 
     reval "${engine[@]}" "$prompt"
 }
-alias xc='openai-complete-with-prompt'
+# alias xc='openai-complete-with-prompt'
 ##
 # function chatgpt-postprocess {
 #     html2org |
@@ -147,10 +156,92 @@ function openai-chatgpt {
         cat-copy-if-tty
 }
 
-alias xx='\noglob openai-chatgpt'
+# alias xx='\noglob openai-chatgpt'
 ##
 function openai-token-count {
+    local model="gpt-4"
+
     in-or-args "$@" |
-        openai_token_count.py
+        reval-ec ttok -m "${model}"
+        # openai_token_count.py
+}
+## * Simon's LLM
+function llm-logs {
+    #: `llm logs list --help | less`
+    ##
+    local count="${1:-50}" opts=("${@[2,-1]}")
+    #: Use count=0 for all chats.
+
+    reval-ec llm logs list --count "${count}" "${opts[@]}" |
+        md2org |
+        emc-less-org @RET
+    emc-eval '(night/org-go-to-last-heading)'
+}
+alias llml='llm-logs'
+
+function llm-m {
+    local model="${llm_model:-gpt-3.5-turbo}"
+    local temp="${llm_temp}"
+    local system_prompt="${llm_system}"
+    local opts=() log=''
+
+    if [[ "$model" == 'continue' ]] ; then
+        model="${llm_last_model}"
+    else
+        typeset -g llm_last_model="$model"
+    fi
+
+    opts+=(-m "${model}")
+    log+="LLM Model: ${model}"
+
+    if test -n "$temp" ; then
+        opts+=(-o temperature "$temp")
+        log+=", Temperature: ${temp}"
+    fi
+
+    if test -n "${system_prompt}" ; then
+        opts+=(--system "${system_prompt}")
+        log+=$'\n'"System Prompt:"$'\t'"${system_prompt}"
+    fi
+
+    ecgray "$log"
+
+    $proxyenv revaldbg command llm "$@" "${opts[@]}" |
+        cat-copy-streaming
+}
+
+function llm-continue {
+    llm_model=continue llm-m --continue "$*"
+    #: This will re-send the prompts and responses for the previous conversation as part of the call to the language model. Note that this can add up quickly in terms of tokens, especially if you are using expensive models.
+    #: --continue will automatically use the same model as the conversation that you are continuing, even if you omit the -m/--model option.
+}
+alias llmc='\noglob llm-continue'
+alias xc='\noglob llm-continue'
+
+function llm-3t {
+    llm_model=gpt-3.5-turbo llm-m "$*"
+}
+alias l3='\noglob llm-3t'
+function llm-3t-chat {
+    llm_model=gpt-3.5-turbo llm-m chat "$@"
+}
+
+function llm-4 {
+    #: @alt =gpt-4-0314= =gpt-4-0613=
+    llm_model=gpt-4 llm-m "$*"
+}
+alias l4='\noglob llm-4'
+# alias xx='\noglob llm-4'
+function llm-4-chat {
+    llm_model=gpt-4 llm-m chat "$@"
+}
+
+function llm-4t {
+    llm_model=gpt-4-turbo llm-m "$*"
+}
+alias l4t='\noglob llm-4t'
+alias xx='\noglob llm-4t'
+function llm-4t-chat {
+    llm_model=gpt-4-turbo llm-m chat "$@"
 }
 ##
