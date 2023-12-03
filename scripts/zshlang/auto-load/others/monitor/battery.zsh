@@ -94,3 +94,17 @@ aliasfn bls battery-charge-limit-status
 aliasfn ble battery-charge-limit-enable
 aliasfn bld battery-charge-limit-disable
 ###
+function last-power-AC-get {
+  local unplugged_time
+  unplugged_time="$(pmset -g log | rg --ignore-case 'using AC\b' | tail -1 | awk '{print $1, $2, $3}')" @TRET
+
+  local unplugged_timestamp
+  unplugged_timestamp="$(gdate -d "$unplugged_time" +"%s")" @TRET
+
+  if fn-isTop ; then
+      ecgray "${unplugged_time}"
+  fi
+
+  ec "${unplugged_timestamp}"
+}
+##
