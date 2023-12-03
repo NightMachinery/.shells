@@ -203,7 +203,9 @@ function fz-createquery {
             fi
         fi
     done
-    ec "$res" | perl -lpe 's/\\/\\\\/g'
+    ec "$res" |
+        perl -lpe 's/\\ /\\\\ /g'
+        #: Whitespace needs to be quoted separately for fzf, so to match =\ =, we =\\ =.
 }
 ##
 function cat-fdz-if-tty {

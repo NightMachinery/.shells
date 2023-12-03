@@ -10,9 +10,11 @@ function lnc-epub {
     local url="$1"
     assert-args url @RET
 
-    jee
+    if isJulia ; then
+        jee
+    fi
 
-    lightnovel-crawler --all --single --format epub --suppress --source "$url"
+    $proxyenv reval-ec lightnovel-crawler --all --single --format epub --suppress --source "$url"
     # --ignore -o .
 
     if isJulia ; then

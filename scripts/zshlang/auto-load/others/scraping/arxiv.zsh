@@ -16,6 +16,7 @@ function arxiv-url-get {
     ## @global/outputs
     ids=()
     urls_pdf=()
+    urls_source=()
     urls_abs=()
     urls_vanity=()
     urls_semantic_scholar=()
@@ -77,6 +78,7 @@ function arxiv-url-get {
             fi
             ids+="$id"
             urls_pdf+="https://export.arxiv.org/pdf/${id}"
+            urls_source+="https://export.arxiv.org/e-print/${id}"
             urls_abs+="https://export.arxiv.org/abs/${id}"
             urls_vanity+="https://arxiv-vanity.com/papers/${id}"
             urls_semantic_scholar+="https://api.semanticscholar.org/arXiv:${id}"

@@ -107,11 +107,12 @@ function pxify {
     pxaify-command tsend
     # enh-pxpy tsend
 
-    # enh-pxpy subgrab
+    pxaify-command llm
 
     pxaify-fn spotdl
 
     pxaify-command subgrab
+    # enh-pxpy subgrab
 
     # keeping the shell bare-bones seem wiser
     pxify-command http # wget curl

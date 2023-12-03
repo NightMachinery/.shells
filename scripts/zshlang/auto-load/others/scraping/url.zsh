@@ -327,7 +327,7 @@ function url-size() {
     fi
 }
 ##
-function urlmeta2() {
+function urlmeta2 {
     mdoc "[html= ] $0 <url> <req> ...
 gets the requested metadata. If html is supplied, will use that. In that case, <url> is superfluous." MAGIC
 
@@ -341,6 +341,8 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
     if test -z "$html" ; then
         html=$(fhSecure="${fhSecure:-n}" full-html2 "$url") || {
             local msg="$0: full-html2 failed; fhMode: ${fhMode}, URL: $(gq "$url"), retcode: $?"
+
+            # ecerr "$msg"
             ectrace "$msg"
 
             # return 1
@@ -348,10 +350,10 @@ gets the requested metadata. If html is supplied, will use that. In that case, <
         }
     fi
 
-    <<<"$html" assert htmlmetadata $reqs[@] || {
+    <<<"$html" htmlmetadata $reqs[@] || {
         local tmp="$(gmktemp --suffix .html)"
         ec "$html" > $tmp
-        ecerr "$0: Copied input HTML to $(gq "$tmp")"
+        ecerr "$0: Failed: htmlmetadata $reqs[@]"$'\n\t'"Copied input HTML to $(gq "$tmp")"
         return 1
     }
 }

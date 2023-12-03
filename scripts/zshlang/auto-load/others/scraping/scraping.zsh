@@ -59,13 +59,16 @@ noglobfn tlwb
 ##
 function curlm {
     local nosilent="${curlm_ns}"
+    local continue_p="${curlm_continue_p:-y}"
 
     local opts=()
     if test -z "$nosilent" ; then
         opts+='--silent'
     fi
 
-    opts+=(--continue-at -) #: automatically find out where/how to resume the transfer. It uses the given output/input files to figure that out.
+    if bool "$continue_p" ; then
+        opts+=(--continue-at -) #: automatically find out where/how to resume the transfer. It uses the given output/input files to figure that out.
+    fi
 
     # cookie-jar saves cookies. I have it here to make curl activate its cookie engine.
     # --suppress-connect-headers is needed so that `curlm --head ...` requests are parseable.

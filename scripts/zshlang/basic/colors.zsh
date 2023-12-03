@@ -73,11 +73,11 @@ function color-cursor {
 function cursor-color { color-cursor "$@" }
 alias cursor-color='color-cursor' # to not increase ${#funcstack}
 
-function colorfg() { ! isColorTty || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
+function colorfg { ! isColor || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
 
-function colorbg() { ! isColorTty || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
+function colorbg { ! isColor || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
 
-function colorb() {
+function colorb {
     co_f=colorbg color "$@"
 }
 
@@ -103,16 +103,19 @@ function color {
     test -n "$nonewline" || echo
 }
 
-function resetcolor() {
-    # This var is builtin in zsh, but I guess it needs some module to be loaded
+function resetcolor {
+    #: This var is builtin in zsh, but I guess it needs some module to be loaded
     if test -z "$reset_color" ; then
         typeset -g reset_color=$'\C-[[00m'
     fi
-    ! isColorTty || printf %s "$reset_color"
+
+    if isColorTty ; then
+        printf %s "$reset_color"
+    fi
 }
-function colorreset() { resetcolor }
+function colorreset { resetcolor }
 ##
-function helloworld() {
+function helloworld {
     colorbg 0 0 255;colorfg 0 255; ec HELLO "$(colorfg 255 100)"BRAVE"$(colorfg 0 255)" $(colorbg 100 0 255)NEW$(colorbg 0 0 255) WORLD\!;resetcolor
 }
 
@@ -160,15 +163,18 @@ function random-color-arr() {
     [[ "$(randomColor.js -f rgbArray "$@")" =~ '\[(\d+),(\d+),(\d+)\]' ]] && ec "$match[@]"
 }
 ##
-function ecrainbow-n() {
+function ecrainbow-n {
     local hue="$(random-color -f hex)"
     print -nr -- "$(colorfg $(random-color-arr -l dark --hue "$hue"))$(colorbg $(random-color-arr -l light --hue "$hue"))""$@" >&2
 }
-function ecrainbow() { ecrainbow-n "$@" ; echo }
-function ecalt1() { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
-function ecalt2() { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
-function h_ecalternate() {
-    if ! isColorTty ; then
+function ecrainbow { ecrainbow-n "$@" ; echo }
+
+function ecalt1 { print -nr -- "$(colorfg 0 255 100)$(colorbg 255 255 255)${*:-EMPTY_HERE} " }
+
+function ecalt2 { print -nr -- "$(colorfg 255 255 255)$(colorbg 0 255 100)${*:-EMPTY_HERE} " }
+
+function h_ecalternate {
+    if ! isColor ; then
         ec "$(gq "$@")"
         return 0
     fi
@@ -180,18 +186,22 @@ function h_ecalternate() {
     shift 1
     $0 "$@"
 }
-function ecalternate() {
+
+function ecalternate {
     {
-        local o
-        o="$(h_ecalternate "$@")" @RET
         if isColorTty ; then
-            # Removes last whitespace  char:
-            ecn "${o[1,-7]}" ; resetcolor ; ec
+            local o
+            o="$(h_ecalternate "$@")" @RET
+
+            #: Removes last whitespace char:
+            ecn "${o[1,-2]}" ; resetcolor ; ec
+            # ecn "${o}" ; resetcolor ; ec
         else
-            ec "$o"
+            ec "$@"
         fi
     } >&2
 }
+alias ecalt='ecalternate'
 ##
 function ec-sep-h {
     ecbold $'\n''-----------'

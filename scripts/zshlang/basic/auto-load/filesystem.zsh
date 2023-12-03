@@ -174,6 +174,7 @@ function mv-merge {
 function cp-link {
     reval-ec command gcp -r --link --archive --verbose "$@"
 }
+aliasfn cpl cp-link
 ##
 function fd-exists() {
     fd -uu --ignore-case --max-results=1 "$@" | silent command rg .

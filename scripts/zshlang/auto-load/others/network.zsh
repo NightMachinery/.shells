@@ -2,13 +2,14 @@
 function curl-ip-nodns {
     assert-args lilf_ip @RET
 
-    env-clean curl --resolve lilf.ir:80:"$lilf_ip" --resolve lilf.ir:443:"$lilf_ip" https://lilf.ir/
+    reval-ec env-clean curl --resolve lilf.ir:80:"$lilf_ip" --resolve lilf.ir:443:"$lilf_ip" https://lilf.ir/
 }
 
 function curl-ip {
+    bella_zsh_disable1
+
     local opts
     opts=( --progress-bar --retry 120 --retry-delay 1 "$@" )
-
 
     local jq_opts=()
     if isColorTty ; then

@@ -333,16 +333,16 @@ function with-sharif-vpn-url-ip {
 }
 
 function sharif-vpn-login-status {
-    curl --insecure -s "${sharif_vpn_url}/status" | ggrep -oP '<td(?:\s[^>]*)?>\K.*?(?=</td>)'
+    revaldbg curl --insecure -s "${sharif_vpn_url}/status" | ggrep -oP '<td(?:\s[^>]*)?>\K.*?(?=</td>)'
 }
 
 function sharif-vpn-login {
-    curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/login" > /dev/null
+    revaldbg curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/login" > /dev/null
     sharif-vpn-login-status
 }
 
 function sharif-vpn-logout {
-    curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/logout"
+    revaldbg curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/logout"
     sharif-vpn-login-status
 }
 ##

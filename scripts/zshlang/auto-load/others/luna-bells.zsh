@@ -822,9 +822,12 @@ bell-maker sc-error 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Bro
 
 # bell-maker sc2- ''
 ###
-## Madagascar:
+## * Insaniquarium Deluxe
+bell-maker insaniquarium-sing "Insaniquarium Deluxe/sing..blue..au"
+bell-maker insaniquarium-points "Insaniquarium Deluxe/POINTS..blue..ogg"
+## * Madagascar
 bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
-## HP3:
+## * HP3
 bell-maker hp3-platform-movement 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/common/platform_movement.wav'
 
 bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 12/Dialog part 1/pc_her_Adv6_7_be careful harry..blue..wav'

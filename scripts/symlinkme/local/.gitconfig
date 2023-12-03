@@ -25,7 +25,8 @@
 	status = auto
 [http]
 	sslVerify = true
-	proxy = http://127.0.0.1:1087
+	proxy = http://127.0.0.1:2089
+	# proxy = http://127.0.0.1:1087
 	# proxy = socks5h://127.0.0.1:1081 # incompatible with git-credential-manager-core
 [pull]
 	rebase = false
@@ -61,3 +62,6 @@
 	useHttpPath = true
 [credential "https://github.com"]
 	NightMachinery = NightMachinery
+	username = NightMachinery
+[credential "https://git.overleaf.com"]
+	provider = generic

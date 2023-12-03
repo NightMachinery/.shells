@@ -844,7 +844,7 @@ function org-img-unused {
 ##
 function strip-prefixed-colons {
     in-or-args "$@" |
-        perl -CS -lpe 's/^: //g' |
+        perl -CS -lpe 's/^:(?: |$)//g' |
         cat-copy-if-tty
 }
 
