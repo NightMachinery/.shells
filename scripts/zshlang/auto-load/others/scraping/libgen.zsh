@@ -1,7 +1,9 @@
 ##
 function libgendl-md5-main {
     local md5="$1"
-    local ipfs_mirror="${libgen_ipfs:-main}"
+
+    local ipfs_mirror="${libgen_ipfs:-all}"
+    # local ipfs_mirror="${libgen_ipfs:-main}"
 
     # local mainmirror="http://93.174.95.29"
     # local mainmirror="http://31.42.184.140"
@@ -13,21 +15,45 @@ function libgendl-md5-main {
     # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
     local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
 
-    if [[ "$ipfs_mirror" == "cloudflare" || "$ipfs_mirror" == 'cf' ]] ; then
-        ipfs_mirror='cloudflare-ipfs.com/'
-    elif [[ "$ipfs_mirror" =~ '^ipfs(\.io)?$' ]] ; then
-        ipfs_mirror='ipfs.io/'
-    elif [[ "$ipfs_mirror" =~ '^infura(\.io)?$' ]] ; then
-        ipfs_mirror='infura.io/'
-    elif [[ "$ipfs_mirror" =~ '^pinata$' ]] ; then
-        ipfs_mirror='pinata.cloud/'
-    elif [[ "$ipfs_mirror" =~ '^main$' ]] ; then
-        ipfs_mirror="$mainmirror"
+    local url_patterns_include=()
+    if [[
+           # "$ipfs_mirror" == "all" ||
+           #: Cloudflare seems to be always down nowadays ...
+               "$ipfs_mirror" == "cloudflare" || "$ipfs_mirror" == 'cf' ]] ; then
+        url_patterns_include+='cloudflare-ipfs.com/'
+    fi
+    if [[ "$ipfs_mirror" == "all" || "$ipfs_mirror" =~ '^ipfs(\.io)?$' ]] ; then
+        url_patterns_include+='ipfs.io/'
+    fi
+    if [[ "$ipfs_mirror" == "all" || "$ipfs_mirror" =~ '^infura(\.io)?$' ]] ; then
+        url_patterns_include+='infura.io/'
+    fi
+    if [[ "$ipfs_mirror" == "all" || "$ipfs_mirror" =~ '^pinata$' ]] ; then
+        url_patterns_include+='pinata.cloud/'
+    fi
+    if [[ "$ipfs_mirror" == "all" || "$ipfs_mirror" =~ '^main$' ]] ; then
+        url_patterns_include+="$mainmirror"
+        url_patterns_include+=(
+            http://download.library
+            https://download.library
+        )
     fi
 
-    getlinks-c -e '\.[^/]+$' "$urls[@]" | {
+    local rg_opts=() i
+    for i in ${url_patterns_include[@]} ; do
+        rg_opts+=(-e "$i") #: OR clauses
+    done
+
+    #: '\.[^/]+$'
+    revaldbg getlinks-c -e '\.(?:'"${(j.|.)ebook_formats}"')$' "$urls[@]" | {
+        if isDbg ; then
+            tee /dev/stderr
+        else
+            cat
+        fi
+        } | {
         # The main mirror (not the IPFS ones) might get false positives if the name of the book contains a dot. We can whitelist allowed formats but that is too costly ...
-        rg -F "$ipfs_mirror"
+        revaldbg rg -F "${rg_opts[@]}"
     }
 }
 
@@ -76,7 +102,7 @@ reify libgendl-md5-main libgendl-md5-bok libgendl-md5-old libgendl-md5-bok-old l
 
 function jlibplain {
     # libgendl-md5-main "${(f@)$(re libgen2md5 "$@")}" | inargsf aa -Z
-    libgendl-md5 "${(f@)$(libgen2md5 "$@")}"
+    revaldbg libgendl-md5 "${(f@)$(libgen2md5 "$@")}"
     # serr re "libgen-cli download -o ." "${(f@)$(re libgen2md5 "$@")}"
 }
 noglobfn jlibplain

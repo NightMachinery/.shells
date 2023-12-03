@@ -76,7 +76,26 @@ function wget-dir {
 }
 ##
 function wget-multi {
+    #: @broken @GPT4 wget does NOT support doing this.
+    ##
     wgetm --continue "$@"
 }
-aliasfn dl-multi wget-multi
+function aria2-multi {
+    aa-gateway "$@"
+}
+function axel-multi {
+    #: This isn't perfect. axel prioritizes the first URLs, so if the good URLs are last, this won't help much.
+    ##
+    local opts=()
+
+    if isDbg ; then
+        opts+=(-vvvv)
+    fi
+
+    revaldbg axel --alternate "${opts[@]}" --num-connections=12 "$@"
+}
+
+# aliasfn dl-multi aria2-multi
+aliasfn dl-multi axel-multi
+#: [[https://superuser.com/questions/1819141/cli-downloaders-how-do-i-download-a-single-file-from-multiple-mirrors][wget - CLI Downloaders: How do I download a single file from multiple mirrors? - Super User]]
 ##
