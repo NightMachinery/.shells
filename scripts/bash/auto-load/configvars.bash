@@ -122,6 +122,23 @@ export nightJournal="$nightNotesPrivate/journal/j0/"
 note_formats=( txt md org )
 createglob note_formats noteglob
 ##
+typeset -ag ebook_formats=(pdf epub mobi azw azw3 azw4 txt cbz cbr djvu fb2 prc lit lrf odt pdb pml rb snb tcr)
+#: * @GPT4T
+#: - `djvu`: A format often used for scanned documents and ebooks, particularly those containing a combination of text, line drawings, and photographs.
+#: - `fb2`: FictionBook 2.0 format, an XML-based ebook format that is popular in countries where the EPUB format is not widely adopted.
+#: - `azw3`: Also known as KF8 (Kindle Format 8), it's Amazon's newer version of the AZW format that supports HTML5 and CSS3.
+#: - `azw4`: A format that is essentially a PDF wrapped in a Kindle-compatible format, often used for textbooks.
+#: - `prc`: An older ebook format that is also used on some mobile devices and e-readers.
+#: - `html` and `htmlz`: HTML is the standard markup language for documents designed to be displayed in a web browser, and it can be used for ebooks. HTMLZ is a zipped HTML ebook format.
+#: - `lit`: Microsoft's discontinued ebook format for its Microsoft Reader software.
+#: - `lrf`: Sony's proprietary format for its line of ebook readers.
+#: - `odt`: OpenDocument Text, the word processing file format of OpenOffice and LibreOffice, which can also be used for ebooks.
+#: - `pdb`: Palm Digital Media format, used on PalmOS and other devices.
+#: - `pml`: Palm Markup Language, an older ebook format used on Palm devices.
+#: - `rb`: A format used by the Rocket eBook device.
+#: - `snb`: A format used by the Shanda Bambook.
+#: - `tcr`: A text compression format for ebooks.
+#:#
 audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
 createglob audio_formats audioglob
 
