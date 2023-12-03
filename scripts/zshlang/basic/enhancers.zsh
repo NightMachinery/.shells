@@ -168,6 +168,18 @@ function paste-after-trim {
     fi
 }
 alias pt='paste-after-trim'
+
+function clipboard-paste-after {
+    local text
+    text="$(clipboard-last)" @TRET
+
+    if (( $#@ == 0 )) ; then
+        ec "$text"
+    else
+        @opts e geval @ reval-env "$@" "${text}"
+    fi
+}
+alias pcl='clipboard-paste-after'
 ##
 function enh-addfinder() {
     local sel
