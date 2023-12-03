@@ -576,3 +576,25 @@ function git-merge-p {
   test -e "$(git rev-parse --git-dir)"/MERGE_HEAD
 }
 ##
+function git-link {
+  local files=($@)
+  if (( $#@ == 0 )) ; then
+    files+='.'
+  fi
+
+  local file repo_root remote_url local github_url
+  for file in $files[@] ; do
+    repo_root="$(git-root)" @TRET
+
+    file="$(grealpath --relative-to="${repo_root}" "$file")" @TRET
+    remote_url="$(git config --get remote.origin.url)" @TRET
+    branch="$(git rev-parse --abbrev-ref HEAD)" @TRET
+    github_url="https://github.com"
+
+    # Remove .git from the end of the remote URL
+    remote_url="${remote_url%.git}"
+
+    ec "${github_url}/${remote_url#*:}/blob/${branch}/${file}"
+  done | cat-copy-if-tty
+}
+##
