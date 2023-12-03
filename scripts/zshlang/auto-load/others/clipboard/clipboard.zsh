@@ -352,3 +352,13 @@ function clipboard-send-6030 {
         socat - TCP:127.0.0.1:6030
 }
 ##
+function clipboard-tail {
+    cat $CLIPBOARD_RECORD_FILE |
+        gtail --zero-terminated "$@" |
+        prefixer -i'\x00'
+}
+
+function clipboard-last {
+    clipboard-tail -n1
+}
+##
