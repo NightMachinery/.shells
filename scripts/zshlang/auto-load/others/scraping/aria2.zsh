@@ -45,8 +45,8 @@ function aac {
 }
 ##
 function aa-raw {
-    local opts=('--stderr=true') split="${aa_split:-6}" no_split="${aaNoSplit}"
-    local browser_refer_p="${aa_browser_refer_p}"
+    local opts=('--stderr=true') split="${aa_split:-8}" no_split="${aaNoSplit}"
+    local refer_mode="${aa_refer_mode:-url}"
     #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
 
     if bool "${aa_log_p}" ; then
@@ -84,10 +84,10 @@ function aa-raw {
         opts=(--user-agent "$useragent_chrome" "${opts[@]}")
         #: --user-agent will throw an error with torrent downloads
 
-        if bool "$browser_refer_p" ; then
+        if [[ "${refer_mode}" == browser ]] ; then
             opts+=(--referer "$(browser-current-url)")
             ecgray "$0: --referer $(browser-current-url)"
-        else
+        elif [[ "${refer_mode}" == url ]] ; then
             local arg
             for arg in $@ ; do
                 if url-match "$arg" ; then
@@ -95,11 +95,28 @@ function aa-raw {
                     break
                 fi
             done
+        elif bool "${refer_mode}" ; then
+            ecerr "$0: unknown refer mode: '${refer_mode}'; aborting"
+            return 1
         fi
     fi
 
-    local cmd
-    cmd=(aria2c --seed-time=0 --max-tries=0 --retry-wait=1 --file-allocation falloc --auto-file-renaming=false --allow-overwrite=false "$opts[@]" "$@")
+    local cmd server_stats="${HOME}/.aria2_server_stats"
+    cmd=(aria2c
+         --connect-timeout="${aa_connect_timeout:-10}"
+         --timeout="${aa_timeout:-30}"
+         --seed-time=0
+         --max-tries="${aa_max_tries:-0}" --retry-wait=1
+         --file-allocation falloc
+         --auto-file-renaming=false
+         --allow-overwrite=false
+         --uri-selector=adaptive
+         #: If  adaptive is given, selects one of the best mirrors for the first and  reserved connections. For supplementary ones, it returns mirrors  which has not been tested yet, and if each of them has already been  tested, returns mirrors which has to be tested again. Otherwise, it  doesn't select anymore mirrors. Like feedback, it uses a performance  profile of servers.
+         # --uri-selector=feedback
+         #: If feedback is given, aria2 uses  download speed observed in the previous downloads and choose fastest  server in the URI list. This also effectively skips dead mirrors. The  observed download speed is a part of performance profile of servers  mentioned in --server-stat-of and --server-stat-if options.
+         "--server-stat-of=${server_stats}" "--server-stat-if=${server_stats}"
+         --server-stat-timeout=$((3600*24*365)) #: Specifies timeout in seconds to invalidate performance profile of the  servers since the last contact to them.
+         "$opts[@]" "$@")
 
     if bool "$save_invocation" ; then
         invocation-save aa "${cmd[@]}"

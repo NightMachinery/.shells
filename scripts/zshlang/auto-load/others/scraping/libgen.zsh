@@ -4,6 +4,7 @@ function libgendl-md5-main {
 
     local ipfs_mirror="${libgen_ipfs:-all}"
     # local ipfs_mirror="${libgen_ipfs:-main}"
+    # local ipfs_mirror="${libgen_ipfs:-pinata}"
 
     # local mainmirror="http://93.174.95.29"
     # local mainmirror="http://31.42.184.140"
@@ -91,7 +92,7 @@ function libgendl-md5 {
 
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
-            dl-multi $links[@] @RET
+            aa_split="${aa_split:-4}" dl-multi $links[@] @RET
         else
             ecerr "$0: No books found for md5: $md5"
             return 1

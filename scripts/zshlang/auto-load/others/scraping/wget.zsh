@@ -81,7 +81,17 @@ function wget-multi {
     wgetm --continue "$@"
 }
 function aria2-multi {
-    aa-gateway "$@"
+    ##
+    aa_refer_mode='n' \
+        aa_split="${aa_split:-12}" aaNoSplit='' \
+        aa_max_tries="${aa_max_tries:-0}" \
+        aa_timeout="${aa_timeout:-10}" \
+        aa_connect_timeout="${aa_connect_timeout:-3}" \
+        aa-gateway "$@"
+    #: The referer breaks =libgendl-md5-main=.
+    ##
+    # revaldbg command aria2c --split=8 "${@}"
+    ##
 }
 function axel-multi {
     #: This isn't perfect. axel prioritizes the first URLs, so if the good URLs are last, this won't help much.
@@ -95,7 +105,7 @@ function axel-multi {
     revaldbg axel --alternate "${opts[@]}" --num-connections=12 "$@"
 }
 
-# aliasfn dl-multi aria2-multi
-aliasfn dl-multi axel-multi
+aliasfn dl-multi aria2-multi
+# aliasfn dl-multi axel-multi
 #: [[https://superuser.com/questions/1819141/cli-downloaders-how-do-i-download-a-single-file-from-multiple-mirrors][wget - CLI Downloaders: How do I download a single file from multiple mirrors? - Super User]]
 ##
