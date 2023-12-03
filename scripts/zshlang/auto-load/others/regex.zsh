@@ -8,11 +8,22 @@ IFS=$'\n' read -r -d '' nightUrlRegex <<'EOF'
 EOF
 
 ###
-function concat() {
+function concat {
     print -nr -- "${(j..)@}"
 }
 ##
-function testre() {
+function testre {
     [[ "$2" =~ "$1" ]]
 }
+##
+function regex-escape-perl {
+    local in
+    in="$(in-or-args "$@")" @RET
+
+    ecn "$in" |
+        perl -pe '$_=quotemeta' |
+        cat-copy-if-tty
+}
+aliasfn regex-escape regex-escape-perl
+aliasfn rees regex-escape
 ##
