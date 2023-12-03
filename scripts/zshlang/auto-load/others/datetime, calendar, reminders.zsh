@@ -909,3 +909,20 @@ function reminders-old-notes-cat {
     reminders-old-cat --end-pattern '\.('"${(j.|.)note_formats}"')' "$@"
 }
 ###
+function hours-since-nat {
+    #: * @tests
+    #: ** `hours-since-nat 'last saturday 14'`
+    ##
+    local from_text="$*"
+
+    local from
+    from="$(datenat-unix "${from_text}")" @RET
+    from_formatted="$(datenat-formatted "${from_text}")" @TRET
+
+    local duration
+    duration=$((EPOCHSECONDS - from)) #: in seconds
+
+    ecgray "Since: ${from_formatted}"
+    ec $((duration / 3600))
+}
+##
