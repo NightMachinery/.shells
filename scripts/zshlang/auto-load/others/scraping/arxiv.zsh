@@ -92,6 +92,23 @@ function arxiv-url-get {
     return $retcode
 }
 
+function arxiv-source-dl {
+    #: Use =tar xf $file --directory=$name= on the downloaded files.
+    ##
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local url url_dl urls_source
+    for url in ${inargs[@]}; do
+        urls_source=()
+        assert arxiv-url-get "$url" @RET
+
+        for url_dl in ${urls_source[@]} ; do
+            reval-ec wgetm "${url_dl}"
+        done
+    done
+}
+
 function arxiv-dl {
     local url="${1}" #: Example: =https://arxiv.org/abs/2109.02355=
     assert-args url @RET
