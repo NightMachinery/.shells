@@ -168,6 +168,10 @@ function prompt-rewrite-fluent {
     prompt-instruction-input 'Make the following text more fluent:' "$@"
 }
 
+function prompt-rewrite-fluent-latex {
+    prompt-instruction-input 'Make the following text more fluent (Output LaTeX):' "$@"
+}
+
 function prompt-rewrite-fluent-orgmode {
     prompt_code_block_p=y prompt-instruction-input 'Make the following org-mode text more fluent:' "$@"
 }
@@ -390,5 +394,15 @@ EOF
         # Add the mapping for the COCO label "${coco_label}".
         # I have attached the file "ilsvrc2012_wordnet_lemmas.txt" that contains ImageNet labels.
     } |  cat-copy-if-tty
+}
+##
+function prompt-imdb-recommend {
+    ec "Recommend $*. Include their IMDB ratings (to the best of your knowledge) and the year of publication. Include a summary of each one's production, plot, and pros/cons." |
+        cat-copy-if-tty
+}
+
+function prompt-imdb-adaptations {
+    ec "List all adaptations of $* with their IMDB ratings and year of publication. Include a summary of each one's production and pros/cons." |
+        cat-copy-if-tty
 }
 ##

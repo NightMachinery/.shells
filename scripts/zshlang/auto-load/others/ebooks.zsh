@@ -1,4 +1,4 @@
-function ebook-cover() {
+function ebook-cover {
     mdocu '[<ebook>​=$jufile <output>]
 Saves the cover of the given ebook to <output>.' MAGIC
 

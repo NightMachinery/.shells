@@ -117,14 +117,17 @@ function file-unix2uri-rp {
 }
 
 function file-uri2unix {
-    local f="$1"
-    # assert-args f @RET
+    local inargs
+    in-or-args3 "$@" @RET
 
-    if [[ "$f" =~ '^file://[^/]*(/.*)$' ]] ; then
-        ec "$match[1]" | url-decode.py @TRET
-    else
-        ec "$f"
-    fi
+    local f
+    for f in ${inargs[@]} ; do
+        if [[ "$f" =~ '^file://[^/]*(/.*)$' ]] ; then
+            ec "$match[1]" | url-decode.py @TRET
+        else
+            ec "$f"
+        fi
+    done
 }
 
 function args-nochromefile() {

@@ -154,7 +154,8 @@ function pandoc-convert {
                     perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g'
 
             elif [[ "$to" == markdown ]] && bool $trim_extra ; then
-                perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g'
+                perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g' |
+                    perl -0777 -pe 's/\{ref\}(?:=)//g'
                 # trying to remove header_attributes, fenced_code_attributes, inline_code_attributes, etc
                 # @alt https://stackoverflow.com/questions/42070656/pandoc-html-to-markdown-remove-all-attributes
                 # @alt i always converted from markdown, but never to. maybe the same pattern: target+ext1-ext2. if not, maybe select another output format like markdown_strict.

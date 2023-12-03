@@ -640,6 +640,7 @@ appHotkey{ key='m', appName='mpv' }
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
 appHotkey{ key='n', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
+appHotkey{ key='j', appName='org.jdownloader.launcher' }
 
 
 hs.hotkey.bind(hyper, "d", function()

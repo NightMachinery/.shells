@@ -4,6 +4,10 @@
 # }
 alias var-show='>&2 typeset -p'
 alias typ='var-show'
+
+function var-get {
+    ec "${(P)1}"
+}
 ##
 function arger() {
     local i
@@ -25,7 +29,7 @@ function argerrainbow() {
     } >&2
 }
 
-function argerng() {
+function argerng {
     clipboard-add-quoted "$@"
 
     { test -n "$jahmode" || isColor } && ecalternate "$@" || arger "$@"
@@ -179,7 +183,7 @@ function retcode() {
 }
 alias e='retcode'
 ##
-function argerdbg() {
+function argerdbg {
     isNotDbg || {
         local errcol=("${debugcol[@]:-cyan}")
         coN=y coNr=y color "$errcol[@]" ''
@@ -187,7 +191,8 @@ function argerdbg() {
         resetcolor
     } >&2
 }
-function revaldbg() {
+
+function revaldbg {
     ecdbg "$(gq "$@")"
     argerdbg "$@"
     reval "$@"

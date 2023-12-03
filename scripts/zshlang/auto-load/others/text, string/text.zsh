@@ -118,7 +118,7 @@ function p-newline2space {
 }
 alias pns='p-newline2space'
 ##
-function char2ascii() {
+function char2ascii {
     ##
     LC_CTYPE=C printf '%d' "'${1[1]}" | cat-copy-if-tty
     ##
@@ -130,7 +130,7 @@ function char2ascii() {
     ###  C  of size (one) char.
 }
 
-function ascii2char() {
+function ascii2char {
     [ "$1" -lt 256 ] || return 1
     printf "\\$(printf '%03o' "$1")" | cat-copy-if-tty
 }
@@ -142,7 +142,7 @@ function char2unicode {
     perl -CA -le 'print ord shift' "$1" | cat-copy-if-tty
 }
 
-function unicode2char() {
+function unicode2char {
     unicode2char-hex "$(printf %08x "${1}")"
 
     ## @tests
@@ -151,7 +151,7 @@ function unicode2char() {
     ##
 }
 
-function unicode2char-hex() {
+function unicode2char-hex {
     # works with emojis
     printf "\U${1}\n" | cat-copy-if-tty
 }
