@@ -259,6 +259,16 @@ alias pa=pbadd
 function pbcopy-img-darwin {
     #: Usage: pbcopy-img <path>
     ##
+    # pbcopy "$@"
+    #: It's useless, the clipboard gets overwritten anyhow.
+
+    local i
+    for i in $@ ; do
+        i_real="$(realpath "$i")" || i_real="$i"
+        clipboard-add "${i_real}"
+    done
+    ##
+    #: =pbcopy_image.m= does not copy as text.
     pbcopy_image.m "$@"
 }
 
