@@ -395,6 +395,13 @@ aliasfn datenat-future datenat_nopast=y datenat
 aliasfn datenat-unix datenat_unix=y datenat
 aliasfn datenat-future-unix datenat_nopast=y datenat_unix=y datenat
 
+function datenat-formatted {
+    local time
+    time="$(datenat_unix=y datenat.js "$*")" @RET
+
+    gdate --date="@${time}"
+}
+
 function datenatj {
     : "GLOBAL OUT: datenatj_unix datenatj_date datenatj_datej"
 
