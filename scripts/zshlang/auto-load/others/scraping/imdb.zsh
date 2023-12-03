@@ -25,8 +25,9 @@ function imdb1() {
     imdbpy search movie --first "$*"
 }
 
-function imdb() {
-    # @publishme : needs jq, dash, awk, googler, imdbpy, pcre-enabled zsh
+function imdb {
+    #: @publishme : needs jq, dash, awk, googler, imdbpy, pcre-enabled zsh
+    ##
     local query="$* site:imdb.com"
 
     setopt local_options

@@ -100,22 +100,22 @@ function summarize-url {
         summarize-text
 }
 ##
-function rss-tl() {
-    tl -p "$rssTitle | " "$@"
+function rss-tl {
+    tlrl-tmp -p "$rssTitle | " "$@"
 }
 
 function rss-ctitle() {
     ggrep -P --silent "$rc_t[@]" <<< "$2"
 }
 
-function rss-tsend() {
+function rss-tsend {
     ensure-redis || return 1
     mkdir -p ~/logs/
     local log=~/logs/rss-tsend.log
     ensure-dir "$log"
     local log_err=~/logs/rss-tsend_err.log
     ensure-dir "$log_err"
-    local engine=("${rt_e[@]:-tl}")
+    local engine=("${rt_e[@]:-tlrl-tmp}")
     local skip_engine="$rt_skip"
     local no_title="$rt_nt"
     local get_engine=("${rt_ge[@]}")

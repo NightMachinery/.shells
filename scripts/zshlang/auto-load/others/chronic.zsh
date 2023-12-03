@@ -34,7 +34,7 @@ function chronic-update {
     fi
 
     if isLocal ; then
-        # re 'brew upgrade' googler # triggers upgrading everything, which we can't afford on weak servers
+        # re 'brew upgrade' sth # triggers upgrading everything, which we can't afford on weak servers
 
         # brew upgrade microsoft-edge @STRUE #: needs @sudo
     fi

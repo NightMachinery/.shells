@@ -7,7 +7,7 @@ alias rgpy="rgm --glob '*.py'"
 alias cleanbuffer='printf "\ec\e[3J"' # there is a similar tool in my anaconda's bin named clear.
 alias emcsave="emc-gateway -e '(save-some-buffers t)'"
 alias itunesprogress='exa -a -T -l ~/Library/iTunes/'
-alias tll="tl -e w2e-curl"
+alias tll="tlrl-ng -e w2e-curl"
 alias visudo="VISUAL=vim sudo visudo"
 ##
 alias FIY='FORCE_INTERACTIVE=y FORCE_NONINTERACTIVE="" '
@@ -113,10 +113,6 @@ alias bu='brew upgrade'
 alias bcu='brew upgrade --cask'
 alias bcrm='brew cask remove'
 alias ynow='y -f best' #No conversion
-alias ddg='ddgr --unsafe -n 6'
-alias dg='ddg --noprompt'
-alias ggg='googler -n 6'
-alias gg='ggg --noprompt'
 alias lynx="lynx -cfg=~/.lynx.cfg  --accept_all_cookies"
 alias fsayd='fsay Darkness is Paramount'
 

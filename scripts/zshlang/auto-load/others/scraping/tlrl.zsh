@@ -35,7 +35,10 @@ Options:
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
     # dact typeset -p opts argv
 
-    local title author
+    local title author out_dir
+    out_dir="${opts[-o]:-.}"
+    #: [agfi:tlrl-tmp]
+
     if false ; then
         # Old API
         silent wread "$1" html || { ecerr "tlrl-ng: wread failed with $? on url $1" ; return 33 }
@@ -51,24 +54,31 @@ Options:
     title="$( ec "${opts[-p]}${title}" | sd / _ )"
     title="${title[1,80]}"
 
-    pushf "${opts[-o]:-$HOME/tmp-kindle}"
-    we_author=$author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
-    e=$?
-    popf
-    return $e
+    pushf "${out_dir}"
+    {
+        we_author=$author eval "$(gq "${opts[-e]:-w2e-raw}" "$title" "$@")"
+    } always {
+        popf
+    }
 }
 @opts-setprefix tlrl-ng tlrl
 noglobfn tlrl-ng
+
+function tlrl-tmp {
+    tlrl-ng -o "${HOME}/tmp-kindle" "$@"
+}
+@opts-setprefix tlrl-tmp tlrl
+noglobfn tlrl-tmp
 ##
-function outlinify() {
+function outlinify {
     mapln 'https://outline.com/$1' "$@"
 }
 ##
-function wread-bat() {
+function wread-bat {
     unbuffer bat --theme OneHalfLight --pager=never --style=plain "$1" | aha --title "$(basename "$1")"
 }
 
-function tlbat() {
+function tlbat {
     uf_idem=y we_dler="wread-bat" w2e "$(basename "$1")" "$@"
 }
 ##

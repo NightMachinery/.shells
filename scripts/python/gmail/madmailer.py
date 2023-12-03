@@ -154,7 +154,7 @@ try:
                 continue
             link = match.group(1)
             print(f"Processing {link} ...")
-            kRes = z('tl -p "fic | " {link}')
+            kRes = z('tlrl-tmp  -p "fic | " {link}')
             if not kRes:
                 kRes.print(file=sys.stderr)
                 continue

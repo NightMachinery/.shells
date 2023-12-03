@@ -9,10 +9,15 @@ function realpath-relchild {
     fi
 }
 ##
-function cdm() {
-    local d="$*"
+function cdm {
+    local d="${*}"
+    if test -z "$d" ; then
+        ecerr "$0: empty input!"
+        ectrace
+        return 1
+    fi
 
-    mkdir -p -- "$d" &&
+    mkdir-m "$d" &&
         cd -P -- "$d"
 }
 ##

@@ -20,13 +20,15 @@ alias w2e-curl-wayback='we_dler=wread-curl w2e-wayback'
 ##
 alias wread-c='fhMode=curl wr_force=y wread'
 ###
-function tlarc() {
-    fhMode=curlfullshort transformer to-archive-is tl "$@"
+function tlarc {
+    fhMode=curlfullshort transformer to-archive-is tlrl-ng "$@"
 }
-function tlold() {
-    arcMode=oldest transformer to-archive-is tl "$@"
+
+function tlold {
+    arcMode=oldest transformer to-archive-is tlrl-ng "$@"
 }
-function to-archive-is() {
+
+function to-archive-is {
     doc "Warning: archive.is is quick to ban bot-like behavior."
 
     # local url="$(urlfinalg "$1")"
@@ -49,11 +51,12 @@ function to-archive-is() {
         return 1
     fi
 }
-function tlwb() {
+
+function tlwb {
     local opts urls
     opts-urls "$@"
-    # we can't use an alias because tl won't get the correct URLs then.
-    tl $opts[@] "${(@f)$(wayback-url "${urls[@]}")}"
+    # we can't use an alias because tlrl-ng won't get the correct URLs then.
+    tlrl-ng $opts[@] "${(@f)$(wayback-url "${urls[@]}")}"
 }
 noglobfn tlwb
 ##
@@ -396,13 +399,15 @@ function h2e() {
     fi
 }
 ##
-function web2epub() {
+function web2epub {
     doc usage: 'we_strict= we_retry= we_dler= we_author= title urls-in-order'
 
     local title="$1"
     title="$(ec "$title" | str2pandoc-title)"  || true
-    local u="$title $(uuidgen)"
-    cdm "$u"
+    local u
+    u="${title} $(uuidgen)" @TRET
+    assert cdm "$u" @RET
+
     local author="$(<<<${we_author:-night} str2pandoc-title)"
     local i=0
     local hasFailed=''
@@ -462,13 +467,13 @@ function str2pandoc-title {
     ec "$title"
 }
 
-function w2e-raw() {
+function w2e-raw {
     local title="$1"
     title="$(ec "$title" | str2pandoc-title)" || true
     web2epub "$title" "${@:2}" && p2k "$title.epub"
 }
 
-function w2e-o() {
+function w2e-o {
     w2e-chrome "$1" "${(@f)$(outlinify "${@:2}")}"
 }
 noglobfn w2e-o
@@ -767,16 +772,16 @@ outputs: <out::array>, stdout::newlineArray"
     arrNN "$out[@]"
 }
 
-function tlrec() {
-    doc recursive tl
-
+function tlrec {
+    #: recursive tlrl-ng
+    ##
     local opts urls
     opts-urls "$@"
     if [[ "${#urls}" != 1 ]] ; then
         ecerr "tlrec's interface supports only a single URL. (${#urls} supplied.)"
         return 1
     fi
-    getlinks-rec "$urls[1]" | inargsf tl $opts[@]
+    getlinks-rec "$urls[1]" | inargsf tlrl-ng $opts[@]
 }
 ##
 function getlinks-img() {
