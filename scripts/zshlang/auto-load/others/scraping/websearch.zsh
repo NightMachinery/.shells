@@ -1,4 +1,15 @@
-function googler-en() {
+## * @aliases
+alias ddg='ddgr --unsafe -n 6'
+alias dg='ddg --noprompt'
+# alias ggg='googler -n 6'
+# alias gg='ggg --noprompt'
+##
+function googler-en {
+    #: @deprecated =googler= is dead.
+    ##
+    ddgr-en "$@"
+    return $?
+    ##
     local ans
     ans="$(googler --tld com --lang en "$@")" || return $?
     # we need to fail proactively to activate the failsafe, ddg:
@@ -6,12 +17,23 @@ function googler-en() {
         return 1
     fi
     ec $ans
+    ##
 }
-function ddgr-en() {
-    ddgr --reg 'us-en' --unsafe "$@"
+
+function ddgr-en {
+    local ans
+    ans="$(ddgr --reg 'us-en' --unsafe "$@")" || return $?
+
+    if [[ "$ans" =~ '^\s*\[\s*\]\s*$' ]] ; then #: empty answer in json
+        return 1
+    fi
+    ec $ans
 }
-function search-json() {
-    local count="${search_json_count:-10}" ddgMode="${search_json_ddg}" query="$1"
+
+function search-json {
+    local count="${search_json_count:-10}" query="$1"
+    local ddgMode="${search_json_ddg}"
+    ddgMode=y #: =googler= is dead.
 
     local bad_google="search_json_bad_google" bad_google_val
     bad_google_val="${$(redism get "$bad_google"):-0}" || bad_google_val=0
@@ -28,8 +50,9 @@ function search-json() {
     fi
     ddg-json "$query" "$count"
 }
-function goo-g() {
-    # use -x, --exact for an exact search.
+
+function goo-g {
+    #: use -x, --exact for an exact search.
     unset goo_urls goo_titles goo_asbtracts goo_metadata
 
     local query="$*"
@@ -45,16 +68,18 @@ function goo-g() {
     goo_abstracts=("${(@0)$(<<<$search jq -re --nul-output '.[] | .abstract')}")
     goo_metadata=("${(@0)$(<<<$search jq -re --nul-output '.[] | .metadata // empty')}") || true
 }
-function goo() {
+
+function goo {
     local goo_urls goo_titles goo_asbtracts goo_metadata
     goo-g "$*" || return 1
     ec ${(F)goo_urls}
 }
-function google-quote() {
+
+function google-quote {
     mapln '"$1"' "$@"
 }
 ##
-function ffgoo() {
+function ffgoo {
     local query="$*" fz_query=''
     local count="${ffgoo_count:-${ffgoo_c:-25}}"
 

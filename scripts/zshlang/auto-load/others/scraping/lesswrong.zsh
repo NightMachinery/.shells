@@ -6,7 +6,7 @@ function w2e-lw-raw() {
 }
 
 function tllw {
-    # we can't use an alias because tl won't get the correct URLs then.
+    #: We can't use an alias because tlrl-ng won't get the correct URLs then.
     tll "${(@f)$(lw2gw "${@}")}"
 }
 noglobfn tllw
@@ -25,14 +25,14 @@ function lwseq-get {
     lw2gw "$@" | inargsf getlinks-c | command rg -F lesswrong.com/ | inargsf lw2gw
 }
 
-function lwseq() {
+function lwseq {
     mdoc "Usage: [tl options] URL ...
     Creates an ebook out of the sequences specified." MAGIC
 
     local opts
     zparseopts -A opts -K -E -D -M -verbose+=v v+ -prefix-title:=p p: -engine:=e e: -outputdir:=o o:
 
-     lwseq-get "$@" | inargsf tl -e "${opts[-e]:-w2e-curl}" -p "${opts[-p]}" -o "${opts[-o]:-./}"
+     lwseq-get "$@" | inargsf tlrl-ng -e "${opts[-e]:-w2e-curl}" -p "${opts[-p]}" -o "${opts[-o]:-./}"
 }
 noglobfn lwseq
 ##

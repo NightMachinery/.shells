@@ -559,9 +559,13 @@ function url-moddate() {
 
     curlm --head "$url" | awk '/last-modified/{print}' | gcut -d ' ' -f2-
 }
-function url-goometa() {
+
+function url-goometa {
     : "Usually contains the date."
     # https://stackoverflow.com/a/47037351/1410221
+
+    ecgray "$0: googler is dead."
+    return 0
 
     local url="${1:?URL Required}"
 
@@ -571,10 +575,11 @@ function url-goometa() {
     <<<$search jqm ' .[] | .metadata'
 }
 
-function url-date() {
+function url-date {
     local url="$1" date
 
-    date="$(url-goometa "$url")" # Google's metadata can contain irrelevant stuff, but if they usually contain the date, and are more accurate than wayback's.
+    date="$(url-goometa "$url")" || true
+    #: Google's metadata can contain irrelevant stuff, but if they usually contain the date, and are more accurate than wayback's.
     if [[ "$date" =~ '^\s*$' ]] ; then
         date="$(url-date-wayback "$url")"
     fi
