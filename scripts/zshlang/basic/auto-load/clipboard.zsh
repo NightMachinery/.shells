@@ -6,7 +6,26 @@ function cat-copy {
     ec "$inargs" # Yes, we are adding a newline here, to work around some functions which do not output their trailing newline.
     ecn "$inargs" | pbcopy
 }
-alias pc='\noglob cat-copy'
+# alias pc='\noglob cat-copy'
+
+function cat-copy-streaming {
+    local temp_file
+    temp_file="$(mktemp)" @TRET
+    {
+        if (( $#@ == 0 )) ; then
+            cat
+        else
+            # arrn "$@"
+            ecn "$*"
+        fi |
+            tee "$temp_file" | cat @RET
+
+        pbcopy < "$temp_file" @RET
+    } always {
+        silent trs-rm "$temp_file"
+    }
+}
+alias pc='\noglob cat-copy-streaming'
 
 function cat-copy-as-file {
     local suffix="${1}"
