@@ -80,11 +80,13 @@ function wget-multi {
     ##
     wgetm --continue "$@"
 }
+
 function aria2-multi {
+    #: This still doesn't work too reliably. I.e., there can be working mirrors but the download doesn't finish in a reasonable amount of time.
     ##
     aa_refer_mode='n' \
         aa_split="${aa_split:-12}" aaNoSplit='' \
-        aa_max_tries="${aa_max_tries:-0}" \
+        aa_max_tries="${aa_max_tries:-10}" \
         aa_timeout="${aa_timeout:-10}" \
         aa_connect_timeout="${aa_connect_timeout:-3}" \
         aa-gateway "$@"
@@ -93,6 +95,7 @@ function aria2-multi {
     # revaldbg command aria2c --split=8 "${@}"
     ##
 }
+
 function axel-multi {
     #: This isn't perfect. axel prioritizes the first URLs, so if the good URLs are last, this won't help much.
     ##

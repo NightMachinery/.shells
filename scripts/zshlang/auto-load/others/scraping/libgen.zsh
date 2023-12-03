@@ -2,8 +2,8 @@
 function libgendl-md5-main {
     local md5="$1"
 
-    local ipfs_mirror="${libgen_ipfs:-all}"
-    # local ipfs_mirror="${libgen_ipfs:-main}"
+    # local ipfs_mirror="${libgen_ipfs:-all}"
+    local ipfs_mirror="${libgen_ipfs:-main}"
     # local ipfs_mirror="${libgen_ipfs:-pinata}"
 
     # local mainmirror="http://93.174.95.29"
@@ -93,6 +93,7 @@ function libgendl-md5 {
         local links=( ${(@f)"$(libgendl-md5-main "$md5")"} )
         if (( ${#links} >= 1 )) ; then
             aa_split="${aa_split:-4}" dl-multi $links[@] @RET
+            #: Setting the split number too high can make the IPFS servers ban us. I don't know if setting them low can solve this issue though.
         else
             ecerr "$0: No books found for md5: $md5"
             return 1
