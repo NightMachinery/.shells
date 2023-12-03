@@ -7,8 +7,11 @@ except:
 ##
 from rich import inspect
 
+
 def h(x, **kwargs):
     return inspect(x, help=True, **kwargs)
+
+
 ##
 from datetime import datetime, timedelta
 import pathlib
@@ -24,12 +27,14 @@ logger = logging.getLogger("ipy")
 
 try:
     import numpy
+
     np = numpy
 except:
     pass
 
 try:
     import pandas
+
     pd = pandas
 except:
     pass
@@ -48,15 +53,19 @@ except ImportError:  # Graceful fallback if IceCream isn't installed.
 from functools import wraps
 from time import time
 
+
 def timing(f):
     @wraps(f)
     def wrap(*args, **kw):
         ts = time()
         result = f(*args, **kw)
         te = time()
-        print('func:%r args:[%r, %r] took: %2.4f sec' % (f.__name__, args, kw, te-ts))
+        print("func:%r args:[%r, %r] took: %2.4f sec" % (f.__name__, args, kw, te - ts))
         return result
+
     return wrap
+
+
 ###
 def char_range(c1, c2):
     """Generates the characters from `c1` to `c2`, inclusive."""
@@ -64,4 +73,21 @@ def char_range(c1, c2):
         yield chr(c)
 
 
+### * LLM
+from pynight.common_bells import bell_gpt
+from pynight.common_openai import (
+    openai_key_get,
+    setup_openai_key,
+    print_chat_streaming,
+)
+from pynight.common_openai import *
+from pynight.common_llm import (
+    chat,
+    conversations,
+    # llm_models,
+)
+from pynight.common_spacy import spacy_sentencizer, spacy_sentencizer_fa
+
+
+setup_openai_key()
 ###
