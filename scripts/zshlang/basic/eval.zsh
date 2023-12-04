@@ -126,6 +126,11 @@ function reval-withstdin {
 }
 alias rin='reval-withstdin'
 
+function reval-to {
+    local to="${1:?}" ; shift
+    reval "$@" | reval "${=to}"
+}
+
 function reval-paste {
     pbpaste | reval "$@"
 }
