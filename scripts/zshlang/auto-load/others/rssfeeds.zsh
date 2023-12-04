@@ -81,8 +81,12 @@ function summarize-text {
     fi
 
     if [[ "$mode" == 'gpt3.5' ]] ; then
+        ecgray "$0: input: ${input[1,255]}..."
+        local prompt_code_block_p=y
         ec "$input" |
-            openai_truncation_length=3400 openai-complete-with-prompt prompt-summarize-text
+            prompt-summarize-text |
+            reval-ec-env llm_max_tokens=12000 llm_token_limit_strategy=truncate llm-3t
+            # openai_truncation_length=3400 openai-complete-with-prompt prompt-summarize-text
     elif [[ "$mode" == 'sumy' ]] ; then
         ec "$input" |
             sumy-text
