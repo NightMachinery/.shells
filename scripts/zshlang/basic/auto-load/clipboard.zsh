@@ -8,7 +8,7 @@ function cat-copy {
 }
 # alias pc='\noglob cat-copy'
 
-function cat-copy-streaming {
+function cat-copy-streaming-v1 {
     local temp_file
     temp_file="$(mktemp)" @TRET
     {
@@ -24,6 +24,9 @@ function cat-copy-streaming {
     } always {
         silent trs-rm "$temp_file"
     }
+}
+function cat-copy-streaming {
+    >&1 > >(pbcopy)
 }
 alias pc='\noglob cat-copy-streaming'
 
