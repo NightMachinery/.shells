@@ -5,6 +5,56 @@ function openai-p {
     test -n "${openai_api_key}"
 }
 ##
+function openai-cost-by-tokens {
+    local model="$1"
+    local mode="${2:-input}"
+    local token_count="${3}"
+    assert-args model mode token_count @RET
+
+    if [[ "${model}" == gpt-4-1106-preview ]] ; then
+        model=gpt-4-turbo
+    elif [[ "${model}" =~ '^gpt-4(?:-0314|-0613)?$' ]] ; then
+        model=gpt-4
+    elif [[ "${model}" =~ '^gpt-3.5-turbo(?:-16k)?$' ]] ; then
+        model=gpt-3.5-turbo-1106
+    fi
+
+    #: [[https://openai.com/pricing][Pricing]]
+    typeset -A model_costs
+    if [[ "${mode}" == input ]] ; then
+        model_costs=(
+            [gpt-4-turbo]=0.01
+            [gpt-4]=0.03
+            [gpt-4-32k]=0.06
+            [gpt-3.5-turbo-1106]=0.0010
+            [gpt-3.5-turbo-instruct]=0.0015
+        )
+    elif [[ "${mode}" == output ]] ; then
+        model_costs=(
+            [gpt-4-turbo]=0.03
+            [gpt-4]=0.06
+            [gpt-4-32k]=0.12
+            [gpt-3.5-turbo-1106]=0.0020
+            [gpt-3.5-turbo-instruct]=0.0020
+        )
+    else
+        ecerr "$0: unknown mode: $mode"
+        return 1
+    fi
+
+    if [[ -n "${model_costs[$model]}" ]]; then
+        cost=$(( (${token_count} / 1000.0) * ${model_costs[$model]})) @TRET
+        if isDbg ; then
+            ecgray "$0: model: $model, mode: $mode, token_count: $token_count, cost_per_1k: ${model_costs[$model]}, total cost: $cost"
+        fi
+
+        ec "$cost"
+    else
+        ecerr "$0: unknown model: $model"
+        return 1
+    fi
+}
+##
 function openai-models-list {
     llm openai models
     ##
