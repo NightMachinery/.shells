@@ -177,7 +177,7 @@ function llm-logs {
         emc-less-org @RET
     emc-eval '(night/org-go-to-last-heading)'
 }
-alias llml='llm-logs'
+aliassafe llml='llm-logs'
 
 function llm-m {
     local model="${llm_model:-gpt-3.5-turbo}"

@@ -661,6 +661,7 @@ function org-link-browser-current {
     org-link-create "$(browser-current-url)" "$(browser-current-title)" \
         | cat-copy-if-tty
 }
+alias lbc='org-link-browser-current'
 
 function md-link-browser-current {
     org-link-browser-current "$@" |
