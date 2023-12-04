@@ -41,8 +41,13 @@ function numfmt-humanfriendly {
 }
 
 function numfmt-comma {
+    #: * @tests
+    #: ** `ec '$999.21 + $1000.0000 + $0.0001 + $0.003' | numfmt-comma`
+    #:      $999.21 + $1,000.000,0 + $0.000,1 + $0.003
+    ##
     in-or-args "$@" |
-        perl -lpe 's/(?<=\d)(?=(\d{3})+\b)/,/g' |
+        perl -lpe 's/(*plb:\.(?:\d{3}))(*pla:\d)/,/g' | #: This formats the digits after the decimal point. You can comment it to disable this.
+        perl -lpe 's/(?:(*nlb:\.\d{1,244})(*plb:\d)(*pla:(\d{3})+\b))/,/g' |
         cat-copy-if-tty
 }
 ##
