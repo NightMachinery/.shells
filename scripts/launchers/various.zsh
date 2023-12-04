@@ -23,7 +23,6 @@ tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile # miniserve
 
 # tmuxnew gost-ssh gost -L ssh://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8104
 # tmuxnew gost-wss gost -L 'http+wss://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8103'
-tmuxnew gost-relay gost -L relay+tls://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8500
 
 # tmuxnew hysteria hysteria server --config ~/hysteriav2.yaml
 ##
