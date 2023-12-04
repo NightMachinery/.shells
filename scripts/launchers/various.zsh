@@ -10,24 +10,24 @@ until silent redis-cli ping ; do ; sleep 2 ; done
 brishgarden-boot 16 /api/v1
 
 ##
-tmuxnew trojan-go trojan-go -config ~/eva_trojan_server.json
+# tmuxnew trojan-go trojan-go -config ~/eva_trojan_server.json
 ##
 # caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile # miniserve -- . #http-server
 
-tmuxnew shadowsocks-ss ss-server -c "$nightNotes/private/configs/eva/shadowsocks/ss.json" # see `man shadowsocks-libev` for config # we might also have this in systemd: `systemctl status ss8324` # needed for the old laptop
-tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
+# tmuxnew shadowsocks-ss ss-server -c "$nightNotes/private/configs/eva/shadowsocks/ss.json" # see `man shadowsocks-libev` for config # we might also have this in systemd: `systemctl status ss8324` # needed for the old laptop
+# tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
 # tmuxnewsh2 v2-socks v2ray -config $NIGHTDIR/configFiles/v2ray/socks_eva.json
 
-tmuxnew vless xray -config ~/vless.json
+# tmuxnew vless xray -config ~/vless.json
 
-tmuxnew gost-ssh gost -L ssh://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8104
+# tmuxnew gost-ssh gost -L ssh://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8104
 # tmuxnew gost-wss gost -L 'http+wss://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8103'
 tmuxnew gost-relay gost -L relay+tls://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8500
 
-tmuxnew hysteria hysteria server --config ~/hysteriav2.yaml
+# tmuxnew hysteria hysteria server --config ~/hysteriav2.yaml
 ##
-tmuxnewsh2 hi10-notify hi10-new-notify 'mahouka|Mushoku Tensei|tokyo revenger|kumo desu ga'
+# tmuxnewsh2 hi10-notify hi10-new-notify 'mahouka|Mushoku Tensei|tokyo revenger|kumo desu ga'
 ##
 #tmuxnew splash 'docker run -it -p 8050:8050 scrapinghub/splash'
 ##

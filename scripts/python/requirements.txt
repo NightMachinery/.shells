@@ -76,6 +76,7 @@ pixcat
 plumbum
 praw
 psaw
+pyjson5
 pypyp
 python-bidi
 python-jose[cryptography]
