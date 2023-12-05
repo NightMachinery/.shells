@@ -13,7 +13,11 @@ brishgarden-boot 16 /api/v1
 # tmuxnew trojan-go trojan-go -config ~/eva_trojan_server.json
 ##
 # caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
-tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
+
+tmuxnewsh2 serve-dl caddy run --config ~/caddy_private.json
+#: [[id:242cb281-7672-45ee-8779-584154c27f1c][{BUG} JSON Caddyfile: env variables are not interpolated in basicauth · Issue #5964 · caddyserver/caddy]]
+
+# tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
 # tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile
 # miniserve -- . #http-server
 ##

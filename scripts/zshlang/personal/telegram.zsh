@@ -15,7 +15,7 @@ export tlg_podcastgen='-1001222930214'
 export tlg_ch_books='-1001304139500'
 export tlg_ch_mll='-1001847212311'
 ###
-function alice() {
+function alice {
     local i="$*"
 
     local res
@@ -33,7 +33,7 @@ function alice() {
     fi
 }
 noglobfn alice
-alias al=alice #NAMECONFLICT: ../Cellar/mono/6.8.0.105/bin/al
+alias al=alice #: @NAMECONFLICT ../Cellar/mono/6.8.0.105/bin/al
 
 function alicedate {
     local rem_comingup_days="${rem_comingup_days:-14}"
