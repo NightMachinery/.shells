@@ -13,13 +13,16 @@ brishgarden-boot 16 /api/v1
 # tmuxnew trojan-go trojan-go -config ~/eva_trojan_server.json
 ##
 # caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
-tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile # miniserve -- . #http-server
-
+tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
+# tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile
+# miniserve -- . #http-server
+##
 # tmuxnew shadowsocks-ss ss-server -c "$nightNotes/private/configs/eva/shadowsocks/ss.json" # see `man shadowsocks-libev` for config # we might also have this in systemd: `systemctl status ss8324` # needed for the old laptop
 # tmuxnew wirehole "cd ~/code/wirehole && docker-compose up"
 # tmuxnewsh2 v2-socks v2ray -config $NIGHTDIR/configFiles/v2ray/socks_eva.json
 
 # tmuxnew vless xray -config ~/vless.json
+tmuxnew vless-reality xray -config ~/vless_reality_server.json
 
 # tmuxnew gost-ssh gost -L ssh://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8104
 # tmuxnew gost-wss gost -L 'http+wss://alice:unfamed-scaum-contagiosity-bimodal-anthranoyl@:8103'
