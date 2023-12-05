@@ -58,13 +58,23 @@ function fd-org {
     fd --absolute-path --extension org --extension org_archive --type f "$@"
 }
 
-function org-update-files-all() {
+function org-update-files-all {
     ##
     # fd --extension org --type f . "$nightNotes" | emc_eval_in=y emc-eval '(apply night/update-files lines)'
     ##
+    local places
+    places=(
+        "$nightNotes"
+        ~tmp/
+        ##
+        # ~cod/ #: adds about 15s
+        ~cod/uni
+        ~cod/python
+        ##
+    )
     {
         local d
-        for d in "$nightNotes" ~tmp/ ; do
+        for d in ${places[@]} ; do
             fd-org . "$d"
         done
      } | inargsf org-update-files
