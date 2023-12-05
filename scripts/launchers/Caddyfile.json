@@ -1,0 +1,441 @@
+{
+  "apps": {
+    "layer4": {
+			"servers": {
+				"example": {
+					"listen": [":443"],
+					"routes": [
+						{
+							"match": [
+								{
+									"tls": {
+										"sni": ["google.co.uk"]
+									}
+								}
+							],
+							"handle": [
+								{
+									"handler": "proxy",
+									"upstreams": [
+										{"dial": ["localhost:7001"]}
+									]
+								}
+							]
+						}
+					]
+				}
+			}
+		},
+    "http": {
+      "servers": {
+        "srv0": {
+          "listen": [
+            ":443"
+          ],
+          "routes": [
+            {
+              "match": [
+                {
+                  "host": [
+                    "garden.lilf.ir"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "authentication",
+                          "providers": {
+                            "http_basic": {
+                              "accounts": [
+                                {
+                                  "password": "{env.GARDEN_HASHED0}",
+                                  "salt": "{env.GARDEN_SALT0_B64}",
+                                  "username": "Alice"
+                                }
+                              ],
+                              "hash": {
+                                "algorithm": "scrypt"
+                              },
+                              "hash_cache": {}
+                            }
+                          }
+                        }
+                      ],
+                      "match": [
+                        {
+                          "path": [
+                            "/api/*"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "handle": [
+                        {
+                          "encodings": {
+                            "gzip": {},
+                            "zstd": {}
+                          },
+                          "handler": "encode"
+                        }
+                      ]
+                    },
+                    {
+                      "handle": [
+                        {
+                          "handler": "subroute",
+                          "routes": [
+                            {
+                              "handle": [
+                                {
+                                  "handler": "rewrite",
+                                  "strip_path_prefix": "/api/v1"
+                                }
+                              ]
+                            },
+                            {
+                              "handle": [
+                                {
+                                  "handler": "reverse_proxy",
+                                  "upstreams": [
+                                    {
+                                      "dial": "localhost:7230"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "match": [
+                        {
+                          "path": [
+                            "/api/v1/*"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "handle": [
+                        {
+                          "body": "Hello Darkness My Old Friend!",
+                          "handler": "static_response"
+                        }
+                      ],
+                      "match": [
+                        {
+                          "path": [
+                            "/api/hi/"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "handle": [
+                        {
+                          "body": "pained gold spots accumulated",
+                          "handler": "static_response"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "terminal": true
+            },
+            {
+              "match": [
+                {
+                  "host": [
+                    "files.lilf.ir"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "authentication",
+                          "providers": {
+                            "http_basic": {
+                              "accounts": [
+                                {
+                                  "password": "{env.BUNNY_HASHED}",
+                                  "username": "Bunny"
+                                }
+                              ],
+                              "hash": {
+                                "algorithm": "bcrypt"
+                              },
+                              "hash_cache": {}
+                            }
+                          }
+                        }
+                      ],
+                      "match": [
+                        {
+                          "path": [
+                            "/static/notes/*"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "handle": [
+                        {
+                          "handler": "authentication",
+                          "providers": {
+                            "http_basic": {
+                              "accounts": [
+                                {
+                                  "password": "{env.GARDEN_HASHED0}",
+                                  "salt": "{env.GARDEN_SALT0_B64}",
+                                  "username": "Alice"
+                                }
+                              ],
+                              "hash": {
+                                "algorithm": "scrypt"
+                              },
+                              "hash_cache": {}
+                            }
+                          }
+                        }
+                      ],
+                      "match": [
+                        {
+                          "path": [
+                            "/private/*"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "handle": [
+                        {
+                          "encodings": {
+                            "gzip": {},
+                            "zstd": {}
+                          },
+                          "handler": "encode"
+                        },
+                        {
+                          "browse": {},
+                          "handler": "file_server",
+                          "hide": [
+                            "*..hidden..*",
+                            "/home/eva/scripts/launchers/Caddyfile"
+                          ],
+                          "root": "{env.HOME}/Downloads"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "terminal": true
+            },
+            {
+              "match": [
+                {
+                  "host": [
+                    "www.lilf.ir"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "static_response",
+                          "headers": {
+                            "Location": [
+                              "https://lilf.ir{http.request.uri}"
+                            ]
+                          },
+                          "status_code": 302
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "terminal": true
+            },
+            {
+              "match": [
+                {
+                  "host": [
+                    "lilf.ir"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "headers",
+                          "response": {
+                            "set": {
+                              "Content-Type": [
+                                "text/plain"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "handler": "templates"
+                        },
+                        {
+                          "body": "You see there is nothing here. You're filled with determination.\n\n    Your IP: {{.RemoteIP}}",
+                          "handler": "static_response"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "terminal": true
+            }
+          ]
+        },
+        "srv1": {
+          "listen": [
+            ":8080"
+          ],
+          "routes": [
+            {
+              "match": [
+                {
+                  "path": [
+                    "/static/notes/*"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "authentication",
+                  "providers": {
+                    "http_basic": {
+                      "accounts": [
+                        {
+                          "password": "{env.BUNNY_HASHED}",
+                          "username": "Bunny"
+                        }
+                      ],
+                      "hash": {
+                        "algorithm": "bcrypt"
+                      },
+                      "hash_cache": {}
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "match": [
+                {
+                  "path": [
+                    "/private/*"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "authentication",
+                  "providers": {
+                    "http_basic": {
+                      "accounts": [
+                        {
+                          "password": "{env.GARDEN_HASHED0}",
+                          "salt": "{env.GARDEN_SALT0_B64}",
+                          "username": "Alice"
+                        }
+                      ],
+                      "hash": {
+                        "algorithm": "scrypt"
+                      },
+                      "hash_cache": {}
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "handle": [
+                {
+                  "encodings": {
+                    "gzip": {},
+                    "zstd": {}
+                  },
+                  "handler": "encode"
+                },
+                {
+                  "browse": {},
+                  "handler": "file_server",
+                  "hide": [
+                    "*..hidden..*",
+                    "/home/eva/scripts/launchers/Caddyfile"
+                  ],
+                  "root": "{env.HOME}/Downloads"
+                }
+              ]
+            }
+          ]
+        },
+        "srv2": {
+          "listen": [
+            ":8443"
+          ],
+          "routes": [
+            {
+              "match": [
+                {
+                  "host": [
+                    "android.lilf.ir",
+                    "api.android.lilf.ir",
+                    "hook.android.lilf.ir"
+                  ]
+                }
+              ],
+              "handle": [
+                {
+                  "handler": "subroute",
+                  "routes": [
+                    {
+                      "handle": [
+                        {
+                          "handler": "reverse_proxy",
+                          "upstreams": [
+                            {
+                              "dial": "localhost:8445"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "terminal": true
+            }
+          ]
+        }
+      }
+    }
+  }
+}
