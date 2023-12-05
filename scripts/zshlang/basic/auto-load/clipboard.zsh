@@ -26,7 +26,13 @@ function cat-copy-streaming-v1 {
     }
 }
 function cat-copy-streaming {
-    >&1 > >(pbcopy)
+    if (( $#@ >= 1 )) ; then
+        # arrN "$@" |
+        ecn "$*" |
+            >&1 > >(pbcopy)
+    else
+        >&1 > >(pbcopy)
+    fi
 }
 alias pc='\noglob cat-copy-streaming'
 
