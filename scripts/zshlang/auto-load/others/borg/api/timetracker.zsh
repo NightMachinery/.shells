@@ -1,9 +1,9 @@
 ##
-function borg-req() {
+function borg-req {
     curl --fail --silent --location --header "Content-Type: application/json" --data '@-' $borgEndpoint/"$@"
 }
 ##
-function borg-tt-mark() {
+function borg-tt-mark {
     local received_at="${borg_tt_mark_at}"
     if isLocal ; then
         revaldbg brishzr @opts at "$received_at" @ "$0" "$@"
