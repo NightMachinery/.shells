@@ -209,7 +209,8 @@ function prompt-translate2per {
 }
 ##
 function prompt-summarize-text {
-    prompt-instruction-input "Summarize the following document:" "$@"
+    # prompt-instruction-input "Summarize the following document." "$@"
+    prompt-instruction-input "Provide a summary of the following document, starting with a concise overview in the initial paragraph. Then, proceed with a detailed breakdown across four additional paragraphs." "$@"
 }
 
 function prompt-summarize-url {
@@ -397,8 +398,12 @@ EOF
 }
 ##
 function prompt-imdb-recommend {
-    ec "Recommend $*. Include their IMDB ratings (to the best of your knowledge) and the year of publication. Include a summary of each one's production, plot, and pros/cons." |
+    ec "Recommend $*. Include their IMDB ratings (to the best of your knowledge), the year of publication, a plot hook, the reason for recommending/disrecommending it (pros/cons)." |
         cat-copy-if-tty
+    # "Try to keep the IMDB ratings above 7."
+    #: Asking it for high IMDB scores seem to bias the model in a bad way.
+
+    # ec "Recommend $*. Include their IMDB ratings (to the best of your knowledge) and the year of publication. Include a summary of each one's production, plot, and pros/cons." |
 }
 
 function prompt-imdb-adaptations {

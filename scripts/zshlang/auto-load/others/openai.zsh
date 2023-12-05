@@ -5,6 +5,56 @@ function openai-p {
     test -n "${openai_api_key}"
 }
 ##
+function openai-cost-by-tokens {
+    local model="$1"
+    local mode="${2:-input}"
+    local token_count="${3}"
+    assert-args model mode token_count @RET
+
+    if [[ "${model}" == gpt-4-1106-preview ]] ; then
+        model=gpt-4-turbo
+    elif [[ "${model}" =~ '^gpt-4(?:-0314|-0613)?$' ]] ; then
+        model=gpt-4
+    elif [[ "${model}" =~ '^gpt-3.5-turbo(?:-16k)?$' ]] ; then
+        model=gpt-3.5-turbo-1106
+    fi
+
+    #: [[https://openai.com/pricing][Pricing]]
+    typeset -A model_costs
+    if [[ "${mode}" == input ]] ; then
+        model_costs=(
+            [gpt-4-turbo]=0.01
+            [gpt-4]=0.03
+            [gpt-4-32k]=0.06
+            [gpt-3.5-turbo-1106]=0.0010
+            [gpt-3.5-turbo-instruct]=0.0015
+        )
+    elif [[ "${mode}" == output ]] ; then
+        model_costs=(
+            [gpt-4-turbo]=0.03
+            [gpt-4]=0.06
+            [gpt-4-32k]=0.12
+            [gpt-3.5-turbo-1106]=0.0020
+            [gpt-3.5-turbo-instruct]=0.0020
+        )
+    else
+        ecerr "$0: unknown mode: $mode"
+        return 1
+    fi
+
+    if [[ -n "${model_costs[$model]}" ]]; then
+        cost=$(( (${token_count} / 1000.0) * ${model_costs[$model]})) @TRET
+        if isDbg ; then
+            ecgray "$0: model: $model, mode: $mode, token_count: $token_count, cost_per_1k: ${model_costs[$model]}, total cost: $cost"
+        fi
+
+        ec "$cost"
+    else
+        ecerr "$0: unknown model: $model"
+        return 1
+    fi
+}
+##
 function openai-models-list {
     llm openai models
     ##
@@ -177,7 +227,7 @@ function llm-logs {
         emc-less-org @RET
     emc-eval '(night/org-go-to-last-heading)'
 }
-alias llml='llm-logs'
+aliassafe llml='llm-logs'
 
 function llm-m {
     local model="${llm_model:-gpt-3.5-turbo}"
@@ -215,33 +265,106 @@ function llm-continue {
     #: This will re-send the prompts and responses for the previous conversation as part of the call to the language model. Note that this can add up quickly in terms of tokens, especially if you are using expensive models.
     #: --continue will automatically use the same model as the conversation that you are continuing, even if you omit the -m/--model option.
 }
-alias llmc='\noglob llm-continue'
+aliassafe llmc='\noglob llm-continue'
 alias xc='\noglob llm-continue'
 
+function llm-send {
+    local model="${llm_model:-gpt-3.5-turbo}"
+    local max_tokens="${llm_max_tokens:-4000}"
+    local token_strategy="${llm_token_limit_strategy:-reject}"
+
+    local input
+    if (( $#@ >= 1 )) ; then
+        input="$*"
+    else
+        input="$(cat)" @RET
+    fi
+
+    local token_count input_cost
+    token_count="$(ecn "${input}" | ttok -m "${model}")" @TRET
+
+    if (( ${token_count} > max_tokens )) ; then
+        if [[ "${token_strategy}" == 'reject' ]] ; then
+            ecerr "$0: Input (${token_strategy} tokens) exceeds the token limit of ${max_tokens} for the model ${model}."
+            return 1
+        elif [[ "${token_strategy}" == 'truncate' ]] ; then
+            input="$(ecn "${input}" | ttok -m "${model}" -t "${max_tokens}")" @TRET
+            if bool "${prompt_code_block_p}" ; then
+                input+=$'\n''```'$'\n'
+            fi
+
+            token_count="$(ecn "${input}" | ttok -m "${model}")" @TRET
+            ecgray "$0: truncated input to ${token_count} tokens"
+        else
+            ecerr "$0: Unknown token limit strategy: ${token_strategy}"
+            return 1
+        fi
+    fi
+    input_cost="$(openai-cost-by-tokens "${model}" input "${token_count}")" @TRET
+
+    ecgray '-----'
+    ecgray "${input}"
+    ecgray '-----'
+    ecgray "Input Tokens: ${token_count}" #  (\$${input_cost})
+    ecgray '-----------'
+    local output output_token_count output_cost total_cost
+    exec {fd_out}<&1
+    {
+        #: =fd_out= is a copy of stdout, which we will use to stream the output.
+        output="$(ecn "${input}" | llm_model="${model}" llm-m >&1 >&${fd_out})" @TRET
+    } always {
+        exec {fd_out}<&-
+    }
+    output_token_count="$(ecn "${output}" | ttok -m "${model}")" @TRET
+    output_cost="$(openai-cost-by-tokens "${model}" output "${output_token_count}")" @TRET
+    total_cost=$(( ${input_cost} + ${output_cost} )) @TRET
+    local n20=$(( 20 / ${total_cost} ))
+    local n20_daily=$(( n20 / 30 ))
+
+    {
+        colorfg "$gray[@]"
+
+        #: We could prefix this with another '\n', but it makes things ugly.
+        printf '-----------\nOutput Tokens: %d\nTotal Cost: $%.3f = $%.3f + $%.3f, $20 Buys: %.1f (Daily: %.1f)\n' ${output_token_count} ${total_cost} ${input_cost} ${output_cost} ${n20} ${n20_daily} |
+            numfmt-comma | cat
+        #: =numfmt-comma= will copy if its output is a tty.
+
+        resetcolor
+    } >&2
+}
+
 function llm-3t {
-    llm_model=gpt-3.5-turbo llm-m "$*"
+    llm_model=gpt-3.5-turbo-16k llm-send "$@"
 }
-alias l3='\noglob llm-3t'
+aliassafe l3='\noglob llm-3t'
 function llm-3t-chat {
-    llm_model=gpt-3.5-turbo llm-m chat "$@"
+    llm_model=gpt-3.5-turbo-16k llm-m chat "$@"
 }
+aliasfn reval-to-gpt3t reval-to llm-3t
+aliassafe rl3t='\noglob reval-to-gpt3t'
 
 function llm-4 {
     #: @alt =gpt-4-0314= =gpt-4-0613=
-    llm_model=gpt-4 llm-m "$*"
+    llm_model=gpt-4 llm-send "$@"
 }
-alias l4='\noglob llm-4'
-# alias xx='\noglob llm-4'
+aliassafe l4='\noglob llm-4'
 function llm-4-chat {
     llm_model=gpt-4 llm-m chat "$@"
 }
+aliasfn reval-to-gpt4 reval-to llm-4
+aliassafe rl4='\noglob reval-to-gpt4'
 
 function llm-4t {
-    llm_model=gpt-4-turbo llm-m "$*"
+    llm_model=gpt-4-turbo llm-send "$@"
 }
-alias l4t='\noglob llm-4t'
-alias xx='\noglob llm-4t'
+aliassafe l4t='\noglob llm-4t'
 function llm-4t-chat {
     llm_model=gpt-4-turbo llm-m chat "$@"
 }
+aliasfn reval-to-gpt4t reval-to llm-4t
+aliassafe rl4t='\noglob reval-to-gpt4t'
+
+# alias xx='\noglob llm-4'
+aliassafe xx='\noglob llm-4t'
+aliassafe xz='\noglob reval-to-gpt4t'
 ##
