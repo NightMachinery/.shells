@@ -183,6 +183,18 @@ function lastunlock-get {
 function lastunlock-get-min {
     ec $(( $(lastunlock-get "$@") / 60 ))
 }
+
+function last-idle-get-epoch {
+    last_idle_time_get
+}
+
+function last-idle-get-sec {
+    ec $(( ${EPOCHREALTIME} - $(last-idle-get-epoch) ))
+}
+
+function last-idle-get-min {
+    ec $(( $(last-idle-get-sec) / 60 ))
+}
 ##
 function load-average {
     #: 1 5 15 minutes
