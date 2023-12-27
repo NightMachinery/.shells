@@ -22,35 +22,36 @@ source ~/.bashrc
 export PATH="$PATH:/usr/local/bin"
 
 ## ** =lastunlock=
-function fromnow {
-    local then
-    then="$(gdate --date "$date" "+%s")" || return 1
-    echo $(( EPOCHSECONDS - then ))
-}
+# function fromnow {
+#     local then
+#     then="$(gdate --date "$date" "+%s")" || return 1
+#     echo $(( EPOCHSECONDS - then ))
+# }
 
-function lastunlock-get {
-    # Using lower precision helps a lot with performance
-    local precision="${1:-2h}" # can only spot the last unlock in this timeframe
+# function lastunlock-get {
+#     # Using lower precision helps a lot with performance
+#     local precision="${1:-2h}" # can only spot the last unlock in this timeframe
 
-    unset date
-    date="$(command log show --style syslog --predicate 'process == "loginwindow"' --debug --info --last "$precision" | command rg "going inactive, create activity semaphore|releasing the activity semaphore" | tail -n1 |cut -c 1-31)" || {
-        # This means the last login was before the precision set
-        echo 9999998
-        return 0
-    }
-    >&2 echo "date: $date"
+#     unset date
+#     date="$(command log show --style syslog --predicate 'process == "loginwindow"' --debug --info --last "$precision" | command rg "going inactive, create activity semaphore|releasing the activity semaphore" | tail -n1 |cut -c 1-31)" || {
+#         # This means the last login was before the precision set
+#         echo 9999998
+#         return 0
+#     }
+#     >&2 echo "date: $date"
 
-    date="$date" fromnow || {
-        echo 9999999
-        return 1
-    }
-}
-function lastunlock-get-min {
-    echo $(( $(lastunlock-get "$@") / 60 ))
-}
+#     date="$date" fromnow || {
+#         echo 9999999
+#         return 1
+#     }
+# }
+# function lastunlock-get-min {
+#     echo $(( $(lastunlock-get "$@") / 60 ))
+# }
 ## * menubar
 # Appears in the menubar YYYY-MM-DD
-echo "$(lastunlock-get-min) ¦ $(date "+%b%-m/%d")"
+printf '%d ¦ %s\n' "$(brishz.dash last-idle-get-min)" "$(date "+%b%-m/%d")"
+# printf '%02d ¦ %s\n' "$(brishz.dash last-idle-get-min)" "$(date "+%b%-m/%d")"
 echo "---"
 
 #---IR
