@@ -101,7 +101,7 @@ function ffz-get {
     ##
 
     local cd_mode="${ffz_cd}" redis_dict='zdirs_choices' nocache="$ffz_nocache"
-    if test -z "$query" ; then
+    if whitespace-p "$query" ; then
         query="$ffz_last_query"
         nocache=y
     else
@@ -176,10 +176,11 @@ function ffz {
     bella_zsh_disable1
 
     ffz_cd=y ffz-get "$@"
-    # avoid forking here, ffz-get needs to save 'ffz_last_query'
+    #: avoid forking here, ffz-get needs to save 'ffz_last_query'
 }
 aliasfn z ffz
 aliasfn zi ffz_nocache=y ffz
+#: =z= (invoked with no query) is the same as =zi=.
 ##
 function ffz-b() {
     # z-back
