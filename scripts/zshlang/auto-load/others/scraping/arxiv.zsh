@@ -92,19 +92,58 @@ function arxiv-url-get {
     return $retcode
 }
 
-function arxiv-source-dl {
+function arxiv-json {
     #: Use =tar xf $file --directory=$name= on the downloaded files.
     ##
     local inargs
     in-or-args3 "$@" @RET
 
-    local url url_dl urls_source
+    local url ids api_endpoint title
+    for url in ${inargs[@]}; do
+        ids=()
+        assert sout arxiv-url-get "$url" @RET
+
+        for id in ${ids[@]} ; do
+            api_endpoint="http://export.arxiv.org/api/query?id_list=${id}"
+            # re var-show id api_endpoint
+
+            title="$(curl -s "$api_endpoint")" @TRET
+            #  | ggrep -oPm1 "(?<=<title>)[^<]+"
+            ec "${title}" | xml2json
+        done
+    done
+}
+
+function arxiv-title {
+    arxiv-json "$@" |
+        jqm '.feed.entry.title'
+}
+
+function arxiv-source-dl {
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local url url_dl urls_source title title_fs archive
     for url in ${inargs[@]}; do
         urls_source=()
-        assert arxiv-url-get "$url" @RET
+        assert sout arxiv-url-get "$url" @RET
+
+        title="$(arxiv-title "$url")" @TRET
+        title_fs="$(str2filename "$title")" @TRET
 
         for url_dl in ${urls_source[@]} ; do
-            reval-ec wgetm "${url_dl}"
+            ##
+            # reval-ec url-filename "${url_dl}"
+            #: fails
+
+            archive="${title_fs}.tar.gz"
+            assert reval-ec wgetm --continue -O  "${archive}" "${url_dl}" @RET
+
+            mkdir-m "${title_fs}"
+            assert reval-ec gtar --directory="${title_fs}" --extract --ungzip --verbose --file="${archive}" @RET
+
+            trs "${archive}" || true
+            ##
         done
     done
 }
