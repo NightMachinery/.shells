@@ -180,4 +180,3 @@ alias rsp-safe='rsync --verbose --checksum --protect-args --human-readable --xat
 # partial-dir supports resume
 ##
 
-psource ~/.privateShell

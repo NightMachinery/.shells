@@ -22,4 +22,6 @@ PROMPT_COMMAND="builtin history -a ; builtin history -r ; ${PROMPT_COMMAND}"
 HISTSIZE=1000
 HISTFILESIZE=2000
 #: for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
+### * End
+psource ~/.privateShell
 ###
