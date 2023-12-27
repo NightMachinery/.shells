@@ -95,7 +95,7 @@ function h_luna-advanced-bell {
 
     (
         local bell_awaysh=no hear_loudidle=no i
-        if sharif-vc-is ; then
+        if sharif-vc-p ; then
             display-gray-on
 
             if true ; then
@@ -159,8 +159,26 @@ function h_luna-advanced-bell {
     ecdate "Luna iterated."
 }
 
-function sharif-vc-is {
-    [[ "$(browser-current-url)" == *"https://vc.sharif.edu/ch/"* ]]
+function sharif-vc-p {
+    {
+        browser-current-url
+        arc-current-url
+        # edge-current-url
+    } | rg --ignore-case --quiet '^https://vc.sharif.edu/ch/'
+}
+aliasfn sharif-vc-is sharif-vc-p
+
+function sharif-vc-p-v1 {
+    #: @deprecated
+    ##
+    local i
+    for i in "$(browser-current-url)" "$(arc-current-url)" ; do
+        if [[ "$i" == *"https://vc.sharif.edu/ch/"* ]] ; then
+            return 0
+        fi
+    done
+
+    return 1
 }
 
 function bell-avarice {
