@@ -64,4 +64,6 @@ function cron-commands-reboot-run {
 }
 ##
 alias rh=rehash
+### * End
+psource ~/.privateShell
 ###
