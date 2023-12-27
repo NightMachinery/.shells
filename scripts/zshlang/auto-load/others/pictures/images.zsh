@@ -48,21 +48,28 @@ function img-black2white {
 }
 @opts-setprefix img-black2white img_color2color
 ##
-function pbpaste-image() { # image-paste, imgpaste; used from night-org.el
+function pbpaste-image {
+    #: image-paste, imgpaste; used from night-org.el
+    ##
     local dest="$1" ; test -z "$dest" && {
         ecerr "$0: empty dest."
         return 1
     }
+    local format="${dest:e:l}"
     pbpaste-plus @RET
 
-    local f="$paste[1]" # We do not support multipastes at this point
+    local f="${paste[1]}" #: We do not support multipastes at this point
     if test -e "$f" ; then
         cp "$f" "$dest" @RET
     elif url-match "$f" ; then
         fhMode=curl full-html "$f" "$dest" @RET
-        # aria2 is weaker than curl, and these simple downloads don't benefit from aria2's strengths
+        #: aria2 is weaker than curl, and these simple downloads don't benefit from aria2's strengths
     else
-        pngpaste "$dest" @RET
+        if [[ "${format}" =~ '^jpe?g$' ]] ; then
+            jpgpaste "${dest}" @RET
+        else
+            pngpaste "$dest" @RET
+        fi
     fi
 }
 alias saveas-img='pbpaste-image'
