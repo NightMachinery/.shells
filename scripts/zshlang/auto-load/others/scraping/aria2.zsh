@@ -179,16 +179,16 @@ Shows you how much is downloaded at least.' ; mret
     ybase -f best "$url" -o - | tee "$name" | mpv-cache -
 }
 
-function y-stream() {
+function y-stream {
     magic mdoc 'y-stream <url>
 Alt: ys.py, y-stream-pipe' ; mret
 
     
-    local out=( "${(@f)$(memoi_expire=$((3600*24)) y --get-url --no-part -f best --get-filename -o "%(title)s.%(ext)s" "$@")}" )
-
-
+    local out
+    out=( "${(@f)$(memoi_expire=$((3600*24)) y --get-url --no-part -f best --get-filename -o "%(title)s.%(ext)s" "$@")}" ) || true
     test -n "$out[1]" || { ecerr Could not get video\'s url. Aborting. ; return 1 }
     test -n "$out[2]" || { ecerr Could not get video\'s name. Aborting. ; return 1 }
+
     local name="$out[2]"
     local tmuxname="$(<<<$out[2] str2tmuxname)"
     local dlurl="$out[1]"
@@ -206,8 +206,11 @@ Alt: ys.py, y-stream-pipe' ; mret
             ecerr Not big enough yet
             sleep 1
         done
-        mpv-stream "$name"
-    } always { tmuxzombie $tmuxname }
+        reval-ec mpv-stream "$name"
+    } always {
+        ecgray "$0: You can stop the download with:"$'\n\t'"tmuxzombie $tmuxname"
+        # reval-ec tmuxzombie $tmuxname
+    }
     return $?
 
     # ## new

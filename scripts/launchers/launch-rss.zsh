@@ -10,7 +10,7 @@ typeset -A podcasts
 podcasts['techmeme']='https://rss.art19.com/techmeme-ridehome'
 podcasts['Machine Learning Street Talk']='https://anchor.fm/s/1e4a0eac/podcast/rss'
 
-tmuxnewshenv="rt_skip='$rt_skip' rt_e=(@opts dest '$tlg_podcastgen' @ podcast2tel) rt_notel=y rt_ge=( rsstail -i 120 -e -n 3 -N ) rt_eud=0" tmuxnewsh rss-podcastgen rss-tsend ${(@v)podcasts}
+# tmuxnewshenv="rt_skip='$rt_skip' rt_e=(@opts dest '$tlg_podcastgen' @ podcast2tel) rt_notel=y rt_ge=( rsstail -i 120 -e -n 3 -N ) rt_eud=0" tmuxnewsh rss-podcastgen rss-tsend ${(@v)podcasts}
 ## uni
 # tmuxnewshenv="rt_skip='$rt_skip' rt_e=(amar-process) rt_notel=y rt_ge=(withchrome getlinks-uniq -e '/session/id/video/') rt_nt=y rt_eid=$((3600*3)) rt_eud=0" tmuxnewsh rss-ocwvids rss-tsend 'http://ocw.sharif.edu/course/id/224'
 ##

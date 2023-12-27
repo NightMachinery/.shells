@@ -32,7 +32,7 @@ function reval-confirm {
     fi
 }
 
-function reval-ec() {
+function reval-ec {
     ## old implementation:
     # ge_no_hist=y rgeval "$@"
     ##

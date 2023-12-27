@@ -256,7 +256,9 @@ function str-normalize2 {
 }
 
 function newline-normalize {
-    perl -0777 -pe 's/\R/\n/g'
+    cat-paste-if-tty |
+        perl -0777 -pe 's/\R/\n/g' |
+        cat-copy-if-tty
 }
 ##
 function str-bad-characters-rm {

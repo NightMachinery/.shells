@@ -1,5 +1,5 @@
 ###
-ensure-redis() {
+function ensure-redis {
     (( ${+commands[redis-cli]} )) || {
         ecerr "redis-cli not found. Have you installed redis?"
         return 2
@@ -9,6 +9,9 @@ ensure-redis() {
         ecerr '`redis-cli ping` failed. Please make sure redis is up.'
         return 1
     }
+}
+function redis-assert {
+    ensure-redis "$@"
 }
 
 function redism {

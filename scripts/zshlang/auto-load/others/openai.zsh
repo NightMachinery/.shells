@@ -270,6 +270,8 @@ alias xc='\noglob llm-continue'
 
 function llm-send {
     local model="${llm_model:-gpt-3.5-turbo}"
+    typeset -g llm_last_model="$model"
+
     local max_tokens="${llm_max_tokens:-4000}"
     local token_strategy="${llm_token_limit_strategy:-reject}"
 
@@ -277,7 +279,7 @@ function llm-send {
     if (( $#@ >= 1 )) ; then
         input="$*"
     else
-        input="$(cat)" @RET
+        input="$(cat-paste-if-tty)" @RET
     fi
 
     local token_count input_cost
@@ -366,5 +368,5 @@ aliassafe rl4t='\noglob reval-to-gpt4t'
 
 # alias xx='\noglob llm-4'
 aliassafe xx='\noglob llm-4t'
-aliassafe xz='\noglob reval-to-gpt4t'
+aliassafe xz='\noglob reval-to-gpt4t' #: @nameConflict xz, unxz, xzcat, lzma, unlzma, lzcat - Compress or decompress .xz and .lzma  files
 ##

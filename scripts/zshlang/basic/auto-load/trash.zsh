@@ -11,7 +11,7 @@ function trs {
             if (( ${+commands[rip]} )) ; then
                 assert reval-ec rip -- "$i" @RET
             elif (( ${+commands[trash]} )) ; then
-                assert reval-ec command trash -- "$i" @RET # bloody slow
+                assert reval-ec command trash -- "$i" @RET #: bloody slow
             else
                 ecgray "WARNING: 'trash' or 'rip' commands not found, switching to 'rm'."
 

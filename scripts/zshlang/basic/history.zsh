@@ -1,12 +1,12 @@
-function hist-add-unquoted() {
+function hist-add-unquoted {
     print -r -S -- "$*"
 }
-function hist-add() {
+function hist-add {
     print -r -S -- "$(gq "$@")"
 }
 alias hist-add-self='hist-add "$0" "$@"'
 ##
-function hist-last() {
+function hist-last {
     local from="${1:-1}"
     local to="$from"
 
@@ -30,21 +30,21 @@ function hist-last() {
     ##
 }
 ##
-function seal-history-append() {
+function seal-history-append {
     assert test -e "$UHIST_FILE" @RET
 
     sync-append "$UHIST_FILE" $'\n'"${*}"$'\n'
 }
 
-function seal-history-unquoted() {
+function seal-history-unquoted {
     seal-history-append "hist-add-unquoted $(gq "$*")"
 }
 
-function seal-history() {
+function seal-history {
     seal-history-append "hist-add $(gq "$@")"
 }
 
-function seal-history-literal-fc() {
+function seal-history-literal-fc {
     local line="$(hist-last 0)"
     if [[ "$line" =~ '^\s*(?:dbg\s+)?(?:(?:[^#]*#+)|shl|seal-history-literal)\s+((?:.|\n)*)\s*$' ]] ; then
         local cmd="$match[1]"
@@ -62,7 +62,7 @@ alias shl='seal-history-literal-fc # '
 # this hack works only on a single line, as '#' is single-line only
 # use 'seal-history-literal' itself for multiline commands and quote expansions accordingly
 ##
-function hist-add-universal-unquoted() {
+function hist-add-universal-unquoted {
     # the history file will get created automatically, but let's check its existence to avoid creating it when the notes repo is not present:
     assert test -e "$UHIST_FILE_FC" @RET
 
@@ -74,22 +74,22 @@ function hist-add-universal-unquoted() {
     hist-add-unquoted "$@"
 }
 
-function hist-add-universal() {
+function hist-add-universal {
     hist-add-universal-unquoted "$(gq "$@")"
 }
 
-function seal-history-last-fc() {
+function seal-history-last-fc {
     reval-ec hist-add-universal-unquoted "$(hist-last 1)"
 }
 alias shla='seal-history-last-fc'
 ##
-function hist-inject() {
+function hist-inject {
     assert test -e "$UHIST_FILE" @RET
 
     source "$UHIST_FILE"
 }
 
-function hist-inject-fc() {
+function hist-inject-fc {
     assert test -e "$UHIST_FILE_FC" @RET
 
     builtin fc -R -I "$UHIST_FILE_FC"

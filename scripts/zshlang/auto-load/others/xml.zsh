@@ -1,5 +1,7 @@
 ##
 function xml2json {
-    xml2json.py
+    local json
+    json="$(xml2json.py)" @RET
+    ec "$json" | jq .
 }
 ##

@@ -314,13 +314,14 @@ function url-filename() {
         }
 }
 
-function url-size() {
+function url-size {
     local size
     size="$(curlm --head "$@" | rget '^content-length\S*\s*(\d+)' | gtail -n 1)" || return $?
     # if redirects are present a URL can have multiple content-lengths, hence the tailing
 
     # test -z "$size" && return 1 # rget ensures it
     if isOutTty ; then
+        dact var-show size
         ec "$size" | numfmt-humanfriendly-bytes
     else
         ec "$size"
@@ -439,64 +440,65 @@ Set cleanedhtml=no to disable adding the reading estimate. (This improves perfor
     fi
 
     local indent="    "
-    if [[ "$mode" == md ]] ; then
-        if true; then
-            ec "[${title:-$url}]($url)"
-        else
-            ec "* [${title:-$url}]($url)"
-            test -z "$author" || ec "${indent}* By: $author"
-            test -z "$readest" || ec "${indent}* $readest"
-            test -z "$desc" || ec "${indent}* $desc"
-            #test -z "$title" || ec "${indent}* $url"
-            test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
-        fi
-    elif [[ "$mode" == org ]] ; then
-        if bool "$emacsMode" ; then
-            # we insert the links with the heading already created in emacs.
-            indent=""
-            ec "[[$(ec $url| url-encode.py)][${title:-$url}]]"
-        else
-            indent="** "
-            ec "* [[$(ecn $url| url-encode.py)][${title:-$url}]]"
-
-            test -n "$author" && ec "${indent}By: $author"
-            test -n "$readest" && ec "${indent}$readest"
-            test -n "$desc" && ec "${indent}$desc"
-        fi
-        ##
-        if test -n "$imgMode" && test -n "$img" ; then
-            # ec "${indent}[[img$img]]"
-            ##
-            local ext="${${img:e}:-png}"
-            local tmp
-            tmp="$(gmktemp --suffix=".${ext}")" @TRET
-
-            local imgdir="$org_img_dir"
-            mkdir -p "$imgdir"
-            if silent wgetm "$img" -O "$tmp" ; then
-                local name="$(md5-file "$tmp").$ext"
-                local imgpath="${imgdir}/$name"
-                assert command gmv "$tmp" "$imgpath" @RET
-                local img_path_rel
-                img_path_rel="$(grealpath --relative-to "$imgdir" "$imgpath")" @TRET
-                ec "#+ATTR_HTML: :width 900"
-                ec "[[org_image_dir:$(org-escape-link ${img_path_rel})]]" @TRET
+    {
+        if [[ "$mode" == md ]] ; then
+            if true; then
+                ec "[${title:-$url}]($url)"
             else
-                ecerr "$0: Failed to download: $img"
+                ec "* [${title:-$url}]($url)"
+                test -z "$author" || ec "${indent}* By: $author"
+                test -z "$readest" || ec "${indent}* $readest"
+                test -z "$desc" || ec "${indent}* $desc"
+                #test -z "$title" || ec "${indent}* $url"
+                test -n "$imgMode" && test -n "$img" && ec '![]'"($img)"
             fi
+        elif [[ "$mode" == org ]] ; then
+            if bool "$emacsMode" ; then
+                # we insert the links with the heading already created in emacs.
+                indent=""
+                ec "[[$(ec $url| url-encode.py)][${title:-$url}]]"
+            else
+                indent="** "
+                ec "* [[$(ecn $url| url-encode.py)][${title:-$url}]]"
+
+                test -n "$author" && ec "${indent}By: $author"
+                test -n "$readest" && ec "${indent}$readest"
+                test -n "$desc" && ec "${indent}$desc"
+            fi
+            ##
+            if test -n "$imgMode" && test -n "$img" ; then
+                # ec "${indent}[[img$img]]"
+                ##
+                local ext="${${img:e}:-png}"
+                local tmp
+                tmp="$(gmktemp --suffix=".${ext}")" @TRET
+
+                local imgdir="$org_img_dir"
+                mkdir -p "$imgdir"
+                if silent wgetm "$img" -O "$tmp" ; then
+                    local name="$(md5-file "$tmp").$ext"
+                    local imgpath="${imgdir}/$name"
+                    assert command gmv "$tmp" "$imgpath" @RET
+                    local img_path_rel
+                    img_path_rel="$(grealpath --relative-to "$imgdir" "$imgpath")" @TRET
+                    ec "#+ATTR_HTML: :width 900"
+                    ec "[[org_image_dir:$(org-escape-link ${img_path_rel})]]" @TRET
+                else
+                    ecerr "$0: Failed to download: $img"
+                fi
+            fi
+            ##
+        elif [[ "$mode" == html ]] ; then
+            test -z "$title" || ec "<h1>${title}</h1>"
+            ec "<p>$url</p>"
+            test -z "$author" || ec "<p>By: $author</p>"
+            test -z "$readest" || ec "<p>${readest}</p>"
+            test -z "$desc" || ec "<p>Description: $desc</p>"
+            test -n "$imgMode" && test -n "$img" && ec "<img src=\"$img\" />"
+        elif [[ "$mode" == none ]] ; then
+
         fi
-        ##
-    elif [[ "$mode" == html ]] ; then
-        test -z "$title" || ec "<h1>${title}</h1>"
-        ec "<p>$url</p>"
-        test -z "$author" || ec "<p>By: $author</p>"
-        test -z "$readest" || ec "<p>${readest}</p>"
-        test -z "$desc" || ec "<p>Description: $desc</p>"
-        test -n "$imgMode" && test -n "$img" && ec "<img src=\"$img\" />"
-    elif [[ "$mode" == none ]] ; then
-
-    fi
-
+    } | cat-copy-if-tty
 }
 noglobfn url2note
 

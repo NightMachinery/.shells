@@ -242,7 +242,7 @@ function h_gss_tail() {
   done
 }
 
-function git-commitmsg() {
+function git-commitmsg {
   ## alts
   # git diff --cached --diff-filter='M' --name-only # gives names of modified files
   ##

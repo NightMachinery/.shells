@@ -16,7 +16,7 @@ function browser-recording-postprocess {
         gmv --verbose "$f" "$name" @RET
     fi
 
-    local path_fixed="${name:r}_fixed.mp4"
+    local path_fixed="${name:r}_FU.mp4" #: fixed, uncompressed
     vid-fix "$name" "$path_fixed" @RET
     command yes n | trs "$name"
 

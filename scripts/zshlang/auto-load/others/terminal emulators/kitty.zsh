@@ -118,6 +118,8 @@ function kitty-is-focused() {
 }
 ##
 function kitty-launch-emc {
+    retry ensure-redis @RET
+
     kitty-remote launch '--type=tab' "${commands[zsh]}" -c "proxy_disabled=$proxy_disabled fnswap isColor true retry-limited 2 $@ emc-gateway"
     # The retry is to work around the recent emacs/doom issue that kills the starting frame (and sometimes all the frames, when doom themes are used).
     ##

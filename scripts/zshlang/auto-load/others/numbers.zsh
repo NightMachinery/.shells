@@ -29,7 +29,10 @@ function numfmt-humanfriendly-bytes {
     local inargs
     in-or-args3 "$@" @RET
 
-    numfmt --to=iec-i --suffix=B "${inargs[@]}"
+    local i
+    for i in ${inargs[@]} ; do
+        numfmt --to=iec-i --suffix=B "$i"
+    done
 }
 aliasfn numfmt-bytes numfmt-humanfriendly-bytes
 

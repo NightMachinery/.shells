@@ -77,7 +77,7 @@ function preamble-coding-rewriter {
 }
 ##
 function prompt-coding-rewrite-performant {
-    prompt_code_block_p=y prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.'
+    prompt_code_block_p=y prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.' "$@"
 }
 ##
 function prompt-coding-correct-mistakes {
@@ -157,7 +157,7 @@ function prompt-web-define-tex {
 }
 
 function prompt-tex2plain {
-    prompt_code_block_p=y prompt-instruction-input 'Convert the following document from LaTeX into plain text.'
+    prompt_code_block_p=y prompt-instruction-input 'Convert the following document from LaTeX into plain text.' "$@"
 }
 ##
 function prompt-correct-grammar {
@@ -182,6 +182,14 @@ function prompt-rewrite-fluent-orgbeamer {
 
 function prompt-rewrite-fluent-selective {
     prompt-instruction-input 'Make the following text more fluent by editing the part marked with `{ ... }`:' "$@"
+}
+
+function prompt-rewrite-stackoverflow {
+    prompt_code_block_p=y prompt-instruction-input 'Rewrite the following question for Stackoverflow. Be concise, to the point, but detailed.' "$@"
+}
+##
+function prompt-write-exercise-descpription {
+    prompt_code_block_p=y prompt-instruction-input 'The following is a practical exercise for a course. Write its description for the students.' "$@"
 }
 ##
 function prompt-issue-rewrite {
@@ -284,6 +292,10 @@ function prompt-explain-stacktrace {
 aliasfn xss prompt-explain-stacktrace
 ##
 function prompt-code-complete {
+    prompt_code_block_p=y prompt-instruction-input "Complete the given code with complete, production-ready, code. Output in a code block. Don't output anything else." "$@"
+}
+
+function prompt-code-complete-3 {
     prompt_code_block_p=y prompt-instruction-input "Give three likely completions for the following code snippet. Output each candidate completion in a code block. Don't output anything else. Your completions should be complete, production-ready code." "$@"
 }
 
@@ -312,40 +324,40 @@ function prompt-learn-papers {
 }
 ##
 function prompt-rewrite-formal {
-    prompt_code_block_p=y prompt-instruction-input "Rewrite the following in a formal manner."
+    prompt_code_block_p=y prompt-instruction-input "Rewrite the following in a formal manner." "$@"
 }
 ##
 function prompt-2json {
-    prompt_code_block_p=y prompt-instruction-input "Convert the following data into JSON:"
+    prompt_code_block_p=y prompt-instruction-input "Convert the following data into JSON:" "$@"
 }
 ##
 function prompt-2jax {
-    prompt_code_block_p=y prompt-instruction-input "Rewrite the following code to use JAX (Flax) instead."
+    prompt_code_block_p=y prompt-instruction-input "Rewrite the following code to use JAX (Flax) instead." "$@"
 }
 ##
 function prompt-tests-gen {
-    prompt_code_block_p=y prompt-instruction-input "Write tests for the following code."
+    prompt_code_block_p=y prompt-instruction-input "Write tests for the following code." "$@"
 }
 
 function prompt-tests-gen-human {
-    prompt_code_block_p=y prompt-instruction-input "Write tests for the following code. These tests should print the computed results along with the expected result. The tests are intended for manual human inspection."
+    prompt_code_block_p=y prompt-instruction-input "Write tests for the following code. These tests should print the computed results along with the expected result. The tests are intended for manual human inspection." "$@"
 }
 
 function prompt-examples-gen {
-    prompt_code_block_p=y prompt-instruction-input "Write examples of using the following code."
+    prompt_code_block_p=y prompt-instruction-input "Write examples of using the following code." "$@"
 }
 #
 ##
 function prompt-org2md {
-    prompt_code_block_p=y prompt-instruction-input "Convert the following from org-mode to markdown:"
+    prompt_code_block_p=y prompt-instruction-input "Convert the following from org-mode to markdown:" "$@"
 }
 ##
 function prompt-2bash {
-    prompt_code_block_p=y prompt-instruction-input "Convert the following code into Bash:"
+    prompt_code_block_p=y prompt-instruction-input "Convert the following code into Bash:" "$@"
 }
 
 function prompt-zsh2bash {
-    prompt_code_block_p=y prompt-instruction-input "Convert the following code from Zsh into Bash:"
+    prompt_code_block_p=y prompt-instruction-input "Convert the following code from Zsh into Bash:" "$@"
 }
 ##
 function prompt-code-rewrite-idiomatic {
@@ -409,5 +421,13 @@ function prompt-imdb-recommend {
 function prompt-imdb-adaptations {
     ec "List all adaptations of $* with their IMDB ratings and year of publication. Include a summary of each one's production and pros/cons." |
         cat-copy-if-tty
+}
+##
+function prompt-ocr-correct {
+    prompt_code_block_p=y prompt-instruction-input 'Please find below the output of an OCR. Correct any errors that the OCR may have introduced into the following output text. Correct whitespace mistakes, too. Only output the corrected text in a code block.' "$@"
+}
+##
+function prompt-2en-solve-exercise {
+    prompt_code_block_p=y prompt-instruction-input 'First translate the following problem statement to English. Then solve it.' "$@"
 }
 ##

@@ -1,7 +1,7 @@
 ###
 alias nohistory='unset HISTFILE' #disables history for current session
 
-function history-enable() {
+function history-enable {
     if test -z "$history_enable_nowarn" ; then
         ecerr "$0: Beware that this will still persist the history items before this was called"
     fi

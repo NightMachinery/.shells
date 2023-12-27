@@ -15,25 +15,37 @@ export tlg_podcastgen='-1001222930214'
 export tlg_ch_books='-1001304139500'
 export tlg_ch_mll='-1001847212311'
 ###
-function alice {
+function h-alice {
     local i="$*"
 
     local res
-    if res="$(borg-tt-mark "$i")" && test -n "$res" ; then # brishzr is invoked for 'borg-tt-mark' on isLocal automatically
+    if res="$(borg-tt-mark "$i")" && test -n "$res" ; then #: brishzr is invoked for 'borg-tt-mark' on isLocal automatically
         ec "$res"
         bell-pp-electricity
         @opts dur 10 @ alert "$res"
         # ec "Alicized successfully: $i"
-        true
+
+        return 0
     else
-        ec "$res"
+        return 1
+    fi
+}
+
+function alice {
+    local retires="${alice_retries:-10}"
+
+    if retry-limited "${retries}" h-alice "$@" ; then
+        return 0
+    else
         ecdate-err "Alicization failed"'!'
         redo2 2 tts-glados1-cached Alicization has failed
         return 1
     fi
+
 }
+
 noglobfn alice
-alias al=alice #: @NAMECONFLICT ../Cellar/mono/6.8.0.105/bin/al
+alias al=alice #: @nameConflict ../Cellar/mono/6.8.0.105/bin/al
 
 function alicedate {
     local rem_comingup_days="${rem_comingup_days:-14}"
