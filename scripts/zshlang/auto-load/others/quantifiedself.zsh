@@ -1,4 +1,17 @@
 ##
+function '/o' {
+    local since="${1:-last saturday 12:45PM}"
+    local hours
+    if [[ "${since}" =~ '^\d+$' ]] ; then
+        hours="${since}"
+    else
+        ecgray "$0: since: ${since}"
+        hours="$(hours-since-nat ${since})" @TRET
+    fi
+
+    reval-ec al "/o${hours}"
+}
+##
 function by-freq {
     : "-r, --reverse"
 
