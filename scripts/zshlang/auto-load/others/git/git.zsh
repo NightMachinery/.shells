@@ -36,22 +36,31 @@ alias gbsr='git bisect reset'
 alias gbss='git bisect start'
 
 alias gc='git commit -v'
-alias gc!='git commit -v --amend'
-alias gcn!='git commit -v --no-edit --amend'
+alias 'gc!'='git commit -v --amend'
+alias 'gcn!'='git commit -v --no-edit --amend'
 alias gca='git commit -v -a'
-alias gca!='git commit -v -a --amend'
-alias gcan!='git commit -v -a --no-edit --amend'
-alias gcans!='git commit -v -a -s --no-edit --amend'
+alias 'gca!'='git commit -v -a --amend'
+alias 'gcan!'='git commit -v -a --no-edit --amend'
+#: - `--no-edit`: This flag is used in conjunction with the `--amend` option. It tells Git to use the commit message from the previous commit without launching the commit message editor. Typically when you amend a commit, Git opens the editor so you can modify the existing commit message, but `--no-edit` bypasses this, keeping the original message intact.
+
+# alias 'gcans!'='git commit -v -a -s --no-edit --amend'
 alias gcam='git commit -a -m'
-alias gcsm='git commit -s -m'
+# alias gcsm='git commit -s -m'
+
+function h-gcm {
+  git commit -m "$*"
+}
+alias gcm='\noglob h-gcm'
+# alias gcm='git commit -m'
+# alias gcmsg='git commit -m'
+
 alias gcb='git checkout -b'
 alias gcf='git config --list'
 alias gcl='git clone --recursive'
-alias gclean='git clean -fd'
-alias gcm='git checkout master'
-alias gcd='git checkout develop'
-alias gcmsg='git commit -m'
+# alias gclean='git clean -fd'
 alias gco='git checkout'
+# alias gcm='git checkout master'
+# alias gcd='git checkout develop'
 alias gcount='git shortlog -sn'
 ##
 # alias gcp='git cherry-pick'
@@ -272,6 +281,14 @@ function git-commitmsg {
     fi
   fi
 }
+
+function git-commit-with-auto-msg {
+  local msg
+  msg="${$(git-commitmsg)}" @RET
+
+  reval-ec git commit -m "${msg}"
+}
+alias gcauto='git-commit-with-auto-msg'
 ##
 function git-branch-name() {
   # @see `git symbolic-ref HEAD`
