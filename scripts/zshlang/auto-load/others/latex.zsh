@@ -15,81 +15,150 @@ function tex2png {
 }
 alias xt='\noglob silence tex2png' #: =\= still needs escaping
 ##
-function latex-url-escape {
-    cat-paste-if-tty |
+function latex-escape {
+    in-or-args "$@" |
         perl -pe 's/([\#\$\%\&\~\_\^\\\{\}])/\\$1/g' |
         cat-copy-if-tty
 }
+aliasfn latex-url-escape latex-escape
 ##
 function pdflatex-m {
+    local autodir="${pdflatex_autodir:-n}"
+    local var_escaper
+    #: [[id:a7185750-2d2e-4b83-af93-94ffdc9fb07e][latex/escaping]]
+    var_escaper=(ec)
+    # var_escaper=(lisp-quote)
+    # var_escaper=(latex-escape)
+
     local opts=("${@[1,-2]}") f="${@[-1]}"
     if ! [[ "$f" =~ '\.tex$' ]] ; then
         f+='.tex'
     fi
     # f="$(grealpath "$f")" @TRET
     assert-args f @RET
-    local name="${f:r:t}" name_tmp
-
-    local cv_p='n'
-    if [[ "$name" =~ '^CV.*' ]] ; then
-        ecgray "$0: CV Mode"
-
-        cv_p=y
+    local f_dir="${f:h}" name="${f:r:t}" name_tmp
+    if bool "${autodir}" ; then
+        reval-ec pushf "${f_dir}"
     fi
-
-    local cv_dir
-    cv_dir="${nightNotes}/private/subjects/resume, CV"
-
-    typeset -A tex_vars=()
-    if (( ${#latex_vars} > 0 )) ; then
-        tex_vars=("${latex_vars[@]}") #: [key var] ...
-    fi
-
-    local tex=""
-    if ! isDeus ; then
-        tex+="\pdfcompresslevel=0
-\pdfobjcompresslevel=0"$'\n'
-    fi
-
-    tex+="\def\mypwd{${f:h}}"$'\n'
-
-    if bool "${cv_p}" ; then
-        tex+="\def\CVDir{${cv_dir}}"$'\n'
-
-        assert gcp -v "${cv_dir}/"*.bib . @RET
-    fi
-
-    for k in ${(k@)latex_vars} ; do
-        tex+="\def\${k}{${latex_vars[$k]}}"$'\n'
-    done
-
-    tex+="\input{\"${f}\"}"$'\n'
-    #: path with spaces needs to be quoted for \input
-
-    local tex_f
-    tex_f="$(gmktemp --suffix='.tex')" @TRET
-    name_tmp="${tex_f:t:r}"
-    ec "$tex" > "$tex_f" @RET
-
-    # dact emc "$tex_f"
-
-    opts+=(-jobname="${name_tmp}")
-
     {
-        #: [[https://tex.stackexchange.com/questions/450863/using-bibtex-with-pdflatex][pdftex - Using BibTex with pdfLaTeX - TeX - LaTeX Stack Exchange]]
-        assert reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+        local cv_p='n'
+        if [[ "$name" =~ '^CV.*' ]] ; then
+            ecgray "$0: CV Mode"
 
-        reval-ec bibtex *.aux @RET
+            cv_p=y
+        fi
 
-        reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
-        reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
-        gmv -v "${name_tmp}.pdf" "${name}.pdf"
-        trs "${name_tmp}"*(.D)
+        local cv_dir
+        cv_dir="${nightNotes}/private/subjects/resume, CV"
+
+        typeset -A tex_vars=()
+        if (( ${#latex_vars} > 0 )) ; then
+            tex_vars=("${latex_vars[@]}") #: [key var] ...
+        fi
+
+        local tex=""
+        if ! isDeus ; then
+            tex+="\\pdfcompresslevel=0
+\\pdfobjcompresslevel=0"$'\n'
+        fi
+
+        local key val vars=(
+            nightNotes
+            nightNotesPrivate
+            nightNotesPublic
+            nightResourcesPublic
+            nightResourcesPrivate
+        )
+        for key in ${vars[@]} ; do
+            val="${(P)key}"
+            # re var-show key val
+
+            val="$(reval "${var_escaper[@]}" "${val}")" @TRET
+            # var-show val
+
+            tex+="\\newcommand{\\${key}}{${val}}"$'\n'
+        done
+
+        tex+="\\newcommand{\\globalBibPath}{$(reval "${var_escaper[@]}" ${nightGlobalBib})}"$'\n' @TRET
+        tex+="\\newcommand{\\mypwd}{$(reval "${var_escaper[@]}" ${f:h})}"$'\n' @TRET
+
+        if bool "${cv_p}" ; then
+            tex+="\\newcommand{\\CVDir}{${cv_dir}}"$'\n'
+
+            assert gcp -v "${cv_dir}/"*.bib(.D) . @RET
+        fi
+
+        for key in ${(k@)latex_vars} ; do
+            val="${latex_vars[$k]}"
+            val="$(reval "${var_escaper[@]}" ${val})" @TRET
+            tex+="\\newcommand{\\${k}}{${val}}"$'\n'
+        done
+
+        local f_escaped
+        # f_escaped="$(reval "${var_escaper[@]}" ${f})"
+        f_escaped="\"${f}\""
+        tex+="\\input{${f}}"$'\n'
+        #: path with spaces needs to be quoted for \input
+
+        local tex_f
+        tex_f="$(gmktemp --suffix='.tex')" @TRET
+        var-show tex_f
+        name_tmp="${tex_f:t:r}"
+        ec "$tex" > "$tex_f" @RET
+
+        # dact emc "$tex_f"
+
+        opts+=(-jobname="${name_tmp}")
+
+        local success_p=n
+        {
+            trs *.aux(.DN) @TRET
+
+            #: [[https://tex.stackexchange.com/questions/450863/using-bibtex-with-pdflatex][pdftex - Using BibTex with pdfLaTeX - TeX - LaTeX Stack Exchange]]
+            assert reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+
+            reval-ec bibtex *.aux @RET
+
+            reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+
+            reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+            #: This is needed, otherwise the CVPR's review line numbers don't align properly at the start of the paragraphs.
+
+            reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
+            gmv -v "${name_tmp}.pdf" "${name}.pdf"
+            trs "${name_tmp}"*(.DN) || true
+
+            success_p=y
+        } always {
+            if bool "${success_p}" ; then
+                bell-insaniquarium-sing
+            else
+                fsay 'failed to compile latex to PDF'
+            fi
+        }
     } always {
-        bell-insaniquarium-sing
+        if bool "${autodir}" ; then
+            popf
+        fi
     }
 }
 @opts-setprefix pdflatex-m latex
+
+function h-pdflatex-emacs {
+    local f="$1"
+
+    local pdflatex_autodir=y
+    pdflatex-m -shell-escape -interaction=nonstopmode "$f"
+}
+
+function h-pdflatex-emacs-async {
+    local log="${HOME}/logs/pdflatex_emacs.ansilog"
+    #: @duplicateCode/f96ce923c4daa8a299a2a376062acc30
+
+    assert mkdir-m "${log:h}" @RET
+
+    awaysh log-to "${log}" h-pdflatex-emacs "$@"
+}
 
 function pdflatex-full {
     #: @deprecated Use [agfi:pdflatex-m].
