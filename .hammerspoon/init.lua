@@ -612,7 +612,8 @@ function appHotkey(o)
 end
   -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
-appHotkey{ key='.', appName='com.microsoft.edgemac' }
+-- appHotkey{ key='.', appName='com.microsoft.edgemac' }
+appHotkey{ key='.', appName='company.thebrowser.Browser' }
 appHotkey{ key='/', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
@@ -623,22 +624,28 @@ appHotkey{ key='p', appName='com.jetbrains.pycharm' }
 emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='x', appName=emacsAppName }
 
-appHotkey{ key='\\', appName='com.tdesktop.Telegram' }
+appHotkey{ key='l', appName='com.tdesktop.Telegram' }
+-- appHotkey{ key='\\', appName='com.tdesktop.Telegram' }
 
 -- appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='b', appName='zathura' }
 appHotkey{ key='a', appName='com.adobe.Reader' }
 appHotkey{ key='p', appName='com.apple.Preview' }
-appHotkey{ key='[', appName='net.sourceforge.skim-app.skim' }
-appHotkey{ key=']', appName='info.sioyek.sioyek' }
+
+
+appHotkey{ key='j', appName='info.sioyek.sioyek' }
+appHotkey{ key='k', appName='net.sourceforge.skim-app.skim' }
+-- appHotkey{ key='[', appName='info.sioyek.sioyek' }
+-- appHotkey{ key=']', appName='net.sourceforge.skim-app.skim' }
 
 appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
-appHotkey{ key='l', appName='com.apple.iCal' }
+appHotkey{ key='\\', appName='com.apple.iCal' }
 appHotkey{ key='m', appName='mpv' }
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
-appHotkey{ key='n', appName='com.microsoft.Powerpoint' }
+appHotkey{ key='n', appName='com.appilous.Chatbot' }
+appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
 appHotkey{ key='j', appName='org.jdownloader.launcher' }
 
@@ -811,9 +818,26 @@ hs.hotkey.bind({}, 'F12', kittyHandler)
 function pasteBlockified()
   -- Get the clipboard content
   local clipboardContent = hs.pasteboard.getContents()
+  if clipboardContent then
+    -- Remove trailing whitespace
+    clipboardContent = string.gsub(clipboardContent, "%s*$", "")
+  end
 
-  -- Wrap the clipboard content in Markdown's code blocks
-  local markdownContent = "```\n" .. clipboardContent .. "\n```"
+  -- Check if the clipboard content contains multiple lines.
+  -- [[https://stackoverflow.com/questions/55586867/how-to-put-in-markdown-an-inline-code-block-that-only-contains-a-backtick-char][How to put (in markdown) an inline code block that only contains a backtick character (`) - Stack Overflow]]
+  if clipboardContent:match("\n") then
+    -- Multiple lines
+    markdownContent = "```\n" .. clipboardContent .. "\n```\n"
+  else
+    -- Single line
+    clipboardContent = string.gsub(clipboardContent, "^%s*", "")
+
+    if clipboardContent:match("`") then
+      markdownContent = "```" .. clipboardContent .. "```"
+    else
+      markdownContent = "`" .. clipboardContent .. "`"
+    end
+  end
 
   -- Put the markdownContent back to clipboard
   hs.pasteboard.setContents(markdownContent)
