@@ -312,12 +312,12 @@ function pbpaste-plus() {
     test -n "$ppaths[*]" && paste=( $ppaths[@] ) || true
 }
 ##
-function clipboard-info-darwin() {
+function clipboard-info-darwin {
   osascript -e "clipboard info" |
   sed -E 's/, /,/g; s/,([0-9]+)/:\1/g' | tr ':,' '\t\n'
 }
 
-function pngpaste() {
+function pngpaste {
     # See https://apple.stackexchange.com/a/375353/282215 for getting other types of stuff out of the clipboard
     local name="${1}" extension="${2:-png}" class="${3}"
     test -z "$class" && class='«class PNGf»'
@@ -373,7 +373,7 @@ function pngpaste() {
     ##
 }
 
-function jpgpaste() {
+function jpgpaste {
     pngpaste "$1" jpg 'JPEG picture'
 }
 ##

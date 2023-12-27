@@ -6,7 +6,7 @@
 # https://github.com/jdberry/tag
 ##
 ntag_colors=(red orange yellow green blue purple gray black aqua teal)
-ntag_sep='..' # . is likely to conflict with existing names, but it's cute.
+ntag_sep='..' #: . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
 ### shortcut aliases
 # function h_tgfn_tag() {

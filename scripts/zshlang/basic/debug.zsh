@@ -103,8 +103,13 @@ function ecgray() {
 function ecngray() {
     { colorfg "$gray[@]" ; ecn "${@}" ; resetcolor } 1>&2
 }
-function ecdate() {
-    ec "$edPre$(color 100 100 100 $(dateshort))            $@" 1>&2
+
+function ecdate {
+    local date_engine
+    # date_engine=(dateshort)
+    date_engine=('datej-all-short ; date-time')
+
+    ec "${edPre}$(color 100 100 100 $(eval "${date_engine[@]}"))            $@" 1>&2
 }
 function ecdate-err() {
     ecerr-raw "$(ecdate "$(colorfg 255 50 10)${*}$(resetcolor)")" >&2

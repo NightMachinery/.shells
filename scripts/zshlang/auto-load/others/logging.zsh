@@ -6,10 +6,11 @@ function log-to {
 
     {
         ec-sep-h
-        ecdate "logging: $(gquote "${cmd[@]}")"
+        edPre="* " ecdate "logging: $(gquote "${cmd[@]}")"
         ec
         reval "$@"
         ec
+        ec-sep-h
     } |& sync-append-in "$log_file"
 }
 ##

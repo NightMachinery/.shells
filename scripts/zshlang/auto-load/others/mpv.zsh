@@ -116,6 +116,7 @@ function hear-get {
     ec "$res" |
         cat-copy-if-tty
 }
+alias 'hgg'=hear-get
 
 function mpv-get {
     mpv-do get_property "${1:-path}" | jq --raw-output -e .data

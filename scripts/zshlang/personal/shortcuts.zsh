@@ -113,7 +113,7 @@ function cellp {
     brishzr-repeat
     #: to commit remote stuff so that we can pull them
 
-    for root in "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${resources_dir}" ; do
+    for root in "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${nightResourcesPrivate}" ; do
         ec-sep-h
         ecbold "* ${root}"
         pushf "$root"
@@ -122,7 +122,7 @@ function cellp {
                 local err="git merge already in progress"
                 ecerr "$0 (${root}): $err"
 
-                fsay-noidle "$err in the ${root:t}"
+                fsay-noidle "$err in the cellar's ${root:t}"
 
                 # return 3
                 continue

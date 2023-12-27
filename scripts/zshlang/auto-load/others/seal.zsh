@@ -29,7 +29,6 @@ alias todo-import='attic_todo seal-import'
 alias todo-import-NUL='attic_todo seal-import-NUL'
 alias td=todo
 alias tds='cat "$attic_todo"'
-# alias ts=todos #CONFLICTING_NAME
 alias tn=todone
 alias tdi=todo-import
 ## temoji

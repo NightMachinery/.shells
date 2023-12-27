@@ -146,6 +146,7 @@
     ((cl-ppcre:scan "(?i)Computational Linguistics" str) "CL")
     ((cl-ppcre:scan "(?i)Journal of Natural Language Engineering" str) "JNLE")
     ((cl-ppcre:scan "(?i)(?:Conference on )?Computer Vision and Pattern Recognition" str) "CVPR")
+    ((cl-ppcre:scan "(?i)(?:Conference on )?Uncertainty in Artificial Intelligence" str) "UAI")
     ((cl-ppcre:scan "(?i)(?:Conference on )?Empirical Methods in Natural Language Processing" str) "EMNLP")
     ((cl-ppcre:scan "(?i)International Conference on Computer Vision" str) "ICCV")
     ((cl-ppcre:scan "(?i)European Conference on Computer Vision" str) "ECCV")

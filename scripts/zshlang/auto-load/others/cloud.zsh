@@ -1,6 +1,6 @@
 typeset -g rabbit1=0AF7KyzWP4KAlUk9PVA
 typeset -g rabbit0=0AIWO9GXzMv3kUk9PVA
-typeset  -g b6=0AFfTUWcPSmcdUk9PVA # short name might cause name conflict
+typeset -g b6=0AFfTUWcPSmcdUk9PVA #: the short name might cause name conflict
 typeset -g b6_0='1cAmBna4bKr7CHtO6Kfvr56UNOWHFHuLv'
 typeset -g b7=0AG9i3iMiXl8WUk9PVA
 

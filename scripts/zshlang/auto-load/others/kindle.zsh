@@ -78,12 +78,12 @@ function aa-k2pdf() {
 }
 alias aap='\noglob aa-k2pdf'
 
-function aa-book() {
+function aa-book {
     local url="$1"
     assert-args url @RET;
 
     local aaMark="$(uuidm)"
-    aaMark="$aaMark" aa-remotename --on-download-complete aa-helper-gen.zsh "$url"
+    aaMark="$aaMark" aa_helper_e=p2k aa-remotename --on-download-complete aa-helper-gen.zsh "$url"
     till_file_del_p=y till-file "$aaMark"
 }
 renog aa-book

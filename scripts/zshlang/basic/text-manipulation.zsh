@@ -2,7 +2,7 @@
 alias zre='regexp-replace' #Change to function and add bash fallback
 
 function strip {
-    # TODO name conflicts with the strip command
+    #: @nameConflict with the strip command
     local x="$1"
     zre x "^$2" ''
     zre x "$2"'$' ''

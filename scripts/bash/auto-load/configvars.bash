@@ -73,18 +73,24 @@ export nightNotes="${nightNotesN}/"
 # export nightNotes="$cellar/notes/"
 #: Keep the trailing '/', it is important when removing prefixes. =nightNotesN= is useful for =aliasdir=.
 
-export nightNotesPrivate="$nightNotes/private"
-export nightNotesPublic="$nightNotes/public"
-export orgdir="$nightNotesPublic/org"
-export org_img_dir="$orgdir/images"
-export memorydir="$nightNotesPrivate/memories"
-export peopledir="$nightNotesPrivate/memories/people"
+export nightNotesPrivate="${nightNotes}/private"
+export nightNotesPublic="${nightNotes}/public"
+
+# export resources_dir="${nightNotes}/resources"
+export nightResourcesPrivate="${nightNotes}/resources"
+export nightResourcesPublic="${nightNotesPublic}/resources"
+export nightGlobalBib="${nightResourcesPublic}/latex/global_refs.bib"
+
+export orgdir="${nightNotesPublic}/org"
+export org_img_dir="${orgdir}/images"
+export memorydir="${nightNotesPrivate}/memories"
+export peopledir="${nightNotesPrivate}/memories/people"
 
 # export mpv_bookmarks="${music_dir}/bookmarks/default"
 export mpv_bookmarks="${nightNotesPrivate}/configs/mpv/bookmarks/default"
 
-typeset -g UHIST_FILE="$nightNotesPublic/bookmarks/useme/zsh/universal_history.zsh"
-typeset -g UHIST_FILE_FC="$nightNotesPublic/bookmarks/useme/zsh/universal_history_fc.zsh"
+typeset -g UHIST_FILE="${nightNotesPublic}/bookmarks/useme/zsh/universal_history.zsh"
+typeset -g UHIST_FILE_FC="${nightNotesPublic}/bookmarks/useme/zsh/universal_history_fc.zsh"
 
 typeset -g kindle_clippings_dir="${nightNotesPrivate}/backups/Kindle/clippings"
 typeset -g kindle_clippings_org_dir="${kindle_clippings_dir}/orgified"
@@ -99,8 +105,6 @@ test -z "$attic_todo" && attic_todo="$attic_private_dir/.attic_todo"
 test -z "$attic_temoji" && attic_temoji="$attic_dir/.temojis"
 test -z "$attic_quotes" && attic_quotes="$attic_dir/.quotes"
 test -z "$attic_emails" && attic_emails="$attic_private_dir/.emails"
-##
-export resources_dir="${nightNotes}/resources"
 ##
 export borgEndpoint="http://127.0.0.1:5922"
 

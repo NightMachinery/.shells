@@ -5,10 +5,12 @@ import argparse
 import torch
 import json
 from pynight.common_dict import BatchedDict
+from pynight.common_icecream import ic
 
 
 def load_and_print_data(file_path, start_index, end_index):
     data = torch.load(file_path)
+    ic(data.shape)
 
     if isinstance(data, dict):
         data = BatchedDict(data)
