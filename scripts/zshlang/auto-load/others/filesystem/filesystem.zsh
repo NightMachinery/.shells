@@ -7,6 +7,68 @@ function rm-empty {
         fd --type=directory --type=empty . "$dir" | inargsf trs-rm
     done
 }
+
+function rm-dir-only-child {
+    local dir="${1:-.}"
+    if [[ ! -d "$dir" ]]; then
+        ecerr "$0: not a directory or does not exist: $dir"
+        return 1
+    fi
+    dir="${dir:A}"
+
+    local d
+    for d in "${dir}"/*(/DN) ; do
+        h-rm-dir-only-child "$d"
+        #: This way, we won't actually remove only-child dirs in the current root. E.g., if we have =games/x= and start from =games=, we won't remove =x=.
+    done
+}
+
+function h-rm-dir-only-child {
+    local dir="${1:-.}"
+
+    if [[ ! -d "$dir" ]]; then
+        ecerr "$0: not a directory or does not exist: $dir"
+        return 1
+    fi
+    dir="${dir:A}"
+
+    local children children_dir only_child_dir only_child_dir_content
+    while true; do
+        revaldbg rm-empty .
+
+        children=("${dir}"/*(DN))
+        children_dir=("${dir}"/*(/DN))
+        #: /: only dirs, N: null glob, D: allow hidden
+
+        if (( ${#children} == 1 && ${#children_dir} == 1 )) ; then
+            #: There is an only-child dir here.
+            ##
+            only_child_dir="${children_dir[1]}"
+            only_child_dir_content=("${only_child_dir}"/*(DN))
+
+            if (( ${#only_child_dir_content} >= 1 ))  ; then
+                ecgray "$0: getting rid of the only-child dir: ${only_child_dir:t}"
+
+                # if ! ask "Confirm" Y ; then
+                #     return 1
+                # fi
+
+                reval-ec mv-merge "${only_child_dir_content[@]}" "${dir}"/ @RET
+            fi
+
+            revaldbg rm-empty .
+
+            continue
+        else
+            local d
+            for d in ${children_dir[@]} ; do
+                revaldbg "$0" "$d"
+            done
+
+            break
+        fi
+    done
+}
 ##
 function file-unix2uri-rp-v2 {
     in-or-args "$@" |
