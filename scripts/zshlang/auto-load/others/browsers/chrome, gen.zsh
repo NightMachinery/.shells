@@ -94,16 +94,30 @@ function browser-current-url {
         url_clean_redirects=n url-clean-unalix
     #: Or we can only use =url-clean-unalix= if the URL matches certain patterns, e.g., IMDB.
 }
+
+function browser-all-urls {
+    chrome-cli list links | gcut -d' ' -f '2-'
+}
 ##
 function with-edge {
     CHROME_BUNDLE_IDENTIFIER='com.microsoft.edgemac' reval-env "$@"
 }
 
 aliasfn edge-current-url with-edge chrome-current-url
+aliasfn edge-all-urls with-edge browser-all-urls
 aliasfn edge-current-title with-edge chrome-current-title
 aliasfn org-link-edge-current with-edge org-link-browser-current
 ##
-function chrome-open() {
+function with-arc {
+    CHROME_BUNDLE_IDENTIFIER='company.thebrowser.Browser' reval-env "$@"
+}
+
+aliasfn arc-current-url with-arc chrome-current-url
+aliasfn arc-all-urls with-arc browser-all-urls
+aliasfn arc-current-title with-arc chrome-current-title
+aliasfn org-link-arc-current with-arc org-link-browser-current
+##
+function chrome-open {
     ensure isDarwin @MRET # @darwinonly
     chrome-cli open "$@"
 }
