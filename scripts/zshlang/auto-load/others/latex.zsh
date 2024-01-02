@@ -1,5 +1,71 @@
 ##
+function tex2pdf {
+    local tex_content
+    tex_content="$(in-or-args "$@")" @RET
+
+    local echo_dest_p="${tex2pdf_echo_dest_p}"
+    local dest dest_dir
+    dest="${tex2pdf_o}"
+    if test -z "${dest}" ; then
+        dest="$(mktemp-borg --suffix='.pdf')" @TRET
+
+        echo_dest_p="${echo_dest_p:-n}"
+    fi
+    echo_dest_p="${echo_dest_p:-y}"
+
+    if ! [[ "$dest" =~ '\.pdf$' ]] ; then
+        dest+='.pdf'
+    fi
+
+    dest_dir="${dest:h}"
+
+    local pkgs=( ${tex2pdf_pkgs[@]} amsmath amssymb )
+
+    local extra_pkgs="${(j:,:)pkgs}"
+
+    local tmp_tex_file tmp_dir
+    tmp_dir="$(gmktemp -d)" @TRET
+    {
+        tmp_tex_file="${tmp_dir}/main.tex"
+
+        cat > "$tmp_tex_file" <<EOF
+\documentclass[preview,border=1pt,varwidth]{standalone}
+\usepackage{${extra_pkgs}}
+\begin{document}
+\(
+${tex_content}
+\)
+\end{document}
+EOF
+
+        assert sout pdflatex -interaction=batchmode \
+            -output-directory "${tmp_dir}" \
+            "${tmp_tex_file}" @RET
+        #: @GPT4T The pdflatex command does not have a direct flag to suppress the banner. Instead, you can redirect the standard output to /dev/null to hide the banner along with other messages, except for errors which are sent to standard error.
+
+        assert mv "${tmp_tex_file:r}.pdf" "$dest" @RET
+
+        if bool "${echo_dest_p}" ; then
+            ec "${dest}"
+        fi
+
+        if isIReally && ! isBorg ; then
+            local icat_v=n
+            ##
+            revaldbg icat "${dest}" || true
+            ##
+            # revaldbg icat-kitty-realsize "${dest}" || true
+            ##
+        fi
+    } always {
+        silent trs-rm "${tmp_dir}"
+    }
+}
+
 function tex2png {
+    #: @alt Just convert the PDF produced by [agfi:tex2pdf] to PNG instead.
+    #: =tex2png= is somewhat buggy, not recommended.
+    ##
     local tex
     tex="$(in-or-args "$@")" @RET
     local dpi="${tex2png_dpi:-1500}"
@@ -9,18 +75,18 @@ function tex2png {
 
     pnglatex.bash -b Transparent -P 2 -p "${(j.:.)pkgs}" -d "$dpi" -o "$dest" -f "$tex" @TRET
 
-    if isIReally ; then
-        if isBorg ; then
-        else
-            ##
-            revaldbg icat "${dest}" || true
-            ##
-            # revaldbg icat-kitty-realsize "${dest}" || true
-            ##
-        fi
+    if isIReally && ! isBorg ; then
+        local icat_v=n
+        ##
+        revaldbg icat "${dest}" || true
+        ##
+        # revaldbg icat-kitty-realsize "${dest}" || true
+        ##
     fi
 }
-alias xt='\noglob silence tex2png' #: =\= still needs escaping
+# alias xt='\noglob silence tex2png'
+alias xt='\noglob silence tex2pdf'
+#: Even with noglob, =\= still needs escaping
 ##
 function latex-escape {
     in-or-args "$@" |
@@ -197,7 +263,7 @@ function bibtex2apa {
 }
 ##
 function pix2tex-m {
-    local preview_mode="${pix2tex_preview_mode:-web}"
+    local preview_mode="${pix2tex_preview_mode:-local}"
 
     local image extension=png
     image="$(gmktemp --suffix ".${extension}")" @TRET
@@ -237,7 +303,17 @@ function pix2tex-m {
         ##
 
         if true || [[ "${preview_mode}" == 'local' ]] ; then
-            ec "${latex}" | tex2png
+            local icat_v=n
+
+            ecbold "* Original:"
+            # icat-kitty-fit-width "${image}" || true
+            icat "${image}" || true
+
+            ecbold "* Ours:"
+            ec "${latex}" | {
+                tex2pdf
+                # tex2png
+            }
             #: Our current =tex2png= implementation is buggy:
             #: `C(V,W,I)=\sum_{j=1}^{d^{\prime}}\mathbb{I}_{[\exists i\in V:W_{i j}>0]}I_{j}`
             #: The : in =V:W= does not render for us.

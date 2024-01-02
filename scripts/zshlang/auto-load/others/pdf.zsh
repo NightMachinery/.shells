@@ -60,7 +60,7 @@ function pdf2png-mutool() {
 @opts-setprefix pdf2png-mutool pdf2png
 aliasfn pdf2png pdf2png-mutool
 
-function icat-pdf() {
+function icat-pdf {
     local i="${1}" pages="${icat_p:-1}"
     assert-args i @RET
 
