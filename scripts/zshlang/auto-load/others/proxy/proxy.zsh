@@ -346,3 +346,8 @@ function proxy-git-off() {
     git config --global --unset http.proxy
 }
 ##
+function proxy-restart {
+    fz_opts=(-1) fftr gost-2083 ; ci98
+}
+alias '/'='proxy-restart'
+##
