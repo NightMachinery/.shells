@@ -207,7 +207,7 @@ function fz-createquery {
         fi
     done
 
-    if [[ "${res[-2]}" == '\' ]] ; then
+    if [[ "${res[-2,-1]}" == '\ ' ]] ; then
         res+=" "
         #: The query is ending with an escaped space. We need to add another space so that the next word (that the user writes interactively) in the query is not assumed to be a continuation of this escaped space.
     fi
