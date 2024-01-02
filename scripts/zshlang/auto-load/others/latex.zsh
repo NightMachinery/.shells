@@ -109,8 +109,16 @@ function tex2png-v1 {
         ##
     fi
 }
-# alias xt='\noglob silence tex2png'
-alias xt='\noglob silence tex2pdf'
+
+function tex-preview {
+    if isBorg ; then
+        tex2png "$@"
+    else
+        tex2pdf "$@"
+    fi
+
+}
+alias xt='\noglob silence tex-preview'
 #: Even with noglob, =\= still needs escaping
 ##
 function latex-escape {
