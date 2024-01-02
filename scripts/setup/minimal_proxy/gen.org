@@ -8,6 +8,10 @@ rsp-safe ~/.tmux.conf ~/.inputrc x@y:
 rsp-safe ~/.tmux.conf ~/.inputrc ~/scripts/setup/minimal_proxy/*.(zsh|zshenv|zshrc|bashrc|bash|sh)(D) x@y:
 #+end_example
 
+#+begin_example zsh
+rsp-safe2 x@y:bin/ $NIGHTDIR/perllang/url_dir_count.pl 
+#+end_example
+
 * Add User
 :PROPERTIES:
 :visibility: folded
