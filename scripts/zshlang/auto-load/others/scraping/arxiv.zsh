@@ -119,7 +119,7 @@ function arxiv-title {
         jqm '.feed.entry.title'
 }
 
-function arxiv-source-dl {
+function h-arxiv-source-dl {
     local inargs
     in-or-args3 "$@" @RET
 
@@ -146,6 +146,16 @@ function arxiv-source-dl {
             ##
         done
     done
+}
+
+function arxiv-source-dl {
+    local paper_source_dir
+    paper_source_dir="$(ffz-get paper latex)" @TRET
+
+    reval-ecgray pushf "${paper_source_dir}" @RET
+    {
+        h-arxiv-source-dl "$@"
+    } always { popf }
 }
 
 function arxiv-dl {

@@ -282,6 +282,8 @@ function pbcopy-img-darwin {
 }
 
 function pbcopy-img {
+    #: @seeAlso [help:ns-yank-image-at-point-as-image]
+    ##
     if isDarwin ; then
         pbcopy-img-darwin "$@"
     else

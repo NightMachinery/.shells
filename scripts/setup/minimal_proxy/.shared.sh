@@ -179,4 +179,3 @@ http-static-caddy () {
 alias rsp-safe='rsync --verbose --checksum --protect-args --human-readable --xattrs --times --info=progress2 --partial-dir=.rsync-partial -r'
 # partial-dir supports resume
 ##
-

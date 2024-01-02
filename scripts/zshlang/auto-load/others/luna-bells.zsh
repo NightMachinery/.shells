@@ -368,7 +368,7 @@ function deluna {
             reval-ecdate last-idle-reset
         fi
 
-        if (( $(idle-get) >= $timeout || $(lastunlock-get) <= 120 )) ; then
+        if (( $(idle-get) >= $timeout || $(lastunlock-get) < 60 )) ; then
             edPre=$'\n' ecdate "$(color 255 100 255 "Deluna committed homicide! (idle: $(idle-get), last_unlock: $(lastunlock-get-min))")"
             ##
             lunaquit " via deluna" @STRUE

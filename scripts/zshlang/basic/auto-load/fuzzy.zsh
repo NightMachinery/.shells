@@ -164,6 +164,9 @@ function rg-createquery() {
 }
 
 function fz-createquery {
+    #: * @tests
+    #: ** `ec "|$(fz-createquery 'ml\ ' )|" `
+    ##
     local ugrepMode="$fzp_ug"
     if [[ "$fzp_ug" == ni ]] ; then
         if isI ; then

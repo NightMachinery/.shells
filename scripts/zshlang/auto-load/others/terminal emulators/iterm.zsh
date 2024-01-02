@@ -142,7 +142,7 @@ function icat-autoresize() {
 }
 @opts-setprefix icat-autoresize icat
 
-function icat() {
+function icat {
     isI || return 0
 
     if (( $#@ == 0 )) ; then
@@ -198,6 +198,7 @@ function h_icat() {
 
         return $?
     fi
+
     if test -z "$TMUX" ; then
         icat-autoresize "$i"
     else
