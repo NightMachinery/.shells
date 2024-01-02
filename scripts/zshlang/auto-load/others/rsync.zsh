@@ -17,9 +17,22 @@ function path-parent-dirs {
     awk '{print; while(/\//) {sub("/[^/]*$", ""); print}}'
 }
 ##
+function static-public-ls {
+    fd -t f . ~dl/static/public
+}
+##
 function lilf-link-notes {
     local inargs
     in-or-args3 "$@" @RET
+
+    local public_p="${rsp_notes_public_p:-n}"
+
+    local dir
+    if bool "${public_p}" ; then
+        dir='static/public/notes'
+    else
+        dir='static/notes'
+    fi
 
     local i i_html
     for i in ${inargs[@]} ; do
@@ -28,7 +41,7 @@ function lilf-link-notes {
             i="$i_html"
         fi
 
-        ec "${dl_base_url}/static/notes/$(grealpath --relative-to "$nightNotes" "$i")"  | url-encode
+        ec "${dl_base_url}/${dir}/$(grealpath --relative-to "$nightNotes" "$i")"  | url-encode
         #: url-encode encodes newlines, so we need to apply it per link.
     done | cat-copy-if-tty
 }
@@ -60,6 +73,7 @@ function rsp-notes {
 
     local src="$1"
     src="$(grealpath -- "$src")" @TRET
+    local public_p="${rsp_notes_public_p:-n}"
 
     local rsync_opts=(
         ## @tmp
@@ -71,7 +85,12 @@ function rsp-notes {
     )
 
     # local lilf_ip=193.151.136.67 #: @tmp
-    local dest="${rsp_dest:-${lilf_user}@${lilf_ip}:Downloads/static}"
+    local dest
+    dest="${rsp_notes_dest:-${lilf_user}@${lilf_ip}:Downloads/static}"
+    if bool "${public_p}" ; then
+        dest+='/public'
+    fi
+
     local pattern="${rsp_pat:-.}"
     assert-args src dest pattern @RET
 
