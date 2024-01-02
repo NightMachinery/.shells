@@ -1,5 +1,8 @@
 ##
 function tex2pdf {
+    #: * @tests
+    #: ** `tex2pdf 'C(V,W,I)=\sum_{j=1}^{d^{\prime}}\mathbb{I}_{[\exists i\in V:W_{i j}>0]}I_{j}'`
+    ##
     local tex_content
     tex_content="$(in-or-args "$@")" @RET
 
@@ -45,6 +48,7 @@ EOF
 
         assert mv "${tmp_tex_file:r}.pdf" "$dest" @RET
 
+        out="${dest}" #: @globalOutput
         if bool "${echo_dest_p}" ; then
             ec "${dest}"
         fi
@@ -63,8 +67,29 @@ EOF
 }
 
 function tex2png {
-    #: @alt Just convert the PDF produced by [agfi:tex2pdf] to PNG instead.
-    #: =tex2png= is somewhat buggy, not recommended.
+    local dpi="${tex2png_dpi:-1500}"
+    local echo_dest_p="${tex2png_echo_dest_p}"
+    echo_dest_p="${echo_dest_p:-y}"
+
+    local dest
+    dest="${tex2png_o:-$(mktemp-borg --suffix='.png')}" @TRET
+
+    local pdf out
+    tex2pdf_echo_dest_p=n tex2pdf "$@" @RET
+    pdf="${out}"
+    dact var-show pdf
+
+    pdf2png_dpi="${dpi}" pdf2png_o="${dest}" assert pdf2png "${pdf}" @RET
+    out="${dest}" #: @globalOutput
+
+    if bool "${echo_dest_p}" ; then
+        ec "${dest}"
+    fi
+}
+
+function tex2png-v1 {
+    #: @alt [agfi:tex2pdf] [agfi:tex2png]
+    #: =tex2png-v1= is somewhat buggy, not recommended.
     ##
     local tex
     tex="$(in-or-args "$@")" @RET
