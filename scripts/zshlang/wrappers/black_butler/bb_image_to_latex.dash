@@ -1,0 +1,11 @@
+#!/usr/bin/env dash
+
+# BLACKBUTLER_API_ROOT='http://localhost:9000/api'
+endpoint="${BLACKBUTLER_API_ROOT:-http://127.0.0.1:${BLACKBUTLER_PORT:-7260}}/image_to_latex/"
+
+# stdin="$(cat)"
+stdin=""
+image_path="${1}"
+
+req="$(printf -- "%s " "$stdin" | jq --arg image_path "${image_path}" --raw-input --slurp --null-input --compact-output 'inputs as $i | {image_path: $image_path}')"
+printf -- "%s" "$req" | curl --silent --fail --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
