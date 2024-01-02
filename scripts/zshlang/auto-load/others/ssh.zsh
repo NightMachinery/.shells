@@ -12,16 +12,21 @@ function kitty-terminfo-install() {
     infocmp -x xterm-kitty | ssh "$@" tic -x -o \~/.terminfo/ /dev/stdin
 }
 
-function ssh-kitty {
+function ssh {
   bella_zsh_disable1
 
-  if fn-isTop && isKitty ; then
-    # will install the xterm-kitty terminal definition on the remote in your home directory.
-    # Only needs to run once per host
-    ecbold kitty +kitten ssh "$@"
-  else
-    ecbold command ssh "$@"
-  fi
+  {
+    if isDeus && fn-isTop && isKitty ; then
+      # if fn-isTop && isKitty ; then
+      # will install the xterm-kitty terminal definition on the remote in your home directory.
+      # Only needs to run once per host
+      reval-ec kitty +kitten ssh "$@"
+    else
+      reval-ec command ssh "$@"
+    fi
+  } always {
+    reval-ecgray stty sane
+  }
 }
 ##
 function firewall-allow-mosh-darwin() {
