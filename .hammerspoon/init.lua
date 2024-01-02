@@ -586,6 +586,18 @@ hs.hotkey.bind(hyper, "i", function()
                  input_lang_push_lang = nil
 end)
 ---
+function focusAppYabai(appName)
+    local app = hs.application.get(appName)
+    if app then
+        local mainWindow = app:mainWindow()
+        if mainWindow then
+            local windowID = mainWindow:id()
+            hs.execute("/opt/homebrew/bin/yabai -m window --focus " .. windowID)
+            -- brishzeval("yabai -m window --focus " .. windowID)
+        end
+    end
+end
+
 function toggleFocus(appName)
   local app = hs.application.get(appName)
 
@@ -594,6 +606,7 @@ function toggleFocus(appName)
       app:hide()
     else
       app:activate()
+      -- focusAppYabai(appName)
     end
   else
     if o.launch then
@@ -613,8 +626,8 @@ end
   -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
 -- appHotkey{ key='.', appName='com.microsoft.edgemac' }
-appHotkey{ key='.', appName='company.thebrowser.Browser' }
-appHotkey{ key='/', appName='com.google.Chrome' }
+appHotkey{ key='/', appName='company.thebrowser.Browser' }
+appHotkey{ key='.', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 
@@ -632,6 +645,7 @@ appHotkey{ key='l', appName='com.tdesktop.Telegram' }
 appHotkey{ key='a', appName='com.adobe.Reader' }
 appHotkey{ key='p', appName='com.apple.Preview' }
 
+appHotkey{ key=']', appName='org.jdownloader.launcher' }
 
 appHotkey{ key='j', appName='info.sioyek.sioyek' }
 appHotkey{ key='k', appName='net.sourceforge.skim-app.skim' }
@@ -647,7 +661,6 @@ appHotkey{ key='m', appName='mpv' }
 appHotkey{ key='n', appName='com.appilous.Chatbot' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
-appHotkey{ key='j', appName='org.jdownloader.launcher' }
 
 
 hs.hotkey.bind(hyper, "d", function()
