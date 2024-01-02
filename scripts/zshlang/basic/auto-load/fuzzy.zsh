@@ -200,13 +200,19 @@ function fz-createquery {
             fi
 
             if test -z "$ugrepMode" ; then
-                res+="${exact_prefix}$i "
+                res+="${exact_prefix}${i} "
             else
-                res+="$i "
+                res+="${i} "
             fi
         fi
     done
-    ec "$res" |
+
+    if [[ "${res[-2]}" == '\' ]] ; then
+        res+=" "
+        #: The query is ending with an escaped space. We need to add another space so that the next word (that the user writes interactively) in the query is not assumed to be a continuation of this escaped space.
+    fi
+
+    ec "${res}" |
         perl -lpe 's/\\ /\\\\ /g'
         #: Whitespace needs to be quoted separately for fzf, so to match =\ =, we =\\ =.
 }
