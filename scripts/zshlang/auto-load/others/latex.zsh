@@ -196,3 +196,58 @@ function bibtex2apa {
     bibtex2html -nokeys -o - -s apa -nodoc "$tmp"
 }
 ##
+function pix2tex-m {
+    local preview_mode="${pix2tex_preview_mode:-web}"
+
+    local image extension=png
+    image="$(gmktemp --suffix ".${extension}")" @TRET
+
+    assert pngpaste "${image}" @RET
+    icat_v=n icat "${image}" || true
+
+    ##
+    # reval-ecgray \
+        # command pix2tex --show "${image}"
+    ##
+    local res
+    local retcode preview_url latex
+    res="$(bb_image_to_latex.dash "${image}")" @TRET
+
+    # ecgray "$res"
+
+    retcode="$(ec "$res" | jq -re '.retcode')" || {
+        ecgray "$res"
+        ecerr "$0: failed to parse retcode"
+        return 1
+    }
+
+    if (( ${retcode} == 0 )) ; then
+        preview_url="$(ec "$res" | jq -re '.preview_url')" @TRET
+        latex="$(ec "$res" | jq -re '.latex')" @TRET
+
+        { ecn "$latex" | cat-copy-if-tty } @TRET
+
+        ##
+        if [[ "${preview_mode}" == 'web' ]] ; then
+             open "${preview_url}"
+        fi
+
+        clipboard-add "${preview_url}" @STRUE
+        ecgray "preview_url:"$'\n  '"${preview_url}"$'\n'
+        ##
+
+        if true || [[ "${preview_mode}" == 'local' ]] ; then
+            ec "${latex}" | tex2png
+            #: Our current =tex2png= implementation is buggy:
+            #: `C(V,W,I)=\sum_{j=1}^{d^{\prime}}\mathbb{I}_{[\exists i\in V:W_{i j}>0]}I_{j}`
+            #: The : in =V:W= does not render for us.
+        fi
+    else
+        return "${retcode}"
+    fi
+    ##
+}
+@opts-setprefix pix2tex-m pix2tex
+
+alias xs='pix2tex-m'
+##
