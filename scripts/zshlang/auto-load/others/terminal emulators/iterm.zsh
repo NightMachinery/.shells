@@ -106,15 +106,15 @@ function icat-kitty-fit-width {
   done
 }
 ##
-function icat-realsize() {
+function icat-realsize {
     isI || return 0
     if isKitty ; then
-        icat-kitty "$@"
+        icat-kitty-realsize "$@"
     else
         @opts h x @ icat-go "$@"
     fi
 }
-function icat-autoresize() {
+function icat-autoresize {
     local margin="${icat_margin:-${icat_m}}"
     (( $#@ == 0 )) && set -- -
 
