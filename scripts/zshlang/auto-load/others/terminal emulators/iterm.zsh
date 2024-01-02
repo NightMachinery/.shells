@@ -59,9 +59,19 @@ function icat-py() {
     python -m imgcat --height "${icat_h:-30}" "$@" # This will zoom, too, but that's actually good in most cases!
 }
 ##
-function icat-kitty {
-    kitty +kitten icat --scale-up "$@"
+function h-icat-kitty {
+    kitty +kitten icat "$@" < /dev/tty
+    #: `echo | h-icat-kitty` prints lots of errors when we omit `/dev/tty`.
 }
+
+function icat-kitty-realsize {
+    h-icat-kitty "$@"
+}
+
+function icat-kitty {
+    h-icat-kitty --scale-up "$@"
+}
+
 aliasfn islideshow-kitty2 icat-kitty --hold # press a key to go to next image
 
 function icat-kitty-single {
@@ -170,10 +180,13 @@ function icat {
 
     re h_icat "$@"
 }
-function h_icat() {
+
+function h_icat {
     local i="$1"
 
-    ecgray "${i:t}"
+    if bool "${icat_v}" ; then
+        ecgray "${i:t}"
+    fi
 
     if [[ "$i" == *.pdf ]] ; then
         icat-pdf "$i"
