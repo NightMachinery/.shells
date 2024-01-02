@@ -27,7 +27,7 @@ Uses ghostscript to rewrite the file without encryption." MAGIC
     gs -q -dNOPAUSE -dBATCH -sDEVICE=pdfwrite -sOutputFile="${in:r}_unencrypted.pdf" -c .setpdfwrite -f "$in"
 }
 ##
-function pdf-cover-gs() {
+function pdf-cover-gs {
     local i="$1" out="${1:r}.png"
     assert-args i @RET
 
@@ -38,12 +38,13 @@ function pdf-cover-gs() {
     # convert "pdf:${i}[0]" "png:$out"
     ##
 }
-function pdf-cover() {
+function pdf-cover {
     : "works with EPUBs, too"
 
-    pdf2png "$@" 1
+    pdf2png-mutool "$@" 1
 }
-function pdf2png-mutool() {
+
+function pdf2png-mutool {
     : "mutool draw [options] file [pages]"
     # pages:  Comma separated list of page numbers and ranges (for example: 1,5,10-15,20-N), where
     #               the character N denotes the last page.  If no pages are specified, then all pages
@@ -51,11 +52,18 @@ function pdf2png-mutool() {
 
     local i="$1"
     assert-args i @RET
+    local opts=()
+
     local out="${pdf2png_o:-${i:r}_%03d.png}"
     [[ "$out" == *.png ]] || out+='.png'
 
-    assert serrdbg command mutool draw -o "$out" -F png "$i" "${@[2,-1]}" @RET
-    : '`-r 300` to set dpi'
+    local dpi="${pdf2png_dpi}"
+    if test -n "${dpi}" ; then
+        opts+=(-r "${dpi}")
+    fi
+
+    assert serrdbg command mutool draw -o "$out" "${opts[@]}" -F png "$i" "${@[2,-1]}" @RET
+
 }
 @opts-setprefix pdf2png-mutool pdf2png
 aliasfn pdf2png pdf2png-mutool
@@ -68,7 +76,10 @@ function icat-pdf {
     tmp="$(gmktemp --suffix .png)" @TRET
     {
         assert @opts o "$tmp" @ pdf2png-mutool -w "$(screen-width)" "$i" "$pages" @RET
-        icat-realsize "$tmp"
+
+        icat "$tmp"
+        # icat-kitty "$tmp"
+        # icat-realsize "$tmp"
     } always {
         silent trs-rm "$tmp"
     }
