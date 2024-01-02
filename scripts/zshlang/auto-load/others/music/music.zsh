@@ -387,10 +387,30 @@ function hear-rm {
     fi
 }
 ##
-function hear-mv {
+function h-hear-do {
+    local engine="${hear_do_engine:-mv}"
+    local copy_mode="${hear_do_copy_mode:-org}"
+    local opts=("${@[1,-2]}") dest="${@[-1]}"
+
     local i
     i="$(hear-get)" @TRET
 
-    mv "$i" "$@"
+    assert reval-ec "${engine}" "${opts[@]}" "$i" "${dest}" @RET
+    if test -d "$dest" ; then
+        dest="${dest}/${i:t}"
+        assert test -f "$dest" @RET
+    fi
+
+    if [[ "${copy_mode}" == org ]] ; then
+        pbcopy "[[audiofile:$(org-escape-link "${dest}" | path-abbrev)]]"
+    fi
+}
+
+function hear-mv {
+    hear_do_engine=mv h-hear-do "$@"
+}
+
+function hear-cp {
+    hear_do_engine=cp h-hear-do "$@"
 }
 ##
