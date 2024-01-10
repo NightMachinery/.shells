@@ -1,5 +1,8 @@
 #!/usr/bin/env dash
-
+##
+#: We need to find =gmktemp=.
+export PATH="${PATH}:/opt/homebrew/bin:/usr/local/bin"
+##
 tmp="$(gmktemp --suffix='.zsh')" || return $?
 cat > $tmp || return $?
 # @workaround Using a temp file protects against unicode corruption in brish

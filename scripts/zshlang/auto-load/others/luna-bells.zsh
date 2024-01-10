@@ -257,9 +257,9 @@ function h-lunaquit-force {
 
 function h-lunaquit-force-dynamic {
     # bb_say_speed=1 fsay2 'sustain not crucify; great evil lies ahead!'
-    tts-glados1-cached 'sustain not crucify; great evil lies ahead!'
+    # tts-glados1-cached 'sustain not crucify; great evil lies ahead!'
 
-    h-lunaquit-force
+    h-lunaquit-force || true
 }
 
 function lunaquit-force {

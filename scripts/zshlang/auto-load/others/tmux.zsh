@@ -71,7 +71,7 @@ function tmuxzombie-ls() {
 }
 aliasfn tzls tmuxzombie-ls
 
-function tmuxzombie-kill() {
+function tmuxzombie-kill {
     local fd1
     {
         exec {fd1}>&1 # to output to the original stdout
@@ -106,9 +106,13 @@ function str2filename-ascii {
         utf8-to-ascii
 }
 ##
-function tmux-capture() {
-    local target="${1:?}" limit="${2}" # empty limit seems to mean return everything
-    tmux capture-pane -p -S -"$limit" -t "$target"
+function tmux-capture {
+    local target="${1}"
+    assert-args target @RET
+
+    local limit="${2}" #: empty limit seems to mean return everything
+
+    revaldbg tmux capture-pane -p -S -"$limit" -t "$target"
 }
 
 aliasfn tcgar tmux-capture BrishGarden

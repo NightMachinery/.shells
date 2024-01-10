@@ -18,19 +18,25 @@ function display-off {
 ##
 function sleepnow {
     sleep "${1:-7}"
-    pmset sleepnow
+    #: [[id:f8ad0757-23ae-4ab2-b046-06531e97bc13][Macbook not sleeping under Big Sur · Issue #2519 · pqrs-org/Karabiner-Elements]]
+    #: Some amount of waiting before triggering the sleep is needed to avoid Karabiner canceling the sleep event.
+    #: This is also useful without karabiner, as we may inadvertently generate some user "activity."
+
+    reval-ec pmset sleepnow
 }
 
 function sleepforce {
     lo_s=60 lo_p=${1:-~/tmp/.sleepforce} loop sleepnow 10
 }
 
-function sleepifidle {
-    while (( $(load5) >= ${1:-7} ))
+function sleep-if-underloaded {
+    while (( $(load5) >= "${1:-7}" ))
     do
+        #: Load is too high, NOT sleeping
         sleep 150
     done
-    ecdate sleeping with load5 $(load5)
+
+    ecdate "sleeping with load5=$(load5)"
     sleepforce
 }
 ##

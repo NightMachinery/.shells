@@ -79,6 +79,7 @@ from pynight.common_openai import (
     openai_key_get,
     setup_openai_key,
     print_chat_streaming,
+    openai_chat_complete,
 )
 from pynight.common_openai import *
 from pynight.common_llm import (

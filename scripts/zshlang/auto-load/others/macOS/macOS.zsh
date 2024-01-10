@@ -113,14 +113,16 @@ function nightshift-auto() {
 function macos-version {
     if isDarwin ; then
     command sw_vers |
-        rget 'ProductVersion:\s+(\S+)'
+        rget 'ProductVersion:\s+(\S+)' |
+        cat-copy-if-tty
     else
         return 1
     fi
 }
 
 function macos-version-major {
-    macos-version | rget '^(\d+)'
+    macos-version | rget '^(\d+)' |
+      cat-copy-if-tty
 }
 
 function macos-ventura-or-higher-p {
