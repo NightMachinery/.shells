@@ -109,7 +109,8 @@ function resetcolor {
         typeset -g reset_color=$'\C-[[00m'
     fi
 
-    if isColorTty ; then
+    if true || isColorTty ; then
+        #: =resetcolor= is almost always activated from subshells, so we can't check for a color tty.
         printf %s "$reset_color"
     fi
 }

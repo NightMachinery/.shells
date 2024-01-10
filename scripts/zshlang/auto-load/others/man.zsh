@@ -2,6 +2,8 @@
 #:  https://boredzo.org/blog/archives/2016-08-15/colorized-man-pages-understood-and-customized
 
 function man-colored1 {
+    local color_p=y
+
     local -x LESS_TERMCAP_mb="$(colorfg 100 255 0)"
     local -x LESS_TERMCAP_md="$(colorfg 10 90 20 ; Bold)"
     local -x LESS_TERMCAP_me="$(colorreset)"
