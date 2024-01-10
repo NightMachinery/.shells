@@ -112,7 +112,8 @@ function isMB2 {
         host="$(hostname)"
     fi
 
-    [[ "$host" == 'Feraidoons-MacBook-Air.local' ]]
+    # [[ "$host" == 'Feraidoons-MacBook-Air.local' ]]
+    [[ "$host" == 'mb2.local' ]]
 }
 
 function isGrayfur {
