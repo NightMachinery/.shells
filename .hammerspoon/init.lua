@@ -23,6 +23,261 @@ eventtap = require "hs.eventtap"
 -- chooser = require "hs.chooser"
 plp = require 'pl.pretty'
 ---
+function nop()
+  hs.alert("repeating")
+end
+---- * Hyper Modifier Key
+if false then
+  -- Here we were trying to make F7 press other modifier keys.
+  -- [[id:6fcee871-a0f9-46b5-af2f-a9b767c48422][@me How can I make Hammerspoon press modifier keys? · Issue #3582 · Hammerspoon/hammerspoon]]
+
+  hs.hotkey.bind({}, 'F7', nil, function()
+      -- hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, "")
+
+      hs.alert('F7 pressed')
+      -- hs.eventtap.event.newKeyEvent("shift", true):post()
+      -- hs.eventtap.event.newKeyEvent("shift", false):post()
+      -- hs.eventtap.event.newKeyEvent(hs.keycodes.map.alt, true):post()
+      -- hs.eventtap.event.newKeyEvent(hs.keycodes.map.alt, false):post()
+
+      -- hs.osascript.applescript('tell application "System Events" to key code 58')
+      -- hs.eventtap.event.newKeyEvent({}, " ", true):setKeyCode(61):post()
+      -- hs.eventtap.event.newKeyEvent({}, " ", false):setKeyCode(61):post()
+  end)
+end
+
+-- A global variable for the Hyper Mode
+hyper_modality = hs.hotkey.modal.new()
+
+function hyper_enter()
+  hyper_modality:enter()
+end
+
+function hyper_exit()
+  hyper_modality:exit()
+end
+
+function hyper_toggle()
+  -- hs.alert("toggle")
+
+  if hyper_modality.entered_p then
+    hyper_exit()
+  else
+    hyper_enter()
+  end
+end
+
+hyper_modality.exit_on_release_p = false
+hyper_modality.down_p = false
+
+function hyper_down()
+  -- hs.alert("hyper down")
+
+  hyper_modality.down_p = true
+
+  hyper_toggle()
+end
+
+function hyper_up()
+  -- hs.alert("hyper up")
+
+  hyper_modality.down_p = false
+
+  if hyper_modality.exit_on_release_p then
+    hyper_exit()
+  end
+  -- hyper_modality.exit_on_release_p = false
+end
+
+hyper_toggler_1 = hs.hotkey.bind({}, "F18", hyper_down, hyper_up, nil)
+
+-- hyper_modality:bind({}, "F4", nil, function()
+--     hyper_exit()
+-- end)
+
+local hyperAlerts
+
+local hyperStyle = {
+  -- [[https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/alert/alert.lua#L17][hammerspoon/extensions/alert/alert.lua at master · Hammerspoon/hammerspoon]]
+  -- strokeWidth  = 2,
+  -- strokeColor = { white = 1, alpha = 1 },
+  -- fillColor   = { white = 0, alpha = 0.75 },
+  -- textColor = { white = 1, alpha = 1 },
+  -- textFont  = ".AppleSystemUIFont",
+  -- textSize  = 27,
+  -- radius = 27,
+  atScreenEdge = 1,
+  fadeInDuration = 0.001,
+  fadeOutDuration = 0.001,
+  -- padding = nil,
+  fillColor = { white = 1, alpha = 2 / 3 },
+  radius = 24,
+  strokeColor = { red = 19 / 255, green = 182 / 255, blue = 133 / 255, alpha = 1},
+  strokeWidth = 16,
+  textColor = { white = 0.125 },
+  textSize = 48,
+}
+
+function hyper_modality:entered()
+  hyper_modality.entered_p = true
+
+  if hs.eventtap.isSecureInputEnabled() then
+    hs.alert("⚠️ Secure Input is on. Our Hyper Mode commands might not work.")
+    -- [[https://github.com/Hammerspoon/hammerspoon/issues/3555][Hammerspoon hangs spradically when entering hyper mode and displaying a modal window · Issue #3555 · Hammerspoon/hammerspoon]]
+  end
+
+  hyperAlerts = {}
+  for i, screen in pairs(hs.screen.allScreens()) do
+    msg = "🌟"
+    -- msg = "Hyper Mode 🌟"
+    -- msg = "Hyper Mode ✈"
+
+    alert = hs.alert(msg, hyperStyle, screen, "")
+    hyperAlerts[i] = alert
+  end
+end
+
+function hyper_modality:exited()
+  hyper_modality.entered_p = false
+  hyper_modality.exit_on_release_p = false
+
+  for i, alert in pairs(hyperAlerts) do
+    hs.alert.closeSpecific(alert, 0.25)
+  end
+end
+
+function hyper_triggered()
+  hyper_modality.exit_on_release_p = true
+  if not hyper_modality.down_p then
+    -- This is to handle the race conditions.
+    -- The key release handler might be run before we have set =exit_on_release_p=.
+    hyper_exit()
+  end
+end
+
+function hyper_bind_v1(key, pressedfn)
+  function h_pressedfn()
+    hyper_triggered()
+
+    pressedfn()
+  end
+
+  return hyper_modality:bind({}, key, h_pressedfn, nil, nil)
+end
+
+function hyper_bind_v2(o)
+  local hotkey_holder = { my_hotkey = nil }
+
+  if o.auto_trigger_p == nil then
+    o.auto_trigger_p = true
+  end
+
+  if o.auto_trigger_p then
+    if o.pressedfn == nil then
+      h_pressedfn = nil
+    else
+      function h_pressedfn()
+        hyper_triggered()
+
+        o.pressedfn()
+      end
+    end
+
+    if o.releasedfn == nil then
+      h_releasedfn = nil
+    else
+      function h_releasedfn()
+        hyper_triggered()
+
+        o.releasedfn()
+      end
+    end
+
+    if o.repeatfn == nil then
+      h_repeatfn = nil
+    else
+      function h_repeatfn()
+        -- hs.alert("repeating: " .. o.key)
+        -- hs.alert("repeating: " .. o.key .. "down: " .. tostring(hyper_modality.down_p) .. "hotkey: " .. tostring(hotkey_holder.my_hotkey))
+
+        if hyper_modality.down_p == false then
+          -- @upstreamBug @raceCondition [[id:c27a51c9-d4ea-4714-8c15-72840c1fb933][=repeatfn= is buggy]]
+
+          -- hyper_exit()
+
+          if true then
+            hyper_enter()
+            hyper_exit()
+            return
+          elseif false then
+            error("workaround for infinitely repeating hotkeys (id: NIGHT_817124)")
+            -- No need for the buggy code down, we can just throw an explicit error ourselves.
+
+            -- return
+            -- Somehow the return statment above causes a syntax error!
+          else
+            if not (hotkey_holder.my_hotkey == nil) then
+              -- hs.alert("disabling")
+
+              -- Disable the hotkey
+              hotkey_holder.my_hotkey:disable()
+              -- This throws an exception which successfully stops the repeat loop.
+              -- `callback: /Users/evar/.hammerspoon/init.lua:209: attempt to call a nil value (method 'disable')`
+
+              hotkey_holder.my_hotkey:enable()
+              -- We should re-enable the hotkey so that it can be triggered again. Since an exception happens, everything magically works out even without this line.
+
+              hs.alert("disabled")
+            end
+
+            hs.alert("Repeat Bug Encountered (id: NIGHT_817123)")
+            return 0
+          end
+        end
+
+        hyper_triggered()
+
+        o.repeatfn()
+      end
+    end
+  else
+    h_pressedfn = o.pressedfn
+    h_releasedfn = o.releasedfn
+    h_repeatfn = o.repeatfn
+  end
+
+  hotkey_holder.my_hotkey = hyper_modality:bind(o.mods or {}, o.key, h_pressedfn, h_releasedfn, h_repeatfn)
+  -- hs.hotkey.bind(mods, key, [message,] pressedfn, releasedfn, repeatfn)
+
+  return hotkey_holder.my_hotkey
+end
+
+-- Trigger existing hyper key shortcuts
+for _, key in ipairs({"v"}) do
+  -- hs.keycodes.map['left'], hs.keycodes.map['right'], "right"
+  -- [[https://github.com/Hammerspoon/hammerspoon/issues/2282][Having trouble sending arrow key events · Issue #2282 · Hammerspoon/hammerspoon]]
+  ---
+  hyper_bind_v2{key=key, pressedfn=function()
+                  hyper_triggered()
+
+                  hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, key)
+  end}
+end
+
+---
+-- [[https://github.com/Hammerspoon/hammerspoon/issues/1946][Mission control related shortcuts do not work on macOS Mojave · Issue #1946 · Hammerspoon/hammerspoon]]
+-- Trigger existing hyper key shortcuts
+for _, key in ipairs({"left", "right"}) do
+  -- hs.keycodes.map['left'], hs.keycodes.map['right']
+  -- [[https://github.com/Hammerspoon/hammerspoon/issues/2282][Having trouble sending arrow key events · Issue #2282 · Hammerspoon/hammerspoon]]
+  ---
+  hyper_bind_v2{key=key, pressedfn=function()
+                  hyper_triggered()
+
+                  hs.eventtap.keyStroke({"fn", "cmd","alt","shift","ctrl"}, key)
+  end}
+end
+---
 function has_value (tab, val)
   for index, value in ipairs(tab) do
     if value == val then
@@ -300,16 +555,16 @@ popclickInit()
 -- ** DONE [[https://github.com/Hammerspoon/hammerspoon/issues/3350][`hs.eventtap.event.newSystemKeyEvent`: keeps pressing the keys indefintely · Issue #3350 · Hammerspoon/hammerspoon]]
 
 function systemKey(key, repeatDelay)
-    -- REPEAT_FASTER = 10 * 1000
-    REPEAT_FASTER = 5
+  -- REPEAT_FASTER = 10 * 1000
+  REPEAT_FASTER = 5
 
-    hs.eventtap.event.newSystemKeyEvent(key, true):post()
+  hs.eventtap.event.newSystemKeyEvent(key, true):post()
 
-    if not repeatDelay or repeatDelay <= 0 then
-        repeatDelay = REPEAT_FASTER
-    end
-    hs.timer.usleep(repeatDelay)
-    hs.eventtap.event.newSystemKeyEvent(key, false):post()
+  if not repeatDelay or repeatDelay <= 0 then
+    repeatDelay = REPEAT_FASTER
+  end
+  hs.timer.usleep(repeatDelay)
+  hs.eventtap.event.newSystemKeyEvent(key, false):post()
 end
 
 function mediaPlayPauseKey()
@@ -345,31 +600,31 @@ function brightnessDecKey()
 end
 ---
 if false then
-  hs.hotkey.bind(hyper, "p", function()
-                   appName = application.frontmostApplication():name()
-                   -- brishzeval("true " .. hs.pasteboard.getContents())
-                   if appName == "Screen Sharing" then
-                     -- Doesn't work, test with `sleep 2 ; hs -c 'hs.eventtap.keyStrokes("hi jungle")'`
-                     -- hs.eventtap.keyStrokes(hs.pasteboard.getContents())
-                   else
-                     -- This was slow even with input-lang-get-darwin-fast, so the fault is probably with hammerspoon itself?
+  hyper_bind_v1("p", function()
+                  appName = application.frontmostApplication():name()
+                  -- brishzeval("true " .. hs.pasteboard.getContents())
+                  if appName == "Screen Sharing" then
+                    -- Doesn't work, test with `sleep 2 ; hs -c 'hs.eventtap.keyStrokes("hi jungle")'`
+                    -- hs.eventtap.keyStrokes(hs.pasteboard.getContents())
+                  else
+                    -- This was slow even with input-lang-get-darwin-fast, so the fault is probably with hammerspoon itself?
 
-                     -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
-                     -- eventtap.keyStroke({"cmd"}, 'a')
-                     -- eventtap.keyStroke({"cmd"}, 'c')
-                     eventtap.keyStroke({"cmd"}, 0)
-                     eventtap.keyStroke({"cmd"}, 8)
-                     local res
-                     -- res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
-                     if hs.keycodes.currentSourceID() == inputEnglish then
-                       res = brishzeval2(("ecn %q | en2per"):format(hs.pasteboard.getContents()))
-                       langSetPer()
-                     else
-                       res = brishzeval2(("ecn %q | per2en"):format(hs.pasteboard.getContents()))
-                       langSetEn()
-                     end
-                     hs.eventtap.keyStrokes(tostring(res))
-                   end
+                    -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
+                    -- eventtap.keyStroke({"cmd"}, 'a')
+                    -- eventtap.keyStroke({"cmd"}, 'c')
+                    eventtap.keyStroke({"cmd"}, 0)
+                    eventtap.keyStroke({"cmd"}, 8)
+                    local res
+                    -- res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
+                    if hs.keycodes.currentSourceID() == inputEnglish then
+                      res = brishzeval2(("ecn %q | en2per"):format(hs.pasteboard.getContents()))
+                      langSetPer()
+                    else
+                      res = brishzeval2(("ecn %q | per2en"):format(hs.pasteboard.getContents()))
+                      langSetEn()
+                    end
+                    hs.eventtap.keyStrokes(tostring(res))
+                  end
   end)
 end
 ---
@@ -417,9 +672,11 @@ function chis()
   end)
   c:show()
 end
--- hs.hotkey.bind(hyper, "o", chis)
+-- hyper_bind_v1("o", chis)
 --
 function ntagFinder()
+  -- allows you to add (use enter or tab) or remove (shift+tab) tags from the selected files in Finder.
+  ---
   local timer
   local tab = nil
   local antitab = nil
@@ -427,7 +684,7 @@ function ntagFinder()
       if tab then tab:delete() end
       if antitab then antitab:delete() end
       if not x then return end
-      brishzeval2bg(("ntag-finder-sel-add %q"):format(x.text))
+      brishzeval2_out(("ntag-finder-sel-add %q"):format(x.text))
   end)
   c:placeholderText("ntag ...")
   -- c:width(95)
@@ -441,12 +698,12 @@ function ntagFinder()
                          brishzeval2bg(("bell-lm-mhm ; ntag-finder-sel-add %q ; "):format(x.text))
   end)
   antitab = hs.hotkey.bind('shift', 'tab', function()
-                         local x = c:selectedRowContents()
-                         if not x then
-                           return
-                         end
-                         -- brishzeval2bg(("ntag-finder-sel-rm %q ; bell-pp-piece"):format(x.text))
-                         brishzeval2bg(("bell-pp-piece ; ntag-finder-sel-rm %q ; "):format(x.text))
+                             local x = c:selectedRowContents()
+                             if not x then
+                               return
+                             end
+                             -- brishzeval2bg(("ntag-finder-sel-rm %q ; bell-pp-piece"):format(x.text))
+                             brishzeval2bg(("bell-pp-piece ; ntag-finder-sel-rm %q ; "):format(x.text))
   end)
   c:choices(function()
       local q = c:query()
@@ -468,7 +725,7 @@ function ntagFinder()
   end)
   c:show()
 end
-hs.hotkey.bind(hyper, "n", ntagFinder)
+hyper_bind_v2{mods={"cmd"}, key='n', pressedfn=ntagFinder}
 ---
 function anycomplete()
   local timer
@@ -501,12 +758,12 @@ function anycomplete()
                          refreshChoices()
   end)
   antitab = hs.hotkey.bind('shift', 'tab', function()
-                         local x = c:selectedRowContents()
-                         if not x then
-                           return
-                         end
-                         hs.pasteboard.setContents(x.text)
-                         c:hide()
+                             local x = c:selectedRowContents()
+                             if not x then
+                               return
+                             end
+                             hs.pasteboard.setContents(x.text)
+                             c:hide()
   end)
   -- c:choices(function()
   --     local q = c:query()
@@ -528,14 +785,14 @@ function anycomplete()
     local cmd = ("autosuggestions-gateway %q"):format(q)
     -- print("cmd: " .. cmd)
     myTask = hs.task.new("/usr/local/bin/brishz2.dash",
-                function(exitCode, stdOut, stdErr)
-                  local res = stdOut
-                  local out = {}
-                  for l in res:gmatch("([^\r\n]+)\r?\n?") do
-                    table.insert(out, {["text"] = l})
-                  end
-                  c:choices(out)
-                end, {cmd})
+                         function(exitCode, stdOut, stdErr)
+                           local res = stdOut
+                           local out = {}
+                           for l in res:gmatch("([^\r\n]+)\r?\n?") do
+                             table.insert(out, {["text"] = l})
+                           end
+                           c:choices(out)
+                         end, {cmd})
     if myTask  then
       myTask:start()
     end
@@ -555,11 +812,11 @@ function anycomplete()
     eventtap.keyStroke({}, hs.keycodes.map['left'])
   end
 end
-hs.hotkey.bind(hyper, "g", anycomplete)
+hyper_bind_v1("g", anycomplete)
 ---
 -- https://github.com/kovidgoyal/kitty/issues/45
 
--- hs.hotkey.bind(hyper, "k", function()
+-- hyper_bind_v1("k", function()
 --   local app = hs.application.get("kitty")
 
 --   if app then
@@ -579,26 +836,28 @@ hs.hotkey.bind(hyper, "g", anycomplete)
 --   -- app:mainWindow().setShadows(false)
 -- end)
 ---
-hs.hotkey.bind(hyper, "i", function()
-                 langSetToggle()
-                 hs.alert(langGet(), 1)
-                 brishzeval('input_lang_push_lang_del')
-                 input_lang_push_lang = nil
+hyper_bind_v1("i", function()
+                langSetToggle()
+                hs.alert(langGet(), 1)
+                brishzeval('input_lang_push_lang_del')
+                input_lang_push_lang = nil
 end)
 ---
 function focusAppYabai(appName)
-    local app = hs.application.get(appName)
-    if app then
-        local mainWindow = app:mainWindow()
-        if mainWindow then
-            local windowID = mainWindow:id()
-            hs.execute("/opt/homebrew/bin/yabai -m window --focus " .. windowID)
-            -- brishzeval("yabai -m window --focus " .. windowID)
-        end
+  local app = hs.application.get(appName)
+  if app then
+    local mainWindow = app:mainWindow()
+    if mainWindow then
+      local windowID = mainWindow:id()
+      hs.execute("/opt/homebrew/bin/yabai -m window --focus " .. windowID)
+      -- brishzeval("yabai -m window --focus " .. windowID)
     end
+  end
 end
 
 function toggleFocus(appName)
+  local launch_p = false
+
   local app = hs.application.get(appName)
 
   if app then
@@ -609,7 +868,7 @@ function toggleFocus(appName)
       -- focusAppYabai(appName)
     end
   else
-    if o.launch then
+    if launch_p then
       hs.application.launchOrFocus(appName)
       app = hs.application.get(appName)
     end
@@ -617,13 +876,21 @@ function toggleFocus(appName)
 end
 
 function appHotkey(o)
-  hs.hotkey.bind(o.modifiers or hyper, o.key, function()
-                   toggleFocus(o.appName)
-                   -- use `sleep 2 ; reval-copy frontapp-get ; fsay hi` to get this
+  function h_appHotkey()
+    toggleFocus(o.appName)
+    -- use `sleep 2 ; reval-copy frontapp-get ; fsay hi` to get this
+  end
 
-  end)
+  mods = o.modifiers
+  -- If mods == "hyper", use =hyper_bind_v1=:
+  if mods == "hyper" or mods == hyper or not mods then
+    hyper_bind_v1(o.key, h_appHotkey)
+  else
+    -- hs.hotkey.bind(mods, o.key, h_appHotkey)
+    hs.alert("impossible 8170")
+  end
 end
-  -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
+-- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
 -- appHotkey{ key='.', appName='com.microsoft.edgemac' }
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
@@ -632,7 +899,6 @@ appHotkey{ key='.', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 
 appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
-appHotkey{ key='p', appName='com.jetbrains.pycharm' }
 
 emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='x', appName=emacsAppName }
@@ -643,6 +909,8 @@ appHotkey{ key='l', appName='com.tdesktop.Telegram' }
 -- appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='b', appName='zathura' }
 appHotkey{ key='a', appName='com.adobe.Reader' }
+
+-- appHotkey{ key='p', appName='com.jetbrains.pycharm' }
 appHotkey{ key='p', appName='com.apple.Preview' }
 
 appHotkey{ key=']', appName='org.jdownloader.launcher' }
@@ -658,14 +926,15 @@ appHotkey{ key='f', appName='com.apple.finder' }
 appHotkey{ key='\\', appName='com.apple.iCal' }
 appHotkey{ key='m', appName='mpv' }
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
-appHotkey{ key='n', appName='com.appilous.Chatbot' }
+-- appHotkey{ key='n', appName='com.appilous.Chatbot' }
+appHotkey{ key='b', appName='com.parallels.desktop.console' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
 
 
-hs.hotkey.bind(hyper, "d", function()
-                 brishzeval("notif-dismiss.as")
-                 end)
+hyper_bind_v1("d", function()
+                brishzeval("notif-dismiss.as")
+end)
 ---
 acrobatScrollStep = 20
 
@@ -679,13 +948,13 @@ acrobatHotkeyDown = hs.hotkey.new({}, 'b', function()
     ---
     -- hs.eventtap.keyStroke({}, 'b') -- @todo1 @infLoop
     -- [[https://github.com/Hammerspoon/hammerspoon/discussions/3130][How do I make the keybinding be detected but not intercepted? · Discussion #3130 · Hammerspoon/hammerspoon]]
-  end)
+end)
 
 acrobatHotkeyUp = hs.hotkey.new({}, 'v', function()
     hs.eventtap.scrollWheel({0, acrobatScrollStep}, {}, "line")
     ---
     -- hs.eventtap.keyStroke({}, 'v') -- @infLoop
-  end)
+end)
 
 hs.window.filter.new('Acrobat Reader')
   :subscribe(hs.window.filter.windowFocused,function()
@@ -698,7 +967,16 @@ hs.window.filter.new('Acrobat Reader')
             end)
 ---
 function bindWithRepeat(mods, key, pressedfn)
-  hs.hotkey.bind(mods, key, pressedfn, nil, pressedfn)
+  if mods == "hyper" or mods == hyper or not mods then
+    hyper_bind_v2{
+      key=key,
+      pressedfn=pressedfn,
+      repeatfn=pressedfn,
+    }
+  else
+    hs.alert("bindWithRepeat: with mods")
+    hs.hotkey.bind(mods, key, pressedfn, nil, pressedfn)
+  end
 end
 ----
 function pressPageUp()
@@ -712,9 +990,9 @@ bindWithRepeat(hyper, "down", function()
 end)
 
 -- You can set hyper+F5 to the dictation command in macOS settings.
-hs.hotkey.bind(hyper, "5", function()
-                 brishzeval('awaysh-fast input-volume-mute-toggle')
-                 -- @needed awaysh-fast
+hyper_bind_v1("5", function()
+                brishzeval('awaysh-fast input-volume-mute-toggle')
+                -- @needed awaysh-fast
 end)
 
 bindWithRepeat(hyper, "F1", function()
@@ -725,28 +1003,28 @@ bindWithRepeat(hyper, "F2", function()
                  brishzeval('awaysh-fast brightness-inc')
 end)
 
-hs.hotkey.bind(hyper, "F6", function()
-                 brishzeval('awaysh-fast focus-do-not-disturb-toggle')
+hyper_bind_v1("F6", function()
+                brishzeval('awaysh-fast focus-do-not-disturb-toggle')
 end)
 
-hs.hotkey.bind(hyper, "F7", function()
-                 -- brishzeval('awaysh-fast hear-prev')
-                 mediaPreviousKey()
+hyper_bind_v1("F7", function()
+                -- brishzeval('awaysh-fast hear-prev')
+                mediaPreviousKey()
 end)
 
-hs.hotkey.bind(hyper, "F8", function()
-                 -- brishzeval('awaysh-fast hear-play-toggle')
-                 mediaPlayPauseKey()
+hyper_bind_v1("F8", function()
+                -- brishzeval('awaysh-fast hear-play-toggle')
+                mediaPlayPauseKey()
 end)
 
-hs.hotkey.bind(hyper, "F9", function()
-                 -- brishzeval('awaysh-fast hear-next')
-                 mediaNextKey()
+hyper_bind_v1("F9", function()
+                -- brishzeval('awaysh-fast hear-next')
+                mediaNextKey()
 end)
 
-hs.hotkey.bind(hyper, "F10", function()
-                 -- brishzeval('awaysh-fast volume-mute-toggle')
-                 volumeMuteKey()
+hyper_bind_v1("F10", function()
+                -- brishzeval('awaysh-fast volume-mute-toggle')
+                volumeMuteKey()
 end)
 
 function volumeInc(v, device)
@@ -793,39 +1071,39 @@ function kittyHandler()
   local mouseSpace = hs.spaces.focusedSpace()
 
   if app then
-      if appscreen == mousescreen then
-        if app:isFrontmost() then 
-          app:hide()
-	  kitty_prev_app:activate() 
-	  -- sometimes works without this, too, but it's better to explicitly include this.
-      	else
-	  kitty_prev_app = application.frontmostApplication()
-
-          space_res = hs.spaces.moveWindowToSpace(win, mouseSpace)
-	  -- https://www.hammerspoon.org/docs/hs.spaces.html#moveWindowToSpace
-	  -- a window can only be moved from a user space to another user space -- you cannot move the window of a full screen (or tiled) application to another space and you cannot move a window to the same space as a full screen application.
-	  -- @toFuture/1401/12 This merged PR solves this: https://github.com/Hammerspoon/hammerspoon/pull/3298
-
-	  -- hs.alert.show(string.format("moving to space %s: %s", mouseSpace, space_res))
-
-          app:activate()
-	  app:mainWindow():moveToUnit'[100,0,0,100]'
-      	end
+    if appscreen == mousescreen then
+      if app:isFrontmost() then
+        app:hide()
+        kitty_prev_app:activate()
+        -- sometimes works without this, too, but it's better to explicitly include this.
       else
-        win:moveToScreen(mousescreen)
+        kitty_prev_app = application.frontmostApplication()
 
-	if app:isHidden() then 
-          app:activate()
-	  app:mainWindow():moveToUnit'[100,0,0,100]'
-      	end
+        space_res = hs.spaces.moveWindowToSpace(win, mouseSpace)
+        -- https://www.hammerspoon.org/docs/hs.spaces.html#moveWindowToSpace
+        -- a window can only be moved from a user space to another user space -- you cannot move the window of a full screen (or tiled) application to another space and you cannot move a window to the same space as a full screen application.
+        -- @toFuture/1401/12 This merged PR solves this: https://github.com/Hammerspoon/hammerspoon/pull/3298
 
+        -- hs.alert.show(string.format("moving to space %s: %s", mouseSpace, space_res))
+
+        app:activate()
+        app:mainWindow():moveToUnit'[100,0,0,100]'
       end
+    else
+      win:moveToScreen(mousescreen)
+
+      if app:isHidden() then
+        app:activate()
+        app:mainWindow():moveToUnit'[100,0,0,100]'
+      end
+
+    end
   end
 
   -- app:mainWidnow().setShadows(false)
 end
 
-hs.hotkey.bind(hyper, 'z', kittyHandler)
+hyper_bind_v1('z', kittyHandler)
 hs.hotkey.bind({}, 'F12', kittyHandler)
 ---
 function pasteBlockified()
@@ -838,8 +1116,9 @@ function pasteBlockified()
 
   -- Check if the clipboard content contains multiple lines.
   -- [[https://stackoverflow.com/questions/55586867/how-to-put-in-markdown-an-inline-code-block-that-only-contains-a-backtick-char][How to put (in markdown) an inline code block that only contains a backtick character (`) - Stack Overflow]]
-  if clipboardContent:match("\n") then
+  if true or clipboardContent:match("\n") then
     -- Multiple lines
+    -- Update: I have made this codepath be taken even for single line inputs, as that behavior is more often wanted.
     markdownContent = "```\n" .. clipboardContent .. "\n```\n"
   else
     -- Single line
@@ -862,7 +1141,7 @@ function pasteBlockified()
   hs.timer.doAfter(0.2, function() hs.pasteboard.setContents(clipboardContent) end)
 end
 
-hs.hotkey.bind(hyper, ",", pasteBlockified)
+hyper_bind_v1(",", pasteBlockified)
 ---
 function install()
   -- @bootstrap installs the CLI binary
