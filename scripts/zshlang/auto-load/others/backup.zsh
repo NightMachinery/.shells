@@ -228,3 +228,8 @@ function backup-sftpgo {
     dl onlc mv2 ~nt/private/backups/sftpgo/sftpgo.json
 }
 ##
+function backup-arc {
+    cp2 "${nightNotesPrivate}/backups/Arc" \
+        ~'/Library/Application Support/Arc/'*.json~*/(StorableAuth|StorableArchive|StorableWindows)*(DN.)
+}
+##
