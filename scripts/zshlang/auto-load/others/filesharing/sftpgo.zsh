@@ -8,7 +8,22 @@ function sftpgo-boot {
     fi
 
     if test -n "$sftpgo_config" ; then
-        assert tmuxnewsh2 sftpgo_shared reval-notifexit sftpgo serve --config-file "$sftpgo_config" --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log @RET
+        #: =log-file-path= is relative to ==--config-dir=, i.e., [[~/base/keys/sftpgo/sftpgo.log]].
+        ##
+        #: This approach has better error handling, but restarting the process via tmux will NOT load the latest config.
+
+        # local config_tmp
+        # config_tmp="$(gmktemp --suffix .json)" @TRET
+        # { cat "${sftpgo_config}" | json5-to-json > "${config_tmp}" } @TRET
+
+        # assert tmuxnewsh2 sftpgo_shared reval-ec reval-notifexit sftpgo serve --config-file "${config_tmp}" --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log @RET
+        ##
+        local cmd
+        cmd='TMPSUFFIX=.json && reval-ec reval-notifexit sftpgo serve --config-file =(cat '"$(gquote-dq "${sftpgo_config}")"' | json5-to-json) --config-dir ~/Base/keys/sftpgo --log-file-path sftpgo.log'
+        ecgray "$0: cmd: $cmd"
+
+        assert tmuxnew sftpgo_shared zsh -c "$cmd" @RET
+        ##
     else
         return 1
     fi
