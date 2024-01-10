@@ -29,7 +29,9 @@
     "bindings": [
       {
         "port": 8115,
-        "address": "192.168.1.57",
+        "address": "mb2.local",
+      // "address": "192.168.2.1",
+      // "address": "192.168.1.57",
         "apply_proxy_config": true
       }
     ],
@@ -55,7 +57,8 @@
     "bindings": [
       {
         "port": 8116,
-        "address": "192.168.1.57",
+        "address": "mb2.local",
+        // "address": "192.168.1.57",
         "apply_proxy_config": true,
         "tls_mode": 0,
         "force_passive_ip": "",
@@ -83,7 +86,8 @@
     "bindings": [
       {
         "port": 8114,
-        "address": "192.168.1.57",
+      "address": "mb2.local",
+        // "address": "192.168.1.57",
         "enable_https": false,
         "client_auth_type": 0,
         "tls_cipher_suites": []
