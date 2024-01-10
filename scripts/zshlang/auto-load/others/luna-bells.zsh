@@ -359,11 +359,15 @@ alias li='last-idle-reset'
 function deluna {
     local nonce
     nonce="$(oneinstance-setup $0)" || return 1
-    local timeout="${1:-240}" # 150 is good for PC work, but 800 might be better for reading, as the screen dims in 10 minutes
+    local timeout="${1:-180}" # 150 is good for PC work, but 800 might be better for reading, as the screen dims in 10 minutes
 
     ec "deluna (nonce: $nonce) started with timeout $timeout"
     while oneinstance $0 $nonce
     do
+        if (( $(lastunlock-get) < 60 )) ; then
+            unlock-hook
+        fi
+
         if (( $(idle-get) >= $timeout )) ; then
             reval-ecdate last-idle-reset
         fi
@@ -375,7 +379,7 @@ function deluna {
             kill-marker-luna-timer-late || true
             luna_skipped_set 0 @STRUE
             ##
-            lock-hook
+            deluna-hook
             ##
         fi
 
