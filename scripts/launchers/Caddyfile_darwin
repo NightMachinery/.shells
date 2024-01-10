@@ -7,6 +7,11 @@
 	# order webdav after basicauth
 }
 
+http://:8111 {
+  templates
+  header Content-Type text/plain
+  respond "Your IP: {{.RemoteIP}}"
+}
 
 
 # run: adapting config using caddyfile: subject does not qualify for certificate: 'files.{env.MDNS_NAME}.local'
@@ -15,10 +20,17 @@
 http://:8112 {
   #: https://caddy.community/t/how-to-reuse-matchers-between-site-blocks/13599
   @nonLocal {
-    not remote_ip 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8 127.0.0.1/32
+    not remote_ip 192.168.0.0/16 172.16.0.0/12 10.0.0.0/8 127.0.0.1/32 ::1/128 fd00::/8 fe80::/10
+    #: @GPT4T
+    #: - `::1/128` is the loopback address for localhost in IPv6, equivalent to `127.0.0.1/32` in IPv4.
+    #: - `fd00::/8` is the range for Unique Local Addresses (ULA), which are similar to the private address ranges in IPv4 (like `192.168.x.x`, `172.16.x.x`, and `10.x.x.x`).
+    #: - `fe80::/10` is the range for link-local addresses, which are used within a single link (like a LAN segment) and are not routable.
   }
 
-  respond @nonLocal "Non-local access not granted. Scram!" 403 {
+
+  templates
+  # header Content-Type text/plain
+  respond @nonLocal "Non-local access not granted. (Your IP: {{.RemoteIP}}) Scram!" 403 {
     close
   }
 
