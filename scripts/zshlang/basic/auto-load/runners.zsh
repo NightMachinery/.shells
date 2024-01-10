@@ -186,10 +186,53 @@ function sudo-patch-touchid-darwin {
 #     command sudo "$@"
 # }
 ##
-function sud() {
-    ## test
-    # alias bb='bash -c'
-    # sud fin='h j a' bb 'echo $fin'
+function h-sudoers-no-pass {
+    #: You need to add the output of this function to the sudoers file manually using =visudo=.
+    ##
+    local binary="${1}"
+    assert-args binary @RET
+
+    if [[ ! -f "$binary" ]]; then
+        # binary="${commands[$binary]}"
+        #: Since we are storing the hash of the binary, using the real path is better than a possible symlink. The symlink breaks if it points to an updated binary anyway.
+        binary="$(realpath2 "${binary}")" @TRET
+    fi
+
+    if [[ ! -f "$binary" ]]; then
+        ecerr "Error: File does not exist: $binary"
+        return 1
+    fi
+
+    local hash
+    hash="$(openssl dgst -binary -sha256 "${binary}" | openssl base64)" @TRET
+    # hash="$(sha256sum "$binary" | awk '{print $1}')" @TRET
+
+    if [[ -z "$hash" ]]; then
+        ecerr "Error: Unable to compute hash for the binary at: $binary"
+        return 1
+    fi
+
+    local user
+    user="$(whoami)" @TRET
+
+    ec "${user} ALL=(ALL) NOPASSWD: sha256:${hash} ${binary}"
+}
+
+function sudoers-no-pass {
+    local i
+    for i in $@ ; do
+        h-sudoers-no-pass "$i"
+        ec
+    done  |
+        cat-copy-if-tty
+}
+##
+function sudo-with-alias {
+    ##
+    #: @deprecated? This seems a bit dangerous, perhaps it's best not to use it.
+    #:
+    #: * @tests
+    #: `alias bb='bash -c' && sud fin='h j a' bb 'echo $fin'`
     ##
     local env=()
     local i
@@ -203,21 +246,26 @@ function sud() {
             break
         fi
     done
+
     local cmdhead="$1"
     cmdhead=($(expand-alias-strip "$cmdhead"))
+
     local cmdbody=("$@[2,-1]")
+
     local cmd_binary
     { cmd_binary="$(realpath2 "${cmdhead[1]}")" && test -n "$cmd_binary" } || {
         local ret=$?
         ecerr "$0: realpath2 could not find '${cmdhead[1]}'"
         return $ret
     }
+
     revaldbg sudo "$env[@]" "$cmd_binary" "${(@)cmdhead[2,-1]}" "$cmdbody[@]"
 }
-function sudoify() {
+##
+function sudoify {
     local head="$1" ; shift
 
     fnswap "$head" "sudo $head" "$@"
-    # @tip command is also a unix command, and so can be sudoified
+    #: @tip command is also a unix command, and so can be sudoified
 }
 ##
