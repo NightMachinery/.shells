@@ -8,10 +8,12 @@ function deluna-hook {
 function unlock-hook {
     #: Currently implemented via [agfi:deluna]
     ##
-    # ec $'\n\n'"$0" | sync-append-in "${KARABINER_RESET_LOG}"
-    ec $'\n\n'"$0" >> "${KARABINER_RESET_LOG}" @STRUE
-    #: I don't want potential lock issues to prevent us from running this.
+    if false ; then
+        # ec $'\n\n'"$0" | sync-append-in "${KARABINER_RESET_LOG}"
+        ec $'\n\n'"$0" >> "${KARABINER_RESET_LOG}" @STRUE
+        #: I don't want potential lock issues to prevent us from running this.
 
-    karabiner-reset
+        karabiner-reset
+    fi
 }
 ##
