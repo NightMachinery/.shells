@@ -1,5 +1,5 @@
 ##
-function chronic-all() {
+function chronic-all {
     tmuxzombie-kill
     rm-caches
     chronic-backup
@@ -20,8 +20,8 @@ function chronic-update {
     pip install --upgrade ddgr fanficfare cloudscraper
     pip install --upgrade --force pytube ytmusicapi youtube-dl spotipy spotdl
 
-    # pip install -U yt-dlp
-    $proxyenv yt-dlp --update-to nightly
+    pip install -U yt-dlp
+    # $proxyenv yt-dlp --update-to nightly
 
     tldr --update
 
@@ -50,13 +50,17 @@ function chronic-backup {
     backup-cron
 
     if isLocal && isMe ; then
+        backup-arc
+
         backup-startupSh
-        ziib-all
+
+        # ziib-all
+
         # backup-rsync
     fi
 }
 
-function chronic-anticreep() {
+function chronic-anticreep {
     ansifold-path-fix @STRUE
     ##
     pip uninstall -y enum34 # Since python 3.6 the enum34 library is no longer compatible with the standard library.

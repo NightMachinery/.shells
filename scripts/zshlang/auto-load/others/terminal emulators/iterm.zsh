@@ -184,7 +184,7 @@ function icat {
 function h_icat {
     local i="$1"
 
-    if bool "${icat_v}" ; then
+    if bool "${icat_v:-y}" ; then
         ecgray "${i:t}"
     fi
 

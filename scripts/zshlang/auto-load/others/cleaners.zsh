@@ -32,7 +32,9 @@ function rm-caches {
     trs-rm  ~/.local/share/Trash/*(DN)
     trs-rm ~/sent
     trs-rm /tmp/*.png(DN) # wallpaper-auto can leave garbage here, which on a long-lived server will obviously not clear on the nonexistent reboots
+
     trs-rm ~/logs/*(DN) ~/log/*(DN) # do NOT delete these folders themselves
+
     trs-rm ~/julia_tmp/*(DN) ~/tmp-kindle/*(DN)
     trs-rm "$(brew --cache)"
 

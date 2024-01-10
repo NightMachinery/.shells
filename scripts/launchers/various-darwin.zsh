@@ -87,11 +87,13 @@ if isMe ; then
     # needs to run by cron instead:
     # tmux new -d -s books "$NIGHTDIR/zshlang/book-checker.zsh"
     ##
-    wallpaper-auto
+    # wallpaper-auto
 fi
 ##
 tmuxnewsh2 clipboard-record clipboard-record
 ##
 psource ~/.startup..private..zsh
+##
+emc-launch-gui
 ##
 chronic-all

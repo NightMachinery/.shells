@@ -1,8 +1,9 @@
 ##
-function backup-rsync() {
+function backup-rsync {
     backup-rsync-greencase
 }
-function backup-rsync-greencase() {
+
+function backup-rsync-greencase {
     source="$GREENCASE_DIR/"
     dest=/Volumes/hyper-diva/backups/greencase
     assert mkdir -p "$dest" @RET
@@ -11,13 +12,19 @@ function backup-rsync-greencase() {
     fi
 }
 ##
-function backup-startupSh() {
+function backup-startupSh {
     local d="$nightNotes/private/configs/$(hostname)/$(whoami)"
-    mkdir -p "$d"
-    cp /Users/Shared/bin/startup.sh ~/.privateStartup.sh "${d}/"
+    mkdir-m "$d"
+
+    local i
+    for i in /Users/Shared/bin/startup.sh ~/.privateStartup.sh ~/.startup..private..zsh ; do
+        if test -e "$i" ; then
+            cp "$i" "${d}/"
+        fi
+    done
 }
 ##
-function backup-cron() {
+function backup-cron {
     # aka cellar-getcron
     ##
     if ! { isLocal || isLilf } ; then

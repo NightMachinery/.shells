@@ -119,10 +119,10 @@ function songc {
     ! test -z "$f[*]" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
 }
 
-function touch-tracks() {
+function touch-tracks {
     comment "songd dir-touches using touch-tracks, but songc does not. We can of course add an env var and dir-touch here ... Using 'mus' (so songd) might also work ..."
 
-    if bool "${touch_tracks_recursive:-y}" ; then
+    if bool "${touch_tracks_recursive:-n}" ; then
         local f tt i
         tt=()
         typeset -U tt

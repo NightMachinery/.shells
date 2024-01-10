@@ -194,6 +194,13 @@ function emc-focus {
 
 function emc-focus-gui {
     if isDarwin ; then
+        if emc-gui-p ; then
+            #: called by a GUI emacs instance, so emacs is most probably still in focus
+            #: This is a hack because =frontapp-get= has stopped working.
+
+            return 0
+        fi
+
         if [[ "$(frontapp-get)" =~ '(?i).*emacs.*' ]] ; then
             #: already in focus
 
