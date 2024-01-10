@@ -417,6 +417,31 @@ function datenatj {
 }
 aliasfn datenatj-future datenat_nopast=y datenatj
 
+function datenatj-human {
+    datenatj "$@" | monthj2en-filter
+}
+
+function monthj2en-filter {
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local date year month day pre post
+    for date in ${inargs[@]}; do
+        if [[ "${date}" =~ "(.*?)(\d+)/(\d+)/(\d+)(.*)" ]] ; then
+            pre="${match[1]}"
+            year="${match[2]}"
+            month="${match[3]}"
+            day="${match[4]}"
+            post="${match[5]}"
+
+            ec "${pre}${year}/$(monthj2en $month)${month}/${day}${post}"
+        else
+            ec "${date}" #: return the line unchanged
+        fi
+    done
+}
+
+
 function datenat-full1 {
     # Used in 'remn'
     local natdate="$*"
