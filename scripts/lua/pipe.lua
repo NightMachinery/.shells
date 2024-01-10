@@ -132,11 +132,21 @@ end
 function brishzevalbg(cmd)
   brishzeval("{ " .. cmd .. " } &>/dev/null &")
 end
+
 function brishzeval2(cmd)
   local my_in = cmd
-  local my_cmd = "bsh.dash" -- susceptible to getting stuck as bsh.dash uses a single session
+  local my_cmd = "/usr/local/bin/bsh.dash" -- susceptible to getting stuck as bsh.dash uses a single session
   local my_args = {} -- no arguments
   local my_status, my_out, my_err = pipe_simple(my_in, my_cmd, table.unpack(my_args))
 
   return my_out .. my_err
+end
+
+function brishzeval2_out(cmd)
+  local my_in = cmd
+  local my_cmd = "/usr/local/bin/bsh.dash" -- susceptible to getting stuck as bsh.dash uses a single session
+  local my_args = {} -- no arguments
+  local my_status, my_out, my_err = pipe_simple(my_in, my_cmd, table.unpack(my_args))
+
+  return my_out
 end
