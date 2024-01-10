@@ -386,3 +386,7 @@ function emc-html-viewer() {
     emc "$tmp"
 }
 ##
+function undo-fu-cache-clear {
+    trs ~/.emacs.d/.local/cache/undo-fu-session/*(DN)
+}
+##
