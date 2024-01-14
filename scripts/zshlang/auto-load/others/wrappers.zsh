@@ -96,9 +96,15 @@ function open-with {
     inargsf reval-ec open -a "$app" --
 }
 
-aliasfn opv open-with preview
-aliasfn ops open-with Skim
-aliasfn opy open-with sioyek
+aliasfn open-preview open-with preview
+aliasfn opv open-preview
+
+aliasfn open-skim open-with Skim
+aliasfn ops open-skim
+
+aliasfn open-sioyek open-with sioyek
+aliasfn opy open-sioyek
+aliasfn sio open-sioyek
 ##
 function mega-get() {
   if isBicon ; then

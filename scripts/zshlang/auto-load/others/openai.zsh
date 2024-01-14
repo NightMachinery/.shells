@@ -209,11 +209,11 @@ function openai-chatgpt {
 # alias xx='\noglob openai-chatgpt'
 ##
 function openai-token-count {
-    local model="gpt-4"
+    local model="${token_count_model:-gpt-4}"
 
     in-or-args "$@" |
-        reval-ec ttok -m "${model}"
-        # openai_token_count.py
+        # $proxyenv reval-ec ttok -m "${model}"
+        openai_token_count.py
 }
 ## * Simon's LLM
 function llm-logs {
@@ -283,7 +283,7 @@ function llm-send {
     fi
 
     local token_count input_cost
-    token_count="$(ecn "${input}" | ttok -m "${model}")" @TRET
+    token_count="$(ecn "${input}" | token_count_model="${model}" openai-token-count)" @TRET
 
     if (( ${token_count} > max_tokens )) ; then
         if [[ "${token_strategy}" == 'reject' ]] ; then
@@ -295,7 +295,7 @@ function llm-send {
                 input+=$'\n''```'$'\n'
             fi
 
-            token_count="$(ecn "${input}" | ttok -m "${model}")" @TRET
+            token_count="$(ecn "${input}" | token_count_model="${model}" openai-token-count)" @TRET
             ecgray "$0: truncated input to ${token_count} tokens"
         else
             ecerr "$0: Unknown token limit strategy: ${token_strategy}"
@@ -317,7 +317,7 @@ function llm-send {
     } always {
         exec {fd_out}<&-
     }
-    output_token_count="$(ecn "${output}" | ttok -m "${model}")" @TRET
+    output_token_count="$(ecn "${output}" | token_count_model="${model}" openai-token-count)" @TRET
     output_cost="$(openai-cost-by-tokens "${model}" output "${output_token_count}")" @TRET
     total_cost=$(( ${input_cost} + ${output_cost} )) @TRET
     local n20=$(( 20 / ${total_cost} ))

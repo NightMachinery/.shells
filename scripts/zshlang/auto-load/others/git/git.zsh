@@ -402,11 +402,12 @@ Undoes last commits without changing files." MAGIC
   git reset --soft HEAD~"${1:-1}"
 }
 ##
-function http2git {
+function git-http-to-ssh {
   in-or-args "$@" |
     perl -ple 's|^https://([^/]+)/|git\@$1:| && s|(?:\.git)?$|.git|' |
     cat-copy-if-tty
 }
+aliasfn http2git git-http-to-ssh
 
 function git-remote-2ssh {
   local remotes=($@)
@@ -584,7 +585,8 @@ function git-conflicts-paths {
 }
 ##
 function git-current-commit {
-  git rev-parse "${1:-HEAD}"
+  git rev-parse "${1:-HEAD}" |
+    cat-copy-if-tty
 }
 ##
 function git-merge-p {

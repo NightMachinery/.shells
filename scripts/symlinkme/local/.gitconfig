@@ -63,5 +63,10 @@
 [credential "https://github.com"]
 	NightMachinery = NightMachinery
 	username = NightMachinery
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
 [credential "https://git.overleaf.com"]
 	provider = generic
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
