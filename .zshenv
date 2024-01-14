@@ -140,7 +140,7 @@ function nightsh-load-zshenv {
             # -e, --canonicalize-existing: all components of the path must exist
             ##
         }
-        function rp() {
+        function rp {
             realpath2 "$@"
         }
     }

@@ -77,7 +77,7 @@ function icat-pdf {
     {
         assert @opts o "$tmp" @ pdf2png-mutool -w "$(screen-width)" "$i" "$pages" @RET
 
-        icat "$tmp"
+        icat_v=n icat "$tmp"
         # icat-kitty "$tmp"
         # icat-realsize "$tmp"
     } always {

@@ -5,7 +5,7 @@ function ugrep-c-get {
     ec "${ugrep_c:-3}"
 }
 ##
-function ugbase() {
+function ugrep-base {
     local follow_sym="${ugbase_follow}" rtl="${ugbase_rtl:-y}"
 
     local sel ret opts=()
@@ -34,8 +34,15 @@ function ugbase() {
         return $ret
     fi
 }
+aliasfn ugbase ugrep-base
+
+function ugrep-pdf {
+    #: @alt =rga= shows the page numbers, too. I don't know how to do that with =ugrep= or if it's possible at all.
+    ##
+    ugbase --filter='pdf:pdftotext % -' "$@"
+}
 ##
-function ugbool() {
+function ugbool {
     local q="${*:-.}"
 
     ugbase --bool -- "$q"
@@ -149,11 +156,12 @@ function ugfz() {
     fi
 }
 ###
-function ugrep_get {
+function ugrep-get {
     local format="${ugrep_get_format:-%[1]#%~}"
     # format='%f%s%n%s%[1]#' # path+linenumber+match
 
     revaldbg ugrep "$ugrep_opts[@]" --perl-regexp --format="$format" "$@"
     # `--colors='hl'` doesn't work with `--format`.
 }
+aliasfn ugrep_get ugrep-get
 ##

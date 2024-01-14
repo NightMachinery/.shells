@@ -4,7 +4,7 @@
 powersaving_status_del
 # wireguard_enabled_del
 ##
-darwin-dns-set 127.0.0.1 1.1.1.1
+darwin-dns-set 8.8.8.8 1.1.1.1 # 127.0.0.1
 ##
 if test -n "$MDNS_NAME" ; then
     # mdns-init-darwin

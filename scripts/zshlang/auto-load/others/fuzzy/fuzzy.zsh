@@ -359,18 +359,18 @@ aliasfn ve-code veditor=(code-insiders --reuse-window)
 aliasfn ve-emc veditor=(emc-gateway)
 aliasfn vv ve-emc v
 ###
-function vp-ls() {
-    arrN ~/Downloads/**/*.pdf ~base/_Books/**/*.pdf ~base/documents/course_materials/**/*.pdf
+function vp-ls {
+    arrN ~/Downloads/**/*.pdf(ND.) ~base/_Books/**/*.pdf(ND.) ~base/documents/course_materials/**/*.pdf(ND.)
 }
 
-function vp {
+function pdf-recent-fz {
     # v pdf
     ##
     bella_zsh_disable1
 
     local opener=("${pdf_opener[@]}")
     if test -z "${opener[*]}" ; then
-        opener=(open -a sioyek)
+        opener=(open-sioyek)
     fi
 
     local q="$* "
@@ -381,6 +381,9 @@ function vp {
         sponge |
         inargsf "${opener[@]}"
 }
+aliasfn vp pdf-recent-fz
+
+aliasfn vps pdf_opener=open-skim pdf-recent-fz
 ##
 function fuzzy-choose() {
     bella_zsh_disable1

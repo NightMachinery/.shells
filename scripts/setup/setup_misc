@@ -78,6 +78,8 @@ re '$proxyenv dasht-docsets-install -f' css html bash
 ##
 luarocks install penlight # require 'pl.pretty'.dump(table)
 luarocks install luaposix
+luarocks install redis-lua
+luarocks install lzmq
 ##
 epubmerge-install
 ##
