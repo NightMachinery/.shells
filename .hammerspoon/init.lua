@@ -20,6 +20,7 @@ timer = require "hs.timer"
 appfinder = require "hs.appfinder"
 applescript = require "hs.applescript"
 eventtap = require "hs.eventtap"
+json = require("hs.json")
 -- chooser = require "hs.chooser"
 plp = require 'pl.pretty'
 ---
@@ -57,6 +58,41 @@ if success then
     -- You can now use redisClient to interact with Redis
 else
     print("Failed to connect to Redis after " .. maxRetries .. " attempts.")
+end
+---
+local function copyToClipboard(text)
+    hs.pasteboard.setContents(text)
+end
+
+local function doCopy()
+    hs.eventtap.keyStroke({"cmd"}, "c")
+end
+
+local function doPaste()
+    hs.eventtap.keyStroke({"cmd"}, "v")
+end
+---
+local function timerifyFn(params)
+    -- We need to create a new timer for each call/press and make sure it
+    -- doesn't get garbage-collected:
+    local enabled_p = params.enabled_p
+    if enabled_p == nil then
+        enabled_p = true
+    end
+    local fn = params.fn
+    local delay = params.delay or 0
+
+    if enabled_p then
+        return function()
+            local timer
+            timer = hs.timer.doAfter(delay, function()
+                                         timer = nil
+                                         fn()
+            end)
+        end
+    else
+        return fn
+    end
 end
 ---- * Hyper Modifier Key
 if false then
@@ -169,6 +205,7 @@ function hyper_modality:entered()
     end
 
     hyperAlerts = {}
+    -- WAIT @me [[https://github.com/Hammerspoon/hammerspoon/issues/3586][How do I show an alert on all fullscreen spaces? · Issue #3586 · Hammerspoon/hammerspoon]]
     for i, screen in pairs(hs.screen.allScreens()) do
         msg = "🌟"
         -- msg = "Hyper Mode 🌟"
@@ -299,8 +336,10 @@ end
 --- ** Hyper Hotkeys (Main Section)
 hyper_toggler_1 = hs.hotkey.bind({}, "F18", hyper_down, hyper_up, nil)
 -- Trigger existing hyper key shortcuts
-for _, key in ipairs({"v", "[", "-", "\\"}) do
-    -- I cannot bind =]= using hyper. I have no idea why.
+for _, key in ipairs({"v", "\\", "delete", "space", "h"}) do
+    -- "o",
+    --
+    -- If you can't bind a key here, it's most probably because you have bound it later in the code.
     ---
     -- hs.keycodes.map['left'], hs.keycodes.map['right'], "right"
     -- [[https://github.com/Hammerspoon/hammerspoon/issues/2282][Having trouble sending arrow key events · Issue #2282 · Hammerspoon/hammerspoon]]
@@ -310,6 +349,22 @@ for _, key in ipairs({"v", "[", "-", "\\"}) do
 
                       hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, key)
     end}
+end
+
+for _, key in ipairs({"[", "-"}) do
+    -- AltTab Window Switcher:
+    -- Its proper functions needs the modifier keys to be kept pressed while the hyper mode is active. I.e., it really needs the hyper mode to be the same thing as having the modifiers pressed.
+    -- I don't know of a way to do that (see [[id:6fcee871-a0f9-46b5-af2f-a9b767c48422][@me How can I make Hammerspoon press modifier keys? · Issue #3582 · Hammerspoon/hammerspoon]]), but we could add `hyper_modality.press_on_exit = {"return"}`. This would make the common usage of the window switcher painless, but it might break the more advanced usage of it; like pressing =w= to close a window.
+    hyper_bind_v2{
+        key = key,
+        pressedfn = function()
+            hyper_triggered()
+            hs.eventtap.event.newKeyEvent({"cmd", "alt", "shift", "ctrl"}, key, true):post()
+        end,
+        releasedfn = function()
+            hs.eventtap.event.newKeyEvent({"cmd", "alt", "shift", "ctrl"}, key, false):post()
+        end
+    }
 end
 
 ---
@@ -531,20 +586,18 @@ end
 purple_toggler_1 = hyper_bind_v2{mods={"cmd"}, key="p", pressedfn=purple_down, releasedfn=purple_up}
 purple_bind_v2{ mods={"shift"}, auto_trigger_p=false, key="escape", pressedfn=purple_exit }
 
-purple_bind_v2{ auto_trigger_p=false, key="q", pressedfn=(function()
+purple_bind_v2{ auto_trigger_p=false, key="q", pressedfn=timerifyFn{enabled_p=false, delay=0, fn=function()
                         -- hs.alert("purple_modality: undo")
 
                         -- purple_modality:exit()
                         -- Somehow the =h= here would be in conflict with the h hotkey in purple_modality. This can be worked around by exiting and re-entering the mode.
                         -- Using a timer also works
                         -- [[https://stackoverflow.com/questions/53320589/hs-eventtap-keystroke-with-modifier-works-only-after-double-press][hammerspoon - hs.eventtap.keyStroke with modifier works only after double press - Stack Overflow]]
-                        -- hs.timer.doAfter(0.1, function()
-                        -- hs.eventtap.keyStroke({"cmd"}, "z")
-                        -- end)
                         -- We just need the key of this hotkey not to be in conflict with itself.
+                        -- Or we can change it to a released callback, so the real key isn't being held anymore.
                         hs.eventtap.keyStroke({"cmd"}, "z")
                         -- purple_modality:enter()
-end)}
+end}}
 purple_bind_v2{ auto_trigger_p=false, key="a", pressedfn=(function()
                         hs.eventtap.keyStroke({"cmd", "ctrl"}, "h")
 end)}
@@ -565,10 +618,13 @@ function cursorHide()
     local xPosition = mainFrame.w - 1
     local yPosition = mainFrame.h / 2 -- This will place the cursor vertically at the center
 
-    -- Move the mouse to the calculated position
+    -- Move the mouse to the top center (so that the top app bar gets hidden next)
+    hs.mouse.absolutePosition(hs.geometry.point(mainFrame.w / 2, 0))
+
+    -- Move the mouse to the center right
     hs.mouse.absolutePosition(hs.geometry.point(xPosition, yPosition))
 end
-hyper_bind_v2{pressedfn=cursorHide, mods={"ctrl"}, key="c"}
+hyper_bind_v2{pressedfn=cursorHide, mods={"ctrl"}, key="space"}
 -- ** Keyboard Mouse Mode
 -- @warning Moving the mouse using Hammerspoon doesn't register for certain for some events. Doing a right click forces the new position to be registered in these cases.
 ---
@@ -940,12 +996,18 @@ function screenPositionAvy(params)
             cleanup()
     end)
 
+    -- Pressing =enter= will reuse the current mouse position.
+    mouse_avy_modality:bind({}, "return", function()
+            local mousePosition = hs.mouse.absolutePosition()
+            local x = mousePosition.x
+            local y = mousePosition.y
+
+            handleKeyPress(mouse_avy_modality, x, y)
+    end)
+
     -- Enter the modal state
     mouse_avy_modality:enter()
 end
-
-hyper_bind_v2{key="return", pressedfn=screenPositionAvy}
-purple_bind_v2{mods={}, key="return", pressedfn=screenPositionAvy}
 -- *** Mouse Clicks
 function leftClick()
     hs.eventtap.leftClick(hs.mouse.absolutePosition())
@@ -971,7 +1033,8 @@ function mouseClick(params)
         left_up = hs.eventtap.event.types.leftMouseUp,
         right_down = hs.eventtap.event.types.rightMouseDown,
         right_up = hs.eventtap.event.types.rightMouseUp,
-        -- Add other actions here if needed
+
+        left_drag = hs.eventtap.event.types.leftMouseDragged,
     }
 
     -- Alias mapping for shorthand actions
@@ -990,6 +1053,7 @@ function mouseClick(params)
         if eventType then
             local event = hs.eventtap.event.newMouseEvent(eventType, params.position, params.mods)
             event:post()
+
             -- Sleep between actions if specified
             if params.sleep > 0 then
                 hs.timer.usleep(params.sleep * 1000000)
@@ -1000,8 +1064,96 @@ function mouseClick(params)
     end
 end
 
+function leftClickAvy()
+    screenPositionAvy({
+            callback = function(x, y)
+            ---
+             hs.mouse.absolutePosition({ x = x, y = y })
+             leftClick()
+            ---
+                -- This also moves the cursor and doesn't just click the location like Shortcat can do.
+                -- mouseClick{position={ x = x, y = y}}
+            ---
+        end,
+    })
+end
+function leftDrag()
+    mouseClick{actions={"left_down", "left_drag"}, sleep=0}
+end
+function leftDragAvy()
+    screenPositionAvy({
+            callback = function(x, y)
+                mouseClick{position={ x = x, y = y}, actions={"left_down", "left_drag"}, sleep=0}
+                -- This works with the real cursor (i.e., moving the cursor selects stuff), but not with us moving the cursor. This same thing happened with just =left_down=.
+                -- Update: This no longer works with the real cursor. I have no idea what I changed. It just worked a minute ago!
+                -- This somewhat works (on Skim only) if you press leftDrag both on the start of the text and on its end. It's not at all reliable though.
+                -- I guess the only way to make this work reliably is as =textSelectAvyV2= does: do a left_down on the start, then a left_drag and left_up at the destination. Even that doesn't work reliably on Skim.
+
+                -- mouseClick{position={ x = x, y = y}, actions={"left_drag", "left_up"}, sleep=0}
+            end,
+    })
+end
+function rightClickAvy()
+    screenPositionAvy({
+            callback = function(x, y)
+            hs.mouse.absolutePosition({ x = x, y = y })
+            rightClick()
+        end,
+    })
+end
+
+function textSelectAvy()
+    local function second(x, y)
+        mouseClick{mods={"shift"}, position={ x = x, y = y }}
+
+        doCopy()
+    end
+
+    local function first(x, y)
+        hs.mouse.absolutePosition({ x = x, y = y })
+        leftClick()
+
+        screenPositionAvy({
+                callback = second,
+        })
+    end
+
+    screenPositionAvy({
+            callback = first,
+    })
+end
+
+function textSelectAvyV2()
+    local function dragTo(x, y)
+        mouseClick{position={ x = x, y = y}, actions={"left_drag", "left_up"}, sleep=0}
+
+        doCopy()
+    end
+
+    local function startDrag(x, y)
+        -- Move the mouse to the starting position
+        -- hs.mouse.absolutePosition({ x = x, y = y })
+
+        -- Create a mouse event for pressing down
+        mouseClick{position={ x = x, y = y}, actions={"left_down"}, sleep=0}
+
+        screenPositionAvy({
+            callback = dragTo,
+        })
+    end
+
+    screenPositionAvy({
+        callback = startDrag,
+    })
+end
 
 for _, binder in ipairs({purple_bind_v2, hyper_bind_v2}) do
+    binder{mods={"ctrl"}, key="return", pressedfn=screenPositionAvy,}
+    binder{mods={}, key="return", pressedfn=leftClickAvy,}
+    -- binder{mods={"shift"}, key="return", pressedfn=leftDrag,}
+    binder{mods={}, key="]", pressedfn=rightClickAvy,}
+    binder{mods={}, key="o", pressedfn=textSelectAvyV2,}
+
     binder{mods={}, key="'", pressedfn=leftClick}
     binder{mods={"shift"}, key="'", pressedfn=function()
                mouseClick{mods={"shift"}}
@@ -1019,7 +1171,7 @@ function takeScreenshot(topLeft, bottomRight)
     local y = topLeft.y
     local width = bottomRight.x - topLeft.x
     local height = bottomRight.y - topLeft.y
-    local rectString = string.format("%d,%d,%d,%d", x, y, width, height)
+    local rectString = string.format("%f,%f,%f,%f", x, y, width, height)
 
     -- -c      Force screen capture to go to the clipboard.
     -- -R      <rectangle> Capture rectangle using format x,y,width,height.
@@ -1045,6 +1197,7 @@ function screenshotAvy()
             })
         end
     end
+
     -- Start capturing the first point
     screenPositionAvy({
             callback = capturePoint,
@@ -1388,7 +1541,7 @@ if false then
 
                           -- Warning:hs.keycode: key 'c' not found in active keymap; using ANSI-standard US keyboard layout as fallback, returning '8'
                           -- eventtap.keyStroke({"cmd"}, 'a')
-                          -- eventtap.keyStroke({"cmd"}, 'c')
+                          -- doCopy()
                           eventtap.keyStroke({"cmd"}, 0)
                           eventtap.keyStroke({"cmd"}, 8)
                           local res
@@ -1503,6 +1656,193 @@ function ntagFinder()
     c:show()
 end
 hyper_bind_v2{mods={"cmd"}, key='n', pressedfn=ntagFinder}
+--- * Emoji Chooser
+-- Reusable function to filter choices based on space-separated regexp patterns
+local function filterChoicesByPatterns(params)
+    local query = params.query
+    local choices = params.choices
+    local filterKey = params.on or "text" -- Default to "text" if no key is provided
+
+    local patterns = {}
+    for pattern in query:gmatch("%S+") do -- Split query into space-separated patterns
+        table.insert(patterns, pattern)
+    end
+
+    local filteredChoices = {}
+    for _, choice in ipairs(choices) do
+        local match = true
+        for _, pattern in ipairs(patterns) do
+            if not string.match(choice[filterKey], pattern) then
+
+                match = false
+                break
+            end
+        end
+        if match then
+            table.insert(filteredChoices, choice)
+        end
+    end
+    return filteredChoices
+end
+
+
+local emojiData = {}
+local function loadEmojiData()
+    local filePath = os.getenv("HOME") .. "/code/misc/unicode-emoji-json/data-by-emoji.json"
+    local file = io.open(filePath, "r")
+    if not file then
+        hs.alert.show("Emoji data file not found")
+        return
+    end
+
+    local data = file:read("*a")
+
+    file:close()
+    emojiData = json.decode(data)
+end
+loadEmojiData()
+
+local emojiAlert -- Reference to the alert
+
+local emojiStyle = {
+    -- Define your custom style here, similar to hyperStyle
+    atScreenEdge = 1,
+    fadeInDuration = 0.001,
+    fadeOutDuration = 0.001,
+    fillColor = { white = 1, alpha = 2 / 3 },
+
+    radius = 24,
+    strokeColor = { red = 19 / 255, green = 182 / 255, blue = 133 / 255, alpha = 1},
+    strokeWidth = 16,
+    textColor = { white = 0.125 },
+    textSize = 48,
+}
+
+function emojiChooser()
+    local selectedEmojis = {} -- Table to store selected emojis
+
+    local function updateAlert()
+        if emojiAlert then
+            hs.alert.closeSpecific(emojiAlert)
+        end
+
+        if #selectedEmojis >= 1 then
+            local message = table.concat(selectedEmojis)
+            emojiAlert = hs.alert.show(message, emojiStyle, hs.screen.mainScreen(), 'infinite')
+        end
+    end
+
+    local function clearAlert()
+        if emojiAlert then
+            hs.alert.closeSpecific(emojiAlert)
+            emojiAlert = nil
+        end
+    end
+
+    local chooser = hs.chooser.new(function(choice)
+            if not choice then
+                -- canceled
+                return
+            end
+
+            if #selectedEmojis == 0 then
+                table.insert(selectedEmojis, choice.text)
+            end
+
+            local emojiString = table.concat(selectedEmojis)
+            ---
+            -- hs.eventtap.keyStrokes(emojiString)
+            -- =keyStrokes= cannot insert some emojis.
+            ---
+            copyToClipboard(emojiString)
+            doPaste()
+            ---
+
+            selectedEmojis = {}
+            clearAlert()
+            return
+    end)
+    chooser:placeholderText("Choose an emoji...")
+
+    local choices = {}
+    for emoji, info in pairs(emojiData) do
+        table.insert(choices, {
+                         text = emoji,
+                         subText = info.name
+                         ---
+                         -- subText = emoji,
+                         -- text = info.name
+                         ---
+                         -- image property can be added here if you have images for emojis
+        })
+    end
+
+    table.sort(choices, function(a, b) return a.subText < b.subText end)
+
+    chooser:choices(choices)
+
+    -- Update the chooser choices based on the query
+    chooser:queryChangedCallback(function(query)
+            local filteredChoices = filterChoicesByPatterns{query=query, choices=choices, on="subText"}
+        chooser:choices(filteredChoices)
+    end)
+
+    local function addCurrent()
+        local choice = chooser:selectedRowContents()
+
+        if choice then
+            table.insert(selectedEmojis, choice.text)
+            updateAlert()
+        end
+    end
+
+    local function removeLast()
+        if #selectedEmojis > 0 then
+            table.remove(selectedEmojis)
+            updateAlert()
+        end
+    end
+
+    local hotkeys = {
+        shiftEnter = hs.hotkey.bind('shift', 'return', addCurrent),
+        tab = hs.hotkey.bind('', 'tab', addCurrent),
+        backspace = hs.hotkey.bind('shift', 'delete', removeLast),
+        backspace = hs.hotkey.bind('', '\\', removeLast),
+        shiftTab = hs.hotkey.bind('shift', 'tab', removeLast)
+    }
+
+    local function cleanup()
+        -- hs.alert("emojiChooser: cleanup")
+
+        for _, hk in pairs(hotkeys) do hk:delete() end
+        clearAlert()
+    end
+
+    chooser:hideCallback(cleanup)
+
+    local function main()
+        chooser:show()
+    end
+
+    -- Wrap the main execution in pcall to catch any errors
+    local success, err = pcall(main)
+
+    -- If an error occurred, clean up and rethrow the error
+    if not success then
+        hs.alert("emojiChooser error:" .. err)
+
+        cleanup()
+        error(err)
+    end
+
+    -- Use the defer function to ensure cleanup happens on garbage collection
+    -- This will act as a "finally" block
+    -- local function defer(func)
+    --     return setmetatable({}, { __gc = func })
+    -- end
+    -- local _ = defer(cleanup)
+end
+hyper_bind_v2{mods={}, key="a", pressedfn=emojiChooser}
 ---
 function anycomplete()
     local timer
@@ -1515,7 +1855,9 @@ function anycomplete()
     else
         eventtap.keyStroke({"shift", "alt"}, hs.keycodes.map['right'])
     end
-    eventtap.keyStroke({"cmd"}, hs.keycodes.map['c'])
+
+    doCopy()
+
     c = hs.chooser.new(function(x)
             if tab then tab:delete() end
             if antitab then antitab:delete() end
@@ -1685,12 +2027,12 @@ appHotkey{ key='l', appName='com.tdesktop.Telegram' }
 
 -- appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='b', appName='zathura' }
-appHotkey{ key='a', appName='com.adobe.Reader' }
+-- appHotkey{ key='a', appName='com.adobe.Reader' }
 
 -- appHotkey{ key='p', appName='com.jetbrains.pycharm' }
 appHotkey{ key='p', appName='com.apple.Preview' }
 
-appHotkey{ key=']', appName='org.jdownloader.launcher' }
+-- appHotkey{ key=']', appName='org.jdownloader.launcher' }
 
 appHotkey{ key='k', appName='info.sioyek.sioyek' }
 appHotkey{ key='j', appName='net.sourceforge.skim-app.skim' }
@@ -1912,7 +2254,7 @@ function pasteBlockified()
     hs.pasteboard.setContents(markdownContent)
 
     -- Trigger a "paste" event
-    hs.eventtap.keyStroke({"cmd"}, "v")
+    doPaste()
 
     -- Set the original clipboard content back to clipboard after some delay (in seconds)
     hs.timer.doAfter(0.2, function() hs.pasteboard.setContents(clipboardContent) end)
