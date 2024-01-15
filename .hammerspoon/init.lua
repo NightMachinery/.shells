@@ -36,23 +36,26 @@ function connectToRedis()
     return redis.connect('127.0.0.1', 6379)
 end
 
-function connectToRedisWithRetries()
+function connectToRedisWithRetries(maxRetries, retryDelay)
     local redisClient
-    local success, errMsg
+    local success, retVal
     for attempt = 1, maxRetries do
-        success, redisClient = pcall(connectToRedis)
+        success, retVal = pcall(connectToRedis)
+
         if success then
-            return true, redisClient
+            return true, retVal -- retVal here is the redisClient on success
         else
-            print("Attempt " .. attempt .. " failed: " .. errMsg)
-            print("Retrying in " .. retryDelay .. " seconds...")
+            print("connectToRedisWithRetries: Attempt " .. attempt .. " failed: " .. retVal) -- retVal is the error message on failure
+
+            print("connectToRedisWithRetries: Retrying in " .. retryDelay .. " seconds...")
             hs.timer.usleep(retryDelay * 1000000) -- usleep takes microseconds
+
         end
     end
     return false, nil
 end
 
-local success, redisClient = connectToRedisWithRetries()
+local success, redisClient = connectToRedisWithRetries(maxRetries, retryDelay)
 if success then
     -- print("Connected to Redis successfully!")
     -- You can now use redisClient to interact with Redis
