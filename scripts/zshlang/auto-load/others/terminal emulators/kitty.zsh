@@ -107,12 +107,14 @@ function kitty-tab-is-focused {
 }
 ##
 # redis-defvar kitty_focused
-function kitty-is-focused() {
+function kitty-is-focused {
     ##
-    [[ "$(frontapp-get)" == 'net.kovidgoyal.kitty' ]]
-    ## does not work, is always true, probably tracks the last active kitty window regardless of OS frontapp-getfocus:
-    # kitty-remote ls | jq -r '.[] | .is_focused'
+    #: @toFuture/1404 If we have fixed [agfi:frontapp-get], let's switch back to it. It's more reliable.
+    # [[ "$(frontapp-get)" == 'net.kovidgoyal.kitty' ]]
     ##
+    [[ "$(kitty-remote ls | jq -r '.[] | .is_focused')" == true ]]
+    ##
+    # @Redis
     # [[ "$(kitty_focused_get)" == 1 ]]
     ##
 }
