@@ -2115,6 +2115,10 @@ hs.window.filter.new('Acrobat Reader')
               end)
 ---
 function bindWithRepeat(mods, key, pressedfn)
+    -- WAIT [[id:6b34d65d-0fe4-4fcc-b388-39d532880a6c][@me {FR} Add the ability to customize the repeat rate for `repeatfn` per hotkey · Issue #3587 · Hammerspoon/hammerspoon]]
+    --
+    -- The above is especially needed for pageup and pagedown.
+    ---
     if mods == "hyper" or mods == hyper or not mods then
         hyper_bind_v2{
             key=key,
@@ -2126,30 +2130,57 @@ function bindWithRepeat(mods, key, pressedfn)
         hs.hotkey.bind(mods, key, pressedfn, nil, pressedfn)
     end
 end
+
+function bindWithRepeatV2(params)
+    local binder = params.binder or hyper_bind_v2
+    params.repeatfn = params.repeatfn or params.pressedfn
+
+    binder(params)
+end
 ----
 function pressPageUp()
     eventtap.keyStroke({}, hs.keycodes.map['pageup'])
 end
-
 bindWithRepeat(hyper, "up", pressPageUp)
 
 bindWithRepeat(hyper, "down", function()
                    eventtap.keyStroke({}, hs.keycodes.map['pagedown'])
 end)
 
+-- =bindToKey= did not repeat these keys.
+-- bindToKey{
+--     binder = hyper_bind_v2,
+--     from = "down",
+--     to = "pagedown",
+-- }
+-- bindToKey{
+--     binder = hyper_bind_v2,
+--     from = "up",
+--     to = "pageup",
+-- }
+---
 -- You can set hyper+F5 to the dictation command in macOS settings.
 hyper_bind_v1("5", function()
                   brishzeval('awaysh-fast input-volume-mute-toggle')
                   -- @needed awaysh-fast
 end)
 
-bindWithRepeat(hyper, "F1", function()
+bindWithRepeatV2{
+    binder=hyper_bind_v2,
+    key="F1",
+    pressedfn=function()
                    brishzeval('awaysh-fast brightness-dec')
-end)
-
-bindWithRepeat(hyper, "F2", function()
+    end,
+    auto_trigger_p=false
+}
+bindWithRepeatV2{
+    binder=hyper_bind_v2,
+    key="F2",
+    pressedfn=function()
                    brishzeval('awaysh-fast brightness-inc')
-end)
+    end,
+    auto_trigger_p=false
+}
 
 hyper_bind_v1("F6", function()
                   brishzeval('awaysh-fast focus-do-not-disturb-toggle')
@@ -2192,23 +2223,32 @@ function volumeInc(v, device)
     hs.alert("vol: " .. math.floor(v + 0.5), 0.4)
 end
 
-bindWithRepeat(hyper, "F11", function()
+bindWithRepeatV2{
+    binder=hyper_bind_v2,
+    key="F11",
+    pressedfn=function()
                    ---
                    -- brishzeval('awaysh-fast volume-dec')
                    ---
                    -- volumeInc(-5)
                    volumeDecKey()
                    ---
-end)
-
-bindWithRepeat(hyper, "F12", function()
+    end,
+    -- auto_trigger_p=false
+}
+bindWithRepeatV2{
+    binder=hyper_bind_v2,
+    key="F12",
+    pressedfn=function()
                    ---
                    -- brishzeval('awaysh-fast volume-inc')
                    ---
                    -- volumeInc(5)
                    volumeIncKey()
                    ---
-end)
+    end,
+    -- auto_trigger_p=false,
+}
 --
 kitty_prev_app = nil
 function kittyHandler()
