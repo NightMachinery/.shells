@@ -2,6 +2,8 @@
 function focus-off {
     if isDarwin ; then
        shortcuts run 'Focus Off'
+
+        alert "Do Not Disturb: off"
     else
         @NA
     fi
@@ -37,6 +39,8 @@ function focus-do-not-disturb-p {
 function focus-do-not-disturb-on {
     if isDarwin ; then
         shortcuts run 'Focus Set: Do Not Disturb'
+
+        alert "Do Not Disturb: ON"
     else
         @NA
     fi
