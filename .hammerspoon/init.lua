@@ -98,6 +98,8 @@ local function timerifyFn(params)
     end
 end
 ---- * Hyper Modifier Key
+hyper = {"cmd","ctrl","alt","shift"}
+
 if false then
     -- Here we were trying to make F7 press other modifier keys.
     -- [[id:6fcee871-a0f9-46b5-af2f-a9b767c48422][@me How can I make Hammerspoon press modifier keys? · Issue #3582 · Hammerspoon/hammerspoon]]
@@ -348,25 +350,38 @@ for _, key in ipairs({"v", "\\", "delete", "space", "h"}) do
     -- [[https://github.com/Hammerspoon/hammerspoon/issues/2282][Having trouble sending arrow key events · Issue #2282 · Hammerspoon/hammerspoon]]
     ---
     hyper_bind_v2{key=key, pressedfn=function()
-                      hyper_triggered()
-
                       hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, key)
     end}
+end
+
+function bindToKey(params)
+    local binder = params.binder or hyper_bind_v2
+    local from_mods = params.from_mods or {}
+    local from = params.from
+    local to = params.to
+    local to_mods = params.to_mods or {}
+
+    binder{
+        mods = from_mods,
+        key = from,
+        pressedfn = function()
+            hs.eventtap.event.newKeyEvent(to_mods, to, true):post()
+        end,
+        releasedfn = function()
+            hs.eventtap.event.newKeyEvent(to_mods, key, false):post()
+        end
+    }
 end
 
 for _, key in ipairs({"[", "-"}) do
     -- AltTab Window Switcher:
     -- Its proper functions needs the modifier keys to be kept pressed while the hyper mode is active. I.e., it really needs the hyper mode to be the same thing as having the modifiers pressed.
-    -- I don't know of a way to do that (see [[id:6fcee871-a0f9-46b5-af2f-a9b767c48422][@me How can I make Hammerspoon press modifier keys? · Issue #3582 · Hammerspoon/hammerspoon]]), but we could add `hyper_modality.press_on_exit = {"return"}`. This would make the common usage of the window switcher painless, but it might break the more advanced usage of it; like pressing =w= to close a window.
-    hyper_bind_v2{
-        key = key,
-        pressedfn = function()
-            hyper_triggered()
-            hs.eventtap.event.newKeyEvent({"cmd", "alt", "shift", "ctrl"}, key, true):post()
-        end,
-        releasedfn = function()
-            hs.eventtap.event.newKeyEvent({"cmd", "alt", "shift", "ctrl"}, key, false):post()
-        end
+    -- I don't know of a way to do that (see [[id:6fcee871-a0f9-46b5-af2f-a9b767c48422][@me How can I make Hammerspoon press modifier keys? · Issue #3582 · Hammerspoon/hammerspoon]]), but we could add `hyper_modality.press_on_exit = {"space"}`. This would make the common usage of the window switcher painless, but it might break the more advanced usage of it; like pressing =w= to close a window.
+    bindToKey{
+        binder = hyper_bind_v2,
+        from = key,
+        to = key,
+        to_mods = hyper,
     }
 end
 
@@ -1402,7 +1417,6 @@ end
 local inputEnglish = "com.apple.keylayout.US"
 local inputPersian = "com.apple.keylayout.Persian-ISIRI2901"
 --
-hyper = {"cmd","ctrl","alt","shift"}
 hs.window.animationDuration = 0;
 hs.dockicon.hide() -- to appear above full-screen windows you must hide the Hammerspoon Dock icon
 ---
