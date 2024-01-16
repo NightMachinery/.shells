@@ -1470,20 +1470,26 @@ if false then
     end
 else
     input_lang_push_lang = nil
+    function inputLangPop()
+        if not (input_lang_push_lang == nil) then
+            hs.keycodes.currentSourceID(input_lang_push_lang)
+            input_lang_push_lang = nil
+        end
+    end
+    function inputLangPush()
+        if input_lang_push_lang == nil then
+            input_lang_push_lang = hs.keycodes.currentSourceID()
+        end
+    end
+
     function appWatch(appName, event, app)
         -- alert.show("appWatch: " .. appName .. ", event: " .. tostring(event) .. ", app: " .. tostring(app), 7)
         if event == hs.application.watcher.activated then
             if has_value(enOnly, appName) then
-                if input_lang_push_lang == nil then
-                    input_lang_push_lang = hs.keycodes.currentSourceID()
-                end
-
+                inputLangPush()
                 langSetEn()
             else
-                if not (input_lang_push_lang == nil) then
-                    hs.keycodes.currentSourceID(input_lang_push_lang)
-                    input_lang_push_lang = nil
-                end
+                inputLangPop()
             end
         end
     end
@@ -1832,12 +1838,18 @@ function emojiChooser()
         -- hs.alert("emojiChooser: cleanup")
 
         for _, hk in pairs(hotkeys) do hk:delete() end
+
+        inputLangPop()
+
         clearAlert()
     end
 
     chooser:hideCallback(cleanup)
 
     local function main()
+        inputLangPush()
+        langSetEn()
+
         chooser:show()
     end
 
