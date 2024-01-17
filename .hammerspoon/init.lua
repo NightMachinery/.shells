@@ -121,6 +121,8 @@ end
 
 -- A global variable for the Hyper Mode
 redisModalityUpdateP = false
+-- redisModalityUpdateP = true
+
 -- @works but not needed for now
 function redisActivateMode(mode)
     if redisActivateMode then
@@ -341,7 +343,7 @@ end
 --- ** Hyper Hotkeys (Main Section)
 hyper_toggler_1 = hs.hotkey.bind({}, "F18", hyper_down, hyper_up, nil)
 -- Trigger existing hyper key shortcuts
-for _, key in ipairs({"v", "\\", "delete", "space", "h"}) do
+for _, key in ipairs({"v", "\\", "delete", "space", "j"}) do
     -- "o",
     --
     -- If you can't bind a key here, it's most probably because you have bound it later in the code.
@@ -605,16 +607,16 @@ purple_toggler_1 = hyper_bind_v2{mods={"cmd"}, key="p", pressedfn=purple_down, r
 purple_bind_v2{ mods={"shift"}, auto_trigger_p=false, key="escape", pressedfn=purple_exit }
 
 purple_bind_v2{ auto_trigger_p=false, key="q", pressedfn=timerifyFn{enabled_p=false, delay=0, fn=function()
-                        -- hs.alert("purple_modality: undo")
+                                                                        -- hs.alert("purple_modality: undo")
 
-                        -- purple_modality:exit()
-                        -- Somehow the =h= here would be in conflict with the h hotkey in purple_modality. This can be worked around by exiting and re-entering the mode.
-                        -- Using a timer also works
-                        -- [[https://stackoverflow.com/questions/53320589/hs-eventtap-keystroke-with-modifier-works-only-after-double-press][hammerspoon - hs.eventtap.keyStroke with modifier works only after double press - Stack Overflow]]
-                        -- We just need the key of this hotkey not to be in conflict with itself.
-                        -- Or we can change it to a released callback, so the real key isn't being held anymore.
-                        hs.eventtap.keyStroke({"cmd"}, "z")
-                        -- purple_modality:enter()
+                                                                        -- purple_modality:exit()
+                                                                        -- Somehow the =h= here would be in conflict with the h hotkey in purple_modality. This can be worked around by exiting and re-entering the mode.
+                                                                        -- Using a timer also works
+                                                                        -- [[https://stackoverflow.com/questions/53320589/hs-eventtap-keystroke-with-modifier-works-only-after-double-press][hammerspoon - hs.eventtap.keyStroke with modifier works only after double press - Stack Overflow]]
+                                                                        -- We just need the key of this hotkey not to be in conflict with itself.
+                                                                        -- Or we can change it to a released callback, so the real key isn't being held anymore.
+                                                                        hs.eventtap.keyStroke({"cmd"}, "z")
+                                                                        -- purple_modality:enter()
 end}}
 purple_bind_v2{ auto_trigger_p=false, key="a", pressedfn=(function()
                         hs.eventtap.keyStroke({"cmd", "ctrl"}, "h")
@@ -804,19 +806,96 @@ end
 -- })
 -- ***** avy
 -- Define a function to generate two-letter combinations
-local function generateTwoLetterCombinations()
-    local lettersFirst = "abcdefghijklmnopqrstuvwxyz/.,;'[]\\=-0987654321`"
-    -- letters = letters .. "1234567890-="
+-- backspace_symbol = "⌫"
+backspace_symbol = "⎌" -- good, as it is small enough not to disturb the grid
+-- backspace_symbol = "␈" -- bad, big
 
-    local lettersSecond = "abcdefghijklmnopqrstuvwxyz/.,;'[]\\"
+function strToList(str)
+    local list = {}
+    for i = 1, #str do
+        table.insert(list, str:sub(i, i))
+    end
+    return list
+end
+
+function flatten1(list_of_lists)
+    local flat_list = {}
+    for _, sublist in ipairs(list_of_lists) do
+        for _, item in ipairs(sublist) do
+            table.insert(flat_list, item)
+        end
+    end
+    return flat_list
+end
+
+function generateTwoLetterCombinations()
+    local lettersFirstList = flatten1({
+            {backspace_symbol, "↑", "↓", "←", "→"},
+            strToList("abcdefghijklmnopqrstuvwxyz/.,;'[]\\=-0987654321`A")
+    })
+
+    local lettersSecondList = flatten1({
+            {backspace_symbol, "↑", "↓", "←", "→"},
+            strToList("abcdefghijklmnopqrstuvwxyz/.,;'[]\\"),
+    })
 
     local combinations = {}
-    for i = 1, #lettersFirst do
-        for j = 1, #lettersSecond do
-            table.insert(combinations, lettersFirst:sub(i, i) .. lettersSecond:sub(j, j))
+    for i, first in ipairs(lettersFirstList) do
+
+        for j, second in ipairs(lettersSecondList) do
+            local combo = {text=(first .. second), first=first, second=second}
+            table.insert(combinations, combo)
         end
     end
     return combinations
+end
+
+avy_combinations = generateTwoLetterCombinations()
+-- No need to recompute this every time
+
+function charToKeybinding(char)
+    local mods = {}
+    local char_base = char
+    local shift_map = {
+        ["~"] = "`", ["!"] = "1", ["@"] = "2", ["#"] = "3",
+        ["$"] = "4", ["%"] = "5", ["^"] = "6", ["&"] = "7",
+
+        ["*"] = "8", ["("] = "9", [")"] = "0", ["_"] = "-",
+
+        ["+"] = "=", ["<"] = ",", [">"] = ".", [":"] = ";",
+        ["\""] = "'", ["?"] = "/", ["{"] = "[", ["}"] = "]",
+        ["|"] = "\\",
+    }
+    local icon_map = {
+        ["↑"] = "up",
+        ["↓"] = "down",
+        ["←"] = "left",
+        ["→"] = "right",
+        [backspace_symbol] = "delete",
+        -- We can add more stuff. Even the `fn` key can be bound.
+    }
+
+    -- Check if the character is an arrow key
+    if icon_map[char] then
+        char_base = icon_map[char]
+    -- Check if the character is uppercase or a special character
+    elseif char:match("%u") or shift_map[char] then
+        mods = {"shift"}
+        -- If it's a special character, get its base version
+        if shift_map[char] then
+            char_base = shift_map[char]
+        else
+            -- If it's an uppercase letter, convert it to lowercase
+
+            char_base = char:lower()
+
+        end
+    elseif char:match("%l") then
+    else
+        -- print("charToKeybinding: unknown: " .. char)
+    end
+
+    return {mods=mods, key=char_base}
 end
 
 function screenPositionAvy(params)
@@ -836,7 +915,7 @@ function screenPositionAvy(params)
         secondModalFgColor = { red = 0.8, green = 0.0, blue = 0.0, alpha = 1.0 },
 
         overlayHeight = 20,
-        overlayWidth = 50,
+        overlayWidth = 33,
         fontSize = 18,
     }
 
@@ -853,7 +932,8 @@ function screenPositionAvy(params)
     local secondModalBgColor = hs.drawing.color.asRGB(params.secondModalBgColor)
     local secondModalFgColor = hs.drawing.color.asRGB(params.secondModalFgColor)
 
-    local combinations = generateTwoLetterCombinations()
+    local combinations = avy_combinations
+    -- local combinations = generateTwoLetterCombinations()
 
     local screenWidth = hs.screen.mainScreen():frame().w
     local screenHeight = hs.screen.mainScreen():frame().h
@@ -862,12 +942,12 @@ function screenPositionAvy(params)
     local overlayWidth = params.overlayWidth
     local fontSize = params.fontSize
 
-    local canvas = hs.canvas.new({x = 0, y = 0, w = screenWidth, h = screenHeight + 200})
+    local canvas = hs.canvas.new({x = 0, y = 0, w = screenWidth, h = screenHeight + 30})
     local index = 1
 
     -- Calculate the number of overlays to fit the screen
     local columns = math.ceil(screenWidth / overlayWidth)
-    local rows = math.ceil(screenHeight / overlayHeight) + 9
+    local rows = math.ceil(screenHeight / overlayHeight) + 2
 
     local function cleanup()
         canvas:hide()
@@ -897,7 +977,8 @@ function screenPositionAvy(params)
                          }, 1) -- Insert as the first element
 
     local function updateStyledTextColor(element_index, combo_index, color)
-        local text = combinations[combo_index]
+        local combo_obj = combinations[combo_index]
+        local text = combo_obj.text
 
         local newStyledText = hs.styledtext.new(
             text,
@@ -914,7 +995,8 @@ function screenPositionAvy(params)
     local text_elements_by_first_char = {}
     for row = 0, rows - 1 do
         for col = 0, columns - 1 do
-            local combo = combinations[index]
+            local combo_obj = combinations[index]
+            local combo = combo_obj.text
 
             -- if not combo then
             --    combo = "??"
@@ -943,8 +1025,10 @@ function screenPositionAvy(params)
                 local canvas_index = #canvas
                 local combo_index = index
 
-                local first_char = combo:sub(1, 1)
-                local second_char = combo:sub(2, 2)
+                local first_char = combo_obj.first
+                local second_char = combo_obj.second
+                -- local first_char = combo:sub(1, 1)
+                -- local second_char = combo:sub(2, 2)
 
                 -- Store the text element index for the first character
                 if not text_elements_by_first_char[first_char] then
@@ -955,9 +1039,11 @@ function screenPositionAvy(params)
 
                 if not second_modals[first_char] then
                     second_modals[first_char] = hs.hotkey.modal.new()
+                    first_char_keybinding = charToKeybinding(first_char)
+
                     mouse_avy_modality:bind(
-                        {},
-                        first_char,
+                        first_char_keybinding.mods,
+                        first_char_keybinding.key,
                         function()
                             mouse_avy_modality:exit()
                             second_modals[first_char]:enter()
@@ -975,8 +1061,10 @@ function screenPositionAvy(params)
                     end)
                 end
 
-                second_modals[first_char]:bind({}, second_char, (function()
-                            handleKeyPress(second_modals[first_char], x, y_canvas + 10)
+
+                second_char_keybinding = charToKeybinding(second_char)
+                second_modals[first_char]:bind(second_char_keybinding.mods, second_char_keybinding.key, (function()
+                                                       handleKeyPress(second_modals[first_char], x, y_canvas + 10)
                                               end))
 
                 index = index + 1
@@ -1085,14 +1173,14 @@ end
 function leftClickAvy()
     screenPositionAvy({
             callback = function(x, y)
-            ---
-             hs.mouse.absolutePosition({ x = x, y = y })
-             leftClick()
-            ---
+                ---
+                hs.mouse.absolutePosition({ x = x, y = y })
+                leftClick()
+                ---
                 -- This also moves the cursor and doesn't just click the location like Shortcat can do.
                 -- mouseClick{position={ x = x, y = y}}
-            ---
-        end,
+                ---
+            end,
     })
 end
 function leftDrag()
@@ -1114,9 +1202,9 @@ end
 function rightClickAvy()
     screenPositionAvy({
             callback = function(x, y)
-            hs.mouse.absolutePosition({ x = x, y = y })
-            rightClick()
-        end,
+                hs.mouse.absolutePosition({ x = x, y = y })
+                rightClick()
+            end,
     })
 end
 
@@ -1156,12 +1244,12 @@ function textSelectAvyV2()
         mouseClick{position={ x = x, y = y}, actions={"left_down"}, sleep=0}
 
         screenPositionAvy({
-            callback = dragTo,
+                callback = dragTo,
         })
     end
 
     screenPositionAvy({
-        callback = startDrag,
+            callback = startDrag,
     })
 end
 
@@ -1209,9 +1297,9 @@ function screenshotAvy()
         else
             -- Call screenPositionAvy again to capture the second point
             screenPositionAvy({
-            callback = capturePoint,
-            backgroundColor = { red=255/255, green=140/255, blue=0 , alpha = alpha },
-            secondModalBgColor = { red = 0.9, green = 1.0, blue = 1.0, alpha = alpha },
+                    callback = capturePoint,
+                    backgroundColor = { red=255/255, green=140/255, blue=0 , alpha = alpha },
+                    secondModalBgColor = { red = 0.9, green = 1.0, blue = 1.0, alpha = alpha },
             })
         end
     end
@@ -1225,6 +1313,19 @@ function screenshotAvy()
 end
 
 hyper_bind_v2{key="s", pressedfn=screenshotAvy}
+
+function screenshotAll()
+    hs.task.new("/usr/sbin/screencapture", nil, {"-c"}):start()
+end
+function hScreenshotAll()
+    hyper_exit()
+    hs.timer.usleep(300000)
+    -- to wait for the hyper alert and the OS sticky modifier alerts to fade out
+
+    screenshotAll()
+end
+hyper_bind_v2{mods={}, key="3", pressedfn=screenshotAll}
+hyper_bind_v2{mods={"shift"}, key="s", pressedfn=hScreenshotAll}
 --- * _
 function has_value (tab, val)
     for index, value in ipairs(tab) do
@@ -1807,7 +1908,7 @@ function emojiChooser()
     -- Update the chooser choices based on the query
     chooser:queryChangedCallback(function(query)
             local filteredChoices = filterChoicesByPatterns{query=query, choices=choices, on="subText"}
-        chooser:choices(filteredChoices)
+            chooser:choices(filteredChoices)
     end)
 
     local function addCurrent()
@@ -2064,7 +2165,7 @@ appHotkey{ key='p', appName='com.apple.Preview' }
 -- appHotkey{ key=']', appName='org.jdownloader.launcher' }
 
 appHotkey{ key='k', appName='info.sioyek.sioyek' }
-appHotkey{ key='j', appName='net.sourceforge.skim-app.skim' }
+appHotkey{ key='n', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='[', appName='info.sioyek.sioyek' }
 -- appHotkey{ key=']', appName='net.sourceforge.skim-app.skim' }
 
@@ -2169,7 +2270,7 @@ bindWithRepeatV2{
     binder=hyper_bind_v2,
     key="F1",
     pressedfn=function()
-                   brishzeval('awaysh-fast brightness-dec')
+        brishzeval('awaysh-fast brightness-dec')
     end,
     auto_trigger_p=false
 }
@@ -2177,7 +2278,7 @@ bindWithRepeatV2{
     binder=hyper_bind_v2,
     key="F2",
     pressedfn=function()
-                   brishzeval('awaysh-fast brightness-inc')
+        brishzeval('awaysh-fast brightness-inc')
     end,
     auto_trigger_p=false
 }
@@ -2227,12 +2328,12 @@ bindWithRepeatV2{
     binder=hyper_bind_v2,
     key="F11",
     pressedfn=function()
-                   ---
-                   -- brishzeval('awaysh-fast volume-dec')
-                   ---
-                   -- volumeInc(-5)
-                   volumeDecKey()
-                   ---
+        ---
+        -- brishzeval('awaysh-fast volume-dec')
+        ---
+        -- volumeInc(-5)
+        volumeDecKey()
+        ---
     end,
     -- auto_trigger_p=false
 }
@@ -2240,15 +2341,52 @@ bindWithRepeatV2{
     binder=hyper_bind_v2,
     key="F12",
     pressedfn=function()
-                   ---
-                   -- brishzeval('awaysh-fast volume-inc')
-                   ---
-                   -- volumeInc(5)
-                   volumeIncKey()
-                   ---
+        ---
+        -- brishzeval('awaysh-fast volume-inc')
+        ---
+        -- volumeInc(5)
+        volumeIncKey()
+        ---
     end,
     -- auto_trigger_p=false,
 }
+--- * Mission Control, Window/App Switcher, Expose
+hyper_bind_v2{
+    -- key="e",
+    mods={"ctrl"}, key='[',
+    pressedfn=hs.spaces.toggleMissionControl
+}
+-- Use Escape to exit the mission control.
+-- You can move between spaces as you always do, i.e., with hyper+arrows.
+
+--- ** hs.expose
+-- [[id:adf82ba0-fccb-4922-bb6b-cdaab1fe0411][@upstreamBug? =hs.expose= doesn't show all apps.]]
+if false then
+    hs.expose.ui.fitWindowsInBackground = false
+    -- hs.expose.ui.fitWindowsInBackground = true
+
+    expose = hs.expose.new(
+        nil, {
+            fitWindowsInBackground = hs.expose.ui.fitWindowsInBackground, -- probably @redundant
+            showThumbnails=true,
+            -- showThumbnails=false,
+            onlyActiveApplication=false,
+            includeOtherSpaces=true,
+    })
+
+    -- expose_app = hs.expose.new(nil,{onlyActiveApplication=true})
+    -- show windows for the current application
+
+    -- expose_space = hs.expose.new(nil,{includeOtherSpaces=false})
+    -- current space only
+
+    -- expose_browsers = hs.expose.new{'Safari','Google Chrome'}
+    -- -- specialized expose using a custom windowfilter
+    -- for your dozens of browser windows :)
+
+    -- then bind to a hotkey
+    hyper_bind_v2{mods={"ctrl"}, key='[', pressedfn=function()expose:toggleShow()end}
+end
 --
 kitty_prev_app = nil
 function kittyHandler()
