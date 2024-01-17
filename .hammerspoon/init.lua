@@ -807,8 +807,22 @@ end
 -- ***** avy
 -- Define a function to generate two-letter combinations
 -- backspace_symbol = "⌫"
-backspace_symbol = "⎌" -- good, as it is small enough not to disturb the grid
+backspace_symbol = "⎌" -- good, as it is small enough not to disturb the grid, also we can see behind it better
 -- backspace_symbol = "␈" -- bad, big
+
+fn_symbol = "ϟ"
+
+-- tab_symbol = "↪"
+tab_symbol = "↪"
+-- tab_symbol = "⎞"
+-- tab_symbol = "⇥"
+
+-- I_symbol = "ℐ"
+-- I_symbol = "ℑ"
+-- I_symbol = "𐒻"
+-- I_symbol = "𐒻"
+I_symbol = "𝐈"
+-- I_symbol = "I"
 
 function strToList(str)
     local list = {}
@@ -830,13 +844,32 @@ end
 
 function generateTwoLetterCombinations()
     local lettersFirstList = flatten1({
-            {backspace_symbol, "↑", "↓", "←", "→"},
-            strToList("abcdefghijklmnopqrstuvwxyz/.,;'[]\\=-0987654321`A")
+            {
+                backspace_symbol,
+                fn_symbol,
+             -- "↑", "↓", "←", "→"
+             -- We are using the arrow keys to move the canvas grid, so we can't use them here.
+            },
+            strToList("abcdefghijklmnopqrstuvwxyz/.,;'[]\\=-098"),
+            {
+                tab_symbol,
+            },
+            strToList("|\":?<>LKJNM{}POIUHBZXCASDFV"),
+            strToList("`1234567"),
+            -- 654321
     })
 
     local lettersSecondList = flatten1({
-            {backspace_symbol, "↑", "↓", "←", "→"},
-            strToList("abcdefghijklmnopqrstuvwxyz/.,;'[]\\"),
+            {
+                backspace_symbol,
+                fn_symbol,
+                "↑", "↓", "←", "→",
+            },
+            strToList("abcijklmnopsuvxz/.,;'[]\\"),
+            {
+                tab_symbol,
+            },
+            -- strToList("qwertydfgh"),
     })
 
     local combinations = {}
@@ -872,6 +905,8 @@ function charToKeybinding(char)
         ["←"] = "left",
         ["→"] = "right",
         [backspace_symbol] = "delete",
+        [fn_symbol] = "F18",
+        [tab_symbol] = "tab",
         -- We can add more stuff. Even the `fn` key can be bound.
     }
 
@@ -879,6 +914,9 @@ function charToKeybinding(char)
     if icon_map[char] then
         char_base = icon_map[char]
     -- Check if the character is uppercase or a special character
+    elseif char == I_symbol then
+        char_base = "i"
+        mods = {"shift"}
     elseif char:match("%u") or shift_map[char] then
         mods = {"shift"}
         -- If it's a special character, get its base version
@@ -917,6 +955,11 @@ function screenPositionAvy(params)
         overlayHeight = 20,
         overlayWidth = 33,
         fontSize = 18,
+        fontName = "Fira Code Retina",
+        fontAlignment = "center",
+
+        -- Define the amount to move the canvas with each arrow key press
+        moveAmount = 5,
     }
 
     -- Merge default values with the provided parameters
@@ -926,6 +969,7 @@ function screenPositionAvy(params)
         end
     end
     ---
+    local moveAmount = params.moveAmount
     local callback = params.callback
     local fgColor = hs.drawing.color.asRGB(params.fgColor)
     local bgColor = hs.drawing.color.asRGB(params.backgroundColor)
@@ -940,27 +984,43 @@ function screenPositionAvy(params)
 
     local overlayHeight = params.overlayHeight
     local overlayWidth = params.overlayWidth
-    local fontSize = params.fontSize
 
-    local canvas = hs.canvas.new({x = 0, y = 0, w = screenWidth, h = screenHeight + 30})
+    local y_overlay_offset = 15
+    local overlayHeightOffset = 10
+    -- These two depend on the font in question.
+
+    local fontName = params.fontName
+    local fontSize = params.fontSize
+    local fontAlignment = params.fontAlignment
+
+    local canvas_initial_x = -overlayWidth
+    local canvas_initial_y = -overlayHeight
+    local canvas_width = screenWidth - 2 * canvas_initial_x
+    local canvas_height = screenHeight - 2 * canvas_initial_y + 30
+    local canvas = hs.canvas.new({x = canvas_initial_x, y = canvas_initial_y, w = canvas_width, h = canvas_height})
     local index = 1
 
+    -- Variable to store the current offset of the canvas
+    local canvasOffset = { x = canvas_initial_x, y = canvas_initial_y }
+
     -- Calculate the number of overlays to fit the screen
-    local columns = math.ceil(screenWidth / overlayWidth)
-    local rows = math.ceil(screenHeight / overlayHeight) + 2
+    local columns = math.ceil(canvas_width / overlayWidth)
+    local rows = math.ceil(canvas_height / overlayHeight) + 0
 
     local function cleanup()
         canvas:hide()
         canvas:delete()
     end
 
-    -- Define a function to handle key presses
     local function handleKeyPress(modal, x, y)
-        -- hs.mouse.absolutePosition({ x = x, y = y })
+        -- Adjust the position by the current canvas offset
+        local adjustedX = x + canvasOffset.x
+        local adjustedY = y + canvasOffset.y
+
         modal:exit()
         cleanup()
 
-        callback(x, y) -- Call the callback function with the selected position
+        callback(adjustedX, adjustedY) -- Call the callback function with the adjusted position
     end
 
     -- Set up the hotkey modal
@@ -985,8 +1045,8 @@ function screenPositionAvy(params)
             {
 
                 color = color,
-                paragraphStyle = { alignment = "center" },
-                font = { size = fontSize },
+                paragraphStyle = { alignment = fontAlignment },
+                font = { name = fontName, size = fontSize },
         })
         canvas[element_index].text = newStyledText
     end
@@ -1012,14 +1072,14 @@ function screenPositionAvy(params)
                     combo,
                     {
                         color = fgColor,
-                        paragraphStyle = { alignment = "center" },
-                        font = { size = fontSize },
+                        paragraphStyle = { alignment = fontAlignment },
+                        font = { name = fontName, size = fontSize },
                 })
                 canvas:insertElement({
 
                         type = "text",
                         text = styledText,
-                        frame = { x = x_canvas, y = y_canvas, w = overlayWidth, h = overlayHeight }
+                        frame = { x = x_canvas, y = y_canvas, w = overlayWidth, h = (overlayHeight + overlayHeightOffset) }
 
                 })
                 local canvas_index = #canvas
@@ -1054,7 +1114,6 @@ function screenPositionAvy(params)
                             -- Change the text color when entering the second modal
                             if text_elements_by_first_char[first_char] then
                                 for _, el in ipairs(text_elements_by_first_char[first_char]) do
-
                                     updateStyledTextColor(el.canvas_index, el.combo_index, secondModalFgColor)
                                 end
                             end
@@ -1063,14 +1122,58 @@ function screenPositionAvy(params)
 
 
                 second_char_keybinding = charToKeybinding(second_char)
-                second_modals[first_char]:bind(second_char_keybinding.mods, second_char_keybinding.key, (function()
-                                                       handleKeyPress(second_modals[first_char], x, y_canvas + 10)
+                second_modals[first_char]:bind(
+                    second_char_keybinding.mods,
+                    second_char_keybinding.key,
+                    (function()
+                            handleKeyPress(second_modals[first_char], x, y_canvas + y_overlay_offset)
                                               end))
 
                 index = index + 1
             end
         end
     end
+
+    ---
+    -- Functions to move the canvas
+    -- Function to move the canvas
+    local function moveCanvas(dx, dy)
+        canvasOffset.x = canvasOffset.x + dx
+        canvasOffset.y = canvasOffset.y + dy
+
+        local currentPos = canvas:frame()
+
+        canvas:frame({
+                x = currentPos.x + dx,
+                y = currentPos.y + dy,
+                w = currentPos.w,
+                h = currentPos.h
+        })
+    end
+
+    local function moveCanvasUp()
+        moveCanvas(0, -moveAmount)
+    end
+
+    local function moveCanvasDown()
+        moveCanvas(0, moveAmount)
+    end
+
+    local function moveCanvasLeft()
+        moveCanvas(-moveAmount, 0)
+    end
+
+    local function moveCanvasRight()
+        moveCanvas(moveAmount, 0)
+    end
+    -- Bind arrow keys to move the canvas with repeat functionality
+
+    mouse_avy_modality:bind({}, "up", moveCanvasUp, nil, moveCanvasUp)
+    mouse_avy_modality:bind({}, "down", moveCanvasDown, nil, moveCanvasDown)
+
+    mouse_avy_modality:bind({}, "left", moveCanvasLeft, nil, moveCanvasLeft)
+    mouse_avy_modality:bind({}, "right", moveCanvasRight, nil, moveCanvasRight)
+    ---
 
     -- Show the canvas
     canvas:show()
