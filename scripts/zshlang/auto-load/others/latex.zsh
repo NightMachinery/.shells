@@ -358,5 +358,6 @@ function pix2tex-m {
 }
 @opts-setprefix pix2tex-m pix2tex
 
-alias xs='pix2tex-m'
+aliasfn ocr-latex pix2tex-m
+alias xs='ocr-latex'
 ##

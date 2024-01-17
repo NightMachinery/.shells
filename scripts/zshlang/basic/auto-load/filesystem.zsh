@@ -112,7 +112,7 @@ function lnrp {
         return $?
     fi
 
-    if isIReally && isRcLoaded && fn-isTop lnrp lnrp-re ; then
+    if bool "${lnrp_auto_i:-y}" && isIReally && isRcLoaded && fn-isTop lnrp lnrp-re ; then
         opts+=( -i )
     fi
 

@@ -370,3 +370,13 @@ aliassafe rl4t='\noglob reval-to-gpt4t'
 aliassafe xx='\noglob llm-4t'
 aliassafe xz='\noglob reval-to-gpt4t' #: @nameConflict xz, unxz, xzcat, lzma, unlzma, lzcat - Compress or decompress .xz and .lzma  files
 ##
+function sgpt-m {
+    OPENAI_API_KEY="${openai_api_key}" $proxyenv reval-ecgray command sgpt --temperature 0 "$@"
+    # --stream
+}
+
+function sgpt-gpt4v {
+    sgpt-m --max-tokens 40000 -m "gpt-4-vision-preview" "$@"
+}
+alias xv='sgpt-gpt4v'
+##

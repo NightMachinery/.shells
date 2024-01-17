@@ -351,4 +351,5 @@ function proxy-restart {
 }
 alias '/'='proxy-restart'
 alias '//'='reval-ec ping 8.8.8.8'
+alias '/.'='reval-ec ci98'
 ##
