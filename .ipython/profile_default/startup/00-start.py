@@ -80,6 +80,7 @@ from pynight.common_openai import (
     setup_openai_key,
     print_chat_streaming,
     openai_chat_complete,
+    openai_image_url_auto,
 )
 from pynight.common_openai import *
 from pynight.common_llm import (
