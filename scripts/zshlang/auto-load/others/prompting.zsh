@@ -435,3 +435,9 @@ function prompt-2en-solve-exercise {
     prompt_code_block_p=y prompt-instruction-input 'First translate the following problem statement to English. Then solve it.' "$@"
 }
 ##
+function text-split-letters {
+    in-or-args "$@" |
+        perl -lpe 's/(.)/$1 /g' |
+        cat-copy-if-tty
+}
+##
