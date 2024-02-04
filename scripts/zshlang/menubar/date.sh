@@ -50,9 +50,30 @@ export PATH="$PATH:/usr/local/bin"
 # }
 ## * menubar
 # Appears in the menubar YYYY-MM-DD
-printf '%d ¦ %s\n' "$(brishz.dash last-idle-get-min)" "$(date "+%b%-m/%d")"
-# printf '%02d ¦ %s\n' "$(brishz.dash last-idle-get-min)" "$(date "+%b%-m/%d")"
+stopwatch_text="$(brishz.dash menu_stopwatch_format=min serr reval-true menu-stopwatch-text-get)"
+
+last_idle_min="$(brishz.dash last-idle-get-min)"
+current_date="$(date "+%b%-m/%d")"
+
+if [ -n "$stopwatch_text" ]; then
+    printf '⏱️%s ¦ %d ¦ %s\n' "$stopwatch_text" "$last_idle_min" "$current_date"
+else
+    printf '%d ¦ %s\n' "$last_idle_min" "$current_date"
+    # %02d
+fi
 echo "---"
+
+#---Music
+hear_path="$(brishzq.zsh eval '{ hear-get | path-abbrev } || true')"
+if test -n "${hear_path}" ; then
+    if [[ ${#hear_path} -gt 110 ]] ; then
+        printf "…%s\n" "${hear_path: -110}"
+    else
+        printf "%s\n" "${hear_path}"
+    fi
+
+    echo "---"
+fi
 
 #---IR
 
