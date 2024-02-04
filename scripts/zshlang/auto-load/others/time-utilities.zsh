@@ -75,7 +75,50 @@ function timer {
     }
 }
 noglobfn timer
+##
+#: =menu-stopwatch= is used in [[NIGHTDIR:zshlang/menubar/date.sh]]
+#: @todo Implement =menu-stopwatch-pause=. We can store a =paused_duration= which we subtract from the total duration when displaying the time passed.
 
+function menu-stopwatch-start {
+    local stopwatch_name="${1:-default}"
+
+    redism SET "menu_stopwatch_start_${stopwatch_name}" "$EPOCHREALTIME"
+}
+
+function menu-stopwatch-delete {
+    local stopwatch_name="${1:-default}"
+
+    redism DEL "menu_stopwatch_start_${stopwatch_name}"
+}
+
+function menu-stopwatch-text-get {
+    #: Function to get the elapsed time in mm:ss format
+    ##
+    local stopwatch_name="${1:-default}"
+    local format="${menu_stopwatch_format:-default}"
+
+    local start_time="$(redism GET "menu_stopwatch_start_${stopwatch_name}")"
+    if [[ -z "$start_time" ]]; then
+        ecerr "$0: Stopwatch not set"
+        return 1
+    fi
+
+    local current_time="$EPOCHREALTIME"
+
+    local elapsed_seconds=$(( ${current_time} - ${start_time} ))
+
+    local minutes=$((elapsed_seconds / 60))
+
+    local seconds=$((elapsed_seconds % 60))
+
+    if [[ "$format" == min ]] ; then
+        printf "%d\n" "$minutes"
+        # printf "%02d\n" "$minutes"
+    else
+        printf "%02d:%02d\n" "$minutes" "$seconds"
+    fi
+}
+##
 typeset -g marker_alarm_at='ALARM_AT'
 function alarm-at {
     local at="$1" msg="${@[2,-1]}"
