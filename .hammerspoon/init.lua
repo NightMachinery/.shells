@@ -67,6 +67,10 @@ local function copyToClipboard(text)
     hs.pasteboard.setContents(text)
 end
 
+local function doEscape()
+    hs.eventtap.keyStroke({}, "escape")
+end
+
 local function doCopy()
     hs.eventtap.keyStroke({"cmd"}, "c")
 end
@@ -97,6 +101,25 @@ local function timerifyFn(params)
         return fn
     end
 end
+---
+function tableShallowCopy(orig)
+    local copy
+
+    local orig_type = type(orig)
+    if orig_type == 'table' then
+        copy = {}
+        for orig_key, orig_value in pairs(orig) do
+
+            copy[orig_key] = orig_value
+
+        end
+    else
+        -- Raise error
+        error("tableShallowCopy: Can't copy a " .. orig_type)
+    end
+
+    return copy
+end
 ---- * Hyper Modifier Key
 hyper = {"cmd","ctrl","alt","shift"}
 
@@ -118,6 +141,103 @@ if false then
             -- hs.eventtap.event.newKeyEvent({}, " ", false):setKeyCode(61):post()
     end)
 end
+
+local hyperAlerts
+
+local hyperStyle = {
+    -- [[https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/alert/alert.lua#L17][hammerspoon/extensions/alert/alert.lua at master · Hammerspoon/hammerspoon]]
+    -- strokeWidth  = 2,
+    -- strokeColor = { white = 1, alpha = 1 },
+    -- fillColor   = { white = 0, alpha = 0.75 },
+    -- textColor = { white = 1, alpha = 1 },
+    -- textFont  = ".AppleSystemUIFont",
+    -- textSize  = 27,
+    -- radius = 27,
+    atScreenEdge = 1,
+    fadeInDuration = 0.001,
+    fadeOutDuration = 0.001,
+    -- padding = nil,
+    fillColor = { white = 1, alpha = 2 / 3 },
+    radius = 24,
+    strokeColor = { red = 19 / 255, green = 182 / 255, blue = 133 / 255, alpha = 1},
+    strokeWidth = 16,
+    textColor = { white = 0.125 },
+    textSize = 48,
+    text = "🌟",
+}
+local secureInputStyle = tableShallowCopy(hyperStyle)
+secureInputStyle.fillColor = { red = 1, green = 0, blue = 0, alpha = 0.5 }
+
+local realCurrentWindow
+local maxSIMWaitTime <const> = 0.75 -- seconds
+
+local focusStealingWebview = hs.webview.new{x=0, y=0, w=500, h=500}
+-- local focusStealingWebview = hs.webview.new{x=0, y=0, w=0, h=0}
+
+local hyperSIMAlerts
+local isSecureInputEnabled = hs.eventtap.isSecureInputEnabled
+---
+-- hyper_alert_canvas_p = false
+hyper_alert_canvas_p = true
+-- canvas mode seems to be more buggy though? It sometimes just doesn't show up.
+
+function hyperModeIndicatorCreate(hyperStyle)
+    local strokeWidth = hyperStyle.strokeWidth / 1.5
+
+    local hyperModeIndicator = hs.canvas.new{x=0, y=0, w=0, h=0}:insertElement{
+        id = 'background',
+        type = 'rectangle',
+        action = 'strokeAndFill',
+        fillColor = hyperStyle.fillColor,
+        roundedRectRadii = { xRadius = hyperStyle.radius, yRadius = hyperStyle.radius },
+        strokeColor = hyperStyle.strokeColor,
+        strokeWidth = strokeWidth,
+        padding = strokeWidth / 2,
+}:insertElement{
+        id = 'textBox',
+        type = 'text',
+        text = hyperStyle.text,
+        textAlignment = 'center',
+        textColor = hyperStyle.textColor,
+        textSize = hyperStyle.textSize,
+}
+    local hyperTextBoxSize = hyperModeIndicator:minimumTextSize(2, hyperStyle.text)
+    local screenFrame = hs.screen.primaryScreen():fullFrame()
+    local hyperFrame = {}
+    hyperFrame.w = hyperTextBoxSize.w + hyperStyle.strokeWidth*2 + hyperStyle.textSize -- default alert padding is 1/2 of font size, but we need it on both sides
+    hyperFrame.h = hyperTextBoxSize.h + hyperStyle.strokeWidth*2 + hyperStyle.textSize -- ditto
+    hyperFrame.x = (screenFrame.w - hyperFrame.w)/2
+    hyperFrame.y = screenFrame.y -- top edge
+    -- hyperFrame.y = hyperFrame.y + 35 -- to be below the notch
+
+    -- Hammerspoon can automatically center the text horizontally, but not vertically, so:
+    hyperModeIndicator.textBox.frame = {
+        x = (hyperFrame.w - hyperTextBoxSize.w)/2,
+        y = ((hyperFrame.h - hyperTextBoxSize.h)/2) + 5,
+        -- I have added =5= to make it look better on the notch.
+        w = hyperTextBoxSize.w,
+        h = hyperTextBoxSize.h,
+    }
+    hyperModeIndicator:frame(hyperFrame)
+
+    hyperModeIndicator:behavior{'canJoinAllSpaces', 'transient', 'fullScreenAuxiliary'} -- canvas will appear in all spaces
+    -- OR
+    -- hyperModeIndicator:behavior{'canJoinAllSpaces', 'stationary', 'fullScreenAuxiliary'} -- canvas will appear in all spaces AND Mission Control
+
+    return hyperModeIndicator
+end
+
+
+local hyperModeIndicator
+local hyperModeIndicatorOrig
+local hyperModeIndicatorSI
+if hyper_alert_canvas_p then
+    hyperModeIndicatorOrig = hyperModeIndicatorCreate(hyperStyle)
+    hyperModeIndicator = hyperModeIndicatorOrig
+
+    hyperModeIndicatorSI = hyperModeIndicatorCreate(secureInputStyle)
+end
+---
 
 -- A global variable for the Hyper Mode
 redisModalityUpdateP = false
@@ -177,49 +297,73 @@ function hyper_up()
     -- hyper_modality.exit_on_release_p = false
 end
 
-local hyperAlerts
-
-local hyperStyle = {
-    -- [[https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/alert/alert.lua#L17][hammerspoon/extensions/alert/alert.lua at master · Hammerspoon/hammerspoon]]
-    -- strokeWidth  = 2,
-    -- strokeColor = { white = 1, alpha = 1 },
-    -- fillColor   = { white = 0, alpha = 0.75 },
-    -- textColor = { white = 1, alpha = 1 },
-    -- textFont  = ".AppleSystemUIFont",
-    -- textSize  = 27,
-    -- radius = 27,
-    atScreenEdge = 1,
-    fadeInDuration = 0.001,
-    fadeOutDuration = 0.001,
-    -- padding = nil,
-    fillColor = { white = 1, alpha = 2 / 3 },
-    radius = 24,
-    strokeColor = { red = 19 / 255, green = 182 / 255, blue = 133 / 255, alpha = 1},
-    strokeWidth = 16,
-    textColor = { white = 0.125 },
-    textSize = 48,
-}
-
 function hyper_modality:entered()
     hyper_modality.entered_p = true
 
     -- I have not yet added the redis updaters for purple_modality.
     redisActivateMode("hyper_modality")
 
-    if hs.eventtap.isSecureInputEnabled() then
-        hs.alert("⚠️ Secure Input is on. Our Hyper Mode commands might not work.")
+    if isSecureInputEnabled() then
         -- [[https://github.com/Hammerspoon/hammerspoon/issues/3555][Hammerspoon hangs spradically when entering hyper mode and displaying a modal window · Issue #3555 · Hammerspoon/hammerspoon]]
+        -- hs.alert("⚠️ Secure Input is on. Our Hyper Mode commands might not work.", 0.7)
+
+        hyperModeIndicator = hyperModeIndicatorSI
+        ---
+        if true then
+            doEscape()
+            -- An escape makes the password input bar unfocused in Arc.
+        else
+            realCurrentWindow = hs.window.focusedWindow()
+
+            focusStealingWebview:show():hswindow():focus()
+
+            if false then
+                -- Whichever app is enabling SIM might not disable it immediately.
+                -- Watch for SIM to shut off, giving up after `maxSIMWaitTime` seconds.
+                local endTime = hs.timer.absoluteTime() + maxSIMWaitTime*1000000000 -- convert to nanoseconds
+                while isSecureInputEnabled() and hs.timer.absoluteTime() < endTime do
+                    -- Normally I try to avoid hs.timer.usleep, because it basically hangs Hammerspoon.
+                    -- But for really short periods like this, it's probably cleaner than rewriting with timers or coroutines.
+                    hs.timer.usleep(1000)
+                end
+
+                if isSecureInputEnabled() then
+                    -- Still in Secure Input Mode - give up and show alerts about it.
+                    local secureInputInfo = hs.execute[[ps -c -o pid=,command= -p $(ioreg -l -w 0 | grep -Eo '"kCGSSessionSecureInputPID"=[0-9]+' | cut -d= -f2 | sort | uniq]]
+
+                    local msg = "⚠️ Secure Input is on. Hyper Mode commands might not work.\nEnabled by:\n"..secureInputInfo
+                    msg = msg:gsub('loginwindow', 'unknown (supposedly loginwindow)')
+                    msg = msg:gsub('^%s*(.-)%s*$', '%1')
+
+                    print(msg) -- leave a copy of the message in the console, so you can still see it after the alert goes away
+                    hyperSIMAlerts = {}
+                    for i, screen in pairs(hs.screen.allScreens()) do
+                        hyperSIMAlerts[i] = hs.alert(msg, screen, "")
+                    end
+                end
+            end
+        end
+    else
+        realCurrentWindow = nil
+
+        hyperModeIndicator = hyperModeIndicatorOrig
     end
+    
+    if hyper_alert_canvas_p then
+        hyperModeIndicator:show()
+    else
+        -- @todo Use secureInputStyle if secure input is enabled.
+        ---
+        hyperAlerts = {}
+        -- WAIT @me [[https://github.com/Hammerspoon/hammerspoon/issues/3586][How do I show an alert on all fullscreen spaces? · Issue #3586 · Hammerspoon/hammerspoon]]
+        for i, screen in pairs(hs.screen.allScreens()) do
+            msg = "🌟"
+            -- msg = "Hyper Mode 🌟"
+            -- msg = "Hyper Mode ✈"
 
-    hyperAlerts = {}
-    -- WAIT @me [[https://github.com/Hammerspoon/hammerspoon/issues/3586][How do I show an alert on all fullscreen spaces? · Issue #3586 · Hammerspoon/hammerspoon]]
-    for i, screen in pairs(hs.screen.allScreens()) do
-        msg = "🌟"
-        -- msg = "Hyper Mode 🌟"
-        -- msg = "Hyper Mode ✈"
-
-        alert = hs.alert(msg, hyperStyle, screen, "")
-        hyperAlerts[i] = alert
+            alert = hs.alert(msg, hyperStyle, screen, "")
+            hyperAlerts[i] = alert
+        end
     end
 end
 
@@ -227,8 +371,23 @@ function hyper_modality:exited()
     hyper_modality.entered_p = false
     hyper_modality.exit_on_release_p = false
 
-    for i, alert in pairs(hyperAlerts) do
-        hs.alert.closeSpecific(alert, 0.25)
+    if hyperSIMAlerts then
+        for i, alert in pairs(hyperSIMAlerts) do
+            hs.alert.closeSpecific(alert, 0.25)
+        end
+    end
+    if realCurrentWindow then
+        realCurrentWindow:focus()
+        realCurrentWindow = nil
+        focusStealingWebview:hide()
+    end
+
+    if hyper_alert_canvas_p then
+        hyperModeIndicator:hide()
+    else
+        for i, alert in pairs(hyperAlerts) do
+            hs.alert.closeSpecific(alert, 0.25)
+        end
     end
 
     redisDeactivateMode("hyper_modality")
@@ -811,11 +970,15 @@ backspace_symbol = "⎌" -- good, as it is small enough not to disturb the grid,
 -- backspace_symbol = "␈" -- bad, big
 
 fn_symbol = "ϟ"
+-- fn_symbol = "★"
+-- fn_symbol = "🌟"
+-- fn_symbol = "☆"
+-- fn_symbol = "✯"
 
--- tab_symbol = "↪"
 tab_symbol = "↪"
--- tab_symbol = "⎞"
+-- tab_symbol = "↪"
 -- tab_symbol = "⇥"
+-- tab_symbol = "⎞"
 
 -- I_symbol = "ℐ"
 -- I_symbol = "ℑ"
@@ -843,18 +1006,22 @@ function flatten1(list_of_lists)
 end
 
 function generateTwoLetterCombinations()
+    -- @todo Change the order of lettersFirstList so that hard-to-press keys are in positions usually not needed.
     local lettersFirstList = flatten1({
+            strToList("r"),
             {
                 backspace_symbol,
                 fn_symbol,
-             -- "↑", "↓", "←", "→"
-             -- We are using the arrow keys to move the canvas grid, so we can't use them here.
+                -- "↑", "↓", "←", "→"
+                -- We are using the arrow keys to move the canvas grid, so we can't use them here.
             },
-            strToList("abcdefghijklmnopqrstuvwxyz/.,;'[]\\=-098"),
+            strToList("abcdeijklmnopqsuvwxyz/.,;'[]\\=-09"),
             {
                 tab_symbol,
             },
-            strToList("|\":?<>LKJNM{}POIUHBZXCASDFV"),
+            strToList("|\":?<>LKJNM{}POIUB"),
+            strToList("hfgt"),
+            strToList("8HZXCASDFV"),
             strToList("`1234567"),
             -- 654321
     })
@@ -865,7 +1032,7 @@ function generateTwoLetterCombinations()
                 fn_symbol,
                 "↑", "↓", "←", "→",
             },
-            strToList("abcijklmnopsuvxz/.,;'[]\\"),
+            strToList("abcijklmnopsuvxz/.,;'[]\\=-0"),
             {
                 tab_symbol,
             },
@@ -913,7 +1080,7 @@ function charToKeybinding(char)
     -- Check if the character is an arrow key
     if icon_map[char] then
         char_base = icon_map[char]
-    -- Check if the character is uppercase or a special character
+        -- Check if the character is uppercase or a special character
     elseif char == I_symbol then
         char_base = "i"
         mods = {"shift"}
@@ -937,6 +1104,8 @@ function charToKeybinding(char)
 end
 
 function screenPositionAvy(params)
+    -- @todo2 Cache the canvas object etc. to make this function faster
+    ---
     if params == nil then
         params = {}
     end
@@ -985,7 +1154,7 @@ function screenPositionAvy(params)
     local overlayHeight = params.overlayHeight
     local overlayWidth = params.overlayWidth
 
-    local y_overlay_offset = 15
+    local y_overlay_offset = 17
     local overlayHeightOffset = 10
     -- These two depend on the font in question.
 
@@ -1012,10 +1181,18 @@ function screenPositionAvy(params)
         canvas:delete()
     end
 
-    local function handleKeyPress(modal, x, y)
-        -- Adjust the position by the current canvas offset
-        local adjustedX = x + canvasOffset.x
-        local adjustedY = y + canvasOffset.y
+    local function handleKeyPress(modal, x, y, adjust_p)
+        if adjust_p == nil then
+            adjust_p = true
+        end
+
+        local adjustedX = x
+        local adjustedY = y
+        if adjust_p then
+            -- Adjust the position by the current canvas offset
+            adjustedX = x + canvasOffset.x
+            adjustedY = y + canvasOffset.y
+        end
 
         modal:exit()
         cleanup()
@@ -1056,11 +1233,12 @@ function screenPositionAvy(params)
     for row = 0, rows - 1 do
         for col = 0, columns - 1 do
             local combo_obj = combinations[index]
-            local combo = combo_obj.text
+            if not combo_obj then
+                print("screenPositionAvy: insufficient combinations")
+                break
+            end
 
-            -- if not combo then
-            --    combo = "??"
-            -- end
+            local combo = combo_obj.text
 
             if combo then
                 local x = col * overlayWidth + overlayWidth / 2
@@ -1175,10 +1353,6 @@ function screenPositionAvy(params)
     mouse_avy_modality:bind({}, "right", moveCanvasRight, nil, moveCanvasRight)
     ---
 
-    -- Show the canvas
-    canvas:show()
-    canvas:bringToFront(true)
-
     -- Exit the second modal and re-enter the first modal when the escape key is pressed
     -- [[https://github.com/Hammerspoon/hammerspoon/issues/848][How to bind hs.hotkey.modal to any key press? · Issue #848 · Hammerspoon/hammerspoon]]
     for first_char, second_modal in pairs(second_modals) do
@@ -1211,11 +1385,15 @@ function screenPositionAvy(params)
             local x = mousePosition.x
             local y = mousePosition.y
 
-            handleKeyPress(mouse_avy_modality, x, y)
+            handleKeyPress(mouse_avy_modality, x, y, false)
     end)
 
     -- Enter the modal state
     mouse_avy_modality:enter()
+
+    -- Show the canvas
+    canvas:show()
+    canvas:bringToFront(true)
 end
 -- *** Mouse Clicks
 function leftClick()
@@ -1391,6 +1569,12 @@ end
 function screenshotAvy()
     local alpha = 0.1
 
+    local fg_alpha = 1.0
+    -- local fg_alpha = 0.5
+
+    -- local overlayHeight = 20
+    local overlayWidth = 50
+
     local points = {}
     local function capturePoint(x, y)
         table.insert(points, {x = x, y = y})
@@ -1403,6 +1587,11 @@ function screenshotAvy()
                     callback = capturePoint,
                     backgroundColor = { red=255/255, green=140/255, blue=0 , alpha = alpha },
                     secondModalBgColor = { red = 0.9, green = 1.0, blue = 1.0, alpha = alpha },
+
+                    fgColor = { red = 0, green = 0, blue = 0, alpha = fg_alpha },
+                    secondModalFgColor = { red = 0.8, green = 0.0, blue = 0.0, alpha = fg_alpha },
+
+                    overlayWidth = overlayWidth,
             })
         end
     end
@@ -1412,6 +1601,11 @@ function screenshotAvy()
             callback = capturePoint,
             backgroundColor = { red=255/255, green=215/255, blue=0 , alpha = alpha },
             secondModalBgColor = { red = 0.9, green = 1.0, blue = 1.0, alpha = alpha },
+
+            fgColor = { red = 0, green = 0, blue = 0, alpha = fg_alpha },
+            secondModalFgColor = { red = 0.8, green = 0.0, blue = 0.0, alpha = fg_alpha },
+
+            overlayWidth = overlayWidth,
     })
 end
 
@@ -2533,7 +2727,7 @@ function kittyHandler()
 end
 
 hyper_bind_v1('z', kittyHandler)
-hs.hotkey.bind({}, 'F12', kittyHandler)
+-- hs.hotkey.bind({}, 'F12', kittyHandler)
 ---
 function pasteBlockified()
     -- Get the clipboard content
@@ -2594,6 +2788,7 @@ function reloadConfig(files)
         hs.reload()
     end
 end
+hyper_bind_v2{mods={"cmd"}, key="r", pressedfn=hs.reload}
 myWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", reloadConfig):start()
 brishzeval("bell-lm-eternalhappiness")
 --- @end
