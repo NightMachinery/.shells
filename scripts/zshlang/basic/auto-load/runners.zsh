@@ -12,11 +12,25 @@ function rexa(){
         eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
     done
 }
-redo-eval() {
-    local i
+
+function redo-eval {
+    local fail_mode="${redo_fail_mode:-ignore}"
+
+    local i retcode
     for i in {1.."${@: -1}"}
     do
-        eval "${@: 1:-1}"
+        eval "${@: 1:-1}" || {
+            retcode=$?
+
+            if [[ "${fail_mode}" == ignore ]] ; then
+                continue
+            elif [[ "${fail_mode}" == exit ]] ; then
+                return $retcode
+            else
+                ecerr "$0: Unknown fail mode: ${fail_mode}"
+                return 1
+            fi
+        }
     done
 }
 redo() redo-eval "$(gquote "${@: 1:-1}")" "${@: -1}"
