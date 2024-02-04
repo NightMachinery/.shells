@@ -256,3 +256,71 @@ function open-zip-pdf {
     fi
 }
 ##
+function pdf-empty-create {
+    local dest="${1}"
+    local page_count="${2:-50}"
+
+    local page_size="auto"
+    # local page_size="a4paper"
+
+    if test -z "${dest}" ; then
+        local whiteboard_dir=~/tmp/whiteboards
+        mkdir-m "${whiteboard_dir}"
+
+        dest="$(gmktemp --tmpdir="${whiteboard_dir}" --dry-run --suffix .pdf)"
+        ecgray "$dest"
+    fi
+    if [[ "${dest}" != *.pdf ]] ; then
+        dest="${dest}.pdf"
+    fi
+
+    local temp_dir="$(gmktemp -d)"
+    ecgray "$0: temp_dir: ${temp_dir}"
+
+    local temp_tex_file="${temp_dir}/main.tex"
+
+    local geometry_options='left=0mm,right=0mm,top=0mm,bottom=0mm'
+    if [[ ${page_size} == 'auto' ]] ; then
+        page_size=''
+        geometry_options+=', paperwidth=16in, paperheight=9in'
+    fi
+
+    if test -n "${page_size}" ; then
+        page_size="[${page_size}]"
+    fi
+    if test -n "${geometry_options}" ; then
+        geometry_options="[${geometry_options}]"
+    fi
+
+    cat > "$temp_tex_file" <<EOF
+\\documentclass${page_size}{article}
+\\usepackage${geometry_options}{geometry}
+\\usepackage{pdfpages}
+\\begin{document}
+\\pagestyle{empty}
+EOF
+
+    #: Add blank pages
+    for ((i=1; i<=page_count; i++)); do
+        ec "\\newpage\\null" >> "$temp_tex_file"
+    done
+
+    #: End the LaTeX document
+    ec "\\end{document}" >> "$temp_tex_file"
+
+    #: Compile the LaTeX document into a PDF
+    assert reval-ecgray pdflatex -interaction=batchmode -output-directory "${temp_dir}" "${temp_tex_file}" @RET
+    # &> "${temp_dir}/pdflatex.log"
+
+    #: Move the PDF to the desired destination
+    reval-ecgray gmv -i "${temp_tex_file:r}.pdf" "$dest"
+
+    #: Clean up temporary files
+    if isDebug ; then
+        reval-ec emc-open "${temp_tex_file}"
+    else
+        silent trs-rm "${temp_dir}"
+    fi
+}
+aliasfn pdf-blank-create pdf-empty-create
+##
