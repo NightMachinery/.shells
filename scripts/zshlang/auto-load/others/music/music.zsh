@@ -352,8 +352,20 @@ function mu-gateway() {
 function muc {
     fz_opts=("$fz_opts[@]" --no-sort) deus songc --loop-playlist "$*"
 }
+
+function hear-start-server {
+    local f
+
+    f=~mu/'mmisc/Brian Eno/Brian Eno - Calcium Needles.m4a'
+
+    if ! test -e "$f" ; then
+        f="$(fd -e mp3 . ~mu/ | head -n1)"
+    fi
+
+    hear --pause "$f"
+}
 ##
-function sdlg() {
+function sdlg {
     ecerr "@broken due to breaking changes to spotdl, but now spotdl itself has a better API and sdl is pretty much unnecessary" ; return 1
 
     #use with aget
