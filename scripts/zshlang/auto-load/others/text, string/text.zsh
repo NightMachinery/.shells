@@ -257,7 +257,7 @@ function str-normalize2 {
 
 function newline-normalize {
     cat-paste-if-tty |
-        perl -0777 -pe 's/\R/\n/g' |
+        perl -CS -0777 -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ; s/\R/\n/g' |
         cat-copy-if-tty
 }
 ##

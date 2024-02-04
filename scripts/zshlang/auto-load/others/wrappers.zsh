@@ -102,7 +102,10 @@ aliasfn opv open-preview
 aliasfn open-skim open-with Skim
 aliasfn ops open-skim
 
-aliasfn open-sioyek open-with sioyek
+function open-sioyek {
+  open-with sioyek "$@" @RET
+  sioyek-reload
+}
 aliasfn opy open-sioyek
 aliasfn sio open-sioyek
 ##

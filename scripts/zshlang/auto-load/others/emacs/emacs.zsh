@@ -11,11 +11,11 @@ function emc-sudo() {
     # revaldbg emcnw -e '(find-file "/sudo::'$f'")'
 }
 ##
-function doom-sync() {
+function doom-sync {
     : "-u updates as well"
 
     rust-setup
-    doom sync "$@"
+    $proxyenv doom sync "$@"
 }
 ##
 function emcpe {

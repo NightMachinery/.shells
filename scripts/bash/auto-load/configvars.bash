@@ -144,7 +144,7 @@ typeset -ag ebook_formats=(pdf epub mobi azw azw3 azw4 txt cbz cbr djvu fb2 prc 
 #: - `snb`: A format used by the Shanda Bambook.
 #: - `tcr`: A text compression format for ebooks.
 #:#
-audio_formats=(mp3 m4a m4b ogg flac ogm opus wav)
+audio_formats=(mp3 m4a m4b ogg flac ogm opus wav wma aac aiff ape mka mpa ra tta wv)
 createglob audio_formats audioglob
 
 image_formats=(png jpg jpeg gif psd tif tiff avif webp)

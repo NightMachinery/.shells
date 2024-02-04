@@ -134,19 +134,20 @@ function agcell {
     agm -uuu --iglob '!.git' "$@" $cellar # --binary --hidden don't work with -C somehow, so we use -uuu :D
 }
 ##
-agrdry() {
+function agrdry {
     agm -F  -- "$from" "${@}"
 }
+
 function agr {
     doc 'Use https://github.com/facebookincubator/fastmod instead?'
     doc 'usage: from=sth to=another agr [ag-args]'
     comment -l --files-with-matches
 
     local opts=()
-    if test -z "$agr_regex" ; then
+    if ! bool "$agr_regex" ; then
         opts+='--literal'
     fi
-    ag -0 -l "$opts[@]" -- "$from" "${@}" | pre-files "$from" "$to"
+    command ag -0 -l --ignore-case "$opts[@]" -- "$from" "${@}" | pre-files "$from" "$to"
 }
 ##
 function pathtree-search {

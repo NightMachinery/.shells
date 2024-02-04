@@ -134,18 +134,23 @@ function ivy {
 
     ivy-convenience
 
-    ivy-self # attaches and blocks, I think
+    ivy-self
+    #: attaches and blocks, I think
 }
 
-function ivy-self() {
+function ivy-self {
     local -x DISABLE_DEFER=y
 
     tmux kill-session -t "ivy" &> /dev/null
     tmux new-session -s ivy -d 'zsh'
-    tmux send-keys "muc " # 'mu' could also download, but it needs to be updated
+
+    #: We add a space before our commands to avoid cluttering the shell history.
+    tmux send-keys " hear-start-server "$'\n'
+    # tmux send-keys " muc "
+    #: 'mu' could also download, but it needs to be updated
+
     tmux split-window -h  'zsh'
-    tmux send-keys " lunas
-"
+    tmux send-keys " lunas "$'\n'
     tmux split-window -v 'zsh'
     # tmux split-window -v 'salice.py'
     tmux select-pane -t 0

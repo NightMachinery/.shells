@@ -221,20 +221,22 @@ function pdflatex-m {
             trs *.aux(.DN) @TRET
 
             #: [[https://tex.stackexchange.com/questions/450863/using-bibtex-with-pdflatex][pdftex - Using BibTex with pdfLaTeX - TeX - LaTeX Stack Exchange]]
-            assert reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+            time2 assert reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
 
-            reval-ec bibtex *.aux @RET
+            time2 reval-ec bibtex *.aux @RET
 
-            reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+            time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
 
-            reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+            time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
             #: This is needed, otherwise the CVPR's review line numbers don't align properly at the start of the paragraphs.
 
-            reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
+            time2 reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
             gmv -v "${name_tmp}.pdf" "${name}.pdf"
-            trs "${name_tmp}"*(.DN) || true
 
             success_p=y
+
+            trs "${name_tmp}"*(.DN) || true
+            sioyek-reload || true
         } always {
             if bool "${success_p}" ; then
                 bell-insaniquarium-sing

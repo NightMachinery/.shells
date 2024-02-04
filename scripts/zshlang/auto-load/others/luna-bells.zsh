@@ -369,6 +369,7 @@ function deluna {
         fi
 
         if (( $(idle-get) >= $timeout )) ; then
+            #: We might need to do this on unlock, too. The idle value doesn't seem to get updated when the laptop's lid is closed.
             reval-ecdate last-idle-reset
         fi
 

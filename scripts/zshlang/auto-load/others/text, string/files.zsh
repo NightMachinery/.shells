@@ -1,15 +1,15 @@
 ### Module Text Processing
 ### This module specializes in functions that touch the disk.
 ###
-function pre-files() {
+function pre-files {
   doc 'stdin should be null-separated list of files that need replacement; $1 the string to replace, $2 the replacement.'
 
   local from="$1" to="$2"
 
   local cmd
-  if test -n "$agr_regex" ; then
+  if bool "${agr_regex}" ; then
     if true ; then
-    cmd="s/${from}/${to}/g"
+      cmd="s/${from}/${to}/g"
     else
       # the quoting rules here are weird, and seem to quote AGR_TO as a literal string.
       cmd='s/$ENV{AGR_FROM}/$ENV{AGR_TO}/g'

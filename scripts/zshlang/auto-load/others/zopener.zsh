@@ -1,4 +1,25 @@
-function zopen() {
+##
+function zopen-audio {
+    local f="$1"
+    assert-args f @RET
+
+    hear-loadfile "$f"
+    # hearinvisible "$f"
+}
+
+function zopen-ebook {
+    local f="$1"
+    assert-args f @RET
+
+    ##
+    # awaysh ebook-viewer "${f}"
+    ##
+    open-sioyek "$f"
+    #: [[id:4e51667e-8f0b-482a-8d1f-5962857cfa72][sioyek/EPUB]]
+    ##
+}
+
+function zopen {
     local f files=("$@") bell=''
     for f in $files[@] ; do
         test -e "$f" || {
@@ -10,11 +31,16 @@ function zopen() {
         local text_exts="(${(j.|.)text_formats})"
         
         case "$ext" in
-            wav|mp2|mp3|mp3test|m4a|ogg|au|flac) hearinvisible "$f" ;;
+            wav|mp2|mp3|mp3test|m4a|ogg|au|flac)
+                zopen-audio "$f"
+                ;;
             zip|rar|7z) unzip2dir "$f" ; bell=y ;;
-            mobi|epub|azw*) awaysh ebook-viewer "$f" ;;
+            mobi|epub|azw*) zopen-ebook "$f" ;;
             cbz) awaysh mpv-manga "$f" ;;
-            pdf) chrome-open-pdf "$f" ;;
+            pdf)
+                open-sioyek "$f"
+                # chrome-open-pdf "$f"
+                ;;
             ${~text_exts}) emc-nowait2 "$f" ;;
             # *) re typ text_exts ext f ; return 0 ;;
             *) usemime=y ;;
@@ -22,11 +48,12 @@ function zopen() {
         if test -n "$usemime" ; then
             local m="$(mimetype2 "$f")"
             case "$m" in
-                audio*) hearinvisible "$f" ;;
-                */epub*) awaysh ebook-viewer "$f" ;;
+                audio*) zopen-audio "$f" ;;
+                */epub*) zopen-ebook "$f" ;;
                 
-                # *) fsay "Unsupported file: $m" ;;
-                *) open "$f" ;;
+                *) fsay "Unsupported file: $m" ;;
+                # *) open "$f" ;;
+                # Using =open= will cause an infinite loop if =zopen= is the file's default opener!
             esac
         fi
     done
@@ -38,3 +65,4 @@ function zopen() {
     return 0
 }
 aliasfn zop zopen
+##

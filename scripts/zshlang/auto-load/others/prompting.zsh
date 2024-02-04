@@ -208,6 +208,10 @@ function prompt-idea-dataset {
     prompt-instruction-input "Recommend some datasets that are revelevant to the following research proposal." "$@"
 }
 ##
+function prompt-translate2en-orgbeamer {
+    prompt-instruction-input 'Rewrite the below latex snippet as English org-mode org-beamer slides. You should put citation inside `@@latex:\cite{...}@@`.' "$@"
+}
+
 function prompt-translate2en {
     prompt-instruction-input "Translate the following to English. Preserve the original's style and tone. Do not include any additional commentary." "$@"
 }
