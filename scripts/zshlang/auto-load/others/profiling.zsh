@@ -1,17 +1,19 @@
 ##
 aliasfn time2 time_engine=reval-env time2-unquoted
-function time2-unquoted() {
+function time2-unquoted {
     local cmd=("$@") engine=("${time_engine[@]:-eval}")
     test -z "$cmd[*]" && return 0
     local time2_start=$EPOCHREALTIME
 
-    "$engine[@]" "$cmd[@]"
-    # (eval "$cmd") # subshell protects against premature exits because of, e.g., glob failure
-    local ret=$?
+    {
+        "$engine[@]" "$cmd[@]"
+        # (eval "$cmd") # subshell protects against premature exits because of, e.g., glob failure
 
-    ecbold $'\n\n'"Took $(( EPOCHREALTIME - time2_start ))" >&2
-
-    return $ret
+        local ret=$?
+        return $ret
+    } always {
+        ecbold $'\n\n'"Took $(( EPOCHREALTIME - time2_start ))" >&2
+    }
 }
 @opts-setprefix time2-unquoted time
 aliasfn time2-uq time2-unquoted

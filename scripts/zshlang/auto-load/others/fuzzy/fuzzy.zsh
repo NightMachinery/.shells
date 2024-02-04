@@ -360,7 +360,18 @@ aliasfn ve-emc veditor=(emc-gateway)
 aliasfn vv ve-emc v
 ###
 function vp-ls {
-    arrN ~/Downloads/**/*.pdf(ND.) ~base/_Books/**/*.pdf(ND.) ~base/documents/course_materials/**/*.pdf(ND.)
+    local pdf_dirs=(
+        ~/Downloads
+        ~base/_Books
+        ~base/documents/course_materials
+        ~cod/uni/papers
+        $nightNotes
+    )
+
+    local d
+    for d in ${pdf_dirs[@]} ; do
+        fd --type file --extension "pdf" -- . "$d"
+    done
 }
 
 function pdf-recent-fz {

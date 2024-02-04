@@ -287,6 +287,9 @@ function isDbg {
     test -n "$DEBUGME"
 }
 alias isdbg=isDbg
+alias isdebug=isDbg
+alias isDebug=isDbg
+alias 'debug-p'=isDbg
 function isNotDbg {
     ! isDbg
 }

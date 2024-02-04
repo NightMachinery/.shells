@@ -44,19 +44,38 @@ function set-defaults() {
         duti -s $cf_zopen com.apple.m4a-audio all
         duti -s $cf_zopen public.mpeg-4-audio all
         duti -s $cf_zopen public.audio all
-        duti -s $cf_zopen "public.zip-archive" all
-        duti -s $cf_zopen "com.rarlab.rar-archive" all
-        duti -s $cf_zopen ".rar" all
+
+        # duti -s $cf_zopen "public.zip-archive" all
+        # duti -s $cf_zopen "com.rarlab.rar-archive" all
+        # duti -s $cf_zopen ".rar" all
+
         duti -s $cf_zopen "org.idpf.epub-container" all
         duti -s $cf_zopen "public.mobi" all
         duti -s $cf_zopen ".mobi" all
         duti -s $cf_zopen ".azw3" all
         duti -s $cf_zopen ".azw" all
-        duti -s $cf_zopen ".cbz" all
-        duti -s $cf_zopen "com.yacreader.yacreader.cbz" all
 
-        # duti -s $cf_zopen .pdf all
-        # duti -s $cf_zopen "com.adobe.pdf" all
+        # duti -s $cf_zopen ".cbz" all
+        # duti -s $cf_zopen "com.yacreader.yacreader.cbz" all
+
+        duti -s $cf_zopen .pdf all
+        duti -s $cf_zopen "com.adobe.pdf" all
+    else
+        ##
+        if true && test -e /Applications/Skim.app ; then
+            local cf_skim='net.sourceforge.skim-app.skim'
+
+            duti -s $cf_skim .pdf all
+            duti -s $cf_skim "com.adobe.pdf" all
+        fi
+
+        if false && test -e /Applications/sioyek.app ; then
+            local cf_sioyek='info.sioyek.sioyek'
+
+            duti -s $cf_sioyek .pdf all
+            duti -s $cf_sioyek "com.adobe.pdf" all
+        fi
+        ##
     fi
     ## mpv
     if test -e /Applications/mpv.app ; then
@@ -67,20 +86,6 @@ function set-defaults() {
         duti -s $cf_mpv .mkv all
         duti -s $cf_mpv .avi all
         duti -s $cf_mpv .webm all
-    fi
-    ##
-    if true && test -e /Applications/Skim.app ; then
-        local cf_skim='net.sourceforge.skim-app.skim'
-
-        duti -s $cf_skim .pdf all
-        duti -s $cf_skim "com.adobe.pdf" all
-    fi
-
-    if false && test -e /Applications/sioyek.app ; then
-        local cf_sioyek='info.sioyek.sioyek'
-
-        duti -s $cf_sioyek .pdf all
-        duti -s $cf_sioyek "com.adobe.pdf" all
     fi
     ##
 }

@@ -61,6 +61,6 @@ function rial2human {
 }
 
 function human2rial {
-    human2number.py --rial "$@" > >( { colorfg "$gray[@]" ; rial2human ; resetcolor } >&2) | cat-copy-if-tty
+    human2number.py --rial "${@:-$(pbpaste)}" > >( { colorfg "$gray[@]" ; rial2human ; resetcolor } >&2) | cat-copy-if-tty
 }
 ##

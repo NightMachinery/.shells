@@ -175,6 +175,7 @@ function hear-loadfile {
     revaldbg hear-play-on
 }
 aliasfn hear-open hear-loadfile
+aliasfn hlo hear-loadfile
 aliasfn mpv-loadfile fnswap hear-do mpv-do hear-loadfile
 aliasfn mpv-open mpv-loadfile
 
