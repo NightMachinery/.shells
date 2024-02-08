@@ -297,6 +297,21 @@ function hyper_up()
     -- hyper_modality.exit_on_release_p = false
 end
 
+if false then
+    -- For debugging:
+    hs.hotkey.bind('ctrl', "'",
+                   function() -- pressed
+                       focusStealingWebview:allowTextEntry(true)
+                       focusStealingWebview:windowStyle(hs.webview.windowMasks.titled)
+                       focusStealingWebview:show():hswindow():focus()
+                   end,
+                   function() -- released
+                       focusStealingWebview:hide()
+                   end
+    )
+end
+
+prevFocusedElement = nil
 function hyper_modality:entered()
     hyper_modality.entered_p = true
 
@@ -310,11 +325,24 @@ function hyper_modality:entered()
         hyperModeIndicator = hyperModeIndicatorSI
         ---
         if true then
+            local axApp = hs.axuielement.applicationElement(hs.application.frontmostApplication())
+            if axApp then
+                -- hs.alert("axApp found")
+                prevFocusedElement = axApp.AXFocusedUIElement
+
+                -- hs.alert("axApp.AXFocusedUIElement: " .. prevFocusedElement)
+                prevFocusedElement.AXFocused = false
+            else
+                -- hs.alert("no axApp")
+            end
+        elseif true then
             doEscape()
             -- An escape makes the password input bar unfocused in Arc.
         else
             realCurrentWindow = hs.window.focusedWindow()
 
+            -- focusStealingWebview:allowTextEntry(true)
+          focusStealingWebview:windowStyle(hs.webview.windowMasks.titled)
             focusStealingWebview:show():hswindow():focus()
 
             if false then
@@ -381,6 +409,11 @@ function hyper_modality:exited()
         realCurrentWindow = nil
         focusStealingWebview:hide()
     end
+
+    if prevFocusedElement and prevFocusedElement:isValid() then
+        prevFocusedElement.AXFocused = true
+    end
+    prevFocusedElement = nil
 
     if hyper_alert_canvas_p then
         hyperModeIndicator:hide()
@@ -514,6 +547,10 @@ for _, key in ipairs({"v", "\\", "delete", "space", "j"}) do
                       hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, key)
     end}
 end
+-- Binding hyper+cmd+v so that we can access the clipboard manager even when Secure Input is on. (Individual letters won't be readable by Hammerspoon, but modifier+letters are readable.)
+hyper_bind_v2{mods={"cmd"}, key="v", pressedfn=function()
+                    hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, "v")
+end}
 
 function bindToKey(params)
     local binder = params.binder or hyper_bind_v2
@@ -1536,7 +1573,12 @@ end
 
 for _, binder in ipairs({purple_bind_v2, hyper_bind_v2}) do
     binder{mods={"ctrl"}, key="return", pressedfn=screenPositionAvy,}
-    binder{mods={}, key="return", pressedfn=leftClickAvy,}
+    binder{mods={}, key="return", auto_trigger_p=false, pressedfn=(function()
+                   prevFocusedElement = nil -- We do not want the focus to return to a SecureInput element.
+                   hyper_triggered()
+
+                   leftClickAvy()
+               end),}
     -- binder{mods={"shift"}, key="return", pressedfn=leftDrag,}
     binder{mods={}, key="]", pressedfn=rightClickAvy,}
     binder{mods={}, key="o", pressedfn=textSelectAvyV2,}
