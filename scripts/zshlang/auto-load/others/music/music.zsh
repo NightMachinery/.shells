@@ -360,9 +360,10 @@ function hear-start-server {
 
     if ! test -e "$f" ; then
         f="$(fd -e mp3 . ~mu/ | head -n1)"
+        assert test -e "$f" @RET
     fi
 
-    hear --pause "$f"
+    hear --pause --loop-playlist=inf "$f"
 }
 ##
 function sdlg {
