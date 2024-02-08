@@ -130,6 +130,7 @@ aliasfn latex-url-escape latex-escape
 ##
 function pdflatex-m {
     local autodir="${pdflatex_autodir:-n}"
+    local bib_mode="${pdflatex_bib_mode:-bibtex_ignore}"
     local var_escaper
     #: [[id:a7185750-2d2e-4b83-af93-94ffdc9fb07e][latex/escaping]]
     var_escaper=(ec)
@@ -223,7 +224,16 @@ function pdflatex-m {
             #: [[https://tex.stackexchange.com/questions/450863/using-bibtex-with-pdflatex][pdftex - Using BibTex with pdfLaTeX - TeX - LaTeX Stack Exchange]]
             time2 assert reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
 
-            time2 reval-ec bibtex *.aux @RET
+            if [[ "${bib_mode}" == bibtex ]] ; then
+                time2 reval-ec bibtex *.aux @RET
+            elif [[ "${bib_mode}" == bibtex_ignore ]] ; then
+                time2 reval-ec bibtex *.aux @STRUE
+            elif [[ "${bib_mode}" == n ]] ; then
+                ecgray "$0: no bibtex"
+            else
+                ecerr "$0: unknown bib_mode: ${bib_mode}"
+                return 1
+            fi
 
             time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
 
