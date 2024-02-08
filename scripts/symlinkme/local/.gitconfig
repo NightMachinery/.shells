@@ -41,8 +41,8 @@
 	cmd = kitty kitty +kitten diff $LOCAL $REMOTE
 [receive]
 	denyCurrentBranch = updateInstead
-# [url "ssh://git@github.com/"]
-# 	insteadOf = https://github.com/
+[url "ssh://git@github.com/"]
+	insteadOf = https://github.com/
 # [url "ssh://git@bitbucket.org/"]
 # 	insteadOf = https://bitbucket.org/
 [filter "lfs"]
