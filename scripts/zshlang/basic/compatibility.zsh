@@ -23,6 +23,7 @@ function isdefined-cmd {
 
      test -n "$sym" && (( $+commands[$sym] ))
 }
+alias 'isDefined-cmd'=isdefined-cmd
 
 function ifdefined-cmd() {
     # @duplicateCode/2835fdc8e7eb4fedc98965e17db301b6
@@ -35,7 +36,6 @@ function ifdefined-cmd() {
         return 1270 # == 246
     fi
 }
-alias 'isDefined-cmd'=isdefined-cmd
 
 function cmd-sub() {
     local cmd="$1" sub="$2"

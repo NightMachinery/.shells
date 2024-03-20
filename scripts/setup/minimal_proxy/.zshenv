@@ -97,6 +97,52 @@ function wget-dir {
     ##
 }
 ##
+function uv-pip {
+    if isDefined-cmd uv ; then
+        if test -z "${CONDA_PREFIX}" ; then
+            for d in ~/anaconda ~/miniconda3 ; do
+                if test -e "$d" ; then
+                    local -x CONDA_PREFIX="$d"
+
+                    break
+                fi
+            done
+        fi
+        # var-show CONDA_PREFIX
+
+        $proxyenv command uv pip "$@"
+    else
+        pip "$@"
+    fi
+}
+
+function pip-install {
+    #: @duplicateCode/47062dbd66e1829f2778ed5684a5e8ff
+    ##
+    if [[ "$1" =~ '^git\+' ]] ; then
+        #: =uv= doesn't support =git= links
+        ##
+        pip install "$@"
+        pip install --no-deps --force-reinstall "$@"
+    else
+        uv-pip install -U "$@"
+    fi
+}
+alias pi='\noglob pip-install'
+##
+function plg-log-last-reval() {
+  local last_file=$(ls -t ~/.plg | head -1)
+  if [[ -n $last_file ]]; then
+    reval "$@" ~/.plg/$last_file
+  else
+    echo "No files found in ~/.plg directory"
+  fi
+}
+
+function plg-log-last {
+  plg-log-last-reval tail -f
+}
+##
 ### * End
 psource ~/.privateShell
 ###
