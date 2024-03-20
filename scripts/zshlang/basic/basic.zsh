@@ -59,14 +59,18 @@ function md5m {
     }
 }
 
-function md5-file {
+function hash-file {
     local f="$1"
     assert-args f @RET
+    local engine="${hash_file_engine:-gsha512sum}"
 
-    md5sum -- $f | awkn 1 | cat-copy-if-tty
+    reval "${engine}" -- $f | awkn 1 | cat-copy-if-tty
     ##
     # command md5 -q "$f" #: This was Darwin-only.
     ##
+}
+function md5-file {
+    hash_file_engine=md5sum hash-file "$@"
 }
 
 function md5-file-first-bytes {

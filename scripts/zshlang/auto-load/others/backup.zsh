@@ -233,3 +233,7 @@ function backup-arc {
         ~'/Library/Application Support/Arc/'*.json~*/(StorableAuth|StorableArchive|StorableWindows)*(DN.)
 }
 ##
+function rclone-backup {
+    cp -r ~/.config/rclone ${nightNotesPrivate}/backups/
+}
+##

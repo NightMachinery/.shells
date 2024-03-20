@@ -11,6 +11,40 @@ function num-stats {
 }
 
 function grade-stats {
+    local data
+    data="$(in-or-args "$@")" @RET
+
+    local icat_v=n
+
+    local data_ge_10
+    data_ge_10="$(ec "$data" | perl -nle '(print $_ <= 20 ? $_ : 20) if $_ >= 10')" @TRET
+
+    local data_ge_19_5
+    data_ge_19_5="$(ec "$data" | perl -nle 'print $_ if $_ >= 19.49 and /\d+/')" @TRET
+
+    local data_le_10
+    data_le_10="$(ec "$data" | perl -nle 'print $_ if $_ <= 10 and /\d+/')" @TRET
+
+
+    ec "$data" | plot-stdin-histogram-py --dpi=320 -b=1 - | icat
+
+    ec $'\n'"<10:"
+    ec "$data_le_10" | prefixer -a '  '
+    ec $'\n'">=19.5:"
+    ec "$data_ge_19_5" | prefixer -a '  '
+
+    ec
+    ec "$data_ge_10" | {
+        ec ">=10 min: $(num-min)"
+    }
+    ec "$data" | labeled num-max
+
+    ecgray $'\n'"$0: Removing less than 10 and clamping to 20 for average and STD ..."
+    ec "$data_ge_10" | labeled average
+    ec "$data_ge_10" | labeled num-std
+}
+
+function grade-stats-v1 {
     ecgray "$0: Removing less than 10 and clamping to 20 for average and STD ..."
 
     in-or-args "$@" |
@@ -19,7 +53,7 @@ function grade-stats {
                 plot-stdin-histogram-py --dpi=320 -b=1 - | icat
                 #: A bigger DPI makes the image larger.
             ) \
-            > >(
+                > >(
                 perl -nle '(print $_ <= 20 ? $_ : 20) if $_ >= 10' |
                     > >(labeled average) \
                         > >(labeled num-std) \
@@ -27,11 +61,19 @@ function grade-stats {
             ) \
                 > >(labeled num-max) \
                 > >(
+                ec ">=19.5:"
+                perl -nle 'print $_ if $_ >= 19.49 and /\d+/' |
+                    prefixer -a '  '
+                ec
+            ) \
+                > >(labeled num-max) \
+                > >(
                 ec "<10:"
                 perl -nle 'print $_ if $_ <= 10 and /\d+/' |
                     prefixer -a '  '
                 ec
-            )  # > >(labeled num-min)
+            )
+            # > >(labeled num-min)
         } |
         cat
 }

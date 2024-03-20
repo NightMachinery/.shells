@@ -126,8 +126,27 @@ alias rqup='wg-quick up ~/Downloads/rq.conf'
 alias rqdown='wg-quick down ~/Downloads/rq.conf'
 alias wifi='osx-wifi-cli'
 ##
+function uv-pip {
+    if isDefined-cmd uv ; then
+        if test -z "${CONDA_PREFIX}" ; then
+            for d in ~/anaconda ~/miniconda3 ; do
+                if test -e "$d" ; then
+                    local -x CONDA_PREFIX="$d"
+
+                    break
+                fi
+            done
+        fi
+        # var-show CONDA_PREFIX
+
+        $proxyenv command uv pip "$@"
+    else
+        pip "$@"
+    fi
+}
+
 function pip-install {
-    pip install -U "$@"
+    uv-pip install -U "$@"
 }
 alias pi='\noglob pip-install'
 ##

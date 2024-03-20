@@ -1,4 +1,7 @@
 #!/usr/bin/osascript
+---
+-- @deprecated See [[./notif-dismiss-v2.jxa]]
+---
 
 activate application "NotificationCenter"
 tell application "System Events"

@@ -72,7 +72,8 @@ lv-simple2() { @opts nopriority y @ ntag-lv | tac }
 
 function ntag-ll {
     local opts
-    opts=(-a -l --blocksize)
+    opts=(-a -l --blocksize) # --header
+    #: --blocksize: List each file’s size of allocated file system blocks.
 
     if isI && istty ; then
         exa "${opts[@]}" --color always "$@" |

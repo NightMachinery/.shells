@@ -31,6 +31,8 @@ proxy-env-unset () {
     unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 }
 
+alias noproxy='proxy_disabled=n'
+
 function pxa-create {
     local px_httpport="${1:-1087}" name="${2:-pxa}"
     local px_http_ip="${3:-127.0.0.1}"
@@ -108,6 +110,8 @@ function pxify {
     # enh-pxpy tsend
 
     pxaify-command llm
+
+    pxaify-command doom
 
     pxaify-fn spotdl
 

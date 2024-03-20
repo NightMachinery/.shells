@@ -6,7 +6,7 @@ powersaving_status_del
 ##
 darwin-dns-set 8.8.8.8 1.1.1.1 # 127.0.0.1
 ##
-if test -n "$MDNS_NAME" ; then
+if test -n "${MDNS_NAME}" ; then
     # mdns-init-darwin
 fi
 ##
@@ -14,7 +14,8 @@ fi
 brishgarden-boot 64
 
 if isMB2 ; then
-    battery-charge-limit-enable
+    battery-charge-limit-restore-status
+    # battery-charge-limit-enable
 fi
 
 if isMe || isGrayfur ; then

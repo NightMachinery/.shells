@@ -26,6 +26,13 @@ function md2plain() {
     @opts from markdown to plain @ pandoc-convert "$@"
 }
 
+function org-heading-to-list-item {
+    in-or-args "$@" |
+        org-header-rm-shared-level |
+        perl -CS -lpe 'BEGIN { use utf8; use open qw/:std :utf8/; } ; s/^(\*+)(\s)/"  " x (length($1) - 1) . "-" . $2/e' |
+        cat-copy-if-tty
+}
+
 function org2md {
     in-or-args "$@" |
     perl -lpe 's/^(#\+[a-zA-Z]+_example)\s+.*/$1/gi' | #: @upstreamBug pandoc doesn't convert example blocks correctly
@@ -152,7 +159,12 @@ function pandoc-convert {
                     fi
                 } |
                     perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g' |
-                    perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g'
+                    perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g' |
+                    perl -CS -lpe 's{^(#\+(?:begin|end)_)example\b}{lc($1) . "src"}ieg' | #: =lc= converts to lower-case
+                    perl -CS -lpe 's{^(#\+begin_src\b.*)$}{$1 :eval never}ig'
+                #: We can add a negative lookbehind to avoid adding =:eval never= if it's already added, but I don't think such a check is needed.
+                #:
+                #: =example= blocks are produced from markdown source blocks with no language identifier. These blocks will not be syntax-highlighted when exported to HTML, so I am converting them to source blocks instead.
 
             elif [[ "$to" == markdown ]] && bool $trim_extra ; then
                 perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g' |

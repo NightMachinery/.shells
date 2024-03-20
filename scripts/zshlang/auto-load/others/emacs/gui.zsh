@@ -31,6 +31,8 @@ function emc-launch-gui {
         emacs_app="${emacs_app[1]}"
     fi
 
+    retry ensure-redis @RET
+
     reval-ec tmuxnewsh2 emacs-gui reval-env-ec LOGNAME="$(whoami)" proxy_disabled="$proxy_disabled" DOOMDIR="$DOOMDIR" $proxyenv "${env_setters[@]}" "${emacs_app}" "${opts[@]}"
 }
 ##
