@@ -298,6 +298,7 @@ function mpv-bookmark-cleanup {
 }
 
 function mpv-bookmark-fz {
+    local engine=("${mpv_bookmark_engine:-mpv}")
     local bookmark_file="${mpv_bookmarks}"
 
     local bookmarks
@@ -316,7 +317,11 @@ function mpv-bookmark-fz {
         ecerr "$0: multiple selections not supported"
     fi
 
-    reval-ec hear-noipc --start="${timestamps[1]}" "${files[1]}"
+    reval-ec "${engine}" --start="${timestamps[1]}" "${files[1]}"
+}
+
+function hear-bookmark-fz {
+    mpv_bookmark_engine=hear-noipc mpv-bookmark-fz "$@"
 }
 ##
 function mpv-tui {
