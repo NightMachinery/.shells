@@ -43,9 +43,13 @@ function ugrep-pdf {
 }
 ##
 function ugbool {
-    local q="${*:-.}"
+    local q="${*}"
 
-    ugbase --bool -- "$q"
+    if test -n "${q}" ; then
+        ugbase --bool -- "$q"
+    else
+        cat
+    fi
 }
 noglobfn ugbool
 alias ugb='\noglob ugbool'

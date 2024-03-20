@@ -1,3 +1,4 @@
+##
 function h_spotify-discography-get() {
     local url="${1:?}"
 

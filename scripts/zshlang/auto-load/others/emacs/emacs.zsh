@@ -258,7 +258,9 @@ alias icc='icat-emc'
 ##
 function lisp-quote {
     ##
-    in-or-args "$@" | lisp-quote.lisp
+    in-or-args "$@" |
+        lisp-quote.lisp |
+        cat-copy-if-tty
     ##
     # local i res=''
     # for i in "$@" ; do

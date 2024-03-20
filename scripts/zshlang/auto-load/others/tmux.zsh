@@ -96,7 +96,7 @@ function str2filename {
     ##
     in-or-args "$@" |
         gtr '/' '_' |
-        gtr -d ':?/\\~!@#$%^&*+|<>\000'$'\n\t' |
+        gtr -d ':?/\\~!@#$%^&*|<>\000'$'\n\t' | #: `+` is okay
         trimsed |
         cat-copy-if-tty
 }

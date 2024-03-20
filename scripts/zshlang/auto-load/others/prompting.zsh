@@ -6,7 +6,14 @@ function prompt-instruction-input {
     local preambles=(${prompt_preambles[@]})
 
     local input
-    input="$(in-or-args "$@" | erase-ansi)" @RET
+    # input="$(in-or-args "$@")" @RET
+    if (( $#@ > 0 )) ; then
+        input="$*"
+    else
+        input="$(cat-paste-if-tty)" @RET
+    fi
+
+    input="$(ec "$input" | erase-ansi)" @TRET
 
     if test -n "$input" ; then
         if bool "$code_block_p" ; then
@@ -377,6 +384,10 @@ function snippet-debug-add-prints {
     ec "Add print statements for debugging purposes." |
         cat-copy-if-tty
 }
+
+function prompt-find-bugs {
+    prompt_code_block_p=y prompt-instruction-input 'Find bugs in the following code:' "$@"
+}
 ##
 function prompt-slide-complete-orgbeamer {
     prompt_code_block_p=y prompt-instruction-input 'Complete the following org-mode beamer presentation:' "$@"
@@ -439,5 +450,9 @@ function text-split-letters {
     in-or-args "$@" |
         perl -lpe 's/(.)/$1 /g' |
         cat-copy-if-tty
+}
+##
+function prompt-emoji-name {
+    prompt_code_block_p=y prompt-instruction-input 'What are the names of the emojis related to the following:' "$@"
 }
 ##

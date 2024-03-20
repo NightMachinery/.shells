@@ -179,7 +179,7 @@ function zathura {
 }
 ##
 function tidy-viewer {
-  command tidy-viewer --extend-width-and-length --color 5 -n 999 --upper-column-width 999 "$@" |
+  command tidy-viewer --extend-width-and-length --color 5 -n 99999 --upper-column-width 999 "$@" |
     whitespace-shared-rm
 }
 ##
