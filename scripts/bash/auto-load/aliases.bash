@@ -146,7 +146,16 @@ function uv-pip {
 }
 
 function pip-install {
-    uv-pip install -U "$@"
+    #: @duplicateCode/47062dbd66e1829f2778ed5684a5e8ff
+    ##
+    if [[ "$1" =~ '^git\+' ]] ; then
+        #: =uv= doesn't support =git= links
+        ##
+        pip install "$@"
+        pip install --no-deps --force-reinstall "$@"
+    else
+        uv-pip install -U "$@"
+    fi
 }
 alias pi='\noglob pip-install'
 ##
