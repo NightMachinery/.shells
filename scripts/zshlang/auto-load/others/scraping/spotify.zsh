@@ -181,3 +181,7 @@ function spotify-artist-fz-re() {
     ec-copy "$o"
 }
 ##
+function spotdl-current-browser-links {
+    arc-current-links | rg '/album' | inargsf rgeval spotdl download
+}
+##
