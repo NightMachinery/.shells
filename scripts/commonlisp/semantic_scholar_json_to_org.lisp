@@ -64,6 +64,19 @@
 
 (defun v (key)
   (cond
+    ((string= key "journal_name")
+     (or
+      (when-let ((journal (json-get d "journal")))
+        (when journal
+          (json-get (car journal) "name")))
+      (json-get d "journal_name")))
+    ((string= key authors_names_key)
+     (or
+      (when-let ((authors (json-get d "authors")))
+        (mapcar (lambda (author)
+                  (json-get author "name"))
+                authors))
+      (json-get d authors_names_key)))
     ((string= key "arxiv")
      (listify-if-not arxiv-url))
     ((string= key "openAccessPdf")
@@ -87,9 +100,14 @@
                 (concat tag "/" month)
                 tag))))))
     (t (json-get d key))))
-
+;;;
+;; @duplicateCode/7af1f458383296158787f94092a27736
 (defun v0 (key)
-  (car (v key)))
+  (let ((result (v key)))
+    (if (consp result)
+        (car result)
+        nil)))
+;;;
 
 (defun camel-case-v1 (str)
   (reduce (lambda (acc word) (concatenate 'string acc (string-capitalize word)))
@@ -117,6 +135,7 @@
     ((cl-ppcre:scan "(?i)IEEE/CVF International Conference on Computer Vision Workshop" str) "ICCVW")
     ((cl-ppcre:scan "(?i)Conference on Computer Vision and Pattern Recognition Workshops" str) "CVPRW")
     ((cl-ppcre:scan "(?i)European Conference on Computer Vision Workshops" str) "ECCVW")
+    ((cl-ppcre:scan "(?i)British Machine Vision Conference" str) "BMVC")
     ((cl-ppcre:scan "(?i)Workshop on Action and Anticipation for Visual Learning" str) "AAVL")
     ((cl-ppcre:scan "(?i)Workshop on Visual Object Tracking" str) "VOT")
     ((cl-ppcre:scan "(?i)Workshop on the Applications of Computer Vision for Drone Technology" str) "ACVDT")
@@ -202,19 +221,23 @@
     ((cl-ppcre:scan "(?i)ACM SIGPLAN Conference on Programming Language Design and Implementation" str) "PLDI")
     ;; Default to camel case for other venue names
     (t (camel-case str))))
+
+(defun venue-or-journal-name-get ()
+  (or (v0 "venue")
+      (v0 "journal_name")))
 ;;;
 (progn
   (let ((title (v0 "title"))
         (url (car (argv-get)))
-        (venue (v0 "venue")))
+        (venue-or-journal (venue-or-journal-name-get)))
     (format t "@citations/~a ~a "
             (v0 citations_count_key)
             (v0 "date_tag"))
     (when
-        (and venue
-             (not (emptyp venue)))
+        (and venue-or-journal
+             (not (emptyp venue-or-journal)))
       (format t "@~a "
-              (venue-name-get venue)))
+              (venue-name-get venue-or-journal)))
     (org-link-write :url url :title title)
     (ec))
 
