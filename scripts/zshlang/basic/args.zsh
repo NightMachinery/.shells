@@ -168,7 +168,7 @@ function opts-urls() {
     done
 }
 ##
-function bool() {
+function bool {
     local i="${1:l}"
 
     if [[ "${i}" == (n|no|0|false) ]] ; then

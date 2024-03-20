@@ -5,7 +5,7 @@
 #     agg() { command tag-ag "$@"; source ${TAG_ALIAS_FILE:-/tmp/tag_aliases} 2>/dev/null }
 # fi
 ###
-ffaliases() {
+function ffaliases {
     # also see aga
     for k in "${(@k)aliases}"; do
         ec "$k=${aliases[$k]}"
@@ -13,8 +13,8 @@ ffaliases() {
 }
 # alias ffa=ffaliases
 
-alias agcommands='ec "${(F)commands}"|agC=0 rgm  --color=never'
-ffcommands() {
+alias agcommands='ec "${(F)commands}" | agC=0 rgm  --color=never'
+function ffcommands {
     # cmf (previous name)
     # command finder
     printz "$(agcommands "${@:-.}" | fz --prompt 'Commands> ')"
@@ -27,7 +27,7 @@ fffunctions() {
 }
 # alias ff=fffunctions
 ##
-function ffall() {
+function ffall {
     # @alt agfi
     local query="$(fz-createquery "$@")"
 
@@ -48,9 +48,6 @@ function function-rg {
 }
 alias frg='function-rg'
 ##
-alias rr=rgm
-alias rrn='rgm --line-number'
-##
 function rg-literal-or {
     ensure-array rg_literal_or_opts
     local patterns=("$@") opts=("${rg_literal_or_opts[@]}")
@@ -65,7 +62,7 @@ function rg-literal-or {
     revaldbg "$engine[@]" --fixed-strings "$opts_pats[@]" "$opts[@]"
 }
 ##
-aliasfn fda fd --hidden --no-ignore #ag --unrestricted -g # search in the pathnames
+aliasfn fda fd --hidden --no-ignore # ag --unrestricted -g # search in the pathnames
 function fdrp {
     fda "$@" | inargsf re 'grealpath --'
 }
@@ -98,6 +95,10 @@ function rgbase {
     #: --engine auto: use PCRE2 only if needed
     #: --colors "match:bg:255,228,181"
 }
+alias rr='rgbase'
+alias rrn='rr --line-number'
+# alias rr=rgm
+# alias rrn='rgm --line-number'
 
 function rgcontext {
     rgbase -C ${agC:-1} "$@"
@@ -111,6 +112,10 @@ function rgm {
 
     fnswap isColorTty "$color" rgcontext --heading "$@" | less-min
 }
+# function rg-less {
+#     rgm "$@" | less-min
+# }
+# aliasfn rgl rg-less
 
 function agm {
     rgm "$@" #alias agm='rg' #'ag -C "${agC:-1}" --nonumbers'

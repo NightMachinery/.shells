@@ -43,8 +43,13 @@ function redism-bool {
     fi
 }
 ##
-function redis-defvar() {
-    local name="${1:?}"
+function redis-defvar {
+    local name="${1}"
+
+    if test -z "${name}" ; then
+        ecerr "$0: name not supplied"
+        return 1
+    fi
 
     fndef "${name}_get" redism get "$name"
     aliasfnq "${name}_set" silent redism set "$name"

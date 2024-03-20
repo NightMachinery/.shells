@@ -15,7 +15,7 @@ function doom-sync {
     : "-u updates as well"
 
     rust-setup
-    $proxyenv doom sync "$@"
+    doom sync "$@"
 }
 ##
 function emcpe {
@@ -87,6 +87,8 @@ alias emc='emc-open'
 function emc-gateway {
     bella_zsh_disable1
 
+    retry ensure-redis @RET
+
     local title=emacs
     if test -n "$emacs_night_server_name" ; then
         title="${emacs_night_server_name:t}"
@@ -121,6 +123,10 @@ function emc-eval {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1
 
     local cmd stdin="${emc_eval_in}"
+
+    local -x LANG=en_US.UTF-8
+    #: To avoid this warning:
+    #: `LANG=en_US@calendar=persian.UTF-8 cannot be used, using en_US.UTF-8 instead.`
 
     cmd="(progn
      (require 'server)
@@ -160,7 +166,7 @@ function emc-eval {
 }
 aliasfnq emc-buffer-file-name emc-eval "(buffer-file-name)"
 
-function emc-sourceme() {
+function emc-sourceme {
     local f
     f="$(emc-buffer-file-name)" @RET
     if source-suitable-p "$f" ; then

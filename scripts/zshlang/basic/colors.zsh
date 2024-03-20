@@ -194,9 +194,12 @@ function ecalternate {
             local o
             o="$(h_ecalternate "$@")" @RET
 
+            ##
             #: Removes last whitespace char:
-            ecn "${o[1,-2]}" ; resetcolor ; ec
-            # ecn "${o}" ; resetcolor ; ec
+            # ecn "${o[1,-2]}" ; resetcolor ; ec
+            #: This doesn't work, as there are ANSI color codes in the string.
+            ##
+            ecn "${o}" ; resetcolor ; ec
         else
             ec "$@"
         fi

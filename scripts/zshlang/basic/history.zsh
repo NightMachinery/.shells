@@ -10,11 +10,17 @@ function hist-last {
     local from="${1:-1}"
     local to="$from"
 
+    local last_cmd
     if (( from == 0 )) ; then
-        ecn $history[$HISTCMD]
+        last_cmd="${history[$HISTCMD]}"
     else
-        builtin fc -I -nl -$from -$to
+        last_cmd="$(builtin fc -I -nl -$from -$to)"
+
+        #: Replace \n with actual newlines
+        last_cmd=${(S)last_cmd//\\n/$'\n'}
     fi
+
+    ecn "${last_cmd}" | cat-copy-if-tty
     ##
     # -I
     #       restricts to only internal events (not from $HISTFILE)

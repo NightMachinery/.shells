@@ -32,7 +32,18 @@ function memoi-eval() {
     local memoi_expire="${memoi_expire:-0}"
     local cmd="$(gquote "$@")"
     local custom_key="$memoi_key"
-    local rediskey="$custom_key|> $cmd"
+
+    local rediskey
+    local memoi_key_mode="${memoi_key_mode:-default}"
+    if [[ "${memoi_key_mode}" == 'default' ]] ; then
+        rediskey="${custom_key}|> $cmd"
+    elif [[ "${memoi_key_mode}" == 'custom_only' ]] ; then
+        rediskey="${custom_key}"
+    else
+        ecerr "$0: unknown memoi_key_mode: ${memoi_key_mode}"
+        return 1
+    fi
+
     local deusvult="$deusvult"
     local skiperr="$memoi_skiperr"
     local aborterr="$memoi_aborterr"
@@ -113,7 +124,7 @@ function memoi-eval() {
 }
 @opts-setprefix memoi-eval memoi
 
-function eval-memoi() {
+function eval-memoi {
   memoi-eval "$@"
 }
 enh-savename eval-memoi memoi-eval
@@ -125,7 +136,7 @@ function reval-memoi() {
 enh-savename reval-memoi memoi-eval
 @opts-setprefix reval-memoi memoi
 
-function me() {
+function me {
   memoi-eval "$@"
 }
 enh-savename me memoi-eval

@@ -296,3 +296,23 @@ function whitespace-shared-rm {
 }
 aliasfn strip-prefixed-whitespace whitespace-shared-rm
 ##
+function sort-last-float {
+    #: Sorts such that the last line is the highest number.
+    #: You can use `tac` to reverse the order.
+    ##
+
+    perl -e '
+    # $float_pat = qr/([-+]?\d+(?:\.\d*)?)\D*$/;
+    $float_pat = qr/([-+]?\d+(?:\.\d*)?(?:[eE][-+]?\d+)?)\D*$/;
+
+    print sort {
+        ($a =~ $float_pat)[0] <=> ($b =~ $float_pat)[0]
+    } <>
+'
+    #: - `print sort { ... } <>`: Reads input lines (from a file specified as an argument or from standard input), sorts them based on the block of code provided, and prints the sorted lines.
+    #: - `($a =~ /.../)[0]`: For each line in `$a`, this regular expression matches the last number appearing just before a semicolon. The number can be an integer or a floating-point number. The `[0]` at the end extracts the first match from the list of matches (which, in this case, is the only match).
+    #: - `<=>`: The spaceship operator is used for numeric comparison between the extracted numbers from `$a` and `$b` (where `$a` and `$b` are the default variables used by Perl's `sort` function to hold the items being compared).
+    #: - `<>`: This is the diamond operator, used here to read input from either standard input or from files specified as command-line arguments.
+}
+
+##

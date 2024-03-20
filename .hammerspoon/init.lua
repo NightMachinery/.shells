@@ -76,6 +76,8 @@ local function doCopy()
 end
 
 local function doPaste()
+    hyper_exit()
+
     hs.eventtap.keyStroke({"cmd"}, "v")
 end
 ---
@@ -2446,7 +2448,8 @@ end
 function toggleFocus(appName)
     local launch_p = false
 
-    local app = hs.application.get(appName)
+    local app = nil
+    app = hs.application.get(appName)
 
     if app then
         if app:isFrontmost() then
@@ -2519,9 +2522,11 @@ appHotkey{ key='b', appName='com.parallels.desktop.console' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
 
+appHotkey{ key='t', appName='Thunderbird' }
+
 
 hyper_bind_v1("d", function()
-                  brishzeval("notif-dismiss.as")
+                  brishzeval2bg("notif-os-dismiss-all")
 end)
 ---
 acrobatScrollStep = 20
@@ -2771,12 +2776,53 @@ end
 hyper_bind_v1('z', kittyHandler)
 -- hs.hotkey.bind({}, 'F12', kittyHandler)
 ---
+function escapeTripleQuotes(s)
+    local result = {}
+    local i = 1
+    local len = #s
+
+    while i <= len do
+        local c = s:sub(i, i)
+        if c == '"' and s:sub(i + 1, i + 2) == '""' and (i == 1 or s:sub(i - 1, i - 1) ~= '\\') then
+            table.insert(result, '\\')
+            table.insert(result, '"""')
+            i = i + 3
+        else
+            table.insert(result, c)
+            i = i + 1
+        end
+    end
+
+    return table.concat(result)
+end
+-- function escapeTripleQuotes(s)
+--     -- Escape unescaped triple quotes
+--     ---
+--     -- @GPT4T
+--     -- Lua's pattern matching system does not support lookbehind assertions.
+--     -- This pattern matches a sequence that is either at the start of the string (^)
+--     -- or not following a backslash ([^\\]), followed by triple quotes.
+--     -- The parentheses around [^\\] and the triple quotes capture these sequences for use in the replacement.
+--     local pattern = "(^|[^\\])\"\"\""
+
+--     -- The replacement adds a backslash before the triple quotes.
+--     -- %1 refers to the first captured group (either the start of the string or a character that is not a backslash),
+--     -- ensuring we preserve it in the output.
+
+--     -- local result = s:gsub(pattern, "%1\\\"\"\"")
+--     local result = s:gsub(pattern, "ICED")
+
+--     return result
+-- end
+
 function pasteBlockified()
     -- Get the clipboard content
     local clipboardContent = hs.pasteboard.getContents()
     if clipboardContent then
         -- Remove trailing whitespace
         clipboardContent = string.gsub(clipboardContent, "%s*$", "")
+
+        clipboardContent = escapeTripleQuotes(clipboardContent)
     end
 
     -- Check if the clipboard content contains multiple lines.

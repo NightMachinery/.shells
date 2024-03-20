@@ -21,3 +21,5 @@ alias -s rar="unrar l"
 alias -s tar="tar tf"
 alias -s tar.gz="echo "
 alias -s ace="unace l"
+
+alias -s pdf="open-sioyek"

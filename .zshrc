@@ -555,6 +555,8 @@ function nightsh-load-zshrc() {
   }
   precmd_functions+=(omz_termsupport_precmd)
   prompt_pure_set_title() true # disables pure setting the title
+
+  precmd_functions+=(h-postmsg) #: This needs to be after the prompt precmd hook
   ###
   # https://stackoverflow.com/a/14634437/1410221
   function per2en-buffer() {
@@ -626,11 +628,12 @@ function nightsh-load-zshrc() {
   # WORDCHARS="${WORDCHARS/\|/}"
   WORDCHARS+='ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو۱۲۳۴۵۶۷۸۹۰'
 
-  function backward-kill-word2() {
-    if [[ "$LBUFFER" =~ '(.*)\s+$' ]] ; then
-      LBUFFER="$match[1]"
+  function backward-kill-word2 {
+    #: LBUFFER contains multi-line commands as a complete string, with =\n= for the linebreaks.
+    if [[ "$LBUFFER" =~ '^((?:\n|.)*?)\s+$' ]] ; then
+      LBUFFER="${match[1]}"
     else
-      ## if you want to customize WORDCHARS per function:
+      #: If you want to customize WORDCHARS per function:
       local WORDCHARS="${WORDCHARS}"
       zle backward-kill-word
     fi

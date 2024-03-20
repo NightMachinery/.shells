@@ -1,3 +1,15 @@
+function notif-os-dismiss-all {
+    if isDarwin ; then
+        ##
+        notif-dismiss-v2.jxa
+        ##
+        # notif-dismiss.as
+        ##
+    else
+        @NA
+    fi
+}
+
 function notif-os {
     local title="$1" msg="$2"
 
@@ -19,6 +31,7 @@ function notif-os {
         @NA
     fi
 }
+aliasfn os-notif notif-os
 
 function notif-kitty {
     local title="$1" msg="$2"

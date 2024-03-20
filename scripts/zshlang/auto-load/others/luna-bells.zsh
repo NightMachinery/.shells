@@ -95,7 +95,7 @@ function h_luna-advanced-bell {
 
     (
         local bell_awaysh=no hear_loudidle=no i
-        if sharif-vc-p ; then
+        if meeting-p || focus-do-not-disturb-p ; then
             display-gray-on
 
             if true ; then
@@ -159,14 +159,22 @@ function h_luna-advanced-bell {
     ecdate "Luna iterated."
 }
 
-function sharif-vc-p {
+function browser-current-match-p {
     {
         browser-current-url
         arc-current-url
         # edge-current-url
-    } | rg --ignore-case --quiet '^https://vc.sharif.edu/ch/'
+    } | rg --ignore-case --quiet "$@"
+}
+
+function sharif-vc-p {
+    browser-current-match-p '^https://vc\.sharif\.edu'
 }
 aliasfn sharif-vc-is sharif-vc-p
+
+function meeting-p {
+    browser-current-match-p '^https://(vc\.sharif\.edu|meet\.google\.)'
+}
 
 function sharif-vc-p-v1 {
     #: @deprecated
@@ -369,7 +377,7 @@ function deluna {
         fi
 
         if (( $(idle-get) >= $timeout )) ; then
-            #: We might need to do this on unlock, too. The idle value doesn't seem to get updated when the laptop's lid is closed.
+            #: We do this in [agfi:unlock-hook], too. The idle value doesn't seem to get updated when the laptop's lid is closed.
             reval-ecdate last-idle-reset
         fi
 

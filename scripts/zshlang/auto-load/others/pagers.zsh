@@ -12,7 +12,7 @@ export LESSMIN='-RiF --mouse --wheel-lines=3 -j.3'
 # -j.5 causes search matches to be centered at the specified fraction of the screen
 
 alias lmin='LESS=$LESSMIN '
-function less-min() {
+function less-min {
     LESS=$LESSMIN less "$@"
 }
 

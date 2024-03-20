@@ -11,7 +11,7 @@ Use rcrdl to copy from remote to local."
 
     local opts=()
     isI && opts+="--progress"
-    RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$(url-tail "$rudi")" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$(url-tail "$rabbit")" rclone "$opts[@]" --multi-thread-streams=0 --drive-server-side-across-configs "$@"
+    RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$(url-tail "$rudi")" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$(url-tail "$rabbit")" $proxyenv rclone "$opts[@]" --multi-thread-streams=0 --drive-server-side-across-configs "$@"
 }
 ##
 function rcr-gdrive-shareddrives-list() {

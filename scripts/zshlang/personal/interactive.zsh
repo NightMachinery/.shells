@@ -5,18 +5,21 @@ isI && {
     function precmd_pipestatus {
         # @duplicateCode/0043fdb53e9bf6f36a57e7570b22453b
         local r=$? ps=("${pipestatus[@]}") ps_p=("${pipestatus_preserved[@]}")
+        local msg=""
         if (( r != 0 )) ; then
             if (( r != 0 && ${#ps} == 1 && ${#ps_p} > 1 )) ; then
                 ps=("$ps_p[@]")
             fi
 
             if (( ${#ps} > 1 )) ; then
-                RPROMPT="${(j.|.)ps}"
+                msg="${(j.|.)ps}"
             else
-                RPROMPT="${r}"
+                msg="${r}"
             fi
-        else
-            RPROMPT=""
+        fi
+
+        if test -n "${msg}" ; then
+            NIGHT_POSTMSG+=" ${msg}"
         fi
     }
     add-zsh-hook precmd precmd_pipestatus

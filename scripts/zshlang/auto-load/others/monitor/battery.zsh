@@ -38,6 +38,8 @@ alias energy-monitor-darwin='power-monitor-darwin'
 # Nonetheless, it only works with fixed thresholds (80% as upper limit and 70% as lower limit).
 # CHWA key is the one used to enable/disable the native limit. 01 = 80% limit, 00 = no limit
 ##
+redis-defvar battery_charge_limit_p
+
 typeset -g smc_command="/usr/local/bin/smc"
 typeset -g smc_charge_limit_key="CHWA"
 typeset -g smc_charge_limit_status_on="01"
@@ -49,7 +51,9 @@ function battery-charge-limit-enable {
     if isDarwin ; then
         assert test -e "${smc_command}" @RET
 
-        reval-ec sudo "${smc_command}" -k "${smc_charge_limit_key}" -w "${smc_charge_limit_status_on}"
+        reval-ecgray sudo "${smc_command}" -k "${smc_charge_limit_key}" -w "${smc_charge_limit_status_on}" @RET
+
+        assert battery_charge_limit_p_set true @RET
     else
         @NA
     fi
@@ -59,9 +63,24 @@ function battery-charge-limit-disable {
     if isDarwin ; then
         assert test -e "${smc_command}" @RET
 
-        reval-ec sudo "${smc_command}" -k "${smc_charge_limit_key}" -w "${smc_charge_limit_status_off}"
+        reval-ecgray sudo "${smc_command}" -k "${smc_charge_limit_key}" -w "${smc_charge_limit_status_off}" @RET
+
+        assert battery_charge_limit_p_set false @RET
     else
         @NA
+    fi
+}
+
+function battery-charge-limit-restore-status {
+    retry ensure-redis @RET
+
+    local status_p
+    status_p="$(battery_charge_limit_p_get)" @TRET
+
+    if bool "${status_p}" ; then
+        reval-ecgray battery-charge-limit-enable
+    else
+        reval-ecgray battery-charge-limit-disable
     fi
 }
 

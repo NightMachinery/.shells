@@ -1,5 +1,10 @@
 ##
-# import torch.nn.functional as F
+try:
+    import torch
+    import torch.nn.functional as F
+except:
+    pass
+
 try:
     import jax.nn as jnn
 except:

@@ -1,5 +1,10 @@
 BTT_HS_NOISES_UID='5DBF0BE7-5822-459A-B450-36E3396124F9'
 ##
+function hammerspoon-reload {
+     hammerspoon -c "hs.reload()"
+}
+alias hsr='hammerspoon-reload'
+##
 function hs-popclickBttToggle() {
     local lis="$(serr hammerspoon -c 'popclickBttToggle()')"
     hs-popclick-btt-refresh
