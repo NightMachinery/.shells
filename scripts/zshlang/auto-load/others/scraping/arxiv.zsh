@@ -149,8 +149,8 @@ function h-arxiv-source-dl {
 }
 
 function arxiv-source-dl {
-    local paper_source_dir
-    paper_source_dir="$(ffz-get paper latex)" @TRET
+    #: now @global
+    # local paper_source_dir
 
     reval-ecgray pushf "${paper_source_dir}" @RET
     {
@@ -203,8 +203,8 @@ function arxiv-latex-dl {
     local inargs
     in-or-args3 "$@" @RET
 
-    local paper_dir
-    paper_dir="$(ffz-get 'paper')" @TRET
+    #: now @global
+    # local paper_dir
 
     local url paper_id api_url paper_title
     for url in ${inargs[@]}; do
@@ -226,7 +226,7 @@ function arxiv-latex-dl {
 
         paper_title="$(ec "${paper_title}" | xml2 | rget '/feed/entry/title=(.+)' | str2filename)" @TRET
 
-        local save_dir="${paper_dir}/latex/${paper_title}"
+        local save_dir="${paper_source_dir}/${paper_title}"
         mkdir-m "${save_dir}"
 
         # Download LaTeX source

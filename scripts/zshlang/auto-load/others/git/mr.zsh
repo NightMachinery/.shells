@@ -7,7 +7,7 @@ if isMB2 ; then
 
         ~cod/orgmode-styles
 
-        ~base/_Books/papers
+        "${paper_dir}"
     )
 fi
 
