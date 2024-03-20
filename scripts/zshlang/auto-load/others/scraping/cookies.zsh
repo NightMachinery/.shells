@@ -3,13 +3,13 @@ function cookies-copy() {
     ec-copy "theCookies=$(gq "$(cookies-auto "$@")" "$@")"
 }
 aliasfn cook cookies-copy
-function cookies-killlock() {
+function cookies-killlock {
     if ask "$(fuser "$cookiesFile" | inargsf ps -fp)" ; then
         kill "$(serr fuser "$cookiesFile")"
     fi
 }
 
-function getcookies() {
+function getcookies {
     mdoc "[cookiesFile= ] $0 <url>
 Will output Chrome's cookies for the given URL in key=val;key2=val2
 See |cookies| for higher-level API." MAGIC
@@ -19,7 +19,7 @@ See |cookies| for higher-level API." MAGIC
     test -e "$cf" || { ecdbg "getcookies called with non-existent file: $cf" ; return 0 }
 
     local tmp
-    if true ; then # @futureCron Did this solve the locking issue?
+    if true ; then #: @futureCron Did this solve the locking issue?
         tmp="$(gmktemp)"
         assert command cp "$cf" "$tmp" @RET
         cf="$tmp"
