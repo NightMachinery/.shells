@@ -180,6 +180,11 @@ createglob archive_formats archiveglob
 if isDarwin ; then
     # veditor=(code-insiders -r)
     veditor=(emc)
+
+    #: [[id:ef65fc62-4e5b-4645-8465-32d2368d1b8d][Arc/cookies]]
+    #: @broken
+    # cookiesFile="${HOME}/Library/Application Support/Arc/User Data/Default/Cookies"
+
     cookiesFile="${HOME}/Library/Application Support/Google/Chrome/Default/Cookies"
 else
     # test -e ~/.SpaceVim && veditor=(svi -p) ||
