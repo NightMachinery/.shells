@@ -296,7 +296,21 @@ function whitespace-shared-rm {
 }
 aliasfn strip-prefixed-whitespace whitespace-shared-rm
 ##
-function sort-last-float {
+function floatsort {
+    cat-paste-if-tty |
+        floatsort.rs "$@" |
+        cat-copy-if-tty
+}
+aliasfn fsort floatsort
+
+function sort-last-float-rust {
+    #: This is much faster than `sort-last-float-perl'.
+    ##
+    floatsort "$@"
+}
+aliasfn sort-last-float sort-last-float-rust
+
+function sort-last-float-perl {
     #: Sorts such that the last line is the highest number.
     #: You can use `tac` to reverse the order.
     ##
