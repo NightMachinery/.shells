@@ -160,25 +160,28 @@ aliasfn hear-shuffle hear-do playlist-shuffle # or just press 'k'
 
 function hear-loadfile {
     local url="$1"
-    local mode="${mpv_loadfile_mode:-replace}"
+    local mode="${mpv_load_mode:-replace}"
     #: * =replace=: Stop playback of the current file, and play the new file immediately.
     #: * =append-play=: Append the file, and if nothing is currently playing, start playback. (Always starts with the added file, even if the playlist was not empty before running this command.) This will not skip the currently playing file.
     #: * =append=: Append the file to the playlist.
     #:
     #: The append modes add all the other files of the dir to the playnext, too (possibly because of my scripts).
+    local mpv_command="${mpv_load_command:-loadfile}"
 
     assert-args url
     if test -e "$url" ; then
         url="$(grealpath -- "$url")" @TRET
     fi
 
-    revaldbg hear-do loadfile "${url}" "$mode"
+    revaldbg hear-do "${mpv_command}" "${url}" "$mode"
     revaldbg hear-play-on
 }
 aliasfn hear-open hear-loadfile
 aliasfn hlo hear-loadfile
 aliasfn mpv-loadfile fnswap hear-do mpv-do hear-loadfile
 aliasfn mpv-open mpv-loadfile
+
+aliasfn hear-load-playlist mpv_load_command=loadlist hear-loadfile
 
 function hear-loadfile-begin {
     hear-loadfile "$@" @RET
