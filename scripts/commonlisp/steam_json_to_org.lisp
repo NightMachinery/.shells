@@ -68,11 +68,16 @@
                  val))
               (t val))))))))
 
+;;;
+;; @duplicateCode/7af1f458383296158787f94092a27736
 (defun v (key)
   (json-get d key))
 
 (defun v0 (key)
-  (car (v key)))
+  (let ((result (v key)))
+    (if (consp result)
+        (car result)
+        nil)))
 ;;;
 (progn
   (let ((title (v0 "title"))
