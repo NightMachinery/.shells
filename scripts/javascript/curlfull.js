@@ -4,6 +4,8 @@ const timeout = ((process.env.cfTimeout) || 20) * 1000
 const scrollDown = ((process.env.cfScrollDown) || 0)
 const urlFinal = ((process.env.cfUrlFinal) || 0)
 
+const { setTimeout } = require('node:timers/promises');
+
 // const puppeteer = require('puppeteer');
 const puppeteer = require('puppeteer-extra');
 // puppeteer.use(require('puppeteer-extra-plugin-repl')())
@@ -30,7 +32,10 @@ puppeteer.use(StealthPlugin());
     const waittill = { timeout: 300000, waitUntil: ['networkidle2', 'domcontentloaded'] }
     await page.goto(url, waittill);
     // await page.waitForNavigation(waittill); // can get stuck
-    await page.waitForTimeout(timeout);
+    // await page.waitForTimeout(timeout);
+    await setTimeout(timeout);
+    // [[https://stackoverflow.com/questions/64805395/puppeteer-waitfortimeout-is-not-a-function/77078430#77078430][javascript - Puppeteer waitForTimeout is not a function - Stack Overflow]]
+    // [[https://stackoverflow.com/questions/46919013/puppeteer-wait-n-seconds-before-continuing-to-the-next-line/73676564#73676564][javascript - puppeteer: wait N seconds before continuing to the next line - Stack Overflow]]
 
     // Start an interactive REPL here with the `page` instance.
     // await page.repl()
