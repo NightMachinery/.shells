@@ -31,7 +31,7 @@ function semantic-scholar-to-json-api {
     local json
     local url
     url="https://api.semanticscholar.org/graph/v1/paper/${paper_id}?fields=title,url,citationCount,influentialCitationCount,externalIds,abstract,venue,year,referenceCount,isOpenAccess,fieldsOfStudy,s2FieldsOfStudy,publicationTypes,publicationDate,journal,authors.name,authors.hIndex,authors.homepage,authors.affiliations,authors.citationCount,authors.paperCount,authors.aliases,authors.url,authors.externalIds,openAccessPdf"
-    json="$(revaldbg gurl "$url")" || {
+    json="$(revaldbg gurl -H "x-api-key: ${SemanticScholar_API_key}" "$url")" || {
         ecerr "$0: curl-ing the API failed with $?"$'\n'"URL: ${url}"
         pbcopy "$url"
         return 1
@@ -57,7 +57,15 @@ function semantic-scholar-to-json {
                     rget '(?:Corpus\s*ID:\s*)?(\d+)')" || true
 
     local json_api
-    json_api="$(semantic_scholar_corpus_id="$corpus_id" semantic-scholar-to-json-api "$url")" @TRET
+    if ! json_api="$(semantic_scholar_corpus_id="$corpus_id" semantic-scholar-to-json-api "$url")" ; then
+        ecerr "$0: API failed, falling back to scraped data"
+        if true ; then
+            return 1
+        else
+            ec "${json_scraped}"
+            return 0
+        fi
+    fi
 
     if false ; then
         {
