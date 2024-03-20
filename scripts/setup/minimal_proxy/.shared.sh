@@ -1,5 +1,9 @@
 ##
 export TERM="xterm-256color"
+# export TERMINFO=/usr/share/terminfo
+# export TERM="xterm+256color"
+# export TERM="xterm-color"
+# export TERM="xterm-direct"
 
 export TZ='Asia/Tehran'
 
@@ -49,6 +53,7 @@ export PATH="${HOME}/bin:${PATH}"
 
 export PATH="${HOME}/.emacs.d/bin:${PATH}"
 
+export PATH="${HOME}/.cargo/bin:${PATH}"
 export PATH="${HOME}/.local/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/sbin:${PATH}"
@@ -62,12 +67,13 @@ psource "$GUIX_PROFILE/etc/profile"
 export PATH="${HOME}/anaconda/bin:${PATH}"
 export PATH="${HOME}/miniconda3/bin:${PATH}"
 ##
-export HOMEBREW_CURLRC="${HOME}/.curlrc"
+if test -e "${HOME}/.curlrc" ; then
+    export HOMEBREW_CURLRC="${HOME}/.curlrc"
+fi
 ##
 alias wh='which'
 
 alias bi='brew install'
-alias pi='pip install --upgrade'
 
 alias ll='ls -alh'
 alias l='ls -ah'

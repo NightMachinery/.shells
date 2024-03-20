@@ -1,20 +1,72 @@
 #+TITLE: minimal_proxy/gen
 
-* rsync
-#+begin_example zsh
-rsp-safe ~/scripts/setup/minimal_proxy/.shared.sh x@y:
-rsp-safe ~/.tmux.conf ~/.inputrc x@y:
+* steps
+** [[id:a802bc74-36e7-4bb7-a3a7-a89a5efece52][Add User]]
 
-rsp-safe ~/.tmux.conf ~/.inputrc ~/scripts/setup/minimal_proxy/*.(zsh|zshenv|zshrc|bashrc|bash|sh)(D) x@y:
+** Tangle this page.
+*** [help:org-babel-tangle]
+
+** rsync necessary files
+#+begin_example zsh
+# user=tmptilmay
+# host=t21
+
+user=user01
+# host=pino
+host=giant
+
+# fullhost=$user@$host
+fullhost=$host
+
+rsp-safe --rsync-path="mkdir -p ~/base/bootstrap && rsync" "${nightNotesPublic}"/cheatsheets/OS/unix/tangled/*(D) ${fullhost}:base/bootstrap/
+
+rsp-safe ~/.tmux.conf ~/.inputrc ~/scripts/setup/minimal_proxy/**/*.(zsh|zshenv|zshrc|bashrc|bash|sh|curlrc)(D) ${fullhost}:
 #+end_example
 
 #+begin_example zsh
-rsp-safe2 x@y:bin/ $NIGHTDIR/perllang/url_dir_count.pl 
+rsp-safe2 ${fullhost}:bin/ $NIGHTDIR/perllang/url_dir_count.pl 
 #+end_example
+
+** On the destination server:
+*** @root
+**** Sync datetime if needed.
+***** [[id:5aa32083-1c7d-4ba4-a40a-e5c6f183e661][time/sync]]
+
+**** [[id:9950dc25-c88f-4660-b059-6302af531c03][apt]]
+
+*** You should run the next steps in =tmux=.
+
+*** Run =bash bootstrap_minimal.bash=
+
+*** Run next steps in Zsh.
+
+*** Setup a proxy.
+#+begin_src zsh :eval never
+export-from-alias pxa2096
+#+end_src
+
+*** [[id:cf6c92c4-bf55-4534-9064-13fb1a80a874][brew]]
+**** This will be slow without a proxy.
+
+*** =bash bootstrap_with_proxy.bash=
+
+*** Setup other stuff.
+**** [[id:d565cc4f-728e-45bf-8554-d03670fa2707][SSH/setup, keygen]]
+#+begin_src zsh :eval never
+ssh-keygen
+#+end_src
+
+**** =DecompV/setup.zsh=
+
+**** =.privateShell=
+***** [[id:b4ad4e80-aa83-459b-87f0-07d1e5b22f0e][@PATH =micromamba=]]
+
+***** TQDM and Telegram tokens
 
 * Add User
 :PROPERTIES:
 :visibility: folded
+:ID:       a802bc74-36e7-4bb7-a3a7-a89a5efece52
 :END:
 #+begin_example zsh
 function sudoer-add-user {
@@ -71,6 +123,51 @@ EOF
 
 
 * install
+#+begin_src zsh :eval never :tangle tangled/bootstrap_minimal.bash
+set -exo pipefail
+##
+function micromamba-setup {
+    #: @duplicateCode/0d387fd1a8cb09e91286067c039ffd2a
+    #: @noninteractive
+    ##
+    INIT_YES=n \
+        </dev/null bash <(curl -L micro.mamba.pm/install.sh)
+
+    export PATH="${HOME}/.local/bin:${PATH}"
+    micromamba config append channels conda-forge --env
+    micromamba self-update
+
+    micromamba create --yes -c conda-forge --name p310 python=3.10 numpy 
+}
+
+function gost-setup {
+    #: @duplicateCode/677fcfc72b5b857e88b4687a1824e9e3
+    ##
+    mkdir -p ~/bin/
+    wget -O - 'https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz' | gunzip -c > ~/bin/gost
+
+    chmod +x ~/bin/gost
+    # sudo setcap 'cap_net_bind_service=+ep' "$(realpath ~/bin/gost)"
+}
+##
+
+command sh -c "$(wget -O- https://raw.githubusercontent.com/romkatv/zsh-bin/master/install)" -- -d ~/.local -e no
+
+mkdir -p ~/.local/bin
+curl -sS https://starship.rs/install.sh | sh -s -- -b ~/.local/bin -y
+
+curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+
+gost-setup
+
+micromamba-setup
+
+curl -LsSf https://astral.sh/uv/install.sh | INSTALLER_NO_MODIFY_PATH=1 INSTALLER_PRINT_VERBOSE=1 sh
+
+##
+
+#+end_src
+
 ** [[id:7be66ef4-f0a4-49c9-9d61-fce8ead929c2][zsh/install]]
 
 ** [[id:6de074b1-51c0-4282-9dac-4056c60978c8][starship/starship: ☄🌌️ The minimal, blazing-fast, and infinitely customizable prompt for any shell!]]
@@ -79,7 +176,14 @@ EOF
 
 ** [[id:4290bea9-23d5-4359-84e1-4e0d091ebad6][@install micromamba]]
 
+** [[id:7e269ee3-69ef-4809-95ec-fa33b0aad996][@install =uv=]]
+
+** [[id:e85ddd44-c6d6-4c2e-acbe-0def717987b8][@good GitHub - XuehaiPan/nvitop: An interactive NVIDIA-GPU process viewer, the one-stop solution for GPU process management.]]
+
 ** [[id:3eed54eb-4ff0-4c77-8d87-7ade88f9fdb4][@install gost]]
+
+** available on brew
+*** [[id:dab96609-f540-46ba-adf8-2aeaa46a0002][Release nnn v4.9 Elixir · jarun/nnn]]
 
 * [[id:cef1b558-0642-4d7e-b94b-b357e2e6bf48][Adding a new SSH key to your GitHub account - GitHub Docs]]
 
@@ -92,7 +196,10 @@ source ~/.config/envman/PATH.env
 #+end_example
 
 ** others
-#+begin_example zsh
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
+## WebI
+#: @proxyNeeded
+
 curl -sS https://webi.sh/webi | sh
 
 curl -sS https://webi.sh/golang | sh
@@ -106,23 +213,41 @@ curl -sS https://webi.sh/fd | sh
 curl -sS https://webi.sh/fzf | sh
 curl -sS https://webi.sh/jq | sh
 
-# curl -sS https://webi.sh/docker | sh # NA
-#+end_example
+#: @NA :
+# curl -sS https://webi.sh/nnn | sh
+# curl -sS https://webi.sh/ugrep | sh
+# curl -sS https://webi.sh/ncdu | sh
+# curl -sS https://webi.sh/docker | sh
+##
+
+#+end_src
 
 ** pip
-#+begin_example zsh
+#+begin_src zsh :eval never :tangle tangled/bootstrap_minimal.bash
+## pip
 pip install --upgrade pipx
-pipx install -U speedtest-cli nvitop
+pip install -U speedtest-cli nvitop
 
-pip install -U jupyter jupyterlab
-#+end_example
+pip install -U jupyter jupyterlab py-spy
+##
+
+#+end_src
 
 ** apt
+:PROPERTIES:
+:ID:       9950dc25-c88f-4660-b059-6302af531c03
+:END:
 #+begin_example zsh
-sudo apt-get install -y tmux zsh openconnect jq python3 python3-pip
+sudo apt-get install -y build-essential tmux zsh openconnect jq python3 python3-pip socat
 #+end_example
 
 ** brew
+:PROPERTIES:
+:ID:       cf6c92c4-bf55-4534-9064-13fb1a80a874
+:END:
+*** [[id:1b697891-c688-4790-9812-2ff60d9e422c][Homebrew/install]]
+
+*** @nonRoot
 #+begin_example zsh
 curl -sS https://webi.sh/brew | sh
 #+end_example
@@ -137,10 +262,10 @@ tmuxnew brew-install zsh -c 'curl -sS https://webi.sh/brew | sh'
 export PATH="${PATH}:${HOME}/.local/opt/brew/bin"
 #+end_example
 
-*** install
-#+begin_example zsh
-brew install zsh tealdeer progress bandwhich ncdu rm-improved
-#+end_example
+*** install brew packages
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
+brew install zsh ugrep tealdeer progress bandwhich ncdu rm-improved eza
+#+end_src
 
 * Caddy
 #+begin_example zsh

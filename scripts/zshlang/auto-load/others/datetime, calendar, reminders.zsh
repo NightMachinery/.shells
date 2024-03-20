@@ -951,3 +951,9 @@ function hours-since-nat {
     ec $((duration / 3600))
 }
 ##
+function cook-date {
+  local current_date=$(date +"%Y-%m-%d %H:%M:%S")
+  ec "sudo date -s \"$current_date\"" |
+      cat-copy-if-tty
+}
+##
