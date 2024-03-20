@@ -54,7 +54,13 @@ function ipynb2org {
         { cat "$tmp" | md2org | orgbabel-src-python-reset > "$dest" } @TRET
 
         grealpath -- "$dest"
-    } always { silent trs-rm "$tmp" }
+    } always {
+        if isDbg ; then
+            var-show tmp
+        else
+            silent trs-rm "$tmp"
+        fi
+    }
 }
 
 function emc-ipynb {

@@ -131,12 +131,13 @@ function pxify {
     pxaify-command pip # makes downloads faster
     pxify-command conda
     # pxaify-command git # use git's own config
-    # pxaify-command npm
+    pxaify-command npm
     pxaify-command go
     pxaify-command dart
 
-    # pxaify-command cargo # did not work, using CARGO_HTTP_PROXY instead
-    export CARGO_HTTP_PROXY=socks5://localhost:1081
+    # pxaify-command cargo # did not work
+    # export CARGO_HTTP_PROXY=http://127.0.0.1:1087
+    export CARGO_NET_GIT_FETCH_WITH_CLI=true
 
     # pxaify-command emacs
     # pxaify-command emacsclient

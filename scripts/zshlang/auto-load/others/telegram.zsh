@@ -96,7 +96,10 @@ function tsend-urls {
 }
 ##
 function air {
-    zargs -i ___ -- "$@" -- reval-ec tsendf ___ "$(hear-get)"
+    local i
+    for i in $@ ; do
+        reval-ec tsendf "$i" "$(hear-get)"
+    done
 }
 ##
 function reval-tlg {

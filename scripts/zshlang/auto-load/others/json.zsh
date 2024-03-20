@@ -54,16 +54,16 @@ function json-beautify2 {
     prettier --parser=json5
 }
 ##
-function arrJ-noquote() {
+function arrJ-noquote {
     local items=( "$@" )
 
     print -nr -- "[ ${(j.,.)items} ]"
 }
-function arrJ() {
+function arrJ {
     local items=( "$@" )
 
     ##
-    jq --null-input '$ARGS.positional' --args "${items[@]}"
+    jq --null-input '$ARGS.positional' --args -- "${items[@]}"
     ##
 }
 function arrJ-in() {

@@ -130,7 +130,8 @@ function mpv-do {
 
     mpv-rpc "$cmd"
 }
-function mpv-rpc () {
+
+function mpv-rpc {
     local soc="${mpv_rpc_socket:-$mpv_ipc}" cmd="$1"
     assert-args soc cmd @RET
     assert test -e "$soc" @RET

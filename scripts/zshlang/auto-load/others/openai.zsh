@@ -16,26 +16,36 @@ function openai-cost-by-tokens {
     elif [[ "${model}" =~ '^gpt-4(?:-0314|-0613)?$' ]] ; then
         model=gpt-4
     elif [[ "${model}" =~ '^gpt-3.5-turbo(?:-16k)?$' ]] ; then
-        model=gpt-3.5-turbo-1106
+        model=gpt-3.5-turbo-0125
     fi
 
     #: [[https://openai.com/pricing][Pricing]]
+    #: [[https://www.anthropic.com/api][Claude API \ Anthropic]]
+    #: Per 1K tokens
     typeset -A model_costs
     if [[ "${mode}" == input ]] ; then
         model_costs=(
-            [gpt-4-turbo]=0.01
+            [gpt-3.5-turbo-1106]=0.0010
+            [gpt-3.5-turbo-0125]=0.0005
+            [gpt-3.5-turbo-instruct]=0.0015
+
             [gpt-4]=0.03
             [gpt-4-32k]=0.06
-            [gpt-3.5-turbo-1106]=0.0010
-            [gpt-3.5-turbo-instruct]=0.0015
+            [gpt-4-turbo]=0.01
+
+            [claude-3-opus]=0.015
         )
     elif [[ "${mode}" == output ]] ; then
         model_costs=(
-            [gpt-4-turbo]=0.03
+            [gpt-3.5-turbo-1106]=0.0020
+            [gpt-3.5-turbo-0125]=0.0015
+            [gpt-3.5-turbo-instruct]=0.0020
+
             [gpt-4]=0.06
             [gpt-4-32k]=0.12
-            [gpt-3.5-turbo-1106]=0.0020
-            [gpt-3.5-turbo-instruct]=0.0020
+            [gpt-4-turbo]=0.03
+
+            [claude-3-opus]=0.075
         )
     else
         ecerr "$0: unknown mode: $mode"
@@ -365,10 +375,36 @@ function llm-4t-chat {
 }
 aliasfn reval-to-gpt4t reval-to llm-4t
 aliassafe rl4t='\noglob reval-to-gpt4t'
+aliassafe 4t='\noglob reval-to-gpt4t'
+
+function llm-c3o {
+    llm_model=claude-3-opus llm-send "$@"
+}
+aliassafe c3o='\noglob llm-c3o'
+function llm-c3o-chat {
+    llm_model=claude-3-opus llm-m chat "$@"
+}
+aliasfn reval-to-c3o reval-to llm-c3o
+aliassafe rc3o='\noglob reval-to-c3o'
+
+function llm-c3h {
+    llm_model=claude-3-haiku llm-send "$@"
+}
+aliassafe c3h='\noglob llm-c3h'
+function llm-c3h-chat {
+    llm_model=claude-3-haiku llm-m chat "$@"
+}
+aliasfn reval-to-c3h reval-to llm-c3h
+aliassafe rc3h='\noglob reval-to-c3h'
 
 # alias xx='\noglob llm-4'
-aliassafe xx='\noglob llm-4t'
-aliassafe xz='\noglob reval-to-gpt4t' #: @nameConflict xz, unxz, xzcat, lzma, unlzma, lzcat - Compress or decompress .xz and .lzma  files
+
+# aliassafe xx='\noglob llm-4t'
+# aliassafe xz='\noglob reval-to-gpt4t'
+
+aliassafe xx='\noglob llm-c3o'
+aliassafe xz='\noglob reval-to-c3o'
+#: @nameConflict xz, unxz, xzcat, lzma, unlzma, lzcat - Compress or decompress .xz and .lzma  files
 ##
 function sgpt-m {
     OPENAI_API_KEY="${openai_api_key}" $proxyenv reval-ecgray command sgpt --temperature 0 "$@"
