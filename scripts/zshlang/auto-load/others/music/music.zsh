@@ -146,16 +146,19 @@ touch-tracks_() {
     done
 }
 
-playlistc() {
+function playlistc {
     : "fuzzy choose between existing playlists"
 
     bella_zsh_disable1
 
+    local query
+    query=".m3u$ !/old/ $(fz-createquery "$@")"
+
     local playlists
-    playlists=("${(@f)$(fd --exclude .git --follow -t f '.' "${playlist_dir}" | fz -q "$(fz-createquery "$@")")}") @RET
+    playlists=("${(@f)$(fd --exclude .git --follow -t f '.' "${playlist_dir}" | fz -q "${query}")}") @RET
 
     ec "Playing playlist(s) $playlists"
-    hearp +s "${(@)playlists}"
+    hear-playlist "${(@)playlists}"
 }
 
 function playlister() {
@@ -296,51 +299,89 @@ function playlist-absolutify {
         local orig_dir="${playlist:h}"
 
         local files
-        files=(${(@f)"$(cat "$playlist")"}) @TRET
+        files="$(cat "$playlist" | prefixer --skip-empty | url-decode)" @TRET
+        #: Some playlists need [agfi:url-decode].
+
+        #: @hack Here we redirect some paths to other paths. :D
+        files="$(ec "${files}" |
+        music_dir="${music_dir}" perl -lpe "
+s{^../../../hyperdiva/Songs}{../../Songs}g ;
+# Though the music collection in hyperdiva might be more complete? E.g., we don't have =SkullGirls OST= on MB2.
+
+s{/Motion Picture\\'s Soundtracks/More/Disney/}{/Motion Picture's Soundtracks/Disney/}g ;
+s{/Disney/Disney Special/}{/Disney/Disney Special Editions/}g ;
+s{\Q/Disney/32. 1994 The Lion King [Remastered]/\E}{/Disney/Disney Special Editions/32. 1994 The Lion King [Remastered]/}g ;
+
+s{/Games/More/Rayman Soundtracks/}{/Games/Rayman Soundtracks/}g ;
+
+s{^E:/Downlaods/Torrents/Dls/Jonas Brothers/}{\$ENV{music_dir}/Songs/Foreign/Jonas Brothers/}g ;
+
+s{/Foreign/Selena Gomez/all/}{/Foreign/Selena Gomez/}g ;
+
+s{\Q/Foreign/More/Carly Rae Jepsen - Kiss (Deluxe Edition)/\E}{/Foreign/Carly Rae Jepsen/Carly Rae Jepsen - Kiss (Deluxe Edition)/}
+")" @TRET
+
+        files=(${(@f)files})
 
         local f
         for f in $files[@] ; do
-            if [[ "$f" == /* ]] ; then
+            if [[ "$f" =~ '^([A-Z]:)?/' ]] ; then
                 ec "$f"
             else
-                grealpath -e -- "${orig_dir}/$f" || true # @STRUE # too slow
+                grealpath -e -- "${orig_dir}/$f" || true # @STRUE #: too slow
             fi
         done
     done
 }
 
-function hearp() {
-    local shuf='--shuffle'
-    test "${1}" = '+s' && {
-        shuf=''
-        shift
-    }
+function hear-playlist {
+    local shuf=''
+    if bool "${hear_playlist_shuffle}" ; then
+        shuf='--shuffle'
+    fi
+
     local tracks
     tracks="$(playlist-absolutify "${@}")" @TRET
     if test -n "$shuf" ; then
-        tracks="$(ec "$tracks"| shuf)" @TRET
+        tracks="$(ec "$tracks" | shuf)" @TRET
     fi
-    if test -z "$NO_HEARP_TOUCH" ; then
+    if bool "${hear_playlist_touch}" ; then
+        ecgray "$0: touching tracks ..."
+
         touch-tracks "${(@f)tracks}" @TRET
     fi
-    # Don't use mpv's native --shuffle since it MIGHT use autoloaded tracks, also empty string causes a harmless error
-    # k shuffles live in mpv (with MY config :D)
-    hear --loop-playlist --playlist=<(ec "$tracks")
+
+    ##
+    # hear --loop-playlist --playlist=<(ec "$tracks")
+    ##
+    #: Save tracks in a temp file:
+    local tmp
+    tmp="$(mktemp)" @TRET
+    ec "${tracks}" > "$tmp"
+
+    reval-ecgray hear-load-playlist "${tmp}"
+    ##
+    #: Don't use mpv's native --shuffle since it MIGHT use autoloaded tracks, also empty string causes a harmless error
+    #: k shuffles live in mpv (with MY config :D)
 }
 
-function mut() {
+function mut {
     music_dir=$HOME'/Downloads/Telegram Desktop' songc --loop ${*:+"$*"}
 }
 
-function muf() songc --loop ${*:+"$*"}
+function muf {
+    songc --loop ${*:+"$*"}
+}
 
-function mub() {
+function mub {
     songc --loop-playlist ${*:+"$*"} #alBum
 }
 
-function mup() playlistc "$@"
+function mup {
+    playlistc "$@"
+}
 
-function mu-gateway() {
+function mu-gateway {
     local bp=()
     { test "${1}" = "-d" || test "$1" = "-a" || test "$1" = "-p" } && {
         bp+="$1"
