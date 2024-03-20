@@ -78,6 +78,7 @@ if isDarwin ; then
     aliasdir vol /Volumes
 fi
 aliasdir base $HOME/base
+aliasdir paper "${paper_dir}"
 aliasdir cod $codedir
 aliasdir dl  $HOME/Downloads
 aliasfn indl dl

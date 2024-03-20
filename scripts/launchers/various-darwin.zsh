@@ -31,7 +31,7 @@ if isMe ; then
     fi
     ##
     # tmuxnewsh2 shared_smb loop reval-notifexit sudo /usr/sbin/smbd -no-symlinks false -stdout -debug
-    # tmuxnewsh2 shared_ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/_Books --debug
+    # tmuxnewsh2 shared_ftp_books reval-notifexit python -m pyftpdlib -i '192.168.1.56' -p 8119 -d ~/Base/books --debug
     ##
     # @warn dav has no pass set on writable
     # @fatal wsgidav consumes way too much CPU (was at 98% even with no WiFi connected), and might even be hanging the laptop

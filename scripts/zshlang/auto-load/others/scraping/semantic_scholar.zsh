@@ -137,7 +137,7 @@ function semantic-scholar-dl-from-org {
         if isBorg ; then
             dir="$(gmktemp -d)" @TRET
         else
-            dir=~base/_Books/papers
+            dir="${paper_dir}"
             if ! test -d "$dir" ; then
                 dir="."
             fi

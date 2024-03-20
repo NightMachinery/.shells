@@ -362,7 +362,7 @@ aliasfn vv ve-emc v
 function vp-ls {
     local pdf_dirs=(
         ~/Downloads
-        ~base/_Books
+        ~base/books
         ~base/documents/course_materials
         ~cod/uni/papers
         $nightNotes

@@ -86,6 +86,12 @@ export org_img_dir="${orgdir}/images"
 export memorydir="${nightNotesPrivate}/memories"
 export peopledir="${nightNotesPrivate}/memories/people"
 
+typeset -g paper_dir="$HOME/base/books/papers"
+# paper_dir="$(ffz-get 'paper')" @TRET
+
+typeset -g paper_source_dir="${paper_dir}/latex"
+# paper_source_dir="$(ffz-get paper latex)" @TRET
+
 # export mpv_bookmarks="${music_dir}/bookmarks/default"
 export mpv_bookmarks="${nightNotesPrivate}/configs/mpv/bookmarks/default"
 
