@@ -889,3 +889,19 @@ function strip-wikipedia-citations {
         cat-copy-if-tty
 }
 ##
+function py-escape-triple-quotes {
+    #: @tests
+    #: `ec "hi''''" | py-escape-triple-quotes`
+    ##
+    cat-paste-if-tty |
+        # perl -lpe 's/(*nlb:\\)'"((?:\"|'){3})"'/\\$1/g' |
+        perl -lpe 's/(*nlb:\\)'"(*pla:(?:\"|'){3})"'/\\/g' |
+        cat-copy-if-tty
+}
+
+function org2md-escape-triple-quotes {
+    org2md "$@" |
+        py-escape-triple-quotes |
+        cat-copy-if-tty
+}
+##
