@@ -163,11 +163,15 @@ function semantic-scholar-dl-from-org {
     else
         urls="$(ec "$org" | rget '^\s*:pdf_urls:\s+(.*?)\s*$')" @TRET
     fi
-    urls="$(ec "${urls}" | arxiv-exportify)"
+    urls="$(ec "${urls}" | arxiv-exportify)" @TRET
+    urls="$(ec "${urls}" | ugrep -i -v '^https?://ieeexplore.ieee.org/stamp/stamp.jsp')" @TRET
     urls=(${(@f)urls})
 
     local url
     url="${urls[1]}"
+    if test -z "$url" ; then
+        ecerr "$0: no suitable URLs found!"
+    fi
 
     local name
     name="$(
