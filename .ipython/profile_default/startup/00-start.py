@@ -1,3 +1,4 @@
+#: Errors here will be silently ignored by emacs-jupyter, but the rest of the code won't run.
 ##
 try:
     import torch
@@ -97,4 +98,11 @@ from pynight.common_spacy import spacy_sentencizer, spacy_sentencizer_fa
 
 
 setup_openai_key()
+###
+from pynight.common_anthropic import (
+    setup_anthropic_key,
+    anthropic_key_get,
+)
+
+anthropic_client = setup_anthropic_key()
 ###
