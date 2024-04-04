@@ -1,4 +1,21 @@
 ##
+function chrome-cli {
+    CHROME_BUNDLE_IDENTIFIER="${CHROME_BUNDLE_IDENTIFIER:-company.thebrowser.Browser}" \
+    command chrome-cli "$@"
+}
+
+function with-chrome {
+    CHROME_BUNDLE_IDENTIFIER='com.google.Chrome' reval-env "$@"
+}
+
+function with-arc {
+    CHROME_BUNDLE_IDENTIFIER='company.thebrowser.Browser' reval-env "$@"
+}
+
+function with-edge {
+    CHROME_BUNDLE_IDENTIFIER='com.microsoft.edgemac' reval-env "$@"
+}
+##
 function browser-recording-postprocess {
     local f="$1"
     local name="${2-${f:r}}"
@@ -63,7 +80,7 @@ function browser-recordings-process-watch() {
         # -d Track the directories of regular files provided as input and exit if a new file is added. This option also enables directories to be specified explicitly. Files with names beginning with ‘.’ are ignored.
         # -n Run in non-interactive mode. In this mode entr does not attempt to read from the TTY or change its properties.
         # -r Reload a persistent child process. As with the standard mode of operation, a utility which terminates is not executed again until a file system or keyboard event is processed. SIGTERM is used to terminate the utility before it is restarted. A process group is created to prevent shell scripts from masking signals. entr waits for the utility to exit to ensure that resources such as sockets have been closed. Control of the TTY is not transferred the child process.
-        
+
         ec "$0: Triggered"
         sleep 20 # entr doesn't trigger on rename, so we need to wait for files to fully download https://github.com/eradman/entr/issues/65
         browser-recordings-process
@@ -71,21 +88,36 @@ function browser-recordings-process-watch() {
     done
 }
 ##
-function chrome-current-title {
+function browser-current-html {
+    assert isDarwin @RET
+
+    chrome-cli source |
+        command jq -re . |
+        html-links-absolutify "$(browser-current-url)" |
+        cat-copy-if-tty
+}
+
+function browser-current-links {
+    browser-current-html |
+        urls-extract |
+        perl -ple 's/\\$//g' | #: Sometimes URLs are in the form of `\"http...\"`, and the last backslash is mistakenly detected as part of the URL
+        duplicates-clean |
+        cat-copy-if-tty
+}
+
+function browser-current-title {
     assert isDarwin @RET
 
     chrome-cli info | rget 'Title:\s+(.*)' | cat-copy-if-tty
 }
-aliasfn browser-current-title chrome-current-title # @darwinonly @chromeonly
 
-function chrome-current-url {
+function h-browser-current-url {
     assert isDarwin @RET
 
     chrome-cli info |
         rget 'Url:\s+(.*)' |
         cat-copy-if-tty
 }
-aliasfn h-browser-current-url chrome-current-url # @darwinonly @chromeonly
 function browser-current-url {
     local url
     url="$(h-browser-current-url)" @RET
@@ -99,30 +131,31 @@ function browser-all-urls {
     chrome-cli list links | gcut -d' ' -f '2-'
 }
 ##
-function with-edge {
-    CHROME_BUNDLE_IDENTIFIER='com.microsoft.edgemac' reval-env "$@"
-}
-
-aliasfn edge-current-url with-edge chrome-current-url
+aliasfn chrome-current-html with-chrome browser-current-html
+aliasfn chrome-current-links with-chrome browser-current-links
+aliasfn chrome-current-url with-chrome browser-current-url
+aliasfn chrome-all-urls with-chrome browser-all-urls
+aliasfn chrome-current-title with-chrome browser-current-title
+aliasfn org-link-chrome-current with-chrome org-link-browser-current
+##
+aliasfn edge-current-url with-edge browser-current-url
 aliasfn edge-all-urls with-edge browser-all-urls
-aliasfn edge-current-title with-edge chrome-current-title
+aliasfn edge-current-title with-edge browser-current-title
 aliasfn org-link-edge-current with-edge org-link-browser-current
 ##
-function with-arc {
-    CHROME_BUNDLE_IDENTIFIER='company.thebrowser.Browser' reval-env "$@"
-}
-
-aliasfn arc-current-url with-arc chrome-current-url
+aliasfn arc-current-html with-arc browser-current-html
+aliasfn arc-current-links with-arc browser-current-links
+aliasfn arc-current-url with-arc browser-current-url
 aliasfn arc-all-urls with-arc browser-all-urls
-aliasfn arc-current-title with-arc chrome-current-title
+aliasfn arc-current-title with-arc browser-current-title
 aliasfn org-link-arc-current with-arc org-link-browser-current
 ##
-function chrome-open {
+function browser-open {
     ensure isDarwin @MRET # @darwinonly
     chrome-cli open "$@"
 }
 
-function chrome-open-file() {
+function browser-open-file {
     ensure isDarwin @MRET # @darwinonly
     local f="$1"
     ensure-args f @MRET
@@ -132,14 +165,15 @@ function chrome-open-file() {
     url="$(file-unix2uri-rp "$f")" @TRET
     pbcopy "$url" && tts-glados1-cached 'copied'
     ##
-    # works badly with Workona, otherwise works fine
-    # revaldbg chrome-open $url "$@"
+    #: works badly with Workona, otherwise works fine
+    revaldbg browser-open $url "$@"
     ##
-    # doesn't work
-    open -a "/Applications/Google Chrome.app" "$@"
+    #: doesn't work
+    # open -a "/Applications/Google Chrome.app" "$@"
     ##
 }
-function chrome-open-pdf() {
+
+function browser-open-pdf {
     ensure isDarwin @MRET # @darwinonly
     local f="$1"
     ensure-args f @MRET
@@ -152,7 +186,7 @@ function chrome-open-pdf() {
             opts+=(-n) # new window
         fi
     fi
-    chrome-open-file "$f" "$opts[@]"
+    browser-open-file "$f" "$opts[@]"
 }
-reify chrome-open-pdf
+reify browser-open-pdf
 ##

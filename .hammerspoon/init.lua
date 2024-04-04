@@ -5,6 +5,9 @@ package.path = package.path .. ';/usr/local/Cellar/luarocks/3.3.1/share/lua/5.4/
 package.cpath = package.cpath .. ';/usr/local/lib/lua/5.4/?.so;/usr/local/lib/lua/5.4/loadall.so;./?.so;/Users/evar/.luarocks/lib/lua/5.4/?.so'
 
 require "pipe"
+
+rex = require("rex_pcre2")
+
 ipc = require "hs.ipc"
 popclick = require "hs.noises"
 application = require "hs.application"
@@ -26,6 +29,36 @@ plp = require 'pl.pretty'
 ---
 function nop()
     hs.alert("repeating")
+end
+---
+function active_app_re_p(pattern, case_mode)
+    local activeApp = hs.application.frontmostApplication()
+    local activeAppName = activeApp:name()
+
+    if case_mode == nil then
+        case_mode = "smart"
+    end
+
+    local compiledPattern
+    if case_mode == "smart" then
+        if pattern:match("%u") then
+            -- If the pattern contains uppercase letters, use case-sensitive matching
+            compiledPattern = rex.new(pattern)
+        else
+            -- If the pattern contains only lowercase letters, use case-insensitive matching
+            compiledPattern = rex.new(pattern, rex.flags().CASELESS)
+        end
+    elseif case_mode == "sensitive" then
+        -- Use case-sensitive matching
+        compiledPattern = rex.new(pattern)
+    elseif case_mode == "insensitive" then
+        -- Use case-insensitive matching
+        compiledPattern = rex.new(pattern, rex.flags().CASELESS)
+    else
+        error("Invalid case_mode. Valid values are 'smart', 'sensitive', or 'insensitive'.")
+    end
+
+    return compiledPattern:match(activeAppName) ~= nil
 end
 ---- * Redis
 local redis = require("redis")
