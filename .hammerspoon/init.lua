@@ -2161,8 +2161,17 @@ local function filterChoicesByPatterns(params)
     local choices = params.choices
     local filterKey = params.on or "text" -- Default to "text" if no key is provided
 
+    -- Determine if the query contains any uppercase characters
+    local case_sensitive_p = query:match("%u")
+
     local patterns = {}
     for pattern in query:gmatch("%S+") do -- Split query into space-separated patterns
+
+        -- If case_sensitive_p is true, use the pattern as is; otherwise, convert to lowercase
+        if not case_sensitive_p then
+            pattern = pattern:lower()
+        end
+
         table.insert(patterns, pattern)
     end
 
@@ -2170,8 +2179,14 @@ local function filterChoicesByPatterns(params)
     for _, choice in ipairs(choices) do
         local match = true
         for _, pattern in ipairs(patterns) do
-            if not string.match(choice[filterKey], pattern) then
+            local choiceText = choice[filterKey]
 
+            -- If case_sensitive_p is true, use the choiceText as is; otherwise, convert to lowercase
+            if not case_sensitive_p then
+                choiceText = choiceText:lower()
+            end
+
+            if not string.match(choiceText, pattern) then
                 match = false
                 break
             end
