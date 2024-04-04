@@ -1,0 +1,42 @@
+#!/usr/bin/env -S osascript -l JavaScript
+///
+// * @forkedFrom
+// ** https://gist.github.com/lancethomps/a5ac103f334b171f70ce2ff983220b4f
+// *** https://apple.stackexchange.com/a/460171/282215
+///
+// [[id:31879d69-bdcd-4e81-ace3-01831fa51ab6][macOS keyboard shortcut to dismiss notifications? - Ask Different]]
+///
+"use strict";
+
+function run() {
+  const SystemEvents = Application("System Events");
+  const NotificationCenter = SystemEvents.processes.byName("NotificationCenter");
+  const notificationGroups = () => {
+    const windows = NotificationCenter.windows;
+    return windows.length === 0
+      ? []
+      : windows.at(0).groups.at(0).scrollAreas.at(0).uiElements.at(0).groups();
+  };
+
+  const findCloseAction = (group) => {
+    const [closeAllAction, closeAction] = group.actions().reduce(
+      (matches, action) => {
+        switch (action.description()) {
+          case "Clear All":
+            return [action, matches[1]];
+          case "Close":
+            return [matches[0], action];
+          default:
+            return matches;
+        }
+      },
+      [null, null]
+    );
+    return closeAllAction ?? closeAction;
+  };
+
+  const actions = notificationGroups().map(findCloseAction);
+  for (const action of actions) {
+    action?.perform();
+  }
+}
