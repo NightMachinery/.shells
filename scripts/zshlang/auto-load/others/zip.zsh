@@ -7,9 +7,26 @@ function zir {
 
 function prefix-shared-dir-get {
     in-or-args "$@" |
+        prefixer --skip-empty |
+        gsort -u |
         perl -e '
-        my @paths = <STDIN>;
+        use File::Basename;
+
+        # my @paths = <STDIN>;
+        my @paths = grep { $_ ne "" } <STDIN>;
         chomp @paths;
+        if (scalar @paths == 1) {
+            my $dirname = $paths[0];
+            # $dirname =~ s{/[^/]*$}{};
+            # $dirname = dirname($path);
+            if ($dirname =~ m{^(.*)/[^/]*$}) {
+                $dirname = $1;
+                print $dirname;
+            }
+
+            exit;
+        }
+
         my $prefix = $paths[0];
         for my $path (@paths[1..$#paths]) {
           while (not $path =~ /^\Q$prefix\E/) {
@@ -40,14 +57,30 @@ function prefix-shared-dir-strip {
 }
 
 function zip-create {
+  local opts=()
+
   local dest="$1" ; shift
   assert-args dest @RET
 
+  dest="$(grealpath "$dest")" @TRET
+
   local -a files=("$@")
+
+  local prefix
+  prefix="$(arrn "${files[@]}" | prefix-shared-dir-get)" @TRET
 
   local -a pruned_files=("${(@f)$(prefix-shared-dir-strip "${files[@]}")}")
 
-  reval-ecgray zip -r "$dest" ${pruned_files[@]}
+  if test -n "$prefix" ; then
+      reval-ecgray pushf "$prefix"
+  fi
+  {
+      reval-ecgray zip "${opts[@]}" -r "$dest" ${pruned_files[@]}
+  } always {
+        if test -n "$prefix" ; then
+            popf
+        fi
+  }
 }
 ##
 function unzip2dir() {
