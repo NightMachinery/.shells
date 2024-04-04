@@ -97,7 +97,8 @@ from pynight.common_llm import (
 from pynight.common_spacy import spacy_sentencizer, spacy_sentencizer_fa
 
 
-setup_openai_key()
+openai_client = setup_openai_key()
+openrouter_client = setup_openrouter_key()
 ###
 from pynight.common_anthropic import (
     setup_anthropic_key,
