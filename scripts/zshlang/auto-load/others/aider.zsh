@@ -1,0 +1,32 @@
+##
+function aider-m {
+    local model="${aider_model}"
+    local opts=()
+
+    if git diff-index --quiet HEAD -- ; then
+        # The repository is clean
+
+        if [[ "$model" == c3o ]] ; then
+            local -x OPENAI_API_KEY="${openrouter_api_key}"
+            local -x OPENAI_API_BASE=https://openrouter.ai/api/v1
+
+            opts+=(
+                --model
+                # anthropic/claude-3-opus
+                anthropic/claude-3-opus:beta
+
+                --edit-format diff
+            )
+        else
+            local -x OPENAI_API_KEY="${openai_api_key}"
+        fi
+
+        $proxyenv reval-ecgray command aider "${opts[@]}" "$@"
+    else
+        ecerr "$0: Repository is dirty"
+        return 1
+    fi
+}
+aliasfn aider aider-m
+aliasfn aider-c3o aider_model=c3o aider-m
+##

@@ -6,4 +6,6 @@
 *.lispimage
 *.lispexe
 
+.aider*
+
 .auctex-auto/
