@@ -399,11 +399,12 @@ aliassafe rc3h='\noglob reval-to-c3h'
 
 # alias xx='\noglob llm-4'
 
-# aliassafe xx='\noglob llm-4t'
-# aliassafe xz='\noglob reval-to-gpt4t'
+aliassafe xx='\noglob llm-4t'
+aliassafe xz='\noglob reval-to-gpt4t'
 
-aliassafe xx='\noglob llm-c3o'
-aliassafe xz='\noglob reval-to-c3o'
+# aliassafe xx='\noglob llm-c3o'
+# aliassafe xz='\noglob reval-to-c3o'
+
 #: @nameConflict xz, unxz, xzcat, lzma, unlzma, lzcat - Compress or decompress .xz and .lzma  files
 ##
 function sgpt-m {

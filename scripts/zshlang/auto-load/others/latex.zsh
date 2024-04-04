@@ -238,6 +238,7 @@ function pdflatex-m {
             time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
 
             time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+            time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
             #: This is needed, otherwise the CVPR's review line numbers don't align properly at the start of the paragraphs.
 
             time2 reval-ec pdflatex "${opts[@]}" "$tex_f" @RET

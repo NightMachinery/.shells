@@ -9,6 +9,7 @@ function unlock-hook {
     #: Currently implemented via [agfi:deluna]
     ##
     reval-ecdate last-idle-reset
+    reval-ecdate luna_skipped_set 0
 
     if false ; then
         # ec $'\n\n'"$0" | sync-append-in "${KARABINER_RESET_LOG}"

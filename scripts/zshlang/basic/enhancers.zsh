@@ -193,8 +193,11 @@ function paste-after-current-url {
     local url
     url="$(browser-current-url)" @TRET
 
+    ecgray "Current URL's title:"$'\n\t'"$(browser-current-title)" @STRUE
+
     rgeval "$@" "${url}"
 }
+alias pl='paste-after-current-url' #: @nameConflict
 ##
 function if-out-tty {
     if isOutTty ; then

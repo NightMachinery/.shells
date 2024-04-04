@@ -197,7 +197,7 @@ function ip-internal-get1 {
 }
 ##
 function http-static-py {
-    python -m http.server "${1:-8000}"
+    python3 -m http.server "${1:-8000}"
 }
 ##
 function http-static-caddy {

@@ -72,7 +72,18 @@ def group_activities_by_date(activities):
     return grouped
 
 
-def format_to_org_mode(grouped_activities, group_by):
+def format_to_org_mode(
+    grouped_activities,
+    group_by,
+    ##
+    # act_prefix="- ",
+    act_prefix="",
+    ##
+    # act_sep=" :: ",
+    # act_sep=" : ",
+    act_sep="   ",
+    ##
+):
     org_entries = []
 
     if group_by == "none":
@@ -86,7 +97,9 @@ def format_to_org_mode(grouped_activities, group_by):
             for activity in activities:
                 start_time = parse_datetime(activity.start).strftime("%H:%M")
                 end_time = parse_datetime(activity.end).strftime("%H:%M")
-                org_entries.append(f"** {start_time} -> {end_time} :: {activity.name}")
+                org_entries.append(
+                    f"{act_prefix}{start_time} -> {end_time}{act_sep}{activity.name}"
+                )
             org_entries.append("")
 
     elif group_by == "jalali":
@@ -109,7 +122,7 @@ def format_to_org_mode(grouped_activities, group_by):
                 start_time = parse_datetime(activity.start).strftime("%H:%M")
                 end_time = parse_datetime(activity.end).strftime("%H:%M")
                 org_entries.append(
-                    f"**** {start_time} -> {end_time} :: {activity.name}"
+                    f"{act_prefix}{start_time} -> {end_time}{act_sep}{activity.name}"
                 )
             org_entries.append("")
 

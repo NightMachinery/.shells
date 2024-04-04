@@ -34,7 +34,7 @@ function arxiv-url-get {
             if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?(?:#.*)?/*$'
                     || "$url" =~ '(?i)arxiv:([^/]+?)(?:\.pdf)?/*$'
                     || "$url" =~ '(?i)huggingface\.co/papers/([^/]+)'
-                    || "$url" =~ '(?i)ar5iv.labs.arxiv.org/html/(\d+\.\d+)'
+                    || "$url" =~ '(?i)(?:ar5iv\.labs\.)?arxiv\.org/html/(\d+\.\d+)'
                     || "$url" =~ '(?i)semanticscholar.org/arxiv:([^/]+?)/*$'
                     || "$url" =~ '(?i)^https://scholar.google.com/.*&arxiv_id=([^/&]+)/*$'
                     || "$url" =~ '^https://(?:www\.)?doi\.org(?:.*)/arXiv\.([^/]+)'

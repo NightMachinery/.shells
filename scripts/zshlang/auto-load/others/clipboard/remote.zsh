@@ -74,7 +74,11 @@ bell-call-remote() {
     local bell_name="${1}"
     local port="${bell_port:-6030}"
 
-    echo "MAGIC_BELL_${bell_name}" |
-        copy_port="$port" pbcopy-remote
+    if isLocal ; then
+        reval "${bell_name}"
+    else
+        echo "MAGIC_BELL_${bell_name}" |
+            copy_port="$port" pbcopy-remote
+    fi
 }
 ##
