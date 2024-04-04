@@ -80,6 +80,9 @@ luarocks install penlight # require 'pl.pretty'.dump(table)
 luarocks install luaposix
 luarocks install redis-lua
 luarocks install lzmq
+
+brew install pcre2
+luarocks install lrexlib-PCRE2 PCRE2_DIR="$(brew --prefix pcre2)"
 ##
 epubmerge-install
 ##

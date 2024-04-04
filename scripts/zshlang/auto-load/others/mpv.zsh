@@ -331,6 +331,6 @@ function mpv-tui {
 }
 ##
 function mpv-cheatsheet {
-    icat "${nightNotes}/cheatsheets/mpv/mpbindings_big.png"
+    icat "${nightNotesPublic}/cheatsheets/mpv/mpbindings_big.png"
 }
 ##

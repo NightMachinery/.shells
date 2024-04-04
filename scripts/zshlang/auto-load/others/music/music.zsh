@@ -335,6 +335,9 @@ s{\Q/Foreign/More/Carly Rae Jepsen - Kiss (Deluxe Edition)/\E}{/Foreign/Carly Ra
 }
 
 function hear-playlist {
+    local mode="${hear_playlist_mode:-load}"
+    #: emacs depends on the default mode being =load=.
+
     local shuf=''
     if bool "${hear_playlist_shuffle}" ; then
         shuf='--shuffle'
@@ -352,14 +355,19 @@ function hear-playlist {
     fi
 
     ##
-    # hear --loop-playlist --playlist=<(ec "$tracks")
-    ##
     #: Save tracks in a temp file:
     local tmp
     tmp="$(mktemp)" @TRET
     ec "${tracks}" > "$tmp"
 
-    reval-ecgray hear-load-playlist "${tmp}"
+    if [[ "${mode}" == load ]] ; then
+        reval-ecgray hear-load-playlist "${tmp}"
+    elif [[ "${mode}" == instance ]] ; then
+        reval-ecgray hear --loop-playlist --playlist="${tmp}"
+    else
+        ecerr "$0: Unknown mode: ${mode}"
+        return 1
+    fi
     ##
     #: Don't use mpv's native --shuffle since it MIGHT use autoloaded tracks, also empty string causes a harmless error
     #: k shuffles live in mpv (with MY config :D)

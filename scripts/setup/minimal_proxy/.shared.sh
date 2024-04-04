@@ -81,6 +81,8 @@ alias l='ls -ah'
 alias ncdu='ncdu --color off'
 
 alias gcl='git clone --recursive'
+alias git-clone-shallow='git clone --recursive --depth=1 --shallow-submodules'
+alias gcls='git-clone-shallow'
 alias ga='git add'
 alias gc='git commit'
 alias gco='git checkout'

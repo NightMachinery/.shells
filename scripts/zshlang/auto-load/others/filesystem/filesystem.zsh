@@ -34,7 +34,7 @@ function h-rm-dir-only-child {
 
     local children children_dir only_child_dir only_child_dir_content
     while true; do
-        revaldbg rm-empty .
+        revaldbg rm-empty "${dir}"
 
         children=("${dir}"/*(DN))
         children_dir=("${dir}"/*(/DN))
@@ -56,12 +56,16 @@ function h-rm-dir-only-child {
                 reval-ec mv-merge "${only_child_dir_content[@]}" "${dir}"/ @RET
             fi
 
-            revaldbg rm-empty .
+            revaldbg rm-empty "${dir}"
 
             continue
         else
             local d
             for d in ${children_dir[@]} ; do
+                if [[ "$d" == '.git' ]] ; then
+                    continue
+                fi
+
                 revaldbg "$0" "$d"
             done
 

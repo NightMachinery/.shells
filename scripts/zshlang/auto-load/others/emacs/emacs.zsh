@@ -83,6 +83,7 @@ function emc-open {
 }
 
 alias emc='emc-open'
+alias emcg='withemcgui emc-open'
 
 function emc-gateway {
     bella_zsh_disable1
@@ -228,7 +229,7 @@ function emc-nowait {
 }
 alias emcnw='emc-nowait2'
 
-ialias emcg="emacsclient -c"
+# ialias emcg="emacsclient -c"
 ##
 function emc-in {
     local s="${1:-.log}"
