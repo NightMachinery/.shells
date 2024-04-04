@@ -1,4 +1,10 @@
-#+TITLE: minimal_proxy/gen
+:PROPERTIES:
+:ID:       6fffffe6-4745-438b-aeae-f78433ea8400
+:END:
+#+TITLE: Minimal Server
+
+* @links
+** [[id:827ff9a8-8709-4015-9355-aca48ae85c64][minse]]
 
 * steps
 ** [[id:a802bc74-36e7-4bb7-a3a7-a89a5efece52][Add User]]
@@ -8,19 +14,21 @@
 
 ** rsync necessary files
 #+begin_example zsh
-# user=tmptilmay
-# host=t21
-
-user=user01
+host=t21
+# host=t31
 # host=pino
-host=giant
+# host=s17
 
 # fullhost=$user@$host
 fullhost=$host
 
 rsp-safe --rsync-path="mkdir -p ~/base/bootstrap && rsync" "${nightNotesPublic}"/cheatsheets/OS/unix/tangled/*(D) ${fullhost}:base/bootstrap/
 
-rsp-safe ~/.tmux.conf ~/.inputrc ~/scripts/setup/minimal_proxy/**/*.(zsh|zshenv|zshrc|bashrc|bash|sh|curlrc)(D) ${fullhost}:
+rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(zsh|zshenv|zshrc|bashrc|bash|sh|curlrc)(D) ${fullhost}:
+
+rsp-safe "$nightNotesPrivate"/configs/minse/.private.env.zsh ${fullhost}:
+
+rsp-safe --rsync-path="mkdir -p ~/bin && rsync" "$NIGHTDIR/python/telegram-send/tsend.py" ${fullhost}:bin/
 #+end_example
 
 #+begin_example zsh
@@ -56,12 +64,25 @@ export-from-alias pxa2096
 ssh-keygen
 #+end_src
 
+**** jupyter
+***** [[id:991aa765-f5de-4022-9910-1e42797edc34][Setting a password on the Jupyter server]]
+
+***** [[id:a2001dcf-9d97-467b-b8c5-929e728d6d7c][Install the current env as a kernel with a custom name]]
+
 **** =DecompV/setup.zsh=
 
 **** =.privateShell=
-***** [[id:b4ad4e80-aa83-459b-87f0-07d1e5b22f0e][@PATH =micromamba=]]
+***** @retired
+****** [[id:b4ad4e80-aa83-459b-87f0-07d1e5b22f0e][@PATH =micromamba=]]
 
-***** TQDM and Telegram tokens
+****** TQDM and Telegram tokens
+
+**** Test SSH port forwarding:
+#+begin_src zsh :eval never
+bell-call-remote bell-lm-timetoparty
+#+end_src
+
+**** Add proxy and jupyter to cron
 
 * Add User
 :PROPERTIES:
@@ -197,6 +218,9 @@ source ~/.config/envman/PATH.env
 
 ** others
 #+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
+set -exo pipefail
+##
+
 ## WebI
 #: @proxyNeeded
 
@@ -222,18 +246,20 @@ curl -sS https://webi.sh/jq | sh
 
 #+end_src
 
-** pip
+* pip
 #+begin_src zsh :eval never :tangle tangled/bootstrap_minimal.bash
 ## pip
 pip install --upgrade pipx
 pip install -U speedtest-cli nvitop
 
 pip install -U jupyter jupyterlab py-spy
+
+pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot
 ##
 
 #+end_src
 
-** apt
+* apt
 :PROPERTIES:
 :ID:       9950dc25-c88f-4660-b059-6302af531c03
 :END:
@@ -241,13 +267,13 @@ pip install -U jupyter jupyterlab py-spy
 sudo apt-get install -y build-essential tmux zsh openconnect jq python3 python3-pip socat
 #+end_example
 
-** brew
+* brew
 :PROPERTIES:
 :ID:       cf6c92c4-bf55-4534-9064-13fb1a80a874
 :END:
-*** [[id:1b697891-c688-4790-9812-2ff60d9e422c][Homebrew/install]]
+** [[id:1b697891-c688-4790-9812-2ff60d9e422c][Homebrew/install]]
 
-*** @nonRoot
+** @nonRoot
 #+begin_example zsh
 curl -sS https://webi.sh/brew | sh
 #+end_example
@@ -257,14 +283,44 @@ Or:
 tmuxnew brew-install zsh -c 'curl -sS https://webi.sh/brew | sh'
 #+end_example
 
-*** PATH
+** PATH
 #+begin_example zsh
 export PATH="${PATH}:${HOME}/.local/opt/brew/bin"
 #+end_example
 
-*** install brew packages
+** install brew packages
 #+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
-brew install zsh ugrep tealdeer progress bandwhich ncdu rm-improved eza
+brew install gcc zsh ugrep tealdeer progress bandwhich ncdu rm-improved eza
+
+brew install redis
+brew services start redis
+#+end_src
+
+** [[id:4fd8da85-fe5e-416c-a8ee-ca5219fd6d69][@install emacs]]
+#+begin_src zsh :eval never :tangle tangled/emacs_install.zsh
+(
+export PS4='> '
+setopt PIPE_FAIL PRINT_EXIT_VALUE ERR_RETURN SOURCE_TRACE XTRACE
+##
+
+# brew tap d12frosted/emacs-plus
+# brew install emacs-plus@29 --without-cocoa
+
+alias gcl='git clone --recursive'
+cd ~/
+
+rm -fr ~/.emacs.d ~/doom.d ~/.doom.d || true
+gcl https://github.com/hlissner/doom-emacs ~/.emacs.d
+gcl https://github.com/NightMachinary/doom.d
+
+ln -s ~/doom.d ~/.doom.d
+
+rehash
+
+#: With `yes` added, hopefully non-interactive
+command yes | doom install
+doom sync
+)
 #+end_src
 
 * Caddy

@@ -109,10 +109,21 @@ alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 h
 alias pxa2097='ALL_PROXY=http://127.0.0.1:2097 all_proxy=http://127.0.0.1:2097 http_proxy=http://127.0.0.1:2097 https_proxy=http://127.0.0.1:2097 HTTP_PROXY=http://127.0.0.1:2097 HTTPS_PROXY=http://127.0.0.1:2097'
 # export ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096
 alias pxateias='ALL_PROXY=http://10.2.32.28:10809 all_proxy=http://10.2.32.28:10809 http_proxy=http://10.2.32.28:10809 https_proxy=http://10.2.32.28:10809 HTTP_PROXY=http://10.2.32.28:10809 HTTPS_PROXY=http://10.2.32.28:10809'
+alias pxa='pxa2096'
 ##
+#: @duplicateCode/0c8b9d0226cdfb4f5bc0a9ea735089df
 tmuxnew () {
     tmux kill-session -t "$1" &> /dev/null
     tmux new -d -s "$@"
+}
+
+tmuxnew-ensure() {
+    if ! tmux has-session -t "$1" &> /dev/null ; then
+        tmuxnew "$@"
+    else
+        # echo "Session $1 already exists and is alive."
+        return 0
+    fi
 }
 ###
 http-static-py () {
@@ -122,7 +133,7 @@ http-static-py () {
 export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
 
 emc-gateway () {
-    ALTERNATE_EDITOR="" LOGNAME="$(whoami)" DOOMDIR=~/doom.d emacsclient -t "$@"
+    ALTERNATE_EDITOR="" LOGNAME="$(whoami)" DOOMDIR=~/doom.d pxa emacsclient -t "$@"
 }
 ##
 function redo2 {
@@ -178,6 +189,22 @@ clipboard-remote-listen-2file() {
     tmuxnew "clipboard-listen-2file-${port}" \
         socat -u "TCP-LISTEN:${port},bind=127.0.0.1,fork" 'EXEC:tee '"${HOME}/.remote_clipboard"
     # 'EXEC:zsh -fc \"tee >(pbcopy)\"'
+}
+##
+proxy-available-p () {
+  local port="${1:-2096}"
+  local host="${2:-localhost}"
+
+  #: Attempt to establish a connection to the proxy
+  if nc -z "$host" "$port" >/dev/null 2>&1; then
+    # echo "HTTP proxy is running on $host:$port"
+
+    return 0
+  else
+    # echo "HTTP proxy is not running on $host:$port"
+
+    return 1
+  fi
 }
 ##
 http-static-caddy () {
