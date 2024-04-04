@@ -162,7 +162,7 @@ function h_luna-advanced-bell {
 function browser-current-match-p {
     {
         browser-current-url
-        arc-current-url
+        # arc-current-url
         # edge-current-url
     } | rg --ignore-case --quiet "$@"
 }
@@ -174,19 +174,6 @@ aliasfn sharif-vc-is sharif-vc-p
 
 function meeting-p {
     browser-current-match-p '^https://(vc\.sharif\.edu|meet\.google\.)'
-}
-
-function sharif-vc-p-v1 {
-    #: @deprecated
-    ##
-    local i
-    for i in "$(browser-current-url)" "$(arc-current-url)" ; do
-        if [[ "$i" == *"https://vc.sharif.edu/ch/"* ]] ; then
-            return 0
-        fi
-    done
-
-    return 1
 }
 
 function bell-avarice {

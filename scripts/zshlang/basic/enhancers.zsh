@@ -189,6 +189,13 @@ function enh-addfinder() {
 }
 alias pf='enh-addfinder'
 ##
+function paste-after-current-url {
+    local url
+    url="$(browser-current-url)" @TRET
+
+    rgeval "$@" "${url}"
+}
+##
 function if-out-tty {
     if isOutTty ; then
         reval "$@"
