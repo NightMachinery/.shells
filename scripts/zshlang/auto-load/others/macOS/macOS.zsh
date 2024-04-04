@@ -29,25 +29,54 @@ function screen-gray-set-darwin () {
 }
 ##
 function frontapp-get {
+    #: [[id:5192ebaf-95c8-43df-be58-c153ab412564][macOS/front app]]
+    ##
     if isDarwin ; then
-      local info
-      info="$(lsappinfo info "$(lsappinfo front)")" @TRET
+      if true ; then
+        frontapp-get-bundle-id-osa
+      else
+          #: @upstreamBug? [[id:1163a291-fbc8-4f77-8b53-9b58be684e66][=lsappinfo info= doesn't return anything.]]
+          ##
+          local info
+          info="$(lsappinfo info "$(lsappinfo front)")" @TRET
 
-      local bundle_id
-      if bundle_id="$(ec "$info" | command rg --only-matching --replace='$1' 'bundleID\s*=\s*"([^"]*)"\s*$')" ; then
-        ec "$bundle_id"
-	return 0
-      fi
+          local bundle_id
+          if bundle_id="$(ec "$info" | command rg --only-matching --replace='$1' 'bundleID\s*=\s*"([^"]*)"\s*$')" ; then
+            ec "$bundle_id"
+	        return 0
+          fi
 
-      local bundle_path
-      if bundle_path="$(ec "$info" | command rg --only-matching --replace='$1' 'bundle\s*path="([^"]*)"')" ; then
-        ec "$bundle_path"
+          local bundle_path
+          if bundle_path="$(ec "$info" | command rg --only-matching --replace='$1' 'bundle\s*path="([^"]*)"')" ; then
+            ec "$bundle_path"
+          fi
       fi
     else
         ectrace "Linux not supported"
         return 1
     fi
 }
+
+function frontapp-get-bundle-id-osa {
+    #: @slow
+    #: `time2 frontapp-get-bundle-id-osa`
+    #: 0.2s
+    ##
+    osascript <<EOF
+tell application "System Events"
+    bundle identifier of (first process whose frontmost is true)
+end tell
+EOF
+}
+
+function frontapp-get-name-osa {
+    osascript <<EOF
+tell application "System Events"
+    name of (first process whose frontmost is true)
+end tell
+EOF
+}
+
 ##
 alias mac-mail-log="sudo log stream --predicate  '(process == \"smtpd\") || (process == \"smtp\")' --info" #this command starts filtering, so after that you get log messages when you start accessing smtp.
 
