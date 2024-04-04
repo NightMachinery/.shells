@@ -67,9 +67,10 @@ autoload -Uz _zinit
 (( ${+_comps} )) && _comps[zinit]=_zinit
 ###
 ##
-# autoload -Uz compinit && compinit
-# zinit light Aloxaf/fzf-tab #: fzf-tab needs to be loaded after compinit, but before plugins which will wrap widgets, such as zsh-autosuggestions or fast-syntax-highlighting
-# enable-fzf-tab
+autoload -Uz compinit && compinit
+zinit light Aloxaf/fzf-tab #: fzf-tab needs to be loaded after compinit, but before plugins which will wrap widgets, such as zsh-autosuggestions or fast-syntax-highlighting
+enable-fzf-tab
+# disable-fzf-tab
 
 eval "$(starship init zsh)"
 zinit light zsh-users/zsh-autosuggestions

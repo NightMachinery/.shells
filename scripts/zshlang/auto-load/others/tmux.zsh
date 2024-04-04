@@ -1,4 +1,5 @@
 ##
+#: @duplicateCode/0c8b9d0226cdfb4f5bc0a9ea735089df
 function tmuxnew {
     #: @todo0 integrate =str2tmuxname=
     ##
@@ -6,6 +7,15 @@ function tmuxnew {
     tmux new -d -s "$@"
 }
 
+function tmuxnew-ensure {
+    if ! tmux has-session -t "$1" &> /dev/null ; then
+        tmuxnew "$@"
+    else
+        # echo "Session $1 already exists and is alive."
+        return 0
+    fi
+}
+##
 function tmuxnewsh {
     doc "Use tsh instead."
 
