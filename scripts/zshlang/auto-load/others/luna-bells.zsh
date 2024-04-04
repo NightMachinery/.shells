@@ -60,6 +60,21 @@ function luna {
     lunar pmset displaysleepnow
 }
 ##
+function luna-skip-p {
+    if meeting-p ||
+            focus-do-not-disturb-p ; then
+        return 0
+    fi
+
+    # local frontapp
+    # frontapp="$(frontapp-get)" @TRET
+    # if [[ "${frontapp}" =~ '^com.parallels.desktop' ]] ; then
+
+    # fi
+
+    return 1
+}
+
 function lunas {
     : "lo_min=20 luna_duration=60 lunas"
 
@@ -95,7 +110,7 @@ function h_luna-advanced-bell {
 
     (
         local bell_awaysh=no hear_loudidle=no i
-        if meeting-p || focus-do-not-disturb-p ; then
+        if luna-skip-p ; then
             display-gray-on
 
             if true ; then
