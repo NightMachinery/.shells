@@ -2870,7 +2870,9 @@ function pasteBlockified()
         -- Remove trailing whitespace
         clipboardContent = string.gsub(clipboardContent, "%s*$", "")
 
-        clipboardContent = escapeTripleQuotes(clipboardContent)
+        if active_app_re_p("emacs|kitty", "insensitive") then
+            clipboardContent = escapeTripleQuotes(clipboardContent)
+        end
     end
 
     -- Check if the clipboard content contains multiple lines.
