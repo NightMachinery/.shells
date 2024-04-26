@@ -146,6 +146,7 @@ function mpv-rpc {
     ec $cmd | socat - "$soc" | jq .
 }
 alias mpv-rpc-audio='mpv_rpc_socket="$mpv_audio_ipc" '
+aliasfn hear-rpc mpv-rpc-audio mpv-rpc
 aliasfn hear-do mpv-rpc-audio mpv-do
 
 aliasfn hear-shuffle hear-do playlist-shuffle
@@ -173,6 +174,10 @@ function hear-loadfile {
         url="$(grealpath -- "$url")" @TRET
     fi
 
+    if [[ "${mpv_command}" == 'loadfile' ]] ; then
+        reval-ecgray hear-autoload-enable
+    fi
+
     revaldbg hear-do "${mpv_command}" "${url}" "$mode"
     revaldbg hear-play-on
 }
@@ -181,7 +186,30 @@ aliasfn hlo hear-loadfile
 aliasfn mpv-loadfile fnswap hear-do mpv-do hear-loadfile
 aliasfn mpv-open mpv-loadfile
 
-aliasfn hear-load-playlist mpv_load_command=loadlist hear-loadfile
+function mpv-script-message-to {
+    local script="$1" msg="$2"
+    assert-args script msg @RET
+    mpv-rpc "$(jq -nc --arg script "$script" --arg msg "$msg" '["script-message-to", $script, $msg]')"
+}
+aliasfn hear-script-message-to mpv-rpc-audio mpv-script-message-to
+
+aliasfn mpv-autoload-enable mpv-script-message-to autoload enable
+aliasfn mpv-autoload-disable mpv-script-message-to autoload disable
+aliasfn hear-autoload-enable mpv-rpc-audio mpv-autoload-enable
+aliasfn hear-autoload-disable mpv-rpc-audio mpv-autoload-disable
+
+function hear-load-playlist {
+    {
+        reval-ecgray hear-autoload-disable
+        sleep 0.2 #: to make =hear-autoload-disable= take effect
+        mpv_load_command=loadlist reval-ecgray hear-loadfile "$@"
+        sleep 0.2 && revaldbg hear-seek-begin
+    } always {
+        #: We can't re-enable =autoload=, or it will autoload files when the next file in the playlist is opened.
+        # awaysh eval 'sleep 1 ;  hear-autoload-enable'
+    }
+}
+
 
 function hear-loadfile-begin {
     hear-loadfile "$@" @RET

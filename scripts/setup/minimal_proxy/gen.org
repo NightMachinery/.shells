@@ -24,7 +24,7 @@ fullhost=$host
 
 rsp-safe --rsync-path="mkdir -p ~/base/bootstrap && rsync" "${nightNotesPublic}"/cheatsheets/OS/unix/tangled/*(D) ${fullhost}:base/bootstrap/
 
-rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(zsh|zshenv|zshrc|bashrc|bash|sh|curlrc)(D) ${fullhost}:
+rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(zsh|zshenv|zshrc|bash_profile|bashrc|bash|sh|curlrc)(D) ${fullhost}:
 
 rsp-safe "$nightNotesPrivate"/configs/minse/.private.env.zsh ${fullhost}:
 
@@ -170,6 +170,16 @@ function gost-setup {
     chmod +x ~/bin/gost
     # sudo setcap 'cap_net_bind_service=+ep' "$(realpath ~/bin/gost)"
 }
+
+function tpix-setup {
+    #: @duplicateCode/12c0863cd8154859380fdff56d92b647
+    ##
+    mkdir -p ~/bin/
+    wget -O - 'https://github.com/jesvedberg/tpix/releases/download/v1.0.0/tpix-1.0.0-x86_64-linux.tar.gz' | tar -xzf - -C ~/bin tpix
+    #: `tpix` at the end specifies the specific file to be extracted from the archive. Only the `tpix` file will be extracted and placed in the `~/bin` directory.
+
+    chmod +x ~/bin/tpix
+}
 ##
 
 command sh -c "$(wget -O- https://raw.githubusercontent.com/romkatv/zsh-bin/master/install)" -- -d ~/.local -e no
@@ -180,6 +190,7 @@ curl -sS https://starship.rs/install.sh | sh -s -- -b ~/.local/bin -y
 curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 
 gost-setup
+tpix-setup
 
 micromamba-setup
 
@@ -237,7 +248,9 @@ curl -sS https://webi.sh/fd | sh
 curl -sS https://webi.sh/fzf | sh
 curl -sS https://webi.sh/jq | sh
 
+
 #: @NA :
+# curl -sS https://webi.sh/eza | sh
 # curl -sS https://webi.sh/nnn | sh
 # curl -sS https://webi.sh/ugrep | sh
 # curl -sS https://webi.sh/ncdu | sh
@@ -250,7 +263,8 @@ curl -sS https://webi.sh/jq | sh
 #+begin_src zsh :eval never :tangle tangled/bootstrap_minimal.bash
 ## pip
 pip install --upgrade pipx
-pip install -U speedtest-cli nvitop
+pipx install speedtest-cli nvitop black
+#: nvitop needs the isolated env (?) pipx provides or sth.
 
 pip install -U jupyter jupyterlab py-spy
 
@@ -266,6 +280,18 @@ pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-b
 #+begin_example zsh
 sudo apt-get install -y build-essential tmux zsh openconnect jq python3 python3-pip socat
 #+end_example
+
+* junest pacman
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
+
+sudo-junest pacman -Syy --noconfirm socat nodejs npm
+
+sudo-junest pacman -Syy --noconfirm tealdeer
+tldr --update
+
+sudo-junest pacman -Syy --noconfirm emacs
+
+#+end_src
 
 * brew
 :PROPERTIES:
@@ -296,7 +322,7 @@ brew install redis
 brew services start redis
 #+end_src
 
-** [[id:4fd8da85-fe5e-416c-a8ee-ca5219fd6d69][@install emacs]]
+** [[gid:4fd8da85-fe5e-416c-a8ee-ca5219fd6d69][@install emacs]]
 #+begin_src zsh :eval never :tangle tangled/emacs_install.zsh
 (
 export PS4='> '

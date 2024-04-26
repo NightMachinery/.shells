@@ -90,6 +90,11 @@ function emc-gateway {
 
     retry ensure-redis @RET
 
+    local emc_engine="${emc_gateway_engine}"
+    if test -z "${emc_engine}" ; then
+        emc_engine=(emacsclient -t)
+    fi
+
     local title=emacs
     if test -n "$emacs_night_server_name" ; then
         title="${emacs_night_server_name:t}"
@@ -117,8 +122,13 @@ function emc-gateway {
         LOGNAME="$(whoami)" \
         KITTY_WINDOW_ID="${KITTY_WINDOW_ID}" \
         $proxyenv \
-        emacsclient -t "$@"
+        reval "${emc_engine[@]}" "$@"
 }
+
+function emc-open-no-server {
+    emc_gateway_engine=(emacs) emc-gateway "$@"
+}
+aliasfn emc-open-no-server-tui emc-open-no-server -nw
 
 function emc-eval {
     # https://emacs.stackexchange.com/questions/28665/print-unquoted-output-to-stdout-from-emacsclient?noredirect=1&lq=1

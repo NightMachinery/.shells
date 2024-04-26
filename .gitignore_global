@@ -1,6 +1,8 @@
 # -*- mode: gitignore; -*-
 
 ## My own
+.aider*
+
 **/*..nogit..*
 
 *.pbak

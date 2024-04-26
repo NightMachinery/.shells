@@ -200,7 +200,8 @@ function cp2ltmp() {
 ##
 function cdtmp {
     local name="$*"
+    local cd_engine="${cdtmp_engine:-cd-mkdir}"
 
-    reval-ec cdm ~tmp/"${name}_cdtmp_$(uuidm)"
+    reval-ecgray "${cd_engine}" ~tmp/"${name}_cdtmp_$(uuidm)"
 }
 ##

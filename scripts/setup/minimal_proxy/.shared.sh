@@ -1,5 +1,10 @@
 ##
+isBash () {
+    [[ -n $BASH_VERSION ]]
+}
+##
 export TERM="xterm-256color"
+# export TERM="xterm-kitty"
 # export TERMINFO=/usr/share/terminfo
 # export TERM="xterm+256color"
 # export TERM="xterm-color"
@@ -64,8 +69,24 @@ export PATH="${HOME}/.config/guix/current/bin:${PATH}"
 GUIX_PROFILE="${HOME}/.guix-profile"
 psource "$GUIX_PROFILE/etc/profile"
 
+export PATH="${HOME}/.local/share/junest/bin:$PATH"
+export PATH="$PATH:${HOME}/.junest/usr/bin_wrappers"
+export JUNEST_HOME="${HOME}/.junest"
+alias sudo-junest="${HOME}/.junest/usr/bin_wrappers/sudo"
+##
 export PATH="${HOME}/anaconda/bin:${PATH}"
 export PATH="${HOME}/miniconda3/bin:${PATH}"
+
+export MAMBA_ROOT_PREFIX="${HOME}/micromamba"
+if isBash ; then
+    if eval "$(micromamba shell hook --shell bash)" ; then
+        micromamba activate p310
+    fi
+else
+    if eval "$(micromamba shell hook --shell zsh)" ; then
+        micromamba activate p310
+    fi
+fi
 ##
 if test -e "${HOME}/.curlrc" ; then
     export HOMEBREW_CURLRC="${HOME}/.curlrc"
@@ -213,4 +234,9 @@ http-static-caddy () {
 ##
 alias rsp-safe='rsync --verbose --checksum --protect-args --human-readable --xattrs --times --info=progress2 --partial-dir=.rsync-partial -r'
 # partial-dir supports resume
+##
+alias icat='tpix'
+alias ic=icat
+##
+alias trs='rip --'
 ##

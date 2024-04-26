@@ -185,7 +185,11 @@ function h_icat {
     local i="$1"
 
     if bool "${icat_v:-y}" ; then
-        ecgray "${i:t}"
+        if [[ "${icat_v}" == as_is ]] ; then
+            ecgray "${i}"
+        else
+            ecgray "${i:t}"
+        fi
     fi
 
     if [[ "$i" == *.pdf ]] ; then

@@ -29,7 +29,7 @@ function seg-result-load {
     local f="${1}" ; shift
     assert test -d "$f" @RET
 
-    local metric="${seg_metric:-IoU}"
+    local metric="${seg_metric:-BAUPRC}"
 
     assert seg_result_input_file_set "$f" @RET
 
@@ -75,7 +75,14 @@ function faith-result-load {
 
     memoi_key_mode='custom_only' \
         memoi_key="${0}:$(hash-files "${input_files[@]}"):${name}" \
-        reval-memoi h-faith-result-load "${input_files[@]}"
+        reval-memoi h-faith-result-load "${input_files[@]}" |
+        {
+            if isTty ; then
+                 tac
+            else
+                cat
+            fi
+        }
 }
 noglobfn faith-result-load
 
@@ -92,7 +99,7 @@ function h-faith-result-load {
 --join-column 'method' --join-fn 'sum(v)/len(v)' \
 -i 'method' 'area-under-curve' 'average' \
 -s 'area-under-curve:d' |
-    tidy-viewer | tac
+    tidy-viewer
 }
 
 function h-faith-result-load-v1 {

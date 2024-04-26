@@ -42,7 +42,7 @@ function org-watch {
     }
 }
 
-function org-update-files() {
+function org-update-files {
     local files=($@)
     if (( ${#files} == 0 )) ; then
         ecgray "$0: called with zero inputs."
@@ -905,4 +905,29 @@ function org2md-escape-triple-quotes {
         py-escape-triple-quotes |
         cat-copy-if-tty
 }
+##
+function emc-jupyter-with {
+    local f="$1"
+    local session="${emc_jupyter_with_session}"
+    local kernel="${emc_jupyter_with_kernel}"
+    local engine="${emc_jupyter_with_engine:-emc-open-no-server-tui}"
+    assert-args f @RET
+
+    cdtmp_engine=pushf cdtmp
+    {
+        local f_copied
+        f_copied="./${f:t}"
+        assert reval-not test -e "${f_copied}" @RET
+
+        cat "$f" | session="$session" kernel="$kernel" perl -lpe '
+        s{:session\s+\S+}{:session $ENV{session}}g if $ENV{session};
+        s{:kernel\s+\S+}{:kernel $ENV{kernel}}g if $ENV{kernel};
+        ' > "${f_copied}" @RET
+
+        reval "${engine}" "${f_copied}"
+    } always {
+        # popf
+    }
+}
+
 ##

@@ -10,6 +10,35 @@ bindkey '\}' self-insert-unmeta
 
 bindkey "^U" backward-kill-line
 ##
+function zle-print-dots() {
+    # toggle line-wrapping off and back on again
+    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti rmam
+    # print -Pn "%{%F{red}......%f%}"
+    print -Pn "%{%F{green}...%f%}"
+    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti smam
+}
+function zle-complete-with-dots() {
+    zle-print-dots
+    ##
+    # This expands variables and globs if possible, else it auto-completes:
+    # zle expand-or-complete
+    ##
+    # zle fzf-tab-complete # causes infinite loop
+    ##
+    zle complete-word
+    ##
+    zle redisplay
+}
+zle -N zle-complete-with-dots
+bindkey "^I" zle-complete-with-dots # TAB
+
+function zle-expand {
+    zle expand-word
+    # zle redisplay # @bug does not syntax-color
+}
+zle -N zle-expand
+bindkey "^_" zle-expand #: Ctrl-/ C-/
+##
 # start typing + [Up-Arrow] - fuzzy find history forward
 if [[ "${terminfo[kcuu1]}" != "" ]]; then
     autoload -U up-line-or-beginning-search

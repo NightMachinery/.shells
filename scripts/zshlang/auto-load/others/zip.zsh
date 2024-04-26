@@ -6,9 +6,16 @@ function zir {
 }
 
 function prefix-shared-dir-get {
-    in-or-args "$@" |
-        prefixer --skip-empty |
-        gsort -u |
+  local input
+  input="$(in-or-args "$@")" @RET
+  dact var-show input
+
+  local res
+  res="$(ec "${input}" |
+    prefixer --skip-empty |
+    gsort -u)" @TRET
+
+  ec "$res" |
         perl -e '
         use File::Basename;
 
@@ -28,14 +35,22 @@ function prefix-shared-dir-get {
         }
 
         my $prefix = $paths[0];
+        if (not ($prefix =~ m|^/|)) {
+            $prefix = "";
+        }
+
         for my $path (@paths[1..$#paths]) {
           while (not $path =~ /^\Q$prefix\E/) {
             $prefix =~ s{/[^/]*$}{};
+
+            last if $prefix eq ""; # Break the loop if prefix becomes empty
           }
+          last if $prefix eq "";
         }
         print $prefix;
   ' |
-        cat-copy-if-tty
+    # cat
+    cat-copy-if-tty
 }
 
 function prefix-shared-dir-strip {
@@ -67,9 +82,12 @@ function zip-create {
   local -a files=("$@")
 
   local prefix
-  prefix="$(arrn "${files[@]}" | prefix-shared-dir-get)" @TRET
+  prefix="$(re realpath "${files[@]}" | prefix-shared-dir-get)" @TRET
+  dact var-show prefix
 
-  local -a pruned_files=("${(@f)$(prefix-shared-dir-strip "${files[@]}")}")
+  local -a pruned_files
+  pruned_files=("${(@f)$(prefix-shared-dir-strip "${files[@]}")}") @TRET
+  dact var-show pruned_files
 
   if test -n "$prefix" ; then
       reval-ecgray pushf "$prefix"

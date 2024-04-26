@@ -30,19 +30,42 @@ function pre-files {
 function f-text-split {
   : "splits a text file into parts having the specified size"
 
-  local i="$1" size="$2"
-  assert-args i size
-  if [[ "$size" =~ '^\d+$' ]] ; then
-    size+='k' #: use kilobytes by default
-  fi
-  local o="${3:-${i:r}_part}"
+  local i="$1" size="$2" del_p="${f_split_del_p}"
+  assert-args i size @RET
+  assert test -e "$i" @RET
 
+  if [[ "$size" =~ '^\d+$' ]] ; then
+  size+='k' #: use kilobytes by default
+  fi
+
+  local o="${3}"
   local opts=()
   local ext="${i:e}"
-  if test -n "$ext" ; then
+
+  if true ; then
+  o="${o:-${i}.part}"
+  else
+    o="${o:-${i:r}_part}"
+
+    if test -n "$ext" ; then
     opts+=( --additional-suffix=".${ext}")
+    fi
   fi
 
-  reval-ec gsplit "$opts[@]" -C "$size" --numeric-suffixes "$i" "$o"
+  reval-ec gsplit "$opts[@]" -C "$size" --numeric-suffixes "$i" "$o" @RET
+
+  ec-sep-h
+  ecgray "Split Files:"
+  ll "$o"*(.DN) #: show the split files
+  ec-sep-h
+
+  if bool "${del_p}" ; then
+    if git-p "$i" ; then
+      reval-ecgray git-rm "$i" || true
+    fi
+
+    trs "$i"
+  fi
 }
+@opts-setprefix f-text-split f_split
 ##

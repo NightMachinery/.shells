@@ -330,7 +330,7 @@ function pbcopy-z {
         pbcopy "$cmd"
     fi
 }
-alias pcz='pbcopy-z'
+# alias pcz='pbcopy-z'
 ##
 function clipboard-add-files {
     if isDarwin ; then

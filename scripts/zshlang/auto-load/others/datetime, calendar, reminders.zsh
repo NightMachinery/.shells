@@ -408,7 +408,8 @@ function datenatj {
     unset datenatj_unix
     unset datenatj_date
     unset datenatj_datej
-    local natdate="$*"
+    local natdate
+    natdate="$(in-or-args "$@")" @RET
 
     datenatj_unix="$(datenat_unix=y datenat $natdate)" || { ecerr "$0: datenat failed for: $natdate" ; return 1 }
     datenatj_datej="$(jalalicli tojalali "$datenatj_unix" -g 'unix')" || return $?
@@ -496,8 +497,7 @@ function remn-interactive {
     local -x datenat_hardcode_time=y
     
     local natdate=""
-    # @warn brishz.dash does not quote its arguments, so we essentially have an @unsafeEval here. I think it's worth the speed boost, though I have noot profiled it.
-    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long-time ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishz.dash reval-true serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
+    natdate="$(FZF_DEFAULT_COMMAND=echo fz-empty --header "$(Bold ; ecn "Today: " ; colorfg 0 100 255 ; datej-all-long-time ; resetcolor)" --reverse --height '20%' --bind "change:reload:brishzq.zsh reval-true serr datenat-full2-future {q} || true" --disabled --query "" --print-query | ghead -n 1)" || return $?
     remn "$text" "$natdate"
 }
 aliasfn ri reminday_store_nosync=y remn-interactive
