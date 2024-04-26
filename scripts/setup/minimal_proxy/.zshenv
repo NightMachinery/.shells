@@ -148,6 +148,9 @@ function plg-log-last {
   plg-log-last-reval tail -f
 }
 ##
+alias sbb='exec ${commands[zsh]}'
+#: We can't use our own 'sbb' here. When we remove all the env vars, the terminal breaks. I guess this has to do with the terminal being remote? Anyhow, I don't know which exact env var is needed to stop the breakage.
+##
 ### * End
 psource ~/.private.env.zsh
 psource ~/.privateShell

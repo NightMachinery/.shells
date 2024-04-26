@@ -193,3 +193,11 @@ function ivy-convenience {
     ##
 }
 ##
+function tmux-attach {
+    local session="$1"
+    assert-args session @RET
+
+    tty-title "${session}"
+    tmux a -t "${session}"
+}
+##

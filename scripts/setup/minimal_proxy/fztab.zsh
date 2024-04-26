@@ -1,31 +1,3 @@
-function zle-print-dots() {
-    # toggle line-wrapping off and back on again
-    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti rmam
-    # print -Pn "%{%F{red}......%f%}"
-    print -Pn "%{%F{green}...%f%}"
-    [[ -n "$terminfo[rmam]" && -n "$terminfo[smam]" ]] && echoti smam
-}
-function zle-complete-with-dots() {
-    zle-print-dots
-    ##
-    # This expands variables and globs if possible, else it auto-completes:
-    # zle expand-or-complete
-    ##
-    # zle fzf-tab-complete # causes infinite loop
-    ##
-    zle complete-word
-    ##
-    zle redisplay
-}
-zle -N zle-complete-with-dots
-bindkey "^I" zle-complete-with-dots # TAB
-
-function zle-expand() {
-    zle expand-word
-    # zle redisplay # @bug does not syntax-color
-}
-zle -N zle-expand
-bindkey "^_" zle-expand # C-/
 ##
 FZTAB_OPTS=(
     --color=light # needed, as fzf-tab overrides the colors, so we need to re-override them
@@ -73,3 +45,4 @@ zstyle ':completion:*' insert-tab false
 ##
 # zstyle ':completion:*' matcher-list '+m:{a-zA-Z}={A-Za-z}' '+r:|[._-]=* r:|=*' 'r:|?=** m:{a-z\-}={A-Z\_}' '+l:|=* r:|=*'
 zstyle ':completion:*' matcher-list 'r:|?=** m:{a-z\-}={A-Z\_}' '+l:|=* r:|=*'
+##

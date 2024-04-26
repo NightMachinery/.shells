@@ -17,6 +17,17 @@ function aider-m {
 
                 --edit-format diff
             )
+
+        elif [[ "$model" == g1.5 ]] ; then
+            local -x OPENAI_API_KEY="${openrouter_api_key}"
+            local -x OPENAI_API_BASE=https://openrouter.ai/api/v1
+
+            opts+=(
+                --model
+                google/gemini-pro-1.5
+
+                # --edit-format diff
+            )
         else
             local -x OPENAI_API_KEY="${openai_api_key}"
         fi
@@ -29,4 +40,5 @@ function aider-m {
 }
 aliasfn aider aider-m
 aliasfn aider-c3o aider_model=c3o aider-m
+aliasfn aider-g1.5 aider_model=g1.5 aider-m
 ##

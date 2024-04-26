@@ -9,7 +9,7 @@ function realpath-relchild {
     fi
 }
 ##
-function cdm {
+function cd-mkdir {
     local d="${*}"
     if test -z "$d" ; then
         ecerr "$0: empty input!"
@@ -20,8 +20,9 @@ function cdm {
     mkdir-m "$d" &&
         cd -P -- "$d"
 }
+aliasfn cdm cd-mkdir
 ##
-function bottomdir() {
+function bottomdir {
     # I have tried to output the dir without its trailing '/'
     ##
     local empty="${bottomdir_empty-.}"

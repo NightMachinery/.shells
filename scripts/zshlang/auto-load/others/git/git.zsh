@@ -202,7 +202,8 @@ alias glum='git pull upstream master'
 alias gwch='git whatchanged -p --abbrev-commit --pretty=medium'
 alias gwip='git add -A; git rm $(git ls-files --deleted) 2> /dev/null; git commit --no-verify -m "--wip-- [skip ci]"'
 ##
-alias grm='git rm --cached'
+aliasfn git-rm git rm --cached
+alias grm='git-rm'
 alias glcs='glc --depth=1'
 ###
 function git-status-summary() {
@@ -591,6 +592,18 @@ function git-current-commit {
     cat-copy-if-tty
 }
 ##
+function git-p {
+    local d="${1:-.}"
+    if ! test -d "$d" ; then
+      d="${d:h}" #: assuming `d` was a file
+      assert test -d "$d" @RET
+    fi
+
+    #: @GPT4T Check if the current directory is inside a git repository
+    silent git -C "$d" rev-parse --is-inside-work-tree
+    #: -C <path>  Run as if git was started in <path> instead of the current working  directory.
+}
+
 function git-merge-p {
   #: [[https://stackoverflow.com/questions/29101270/how-to-know-if-a-merge-is-ongoing-in-git][How to know if a merge is ongoing in git - Stack Overflow]]
   ##

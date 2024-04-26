@@ -23,6 +23,16 @@ function gost-setup {
     chmod +x ~/bin/gost
     # sudo setcap 'cap_net_bind_service=+ep' "$(realpath ~/bin/gost)"
 }
+
+function tpix-setup {
+    #: @duplicateCode/12c0863cd8154859380fdff56d92b647
+    ##
+    mkdir -p ~/bin/
+    wget -O - 'https://github.com/jesvedberg/tpix/releases/download/v1.0.0/tpix-1.0.0-x86_64-linux.tar.gz' | tar -xzf - -C ~/bin tpix
+    #: `tpix` at the end specifies the specific file to be extracted from the archive. Only the `tpix` file will be extracted and placed in the `~/bin` directory.
+
+    chmod +x ~/bin/tpix
+}
 ##
 
 command sh -c "$(wget -O- https://raw.githubusercontent.com/romkatv/zsh-bin/master/install)" -- -d ~/.local -e no
@@ -33,6 +43,7 @@ curl -sS https://starship.rs/install.sh | sh -s -- -b ~/.local/bin -y
 curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
 
 gost-setup
+tpix-setup
 
 micromamba-setup
 
@@ -42,7 +53,8 @@ curl -LsSf https://astral.sh/uv/install.sh | INSTALLER_NO_MODIFY_PATH=1 INSTALLE
 
 ## pip
 pip install --upgrade pipx
-pip install -U speedtest-cli nvitop
+pipx install speedtest-cli nvitop black
+#: nvitop needs the isolated env (?) pipx provides or sth.
 
 pip install -U jupyter jupyterlab py-spy
 

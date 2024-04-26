@@ -1,3 +1,4 @@
+##
 function hist-add-unquoted {
     print -r -S -- "$*"
 }
@@ -53,6 +54,9 @@ function seal-history {
 function seal-history-literal-fc {
     local line="$(hist-last 0)"
     if [[ "$line" =~ '^\s*(?:dbg\s+)?(?:(?:[^#]*#+)|shl|seal-history-literal)\s+((?:.|\n)*)\s*$' ]] ; then
+        #: @duplicateCode/9a5ac779e2f576938405f140592757b7
+        #: Note that we needed to explicitly put =shl= in the above pattern because =line= contains the exact command line executed, and the alias =shl= is not expanded in it.
+        ##
         local cmd="$match[1]"
         ##
         # seal-history-unquoted "$cmd"
@@ -67,6 +71,24 @@ function seal-history-literal-fc {
 alias shl='seal-history-literal-fc # '
 # this hack works only on a single line, as '#' is single-line only
 # use 'seal-history-literal' itself for multiline commands and quote expansions accordingly
+##
+function pbcopy-z-literal-fc {
+    local line="$(hist-last 0)"
+    if [[ "$line" =~ '^\s*(?:dbg\s+)?(?:(?:[^#]*#+)|pczz?|pbcopy-z-literal-fc)\s+((?:.|\n)*)\s*$' ]] ; then
+        #: @duplicateCode/9a5ac779e2f576938405f140592757b7
+        ##
+        local cmd="$match[1]"
+        ##
+        # seal-history-unquoted "$cmd"
+        ##
+        reval-ecgray pbcopy "$cmd"
+        ##
+    else
+        ecerr "$0: failed to match: $(gq "$line")"
+    fi
+}
+alias pcz='pbcopy-z-literal-fc # '
+#: @todo We can check for the pattern `^pcz ` in the execution hooks instead of using the above workaround? That might allow for copying multiline inputs.
 ##
 function hist-add-universal-unquoted {
     # the history file will get created automatically, but let's check its existence to avoid creating it when the notes repo is not present:

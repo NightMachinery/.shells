@@ -24,7 +24,14 @@ curl -sS https://webi.sh/jq | sh
 # curl -sS https://webi.sh/docker | sh
 ##
 
-brew install zsh ugrep tealdeer progress bandwhich ncdu rm-improved eza
+sudo-junest pacman -Syy --noconfirm socat nodejs npm
+
+sudo-junest pacman -Syy --noconfirm tealdeer
+tldr --update
+
+sudo-junest pacman -Syy --noconfirm emacs
+
+brew install gcc zsh ugrep tealdeer progress bandwhich ncdu rm-improved eza
 
 brew install redis
 brew services start redis

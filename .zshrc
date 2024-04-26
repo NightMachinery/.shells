@@ -438,12 +438,12 @@ function nightsh-load-zshrc() {
   zle -N zle-complete-with-dots
   bindkey "^I" zle-complete-with-dots # TAB
 
-  function zle-expand() {
+  function zle-expand {
     zle expand-word
     # zle redisplay # @bug does not syntax-color
   }
   zle -N zle-expand
-  bindkey "^_" zle-expand # C-/
+  bindkey "^_" zle-expand #: Ctrl-/ C-/
   ##
   FZTAB_OPTS=(
     --color=light # needed, as fzf-tab overrides the colors, so we need to re-override them
