@@ -2565,7 +2565,7 @@ appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='\\', appName='com.apple.iCal' }
 appHotkey{ key='m', appName='mpv' }
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
--- appHotkey{ key='n', appName='com.appilous.Chatbot' }
+appHotkey{ key='n', appName='com.appilous.Chatbot' } -- Pal ChatGPT app
 appHotkey{ key='b', appName='com.parallels.desktop.console' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
@@ -2727,7 +2727,7 @@ bindWithRepeatV2{
         volumeDecKey()
         ---
     end,
-    -- auto_trigger_p=false
+    auto_trigger_p=false
 }
 bindWithRepeatV2{
     binder=hyper_bind_v2,
@@ -2740,7 +2740,7 @@ bindWithRepeatV2{
         volumeIncKey()
         ---
     end,
-    -- auto_trigger_p=false,
+    auto_trigger_p=false,
 }
 --- * Mission Control, Window/App Switcher, Expose
 hyper_bind_v2{

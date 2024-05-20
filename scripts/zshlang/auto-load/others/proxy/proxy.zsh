@@ -352,7 +352,9 @@ function proxy-git-off() {
 }
 ##
 function proxy-restart {
-    fz_opts=(-1) fftr gost-2083 ; ci98
+    fz_opts=(-1) fftr gost-2083
+    sleep 0.5
+    ci98
 }
 alias '/'='proxy-restart'
 alias '//'='reval-ec ping 8.8.8.8'

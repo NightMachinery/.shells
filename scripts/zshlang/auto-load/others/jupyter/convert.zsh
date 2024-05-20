@@ -7,6 +7,8 @@ function ipynb2md {
 ##
 function orgbabel-src-python-reset {
     local output_clear_p="${ipynb_output_clear_p:-y}"
+    local session="${emc_jupyter_with_session:-/jpy:127.0.0.1#7031:orgk1/}"
+    local kernel="${emc_jupyter_with_kernel:-py_base}"
 
     local p1=''
     if bool "$output_clear_p" ; then
@@ -15,7 +17,7 @@ function orgbabel-src-python-reset {
     fi
 
     cat-paste-if-tty |
-    perl -lpe 's{^'${p1}'(#\+begin_src\s+(?:jupyter-)?python\b.*)}{#+begin_src jupyter-python :kernel py_base :session /jpy:127.0.0.1#6035:orgk1/ :async yes :exports both}g' |
+    session="$session" kernel="$kernel" perl -lpe 's{^'${p1}'(#\+begin_src\s+(?:jupyter-)?python\b.*)}{#+begin_src jupyter-python :kernel $ENV{kernel} :session $ENV{session} :async yes :exports both}g' |
     cat-copy-if-tty
 
     #: If converting from ipynb, just clear the cell outputs first instead. (This way you won't get extraneous 'caption' image blocks.)
@@ -25,6 +27,7 @@ function orgbabel-src-python-reset {
 function ipynb2org {
     local input="$1"
     assert-args input @RET
+
     local output_clear_p="${ipynb_output_clear_p:-y}"
 
     local dest="${2}"

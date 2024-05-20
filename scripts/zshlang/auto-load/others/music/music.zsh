@@ -90,10 +90,11 @@ aliasfn heari hearinvisible
 aliasfn hearinvisible-mpv silent hear-noipc --no-terminal --load-scripts=no
 @opts-setprefix hearinvisible-mpv hear
 ##
-function hear {
+aliasfn hear hear-noipc
+function hear-ipc {
     # arger "${(0@)$(rpargs "$@")}"
     comment '(0@) inserts empty elements with quoting'
-    hear-noipc --input-ipc-server="$mpv_audio_ipc" ${(0@)"$(rpargs "$@")"} #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
+    hear-noipc --input-ipc-server="${mpv_audio_ipc}" ${(0@)"$(rpargs "$@")"} #--no-config  #'ffplay -autoexit -nodisp -loglevel panic'
 }
 
 function hear-rnd() {
@@ -116,7 +117,7 @@ function songc {
 
     playlist-auto-create "${f[@]}"
 
-    ! test -z "$f[*]" && { touch-tracks  "${(@f)f}" ; hear "${@:1:-1}" "${(@f)f}" }
+    ! test -z "$f[*]" && { touch-tracks  "${(@f)f}" ; hear-ipc "${@:1:-1}" "${(@f)f}" }
 }
 
 function touch-tracks {
@@ -244,7 +245,7 @@ function songd {
                 trs "$spath"
                 false
             } && {
-                hear "${@:1:-1}" "$spath"
+                hear-ipc "${@:1:-1}" "$spath"
                 true
             }
         } || {
@@ -363,7 +364,7 @@ function hear-playlist {
     if [[ "${mode}" == load ]] ; then
         reval-ecgray hear-load-playlist "${tmp}"
     elif [[ "${mode}" == instance ]] ; then
-        reval-ecgray hear --loop-playlist --playlist="${tmp}"
+        reval-ecgray hear-ipc --loop-playlist --playlist="${tmp}"
     else
         ecerr "$0: Unknown mode: ${mode}"
         return 1
@@ -412,7 +413,7 @@ function hear-start-server {
         assert test -e "$f" @RET
     fi
 
-    hear --pause --loop-playlist=inf "$f"
+    hear-ipc --pause --loop-playlist=inf "$f"
 }
 ##
 function sdlg {

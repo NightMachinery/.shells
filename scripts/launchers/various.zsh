@@ -14,8 +14,8 @@ brishgarden-boot 16 /api/v1
 ##
 # caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
 
-tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
-# tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile
+# tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
+tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile
 # miniserve -- . #http-server
 ##
 # tmuxnew shadowsocks-ss ss-server -c "$nightNotes/private/configs/eva/shadowsocks/ss.json" # see `man shadowsocks-libev` for config # we might also have this in systemd: `systemctl status ss8324` # needed for the old laptop

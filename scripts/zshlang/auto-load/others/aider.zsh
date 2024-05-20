@@ -28,6 +28,17 @@ function aider-m {
 
                 # --edit-format diff
             )
+
+        elif [[ "$model" == gq-llama3 ]] ; then
+            local -x GROQ_API_KEY="${groq_api_key}"
+
+            opts+=(
+                --model
+                groq/llama3-70b-8192
+
+                # --edit-format diff
+            )
+
         else
             local -x OPENAI_API_KEY="${openai_api_key}"
         fi
@@ -41,4 +52,5 @@ function aider-m {
 aliasfn aider aider-m
 aliasfn aider-c3o aider_model=c3o aider-m
 aliasfn aider-g1.5 aider_model=g1.5 aider-m
+aliasfn aider-l3 aider_model=gq-llama3 aider-m
 ##

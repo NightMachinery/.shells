@@ -14,8 +14,8 @@
 
 ** rsync necessary files
 #+begin_example zsh
-host=t21
-# host=t31
+# host=t21
+host=t31
 # host=pino
 # host=s17
 

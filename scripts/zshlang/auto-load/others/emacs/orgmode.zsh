@@ -919,7 +919,16 @@ function emc-jupyter-with {
         f_copied="./${f:t}"
         assert reval-not test -e "${f_copied}" @RET
 
-        cat "$f" | session="$session" kernel="$kernel" perl -lpe '
+        {
+            if test -n "${session}" ; then
+                ec ":PROPERTIES:
+:jupyter-python-session: ${session}
+:END:
+"
+            fi
+
+            cat "$f"
+        } | session="$session" kernel="$kernel" perl -lpe '
         s{:session\s+\S+}{:session $ENV{session}}g if $ENV{session};
         s{:kernel\s+\S+}{:kernel $ENV{kernel}}g if $ENV{kernel};
         ' > "${f_copied}" @RET
