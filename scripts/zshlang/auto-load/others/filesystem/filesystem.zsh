@@ -8,29 +8,29 @@ function rm-empty {
     done
 }
 
-function rm-dir-only-child {
+function rm-dir-only-child-v2 {
     local dir="${1:-.}"
     if [[ ! -d "$dir" ]]; then
         ecerr "$0: not a directory or does not exist: $dir"
         return 1
     fi
-    dir="${dir:A}"
+    dir="${dir:A}" #: realpath
 
     local d
     for d in "${dir}"/*(/DN) ; do
-        h-rm-dir-only-child "$d"
+        rm-dir-only-child-v1 "$d"
         #: This way, we won't actually remove only-child dirs in the current root. E.g., if we have =games/x= and start from =games=, we won't remove =x=.
     done
 }
 
-function h-rm-dir-only-child {
+function rm-dir-only-child-v1 {
     local dir="${1:-.}"
 
     if [[ ! -d "$dir" ]]; then
         ecerr "$0: not a directory or does not exist: $dir"
         return 1
     fi
-    dir="${dir:A}"
+    dir="${dir:A}" #: realpath
 
     local children children_dir only_child_dir only_child_dir_content
     while true; do
@@ -73,6 +73,7 @@ function h-rm-dir-only-child {
         fi
     done
 }
+aliasfn rm-dir-only-child rm-dir-only-child-v1
 ##
 function file-unix2uri-rp-v2 {
     in-or-args "$@" |

@@ -142,9 +142,7 @@ function tts-espnet() {
     <<<"$text" ESPnet2-TTS.py > "$output"
 }
 ##
-function tts-glados1() {
-    # curl --silent -L --retry 30 --get --fail --data-urlencode "text=$*" "https://glados.c-net.org/generate" | silent hear -
-
+function tts-glados1 {
     local text="${1}" output="${2:?}"
 
     text="$(ecn "$text" | sdlit $'\n' " , ")" # this API does not support multiline input

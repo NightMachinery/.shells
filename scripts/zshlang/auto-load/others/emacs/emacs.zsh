@@ -30,7 +30,7 @@ function emcpe {
     local fz_opts=( $fz_opts[@] -1 )
     # ffkill -SIGUSR2 \'emacs \'daemon
     if emc-gui-p ; then
-        ffkill "${opts[@]}" 'Emacs.app/Contents/MacOS/Emacs' '!daemon' '!batch' '!zsh' '!alt'
+        ffkill "${opts[@]}" 'Emacs.app/Contents/MacOS/Emacs' '!daemon' '!batch' '!zsh' '!alt' '!-nw'
     else
         ffkill "${opts[@]}" emacs daemon '!alt'
     fi

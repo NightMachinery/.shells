@@ -27,5 +27,5 @@ gquote () {
 source ~/.shared.sh
 ##
 ### * End
-# psource ~/.privateShell
+psource ~/.privateShell
 ###

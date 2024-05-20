@@ -117,7 +117,12 @@ function html2md {
 }
 # @opts-setprefix html2md html2org
 
-function html2text() {
+function html2md-v2 {
+    html2org | org2md
+    #: This strips a lot of useless metadata compared to =html2md=.
+}
+
+function html2text {
     # @alt/worse html2text (python)
     ##
     html2org =(cat)

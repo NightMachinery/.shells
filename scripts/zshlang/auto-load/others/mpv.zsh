@@ -362,3 +362,7 @@ function mpv-cheatsheet {
     icat "${nightNotesPublic}/cheatsheets/mpv/mpbindings_big.png"
 }
 ##
+function mpv-progress {
+    mpv -osd-msg1='${osd-ass-cc/0}{\\pos(10,-6)}{\\fs15}${osd-sym-cc} {\\fs15}${time-pos} / ${playtime-remaining}    ${percent-pos}%' "$@"
+}
+##

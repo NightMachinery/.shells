@@ -42,6 +42,11 @@ files.lilf.ir, http://:8080 {
   }
 }
 
+llm.lilf.ir {
+  encode zstd gzip
+  reverse_proxy localhost:3000
+}
+
 # sg.lilf.ir {
 #   encode zstd gzip
 #   reverse_proxy localhost:7080

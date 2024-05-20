@@ -32,6 +32,7 @@ function openai-cost-by-tokens {
             [gpt-4]=0.03
             [gpt-4-32k]=0.06
             [gpt-4-turbo]=0.01
+            [gpt-4o]=0.005
 
             [claude-3-opus]=0.015
         )
@@ -44,12 +45,14 @@ function openai-cost-by-tokens {
             [gpt-4]=0.06
             [gpt-4-32k]=0.12
             [gpt-4-turbo]=0.03
+            [gpt-4o]=0.015
 
             [claude-3-opus]=0.075
         )
     else
-        ecerr "$0: unknown mode: $mode"
-        return 1
+        # ecerr "$0: unknown mode: $mode"
+        # return 1
+        return 0
     fi
 
     if [[ -n "${model_costs[$model]}" ]]; then
@@ -60,8 +63,9 @@ function openai-cost-by-tokens {
 
         ec "$cost"
     else
-        ecerr "$0: unknown model: $model"
-        return 1
+        # ecerr "$0: unknown model: $model"
+        # return 1
+        return 0
     fi
 }
 ##
@@ -329,8 +333,10 @@ function llm-send {
     }
     output_token_count="$(ecn "${output}" | token_count_model="${model}" openai-token-count)" @TRET
     output_cost="$(openai-cost-by-tokens "${model}" output "${output_token_count}")" @TRET
-    total_cost=$(( ${input_cost} + ${output_cost} )) @TRET
-    local n20=$(( 20 / ${total_cost} ))
+    total_cost=$(( ${input_cost:-0} + ${output_cost:-0} )) @TRET
+
+    local n20
+    n20=$(( 20 / ${total_cost} )) @TRET
     local n20_daily=$(( n20 / 30 ))
 
     {
@@ -348,12 +354,12 @@ function llm-send {
 function llm-3t {
     llm_model=gpt-3.5-turbo-16k llm-send "$@"
 }
-aliassafe l3='\noglob llm-3t'
+aliassafe 3t='\noglob llm-3t'
 function llm-3t-chat {
     llm_model=gpt-3.5-turbo-16k llm-m chat "$@"
 }
 aliasfn reval-to-gpt3t reval-to llm-3t
-aliassafe rl3t='\noglob reval-to-gpt3t'
+aliassafe r3t='\noglob reval-to-gpt3t'
 
 function llm-4 {
     #: @alt =gpt-4-0314= =gpt-4-0613=
@@ -377,6 +383,17 @@ aliasfn reval-to-gpt4t reval-to llm-4t
 aliassafe rl4t='\noglob reval-to-gpt4t'
 aliassafe 4t='\noglob reval-to-gpt4t'
 
+function llm-4o {
+    llm_model=gpt-4o llm-send "$@"
+}
+aliassafe l4o='\noglob llm-4o'
+function llm-4o-chat {
+    llm_model=gpt-4o llm-m chat "$@"
+}
+aliasfn reval-to-gpt4o reval-to llm-4o
+aliassafe rl4o='\noglob reval-to-gpt4o'
+aliassafe 4o='\noglob reval-to-gpt4o'
+
 function llm-c3o {
     llm_model=claude-3-opus llm-send "$@"
 }
@@ -397,10 +414,26 @@ function llm-c3h-chat {
 aliasfn reval-to-c3h reval-to llm-c3h
 aliassafe rc3h='\noglob reval-to-c3h'
 
+function llm-l3 {
+    llm_model=gq-llama3 llm-send "$@"
+}
+aliassafe l3='\noglob llm-l3'
+function llm-l3-chat {
+    llm_model=gq-llama3 llm-m chat "$@"
+}
+aliasfn reval-to-l3 reval-to llm-l3
+aliassafe rl3='\noglob reval-to-l3'
+
 # alias xx='\noglob llm-4'
 
-aliassafe xx='\noglob llm-4t'
-aliassafe xz='\noglob reval-to-gpt4t'
+# aliassafe xx='\noglob llm-4t'
+# aliassafe xz='\noglob reval-to-gpt4t'
+
+aliassafe xx='\noglob llm-4o'
+aliassafe xz='\noglob reval-to-gpt4o'
+
+# aliassafe xx='\noglob llm-l3'
+# aliassafe xz='\noglob reval-to-l3'
 
 # aliassafe xx='\noglob llm-c3o'
 # aliassafe xz='\noglob reval-to-c3o'

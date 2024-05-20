@@ -71,7 +71,10 @@ function prefix-shared-dir-strip {
     ' "$prefix"
 }
 
-function zip-create {
+function zip-create-v1 {
+  #: @deprecated
+  #: @seeAlso [agfi:zip-flat]
+  ##
   local opts=()
 
   local dest="$1" ; shift
@@ -98,6 +101,49 @@ function zip-create {
         if test -n "$prefix" ; then
             popf
         fi
+  }
+}
+##
+function zip-flat {
+  #: This function puts all of its arguments into the root of the archive.
+  #: This is unlike `zip -r`, which will preserve the directory structure of its arguments. I.e., `zip -r dest.zip a/b.txt` will create a file `a/b.txt` in the archive, while `zip-flat dest.zip a/b.txt` will create a file `b.txt` in the archive.
+  ##
+  #: Check if at least two arguments are provided (destination and one file)
+  if (( $# < 2 )); then
+    echo "Usage: zip-flat <dest> <file> ..."
+    return 1
+  fi
+
+  local dest="$1"
+  shift 1
+  assert-args dest @RET
+
+  if test -e "$dest" ; then
+    assert trs "$dest" @RET
+  fi
+
+  #: Create a temporary directory to hold the flattened files
+  local tmpdir
+  tmpdir="$(mktemp -d)" @TRET
+
+  #: Loop over each file or directory to add them to the zip file
+  local item
+  for item in "$@"; do
+    if [[ -d $item ]]; then
+      assert command cp -r "$item" "$tmpdir/" @RET
+    else
+      assert command cp "$item" "$tmpdir/" @RET
+    fi
+  done
+
+  #: Change to the temporary directory and zip all files from there
+  assert pushf "$tmpdir" @RET
+  {
+    zip -r "$OLDPWD/$dest" ./*
+  } always {
+    popf
+
+    trs "$tmpdir"
   }
 }
 ##
