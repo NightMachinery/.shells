@@ -4,6 +4,7 @@ alias pblk='prompt_input_mode=block'
 
 function prompt-instruction-input {
     local instruction="$1" ; shift
+    ensure-array prompt_input_images #: @global/input
     local input_mode="${prompt_input_mode}"
     local qa_p="${prompt_qa_p}"
     local preambles=(${prompt_preambles[@]})
@@ -37,9 +38,10 @@ function prompt-instruction-input {
         fi
     fi
 
-    {
+    local prompt_text
+    prompt_text="$( {
         for preamble in "${preambles[@]}" ; do
-            reval "${preamble}"
+            assert reval "${preamble}" @RET
         done
 
         ec "$instruction"
@@ -48,8 +50,39 @@ function prompt-instruction-input {
             ec $'\n'"$input"
         fi
     } |
-        strip-blank-lines-start-end |
-        cat-copy-if-tty
+        strip-blank-lines-start-end)" @RET
+
+    local input_files=()
+    if (( ${#prompt_input_images} >= 1 )) ; then
+        local input_image processed_image tmp_file
+        for input_image in "${prompt_input_images[@]}" ; do
+            if [[ "${input_image}" == "MAGIC_CLIPBOARD" ]] ; then
+                tmp_file="$(gmktemp --suffix ".png")" @TRET
+                assert pngpaste "${tmp_file}" @RET
+
+                processed_image="${tmp_file}"
+            else
+                assert test -e "${input_image}" @RET
+
+                processed_image="${input_image}"
+            fi
+
+            input_files+=("${processed_image}")
+            icat_v=n icat "${processed_image}" @STRUE
+        done
+
+        if isOutTty ; then
+            assert copy_files_with_text.swift "${prompt_text}" "${input_files}" @RET
+
+            ec "$prompt_text"
+        else
+            ec "${prompt_text}"
+            ecgray "$0: attached images ignored as the output is not a TTY"
+        fi
+    else
+        ec "${prompt_text}" |
+            cat-copy-if-tty
+    fi
 }
 
 function prompt-instruction-input-coding {
@@ -404,10 +437,6 @@ function prompt-find-bugs {
 ##
 function prompt-slide-complete-orgbeamer {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Complete the following org-mode beamer presentation:' "$@"
-}
-##
-function prompt-t2i-expand {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Create a detailed description for a text2image prompt from this preliminary prompt:' "$@"
 }
 ##
 function prompt-coco2imagenet {
