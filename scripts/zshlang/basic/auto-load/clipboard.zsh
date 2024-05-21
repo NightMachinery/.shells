@@ -358,9 +358,10 @@ function pngpaste {
         cat "$f" @TRET
         silent trs-rm "$f" @STRUE
     else
-        ecgray "$0: pasted to $(gq "$f")"
         if fn-isTop ; then
-            icat "$f" @STRUE
+            ecgray "$0: pasted to $(gq "$f")"
+
+            icat_v=n icat "$f" @STRUE
         fi
     fi
     ## @alt:
