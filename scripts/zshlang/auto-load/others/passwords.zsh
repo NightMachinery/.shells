@@ -1,11 +1,13 @@
 function passgen {
-    : "@alt passgen.go"
-
-    reval-copy openssl rand -base64 "${1:-16}"
+    #: @alt =passgen.go=
+    ##
+    openssl rand -base64 "${1:-16}" |
+        cat-copy-if-tty
 }
 
 function passgen-hex {
-    reval-copy openssl rand -hex "${1:-16}"
+    openssl rand -hex "${1:-16}" |
+        cat-copy-if-tty
 }
 
 function passgen-numerical {
@@ -17,7 +19,8 @@ function passgen-numerical {
     local dec
     dec="$(revaldbg hex2decimal "${hex}")" @TRET
 
-    ec "${dec[1,$len]}" # deciaml is longer than hex
+    ec "${dec[1,$len]}" | # deciaml is longer than hex
+        cat-copy-if-tty
 }
 
 function passgen-words {
