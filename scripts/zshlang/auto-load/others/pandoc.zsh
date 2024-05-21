@@ -112,7 +112,7 @@ function html2plain-std {
     pandoc --wrap=none --from html --to plain - -o -
 }
 
-function html2md {
+function html2md-v1 {
     @opts f markdown @ html2org "$@"
 }
 # @opts-setprefix html2md html2org
@@ -120,6 +120,35 @@ function html2md {
 function html2md-v2 {
     html2org | org2md
     #: This strips a lot of useless metadata compared to =html2md=.
+}
+
+function html2md-strict {
+    @opts f markdown_strict @ html2org "$@"
+}
+aliasfn html2md html2md-strict
+
+function html2md-djot {
+    #: djot still outputs superfluous stuff
+    ##
+    @opts f djot @ html2org "$@"
+}
+
+function html2md-gfm {
+    #: gfm outputs even more superfluous stuff
+    ##
+    @opts f gfm @ html2org "$@"
+}
+
+function html2md-commonmark {
+    #: commonmark outputs even more superfluous stuff
+    ##
+    @opts f commonmark @ html2org "$@"
+}
+
+function html2md-commonmark-x {
+    #: commonmark_x still outputs superfluous stuff
+    ##
+    @opts f commonmark_x @ html2org "$@"
 }
 
 function html2text {
@@ -153,6 +182,12 @@ function pandoc-convert {
     tmp_o="$(gmktemp)" @TRET
 
 
+    if [[ "$to" =~ '^(?:gfm|commonmark.*|markdown.*|djot)$' ]] ; then
+        #: [[id:1ffc4d15-5baf-44bd-9cd4-98d50b3270b4][Add option to disable indented code blocks? · Issue #2120 · jgm/pandoc]]
+        opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/md_code_blocks.lua")
+        # var-show opts
+    fi
+
     pandoc --wrap=none "$opts[@]" --from "$from" --to "$to" "$input" -o "-" | {
         if bool ${postprocess_p} ; then
             if [[ "$to" == org ]] ; then
@@ -166,10 +201,11 @@ function pandoc-convert {
                     perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g' |
                     perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g' |
                     perl -CS -lpe 's{^(#\+(?:begin|end)_)example\b}{lc($1) . "src"}ieg' | #: =lc= converts to lower-case
-                    perl -CS -lpe 's{^(#\+begin_src\b.*)$}{$1 :eval never}ig'
-                #: We can add a negative lookbehind to avoid adding =:eval never= if it's already added, but I don't think such a check is needed.
-                #:
                 #: =example= blocks are produced from markdown source blocks with no language identifier. These blocks will not be syntax-highlighted when exported to HTML, so I am converting them to source blocks instead.
+                    perl -CS -lpe 's{^(#\+begin_src\b.*)$}{$1 :eval never}ig' |
+                #: We can add a negative lookbehind to avoid adding =:eval never= if it's already added, but I don't think such a check is needed.
+                    perl -CS -lpe '/^#\+begin_src\b/i && s/:style.*?(?:$|\s(*pla::))//ig'
+                #: Removes `:style ...` till the next attribute, hence `\s(*pla::)`. (Note the non-greedy matcher.)
 
             elif [[ "$to" == markdown ]] && bool $trim_extra ; then
                 perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g' |
