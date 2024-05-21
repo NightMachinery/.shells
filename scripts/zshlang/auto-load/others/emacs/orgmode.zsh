@@ -830,21 +830,27 @@ function org-img-unused-trs-i {
 }
 
 function org-img-unused {
-    #: @seeAlso [agfi:org-img-unused-trs-i]
+    #: * @seeAlso
+    #: ** [agfi:org-img-unused-trs-i]
+    #: ** [help:night/org-img-unused-trs]
     ##
     local fs=($@)
 
-    local f text files used i
+    local f text files used
     for f in ${fs[@]} ; do
         text="$(cat "$f")" @TRET
-        files=({"${f}_imgs",.ob-jupyter}/*(D.N))
+        files=({"${f}_imgs","${f:h}/.ob-jupyter"}/*(D.N))
         files=(${(@f)"$(arrnn "${files[@]}" |
-                          inargsf re 'grealpath --')"})
+                          inargsf re 'grealpath --')"}) @TRET
 
-        used=(${(@f)"$(ec "$text" |
+        if used="$(ec "${text}" |
                          org-link-extract-file |
-                         rg "\.(${(j.|.)image_formats})\$" |
-                         { cd "${f:h}" && inargsf re 'grealpath --' })"}) @TRET
+                         rg "\.(${(j.|.)image_formats})\$")" ; then
+            used=(${(@f)"$(ec "${used}" |
+                         { cd "${f:h}" && inargsf re 'grealpath --canonicalize-missing --' })"}) @TRET
+        else
+            used=()
+        fi
 
         # dact var-show files
         # dact var-show used
