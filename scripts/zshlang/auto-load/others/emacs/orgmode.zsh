@@ -77,7 +77,7 @@ function org-update-files-all {
         for d in ${places[@]} ; do
             fd-org . "$d"
         done
-     } | inargsf org-update-files
+    } | inargsf org-update-files
     # emc-eval "(org-id-locations-save)" # @idk if this is needed, I think it's done automatically
     ##
     # org-update-files "$nightNotes"/**/*.org
@@ -302,7 +302,7 @@ function org-link-extract {
 
     cat-paste-if-tty |
         rget_replace="$format" ugrep_get_format="$format" revaldbg "$rget_e[@]" "${opts[@]}" \
-        -e '(?:\s*(?:\*|-|\+)\s*)?(.*(?<!\\)(?:\[|<)('${link_type}'(?:[^][]|\\\[|\\\])+)(?<!\\)(?:\]|>).*)' |
+            -e '(?:\s*(?:\*|-|\+)\s*)?(.*(?<!\\)(?:\[|<)('${link_type}'(?:[^][]|\\\[|\\\])+)(?<!\\)(?:\]|>).*)' |
         cat-copy-if-tty
 }
 
@@ -343,11 +343,19 @@ function org-export-raw {
     local ret=0 inargs=()
     in-or-args3 "$@" @RET
 
-    local f f_q
+    local f f_q res
     for f in ${inargs[@]} ; do
         f_q="$(emc-quote "$f")" @TRET
 
-        emc-eval "(night/org-export-file-to-html ${f_q})" || ret=$?
+        if res="$(emc-eval "(night/org-export-file-to-html ${f_q})")" ; then
+            if [[ "${res}" == 'nil' ]] ; then
+                ret=1
+            else
+                ec "${res}"
+            fi
+        else
+            ret=$?
+        fi
     done
 
     return $ret
@@ -356,11 +364,14 @@ function org-export-raw {
 function h-org-export-recursive {
     #: This function cannot be directly called. Use `org-export-recursive'.
     assert test -n "$storage_key_root" @RET
+    local root_dir="${org_export_root_dir:a}" #: =:a= normalizes the path, returns empty string for empty input
 
     local fs=($@)
 
-    local f f_hashed id_link file_link text h outs exported_file
+    local f f_hashed id_link file_link file_links text h outs exported_file
     for f in ${fs[@]} ; do
+        file_links=()
+
         f_hashed="$(md5m "$f")" @TRET
         h="$(md5-file "$f")" @TRET
         h_last="$(redism hget "${storage_key_hashes}" "${f_hashed}")" || true
@@ -396,18 +407,26 @@ function h-org-export-recursive {
             file_link="$(emc-eval "(night/org-id-path-get $(emc-quote "$id_link"))")" @TRET
 
             if [[ "$file_link" == nil ]] ; then
-                ecerr "$0: got a nil file_link for id: ${id_link}"
+                ecerr "$0: ID not found: ${id_link}"
                 return 1
+            fi
+
+            file_link="${file_link:a}"
+
+            if test -n "${root_dir}" && [[ ! "${file_link}" == "${root_dir}"* ]] ; then
+                ecgray "$0: skipped file out of root dir: ${file_link}"
+                continue
             fi
 
             outs+="$("$0" "$file_link")"$'\n' @TRET
         done
 
-        file_links=( ${(@f)"$(ec "$text" | { org-link-extract-file || true } | { rg '\.org(?:::.*)?$' || true } )"}) @TRET
+        file_links+=( ${(@f)"$(ec "$text" | { org-link-extract-file || true } | { rg '\.org(?:::.*)?$' || true } )"}) @TRET
         for file_link in ${file_links[@]} ; do
             outs+="$("$0" "$file_link")"$'\n' @TRET
         done
 
+        outs+="$(org-img-used "$f")" @TRET
         outs="$(ec "$outs" | duplicates-clean)"$'\n' @TRET
         assert sout redism hset "${storage_key_outs}" "${f_hashed}" "${outs}" @RET
         ec "$outs"
@@ -452,7 +471,7 @@ function org-id2ss {
                     { rg "${semanticscholar_url_regex}" || true }
             fi
         done
-     } |
+    } |
         duplicates-clean |
         cat-copy-if-tty
 }
@@ -461,8 +480,8 @@ function id2ss-csv {
     bella_zsh_disable1
 
     withemcgui org-id2ss "$@" |
-    inargsf semantic-scholar-get --adder FM --format csv --flat |
-    pbcopy
+        inargsf semantic-scholar-get --adder FM --format csv --flat |
+        pbcopy
 
     bello
 }
@@ -494,7 +513,7 @@ function org-html-postprocess {
     #: perl v5.34: Lookbehind longer than 255 not implemented
     # cat-paste-if-tty |
     #     perl -CS -Mexperimental=vlb -ple \
-    #         's/(?<=\s|(*nlb:class="(?:[^"]{0,75}\s)?todo(?:\s[^"]{0,75})?"[^>]{0,75})>)(@(?:\w|\/|\d|[][(),.;'\''])+)(?=\s|<)/<span class="todo at_tag">$1<\/span>/g' |
+        #         's/(?<=\s|(*nlb:class="(?:[^"]{0,75}\s)?todo(?:\s[^"]{0,75})?"[^>]{0,75})>)(@(?:\w|\/|\d|[][(),.;'\''])+)(?=\s|<)/<span class="todo at_tag">$1<\/span>/g' |
     #     cat-copy-if-tty
     ##
 }
@@ -539,7 +558,7 @@ function org-log-date-get {
     # @todo avoid reloading the code, it can reduce the time to ~0.9s, which is the best we can get with the Clojure kernel
     local code=''
     if ! bool "$already_loaded" ; then
-       code+="$(ec ; cat "$script")" @TRET
+        code+="$(ec ; cat "$script")" @TRET
     else
         ecgray "$0: skipping (re)loading"
     fi
@@ -576,11 +595,11 @@ function cutestarsabove {
     local query=("$@") \
         p_opts=("${cutestarsabove_po[@]}") \
         n="${cutestarsabove_n:-4000}"
-        fd_query="${cutestarsabove_fq:-.}"
+    fd_query="${cutestarsabove_fq:-.}"
 
     {
-    reval-ec fd-org "${fd_query}" "$PWD" | reval-ec parad -N "$n" --pipe "$p_opts[@]" cutestarsabove.pl "$query[@]"
-    # add --dry-run to see how many jobs it runs
+        reval-ec fd-org "${fd_query}" "$PWD" | reval-ec parad -N "$n" --pipe "$p_opts[@]" cutestarsabove.pl "$query[@]"
+        # add --dry-run to see how many jobs it runs
     } always {
         bell-lm-diary-search-fx
     }
@@ -645,7 +664,7 @@ function org-date-extract-due {
             org_link_extract_opts=("$opts[@]" "$files[@]") \
                 org_link_extract_what="$what" \
                 org-date-extract \
-        } || true
+                } || true
     else
         local f date
         for f in $files[@] ; do
@@ -762,18 +781,18 @@ function org-header-rm-shared-level {
 
     local min_level
     if min_level="$(ec "$text" | perl -lne 'm/^(\*+)/ && print length $1' | num-min)" ; then
-       min_level=$(( min_level - 1 ))
+        min_level=$(( min_level - 1 ))
 
-       local min_heading=''
-       while (( $min_level > 0 )) ; do
-           min_level=$(( min_level - 1 ))
+        local min_heading=''
+        while (( $min_level > 0 )) ; do
+            min_level=$(( min_level - 1 ))
 
-           min_heading+='*'
-       done
+            min_heading+='*'
+        done
 
-       if test -n "$min_heading" ; then
-          text="$(ec "$text" | prefixer --remove-prefix="$min_heading")" @TRET
-       fi
+        if test -n "$min_heading" ; then
+            text="$(ec "$text" | prefixer --remove-prefix="$min_heading")" @TRET
+        fi
     fi
 
     ec "$text" | cat-copy-if-tty
@@ -829,6 +848,26 @@ function org-img-unused-trs-i {
         fz | inargsf trs
 }
 
+function org-img-used {
+    local fs=($@)
+
+    local f files used text
+    for f in ${fs[@]} ; do
+        text="$(cat "$f")"
+
+        if used="$(ec "${text}" |
+                     org-link-extract-file |
+                     rg "\.(${(j.|.)image_formats})\$")" ; then
+            used=(${(@f)"$(ec "${used}" |
+                     { cd "${f:h}" && inargsf re 'grealpath --canonicalize-missing --' } )"}) @TRET
+        else
+            used=()
+        fi
+
+        arrnn "${used[@]}"
+    done
+}
+
 function org-img-unused {
     #: * @seeAlso
     #: ** [agfi:org-img-unused-trs-i]
@@ -836,24 +875,13 @@ function org-img-unused {
     ##
     local fs=($@)
 
-    local f text files used
+    local f files used
     for f in ${fs[@]} ; do
-        text="$(cat "$f")" @TRET
         files=({"${f}_imgs","${f:h}/.ob-jupyter"}/*(D.N))
         files=(${(@f)"$(arrnn "${files[@]}" |
                           inargsf re 'grealpath --')"}) @TRET
 
-        if used="$(ec "${text}" |
-                         org-link-extract-file |
-                         rg "\.(${(j.|.)image_formats})\$")" ; then
-            used=(${(@f)"$(ec "${used}" |
-                         { cd "${f:h}" && inargsf re 'grealpath --canonicalize-missing --' })"}) @TRET
-        else
-            used=()
-        fi
-
-        # dact var-show files
-        # dact var-show used
+        used=(${(@f)"$(org-img-used "$f")"}) @RET
 
         arrnn ${(@)files:|used}
     done
@@ -891,7 +919,7 @@ function strip-ic-lines {
 }
 ##
 function strip-wikipedia-citations {
-     in-or-args "$@" |
+    in-or-args "$@" |
         perl -CS -lpe 's/\[\d+\]//g' |
         cat-copy-if-tty
 }
@@ -945,4 +973,11 @@ function emc-jupyter-with {
     }
 }
 
+##
+function org-remove-inline-images {
+    in-or-args "$@" |
+        perl -ple 's/\[\[data:image.*?\]\]//g' |
+        # perl -nle 'print unless m/^\s*\Q[[data:image\E/' |
+        cat-copy-if-tty
+}
 ##

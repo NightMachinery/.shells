@@ -48,7 +48,7 @@ function lilf-link-notes {
 
 function rsp-notes-export {
     local rsp_include entries=("${@}")
-    rsp_include=(${(@f)"$(org-export-recursive "${entries[@]}" | trim-extension)"}) @TRET
+    rsp_include=(${(@f)"$(org_export_root_dir="${nightNotes}" org-export-recursive "${entries[@]}")"}) @TRET
 
     if (( ${#rsp_include} == 0 )) ; then
         ##
@@ -98,11 +98,29 @@ function rsp-notes {
     local includes=(${(@)rsp_include})
     local includes_cmd=()
     if ((${#includes} >= 1)) ; then
-        includes_cmd=(ugrep -F)
-        local i
-        for i in ${includes[@]} ; do
-            includes_cmd+=(-e "${i}")
-        done
+        if true ; then
+            local pattern_file
+            pattern_file="$(mktemp)" @TRET
+
+            if true ; then
+                arrnn ${includes[@]} > "${pattern_file}"
+                #: [[id:0e2bf436-2574-4169-8b21-722cf0b05d1c][Literal escape sequences do NOT work when read from a file]]
+            fi
+
+            # dact var-show pattern_file
+            includes_cmd=(perl -nle 'BEGIN { open my $fh, "<", shift or die $!; @patterns = <$fh>; chomp @patterns; close $fh } foreach my $pattern (@patterns) { if (/^\Q$pattern\E$/) { print; last } }' "$pattern_file")
+        else
+            #: @deprecated
+            ##
+            includes_cmd=(ugrep -F)
+            local i
+            for i in ${includes[@]} ; do
+                i="${i:r}" #: trim extension
+                includes_cmd+=(-e "${i}")
+                #: This will NOT add `^` or `$`, so if we have included `/a.org`, `/a.org_attachments/...` will also match.
+                #: We are also trimming the extensions, so `/a.js` will also match.
+            done
+        fi
     else
         includes_cmd=(cat)
     fi
@@ -115,29 +133,34 @@ function rsp-notes {
 
     local opts=()
 
-    local exts=( ${image_formats[@]} html css ) #: @Warning Do NOT add org to this list, as then our private :noexport: subtrees will be exposed!
+    local exts=(
+        ${image_formats[@]}
+        html
+        css
+    ) #: @Warning Do NOT add org to this list, as then our private :noexport: subtrees will be exposed!
     local ext
     for ext in ${exts[@]} ; do
         opts+=(--extension "$ext")
     done
 
+    # dact var-show src
     {
-    #: @warning These paths seem to be relative to all included directories. So having 'notes' will cause 'x/notes' to also be included. But I think this will at most cause some empty directories to be copied in our situation, and not files.
-    reval-ec fd -uuu --type=file --full-path \
-        "${opts[@]}" \
-        "$pattern" \
-        "$src" |
-        revaldbg "${includes_cmd[@]}" |
-        prefixer -r "$starting_dir" |
-        prefixer -r "/" |
-        {
-            ec "$src"
-            path-parent-dirs
-        } |
-        duplicates-clean |
-        reval-ec rsp-safe --include-from=- --exclude='*' \
-            "${rsync_opts[@]}" \
-            "$src" "$dest"
+        #: @warning These paths seem to be relative to all included directories. So having 'notes' will cause 'x/notes' to also be included. But I think this will at most cause some empty directories to be copied in our situation, and not files.
+        reval-ec fd -uuu --type=file --full-path \
+            "${opts[@]}" \
+            "$pattern" \
+            "$src" |
+            revaldbg "${includes_cmd[@]}" |
+            prefixer -r "$starting_dir" |
+            prefixer -r "/" |
+            {
+                ec "$src"
+                path-parent-dirs
+            } |
+            duplicates-clean |
+            reval-ec rsp-safe --include-from=- --exclude='*' \
+                "${rsync_opts[@]}" \
+                "$src" "$dest"
     } always { bell-hp3-star-pickup }
 }
 @opts-setprefix rsp-notes rsp
