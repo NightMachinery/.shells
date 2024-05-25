@@ -554,7 +554,9 @@ function rem-today {
                     # Run clean zsh so that  our env doesn't pollute it.
                     ecbold "$0: running $(gq "$f")"
 
-                    out=$'\n\n'"$(env-clean FORCE_INTERACTIVE='' FORCE_NONINTERACTIVE=y zsh "$f" 2>&1)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                    out=$'\n\n'"$(env-clean FORCE_INTERACTIVE='' FORCE_NONINTERACTIVE=y color_p=n zsh "$f" 2>&1 | erase-ansi)" || out+=$'\n\n'"$0: ${(q+)f} returned $?"
+                    #: Even if there is an error, the output is still stored in =out=.
+                    #: E.g., `a= ; a="$(echo hi ; return 1)" || a+=' beautiful' ; echo $a` prints 'hi beautiful'.
 
                     ecbold "$0: finished $(gq "$f")"
                     ##
