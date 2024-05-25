@@ -23,7 +23,7 @@ function zopen {
     local f files=("$@") bell=''
     for f in $files[@] ; do
         test -e "$f" || {
-            ecerr "Nonexistent file: $f"
+            ecerr "$0: nonexistent file: $f"
             continue
         }
         local ext="${f:e:l}" usemime=''
@@ -48,10 +48,11 @@ function zopen {
         if test -n "$usemime" ; then
             local m="$(mimetype2 "$f")"
             case "$m" in
+                inode/x-empty) ecerr "$0: empty file" ;;
                 audio*) zopen-audio "$f" ;;
                 */epub*) zopen-ebook "$f" ;;
                 
-                *) fsay "Unsupported file: $m" ;;
+                *) fsay "Z-Open: unsupported file: $m" ;;
                 # *) open "$f" ;;
                 # Using =open= will cause an infinite loop if =zopen= is the file's default opener!
             esac

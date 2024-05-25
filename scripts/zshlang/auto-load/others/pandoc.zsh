@@ -36,7 +36,7 @@ function org-heading-to-list-item {
 function org2md {
     in-or-args "$@" |
     perl -lpe 's/^(#\+[a-zA-Z]+_example)\s+.*/$1/gi' | #: @upstreamBug pandoc doesn't convert example blocks correctly
-        org2md-raw "$@" |
+        org2md-raw |
         perl -lpe 's/^(```)\s+example$/$1/g' |
         perl -lpe 's/\\([][@])/$1/g' |
         perl -lpe 's/\[{1,2}jalali:([^][]+)\]{1,2}/$1/g' |
@@ -198,6 +198,7 @@ function pandoc-convert {
                         cat
                     fi
                 } |
+                    org-remove-inline-images |
                     perl -CS -lpe 's/^(\s*\d+\.\s+)\[@\d+\]\s/$1/g' |
                     perl -CS -lpe 's{\[cite/t:([^][]+)\]}{$1}g' |
                     perl -CS -lpe 's{^(#\+(?:begin|end)_)example\b}{lc($1) . "src"}ieg' | #: =lc= converts to lower-case

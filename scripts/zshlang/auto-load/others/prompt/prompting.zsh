@@ -24,7 +24,9 @@ function prompt-instruction-input {
             input='```'$'\n'"$input"$'\n''```'
 
         elif [[ "${input_mode}" =~ '^org(?:2md)?$' ]] ; then
-            input="$(ec "$input" | org2md)" @TRET
+            input="$(ec "$input" |
+            org-remove-inline-images |
+            org2md)" @TRET
 
         elif test -z "${input_mode}" || [[ "${input_mode}" =~ '(?i)^none|n$' ]] ; then
             #: do nothing
