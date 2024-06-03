@@ -283,3 +283,50 @@ function img-to-data-uri {
     fi
 }
 ##
+function img-split-vertical-dumb-v1 {
+    #: @alt [[NIGHTDIR:python/img_vertical_split.py]]
+    #: @deprecated
+    ##
+    local input="$1"
+    local max_height="${2:-400}"
+    local output="${3:-${input:r}_.${input:e}}"
+    assert-args input @RET
+
+    local width height
+    width="$(identify -format "%w" "$input")" @TRET
+    height="$(identify -format "%h" "$input")" @TRET
+
+    #: Calculate the number of chunks needed (returns integer)
+    local num_chunks
+    num_chunks=$(( (height + max_height - 1) / max_height ))
+
+    #: Split the image into chunks
+    local y_offset chunk_output
+    for ((i = 0; i < num_chunks; i++)); do
+        y_offset=$(( i * max_height ))
+        chunk_output="${output:r}${i}.${output:e}"
+        assert revaldbg magick convert "$input" -crop "${width}x${max_height}+0+${y_offset}" +repage "$chunk_output" @RET
+        #: @GPT4O `+repage`: This resets the virtual canvas information of the image. After cropping an image, the virtual canvas size and offset might still retain original image settings. Using `+repage` ensures that the output image's dimensions match the cropped dimensions without any offsets.
+
+        ec "${chunk_output}"
+    done
+
+    ecgray "$0: Image split into $num_chunks chunks."
+}
+
+# function img-split-vertical-and-copy {
+#     local input="${1:a}" #: normalizes path
+#     local max_height="${2:-400}"
+#     assert-args input @RET
+
+#     local tmp_dir
+#     tmp_dir="$(gmktemp -d)" @RET
+#     assert pushf "$tmp_dir" @RET
+#     {
+#         img-split-vertical "$input" "$max_height" "$tmp_dir/$(basename "$input")"
+#     } always {
+#         popf
+#         # trs "$tmp_dir"
+#     }
+# }
+##
