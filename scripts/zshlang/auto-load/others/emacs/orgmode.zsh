@@ -349,9 +349,13 @@ function org-export-raw {
 
         if res="$(emc-eval "(night/org-export-file-to-html ${f_q})")" ; then
             if [[ "${res}" == 'nil' ]] ; then
+                ecerr "$0: returned nil: ${f}"
                 ret=1
             else
                 ec "${res}"
+
+                git-rm-smart "${res}"
+                night_git_ignore_file="${res:h}/.gitignore" assert git-ignore "${res:t}" @RET
             fi
         else
             ret=$?
