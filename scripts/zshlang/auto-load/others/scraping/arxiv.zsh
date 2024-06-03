@@ -248,3 +248,15 @@ function arxiv-latex-dl {
     done
 }
 ##
+function arxiv-id-get {
+    local ids=()
+    assert sout arxiv-url-get "$@" @RET
+
+    arrnn "${ids[@]}" |
+        cat-copy-if-tty
+}
+
+function h-emc-arxiv-id-get {
+    arxiv_url_get_redirect_p=n serr arxiv-id-get "$@" || true
+}
+##
