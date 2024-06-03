@@ -7,7 +7,7 @@ function nt-due-init {
         typeset -g nightNotesDueDir=(~nt/private/wallet)
         typeset -ag nightNotesDue=(
             "$nightNotesDueDir"/**/*bills/**/(log|gen).org
-            #: Use =finished log.org= to exclude from here.
+            #: Use =finished log.org=, =log disabled.org= to exclude from here.
         )
     fi
 }

@@ -22,13 +22,20 @@ function zopen-ebook {
 function zopen {
     local f files=("$@") bell=''
     for f in $files[@] ; do
-        test -e "$f" || {
-            ecerr "$0: nonexistent file: $f"
+        local f_orig="$f"
+        if ! test -e "$f" ; then
+            f="$(path-unabbrev "$f")" @TRET
+
+            if ! test -e "$f" ; then
+            ecerr "$0: nonexistent file: ${f_orig}"
             continue
-        }
+            fi
+        fi
+
         local ext="${f:e:l}" usemime=''
         
         local text_exts="(${(j.|.)text_formats})"
+        local video_exts="(${(j.|.)video_formats})"
         
         case "$ext" in
             wav|mp2|mp3|mp3test|m4a|ogg|au|flac)
@@ -42,6 +49,7 @@ function zopen {
                 # chrome-open-pdf "$f"
                 ;;
             ${~text_exts}) emc-nowait2 "$f" ;;
+            ${~video_exts}) awaysh mpv "$f" ;;
             # *) re typ text_exts ext f ; return 0 ;;
             *) usemime=y ;;
         esac

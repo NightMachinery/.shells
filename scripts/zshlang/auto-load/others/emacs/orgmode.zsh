@@ -925,6 +925,8 @@ function strip-wikipedia-citations {
 }
 ##
 function py-escape-triple-quotes {
+    #: @seeAlso [help:night/py-escape-triple-quotes-elisp]
+    #:
     #: @tests
     #: `ec "hi''''" | py-escape-triple-quotes`
     ##
