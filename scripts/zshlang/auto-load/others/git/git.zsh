@@ -603,6 +603,7 @@ function git-p {
     silent git -C "$d" rev-parse --is-inside-work-tree
     #: -C <path>  Run as if git was started in <path> instead of the current working  directory.
 }
+aliasfn git-repo-p git-p
 
 function git-merge-p {
   #: [[https://stackoverflow.com/questions/29101270/how-to-know-if-a-merge-is-ongoing-in-git][How to know if a merge is ongoing in git - Stack Overflow]]

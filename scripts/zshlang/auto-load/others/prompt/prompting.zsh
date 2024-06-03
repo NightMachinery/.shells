@@ -239,8 +239,15 @@ function prompt-rewrite-fluent-selective {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Make the following text more fluent by editing the part marked with `{ ... }`:' "$@"
 }
 
-function prompt-rewrite-stackoverflow {
+function prompt-rewrite-question-stackoverflow {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following question for Stackoverflow. Be concise, to the point, but detailed.' "$@"
+}
+
+function prompt-rewrite-abstract {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the given abstract to be more clear.' "$@"
+}
+function prompt-rewrite-abstract-concise {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the given abstract to be more clear, engaging, and concise.' "$@"
 }
 ##
 function prompt-write-exercise-descpription {

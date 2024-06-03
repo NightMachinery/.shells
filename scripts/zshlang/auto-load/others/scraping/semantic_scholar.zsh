@@ -141,7 +141,8 @@ function semantic-scholar-dl-from-org {
     #     pxa89-local
     # fi
 
-    local tlg_dest="${tlg_dest:-$tlg_ch_books}"
+    local tlg_dest="${ssdl_tlg_dest:-$tlg_ch_books}"
+    local tlg_p="${ssdl_tlg_p:-y}"
 
     local dir="${ss_dl_dir}"
     if test -z "$dir" ; then
@@ -194,30 +195,33 @@ function semantic-scholar-dl-from-org {
     curlm_ns=y reval-ec retry curlm "$url" --output-dir "$dir" --create-dirs -o "${dest}" @RET
     dest="${dir}/${dest}"
 
-    local lock_id="$0"
-    retry_sleep=15 assert lock-aquire-redis-retry "${lock_id}" $((30*60)) @RET
-    setopt localtraps
-    trap "" $exit_traps[@]
-    {
-        #: The subshell allows us to exit via C-c, which we have otherwise disabled via the trap above.
-        (
-            {
-                ec "$org" |
-                    perl -ple 's/\@(?:toread\S*|tosee\S*|CR\b)\s?//g' |
-                    org2tlg "$tlg_dest"
-            } || {
-                ecerr "$0: failed to send the description to Telegram"
-                return 1
-            }
+    if bool "${tlg_p}" ; then
+        local lock_id="$0"
+        retry_sleep=15 assert lock-aquire-redis-retry "${lock_id}" $((30*60)) @RET
+        setopt localtraps
+        trap "" $exit_traps[@]
+        {
+            #: The subshell allows us to exit via C-c, which we have otherwise disabled via the trap above.
+            (
+                {
+                    ec "$org" |
+                        perl -ple 's/\@(?:toread\S*|tosee\S*|CR\b)\s?//g' |
+                        org2tlg "$tlg_dest"
+                } || {
+                    ecerr "$0: failed to send the description to Telegram"
+                    return 1
+                }
 
-            reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
-        )
-    } always {
-        lock-release-redis "${lock_id}"
-        trap - $exit_traps[@]
-    }
+                reval-env-ec tlg_dest="$tlg_dest" retry_sleep=10 retry-limited 10 tsendf-book "$dest"
+            )
+        } always {
+            lock-release-redis "${lock_id}"
+            trap - $exit_traps[@]
+        }
+    fi
 }
 aliasfn ssdl semantic-scholar-dl-from-org
+@opts-setprefix semantic-scholar-dl-from-org ssdl
 
 function semantic-scholar-get-and-dl {
     # if should-proxy-p ; then

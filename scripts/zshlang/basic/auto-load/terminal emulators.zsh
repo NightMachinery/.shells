@@ -46,7 +46,7 @@ function title {
 }
 
 function tty-title {
-    isI || return
+    isI || return 0
     local text="$@"
 
     title "$text" "$text"

@@ -1,5 +1,5 @@
 ##
-function sync-append() {
+function sync-append {
     # flock alts:
     # zsystem flock
     # lockfile (part of the procmail package)

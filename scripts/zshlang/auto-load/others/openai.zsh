@@ -35,6 +35,7 @@ function openai-cost-by-tokens {
             [gpt-4o]=0.005
 
             [claude-3-opus]=0.015
+            [${c3o_model_name}]=0.015
         )
     elif [[ "${mode}" == output ]] ; then
         model_costs=(
@@ -48,6 +49,7 @@ function openai-cost-by-tokens {
             [gpt-4o]=0.015
 
             [claude-3-opus]=0.075
+            [${c3o_model_name}]=0.075
         )
     else
         # ecerr "$0: unknown mode: $mode"
@@ -333,22 +335,24 @@ function llm-send {
     }
     output_token_count="$(ecn "${output}" | token_count_model="${model}" openai-token-count)" @TRET
     output_cost="$(openai-cost-by-tokens "${model}" output "${output_token_count}")" @TRET
-    total_cost=$(( ${input_cost:-0} + ${output_cost:-0} )) @TRET
+    if test -n "${output_cost}" && test -n "${input_cost}" ; then
+        total_cost=$(( ${input_cost} + ${output_cost} )) @TRET
 
-    local n20
-    n20=$(( 20 / ${total_cost} )) @TRET
-    local n20_daily=$(( n20 / 30 ))
+        local n20
+        n20=$(( 20 / ${total_cost} )) @TRET
+        local n20_daily=$(( n20 / 30 ))
 
-    {
-        colorfg "$gray[@]"
+        {
+            colorfg "$gray[@]"
 
-        #: We could prefix this with another '\n', but it makes things ugly.
-        printf '-----------\nOutput Tokens: %d\nTotal Cost: $%.3f = $%.3f + $%.3f, $20 Buys: %.1f (Daily: %.1f)\n' ${output_token_count} ${total_cost} ${input_cost} ${output_cost} ${n20} ${n20_daily} |
-            numfmt-comma | cat
-        #: =numfmt-comma= will copy if its output is a tty.
+            #: We could prefix this with another '\n', but it makes things ugly.
+            printf '-----------\nOutput Tokens: %d\nTotal Cost: $%.3f = $%.3f + $%.3f, $20 Buys: %.1f (Daily: %.1f)\n' ${output_token_count} ${total_cost} ${input_cost} ${output_cost} ${n20} ${n20_daily} |
+                numfmt-comma | cat
+            #: =numfmt-comma= will copy if its output is a tty.
 
-        resetcolor
-    } >&2
+            resetcolor
+        } >&2
+    fi
 }
 
 function llm-3t {
@@ -394,12 +398,13 @@ aliasfn reval-to-gpt4o reval-to llm-4o
 aliassafe rl4o='\noglob reval-to-gpt4o'
 aliassafe 4o='\noglob reval-to-gpt4o'
 
+typeset -g c3o_model_name='or:c3o'
 function llm-c3o {
-    llm_model=claude-3-opus llm-send "$@"
+    llm_model="${c3o_model_name}" llm-send "$@"
 }
 aliassafe c3o='\noglob llm-c3o'
 function llm-c3o-chat {
-    llm_model=claude-3-opus llm-m chat "$@"
+    llm_model="${c3o_model_name}" llm-m chat "$@"
 }
 aliasfn reval-to-c3o reval-to llm-c3o
 aliassafe rc3o='\noglob reval-to-c3o'

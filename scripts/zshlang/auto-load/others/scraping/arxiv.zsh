@@ -25,6 +25,7 @@ function arxiv-url-get {
     local urls
     urls="$(in-or-args "$@")" @RET
     urls=(${(@f)urls})
+    local redirect_p="${arxiv_url_get_redirect_p:-y}"
 
     local url id doi_id acl_id retcode=0
     for url in $urls[@] ; do
@@ -69,12 +70,15 @@ function arxiv-url-get {
                 acl_id="$(ec "$acl_id" | perl -ple 's/\.pdf$//g' )" @TRET
                 urls_semantic_scholar+="https://api.semanticscholar.org/ACL:${acl_id}"
                 break
-            elif ! bool "$redirected_p" ; then
-                url="$(urlfinalg "$url")" @TRET
+            elif ! bool "${redirected_p}" ; then
+                redirected_p=y
+                url="$(revaldbg urlfinalg "$url")" @TRET
                 continue
             else
                 ecerr "$0: bad URL $(gq "$url")"
                 retcode=1
+
+                break
             fi
             ids+="$id"
             urls_pdf+="https://export.arxiv.org/pdf/${id}"

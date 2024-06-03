@@ -48,13 +48,13 @@ function h_mpv-args {
             if test -z "$first" ; then
                 first="${i:t}"
             fi
-            args+="$(grealpath --canonicalize-existing -- "$i")"
+            args+="$(grealpath --canonicalize-existing -- "$i")" @TRET
         else
             args+="$i"
         fi
     done
 
-    tty-title "$first"
+    tty-title "$first" || true
 }
 
 
@@ -75,7 +75,7 @@ function mpv {
     fi
 
     local args=()
-    h_mpv-args "$@" @RET
+    assert h_mpv-args "$@" @RET
     set --
 
     revaldbg $proxyenv command-mpv $opts[@] --sub-auto=fuzzy --fs --input-ipc-server="$mpv_ipc" "${(@)args}"
