@@ -15,6 +15,9 @@ function rename-pipe {
 
     local f new_path
     for f in $files[@] ; do
+        f="${f%%/##}"
+        #: `%%/##`: `%%` removes longest match, `##` is like `+` in regex
+
         new_path="$(ec "$f" | reval "$cmd[@]")" @TRET
 
         if [[ "$new_path" != "$f" ]] ; then
