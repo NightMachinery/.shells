@@ -378,3 +378,17 @@ function fd-size {
         gsort -rh | tac
 }
 ##
+function file-ends-with-newline-p {
+    local file="$1"
+    if [[ ! -s "$file" ]]; then
+        #: If the file doesn't exist or it is empty, we can concat material to it without needing to add a newline, so return true.
+        return 0
+    fi
+
+    #: If the last char is a newline, it will be stripped away and we will be left with an empty string:
+    [[ "$(tail -c 1 "$file")" == "" ]] ; return $?
+    ##
+    # perl -e 'exit((`tail -c 1 $ARGV[0]` eq "\n") ? 0 : 1)' -- "$file" ; return $?
+    ##
+}
+##

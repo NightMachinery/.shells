@@ -202,8 +202,24 @@ alias glum='git pull upstream master'
 alias gwch='git whatchanged -p --abbrev-commit --pretty=medium'
 alias gwip='git add -A; git rm $(git ls-files --deleted) 2> /dev/null; git commit --no-verify -m "--wip-- [skip ci]"'
 ##
-aliasfn git-rm git rm --cached
+function git-rm {
+  git rm --cached "$@"
+}
 alias grm='git-rm'
+
+function git-rm-smart {
+  local paths=($@)
+
+  local f
+  for f in "${paths[@]}" ; do
+    if git-p "${f:h}" ; then
+      assert git -C "${f:h}" rm -r --cached --ignore-unmatch --quiet -- "${f}" @RET
+      #: -r: Allow recursive removal when a leading directory name is given.
+      #: --ignore-unmatch: Exit with a zero status even if no files matched.
+    fi
+  done
+}
+
 alias glcs='glc --depth=1'
 ###
 function git-status-summary() {
@@ -631,5 +647,23 @@ function git-link {
 
     ec "${github_url}/${remote_url#*:}/blob/${branch}/${file}"
   done | cat-copy-if-tty
+}
+##
+function git-ignore {
+  local patterns=("$@")
+  local gitignore_file="${night_git_ignore_file:-.gitignore}"
+
+  local pattern
+  for pattern in "${patterns[@]}"; do
+    #: Check if the pattern is already in the .gitignore file
+    #: --line-regexp:  When enabled, ripgrep will only show matches surrounded by line  boundaries. This is equivalent to surrounding every pattern with ^ and  $. In other words, this only prints lines where the entire line  participates in a match.
+    if test -e "${gitignore_file}" && rg --fixed-strings --line-regexp --quiet "$pattern" "${gitignore_file}"; then
+      ecgray "$0: Pattern '$pattern' already exists in ${gitignore_file}"
+    else
+      assert sync-append-with-newline "${gitignore_file}" "$pattern" @RET
+
+      ecgray "$0: Pattern '$pattern' added to ${gitignore_file}"
+    fi
+  done
 }
 ##
