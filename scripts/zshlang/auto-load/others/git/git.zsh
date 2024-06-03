@@ -660,7 +660,7 @@ function git-ignore {
     if test -e "${gitignore_file}" && rg --fixed-strings --line-regexp --quiet "$pattern" "${gitignore_file}"; then
       ecgray "$0: Pattern '$pattern' already exists in ${gitignore_file}"
     else
-      assert sync-append-with-newline "${gitignore_file}" "$pattern" @RET
+      assert sync-append-with-newline "${gitignore_file}" "$pattern"$'\n' @RET
 
       ecgray "$0: Pattern '$pattern' added to ${gitignore_file}"
     fi
