@@ -1,4 +1,41 @@
 ##
+function eval-on-fullhosts {
+    local code
+    code="$(cat-paste-if-tty)" @RET
+
+    local hosts=( $@ )
+    if (( ${#hosts} == 0 )) ; then
+        hosts=(
+            pino
+            c0
+            mmd1
+            t21
+            m15-hpc
+            m17-hpc
+        )
+    fi
+
+    SHARED_ROOT="/opt/decompv"
+    for fullhost in ${hosts[@]} ; do
+        ec-sep-h
+        ec "fullhost: ${fullhost}"$'\n'
+
+        if eval-ec "${code}" ; then
+        else
+            ecerr "$0: failed for fullhost=${fullhost}."
+
+            if isDeus ; then
+                ecgray "continuing to the next server (Deus Mode) ..."
+
+            else
+                ecgray "aborting"
+
+                return 1
+            fi
+        fi
+    done
+}
+##
 redis-defvar seg_result_input_file
 
 function h-seg-result-load {
