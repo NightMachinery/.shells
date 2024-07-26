@@ -546,12 +546,13 @@ function rem-today {
 
     local text=""
 
-    (
-        cd "$remindayDir/"
+
+    pushf "$remindayDir/"
+    {
         if git-merge-p ; then
             text+=$'\n\n'"Reminder directory is in an active merge!"
         fi
-    )
+    } always { popf }
 
     local today
     rem-todaypaths
