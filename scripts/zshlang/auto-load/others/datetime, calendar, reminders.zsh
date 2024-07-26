@@ -544,10 +544,18 @@ function rem-today {
     ensure-dir "$remindayDir/"
     ensure-dir "$remindayBakDir/"
 
+    local text=""
+
+    (
+        cd "$remindayDir/"
+        if git-merge-p ; then
+            text+=$'\n\n'"Reminder directory is in an active merge!"
+        fi
+    )
+
     local today
     rem-todaypaths
 
-    local text=""
     local f bak res
     for f in $today[@] ; do
         if test -e "$f" ; then
@@ -568,6 +576,7 @@ function rem-today {
                     ##
                     text+=$'\n\n'"$out" # will be interpreted in markdown; Escape it perhaps? The power is nice though.
                 fi
+
             elif [[ "$ext" == bak ]] ; then
                 #: These are always =.zsh.bak= files, as we don't add the =.bak= suffix for text files in [agfi:rem-trs].
                 ##
