@@ -211,8 +211,9 @@ async def discreet_send(
                             reply_to=(last_msg),
                         )
                         break
-                    except Exception as e:
-                        await handle(e, attempt, max_retries, verbosity)
+
+                    except Exception as err:
+                        await handle(err, attempt, max_retries, verbosity)
 
                 s = e
                 e = s + 4000
@@ -419,6 +420,8 @@ async def tsend(arguments):
                     .get_updates_proxy_url(proxy_url)
                     .build()
                 )
+                # PTBDeprecationWarning: Deprecated since version 20.7: `ApplicationBuilder.proxy_url` is deprecated. Use `ApplicationBuilder.proxy` instead.
+
                 bot = app.bot
             else:
                 bot = telegram.Bot(token)
@@ -452,18 +455,28 @@ async def tsend(arguments):
                         message=message,
                         parse_mode=parse_mode,
                     )
-        else:
+        else:  #: Telethon backend
             from telethon import TelegramClient
 
-            # print("telethon used")
+            # print("Telethon used")
             proxy = pysocks_proxy_from_env()
-            async with TelegramClient(
-                str(Path.home()) + "/alice_is_happy",
-                api_id,
-                api_hash,
-                proxy=proxy,
-            ) as client:
 
+            client_params = dict(
+                api_hash=api_hash,
+                api_id=api_id,
+                proxy=proxy,
+            )
+            client_params["session"] = str(Path.home()) + "/alice_is_happy"
+            client = TelegramClient(**client_params)
+
+            if token:
+                # ic(token)
+                await client.start(bot_token=token)
+
+            else:
+                await client.start()
+
+            try:
                 # print(arguments)
                 if arguments["--parse-mode"] == "html":
                     arguments["<message>"] = re.sub(
@@ -480,6 +493,10 @@ async def tsend(arguments):
                     link_preview=arguments["--link-preview"],
                     album_mode=(not arguments["--no-album"]),
                 )
+
+            finally:
+                await client.disconnect()
+
     finally:
         if lock:
             await lock_release(
