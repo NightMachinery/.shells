@@ -687,6 +687,7 @@ function git-merge-p {
   # test -e "$(git rev-parse --git-dir)"/MERGE_HEAD
   ##
   git rev-parse -q --verify MERGE_HEAD &> /dev/null
+  return $?
   ##
   #: @test
   # cdtmp
