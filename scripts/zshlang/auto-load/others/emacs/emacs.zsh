@@ -12,10 +12,12 @@ function emc-sudo() {
 }
 ##
 function doom-sync {
-    : "-u updates as well"
+    #: -u: Update all installed packages after syncing.
+    #: -U: Don't update any packages.
+    #: -!, --force: Suppress prompts by auto-accepting their consequences.
 
     rust-setup
-    doom sync "$@"
+    doom sync -U "$@"
 }
 ##
 function emcpe {
@@ -406,6 +408,8 @@ function emc-html-viewer() {
 }
 ##
 function undo-fu-cache-clear {
+    #: @alt [help:undo-fu-clear-all] (in the latest version)
+    ##
     trs ~/.emacs.d/.local/cache/undo-fu-session/*(DN)
 }
 ##

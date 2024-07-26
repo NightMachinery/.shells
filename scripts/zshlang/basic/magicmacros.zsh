@@ -29,7 +29,7 @@ alias '@deprecated'='ecgray "$0: deprecated"'
 
 alias '@placeholder'='ectrace "$0: this code is in the middle of editing; aborting." @RET'
 ##
-function magic_h() {
+function magic_h {
     : 'Usage: magic ... ; mret'
     : 'Does not access stdin, which makes it less buggy. E.g., "arger 1 2 3|fz |stdinmagic" hangs. https://unix.stackexchange.com/questions/585941/zsh-weird-behavior-bug-in-reading-stdin '
 
@@ -132,9 +132,10 @@ function fn-line-test() {
 
     reval h_fn-line-test B 2
 }
-function fn-isTop() {
+
+function fn-isTop {
     local caller=( "${@}" ) prefixes=( ${fn_isTop_p[@]} ) reverse="${fn_isTop_r}"
-    local caller_name="$(fn-name 3)" # funcstack_excluded_names is itself used in fn-name, so we have to get this before polluting it
+    local caller_name="$(fn-name 3)" #: funcstack_excluded_names is itself used in fn-name, so we have to get this before polluting it
     local funcstack_excluded_names=( ${funcstack_excluded_names[@]} ${fn_isTop_x[@]} )
     local funcstack_excluded_prefixes=( ${funcstack_excluded_prefixes[@]} ${fn_isTop_xp[@]} )
 
@@ -171,16 +172,28 @@ function fn-isTop() {
         fi
     done
     if bool "$reverse" ; then
-        # requested parent not found
+        #: requested parent not found
         return 1
     else
         ectrace "$0: @impossible funcstack exhausted"
         return 1
     fi
 }
-function re-val() {
+
+function re-val {
     : "A function used to test fn-isTop"
 
     reval "$@"
+}
+##
+function h-disallow-interactive-call {
+    #: You can use `h-disallow-interactive-call @RET` to make functions callable only by other functions, not by the user directly.
+    ##
+    if fn-isTop ; then
+        ecgray 'calling me interactively is disallowed!'
+        return 1
+    else
+        # ecgray "$0: not top"
+    fi
 }
 ##

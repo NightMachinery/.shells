@@ -32,7 +32,7 @@ function ntag-lv-nocolor() {
         ec $vids
     fi
 }
-function ntag-lv() {
+function ntag-lv {
     if isI && istty ; then
         ntag-lv-nocolor "$@" | ntag-color | rtl-reshaper
     else
@@ -40,7 +40,8 @@ function ntag-lv() {
     fi
 }
 @opts-setprefix ntag-lv-nocolor ntag-lv
-function openv() {
+##
+function openv {
     local dirs=(${openv_dirs[@]}) query="$(fz-createquery "$@")"
     test -z "$dirs[*]" && dirs=(.)
     @opts nopriority '' @ ntag-lv "$dirs[@]" | fzf_mru_context="$0_${(@F)dirs}" fzf_mru_count=10 fz-ntag --tiebreak=end,length --delimiter / --with-nth  -3..-1 --query "$query" --preview-window down:4:wrap | inargsf play-tag
@@ -49,28 +50,30 @@ function delenda() {
     ntag-filterori red green aqua teal gray grey | inargsf trs
 }
 ##
-function zv() {
+function zv {
     local q="$1" ; (( $#@ >= 1 )) && shift
     local query=("$@")
 
     if test -n "$q" ; then
         indir "$q" openv $query[@]
     else
-        @opts dirs [ \
-            ~/base/cache \
-            ~/base/Lectures \
-            ~/base/series \
-            ~/Base/'animated series' \
-            ~/base/anime \
-            ~/"base/_Local TMP" \
-            ~/base/docu \
-            ~/base/movies \
-            ~/base/dls \
-            ~/Downloads \
-            ~vol/hyper-diva/video \
-            ] @ openv $query[@]
+        local openv_dirs=(
+            ~/base/cache
+            ~/base/series
+            ~/Base/'animated series'
+            ~/base/anime
+            ~/"base/_Local TMP"
+            ~/base/docu
+            ~/base/movies
+            ~/base/dls
+            ~/Downloads
+            ~vol/hyper-diva/video
+            # ~/base/Lectures
+        )
+
+        openv $query[@]
         # ~/base/V \
-    fi
+            fi
 }
 aliasfnq zvv zv ''
 aliasfn r2 incache openv

@@ -43,7 +43,7 @@ function hi10-cook() {
     ec-copy "tmux new -s $(gq "$title") zsh -c $(gq "$cmd")"
 }
 ##
-function hi10-ng() {
+function hi10-ng {
     mdoc "$0 <url-of-hi10-page> [<regex>]
 Use hi10-cook to copy the necessary command for pasting in a remote server." MAGIC
     local url="$1" dest="${hi10_ng_dest}"
@@ -89,11 +89,13 @@ function hi10-multilink() {
     arrN "${(@u)pArgs}" | fz | tee "hi10-links.txt" | hi10-dl # (u) makes the array elements unique.
 }
 
-function hi10-dl() {
-    magic mdoc "$0 < links.txt
-Generates jtokens for links and downloads them." ; mret
+function hi10-dl {
+    #: `hi10-dl < hi10-links.txt`
+    #     magic mdoc "$0 < hi10-links.txt
+    # Generates jtokens for links and downloads them." ; mret
+    ##
 
-    inargsf mapg '$i$(hi10-jtoken)' | inargsf rgeval aa -j2 -Z
+    inargsf mapg '$i$(hi10-jtoken)' | inargsf rgeval $proxyenv aa -j2 -Z
 
     bell-dl
 }

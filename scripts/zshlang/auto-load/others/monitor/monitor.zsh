@@ -14,6 +14,11 @@ function fftop {
 }
 # aliasfn pt fftop # process-top
 ##
+function cpu-core-count {
+    nproc
+    #: part of GNU coreutils
+}
+
 function cpu-usage-get() {
     ps -A -o %cpu | awk '{s+=$1} END {print s "%"}'
 }

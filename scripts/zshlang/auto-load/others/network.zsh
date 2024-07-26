@@ -115,7 +115,7 @@ function myip-linux() {
     hostname -I | awk '{print $1}'
 }
 
-function myip() {
+function myip {
     # these are all slow in Iran. If we could find some bloody Iranian service ...
     # https://iranwebmaster.net/t/ip/260
     
@@ -125,6 +125,7 @@ function myip() {
         myip-google
     fi
 }
+aliasfn ip-get myip
 ##
 # @fast Akamai approximate; not reliable for isIran.
 # NOTE: This returns only an approximate IP from your block,

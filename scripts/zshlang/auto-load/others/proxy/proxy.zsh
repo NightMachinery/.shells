@@ -22,7 +22,7 @@ else
 fi
 
 # alias pxs-maybe='isIran && pxs-local'
-alias pxs-maybe='isLocal && pxs-local'
+alias pxs-maybe='proxy-auto-p && pxs-local'
 function reval-pxs() {
     reval pxs "$@"
 }
@@ -62,7 +62,7 @@ pxa-create 2098 pxa2098
 pxa-create 10809 pxateias 10.2.32.28
 
 # alias pxa-maybe='isIran && pxa-local'
-alias pxa-maybe='isLocal && pxa-local'
+alias pxa-maybe='proxy-auto-p && pxa-local'
 
 function reval-pxa {
     pxa reval "$@"
@@ -343,11 +343,12 @@ function proxy-widget() {
 # aliasfn proxy-widget-refresh btt-refresh '$proxy_widget_uuid'
 proxy-widget-refresh() { btt-update $proxy_widget_uuid "$(proxy-widget)" }
 ##
-function proxy-git-on() {
+function proxy-git-on {
     : "You need to set the appropriate SSH proxies, too"
     git config --global http.proxy socks5h://127.0.0.1:"${1:-1081}"
 }
-function proxy-git-off() {
+
+function proxy-git-off {
     git config --global --unset http.proxy
 }
 ##

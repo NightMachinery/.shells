@@ -108,7 +108,7 @@ from pynight.common_llm import (
     conversations,
     # llm_models,
 )
-from pynight.common_spacy import spacy_sentencizer, spacy_sentencizer_fa
+# from pynight.common_spacy import spacy_sentencizer, spacy_sentencizer_fa
 
 
 openai_client = setup_openai_key()

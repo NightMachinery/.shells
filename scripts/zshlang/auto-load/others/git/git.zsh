@@ -202,6 +202,15 @@ alias glum='git pull upstream master'
 alias gwch='git whatchanged -p --abbrev-commit --pretty=medium'
 alias gwip='git add -A; git rm $(git ls-files --deleted) 2> /dev/null; git commit --no-verify -m "--wip-- [skip ci]"'
 ##
+function gss-mods {
+  local res
+  res="$(gss "$@")" @RET
+  ec "$res"
+  ec-sep-h
+  ec "$res" | rg -v '^A '
+}
+alias gssm=gss-mods
+
 function git-rm {
   git rm --cached "$@"
 }
@@ -290,7 +299,7 @@ function git-commitmsg {
         # zmodload zsh/zle
         # vared -p "msg (use =ESC d d= to clear): " msg @RET
         ##
-        msg="$(vared-py "msg: " "$msg")" @RET
+        msg="$(vared-m "msg: " "$msg")" @RET
         ec "$msg"
       else
         ec "${msg[1,300]} ..."
@@ -665,5 +674,20 @@ function git-ignore {
       ecgray "$0: Pattern '$pattern' added to ${gitignore_file}"
     fi
   done
+}
+##
+#: @duplicateCode/b5bd9b0856024ac4d9a4c454de6be2a4
+function git-clean-p {
+  git diff-index --quiet HEAD --
+  #: --quiet  Disable all output of the program. Implies --exit-code.
+  #: --exit-code  Make the program exit with codes similar to diff(1). That is, it  exits with 1 if there were differences and 0 means no differences.
+}
+
+function git-dirty-p {
+  ! git-clean-p
+}
+##
+function git-merge-p {
+  git rev-parse -q --verify MERGE_HEAD &> /dev/null
 }
 ##

@@ -207,8 +207,9 @@ function _crash_global_exception_handler() {
   return $state_code
 }
 ##
-typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 p command_not_found_handler )
-typeset -ag funcstack_excluded_prefixes=( reval eval geval rgeval seval memoi-eval ensure assert ec- ecdate ecerr ecnerr redo- )
+typeset -ag funcstack_excluded_names=( @opts h_@opts ectrace reval '(eval)' ensure ensure-dbg ensure-args assert assert-args assert-dbg redo redo2 p command_not_found_handler h-disallow-interactive-call )
+typeset -ag funcstack_excluded_prefixes=( reval eval geval rgeval seval memoi-eval ensure assert ec- ecdate ecerr ecnerr redo- tmp_block_ )
+#: `tmp_block_` is used by brish.
 
 function funcstack_excluded_prefixes_glob() {
   ec "(${(@j.|.)funcstack_excluded_prefixes})*"

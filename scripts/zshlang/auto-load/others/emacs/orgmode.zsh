@@ -891,6 +891,13 @@ function org-img-unused {
     done
 }
 ##
+function strip-prefixed-hash-comment {
+    in-or-args "$@" |
+        perl -CS -lpe 's/^(\s*)#:? ?/$1/g' |
+        #: ` +` is for unified diff.
+        cat-copy-if-tty
+}
+
 function strip-prefixed-colons {
     in-or-args "$@" |
         perl -CS -lpe 's/^:(?: \+?|$)//g' |
@@ -940,45 +947,90 @@ function py-escape-triple-quotes {
         cat-copy-if-tty
 }
 
+function py-unescape-triple-quotes {
+    #: @seeAlso [help:night/py-escape-triple-quotes-elisp]
+    #:
+    #: @tests
+    #: `ec "hi''''" | py-escape-triple-quotes`
+    ##
+    cat-paste-if-tty |
+        perl -lpe 's/(*nlb:\\)\\'"(*pla:(?:\"|'){3})"'/ /g' |
+        cat-copy-if-tty
+}
+
 function org2md-escape-triple-quotes {
     org2md "$@" |
         py-escape-triple-quotes |
         cat-copy-if-tty
 }
 ##
-function emc-jupyter-with {
-    local f="$1"
+function org-jupyter-with {
     local session="${emc_jupyter_with_session}"
     local kernel="${emc_jupyter_with_kernel}"
-    local engine="${emc_jupyter_with_engine:-emc-open-no-server-tui}"
+
+    local f="$1"
+    local input
+    if test -z "$f" ; then
+        input="$(pbpaste)" @TRET
+    else
+        input="$(cat "$f")" @TRET
+    fi
+
+    {
+        ec "${input}"
+    } | session="$session" kernel="$kernel" perl -CS -0777 -pe '
+BEGIN { use utf8; use open qw/:std :utf8/; } ;
+
+        if ($ENV{session}) {
+#: Only do the initial echo if the file does not start with a properties block with the key `jupyter-python-session` already. (The property drawer might have other keys though and the order of keys does not matter.)
+            if (/^\s*:PROPERTIES:\s*\n((?:.*\n)*?):END:/m) {
+                my $props = $1;
+                if ($props !~ /^\s*:jupyter-python-session:/m) {
+                    s/(:PROPERTIES:\s*\n)/$1:jupyter-python-session: $ENV{session}\n/;
+                }
+            } else {
+                $_ = ":PROPERTIES:\n:jupyter-python-session: $ENV{session}\n:END:\n" . $_;
+            }
+
+            s{:jupyter-python-session:\s+\S+}{:jupyter-python-session: $ENV{session}}g;
+            s{:session\s+\S+}{:session $ENV{session}}g;
+        }
+
+        s{:kernel\s+\S+}{:kernel $ENV{kernel}}g if $ENV{kernel};
+    ' |
+        cat-copy-if-tty
+}
+@opts-setprefix org-jupyter-with emc-jupyter-with
+
+function org-jupyter-with-inplace {
+    local f="$1"
+    assert-args f @RET
+
+    local res
+    res="$(org-jupyter-with "$f")" @TRET
+    assert cp "$f" ~/tmp/backup/ @RET
+    ec "${res}" > "$f"
+}
+@opts-setprefix org-jupyter-with-inplace emc-jupyter-with
+
+function emc-jupyter-with {
+    local f="$1"
+    local engine=("${emc_jupyter_with_engine[@]:-emc-open-no-server-tui}")
     assert-args f @RET
 
     cdtmp_engine=pushf cdtmp
     {
         local f_copied
-        f_copied="./${f:t}"
+        f_copied="./${f:t:r}..no_recent..${f:e}"
         assert reval-not test -e "${f_copied}" @RET
 
-        {
-            if test -n "${session}" ; then
-                ec ":PROPERTIES:
-:jupyter-python-session: ${session}
-:END:
-"
-            fi
-
-            cat "$f"
-        } | session="$session" kernel="$kernel" perl -lpe '
-        s{:session\s+\S+}{:session $ENV{session}}g if $ENV{session};
-        s{:kernel\s+\S+}{:kernel $ENV{kernel}}g if $ENV{kernel};
-        ' > "${f_copied}" @RET
+        org-jupyter-with "$f" > "${f_copied}" @RET
 
         reval "${engine}" "${f_copied}"
     } always {
         # popf
     }
 }
-
 ##
 function org-remove-inline-images {
     in-or-args "$@" |

@@ -134,7 +134,7 @@ function kemc1 {
     kitty-launch-emc withemc1
 }
 ##
-function kitty-launch-icat() {
+function kitty-launch-icat {
     ## use this for troubleshooting:
     # kitty @ launch --type=tab env PATH="$PATH" "$(which wait4user.sh)" "$(which kitty)" +kitten icat "$@"
     # @raceCondition sometimes this does not work, no idea why
@@ -149,7 +149,7 @@ function kitty-launch-icat() {
     ##
 }
 ##
-function kitty-theme() {
+function kitty-theme {
     # the theme names should be stripped of '.conf' before being fed to kitty-theme, and they should not be in abs paths:
     # `kitty-theme --test Zenburn `
     ##
@@ -158,17 +158,28 @@ function kitty-theme() {
     command kitty-theme -c $NIGHTDIR/configFiles/kitty/kitty_theme_changer.conf.py "$@"
 }
 
-function kitty-theme-setup() {
-    kitty-theme --setl night-solarized-light
+function kitty-theme-setup {
+    #: `kitty-theme-setup Spring Dumbledore`
+    ##
+    local light="${1:-night-solarized-light}"
+    local dark="${2:-ayu}"
 
-    kitty-theme --setd ayu
+    reval-ecgray kitty-theme --setl "$light"
+
+    reval-ecgray kitty-theme --setd "$dark"
+
+    kitty-theme-reload
 }
 
-function kitty-theme-toggle() {
+function kitty-theme-toggle {
+    : "needs kitty-theme-setup to have been run"
+
     kitty-theme --toggle --live
 }
 
-function kitty-theme-test() {
+function kitty-theme-test {
+    : "Use 'kitty-theme-setup' to change the themes for all sessions."
+
     local theme q="$(fz-createquery "$@")"
 
     local dir
@@ -179,7 +190,7 @@ function kitty-theme-test() {
     reval-ec kitty-theme --test "$theme"
 }
 
-function kitty-theme-reload() {
+function kitty-theme-reload {
     kitty-theme --live
 }
 ##

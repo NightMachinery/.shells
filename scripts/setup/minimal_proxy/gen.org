@@ -15,20 +15,23 @@
 ** rsync necessary files
 #+begin_example zsh
 # host=t21
-host=t31
+# host=t31
+host=c0
 # host=pino
-# host=s17
+# host=m17-hpc
+# host=m15-hpc
+# host=mmd1
 
 # fullhost=$user@$host
 fullhost=$host
 
 rsp-safe --rsync-path="mkdir -p ~/base/bootstrap && rsync" "${nightNotesPublic}"/cheatsheets/OS/unix/tangled/*(D) ${fullhost}:base/bootstrap/
 
-rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(zsh|zshenv|zshrc|bash_profile|bashrc|bash|sh|curlrc)(D) ${fullhost}:
+rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(el|zsh|zshenv|zshrc|bash_profile|bashrc|bash|sh|curlrc)(D) ${fullhost}:
 
-rsp-safe "$nightNotesPrivate"/configs/minse/.private.env.zsh ${fullhost}:
+rsp-safe "$nightNotesPrivate"/configs/minse/{.private.env.zsh,.secret-private-config.el} ${fullhost}:
 
-rsp-safe --rsync-path="mkdir -p ~/bin && rsync" "$NIGHTDIR/python/telegram-send/tsend.py" ${fullhost}:bin/
+rsp-safe --rsync-path="mkdir -p ~/bin && rsync" "$NIGHTDIR/python/telegram-send/tsend.py" "$NIGHTDIR/perllang/ssh_password_auth_disable.pl" ${fullhost}:bin/
 #+end_example
 
 #+begin_example zsh
@@ -43,10 +46,16 @@ rsp-safe2 ${fullhost}:bin/ $NIGHTDIR/perllang/url_dir_count.pl
 **** [[id:9950dc25-c88f-4660-b059-6302af531c03][apt]]
 
 *** You should run the next steps in =tmux=.
+#+begin_src zsh :eval never
+tmux new -s setup zsh
+#+end_src
 
 *** Run =bash bootstrap_minimal.bash=
 
 *** Run next steps in Zsh.
+#+begin_src zsh :eval never
+exec zsh
+#+end_src
 
 *** Setup a proxy.
 #+begin_src zsh :eval never
@@ -56,13 +65,15 @@ export-from-alias pxa2096
 *** [[id:cf6c92c4-bf55-4534-9064-13fb1a80a874][brew]]
 **** This will be slow without a proxy.
 
-*** =bash bootstrap_with_proxy.bash=
+*** =zsh bootstrap_with_proxy.zsh=
 
 *** Setup other stuff.
 **** [[id:d565cc4f-728e-45bf-8554-d03670fa2707][SSH/setup, keygen]]
 #+begin_src zsh :eval never
 ssh-keygen
 #+end_src
+
+***** Add public key to =batbone=.
 
 **** jupyter
 ***** [[id:991aa765-f5de-4022-9910-1e42797edc34][Setting a password on the Jupyter server]]
@@ -142,7 +153,6 @@ EOF
 }
 #+end_example
 
-
 * install
 #+begin_src zsh :eval never :tangle tangled/bootstrap_minimal.bash
 set -exo pipefail
@@ -159,6 +169,9 @@ function micromamba-setup {
     micromamba self-update
 
     micromamba create --yes -c conda-forge --name p310 python=3.10 numpy 
+
+    #: To activate the newly created environment:
+    source ~/.shared.sh 
 }
 
 function gost-setup {
@@ -228,7 +241,7 @@ source ~/.config/envman/PATH.env
 #+end_example
 
 ** others
-#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.zsh
 set -exo pipefail
 ##
 
@@ -240,7 +253,9 @@ curl -sS https://webi.sh/webi | sh
 curl -sS https://webi.sh/golang | sh
 curl -sS https://webi.sh/go-essentials | sh
 
-curl -sS https://webi.sh/ffmpeg | sh
+# curl -sS https://webi.sh/ffmpeg | sh
+#: ffmpeg via webi has broken
+#: - [jalali:1403/04/11/16:29]
 
 curl -sS https://webi.sh/gh | sh
 curl -sS https://webi.sh/rg | sh
@@ -259,6 +274,12 @@ curl -sS https://webi.sh/jq | sh
 
 #+end_src
 
+* git
+#+begin_src zsh :eval never
+git config --global http.proxy http://127.0.0.1:2096
+git config --global https.proxy http://127.0.0.1:2096
+#+end_src
+
 * pip
 #+begin_src zsh :eval never :tangle tangled/bootstrap_minimal.bash
 ## pip
@@ -268,7 +289,8 @@ pipx install speedtest-cli nvitop black
 
 pip install -U jupyter jupyterlab py-spy
 
-pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot
+pip install -U IPython aiofile docopt PySocks telethon python-telegram-bot py-spy
+# pip install -U pynight
 ##
 
 #+end_src
@@ -278,11 +300,51 @@ pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-b
 :ID:       9950dc25-c88f-4660-b059-6302af531c03
 :END:
 #+begin_example zsh
-sudo apt-get install -y build-essential tmux zsh openconnect jq python3 python3-pip socat
+sudo apt-get install -y kitty-terminfo htop ncdu vim neovim git curl wget build-essential tmux zsh openconnect jq python3 python3-pip bindfs socat nmap net-tools netcat-openbsd openssh-client openssh-server autossh redis-server zstd
+
+# redis-install
 #+end_example
 
-* junest pacman
-#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
+* junest
+- @from [[id:eda140aa-85af-4304-a744-04dc77d7290d][@install junest]]
+  
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.zsh
+function junest-install {
+(
+    export PS4='> '
+    setopt LOCAL_OPTIONS PIPE_FAIL PRINT_EXIT_VALUE ERR_RETURN SOURCE_TRACE XTRACE 
+    setopt TYPESET_SILENT NO_CASE_GLOB multios re_match_pcre extendedglob pipefail interactivecomments hash_executables_only
+    ##
+    git clone https://github.com/fsquillace/junest.git ~/.local/share/junest
+    ##
+    export PATH="${HOME}/.local/share/junest/bin:$PATH"
+    export PATH="$PATH:${HOME}/.junest/usr/bin_wrappers"
+    export JUNEST_HOME="${HOME}/.junest"
+
+    if test -n "${JUNEST_ENV}" ; then
+        #: We are already inside junest, so just use the normal sudo.
+        alias sudo-junest=sudo
+    else
+        alias sudo-junest="${HOME}/.junest/usr/bin_wrappers/sudo"
+    fi
+    ##
+    junest setup
+    sudo-junest pacman -Syy
+)
+}
+
+if ! test -e ~/.local/share/junest ; then
+    junest-install
+fi
+#+end_src
+
+** pacman
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.zsh
+sudo-junest pacman -Syy --noconfirm tar gzip gcc zsh ugrep tealdeer progress bandwhich ncdu eza ffmpeg
+
+sudo-junest pacman -Syy --noconfirm rust
+cargo install rm-improved
+# sudo-junest yay -S --noconfirm rm-improved
 
 sudo-junest pacman -Syy --noconfirm socat nodejs npm
 
@@ -290,7 +352,14 @@ sudo-junest pacman -Syy --noconfirm tealdeer
 tldr --update
 
 sudo-junest pacman -Syy --noconfirm emacs
+#+end_src
 
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.zsh
+# sudo-junest pacman -Syy --noconfirm redis
+#: doesn't seem to work
+
+#: Add to cron:
+# tmux new -d -s redis redis-server
 #+end_src
 
 * brew
@@ -315,11 +384,13 @@ export PATH="${PATH}:${HOME}/.local/opt/brew/bin"
 #+end_example
 
 ** install brew packages
-#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.bash
-brew install gcc zsh ugrep tealdeer progress bandwhich ncdu rm-improved eza
+#+begin_src zsh :eval never :tangle tangled/bootstrap_with_proxy.zsh
+###
+# brew install gcc zsh ugrep tealdeer progress bandwhich ncdu rm-improved eza
 
-brew install redis
-brew services start redis
+# brew install redis
+# brew services start redis
+###
 #+end_src
 
 ** [[gid:4fd8da85-fe5e-416c-a8ee-ca5219fd6d69][@install emacs]]

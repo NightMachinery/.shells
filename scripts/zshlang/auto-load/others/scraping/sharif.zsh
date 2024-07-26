@@ -323,26 +323,102 @@ function sharif-goto-register {
         --compressed
 }
 ##
-typeset -g sharif_vpn_url_normal='https://net2.sharif.edu'
-typeset -g sharif_vpn_url_ip='https://172.17.1.214'
-# typeset -g sharif_vpn_url_ip='https://198.18.0.8'
-typeset -g sharif_vpn_url="${sharif_vpn_url_ip}"
+typeset -g sharif_net_url_normal='https://net2.sharif.edu'
+typeset -g sharif_net_url_ip='https://172.17.1.214'
+# typeset -g sharif_net_url_ip='https://198.18.0.8'
+# typeset -g sharif_net_url="${sharif_net_url_normal}"
+typeset -g sharif_net_url="${sharif_net_url_ip}"
 
-function with-sharif-vpn-url-ip {
-    sharif_vpn_url="${sharif_vpn_url_ip}" reval-env "$@"
+function with-sharif-net-url-ip {
+    sharif_net_url="${sharif_net_url_ip}" reval-env "$@"
 }
 
-function sharif-vpn-login-status {
-    revaldbg curl --insecure -s "${sharif_vpn_url}/status" | ggrep -oP '<td(?:\s[^>]*)?>\K.*?(?=</td>)'
+function h-sharif-net-curl {
+    (
+        ecgray "$0: disabled proxies  locally (by running proxy-env-unset in a subshell)"
+        proxy-env-unset
+
+        revaldbg curl --insecure "$@"
+    )
 }
 
-function sharif-vpn-login {
-    revaldbg curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/login" > /dev/null
-    sharif-vpn-login-status
+function sharif-net-status {
+    h-sharif-net-curl -s "${sharif_net_url}/status" | ggrep -oP '<td(?:\s[^>]*)?>\K.*?(?=</td>)'
 }
 
-function sharif-vpn-logout {
-    revaldbg curl --insecure -d "username=$sharif_vpn_username&password=$sharif_vpn_passowrd" -X POST "${sharif_vpn_url}/logout"
-    sharif-vpn-login-status
+function sharif-net-login {
+    h-sharif-net-curl -d "username=${sharif_vpn_username}&password=${sharif_vpn_passowrd}" -X POST "${sharif_net_url}/login" > /dev/null
+    sharif-net-status
+}
+
+function sharif-net-logout {
+    h-sharif-net-curl -d "" -X POST "${sharif_net_url}/logout"
+    sharif-net-status
+}
+##
+# Private function to check VPN status
+function h-check-vpn-status-darwin {
+    networksetup -showpppoestatus "$1"
+}
+
+# Private function to connect/disconnect VPN
+function h-toggle-vpn-darwin {
+    networksetup -${1}pppoeservice "$2"
+}
+
+# Function to manage VPN connection and show status
+function h-manage-vpn-darwin {
+    local action="$1"
+    local vpn_name="$2"
+    local desired_status="${3:-connected}"
+
+    h-toggle-vpn-darwin "$action" "$vpn_name"
+
+    local current_status
+    while true; do
+        current_status=$(h-check-vpn-status-darwin "$vpn_name")
+        printf "\rVPN Status: %s" "$current_status           "
+        [[ "$current_status" == "$desired_status" ]] && { echo; break; }
+        sleep 1
+    done
+}
+
+# Function to connect VPN
+function vpn-connect-darwin {
+    h-manage-vpn-darwin "connect" "$1" "connected"
+}
+
+# Function to disconnect VPN
+function vpn-disconnect-darwin {
+    h-manage-vpn-darwin "disconnect" "$1" "disconnected"
+}
+
+# Function to check VPN status
+function vpn-status-darwin {
+    h-check-vpn-status-darwin "$1"
+}
+
+# Global variable for Sharif VPN name
+typeset -g SHARIF_VPN_NAME="sharif2"
+
+# Function to manage Sharif VPN
+function h-sharif-system-vpn {
+    local action="$1"
+    "vpn-${action}-darwin" "$SHARIF_VPN_NAME"
+}
+
+# Function to connect Sharif VPN
+function sharif-system-vpn-connect {
+    h-sharif-system-vpn "connect"
+}
+
+# Function to disconnect Sharif VPN
+function sharif-system-vpn-disconnect {
+    h-sharif-system-vpn "disconnect"
+}
+
+# Function to check Sharif VPN status
+function sharif-system-vpn-status {
+    h-sharif-system-vpn "status"
 }
 ##

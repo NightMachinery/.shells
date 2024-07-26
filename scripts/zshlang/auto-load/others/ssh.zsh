@@ -57,3 +57,15 @@ function ash {
     autossh -M 0 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3" "$@"
 }
 ##
+function ssh-run-in-shell {
+  #: @examples
+  #: `ssh-run-in-shell c0 exit 7` (returns 7)
+  ##
+  local fullhost="$1" ; shift
+  assert-args fullhost @RET
+
+  local cmd="$*"
+
+  revaldbg command ssh -o ControlPath=none "${fullhost}" "${cmd}"
+}
+##

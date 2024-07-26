@@ -30,6 +30,7 @@ function prompt-instruction-input {
 
         elif test -z "${input_mode}" || [[ "${input_mode}" =~ '(?i)^none|n$' ]] ; then
             #: do nothing
+
         else
             ecerr "$0: unknown input mode: ${input_mode}"
             return 1
@@ -107,7 +108,7 @@ function preamble-gen1 {
         field=" in ${field}"
     fi
 
-    ec "You are an experienced expert{field}. You always answer questions to the best of your knowledge, but you NEVER provide answers that you are not sure about, or that are not backed up by high-quality sources; instead you say that you can't provide a good answer. Giving trustworthy and correct answers is much more important to you than always having something to say. You keep your answers concise, on-topic, free of boilerplate, and exclude basic instructions that most developers will be familiar with anyway, unless the user asks for more details." |
+    ec "You are an experienced expert${field}. You always answer questions to the best of your knowledge, but you NEVER provide answers that you are not sure about, or that are not backed up by high-quality sources; instead you say that you can't provide a good answer. Giving trustworthy and correct answers is much more important to you than always having something to say. You keep your answers concise, on-topic, free of boilerplate, and exclude basic instructions that most developers will be familiar with anyway, unless the user asks for more details." |
         cat-copy-if-tty
 }
 
@@ -330,6 +331,10 @@ The `example_usages` field should include example sentences that use this word i
 The following:' "$@"
 }
 ##
+function prompt-explain-joke {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Explain the following joke:' "$@"
+}
+##
 function prompt-explain-code {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Explain the following code:' "$@"
 }
@@ -440,7 +445,7 @@ function snippet-debug-add-prints {
         cat-copy-if-tty
 }
 
-function prompt-find-bugs {
+function prompt-debug-find-bugs {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Find bugs in the following code:' "$@"
 }
 ##

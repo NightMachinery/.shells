@@ -34,6 +34,7 @@ function openai-cost-by-tokens {
             [gpt-4-turbo]=0.01
             [gpt-4o]=0.005
 
+            [${claude_3_5_sonnet_model_name}]=0.003
             [claude-3-opus]=0.015
             [${c3o_model_name}]=0.015
         )
@@ -48,6 +49,7 @@ function openai-cost-by-tokens {
             [gpt-4-turbo]=0.03
             [gpt-4o]=0.015
 
+            [${claude_3_5_sonnet_model_name}]=0.015
             [claude-3-opus]=0.075
             [${c3o_model_name}]=0.075
         )
@@ -227,6 +229,10 @@ function openai-chatgpt {
 function openai-token-count {
     local model="${token_count_model:-gpt-4}"
 
+    if [[ "${model}" == "${claude_3_5_sonnet_model_name}" ]] ; then
+        # model=''
+    fi
+
     in-or-args "$@" |
         # $proxyenv reval-ec ttok -m "${model}"
         openai_token_count.py
@@ -398,6 +404,17 @@ aliasfn reval-to-gpt4o reval-to llm-4o
 aliassafe rl4o='\noglob reval-to-gpt4o'
 aliassafe 4o='\noglob reval-to-gpt4o'
 
+typeset -g claude_3_5_sonnet_model_name='or:c35s'
+function llm-s3 {
+    llm_model="${claude_3_5_sonnet_model_name}" llm-send "$@"
+}
+aliassafe s3='\noglob llm-s3'
+function llm-s3-chat {
+    llm_model="${claude_3_5_sonnet_model_name}" llm-m chat "$@"
+}
+aliasfn reval-to-s3 reval-to llm-s3
+aliassafe rs3='\noglob reval-to-s3'
+
 typeset -g c3o_model_name='or:c3o'
 function llm-c3o {
     llm_model="${c3o_model_name}" llm-send "$@"
@@ -434,8 +451,11 @@ aliassafe rl3='\noglob reval-to-l3'
 # aliassafe xx='\noglob llm-4t'
 # aliassafe xz='\noglob reval-to-gpt4t'
 
-aliassafe xx='\noglob llm-4o'
-aliassafe xz='\noglob reval-to-gpt4o'
+aliassafe xx='\noglob llm-s3'
+aliassafe xz='\noglob reval-to-s3'
+
+# aliassafe xx='\noglob llm-4o'
+# aliassafe xz='\noglob reval-to-gpt4o'
 
 # aliassafe xx='\noglob llm-l3'
 # aliassafe xz='\noglob reval-to-l3'

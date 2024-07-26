@@ -144,6 +144,12 @@ function dateshortnum() { date +"%Y/%m/%d" }
 function date-tehran {
     TZ='Asia/Tehran' date +'%Y-%m-%d %A %H:%M:%S'
 }
+function date-canada {
+    TZ='Canada/Eastern' date +'%Y-%m-%d %A %H:%M:%S'
+}
+function date-spain {
+    TZ='Europe/Madrid' date +'%Y-%m-%d %A %H:%M:%S'
+}
 
 function datej {
     # alt: Python https://github.com/fitnr/convertdate

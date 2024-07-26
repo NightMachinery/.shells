@@ -44,6 +44,13 @@ function luna-skip-reset {
     luna_skipped_set 0
 }
 
+function h-lunaquit-force-skip-reset {
+    h-disallow-interactive-call @RET
+
+    h-lunaquit-force
+    luna-skip-reset
+}
+
 function lunaquit-force-skip-reset {
     lunaquit-force
     luna-skip-reset
@@ -262,6 +269,8 @@ function lunaquit {
 }
 
 function h-lunaquit-force {
+    h-disallow-interactive-call @RET
+
     lunaquit ; pkill LUNA ; sleep 1 && kill-marker-luna-timer-late
 }
 
@@ -269,12 +278,19 @@ function h-lunaquit-force-dynamic {
     # bb_say_speed=1 fsay2 'sustain not crucify; great evil lies ahead!'
     # tts-glados1-cached 'sustain not crucify; great evil lies ahead!'
 
+    if ! isBrish ; then
+        ecgray "$0: only callable from within brishgraden"
+        return 1
+    fi
+
     h-lunaquit-force || true
 }
 
 function lunaquit-force {
-    #: This forces the updated version to be used, which allows us to dynamically swap the function called from any terminal session.
-    brishz h-lunaquit-force-dynamic
+    if friction-type ; then
+        #: This forces the updated version to be used, which allows us to dynamically swap the function called from any terminal session.
+        brishz h-lunaquit-force-dynamic
+    fi
 }
 
 function lunaquit-monitor {
@@ -317,11 +333,11 @@ function lunaquit-monitor {
         trapexits-release
     }
 }
-function kill-marker-luna-timer-late() {
+function kill-marker-luna-timer-late {
     kill-marker "LUNA_MONITOR_TIMER_LATE" -9
 }
 
-function bell-evacuate() {
+function bell-evacuate {
     kill-marker-luna-timer-late
 
     # `x (4*46)/0.78` = 235
@@ -375,7 +391,8 @@ function deluna {
     while oneinstance $0 $nonce
     do
         if (( $(lastunlock-get) < 60 )) ; then
-            unlock-hook
+            #: Now using [[id:597345ed-90e6-491b-9c70-43db87bc707d][@good lock_watcher.swift]] instead.
+            # h-hook-unlock
         fi
 
         if (( $(idle-get) >= $timeout )) ; then
@@ -390,7 +407,7 @@ function deluna {
             kill-marker-luna-timer-late || true
             luna_skipped_set 0 @STRUE
             ##
-            deluna-hook
+            h-hook-deluna
             ##
         fi
 
@@ -768,6 +785,51 @@ aliasfn bell-fail bell-lm-fail
 function bell-lm-mhm {
 	bell-ringer "BELL_LM_MHM_MARKER" "$GREENCASE_DIR/LittleMisfortune/mhm/16_31_MI_mhm..blue..flac" "$GREENCASE_DIR/LittleMisfortune/mhm/16_36_MI_mmhm..blue..flac" "$GREENCASE_DIR/LittleMisfortune/mhm/17.2_08_MI_mmhmm..blue..flac" "$GREENCASE_DIR/LittleMisfortune/mhm/18_09_MI_mmhmm..blue..flac"
 }
+
+function bell-lm-ok {
+    local files=(
+        ${GREENCASE_DIR}/LittleMisfortune/flac/11_34_MI_ok.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/07_14_MI_ok.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/11_16_MI_ok.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/09_17_MI_ok.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/29_07_MI_ok.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/17_64_MI_ok.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/18.6_14_MI_ok.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/16_54_MI_laughok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/17.3_17_MI_okok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/10_03_MI_okokok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/16.4_03_MI_okgreat.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/18.6_38_MI_okokagain.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/DanceDance_crowd_cheer_OK.flac
+        ${GREENCASE_DIR}/LittleMisfortune/flac/17_25_MI_mok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/16_28_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/17_36_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/16_13_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/17_58_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/08_14_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/09_21_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/22_13_MI_hmmok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/17_31_MI_mmmok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/10_11_MI_mmmok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/18_13_MI_mmmok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/10.2_36_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/18.6_19_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/10.2_37_MI_mook.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/16-1_07_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/16-1_32_MI_oyok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/18.6_72_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/18.6_43_MI_ahok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/10.3_15_MI_mmmok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/06.2_06_MI_mmmok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/18.6_67_MI_huhok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/17.3_21_MI_mmmok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/18.1_34_MI_huhok.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/13_03_MI_ahoknice.flac
+        # ${GREENCASE_DIR}/LittleMisfortune/flac/10.2_12_MI_nommmok.flac
+    )
+
+    bell-ringer "BELL_LM_OK_MARKER" "${files[@]}"
+}
 ##
 bell-lm-maker mo-welldone flac/17.1_11_MO_welldone.flac
 # `fr heari 'flac/ MI cool'`
@@ -826,6 +888,18 @@ bell-pp-piece-r() { redo2 10 bell-pp-piece }
 bell-maker sc2-nav_online "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zCutscene_Zerg04_DropShipAdjutant_020_navigation online..blue...ogg"
 aliasfn reval-bell-sc2-nav_online @opts bell bell-sc2-nav_online @ reval-bell
 ##
+
+bell-maker sc2-connect 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/connect1.wav'
+bell-maker sc2-disconnect 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/disconn1.wav'
+
+bell-maker sc2-mousedown1 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/mousedown1.wav'
+# bell-maker sc2-mousedown2 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/mousedown2.wav' #: almost the same as =sc2-mousedown1=
+# bell-maker sc2-mouseover1 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/mouseover1.wav'
+# bell-maker sc2-mouseover2 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/mouseover2.wav'
+
+# bell-maker sc2-scorefill 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/scorefill.wav'
+
+bell-maker sc2-countdown-beep 'Starcraft/Starcraft I Brood War/PC Computer - StarCraft Brood War - Interface/interface/countdown.wav'
 
 bell-maker sc2-activating-defense-turrets 'Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zMission_Lab01_DropShipAdjutant_067..activating automated defense turrets..blue..ogg'
 

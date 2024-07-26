@@ -32,6 +32,8 @@ function zle-complete-with-dots() {
 zle -N zle-complete-with-dots
 bindkey "^I" zle-complete-with-dots # TAB
 
+bindkey '^[/' expand-or-complete #: Alt+/ for normal Zsh completion (to bypass fzf tab completion)
+
 function zle-expand {
     zle expand-word
     # zle redisplay # @bug does not syntax-color
