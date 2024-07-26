@@ -51,6 +51,7 @@ function battery-charge-limit-enable {
     if isDarwin ; then
         assert test -e "${smc_command}" @RET
 
+        ecgray "$0"
         reval-ecgray sudo "${smc_command}" -k "${smc_charge_limit_key}" -w "${smc_charge_limit_status_on}" @RET
 
         assert battery_charge_limit_p_set true @RET
@@ -63,6 +64,7 @@ function battery-charge-limit-disable {
     if isDarwin ; then
         assert test -e "${smc_command}" @RET
 
+        ecgray "$0"
         reval-ecgray sudo "${smc_command}" -k "${smc_charge_limit_key}" -w "${smc_charge_limit_status_off}" @RET
 
         assert battery_charge_limit_p_set false @RET

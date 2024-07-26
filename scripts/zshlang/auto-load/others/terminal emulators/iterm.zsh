@@ -226,6 +226,11 @@ function h_icat {
 }
 alias ic=icat
 
+function icat-v {
+    icat_v='as_is' icat "$@"
+}
+
+
 aliasfn icat-big icat-kitty
 alias icb=icat-big
 ##

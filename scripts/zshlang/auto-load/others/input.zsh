@@ -1,8 +1,19 @@
-function vared-py() {
-    vared.py "$@" # </dev/tty # incompatible with prompt_toolkit
+function vared-py {
+    #: `vared.py [prompt default_value]`
+    ##: @broken @deprecated vared-py doesn't work well.
+    # vared.py "$@" # </dev/tty # incompatible with prompt_toolkit
+    ##
+    vared-m "$@"
+    ##
+}
+
+function vared-m {
+    #: @usage `[prompt default_value]`
+    #: This is an alternative to =vared= that supports an initial default value.
+    readline_prompt "$@"
 }
 ##
-function ask() {
+function ask {
     doc 'This is a general-purpose function to ask Yes/No questions in Bash, either with or without a default answer. It keeps repeating the question until it gets a valid answer.'
     : "usage: prompt [default]"
 
@@ -43,6 +54,61 @@ function ask() {
             N*|n*) return 1 ;;
         esac
 
+    done
+}
+##
+function friction-type {
+    local input_string="$1"
+    local retries_count=-1
+
+    local user_input=""
+    local start_time
+    local end_time
+    local time_taken
+
+    #: If no string is provided, generate one using passgen-words
+    if [[ -z "$input_string" ]]; then
+        input_string="$(passgen-words 3 | tr '-' " ")" @TRET
+    fi
+
+
+    #: Print the string with zero-width spaces between each character
+    local output_string=""
+    for (( i=0; i<${#input_string}; i++ )); do
+        output_string+="${input_string:$i:1}"
+        if (( i < ${#input_string} - 1 )); then
+            output_string+=$'\u200b'
+        fi
+    done
+
+    while true; do
+        ec "Type the following text:"
+        ec "$output_string"$'\n'
+
+        start_time=$EPOCHSECONDS
+
+        # vared -p "> " user_input
+        user_input="$(vared-m "> " "${user_input}")" @RET
+
+        end_time=$EPOCHSECONDS
+
+        time_taken=$((end_time - start_time))
+
+        ec
+        #: Check if the input matches
+        if [[ "$user_input" == "$input_string" ]]; then
+            ec "Correct! Time taken: $time_taken seconds"
+            return 0
+        else
+            ec "Incorrect. Try again."
+            if (( retries_count > 0 )); then
+                ((retries_count--))
+                if (( retries_count == 0 )); then
+                    ec "No more retries left."
+                    return 1
+                fi
+            fi
+        fi
     done
 }
 ##

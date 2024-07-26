@@ -160,7 +160,7 @@ aliasfn greens2hell @opts rm [ "$greens[@]" ] @ ntag-rmadd
 ##
 aliasfn red2hell @opts rm [ red ] @ ntag-rmadd
 ###
-function ntag-mv() {
+function ntag-mv {
     local i="$1" o="$2"
     color 100 255 200 "$0 $(gq "$@")" # >&2
     
@@ -172,7 +172,7 @@ function ntag-mv() {
     command mv "$i" "$o"
 }
 ##
-function ntag-migrate-sep() {
+function ntag-migrate-sep {
     local old="$1" new="$2" f="$3"
     { test -z "$old" || test -z "$new" } && return 1
     test -e "$f" || {

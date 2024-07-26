@@ -66,9 +66,10 @@ function watchm() {
     ruu "watch -n $1" "${@:2}"
 }
 ##
-function fd() {
-  # include ignored files by default
+function fd {
   command fd -u "$@"
+  #: -i,  --ignore-case
+  #: -u: include ignored files by default
 }
 ##
 # function open() {
@@ -108,8 +109,19 @@ function open-sioyek {
 }
 aliasfn opy open-sioyek
 aliasfn sio open-sioyek
+
+function open-sioyek-v2 {
+  local file="${1}" ; shift
+  assert-args file @RET
+
+  file="$(path-unabbrev "${file}")" @TRET
+
+  assert sioyek "${file}" "$@" @RET
+  sioyek-reload
+  sioyek-focus
+}
 ##
-function mega-get() {
+function mega-get {
   if isBicon ; then
     ecgray "$0: mega-get sometimes hangs when run in Bicon; Wrapping it in a tmux session."
     tshd command mega-get "$@"

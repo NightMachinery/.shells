@@ -74,34 +74,52 @@ function pbpaste-image {
 }
 alias saveas-img='pbpaste-image'
 ##
-function text2img-old() {
-    # Doesn't work with Persian at all
-    : " < text text2img <img-name>"
+function text2img-v1 {
+    #: Doesn't work with Persian at all
+    : " < text text2img-v1 <img-name>"
     local img="$1"
 
     test -z "$img" && { ecerr "$0: Empty image destination. Aborting." ; return 1 }
 
-    # `convert -list font` for available fonts, or use absolute paths
-    convert -page  4000x4000 -font FreeMono -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"$img".png
-    ## persian (doesn't work well)
-    # ec سلام monster |     convert -page  700x700 -font '/Users/evar/Library/Fonts/B Nazanin Bold_0.ttf' -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:hi.png
-    # Use https://stackoverflow.com/questions/23536375/linux-cli-how-to-render-arabic-text-into-bitmap instead
     ##
-}
-function text2img() {
-    # @alt https://xg4.github.io/text2image/ does support Persian seemingly, but not completely?
-    # @alt @good https://vincent7128.github.io/text-image/ seems to work as well as text2img.py with Persian, but it can also size the output image automatically.
-
+    #: @duplicateCode/f44064fbab76db98c38d3e18d8c66685
     local font="${text2img_font}"
     if test -z "$font" ; then
         # local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf" # monospace font by GNU that supports most languages, but quite ugly and unreadable.
         local font="Courier New" # See https://github.com/IranOpenFontGroup/Discussions/issues/7 for more Persian monospace fonts
         test -e "$Font_Symbola_CourierNew" && font="$Font_Symbola_CourierNew"
     fi
+    ##
+    # font='FreeMono'
+
+    # `magick convert -list font` for available fonts, or use absolute paths
+    magick convert -page  4000x4000 -font "$font" -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:"${img:r}".png
+    ## persian (doesn't work well)
+    # ec سلام monster |     convert -page  700x700 -font '/Users/evar/Library/Fonts/B Nazanin Bold_0.ttf' -pointsize 20 -fill black -background white -trim +repage -bordercolor white  -border 15 text:- png:hi.png
+    # Use https://stackoverflow.com/questions/23536375/linux-cli-how-to-render-arabic-text-into-bitmap instead
+    ##
+}
+function text2img {
+    #: @usage:
+    #: `echo Hello World | text2img out.png`
+    #:
+    # @alt https://xg4.github.io/text2image/ does support Persian seemingly, but not completely?
+    # @alt @good https://vincent7128.github.io/text-image/ seems to work as well as text2img.py with Persian, but it can also size the output image automatically.
+
+    ##
+    #: @duplicateCode/f44064fbab76db98c38d3e18d8c66685
+    local font="${text2img_font}"
+    if test -z "$font" ; then
+        # local font="$NIGHTDIR/resources/fonts/unifont-13.0.06.ttf" # monospace font by GNU that supports most languages, but quite ugly and unreadable.
+        local font="Courier New" # See https://github.com/IranOpenFontGroup/Discussions/issues/7 for more Persian monospace fonts
+        test -e "$Font_Symbola_CourierNew" && font="$Font_Symbola_CourierNew"
+    fi
+    ##
 
     text2img.py $font "$@"
 }
-function text-show() {
+
+function text-show {
     local tmp="$(gmktemp --suffix .png)"
 
     text2img $tmp
@@ -109,12 +127,13 @@ function text-show() {
     rm $tmp
 }
 @opts-setprefix text-show text2img
-function reval-ts() {
+
+function reval-ts {
     reval "$@" | text-show
 }
 @opts-setprefix reval-ts text2img
 ##
-function 2ico() {
+function 2ico {
     local i="${1}" o="${2:-${1:r}.ico}" s="${png2ico_size:-256}"
 
     convert -background transparent "$i" -define icon:auto-resize=16,24,32,48,64,72,96,128,256 "$o"
@@ -122,7 +141,7 @@ function 2ico() {
 }
 aliasfn png2ico 2ico
 ##
-function convert-pad() {
+function convert-pad {
     jglob
     local i="${1:? Input required}" o="${2:-${1:r}_padded.png}" w="${convert_pad_w:-${convert_pad_s:-1024}}" h="${convert_pad_h:-${convert_pad_s:-1024}}"
 
@@ -144,7 +163,7 @@ function convert-pad() {
 }
 aliasfn img-fix-telegram convert-pad
 ##
-function jiconpack() {
+function jiconpack {
     jej
 
     unzip2dir $j
@@ -152,19 +171,19 @@ function jiconpack() {
     re convert-pad *.png
 }
 ##
-# function img-dimensions() {
+# function img-dimensions {
 #     magick identify -format 'width=%wpx;height=%hpx;' "$1" # 2>/dev/null
 # }
-function img-width() {
+function img-width {
     magick identify -format '%w' "$1"
 }
 reify img-width
-function img-height() {
+function img-height {
     magick identify -format '%h' "$1"
 }
 reify img-height
 ##
-function pad2square() {
+function pad2square {
     # @alt convert-pad
     local input="$1"
     local o="${2:-${1:r}_padded.png}"
@@ -174,7 +193,7 @@ function pad2square() {
     convert "$input" \( +clone -rotate 90 +clone -mosaic +level-colors gray -transparent gray \) +swap -gravity center -composite "$o"
 }
 ##
-function resize4ipad-fill() {
+function resize4ipad-fill {
     local input="$1"
     local o="${2:-${1:r}_ipad.png}"
     ensure-args input @MRET
@@ -184,7 +203,7 @@ function resize4ipad-fill() {
     local size="${w}x${h}"
     convert "$input" -resize "${size}^" -gravity center -extent "$size" "$o"
 }
-function resize4ipad-pad() {
+function resize4ipad-pad {
     local input="$1"
     local o="${2:-${1:r}_ipad.png}"
     ensure-args input @MRET
@@ -194,7 +213,7 @@ function resize4ipad-pad() {
     pad2square "$o" "$o"
 }
 ##
-function img-rotate() {
+function img-rotate {
     ## usage tips
     # - select the files that need to be rotated in Finder
     # - =pf re 'o d -90 @ img-rotate'=

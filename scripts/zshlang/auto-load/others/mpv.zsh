@@ -107,14 +107,18 @@ function hear-get {
     local prop="${1:-path}"
 
     local res
-    res="$(hear-do get_property "$prop" | jq --raw-output -e .data)" @RET
+    res="$(hear-do get_property "$prop")" @TRET
+    res="$(ec "${res}" | jq --raw-output -e .data)" || {
+        ecerr "$0: Failed to parse JSON response:"$'\n'"$res"
+        return 1
+    }
 
     if [[ "$prop" == 'path' ]] ; then
         res="$(ntag-recoverpath "$res")" @STRUE
     fi
 
     ec "$res" |
-        cat-copy-if-tty
+        cat-copy-rtl-if-tty
 }
 alias 'hgg'=hear-get
 
@@ -128,7 +132,27 @@ function mpv-do {
     local cmd
     cmd="$(arrJ "$@")" @RET
 
-    mpv-rpc "$cmd"
+    local res
+    res="$(revaldbg mpv-rpc "$cmd")" @TRET
+    res="$(ec "${res}" | jq .)" || {
+        ecerr "$0: Failed to parse JSON response:"$'\n'"$res"
+        return 1
+    }
+
+    err="$(ec "${res}" | jq -re .error)" || {
+        ecerr "$0: failed to get error:"$'\n'"$res"
+        return 1
+    }
+
+    if [[ "$err" == "success" ]] ; then
+        ec "${res}"
+
+        return 0
+    else
+        ecerr "$0: error: ${err}"
+
+        return 1
+    fi
 }
 
 function mpv-rpc {
@@ -213,8 +237,13 @@ function hear-load-playlist {
 
 function hear-loadfile-begin {
     hear-loadfile "$@" @RET
-    sleep 0.2 && #: @raceCondition can't seek until the file has been loaded; @alt retry until success after smaller delay
-        revaldbg hear-seek-begin
+    if true ; then
+        retry_sleep=0.05 retry-limited 100 hear-seek-begin
+    else
+        #: @deprecated
+        sleep 0.3 && #: @raceCondition can't seek until the file has been loaded
+            revaldbg hear-seek-begin
+    fi
 }
 ###
 function play-and-trash(){

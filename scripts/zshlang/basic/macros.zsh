@@ -193,7 +193,8 @@ function @gather-reval() {
         unset magic_gathered_vars
     }
 }
-function h_@opts() {
+
+function h_@opts {
     local prefix="${magic_opts_prefix:-magic}"
     @gather "$@"
     local cmd=( "$magic_cmd[@]" )

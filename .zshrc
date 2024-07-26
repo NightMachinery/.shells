@@ -436,11 +436,13 @@ function nightsh-load-zshrc() {
     zle redisplay
   }
   zle -N zle-complete-with-dots
-  bindkey "^I" zle-complete-with-dots # TAB
+  bindkey "^I" zle-complete-with-dots #: TAB
+
+  bindkey '^[/' expand-or-complete #: Alt+/ for normal Zsh completion (to bypass fzf tab completion)
 
   function zle-expand {
     zle expand-word
-    # zle redisplay # @bug does not syntax-color
+    # zle redisplay #: @bug does not syntax-color
   }
   zle -N zle-expand
   bindkey "^_" zle-expand #: Ctrl-/ C-/

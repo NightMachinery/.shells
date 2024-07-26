@@ -24,6 +24,8 @@ fi
 
 if isMe ; then
     ##
+    tmuxnew lock-watcher lock_watcher.swift -v
+    ##
     blackbutler-boot
     ##
     if isdefined-cmd sftpgo ; then

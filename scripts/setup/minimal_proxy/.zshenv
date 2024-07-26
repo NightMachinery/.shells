@@ -25,6 +25,11 @@ alias -g '@RET'=' || { retcode=$? ; print -r -- "exited ${retcode}" ; return $re
 ec() {
     print -r -- "$@"
 }
+alias ecgray=ec
+
+ecerr() {
+    ec "$@" >&2
+}
 
 gquote () {
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
@@ -146,6 +151,82 @@ function plg-log-last-reval() {
 
 function plg-log-last {
   plg-log-last-reval tail -f
+}
+##
+function head-tail {
+    local from="${1}" to="${2}"
+
+    integer len=$((to - (from - 1)))
+    head -n "${to}" | tail -n "${len}"
+}
+
+function sort-by-regex-perl {
+    #: @duplicateCode/22b86ed758257c1f1036c9b3cdf93542
+    #:
+    #: @alt [[NIGHTDIR:rust/floatsort.rs][floatsort]]
+    #:
+    #: @example
+    #: You can sort the lines by the 'n' number first, and if the numbers are the same, by the fruit name:
+    #: echo -e 'apple 1 n:10\nbanana 2 n:20\ncherry 3 n:10\ndate 4 n:30' |
+    #:   sort-by-regex-perl -a 'n:(\d+)' -d '(\w+)'
+    ##
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: sort-by-regex-perl [-a|--ascending] [-d|--descending] <pattern1> [<pattern2> ...] [--]"
+        return 1
+    fi
+
+    perl -e '
+    use strict;
+    use warnings;
+    use v5.34.0;
+    use Getopt::Long;
+
+    my @patterns;
+    my @orders;
+    my $default_order = "ascending";
+    # my $default_order = "descending";
+    my $current_order = $default_order;
+
+    GetOptions(
+        "a|ascending" => sub { $current_order = "ascending"; },
+        "d|descending" => sub { $current_order = "descending"; },
+        "<>" => sub {
+            push @patterns, { pattern => $_[0], order => $current_order };
+            $current_order = $default_order;
+        }
+    );
+
+    if (@patterns == 0) {
+        die "Usage: sort-by-regex-perl [-a|--ascending] [-d|--descending] <pattern1> [<pattern2> ...] [--]\n";
+    }
+
+    my @lines = <STDIN>;
+
+    print sort {
+        my $result = 0;
+        for my $entry (@patterns) {
+            my $pattern = $entry->{pattern};
+            my $order = $entry->{order};
+            my ($a_match) = $a =~ /$pattern/;
+            my ($b_match) = $b =~ /$pattern/;
+            $a_match //= "";
+            $b_match //= "";
+
+            # Use numeric comparison if both matches are numbers, otherwise use string comparison
+            if ($a_match =~ /^-?\d+(?:\.\d+)?$/ && $b_match =~ /^-?\d+(?:\.\d+)?$/) {
+                $result = $a_match <=> $b_match;
+            } else {
+                $result = $a_match cmp $b_match;
+            }
+
+            # print STDERR "Comparing $a_match (from pattern $pattern) and $b_match: $result\n";
+
+            $result = -$result if $order eq "descending";
+            last if $result != 0;
+        }
+        $result;
+    } @lines;
+    ' -- "$@"
 }
 ##
 alias sbb='exec ${commands[zsh]}'

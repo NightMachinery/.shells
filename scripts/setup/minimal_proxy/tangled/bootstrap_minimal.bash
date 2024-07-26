@@ -12,6 +12,9 @@ function micromamba-setup {
     micromamba self-update
 
     micromamba create --yes -c conda-forge --name p310 python=3.10 numpy 
+
+    #: To activate the newly created environment:
+    source ~/.shared.sh 
 }
 
 function gost-setup {
@@ -58,5 +61,6 @@ pipx install speedtest-cli nvitop black
 
 pip install -U jupyter jupyterlab py-spy
 
-pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot
+pip install -U IPython aiofile docopt PySocks telethon python-telegram-bot py-spy
+# pip install -U pynight
 ##

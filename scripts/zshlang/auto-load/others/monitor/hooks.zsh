@@ -1,15 +1,30 @@
 ##
-function deluna-hook {
-    # @todo1/security Currently implemented via [agfi:deluna], which actually runs it when the computer is unlocked, and also runs it multiple times and when idle etc.
-    ##
+function lock-security {
     killall gpg-agent || true
 }
-
-function unlock-hook {
-    #: Currently implemented via [agfi:deluna]
+##
+function h-hook-deluna {
+    # Currently implemented via [agfi:deluna], which actually runs it when the computer is unlocked, and also runs it multiple times and when idle etc.
     ##
+    lock-security
+}
+##
+function h-hook-lock {
+    #: [[id:597345ed-90e6-491b-9c70-43db87bc707d][@good lock_watcher.swift]]
+    ##
+    h-lunaquit-force-skip-reset
+
+    lock-security
+}
+
+function h-hook-unlock {
+    #: [[id:597345ed-90e6-491b-9c70-43db87bc707d][@good lock_watcher.swift]]
+    #: @old [agfi:deluna]
+    ##
+    lock-security
+
     reval-ecdate last-idle-reset
-    reval-ecdate luna_skipped_set 0
+    reval-ecdate luna-skip-reset
 
     if false ; then
         # ec $'\n\n'"$0" | sync-append-in "${KARABINER_RESET_LOG}"
@@ -18,5 +33,8 @@ function unlock-hook {
 
         karabiner-reset
     fi
+
+    battery-charge-limit-restore-status
+    #: If the laptop's battery dies and we turn it on again, our restart hooks won't run but the limit would be reset.
 }
 ##

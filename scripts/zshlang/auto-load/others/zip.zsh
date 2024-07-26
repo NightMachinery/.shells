@@ -139,7 +139,7 @@ function zip-flat {
   #: Change to the temporary directory and zip all files from there
   assert pushf "$tmpdir" @RET
   {
-    zip -r "$OLDPWD/$dest" ./*
+    zip -r "$OLDPWD/$dest" ./*(DN)
   } always {
     popf
 

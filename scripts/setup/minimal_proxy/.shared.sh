@@ -2,8 +2,18 @@
 isBash () {
     [[ -n $BASH_VERSION ]]
 }
+
+isZsh () {
+    [[ -n $ZSH_VERSION ]]
+}
 ##
-export TERM="xterm-256color"
+if infocmp xterm-kitty > /dev/null 2>&1; then
+  export TERM="xterm-kitty"
+else
+  # echo "The terminfo entry for xterm-kitty does not exist." >&2
+
+  export TERM="xterm-256color"
+fi
 # export TERM="xterm-kitty"
 # export TERMINFO=/usr/share/terminfo
 # export TERM="xterm+256color"
@@ -72,7 +82,12 @@ psource "$GUIX_PROFILE/etc/profile"
 export PATH="${HOME}/.local/share/junest/bin:$PATH"
 export PATH="$PATH:${HOME}/.junest/usr/bin_wrappers"
 export JUNEST_HOME="${HOME}/.junest"
-alias sudo-junest="${HOME}/.junest/usr/bin_wrappers/sudo"
+if test -n "${JUNEST_ENV}" ; then
+    #: We are already inside junest, so just use the normal sudo.
+    alias sudo-junest=sudo
+else
+    alias sudo-junest="${HOME}/.junest/usr/bin_wrappers/sudo"
+fi
 ##
 export PATH="${HOME}/anaconda/bin:${PATH}"
 export PATH="${HOME}/miniconda3/bin:${PATH}"
@@ -107,11 +122,16 @@ alias gcls='git-clone-shallow'
 alias ga='git add'
 alias gc='git commit'
 alias gco='git checkout'
+alias gf='git fetch'
 alias gl='git pull'
 alias gp='git push'
 alias grv='git remote -v'
 alias gss='git status'
 alias gd='git diff'
+alias gcm='\noglob h-gcm'
+h-gcm () {
+    git commit -m "$*"
+}
 
 glola () {
     LESS=$LESSMIN git log --graph --pretty=format:'%Cred%h%Creset %C(yellow)%ad%Creset %Cgreen(%cr)%Creset %s %C(yellow)%d%Creset %C(bold blue)<%an>%Creset' --date=short --abbrev-commit --all
@@ -119,6 +139,15 @@ glola () {
 ##
 reval() {
     eval "$(gquote "$@")"
+}
+revaldbg() {
+    reval "$@"
+}
+reval-ec() {
+    reval "$@"
+}
+reval-ecgray() {
+    reval "$@"
 }
 ##
 proxy-env-unset () {
@@ -154,7 +183,7 @@ http-static-py () {
 export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
 
 emc-gateway () {
-    ALTERNATE_EDITOR="" LOGNAME="$(whoami)" DOOMDIR=~/doom.d pxa emacsclient -t "$@"
+    TERM=xterm-kitty ALTERNATE_EDITOR="" LOGNAME="$(whoami)" DOOMDIR=~/doom.d pxa emacsclient -t "$@"
 }
 ##
 function redo2 {
@@ -228,6 +257,13 @@ proxy-available-p () {
   fi
 }
 ##
+httpify-socks5 () {
+    local socks="${1}"
+    local http="${2}"
+
+    tmuxnew "httpify-socks-${socks}-to-${http}" gost -F "socks5://127.0.0.1:${socks}" -L "http://127.0.0.1:${http}"
+}
+##
 http-static-caddy () {
     caddy file-server --browse --listen "${2:-0.0.0.0}:${1:-8000}"
 }
@@ -239,4 +275,54 @@ alias icat='tpix'
 alias ic=icat
 ##
 alias trs='rip --'
+##
+alias ggrep=grep
+##
+##
+typeset -g sharif_net_url_normal='https://net2.sharif.edu'
+typeset -g sharif_net_url_ip='https://172.17.1.214'
+# typeset -g sharif_net_url_ip='https://198.18.0.8'
+typeset -g sharif_net_url="${sharif_net_url_ip}"
+
+function with-sharif-net-url-ip {
+    sharif_net_url="${sharif_net_url_ip}" reval-env "$@"
+}
+
+function h-sharif-net-curl {
+    (
+        ecgray "$0: disabled proxies  locally (by running proxy-env-unset in a subshell)"
+        proxy-env-unset
+
+        revaldbg curl --insecure "$@"
+    )
+}
+
+function sharif-net-status {
+    h-sharif-net-curl -s "${sharif_net_url}/status" | ggrep -oP '<td(?:\s[^>]*)?>\K.*?(?=</td>)'
+}
+
+function sharif-net-login {
+    h-sharif-net-curl -d "username=${sharif_vpn_username}&password=${sharif_vpn_passowrd}" -X POST "${sharif_net_url}/login" > /dev/null
+    sharif-net-status
+}
+
+function sharif-net-logout {
+    h-sharif-net-curl -d "" -X POST "${sharif_net_url}/logout"
+    sharif-net-status
+}
+##
+function date-tehran {
+    TZ='Asia/Tehran' date +'%Y-%m-%d %A %H:%M:%S'
+}
+##
+#: @duplicateCode/b5bd9b0856024ac4d9a4c454de6be2a4
+function git-clean-p {
+  git diff-index --quiet HEAD --
+  #: --quiet  Disable all output of the program. Implies --exit-code.
+  #: --exit-code  Make the program exit with codes similar to diff(1). That is, it  exits with 1 if there were differences and 0 means no differences.
+}
+
+function git-dirty-p {
+  ! git-clean-p
+}
 ##

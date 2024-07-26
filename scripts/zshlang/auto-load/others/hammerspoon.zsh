@@ -134,3 +134,18 @@ function hs-type {
     reval-ec hammerspoon -c "hs.eventtap.keyStrokes($(gquote-dq "$input"))"
 }
 ##
+function hs-focus-app {
+    local app_name="$1"
+    assert-args app_name @RET
+
+    hammerspoon -c "focusApp('${app_name}')"
+}
+
+function focus-app {
+    if isDarwin ; then
+        hs-focus-app "$@"
+    else
+        @NA
+    fi
+}
+##

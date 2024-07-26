@@ -86,19 +86,19 @@ def main():
     parser = argparse.ArgumentParser(description="Split an image into chunks.")
     parser.add_argument("input_path", type=str, help="Path to the input image.")
     parser.add_argument(
-        "--max_height", type=int, default=700, help="Maximum height of each chunk."
+        "--max-height", type=int, default=700, help="Maximum height of each chunk."
     )
     parser.add_argument(
-        "--min_height", type=int, default=200, help="Minimum height of each chunk."
+        "--min-height", type=int, default=200, help="Minimum height of each chunk."
     )
     parser.add_argument(
-        "--output_prefix",
+        "--output-prefix",
         type=str,
         default=None,
         help="Prefix for the output image files. If not specified, it defaults to the input file name.",
     )
     parser.add_argument(
-        "--bar_height",
+        "--bar-height",
         type=int,
         default=7,
         help="Height of the bar to detect for splitting.",
