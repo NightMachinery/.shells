@@ -2493,6 +2493,25 @@ function focusAppYabai(appName)
     end
 end
 
+function focusApp(appName)
+    local launch_p = false
+
+    local app = nil
+    app = hs.application.get(appName)
+
+    if app then
+        if app:isFrontmost() then
+        else
+            app:activate()
+        end
+    else
+        if launch_p then
+            hs.application.launchOrFocus(appName)
+            app = hs.application.get(appName)
+        end
+    end
+end
+
 function toggleFocus(appName)
     local launch_p = false
 
@@ -2533,7 +2552,7 @@ end
 
 -- appHotkey{ key='.', appName='com.microsoft.edgemac' }
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
-appHotkey{ key='.', appName='com.google.Chrome' }
+appHotkey{ key='n', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 
@@ -2555,7 +2574,7 @@ appHotkey{ key='p', appName='com.apple.Preview' }
 -- appHotkey{ key=']', appName='org.jdownloader.launcher' }
 
 appHotkey{ key='k', appName='info.sioyek.sioyek' }
-appHotkey{ key='n', appName='net.sourceforge.skim-app.skim' }
+-- appHotkey{ key='n', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='[', appName='info.sioyek.sioyek' }
 -- appHotkey{ key=']', appName='net.sourceforge.skim-app.skim' }
 
@@ -2565,7 +2584,7 @@ appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='\\', appName='com.apple.iCal' }
 appHotkey{ key='m', appName='mpv' }
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
-appHotkey{ key='n', appName='com.appilous.Chatbot' } -- Pal ChatGPT app
+-- appHotkey{ key='n', appName='com.appilous.Chatbot' } -- Pal ChatGPT app
 appHotkey{ key='b', appName='com.parallels.desktop.console' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
