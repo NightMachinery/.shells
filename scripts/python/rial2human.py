@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+from pynight.common_regex import float_pattern
 
 
 def rial_to_toman(rial):
@@ -19,7 +20,7 @@ def rial_to_toman(rial):
 
     for key in sorted(magnitude.keys(), reverse=True):
         if toman >= key:
-            count = int(toman / key)
+            count = int(toman // key)
             toman -= count * key
 
             if human_readable_toman != "":
@@ -35,5 +36,5 @@ if __name__ == "__main__":
         print("Usage: <rial_amount>")
         sys.exit(1)
 
-    rial = int(sys.argv[1].replace(",", ""))
+    rial = float(sys.argv[1].replace(",", ""))
     print(rial_to_toman(rial))
