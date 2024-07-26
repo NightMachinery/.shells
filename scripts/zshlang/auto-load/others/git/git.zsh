@@ -629,12 +629,6 @@ function git-p {
     #: -C <path>  Run as if git was started in <path> instead of the current working  directory.
 }
 aliasfn git-repo-p git-p
-
-function git-merge-p {
-  #: [[https://stackoverflow.com/questions/29101270/how-to-know-if-a-merge-is-ongoing-in-git][How to know if a merge is ongoing in git - Stack Overflow]]
-  ##
-  test -e "$(git rev-parse --git-dir)"/MERGE_HEAD
-}
 ##
 function git-link {
   local files=($@)
@@ -688,6 +682,47 @@ function git-dirty-p {
 }
 ##
 function git-merge-p {
+  ##
+  #: [[https://stackoverflow.com/questions/29101270/how-to-know-if-a-merge-is-ongoing-in-git][How to know if a merge is ongoing in git - Stack Overflow]]
+  # test -e "$(git rev-parse --git-dir)"/MERGE_HEAD
+  ##
   git rev-parse -q --verify MERGE_HEAD &> /dev/null
+  ##
+  #: @test
+  # cdtmp
+
+  # # Create a test repository
+  # mkdir test-repo
+  # cd test-repo
+  # git init
+
+  # # Get the name of the initial branch
+  # initial_branch=$(git branch --show-current)
+
+  # # Create an initial commit
+  # echo "Initial content" > file.txt
+  # git add file.txt
+  # git commit -m "Initial commit"
+
+  # # Create a new branch and make a change
+  # git checkout -b feature-branch
+  # echo "Feature branch change" >> file.txt
+  # git commit -am "Feature branch commit"
+
+  # # Switch back to the initial branch and make a different change
+  # git checkout "$initial_branch"
+  # echo "Initial branch change" >> file.txt
+  # git commit -am "Initial branch commit"
+
+  # # Attempt to merge the feature branch, which should create a conflict
+  # git merge feature-branch
+
+  # # Test the git-merge-p function
+  # if git-merge-p; then
+  # echo "Merge is in progress"
+  # else
+  #   echo "No merge in progress"
+  # fi
+  ##
 }
 ##
