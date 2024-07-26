@@ -685,6 +685,7 @@ function git-merge-p {
   ##
   #: [[https://stackoverflow.com/questions/29101270/how-to-know-if-a-merge-is-ongoing-in-git][How to know if a merge is ongoing in git - Stack Overflow]]
   # test -e "$(git rev-parse --git-dir)"/MERGE_HEAD
+  # return $?
   ##
   git rev-parse -q --verify MERGE_HEAD &> /dev/null
   return $?
