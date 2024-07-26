@@ -91,6 +91,16 @@ function seg-result-load {
 @opts-setprefix seg-result-load seg
 noglobfn seg-result-load
 ##
+function seg-aggregate-result-load {
+    local d="$f"
+    assert-args d @RET
+
+    (
+        assert cd "$d" @RET
+        fd method2metrics_no_threshold_mean.json | jsons_sort_by_best.py "$@" |& less
+    )
+}
+##
 function faith-result-load {
     #: @inputs ff, name
     ##
