@@ -237,3 +237,21 @@ function rclone-backup {
     cp -r ~/.config/rclone ${nightNotesPrivate}/backups/
 }
 ##
+function backup-simon-llm {
+    local d="$nightNotes/private/configs/simon_llm/"
+    # $(hostname)/$(whoami)/
+
+    mkdir-m "$d"
+
+    local fs=(
+        ~/'Library/Application Support/io.datasette.llm/extra-openai-models.yaml'
+    )
+
+    local i
+    for i in ${fs[@]} ; do
+        if test -e "$i" ; then
+            cp "$i" "${d}/"
+        fi
+    done
+}
+##
