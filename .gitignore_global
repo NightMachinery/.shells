@@ -1,6 +1,7 @@
 # -*- mode: gitignore; -*-
 
 ## My own
+.*.evilmarkers
 .aider*
 
 **/*..nogit..*
