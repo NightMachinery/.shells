@@ -1,3 +1,5 @@
+-- hs.alert("loading")
+---
 nightdir = os.getenv("NIGHTDIR") or (os.getenv("HOME") .. "/scripts")
 -- require("luarocks.loader")
 -- `luarocks path`
@@ -24,6 +26,7 @@ appfinder = require "hs.appfinder"
 applescript = require "hs.applescript"
 eventtap = require "hs.eventtap"
 json = require("hs.json")
+
 -- chooser = require "hs.chooser"
 plp = require 'pl.pretty'
 ---
@@ -2552,7 +2555,7 @@ end
 
 -- appHotkey{ key='.', appName='com.microsoft.edgemac' }
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
-appHotkey{ key='n', appName='com.google.Chrome' }
+appHotkey{ key='.', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 
@@ -2583,8 +2586,9 @@ appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='l', appName='notion.id' }
 -- appHotkey{ key='\\', appName='com.apple.iCal' }
 appHotkey{ key='m', appName='mpv' }
--- appHotkey{ key='/', appName='com.quora.app.Experts' }
+appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
 -- appHotkey{ key='n', appName='com.appilous.Chatbot' } -- Pal ChatGPT app
+-- appHotkey{ key='/', appName='com.quora.app.Experts' }
 appHotkey{ key='b', appName='com.parallels.desktop.console' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
@@ -3186,7 +3190,8 @@ function whisper_run_fa()
 end
 
 hyper_bind_v1("escape", whisper_run_en)
-hyper_bind_v1(".", whisper_run_en)
+-- hyper_bind_v1(".", whisper_run_en)
+hyper_bind_v2{mods={"cmd"}, key=".", pressedfn=whisper_run_en}
 hyper_bind_v2{mods={"ctrl"}, key=".", pressedfn=whisper_run_fa}
 
 hs.hotkey.bind({}, 'F1', whisper_run_en)
