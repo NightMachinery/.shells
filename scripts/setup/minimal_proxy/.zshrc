@@ -108,6 +108,7 @@ zinit light zsh-users/zsh-autosuggestions
 zinit light zdharma-continuum/fast-syntax-highlighting
 #: fast-syntax-highlighting should be last
 ##
+unalias zi &> /dev/null || true
 ###
 psource ~/.zshrc.private
 
