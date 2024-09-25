@@ -822,6 +822,13 @@ function h-rem-reclater {
 function date-unix {
     command date "+%s"
 }
+
+function date-from-unix {
+    local unix
+    unix="$(in-or-args "$@")" @RET
+
+    gdate -d "@${unix}" --rfc-3339=s
+}
 ##
 function str-center-justify {
   local str="$1"
