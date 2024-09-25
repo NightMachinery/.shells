@@ -252,6 +252,8 @@ function llm-logs {
 aliassafe llml='llm-logs'
 
 function llm-m {
+    bella_zsh_disable1
+
     local model="${llm_model:-gpt-3.5-turbo}"
     local temp="${llm_temp}"
     local system_prompt="${llm_system}"
@@ -279,7 +281,8 @@ function llm-m {
     ecgray "$log"
 
     $proxyenv revaldbg command llm "$@" "${opts[@]}" |
-        cat-copy-streaming
+        cat-rtl-streaming-if-tty
+        # cat-copy-streaming
 }
 
 function llm-continue {
@@ -291,6 +294,8 @@ aliassafe llmc='\noglob llm-continue'
 alias xc='\noglob llm-continue'
 
 function llm-send {
+    bella_zsh_disable1
+
     local model="${llm_model:-gpt-3.5-turbo}"
     typeset -g llm_last_model="$model"
 
@@ -327,7 +332,7 @@ function llm-send {
     input_cost="$(openai-cost-by-tokens "${model}" input "${token_count}")" @TRET
 
     ecgray '-----'
-    ecgray "${input}"
+    ecgray "${input}" |& cat-rtl-if-tty
     ecgray '-----'
     ecgray "Input Tokens: ${token_count}" #  (\$${input_cost})
     ecgray '-----------'
@@ -336,6 +341,7 @@ function llm-send {
     {
         #: =fd_out= is a copy of stdout, which we will use to stream the output.
         output="$(ecn "${input}" | llm_model="${model}" llm-m >&1 >&${fd_out})" @TRET
+        #: `> >(cat-rtl-streaming-if-tty >&${fd_out})` is no good as it needs to wait for the whole line to finish to output, while the default streamer outputs token by token. So we need to explicitly opt in for RTL manually when we need it.
     } always {
         exec {fd_out}<&-
     }

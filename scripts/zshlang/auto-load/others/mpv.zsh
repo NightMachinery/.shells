@@ -319,8 +319,8 @@ function playtmp() {
     pat ~/tmp/delme/"$1:t"
 }
 
-function mpv-imgseq() {
-    mpv "mf://*.png" --mf-fps 30
+function mpv-imgseq {
+    mpv "mf://*.png" --mf-fps=30
 }
 aliasfn mpvi mpv-imgseq
 ##
