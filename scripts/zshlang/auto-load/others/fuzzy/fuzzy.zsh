@@ -404,10 +404,10 @@ function fuzzy-choose() {
     fuzzyChoose.js "$*" | jqm '.[] | .[1]'
 }
 ##
-function fzinw() {
+function fzinw {
     bella_zsh_disable1
 
-    doc 'fz in words: allows you to select the part of the output you need from a command. (alt: smenu?)'
+    doc 'fz in words: allows you to select the part of the output you need from a command. (alt: smenu?, fz for selecting line-wise)'
 
     local q="$(fz-createquery "$@")"
 
@@ -416,4 +416,6 @@ function fzinw() {
     ec-copy "$res"
 }
 aliasfn ffin-words fzinw
+aliasfn ffs fzinw
+aliasfn select-menu-from-words fzinw
 ##

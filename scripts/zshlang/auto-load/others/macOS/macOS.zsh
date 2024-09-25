@@ -31,30 +31,32 @@ function screen-gray-set-darwin () {
 function frontapp-get {
     #: [[id:5192ebaf-95c8-43df-be58-c153ab412564][macOS/front app]]
     ##
-    if isDarwin ; then
-      if true ; then
-        frontapp-get-bundle-id-osa
-      else
-          #: @upstreamBug? [[id:1163a291-fbc8-4f77-8b53-9b58be684e66][=lsappinfo info= doesn't return anything.]]
-          ##
-          local info
-          info="$(lsappinfo info "$(lsappinfo front)")" @TRET
+    {
+        if isDarwin ; then
+            if true ; then
+            frontapp-get-bundle-id-osa
+            else
+                #: @upstreamBug? [[id:1163a291-fbc8-4f77-8b53-9b58be684e66][=lsappinfo info= doesn't return anything.]]
+                ##
+                local info
+                info="$(lsappinfo info "$(lsappinfo front)")" @TRET
 
-          local bundle_id
-          if bundle_id="$(ec "$info" | command rg --only-matching --replace='$1' 'bundleID\s*=\s*"([^"]*)"\s*$')" ; then
-            ec "$bundle_id"
-	        return 0
-          fi
+                local bundle_id
+                if bundle_id="$(ec "$info" | command rg --only-matching --replace='$1' 'bundleID\s*=\s*"([^"]*)"\s*$')" ; then
+                ec "$bundle_id"
+                return 0
+                fi
 
-          local bundle_path
-          if bundle_path="$(ec "$info" | command rg --only-matching --replace='$1' 'bundle\s*path="([^"]*)"')" ; then
-            ec "$bundle_path"
-          fi
-      fi
-    else
-        ectrace "Linux not supported"
-        return 1
-    fi
+                local bundle_path
+                if bundle_path="$(ec "$info" | command rg --only-matching --replace='$1' 'bundle\s*path="([^"]*)"')" ; then
+                ec "$bundle_path"
+                fi
+            fi
+        else
+            ectrace "Linux not supported"
+            return 1
+        fi
+    } | cat-copy-if-tty
 }
 
 function frontapp-get-bundle-id-osa {
