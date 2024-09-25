@@ -56,7 +56,9 @@ function trim {
 }
 
 function trimsed {
-    gsed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+     in-or-args "$@" |
+        gsed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' |
+        cat-copy-if-tty
 }
 
 function trimpy {

@@ -41,8 +41,9 @@ function reval-rtl {
     # not having a pipe can make more stuff work, so this opens the possibility of you seeing bugs later (i.e., some bugs will only become visible when you use rtl-reshaper)
     # but still, seeing bugs later is also a blessing, right? ;)
     reval "$@"
+
   else
-    reval "$@" | rtl-reshaper
+    reval "$@" | rtl-reshaper-streaming
   fi
 }
 aliasfn rtl reval-rtl
