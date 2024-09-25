@@ -116,6 +116,7 @@ openrouter_client = setup_openrouter_key()
 groq_client = setup_groq_key()
 deepseek_client = setup_deepseek_key()
 together_client = setup_together_key()
+gemini_client = setup_gemini_key()
 ###
 from pynight.common_anthropic import (
     setup_anthropic_key,
