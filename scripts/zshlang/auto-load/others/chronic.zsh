@@ -17,7 +17,9 @@ function chronic-certs {
 }
 
 function chronic-update {
-    pip-install aider-chat fanficfare cloudscraper
+    pipx upgrade aider-chat
+
+    pip-install fanficfare cloudscraper
     # ddgr
     pip install --upgrade --force pytube ytmusicapi youtube-dl spotipy spotdl
 
