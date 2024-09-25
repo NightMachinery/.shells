@@ -41,7 +41,8 @@ function fz {
         fzf-noempty "$cmdbody[@]" # moved options to FZF_DEFAULT_OPTS
     else
         fzf-gateway "$cmdbody[@]"
-    fi
+    fi |
+        cat-copy-if-tty
 }
 
 function fzf-noempty {

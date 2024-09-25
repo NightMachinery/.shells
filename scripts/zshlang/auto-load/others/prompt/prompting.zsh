@@ -1,4 +1,6 @@
 ##
+alias 2en='xz prompt-translate2en'
+##
 alias porg='prompt_input_mode=org'
 alias pblk='prompt_input_mode=block'
 
@@ -276,6 +278,10 @@ function prompt-translate2en-orgbeamer {
 }
 
 function prompt-translate2en {
+    prompt-instruction-input "Translate the following to English. Do not include any additional commentary." "$@"
+}
+
+function prompt-translate2en-v1 {
     prompt-instruction-input "Translate the following to English. Preserve the original's style and tone. Do not include any additional commentary." "$@"
 }
 
