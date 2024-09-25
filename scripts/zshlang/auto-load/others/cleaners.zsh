@@ -42,6 +42,10 @@ function rm-caches {
     trs-rm ~/tmp/hs_whisper
     trs-rm "$(brew --cache)"
 
+    if isDarwin ; then
+        sudo rm -rf /Library/Logs
+    fi
+
     pip cache remove '*'
     conda clean --all --yes #: STILL does not delete old python version stuff!
 
