@@ -10,6 +10,9 @@ require "pipe"
 
 rex = require("rex_pcre2")
 
+inspect = require "hs.inspect"
+location = require "hs.location"
+wifi = require "hs.wifi"
 ipc = require "hs.ipc"
 popclick = require "hs.noises"
 application = require "hs.application"
@@ -33,6 +36,71 @@ plp = require 'pl.pretty'
 function nop()
     hs.alert("repeating")
 end
+---
+function sanitizeLocationTable(location)
+    local sanitized = {}
+    for key, value in pairs(location) do
+        -- Exclude keys that start with '__' (like '__luaSkinType')
+        if type(key) == "string" and not key:match("^__") then
+            sanitized[key] = value
+        end
+    end
+    return sanitized
+end
+
+function printLocation()
+    local location = hs.location.get()
+    if location then
+        -- Sanitize the location table to remove non-serializable fields
+        local sanitizedLocation = sanitizeLocationTable(location)
+
+        -- Encode the sanitized table as a JSON string with pretty printing
+        local success, jsonOrError = pcall(hs.json.encode, sanitizedLocation, true)
+
+        if success then
+            print(jsonOrError)
+        else
+            -- If encoding fails, print the error message
+            print("Error encoding location data to JSON:", jsonOrError)
+        end
+    else
+        print("No location data available.")
+    end
+end
+--- * Wi-Fi Watcher
+wifiWatcher = nil
+previousSSID = hs.wifi.currentNetwork()
+
+-- Define the callback function
+function ssidChangedCallback()
+    local newSSID = hs.wifi.currentNetwork()
+
+    local alert_dur = 3
+
+    if newSSID ~= previousSSID then
+        if not newSSID then
+            hs.alert("Disconnected from Wi-Fi network: " .. (previousSSID or "None"), alert_dur)
+
+            brishzeval2bg("wifi-disconnect-hook")
+
+        else
+            hs.alert("Connected to Wi-Fi network: " .. (newSSID or "None"), alert_dur)
+
+            if newSSID == "Tealy" then
+                brishzeval2bg("tealy-connect-hook")
+
+            else
+                brishzeval2bg("wifi-unknown-connect-hook")
+            end
+        end
+
+        previousSSID = newSSID
+    end
+end
+
+-- Create and start the Wi-Fi watcher
+wifiWatcher = hs.wifi.watcher.new(ssidChangedCallback)
+wifiWatcher:start()
 ---
 function active_app_re_p(pattern, case_mode)
     local activeApp = hs.application.frontmostApplication()
@@ -3224,5 +3292,9 @@ function reloadConfig(files)
 end
 hyper_bind_v2{mods={"cmd"}, key="r", pressedfn=hs.reload}
 myWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", reloadConfig):start()
+---
+printLocation()
+-- We need to call this here so that Hammerspoon appears in the System location permissions. The first call to it also sometimes doesn't work, and this solves that, too.
+---
 brishzeval("bell-lm-eternalhappiness")
 --- @end
