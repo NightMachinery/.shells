@@ -107,8 +107,8 @@ function open-sioyek {
   open-with sioyek "$@" @RET
   sioyek-reload
 }
-aliasfn opy open-sioyek
-aliasfn sio open-sioyek
+# aliasfn opy open-sioyek
+# aliasfn sio open-sioyek
 
 function open-sioyek-v2 {
   local file="${1}" ; shift
@@ -116,10 +116,11 @@ function open-sioyek-v2 {
 
   file="$(path-unabbrev "${file}")" @TRET
 
-  assert sioyek "${file}" "$@" @RET
+  awaysh sioyek "${file}" "$@" @TRET
   sioyek-reload
   sioyek-focus
 }
+aliasfn sio open-sioyek-v2
 ##
 function mega-get {
   if isBicon ; then

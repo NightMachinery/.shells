@@ -15,8 +15,8 @@
 ** rsync necessary files
 #+begin_example zsh
 # host=t21
-# host=t31
-host=c0
+host=t31
+# host=c0
 # host=pino
 # host=m17-hpc
 # host=m15-hpc
@@ -83,6 +83,24 @@ ssh-keygen
 **** =DecompV/setup.zsh=
 
 **** =.privateShell=
+***** You might want to disable using shared HF and conda on a server:
+#+begin_src zsh :eval never
+##
+unset HF_HOME
+
+unset ANACONDA
+path-rm '/opt/anaconda3/bin'
+##
+#+end_src
+
+These are usually set up in:
+#+begin_src zsh :eval never
+❯ sudo cat /etc/environment
+HF_HOME=/opt/huggingface
+ANACONDA=/opt/anaconda3
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/opt/anaconda3/bin:"
+#+end_src
+
 ***** @retired
 ****** [[id:b4ad4e80-aa83-459b-87f0-07d1e5b22f0e][@PATH =micromamba=]]
 
@@ -300,7 +318,7 @@ pip install -U IPython aiofile docopt PySocks telethon python-telegram-bot py-sp
 :ID:       9950dc25-c88f-4660-b059-6302af531c03
 :END:
 #+begin_example zsh
-sudo apt-get install -y kitty-terminfo htop ncdu vim neovim git curl wget build-essential tmux zsh openconnect jq python3 python3-pip bindfs socat nmap net-tools netcat-openbsd openssh-client openssh-server autossh redis-server zstd
+sudo apt-get install -y kitty-terminfo htop ncdu vim neovim git curl wget build-essential tmux zsh openconnect jq python3 python3-pip bindfs socat nmap net-tools netcat-openbsd openssh-client openssh-server autossh redis-server zstd ripgrep
 
 # redis-install
 #+end_example

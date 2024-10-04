@@ -38,3 +38,23 @@ function h-hook-unlock {
     #: If the laptop's battery dies and we turn it on again, our restart hooks won't run but the limit would be reset.
 }
 ##
+function tealy-connect-hook {
+    # fsay "Tealy connected"
+
+    darwin-net-static-set
+    sleep 5
+    darwin-net-static-set
+}
+
+function wifi-disconnect-hook {
+    darwin-net-static-unset
+    sleep 5
+    darwin-net-static-unset
+}
+
+function wifi-unknown-connect-hook {
+    darwin-net-static-unset
+    sleep 5
+    darwin-net-static-unset
+}
+##

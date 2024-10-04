@@ -56,7 +56,7 @@ function sftpgo-portable {
 
     local d=~/Base/keys/sftpgo
     assert mkdir -p "$d" @RET
-    indir "$d" reval-ec sftpgo portable -d "$serve_dir" --permissions "$perms" --username "$user" --password "$pass" --log-verbose --log-file-path "$(ecn "sftpgo__${serve_dir}.log" | gtr / _ | str2filename)" "$opts[@]"
+    indir "$d" reval-ec sftpgo portable -d "$serve_dir" --permissions "$perms" --username "$user" --password "$pass" --log-level 'debug' --log-file-path "$(ecn "sftpgo__${serve_dir}.log" | gtr / _ | str2filename)" "$opts[@]"
     # --advertise-service
 }
 
