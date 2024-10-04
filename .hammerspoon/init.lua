@@ -2645,6 +2645,7 @@ appHotkey{ key='p', appName='com.apple.Preview' }
 -- appHotkey{ key=']', appName='org.jdownloader.launcher' }
 
 appHotkey{ key='k', appName='info.sioyek.sioyek' }
+-- appHotkey{ key='k', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='n', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='[', appName='info.sioyek.sioyek' }
 -- appHotkey{ key=']', appName='net.sourceforge.skim-app.skim' }

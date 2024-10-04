@@ -150,7 +150,7 @@ reval-ecgray() {
     reval "$@"
 }
 ##
-proxy-env-unset () {
+proxy-env-unset () { #: proxy unexport
     unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
 }
 

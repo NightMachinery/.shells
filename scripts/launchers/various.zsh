@@ -12,7 +12,9 @@ brishgarden-boot 16 /api/v1
 ##
 # tmuxnew trojan-go trojan-go -config ~/eva_trojan_server.json
 ##
-# caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
+sftpgo-serve-dl 'mercy in love'
+
+#: caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
 
 # tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
 tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile
