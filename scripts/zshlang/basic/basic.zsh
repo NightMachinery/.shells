@@ -200,3 +200,14 @@ rehash # make hash_executables_only take effect
 # hash_executables_only's effect sometimes gets lost when sourcing load-first, probably a zsh bug
 # echo t: ${commands[zsh]}
 ##
+function bool {
+    local i="${1:l}"
+
+    if [[ "${i}" == (n|no|0|false) ]] ; then
+        return 1
+    else
+        test -n "${i}"
+        return $?
+    fi
+}
+##

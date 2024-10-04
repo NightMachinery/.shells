@@ -187,6 +187,14 @@ function ncp {
     cat | gnc -c localhost 2000
 }
 ##
+function ip-router {
+    if isDarwin ; then
+        netstat -nr | perl -ne 'if (/^default\s+(\d+\.\d+\.\d+\.\d+)/) { print "$1\n"; exit }' | head -n1
+    else
+        @NA
+    fi
+}
+##
 function ip-internal-get {
     : "Use 'ipconfig getifaddr en1' for wireless, or 'ipconfig getifaddr en0' for ethernet."
 
@@ -303,8 +311,32 @@ function bwh {
 function darwin-net-static-set {
     if isMBP ; then
         reval-ec networksetup -setmanual Wi-Fi 192.168.1.56 255.255.0.0 192.168.1.1
+
     elif isMB2 ; then
-        reval-ec networksetup -setmanual Wi-Fi 192.168.1.57 255.255.0.0 192.168.1.1
+        ##
+        # reval-ec networksetup -setmanual Wi-Fi 192.168.1.57 255.255.0.0 192.168.1.1
+        ###
+        local router_ip
+        router_ip="$(ip-router)" @TRET
+        our_ip="${router_ip%.*}.57"
+        if [[ "${our_ip}" == "${router_ip}" ]] ; then
+            our_ip="${router_ip%.*}.1"
+            ecbold "$0: router_ip is already ${router_ip}, setting our_ip to ${our_ip} instead."
+        fi
+
+        ecgray "router_ip: ${router_ip}"
+        ecgray "our_ip: ${our_ip}"
+
+        reval-ec networksetup -setmanual Wi-Fi "${our_ip}" 255.255.255.0 "${router_ip}"
+        ##
+        # if isDeus || [[ "${router_ip}" =~ '^192\.168\.187\.' ]] ; then
+        #     reval-ec networksetup -setmanual Wi-Fi 192.168.187.57 255.255.255.0 "${router_ip}"
+
+        # else
+        #     ecerr "$0: router_ip does not match expected subnet."
+        #     reval-ec darwin-net-static-unset
+        # fi
+        ###
     else
         @NA
     fi

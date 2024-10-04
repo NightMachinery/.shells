@@ -4,6 +4,7 @@ function in-or-args2 {
 
     if (( $# )) ; then
         inargs=( "$@" )
+
     else
         ##
         in_or_args_in_p=y
@@ -37,7 +38,7 @@ function in-or-args {
     local html_p="${in_or_args_html_p}"
 
     if (( $# )) ; then
-        if test -n "$end_newline_p" ; then
+        if bool "$end_newline_p" ; then
             arrNN "$@"
         else
             arrN "$@"
@@ -168,17 +169,6 @@ function opts-urls() {
     done
 }
 ##
-function bool {
-    local i="${1:l}"
-
-    if [[ "${i}" == (n|no|0|false) ]] ; then
-        return 1
-    else
-        test -n "${i}"
-        return $?
-    fi
-}
-
 function bool-ask {
     local i="${1:l}" ask_args=("${@[2,-1]}")
 

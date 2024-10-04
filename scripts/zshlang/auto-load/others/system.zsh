@@ -441,7 +441,14 @@ function open_command {
 function location-get-darwin {
 	ensure isDarwin @MRET
 
-	CoreLocationCLI -json | jq .
+	##
+  # CoreLocationCLI -json | jq .
+  ##
+  hammerspoon -c 'printLocation()' |
+    rg -v '^-- ' |
+    jq .
+  #: Sometimes outputs '-- Loading extension: inspect'
+  ##
 }
 
 function location-get {

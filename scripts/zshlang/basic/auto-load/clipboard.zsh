@@ -1,9 +1,9 @@
 # alias pc='pbcopy'
 function cat-copy {
     local inargs
-    in-or-args2 "$@"
+    in_or_args_newline_p=n in-or-args2 "$@"
 
-    ec "$inargs" # Yes, we are adding a newline here, to work around some functions which do not output their trailing newline.
+    ec "$inargs" #: Yes, we are adding a newline here, to work around some functions which do not output their trailing newline.
     ecn "$inargs" | pbcopy
 }
 # alias pc='\noglob cat-copy'

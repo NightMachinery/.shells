@@ -401,3 +401,11 @@ function sort-by-regex-perl {
     ' -- "$@"
 }
 ##
+function lower {
+    local input
+    input="${$(in_or_args_newline_p=n in-or-args "$@" ; print -n .)[1,-2]}" @RET
+
+    ecn "${input:l}" |
+        cat-copy-if-tty
+}
+##
