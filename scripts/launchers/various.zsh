@@ -12,8 +12,11 @@ brishgarden-boot 16 /api/v1
 ##
 # tmuxnew trojan-go trojan-go -config ~/eva_trojan_server.json
 ##
-sftpgo-serve-dl 'mercy in love'
+# sftpgo-serve-dl 'mercy in love'
+#: Using SFTP is slow when accessing the server using Iran's internet. FTP and WebDAV don't seem to work with =sftpgo portable=.
 
+tmuxnew serve-dl-webdav-rclone rclone serve webdav ~/Downloads/ --read-only --addr :8000 --user alice --pass 'mercy in love'
+##
 #: caddy's memory usage sucks, and oom can kill it. We might need to add `retry` to it, but I want things to break noisily for now.
 
 # tmuxnewsh2 serve-dl caddy run --config $NIGHTDIR/launchers/Caddyfile.json
