@@ -326,3 +326,80 @@ function git-dirty-p {
   ! git-clean-p
 }
 ##
+function path-rm {
+    #: @duplicateCode/5a7a8cf2bca9b3e2eff69a63ad963603
+    #: actually not duplicated yet
+    ##
+    # Check if at least one directory is provided as an argument
+    if [ "$#" -eq 0 ]; then
+        echo "Usage: path-rm <dir1> [dir2 ...]" >&2
+        return 1
+    fi
+
+    # Assign all input arguments to a local array for directories to remove
+    local dirs_to_remove=("$@")
+    local newPATH=""
+    local path_array=()
+
+    # Determine the current shell: zsh or bash
+    if [ -n "$ZSH_VERSION" ]; then
+        # -----------------------
+        # zsh-Specific Handling
+        # -----------------------
+        # Split PATH into an array using zsh's parameter expansion
+        path_array=("${(@s/:/)PATH}")
+
+    elif [ -n "$BASH_VERSION" ]; then
+        # ------------------------
+        # bash-Specific Handling
+        # ------------------------
+        # Save the original Internal Field Separator (IFS)
+        local OLDIFS="$IFS"
+
+        # IFS (Internal Field Separator): Temporarily set to =:= to split the =PATH= variable into individual directories.
+        IFS=':'
+
+        # Split PATH into an array based on IFS
+        path_array=($PATH)
+
+        # Restore the original IFS
+        IFS="$OLDIFS"
+
+    else
+        # ------------------------
+        # Unsupported Shell
+        # ------------------------
+        echo "Error: Unsupported shell. This function works with bash and zsh only." >&2
+        return 1
+    fi
+
+    # ------------------------
+    # Common Handling
+    # ------------------------
+    # Iterate over each directory in the path_array
+    for dir in "${path_array[@]}"; do
+        # Initialize a flag to determine if the current dir should be removed
+        local remove=0
+
+        # Check if the current directory matches any of the directories to remove
+        for to_remove in "${dirs_to_remove[@]}"; do
+            if test -z "$dir" || [ "$dir" = "$to_remove" ]; then
+                remove=1
+                break
+            fi
+        done
+
+        # If the directory is not marked for removal, add it to newPATH
+        if [ "$remove" -eq 0 ]; then
+            if [ -z "$newPATH" ]; then
+                newPATH="$dir"
+            else
+                newPATH="$newPATH:$dir"
+            fi
+        fi
+    done
+
+    # Update the PATH variable in the current shell session
+    export PATH="$newPATH"
+}
+##
