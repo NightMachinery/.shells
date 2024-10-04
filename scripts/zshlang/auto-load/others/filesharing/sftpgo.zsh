@@ -61,7 +61,9 @@ function sftpgo-portable {
 }
 
 function sftpgo-serve-dl {
-    tmuxnewsh2 "$0" @opts sftp 9003 pass "${1:?}" @ sftpgo-portable ~/Downloads
+    #: `sudo ufw allow 9001 9002 9003`
+    ##
+    tmuxnewsh2 "$0" @opts sftp 9003 ftp 9002 webdav 9001 pass "${1:?}" @ sftpgo-portable ~/Downloads
 }
 
 function sftpgo-serve-base-writable {
