@@ -113,6 +113,10 @@ https://garden.lilf.ir {
   respond "pained gold spots accumulated"
 }
 
+deluge.lilf.ir {
+ encode zstd gzip
+ reverse_proxy localhost:8666
+}
 
 # org.lilf.ir {
 #  encode zstd gzip
