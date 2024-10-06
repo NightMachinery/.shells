@@ -41,7 +41,7 @@ function rem-sync {
 
     if ! bool "$nosync" ; then
         ec $'\n'
-        cellp
+        h-rem-sync
         awaysh iwidget-rem-refresh
     fi
 }
@@ -627,14 +627,18 @@ function datej-daylater {
 function rem-today-notify {
     ensure-dir ~/logs/
     {
-        ec "---"
+        ec "-------"
         date
-        # rem-sync
+
+        ec "---"
+        rem-sync-ni
+        ec "---"
+
         local text="$(rem-today ; ec ; remc-today)"
         if test -n "$text" ; then
             reval-ec notif-os "$(datej)" "$text"
         fi
-        ec "---"
+        ec "-------"
     } >> ~/logs/rem-today-notify.txt  2>&1 | cat
 }
 

@@ -107,14 +107,13 @@ function path-abbrev-to-music-dir {
         | cat-copy-if-tty
 }
 ##
-function cellp {
+function git-sync-v2 {
+    local dirs=("$@")
+
     assert-net @RET
 
-    #: Use =fnswap brishzr true= to disable this:
-    brishzr-repeat
-    #: to commit remote stuff so that we can pull them
-
-    for root in "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${nightResourcesPrivate}" ; do
+    local retcode=0
+    for root in "${dirs[@]}" ; do
         ec-sep-h
         ecbold "* ${root}"
         pushf "$root"
@@ -123,9 +122,9 @@ function cellp {
                 local err="git merge already in progress"
                 ecerr "$0 (${root}): $err"
 
-                fsay-noidle "$err in the cellar's ${root:t}"
+                fsay-noidle "git-sync: $err in ${root:t}"
 
-                # return 3
+                retcode=3
                 continue
             fi
 
@@ -134,6 +133,27 @@ function cellp {
             git_commitmsg_ask=no reval-ec gsync
         } always { popf }
     done
+
+    return $retcode
+}
+
+function cellp {
+    #: Use =fnswap brishzr true= to disable this:
+    brishzr-repeat
+    #: to commit remote stuff so that we can pull them
+
+    git-sync-v2 "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${nightResourcesPrivate}"
+
+    brishzr-repeat
+    #: to pull the new changes
+}
+
+function h-rem-sync {
+    #: Use =fnswap brishzr true= to disable this:
+    brishzr-repeat
+    #: to commit remote stuff so that we can pull them
+
+    git-sync-v2 "${remindayRootDir}"
 
     brishzr-repeat
     #: to pull the new changes
