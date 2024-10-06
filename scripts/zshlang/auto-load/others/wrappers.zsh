@@ -103,7 +103,7 @@ aliasfn opv open-preview
 aliasfn open-skim open-with Skim
 aliasfn ops open-skim
 
-function open-sioyek {
+function open-sioyek-v1 {
   open-with sioyek "$@" @RET
   sioyek-reload
 }
@@ -120,6 +120,7 @@ function open-sioyek-v2 {
   sioyek-reload
   sioyek-focus
 }
+aliasfn open-sioyek open-sioyek-v2
 aliasfn sio open-sioyek-v2
 ##
 function mega-get {
