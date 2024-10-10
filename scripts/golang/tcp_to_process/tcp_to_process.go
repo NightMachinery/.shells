@@ -7,14 +7,21 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/atotto/clipboard"
+	"golang.design/x/clipboard"
 )
 
 func main() {
+	// Init returns an error if the package is not ready for use.
+	err := clipboard.Init()
+	if err != nil {
+		panic(err)
+	}
+
 	// Command-line flags
 	bind := flag.String("bind", "127.0.0.1", "IP address to bind to")
 	port := flag.String("port", "", "Port to listen on")
@@ -107,18 +114,57 @@ func handleConnection(conn net.Conn, cmdArgs []string, envVars []string, readTim
 			return
 		}
 
-		// Copy data to clipboard
-		err = clipboard.WriteAll(data.String())
-		if err != nil {
+		receivedText := data.String()
+		receivedTextTrimmed := strings.TrimSpace(receivedText)
+
+		// Check if the data matches MAGIC_BELL_ regex
+		re := regexp.MustCompile(`^MAGIC_BELL_(bell\S?-?\S*)$`)
+		matches := re.FindStringSubmatch(receivedTextTrimmed)
+
+		if len(matches) == 2 {
+			// Extract bell name and execute command
+			bellName := matches[1]
+
+			// Log the action
 			if verbose > 0 {
-				fmt.Printf("Error: Failed to copy data to clipboard: %v\n", err)
+				fmt.Printf("Received MAGIC_BELL command with bell name: %s\n", bellName)
+			}
+
+			// Execute brishzq.zsh <bellName>
+			cmd := exec.Command("brishzq.zsh", bellName)
+
+			// Start the command
+			if err := cmd.Start(); err != nil {
+				if verbose > 0 {
+					fmt.Printf("Error: Failed to start command: %v\n", err)
+				}
+				return
+			}
+
+			// Wait for the command to finish
+			if err := cmd.Wait(); err != nil {
+				if verbose > 0 {
+					fmt.Printf("Error: Command exited with error: %v\n", err)
+				}
+			}
+
+			// Log the action
+			if verbose > 0 {
+				fmt.Printf("Executed brishzq.zsh %s\n", bellName)
+			}
+
+			if verbose > 0 {
+				fmt.Printf("Connection from %s closed\n", conn.RemoteAddr())
 			}
 			return
 		}
 
+		// If not MAGIC_BELL, copy data to clipboard
+		clipboard.Write(clipboard.FmtText, []byte(receivedText))
+
 		// Log data if verbosity level is greater than 1
 		if verbose > 1 {
-			fmt.Printf("Data copied to clipboard: %s\n", data.String())
+			fmt.Printf("Data copied to clipboard: %s\n", receivedText)
 		}
 
 		if verbose > 0 {
