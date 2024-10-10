@@ -6,10 +6,11 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/atotto/clipboard"
 )
 
 func main() {
@@ -20,6 +21,7 @@ func main() {
 	writeTimeout := flag.Duration("write-timeout", time.Hour, "Connection write timeout")
 	unidirectional := flag.Bool("u", false, "Unidirectional mode")
 	flag.BoolVar(unidirectional, "unidirectional", false, "Unidirectional mode")
+	verbose := flag.Int("verbose", 2, "Set verbosity level")
 	flag.Parse()
 
 	// Check if port is provided
@@ -40,6 +42,12 @@ func main() {
 	// Parse environment variables from command arguments
 	envVars, cmdArgs := parseEnvVars(args)
 
+	// Check if the command is MAGIC_COPY
+	isMagicCopy := false
+	if len(cmdArgs) > 0 && cmdArgs[0] == "MAGIC_COPY" {
+		isMagicCopy = true
+	}
+
 	// Start listening on the specified TCP address and port
 	address := net.JoinHostPort(*bind, *port)
 	listener, err := net.Listen("tcp", address)
@@ -49,15 +57,19 @@ func main() {
 	}
 	defer listener.Close()
 
-	fmt.Printf("Listening on %s\n", address)
+	if *verbose > 0 {
+		fmt.Printf("Listening on %s\n", address)
+	}
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Printf("Error: Failed to accept connection: %v\n", err)
+			if *verbose > 0 {
+				fmt.Printf("Error: Failed to accept connection: %v\n", err)
+			}
 			continue
 		}
-		go handleConnection(conn, cmdArgs, envVars, *readTimeout, *writeTimeout, *unidirectional)
+		go handleConnection(conn, cmdArgs, envVars, *readTimeout, *writeTimeout, *unidirectional, isMagicCopy, *verbose)
 	}
 }
 
@@ -73,13 +85,46 @@ func parseEnvVars(args []string) (envVars []string, cmdArgs []string) {
 	return
 }
 
-func handleConnection(conn net.Conn, cmdArgs []string, envVars []string, readTimeout, writeTimeout time.Duration, unidirectional bool) {
+func handleConnection(conn net.Conn, cmdArgs []string, envVars []string, readTimeout, writeTimeout time.Duration, unidirectional bool, isMagicCopy bool, verbose int) {
 	defer conn.Close()
-	fmt.Printf("Accepted connection from %s\n", conn.RemoteAddr())
+	if verbose > 0 {
+		fmt.Printf("Accepted connection from %s\n", conn.RemoteAddr())
+	}
 
 	// Set connection timeouts
 	conn.SetReadDeadline(time.Now().Add(readTimeout))
 	conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+
+	if isMagicCopy {
+		// Read data from the connection
+		var data strings.Builder
+		_, err := io.Copy(&data, conn)
+		if err != nil {
+			if verbose > 0 {
+				fmt.Printf("Error: Failed to read data from connection: %v\n", err)
+			}
+			return
+		}
+
+		// Copy data to clipboard
+		err = clipboard.WriteAll(data.String())
+		if err != nil {
+			if verbose > 0 {
+				fmt.Printf("Error: Failed to copy data to clipboard: %v\n", err)
+			}
+			return
+		}
+
+		// Log data if verbosity level is greater than 1
+		if verbose > 1 {
+			fmt.Printf("Data copied to clipboard: %s\n", data.String())
+		}
+
+		if verbose > 0 {
+			fmt.Printf("Connection from %s closed\n", conn.RemoteAddr())
+		}
+		return
+	}
 
 	// Prepare the command
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
@@ -88,23 +133,31 @@ func handleConnection(conn net.Conn, cmdArgs []string, envVars []string, readTim
 	// Set up pipes for stdin, stdout, and stderr
 	cmdStdout, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Printf("Error: Failed to get stdout pipe: %v\n", err)
+		if verbose > 0 {
+			fmt.Printf("Error: Failed to get stdout pipe: %v\n", err)
+		}
 		return
 	}
 	cmdStderr, err := cmd.StderrPipe()
 	if err != nil {
-		fmt.Printf("Error: Failed to get stderr pipe: %v\n", err)
+		if verbose > 0 {
+			fmt.Printf("Error: Failed to get stderr pipe: %v\n", err)
+		}
 		return
 	}
 	cmdStdin, err := cmd.StdinPipe()
 	if err != nil {
-		fmt.Printf("Error: Failed to get stdin pipe: %v\n", err)
+		if verbose > 0 {
+			fmt.Printf("Error: Failed to get stdin pipe: %v\n", err)
+		}
 		return
 	}
 
 	// Start the command
 	if err := cmd.Start(); err != nil {
-		fmt.Printf("Error: Failed to start command: %v\n", err)
+		if verbose > 0 {
+			fmt.Printf("Error: Failed to start command: %v\n", err)
+		}
 		return
 	}
 
@@ -150,8 +203,12 @@ func handleConnection(conn net.Conn, cmdArgs []string, envVars []string, readTim
 
 	// Wait for the command to finish
 	if err := cmd.Wait(); err != nil {
-		fmt.Printf("Error: Command exited with error: %v\n", err)
+		if verbose > 0 {
+			fmt.Printf("Error: Command exited with error: %v\n", err)
+		}
 	}
 
-	fmt.Printf("Connection from %s closed\n", conn.RemoteAddr())
+	if verbose > 0 {
+		fmt.Printf("Connection from %s closed\n", conn.RemoteAddr())
+	}
 }
