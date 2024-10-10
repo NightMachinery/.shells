@@ -85,10 +85,15 @@ func handleConnection(conn net.Conn, cmdArgs []string, envVars []string, readTim
 	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	cmd.Env = append(os.Environ(), envVars...)
 
-	// Set up pipes for stdin and stdout
+	// Set up pipes for stdin, stdout, and stderr
 	cmdStdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Printf("Error: Failed to get stdout pipe: %v\n", err)
+		return
+	}
+	cmdStderr, err := cmd.StderrPipe()
+	if err != nil {
+		fmt.Printf("Error: Failed to get stderr pipe: %v\n", err)
 		return
 	}
 	cmdStdin, err := cmd.StdinPipe()
@@ -121,19 +126,22 @@ func handleConnection(conn net.Conn, cmdArgs []string, envVars []string, readTim
 			defer wg.Done()
 			io.Copy(os.Stdout, cmdStdout)
 		}()
-		if cmdStderr, err := cmd.StderrPipe(); err == nil {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				io.Copy(os.Stderr, cmdStderr)
-			}()
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			io.Copy(os.Stderr, cmdStderr)
+		}()
 	} else {
-		// In bidirectional mode, pipe the command's output back to the connection
+		// In bidirectional mode, pipe the command's output and error back to the connection
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			io.Copy(conn, cmdStdout)
+		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			io.Copy(conn, cmdStderr)
 		}()
 	}
 
