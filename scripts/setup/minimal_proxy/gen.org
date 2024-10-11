@@ -13,18 +13,12 @@
 *** [help:org-babel-tangle]
 
 ** rsync necessary files
-#+begin_example zsh
-# host=t21
-host=t31
-# host=c0
-# host=pino
-# host=m17-hpc
-# host=m15-hpc
-# host=mmd1
+#+begin_src zsh :eval never
+cat "${NIGHTDIR}/setup/minimal_proxy/tangled/rsp_inject_host.zsh" | eval-on-fullhosts
+#+end_src
 
-# fullhost=$user@$host
-fullhost=$host
-
+#+name: rsp_1
+#+begin_src zsh :eval never
 rsp-safe --rsync-path="mkdir -p ~/base/bootstrap && rsync" "${nightNotesPublic}"/cheatsheets/OS/unix/tangled/*(D) ${fullhost}:base/bootstrap/
 
 rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(el|zsh|zshenv|zshrc|bash_profile|bashrc|bash|sh|curlrc)(D) ${fullhost}:
@@ -32,11 +26,29 @@ rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(el|zsh|
 rsp-safe "$nightNotesPrivate"/configs/minse/{.private.env.zsh,.secret-private-config.el} ${fullhost}:
 
 rsp-safe --rsync-path="mkdir -p ~/bin && rsync" "$NIGHTDIR/python/telegram-send/tsend.py" "$NIGHTDIR/perllang/ssh_password_auth_disable.pl" ${fullhost}:bin/
-#+end_example
 
-#+begin_example zsh
-rsp-safe2 ${fullhost}:bin/ $NIGHTDIR/perllang/url_dir_count.pl 
-#+end_example
+rsp-safe2 ${fullhost}:bin/ $NIGHTDIR/perllang/url_dir_count.pl
+#+end_src
+
+
+#+begin_src zsh :noweb yes :eval never :tangle tangled/rsp_with_host.zsh
+# host=t21
+# host=t31
+# host=c0
+host=pino
+# host=m17-hpc
+# host=m15-hpc
+# host=mmd1
+
+# fullhost=$user@$host
+fullhost=$host
+
+<<rsp_1>>
+#+end_src
+
+#+begin_src zsh :noweb yes :eval never :tangle tangled/rsp_inject_host.zsh
+<<rsp_1>>
+#+end_src
 
 ** On the destination server:
 *** @root
