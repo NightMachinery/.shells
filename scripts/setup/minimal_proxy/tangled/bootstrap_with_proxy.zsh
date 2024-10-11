@@ -56,7 +56,7 @@ if ! test -e ~/.local/share/junest ; then
     junest-install
 fi
 
-sudo-junest pacman -Syy --noconfirm gcc zsh ugrep tealdeer progress bandwhich ncdu eza ffmpeg
+sudo-junest pacman -Syy --noconfirm tar gzip gcc zsh ugrep tealdeer progress bandwhich ncdu eza ffmpeg
 
 sudo-junest pacman -Syy --noconfirm rust
 cargo install rm-improved

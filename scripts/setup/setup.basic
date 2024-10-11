@@ -7,4 +7,4 @@ cd "$setup_dir"
 
 ins-all
 
-re source "${setup_dir}/setup_dirs" "${setup_dir}/setup_links" "${setup_dir}/setup_misc" "${setup_dir}/git.config" "${setup_dir}/setup.cargo" "${setup_dir}/setup.linux" "${setup_dir}/setup_macOS.zsh" "${setup_dir}/setup_perl.zsh"
+re source "${setup_dir}/setup_dirs" "${setup_dir}/setup_links" "${setup_dir}/setup_misc" "${setup_dir}/setup_go" "${setup_dir}/git.config" "${setup_dir}/setup.cargo" "${setup_dir}/setup.linux" "${setup_dir}/setup_macOS.zsh" "${setup_dir}/setup_perl.zsh"

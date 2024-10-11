@@ -1,10 +1,30 @@
 ##
+#: Minimal proxy is supposed to always be running on a remote system, so we can hardcode the following:
+isLocal () {
+    return 1
+}
+
+isRemote () {
+    return 0
+}
+##
 isBash () {
     [[ -n $BASH_VERSION ]]
 }
 
 isZsh () {
     [[ -n $ZSH_VERSION ]]
+}
+##
+aliasfn () {
+    local name="$1"
+    local body="$@[2,-1]"
+
+    if isZsh ; then
+        functions[$name]="$body "'"$@"'
+    else
+        alias "$name"="$body"
+    fi
 }
 ##
 if infocmp xterm-kitty > /dev/null 2>&1; then
@@ -135,6 +155,14 @@ h-gcm () {
 
 glola () {
     LESS=$LESSMIN git log --graph --pretty=format:'%Cred%h%Creset %C(yellow)%ad%Creset %Cgreen(%cr)%Creset %s %C(yellow)%d%Creset %C(bold blue)<%an>%Creset' --date=short --abbrev-commit --all
+}
+
+gap () {
+  #: @duplicateCode/e7fe1579f27b25514799a50b50f2eff8
+  ##
+  reval-ec git add -p "$@"
+
+  reval-ec git status --short --untracked-files
 }
 ##
 reval() {
@@ -402,4 +430,9 @@ function path-rm {
     # Update the PATH variable in the current shell session
     export PATH="$newPATH"
 }
+##
+myip-ipinfo () {
+    curl -H "Authorization: Bearer ${ipinfo_api_token}" "ipinfo.io"
+}
+alias ci='myip-ipinfo'
 ##

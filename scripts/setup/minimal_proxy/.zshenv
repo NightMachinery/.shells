@@ -25,6 +25,9 @@ alias -g '@RET'=' || { retcode=$? ; print -r -- "exited ${retcode}" ; return $re
 ec() {
     print -r -- "$@"
 }
+ecn() {
+    print -nr -- "$@"
+}
 alias ecgray=ec
 
 ecerr() {
@@ -232,6 +235,126 @@ function sort-by-regex-perl {
 alias sbb='exec ${commands[zsh]}'
 #: We can't use our own 'sbb' here. When we remove all the env vars, the terminal breaks. I guess this has to do with the terminal being remote? Anyhow, I don't know which exact env var is needed to stop the breakage.
 ##
+#: @duplicateCode/fd8ad3a5d0229646fb38ce64e1cede19
+function aider-m {
+    local model="${aider_model}"
+    local opts=(
+        --map-tokens=0
+        #: Max number of tokens to use for repo map, use 0 to  disable (default: 1024) [env var: AIDER_MAP_TOKENS]
+    )
+
+    if git-clean-p ; then
+        # The repository is clean
+
+        local -x OPENROUTER_API_KEY="${openrouter_api_key}"
+        local -x OPENAI_API_KEY="${openai_api_key}"
+        #: Some models below replace OPENAI_API_KEY.
+        #: This is bad, as aider uses OpenAI for its voice mode, too.
+
+        if [[ "$model" == c3o ]] ; then
+            opts+=(
+                --model
+                openrouter/anthropic/claude-3-opus:beta
+
+                --edit-format diff
+            )
+            ##
+            # local -x OPENAI_API_KEY="${openrouter_api_key}"
+            # local -x OPENAI_API_BASE=https://openrouter.ai/api/v1
+
+            # opts+=(
+            #     --model
+            #     # anthropic/claude-3-opus
+            #     anthropic/claude-3-opus:beta
+
+            #     --edit-format diff
+            # )
+            ##
+
+        elif [[ "$model" == s3 ]] ; then
+            opts+=(
+                --model
+                # openrouter/anthropic/claude-3.5-sonnet:beta
+                #: The beta variant is not recognized by aider.
+                openrouter/anthropic/claude-3.5-sonnet
+
+                --edit-format diff
+            )
+
+        elif [[ "$model" == g1.5 ]] ; then
+            local -x OPENAI_API_KEY="${openrouter_api_key}"
+            local -x OPENAI_API_BASE=https://openrouter.ai/api/v1
+
+            opts+=(
+                --model
+                google/gemini-pro-1.5
+
+                # --edit-format diff
+            )
+
+        elif [[ "$model" == gq-llama3 ]] ; then
+            local -x GROQ_API_KEY="${groq_api_key}"
+
+            opts+=(
+                --model
+                groq/llama3-70b-8192
+
+                # --edit-format diff
+            )
+        fi
+
+        $proxyenv reval-ecgray command aider "${opts[@]}" "$@"
+    else
+        ecerr "$0: Repository is dirty"
+        return 1
+    fi
+}
+aliasfn aider aider-m
+aliasfn aider-4 aider_model=gpt-4 aider-m
+aliasfn aider-4t aider_model=gpt-4-turbo aider-m
+aliasfn aider-s3 aider_model=s3 aider-m
+aliasfn aider-c3o aider_model=c3o aider-m
+aliasfn aider-g1.5 aider_model=g1.5 aider-m
+aliasfn aider-l3 aider_model=gq-llama3 aider-m
+##
+function decompv-run {
+    local log_file="${HOME}/logs/run_$EPOCHSECONDS"
+    mkdir -p "${log_file:h}"
+
+    ec "log_file: ${log_file}"
+
+    python ~/code/DecompV/decompv/x/run/run_v1.py "$@" |& tee "${log_file}"
+}
+##
+function pbcopy-file-as-md {
+    #: @duplicateCode/2f9a53358e9a32d7c5642a4a9842dd63
+    ##
+    local fs=($@)
+
+    local f retcode=0
+    for f in "${fs[@]}" ; do
+        if ! test -e "$f" ; then
+            ecerr "$0: File does not exist: $f"
+            retcode=1
+            continue
+        fi
+
+        ec "File: $f"
+        ec '``````````'
+        cat "$f"
+        ec '``````````'
+        ec $'\n'
+    done | {
+        if isLocal ; then
+            cat-copy-streaming
+        else
+            pbcopy-remote
+        fi
+    }
+
+    return $retcode
+}
+alias cx='pbcopy-file-as-md'
 ### * End
 psource ~/.private.env.zsh
 psource ~/.privateShell
