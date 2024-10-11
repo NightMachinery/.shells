@@ -19,8 +19,9 @@ function curl-ip {
     pbcopy "$(gq curl "$opts[@]" https://checkip.amazonaws.com)"
 
     local res res_json
-    if bool "${ipinfo:-y}" && res="$(reval-ec curl "$opts[@]" https://ipinfo.io)" && res_json="$(ec $res | serr jq -e "$jq_opts[@]" .)" ; then
+    if bool "${ipinfo:-y}" && res="$(reval-ec curl "$opts[@]" -H "Authorization: Bearer ${ipinfo_api_token}" https://ipinfo.io)" && res_json="$(ec $res | serr jq -e "$jq_opts[@]" .)" ; then
         ec $res_json
+
     else # ipinfo blocks Iranian IPs
         local ip
         ip="$(reval-ec curl "$opts[@]" https://checkip.amazonaws.com)" @RET
@@ -80,7 +81,7 @@ aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
 aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
 ##
 alias myip-amazon='curlm https://checkip.amazonaws.com'
-alias myip-ipinfo='curlm https://ipinfo.io/ip'
+alias myip-ipinfo='curlm -H "Authorization: Bearer ${ipinfo_api_token}" https://ipinfo.io/ip'
 ##
 # opendns sometimes returns wrong results, but it is slightly faster
 alias myip-opendns='dig +short myip.opendns.com @208.67.222.222' # @resolver1.opendns.com

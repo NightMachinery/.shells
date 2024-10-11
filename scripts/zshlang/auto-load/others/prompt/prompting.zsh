@@ -452,7 +452,7 @@ function snippet-debug-add-prints {
 }
 
 function prompt-debug-find-bugs {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Find bugs in the following code:' "$@"
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Find bugs in the following code. Then fix the found bugs.' "$@"
 }
 ##
 function prompt-slide-complete-orgbeamer {
@@ -517,4 +517,34 @@ function text-split-letters {
 function prompt-emoji-name {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'What are the names of the emojis related to the following:' "$@"
 }
+##
+function pbcopy-file-as-md {
+    #: @duplicateCode/2f9a53358e9a32d7c5642a4a9842dd63
+    ##
+    local fs=($@)
+
+    local f retcode=0
+    for f in "${fs[@]}" ; do
+        if ! test -e "$f" ; then
+            ecerr "$0: File does not exist: $f"
+            retcode=1
+            continue
+        fi
+
+        ec "File: $f"
+        ec '``````````'
+        cat "$f"
+        ec '``````````'
+        ec $'\n'
+    done | {
+        if isLocal ; then
+            cat-copy-streaming
+        else
+            pbcopy-remote
+        fi
+    }
+
+    return $retcode
+}
+alias cx='pbcopy-file-as-md'
 ##

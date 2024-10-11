@@ -17,6 +17,10 @@ function rm-caches-sudo {
         sudo journalctl --vacuum-time=1s
         # sudo rm -rf /var/log/* #: This can break things that depend on some directories existing. Delete manually via ncdu.
     fi
+
+    if isDarwin ; then
+        sudo rm -rf /Library/Logs
+    fi
 }
 
 function trs-rm {
@@ -41,10 +45,6 @@ function rm-caches {
     trs-rm ~/julia_tmp/*(DN) ~/tmp-kindle/*(DN)
     trs-rm ~/tmp/hs_whisper
     trs-rm "$(brew --cache)"
-
-    if isDarwin ; then
-        sudo rm -rf /Library/Logs
-    fi
 
     pip cache remove '*'
     conda clean --all --yes #: STILL does not delete old python version stuff!

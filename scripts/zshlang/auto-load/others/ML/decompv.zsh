@@ -8,32 +8,43 @@ function eval-on-fullhosts {
         hosts=(
             pino
             c0
-            mmd1
+            t31
             t21
             m15-hpc
             m17-hpc
+            mmd1
         )
     fi
 
     SHARED_ROOT="/opt/decompv"
+    local retcode=0 err=""
     for fullhost in ${hosts[@]} ; do
         ec-sep-h
         ec "fullhost: ${fullhost}"$'\n'
 
         if eval-ec "${code}" ; then
         else
-            ecerr "$0: failed for fullhost=${fullhost}."
+            local msg
+            msg="$0: failed for fullhost=${fullhost}."
+            ecerr "$msg"
+            err+="$msg"$'\n\n'
+            retcode=1
 
-            if isDeus ; then
-                ecgray "continuing to the next server (Deus Mode) ..."
+            ##
+            # if isDeus ; then
+            #     ecgray "continuing to the next server (Deus Mode) ..."
 
-            else
-                ecgray "aborting"
+            # else
+            #     ecgray "aborting"
 
-                return 1
-            fi
+            #     return 1
+            # fi
+            ##
         fi
     done
+
+    ecerr "$err"
+    return $retcode
 }
 ##
 redis-defvar seg_result_input_file

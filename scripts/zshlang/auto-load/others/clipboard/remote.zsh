@@ -29,32 +29,42 @@ function clipboard-remote-listen {
     local port="${1:-6070}"
 
     tmuxnew "clipboard-listen-${port}" \
-        socat -u "TCP-LISTEN:${port},bind=127.0.0.1,fork" 'EXEC:env brishz_in=MAGIC_READ_STDIN brishzq.zsh h-clipboard-remote-listen'
+        tcp_to_process -u --bind=127.0.0.1 --port=${port} MAGIC_COPY
+        # tcp_to_process -u --bind=127.0.0.1 --port=${port} brishz_in=MAGIC_READ_STDIN brishzq.zsh h-clipboard-remote-listen
+        # socat -d -d -u "TCP-LISTEN:${port},bind=127.0.0.1,fork" 'EXEC:env brishz_in=MAGIC_READ_STDIN brishzq.zsh h-clipboard-remote-listen'
     # 'EXEC:zsh -fc \"tee >(pbcopy)\"'
 }
 
 function h-clipboard-remote-listen {
-    local isColor_override=y
-
-    local in
-    in="${$(</dev/stdin ; print -n .)[1,-2]}"
+    ensure-dir ~/logs/
 
     {
-        ec-sep-h
-        ecn "$in"
-        ec-sep-h
-    } >&2
+        # ecgray 'clipboard received input'
 
-    if [[ "$in" =~ '^MAGIC_BELL_(bell\S?-?\S*)$' ]] ; then
-        bell_name="${match[1]}"
+        local isColor_override=y
 
-        if isdefined "$bell_name" ; then #: @securityRisk9 @abundanceOfCaution
-            reval "${bell_name}"
+        local in
+        # ecgray 'clipboard: loading stdin'
+        in="${$(</dev/stdin ; print -n .)[1,-2]}"
+        # ecgray 'clipboard: finished loading'
+
+        {
+            ec-sep-h
+            ecn "$in"
+            ec-sep-h
+        } >&2
+
+        if [[ "$in" =~ '^MAGIC_BELL_(bell\S?-?\S*)$' ]] ; then
+            bell_name="${match[1]}"
+
+            if isdefined "$bell_name" ; then #: @securityRisk9 @abundanceOfCaution
+                reval "${bell_name}"
+            fi
+        else
+            ecn "$in" |
+                pbcopy
         fi
-    else
-        ecn "$in" |
-            pbcopy
-    fi
+    } |& tee -a ~/logs/"clipboard_listen"
 }
 ##
 pbcopy-remote() {

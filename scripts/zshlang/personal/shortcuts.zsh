@@ -142,7 +142,7 @@ function cellp {
     brishzr-repeat
     #: to commit remote stuff so that we can pull them
 
-    git-sync-v2 "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${nightResourcesPrivate}"
+    git-sync-v2 "${remindayRootDir}" "${nightNotesPrivate}" "${nightNotesPublic}" "${timetracker_dir}" "${nightResourcesPrivate}" @RET
 
     brishzr-repeat
     #: to pull the new changes
@@ -153,7 +153,13 @@ function h-rem-sync {
     brishzr-repeat
     #: to commit remote stuff so that we can pull them
 
-    git-sync-v2 "${remindayRootDir}"
+    (
+        cd "${remindayRootDir}"
+        assert git-synced-config-enable @RET
+        #: This is only needed once, but running it again is idempotent.
+    ) @RET
+
+    git-sync-v2 "${remindayRootDir}" @RET
 
     brishzr-repeat
     #: to pull the new changes

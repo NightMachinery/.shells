@@ -13,7 +13,7 @@ function brishgarden-count() {
     fnswap isI false ffps BRIIIII | wc -l
 }
 ##
-function brishz() {
+function brishz {
     ## PERF:
     # `hyperfine --warmup 5 'brishzq.zsh ec hi' "brishz_quote=y brishz.dash 'ec hi'" "brishz_quote='' brishz.dash 'ec hi'"` 81ms, 34ms, 24ms
     ##
