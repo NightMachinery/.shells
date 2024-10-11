@@ -11,6 +11,13 @@ path+=( /usr/local/bin /opt/homebrew/bin /home/linuxbrew/.linuxbrew/bin )
 autoload -Uz regexp-replace
 
 alias ec='print -r --'
+alias ecn='print -rn --'
+
+local debug_p=''
+# debug_p=y
+
+test -n "${debug_p}" && ec 'brishzq.zsh: started'
+
 function gquote() {
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
 }
@@ -143,8 +150,23 @@ if test -z "$brishz_noquote" ; then
     fi
 fi
 
-local stdin="$brishz_in"
-[[ "$stdin" == 'MAGIC_READ_STDIN' ]] && stdin="$(</dev/stdin)"
+
+local stdin="${brishz_in}"
+local stdin_file_p=''
+if [[ "$stdin" == 'MAGIC_READ_STDIN' ]] ; then
+    test -n "${debug_p}" && ec 'brishzq.zsh: reading stdin'
+
+    stdin_file_p='y'
+
+    stdin="${$(</dev/stdin ; ecn .)[1,-2]}"
+    # stdin="$(cat)"
+
+    test -n "${debug_p}" && ec 'brishzq.zsh: stdin read'
+
+else
+    test -n "${debug_p}" && ec "brishzq.zsh: stdin: ${stdin}"
+fi
+
 
 
 local opts=()
@@ -163,7 +185,24 @@ if [[ "$endpoint" =~ 'garden' ]] ; then
     opts+=(--user "Alice:$GARDEN_PASS0")
 fi
 local v=1
-local req="$(print -nr -- "$stdin" \
+local req
+
+if test -n "${stdin_file_p}" ; then
+    local stdin_f
+    stdin_f="$(mktemp)" || {
+        ec "Failed to create temporary file for stdin." >&2
+        return 1
+    }
+    ecn "$stdin" > "$stdin_f"
+req="$(jq --null-input --compact-output \
+    --arg nolog "$nolog" \
+    --arg failure_expected "$failure_expected" \
+    --arg s "$session" \
+    --arg c "< $(gquote-sq "${stdin_f}") {"$'\n'"$input_cmd[*]"$'\n'"}" \
+    --arg v $v \
+    '{"cmd": $c, "session": $s, "json_output": $v, "nolog": $nolog, "failure_expected": $failure_expected}')"
+else
+req="$(print -nr -- "$stdin" \
     | jq --raw-input --slurp --null-input --compact-output \
     --arg nolog "$nolog" \
     --arg failure_expected "$failure_expected" \
@@ -171,13 +210,19 @@ local req="$(print -nr -- "$stdin" \
     --arg c "$input_cmd[*]" \
     --arg v $v \
     'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "json_output": $v, "nolog": $nolog, "failure_expected": $failure_expected}')"
+fi
 local cmd=( curl $opts[@] --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint )
+
+test -n "${debug_p}" && ec "brishzq.zsh: req: ${req}"
+test -n "${debug_p}" && ec "brishzq.zsh: cmd: ${cmd}"
+
 cmd="$(gq print -nr -- $req) | $(gq "$cmd[@]")"
 if ((${+commands[pbcopy]})) ; then
     if test -n "$copy_cmd" ; then
         <<<"$cmd" pbcopy
     fi
 fi
+
 local out
 out="$(eval "$cmd")" || return $?
 

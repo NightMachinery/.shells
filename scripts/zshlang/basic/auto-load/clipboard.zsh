@@ -8,6 +8,15 @@ function cat-copy {
 }
 # alias pc='\noglob cat-copy'
 
+function cat-copy-v2 {
+    if (( $#@ > 0 )) ; then
+        cat "$@"
+    else
+        in-or-args
+    fi | pbcopy
+}
+alias cf='cat-copy-v2'
+
 function cat-copy-streaming-v1 {
     local temp_file
     temp_file="$(mktemp)" @TRET

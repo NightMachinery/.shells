@@ -18,9 +18,9 @@ alias g='git'
 
 alias ga='git add'
 alias gaa='git add --all'
-alias gapa='git add --patch'
+# alias gapa='git add --patch'
 alias gau='git add --update'
-alias gap='git apply'
+# alias gap='git apply'
 
 alias gb='git branch'
 alias gba='git branch -a'
@@ -202,6 +202,14 @@ alias glum='git pull upstream master'
 alias gwch='git whatchanged -p --abbrev-commit --pretty=medium'
 alias gwip='git add -A; git rm $(git ls-files --deleted) 2> /dev/null; git commit --no-verify -m "--wip-- [skip ci]"'
 ##
+function gap {
+  #: @duplicateCode/e7fe1579f27b25514799a50b50f2eff8
+  ##
+  reval-ec git add -p "$@"
+
+  reval-ec git status --short --untracked-files
+}
+##
 function gss-mods {
   local res
   res="$(gss "$@")" @RET
@@ -231,15 +239,15 @@ function git-rm-smart {
 
 alias glcs='glc --depth=1'
 ###
-function git-status-summary() {
+function git-status-summary {
   local args=("$@")
 
   local opts=()
   if isI && istty ; then
     opts+=(-c color.status=always -c color.ui=always)
   fi
-  local out="$(git "$opts[@]" submodule foreach git status -s "$args[@]")"
-  out+="$(prefix-if-ne $'\n\nMain repo\n' "$(git "$opts[@]" status -s "$args[@]")" "$out")"
+  local out="$(git "$opts[@]" submodule foreach git status --short "$args[@]")"
+  out+="$(prefix-if-ne $'\n\nMain repo\n' "$(git "$opts[@]" status --short "$args[@]")" "$out")"
   ec "$out"
 }
 aliasfn gss git-status-summary
@@ -726,5 +734,10 @@ function git-merge-p {
   #   echo "No merge in progress"
   # fi
   ##
+}
+##
+function git-synced-config-enable {
+  # touch .gitconfig
+  git config --local include.path ../.gitconfig
 }
 ##

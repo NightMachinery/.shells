@@ -398,7 +398,7 @@ function llm-4t-chat {
 aliasfn reval-to-gpt4t reval-to llm-4t
 aliassafe rl4t='\noglob reval-to-gpt4t'
 aliassafe 4t='\noglob reval-to-gpt4t'
-
+##
 function llm-4o {
     llm_model=gpt-4o llm-send "$@"
 }
@@ -409,7 +409,19 @@ function llm-4o-chat {
 aliasfn reval-to-gpt4o reval-to llm-4o
 aliassafe rl4o='\noglob reval-to-gpt4o'
 aliassafe 4o='\noglob reval-to-gpt4o'
+##
+function llm-4om {
+    llm_model=gpt-4o-mini llm-send "$@"
+}
+aliassafe l4om='\noglob llm-4om'
 
+function llm-4om-chat {
+    llm_model=gpt-4o-mini llm-m chat "$@"
+}
+aliasfn reval-to-gpt4om reval-to llm-4om
+aliassafe rl4om='\noglob reval-to-gpt4om'
+aliassafe 4om='\noglob reval-to-gpt4om'
+##
 typeset -g claude_3_5_sonnet_model_name='or:c35s'
 function llm-s3 {
     llm_model="${claude_3_5_sonnet_model_name}" llm-send "$@"

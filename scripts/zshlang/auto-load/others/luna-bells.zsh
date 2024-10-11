@@ -1075,14 +1075,35 @@ function bell-pi {
     fi
 }
 ##
-function bell-great-evil {
+function fsay-trinoids {
     bella_zsh_disable1
 
     if isDarwin ; then
-        fsay_r=140 fsay_v=Trinoids fsay "Great Evil"
+        fsay_r=140 fsay_v=Trinoids fsay "$@"
     else
         return 1
     fi
+}
+
+function bell-great-evil {
+    fsay-trinoids "Great Evil"
+}
+
+function bell-tables-created {
+    fsay-trinoids "Tables created"
+}
+
+function bell-metrics-loaded {
+    fsay-trinoids "Metrics loaded"
+}
+
+function bell-reloaded {
+    fsay-trinoids "Reloaded"
+}
+
+bell-maker "system-booted" "${NIGHTDIR}/resources/audio/tts/weights/glados_v1/System booted.mp3"
+function bell-system-booted-v1 {
+    fsay-trinoids "System booted"
 }
 ##
 function bell-awaiting-commands {

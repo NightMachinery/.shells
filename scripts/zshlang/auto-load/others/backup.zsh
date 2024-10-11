@@ -229,7 +229,7 @@ function backup-sftpgo {
 }
 ##
 function backup-arc {
-    cp2 "${nightNotesPrivate}/backups/Arc" \
+    cp2 "${nightNotesPrivate}/backups/arc_browser" \
         ~'/Library/Application Support/Arc/'*.json~*/(StorableAuth|StorableArchive|StorableWindows)*(DN.)
 }
 ##
