@@ -5,6 +5,7 @@ import os
 import argparse
 import shutil
 import re
+import ebooklib
 from ebooklib import epub
 from pynight.common_tui import ask
 
@@ -110,12 +111,11 @@ def check_dependencies():
         sys.exit(1)
 
 
-def convert_html_to_markdown(html_content, chapter_title):
+def convert_html_to_markdown(html_text, chapter_title):
     """Convert HTML content to Markdown using pypandoc."""
     try:
         import pypandoc  # Import inside the function after dependency check
 
-        html_text = html_content.decode("utf-8", errors="ignore")
         md_content = pypandoc.convert_text(html_text, "markdown", format="html")
         return md_content
     except Exception as e:
@@ -123,15 +123,42 @@ def convert_html_to_markdown(html_content, chapter_title):
         return None
 
 
-def get_markdown_content(book, title, href):
+def get_markdown_content(book, title, href, next_href=None):
     """Retrieve and convert a chapter's HTML content to Markdown."""
     href_no_fragment = href.split("#")[0]
-    item = book.get_item_with_href(href_no_fragment)
-    if item is None:
-        print_error(f"Error: href '{href}' not found in EPUB items.")
+
+    # Get the list of spine items in reading order
+    spine_items = [item for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT)]
+    spine_hrefs = [item.get_name() for item in spine_items]
+
+    # Find the index of the current item in the spine
+    try:
+        start_index = spine_hrefs.index(href_no_fragment)
+    except ValueError:
+        print_error(f"Error: href '{href}' not found in spine items.")
         return None
-    html_content = item.get_content()
-    md_content = convert_html_to_markdown(html_content, title)
+
+    # Determine the end index
+    if next_href:
+        next_href_no_fragment = next_href.split("#")[0]
+        try:
+            end_index = spine_hrefs.index(next_href_no_fragment)
+        except ValueError:
+            end_index = len(spine_items)
+    else:
+        end_index = len(spine_items)
+
+    # Collect content from start_index up to end_index
+    html_contents = []
+    for item in spine_items[start_index:end_index]:
+        html_content = item.get_content()
+        html_contents.append(html_content.decode('utf-8', errors='ignore'))
+
+    # Combine the html contents
+    html_text = '\n'.join(html_contents)
+
+    # Convert to markdown
+    md_content = convert_html_to_markdown(html_text, title)
     if md_content is None:
         return None
     return f"# {title}\n\n{md_content}"
@@ -196,8 +223,8 @@ def construct_chapter_filename(dest_basename, dest_ext, index, title, append_nam
 def export_selected_chapters(book, selected, output_file):
     """Export selected chapters to a single Markdown file."""
     md_contents = []
-    for index, title, href in selected:
-        md_content = get_markdown_content(book, title, href)
+    for index, title, href, next_href in selected:
+        md_content = get_markdown_content(book, title, href, next_href)
         if md_content:
             md_contents.append(md_content)
     final_md = "\n\n".join(md_contents)
@@ -216,8 +243,8 @@ def export_selected_chapters_individually(book, selected, output_base, append_na
     if not dest_ext and "." in os.path.basename(output_base):
         dest_basename = os.path.splitext(os.path.basename(output_base))[0]
 
-    for index, title, href in selected:
-        md_content = get_markdown_content(book, title, href)
+    for index, title, href, next_href in selected:
+        md_content = get_markdown_content(book, title, href, next_href)
         if md_content:
             chapter_filename = construct_chapter_filename(
                 dest_basename, dest_ext, index, title, append_name
@@ -242,7 +269,7 @@ def interactive_select_chapters(flat_toc_with_index):
         )
         sys.exit(1)
 
-    display_lines = [f"{index}. {title}" for index, title, _ in flat_toc_with_index]
+    display_lines = [f"{index}. {title}" for index, title, _, _ in flat_toc_with_index]
 
     # Invoke iterfzf for interactive selection
     try:
@@ -302,10 +329,15 @@ def main():
 
     toc = book.toc
     flat_toc = flatten_toc(toc)
-    # Enumerate flat_toc to store original indices
-    flat_toc_with_index = [
-        (index, title, href) for index, (title, href) in enumerate(flat_toc, start=1)
-    ]
+    # Enumerate flat_toc to store original indices and next_href
+    flat_toc_with_index = []
+    for i, (title, href) in enumerate(flat_toc):
+        index = i + 1
+        if i + 1 < len(flat_toc):
+            next_href = flat_toc[i + 1][1]
+        else:
+            next_href = None
+        flat_toc_with_index.append((index, title, href, next_href))
 
     if not flat_toc_with_index:
         print_error("Error: No chapters found in the EPUB's table of contents.")
