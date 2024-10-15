@@ -1,14 +1,27 @@
 #!/usr/bin/env python3
 ##
-#: @o1, @o1-mini
-##
 import sys
 import os
 import argparse
 import shutil
+import re
 from ebooklib import epub
+from pynight.common_tui import ask
 
-# Note: Removed top-level imports for pandoc and iterfzf
+##
+import warnings
+
+# Suppress specific warnings
+warnings.filterwarnings(
+    "ignore",
+    message="In the future version we will turn default option ignore_ncx to True.",
+)
+warnings.filterwarnings(
+    "ignore",
+    category=FutureWarning,
+    message="This search incorrectly ignores the root element",
+)
+##
 
 
 def flatten_toc(toc):
@@ -38,17 +51,20 @@ def parse_arguments():
     )
     parser.add_argument(
         "--all",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help="Export all chapters to separate files.",
     )
     parser.add_argument(
         "--append-name",
-        action="store_true",
-        help="Append chapter name to the output filename when using --all.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Append chapter name to the output filename.",
     )
     parser.add_argument(
         "--export-each",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
+        default=True,
         help="Export each selected chapter to a separate file instead of combining them.",
     )
     return parser.parse_args()
@@ -72,12 +88,12 @@ def check_dependencies():
         )
         sys.exit(1)
 
-    # Check for pandoc Python package
+    # Check for pypandoc
     try:
-        import pandoc
+        import pypandoc
     except ImportError:
         print_error(
-            "Error: pandoc Python package is not installed. Please install it using pip:\n\tpip install --upgrade pandoc"
+            "Error: pypandoc is not installed. Please install it using pip:\n\tpip install pypandoc"
         )
         sys.exit(1)
 
@@ -95,15 +111,13 @@ def check_dependencies():
 
 
 def convert_html_to_markdown(html_content, chapter_title):
-    """Convert HTML content to Markdown using the Pandoc Python API."""
+    """Convert HTML content to Markdown using pypandoc."""
     try:
-        import pandoc  # Import inside the function after dependency check
+        import pypandoc  # Import inside the function after dependency check
 
         html_text = html_content.decode("utf-8", errors="ignore")
-        doc = pandoc.read(html_text, format="html")
-        md_content = pandoc.write(doc, format="markdown")
+        md_content = pypandoc.convert_text(html_text, "markdown", format="html")
         return md_content
-
     except Exception as e:
         print_error(f"Pandoc error for chapter '{chapter_title}': {e}")
         return None
@@ -125,6 +139,16 @@ def get_markdown_content(book, title, href):
 
 def write_markdown_to_file(md_content, filename):
     """Write Markdown content to a specified file."""
+    #: Ask the user to overwrite if exists:
+    if os.path.exists(filename):
+        overwrite = ask(
+            f"File '{filename}' already exists. Overwrite?",
+            default=False,
+        )
+        if not overwrite:
+            print_error("Aborted.")
+            return
+
     try:
         with open(filename, "w", encoding="utf-8") as f:
             f.write(md_content)
@@ -140,16 +164,31 @@ def construct_chapter_filename(dest_basename, dest_ext, index, title, append_nam
     sanitized_title = "".join(
         c for c in title if c.isalnum() or c in (" ", "_", "-")
     ).rstrip()
-    sanitized_title = sanitized_title.replace(" ", "_")
 
-    # Construct output filename using the original index
+    # Prepare components of the filename
+    index_part = f"_c{index}"
+    extension_part = dest_ext or ""
+
+    # Compute base length without the title
+    base_length = len(dest_basename) + len(index_part) + len(extension_part)
+    # Add 1 if append_name is True to account for the extra '_'
     if append_name:
-        chapter_filename = f"{dest_basename}_c{index}_{sanitized_title}"
-    else:
-        chapter_filename = f"{dest_basename}_c{index}"
+        base_length += 1  # For the underscore before the title
 
-    if dest_ext:
-        chapter_filename += f"{dest_ext}"
+    # Maximum allowed length for the title part
+    max_name_length = 256
+    max_title_length = max_name_length - base_length
+
+    # Truncate the title if necessary
+    if append_name:
+        if len(sanitized_title) > max_title_length:
+            sanitized_title = sanitized_title[:max_title_length]
+        chapter_filename = f"{dest_basename}{index_part}_{sanitized_title}"
+    else:
+        chapter_filename = f"{dest_basename}{index_part}"
+
+    # Add extension if provided
+    chapter_filename += extension_part
 
     return chapter_filename
 
@@ -211,7 +250,6 @@ def interactive_select_chapters(flat_toc_with_index):
             display_lines,
             multi=True,
             prompt="Select chapters (Use TAB to select, ENTER to confirm): ",
-            # Removed 'default' parameter
         )
     except Exception as e:
         print_error(f"Error during chapter selection: {e}")
@@ -265,7 +303,9 @@ def main():
     toc = book.toc
     flat_toc = flatten_toc(toc)
     # Enumerate flat_toc to store original indices
-    flat_toc_with_index = [(index, title, href) for index, (title, href) in enumerate(flat_toc, start=1)]
+    flat_toc_with_index = [
+        (index, title, href) for index, (title, href) in enumerate(flat_toc, start=1)
+    ]
 
     if not flat_toc_with_index:
         print_error("Error: No chapters found in the EPUB's table of contents.")
