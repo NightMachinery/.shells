@@ -10,3 +10,9 @@ function python-package-version {
     python -c "import sys ; import json ; from pynight.common_package import packages_commit_get ; print(json.dumps(packages_commit_get(sys.argv[1:], import_p=${import_p},), indent=2))" "$@"
 }
 ##
+function py-args-to-kwargs {
+    in-or-args "$@" |
+        perl -pe 's/^(\s*)(\w+),/${1}${2}=${2},/' |
+        cat-copy-if-tty
+}
+##
