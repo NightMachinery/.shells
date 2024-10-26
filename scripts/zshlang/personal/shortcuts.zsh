@@ -232,3 +232,18 @@ function cdtmp {
     reval-ecgray "${cd_engine}" ~tmp/"${name}_cdtmp_$(uuidm)"
 }
 ##
+function servers-list-for-telegram {
+    servers=(
+        '@t21-gpu6'
+        '@t31-gpu13'
+        '@Pinocchio'
+        '@Taher'
+        '@m15'
+        # '@m17'
+    )
+
+    arrn "${servers[@]}" |
+        fz |
+        cat-copy-if-tty
+}
+##

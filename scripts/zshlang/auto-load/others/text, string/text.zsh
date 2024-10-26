@@ -297,6 +297,12 @@ function whitespace-shared-rm {
         cat-copy-if-tty
 }
 aliasfn strip-prefixed-whitespace whitespace-shared-rm
+
+function trailing-whitespace-rm {
+    cat-paste-if-tty |
+    perl -lpe 's/\s+$//' |
+        cat-copy-if-tty
+}
 ##
 function floatsort {
     cat-paste-if-tty |

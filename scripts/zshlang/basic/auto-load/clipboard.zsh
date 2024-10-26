@@ -270,6 +270,8 @@ function pbadd-applescript() {
 }
 
 function pbadd {
+    #: [agfi:pbcopy-img}
+    ##
     copy_files.swift "${(f@)$(re 'grealpath --' $@)}"
 }
 alias pa=pbadd
@@ -291,7 +293,9 @@ function pbcopy-img-darwin {
 }
 
 function pbcopy-img {
-    #: @seeAlso [help:ns-yank-image-at-point-as-image]
+    #: @seeAlso
+    #: - [help:ns-yank-image-at-point-as-image]
+    #: - [agfi:pbadd]
     ##
     if isDarwin ; then
         pbcopy-img-darwin "$@"

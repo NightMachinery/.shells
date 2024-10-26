@@ -123,16 +123,21 @@ function semantic-scholar-to-json-scraping {
 }
 
 function semantic-scholar-to-org {
-    local url="${1:-$(pbpaste)}"
-    assert-args url @RET
-    url="$(semantic-scholar-url-get "$url")" @TRET
+    #: This function should probably be called only with a single arg ... I doubt combining its output for mutiple URLs will be good.
+    ##
+    local inargs
+    in-or-args3 "$@" @RET
 
-    local json
-    json="$(revaldbg semantic-scholar-to-json "$url")" @TRET
+    local url
+    for url in ${inargs[@]} ; do
+        url="$(semantic-scholar-url-get "$url")" @TRET
 
-    ec "$json" |
-        revaldbg semantic_scholar_json_to_org.lisp "$url" |
-        cat-copy-if-tty
+        local json
+        json="$(revaldbg semantic-scholar-to-json "$url")" @TRET
+
+        ec "$json" |
+            revaldbg semantic_scholar_json_to_org.lisp "$url"
+    done | cat-copy-if-tty
 }
 aliasfn ssorg semantic-scholar-to-org
 ##

@@ -182,7 +182,7 @@ function icat {
 }
 
 function h_icat {
-    local i="$1"
+    local i="$1" copy_p="${icat_copy_p}"
 
     if bool "${icat_v:-y}" ; then
         if [[ "${icat_v}" == as_is ]] ; then
@@ -209,6 +209,10 @@ function h_icat {
         } always { silent trs-rm "$tmp" }
     fi
 
+    if bool "${copy_p}" ; then
+        assert pbcopy-img "${i}" @RET
+    fi
+
     if isKitty ; then
         icat-kitty "$i"
         # icat-kitty2 "$i"
@@ -229,7 +233,12 @@ alias ic=icat
 function icat-v {
     icat_v='as_is' icat "$@"
 }
+alias icv='icat-v'
 
+function icat-copy {
+    icat_copy_p=y icat-v "$@"
+}
+alias icc='icat-copy'
 
 aliasfn icat-big icat-kitty
 alias icb=icat-big
