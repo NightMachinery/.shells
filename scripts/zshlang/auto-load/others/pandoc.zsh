@@ -2,6 +2,10 @@ function epub2org() {
     @opts from epub to org trim_extra n @ pandoc-convert "$@"
 }
 
+function epub2md {
+    @opts from epub to markdown @ pandoc-convert "$@"
+}
+
 function epub2plain() {
     @opts from epub to plain @ pandoc-convert "$@"
 }

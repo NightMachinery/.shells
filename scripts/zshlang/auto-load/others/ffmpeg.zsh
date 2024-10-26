@@ -98,7 +98,8 @@ function ffmpeg-convert {
     local hw_encode_p="${ffmpeg_hw_encode_p:-n}"
     #: > It is hard to get an objective apples to apples comparison when it comes to quality of Handbrake's SW and HW encoding settings, but when I tried to get a similar quality encode Handbrake SW and HW encoding, the file size of the HW encode was a lot larger than the SW encode.
 
-    local opts=() encoder
+    ensure-array ffmpeg_opts
+    local opts=("${ffmpeg_opts[@]}") encoder
     if [[ "$encoder_family" == 'x265' ]] ; then
         if bool "$ffmpeg_hw_encode_p" && isAppleSilicon ; then
             encoder='hevc_videotoolbox'

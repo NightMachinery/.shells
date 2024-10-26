@@ -287,6 +287,8 @@ function h-lunaquit-force-dynamic {
 }
 
 function lunaquit-force {
+    bella_zsh_disable1
+
     if friction-type ; then
         #: This forces the updated version to be used, which allows us to dynamically swap the function called from any terminal session.
         brishz h-lunaquit-force-dynamic
@@ -772,6 +774,7 @@ function bell-lm-MI {
 }
 
 bell-lm-maker diary-search-fx 'flac/BenjaminDiarySearch.flac'
+bell-lm-maker lets-finish-this 'flac/25_40_MI_letsfinishthis.flac'
 bell-lm-maker eternalhappiness 01_09_MI_eternalhappiness.flac
 bell-lm-maker whattimeisit 20_02_MI_whattimeisit.flac
 bell-lm-maker timetoparty flac/08_06_MI_timetocheckouttheparty..blue..flac
@@ -831,10 +834,14 @@ function bell-lm-ok {
     bell-ringer "BELL_LM_OK_MARKER" "${files[@]}"
 }
 ##
+bell-lm-maker mo-very-wrong flac/20_02_MO_verywrong.flac
+bell-lm-maker mo-sth-wrong-here flac/20_01_MO_somethingwronghere.flac
+bell-lm-maker mo-no-right-or-wrong flac/04_09_MO_thereisnorightorwrong.flac
+
 bell-lm-maker mo-welldone flac/17.1_11_MO_welldone.flac
 # `fr heari 'flac/ MI cool'`
 ##
-function reval-onhold() {
+function reval-onhold {
     local id="$(uuidm)_REVAL_ONHOLD_MARKER"
     id="${id:u}"
 
@@ -952,6 +959,8 @@ bell-maker penguins-smileandwave "madagascar movie/smileandwave.wav"
 ## * HP3
 bell-maker hp3-platform-movement 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - Sound Effects/soundeffects.uax/common/platform_movement.wav'
 
+bell-maker hp3-fail-bean-bonus 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 22/Dialog part 2/pc_lup_Ch1FinalStrFail_2.wav'
+
 bell-maker hp3-be-careful-harry 'HP3/PC Computer - Harry Potter & the Prisoner of Azkaban - English Dialogue 12/Dialog part 1/pc_her_Adv6_7_be careful harry..blue..wav'
 
 bell-maker hp3-water-trickle \
@@ -1037,6 +1046,8 @@ aliasfn bell-image-uploaded tts-glados1-cached 'picture, uploaded'
 ##
 bell-maker 'batman-cave-open' 'batman/PlayStation 2 - LEGO Batman - Sound Effects/BATCAVE_BIGDOOR_OPEN.wav'
 ##
+bell-maker 'p2-you-look-great' 'PC Computer - Portal 2 - GLaDOS/sp_catapult_fling_sphere_peek_failuretwo02.mp3'
+
 bell-maker 'p2-searching' 'PC Computer - Portal 2 - Turret/turret_search_4..blue..wav'
 
 bell-maker 'p2-target-lost' 'PC Computer - Portal 2 - Turret/turret_search_2..blue..wav'
@@ -1102,8 +1113,21 @@ function bell-reloaded {
 }
 
 bell-maker "system-booted" "${NIGHTDIR}/resources/audio/tts/weights/glados_v1/System booted.mp3"
+
 function bell-system-booted-v1 {
     fsay-trinoids "System booted"
+}
+
+function bell-python-error {
+    redo2 2 fsay-trinoids "Python exception occurred"
+}
+
+function bell-jupyter-error {
+    ##
+    # bell-lm-mo-no-right-or-wrong
+    ##
+    redo2 2 fsay-trinoids "Jupyter exception occurred"
+    ##
 }
 ##
 function bell-awaiting-commands {
