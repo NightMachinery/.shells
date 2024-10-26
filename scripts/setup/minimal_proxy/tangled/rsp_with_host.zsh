@@ -17,4 +17,4 @@ rsp-safe "$nightNotesPrivate"/configs/minse/{.private.env.zsh,.secret-private-co
 
 rsp-safe --rsync-path="mkdir -p ~/bin && rsync" "$NIGHTDIR/python/telegram-send/tsend.py" "$NIGHTDIR/perllang/ssh_password_auth_disable.pl" ${fullhost}:bin/
 
-rsp-safe2 ${fullhost}:bin/ $NIGHTDIR/perllang/url_dir_count.pl
+rsp-safe2 ${fullhost}:bin/ $NIGHTDIR/perllang/url_dir_count.pl $NIGHTDIR/python/torch_cat.py
