@@ -148,22 +148,42 @@ function jpdfpages {
     pdf-getpages "$j" "$@"
 }
 ##
-function pdf-compress-gray {
-    : 'ALT: `pdftk in.pdf output out.pdf compress` does not compress as much'
+function pdf-compress-pdftk {
+    local input="${1}"
+    local out="${2:-${input:r}_c.pdf}"
 
+    reval-ec pdftk "${input}" output "${out}" compress
+}
+
+function pdf-compress {
     jglob
 
     local input="${1}"
-    local out="${2:-${input:r}_cg.pdf}"
-    local dpi="${pdf_compress_gray_dpi:-150}"
+    local out="${2:-${input:r}_compressed.pdf}"
+    local dpi="${pdf_compress_dpi:-150}"
+    local gray_p="${pdf_compress_gray_p}"
+    local opts=(
+        # -dEmbedAllFonts=true
+        # -dSubsetFonts=true
+    )
 
-        # -dEmbedAllFonts=true \
-        # -dSubsetFonts=true \
-    gs  -q -dNOPAUSE -dBATCH -dSAFER \
+    if bool "${gray_p}" ; then
+        opts+=(
+            -sProcessColorModel=DeviceGray
+            -sColorConversionStrategy=Gray
+            -dOverrideICC
+            #: @Claude/3.5-sonnet The -dOverrideICC switch is used to override or ignore ICC (International Color Consortium) profiles in PDF files during processing. When set to true, Ghostscript will ignore embedded ICC profiles and use its default color management instead.
+        )
+        out="${2:-${input:r}_cg.pdf}"
+    fi
+
+    trs "$out" || true
+    assert command gs -q -dNOPAUSE -dBATCH -dSAFER \
         -sDEVICE=pdfwrite \
         -dCompatibilityLevel=1.4 \
-        -sProcessColorModel=DeviceGray -sColorConversionStrategy=Gray -dOverrideICC \
-        -dDownsampleColorImages=true -dDownsampleGrayImages=true \
+        -dDownsampleColorImages=true \
+        -dDownsampleGrayImages=true \
+        -dDownsampleMonoImages=true \
         -dPDFSETTINGS=/screen \
         -dColorImageDownsampleType=/Bicubic \
         -dColorImageResolution=$dpi \
@@ -171,7 +191,14 @@ function pdf-compress-gray {
         -dGrayImageResolution=$dpi \
         -dMonoImageDownsampleType=/Bicubic \
         -dMonoImageResolution=$dpi \
-        -sOutputFile="$out" "$input"
+        ${opts[@]} \
+        -sOutputFile="$out" "$input" @RET
+
+    command du -h "${input}" "${out}"
+}
+
+function pdf-compress-gray {
+    pdf_compress_gray_p=y pdf-compress "$@"
 }
 ##
 function pdf-numberme {
