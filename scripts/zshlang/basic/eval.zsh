@@ -105,10 +105,13 @@ function aget {
 }
 ##
 function reval {
-    # ecdbg revaling "$(gquote "$@")"
-    # Don't put stuff here, reval is used in ecdbg itself!
     local cmd="$(gquote "$@")"
-    test -z "$*" && return 0 # Don't throw an error, it throws some other stuff up :|
+    test -z "${cmd}" && return 0
+    #: Don't throw an error, it throws some other stuff up :|
+
+    # ecdbg revaling "${cmd}"
+    #: Don't put stuff here, reval is used in ecdbg itself!
+
     eval "$cmd"
 }
 
