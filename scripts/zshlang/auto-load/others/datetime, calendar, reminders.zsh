@@ -139,17 +139,26 @@ function now-year {
 
 function dateshort() { date +"%b %d %H:%M:%S" }
 
-function dateshortnum() { date +"%Y/%m/%d" }
+function dateshortnum {
+    date +"%Y/%m/%d"
+}
 
 function date-tehran {
     TZ='Asia/Tehran' date +'%Y-%m-%d %A %H:%M:%S'
 }
+
 function date-canada {
     TZ='Canada/Eastern' date +'%Y-%m-%d %A %H:%M:%S'
 }
+
 function date-spain {
     TZ='Europe/Madrid' date +'%Y-%m-%d %A %H:%M:%S'
 }
+
+function date-uk {
+    TZ='Europe/London' date +'%Y-%m-%d %A %H:%M:%S'
+}
+aliasfn date-london date-uk
 
 function datej {
     # alt: Python https://github.com/fitnr/convertdate
