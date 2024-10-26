@@ -11,7 +11,15 @@ function comment-rm-json {
 }
 # aliasfn comment-rm-json json5-to-json
 ##
-function comment-rm-py {
+function comment-rm-py-v2 {
+    whitespace-shared-rm |
+        comment_rm_py.py |
+        trailing-whitespace-rm |
+        cat-copy-if-tty
+}
+aliasfn comment-rm-py comment-rm-py-v2
+
+function comment-rm-py-v1 {
     #: * @warn
     #: ** This only removes lines starting with a comment.
     #: *** This will also delete such lines even if they are in a multi-line string.
