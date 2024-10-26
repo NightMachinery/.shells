@@ -131,6 +131,22 @@ function reval-to {
     reval "$@" | reval "${=to}"
 }
 
+function reval-on-file {
+    local files=("$1") cmd=("${@[2,-1]}")
+
+    cat "${files[@]}" |
+        reval "${cmd[@]}" |
+        cat-copy-if-tty
+}
+
+function reval-on-file-inplace {
+    local file=("$1") cmd=("${@[2,-1]}")
+
+    cat "${file}" |
+        reval "${cmd[@]}" |
+        sponge "${file}"
+}
+
 function reval-paste {
     pbpaste | reval "$@"
 }
