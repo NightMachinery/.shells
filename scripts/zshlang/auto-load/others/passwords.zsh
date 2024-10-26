@@ -1,7 +1,15 @@
-function passgen {
+##
+function passgen-base64 {
     #: @alt =passgen.go=
     ##
     openssl rand -base64 "${1:-16}" |
+        cat-copy-if-tty
+    #: Base64 is a scheme for converting binary data to printable ASCII characters, namely the upperand lower-case Roman alphabet characters (A–Z, a–z), the numerals (0–9), and the "+" and "/" symbols, with the "=" symbol as a special suffix code.
+}
+
+function passgen-alphanumeric {
+    passgen-base64 "${@:-32}" |
+        tr -dc 'a-zA-Z0-9' |
         cat-copy-if-tty
 }
 
@@ -9,6 +17,7 @@ function passgen-hex {
     openssl rand -hex "${1:-16}" |
         cat-copy-if-tty
 }
+aliasfn passgen passgen-alphanumeric
 
 function passgen-numerical {
     local len="${1:-16}"
@@ -24,6 +33,8 @@ function passgen-numerical {
 }
 
 function passgen-words {
+    #: @alt =passgen_words.py=
+    ##
     local len="${1:-10}"
 
     local words=() n w
