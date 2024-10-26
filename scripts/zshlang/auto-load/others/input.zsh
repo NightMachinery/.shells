@@ -58,6 +58,8 @@ function ask {
 }
 ##
 function friction-type {
+    bella_zsh_disable1
+
     local input_string="$1"
     local retries_count=-1
 
