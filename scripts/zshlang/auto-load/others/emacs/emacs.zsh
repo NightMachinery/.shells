@@ -264,10 +264,10 @@ function emc-colorize {
     # this whole command is a raceCondition but it should be harmless
 }
 ##
-function icat-emc() {
+function icat-emc {
     icat "$(emc-buffer-file-name)"
 }
-alias icc='icat-emc'
+# alias ice='icat-emc'
 ##
 function lisp-quote {
     ##
