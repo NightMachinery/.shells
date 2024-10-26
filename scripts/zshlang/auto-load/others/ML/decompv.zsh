@@ -1,4 +1,8 @@
 ##
+function rsp-metrics {
+    reval-ec rsp-safe --ignore-missing-args "${fullhost}:/opt/decompv/metrics/"{MURA,ImageNet-Hard,cls_v3,s} ~cod/uni/FairGrad_Metrics/metrics/
+}
+
 function eval-on-fullhosts {
     local code
     code="$(cat-paste-if-tty)" @RET
@@ -188,4 +192,89 @@ function decompv-channel-mixer-best {
 function decompv-channel-mixer-unique {
     unique_by.rs -r=-1 -e '(attributions_.*)_s:[^_".]*([^".]*)'
 }
+##
+function decompv-sync {
+    ecbold "$0: syncing locally ..."
+
+    PIP_INSTALL_P= zsh '/Users/evar/notes/private/research/DecompV/tangled/setup.zsh'
+
+    ec-sep-h
+
+    ec 'ssh-run-in-shell "${fullhost}" "PIP_INSTALL_P= zsh ~/code/DecompV_setup/setup.zsh"' | eval-on-fullhosts "$@"
+}
+##
+function tbl2pdf {
+    local input="${1}"
+    local dest="${2:-${input:r}.pdf}"
+    local template_name="${tbl2pdf_template:-table_1.tex}"
+
+    if ! test -e "${template_name}" ; then
+        template_name=~[decompnote]/latex_templates/"${template_name}"
+    fi
+    assert test -e "${template_name}" @RET
+
+    (
+        cdtmp
+
+        cp "${template_name}" .
+
+        local input_text
+        input_text="$(cat "${input}")" @TRET
+
+         < "${template_name}" assert command sd --string-mode '% REPLACE_HERE' "${input_text}" | sponge t.tex @RET
+
+        assert pdflatex t.tex @RET
+
+        cp -v "t.pdf" "${dest}"
+    ) @RET
+}
+
+function tbl2pdf-i {
+    local tmp
+    tmp="$(gmktemp)" @TRET
+    tmp_pdf="$(gmktemp --suffix .pdf)" @TRET
+
+    cat-paste-if-tty > "${tmp}" @RET
+
+    tbl2pdf "${tmp}" "${tmp_pdf}" @RET
+
+    assert zopen "${tmp_pdf}" @RET
+}
+##
+typeset -g fairgrad_paper_dir=~cod/uni/papers/FairGrad
+typeset -g decompv_artifacts_dir=~cod/decompv_artifacts
+
+function fairgrad-paper-used-files {
+    (
+        assert cd "${fairgrad_paper_dir}" @RET
+
+        cat **/*.tex |
+            rg -v '^\s*%' |
+            rget '((?:qual_v5|tables_v1)/.*\.(png|jpe?g|pdf))\b'
+    )
+}
+
+function h-fairgrad-paper-copy-files {
+    trs "${fairgrad_paper_dir}"/files/{qual_v5,tables_v1} || true
+    local f fs
+    fs=(${(@f)"$(fairgrad-paper-used-files)"}) || true
+    for f in "${fs[@]}" ; do
+        assert cp "${decompv_artifacts_dir}/${f}" "${fairgrad_paper_dir}/files/${f}" @RET
+    done
+}
+
+function fairgrad-paper-build {
+    (
+        assert cd "${fairgrad_paper_dir}" @RET
+
+        assert h-fairgrad-paper-copy-files @RET
+
+        pdflatex-m main.tex @RET
+
+        silent trs tmp.*(DN.) || true
+
+        awaysh zopen main.pdf
+    )
+}
+
 ##
