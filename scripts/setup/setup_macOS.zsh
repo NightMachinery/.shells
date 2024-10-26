@@ -3,6 +3,9 @@
 if isDarwin ; then
     objc-compile "$NIGHTDIR/objective-c/input_lang_get_objc.m"
 
+    brew install util-linux
+    lnrp "$(brew --prefix util-linux)/bin/setsid" ~/bin/setsid
+
     brew install --cask mactex
     brew install --cask handbrake
     brew install --cask adobe-acrobat-reader skim # foxit-pdf-editor
