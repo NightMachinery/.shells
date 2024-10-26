@@ -186,7 +186,7 @@ function awaysh-exit() {
     ##
 }
 
-function awaysh-doublefork() {
+function awaysh-doublefork {
     # https://stackoverflow.com/questions/66936760/shell-fork-daemonize-a-subshell-such-that-it-survives-the-death-of-its-tmux-s
     awaysh1 awaysh-exit "$@"
 }
@@ -197,12 +197,12 @@ function awaysh() {
     # also, weirdly, with this subshell, we no longer need MONITOR in the first place :|
 }
 
-function awaysh-sure() {
-    # @broken completely
-    awaysh-doublefork "$@"
-    # ( awaysh-exit "$@" )
-    sleep 1 # give it time to fork
-}
+# function awaysh-sure() {
+#     # @broken completely
+#     awaysh-doublefork "$@"
+#     # ( awaysh-exit "$@" )
+#     sleep 1 # give it time to fork
+# }
 
 function awaysh1() {
     local cmd="$(gquote "$@")"
@@ -234,6 +234,27 @@ function disown-true {
 @opts-setprefix awaysh insubshell-eval
 @opts-setprefix awaysh1 insubshell-eval
 @opts-setprefix awaysh2 insubshell-eval
+##
+function awaysh-v2 {
+    #: @o1
+    ##
+    (
+        # Start a new session and become the session leader
+        setsid
+
+        # Second fork to prevent the process from acquiring a controlling terminal
+        (
+            # Redirect standard input, output, and error to /dev/null
+            exec 0</dev/null 1>/dev/null 2>&1
+
+            # Execute the provided command
+            reval "$@"
+        ) &
+
+        # Exit the intermediate shell
+        exit 0
+    ) &
+}
 ##
 function inbg() {
     reval "$@" &|
