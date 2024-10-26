@@ -784,7 +784,9 @@ function org-header-rm-shared-level {
     text="$(in-or-args "$@")" @TRET
 
     local min_level
-    if min_level="$(ec "$text" | perl -lne 'm/^(\*+)/ && print length $1' | num-min)" ; then
+    if min_level="$(ec "$text" | perl -lne 'm/^(\*+)\s/ && print length $1' | num-min)" ; then
+        dact var-show min_level
+
         min_level=$(( min_level - 1 ))
 
         local min_heading=''
