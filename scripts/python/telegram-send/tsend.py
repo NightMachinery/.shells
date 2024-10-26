@@ -342,7 +342,7 @@ async def ptb_send(
         await send_media_group(media_group_docs, is_image=False)
 
 
-def get_parse_mode(mode_str):
+def ptb_get_parse_mode(mode_str):
     if mode_str:
         mode_str = mode_str.lower()
 
@@ -416,18 +416,18 @@ async def tsend(arguments):
                 app = (
                     ApplicationBuilder()
                     .token(token)
-                    .proxy_url(proxy_url)
-                    .get_updates_proxy_url(proxy_url)
+                    .proxy(proxy_url)
+                    .get_updates_proxy(proxy_url)
                     .build()
                 )
-                # PTBDeprecationWarning: Deprecated since version 20.7: `ApplicationBuilder.proxy_url` is deprecated. Use `ApplicationBuilder.proxy` instead.
+                #: PTBDeprecationWarning: Deprecated since version 20.7: `ApplicationBuilder.proxy_url` is deprecated. Use `ApplicationBuilder.proxy` instead.
 
                 bot = app.bot
             else:
                 bot = telegram.Bot(token)
 
             async with bot:
-                parse_mode = get_parse_mode(parse_mode_str)
+                parse_mode = ptb_get_parse_mode(parse_mode_str)
 
                 # ic(parse_mode_str)
                 if parse_mode_str == "html":
@@ -478,10 +478,15 @@ async def tsend(arguments):
 
             try:
                 # print(arguments)
-                if arguments["--parse-mode"] == "html":
+                if parse_mode_str == "html":
                     arguments["<message>"] = re.sub(
                         r"(<(br|p)\s*/?>)", r"\1" + "\n", arguments["<message>"]
                     )
+
+                elif parse_mode_str == "none":
+                    parse_mode_str = None
+                    #: Disabling default formatting
+                    #: [[https://docs.telethon.dev/en/stable/modules/client.html#telethon.client.messageparse.MessageParseMethods.parse_mode][TelegramClient — Telethon 1.36.0 documentation]]
 
                 await discreet_send(
                     client,
@@ -489,7 +494,7 @@ async def tsend(arguments):
                     arguments["<message>"],
                     file=(arguments["--file"] or None),
                     force_document=arguments["--force-document"],
-                    parse_mode=arguments["--parse-mode"],
+                    parse_mode=parse_mode_str,
                     link_preview=arguments["--link-preview"],
                     album_mode=(not arguments["--no-album"]),
                 )
