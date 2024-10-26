@@ -27,15 +27,15 @@ function jcolor {
 ##
 function borg-restart {
     ##
-    awaysh-sure tmux-session-restart julia
+    reval-ec awaysh-sure tmux-session-restart julia
     ##
-    # brishz awaysh tmux-session-restart julia
+    # reval-ec brishz awaysh tmux-session-restart julia
     ##
 }
 alias reborg=borg-restart
 
 function borg-restart-remote {
-    brishzr awaysh tmux-session-restart julia
+    reval-ec brishzr awaysh tmux-session-restart julia
 }
 ##
 jkey_expire=$((3600*24*60))
