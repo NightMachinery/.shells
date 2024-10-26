@@ -318,12 +318,21 @@ aliasfn aider-g1.5 aider_model=g1.5 aider-m
 aliasfn aider-l3 aider_model=gq-llama3 aider-m
 ##
 function decompv-run {
-    local log_file="${HOME}/logs/run_$EPOCHSECONDS"
-    mkdir -p "${log_file:h}"
+    (
+        # typeset -ag exit_traps=( 0 INT TERM HUP EXIT )
+        # setopt localtraps ; trap "" $exit_traps[@]
 
-    ec "log_file: ${log_file}"
+        local log_file="${HOME}/logs/run_$EPOCHSECONDS"
+        mkdir -p "${log_file:h}"
 
-    python ~/code/DecompV/decompv/x/run/run_v1.py "$@" |& tee "${log_file}"
+        ec "log_file: ${log_file}"
+
+        python ~/code/DecompV/decompv/x/run/run_v1.py "$@" |& tee "${log_file}"
+        #: `setsid --wait --fork --` does not seem to work for making the interrupt signal go to the Python script.
+        #: Use `q` to exit pdb instead of using ctrl-c, problem solved, no need for complex signal handling.
+
+        # trap - $exit_traps[@]
+    )
 }
 ##
 function pbcopy-file-as-md {
