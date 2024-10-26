@@ -219,7 +219,7 @@ function prompt-tex2plain {
 }
 ##
 function prompt-correct-grammar {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Correct grammatical and spelling mistakes in the following text:' "$@"
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Correct grammatical and spelling mistakes in the following text,  without changing the wording:' "$@"
 }
 
 function prompt-rewrite-fluent {
@@ -435,6 +435,10 @@ function prompt-2bash {
 
 function prompt-zsh2bash {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "Convert the following code from Zsh into Bash:" "$@"
+}
+##
+function prompt-py-use-kwargs {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Always use `function (*, ` (unless it takes no arguments or the function already has a `*` in its argument list) and kwargs calling.' "$@"
 }
 ##
 function prompt-code-rewrite-idiomatic {
