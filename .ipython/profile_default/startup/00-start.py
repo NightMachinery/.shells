@@ -1,5 +1,7 @@
 #: Errors here will be silently ignored by emacs-jupyter, but the rest of the code won't run.
 ##
+from pynight.common_debugging2 import ipdb_enable
+##
 try:
     import torch
     import torch.nn.functional as F
@@ -80,7 +82,11 @@ def char_range(c1, c2):
 
 
 ### * LLM
-from pynight.common_bells import bell_gpt
+from pynight.common_bells import (
+    bell_call_remote,
+    bell_gpt,
+)
+
 from pynight.common_openai import (
     openai_key_get,
     setup_openai_key,
