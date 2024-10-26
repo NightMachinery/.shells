@@ -26,8 +26,13 @@ function jcolor {
 }
 ##
 function borg-restart {
-    brishz awaysh tmux-session-restart julia
+    ##
+    awaysh-sure tmux-session-restart julia
+    ##
+    # brishz awaysh tmux-session-restart julia
+    ##
 }
+alias reborg=borg-restart
 
 function borg-restart-remote {
     brishzr awaysh tmux-session-restart julia
