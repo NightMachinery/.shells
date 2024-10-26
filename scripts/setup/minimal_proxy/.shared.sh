@@ -185,6 +185,7 @@ proxy-env-unset () { #: proxy unexport
 alias pxa87='ALL_PROXY=http://127.0.0.1:1087 all_proxy=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
 alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096'
 alias pxa2097='ALL_PROXY=http://127.0.0.1:2097 all_proxy=http://127.0.0.1:2097 http_proxy=http://127.0.0.1:2097 https_proxy=http://127.0.0.1:2097 HTTP_PROXY=http://127.0.0.1:2097 HTTPS_PROXY=http://127.0.0.1:2097'
+alias pxa4096='ALL_PROXY=http://127.0.0.1:4096 all_proxy=http://127.0.0.1:4096 http_proxy=http://127.0.0.1:4096 https_proxy=http://127.0.0.1:4096 HTTP_PROXY=http://127.0.0.1:4096 HTTPS_PROXY=http://127.0.0.1:4096'
 # export ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096
 alias pxateias='ALL_PROXY=http://10.2.32.28:10809 all_proxy=http://10.2.32.28:10809 http_proxy=http://10.2.32.28:10809 https_proxy=http://10.2.32.28:10809 HTTP_PROXY=http://10.2.32.28:10809 HTTPS_PROXY=http://10.2.32.28:10809'
 alias pxa='pxa2096'
