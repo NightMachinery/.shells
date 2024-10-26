@@ -235,26 +235,55 @@ function disown-true {
 @opts-setprefix awaysh1 insubshell-eval
 @opts-setprefix awaysh2 insubshell-eval
 ##
-function awaysh-v2 {
+function h-awaysh-v2 {
     #: @o1
+    #: @broken This does not work.
     ##
-    (
-        # Start a new session and become the session leader
-        setsid
-
-        # Second fork to prevent the process from acquiring a controlling terminal
+    {
+        # First fork to run in background
         (
-            # Redirect standard input, output, and error to /dev/null
-            exec 0</dev/null 1>/dev/null 2>&1
+            # Ignore SIGHUP signal so the process isn't killed when the shell exits
+            trap '' HUP
 
-            # Execute the provided command
-            reval "$@"
+            # Start a new session and become the session leader
+            setsid
+
+            # Second fork to prevent reacquiring a controlling terminal
+            (
+                # Redirect standard input, output, and error to /dev/null
+                exec 0</dev/null 1>/dev/null 2>&1
+
+                # Execute the provided command
+                reval "$@"
+            ) &
+
+            # Disown the background job so it's not tracked by the shell
+            disown
+
+            # Exit the intermediate shell
+            exit 0
         ) &
 
-        # Exit the intermediate shell
-        exit 0
-    ) &
+        # Disown the job in the parent shell as well
+        disown
+    } &>/dev/null   # Suppress any possible error messages
 }
+
+function awaysh-v3 {
+    local cmd="$(gquote "$@")"
+    test -z "${cmd}" && return 0
+    # var-show cmd
+
+    #: Double fork using subshell and disown
+    (
+        (
+            #: Start a new session and execute command with all output to /dev/null
+            setsid zsh -c "$cmd" < /dev/null > /dev/null 2>&1 &
+            disown $! &>/dev/null || true
+        )
+    )
+}
+aliasfn awaysh-sure awaysh-v3
 ##
 function inbg() {
     reval "$@" &|
