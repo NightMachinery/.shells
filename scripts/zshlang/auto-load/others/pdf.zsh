@@ -351,3 +351,11 @@ EOF
 }
 aliasfn pdf-blank-create pdf-empty-create
 ##
+function pdf-ocr {
+    local input="${1}"
+    local dest="${2:-${input:r}_ocr.pdf}"
+    assert-args input @RET
+
+    reval-ec ocrmypdf --redo-ocr "${input}" "${dest}" @RET
+}
+##
