@@ -23,12 +23,15 @@ import logging
 import datetime
 from typing import List, Optional, Dict, Any, Iterable
 import email.utils
+import re
 
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, APIC
 from mutagen.mp4 import MP4Cover, MP4
 from PIL import Image
 from feedgen.feed import FeedGenerator
+from pynight.common_files import list_children
+from pynight.common_sort import version_sort_key
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -71,11 +74,11 @@ def configure_logging(*, verbose: bool):
     logging.basicConfig(level=level, format='%(levelname)s: %(message)s')
 
 
-def find_audio_files(*, base_dir: str, paths: Optional[Iterable[str]] = None, scan_for_audio: bool = False) -> List[str]:
+def find_audio_files(*, working_dir: str, paths: Optional[Iterable[str]] = None, scan_for_audio: bool = False) -> List[str]:
     """Find audio files based on input methods.
 
     Args:
-        base_dir (str): Base directory to search for audio files.
+        working_dir (str): Working directory to search for audio files.
         paths (Optional[Iterable[str]]): Iterable of file paths.
         scan_for_audio (bool): Whether to scan the current directory for audio files.
 
@@ -89,18 +92,26 @@ def find_audio_files(*, base_dir: str, paths: Optional[Iterable[str]] = None, sc
         # Positional arguments provided
         audio_files = [os.path.abspath(path.strip()) for path in paths if path.strip().lower().endswith(audio_extensions)]
         logging.debug(f'Audio files from positional arguments: {audio_files}')
+        
     elif not sys.stdin.isatty():
         # Read from stdin
         input_files = [line.strip() for line in sys.stdin if line.strip()]
         audio_files = [os.path.abspath(path) for path in input_files if path.lower().endswith(audio_extensions)]
         logging.debug(f'Audio files from stdin: {audio_files}')
+
     elif scan_for_audio or sys.stdin.isatty():
-        # Scan current directory
-        for root, _, files in os.walk(os.getcwd()):
-            for f in files:
-                if f.lower().endswith(audio_extensions):
-                    audio_files.append(os.path.join(root, f))
-        logging.debug(f'Audio files from scanning current directory: {audio_files}')
+        # Scan working directory
+        audio_files = list_children(
+            working_dir,
+            include_patterns=[r'.*\.(mp3|m4a|m4b|wav)$'],
+            recursive=True
+        )
+        logging.debug(f'Audio files from scanning working directory: {audio_files}')
+
+        # Sort audio files using version_sort_key
+        audio_files.sort(key=version_sort_key)
+        logging.debug(f'Sorted audio files:\n{audio_files}')
+
     else:
         logging.error('No audio files provided.')
         sys.exit(1)
@@ -108,6 +119,8 @@ def find_audio_files(*, base_dir: str, paths: Optional[Iterable[str]] = None, sc
     if not audio_files:
         logging.error('No audio files found.')
         sys.exit(1)
+
+    
 
     return audio_files
 
@@ -212,6 +225,35 @@ def validate_image(*, image_path: str) -> bool:
         return False
 
 
+def find_highest_resolution_image(working_dir: str) -> Optional[str]:
+    """Find the image with the highest resolution in the working directory.
+
+    Args:
+        working_dir (str): Working directory to search for images.
+
+    Returns:
+        Optional[str]: Path to the highest resolution image.
+    """
+    max_resolution = 0
+    album_art_path = None
+    image_files = list_children(
+        working_dir,
+        include_patterns=[r'.*\.(jpg|jpeg|png)$'],
+        recursive=True
+    )
+    for image_path in image_files:
+        try:
+            with Image.open(image_path) as img:
+                resolution = img.size[0] * img.size[1]
+                if resolution > max_resolution:
+                    max_resolution = resolution
+                    album_art_path = image_path
+                    logging.debug(f'Found higher resolution image: {album_art_path} with resolution {resolution}')
+        except Exception as e:
+            logging.error(f'Error opening image {image_path}: {e}')
+    return album_art_path
+
+
 def generate_rss_feed(
     episodes: List[Dict[str, Any]],
     *,
@@ -274,8 +316,14 @@ def main():
         logging.error(f'Base directory {base_dir} does not exist or is not a directory.')
         sys.exit(1)
 
+    working_dir = os.getcwd()
+    if len(args.audio_files) == 1 and os.path.isdir(args.audio_files[0]):
+        working_dir = os.path.abspath(args.audio_files[0])
+        args.audio_files = []
+        args.scan_for_audio = True
+
     audio_files = find_audio_files(
-        base_dir=base_dir,
+        working_dir=working_dir,
         paths=args.audio_files if args.audio_files else None,
         scan_for_audio=args.scan_for_audio
     )
@@ -308,21 +356,8 @@ def main():
         # Try extracting image from the audio file
         album_art_path = extract_image_from_audio(episodes[0]['file_path'])
     else:
-        # Try finding the image with the biggest resolution in the current directory
-        max_resolution = 0
-        for root, _, files in os.walk(os.getcwd()):
-            for f in files:
-                if f.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    image_path = os.path.join(root, f)
-                    try:
-                        with Image.open(image_path) as img:
-                            resolution = img.size[0] * img.size[1]
-                            if resolution > max_resolution:
-                                max_resolution = resolution
-                                album_art_path = image_path
-                                logging.debug(f'Found higher resolution image: {album_art_path} with resolution {resolution}')
-                    except Exception as e:
-                        logging.error(f'Error opening image {image_path}: {e}')
+        # Try finding the image with the biggest resolution in the working directory
+        album_art_path = find_highest_resolution_image(working_dir)
 
     if album_art_path and not validate_image(image_path=album_art_path):
         logging.warning(f"Album art {album_art_path} does not meet requirements.")
@@ -337,10 +372,13 @@ def main():
     if len(episodes) == 1:
         default_title = os.path.splitext(os.path.basename(episodes[0]['file_path']))[0]
         default_output = f"{default_title}.rss"
+
     else:
-        default_title = os.path.basename(os.getcwd())
+        default_title = os.path.basename(working_dir)
         default_output = 'feed.rss'
 
+    default_output = os.path.join(working_dir, default_output)
+    
     podcast_title = args.title or default_title
     podcast_author = args.author or episodes[0].get('author') or 'Unknown Author'
     podcast_description = args.description or 'No description available.'
@@ -349,7 +387,7 @@ def main():
     output_path = args.output or default_output
 
     if not args.overwrite and os.path.exists(output_path):
-        logging.error(f'Output file {output_path} already exists. Use --overwrite to overwrite.')
+        logging.error(f'Output file {output_path} already exists. Use --overwrite (-f) to overwrite.')
         sys.exit(1)
 
     generate_rss_feed(
