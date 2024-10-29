@@ -196,6 +196,8 @@ function pdf-compress {
 
     command du -h "${input}" "${out}"
 }
+aliasfn pdf-compress-inplace inplace-io pdf-compress
+@opts-setprefix pdf-compress-inplace pdf_compress
 
 function pdf-compress-gray {
     pdf_compress_gray_p=y pdf-compress "$@"

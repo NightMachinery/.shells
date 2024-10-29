@@ -2627,7 +2627,8 @@ appHotkey{ key='.', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 
-appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
+-- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
+appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor
 
 emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='x', appName=emacsAppName }
@@ -3268,6 +3269,11 @@ hs.hotkey.bind({}, 'F2', whisper_run_fa)
 
 hs.hotkey.bind({}, 'F11', whisper_run_en)
 hs.hotkey.bind({}, 'F12', whisper_run_fa)
+---
+function display_off()
+    brishzeval2bg("display-off")
+end
+hyper_bind_v2{mods={"cmd"}, key="l", pressedfn=display_off}
 ---
 function install()
     -- @bootstrap installs the CLI binary

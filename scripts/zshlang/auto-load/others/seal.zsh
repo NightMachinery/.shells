@@ -98,7 +98,7 @@ function unseal {
     local l="$(unseal-get RS2NUL | fz $un_fz[@] $other_options[@] --read0 --tac --no-sort -q "${query}")"
     test -n "$l" && {
         { [[ "$l" != (@|\#)* ]] && test -z "$un_p" } && printz "$l" || ec "$l"
-        ec "$l"|pbcopy
+        ec "$l" | pbcopy
         return 0
     }
 }

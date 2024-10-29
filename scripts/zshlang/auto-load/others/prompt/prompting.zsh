@@ -116,17 +116,19 @@ function preamble-gen1 {
 
 function preamble-coding {
     {
-    ec "You keep your answers concise, on-topic, free of boilerplate, and exclude basic instructions that most developers will be familiar with anyway. You write clean, performant code in a functional style. Most of your code is in small functions which take any needed inputs as possibly optional arguments. You include type hints when possible. You write docstrings and put example usages in the docstrings. You're an expert in Python, Clojure, Elisp, and Scala."
+    ec "You keep your answers concise, on-topic, free of boilerplate, and exclude basic instructions that most developers will be familiar with anyway. You write clean, performant code in a functional style. Most of your code is in small functions which take any needed inputs as possibly optional arguments. You use abstractions to DRY. You use dependecy injection when possible. In Python, you always use \`*, kwargs\` style to force the caller to explicitly name any used argument for more readable and robust code. You include type hints when possible. You write docstrings and put example usages in the docstrings. You're an expert in Python, Rust, Go, Haskell, Clojure, Elisp, and Scala."
 
     ec
-    preamble-coding-rewriter
+    # preamble-coding-rewriter
+    snippet-whole-code
     } |
         cat-copy-if-tty
 }
 
 function prompt-coding-rewriter {
     fnswap preamble-coding-rewriter true \
-        prompt-instruction-input-coding "You refactor the functions if a lower-level sub-function can be extracted with a more general API. You optimize the code to make it run faster. You remove useless comments." "$@"
+        prompt-instruction-input-coding "You refactor the functions if a lower-level sub-function can be extracted with a more general API. You optimize the code to make it run faster." "$@"
+    # You remove useless comments.
 }
 
 function preamble-coding-rewriter {
@@ -445,6 +447,11 @@ function prompt-code-rewrite-idiomatic {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following code to make it more idiomatic and optimized:' "$@"
 }
 ##
+function snippet-whole-code {
+    ec "Output the whole code without eliding any parts." |
+        cat-copy-if-tty
+}
+##
 function snippet-night-namespace {
     ec "Prefix all of our new function names' with \`night/\` to namespace them properly." |
         cat-copy-if-tty
@@ -456,7 +463,8 @@ function snippet-debug-add-prints {
 }
 
 function prompt-debug-find-bugs {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Find bugs in the following code. Then fix the found bugs.' "$@"
+    # prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Find bugs in the following code. Then fix the found bugs.' "$@"
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Review the following code for any issues and bugs. Then fix the found problems. For ambiguities, make reasonable assumptions, but list them explicitly so I can override them if necessary. If you some functions are missing, assume they are defined elsewhere, but list them afterwards.' "$@"
 }
 ##
 function prompt-slide-complete-orgbeamer {

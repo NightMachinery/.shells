@@ -1,7 +1,7 @@
 ##
 function sioyek-reload {
     # sioyek --execute-command reload
-    sioyek --execute-command reload_no_flicker
+    awaysh sioyek --execute-command reload_no_flicker
 }
 
 function sioyek-focus {

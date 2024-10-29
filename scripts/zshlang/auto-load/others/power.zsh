@@ -15,6 +15,7 @@ function display-off {
     displaysleep
 	#: causes display to go to sleep immediately.
 }
+alias lock-screen-user display-off
 ##
 function sleepnow {
     sleep "${1:-7}"
