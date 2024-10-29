@@ -146,8 +146,8 @@ function convert-pad {
     local i="${1:? Input required}" o="${2:-${1:r}_padded.png}" w="${convert_pad_w:-${convert_pad_s:-1024}}" h="${convert_pad_h:-${convert_pad_s:-1024}}"
 
     local actualw actualh
-    actualw=$(identify -format %w "$i") || return $?
-    actualh=$(identify -format %h "$i") || return $?
+    actualw="$(image-width "$i")" || return $?
+    actualh="$(image-height "$i")" || return $?
 
     if (( w < actualw )) ; then
         w=$actualw
@@ -178,10 +178,13 @@ function img-width {
     magick identify -format '%w' "$1"
 }
 reify img-width
+aliasfn image-width img-width
+
 function img-height {
     magick identify -format '%h' "$1"
 }
 reify img-height
+aliasfn image-height img-height
 ##
 function pad2square {
     # @alt convert-pad

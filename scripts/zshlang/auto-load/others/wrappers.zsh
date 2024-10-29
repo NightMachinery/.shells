@@ -197,3 +197,7 @@ function tidy-viewer {
     whitespace-shared-rm
 }
 ##
+function duh {
+  reval-ecgray gdu --exclude='.git' -h "$@"
+}
+##
