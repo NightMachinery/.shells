@@ -260,3 +260,7 @@ function h-emc-arxiv-id-get {
     arxiv_url_get_redirect_p=n serr arxiv-id-get "$@" || true
 }
 ##
+function arxiv-normalize-path {
+    perl -lpe 's/[ :&\\]/_/g'
+}
+##

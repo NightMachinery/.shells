@@ -257,7 +257,8 @@ function fairgrad-paper-used-files {
 
         cat **/*.tex |
             rg -v '^\s*%' |
-            rget '((?:qual_v5|tables_v1)/.*\.(png|jpe?g|pdf|tex))\b'
+            rget '((?:qual_v5|tables_v1)/.*\.(png|jpe?g|pdf|tex))\b' |
+            arxiv-normalize-path
     )
 }
 
