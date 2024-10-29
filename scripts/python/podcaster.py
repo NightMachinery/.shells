@@ -308,8 +308,21 @@ def main():
         # Try extracting image from the audio file
         album_art_path = extract_image_from_audio(episodes[0]['file_path'])
     else:
-        # Do not scan entire base directory in multi-file mode
-        album_art_path = None
+        # Try finding the image with the biggest resolution in the current directory
+        max_resolution = 0
+        for root, _, files in os.walk(os.getcwd()):
+            for f in files:
+                if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    image_path = os.path.join(root, f)
+                    try:
+                        with Image.open(image_path) as img:
+                            resolution = img.size[0] * img.size[1]
+                            if resolution > max_resolution:
+                                max_resolution = resolution
+                                album_art_path = image_path
+                                logging.debug(f'Found higher resolution image: {album_art_path} with resolution {resolution}')
+                    except Exception as e:
+                        logging.error(f'Error opening image {image_path}: {e}')
 
     if album_art_path and not validate_image(image_path=album_art_path):
         logging.warning(f"Album art {album_art_path} does not meet requirements.")
