@@ -303,6 +303,15 @@ function trailing-whitespace-rm {
     perl -lpe 's/\s+$//' |
         cat-copy-if-tty
 }
+function end-trailing-whitespace-rm {
+    #: Removes whitespace exactly at the end of the file (e.g., newlines at the end)
+    #: \Z Match only at end of string, or before newline at the end
+    #: \z Match only at end of string
+    ##
+    cat-paste-if-tty |
+    perl -0777 -pe  's/\s+\z//' |
+        cat-copy-if-tty
+}
 ##
 function floatsort {
     cat-paste-if-tty |
