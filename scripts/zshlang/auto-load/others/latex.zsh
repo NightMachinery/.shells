@@ -130,6 +130,8 @@ aliasfn latex-url-escape latex-escape
 ##
 function pdflatex-m {
     local autodir="${pdflatex_autodir:-n}"
+    local fast_p="${pdflatex_fast_p:-n}"
+    local bell_p="${pdflatex_bell_p:-y}"
     local bib_mode="${pdflatex_bib_mode:-bibtex_ignore}"
     local var_escaper
     #: [[id:a7185750-2d2e-4b83-af93-94ffdc9fb07e][latex/escaping]]
@@ -141,9 +143,9 @@ function pdflatex-m {
     if ! [[ "$f" =~ '\.tex$' ]] ; then
         f+='.tex'
     fi
-    # f="$(grealpath "$f")" @TRET
+    f_realpath="$(grealpath "$f")" @TRET
     assert-args f @RET
-    local f_dir="${f:h}" name="${f:r:t}" name_tmp
+    local f_dir="${f_realpath:h}" name="${f:r:t}" name_tmp
     if bool "${autodir}" ; then
         reval-ec pushf "${f_dir}"
     fi
@@ -170,6 +172,7 @@ function pdflatex-m {
         fi
 
         local key val vars=(
+            HOME
             nightNotes
             nightNotesPrivate
             nightNotesPublic
@@ -187,7 +190,7 @@ function pdflatex-m {
         done
 
         tex+="\\newcommand{\\globalBibPath}{$(reval "${var_escaper[@]}" ${nightGlobalBib})}"$'\n' @TRET
-        tex+="\\newcommand{\\mypwd}{$(reval "${var_escaper[@]}" ${f:h})}"$'\n' @TRET
+        tex+="\\newcommand{\\mypwd}{$(reval "${var_escaper[@]}" ${f_dir})}"$'\n' @TRET
 
         if bool "${cv_p}" ; then
             tex+="\\newcommand{\\CVDir}{${cv_dir}}"$'\n'
@@ -237,9 +240,11 @@ function pdflatex-m {
 
             time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
 
-            time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
-            time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
-            #: This is needed, otherwise the CVPR's review line numbers don't align properly at the start of the paragraphs.
+            if ! bool "${fast_p}" ; then
+                time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+                time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+                #: This is needed, otherwise the CVPR's review line numbers don't align properly at the start of the paragraphs.
+            fi
 
             time2 reval-ec pdflatex "${opts[@]}" "$tex_f" @RET
             gmv -v "${name_tmp}.pdf" "${name}.pdf"
@@ -248,9 +253,13 @@ function pdflatex-m {
 
             trs "${name_tmp}"*(.DN) || true
             sioyek-reload || true
+
         } always {
             if bool "${success_p}" ; then
-                bell-insaniquarium-sing
+                if bool "${bell_p}" ; then
+                    bell-insaniquarium-sing
+                fi
+
             else
                 fsay 'failed to compile latex to PDF'
             fi
