@@ -3062,12 +3062,14 @@ function whisper.transcribeCommand(inputFile, language)
 
     return cmd
 end
+whisper.processing_interrupted_p = false
 
 function whisper_run(language)
     whisper.language = language
     if whisper.state == "off" then
         -- Start recording
         whisper.state = "recording"
+        whisper.processing_interrupted_p = false  -- Reset interrupt flag when starting new recording
         updateIndicator()
 
         -- Ensure temp directory exists
@@ -3107,6 +3109,7 @@ function whisper_run(language)
 
     else
         -- Stop recording
+        whisper.processing_interrupted_p = (whisper.state == "processing")  -- Set flag if stopping during processing
         whisper.state = "off"
         updateIndicator()
 
@@ -3139,10 +3142,10 @@ function processRecording(wavFile, language)
             content = content .. " "
 
             hs.pasteboard.setContents(content)
-            if true then
+            if not whisper.processing_interrupted_p then
                 doPaste()
-            else
-                hs.eventtap.keyStrokes(content)
+                ---
+                -- hs.eventtap.keyStrokes(content)
             end
 
             -- hs.alert.show("Transcription complete")
@@ -3150,6 +3153,7 @@ function processRecording(wavFile, language)
             hs.alert.show("Transcription failed. Exit code: " .. exitCode .. "\nError: " .. stdErr)
         end
         whisper.state = "off"
+        whisper.processing_interrupted_p = false  -- Reset the flag
         updateIndicator()
     end, transcribeCommand.args)
 
@@ -3157,6 +3161,7 @@ function processRecording(wavFile, language)
     if not success then
         hs.alert.show("Failed to start transcription process")
         whisper.state = "off"
+        whisper.processing_interrupted_p = false  -- Reset the flag
         updateIndicator()
     end
 end
