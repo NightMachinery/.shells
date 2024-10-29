@@ -1,6 +1,6 @@
 ##
 function rsp-metrics {
-    reval-ec rsp-safe --ignore-missing-args "${fullhost}:/opt/decompv/metrics/"{MURA,ImageNet-Hard,cls_v3,s} ~cod/uni/FairGrad_Metrics/metrics/
+    reval-ec rsp-safe --ignore-missing-args "${fullhost}:/opt/decompv/metrics/"{MURA,oxford_pet,ImageNet-Hard,cls_v3,s} ~cod/uni/FairGrad_Metrics/metrics/
 }
 
 function eval-on-fullhosts {
@@ -47,6 +47,7 @@ function eval-on-fullhosts {
         fi
     done
 
+    ec-sep-h
     ecerr "$err"
     return $retcode
 }
@@ -204,7 +205,13 @@ function decompv-sync {
 }
 ##
 function tbl2pdf {
+    local pdflatex_bell_p="${pdflatex_bell_p:-n}"
+    local pdflatex_fast_p="${pdflatex_fast_p:-y}"
+
     local input="${1}"
+    assert test -e "${input}" @RET
+    input="$(realpath "$input")" @TRET
+
     local dest="${2:-${input:r}.pdf}"
     local template_name="${tbl2pdf_template:-table_1.tex}"
 
@@ -223,7 +230,7 @@ function tbl2pdf {
 
          < "${template_name}" assert command sd --string-mode '% REPLACE_HERE' "${input_text}" | sponge t.tex @RET
 
-        assert pdflatex t.tex @RET
+        assert pdflatex-m t.tex @RET
 
         cp -v "t.pdf" "${dest}"
     ) @RET
@@ -250,7 +257,7 @@ function fairgrad-paper-used-files {
 
         cat **/*.tex |
             rg -v '^\s*%' |
-            rget '((?:qual_v5|tables_v1)/.*\.(png|jpe?g|pdf))\b'
+            rget '((?:qual_v5|tables_v1)/.*\.(png|jpe?g|pdf|tex))\b'
     )
 }
 
