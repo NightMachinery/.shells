@@ -72,16 +72,18 @@ function seal() {
     print -r -n -- "$n$i"$'\n' >> "$attic"
 }
 
-function unseal-get() {
+function unseal-get {
     <"$attic[@]" "$@"
 }
-function unseal-get2note() {
+function unseal-get2note {
     unseal-get prefixer -s -i $'\36' -o '\x00' -a "${attic}:PREFIXER_LINENUMBER:" -l /dev/null
 }
 
-function unseal() {
+function unseal {
     bella_zsh_disable1
 
+
+    local unseal_trim_trailing_whitespace_p="${unseal_trim_trailing_whitespace_p:-y}"
     local query="$(fz-createquery "$@")"
     
     doc unseal
