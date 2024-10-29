@@ -80,3 +80,8 @@ aa2ab() {
 	dir2ab-merge .
 	popf
 }
+##
+function podcaster {
+    podcaster.py --base-url "https://files.lilf.ir/" --base-dir "~/Downloads" "$@"
+}
+##
