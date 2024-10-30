@@ -52,7 +52,10 @@ from pynight.common_sort import version_sort_key
 # Shared regex patterns
 YOUTUBE_CHANNEL_ID_PATTERN = r"^UC[a-zA-Z0-9_-]{22}$"
 YOUTUBE_CHANNEL_URL_PATTERN = r"channel/(UC[a-zA-Z0-9_-]{22})"
-YOUTUBE_PLAYLIST_URL_PATTERN = r"(?:https?://)?(?:www\.)?youtube\.com/playlist\?list=([a-zA-Z0-9_-]{10,})"
+YOUTUBE_PLAYLIST_URL_PATTERN = (
+    r"(?:https?://)?(?:www\.)?youtube\.com/playlist\?list=([a-zA-Z0-9_-]{10,})"
+)
+
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments.
@@ -246,7 +249,9 @@ def get_playlist_url(text: str) -> str:
         return playlist_url
 
     # If input is neither, raise an error
-    raise ValueError("Input must be a YouTube channel ID, channel URL, or playlist URL.")
+    raise ValueError(
+        "Input must be a YouTube channel ID, channel URL, or playlist URL."
+    )
 
 
 def extract_channel_id(text: str) -> Optional[str]:
@@ -271,10 +276,10 @@ def extract_channel_id(text: str) -> Optional[str]:
 
     # Attempt to extract channel ID using yt-dlp
     try:
-        ydl_opts = {'quiet': True, 'skip_download': True}
+        ydl_opts = {"quiet": True, "skip_download": True}
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(text, download=False)
-            channel_id = info.get('channel_id')
+            channel_id = info.get("channel_id")
             if channel_id and re.match(YOUTUBE_CHANNEL_ID_PATTERN, channel_id):
                 logging.debug(f"Extracted channel ID using yt-dlp: {channel_id}")
                 return channel_id
@@ -289,19 +294,21 @@ class TqdmUpdater:
         self.pbar = None
 
     def download_hook(self, d):
-        if d['status'] == 'downloading':
-            total = d.get('total_bytes') or d.get('total_bytes_estimate')
-            downloaded = d.get('downloaded_bytes', 0)
+        if d["status"] == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate")
+            downloaded = d.get("downloaded_bytes", 0)
             if self.pbar is None and total is not None:
-                self.pbar = tqdm(total=total, unit='B', unit_scale=True, desc='Downloading')
+                self.pbar = tqdm(
+                    total=total, unit="B", unit_scale=True, desc="Downloading"
+                )
             if self.pbar:
                 self.pbar.update(downloaded - self.pbar.n)
-        elif d['status'] == 'finished':
+        elif d["status"] == "finished":
             if self.pbar:
                 self.pbar.close()
                 self.pbar = None
             logging.info(f"Downloaded {d['filename']}")
-        elif d['status'] == 'error':
+        elif d["status"] == "error":
             if self.pbar:
                 self.pbar.close()
                 self.pbar = None
@@ -575,15 +582,13 @@ def generate_rss_feed(
         # Generate a unique GUID that changes when the date changes
         guid_str = f"{ep['url']}|{ep['date']}"
         # Optionally, hash the GUID string for brevity
-        guid_hash = hashlib.md5(guid_str.encode('utf-8')).hexdigest()
+        guid_hash = hashlib.md5(guid_str.encode("utf-8")).hexdigest()
         fe.guid(guid_hash, permalink=False)
         fe.title(ep["title"])
         fe.description(ep.get("description", "No description available."))
         audio_format = os.path.splitext(ep["file_path"])[1][1:].lower()
         mime_type = MIME_TYPES.get(audio_format, "audio/mpeg")
-        fe.enclosure(
-            ep["url"], str(ep["size"]), mime_type
-        )
+        fe.enclosure(ep["url"], str(ep["size"]), mime_type)
         pub_date = email.utils.formatdate(ep["date"], usegmt=True)
         fe.pubDate(pub_date)
         duration = str(datetime.timedelta(seconds=ep.get("duration")))
@@ -596,7 +601,6 @@ def generate_rss_feed(
     else:
         fg.rss_file(output_path)
         logging.info(f"RSS feed generated at {output_path}")
-
 
 
 def handle_local_mode(args: argparse.Namespace):
@@ -792,14 +796,25 @@ def handle_yt_mode(args: argparse.Namespace):
         )
 
         if args.non_interactive:
-            selected_videos = videos[:args.num_videos]
-            logging.info(f"Selecting the last {len(selected_videos)} videos automatically.")
+            selected_videos = videos[: args.num_videos]
+            logging.info(
+                f"Selecting the last {len(selected_videos)} videos automatically."
+            )
             video_urls = [video.get("webpage_url") for video in selected_videos]
         else:
             # Interactive mode: Allow selection from a larger set
-            video_titles = [f"{video.get('title')}" for idx, video in enumerate(videos) if video.get('title')]
-            selected_indices = rtl_iterfzf(video_titles, multi=True).selected_indices
-            selected_videos = [videos[i] for i in selected_indices if 0 <= i < len(videos)]
+            video_titles = [
+                f"{video.get('title')}"
+                for idx, video in enumerate(videos)
+                if video.get("title")
+            ]
+            selected_indices = rtl_iterfzf(
+                video_titles,
+                multi=True,
+            ).indices
+            selected_videos = [
+                videos[i] for i in selected_indices if 0 <= i < len(videos)
+            ]
             if not selected_videos:
                 logging.info("No videos selected.")
                 sys.exit(0)
