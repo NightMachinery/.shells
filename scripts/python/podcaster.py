@@ -11,7 +11,7 @@ Example usage:
     python podcaster.py local audiobook.m4b --base-url "https://files.example.com/" --base-dir "~/Downloads" --image cover.jpg
 
     # Generate podcast from a YouTube channel
-    python podcaster.py yt UC_x5XG1OV2P6uZZ5FSM9Ttw --base-url "https://files.example.com/" --base-dir "~/Podcasts" --out-dir "Google Developers"
+    python podcaster.py yt UC_x5XG1OV2P6uZZ5FSM9Ttw --base-url "https://files.example.com/" --base-dir "~/Podcasts" --out-dir "Google Developers" -n 50
 
 Dependencies:
     - mutagen
@@ -19,10 +19,11 @@ Dependencies:
     - feedgen
     - yt-dlp
     - iterfzf
+    - tqdm
     - pynight (custom module)
 
 Install dependencies with:
-    pip install -U feedgen Pillow mutagen yt-dlp iterfzf
+    pip install -U feedgen Pillow mutagen yt-dlp iterfzf tqdm
 """
 
 import os
@@ -40,10 +41,15 @@ from mutagen.mp4 import MP4Cover, MP4
 from PIL import Image
 from feedgen.feed import FeedGenerator
 from yt_dlp import YoutubeDL
+from tqdm import tqdm
 from pynight.common_fzf import rtl_iterfzf
 
 from pynight.common_files import list_children
 from pynight.common_sort import version_sort_key
+
+# Shared regex pattern
+YOUTUBE_CHANNEL_ID_PATTERN = r"^UC[a-zA-Z0-9_-]{22}$"
+YOUTUBE_CHANNEL_URL_PATTERN = r"channel/(UC[a-zA-Z0-9_-]{22})"
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -111,6 +117,18 @@ def parse_arguments() -> argparse.Namespace:
             type=str,
             help="Podcast main link URL.",
         )
+        parser.add_argument(
+            "--tqdm",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Use tqdm for download progress.",
+        )
+        parser.add_argument(
+            "--non-interactive",
+            action=argparse.BooleanOptionalAction,
+            default=False,
+            help="Automatically select the last n videos without prompting.",
+        )
 
     # Subparser for local audio files
     parser_local = subparsers.add_parser(
@@ -139,7 +157,6 @@ def parse_arguments() -> argparse.Namespace:
         type=str,
         help="Path to image file or audio file to extract image from.",
     )
-    # Override the base_dir default for local parser
     parser_local.set_defaults(base_dir=None)
 
     # Subparser for YouTube channel
@@ -149,8 +166,8 @@ def parse_arguments() -> argparse.Namespace:
     )
     add_shared_arguments(parser_yt)
     parser_yt.add_argument(
-        "channel_id",
-        help="YouTube channel ID to fetch videos from.",
+        "channel_input",
+        help="YouTube channel ID or URL to fetch videos from.",
     )
     parser_yt.add_argument(
         "--out-dir", type=str, help="Output directory for the podcast files."
@@ -167,7 +184,13 @@ def parse_arguments() -> argparse.Namespace:
         default=256,
         help="Preferred audio bitrate in kbps.",
     )
-    # Set YouTube-specific defaults
+    parser_yt.add_argument(
+        "-n",
+        "--num-videos",
+        type=int,
+        default=50,
+        help="Limit to the last n videos from the channel.",
+    )
     parser_yt.set_defaults(base_dir="~/Podcasts", overwrite=True)
 
     args = parser.parse_args()
@@ -189,6 +212,64 @@ def configure_logging(*, verbose: bool, log_file: Optional[str] = None):
     logging.basicConfig(
         level=level, format="%(levelname)s: %(message)s", handlers=handlers
     )
+
+
+def yt_channel_id_get(text: str) -> str:
+    """Extract the YouTube channel ID from the given text."""
+    if re.match(YOUTUBE_CHANNEL_ID_PATTERN, text):
+        return text
+
+    match = re.search(YOUTUBE_CHANNEL_URL_PATTERN, text)
+    if match:
+        return match.group(1)
+
+    try:
+        ydl_opts = {'quiet': True, 'skip_download': True}
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(text, download=False)
+            channel_id = info.get('channel_id')
+            if channel_id:
+                return channel_id
+            if info.get('id') and re.match(YOUTUBE_CHANNEL_ID_PATTERN, info['id']):
+                return info['id']
+    except Exception as e:
+        logging.error(f"Error extracting channel ID from {text}: {e}")
+
+    raise ValueError(f"Cannot extract channel ID from {text}")
+
+
+class TqdmUpdater:
+    def __init__(self):
+        self.pbar = None
+
+    def download_hook(self, d):
+        if d['status'] == 'downloading':
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+            downloaded = d.get('downloaded_bytes', 0)
+            if self.pbar is None and total is not None:
+                self.pbar = tqdm(total=total, unit='B', unit_scale=True, desc='Downloading')
+            if self.pbar:
+                self.pbar.update(downloaded - self.pbar.n)
+        elif d['status'] == 'finished':
+            if self.pbar:
+                self.pbar.close()
+                self.pbar = None
+            logging.info(f"Downloaded {d['filename']}")
+        elif d['status'] == 'error':
+            if self.pbar:
+                self.pbar.close()
+                self.pbar = None
+            logging.error(f"Error downloading {d.get('filename', 'unknown file')}")
+
+
+def download_hook(d):
+    """Fallback download hook for yt-dlp downloads (without tqdm)."""
+    if d["status"] == "finished":
+        logging.info(f"Downloaded {d['filename']}")
+    elif d["status"] == "error":
+        logging.error(f"Error downloading {d.get('filename', 'unknown file')}")
+    elif d["status"] == "downloading":
+        pass  # Add basic progress logging here if needed
 
 
 def find_audio_files(
@@ -433,14 +514,23 @@ def generate_rss_feed(
         for i, ep in enumerate(episodes):
             ep["date"] = now - (i * interval)
 
+    # Define MIME types based on audio format
+    MIME_TYPES = {
+        "mp3": "audio/mpeg",
+        "m4a": "audio/mp4",
+        "wav": "audio/wav",
+    }
+
     for ep in episodes:
         fe = fg.add_entry()
         fe.id(ep["url"])
         fe.title(ep["title"])
         fe.description(ep.get("description", "No description available."))
+        audio_format = os.path.splitext(ep["file_path"])[1][1:].lower()
+        mime_type = MIME_TYPES.get(audio_format, "audio/mpeg")
         fe.enclosure(
-            ep["url"], str(ep["size"]), "audio/mpeg"
-        )  # Adjust MIME type as needed
+            ep["url"], str(ep["size"]), mime_type
+        )
         pub_date = email.utils.formatdate(ep["date"], usegmt=True)
         fe.pubDate(pub_date)
         duration = str(datetime.timedelta(seconds=ep.get("duration")))
@@ -462,7 +552,7 @@ def handle_local_mode(args: argparse.Namespace):
         args (argparse.Namespace): Parsed arguments.
     """
     base_url_sanitized = args.base_url.rstrip("/")
-    base_dir = os.path.expanduser(args.base_dir)
+    base_dir = os.path.expanduser(args.base_dir) if args.base_dir else os.getcwd()
     if not os.path.isdir(base_dir):
         logging.error(
             f"Base directory {base_dir} does not exist or is not a directory."
@@ -568,6 +658,19 @@ def handle_yt_mode(args: argparse.Namespace):
         os.makedirs(base_dir)
         logging.info(f"Created base directory {base_dir}")
 
+    try:
+        channel_id = yt_channel_id_get(args.channel_input)
+    except ValueError as e:
+        logging.error(str(e))
+        sys.exit(1)
+
+    channel_url = f"https://www.youtube.com/channel/{channel_id}"
+
+    tqdm_updater = TqdmUpdater() if args.tqdm else None
+    progress_hooks = [tqdm_updater.download_hook] if args.tqdm else [download_hook]
+
+    playlist_end = args.num_videos
+
     ydl_opts = {
         "ignoreerrors": True,
         "format": "bestaudio/best",
@@ -580,9 +683,10 @@ def handle_yt_mode(args: argparse.Namespace):
         "subtitleslangs": ["en"],
         "verbose": args.verbose,
         "overwrites": args.overwrite,
-        "progress_hooks": [download_hook],
-        "noplaylist": True,
+        "progress_hooks": progress_hooks,
         "continuedl": True,
+        "noplaylist": False,
+        "playlistend": playlist_end,
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -599,8 +703,6 @@ def handle_yt_mode(args: argparse.Namespace):
     }
 
     with YoutubeDL(ydl_opts) as ydl:
-        # Fetch video info
-        channel_url = f"https://www.youtube.com/channel/{args.channel_id}"
         logging.info(f"Fetching videos from {channel_url}")
         channel_info = ydl.extract_info(channel_url, download=False)
         if not channel_info:
@@ -618,7 +720,7 @@ def handle_yt_mode(args: argparse.Namespace):
             os.makedirs(output_dir)
             logging.info(f"Created output directory {output_dir}")
 
-        # List videos
+        # List videos (limited by playlist_end)
         videos = channel_info.get("entries", [])
         if not videos:
             logging.error("No videos found in the channel.")
@@ -636,16 +738,20 @@ def handle_yt_mode(args: argparse.Namespace):
             key=lambda x: x.get("upload_date", ""),
             reverse=True,
         )
-        video_titles = [video.get("title") for video in videos if video.get("title")]
-        # Use iterfzf to select videos
-        selected_indices = rtl_iterfzf(video_titles, multi=True).indices
-        if not selected_indices:
-            logging.info("No videos selected.")
-            sys.exit(0)
 
-        selected_videos = [videos[i] for i in selected_indices]
-
-        video_urls = [video.get("webpage_url") for video in selected_videos]
+        if args.non_interactive:
+            selected_videos = videos[:args.num_videos]
+            logging.info(f"Selecting the last {len(selected_videos)} videos automatically.")
+            video_urls = [video.get("webpage_url") for video in selected_videos]
+        else:
+            # Interactive mode: Allow selection from a larger set
+            video_titles = [f"{video.get('title')}" for idx, video in enumerate(videos) if video.get('title')]
+            selected_indices = rtl_iterfzf(video_titles, multi=True).selected_indices
+            selected_videos = [videos[i] for i in selected_indices if 0 <= i < len(videos)]
+            if not selected_videos:
+                logging.info("No videos selected.")
+                sys.exit(0)
+            video_urls = [video.get("webpage_url") for video in selected_videos]
 
         # Download selected videos
         logging.info("Starting download of selected videos...")
@@ -709,16 +815,6 @@ def handle_yt_mode(args: argparse.Namespace):
         link_url=link_url,
         fake_dates=args.fake_dates,
     )
-
-
-def download_hook(d):
-    """Progress hook for yt-dlp downloads."""
-    if d["status"] == "finished":
-        logging.info(f"Downloaded {d['filename']}")
-    elif d["status"] == "error":
-        logging.error(f"Error downloading {d.get('filename', 'unknown file')}")
-    elif d["status"] == "downloading":
-        pass  # You can add progress logging here if needed
 
 
 def main():
