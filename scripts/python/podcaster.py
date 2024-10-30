@@ -34,6 +34,7 @@ import datetime
 from typing import List, Optional, Dict, Any, Iterable
 import email.utils
 import re
+from urllib.parse import urlparse, parse_qs
 
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, APIC
@@ -47,10 +48,10 @@ from pynight.common_fzf import rtl_iterfzf
 from pynight.common_files import list_children
 from pynight.common_sort import version_sort_key
 
-# Shared regex pattern
+# Shared regex patterns
 YOUTUBE_CHANNEL_ID_PATTERN = r"^UC[a-zA-Z0-9_-]{22}$"
 YOUTUBE_CHANNEL_URL_PATTERN = r"channel/(UC[a-zA-Z0-9_-]{22})"
-
+YOUTUBE_PLAYLIST_URL_PATTERN = r"(?:https?://)?(?:www\.)?youtube\.com/playlist\?list=([a-zA-Z0-9_-]{10,})"
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments.
@@ -159,15 +160,15 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser_local.set_defaults(base_dir=None)
 
-    # Subparser for YouTube channel
+    # Subparser for YouTube channel or playlist
     parser_yt = subparsers.add_parser(
         "yt",
-        help="Generate podcast from a YouTube channel",
+        help="Generate podcast from a YouTube channel or playlist",
     )
     add_shared_arguments(parser_yt)
     parser_yt.add_argument(
         "channel_input",
-        help="YouTube channel ID or URL to fetch videos from.",
+        help="YouTube channel ID, channel URL, or playlist URL to fetch videos from.",
     )
     parser_yt.add_argument(
         "--out-dir", type=str, help="Output directory for the podcast files."
@@ -189,7 +190,7 @@ def parse_arguments() -> argparse.Namespace:
         "--num-videos",
         type=int,
         default=10,
-        help="Limit to the last n videos from the channel.",
+        help="Limit to the last n videos from the channel or playlist.",
     )
     parser_yt.set_defaults(base_dir="~/Podcasts", overwrite=True)
 
@@ -214,28 +215,72 @@ def configure_logging(*, verbose: bool, log_file: Optional[str] = None):
     )
 
 
-def yt_channel_id_get(text: str) -> str:
-    """Extract the YouTube channel ID from the given text."""
+def get_playlist_url(text: str) -> str:
+    """
+    Determine if the input is a playlist URL or a channel ID/URL.
+    If it's a channel ID/URL, convert it to the uploads playlist URL.
+    If it's already a playlist URL, return it directly.
+
+    Args:
+        text (str): Input string provided by the user.
+
+    Returns:
+        str: Playlist URL to be used for downloading.
+    """
+    # Check if input is a playlist URL
+    playlist_match = re.search(YOUTUBE_PLAYLIST_URL_PATTERN, text)
+    if playlist_match:
+        playlist_id = playlist_match.group(1)
+        playlist_url = f"https://www.youtube.com/playlist?list={playlist_id}"
+        logging.debug(f"Input is a playlist URL: {playlist_url}")
+        return playlist_url
+
+    # Check if input is a channel ID or channel URL
+    channel_id = extract_channel_id(text)
+    if channel_id:
+        # Convert channel ID to uploads playlist URL
+        uploads_playlist_id = f"UU{channel_id[2:]}"  # Replace 'UC' with 'UU'
+        playlist_url = f"https://www.youtube.com/playlist?list={uploads_playlist_id}"
+        logging.debug(f"Converted channel ID to uploads playlist URL: {playlist_url}")
+        return playlist_url
+
+    # If input is neither, raise an error
+    raise ValueError("Input must be a YouTube channel ID, channel URL, or playlist URL.")
+
+
+def extract_channel_id(text: str) -> Optional[str]:
+    """
+    Extract the YouTube channel ID from the given text.
+
+    Args:
+        text (str): Input string provided by the user.
+
+    Returns:
+        Optional[str]: Extracted channel ID if found, else None.
+    """
     if re.match(YOUTUBE_CHANNEL_ID_PATTERN, text):
+        logging.debug(f"Input is a channel ID: {text}")
         return text
 
     match = re.search(YOUTUBE_CHANNEL_URL_PATTERN, text)
     if match:
-        return match.group(1)
+        channel_id = match.group(1)
+        logging.debug(f"Extracted channel ID from URL: {channel_id}")
+        return channel_id
 
+    # Attempt to extract channel ID using yt-dlp
     try:
         ydl_opts = {'quiet': True, 'skip_download': True}
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(text, download=False)
             channel_id = info.get('channel_id')
-            if channel_id:
+            if channel_id and re.match(YOUTUBE_CHANNEL_ID_PATTERN, channel_id):
+                logging.debug(f"Extracted channel ID using yt-dlp: {channel_id}")
                 return channel_id
-            if info.get('id') and re.match(YOUTUBE_CHANNEL_ID_PATTERN, info['id']):
-                return info['id']
     except Exception as e:
         logging.error(f"Error extracting channel ID from {text}: {e}")
 
-    raise ValueError(f"Cannot extract channel ID from {text}")
+    return None
 
 
 class TqdmUpdater:
@@ -647,7 +692,7 @@ def handle_local_mode(args: argparse.Namespace):
 
 
 def handle_yt_mode(args: argparse.Namespace):
-    """Handle the YouTube mode for processing a YouTube channel.
+    """Handle the YouTube mode for processing a YouTube channel or playlist.
 
     Args:
         args (argparse.Namespace): Parsed arguments.
@@ -659,12 +704,10 @@ def handle_yt_mode(args: argparse.Namespace):
         logging.info(f"Created base directory {base_dir}")
 
     try:
-        channel_id = yt_channel_id_get(args.channel_input)
+        playlist_url = get_playlist_url(args.channel_input)
     except ValueError as e:
         logging.error(str(e))
         sys.exit(1)
-
-    channel_url = f"https://www.youtube.com/channel/{channel_id}"
 
     tqdm_updater = TqdmUpdater() if args.tqdm else None
     progress_hooks = [tqdm_updater.download_hook] if args.tqdm else [download_hook]
@@ -703,16 +746,16 @@ def handle_yt_mode(args: argparse.Namespace):
     }
 
     with YoutubeDL(ydl_opts) as ydl:
-        logging.info(f"Fetching videos from {channel_url}")
-        channel_info = ydl.extract_info(channel_url, download=False)
-        if not channel_info:
-            logging.error("Failed to retrieve channel information.")
+        logging.info(f"Fetching videos from {playlist_url}")
+        playlist_info = ydl.extract_info(playlist_url, download=False)
+        if not playlist_info:
+            logging.error("Failed to retrieve playlist information.")
             sys.exit(1)
 
         # Get the uploader's name for output directory
         uploader = (
-            channel_info.get("channel")
-            or channel_info.get("uploader")
+            playlist_info.get("channel")
+            or playlist_info.get("uploader")
             or "UnknownChannel"
         )
         output_dir = os.path.join(base_dir, args.out_dir or uploader)
@@ -721,15 +764,15 @@ def handle_yt_mode(args: argparse.Namespace):
             logging.info(f"Created output directory {output_dir}")
 
         # List videos (limited by playlist_end)
-        videos = channel_info.get("entries", [])
+        videos = playlist_info.get("entries", [])
         if not videos:
-            logging.error("No videos found in the channel.")
+            logging.error("No videos found in the playlist.")
             sys.exit(1)
 
         # Filter out None entries
         videos = [video for video in videos if video]
         if not videos:
-            logging.error("No valid videos found in the channel.")
+            logging.error("No valid videos found in the playlist.")
             sys.exit(1)
 
         # Sort videos by upload date (most recent first)
@@ -793,7 +836,7 @@ def handle_yt_mode(args: argparse.Namespace):
     podcast_title = args.title or uploader
     podcast_author = args.author or uploader
     podcast_description = (
-        args.description or f"Podcast feed for YouTube channel {uploader}"
+        args.description or f"Podcast feed for YouTube playlist/channel {uploader}"
     )
     link_url = args.link or base_url_sanitized
 
