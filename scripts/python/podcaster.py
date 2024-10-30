@@ -188,7 +188,7 @@ def parse_arguments() -> argparse.Namespace:
         "-n",
         "--num-videos",
         type=int,
-        default=50,
+        default=10,
         help="Limit to the last n videos from the channel.",
     )
     parser_yt.set_defaults(base_dir="~/Podcasts", overwrite=True)
