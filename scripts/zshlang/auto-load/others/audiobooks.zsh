@@ -89,7 +89,7 @@ typeset -g yt_channel_holakouee='UCEUO9scRXBptMsPycZygmbg'
 
 function podcaster-yt {
 	(
-		cdm "~/Downloads/yt"
+		cdm ~/"Downloads/yt"  #: @redundant
 
 		reval-ecgray podcaster.py yt --base-url "https://files.lilf.ir/yt" --base-dir ~/"Downloads/yt" "$@" @RET
 	)
