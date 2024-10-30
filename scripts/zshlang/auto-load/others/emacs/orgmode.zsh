@@ -900,6 +900,13 @@ function strip-prefixed-hash-comment {
         cat-copy-if-tty
 }
 
+function strip-prefixed-plus-minus {
+    in-or-args "$@" |
+        perl -CS -lpe 's/^(?:\+|-)//g' |
+        #: `+`, `-` is for unified diff.
+        cat-copy-if-tty
+}
+
 function strip-prefixed-colons {
     in-or-args "$@" |
         perl -CS -lpe 's/^:(?: \+?|$)//g' |
