@@ -186,6 +186,7 @@ def parse_arguments() -> argparse.Namespace:
     parser_yt.add_argument(
         "--audio-bitrate",
         type=int,
+        # default=0,
         default=256,
         help="Preferred audio bitrate in kbps.",
     )
@@ -729,7 +730,8 @@ def handle_yt_mode(args: argparse.Namespace):
 
     ydl_opts = {
         "ignoreerrors": True,
-        "format": "bestaudio/best",
+        # "format": "bestaudio/best",
+        "format": f"bestaudio[ext={args.audio_format}]/bestaudio/best",
         "outtmpl": os.path.join(
             base_dir, args.out_dir or "%(uploader)s", "%(title)s.%(ext)s"
         ),
@@ -747,7 +749,8 @@ def handle_yt_mode(args: argparse.Namespace):
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": args.audio_format,
-                "preferredquality": str(args.audio_bitrate),
+                # "preferredquality": str(args.audio_bitrate),
+                #: Let us disable this for now, in hopes that yt-dlp will skip conversion if it could find the requested audio format directly.
             },
             {
                 "key": "EmbedThumbnail",
@@ -827,7 +830,9 @@ def handle_yt_mode(args: argparse.Namespace):
     # After download, process the downloaded files
     audio_extensions = [f".{args.audio_format.lower()}"]
     audio_files = find_audio_files(
-        working_dir=output_dir, scan_for_audio=True, audio_extensions=audio_extensions
+        working_dir=output_dir,
+        scan_for_audio=True,
+        audio_extensions=audio_extensions,
     )
 
     if not audio_files:
