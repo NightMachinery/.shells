@@ -466,7 +466,8 @@ function snippet-debug-add-prints {
 
 function prompt-debug-find-bugs {
     # prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Find bugs in the following code. Then fix the found bugs.' "$@"
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Review the following code for any issues and bugs. Then fix the found problems. For ambiguities, make reasonable assumptions, but list them explicitly so I can override them if necessary. If you some functions are missing, assume they are defined elsewhere, but list them afterwards.' "$@"
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Review the following code for any issues and bugs. Then fix the found problems. For ambiguities, make reasonable assumptions, but list them explicitly so I can override them if necessary. If some function from a library is imported, assume the library exists even if you do not know about it.' "$@"
+    # If you some functions are missing, assume they are defined elsewhere, but list them afterwards.
 }
 ##
 function prompt-slide-complete-orgbeamer {
