@@ -94,5 +94,9 @@ function podcaster-yt {
 		reval-ecgray podcaster.py yt --base-url "https://files.lilf.ir/yt" --base-dir ~/"Downloads/yt" "$@" @RET
 	)
 }
+
 aliasfn holak podcaster-yt "${yt_channel_holakouee}"
+function holak-auto-updater {
+    tmuxnewsh2 holak holak --non-interactive -n=50
+}
 ###
