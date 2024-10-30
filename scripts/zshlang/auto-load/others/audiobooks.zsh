@@ -82,7 +82,7 @@ aa2ab() {
 }
 ###
 function podcaster {
-    podcaster.py local --base-url "https://files.lilf.ir/" --base-dir "~/Downloads" "$@"
+    reval-ecgray podcaster.py local --base-url "https://files.lilf.ir/" --base-dir "~/Downloads" --fake-dates "$@"
 }
 ##
 typeset -g yt_channel_holakouee='UCEUO9scRXBptMsPycZygmbg'
@@ -91,7 +91,7 @@ function podcaster-yt {
 	(
 		cdm "~/Downloads/yt"
 
-		podcaster.py yt --base-url "https://files.lilf.ir/" --base-dir "~/Downloads" "$@" @RET
+		reval-ecgray podcaster.py yt --base-url "https://files.lilf.ir/yt" --base-dir "~/Downloads/yt" "$@" @RET
 	)
 }
 aliasfn holak podcaster-yt "${yt_channel_holakouee}"
