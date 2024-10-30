@@ -6,6 +6,22 @@ import re
 from typing import List, Optional, Dict, Tuple
 
 
+def newline2space(s: str) -> str:
+    """
+    Replaces newlines and multiple spaces with a single space, removes specific patterns.
+
+    Example:
+        >>> newline2space("Title [Test]\\nSecond Line")
+        'Title {Test} Second Line'
+    """
+    s = re.sub(r'^[ \t]+', '', s, count=1)
+    s = s.replace('\x02', '')
+    s = re.sub(r'[\r\n]+', ' ', s)
+    s = re.sub(r'[ \t]+', ' ', s)
+    s = re.sub(r'(\(\*plb:\w+)-[ \t]+', r'\1', s)
+    return s
+
+
 def org_title_escape(s: str) -> str:
     """
     Escapes titles for Org-mode links.
@@ -338,7 +354,8 @@ def get_title(entry: Dict, *, source: str) -> str:
         >>> get_title({'title': 'Test Title'}, source='arxiv')
         'Test Title'
     """
-    return entry.get("title", "").strip()
+    raw_title = entry.get("title", "").strip()
+    return newline2space(raw_title)
 
 
 def get_abstract(entry: Dict, *, source: str) -> str:
@@ -350,7 +367,8 @@ def get_abstract(entry: Dict, *, source: str) -> str:
         'Test Abstract'
     """
     key = "summary" if source == "arxiv" else "abstract"
-    return entry.get(key, "").strip()
+    raw_abstract = entry.get(key, "").strip()
+    return newline2space(raw_abstract)
 
 
 def get_authors(entry: Dict, *, source: str) -> List[str]:
@@ -505,7 +523,7 @@ def build_properties(entry: Dict, *, source: str) -> Dict[str, str]:
 
     Example:
         >>> build_properties({'title': 'Test'}, source='arxiv')
-        {'title': 'Test', 'url': None, 'arxiv': 'yes'}
+        {'title': 'Test', 'url': '', 'arxiv': 'yes'}
     """
     properties: Dict[str, str] = {
         "title": get_title(entry, source=source),
