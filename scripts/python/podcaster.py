@@ -39,6 +39,7 @@ from urllib.parse import urlparse, parse_qs
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, APIC
 from mutagen.mp4 import MP4Cover, MP4
+import hashlib
 from PIL import Image
 from feedgen.feed import FeedGenerator
 from yt_dlp import YoutubeDL
@@ -568,7 +569,11 @@ def generate_rss_feed(
 
     for ep in episodes:
         fe = fg.add_entry()
-        fe.id(ep["url"])
+        # Generate a unique GUID that changes when the date changes
+        guid_str = f"{ep['url']}|{ep['date']}"
+        # Optionally, hash the GUID string for brevity
+        guid_hash = hashlib.md5(guid_str.encode('utf-8')).hexdigest()
+        fe.guid(guid_hash, permalink=False)
         fe.title(ep["title"])
         fe.description(ep.get("description", "No description available."))
         audio_format = os.path.splitext(ep["file_path"])[1][1:].lower()
@@ -588,6 +593,7 @@ def generate_rss_feed(
     else:
         fg.rss_file(output_path)
         logging.info(f"RSS feed generated at {output_path}")
+
 
 
 def handle_local_mode(args: argparse.Namespace):
