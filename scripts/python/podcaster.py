@@ -60,6 +60,8 @@ def parse_arguments() -> argparse.Namespace:
                         help='Scan current directory for audio files.')
     parser.add_argument('--image', type=str,
                         help='Path to image file or audio file to extract image from.')
+    parser.add_argument('--fake-dates', action='store_true',
+                        help='Generate fake dates to maintain episode order in podcast players.')
     args = parser.parse_args()
     return args
 
@@ -263,6 +265,7 @@ def generate_rss_feed(
     album_art_url: Optional[str],
     output_path: str,
     link_url: str,
+    fake_dates: bool = False,
 ):
     """Generate the RSS feed using python-feedgen.
 
@@ -274,6 +277,7 @@ def generate_rss_feed(
         album_art_url (Optional[str]): URL to the album art image.
         output_path (str): Output path for the RSS feed.
         link_url (str): Podcast main link URL.
+        fake_dates (bool): Generate fake dates to maintain episode order.
     """
     fg = FeedGenerator()
     fg.load_extension('podcast')
@@ -285,6 +289,13 @@ def generate_rss_feed(
     fg.podcast.itunes_author(author)
     if album_art_url:
         fg.podcast.itunes_image(album_art_url)
+
+    if fake_dates:
+        # Generate dates starting from now and going backwards
+        now = datetime.datetime.now().timestamp()
+        interval = 24 * 60 * 60  # One day in seconds
+        for i, ep in enumerate(episodes):
+            ep['date'] = now - (i * interval)
 
     for ep in episodes:
         fe = fg.add_entry()
@@ -398,6 +409,7 @@ def main():
         album_art_url=album_art_url,
         output_path=output_path,
         link_url=link_url,
+        fake_dates=args.fake_dates,
     )
 
 
