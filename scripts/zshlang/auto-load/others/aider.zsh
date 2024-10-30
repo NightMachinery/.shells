@@ -5,6 +5,11 @@ function aider-m {
     local opts=(
         --map-tokens=0
         #: Max number of tokens to use for repo map, use 0 to  disable (default: 1024) [env var: AIDER_MAP_TOKENS]
+
+        --gitignore
+        --no-dirty-commits
+        --vim
+        --no-suggest-shell-commands
     )
 
     if git-clean-p ; then
@@ -45,6 +50,17 @@ function aider-m {
                 --edit-format diff
             )
 
+        elif [[ "$model" == o1-deepseek ]] ; then
+            opts+=(
+                --model
+                openrouter/openai/o1-preview
+
+                --editor-model
+                openrouter/deepseek/deepseek-coder
+
+                --edit-format whole
+            )
+
         elif [[ "$model" == g1.5 ]] ; then
             local -x OPENAI_API_KEY="${openrouter_api_key}"
             local -x OPENAI_API_BASE=https://openrouter.ai/api/v1
@@ -78,6 +94,8 @@ aliasfn aider-4 aider_model=gpt-4 aider-m
 aliasfn aider-4t aider_model=gpt-4-turbo aider-m
 aliasfn aider-s3 aider_model=s3 aider-m
 aliasfn aider-c3o aider_model=c3o aider-m
+aliasfn aider-o1 aider_model=o1-deepseek aider-m
 aliasfn aider-g1.5 aider_model=g1.5 aider-m
 aliasfn aider-l3 aider_model=gq-llama3 aider-m
+# --no-auto-commits
 ##

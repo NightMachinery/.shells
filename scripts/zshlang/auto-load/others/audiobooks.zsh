@@ -91,6 +91,8 @@ function podcaster-yt {
 	(
 		cdm ~/"Downloads/yt"  #: @redundant
 
+		pip-install yt-dlp
+
 		reval-ecgray podcaster.py yt --base-url "https://files.lilf.ir/yt" --base-dir ~/"Downloads/yt" "$@" @RET
 	)
 }

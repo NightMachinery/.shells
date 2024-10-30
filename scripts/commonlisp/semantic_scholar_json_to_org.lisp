@@ -41,7 +41,7 @@
                      ;;               references_count_key) :test #'string=)
                      ;;  (ppcre:regex-replace-all "\\D+" val ""))
                      ((string= key "links")
-                      (when (ppcre:scan "^https?://([^/]+\.)?arxiv.org/" val)
+                      (when (ppcre:scan "^https?://([^/]+\\.)?arxiv\\.org/" val)
                         (setq arxiv-url
                               (empty-str-to-nil
                                (brishz-outrs "arxiv-url-get" val))))
