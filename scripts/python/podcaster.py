@@ -542,6 +542,9 @@ def generate_rss_feed(
         link_url (str): Podcast main link URL.
         fake_dates (bool): Generate fake dates to maintain episode order.
     """
+    if len(episodes) <= 1:
+        fake_dates = False
+
     fg = FeedGenerator()
     fg.load_extension("podcast")
 
