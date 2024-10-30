@@ -82,6 +82,6 @@ aa2ab() {
 }
 ##
 function podcaster {
-    podcaster.py --base-url "https://files.lilf.ir/" --base-dir "~/Downloads" "$@"
+    podcaster.py local --base-url "https://files.lilf.ir/" --base-dir "~/Downloads" "$@"
 }
 ##
