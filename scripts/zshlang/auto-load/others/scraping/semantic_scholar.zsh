@@ -141,6 +141,22 @@ function semantic-scholar-to-org {
 }
 aliasfn ssorg semantic-scholar-to-org
 ##
+function arxiv-to-org {
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local url
+    for url in ${inargs[@]} ; do
+        url="$(arxiv-url-get "$url")" @TRET
+
+        local json
+        json="$(revaldbg arxiv-json "$url")" @TRET
+
+        ec "$json" |
+            revaldbg paper_to_org.py "$url"
+    done | cat-copy-if-tty
+}
+##
 function semantic-scholar-dl-from-org {
     # if should-proxy-p ; then
     #     pxa89-local
