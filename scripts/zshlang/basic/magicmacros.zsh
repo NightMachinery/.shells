@@ -12,6 +12,7 @@ alias -g '@w'=' | fzinw | inargsf rgeval-env '
 alias -g 'MAGIC'='| { eval "$(< /dev/stdin)" }'
 
 alias -g '@RET'=' || return $?'
+# alias -g '@RET'=' || { retcode=$? ; print -r -- "Inside $0: exited ${retcode}" ; return $retcode } '
 
 
 alias -g '@STRUE'=' || { ectrace_single_trace=y ectrace_ret=$? ectrace ; true }'

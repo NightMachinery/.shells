@@ -365,15 +365,31 @@ function org-export-raw {
     return $ret
 }
 
+function html-favicon-add {
+    local favicon="${1}" html_input="${2}"
+    local html_output="${3:-${html_input}}"
+    assert-args favicon html_input html_output @RET
+
+    local root_dir="${html_output:h}"
+    (
+        cdm "${root_dir}" @TRET
+        reval-ecgray html_favicon.py "${favicon}" --input="${html_input}" --output="${html_output}" @TRET
+    ) @RET
+}
+
 function h-org-export-recursive {
     #: This function cannot be directly called. Use `org-export-recursive'.
     assert test -n "$storage_key_root" @RET
-    local root_dir="${org_export_root_dir:a}" #: =:a= normalizes the path, returns empty string for empty input
+    local root_dir="${org_export_root_dir:-.}"
+    local root_dir="${root_dir:a}" #: =:a= normalizes the path, returns empty string for empty input
+    dact var-show root_dir
 
     local fs=($@)
 
     local f f_hashed id_link file_link file_links text h outs exported_file
     for f in ${fs[@]} ; do
+        f="$(realpath "$f")" @TRET
+
         file_links=()
 
         f_hashed="$(md5m "$f")" @TRET
@@ -390,6 +406,7 @@ function h-org-export-recursive {
 
         ecbold "exporting ${f}"
         exported_file="$(org-export-raw "$f")" @TRET
+        dact var-show exported_file
         assert test -e "$exported_file" @RET
 
         outs="${exported_file}"$'\n'
@@ -397,6 +414,16 @@ function h-org-export-recursive {
         cat "$exported_file" |
             org-html-postprocess |
             sponge "$exported_file" @RET
+
+        local favicon
+        for favicon in "${exported_file:h}/favicon."{svg,png} ; do
+            if test -e "${favicon}" ; then
+                html-favicon-add "${favicon}" "${exported_file}" @RET
+
+                break
+            fi
+        done
+
 
         assert sout redism hset "${storage_key_hashes}" "${f_hashed}" "${h}" @RET
         assert sout redism hset "${storage_key_outs}" "${f_hashed}" "" @RET
@@ -504,6 +531,7 @@ function org-html-postprocess {
     ##
     cat-paste-if-tty |
         org_html_postprocess.py |
+        html_copy_button.py |
         cat-copy-if-tty
     ##
     #: @works @deprecated

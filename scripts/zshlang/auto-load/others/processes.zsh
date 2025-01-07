@@ -16,6 +16,7 @@ function ps-grandchildren() {
     "$0" "$pid"
   done
 }
+
 function kill-withchildren() {
     local sig=-15 # TERM
     if [[ "$1" =~ '^-\S+$' ]] ; then

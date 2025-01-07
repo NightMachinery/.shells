@@ -68,8 +68,8 @@ function luna {
 }
 ##
 function luna-skip-p {
-    if meeting-p ||
-            focus-do-not-disturb-p ; then
+    if meeting-p || focus-do-not-disturb-p ; then
+    # if meeting-p ; then
         return 0
     fi
 

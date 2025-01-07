@@ -27,12 +27,14 @@ function arxiv-url-get {
     urls=(${(@f)urls})
     local redirect_p="${arxiv_url_get_redirect_p:-y}"
 
-    local url id doi_id acl_id retcode=0
+    local url id id_without_version doi_id acl_id retcode=0
     for url in $urls[@] ; do
         local redirected_p=''
         while true ; do
             id=""
-            if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?(?:#.*)?/*$'
+
+            #: @duplicateCode/6bc7240c4b1443bf87f86043439a8eb3
+            if [[ "$url" =~ '(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?(?:(?:#|\?).*)?/*$'
                     || "$url" =~ '(?i)arxiv:([^/]+?)(?:\.pdf)?/*$'
                     || "$url" =~ '(?i)huggingface\.co/papers/([^/]+)'
                     || "$url" =~ '(?i)(?:ar5iv\.labs\.)?arxiv\.org/html/(\d+\.\d+)'
@@ -85,7 +87,9 @@ function arxiv-url-get {
             urls_source+="https://export.arxiv.org/e-print/${id}"
             urls_abs+="https://export.arxiv.org/abs/${id}"
             urls_vanity+="https://arxiv-vanity.com/papers/${id}"
-            urls_semantic_scholar+="https://api.semanticscholar.org/arXiv:${id}"
+
+            id_without_version="${id:s/v[0-9]#//}"
+            urls_semantic_scholar+="https://api.semanticscholar.org/arXiv:${id_without_version}"
 
             break
         done
@@ -261,6 +265,6 @@ function h-emc-arxiv-id-get {
 }
 ##
 function arxiv-normalize-path {
-    perl -lpe 's/[ :&\\]/_/g'
+    perl -lpe 's/[ :&\\"]/_/g'
 }
 ##

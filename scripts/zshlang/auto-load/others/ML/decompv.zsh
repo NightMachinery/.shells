@@ -204,7 +204,7 @@ function decompv-sync {
     ec 'ssh-run-in-shell "${fullhost}" "PIP_INSTALL_P= zsh ~/code/DecompV_setup/setup.zsh"' | eval-on-fullhosts "$@"
 }
 ##
-function tbl2pdf {
+function table2pdf {
     local pdflatex_bell_p="${pdflatex_bell_p:-n}"
     local pdflatex_fast_p="${pdflatex_fast_p:-y}"
 
@@ -235,6 +235,7 @@ function tbl2pdf {
         cp -v "t.pdf" "${dest}"
     ) @RET
 }
+aliasfn tbl2pdf table2pdf
 
 function tbl2pdf-i {
     local tmp
@@ -248,6 +249,7 @@ function tbl2pdf-i {
     assert zopen "${tmp_pdf}" @RET
 }
 ##
+typeset -g fairgrad_prompt_dir="${nightNotesPrivate}/research/DecompV/FairGrad/writing/prompts"
 typeset -g fairgrad_paper_dir=~cod/uni/papers/FairGrad
 typeset -g decompv_artifacts_dir=~cod/decompv_artifacts
 
@@ -255,34 +257,161 @@ function fairgrad-paper-used-files {
     (
         assert cd "${fairgrad_paper_dir}" @RET
 
+        # `LibraGrad_slides.org` creates a tex file anyway
         cat **/*.tex |
             rg -v '^\s*%' |
-            rget '((?:qual_v5|tables_v1)/.*\.(png|jpe?g|pdf|tex))\b' |
+            rget '((?:(?:qual_v5|tables_v1)/.*\.(png|jpe?g|pdf|tex))|qual_v5/.*/zele_\d+)\b' |
             arxiv-normalize-path
+        #: We are finding Zele dirs used by `\ZeleAll`.
     )
 }
 
 function h-fairgrad-paper-copy-files {
-    trs "${fairgrad_paper_dir}"/files/{qual_v5,tables_v1} || true
-    local f fs
+    if ! isDeus && ! bool "${fairgrad_copy_files_p}" ; then
+        return 0
+    fi
+
+    if bool "${fairgrad_copy_files_p}" ; then
+        bell-sc2-become-primal
+        trs "${fairgrad_paper_dir}"/files/{qual_v5,tables_v1} || true
+    fi
+
+    local f fs src dest
     fs=(${(@f)"$(fairgrad-paper-used-files)"}) || true
     for f in "${fs[@]}" ; do
-        assert cp "${decompv_artifacts_dir}/${f}" "${fairgrad_paper_dir}/files/${f}" @RET
+        src="${decompv_artifacts_dir}/${f}"
+        dest="${fairgrad_paper_dir}/files/${f}"
+        assert test -e "${src}" @RET
+
+
+        var-show f dest
+        if test -d "${src}" ; then
+            # local dest_dir="${dest:h}"
+            # mkdir -p "${dest_dir}"
+
+            local srcfile
+            for srcfile in "${src}"/**/*(.DN); do
+                f="$(grealpath --relative-to="${decompv_artifacts_dir}" "${srcfile}")"
+                src="${srcfile}"
+                dest="${fairgrad_paper_dir}/files/${f}"
+                assert h-fairgrad-paper-copy-file-1 @RET
+            done
+
+        else
+            h-fairgrad-paper-copy-file-1
+        fi
     done
 }
 
+function h-fairgrad-paper-copy-file-1 {
+    #: @global inputs: f, src, dest
+    ##
+    assert ensure-dir "${dest}" @RET
+
+    if [[ "$f" =~ '\.tex$' ]] ; then
+        if ! bool "${fairgrad_copy_files_p}" ; then
+            return 0
+        fi
+
+        cat "${src}" |
+            {
+                perl -lpe '
+                # s/\\textcolor\{green\}/\\textcolor\{ultramarine\}/g;
+                # s/\\textcolor\{green\}/\\textcolor\{richcobalt\}/g;
+                s/\\textcolor\{green\}/\\textcolor\{blue\}/g;
+
+                # s/\\textcolor\{red\}/\\textcolor\{deepsaffron\}/g;
+                # s/\\textcolor\{red\}/\\textcolor\{deepgoldenrod\}/g; # bad
+                s/\\textcolor\{red\}/\\textcolor\{coral\}/g;
+                '
+            } |
+            {
+                if [[ "$f" =~ 'complexity\.tex$' ]] ; then
+                perl -lpe '
+                s/\\begin\{table\}\[h\]/\\begin{table}[!t]/g;
+                '
+                else
+                    cat
+                fi
+            } |
+            {
+                if [[ "$f" =~ 'm_IG\.tex$' ]] ; then
+                    perl -lpe "
+                s/^Integrated/Int./g
+                "
+                    # '
+                    # BEGIN { $prev = "" }
+                    # s{(Integrated|Fair) \K((?:\w|\+)+)}{
+                    #   "\\textprime\\textprime"
+                    #                     ($2 eq $prev) ? "\\textprime\\textprime" : ($prev = $2, $2)
+                    # }ge;
+                    # '
+
+                    #: [[id:9bb17656-bc38-4a38-9208-e225dc5ffeb4][=\K=]]
+                else
+                    cat
+                fi
+            } > "${dest}" @RET
+
+
+    elif isDeus && [[ "$f" =~ '\.pdf$' && ! "$f" =~ '(?:CLIP_M_Big_1|CLIP_FP_NI_6|zele_31569)' ]] ; then
+        #: We only compress stuff when in Deus mode.
+        #: I have excluded `CLIP_M_Big_1` as it appears on the first page.
+        #: Excluding it increases the size of the main PDF by ~0.8MB.
+        ##
+        if test -e "${dest}" ; then
+            ecgray "$0: skipped existing dest: ${dest}"
+            return 0
+        fi
+
+        assert pdf-compress "${src}" "${dest}" @RET
+
+    else
+        # if [[ "$f" =~ '(?:CLIP_M_Big_1|CLIP_FP_NI_6|zele_31569)' ]] ; then
+        #     fsay monkey
+        #     ec "f=$f src=$src dest=$dest" >> tmp.log.34
+        # fi
+
+        assert command gcp "${src}" "${dest}" @RET
+    fi
+}
+
 function fairgrad-paper-build {
+    local marker=FAIRGRAD_BUILD
+    #: The marker must be short enough so that when using it outside of brish it can still work. (Brish uses a workaround so the marker length can be quite high.)
+
+    kill-marker "${marker}"
     (
+        mark-me "${marker}"
+
         assert cd "${fairgrad_paper_dir}" @RET
 
         assert h-fairgrad-paper-copy-files @RET
 
-        pdflatex-m main.tex @RET
+        pdflatex_bib_mode="${pdflatex_bib_mode:-bibtex}" pdflatex-m main.tex @RET
 
         silent trs tmp.*(DN.) || true
 
-        awaysh zopen main.pdf
+        # awaysh zopen main.pdf
     )
 }
 
+##
+function fairgrad-sync-experiments {
+    assert-net @RET
+
+    reval-ecgray python ~cod/uni/DecompV/decompv/x/run/sync_experiments.py --upload --hostnames pino c0 t31 t21 m15-hpc
+}
+
+function h-fairgrad-sync-experiments-loop {
+    lo_s=3600 loop fairgrad-sync-experiments
+    # while sleep 3600 ; do
+    #     fairgrad-sync-experiments || true
+    # done
+}
+aliasfn fairgrad-sync-experiments-loop tmuxnewsh2 fairgrad-sync-experiments h-fairgrad-sync-experiments-loop
+##
+function snippet-fairgrad-context {
+    snippet-input-file "${fairgrad_prompt_dir}/context.org" "$@"
+}
 ##

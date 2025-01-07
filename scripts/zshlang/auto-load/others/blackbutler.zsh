@@ -5,7 +5,7 @@ function butler-p {
 }
 ##
 function blackbutler-boot {
-    tmuxnewsh2 BlackButler BLACKBUTLER_DEBUGME="$BLACKBUTLER_DEBUGME" blackbutler "${@[2,-1]}"
+    tmuxnew BlackButler zsh -c 'cdm ~/tmp/blackbutler && BLACKBUTLER_DEBUGME="$BLACKBUTLER_DEBUGME" blackbutler "${@[2,-1]}"'
 }
 ##
 function bb-say {

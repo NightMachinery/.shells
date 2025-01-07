@@ -1,0 +1,39 @@
+--------
+
+* Emacs Lisp (elisp) Coding Guidelines:
+** Namespacing:
+   - Prefix all public variables and functions with =night/=
+   - For internal/private names, use =night/h-= prefix
+     
+** Function Definitions:
+   - For functions with multiple arguments, use =cl-defun= with keyword arguments. Only use =cl-defun= when needed!
+   - Provide sensible default values for optional arguments
+
+   - When the helper functions are too niche, define them as internal functions of the main functions, using =cl-flet=, =cl-labels=, etc.
+     
+** Modifying External Functions:
+   - When modifying functions outside our namespace (not prefixed with =night/=),
+   - Prefer using advice instead of redefining the function
+     
+** Conditional Statements:
+   - Use =cond= instead of =if=
+     
+** Coding Practices:
+   - Keep functions short and focused on a single task.
+   - Use a functional style when applicable.
+   - Use descriptive names for functions and variables for clarity.
+   - Refactor duplicated code into reusable functions.
+   - DRY, don't repeat yourself.
+     
+** User Configuration:
+   - Allow users to customize behavior via variables or hooks.
+   - Provide sensible defaults that work well out of the box.
+     
+** Logging and Debugging:
+   - Use =message= for logging important information. Define a local variable =verbosity-level= at the start of the function using a =let= block which controls the verbosity. Hardcode the value at =0=, no need for customizability of =verbosity-level=.
+     
+** Error Handling:
+   - Use =condition-case= to handle exceptions gracefully.
+   - Provide informative error messages to aid in debugging.
+
+--------

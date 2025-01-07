@@ -72,6 +72,14 @@ function cat-rtl-streaming-if-tty {
     fi
 }
 
+function cat-streaming-copy-rtl-if-tty {
+    if isOutTty ; then
+        cat-copy-streaming | rtl-reshaper-streaming
+    else
+        cat
+    fi
+}
+
 function cat-copy-rtl-if-tty {
     if isOutTty ; then
         cat-copy | rtl-reshaper-streaming

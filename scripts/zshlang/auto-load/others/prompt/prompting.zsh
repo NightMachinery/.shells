@@ -5,7 +5,9 @@ alias porg='prompt_input_mode=org'
 alias pblk='prompt_input_mode=block'
 
 function prompt-instruction-input {
-    local instruction="$1" ; shift
+    local instruction="$1"
+    shift @RET
+
     ensure-array prompt_input_images #: @global/input
     local input_mode="${prompt_input_mode}"
     local qa_p="${prompt_qa_p}"
@@ -46,7 +48,8 @@ function prompt-instruction-input {
     local prompt_text
     prompt_text="$( {
         for preamble in "${preambles[@]}" ; do
-            assert reval "${preamble}" @RET
+            prompt_preambles=() prompt_qa_p= prompt_input_mode= assert reval "${preamble}" '' @RET
+            #: Preambles are often snippets. Snippets might decide to read from stdin or the clipboard if we do not explicitly supply their input, hence the empty =''=.
         done
 
         ec "$instruction"
@@ -92,7 +95,7 @@ function prompt-instruction-input {
 
 function prompt-instruction-input-coding {
     prompt_input_mode="${prompt_input_mode:-block}" \
-    prompt_preambles=(${prompt_preambles[@]} preamble-coding) \
+    prompt_preambles=(${prompt_preambles[@]} snippet-preamble-coding) \
         prompt-instruction-input "$@"
 }
 
@@ -102,41 +105,6 @@ function prompt-blockify {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input ''
 }
 alias xb='prompt-blockify'
-##
-function preamble-gen1 {
-    local field="$1"
-
-    if test -n "$field" ; then
-        field=" in ${field}"
-    fi
-
-    ec "You are an experienced expert${field}. You always answer questions to the best of your knowledge, but you NEVER provide answers that you are not sure about, or that are not backed up by high-quality sources; instead you say that you can't provide a good answer. Giving trustworthy and correct answers is much more important to you than always having something to say. You keep your answers concise, on-topic, free of boilerplate, and exclude basic instructions that most developers will be familiar with anyway, unless the user asks for more details." |
-        cat-copy-if-tty
-}
-
-function preamble-coding {
-    {
-    ec "You keep your answers concise, on-topic, free of boilerplate, and exclude basic instructions that most developers will be familiar with anyway. You write clean, performant code in a functional style. Most of your code is in small functions which take any needed inputs as possibly optional arguments. You use abstractions to DRY. You use dependecy injection when possible. You include type hints when possible. You write docstrings and put example usages in the docstrings. You're an expert in Python, Rust, Go, Haskell, Clojure, Elisp, and Scala."
-
-    ec "In Python, you use \`*, \` style for functions with multiple arguments to force the caller to explicitly name any used argument for more readable and robust code. You always end your argument lists with a comma so that the linter formats the code correctly."
-
-    ec
-    # preamble-coding-rewriter
-    snippet-whole-code
-    } |
-        cat-copy-if-tty
-}
-
-function prompt-coding-rewriter {
-    fnswap preamble-coding-rewriter true \
-        prompt-instruction-input-coding "You refactor the functions if a lower-level sub-function can be extracted with a more general API. You optimize the code to make it run faster." "$@"
-    # You remove useless comments.
-}
-
-function preamble-coding-rewriter {
-    ec "After writing a code snippet, you always rewrite it to make it better in the following ways. $(prompt-coding-rewriter '')" |
-        cat-copy-if-tty
-}
 ##
 function prompt-coding-rewrite-performant {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.' "$@"
@@ -226,8 +194,57 @@ function prompt-correct-grammar {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Correct grammatical and spelling mistakes in the following text,  without changing the wording:' "$@"
 }
 
+function prompt-correct-grammar-list {
+    local prompt='Please review the given text and list each spelling or grammar mistake found. For each error, provide potential corrections in this format:
+
+1. [Quote the sentence containing incorrect text]: Brief explanation of the error
+Possible corrections:
+- [Correction option 1]
+- [Correction option 2] (if applicable)
+
+2. [Quote the sentence containing incorrect text]: Brief explanation of the error
+Possible corrections:
+- [Correction option 1]
+- [Correction option 2] (if applicable)
+
+Note: Please preserve original wording and only address spelling and grammar issues. Do not make changes to formatting or spacing.'
+
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt}" "$@"
+}
+##
+function prompt-rewrite-polite {
+    local prompt
+    prompt="Rewrite the given text to be more polite and professional. Preserve all information in the given text."
+
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt}" "$@"
+}
+##
+function prompt-rewrite-fluent-list {
+    local prompt
+    prompt="List all sentences that need improvement or need to be moved for better flow, along with suggested changes and explanations."
+
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt}" "$@"
+}
+
+typeset -g prompt_fluent='Rewrite the text more fluently and with correct grammar.'
+typeset -g prompt_concise='Rewrite the text more fluently and concisely. All information must be retained, only redundancies and fluff can be omitted.'
+typeset -g prompt_concise_v2='Rewrite in my own language but with better flow and more concise. Output in a code block. Use LaTeX if the source is in LaTeX. Preserve my own voice!'
+
 function prompt-rewrite-fluent {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Make the following text more fluent:' "$@"
+    local prompt
+    prompt="${prompt_fluent}"
+    # prompt='Make the following text more fluent:'
+
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt}" "$@"
+}
+function prompt-rewrite-fluent-multi {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt_fluent} Give 5 different rewrites, with different trade-offs in each. You can move sentences around for better flow. If the original text is in a particular format, e.g., LaTeX, also output in that format in a code block." "$@"
+}
+function prompt-rewrite-concise-multi {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt_concise} Give 5 different rewrites, with different trade-offs in each." "$@"
+}
+function prompt-rewrite-concise-multi-v2 {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt_concise_v2} Give 5 different rewrites, with different trade-offs in each." "$@"
 }
 
 function prompt-rewrite-fluent-latex {
@@ -255,6 +272,13 @@ function prompt-rewrite-abstract {
 }
 function prompt-rewrite-abstract-concise {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the given abstract to be more clear, engaging, and concise.' "$@"
+}
+
+function prompt-rewrite-fluent-graduate {
+   local prompt_input_mode="${prompt_input_mode:-block}"
+   local prompt="Rewrite the following text at a postgraduate academic reading level - sophisticated and precise but not flowery. Use natural, fluid language while maintaining technical rigor and depth. Keep core meaning and details intact while making expression more direct:"
+
+   prompt-instruction-input "${prompt}" "$@"
 }
 ##
 function prompt-write-exercise-descpription {
@@ -449,19 +473,8 @@ function prompt-code-rewrite-idiomatic {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following code to make it more idiomatic and optimized:' "$@"
 }
 ##
-function snippet-whole-code {
-    ec "Output the whole code without eliding any parts." |
-        cat-copy-if-tty
-}
-##
-function snippet-night-namespace {
-    ec "Prefix all of our new function names' with \`night/\` to namespace them properly." |
-        cat-copy-if-tty
-}
-##
 function snippet-debug-add-prints {
-    ec "Add print statements for debugging purposes." |
-        cat-copy-if-tty
+    snippet-input "Add print statements for debugging purposes." "$@"
 }
 
 function prompt-debug-find-bugs {
@@ -533,25 +546,58 @@ function prompt-emoji-name {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'What are the names of the emojis related to the following:' "$@"
 }
 ##
+function latex-inline-inputs {
+    ##
+    revaldbg latex_inline_inputs.py "${@}" |
+        strip-duplicate-subsequent-blank-whitespace-lines |
+        cat-copy-if-tty
+    ##
+    # local input="${1}"
+    # assert-args input @RET
+    # shift
+
+    # local opts=("${@}")
+    # revaldbg latex_inline_inputs.py "${opts[@]}" -- "${input}"
+    ##
+}
+
 function pbcopy-file-as-md {
     #: @duplicateCode/2f9a53358e9a32d7c5642a4a9842dd63
     ##
     local fs=($@)
+    ensure-array copy_as_md_latex_inline_opts
+    local latex_inline_opts=("${copy_as_md_latex_inline_opts[@]}")
+
+    if ! array-contains latex_inline_opts --no-rm-comments ; then
+        latex_inline_opts+=('--rm-comments')
+
+        # ecgray "Added '--rm-comments' to latex_inline_opts"
+    else
+        # ecgray "Option '--no-rm-comments' is present. No changes made."
+    fi
 
     local f retcode=0
-    for f in "${fs[@]}" ; do
-        if ! test -e "$f" ; then
-            ecerr "$0: File does not exist: $f"
-            retcode=1
-            continue
-        fi
+    {
+        for f in "${fs[@]}" ; do
+            if ! test -e "$f" ; then
+                ecerr "$0: File does not exist: $f"
+                retcode=1
+                continue
+            fi
 
-        ec "File: $f"
-        ec '``````````'
-        cat "$f"
-        ec '``````````'
-        ec $'\n'
-    done | {
+            ec "File: $f"
+            ec '``````````'
+            if isDeus && [[ "${f}" =~ '\.tex$' ]] ; then
+                latex-inline-inputs "${f}" "${latex_inline_opts[@]}" @RET
+            else
+                cat "$f"
+            fi
+            ec '``````````'
+            ec $'\n'
+        done
+
+        ec '---'$'\n'
+    } | {
         if isLocal ; then
             cat-copy-streaming
         else
@@ -561,5 +607,22 @@ function pbcopy-file-as-md {
 
     return $retcode
 }
-alias cx='pbcopy-file-as-md'
+aliassafe cx='pbcopy-file-as-md'
+##
+function prompt-rewrite-telegram {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following text as a post for a Telegram channel. You can use emojis, etc. You can use `**bold text**`, `__italic text__`, ~~strikethrough~~, and Markdown literals and code blocks using backticks, e.g., \`CONSTANT_IN_CODE\`. You can use Markdown links, `[label](url)`. End the post by including a link to our channel, `EMOJI [@SUTCSE](https://t.me/sutcse)` with a random nice creative emoji. This line starts with an emoji and ends with our link, no other text needed.'" (To ensure randomness, use the current date as a seed for your decision: $(date)."' Be concise, but easy to understand. The target audience is AI PhD students studying in Sharif University of Technology. Begin your post with a headline that summarizes the main point (the lede). Write in Farsi (Persian), as the students are Iranians.' "$@"
+}
+
+function run-prompt-rewrite-telegram {
+    ensure-array tsend_opts
+    local tsend_opts=("${tsend_opts[@]}" --link-preview)
+
+    llm_copy_p="${llm_copy_p:-n}" \
+        llm-run prompt-rewrite-telegram "$@" > >(md2tlg) |
+        cat-rtl-streaming-if-tty
+}
+##
+function prompt-cs-phd-apply {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'CS PhD application requirements (GRE, LOR count) and deadline' "$@"
+}
 ##

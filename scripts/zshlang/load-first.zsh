@@ -1,5 +1,7 @@
 ### Initiate the Darkness
 export NIGHTDIR="${0:h:h}/" # echo "_: $_ 0: $0 bs: $BASH_SOURCE"
+typeset -g night_prompt_dir="${NIGHTDIR}/prompt"
+
 source-basic() {
     local i
     for i in "$@" ; do

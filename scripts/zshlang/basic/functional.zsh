@@ -33,10 +33,18 @@ function lambda() {
     lambda-unquoted "$(gq "$@")"
 }
 ##
-function labeled() {
-    #  zip enumerate
-    ec "$(gq "${@}"): $(reval "$@")"
-    # ec "${@[2,-1]}: $(reval "$@")"
+function labeled {
+    local msg out retcode=0
+    out="$(reval "$@")" || retcode=$?
+    msg="$(gq "${@}"): ${out}"
+
+    if (( retcode != 0 )) ; then
+        msg+=" (exited ${retcode})"
+    fi
+
+    ec "${msg}"
+
+    return ${retcode}
 }
 ##
 function fnrep {

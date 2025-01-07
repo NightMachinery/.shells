@@ -36,7 +36,7 @@ function openai-cost-by-tokens {
 
             [${claude_3_5_sonnet_model_name}]=0.003
             [claude-3-opus]=0.015
-            [${c3o_model_name}]=0.015
+            [${claude_3_opus_model}]=0.015
         )
     elif [[ "${mode}" == output ]] ; then
         model_costs=(
@@ -51,7 +51,7 @@ function openai-cost-by-tokens {
 
             [${claude_3_5_sonnet_model_name}]=0.015
             [claude-3-opus]=0.075
-            [${c3o_model_name}]=0.075
+            [${claude_3_opus_model}]=0.075
         )
     else
         # ecerr "$0: unknown mode: $mode"
@@ -73,7 +73,11 @@ function openai-cost-by-tokens {
     fi
 }
 ##
-function openai-models-list {
+function llm-models-list {
+    llm models
+}
+
+function llm-openai-models-list {
     llm openai models
     ##
     # curl --silent --fail -X GET \
@@ -254,6 +258,10 @@ aliassafe llml='llm-logs'
 function llm-m {
     bella_zsh_disable1
 
+    ensure-array llm_attachments @RET
+    local attachments=("${llm_attachments[@]}")
+    llm_attachments=() #: clear the attachments
+
     local model="${llm_model:-gpt-3.5-turbo}"
     local temp="${llm_temp}"
     local system_prompt="${llm_system}"
@@ -278,12 +286,27 @@ function llm-m {
         log+=$'\n'"System Prompt:"$'\t'"${system_prompt}"
     fi
 
+    local a
+    for a in "${attachments[@]}" ; do
+        if [[ "${a}" == "MAGIC_CLIPBOARD" ]] ; then
+            # Save the image from the clipboard to a temp file using `pbpaste-image`:
+            a="$(gmktemp --suffix=".png")" @TRET
+            assert pbpaste-image "${a}" @RET
+
+            icat-v "${a}" || true
+        fi
+        
+        opts+=(--attachment "$a")
+        # log+=$'\n'"Attached:"$'\t'"${a}"
+    done
+
     ecgray "$log"
 
     $proxyenv revaldbg command llm "$@" "${opts[@]}" |
         cat-rtl-streaming-if-tty
         # cat-copy-streaming
 }
+alias with-llm-attach-clipboard='llm_attachments=("MAGIC_CLIPBOARD") '
 
 function llm-continue {
     llm_model=continue llm-m --continue "$*"
@@ -296,9 +319,11 @@ alias xc='\noglob llm-continue'
 function llm-send {
     bella_zsh_disable1
 
-    local model="${llm_model:-gpt-3.5-turbo}"
+    local model="${llm_model:-${llm_default_model}}"
+    assert-args model @RET
     typeset -g llm_last_model="$model"
 
+    local copy_p="${llm_copy_p:-y}"
     local max_tokens="${llm_max_tokens:-4000}"
     local token_strategy="${llm_token_limit_strategy:-reject}"
 
@@ -332,7 +357,7 @@ function llm-send {
     input_cost="$(openai-cost-by-tokens "${model}" input "${token_count}")" @TRET
 
     ecgray '-----'
-    ecgray "${input}" |& cat-rtl-if-tty
+    ecgray "${input}" |& cat-rtl-if-tty >&2
     ecgray '-----'
     ecgray "Input Tokens: ${token_count}" #  (\$${input_cost})
     ecgray '-----------'
@@ -345,6 +370,11 @@ function llm-send {
     } always {
         exec {fd_out}<&-
     }
+
+    if bool "${copy_p}" ; then
+        pbcopy "${output}" || true
+    fi
+
     output_token_count="$(ecn "${output}" | token_count_model="${model}" openai-token-count)" @TRET
     output_cost="$(openai-cost-by-tokens "${model}" output "${output_token_count}")" @TRET
     if test -n "${output_cost}" && test -n "${input_cost}" ; then
@@ -367,119 +397,227 @@ function llm-send {
     fi
 }
 
-function llm-3t {
-    llm_model=gpt-3.5-turbo-16k llm-send "$@"
+function reval-to-llm {
+    reval-to llm-send "$@"
 }
-aliassafe 3t='\noglob llm-3t'
-function llm-3t-chat {
-    llm_model=gpt-3.5-turbo-16k llm-m chat "$@"
-}
-aliasfn reval-to-gpt3t reval-to llm-3t
-aliassafe r3t='\noglob reval-to-gpt3t'
+aliasfn llm-chat llm-m chat
 
-function llm-4 {
-    #: @alt =gpt-4-0314= =gpt-4-0613=
-    llm_model=gpt-4 llm-send "$@"
-}
-aliassafe l4='\noglob llm-4'
-function llm-4-chat {
-    llm_model=gpt-4 llm-m chat "$@"
-}
-aliasfn reval-to-gpt4 reval-to llm-4
-aliassafe rl4='\noglob reval-to-gpt4'
+function define-llm-model {
+    local model_name="$1"
+    local long_name="${long_name}"
+    local short_name="${short_name:-${long_name}}"
+    assert-args model_name long_name short_name @RET
 
-function llm-4t {
-    llm_model=gpt-4-turbo llm-send "$@"
+    ensure-array reval_to_aliases send_aliases
+    local reval_to_aliases=("${reval_to_aliases[@]}")
+    local send_aliases=("${send_aliases[@]}")
+
+    local model_var_name="${long_name}_model"
+    revaldbg typeset -g "${model_var_name}=${model_name}" @RET
+
+    local with_alias_name="with-${short_name}"
+    revaldbg aliassafe "${with_alias_name}=llm_model=\"\${${model_var_name}}\" " @RET
+
+    local llm_function_name="llm-${short_name}"
+    revaldbg aliasfn-ng "${llm_function_name}" "${with_alias_name}" llm-send @RET
+
+    local alias_
+    for alias_ in "${send_aliases[@]}"; do
+        revaldbg aliassafe "${alias_}"="${llm_function_name}" @RET
+    done
+
+    local llm_chat_function_name="${llm_function_name}-chat"
+    revaldbg aliasfn "${llm_chat_function_name}" "${with_alias_name}" llm-chat @RET
+
+    local reval_to_function_name="reval-to-${short_name}"
+    revaldbg aliasfn-ng "${reval_to_function_name}" "${with_alias_name}" reval-to-llm @RET
+
+    for alias_ in "${reval_to_aliases[@]}"; do
+        revaldbg aliassafe "${alias_}"="${reval_to_function_name}" @RET
+    done
 }
-aliassafe l4t='\noglob llm-4t'
-function llm-4t-chat {
-    llm_model=gpt-4-turbo llm-m chat "$@"
+
+function define-llm-model-v2 {
+    local map_name="$1"
+
+    #: Extract values from the hash map using indirect parameter expansion
+    local model_name="${${(P)map_name}[model_name]}"
+    local long_name="${${(P)map_name}[long_name]}"
+    local short_name="${${(P)map_name}[short_name]}"
+    local reval_to_aliases=(${(s: :)${(P)map_name}[reval_to_aliases]})
+    local send_aliases=(${(s: :)${(P)map_name}[send_aliases]})
+
+    define-llm-model "$model_name"
 }
-aliasfn reval-to-gpt4t reval-to llm-4t
-aliassafe rl4t='\noglob reval-to-gpt4t'
-aliassafe 4t='\noglob reval-to-gpt4t'
+## * Models
+## ** Google Gemini
+typeset -gA gemini15_obj=(
+    model_name 'gemini-1.5-pro-latest'
+    long_name 'gemini_1_5_pro'
+    short_name 'g15'
+    reval_to_aliases 'g15 gemini'
+    send_aliases 'lg15'
+)
+define-llm-model-v2 gemini15_obj
+
+typeset -A gemini_flash_8b_obj=(
+    model_name 'gemini-1.5-flash-8b-latest'
+    long_name 'gemini_flash_8b_1_5'
+    short_name 'flash-8b'
+    reval_to_aliases 'rflash_8b fl8'
+    send_aliases 'lflash_8b'
+)
+define-llm-model-v2 gemini_flash_8b_obj
+
+typeset -A gemini_flash_obj=(
+    model_name 'gemini-1.5-flash-latest'
+    long_name 'gemini_flash_1_5'
+    short_name 'flash'
+    reval_to_aliases 'rflash fl'
+    send_aliases 'lflash'
+)
+define-llm-model-v2 gemini_flash_obj
+## *** OpenRouter: Google Gemini
+# OpenRouter Gemini Flash 8B
+typeset -A openrouter_gemini_flash_8b_obj=(
+    model_name 'openrouter/google/gemini-flash-1.5-8b'
+    long_name 'openrouter_gemini_flash_8b'
+    short_name 'or-flash-8b'
+    reval_to_aliases 'or_rflash_8b orfl8'
+    send_aliases 'or_lflash_8b'
+)
+define-llm-model-v2 openrouter_gemini_flash_8b_obj
+
+# OpenRouter Gemini Flash 8B Experimental
+typeset -A openrouter_gemini_flash_8b_exp_obj=(
+    model_name 'openrouter/google/gemini-flash-1.5-8b-exp'
+    long_name 'openrouter_gemini_flash_8b_exp'
+    short_name 'or-flash-8b-exp'
+    reval_to_aliases 'or_rflash_8b_exp orfl8e'
+    send_aliases 'or_lflash_8b_exp'
+)
+define-llm-model-v2 openrouter_gemini_flash_8b_exp_obj
+
+# OpenRouter Gemini 1.5
+typeset -A openrouter_gemini_15_obj=(
+    model_name 'openrouter/google/gemini-pro-1.5'
+    long_name 'openrouter_gemini_15'
+    short_name 'or-g15'
+    reval_to_aliases 'or_rg15 org15'
+    send_aliases 'or_lg15'
+)
+define-llm-model-v2 openrouter_gemini_15_obj
+
+# OpenRouter Gemini 1.5 Experimental
+typeset -A openrouter_gemini_15_exp_obj=(
+    model_name 'openrouter/google/gemini-pro-1.5-exp'
+    long_name 'openrouter_gemini_15_exp'
+    short_name 'or-g15-exp'
+    reval_to_aliases 'or_rg15_exp org15e'
+    send_aliases 'or_lg15_exp'
+)
+
+## ** Misc Models
+typeset -gA gpt35t16k_obj=(
+    model_name 'gpt-3.5-turbo-16k'
+    long_name 'gpt_3_5_16k'
+    short_name '3t'
+    reval_to_aliases 'r3t'
+    send_aliases '3t'
+)
+define-llm-model-v2 gpt35t16k_obj
+
+typeset -gA gpt4_obj=(
+    model_name 'gpt-4'
+    long_name 'gpt_4'
+    short_name '4'
+    reval_to_aliases 'rl4'
+    send_aliases 'l4'
+)
+define-llm-model-v2 gpt4_obj
+
+typeset -gA gpt4turbo_obj=(
+    model_name 'gpt-4-turbo'
+    long_name 'gpt_4_turbo'
+    short_name '4t'
+    reval_to_aliases 'rl4t 4t'
+    send_aliases 'l4t'
+)
+define-llm-model-v2 gpt4turbo_obj
+
+typeset -gA gpt4o_obj=(
+    model_name 'gpt-4o'
+    long_name 'gpt_4o'
+    short_name '4o'
+    reval_to_aliases 'rl4o 4o'
+    send_aliases 'l4o'
+)
+define-llm-model-v2 gpt4o_obj
+
+typeset -gA gpt4o_audio_obj=(
+    model_name 'gpt-4o-audio-preview'
+    long_name 'gpt_4o_audio'
+    short_name '4o-audio'
+    # short_name '4o-audio'
+    # reval_to_aliases 'rl4o 4o'
+    # send_aliases 'l4o'
+)
+define-llm-model-v2 gpt4o_audio_obj
+
+typeset -gA gpt4omini_obj=(
+    model_name 'gpt-4o-mini'
+    long_name 'gpt_4o_mini'
+    short_name '4om'
+    reval_to_aliases 'rl4om 4om'
+    send_aliases 'l4om'
+)
+define-llm-model-v2 gpt4omini_obj
+
+typeset -gA claude35sonnet_obj=(
+    model_name 'or:c35s'
+    long_name 'claude_3_5_sonnet'
+    short_name 's3'
+    reval_to_aliases 'rs3'
+    send_aliases 's3'
+)
+define-llm-model-v2 claude35sonnet_obj
+typeset -g claude_3_5_sonnet_model_name="${claude_3_5_sonnet_model}" #: @backcompat
+
+typeset -gA claude3o_obj=(
+    model_name 'or:c3o'
+    long_name 'claude_3_opus'
+    short_name 'c3o'
+    reval_to_aliases 'rc3o'
+    send_aliases 'c3o'
+)
+define-llm-model-v2 claude3o_obj
+
+typeset -gA claude3haiku_obj=(
+    model_name 'claude-3-haiku'
+    long_name 'claude_3_haiku'
+    short_name 'c3h'
+    reval_to_aliases 'rc3h'
+    send_aliases 'c3h'
+)
+define-llm-model-v2 claude3haiku_obj
+
+typeset -gA llama3_obj=(
+    model_name 'gq-llama3'
+    long_name 'llama3'
+    short_name 'l3'
+    reval_to_aliases 'rl3'
+    send_aliases 'l3'
+)
+define-llm-model-v2 llama3_obj
 ##
-function llm-4o {
-    llm_model=gpt-4o llm-send "$@"
-}
-aliassafe l4o='\noglob llm-4o'
-function llm-4o-chat {
-    llm_model=gpt-4o llm-m chat "$@"
-}
-aliasfn reval-to-gpt4o reval-to llm-4o
-aliassafe rl4o='\noglob reval-to-gpt4o'
-aliassafe 4o='\noglob reval-to-gpt4o'
-##
-function llm-4om {
-    llm_model=gpt-4o-mini llm-send "$@"
-}
-aliassafe l4om='\noglob llm-4om'
+## * Default Models
+typeset -g llm_default_model="${claude_3_5_sonnet_model_name}"
 
-function llm-4om-chat {
-    llm_model=gpt-4o-mini llm-m chat "$@"
-}
-aliasfn reval-to-gpt4om reval-to llm-4om
-aliassafe rl4om='\noglob reval-to-gpt4om'
-aliassafe 4om='\noglob reval-to-gpt4om'
-##
-typeset -g claude_3_5_sonnet_model_name='or:c35s'
-function llm-s3 {
-    llm_model="${claude_3_5_sonnet_model_name}" llm-send "$@"
-}
-aliassafe s3='\noglob llm-s3'
-function llm-s3-chat {
-    llm_model="${claude_3_5_sonnet_model_name}" llm-m chat "$@"
-}
-aliasfn reval-to-s3 reval-to llm-s3
-aliassafe rs3='\noglob reval-to-s3'
-
-typeset -g c3o_model_name='or:c3o'
-function llm-c3o {
-    llm_model="${c3o_model_name}" llm-send "$@"
-}
-aliassafe c3o='\noglob llm-c3o'
-function llm-c3o-chat {
-    llm_model="${c3o_model_name}" llm-m chat "$@"
-}
-aliasfn reval-to-c3o reval-to llm-c3o
-aliassafe rc3o='\noglob reval-to-c3o'
-
-function llm-c3h {
-    llm_model=claude-3-haiku llm-send "$@"
-}
-aliassafe c3h='\noglob llm-c3h'
-function llm-c3h-chat {
-    llm_model=claude-3-haiku llm-m chat "$@"
-}
-aliasfn reval-to-c3h reval-to llm-c3h
-aliassafe rc3h='\noglob reval-to-c3h'
-
-function llm-l3 {
-    llm_model=gq-llama3 llm-send "$@"
-}
-aliassafe l3='\noglob llm-l3'
-function llm-l3-chat {
-    llm_model=gq-llama3 llm-m chat "$@"
-}
-aliasfn reval-to-l3 reval-to llm-l3
-aliassafe rl3='\noglob reval-to-l3'
-
-# alias xx='\noglob llm-4'
-
-# aliassafe xx='\noglob llm-4t'
-# aliassafe xz='\noglob reval-to-gpt4t'
-
-aliassafe xx='\noglob llm-s3'
-aliassafe xz='\noglob reval-to-s3'
-
-# aliassafe xx='\noglob llm-4o'
-# aliassafe xz='\noglob reval-to-gpt4o'
-
-# aliassafe xx='\noglob llm-l3'
-# aliassafe xz='\noglob reval-to-l3'
-
-# aliassafe xx='\noglob llm-c3o'
-# aliassafe xz='\noglob reval-to-c3o'
+aliassafe xx='\noglob llm-send'
+aliassafe llm-run='\noglob reval-to-llm'
+aliassafe xz='\noglob llm-run'
+alias xzz='with-llm-attach-clipboard g15'
+#: @bug/upstream [[id:f96f4512-7ecc-4bff-8ebb-dfc8d46979d4][OpenRouter Claude does not support images · Issue #602 · simonw/llm]]
 
 #: @nameConflict xz, unxz, xzcat, lzma, unlzma, lzcat - Compress or decompress .xz and .lzma  files
 ##

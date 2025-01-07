@@ -22,7 +22,7 @@ function loop {
     local lo_p="$lo_p"
     ensure-dir "$lo_p"
 
-    >&2 ec "$(colorfg 255 255 255)$(colorbg 0 30 230) Looping $(colorfg 0 30 230)$(colorbg 255 255 255) ${cmd}$(colorfg 255 255 255)$(colorbg 0 30 230) with interval $(colorfg 255 73 28)$inter$(resetcolor)"
+    >&2 ec "$(colorfg 255 255 255)$(colorbg 0 30 230) Looping $(colorfg 0 30 230)$(colorbg 255 255 255) ${cmd} $(colorfg 255 255 255)$(colorbg 0 30 230) with interval $(colorfg 255 73 28)$inter $(resetcolor)"
     local sig=1 neon prv_loop_iteration=0 sig2=0
     test -z "$lo_noinit" || {
         color 0 255 100 "$(colorbg 255 255 255)Skipping first iteration" >&2
@@ -70,6 +70,10 @@ loop-startover() {
 alias loops='loop-startover' #Oops :D
 ##
 function oneinstance-setup {
+    #: Single Instance
+    #:
+    #: This works when you want the existing instance to quit voluntarily. If you want to kill the previous instances, using a marker-based solution is better. See [agfi:fairgrad-paper-build].
+    ##
     ensure-redis || return 1
     
     local someNonce="${1}"
@@ -278,7 +282,9 @@ function awaysh-v3 {
     (
         (
             #: Start a new session and execute command with all output to /dev/null
+            #: [[id:004b1654-51c8-48d0-93de-fe7f23d6a7b2][=setsid=]]
             setsid zsh -c "$cmd" < /dev/null > /dev/null 2>&1 &
+
             disown $! &>/dev/null || true
         )
     )
@@ -350,7 +356,7 @@ function away() {
     disown &>/dev/null  # Prevent whine if job has already completed
 }
 ##
-function kill-marker() {
+function kill-marker {
     local id="${1}"
     assert-args id @RET ; shift
 

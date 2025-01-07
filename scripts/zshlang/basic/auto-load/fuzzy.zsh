@@ -77,11 +77,11 @@ function fzf-gateway() {
     fi
 }
 
-function fzp() {
+function fzp {
     # fzp: fz potentially
 
     # 'fzp_ug' is used in pther places. Do NOT rename it.
-    local opts=("${@[1,-2]}") query="${@[-1]}" disallowNI="${fzp_dni}" ugrepMode="${fzp_ug}"
+    local opts=("${@[1,-2]}") query="${@[-1]} " disallowNI="${fzp_dni}" ugrepMode="${fzp_ug}"
     local fzp_ug='' # redundant, but this makes sure we won't have an infinite loop in the future
 
     local ugfz_cmd='ugfz'

@@ -1,5 +1,13 @@
 local posix = require("posix")
 
+brishzq_binary = "/usr/local/bin/brishzq.zsh"
+---
+function shell_quote(str)
+    -- Quote a string using Lua's %q format specifier
+    -- Returns a quoted string suitable for reuse as a Lua string
+    -- Example: hello"world -> "hello\"world"
+    return string.format("%q", str)
+end
 ---
 -- froked from https://stackoverflow.com/a/16515126/1410221
 --

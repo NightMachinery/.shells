@@ -8,7 +8,7 @@ function ec {
 }
 alias ecn='print -rn --'
 function ecn {
-    print -r -- "$@"
+    print -rn -- "$@"
 }
 
 function ec-file {

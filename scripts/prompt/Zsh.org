@@ -1,0 +1,134 @@
+--------------
+
+Zsh Coding Guidelines:
+
+- Some basic functions/aliases are already defined, and should be used if needed:
+
+#+begin_src :eval never
+alias -g '@RET'=' || return $?'
+
+function ec {
+    print -r -- "$@"
+}
+
+function ecn {
+    print -rn -- "$@"
+}
+
+function ecerr {
+    ec "$@" >&2
+}
+
+function gquote {
+    ec "${(qq@)@}"
+}
+
+function reval {
+    eval "$(gquote "$@")"
+}
+
+function bool {
+    local i=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+    if [[ "${i}" == "n" ]] || [[ "${i}" == "no" ]] || [[ "${i}" == "0" ]]
+    then
+        return 1
+    else
+        test -n "${i}"
+        return $?
+    fi
+}
+
+function ensure-array {
+    local i
+    for i in $@ ; do
+        if (( ${#${(P)i}} == 0 )) ; then
+            typeset -ag "$i"
+        fi
+    done
+}
+#+end_src
+
+- Functions should be defined in the following form:
+
+#+begin_src :eval never
+function fn-name {
+  ...
+}
+#+end_src
+
+- All variables must be declared local unless global access is needed. Even for dependency injection, prefer:
+
+#+begin_src :eval never
+local dependency="${dependency:-default_value}"
+#+end_src
+
+All env vars (global vars) must be declared local as above, at the start of the function, so that the inputs of the functions are obvious at a glance.
+
+When accessing a global var, we should simplify its local name, e.g.,:
+
+#+begin_src :eval never
+function bar {
+  local flag_p="${bar_flag_p:-y}"
+  ...
+}
+#+end_src
+
+- Prefer keyword-style argument passing like the above, and keep positional arguments simple and intuitive to use.
+- The global name of the keyword arguments should be namespaced to avoid potential conflicts. E.g., =bar_flag_p= above namespaces with =bar_=.
+- The order of argument definition matters. E.g.,
+
+#+begin_src :eval never
+function ffmpeg-to-audio {
+    ...
+    local audio_extension="${ffmpeg_audio_extension:-m4a}"
+    ...
+
+    local input="${1}"
+    local output="${2:-${input:r}.${audio_extension}}"
+    ...
+}
+#+end_src
+
+Notice how we need to first define =audio_extension=, then =output=.
+
+- When the function needs to be passed an array, use this pattern:
+
+#+begin_src :eval never
+function ffmpeg-to-video {
+    ...
+    ensure-array ffmpeg_codec_opts
+    local codec_opts=("${ffmpeg_codec_opts[@]}")
+    ...
+}
+#+end_src
+
+- All values should be quoted.
+
+- If we need to quote something that will be evaled later, we should use =gquote=.
+
+- Note that these options are set:
+
+#+begin_src :eval never
+setopt multios re_match_pcre extendedglob
+#+end_src
+
+If you need to set an option or trap, be sure to use =setopt localoptions= or =setopt localtraps=.
+
+- Idiomatic Zsh should be prefered.
+
+- When in doubt between sed, awk, and perl, always use perl.
+
+- Functions that take a source file and save an output file, should generally use an interface like this:
+
+#+begin_src :eval never
+function pdf-compress {
+    local input="${1}"
+    local out="${2:-${input:r}_compressed.pdf}"
+
+    ...
+}
+#+end_src
+
+- DRY.
+
+--------------

@@ -145,7 +145,16 @@ function podcast2tel() {
 }
 ##
 function md2tlg {
-    tsend --parse-mode=md -- "${me_tel}" "$(pbpaste)"
+    ensure-array tsend_opts
+    local tsend_opts=(
+        "${tsend_opts[@]}"
+        --parse-mode=md
+    )
+
+    local inargs
+    in-or-args2 "$@" @RET
+
+    revaldbg tsend "${tsend_opts[@]}" -- "${me_tel}" "${inargs[*]}"
 }
 
 function org2tlg {

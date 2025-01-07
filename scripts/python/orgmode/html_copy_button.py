@@ -58,7 +58,7 @@ def main():
         with open(args.input, 'r', encoding='utf-8') as f:
             input_html = f.read()
 
-    # Parse HTML
+    # Parse HTML with 'html.parser' to maintain original spacing
     soup = BeautifulSoup(input_html, 'html.parser')
 
     # Find all pre elements with class 'src'
@@ -246,7 +246,7 @@ def main():
         head_tag.append(style_tag)
         soup.html.insert(0, head_tag)
 
-    # Check if script is already present to avoid duplication
+    # Add script if not already present
     existing_scripts = soup.find_all('script')
     script_already_present = any('copyCodeToClipboard' in (script.string or '') for script in existing_scripts)
 
@@ -258,8 +258,9 @@ def main():
         else:
             soup.append(script_tag)
 
-    # Output the modified HTML
-    output_html = soup.prettify()
+    # Output the modified HTML without prettify()
+    # Use str() instead of prettify() to maintain original spacing
+    output_html = str(soup)
     if args.output == '-':
         print(output_html)
     else:

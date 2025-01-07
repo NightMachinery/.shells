@@ -20,6 +20,10 @@ ec() {
     printf "%s\n" "$*"
 }
 
+ecerr() {
+    ec "$@" >&2
+}
+
 gquote () {
     ec "${*@Q}"
 }

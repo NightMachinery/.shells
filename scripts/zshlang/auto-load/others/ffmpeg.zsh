@@ -137,7 +137,72 @@ function rloop_vid {
     ffmpeg -i "$1" -filter_complex "[0:v]reverse,fifo[r];[0:v][r] concat=n=2:v=1 [v]" -map "[v]" "$1_rloop.${2:-mp4}"
 }
 ##
-function imgseq2vid() {
+function ffmpeg-to-audio {
+    ensure-array audio_codec_opts
+    local codec_opts=("${audio_codec_opts[@]}")
+
+    ensure-array ffmpeg_codec_opts
+    local ffmpeg_opts=("${ffmpeg_codec_opts[@]}")
+
+    local audio_extension="${audio_extension:-m4a}"
+    local audio_codec="${audio_codec:-aac}"
+    local print_out_p="${ffmpeg_print_out_p:-n}"
+
+    local input="${1}"
+    local output="${2:-${input:r}.${audio_extension}}"
+
+    # Check if the input file exists
+    if [[ ! -f "${input}" ]]; then
+        ecerr "Input file not found: ${input}"
+        return 1
+    fi
+
+    # Build ffmpeg options
+    ffmpeg_opts+=("-c:a" "${audio_codec}")
+    ffmpeg_opts+=("${codec_opts[@]}")
+    ffmpeg_opts+=("-movflags" "+faststart")
+
+    # Perform the conversion
+    assert ffmpeg -hide_banner -loglevel error -i "${input}" "${ffmpeg_opts[@]}" -y "${output}" >&2 @RET
+
+    # Print the output path if print_out_p is set
+    if bool "${print_out_p}"; then
+        ec "${output}"
+    fi
+}
+
+function to-m4a {
+    local input="${1}"
+    local output="${2:-${input:r}.m4a}"
+
+    # Set audio codec and extension
+    local audio_extension="m4a"
+    local audio_codec
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # Use Apple AudioToolbox AAC encoder for hardware acceleration
+        audio_codec="aac_at"
+    else
+        # Use default AAC encoder
+        audio_codec="aac"
+    fi
+
+    # Call the generalized function
+    ffmpeg-to-audio "${input}" "${output}"
+}
+
+function to-mp3 {
+    local input="${1}"
+    local output="${2:-${input:r}.mp3}"
+
+    # Set audio codec and extension
+    local audio_extension="mp3"
+    local audio_codec="libmp3lame"
+
+    # Call the generalized function
+    ffmpeg-to-audio "${input}" "${output}"
+}
+##
+function imgseq2vid {
     local framerate="${imgseq2vid_r:-30}"
     local crf="${imgseq2vid_crf:-25}"
     local out="${imgseq2vid_out:-${imgseq2vid_o:-out.mp4}}"
@@ -205,3 +270,63 @@ function ffmpeg-speed {
         -map "[v]" -map "[a]" "$output"
 }
 ##
+function ffmpeg-record {
+    #: [[file:~/.hammerspoon/init.lua::function whisper.getRecordCommand(outputFile)]]
+    ##
+    local output="${1}"
+    if test -z "${output}" ; then
+        output="$(gmktemp --suffix=.wav)"
+    fi
+
+    local timeout="${record_timeout:-300}"
+
+    #: Press Ctrl-C to stop recording.
+    #: Does NOT work well. I need to press Ctrl-C two times. I don't know why it works better when we invoke it from Hammerspoon.
+    ffmpeg -f avfoundation -i ":0" -t "${timeout}" -ar 16000 -y "$output" >&2 || true
+
+    ec "${output}" |
+        cat-copy-if-tty
+}
+
+function h-trap-int-do-nothing {
+    ecgray "$0: called"
+
+    return 0
+}
+
+function sox-record {
+    #: [[id:6f8e0395-154e-45e7-b34b-a74b2a4ecab7][signal/catch]]
+    ##
+    local output="${1}"
+    if test -z "${output}" ; then
+        output="$(gmktemp --suffix=.wav)"
+    fi
+
+    local timeout="${record_timeout:-300}"
+
+    #: Press Ctrl-C to stop recording.
+
+    #: Ignore SIGINT in the parent shell
+    setopt localtraps
+    trap '' INT
+
+    local cmd
+    cmd="$(gquote rec "${output}" trim 0 "${timeout}")" @TRET
+
+    (
+        #: @redundant Restore default SIGINT handling in the subshell
+        trap - INT
+
+        rec "${output}" trim 0 "${timeout}"
+    ) </dev/null >&2 || true # ecgray "$0: sox rec exited: $?"
+
+    # zsh -mfc "${cmd}" </dev/null >&2 || true
+
+    #: It exits with 130 when we Ctrl-C it.
+
+    #: Restore default SIGINT handling in the parent shell
+    trap - INT
+
+    ec "${output}" |
+        cat-copy-if-tty
+}

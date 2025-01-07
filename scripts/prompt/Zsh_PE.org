@@ -1,0 +1,179 @@
+* Creating Reusable Zsh Functions for LLM Prompts
+** Introduction
+When frequently interacting with Large Language Models (LLMs) from the command line, it's efficient to encapsulate commonly used prompts into reusable Zsh functions. This approach streamlines your workflow, reduces repetition, and allows for quick invocation of complex prompts.
+
+** Types of Functions
+There are four main types of functions used to create reusable prompts:
+
+*** 1. *Fragment*
+- *Purpose*: Outputs a predefined snippet of text without accepting any inputs.
+
+- *Usage*: Directly invokes the function to retrieve the snippet.
+
+- *Example*:
+
+#+begin_src zsh :eval never
+function fragment-summarize-session {
+    cat-copy-if-tty <<'EOF'
+Summarize our current session, so that I can store it in my notes. I will directly copy your next message, so don't include any preamble.
+EOF
+}
+#+end_src
+
+*How to Use*:
+
+#+begin_src zsh :eval never
+prompt_text=$(fragment-summarize-session)
+#+end_src
+
+You can then use =prompt_text= as part of a larger prompt or output it directly.
+
+*** 2. *Snippet*
+- *Purpose*: Adds a snippet to another prompt, enhancing or modifying it.
+
+- *Usage*: Invoked within other functions to include additional instructions or context.
+
+- *Example*:
+
+#+begin_src zsh :eval never
+function snippet-ask-questions {
+    snippet-input "You can ask me any questions you have first." "$@"
+}
+#+end_src
+
+*How to Use*:
+
+Within a prompt function, include the snippet in the preambles:
+
+#+begin_src zsh :eval never
+function prompt-code-optimization {
+    local prompt_preambles=(snippet-ask-questions)
+    local prompt_input_mode="${prompt_input_mode:-block}"
+    local prompt="Optimize the following code for performance:"
+    
+    prompt-instruction-input "${prompt}" "$@"
+}
+#+end_src
+
+*** 3. *Prompt*
+- *Purpose*: Constructs the main prompt by combining instructions, input, and optional preambles.
+
+- *Usage*: Called with specific instructions and input to build the final prompt text.
+
+- *Example*:
+
+#+begin_src zsh :eval never
+function prompt-translate2en {
+    local prompt_input_mode="${prompt_input_mode:-block}"
+    local prompt="Translate the following to English without adding extra commentary."
+
+    prompt-instruction-input "${prompt}" "$@"
+}
+#+end_src
+
+*How to Use*:
+
+#+begin_src zsh :eval never
+prompt_text=$(prompt-translate2en "Texto en español para traducir.")
+#+end_src
+
+This function prepares the prompt text, which can then be sent to the LLM.
+
+*** 4. *Run-Prompt*
+- *Purpose*: Constructs the complete prompt and executes it, acting as a stand-alone program.
+
+- *Usage*: Calls the prompt function and processes the result through the LLM.
+
+- *Example*:
+
+#+begin_src zsh :eval never
+function run-prompt-rewrite-telegram {
+    local llm_copy_p="n"
+    llm-run prompt-rewrite-telegram "$@" | cat-rtl-streaming-if-tty
+}
+#+end_src
+
+*How to Use*:
+
+#+begin_src zsh :eval never
+run-prompt-rewrite-telegram "Original message to rewrite."
+#+end_src
+
+This function runs the prompt through the LLM and outputs the result, handling any necessary output formatting.
+
+** Core Functions and Variables
+*** =prompt-instruction-input=
+- *Purpose*: Combines your instruction with input text and optional preambles to create the final prompt.
+
+- *Usage*: Used within prompt functions to handle input formatting and assembly.
+
+- *Example in Use*:
+
+  In the =prompt-translate2en= function above, =prompt-instruction-input= takes the instruction and any input provided, applying the specified =prompt_input_mode=.
+
+*** =snippet-input=
+- *Purpose*: Inserts a snippet into the prompt, usually as a preamble.
+
+- *Usage*: Called within snippet functions to include predefined text.
+
+- *Example in Use*:
+
+  In =snippet-preamble-coding=, =snippet-input= adds the coding preamble to the prompt system.
+
+*** Variables
+- *=prompt_input_mode=*: Determines how the input text is formatted.
+  - ="block"=: Wraps input in triple backticks (useful for code blocks).
+  - ="org"=: Converts Org-mode text to Markdown.
+  - ="none"=: Leaves input unchanged.
+- *=prompt_preambles=*: An array of snippet functions to include as preambles before the main instruction.
+
+** Example Workflow
+Suppose you want to create a prompt to summarize a text.
+
+1. *Define a Prompt Function*:
+
+#+begin_src zsh :eval never
+function prompt-summarize-text {
+    local prompt_input_mode="${prompt_input_mode:-block}"
+    local prompt="Provide a concise summary of the following text:"
+    
+    prompt-instruction-input "${prompt}" "$@"
+}
+#+end_src
+
+2. *Use the Prompt Function*:
+
+#+begin_src zsh :eval never
+summary_prompt=$(prompt-summarize-text "Your long text here...")
+#+end_src
+
+3. *Run the Prompt Through the LLM*:
+
+#+begin_src zsh :eval never
+function run-prompt-summarize-text {
+    llm-run prompt-summarize-text "$@"
+}
+
+# Execute and get the summary
+run-prompt-summarize-text "Your long text here..."
+#+end_src
+
+** Best Practices
+- *Consistent Naming*: Use clear prefixes to indicate function types:
+
+- =fragment-= for fragments.
+- =snippet-= for snippets that are added to the main prompt.
+- =prompt-= for main prompt constructors.
+- =run-prompt-= for functions that execute prompts.
+
+Unless the user explicitly asks you, you should choose the best kind of function and only define that one function. In general, you should not define =run-prompt= functions unless asked explicitly, and you should prefer =snippet-= functions to fragments. For any task that is stand-alone, =prompt-= must be used.
+
+- *Modularity*: Reuse snippets and preambles to avoid repetition and keep functions focused.
+
+- *Input Flexibility*: Allow functions to accept input via arguments or standard input for versatility.
+
+- *Clarity*: Ensure all variables and functions used are defined and that their purposes are clear.
+
+- *Conciseness*: Keep functions and prompts as brief as possible while maintaining necessary functionality.
+
+--------

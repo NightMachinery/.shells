@@ -24,10 +24,6 @@ function gh-to-readme() {
     arrnn "$urls[@]"
 }
 
-function gh-to-raw() {
-    in-or-args "$@" | sd '/blob/' '/raw/'
-}
-
 function w2e-gh() {
     h2ed=html2epub-pandoc-simple w2e-curl "$1" "${(@f)$(gh-to-readme "${@:2}")}"
 }

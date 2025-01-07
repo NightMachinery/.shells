@@ -1,0 +1,6 @@
+--------
+
+* Functions
+- Have any non-obvious function arguments be keyword arguments. Have at most two positional arguments. Use =(pos_arg1, ..., *, kwarg,)= to enforce keyword argument usage.
+
+--------

@@ -15,9 +15,11 @@ function comment-rm-py-v2 {
     whitespace-shared-rm |
         comment_rm_py.py |
         trailing-whitespace-rm |
+        strip-duplicate-subsequent-blank-whitespace-lines |
         cat-copy-if-tty
 }
 aliasfn comment-rm-py comment-rm-py-v2
+aliasfn comment-rm-py-inplace inplace_io_m='last_stdin_stdout' inplace-io comment-rm-py
 
 function comment-rm-py-v1 {
     #: * @warn
