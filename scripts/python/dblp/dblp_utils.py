@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
-import subprocess
 import re
+import subprocess
 import requests
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -92,69 +92,106 @@ class PatternGroups:
 
     @classmethod
     def get_patterns(cls, group_set: Optional[str] = None) -> List[str]:
-        """Get patterns for a specific group set or all patterns if no group set specified."""
         if group_set is None:
             return list(cls.PATTERNS.values())
-
+        
         if group_set not in cls.GROUP_SETS:
             raise ValueError(f"Unknown group set: {group_set}")
-
+            
         return [cls.PATTERNS[group] for group in cls.GROUP_SETS[group_set]]
 
     @classmethod
     def get_group_names(cls, group_set: Optional[str] = None) -> List[str]:
-        """Get group names for a specific group set or all groups if no group set specified."""
         if group_set is None:
             return list(cls.PATTERNS.keys())
-
+            
         if group_set not in cls.GROUP_SETS:
             raise ValueError(f"Unknown group set: {group_set}")
-
+            
         return cls.GROUP_SETS[group_set]
 
 
+def remove_duplicates_across_groups(
+    groups: Sequence[Sequence[str]], *, case_sensitive: bool = False
+) -> List[List[str]]:
+    seen = set()
+    result = []
+
+    for group in groups:
+        current_group = []
+        for item in group:
+            key = item if case_sensitive else item.lower()
+            if key not in seen:
+                seen.add(key)
+                current_group.append(item)
+        if current_group:
+            result.append(current_group)
+
+    return result
+
 def get_papers_by_group(titles: Sequence[str], pattern: str, *, case_sensitive: bool = False) -> List[str]:
-    """Filter papers by pattern and return matches."""
     flags = 0 if case_sensitive else re.IGNORECASE
     regex = re.compile(pattern, flags)
-    return [title for title in titles if regex.search(title)]
+    
+    cleaned_titles = [clean_title(title) for title in titles]
+    return [title for title, cleaned in zip(titles, cleaned_titles) 
+            if regex.search(cleaned)]
 
 def get_papers_by_group_set(titles: Sequence[str], group_set: str) -> Dict[str, List[str]]:
-    """Get papers organized by groups within a group set."""
-    results = {}
+    raw_results = {}
     for group_name in PatternGroups.get_group_names(group_set):
         pattern = PatternGroups.PATTERNS[group_name]
         matches = get_papers_by_group(titles, pattern)
         if matches:
-            results[group_name] = matches
+            raw_results[group_name] = matches
+    
+    groups = [raw_results[name] for name in PatternGroups.get_group_names(group_set) 
+             if name in raw_results]
+    deduped_groups = remove_duplicates_across_groups(groups, case_sensitive=False)
+    
+    results = {}
+    for i, group_name in enumerate(raw_results.keys()):
+        if i < len(deduped_groups) and deduped_groups[i]:
+            results[group_name] = deduped_groups[i]
+            
     return results
 
 def save_group_results(base_path: Path, name: str, papers_by_group: Dict[str, List[str]], *, separator: str = "-----------") -> None:
-    """Save results for each group and combined results."""
-    # Save individual group results
     for group_name, papers in papers_by_group.items():
         output_file = base_path / f"{group_name}.txt"
         output_file.write_text("\n".join(papers))
 
-    # Save combined results with separators
     combined_papers = []
     for group_name in PatternGroups.get_group_names():
         if group_name in papers_by_group:
             combined_papers.extend(papers_by_group[group_name])
             combined_papers.append(separator)
-
+    
     if combined_papers and combined_papers[-1] == separator:
         combined_papers.pop()
-
+    
     output_file = base_path / f"{name}.txt"
     output_file.write_text("\n".join(combined_papers))
 
+def clean_title(title: str) -> str:
+    title = re.sub(r'<[^>]+>', '', title)
+    title = ' '.join(title.split())
+    title = title.rstrip('.')
+    return title
+
+def normalize_text(text: str, *, case_sensitive: bool = False) -> str:
+    if not case_sensitive:
+        text = text.lower()
+    return clean_title(text)
+
+def filter_empty_groups(papers_by_group: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    return {k: v for k, v in papers_by_group.items() if v}
+
 def run_dblp_script(script_name: str, url: str, *, check: bool = True, **kwargs) -> str:
-    """Run a DBLP script and return its output."""
     cmd = [script_name, url]
     for key, value in kwargs.items():
         cmd.extend([f"--{key.replace('_', '-')}", str(value)])
-
+        
     result = subprocess.run(
         cmd,
         capture_output=True,

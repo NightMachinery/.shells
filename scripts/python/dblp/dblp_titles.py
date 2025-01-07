@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-##
 import json
 import argparse
 from dblp_utils import DBLPClient, Publication, print_stderr
