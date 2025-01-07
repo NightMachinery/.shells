@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-##
 import sys
 from dblp_utils import DBLPClient, print_stderr
-import xml.etree.ElementTree as ET
 from typing import Dict, List, Mapping, Optional, Sequence, Iterator, Tuple
 import requests
+import xml.etree.ElementTree as ET
 
 
 def get_author_name(url: str, *, client: Optional[DBLPClient] = None) -> str:
