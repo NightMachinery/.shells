@@ -10,6 +10,16 @@
 function semantic-scholar-to-json-api {
     #: @docs https://api.semanticscholar.org/api-docs/graph#tag/Paper-Data/operation/get_graph_get_paper
     ##
+    if should-proxy-p ; then
+        ecdbg "pxa35-local"
+
+        pxa35-local
+
+    else
+        ecdbg "$0: proxy active"
+        var-show HTTP_PROXY
+    fi
+
     local paper_id="${1}" #: e.g., arXiv:1705.10311
     local corpus_id="${semantic_scholar_corpus_id}"
 
@@ -34,7 +44,12 @@ function semantic-scholar-to-json-api {
     #: removed from API:
     # authors.aliases
 
-    json="$(revaldbg gurl -H "x-api-key: ${SemanticScholar_API_key}" "$url")" || {
+    local curl_opts_=()
+    if test -n  "${SemanticScholar_API_key}"; then
+        curl_opts_+=(-H "x-api-key: ${SemanticScholar_API_key}")
+    fi
+
+    json="$(revaldbg gurl "${curl_opts_[@]}" "$url")" || {
         ecerr "$0: curl-ing the API failed with $?"$'\n'"URL: ${url}"
         pbcopy "$url"
         return 1

@@ -53,18 +53,18 @@ function pdf2png-mutool {
     local i="$1"
     assert-args i @RET
     local opts=()
+    local format="${pdf2png_format:-png}"  # Default to png if not specified
+    #: mutool doesn't seem to support jpeg/jpg
 
-    local out="${pdf2png_o:-${i:r}_%03d.png}"
-    [[ "$out" == *.png ]] || out+='.png'
-
+    local out="${pdf2png_o:-${i:r}_%03d.${format}}"
+    [[ "$out" == *.${format} ]] || out+=".${format}"
     local dpi="${pdf2png_dpi}"
     if test -n "${dpi}" ; then
         opts+=(-r "${dpi}")
     fi
-
-    assert serrdbg command mutool draw -o "$out" "${opts[@]}" -F png "$i" "${@[2,-1]}" @RET
-
+    assert serrdbg command mutool draw -o "$out" "${opts[@]}" -F "$format" "$i" "${@[2,-1]}" @RET
 }
+
 @opts-setprefix pdf2png-mutool pdf2png
 aliasfn pdf2png pdf2png-mutool
 

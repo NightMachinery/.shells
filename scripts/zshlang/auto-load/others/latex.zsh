@@ -145,13 +145,13 @@ function pdflatex-m {
     fi
     f_realpath="$(grealpath "$f")" @TRET
     assert-args f @RET
-    local f_dir="${f_realpath:h}" name="${f:r:t}" name_tmp
+    local f_dir="${f_realpath:h}" name="${pdflatex_name:-${f:r:t}}" name_tmp
     if bool "${autodir}" ; then
         reval-ec pushf "${f_dir}"
     fi
     {
         local cv_p='n'
-        if [[ "$name" =~ '^CV.*' ]] ; then
+        if [[ "$name" =~ '^CV.*' || "${name}" == "references" ]] ; then
             ecgray "$0: CV Mode"
 
             cv_p=y
@@ -171,6 +171,7 @@ function pdflatex-m {
 \\pdfobjcompresslevel=0"$'\n'
         fi
 
+        local nightJobName="${name}"
         local key val vars=(
             HOME
             nightNotes
@@ -178,8 +179,14 @@ function pdflatex-m {
             nightNotesPublic
             nightResourcesPublic
             nightResourcesPrivate
+            nightJobName
         )
         for key in ${vars[@]} ; do
+            #: Check if parameter exists
+            if ! [[ -v $key ]] ; then
+                continue
+            fi
+
             val="${(P)key}"
             # re var-show key val
 
@@ -192,9 +199,8 @@ function pdflatex-m {
         tex+="\\newcommand{\\globalBibPath}{$(reval "${var_escaper[@]}" ${nightGlobalBib})}"$'\n' @TRET
         tex+="\\newcommand{\\mypwd}{$(reval "${var_escaper[@]}" ${f_dir})}"$'\n' @TRET
 
+        tex+="\\newcommand{\\CVDir}{${cv_dir}}"$'\n'
         if bool "${cv_p}" ; then
-            tex+="\\newcommand{\\CVDir}{${cv_dir}}"$'\n'
-
             assert gcp -v "${cv_dir}/"*.bib(.D) . @RET
         fi
 
@@ -218,14 +224,20 @@ function pdflatex-m {
 
         # dact emc "$tex_f"
 
-        opts+=(-jobname="${name_tmp}")
+        opts+=(
+            -jobname="${name_tmp}"
+            -halt-on-error
+        )
+        draft_opts=(
+            -draftmode
+        )
 
         local success_p=n
         {
             trs *.aux(.DN) @TRET
 
             #: [[https://tex.stackexchange.com/questions/450863/using-bibtex-with-pdflatex][pdftex - Using BibTex with pdfLaTeX - TeX - LaTeX Stack Exchange]]
-            time2 assert reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+            time2 assert reval-ec pdflatex "${draft_opts[@]}" "${opts[@]}" "$tex_f" @RET
 
             if [[ "${bib_mode}" == bibtex ]] ; then
                 time2 reval-ec bibtex *.aux @RET
@@ -238,11 +250,11 @@ function pdflatex-m {
                 return 1
             fi
 
-            time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+            time2 reval-ec pdflatex "${draft_opts[@]}" "${opts[@]}" "$tex_f" @RET
 
             if ! bool "${fast_p}" ; then
-                time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
-                time2 reval-ec pdflatex -draftmode "${opts[@]}" "$tex_f" @RET
+                time2 reval-ec pdflatex "${draft_opts[@]}" "${opts[@]}" "$tex_f" @RET
+                time2 reval-ec pdflatex "${draft_opts[@]}" "${opts[@]}" "$tex_f" @RET
                 #: This is needed, otherwise the CVPR's review line numbers don't align properly at the start of the paragraphs.
             fi
 
@@ -261,7 +273,7 @@ function pdflatex-m {
                 fi
 
             else
-                fsay 'failed to compile latex to PDF'
+                awaysh fsay 'failed to compile latex to PDF'
             fi
         }
     } always {
@@ -285,7 +297,12 @@ function h-pdflatex-emacs-async {
 
     assert mkdir-m "${log:h}" @RET
 
-    awaysh log-to "${log}" h-pdflatex-emacs "$@"
+    local f="$1"
+    local marker="EMACS_PDFLATEX_${f}"
+    kill-marker "${marker}" || true
+    #: sometimes the processes are dead before we try to kill them and so this command returns non-zero
+
+    awaysh-bnamed "${marker}" log-to "${log}" h-pdflatex-emacs "$@"
 }
 
 function pdflatex-full {
@@ -382,4 +399,54 @@ function pix2tex-m {
 
 aliasfn ocr-latex pix2tex-m
 alias xs='ocr-latex'
+##
+function cv-upload {
+    z CV @RET
+
+    reval-ecgray rsp-safe CV.pdf CV_short.pdf references.pdf "${lilf_user}@${lilf_ip}:Downloads/"
+}
+
+function cv-build {
+    z CV @RET
+
+    local pdflatex_name="${pdflatex_name:-CV}"
+
+    pdflatex-m "${nightNotesPrivate}/subjects/resume, CV/CV.tex"
+    reval-ecgray pbadd "${pdflatex_name}.pdf"
+}
+
+function cv-short-build {
+    pdflatex_name=CV_short cv-build "$@" @RET
+}
+
+function cv-references-build {
+    pdflatex_name=references cv-build "$@" @RET
+    command pdf-crop-margins -p4 100 10 100 100 references.pdf -o references_cropped.pdf
+    command gmv references_cropped.pdf references.pdf
+    pbadd references.pdf
+}
+##
+function bibtidy {
+    if (( ${#@} == 0 )) ; then
+        cat-paste-if-tty |
+            h-bibtidy |
+            cat-copy-if-tty
+    else
+        h-bibtidy "$@"
+    fi
+}
+
+function h-bibtidy {
+    local opts=(
+        --v2
+        --no-sort
+        --duplicates
+        --trailing-commas
+        --encode-urls
+        --blank-lines
+        --space=2  #: default
+    )
+
+    command bibtex-tidy "${opts[@]}" "$@"
+}
 ##

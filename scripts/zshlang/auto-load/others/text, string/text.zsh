@@ -11,11 +11,28 @@ function duplicates-clean-sort-file-inplace {
 function duplicates-clean {
     #: @seeAlso [agfi:mpv-bookmark-cleanup]
     ##
+    local case_sensitive="${duplicates_clean_case_sensitive:-y}"
+    ensure-array duplicates_clean_exceptions
+    local exceptions=("${duplicates_clean_exceptions[@]}")
+
     {
         cat-paste-if-tty |
-            prefixer --tac --skip-empty \
-                | gawk 'NF && !seen[$0]++' \
-                | prefixer --tac --skip-empty @RET
+            prefixer --tac --skip-empty |
+            perl -e '
+                $case = shift @ARGV eq "y";
+                $exceptions = join("|", map { quotemeta } @ARGV);
+                while (<STDIN>) {
+                    chomp;
+                    next unless /\S/;
+                    if ($exceptions && /^(?:$exceptions)$/) {
+                        print "$_\n";
+                    } else {
+                        $k = $case ? $_ : lc($_);
+                        print "$_\n" unless $seen{$k}++;
+                    }
+                }
+            ' "${case_sensitive}" "${exceptions[@]}" |
+            prefixer --tac --skip-empty @RET
         ec #: add an end separator
     } | cat-copy-if-tty
 }
@@ -155,7 +172,7 @@ function unicode2char {
 
 function unicode2char-hex {
     # works with emojis
-    printf "\U${1}\n" | cat-copy-if-tty
+    printf "\U${1}" | cat-copy-if-tty
 }
 ##
 function str2unicode-hex {

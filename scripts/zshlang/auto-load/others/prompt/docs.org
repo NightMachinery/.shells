@@ -1,0 +1,17 @@
+#+TITLE: prompt/docs
+
+* naming
+** =fragment=
+- =bare-snippet=
+
+These functions just output some memorized snippet. They accept no inputs.
+
+** =snippet=
+These functions add some snippet to some other prompt.
+
+** =prompt=
+These functions construct the main prompt.
+
+** =run-prompt=
+These functions construct the complete prompt and run it. They can be viewed as stand-alone programs.
+

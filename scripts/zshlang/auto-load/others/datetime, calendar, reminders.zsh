@@ -155,6 +155,36 @@ function date-spain {
     TZ='Europe/Madrid' date +'%Y-%m-%d %A %H:%M:%S'
 }
 
+function date-germany-berlin {
+    TZ='Europe/Berlin' date +'%Y-%m-%d %A %H:%M:%S'
+}
+
+function date-anywhere-on-earth {
+    TZ='Etc/GMT+12' date +'%Y-%m-%d %A %H:%M:%S'
+}
+aliasfn date-aoe date-anywhere-on-earth
+
+function date-usa-est {
+    TZ='EST' date +'%Y-%m-%d %A %H:%M:%S'
+    #: The Eastern Time Zone (ET) is a time zone encompassing part or all of 23 states in the eastern part of the United States, parts of eastern Canada, and the state of Quintana Roo in Mexico.
+    #: Eastern Standard Time (EST) is five hours behind Coordinated Universal Time (UTC−05:00). Observed during standard time (late autumn/winter in the United States and Canada).
+    # Eastern Daylight Time (EDT) is four hours behind Coordinated Universal Time (UTC−04:00). Observed during daylight saving time (spring/summer/early autumn in the United States and Canada).
+}
+
+function date-usa-pst {
+    TZ='PST8PDT' date +'%Y-%m-%d %A %H:%M:%S'
+    #: The Pacific Time Zone (PT) is a time zone encompassing parts of western Canada, the western United States, and western Mexico.
+    #: Pacific Standard Time (PST) is eight hours behind Coordinated Universal Time (UTC−08:00). Observed during standard time (late autumn/winter in the United States and Canada).
+    #: Pacific Daylight Time (PDT) is seven hours behind Coordinated Universal Time (UTC−07:00). Observed during daylight saving time (spring/summer/early autumn in the United States and Canada).
+}
+
+function date-usa-cst {
+    TZ='CST6CDT' date +'%Y-%m-%d %A %H:%M:%S'
+    #: The Central Time Zone (CT) is a time zone in the central part of the United States, parts of Canada, and some areas in Mexico and Central America.
+    #: Central Standard Time (CST) is six hours behind Coordinated Universal Time (UTC−06:00). Observed during standard time (late autumn/winter in the United States and Canada).
+    #: Central Daylight Time (CDT) is five hours behind Coordinated Universal Time (UTC−05:00). Observed during daylight saving time (spring/summer/early autumn in the United States and Canada).
+}
+
 function date-uk {
     TZ='Europe/London' date +'%Y-%m-%d %A %H:%M:%S'
 }
@@ -399,12 +429,19 @@ function reminday_store {
 }
 ##
 function datenat {
-    local text="$*"
+    local inargs
+    in-or-args2 "$@" @RET
+
+    local text="${inargs[*]}"
 
     #: Making time zones understandable by datenat.js:
     text="$(ec "$text" | perl -lpe 's/Pacific Time/PT/g')"
 
-    datenat.js "$text"
+    local out
+    out="$(datenat.js "$text")" @RET
+
+    ecn "${out}" | cat-copy-if-tty
+    #: cat-copy will add a newline itself, but it will copy without newline so we can paste it in Excel without overwriting the next cell.
 }
 aliasfn datenat-future datenat_nopast=y datenat
 aliasfn datenat-unix datenat_unix=y datenat
@@ -481,7 +518,8 @@ function datenat-full2 {
     local datej_all time
     datej_all="$(@opts mode 1 @ datej-all "$jdate")" @TRET
     time="$(gdate --date "@${datenatj_unix}" +"%H:%M:%S")" @TRET
-    ec "${datej_all} ${time}"
+    ec "${datej_all} ${time}" |
+        cat-copy-if-tty
 }
 aliasfn datenat-full2-future datenat_nopast=y datenat-full2
 

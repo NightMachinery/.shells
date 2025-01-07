@@ -23,6 +23,55 @@ function scan {
     fi
 }
 ##
+function img-crop-magick {
+    #: @alts [agfi:innercrop]
+    #:
+    #: @Claude/3.5-sonnet-new
+    ##
+    # Input/output handling
+    local input="${1}"
+    local ext="${input:e}"
+    local output="${2:-${input:r}_cropped.${ext}}"
+
+    # Parameters with namespaced defaults
+    local fuzz="${img_crop_fuzz:-5}"
+
+    #: By setting the border color to the background color, you can effectively increase the margins of the resultant image.
+    local border="${img_crop_border:-0}"
+    local border_color="${img_crop_border_color:-white}"
+
+    if [[ ! -f "${input}" ]] ; then
+        ecerr "Error: Input file '${input}' does not exist"
+        return 1
+    fi
+
+    local cmd=(convert)
+    cmd+=("${input}")
+
+    if (( fuzz > 0 )) ; then
+        cmd+=(-fuzz "${fuzz}%")
+    fi
+
+    cmd+=(-trim)
+
+    if (( border > 0 )) ; then
+        cmd+=(-bordercolor "${border_color}" -border "${border}")
+    fi
+
+    cmd+=(+repage "${output}")
+    #: @Claude/3.5-sonnet-new The =+repage= option in ImageMagick is used to reset (remove) the page geometry information and any virtual canvas settings of the image.
+
+    reval "${cmd[@]}" @RET
+
+    if [[ $? -eq 0 ]] ; then
+        ec "Cropped image saved to: ${output}"
+        return 0
+    else
+        ecerr "Error: Failed to crop image"
+        return 1
+    fi
+}
+##
 function multicrop {
     : "usage: input [output]"
 
@@ -65,6 +114,8 @@ function multicrop {
 }
 
 function innercrop {
+    #: @alts [agfi:img-crop-magick]
+    ##
     : "usage: input [output]"
 
     local i="${1}"

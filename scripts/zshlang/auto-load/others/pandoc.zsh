@@ -1,3 +1,13 @@
+typeset -g pandoc_md_default='markdown+tex_math_single_backslash'
+##
+function latex2md-pandoc {
+    @opts from 'latex+latex_macros' to markdown @ pandoc-convert "$@"
+}
+
+function latex2plain-pandoc {
+    @opts from 'latex+latex_macros' to plain @ pandoc-convert "$@"
+}
+##
 function epub2org() {
     @opts from epub to org trim_extra n @ pandoc-convert "$@"
 }
@@ -15,7 +25,7 @@ function docx2org() {
 }
 
 function md2org {
-    @opts from markdown to org @ pandoc-convert "$@"
+    @opts from "${pandoc_md_default}" to org @ pandoc-convert "$@"
 }
 
 function mediawiki2md {
@@ -27,7 +37,7 @@ function mediawiki2org {
 }
 
 function md2plain() {
-    @opts from markdown to plain @ pandoc-convert "$@"
+    @opts from "${pandoc_md_default}" to plain @ pandoc-convert "$@"
 }
 
 function org-heading-to-list-item {
@@ -49,7 +59,7 @@ function org2md {
 }
 
 function org2md-raw {
-    @opts from org to markdown @ pandoc-convert "$@"
+    @opts from org to "${pandoc_md_default}" @ pandoc-convert "$@"
 }
 
 function org2json() {
@@ -70,6 +80,16 @@ function org2html {
 
 function pbcopy-org2html {
     org2html "$@" |
+        pbcopy-html
+}
+
+function md2html {
+    # md2org | org2html
+    @opts from "${pandoc_md_default}" to html @ pandoc-convert "$@"
+}
+
+function pbcopy-md2html {
+    md2html "$@" |
         pbcopy-html
 }
 
@@ -117,7 +137,7 @@ function html2plain-std {
 }
 
 function html2md-v1 {
-    @opts f markdown @ html2org "$@"
+    @opts f "${pandoc_md_default}" @ html2org "$@"
 }
 # @opts-setprefix html2md html2org
 
@@ -212,7 +232,7 @@ function pandoc-convert {
                     perl -CS -lpe '/^\s*#\+begin_src\b/i && s/:style.*?(?:$|\s(*pla::))//ig'
                 #: Removes `:style ...` till the next attribute, hence `\s(*pla::)`. (Note the non-greedy matcher.)
 
-            elif [[ "$to" == markdown ]] && bool $trim_extra ; then
+            elif [[ "$to" =~ '^markdown' ]] && bool $trim_extra ; then
                 perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g' |
                     perl -0777 -pe 's/\{ref\}(?:=)//g'
                 # trying to remove header_attributes, fenced_code_attributes, inline_code_attributes, etc

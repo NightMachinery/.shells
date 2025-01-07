@@ -20,7 +20,7 @@ alias -g ....='../../..'
 alias -g .....='../../../..'
 alias -g ......='../../../../..'
 
-alias -g '@RET'=' || { retcode=$? ; print -r -- "exited ${retcode}" ; return $retcode } '
+alias -g '@RET'=' || { retcode=$? ; print -r -- "Inside $0: exited ${retcode}" ; return $retcode } '
 ##
 ec() {
     print -r -- "$@"
@@ -37,7 +37,7 @@ ecerr() {
 gquote () {
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
 }
-
+##
 function export-from-alias {
   local name="${1:?}"
 

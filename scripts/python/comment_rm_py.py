@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 ##
-#!/usr/bin/env python3
-##
 import sys
 import tokenize
 from io import BytesIO
@@ -25,14 +23,15 @@ def remove_comments(code):
 
         if token_type == tokenize.COMMENT:
             #: Remove any preceding whitespace tokens
-            while new_tokens and (
-                new_tokens[-1].type in newline_token_types
-                or new_tokens[-1].string.strip() == ""
-            ):
-                deleted_token = new_tokens.pop()
-                if deleted_token in newline_token_types:
-                    #: We don't want to remove whitespace from previous lines.
-                    break
+            # while new_tokens and (
+            #     new_tokens[-1].type in newline_token_types
+            #     or new_tokens[-1].string.strip() == ""
+            # ):
+            #     deleted_token = new_tokens.pop()
+            #     if deleted_token.type in newline_token_types:
+            #     # if deleted_token in newline_token_types:
+            #         #: We don't want to remove whitespace from previous lines.
+            #         break
 
             continue
         else:

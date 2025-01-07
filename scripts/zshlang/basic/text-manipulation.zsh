@@ -105,4 +105,12 @@ function strip-blank-lines-start-end {
         strip_blank_lines_start_end.pl |
         cat-copy-if-tty
 }
+
+function strip-duplicate-subsequent-blank-whitespace-lines {
+    #: reads stdin
+    ##
+    cat-paste-if-tty |
+        perl -ne 'print if /\S/ || !$seen++; $seen=0 if /\S/' |
+        cat-copy-if-tty
+}
 ##

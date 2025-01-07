@@ -741,3 +741,33 @@ function git-synced-config-enable {
   git config --local include.path ../.gitconfig
 }
 ##
+function git-commit-to-branch {
+    #: @o1
+    ##
+    local branch="${1}"
+    local msg="${2:-.}"
+
+    local current_branch="$(git rev-parse --abbrev-ref HEAD)" @RET
+    local has_stash=0
+
+    if [[ -n "$(git diff --name-only)" ]]; then
+        git stash --keep-index @RET
+        #: @o1 The command git stash --keep-index is used to temporarily save changes in your working directory that are not staged for commit. Here's what each part does:  git stash: Saves your local modifications away and reverts the working directory to match the HEAD commit. --keep-index: Tells Git to only stash unstaged changes, leaving staged changes (the index) intact.
+
+        has_stash=1
+    fi
+
+    if git show-ref --verify --quiet "refs/heads/${branch}"; then
+        git checkout "${branch}" @RET
+    else
+        git checkout -b "${branch}" @RET
+    fi
+
+    git commit -m "${msg}" @RET
+    git checkout "${current_branch}" @RET
+
+    if (( has_stash )); then
+        git stash pop @RET
+    fi
+}
+##

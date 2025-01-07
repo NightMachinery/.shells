@@ -103,3 +103,19 @@ function gh-pr-pip {
         cat-copy-if-tty
 }
 ##
+function gh-to-raw-githack {
+    in-or-args "$@" |
+        perl -pe 's{github\.com}{raw.githack.com}g; s{/blob/}{/}g' |
+        cat-copy-if-tty
+}
+
+function gh-to-raw-v2 {
+    in-or-args "$@" |
+        perl -pe 's{github\.com}{raw.githubusercontent.com}g; s{/blob/}{/}g' |
+        cat-copy-if-tty
+}
+
+function gh-to-raw-v1 {
+    in-or-args "$@" | sd '/blob/' '/raw/'
+}
+##

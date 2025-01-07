@@ -153,32 +153,34 @@ function icat-autoresize {
 @opts-setprefix icat-autoresize icat
 
 function icat {
-    isI || return 0
+    {
+        isI || return 0
 
-    if (( $#@ == 0 )) ; then
-        if isInTty ; then
-            local images=( ${~imageglob} *.pdf(Nn) )
-            if (( ${#images} )) ; then
-                icat "$images[@]"
-                return $?
+        if (( $#@ == 0 )) ; then
+            if isInTty ; then
+                local images=( ${~imageglob} *.pdf(Nn) )
+                if (( ${#images} )) ; then
+                    icat "$images[@]"
+                    return $?
+                else
+                    return 0
+                fi
             else
-                return 0
+                local tmp
+                tmp="$(gmktemp)" @TRET
+                {
+                    cat > $tmp @TRET
+                    icat $tmp </dev/tty # icat-kitty tries to read the stdin if it is not a tty
+
+                    gsleep 0.05 #: to allow us to cancel the loop
+                } always {
+                    silent trs-rm "$tmp"
+                }
             fi
-        else
-            local tmp
-            tmp="$(gmktemp)" @TRET
-            {
-                cat > $tmp @TRET
-                icat $tmp </dev/tty # icat-kitty tries to read the stdin if it is not a tty
-
-                gsleep 0.05 #: to allow us to cancel the loop
-            } always {
-                silent trs-rm "$tmp"
-            }
         fi
-    fi
 
-    re h_icat "$@"
+        re h_icat "$@"
+    } >&2
 }
 
 function h_icat {

@@ -417,7 +417,33 @@ def get_url(entry: Dict, *, source: str) -> Optional[str]:
         pdf_link = next(
             (link.get("@href") for link in links if link.get("title") == "pdf"), None
         )
-        return pdf_link or entry.get("id")
+        url = pdf_link or entry.get("id")
+
+        ###
+        #: @duplicateCode/6bc7240c4b1443bf87f86043439a8eb3
+
+        #: Extract arXiv ID using regex
+        arxiv_patterns = [
+            r'(?i)/(?:abs|pdf)/(?:arxiv:)?([^/]+?)(?:\.pdf)?(?:#.*)?/*$',
+            r'(?i)arxiv:([^/]+?)(?:\.pdf)?/*$',
+            r'(?i)^(\d+\.\d+)$'
+        ]
+
+        for pattern in arxiv_patterns:
+            match = re.search(pattern, url)
+            if match:
+                arxiv_id = match.group(1)
+
+                #: Remove version number (v1, v2, etc.)
+                arxiv_id = re.sub(r'v\d+$', '', arxiv_id)
+
+                semantic_scholar_url = f"https://api.semanticscholar.org/arXiv:{arxiv_id}"
+
+                return semantic_scholar_url
+        ###
+
+        return url
+
     elif source == "semantic-scholar":
         return entry.get("url") or (
             entry.get("links", [{}])[0].get("url") if entry.get("links") else None
@@ -525,8 +551,9 @@ def build_properties(entry: Dict, *, source: str) -> Dict[str, str]:
         >>> build_properties({'title': 'Test'}, source='arxiv')
         {'title': 'Test', 'url': '', 'arxiv': 'yes'}
     """
+    title = get_title(entry, source=source)
     properties: Dict[str, str] = {
-        "title": get_title(entry, source=source),
+        "title": title,
         "url": get_url(entry, source=source) or "",
     }
     authors = get_authors(entry, source=source)
@@ -556,7 +583,7 @@ def print_org_output(entry: Dict, *, source: str) -> None:
     """
     properties = build_properties(entry, source=source)
     date_tag = get_date_tag(properties.get("date"))
-    title = properties.get("title", "")
+    title = properties.pop("title", "")
     url = properties.get("url", "")
     abstract = get_abstract(entry, source=source)
     venue = properties.get("venue", "")

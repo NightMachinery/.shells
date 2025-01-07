@@ -1,0 +1,15 @@
+- Use =Dr.\ X= (with a backslash before the space) when naming professors.
+
+- =\nightCite= automatically inserts a space before itself if needed, so use it like so:
+
+#+begin_example tex
+This paper\nightCite{x} does that.
+#+end_example
+
+- Keep all citations. Do NOT add any new citations.
+
+- Output in a LaTeX code block.
+
+- I repeat, double check that you should not have added any non-existent citations.
+
+

@@ -1,0 +1,12 @@
+--------
+
+- DRY.
+  - Find common patterns in the code that can refactored into shared code.
+
+- Use dependency injection to improve code flexibility - let components receive their dependencies from outside instead of hardcoding them. For example, pass configurations as arguments or inject service instances through constructors. However, never inconvenience the user. The dependencies must always be optional to provide.
+
+- Do NOT add comments about what you have changed, e.g., =newly added=. The user uses version control software to manually review the changes.
+
+# --------
+# This file is often added with another language-specific file, so not having an ending separator is better.
+

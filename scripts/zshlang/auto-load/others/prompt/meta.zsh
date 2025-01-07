@@ -1,4 +1,8 @@
 ##
+function metaprompt-expand-query-to-question {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Convert the above search query to a proper question.' "$@"
+}
+##
 function metaprompt-rewrite {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite this prompt to make it clearer and easier to understand and follow:' "$@"
 }

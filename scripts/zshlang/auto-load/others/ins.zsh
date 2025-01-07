@@ -100,8 +100,20 @@ function gem-install-add {
 aliasfn gemiadd gem-install-add
 aliasfn gmiadd gemiadd
 ##
+function npm-install {
+    local pkg
+    for pkg in $@ ; do
+        npm install -g "$pkg"
+    done
+}
+
 function ins-npm {
-    zargs -l 1 -- $(cat "$nodables") -- npm install -g
+    local packages
+    packages=(${(f)"$(cat $nodables)"}) @TRET
+
+    for pkg in ${packages[@]} ; do
+        npm-install "${pkg}"
+    done
 }
 
 function ins-pip {

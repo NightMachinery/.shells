@@ -69,7 +69,7 @@ function friction-type {
     local time_taken
 
     #: If no string is provided, generate one using passgen-words
-    if [[ -z "$input_string" ]]; then
+    if [[ -z "${input_string}" ]]; then
         input_string="$(passgen-words 3 | tr '-' " ")" @TRET
     fi
 
@@ -85,24 +85,29 @@ function friction-type {
 
     while true; do
         ec "Type the following text:"
-        ec "$output_string"$'\n'
+        ec "${output_string}"$'\n'
 
-        start_time=$EPOCHSECONDS
-
-        # vared -p "> " user_input
+        start_time="${EPOCHSECONDS}"
         user_input="$(vared-m "> " "${user_input}")" @RET
-
-        end_time=$EPOCHSECONDS
-
-        time_taken=$((end_time - start_time))
+        end_time="${EPOCHSECONDS}"
+        time_taken="$((end_time - start_time))"
 
         ec
         #: Check if the input matches
-        if [[ "$user_input" == "$input_string" ]]; then
-            ec "Correct! Time taken: $time_taken seconds"
+
+        if [[ "${user_input}" == "${input_string}" ]]; then
+            ec "Correct! Time taken: ${time_taken} seconds"
             return 0
         else
-            ec "Incorrect. Try again."
+            ec "Incorrect. Differences shown below:"
+            local tmpdir
+            tmpdir="$(mktemp -d)" @RET
+            ec "${input_string}" > "${tmpdir}/expected"
+            ec "${user_input}" > "${tmpdir}/actual"
+            git diff --no-index --color=always --no-prefix --minimal --word-diff --word-diff-regex='.' "${tmpdir}/expected" "${tmpdir}/actual" | tail -n1
+            ec ""
+            silent trs-rm "${tmpdir}"
+
             if (( retries_count > 0 )); then
                 ((retries_count--))
                 if (( retries_count == 0 )); then

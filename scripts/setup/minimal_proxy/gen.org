@@ -331,7 +331,7 @@ pip install -U IPython aiofile docopt PySocks telethon python-telegram-bot py-sp
 :END:
 #+begin_example zsh
 sudo apt-get update
-sudo apt-get install -y kitty-terminfo coreutils moreutils htop ncdu vim neovim git curl wget build-essential tmux zsh openconnect jq python3 python3-pip bindfs socat nmap corkscrew connect-proxy net-tools netcat-openbsd openssh-client openssh-server autossh redis-server zstd ripgrep
+sudo apt-get install -y kitty-terminfo coreutils moreutils htop ncdu vim neovim git curl wget build-essential tmux zsh openconnect jq python3 python3-pip bindfs socat nmap corkscrew connect-proxy net-tools netcat-openbsd openssh-client openssh-server autossh redis-server zstd ripgrep progress
 
 # redis-install
 #+end_example
