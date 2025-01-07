@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 ##
 import sys
-import requests
-from typing import Optional
-from dblp_titles import DBLPClient, print_stderr
+from dblp_utils import DBLPClient, print_stderr
 import xml.etree.ElementTree as ET
+from typing import Dict, List, Mapping, Optional, Sequence, Iterator, Tuple
+import requests
+
 
 def get_author_name(url: str, *, client: Optional[DBLPClient] = None) -> str:
     client = client or DBLPClient()
@@ -26,6 +27,7 @@ def get_author_name(url: str, *, client: Optional[DBLPClient] = None) -> str:
         print_stderr(f"Error fetching name: {e}")
         sys.exit(1)
 
+
 def main() -> None:
     if len(sys.argv) != 2:
         print("Usage: dblp_name.py <dblp_url>", file=sys.stderr)
@@ -33,6 +35,7 @@ def main() -> None:
 
     name = get_author_name(sys.argv[1])
     print(name)
+
 
 if __name__ == "__main__":
     main()
