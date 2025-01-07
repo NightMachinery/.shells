@@ -639,6 +639,15 @@ function hyper_bind_v2(o)
 end
 
 --- ** Hyper Hotkeys (Main Section)
+hyper_bind_v2({
+    key = 'escape',
+    auto_trigger_p=false,
+    pressedfn = function()
+        hyper_exit() -- Exit the modality
+        -- hs.eventtap.keyStroke({}, 'escape') -- Simulate escape key press
+    end
+})
+
 hyper_toggler_1 = hs.hotkey.bind({}, "F18", hyper_down, hyper_up, nil)
 -- Trigger existing hyper key shortcuts
 for _, key in ipairs({"v", "\\", "delete", "space", "j"}) do
@@ -1689,7 +1698,7 @@ for _, binder in ipairs({purple_bind_v2, hyper_bind_v2}) do
     binder{mods={}, key="]", pressedfn=rightClickAvy,}
     binder{mods={}, key="o", pressedfn=textSelectAvyV2,}
 
-    binder{mods={}, key="'", pressedfn=leftClick}
+    -- binder{mods={}, key="'", pressedfn=leftClick} -- overridden by STT
     binder{mods={"shift"}, key="'", pressedfn=function()
                mouseClick{mods={"shift"}}
     end}
@@ -2626,9 +2635,10 @@ appHotkey{ key='/', appName='company.thebrowser.Browser' }
 appHotkey{ key='.', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
+appHotkey{ key=';', appName='com.microsoft.Excel' }
 
--- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
-appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor
+appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
+-- appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor VSCode App
 
 emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='x', appName=emacsAppName }
@@ -3045,17 +3055,34 @@ function whisper.getRecordCommand(outputFile)
     return cmd
 end
 
-function whisper.transcribeCommand(inputFile, language)
-    local langConfig = whisper.languageConfig[language]
-    local cmd = {
-        command = whisper.whisperDir .. "main",
-        args = {
-            "--model", whisper.whisperDir .. "models/ggml-" .. langConfig.model .. ".bin",
-            "--language", language,
-            "--no-timestamps",
-            "--file", inputFile
+function whisper.transcribeCommand(inputFile, language, backend)
+    backend = backend or "whisper"
+
+    local cmd
+    if backend == "whisper" then
+        local langConfig = whisper.languageConfig[language]
+        cmd = {
+            command = whisper.whisperDir .. "main",
+            args = {
+                "--model", whisper.whisperDir .. "models/ggml-" .. langConfig.model .. ".bin",
+                "--language", language,
+                "--no-timestamps",
+                "--file", inputFile
+            }
         }
-    }
+    else
+        cmd = {
+            command = brishzq_binary,
+            args = {
+                "fnswap",
+                "ecgray",
+                "true",
+                backend,
+                "llm-stt-file",
+                inputFile
+            }
+        }
+    end
 
     -- Print the complete command for debugging
     print("Transcribe command: " .. cmd.command .. " " .. table.concat(cmd.args, " "))
@@ -3110,8 +3137,14 @@ function whisper_run(language)
     else
         -- Stop recording
         whisper.processing_interrupted_p = (whisper.state == "processing")  -- Set flag if stopping during processing
-        whisper.state = "off"
-        updateIndicator()
+        if whisper.processing_interrupted_p then
+            whisper.state = "off"
+            updateIndicator()
+
+        else
+            whisper.state = "processing"
+            updateIndicator()
+        end
 
         if whisper.task then
             if whisper.recorderMode == "ffmpeg" then
@@ -3119,6 +3152,7 @@ function whisper_run(language)
             else
                 whisper.task:interrupt()
             end
+
             whisper.task = nil
         end
 
@@ -3126,43 +3160,58 @@ function whisper_run(language)
     end
 end
 
-function processRecording(wavFile, language)
-    -- hs.alert.show("Transcribing ...")
+function processRecording(wavFile, language, backend)
+    -- backend = backend or "whisper"
+    -- backend = backend or "with-g15"
+    backend = backend or "with-flash-8b"
 
     whisper.state = "processing"
     updateIndicator()
 
-    local transcribeCommand = whisper.transcribeCommand(wavFile, language)
+    local wavLogsDir = os.getenv("HOME") .. "/logs/hs/stt"
+    hs.fs.mkdir(wavLogsDir)
+    local wavLogsFile = io.open(wavLogsDir .. "/wav_files.txt", "a")
+    wavLogsFile:write(wavFile .. "\n")
+    wavLogsFile:close()
+
+    local function resetState()
+        whisper.state = "off"
+        whisper.processing_interrupted_p = false
+        updateIndicator()
+    end
+
+    local function handleTranscription(content)
+        content = tostring(content)
+        content = content:gsub("^%s+", "")
+        content = content:gsub("%s+$", "")
+        content = content .. " "
+
+        hs.pasteboard.setContents(content)
+        if not whisper.processing_interrupted_p then
+            doPaste()
+        end
+    end
+
+    local transcribeCommand = whisper.transcribeCommand(wavFile, language, backend)
     local whisperTask = hs.task.new(transcribeCommand.command, function(exitCode, stdOut, stdErr)
+        content = stdOut
+
         if exitCode == 0 then
-            local content = stdOut
-            content = tostring(content)
-            content = content:gsub("^%s+", "")
-            content = content:gsub("%s+$", "")
-            content = content .. " "
-
-            hs.pasteboard.setContents(content)
-            if not whisper.processing_interrupted_p then
-                doPaste()
-                ---
-                -- hs.eventtap.keyStrokes(content)
+            if content and not content:match("^%s*$") then
+                handleTranscription(content)
+            else
+                hs.alert.show("Transcription empty")
             end
-
-            -- hs.alert.show("Transcription complete")
         else
             hs.alert.show("Transcription failed. Exit code: " .. exitCode .. "\nError: " .. stdErr)
         end
-        whisper.state = "off"
-        whisper.processing_interrupted_p = false  -- Reset the flag
-        updateIndicator()
+        resetState()
     end, transcribeCommand.args)
 
     local success = whisperTask:start()
     if not success then
         hs.alert.show("Failed to start transcription process")
-        whisper.state = "off"
-        whisper.processing_interrupted_p = false  -- Reset the flag
-        updateIndicator()
+        resetState()
     end
 end
 
@@ -3264,7 +3313,7 @@ function whisper_run_fa()
     whisper_run("fa")
 end
 
-hyper_bind_v1("escape", whisper_run_en)
+-- hyper_bind_v1("escape", whisper_run_en)
 -- hyper_bind_v1(".", whisper_run_en)
 hyper_bind_v2{mods={"cmd"}, key=".", pressedfn=whisper_run_en}
 hyper_bind_v2{mods={"ctrl"}, key=".", pressedfn=whisper_run_fa}
@@ -3274,6 +3323,8 @@ hs.hotkey.bind({}, 'F2', whisper_run_fa)
 
 hs.hotkey.bind({}, 'F11', whisper_run_en)
 hs.hotkey.bind({}, 'F12', whisper_run_fa)
+
+hyper_bind_v2{mods={}, key="'", pressedfn=whisper_run_en}
 ---
 function display_off()
     brishzeval2bg("display-off")
