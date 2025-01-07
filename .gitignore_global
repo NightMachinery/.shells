@@ -68,7 +68,7 @@ tramp
 /server/
 
 # projectiles files
-.projectile
+# .projectile
 
 # directory configuration
 # .dir-locals.el
