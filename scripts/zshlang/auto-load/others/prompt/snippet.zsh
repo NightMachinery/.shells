@@ -127,6 +127,10 @@ function snippet-disable-artifacts {
     snippet-input "Do not use artifacts, directly output in a code block." "$@"
 }
 ##
+function snippet-zsh-heredoc-file-updater {
+    snippet-input "Give the Zsh code to update the changed files using a literal heredoc. Do not use artifacts." "$@"
+}
+##
 function fragment-from-snippet {
     local snippet_name="${1}"
     if ! (( $+functions[${snippet_name}] )) ; then
@@ -148,6 +152,7 @@ local snippets_to_fragmentize=(
     'ask-questions-v1'
     'snippet-disable-artifacts'
     snippet-sop
+    snippet-zsh-heredoc-file-updater
 )
 
 local snippet_name
