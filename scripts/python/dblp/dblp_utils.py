@@ -157,21 +157,28 @@ def get_papers_by_group_set(titles: Sequence[str], group_set: str) -> Dict[str, 
     return results
 
 def save_group_results(base_path: Path, name: str, papers_by_group: Dict[str, List[str]], *, separator: str = "-----------") -> None:
+    # Filter out empty groups first
+    papers_by_group = filter_empty_groups(papers_by_group)
+    
+    # Only save files for non-empty groups
     for group_name, papers in papers_by_group.items():
         output_file = base_path / f"{group_name}.txt"
         output_file.write_text("\n".join(papers))
 
+    # Create combined results file
     combined_papers = []
-    for group_name in PatternGroups.get_group_names():
+    group_names = PatternGroups.get_group_names(name)  # Use the name as group_set
+    for group_name in group_names:
         if group_name in papers_by_group:
             combined_papers.extend(papers_by_group[group_name])
             combined_papers.append(separator)
     
-    if combined_papers and combined_papers[-1] == separator:
-        combined_papers.pop()
-    
-    output_file = base_path / f"{name}.txt"
-    output_file.write_text("\n".join(combined_papers))
+    if combined_papers:  # Only create the combined file if there are actual results
+        if combined_papers[-1] == separator:
+            combined_papers.pop()
+        
+        output_file = base_path / f"{name}.txt"
+        output_file.write_text("\n".join(combined_papers))
 
 def clean_title(title: str) -> str:
     title = re.sub(r'<[^>]+>', '', title)
