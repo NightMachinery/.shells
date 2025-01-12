@@ -1,3 +1,5 @@
+# [[https://github.com/NightMachinery/.shells/blob/master/scripts/prompt/Zsh_PE.org][.shells/scripts/prompt/Zsh_PE.org at master · NightMachinery/.shells]]
+
 * Creating Reusable Zsh Functions for LLM Prompts
 ** Introduction
 When frequently interacting with Large Language Models (LLMs) from the command line, it's efficient to encapsulate commonly used prompts into reusable Zsh functions. This approach streamlines your workflow, reduces repetition, and allows for quick invocation of complex prompts.
@@ -23,7 +25,7 @@ EOF
 *How to Use*:
 
 #+begin_src zsh :eval never
-prompt_text=$(fragment-summarize-session)
+prompt_text="$(fragment-summarize-session)"
 #+end_src
 
 You can then use =prompt_text= as part of a larger prompt or output it directly.
@@ -121,11 +123,11 @@ This function runs the prompt through the LLM and outputs the result, handling a
   In =snippet-preamble-coding=, =snippet-input= adds the coding preamble to the prompt system.
 
 *** Variables
-- *=prompt_input_mode=*: Determines how the input text is formatted.
+- =prompt_input_mode=: Determines how the input text is formatted.
   - ="block"=: Wraps input in triple backticks (useful for code blocks).
   - ="org"=: Converts Org-mode text to Markdown.
   - ="none"=: Leaves input unchanged.
-- *=prompt_preambles=*: An array of snippet functions to include as preambles before the main instruction.
+- =prompt_preambles=: An array of snippet functions to include as preambles before the main instruction.
 
 ** Example Workflow
 Suppose you want to create a prompt to summarize a text.

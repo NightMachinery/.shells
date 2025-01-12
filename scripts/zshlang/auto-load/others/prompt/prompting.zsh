@@ -93,6 +93,11 @@ function prompt-instruction-input {
     fi
 }
 
+function prompt-instruction-input-block {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "$@"
+}
+alias cat-pblk='prompt-instruction-input-block'
+
 function prompt-instruction-input-coding {
     prompt_input_mode="${prompt_input_mode:-block}" \
     prompt_preambles=(${prompt_preambles[@]} snippet-preamble-coding) \
@@ -624,5 +629,9 @@ function run-prompt-rewrite-telegram {
 ##
 function prompt-cs-phd-apply {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'CS PhD application requirements (GRE, LOR count) and deadline' "$@"
+}
+##
+function prompt-apply-find-interp-papers {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'List the papers related to interpretability and explainable AI (xAI).' "$@"
 }
 ##
