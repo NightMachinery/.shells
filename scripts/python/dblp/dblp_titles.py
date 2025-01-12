@@ -4,6 +4,7 @@ import argparse
 from dblp_utils import DBLPClient, Publication, print_stderr
 from typing import Dict, List, Mapping, Optional, Sequence, Iterator, Tuple
 
+
 class PublicationFormatter:
     @staticmethod
     def format_publications(
@@ -29,12 +30,15 @@ class PublicationFormatter:
             return "\n".join(lines)
 
         if output_mode == "titles-only":
-            return "\n".join(pub.title for pub in publications if getattr(pub, "title", None))
+            return "\n".join(
+                pub.title for pub in publications if getattr(pub, "title", None)
+            )
 
         if output_mode == "json":
             return json.dumps([vars(pub) for pub in publications], indent=2)
 
         raise ValueError(f"Unknown output mode: {output_mode}")
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch publications from DBLP")
@@ -64,6 +68,7 @@ def main() -> None:
     except ValueError as e:
         print_stderr(f"Error: {e}")
         exit(1)
+
 
 if __name__ == "__main__":
     main()
