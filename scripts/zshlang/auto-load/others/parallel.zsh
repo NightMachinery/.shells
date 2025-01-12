@@ -30,7 +30,7 @@ function parallelm() {
     fi
     parallel "$opts[@]" "$@"
     ## useful opts:
-    # -k  Keep sequence of output same as the order of input
+    # -k, --keep-order:  Keep sequence of output same as the order of input
     ## tests:
     # `time2 para 'sleep 1 # {}' ::: {1..120}`
     # `parallel --halt soon,fail=1 exit.dash 78 ::: {1..50}`

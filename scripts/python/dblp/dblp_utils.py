@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence, Iterator, Tuple
 from pathlib import Path
 from urllib.parse import urlparse
+from pynight.common_icecream import ic
 
 
 def print_stderr(message: str) -> None:
@@ -193,6 +194,7 @@ def save_group_results(
 
     # Only save files for non-empty groups
     for group_name, papers in papers_by_group.items():
+
         output_file = base_path / f"{group_name}.txt"
         output_file.write_text("\n".join(papers))
 
@@ -241,3 +243,45 @@ def run_dblp_script(script_name: str, url: str, *, check: bool = True, **kwargs)
         check=check,
     )
     return result.stdout.strip()
+
+
+def remove_duplicates_across_groups_as_dict(
+    groups_dict: Dict[str, List[str]],
+    group_names: List[str],
+    *,
+    case_sensitive: bool = False,
+) -> Dict[str, List[str]]:
+    seen = set()
+    result = {}
+
+    for group_name in group_names:
+        if group_name not in groups_dict:
+            continue
+
+        current_group = []
+        for item in groups_dict[group_name]:
+            key = item if case_sensitive else item.lower()
+            if key not in seen:
+                seen.add(key)
+                current_group.append(item)
+        if current_group:
+            result[group_name] = current_group
+
+    return result
+
+
+def get_papers_by_group_set_as_dict(
+    titles: Sequence[str], group_set: str
+) -> Dict[str, List[str]]:
+    raw_results = {}
+    group_names = PatternGroups.get_group_names(group_set)
+
+    # Get matches for each group
+    for group_name in group_names:
+        pattern = PatternGroups.PATTERNS[group_name]
+        matches = get_papers_by_group(titles, pattern)
+
+        if matches:
+            raw_results[group_name] = matches
+
+    return remove_duplicates_across_groups_as_dict(raw_results, group_names)
