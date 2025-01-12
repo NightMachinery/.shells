@@ -2,6 +2,7 @@
 import json
 import argparse
 from dblp_utils import DBLPClient, Publication, print_stderr
+from typing import Dict, List, Mapping, Optional, Sequence, Iterator, Tuple
 
 class PublicationFormatter:
     @staticmethod
