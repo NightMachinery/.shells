@@ -29,7 +29,7 @@ class PublicationFormatter:
             return "\n".join(lines)
 
         if output_mode == "titles-only":
-            return "\n".join(pub.title for pub in publications)
+            return "\n".join(pub.title for pub in publications if getattr(pub, "title", None))
 
         if output_mode == "json":
             return json.dumps([vars(pub) for pub in publications], indent=2)

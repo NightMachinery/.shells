@@ -20,7 +20,7 @@ function dblp-relevant-2025 {
 
 function dblp-urls-extract {
     pbpaste-urls |
-        rg 'https://dblp.org/pid/(\d+/\d+(?:-\d+)?)' |
+        rg 'https://dblp.org/pid/' |
         duplicates-clean |
         cat-copy-if-tty
 }

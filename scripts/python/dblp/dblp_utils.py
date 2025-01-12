@@ -47,8 +47,8 @@ class DBLPClient:
         if not url:
             raise ValueError("Either URL or PID must be provided")
 
-        # Modified regex to capture the full PID including any suffix
-        pid_match = re.search(r"pid/(\d+/\d+(?:-\d+)?)", url)
+        # Regex to capture the full PID for the specified URL patterns
+        pid_match = re.search(r"pid/(.+)\.(?:html|xml)", url)
         if pid_match:
             return pid_match.group(1)
 
@@ -75,10 +75,11 @@ class DBLPClient:
             return [Publication.from_xml(pub) for pub in root.findall(".//r")]
 
         except requests.RequestException as e:
-            print_stderr(f"Error fetching data: {e}")
+            print_stderr(f"Error fetching data:\n\tURL: {url}\n\t{e}")
             return []
+
         except ET.ParseError as e:
-            print_stderr(f"Error parsing XML: {e}")
+            print_stderr(f"Error parsing XML:\n\tURL: {url}\n\t{e}")
             return []
 
 
@@ -149,7 +150,7 @@ def get_papers_by_group(
     flags = 0 if case_sensitive else re.IGNORECASE
     regex = re.compile(pattern, flags)
 
-    cleaned_titles = [clean_title(title) for title in titles]
+    cleaned_titles = [clean_title(title) for title in titles if title]
     return [
         title for title, cleaned in zip(titles, cleaned_titles) if regex.search(cleaned)
     ]
