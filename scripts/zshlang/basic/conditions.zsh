@@ -229,6 +229,10 @@ function isColor {
         return $?
     fi
 
+    if isBorg ; then
+        return 1
+    fi
+
     isBrishOrg || isI
 }
 
