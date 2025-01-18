@@ -143,8 +143,10 @@ function jstt {
   local input="${1:-${jufile}}"
   assert-args input @RET
 
-  local stt_convert_p="${stt_convert_p:-n}"
+  # local stt_convert_p="${stt_convert_p:-n}"
+  local stt_convert_p="${stt_convert_p:-y}"
   #: VPSes have slow CPUs, so the conversion adds considerable latency.
+  #: [[id:0ddac83c-3a6c-494e-b887-fc2cb3088aa1][does not support uploading audio `application/ogg` · Issue #35 · simonw/llm-gemini]]
 
   stt-file "${input}" 2> >(erase-ansi > log_stderr.txt) @RET
 }
