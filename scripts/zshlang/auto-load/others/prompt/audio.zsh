@@ -127,4 +127,17 @@ function llm-stt-file {
 aliasfn llm-transcribe-audio-file llm-stt-file
 # aliasfn flash-stt-file with-flash-8b llm-stt-file
 aliasfn flash2-stt-file with-flash2 llm-stt-file
+aliasfn stt-file flash2-stt-file
+
+function jstt {
+  local input="${1:-${jufile}}"
+  assert-args input @RET
+
+
+  assert stt-file "${input}" 2> >(erase-ansi > log_stderr.txt) @RET
+
+  if isBorg ; then
+    silent trs "${input:r}.mp3" || true
+  fi
+}
 ##
