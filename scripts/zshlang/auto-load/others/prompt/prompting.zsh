@@ -597,7 +597,7 @@ function pbcopy-file-as-md {
             else
                 cat "$f"
             fi
-            ec '``````````'
+            ec $'\n''``````````'
             ec $'\n'
         done
 
@@ -633,5 +633,16 @@ function prompt-cs-phd-apply {
 ##
 function prompt-apply-find-interp-papers {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'List the papers related to interpretability and explainable AI (xAI).' "$@"
+}
+
+function prompt-apply-find-rel25-papers {
+    local prompt='For each topic, find relevant papers from the list given:
+
+- interpretability and explainable AI (xAI) (separate found papers into three subcategories: technical interpretability, end user-focused xAI, and using interpretability techniques to increase model capabilities, such as mitigating hallucinations)
+- adversarial robustness
+- agents
+- LLMs'
+
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt}" "$@"
 }
 ##

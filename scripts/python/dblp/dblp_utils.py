@@ -86,7 +86,7 @@ class DBLPClient:
 
 class PatternGroups:
     PATTERNS: Dict[str, str] = {
-        "interp_1": r"\binterp|\bexplain|\bexplana|\bsalien|\battribution|\bconcept|\bvisualiz",
+        "interp_1": r"\binterpr|\bexplain|\bexplana|\bsalien|\battribution|\bconcept|\bvisualiz",
         "interp_2": r"\brelevan|\bground|\bmechanis|\bcircuit|\bprobe|\bprobing|\batten",
         "interp_3": r"\bunderstand|\bwhy\b|\btransparen|\bcounterfactual",
         "adversarial": r"\brobust|\badversarial|\banomaly|\bbackdoor|\bpoison",
