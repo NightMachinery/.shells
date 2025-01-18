@@ -99,30 +99,40 @@ function llm-stt-rec {
 aliasfn flash-stt-rec with-flash-8b llm-stt-rec
 
 function llm-stt-file {
-    local audio="${1}"
-    if match-url "${audio}" ; then
-        #: =llm= can handle URLs
+  local audio="${1}"
 
-    else
-        assert test -e "${audio}" @RET
+  local del_audio_p=n
 
-        local convert_p="${stt_convert_p:-y}"
+  if match-url "${audio}" ; then
+    #: =llm= can handle URLs
 
-        if bool "${convert_p}" && [[ "${audio:e}" != "mp3" ]] ; then
-            audio="$(ffmpeg_print_out_p=y to-mp3 "${audio}")" @RET
+  else
+    assert test -e "${audio}" @RET
 
-            var-show audio
-        fi
+    local convert_p="${stt_convert_p:-y}"
 
+    if bool "${convert_p}" && [[ "${audio:e}" != "mp3" ]] ; then
+      audio="$(ffmpeg_print_out_p=y to-mp3 "${audio}")" @RET
+      del_audio_p=y
+
+      var-show audio
     fi
 
-    if [[ "${llm_model}" =~ 'gpt-4o' ]]  ; then
-        local llm_system
-        llm_system="$(prompt-audio-transcribe-stt)" @TRET
-    fi
+  fi
 
+  if [[ "${llm_model}" =~ 'gpt-4o' ]]  ; then
+    local llm_system
+    llm_system="$(prompt-audio-transcribe-stt)" @TRET
+  fi
+
+  {
     llm_attachments=("${audio}") reval-to-llm prompt-audio-transcribe-stt |
-        cat-streaming-copy-rtl-if-tty
+      cat-streaming-copy-rtl-if-tty
+  } always {
+    if bool "${del_audio_p}" ; then
+      silent trs-rm "${audio}"
+    fi
+  }
 }
 aliasfn llm-transcribe-audio-file llm-stt-file
 # aliasfn flash-stt-file with-flash-8b llm-stt-file
@@ -136,10 +146,6 @@ function jstt {
   local stt_convert_p="${stt_convert_p:-n}"
   #: VPSes have slow CPUs, so the conversion adds considerable latency.
 
-  assert stt-file "${input}" 2> >(erase-ansi > log_stderr.txt) @RET
-
-  if isBorg ; then
-    silent trs "${input:r}.mp3" || true
-  fi
+  stt-file "${input}" 2> >(erase-ansi > log_stderr.txt) @RET
 }
 ##
