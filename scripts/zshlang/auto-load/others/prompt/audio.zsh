@@ -124,5 +124,7 @@ function llm-stt-file {
     llm_attachments=("${audio}") reval-to-llm prompt-audio-transcribe-stt |
         cat-streaming-copy-rtl-if-tty
 }
-aliasfn flash-stt-file with-flash-8b llm-stt-file
+aliasfn llm-transcribe-audio-file llm-stt-file
+# aliasfn flash-stt-file with-flash-8b llm-stt-file
+aliasfn flash2-stt-file with-flash2 llm-stt-file
 ##

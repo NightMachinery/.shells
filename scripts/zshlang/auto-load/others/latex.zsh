@@ -425,6 +425,13 @@ function cv-references-build {
     command gmv references_cropped.pdf references.pdf
     pbadd references.pdf
 }
+
+function cv-pub-build {
+    pdflatex_name=publications cv-build "$@" @RET
+    command pdf-crop-margins -p4 100 10 100 100 publications.pdf -o publications_cropped.pdf
+    command gmv publications_cropped.pdf publications.pdf
+    pbadd publications.pdf
+}
 ##
 function bibtidy {
     if (( ${#@} == 0 )) ; then

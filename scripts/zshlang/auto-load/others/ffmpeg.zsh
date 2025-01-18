@@ -8,6 +8,8 @@ function vid-fix {
     fi
     reval-ec ffmpeg -err_detect ignore_err -i "$i" -c copy -movflags faststart "$o"
 }
+aliasfn audio-fix vid_fix_ext=m4a vid-fix
+#: @untested audio-fix
 ##
 typeset -g h_vid_crop_vclass="crop=in_w-325:in_h-100:0:100"
 
@@ -74,8 +76,12 @@ audio-join2() {
 function 2mp3 {
     jglob
     local i="$1"
+    local out="${i:r}.mp3"
+    if [[ "${out}" == "${i}" ]]; then
+        out="${i:r}_fixed.mp3"
+    fi
 
-    ffmpeg -i $i ${i:r}.mp3
+    ffmpeg -i $i "$out"
 }
 ##
 function ffmpeg-to264 {

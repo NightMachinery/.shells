@@ -477,6 +477,26 @@ typeset -A gemini_flash_obj=(
     send_aliases 'lflash'
 )
 define-llm-model-v2 gemini_flash_obj
+## **** Google Gemini 2
+# Gemini 2.0 Flash
+typeset -A gemini2_flash_obj=(
+    model_name 'gemini-2.0-flash-exp'
+    long_name 'gemini_flash_2_0'
+    short_name 'flash2'
+    reval_to_aliases 'rflash2 fl2'
+    send_aliases 'lflash2'
+)
+define-llm-model-v2 gemini2_flash_obj
+
+# Gemini 2.0 Flash Thinking Mode
+typeset -A gemini2_flash_thinking_obj=(
+    model_name 'gemini-2.0-flash-thinking-exp-1219'
+    long_name 'gemini_flash_thinking_2_0'
+    short_name 'flash2t'
+    reval_to_aliases 'rflash2t fl2t'
+    send_aliases 'lflash2t'
+)
+define-llm-model-v2 gemini2_flash_thinking_obj
 ## *** OpenRouter: Google Gemini
 # OpenRouter Gemini Flash 8B
 typeset -A openrouter_gemini_flash_8b_obj=(
