@@ -419,6 +419,10 @@ function cv-short-build {
     pdflatex_name=CV_short cv-build "$@" @RET
 }
 
+function cv-1page-build {
+    pdflatex_name=CV_1page cv-build "$@" @RET
+}
+
 function cv-references-build {
     pdflatex_name=references cv-build "$@" @RET
     command pdf-crop-margins -p4 100 10 100 100 references.pdf -o references_cropped.pdf

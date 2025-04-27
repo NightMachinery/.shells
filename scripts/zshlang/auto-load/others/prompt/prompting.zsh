@@ -1,5 +1,5 @@
 ##
-alias 2en='xz prompt-translate2en'
+alias 2en='\noglob llm-run prompt-translate2en'
 ##
 alias porg='prompt_input_mode=org'
 alias pblk='prompt_input_mode=block'
@@ -253,7 +253,11 @@ function prompt-rewrite-concise-multi-v2 {
 }
 
 function prompt-rewrite-fluent-latex {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Make the following text more fluent (Output LaTeX):' "$@"
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Make the following text more fluent (Output LaTeX in a code block).' "$@"
+}
+
+function prompt-rewrite-as-orgmode-latex {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite as org-mode with LaTeX enabled. First review the syntax rules of this format (VERY IMPORTANT!).' "$@"
 }
 
 function prompt-rewrite-fluent-orgmode {
@@ -638,11 +642,80 @@ function prompt-apply-find-interp-papers {
 function prompt-apply-find-rel25-papers {
     local prompt='For each topic, find relevant papers from the list given:
 
-- interpretability and explainable AI (xAI) (separate found papers into three subcategories: technical interpretability, end user-focused xAI, and using interpretability techniques to increase model capabilities, such as mitigating hallucinations)
-- adversarial robustness
-- agents
-- LLMs'
+-   interpretability and explainable AI (xAI) (separate found papers into three subcategories: technical interpretability, end user-focused xAI, and using interpretability techniques to increase model capabilities, such as mitigating hallucinations)
+-   adversarial robustness
+-   Foundation models
+    -   understanding how models work
+    -   reasoning
+    -   agents
+    -   VLM
+    -   LLM
+    -   prompt engineering
+'
 
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt}" "$@"
+}
+##
+function prompt-clean2md {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Clean up the copied text. The output should be in Markdown format (in a code block).
+- Include all text content in a structured way
+- Maintain the hierarchical organization (headings, subheadings)
+- Preserve the dates and time periods
+- Do not include any image links or placeholders
+- Use proper Markdown formatting (headings with #, line breaks, etc.)' "$@"
+}
+
+function prompt-clean2org {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Clean up the copied text. The output should be in org-mode format (in a code block).
+- Include all text content in a structured way
+- Use proper org-mode formatting (headings with *, lists with -, formatting with /italic/ and *bold*, etc.)
+- Maintain the hierarchical organization (use * for headings, ** for subheadings, etc.)
+- Use lists with "-" for related items at the same level that are not headings
+- Preserve the dates and time periods
+- Do not include any image links or placeholders
+' "$@"
+}
+
+function prompt-clean2org-v2 {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input '
+Format the copied text into org-mode structure:
+
+1. Convert all content into a proper org-mode, and output only the converted text.
+
+2. Structure elements using:
+   - Headings with * (e.g., * Main Heading, ** Subheading)
+   - Lists with - and proper indentation
+   - Prefer lists for a short list of items with no children, and prefer headings for hierarchical organization.
+   - Use list items (- A\n- B) for related details under a heading rather than consecutive lines
+   - Text formatting with /italic/ and *bold*
+   - No manual indentation needed after headings. Org-mode automatically handles heading indentation, but you must indent list items.
+   - Remember that in org-mode, a single line break is treated as a space when exported
+
+3. Important content to preserve:
+   - All text content
+   - Hierarchical organization
+   - Dates and time periods
+
+4. Content to exclude:
+   - Image links
+   - Image placeholders
+
+' "$@"
+}
+
+function run-prompt-clean2org-v2 {
+    local llm_copy_p="${llm_copy_p:-n}"
+
+    {
+        if isInTty ; then
+            pbpaste-html |
+                html4latex-clean
+        else
+            cat
+        fi
+    } |
+        llm-run prompt-clean2org-v2 "$@" |
+        cat-streaming-copy-rtl-if-tty
+        # cat-rtl-streaming-if-tty
 }
 ##

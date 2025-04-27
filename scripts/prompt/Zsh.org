@@ -8,6 +8,7 @@ Zsh Coding Guidelines:
 alias -g '@RET'=' || return $?'
 
 function ec {
+    #: `ec` should almost always be used instead of `echo`.
     print -r -- "$@"
 }
 
@@ -22,6 +23,7 @@ function ecerr {
 function gquote {
     ec "${(qq@)@}"
 }
+alias gq=gquote
 
 function reval {
     eval "$(gquote "$@")"
@@ -43,6 +45,17 @@ function ensure-array {
     for i in $@ ; do
         if (( ${#${(P)i}} == 0 )) ; then
             typeset -ag "$i"
+        fi
+    done
+}
+
+function trs-rm {
+    local paths=("$@")
+
+    local p
+    for p in $paths[@] ; do
+        if test -e "$p" ; then
+            reval-ec command rm -rf -- "$p"
         fi
     done
 }
@@ -102,7 +115,10 @@ function ffmpeg-to-video {
 }
 #+end_src
 
-- All values should be quoted.
+- All values should be quoted, including subshells:
+#+begin_src zsh :eval never
+some_var="$(some_command ...)"
+#+end_src
 
 - If we need to quote something that will be evaled later, we should use =gquote=.
 
@@ -128,6 +144,68 @@ function pdf-compress {
     ...
 }
 #+end_src
+
+- Function/command calls that might fail should use this pattern:
+#+begin_src zsh :eval never
+assert mkdir -p x/y @RET
+#+end_src
+
+=@RET= is already defined as:
+#+begin_src zsh :eval never
+alias -g '@RET'=' || return $?'
+#+end_src
+
+=assert= is also already defined, and can be treated as a version of =reval= defined above which just re-evaluates its input. The above pattern must only be used when the shell is NOT forking. For subshells, use the following pattern.
+
+- For error handling subshells, use this pattern:
+#+begin_src zsh :eval never
+local tmp
+tmp="$(gmktemp)" @TRET
+#+end_src
+
+=@TRET= is already defined as:
+#+begin_src zsh :eval never
+alias -g '@TRET'=' || { local retcode=$? ; ectrace_single_trace=y ectrace_ret=$retcode ectrace ; return $retcode }'
+#+end_src
+
+=@TRET= prints a detailed stacktrace. If the subshell is calling an embedded script with proper error reporting, then we can fall back to =@RET=:
+#+begin_src bsh.dash :results verbatim :exports both :wrap results
+local out
+out="$(perl - "${tmp_file}" <<'EOF'
+...
+    print STDERR "Error: ...\n";
+    exit 1;
+...
+EOF
+)" @RET
+#+end_src
+
+- Some commands are okay to fail. You can use these two patterns to handle them:
+
+This pattern ignores the error silently:
+#+begin_src zsh :eval never
+trs-rm some_temp_file || true
+#+end_src
+
+This pattern prints a stacktrace but ignores the error otherwise:
+#+begin_src zsh :eval never
+trs-rm some_big_file @STRUE
+#+end_src
+
+=@STRUE= is already defined:
+#+begin_src zsh :eval never
+alias -g '@STRUE'=' || { ectrace_single_trace=y ectrace_ret=$? ectrace ; true }'
+#+end_src
+
+Prefer silent errors when the error is inconsequential, like when deleting temporary files.
+
+- When parsing structured input, use the appropriate tool with robust parsing, e.g., =jq= for JSON.
+
+- Heredocs must be used for long literal strings. E.g., when we are embedding a script.
+
+- Helper/internal/private functions should be named =h-...=.
+
+- When multiple implementations of a function are possible, name each implementation with a postfix. E.g., =pdf-compress-pdftk=, =pdf-compress-qpdf=. Then define a general gateway =aliasfn pdf-compres pdf-compress-qpdf=. This way, we can easily swap the default implementation used.
 
 - DRY.
 

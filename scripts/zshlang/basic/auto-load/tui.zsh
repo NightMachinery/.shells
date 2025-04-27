@@ -1,6 +1,6 @@
 ##
 function printz-quoted {
-    printz "$(gq "$@")"
+    printz "$(gquote-env "$@")"
 }
 
 function printz {

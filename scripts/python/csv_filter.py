@@ -14,7 +14,7 @@ from types import SimpleNamespace
 from pynight.common_icecream import ic
 from pynight.common_iterable import flatten1_iterable
 from pynight.common_sort import version_sort_key
-from pynight.common_debugging import ipdb_enable
+from pynight.common_debugging2 import ipdb_enable
 from pynight.common_str import try_float
 
 

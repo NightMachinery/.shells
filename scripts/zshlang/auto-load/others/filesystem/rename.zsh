@@ -103,4 +103,6 @@ function rename-audio-auto {
 
   revaldbg command gmv -v -i "$input_file" "$new_filename"
 }
+reify rename-audio-auto
+aliasfn rename-mp3-auto rename-audio-auto
 ##

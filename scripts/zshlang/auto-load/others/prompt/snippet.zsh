@@ -102,6 +102,10 @@ function snippet-another-llm {
     snippet-input "You don't know the answer. Write the question completely so I can ask a better LLM. Only output the question in Markdown, as I'll directly copy your message to the other LLM." "$@"
 }
 
+function snippet-another-llm-v2 {
+    snippet-input "Can you summarize the context and my concerns in a markdown code block that I can directly copy and ask another LLM for advice? Include all needed context, length is not an issue." "$@"
+}
+
 function snippet-replace-files {
     snippet-input "You have given me one big block of text which is hard to apply to all these files. Perhaps you can give Zsh code with 'EOF' that overwrites these files instead?" "$@"
 }

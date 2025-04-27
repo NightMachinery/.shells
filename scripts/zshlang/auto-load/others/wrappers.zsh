@@ -160,6 +160,9 @@ function pwd {
 ##
 function titlecase {
   #: @install/pip
+  #:
+  #: * @seeAlso
+  #: ** [agfi:lower]
   ##
   cat-paste-if-tty | command titlecase "$@" | cat-copy-if-tty
 }
@@ -200,4 +203,6 @@ function tidy-viewer {
 function duh {
   reval-ecgray gdu --exclude='.git' -h "$@"
 }
+##
+alias tzc='timezone_converter.py'
 ##

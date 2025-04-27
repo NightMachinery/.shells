@@ -158,3 +158,9 @@ function brishzeval2_out(cmd)
 
   return my_out
 end
+---
+function mkdir(path)
+    local status, stdout, stderr = pipe_simple("", "mkdir", "-p", path)
+    return status == 0
+end
+---

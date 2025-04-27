@@ -273,6 +273,21 @@ function llm-m {
         typeset -g llm_last_model="$model"
     fi
 
+    ##
+    local proxy_p="${llm_models_proxy_p[${model}]:-y}"
+    # dact var-show proxy_p model llm_models_proxy_p
+    if bool "${proxy_p}" ; then
+        if should-proxy-p ; then
+            pxa-local
+
+        else
+            ecdbg "$0: proxy not wanted or already active"
+        fi
+
+        log+="HTTP_PROXY: ${HTTP_PROXY}"$'\n'
+    fi
+    ##
+
     opts+=(-m "${model}")
     log+="LLM Model: ${model}"
 
@@ -302,9 +317,9 @@ function llm-m {
 
     ecgray "$log"
 
-    $proxyenv revaldbg command llm "$@" "${opts[@]}" |
+    revaldbg command llm "$@" "${opts[@]}" |
         cat-rtl-streaming-if-tty
-        # cat-copy-streaming
+    # cat-copy-streaming
 }
 alias with-llm-attach-clipboard='llm_attachments=("MAGIC_CLIPBOARD") '
 
@@ -324,7 +339,7 @@ function llm-send {
     typeset -g llm_last_model="$model"
 
     local copy_p="${llm_copy_p:-y}"
-    local max_tokens="${llm_max_tokens:-4000}"
+    local max_tokens="${llm_max_tokens:-20000}"
     local token_strategy="${llm_token_limit_strategy:-reject}"
 
     local input
@@ -402,6 +417,9 @@ function reval-to-llm {
 }
 aliasfn llm-chat llm-m chat
 
+#: define a dict for keeping `proxy_p` per model:
+typeset -gA llm_models_proxy_p
+
 function define-llm-model {
     local model_name="$1"
     local long_name="${long_name}"
@@ -415,8 +433,16 @@ function define-llm-model {
     local model_var_name="${long_name}_model"
     revaldbg typeset -g "${model_var_name}=${model_name}" @RET
 
+    local proxy_p="${proxy_p}"
+    if test -n "${proxy_p}" ; then
+        llm_models_proxy_p[${model_name}]="${proxy_p}"
+    fi
+
     local with_alias_name="with-${short_name}"
     revaldbg aliassafe "${with_alias_name}=llm_model=\"\${${model_var_name}}\" " @RET
+
+    local with_maybe_alias_name="with-${short_name}-maybe"
+    revaldbg aliassafe "${with_maybe_alias_name}=llm_model=\"\${llm_model:-\${${model_var_name}}}\" " @RET
 
     local llm_function_name="llm-${short_name}"
     revaldbg aliasfn-ng "${llm_function_name}" "${with_alias_name}" llm-send @RET
@@ -444,6 +470,7 @@ function define-llm-model-v2 {
     local model_name="${${(P)map_name}[model_name]}"
     local long_name="${${(P)map_name}[long_name]}"
     local short_name="${${(P)map_name}[short_name]}"
+    local proxy_p="${${(P)map_name}[proxy_p]}"
     local reval_to_aliases=(${(s: :)${(P)map_name}[reval_to_aliases]})
     local send_aliases=(${(s: :)${(P)map_name}[send_aliases]})
 
@@ -451,11 +478,26 @@ function define-llm-model-v2 {
 }
 ## * Models
 ## ** Google Gemini
+typeset -gA gemini25_obj=(
+    ##
+    # model_name 'gemini-2.5-pro-preview-03-25'
+    model_name 'gemini-2.5-pro-exp-03-25'
+    ##
+    # model_name 'openrouter/google/gemini-2.5-pro-exp-03-25:free'
+    # model_name 'openrouter/google/gemini-2.5-pro-preview-03-25'
+    ##
+    long_name 'gemini_2_5_pro'
+    short_name 'g25'
+    reval_to_aliases 'g25 gemini'
+    send_aliases 'lg25'
+)
+define-llm-model-v2 gemini25_obj
+
 typeset -gA gemini15_obj=(
     model_name 'gemini-1.5-pro-latest'
     long_name 'gemini_1_5_pro'
     short_name 'g15'
-    reval_to_aliases 'g15 gemini'
+    reval_to_aliases 'g15'
     send_aliases 'lg15'
 )
 define-llm-model-v2 gemini15_obj
@@ -478,9 +520,20 @@ typeset -A gemini_flash_obj=(
 )
 define-llm-model-v2 gemini_flash_obj
 ## **** Google Gemini 2
+# 2.5 Flash
+typeset -A gemini25_flash_obj=(
+    model_name 'gemini-2.5-flash-preview-04-17'
+    long_name 'gemini_flash_2_5'
+    short_name 'flash25'
+    reval_to_aliases 'rflash25 fl25'
+    send_aliases 'lflash25'
+)
+define-llm-model-v2 gemini25_flash_obj
+
 # Gemini 2.0 Flash
 typeset -A gemini2_flash_obj=(
-    model_name 'gemini-2.0-flash-exp'
+    model_name 'gemini-2.0-flash'
+    # model_name 'gemini-2.0-flash-exp'
     long_name 'gemini_flash_2_0'
     short_name 'flash2'
     reval_to_aliases 'rflash2 fl2'
@@ -488,9 +541,19 @@ typeset -A gemini2_flash_obj=(
 )
 define-llm-model-v2 gemini2_flash_obj
 
+typeset -A or_gemini2_flash_obj=(
+    model_name 'openrouter/google/gemini-2.0-flash-001'
+    long_name 'or_gemini_flash_2_0'
+    short_name 'or_flash2'
+    reval_to_aliases 'r-or-flash2 or-fl2'
+    send_aliases 'l-or-flash2'
+)
+define-llm-model-v2 or_gemini2_flash_obj
+
 # Gemini 2.0 Flash Thinking Mode
 typeset -A gemini2_flash_thinking_obj=(
-    model_name 'gemini-2.0-flash-thinking-exp-1219'
+    # model_name 'gemini-2.0-flash-thinking-exp-1219'
+    model_name 'gemini-2.0-flash-thinking-exp-01-21'
     long_name 'gemini_flash_thinking_2_0'
     short_name 'flash2t'
     reval_to_aliases 'rflash2t fl2t'
@@ -631,7 +694,10 @@ typeset -gA llama3_obj=(
 define-llm-model-v2 llama3_obj
 ##
 ## * Default Models
-typeset -g llm_default_model="${claude_3_5_sonnet_model_name}"
+typeset -g llm_default_model="${gemini_flash_2_5_model}"
+# typeset -g llm_default_model="${gemini_flash_thinking_2_0_model}"
+# typeset -g llm_default_model="${gemini_2_5_pro_model}"
+# typeset -g llm_default_model="${claude_3_5_sonnet_model_name}"
 
 aliassafe xx='\noglob llm-send'
 aliassafe llm-run='\noglob reval-to-llm'

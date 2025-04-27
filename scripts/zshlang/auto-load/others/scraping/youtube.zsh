@@ -34,7 +34,16 @@ aliassafe ymp3='noglob youtube-dl --no-playlist --prefer-ffmpeg --extract-audio 
 aliassafe ymp3-playlist='ymp3 --yes-playlist'
 # `-f best` to download single file
 ##
+function yt-dlp-update {
+    reval-ecgray pip-install yt-dlp
+}
+
 function youtube-dl {
+    local autoupdate_p="${youtube_dl_autoupdate_p:-y}"
+    if bool "${autoupdate_p}" ; then
+       yt-dlp-update
+    fi
+
     local invocation_save_p="${youtube_dl_inv_save_p:-y}"
     local cookie_mode="${youtube_dl_c}"
     typeset -ga ytdl_opts # has priority over args

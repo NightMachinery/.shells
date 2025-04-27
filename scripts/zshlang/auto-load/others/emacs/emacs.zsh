@@ -334,8 +334,11 @@ function emc-nowait2 {
 }
 
 function emc-literally {
+    #: This is useful for opening big files.
+    ##
     @opts cmd find-file-literally @ emc-nowait2 "$@"
 }
+aliasfn emc-big-files emc-literally
 ##
 function emc-less {
     local fs=( $@ ) jq_force="$emc_less_jq" parser="$emc_less_parser" suffix="${emc_less_s}"

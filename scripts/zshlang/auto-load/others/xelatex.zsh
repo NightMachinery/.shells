@@ -2,6 +2,9 @@
 function xelatex-m {
     local opts=("${@[1,-2]}") name="${@[-1]:-main}"
 
+    #: remove .tex from end of name
+    name="${name%.tex}"
+
     local success_p=n
     {
         trs *.{log,xdv,aux,bbl,blg,xdv,ent}(.DN)
