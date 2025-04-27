@@ -719,8 +719,37 @@ function org-date-extract-due {
 }
 ##
 function org-link-browser-current {
-    org-link-create "$(browser-current-url)" "$(browser-current-title)" \
-        | cat-copy-if-tty
+    local url title
+    url="$(browser-current-url)" @TRET
+    title="$(browser-current-title)" @TRET
+    local raw_p="${org_link_browser_raw_p:-n}"
+    local success_p=''
+
+    {
+        if ! bool "$raw_p" ; then
+            if [[ "${url}" =~ '^https://scholar\.google\.[^/]*/citations\?user' ]] ; then
+                scholar-org-link-current
+                success_p=y
+
+            elif [[ "${url}" =~ '^https://scholar\.google\.[^/]*/citations\?view' ]] ; then
+                local title_scholar citations link
+                if title_scholar="$(scholar-title-current)" ; then
+                    link="$(org-link-create "${url}" "${title_scholar}")" @TRET
+
+                    if citations="$(scholar-paper-citations-current)" ; then
+                        ec "@citations/${citations} ${link}"
+                    else
+                        ec "${link}"
+                    fi
+                    success_p=y
+                fi
+            fi
+        fi
+
+        if ! bool "$success_p" ; then
+            org-link-create "${url}" "${title}"
+        fi
+    } | cat-copy-if-tty
 }
 alias lbc='org-link-browser-current'
 

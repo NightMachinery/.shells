@@ -142,12 +142,29 @@ function reval-env {
 
     local cmdhead="$1"
     local cmdbody=( "$@[2,-1]" )
+    # var-show cmdhead cmdbody
+
     if bool $clean_mode ; then
-        env -i "$env[@]" "$(realpath2 "$cmdhead")" "$cmdbody[@]"
+        local cmdhead_path
+        cmdhead_path="$(realpath2 "$cmdhead")" || {
+            ecerr "reval-env: $cmdhead: not found"
+            return 1
+        }
+
+        env -i "$env[@]" "${cmdhead_path}" "$cmdbody[@]"
     else
-        local cmd="$(gq "$cmdhead" "$cmdbody[@]")"
-        if test -n "$env[*]" ; then
-            cmd="$env[*] ${cmd}"
+        local cmd
+        if (( $# == 0 )) ; then
+            cmd="$env[*]"
+            #: `reval-env a=9` -> would actually set a=9 globally.
+
+            #: Perhaps the below would be safer? But we'd need to special-case gquote-env if we do that.
+            # cmd="$env[*] true"
+        else
+            cmd="$(gq "$cmdhead" "$cmdbody[@]")"
+            if test -n "$env[*]" ; then
+                cmd="$env[*] ${cmd}"
+            fi
         fi
 
         "$eval_engine[@]" "$cmd"
@@ -155,6 +172,10 @@ function reval-env {
     ## tests:
     # `reval-env sth=\"67 fin='"98" !!' echo-fin`
     ##
+}
+
+function gquote-env {
+    reval_env_e=(ec) reval-env "$@"
 }
 
 function rgeval-env {

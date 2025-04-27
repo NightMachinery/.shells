@@ -86,10 +86,11 @@ function icat-pdf {
 }
 @opts-setprefix icat-pdf icat
 ##
-function pdf-count() {
+function pdf-count {
   setopt local_options pipefail
- { pdfinfo "$1" | grep Pages || { ecerr "$0 failed" ; return 1 } } |awk '{print $2}'
+  { pdfinfo "$1" | grep Pages || { ecerr "$0 failed" ; return 1 } } |awk '{print $2}'
 }
+aliasfn pdf-pages-count pdf-count
 
 function k2pdf-split() {
     doc usage: pdf k2pdf-options
@@ -138,6 +139,21 @@ function pdfoutline {
     mutool show "$1" outline
 }
 ##
+function pdf-getpages-gs {
+    local input="${1}"
+    local from="${2}"
+    local to="${3}"
+    local output="${4:-${input:r}_${from}_${to}.pdf}"
+
+    assert command gs -q -dNOPAUSE -dBATCH -dSAFER \
+        -sDEVICE=pdfwrite \
+        -dFirstPage=${from} \
+        -dLastPage=${to} \
+        -sOutputFile="${output}" "${input}" @RET
+
+    # command du -h "${output}"
+}
+
 function pdf-getpages {
     local f="$1" from="$2" to="$3"
     local o="${4:-${1:r}_${from}_${to}.pdf}"
@@ -165,6 +181,7 @@ function pdf-compress {
     local opts=(
         # -dEmbedAllFonts=true
         # -dSubsetFonts=true
+        # -dDownsampleThreshold=1.0
     )
 
     if bool "${gray_p}" ; then
@@ -175,6 +192,11 @@ function pdf-compress {
             #: @Claude/3.5-sonnet The -dOverrideICC switch is used to override or ignore ICC (International Color Consortium) profiles in PDF files during processing. When set to true, Ghostscript will ignore embedded ICC profiles and use its default color management instead.
         )
         out="${2:-${input:r}_cg.pdf}"
+    else
+        opts+=(
+            # -dConvertCMYKImagesToRGB=true
+            # -dProcessColorModel=/DeviceRGB
+        )
     fi
 
     trs "$out" || true
@@ -201,6 +223,116 @@ aliasfn pdf-compress-inplace inplace-io pdf-compress
 
 function pdf-compress-gray {
     pdf_compress_gray_p=y pdf-compress "$@"
+}
+##
+function pdf-compress-qpdf {
+  local qpdf_bin="${pdf_compress_qpdf_bin:-qpdf}"
+
+  local optimize_images_p="${pdf_compress_qpdf_optimize_images_p:-y}"
+  local keep_inline_images_p="${pdf_compress_qpdf_keep_inline_images_p:-}"
+  local oi_min_width="${pdf_compress_qpdf_oi_min_width:-}"
+  local oi_min_height="${pdf_compress_qpdf_oi_min_height:-}"
+  local oi_min_area="${pdf_compress_qpdf_oi_min_area:-}"
+
+  local input="${1}"
+  local out="${2:-${input:r}_compressed.pdf}"
+
+  local qpdf_opts=()
+
+  if bool "${optimize_images_p}" ; then
+    qpdf_opts+=(--optimize-images)
+  fi
+
+  if bool "${keep_inline_images_p}" ; then
+    qpdf_opts+=(--keep-inline-images)
+  fi
+
+  if [[ -n "${oi_min_width}" ]] ; then
+    qpdf_opts+=(--oi-min-width="${oi_min_width}")
+  fi
+
+  if [[ -n "${oi_min_height}" ]] ; then
+    qpdf_opts+=(--oi-min-height="${oi_min_height}")
+  fi
+
+  if [[ -n "${oi_min_area}" ]] ; then
+    qpdf_opts+=(--oi-min-area="${oi_min_area}")
+  fi
+
+  trs "${out}" || true
+
+  assert command "${qpdf_bin}" "${qpdf_opts[@]}" --linearize "${input}" "${out}" @RET
+
+  command du -h "${input}" "${out}"
+}
+##
+function pdf-compress-ranged-v1 {
+    #: This function splits the PDF files, compresses the specified range, and combines the parts back.
+    #: This will lose links between the parts.
+    ##
+    jglob
+
+    local input="${1}"
+    local out="${2:-${input:r}_compressed.pdf}"
+    local start_page="${pdf_compress_ranged_start}"
+    local end_page="${pdf_compress_ranged_end}"
+
+    #: If no range specified, just use regular pdf-compress
+    if [[ -z "${start_page}" && -z "${end_page}" ]]; then
+        pdf-compress "${input}" "${out}"
+        return $?
+    fi
+
+    #: Get the total page count
+    local page_count
+    page_count="$(pdf-count "${input}")" @TRET
+
+    #: Set defaults for empty values
+    start_page="${start_page:-1}"
+    end_page="${end_page:-$page_count}"
+
+    #: Create a temporary directory for intermediate files
+    local temp_dir
+    temp_dir="$(mktemp -d)" @TRET
+
+    local part1="${temp_dir}/part1.pdf"
+    local part2="${temp_dir}/part2.pdf"
+    local part3="${temp_dir}/part3.pdf"
+    local part2_compressed="${temp_dir}/part2_compressed.pdf"
+
+    local merge_files=()
+
+    #: Extract before range (if needed)
+    if (( start_page > 1 )); then
+        assert pdf-getpages-gs "${input}" 1 $((start_page - 1)) "${part1}" @RET
+        merge_files+=("${part1}")
+    fi
+
+    #: Extract the range to compress
+    assert pdf-getpages-gs "${input}" "${start_page}" "${end_page}" "${part2}" @RET
+
+    #: Compress the range using the existing pdf-compress function
+    assert pdf-compress "${part2}" "${part2_compressed}" @RET
+    merge_files+=("${part2_compressed}")
+
+    #: Extract after range (if needed)
+    if (( end_page < page_count )); then
+        assert pdf-getpages-gs "${input}" $((end_page + 1)) "${page_count}" "${part3}" @RET
+        merge_files+=("${part3}")
+    fi
+
+    #: Now merge all parts into the final output
+    trs "$out" || true
+
+    assert command gs -q -dNOPAUSE -dBATCH -dSAFER \
+        -sDEVICE=pdfwrite \
+        -sOutputFile="${out}" \
+        ${merge_files[@]} @RET
+
+    #: Clean up temporary files
+    silent trs-rm "${temp_dir}" || true
+
+    command du -h "${input}" "${out}"
 }
 ##
 function pdf-numberme {

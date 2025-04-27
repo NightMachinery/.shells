@@ -14,6 +14,8 @@ source-basic variables compatibility magicmacros deps cached conditions crosspla
 for i in "$NIGHTDIR"/zshlang/basic/auto-load/**/*.zsh(.) ; do
     source "$i"
 done
+source-basic proxy
+
 function jinit() {
     if [[ "$PWD" == *borg*/dls/* ]] ; then
         export jufile=(*(.DN))

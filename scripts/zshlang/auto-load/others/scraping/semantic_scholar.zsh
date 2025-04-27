@@ -11,12 +11,14 @@ function semantic-scholar-to-json-api {
     #: @docs https://api.semanticscholar.org/api-docs/graph#tag/Paper-Data/operation/get_graph_get_paper
     ##
     if should-proxy-p ; then
-        ecdbg "pxa35-local"
-
-        pxa35-local
+        ##
+        # ecdbg "pxa35-local"
+        # pxa35-local
+        ##
+        pxa-local
 
     else
-        ecdbg "$0: proxy active"
+        ecdbg "$0: proxy not wanted or already active"
         var-show HTTP_PROXY
     fi
 

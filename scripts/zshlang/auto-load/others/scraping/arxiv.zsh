@@ -23,7 +23,7 @@ function arxiv-url-get {
     doi_ids=()
     ##
     local urls
-    urls="$(in-or-args "$@")" @RET
+    urls="$(in-or-args "$@" | urls-extract)" @RET
     urls=(${(@f)urls})
     local redirect_p="${arxiv_url_get_redirect_p:-y}"
 
@@ -167,6 +167,18 @@ function arxiv-source-dl {
 }
 
 function arxiv-dl {
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local i retcode=0
+    for i in ${inargs[@]} ; do
+        h-arxiv-dl "${i}" || retcode=$?
+    done
+
+    return $retcode
+}
+
+function h-arxiv-dl {
     local url="${1}" #: Example: =https://arxiv.org/abs/2109.02355=
     assert-args url @RET
     local dest="${arxiv_dl_o}"
@@ -174,6 +186,8 @@ function arxiv-dl {
 
     local ids urls_pdf urls_abs urls_vanity title
     arxiv-url-get "$url" @RET
+    url="${urls_abs[1]}" #: update the URL to the canonical one
+
     if [[ "$mode" == 'pdf' ]] ; then
         if test -z "$dest" ; then
             title="$(url-title "$url" | str2filename)" @TRET
@@ -186,7 +200,7 @@ function arxiv-dl {
         web2pdf "${urls_vanity[1]}"
     fi
 }
-renog arxiv-dl
+# renog arxiv-dl
 
 aliasfn-ng arxiv-vanity arxiv_dl_mode=vanity arxiv-dl
 @opts-setprefix arxiv-vanity web2pdf

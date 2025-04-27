@@ -18,6 +18,7 @@ Transcribe this audio word-for-word, following these rules:
 
 3. Format:
   - Pure transcription only
+    - Add appropriate punctuation marks to make the transcription easier to read
   - No comments
   - No timestamps
   - No explanatory notes
@@ -125,6 +126,8 @@ function llm-stt-file {
     llm_system="$(prompt-audio-transcribe-stt)" @TRET
   fi
 
+  local llm_temp="${llm_temp:-0}"
+
   {
     llm_attachments=("${audio}") reval-to-llm prompt-audio-transcribe-stt |
       cat-streaming-copy-rtl-if-tty
@@ -135,9 +138,30 @@ function llm-stt-file {
   }
 }
 aliasfn llm-transcribe-audio-file llm-stt-file
-# aliasfn flash-stt-file with-flash-8b llm-stt-file
+
+aliasfn flash-stt-file with-flash-8b llm-stt-file
 aliasfn flash2-stt-file with-flash2 llm-stt-file
-aliasfn stt-file flash2-stt-file
+aliasfn flash2t-stt-file with-flash2t llm-stt-file
+aliasfn g25-stt-file with-g25 llm-stt-file
+
+aliasfn stt-file with-g25-maybe llm-stt-file
+# aliasfn stt-file flash2-stt-file
+
+function hs-whisper-stt-last {
+  local cmd=()
+
+  cmd+=(indir ~[hs_whisper]/ onlc)
+
+  #: Kind of a hack; we forward the variable llm_model.
+  #: This is needed because of `onlc`.
+  if test -n "${llm_model}" ; then
+    cmd+=( llm_model="${llm_model}" )
+  fi
+
+  cmd+=( stt-file )
+
+  reval "${cmd[@]}"
+}
 
 function jstt {
   local input="${1:-${jufile}}"

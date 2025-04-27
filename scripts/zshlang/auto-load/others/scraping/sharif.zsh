@@ -350,6 +350,7 @@ function sharif-net-login {
     h-sharif-net-curl -d "username=${sharif_vpn_username}&password=${sharif_vpn_passowrd}" -X POST "${sharif_net_url}/login" > /dev/null
     sharif-net-status
 }
+aliasfn sharif-net2-connect sharif-net-login
 
 function sharif-net-logout {
     h-sharif-net-curl -d "" -X POST "${sharif_net_url}/logout"

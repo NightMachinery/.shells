@@ -21,9 +21,10 @@ function chronic-update {
 
     pip-install fanficfare cloudscraper
     # ddgr
-    pip install --upgrade --force pytube ytmusicapi youtube-dl spotipy spotdl
+    pip install --upgrade --force tzdata pytube ytmusicapi youtube-dl spotipy spotdl
 
-    pip install -U yt-dlp
+    yt-dlp-update
+
     # $proxyenv yt-dlp --update-to nightly
 
     tldr --update

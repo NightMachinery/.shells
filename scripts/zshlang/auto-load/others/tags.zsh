@@ -609,14 +609,6 @@ function ntag-color0() {
     done
 }
 ##
-function hear-tag {
-    local tags=($@)
-    ntag-add "$(hear-get)"  "${tags[@]}"
-}
-aliasfn hear-blue hear-tag blue
-aliasfn hear-gray hear-tag gray
-aliasfn air-blue hear-blue
-##
 function ntag-exclude-all {
     fd -uuu --exclude="*${ntag_sep}*${ntag_sep}*"
 }

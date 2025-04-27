@@ -1,4 +1,4 @@
-typeset -g pandoc_md_default='markdown+tex_math_single_backslash'
+typeset -g pandoc_md_default='markdown+tex_math_single_backslash+lists_without_preceding_blankline'
 ##
 function latex2md-pandoc {
     @opts from 'latex+latex_macros' to markdown @ pandoc-convert "$@"

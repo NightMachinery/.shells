@@ -75,6 +75,7 @@ function friction-type {
 
 
     #: Print the string with zero-width spaces between each character
+    #: @bug? `f​i​t​o​ ​` is displayed as `f to` in Kitty.
     local output_string=""
     for (( i=0; i<${#input_string}; i++ )); do
         output_string+="${input_string:$i:1}"

@@ -183,10 +183,13 @@ function ext-all() {
     fd . | inargsf mapg '${i:e}' | gsort --uniq
 }
 ##
-function vidir() {
-    # org has the right comment syntax (to delete), and can autocomplete well
-    edir --all --trash --suffix .org "$@"
+function edir-m {
+    #: [[id:0d2bf2a5-c287-4389-b000-83d924f6af9d][bulletmark/edir: Program to rename, remove, and copy files and directories using your editor (vidir alternative)]]
+    ##
+    edir --all --trash --trash-program rip --suffix .org "$@"
+    #: --suffix .org: org-mode has the right comment syntax (to delete), and can autocomplete well
 }
+aliasfn vidir edir-m
 ##
 function progress() {
     # @wrapper

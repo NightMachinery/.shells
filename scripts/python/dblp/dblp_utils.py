@@ -36,7 +36,12 @@ class Publication:
 
 
 class DBLPClient:
-    def __init__(self, *, base_url: str = "https://dblp.org"):
+    def __init__(
+        self,
+        *,
+        base_url: str = "https://dblp.uni-trier.de",
+        # base_url: str = "https://dblp.org",
+    ):
         self.base_url = base_url.rstrip("/")
 
     def extract_pid(

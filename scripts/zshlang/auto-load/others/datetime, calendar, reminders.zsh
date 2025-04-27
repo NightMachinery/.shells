@@ -189,6 +189,12 @@ function date-usa-cst {
     #: Central Daylight Time (CDT) is five hours behind Coordinated Universal Time (UTC−05:00). Observed during daylight saving time (spring/summer/early autumn in the United States and Canada).
 }
 
+function date-pt {
+    TZ='America/Los_Angeles' date +'%Y-%m-%d %A %H:%M:%S'
+    #: Pacific Time Zone (PT)
+}
+aliasfn date-pacific date-pt
+
 function date-uk {
     TZ='Europe/London' date +'%Y-%m-%d %A %H:%M:%S'
 }

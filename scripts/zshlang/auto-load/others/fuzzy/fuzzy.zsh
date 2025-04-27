@@ -264,14 +264,14 @@ function fftmux-session-restart {
     sessions="$(fftmux-name "$q")" @RET
     "$engine[@]" "$kill_opts[@]" "$sessions[@]"
 }
-alias fftr='fftmux-session-restart'
+aliasfn fftr fftmux-session-restart
 
 function fftmux-session-processes-kill {
     fftmux_engine=(tmux-session-processes-kill) fftmux-session-restart "$@"
 }
-alias fftk='fftmux-session-processes-kill'
+aliasfn fftk fftmux-session-processes-kill
 ##
-ffman() {
+function ffman {
     # mnf
     ##
     bella_zsh_disable1

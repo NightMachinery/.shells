@@ -44,10 +44,27 @@ function aac {
     aria2p --secret "$ARIA_SECRET" "$@"
 }
 ##
+function aa-basic {
+    #: for debugging, etc.
+    ##
+    local opts=(
+        '--stderr=true'
+        --file-allocation falloc
+    )
+
+    reval-ec aria2c "${opts[@]}" "$@"
+}
+
 function aa-raw {
-    local opts=('--stderr=true') split="${aa_split:-8}" no_split="${aaNoSplit}"
+    local split="${aa_split:-8}" no_split="${aaNoSplit}" http_pipelining_p="${aa_http_pipelining_p:-n}"
     local refer_mode="${aa_refer_mode:-url}"
-    #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
+
+    local opts=(
+        '--stderr=true'
+        #: Redirect all console output that would be otherwise printed in stdout to stderr.  Default: false
+
+        --file-allocation falloc
+    )
 
     if bool "${aa_log_p}" ; then
         opts+=(--log='-')
@@ -77,7 +94,18 @@ function aa-raw {
         # opts=("${opts[@]}")
     else
         if ! bool "$no_split" ; then
-            opts+=(--enable-http-pipelining --split "$split" --stream-piece-selector geom)
+            if bool "${http_pipelining_p}" ; then
+                #: HTTP Pipelining does not work with some servers, such as the HTTP server started by MiXplorer.
+                #: As this is noted to be practically useless in the manpage, I have disabled it by default (which is also aria2's own default).
+                opts+=(
+                    --enable-http-pipelining
+                )
+            fi
+
+            opts+=(
+                --split "$split"
+                --stream-piece-selector geom
+            )
             #: @idk if the split options work for torrents or not, but it seems very unlikely, as torrents are naturally downloaded in chunks.
         fi
 
@@ -107,7 +135,6 @@ function aa-raw {
          --timeout="${aa_timeout:-30}"
          --seed-time=0
          --max-tries="${aa_max_tries:-0}" --retry-wait=1
-         --file-allocation falloc
          --auto-file-renaming=false
          --allow-overwrite=false
          --uri-selector=adaptive

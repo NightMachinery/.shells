@@ -1,5 +1,7 @@
 ##
 function h-prompt-image-v1 {
+    #: @globalInput `prompt`
+    ##
     ensure-array prompt_input_images @RET
     local prompt_input_images=("${prompt_input_images[@]}")
     if (( ${#prompt_input_images} == 0 )) && ! (( ${+llm_attachments} && ${+llm_attachments[(I)MAGIC_CLIPBOARD]} )) ; then
@@ -36,4 +38,15 @@ function run-prompt-image-ocr-latex {
         cat-rtl-streaming-if-tty
 }
 aliasfn 4o-run-prompt-image-ocr-latex with-4o run-prompt-image-ocr-latex
+##
+function prompt-image2md {
+    local prompt
+    prompt='Convert the image to Markdown format text.
+- Include all text content in a structured way
+- Maintain the hierarchical organization (headings, subheadings)
+- Preserve the dates and time periods
+- Do not include any image links or placeholders
+- Use proper Markdown formatting (headings with #, line breaks, etc.)'
+    h-prompt-image-v1 "$@"
+}
 ##

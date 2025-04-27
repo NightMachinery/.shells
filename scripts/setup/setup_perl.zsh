@@ -6,11 +6,12 @@ local perl_installables=(
     'Text::Unidecode'
     'Lingua::Translit'
     'Data::Printer'
+    'HTML::TreeBuilder'
 )
 
 local i
 for i in $perl_installables[@] ; do
-    cpanm "$i"
+    command cpanm "$i"
 done
 
 ansifold-path-fix
