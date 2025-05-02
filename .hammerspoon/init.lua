@@ -2671,6 +2671,7 @@ appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
 appHotkey{ key='b', appName='com.parallels.desktop.console' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
+-- appHotkey{ key='w', appName='com.microsoft.Word' }
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
 
 appHotkey{ key='t', appName='Thunderbird' }
@@ -3163,14 +3164,18 @@ end
 function processRecording(wavFile, language, backend)
     -- backend = backend or "whisper"
     -- backend = backend or "with-g15"
+    -- backend = backend or "with-g25"
     -- backend = backend or "with-flash-8b"
-    backend = backend or "with-flash2"
+    -- backend = backend or "with-flash2"
+    backend = backend or "with-flash25"
 
     whisper.state = "processing"
     updateIndicator()
 
+
     local wavLogsDir = os.getenv("HOME") .. "/logs/hs/stt"
-    hs.fs.mkdir(wavLogsDir)
+    mkdir(wavLogsDir)
+
     local wavLogsFile = io.open(wavLogsDir .. "/wav_files.txt", "a")
     wavLogsFile:write(wavFile .. "\n")
     wavLogsFile:close()
