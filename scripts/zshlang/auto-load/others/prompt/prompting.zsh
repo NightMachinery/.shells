@@ -1,4 +1,6 @@
 ##
+alias 2per='\noglob llm-run prompt-translate2per'
+alias 2fa='2per'
 alias 2en='\noglob llm-run prompt-translate2en'
 ##
 alias porg='prompt_input_mode=org'

@@ -814,6 +814,8 @@ function org-header-indent-to-current {
     #: * @seeAlso
     #:  ** [help:night/org-insert-and-fix-levels]
     #:  *** [agfi:h-org-insert-and-fix-levels]
+    #:
+    #:  ** [help:org-yank-adjusted-subtrees]
     ##
     local lv
     lv="$(org-header-current-level)" @TRET
@@ -837,6 +839,69 @@ function h-org-insert-and-fix-levels {
 }
 
 function org-header-rm-shared-level {
+    local text
+    # Read input from stdin or arguments, handle potential errors with @TRET
+    text="$(in-or-args "$@")" @RET
+
+    # Use Perl to find the minimum level and strip the shared prefix from headers
+    # -l: auto-chomp input lines and add newline to print
+    # -e: execute the following script
+    # The script:
+    # 1. Reads all lines into @lines.
+    # 2. Iterates through @lines to find the minimum asterisk level ($min_level)
+    #    for lines matching the header pattern / ^(\*+)\s /x.
+    # 3. If a minimum level is found ($min_level is defined and > 0):
+    #    Iterates through @lines again.
+    #    For lines matching the header pattern, it removes exactly $min_level
+    #    asterisks from the beginning using substitution s/^\*{$min_level}//.
+    #    Prints each (potentially modified) line.
+    # 4. If no headers were found, it prints the original lines unchanged.
+    local modified_text
+    modified_text=$(ec "$text" | perl -le '
+        my @lines = <>; # Slurp all lines into an array
+        my $min_level = undef;
+
+        # Pass 1: Find minimum header level
+        for my $line (@lines) {
+            if ($line =~ /^(\*+)\s/) {
+                my $level = length($1);
+                if (!defined $min_level || $level < $min_level) {
+                    $min_level = $level;
+                }
+            }
+        }
+
+        # Pass 2: Remove minimum prefix from headers and print all lines
+        if (defined $min_level && $min_level > 1) {
+            $min_level -= 1; # Adjust to remove one less than the minimum found
+
+            # uncomment for debugging:
+            # warn "Minimum Level Found: $min_level";
+            for my $line (@lines) {
+                # Only modify lines that are actual headers
+                if ($line =~ /^(\*+)\s/) {
+                    # Remove exactly min_level asterisks from the start
+                    $line =~ s/^\*{$min_level}//;
+                }
+                print $line;
+            }
+        } else {
+            # No headers found, or min_level was somehow invalid, print original lines
+            print @lines;
+        }
+    ')
+    # Check Perl exit status if needed, though command substitution captures output
+    # local perl_exit_status=$?
+    # if (( perl_exit_status != 0 )); then ... handle error ...; fi
+
+    # Output the modified text, using cat-copy-if-tty
+    ec "$modified_text" | cat-copy-if-tty
+}
+
+function org-header-rm-shared-level-v1 {
+    #: This version has this bug:
+    #: Instead of using prefixer to strip the star levels, use perl. Note that ***sth is not a header, and should not be part of the strip. Headers are \*+\s.
+    ##
     local text
     text="$(in-or-args "$@")" @TRET
 

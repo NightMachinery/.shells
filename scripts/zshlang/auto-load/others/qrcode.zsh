@@ -1,20 +1,18 @@
 ##
-function qrcode-decode {
-    qrcode-decode1 "$@"
-}
-
 function qrcode-decode0 {
     : "usage: <png file>"
 
-    zbarimg --raw "$@" @RET
+    zbarimg --raw "$@" | cat-copy-if-tty 
 }
 
 function qrcode-decode1 {
     local i="$1"
     assert test -e "$i" @RET
 
-    qr_decode.js "$i" | jqm .data
+    qr_decode.js "$i" | jqm .data | cat-copy-if-tty
 }
+
+aliasfn qrcode-decode qrcode-decode1
 ##
 function qrcode() {
     # [[id:8ed49663-a35c-44c8-a398-39cc77a13064][CLI/QRCode.org:QRCode]]

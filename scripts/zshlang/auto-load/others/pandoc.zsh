@@ -97,6 +97,13 @@ function org2rtf() {
     @opts from org to rtf @ pandoc-convert "$@"
 }
 
+function md2html-fancy {
+    #: @todo Write zsh function `md2html-fancy` which converts markdown into beautiful html. You can use third-party tools such as pandoc.
+    ##
+    @NA
+}
+
+
 function html2rtf-textutil() {
     # @darwinOnly?
     textutil -stdin -stdout -format html -convert rtf

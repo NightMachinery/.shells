@@ -47,7 +47,16 @@ puppeteer.use(StealthPlugin());
 
     if (urlFinal > 0) {
         const finalurl = await page.url();
-        console.log(finalurl);
+
+
+        if (urlFinal == 2 ) {
+            // output JSON with title and URL
+            const title = await page.title();
+            console.log(JSON.stringify({ title: title, url: finalurl }));
+
+        } else {
+            console.log(finalurl);
+        }
 
         browser.close();
         return;
