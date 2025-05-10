@@ -82,7 +82,10 @@ function rename-audio-auto {
   assert-args input_file @RET
 
   title="$(ffmpeg -i "$input_file" |& rget '^\s*title\s*:\s*(.+)')" || true
-  assert test -n "$title" @RET
+  if test -z "$title" ; then
+     ecerr "no title found for ${input_file}"
+     return 1
+  fi
 
   artist="$(ffmpeg -i "$input_file" |& rget '^\s*artists?\s*:\s*(.+)')" || true
 

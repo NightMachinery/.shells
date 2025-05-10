@@ -116,6 +116,12 @@ function url-final3 {
 }
 reify url-final url-final2 url-final3
 noglobfn url-final url-final2 url-final3
+
+function url-final3-json {
+    cfUrlFinal=2 cfTimeout="${cfTimeout:-1}" retry-limited 5 curlfull.js "$1"
+}
+reify url-final3-json
+noglobfn url-final3-json
 ##
 function url-tail() {
     [[ "$1" =~ '\/([^\/]+)\/?$' ]] && ec "$match[1]" || ec "$1"
