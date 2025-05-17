@@ -720,4 +720,5 @@ function run-prompt-clean2org-v2 {
         cat-streaming-copy-rtl-if-tty
         # cat-rtl-streaming-if-tty
 }
+alias '2org'='run-prompt-clean2org-v2'
 ##
