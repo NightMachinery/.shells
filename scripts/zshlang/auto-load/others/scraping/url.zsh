@@ -35,13 +35,15 @@ function match-url-rg() {
 }
 aliasfn url-match-rg match-url-rg
 
-function match-url2() {
+function match-url2 {
     ec "$*" | ghead -n 1 | silent match-url-rg
 }
-function match-url() {
+
+function match-url-v1 {
     # sometimes errs, presumably because it runs out of memory
     [[ "$*" =~ "^$nightUrlRegex\$" ]]
 }
+
 function match-url-liberal() {
     # https://gist.github.com/gruber/249502
     doc "Doesn't require http"
@@ -49,7 +51,9 @@ function match-url-liberal() {
     [[ "$*" =~ '(?i)\b((?:[a-z][\w-]+:(?:/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\''".,<>?«»“”‘’]))' ]]
 }
 
-aliasfn url-match match-url2
+aliasfn match-url match-url2
+aliasfn url-match match-url
+aliasfn url-p match-url
 ##
 function url-sha256() {
     brishzr l_url-sha256 "$@"

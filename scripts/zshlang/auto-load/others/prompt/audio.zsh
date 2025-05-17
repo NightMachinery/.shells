@@ -144,8 +144,8 @@ aliasfn flash2-stt-file with-flash2 llm-stt-file
 aliasfn flash2t-stt-file with-flash2t llm-stt-file
 aliasfn g25-stt-file with-g25 llm-stt-file
 
-aliasfn stt-file with-g25-maybe llm-stt-file
-# aliasfn stt-file flash2-stt-file
+aliasfn stt-file with-flash25-maybe llm-stt-file
+# aliasfn stt-file with-g25-maybe llm-stt-file
 
 function hs-whisper-stt-last {
   local cmd=()
@@ -167,11 +167,24 @@ function jstt {
   local input="${1:-${jufile}}"
   assert-args input @RET
 
+  if url-p "${input}" && ! test -e "${input}" ; then
+    ystt "${input}"
+    return $?
+  fi
+
   # local stt_convert_p="${stt_convert_p:-n}"
   local stt_convert_p="${stt_convert_p:-y}"
   #: VPSes have slow CPUs, so the conversion adds considerable latency.
   #: [[id:0ddac83c-3a6c-494e-b887-fc2cb3088aa1][does not support uploading audio `application/ogg` · Issue #35 · simonw/llm-gemini]]
 
   stt-file "${input}" 2> >(erase-ansi > log_stderr.txt) @RET
+}
+
+function ystt {
+  (
+    silent cdtmp @RET
+    ymp3 "$1" &> y_log.txt @TRET
+    jstt *.mp3
+  )
 }
 ##
