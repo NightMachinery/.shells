@@ -68,6 +68,26 @@ function pdf2png-mutool {
 @opts-setprefix pdf2png-mutool pdf2png
 aliasfn pdf2png pdf2png-mutool
 
+function pdf2png-magick {
+    local dpi="${pdf2png_magick_dpi:-600}"
+
+    if [[ -z "${1}" ]]; then
+        ecerr "Error: Input PDF path or page specifier missing."
+        ecerr "Usage: pdf2png-magick <input_pdf_or_page_specifier> [output_pattern.png]"
+        ecerr "Example: pdf2png-magick mydoc.pdf mydoc.png"
+        ecerr "Example (specific page): pdf2png-magick mydoc.pdf[0] mydoc_page1.png"
+        ecerr "Note: If 'output_pattern.png' is specified for a multi-page PDF without a page specifier in the input,"
+        ecerr "ImageMagick will typically create files like 'output_pattern-0.png', 'output_pattern-1.png', etc."
+        return 1
+    fi
+    local input="${1}"
+    local out_pattern="${2:-${input:r}.png}"
+
+    reval-ecgray magick convert -density "${dpi}" "${input}" "${out_pattern}" @RET
+}
+
+##
+
 function icat-pdf {
     local i="${1}" pages="${icat_p:-1}"
     assert-args i @RET

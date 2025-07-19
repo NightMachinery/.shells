@@ -434,6 +434,10 @@ function prompt-docstring-write {
 function prompt-proofread-email {
     prompt-instruction-input "Proofread the following email. Make sure it's polite and professional." "$@"
 }
+
+function prompt-find-email {
+    prompt-instruction-input "Find the email addresses of the following people. You can search the web. Back your findings with citations. Output the email in standard form, but show the exact quote from which this standard form was decoded." "$@"
+}
 ##
 function prompt-learn-papers {
     prompt-instruction-input "I want to learn about the following concept(s). Which papers do you recommend?" "$@"

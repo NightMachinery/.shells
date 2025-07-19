@@ -35,7 +35,7 @@ aliassafe ymp3-playlist='ymp3 --yes-playlist'
 # `-f best` to download single file
 ##
 function yt-dlp-update {
-    reval-ecgray pip-install yt-dlp
+    reval-ecgray pip-install "yt-dlp[default,curl-cffi]"
 }
 
 function youtube-dl {
