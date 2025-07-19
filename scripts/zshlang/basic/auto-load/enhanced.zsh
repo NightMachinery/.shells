@@ -8,8 +8,8 @@ function cp {
 }
 ##
 function h_mv {
-    local emd_c='command mv'
-    if isIReally && isRcLoaded && fn-isTop mv ; then
+    local emd_c='command gmv'
+    if isIReally && isRcLoaded && fn-isTop mv mv2 ; then
         emd_c='mv-merge'
         ecgray "mv (top-level): using mv-merge instead" >&2
     fi
@@ -17,7 +17,7 @@ function h_mv {
 }
 
 function mv {
-    unset out # out is GLOBAL
+    unset out #: out is GLOBAL
     args-nochromefile "$@"
     set -- "${out[@]}"
     unset out

@@ -522,7 +522,8 @@ define-llm-model-v2 gemini_flash_obj
 ## **** Google Gemini 2
 # 2.5 Flash
 typeset -A gemini25_flash_obj=(
-    model_name 'gemini-2.5-flash-preview-04-17'
+    model_name 'gemini-2.5-flash'
+    # model_name 'gemini-2.5-flash-preview-04-17'
     long_name 'gemini_flash_2_5'
     short_name 'flash25'
     reval_to_aliases 'rflash25 fl25'

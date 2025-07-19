@@ -38,6 +38,19 @@ function run-prompt-image-ocr-latex {
         cat-rtl-streaming-if-tty
 }
 aliasfn 4o-run-prompt-image-ocr-latex with-4o run-prompt-image-ocr-latex
+
+function prompt-image-ocr-IR-Shaba {
+    local prompt
+    prompt='OCR the given IR Shaba number. First OCR in the original letters used. Then, if the letters are in Persian, change them to English number letters. Finally, double-check the result. Put the final, correct version inside a markdown code block.'
+    h-prompt-image-v1 "$@"
+}
+
+function run-prompt-image-ocr-IR-Shaba {
+    llm_copy_p="${llm_copy_p:-y}" \
+        with-llm-attach-clipboard \
+        llm-run prompt-image-ocr-IR-Shaba "$@" |
+        cat-rtl-streaming-if-tty
+}
 ##
 function prompt-image2md {
     local prompt

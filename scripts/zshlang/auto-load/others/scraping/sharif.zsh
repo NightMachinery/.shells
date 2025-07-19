@@ -323,6 +323,7 @@ function sharif-goto-register {
         --compressed
 }
 ##
+# typeset -g sharif_net_url_normal='https://rasgw01.sharif.edu'
 typeset -g sharif_net_url_normal='https://net2.sharif.edu'
 typeset -g sharif_net_url_ip='https://172.17.1.214'
 # typeset -g sharif_net_url_ip='https://198.18.0.8'
