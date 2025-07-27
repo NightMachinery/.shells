@@ -46,7 +46,7 @@ function eza {
 }
 aliasfn exa eza
 
-function k2pdfopt() {
+function k2pdfopt {
     if isDarwin ; then
         command k2pdfopt_darwin "$@"
     else
