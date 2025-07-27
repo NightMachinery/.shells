@@ -310,8 +310,13 @@ function llm-m {
 
             icat-v "${a}" || true
         fi
-        
-        opts+=(--attachment "$a")
+
+        if [[ "${a}" =~ '\.(oga|ogg)$' ]] ; then
+            opts+=(--attachment-type "$a" 'application/ogg')
+        else
+            opts+=(--attachment "$a")
+        fi
+
         # log+=$'\n'"Attached:"$'\t'"${a}"
     done
 
