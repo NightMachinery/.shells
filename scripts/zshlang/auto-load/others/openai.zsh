@@ -262,7 +262,7 @@ function llm-m {
     local attachments=("${llm_attachments[@]}")
     llm_attachments=() #: clear the attachments
 
-    local model="${llm_model:-gpt-3.5-turbo}"
+    local model="${llm_model:-${llm_default_model}}"
     local temp="${llm_temp}"
     local system_prompt="${llm_system}"
     local opts=() log=''
@@ -413,7 +413,11 @@ function llm-send {
 }
 
 function reval-to-llm {
-    reval-to llm-send "$@"
+    local to
+    to='llm-send'
+    # to='revaldbg llm-send'
+
+    reval-to "${to}" "$@"
 }
 aliasfn llm-chat llm-m chat
 
