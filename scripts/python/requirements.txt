@@ -1,3 +1,6 @@
+llm
+llm-gemini
+groq
 Pillow
 PyPDF2
 Unidecode
