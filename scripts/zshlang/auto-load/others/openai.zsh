@@ -313,6 +313,8 @@ function llm-m {
 
         if [[ "${a}" =~ '\.(oga|ogg)$' ]] ; then
             opts+=(--attachment-type "$a" 'application/ogg')
+            #: Works around upstream bug by explicitly setting the MIME type.
+            #: [[id:0ddac83c-3a6c-494e-b887-fc2cb3088aa1][does not support uploading audio `application/ogg` · Issue #35 · simonw/llm-gemini]]
         else
             opts+=(--attachment "$a")
         fi
