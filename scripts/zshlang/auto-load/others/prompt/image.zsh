@@ -93,9 +93,14 @@ function run-prompt-image-ocr {
 }
 
 function jocr {
-    jej
+    # jej
 
-    local inputs=(*(.DN))
+    local inputs=($@)
+    if ((${#inputs[@]} == 0 )); then
+        inputs=(${~mediaglob})
+        # inputs=(*(.DNOm))
+    fi
+
     if ((${#inputs[@]} == 0 )); then
         ecgray "$0: no inputs"
         return 0

@@ -93,14 +93,16 @@ function aliassafe2() {
     aliasfnq "$head" "$body[@]"
 }
 ##
-function createglob() {
+function createglob {
     local from="$1"
     local to="$2"
     { test -z "$from" || test -z "$to" } && {
         ecerr "$0: insuffient arguments supplied. (needs 2)"
         return 1
     }
-    eval $to'="*.(${(j.|.)'$from'})(.DNn)"' # n sorts numerically: =b-3.png= comes before =b-10.png=
+    eval $to'="*.(${(j.|.)'$from'})(.DNn)"'
+    # n (NUMERIC_GLOB_SORT):  If numeric filenames are matched by a filename generation pattern,  sort the filenames numerically rather than lexicographically.
+    # e.g., =b-3.png= comes before =b-10.png=
 }
 ##
 function ensure-var-name {

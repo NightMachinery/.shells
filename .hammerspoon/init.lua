@@ -2650,9 +2650,6 @@ appHotkey{ key='l', appName='com.tdesktop.Telegram' }
 -- appHotkey{ key='b', appName='zathura' }
 -- appHotkey{ key='a', appName='com.adobe.Reader' }
 
--- appHotkey{ key='p', appName='com.jetbrains.pycharm' }
-appHotkey{ key='p', appName='com.apple.Preview' }
-
 -- appHotkey{ key=']', appName='org.jdownloader.launcher' }
 
 appHotkey{ key='k', appName='info.sioyek.sioyek' }
@@ -2670,8 +2667,13 @@ appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
 -- appHotkey{ key='n', appName='com.appilous.Chatbot' } -- Pal ChatGPT app
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
 appHotkey{ key='b', appName='com.parallels.desktop.console' }
+
+-- appHotkey{ key='p', appName='com.jetbrains.pycharm' }
+appHotkey{ key='p', appName='com.apple.Preview' }
+-- appHotkey{ key='p', appName='com.apple.iWork.Keynote' }
 appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 -- appHotkey{ key='w', appName='com.microsoft.Word' }
+
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
 
 appHotkey{ key='t', appName='Thunderbird' }

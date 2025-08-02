@@ -162,7 +162,7 @@ createglob video_formats videoglob
 office_formats=(pdf ppt pptx doc docx xlsl)
 createglob office_formats officeglob
 
-media_formats=( ${audio_formats[@]} ${video_formats[@]} ${(@)office_formats} )
+media_formats=( ${audio_formats[@]} ${image_formats[@]} ${video_formats[@]} ${(@)office_formats} )
 createglob media_formats mediaglob
 
 code_formats=( m cpp h c swift applescript as osa nu nush el ss scm lisp rkt py jl scala sc kt kotlin java clj cljs rkt js jxa dart rs rb cr crystal zsh dash bash sh ml php lua glsl frag go )
