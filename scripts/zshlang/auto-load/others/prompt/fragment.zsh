@@ -1,4 +1,10 @@
 ##
+function fragment-give-suggestions {
+    cat-copy-if-tty <<'EOF'
+Give suggestions to further improve this.
+EOF
+}
+##
 function fragment-summarize-session {
     cat-copy-if-tty <<'EOF'
 Summarize our current session, so that I can store it in my notes. I will directly copy your next message, so don't include any preamble.

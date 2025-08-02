@@ -103,13 +103,14 @@ function hear-seek-begin {
     hear-do seek 0 absolute-percent
 }
 ##
-function hear-get {
-    local prop="${1:-path}"
+function h-mpv-get-prop {
+    local ipc_do_cmd="$1"
+    local prop="${2:-path}"
 
     local res
-    res="$(hear-do get_property "$prop")" @TRET
+    res="$($ipc_do_cmd get_property "$prop")" @TRET
     res="$(ec "${res}" | jq --raw-output -e .data)" || {
-        ecerr "$0: Failed to parse JSON response:"$'\n'"$res"
+        ecerr "$0: Failed to parse JSON response for property '$prop':"$'\n'"$res"
         return 1
     }
 
@@ -120,10 +121,14 @@ function hear-get {
     ec "$res" |
         cat-copy-rtl-if-tty
 }
+
+function hear-get {
+    h-mpv-get-prop hear-do "${@}"
+}
 alias 'hgg'=hear-get
 
 function mpv-get {
-    mpv-do get_property "${1:-path}" | jq --raw-output -e .data
+    h-mpv-get-prop mpv-do "${@}"
 }
 ##
 function mpv-do {
@@ -185,7 +190,8 @@ aliasfn hear-shuffle hear-do playlist-shuffle # or just press 'k'
 
 function hear-loadfile {
     local url="$1"
-    local mode="${mpv_load_mode:-replace}"
+    local mode="${2:-${mpv_load_mode:-replace}}"
+    local opts=( "${@:3}" )
     #: * =replace=: Stop playback of the current file, and play the new file immediately.
     #: * =append-play=: Append the file, and if nothing is currently playing, start playback. (Always starts with the added file, even if the playlist was not empty before running this command.) This will not skip the currently playing file.
     #: * =append=: Append the file to the playlist.
@@ -202,7 +208,7 @@ function hear-loadfile {
         reval-ecgray hear-autoload-enable
     fi
 
-    revaldbg hear-do "${mpv_command}" "${url}" "$mode"
+    revaldbg hear-do "${mpv_command}" "${url}" "$mode" "${opts[@]}"
     revaldbg hear-play-on
 }
 aliasfn hear-open hear-loadfile
@@ -379,6 +385,23 @@ function mpv-bookmark-fz {
 
 function hear-bookmark-fz {
     mpv_bookmark_engine=hear-noipc mpv-bookmark-fz "$@"
+}
+
+
+function h-hear-bookmark-loader {
+    # usage: h-hear-bookmark-loader --start=<time> <file>
+    local start_arg="$1"
+    local file="$2"
+
+    local time="${start_arg#--start=}"
+    #: `#`: The smallest matching pattern is deleted.
+    #: [[id:88424c96-3482-4ed1-8178-6cb31240a041]]
+
+    hear-loadfile "$file" "replace" "start=$time"
+}
+
+function hlo-bookmark-fz {
+    mpv_bookmark_engine=h-hear-bookmark-loader mpv-bookmark-fz "$@"
 }
 ##
 function mpv-tui {

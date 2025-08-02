@@ -557,6 +557,10 @@ function text-split-letters {
         cat-copy-if-tty
 }
 ##
+function prompt-commit-msg {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Suggest concise commit messages. Put each suggestion into its own code block.' "$@"
+}
+##
 function prompt-emoji-name {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'What are the names of the emojis related to the following:' "$@"
 }
@@ -639,6 +643,10 @@ function run-prompt-rewrite-telegram {
 ##
 function prompt-cs-phd-apply {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'CS PhD application requirements (GRE, LOR count) and deadline' "$@"
+}
+##
+function prompt-text2img-for-bot {
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Give a text2image prompt to generate a great profile picture for this Telegram bot. I want a white background and minimalist design BUT using the intricate capabilities of modern models. E.g., a symbol drawn using glush rainforest textures on a simple white background. Give various suggestions with different themes and complexities. Put each suggested prompt inside a code block.' "$@"
 }
 ##
 function prompt-apply-find-interp-papers {

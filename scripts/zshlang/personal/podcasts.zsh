@@ -3,6 +3,10 @@ typeset -g podcast_dir="${music_dir}/podcasts"
 ##
 typeset -Ag podcasts_urls_my
 
+##
+podcasts_urls_my['Holakouee']='https://files.lilf.ir/yt/Dr.%20Holakouee/feed.rss'
+podcasts_urls_my['Azad']='https://feeds.acast.com/public/shows/65d314ba565a550016877ee4'
+##
 podcasts_urls_my['Machine Learning Street Talk (MLST)']='https://anchor.fm/s/1e4a0eac/podcast/rss'
 podcasts_urls_my['Techmeme Ride Home']='https://rss.art19.com/techmeme-ridehome'
 podcasts_urls_my['Odd Lots']='http://feeds.megaphone.fm/BLM2009837477'
