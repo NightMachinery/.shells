@@ -499,7 +499,7 @@ typeset -gA gemini25_obj=(
     ##
     long_name 'gemini_2_5_pro'
     short_name 'g25'
-    reval_to_aliases 'g25 gemini'
+    reval_to_aliases 'g25'
     send_aliases 'lg25'
 )
 define-llm-model-v2 gemini25_obj
