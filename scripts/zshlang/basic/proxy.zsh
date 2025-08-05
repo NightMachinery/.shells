@@ -111,6 +111,7 @@ function pxify {
     # enh-pxpy tsend
 
     pxaify-command llm
+    pxaify-command gemini
 
     pxaify-command doom
 

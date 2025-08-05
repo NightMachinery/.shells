@@ -68,9 +68,13 @@ function prompt-instruction-input {
         for input_image in "${prompt_input_images[@]}" ; do
             if [[ "${input_image}" == "MAGIC_CLIPBOARD" ]] ; then
                 tmp_file="$(gmktemp --suffix ".png")" @TRET
-                assert pngpaste "${tmp_file}" @RET
 
-                processed_image="${tmp_file}"
+                if pngpaste "${tmp_file}" ; then
+                    processed_image="${tmp_file}"
+                else
+                    ecgray "$0: failed to paste image from clipboard"
+                    continue
+                fi
             else
                 assert test -e "${input_image}" @RET
 
@@ -82,9 +86,13 @@ function prompt-instruction-input {
         done
 
         if isOutTty ; then
-            assert copy_files_with_text.swift "${prompt_text}" "${input_files}" @RET
-
-            ec "$prompt_text"
+            if ((${#input_files} >= 1)) ; then
+                assert copy_files_with_text.swift "${prompt_text}" "${input_files[@]}" @RET
+                ec "$prompt_text"
+            else
+                ec "${prompt_text}" |
+                    cat-copy-if-tty
+            fi
         else
             ec "${prompt_text}"
             ecgray "$0: attached images ignored as the output is not a TTY"
