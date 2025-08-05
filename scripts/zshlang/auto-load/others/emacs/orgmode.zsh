@@ -857,7 +857,7 @@ function org-header-rm-shared-level {
     #    Prints each (potentially modified) line.
     # 4. If no headers were found, it prints the original lines unchanged.
     local modified_text
-    modified_text=$(ec "$text" | perl -le '
+    modified_text=$(ec "$text" | perl -e '
         my @lines = <>; # Slurp all lines into an array
         my $min_level = undef;
 
