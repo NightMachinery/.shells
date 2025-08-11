@@ -2,27 +2,6 @@
 
 function set-defaults() {
     # use `mdls` to get these data (kMDItemContentType, kMDItemCFBundleIdentifier)
-    ## Emacs
-    if false ; then
-        #: @todo Shouldn't we use Zopen and then use emacsclient?
-        ##
-        local cf_emacs=org.gnu.Emacs
-
-        duti -s $cf_emacs "public.plain-text" editor
-        duti -s $cf_emacs "public.text" editor
-        duti -s $cf_emacs "public.yaml" editor
-        duti -s $cf_emacs "public.data" editor
-        duti -s $cf_emacs "org.vim.cfg-file" editor
-        duti -s $cf_emacs "public.python-script" editor
-        duti -s $cf_emacs "public.shell-script" editor
-        duti -s $cf_emacs "public.script" editor
-        duti -s $cf_emacs "public.source-code" editor
-        duti -s $cf_emacs .jl editor
-        duti -s $cf_emacs .lua editor
-
-        # duti -s $cf_emacs .pdf editor
-        # duti -s $cf_emacs "" editor
-    fi
     ## iTerm
     if false ; then
         local cf_iterm=com.googlecode.iterm2
@@ -34,6 +13,29 @@ function set-defaults() {
     ## zopen
     if test -e /Applications/Zopen.app ; then
         local cf_zopen=org.evar.Zopen
+
+        ## Emacs
+        if true ; then
+            ##
+            # local cf_emacs=org.gnu.Emacs
+            local cf_emacs="${cf_zopen}"
+
+            duti -s $cf_emacs "public.plain-text" editor
+            duti -s $cf_emacs "public.text" editor
+            duti -s $cf_emacs "public.yaml" editor
+            duti -s $cf_emacs "public.data" editor
+            duti -s $cf_emacs "org.vim.cfg-file" editor
+            duti -s $cf_emacs "public.python-script" editor
+            duti -s $cf_emacs "public.shell-script" editor
+            duti -s $cf_emacs "public.script" editor
+            duti -s $cf_emacs "public.source-code" editor
+            duti -s $cf_emacs .jl editor
+            duti -s $cf_emacs .lua editor
+
+            # duti -s $cf_emacs .pdf editor
+            # duti -s $cf_emacs "" editor
+        fi
+        ##
 
         duti -s $cf_zopen com.microsoft.waveform-audio all
         duti -s $cf_zopen public.mp3 all
