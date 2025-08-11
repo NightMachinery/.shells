@@ -1,4 +1,75 @@
 ##
+function backup-borg {
+    # Dependency Injection: Allow overriding the target user and source directory.
+    local me_tlg="${borg_backup_me_tlg:-$me_tlg}"
+    local source_dir="${borg_backup_source_dir:-$HOME/.borg}"
+
+    # Check for required commands before proceeding.
+    whence fd &>/dev/null @TRET
+    whence zip &>/dev/null @TRET
+    whence tsendf &>/dev/null @TRET
+
+    # Validate that essential configuration is present.
+    if [[ -z "$me_tlg" ]]; then
+        ecerr "Error: Target Telegram user (\$me_tlg or \$borg_backup_me_tlg) is not set."
+        return 1
+    fi
+    if [[ ! -d "$source_dir" ]]; then
+        ecerr "Error: Source directory '$source_dir' not found."
+        return 1
+    fi
+
+    # Create a temporary directory for the backup process.
+    local tmp_dir
+    tmp_dir="$(gmktemp -d)" @TRET
+
+    # Ensure the temporary directory is cleaned up on exit or error.
+    setopt localtraps
+    trap 'trs-rm "$tmp_dir" || true' EXIT
+
+    # Generate the zip file name with a timestamp for uniqueness.
+    local timestamp
+    timestamp="$(date +'%Y-%m-%d_%H%M%S')" @TRET
+    local zip_filename="borg_backup_${timestamp}.zip"
+    local zip_path="${tmp_dir}/${zip_filename}"
+
+    # Create the zip archive by piping relative paths from fd directly into zip.
+    # This is executed in a subshell to avoid changing the script's working directory
+    # and to ensure the paths in the archive are relative.
+    (
+        cd "$source_dir" @RET
+
+        # First, check if there are any files to back up to avoid creating an empty archive.
+        # We capture the output of fd to test if it's empty.
+        local file_list
+        file_list="$(fd --type f --exclude 'log' --exclude '*.lock' .)" @TRET
+        if [[ -z "$file_list" ]]; then
+            # We are in a subshell, so `return` won't work as expected.
+            # We exit with a special code that the parent can check.
+            exit 127
+        fi
+
+        # dact var-show file_list
+
+        # Pipe the verified file list directly to zip's stdin.
+        # -q for quiet, -@ to read file list from stdin.
+        # The zip_path must be absolute since we are in a different directory.
+        ec "$file_list" | revaldbg zip "$zip_path" -@ @RET
+    )
+    # Check the exit code of the subshell.
+    local subshell_ret=$?
+    if (( subshell_ret == 127 )); then
+        ecerr "Error: No files found to back up in '$source_dir'."
+        return 1
+    elif (( subshell_ret != 0 )); then
+        ecerr "Error: Failed to create zip archive."
+        return $subshell_ret
+    fi
+
+    # Send the created backup file via Telegram.
+    tsendf "$me_tlg" "$zip_path" @RET
+}
+##
 function mktemp-borg {
     local opts=()
     if isBorg ; then
