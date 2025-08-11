@@ -1,5 +1,5 @@
-export me_tel="195391705"
-me="$me_tel"
+export me_tlg="195391705"
+me="${me_tlg}"
 export alice='-1001179162919'
 export arista='-1001154785017'
 export water='-1001293952668'
