@@ -1,4 +1,4 @@
-alias tsmf='tsendf $me_tel'
+alias tsmf='tsendf ${me_tlg}'
 ###
 function tsend-retry {
     retry tsend "$@"
@@ -136,7 +136,7 @@ function tlg-clean-paste() {
 }
 ##
 function podcast2tel() {
-    local dest="${podcast2tel_dest:-${me_tel}}"
+    local dest="${podcast2tel_dest:-${me_tlg}}"
     local l="$1"
     local title="$rssTitle" # from rss-tsend
 
@@ -154,11 +154,11 @@ function md2tlg {
     local inargs
     in-or-args2 "$@" @RET
 
-    revaldbg tsend "${tsend_opts[@]}" -- "${me_tel}" "${inargs[*]}"
+    revaldbg tsend "${tsend_opts[@]}" -- "${me_tlg}" "${inargs[*]}"
 }
 
 function org2tlg {
-    local dest="${1:-${me_tel}}"
+    local dest="${1:-${me_tlg}}"
     assert-args dest @RET
     local text
     text="$(cat-paste-if-tty)" @TRET
