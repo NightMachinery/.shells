@@ -202,6 +202,9 @@ function revaldbg {
     argerdbg "$@"
     reval "$@"
 }
+reval-dbg() { revaldbg "$@" }
+reval-ecdbg() { revaldbg "$@" }
+
 echo-fin() { arger "$fin[@]" } # Useful for debugging env
 ##
 function silencedbg() {
