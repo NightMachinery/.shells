@@ -20,7 +20,7 @@ alias ungron="gron --ungron"
 alias gis='gist --copy  --shorten'
 
 alias dbg='DEBUGME=d'
-function reval-dbg {
+function reval-with-dbg {
     DEBUGME=d reval "$@"
 }
 ##
