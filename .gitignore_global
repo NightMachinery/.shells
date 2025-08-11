@@ -3,6 +3,7 @@
 ## My own
 .*.evilmarkers
 .aider*
+.claude/settings.local.json
 
 **/*..nogit..*
 
