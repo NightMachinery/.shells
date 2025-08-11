@@ -19,6 +19,17 @@ function zopen-ebook {
     ##
 }
 
+function zopen-text {
+    local f="$1"
+    assert-args f @RET
+
+    if isTty ; then
+        emc-nowait2 "$f"
+    else
+        withemcgui emc-nowait2 "$f"
+    fi
+}
+
 function zopen {
     local f files=("$@") bell=''
     for f in $files[@] ; do
@@ -48,7 +59,9 @@ function zopen {
                 open-sioyek "$f"
                 # chrome-open-pdf "$f"
                 ;;
-            ${~text_exts}) emc-nowait2 "$f" ;;
+            ${~text_exts})
+                zopen-text "$f"
+                ;;
             ${~video_exts}) awaysh mpv "$f" ;;
             # *) re typ text_exts ext f ; return 0 ;;
             *) usemime=y ;;
