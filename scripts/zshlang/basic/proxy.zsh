@@ -112,6 +112,8 @@ function pxify {
 
     pxaify-command llm
     pxaify-command gemini
+    pxaify-command claude
+    pxaify-command codex
 
     pxaify-command doom
 
