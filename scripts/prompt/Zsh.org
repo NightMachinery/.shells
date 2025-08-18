@@ -2,6 +2,8 @@
 
 Zsh Coding Guidelines:
 
+- Always use long option/argument forms for CLI commands. This makes the code more readable.
+
 - Some basic functions/aliases are already defined, and should be used if needed:
 
 #+begin_src :eval never
