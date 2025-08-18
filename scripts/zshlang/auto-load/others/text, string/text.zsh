@@ -440,4 +440,12 @@ function lower {
     ecn "${input:l}" |
         cat-copy-if-tty
 }
+
+function upper {
+    local input
+    input="${$(in_or_args_newline_p=n in-or-args "$@" ; print -n .)[1,-2]}" @RET
+
+    ecn "${input:u}" |
+        cat-copy-if-tty
+}
 ##
