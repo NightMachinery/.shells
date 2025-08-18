@@ -491,11 +491,7 @@ function define-llm-model-v2 {
 ## ** Google Gemini
 typeset -gA gemini25_obj=(
     ##
-    # model_name 'gemini-2.5-pro-preview-03-25'
-    model_name 'gemini-2.5-pro-exp-03-25'
-    ##
-    # model_name 'openrouter/google/gemini-2.5-pro-exp-03-25:free'
-    # model_name 'openrouter/google/gemini-2.5-pro-preview-03-25'
+    model_name 'gemini-2.5-pro'
     ##
     long_name 'gemini_2_5_pro'
     short_name 'g25'
