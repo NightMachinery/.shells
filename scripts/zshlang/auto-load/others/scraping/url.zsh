@@ -356,7 +356,7 @@ function url-mime {
 
     local mime
     mime="$(
-        $proxyenv command curl "${curl_opts[@]}" -- "${url}" | \
+        $proxyenv revaldbg command curl "${curl_opts[@]}" -- "${url}" | \
         perl -nE 'state @m; push @m, lc $1 if /^content-type:\s*([^;\s]+)/i; END { say $m[-1] if @m }'
     )"
     local ret=$?
