@@ -24,11 +24,14 @@ function set-defaults() {
             duti -s $cf_emacs "public.text" editor
             duti -s $cf_emacs "public.yaml" editor
             duti -s $cf_emacs "public.data" editor
-            duti -s $cf_emacs "org.vim.cfg-file" editor
             duti -s $cf_emacs "public.python-script" editor
             duti -s $cf_emacs "public.shell-script" editor
             duti -s $cf_emacs "public.script" editor
             duti -s $cf_emacs "public.source-code" editor
+            duti -s $cf_emacs "net.daringfireball.markdown" editor
+            duti -s $cf_emacs .md editor
+            duti -s $cf_emacs "org.vim.cfg-file" editor
+            duti -s $cf_emacs .org editor
             duti -s $cf_emacs .jl editor
             duti -s $cf_emacs .lua editor
 
