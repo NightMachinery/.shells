@@ -624,17 +624,30 @@ function pbcopy-file-as-md {
         done
 
         ec '---'$'\n'
-    } | {
+    } | cat-copy-streaming-remote
+
+    return $retcode
+}
+aliassafe cx1='pbcopy-file-as-md'
+
+function cat-copy-streaming-remote {
         if isLocal ; then
             cat-copy-streaming
         else
             pbcopy-remote
         fi
-    }
-
-    return $retcode
 }
-aliassafe cx='pbcopy-file-as-md'
+
+function repomix-m {
+    ensure-array repomix_opts
+    local files
+    files=($@)
+
+    arrnn ${files[@]} |
+        repomix "${repomix_opts[@]}" --stdin --stdout --output-show-line-numbers |
+        cat-copy-streaming-remote
+}
+aliassafe cx='repomix-m'
 ##
 function prompt-rewrite-telegram {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following text as a post for a Telegram channel. You can use emojis, etc. You can use `**bold text**`, `__italic text__`, ~~strikethrough~~, and Markdown literals and code blocks using backticks, e.g., \`CONSTANT_IN_CODE\`. You can use Markdown links, `[label](url)`. End the post by including a link to our channel, `EMOJI [@SUTCSE](https://t.me/sutcse)` with a random nice creative emoji. This line starts with an emoji and ends with our link, no other text needed.'" (To ensure randomness, use the current date as a seed for your decision: $(date)."' Be concise, but easy to understand. The target audience is AI PhD students studying in Sharif University of Technology. Begin your post with a headline that summarizes the main point (the lede). Write in Farsi (Persian), as the students are Iranians.' "$@"
