@@ -1,5 +1,10 @@
 ##
-export GIT_PAGER="delta --hyperlinks --light --syntax-theme 'Solarized (light)' --line-numbers"
+export GIT_PAGER="delta --light --syntax-theme 'Solarized (light)' --line-numbers"
+if isLocal ; then
+    GIT_PAGER+=" --hyperlinks"
+    #: [jalali:1404/05/27/23:34] somehow doesn't work on SSH on eva
+fi
+
 function diff-colorer {
     command delta --light --syntax-theme 'Solarized (light)' "$@"
     # --true-color=always
