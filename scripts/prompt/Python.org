@@ -3,6 +3,8 @@
 * Functions
 - Have any non-obvious function arguments be keyword arguments. Have at most two positional arguments. Use =(pos_arg1, ..., *, kwarg,)= to enforce keyword argument usage.
 
+* Dataclasses
+Define dataclasses when you need to return multiple items, not tuples.
 
 * Conditionals
 For enum-like conditionals, use explicit matching conditions, and raise an exception on =else= (when it signifies an unknown value).
