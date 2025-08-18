@@ -337,6 +337,43 @@ function url-size {
         ec "$size"
     fi
 }
+
+function url-mime {
+    #: Gets the mimetype of the given url without downloading it.
+    ##
+    local follow_redirects_p="${url_mime_follow_redirects_p:-y}"
+
+    local url="${1}"
+    if [[ -z "$url" ]] ; then
+        ecerr "Usage: url-mime <url>"
+        return 1
+    fi
+
+    local curl_opts=('--silent' '--head')
+    if bool "${follow_redirects_p}" ; then
+        curl_opts+=('--location')
+    fi
+
+    local mime
+    mime="$(
+        $proxyenv command curl "${curl_opts[@]}" -- "${url}" | \
+        perl -nE 'state @m; push @m, lc $1 if /^content-type:\s*([^;\s]+)/i; END { say $m[-1] if @m }'
+    )"
+    local ret=$?
+
+    if (( ret != 0 )) ; then
+        ecerr "Error: Failed to get MIME type for URL: ${url}"
+        return $ret
+    fi
+
+    if [[ -z "${mime}" ]] ; then
+        ecerr "Error: Could not determine MIME type for URL: ${url}"
+        return 1
+    fi
+
+    ec "${mime}" |
+        cat-copy-if-tty
+}
 ##
 function urlmeta2 {
     mdoc "[html= ] $0 <url> <req> ...
