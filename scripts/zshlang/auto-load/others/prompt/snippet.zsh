@@ -4,16 +4,15 @@ function snippet-input-file {
     assert-args file @RET
     shift @RET
 
-    local snippet
+    ##
+    #: @duplicateCode/1df1db85fd5d5e5e106ad354237f763b
+    #: We are losing the whitespace at the end of files deliberately, as keeping the whitespace at the end correct is difficult. emacs can delete trailing whitespace and add unwanted new lines at the end.
+    local instruction
+    instruction="$(h-read-prompt-file "${file}")" @TRET
+    # instruction="${$(h-read-prompt-file "${file}" ; ecn .)[1,-2]}" @TRET
+    ##
 
-    if [[ "${file:e}" == org ]] ; then
-        snippet="$(org2md < "${file}")" @TRET
-
-    else
-        snippet="$(< "${file}")" @TRET
-    fi
-
-    snippet-input "${snippet}" "${@}"
+    snippet-input "${instruction}" "${@}"
 }
 
 function snippet-input {
