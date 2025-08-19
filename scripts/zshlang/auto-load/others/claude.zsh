@@ -7,13 +7,17 @@ function claude {
     $proxyenv command claude "$@"
 }
 ##
+function claude-autocommit {
+     reval-ec claude --verbose -p 'git-committer' --allowedTools 'Bash(git:*)'
+}
+##
 function claude-vcsh-commit {
     local target_dir="${1:-$NIGHTDIR}"
 
     (
         cd "$target_dir" @RET
     
-        claude "${NIGHTDIR}/prompt/vcsh-commit.md"
+        claude "${NIGHTDIR}/prompt/vcsh-commit.md" --verbose --allowedTools 'Bash(vcsh night.sh:*)'
     )
 }
 
