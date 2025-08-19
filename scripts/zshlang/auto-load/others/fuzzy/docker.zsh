@@ -27,3 +27,8 @@ aliasfn ffdocker-start @opts cmd start @ ffdocker-gen
 aliasfn ffdocker-stop @opts cmd stop @ ffdocker-gen
 aliasfn ffdocker-rm @opts cmd rm @ ffdocker-gen
 aliasfn ffdocker-auto-restart-disable @opts cmd [ update --restart=no ] @ ffdocker-gen
+##
+function docker-running {
+    reval-ec docker ps -f "status=running"
+}
+##
