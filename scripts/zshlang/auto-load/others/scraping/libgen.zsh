@@ -10,8 +10,10 @@ function libgendl-md5-main {
     # local mainmirror="http://31.42.184.140"
     # local mainmirror="http://62.182.86.140"
     # local mainmirror="http://193.218.118.42"
-    local mainmirror="http://176.119.25.72"
+    # local mainmirror="http://176.119.25.72"
     # local mainmirror="http://library.lol"
+    local mainmirror="http://81.17.21.234"
+    #: `dig libgen.li`
 
     # local url="http://gen.lib.rus.ec/get?md5=${md5}&open=0"
     local urls=( "$mainmirror/main/${md5}" "$mainmirror/fiction/${md5}" )
