@@ -1,6 +1,6 @@
 ##
 function kindle-p {
-    ! bool "$kindle_disabled"
+    ! bool "${kindle_disabled:-y}"
 }
 
 function without-kindle {
