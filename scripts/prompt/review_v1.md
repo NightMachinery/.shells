@@ -23,7 +23,7 @@ REDDIT, LESSWRONG & RATIONAL-ADJACENT OPINIONS
   - Overcoming Bias (site:overcomingbias.com "TARGET")
   - Hacker News (site:news.ycombinator.com "TARGET")
   - Marginal Revolution (site:marginalrevolution.com "TARGET")
-- Include 6–12 short, representative user/community quotes spanning positive, mixed, and negative views. Ensure at least 2–4 quotes come from the rationalist/rational-adjacent sources above (posts or comment sections). Attribute with source (e.g., LessWrong, ACX, EA Forum, HN, subreddit) and username/handle when available, and link to the comment/post. Trim quotes to the essential 10–25 words; indicate ellipses where you omit text.
+- Include 6–12 short, representative user/community quotes spanning positive, mixed, and negative views. Ensure at least 2–4 quotes come from the rationalist/rational-adjacent sources above (posts or comment sections). Attribute with source (e.g., LessWrong, ACX, EA Forum, HN, subreddit) and username/handle when available, and link to the comment/post. Trim quotes to the essentials (but DO keep the essentials!); indicate ellipses where you omit text.
 
 ANALYSIS & SYNTHESIS
 - Summarize the critical consensus vs. user consensus; highlight convergence/divergence and reasons (e.g., pacing, difficulty, performance, hype backlash).
@@ -68,13 +68,13 @@ OUTPUT FORMAT (use exactly these sections)
 METHOD NOTES
 - Prefer the most recent, credible sources; include access dates.
 - Avoid confirmation bias: deliberately seek contrary views, including from rationalist/rational-adjacent communities.
-- Be transparent about uncertainty (e.g., early access, small sample size).
+- Be transparent about uncertainty (e.g., early access, small sample size, search failure).
 - Where scores differ by edition/region/platform, keep them separate and explain.
-- Keep quotes short and impactful; do not fabricate. Always link.
+- Keep quotes medium-sized and impactful; do not fabricate. Always link.
 - When picking "prominent works," use signals like awards, sales, sustained high ratings, and lasting influence.
 - Use site: searches as needed (examples above) to find rationalist sources and high-signal threads.
 
 NOW WAIT FOR TARGET
 After reading all instructions above, analyze the following TARGET and produce the review:
 
-TARGET: 
+TARGET:
