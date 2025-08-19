@@ -12,6 +12,10 @@ function prompt-instruction-input {
 
     ensure-array prompt_input_images #: @global/input
     local input_mode="${prompt_input_mode}"
+    local input_prefix=${prompt_input_prefix-$'\n\n'}
+    #: must not be double-quoted or $'\n' will be interpreted as literal
+    #: setting this explicitly to empty string will disable the prefix
+
     local qa_p="${prompt_qa_p}"
     local preambles=(${prompt_preambles[@]})
 
@@ -45,6 +49,10 @@ function prompt-instruction-input {
         if bool "${qa_p}" ; then
             input='Q:'$'\n'"$input"$'\n\n''A:'
         fi
+
+        if bool "${input_prefix}" ; then
+            input="${input_prefix}${input}"
+        fi
     fi
 
     local prompt_text
@@ -54,10 +62,10 @@ function prompt-instruction-input {
             #: Preambles are often snippets. Snippets might decide to read from stdin or the clipboard if we do not explicitly supply their input, hence the empty =''=.
         done
 
-        ec "$instruction"
+        ecn "$instruction"
 
         if test -n "$input" ; then
-            ec $'\n'"$input"
+            ec "$input"
         fi
     } |
         strip-blank-lines-start-end)" @RET
@@ -120,6 +128,38 @@ function prompt-blockify {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input ''
 }
 alias xb='prompt-blockify'
+
+function h-read-prompt-file {
+    local file="$1"
+    assert test -e "${file}" @RET
+
+    if [[ "${file:e}" == org ]] ; then
+        org2md < "${file}"
+    else
+        cat -- "${file}"
+    fi
+}
+
+function prompt-input-file {
+    local file="$1"
+    assert-args file @RET
+    shift
+
+    ##
+    #: @duplicateCode/1df1db85fd5d5e5e106ad354237f763b
+    #: We are losing the whitespace at the end of files deliberately, as keeping the whitespace at the end correct is difficult. emacs can delete trailing whitespace and add unwanted new lines at the end.
+    local instruction
+    instruction="$(h-read-prompt-file "${file}")" @TRET
+    # instruction="${$(h-read-prompt-file "${file}" ; ecn .)[1,-2]}" @TRET
+    ##
+
+    prompt-instruction-input "${instruction}" "$@"
+}
+##
+function prompt-review {
+    prompt_input_prefix=" " \
+        prompt-input-file "${night_prompt_dir}/review_v1.md" "$@"
+}
 ##
 function prompt-coding-rewrite-performant {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.' "$@"
