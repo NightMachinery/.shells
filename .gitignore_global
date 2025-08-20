@@ -3,7 +3,7 @@
 ## My own
 .*.evilmarkers
 .aider*
-.claude/settings.local.json
+repomix-output.xml
 
 **/*..nogit..*
 
