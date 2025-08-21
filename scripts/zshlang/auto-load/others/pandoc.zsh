@@ -1,4 +1,4 @@
-typeset -g pandoc_md_default='markdown+tex_math_single_backslash+lists_without_preceding_blankline'
+typeset -g pandoc_md_default='markdown+tex_math_single_backslash+lists_without_preceding_blankline-header_attributes'
 ##
 function latex2md-pandoc {
     @opts from 'latex+latex_macros' to markdown @ pandoc-convert "$@"
@@ -57,6 +57,15 @@ function org2md {
         perl -lpe "s/\\\\('|\")/\$1/g" |
         cat-copy-if-tty
 }
+
+function org2md-file {
+    local input="${1:-$jufile}"
+    local out="${input:r}.md"
+    assert-args input out @RET
+
+    < "$input" org2md  > "$out"
+}
+alias jorg2md='org2md-file'
 
 function org2md-raw {
     @opts from org to "${pandoc_md_default}" @ pandoc-convert "$@"
