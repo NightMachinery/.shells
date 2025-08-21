@@ -17,7 +17,7 @@ function claude-vcsh-commit {
     (
         cd "$target_dir" @RET
     
-        claude "${NIGHTDIR}/prompt/vcsh-commit.md" --verbose --allowedTools 'Bash(vcsh night.sh:*)'
+        claude -p "Read '${NIGHTDIR}/prompt/vcsh-commit.md' and start committing changes." --verbose --allowedTools 'Bash(vcsh night.sh:*)'
     )
 }
 
