@@ -35,6 +35,7 @@ import os
 from os import getenv
 import sys
 import asyncio
+import traceback
 from pathlib import Path
 import asyncio
 from IPython import embed
@@ -190,6 +191,8 @@ async def discreet_send(
                     )
                     break
                 except Exception as e:
+                    traceback.print_exc()
+                    print(f"Error while sending file (attempt {attempt + 1}/{max_retries})", file=sys.stderr)
                     await handle(e, attempt, max_retries, verbosity)
 
         return last_msg
