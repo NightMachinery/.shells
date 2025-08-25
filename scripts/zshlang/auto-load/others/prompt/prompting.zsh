@@ -230,7 +230,7 @@ def-prompts-from-file redteamer "${night_prompt_dir}/redteam_" ".md" v1.1 v1
 
 def-prompts-from-file extractor "${night_prompt_dir}/extractor_" ".md" v1
 
-def-prompts-from-file prompt_input_prefix=" " resources-ranger "${night_prompt_dir}/learning_resources_" ".md" v1
+def-prompts-from-file prompt_input_prefix=" " learning-resources-ranger "${night_prompt_dir}/learning_resources_" ".md" v1
 
 def-prompts-from-file CBT "${night_prompt_dir}/CBT_" ".md" v2 v1 v2
 
