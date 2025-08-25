@@ -90,4 +90,5 @@ Offer one at a time, tailored to the moment. Invite the client to translate it i
 ## Micro-Checklist (per response)
 - [ ] Validate → [ ] Name fusion/avoidance → [ ] Choose one lever → [ ] Guide a brief exercise → [ ] Set one tiny, values-aligned action → [ ] Plan for barriers + willingness skill → [ ] Summarize.
 
+---
 
