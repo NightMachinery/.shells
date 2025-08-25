@@ -156,10 +156,85 @@ function prompt-input-file {
     prompt-instruction-input "${instruction}" "$@"
 }
 ##
-function prompt-review {
-    prompt_input_prefix=" " \
-        prompt-input-file "${night_prompt_dir}/review_v1.md" "$@"
+function def-prompts-from-file {
+    ##
+    #: Define a family of prompt-* functions from versioned files.
+    #: Usage:
+    #:   def-prompts-from-file [var=val ...] <name> <path_prefix> <path_postfix> <default_version> [other_versions...]
+    #: Example:
+    #:   def-prompts-from-file prompt_input_prefix=" " review "${night_prompt_dir}/review_" ".md" v1 v2 v3
+    #:
+    #: This defines:
+    #:   - prompt-review          (uses v1)
+    #:   - prompt-review-v1
+    #:   - prompt-review-v2
+    #:   - prompt-review-v3
+    ##
+    local locals=()
+    # collect optional local var injections: var=val
+    while [[ $# -gt 0 && "$1" == *"="* ]]; do
+        locals+=("$1")
+        shift
+    done
+
+    local name="$1" path_prefix="$2" path_postfix="$3" default_version="$4"
+    shift 4 || {
+        ecerr "$0: usage: def-prompts-from-file [var=val ...] <name> <path_prefix> <path_postfix> <default_version> [other_versions...]"
+        return 2
+    }
+
+    if [[ -z "$name" || -z "$path_prefix" || -z "$path_postfix" || -z "$default_version" ]]; then
+        ecerr "$0: missing required arguments"
+        return 2
+    fi
+
+    local -a versions
+    versions=("${default_version}" $@)
+
+    typeset -A _seen
+
+    # helper to emit a single function
+    local _define_one
+    _define_one() {
+        local _fn="$1" _ver="$2"
+        local _path="${path_prefix}${_ver}${path_postfix}"
+
+        local -a _lines=()
+        # inject requested locals
+        if (( ${#locals[@]} )); then
+            local x
+            for x in "${locals[@]}"; do
+                _lines+=("  local $(gq ${x})")
+            done
+            _lines+=("")
+        fi
+        _lines+=("  prompt-input-file $(gq ${_path}) \"\$@\"")
+        functions[${_fn}]="${(pj.\n.)_lines[@]}"
+    }
+
+    # unversioned default alias: prompt-<name>
+    _define_one "prompt-${name}" "${default_version}"
+
+    # versioned functions for *all* versions (including default), de-duplicated
+    local v
+    for v in "${(u)versions[@]}"; do
+        _define_one "prompt-${name}-${v}" "${v}"
+    done
 }
+## * def-prompts-from-file
+def-prompts-from-file prompt_input_prefix=" " reviewer "${night_prompt_dir}/review_" ".md" v1
+
+def-prompts-from-file socratic-teacher "${night_prompt_dir}/socratic_teacher_" ".md" v1.3 v1 v1.1 v1.2 v1.4 v2
+
+def-prompts-from-file redteamer "${night_prompt_dir}/redteam_" ".md" v1.1 v1
+
+def-prompts-from-file extractor "${night_prompt_dir}/extractor_" ".md" v1
+
+def-prompts-from-file prompt_input_prefix=" " resources-ranger "${night_prompt_dir}/learning_resources_" ".md" v1
+
+def-prompts-from-file CBT "${night_prompt_dir}/CBT_" ".md" v2 v1 v2
+
+def-prompts-from-file ACT "${night_prompt_dir}/ACT_" ".md" v3.2 v1 v2 v2.1 v3 v3.1 v3.2
 ##
 function prompt-coding-rewrite-performant {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.' "$@"
@@ -334,10 +409,10 @@ function prompt-rewrite-abstract-concise {
 }
 
 function prompt-rewrite-fluent-graduate {
-   local prompt_input_mode="${prompt_input_mode:-block}"
-   local prompt="Rewrite the following text at a postgraduate academic reading level - sophisticated and precise but not flowery. Use natural, fluid language while maintaining technical rigor and depth. Keep core meaning and details intact while making expression more direct:"
+    local prompt_input_mode="${prompt_input_mode:-block}"
+    local prompt="Rewrite the following text at a postgraduate academic reading level - sophisticated and precise but not flowery. Use natural, fluid language while maintaining technical rigor and depth. Keep core meaning and details intact while making expression more direct:"
 
-   prompt-instruction-input "${prompt}" "$@"
+    prompt-instruction-input "${prompt}" "$@"
 }
 ##
 function prompt-write-exercise-descpription {
