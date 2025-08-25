@@ -778,20 +778,16 @@ Format the copied text into org-mode structure:
 ' "$@"
 }
 
-function run-prompt-clean2org-v2 {
+function run-with-html-prompt-clean2org-v2 {
     local llm_copy_p="${llm_copy_p:-n}"
 
     {
-        if isInTty ; then
-            pbpaste-html |
-                html4latex-clean
-        else
-            cat
-        fi
+        pbpaste-html |
+            html4latex-clean
     } |
         llm-run prompt-clean2org-v2 "$@" |
         cat-streaming-copy-rtl-if-tty
-        # cat-rtl-streaming-if-tty
+    # cat-rtl-streaming-if-tty
 }
-alias '2org'='run-prompt-clean2org-v2'
+alias '2org'='run-with-html-prompt-clean2org-v2'
 ##
