@@ -13,7 +13,7 @@ function cat-copy-v2 {
         cat "$@"
     else
         in-or-args
-    fi | pbcopy
+    fi | cat-copy-streaming
 }
 alias cf='cat-copy-v2'
 
