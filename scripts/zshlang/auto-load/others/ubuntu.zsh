@@ -1,10 +1,11 @@
-function ubuntu-version() {
+function ubuntu-version {
     cat /etc/os-release
     #lsb_release -a
     echo
     uname -r # kernel
 }
-function ubuntu-upgrade() {
+
+function ubuntu-upgrade {
     sudo apt update --fix-missing
     sudo DEBIAN_FRONTEND='noninteractive' apt-get --fix-missing -y -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade
 
