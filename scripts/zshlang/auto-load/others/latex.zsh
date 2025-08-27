@@ -456,6 +456,7 @@ function h-bibtidy {
         --v2
         --no-sort
         --duplicates
+        --merge='last'
         --trailing-commas
         --encode-urls
         --blank-lines
