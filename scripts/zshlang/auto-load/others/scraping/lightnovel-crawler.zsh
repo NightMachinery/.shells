@@ -1,5 +1,7 @@
 ##
 function lnc-mobi {
+    #: @deprecated refactor to use lnc-epub
+    ##
     local url="$1"
     assert-args url @RET
 
@@ -13,6 +15,8 @@ function lnc-epub {
     if isJulia ; then
         jee
     fi
+
+    reval-ecgray pip-install lightnovel-crawler
 
     $proxyenv reval-ec lightnovel-crawler --all --single --format epub --suppress --source "$url"
     # --ignore -o .
