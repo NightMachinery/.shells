@@ -190,6 +190,7 @@ function def-prompts-from-file {
 
     local -a versions
     versions=("${default_version}" $@)
+    versions=("${(u)versions[@]}")
 
     typeset -A _seen
 
@@ -216,10 +217,13 @@ function def-prompts-from-file {
     _define_one "prompt-${name}" "${default_version}"
 
     # versioned functions for *all* versions (including default), de-duplicated
-    local v
-    for v in "${(u)versions[@]}"; do
-        _define_one "prompt-${name}-${v}" "${v}"
-    done
+    if (( ${#versions} >= 2 )) ; then
+        local v
+        for v in "${versions[@]}"; do
+            _define_one "prompt-${name}-${v}" "${v}"
+        done
+    fi
+
 }
 ## * def-prompts-from-file
 def-prompts-from-file prompt_input_prefix=" " reviewer "${night_prompt_dir}/review_" ".md" v1
