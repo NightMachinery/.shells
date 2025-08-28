@@ -20,7 +20,7 @@ Propose 2-3 shared activities or situations that could provide insight into how 
 Outline a step-by-step plan for a 1-2 hour 'date night' conversation focused on the `TARGET`. Include suggestions for setting a safe and comfortable atmosphere, an opening, a middle section for deep exploration using your suggested questions, and a closing that focuses on appreciation and shared understanding.
 
 **6. Sharing Your Own Story:**
-Provide clear guidance on how the user can best communicate their own history, feelings, and needs related to the `TARGET`. Emphasize the importance of vulnerability, using "I" statements, and ensuring the partner feels they are also getting to know the user better.
+Provide clear guidance on how the user can best communicate their own history, feelings, and needs related to the `TARGET`. Emphasize the importance of vulnerability, and ensuring the partner feels they are also getting to know the user better.
 
 ---
 
