@@ -220,7 +220,8 @@ function def-prompts-from-file {
     if (( ${#versions} >= 2 )) ; then
         local v
         for v in "${versions[@]}"; do
-            _define_one "prompt-${name}-${v}" "${v}"
+            _define_one "prompt-${name}-${v//_/-}" "${v}"
+            #: `//_/-`: replaces all underscores with hyphens
         done
     fi
 
@@ -241,6 +242,11 @@ def-prompts-from-file prompt_input_prefix=" " learning-resources-ranger "${night
 def-prompts-from-file CBT "${night_prompt_dir}/CBT_" ".md" v2 v1 v2
 
 def-prompts-from-file ACT "${night_prompt_dir}/ACT_" ".md" v3.2 v1 v2 v2.1 v3 v3.1 v3.2
+
+ # create mode 100644 scripts/prompt/know_partner_GPT5T_DR_v1.md
+ # create mode 100644 scripts/prompt/know_partner_Opus4.1T_v1.md
+ # create mode 100644 scripts/prompt/know_partner_eight_dates_G25_v1.md
+def-prompts-from-file prompt_input_prefix=" " know-partner "${night_prompt_dir}/know_partner_" ".md" 'eight_dates_G25_v1' 'GPT5T_DR_v1' 'Opus4.1T_v1'
 ##
 function prompt-coding-rewrite-performant {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.' "$@"
