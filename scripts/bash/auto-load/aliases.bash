@@ -37,6 +37,8 @@ alias lcl='lc -l'
 alias lm='l -s modified'
 alias la='ls-by-added|tac'
 alias lac='l -s accessed'
+aliasfn lsize l --sort size
+alias lz=lsize
 
 function last-exa {
     # Usage:
