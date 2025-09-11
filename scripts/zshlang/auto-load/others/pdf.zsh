@@ -53,7 +53,7 @@ function pdf2png-mutool {
     local i="$1"
     assert-args i @RET
     local opts=()
-    local format="${pdf2png_format:-png}"  # Default to png if not specified
+    local format="${pdf2png_format:-png}"  #: Default to png if not specified
     #: mutool doesn't seem to support jpeg/jpg
 
     local out="${pdf2png_o:-${i:r}_%03d.${format}}"
@@ -64,28 +64,47 @@ function pdf2png-mutool {
     fi
     assert serrdbg command mutool draw -o "$out" "${opts[@]}" -F "$format" "$i" "${@[2,-1]}" @RET
 }
-
 @opts-setprefix pdf2png-mutool pdf2png
-aliasfn pdf2png pdf2png-mutool
+# aliasfn pdf2png pdf2png-mutool
 
-function pdf2png-magick {
-    local dpi="${pdf2png_magick_dpi:-600}"
+function h-pdf-to-img-magick {
+    local format="${1}"
+    local input="${2}"
+    local dest="${3:-${input:r}}"
+    dest="${dest:r}.${format}"
 
-    if [[ -z "${1}" ]]; then
-        ecerr "Error: Input PDF path or page specifier missing."
-        ecerr "Usage: pdf2png-magick <input_pdf_or_page_specifier> [output_pattern.png]"
-        ecerr "Example: pdf2png-magick mydoc.pdf mydoc.png"
-        ecerr "Example (specific page): pdf2png-magick mydoc.pdf[0] mydoc_page1.png"
-        ecerr "Note: If 'output_pattern.png' is specified for a multi-page PDF without a page specifier in the input,"
-        ecerr "ImageMagick will typically create files like 'output_pattern-0.png', 'output_pattern-1.png', etc."
+    if [[ "$input" == "${dest}" ]] ; then
+        ecerr "Error: Input and output paths are the same. Please specify a different output path."
         return 1
     fi
-    local input="${1}"
-    local out_pattern="${2:-${input:r}.png}"
 
-    reval-ecgray magick convert -density "${dpi}" "${input}" "${out_pattern}" @RET
+
+    local dpi="${pdf_to_img_magick_dpi:-${pdf2png_magick_dpi:-600}}"
+
+    if [[ -z "${input}" ]]; then
+        ecerr "Error: Input PDF path or page specifier missing."
+        ecerr "Usage: pdf2${format}-magick <input_pdf_or_page_specifier> [output_pattern.${format}]"
+        ecerr "Example: pdf2${format}-magick mydoc.pdf mydoc.${format}"
+        ecerr "Example (specific page): pdf2${format}-magick mydoc.pdf[0] mydoc_page1.${format}"
+        ecerr "Note: If 'output_pattern.${format}' is specified for a multi-page PDF without a page specifier in the input,"
+        ecerr "ImageMagick will typically create files like 'output_pattern-0.${format}', 'output_pattern-1.${format}', etc."
+        return 1
+    fi
+
+    reval-ecgray magick convert -density "${dpi}" "${input}" "${dest}" @RET
 }
 
+function pdf2png-magick {
+    h-pdf-to-img-magick "png" "$@" @RET
+}
+@opts-setprefix pdf2png-magick pdf_to_img_magick
+aliasfn pdf2png pdf2png-magick
+
+function pdf2jpg-magick {
+    h-pdf-to-img-magick "jpg" "$@" @RET
+}
+@opts-setprefix pdf2jpg-magick pdf_to_img_magick
+aliasfn pdf2jpg pdf2jpg-magick
 ##
 
 function icat-pdf {
