@@ -1,7 +1,11 @@
 #+TITLE: org_sort_date
 
+* @deprecated Use the Rust version instead:
+** [[NIGHTDIR:rust/org_sort_date.rs]]
+
 * install
 #+begin_example zsh
 cmake .
 make #: generates the binary at PWD
 #+end_example
+
