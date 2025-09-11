@@ -243,10 +243,7 @@ def-prompts-from-file CBT "${night_prompt_dir}/CBT_" ".md" v2 v1 v2
 
 def-prompts-from-file ACT "${night_prompt_dir}/ACT_" ".md" v3.2 v1 v2 v2.1 v3 v3.1 v3.2
 
- # create mode 100644 scripts/prompt/know_partner_GPT5T_DR_v1.md
- # create mode 100644 scripts/prompt/know_partner_Opus4.1T_v1.md
- # create mode 100644 scripts/prompt/know_partner_eight_dates_G25_v1.md
-def-prompts-from-file prompt_input_prefix=" " know-partner "${night_prompt_dir}/know_partner_" ".md" 'eight_dates_G25_v1' 'GPT5T_DR_v1' 'Opus4.1T_v1'
+def-prompts-from-file prompt_input_prefix=" " know-partner "${night_prompt_dir}/know_partner_" ".md" 'eight_dates_G25_v1.1'  'eight_dates_G25_v1' 'GPT5T_DR_v1' 'Opus4.1T_v1'
 ##
 function prompt-coding-rewrite-performant {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following code to make it faster, optimized and performant. Use best practices.' "$@"
@@ -793,7 +790,7 @@ function prompt-cs-phd-apply {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'CS PhD application requirements (GRE, LOR count) and deadline' "$@"
 }
 ##
-function prompt-text2img-for-bot {
+function prompt-text2img-logo-for-bot {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Give a text2image prompt to generate a great profile picture for this Telegram bot. I want a white background and minimalist design BUT using the intricate capabilities of modern models. E.g., a symbol drawn using glush rainforest textures on a simple white background. Give various suggestions with different themes and complexities. Put each suggested prompt inside a code block.' "$@"
 }
 ##
