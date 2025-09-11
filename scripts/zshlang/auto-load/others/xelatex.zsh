@@ -18,6 +18,11 @@ function xelatex-m {
         # redo_fail_mode=exit redo2 2
         reval-ecgray xelatex "${draft_opts[@]}" "${opts[@]}" "${name}.tex" @RET
 
+        local script='scripts/build_dictionary.py'
+        if test -e "${script}" ; then
+            python "${script}" @RET
+        fi
+
         bibtex "${name}" @RET
 
         reval-ecgray xelatex "${draft_opts[@]}" "${opts[@]}" "${name}.tex" @RET
