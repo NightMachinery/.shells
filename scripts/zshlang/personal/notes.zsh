@@ -24,13 +24,26 @@ function h-nt-due-oh {
     org_date_extract_due_what='org-highlighter' nt-due "$@"
 }
 
+function org-sort-date {
+    #: @C++ =org_sort_date=
+    #: @Rust =org_sort_date.rs=
+    org_sort_date.rs "$@"
+}
+
 function nt-due-oh {
     nt-due-init # can't do it in the pipeline, as forks can't change our env
 
-    h-nt-due-oh "$@" \
-        | org_sort_date \
-        | prefix="$nightNotesDueDir" perl -pe 's|(\[)\Q$ENV{prefix}\E/*([^]]+\]\])|${1}${2}|g' \
-        | if-out-tty emc-pager-highlighter
+    h-nt-due-oh "$@" |
+        org-sort-date |
+        prefix="$nightNotesDueDir" perl -pe 's|(\[)\Q$ENV{prefix}\E/*([^]]+\]\])|${1}${2}|g' |
+        if-out-tty emc-pager-highlighter
+}
+alias bills-due='nt-due-oh'
+
+function nt-due-oh-ugrep {
+    nt-due-oh |
+    org_grouper --out-replace-nulls-with='' -- ugrep --null-data "$@"  |
+    if-out-tty emc-pager-highlighter
 }
 
 function nt-due-sees {
