@@ -81,3 +81,5 @@ Return **one** Markdown document with the following sections **in this order**. 
 
 ## Determinism
 - Do not add creative flourishes or speculation beyond the source transcript.
+
+---
