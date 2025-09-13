@@ -153,5 +153,4 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 
 ---
 
-Target to be defined:
 

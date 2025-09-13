@@ -227,7 +227,7 @@ function def-prompts-from-file {
 
 }
 ## * def-prompts-from-file
-def-prompts-from-file prompt_input_prefix=" " lexi-dictionary-define "${night_prompt_dir}/dictionary_Lexi_" ".md" v1
+def-prompts-from-file prompt_input_prefix="Target to be defined: " lexi-dictionary-define "${night_prompt_dir}/dictionary_Lexi_" ".md" v1
 
 def-prompts-from-file compact "${night_prompt_dir}/compacter_" ".md" GPT5_v1
 
