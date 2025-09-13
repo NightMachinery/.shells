@@ -154,6 +154,7 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 - Keep each sense block compact but complete.
 - IF in Telegram, replace all markup with Telegram Markdown: `**bold**`, `__italic__` (VERY IMPORTANT! Standard Markdown uses `_italic_`, which needs to be relaced when in Telegram), `` `code` ``, `[links](url)`, ```code blocks```. IF else, use standard Markdown.
 - Do NOT output anything else after the entry, e.g., do NOT ask any questions or include any commentary.
+- Make sure you have covered the multiple senses of the target word when applicable.
 
 ---
 
