@@ -55,13 +55,11 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 
 **Antonyms (compact list):** {comma-separated; elide if none distinct from above}
 
+**Collocations:** {0-5 common pairings for this sense: verb+object, adj+noun, preposition patterns, phrasal patterns}
 **Examples:**
-
-* {Example sentence using at least one collocation; tag register/region if notable}
+* {Example sentence using collocations; tag register/region if notable}
 * {Distinct context}
 * {Another distinct context}
-
-**Collocations:** {0-5 common pairings for this sense: verb+object, adj+noun, preposition patterns, phrasal patterns}
 
 **Related phrases & idioms (this sense):** {phrasal verbs, set phrases, idioms with one-line glosses, or elide if none}
 
