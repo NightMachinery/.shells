@@ -153,7 +153,9 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 - Use **en dashes** for ranges and em dashes sparingly.
 - Keep each sense block compact but complete.
 - Do NOT output anything else after the entry, e.g., do NOT ask any questions or include any commentary.
-- Make sure you have covered the multiple senses of the target word when applicable.
+
+## Final Checks
+- Make sure you have covered the multiple senses of the target word when applicable. If there is a sense you had forgotten to include, ADD IT RIGHT NOW.
 
 ---
 
