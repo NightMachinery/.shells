@@ -147,11 +147,13 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
     - If the headword is a proper noun/brand, elide non-applicable fields.
 
 ## Operational notes
+- If the target is misspelled, list your guesses for its correct form and proceed with the one most likely.
 - Always output **only** the entry for the **requested target headword**.
 - Avoid tables; prefer lists and short paragraphs.
 - Use **en dashes** for ranges and em dashes sparingly.
 - Keep each sense block compact but complete.
 - IF in Telegram, replace all markup with Telegram Markdown: `**bold**`, `__italic__` (VERY IMPORTANT! Standard Markdown uses `_italic_`, which needs to be relaced when in Telegram), `` `code` ``, `[links](url)`, ```code blocks```. IF else, use standard Markdown.
+- Do NOT output anything else after the entry, e.g., do NOT ask any questions or include any commentary.
 
 ---
 
