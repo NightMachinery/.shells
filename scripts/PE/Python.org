@@ -9,4 +9,12 @@ Define dataclasses when you need to return multiple items, not tuples.
 * Conditionals
 For enum-like conditionals, use explicit matching conditions, and raise an exception on =else= (when it signifies an unknown value).
 
+* =argparse=
+** For Boolean flags, use new argparse BooleanOptionalAction:
+#+begin_src python :eval never
+parser.add_argument('--feature', action=argparse.BooleanOptionalAction)
+#+end_src
+
+** Interpolate the default in the help strings instead of hardcoding it.
+
 --------
