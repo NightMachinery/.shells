@@ -68,10 +68,9 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 
 **Regional variations:** {US/UK/Aus/Canada/India/etc. spelling/usage/preposition or countability differences, or elide if none}
 
-**Persian (Farsi):**
-
-* **تعریف:** {concise Persian definition tailored to this sense}
-* **ترجمه‌های نزدیک:** {2–6 candidate Persian equivalents, each with brief register/usage notes—e.g., رسمی/محاوره‌ای/اصطلاحی/تخصصی}
+**فارسی:**
+* **تعریف:** {تعریف فارسیِ ویژه این معنی}
+* **ترجمه‌های نزدیک:** {۲ تا ۶ معادل پیشنهادی فارسی، هر یک با یادداشت‌های کوتاه در مورد سطح زبانی و کاربرد (مثلاً: رسمی/محاوره‌ای/اصطلاحی/تخصصی)}
 
 ```
 
