@@ -237,10 +237,12 @@ function openai-token-count {
         # model=''
     fi
 
-    in-or-args "$@" |
+    # in-or-args "$@" |
+    cat "$@" |
         # $proxyenv reval-ec ttok -m "${model}"
         openai_token_count.py
 }
+alias tc='openai-token-count'
 ## * Simon's LLM
 function llm-logs {
     #: `llm logs list --help | less`
