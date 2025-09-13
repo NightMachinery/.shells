@@ -31,13 +31,13 @@ _Also spelled:_ {alternative spellings} (ELIDE this line if no alternatives)
 Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give each a short gloss. Include the **Badges** line exactly as shown.
 
 ```
-{#, using emojis such as 1️⃣2️⃣3️⃣}) _{part of speech}_. {short gloss of the specific sense}
+{#, using emojis such as 1️⃣2️⃣3️⃣}) {part of speech (italicized)}. {short gloss of the specific sense}
 
 {clear learner-friendly explanation tailored to this sense}
 
 **IPA:** AmE /…/ · BrE /…/ (if different from general; otherwise elide)
 
-\[Frequency: {Very common|Common|Uncommon|Rare}] \[Register: {Neutral|Informal|Formal|Slang|Technical|Archaic|Literary|Taboo}] \[CEFR: {A1–C2 or elide if none}] \[Domain: {e.g., Law/Medicine/Computing or elide if none}] \[Region: {e.g., US/UK/Aus/India/Global or elide if non-applicable}] (IF using Telegram Markdown, do NOT escape `\[`; `[` is fine by itself.)
+\[Frequency: {Very common|Common|Uncommon|Rare}] \[Register: {Neutral|Informal|Formal|Slang|Technical|Archaic|Literary|Taboo}] \[CEFR: {A1–C2 or elide if none}] \[Domain: {e.g., Law/Medicine/Computing or elide if none}] \[Region: {e.g., US/UK/Aus/India/Global or elide if non-applicable}] (IMPORTANT: IF using Telegram Markdown, do NOT escape `\[`; `[` must be used by itself.)
 
 **Alternative spellings:** {list or elide if none}
 **Word forms:** {full inflections: -s, -ed, -ing; irregulars; compar./superl.; plural pattern; countability notes}
