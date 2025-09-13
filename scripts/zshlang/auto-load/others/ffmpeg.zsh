@@ -46,12 +46,89 @@ function merge-mp3() {
     reval-ec ffmpeg "$inputs[@]" -filter_complex amix=inputs="${input_len}":duration=longest "$out"
 }
 
+function 2mp3-merge {
+    setopt localoptions
+
+    # outputs: optional, defaults to merged.mp3
+    local out="${mp3merge_out:-${mp3merge_o:-merged.mp3}}"
+
+    if (( $# == 0 )); then
+        ecerr "${0}: No inputs provided. Aborting."
+        return 1
+    fi
+    { test -z "${out}" } && { ecerr "${0}: Empty output name. Aborting."; return 1; }
+
+    # force .mp3 extension
+    local out_ext="${out:e}"
+    if [[ -z "${out_ext}" || "${out_ext:l}" != "mp3" ]]; then
+        out="${out:r}.mp3"
+    fi
+
+    # build input list
+    local -a ff_inputs=()
+    local f
+    for f in "$@"; do
+        ff_inputs+=( -i "$f" )
+    done
+
+    # single input: just transcode to mp3 (VBR q=3)
+    if (( $# == 1 )); then
+        assert \
+            ffmpeg \
+            -hide_banner \
+            -loglevel error \
+            "${ff_inputs[@]}" \
+            -vn \
+            -c:a libmp3lame \
+            -q:a 3 \
+            -ar 44100 \
+            -ac 2 \
+            -- "${out}" \
+            @RET
+        return $?
+    fi
+
+    # multiple inputs: normalize each to common format then concat sequentially
+    local idx=0
+    local filter_chain=""
+    local concat_refs=""
+    local n="$#"
+
+    while (( idx < n )); do
+        # per-input normalize to 44.1kHz stereo s16 so concat is robust across mixed sources
+        if [[ -n "${filter_chain}" ]]; then
+            filter_chain="${filter_chain};"
+        fi
+        filter_chain+="[${idx}:a]aresample=44100,aformat=sample_fmts=s16:channel_layouts=stereo[a${idx}]"
+        concat_refs="${concat_refs}[a${idx}]"
+        (( idx++ ))
+    done
+
+    local filter_complex="${filter_chain};${concat_refs}concat=n=${n}:v=0:a=1[aout]"
+
+    assert \
+        ffmpeg \
+        -hide_banner \
+        -loglevel error \
+        "${ff_inputs[@]}" \
+        -filter_complex "${filter_complex}" \
+        -map "[aout]" \
+        -vn \
+        -c:a libmp3lame \
+        -q:a 3 \
+        -ar 44100 \
+        -ac 2 \
+        -- "${out}" \
+        @RET
+}
+@opts-setprefix 2mp3-merge mp3merge
+
 swap-audio() {
     ffmpeg -i "$1" -i "$2" -c:v copy -map 0:v:0 -map 1:a:0 -shortest "$3"
 }
 
 function audio-join {
-    : "@alt audio-join2"
+    : "@alt audio-join-v2, 2mp3-merge"
     mdocu '<output> <audio-file> ...
 Joins the <audio-file>s into <output>. Automatically sets the extension of <output>.
 Outs: aj_out -> The output file. (Might be relative.)' MAGIC
@@ -60,7 +137,7 @@ Outs: aj_out -> The output file. (Might be relative.)' MAGIC
     ffmpeg -i "concat:${(j:|:)@[2,-1]}" -acodec copy "$aj_out"
 }
 
-audio-join2() {
+function audio-join-v2 {
     : '<output> <audio-file> ...'
     (( $#@ < 2 )) && { ecerr "$0: Not enough arguments" ; return 1 }
     aj_out="${1:r}.${2:e}" # GLOBAL
@@ -76,13 +153,25 @@ audio-join2() {
 function 2mp3 {
     jglob
     local i="$1"
+    local quality="${to_mp3_quality:-3}"
     local out="${i:r}.mp3"
     if [[ "${out}" == "${i}" ]]; then
         out="${i:r}_fixed.mp3"
     fi
 
-    ffmpeg -i $i "$out"
+    revaldbg ffmpeg -i $i -q:a "${quality}" "$out"
+    # @G25Flash
+    # When you use `ffmpeg` to encode MP3 without specifying an audio bitrate, it typically defaults to **128 kbps (kilobits per second)**.  This default is set by the `libmp3lame` encoder, which `ffmpeg` uses by default for MP3 output.
+    #
+    # Common VBR settings:
+    # *   `-q:a 0`: Highest quality, largest file.
+    # *   `-q:a 2`: Very high quality, good balance.
+    # *   `-q:a 4`: Good quality, reasonable file size.
+    # *   `-q:a 6`: Medium quality.
+    # [[https://superuser.com/questions/1515824/ffmpeg-what-are-reasonable-values-for-aq-when-creating-mp3][ffmpeg: What are reasonable values for -aq when creating mp3? - Super User]]
+    # a lower value is a higher quality. 0-3 will normally produce transparent results, 4 (default) should be close to perceptual transparency, and 6 produces an "acceptable" quality
 }
+@opts-setprefix 2mp3 to_mp3
 ##
 function ffmpeg-to264 {
     ffmpeg_f=x264 ffmpeg-convert "$@"
