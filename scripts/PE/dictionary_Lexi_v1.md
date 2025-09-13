@@ -30,19 +30,20 @@ _Also spelled:_ {alternative spellings} (ELIDE this line if no alternatives)
 Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give each a short gloss. Include the **Badges** line exactly as shown.
 
 ```
-{#, using emojis such as 1️⃣2️⃣3️⃣}) {part of speech}. {short gloss of the specific sense}
+{#, using emojis such as 1️⃣2️⃣3️⃣}) _{part of speech}_. {short gloss of the specific sense}
 
-\[Frequency: {Very common|Common|Uncommon|Rare}] \[Register: {Neutral|Informal|Formal|Slang|Technical|Archaic|Literary|Taboo}] \[CEFR: {A1–C2 or elide if none}] \[Domain: {e.g., Law/Medicine/Computing or elide if none}] \[Region: {e.g., US/UK/Aus/India/Global or elide if non-applicable}]
+{clear learner-friendly explanation tailored to this sense}
 
 **IPA:** AmE /…/ · BrE /…/ (if different from general; otherwise elide)
+
+\[Frequency: {Very common|Common|Uncommon|Rare}] \[Register: {Neutral|Informal|Formal|Slang|Technical|Archaic|Literary|Taboo}] \[CEFR: {A1–C2 or elide if none}] \[Domain: {e.g., Law/Medicine/Computing or elide if none}] \[Region: {e.g., US/UK/Aus/India/Global or elide if non-applicable}] (IF using Telegram Markdown, do NOT escape `\[`; `[` is fine by itself.)
+
 **Alternative spellings:** {list or elide if none}
 **Word forms:** {full inflections: -s, -ed, -ing; irregulars; compar./superl.; plural pattern; countability notes}
 **Morphology micro-notes (spelling):** {concise rules that apply here, e.g., -y → -ies; drop final -e before -ing; consonant doubling after stressed short vowel; irregular past/p.p.; hyphenation variants; capitalization patterns; or elide if none}
 
 **Frequency & register (detail):** {one short sentence expanding the badge if needed, otherwise elide}
 **Cultural context:** {connotations, politeness, historical or culture-bound use, taboo/loaded status, or elide if none}
-
-**Definition:** {clear learner-friendly explanation tailored to this sense}
 
 **Mini-thesaurus clusters (sense-specific):**
 
@@ -54,13 +55,13 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 
 **Antonyms (compact list):** {comma-separated; elide if none distinct from above}
 
-**Collocations:** {5–10 common pairings for this sense: verb+object, adj+noun, preposition patterns, phrasal patterns}
-
 **Examples:**
 
 * {Example sentence using at least one collocation; tag register/region if notable}
 * {Distinct context}
 * {Another distinct context}
+
+**Collocations:** {0-5 common pairings for this sense: verb+object, adj+noun, preposition patterns, phrasal patterns}
 
 **Related phrases & idioms (this sense):** {phrasal verbs, set phrases, idioms with one-line glosses, or elide if none}
 
