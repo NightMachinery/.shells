@@ -77,6 +77,8 @@ function trimsed {
         gsed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' |
         cat-copy-if-tty
 }
+aliasfn trim-sed trimsed
+aliasfn strip-sed trimsed
 
 function trimpy {
     python3 -c 'import sys
