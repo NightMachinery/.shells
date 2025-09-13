@@ -259,3 +259,8 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 - Avoid tables; prefer lists and short paragraphs.
 - Use **en dashes** for ranges and em dashes sparingly.
 - Keep each sense block compact but complete.
+
+---
+
+Target to be defined:
+
