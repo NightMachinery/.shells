@@ -30,16 +30,16 @@ _Also spelled:_ {alternative spellings} (ELIDE this line if no alternatives)
 Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give each a short gloss. Include the **Badges** line exactly as shown.
 
 ```
-{#}) {part of speech}. {short gloss of the specific sense}
+{#, using emojis such as 1️⃣2️⃣3️⃣}) {part of speech}. {short gloss of the specific sense}
 
-**Badges:** \[Frequency: {Very common|Common|Uncommon|Rare}] \[Register: {Neutral|Informal|Formal|Slang|Technical|Archaic|Literary|Taboo}] \[CEFR: {A1–C2 or elide if none}] \[Domain: {e.g., Law/Medicine/Computing or elide if none}] \[Region: {e.g., US/UK/Aus/India/Global or elide if non-applicable}]
+\[Frequency: {Very common|Common|Uncommon|Rare}] \[Register: {Neutral|Informal|Formal|Slang|Technical|Archaic|Literary|Taboo}] \[CEFR: {A1–C2 or elide if none}] \[Domain: {e.g., Law/Medicine/Computing or elide if none}] \[Region: {e.g., US/UK/Aus/India/Global or elide if non-applicable}]
 
-**IPA:** AmE /…/ · BrE /…/
+**IPA:** AmE /…/ · BrE /…/ (if different from general; otherwise elide)
 **Alternative spellings:** {list or elide if none}
 **Word forms:** {full inflections: -s, -ed, -ing; irregulars; compar./superl.; plural pattern; countability notes}
 **Morphology micro-notes (spelling):** {concise rules that apply here, e.g., -y → -ies; drop final -e before -ing; consonant doubling after stressed short vowel; irregular past/p.p.; hyphenation variants; capitalization patterns; or elide if none}
 
-**Frequency & register (detail):** {one short sentence expanding the badge if needed}
+**Frequency & register (detail):** {one short sentence expanding the badge if needed, otherwise elide}
 **Cultural context:** {connotations, politeness, historical or culture-bound use, taboo/loaded status, or elide if none}
 
 **Definition:** {clear learner-friendly explanation tailored to this sense}
@@ -64,7 +64,7 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 
 **Related phrases & idioms (this sense):** {phrasal verbs, set phrases, idioms with one-line glosses, or elide if none}
 
-**Etymology (sense-specific):** {if different from general; otherwise “See general etymology” or elide if none}
+**Etymology (sense-specific):** {if different from general; otherwise elide. Also elide if none}
 
 **Regional variations:** {US/UK/Aus/Canada/India/etc. spelling/usage/preposition or countability differences, or elide if none}
 
@@ -78,8 +78,13 @@ Create a block **for each distinct meaning**, numbered `1., 2., 3., …`. Give e
 > Repeat the Sense template for **every** distinct meaning of the headword. Separate senses using double new lines.
 
 ### Global notes (if identical across senses, else put into each sense separately)
+```
+
+---
+
 - **General Etymology:** {brief shared origin or elide if not available}
 - **General Regional Variants:** {high-level note if usage differs broadly or elide if not applicable}
+```
 
 ## Style & data guidelines
 
