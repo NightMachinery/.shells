@@ -227,11 +227,15 @@ function def-prompts-from-file {
 
 }
 ## * def-prompts-from-file
-def-prompts-from-file prompt_input_prefix=" " reviewer "${night_prompt_dir}/review_" ".md" v1
+def-prompts-from-file prompt_input_prefix=" " lexi-dictionary-define "${night_prompt_dir}/dictionary_Lexi_" ".md" v1
+
+def-prompts-from-file compact "${night_prompt_dir}/compacter_" ".md" GPT5_v1
+
+def-prompts-from-file prompt_input_prefix=" " review "${night_prompt_dir}/review_" ".md" v1
 
 def-prompts-from-file socratic-teacher "${night_prompt_dir}/socratic_teacher_" ".md" v1.3 v1 v1.1 v1.2 v1.4 v2
 
-def-prompts-from-file redteamer "${night_prompt_dir}/redteam_" ".md" v1.1 v1
+def-prompts-from-file redteam "${night_prompt_dir}/redteam_" ".md" v1.1 v1
 
 def-prompts-from-file extractor "${night_prompt_dir}/extractor_" ".md" v1
 
