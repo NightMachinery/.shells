@@ -1,4 +1,5 @@
-function emacswiki-install() {
+##
+function emacswiki-install {
     @deprecated
     # @alt `git submodule add git://github.com/emacsmirror/emacswiki.org.git emacswiki`
     ##

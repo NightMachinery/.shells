@@ -1,4 +1,7 @@
-# Perhaps you should use aliasfn
+#: * @links
+#: ** [[NIGHTDIR:zshlang/basic/magicmacros.zsh]]
+##
+#: Perhaps you should use aliasfn
 ###
 re unalias a l la ll map p fd ff pip sp rd pu gss gd zi &>/dev/null # mv cp
 alias 'brishzr-repeat'='isLocal && { ec ; assert reval-ec brishzr "$0" ; ec } || true'
@@ -50,7 +53,7 @@ function last-exa {
     ##
     local dir="$(bottomdir "${2:-.}")"
     # Ignoring hidden files, add --all to show them
-    local rs="$(exa --sort "$@"|tail -n1)"
+    local rs="$(eza --no-quotes --sort "$@"|tail -n1)"
     if ! [[ "$rs" =~ '^/' ]] ; then
         rs="$dir/$rs"
     fi

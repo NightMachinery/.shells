@@ -97,6 +97,7 @@ aliasdir incache ~/base/cache
 aliasdir cac ~/base/cache
 ##
 aliasdir mu "$music_dir"
+typeset -g MUSIC_ALL_PATHS=~mu/all_paths.txt
 
 function path-abbrev-to-music-dir {
     in-or-args "$@" \
