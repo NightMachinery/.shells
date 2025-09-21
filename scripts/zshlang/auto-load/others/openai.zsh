@@ -242,7 +242,13 @@ function openai-token-count {
         # $proxyenv reval-ec ttok -m "${model}"
         openai_token_count.py
 }
-alias tc='openai-token-count'
+aliasfn token-count openai-token-count
+alias tc='token-count'
+
+function token-count-each {
+    re 'labeled token-count' "$@"
+}
+alias tce='token-count-each'
 ## * Simon's LLM
 function llm-logs {
     #: `llm logs list --help | less`
@@ -350,6 +356,10 @@ function llm-send {
     local copy_p="${llm_copy_p:-y}"
     local max_tokens="${llm_max_tokens:-20000}"
     local token_strategy="${llm_token_limit_strategy:-reject}"
+
+    if [[ "${model}" =~ '\bgemini\b' ]] ; then
+        max_tokens=250000
+    fi
 
     local input
     if (( $#@ >= 1 )) ; then
@@ -535,7 +545,7 @@ typeset -A gemini25_flash_obj=(
     # model_name 'gemini-2.5-flash-preview-04-17'
     long_name 'gemini_flash_2_5'
     short_name 'flash25'
-    reval_to_aliases 'rflash25 fl25'
+    reval_to_aliases 'rflash25 f25'
     send_aliases 'lflash25'
 )
 define-llm-model-v2 gemini25_flash_obj
