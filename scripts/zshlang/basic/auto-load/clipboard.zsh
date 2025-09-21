@@ -90,7 +90,24 @@ function cat-copy-rtl-if-tty {
 
 function cat-copy-if-tty {
     if isOutTty ; then
-        cat-copy
+        # cat-copy
+        cat-copy-streaming
+    else
+        cat
+    fi
+}
+
+function cat-copy-streaming-remote {
+        if isLocal ; then
+            cat-copy-streaming
+        else
+            pbcopy-remote
+        fi
+}
+
+function cat-copy-streaming-remote-if-tty {
+    if isOutTty ; then
+        cat-copy-streaming-remote
     else
         cat
     fi
