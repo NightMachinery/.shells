@@ -716,7 +716,7 @@ function latex-inline-inputs {
     ##
 }
 
-function pbcopy-file-as-md {
+function context-from-files-v1 {
     #: @duplicateCode/2f9a53358e9a32d7c5642a4a9842dd63
     ##
     local fs=($@)
@@ -752,19 +752,12 @@ function pbcopy-file-as-md {
         done
 
         ec '---'$'\n'
-    } | cat-copy-streaming-remote
+    } | cat-copy-streaming-remote-if-tty
 
     return $retcode
 }
-aliassafe cx1='pbcopy-file-as-md'
-
-function cat-copy-streaming-remote {
-        if isLocal ; then
-            cat-copy-streaming
-        else
-            pbcopy-remote
-        fi
-}
+aliasfn pbcopy-file-as-md context-from-files-v1
+aliassafe cx1='context-from-files-v1'
 
 function repomix-m {
     ensure-array repomix_opts
@@ -775,7 +768,8 @@ function repomix-m {
         repomix "${repomix_opts[@]}" --stdin --stdout --output-show-line-numbers |
         cat-copy-streaming-remote
 }
-aliassafe cx='repomix-m'
+aliasfn context-from-files repomix-m
+aliassafe cx='context-from-files'
 ##
 function prompt-rewrite-telegram {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following text as a post for a Telegram channel. You can use emojis, etc. You can use `**bold text**`, `__italic text__`, ~~strikethrough~~, and Markdown literals and code blocks using backticks, e.g., \`CONSTANT_IN_CODE\`. You can use Markdown links, `[label](url)`. End the post by including a link to our channel, `EMOJI [@SUTCSE](https://t.me/sutcse)` with a random nice creative emoji. This line starts with an emoji and ends with our link, no other text needed.'" (To ensure randomness, use the current date as a seed for your decision: $(date)."' Be concise, but easy to understand. The target audience is AI PhD students studying in Sharif University of Technology. Begin your post with a headline that summarizes the main point (the lede). Write in Farsi (Persian), as the students are Iranians.' "$@"
@@ -878,4 +872,72 @@ function run-with-html-prompt-clean2org-v2 {
     # cat-rtl-streaming-if-tty
 }
 alias '2org'='run-with-html-prompt-clean2org-v2'
+##
+function prompt-music-curate-playlist {
+    {
+        ec "Create a highly curated themed playlist from my local music files.
+
+GOAL
+Select only tracks that strongly and explicitly fit the theme in THEME. Quality over quantity.
+
+THEME: $*
+
+RULES
+1) Use only the files listed under MUSIC FILES. Do not invent or correct paths or titles.
+2) Select between 30 and 100 songs **if that many strong matches exist**. If fewer than 30 truly strong matches exist, include only those strong matches (do NOT pad with weak or tangential picks).
+3) Be extremely selective. Prioritize tracks that clearly embody the theme via title/lyrics/artist/genre/mood/iconic association. Exclude anything with weak or indirect connections.
+4) Treat matching as case-insensitive for semantics, but copy paths exactly as written.
+5) Paths may contain multiple spaces, brackets, parentheses, punctuation, non-ASCII characters, etc. **Preserve every character exactly** (don’t trim, normalize, or escape).
+6) Do not reorder characters inside a path. Do not add quotes, headers, comments, or metadata.
+7) You are allowed to use web search for details about songs you don’t know.
+8) If nothing qualifies, output nothing (an empty playlist).
+
+OUTPUT FORMAT (.m3u)
+- Output **only** the selected file paths, one per line.
+- No numbering, no extra blank lines, no explanations, no counts.
+
+VALIDATION (silent, before you produce the final output)
+- Every output line must exactly match a path from MUSIC FILES. The path must match EXACTLY, including all characters, spaces, and brackets. You should NOT 'correct' anything, as then the path would NOT EXIST!
+- No extra text appears before, between, or after paths.
+
+MUSIC FILES:
+"
+        (
+            cd ~mu/
+            repomix_opts=(--no-file-summary --no-directory-structure --style xml) repomix-m "${MUSIC_ALL_PATHS}"
+            # context-from-files-v1 ~mu/all_paths.txt
+        )
+    } |
+        cat-copy-streaming-remote-if-tty
+}
+
+function runi-prompt-music-curate-playlist {
+    local target="$*"
+    local dest=~mu/"playlists/LLM/G25/$(str2filename ${target}).m3u"
+
+    assert prompt-music-curate-playlist "${target}" @RET
+
+    ecerr  #: needed to flush sth, I don't know what, otherwise the following Ask prompt won't be shown.
+
+    #: Zsh: Wait for the user to press enter:
+    if ask "Read the LLM's answer and save it to: ${dest}" y ; then
+        assert ensure-dir "${dest}" @RET
+
+        local answer answer_tmp
+        answer_tmp="$(gmktemp)" @TRET
+        answer="$(pbpaste)" @TRET
+        if test -z "${answer}" ; then
+            ecerr "$0: empty answer"
+            return 1
+        fi
+
+        ec "${answer}" | reval-ecgray fix_exact_strings.py -vv --input=- --out="${answer_tmp}" --basename-fallback "${MUSIC_ALL_PATHS}"
+
+        ec-sep-h
+
+        cat "${answer_tmp}" | prefixer -sa '../../../' | tee "${dest}"
+    else
+        ecgray "$0: canceled"
+    fi
+}
 ##
