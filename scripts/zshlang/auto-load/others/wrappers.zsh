@@ -32,11 +32,29 @@ function eza {
     exa_command='eza'
   fi
 
-  local arg long=''
-  for arg in "$@"
-  do
-    [[ "$arg" == "-l" || "$arg" == "--long" || "$arg" =~ "-(-tree|T)" ]] && long='y'
+  local arg long='' has_path_p=''
+  for arg in "$@" ; do
+    if [[ "$arg" == "--color" ]] ; then
+      continue
+      #: skip the value of this option
+    fi
+
+    if [[ "$arg" == "-l" || "$arg" == "--long" || "$arg" =~ "-(-tree|T)" ]] ; then
+      long='y'
+    fi
+
+    if test -n "${arg}" && ! [[ "$arg" =~ "^-" ]] ; then
+      has_path_p='y'
+    fi
   done
+
+  # typ has_path_p
+
+  if ! bool "${has_path_p}" ; then
+    set -- "${@}" .
+    #: working around eza bug, to show the CWD
+  fi
+
   if test -z "$long"
   then
     revaldbg command "${exa_command}" -1 "$@"

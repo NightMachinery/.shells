@@ -7,11 +7,12 @@ function vared-py {
     ##
 }
 
-function vared-m {
+function read-input {
     #: @usage `[prompt default_value]`
     #: This is an alternative to =vared= that supports an initial default value.
     readline_prompt "$@"
 }
+aliasfn vared-m read-input
 ##
 function ask {
     doc 'This is a general-purpose function to ask Yes/No questions in Bash, either with or without a default answer. It keeps repeating the question until it gets a valid answer.'

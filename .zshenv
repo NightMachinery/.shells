@@ -133,9 +133,12 @@ function nightsh-load-zshenv {
         }
 
         function realpath2 {
-            test -e "$1" && grealpath -e -- "$1" || {
+            {
+                test -e "$1" && grealpath -e -- "$1" || {
                     (( ${+commands[$1]} )) && grealpath -e -- "${commands[$1]}"
                 }
+            } |
+                    cat-copy-if-tty
             ##
             # -e, --canonicalize-existing: all components of the path must exist
             ##
