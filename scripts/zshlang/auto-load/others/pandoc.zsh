@@ -245,8 +245,9 @@ function pandoc-convert {
                 #: =example= blocks are produced from markdown source blocks with no language identifier. These blocks will not be syntax-highlighted when exported to HTML, so I am converting them to source blocks instead.
                     perl -CS -lpe 's{^(\s*#\+begin_src\b.*)$}{$1 :eval never}ig' |
                 #: We can add a negative lookbehind to avoid adding =:eval never= if it's already added, but I don't think such a check is needed.
-                    perl -CS -lpe '/^\s*#\+begin_src\b/i && s/:style.*?(?:$|\s(*pla::))//ig'
+                    perl -CS -lpe '/^\s*#\+begin_src\b/i && s/:style.*?(?:$|\s(*pla::))//ig' |
                 #: Removes `:style ...` till the next attribute, hence `\s(*pla::)`. (Note the non-greedy matcher.)
+                    strip-duplicate-subsequent-blank-whitespace-lines
 
             elif [[ "$to" =~ '^markdown' ]] && bool $trim_extra ; then
                 perl -0777 -pe 's/(?<=\W)\{(?:\.|\#)[^{}]+\}(?=\W)//g' |

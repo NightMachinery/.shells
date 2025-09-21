@@ -211,4 +211,39 @@ Prefer silent errors when the error is inconsequential, like when deleting tempo
 
 - DRY.
 
+- Redis-stored variables:
+#+begin_src zsh :eval never
+function redis-defvar {
+    local name="${1}"
+
+    if test -z "${name}" ; then
+        ecerr "$0: name not supplied"
+        return 1
+    fi
+
+    fndef "${name}_get" redism get "$name"
+    aliasfnq "${name}_set" silent redism set "$name"
+    aliasfnq "${name}_setnx" silent redism setnx "$name"
+    fndef "${name}_del" silent redism del "$name"
+}
+#+end_src
+
+The above function can be used like this:
+#+begin_src zsh :eval never
+redis-defvar input_volume_cached
+
+# To set it:
+input_volume_cached_set "$vol"
+
+# To set it if it does not exist:
+input_volume_cached_setnx "$vol"
+
+# To read it:
+input_volume_cached_get
+
+# To delete it:
+input_volume_cached_del
+#+end_src
+
+The redis-backed variables should be used when some state needs to be shared between multiple shell instances.
 --------------

@@ -508,19 +508,21 @@ function 2epub-pandoc-byformat() {
     # pandoc --toc -s --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$title.epub" -f "$format" "$files[@]"
 }
 
-function 2epub-pandoc-simple() {
+function 2epub-pandoc-simple {
     : "This works for any files that have the correct extension, or if you set the format explicitly."
     : "<name> <author> (<file with ext> OR <pandoc-opt>) ..."
 
+    ensure-array pandoc_opts
+    local opts=( "${pandoc_opts[@]}" )
     local title
     title="$(<<<$1 str2pandoc-title)" @TRET
     local author
     author="$(<<<$2 str2pandoc-title)" @TRET
     local dest="${pandoc_convert_dest:-$title.epub}"
 
-    pandoc --toc -s "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$dest" >&2
+    reval-ec assert pandoc --toc -s "${opts[@]}" "${@:3}" --metadata title="$title" --epub-metadata <(ec "<dc:title>$title</dc:title> <dc:creator> $author </dc:creator>") -o "$dest" >&2 @RET
 
-    grealpath -e -- "$dest"
+    revaldbg grealpath -e -- "$dest"
 }
 @opts-setprefix 2epub-pandoc-simple pandoc_convert
 aliasfn html2epub-pandoc-simple 2epub-pandoc-simple
@@ -544,7 +546,9 @@ function 2epub-pandoc-byext () {
 
 aliasfn txt2epub-pandoc PANDOC_EXT=txt 2epub-pandoc-byext
 
-aliasfn md2epub-pandoc PANDOC_EXT=md 2epub-pandoc-byext
+function md2epub-pandoc {
+    PANDOC_EXT=md pandoc_opts=( -f markdown-yaml_metadata_block ) 2epub-pandoc-byext "$@"
+}
 ##
 aliasfn org2epub-pandoc PANDOC_EXT=org 2epub-pandoc-byext
 # function org2epub() {

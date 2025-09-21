@@ -3,7 +3,7 @@
 - DRY.
   - Find common patterns in the code that can refactored into shared code.
 
-- Use dependency injection to improve code flexibility - let components receive their dependencies from outside instead of hardcoding them. For example, pass configurations as arguments or inject service instances through constructors. However, never inconvenience the user. The dependencies must always be optional to provide.
+- Use dependency injection to improve code flexibility; let components receive their dependencies from outside instead of hardcoding them. For example, pass configurations as arguments or inject service instances through constructors. However, never inconvenience the user. The dependencies must always be optional to provide. The dependencies must be meaningful, use your own judgement on whether a dependency should be hardcoded or injected.
 
 - Do NOT add comments about what you have changed, e.g., =newly added=. The user uses version control software to manually review the changes.
 
