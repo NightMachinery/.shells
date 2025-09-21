@@ -16,10 +16,15 @@ function h_aliasfn_save {
 }
 
 
-function h_aliasfn() {
+function h_aliasfn {
     : "ruu might be needed. Example: aliasfn hi ruu someVar=12"
     local name="$1"
     local body="$@[2,-1]"
+    if test -z "${body}" ; then
+        ecerr "$0: aliasfn called with no body: $(gq "$@")"
+        return 1
+    fi
+
     local goesto
     goesto="$(extract-head "$body[@]")"
 

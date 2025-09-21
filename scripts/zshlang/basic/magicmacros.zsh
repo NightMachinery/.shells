@@ -24,7 +24,11 @@ alias -g '@MRET'='"$0" || return $?'
 alias '@inargsf'='if (( $#@ == 0 )) ; then ; inargsf re "$0" ; return $? ; fi'
 ##
 alias '@NA'='ectrace "$0: not implemented" @RET'
-
+##
+alias '@darwinOnly'='isDarwin || { ecerr "$0: only works on macOS, aborting" ; return 1 }'
+#: @tests
+#: `fnswap isDarwin false @darwinOnly`
+##
 # alias '@deprecated'='ectrace "$0: deprecated; aborting." @RET'
 alias '@deprecated'='ecgray "$0: deprecated"'
 
