@@ -9,6 +9,8 @@ function claude {
 ##
 function claude-autocommit {
      reval-ec claude --verbose -p 'git-committer' --allowedTools 'Bash(git:*)'
+
+     reval-ecgray glola 5
 }
 ##
 function claude-vcsh-commit {

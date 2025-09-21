@@ -24,6 +24,11 @@ function battery-status-darwin-full {
     # mcli battery status
 }
 
+function battery-status-all-darwin {
+    pmset -g accps
+}
+
+
 function battery-percentage-darwin {
     battery-status-darwin-full | rget '(\d+)%;'
 }

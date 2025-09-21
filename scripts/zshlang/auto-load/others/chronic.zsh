@@ -74,6 +74,9 @@ function chronic-anticreep {
     pip uninstall -y pyOpenSSL
     #: https://github.com/aws/aws-cli/issues/7325
     #: makes BrishGarden not work
+
+    pip install -U 'urllib3<2'
+    #: [[id:90489ec6-5e11-40c9-9f13-673942019b33][python - "cannot import name 'DEFAULT_CIPHERS' from 'urllib3.util.ssl_'" on AWS Lambda using a layer - Stack Overflow]]
 }
 ##
 function cron-commands-reboot-get {
