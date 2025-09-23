@@ -413,7 +413,8 @@ function hear-start-server {
         assert test -e "$f" @RET
     fi
 
-    hear-ipc --pause --loop-playlist=inf "$f"
+    reval-ec hear-ipc --no-resume-playback --pause --loop-playlist=inf "$f"
+    #: We do not want to resume music files.
 }
 ##
 function sdlg {
