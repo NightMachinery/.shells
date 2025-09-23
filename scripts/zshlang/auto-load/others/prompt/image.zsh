@@ -91,6 +91,7 @@ function run-prompt-image-ocr {
         llm-run prompt-image-ocr "$@" |
         cat-rtl-streaming-if-tty
 }
+aliasfn g25-run-prompt-image-ocr with-g25 run-prompt-image-ocr
 
 function jocr {
     # jej
