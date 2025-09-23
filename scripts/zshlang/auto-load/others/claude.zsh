@@ -20,6 +20,8 @@ function claude-vcsh-commit {
         cd "$target_dir" @RET
     
         claude -p "Read '${NIGHTDIR}/prompt/vcsh-commit.md' and start committing changes." --verbose --allowedTools 'Bash(vcsh night.sh:*)'
+
+        reval-ecgray vcn-with glola 5
     )
 }
 
