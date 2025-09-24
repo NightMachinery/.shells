@@ -463,6 +463,10 @@ function prompt-translate2en-v1 {
 function prompt-translate2per {
     prompt-instruction-input "Translate the following to Persian. Preserve the original's style and tone. Do not include any additional commentary." "$@"
 }
+
+function prompt-translate2per-technical-jargon {
+    prompt-instruction-input "Give several Persian translations for the following machine learning jargon. Use web-search and look at Wikipedia etc. to find the common translations:" "$@"
+}
 ##
 function prompt-summarize-text {
     # prompt-instruction-input "Summarize the following document." "$@"
@@ -912,15 +916,29 @@ MUSIC FILES:
 }
 
 function runi-prompt-music-curate-playlist {
+    #: [[NIGHTDIR:zshlang/personal/shortcuts.zsh::typeset -g MUSIC_ALL_PATHS]]
+    #:
+    #: @usage
+    #: `with-nature-paths runi-prompt-music-curate-playlist 'lullaby'`
+    ##
     local target="$*"
-    local dest=~mu/"playlists/LLM/G25/$(str2filename ${target}).m3u"
+    local model dest
 
     assert prompt-music-curate-playlist "${target}" @RET
 
     ecerr  #: needed to flush sth, I don't know what, otherwise the following Ask prompt won't be shown.
 
+
+    model="$(read-input $'\n'"Confirm the model's name to read the LLM's answer and save it as a playlist:"$'\n'"> " "G25")" @RET
+    if whitespace-p "${model}" ; then
+        return 1
+    fi
+    dest=~mu/"playlists/LLM/${model}/${prompt_music_curate_playlist_dest_prefix}$(str2filename ${target}).m3u" @TRET
+    ecgray "$0: dest: ${dest}"
+
     #: Zsh: Wait for the user to press enter:
-    if ask "Read the LLM's answer and save it to: ${dest}" y ; then
+    # if ask "Read the LLM's answer and save it to: ${dest}" y ; then
+    if true ; then
         assert ensure-dir "${dest}" @RET
 
         local answer answer_tmp
@@ -935,7 +953,10 @@ function runi-prompt-music-curate-playlist {
 
         ec-sep-h
 
-        cat "${answer_tmp}" | prefixer -sa '../../../' | tee "${dest}"
+        cat "${answer_tmp}" | prefixer -sa '../../../' > "${dest}"
+
+        # ec-sep-h
+        ecgray "$0: saved: ${dest}"
     else
         ecgray "$0: canceled"
     fi
