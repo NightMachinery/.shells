@@ -51,26 +51,30 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
     elif isDarwin ; then
         if isArm ; then
             if test -d /opt/homebrew/bin ; then
-                # eval $(/opt/homebrew/bin/brew shellenv)
+                if true ; then
+                    eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
+                    eval $(/opt/homebrew/bin/brew shellenv)
 
-                #: see what this code does with:
-                #: `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
-                ##
-                #: I have copied the content of `/opt/homebrew/bin/brew shellenv` manually below and patched it.
-                export HOMEBREW_PREFIX="/opt/homebrew";
-                export HOMEBREW_CELLAR="/opt/homebrew/Cellar";
-                export HOMEBREW_REPOSITORY="/opt/homebrew";
-                fpath[1,0]="/opt/homebrew/share/zsh/site-functions";
+                    #: see what this code does with:
+                    #: `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
+                else
+                    ##
+                    #: I have copied the content of `/opt/homebrew/bin/brew shellenv` manually below and patched it.
+                    export HOMEBREW_PREFIX="/opt/homebrew";
+                    export HOMEBREW_CELLAR="/opt/homebrew/Cellar";
+                    export HOMEBREW_REPOSITORY="/opt/homebrew";
+                    fpath[1,0]="/opt/homebrew/share/zsh/site-functions";
 
-                eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
-                #: Removed `PATH_HELPER_ROOT="/opt/homebrew"` which will break path_helper!
-                #: `/usr/bin/env -i PATH_HELPER_ROOT="/opt/homebrew" /usr/libexec/path_helper -s`: does not return the system paths in `/etc/paths`!
+                    eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
+                    #: Removed `PATH_HELPER_ROOT="/opt/homebrew"` which will break path_helper!
+                    #: `/usr/bin/env -i PATH_HELPER_ROOT="/opt/homebrew" /usr/libexec/path_helper -s`: does not return the system paths in `/etc/paths`!
 
-                [ -z "${MANPATH-}" ] || export MANPATH=":${MANPATH#:}";
-                export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}";
-                ##
-                addToPATH /opt/homebrew/bin
-                addToPATH /opt/homebrew/sbin
+                    [ -z "${MANPATH-}" ] || export MANPATH=":${MANPATH#:}";
+                    export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}";
+                    ##
+                    addToPATH /opt/homebrew/bin
+                    addToPATH /opt/homebrew/sbin
+                fi
             fi
 
             if isBash ; then
