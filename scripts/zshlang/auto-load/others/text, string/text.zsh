@@ -137,7 +137,7 @@ function newline2space {
 function p-newline2space {
     pbpaste | newline2space | cat-copy-if-tty
 }
-alias pns='p-newline2space'
+alias pns='newline2space'
 ##
 function char2ascii {
     ##
@@ -448,6 +448,48 @@ function upper {
     input="${$(in_or_args_newline_p=n in-or-args "$@" ; print -n .)[1,-2]}" @RET
 
     ecn "${input:u}" |
+        cat-copy-if-tty
+}
+##
+function h-arabic-diacritics-charclass {
+    # Optional dependency injection (globals are namespaced)
+    local remove_tatweel_p="${erase_persian_diacritics_remove_tatweel_p:-n}"
+    local remove_tashdid_p="${erase_persian_diacritics_remove_tashdid_p:-y}"
+    ensure-array erase_persian_diacritics_extra_ranges
+    local extra_ranges=("${erase_persian_diacritics_extra_ranges[@]}")
+
+    # Persian/Arabic combining marks, keeping tashdid (U+0651) by default.
+    # Split the 064B–065F block to exclude 0651 unless explicitly requested.
+    local ranges=(
+        '\x{0610}-\x{061A}'  # Arabic sign annotations
+        '\x{064B}-\x{0650}'  # Harakat before tashdid
+        '\x{0652}-\x{065F}'  # Harakat after tashdid
+        '\x{0670}'           # Superscript Alef
+        '\x{06D6}-\x{06ED}'  # Additional Qur'anic annotations
+    )
+    if bool "${remove_tashdid_p}" ; then
+        ranges+=('\x{0651}') # Tashdid/Shadda (optional)
+    fi
+    if bool "${remove_tatweel_p}" ; then
+        ranges+=('\x{0640}') # Tatweel (optional; not a diacritic)
+    fi
+    local r
+    for r in $extra_ranges[@] ; do
+        ranges+=("$r")
+    done
+
+    local charclass="[${(j::)ranges}]"
+    ec "${charclass}"
+}
+
+function erase-persian-diacritics {
+    local charclass
+    charclass="$(h-arabic-diacritics-charclass)" @TRET
+
+    # Use Perl with UTF-8 stdio (-CS) and in-place filter (-pe)
+    local code="s/${charclass}//g;"
+    in-or-args "$@" |
+        reval-ecgray perl -CSD -pe "${code}" |
         cat-copy-if-tty
 }
 ##

@@ -64,7 +64,8 @@ function hearinvisible-playfast {
     (
         local file="${@[-1]}" # @hack
         local ext="${file:e}"
-        if [[ "$ext" = m4a ]] ; then # play (from sox) does not support m4a (with our compile options at least)
+        if [[ "$ext" = m4a ]] ; then
+            #: `play' (from sox) does not support m4a (with our compile options at least)
             arr0 "$@" | filter0 test -e | inargs0 assert-dbg silent hear
         else
             assert-dbg silent play "$@" -G gain "$vol"
