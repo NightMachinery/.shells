@@ -17,6 +17,7 @@ function chronic-certs {
 }
 
 function chronic-update {
+    codex-install
     pipx upgrade aider-chat
 
     pip-install fanficfare cloudscraper
