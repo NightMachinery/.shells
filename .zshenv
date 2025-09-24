@@ -1,6 +1,23 @@
 ###
 alias zsh-defer=''
 ##
+if false ; then
+    function path_check {
+        #: This function can be used for debugging PATH corruption issues.
+        local prefix="${*:-$0}"
+
+        if [[ -z $ZSH_VERSION ]] ; then
+            return 0
+        fi
+
+        if (($path[(I)/bin])) ; then
+            echo "${prefix}: path is healthy"
+        else
+            echo "${prefix}: path is corrupt!"
+        fi
+    }
+fi
+##
 function psource() {
     if [[ -r "$1" ]]; then # -r: readable file
         source "$@"
@@ -53,6 +70,7 @@ function nightsh-load-zshenv {
     # export disable_malice=''
     export disable_malice='y'
     export NIGHT_PERSONAL=y
+
     source "$HOME/scripts/zshlang/load-first.zsh"
     typeset -g NIGHT_NO_EXPENSIVE
     isNotExpensive || {
@@ -196,4 +214,7 @@ function nightsh-load-local-last() {
     fi
     psource "$HOME/.privateShell"
 }
+
+
 nightsh-load-local-last
+
