@@ -86,7 +86,6 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
     fi
 fi
 
-
 if isDarwin ; then
     addToPATH /Applications/SuperCollider.app/Contents/Resources
     addToPATH /Applications/SuperCollider.app/Contents/MacOS
