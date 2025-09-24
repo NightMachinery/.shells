@@ -212,6 +212,29 @@ function gap {
   reval-ec git status --short --untracked-files
 }
 ##
+function git-untracked-ignored {
+    local output
+    # Use 'git clean -ndx' to list all untracked files and directories,
+    # including those ignored by standard Git ignore rules.
+    # -n, --dry-run: Don't actually remove anything, just show what would be done.
+    # -d: Remove untracked directories in addition to untracked files.
+    # -x: Don't use the standard ignore rules. Remove all untracked files,
+    #     including those that would normally be ignored by .gitignore.
+    output="$(git clean --dry-run -d -x)" @RET
+
+    if [[ -z "${output}" ]]; then
+        # No untracked or ignored files found, return silently.
+        return 0
+    fi
+
+    # Parse the output to extract just the paths.
+    # Each line from 'git clean -ndx' is typically "Would remove <path>".
+    local paths
+    paths="$(ec "${output}" | perl -pe 's/^Would remove //')" @RET
+
+    ec "${paths}"
+}
+##
 function gss-mods {
   local res
   res="$(gss "$@")" @RET
