@@ -1,6 +1,7 @@
 if isDarwin ; then
     eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
     #: adds system's default paths (`/etc/paths`) to $PATH
+    #: [[id:65c502a2-125f-470e-ac22-5d185a0be0fe][macos - Executables in /bin and /usr/bin are not found in path]]
 fi
 
 ### set max open files, etc
