@@ -98,6 +98,9 @@ aliasdir cac ~/base/cache
 ##
 aliasdir mu "$music_dir"
 typeset -g MUSIC_ALL_PATHS=~mu/all_paths.txt
+typeset -g MUSIC_NATURE_PATHS=~mu/nature_paths.txt
+alias with-nature-paths='MUSIC_ALL_PATHS="${MUSIC_NATURE_PATHS}" prompt_music_curate_playlist_dest_prefix="nature: "'
+# aliasfn with-nature-paths 'MUSIC_ALL_PATHS="${MUSIC_NATURE_PATHS}"' reval-env
 
 function path-abbrev-to-music-dir {
     in-or-args "$@" \
