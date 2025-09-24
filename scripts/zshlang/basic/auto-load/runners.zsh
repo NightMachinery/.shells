@@ -304,3 +304,40 @@ function sudoify {
     #: @tip command is also a unix command, and so can be sudoified
 }
 ##
+function envless {
+    local cmd=("$@")
+    cmd[1]="${commands[$cmd[1]]}"
+
+    ensure-array envless_engine
+    local engine=("${envless_engine[@]}")
+    if test -z "${engine[*]}"; then
+        engine=(reval-ecgray env -i)
+    fi
+
+    local opts=()
+
+    ensure-array envless_vars
+    local vars=(
+        HOME
+
+        KITTY_WINDOW_ID
+
+        TERMINFO
+        TERM
+
+        SSH_CLIENT
+
+        "${envless_vars[@]}"
+    )
+
+    for var in "${vars[@]}" ; do
+        if test -n "${(P)var}" ; then
+            opts+=("${var}=${(P)var}")
+        fi
+    done
+
+    "${engine[@]}" "${opts[@]}" "${cmd[@]}"
+}
+
+alias sbb='ZSH_PWD="$PWD" envless_engine=(exec env -i) envless_vars=(ZSH_PWD) envless zsh'
+##
