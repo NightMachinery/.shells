@@ -80,8 +80,8 @@ function nightsh-load-zshenv {
         ##
         # export GERBIL_HOME="$(brew --cellar gerbil-scheme)" # @exorbitant
         if isDarwin ; then
-            export GERBIL_HOME=/usr/local/Cellar/gerbil-scheme/0.16/
-            # not sure if this is even right
+            export GERBIL_HOME=/opt/homebrew/Cellar/gerbil-scheme
+            #: not sure if this is even right
         fi
         ##
         # this is a TCL list https://wiki.tcl-lang.org/page/list , uses whitespace as sep
