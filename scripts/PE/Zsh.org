@@ -246,4 +246,7 @@ input_volume_cached_del
 #+end_src
 
 The redis-backed variables should be used when some state needs to be shared between multiple shell instances.
+
+- Things that should NOT be dependency-injected unless the user asks explicitly:
+  - commands
 --------------
