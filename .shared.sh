@@ -1,5 +1,6 @@
 if isDarwin ; then
     eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
+    #: adds system's default paths (`/etc/paths`) to $PATH
 fi
 
 ### set max open files, etc
@@ -65,6 +66,7 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
                 export brew_bin_dir=/opt/homebrew/bin
             else
                 typeset -xg brew_bin_dir=/opt/homebrew/bin
+                #: Inside a function, `typeset` (or `local`) creates a local variable by default. If a local already exists, `export` will export that local (only commands run inside the function see it); when the function returns, the local disappears and the global remains unchanged. `typeset -xg` bypasses any local shadowing and updates the global.
             fi
             addToPATH "$brew_bin_dir"
             addToPATH /opt/homebrew/sbin
