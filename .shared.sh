@@ -1,3 +1,7 @@
+if isDarwin ; then
+    eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
+fi
+
 ### set max open files, etc
 # The "hard limit" (`-H`) could also be set, but only to a value less than the current one, and only to a value not less than the "soft limit" (`-S`).
 ulimit -S -n 50000 >&/dev/null || ulimit -S -n 10240 # the first one fails on a non-configured macOS
@@ -51,30 +55,10 @@ if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not
     elif isDarwin ; then
         if isArm ; then
             if test -d /opt/homebrew/bin ; then
-                if true ; then
-                    eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
-                    eval $(/opt/homebrew/bin/brew shellenv)
+                eval $(/opt/homebrew/bin/brew shellenv)
 
-                    #: see what this code does with:
-                    #: `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
-                else
-                    ##
-                    #: I have copied the content of `/opt/homebrew/bin/brew shellenv` manually below and patched it.
-                    export HOMEBREW_PREFIX="/opt/homebrew";
-                    export HOMEBREW_CELLAR="/opt/homebrew/Cellar";
-                    export HOMEBREW_REPOSITORY="/opt/homebrew";
-                    fpath[1,0]="/opt/homebrew/share/zsh/site-functions";
-
-                    eval "$(/usr/bin/env /usr/libexec/path_helper -s)"
-                    #: Removed `PATH_HELPER_ROOT="/opt/homebrew"` which will break path_helper!
-                    #: `/usr/bin/env -i PATH_HELPER_ROOT="/opt/homebrew" /usr/libexec/path_helper -s`: does not return the system paths in `/etc/paths`!
-
-                    [ -z "${MANPATH-}" ] || export MANPATH=":${MANPATH#:}";
-                    export INFOPATH="/opt/homebrew/share/info:${INFOPATH:-}";
-                    ##
-                    addToPATH /opt/homebrew/bin
-                    addToPATH /opt/homebrew/sbin
-                fi
+                #: see what this code does with:
+                #: `env -i zsh -f -c '/opt/homebrew/bin/brew shellenv'`
             fi
 
             if isBash ; then
