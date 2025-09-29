@@ -10,5 +10,5 @@ function calc-raw {
     python3 -c "from math import *; print($*)" |
         cat-copy-if-tty
 }
-ialias calc='noglob calc-raw'
-ialias x='noglob calc-raw'
+alias calc='noglob calc-raw'
+alias x='noglob calc-raw'
