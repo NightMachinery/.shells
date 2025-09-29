@@ -4,6 +4,8 @@ function claude {
     local -x VISUAL="${EDITOR}"
     #: not sure if EDITOR is actually used
 
+    tty-title "🍼${PWD:t}"
+
     $proxyenv command claude "$@"
 }
 ##
