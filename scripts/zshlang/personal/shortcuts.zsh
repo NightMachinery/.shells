@@ -98,9 +98,19 @@ aliasdir cac ~/base/cache
 ##
 aliasdir mu "$music_dir"
 typeset -g MUSIC_ALL_PATHS=~mu/all_paths.txt
+
 typeset -g MUSIC_NATURE_PATHS=~mu/nature_paths.txt
-alias with-nature-paths='MUSIC_ALL_PATHS="${MUSIC_NATURE_PATHS}" prompt_music_curate_playlist_dest_prefix="nature: "'
-# aliasfn with-nature-paths 'MUSIC_ALL_PATHS="${MUSIC_NATURE_PATHS}"' reval-env
+alias with-nature-music-paths='MUSIC_ALL_PATHS="${MUSIC_NATURE_PATHS}" prompt_music_curate_playlist_dest_prefix="nature: "'
+# aliasfn with-nature-music-paths 'MUSIC_ALL_PATHS="${MUSIC_NATURE_PATHS}"' reval-env
+
+typeset -g MUSIC_PERSIAN_PATHS=~mu/persian_paths.txt
+alias with-persian-music-paths='MUSIC_ALL_PATHS="${MUSIC_PERSIAN_PATHS}" prompt_music_curate_playlist_dest_prefix="persian: "'
+
+typeset -g MUSIC_FRENCH_PATHS=~mu/french_paths.txt
+alias with-french-music-paths='MUSIC_ALL_PATHS="${MUSIC_FRENCH_PATHS}" prompt_music_curate_playlist_dest_prefix="french: "'
+
+typeset -g MUSIC_FOREIGN_PATHS=~mu/foreign_paths.txt
+alias with-foreign-music-paths='MUSIC_ALL_PATHS="${MUSIC_FOREIGN_PATHS}" prompt_music_curate_playlist_dest_prefix="foreign: "'
 
 function path-abbrev-to-music-dir {
     in-or-args "$@" \

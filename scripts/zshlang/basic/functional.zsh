@@ -34,9 +34,11 @@ function lambda() {
 }
 ##
 function labeled {
+    local cmd=("$@") interfix="${labeled_interfix:- }"
+
     local msg out retcode=0
-    out="$(reval "$@")" || retcode=$?
-    msg="$(gq "${@}"): ${out}"
+    out="$(reval "${cmd[@]}")" || retcode=$?
+    msg="$(gq "${cmd[@]}"):${interfix}${out}"
 
     if (( retcode != 0 )) ; then
         msg+=" (exited ${retcode})"

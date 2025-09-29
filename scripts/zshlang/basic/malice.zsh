@@ -1,4 +1,6 @@
 ## Alias Module
+#: Malice alters the behavior of the spacebar and the alias command to automatically expand aliases as you type.
+##
 function expand-alias {
     doc This only expands once. To expand all aliases, use 'expand-aliases'.
     if [[ -n $ZSH_VERSION ]]; then

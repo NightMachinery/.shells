@@ -1,18 +1,18 @@
-ialias zshrc='$=EDITOR ~/.zshrc'
-ialias zshenv='$=EDITOR ~/.zshenv'
+# ialias zshrc='$=EDITOR ~/.zshrc'
+# ialias zshenv='$=EDITOR ~/.zshenv'
 ##
-alias sb=". ~/.zshenv ; conda-reactivate ; bell-zsh-start"
 alias ss='emc-sourceme'
-alias sbp='eval "$(pbpaste)"'
-alias sbi="sb ; source-interactive-all"
-alias sia='source-interactive-all ; bell-zsh-start'
-alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
-alias szsh='source "$NIGHTDIR"/zshlang/load-others.zsh'
+# alias sb=". ~/.zshenv ; conda-reactivate ; bell-zsh-start"
+# alias sbp='eval "$(pbpaste)"'
+# alias sbi="sb ; source-interactive-all"
+# alias sia='source-interactive-all ; bell-zsh-start'
+# alias sbash='source "$NIGHTDIR"/bash/load-others.bash'
+# alias szsh='source "$NIGHTDIR"/zshlang/load-others.zsh'
 ##
 alias hrep="fc -El 0 | grep"
 alias grep='grep --color=auto'
 
-ialias plc=playlistc
+alias plc=playlistc
 ##
 alias b='builtin'
 alias n='noglob'
