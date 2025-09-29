@@ -7,7 +7,7 @@ function xelatex-m {
 
     local success_p=n
     {
-        trs *.{log,xdv,aux,bbl,blg,xdv,ent}(.DN)
+        trs **/*.{log,xdv,aux,bbl,blg,xdv,ent,toc}(.DN)
         #: =.ent=: endnotes cached files, used in Sharif Seminar
 
         local draft_opts=(--no-pdf)

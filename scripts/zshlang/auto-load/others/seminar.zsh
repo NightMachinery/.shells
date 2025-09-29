@@ -16,7 +16,7 @@ function h-seminar-compile-emacs {
     return 0
 }
 ##
-function agr-replace-latex-command {
+function agr-fix-case-latex-command {
     local cmd="$1"
 
     reval-ec-env agr_regex=y from='(?i)\\'"${cmd:l}" to='\\'"${cmd}" agr
