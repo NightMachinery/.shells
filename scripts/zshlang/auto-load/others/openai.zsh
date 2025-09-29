@@ -501,6 +501,24 @@ function define-llm-model-v2 {
 }
 ## * Models
 ## ** Google Gemini
+typeset -A gemini_flash_latest_obj=(
+    model_name 'gemini-flash-latest'
+    long_name 'gemini_flash_latest'
+    short_name 'flash'
+    reval_to_aliases 'rflash fl'
+    send_aliases 'lflash'
+)
+define-llm-model-v2 gemini_flash_latest_obj
+
+typeset -A gemini_flash_lite_latest_obj=(
+    model_name 'gemini-flash-lite-latest'
+    long_name 'gemini_flash_lite_latest'
+    short_name 'flite'
+    reval_to_aliases 'rflite'
+    send_aliases 'lflite'
+)
+define-llm-model-v2 gemini_flash_lite_latest_obj
+## **** Google Gemini 2.5
 typeset -gA gemini25_obj=(
     ##
     model_name 'gemini-2.5-pro'
@@ -512,34 +530,7 @@ typeset -gA gemini25_obj=(
 )
 define-llm-model-v2 gemini25_obj
 
-typeset -gA gemini15_obj=(
-    model_name 'gemini-1.5-pro-latest'
-    long_name 'gemini_1_5_pro'
-    short_name 'g15'
-    reval_to_aliases 'g15'
-    send_aliases 'lg15'
-)
-define-llm-model-v2 gemini15_obj
-
-typeset -A gemini_flash_8b_obj=(
-    model_name 'gemini-1.5-flash-8b-latest'
-    long_name 'gemini_flash_8b_1_5'
-    short_name 'flash-8b'
-    reval_to_aliases 'rflash_8b fl8'
-    send_aliases 'lflash_8b'
-)
-define-llm-model-v2 gemini_flash_8b_obj
-
-typeset -A gemini_flash_obj=(
-    model_name 'gemini-1.5-flash-latest'
-    long_name 'gemini_flash_1_5'
-    short_name 'flash'
-    reval_to_aliases 'rflash fl'
-    send_aliases 'lflash'
-)
-define-llm-model-v2 gemini_flash_obj
-## **** Google Gemini 2
-# 2.5 Flash
+#: Gemini 2.5 Flash
 typeset -A gemini25_flash_obj=(
     model_name 'gemini-2.5-flash'
     # model_name 'gemini-2.5-flash-preview-04-17'
@@ -549,76 +540,93 @@ typeset -A gemini25_flash_obj=(
     send_aliases 'lflash25'
 )
 define-llm-model-v2 gemini25_flash_obj
+## **** Google Gemini Old Models
+#: Gemini 2.0 Flash
+# typeset -A gemini2_flash_obj=(
+#     model_name 'gemini-2.0-flash'
+#     # model_name 'gemini-2.0-flash-exp'
+#     long_name 'gemini_flash_2_0'
+#     short_name 'flash2'
+#     reval_to_aliases 'rflash2 fl2'
+#     send_aliases 'lflash2'
+# )
+# define-llm-model-v2 gemini2_flash_obj
 
-# Gemini 2.0 Flash
-typeset -A gemini2_flash_obj=(
-    model_name 'gemini-2.0-flash'
-    # model_name 'gemini-2.0-flash-exp'
-    long_name 'gemini_flash_2_0'
-    short_name 'flash2'
-    reval_to_aliases 'rflash2 fl2'
-    send_aliases 'lflash2'
-)
-define-llm-model-v2 gemini2_flash_obj
+# typeset -A or_gemini2_flash_obj=(
+#     model_name 'openrouter/google/gemini-2.0-flash-001'
+#     long_name 'or_gemini_flash_2_0'
+#     short_name 'or_flash2'
+#     reval_to_aliases 'r-or-flash2 or-fl2'
+#     send_aliases 'l-or-flash2'
+# )
+# define-llm-model-v2 or_gemini2_flash_obj
 
-typeset -A or_gemini2_flash_obj=(
-    model_name 'openrouter/google/gemini-2.0-flash-001'
-    long_name 'or_gemini_flash_2_0'
-    short_name 'or_flash2'
-    reval_to_aliases 'r-or-flash2 or-fl2'
-    send_aliases 'l-or-flash2'
-)
-define-llm-model-v2 or_gemini2_flash_obj
-
-# Gemini 2.0 Flash Thinking Mode
-typeset -A gemini2_flash_thinking_obj=(
-    # model_name 'gemini-2.0-flash-thinking-exp-1219'
-    model_name 'gemini-2.0-flash-thinking-exp-01-21'
-    long_name 'gemini_flash_thinking_2_0'
-    short_name 'flash2t'
-    reval_to_aliases 'rflash2t fl2t'
-    send_aliases 'lflash2t'
-)
-define-llm-model-v2 gemini2_flash_thinking_obj
+# typeset -A gemini2_flash_thinking_obj=(
+#     # model_name 'gemini-2.0-flash-thinking-exp-1219'
+#     model_name 'gemini-2.0-flash-thinking-exp-01-21'
+#     long_name 'gemini_flash_thinking_2_0'
+#     short_name 'flash2t'
+#     reval_to_aliases 'rflash2t fl2t'
+#     send_aliases 'lflash2t'
+# )
+# define-llm-model-v2 gemini2_flash_thinking_obj
+##
+# typeset -gA gemini15_obj=(
+#     model_name 'gemini-1.5-pro-latest'
+#     long_name 'gemini_1_5_pro'
+#     short_name 'g15'
+#     reval_to_aliases 'g15'
+#     send_aliases 'lg15'
+# )
+# define-llm-model-v2 gemini15_obj
+##
+# typeset -A gemini_flash_8b_obj=(
+#     model_name 'gemini-1.5-flash-8b-latest'
+#     long_name 'gemini_flash_8b_1_5'
+#     short_name 'flash-8b'
+#     reval_to_aliases 'rflash_8b fl8'
+#     send_aliases 'lflash_8b'
+# )
+# define-llm-model-v2 gemini_flash_8b_obj
 ## *** OpenRouter: Google Gemini
 # OpenRouter Gemini Flash 8B
-typeset -A openrouter_gemini_flash_8b_obj=(
-    model_name 'openrouter/google/gemini-flash-1.5-8b'
-    long_name 'openrouter_gemini_flash_8b'
-    short_name 'or-flash-8b'
-    reval_to_aliases 'or_rflash_8b orfl8'
-    send_aliases 'or_lflash_8b'
-)
-define-llm-model-v2 openrouter_gemini_flash_8b_obj
+# typeset -A openrouter_gemini_flash_8b_obj=(
+#     model_name 'openrouter/google/gemini-flash-1.5-8b'
+#     long_name 'openrouter_gemini_flash_8b'
+#     short_name 'or-flash-8b'
+#     reval_to_aliases 'or_rflash_8b orfl8'
+#     send_aliases 'or_lflash_8b'
+# )
+# define-llm-model-v2 openrouter_gemini_flash_8b_obj
 
 # OpenRouter Gemini Flash 8B Experimental
-typeset -A openrouter_gemini_flash_8b_exp_obj=(
-    model_name 'openrouter/google/gemini-flash-1.5-8b-exp'
-    long_name 'openrouter_gemini_flash_8b_exp'
-    short_name 'or-flash-8b-exp'
-    reval_to_aliases 'or_rflash_8b_exp orfl8e'
-    send_aliases 'or_lflash_8b_exp'
-)
-define-llm-model-v2 openrouter_gemini_flash_8b_exp_obj
+# typeset -A openrouter_gemini_flash_8b_exp_obj=(
+#     model_name 'openrouter/google/gemini-flash-1.5-8b-exp'
+#     long_name 'openrouter_gemini_flash_8b_exp'
+#     short_name 'or-flash-8b-exp'
+#     reval_to_aliases 'or_rflash_8b_exp orfl8e'
+#     send_aliases 'or_lflash_8b_exp'
+# )
+# define-llm-model-v2 openrouter_gemini_flash_8b_exp_obj
 
 # OpenRouter Gemini 1.5
-typeset -A openrouter_gemini_15_obj=(
-    model_name 'openrouter/google/gemini-pro-1.5'
-    long_name 'openrouter_gemini_15'
-    short_name 'or-g15'
-    reval_to_aliases 'or_rg15 org15'
-    send_aliases 'or_lg15'
-)
-define-llm-model-v2 openrouter_gemini_15_obj
+# typeset -A openrouter_gemini_15_obj=(
+#     model_name 'openrouter/google/gemini-pro-1.5'
+#     long_name 'openrouter_gemini_15'
+#     short_name 'or-g15'
+#     reval_to_aliases 'or_rg15 org15'
+#     send_aliases 'or_lg15'
+# )
+# define-llm-model-v2 openrouter_gemini_15_obj
 
 # OpenRouter Gemini 1.5 Experimental
-typeset -A openrouter_gemini_15_exp_obj=(
-    model_name 'openrouter/google/gemini-pro-1.5-exp'
-    long_name 'openrouter_gemini_15_exp'
-    short_name 'or-g15-exp'
-    reval_to_aliases 'or_rg15_exp org15e'
-    send_aliases 'or_lg15_exp'
-)
+# typeset -A openrouter_gemini_15_exp_obj=(
+#     model_name 'openrouter/google/gemini-pro-1.5-exp'
+#     long_name 'openrouter_gemini_15_exp'
+#     short_name 'or-g15-exp'
+#     reval_to_aliases 'or_rg15_exp org15e'
+#     send_aliases 'or_lg15_exp'
+# )
 
 ## ** Misc Models
 typeset -gA gpt35t16k_obj=(
@@ -714,15 +722,13 @@ typeset -gA llama3_obj=(
 define-llm-model-v2 llama3_obj
 ##
 ## * Default Models
-typeset -g llm_default_model="${gemini_flash_2_5_model}"
-# typeset -g llm_default_model="${gemini_flash_thinking_2_0_model}"
+typeset -g llm_default_model="${gemini_flash_latest_model}"
 # typeset -g llm_default_model="${gemini_2_5_pro_model}"
-# typeset -g llm_default_model="${claude_3_5_sonnet_model_name}"
 
 aliassafe xx='\noglob llm-send'
 aliassafe llm-run='\noglob reval-to-llm'
 aliassafe xz='\noglob llm-run'
-alias xzz='with-llm-attach-clipboard g15'
+alias xzz='with-llm-attach-clipboard llm-run'
 #: @bug/upstream [[id:f96f4512-7ecc-4bff-8ebb-dfc8d46979d4][OpenRouter Claude does not support images · Issue #602 · simonw/llm]]
 
 #: @nameConflict xz, unxz, xzcat, lzma, unlzma, lzcat - Compress or decompress .xz and .lzma  files
