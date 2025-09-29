@@ -125,10 +125,28 @@ function h-mpv-get-prop {
 function hear-get {
     h-mpv-get-prop hear-do "${@}"
 }
-alias 'hgg'=hear-get
+function hear-get-info {
+    local labeled_interfix=$'\n'"  "
+
+    labeled hear-get-playlist
+    ec
+    labeled hear-get
+}
+alias hgg='hear-get-info'
+
+alias 'hear-get-playlist'='hear_last_playlist_get'
+alias 'hgp'='hear-get-playlist'
 
 function mpv-get {
     h-mpv-get-prop mpv-do "${@}"
+}
+
+function hear-get-playlist {
+    hear-get playlist-path
+}
+
+function hear-get-playlist-count {
+    hear-get playlist/count
 }
 ##
 function mpv-do {
@@ -178,7 +196,7 @@ alias mpv-rpc-audio='mpv_rpc_socket="$mpv_audio_ipc" '
 aliasfn hear-rpc mpv-rpc-audio mpv-rpc
 aliasfn hear-do mpv-rpc-audio mpv-do
 
-aliasfn hear-shuffle hear-do playlist-shuffle
+aliasfn hear-shuffle hear-do playlist-shuffle  #: or just press 'k'
 aliasfn mpv-play-toggle mpv-do keypress space
 aliasfn hear-play-toggle hear-do keypress space
 aliasfn hear-play-on hear-do set pause no
@@ -186,7 +204,6 @@ aliasfn hear-play-off hear-do set pause yes
 aliasfn mpv-play-on fnswap hear-do mpv-do hear-play-on
 aliasfn mpv-play-off fnswap hear-do mpv-do hear-play-off
 
-aliasfn hear-shuffle hear-do playlist-shuffle # or just press 'k'
 
 function hear-loadfile {
     local url="$1"
@@ -229,10 +246,13 @@ aliasfn hear-autoload-enable mpv-rpc-audio mpv-autoload-enable
 aliasfn hear-autoload-disable mpv-rpc-audio mpv-autoload-disable
 
 function hear-load-playlist {
+    local playlist="$1"
+    assert-args playlist @RET
+
     {
         reval-ecgray hear-autoload-disable
         sleep 0.2 #: to make =hear-autoload-disable= take effect
-        mpv_load_command=loadlist reval-ecgray hear-loadfile "$@"
+        mpv_load_command=loadlist reval-ecgray hear-loadfile "${playlist}"
         sleep 0.2 && revaldbg hear-seek-begin
     } always {
         #: We can't re-enable =autoload=, or it will autoload files when the next file in the playlist is opened.
