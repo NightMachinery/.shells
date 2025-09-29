@@ -2637,7 +2637,8 @@ appHotkey{ key='.', appName='com.google.Chrome' }
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 appHotkey{ key=';', appName='com.microsoft.Excel' }
 
-appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
+-- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
+appHotkey{ key='c', appName='com.apple.Terminal' }
 -- appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor VSCode App
 
 emacsAppName = 'org.gnu.Emacs'
