@@ -322,6 +322,7 @@ function envless {
 
         KITTY_WINDOW_ID
 
+        TERM_PROGRAM
         TERMINFO
         TERM
 
@@ -339,5 +340,7 @@ function envless {
     "${engine[@]}" "${opts[@]}" "${cmd[@]}"
 }
 
-alias sbb='ZSH_PWD="$PWD" envless_engine=(exec env -i) envless_vars=(ZSH_PWD) envless zsh'
+alias zsh-restart='ZSH_PWD="$PWD" envless_engine=(exec env -i) envless_vars=(ZSH_PWD) envless zsh'
+alias sbb='zsh-restart'
+alias sss='zsh-restart'
 ##
