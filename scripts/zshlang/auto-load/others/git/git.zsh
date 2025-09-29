@@ -244,6 +244,50 @@ function gss-mods {
 }
 alias gssm=gss-mods
 
+function git-status-commit {
+  #: `git diff-tree` doesn't seem to support color.
+  ##
+  # --- Dependencies ---
+  local rename_threshold="${git_status_commit_rename_threshold:-50}"
+  local copy_threshold="${git_status_commit_copy_threshold:-50}"
+  local find_copies_harder_p="${git_status_commit_find_copies_harder_p:-y}"
+  # --- Positional Arguments ---
+  local commit_ref="${1:-HEAD}"
+  # --- Logic ---
+  if ! command git rev-parse --is-inside-work-tree >/dev/null 2>&1 ; then
+  ecerr "Error: Not inside a git repository."
+  return 1
+  fi
+  local real_commit
+  real_commit="$(command git rev-parse --verify --quiet "${commit_ref}^{commit}")" @RET
+  if [[ -z "$real_commit" ]]; then
+  ecerr "Error: Invalid commit reference: '${commit_ref}'"
+  return 1
+  fi
+  local -a git_opts
+  git_opts=(
+    --no-commit-id
+    --name-status
+    -r
+    "-M${rename_threshold}%"
+    "-C${copy_threshold}%"
+  )
+  if bool "$find_copies_harder_p" ; then
+  git_opts+=(--find-copies-harder)
+  fi
+  # Handle the initial commit, which has no parents, by comparing it to the empty tree.
+  if ! command git rev-parse --verify --quiet "${real_commit}^" >/dev/null 2>&1 ; then
+  local empty_tree_hash='4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+  #: @G25 Since Git's hashing is deterministic (based on content), an empty tree object **always produces the exact same SHA-1 hash** in every Git repository on every computer in the world. That hash is `4b825dc642cb6eb9a060e54bf8d69288fbee4904`.
+
+  command git diff-tree "${git_opts[@]}" "$empty_tree_hash" "$real_commit" @RET
+  else
+    # For a normal commit, diff-tree implicitly compares it against its first parent.
+    reval-ecgray git diff-tree "${git_opts[@]}" "$real_commit" @RET
+  fi
+}
+alias gssc='git-status-commit'
+##
 function git-rm {
   git rm --cached "$@"
 }
