@@ -112,7 +112,7 @@ function emc-gateway {
         local -x emacs_night_server_name="${EMACS_SOCKET_NAME}"
     fi
 
-    fnswap isI true tty-title "$title"
+    tty_title_f=y tty-title "$title"
 
     local my_term="$TERM"
     if isKitty || isiTerm ; then

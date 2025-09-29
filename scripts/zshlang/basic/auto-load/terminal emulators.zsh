@@ -46,10 +46,11 @@ function title {
 }
 
 function tty-title {
-    isI || return 0
-    local text="$@"
+    if bool "${tty_title_f}" || { isTty && isI } ; then
+        local text="$@"
 
-    title "$text" "$text"
+        title "$text" "$text"
+    fi
 }
 ##
 function terminfo-set-auto {

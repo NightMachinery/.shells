@@ -1,4 +1,11 @@
 ##
+function tmux-client-terminal-get {
+    #: This dynamically returns the TERM of the terminal that the current session is attached to.
+    #: I.e., if you attach to the same session using two different clients, it will return two different values.
+    ##
+    tmux display-message -p '#{client_termname}' 2>/dev/null
+}
+##
 #: @duplicateCode/0c8b9d0226cdfb4f5bc0a9ea735089df
 function tmuxnew {
     #: @todo0 integrate =str2tmuxname=
@@ -130,6 +137,22 @@ aliasfn tcgar tmux-capture BrishGarden
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 
 function ivy {
+    ###
+    local tty_title="${ivy_tty_title}"
+    if test -z "$tty_title" ; then
+        # tty_title="🪴"
+        #: doesn't display correctly
+        #:  - [jalali:1404/07/06/01:33]
+
+        # tty_title="🌿"
+
+        tty_title="🌳"
+
+        # tty_title="ivy"
+    fi
+
+    tty-title "${tty_title}"
+    ###
     ## ivy acts as the terminal emulator's startup hook, as well
     phoenix-reload
     ##
