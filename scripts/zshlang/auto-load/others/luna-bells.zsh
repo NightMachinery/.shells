@@ -1137,4 +1137,8 @@ function bell-awaiting-commands {
 function bell-gpt {
     awaysh command say -v Whisper -r 90 "GPT"
 }
+
+function bell-codex {
+    awaysh command say -v Whisper -r 90 "Codex awaits your attention!"
+}
 ##
