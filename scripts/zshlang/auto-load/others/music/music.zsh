@@ -153,6 +153,7 @@ function playlistc {
 
     bella_zsh_disable1
 
+    local hear_playlist_shuffle="${hear_playlist_shuffle:-y}"
     local query
     query=".m3u$ !/old/ $(fz-createquery "$@")"
 
@@ -336,17 +337,31 @@ s{\Q/Foreign/More/Carly Rae Jepsen - Kiss (Deluxe Edition)/\E}{/Foreign/Carly Ra
     done
 }
 
+redis-defvar hear_last_playlist
 function hear-playlist {
+    local playlist_shuffle="${hear_playlist_shuffle:-y}"
+    local playlists=("$@")
+    local first_playlist="${playlists[1]}"
+    if test -z "${first_playlist}" ; then
+        if ! first_playlist="$(hear_last_playlist_get)" ; then
+            ecerr "$0: no playlist specified"
+            return 1
+        fi
+        playlists=( "${first_playlist}" )
+    fi
+
+    assert hear_last_playlist_set "${first_playlist}" @RET
+    ##
     local mode="${hear_playlist_mode:-load}"
     #: emacs depends on the default mode being =load=.
 
     local shuf=''
-    if bool "${hear_playlist_shuffle}" ; then
+    if bool "${playlist_shuffle}" ; then
         shuf='--shuffle'
     fi
 
     local tracks
-    tracks="$(playlist-absolutify "${@}")" @TRET
+    tracks="$(playlist-absolutify "${playlists[@]}")" @TRET
     if test -n "$shuf" ; then
         tracks="$(ec "$tracks" | shuf)" @TRET
     fi
@@ -364,6 +379,13 @@ function hear-playlist {
 
     if [[ "${mode}" == load ]] ; then
         reval-ecgray hear-load-playlist "${tmp}"
+        ##
+        #: @alt shuffling
+        #: Our current shuffling in [agfi:hear-playlist] is better.
+
+        # reval-ecgray hear-shuffle
+        # reval-ecgray hear-next  #: to actually skip the fixed first track
+        ##
     elif [[ "${mode}" == instance ]] ; then
         reval-ecgray hear-ipc --loop-playlist --playlist="${tmp}"
     else
