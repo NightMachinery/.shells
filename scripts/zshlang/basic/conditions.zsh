@@ -143,11 +143,20 @@ function isMe {
 }
 ##
 function isKitty {
-    if isLocal && isMe ; then
-        return 0 # @surprise
+    # if isLocal && isMe ; then
+    #     return 0  #: @surprise
+    # fi
+
+    if isTmux ; then
+        #: [[id:6f98aca5-a5a3-449e-833c-ba58627f1ad4][detect kitty terminal when inside tmux]]
+        ##
+        [[ "$(tmux-client-terminal-get)" =~ '\bkitty\b' ]]
+        return $?
     fi
 
-    if true || isGuest || ( isLocal && ! isTmux ) ; then
+    if true ; then
+        #: || isGuest || ( isLocal && ! isTmux )
+
         [[ "$TERM_PROGRAM" == kitty ]] || test -n "$KITTY_WINDOW_ID" || [[ "$TERM" == *kitty* ]]
         # the var KITTY_WINDOW_ID can be set incorrectly in tmux
         # we might have unexported KITTY_WINDOW_ID in auto-load/env.zsh, but we also export TERM_PROGRAM there:
@@ -256,6 +265,63 @@ function isColorErrTty {
     fi
 
     isColor && isErrTty
+}
+##
+function true-color-p {
+    # --- optional knobs (dependency injection via env) ---
+    # If set truthy (y/yes/1), force success.
+    local force_p="${true_color_p_force_p:-}"
+
+    # --- environment inputs (declared local by convention) ---
+    local colorterm="${COLORTERM:-}"
+    local term="${TERM:-}"
+
+    # Honor explicit force
+    if bool "${force_p}" ; then
+        return 0
+    fi
+
+    if isKitty || isiTerm ; then
+        return 0
+    elif isAppleTerminal ; then
+        return 1
+        #: @toFuture/1407 They might support True Color in the future.
+    fi
+
+    # 1) COLORTERM check (per termstandard/colors)
+    if test -n "${colorterm}" ; then
+        local ct_lc
+        ct_lc="$(ec "${colorterm}" | tr '[:upper:]' '[:lower:]')"
+        if [[ "${ct_lc}" == *"truecolor"* ]] || [[ "${ct_lc}" == *"24bit"* ]] ; then
+            return 0
+        fi
+    fi
+
+    # 2) terminfo capability check (RGB official, Tc is tmux extension)
+    #    Use no flags to avoid non-portable options; parse with perl.
+    if command -v -- infocmp >/dev/null 2>&1 ; then
+        local ti
+        ti="$(infocmp 2>/dev/null)" || true
+        if test -n "${ti}" ; then
+            if print -r -- "${ti}" | perl -0777 -ne 'exit 0 if /\bRGB\b|\bTc\b/; END { exit 1 }' ; then
+                return 0
+            fi
+        fi
+    fi
+
+    # 3) Conservative TERM heuristics (minimal, only explicit truecolor terms)
+    #    Many emulators still advertise xterm-256color, so we avoid guessing.
+    if test -n "${term}" ; then
+        local term_lc
+        term_lc="$(ec "${term}" | tr '[:upper:]' '[:lower:]')"
+        case "${term_lc}" in
+            *-truecolor|tmux-truecolor)
+                return 0
+            ;;
+        esac
+    fi
+
+    return 1
 }
 ##
 function isOutTty {

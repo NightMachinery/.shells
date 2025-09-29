@@ -73,9 +73,17 @@ function color-cursor {
 function cursor-color { color-cursor "$@" }
 alias cursor-color='color-cursor' # to not increase ${#funcstack}
 
-function colorfg { ! isColor || printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m" }
+function colorfg {
+    if isColor && true-color-p ; then
+        printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"
+    fi
+}
 
-function colorbg { ! isColor || printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m" }
+function colorbg {
+    if isColor && true-color-p ; then
+        printf "\x1b[48;2;${1:-0};${2:-0};${3:-0}m"
+    fi
+}
 
 function colorb {
     co_f=colorbg color "$@"
@@ -125,7 +133,7 @@ function italic-test1 {
     Italic ; ecn hello world '<= ' ; Bold ; ec world ; colorreset ; ecn hello world '<= ' ; Bold ; ec world
 }
 
-function printcolors() {
+function printcolors {
     printf "\x1b[${bg};2;${red};${green};${blue}m\n"
     helloworld
     comment awk 'BEGIN{
