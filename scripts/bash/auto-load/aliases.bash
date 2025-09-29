@@ -16,8 +16,8 @@ alias visudo="VISUAL=vim sudo visudo"
 alias FIY='FORCE_INTERACTIVE=y FORCE_NONINTERACTIVE="" '
 alias FIN='FORCE_INTERACTIVE="" FORCE_NONINTERACTIVE=y '
 ##
-ialias re='run-on-each' #duplicate, to make it ialias
-ialias ec='print -r --' #duplicate, to make it ialias
+# ialias re='run-on-each' #duplicate, to make it ialias
+# ialias ec='print -r --' #duplicate, to make it ialias
 alias norg="gron --ungron"
 alias ungron="gron --ungron"
 alias gis='gist --copy  --shorten'
