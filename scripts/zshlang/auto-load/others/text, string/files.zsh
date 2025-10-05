@@ -18,7 +18,7 @@ function pre-files {
     cmd='s/\Q$ENV{AGR_FROM}\E/$ENV{AGR_TO}/g'
   fi
 
-  AGR_FROM="$from" AGR_TO="$to" gxargs -r0 perl -pi"$pf_i" -e "$cmd" @RET
+  AGR_FROM="$from" AGR_TO="$to" gxargs -r0 perl -CSD -pi"$pf_i" -e "$cmd" @RET
   # -i:
   # backs up original input files with the supplied extension (leave empty for no backup; needed for in-place replacement.)(do not put whitespace between -i and its arg.)'
   #
