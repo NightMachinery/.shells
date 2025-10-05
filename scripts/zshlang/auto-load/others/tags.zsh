@@ -59,9 +59,9 @@ function ntag-filter-or-add() {
 ##
 function ntag-l {
     if isI && istty ; then
-        exa -a --color always "$@" | ntag-color | rtl-reshaper-fast
+        exa --no-quotes -a --color always "$@" | ntag-color | rtl-reshaper-fast
     else
-        exa -a "$@"
+        exa --no-quotes -a "$@"
     fi
 }
 aliasfn l ntag-l
