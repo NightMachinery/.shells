@@ -353,6 +353,8 @@ function llm-send {
     assert-args model @RET
     typeset -g llm_last_model="$model"
 
+
+    local input_copy_p="${llm_input_copy_p:-y}"
     local copy_p="${llm_copy_p:-y}"
     local max_tokens="${llm_max_tokens:-20000}"
     local token_strategy="${llm_token_limit_strategy:-reject}"
@@ -392,6 +394,10 @@ function llm-send {
 
     ecgray '-----'
     ecgray "${input}" |& cat-rtl-if-tty >&2
+    if bool "${input_copy_p}" ; then
+        ec "${input}" | pbcopy @STRUE
+    fi
+
     ecgray '-----'
     ecgray "Input Tokens: ${token_count}" #  (\$${input_cost})
     ecgray '-----------'
@@ -432,11 +438,21 @@ function llm-send {
 }
 
 function reval-to-llm {
+    local cmd_head="${1}"
     local to
     to='llm-send'
     # to='revaldbg llm-send'
 
-    reval-to "${to}" "$@"
+    #: Or cmd_head does not exist in aliases, functions, or commands:
+    if ! isDefined "${cmd_head}" ; then
+        #: Command head is not defined, so
+        #: treating this as a message instead!
+
+        ecgray "$0: message heuristic triggered, sending directly to llm-send!"$'\n' # '---'$'\n'
+        reval "${to}" "$@"
+    else
+        reval-to "${to}" "$@"
+    fi
 }
 aliasfn llm-chat llm-m chat
 
