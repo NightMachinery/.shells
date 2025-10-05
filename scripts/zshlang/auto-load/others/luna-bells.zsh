@@ -486,11 +486,11 @@ function bell-repeat() {
 }
 aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 ##
-function bell-auto() {
-    isDarwin || {
-        ecerr "$0: Not running on Darwin."
+function bell-auto {
+    if ! isLocal ; then
+        ecerr "$0: You're not on a local machine."
         return 1
-    }
+    fi
 
     # You might need to use `sleep $timeout ; ...` to test bell-auto.
 
@@ -1136,9 +1136,20 @@ function bell-awaiting-commands {
 ##
 function bell-gpt {
     awaysh command say -v Whisper -r 90 "GPT"
+    #: remove `awaysh` if you want to run using `bell-auto`
 }
 
-function bell-codex {
-    awaysh command say -v Whisper -r 90 "Codex awaits your attention!"
+function h-bell-codex {
+    command say -v Whisper -r 90 "Codex awaits!"
 }
+aliasfn bell-codex bell_auto_sleep=10 awaysh bell-auto h-bell-codex
+
+function h-bell-claude {
+    ##
+    # command say -v Whisper -r 90 "Claude awaits!"
+    ##
+    bell-sonic-fx-ready
+    ##
+}
+aliasfn bell-claude bell_auto_sleep=10 awaysh bell-auto h-bell-claude
 ##
