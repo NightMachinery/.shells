@@ -249,7 +249,7 @@ function tbl2pdf-i {
     assert zopen "${tmp_pdf}" @RET
 }
 ##
-typeset -g fairgrad_prompt_dir="${nightNotesPrivate}/research/DecompV/FairGrad/writing/prompts"
+typeset -g fairgrad_prompt_dir="${nightNotesPrivate}/research/DecompV/LibraGrad/writing/prompts"
 typeset -g fairgrad_paper_dir=~cod/uni/papers/FairGrad
 typeset -g decompv_artifacts_dir=~cod/decompv_artifacts
 
