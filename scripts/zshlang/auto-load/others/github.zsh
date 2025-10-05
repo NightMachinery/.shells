@@ -119,3 +119,7 @@ function gh-to-raw-v1 {
     in-or-args "$@" | sd '/blob/' '/raw/'
 }
 ##
+function gh-visibility {
+    reval-ecgray gh repo view --json visibility
+}
+##
