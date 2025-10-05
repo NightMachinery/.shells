@@ -198,9 +198,17 @@ function nightsh-load-zshrc() {
     bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
     bindkey "^[[B" down-line-or-beginning-search
   fi
+
+  ##
+  #: @duplicateCode/d16e08e2e9c09107a804763c564d69f6
+  #: Kitty
   bindkey '^[[1;3D' backward-word # alt-left
   bindkey '^[[1;3C' forward-word # alt-right
+
   bindkey '^[/' forward-word # alt-/
+  #: Terminal.app
+  bindkey '^[b' backward-word # alt-left
+  bindkey '^[f' forward-word # alt-right
   ### iTerm Integration
   alias it2attention=~/.iterm2/it2attention
   alias it2check=~/.iterm2/it2check

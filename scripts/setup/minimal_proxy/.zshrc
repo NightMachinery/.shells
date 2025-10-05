@@ -56,9 +56,16 @@ if [[ "${terminfo[kcud1]}" != "" ]]; then
     bindkey "^[[B" down-line-or-beginning-search
 fi
 
+##
+#: @duplicateCode/d16e08e2e9c09107a804763c564d69f6
+#: Kitty
 bindkey '^[[1;3D' backward-word # alt-left
 bindkey '^[[1;3C' forward-word # alt-right
+
 bindkey '^[/' forward-word # alt-/
+#: Terminal.app
+bindkey '^[b' backward-word # alt-left
+bindkey '^[f' forward-word # alt-right
 ##
 # remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
 WORDCHARS+="|'"
