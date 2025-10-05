@@ -2663,7 +2663,10 @@ appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
 -- appHotkey{ key='\\', appName='com.apple.iCal' }
-appHotkey{ key='m', appName='mpv' }
+
+-- appHotkey{ key='m', appName='mpv' }
+appHotkey{ key='m', appName='com.adobe.Reader' }
+
 appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
 -- appHotkey{ key='n', appName='com.appilous.Chatbot' } -- Pal ChatGPT app
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
