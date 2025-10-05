@@ -195,7 +195,7 @@ function awaysh-doublefork {
     awaysh1 awaysh-exit "$@"
 }
 
-function awaysh() {
+function awaysh {
     ( awaysh1 "$@" ) &>/dev/null </dev/null
     # subshell needed to silence messages generated from MONITOR (e.g., `[9] 5152`)
     # also, weirdly, with this subshell, we no longer need MONITOR in the first place :|
@@ -208,7 +208,7 @@ function awaysh() {
 #     sleep 1 # give it time to fork
 # }
 
-function awaysh1() {
+function awaysh1 {
     local cmd="$(gquote "$@")"
 
     setopt LOCAL_OPTIONS NO_NOTIFY
