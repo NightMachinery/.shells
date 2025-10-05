@@ -113,6 +113,7 @@ function pxify {
     pxaify-command llm
     pxaify-command gemini
     pxaify-command codex
+    pxaify-command opencode
 
     pxaify-command doom
 
