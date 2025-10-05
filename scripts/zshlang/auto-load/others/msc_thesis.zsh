@@ -16,7 +16,14 @@ alias zt=z-thesis
 #: @todo disable me
 ##
 function thesis-build {
-    local worktree="${1:-thesis}" dir
+    local worktree="${1}" dir
+    if test -z "${worktree}" ; then
+        worktree="$(thesis-worktree-name-get)" @RET
+
+    elif [[ "${worktree}" == "master" ]] ; then
+        worktree="thesis"
+    fi
+
     dir="$(thesis-dir-get "${worktree}")" @RET
 
     (
@@ -35,13 +42,32 @@ function thesis-build {
     )
 }
 
+function thesis-worktree-name-get {
+    local branch_name
+    branch_name="$(git rev-parse --abbrev-ref HEAD)" @TRET
+
+    if [[ "${branch_name}" == "master" ]]; then
+        echo "thesis"
+    else
+        echo "${branch_name}"
+    fi
+}
+
 function h-thesis-build-emacs {
+    local f="${1}"
+    #: the current open file
+
     local log=~/logs/thesis_build.log
 
     silent trs "$log" || true
 
-    xelatex_open_p=n thesis-build >& "${log}"
+    (
+        cdd "${f}"
+        local worktree
+        worktree="$(thesis-worktree-name-get)" @RET
 
+        xelatex_open_p=n thesis-build "${worktree}" >& "${log}"
+    ) @RET
     return 0
 }
 ##
