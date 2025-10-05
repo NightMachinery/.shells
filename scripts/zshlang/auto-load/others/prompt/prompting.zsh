@@ -770,13 +770,20 @@ function repomix-m {
 
     arrnn ${files[@]} |
         repomix "${repomix_opts[@]}" --stdin --stdout --output-show-line-numbers |
-        cat-copy-streaming-remote
+        cat-copy-streaming-remote @RET
+
+    local f
+    for f in "${files[@]}" ; do
+        if ! test -e "$f" ; then
+            ecerr "$0: File does not exist: $f"
+        fi
+    done
 }
 aliasfn context-from-files repomix-m
 aliassafe cx='context-from-files'
 ##
 function prompt-rewrite-telegram {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'Rewrite the following text as a post for a Telegram channel. You can use emojis, etc. You can use `**bold text**`, `__italic text__`, ~~strikethrough~~, and Markdown literals and code blocks using backticks, e.g., \`CONSTANT_IN_CODE\`. You can use Markdown links, `[label](url)`. End the post by including a link to our channel, `EMOJI [@SUTCSE](https://t.me/sutcse)` with a random nice creative emoji. This line starts with an emoji and ends with our link, no other text needed.'" (To ensure randomness, use the current date as a seed for your decision: $(date)."' Be concise, but easy to understand. The target audience is AI PhD students studying in Sharif University of Technology. Begin your post with a headline that summarizes the main point (the lede). Write in Farsi (Persian), as the students are Iranians.' "$@"
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "Current date: $(date)"$'\n\n'"$(prompt-input-file "${night_prompt_dir}/Telegram_SUTCSE_rewrite_v1.md" '')" "$@"
 }
 
 function run-prompt-rewrite-telegram {
