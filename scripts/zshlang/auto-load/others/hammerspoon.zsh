@@ -4,6 +4,7 @@ function hammerspoon-reload {
      hammerspoon -c "hs.reload()"
 }
 alias hsr='hammerspoon-reload'
+alias hhh='hammerspoon-reload'
 ##
 function hs-popclickBttToggle() {
     local lis="$(serr hammerspoon -c 'popclickBttToggle()')"
