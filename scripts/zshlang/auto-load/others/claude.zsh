@@ -12,6 +12,7 @@ function claude {
 function claude-autocommit {
      reval-ec claude --verbose -p 'git-committer' --allowedTools 'Bash(git:*)'
 
+     ecgray
      reval-ecgray glola 5
 }
 ##
@@ -23,6 +24,7 @@ function claude-vcsh-commit {
     
         claude -p "Read '${NIGHTDIR}/prompt/vcsh-commit.md' and start committing changes." --verbose --allowedTools 'Bash(vcsh night.sh:*)'
 
+        ecgray
         reval-ecgray vcn-with glola 5
     )
 }
