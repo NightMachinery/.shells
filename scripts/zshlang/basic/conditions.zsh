@@ -58,6 +58,11 @@ function isLocal {
     # @darwinonly0
     isDarwin
 }
+
+function isRemote {
+    ! isLocal
+}
+
 function isServer {
     # @darwinonly0
     # This is actually isLinuxServer, but since macOS servers are rare, I have simplified

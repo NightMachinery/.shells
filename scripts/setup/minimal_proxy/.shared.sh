@@ -5,7 +5,7 @@ isLocal () {
 }
 
 isRemote () {
-    return 0
+    ! isLocal
 }
 ##
 isBash () {
