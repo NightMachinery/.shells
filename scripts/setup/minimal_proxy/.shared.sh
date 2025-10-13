@@ -52,7 +52,12 @@ export DOOMDIR=~/doom.d
 
 export LESSMIN='-RiF --mouse --wheel-lines=3 -j.3'
 
-export FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-up:preview-up,alt-down:preview-down,alt-n:next-history,alt-p:previous-history,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-j:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-s:select-all,alt-enter:print-query,shift-right:replace-query' --color=light --multi --hscroll-off 99999"
+##
+#: @duplicateCode/fc1c8d786f258e551cae31f17f050814
+typeset -g H_FZF_DEFAULT_OPTS="--bind 'shift-up:toggle+up,shift-down:toggle+down,alt-k:toggle+up,alt-j:toggle+down,alt-h:backward-word,alt-l:forward-word,alt-up:preview-up,alt-down:preview-down,alt-n:next-history,alt-p:previous-history,tab:toggle,shift-tab:toggle+beginning-of-line+kill-line,alt-/:toggle-preview,ctrl-l:toggle+beginning-of-line+kill-line,ctrl-t:top,ctrl-s:select-all,alt-enter:print-query,shift-right:replace-query' --multi --hscroll-off 99999 --exact"
+#: ctrl-j, ctrl-k: scroll
+
+export FZF_DEFAULT_OPTS="${H_FZF_DEFAULT_OPTS}"
 ##
 psource () {
     if [[ -r "$1" ]]
