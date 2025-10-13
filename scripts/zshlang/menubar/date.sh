@@ -58,7 +58,7 @@ current_date="$(date "+%b%-m/%d")"
 if [ -n "$stopwatch_text" ]; then
     printf '⏱️%s ¦ %d ¦ %s\n' "$stopwatch_text" "$last_idle_min" "$current_date"
 else
-    printf '%d ¦ %s\n' "$last_idle_min" "$current_date"
+    printf '%.0f ¦ %s\n' "$last_idle_min" "$current_date"
     # %02d
 fi
 echo "---"
