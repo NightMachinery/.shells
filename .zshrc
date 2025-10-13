@@ -189,14 +189,18 @@ function nightsh-load-zshrc() {
     autoload -U up-line-or-beginning-search
     zle -N up-line-or-beginning-search
     bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
-    bindkey "^[[A" up-line-or-beginning-search
+    bindkey "^[[A" up-line-or-beginning-search  #: up-arrow
+    bindkey "^[p" up-line-or-beginning-search
+    bindkey "^[k" up-line-or-beginning-search
   fi
   # start typing + [Down-Arrow] - fuzzy find history backward
   if [[ "${terminfo[kcud1]}" != "" ]]; then
     autoload -U down-line-or-beginning-search
     zle -N down-line-or-beginning-search
     bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
-    bindkey "^[[B" down-line-or-beginning-search
+    bindkey "^[[B" down-line-or-beginning-search  #: down-arrow
+    bindkey "^[n" down-line-or-beginning-search
+    bindkey "^[j" down-line-or-beginning-search
   fi
 
   ##
@@ -206,6 +210,9 @@ function nightsh-load-zshrc() {
   bindkey '^[[1;3C' forward-word # alt-right
 
   bindkey '^[/' forward-word # alt-/
+
+  bindkey '^[h' backward-word  #: alt-h
+  bindkey '^[l' forward-word  #: alt-j
   #: Terminal.app
   bindkey '^[b' backward-word # alt-left
   bindkey '^[f' forward-word # alt-right
