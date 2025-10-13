@@ -58,6 +58,9 @@ fi
 ##
 # tmuxnewsh2 notes-hugo indir ~cod/hugo/notes-hugo hugo --bind="127.0.0.1" --baseURL="https://notes.lilf.ir" --appendPort=false --gc --port 1313 serve
 ##
+tmuxnewsh2 deluged deluged -d
+tmuxnewsh2 deluge-web deluge-web -d --interface='127.0.0.1' --port='8666' --loglevel=info
+##
 tmuxnew email-aggregator-bot zsh -c "API_TOKEN=${emailaggbot_api_token} DATABASE_NAME=~/mail_gather_database.db mail-gather-bot"
 ##
 tmuxnew feed_updater1 env TSEND_TOKEN="${TSEND_TOKEN}" TSEND_BACKEND="${TSEND_BACKEND}" "${commands[python]}" "${commands[feed_updater1.py]}"
