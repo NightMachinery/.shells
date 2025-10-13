@@ -10,6 +10,11 @@ function dark-mode-p-darwin {
 }
 
 function dark-mode-p {
+    if isRemote ; then
+        return 0
+        #: @todo We need to contact the client to know the true dark mode status.
+    fi
+
     if isDarwin; then
         dark-mode-p-darwin
     else
