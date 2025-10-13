@@ -1,6 +1,6 @@
 ##
 # https://github.com/ytdl-org/youtube-dl#format-selection-examples
-aliassafe ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en --prefer-ffmpeg"
+aliassafe ybase="noglob youtube-dl --no-playlist --write-sub --sub-lang en"
 
 aliassafe y="ybase --embed-subs --add-metadata --downloader aria2c --downloader-args 'aria2c:--continue --max-concurrent-downloads=30 --max-connection-per-server=16 --split=30 --min-split-size=1M'" #  --embed-thumbnail errs: Only mp3 and m4a/mp4 are supported for thumbnail embedding for now. Causes only the first URL to be downloaded (possibly because of the error.)
 #: -x, --max-connection-per-server=NUM The maximum number of connections to one  server for each download. (Possible Values: 1-16)
@@ -29,7 +29,7 @@ aliassafe yaudio="noglob youtube-dl --no-playlist -f 'bestaudio[ext=m4a]/bestaud
 
 aliassafe yaudio-playlist='yaudio --yes-playlist'
 
-aliassafe ymp3='noglob youtube-dl --no-playlist --prefer-ffmpeg --extract-audio --audio-format mp3'
+aliassafe ymp3='noglob youtube-dl --no-playlist --extract-audio --audio-format mp3'
 
 aliassafe ymp3-playlist='ymp3 --yes-playlist'
 # `-f best` to download single file
