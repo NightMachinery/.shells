@@ -162,7 +162,9 @@ function kitty-theme-setup {
     #: `kitty-theme-setup Spring Dumbledore`
     ##
     local light="${1:-night-solarized-light}"
-    local dark="${2:-ayu}"
+    local dark="${2}"
+    dark="${dark:-Solarized_Dark_-_Patched}"
+    # dark="${dark:-ayu}"
 
     reval-ecgray kitty-theme --setl "$light"
 
