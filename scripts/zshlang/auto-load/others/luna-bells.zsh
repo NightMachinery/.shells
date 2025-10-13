@@ -890,6 +890,14 @@ bell-maker pp-piece2 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything
 bell-maker pp-piece3 "PlayStation - Pink Panther Pinkadelic Pursuit - Everything/SOUND_piece3..blue..wav"
 bell-pp-piece() { do-rnd bell-pp-piece{1..3} }
 bell-pp-piece-r() { redo2 10 bell-pp-piece }
+### Toy Story:
+bell-maker ts-to-infinity 'toy story movie/to_inf.wav'  #: low quality sound?
+
+bell-maker ts-stage-clear 'Mobile - Toy Story Mania - Everything/Everything/mStageClear.wav'
+bell-maker ts-mech-target 'Mobile - Toy Story Mania - Everything/Everything/rt_mechanicTargetEnd.wav'
+bell-maker ts-magic-beep 'Mobile - Toy Story Mania - Everything/Everything/ling.wav'  #: too shrill
+bell-maker ts-unlock-item 'Mobile - Toy Story Mania - Everything/Everything/mUnlockItem.wav'
+bell-maker ts-unlock-item2 'Mobile - Toy Story Mania - Everything/Everything/mUnlockItem2.wav'
 ### Starcraft:
 # @alt tts-gateway 'Garden, Online'
 bell-maker sc2-nav_online "Starcraft/Starcraft II/Heart of the Swarm/PC Computer - StarCraft II Heart of the Swarm - Adjutant/Adjutant/zCutscene_Zerg04_DropShipAdjutant_020_navigation online..blue...ogg"
@@ -1043,8 +1051,9 @@ function bell-visual-flash1() {
 # aliasfn bell-image-uploaded tts-glados1-cached 'image, uploaded'
 aliasfn bell-image-uploaded tts-glados1-cached 'picture, uploaded'
 # aliasfn bell-image-uploaded bell-pp-attack-rotational
-##
+## LEGO Batman:
 bell-maker 'batman-cave-open' 'batman/PlayStation 2 - LEGO Batman - Sound Effects/BATCAVE_BIGDOOR_OPEN.wav'
+bell-maker 'batman-victory' 'batman/PlayStation 2 - LEGO Batman - Sound Effects/VICTORY1.wav'
 ##
 bell-maker 'p2-you-look-great' 'PC Computer - Portal 2 - GLaDOS/sp_catapult_fling_sphere_peek_failuretwo02.mp3'
 
@@ -1134,6 +1143,15 @@ function bell-awaiting-commands {
     fsay2 'Awaiting commands!'
 }
 ##
+function bell-transcription-ready {
+    ##
+    # awaysh command say -v Whisper "Transcription ready!"
+    #: remove `awaysh` if you want to run using `bell-auto`
+    ##
+    bell-batman-victory
+    ##
+}
+
 function bell-gpt {
     awaysh command say -v Whisper -r 90 "GPT"
     #: remove `awaysh` if you want to run using `bell-auto`
