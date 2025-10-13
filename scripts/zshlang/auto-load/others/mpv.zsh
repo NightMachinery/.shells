@@ -128,20 +128,30 @@ function hear-get {
 function hear-get-info {
     local labeled_interfix=$'\n'"  "
 
-    labeled hear-get-playlist
-    ec
+    local playlist
+    playlist="$(hear-get-playlist)"
+    if test -n "${playlist}" ; then
+        ec "Last Playlist:${labeled_interfix}${playlist}"$'\n'
+    fi
+
     labeled hear-get
 }
 alias hgg='hear-get-info'
 
-alias 'hear-get-playlist'='hear_last_playlist_get'
+function hear-get-playlist {
+    local playlist
+    playlist="$(hear_last_playlist_get)" @RET
+
+    ec "${playlist}"
+}
+
 alias 'hgp'='hear-get-playlist'
 
 function mpv-get {
     h-mpv-get-prop mpv-do "${@}"
 }
 
-function hear-get-playlist {
+function hear-get-playlist-path {
     hear-get playlist-path
 }
 
@@ -223,9 +233,11 @@ function hear-loadfile {
 
     if [[ "${mpv_command}" == 'loadfile' ]] ; then
         reval-ecgray hear-autoload-enable
+
+        hear_last_playlist_del
     fi
 
-    revaldbg hear-do "${mpv_command}" "${url}" "$mode" "${opts[@]}"
+    revaldbg hear-do "${mpv_command}" "${url}" "$mode" "${opts[@]}" @RET
     revaldbg hear-play-on
 }
 aliasfn hear-open hear-loadfile
