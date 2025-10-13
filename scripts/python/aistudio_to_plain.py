@@ -4,12 +4,18 @@ import sys
 import argparse
 from typing import Dict, List, TextIO
 
-def format_aistudio_json(data: Dict) -> str:
+def _separator() -> str:
+    """Returns the separator string used between conversation chunks."""
+    return "\n" + "-" * 40 + "\n"
+
+def format_aistudio_json(data: Dict, *, include_thoughts: bool = False, assistant_only: bool = False) -> str:
     """
     Formats AI Studio JSON data into readable plain text.
 
     Args:
         data: The loaded JSON data as a Python dictionary.
+        include_thoughts: Whether to include thought chunks in the output.
+        assistant_only: Whether to output only assistant messages without role tags.
 
     Returns:
         A string containing the formatted conversation and citations.
@@ -24,30 +30,39 @@ def format_aistudio_json(data: Dict) -> str:
     #     output_lines.append("-" * 20)
 
     # --- System Instruction ---
-    system_instruction = data.get('systemInstruction', {}).get('text')
-    if system_instruction:
-        output_lines.append("SYSTEM INSTRUCTION:")
-        output_lines.append(system_instruction.strip())
-        output_lines.append("\n" + "=" * 40 + "\n") # Separator
+    if not assistant_only:
+        system_instruction = data.get('systemInstruction', {}).get('text')
+        if system_instruction:
+            output_lines.append("SYSTEM INSTRUCTION:")
+            output_lines.append(system_instruction.strip())
+            output_lines.append("\n" + "=" * 40 + "\n")
 
     # --- Conversation Chunks ---
     chunks = data.get('chunkedPrompt', {}).get('chunks', [])
     if not chunks:
         output_lines.append("No conversation chunks found.")
     else:
-        for i, chunk in enumerate(chunks):
-            role = chunk.get('role', 'unknown').upper()
+        first_chunk = True
+        for chunk in chunks:
+            role = chunk.get('role', 'unknown')
             text = chunk.get('text', '').strip()
-            is_thought = chunk.get('isThought', False) # Check for 'isThought' flag
+            is_thought = chunk.get('isThought', False)
 
-            # Add a separator before each chunk except the first one
-            if i > 0:
-                 output_lines.append("\n" + "-" * 40 + "\n")
+            if is_thought and not include_thoughts:
+                continue
 
-            if is_thought:
-                 output_lines.append(f"THOUGHT ({role}):") # Label thoughts clearly
-            else:
-                 output_lines.append(f"{role}:")
+            if assistant_only and role.lower() != 'model':
+                continue
+
+            if not first_chunk:
+                output_lines.append(_separator())
+            first_chunk = False
+
+            if not assistant_only:
+                if is_thought:
+                    output_lines.append(f"THOUGHT ({role.upper()}):")
+                else:
+                    output_lines.append(f"{role.upper()}:")
 
             output_lines.append(text)
 
@@ -64,7 +79,7 @@ def format_aistudio_json(data: Dict) -> str:
             output_lines.append(f"[{i+1}] Text Snippet: {text}")
             output_lines.append(f"    URI: {uri}")
             if i < len(citations) - 1:
-                 output_lines.append("") # Add blank line between citations
+                 output_lines.append("")
 
     return '\n'.join(output_lines)
 
@@ -85,6 +100,18 @@ def main():
         default=sys.stdout,
         help='Output file path (writes to stdout by default)'
     )
+    parser.add_argument(
+        '--thoughts',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help='Include thought chunks in the output (default: %(default)s)'
+    )
+    parser.add_argument(
+        '--assistant-only',
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help='Output only assistant messages without role tags (default: %(default)s)'
+    )
 
     args = parser.parse_args()
 
@@ -100,7 +127,11 @@ def main():
                 print(f"Error: Invalid JSON format in input file. {e}", file=sys.stderr)
                 sys.exit(1)
 
-        formatted_text = format_aistudio_json(chat_data)
+        formatted_text = format_aistudio_json(
+            chat_data,
+            include_thoughts=args.thoughts,
+            assistant_only=args.assistant_only
+        )
 
         with args.output as outfile:
             outfile.write(formatted_text)
