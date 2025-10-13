@@ -3023,7 +3023,7 @@ whisper.whisperDir = os.getenv("HOME") .. "/code/misc/whisper.cpp/"
 whisper.model = "distil-large-v3"
 whisper.language = "en"
 whisper.recorderMode = "ffmpeg"
-whisper.recordingTimeout = 300
+whisper.recordingTimeout = 3600
 
 whisper.languageConfig = {
     en = {
@@ -3200,7 +3200,10 @@ function processRecording(wavFile, language, backend)
 
         hs.pasteboard.setContents(content)
         if not whisper.processing_interrupted_p then
-            doPaste()
+            -- doPaste()
+            -- Pasting makes us need to wait for the processing without doing anything.
+            -- Let us just copy it and ring a bell.
+            brishzeval("bell-transcription-ready")
         end
     end
 
