@@ -307,7 +307,7 @@ function lisp-quote-safe {
 aliasfn emc-quote-safe lisp-quote-safe
 ##
 function emc-nowait2 {
-    local f="$1" cmd="${emc_nowait2_cmd:-find-file}"
+    local f=("$@") cmd="${emc_nowait2_cmd:-find-file}"
     assert-args f @RET
     local colorize_p="${emc_nowait2_colorize_p}"
     local other_commands=""
@@ -327,7 +327,7 @@ function emc-nowait2 {
     # tmp="$(serr grealpath -e -- "$f")" && f="$tmp" || true # can be, e.g., an scp path
     ##
     
-    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (${cmd} $(emc-quote "$f")) ${other_commands} t)"
+    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (mapc #'${cmd} '($(emc-quote "${f[@]}"))) ${other_commands} t)"
     # throws useless error 'Invalid read syntax: "#"', but works anyway
 
     emc-focus
