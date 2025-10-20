@@ -960,6 +960,8 @@ function reminday-path-colorize {
 }
 
 function reminders-old-ls {
+    #: Lists reminders that were NOT moved into the backup dirs but are OLDER than the current date.
+    ##
     datej="$(datej)" reminders_old_ls.rs "$@"
 }
 
