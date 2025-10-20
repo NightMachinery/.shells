@@ -191,11 +191,12 @@ function edir-m {
 }
 aliasfn vidir edir-m
 ##
-function progress() {
+function progress-m {
     # @wrapper
     command progress --additional-command gcp --additional-command gmv --additional-command gcat --additional-command gdd --additional-command curl --additional-command aria2c --additional-command wget --additional-command ffmpeg --additional-command youtube-dl --monitor "$@" # --monitor-continuously
 }
-aliasfn prg progress
+aliasfn prg progress-m
+aliasfn monitor-downloads progress-m
 ##
 function fd-count() {
     local dir="$PWD"
