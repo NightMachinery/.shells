@@ -206,6 +206,9 @@ function pbpaste-html {
     if isDarwin ; then
         command pbv public.html public.utf8-plain-text
         # https://stackoverflow.com/questions/17217450/how-to-get-html-data-out-of-of-the-os-x-pasteboard-clipboard
+    elif isLinux ; then
+        #: @untested
+        xclip -o -selection clipboard -t text/html
     else
         @NA
         # See
