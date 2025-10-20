@@ -30,7 +30,7 @@ function rget() {
     rgbase --no-filename --no-line-number --text --smart-case --only-matching --replace "$rep" "$@"
 }
 ##
-function text-wrap() {
+function text-wrap {
     local w="${1:-${text_wrap_columns:-${COLUMNS:-90}}}"
 
     if (( ${+commands[ansifold]} )) ; then
@@ -40,7 +40,8 @@ function text-wrap() {
     else
         ecgray "$0: ansifold not available, falling back to ggrep."
         command ggrep -Eo ".{1,$w}" # unicode-safe (RTL safe)
-    fi
+    fi |
+        cat-copy-if-tty
 }
 alias foldm='text-wrap'
 ##
