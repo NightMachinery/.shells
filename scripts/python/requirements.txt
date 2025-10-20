@@ -1,13 +1,9 @@
-anthropic
-litellm
-llm
-llm-gemini
-groq
 Pillow
 PyPDF2
 Unidecode
 aiofile
 amzqr
+anthropic
 arabic_reshaper
 blend_modes
 catsql
@@ -39,6 +35,7 @@ google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 google_images_download
+groq
 hachoir
 hiredis
 html5lib
@@ -59,6 +56,9 @@ kiss-headers
 libgen.py
 libgenapi
 lightnovel-crawler
+litellm
+llm
+llm-gemini
 magic-wormhole
 metadata-parser
 metadata_parser
