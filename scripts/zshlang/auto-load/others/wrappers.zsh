@@ -224,3 +224,7 @@ function duh {
 ##
 alias tzc='timezone_converter.py'
 ##
+function './gradlew' {
+  $proxyenv command ./gradlew "$@"
+}
+##
