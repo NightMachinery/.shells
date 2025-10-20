@@ -1,0 +1,11 @@
+#+TITLE: goremind
+
+* Install
+#+begin_src zsh :eval never
+go-install-local "${NIGHTDIR}/golang/goremind"
+#+end_src
+
+** @broken [[id:cde958f4-4ab0-4f76-b014-11c9ab440879][Installing a Go Module from a GitHub Repo Subdirectory]]
+#+begin_src zsh :eval never
+go install -v 'github.com/NightMachinary/.shells/scripts/golang/goremind@latest'
+#+end_src
