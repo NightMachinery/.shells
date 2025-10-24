@@ -128,3 +128,16 @@ function pdc-opml2zsh-skipexisting {
         cat-copy-if-tty
 }
 ##
+function pocket-cast-update {
+    (
+        z pocket-casts-scraper
+
+        python export_up_next.py --max-episodes 3 --pretty > up_next.json
+
+        python json_to_markdown.py up_next.json > up_next.md
+        cat up_next.md | md2org > up_next.org
+
+        realpath up_next.org
+    )
+}
+##
