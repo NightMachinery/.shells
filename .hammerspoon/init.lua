@@ -2614,25 +2614,39 @@ function toggleFocus(appName)
 end
 
 function appHotkey(o)
-    function h_appHotkey()
-        toggleFocus(o.appName)
-        -- use `sleep 2 ; reval-copy frontapp-get ; fsay hi` to get this
-    end
-
-    mods = o.modifiers
-    -- If mods == "hyper", use =hyper_bind_v1=:
-    if mods == "hyper" or mods == hyper or not mods then
-        hyper_bind_v1(o.key, h_appHotkey)
-    else
-        -- hs.hotkey.bind(mods, o.key, h_appHotkey)
-        hs.alert("impossible 8170")
-    end
+    -- This function now acts as a wrapper for hyper_bind_v2,
+    -- making it easy to create app-toggling hotkeys.
+    -- It accepts an 'o.mods' table for additional modifiers.
+    hyper_bind_v2{
+        key = o.key,
+        mods = o.mods or {}, -- Use provided mods, or default to an empty table
+        pressedfn = function()
+            toggleFocus(o.appName)
+        end
+    }
 end
+-- function appHotkey(o)
+--     function h_appHotkey()
+--         toggleFocus(o.appName)
+--         -- use `sleep 2 ; reval-copy frontapp-get ; fsay hi` to get this
+--     end
+
+--     mods = o.modifiers
+--     -- If mods == "hyper", use =hyper_bind_v1=:
+--     if mods == "hyper" or mods == hyper or not mods then
+--         hyper_bind_v1(o.key, h_appHotkey)
+--     else
+--         -- hs.hotkey.bind(mods, o.key, h_appHotkey)
+--         hs.alert("impossible 8170")
+--     end
+-- end
 -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
 -- appHotkey{ key='.', appName='com.microsoft.edgemac' }
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
 appHotkey{ key='.', appName='com.google.Chrome' }
+appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
+-- appHotkey{ key='.', appName='com.openai.atlas' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
 appHotkey{ key=';', appName='com.microsoft.Excel' }
@@ -3014,6 +3028,8 @@ end
 
 hyper_bind_v1(",", pasteBlockified)
 ---
+-- [[id:9a133a53-eb25-4715-b560-23620ce685c3][Hammerspoon/STT]]
+--
 -- might need [[id:628475aa-5096-48e9-8034-0bb3a77ac679][@qoute Allow microphone input for the app]]
 local whisper = {}
 whisper.state = "off"  -- Can be "off", "recording", or "processing"
