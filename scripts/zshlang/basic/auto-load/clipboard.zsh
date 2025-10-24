@@ -121,7 +121,13 @@ function cat-paste-if-tty {
     #     cat
     # fi
     ##
-    in-or-args "$@"
+    # in-or-args "$@"
+    ##
+    if isInTty && (( ${#@} == 0 )) ; then
+        pbpaste
+    else
+        cat "$@"
+    fi
     ##
 }
 
