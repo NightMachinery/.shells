@@ -238,7 +238,7 @@ function openai-token-count {
     fi
 
     # in-or-args "$@" |
-    cat "$@" |
+    cat-paste-if-tty "$@" |
         # $proxyenv reval-ec ttok -m "${model}"
         openai_token_count.py
 }
