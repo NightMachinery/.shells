@@ -493,3 +493,28 @@ function erase-persian-diacritics {
         cat-copy-if-tty
 }
 ##
+function h-erase-chars {
+    local regex="${1}"
+    if test -z "${regex}" ; then
+        ecerr "h-erase-chars: regex not supplied"
+        return 1
+    fi
+    shift @RET
+
+    # Use perl with Unicode support (-CSD) to read input line by line (-p)
+    # and substitute characters matching the regex globally (s///g) with an empty string.
+    in-or-args "$@" |
+        perl -CSD -pe "s/${regex}//g" |
+        cat-copy-if-tty
+}
+
+function erase-persian {
+    # Erases characters belonging to the Arabic script (which includes Persian letters).
+    h-erase-chars '\p{Arabic}' @RET
+}
+
+function erase-latin {
+    # Erases characters belonging to the Latin script (A-Z, a-z, and variants).
+    h-erase-chars '\p{Latin}' @RET
+}
+##
