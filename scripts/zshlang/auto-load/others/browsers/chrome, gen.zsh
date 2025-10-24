@@ -151,12 +151,30 @@ aliasfn arc-current-title with-arc browser-current-title
 aliasfn org-link-arc-current with-arc org-link-browser-current
 ##
 function browser-open {
-    ensure isDarwin @MRET # @darwinonly
-    chrome-cli open "$@"
+    @darwinOnly
+
+    local urls=("$@")
+    if isInTty && (( $# == 0 )); then
+        local pasted_urls
+        pasted_urls="$(pbpaste-urls)" @TRET
+
+        if [[ -z "${pasted_urls}" ]]; then
+            ecerr "No URLs provided and clipboard content is empty."
+            return 1
+        fi
+
+        # Split clipboard content by newline into the urls array
+        urls=("${(f@)pasted_urls}")
+    fi
+    urls=($@)  #: remove empty urls
+
+    chrome-cli open "$urls[@]"
 }
+aliasfn chrome-open with-chrome browser-open
 
 function browser-open-file {
-    ensure isDarwin @MRET # @darwinonly
+    @darwinOnly
+
     local f="$1"
     ensure-args f @MRET
     shift
@@ -174,7 +192,8 @@ function browser-open-file {
 }
 
 function browser-open-pdf {
-    ensure isDarwin @MRET # @darwinonly
+    @darwinOnly
+
     local f="$1"
     ensure-args f @MRET
 
@@ -189,4 +208,14 @@ function browser-open-pdf {
     browser-open-file "$f" "$opts[@]"
 }
 reify browser-open-pdf
+##
+function browser-open-mindful {
+    local browser_command="${browser_open_mindful_engine:-chrome-open}"
+    local timer_duration="${browser_open_mindful_timer_duration:-10}"
+
+    reval-ecgray "$browser_command" "$@" @RET
+
+    o msg 'You need to re-examine what you are browsing.' @ timer "$timer_duration"
+}
+aliasfn bom browser-open-mindful
 ##
