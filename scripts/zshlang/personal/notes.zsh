@@ -46,6 +46,30 @@ function nt-due-oh-ugrep {
     if-out-tty emc-pager-highlighter
 }
 
+function org-grep {
+    cat-paste-if-tty |
+        org_grouper --out-replace-nulls-with='' -- ugrep --null-data "$@" |
+        cat-copy-if-tty
+}
+
+function org-strip-no-export {
+    local levels=({1..20})
+    #: assuming no more levels
+
+    local text
+    text="$(cat-paste-if-tty "$@")" @RET
+
+    local level
+    for level in ${levels[@]} ; do
+        text="$(ec "$text" | org_grouper --group-headings-at="$level" --out-replace-nulls-with='' -- perl -0lne 'print unless /^[^\n]*:noexport:/')"
+        #: [[id:44ca24ea-a7ff-41fe-880c-e3aa965d8d04][regex tests]]
+    done
+
+    ec "$text" |
+        cat-copy-if-tty
+
+}
+
 function nt-due-sees {
     nt-due-init # can't do it in the pipeline, as forks can't change our env
 
