@@ -1170,3 +1170,7 @@ function org-remove-inline-images {
         cat-copy-if-tty
 }
 ##
+function org-cache-latex-rm {
+    trs ~/.emacs.d/.local/cache/org/latex/
+}
+##
