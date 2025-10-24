@@ -33,8 +33,8 @@ function dark-mode-toggle {
 
     reval-ec fzf-export-opts
 
-    emc-eval '(night/h-sync-with-system-appearance)'
-    withemcgui emc-eval '(night/h-sync-with-system-appearance)'
+    emc-eval '(night/sync-with-system-appearance)'
+    withemcgui emc-eval '(night/sync-with-system-appearance)'
 }
 ##
 fzf-export-opts
