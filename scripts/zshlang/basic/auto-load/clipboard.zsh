@@ -55,6 +55,7 @@ function cat-copy-as-file {
 
     reval-ec pbadd "$tmp"
 }
+alias caf='cat-copy-as-file'
 
 function cat-rtl-if-tty {
     if isOutTty ; then

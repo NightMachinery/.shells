@@ -418,4 +418,5 @@ function fzinw {
 aliasfn ffin-words fzinw
 aliasfn ffs fzinw
 aliasfn select-menu-from-words fzinw
+aliasfn fz-copy-word fzinw
 ##
