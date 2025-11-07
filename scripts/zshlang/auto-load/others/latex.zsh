@@ -406,6 +406,16 @@ function cv-upload {
     reval-ecgray rsp-safe CV.pdf CV_short.pdf references.pdf "${lilf_user}@${lilf_ip}:Downloads/"
 }
 
+function cv-german-build {
+    z CV @RET
+    cdm german
+
+    local pdflatex_name="${pdflatex_name:-CV_german}"
+
+    pdflatex-m "${nightNotesPrivate}/subjects/resume, CV/CV_german.tex"
+    reval-ecgray pbadd "${pdflatex_name}.pdf"
+}
+
 function cv-build {
     z CV @RET
 
