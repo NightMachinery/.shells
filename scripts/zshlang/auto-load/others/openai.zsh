@@ -546,6 +546,18 @@ typeset -gA gemini25_obj=(
 )
 define-llm-model-v2 gemini25_obj
 
+
+#: Gemini 3 Flash
+# gemini-3-flash-preview
+typeset -A gemini3_flash_obj=(
+    model_name 'gemini-3-flash-preview'
+    long_name 'gemini_3_flash'
+    short_name 'g3f'
+    reval_to_aliases 'rg3f g3f'
+    send_aliases 'lg3f'
+)
+define-llm-model-v2 gemini3_flash_obj
+
 #: Gemini 2.5 Flash
 typeset -A gemini25_flash_obj=(
     model_name 'gemini-2.5-flash'
