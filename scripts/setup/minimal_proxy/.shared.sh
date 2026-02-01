@@ -200,10 +200,13 @@ reval-ecgray() {
 }
 ##
 proxy-env-unset () { #: proxy unexport
-    unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+    #: @duplicateCode/aa8e6083b661b73d230497532ec267d6
+    ##
+    unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY npm_config_proxy npm_config_https_proxy
 }
 
 alias pxa87='ALL_PROXY=http://127.0.0.1:1087 all_proxy=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
+alias pxa89='ALL_PROXY=http://127.0.0.1:2089 all_proxy=http://127.0.0.1:2089 http_proxy=http://127.0.0.1:2089 https_proxy=http://127.0.0.1:2089 HTTP_PROXY=http://127.0.0.1:2089 HTTPS_PROXY=http://127.0.0.1:2089'
 alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096'
 alias pxa2097='ALL_PROXY=http://127.0.0.1:2097 all_proxy=http://127.0.0.1:2097 http_proxy=http://127.0.0.1:2097 https_proxy=http://127.0.0.1:2097 HTTP_PROXY=http://127.0.0.1:2097 HTTPS_PROXY=http://127.0.0.1:2097'
 alias pxa4096='ALL_PROXY=http://127.0.0.1:4096 all_proxy=http://127.0.0.1:4096 http_proxy=http://127.0.0.1:4096 https_proxy=http://127.0.0.1:4096 HTTP_PROXY=http://127.0.0.1:4096 HTTPS_PROXY=http://127.0.0.1:4096'
