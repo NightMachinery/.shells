@@ -75,8 +75,9 @@ bindkey '^[l' forward-word  #: alt-j
 bindkey '^[b' backward-word # alt-left
 bindkey '^[f' forward-word # alt-right
 ##
-# remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
 WORDCHARS+="|'"
+# remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
+WORDCHARS="${WORDCHARS/=/}"
 WORDCHARS="${WORDCHARS/\//}"
 WORDCHARS="${WORDCHARS/\[/}"
 WORDCHARS="${WORDCHARS/\]/}"
