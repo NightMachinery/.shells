@@ -2777,7 +2777,7 @@ end)
 -- }
 ---
 -- You can set hyper+F5 to the dictation command in macOS settings.
-hyper_bind_v1("5", function()
+hyper_bind_v1("f5", function()
                   brishzeval('awaysh-fast input-volume-mute-toggle')
                   -- @needed awaysh-fast
 end)
