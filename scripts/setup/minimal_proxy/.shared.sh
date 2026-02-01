@@ -265,6 +265,7 @@ pbcopy-remote() {
 
     socat - "tcp:127.0.0.1:${port}"
 }
+alias pcr="pbcopy-remote"
 
 bell-call-remote () {
     local bell_name="${1}"
@@ -460,4 +461,15 @@ myip-ipinfo () {
     curl -H "Authorization: Bearer ${ipinfo_api_token}" "ipinfo.io"
 }
 alias ci='myip-ipinfo'
+##
+function npm-install {
+    local pkg
+    for pkg in $@ ; do
+        npm install -g "$pkg" --progress=true --loglevel=verbose
+    done
+}
+
+function codex-install {
+    reval-ecgray npm-install '@openai/codex'
+}
 ##

@@ -1,4 +1,6 @@
 ###
+#: NOTE We load [[nightNotesPublic:cheatsheets/OS/unix/tangled/lib.zsh]] in this file. (=~/base/bootstrap/lib.zsh=)
+###
 #: [[id:3c5fc2e7-2ed9-4b14-b1aa-11337439277a][{BUG} · Issue #331 · Aloxaf/fzf-tab]]
 autoload -Uz zmathfunc
 zmathfunc
@@ -36,6 +38,13 @@ ecerr() {
 
 gquote () {
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
+}
+##
+alias var-show='>&2 typeset -p'
+alias typ='var-show'
+
+function var-get {
+    ec "${(P)1}"
 }
 ##
 function export-from-alias {
@@ -113,7 +122,7 @@ function wget-dir {
 function uv-pip {
     if isDefined-cmd uv ; then
         if test -z "${CONDA_PREFIX}" ; then
-            for d in ~/anaconda ~/miniconda3 ; do
+            for d in ~/anaconda ~/miniforge3 ~/miniconda3 ; do
                 if test -e "$d" ; then
                     local -x CONDA_PREFIX="$d"
 
