@@ -170,7 +170,7 @@ function pdfcrop-inplace() {
     jglob
     re pdf-crop-margins-inplace "$@"
 }
-aliasfn pcr pdfcrop-inplace
+# aliasfn pcr pdfcrop-inplace
 ##
 function pdfoutline {
     jglob
