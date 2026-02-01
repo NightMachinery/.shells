@@ -61,6 +61,8 @@ aliasfn ci81 curl-ip -x 'socks5h://127.0.0.1:1081'
 aliasfn ci82 curl-ip -x 'socks5h://127.0.0.1:1082'
 aliasfn ci2082 curl-ip -x 'http://127.0.0.1:2082'
 aliasfn ci89 curl-ip -x 'socks5h://127.0.0.1:1089'
+aliasfn ci3067-socks curl-ip -x 'socks5h://127.0.0.1:3067'
+aliasfn ci3067 curl-ip -x 'http://127.0.0.1:3067'
 aliasfn ci2089 curl-ip -x 'http://127.0.0.1:2089'
 aliasfn ci90 curl-ip -x 'socks5h://127.0.0.1:1090'
 aliasfn ci91 curl-ip -x 'socks5h://127.0.0.1:1091'
@@ -191,6 +193,8 @@ function ncp {
 }
 ##
 function ip-router {
+    #: This will return the phone's IP when you are connected to its hotspot.
+    ##
     if isDarwin ; then
         netstat -nr | perl -ne 'if (/^default\s+(\d+\.\d+\.\d+\.\d+)/) { print "$1\n"; exit }' | head -n1
     else
