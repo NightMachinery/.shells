@@ -75,6 +75,7 @@ pbcopy-remote() {
 
     socat - "tcp:127.0.0.1:${port}"
 }
+alias pcr="pbcopy-remote"
 
 pbcopy-remote-from-local() {
     pbpaste | pbcopy-remote
