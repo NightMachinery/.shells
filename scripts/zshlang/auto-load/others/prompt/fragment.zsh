@@ -7,8 +7,9 @@ EOF
 ##
 function fragment-summarize-session {
     cat-copy-if-tty <<'EOF'
-Summarize our current session, so that I can store it in my notes. I will directly copy your next message, so don't include any preamble.
+Summarize our current session, so that I can store it in my notes. Be concise but thorough. I will directly copy your next message, so don't include any preamble.
 EOF
+    # Summarize the session for my notes. Be concise but thorough. Output only the summary without any extra commentary.
 }
 ##
 function fragment-sop-correct {
