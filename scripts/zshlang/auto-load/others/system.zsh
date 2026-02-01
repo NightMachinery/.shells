@@ -182,6 +182,7 @@ function input-volume-mute-toggle {
       # awaysh-fast alert "input-volume: $(with-input-volume volume-get)"
     }
 }
+aliasfn microphone-mute-toggle input-volume-mute-toggle
 
 function volget {
   : "0-100"
