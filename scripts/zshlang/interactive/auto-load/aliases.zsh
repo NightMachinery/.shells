@@ -1,3 +1,11 @@
+##
+function alias-copy {
+    local alias_name="$1"
+    assert-args alias_name @RET
+
+    ec-copy "${aliases[$alias_name]}"
+}
+##
 # aliasfn pd proxy-off
 aliasfn '-' proxy-off
 
