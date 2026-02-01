@@ -103,7 +103,7 @@ aliasfn gmiadd gemiadd
 function npm-install {
     local pkg
     for pkg in $@ ; do
-        npm install -g "$pkg"
+        npm install -g "$pkg" --progress=true --loglevel=verbose
     done
 }
 
