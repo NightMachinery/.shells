@@ -23,13 +23,14 @@ rsp-safe --rsync-path="mkdir -p ~/base/bootstrap && rsync" "${nightNotesPublic}"
 
 rsp-safe ~/.tmux.conf ~/.inputrc "${NIGHTDIR}/setup/minimal_proxy"/**/*.(el|zsh|zshenv|zshrc|bash_profile|bashrc|bash|sh|curlrc)(D) ${fullhost}:
 
-rsp-safe "$nightNotesPrivate"/configs/minse/{.private.env.zsh,.secret-private-config.el} ${fullhost}:
-
 rsp-safe --rsync-path="mkdir -p ~/bin && rsync" "$NIGHTDIR/python/telegram-send/tsend.py" "$NIGHTDIR/perllang/ssh_password_auth_disable.pl" ${fullhost}:bin/
 
 rsp-safe2 ${fullhost}:bin/ $NIGHTDIR/perllang/url_dir_count.pl $NIGHTDIR/python/torch_cat.py
 #+end_src
 
+#+begin_src zsh :eval never
+rsp-safe "$nightNotesPrivate"/configs/minse/{.private.env.zsh,.secret-private-config.el} ${fullhost}:
+#+end_src
 
 #+begin_src zsh :noweb yes :eval never :tangle tangled/rsp_with_host.zsh
 # host=t21
@@ -62,7 +63,7 @@ fullhost=$host
 tmux new -s setup zsh
 #+end_src
 
-*** Run =bash bootstrap_minimal.bash=
+*** Run =bash ~/bootstrap_minimal.bash=
 
 *** Run next steps in Zsh.
 #+begin_src zsh :eval never
@@ -331,7 +332,15 @@ pip install -U IPython aiofile docopt PySocks telethon python-telegram-bot py-sp
 :END:
 #+begin_example zsh
 sudo apt-get update
-sudo apt-get install -y kitty-terminfo coreutils moreutils htop ncdu vim neovim git curl wget build-essential tmux zsh openconnect jq python3 python3-pip bindfs socat nmap corkscrew connect-proxy net-tools netcat-openbsd openssh-client openssh-server autossh redis-server zstd ripgrep progress
+sudo apt-get install -y kitty-terminfo coreutils moreutils htop ncdu vim neovim git curl wget build-essential tmux zsh openconnect jq python3 python3-pip bindfs socat nmap corkscrew connect-proxy net-tools netcat-openbsd openssh-client openssh-server autossh redis-server zstd ripgrep progress make ca-certificates aria2 unzip autoconf automake libtool zlib1g-dev
+
+sudo apt-get install -y \
+  build-essential python3 pkg-config \
+  autoconf automake libtool \
+  cmake ninja-build \
+  nasm yasm \
+  zlib1g-dev libssl-dev \
+  libpng-dev libjpeg-dev libwebp-dev libgif-dev
 
 # redis-install
 #+end_example
