@@ -3117,11 +3117,6 @@ whisper.processing_interrupted_p = false
 function whisper_run(language)
     whisper.language = language
     if whisper.state == "off" then
-        -- Start recording
-        whisper.state = "recording"
-        whisper.processing_interrupted_p = false  -- Reset interrupt flag when starting new recording
-        updateIndicator()
-
         -- Ensure temp directory exists
         os.execute("mkdir -p " .. whisper.tempDir)
 
@@ -3132,18 +3127,18 @@ function whisper_run(language)
 
         local recordCommand = whisper.getRecordCommand(wavFile)
         whisper.task = hs.task.new(recordCommand.command, function(exitCode, stdOut, stdErr)
-            if exitCode ~= 0 and whisper.state == "recording" then
-                local msg = "Recording stopped unexpectedly. Exit code: " .. exitCode .. "\nError: " .. stdErr
-                print(msg)
-                hs.alert.show(msg, 10)
-            end
-            whisper.state = "off"
-            updateIndicator()
-            if hs.fs.attributes(wavFile) then
-                processRecording(wavFile, language)
-            else
-                hs.alert.show("Failed to create recording file")
-            end
+                                       if exitCode ~= 0 and whisper.state == "recording" then
+                                           local msg = "Recording stopped unexpectedly. Exit code: " .. exitCode .. "\nError: " .. stdErr
+                                           print(msg)
+                                           hs.alert.show(msg, 10)
+                                       end
+                                       whisper.state = "off"
+                                       updateIndicator()
+                                       if hs.fs.attributes(wavFile) then
+                                           processRecording(wavFile, language)
+                                       else
+                                           hs.alert.show("Failed to create recording file")
+                                       end
         end, recordCommand.args)
 
         local success = whisper.task:start()
@@ -3152,6 +3147,15 @@ function whisper_run(language)
             whisper.state = "off"
             updateIndicator()
             return
+        else
+            -- Start recording
+            whisper.state = "recording"
+            whisper.processing_interrupted_p = false  -- Reset interrupt flag when starting new recording
+
+            -- sleep a bit to allow the recorder to become active
+            hs.timer.usleep(0.3 * 1000000) -- usleep takes microseconds
+
+            updateIndicator()
         end
 
         -- hs.alert.show("Started recording")
