@@ -18,9 +18,8 @@ If the material is a/v and no transcript is provided, request (or generate) a tr
 5. **Temporal awareness**: Note publication dates/versions; check for retractions/updates.
 6. **Method quality**: Weigh evidence by methodology (sample size, controls, preregistration, replication).
 7. **No invention**: Unknown facts/citations are marked as gaps; do not fabricate.
-8. **Safety & ethics**: Avoid sensitive PII; flag unethical/unlawful tactics.
-9. **Crux-first triage**: Keep only **externally checkable** claims that could change conclusions. Deprioritize peripheral claims.
-10. **Self-Proclaim Filter**: Treat as **SKIP** unless independently corroborated:
+8. **Crux-first triage**: Keep only **externally checkable** claims that could change conclusions. Deprioritize peripheral claims.
+9. **Self-Proclaim Filter**: Treat as **SKIP** unless independently corroborated:
     - First-person virtue/intent/character claims (“we care deeply…”, “I’m the best…”)
     - Unmeasured superlatives without defined metric/peer set (“leading,” “world-class”)
     - Self-reported outcomes with no public evidence (“customers love us”)
