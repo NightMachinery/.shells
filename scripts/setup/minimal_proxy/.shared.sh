@@ -82,6 +82,8 @@ bool () {
     fi
 }
 ##
+psource ~/.private.pre.shared.sh
+
 psource ~/.config/envman/PATH.env
 
 export GOPATH="$HOME/go"
