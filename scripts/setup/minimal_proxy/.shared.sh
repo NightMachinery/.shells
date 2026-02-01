@@ -116,17 +116,31 @@ else
     alias sudo-junest="${HOME}/.junest/usr/bin_wrappers/sudo"
 fi
 ##
-export PATH="${HOME}/anaconda/bin:${PATH}"
-export PATH="${HOME}/miniconda3/bin:${PATH}"
+mamba_path="${HOME}/miniforge3"
+mamba_default_env=""
+if test -d "${mamba_path}" ; then
+    #: Mamba is installed
+    ##
+    export PATH="${mamba_path}/bin:${PATH}"
+    export MAMBA_ROOT_PREFIX="${mamba_path}"
+    micromamba() {
+        mamba "$@"
+    }
+else
+    export PATH="${HOME}/anaconda/bin:${PATH}"
+    export PATH="${HOME}/miniconda3/bin:${PATH}"
+    export MAMBA_ROOT_PREFIX="${HOME}/micromamba"
 
-export MAMBA_ROOT_PREFIX="${HOME}/micromamba"
+    mamba_default_env=p310
+fi
+
 if isBash ; then
     if eval "$(micromamba shell hook --shell bash)" ; then
-        micromamba activate p310
+        micromamba activate ${mamba_default_env}
     fi
 else
     if eval "$(micromamba shell hook --shell zsh)" ; then
-        micromamba activate p310
+        micromamba activate ${mamba_default_env}
     fi
 fi
 ##
