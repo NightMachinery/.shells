@@ -1,6 +1,14 @@
 ##
 aliasfn cat-random cat_random.pl
 aliasfn cat-rnd cat-random
+
+# aliasfn cat-random-n cat_random.py
+function cat-random-n {
+    local n="${1:-1}"
+    silent shift || true
+
+    gshuf -n "$n" -- "$@"
+}
 ##
 function random-int {
     mdoc "Usage: $0 <from> <to> <how-many>
