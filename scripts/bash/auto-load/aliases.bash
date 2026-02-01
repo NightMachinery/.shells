@@ -134,7 +134,7 @@ alias wifi='osx-wifi-cli'
 function uv-pip {
     if isDefined-cmd uv ; then
         if test -z "${CONDA_PREFIX}" ; then
-            for d in ~/anaconda ~/miniconda3 ; do
+            for d in ~/anaconda ~/miniforge3 ~/miniconda3 ; do
                 if test -e "$d" ; then
                     local -x CONDA_PREFIX="$d"
 
