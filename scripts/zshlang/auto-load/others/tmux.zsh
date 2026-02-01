@@ -10,7 +10,7 @@ function tmux-client-terminal-get {
 function tmuxnew {
     #: @todo0 integrate =str2tmuxname=
     ##
-    silent tmux kill-session -t "$1"
+    silent tmux kill-session -t "$1" || true
     tmux new -d -s "$@"
 }
 
