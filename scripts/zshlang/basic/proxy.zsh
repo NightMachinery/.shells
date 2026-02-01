@@ -27,11 +27,13 @@ function reval-pxs() {
     reval pxs "$@"
 }
 ##
-proxy-env-unset () {
-    unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+proxy-env-unset () { #: proxy unexport
+    #: @duplicateCode/aa8e6083b661b73d230497532ec267d6
+    ##
+    unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY npm_config_proxy npm_config_https_proxy
 }
 
-alias noproxy='proxy_disabled=n'
+alias noproxy='proxy_disabled=y'
 
 function pxa-create {
     local px_httpport="${1:-1087}" name="${2:-pxa}"
@@ -364,4 +366,11 @@ function proxy-restart {
 alias '/'='proxy-restart'
 alias '//'='reval-ec ping 8.8.8.8'
 alias '/.'='reval-ec ci98'
+##
+function proxy-copy-env {
+    local proxy_name="${1}"
+    assert-args proxy_name @RET
+
+    ec-copy "export ${aliases[${proxy_name}]}"
+}
 ##
