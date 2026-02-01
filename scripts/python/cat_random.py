@@ -6,4 +6,9 @@ import random
 text = sys.stdin.read()
 items = text.split('\n')
 
-print(random.choice(items))
+n = 1
+if len(sys.argv) >= 2:
+    n = int(sys.argv[1])
+
+print("\n".join(random.choices(items, k=n)))
+#: @bug this is with replacements (dups are possible)
