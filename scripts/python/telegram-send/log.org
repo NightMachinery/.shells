@@ -1,0 +1,19 @@
+#+TITLE: telegram-send/log
+
+* _
+#+BEGIN_SRC markdown
+1. close-date: brainstorm ways to make this more user-friendly. E.g., accept human writable time offets, dates, etc. 
+
+2. Explain the option values
+
+3. The latest versions of PTB and Telethon (note the two backends)
+
+4. Extracting PollConfig is a good idea, no need for validation (remote fails anyway)
+#+END_SRCA
+
+#+BEGIN_SRC markdown
+Add `close-in` with the dep. This should use local timezone.
+Also Accept @<epoch> to force UTC timestamp (--close-date @1730584200) and +<seconds> for  relative (--close-date +3600).
+
+Isn't a single byte sufficient only for 8 options? So obviously keep the 2 bytes!
+#+END_SRC
