@@ -2,26 +2,44 @@
 
 """telegram-send
 Usage:
-  tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
+  tsend.py poll <receiver> <question> --option=<option>... [--allow-multiple] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
+  tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
 
 Options:
-  -f <file> --file=<file>  Sends a file, with message as its caption. (Can be specified multiple times, and sends all the files as an album. So they have to be the same kind of 'media'.)
-  --force_document  Whether to send the given file as a document or not.
-  --link_preview  Whether to show a preview of web links.
-  --parse_mode <parser>  Which parser to use for the message.
-  --lock-timeout <seconds>  How long to wait for lock file to be released, in seconds [default: 30].
-  --lock-path <lockpath>  Path to lock file.
-  --album  Send files as an album. (This flag has not been implemented for the first backend!)
-  -h --help  Show this screen.
-  --version  Show version.
+  Global:
+    -v  Increase verbosity. Repeat for more detail (e.g., -vv).
+    -h --help  Show this screen.
+    --version  Show version.
+    --lock-timeout <seconds>  How long to wait for lock file to be released, in seconds [default: 30].
+    --lock-path <lockpath>  Path to lock file.
+
+  Message command:
+    -f <file> --file=<file>  Sends a file, with message as its caption. (Can be specified multiple times, and sends all the files as an album. So they have to be the same kind of 'media'.)
+    --force_document  Whether to send the given file as a document or not.
+    --link_preview  Whether to show a preview of web links.
+    --parse_mode <parser>  Which parser to use for the message.
+    --album  Send files as an album. (This flag has not been implemented for the first backend!)
+    --no-album  Do not send files as an album.
+
+  Poll command:
+    --option <option>  Adds an option to the poll. Use multiple times for more options. (poll command)
+    -m --allow-multiple  Allow voters to pick more than one option. (poll command)
+    --poll-type <type>  Poll type, either "regular" or "quiz". [default: regular]
+    --correct-index <index>  Zero-based index of the correct option for quiz polls.
+    --explanation <text>  Explanation shown after answering a quiz poll.
+    --open-period <seconds>  Auto-close the poll after this many seconds (5-600).
+    --close-date <timestamp>  Unix timestamp when the poll should close. Prefix with @ for UTC epoch or + for relative seconds.
+    --close-in <when>  Human-readable relative time (local timezone), e.g. "15m", "2h", "tomorrow 9am".
+    --anonymous  Send the poll anonymously (default is public voters).
+    --disable-notification  Send poll without a push notification.
 
 Examples:
   tsend.py some_friend "I love you ^_^" --file ~/pics/big_heart.png
 
 Dependencies:
-  pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot
+  pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot dateparser
 
 Created by Fereidoon Mehri. I release my contribution to this program to the public domain (CC0).
 """
@@ -40,6 +58,8 @@ from pathlib import Path
 import asyncio
 from IPython import embed
 import re
+from datetime import datetime, timezone
+import dateparser
 from pynight.common_proxy import pysocks_proxy_from_env
 from pynight.common_lock_async import (
     lock_acquire,
@@ -129,6 +149,175 @@ def sanitize_telegram_html(message):
         html=str(soup),
         image_files=saved_images,
     )
+
+
+def _local_now():
+    return datetime.now().astimezone()
+
+
+def _close_date_dt_from_ts(close_date_ts):
+    return datetime.fromtimestamp(close_date_ts, tz=timezone.utc)
+
+
+def _parse_close_date_raw(close_date_raw):
+    raw = str(close_date_raw or "").strip()
+    if not raw:
+        raise SystemExit("--close-date cannot be empty.")
+
+    if raw.startswith("@"):
+        ts_raw = raw[1:].strip()
+        if not ts_raw.isdigit():
+            raise SystemExit("--close-date @<epoch> must be an integer.")
+        return int(ts_raw)
+
+    if raw.startswith("+"):
+        seconds_raw = raw[1:].strip()
+        if not seconds_raw.isdigit():
+            raise SystemExit("--close-date +<seconds> must be an integer.")
+        return int(_local_now().timestamp()) + int(seconds_raw)
+
+    try:
+        return int(raw)
+    except ValueError:
+        raise SystemExit(
+            "--close-date must be a Unix timestamp (integer), @<epoch>, or +<seconds>."
+        )
+
+
+def _parse_close_in_raw(close_in_raw):
+    raw = str(close_in_raw or "").strip()
+    if not raw:
+        raise SystemExit("--close-in cannot be empty.")
+
+    base = _local_now()
+    if raw.isdigit():
+        return int(base.timestamp()) + int(raw)
+
+    candidate = raw
+    if re.fullmatch(
+        r"\d+\s*[smhdw]",
+        raw,
+        flags=re.IGNORECASE,
+    ) or re.fullmatch(
+        r"\d+\s*(seconds|minutes|hours|days|weeks)",
+        raw,
+        flags=re.IGNORECASE,
+    ):
+        candidate = f"in {raw}"
+
+    settings = dict(
+        RELATIVE_BASE=base,
+        PREFER_DATES_FROM="future",
+        RETURN_AS_TIMEZONE_AWARE=True,
+    )
+    parsed = dateparser.parse(candidate, settings=settings)
+    if parsed is None and candidate != raw:
+        parsed = dateparser.parse(raw, settings=settings)
+    if parsed is None:
+        raise SystemExit(
+            "--close-in could not be parsed. Examples: 15m, 2h, tomorrow 9am."
+        )
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=base.tzinfo)
+
+    return int(parsed.timestamp())
+
+
+def _parse_verbosity(arguments):
+    raw = arguments.get("-v")
+    if isinstance(raw, bool):
+        count = 1 if raw else 0
+    elif isinstance(raw, int):
+        count = raw
+    elif isinstance(raw, (list, tuple)):
+        count = len(raw)
+    else:
+        count = 0
+    return 1 + count
+
+
+def parse_poll_arguments(arguments):
+    question = (arguments.get("<question>") or "").strip()
+    if not question:
+        raise SystemExit("Poll question cannot be empty.")
+
+    options = [opt.strip() for opt in (arguments.get("--option") or []) if opt.strip()]
+    if len(options) < 2:
+        raise SystemExit("Polls require at least two non-empty options.")
+
+    poll_type = (arguments.get("--poll-type") or "regular").strip().lower()
+    if poll_type not in {"regular", "quiz"}:
+        raise SystemExit("Poll type must be either 'regular' or 'quiz'.")
+
+    allow_multiple = bool(arguments.get("--allow-multiple"))
+    if poll_type == "quiz" and allow_multiple:
+        raise SystemExit("Quiz polls cannot allow multiple answers.")
+
+    correct_index_raw = arguments.get("--correct-index")
+    correct_index = None
+    if correct_index_raw is not None:
+        try:
+            correct_index = int(correct_index_raw)
+        except ValueError:
+            raise SystemExit("--correct-index must be an integer.")
+
+    if poll_type == "quiz":
+        if correct_index is None:
+            raise SystemExit("Quiz polls require --correct-index.")
+        if not 0 <= correct_index < len(options):
+            raise SystemExit("--correct-index must reference an existing option.")
+    elif correct_index is not None:
+        raise SystemExit("--correct-index is only valid for quiz polls.")
+
+    explanation = arguments.get("--explanation")
+    if explanation and poll_type != "quiz":
+        raise SystemExit("--explanation can only be used with quiz polls.")
+
+    open_period_raw = arguments.get("--open-period")
+    open_period = None
+    if open_period_raw is not None:
+        try:
+            open_period = int(open_period_raw)
+        except ValueError:
+            raise SystemExit("--open-period must be an integer.")
+        if not 5 <= open_period <= 600:
+            raise SystemExit("--open-period must be between 5 and 600 seconds.")
+
+    close_date_raw = arguments.get("--close-date")
+    close_in_raw = arguments.get("--close-in")
+    close_date_ts = None
+    close_date_dt = None
+
+    if open_period is not None and (close_date_raw is not None or close_in_raw is not None):
+        raise SystemExit("Use only one of --open-period, --close-date, or --close-in.")
+    if close_date_raw is not None and close_in_raw is not None:
+        raise SystemExit("Use only one of --open-period, --close-date, or --close-in.")
+
+    if close_date_raw is not None:
+        close_date_ts = _parse_close_date_raw(close_date_raw)
+        close_date_dt = _close_date_dt_from_ts(close_date_ts)
+
+    if close_in_raw is not None:
+        close_date_ts = _parse_close_in_raw(close_in_raw)
+        close_date_dt = _close_date_dt_from_ts(close_date_ts)
+
+    poll_data = dict(
+        chat_id=p2int(arguments.get("<receiver>")),
+        question=question,
+        options=options,
+        poll_type=poll_type,
+        allow_multiple=allow_multiple,
+        correct_index=correct_index,
+        explanation=explanation,
+        open_period=open_period,
+        close_date_ts=close_date_ts,
+        close_date_dt=close_date_dt,
+        is_anonymous=bool(arguments.get("--anonymous")),
+        disable_notification=bool(arguments.get("--disable-notification")),
+    )
+
+    return poll_data
 
 
 async def handle(e, attempt, max_retries, verbosity):
@@ -384,11 +573,84 @@ async def ptb_send_files_v1(
     )
 
 
-async def tsend(arguments):
-    parse_mode_str = arguments.get("--parse-mode", "markdown")
+async def ptb_send_poll(bot, poll_arguments, max_retries=20, verbosity=2):
+    for attempt in range(max_retries):
+        try:
+            await bot.send_poll(
+                chat_id=poll_arguments["chat_id"],
+                question=poll_arguments["question"],
+                options=poll_arguments["options"],
+                is_anonymous=poll_arguments["is_anonymous"],
+                type=poll_arguments["poll_type"],
+                allows_multiple_answers=poll_arguments["allow_multiple"],
+                correct_option_id=poll_arguments["correct_index"],
+                explanation=poll_arguments["explanation"],
+                open_period=poll_arguments["open_period"],
+                close_date=poll_arguments["close_date_ts"],
+                disable_notification=poll_arguments["disable_notification"],
+            )
+            break
+        except Exception as e:
+            await handle(e, attempt, max_retries, verbosity)
 
-    arguments["<message>"] = str(arguments["<message>"])
-    message = arguments["<message>"]
+
+async def telethon_send_poll(client, poll_arguments, max_retries=30, verbosity=1):
+    from telethon.tl import types
+
+    def _twe(text):
+        return types.TextWithEntities(text=str(text), entities=[])
+
+    answers = []
+    for idx, option_text in enumerate(poll_arguments["options"]):
+        option_bytes = idx.to_bytes(2, byteorder="big")
+        answers.append(types.PollAnswer(text=_twe(option_text), option=option_bytes))
+
+    poll = types.Poll(
+        id=0,
+        question=_twe(poll_arguments["question"]),
+        answers=answers,
+        public_voters=not poll_arguments["is_anonymous"],
+        multiple_choice=poll_arguments["allow_multiple"],
+        quiz=(poll_arguments["poll_type"] == "quiz"),
+        close_period=poll_arguments["open_period"],
+        close_date=poll_arguments["close_date_dt"],
+    )
+
+    correct_answers = None
+    if poll_arguments["poll_type"] == "quiz":
+        correct_answers = [
+            answers[poll_arguments["correct_index"]].option,
+        ]
+
+    input_media = types.InputMediaPoll(
+        poll=poll,
+        correct_answers=correct_answers,
+        solution=poll_arguments["explanation"],
+    )
+
+    for attempt in range(max_retries):
+        try:
+            await client.send_message(
+                poll_arguments["chat_id"],
+                message=None,
+                file=input_media,
+                silent=poll_arguments["disable_notification"],
+            )
+            break
+        except Exception as e:
+            await handle(e, attempt, max_retries, verbosity)
+
+
+async def tsend(arguments):
+    poll_mode = bool(arguments.get("poll"))
+    poll_arguments = parse_poll_arguments(arguments) if poll_mode else None
+    verbosity = _parse_verbosity(arguments)
+
+    parse_mode_str = arguments.get("--parse-mode", "markdown")
+    message = None
+    if not poll_mode:
+        arguments["<message>"] = str(arguments["<message>"])
+        message = arguments["<message>"]
 
     lock_timeout = float(arguments.get("--lock-timeout") or 10)
     lock_path = arguments.get("--lock-path")
@@ -430,34 +692,39 @@ async def tsend(arguments):
                 bot = telegram.Bot(token)
 
             async with bot:
-                parse_mode = ptb_get_parse_mode(parse_mode_str)
-
-                # ic(parse_mode_str)
-                if parse_mode_str == "html":
-                    #: Sanitize the message to contain only HTML tags supported by Telegram
-                    res = sanitize_telegram_html(message)
-                    message = res["html"]
-                    for img_file in res["image_files"]:
-                        arguments["--file"].append(
-                            img_file
-                        )  # Add saved images to the list of files to send
-
-                    # ic(message)
-
-                if arguments["--file"]:
-                    await ptb_send_files_v1(
-                        bot,
-                        arguments,
-                        message=message,
-                        parse_mode=parse_mode,
-                    )
+                if poll_mode:
+                    await ptb_send_poll(bot, poll_arguments, verbosity=verbosity)
                 else:
-                    await ptb_send(
-                        bot,
-                        chat_id=p2int(arguments["<receiver>"]),
-                        message=message,
-                        parse_mode=parse_mode,
-                    )
+                    parse_mode = ptb_get_parse_mode(parse_mode_str)
+
+                    # ic(parse_mode_str)
+                    if parse_mode_str == "html":
+                        #: Sanitize the message to contain only HTML tags supported by Telegram
+                        res = sanitize_telegram_html(message)
+                        message = res["html"]
+                        for img_file in res["image_files"]:
+                            arguments["--file"].append(
+                                img_file
+                            )  # Add saved images to the list of files to send
+
+                        # ic(message)
+
+                    if arguments["--file"]:
+                        await ptb_send_files_v1(
+                            bot,
+                            arguments,
+                            message=message,
+                            parse_mode=parse_mode,
+                            verbosity=verbosity,
+                        )
+                    else:
+                        await ptb_send(
+                            bot,
+                            chat_id=p2int(arguments["<receiver>"]),
+                            message=message,
+                            parse_mode=parse_mode,
+                            verbosity=verbosity,
+                        )
         else:  #: Telethon backend
             from telethon import TelegramClient
 
@@ -480,27 +747,31 @@ async def tsend(arguments):
                 await client.start()
 
             try:
-                # print(arguments)
-                if parse_mode_str == "html":
-                    arguments["<message>"] = re.sub(
-                        r"(<(br|p)\s*/?>)", r"\1" + "\n", arguments["<message>"]
+                if poll_mode:
+                    await telethon_send_poll(client, poll_arguments, verbosity=verbosity)
+                else:
+                    # print(arguments)
+                    if parse_mode_str == "html":
+                        arguments["<message>"] = re.sub(
+                            r"(<(br|p)\s*/?>)", r"\1" + "\n", arguments["<message>"]
+                        )
+
+                    elif parse_mode_str == "none":
+                        parse_mode_str = None
+                        #: Disabling default formatting
+                        #: [[https://docs.telethon.dev/en/stable/modules/client.html#telethon.client.messageparse.MessageParseMethods.parse_mode][TelegramClient — Telethon 1.36.0 documentation]]
+
+                    await discreet_send(
+                        client,
+                        p2int(arguments["<receiver>"]),
+                        arguments["<message>"],
+                        file=(arguments["--file"] or None),
+                        force_document=arguments["--force-document"],
+                        parse_mode=parse_mode_str,
+                        link_preview=arguments["--link-preview"],
+                        album_mode=(not arguments["--no-album"]),
+                        verbosity=verbosity,
                     )
-
-                elif parse_mode_str == "none":
-                    parse_mode_str = None
-                    #: Disabling default formatting
-                    #: [[https://docs.telethon.dev/en/stable/modules/client.html#telethon.client.messageparse.MessageParseMethods.parse_mode][TelegramClient — Telethon 1.36.0 documentation]]
-
-                await discreet_send(
-                    client,
-                    p2int(arguments["<receiver>"]),
-                    arguments["<message>"],
-                    file=(arguments["--file"] or None),
-                    force_document=arguments["--force-document"],
-                    parse_mode=parse_mode_str,
-                    link_preview=arguments["--link-preview"],
-                    album_mode=(not arguments["--no-album"]),
-                )
 
             finally:
                 await client.disconnect()
