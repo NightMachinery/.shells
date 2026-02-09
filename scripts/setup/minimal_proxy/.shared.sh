@@ -206,14 +206,11 @@ proxy-env-unset () { #: proxy unexport
     unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY npm_config_proxy npm_config_https_proxy
 }
 
-alias pxa87='ALL_PROXY=http://127.0.0.1:1087 all_proxy=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087'
-alias pxa89='ALL_PROXY=http://127.0.0.1:2089 all_proxy=http://127.0.0.1:2089 http_proxy=http://127.0.0.1:2089 https_proxy=http://127.0.0.1:2089 HTTP_PROXY=http://127.0.0.1:2089 HTTPS_PROXY=http://127.0.0.1:2089'
-alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096'
-alias pxa2097='ALL_PROXY=http://127.0.0.1:2097 all_proxy=http://127.0.0.1:2097 http_proxy=http://127.0.0.1:2097 https_proxy=http://127.0.0.1:2097 HTTP_PROXY=http://127.0.0.1:2097 HTTPS_PROXY=http://127.0.0.1:2097'
-alias pxa4096='ALL_PROXY=http://127.0.0.1:4096 all_proxy=http://127.0.0.1:4096 http_proxy=http://127.0.0.1:4096 https_proxy=http://127.0.0.1:4096 HTTP_PROXY=http://127.0.0.1:4096 HTTPS_PROXY=http://127.0.0.1:4096'
-# export ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096
-alias pxateias='ALL_PROXY=http://10.2.32.28:10809 all_proxy=http://10.2.32.28:10809 http_proxy=http://10.2.32.28:10809 https_proxy=http://10.2.32.28:10809 HTTP_PROXY=http://10.2.32.28:10809 HTTPS_PROXY=http://10.2.32.28:10809'
-alias pxa='pxa2096'
+alias pxa80='ALL_PROXY=http://127.0.0.1:2080 all_proxy=http://127.0.0.1:2080 http_proxy=http://127.0.0.1:2080 https_proxy=http://127.0.0.1:2080 HTTP_PROXY=http://127.0.0.1:2080 HTTPS_PROXY=http://127.0.0.1:2080 npm_config_proxy=http://127.0.0.1:2080 npm_config_https_proxy=http://127.0.0.1:2080'
+alias pxa87='ALL_PROXY=http://127.0.0.1:1087 all_proxy=http://127.0.0.1:1087 http_proxy=http://127.0.0.1:1087 https_proxy=http://127.0.0.1:1087 HTTP_PROXY=http://127.0.0.1:1087 HTTPS_PROXY=http://127.0.0.1:1087 npm_config_proxy=http://127.0.0.1:1087 npm_config_https_proxy=http://127.0.0.1:1087'
+alias pxa89='ALL_PROXY=http://127.0.0.1:2089 all_proxy=http://127.0.0.1:2089 http_proxy=http://127.0.0.1:2089 https_proxy=http://127.0.0.1:2089 HTTP_PROXY=http://127.0.0.1:2089 HTTPS_PROXY=http://127.0.0.1:2089 npm_config_proxy=http://127.0.0.1:2089 npm_config_https_proxy=http://127.0.0.1:2089'
+alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096 npm_config_proxy=http://127.0.0.1:2096 npm_config_https_proxy=http://127.0.0.1:2096'
+alias pxa='pxa87'
 ##
 #: @duplicateCode/0c8b9d0226cdfb4f5bc0a9ea735089df
 tmuxnew () {
