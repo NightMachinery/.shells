@@ -1,4 +1,15 @@
 ##
+function snippet-chain {
+    local snippets=($@)
+
+    local snippet out=""
+    for snippet in "${snippets[@]}"; do
+        out="$(ec "${out}" | reval "${snippet}")" @RET
+    done
+
+    ec-copy "${out}"
+}
+##
 function snippet-input-file {
     local file="$1"
     assert-args file @RET
