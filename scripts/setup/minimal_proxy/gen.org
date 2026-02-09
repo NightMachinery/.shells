@@ -75,6 +75,11 @@ exec zsh
 export-from-alias pxa2096
 #+end_src
 
+Or:
+#+begin_src zsh :eval never
+export-from-alias pxa87
+#+end_src
+
 *** [[id:cf6c92c4-bf55-4534-9064-13fb1a80a874][brew]]
 **** This will be slow without a proxy.
 

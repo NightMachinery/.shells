@@ -47,6 +47,7 @@ aliasfn ci31 curl-ip -x 'socks5h://127.0.0.1:1031'
 aliasfn ci35 curl-ip -x 'socks5h://127.0.0.1:1035'
 aliasfn ci2035 curl-ip -x 'http://127.0.0.1:2035'
 aliasfn ci40 curl-ip -x 'socks5h://127.0.0.1:1040'
+aliasfn ci2040 curl-ip -x 'http://127.0.0.1:2040'
 aliasfn ci41 curl-ip -x 'socks5h://127.0.0.1:1041'
 aliasfn ci2041 curl-ip -x 'http://127.0.0.1:2041'
 aliasfn ci50 curl-ip -x 'socks5h://127.0.0.1:1050'
@@ -83,6 +84,8 @@ aliasfn ci99 curl-ip -x 'socks5h://127.0.0.1:1099'
 
 aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
 aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
+
+aliasfn ci14000-socks curl-ip -x 'socks5h://127.0.0.1:14000'
 ##
 alias myip-amazon='curlm https://checkip.amazonaws.com'
 alias myip-ipinfo='curlm -H "Authorization: Bearer ${ipinfo_api_token}" https://ipinfo.io/ip'
