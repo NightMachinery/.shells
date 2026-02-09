@@ -637,7 +637,9 @@ function nightsh-load-zshrc() {
   # https://github.com/zsh-users/zsh-autosuggestions/issues/351
   ZSH_AUTOSUGGEST_CLEAR_WIDGETS+=(bracketed-paste)
   ###
+  #: @duplicateCode/45bbd05f7d0f9bc5430c373273772f1a
   # remove '/' from word chars. Affects C-w, alt-left, alt-right, etc
+  WORDCHARS="${WORDCHARS/=/}"
   WORDCHARS="${WORDCHARS/\//}|'"
   WORDCHARS="${WORDCHARS/\#/}"
   WORDCHARS="${WORDCHARS/\./}"
