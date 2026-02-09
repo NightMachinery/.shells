@@ -181,6 +181,19 @@ function h_luna-advanced-bell {
     ecdate "Luna iterated."
 }
 
+function browser-focus-p {
+    @darwinOnly
+
+    local frontapp
+    frontapp="$(frontapp-get)" @RET
+
+    [[ "${frontapp}" == "${CHROME_BUNDLE_IDENTIFIER:-company.thebrowser.Browser}" ]]
+
+    # [[ "${frontapp}" =~ '(?:company\.thebrowser\.Browser)' ]]
+    #: We CAN check other browsers, too, but is it useful?
+    #: [agfi:browser-current-match-p] only checks the default.
+}
+
 function browser-current-match-p {
     {
         browser-current-url

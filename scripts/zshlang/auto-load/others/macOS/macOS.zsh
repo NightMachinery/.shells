@@ -31,6 +31,12 @@ function screen-gray-set-darwin () {
 function frontapp-get {
     #: [[id:5192ebaf-95c8-43df-be58-c153ab412564][macOS/front app]]
     ##
+    local frontapp="${front_app_cached}"
+    if test -n "$frontapp" ; then
+        ec "${frontapp}"
+        return 0
+    fi
+
     {
         if isDarwin ; then
             if true ; then
