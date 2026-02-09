@@ -106,11 +106,48 @@ function kitty-tab-is-focused {
     [[ "$(ec "$res" | jq -r '.is_focused')" == 'true' ]]
 }
 ##
+function kitty-emacs-focused-p {
+    kitty-remote ls --match-tab 'state:focused' --match 'state:focused' | jq -e '
+      any(.[]?.tabs[]?.windows[]?;
+        (
+          (
+            [ .foreground_processes[]?.cmdline[]? ]
+            | map(tostring)
+            | any(test("emacs|emc-gateway"; "i"))
+          )
+          # or
+          # ((.title // "") | test("emacs"))
+        )
+      )
+    ' >/dev/null
+}
+
+function kitty-tab-codex-p {
+    #: true (0) if the *focused window in the focused tab* is running codex
+    #: kitty doesn't see through SSH (or perhaps even tmux), so we fallback on checking for TTY titles.
+    #: If the TTY title starts with `⚡`, it's running Codex.
+    ##
+    kitty-remote ls --match-tab 'state:focused' --match 'state:focused' | jq -e '
+      any(.[]?.tabs[]?.windows[]?;
+        (
+          (
+            [ .foreground_processes[]?.cmdline[]? ]
+            | map(tostring)
+            | any(test("(^|[[:space:]/])codex([[:space:]]|$)"; "i"))
+          )
+          or
+          ((.title // "") | test("^⚡"))
+        )
+      )
+    ' >/dev/null
+}
+##
 # redis-defvar kitty_focused
 function kitty-is-focused {
     ##
-    #: @toFuture/1404 If we have fixed [agfi:frontapp-get], let's switch back to it. It's more reliable.
-    # [[ "$(frontapp-get)" == 'net.kovidgoyal.kitty' ]]
+    #: If we have fixed [agfi:frontapp-get], let's switch back to it. It's more reliable.
+    #: But this is also slower, so I am keeping the second option.
+    # [[ "$(frontapp-get)" == 'net.kovidgoyal.kitty' ]] ; return $?
     ##
     [[ "$(kitty-remote ls | jq -r '.[] | .is_focused')" == true ]]
     ##
