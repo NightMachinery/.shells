@@ -1,3 +1,4 @@
+##
 function '.a'() {
     if isDarwin ; then
         brishzr .a "$@"
@@ -6,3 +7,4 @@ function '.a'() {
         aget "$(gquote "$@")"
     fi
 }
+##
