@@ -61,6 +61,10 @@ function snippet-preamble-coding-rewriter {
     snippet-input "${snippet}" "$@"
 }
 ##
+function snippet-stt-coding {
+    snippet-input-file "${night_prompt_dir}/STT_coding.md" "$@"
+}
+##
 function snippet-whole-code {
     snippet-input "Output the whole code without eliding any parts." "$@"
 }
