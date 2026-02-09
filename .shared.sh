@@ -106,6 +106,10 @@ export GOPATH="$HOME/go"
 export GOBIN="$GOPATH/bin"
 addToPATH "$HOME/go/bin"
 addToPATH "/usr/local/opt/texinfo/bin"
+
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
 addToPATH "$HOME/kscripts"
 addToPATH "/usr/libexec"
 export GEM_HOME="$HOME/.gem"
