@@ -53,6 +53,8 @@ function pxa-create {
 }
 pxa-create
 pxa-create 1087 pxa87
+pxa-create 2040 pxa40
+pxa-create 2080 pxa80
 pxa-create 2091 pxa91
 pxa-create 2092 pxa92
 pxa-create 2041 pxa41
