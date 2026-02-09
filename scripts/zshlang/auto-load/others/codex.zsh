@@ -41,6 +41,12 @@ function codex-ask-med {
     codex_reasoning_effort=medium codex-ask "$@"
 }
 ##
+#: @duplicateCode/5a56c1bf4c428167af08cffefb52d3aa
+function codex {
+    tty-title "⚡${PWD:t}"
+    command codex "$@"
+}
+
 function codex-m {
     memoi_expire=$(( 3600*24*1 )) reval-memoi codex-install
     #: run codex-install every once in a while
