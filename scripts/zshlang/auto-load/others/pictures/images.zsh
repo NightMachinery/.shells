@@ -370,9 +370,10 @@ function finder-img-gallery {
         return 1
     fi
 
+    (
     cdtmp @RET
     local out_dir
-    out_dir="$(command pwd -P)" @TRET
+    out_dir="$PWD"
 
     local i=0
     local linked_n=0
@@ -390,7 +391,7 @@ function finder-img-gallery {
         ext="${ext:-img}"
 
         local name
-        name="$(printf '%03d.%s' "$i" "$ext")" @TRET
+        name="$(printf '%04d.%s' "$i" "$ext")" @TRET
 
         reval command ln -s -- "${src}" "${name}" @RET
         (( linked_n++ ))
