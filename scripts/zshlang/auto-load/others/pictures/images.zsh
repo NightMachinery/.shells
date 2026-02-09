@@ -352,3 +352,57 @@ function img-split-vertical-dumb-v1 {
 #     }
 # }
 ##
+function qview {
+    @darwinOnly
+
+    open -a "qView" -- "$@"
+}
+##
+function finder-img-gallery {
+    local finder_img_gallery_open_p="${finder_img_gallery_open_p:-y}"
+
+    local inargs
+    in-or-args2 "$@"
+    local inputs=( ${inargs[@]} )
+
+    if (( ${#inputs[@]} == 0 )) ; then
+        ecerr "finder-img-gallery: no input paths"
+        return 1
+    fi
+
+    cdtmp @RET
+    local out_dir
+    out_dir="$(command pwd -P)" @TRET
+
+    local i=0
+    local linked_n=0
+    local p
+    for p in "${inputs[@]}" ; do
+        (( i++ ))
+
+        local src="${p}"
+        if ! test -e "${src}" ; then
+            ecerr "finder-img-gallery: missing: ${src}"
+            continue
+        fi
+
+        local ext="${src:e}"
+        ext="${ext:-img}"
+
+        local name
+        name="$(printf '%03d.%s' "$i" "$ext")" @TRET
+
+        reval command ln -s -- "${src}" "${name}" @RET
+        (( linked_n++ ))
+    done
+
+    if (( linked_n == 0 )) ; then
+        ecerr "finder-img-gallery: no existing paths to link"
+        return 1
+    fi
+
+    if bool "${finder_img_gallery_open_p}" ; then
+        command open -- "${out_dir}"
+    fi
+}
+##
