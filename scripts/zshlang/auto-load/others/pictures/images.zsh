@@ -352,48 +352,31 @@ function img-split-vertical-dumb-v1 {
 #     }
 # }
 ##
-function qview {
-    @darwinOnly
-
+function h-img-gallery-links-dir {
     local inargs
     in-or-args3 "$@" @RET
-
-    if (( ${#inargs[@]} == 0 )) ; then
-        return 0
-    fi
-
-    #: Use argv mode for bulk opens.
-    command open -na "qView" --args "${inargs[@]}"
-}
-##
-function finder-img-gallery {
-    local finder_img_gallery_open_p="${finder_img_gallery_open_p:-y}"
-
-    local inargs
-    in-or-args3 "$@"
-    local inputs=( ${inargs[@]} )
+    local inputs=( "${inargs[@]}" )
 
     if (( ${#inputs[@]} == 0 )) ; then
-        ecerr "finder-img-gallery: no input paths"
+        ecerr "h-img-gallery-links-dir: no input paths"
         return 1
     fi
 
-    (
-        cdtmp @RET
+    {
         local out_dir
-        out_dir="$PWD"
+        out_dir="$(gmktemp -d)" @TRET
 
         local i=0
         local linked_n=0
         local p
         for p in "${inputs[@]}" ; do
-            (( i++ ))
-
-            local src="${p}"
+            local src="${p:A}"
             if ! test -e "${src}" ; then
-                ecerr "finder-img-gallery: missing: ${src}"
+                ecerr "h-img-gallery-links-dir: missing: ${src}"
                 continue
             fi
+
+            (( i++ ))
 
             local ext="${src:e}"
             ext="${ext:-img}"
@@ -401,18 +384,39 @@ function finder-img-gallery {
             local name
             name="$(printf '%04d.%s' "$i" "$ext")" @TRET
 
-            reval command ln -s -- "${src}" "${name}" @RET
+            reval command ln -s -- "${src}" "${out_dir}/${name}" @RET
             (( linked_n++ ))
         done
 
         if (( linked_n == 0 )) ; then
-            ecerr "finder-img-gallery: no existing paths to link"
+            ecerr "h-img-gallery-links-dir: no existing paths to link"
+            reval command rmdir -- "${out_dir}" @STRUE
             return 1
         fi
+    } >&2
 
-        if bool "${finder_img_gallery_open_p}" ; then
-            command open -- "${out_dir}"
-        fi
-    )
+    ec "${out_dir}"
+}
+##
+function img-gallery-open-app {
+    @darwinOnly
+
+    local app="${1:-qView}"
+    assert-args app @RET
+    shift
+
+    local links_dir
+    links_dir="$(h-img-gallery-links-dir "$@")" @RET
+
+    reval-ec command open -a "${app}" -- "${links_dir}" @RET
+    # ec "${links_dir}"
+}
+##
+function qview {
+    img-gallery-open-app "qView" "$@" @RET
+}
+##
+function finder-img-gallery {
+    img-gallery-open-app "Finder" "$@" @RET
 }
 ##
