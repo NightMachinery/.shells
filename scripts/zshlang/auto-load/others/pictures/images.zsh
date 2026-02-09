@@ -355,14 +355,22 @@ function img-split-vertical-dumb-v1 {
 function qview {
     @darwinOnly
 
-    open -a "qView" -- "$@"
+    local inargs
+    in-or-args3 "$@" @RET
+
+    if (( ${#inargs[@]} == 0 )) ; then
+        return 0
+    fi
+
+    #: Use argv mode for bulk opens.
+    command open -na "qView" --args "${inargs[@]}"
 }
 ##
 function finder-img-gallery {
     local finder_img_gallery_open_p="${finder_img_gallery_open_p:-y}"
 
     local inargs
-    in-or-args2 "$@"
+    in-or-args3 "$@"
     local inputs=( ${inargs[@]} )
 
     if (( ${#inputs[@]} == 0 )) ; then
