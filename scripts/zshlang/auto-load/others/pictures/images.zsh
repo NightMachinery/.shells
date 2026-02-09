@@ -371,39 +371,40 @@ function finder-img-gallery {
     fi
 
     (
-    cdtmp @RET
-    local out_dir
-    out_dir="$PWD"
+        cdtmp @RET
+        local out_dir
+        out_dir="$PWD"
 
-    local i=0
-    local linked_n=0
-    local p
-    for p in "${inputs[@]}" ; do
-        (( i++ ))
+        local i=0
+        local linked_n=0
+        local p
+        for p in "${inputs[@]}" ; do
+            (( i++ ))
 
-        local src="${p}"
-        if ! test -e "${src}" ; then
-            ecerr "finder-img-gallery: missing: ${src}"
-            continue
+            local src="${p}"
+            if ! test -e "${src}" ; then
+                ecerr "finder-img-gallery: missing: ${src}"
+                continue
+            fi
+
+            local ext="${src:e}"
+            ext="${ext:-img}"
+
+            local name
+            name="$(printf '%04d.%s' "$i" "$ext")" @TRET
+
+            reval command ln -s -- "${src}" "${name}" @RET
+            (( linked_n++ ))
+        done
+
+        if (( linked_n == 0 )) ; then
+            ecerr "finder-img-gallery: no existing paths to link"
+            return 1
         fi
 
-        local ext="${src:e}"
-        ext="${ext:-img}"
-
-        local name
-        name="$(printf '%04d.%s' "$i" "$ext")" @TRET
-
-        reval command ln -s -- "${src}" "${name}" @RET
-        (( linked_n++ ))
-    done
-
-    if (( linked_n == 0 )) ; then
-        ecerr "finder-img-gallery: no existing paths to link"
-        return 1
-    fi
-
-    if bool "${finder_img_gallery_open_p}" ; then
-        command open -- "${out_dir}"
-    fi
+        if bool "${finder_img_gallery_open_p}" ; then
+            command open -- "${out_dir}"
+        fi
+    )
 }
 ##
