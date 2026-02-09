@@ -147,9 +147,20 @@ aliasfn stt-file with-flash-maybe llm-stt-file
 # aliasfn stt-file with-g25-maybe llm-stt-file
 
 function hs-whisper-stt-last {
+  stt_last_dir=~[hs_whisper]/ h-stt-last "$@"
+}
+
+function handy-stt-last {
+  stt_last_dir=$HANDY_RECORDING_DIR h-stt-last "$@"
+}
+
+function h-stt-last {
+  local d="${stt_last_dir}"
+  assert-args d @RET
+
   local cmd=()
 
-  cmd+=(indir ~[hs_whisper]/ onlc)
+  cmd+=(indir "$d" onlc)
 
   #: Kind of a hack; we forward the variable llm_model.
   #: This is needed because of `onlc`.

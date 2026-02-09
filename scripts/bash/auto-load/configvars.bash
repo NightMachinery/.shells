@@ -1,4 +1,8 @@
 ##
+#: @todo We should move `typeset -g` vars to a Zsh script, as I don't think bash supports them.
+##
+typeset -g HANDY_RECORDING_DIR=~/"Library/Application Support/com.pais.handy/recordings"
+##
 org_props_folded=$'\n:PROPERTIES:\n:visibility: folded\n:END:\n'
 ##
 typeset -g irc_networks=('Libera')
