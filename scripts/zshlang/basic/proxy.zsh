@@ -95,6 +95,8 @@ function v2-on {
 
 function v2-off {
     ##
+    #: @seeAlso [agfi:httpify-socks5]
+    ##
     # tmuxnew v2ray-genrouter v2ray -config $nightNotes/private/configs/zii/v2ray/direct.json
     ##
     tmuxnew v2ray-genrouter gost -L socks5://127.0.0.1:1081 -L http://127.0.0.1:1087
