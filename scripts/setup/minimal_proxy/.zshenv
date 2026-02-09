@@ -441,6 +441,131 @@ function pbcopy-file-as-md {
     return $retcode
 }
 alias cx='pbcopy-file-as-md'
+##
+function h-nvidia-smi-query {
+    ensure-array nvidia_smi_opts
+    local opts=("${nvidia_smi_opts[@]}")
+
+    local query="${1}"
+    local target_gpu="${2}"
+
+    local args=(
+        --query-gpu="${query}"
+        --format=csv,noheader,nounits
+    )
+
+    if test -n "${target_gpu}" ; then
+        args+=(--id="${target_gpu}")
+    fi
+
+    local out
+    out="$(nvidia-smi "${opts[@]}" "${args[@]}")" @RET
+
+    ec "${out}" | perl -lpe 's/^\s+|\s+$//g'
+}
+
+function nvidia-ram-free-get {
+    local target_gpu="${1}"
+
+    h-nvidia-smi-query "memory.free" "${target_gpu}"
+    #: outputs in MB
+}
+
+function nvidia-wait-for-ram {
+    #: * @usage
+    #: `nvidia-wait-for-ram 11000 && {`
+    ##
+    local wanted_ram="${1}"
+    local target_gpu="${2}"
+
+    until (( wanted_ram < $(nvidia-ram-free-get "${target_gpu}") )) ; do
+        sleep 30
+    done
+
+    return 0
+}
+###
+function isI {
+    if test -n "$FORCE_NONINTERACTIVE" ; then
+        return 1
+    fi
+    if test -n "$FORCE_INTERACTIVE" ; then
+        return 0
+    fi
+
+    isIReally
+}
+function isIReally {
+    if isBash ; then
+        [[ $- == *i* ]]
+    else
+        [[ -o interactive ]]
+    fi
+}
+##
+function isOutTty {
+    [ -t 1 ]
+    # -t fd True if file descriptor fd is open and refers to a terminal.
+}
+alias istty=isOutTty # NOTE: aliases are not fnswappable
+alias isTty=isOutTty
+
+function isErrTty {
+    [ -t 2 ]
+    # -t fd True if file descriptor fd is open and refers to a terminal.
+}
+
+function isInTty {
+    [ -t 0 ]
+    # -t fd True if file descriptor fd is open and refers to a terminal.
+}
+##
+function title {
+    # forked from OMZ, see https://superuser.com/a/344397/856545 for setting tab and window separately
+    emulate -L zsh
+    setopt prompt_subst
+
+    {
+        [[ "$EMACS" == *term* ]] && return
+
+        # if $2 is unset use $1 as default
+        # if it is set and empty, leave it as is
+        : ${2=$1}
+
+        case "$TERM" in
+            cygwin|xterm*|putty*|rxvt*|ansi)
+                print -Pn "\e]2;$2:q\a" # set window name
+                print -Pn "\e]1;$1:q\a" # set tab name
+                ;;
+            screen*)
+                print -Pn "\ek$1:q\e\\" # set screen hardstatus
+                ;;
+            *)
+                if [[ "$TERM_PROGRAM" == "iTerm.app" ]]; then
+                    print -Pn "\e]2;$2:q\a" # set window name
+                    print -Pn "\e]1;$1:q\a" # set tab name
+                else
+                    # Try to use terminfo to set the title
+                    # If the feature is available set title
+                    if [[ -n "$terminfo[fsl]" ]] && [[ -n "$terminfo[tsl]" ]]; then
+                        echoti tsl
+                        print -Pn "$1"
+                        echoti fsl
+                    fi
+                fi
+                ;;
+        esac
+    } >/dev/tty
+}
+
+function tty-title {
+    if bool "${tty_title_f}" || { isTty && isI } ; then
+        local text="$@"
+
+        title "$text" "$text"
+    fi
+}
+##
 ### * End
 psource ~/.private.env.zsh
 psource ~/.privateShell
