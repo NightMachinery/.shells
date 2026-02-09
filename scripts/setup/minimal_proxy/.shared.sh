@@ -473,3 +473,42 @@ function codex-install {
     reval-ecgray npm-install '@openai/codex'
 }
 ##
+#: @duplicateCode/5a56c1bf4c428167af08cffefb52d3aa
+function codex {
+    tty-title "⚡${PWD:t}"
+    command codex "$@"
+}
+
+function codex-m {
+    ensure-array codex_security_opts
+    local security_opts=( "${codex_security_opts[@]}" )
+    if (( ${#security_opts[@]} == 0 )) ; then
+        security_opts=(--ask-for-approval on-failure --sandbox workspace-write)
+    fi
+
+    # -c model_reasoning_effort="high"
+    reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c web_search="true" --search "$@"
+    # -c model_verbosity="high"
+    #
+    # --ask-for-approval:
+    # - untrusted: Only run "trusted" commands (e.g. ls, cat, sed) without  asking for user approval. Will escalate to the user if the model proposes  a command that is not in the "trusted" set
+    # - on-failure: Run all commands without asking for user approval. Only asks  for approval if a command fails to execute, in which case it will  escalate to the user to ask for un-sandboxed execution
+    # - on-request: The model decides when to ask the user for approval
+    # - never: Never ask for user approval Execution failures are immediately returned to the model
+}
+
+function codex-yolo {
+    codex_security_opts=(--dangerously-bypass-approvals-and-sandbox) codex-m "$@"
+}
+##
+function nvm-load {
+    #: @duplicateCode/eb63d30fe4c6efdc000acf16a3875bc6
+    ##
+    local p
+    for p in ~/.nvm_load "/opt/homebrew/opt/nvm/nvm.sh" ; do
+        if [ -s "$p" ] ; then
+            source "$p"
+        fi
+    done
+}
+##
