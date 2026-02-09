@@ -143,7 +143,7 @@ aliasfn flash-stt-file with-flash llm-stt-file
 aliasfn flash25-stt-file with-flash25 llm-stt-file
 aliasfn g25-stt-file with-g25 llm-stt-file
 
-aliasfn stt-file with-flash25-maybe llm-stt-file
+aliasfn stt-file with-flash-maybe llm-stt-file
 # aliasfn stt-file with-g25-maybe llm-stt-file
 
 function hs-whisper-stt-last {
