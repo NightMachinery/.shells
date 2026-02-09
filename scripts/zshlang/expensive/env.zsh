@@ -1,3 +1,20 @@
+###
+export NVM_DIR="$HOME/.nvm"
+function nvm-load {
+    #: @duplicateCode/eb63d30fe4c6efdc000acf16a3875bc6
+    ##
+    local p
+    for p in ~/.nvm_load "/opt/homebrew/opt/nvm/nvm.sh" ; do
+        if [ -s "$p" ] ; then
+            source "$p"
+        fi
+    done
+
+    if proxy-auto-p ; then
+        pxaify-fn nvm
+    fi
+}
+##
 if ((${+commands[npm]})) ; then
     # redis can be down for the startup sessions, hence it's better to hardcode the dir. It's also faster.
     if isMBP ; then
@@ -13,3 +30,4 @@ if ((${+commands[npm]})) ; then
     # silence eval "add-path NODE_PATH /home/linuxbrew/.linuxbrew/Cellar/node/(^node_modules*/)#/node_modules"
     ##
 fi
+###
