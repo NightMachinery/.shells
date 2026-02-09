@@ -855,9 +855,10 @@ Format the copied text into org-mode structure:
    - Lists with - and proper indentation
    - Prefer lists for a short list of items with no children, and prefer headings for hierarchical organization.
    - Use list items (- A\n- B) for related details under a heading rather than consecutive lines
-   - Text formatting with /italic/ and *bold*
+   - Text formatting with =verbatim=, /italic/ and *bold*
    - No manual indentation needed after headings. Org-mode automatically handles heading indentation, but you must indent list items.
    - Remember that in org-mode, a single line break is treated as a space when exported
+   - You can use links when needed: [[link][description]]
 
 3. Important content to preserve:
    - All text content
