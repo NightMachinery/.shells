@@ -396,3 +396,12 @@ function file-ends-with-newline-p {
     ##
 }
 ##
+function du-video {
+    du-h --all | rg -i "\\.(?:${(pj.|.)video_formats})\$" | gsort -h
+}
+aliasfn duv du-video
+
+function ffduv {
+    du-video | gcut -f 2- | tac | fz | inargsf rgeval m
+}
+##
