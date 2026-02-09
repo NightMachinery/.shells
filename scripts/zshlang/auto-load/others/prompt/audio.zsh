@@ -139,9 +139,8 @@ function llm-stt-file {
 }
 aliasfn llm-transcribe-audio-file llm-stt-file
 
-aliasfn flash-stt-file with-flash-8b llm-stt-file
-aliasfn flash2-stt-file with-flash2 llm-stt-file
-aliasfn flash2t-stt-file with-flash2t llm-stt-file
+aliasfn flash-stt-file with-flash llm-stt-file
+aliasfn flash25-stt-file with-flash25 llm-stt-file
 aliasfn g25-stt-file with-g25 llm-stt-file
 
 aliasfn stt-file with-flash25-maybe llm-stt-file
