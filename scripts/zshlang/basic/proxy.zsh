@@ -140,6 +140,7 @@ function pxify {
     pxaify-command pip # makes downloads faster
     pxify-command conda
     # pxaify-command git # use git's own config
+    pxaify-command gh
     pxaify-command npm
     pxaify-command go
     pxaify-command dart
