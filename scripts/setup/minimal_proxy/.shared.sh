@@ -91,8 +91,6 @@ export GOBIN="$GOPATH/bin"
 export PATH="/usr/local/go/bin:${PATH}"
 export PATH="${GOBIN}:${PATH}"
 
-export PATH="${HOME}/bin:${PATH}"
-
 export PATH="${HOME}/.emacs.d/bin:${PATH}"
 
 export PATH="${HOME}/.cargo/bin:${PATH}"
@@ -101,6 +99,9 @@ export PATH="${HOME}/.local/opt/brew/bin:${PATH}"
 export PATH="${HOME}/.local/opt/brew/sbin:${PATH}"
 export PATH="/home/linuxbrew/.linuxbrew/bin:${PATH}"
 export PATH="/home/linuxbrew/.linuxbrew/sbin:${PATH}"
+export PATH="$HOME/.npm-global/bin:$PATH"
+
+export PATH="${HOME}/bin:${PATH}"
 
 export PATH="${HOME}/.config/guix/current/bin:${PATH}"
 GUIX_PROFILE="${HOME}/.guix-profile"
