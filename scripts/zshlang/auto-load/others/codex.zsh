@@ -9,7 +9,7 @@ function h-codex-notify {
 }
 ##
 function codex-ask {
-    local model="${codex_model:-gpt-5}" reasoning_effort="${codex_reasoning_effort:-high}"
+    local model="${codex_model:-gpt-5.2}" reasoning_effort="${codex_reasoning_effort:-high}"
     local inargs prompt out opts=()
     in-or-args2 "$@" @RET
     prompt="${inargs[*]}"
