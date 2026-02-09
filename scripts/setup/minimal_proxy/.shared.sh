@@ -312,8 +312,9 @@ proxy-available-p () {
 httpify-socks5 () {
     local socks="${1}"
     local http="${2}"
+    local host="${3:-127.0.0.1}"
 
-    tmuxnew "httpify-socks-${socks}-to-${http}" gost -F "socks5://127.0.0.1:${socks}" -L "http://127.0.0.1:${http}"
+    tmuxnew "httpify-socks-${socks}-to-${http}" gost -F "socks5://127.0.0.1:${socks}" -L "http://${host}:${http}"
 }
 ##
 http-static-caddy () {
