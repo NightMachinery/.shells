@@ -132,7 +132,13 @@ setopt multios re_match_pcre extendedglob
 
 If you need to set an option or trap, be sure to use =setopt localoptions= or =setopt localtraps=.
 
-- Idiomatic Zsh should be prefered.
+- Use =in-or-args= variants idiomatically:
+  - =in-or-args "$@"=: return text from args/stdin/clipboard.
+  - =in-or-args2 "$@"=: populate =$inargs= (string) and =$in_or_args_in_p=.
+  - =in-or-args3 "$@"=: populate =$inargs= as an array (line-split when reading stdin).
+  - =in-or-args-pns "$@"=: newline-to-space mode.
+
+- Write idiomatic Zsh. Prefer parameter expansion flags over external tools when practical (split/join/quote/etc), e.g. =${(@f)text}=, =${(j.\n.)arr}=, =${(qq)val}=.
 
 - When in doubt between sed, awk, and perl, always use perl.
 
