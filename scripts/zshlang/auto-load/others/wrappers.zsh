@@ -218,9 +218,10 @@ function tidy-viewer {
     whitespace-shared-rm
 }
 ##
-function duh {
+function du-h {
   reval-ecgray gdu --exclude='.git' -h "$@"
 }
+aliasfn duh du-h
 ##
 alias tzc='timezone_converter.py'
 ##
