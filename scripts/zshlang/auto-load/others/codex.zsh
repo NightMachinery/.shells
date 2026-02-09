@@ -24,7 +24,7 @@ function codex-ask {
         assert cdm ~/tmp/codex_ask @RET
         assert silent git init @RET
 
-        ec "${prompt}" | revaldbg codex -c model_reasoning_effort="${reasoning_effort}" -c model_reasoning_summary="detailed" -c tools.web_search="true" --search --ask-for-approval on-failure --sandbox read-only exec "${opts}" --output-last-message="${out}" -
+        ec "${prompt}" | revaldbg codex -c model_reasoning_effort="${reasoning_effort}" -c model_reasoning_summary="detailed" -c web_search="true" --search --ask-for-approval on-failure --sandbox read-only exec "${opts}" --output-last-message="${out}" -
     ) @RET
 
     if isTty ; then
@@ -51,9 +51,8 @@ function codex-m {
         security_opts=(--ask-for-approval on-failure --sandbox workspace-write)
     fi
 
-    tty-title "⚡${PWD:t}"
-
-    reval-ec codex "${security_opts[@]}" -c model_reasoning_effort="high" -c model_reasoning_summary="detailed" -c tools.web_search="true" --search "$@"
+    # -c model_reasoning_effort="high"
+    reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c web_search="true" --search "$@"
     # -c model_verbosity="high"
     #
     # --ask-for-approval:
