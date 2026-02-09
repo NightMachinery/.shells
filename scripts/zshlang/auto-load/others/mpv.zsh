@@ -123,8 +123,12 @@ function h-mpv-get-prop {
 }
 
 function hear-get {
+    #: [agfi:hgg]
+    ##
     h-mpv-get-prop hear-do "${@}"
 }
+aliasfn hear-current hear-get
+
 function hear-get-info {
     local labeled_interfix=$'\n'"  "
 
