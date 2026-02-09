@@ -43,7 +43,7 @@ function pxa-create {
     # @todo0 make this support multiple ports at the  same time
 
     local v="${name}_env"
-    export "$v"="ALL_PROXY=http://${px_http_ip}:${px_httpport} all_proxy=http://${px_http_ip}:${px_httpport} http_proxy=http://${px_http_ip}:${px_httpport} https_proxy=http://${px_http_ip}:${px_httpport} HTTP_PROXY=http://${px_http_ip}:${px_httpport} HTTPS_PROXY=http://${px_http_ip}:${px_httpport}"
+    export "$v"="ALL_PROXY=http://${px_http_ip}:${px_httpport} all_proxy=http://${px_http_ip}:${px_httpport} http_proxy=http://${px_http_ip}:${px_httpport} https_proxy=http://${px_http_ip}:${px_httpport} HTTP_PROXY=http://${px_http_ip}:${px_httpport} HTTPS_PROXY=http://${px_http_ip}:${px_httpport} npm_config_proxy=http://${px_http_ip}:${px_httpport} npm_config_https_proxy=http://${px_http_ip}:${px_httpport}"
 
     # silent re unalias pxa pxa-local
     #: @redundant
