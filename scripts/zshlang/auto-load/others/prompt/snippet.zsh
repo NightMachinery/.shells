@@ -145,6 +145,23 @@ function snippet-disable-artifacts {
     snippet-input "Do not use artifacts, directly output in a code block." "$@"
 }
 ##
+function snippet-review-diff-do-base {
+    snippet-input "Review your changes (diff), and do:" "$@"
+}
+
+function snippet-review-diff-do {
+    snippet-input "Review your changes (diff), and do:
+- Find ways to DRY and KISS.
+- Suggest ways to make the code consistent with my preferences.
+- Suggest ways to add significant value to the code.
+
+" "$@"
+}
+
+function review-diff-do {
+    snippet-chain "$@" snippet-review-diff-do
+}
+##
 function snippet-zsh-heredoc-file-updater {
     snippet-input "Give the Zsh code to update the changed files using a literal heredoc. Do not use artifacts." "$@"
 }
