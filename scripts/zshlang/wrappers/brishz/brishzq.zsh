@@ -1,6 +1,11 @@
 #!/usr/bin/env -S zsh -f
 # macOS bug: https://stackoverflow.com/questions/9988125/shebang-pointing-to-script-also-having-shebang-is-effectively-ignored
 
+if [[ "${DISABLE_BRISH:l}" == y ]] ; then
+    echo "brishq.zsh: disabled by DISABLE_BRISH" >&2
+    exit 1
+fi
+
 if test "$1" = '-c' ; then
    shift
 fi

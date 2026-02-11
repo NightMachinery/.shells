@@ -9,28 +9,37 @@ function h-codex-notify {
 }
 ##
 function codex-ask {
-    local model="${codex_model:-gpt-5.2}" reasoning_effort="${codex_reasoning_effort:-high}"
+    local model="${codex_model:-gpt-5.2}" reasoning_effort="${codex_reasoning_effort:-high}" color="${codex_color}"
     local inargs prompt out opts=()
     in-or-args2 "$@" @RET
     prompt="${inargs[*]}"
+
+    typeset -x DISABLE_BRISH=y
+    #: To forcefully disable [agfi:bell-codex]
 
     out="$(gmktemp --suffix=.md)" @TRET
 
     if test -n "${model}" ; then
         opts+=(--model="${model}")
     fi
+    if test -n "${color}" ; then
+        opts+=(--color="${color}")
+        #: always, never, auto
+    fi
 
     (
         assert cdm ~/tmp/codex_ask @RET
         assert silent git init @RET
 
-        ec "${prompt}" | revaldbg codex -c model_reasoning_effort="${reasoning_effort}" -c model_reasoning_summary="detailed" -c web_search="true" --search --ask-for-approval on-failure --sandbox read-only exec "${opts}" --output-last-message="${out}" -
-    ) @RET
+        ec "${prompt}" | revaldbg codex -c model_reasoning_effort="${reasoning_effort}" -c model_reasoning_summary="detailed" --search --ask-for-approval on-failure --sandbox read-only exec "${opts}" --output-last-message="${out}" -
+    ) >&2 @RET
 
     if isTty ; then
         ecgray $'\n'"$0: saved last message to: ${out}"
-        cat "${out}" | pbcopy
     fi
+
+    cat "${out}" |
+        cat-copy-if-tty
 }
 
 function codex-ask-low {
