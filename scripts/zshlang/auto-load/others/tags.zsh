@@ -613,3 +613,24 @@ function ntag-exclude-all {
     fd -uuu --exclude="*${ntag_sep}*${ntag_sep}*"
 }
 ##
+function h-ntag-interactive {
+    ensure-array ntag_interactive_engine
+    local engine=( "${ntag_interactive_engine[@]}" )
+    local tag="${1}"
+    local fs=(${@[2,-1]})
+    assert-args engine tag fs @RET
+
+    local f
+    for f in ${fs[@]} ; do
+        reval "${engine[@]}" "$f" || true
+
+        if ask "${tag}: ${(q)f} ?" y ; then
+            ntag-add "${f}" "${tag}" || true
+        fi
+    done
+}
+
+function ntag-interactive-icat {
+    ntag_interactive_engine=( icat ) h-ntag-interactive "${@}"
+}
+##
