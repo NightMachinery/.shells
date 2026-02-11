@@ -616,16 +616,28 @@ function ntag-exclude-all {
 function h-ntag-interactive {
     ensure-array ntag_interactive_engine
     local engine=( "${ntag_interactive_engine[@]}" )
-    local tag="${1}"
+    local original_tag="${1}"
+    local tag="${original_tag}"
+    local remove_p=n
     local fs=(${@[2,-1]})
+
+    if [[ "${tag}" == -* ]] ; then
+        remove_p=y
+        tag="${tag#-}"
+    fi
+
     assert-args engine tag fs @RET
 
     local f
     for f in ${fs[@]} ; do
         reval "${engine[@]}" "$f" || true
 
-        if ask "${tag}: ${(q)f} ?" n ; then
-            ntag-add "${f}" "${tag}" || true
+        if ask "${original_tag}: ${(q)f} ?" n ; then
+            if bool "${remove_p}" ; then
+                ntag-rm "${f}" "${tag}" || true
+            else
+                ntag-add "${f}" "${tag}" || true
+            fi
         fi
     done
 }
