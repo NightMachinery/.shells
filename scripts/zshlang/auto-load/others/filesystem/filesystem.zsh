@@ -253,7 +253,7 @@ function list-dirs-parents() {
     fi
 }
 ##
-function trs-empty-files() {
+function trs-empty-files {
     local d="${1}"
     assert-args d @RET
 
