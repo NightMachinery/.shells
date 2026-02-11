@@ -30,7 +30,7 @@ function h-stt-filter {
     local f="$1"
 
     local end=''
-    if true || llm-focus-p ; then
+    if llm-focus-p ; then
         ##
         # snippet-stt-coding ''
         ##
