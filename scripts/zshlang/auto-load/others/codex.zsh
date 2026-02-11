@@ -91,3 +91,35 @@ function codex-clean-text {
         cat-copy-if-tty
 }
 ##
+function codex-status {
+    local codex_status_timeout_s="${codex_status_timeout_s:-20}"
+    local codex_status_profile="${codex_status_profile:-}"
+    local codex_status_cd="${codex_status_cd:-$HOME/tmp}"
+    local codex_status_strip_ansi_p="${codex_status_strip_ansi_p:-n}"
+
+    ensure-array codex_status_args
+    local codex_args=("${codex_status_args[@]}")
+
+    if ! command -v -- codex_status.py >/dev/null 2>&1 ; then
+        ecerr "codex-status: codex_status.py not found in PATH"
+        return 127
+    fi
+    local script_args=(--timeout "${codex_status_timeout_s}")
+    if test -n "${codex_status_profile}" ; then
+        script_args+=(--profile "${codex_status_profile}")
+    fi
+    if test -n "${codex_status_cd}" ; then
+        script_args+=(--cd "${codex_status_cd}")
+    fi
+    if bool "${codex_status_strip_ansi_p}" ; then
+        script_args+=(--color never)
+    fi
+
+    local arg
+    for arg in "${codex_args[@]}" ; do
+        script_args+=(--codex-arg "${arg}")
+    done
+
+    command codex_status.py "${script_args[@]}" "$@"
+}
+##
