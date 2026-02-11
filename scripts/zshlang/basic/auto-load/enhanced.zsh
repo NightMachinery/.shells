@@ -53,7 +53,7 @@ function enh-dest-shift () {
 
     reval-ec "${engine[@]}" "${opts[@]}" "${@[2,-1]}" "$1"
 }
-aliasfn ln2 enh_dest_shift_e=(ln) enh-dest-shift
+aliasfn ln2 enh_dest_shift_e=(gln) enh-dest-shift
 aliasfn mv2 enh_dest_shift_e=(mv) enh-dest-shift
 aliasfn cp2 enh_dest_shift_e=(cp -r) enh-dest-shift
 aliasfn cpl2 enh_dest_shift_e=(cp-link) enh-dest-shift
