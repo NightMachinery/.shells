@@ -186,10 +186,16 @@ def format_relative(epoch_s: int | None) -> str:
     past = delta < 0
     delta = abs(delta)
 
-    hours, rem = divmod(delta, 3600)
+    weeks, rem = divmod(delta, 7 * 24 * 3600)
+    days, rem = divmod(rem, 24 * 3600)
+    hours, rem = divmod(rem, 3600)
     mins, secs = divmod(rem, 60)
 
     parts: list[str] = []
+    if weeks:
+        parts.append(f"{weeks}w")
+    if days:
+        parts.append(f"{days}d")
     if hours:
         parts.append(f"{hours}h")
     if mins:
