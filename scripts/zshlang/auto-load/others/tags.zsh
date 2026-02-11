@@ -624,7 +624,7 @@ function h-ntag-interactive {
     for f in ${fs[@]} ; do
         reval "${engine[@]}" "$f" || true
 
-        if ask "${tag}: ${(q)f} ?" y ; then
+        if ask "${tag}: ${(q)f} ?" n ; then
             ntag-add "${f}" "${tag}" || true
         fi
     done
