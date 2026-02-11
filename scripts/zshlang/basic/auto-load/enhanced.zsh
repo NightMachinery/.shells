@@ -1,4 +1,4 @@
-re 'self-enh enh-mkdest' ln
+re 'self-enh enh-mkdest' ln gln
 ##
 function cp {
     local emd_c='command gcp --reflink=auto'
