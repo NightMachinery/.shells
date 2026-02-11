@@ -34,11 +34,14 @@ function json-rm-keys-empty {
 function jq-quote {
     local i
     i="$(in-or-args "$@")" @TRET # this trim-rights the input, which seems desirable
-    ecn "$i" | jq --raw-input --slurp --null-input --compact-output 'inputs'
+    ecn "$i" | jq --raw-input --slurp --null-input --compact-output 'inputs' |
+        cat-copy-if-tty
     ## tests:
     # `arrN h j k 'j m n "man"' " 'god'" |jq-quote `
     ##
 }
+
+aliasfn js-quote jq-quote
 ##
 function json-beautify {
     if isI ; then
