@@ -89,6 +89,12 @@ function fd {
   #: -i,  --ignore-case
   #: -u: include ignored files by default
 }
+
+function fd-m {
+  ensure-array fd_opts
+
+  command fd "${fd_opts[m]}" "$@"
+}
 ##
 # function open() {
 #   assert isDarwin @RET
