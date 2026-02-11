@@ -20,7 +20,7 @@ function trs {
         }
     done
 }
-function trs-empty {
+function trash-empty-all {
     trs-rm "${TRASH_DIR}" /tmp/graveyard-*(DN) || true
     assert empty-trash @RET
 }

@@ -49,7 +49,7 @@ function rm-caches {
     pip cache remove '*'
     conda clean --all --yes #: STILL does not delete old python version stuff!
 
-    trs-empty
+    trash-empty-all
 }
 
 function rm-caches-all {
@@ -64,7 +64,7 @@ function rm-caches-all {
 ##
 function cleanup {
     reval-ec rm-caches-all
-    reval-ec trs-empty
+    reval-ec trash-empty-all
     isLocal && reval-ec clean-deps
     reval-ec brew cleanup
 }
