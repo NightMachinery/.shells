@@ -5,7 +5,7 @@
 # macOS deps:
 # https://github.com/jdberry/tag
 ##
-ntag_colors=(red orange yellow green blue purple gray black aqua teal)
+ntag_colors=(red orange yellow green emerald blue purple gray black aqua teal)
 ntag_sep='..' #: . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
 ### shortcut aliases
@@ -378,6 +378,9 @@ function tag-apple-rm-colors-rec() {
     @opts e tag-apple-rm-colors @ ntag-gen-rec "$@"
 }
 function ntag-fromapple-rec() {
+    #: `ntag-fromapple-rec .`: applies Apple Finder tags as ntags to the filenames in the current directory, recursively.
+    #: @seeAlso [agfi:ntag-fromapple-force]
+    ##
     @opts e ntag-fromapple @ ntag-gen-rec "$@"
 }
 function ntag-toapple-rec() {
@@ -620,6 +623,11 @@ function h-ntag-interactive {
     local tag="${original_tag}"
     local remove_p=n
     local fs=(${@[2,-1]})
+
+    if test -e "${original_tag}" ; then
+        ecerr "$0: you forgot to specify the tag and instead gave a file"
+        return 1
+    fi
 
     if [[ "${tag}" == -* ]] ; then
         remove_p=y

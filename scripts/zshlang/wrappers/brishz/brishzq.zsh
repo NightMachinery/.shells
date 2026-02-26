@@ -10,8 +10,16 @@ if test "$1" = '-c' ; then
    shift
 fi
 ##
+function psource {
+    #: @duplicateCode/9ae25a72d39d3e69299cc8b3eb6310c9
+    ##
+    if [[ -r "$1" ]]; then # -r: readable file
+        source "$@"
+    fi
+}
+##
 path+=( /usr/local/bin /opt/homebrew/bin /home/linuxbrew/.linuxbrew/bin )
-. ~/.privateShell
+psource ~/.privateShell
 ##
 autoload -Uz regexp-replace
 

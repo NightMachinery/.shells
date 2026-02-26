@@ -92,6 +92,8 @@ function ec_bash() {
 }
 ##
 function return-code {
+    #: @duplicateCode/62ee5b8e72bcd36de9d0e1bb405edfe5
+    ##
     return "${1:-$?}"
 }
 ##
