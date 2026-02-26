@@ -33,7 +33,7 @@ aliasfn nightshift-status nightshift-status-darwin
 ##
 #: nightshift-auto will set the night shift mode depending on the frontmost app.
 redis-defvar nightshift_auto_enabled
-nightshift_auto_enabled_setnx 1
+
 function nightshift-auto {
     # `nightshift_auto_enabled_set 0` to disable
     if (( $(nightshift_auto_enabled_get) != 1 )) ; then

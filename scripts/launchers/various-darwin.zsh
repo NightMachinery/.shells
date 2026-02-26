@@ -1,6 +1,8 @@
 #!/usr/bin/env zsh
 
 ##
+nightshift_auto_enabled_setnx 1
+##
 powersaving_status_del
 # wireguard_enabled_del
 ##

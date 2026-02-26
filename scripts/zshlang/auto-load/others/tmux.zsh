@@ -24,7 +24,8 @@ function tmuxnew-ensure {
 }
 ##
 function tmuxnewsh {
-    doc "Use tsh instead."
+    #: [agfi:tmuxnewsh2]
+    ##
 
     local env="${tmuxnewshenv[*]}"
     local proxy_forward_p="${tmuxnewsh_proxy_forward_p:-n}"
@@ -41,11 +42,12 @@ function tmuxnewsh {
         )
     fi
 
-    revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${env[*]} $(gq "${@[2,-1]}")")"
+    revaldbg tmuxnew "$1" "$(gq zsh -c "cd $(gq $PWD) && FORCE_INTERACTIVE=y ${env[*]} $(gq "${@[2,-1]}")")"
 }
 
 function tmuxnewsh2 {
-    doc "Supports simple env vars automatically"
+    #: Supports simple env vars automatically
+    ##
 
     local name="$1"
     shift

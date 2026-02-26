@@ -135,13 +135,15 @@ else
     mamba_default_env=p310
 fi
 
-if isBash ; then
-    if eval "$(micromamba shell hook --shell bash)" ; then
-        micromamba activate ${mamba_default_env}
-    fi
-else
-    if eval "$(micromamba shell hook --shell zsh)" ; then
-        micromamba activate ${mamba_default_env}
+if test -d "${MAMBA_ROOT_PREFIX}" ; then
+    if isBash ; then
+        if eval "$(micromamba shell hook --shell bash)" ; then
+            micromamba activate ${mamba_default_env}
+        fi
+    else
+        if eval "$(micromamba shell hook --shell zsh)" ; then
+            micromamba activate ${mamba_default_env}
+        fi
     fi
 fi
 ##
@@ -271,6 +273,11 @@ bell-call-remote () {
 
     echo "MAGIC_BELL_${bell_name}" |
         copy_port="$port" pbcopy-remote
+}
+##
+#: * Bells
+function h-codex-notify {
+    bell-call-remote bell-codex
 }
 ##
 python-package-version () {

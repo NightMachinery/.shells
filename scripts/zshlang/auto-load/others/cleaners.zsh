@@ -47,7 +47,9 @@ function rm-caches {
     trs-rm "$(brew --cache)"
 
     pip cache remove '*'
-    conda clean --all --yes #: STILL does not delete old python version stuff!
+    if isdefined conda ; then
+        conda clean --all --yes #: STILL does not delete old python version stuff!
+    fi
 
     trash-empty-all
 }

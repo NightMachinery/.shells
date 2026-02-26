@@ -1,5 +1,9 @@
 ##
 function preprompts-expand {
+    #: * @usage
+    #: ** `fd-m --extension .md prompts | gsort -V | cat-files-to-lines > all.md`
+    #: ** `cat-files-to-lines prompts/*.md > all.md`
+    ##
     local model="${codex_model}" reasoning_effort="${codex_reasoning_effort:-high}" color="${codex_color:-always}"
 
     local preprompts_dir="${1}"
@@ -12,7 +16,7 @@ function preprompts-expand {
     (
         cd "${preprompts_dir}" @RET
         local inputs
-        inputs="$(fd-m --extension .md)" @RET
+        inputs="$(fd-m --extension .md | gsort --version-sort)" @RET
         inputs=( ${(f@)inputs} )
 
         local i name dest

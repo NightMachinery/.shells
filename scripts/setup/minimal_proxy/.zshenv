@@ -7,7 +7,6 @@ zmathfunc
 ###
 setopt aliases
 setopt interactivecomments
-setopt NO_CASE_GLOB
 setopt autocd multios re_match_pcre extendedglob pipefail interactivecomments hash_executables_only # hash_executables_only will not hash dirs instead of executables, but it can be slow.
 setopt long_list_jobs complete_in_word always_to_end
 setopt append_history extended_history hist_expire_dups_first hist_ignore_dups hist_ignore_space hist_verify inc_append_history share_history
@@ -23,6 +22,7 @@ alias -g .....='../../../..'
 alias -g ......='../../../../..'
 
 alias -g '@RET'=' || { retcode=$? ; print -r -- "Inside $0: exited ${retcode}" ; return $retcode } '
+alias -g '@TRET'=' || { retcode=$? ; print -r -- "Inside $0: exited ${retcode}" ; return $retcode } '
 ##
 ec() {
     print -r -- "$@"
@@ -39,6 +39,7 @@ ecerr() {
 gquote () {
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
 }
+alias gq=gquote
 ##
 alias var-show='>&2 typeset -p'
 alias typ='var-show'
@@ -133,6 +134,12 @@ function export-from-alias {
 
 source ~/.shared.sh
 psource ~/base/bootstrap/lib.zsh
+
+if ! isTermux ; then
+    setopt NO_CASE_GLOB
+    #: This works around an upstream Termux-specific bug
+    #: [[id:e67e05d1-d2f5-49fc-89b6-de4a3f65e5d6][zsh plugin autosuggestion not working "termux"]]
+fi
 ###
 export HISTFILE="${HOME}/.zsh_history"
 export HISTSIZE=1000000
@@ -566,6 +573,67 @@ function tty-title {
     fi
 }
 ##
+function tmuxnewsh {
+    #: [agfi:tmuxnewsh2]
+    ##
+
+    local env="${tmuxnewshenv[*]}"
+    local proxy_forward_p="${tmuxnewsh_proxy_forward_p:-n}"
+    if bool "$proxy_forward_p" ; then
+        env=(
+            proxy_disabled="${proxy_disabled}"
+            all_proxy="${all_proxy}"
+            ALL_PROXY="${ALL_PROXY}"
+            http_proxy="${http_proxy}"
+            https_proxy="${https_proxy}"
+            HTTP_PROXY="${HTTP_PROXY}"
+            HTTPS_PROXY="${HTTPS_PROXY}"
+            "${env}"
+        )
+    fi
+
+    revaldbg tmuxnew "$1" "$(gq zsh -c "FORCE_INTERACTIVE=y ${env[*]} $(gq "${@[2,-1]}")")"
+}
+
+function tmuxnewsh2 {
+    #: Supports simple env vars automatically
+    ##
+
+    local name="$1"
+    shift
+    local env=()
+    local i
+    for i in "$@" ; do
+        if [[ "$i" =~ '^([^=]*)=(.*)$' ]] ; then
+            env+="$match[1]=$(gq "$match[2]")"
+            shift
+        else
+            break
+        fi
+    done
+    ## debug:
+    # arger "$@"
+    # ec "$env[*]"
+    # typ env
+    ##
+
+    tmuxnewshenv="${tmuxnewshenv[*]} $env[*]" tmuxnewsh "$name" "$@"
+}
+##
+function brishgarden-boot {
+    #: @duplicateCode/9d5c6cada217b9c834ffb54708013acb
+    ##
+    tmuxnewsh2 BrishGarden BRISHGARDEN_DEBUGME="$BRISHGARDEN_DEBUGME" BRISHGARDEN_N="${1:-32}" brishgarden "${@[2,-1]}" # using the shell to increase max open files
+    ## tests:
+    # `time (parallel_jobs=0 para 'sleep 1 ; ec {}' ::: {1..100} >/dev/null)`
+    # `time (parallel_jobs=0 para -k 'sleep 1 ; ec {}' ::: {1..100} >/dev/null)`
+    # `parallel_jobs=0 time2 para 'sleep 5 ; ec ${brish_server_index}: {}' ::: {1..100}`
+    # `parallel_jobs=0 time2 para 'ec ${brish_server_index}: {}' ::: {1..200}`
+    ##
+}
+##
+#: * Substituting non-essential functions with no-ops
+function mark-me { true }
 ### * End
 psource ~/.private.env.zsh
 psource ~/.privateShell

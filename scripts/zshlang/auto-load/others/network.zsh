@@ -87,6 +87,7 @@ aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
 
 aliasfn ci14000-socks curl-ip -x 'socks5h://127.0.0.1:14000'
 ##
+alias myip-httpbin='curlm https://httpbin.org/ip'
 alias myip-amazon='curlm https://checkip.amazonaws.com'
 alias myip-ipinfo='curlm -H "Authorization: Bearer ${ipinfo_api_token}" https://ipinfo.io/ip'
 ##
@@ -195,7 +196,7 @@ function ncp {
     cat | gnc -c localhost 2000
 }
 ##
-function ip-router {
+function router-ip {
     #: This will return the phone's IP when you are connected to its hotspot.
     ##
     if isDarwin ; then
@@ -204,6 +205,7 @@ function ip-router {
         @NA
     fi
 }
+aliasfn ip-router router-ip
 ##
 function ip-internal-get {
     : "Use 'ipconfig getifaddr en1' for wireless, or 'ipconfig getifaddr en0' for ethernet."
