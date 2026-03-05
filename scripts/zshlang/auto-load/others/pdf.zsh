@@ -532,3 +532,517 @@ function pdf-ocr {
     reval-ec ocrmypdf --redo-ocr "${input}" "${dest}" @RET
 }
 ##
+function h-pdf-rasterize-normalize-pdftoppm-names {
+    local out_dir="${1}"
+    local ext="${2}"
+
+    local f
+    for f in "${out_dir}"/page-*.${ext}(N) ; do
+        local base="${f:t}"
+        if [[ "${base}" =~ '^page-([0-9]+)\.' ]] ; then
+            local n="${match[1]}"
+            local padded
+            printf -v padded '%04d' "${n}"
+            local new="${out_dir}/page_${padded}.${ext}"
+            assert command gmv --force -- "${f}" "${new}" @RET
+        fi
+    done
+}
+
+function h-pdf-rasterize-out-count {
+    local out_dir="${1}"
+    local ext="${2}"
+
+    local outs=("${out_dir}"/page_*.${ext}(N) "${out_dir}"/page-*.${ext}(N))
+    ec "${#outs[@]}"
+}
+
+function h-pdf-rasterize-progress-render {
+    local done="${1}"
+    local total="${2}"
+    local backend="${3}"
+
+    if ! [[ "${done}" =~ '^[0-9]+$' ]] ; then
+        done=0
+    fi
+    if ! [[ "${total}" =~ '^[0-9]+$' ]] ; then
+        total=0
+    fi
+
+    if (( total > 0 )) ; then
+        (( done > total )) && done="${total}"
+        local percent="$(( done * 100 / total ))"
+        local bar_width=20
+        local filled="$(( done * bar_width / total ))"
+        local empty="$(( bar_width - filled ))"
+        local bar_filled=""
+        local bar_empty=""
+        printf -v bar_filled '%*s' "${filled}" ''
+        bar_filled="${bar_filled// /#}"
+        printf -v bar_empty '%*s' "${empty}" ''
+        bar_empty="${bar_empty// /-}"
+        ecn $'\r'"pdf-rasterize(${backend}): [${bar_filled}${bar_empty}] ${done}/${total} (${percent}%)" >&2
+    else
+        ecn $'\r'"pdf-rasterize(${backend}): ${done} page(s)" >&2
+    fi
+}
+
+function h-pdf-rasterize-progress-watch {
+    local pid="${1}"
+    local out_dir="${2}"
+    local ext="${3}"
+    local total="${4}"
+    local backend="${5}"
+
+    local done=0
+    while command kill -0 "${pid}" >/dev/null 2>&1 ; do
+        done="$(h-pdf-rasterize-out-count "${out_dir}" "${ext}")" @TRET
+        h-pdf-rasterize-progress-render "${done}" "${total}" "${backend}"
+        command sleep 0.2
+    done
+
+    done="$(h-pdf-rasterize-out-count "${out_dir}" "${ext}")" @TRET
+    h-pdf-rasterize-progress-render "${done}" "${total}" "${backend}"
+    ecerr ""
+}
+
+function pdf-rasterize {
+    local backend="${pdf_rasterize_backend:-auto}"
+    local density="${pdf_rasterize_density:-300}"
+    local format_raw="${pdf_rasterize_format:-png}"
+    local jpg_quality="${pdf_rasterize_jpg_quality:-70}"
+    local background="${pdf_rasterize_background:-white}"
+    local clean_p="${pdf_rasterize_clean_p:-y}"
+    local progress_p="${pdf_rasterize_progress_p:-auto}"
+
+    local input="${1}"
+    local out_dir="${2:-${input:r}_rasterized}"
+    local format="${format_raw:l}"
+
+    if test -z "${input}" ; then
+        ecerr "pdf-rasterize: input not supplied"
+        return 1
+    fi
+
+    if ! test -f "${input}" ; then
+        ecerr "pdf-rasterize: input not found: ${input}"
+        return 1
+    fi
+
+    assert mkdir-m "${out_dir}" @RET
+
+    if bool "${clean_p}" ; then
+        trs-rm "${out_dir}"/page_*.${format}(N) || true
+        trs-rm "${out_dir}"/page-*.${format}(N) || true
+    fi
+
+    case "${progress_p}" in
+        auto)
+            if isI ; then
+                progress_p=y
+            else
+                progress_p=n
+            fi
+            ;;
+    esac
+
+    local page_count=0
+    if bool "${progress_p}" ; then
+        page_count="$(pdf-count "${input}" 2>/dev/null)" || page_count=0
+        [[ "${page_count}" =~ '^[0-9]+$' ]] || page_count=0
+    fi
+
+    local try_backends=()
+    case "${backend}" in
+        auto)
+            try_backends=(pdftoppm gs magick)
+            ;;
+        *)
+            try_backends=("${backend}")
+            ;;
+    esac
+
+    local ok_p=n
+    local b
+    for b in "${try_backends[@]}" ; do
+        case "${b}" in
+            pdftoppm)
+                if command -v pdftoppm >/dev/null 2>&1 ; then
+                    local ext="${format}"
+                    local flag=""
+                    local pdftoppm_jpeg_opts=()
+                    case "${format}" in
+                        png)
+                            flag="-png"
+                            ;;
+                        jpg|jpeg)
+                            ext="jpg"
+                            flag="-jpeg"
+                            if [[ "${jpg_quality}" =~ '^[0-9]+$' ]] && command pdftoppm -h 2>&1 | command grep -q -- '-jpegopt' ; then
+                                pdftoppm_jpeg_opts=( -jpegopt "quality=${jpg_quality}" )
+                            fi
+                            ;;
+                        tif|tiff)
+                            ext="tiff"
+                            flag="-tiff"
+                            ;;
+                        *)
+                            ecerr "pdf-rasterize: unsupported format for pdftoppm: ${format}"
+                            return 1
+                            ;;
+                    esac
+
+                    if bool "${progress_p}" ; then
+                        command pdftoppm -r "${density}" "${flag}" "${pdftoppm_jpeg_opts[@]}" -- "${input}" "${out_dir}/page" &
+                        local raster_pid="${!}"
+                        h-pdf-rasterize-progress-watch "${raster_pid}" "${out_dir}" "${ext}" "${page_count}" "pdftoppm" @RET
+                        wait "${raster_pid}" || return $?
+                    else
+                        assert command pdftoppm -r "${density}" "${flag}" "${pdftoppm_jpeg_opts[@]}" -- "${input}" "${out_dir}/page" @RET
+                    fi
+
+                    h-pdf-rasterize-normalize-pdftoppm-names "${out_dir}" "${ext}" @RET
+                    ok_p=y
+                    format="${ext}"
+                    break
+                fi
+                ;;
+            gs)
+                if command -v gs >/dev/null 2>&1 ; then
+                    local device=""
+                    local ext="${format}"
+                    local gs_jpeg_opts=()
+                    case "${format}" in
+                        png)
+                            device="png16m"
+                            ;;
+                        jpg|jpeg)
+                            ext="jpg"
+                            device="jpeg"
+                            if [[ "${jpg_quality}" =~ '^[0-9]+$' ]] ; then
+                                gs_jpeg_opts=( "-dJPEGQ=${jpg_quality}" )
+                            fi
+                            ;;
+                        tif|tiff)
+                            ext="tiff"
+                            device="tiff24nc"
+                            ;;
+                        *)
+                            ecerr "pdf-rasterize: unsupported format for gs: ${format}"
+                            return 1
+                            ;;
+                    esac
+
+                    if bool "${progress_p}" ; then
+                        command gs -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT "-r${density}" "-sDEVICE=${device}" "${gs_jpeg_opts[@]}" "-sOutputFile=${out_dir}/page_%04d.${ext}" -- "${input}" &
+                        local raster_pid="${!}"
+                        h-pdf-rasterize-progress-watch "${raster_pid}" "${out_dir}" "${ext}" "${page_count}" "gs" @RET
+                        wait "${raster_pid}" || return $?
+                    else
+                        assert command gs -dSAFER -dBATCH -dNOPAUSE -dNOPROMPT "-r${density}" "-sDEVICE=${device}" "${gs_jpeg_opts[@]}" "-sOutputFile=${out_dir}/page_%04d.${ext}" -- "${input}" @RET
+                    fi
+
+                    ok_p=y
+                    format="${ext}"
+                    break
+                fi
+                ;;
+            magick)
+                if command -v magick >/dev/null 2>&1 ; then
+                    local magick_opts=()
+                    if [[ "${format}" == (jpg|jpeg) ]] && [[ "${jpg_quality}" =~ '^[0-9]+$' ]] ; then
+                        magick_opts=(-strip -sampling-factor 4:2:0 -quality "${jpg_quality}")
+                    fi
+
+                    if bool "${progress_p}" ; then
+                        command magick -density "${density}" -background "${background}" -alpha remove -alpha off -scene 1 "${magick_opts[@]}" -- "${input}" "${out_dir}/page_%04d.${format}" &
+                        local raster_pid="${!}"
+                        h-pdf-rasterize-progress-watch "${raster_pid}" "${out_dir}" "${format}" "${page_count}" "magick" @RET
+                        wait "${raster_pid}" || return $?
+                    else
+                        assert command magick -density "${density}" -background "${background}" -alpha remove -alpha off -scene 1 "${magick_opts[@]}" -- "${input}" "${out_dir}/page_%04d.${format}" @RET
+                    fi
+
+                    ok_p=y
+                    break
+                elif command -v convert >/dev/null 2>&1 ; then
+                    local convert_opts=()
+                    if [[ "${format}" == (jpg|jpeg) ]] && [[ "${jpg_quality}" =~ '^[0-9]+$' ]] ; then
+                        convert_opts=(-strip -sampling-factor 4:2:0 -quality "${jpg_quality}")
+                    fi
+
+                    if bool "${progress_p}" ; then
+                        command convert -density "${density}" -background "${background}" -alpha remove -alpha off -scene 1 "${convert_opts[@]}" -- "${input}" "${out_dir}/page_%04d.${format}" &
+                        local raster_pid="${!}"
+                        h-pdf-rasterize-progress-watch "${raster_pid}" "${out_dir}" "${format}" "${page_count}" "convert" @RET
+                        wait "${raster_pid}" || return $?
+                    else
+                        assert command convert -density "${density}" -background "${background}" -alpha remove -alpha off -scene 1 "${convert_opts[@]}" -- "${input}" "${out_dir}/page_%04d.${format}" @RET
+                    fi
+
+                    ok_p=y
+                    break
+                fi
+                ;;
+            *)
+                ecerr "pdf-rasterize: unknown backend: ${b}"
+                return 1
+                ;;
+        esac
+    done
+
+    if ! bool "${ok_p}" ; then
+        ecerr "pdf-rasterize: no working backend found (tried: ${(j:, :)try_backends})"
+        return 1
+    fi
+
+    local outs=("${out_dir}"/page_*.${format}(N))
+    if (( ${#outs[@]} == 0 )) ; then
+        ecerr "pdf-rasterize: no output produced in: ${out_dir}"
+        return 1
+    fi
+
+    local out
+    for out in "${outs[@]}" ; do
+        ec "${out}"
+    done
+}
+@opts-setprefix pdf-rasterize pdf_rasterize
+
+function h-pdf-rasterize2word-pdf-size-twips {
+    local input="${1}"
+
+    if ! command -v pdfinfo >/dev/null 2>&1 ; then
+        return 1
+    fi
+
+    local info
+    info="$(command pdfinfo -f 1 -l 1 -- "${input}" 2>/dev/null)" || return 1
+    test -n "${info}" || return 1
+
+    ec "${info}" | perl -0777 -ne '
+if (/^Page size:\s*([0-9.]+)\s*x\s*([0-9.]+)/m) {
+    my $w = int(($1 * 20) + 0.5);
+    my $h = int(($2 * 20) + 0.5);
+    print "$w $h\n";
+    exit 0;
+}
+exit 1;
+'
+}
+
+function h-pdf-rasterize2word-reference-doc-create {
+    local out="${1}"
+    local page_width_twips="${2:-12240}"
+    local page_height_twips="${3:-15840}"
+    local margin_top="${4:-0}"
+    local margin_right="${5:-0}"
+    local margin_bottom="${6:-0}"
+    local margin_left="${7:-0}"
+    local margin_header="${8:-0}"
+    local margin_footer="${9:-0}"
+    local margin_gutter="${10:-0}"
+
+    assert mkdir-m "${out:h}" @RET
+
+    cat <<EOF | command pandoc \
+        --from 'markdown+raw_attribute' \
+        --to docx \
+        --output "${out:A}" \
+        - @RET
+~~~{=openxml}
+<w:p><w:pPr><w:sectPr><w:pgSz w:w="${page_width_twips}" w:h="${page_height_twips}"/><w:pgMar w:top="${margin_top}" w:right="${margin_right}" w:bottom="${margin_bottom}" w:left="${margin_left}" w:header="${margin_header}" w:footer="${margin_footer}" w:gutter="${margin_gutter}"/></w:sectPr></w:pPr></w:p>
+~~~
+EOF
+}
+
+function pdf-rasterize2word {
+    local density="${pdf_rasterize2word_density:-${pdf_rasterize_density:-300}}"
+    local format_raw="${pdf_rasterize2word_format:-${pdf_rasterize_format:-png}}"
+    local jpg_quality="${pdf_rasterize2word_jpg_quality:-${pdf_rasterize_jpg_quality:-70}}"
+    local background="${pdf_rasterize2word_background:-${pdf_rasterize_background:-white}}"
+    local backend="${pdf_rasterize2word_backend:-${pdf_rasterize_backend:-auto}}"
+    local force_page_break_p="${pdf_rasterize2word_force_page_break_p:-n}"
+    local keep_images_p="${pdf_rasterize2word_keep_images_p:-n}"
+    local images_dir_arg="${pdf_rasterize2word_images_dir:-}"
+    local image_width="${pdf_rasterize2word_image_width:-100%}"
+    local reference_doc="${pdf_rasterize2word_reference_doc:-}"
+    local auto_reference_doc_p="${pdf_rasterize2word_auto_reference_doc_p:-y}"
+    local auto_page_size_p="${pdf_rasterize2word_auto_page_size_p:-y}"
+    local page_width_twips="${pdf_rasterize2word_page_width_twips:-}"
+    local page_height_twips="${pdf_rasterize2word_page_height_twips:-}"
+    local margin="${pdf_rasterize2word_margin:-144}"
+    local margin_top="${pdf_rasterize2word_margin_top:-${margin}}"
+    local margin_right="${pdf_rasterize2word_margin_right:-${margin}}"
+    local margin_bottom="${pdf_rasterize2word_margin_bottom:-${margin}}"
+    local margin_left="${pdf_rasterize2word_margin_left:-${margin}}"
+    local margin_header="${pdf_rasterize2word_margin_header:-0}"
+    local margin_footer="${pdf_rasterize2word_margin_footer:-0}"
+    local margin_gutter="${pdf_rasterize2word_margin_gutter:-0}"
+    ensure-array pdf_rasterize2word_pandoc_opts
+    local pandoc_opts=("${pdf_rasterize2word_pandoc_opts[@]}")
+
+    local input="${1}"
+    local out="${2:-${input:r}_rasterized.docx}"
+    local format="${format_raw:l}"
+    [[ "${out}" == *.docx ]] || out+='.docx'
+
+    if test -z "${input}" ; then
+        ecerr "pdf-rasterize2word: input not supplied"
+        return 1
+    fi
+
+    if ! test -f "${input}" ; then
+        ecerr "pdf-rasterize2word: input not found: ${input}"
+        return 1
+    fi
+
+    local reference_doc_tmp=""
+    if test -n "${reference_doc}" ; then
+        if ! test -f "${reference_doc}" ; then
+            ecerr "pdf-rasterize2word: reference doc not found: ${reference_doc}"
+            return 1
+        fi
+    elif bool "${auto_reference_doc_p}" ; then
+        if bool "${auto_page_size_p}" && { test -z "${page_width_twips}" || test -z "${page_height_twips}" ; } ; then
+            local page_size
+            page_size="$(h-pdf-rasterize2word-pdf-size-twips "${input}")" || page_size=""
+            if test -n "${page_size}" ; then
+                local page_size_parts=("${(z)page_size}")
+                page_width_twips="${page_width_twips:-${page_size_parts[1]}}"
+                page_height_twips="${page_height_twips:-${page_size_parts[2]}}"
+            fi
+        fi
+        page_width_twips="${page_width_twips:-12240}"
+        page_height_twips="${page_height_twips:-15840}"
+
+        reference_doc_tmp="$(gmktemp --suffix '.docx')" @TRET
+        h-pdf-rasterize2word-reference-doc-create \
+            "${reference_doc_tmp}" \
+            "${page_width_twips}" \
+            "${page_height_twips}" \
+            "${margin_top}" \
+            "${margin_right}" \
+            "${margin_bottom}" \
+            "${margin_left}" \
+            "${margin_header}" \
+            "${margin_footer}" \
+            "${margin_gutter}" @RET
+        reference_doc="${reference_doc_tmp}"
+    fi
+
+    if test -n "${reference_doc}" ; then
+        pandoc_opts+=( --reference-doc "${reference_doc}" )
+    fi
+
+    local images_dir=""
+    local tmp_dir=""
+
+    if test -n "${images_dir_arg}" ; then
+        images_dir="${images_dir_arg}"
+        assert mkdir-m "${images_dir}" @RET
+    else
+        tmp_dir="$(gmktemp -d)" @TRET
+        images_dir="${tmp_dir}"
+    fi
+
+    assert mkdir-m "${out:h}" @RET
+
+    local pdf_rasterize_density="${density}"
+    local pdf_rasterize_format="${format}"
+    local pdf_rasterize_jpg_quality="${jpg_quality}"
+    local pdf_rasterize_background="${background}"
+    local pdf_rasterize_backend="${backend}"
+
+    local rasterized_output
+    rasterized_output="$(pdf-rasterize "${input}" "${images_dir}")" @TRET
+    local images=("${(@f)rasterized_output}")
+    if (( ${#images[@]} == 0 )) ; then
+        ecerr "pdf-rasterize2word: no images found in: ${images_dir}"
+        if test -n "${reference_doc_tmp}" ; then
+            silent trs-rm "${reference_doc_tmp}" || true
+        fi
+        if test -n "${tmp_dir}" ; then
+            silent trs-rm "${tmp_dir}" || true
+        fi
+        return 1
+    fi
+
+    local progress_p=n
+    if isI ; then
+        progress_p=y
+        # ecgray "$0: progress bar activated because stdout is a terminal"
+    fi
+
+    local images_n="${#images[@]}"
+
+    local convert_ret=0
+    {
+        local image
+        local image_i=0
+        for image in "${images[@]}" ; do
+            (( image_i++ ))
+            if bool "${progress_p}" ; then
+                local percent="$(( image_i * 100 / images_n ))"
+                local bar_width=20
+                local filled="$(( image_i * bar_width / images_n ))"
+                local empty="$(( bar_width - filled ))"
+                local bar_filled=""
+                local bar_empty=""
+                printf -v bar_filled '%*s' "${filled}" ''
+                bar_filled="${bar_filled// /#}"
+                printf -v bar_empty '%*s' "${empty}" ''
+                bar_empty="${bar_empty// /-}"
+                ecn $'\r'"pdf-rasterize2word: [${bar_filled}${bar_empty}] ${image_i}/${images_n} (${percent}%)" >&2
+            fi
+
+            ec "![](${image:t}){width=${image_width}}"
+            if bool "${force_page_break_p}" && [[ "${image}" != "${images[-1]}" ]] ; then
+                cat <<'EOF'
+```{=openxml}
+<w:p><w:r><w:br w:type="page"/></w:r></w:p>
+```
+EOF
+            fi
+            ec ''
+        done
+
+        if bool "${progress_p}" ; then
+            ecerr ""
+        fi
+    } | indir "${images_dir}" pandoc \
+        --from 'markdown+raw_attribute' \
+        --to docx \
+        "${pandoc_opts[@]}" \
+        --output "${out:A}" \
+        - || convert_ret="$?"
+
+    if test -n "${tmp_dir}" ; then
+        if bool "${keep_images_p}" ; then
+            ec "${tmp_dir}"
+        else
+            silent trs-rm "${tmp_dir}" || true
+        fi
+    fi
+
+    if test -n "${reference_doc_tmp}" ; then
+        silent trs-rm "${reference_doc_tmp}" || true
+    fi
+
+    if (( convert_ret != 0 )) ; then
+        return "${convert_ret}"
+    fi
+
+    ec "${out}"
+}
+@opts-setprefix pdf-rasterize2word pdf_rasterize2word
+
+function pdf-rasterize2word-compress {
+    reval-ec-env \
+        pdf_rasterize2word_format=jpg \
+        pdf_rasterize2word_density=180 \
+        pdf_rasterize2word_jpg_quality=60 \
+        pdf-rasterize2word "$@"
+}
+@opts-setprefix pdf-rasterize2word-compress pdf_rasterize2word_compress
+##

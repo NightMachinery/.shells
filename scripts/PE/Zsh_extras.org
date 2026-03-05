@@ -1,0 +1,2 @@
+- Long-running converters should expose a namespaced =*_progress_p= option with values =(auto|y|n)=. Use carriage-return (=\\r=) status updates only in interactive mode (e.g., behind =isI=), and keep non-interactive output clean.
+
