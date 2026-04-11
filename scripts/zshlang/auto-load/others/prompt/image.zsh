@@ -65,6 +65,17 @@ function prompt-image2md {
     h-prompt-image-v1 "$@"
 }
 ##
+function prompt-image-ocr-simple {
+    local prompt
+    # prompt='OCR the given images.'
+    prompt="$(cat << 'EOF'
+OCR this image into a markdown code block.
+EOF
+)"
+    h-prompt-image-v1 "$@"
+}
+
+
 function prompt-image-ocr {
     local prompt
     # prompt='OCR the given images.'
