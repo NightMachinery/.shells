@@ -169,7 +169,7 @@ Uses |theCookies| var or else feeds first URL to |cookies|." MAGIC
 ##
 function aagh() { aa "${(@f)$(gh-to-raw "$@")}" }
 ##
-function aas() {
+function aa-stream {
     : "@deprecated Use y-stream instead."
 
     local out="$(md5m "$1")"
@@ -177,6 +177,12 @@ function aas() {
     sleep 10
     retry-mpv "'$out'/*" || kill %
 }
+# aliasfn aas aa-stream
+
+function aa-sequential {
+    aaNoSplit=y aa "$@"
+}
+aliasfn aas aa-sequential
 ##
 function aac-getlen() {
     aac call aria2.tellStatus -P "$1" | jqm .completedLength
