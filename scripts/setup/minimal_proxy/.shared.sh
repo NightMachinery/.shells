@@ -469,9 +469,15 @@ myip-ipinfo () {
 alias ci='myip-ipinfo'
 ##
 function npm-install {
+    #: @duplicateCode/b00b656b70d11d5d26d81a77f2d2b970
+    ##
     local pkg
     for pkg in $@ ; do
-        npm install -g "$pkg" --progress=true --loglevel=verbose
+        if test -n "${commands[pnpm]}" ; then
+            reval-ecgray pnpm install -g "${pkg}" --include=optional --loglevel=silly
+        else
+            reval-ecgray npm install -g "$pkg" --progress=true --loglevel=verbose
+        fi
     done
 }
 
