@@ -5,7 +5,7 @@
 # macOS deps:
 # https://github.com/jdberry/tag
 ##
-ntag_colors=(red orange yellow green emerald blue purple gray black aqua teal)
+ntag_colors=(white red orange yellow green emerald blue purple gray black aqua teal)
 ntag_sep='..' #: . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
 ### shortcut aliases
@@ -623,6 +623,7 @@ function h-ntag-interactive {
     local tag="${original_tag}"
     local remove_p=n
     local fs=(${@[2,-1]})
+    local ask_default="${ntag_interactive_icat_default:-n}"
 
     if test -e "${original_tag}" ; then
         ecerr "$0: you forgot to specify the tag and instead gave a file"
@@ -640,7 +641,7 @@ function h-ntag-interactive {
     for f in ${fs[@]} ; do
         reval "${engine[@]}" "$f" || true
 
-        if ask "${original_tag}: ${(q)f} ?" n ; then
+        if ask "${original_tag}: ${(q)f} ?" "${ask_default}" ; then
             if bool "${remove_p}" ; then
                 ntag-rm "${f}" "${tag}" || true
             else
