@@ -82,7 +82,18 @@ function codex-yolo {
 }
 ##
 function codex-install {
-    reval-ecgray npm-install '@openai/codex'
+    if false ; then
+        # pnpm i -g
+        NODE_OPTIONS="--max-old-space-size=4096" pnpm install -g @openai/codex@latest --include=optional --loglevel=silly
+
+    else
+        if isDeus ; then
+            #: I don't know what causes the bug that this directory needs to be removed.
+            trs '/opt/homebrew/lib/node_modules/@openai/codex'
+        fi
+
+        reval-ecgray npm-install '@openai/codex'
+    fi
 }
 ##
 function codex-clean-text {
@@ -120,6 +131,6 @@ function codex-status {
         script_args+=(--codex-arg "${arg}")
     done
 
-    command codex_status.py "${script_args[@]}" "$@"
+    $proxyenv command codex_status.py "${script_args[@]}" "$@"
 }
 ##
