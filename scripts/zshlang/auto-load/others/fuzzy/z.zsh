@@ -1,6 +1,8 @@
+##
 typeset -g ZDIRS_ENABLED=y
 typeset -g ZDIRS_NAME=zdirs
-function z-add() {
+
+function z-add {
     if test -z "$HISTFILE" ; then
         return 0
     fi
@@ -22,13 +24,15 @@ function z-add-pwd() {
     inbg silence z-add "$PWD"
     # the 'silent' alias is weirdly not defined in the completion context (test with `in x ll y<TAB>`)
 }
-function z-list() {
+
+function z-list {
     redism SMEMBERS "$ZDIRS_NAME"
 }
 
-function z-list0() {
+function z-list0 {
     redis_smembers0.py "$ZDIRS_NAME"
 }
+
 function z-cleanup {
     local d dp
     typeset -A seen_heads
