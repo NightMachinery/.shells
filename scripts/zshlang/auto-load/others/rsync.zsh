@@ -1,9 +1,9 @@
 ##
 #: `-r` is `--recursive` like `cp -r`
 
-aliasfn rsp-dl rsync --protect-args --human-readable --xattrs --times --info=progress2 --append -r # append assumes files only grow and do not otherwise change
+aliasfn rsp-dl rsync --protect-args --human-readable --xattrs --times --info=progress2 --append -r --fuzzy # append assumes files only grow and do not otherwise change
 
-aliasfn rsp-safe rsync --verbose --checksum --protect-args --human-readable --xattrs --times --info=progress2 --partial-dir=.rsync-partial -r # partial-dir supports resume
+aliasfn rsp-safe rsync --verbose --checksum --protect-args --human-readable --xattrs --times --info=progress2 --partial-dir=.rsync-partial -r --fuzzy # partial-dir supports resume
 #: @toFuture/1406 add =--mkpath=, currently most installed rsync are too old to support it
 
 aliasfn rsp-safe2 enh_dest_shift_e=(rsp-safe) enh-dest-shift
