@@ -206,7 +206,7 @@ function pbpaste {
         copyq clipboard
     } || {
         (( $+commands[pbpaste] )) && command pbpaste
-    } | cat-rtl-if-tty
+    } | cat-copy-rtl-if-tty
 }
 
 function pbpaste-html {
