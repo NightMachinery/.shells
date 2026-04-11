@@ -134,6 +134,13 @@ function newline2space {
     #: =(*plb:\w)-\h= changes, e.g., =com- ponent= to =component=
 }
 
+function newline-strip {
+    cat-paste-if-tty |
+        perl -0777 -CS -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ;
+s/\R\s*/'${to}'/g ; s/\h+/ /g ; s/(*plb:\w)-\h//g' |
+        cat-copy-if-tty
+}
+
 function p-newline2space {
     pbpaste | newline2space | cat-copy-if-tty
 }
