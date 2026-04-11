@@ -18,12 +18,13 @@ if false ; then
     }
 fi
 ##
-function psource() {
+function psource {
+    #: @duplicateCode/9ae25a72d39d3e69299cc8b3eb6310c9
+    ##
     if [[ -r "$1" ]]; then # -r: readable file
         source "$@"
     fi
 }
-
 ##
 function nightsh-load-zshenv {
     ZSH_PWD_CACHE=~/tmp/.zsh_pwd
