@@ -55,9 +55,13 @@ aliasfn ci2050 curl-ip -x 'http://127.0.0.1:2050'
 aliasfn ci60 curl-ip -x 'socks5h://127.0.0.1:1060'
 aliasfn ci62 curl-ip -x 'socks5h://127.0.0.1:1062'
 aliasfn ci2062 curl-ip -x 'http://127.0.0.1:2062'
+aliasfn ci70 curl-ip -x 'socks5h://127.0.0.1:1070'
+aliasfn ci2070 curl-ip -x 'http://127.0.0.1:2070'
 aliasfn ci78 curl-ip -x 'socks5h://127.0.0.1:1078'
 aliasfn ci79 curl-ip -x 'socks5h://127.0.0.1:1079'
 aliasfn ci80 curl-ip -x 'socks5h://127.0.0.1:1080'
+aliasfn ci10808 curl-ip -x 'socks5h://127.0.0.1:10808'
+aliasfn ci20808 curl-ip -x 'http://127.0.0.1:20808'
 aliasfn ci81 curl-ip -x 'socks5h://127.0.0.1:1081'
 aliasfn ci82 curl-ip -x 'socks5h://127.0.0.1:1082'
 aliasfn ci2082 curl-ip -x 'http://127.0.0.1:2082'
@@ -78,12 +82,20 @@ aliasfn ci2096 curl-ip -x 'http://127.0.0.1:2096'
 aliasfn ci3096 curl-ip -x 'http://127.0.0.1:3096'
 aliasfn ci97 curl-ip -x 'socks5h://127.0.0.1:1097'
 aliasfn ci2097 curl-ip -x 'http://127.0.0.1:2097'
+aliasfn ci6097 curl-ip -x 'http://127.0.0.1:6097'
 aliasfn ci98 curl-ip -x 'socks5h://127.0.0.1:1098'
 aliasfn ci2098 curl-ip -x 'http://127.0.0.1:2098'
 aliasfn ci99 curl-ip -x 'socks5h://127.0.0.1:1099'
 
 aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
 aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
+
+aliasfn ci5080 curl-ip -x 'socks5h://127.0.0.1:5080'
+aliasfn ci5081 curl-ip -x 'socks5h://127.0.0.1:5081'
+aliasfn ci6081 curl-ip -x 'http://127.0.0.1:6081'
+
+aliasfn ci9081 curl-ip -x 'socks5h://127.0.0.1:9081'
+aliasfn ci9087 curl-ip -x 'http://127.0.0.1:9087'
 
 aliasfn ci14000-socks curl-ip -x 'socks5h://127.0.0.1:14000'
 ##
@@ -203,9 +215,13 @@ function router-ip {
         netstat -nr | perl -ne 'if (/^default\s+(\d+\.\d+\.\d+\.\d+)/) { print "$1\n"; exit }' | head -n1
     else
         @NA
-    fi
+    fi | cat-copy-if-tty
 }
 aliasfn ip-router router-ip
+
+function hotspot-http-open {
+    open "http://$(ip-router):8181/"
+}
 ##
 function ip-internal-get {
     : "Use 'ipconfig getifaddr en1' for wireless, or 'ipconfig getifaddr en0' for ethernet."
@@ -214,7 +230,8 @@ function ip-internal-get {
 }
 
 function ip-internal-get1 {
-    ip-internal-get | gsed 1d | rget 'inet\s+(\d+\.\d+\.\d+\.\d+)'
+    ip-internal-get | gsed 1d | rget 'inet\s+(\d+\.\d+\.\d+\.\d+)' |
+        cat-copy-if-tty
 }
 ##
 function http-static-py {
