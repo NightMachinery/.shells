@@ -52,20 +52,24 @@ function pxa-create {
     alias "${name}-local"="local -x ${(P)v}"
 }
 pxa-create
+pxa-create 20808 pxa20808
 pxa-create 1087 pxa87
 pxa-create 2030 pxa30
 pxa-create 2040 pxa40
 pxa-create 2080 pxa80
 pxa-create 2091 pxa91
 pxa-create 2092 pxa92
+pxa-create 2097 pxa97
 pxa-create 2041 pxa41
 pxa-create 2032 pxa32
 pxa-create 2035 pxa35
+pxa-create 2050 pxa50
 pxa-create 2089 pxa89
 pxa-create 2096 pxa2096
 pxa-create 2098 pxa98
 pxa-create 2098 pxa2098
 pxa-create 3067 pxa3067
+pxa-create 9087 pxa9087
 pxa-create 10809 pxateias 10.2.32.28
 
 # alias pxa-maybe='isIran && pxa-local'
@@ -120,6 +124,7 @@ function pxify {
 
     pxaify-command llm
     pxaify-command gemini
+    pxaify-command omp
     pxaify-command codex
     pxaify-command opencode
 
@@ -145,6 +150,7 @@ function pxify {
     # pxaify-command git # use git's own config
     pxaify-command gh
     pxaify-command npm
+    pxaify-command pnpm
     pxaify-command go
     pxaify-command dart
 
