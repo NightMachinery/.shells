@@ -235,3 +235,20 @@ function './gradlew' {
   $proxyenv command ./gradlew "$@"
 }
 ##
+function ncdu-m {
+    local sudo_p="${ncdu_sudo_p}"
+
+    tty-title ncdu
+
+    local engine=()
+    if bool "${sudo_p}" ; then
+        engine=(sudo)
+    fi
+
+    TERM=xterm-256color reval-ec "${engine[@]}" ncdu --color off --exclude 'Volumes' -x
+
+    # -x: Do not cross filesystem boundaries. using exclude patterns to avoid the infinite loop has not worked for me. beware that the loop can hog up all ram and then use swap space and fill up the disk completely.  --exclude-firmlinks also makes everything show up as zero.
+}
+alias ncdu="ncdu-m"
+alias ncdu-sudo="ncdu_sudo_p=y ncdu-m"
+##
