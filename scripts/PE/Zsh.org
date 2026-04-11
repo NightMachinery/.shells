@@ -4,6 +4,8 @@ Zsh Coding Guidelines:
 
 - Always use long option/argument forms for CLI commands. This makes the code more readable.
 
+- Use =gmv=, =gmkdir=, etc. when you want to use a GNU-specific feature, as the code must run on both macOS and Linux.
+
 - Some basic functions/aliases are already defined, and should be used if needed:
 
 #+begin_src :eval never
@@ -256,3 +258,5 @@ The redis-backed variables should be used when some state needs to be shared bet
 - Things that should NOT be dependency-injected unless the user asks explicitly:
   - commands
 --------------
+
+Read all scripts in =zshlang/basic=. Reuse functions when possible, DRY.
