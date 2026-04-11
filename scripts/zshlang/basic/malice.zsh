@@ -89,4 +89,5 @@ function export-from-alias {
   # tmp="a ;b; c"
   ##
 }
+alias proxy-export='export-from-alias'
 ##
