@@ -132,7 +132,7 @@ function hs-type {
     local input
     input="$(in-or-args "$@")" @RET
 
-    reval-ec hammerspoon -c "hs.eventtap.keyStrokes($(gquote-dq "$input"))"
+    reval-ec hammerspoon -c "hs.eventtap.keyStrokes($(js-quote "$input"))"
 }
 ##
 function hs-focus-app {
