@@ -386,11 +386,14 @@ function isNet {
 
 function h-isNet {
     ##
+    local test_ip="${isNet_ip:-185.97.118.92}"
+    # local test_ip="${isNet_ip:-8.8.8.8}"
+
     if isDarwin ; then
-        ping -q -c 1 -W 400 8.8.8.8 &>/dev/null
+        ping -q -c 1 -W 400 "${test_ip}" &>/dev/null
         # -W waittime in ms
     else
-        ping -q -c 1 -W 1 8.8.8.8 &>/dev/null
+        ping -q -c 1 -W 1 "${test_ip}" &>/dev/null
         # -W waittime in s
     fi
 }
