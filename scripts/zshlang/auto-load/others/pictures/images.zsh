@@ -384,6 +384,16 @@ function h-img-gallery-links-dir {
             local name
             name="$(printf '%04d.%s' "$i" "$ext")" @TRET
 
+            local orig_name="${p:t:r}"
+            if [[ "${orig_name}" != "${i}" ]] ; then
+                name="${name:r}_${orig_name}.${name:e}"
+                #: adding the original name as a suffix
+
+                # var-show name
+            else
+                ecgray "$0: ${orig_name} == ${i}"
+            fi
+
             reval command ln -s -- "${src}" "${out_dir}/${name}" @RET
             (( linked_n++ ))
         done
