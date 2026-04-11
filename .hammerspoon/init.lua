@@ -2649,7 +2649,8 @@ appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
 -- appHotkey{ key='.', appName='com.openai.atlas' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
-appHotkey{ key=';', appName='com.microsoft.Excel' }
+-- appHotkey{ key=';', appName='com.microsoft.Excel' }
+appHotkey{ key=';', appName='chat.delta.desktop.electron' }
 
 -- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 -- appHotkey{ key='c', appName='com.apple.Terminal' }
