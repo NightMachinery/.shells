@@ -525,3 +525,9 @@ function erase-latin {
     h-erase-chars '\p{Latin}' @RET
 }
 ##
+function zsh-function-to-dash {
+    cat-paste-if-tty |
+        perl -0777 -pe 's/\bfunction\s+([a-zA-Z0-9_-]+)\s*\{/\1 () {/g' |
+        cat-copy-if-tty
+}
+##

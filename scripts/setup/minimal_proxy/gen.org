@@ -6,6 +6,8 @@
 * @links
 ** [[id:827ff9a8-8709-4015-9355-aca48ae85c64][minse]]
 
+** [agfi:zsh-function-to-dash]
+
 * steps
 ** [[id:a802bc74-36e7-4bb7-a3a7-a89a5efece52][Add User]]
 
