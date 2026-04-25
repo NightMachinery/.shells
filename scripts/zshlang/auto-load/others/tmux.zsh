@@ -14,13 +14,59 @@ function tmuxnew {
     tmux new -d -s "$@"
 }
 
-function tmuxnew-ensure {
-    if ! tmux has-session -t "$1" &> /dev/null ; then
-        tmuxnew "$@"
-    else
-        # echo "Session $1 already exists and is alive."
-        return 0
+function tmux-alive-p {
+    local session="${1}"
+    assert-args session @RET
+
+    local tmux_target="=${session}"
+    local pane_dead_values
+
+    if ! tmux has-session -t "${tmux_target}" &>/dev/null ; then
+        return 1
     fi
+
+    pane_dead_values=("${(@f)$(tmux list-panes -t "${tmux_target}" -F '#{pane_dead}')}" ) @RET
+
+    local pane_dead
+    for pane_dead in "${pane_dead_values[@]}" ; do
+        if [[ "${pane_dead}" == "0" ]] ; then
+            #: at least one pane is not dead
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+function tmuxnew-ensure {
+    local session="${1}"
+
+    if tmux-alive-p "${session}" ; then
+        ecgray "$0: tmux session ${session} already exists"
+
+        return 0
+    else
+        tmuxnew "$@"
+    fi
+}
+
+function tmux-ensure-attach {
+    local session="${1}"
+    assert-args session @RET
+    shift
+    local command=("${@:-zsh}")
+
+    tmuxnew-ensure "${session}" "${command[@]}"
+    tmux attach -t "${session}"
+}
+alias tma='tmux-ensure-attach'
+
+function tma-z {
+    local name="${1}"
+    assert-args name @RET
+
+    tmux-ensure-attach "${name}" zsh -c "z $(gq ${name%-*}) && exec zsh"
+    #: `%-*`: remove last dash and everything after it
 }
 ##
 function tmuxnewsh {
