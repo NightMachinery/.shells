@@ -25,7 +25,9 @@ function docx2org() {
 }
 
 function md2org {
-    @opts from "${pandoc_md_default}" to org @ pandoc-convert "$@"
+    cat-paste-if-tty |
+    perl -pe 's/^(```+[^\s`]+)(?:\h+.*)?$/$1/' |  #: [[id:840a466b-9e1b-4f15-bac9-e9001e5e87d7][pandoc markdown code block fence attributes]]
+        @opts from "${pandoc_md_default}" to org @ pandoc-convert "$@"
 }
 
 function mediawiki2md {
