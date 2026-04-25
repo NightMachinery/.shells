@@ -214,9 +214,10 @@ function micromamba-setup {
 
 function gost-setup {
     #: @duplicateCode/677fcfc72b5b857e88b4687a1824e9e3
-    ##
     mkdir -p ~/bin/
-    wget -O - 'https://github.com/ginuerzh/gost/releases/download/v2.11.5/gost-linux-amd64-2.11.5.gz' | gunzip -c > ~/bin/gost
+
+    wget -O - 'https://github.com/ginuerzh/gost/releases/download/v2.12.0/gost_2.12.0_linux_amd64.tar.gz' \
+      | tar -xz -C ~/bin/ gost
 
     chmod +x ~/bin/gost
     # sudo setcap 'cap_net_bind_service=+ep' "$(realpath ~/bin/gost)"
