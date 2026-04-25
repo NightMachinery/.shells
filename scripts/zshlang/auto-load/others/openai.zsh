@@ -666,6 +666,15 @@ typeset -gA gpt35t16k_obj=(
 )
 define-llm-model-v2 gpt35t16k_obj
 
+typeset -gA gpt5_obj=(
+    model_name 'openai-codex/gpt-5.5'
+    long_name 'gpt_5'
+    short_name '5'
+    reval_to_aliases 'rl5'
+    send_aliases 'l5'
+)
+define-llm-model-v2 gpt5_obj
+
 typeset -gA gpt4_obj=(
     model_name 'gpt-4'
     long_name 'gpt_4'
@@ -750,7 +759,8 @@ typeset -gA llama3_obj=(
 define-llm-model-v2 llama3_obj
 ##
 ## * Default Models
-typeset -g llm_default_model="${gemini_flash_latest_model}"
+# typeset -g llm_default_model="${gemini_flash_latest_model}"
+typeset -g llm_default_model="${gpt_5_model}"
 # typeset -g llm_default_model="${gemini_2_5_pro_model}"
 
 aliassafe xx='\noglob llm-send'
