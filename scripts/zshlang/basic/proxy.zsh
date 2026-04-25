@@ -11,7 +11,8 @@ export no_proxy='127.0.0.1,localhost'
 function pxs-create() {
     typeset -g socksport="${1:-1081}"
 
-    export pxs_env="ALL_PROXY=socks5h://127.0.0.1:$socksport"
+    local px_no_proxy='127.0.0.1,localhost,::1'
+    export pxs_env="ALL_PROXY=socks5h://127.0.0.1:$socksport NO_PROXY=${px_no_proxy} no_proxy=${px_no_proxy}"
     alias pxs="$pxs_env"
     alias pxs-local="local -x $pxs_env"
 }
@@ -30,7 +31,7 @@ function reval-pxs() {
 proxy-env-unset () { #: proxy unexport
     #: @duplicateCode/aa8e6083b661b73d230497532ec267d6
     ##
-    unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY npm_config_proxy npm_config_https_proxy
+    unset ALL_PROXY all_proxy http_proxy https_proxy HTTP_PROXY HTTPS_PROXY npm_config_proxy npm_config_https_proxy NO_PROXY no_proxy
 }
 
 alias noproxy='proxy_disabled=y'
@@ -43,7 +44,8 @@ function pxa-create {
     # @todo0 make this support multiple ports at the  same time
 
     local v="${name}_env"
-    export "$v"="ALL_PROXY=http://${px_http_ip}:${px_httpport} all_proxy=http://${px_http_ip}:${px_httpport} http_proxy=http://${px_http_ip}:${px_httpport} https_proxy=http://${px_http_ip}:${px_httpport} HTTP_PROXY=http://${px_http_ip}:${px_httpport} HTTPS_PROXY=http://${px_http_ip}:${px_httpport} npm_config_proxy=http://${px_http_ip}:${px_httpport} npm_config_https_proxy=http://${px_http_ip}:${px_httpport}"
+    local px_no_proxy='127.0.0.1,localhost,::1'
+    export "$v"="ALL_PROXY=http://${px_http_ip}:${px_httpport} all_proxy=http://${px_http_ip}:${px_httpport} http_proxy=http://${px_http_ip}:${px_httpport} https_proxy=http://${px_http_ip}:${px_httpport} HTTP_PROXY=http://${px_http_ip}:${px_httpport} HTTPS_PROXY=http://${px_http_ip}:${px_httpport} npm_config_proxy=http://${px_http_ip}:${px_httpport} npm_config_https_proxy=http://${px_http_ip}:${px_httpport} NO_PROXY=${px_no_proxy} no_proxy=${px_no_proxy}"
 
     # silent re unalias pxa pxa-local
     #: @redundant
