@@ -634,6 +634,8 @@ function brishgarden-boot {
 ##
 #: * Substituting non-essential functions with no-ops
 function mark-me { true }
+##
+eval "$(zoxide init zsh)"
 ### * End
 psource ~/.private.env.zsh
 psource ~/.privateShell

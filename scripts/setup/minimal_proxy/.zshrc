@@ -99,8 +99,6 @@ zle -N backward-kill-word2
 bindkey '^W' backward-kill-word2 # C-w
 bindkey '^[^?' backward-kill-word2 # alt-backspace alt-delete
 ##
-eval "$(zoxide init zsh)"
-##
 ### Added by Zinit's installer
 if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
     print -P "%F{33} %F{220}Installing %F{33}ZDHARMA-CONTINUUM%F{220} Initiative Plugin Manager (%F{33}zdharma-continuum/zinit%F{220})…%f"
@@ -128,7 +126,8 @@ zinit light zdharma-continuum/fast-syntax-highlighting
 unalias zi &> /dev/null || true
 ###
 psource ~/.zshrc.private
-
-cd ~/
+##
+# cd ~/
 #: @workaround [[id:3c5c3e16-9ae8-483b-82c8-bf1a333b058f][{bug}: loading plugins changes PWD · Issue #543 · zdharma-continuum/zinit]]
+#: [jalali:1405/01/25/14:22] no longer reproduces
 ###
