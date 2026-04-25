@@ -134,3 +134,24 @@ function codex-status {
     $proxyenv command codex_status.py "${script_args[@]}" "$@"
 }
 ##
+function image2remote {
+    assert-args fullhost @RET
+
+    local name="${EPOCHSECONDS}.png"
+    local dest="tmp/screenshots/${name}"
+
+    (
+        cdtmp @RET
+        assert pngpaste "${name}" @RET
+        icat "${name}" || true
+
+        assert rsp-safe --mkpath -- "${name}" "${fullhost}:${dest}" @RET
+    ) >&2 @RET
+
+    ec "Look at \`~/${dest}\`. " |
+        cat-copy-if-tty
+
+    bell-sonic-fx-zone-moved
+}
+alias ire='image2remote'
+##
