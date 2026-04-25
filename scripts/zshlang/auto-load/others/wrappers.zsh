@@ -245,7 +245,7 @@ function ncdu-m {
         engine=(sudo)
     fi
 
-    TERM=xterm-256color reval-ec "${engine[@]}" ncdu --color off --exclude 'Volumes' -x
+    TERM=xterm-256color reval-ec "${engine[@]}" command ncdu --color off --exclude 'Volumes' -x "$@"
 
     # -x: Do not cross filesystem boundaries. using exclude patterns to avoid the infinite loop has not worked for me. beware that the loop can hog up all ram and then use swap space and fill up the disk completely.  --exclude-firmlinks also makes everything show up as zero.
 }
