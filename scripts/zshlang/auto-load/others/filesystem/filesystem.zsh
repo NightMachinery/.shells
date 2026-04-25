@@ -304,7 +304,7 @@ function path-unabbrev {
 
     local i head tail
     for i in ${inargs[@]}; do
-        if [[ "$i" =~ '^(~[^/]*)(.*)' ]] ; then
+        if [[ "$i" =~ '^(~\[(?:[^]]|\\\])*\])(.*)' ]] || [[ "$i" =~ '^(~[^/]*)(.*)' ]] ; then
             head="${match[1]}"
             tail="${match[2]}"
             ec ${~${head}}"${tail}" # do NOT quote this
