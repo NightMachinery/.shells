@@ -5,7 +5,9 @@
 # macOS deps:
 # https://github.com/jdberry/tag
 ##
-ntag_colors=(white red orange yellow green emerald blue purple gray black aqua teal)
+ntag_colors=(white red orange yellow green emerald blue purple gray black aqua teal pink dup)
+#: `dup` is not a color, but this is not really about colors. It's about commonly-used tags.
+
 ntag_sep='..' #: . is likely to conflict with existing names, but it's cute.
 ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
 ### shortcut aliases
@@ -248,10 +250,15 @@ function ntag-add() {
     local ftr="$(ntag_ftr "$f")"
 
     for tag in $tags[@] ; do
+        if [[ "${tag}" == grey ]] ; then
+            tag='gray'
+        fi
+
         if ! ntag-has "$ft" "$tag" ; then
             toadd+="$tag"
         fi
     done
+
     test -z "$toadd[*]" || {
         local dest="$fh/$( {
               print -nr -- "$ftr" | prefixer --skip-empty -i "${ntag_sep}" -o '\x00'
