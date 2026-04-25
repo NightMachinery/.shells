@@ -780,7 +780,8 @@ function repomix-m {
     done
 }
 aliasfn context-from-files repomix-m
-aliassafe cx='context-from-files'
+aliassafe cx2='context-from-files'
+aliassafe cx='cx2'
 ##
 function prompt-rewrite-telegram {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "Current date: $(date)"$'\n\n'"$(prompt-input-file "${night_prompt_dir}/Telegram_SUTCSE_rewrite_v1.md" '')" "$@"
