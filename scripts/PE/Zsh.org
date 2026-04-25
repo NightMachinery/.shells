@@ -259,4 +259,3 @@ The redis-backed variables should be used when some state needs to be shared bet
   - commands
 --------------
 
-Read all scripts in =zshlang/basic=. Reuse functions when possible, DRY.
