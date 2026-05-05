@@ -2646,6 +2646,7 @@ end
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
 appHotkey{ key='.', appName='com.google.Chrome' }
 appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
+appHotkey{ key='/', mods={'shift'}, appName='com.interversehq.qView' }
 -- appHotkey{ key='.', appName='com.openai.atlas' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
