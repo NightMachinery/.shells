@@ -644,6 +644,7 @@ function nightsh-load-zshrc() {
   WORDCHARS="${WORDCHARS/\#/}"
   WORDCHARS="${WORDCHARS/\./}"
   WORDCHARS="${WORDCHARS/\-/}"
+  WORDCHARS="${WORDCHARS/\_/}"
   # WORDCHARS="${WORDCHARS/\|/}"
   WORDCHARS+='ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو۱۲۳۴۵۶۷۸۹۰'
 
