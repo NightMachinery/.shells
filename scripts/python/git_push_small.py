@@ -3,8 +3,23 @@
 Rewrite local commits into smaller path-based commits and push each one incrementally
 to avoid remote per-push size limits.
 
-Default mode is `split`, which rewrites the last N local commits on the current branch
-into smaller path-based commits and pushes after each new commit.
+This script requires a subcommand: split, commit, or resume.
+
+All actual pushes retry indefinitely on failure. After each failed push, the script
+waits 60 seconds and tries again. Dry runs never push.
+
+The `split` subcommand rewrites the last N local commits on the current branch into
+smaller path-based commits and pushes after each new commit.
+
+The `commit` subcommand takes current uncommitted changes, repeatedly finds the next
+path-based chunk whose approximate payload stays below --max-size, commits that chunk,
+pushes it, then scans the working tree again. This means files added while the command
+is running can be picked up by a later chunk.
+
+By default, `commit` runs in direct mode. In direct mode, the script does not create a
+backup branch or backup stash. It requires that no changes are staged at start, then
+stages each chunk directly, commits it, and pushes it. Use --no-direct to restore the
+older backup-stash behavior.
 
 The `resume` subcommand resumes an interrupted split from the current branch. It infers
 the original commit SHA and split numbering from HEAD, which must have a subject like:
@@ -20,10 +35,16 @@ the current split is incomplete and when HEAD is already the final split part, s
 
 Examples:
 
-    python3 git_push_small.py --split-last-commits=1 --max-size=100mb
     python3 git_push_small.py split --split-last-commits=3 --max-size=500mb
     python3 git_push_small.py split --split-last-commits=1 --max-size=1.5GiB --dry-run
     python3 git_push_small.py split --split-last-commits=1 --max-size=100mb --force-with-lease
+
+    python3 git_push_small.py commit --max-size=100mb
+    python3 git_push_small.py commit --max-size=20mb --message="Import assets"
+    python3 git_push_small.py commit --max-size=1.5GiB --dry-run
+    python3 git_push_small.py commit --max-size=100mb --force-with-lease
+    python3 git_push_small.py commit --max-size=100mb --no-direct
+
     python3 git_push_small.py resume --max-size=20mb
     python3 git_push_small.py resume --max-size=20mb --from-backup-branch=backup/git_push_small_20260411_162223
     python3 git_push_small.py resume --max-size=20mb --dry-run
@@ -38,6 +59,7 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from typing import List, Sequence
 
@@ -45,6 +67,8 @@ from typing import List, Sequence
 SPLIT_SUBJECT_RE = re.compile(
     r"^(?P<original_subject>.*) \[split (?P<index>\d+)/(?P<total>\d+) from (?P<original_sha>[0-9a-fA-F]{7,40})\]$"
 )
+
+PUSH_RETRY_SLEEP_SECONDS = 60
 
 
 @dataclass
@@ -126,8 +150,10 @@ def parse_size(value: str) -> int:
     match = re.fullmatch(r"(\d+(?:\.\d+)?)([kmgt]?i?b?)?", text)
     if not match:
         raise argparse.ArgumentTypeError(f"Invalid size: {value!r}")
+
     number = float(match.group(1))
     unit = match.group(2) or "b"
+
     multipliers = {
         "": 1,
         "b": 1,
@@ -148,20 +174,24 @@ def parse_size(value: str) -> int:
         "ti": 1024**4,
         "tib": 1024**4,
     }
+
     if unit not in multipliers:
         raise argparse.ArgumentTypeError(f"Invalid size unit: {value!r}")
+
     return int(number * multipliers[unit])
 
 
 def human_size(num_bytes: int) -> str:
     units = ["B", "KiB", "MiB", "GiB", "TiB"]
     value = float(num_bytes)
+
     for unit in units:
         if value < 1024.0 or unit == units[-1]:
             if unit == "B":
                 return f"{int(value)} {unit}"
             return f"{value:.2f} {unit}"
         value /= 1024.0
+
     return f"{num_bytes} B"
 
 
@@ -187,15 +217,18 @@ def current_branch() -> str:
 def resolve_upstream(branch: str, remote_arg: str | None) -> tuple[str, str]:
     if remote_arg:
         return remote_arg, branch
+
     proc = run_git(
         ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
         check=False,
     )
+
     if proc.returncode == 0:
         upstream = proc.stdout.strip()
         if "/" in upstream:
             remote, remote_branch = upstream.split("/", 1)
             return remote, remote_branch
+
     return "origin", branch
 
 
@@ -214,11 +247,13 @@ def backup_branch_name(prefix: str = "git_push_small") -> str:
 def commit_list(last_n: int) -> List[str]:
     proc = run_git(["rev-list", "--reverse", f"HEAD~{last_n}..HEAD"])
     commits = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
     if len(commits) != last_n:
         raise GitPushSmallError(
             f"Expected {last_n} commits, but found {len(commits)}. "
             "Make sure the branch has at least that many commits."
         )
+
     return commits
 
 
@@ -226,8 +261,10 @@ def commit_meta(rev: str) -> CommitMeta:
     fmt = "%H%x00%s%x00%b%x00%an%x00%ae%x00%aI"
     out = run_git(["show", "-s", f"--format={fmt}", rev]).stdout
     parts = out.split("\x00")
+
     if len(parts) < 6:
         raise GitPushSmallError(f"Failed to read metadata for {rev}")
+
     return CommitMeta(
         sha=parts[0].strip(),
         subject=parts[1].strip(),
@@ -242,8 +279,32 @@ def blob_size_in_commit(commit: str, path: str) -> int:
     proc = run_git(["cat-file", "-s", f"{commit}:{path}"], check=False)
     if proc.returncode != 0:
         return 0
+
     text = proc.stdout.strip()
     return int(text) if text else 0
+
+
+def blob_size_in_index(path: str) -> int:
+    proc = run_git(["cat-file", "-s", f":{path}"], check=False)
+    if proc.returncode != 0:
+        return 0
+
+    text = proc.stdout.strip()
+    return int(text) if text else 0
+
+
+def working_tree_path_size(path: str) -> int:
+    if not os.path.lexists(path):
+        return 0
+
+    try:
+        if os.path.islink(path):
+            return len(os.readlink(path).encode("utf-8", errors="surrogateescape"))
+        if os.path.isdir(path):
+            return 0
+        return os.path.getsize(path)
+    except OSError:
+        return 0
 
 
 def changed_entries(commit: str) -> List[ChangeEntry]:
@@ -251,23 +312,30 @@ def changed_entries(commit: str) -> List[ChangeEntry]:
         ["diff-tree", "--root", "--no-commit-id", "-r", "-M", "--name-status", "-z", commit]
     )
     items = proc.stdout.split(b"\x00")
+
     if items and items[-1] == b"":
         items.pop()
 
     entries: List[ChangeEntry] = []
     idx = 0
+
     while idx < len(items):
         status_token = items[idx].decode("utf-8", errors="surrogateescape")
         idx += 1
+
         if not status_token:
             continue
+
         status_code = status_token[0]
+
         if status_code in {"R", "C"}:
             if idx + 1 >= len(items):
                 raise GitPushSmallError(f"Malformed diff-tree output for commit {commit}")
+
             old_path = items[idx].decode("utf-8", errors="surrogateescape")
             new_path = items[idx + 1].decode("utf-8", errors="surrogateescape")
             idx += 2
+
             size_bytes = blob_size_in_commit(commit, new_path)
             entries.append(
                 ChangeEntry(
@@ -279,188 +347,20 @@ def changed_entries(commit: str) -> List[ChangeEntry]:
         else:
             if idx >= len(items):
                 raise GitPushSmallError(f"Malformed diff-tree output for commit {commit}")
+
             path = items[idx].decode("utf-8", errors="surrogateescape")
             idx += 1
+
             size_bytes = 0 if status_code == "D" else blob_size_in_commit(commit, path)
             entries.append(
-                ChangeEntry(status=status_token, paths=[path], size_bytes=size_bytes)
+                ChangeEntry(
+                    status=status_token,
+                    paths=[path],
+                    size_bytes=size_bytes,
+                )
             )
+
     return entries
-
-
-def chunk_entries(entries: Sequence[ChangeEntry], max_size: int) -> List[List[ChangeEntry]]:
-    if not entries:
-        return []
-    groups: List[List[ChangeEntry]] = []
-    current: List[ChangeEntry] = []
-    current_size = 0
-    for entry in entries:
-        entry_size = max(entry.size_bytes, 1 if entry.status.startswith("D") else 0)
-        if current and current_size + entry_size > max_size:
-            groups.append(current)
-            current = []
-            current_size = 0
-        current.append(entry)
-        current_size += entry_size
-        if entry_size > max_size:
-            groups.append(current)
-            current = []
-            current_size = 0
-    if current:
-        groups.append(current)
-    return groups
-
-
-def flatten_paths(entries: Sequence[ChangeEntry]) -> List[str]:
-    seen: set[str] = set()
-    result: List[str] = []
-    for entry in entries:
-        for path in entry.paths:
-            if path not in seen:
-                seen.add(path)
-                result.append(path)
-    return result
-
-
-def stage_group(entries: Sequence[ChangeEntry]) -> None:
-    paths = flatten_paths(entries)
-    if not paths:
-        return
-    run_git(["add", "-A", "--", *paths])
-
-
-def make_commit_message(meta: CommitMeta, part_number: int, total_parts: int) -> str:
-    if total_parts == 1:
-        return meta.subject
-    return f"{meta.subject} [split {part_number}/{total_parts} from {meta.sha[:7]}]"
-
-
-def commit_group(meta: CommitMeta, part_number: int, total_parts: int) -> None:
-    subject = make_commit_message(meta, part_number, total_parts)
-    body_parts: List[str] = []
-    if meta.body.strip():
-        body_parts.append(meta.body.strip())
-    if total_parts > 1:
-        body_parts.append(
-            f"Split automatically from original commit {meta.sha}. "
-            f"Part {part_number} of {total_parts}."
-        )
-
-    env = os.environ.copy()
-    env["GIT_AUTHOR_DATE"] = meta.author_date
-    env["GIT_COMMITTER_DATE"] = meta.author_date
-
-    args = [
-        "commit",
-        "--no-gpg-sign",
-        "--author",
-        f"{meta.author_name} <{meta.author_email}>",
-        "-m",
-        subject,
-    ]
-    for part in body_parts:
-        args.extend(["-m", part])
-    run_git(args, env=env)
-
-
-def push_head(remote: str, remote_branch: str, force_with_lease: bool) -> None:
-    args = ["push"]
-    if force_with_lease:
-        args.append("--force-with-lease")
-    args.extend([remote, f"HEAD:refs/heads/{remote_branch}"])
-    run_git(args)
-
-
-def verify_clean_after_commit(original_commit: str) -> None:
-    status = run_git(["status", "--porcelain"]).stdout
-    if status.strip():
-        raise GitPushSmallError(
-            f"After replaying {original_commit}, the working tree is not clean.\n"
-            "This usually means one of the split commits did not stage all required paths."
-        )
-
-
-def original_parent(commit: str) -> str:
-    return run_git(["rev-parse", f"{commit}^"]).stdout.strip()
-
-
-def replay_commit(
-    meta: CommitMeta,
-    max_size: int,
-    remote: str,
-    remote_branch: str,
-    force_with_lease: bool,
-) -> None:
-    entries = changed_entries(meta.sha)
-    if not entries:
-        eprint(f"[warn] Commit {meta.sha[:7]} is empty; recreating it as an empty commit.")
-        env = os.environ.copy()
-        env["GIT_AUTHOR_DATE"] = meta.author_date
-        env["GIT_COMMITTER_DATE"] = meta.author_date
-        run_git(
-            [
-                "commit",
-                "--allow-empty",
-                "--no-gpg-sign",
-                "--author",
-                f"{meta.author_name} <{meta.author_email}>",
-                "-m",
-                meta.subject,
-            ],
-            env=env,
-        )
-        push_head(remote, remote_branch, force_with_lease)
-        return
-
-    eprint(f"Applying original commit {meta.sha[:7]}: {meta.subject}")
-    cherry = run_git(["cherry-pick", "-n", meta.sha], check=False)
-    if cherry.returncode != 0:
-        raise GitPushSmallError(
-            f"Cherry-pick failed for {meta.sha}. Resolve conflicts manually or lower the split count.\n"
-            f"{cherry.stderr.strip() or cherry.stdout.strip()}"
-        )
-
-    run_git(["reset"])
-    groups = chunk_entries(entries, max_size)
-    eprint(f"  -> {len(groups)} split commit(s) planned")
-    for idx, group in enumerate(groups, start=1):
-        group_size = sum(entry.size_bytes for entry in group)
-        if any(entry.size_bytes > max_size for entry in group):
-            eprint(
-                f"  [warn] A single path in part {idx}/{len(groups)} exceeds the requested max size; "
-                "it will be committed alone."
-            )
-        eprint(f"  -> committing part {idx}/{len(groups)} (~{human_size(group_size)})")
-        stage_group(group)
-        commit_group(meta, idx, len(groups))
-        eprint(f"  -> pushing part {idx}/{len(groups)}")
-        push_head(remote, remote_branch, force_with_lease)
-
-    verify_clean_after_commit(meta.sha)
-
-
-def parse_split_head_subject(subject: str) -> SplitHeadInfo:
-    match = SPLIT_SUBJECT_RE.fullmatch(subject)
-    if not match:
-        raise GitPushSmallError(
-            "HEAD does not look like a split commit created by this script.\n"
-            "Expected a subject like:\n"
-            "  SUBJECT [split 31/163 from b0c8276]"
-        )
-
-    current_index = int(match.group("index"))
-    total_parts = int(match.group("total"))
-    if current_index < 1 or total_parts < 1 or current_index > total_parts:
-        raise GitPushSmallError(
-            f"HEAD subject has invalid split numbering: {subject!r}"
-        )
-
-    return SplitHeadInfo(
-        original_subject=match.group("original_subject"),
-        current_index=current_index,
-        total_parts=total_parts,
-        original_sha=match.group("original_sha"),
-    )
 
 
 def decode_z_paths(data: bytes) -> List[str]:
@@ -486,11 +386,348 @@ def untracked_paths() -> List[str]:
     return git_paths_z(["ls-files", "--others", "--exclude-standard", "-z"])
 
 
+def dirty_worktree_entries() -> List[ChangeEntry]:
+    proc = run_git_bytes(["status", "--porcelain=v1", "-z", "--untracked-files=all"])
+    items = proc.stdout.split(b"\x00")
+
+    if items and items[-1] == b"":
+        items.pop()
+
+    entries: List[ChangeEntry] = []
+    idx = 0
+
+    while idx < len(items):
+        token = items[idx].decode("utf-8", errors="surrogateescape")
+        idx += 1
+
+        if not token:
+            continue
+
+        if len(token) < 3:
+            raise GitPushSmallError(f"Malformed git status output token: {token!r}")
+
+        raw_status = token[:2]
+        status = raw_status.strip() or raw_status
+        path = token[3:]
+
+        if not path:
+            raise GitPushSmallError(f"Malformed git status output path: {token!r}")
+
+        paths = [path]
+
+        # With porcelain v1 -z, rename/copy entries are:
+        #   XY new_path NUL old_path NUL
+        # This is reversed compared with the human-readable "old -> new" output.
+        if "R" in raw_status or "C" in raw_status:
+            if idx >= len(items):
+                raise GitPushSmallError("Malformed git status rename/copy output")
+
+            old_path = items[idx].decode("utf-8", errors="surrogateescape")
+            idx += 1
+            paths = [old_path, path]
+
+        size_bytes = working_tree_path_size(path)
+        if size_bytes == 0:
+            size_bytes = blob_size_in_index(path)
+
+        if "D" in raw_status and not os.path.lexists(path):
+            size_bytes = 0
+
+        entries.append(
+            ChangeEntry(
+                status=status,
+                paths=paths,
+                size_bytes=size_bytes,
+            )
+        )
+
+    return entries
+
+
+def entry_payload_size(entry: ChangeEntry) -> int:
+    return max(entry.size_bytes, 1 if "D" in entry.status else 0)
+
+
+def chunk_entries(entries: Sequence[ChangeEntry], max_size: int) -> List[List[ChangeEntry]]:
+    if not entries:
+        return []
+
+    groups: List[List[ChangeEntry]] = []
+    current: List[ChangeEntry] = []
+    current_size = 0
+
+    for entry in entries:
+        entry_size = entry_payload_size(entry)
+
+        if current and current_size + entry_size > max_size:
+            groups.append(current)
+            current = []
+            current_size = 0
+
+        current.append(entry)
+        current_size += entry_size
+
+        if entry_size > max_size:
+            groups.append(current)
+            current = []
+            current_size = 0
+
+    if current:
+        groups.append(current)
+
+    return groups
+
+
+def next_dirty_chunk(entries: Sequence[ChangeEntry], max_size: int) -> List[ChangeEntry]:
+    chunks = chunk_entries(entries, max_size)
+    return chunks[0] if chunks else []
+
+
+def flatten_paths(entries: Sequence[ChangeEntry]) -> List[str]:
+    seen: set[str] = set()
+    result: List[str] = []
+
+    for entry in entries:
+        for path in entry.paths:
+            if path not in seen:
+                seen.add(path)
+                result.append(path)
+
+    return result
+
+
+def stage_group(entries: Sequence[ChangeEntry]) -> None:
+    paths = flatten_paths(entries)
+
+    if not paths:
+        return
+
+    run_git(["add", "-A", "--", *paths])
+
+
+def make_commit_message(meta: CommitMeta, part_number: int, total_parts: int) -> str:
+    if total_parts == 1:
+        return meta.subject
+    return f"{meta.subject} [split {part_number}/{total_parts} from {meta.sha[:7]}]"
+
+
+def commit_group(meta: CommitMeta, part_number: int, total_parts: int) -> None:
+    subject = make_commit_message(meta, part_number, total_parts)
+    body_parts: List[str] = []
+
+    if meta.body.strip():
+        body_parts.append(meta.body.strip())
+
+    if total_parts > 1:
+        body_parts.append(
+            f"Split automatically from original commit {meta.sha}. "
+            f"Part {part_number} of {total_parts}."
+        )
+
+    env = os.environ.copy()
+    env["GIT_AUTHOR_DATE"] = meta.author_date
+    env["GIT_COMMITTER_DATE"] = meta.author_date
+
+    args = [
+        "commit",
+        "--no-gpg-sign",
+        "--author",
+        f"{meta.author_name} <{meta.author_email}>",
+        "-m",
+        subject,
+    ]
+
+    for part in body_parts:
+        args.extend(["-m", part])
+
+    run_git(args, env=env)
+
+
+def make_dirty_commit_subject(message: str, part_number: int, total_parts: int | None) -> str:
+    if total_parts is None or total_parts <= 1:
+        return message
+    return f"{message} [part {part_number}/{total_parts}]"
+
+
+def commit_dirty_group(message: str, part_number: int, total_parts: int | None = None) -> None:
+    subject = make_dirty_commit_subject(message, part_number, total_parts)
+
+    args = [
+        "commit",
+        "--no-gpg-sign",
+        "-m",
+        subject,
+    ]
+
+    if total_parts is not None and total_parts > 1:
+        args.extend(
+            [
+                "-m",
+                (
+                    "Committed automatically from uncommitted working-tree changes. "
+                    f"Part {part_number} of {total_parts}."
+                ),
+            ]
+        )
+    else:
+        args.extend(
+            [
+                "-m",
+                (
+                    "Committed automatically from uncommitted working-tree changes. "
+                    f"Dynamic chunk {part_number}."
+                ),
+            ]
+        )
+
+    run_git(args)
+
+
+def push_head(remote: str, remote_branch: str, force_with_lease: bool) -> None:
+    args = ["push"]
+
+    if force_with_lease:
+        args.append("--force-with-lease")
+
+    args.extend([remote, f"HEAD:refs/heads/{remote_branch}"])
+
+    attempt = 1
+    while True:
+        proc = run_git(args, check=False)
+        if proc.returncode == 0:
+            return
+
+        stderr = proc.stderr.strip()
+        stdout = proc.stdout.strip()
+        details = stderr or stdout or f"exit code {proc.returncode}"
+
+        eprint(
+            f"[warn] git push failed on attempt {attempt}; "
+            f"retrying in {PUSH_RETRY_SLEEP_SECONDS} seconds."
+        )
+        eprint(details)
+        time.sleep(PUSH_RETRY_SLEEP_SECONDS)
+        attempt += 1
+
+
+def verify_clean_after_commit(original_commit: str) -> None:
+    status = run_git(["status", "--porcelain"]).stdout
+    if status.strip():
+        raise GitPushSmallError(
+            f"After replaying {original_commit}, the working tree is not clean.\n"
+            "This usually means one of the split commits did not stage all required paths."
+        )
+
+
+def verify_clean_worktree_now(context: str) -> None:
+    status = run_git(["status", "--porcelain"]).stdout
+    if status.strip():
+        raise GitPushSmallError(
+            f"Working tree is still not clean after {context}.\n"
+            "This usually means one or more paths were not included in the commit plan."
+        )
+
+
+def original_parent(commit: str) -> str:
+    return run_git(["rev-parse", f"{commit}^"]).stdout.strip()
+
+
+def replay_commit(
+    meta: CommitMeta,
+    max_size: int,
+    remote: str,
+    remote_branch: str,
+    force_with_lease: bool,
+) -> None:
+    entries = changed_entries(meta.sha)
+
+    if not entries:
+        eprint(f"[warn] Commit {meta.sha[:7]} is empty; recreating it as an empty commit.")
+
+        env = os.environ.copy()
+        env["GIT_AUTHOR_DATE"] = meta.author_date
+        env["GIT_COMMITTER_DATE"] = meta.author_date
+
+        run_git(
+            [
+                "commit",
+                "--allow-empty",
+                "--no-gpg-sign",
+                "--author",
+                f"{meta.author_name} <{meta.author_email}>",
+                "-m",
+                meta.subject,
+            ],
+            env=env,
+        )
+
+        push_head(remote, remote_branch, force_with_lease)
+        return
+
+    eprint(f"Applying original commit {meta.sha[:7]}: {meta.subject}")
+
+    cherry = run_git(["cherry-pick", "-n", meta.sha], check=False)
+    if cherry.returncode != 0:
+        raise GitPushSmallError(
+            f"Cherry-pick failed for {meta.sha}. Resolve conflicts manually or lower the split count.\n"
+            f"{cherry.stderr.strip() or cherry.stdout.strip()}"
+        )
+
+    run_git(["reset"])
+
+    groups = chunk_entries(entries, max_size)
+    eprint(f"  -> {len(groups)} split commit(s) planned")
+
+    for idx, group in enumerate(groups, start=1):
+        group_size = sum(entry_payload_size(entry) for entry in group)
+
+        if any(entry_payload_size(entry) > max_size for entry in group):
+            eprint(
+                f"  [warn] A single path in part {idx}/{len(groups)} exceeds the requested max size; "
+                "it will be committed alone."
+            )
+
+        eprint(f"  -> committing part {idx}/{len(groups)} (~{human_size(group_size)})")
+        stage_group(group)
+        commit_group(meta, idx, len(groups))
+
+        eprint(f"  -> pushing part {idx}/{len(groups)}")
+        push_head(remote, remote_branch, force_with_lease)
+
+    verify_clean_after_commit(meta.sha)
+
+
+def parse_split_head_subject(subject: str) -> SplitHeadInfo:
+    match = SPLIT_SUBJECT_RE.fullmatch(subject)
+
+    if not match:
+        raise GitPushSmallError(
+            "HEAD does not look like a split commit created by this script.\n"
+            "Expected a subject like:\n"
+            "  SUBJECT [split 31/163 from b0c8276]"
+        )
+
+    current_index = int(match.group("index"))
+    total_parts = int(match.group("total"))
+
+    if current_index < 1 or total_parts < 1 or current_index > total_parts:
+        raise GitPushSmallError(f"HEAD subject has invalid split numbering: {subject!r}")
+
+    return SplitHeadInfo(
+        original_subject=match.group("original_subject"),
+        current_index=current_index,
+        total_parts=total_parts,
+        original_sha=match.group("original_sha"),
+    )
+
+
 def format_path_sample(paths: Sequence[str], limit: int = 10) -> str:
     shown = list(paths[:limit])
     lines = [f"  {path}" for path in shown]
+
     if len(paths) > limit:
         lines.append(f"  ... and {len(paths) - limit} more")
+
     return "\n".join(lines)
 
 
@@ -500,11 +737,13 @@ def ensure_ref_exists(rev: str) -> None:
 
 def commits_after_on_branch(original_commit: str, branch: str) -> List[str]:
     ensure_ref_exists(branch)
+
     proc = run_git(["merge-base", "--is-ancestor", original_commit, branch], check=False)
     if proc.returncode != 0:
         raise GitPushSmallError(
             f"Backup branch {branch!r} does not contain original commit {original_commit}."
         )
+
     proc = run_git(["rev-list", "--reverse", f"{original_commit}..{branch}"])
     return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
@@ -527,6 +766,7 @@ def remaining_entries_for_resume(original_commit: str, dirty_paths: Sequence[str
         raise GitPushSmallError(
             "No remaining paths from the interrupted split commit were found in the working tree."
         )
+
     return remaining
 
 
@@ -541,6 +781,7 @@ def create_resume_backups(include_dirty_state: bool) -> tuple[str, str | None]:
     if include_dirty_state:
         stash_label = backup_branch.split("/", 1)[1]
         eprint("Capturing current dirty resume state in a stash backup")
+
         stash_push = run_git(
             ["stash", "push", "--include-untracked", "-m", stash_label],
             check=False,
@@ -552,10 +793,12 @@ def create_resume_backups(include_dirty_state: bool) -> tuple[str, str | None]:
                 "Failed to create a stash backup for the dirty resume state.\n"
                 f"{stash_text}"
             )
+
         if "No local changes to save" in stash_text:
             raise GitPushSmallError("Expected a dirty working tree for resume, but nothing was stashed.")
 
         stash_ref = "stash@{0}"
+
         restore = run_git(["stash", "apply", stash_ref], check=False)
         if restore.returncode != 0:
             raise GitPushSmallError(
@@ -569,23 +812,86 @@ def create_resume_backups(include_dirty_state: bool) -> tuple[str, str | None]:
     return backup_branch, stash_ref
 
 
+def create_dirty_state_backup() -> tuple[str, str]:
+    head = run_git(["rev-parse", "HEAD"]).stdout.strip()
+    backup_branch = backup_branch_name("git_push_small_commit")
+    stash_label = backup_branch.split("/", 1)[1]
+
+    eprint(f"Creating commit-mode backup branch {backup_branch} at {head[:7]}")
+    run_git(["branch", backup_branch, head])
+
+    eprint("Capturing current uncommitted state in a stash backup")
+    stash_push = run_git(
+        ["stash", "push", "--include-untracked", "-m", stash_label],
+        check=False,
+    )
+    stash_text = f"{stash_push.stdout}\n{stash_push.stderr}".strip()
+
+    if stash_push.returncode != 0:
+        raise GitPushSmallError(
+            "Failed to create a stash backup for the uncommitted state.\n"
+            f"{stash_text}"
+        )
+
+    if "No local changes to save" in stash_text:
+        raise GitPushSmallError("Expected a dirty working tree, but nothing was stashed.")
+
+    stash_ref = "stash@{0}"
+
+    restore = run_git(["stash", "apply", "--index", stash_ref], check=False)
+    if restore.returncode != 0:
+        restore = run_git(["stash", "apply", stash_ref], check=False)
+
+    if restore.returncode != 0:
+        raise GitPushSmallError(
+            f"Created backup branch {backup_branch} and stash {stash_ref}, "
+            "but failed to restore the dirty working tree.\n"
+            "You can restore it manually with:\n"
+            f"  git stash apply {stash_ref}\n\n"
+            f"{restore.stderr.strip() or restore.stdout.strip()}"
+        )
+
+    return backup_branch, stash_ref
+
+
 def plan_lines_for_commits(commits: Sequence[str], max_size: int) -> List[str]:
     lines: List[str] = []
+
     for sha in commits:
         meta = commit_meta(sha)
         entries = changed_entries(sha)
         groups = chunk_entries(entries, max_size) or [[]]
-        entry_total = sum(e.size_bytes for e in entries)
+        entry_total = sum(entry_payload_size(e) for e in entries)
+
         lines.append(
             f"- {sha[:7]} {meta.subject!r}: {len(entries)} path group(s), "
             f"~{human_size(entry_total)} total, {len(groups)} resulting commit(s)"
         )
+
+    return lines
+
+
+def plan_lines_for_dirty_entries(entries: Sequence[ChangeEntry], max_size: int) -> List[str]:
+    groups = chunk_entries(entries, max_size)
+    lines: List[str] = []
+
+    for idx, group in enumerate(groups, start=1):
+        group_size = sum(entry_payload_size(entry) for entry in group)
+        path_count = len(flatten_paths(group))
+        oversized = any(entry_payload_size(entry) > max_size for entry in group)
+        suffix = " [single path exceeds max]" if oversized else ""
+
+        lines.append(
+            f"- part {idx}/{len(groups)}: {path_count} path(s), ~{human_size(group_size)}{suffix}"
+        )
+
     return lines
 
 
 def run_split(args: argparse.Namespace) -> int:
     if args.split_last_commits < 1:
         raise GitPushSmallError("--split-last-commits must be >= 1")
+
     if args.max_size < 1:
         raise GitPushSmallError("--max-size must be > 0")
 
@@ -613,12 +919,14 @@ def run_split(args: argparse.Namespace) -> int:
 
     plan_lines = plan_lines_for_commits(commits, args.max_size)
 
-    print(f"Mode:             split")
+    print("Mode:             split")
     print(f"Branch:           {branch}")
     print(f"Remote target:    {remote}/{remote_branch}")
     print(f"Split commits:    {args.split_last_commits}")
     print(f"Max chunk size:   {human_size(args.max_size)}")
+    print(f"Push retry sleep: {PUSH_RETRY_SLEEP_SECONDS} seconds")
     print("Plan:")
+
     for line in plan_lines:
         print(line)
 
@@ -631,12 +939,19 @@ def run_split(args: argparse.Namespace) -> int:
 
     eprint(f"Creating backup branch {backup} at {original_head[:7]}")
     run_git(["branch", backup, original_head])
+
     eprint(f"Resetting {branch} to {base[:7]}")
     run_git(["reset", "--hard", base])
 
     try:
         for sha in commits:
-            replay_commit(commit_meta(sha), args.max_size, remote, remote_branch, args.force_with_lease)
+            replay_commit(
+                commit_meta(sha),
+                args.max_size,
+                remote,
+                remote_branch,
+                args.force_with_lease,
+            )
     except Exception:
         eprint(f"\nA backup of the original history is preserved at: {backup}")
         eprint("You can restore it with:")
@@ -648,6 +963,150 @@ def run_split(args: argparse.Namespace) -> int:
     print(f"Backup branch:    {backup}")
     print(f"Original HEAD:    {original_head}")
     print(f"Current HEAD:     {run_git(['rev-parse', 'HEAD']).stdout.strip()}")
+
+    return 0
+
+
+def run_commit(args: argparse.Namespace) -> int:
+    if args.max_size < 1:
+        raise GitPushSmallError("--max-size must be > 0")
+
+    if not args.message.strip():
+        raise GitPushSmallError("--message must not be empty")
+
+    ensure_git_repo()
+
+    branch = current_branch()
+    remote, remote_branch = resolve_upstream(branch, args.remote)
+    ahead = count_ahead(remote, remote_branch)
+
+    initial_staged = staged_paths()
+    if args.direct and initial_staged:
+        raise GitPushSmallError(
+            "Direct commit mode requires no staged changes at start.\n"
+            "Unstage them first, or use --no-direct to create a backup stash and continue.\n"
+            f"{format_path_sample(sorted(initial_staged))}"
+        )
+
+    initial_entries = dirty_worktree_entries()
+
+    if not initial_entries:
+        raise GitPushSmallError("Working tree is clean. There are no uncommitted changes to commit.")
+
+    initial_groups = chunk_entries(initial_entries, args.max_size)
+    initial_total_size = sum(entry_payload_size(entry) for entry in initial_entries)
+    initial_total_paths = len(flatten_paths(initial_entries))
+    initial_plan_lines = plan_lines_for_dirty_entries(initial_entries, args.max_size)
+
+    print("Mode:             commit")
+    print(f"Direct mode:      {'yes' if args.direct else 'no'}")
+    print(f"Branch:           {branch}")
+    print(f"Remote target:    {remote}/{remote_branch}")
+    print(f"Commit message:   {args.message!r}")
+    print(f"Max chunk size:   {human_size(args.max_size)}")
+    print(f"Push retry sleep: {PUSH_RETRY_SLEEP_SECONDS} seconds")
+    print(f"Initial paths:    {initial_total_paths}")
+    print(f"Initial size:     {human_size(initial_total_size)}")
+    print(f"Initial chunks:   {len(initial_groups)}")
+
+    if ahead:
+        print(f"Already ahead:    {ahead} commit(s) ahead of {remote}/{remote_branch}")
+
+    print("Initial plan:")
+    for line in initial_plan_lines:
+        print(line)
+
+    if ahead and not args.allow_existing_ahead:
+        raise GitPushSmallError(
+            f"Branch is already {ahead} commit(s) ahead of {remote}/{remote_branch}.\n"
+            "Commit mode pushes after each new chunk, but the first push would also include "
+            "those existing unpushed commit(s).\n"
+            "Push or split those commits first, or pass --allow-existing-ahead if you intentionally "
+            "want them included in the first push."
+        )
+
+    if args.dry_run:
+        return 0
+
+    backup_branch: str | None = None
+    stash_ref: str | None = None
+
+    if not args.direct:
+        backup_branch, stash_ref = create_dirty_state_backup()
+
+    committed_chunks = 0
+
+    try:
+        if not args.direct:
+            # Clear the index so each generated commit contains only the paths for that chunk.
+            # This intentionally discards the user's staging boundaries, but not the working-tree data.
+            run_git(["reset"])
+
+        while True:
+            entries = dirty_worktree_entries()
+            if not entries:
+                break
+
+            group = next_dirty_chunk(entries, args.max_size)
+            if not group:
+                break
+
+            committed_chunks += 1
+            group_size = sum(entry_payload_size(entry) for entry in group)
+            group_paths = flatten_paths(group)
+
+            if any(entry_payload_size(entry) > args.max_size for entry in group):
+                eprint(
+                    f"  [warn] A single path in chunk {committed_chunks} exceeds the requested max size; "
+                    "it will be committed alone."
+                )
+
+            eprint(
+                f"  -> staging chunk {committed_chunks} "
+                f"({len(group_paths)} path(s), ~{human_size(group_size)})"
+            )
+            stage_group(group)
+
+            if not staged_paths():
+                raise GitPushSmallError(
+                    f"No staged changes were produced for chunk {committed_chunks}.\n"
+                    "The worktree may have changed while the command was running."
+                )
+
+            eprint(f"  -> committing chunk {committed_chunks}")
+            commit_dirty_group(args.message, committed_chunks)
+
+            eprint(f"  -> pushing chunk {committed_chunks}")
+            push_head(remote, remote_branch, args.force_with_lease)
+
+        verify_clean_worktree_now("commit mode")
+
+    except Exception:
+        if args.direct:
+            eprint("\nDirect commit mode did not create a backup branch or stash.")
+            eprint("No data was intentionally discarded. Inspect the current Git state with:")
+            eprint("  git status")
+        else:
+            eprint(f"\nCommit-mode backup branch: {backup_branch}")
+            eprint(f"Commit-mode backup stash:  {stash_ref}")
+            eprint("You can restore the original uncommitted state with:")
+            eprint(f"  git reset --hard {backup_branch}")
+            eprint(f"  git stash apply {stash_ref}")
+        raise
+
+    print()
+    print("Done.")
+    print(f"Chunks committed: {committed_chunks}")
+
+    if args.direct:
+        print("Backup branch:    none")
+        print("Backup stash:     none")
+    else:
+        print(f"Backup branch:    {backup_branch}")
+        print(f"Backup stash:     {stash_ref}")
+
+    print(f"Current HEAD:     {run_git(['rev-parse', 'HEAD']).stdout.strip()}")
+
     return 0
 
 
@@ -656,6 +1115,7 @@ def run_resume(args: argparse.Namespace) -> int:
         raise GitPushSmallError("--max-size must be > 0")
 
     ensure_git_repo()
+
     branch = current_branch()
     remote, remote_branch = resolve_upstream(branch, args.remote)
 
@@ -694,6 +1154,7 @@ def run_resume(args: argparse.Namespace) -> int:
                 "Resume expects no staged changes. The interrupted run should leave only unstaged/untracked paths.\n"
                 f"{format_path_sample(sorted(staged))}"
             )
+
         if not dirty:
             raise GitPushSmallError(
                 "HEAD says the current split is incomplete, but the working tree is clean.\n"
@@ -715,17 +1176,19 @@ def run_resume(args: argparse.Namespace) -> int:
 
     later_plan_lines = plan_lines_for_commits(later_commits, args.max_size) if later_commits else []
 
-    print(f"Mode:             resume")
+    print("Mode:             resume")
     print(f"Branch:           {branch}")
     print(f"Remote target:    {remote}/{remote_branch}")
     print(f"Current HEAD:     {head_meta.sha[:7]} {head_meta.subject!r}")
     print(f"Original commit:  {original_meta.sha[:7]} {original_meta.subject!r}")
     print(f"Max chunk size:   {human_size(args.max_size)}")
+    print(f"Push retry sleep: {PUSH_RETRY_SLEEP_SECONDS} seconds")
 
     if current_complete:
         print(f"Current split:    complete at {head_info.current_index}/{head_info.total_parts}")
     else:
-        remaining_total = sum(entry.size_bytes for entry in remaining_entries)
+        remaining_total = sum(entry_payload_size(entry) for entry in remaining_entries)
+
         print(f"Current split:    incomplete at {head_info.current_index}/{head_info.total_parts}")
         print(f"Next split part:  {head_info.current_index + 1}/{head_info.total_parts}")
         print(f"Remaining paths:  {len(remaining_entries)} path group(s)")
@@ -735,6 +1198,7 @@ def run_resume(args: argparse.Namespace) -> int:
     if args.from_backup_branch:
         print(f"Backup branch:    {args.from_backup_branch}")
         print(f"Later commits:    {len(later_commits)}")
+
         if later_plan_lines:
             print("Continuation plan:")
             for line in later_plan_lines:
@@ -754,18 +1218,22 @@ def run_resume(args: argparse.Namespace) -> int:
         if not current_complete:
             for offset, group in enumerate(resume_groups, start=1):
                 part_number = head_info.current_index + offset
-                group_size = sum(entry.size_bytes for entry in group)
-                if any(entry.size_bytes > args.max_size for entry in group):
+                group_size = sum(entry_payload_size(entry) for entry in group)
+
+                if any(entry_payload_size(entry) > args.max_size for entry in group):
                     eprint(
                         f"  [warn] A single path in part {part_number}/{head_info.total_parts} exceeds "
                         "the requested max size; it will be committed alone."
                     )
+
                 eprint(
                     f"  -> committing resumed part {part_number}/{head_info.total_parts} "
                     f"(~{human_size(group_size)})"
                 )
+
                 stage_group(group)
                 commit_group(original_meta, part_number, head_info.total_parts)
+
                 eprint(f"  -> pushing part {part_number}/{head_info.total_parts}")
                 push_head(remote, remote_branch, False)
 
@@ -776,10 +1244,12 @@ def run_resume(args: argparse.Namespace) -> int:
 
     except Exception:
         eprint(f"\nResume backup branch: {backup_branch}")
+
         if stash_ref:
             eprint(f"Resume backup stash:  {stash_ref}")
             eprint("You can restore the dirty resume state with:")
             eprint(f"  git stash apply {stash_ref}")
+
         eprint("And reset the branch with:")
         eprint(f"  git reset --hard {backup_branch}")
         raise
@@ -787,9 +1257,12 @@ def run_resume(args: argparse.Namespace) -> int:
     print()
     print("Done.")
     print(f"Resume backup:    {backup_branch}")
+
     if stash_ref:
         print(f"Resume stash:     {stash_ref}")
+
     print(f"Current HEAD:     {run_git(['rev-parse', 'HEAD']).stdout.strip()}")
+
     return 0
 
 
@@ -797,10 +1270,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Rewrite large local commits into smaller path-based commits and push incrementally. "
-            "Without a subcommand, the script defaults to `split` for backward compatibility."
+            "A subcommand is required: split, commit, or resume."
         )
     )
-    subparsers = parser.add_subparsers(dest="command")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
 
     split_parser = subparsers.add_parser(
         "split",
@@ -815,8 +1289,8 @@ def build_parser() -> argparse.ArgumentParser:
     split_parser.add_argument(
         "--max-size",
         type=parse_size,
-        default=parse_size("100mb"),
-        help="Approximate maximum payload per rewritten commit, e.g. 100mb, 1.5GiB (default: 100mb)",
+        default=parse_size("20mb"),
+        help="Approximate maximum payload per rewritten commit, e.g. 100mb, 1.5GiB (default: 20mb)",
     )
     split_parser.add_argument(
         "--remote",
@@ -832,6 +1306,68 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Show the planned split without rewriting commits or pushing.",
+    )
+
+    commit_parser = subparsers.add_parser(
+        "commit",
+        help=(
+            "Commit current uncommitted changes in max-size path chunks, push after each commit, "
+            "then scan again for the next chunk."
+        ),
+    )
+    commit_parser.add_argument(
+        "--max-size",
+        type=parse_size,
+        default=parse_size("20mb"),
+        help="Approximate maximum payload per generated commit, e.g. 100mb, 1.5GiB (default: 20mb)",
+    )
+    commit_parser.add_argument(
+        "--message",
+        "-m",
+        default="Commit uncommitted changes",
+        help="Commit subject to use for each generated chunk.",
+    )
+    commit_parser.add_argument(
+        "--remote",
+        default=None,
+        help="Remote name to push to. Defaults to the branch upstream, or origin.",
+    )
+    commit_parser.add_argument(
+        "--force-with-lease",
+        action="store_true",
+        help="Use --force-with-lease when pushing.",
+    )
+    commit_parser.add_argument(
+        "--allow-existing-ahead",
+        action="store_true",
+        help=(
+            "Allow commit mode to run even when the branch already has unpushed commits. "
+            "Those commits will be included in the first push."
+        ),
+    )
+
+    direct_group = commit_parser.add_mutually_exclusive_group()
+    direct_group.add_argument(
+        "--direct",
+        dest="direct",
+        action="store_true",
+        default=True,
+        help=(
+            "Run commit mode without creating a backup branch or backup stash. "
+            "Requires no staged changes at start. This is the default."
+        ),
+    )
+    direct_group.add_argument(
+        "--no-direct",
+        dest="direct",
+        action="store_false",
+        help="Create a backup branch and stash before committing chunks.",
+    )
+
+    commit_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show the initial planned chunks without committing or pushing.",
     )
 
     resume_parser = subparsers.add_parser(
@@ -852,7 +1388,10 @@ def build_parser() -> argparse.ArgumentParser:
     resume_parser.add_argument(
         "--from-backup-branch",
         default=None,
-        help="Optional backup branch containing the original unsplit commits. If provided, resume will also continue the later original commits found after the current split's source commit on that branch.",
+        help=(
+            "Optional backup branch containing the original unsplit commits. If provided, resume will also "
+            "continue the later original commits found after the current split's source commit on that branch."
+        ),
     )
     resume_parser.add_argument(
         "--dry-run",
@@ -863,23 +1402,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def normalize_argv(argv: Sequence[str]) -> List[str]:
-    args = list(argv)
-    if not args:
-        return ["split"]
-    first = args[0]
-    if first in {"split", "resume", "-h", "--help"}:
-        return args
-    return ["split", *args]
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
-    normalized = normalize_argv(sys.argv[1:] if argv is None else argv)
-    args = parser.parse_args(normalized)
+    args = parser.parse_args(sys.argv[1:] if argv is None else argv)
 
     if args.command == "split":
         return run_split(args)
+
+    if args.command == "commit":
+        return run_commit(args)
+
     if args.command == "resume":
         return run_resume(args)
 
