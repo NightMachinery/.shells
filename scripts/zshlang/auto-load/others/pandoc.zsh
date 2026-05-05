@@ -16,12 +16,20 @@ function epub2md {
     @opts from epub to markdown @ pandoc-convert "$@"
 }
 
-function epub2plain() {
+function epub2md-v2 {
+    epub2org "$@" | org2md
+}
+
+function epub2plain {
     @opts from epub to plain @ pandoc-convert "$@"
 }
 
-function docx2org() {
+function docx2org {
     @opts from docx to org @ pandoc-convert "$@"
+}
+
+function docx2plain {
+    @opts from docx to plain @ pandoc-convert "$@"
 }
 
 function md2org {
