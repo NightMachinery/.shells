@@ -1,24 +1,64 @@
 #!/usr/bin/env python3
-##
 from __future__ import annotations
 
 import argparse
 import base64
+import concurrent.futures
 import json
 import os
+import re
 import select
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 
 AUTH_CLAIM = "https://api.openai.com/auth"
+AUTH_FILE_RE = re.compile(r"^auth(?:\.|_|-)?(?P<alias>.+)\.json$")
 
 
 class CodexStatusError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, stderr_text: str = "") -> None:
+        super().__init__(message)
+        self.stderr_text = stderr_text
+
+
+@dataclass(frozen=True)
+class ParsedArgs:
+    args: argparse.Namespace
+    passthrough: list[str]
+
+
+@dataclass(frozen=True)
+class AuthSource:
+    path: Path | None
+    label: str
+    display_path: str | None
+
+
+@dataclass(frozen=True)
+class CodexSessionResult:
+    init_result: dict
+    account_result: dict
+    rate_result: dict
+
+
+@dataclass(frozen=True)
+class AuthStatus:
+    source: AuthSource
+    ok: bool
+    rate_result: dict = field(default_factory=dict)
+    account_result: dict = field(default_factory=dict)
+    rate_limits: dict = field(default_factory=dict)
+    auth_claims: dict = field(default_factory=dict)
+    identity: dict[str, str] = field(default_factory=dict)
+    error: str | None = None
+    stderr: str = ""
 
 
 class Style:
@@ -63,27 +103,71 @@ def env_first(*names: str, default: str | None = None) -> str | None:
 def parse_timeout() -> float:
     raw = env_first("codex_status_timeout_s", "CODEX_STATUS_TIMEOUT_S", default="20")
     assert raw is not None
+
     try:
         return float(raw)
     except ValueError:
         return 20.0
 
 
-def parse_args() -> tuple[argparse.Namespace, list[str]]:
+def parse_worker_default() -> int:
+    raw = env_first("codex_status_workers", "CODEX_STATUS_WORKERS")
+    if raw is not None:
+        try:
+            value = int(raw)
+        except ValueError:
+            value = 0
+
+        if value > 0:
+            return value
+
+    return min(8, max(1, os.cpu_count() or 1))
+
+
+def positive_int(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+
+    if number <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+
+    return number
+
+
+def parse_args() -> ParsedArgs:
     parser = argparse.ArgumentParser(
         description="Read Codex account identity and rate limits via codex app-server."
     )
-    parser.add_argument("--json", action="store_true", help="Output JSON response.")
+    parser.add_argument(
+        "--json",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Output JSON response (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--all",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Show status for every ~/.codex/auth*.json file (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--workers",
+        type=positive_int,
+        default=parse_worker_default(),
+        help="Maximum parallel auth files to check (default: %(default)s).",
+    )
     parser.add_argument(
         "--timeout",
         type=float,
         default=parse_timeout(),
-        help="Timeout in seconds (default: env codex_status_timeout_s or 20).",
+        help="Timeout in seconds (default: %(default)s).",
     )
     parser.add_argument(
         "--profile",
         default=env_first("codex_status_profile", "CODEX_STATUS_PROFILE", default=""),
-        help="Codex profile name.",
+        help="Codex profile name (default: %(default)r).",
     )
     parser.add_argument(
         "--cd",
@@ -93,13 +177,13 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
             "CODEX_STATUS_CD",
             default=os.path.join(os.path.expanduser("~"), "tmp"),
         ),
-        help="Working directory for codex.",
+        help="Working directory for codex (default: %(default)s).",
     )
     parser.add_argument(
         "--color",
         choices=("auto", "always", "never"),
         default="auto",
-        help="Color mode for human-readable output.",
+        help="Color mode for human-readable output (default: %(default)s).",
     )
     parser.add_argument(
         "--codex-arg",
@@ -110,7 +194,18 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     )
 
     args, unknown = parser.parse_known_args()
-    return args, unknown
+    return ParsedArgs(args=args, passthrough=unknown)
+
+
+def color_enabled(color_mode: str) -> bool:
+    if color_mode == "always":
+        return True
+    if color_mode == "never":
+        return False
+    if color_mode == "auto":
+        return sys.stdout.isatty()
+
+    raise ValueError(f"unknown color mode: {color_mode}")
 
 
 def build_codex_cmd(args: argparse.Namespace, passthrough: list[str]) -> list[str]:
@@ -224,6 +319,118 @@ def try_rpc_request(
         return {}
 
 
+def run_codex_session(
+    args: argparse.Namespace,
+    passthrough: list[str],
+    *,
+    env: dict[str, str] | None = None,
+) -> CodexSessionResult:
+    cmd = build_codex_cmd(args, passthrough)
+    deadline = time.monotonic() + max(1.0, args.timeout)
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            env=env,
+        )
+    except FileNotFoundError as exc:
+        raise CodexStatusError("codex-status: codex not found in PATH") from exc
+
+    error: CodexStatusError | None = None
+    session: CodexSessionResult | None = None
+    stderr_text = ""
+
+    try:
+        send_json(
+            proc,
+            {
+                "method": "initialize",
+                "id": "1",
+                "params": {
+                    "clientInfo": {
+                        "name": "codex-status",
+                        "version": "1",
+                    },
+                    "capabilities": {
+                        "experimentalApi": True,
+                    },
+                },
+            },
+        )
+
+        init_resp = recv_json_response(proc, wanted_id="1", deadline=deadline)
+        if init_resp is None:
+            raise CodexStatusError("codex-status: initialize timed out")
+        if "error" in init_resp:
+            raise CodexStatusError(
+                "codex-status: initialize failed: "
+                + json.dumps(init_resp["error"], ensure_ascii=False)
+            )
+
+        init_result = init_resp.get("result", {})
+        if not isinstance(init_result, dict):
+            init_result = {}
+
+        send_json(proc, {"method": "initialized"})
+
+        account_deadline = min(
+            deadline,
+            time.monotonic() + max(1.0, min(5.0, args.timeout / 3)),
+        )
+        account_result = try_rpc_request(
+            proc,
+            method="account/read",
+            request_id="2",
+            deadline=account_deadline,
+            params={"refreshToken": False},
+        )
+
+        rate_result = rpc_request(
+            proc,
+            method="account/rateLimits/read",
+            request_id="3",
+            deadline=deadline,
+            params=None,
+        )
+
+        session = CodexSessionResult(
+            init_result=init_result,
+            account_result=account_result,
+            rate_result=rate_result,
+        )
+    except CodexStatusError as exc:
+        error = exc
+    finally:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+
+        try:
+            _stdout_tail, stderr_text = proc.communicate(timeout=1.5)
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            try:
+                _stdout_tail, stderr_text = proc.communicate(timeout=1.0)
+            except Exception:
+                stderr_text = ""
+
+    if error is not None:
+        error.stderr_text = stderr_text.strip()
+        raise error
+
+    assert session is not None
+    return session
+
+
 def get_path(obj: object, path: tuple[str, ...]) -> object | None:
     cur: object = obj
 
@@ -319,7 +526,7 @@ def format_used_percent(style: Style, used: object | None) -> str:
     return style.green(text)
 
 
-def format_window(style: Style, label: str, window: dict | None) -> str:
+def format_window(style: Style, label: str, *, window: dict | None) -> str:
     if not isinstance(window, dict):
         return f"{label}: {style.dim('n/a')}"
 
@@ -338,7 +545,7 @@ def format_window(style: Style, label: str, window: dict | None) -> str:
     return " | ".join(bits)
 
 
-def format_credits(style: Style, credits: dict | None) -> str:
+def format_credits(style: Style, *, credits: dict | None) -> str:
     if not isinstance(credits, dict):
         return style.dim("n/a")
 
@@ -395,7 +602,6 @@ def collect_tokens(obj: object) -> list[str]:
         seen.add(value)
         tokens.append(value)
 
-    # Prefer ID tokens because they normally contain identity claims.
     explicit_paths = [
         ("tokens", "id_token"),
         ("id_token",),
@@ -443,6 +649,28 @@ def auth_file_candidates(codex_home: object | None) -> list[Path]:
     return out
 
 
+def read_auth_claims_from_file(path: Path) -> dict:
+    data = read_json_file(path)
+    if not data:
+        return {}
+
+    for token in collect_tokens(data):
+        claims = decode_jwt_payload(token)
+        if claims:
+            return claims
+
+    return {}
+
+
+def read_local_auth_claims(codex_home: object | None) -> dict:
+    for path in auth_file_candidates(codex_home):
+        claims = read_auth_claims_from_file(path)
+        if claims:
+            return claims
+
+    return {}
+
+
 def auth_file_bytes(path: Path) -> bytes | None:
     try:
         return path.read_bytes()
@@ -458,17 +686,33 @@ def active_auth_file(codex_home: object | None) -> Path | None:
     return None
 
 
-def workspace_name_from_auth_file_alias(codex_home: object | None) -> str | None:
-    """Infer a local workspace alias from auth_<alias>.json backups.
+def alias_from_auth_path(path: Path) -> str | None:
+    match = AUTH_FILE_RE.fullmatch(path.name)
+    if match:
+        alias = match.group("alias").strip()
+        return alias or None
 
-    Codex's app-server currently exposes the ChatGPT workspace/account ID but
-    not its display name. Some local setups keep per-workspace auth snapshots
-    named like auth_<workspace>.json; when auth.json is byte-identical to one
-    of those snapshots, use that alias as a local fallback. This avoids
-    presenting token organization titles such as "Personal" as the active
-    Codex workspace name for Team/Enterprise accounts.
-    """
+    alias = path.stem.strip()
+    return alias or None
 
+
+def iter_matching_files(directory: Path, pattern: re.Pattern[str]) -> list[Path]:
+    try:
+        entries = list(directory.iterdir())
+    except OSError:
+        return []
+
+    paths: list[Path] = []
+    for entry in entries:
+        if not entry.is_file():
+            continue
+        if pattern.fullmatch(entry.name):
+            paths.append(entry)
+
+    return sorted(paths, key=lambda path: path.name)
+
+
+def workspace_name_from_matching_auth_alias(codex_home: object | None) -> str | None:
     active = active_auth_file(codex_home)
     if active is None:
         return None
@@ -478,37 +722,17 @@ def workspace_name_from_auth_file_alias(codex_home: object | None) -> str | None
         return None
 
     matches: list[str] = []
-    for path in sorted(active.parent.glob("auth_*.json")):
+    for path in iter_matching_files(active.parent, AUTH_FILE_RE):
         if path.name == "auth.json":
             continue
         if auth_file_bytes(path) != active_bytes:
             continue
 
-        alias = path.stem.removeprefix("auth_")
-        alias = alias.strip()
+        alias = alias_from_auth_path(path)
         if alias:
             matches.append(alias)
 
-    if not matches:
-        return None
-
-    # Multiple aliases for the exact same auth state are possible. Pick a
-    # stable, deterministic value rather than guessing from non-identical files.
-    return matches[0]
-
-
-def read_local_auth_claims(codex_home: object | None) -> dict:
-    for path in auth_file_candidates(codex_home):
-        data = read_json_file(path)
-        if not data:
-            continue
-
-        for token in collect_tokens(data):
-            claims = decode_jwt_payload(token)
-            if claims:
-                return claims
-
-    return {}
+    return matches[0] if matches else None
 
 
 def workspace_name_from_claims(claims: dict) -> str | None:
@@ -565,10 +789,12 @@ def workspace_name_from_claims(claims: dict) -> str | None:
 
 
 def build_identity(
+    *,
     rate_limits: dict,
     account_result: dict,
     rate_result: dict,
     auth_claims: dict,
+    auth_file: Path | None = None,
     codex_home: object | None = None,
 ) -> dict[str, str]:
     account_obj = account_result.get("account")
@@ -581,8 +807,6 @@ def build_identity(
         or first_path(auth_claims, (AUTH_CLAIM, "chatgpt_plan_type"))
     )
 
-    # There is no documented separate "workspace owner email" in the app-server
-    # rate-limit response. account/read exposes the authenticated ChatGPT email.
     plan_owner_email = as_nonempty_str(
         first_path(account, ("email",))
         or first_path(account_result, ("email",))
@@ -590,6 +814,7 @@ def build_identity(
         or first_path(auth_claims, ("email",), (AUTH_CLAIM, "email"))
     )
 
+    auth_file_alias = alias_from_auth_path(auth_file) if auth_file else None
     workspace_name = as_nonempty_str(
         first_path(
             account,
@@ -608,7 +833,8 @@ def build_identity(
             ("organization", "title"),
         )
         or workspace_name_from_claims(auth_claims)
-        or workspace_name_from_auth_file_alias(codex_home)
+        or auth_file_alias
+        or workspace_name_from_matching_auth_alias(codex_home)
     )
 
     identity: dict[str, str] = {}
@@ -622,172 +848,285 @@ def build_identity(
     return identity
 
 
-def print_human(
-    rate_limits: dict,
-    color_mode: str,
-    *,
-    account_result: dict,
-    rate_result: dict,
-    auth_claims: dict,
-    codex_home: object | None = None,
-) -> None:
-    use_color = color_mode == "always" or (
-        color_mode == "auto" and sys.stdout.isatty()
+def home_relative(path: Path) -> str:
+    expanded = path.expanduser()
+    home = Path.home()
+
+    try:
+        return "~/" + str(expanded.resolve().relative_to(home.resolve()))
+    except (OSError, ValueError):
+        return str(expanded)
+
+
+def all_auth_sources() -> list[AuthSource]:
+    codex_home = Path(os.path.expanduser("~")) / ".codex"
+    sources: list[AuthSource] = []
+
+    for path in iter_matching_files(codex_home, AUTH_FILE_RE):
+        label = alias_from_auth_path(path) or path.name
+        sources.append(
+            AuthSource(
+                path=path,
+                label=label,
+                display_path=home_relative(path),
+            )
+        )
+
+    return sources
+
+
+def active_auth_source() -> AuthSource:
+    path = active_auth_file(None)
+    return AuthSource(
+        path=None,
+        label="active",
+        display_path=home_relative(path) if path else None,
     )
-    style = Style(use_color)
+
+
+def copy_config_file(source_home: Path, temp_home: Path, *, name: str) -> None:
+    source = source_home / name
+    target = temp_home / name
+
+    if not source.is_file():
+        return
+
+    try:
+        shutil.copy2(source, target)
+    except OSError:
+        return
+
+
+def prepare_codex_home(source_home: Path, temp_home: Path, *, auth_file: Path) -> None:
+    temp_home.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(auth_file, temp_home / "auth.json")
+
+    for name in ("config.toml", "config.json", "AGENTS.md"):
+        copy_config_file(source_home, temp_home, name=name)
+
+
+def env_for_codex_home(codex_home: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env["CODEX_HOME"] = str(codex_home)
+    env["codex_home"] = str(codex_home)
+    return env
+
+
+def build_success_status(
+    source: AuthSource,
+    session: CodexSessionResult,
+    *,
+    auth_file: Path | None,
+) -> AuthStatus:
+    rate_limits_obj = session.rate_result.get("rateLimits", session.rate_result)
+    rate_limits = rate_limits_obj if isinstance(rate_limits_obj, dict) else {}
+
+    codex_home = session.init_result.get("codexHome")
+    auth_claims = (
+        read_auth_claims_from_file(auth_file)
+        if auth_file is not None
+        else read_local_auth_claims(codex_home)
+    )
 
     identity = build_identity(
-        rate_limits, account_result, rate_result, auth_claims, codex_home
+        rate_limits=rate_limits,
+        account_result=session.account_result,
+        rate_result=session.rate_result,
+        auth_claims=auth_claims,
+        auth_file=auth_file,
+        codex_home=codex_home,
     )
 
+    return AuthStatus(
+        source=source,
+        ok=True,
+        rate_result=session.rate_result,
+        account_result=session.account_result,
+        rate_limits=rate_limits,
+        auth_claims=auth_claims,
+        identity=identity,
+    )
+
+
+def gather_status(source: AuthSource, *, parsed: ParsedArgs) -> AuthStatus:
+    try:
+        if source.path is None:
+            session = run_codex_session(parsed.args, parsed.passthrough)
+            return build_success_status(source, session, auth_file=None)
+
+        with tempfile.TemporaryDirectory(prefix="codex-status-") as temp_dir:
+            temp_home = Path(temp_dir)
+            prepare_codex_home(source.path.parent, temp_home, auth_file=source.path)
+            session = run_codex_session(
+                parsed.args,
+                parsed.passthrough,
+                env=env_for_codex_home(temp_home),
+            )
+            return build_success_status(source, session, auth_file=source.path)
+    except CodexStatusError as exc:
+        return AuthStatus(
+            source=source,
+            ok=False,
+            error=str(exc),
+            stderr=exc.stderr_text,
+        )
+    except Exception as exc:
+        return AuthStatus(
+            source=source,
+            ok=False,
+            error=f"codex-status: {type(exc).__name__}: {exc}",
+        )
+
+
+def gather_statuses(parsed: ParsedArgs, sources: list[AuthSource]) -> list[AuthStatus]:
+    if len(sources) <= 1:
+        return [gather_status(sources[0], parsed=parsed)] if sources else []
+
+    max_workers = min(parsed.args.workers, len(sources))
+    statuses: list[AuthStatus | None] = [None] * len(sources)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(gather_status, source, parsed=parsed): index
+            for index, source in enumerate(sources)
+        }
+
+        for future in concurrent.futures.as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                statuses[index] = future.result()
+            except Exception as exc:
+                statuses[index] = AuthStatus(
+                    source=sources[index],
+                    ok=False,
+                    error=f"codex-status: {type(exc).__name__}: {exc}",
+                )
+
+    return [status for status in statuses if status is not None]
+
+
+def print_rate_details(
+    rate_limits: dict,
+    style: Style,
+    *,
+    identity: dict[str, str],
+) -> None:
     plan = identity.get("planType") or "unknown"
     plan_owner_email = identity.get("planOwnerEmail")
     workspace_name = identity.get("workspaceName")
 
-    primary = rate_limits.get("primary")
-    secondary = rate_limits.get("secondary")
-    credits = rate_limits.get("credits")
+    primary_obj = rate_limits.get("primary")
+    secondary_obj = rate_limits.get("secondary")
+    credits_obj = rate_limits.get("credits")
 
-    print(style.bold(style.cyan("Codex rate limits")))
+    primary = primary_obj if isinstance(primary_obj, dict) else None
+    secondary = secondary_obj if isinstance(secondary_obj, dict) else None
+    credits = credits_obj if isinstance(credits_obj, dict) else None
+
     print(f"Plan: {style.magenta(str(plan)) if plan != 'unknown' else plan}")
     print(f"Plan owner: {plan_owner_email if plan_owner_email else style.dim('n/a')}")
     print(
         f"Workspace: {style.magenta(workspace_name) if workspace_name else style.dim('n/a')}"
     )
-    print(format_window(style, "Primary", primary))
-    print(format_window(style, "Secondary", secondary))
-    print(f"Credits: {format_credits(style, credits)}")
+    print(format_window(style, "Primary", window=primary))
+    print(format_window(style, "Secondary", window=secondary))
+    print(f"Credits: {format_credits(style, credits=credits)}")
+
+
+def print_human_status(
+    status: AuthStatus,
+    style: Style,
+    *,
+    show_auth_header: bool,
+) -> None:
+    title = "Codex rate limits"
+    if show_auth_header and status.source.display_path:
+        title = f"* {status.source.display_path}"
+
+    print(style.bold(style.cyan(title)))
+
+    if show_auth_header:
+        print(f"Alias: {style.magenta(status.source.label)}")
+
+    if not status.ok:
+        print(f"Status: {style.red('failed')}")
+        print(f"Error: {status.error or 'unknown error'}")
+        if status.stderr.strip():
+            print(style.dim(status.stderr.strip()))
+        return
+
+    print_rate_details(status.rate_limits, style, identity=status.identity)
+
+
+def print_human_statuses(
+    statuses: list[AuthStatus],
+    *,
+    color_mode: str,
+    show_auth_header: bool,
+) -> None:
+    style = Style(color_enabled(color_mode))
+
+    for index, status in enumerate(statuses):
+        if index:
+            print()
+        print_human_status(status, style, show_auth_header=show_auth_header)
+
+
+def status_json(status: AuthStatus) -> dict:
+    payload: dict[str, object] = {}
+
+    if status.ok:
+        payload.update(status.rate_result)
+        if status.account_result.get("account") is not None:
+            payload["account"] = status.account_result.get("account")
+        if status.identity:
+            payload["identity"] = status.identity
+    else:
+        payload["error"] = status.error or "unknown error"
+        if status.stderr.strip():
+            payload["stderr"] = status.stderr.strip()
+
+    payload["ok"] = status.ok
+    payload["alias"] = status.source.label
+    if status.source.display_path:
+        payload["authFile"] = status.source.display_path
+
+    return payload
+
+
+def print_json_statuses(statuses: list[AuthStatus], *, all_mode: bool) -> None:
+    if all_mode:
+        output: object = {"authFiles": [status_json(status) for status in statuses]}
+    else:
+        output = status_json(statuses[0]) if statuses else {}
+
+    print(json.dumps(output, indent=2, ensure_ascii=False))
 
 
 def run() -> int:
-    args, passthrough = parse_args()
-    cmd = build_codex_cmd(args, passthrough)
-    deadline = time.monotonic() + max(1.0, args.timeout)
+    parsed = parse_args()
 
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
-    except FileNotFoundError:
-        print("codex-status: codex not found in PATH", file=sys.stderr)
-        return 127
+    if parsed.args.all:
+        sources = all_auth_sources()
+        if not sources:
+            pattern = os.path.join(os.path.expanduser("~"), ".codex", AUTH_FILE_RE.pattern)
+            print(f"codex-status: no auth files found matching {pattern}", file=sys.stderr)
+            return 1
+    else:
+        sources = [active_auth_source()]
 
-    stderr_text = ""
-    failed = False
+    statuses = gather_statuses(parsed, sources)
 
-    try:
-        send_json(
-            proc,
-            {
-                "method": "initialize",
-                "id": "1",
-                "params": {
-                    "clientInfo": {
-                        "name": "codex-status",
-                        "version": "1",
-                    },
-                    "capabilities": {
-                        "experimentalApi": True,
-                    },
-                },
-            },
+    if parsed.args.json:
+        print_json_statuses(statuses, all_mode=parsed.args.all)
+    else:
+        print_human_statuses(
+            statuses,
+            color_mode=parsed.args.color,
+            show_auth_header=parsed.args.all,
         )
 
-        init_resp = recv_json_response(proc, wanted_id="1", deadline=deadline)
-        if init_resp is None:
-            raise CodexStatusError("codex-status: initialize timed out")
-        if "error" in init_resp:
-            raise CodexStatusError(
-                "codex-status: initialize failed: "
-                + json.dumps(init_resp["error"], ensure_ascii=False)
-            )
-
-        init_result = init_resp.get("result", {})
-        if not isinstance(init_result, dict):
-            init_result = {}
-
-        send_json(proc, {"method": "initialized"})
-
-        # Identity lives here, not in account/rateLimits/read.
-        # Keep it nonfatal so rate limits still print on older/broken builds.
-        account_deadline = min(deadline, time.monotonic() + max(1.0, min(5.0, args.timeout / 3)))
-        account_result = try_rpc_request(
-            proc,
-            method="account/read",
-            request_id="2",
-            deadline=account_deadline,
-            params={"refreshToken": False},
-        )
-
-        rate_result = rpc_request(
-            proc,
-            method="account/rateLimits/read",
-            request_id="3",
-            deadline=deadline,
-            params=None,
-        )
-
-        rate_limits = rate_result.get("rateLimits", rate_result)
-        if not isinstance(rate_limits, dict):
-            rate_limits = {}
-
-        codex_home = init_result.get("codexHome")
-        auth_claims = read_local_auth_claims(codex_home)
-
-        if args.json:
-            output = dict(rate_result)
-            if account_result.get("account") is not None:
-                output["account"] = account_result.get("account")
-
-            identity = build_identity(
-                rate_limits, account_result, rate_result, auth_claims, codex_home
-            )
-            if identity:
-                output["identity"] = identity
-
-            print(json.dumps(output, indent=2, ensure_ascii=False))
-        else:
-            print_human(
-                rate_limits,
-                args.color,
-                account_result=account_result,
-                rate_result=rate_result,
-                auth_claims=auth_claims,
-                codex_home=codex_home,
-            )
-
-    except CodexStatusError as exc:
-        failed = True
-        print(str(exc), file=sys.stderr)
-    finally:
-        try:
-            proc.terminate()
-        except Exception:
-            pass
-
-        try:
-            _stdout_tail, stderr_text = proc.communicate(timeout=1.5)
-        except subprocess.TimeoutExpired:
-            try:
-                proc.kill()
-            except Exception:
-                pass
-            try:
-                _stdout_tail, stderr_text = proc.communicate(timeout=1.0)
-            except Exception:
-                stderr_text = ""
-
-    if failed:
-        if stderr_text.strip():
-            print(stderr_text.strip(), file=sys.stderr)
-        return 1
-
-    return 0
+    return 1 if any(not status.ok for status in statuses) else 0
 
 
 def main() -> int:
