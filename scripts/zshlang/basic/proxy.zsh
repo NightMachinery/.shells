@@ -58,6 +58,7 @@ pxa-create 20808 pxa20808
 pxa-create 1087 pxa87
 pxa-create 2030 pxa30
 pxa-create 2040 pxa40
+pxa-create 2070 pxa70
 pxa-create 2080 pxa80
 pxa-create 2091 pxa91
 pxa-create 2092 pxa92
@@ -127,7 +128,6 @@ function pxify {
     pxaify-command llm
     pxaify-command gemini
     pxaify-command omp
-    pxaify-command codex
     pxaify-command opencode
 
     pxaify-command doom
@@ -171,7 +171,7 @@ function pxify-command {
 reify pxify-command
 
 function pxaify-command {
-    aliasfn "$1" pxa command "$1"
+    aliasfn "$1" '$proxyenv' command "$1"
 }
 reify pxaify-command
 
@@ -384,7 +384,11 @@ alias '/.'='reval-ec ci98'
 ##
 function proxy-copy-env {
     local proxy_name="${1}"
-    assert-args proxy_name @RET
+    # assert-args proxy_name @RET
+    if test -z "${proxy_name}" ; then
+        ec-copy 'ALL_PROXY="${ALL_PROXY}" all_proxy="${all_proxy:-${ALL_PROXY}}" http_proxy="${http_proxy:-${HTTP_PROXY}}" https_proxy="${https_proxy:-${HTTPS_PROXY}}" HTTP_PROXY="${HTTP_PROXY}" HTTPS_PROXY="${HTTPS_PROXY}" npm_config_proxy="${npm_config_proxy:-${HTTP_PROXY}}" npm_config_https_proxy="${npm_config_https_proxy:-${HTTPS_PROXY}}" NO_PROXY="${NO_PROXY}" no_proxy="${no_proxy:-${NO_PROXY}}"'
+        return 0
+    fi
 
     ec-copy "export ${aliases[${proxy_name}]}"
 }
