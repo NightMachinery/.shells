@@ -61,6 +61,18 @@ class AuthStatus:
     stderr: str = ""
 
 
+@dataclass(frozen=True)
+class SwapResult:
+    selected: AuthStatus | None
+    statuses: list[AuthStatus]
+    eligible: list[AuthStatus]
+    active_alias: str | None
+    active_auth_file: Path
+    swapped: bool
+    dry_run: bool
+    reason: str
+
+
 class Style:
     def __init__(self, enabled: bool):
         self.enabled = enabled
@@ -136,9 +148,16 @@ def positive_int(value: str) -> int:
     return number
 
 
-def parse_args() -> ParsedArgs:
+def parse_args(argv: list[str] | None = None) -> ParsedArgs:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    command = "status"
+    if raw_argv and raw_argv[0] in {"status", "swap"}:
+        command = raw_argv.pop(0)
+
     parser = argparse.ArgumentParser(
-        description="Read Codex account identity and rate limits via codex app-server."
+        description=(
+            "Read Codex account identity/rate limits, or swap to the least-used auth."
+        )
     )
     parser.add_argument(
         "--json",
@@ -192,8 +211,15 @@ def parse_args() -> ParsedArgs:
         metavar="ARG",
         help="Extra argument forwarded to codex before app-server.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="For swap, select an auth without replacing auth.json.",
+    )
 
-    args, unknown = parser.parse_known_args()
+    args, unknown = parser.parse_known_args(raw_argv)
+    args.command = command
     return ParsedArgs(args=args, passthrough=unknown)
 
 
@@ -524,6 +550,17 @@ def format_used_percent(style: Style, used: object | None) -> str:
     if pct >= 75:
         return style.yellow(text)
     return style.green(text)
+
+
+def numeric_used_percent(window: object) -> float | None:
+    if not isinstance(window, dict):
+        return None
+
+    value = window.get("usedPercent")
+    if not isinstance(value, (int, float)):
+        return None
+
+    return float(value)
 
 
 def format_window(style: Style, label: str, *, window: dict | None) -> str:
@@ -1103,8 +1140,220 @@ def print_json_statuses(statuses: list[AuthStatus], *, all_mode: bool) -> None:
     print(json.dumps(output, indent=2, ensure_ascii=False))
 
 
+def active_auth_json_path() -> Path:
+    return Path(os.path.expanduser("~")) / ".codex" / "auth.json"
+
+
+def auth_bytes_equal(left: Path, right: Path) -> bool:
+    left_bytes = auth_file_bytes(left)
+    right_bytes = auth_file_bytes(right)
+    return left_bytes is not None and right_bytes is not None and left_bytes == right_bytes
+
+
+def status_weekly_used(status: AuthStatus) -> float:
+    pct = numeric_used_percent(status.rate_limits.get("secondary"))
+    return pct if pct is not None else float("inf")
+
+
+def status_weekly_used_value(status: AuthStatus) -> float | None:
+    return numeric_used_percent(status.rate_limits.get("secondary"))
+
+
+def status_primary_used(status: AuthStatus) -> float:
+    pct = numeric_used_percent(status.rate_limits.get("primary"))
+    return pct if pct is not None else float("inf")
+
+
+def status_primary_used_value(status: AuthStatus) -> float | None:
+    return numeric_used_percent(status.rate_limits.get("primary"))
+
+
+def has_primary_credit_remaining(status: AuthStatus) -> bool:
+    pct = numeric_used_percent(status.rate_limits.get("primary"))
+    return pct is not None and pct < 100
+
+
+def eligible_swap_statuses(statuses: list[AuthStatus]) -> list[AuthStatus]:
+    return [
+        status
+        for status in statuses
+        if status.ok and status.source.path is not None and has_primary_credit_remaining(status)
+    ]
+
+
+def select_swap_status(statuses: list[AuthStatus]) -> AuthStatus | None:
+    eligible = eligible_swap_statuses(statuses)
+    if not eligible:
+        return None
+
+    return min(
+        eligible,
+        key=lambda status: (
+            status_weekly_used(status),
+            status_primary_used(status),
+            status.source.label,
+            status.source.display_path or "",
+        ),
+    )
+
+
+def replace_active_auth(selected: AuthStatus, active_path: Path) -> bool:
+    if selected.source.path is None:
+        raise CodexStatusError("codex-status: selected auth has no source path")
+
+    active_path.parent.mkdir(parents=True, exist_ok=True)
+    if active_path.exists() and auth_bytes_equal(active_path, selected.source.path):
+        return False
+
+    tmp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=".auth.",
+            suffix=".json",
+            dir=str(active_path.parent),
+            delete=False,
+        ) as tmp:
+            tmp_path = Path(tmp.name)
+
+        shutil.copy2(selected.source.path, tmp_path)
+        os.replace(tmp_path, active_path)
+        tmp_path = None
+        return True
+    finally:
+        if tmp_path is not None:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+
+
+def run_swap(parsed: ParsedArgs) -> SwapResult:
+    sources = all_auth_sources()
+    active_path = active_auth_json_path()
+    active_alias = workspace_name_from_matching_auth_alias(None)
+
+    if not sources:
+        return SwapResult(
+            selected=None,
+            statuses=[],
+            eligible=[],
+            active_alias=active_alias,
+            active_auth_file=active_path,
+            swapped=False,
+            dry_run=parsed.args.dry_run,
+            reason="no auth snapshots found",
+        )
+
+    statuses = gather_statuses(parsed, sources)
+    eligible = eligible_swap_statuses(statuses)
+    selected = select_swap_status(statuses)
+
+    if selected is None:
+        return SwapResult(
+            selected=None,
+            statuses=statuses,
+            eligible=eligible,
+            active_alias=active_alias,
+            active_auth_file=active_path,
+            swapped=False,
+            dry_run=parsed.args.dry_run,
+            reason="no auth has 5-hour credit remaining",
+        )
+
+    swapped = False
+    reason = "dry run"
+    if not parsed.args.dry_run:
+        swapped = replace_active_auth(selected, active_path)
+        reason = "swapped" if swapped else "selected auth is already active"
+
+    return SwapResult(
+        selected=selected,
+        statuses=statuses,
+        eligible=eligible,
+        active_alias=active_alias,
+        active_auth_file=active_path,
+        swapped=swapped,
+        dry_run=parsed.args.dry_run,
+        reason=reason,
+    )
+
+
+def swap_result_json(result: SwapResult) -> dict:
+    selected = result.selected
+    payload: dict[str, object] = {
+        "ok": selected is not None,
+        "swapped": result.swapped,
+        "dryRun": result.dry_run,
+        "reason": result.reason,
+        "activeAuthFile": home_relative(result.active_auth_file),
+        "eligibleCount": len(result.eligible),
+        "checkedCount": len(result.statuses),
+    }
+
+    if result.active_alias:
+        payload["previousActiveAlias"] = result.active_alias
+
+    if selected is not None:
+        payload["selected"] = {
+            "alias": selected.source.label,
+            "authFile": selected.source.display_path,
+            "identity": selected.identity,
+            "rateLimits": selected.rate_limits,
+            "weeklyUsedPercent": status_weekly_used_value(selected),
+            "primaryUsedPercent": status_primary_used_value(selected),
+        }
+
+    failures = [status_json(status) for status in result.statuses if not status.ok]
+    if failures:
+        payload["failures"] = failures
+
+    return payload
+
+
+def print_json_swap_result(result: SwapResult) -> None:
+    print(json.dumps(swap_result_json(result), indent=2, ensure_ascii=False))
+
+
+def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
+    style = Style(color_enabled(color_mode))
+    print(style.bold(style.cyan("Codex auth swap")))
+    print(f"Active auth: {home_relative(result.active_auth_file)}")
+    if result.active_alias:
+        print(f"Previous active alias: {style.magenta(result.active_alias)}")
+    print(f"Checked auths: {len(result.statuses)}")
+    print(f"Eligible auths: {len(result.eligible)}")
+
+    if result.selected is None:
+        print(f"Status: {style.red('failed')}")
+        print(f"Reason: {result.reason}")
+        return
+
+    selected = result.selected
+    print(f"Selected alias: {style.magenta(selected.source.label)}")
+    if selected.source.display_path:
+        print(f"Selected auth: {selected.source.display_path}")
+    print(f"Weekly usage: {format_used_percent(style, status_weekly_used_value(selected))}")
+    print(f"5-hour usage: {format_used_percent(style, status_primary_used_value(selected))}")
+
+    if result.dry_run:
+        print(f"Status: {style.yellow('dry run')}")
+    elif result.swapped:
+        print(f"Status: {style.green('swapped')}")
+    else:
+        print(f"Status: {style.green('already active')}")
+
+
 def run() -> int:
     parsed = parse_args()
+
+    if parsed.args.command == "swap":
+        result = run_swap(parsed)
+        if parsed.args.json:
+            print_json_swap_result(result)
+        else:
+            print_human_swap_result(result, color_mode=parsed.args.color)
+
+        return 0 if result.selected is not None else 1
 
     if parsed.args.all:
         sources = all_auth_sources()
