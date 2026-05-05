@@ -277,7 +277,8 @@ tma-z () {
     local name="${1}"
     assert-args name @RET
 
-    tmux-ensure-attach "${name}" zsh -c "z $(gq ${name%-*}) && exec zsh"
+    tmux-ensure-attach "${name}" zsh -c "cd ~/ ; z $(gq ${name%-*}) && exec zsh"
+    #: `cd ~/` because z rejects CWD when jumping and so needs a neutral starting point.
     #: `%-*`: remove last dash and everything after it
 }
 ###
