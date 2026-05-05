@@ -1315,8 +1315,28 @@ def print_json_swap_result(result: SwapResult) -> None:
     print(json.dumps(swap_result_json(result), indent=2, ensure_ascii=False))
 
 
+def same_auth_source(left: AuthStatus, right: AuthStatus | None) -> bool:
+    if right is None:
+        return False
+    if left.source.path is not None and right.source.path is not None:
+        return left.source.path == right.source.path
+    return left.source.label == right.source.label
+
+
 def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
     style = Style(color_enabled(color_mode))
+    other_statuses = [
+        status for status in result.statuses if not same_auth_source(status, result.selected)
+    ]
+
+    if other_statuses:
+        print(style.bold(style.cyan("Auth statuses")))
+        for index, status in enumerate(other_statuses):
+            if index:
+                print()
+            print_human_status(status, style, show_auth_header=True)
+        print()
+
     print(style.bold(style.cyan("Codex auth swap")))
     print(f"Active auth: {home_relative(result.active_auth_file)}")
     if result.active_alias:
@@ -1342,13 +1362,6 @@ def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
         print(f"Status: {style.green('swapped')}")
     else:
         print(f"Status: {style.green('already active')}")
-
-    if result.statuses:
-        print()
-        print(style.bold(style.cyan("Auth statuses")))
-        for status in result.statuses:
-            print()
-            print_human_status(status, style, show_auth_header=True)
 
 
 def run() -> int:
