@@ -84,6 +84,8 @@ WORDCHARS="${WORDCHARS/\[/}"
 WORDCHARS="${WORDCHARS/\]/}"
 WORDCHARS="${WORDCHARS/\#/}"
 WORDCHARS="${WORDCHARS/\./}"
+WORDCHARS="${WORDCHARS/\-/}"
+WORDCHARS="${WORDCHARS/\_/}"
 WORDCHARS+='ضصثقفغعهخحجچشسیبلاتنمکگظطزرذدپو۱۲۳۴۵۶۷۸۹۰'
 
 function backward-kill-word2() {
