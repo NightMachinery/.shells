@@ -119,24 +119,31 @@ function icat-autoresize {
     (( $#@ == 0 )) && set -- -
 
     integer margin_height=270
-    local sw="$(screen-width)"
-    local sh="$(screen-height)"
+    local sw sh
+    sw="$(screen-width)" @TRET
+    sh="$(screen-height)" @TRET
+
     local i
     for i in $@ ; do
         local m="$margin"
         if [[ "$i" == - ]] ; then
-            i="$(gmktemp --suffix=.png)"
-            cat > "$i"
+            i="$(gmktemp --suffix=.png)" @TRET
+            cat > "$i" @TRET
             # needed for gettings dimensions
         fi
+
         local w_r=$(( sw - 50 )) # width_real
         if test -z "$m" ; then
             ecdbg "$0: automatically determining size ..."
-            # needs zsh/mathfunc
-            local w="$(img-width "$i")"
-            local h="$(img-height "$i")"
+
+            #: needs zsh/mathfunc
+            local w h
+            w="$(img-width "$i")" @TRET
+            h="$(img-height "$i")" @TRET
             local r=$(( float(w)/h ))
+
             # re dvar w h r
+
             local max_w=$(( int((sh - margin_height) * r) ))
             if (( w_r > max_w )) ; then
                 # dvar max_w
@@ -146,7 +153,13 @@ function icat-autoresize {
             w_r=$(( sw - m ))
         fi
         ##
-        revaldbg magick convert "${${i:e}:-png}":"$i" -resize "$w_r"x png:- | icat-realsize
+        local resized
+        resized="$(gmktemp --suffix=.png)" @TRET
+
+        assert revaldbg magick convert "${${i:e}:-png}":"$i" -resize "$w_r"x "png:${resized}" @RET
+
+        revaldbg icat-realsize "${resized}"
+        # ec "${resized}"
         ##
     done
 }
