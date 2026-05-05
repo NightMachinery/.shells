@@ -1288,6 +1288,7 @@ def swap_result_json(result: SwapResult) -> dict:
         "activeAuthFile": home_relative(result.active_auth_file),
         "eligibleCount": len(result.eligible),
         "checkedCount": len(result.statuses),
+        "authFiles": [status_json(status) for status in result.statuses],
     }
 
     if result.active_alias:
@@ -1341,6 +1342,13 @@ def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
         print(f"Status: {style.green('swapped')}")
     else:
         print(f"Status: {style.green('already active')}")
+
+    if result.statuses:
+        print()
+        print(style.bold(style.cyan("Auth statuses")))
+        for status in result.statuses:
+            print()
+            print_human_status(status, style, show_auth_header=True)
 
 
 def run() -> int:

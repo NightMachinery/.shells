@@ -24,4 +24,5 @@ remaining, `swap` exits nonzero and leaves `auth.json` unchanged.
 
 Use `--dry-run` to inspect the selected auth without replacing `auth.json`.
 Use `--json` to print the selected alias/path, previous active alias when
-inferable, swap status, and selected rate-limit summary.
+inferable, swap status, selected rate-limit summary, and the full checked auth
+status list.
