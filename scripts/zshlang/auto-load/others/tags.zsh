@@ -19,14 +19,16 @@ ntag_fd_opts=( --no-ignore --hidden ) # --no-ignore --hidden
 # re h_tgfn_tag $ntag_colors[@]
 # aliasfn mg tg-gray
 ##
-function h_aliastag() {
+function h_aliastag {
     local tag="$1"
     assert-args tag @RET
 
     ##
     # aliasfn "$tag" ntag-filter "$tag" # @altAPT ; This is used less often, so I dropped it. You can use `tgf blue green ...` for this.
 
-    aliasfn "$tag" ntag-filter-or-add "$tag"
+    aliasfn "$tag" 'ntag_add_image_preview_p=$(fn-isTop && ec y)' ntag-filter-or-add "$tag"
+    #: If called at top level (interactively), preview the tagged files if they are images
+
     @opts-setprefix "$tag" ntag-search
     ##
 }
@@ -116,7 +118,7 @@ function ntag-ls-head() {
 }
 aliasfn lkh ntag-ls-head
 ##
-function ntag-rmadd() {
+function ntag-rmadd {
     ## tests
     # `@opts rm [ red bad ] add [ yellow blue purple ] @ ntag-rmadd `
     ##
@@ -144,7 +146,8 @@ function ntag-rmadd() {
     done
     return $retcode
 }
-function ntag-add-multi() {
+
+function ntag-add-multi {
     @opts add "${1:?}" @ ntag-rmadd "${@:2}"
 }
 aliasfn tgm ntag-add-multi
@@ -236,7 +239,8 @@ function ntag-add-givedest() {
     }
     ec "$ntag_add_dest"
 }
-function ntag-add() {
+
+function ntag-add {
     : "GLOBAL OUT: ntag_add_dest"
     unset ntag_add_dest
 
@@ -246,6 +250,14 @@ function ntag-add() {
         ecerr "$0: Nonexistent file: $f"
         return 1
     }
+
+    ##
+    #: preview images when adding a tag to them
+    if bool "${ntag_add_image_preview_p}" && (( ${image_formats[(Ie)${f:e:l}]} )); then
+            icat "$f"
+    fi
+    ##
+
     local ft="${f:t}" fe="${f:e}" fh="${f:h}"
     local ftr="$(ntag_ftr "$f")"
 
@@ -268,6 +280,7 @@ function ntag-add() {
         dest="$(ntag_merge_dest_fe "$dest" "$fe")"
         ntag-mv "$f" "$dest" || return 1
         ntag-toapple-force "$dest"
+
         ntag_add_dest="$dest"
     }
 }
@@ -660,5 +673,9 @@ function h-ntag-interactive {
 
 function ntag-interactive-icat {
     ntag_interactive_engine=( icat ) h-ntag-interactive "${@}"
+}
+
+function ntag-interactive-icat-autoresize {
+    ntag_interactive_engine=( icat-autoresize ) h-ntag-interactive "${@}"
 }
 ##
