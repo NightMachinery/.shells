@@ -53,7 +53,7 @@ function codex-ask-med {
 #: @duplicateCode/5a56c1bf4c428167af08cffefb52d3aa
 function codex {
     tty-title "⚡${PWD:t}"
-    command codex "$@"
+    $proxyenv command codex "$@"
 }
 
 function codex-m {
@@ -133,8 +133,10 @@ function codex-status {
 
     $proxyenv command codex_status.py "${script_args[@]}" "$@"
 }
+alias cs='codex-status'
 ##
 function image2remote {
+    local fullhost="${fullhost:-pinky}"
     assert-args fullhost @RET
 
     local name="${EPOCHSECONDS}.png"
@@ -145,7 +147,7 @@ function image2remote {
         assert pngpaste "${name}" @RET
         icat "${name}" || true
 
-        assert rsp-safe --mkpath -- "${name}" "${fullhost}:${dest}" @RET
+        assert reval-ecgray rsp-safe --mkpath -- "${name}" "${fullhost}:${dest}" @RET
     ) >&2 @RET
 
     ec "Look at \`~/${dest}\`. " |
@@ -154,4 +156,12 @@ function image2remote {
     bell-sonic-fx-zone-moved
 }
 alias ire='image2remote'
+##
+function codex-auth2remote {
+    local fullhost="${fullhost:-pinky}"
+    assert-args fullhost @RET
+
+    reval-ec rsp-safe ~/.codex/auth.json "${fullhost}:.codex/"
+}
+alias a2r='codex-auth2remote'
 ##

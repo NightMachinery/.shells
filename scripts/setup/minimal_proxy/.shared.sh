@@ -541,7 +541,7 @@ function codex-install {
 #: @duplicateCode/5a56c1bf4c428167af08cffefb52d3aa
 function codex {
     tty-title "⚡${PWD:t}"
-    command codex "$@"
+    $proxyenv command codex "$@"
 }
 
 function codex-m {
