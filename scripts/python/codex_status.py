@@ -1091,6 +1091,8 @@ def print_human_status(
     title = "Codex rate limits"
     if show_auth_header and status.source.display_path:
         title = f"* {status.source.display_path}"
+        if status_is_active(status):
+            title = f"{title} {style.magenta('[Active]')}"
 
     print(style.bold(style.cyan(title)))
 
@@ -1118,6 +1120,17 @@ def average_used_percent(statuses: list[AuthStatus], window_name: str) -> float 
         return None
 
     return sum(values) / len(values)
+
+
+def status_is_active(status: AuthStatus) -> bool:
+    if status.source.path is None:
+        return False
+
+    active_path = active_auth_file(None)
+    if active_path is None:
+        return False
+
+    return auth_bytes_equal(active_path, status.source.path)
 
 
 def average_usage_json(statuses: list[AuthStatus]) -> dict[str, float | None]:
