@@ -64,6 +64,7 @@ class AuthStatus:
 @dataclass(frozen=True)
 class SwapResult:
     selected: AuthStatus | None
+    previously_active: AuthStatus | None
     statuses: list[AuthStatus]
     eligible: list[AuthStatus]
     active_alias: str | None
@@ -1087,12 +1088,17 @@ def print_human_status(
     style: Style,
     *,
     show_auth_header: bool,
+    heading_tags: list[str] | None = None,
+    extra_lines: list[str] | None = None,
 ) -> None:
     title = "Codex rate limits"
     if show_auth_header and status.source.display_path:
         title = f"* {status.source.display_path}"
-        if status_is_active(status):
-            title = f"{title} {style.magenta('[Active]')}"
+        if heading_tags is None:
+            heading_tags = ["Active"] if status_is_active(status) else []
+
+        for tag in heading_tags:
+            title = f"{title} {style.magenta(f'[{tag}]')}"
 
     print(style.bold(style.cyan(title)))
 
@@ -1104,6 +1110,8 @@ def print_human_status(
         return
 
     print_rate_details(status.rate_limits, style, identity=status.identity)
+    for line in extra_lines or []:
+        print(line)
 
 
 def average_used_percent(statuses: list[AuthStatus], window_name: str) -> float | None:
@@ -1133,6 +1141,17 @@ def status_is_active(status: AuthStatus) -> bool:
     return auth_bytes_equal(active_path, status.source.path)
 
 
+def status_matches_auth_path(status: AuthStatus, path: Path) -> bool:
+    if status.source.path is None:
+        return False
+
+    return auth_bytes_equal(path, status.source.path)
+
+
+def active_last_statuses(statuses: list[AuthStatus]) -> list[AuthStatus]:
+    return sorted(statuses, key=lambda status: status_is_active(status))
+
+
 def average_usage_json(statuses: list[AuthStatus]) -> dict[str, float | None]:
     return {
         "primaryUsedPercent": average_used_percent(statuses, "primary"),
@@ -1156,7 +1175,7 @@ def print_human_statuses(
 ) -> None:
     style = Style(color_enabled(color_mode))
 
-    for index, status in enumerate(statuses):
+    for index, status in enumerate(active_last_statuses(statuses)):
         if index:
             print()
         print_human_status(status, style, show_auth_header=show_auth_header)
@@ -1257,6 +1276,14 @@ def select_swap_status(statuses: list[AuthStatus]) -> AuthStatus | None:
     )
 
 
+def find_status_matching_auth_path(statuses: list[AuthStatus], path: Path) -> AuthStatus | None:
+    for status in statuses:
+        if status_matches_auth_path(status, path):
+            return status
+
+    return None
+
+
 def replace_active_auth(selected: AuthStatus, active_path: Path) -> bool:
     if selected.source.path is None:
         raise CodexStatusError("codex-status: selected auth has no source path")
@@ -1295,6 +1322,7 @@ def run_swap(parsed: ParsedArgs) -> SwapResult:
     if not sources:
         return SwapResult(
             selected=None,
+            previously_active=None,
             statuses=[],
             eligible=[],
             active_alias=active_alias,
@@ -1307,10 +1335,12 @@ def run_swap(parsed: ParsedArgs) -> SwapResult:
     statuses = gather_statuses(parsed, sources)
     eligible = eligible_swap_statuses(statuses)
     selected = select_swap_status(statuses)
+    previously_active = find_status_matching_auth_path(statuses, active_path)
 
     if selected is None:
         return SwapResult(
             selected=None,
+            previously_active=previously_active,
             statuses=statuses,
             eligible=eligible,
             active_alias=active_alias,
@@ -1328,6 +1358,7 @@ def run_swap(parsed: ParsedArgs) -> SwapResult:
 
     return SwapResult(
         selected=selected,
+        previously_active=previously_active,
         statuses=statuses,
         eligible=eligible,
         active_alias=active_alias,
@@ -1383,45 +1414,57 @@ def same_auth_source(left: AuthStatus, right: AuthStatus | None) -> bool:
     return left.source.label == right.source.label
 
 
+def format_status_alias(
+    status: AuthStatus | None,
+    style: Style,
+    fallback: str | None = None,
+) -> str:
+    label = status.source.label if status is not None else fallback
+    if not label:
+        return style.dim("n/a")
+
+    return style.magenta(label)
+
+
+def swap_heading_tags(status: AuthStatus, result: SwapResult) -> list[str]:
+    tags: list[str] = []
+    if status_is_active(status):
+        tags.append("Active")
+    if same_auth_source(status, result.previously_active):
+        tags.append("Previously Active")
+    return tags
+
+
 def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
     style = Style(color_enabled(color_mode))
-    other_statuses = [
-        status for status in result.statuses if not same_auth_source(status, result.selected)
-    ]
-
-    if other_statuses:
-        print(style.bold(style.cyan("Auth statuses")))
-        for index, status in enumerate(other_statuses):
-            if index:
-                print()
-            print_human_status(status, style, show_auth_header=True)
-        print()
-
-    print(style.bold(style.cyan("Codex auth swap")))
-    print(f"Active auth: {home_relative(result.active_auth_file)}")
-    if result.active_alias:
-        print(f"Previous active alias: {style.magenta(result.active_alias)}")
-    print(f"Checked auths: {len(result.statuses)}")
-    print(f"Eligible auths: {len(result.eligible)}")
+    previously_active = format_status_alias(
+        result.previously_active,
+        style,
+        result.active_alias,
+    )
 
     if result.selected is None:
-        print(f"Status: {style.red('failed')}")
+        print(style.bold(style.cyan("Swap Failed")))
         print(f"Reason: {result.reason}")
-        return
+        if result.statuses:
+            print()
 
-    selected = result.selected
-    print(f"Selected alias: {style.magenta(selected.source.label)}")
-    if selected.source.display_path:
-        print(f"Selected auth: {selected.source.display_path}")
-    print(f"Weekly usage: {format_used_percent(style, status_weekly_used_value(selected))}")
-    print(f"5-hour usage: {format_used_percent(style, status_primary_used_value(selected))}")
+    for index, status in enumerate(active_last_statuses(result.statuses)):
+        if index:
+            print()
 
-    if result.dry_run:
-        print(f"Status: {style.yellow('dry run')}")
-    elif result.swapped:
-        print(f"Status: {style.green('swapped')}")
-    else:
-        print(f"Status: {style.green('already active')}")
+        extra_lines = (
+            [f"Previously active: {previously_active}"]
+            if same_auth_source(status, result.selected)
+            else None
+        )
+        print_human_status(
+            status,
+            style,
+            show_auth_header=True,
+            heading_tags=swap_heading_tags(status, result),
+            extra_lines=extra_lines,
+        )
 
 
 def run() -> int:
