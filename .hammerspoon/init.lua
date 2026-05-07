@@ -2447,6 +2447,14 @@ local wifiChooserScan = nil
 local wifiChooserNetworkCache = nil
 local wifiChooserNetworkCacheAt = nil
 
+local function wifiChooserCacheAgeText()
+    if wifiChooserNetworkCacheAt then
+        return "cached " .. tostring(math.floor(hs.timer.secondsSinceEpoch() - wifiChooserNetworkCacheAt)) .. "s ago"
+    end
+
+    return "cached"
+end
+
 local function wifiChooserInterface()
     local ok, details = pcall(wifi.interfaceDetails)
     if ok and details and details.interface then
@@ -2461,6 +2469,8 @@ function wifiChooser()
     local interface = wifiChooserInterface()
     local currentNetwork = wifi.currentNetwork(interface)
     local allChoices = {}
+    local active = true
+    local retryTimer = nil
 
     local chooser = hs.chooser.new(function(choice)
             if not choice or not choice.ssid or choice.ssid == "" then
@@ -2500,12 +2510,6 @@ function wifiChooser()
 
     local function updateChoices(networks)
         currentNetwork = wifi.currentNetwork(interface)
-
-        if type(networks) == "string" then
-            allChoices = {{text="Wi-Fi scan failed", subText=networks, ssid=""}}
-            chooser:choices(allChoices)
-            return
-        end
 
         local bySsid = {}
         for _, network in ipairs(networks or {}) do
@@ -2565,26 +2569,49 @@ function wifiChooser()
     end
 
     chooser:hideCallback(function()
-            wifiChooserScan = nil
+            active = false
+            if retryTimer and retryTimer:running() then
+                retryTimer:stop()
+            end
     end)
 
     if wifiChooserNetworkCache then
         updateChoices(wifiChooserNetworkCache)
-        if wifiChooserNetworkCacheAt then
-            chooser:placeholderText("Choose Wi-Fi network... cached " .. tostring(math.floor(hs.timer.secondsSinceEpoch() - wifiChooserNetworkCacheAt)) .. "s ago")
-        end
+        chooser:placeholderText("Choose Wi-Fi network... " .. wifiChooserCacheAgeText())
     end
 
-    chooser:show()
-    wifiChooserScan = wifi.backgroundScan(function(networks)
+    local function startScan()
+        if wifiChooserScan and not wifiChooserScan:isDone() then
+            return
+        end
+
+        wifiChooserScan = wifi.backgroundScan(function(networks)
             wifiChooserScan = nil
-            if type(networks) ~= "string" then
+            if not active then
+                return
+            end
+
+            if type(networks) == "string" then
+                if wifiChooserNetworkCache then
+                    updateChoices(wifiChooserNetworkCache)
+                    chooser:placeholderText("Choose Wi-Fi network... " .. wifiChooserCacheAgeText() .. "; scan retrying")
+                else
+                    chooser:choices({{text="Scanning Wi-Fi networks...", subText="Retrying after scan error: " .. networks, ssid=""}})
+                end
+
+                retryTimer = hs.timer.doAfter(3, startScan)
+                return
+            else
                 wifiChooserNetworkCache = networks
                 wifiChooserNetworkCacheAt = hs.timer.secondsSinceEpoch()
                 chooser:placeholderText("Choose Wi-Fi network...")
             end
             updateChoices(networks)
-    end, interface)
+        end, interface)
+    end
+
+    chooser:show()
+    startScan()
 end
 _G["wifi-chooser"] = wifiChooser
 hyper_bind_v2{mods={}, key="w", pressedfn=wifiChooser}

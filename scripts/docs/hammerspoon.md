@@ -3,9 +3,10 @@
 `~/.hammerspoon/init.lua` includes a `hyper+w` Wi-Fi chooser.
 
 The chooser shows cached network names immediately when available, refreshes
-nearby Wi-Fi networks in the background, marks the currently connected SSID with
-`*`, and toggles the selected network. Selecting the current network disconnects
-from Wi-Fi. Selecting another network runs:
+nearby Wi-Fi networks in the background, ignores transient scan errors while
+keeping the cache visible, marks the currently connected SSID with `*`, and
+toggles the selected network. Selecting the current network disconnects from
+Wi-Fi. Selecting another network runs:
 
 ```sh
 networksetup -setairportnetwork <interface> <ssid>
