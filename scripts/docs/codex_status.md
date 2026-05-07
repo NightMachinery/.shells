@@ -13,7 +13,8 @@ Workspace names are resolved from app-server account/rate-limit responses when p
 If no workspace name or alias can be resolved, the human-readable output prints `Workspace: n/a`.
 
 When checking all auth files, the human-readable output uses each auth file path as
-the section header and omits the redundant `Alias:` field. After the per-auth
+the section header, marks the snapshot matching `~/.codex/auth.json` with an
+`[Active]` tag, and omits the redundant `Alias:` field. After the per-auth
 details, it prints average primary and secondary usage across successful auths
 that returned numeric usage values. JSON `--all` output includes the same
 aggregate under `averageUsage`.
