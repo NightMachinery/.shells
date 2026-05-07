@@ -2692,7 +2692,7 @@ appHotkey{ key='b', appName='com.parallels.desktop.console' }
 -- appHotkey{ key='p', appName='com.jetbrains.pycharm' }
 appHotkey{ key='p', appName='com.apple.Preview' }
 -- appHotkey{ key='p', appName='com.apple.iWork.Keynote' }
-appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
+-- appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
 -- appHotkey{ key='w', appName='com.microsoft.Word' }
 
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
@@ -2805,7 +2805,7 @@ hyper_bind_v2{
     mods={"shift"},
     key="F2",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-set 0.45')
+        brishzeval('awaysh-fast brightness-set 0.435')
     end,
 }
 
