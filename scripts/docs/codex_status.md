@@ -39,5 +39,5 @@ Human-readable swap output uses the same per-auth status blocks as status
 output. The current active auth is tagged `[Active]`, the auth that was active
 before swap selection is tagged `[Previously Active]`, and the selected block
 adds `Previously active: <alias>` with the alias styled like the `Workspace:`
-value. If no auth can be selected, the failure summary uses the heading
-`Swap Failed`.
+value. It also prints the same `Average usage` block as status output. If no
+auth can be selected, the failure summary uses the heading `Swap Failed`.
