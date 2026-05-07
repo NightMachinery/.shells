@@ -2442,6 +2442,138 @@ function emojiChooser()
     -- local _ = defer(cleanup)
 end
 hyper_bind_v2{mods={}, key="a", pressedfn=emojiChooser}
+--- * Wi-Fi Chooser
+local wifiChooserScan = nil
+
+local function wifiChooserInterface()
+    local ok, details = pcall(wifi.interfaceDetails)
+    if ok and details and details.interface then
+        return details.interface
+    end
+
+    local interfaces = wifi.interfaces()
+    return interfaces and interfaces[1] or nil
+end
+
+function wifiChooser()
+    local interface = wifiChooserInterface()
+    local currentNetwork = wifi.currentNetwork(interface)
+    local allChoices = {}
+
+    local chooser = hs.chooser.new(function(choice)
+            if not choice or not choice.ssid or choice.ssid == "" then
+                return
+            end
+
+            if choice.connected then
+                wifi.disassociate(interface)
+                hs.alert("Disconnected from Wi-Fi: " .. choice.ssid)
+                return
+            end
+
+            if not interface then
+                hs.alert("No Wi-Fi interface found")
+                return
+            end
+
+            hs.alert("Connecting Wi-Fi: " .. choice.ssid)
+            hs.task.new("/usr/sbin/networksetup", function(exitCode, stdOut, stdErr)
+                    if exitCode == 0 then
+                        hs.alert("Connected Wi-Fi: " .. choice.ssid)
+                    else
+                        local err = stdErr or stdOut or ""
+                        hs.alert("Wi-Fi connect failed: " .. choice.ssid .. "\n" .. err)
+                    end
+            end, {"-setairportnetwork", interface, choice.ssid}):start()
+    end)
+
+    chooser:placeholderText("Choose Wi-Fi network...")
+    chooser:choices({{text="Scanning Wi-Fi networks...", subText=currentNetwork and ("Current: " .. currentNetwork) or "Not connected"}})
+    chooser:rows(12)
+
+    chooser:queryChangedCallback(function(query)
+            local filteredChoices = filterChoicesByPatterns{query=query, choices=allChoices, on="ssid"}
+            chooser:choices(filteredChoices)
+    end)
+
+    local function updateChoices(networks)
+        currentNetwork = wifi.currentNetwork(interface)
+
+        if type(networks) == "string" then
+            allChoices = {{text="Wi-Fi scan failed", subText=networks, ssid=""}}
+            chooser:choices(allChoices)
+            return
+        end
+
+        local bySsid = {}
+        for _, network in ipairs(networks or {}) do
+            local ssid = network.ssid
+            if ssid and ssid ~= "" then
+                local existing = bySsid[ssid]
+                if not existing or (network.rssi or -999) > (existing.rssi or -999) then
+                    bySsid[ssid] = network
+                end
+            end
+        end
+
+        if currentNetwork and currentNetwork ~= "" and not bySsid[currentNetwork] then
+            bySsid[currentNetwork] = {ssid=currentNetwork}
+        end
+
+        allChoices = {}
+        for ssid, network in pairs(bySsid) do
+            local connected = ssid == currentNetwork
+            local prefix = connected and "* " or "  "
+            local parts = {}
+
+            if connected then
+                table.insert(parts, "connected")
+            end
+            if network.rssi then
+                table.insert(parts, "RSSI " .. tostring(network.rssi))
+            end
+            if network.wlanChannel and network.wlanChannel.number then
+                table.insert(parts, "channel " .. tostring(network.wlanChannel.number))
+            end
+
+            table.insert(allChoices, {
+                             text=prefix .. ssid,
+                             subText=table.concat(parts, " | "),
+                             ssid=ssid,
+                             connected=connected,
+                             rssi=network.rssi or -999,
+            })
+        end
+
+        table.sort(allChoices, function(a, b)
+                if a.connected ~= b.connected then
+                    return a.connected
+                end
+                if a.rssi ~= b.rssi then
+                    return a.rssi > b.rssi
+                end
+                return a.ssid < b.ssid
+        end)
+
+        if #allChoices == 0 then
+            allChoices = {{text="No Wi-Fi networks found", subText="", ssid=""}}
+        end
+
+        chooser:choices(filterChoicesByPatterns{query=chooser:query(), choices=allChoices, on="ssid"})
+    end
+
+    chooser:hideCallback(function()
+            wifiChooserScan = nil
+    end)
+
+    chooser:show()
+    wifiChooserScan = wifi.backgroundScan(function(networks)
+            wifiChooserScan = nil
+            updateChoices(networks)
+    end, interface)
+end
+_G["wifi-chooser"] = wifiChooser
+hyper_bind_v2{mods={}, key="w", pressedfn=wifiChooser}
 ---
 function anycomplete()
     local timer

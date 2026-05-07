@@ -10,3 +10,7 @@ There are some non-FOSS resources in this repo that I have included only for my 
 ** =./scripts/bin/=
 
 ** =/scripts/resources/= unless otherwise specified
+
+* Hammerspoon
+
+Hammerspoon shortcut notes are tracked in =./docs/hammerspoon.md=.
