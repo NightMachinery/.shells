@@ -131,7 +131,11 @@ function codex-status {
         script_args+=(--codex-arg "${arg}")
     done
 
-    $proxyenv revaldbg command codex_status.py "$@" "${script_args[@]}"
+    (
+        cdm ~/tmp/.codex-status/
+
+        $proxyenv revaldbg command codex_status.py "$@" "${script_args[@]}"
+    )
 }
 alias cs='codex-status'
 ##
