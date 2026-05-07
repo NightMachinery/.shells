@@ -2444,6 +2444,8 @@ end
 hyper_bind_v2{mods={}, key="a", pressedfn=emojiChooser}
 --- * Wi-Fi Chooser
 local wifiChooserScan = nil
+local wifiChooserNetworkCache = nil
+local wifiChooserNetworkCacheAt = nil
 
 local function wifiChooserInterface()
     local ok, details = pcall(wifi.interfaceDetails)
@@ -2566,9 +2568,21 @@ function wifiChooser()
             wifiChooserScan = nil
     end)
 
+    if wifiChooserNetworkCache then
+        updateChoices(wifiChooserNetworkCache)
+        if wifiChooserNetworkCacheAt then
+            chooser:placeholderText("Choose Wi-Fi network... cached " .. tostring(math.floor(hs.timer.secondsSinceEpoch() - wifiChooserNetworkCacheAt)) .. "s ago")
+        end
+    end
+
     chooser:show()
     wifiChooserScan = wifi.backgroundScan(function(networks)
             wifiChooserScan = nil
+            if type(networks) ~= "string" then
+                wifiChooserNetworkCache = networks
+                wifiChooserNetworkCacheAt = hs.timer.secondsSinceEpoch()
+                chooser:placeholderText("Choose Wi-Fi network...")
+            end
             updateChoices(networks)
     end, interface)
 end
