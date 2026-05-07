@@ -18,7 +18,10 @@ the section header, marks the snapshot matching `~/.codex/auth.json` with an
 details, it prints average primary and secondary usage across successful auths
 that returned numeric usage values. The active auth is printed last in
 human-readable status lists. JSON `--all` output includes the same aggregate
-under `averageUsage`.
+under `averageUsage`. When no checked auth has usable quota available, the
+aggregate also includes `First Time to Reset`: the earliest 5-hour reset for
+auths with weekly credit remaining, or the earliest weekly reset for auths
+without weekly credit remaining.
 
 ## Swap
 
@@ -27,7 +30,8 @@ replaces `~/.codex/auth.json` with the best eligible auth.
 
 Selection prioritizes the auth with the lowest weekly usage
 (`secondary.usedPercent`). Auths with exhausted 5-hour usage
-(`primary.usedPercent >= 100`) are not eligible. If no auth has 5-hour credit
+(`primary.usedPercent >= 100`) or exhausted weekly usage
+(`secondary.usedPercent >= 100`) are not eligible. If no auth has usable quota
 remaining, `swap` exits nonzero and leaves `auth.json` unchanged.
 
 Use `--dry-run` to inspect the selected auth without replacing `auth.json`.
