@@ -16,8 +16,9 @@ When checking all auth files, the human-readable output uses each auth file path
 the section header, marks the snapshot matching `~/.codex/auth.json` with an
 `[Active]` tag, and omits the redundant `Alias:` field. After the per-auth
 details, it prints average primary and secondary usage across successful auths
-that returned numeric usage values. JSON `--all` output includes the same
-aggregate under `averageUsage`.
+that returned numeric usage values. The active auth is printed last in
+human-readable status lists. JSON `--all` output includes the same aggregate
+under `averageUsage`.
 
 ## Swap
 
@@ -33,3 +34,10 @@ Use `--dry-run` to inspect the selected auth without replacing `auth.json`.
 Use `--json` to print the selected alias/path, previous active alias when
 inferable, swap status, selected rate-limit summary, and the full checked auth
 status list.
+
+Human-readable swap output uses the same per-auth status blocks as status
+output. The current active auth is tagged `[Active]`, the auth that was active
+before swap selection is tagged `[Previously Active]`, and the selected block
+adds `Previously active: <alias>` with the alias styled like the `Workspace:`
+value. If no auth can be selected, the failure summary uses the heading
+`Swap Failed`.
