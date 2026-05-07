@@ -576,6 +576,17 @@ def numeric_used_percent(window: object) -> float | None:
     return float(value)
 
 
+def numeric_reset_time(window: object) -> float | None:
+    if not isinstance(window, dict):
+        return None
+
+    value = window.get("resetsAt")
+    if not isinstance(value, (int, float)):
+        return None
+
+    return float(value)
+
+
 def format_window(style: Style, label: str, *, window: dict | None) -> str:
     if not isinstance(window, dict):
         return f"{label}: {style.dim('n/a')}"
@@ -1152,19 +1163,66 @@ def active_last_statuses(statuses: list[AuthStatus]) -> list[AuthStatus]:
     return sorted(statuses, key=lambda status: status_is_active(status))
 
 
+def has_usable_quota(status: AuthStatus) -> bool:
+    primary = numeric_used_percent(status.rate_limits.get("primary"))
+    secondary = numeric_used_percent(status.rate_limits.get("secondary"))
+    return (
+        primary is not None
+        and primary < 100
+        and secondary is not None
+        and secondary < 100
+    )
+
+
+def reset_time_for_exhausted_auth(status: AuthStatus) -> float | None:
+    secondary = numeric_used_percent(status.rate_limits.get("secondary"))
+    if secondary is not None and secondary < 100:
+        return numeric_reset_time(status.rate_limits.get("primary"))
+
+    return numeric_reset_time(status.rate_limits.get("secondary"))
+
+
+def first_quota_reset_time(statuses: list[AuthStatus]) -> float | None:
+    ok_statuses = [status for status in statuses if status.ok]
+    if not ok_statuses or any(has_usable_quota(status) for status in ok_statuses):
+        return None
+
+    reset_times = [
+        reset_time
+        for status in ok_statuses
+        if (reset_time := reset_time_for_exhausted_auth(status)) is not None
+    ]
+    if not reset_times:
+        return None
+
+    return min(reset_times)
+
+
 def average_usage_json(statuses: list[AuthStatus]) -> dict[str, float | None]:
-    return {
+    payload = {
         "primaryUsedPercent": average_used_percent(statuses, "primary"),
         "secondaryUsedPercent": average_used_percent(statuses, "secondary"),
     }
+
+    first_reset = first_quota_reset_time(statuses)
+    if first_reset is not None:
+        payload["firstTimeToReset"] = first_reset
+
+    return payload
 
 
 def print_average_usage(statuses: list[AuthStatus], style: Style) -> None:
     primary = average_used_percent(statuses, "primary")
     secondary = average_used_percent(statuses, "secondary")
+    first_reset = first_quota_reset_time(statuses)
     print(style.bold(style.cyan("Average usage")))
     print(f"Primary: {format_average_percent(style, primary)} used")
     print(f"Secondary: {format_average_percent(style, secondary)} used")
+    if first_reset is not None:
+        print(
+            "First Time to Reset: "
+            f"{format_relative(first_reset)} ({format_timestamp(first_reset)})"
+        )
 
 
 def print_human_statuses(
@@ -1247,16 +1305,11 @@ def status_primary_used_value(status: AuthStatus) -> float | None:
     return numeric_used_percent(status.rate_limits.get("primary"))
 
 
-def has_primary_credit_remaining(status: AuthStatus) -> bool:
-    pct = numeric_used_percent(status.rate_limits.get("primary"))
-    return pct is not None and pct < 100
-
-
 def eligible_swap_statuses(statuses: list[AuthStatus]) -> list[AuthStatus]:
     return [
         status
         for status in statuses
-        if status.ok and status.source.path is not None and has_primary_credit_remaining(status)
+        if status.ok and status.source.path is not None and has_usable_quota(status)
     ]
 
 
@@ -1347,7 +1400,7 @@ def run_swap(parsed: ParsedArgs) -> SwapResult:
             active_auth_file=active_path,
             swapped=False,
             dry_run=parsed.args.dry_run,
-            reason="no auth has 5-hour credit remaining",
+            reason="no auth has usable quota remaining",
         )
 
     swapped = False
