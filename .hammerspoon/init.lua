@@ -2801,6 +2801,13 @@ bindWithRepeatV2{
     end,
     auto_trigger_p=false
 }
+hyper_bind_v2{
+    mods={"shift"},
+    key="F2",
+    pressedfn=function()
+        brishzeval('awaysh-fast brightness-set 0.45')
+    end,
+}
 
 hyper_bind_v1("F6", function()
                   brishzeval('awaysh-fast focus-do-not-disturb-toggle')
