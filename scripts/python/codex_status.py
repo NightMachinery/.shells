@@ -552,6 +552,18 @@ def format_used_percent(style: Style, used: object | None) -> str:
     return style.green(text)
 
 
+def format_average_percent(style: Style, used: object | None) -> str:
+    if used is None:
+        return style.dim("n/a")
+
+    try:
+        pct = float(used)
+    except (TypeError, ValueError):
+        return style.dim("n/a")
+
+    return format_used_percent(style, round(pct, 1))
+
+
 def numeric_used_percent(window: object) -> float | None:
     if not isinstance(window, dict):
         return None
@@ -1082,9 +1094,6 @@ def print_human_status(
 
     print(style.bold(style.cyan(title)))
 
-    if show_auth_header:
-        print(f"Alias: {style.magenta(status.source.label)}")
-
     if not status.ok:
         print(f"Status: {style.red('failed')}")
         print(f"Error: {status.error or 'unknown error'}")
@@ -1093,6 +1102,37 @@ def print_human_status(
         return
 
     print_rate_details(status.rate_limits, style, identity=status.identity)
+
+
+def average_used_percent(statuses: list[AuthStatus], window_name: str) -> float | None:
+    values: list[float] = []
+    for status in statuses:
+        if not status.ok:
+            continue
+
+        pct = numeric_used_percent(status.rate_limits.get(window_name))
+        if pct is not None:
+            values.append(pct)
+
+    if not values:
+        return None
+
+    return sum(values) / len(values)
+
+
+def average_usage_json(statuses: list[AuthStatus]) -> dict[str, float | None]:
+    return {
+        "primaryUsedPercent": average_used_percent(statuses, "primary"),
+        "secondaryUsedPercent": average_used_percent(statuses, "secondary"),
+    }
+
+
+def print_average_usage(statuses: list[AuthStatus], style: Style) -> None:
+    primary = average_used_percent(statuses, "primary")
+    secondary = average_used_percent(statuses, "secondary")
+    print(style.bold(style.cyan("Average usage")))
+    print(f"Primary: {format_average_percent(style, primary)} used")
+    print(f"Secondary: {format_average_percent(style, secondary)} used")
 
 
 def print_human_statuses(
@@ -1107,6 +1147,10 @@ def print_human_statuses(
         if index:
             print()
         print_human_status(status, style, show_auth_header=show_auth_header)
+
+    if show_auth_header and statuses:
+        print()
+        print_average_usage(statuses, style)
 
 
 def status_json(status: AuthStatus) -> dict:
@@ -1133,7 +1177,10 @@ def status_json(status: AuthStatus) -> dict:
 
 def print_json_statuses(statuses: list[AuthStatus], *, all_mode: bool) -> None:
     if all_mode:
-        output: object = {"authFiles": [status_json(status) for status in statuses]}
+        output: object = {
+            "authFiles": [status_json(status) for status in statuses],
+            "averageUsage": average_usage_json(statuses),
+        }
     else:
         output = status_json(statuses[0]) if statuses else {}
 
