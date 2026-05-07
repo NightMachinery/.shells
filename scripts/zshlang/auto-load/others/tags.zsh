@@ -52,7 +52,7 @@ aliasfn mg gray # make gray
 
 aliasfn lxg lx gray grey
 ###
-function ntag-filter-or-add() {
+function ntag-filter-or-add {
     local tag="${1:?}" ; shift
     if (( $#@ == 0 )) ; then
         ntag-filter "$tag"

@@ -141,13 +141,15 @@ function image2remote {
 
     local name="${EPOCHSECONDS}.png"
     local dest="tmp/screenshots/${name}"
+    local src="${HOME}/${dest}"
 
     (
         cdtmp @RET
-        assert pngpaste "${name}" @RET
-        icat "${name}" || true
 
-        assert reval-ecgray rsp-safe --mkpath -- "${name}" "${fullhost}:${dest}" @RET
+        assert pngpaste "${src}" @RET
+        icat "${src}" || true
+
+        assert reval-ecgray rsp-safe --mkpath -- "${src}" "${fullhost}:${dest}" @RET
     ) >&2 @RET
 
     ec "Look at \`~/${dest}\`. " |

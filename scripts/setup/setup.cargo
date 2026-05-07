@@ -1,4 +1,5 @@
 #!/usr/bin/env zsh
+##
 rustup component add rust-src
 ###
 # @workaround `CARGO_NET_GIT_FETCH_WITH_CLI=true` uses git binary to fetch

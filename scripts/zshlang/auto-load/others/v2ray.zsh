@@ -1,4 +1,11 @@
 ##
+function genrouter-restart {
+    tmux-session-restart v2ray-genrouter
+
+    sleep-neon 1
+    ci81
+}
+##
 function xray-json-to-link {
     local f="${1}"
     local name="${2:-${f:t:r}}"
