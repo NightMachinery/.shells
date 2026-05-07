@@ -1466,6 +1466,10 @@ def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
             extra_lines=extra_lines,
         )
 
+    if result.statuses:
+        print()
+        print_average_usage(result.statuses, style)
+
 
 def run() -> int:
     parsed = parse_args()
