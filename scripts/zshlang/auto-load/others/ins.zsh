@@ -149,7 +149,7 @@ ins-brew() {
     brew bundle install --file="$brewables"
 }
 
-ins-go() {
+function ins-go {
     zargs -n 1 -- $(< "$ins_go") -- goi #Don't quote the inputs, it makes zargs treat them as one monolithic input.
 }
 
