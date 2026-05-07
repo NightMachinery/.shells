@@ -63,7 +63,7 @@ function codex-m {
     ensure-array codex_security_opts
     local security_opts=( "${codex_security_opts[@]}" )
     if (( ${#security_opts[@]} == 0 )) ; then
-        security_opts=(--ask-for-approval on-failure --sandbox workspace-write)
+        # security_opts=(--ask-for-approval on-failure --sandbox workspace-write)
     fi
 
     # -c model_reasoning_effort="high"
