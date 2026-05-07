@@ -5,7 +5,7 @@
 # macOS deps:
 # https://github.com/jdberry/tag
 ##
-ntag_colors=(white red orange yellow green emerald blue purple gray black aqua teal pink dup)
+ntag_colors=(white red orange yellow green emerald blue navy purple gray black aqua teal pink magenta dup)
 #: `dup` is not a color, but this is not really about colors. It's about commonly-used tags.
 
 ntag_sep='..' #: . is likely to conflict with existing names, but it's cute.
