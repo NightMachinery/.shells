@@ -102,6 +102,9 @@ aliasfn ci14000-socks curl-ip -x 'socks5h://127.0.0.1:14000'
 ##
 alias myip-httpbin='curlm https://httpbin.org/ip'
 alias myip-amazon='curlm https://checkip.amazonaws.com'
+function myip-wtf {
+    curlm https://myip.wtf/json "$@" | command jq .
+}
 alias myip-ipinfo='curlm -H "Authorization: Bearer ${ipinfo_api_token}" https://ipinfo.io/ip'
 ##
 # opendns sometimes returns wrong results, but it is slightly faster
