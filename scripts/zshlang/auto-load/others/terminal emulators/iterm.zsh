@@ -205,6 +205,7 @@ function h_icat {
         else
             ecgray "${i:t}"
         fi
+        #: It's difficult to apply ntag-color here, because ntagcolor resets colors instead of resuming.
     fi
 
     if [[ "$i" == *.pdf ]] ; then

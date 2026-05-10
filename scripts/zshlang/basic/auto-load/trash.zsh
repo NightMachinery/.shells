@@ -7,7 +7,9 @@ function trs {
     for i in "$@"
     do
         [[ -e "$i" ]] && {
-            # ec Trying to remove "$i"
+            icat-maybe "$i"
+
+            #: ec Trying to remove "$i"
             if (( ${+commands[rip]} )) ; then
                 assert reval-ec rip -- "$i" @RET
             elif (( ${+commands[trash]} )) ; then

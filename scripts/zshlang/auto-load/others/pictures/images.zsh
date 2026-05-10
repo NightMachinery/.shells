@@ -430,3 +430,14 @@ function finder-img-gallery {
     img-gallery-open-app "Finder" "$@" @RET
 }
 ##
+function icat-maybe {
+    local fs=($@)
+
+    local f
+    for f in "${fs[@]}"; do
+        if (( ${image_formats[(Ie)${f:e:l}]} )); then
+            icat "$f"
+        fi
+    done
+}
+##

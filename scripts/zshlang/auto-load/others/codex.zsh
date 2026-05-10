@@ -140,6 +140,11 @@ function codex-status {
 alias cs='codex-status'
 ##
 function image2remote {
+    local input="${1}"
+    if test -e "${input}" ; then
+        reval-ecgray pbadd "${input}" @RET
+    fi
+
     local fullhost="${fullhost:-pinky}"
     assert-args fullhost @RET
 

@@ -29,6 +29,8 @@ function trs-rm {
     local p
     for p in $paths[@] ; do
         if test -e "$p" ; then
+            icat-maybe "$p"
+
             reval-ec command rm -rf -- "$p"
         fi
     done
