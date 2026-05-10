@@ -94,6 +94,50 @@ def format_duration(seconds: int) -> str:
         return f"{int(hours)}:{int(minutes):02d}:{int(seconds):02d}"
 
 
+def get_reaction_label(reaction: Dict) -> str:
+    """Return a readable label for Telegram Desktop and betterborg reactions."""
+    if "emoji" in reaction:
+        return reaction["emoji"]
+
+    reaction_type = reaction.get("type")
+    if reaction_type == "custom_emoji" and reaction.get("document_id"):
+        return f"custom_emoji:{reaction['document_id']}"
+
+    return reaction_type or "reaction"
+
+
+def get_reaction_sender(recent: Dict) -> str:
+    """Return the best available reactor identity for private and group exports."""
+    return (
+        recent.get("from")
+        or recent.get("from_id")
+        or recent.get("peer_id")
+        or "Unknown"
+    )
+
+
+def format_reactions(message: Dict) -> List[str]:
+    """Format reactions, including multiple reaction types and multiple senders."""
+    lines = []
+    for reaction in message.get("reactions", []) or []:
+        reaction_label = get_reaction_label(reaction)
+        recent_reactions = reaction.get("recent") or []
+
+        if recent_reactions:
+            for recent in recent_reactions:
+                recent_label = get_reaction_label(recent)
+                if recent_label == "reaction":
+                    recent_label = reaction_label
+                reactor_name = get_reaction_sender(recent)
+                lines.append(f"{reactor_name}'s Reaction: {recent_label}")
+        elif reaction.get("count"):
+            lines.append(f"Reaction: {reaction_label} x{reaction['count']}")
+        else:
+            lines.append(f"Reaction: {reaction_label}")
+
+    return lines
+
+
 def get_media_description(message: Dict, media_mode: MediaMode) -> str:
     """Generate a text description of the media in the message."""
     if media_mode == MediaMode.NONE:
@@ -273,12 +317,7 @@ def format_chat(
         formatted_messages.append(formatted_line)
 
         # Check for reactions
-        if 'reactions' in message:
-            for reaction in message['reactions']:
-                emoji = reaction['emoji']
-                for recent in reaction['recent']:
-                    reactor_name = recent['from']
-                    formatted_messages.append(f"{reactor_name}'s Reaction: {emoji}")
+        formatted_messages.extend(format_reactions(message))
 
         # Add a blank line after each message for readability
         formatted_messages.append('')
