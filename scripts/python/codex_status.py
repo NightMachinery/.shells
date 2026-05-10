@@ -12,7 +12,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import termios
 import time
+import tty
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +22,81 @@ from pathlib import Path
 
 AUTH_CLAIM = "https://api.openai.com/auth"
 AUTH_FILE_RE = re.compile(r"^auth(?:\.|_|-)?(?P<alias>.+)\.json$")
+RGB = tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class ColorTheme:
+    heading: RGB
+    identity: RGB
+    ok: RGB
+    warn: RGB
+    error: RGB
+    dim: RGB
+    reset_time: RGB
+
+
+DARK_THEMES: dict[str, ColorTheme] = {
+    "neon": ColorTheme(
+        heading=(80, 220, 255),
+        identity=(255, 110, 210),
+        ok=(80, 220, 135),
+        warn=(245, 195, 80),
+        error=(255, 95, 95),
+        dim=(135, 145, 160),
+        reset_time=(125, 185, 255),
+    ),
+    "ember": ColorTheme(
+        heading=(255, 175, 95),
+        identity=(230, 130, 255),
+        ok=(110, 220, 140),
+        warn=(245, 210, 95),
+        error=(255, 105, 115),
+        dim=(145, 135, 125),
+        reset_time=(255, 145, 95),
+    ),
+    "ocean": ColorTheme(
+        heading=(95, 200, 230),
+        identity=(145, 165, 255),
+        ok=(85, 210, 175),
+        warn=(235, 200, 90),
+        error=(255, 100, 120),
+        dim=(130, 150, 165),
+        reset_time=(80, 185, 255),
+    ),
+}
+DARK_THEME_DEFAULT = "neon"
+
+LIGHT_THEMES: dict[str, ColorTheme] = {
+    "day": ColorTheme(
+        heading=(0, 110, 150),
+        identity=(165, 55, 145),
+        ok=(20, 130, 75),
+        warn=(165, 105, 0),
+        error=(195, 45, 55),
+        dim=(105, 110, 120),
+        reset_time=(20, 105, 190),
+    ),
+    "paper": ColorTheme(
+        heading=(20, 95, 125),
+        identity=(140, 65, 120),
+        ok=(40, 125, 80),
+        warn=(150, 105, 25),
+        error=(180, 55, 60),
+        dim=(115, 105, 95),
+        reset_time=(30, 95, 165),
+    ),
+    "mint": ColorTheme(
+        heading=(0, 120, 115),
+        identity=(150, 65, 150),
+        ok=(20, 135, 90),
+        warn=(155, 115, 15),
+        error=(185, 55, 70),
+        dim=(100, 115, 110),
+        reset_time=(0, 115, 170),
+    ),
+}
+LIGHT_THEME_DEFAULT = "day"
 
 
 class CodexStatusError(RuntimeError):
@@ -75,34 +152,67 @@ class SwapResult:
 
 
 class Style:
-    def __init__(self, enabled: bool):
+    def __init__(
+        self,
+        enabled: bool,
+        *,
+        true_color: bool = False,
+        theme: ColorTheme | None = None,
+    ):
         self.enabled = enabled
+        self.true_color = true_color
+        self.theme = theme
 
     def _wrap(self, text: str, code: str) -> str:
         if not self.enabled:
             return text
         return f"\033[{code}m{text}\033[0m"
 
+    def _rgb(self, text: str, color: RGB, fallback_code: str) -> str:
+        if not self.enabled:
+            return text
+        if self.true_color:
+            r, g, b = color
+            return self._wrap(text, f"38;2;{r};{g};{b}")
+        return self._wrap(text, fallback_code)
+
     def bold(self, text: str) -> str:
         return self._wrap(text, "1")
 
     def cyan(self, text: str) -> str:
-        return self._wrap(text, "36")
+        if self.theme is None:
+            return self._wrap(text, "36")
+        return self._rgb(text, self.theme.heading, "36")
 
     def magenta(self, text: str) -> str:
-        return self._wrap(text, "35")
+        if self.theme is None:
+            return self._wrap(text, "35")
+        return self._rgb(text, self.theme.identity, "35")
 
     def green(self, text: str) -> str:
-        return self._wrap(text, "32")
+        if self.theme is None:
+            return self._wrap(text, "32")
+        return self._rgb(text, self.theme.ok, "32")
 
     def yellow(self, text: str) -> str:
-        return self._wrap(text, "33")
+        if self.theme is None:
+            return self._wrap(text, "33")
+        return self._rgb(text, self.theme.warn, "33")
 
     def red(self, text: str) -> str:
-        return self._wrap(text, "31")
+        if self.theme is None:
+            return self._wrap(text, "31")
+        return self._rgb(text, self.theme.error, "31")
 
     def dim(self, text: str) -> str:
-        return self._wrap(text, "2")
+        if self.theme is None or not self.true_color:
+            return self._wrap(text, "2")
+        return self._rgb(text, self.theme.dim, "2")
+
+    def reset_time(self, text: str) -> str:
+        if self.theme is None:
+            return self.cyan(text)
+        return self._rgb(text, self.theme.reset_time, "36")
 
 
 def env_first(*names: str, default: str | None = None) -> str | None:
@@ -206,6 +316,30 @@ def parse_args(argv: list[str] | None = None) -> ParsedArgs:
         help="Color mode for human-readable output (default: %(default)s).",
     )
     parser.add_argument(
+        "--true-color",
+        choices=("on", "off", "auto"),
+        default="auto",
+        help="True-color mode for human-readable output (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--dark-mode",
+        choices=("on", "off", "auto"),
+        default="auto",
+        help="Theme brightness mode for human-readable output (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--dark-theme",
+        choices=tuple(DARK_THEMES),
+        default=DARK_THEME_DEFAULT,
+        help="Dark true-color theme name (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--light-theme",
+        choices=tuple(LIGHT_THEMES),
+        default=LIGHT_THEME_DEFAULT,
+        help="Light true-color theme name (default: %(default)s).",
+    )
+    parser.add_argument(
         "--codex-arg",
         action="append",
         default=[],
@@ -233,6 +367,155 @@ def color_enabled(color_mode: str) -> bool:
         return sys.stdout.isatty()
 
     raise ValueError(f"unknown color mode: {color_mode}")
+
+
+def terminal_looks_like_kitty() -> bool:
+    return (
+        os.environ.get("TERM_PROGRAM") == "kitty"
+        or bool(os.environ.get("KITTY_WINDOW_ID"))
+        or "kitty" in os.environ.get("TERM", "").lower()
+    )
+
+
+def true_color_enabled(true_color_mode: str) -> bool:
+    if true_color_mode == "on":
+        return True
+    if true_color_mode == "off":
+        return False
+    if true_color_mode != "auto":
+        raise ValueError(f"unknown true-color mode: {true_color_mode}")
+
+    if terminal_looks_like_kitty():
+        return True
+
+    colorterm = os.environ.get("COLORTERM", "").lower()
+    if "truecolor" in colorterm or "24bit" in colorterm:
+        return True
+
+    try:
+        proc = subprocess.run(
+            ["infocmp"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=0.5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+    return bool(re.search(r"\b(?:RGB|Tc)\b", proc.stdout))
+
+
+def parse_terminal_rgb_response(response: bytes) -> RGB | None:
+    text = response.decode("ascii", errors="ignore")
+    match = re.search(
+        r"(?:\]11;|\]10;)?rgb:([0-9a-fA-F]{1,4})/([0-9a-fA-F]{1,4})/([0-9a-fA-F]{1,4})",
+        text,
+    )
+    if match:
+        values: list[int] = []
+        for raw in match.groups():
+            value = int(raw, 16)
+            max_value = (16 ** len(raw)) - 1
+            values.append(round(value * 255 / max_value))
+        return values[0], values[1], values[2]
+
+    match = re.search(r"#([0-9a-fA-F]{6})", text)
+    if match:
+        raw = match.group(1)
+        return int(raw[0:2], 16), int(raw[2:4], 16), int(raw[4:6], 16)
+
+    return None
+
+
+def query_terminal_background_rgb(timeout_s: float = 0.2) -> RGB | None:
+    if not sys.stdout.isatty():
+        return None
+
+    try:
+        fd = os.open("/dev/tty", os.O_RDWR | os.O_NOCTTY)
+    except OSError:
+        return None
+
+    old_attrs = None
+    try:
+        old_attrs = termios.tcgetattr(fd)
+        tty.setcbreak(fd)
+        os.write(fd, b"\033]11;?\033\\")
+
+        deadline = time.monotonic() + timeout_s
+        chunks: list[bytes] = []
+        while time.monotonic() < deadline:
+            remaining = max(0.0, deadline - time.monotonic())
+            readable, _, _ = select.select([fd], [], [], min(0.05, remaining))
+            if not readable:
+                continue
+
+            chunk = os.read(fd, 128)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            data = b"".join(chunks)
+            if b"\a" in data or b"\033\\" in data:
+                return parse_terminal_rgb_response(data)
+    except OSError:
+        return None
+    finally:
+        if old_attrs is not None:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
+            except OSError:
+                pass
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+
+    return None
+
+
+def rgb_is_dark(rgb: RGB) -> bool:
+    r, g, b = rgb
+    luminance = (0.2126 * r) + (0.7152 * g) + (0.0722 * b)
+    return luminance < 128
+
+
+def dark_mode_enabled(dark_mode: str) -> bool:
+    if dark_mode == "on":
+        return True
+    if dark_mode == "off":
+        return False
+    if dark_mode != "auto":
+        raise ValueError(f"unknown dark mode: {dark_mode}")
+
+    background = query_terminal_background_rgb()
+    if background is not None:
+        return rgb_is_dark(background)
+
+    colorfgbg = os.environ.get("COLORFGBG", "")
+    if colorfgbg:
+        try:
+            background_code = int(colorfgbg.split(";")[-1])
+        except ValueError:
+            background_code = -1
+        if background_code >= 0:
+            return background_code in {0, 1, 2, 3, 4, 5, 6, 8}
+
+    return True
+
+
+def build_style(args: argparse.Namespace) -> Style:
+    enabled = color_enabled(args.color)
+    true_color = enabled and true_color_enabled(args.true_color)
+    theme: ColorTheme | None = None
+    if true_color:
+        if dark_mode_enabled(args.dark_mode):
+            theme = DARK_THEMES[args.dark_theme]
+        else:
+            theme = LIGHT_THEMES[args.light_theme]
+
+    return Style(enabled, true_color=true_color, theme=theme)
 
 
 def build_codex_cmd(args: argparse.Namespace, passthrough: list[str]) -> list[str]:
@@ -498,17 +781,17 @@ def format_timestamp(epoch_s: int | float | None) -> str:
     except (OverflowError, OSError, ValueError, TypeError):
         return f"{epoch_s}"
 
-    return dt.strftime("%Y-%m-%d %H:%M:%S %Z")
+    return dt.strftime("%Y-%m-%d %H:%M:%S %z")
 
 
-def format_relative(epoch_s: int | float | None) -> str:
+def relative_parts(epoch_s: int | float | None) -> tuple[str, bool] | None:
     if epoch_s is None:
-        return "n/a"
+        return None
 
     try:
         delta = int(round(float(epoch_s) - time.time()))
     except (TypeError, ValueError):
-        return "n/a"
+        return None
 
     past = delta < 0
     delta = abs(delta)
@@ -533,7 +816,26 @@ def format_relative(epoch_s: int | float | None) -> str:
         parts.append("0s")
 
     text = " ".join(parts)
+    return text, past
+
+
+def format_relative(epoch_s: int | float | None) -> str:
+    parts = relative_parts(epoch_s)
+    if parts is None:
+        return "n/a"
+
+    text, past = parts
     return f"{text} ago" if past else f"in {text}"
+
+
+def format_relative_colored(style: Style, epoch_s: int | float | None) -> str:
+    parts = relative_parts(epoch_s)
+    if parts is None:
+        return style.dim("n/a")
+
+    text, past = parts
+    colored = style.reset_time(text)
+    return f"{colored} ago" if past else f"in {colored}"
 
 
 def format_used_percent(style: Style, used: object | None) -> str:
@@ -1182,31 +1484,50 @@ def reset_time_for_exhausted_auth(status: AuthStatus) -> float | None:
     return numeric_reset_time(status.rate_limits.get("secondary"))
 
 
-def first_quota_reset_time(statuses: list[AuthStatus]) -> float | None:
+@dataclass(frozen=True)
+class ResetCandidate:
+    status: AuthStatus
+    reset_time: float
+
+
+def first_quota_reset(statuses: list[AuthStatus]) -> ResetCandidate | None:
     ok_statuses = [status for status in statuses if status.ok]
     if not ok_statuses or any(has_usable_quota(status) for status in ok_statuses):
         return None
 
-    reset_times = [
-        reset_time
+    reset_candidates = [
+        ResetCandidate(status=status, reset_time=reset_time)
         for status in ok_statuses
         if (reset_time := reset_time_for_exhausted_auth(status)) is not None
     ]
-    if not reset_times:
+    if not reset_candidates:
         return None
 
-    return min(reset_times)
+    return min(
+        reset_candidates,
+        key=lambda candidate: (
+            candidate.reset_time,
+            candidate.status.source.label,
+            candidate.status.source.display_path or "",
+        ),
+    )
 
 
-def average_usage_json(statuses: list[AuthStatus]) -> dict[str, float | None]:
+def first_quota_reset_time(statuses: list[AuthStatus]) -> float | None:
+    first_reset = first_quota_reset(statuses)
+    return first_reset.reset_time if first_reset is not None else None
+
+
+def average_usage_json(statuses: list[AuthStatus]) -> dict[str, object]:
     payload = {
         "primaryUsedPercent": average_used_percent(statuses, "primary"),
         "secondaryUsedPercent": average_used_percent(statuses, "secondary"),
     }
 
-    first_reset = first_quota_reset_time(statuses)
+    first_reset = first_quota_reset(statuses)
     if first_reset is not None:
-        payload["firstTimeToReset"] = first_reset
+        payload["firstTimeToReset"] = first_reset.reset_time
+        payload["firstTimeToResetAlias"] = first_reset.status.source.label
 
     return payload
 
@@ -1214,24 +1535,26 @@ def average_usage_json(statuses: list[AuthStatus]) -> dict[str, float | None]:
 def print_average_usage(statuses: list[AuthStatus], style: Style) -> None:
     primary = average_used_percent(statuses, "primary")
     secondary = average_used_percent(statuses, "secondary")
-    first_reset = first_quota_reset_time(statuses)
+    first_reset = first_quota_reset(statuses)
     print(style.bold(style.cyan("Average usage")))
     print(f"Primary: {format_average_percent(style, primary)} used")
     print(f"Secondary: {format_average_percent(style, secondary)} used")
     if first_reset is not None:
+        alias = format_status_alias(first_reset.status, style)
         print(
             "First Time to Reset: "
-            f"{format_relative(first_reset)} ({format_timestamp(first_reset)})"
+            f"{alias} {format_relative_colored(style, first_reset.reset_time)} "
+            f"({format_timestamp(first_reset.reset_time)})"
         )
 
 
 def print_human_statuses(
     statuses: list[AuthStatus],
     *,
-    color_mode: str,
+    args: argparse.Namespace,
     show_auth_header: bool,
 ) -> None:
-    style = Style(color_enabled(color_mode))
+    style = build_style(args)
 
     for index, status in enumerate(active_last_statuses(statuses)):
         if index:
@@ -1488,19 +1811,13 @@ def swap_heading_tags(status: AuthStatus, result: SwapResult) -> list[str]:
     return tags
 
 
-def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
-    style = Style(color_enabled(color_mode))
+def print_human_swap_result(result: SwapResult, *, args: argparse.Namespace) -> None:
+    style = build_style(args)
     previously_active = format_status_alias(
         result.previously_active,
         style,
         result.active_alias,
     )
-
-    if result.selected is None:
-        print(style.bold(style.cyan("Swap Failed")))
-        print(f"Reason: {result.reason}")
-        if result.statuses:
-            print()
 
     for index, status in enumerate(active_last_statuses(result.statuses)):
         if index:
@@ -1523,6 +1840,12 @@ def print_human_swap_result(result: SwapResult, *, color_mode: str) -> None:
         print()
         print_average_usage(result.statuses, style)
 
+    if result.selected is None:
+        if result.statuses:
+            print()
+        print(style.bold(style.cyan("Swap Failed")))
+        print(f"Reason: {result.reason}")
+
 
 def run() -> int:
     parsed = parse_args()
@@ -1532,7 +1855,7 @@ def run() -> int:
         if parsed.args.json:
             print_json_swap_result(result)
         else:
-            print_human_swap_result(result, color_mode=parsed.args.color)
+            print_human_swap_result(result, args=parsed.args)
 
         return 0 if result.selected is not None else 1
 
@@ -1552,7 +1875,7 @@ def run() -> int:
     else:
         print_human_statuses(
             statuses,
-            color_mode=parsed.args.color,
+            args=parsed.args,
             show_auth_header=parsed.args.all,
         )
 
