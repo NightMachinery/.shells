@@ -2815,10 +2815,10 @@ end
 -- end
 -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
--- appHotkey{ key='.', appName='com.microsoft.edgemac' }
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
 appHotkey{ key='.', appName='com.google.Chrome' }
-appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
+appHotkey{ key='.', mods={'shift'}, appName='com.microsoft.edgemac' }
+-- appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
 appHotkey{ key='/', mods={'shift'}, appName='com.interversehq.qView' }
 -- appHotkey{ key='.', appName='com.openai.atlas' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
@@ -2974,13 +2974,22 @@ bindWithRepeatV2{
     end,
     auto_trigger_p=false
 }
+
+hyper_bind_v2{
+    mods={"shift"},
+    key="F1",
+    pressedfn=function()
+        brishzeval('awaysh-fast brightness-off')
+    end,
+}
 hyper_bind_v2{
     mods={"shift"},
     key="F2",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-set 0.435')
+        brishzeval('awaysh-fast brightness-on')
     end,
 }
+---
 
 hyper_bind_v1("F6", function()
                   brishzeval('awaysh-fast focus-do-not-disturb-toggle')
