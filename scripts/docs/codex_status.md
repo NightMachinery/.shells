@@ -12,6 +12,15 @@ Workspace names are resolved from app-server account/rate-limit responses when p
 
 If no workspace name or alias can be resolved, the human-readable output prints `Workspace: n/a`.
 
+If Codex reports that a refresh token has already been used for a checked auth
+snapshot, `codex_status.py` looks in `~/tmp/.codex-auths` for a replacement auth
+JSON with the same stable token identity. Matching uses token data such as
+`tokens.account_id` and decoded `id_token` claims, not filenames. When a newer
+matching auth is found, the status check is retried with that auth and
+human-readable/JSON output records the recovery source. After a successful
+retry, the recovered auth overwrites the failed snapshot so future checks use
+the new refresh token.
+
 When checking all auth files, the human-readable output uses each auth file path as
 the section header, marks the snapshot matching `~/.codex/auth.json` with an
 `[Active]` tag, and omits the redundant `Alias:` field. After the per-auth
