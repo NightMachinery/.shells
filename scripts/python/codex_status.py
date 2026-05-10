@@ -22,6 +22,7 @@ from pathlib import Path
 
 AUTH_CLAIM = "https://api.openai.com/auth"
 AUTH_FILE_RE = re.compile(r"^auth(?:\.|_|-)?(?P<alias>.+)\.json$")
+AUTH_RECOVERY_DIR = Path(os.path.expanduser("~/tmp/.codex-auths"))
 RGB = tuple[int, int, int]
 
 
@@ -136,6 +137,7 @@ class AuthStatus:
     identity: dict[str, str] = field(default_factory=dict)
     error: str | None = None
     stderr: str = ""
+    recovered_from: AuthSource | None = None
 
 
 @dataclass(frozen=True)
@@ -1025,6 +1027,133 @@ def read_auth_claims_from_file(path: Path) -> dict:
     return {}
 
 
+def auth_refresh_token(data: dict | None) -> str | None:
+    if not isinstance(data, dict):
+        return None
+
+    return as_nonempty_str(
+        first_path(data, ("tokens", "refresh_token"), ("refresh_token",))
+    )
+
+
+def auth_id_token(data: dict | None) -> str | None:
+    if not isinstance(data, dict):
+        return None
+
+    return as_nonempty_str(first_path(data, ("tokens", "id_token"), ("id_token",)))
+
+
+def auth_account_id(data: dict | None) -> str | None:
+    if not isinstance(data, dict):
+        return None
+
+    return as_nonempty_str(first_path(data, ("tokens", "account_id"), ("account_id",)))
+
+
+def auth_identity_key(data: dict | None) -> tuple[str, ...]:
+    if not isinstance(data, dict):
+        return ()
+
+    id_token = auth_id_token(data)
+    claims = decode_jwt_payload(id_token) if id_token else None
+    if not isinstance(claims, dict):
+        claims = {}
+
+    auth_claim = claims.get(AUTH_CLAIM)
+    auth = auth_claim if isinstance(auth_claim, dict) else {}
+
+    parts: list[str] = []
+    for value in (
+        auth_account_id(data),
+        as_nonempty_str(first_path(claims, ("sub",))),
+        as_nonempty_str(first_path(claims, ("email",), (AUTH_CLAIM, "email"))),
+        as_nonempty_str(
+            first_path(
+                auth,
+                ("workspaceId",),
+                ("workspace_id",),
+                ("workspace", "id"),
+                ("organization", "id"),
+                ("default_organization", "id"),
+            )
+        ),
+    ):
+        if value and value not in parts:
+            parts.append(value)
+
+    return tuple(parts)
+
+
+def auth_files_in_directory(directory: Path) -> list[Path]:
+    try:
+        entries = list(directory.iterdir())
+    except OSError:
+        return []
+
+    return sorted(
+        entry
+        for entry in entries
+        if entry.is_file() and entry.name.startswith("auth") and entry.suffix == ".json"
+    )
+
+
+def auth_last_refresh_sort_key(path: Path, data: dict | None) -> tuple[str, float, str]:
+    last_refresh = ""
+    if isinstance(data, dict):
+        last_refresh = as_nonempty_str(data.get("last_refresh")) or ""
+
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+
+    return last_refresh, mtime, path.name
+
+
+def find_recovered_auth_file(stale_auth_file: Path) -> Path | None:
+    stale_data = read_json_file(stale_auth_file)
+    stale_key = auth_identity_key(stale_data)
+    stale_refresh_token = auth_refresh_token(stale_data)
+    if not stale_key:
+        return None
+
+    candidates: list[tuple[tuple[str, float, str], Path]] = []
+    for candidate in auth_files_in_directory(AUTH_RECOVERY_DIR):
+        if candidate.resolve() == stale_auth_file.resolve():
+            continue
+
+        candidate_data = read_json_file(candidate)
+        if auth_identity_key(candidate_data) != stale_key:
+            continue
+
+        candidate_refresh_token = auth_refresh_token(candidate_data)
+        if (
+            stale_refresh_token
+            and candidate_refresh_token
+            and candidate_refresh_token == stale_refresh_token
+        ):
+            continue
+
+        candidates.append((auth_last_refresh_sort_key(candidate, candidate_data), candidate))
+
+    if not candidates:
+        return None
+
+    return max(candidates, key=lambda item: item[0])[1]
+
+
+def refresh_token_already_used_error(exc: CodexStatusError) -> bool:
+    text = f"{exc}\n{exc.stderr_text}".lower()
+    return (
+        "refresh token" in text
+        and (
+            ("already" in text and "used" in text)
+            or "reuse" in text
+            or "invalid_grant" in text
+        )
+    )
+
+
 def read_local_auth_claims(codex_home: object | None) -> dict:
     for path in auth_file_candidates(codex_home):
         claims = read_auth_claims_from_file(path)
@@ -1280,6 +1409,7 @@ def build_success_status(
     session: CodexSessionResult,
     *,
     auth_file: Path | None,
+    recovered_from: AuthSource | None = None,
 ) -> AuthStatus:
     rate_limits_obj = session.rate_result.get("rateLimits", session.rate_result)
     rate_limits = rate_limits_obj if isinstance(rate_limits_obj, dict) else {}
@@ -1308,7 +1438,36 @@ def build_success_status(
         rate_limits=rate_limits,
         auth_claims=auth_claims,
         identity=identity,
+        recovered_from=recovered_from,
     )
+
+
+def gather_status_for_auth_file(
+    source: AuthSource,
+    *,
+    parsed: ParsedArgs,
+    auth_file: Path,
+    config_home: Path | None = None,
+    recovered_from: AuthSource | None = None,
+) -> AuthStatus:
+    with tempfile.TemporaryDirectory(prefix="codex-status-") as temp_dir:
+        temp_home = Path(temp_dir)
+        prepare_codex_home(
+            config_home or auth_file.parent,
+            temp_home,
+            auth_file=auth_file,
+        )
+        session = run_codex_session(
+            parsed.args,
+            parsed.passthrough,
+            env=env_for_codex_home(temp_home),
+        )
+        return build_success_status(
+            source,
+            session,
+            auth_file=auth_file,
+            recovered_from=recovered_from,
+        )
 
 
 def gather_status(source: AuthSource, *, parsed: ParsedArgs) -> AuthStatus:
@@ -1317,15 +1476,34 @@ def gather_status(source: AuthSource, *, parsed: ParsedArgs) -> AuthStatus:
             session = run_codex_session(parsed.args, parsed.passthrough)
             return build_success_status(source, session, auth_file=None)
 
-        with tempfile.TemporaryDirectory(prefix="codex-status-") as temp_dir:
-            temp_home = Path(temp_dir)
-            prepare_codex_home(source.path.parent, temp_home, auth_file=source.path)
-            session = run_codex_session(
-                parsed.args,
-                parsed.passthrough,
-                env=env_for_codex_home(temp_home),
+        try:
+            return gather_status_for_auth_file(
+                source,
+                parsed=parsed,
+                auth_file=source.path,
             )
-            return build_success_status(source, session, auth_file=source.path)
+        except CodexStatusError as exc:
+            if not refresh_token_already_used_error(exc):
+                raise
+
+            recovered_path = find_recovered_auth_file(source.path)
+            if recovered_path is None:
+                raise
+
+            recovered_source = AuthSource(
+                path=recovered_path,
+                label=alias_from_auth_path(recovered_path) or recovered_path.name,
+                display_path=home_relative(recovered_path),
+            )
+            recovered_status = gather_status_for_auth_file(
+                source,
+                parsed=parsed,
+                auth_file=recovered_path,
+                config_home=source.path.parent,
+                recovered_from=recovered_source,
+            )
+            replace_auth_file(source_path=recovered_path, target_path=source.path)
+            return recovered_status
     except CodexStatusError as exc:
         return AuthStatus(
             source=source,
@@ -1423,6 +1601,8 @@ def print_human_status(
         return
 
     print_rate_details(status.rate_limits, style, identity=status.identity)
+    if status.recovered_from is not None and status.recovered_from.display_path:
+        print(f"Recovered auth: {style.dim(status.recovered_from.display_path)}")
     for line in extra_lines or []:
         print(line)
 
@@ -1444,21 +1624,30 @@ def average_used_percent(statuses: list[AuthStatus], window_name: str) -> float 
 
 
 def status_is_active(status: AuthStatus) -> bool:
-    if status.source.path is None:
-        return False
-
     active_path = active_auth_file(None)
     if active_path is None:
         return False
 
-    return auth_bytes_equal(active_path, status.source.path)
+    return any(auth_bytes_equal(active_path, path) for path in status_auth_paths(status))
 
 
 def status_matches_auth_path(status: AuthStatus, path: Path) -> bool:
-    if status.source.path is None:
-        return False
+    return any(auth_bytes_equal(path, auth_path) for auth_path in status_auth_paths(status))
 
-    return auth_bytes_equal(path, status.source.path)
+
+def status_auth_paths(status: AuthStatus) -> list[Path]:
+    paths: list[Path] = []
+    if status.source.path is not None:
+        paths.append(status.source.path)
+    if status.recovered_from is not None and status.recovered_from.path is not None:
+        paths.append(status.recovered_from.path)
+    return paths
+
+
+def status_effective_auth_path(status: AuthStatus) -> Path | None:
+    if status.recovered_from is not None and status.recovered_from.path is not None:
+        return status.recovered_from.path
+    return status.source.path
 
 
 def active_last_statuses(statuses: list[AuthStatus]) -> list[AuthStatus]:
@@ -1584,6 +1773,11 @@ def status_json(status: AuthStatus) -> dict:
     payload["alias"] = status.source.label
     if status.source.display_path:
         payload["authFile"] = status.source.display_path
+    if status.recovered_from is not None:
+        payload["recoveredFrom"] = {
+            "alias": status.recovered_from.label,
+            "authFile": status.recovered_from.display_path,
+        }
 
     return payload
 
@@ -1661,11 +1855,16 @@ def find_status_matching_auth_path(statuses: list[AuthStatus], path: Path) -> Au
 
 
 def replace_active_auth(selected: AuthStatus, active_path: Path) -> bool:
-    if selected.source.path is None:
+    selected_auth_path = status_effective_auth_path(selected)
+    if selected_auth_path is None:
         raise CodexStatusError("codex-status: selected auth has no source path")
 
-    active_path.parent.mkdir(parents=True, exist_ok=True)
-    if active_path.exists() and auth_bytes_equal(active_path, selected.source.path):
+    return replace_auth_file(source_path=selected_auth_path, target_path=active_path)
+
+
+def replace_auth_file(*, source_path: Path, target_path: Path) -> bool:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if target_path.exists() and auth_bytes_equal(target_path, source_path):
         return False
 
     tmp_path: Path | None = None
@@ -1673,13 +1872,13 @@ def replace_active_auth(selected: AuthStatus, active_path: Path) -> bool:
         with tempfile.NamedTemporaryFile(
             prefix=".auth.",
             suffix=".json",
-            dir=str(active_path.parent),
+            dir=str(target_path.parent),
             delete=False,
         ) as tmp:
             tmp_path = Path(tmp.name)
 
-        shutil.copy2(selected.source.path, tmp_path)
-        os.replace(tmp_path, active_path)
+        shutil.copy2(source_path, tmp_path)
+        os.replace(tmp_path, target_path)
         tmp_path = None
         return True
     finally:
@@ -1765,6 +1964,9 @@ def swap_result_json(result: SwapResult) -> dict:
         payload["selected"] = {
             "alias": selected.source.label,
             "authFile": selected.source.display_path,
+            "effectiveAuthFile": home_relative(status_effective_auth_path(selected))
+            if status_effective_auth_path(selected) is not None
+            else None,
             "identity": selected.identity,
             "rateLimits": selected.rate_limits,
             "weeklyUsedPercent": status_weekly_used_value(selected),
