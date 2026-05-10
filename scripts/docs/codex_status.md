@@ -21,7 +21,22 @@ human-readable status lists. JSON `--all` output includes the same aggregate
 under `averageUsage`. When no checked auth has usable quota available, the
 aggregate also includes `First Time to Reset`: the earliest 5-hour reset for
 auths with weekly credit remaining, or the earliest weekly reset for auths
-without weekly credit remaining.
+without weekly credit remaining. Human-readable output shows the auth alias
+that will reset first, for example:
+
+`First Time to Reset: some_alias in 2h 20m (2026-05-07 19:41:54 +0330)`
+
+## Color
+
+Human-readable output supports `--color {auto,always,never}`. When color is
+enabled, `--true-color {on,off,auto}` controls RGB color output; `auto` detects
+Kitty first, then `COLORTERM=truecolor|24bit`, then terminfo `RGB`/`Tc`.
+
+True-color output has named themes. Use `--dark-mode {on,off,auto}` to select
+dark or light theme mode; `auto` queries the terminal background color with OSC
+11 when possible and falls back to environment heuristics. Dark themes are
+`neon`, `ember`, and `ocean`; light themes are `day`, `paper`, and `mint`.
+Select them with `--dark-theme NAME` and `--light-theme NAME`.
 
 ## Swap
 
@@ -44,4 +59,5 @@ output. The current active auth is tagged `[Active]`, the auth that was active
 before swap selection is tagged `[Previously Active]`, and the selected block
 adds `Previously active: <alias>` with the alias styled like the `Workspace:`
 value. It also prints the same `Average usage` block as status output. If no
-auth can be selected, the failure summary uses the heading `Swap Failed`.
+auth can be selected, the failure summary uses the heading `Swap Failed` after
+the checked auth blocks and average usage.

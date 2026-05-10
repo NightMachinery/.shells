@@ -14,3 +14,7 @@ There are some non-FOSS resources in this repo that I have included only for my 
 * Hammerspoon
 
 Hammerspoon shortcut notes are tracked in =./docs/hammerspoon.md=.
+
+* Codex
+
+=codex_status.py= notes are tracked in =./docs/codex_status.md=.
