@@ -44,13 +44,13 @@ def main():
     args = parser.parse_args()
 
     # 1. Check for credentials in environment variables
-    username = os.environ.get("NET2_USERNAME")
-    password = os.environ.get("NET2_PASSWORD")
+    username = os.environ.get("sharif_vpn_username")
+    password = os.environ.get("sharif_vpn_passowrd")
 
     # 2. If not found in env, prompt the user
     if not username or not password:
         print("---")
-        print("Note: NET2_USERNAME or NET2_PASSWORD environment variables not found.")
+        print("Note: sharif_vpn_username or sharif_vpn_passowrd environment variables not found.")
         print("Falling back to manual input.")
         print("---")
         username = input("User: ")
@@ -58,7 +58,7 @@ def main():
         password = getpass.getpass("Password: ")
     else:
         print("---")
-        print("Using credentials from NET2_USERNAME and NET2_PASSWORD environment variables.")
+        print("Using credentials from sharif_vpn_username and sharif_vpn_passowrd environment variables.")
         print("---")
 
 
