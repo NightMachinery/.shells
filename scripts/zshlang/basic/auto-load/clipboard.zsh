@@ -307,7 +307,15 @@ function pbadd-applescript() {
 function pbadd {
     #: [agfi:pbcopy-img}
     ##
-    copy_files.swift "${(f@)$(re 'grealpath --' $@)}"
+    @darwinOnly
+
+    assert copy_files.swift "${(f@)$(re 'grealpath --' $@)}" @RET
+
+    ##
+    if bool "${pbadd_image_preview_p:-y}" ; then
+        icat-maybe "$@"
+    fi
+    ##
 }
 alias pa=pbadd
 
@@ -398,10 +406,26 @@ function pngpaste {
         silent trs-rm "$f" @TRET
     fi
 
-    revaldbg osascript -e "tell application \"System Events\" to ¬
+    ##
+    local paste
+    paste="$(pbpaste)" @TRET
+
+    dvar paste
+    if test -e "${paste}" ; then
+        #: File path in clipboard
+        if [[ "${paste:e}" != png ]] ; then
+            reval-ecgray magick convert -background transparent "${paste}" "$f" @TRET
+        else
+            reval-ecgray cp "${paste}" "$f"
+        fi
+    else
+        revaldbg osascript -e "tell application \"System Events\" to ¬
                   write (the clipboard as ${class}) to ¬
                           (make new file at folder \"${dir}\" with properties ¬
                                   {name:\"${name}\"})" @TRET
+    fi
+    ##
+
     if test -n "$stdout" ; then
         cat "$f" @TRET
         silent trs-rm "$f" @STRUE

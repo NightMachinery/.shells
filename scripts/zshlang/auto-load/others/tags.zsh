@@ -5,7 +5,7 @@
 # macOS deps:
 # https://github.com/jdberry/tag
 ##
-ntag_colors=(white red orange yellow green emerald blue navy purple gray black aqua teal pink magenta dup)
+ntag_colors=(white red orange lightsalmon yellow green emerald blue lightsteelblue navy purple gray black aqua teal pink magenta peru dup)
 #: `dup` is not a color, but this is not really about colors. It's about commonly-used tags.
 
 ntag_sep='..' #: . is likely to conflict with existing names, but it's cute.
@@ -34,6 +34,10 @@ function h_aliastag {
 }
 re h_aliastag $ntag_colors[@] @todo @todo{0..9} # You can use `fd ..@todo` to prefix-search.
 unfunction black #: conflicts with the python formatter
+
+function colored {
+    ntag-filteror "${ntag_colors[@]}"
+}
 ##
 # aliasfnq gray ntag-filter "gray | 'grey"
 function gray() {
@@ -253,8 +257,8 @@ function ntag-add {
 
     ##
     #: preview images when adding a tag to them
-    if bool "${ntag_add_image_preview_p}" && (( ${image_formats[(Ie)${f:e:l}]} )); then
-            icat "$f"
+    if bool "${ntag_add_image_preview_p}" ; then
+        icat-maybe "$f"
     fi
     ##
 
@@ -440,11 +444,13 @@ function ntag-fromapple-force() {
 #### fuzzy
 ###
 ## Non-coloring, potentially fuzzy (Using `tgs`, `tgsor` instead is recommended.)
-function ntag-search() {
+function ntag-search {
     local orMode="${ntag_search_or}"
     local query_sep=''
     test -n "$orMode" && query_sep=' | '
-    local query="$(mg_sep=' ' mapg "\'\${ntag_sep}\$i\${ntag_sep}\${query_sep}" "$@")"
+    local query="$(mg_sep=' ' mapg "\${ntag_sep}\$i\${ntag_sep}\${query_sep}" "$@")"
+
+    local fz_opts=( $fz_opts[@] --exact)
 
     ##
     # local nightNotes="${ntag_search_dir:-.}"
