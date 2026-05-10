@@ -179,3 +179,18 @@ android.lilf.ir:8443, api.android.lilf.ir:8443, hook.android.lilf.ir:8443 {
 #     }
 # }
 ##
+
+cdn.lilf.ir {
+    @xhttp path /lilf-cdn*
+    handle @xhttp {
+        reverse_proxy 127.0.0.1:1443 {
+            transport http {
+                versions h2c
+            }
+        }
+    }
+
+    handle {
+        respond "Not found" 404
+    }
+}
