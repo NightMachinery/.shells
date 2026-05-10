@@ -2,6 +2,24 @@
 aliasfn displaysleep-darwin pmset displaysleepnow
 aliasfn displaysleep displaysleep-darwin
 ##
+function brightness-off {
+    caffeinate-on
+    brightness-set 0
+}
+
+function brightness-on {
+    # caffeinate-off
+    brightness-set 0.435
+}
+
+function caffeinate-on {
+    reval-ecgray tmuxnewsh2 caffeinate reval-ec caffeinate -d
+}
+
+function caffeinate-off {
+    reval-ecgray tmux kill-session -t caffeinate
+}
+##
 function display-off-brightness {
 	local dur="${1:-1}"
 
