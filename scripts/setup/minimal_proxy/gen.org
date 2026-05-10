@@ -53,6 +53,30 @@ fullhost=$host
 <<rsp_1>>
 #+end_src
 
+** rsync from a setup server to another with net blackout
+#+begin_src zsh :eval never
+fullhost=m201
+
+rsp-safe ~/.local/share/zinit "${fullhost}:.local/share/"
+
+rsp-safe ~/.local/bin/ "${fullhost}:.local/bin/"
+
+rsp-safe "$(realpath "${commands[gost]}")" "${fullhost}:bin/"
+rsp-safe ~/bin/ "${fullhost}:bin/"
+
+#+end_src
+
+#+begin_src zsh :eval never
+rsp-safe ~/.base/{cf-proxy,startup.zsh} "${fullhost}:.base/"
+#+end_src
+
+From laptop:
+#+begin_src zsh :eval never
+rsp-safe ~/base/Software/Linux/gost "${fullhost}:bin/"
+
+rsp-safe $NIGHTDIR/python/Sharif/sharif_net_login.zsh "${fullhost}:.base/"
+#+end_src
+
 ** On the destination server:
 *** @root
 **** Sync datetime if needed.
