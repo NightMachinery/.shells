@@ -226,6 +226,7 @@ function tableShallowCopy(orig)
 
     return copy
 end
+dofile(nightdir .. "/hammerspoon/modal-mode.lua")
 ---- * Hyper Modifier Key
 hyper = {"cmd","ctrl","alt","shift"}
 
@@ -289,6 +290,7 @@ hyper_alert_canvas_p = true
 
 function hyperModeIndicatorCreate(hyperStyle)
     local strokeWidth = hyperStyle.strokeWidth / 1.5
+    local text = hyperStyle.text or ""
 
     local hyperModeIndicator = hs.canvas.new{x=0, y=0, w=0, h=0}:insertElement{
         id = 'background',
@@ -302,18 +304,17 @@ function hyperModeIndicatorCreate(hyperStyle)
 }:insertElement{
         id = 'textBox',
         type = 'text',
-        text = hyperStyle.text,
+        text = text,
         textAlignment = 'center',
         textColor = hyperStyle.textColor,
         textSize = hyperStyle.textSize,
 }
-    local hyperTextBoxSize = hyperModeIndicator:minimumTextSize(2, hyperStyle.text)
+    local hyperTextBoxSize = hyperModeIndicator:minimumTextSize(2, text)
     local screenFrame = hs.screen.primaryScreen():fullFrame()
     local hyperFrame = {}
     hyperFrame.w = hyperTextBoxSize.w + hyperStyle.strokeWidth*2 + hyperStyle.textSize -- default alert padding is 1/2 of font size, but we need it on both sides
     hyperFrame.h = hyperTextBoxSize.h + hyperStyle.strokeWidth*2 + hyperStyle.textSize -- ditto
-    hyperFrame.x = (screenFrame.w - hyperFrame.w)/2
-    hyperFrame.y = screenFrame.y -- top edge
+    ModalMode.positionedFrame(screenFrame, hyperFrame, hyperStyle.overlayPosition or "center-top", hyperStyle.overlayMargin)
     -- hyperFrame.y = hyperFrame.y + 35 -- to be below the notch
 
     -- Hammerspoon can automatically center the text horizontally, but not vertically, so:
@@ -361,47 +362,8 @@ function redisDeactivateMode(mode)
     end
 end
 
-hyper_modality = hs.hotkey.modal.new()
-hyper_modality.exit_on_release_p = false
-hyper_modality.down_p = false
-hyper_modality.entered_p = false
-
-function hyper_enter()
-    hyper_modality:enter()
-end
-
-function hyper_exit()
-    hyper_modality:exit()
-end
-
-function hyper_toggle()
-    -- hs.alert("toggle")
-
-    if hyper_modality.entered_p then
-        hyper_exit()
-    else
-        hyper_enter()
-    end
-end
-
-function hyper_down()
-    -- hs.alert("hyper down")
-
-    hyper_modality.down_p = true
-
-    hyper_toggle()
-end
-
-function hyper_up()
-    -- hs.alert("hyper up")
-
-    hyper_modality.down_p = false
-
-    if hyper_modality.exit_on_release_p then
-        hyper_exit()
-    end
-    -- hyper_modality.exit_on_release_p = false
-end
+hyper_mode = ModalMode.create{name="hyper"}
+ModalMode.installGlobals(hyper_mode, "hyper")
 
 if false then
     -- For debugging:
@@ -533,109 +495,15 @@ function hyper_modality:exited()
 end
 
 function hyper_triggered()
-    hyper_modality.exit_on_release_p = true
-    if not hyper_modality.down_p then
-        -- This is to handle the race conditions.
-        -- The key release handler might be run before we have set =exit_on_release_p=.
-        hyper_exit()
-    end
+    hyper_mode.triggered()
 end
 
 function hyper_bind_v1(key, pressedfn)
-    function h_pressedfn()
-        hyper_triggered()
-
-        pressedfn()
-    end
-
-    return hyper_modality:bind({}, key, h_pressedfn, nil, nil)
+    return hyper_mode.bindV1(key, pressedfn)
 end
 
 function hyper_bind_v2(o)
-    local hotkey_holder = { my_hotkey = nil }
-
-    if o.auto_trigger_p == nil then
-        o.auto_trigger_p = true
-    end
-
-    if o.auto_trigger_p then
-        if o.pressedfn == nil then
-            h_pressedfn = nil
-        else
-            function h_pressedfn()
-                hyper_triggered()
-
-                o.pressedfn()
-            end
-        end
-
-        if o.releasedfn == nil then
-            h_releasedfn = nil
-        else
-            function h_releasedfn()
-                hyper_triggered()
-
-                o.releasedfn()
-            end
-        end
-
-        if o.repeatfn == nil then
-            h_repeatfn = nil
-        else
-            function h_repeatfn()
-                -- hs.alert("repeating: " .. o.key)
-                -- hs.alert("repeating: " .. o.key .. "down: " .. tostring(hyper_modality.down_p) .. "hotkey: " .. tostring(hotkey_holder.my_hotkey))
-
-                if hyper_modality.down_p == false then
-                    -- @upstreamBug @raceCondition [[id:c27a51c9-d4ea-4714-8c15-72840c1fb933][=repeatfn= is buggy]]
-
-                    -- hyper_exit()
-
-                    if true then
-                        hyper_enter()
-                        hyper_exit()
-                        return
-                    elseif false then
-                        error("workaround for infinitely repeating hotkeys (id: NIGHT_817124)")
-                        -- No need for the buggy code down, we can just throw an explicit error ourselves.
-
-                        -- return
-                        -- Somehow the return statment above causes a syntax error!
-                    else
-                        if not (hotkey_holder.my_hotkey == nil) then
-                            -- hs.alert("disabling")
-
-                            -- Disable the hotkey
-                            hotkey_holder.my_hotkey:disable()
-                            -- This throws an exception which successfully stops the repeat loop.
-                            -- `callback: /Users/evar/.hammerspoon/init.lua:209: attempt to call a nil value (method 'disable')`
-
-                            hotkey_holder.my_hotkey:enable()
-                            -- We should re-enable the hotkey so that it can be triggered again. Since an exception happens, everything magically works out even without this line.
-
-                            hs.alert("disabled")
-                        end
-
-                        hs.alert("Repeat Bug Encountered (id: NIGHT_817123)")
-                        return 0
-                    end
-                end
-
-                hyper_triggered()
-
-                o.repeatfn()
-            end
-        end
-    else
-        h_pressedfn = o.pressedfn
-        h_releasedfn = o.releasedfn
-        h_repeatfn = o.repeatfn
-    end
-
-    hotkey_holder.my_hotkey = hyper_modality:bind(o.mods or {}, o.key, h_pressedfn, h_releasedfn, h_repeatfn)
-    -- hs.hotkey.bind(mods, key, [message,] pressedfn, releasedfn, repeatfn)
-
-    return hotkey_holder.my_hotkey
+    return hyper_mode.bindV2(o)
 end
 
 --- ** Hyper Hotkeys (Main Section)
@@ -713,47 +581,8 @@ for _, key in ipairs({"left", "right"}) do
 end
 --- * Purple Mode
 -- A global variable for the Purple Mode
-purple_modality = hs.hotkey.modal.new()
-purple_modality.exit_on_release_p = false
-purple_modality.down_p = false
-purple_modality.entered_p = false
-
-function purple_enter()
-    purple_modality:enter()
-end
-
-function purple_exit()
-    purple_modality:exit()
-end
-
-function purple_toggle()
-    -- hs.alert("toggle")
-
-    if purple_modality.entered_p then
-        purple_exit()
-    else
-        purple_enter()
-    end
-end
-
-function purple_down()
-    -- hs.alert("purple down")
-
-    purple_modality.down_p = true
-
-    purple_toggle()
-end
-
-function purple_up()
-    -- hs.alert("purple up")
-
-    purple_modality.down_p = false
-
-    if purple_modality.exit_on_release_p then
-        purple_exit()
-    end
-    -- purple_modality.exit_on_release_p = false
-end
+purple_mode = ModalMode.create{name="purple"}
+ModalMode.installGlobals(purple_mode, "purple")
 
 local purpleAlerts
 
@@ -807,112 +636,17 @@ function purple_modality:exited()
 end
 
 function purple_triggered()
-    purple_modality.exit_on_release_p = true
-    if not purple_modality.down_p then
-        -- This is to handle the race conditions.
-        -- The key release handler might be run before we have set =exit_on_release_p=.
-        purple_exit()
-    end
+    purple_mode.triggered()
 end
 
 function purple_bind_v1(key, pressedfn)
-    function h_pressedfn()
-        purple_triggered()
-
-        pressedfn()
-    end
-
-    return purple_modality:bind({}, key, h_pressedfn, nil, nil)
+    return purple_mode.bindV1(key, pressedfn)
 end
 
 function purple_bind_v2(o)
-    local hotkey_holder = { my_hotkey = nil }
-
-    if o.auto_trigger_p == nil then
-        o.auto_trigger_p = true
-    end
-
-    if o.auto_trigger_p then
-        if o.pressedfn == nil then
-            h_pressedfn = nil
-        else
-            function h_pressedfn()
-                purple_triggered()
-
-                o.pressedfn()
-            end
-        end
-
-        if o.releasedfn == nil then
-            h_releasedfn = nil
-        else
-            function h_releasedfn()
-                purple_triggered()
-
-                o.releasedfn()
-            end
-        end
-
-        if o.repeatfn == nil then
-            h_repeatfn = nil
-        else
-            function h_repeatfn()
-                -- hs.alert("repeating: " .. o.key)
-                -- hs.alert("repeating: " .. o.key .. "down: " .. tostring(purple_modality.down_p) .. "hotkey: " .. tostring(hotkey_holder.my_hotkey))
-
-                if purple_modality.down_p == false then
-                    -- @upstreamBug @raceCondition [[id:c27a51c9-d4ea-4714-8c15-72840c1fb933][=repeatfn= is buggy]]
-
-                    -- purple_exit()
-
-                    if true then
-                        purple_enter()
-                        purple_exit()
-                        return
-                    elseif false then
-                        error("workaround for infinitely repeating hotkeys (id: NIGHT_817124)")
-                        -- No need for the buggy code down, we can just throw an explicit error ourselves.
-
-                        -- return
-                        -- Somehow the return statment above causes a syntax error!
-                    else
-                        if not (hotkey_holder.my_hotkey == nil) then
-                            -- hs.alert("disabling")
-
-                            -- Disable the hotkey
-                            hotkey_holder.my_hotkey:disable()
-                            -- This throws an exception which successfully stops the repeat loop.
-                            -- `callback: /Users/evar/.hammerspoon/init.lua:209: attempt to call a nil value (method 'disable')`
-
-                            hotkey_holder.my_hotkey:enable()
-                            -- We should re-enable the hotkey so that it can be triggered again. Since an exception happens, everything magically works out even without this line.
-
-                            hs.alert("disabled")
-                        end
-
-                        hs.alert("Repeat Bug Encountered (id: NIGHT_817123)")
-                        return 0
-                    end
-                end
-
-                purple_triggered()
-
-                o.repeatfn()
-            end
-        end
-    else
-        h_pressedfn = o.pressedfn
-        h_releasedfn = o.releasedfn
-        h_repeatfn = o.repeatfn
-    end
-
-    hotkey_holder.my_hotkey = purple_modality:bind(o.mods or {}, o.key, h_pressedfn, h_releasedfn, h_repeatfn)
-    -- hs.hotkey.bind(mods, key, [message,] pressedfn, releasedfn, repeatfn)
-
-    return hotkey_holder.my_hotkey
+    return purple_mode.bindV2(o)
 end
 
--- Everything above is just copied from the hyper modality code with a simple s/hyper/purple/gc.
 --- ** Purple Hotkeys
 purple_toggler_1 = hyper_bind_v2{mods={"cmd"}, key="p", pressedfn=purple_down, releasedfn=purple_up}
 purple_bind_v2{ mods={"shift"}, auto_trigger_p=false, key="escape", pressedfn=purple_exit }
@@ -3582,6 +3316,26 @@ function reloadConfig(files)
 end
 hyper_bind_v2{mods={"cmd"}, key="r", pressedfn=hs.reload}
 myWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", reloadConfig):start()
+scriptsHammerspoonWatcher = hs.pathwatcher.new(nightdir .. "/hammerspoon/", reloadConfig):start()
+---
+function loadHammerspoonAutoLoad()
+    local dir = nightdir .. "/hammerspoon/auto-load"
+    local files = {}
+
+    for file in hs.fs.dir(dir) do
+        if file:match("%.lua$") then
+            table.insert(files, file)
+        end
+    end
+
+    table.sort(files)
+
+    for _, file in ipairs(files) do
+        dofile(dir .. "/" .. file)
+    end
+end
+
+loadHammerspoonAutoLoad()
 ---
 printLocation()
 -- We need to call this here so that Hammerspoon appears in the System location permissions. The first call to it also sometimes doesn't work, and this solves that, too.
