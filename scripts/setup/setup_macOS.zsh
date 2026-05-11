@@ -1,6 +1,8 @@
 #!/usr/bin/env zsh
 
 if isDarwin ; then
+    lnrp "$NIGHTDIR/hammerspoon/boot.lua" ~/.hammerspoon/init.lua
+
     objc-compile "$NIGHTDIR/objective-c/input_lang_get_objc.m"
 
     brew install util-linux
