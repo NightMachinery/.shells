@@ -261,7 +261,7 @@ def format_chat(
         date_str = timestamp_formatter(int(message['date_unixtime']))
 
         # Get the sender's name and message text
-        sender = message['from']
+        sender = message.get('from', 'NA')
         raw_text = message.get('text', '')
         text = convert_to_plain_text(raw_text)
 
@@ -274,7 +274,7 @@ def format_chat(
             replied_message = message_map.get(reply_id)
 
             if replied_message:
-                replied_sender = replied_message['from']
+                replied_sender = replied_message.get('from', 'NA')
                 replied_raw_text = replied_message.get('text', '')
                 replied_text = convert_to_plain_text(replied_raw_text)
                 replied_date_str = timestamp_formatter(int(replied_message['date_unixtime']))
