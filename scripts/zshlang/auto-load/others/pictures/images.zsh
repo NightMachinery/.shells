@@ -422,10 +422,6 @@ function img-gallery-open-app {
     # ec "${links_dir}"
 }
 ##
-function qview {
-    img-gallery-open-app "qView" "$@" @RET
-}
-##
 function finder-img-gallery {
     img-gallery-open-app "Finder" "$@" @RET
 }
