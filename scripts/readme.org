@@ -15,6 +15,9 @@ There are some non-FOSS resources in this repo that I have included only for my 
 
 Hammerspoon shortcut notes are tracked in =./docs/hammerspoon.md=.
 
+=~/.hammerspoon/init.lua= points at =./hammerspoon/boot.lua=. Lua files in
+=./hammerspoon/auto-load/= are loaded alphabetically.
+
 * Codex
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.
