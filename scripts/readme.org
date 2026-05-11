@@ -13,7 +13,7 @@ There are some non-FOSS resources in this repo that I have included only for my 
 
 * Hammerspoon
 
-Hammerspoon shortcut notes are tracked in =./docs/hammerspoon.md=.
+Hammerspoon shortcut notes are tracked in =./hammerspoon/docs/hammerspoon.md=.
 
 =~/.hammerspoon/init.lua= points at =./hammerspoon/boot.lua=. Lua files in
 =./hammerspoon/auto-load/= are loaded alphabetically.
