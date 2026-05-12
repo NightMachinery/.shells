@@ -103,7 +103,7 @@ function codex-clean-text {
 }
 ##
 function codex-status {
-    local codex_status_timeout_s="${codex_status_timeout_s:-40}"
+    local codex_status_timeout_s="${codex_status_timeout_s:-60}"
     local codex_status_profile="${codex_status_profile:-}"
     local codex_status_cd="${codex_status_cd:-$HOME/tmp}"
     local codex_status_strip_ansi_p="${codex_status_strip_ansi_p:-n}"
