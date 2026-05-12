@@ -1,4 +1,50 @@
 ModalMode = ModalMode or {}
+ModalMode.appFocusModes = ModalMode.appFocusModes or {}
+ModalMode.nonAppModeDepth = ModalMode.nonAppModeDepth or 0
+
+function ModalMode.appFocusSuspended()
+    return ModalMode.nonAppModeDepth > 0
+end
+
+function ModalMode.registerAppFocusMode(mode)
+    table.insert(ModalMode.appFocusModes, mode)
+end
+
+function ModalMode.suspendAppFocusModes()
+    for _, mode in ipairs(ModalMode.appFocusModes) do
+        if mode.modality.entered_p then
+            mode.app_focus_suspended_p = true
+            mode.exit()
+        end
+    end
+end
+
+function ModalMode.resumeAppFocusModes()
+    for _, mode in ipairs(ModalMode.appFocusModes) do
+        mode.app_focus_suspended_p = false
+        if mode.syncWithFrontmost then
+            mode.syncWithFrontmost()
+        end
+    end
+end
+
+function ModalMode.nonAppModeWillEnter()
+    ModalMode.nonAppModeDepth = ModalMode.nonAppModeDepth + 1
+
+    if ModalMode.nonAppModeDepth == 1 then
+        ModalMode.suspendAppFocusModes()
+    end
+end
+
+function ModalMode.nonAppModeDidExit()
+    if ModalMode.nonAppModeDepth > 0 then
+        ModalMode.nonAppModeDepth = ModalMode.nonAppModeDepth - 1
+    end
+
+    if ModalMode.nonAppModeDepth == 0 then
+        ModalMode.resumeAppFocusModes()
+    end
+end
 
 function ModalMode.positionedFrame(screenFrame, frame, position, margin)
     position = position or "center-top"
@@ -108,18 +154,35 @@ function ModalMode.create(o)
         name = o.name,
         modality = o.modality or hs.hotkey.modal.new(),
         auto_trigger_p = o.auto_trigger_p,
+        app_focus_p = o.app_focus_p,
     }
+    mode.suspends_app_focus_p = o.suspends_app_focus_p
+    if mode.suspends_app_focus_p == nil then
+        mode.suspends_app_focus_p = not mode.app_focus_p
+    end
 
     mode.modality.exit_on_release_p = false
     mode.modality.down_p = false
     mode.modality.entered_p = false
+    mode.active_p = false
 
     function mode.enter()
+        if mode.suspends_app_focus_p and not mode.active_p then
+            mode.active_p = true
+            ModalMode.nonAppModeWillEnter()
+        end
+
         mode.modality:enter()
     end
 
     function mode.exit()
+        local wasActive = mode.active_p
         mode.modality:exit()
+
+        if mode.suspends_app_focus_p and wasActive then
+            mode.active_p = false
+            ModalMode.nonAppModeDidExit()
+        end
     end
 
     function mode.toggle()
@@ -241,6 +304,7 @@ function ModalMode.createAppFocusMode(o)
     local mode = ModalMode.create{
         name = o.name,
         auto_trigger_p = o.auto_trigger_p,
+        app_focus_p = true,
     }
 
     local indicator
@@ -266,6 +330,14 @@ function ModalMode.createAppFocusMode(o)
     end
 
     local function syncWithFrontmost(app)
+        if ModalMode.appFocusSuspended() then
+            if mode.modality.entered_p then
+                mode.app_focus_suspended_p = true
+                mode.exit()
+            end
+            return
+        end
+
         app = app or hs.application.frontmostApplication()
 
         if ModalMode.appMatches(app, o) then
@@ -276,6 +348,7 @@ function ModalMode.createAppFocusMode(o)
             mode.exit()
         end
     end
+    mode.syncWithFrontmost = syncWithFrontmost
 
     mode.watcher = hs.application.watcher.new(function(appName, event, app)
         if event == hs.application.watcher.activated then
@@ -287,6 +360,7 @@ function ModalMode.createAppFocusMode(o)
         end
     end)
     mode.watcher:start()
+    ModalMode.registerAppFocusMode(mode)
     syncWithFrontmost()
 
     return mode
