@@ -1,0 +1,29 @@
+#+TITLE: hammerspoon/todo
+
+* modal hotkeys
+** When we enter another mode (e.g., hyper) in a app-specific mode, temporarily disable the app mode and return to it after the new mode exits.
+
+** _
+#+BEGIN_SRC markdown
+modal: Implement `bind_v3` which allows us to define key chords:
+```
+qview_bind_v3{
+    -- mods={},
+    key={"SPC", "c", "c"} 
+    pressedfn=function()
+        brishzeval('awaysh-fast h-hs-on-qview dup')
+    end,
+}
+```
+
+SPC is the space key.
+
+This is the same design that Doom Emacs uses. We should show the pressed key chords thus far in the overlay.
+
+Latency and robustness and not "eating" key pressed matters a lot here.
+
+Any questions or suggestions?
+#+END_SRC
+
+* We can split the module files finer, such as the choosers file.
+

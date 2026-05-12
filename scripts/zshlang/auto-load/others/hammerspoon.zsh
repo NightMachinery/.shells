@@ -107,12 +107,34 @@ function gradS-get() {
 #     retry_sleep=0.1 serr retry h_gradS-get
 # }
 ##
-function alert() {
+function hs-alert {
+    @darwinOnly
+
     local msg="$*" dur="${alert_dur:-5}"
 
     msg="$(ecn $msg | text-wrap 90 | sdlit $'\n' '\n' | sdlit '"' '\"')" @TRET
     sout hammerspoon -c "hs.alert (\"$msg\", ${dur})" # outputs a UUID thingy
     # https://www.hammerspoon.org/docs/hs.alert.html
+}
+aliasfn alert hs-alert
+##
+function hs-reval-alert {
+    local alert_dur="${alert_dur:-1}"
+
+    local out retcode=0
+    out="$(reval "$@" 2>&1)" || retcode=$?
+
+    if test -z "$out" ; then
+        out="[No Output]"
+    fi
+
+    if (( retcode != 0 )) ; then
+        out="[Error Code: $retcode]"$'\n\n'"${out}"
+    fi
+
+    out="> $(gq "$@")"$'\n\n'"${out}"
+
+    hs-alert "$(ec "$out" | head -n 30)"
 }
 ##
 function hs-hyper-z() {
