@@ -86,6 +86,29 @@ function ModalMode.positionedFrame(screenFrame, frame, position, margin)
     return frame
 end
 
+function ModalMode.updateIndicatorText(indicator, style, text)
+    if not indicator then
+        return
+    end
+
+    local textBoxSize = indicator:minimumTextSize(2, text)
+    local screenFrame = hs.screen.primaryScreen():fullFrame()
+    local frame = {
+        w = textBoxSize.w + style.strokeWidth * 2 + style.textSize,
+        h = textBoxSize.h + style.strokeWidth * 2 + style.textSize,
+    }
+    ModalMode.positionedFrame(screenFrame, frame, style.overlayPosition or style.position, style.overlayMargin)
+
+    indicator.textBox.text = text
+    indicator.textBox.frame = {
+        x = (frame.w - textBoxSize.w) / 2,
+        y = ((frame.h - textBoxSize.h) / 2) + (style.textYOffset or 5),
+        w = textBoxSize.w,
+        h = textBoxSize.h,
+    }
+    indicator:frame(frame)
+end
+
 function ModalMode.createIndicator(style)
     local strokeWidth = style.strokeWidth / 1.5
     local text = style.text or style.name or ""
@@ -108,21 +131,7 @@ function ModalMode.createIndicator(style)
         textSize = style.textSize,
     }
 
-    local textBoxSize = indicator:minimumTextSize(2, text)
-    local screenFrame = hs.screen.primaryScreen():fullFrame()
-    local frame = {
-        w = textBoxSize.w + style.strokeWidth * 2 + style.textSize,
-        h = textBoxSize.h + style.strokeWidth * 2 + style.textSize,
-    }
-    ModalMode.positionedFrame(screenFrame, frame, style.overlayPosition or style.position, style.overlayMargin)
-
-    indicator.textBox.frame = {
-        x = (frame.w - textBoxSize.w) / 2,
-        y = ((frame.h - textBoxSize.h) / 2) + (style.textYOffset or 5),
-        w = textBoxSize.w,
-        h = textBoxSize.h,
-    }
-    indicator:frame(frame)
+    ModalMode.updateIndicatorText(indicator, style, text)
     indicator:behavior{"canJoinAllSpaces", "transient", "fullScreenAuxiliary"}
 
     return indicator
@@ -147,6 +156,65 @@ function ModalMode.defaultStyle(o)
     }
 end
 
+ModalMode.keyAliases = {
+    SPC = "space",
+    spc = "space",
+    RET = "return",
+    ret = "return",
+    ESC = "escape",
+    esc = "escape",
+}
+
+function ModalMode.normalizeKeyName(key)
+    local keyName = tostring(key)
+    local alias = ModalMode.keyAliases[keyName]
+    if alias then
+        return alias
+    end
+
+    return keyName:lower()
+end
+
+function ModalMode.displayKeyName(key)
+    local keyName = ModalMode.normalizeKeyName(key)
+
+    if keyName == "space" then
+        return "SPC"
+    elseif keyName == "return" then
+        return "RET"
+    elseif keyName == "escape" then
+        return "ESC"
+    end
+
+    return keyName
+end
+
+function ModalMode.keyNameFromEvent(event)
+    if not ModalMode.keyCodeNames then
+        ModalMode.keyCodeNames = {}
+        for name, code in pairs(hs.keycodes.map) do
+            if not ModalMode.keyCodeNames[code] then
+                ModalMode.keyCodeNames[code] = ModalMode.normalizeKeyName(name)
+            end
+        end
+    end
+
+    local keyCode = event:getKeyCode()
+    return ModalMode.keyCodeNames[keyCode] or tostring(keyCode)
+end
+
+function ModalMode.modsId(mods)
+    mods = mods or {}
+
+    local copy = {}
+    for _, mod in ipairs(mods) do
+        table.insert(copy, mod)
+    end
+    table.sort(copy)
+
+    return table.concat(copy, "+")
+end
+
 function ModalMode.create(o)
     o = o or {}
 
@@ -165,6 +233,8 @@ function ModalMode.create(o)
     mode.modality.down_p = false
     mode.modality.entered_p = false
     mode.active_p = false
+    mode.chordRoots = {}
+    mode.chordFirstHotkeys = {}
 
     function mode.enter()
         if mode.suspends_app_focus_p and not mode.active_p then
@@ -177,12 +247,93 @@ function ModalMode.create(o)
 
     function mode.exit()
         local wasActive = mode.active_p
+        mode.cancelChord()
         mode.modality:exit()
 
         if mode.suspends_app_focus_p and wasActive then
             mode.active_p = false
             ModalMode.nonAppModeDidExit()
         end
+    end
+
+    function mode.setOverlaySuffix(suffix)
+    end
+
+    function mode.updateChordOverlay()
+        if mode.chordState then
+            mode.setOverlaySuffix(table.concat(mode.chordState.displayKeys, " "))
+        else
+            mode.setOverlaySuffix(nil)
+        end
+    end
+
+    function mode.stopChordTap()
+        if mode.chordEventtap then
+            mode.chordEventtap:stop()
+        end
+    end
+
+    function mode.cancelChord()
+        mode.stopChordTap()
+        mode.chordState = nil
+        mode.updateChordOverlay()
+    end
+
+    function mode.runChordAction(action)
+        mode.cancelChord()
+
+        if action.autoTrigger then
+            mode.triggered()
+        end
+
+        action.pressedfn()
+    end
+
+    function mode.handleChordEvent(event)
+        if not mode.chordState then
+            return false
+        end
+
+        local keyName = ModalMode.keyNameFromEvent(event)
+        if keyName == "escape" then
+            mode.cancelChord()
+            return true
+        end
+
+        local nextNode = mode.chordState.node.children[keyName]
+        if not nextNode then
+            mode.cancelChord()
+            return true
+        end
+
+        table.insert(mode.chordState.displayKeys, nextNode.displayName)
+        mode.chordState.node = nextNode
+        mode.updateChordOverlay()
+
+        if nextNode.action then
+            mode.runChordAction(nextNode.action)
+        end
+
+        return true
+    end
+
+    function mode.ensureChordTap()
+        if not mode.chordEventtap then
+            mode.chordEventtap = hs.eventtap.new({ hs.eventtap.event.types.keyDown }, function(event)
+                return mode.handleChordEvent(event)
+            end)
+        end
+    end
+
+    function mode.startChord(node)
+        mode.cancelChord()
+        mode.chordState = {
+            node = node,
+            displayKeys = { node.displayName },
+        }
+        mode.updateChordOverlay()
+        mode.ensureChordTap()
+        mode.chordEventtap:start()
     end
 
     function mode.toggle()
@@ -268,6 +419,71 @@ function ModalMode.create(o)
         return hotkeyHolder.my_hotkey
     end
 
+    function mode.bindV3(bindOptions)
+        local keys = bindOptions.key
+        if type(keys) ~= "table" or #keys == 0 then
+            error("bindV3 requires key to be a non-empty array")
+        end
+
+        if not bindOptions.pressedfn then
+            error("bindV3 requires pressedfn")
+        end
+
+        local autoTrigger = bindOptions.auto_trigger_p
+        if autoTrigger == nil then
+            autoTrigger = mode.auto_trigger_p
+        end
+        if autoTrigger == nil then
+            autoTrigger = true
+        end
+
+        local firstKeyName = ModalMode.normalizeKeyName(keys[1])
+        local firstHotkeyId = ModalMode.modsId(bindOptions.mods) .. "::" .. firstKeyName
+        mode.chordRoots[firstHotkeyId] = mode.chordRoots[firstHotkeyId] or { children = {} }
+
+        local node = mode.chordRoots[firstHotkeyId]
+        for i, key in ipairs(keys) do
+            local keyName = ModalMode.normalizeKeyName(key)
+            if node.action then
+                error("bindV3 chord extends an existing chord prefix")
+            end
+
+            node.children[keyName] = node.children[keyName] or {
+                children = {},
+                displayName = ModalMode.displayKeyName(key),
+            }
+            node = node.children[keyName]
+
+            if i == #keys then
+                if node.action then
+                    error("bindV3 duplicate chord")
+                end
+
+                for _ in pairs(node.children) do
+                    error("bindV3 chord is a prefix of an existing chord")
+                end
+
+                node.action = {
+                    pressedfn = bindOptions.pressedfn,
+                    autoTrigger = autoTrigger,
+                }
+            end
+        end
+
+        local firstNode = mode.chordRoots[firstHotkeyId].children[firstKeyName]
+        if not mode.chordFirstHotkeys[firstHotkeyId] then
+            mode.chordFirstHotkeys[firstHotkeyId] = mode.modality:bind(bindOptions.mods or {}, firstKeyName, function()
+                if firstNode.action then
+                    mode.runChordAction(firstNode.action)
+                else
+                    mode.startChord(firstNode)
+                end
+            end)
+        end
+
+        return mode.chordFirstHotkeys[firstHotkeyId]
+    end
+
     return mode
 end
 
@@ -282,6 +498,7 @@ function ModalMode.installGlobals(mode, prefix)
     _G[prefix .. "_triggered"] = mode.triggered
     _G[prefix .. "_bind_v1"] = mode.bindV1
     _G[prefix .. "_bind_v2"] = mode.bindV2
+    _G[prefix .. "_bind_v3"] = mode.bindV3
 end
 
 function ModalMode.appMatches(app, o)
@@ -308,14 +525,36 @@ function ModalMode.createAppFocusMode(o)
     }
 
     local indicator
+    local overlayStyle
+    local overlayBaseText
     if o.overlay ~= false then
-        local style = ModalMode.defaultStyle(o.overlay or {})
-        style.text = style.text or o.label or o.appName or o.name
-        indicator = ModalMode.createIndicator(style)
+        overlayStyle = ModalMode.defaultStyle(o.overlay or {})
+        overlayStyle.text = overlayStyle.text or o.label or o.appName or o.name
+        overlayBaseText = overlayStyle.text
+        indicator = ModalMode.createIndicator(overlayStyle)
+    end
+
+    function mode.setOverlayText(text)
+        if indicator then
+            ModalMode.updateIndicatorText(indicator, overlayStyle, text)
+        end
+    end
+
+    function mode.setOverlaySuffix(suffix)
+        if not indicator then
+            return
+        end
+
+        if suffix and suffix ~= "" then
+            mode.setOverlayText(overlayBaseText .. "  " .. suffix)
+        else
+            mode.setOverlayText(overlayBaseText)
+        end
     end
 
     function mode.modality:entered()
         mode.modality.entered_p = true
+        mode.setOverlaySuffix(nil)
         if indicator then
             indicator:show()
         end
@@ -324,6 +563,7 @@ function ModalMode.createAppFocusMode(o)
     function mode.modality:exited()
         mode.modality.entered_p = false
         mode.modality.exit_on_release_p = false
+        mode.cancelChord()
         if indicator then
             indicator:hide()
         end
