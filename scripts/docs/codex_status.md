@@ -2,6 +2,12 @@
 
 `python/codex_status.py` starts `codex app-server` and prints account rate-limit status in either human-readable or JSON form.
 
+Use `--retries N` to retry failed status checks `N` times after the first
+attempt. Retries are per auth source, so `--all --retries 10` gives each auth
+file up to 10 retry attempts before reporting its final error. The zsh
+`codex-status` wrapper defaults to `--retries 10`; set `codex_status_retries`
+to override it.
+
 The status output includes identity context when available:
 
 - plan type

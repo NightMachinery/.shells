@@ -261,6 +261,18 @@ def positive_int(value: str) -> int:
     return number
 
 
+def nonnegative_int(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+
+    if number < 0:
+        raise argparse.ArgumentTypeError("must be zero or greater")
+
+    return number
+
+
 def parse_args(argv: list[str] | None = None) -> ParsedArgs:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     command = "status"
@@ -295,6 +307,15 @@ def parse_args(argv: list[str] | None = None) -> ParsedArgs:
         type=float,
         default=parse_timeout(),
         help="Timeout in seconds (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--retries",
+        type=nonnegative_int,
+        default=0,
+        help=(
+            "Retry failed status checks this many times after the first attempt "
+            "(default: %(default)s)."
+        ),
     )
     parser.add_argument(
         "--profile",
@@ -1470,53 +1491,71 @@ def gather_status_for_auth_file(
         )
 
 
-def gather_status(source: AuthSource, *, parsed: ParsedArgs) -> AuthStatus:
+def gather_status_once(source: AuthSource, *, parsed: ParsedArgs) -> AuthStatus:
+    if source.path is None:
+        session = run_codex_session(parsed.args, parsed.passthrough)
+        return build_success_status(source, session, auth_file=None)
+
     try:
-        if source.path is None:
-            session = run_codex_session(parsed.args, parsed.passthrough)
-            return build_success_status(source, session, auth_file=None)
-
-        try:
-            return gather_status_for_auth_file(
-                source,
-                parsed=parsed,
-                auth_file=source.path,
-            )
-        except CodexStatusError as exc:
-            if not refresh_token_already_used_error(exc):
-                raise
-
-            recovered_path = find_recovered_auth_file(source.path)
-            if recovered_path is None:
-                raise
-
-            recovered_source = AuthSource(
-                path=recovered_path,
-                label=alias_from_auth_path(recovered_path) or recovered_path.name,
-                display_path=home_relative(recovered_path),
-            )
-            recovered_status = gather_status_for_auth_file(
-                source,
-                parsed=parsed,
-                auth_file=recovered_path,
-                config_home=source.path.parent,
-                recovered_from=recovered_source,
-            )
-            replace_auth_file(source_path=recovered_path, target_path=source.path)
-            return recovered_status
+        return gather_status_for_auth_file(
+            source,
+            parsed=parsed,
+            auth_file=source.path,
+        )
     except CodexStatusError as exc:
+        if not refresh_token_already_used_error(exc):
+            raise
+
+        recovered_path = find_recovered_auth_file(source.path)
+        if recovered_path is None:
+            raise
+
+        recovered_source = AuthSource(
+            path=recovered_path,
+            label=alias_from_auth_path(recovered_path) or recovered_path.name,
+            display_path=home_relative(recovered_path),
+        )
+        recovered_status = gather_status_for_auth_file(
+            source,
+            parsed=parsed,
+            auth_file=recovered_path,
+            config_home=source.path.parent,
+            recovered_from=recovered_source,
+        )
+        replace_auth_file(source_path=recovered_path, target_path=source.path)
+        return recovered_status
+
+
+def error_status_from_exception(source: AuthSource, exc: BaseException) -> AuthStatus:
+    if isinstance(exc, CodexStatusError):
         return AuthStatus(
             source=source,
             ok=False,
             error=str(exc),
             stderr=exc.stderr_text,
         )
-    except Exception as exc:
-        return AuthStatus(
-            source=source,
-            ok=False,
-            error=f"codex-status: {type(exc).__name__}: {exc}",
-        )
+
+    return AuthStatus(
+        source=source,
+        ok=False,
+        error=f"codex-status: {type(exc).__name__}: {exc}",
+    )
+
+
+def gather_status(source: AuthSource, *, parsed: ParsedArgs) -> AuthStatus:
+    attempts = parsed.args.retries + 1
+    last_exc: BaseException | None = None
+
+    for attempt in range(attempts):
+        try:
+            return gather_status_once(source, parsed=parsed)
+        except Exception as exc:
+            last_exc = exc
+            if attempt + 1 < attempts:
+                continue
+
+    assert last_exc is not None
+    return error_status_from_exception(source, last_exc)
 
 
 def gather_statuses(parsed: ParsedArgs, sources: list[AuthSource]) -> list[AuthStatus]:
