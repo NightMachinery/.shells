@@ -104,6 +104,7 @@ function codex-clean-text {
 ##
 function codex-status {
     local codex_status_timeout_s="${codex_status_timeout_s:-60}"
+    local codex_status_retries="${codex_status_retries:-10}"
     local codex_status_profile="${codex_status_profile:-}"
     local codex_status_cd="${codex_status_cd:-$HOME/tmp}"
     local codex_status_strip_ansi_p="${codex_status_strip_ansi_p:-n}"
@@ -115,7 +116,7 @@ function codex-status {
         ecerr "codex-status: codex_status.py not found in PATH"
         return 127
     fi
-    local script_args=(--timeout "${codex_status_timeout_s}")
+    local script_args=(--timeout "${codex_status_timeout_s}" --retries "${codex_status_retries}")
     if test -n "${codex_status_profile}" ; then
         script_args+=(--profile "${codex_status_profile}")
     fi
