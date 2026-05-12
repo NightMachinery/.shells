@@ -1,9 +1,12 @@
 #+TITLE: hammerspoon/todo
 
-* modal hotkeys
-** DONE When we enter another mode (e.g., hyper) in a app-specific mode, temporarily disable the app mode and return to it after the new mode exits.
+* We can split the module files finer, such as the choosers file.
 
-** DONE _
+* @done
+** modal hotkeys
+*** DONE When we enter another mode (e.g., hyper) in a app-specific mode, temporarily disable the app mode and return to it after the new mode exits.
+
+*** DONE _
 #+BEGIN_SRC markdown
 modal: Implement `bind_v3` which allows us to define key chords:
 ```
@@ -25,4 +28,3 @@ Latency and robustness and not "eating" key pressed matters a lot here.
 Any questions or suggestions?
 #+END_SRC
 
-* We can split the module files finer, such as the choosers file.
