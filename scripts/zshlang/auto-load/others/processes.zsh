@@ -1,7 +1,8 @@
-function pk() {
+function pkill9 {
     pgrep -i "$@"
     pkill -9 -i "$@"
 }
+aliasfn pk pkill9
 ##
 function ps-children() {
     pgrep -P "$1"

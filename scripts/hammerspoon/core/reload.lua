@@ -26,6 +26,7 @@ function reloadConfig(files)
     end
 end
 hyper_bind_v2{mods={"cmd"}, key="r", pressedfn=hs.reload}
+
 myWatcher = hs.pathwatcher.new(os.getenv("HOME") .. "/.hammerspoon/", reloadConfig):start()
 scriptsHammerspoonWatcher = hs.pathwatcher.new(nightdir .. "/hammerspoon/", reloadConfig):start()
 ---
