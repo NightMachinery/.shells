@@ -406,7 +406,7 @@ function h-sharif-net-curl {
         ecgray "$0: disabled proxies  locally (by running proxy-env-unset in a subshell)"
         proxy-env-unset
 
-        revaldbg curl --insecure "$@"
+        revaldbg curl --insecure -L "$@"
     )
 }
 

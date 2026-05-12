@@ -36,6 +36,33 @@ proxy-env-unset () { #: proxy unexport
 
 alias noproxy='proxy_disabled=y'
 
+function proxy-env-create {
+    local px_httpport="${1:-1087}"
+    local px_http_ip="${2:-127.0.0.1}"
+
+    proxy-env-fill "http://${px_http_ip}:${px_httpport}"
+}
+
+function proxy-env-fill {
+    local proxy="${1}"
+    assert-args proxy @RET
+
+    local px_no_proxy='127.0.0.1,localhost,::1'
+
+    ec \
+        "ALL_PROXY=${proxy}" \
+        "all_proxy=${proxy}" \
+        "http_proxy=${proxy}" \
+        "https_proxy=${proxy}" \
+        "HTTP_PROXY=${proxy}" \
+        "HTTPS_PROXY=${proxy}" \
+        "npm_config_proxy=${proxy}" \
+        "npm_config_https_proxy=${proxy}" \
+        "NO_PROXY=${px_no_proxy}" \
+        "no_proxy=${px_no_proxy}" |
+        cat-copy-if-tty
+}
+
 function pxa-create {
     local px_httpport="${1:-1087}" name="${2:-pxa}"
     local px_http_ip="${3:-127.0.0.1}"
@@ -43,9 +70,13 @@ function pxa-create {
     # 1088: shadowsocks
     # @todo0 make this support multiple ports at the  same time
 
+    ##
     local v="${name}_env"
-    local px_no_proxy='127.0.0.1,localhost,::1'
-    export "$v"="ALL_PROXY=http://${px_http_ip}:${px_httpport} all_proxy=http://${px_http_ip}:${px_httpport} http_proxy=http://${px_http_ip}:${px_httpport} https_proxy=http://${px_http_ip}:${px_httpport} HTTP_PROXY=http://${px_http_ip}:${px_httpport} HTTPS_PROXY=http://${px_http_ip}:${px_httpport} npm_config_proxy=http://${px_http_ip}:${px_httpport} npm_config_https_proxy=http://${px_http_ip}:${px_httpport} NO_PROXY=${px_no_proxy} no_proxy=${px_no_proxy}"
+
+    local val
+    val="$(proxy-env-create ${px_httpport} ${px_http_ip})" @RET
+    export "$v"="${val}"
+    ##
 
     # silent re unalias pxa pxa-local
     #: @redundant
