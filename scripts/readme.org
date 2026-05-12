@@ -18,6 +18,10 @@ Hammerspoon shortcut notes are tracked in =./hammerspoon/docs/hammerspoon.md=.
 =~/.hammerspoon/init.lua= points at =./hammerspoon/boot.lua=. Lua files in
 =./hammerspoon/auto-load/= are loaded alphabetically.
 
+Hammerspoon modal helpers support single-key bindings with =bind_v2= and
+multi-key chords with =bind_v3=. See =./hammerspoon/docs/hammerspoon.md= for
+the chord behavior and qView examples.
+
 * Codex
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.

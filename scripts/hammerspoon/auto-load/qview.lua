@@ -58,3 +58,11 @@ qview_bind_v2{
         brishzeval('awaysh-fast hs-reval-alert qview-trs')
     end,
 }
+
+qview_bind_v3{
+    -- mods={},
+    key={"SPC", "c", "c"},
+    pressedfn=function()
+        brishzeval('awaysh-fast h-hs-on-qview dup')
+    end,
+}

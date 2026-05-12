@@ -29,10 +29,17 @@ Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
 App-scoped modes should use the shared `ModalMode` helpers. qView is defined in
-`auto-load/qview.lua`, exposes `qview_bind_v2`, and enters while qView is the
-frontmost app. Its overlay is positioned in the top-left corner. App-scoped
-modes are temporarily suspended while global modes such as Hyper or Purple are
-active, then re-sync with the frontmost app after the global mode stack exits.
+`auto-load/qview.lua`, exposes `qview_bind_v2` and `qview_bind_v3`, and enters
+while qView is the frontmost app. Its overlay is positioned in the top-left
+corner. App-scoped modes are temporarily suspended while global modes such as
+Hyper or Purple are active, then re-sync with the frontmost app after the
+global mode stack exits.
+
+`bind_v3` defines modal key chords. Key arrays use Hammerspoon key names plus
+aliases such as `SPC`, `RET`, and `ESC`. While a chord is pending, the mode
+overlay shows the pressed prefix. Valid next keys are consumed and advance the
+chord; invalid next keys are consumed and cancel it. `Escape` cancels a pending
+chord. Chords have no timeout, so prefix-overlapping chords are rejected.
 
 Purple Mode is defined in `purple-mode.lua` and loaded before the mouse
 bindings that use `purple_bind_v2`. Enter it with `Hyper+Cmd+P`. Current
