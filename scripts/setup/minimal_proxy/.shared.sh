@@ -292,17 +292,18 @@ emc-gateway () {
     TERM=xterm-kitty ALTERNATE_EDITOR="" LOGNAME="$(whoami)" DOOMDIR=~/doom.d pxa emacsclient -t "$@"
 }
 ##
-function redo2 {
-    local count=$1
-    shift
-    local cmd="${*@Q}"
+#: moved to zsh
+# function redo2 {
+#     local count=$1
+#     shift
+#     local cmd="${*@Q}"
 
-    echo "repeating cmd: ${cmd}"
-    for ((i=1; i<=count; i++))
-    do
-        eval "$cmd"
-    done
-}
+#     echo "repeating cmd: ${cmd}"
+#     for ((i=1; i<=count; i++))
+#     do
+#         eval "$cmd"
+#     done
+# }
 ##
 retry () {
     local retry_sleep="${retry_sleep:-0.1}"
