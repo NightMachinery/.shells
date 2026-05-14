@@ -12,15 +12,21 @@ function rexa(){
         eval "$(sed -e "s/_/${i:q:q}/g" <<< "$1")" #sed itself needs escaping, hence the double :q; I don't know if this works well.
     done
 }
-
+##
+#: @duplicateCode/3866c2c635a34c482cded794696d7aed
 function redo-eval {
     local fail_mode="${redo_fail_mode:-ignore}"
+    local sleep_dur="${redo_sleep:-0}"
 
-    local i retcode
-    for i in {1.."${@: -1}"}
+    local i=1
+    local max="${@: -1}"
+
+    while [[ "${max:u}" == "inf" || $i -le $max ]]
     do
+        (( i++ ))
+
         eval "${@: 1:-1}" || {
-            retcode=$?
+            local retcode=$?
 
             if [[ "${fail_mode}" == ignore ]] ; then
                 continue
@@ -31,11 +37,22 @@ function redo-eval {
                 return 1
             fi
         }
+
+        if (( sleep_dur > 0 )) ; then
+            reval-ecgray sleep "${sleep_dur}" || true
+        fi
     done
 }
-redo() redo-eval "$(gquote "${@: 1:-1}")" "${@: -1}"
-redo2() { redo "$@[2,-1]" "$1" }
-function redo-async() {
+
+function redo {
+    redo-eval "$(gquote "${@: 1:-1}")" "${@: -1}"
+}
+
+function redo2 {
+    redo "$@[2,-1]" "$1"
+}
+
+function redo-async {
     local cmd=( "$@[2,-1]" ) n="$1" i
     for i in {1..$n}; do
         reval "$cmd[@]" &

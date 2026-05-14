@@ -632,6 +632,52 @@ function brishgarden-boot {
     ##
 }
 ##
+#: @duplicateCode/3866c2c635a34c482cded794696d7aed
+function redo-eval {
+    local fail_mode="${redo_fail_mode:-ignore}"
+    local sleep_dur="${redo_sleep:-0}"
+
+    local i=1
+    local max="${@: -1}"
+
+    while [[ "${max:u}" == "inf" || $i -le $max ]]
+    do
+        (( i++ ))
+
+        eval "${@: 1:-1}" || {
+            local retcode=$?
+
+            if [[ "${fail_mode}" == ignore ]] ; then
+                continue
+            elif [[ "${fail_mode}" == exit ]] ; then
+                return $retcode
+            else
+                ecerr "$0: Unknown fail mode: ${fail_mode}"
+                return 1
+            fi
+        }
+
+        if (( sleep_dur > 0 )) ; then
+            reval-ecgray sleep "${sleep_dur}" || true
+        fi
+    done
+}
+
+function redo {
+    redo-eval "$(gquote "${@: 1:-1}")" "${@: -1}"
+}
+
+function redo2 {
+    redo "$@[2,-1]" "$1"
+}
+
+function redo-async {
+    local cmd=( "$@[2,-1]" ) n="$1" i
+    for i in {1..$n}; do
+        reval "$cmd[@]" &
+    done
+}
+##
 #: * Substituting non-essential functions with no-ops
 function mark-me { true }
 ##
