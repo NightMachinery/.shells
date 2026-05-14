@@ -5,6 +5,7 @@ import json
 import sys
 import requests
 import os
+from pathlib import Path
 from bs4 import BeautifulSoup
 
 import getpass
@@ -15,8 +16,9 @@ BASE = "https://net2.sharif.edu"
 LOGIN_URL = f"{BASE}/en-us/user/login/"
 CONNECT_URL = f"{BASE}/en-us/user/aaa_ras_connect/"
 PORTAL_LOGOUT_URL = f"{BASE}/logout"
-STATUS_URL = f"{BASE}/status"
 META_URL = f"{BASE}/en-us/user/get_user_metadata/"
+ONLINE_SESSION_URL = f"{BASE}/en-us/user/get_user_online_session/"
+COOKIE_FILE = Path(os.environ.get("sharif_sid_cookie_file", "~/.cache/sharif/SID.cookies.json")).expanduser()
 # ---------------------
 
 def humanize_credit(raw_credit: str) -> str:
@@ -65,12 +67,45 @@ def get_credentials():
 def build_session():
     """Builds a requests session with the browser-like headers Net2 expects."""
     session = requests.Session()
+    session.trust_env = False
     session.headers.update({
         "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                        "AppleWebKit/537.36 (KHTML, like Gecko) "
                        "Chrome/139.0.0.0 Safari/537.36")
     })
     return session
+
+
+def load_cookies(session):
+    """Loads persisted Net2 session cookies, if present."""
+    if not COOKIE_FILE.exists():
+        return
+
+    try:
+        cookies = json.loads(COOKIE_FILE.read_text())
+    except Exception as e:
+        print(f"Warning: Could not read saved session cookies. ({e})", file=sys.stderr)
+        return
+
+    if isinstance(cookies, dict):
+        session.cookies.update(cookies)
+
+
+def save_cookies(session):
+    """Persists Net2 session cookies without storing credentials."""
+    COOKIE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    cookie_data = requests.utils.dict_from_cookiejar(session.cookies)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    with os.fdopen(os.open(COOKIE_FILE, flags, 0o600), "w") as cookie_file:
+        json.dump(cookie_data, cookie_file)
+
+
+def clear_cookies():
+    """Removes persisted Net2 session cookies."""
+    try:
+        COOKIE_FILE.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def login_session(session, username, password, connect=True):
@@ -178,6 +213,7 @@ def print_user_info(session, title="Login Successful! User Information"):
 
 def logout(session):
     """Logs out of the active Net2 portal session without prompting for credentials."""
+    load_cookies(session)
     logout_resp = session.post(
         PORTAL_LOGOUT_URL,
         data="",
@@ -186,34 +222,71 @@ def logout(session):
         allow_redirects=False,
     )
     logout_resp.raise_for_status()
+    clear_cookies()
 
     print("Logged out successfully.")
 
 
 def print_status(session):
     """Prints the current Net2 portal status without changing login state."""
-    status_resp = session.get(STATUS_URL, timeout=10, allow_redirects=False)
+    load_cookies(session)
+    status_resp = session.get(
+        ONLINE_SESSION_URL,
+        headers={"X-Requested-With": "XMLHttpRequest", "Referer": BASE},
+        timeout=10,
+        allow_redirects=False,
+    )
 
-    if status_resp.is_redirect and "user/login" in status_resp.headers.get("Location", ""):
-        print("Logged out.")
+    if status_resp.is_redirect:
+        location = status_resp.headers.get("Location", "")
+        if "user/login" in location:
+            clear_cookies()
+            print("Logged out.")
+            return
+        print_user_info(session, title="Status")
         return
 
     status_resp.raise_for_status()
 
-    soup = BeautifulSoup(status_resp.text, "html.parser")
-    cells = [cell.get_text(" ", strip=True) for cell in soup.find_all("td")]
-    cells = [cell for cell in cells if cell]
-
-    if not cells:
-        text = status_resp.text.strip()
-        if text:
-            print(text)
-        else:
-            print("No status information returned.")
+    if not status_resp.text.strip():
+        clear_cookies()
+        print("Logged out.")
         return
 
-    for cell in cells:
-        print(cell)
+    payload = json.loads(status_resp.text)
+    result = payload.get("result", {})
+    if not result:
+        print("Logged in.")
+        print("Disconnected.")
+        return
+
+    if isinstance(result, list):
+        online_sessions = []
+        for item in result:
+            if isinstance(item, list):
+                online_sessions.extend(entry for entry in item if isinstance(entry, dict))
+            elif isinstance(item, dict):
+                online_sessions.append(item)
+    else:
+        user_id = next(iter(result.keys()))
+        online_sessions = result.get(user_id) or []
+
+    current_ip = payload.get("ip")
+    current_session = next(
+        (entry for entry in online_sessions if entry.get("session_ip") == current_ip),
+        None,
+    )
+
+    print("Logged in.")
+    if current_session:
+        print("Connected.")
+        print(f"  Session IP         : {current_session.get('session_ip', current_ip)}")
+        print(f"  Login Date         : {current_session.get('session_start_time', 'N/A')}")
+    else:
+        print("Disconnected.")
+
+    if online_sessions:
+        print(f"  Active Sessions    : {len(online_sessions)}")
 
 
 def main():
@@ -234,6 +307,7 @@ def main():
         else:
             username, password = get_credentials()
             login_session(session, username, password, connect=True)
+            save_cookies(session)
             print_user_info(session)
 
     except requests.exceptions.HTTPError as e:
