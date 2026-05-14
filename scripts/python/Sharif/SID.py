@@ -15,6 +15,7 @@ BASE = "https://net2.sharif.edu"
 LOGIN_URL = f"{BASE}/en-us/user/login/"
 CONNECT_URL = f"{BASE}/en-us/user/aaa_ras_connect/"
 PORTAL_LOGOUT_URL = f"{BASE}/logout"
+STATUS_URL = f"{BASE}/status"
 META_URL = f"{BASE}/en-us/user/get_user_metadata/"
 # ---------------------
 
@@ -115,8 +116,8 @@ def login_session(session, username, password, connect=True):
         print(f"Warning: Connection attempt failed or timed out, proceeding to check metadata. ({e})", file=sys.stderr)
 
 
-def print_user_info(session):
-    """Fetches and prints Net2 user metadata for the authenticated session."""
+def get_user_info(session):
+    """Fetches Net2 user metadata for the authenticated session."""
     # Step 4: Get User Metadata
     meta_headers = {"X-Requested-With": "XMLHttpRequest", "Referer": BASE}
     meta = session.get(META_URL, headers=meta_headers, timeout=15)
@@ -152,13 +153,26 @@ def print_user_info(session):
     credit = humanize_credit(info.get("credit", "0"))
     deposit = humanize_deposit(info.get("deposit"))
 
+    return {
+        "username": username,
+        "creation_date": creation_date,
+        "exp_date": exp_date,
+        "credit": credit,
+        "deposit": deposit,
+    }
+
+
+def print_user_info(session, title="Login Successful! User Information"):
+    """Prints Net2 user metadata for the authenticated session."""
+    info = get_user_info(session)
+
     # Print results
-    print("\n✅ Login Successful! User Information:")
-    print(f"  Username           : {username}")
-    print(f"  Creation Date      : {creation_date}")
-    print(f"  Remaining Volume   : {credit}")
-    print(f"  Remaining Time     : {deposit}")
-    print(f"  Expiration Date    : {exp_date}")
+    print(f"\n✅ {title}:")
+    print(f"  Username           : {info['username']}")
+    print(f"  Creation Date      : {info['creation_date']}")
+    print(f"  Remaining Volume   : {info['credit']}")
+    print(f"  Remaining Time     : {info['deposit']}")
+    print(f"  Expiration Date    : {info['exp_date']}")
     print("\nFinished successfully.")
 
 
@@ -176,11 +190,38 @@ def logout(session):
     print("Logged out successfully.")
 
 
+def print_status(session):
+    """Prints the current Net2 portal status without changing login state."""
+    status_resp = session.get(STATUS_URL, timeout=10, allow_redirects=False)
+
+    if status_resp.is_redirect and "user/login" in status_resp.headers.get("Location", ""):
+        print("Logged out.")
+        return
+
+    status_resp.raise_for_status()
+
+    soup = BeautifulSoup(status_resp.text, "html.parser")
+    cells = [cell.get_text(" ", strip=True) for cell in soup.find_all("td")]
+    cells = [cell for cell in cells if cell]
+
+    if not cells:
+        text = status_resp.text.strip()
+        if text:
+            print(text)
+        else:
+            print("No status information returned.")
+        return
+
+    for cell in cells:
+        print(cell)
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Sharif Net2 login/logout and user info")
+    parser = argparse.ArgumentParser(description="Sharif Net2 login/logout/status and user info")
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("login", help="log in and print user info")
     subparsers.add_parser("logout", help="log out from Sharif Net2")
+    subparsers.add_parser("status", help="print Sharif Net2 status")
     args = parser.parse_args()
 
     session = build_session()
@@ -188,6 +229,8 @@ def main():
     try:
         if args.command == "logout":
             logout(session)
+        elif args.command == "status":
+            print_status(session)
         else:
             username, password = get_credentials()
             login_session(session, username, password, connect=True)
