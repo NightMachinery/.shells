@@ -164,7 +164,13 @@ def print_user_info(session):
 
 def logout(session):
     """Logs out of the active Net2 portal session without prompting for credentials."""
-    logout_resp = session.post(PORTAL_LOGOUT_URL, data="", headers={"Referer": BASE}, timeout=10)
+    logout_resp = session.post(
+        PORTAL_LOGOUT_URL,
+        data="",
+        headers={"Referer": BASE},
+        timeout=10,
+        allow_redirects=False,
+    )
     logout_resp.raise_for_status()
 
     print("Logged out successfully.")
