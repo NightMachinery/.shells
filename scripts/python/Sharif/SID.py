@@ -14,8 +14,7 @@ import getpass
 BASE = "https://net2.sharif.edu"
 LOGIN_URL = f"{BASE}/en-us/user/login/"
 CONNECT_URL = f"{BASE}/en-us/user/aaa_ras_connect/"
-DISCONNECT_URL = f"{BASE}/en-us/user/aaa_ras_disconnect/"
-LOGOUT_URL = f"{BASE}/en-us/user/logout/"
+PORTAL_LOGOUT_URL = f"{BASE}/logout"
 META_URL = f"{BASE}/en-us/user/get_user_metadata/"
 # ---------------------
 
@@ -163,19 +162,9 @@ def print_user_info(session):
     print("\nFinished successfully.")
 
 
-def logout(session, username, password):
-    """Disconnects the active RAS session and logs out of the Net2 web session."""
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "X-CSRFToken": session.cookies.get("csrftoken", ""),
-        "X-Requested-With": "XMLHttpRequest",
-        "Referer": LOGIN_URL,
-    }
-    disconnect_data = {"user": username, "pass": password}
-    disconnect_resp = session.post(DISCONNECT_URL, data=disconnect_data, headers=headers, timeout=10)
-    disconnect_resp.raise_for_status()
-
-    logout_resp = session.get(LOGOUT_URL, headers={"Referer": BASE}, timeout=10)
+def logout(session):
+    """Logs out of the active Net2 portal session without prompting for credentials."""
+    logout_resp = session.post(PORTAL_LOGOUT_URL, data="", headers={"Referer": BASE}, timeout=10)
     logout_resp.raise_for_status()
 
     print("Logged out successfully.")
@@ -188,14 +177,13 @@ def main():
     subparsers.add_parser("logout", help="log out from Sharif Net2")
     args = parser.parse_args()
 
-    username, password = get_credentials()
     session = build_session()
 
     try:
         if args.command == "logout":
-            login_session(session, username, password, connect=False)
-            logout(session, username, password)
+            logout(session)
         else:
+            username, password = get_credentials()
             login_session(session, username, password, connect=True)
             print_user_info(session)
 
