@@ -203,12 +203,17 @@ def print_user_info(session, title="Login Successful! User Information"):
 
     # Print results
     print(f"\n✅ {title}:")
+    print_account_info(info)
+    print("\nFinished successfully.")
+
+
+def print_account_info(info):
+    """Prints formatted Net2 account metadata."""
     print(f"  Username           : {info['username']}")
     print(f"  Creation Date      : {info['creation_date']}")
     print(f"  Remaining Volume   : {info['credit']}")
     print(f"  Remaining Time     : {info['deposit']}")
     print(f"  Expiration Date    : {info['exp_date']}")
-    print("\nFinished successfully.")
 
 
 def logout(session):
@@ -276,6 +281,7 @@ def print_status(session):
         (entry for entry in online_sessions if entry.get("session_ip") == current_ip),
         None,
     )
+    info = get_user_info(session)
 
     print("Logged in.")
     if current_session:
@@ -287,6 +293,8 @@ def print_status(session):
 
     if online_sessions:
         print(f"  Active Sessions    : {len(online_sessions)}")
+
+    print_account_info(info)
 
 
 def main():
