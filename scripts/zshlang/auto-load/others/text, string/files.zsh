@@ -36,6 +36,7 @@ function f-text-split {
 
   if [[ "$size" =~ '^\d+$' ]] ; then
   size+='k' #: use kilobytes by default
+  #: `m`: megabytes
   fi
 
   local o="${3}"
