@@ -89,6 +89,8 @@ pxa-create 20808 pxa20808
 pxa-create 1087 pxa87
 pxa-create 2030 pxa30
 pxa-create 2040 pxa40
+pxa-create 2060 pxa60
+pxa-create 2066 pxa66
 pxa-create 2070 pxa70
 pxa-create 2080 pxa80
 pxa-create 2091 pxa91
@@ -98,10 +100,13 @@ pxa-create 2041 pxa41
 pxa-create 2032 pxa32
 pxa-create 2035 pxa35
 pxa-create 2050 pxa50
+pxa-create 20050 pxa20050
 pxa-create 2089 pxa89
+pxa-create 2096 pxa96
 pxa-create 2096 pxa2096
 pxa-create 2098 pxa98
 pxa-create 2098 pxa2098
+pxa-create 2099 pxa99
 pxa-create 3067 pxa3067
 pxa-create 9087 pxa9087
 pxa-create 10809 pxateias 10.2.32.28
