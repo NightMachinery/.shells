@@ -55,6 +55,11 @@ aliasfn ci2050 curl-ip -x 'http://127.0.0.1:2050'
 aliasfn ci60 curl-ip -x 'socks5h://127.0.0.1:1060'
 aliasfn ci62 curl-ip -x 'socks5h://127.0.0.1:1062'
 aliasfn ci2062 curl-ip -x 'http://127.0.0.1:2062'
+
+aliasfn ci66 curl-ip -x 'http://127.0.0.1:2066'
+# aliasfn ci66 curl-ip -x 'socks5h://127.0.0.1:1066'
+aliasfn ci2066 curl-ip -x 'http://127.0.0.1:2066'
+
 aliasfn ci70 curl-ip -x 'socks5h://127.0.0.1:1070'
 aliasfn ci2070 curl-ip -x 'http://127.0.0.1:2070'
 aliasfn ci78 curl-ip -x 'socks5h://127.0.0.1:1078'
@@ -102,9 +107,17 @@ aliasfn ci14000-socks curl-ip -x 'socks5h://127.0.0.1:14000'
 ##
 alias myip-httpbin='curlm https://httpbin.org/ip'
 alias myip-amazon='curlm https://checkip.amazonaws.com'
+alias myip-ipify='curlm https://api.ipify.org'
+#: ipify does not return location, but you can its IP output as JSON with `"https://api.ipify.org?format=json"`.
+
 function myip-wtf {
     curlm https://myip.wtf/json "$@" | command jq .
 }
+
+function myip-ipapi {
+    curlm "https://ipapi.co/json/" "$@" | command jq .
+}
+
 alias myip-ipinfo='curlm -H "Authorization: Bearer ${ipinfo_api_token}" https://ipinfo.io/ip'
 ##
 # opendns sometimes returns wrong results, but it is slightly faster
