@@ -176,4 +176,11 @@ function codex-auth2remote {
     reval-ec rsp-safe ~/.codex/auth.json "${fullhost}:.codex/"
 }
 alias a2r='codex-auth2remote'
+
+function codex-auth-from-remote {
+    local fullhost="${fullhost:-pinky}"
+    assert-args fullhost @RET
+
+    reval-ec rsp-safe "${fullhost}:.codex/auth.json" ~/tmp/.codex-auths/"auth_$(str2filename-ascii ${fullhost}).json"
+}
 ##
