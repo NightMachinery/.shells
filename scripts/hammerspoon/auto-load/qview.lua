@@ -37,6 +37,14 @@ qview_bind_v2{
 
 qview_bind_v2{
     -- mods={},
+    key="n",
+    pressedfn=function()
+        brishzeval('awaysh-fast h-hs-on-qview navy')
+    end,
+}
+
+qview_bind_v2{
+    -- mods={},
     key="m",
     pressedfn=function()
         brishzeval('awaysh-fast h-hs-on-qview lightsalmon')
