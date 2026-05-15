@@ -9,7 +9,6 @@ function surreal-sync2remote {
         --info=progress2 \
         --partial-dir=.rsync-partial \
         --exclude='.git' \
-        --max-delete=100 \
         --fuzzy \
         --delete-after \
         --delete-excluded \
@@ -19,6 +18,8 @@ function surreal-sync2remote {
         --exclude='*' \
         -- ~/Pictures/SurrealPictures/ \
         "${fullhost}:Pictures/SurrealPictures/"
+
+    # --max-delete=100 \
     # @GPT5.5T
     # Rsync filters are ordered; first matching rule wins.
     # Include all dirs (`*/`) so rsync can recurse through parents and find nested chosen*/ dirs.
