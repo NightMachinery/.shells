@@ -64,6 +64,39 @@ function ntag-filter-or-add {
         ntag-add-multi "$tag" "$@"
     fi
 }
+
+function ntag-toggle-multi {
+    local tag="${1:?}" ; shift
+    local files=("$@") f retcode=0
+
+    if [[ "${tag}" == grey ]] ; then
+        tag='gray'
+    fi
+
+    for f in $files[@] ; do
+        f="$(ntag-recoverpath "$f")" || {
+            retcode=1
+            continue
+        }
+
+        if ntag-has "${f:t}" "$tag" ; then
+            ntag-rm "$f" "$tag" || retcode=1
+        else
+            ntag-add "$f" "$tag" || retcode=1
+        fi
+    done
+
+    return $retcode
+}
+
+function ntag-filter-or-toggle {
+    local tag="${1:?}" ; shift
+    if (( $#@ == 0 )) ; then
+        ntag-filter "$tag"
+    else
+        ntag-toggle-multi "$tag" "$@"
+    fi
+}
 ##
 function ntag-l {
     if isI && istty ; then

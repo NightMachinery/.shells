@@ -25,3 +25,7 @@ the chord behavior and qView examples.
 * Codex
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.
+
+* ntag
+
+ntag notes are tracked in =./docs/ntag/=.
