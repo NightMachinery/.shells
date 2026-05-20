@@ -71,6 +71,10 @@ function hi10-multilink() {
             # echo $match[1]
             pArgs[$i]="${match[1]}"
             # pArgs[$i]='http://hi10anime'"${match[1]}$(hi10-jtoken)"
+
+        elif [[ "$argv[i]" =~ '(https?://[^/]*backblazeb.*)' ]]; then #'.*http:\/\/ouo.io\/s\/166CefdX\?s=(.*)' ]]; then
+            pArgs[$i]="${match[1]}"
+
         else
             ecerr Invalid link: "$argv[i]"$'\n'
         fi
