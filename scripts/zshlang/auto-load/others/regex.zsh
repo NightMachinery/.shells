@@ -1,4 +1,10 @@
 ###
+typeset -g ip_dns_regex='\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?::53)?\b'
+
+function ip-dns-extract {
+  rget "(${ip_dns_regex})"
+}
+##
 typeset -g youtube_url_regex='(?:https?://)?[^/]*(?:youtube\.com|youtu\.be)'
 ##
 # adapted from https://gist.github.com/gruber/8891611

@@ -26,7 +26,7 @@ function h_aliastag {
     ##
     # aliasfn "$tag" ntag-filter "$tag" # @altAPT ; This is used less often, so I dropped it. You can use `tgf blue green ...` for this.
 
-    aliasfn "$tag" 'ntag_add_image_preview_p=$(fn-isTop && ec y)' ntag-filter-or-add "$tag"
+    aliasfn "$tag" 'ntag_image_preview_p=$(fn-isTop && ec y)' ntag-filter-or-toggle "$tag"
     #: If called at top level (interactively), preview the tagged files if they are images
 
     @opts-setprefix "$tag" ntag-search
@@ -290,7 +290,7 @@ function ntag-add {
 
     ##
     #: preview images when adding a tag to them
-    if bool "${ntag_add_image_preview_p}" ; then
+    if bool "${ntag_image_preview_p}" ; then
         icat-maybe "$f"
     fi
     ##
@@ -334,7 +334,7 @@ function ntag-get() {
     local tags=( ${tmp[2,-2]} )
     arrN "$tags[@]"
 }
-function ntag-rm() {
+function ntag-rm {
     : "GLOBAL OUT: ntag_rm_dest"
     unset ntag_rm_dest
 
@@ -343,6 +343,14 @@ function ntag-rm() {
         ecerr "$0: Nonexistent file: $f"
         return 1
     }
+
+    ##
+    #: preview images when adding a tag to them
+    if bool "${ntag_image_preview_p}" ; then
+        icat-maybe "$f"
+    fi
+    ##
+
     local ft="${f:t}" fh="${f:h}" fe="${f:e}"
     local ftr="$(ntag_ftr "$f")"
 

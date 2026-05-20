@@ -11,7 +11,14 @@ Use rcrdl to copy from remote to local."
 
     local opts=()
     isI && opts+="--progress"
-    RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$(url-tail "$rudi")" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$(url-tail "$rabbit")" $proxyenv rclone "$opts[@]" --multi-thread-streams=0 --drive-server-side-across-configs "$@"
+    RCLONE_CONFIG_RUDI_ROOT_FOLDER_ID="$(url-tail "$rudi")" RCLONE_CONFIG_RABBIT0_ROOT_FOLDER_ID="$(url-tail "$rabbit")" rclone "$opts[@]" --multi-thread-streams=0 --drive-server-side-across-configs "$@"
+    # $proxyenv
+}
+
+function rcr-3010 {
+    local -x RCLONE_NO_CHECK_CERTIFICATE=true
+
+    pxa3010 rcr "$@"
 }
 ##
 function rcr-gdrive-shareddrives-list() {
@@ -137,7 +144,7 @@ function jdlrc() {
         reval-ec rcr copy -v --no-traverse "./$i" "rabbit0:julia/$jrabbit"
     done
 }
-function aa-rc() {
+function aa-rc {
     : "Alt: rcraa"
     
     local dest=( $jrabbit "$(basename "$(pwd)")" )
@@ -159,7 +166,8 @@ function aa-rc() {
         popf
     done
 }
-alias hi10-rc='jrabbit=anime fnswap aa aa-rc'
+aliasfn hi10-rc jrabbit=anime fnswap aa aa-rc
+
 function hi10-dl-rc() {
     # using `hi10-rc hi10-ng ...` works, too
      hi10-rc hi10-dl < hi10-links.txt

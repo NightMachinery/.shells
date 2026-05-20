@@ -106,6 +106,11 @@ function hear-copy {
     reval-ecgray pbadd "$(hear-get)"
 }
 alias air-copy="hear-copy"
+
+function hear-cd {
+    cdd "$(hear-get)"
+}
+alias air-cd='hear-cd'
 ##
 function reval-tlg {
     local rec="${reval_tlg_receiver:-${reval_tlg_r:-$me}}"

@@ -25,9 +25,10 @@ function sdlit() {
     rmprefix '' "$search" "$replace"
 }
 ##
-function rget() {
+function rget {
     local rep="${rget_replace:-${rget_r:-\$1}}"
-    rgbase --no-filename --no-line-number --text --smart-case --only-matching --replace "$rep" "$@"
+    rgbase --no-filename --no-line-number --text --smart-case --only-matching --replace "$rep" "$@" |
+        cat-copy-if-tty
 }
 ##
 function text-wrap {
