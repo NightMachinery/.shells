@@ -107,6 +107,7 @@ pxa-create 2096 pxa2096
 pxa-create 2098 pxa98
 pxa-create 2098 pxa2098
 pxa-create 2099 pxa99
+pxa-create 3010 pxa3010
 pxa-create 3067 pxa3067
 pxa-create 9087 pxa9087
 pxa-create 10809 pxateias 10.2.32.28

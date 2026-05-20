@@ -61,29 +61,31 @@ typeset -g qview_deletion_log="${HOME}/.qview/deletion_log"
 typeset -g qview_trash_dir="${HOME}/.qview/trash"
 
 function qview-trs {
-    local f
-    f="$(qview-path-get)" @RET
+  #: @seeAlso [agfi:qview-restore-last]
+  ###
+  local f
+  f="$(qview-path-get)" @RET
 
-    if ! test -e "$f" ; then
-        ecerr "$0: nonexistent file: $f"
-        return 1
-    fi
+  if ! test -e "$f" ; then
+    ecerr "$0: nonexistent file: $f"
+    return 1
+  fi
 
-    sync-append-with-newline "${qview_deletion_log}" "$f"
+  sync-append-with-newline "${qview_deletion_log}" "$f"
 
-    local trash_path
-    trash_path="${qview_trash_dir}/$f"
+  local trash_path
+  trash_path="${qview_trash_dir}/$f"
 
-    if test -e "${trash_path}" ; then
-      trash_path+="_${EPOCHSECONDS}"
-    fi
+  if test -e "${trash_path}" ; then
+    trash_path+="_${EPOCHSECONDS}"
+  fi
 
-    reval-ecgray mv "$f" "${trash_path}"
+  reval-ecgray mv "$f" "${trash_path}"
 }
 
 function qview-restore-last {
    local f
-   f="$(tail -n 1 "${qview_deletion_log}")" @RET
+   f="$(tail-pop -n 1 "${qview_deletion_log}")" @RET
 
    local trash_path
    trash_path="${qview_trash_dir}/$f"

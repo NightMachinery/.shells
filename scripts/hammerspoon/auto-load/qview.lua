@@ -37,6 +37,14 @@ qview_bind_v2{
 
 qview_bind_v2{
     -- mods={},
+    key="r",
+    pressedfn=function()
+        brishzeval('awaysh-fast h-hs-on-qview red')
+    end,
+}
+
+qview_bind_v2{
+    -- mods={},
     key="n",
     pressedfn=function()
         brishzeval('awaysh-fast h-hs-on-qview navy')
@@ -64,6 +72,14 @@ qview_bind_v2{
     key="d",
     pressedfn=function()
         brishzeval('awaysh-fast hs-reval-alert qview-trs')
+    end,
+}
+
+qview_bind_v2{
+    -- mods={"shift"},
+    key="u",
+    pressedfn=function()
+        brishzeval('awaysh-fast hs-reval-alert qview-restore-last')
     end,
 }
 

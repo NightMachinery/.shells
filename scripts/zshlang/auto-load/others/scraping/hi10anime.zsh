@@ -36,7 +36,7 @@ function hi10-new-notify() {
     loop h_hi10-new-notify "$@"
 }
 ##
-function hi10-cook() {
+function hi10-cook {
     local url="$1"
     local title="$(urlmeta $url title|str2tmuxname)"
     local cmd="FORCE_INTERACTIVE=y $(cook hi10-rc hi10-ng "$url")"
