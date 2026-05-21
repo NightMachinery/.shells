@@ -182,6 +182,10 @@ function rudi-clone() {
 }
 ##
 function h-dl-rc {
+    local temp_dir="${dl_rc_tempdir:-$HOME/tmp/dl-rc/}"
+    cd-mkdir "${temp_dir}" @RET
+    #: The temp dir uses storage so it matters where it is.
+
     local dl_engine=("${dl_rc_engine[@]}")
     if test -z "${dl_engine[*]}" ; then
         ecerr "$0: dl_rc_engine is empty"
@@ -217,7 +221,7 @@ function h-dl-rc {
 
         reval-ec "$dl_engine[@]" "${opts[@]}" "$i"
 
-        fs=(*(DN))
+        fs=(*~*_invocations.txt(DN))
         if (( ${#fs} >=1 )) ; then
             reval-ec jdlrc "${fs[@]}"
             reval-ec rm -r "${fs[@]}"
@@ -234,20 +238,17 @@ function y-rc {
 
     dl_rc_engine=("${y_rc_engine[@]:-ysmall}") h-dl-rc "$@"
 }
+aliasfn yrc y-rc
 
 function y-rc-small {
     y_rc_engine=(ysmall) y-rc "$@"
 }
+aliasfn yrcsmall y-rc-small
 
 function y-rc-1080 {
     y_rc_engine=(y1080) y-rc "$@"
 }
-
-function jyrc {
-    cdm ~/tmp/YT/ @RET
-
-    y-rc "$@"
-}
+aliasfn yrc1080 y-rc-1080
 ##
 function trr-count {
     local count
