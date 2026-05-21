@@ -151,21 +151,24 @@ function aa-rc {
     local dest=( $jrabbit "$(basename "$(pwd)")" )
     local jrabbit="${(j|/|)dest}"
     # dvar jrabbit
-    local i
-    local opts=()
+    ##
+    dl_rc_engine=(aa-raw) h-dl-rc "$@"
+    ##
+    # local i
+    # local opts=()
 
-    for i in "$@" ; do
-        [[ "$i" =~ '^-' ]] && {
-            opts+="$i"
-            continue
-        }
-        local u="$(uuidgen)"
-        pushf "$u"
-        aa-raw $opts[@] "$i"
-        jdlrc *
-        rm *
-        popf
-    done
+    # for i in "$@" ; do
+    #     [[ "$i" =~ '^-' ]] && {
+    #         opts+="$i"
+    #         continue
+    #     }
+    #     local u="$(uuidgen)"
+    #     pushf "$u"
+    #     aa-raw $opts[@] "$i"
+    #     jdlrc *
+    #     rm *
+    #     popf
+    # done
 }
 aliasfn hi10-rc jrabbit=anime fnswap aa aa-rc
 
@@ -176,6 +179,74 @@ function hi10-dl-rc() {
 function rudi-clone() {
     rudi="$rabbit1" rcr --progress --drive-server-side-across-configs sync rabbit0: rudi:
     rudi="$b7" rabbit="$b6" rcr --progress --drive-server-side-across-configs sync rabbit0: rudi:
+}
+##
+function h-dl-rc {
+    local dl_engine=("${dl_rc_engine[@]}")
+    if test -z "${dl_engine[*]}" ; then
+        ecerr "$0: dl_rc_engine is empty"
+        return 1
+    fi
+
+    # dvar jrabbit
+    local i
+    local i opts=() urls=()
+    local fs
+
+    while (( ${#@} >= 1 )) ; do
+        i="$1"
+        shift @RET
+
+        if [[ "$i" == '--' ]] ; then
+            urls+=("$@")
+            break
+
+        elif [[ "$i" =~ '^-' ]] ; then
+            opts+="$i"
+            continue
+
+        else
+            urls+="$i"
+            continue
+        fi
+    done
+
+    for i in "${urls[@]}" ; do
+        local u="$(uuidgen)"
+        pushf "$u"
+
+        reval-ec "$dl_engine[@]" "${opts[@]}" "$i"
+
+        fs=(*(DN))
+        if (( ${#fs} >=1 )) ; then
+            reval-ec jdlrc "${fs[@]}"
+            reval-ec rm -r "${fs[@]}"
+        fi
+
+        popf
+    done
+}
+##
+function y-rc {
+    local dest=( $jrabbit YT )
+    local jrabbit="${(j|/|)dest}"
+    # dvar jrabbit
+
+    dl_rc_engine=("${y_rc_engine[@]:-ysmall}") h-dl-rc "$@"
+}
+
+function y-rc-small {
+    y_rc_engine=(ysmall) y-rc "$@"
+}
+
+function y-rc-1080 {
+    y_rc_engine=(y1080) y-rc "$@"
+}
+
+function jyrc {
+    cdm ~/tmp/YT/ @RET
+
+    y-rc "$@"
 }
 ##
 function trr-count {
