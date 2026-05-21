@@ -142,7 +142,7 @@ function jdlrc {
     jglob
     local i
     for i in "$@" ; do
-        reval-ec rcr copy -vv --no-traverse "./$i" "rabbit0:julia/$jrabbit"
+        reval-ec rcr copy -vv --no-traverse "./$i" "rabbit0:julia/${jrabbit:-misc}"
     done
 }
 
@@ -180,9 +180,10 @@ function h-aa-rc-pwd-head {
 
 aliasfn hi10-rc jrabbit=anime fnswap aa h-aa-rc-pwd-head
 
-function hi10-dl-rc() {
-    # using `hi10-rc hi10-ng ...` works, too
-     hi10-rc hi10-dl < hi10-links.txt
+function hi10-dl-rc {
+    #: using `hi10-rc hi10-ng ...` works, too
+    ##
+    hi10-rc hi10-dl < hi10-links.txt
 }
 ##
 function rudi-clone() {

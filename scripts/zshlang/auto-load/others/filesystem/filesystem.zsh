@@ -405,3 +405,20 @@ function ffduv {
     du-video | gcut -f 2- | tac | fz | inargsf rgeval m
 }
 ##
+function fd-deepest-dir {
+  local d rel depth best max=-1
+
+  while IFS= read -r -d $'\0' d; do
+    rel=${d#./}
+    depth=${#${(s:/:)rel}}
+
+    if (( depth > max )); then
+      max=$depth
+      best=$d
+    fi
+  done < <(command fd -uuu -H -0 -t d . .) @TRET
+
+  ec "$best" |
+      cat-copy-if-tty
+}
+##

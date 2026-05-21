@@ -100,6 +100,7 @@ aliasfn ci2098 curl-ip -x 'http://127.0.0.1:2098'
 aliasfn ci99 curl-ip -x 'socks5h://127.0.0.1:1099'
 
 aliasfn ci18000 curl-ip -x 'socks5h://127.0.0.1:18000'
+aliasfn ci18001 curl-ip -x 'socks5h://127.0.0.1:18001'
 
 aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
 aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
