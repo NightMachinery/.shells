@@ -238,17 +238,17 @@ function y-rc {
 
     dl_rc_engine=("${y_rc_engine[@]:-ysmall}") h-dl-rc "$@"
 }
-aliasfn yrc y-rc
+aliasfn-ng yrc y-rc
 
 function y-rc-small {
     y_rc_engine=(ysmall) y-rc "$@"
 }
-aliasfn yrcsmall y-rc-small
+aliasfn-ng yrcsmall y-rc-small
 
 function y-rc-1080 {
     y_rc_engine=(y1080) y-rc "$@"
 }
-aliasfn yrc1080 y-rc-1080
+aliasfn-ng yrc1080 y-rc-1080
 ##
 function trr-count {
     local count
