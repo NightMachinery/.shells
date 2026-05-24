@@ -191,6 +191,7 @@ cdn.lilf.ir {
     }
 
     handle {
-        respond "Not found" 404
+        # respond "Not found" 404
+        respond "Server under maintenance. Have some iced tea first!"
     }
 }
