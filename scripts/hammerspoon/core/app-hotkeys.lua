@@ -80,8 +80,16 @@ end
 -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
-appHotkey{ key='.', appName='com.google.Chrome' }
-appHotkey{ key='.', mods={'shift'}, appName='com.microsoft.edgemac' }
+appHotkey{
+    key='.',
+    mods={'shift'},
+    appName='com.google.Chrome'
+}
+appHotkey{
+    key='.',
+    -- mods={'shift'},
+    appName='com.microsoft.edgemac'
+}
 -- appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
 appHotkey{ key='/', mods={'shift'}, appName='com.interversehq.qView' }
 -- appHotkey{ key='.', appName='com.openai.atlas' }
