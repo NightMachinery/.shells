@@ -124,6 +124,13 @@ function ffmpeg-to-video {
 some_var="$(some_command ...)"
 #+end_src
 
+However some values cannot be quoted:
+#+begin_src zsh :eval never
+functions["name"]="${body}"
+#+end_src
+
+This will actually define `"name"` as the function name, including the quotes.
+
 - If we need to quote something that will be evaled later, we should use =gquote=.
 
 - Note that these options are set:

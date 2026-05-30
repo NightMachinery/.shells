@@ -781,3 +781,7 @@ function sgpt-gpt4v {
 }
 alias xv='sgpt-gpt4v'
 ##
+function codex-models-ls {
+    reval-ec llm models -q openai-codex
+}
+##

@@ -37,6 +37,16 @@ function ifdefined-cmd() {
     fi
 }
 
+function ensure-cmd {
+    local name
+    for name in "$@" ; do
+        if ! isdefined-cmd "${name}" ; then
+            ecerr "missing command: ${name}"
+            return 1
+        fi
+    done
+}
+
 function cmd-sub() {
     local cmd="$1" sub="$2"
 

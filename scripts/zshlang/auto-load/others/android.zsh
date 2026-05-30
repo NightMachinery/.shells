@@ -7,19 +7,21 @@ function apkdl() {
 reify apkdl
 noglobfn apkdl
 ##
-function h-hotspot-1081-to-9081 {
-    reval-ec gost -L socks5://127.0.0.1:9081 -L http://127.0.0.1:9087 -F "socks5://$(router-ip):1081"
+function h-hotspot-to-9081 {
+    local hotspot_port="${hotspot_port:-10886}"
+
+    reval-ec gost -L socks5://127.0.0.1:9081 -L http://127.0.0.1:9087 -F "socks5://$(router-ip):${hotspot_port}"
 }
 
-function hotspot-1081-to-9081 {
-    tmuxnewsh2 hotspot-1081-to-9081 h-hotspot-1081-to-9081
+function hotspot-to-9081 {
+    tmuxnewsh2 hotspot-to-9081 hotspot_port="${hotspot_port}" h-hotspot-to-9081
 }
 
 function 1070-to-9081 {
-    tmuxnewsh2 hotspot-1081-to-9081 gost -L socks5://127.0.0.1:9081 -L http://127.0.0.1:9087 -F "socks5://localhost:1070"
+    tmuxnewsh2 hotspot-to-9081 gost -L socks5://127.0.0.1:9081 -L http://127.0.0.1:9087 -F "socks5://localhost:1070"
 }
 
 function 1097-to-9081 {
-    tmuxnewsh2 hotspot-1081-to-9081 gost -L socks5://127.0.0.1:9081 -L http://127.0.0.1:9087 -F "socks5://localhost:1097"
+    tmuxnewsh2 hotspot-to-9081 gost -L socks5://127.0.0.1:9081 -L http://127.0.0.1:9087 -F "socks5://localhost:1097"
 }
 ##

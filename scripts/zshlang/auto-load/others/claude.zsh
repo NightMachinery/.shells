@@ -18,11 +18,12 @@ function claude-autocommit {
 ##
 function claude-vcsh-commit {
     local target_dir="${1:-$NIGHTDIR}"
+    local engine=("${claude_commit_engine[@]:-claude}")
 
     (
         cd "$target_dir" @RET
     
-        claude -p "Read '${NIGHTDIR}/prompt/vcsh-commit.md' and start committing changes." --verbose --allowedTools 'Bash(vcsh night.sh:*)'
+        reval-ecgray "${engine[@]}" -p "Read '${NIGHTDIR}/AGENTS.md' and '${NIGHTDIR}/PE/vcsh-commit.md' and start committing changes." --verbose --allowedTools 'Bash(vcsh night.sh:*)'
 
         ecgray
         reval-ecgray vcn-with glola 5
