@@ -10,7 +10,7 @@ function claude {
 }
 ##
 function claude-autocommit {
-     reval-ec claude --verbose -p 'git-committer' --allowedTools 'Bash(git:*)'
+     reval-ec claude-m --verbose -p 'git-committer' --allowedTools 'Bash(git:*)'
 
      ecgray
      reval-ecgray glola 5
@@ -18,7 +18,7 @@ function claude-autocommit {
 ##
 function claude-vcsh-commit {
     local target_dir="${1:-$NIGHTDIR}"
-    local engine=("${claude_commit_engine[@]:-claude}")
+    local engine=("${claude_commit_engine[@]:-claude-m}")
 
     (
         cd "$target_dir" @RET
@@ -34,7 +34,16 @@ function claude-night-sh {
     (
         cd "$NIGHTDIR" @RET
         
-        claude "${NIGHTDIR}/prompt/night-sh.md"
+        claude-m "${NIGHTDIR}/prompt/night-sh.md"
     )
 }
+##
+function claude-pioneer {
+    local -x ANTHROPIC_AUTH_TOKEN="${pioneer_api_key}"
+    local -x ANTHROPIC_BASE_URL="https://api.pioneer.ai/"
+
+    claude "$@"
+}
+
+aliasfn claude-m claude-pioneer
 ##
