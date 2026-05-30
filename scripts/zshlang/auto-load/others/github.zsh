@@ -95,8 +95,8 @@ function gh-release-get {
         # popf
     }
 }
-alias gh-install='gh-release-get'
-alias github-install='gh-release-get'
+aliasfn gh-install gh-release-get
+aliasfn github-install gh-release-get
 ##
 function gh-pr-pip {
     gh_pr_pip.py "$@" |

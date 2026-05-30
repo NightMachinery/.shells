@@ -88,7 +88,15 @@ function tmuxnewsh {
         )
     fi
 
-    revaldbg tmuxnew "$1" "$(gq zsh -c "cd $(gq $PWD) && FORCE_INTERACTIVE=y ${env[*]} $(gq "${@[2,-1]}")")"
+    local tmux_pwd="$PWD"
+    if isBorg ; then
+        tmux_pwd="${HOME}/tmp"
+        mkdir-m "${tmux_pwd}"
+
+        #: In Borg, the current PWD will be deleted after command execution. This can be hazardous to the processes running in tmux.
+    fi
+
+    revaldbg tmuxnew "$1" "$(gq zsh -c "cd $(gq ${tmux_pwd}) && FORCE_INTERACTIVE=y ${env[*]} $(gq "${@[2,-1]}")")"
 }
 
 function tmuxnewsh2 {

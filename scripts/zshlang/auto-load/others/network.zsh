@@ -69,22 +69,28 @@ aliasfn ci2075 curl-ip -x 'http://127.0.0.1:2075'
 aliasfn ci78 curl-ip -x 'socks5h://127.0.0.1:1078'
 aliasfn ci79 curl-ip -x 'socks5h://127.0.0.1:1079'
 aliasfn ci80 curl-ip -x 'socks5h://127.0.0.1:1080'
+aliasfn ci2080 curl-ip -x 'http://127.0.0.1:2080'
 aliasfn ci7085 curl-ip -x 'socks5h://127.0.0.1:7085'
+aliasfn ci10886 curl-ip -x 'socks5h://127.0.0.1:10886'
 aliasfn ci10808 curl-ip -x 'socks5h://127.0.0.1:10808'
 aliasfn ci20808 curl-ip -x 'http://127.0.0.1:20808'
 aliasfn ci10809 curl-ip -x 'http://127.0.0.1:10809'
 aliasfn ci81 curl-ip -x 'socks5h://127.0.0.1:1081'
 aliasfn ci82 curl-ip -x 'socks5h://127.0.0.1:1082'
 aliasfn ci2082 curl-ip -x 'http://127.0.0.1:2082'
-aliasfn ci89 curl-ip -x 'socks5h://127.0.0.1:1089'
 aliasfn ci3067-socks curl-ip -x 'socks5h://127.0.0.1:3067'
 aliasfn ci3067 curl-ip -x 'http://127.0.0.1:3067'
+
+# aliasfn ci89 curl-ip -x 'socks5h://127.0.0.1:1089'
+aliasfn ci89 curl-ip -x 'http://127.0.0.1:2089'
 aliasfn ci2089 curl-ip -x 'http://127.0.0.1:2089'
+
 aliasfn ci90 curl-ip -x 'socks5h://127.0.0.1:1090'
 aliasfn ci2090 curl-ip -x 'http://127.0.0.1:2090'
 aliasfn ci91 curl-ip -x 'socks5h://127.0.0.1:1091'
 aliasfn ci92 curl-ip -x 'socks5h://127.0.0.1:1092'
 aliasfn ci93 curl-ip -x 'socks5h://127.0.0.1:1093'
+aliasfn ci2093 curl-ip -x 'http://127.0.0.1:2093'
 aliasfn ci94 curl-ip -x 'socks5h://127.0.0.1:1094'
 aliasfn ci95 curl-ip -x 'socks5h://127.0.0.1:1095'
 aliasfn ci195 curl-ip -x 'socks5h://127.0.0.1:1195'
@@ -114,9 +120,9 @@ aliasfn ci9087 curl-ip -x 'http://127.0.0.1:9087'
 
 aliasfn ci14000-socks curl-ip -x 'socks5h://127.0.0.1:14000'
 ##
-alias myip-httpbin='curlm https://httpbin.org/ip'
-alias myip-amazon='curlm https://checkip.amazonaws.com'
-alias myip-ipify='curlm https://api.ipify.org'
+aliasfn myip-httpbin curlm https://httpbin.org/ip
+aliasfn myip-amazon curlm https://checkip.amazonaws.com
+aliasfn myip-ipify curlm https://api.ipify.org
 #: ipify does not return location, but you can its IP output as JSON with `"https://api.ipify.org?format=json"`.
 
 function myip-wtf {
@@ -127,7 +133,7 @@ function myip-ipapi {
     curlm "https://ipapi.co/json/" "$@" | command jq .
 }
 
-alias myip-ipinfo='curlm -H "Authorization: Bearer ${ipinfo_api_token}" https://ipinfo.io/ip'
+aliasfn myip-ipinfo curlm -H '"Authorization: Bearer ${ipinfo_api_token}"' https://ipinfo.io/ip
 ##
 # opendns sometimes returns wrong results, but it is slightly faster
 alias myip-opendns='dig +short myip.opendns.com @208.67.222.222' # @resolver1.opendns.com
@@ -141,15 +147,16 @@ function myip-dnstoys {
 function myip-google1 {
     dig TXT +short o-o.myaddr.l.google.com @ns1.google.com | gtr -d '"'
 }
-function myip-google() {
+function myip-google {
     # `hyperfine 'dig TXT +short o-o.myaddr.l.google.com @8.8.8.8' 'dig TXT +short o-o.myaddr.l.google.com @8.8.4.4'`
     dig TXT +short o-o.myaddr.l.google.com @8.8.4.4 | rg --only-matching --replace '$1' '"edns0-client-subnet (.*)/\d+"'
 }
 ##
-function myip-cloudflare() {
+function myip-cloudflare {
     dig @1.1.1.1 ch txt whoami.cloudflare +short | gtr -d '"'
 }
-function myip-stun() {
+
+function myip-stun {
     # servers: http://olegh.ftp.sh/public-stun.txt https://gist.github.com/mondain/b0ec1cf5f60ae726202e
     {
         # stunclient stun.stunprotocol.org
@@ -157,7 +164,7 @@ function myip-stun() {
     } | rg --only-matching --replace='$1' 'Mapped address:\s+([^:]*):'
 }
 
-function myip-linux() {
+function myip-linux {
     # @serveronly ? https://apple.stackexchange.com/questions/93533/how-to-obtain-the-external-ipv4-address-via-terminal
     hostname -I | awk '{print $1}'
 }
@@ -177,7 +184,7 @@ aliasfn ip-get myip
 # @fast Akamai approximate; not reliable for isIran.
 # NOTE: This returns only an approximate IP from your block,
 # but has the benefit of working with private DNS proxies.
-function myipa-akami() {
+function myipa-akami {
     dig +short TXT whoami.ds.akahelp.net | rg --only-matching --replace '$1' '"(\d+[^"]+)"'
 }
 ##
