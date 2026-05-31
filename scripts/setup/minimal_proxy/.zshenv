@@ -706,6 +706,35 @@ function codex-yolo {
     codex_security_opts=(--yolo) codex-m "$@"
 }
 ##
+function claude {
+    #: @duplicateCode/fd706e6b8475e27ca5cf27951b1d8ddc
+    ##
+    local -x EDITOR=nvim
+    local -x VISUAL="${EDITOR}"
+    #: not sure if EDITOR is actually used
+
+    tty-title "🍼${PWD:t}"
+
+    $proxyenv command claude "$@"
+}
+
+function claude-pioneer {
+    local -x ANTHROPIC_AUTH_TOKEN="${pioneer_api_key}"
+    local -x ANTHROPIC_BASE_URL="https://api.pioneer.ai/"
+
+    claude "$@"
+}
+aliasfn claude-m claude-pioneer
+
+function claude-freemodel {
+    local -x ANTHROPIC_AUTH_TOKEN="${freemodel_api_key}"
+    local -x ANTHROPIC_API_KEY="${freemodel_api_key}"
+    local -x ANTHROPIC_BASE_URL="https://cc.freemodel.dev"
+    local -x CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+
+    claude "$@"
+}
+##
 #: * Substituting non-essential functions with no-ops
 function mark-me { true }
 ##
