@@ -4,9 +4,9 @@ function zerr_handler {
     #
     # [[https://unix.stackexchange.com/questions/664117/zsh-how-to-store-the-return-code-of-a-statement-without-triggering-set-e][shell - zsh: How to store the return code of a statement without triggering `...]]
     ##
-    local r=$? ps=("$pipestatus[@]") skip="${zerr_skip}" # @alt `&& true` also skips zerr
+    local r=$? ps=("$pipestatus[@]") skip="${zerr_skip:-}" # @alt `&& true` also skips zerr
 
-    if ! bool "$zerr_skip" ; then
+    if ! bool "${zerr_skip:-}" ; then
         case $r in
             895)
                 # ectrace "$0: $r ; subshell level: $ZSH_SUBSHELL" || true
