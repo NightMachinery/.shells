@@ -1,5 +1,7 @@
 ##
 function claude {
+    #: @duplicateCode/fd706e6b8475e27ca5cf27951b1d8ddc
+    ##
     local -x EDITOR=nvim
     local -x VISUAL="${EDITOR}"
     #: not sure if EDITOR is actually used
@@ -10,6 +12,8 @@ function claude {
 }
 ##
 function claude-autocommit {
+    local -x ANTHROPIC_MODEL="sonnet"
+
      reval-ec claude-m --verbose -p 'git-committer' --allowedTools 'Bash(git:*)'
 
      ecgray
@@ -21,6 +25,8 @@ function claude-vcsh-commit {
     local engine=("${claude_commit_engine[@]:-claude-m}")
 
     (
+        local -x ANTHROPIC_MODEL="sonnet"
+
         cd "$target_dir" @RET
     
         reval-ecgray "${engine[@]}" -p "Read '${NIGHTDIR}/AGENTS.md' and '${NIGHTDIR}/PE/vcsh-commit.md' and start committing changes." --verbose --allowedTools 'Bash(vcsh night.sh:*)'
@@ -46,4 +52,13 @@ function claude-pioneer {
 }
 
 aliasfn claude-m claude-pioneer
+##
+function claude-freemodel {
+    local -x ANTHROPIC_AUTH_TOKEN="${freemodel_api_key}"
+    local -x ANTHROPIC_API_KEY="${freemodel_api_key}"
+    local -x ANTHROPIC_BASE_URL="https://cc.freemodel.dev"
+    local -x CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+
+    claude "$@"
+}
 ##
