@@ -67,7 +67,8 @@ function codex-m {
     fi
 
     # -c model_reasoning_effort="high"
-    reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c web_search="true" --search "$@"
+    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" --search "$@"
+    # -c web_search="true"
     # -c model_verbosity="high"
     #
     # --ask-for-approval:
