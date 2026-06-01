@@ -107,7 +107,8 @@ emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='x', appName=emacsAppName }
 
 appHotkey{ key='l', appName='com.tdesktop.Telegram' }
--- appHotkey{ key='\\', appName='com.tdesktop.Telegram' }
+
+appHotkey{ key='\\', appName='moe.Throne.macosx' }
 
 -- appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='b', appName='zathura' }
