@@ -29,7 +29,11 @@ the new refresh token.
 
 When checking all auth files, the human-readable output uses each auth file path as
 the section header, marks the snapshot matching `~/.codex/auth.json` with an
-`[Active]` tag, and omits the redundant `Alias:` field. After the per-auth
+`[Active]` tag, and omits the redundant `Alias:` field. The bare
+`~/.codex/auth.json` is checked as its own source (labeled `auth`) only when its
+bytes do not already match one of the `auth_<alias>.json` snapshots; when it is
+byte-identical to an alias snapshot, that alias source already represents it and
+the bare file is skipped to avoid a duplicate check. After the per-auth
 details, it prints average primary and secondary usage across successful auths
 that returned numeric usage values. The active auth is printed last in
 human-readable status lists. JSON `--all` output includes the same aggregate
@@ -40,6 +44,17 @@ without weekly credit remaining. Human-readable output shows the auth alias
 that will reset first, for example:
 
 `First Time to Reset: some_alias in 2h 20m (2026-05-07 19:41:54 +0330)`
+
+## Progress
+
+When more than one auth file is checked and stderr is a TTY, a single-line
+progress bar is rendered to stderr while the parallel status checks run, then
+cleared before the report prints. It uses [tqdm](https://github.com/tqdm/tqdm)
+when importable and falls back to a small ASCII bar (`Checking auths
+[####----] 3/8`) otherwise, so the script still works under a Python without
+tqdm installed. This applies to both `status --all` and `swap`. The bar is
+suppressed when `--color never` is in effect or when stderr is not a terminal,
+so piped/redirected output stays clean.
 
 ## Color
 

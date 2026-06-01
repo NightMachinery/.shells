@@ -19,6 +19,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+try:
+    from tqdm import tqdm as _tqdm
+except ImportError:
+    _tqdm = None
+
 
 AUTH_CLAIM = "https://api.openai.com/auth"
 AUTH_FILE_RE = re.compile(r"^auth(?:\.|_|-)?(?P<alias>.+)\.json$")
@@ -1375,13 +1380,28 @@ def all_auth_sources() -> list[AuthSource]:
     codex_home = Path(os.path.expanduser("~")) / ".codex"
     sources: list[AuthSource] = []
 
-    for path in iter_matching_files(codex_home, AUTH_FILE_RE):
+    alias_paths = iter_matching_files(codex_home, AUTH_FILE_RE)
+    for path in alias_paths:
         label = alias_from_auth_path(path) or path.name
         sources.append(
             AuthSource(
                 path=path,
                 label=label,
                 display_path=home_relative(path),
+            )
+        )
+
+    # Include the bare auth.json on its own when no aliased snapshot already
+    # carries identical bytes; otherwise that alias source already represents it.
+    bare = codex_home / "auth.json"
+    if bare.is_file() and not any(
+        auth_bytes_equal(bare, path) for path in alias_paths
+    ):
+        sources.append(
+            AuthSource(
+                path=bare,
+                label=alias_from_auth_path(bare) or bare.name,
+                display_path=home_relative(bare),
             )
         )
 
@@ -1558,12 +1578,83 @@ def gather_status(source: AuthSource, *, parsed: ParsedArgs) -> AuthStatus:
     return error_status_from_exception(source, last_exc)
 
 
+class ProgressBar:
+    """Progress bar shown on stderr while statuses load.
+
+    Uses tqdm when it is importable; otherwise falls back to a small
+    carriage-return ASCII bar so the script keeps working under a Python
+    without tqdm installed.
+    """
+
+    def __init__(
+        self,
+        total: int,
+        *,
+        label: str = "Checking auths",
+        width: int = 24,
+        enabled: bool = True,
+    ) -> None:
+        self.total = total
+        self.done = 0
+        self.label = label
+        self.width = width
+        self.enabled = enabled and total > 0 and sys.stderr.isatty()
+        self._rendered = False
+        self._tqdm = None
+
+    def _render(self) -> None:
+        if not self.enabled or self._tqdm is not None:
+            return
+
+        filled = int(self.width * self.done / self.total) if self.total else self.width
+        bar = "#" * filled + "-" * (self.width - filled)
+        sys.stderr.write(f"\r{self.label} [{bar}] {self.done}/{self.total}")
+        sys.stderr.flush()
+        self._rendered = True
+
+    def start(self) -> None:
+        if not self.enabled:
+            return
+
+        if _tqdm is not None:
+            self._tqdm = _tqdm(
+                total=self.total,
+                desc=self.label,
+                unit="auth",
+                leave=False,
+                file=sys.stderr,
+            )
+            return
+
+        self._render()
+
+    def advance(self) -> None:
+        self.done += 1
+        if self._tqdm is not None:
+            self._tqdm.update(1)
+            return
+
+        self._render()
+
+    def finish(self) -> None:
+        if self._tqdm is not None:
+            self._tqdm.close()
+            self._tqdm = None
+        elif self.enabled and self._rendered:
+            sys.stderr.write("\r\033[K")
+            sys.stderr.flush()
+        self.enabled = False
+
+
 def gather_statuses(parsed: ParsedArgs, sources: list[AuthSource]) -> list[AuthStatus]:
     if len(sources) <= 1:
         return [gather_status(sources[0], parsed=parsed)] if sources else []
 
     max_workers = min(parsed.args.workers, len(sources))
     statuses: list[AuthStatus | None] = [None] * len(sources)
+
+    progress = ProgressBar(len(sources), enabled=parsed.args.color != "never")
+    progress.start()
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_index = {
@@ -1581,7 +1672,10 @@ def gather_statuses(parsed: ParsedArgs, sources: list[AuthSource]) -> list[AuthS
                     ok=False,
                     error=f"codex-status: {type(exc).__name__}: {exc}",
                 )
+            finally:
+                progress.advance()
 
+    progress.finish()
     return [status for status in statuses if status is not None]
 
 
