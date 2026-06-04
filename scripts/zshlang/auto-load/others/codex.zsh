@@ -185,3 +185,60 @@ function codex-auth-from-remote {
     reval-ec rsp-safe "${fullhost}:.codex/auth.json" ~/tmp/.codex-auths/"auth_$(str2filename-ascii ${fullhost}).json"
 }
 ##
+function codex-pioneer {
+    local -x PIONEER_API_KEY="${pioneer_api_key}"
+
+    codex \
+        -c 'model_provider="pioneer"' \
+        -c 'model="gpt-5.5"' \
+        -c 'model_providers.pioneer.name="Pioneer"' \
+        -c 'model_providers.pioneer.base_url="https://api.pioneer.ai/v1"' \
+        -c 'model_providers.pioneer.wire_api="responses"' \
+        -c 'model_providers.pioneer.env_key="PIONEER_API_KEY"' \
+        -c 'model_providers.pioneer.request_max_retries=10' \
+        -c 'model_providers.pioneer.stream_max_retries=10' \
+        -c 'tui.status_line=["model-with-reasoning","current-dir","context-used"]' \
+        -c 'features.plugins=false' \
+        -c 'check_for_update_on_startup=false' \
+        -c 'include_permissions_instructions=false' \
+        "$@"
+}
+# Check whether Pioneer's /v1/responses streaming has been fixed for a model.
+# Usage: pioneer-responses-test-streaming [gpt-5.5]
+function pioneer-responses-test-streaming {
+    emulate -L zsh
+    local model="${1:-gpt-5.5}"
+    local key="${PIONEER_API_KEY:-${pioneer_api_key}}"
+    if [[ -z "$key" ]]; then
+        print -u2 "pioneer-responses-test-streaming: no API key (set \$PIONEER_API_KEY or \$pioneer_api_key)"
+        return 2
+    fi
+
+    local body
+    body=$($proxyenv curl -s --max-time 60 \
+        -N https://api.pioneer.ai/v1/responses \
+        -H "Content-Type: application/json" \
+        -H "Accept: text/event-stream" \
+        -H "Authorization: Bearer ${key}" \
+        -d "{\"model\":\"${model}\",\"input\":\"Reply with exactly STREAMOK\",\"stream\":true}" 2>&1)
+
+    local delta_text
+    delta_text=$(print -r -- "$body" \
+        | grep '"type": "response.output_text.delta"' \
+        | grep -oE '"delta": ?"[^"]*"' \
+        | sed -E 's/"delta": ?"//; s/"$//' \
+        | tr -d '\n')
+
+    if [[ -n "$delta_text" ]]; then
+        print -r -- "✅ $model: streaming FIXED — deltas received: ${delta_text}"
+        return 0
+    elif print -r -- "$body" | grep -q 'output_text.done'; then
+        print -r -- "❌ $model: streaming STILL BROKEN — stream completed with NO text deltas (upstream bug)"
+        return 1
+    else
+        print -r -- "⚠️  $model: no stream events — request error. Raw head:"
+        print -r -- "$body" | head -c 600
+        return 1
+    fi
+}
+##
