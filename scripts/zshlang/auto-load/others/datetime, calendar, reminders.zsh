@@ -167,6 +167,10 @@ function date-cet {
     TZ='CET' date +'%Y-%m-%d %A %H:%M:%S'
 }
 
+function date-utc {
+    TZ='UTC' date +'%Y-%m-%d %A %H:%M:%S'
+}
+
 function date-anywhere-on-earth {
     TZ='Etc/GMT+12' date +'%Y-%m-%d %A %H:%M:%S'
 }
