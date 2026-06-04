@@ -202,7 +202,9 @@ function codex-pioneer {
         -c 'check_for_update_on_startup=false' \
         -c 'include_permissions_instructions=false' \
         "$@"
+    #: [[id:1d18fd68-ab63-417f-9d17-93c965b48f5e][Codex + Pioneer: interactive =403 Forbidden=; root cause & mitigations]]
 }
+
 # Check whether Pioneer's /v1/responses streaming has been fixed for a model.
 # Usage: pioneer-responses-test-streaming [gpt-5.5]
 function pioneer-responses-test-streaming {
