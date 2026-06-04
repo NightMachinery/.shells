@@ -5,6 +5,9 @@
 .aider*
 repomix-output.xml
 
+**/.claude/settings.local.json
+#: use `.claude/settings.json` if you want it to be tracked
+
 **/*..nogit..*
 
 *.pbak
@@ -323,4 +326,5 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
 
