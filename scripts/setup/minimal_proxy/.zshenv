@@ -705,6 +705,28 @@ function codex-m() {
 function codex-yolo {
     codex_security_opts=(--yolo) codex-m "$@"
 }
+
+function codex-pioneer {
+    #: @duplicateCode/60059a732ea0ddc623c1c01e78587d11
+    ##
+    local -x PIONEER_API_KEY="${pioneer_api_key}"
+
+    codex \
+        -c 'model_provider="pioneer"' \
+        -c 'model="gpt-5.5"' \
+        -c 'model_providers.pioneer.name="Pioneer"' \
+        -c 'model_providers.pioneer.base_url="https://api.pioneer.ai/v1"' \
+        -c 'model_providers.pioneer.wire_api="responses"' \
+        -c 'model_providers.pioneer.env_key="PIONEER_API_KEY"' \
+        -c 'model_providers.pioneer.request_max_retries=10' \
+        -c 'model_providers.pioneer.stream_max_retries=10' \
+        -c 'tui.status_line=["model-with-reasoning","current-dir","context-used"]' \
+        -c 'features.plugins=false' \
+        -c 'check_for_update_on_startup=false' \
+        -c 'include_permissions_instructions=false' \
+        "$@"
+    #: [[id:1d18fd68-ab63-417f-9d17-93c965b48f5e][Codex + Pioneer: interactive =403 Forbidden=; root cause & mitigations]]
+}
 ##
 function claude {
     #: @duplicateCode/fd706e6b8475e27ca5cf27951b1d8ddc
