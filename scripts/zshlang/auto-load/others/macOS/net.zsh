@@ -5,6 +5,7 @@ function router-mac-darwin {
 
     assert silent ping -c1 -t1 "$gw" @RET
     arp -n "$gw" | awk '{print $4}' |
+        perl -nE 'chomp; say join ":", map { sprintf "%02x", hex $_ } split /:/' |
         cat-copy-if-tty
 }
 ##
