@@ -23,18 +23,6 @@ function rm-caches-sudo {
     fi
 }
 
-function trs-rm {
-    local paths=("$@")
-
-    local p
-    for p in $paths[@] ; do
-        if test -e "$p" ; then
-            icat-maybe "$p"
-
-            reval-ec command rm -rf -- "$p"
-        fi
-    done
-}
 
 function rm-caches {
     rm-deleteus

@@ -6,13 +6,6 @@ function tmux-client-terminal-get {
     tmux display-message -p '#{client_termname}' 2>/dev/null
 }
 ##
-#: @duplicateCode/0c8b9d0226cdfb4f5bc0a9ea735089df
-function tmuxnew {
-    #: @todo0 integrate =str2tmuxname=
-    ##
-    silent tmux kill-session -t "$1" || true
-    tmux new -d -s "$@"
-}
 
 function tmux-alive-p {
     local session="${1}"
