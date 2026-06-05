@@ -609,6 +609,7 @@ async def telethon_send_poll(client, poll_arguments, max_retries=30, verbosity=1
         id=0,
         question=_twe(poll_arguments["question"]),
         answers=answers,
+        hash=0,
         public_voters=not poll_arguments["is_anonymous"],
         multiple_choice=poll_arguments["allow_multiple"],
         quiz=(poll_arguments["poll_type"] == "quiz"),
