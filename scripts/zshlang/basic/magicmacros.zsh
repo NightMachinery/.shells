@@ -1,3 +1,4 @@
+source "${${(%):-%x}:A:h}/return-aliases.zsh"
 ## Global Aliases
 alias -g ...='../..'
 alias -g ....='../../..'
@@ -11,15 +12,6 @@ alias -g '@w'=' | fzinw | inargsf rgeval-env '
 # alias -g 'MAGIC'='| { eval "$(read -d "" -r -E)" }'
 alias -g 'MAGIC'='| { eval "$(< /dev/stdin)" }'
 
-alias -g '@RET'=' || return $?'
-# alias -g '@RET'=' || { retcode=$? ; print -r -- "Inside $0: exited ${retcode}" ; return $retcode } '
-
-
-alias -g '@STRUE'=' || { ectrace_single_trace=y ectrace_ret=$? ectrace ; true }'
-
-alias -g '@TRET'=' || { local retcode=$? ; ectrace_single_trace=y ectrace_ret=$retcode ectrace ; return $retcode }' # "$0: TRET encountered"
-
-alias -g '@MRET'='"$0" || return $?'
 ##
 alias '@inargsf'='if (( $#@ == 0 )) ; then ; inargsf re "$0" ; return $? ; fi'
 ##
