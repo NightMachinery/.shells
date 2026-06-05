@@ -5,6 +5,7 @@ isNotExpensive || {
 # personal initializes a lot of vars, so it should be sourced first
 test -z "$NIGHT_PERSONAL" || re source "$NIGHTDIR"/zshlang/personal/**/*.zsh(.)
 run-on-each source "$NIGHTDIR"/zshlang/auto-load/**/*.zsh(.) #I have disabled dotfiles because vim and others create them for swap.
-run-on-each source "$NIGHTDIR"/zshlang/plugins/**/*.plugin.zsh(.N)
+run-on-each source \
+    "$NIGHTDIR"/zshlang/plugins/psiphon/psiphon.plugin.zsh
 
 psource "$NIGHTDIR/zshlang/last.zsh"
