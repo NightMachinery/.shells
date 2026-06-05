@@ -688,7 +688,9 @@ function psiphon-status {
 
     if h-psiphon-tmux-alive ; then
         ec "up: ${session_name}"
-        cat "${last_config_file}" | prefixer -a'  ' || true
+        while IFS= read -r line ; do
+            ec "  ${line}"
+        done < "${last_config_file}" || true
     else
         ec "down: ${session_name}"
         return 1
