@@ -17,3 +17,6 @@ Also Accept @<epoch> to force UTC timestamp (--close-date @1730584200) and +<sec
 
 Isn't a single byte sufficient only for 8 options? So obviously keep the 2 bytes!
 #+END_SRC
+* Fixes
+
+- Telethon 1.43.2 requires =types.Poll(hash=...)=; new outgoing polls now pass =hash=0= when constructing =InputMediaPoll=.
