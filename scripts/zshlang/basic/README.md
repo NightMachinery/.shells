@@ -62,7 +62,7 @@ zplug "NightMachinery/.shells", use:"zshlang/basic/basic.plugin.zsh"
 
 ## Public helper surface
 
-`basic.plugin.zsh` provides the small helper set needed by public plugins such as Psiphon, including:
+`basic.plugin.zsh` provides the small helper set needed by public plugins, including:
 
 - `ec`, `ecn`, `ecerr`
 - `bool`, `ensure-array`, `ensure-cmd`
