@@ -108,6 +108,12 @@ function ffmpeg-to-audio {
 
 Notice how we need to first define =audio_extension=, then =output=.
 
+- Do not use =~= in parameter-expansion defaults; it will not be expanded there. Prefer =${HOME}=:
+
+#+begin_src :eval never
+local config_path="${1:-${HOME}/example/config.yaml}"
+#+end_src
+
 - When the function needs to be passed an array, use this pattern:
 
 #+begin_src :eval never

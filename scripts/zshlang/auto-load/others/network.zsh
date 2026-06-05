@@ -267,6 +267,65 @@ function ip-internal-get1 {
         cat-copy-if-tty
 }
 ##
+function paqet-config-network-update {
+    local config_path="${1}"
+    local addr="${2}"
+    local router_mac="${3}"
+    assert-args config_path addr router_mac @RET
+
+    perl -0pi -e '
+        BEGIN { our $addr = shift @ARGV; our $router_mac = shift @ARGV; }
+        our ($addr, $router_mac);
+        my $replacement = qq{network:\n  interface: "en0"  # Your network interface (en0 for macOS, eth0 for Linux)\n  ipv4:\n    addr: "$addr:0"  # Your local IP, e.g., 192.168.1.100:0\n    router_mac: "$router_mac"  # Gateway MAC, e.g., aa:bb:cc:dd:ee:ff\n};
+        s/^network:\n(?:^[ \t].*\n)*/$replacement/m or die "network block not found\n";
+    ' "${addr}" "${router_mac}" "${config_path}" @RET
+}
+
+function paqet-proxy-listen-get {
+    local config_path="${1}"
+    assert-args config_path @RET
+
+    perl -ne '
+        if (/^socks5:\s*$/) { $in = 1; next }
+        if ($in && /^\S/ && !/^socks5:\s*$/) { $in = 0 }
+        if ($in && /^\s*-\s*listen:\s*["\047]?([^"\047\s#]+)["\047]?/) { print "$1\n"; exit }
+    ' "${config_path}"
+}
+
+function paqet-on {
+    local config_path="${1:-${HOME}/paqet/config.yaml}"
+    local paqet_bin="${commands[paqet]}"
+    local addr router_mac proxy_listen i ipify_out
+
+    assert test -n "${paqet_bin}" @RET
+    assert test -f "${config_path}" @RET
+
+    addr="$(ip-internal-get1 | command rg --invert-match '^127\.' | ghead -1)" @TRET
+    router_mac="$(router-mac-darwin)" @TRET
+    assert test -n "${addr}" @RET
+    assert test -n "${router_mac}" @RET
+
+    paqet-config-network-update "${config_path}" "${addr}" "${router_mac}" @RET
+
+    tmuxnew paqet-client sudo "${paqet_bin}" run -c "${config_path}" @RET
+
+    sleep 1
+    proxy_listen="$(paqet-proxy-listen-get "${config_path}")" @TRET
+    proxy_listen="${proxy_listen:-127.0.0.1:1040}"
+
+    for i in {1..10} ; do
+        ipify_out="$(curl --fail --silent --show-error --connect-timeout 2 --max-time 10 --proxy "socks5h://${proxy_listen}" https://api.ipify.org 2>&1)" && { ec "${ipify_out}" ; return 0 }
+        sleep 1
+    done
+
+    ecerr "${ipify_out}"
+    return 1
+}
+
+function paqet-off {
+    silent tmux kill-session -t paqet-client || true
+}
+##
 function http-static-py {
     python3 -m http.server "${1:-8000}"
 }
