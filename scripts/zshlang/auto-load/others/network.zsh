@@ -323,7 +323,7 @@ function paqet-on {
 }
 
 function paqet-off {
-    silent tmux kill-session -t paqet-client || true
+    tmux-session-processes-kill paqet-client || true
 }
 ##
 function http-static-py {
