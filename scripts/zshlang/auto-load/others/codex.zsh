@@ -186,6 +186,8 @@ function codex-auth-from-remote {
 }
 ##
 function codex-pioneer {
+    #: @duplicateCode/60059a732ea0ddc623c1c01e78587d11
+    ##
     local -x PIONEER_API_KEY="${pioneer_api_key}"
 
     codex \
