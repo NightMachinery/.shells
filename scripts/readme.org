@@ -22,6 +22,25 @@ Hammerspoon modal helpers support single-key bindings with =bind_v2= and
 multi-key chords with =bind_v3=. See =./hammerspoon/docs/hammerspoon.md= for
 the chord behavior and qView examples.
 
+* Zsh plugins
+
+The Zsh code under =./zshlang/= is organized so selected directories can also be loaded as public Zsh plugins. Plugin entrypoint files named =*.plugin.zsh= should stay thin loaders; implementation should live in modular =*.zsh= files.
+
+Current public entrypoints:
+
+- =./zshlang/basic/basic.plugin.zsh=: minimal public helper layer for other plugins.
+- =./zshlang/basic/basic-full.zsh=: full/opinionated local basic stack.
+- =./zshlang/plugins/psiphon/psiphon.plugin.zsh=: Psiphon wrapper plugin; load =basic.plugin.zsh= first.
+
+Manual loading example:
+
+#+begin_src zsh
+source /path/to/.shells/zshlang/basic/basic.plugin.zsh
+source /path/to/.shells/zshlang/plugins/psiphon/psiphon.plugin.zsh
+#+end_src
+
+See =./zshlang/basic/README.md= and =./zshlang/plugins/psiphon/README.md= for plugin-manager examples.
+
 * Codex
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.
