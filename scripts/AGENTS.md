@@ -5,3 +5,13 @@ The root of this git repo is at `~/` as it contains some dotfiles. But we only w
 Read `./PE/Zsh.org`. When you think of something that needs to be in this file, suggest it to me, but don't edit the file yourself unless I tell you to.
 
 Read all scripts in `zshlang/basic`. Reuse functions when possible, DRY.
+
+## Plugins
+### Loading
+
+We load our plugins manually in `zshlang/load-others.zsh`.
+
+### Documentaion
+
+If you want to document installation for a plugin, read the readme of another plugin first and use its style.
+
