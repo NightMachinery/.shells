@@ -548,3 +548,13 @@ tmuxnew julia-borg bash -c 'cd ~/code/betterborg/ && borgp=1096 python3 stdborg.
 * Zsh
 ** escape codes for hotkeys
 *** Make Zsh understand that =^[[1;3C= means =alt + right arrow=.
+
+** zinit plugins
+#+begin_src zsh :eval never
+zinit ice id-as"nightsh" \
+    aliases \
+    pick"scripts/zshlang/basic/basic.plugin.zsh" \
+    multisrc"scripts/zshlang/plugins/psiphon/psiphon.plugin.zsh scripts/zshlang/plugins/paqet/paqet.plugin.zsh"
+zinit light NightMachinery/.shells
+#+end_src
+

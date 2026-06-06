@@ -105,11 +105,11 @@ use = ["zshlang/plugins/paqet/paqet.plugin.zsh"]
 ### Zinit / Zi
 
 ```zsh
-zi ice id-as"night-basic" pick"zshlang/basic/basic.plugin.zsh"
-zi light NightMachinery/.shells
+zinit ice id-as"night-basic" pick"zshlang/basic/basic.plugin.zsh"
+zinit light NightMachinery/.shells
 
-zi ice id-as"night-paqet" pick"zshlang/plugins/paqet/paqet.plugin.zsh"
-zi light NightMachinery/.shells
+zinit ice id-as"night-paqet" pick"zshlang/plugins/paqet/paqet.plugin.zsh"
+zinit light NightMachinery/.shells
 ```
 
 ### Zplug
