@@ -7,8 +7,8 @@ A Zsh wrapper for running a local Paqet client in `tmux`. It updates the `networ
 Load the basic plugin before this plugin:
 
 ```zsh
-source /path/to/.shells/zshlang/basic/basic.plugin.zsh
-source /path/to/.shells/zshlang/plugins/paqet/paqet.plugin.zsh
+source /path/to/.shells/scripts/zshlang/basic/basic.plugin.zsh
+source /path/to/.shells/scripts/zshlang/plugins/paqet/paqet.plugin.zsh
 ```
 
 External commands:
@@ -79,15 +79,15 @@ Replace `NightMachinery/.shells` if you install from another fork or mirror. Loa
 ### Antidote
 
 ```text
-NightMachinery/.shells path:zshlang/basic
-NightMachinery/.shells path:zshlang/plugins/paqet
+NightMachinery/.shells path:scripts/zshlang/basic
+NightMachinery/.shells path:scripts/zshlang/plugins/paqet
 ```
 
 ### Zimfw
 
 ```zsh
-zmodule NightMachinery/.shells --root zshlang/basic --source basic.plugin.zsh
-zmodule NightMachinery/.shells --root zshlang/plugins/paqet --source paqet.plugin.zsh
+zmodule NightMachinery/.shells --root scripts/zshlang/basic --source basic.plugin.zsh
+zmodule NightMachinery/.shells --root scripts/zshlang/plugins/paqet --source paqet.plugin.zsh
 ```
 
 ### Sheldon
@@ -95,25 +95,31 @@ zmodule NightMachinery/.shells --root zshlang/plugins/paqet --source paqet.plugi
 ```toml
 [plugins.night-basic]
 github = "NightMachinery/.shells"
-use = ["zshlang/basic/basic.plugin.zsh"]
+use = ["scripts/zshlang/basic/basic.plugin.zsh"]
 
 [plugins.paqet]
 github = "NightMachinery/.shells"
-use = ["zshlang/plugins/paqet/paqet.plugin.zsh"]
+use = ["scripts/zshlang/plugins/paqet/paqet.plugin.zsh"]
 ```
 
 ### Zinit / Zi
 
-```zsh
-zinit ice id-as"night-basic" pick"zshlang/basic/basic.plugin.zsh"
-zinit light NightMachinery/.shells
+Zinit must use `aliases`; otherwise global aliases such as `@RET` are not expanded while plugin files are parsed.
 
-zinit ice id-as"night-paqet" pick"zshlang/plugins/paqet/paqet.plugin.zsh"
+```zsh
+zinit ice id-as"nightsh" \
+  aliases \
+  pick"scripts/zshlang/basic/basic.plugin.zsh" \
+  multisrc"scripts/zshlang/plugins/paqet/paqet.plugin.zsh"
 zinit light NightMachinery/.shells
 ```
+
+#### Zinit troubleshooting
+
+If Zinit reports `parse error near @RET`, the plugin was loaded without alias expansion. Add the `aliases` ice shown above.
 
 ### Zplug
 
 ```zsh
-zplug "NightMachinery/.shells", use:"zshlang/basic/basic.plugin.zsh zshlang/plugins/paqet/paqet.plugin.zsh"
+zplug "NightMachinery/.shells", use:"scripts/zshlang/basic/basic.plugin.zsh scripts/zshlang/plugins/paqet/paqet.plugin.zsh"
 ```

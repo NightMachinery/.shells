@@ -550,6 +550,7 @@ tmuxnew julia-borg bash -c 'cd ~/code/betterborg/ && borgp=1096 python3 stdborg.
 *** Make Zsh understand that =^[[1;3C= means =alt + right arrow=.
 
 ** zinit plugins
+Zinit needs =aliases= because the plugins use global aliases such as =@RET=.
 #+begin_src zsh :eval never
 zinit ice id-as"nightsh" \
     aliases \

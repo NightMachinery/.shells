@@ -14,13 +14,13 @@ Use `basic.plugin.zsh` unless you specifically want the full local environment.
 ## Manual loading
 
 ```zsh
-source /path/to/.shells/zshlang/basic/basic.plugin.zsh
+source /path/to/.shells/scripts/zshlang/basic/basic.plugin.zsh
 ```
 
 For the full local stack:
 
 ```zsh
-source /path/to/.shells/zshlang/basic/basic-full.zsh
+source /path/to/.shells/scripts/zshlang/basic/basic-full.zsh
 ```
 
 ## Plugin-manager examples
@@ -30,13 +30,13 @@ Replace `NightMachinery/.shells` if you install from another fork or mirror.
 ### Antidote
 
 ```text
-NightMachinery/.shells path:zshlang/basic
+NightMachinery/.shells path:scripts/zshlang/basic
 ```
 
 ### Zimfw
 
 ```zsh
-zmodule NightMachinery/.shells --root zshlang/basic --source basic.plugin.zsh
+zmodule NightMachinery/.shells --root scripts/zshlang/basic --source basic.plugin.zsh
 ```
 
 ### Sheldon
@@ -44,20 +44,24 @@ zmodule NightMachinery/.shells --root zshlang/basic --source basic.plugin.zsh
 ```toml
 [plugins.night-basic]
 github = "NightMachinery/.shells"
-use = ["zshlang/basic/basic.plugin.zsh"]
+use = ["scripts/zshlang/basic/basic.plugin.zsh"]
 ```
 
 ### Zinit / Zi
 
+Zinit must load this plugin with `aliases`, because the basic plugin defines global aliases used by dependent plugins.
+
 ```zsh
-zi ice id-as"night-basic" pick"zshlang/basic/basic.plugin.zsh"
-zi light NightMachinery/.shells
+zinit ice id-as"nightsh" \
+  aliases \
+  pick"scripts/zshlang/basic/basic.plugin.zsh"
+zinit light NightMachinery/.shells
 ```
 
 ### Zplug
 
 ```zsh
-zplug "NightMachinery/.shells", use:"zshlang/basic/basic.plugin.zsh"
+zplug "NightMachinery/.shells", use:"scripts/zshlang/basic/basic.plugin.zsh"
 ```
 
 ## Public helper surface
