@@ -75,7 +75,7 @@ use = ["scripts/zshlang/plugins/psiphon/psiphon.plugin.zsh"]
 
 ### Zinit / Zi
 
-Zinit must use `aliases`; otherwise global aliases such as `@RET` are not expanded while plugin files are parsed.
+Zinit must use `aliases`; otherwise aliases such as `@RET` are not expanded while plugin files are parsed.
 
 ```zsh
 zinit ice id-as"nightsh" \
@@ -84,10 +84,6 @@ zinit ice id-as"nightsh" \
   multisrc"scripts/zshlang/plugins/psiphon/psiphon.plugin.zsh"
 zinit light NightMachinery/.shells
 ```
-
-#### Zinit troubleshooting
-
-If Zinit reports `parse error near @RET`, the plugin was loaded without alias expansion. Add the `aliases` ice shown above.
 
 ### Zplug
 
