@@ -730,7 +730,7 @@ function h-psiphon-default-regions {
 }
 
 function h-psiphon-default-port-specs {
-    local ports=(75 81 2089 93 96)
+    local ports=(70 75 80 81 2089 93 96 9081)
 
     arrnn ${ports[@]}
 }
