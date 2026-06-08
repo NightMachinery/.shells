@@ -101,6 +101,8 @@ function nightsh-load-zshrc() {
   # alias ohmyzsh="mate ~/.oh-my-zsh"
   ###
 
+  source-plugin 'mattmc3/zman'
+
   zsh-defer psource /usr/local/opt/git-extras/share/git-extras/git-extras-completion.zsh
 
   ## vi-mode (forked from OMZ)
