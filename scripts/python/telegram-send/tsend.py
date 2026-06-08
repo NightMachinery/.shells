@@ -107,6 +107,13 @@ def p2int(p):
         return p
 
 
+def normalize_destination(destination):
+    destination = str(destination or "").strip()
+    if not destination:
+        raise SystemExit("Destination cannot be empty.")
+    return destination
+
+
 def sanitize_telegram_html(message):
     allowed_tags = ["b", "i", "u", "s", "code", "pre", "a"]
 
@@ -304,7 +311,7 @@ def parse_poll_arguments(arguments):
         close_date_dt = _close_date_dt_from_ts(close_date_ts)
 
     poll_data = dict(
-        chat_id=p2int(arguments.get("<receiver>")),
+        chat_id=p2int(normalize_destination(arguments.get("<receiver>"))),
         question=question,
         options=options,
         poll_type=poll_type,
@@ -647,6 +654,8 @@ async def tsend(arguments):
     poll_mode = bool(arguments.get("poll"))
     poll_arguments = parse_poll_arguments(arguments) if poll_mode else None
     verbosity = _parse_verbosity(arguments)
+
+    arguments["<receiver>"] = normalize_destination(arguments.get("<receiver>"))
 
     parse_mode_str = arguments.get("--parse-mode", "markdown")
     message = None
