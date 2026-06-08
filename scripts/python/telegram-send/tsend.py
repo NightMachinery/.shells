@@ -2,7 +2,7 @@
 
 """telegram-send
 Usage:
-  tsend.py poll <receiver> <question> --option=<option>... [--allow-multiple] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
+  tsend.py poll [--] <receiver> <question> --option=<option>... [--allow-multiple] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
   tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
@@ -37,6 +37,7 @@ Options:
 
 Examples:
   tsend.py some_friend "I love you ^_^" --file ~/pics/big_heart.png
+  tsend.py poll --option '5 PM' --option '6 PM' -- some_friend "When should we play?"
 
 Dependencies:
   pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot dateparser
