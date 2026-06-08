@@ -3,10 +3,9 @@
 function tmuxnew {
     #: @todo0 integrate =str2tmuxname=
     ##
-    if (( ${+aliases[silent]} )) ; then
-        silent tmux kill-session -t "$1" || true
-    else
-        command tmux kill-session -t "$1" &> /dev/null || true
-    fi
+
+    # command tmux kill-session -t "$1" &> /dev/null || true
+    tmux-session-processes-kill "$1"
+
     command tmux new -d -s "$@"
 }
