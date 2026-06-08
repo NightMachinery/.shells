@@ -1,5 +1,16 @@
 alias tsmf='tsendf ${me_tlg}'
 ###
+function tlg-dest-assert {
+    local dest="${1}"
+    local label="${2:-dest}"
+    local caller="${funcstack[2]:-$0}"
+
+    if isSpace "$dest" ; then
+        ecerr "$caller: ${label} is empty/whitespace; aborting."
+        return 1
+    fi
+}
+###
 function tsend-retry {
     retry tsend "$@"
 }
@@ -25,6 +36,7 @@ aliasfn tnotifc tnotif-casual
 ##
 function tsendf-book {
     local dest="${tlg_dest:-$tlg_ch_books}"
+    tlg-dest-assert "$dest" @RET
     local inargs
     in-or-args3 "$@" @RET
 
@@ -39,6 +51,8 @@ function tsendf-book {
 @opts-setprefix tsendf-book tsend
 ##
 function tsendf {
+    local dest="${1}"
+    tlg-dest-assert "$dest" @RET
     local fs=("${@:2}")
     local album_p="${tsend_album_p:-y}"
 
@@ -53,7 +67,7 @@ function tsendf {
         opts+=(--file "$f")
     done
 
-    revaldbg tsend "$opts[@]" -- "$1" ''
+    revaldbg tsend "$opts[@]" -- "$dest" ''
 }
 
 function tsendf-discrete {
@@ -66,7 +80,8 @@ function tsendf-discrete {
 }
 
 function tsend-url {
-    local dest="${1:?}" url="${2:?}" msg="$3"
+    local dest="${1}" url="${2:?}" msg="$3"
+    tlg-dest-assert "$dest" @RET
 
     local tmp=~/tmp/"$(uuidm)"
     pushf $tmp || return $?
@@ -80,14 +95,15 @@ function tsend-url {
                msg="${f:t}"
             fi
 
-            tsend --file $f -- $dest "${msg}"
+            tsend --file "$f" -- "$dest" "${msg}"
         done
     } always { popf ; command rm -rf "$tmp" }
 }
 
 function tsend-urls {
     local dest="${1}" urls=("${@[2,-1]}")
-    assert-args dest urls @RET
+    tlg-dest-assert "$dest" @RET
+    assert-args urls @RET
 
     local url
     for url in ${urls[@]} ; do
@@ -147,6 +163,7 @@ function tlg-clean-paste() {
 ##
 function podcast2tel() {
     local dest="${podcast2tel_dest:-${me_tlg}}"
+    tlg-dest-assert "$dest" @RET
     local l="$1"
     local title="$rssTitle" # from rss-tsend
 
@@ -169,7 +186,7 @@ function md2tlg {
 
 function org2tlg {
     local dest="${1:-${me_tlg}}"
-    assert-args dest @RET
+    tlg-dest-assert "$dest" @RET
     local text
     text="$(cat-paste-if-tty)" @TRET
     text="$(ec "$text" | org-header-rm-shared-level)" @TRET
