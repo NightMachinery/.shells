@@ -20,3 +20,4 @@ Isn't a single byte sufficient only for 8 options? So obviously keep the 2 bytes
 * Fixes
 
 - Telethon 1.43.2 requires =types.Poll(hash=...)=; new outgoing polls now pass =hash=0= when constructing =InputMediaPoll=.
+- Poll command usage now accepts the standard `--` end-of-options separator before receiver/question.
