@@ -305,7 +305,7 @@ function paqet-off {
     ensure-cmd tmux @RET
 
     if command tmux has-session -t "${session_name}" &> /dev/null ; then
-        command tmux kill-session -t "${session_name}" @RET
+        tmux-session-processes-kill "${session_name}" @RET
         ec "paqet down: ${session_name}"
     else
         ec "paqet already down: ${session_name}"

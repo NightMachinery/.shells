@@ -164,13 +164,13 @@ function fftmux() {
 }
 alias fft=fftmux
 
-function fftmuxkill() {
-    ecgray "$0: using fftmux-session-processes-kill is usually better than this"
-
-    ftE=(tmux kill-session -t) fftmux "$@"
+function fftmuxkill {
+    ftE=(tmux-session-processes-kill) fftmux "$@"
 }
 
-function fftmux-name() { ftE=(ec) fftmux "$@" }
+function fftmux-name {
+    ftE=(ec) fftmux "$@"
+}
 
 function tmux-pane-list {
     : "Usage: <session-name>"
@@ -222,6 +222,8 @@ function tmux-session-processes-kill {
         for p in ${(@f)pane_pids} ; do
             reval-ec kill-withchildren "$kill_opts" "$p"
         done
+
+        command tmux kill-session -t "${s}" || true
     done
 }
 
