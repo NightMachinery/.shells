@@ -4,10 +4,10 @@
 
 ```zsh
 2fa-code EX6TRKUH4Q6NMZWPE4RIWVRLHF2DION6
-2fa-code 'otpauth://totp/example?secret=EX6TRKUH4Q6NMZWPE4RIWVRLHF2DION6&issuer=Example'
+2fa-code 'otpauth://totp/example?secret=EX6TRKUH4Q6NMZWPE4RIWVRLHF2DION6&issuer=Example&period=30'
 ```
 
-The generated code is sent through `ec-copy`, so it is echoed and copied to the clipboard. The validity duration is printed with `ecgray`.
+The generated code is sent through `ec-copy`, so it is echoed and copied to the clipboard. The validity duration is printed with `ecgray`. For `otpauth://` URLs, `period=` is honored when present; otherwise the standard 30-second TOTP period is used.
 
 ## Dependency
 
