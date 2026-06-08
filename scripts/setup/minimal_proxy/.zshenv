@@ -15,6 +15,24 @@ unsetopt autopushd
 unsetopt AUTO_NAME_DIRS
 unsetopt BG_NICE # Run all background jobs at a lower priority.
 # having this enabled will cause some failures in BTT-issued background brishz commands
+### Added by Zinit's installer
+if [[ ! -f $HOME/.local/share/zinit/zinit.git/zinit.zsh ]]; then
+    print -P "%F{33} %F{220}Installing %F{33}ZDHARMA-CONTINUUM%F{220} Initiative Plugin Manager (%F{33}zdharma-continuum/zinit%F{220})…%f"
+    command mkdir -p "$HOME/.local/share/zinit" && command chmod g-rwX "$HOME/.local/share/zinit"
+    command git clone https://github.com/zdharma-continuum/zinit "$HOME/.local/share/zinit/zinit.git" && \
+        print -P "%F{33} %F{34}Installation successful.%f%b" || \
+        print -P "%F{160} The clone has failed.%f%b"
+fi
+
+source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
+autoload -Uz _zinit
+(( ${+_comps} )) && _comps[zinit]=_zinit
+###
+zinit ice id-as"nightsh" \
+  aliases \
+  pick"scripts/zshlang/basic/basic.plugin.zsh" \
+  multisrc"scripts/zshlang/plugins/psiphon/psiphon.plugin.zsh"
+zinit light NightMachinery/.shells
 ## * Global Aliases
 alias -g ...='../..'
 alias -g ....='../../..'
@@ -24,19 +42,19 @@ alias -g ......='../../../../..'
 alias -g '@RET'=' || { retcode=$? ; print -r -- "Inside $0: exited ${retcode}" ; return $retcode } '
 alias -g '@TRET'=' || { retcode=$? ; print -r -- "Inside $0: exited ${retcode}" ; return $retcode } '
 ##
-ec() {
+'ec' () {
     print -r -- "$@"
 }
-ecn() {
+'ecn' () {
     print -nr -- "$@"
 }
-alias ecgray=ec
 
-ecerr() {
+'ecerr' () {
     ec "$@" >&2
 }
+alias ecgray=ecerr
 
-gquote () {
+'gquote' () {
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"
 }
 alias gq=gquote
