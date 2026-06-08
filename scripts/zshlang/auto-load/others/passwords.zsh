@@ -103,6 +103,63 @@ function num2words {
     cat "$wordlist" | revaldbg prefixer --included-only --process-include="${(j.,.)n_safe}"
 }
 ##
+
+function 2fa-code {
+    local input="${1}"
+    local period="${twofa_code_period:-30}"
+    local secret=""
+    local code=""
+    local valid_for=""
+
+    if test -z "${input}" ; then
+        ecerr "Usage: $0 <BASE32_SECRET_OR_OTPAUTH_URL>"
+        return 1
+    fi
+
+    if [[ ! "${period}" == <1-> ]] ; then
+        ecerr "$0: invalid twofa_code_period: $(gquote-sq "${period}")"
+        return 1
+    fi
+
+    if [[ "${input}" == otpauth://* ]] ; then
+        secret="$(perl -e '
+            use strict;
+            use warnings;
+            my $url = shift // q{};
+            if ($url =~ /(?:\?|&)secret=([^&]*)/) {
+                my $secret = $1;
+                $secret =~ tr/+/ /;
+                $secret =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+                print $secret;
+                exit 0;
+            }
+            print STDERR "secret= not found in otpauth URL\n";
+            exit 1;
+        ' "${input}")" @RET
+    else
+        secret="${input}"
+    fi
+
+    secret="${secret:u}"
+    secret="${secret//[[:space:]-]/}"
+
+    if test -z "${secret}" ; then
+        ecerr "$0: empty 2FA secret"
+        return 1
+    fi
+
+    if ! isdefined-cmd oathtool ; then
+        ecerr "$0: missing command: oathtool (install Homebrew 'oath-toolkit' or apt 'oathtool')"
+        return 1
+    fi
+
+    code="$(command oathtool --totp --base32 "${secret}")" @RET
+    ec-copy "${code}"
+
+    valid_for="$(( period - (EPOCHSECONDS % period) ))"
+    ecgray "$0: valid for ${valid_for}s"
+}
+##
 function pass-check() {
     # * pass_check_additional: user data to be added to the dictionaries that are tested against (name, birthdate, etc)
     # * Check out `crack_times_display` in the output

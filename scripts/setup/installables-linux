@@ -10,6 +10,7 @@ libssl-dev
 libtool
 libxslt-dev
 libyaml-dev
+oathtool
 opus-tools
 poppler-utils
 sendmail
