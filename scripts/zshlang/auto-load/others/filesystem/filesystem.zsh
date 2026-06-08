@@ -299,6 +299,8 @@ aliasfn path-abbrev fnswap z-add true h_path-abbrev # using 'cd' triggers z-add 
 aliasfn path2tilde path-abbrev
 
 function path-unabbrev {
+    setopt localoptions re_match_pcre
+
     local inargs
     in-or-args3 "$@" @RET
 
