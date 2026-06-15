@@ -412,6 +412,15 @@ def _telethon_input_media_from_bot_media(media, types):
 
 
 async def _telethon_message_media_from_bot_media(client, peer, media, types, functions):
+    media_type = str(media.get("type") or "").strip().lower()
+    if media_type == "link":
+        url = str(media.get("url") or "").strip()
+        if not url:
+            raise SystemExit("Poll option link media requires a non-empty url.")
+        return types.MessageMediaWebPage(
+            webpage=types.WebPagePending(id=0, date=None, url=url)
+        )
+
     input_media = _telethon_input_media_from_bot_media(media, types)
     uploaded = await client(functions.messages.UploadMediaRequest(peer=peer, media=input_media))
     return uploaded
