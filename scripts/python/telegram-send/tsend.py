@@ -2,7 +2,7 @@
 
 """telegram-send
 Usage:
-  tsend.py poll [--] <receiver> <question> --option=<option>... [--allow-multiple] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
+  tsend.py poll [--] <receiver> <question> --option=<option>... [--allow-multiple] [--allow-adding-options | --no-adding-options] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
   tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
@@ -26,6 +26,8 @@ Options:
   Poll command:
     --option <option>  Adds an option to the poll. Use multiple times for more options. (poll command)
     -m --allow-multiple  Allow voters to pick more than one option. (poll command)
+    --allow-adding-options  Allow users to add answer options after poll creation; off by default. (poll command)
+    --no-adding-options  Explicitly keep user-added answer options disabled. (poll command)
     --poll-type <type>  Poll type, either "regular" or "quiz". [default: regular]
     --correct-index <index>  Zero-based index of the correct option for quiz polls.
     --explanation <text>  Explanation shown after answering a quiz poll.
@@ -38,6 +40,7 @@ Options:
 Examples:
   tsend.py some_friend "I love you ^_^" --file ~/pics/big_heart.png
   tsend.py poll --option '5 PM' --option '6 PM' -- some_friend "When should we play?"
+  tsend.py poll --allow-adding-options --option '5 PM' --option '6 PM' -- some_friend "When should we play?"
 
 Dependencies:
   pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot dateparser
@@ -262,6 +265,10 @@ def parse_poll_arguments(arguments):
     if poll_type == "quiz" and allow_multiple:
         raise SystemExit("Quiz polls cannot allow multiple answers.")
 
+    allow_adding_options = bool(arguments.get("--allow-adding-options"))
+    if allow_adding_options and poll_type == "quiz":
+        raise SystemExit("--allow-adding-options is not supported for quiz polls.")
+
     correct_index_raw = arguments.get("--correct-index")
     correct_index = None
     if correct_index_raw is not None:
@@ -310,6 +317,10 @@ def parse_poll_arguments(arguments):
         close_date_ts = _parse_close_in_raw(close_in_raw)
         close_date_dt = _close_date_dt_from_ts(close_date_ts)
 
+    is_anonymous = bool(arguments.get("--anonymous"))
+    if allow_adding_options and is_anonymous:
+        raise SystemExit("--allow-adding-options is not supported for anonymous polls.")
+
     poll_data = dict(
         chat_id=p2int(normalize_destination(arguments.get("<receiver>"))),
         question=question,
@@ -321,7 +332,8 @@ def parse_poll_arguments(arguments):
         open_period=open_period,
         close_date_ts=close_date_ts,
         close_date_dt=close_date_dt,
-        is_anonymous=bool(arguments.get("--anonymous")),
+        is_anonymous=is_anonymous,
+        allow_adding_options=allow_adding_options,
         disable_notification=bool(arguments.get("--disable-notification")),
     )
 
@@ -582,6 +594,10 @@ async def ptb_send_files_v1(
 
 
 async def ptb_send_poll(bot, poll_arguments, max_retries=20, verbosity=2):
+    api_kwargs = {}
+    if poll_arguments["allow_adding_options"]:
+        api_kwargs["allow_adding_options"] = True
+
     for attempt in range(max_retries):
         try:
             await bot.send_poll(
@@ -596,6 +612,7 @@ async def ptb_send_poll(bot, poll_arguments, max_retries=20, verbosity=2):
                 open_period=poll_arguments["open_period"],
                 close_date=poll_arguments["close_date_ts"],
                 disable_notification=poll_arguments["disable_notification"],
+                api_kwargs=api_kwargs or None,
             )
             break
         except Exception as e:
@@ -621,6 +638,7 @@ async def telethon_send_poll(client, poll_arguments, max_retries=30, verbosity=1
         public_voters=not poll_arguments["is_anonymous"],
         multiple_choice=poll_arguments["allow_multiple"],
         quiz=(poll_arguments["poll_type"] == "quiz"),
+        open_answers=poll_arguments["allow_adding_options"] or None,
         close_period=poll_arguments["open_period"],
         close_date=poll_arguments["close_date_dt"],
     )
