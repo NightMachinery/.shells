@@ -23,3 +23,4 @@ Isn't a single byte sufficient only for 8 options? So obviously keep the 2 bytes
 - Poll command usage now accepts the standard `--` end-of-options separator before receiver/question.
 - Python sender now exits before sending when the destination/receiver is empty or whitespace-only.
 - Poll command now supports `--allow-adding-options` (`allow_adding_options` in Bot API, `open_answers` in Telethon) so users can suggest new answer options; it is rejected for anonymous and quiz polls.
+- Poll options now default to Markdown link parsing; `[label](https://example.com)` becomes visible option text plus link media, and `--option-json` exposes Bot API `InputPollOption` rich media objects.
