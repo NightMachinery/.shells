@@ -349,6 +349,10 @@ def _poll_options_have_media(options):
     return any(option.get("media") for option in options)
 
 
+def _poll_options_need_rich_bot_api(options):
+    return any(option.get("media") for option in options)
+
+
 def _telethon_input_media_from_bot_media(media, types):
     media_type = str(media.get("type") or "").strip().lower()
 
@@ -892,6 +896,54 @@ async def telethon_send_poll(client, poll_arguments, max_retries=30, verbosity=1
             await handle(e, attempt, max_retries, verbosity)
 
 
+def _bot_api_chat_id_from_telethon_entity(entity):
+    from telethon.tl import types
+
+    if isinstance(entity, types.User):
+        return entity.id
+    if isinstance(entity, types.Chat):
+        return -entity.id
+    if isinstance(entity, types.Channel):
+        return int(f"-100{entity.id}")
+    entity_id = getattr(entity, "id", None)
+    if entity_id is None:
+        raise SystemExit(f"Could not convert Telegram entity to Bot API chat_id: {entity!r}")
+    return entity_id
+
+
+async def _ptb_bot_from_env():
+    import telegram
+    from telegram.ext import ApplicationBuilder
+
+    proxy_url = os.environ.get("HTTP_PROXY")
+    if proxy_url:
+        app = (
+            ApplicationBuilder()
+            .token(token)
+            .proxy(proxy_url)
+            .get_updates_proxy(proxy_url)
+            .build()
+        )
+        return app.bot
+    return telegram.Bot(token)
+
+
+async def ptb_send_poll_from_telethon_resolution(client, poll_arguments, receiver, verbosity):
+    if not token:
+        raise SystemExit(
+            "Rich poll option media requires the Bot API backend, but TSEND_TOKEN/TELEGRAM_TOKEN is not set."
+        )
+
+    entity = await client.get_entity(receiver)
+    bot_api_chat_id = _bot_api_chat_id_from_telethon_entity(entity)
+    poll_arguments = dict(poll_arguments)
+    poll_arguments["chat_id"] = bot_api_chat_id
+
+    bot = await _ptb_bot_from_env()
+    async with bot:
+        await ptb_send_poll(bot, poll_arguments, verbosity=verbosity)
+
+
 async def tsend(arguments):
     poll_mode = bool(arguments.get("poll"))
     poll_arguments = parse_poll_arguments(arguments) if poll_mode else None
@@ -1001,7 +1053,21 @@ async def tsend(arguments):
 
             try:
                 if poll_mode:
-                    await telethon_send_poll(client, poll_arguments, verbosity=verbosity)
+                    me = await client.get_me()
+                    if _poll_options_need_rich_bot_api(poll_arguments["options"]):
+                        if verbosity >= 2:
+                            print(
+                                "Rich poll option media detected; using Bot API sendPoll "
+                                f"after Telethon peer resolution (telethon_user_is_bot={bool(getattr(me, 'bot', False))})."
+                            )
+                        await ptb_send_poll_from_telethon_resolution(
+                            client,
+                            poll_arguments,
+                            arguments["<receiver>"],
+                            verbosity,
+                        )
+                    else:
+                        await telethon_send_poll(client, poll_arguments, verbosity=verbosity)
                 else:
                     # print(arguments)
                     if parse_mode_str == "html":
