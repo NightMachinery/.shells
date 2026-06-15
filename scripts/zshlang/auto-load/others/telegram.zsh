@@ -161,6 +161,12 @@ function tlg-clean-paste() {
     tlg-clean-copied "$(pbpaste)"
 }
 ##
+function tlg-strip-metadata {
+    in-or-args "$@" |
+        perl -CSD -pe 's/^\[\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\]\s+[^:\r\n]+:\s*//;' |
+        cat-copy-if-tty
+}
+##
 function podcast2tel() {
     local dest="${podcast2tel_dest:-${me_tlg}}"
     tlg-dest-assert "$dest" @RET
