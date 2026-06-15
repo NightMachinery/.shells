@@ -248,6 +248,10 @@ POLL_OPTION_MAX_CHARS = 100
 _MARKDOWN_LINK_RE = re.compile(r"\[([^\]\n]+)\]\((https?://[^\s)]+)\)")
 
 
+def _utf16_len(text):
+    return len(str(text).encode("utf-16-le")) // 2
+
+
 def _poll_option_text(option):
     return str(option.get("text") or "")
 
@@ -261,7 +265,7 @@ def _parse_markdown_poll_option(raw):
         label = match.group(1)
         url = match.group(2)
         if media is None:
-            media = dict(type="link", url=url)
+            media = dict(type="link", url=url, text_url_entity=True)
         return label
 
     text = _MARKDOWN_LINK_RE.sub(replace, raw).strip()
@@ -821,18 +825,30 @@ async def telethon_send_poll(client, poll_arguments, max_retries=30, verbosity=1
     for idx, option in enumerate(poll_arguments["options"]):
         option_bytes = idx.to_bytes(2, byteorder="big")
         media = option.get("media")
+        text = _poll_option_text(option)
+        text_entities = []
         answer_kwargs = {}
         if media:
-            answer_kwargs["media"] = await _telethon_message_media_from_bot_media(
-                client,
-                poll_arguments["chat_id"],
-                media,
-                types,
-                functions,
-            )
+            media_type = str(media.get("type") or "").strip().lower()
+            if media_type == "link" and media.get("text_url_entity"):
+                text_entities.append(
+                    types.MessageEntityTextUrl(
+                        offset=0,
+                        length=_utf16_len(text),
+                        url=str(media.get("url") or ""),
+                    )
+                )
+            else:
+                answer_kwargs["media"] = await _telethon_message_media_from_bot_media(
+                    client,
+                    poll_arguments["chat_id"],
+                    media,
+                    types,
+                    functions,
+                )
         answers.append(
             types.PollAnswer(
-                text=_twe(_poll_option_text(option)),
+                text=types.TextWithEntities(text=str(text), entities=text_entities),
                 option=option_bytes,
                 **answer_kwargs,
             )
