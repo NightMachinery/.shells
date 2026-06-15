@@ -2,7 +2,7 @@
 
 """telegram-send
 Usage:
-  tsend.py poll [--] <receiver> <question> --option=<option>... [--allow-multiple] [--allow-adding-options | --no-adding-options] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
+  tsend.py poll [--] <receiver> <question> [--option=<option>]... [--option-json=<json>]... [--options-parse-mode=<mode>] [--allow-multiple] [--allow-adding-options | --no-adding-options] [--poll-type=<type>] [--correct-index=<index>] [--explanation=<text>] [--open-period=<seconds>] [--close-date=<timestamp>] [--close-in=<when>] [--anonymous] [--disable-notification] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>]
   tsend.py [--file=<file>]... [--no-album --force-document --link-preview --parse-mode=<parser>] [-v...] [--lock-timeout=<seconds>] [--lock-path=<lockpath>] [--album | --no-album] [--] <receiver> <message>
   tsend.py (-h | --help)
   tsend.py --version
@@ -24,7 +24,9 @@ Options:
     --no-album  Do not send files as an album.
 
   Poll command:
-    --option <option>  Adds an option to the poll. Use multiple times for more options. (poll command)
+    --option <option>  Adds an option to the poll. Use multiple times for more options. Markdown links are parsed by default. (poll command)
+    --option-json <json>  Adds a rich Bot API InputPollOption JSON object. Use multiple times for more options. (poll command)
+    --options-parse-mode <mode>  How to parse --option values: "markdown" or "plain". [default: markdown]
     -m --allow-multiple  Allow voters to pick more than one option. (poll command)
     --allow-adding-options  Allow users to add answer options after poll creation; off by default. (poll command)
     --no-adding-options  Explicitly keep user-added answer options disabled. (poll command)
@@ -41,6 +43,7 @@ Examples:
   tsend.py some_friend "I love you ^_^" --file ~/pics/big_heart.png
   tsend.py poll --option '5 PM' --option '6 PM' -- some_friend "When should we play?"
   tsend.py poll --allow-adding-options --option '5 PM' --option '6 PM' -- some_friend "When should we play?"
+  tsend.py poll --option 'hello [world](https://example.com)' --option 'plain option' -- some_friend "Pick one"
 
 Dependencies:
   pip install -U pynight IPython aiofile docopt PySocks telethon python-telegram-bot dateparser
@@ -53,6 +56,7 @@ from urllib.parse import urlparse
 from urllib.request import urlopen
 import mimetypes
 import tempfile
+import json
 import os
 from os import getenv
 import sys
@@ -235,6 +239,184 @@ def _parse_close_in_raw(close_in_raw):
     return int(parsed.timestamp())
 
 
+POLL_QUESTION_MAX_CHARS = 300
+POLL_OPTION_MIN_COUNT = 2
+POLL_OPTION_MAX_COUNT = 12
+POLL_OPTION_MAX_CHARS = 100
+
+
+_MARKDOWN_LINK_RE = re.compile(r"\[([^\]\n]+)\]\((https?://[^\s)]+)\)")
+
+
+def _poll_option_text(option):
+    return str(option.get("text") or "")
+
+
+def _parse_markdown_poll_option(raw):
+    raw = str(raw)
+    media = None
+
+    def replace(match):
+        nonlocal media
+        label = match.group(1)
+        url = match.group(2)
+        if media is None:
+            media = dict(type="link", url=url)
+        return label
+
+    text = _MARKDOWN_LINK_RE.sub(replace, raw).strip()
+    option = dict(text=text)
+    if media:
+        option["media"] = media
+    return option
+
+
+def _normalize_poll_option_json(raw):
+    try:
+        option = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"--option-json is not valid JSON: {e}")
+
+    if not isinstance(option, dict):
+        raise SystemExit("--option-json must be a JSON object.")
+
+    option = dict(option)
+    option["text"] = str(option.get("text") or "").strip()
+    media = option.get("media")
+    if media is not None and not isinstance(media, dict):
+        raise SystemExit("--option-json media must be a JSON object when supplied.")
+    return option
+
+
+def _parse_poll_options(arguments):
+    parse_mode = (arguments.get("--options-parse-mode") or "markdown").strip().lower()
+    if parse_mode not in {"markdown", "plain"}:
+        raise SystemExit('--options-parse-mode must be either "markdown" or "plain".')
+
+    options = []
+    for raw in arguments.get("--option") or []:
+        raw = str(raw).strip()
+        if not raw:
+            continue
+        if parse_mode == "markdown":
+            options.append(_parse_markdown_poll_option(raw))
+        else:
+            options.append(dict(text=raw))
+
+    for raw in arguments.get("--option-json") or []:
+        options.append(_normalize_poll_option_json(raw))
+
+    return options, parse_mode
+
+
+def _validate_poll_options(question, options):
+    question_len = len(question)
+    if question_len > POLL_QUESTION_MAX_CHARS:
+        raise SystemExit(
+            f"Poll question is too long: {question_len}/{POLL_QUESTION_MAX_CHARS} characters."
+        )
+
+    if len(options) < POLL_OPTION_MIN_COUNT:
+        raise SystemExit("Polls require at least two non-empty options.")
+    if len(options) > POLL_OPTION_MAX_COUNT:
+        raise SystemExit(
+            f"Polls support at most {POLL_OPTION_MAX_COUNT} options; got {len(options)}."
+        )
+
+    for idx, option in enumerate(options):
+        text = _poll_option_text(option)
+        text_len = len(text)
+        if text_len == 0:
+            raise SystemExit(f"Poll option {idx} cannot be empty after parsing.")
+        if text_len > POLL_OPTION_MAX_CHARS:
+            raise SystemExit(
+                f"Poll option {idx} is too long after parsing: "
+                f"{text_len}/{POLL_OPTION_MAX_CHARS} characters: {text!r}"
+            )
+
+
+def _bot_api_poll_options(options):
+    if any("media" in option or set(option.keys()) != {"text"} for option in options):
+        return options
+    return [_poll_option_text(option) for option in options]
+
+
+def _poll_options_have_media(options):
+    return any(option.get("media") for option in options)
+
+
+def _telethon_input_media_from_bot_media(media, types):
+    media_type = str(media.get("type") or "").strip().lower()
+
+    if media_type == "link":
+        url = str(media.get("url") or "").strip()
+        if not url:
+            raise SystemExit("Poll option link media requires a non-empty url.")
+        return types.InputMediaWebPage(url=url)
+
+    if media_type == "location":
+        try:
+            lat = float(media["latitude"])
+            lon = float(media["longitude"])
+        except (KeyError, TypeError, ValueError):
+            raise SystemExit("Poll option location media requires latitude and longitude.")
+        return types.InputMediaGeoPoint(
+            geo_point=types.InputGeoPoint(lat=lat, long=lon)
+        )
+
+    if media_type == "venue":
+        try:
+            lat = float(media["latitude"])
+            lon = float(media["longitude"])
+        except (KeyError, TypeError, ValueError):
+            raise SystemExit("Poll option venue media requires latitude and longitude.")
+        return types.InputMediaVenue(
+            geo_point=types.InputGeoPoint(lat=lat, long=lon),
+            title=str(media.get("title") or ""),
+            address=str(media.get("address") or ""),
+            provider="",
+            venue_id=str(media.get("foursquare_id") or media.get("google_place_id") or ""),
+            venue_type=str(media.get("foursquare_type") or media.get("google_place_type") or ""),
+        )
+
+    media_value = str(media.get("media") or "").strip()
+    if media_type == "photo" and media_value.startswith(("http://", "https://")):
+        return types.InputMediaPhotoExternal(url=media_value)
+
+    if media_type in {"video", "animation"} and media_value.startswith(("http://", "https://")):
+        attrs = []
+        if media_type == "animation":
+            attrs.append(types.DocumentAttributeAnimated())
+        else:
+            attrs.append(
+                types.DocumentAttributeVideo(
+                    duration=float(media.get("duration") or 0),
+                    w=int(media.get("width") or 0),
+                    h=int(media.get("height") or 0),
+                    supports_streaming=True,
+                )
+            )
+        return types.InputMediaDocumentExternal(
+            url=media_value,
+            video_cover=None,
+            video_timestamp=media.get("start_timestamp"),
+        )
+
+    if media_type in {"photo", "video", "animation", "sticker", "live_photo"}:
+        raise SystemExit(
+            f"Telethon poll option media type {media_type!r} currently supports HTTP URLs "
+            "for photo/video/animation only; use TSEND_BACKEND=2 for full Bot API rich poll options."
+        )
+
+    raise SystemExit(f"Unsupported poll option media type: {media_type!r}")
+
+
+async def _telethon_message_media_from_bot_media(client, peer, media, types, functions):
+    input_media = _telethon_input_media_from_bot_media(media, types)
+    uploaded = await client(functions.messages.UploadMediaRequest(peer=peer, media=input_media))
+    return uploaded
+
+
 def _parse_verbosity(arguments):
     raw = arguments.get("-v")
     if isinstance(raw, bool):
@@ -253,9 +435,8 @@ def parse_poll_arguments(arguments):
     if not question:
         raise SystemExit("Poll question cannot be empty.")
 
-    options = [opt.strip() for opt in (arguments.get("--option") or []) if opt.strip()]
-    if len(options) < 2:
-        raise SystemExit("Polls require at least two non-empty options.")
+    options, options_parse_mode = _parse_poll_options(arguments)
+    _validate_poll_options(question, options)
 
     poll_type = (arguments.get("--poll-type") or "regular").strip().lower()
     if poll_type not in {"regular", "quiz"}:
@@ -325,6 +506,8 @@ def parse_poll_arguments(arguments):
         chat_id=p2int(normalize_destination(arguments.get("<receiver>"))),
         question=question,
         options=options,
+        bot_api_options=_bot_api_poll_options(options),
+        options_parse_mode=options_parse_mode,
         poll_type=poll_type,
         allow_multiple=allow_multiple,
         correct_index=correct_index,
@@ -603,7 +786,7 @@ async def ptb_send_poll(bot, poll_arguments, max_retries=20, verbosity=2):
             await bot.send_poll(
                 chat_id=poll_arguments["chat_id"],
                 question=poll_arguments["question"],
-                options=poll_arguments["options"],
+                options=poll_arguments["bot_api_options"],
                 is_anonymous=poll_arguments["is_anonymous"],
                 type=poll_arguments["poll_type"],
                 allows_multiple_answers=poll_arguments["allow_multiple"],
@@ -620,15 +803,31 @@ async def ptb_send_poll(bot, poll_arguments, max_retries=20, verbosity=2):
 
 
 async def telethon_send_poll(client, poll_arguments, max_retries=30, verbosity=1):
-    from telethon.tl import types
+    from telethon.tl import functions, types
 
     def _twe(text):
         return types.TextWithEntities(text=str(text), entities=[])
 
     answers = []
-    for idx, option_text in enumerate(poll_arguments["options"]):
+    for idx, option in enumerate(poll_arguments["options"]):
         option_bytes = idx.to_bytes(2, byteorder="big")
-        answers.append(types.PollAnswer(text=_twe(option_text), option=option_bytes))
+        media = option.get("media")
+        answer_kwargs = {}
+        if media:
+            answer_kwargs["media"] = await _telethon_message_media_from_bot_media(
+                client,
+                poll_arguments["chat_id"],
+                media,
+                types,
+                functions,
+            )
+        answers.append(
+            types.PollAnswer(
+                text=_twe(_poll_option_text(option)),
+                option=option_bytes,
+                **answer_kwargs,
+            )
+        )
 
     poll = types.Poll(
         id=0,
