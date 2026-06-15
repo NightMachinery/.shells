@@ -81,6 +81,8 @@ aliasfn ci2082 curl-ip -x 'http://127.0.0.1:2082'
 aliasfn ci3067-socks curl-ip -x 'socks5h://127.0.0.1:3067'
 aliasfn ci3067 curl-ip -x 'http://127.0.0.1:3067'
 
+aliasfn ci83 curl-ip -x 'http://127.0.0.1:2083'
+
 # aliasfn ci89 curl-ip -x 'socks5h://127.0.0.1:1089'
 aliasfn ci89 curl-ip -x 'http://127.0.0.1:2089'
 aliasfn ci2089 curl-ip -x 'http://127.0.0.1:2089'
@@ -109,7 +111,8 @@ aliasfn ci18000 curl-ip -x 'socks5h://127.0.0.1:18000'
 aliasfn ci18001 curl-ip -x 'socks5h://127.0.0.1:18001'
 
 aliasfn ci87 curl-ip -x 'http://127.0.0.1:1087'
-aliasfn ci88 curl-ip -x 'http://127.0.0.1:1088'
+aliasfn ci88 curl-ip -x 'http://127.0.0.1:2088'
+aliasfn ci2088 curl-ip -x 'http://127.0.0.1:2088'
 
 aliasfn ci5080 curl-ip -x 'socks5h://127.0.0.1:5080'
 aliasfn ci5081 curl-ip -x 'socks5h://127.0.0.1:5081'
