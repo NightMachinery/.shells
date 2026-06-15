@@ -164,7 +164,7 @@ function tlg-clean-paste() {
 function tlg-strip-metadata {
     in-or-args "$@" |
         perl -CSD -pe 's/^\[\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\]\s+[^:\r\n]+:\s*//;' |
-        cat-copy-if-tty
+        cat-copy-rtl-if-tty
 }
 ##
 function podcast2tel() {
