@@ -241,6 +241,9 @@ def _parse_close_in_raw(close_in_raw):
 
 POLL_QUESTION_MAX_CHARS = 300
 POLL_OPTION_MIN_COUNT = 2
+# Telegram Bot API currently allows up to 12 poll options.  python-telegram-bot
+# 20.8 still reports Poll.MAX_OPTION_NUMBER == 10, so keep the current Bot API
+# limit here until the local dependency catches up.
 POLL_OPTION_MAX_COUNT = 12
 POLL_OPTION_MAX_CHARS = 100
 
@@ -311,6 +314,16 @@ def _parse_poll_options(arguments):
         options.append(_normalize_poll_option_json(raw))
 
     return options, parse_mode
+
+
+def _warn_addable_poll_full(options):
+    if len(options) == POLL_OPTION_MAX_COUNT:
+        print(
+            "Warning: --allow-adding-options is enabled, but this poll already "
+            f"has {POLL_OPTION_MAX_COUNT}/{POLL_OPTION_MAX_COUNT} options; "
+            "users cannot add more options unless you start with fewer options.",
+            file=sys.stderr,
+        )
 
 
 def _validate_poll_options(question, options):
@@ -466,6 +479,8 @@ def parse_poll_arguments(arguments):
     allow_adding_options = bool(arguments.get("--allow-adding-options"))
     if allow_adding_options and poll_type == "quiz":
         raise SystemExit("--allow-adding-options is not supported for quiz polls.")
+    if allow_adding_options:
+        _warn_addable_poll_full(options)
 
     correct_index_raw = arguments.get("--correct-index")
     correct_index = None
