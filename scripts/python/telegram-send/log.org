@@ -26,3 +26,4 @@ Isn't a single byte sufficient only for 8 options? So obviously keep the 2 bytes
 - Poll options now default to Markdown link parsing; `[label](https://example.com)` becomes visible option text plus link media, and `--option-json` exposes Bot API `InputPollOption` rich media objects.
 - Telethon Markdown poll links now use `MessageEntityTextUrl` in option text instead of `PollAnswer.media`, because Telegram rejects webpage media in poll answers with `ANSWER_0_MEDIA_INVALID` for bot sends.
 - Rich poll option media is sent through Bot API after Telethon peer resolution when the configured Telethon backend is active, because MTProto poll-answer media is rejected in practice for these sends.
+- Poll command now warns when `--allow-adding-options` is used with the current Bot API maximum of 12 initial options, because users have no remaining option slots to add suggestions.
