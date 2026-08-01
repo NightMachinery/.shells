@@ -971,6 +971,8 @@ function h-reval-to-org-headings {
 }
 ##
 function org-img-unused-trs-i {
+    : "You should have copied the file paths of the files you want to delete before using this. It does not read the current open emacs file automatically."
+
     in-or-args "$@" |
         inargsf org-img-unused |
         fz | inargsf trs
