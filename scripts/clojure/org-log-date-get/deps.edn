@@ -1,5 +1,5 @@
 {:paths ["src" "resources"]
- :deps {org.clojure/clojure {:mvn/version "1.10.3"}
+ :deps {org.clojure/clojure {:mvn/version "1.11.2"}
         org-parser/org-parser {:mvn/version "0.1.4"}}
  :aliases
  {:run-m {:main-opts ["-m" "NightMachinary.org-log-date-get"]}
