@@ -759,8 +759,8 @@ typeset -gA llama3_obj=(
 define-llm-model-v2 llama3_obj
 ##
 ## * Default Models
-# typeset -g llm_default_model="${gemini_flash_latest_model}"
-typeset -g llm_default_model="${gpt_5_model}"
+typeset -g llm_default_model="${gemini_flash_latest_model}"
+# typeset -g llm_default_model="${gpt_5_model}"
 # typeset -g llm_default_model="${gemini_2_5_pro_model}"
 
 aliassafe xx='\noglob llm-send'
