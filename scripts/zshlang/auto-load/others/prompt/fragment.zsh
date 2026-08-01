@@ -1,4 +1,14 @@
 ##
+function fragment-export-save-session-to-notes {
+    cat-copy-if-tty <<'EOF'
+Summarize our findings into a single concise but complete note I can put into my notes.
+
+Include the already found sources as links near where they are used. You do not need to browse the web or search.
+
+Organize the notes into structured markdown.
+EOF
+}
+##
 function fragment-give-suggestions {
     cat-copy-if-tty <<'EOF'
 Give suggestions to further improve this.
