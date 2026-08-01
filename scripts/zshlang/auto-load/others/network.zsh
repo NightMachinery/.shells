@@ -123,6 +123,31 @@ aliasfn ci9087 curl-ip -x 'http://127.0.0.1:9087'
 
 aliasfn ci14000-socks curl-ip -x 'socks5h://127.0.0.1:14000'
 ##
+function h-curl-ip-iran {
+    local opts=("$@")
+    local url="${curl_ip_iran_url}" json_p=n
+
+    local jq_opts=()
+    if isColorTty ; then
+        jq_opts+='--color-output'
+    fi
+
+    url="${url:-https://www.aypi.ir/?json=}" json_p=y
+    # url="${url:-https://www.zoomit.ir}"
+
+    reval-ec curl '--progress-bar' '--retry' '120' '--retry-delay' '1' "${opts[@]}" "${url}" | {
+        if bool "${json_p}" ; then
+            command jq -e "$jq_opts[@]" . || true
+        else
+            cat
+        fi |
+            rtl-reshaper-streaming
+    }
+}
+
+aliasfn ci-iran h-curl-ip-iran -x 'socks5h://127.0.0.1:1050'
+aliasfn ci-iran50 h-curl-ip-iran -x 'socks5h://127.0.0.1:1050'
+##
 aliasfn myip-httpbin curlm https://httpbin.org/ip
 aliasfn myip-amazon curlm https://checkip.amazonaws.com
 aliasfn myip-ipify curlm https://api.ipify.org
