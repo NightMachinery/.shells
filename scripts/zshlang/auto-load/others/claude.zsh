@@ -84,3 +84,34 @@ function claude-highwayai {
     claude "$@"
 }
 ##
+function claude-code-usage {
+    #: Shows the usage stats of the current Claude Code plan (like the in-app =/usage=).
+    #: See =docs/claude_code_usage.md=.
+    ##
+    local claude_code_usage_timeout_s="${claude_code_usage_timeout_s:-10}"
+    local claude_code_usage_cache_ttl_s="${claude_code_usage_cache_ttl_s:-300}"
+    local claude_code_usage_refresh_p="${claude_code_usage_refresh_p:-n}"
+    local claude_code_usage_json_p="${claude_code_usage_json_p:-n}"
+    local claude_code_usage_strip_ansi_p="${claude_code_usage_strip_ansi_p:-n}"
+
+    if ! command -v -- claude_code_usage.py >/dev/null 2>&1 ; then
+        ecerr "claude-code-usage: claude_code_usage.py not found in PATH"
+        return 127
+    fi
+
+    local script_args=(--timeout "${claude_code_usage_timeout_s}" --cache-ttl "${claude_code_usage_cache_ttl_s}")
+    if bool "${claude_code_usage_refresh_p}" ; then
+        script_args+=(--refresh)
+    fi
+    if bool "${claude_code_usage_json_p}" ; then
+        script_args+=(--json)
+    fi
+    if bool "${claude_code_usage_strip_ansi_p}" ; then
+        script_args+=(--color never)
+    fi
+
+    #: =script_args= before user args so explicit CLI flags win (argparse last-wins).
+    $proxyenv revaldbg command claude_code_usage.py "${script_args[@]}" "$@"
+}
+alias ccu='claude-code-usage'
+##

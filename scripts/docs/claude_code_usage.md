@@ -1,0 +1,84 @@
+# claude_code_usage.py
+
+`python/claude_code_usage.py` prints the usage stats of the current Claude Code
+plan (what the in-app `/usage` shows: 5-hour session utilization, weekly
+utilization, model-scoped weekly windows, reset times) in either human-readable
+or JSON form. The zsh wrapper is `claude-code-usage` (alias `ccu`) in
+`zshlang/auto-load/others/claude.zsh`.
+
+## Data source
+
+The script queries `GET https://api.anthropic.com/api/oauth/usage`, the same
+undocumented endpoint Claude Code itself uses (also used by community tools
+such as claude-powerline and ccstatusline). Because it is undocumented, its
+schema and the required `anthropic-beta: oauth-2025-04-20` header may change
+without notice.
+
+The request must send a `User-Agent` that looks like Claude Code
+(`claude-code/<version>`); other user agents land in an aggressively
+rate-limited bucket that returns persistent 429s. If the pinned default
+version string ever stops working, override it with `--user-agent` or
+`CLAUDE_CODE_USAGE_USER_AGENT`.
+
+Newer responses carry an authoritative `limits` array (integer percents,
+severity, model-scoped weekly windows such as a per-model 7-day limit); the
+script prefers it and falls back to the legacy `five_hour` / `seven_day` /
+`seven_day_*` window objects when `limits` is absent. Unknown window keys are
+rendered generically rather than dropped. An `extra_usage` line is shown only
+when extra usage is enabled or credits have been spent.
+
+## Credentials
+
+The OAuth access token is looked up in this order:
+
+1. the `CLAUDE_CODE_OAUTH_TOKEN` environment variable,
+2. the macOS Keychain generic password `Claude Code-credentials`
+   (read via `security find-generic-password`; the first read may pop a
+   one-time Keychain permission prompt),
+3. `~/.claude/.credentials.json` (Linux).
+
+The Keychain/file credential also provides the plan name (`subscriptionType`)
+and token expiry. An expired token only produces a warning — the request is
+still attempted, since Claude Code may have refreshed the Keychain entry. The
+script never refreshes the token itself; open `claude` (or run `/login` inside
+it) to refresh.
+
+## Caching
+
+Successful responses are cached in `~/tmp/.claude-usage/usage.json`
+(`--cache-dir` to relocate). Cached data younger than `--cache-ttl` seconds
+(default 300) is reused without hitting the network; `--refresh` skips the
+cache read but still updates the cache afterwards. Do not disable caching in
+tight loops — the endpoint rate-limits quickly and recovers slowly.
+
+If a fetch fails (401, 429, network) and any cache exists — even an expired
+one — the cached data is shown with a red `[stale cache: ...]` annotation and
+the script exits 0; without a cache the error is fatal (exit 1).
+
+## Flags and environment variables
+
+| Flag | Env fallback | Default |
+|---|---|---|
+| `--json` | — | off |
+| `--timeout` | `claude_code_usage_timeout_s` / `CLAUDE_CODE_USAGE_TIMEOUT_S` | 10 |
+| `--cache-ttl` | `claude_code_usage_cache_ttl_s` / `CLAUDE_CODE_USAGE_CACHE_TTL_S` | 300 |
+| `--refresh` | — | off |
+| `--cache-dir` | `claude_code_usage_cache_dir` / `CLAUDE_CODE_USAGE_CACHE_DIR` | `~/tmp/.claude-usage` |
+| `--user-agent` | `claude_code_usage_user_agent` / `CLAUDE_CODE_USAGE_USER_AGENT` | `claude-code/2.1.220` |
+
+`--json` output contains normalized `windows` (percent, epoch and ISO reset
+times, severity, is_active) plus the `raw` payload for forward compatibility.
+
+## Zsh wrapper
+
+`claude-code-usage` (alias `ccu`) forwards to the script. Knobs (set as env
+vars): `claude_code_usage_timeout_s`, `claude_code_usage_cache_ttl_s`, and the
+boolean `claude_code_usage_refresh_p`, `claude_code_usage_json_p`,
+`claude_code_usage_strip_ansi_p`. Extra CLI args are passed through after the
+derived ones, so explicit flags win.
+
+## Color
+
+Color handling (`--color`, `--true-color`, `--dark-mode`, `--dark-theme`,
+`--light-theme`) is shared with `codex_status.py` via
+`python/libs/common_sub_status.py`; see `docs/codex_status.md` for details.
