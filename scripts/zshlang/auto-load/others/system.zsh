@@ -237,7 +237,7 @@ function volume-dec {
 function mute-external_() {
 	: "You probably want to use mute-external which calls this in a loop.
 Usage: mute-external_ [<headphone-volume-from-100>=1]"
-	: "Note that headphones-is is expensive and takes ~0.3 seconds"
+	: "Note that headphones-is takes ~10ms via Hammerspoon (~200ms if it falls back to system_profiler)"
 
 	{
 		local lev="${1:-1}"

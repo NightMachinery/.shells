@@ -225,13 +225,68 @@ function lsport {
     ((${#opts})) && sudo lsof -n $opts[@]
 }
 ##
+function audio-output-get-hs {
+    : "outputs: default output device name \n transport (Bluetooth|Built-in|USB|DisplayPort|...)"
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    #: Fast (~8ms warm, ~140ms cold): IPC to the already-running Hammerspoon instance.
+    hammerspoon -c 'local d = hs.audiodevice.defaultOutputDevice(); return d:name() .. "\n" .. d:transportType()'
+}
+
+function audio-output-get-system-profiler {
+    : "outputs: default output device name \n transport (Bluetooth|Built-in|USB|DisplayPort|...)"
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    #: Slow (~200ms): spawns a fresh process and re-enumerates all audio devices,
+    #: but works even when Hammerspoon is not running.
+    #: Prints the name and Transport of the device block marked "Default Output Device: Yes".
+    #: (Each device is an 8-space-indented "Name:" line followed by 10-space-indented properties;
+    #: the default device can appear twice, once as input and once as output.)
+    system_profiler SPAudioDataType |
+        perl -0777 -ne 'while (m/^ {8}(.+?):\n\n((?: {10}.*\n)+)/mg) { my ($n, $b) = ($1, $2); if ($b =~ m/^ {10}Default Output Device: Yes/m) { my ($t) = $b =~ m/^ {10}Transport: (.*?)\s*$/m; print "$n\n$t\n"; exit 0 } } exit 1'
+}
+
+function audio-output-get {
+    : "outputs: default output device name \n transport (Bluetooth|Built-in|USB|DisplayPort|...)"
+    #: Gateway: tries the fast Hammerspoon helper, falls back to system_profiler.
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    local out
+    if out="$(audio-output-get-hs 2>/dev/null)" && [[ -n "$out" ]] ; then
+        ec "$out"
+    else
+        audio-output-get-system-profiler
+    fi
+}
+
 function headphones-p {
-    # @alt `hs.audiodevice.current().name`
+    : "returns 0 iff the default audio output is likely worn in/on the ear (headphones, earbuds, headset)"
     # @darwinOnly
     ##
     if isDarwin ; then
-        system_profiler SPAudioDataType |
-            perl -0777 -ne 'm/(?:headphones|buds|pods):\s+Default Output Device: Yes/i && exit 0 || exit 1'
+        local out
+        out="$(audio-output-get)" @RET
+
+        local lines=("${(@f)out}")
+        local name="${(L)lines[1]}" transport="${lines[2]}"
+
+        if [[ "$name" == *(headphone|earphone|headset|buds|pods)* ]] ; then
+            #: Name says it's worn: the wired jack shows up as "External Headphones",
+            #: and this also catches AirPods, Galaxy Buds, etc.
+            return 0
+        elif [[ "$transport" == "Bluetooth" && "$name" != *speaker* ]] ; then
+            #: Heuristic: a Bluetooth audio device without "speaker" in its name is assumed worn
+            #: (catches e.g. Sony WF/WH-1000XM*, Bose QC, whose names lack headphone-ish words).
+            return 0
+        else
+            return 1
+        fi
     else
         ecgray "$0: NA"
         return 1
