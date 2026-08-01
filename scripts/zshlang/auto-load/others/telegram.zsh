@@ -137,7 +137,7 @@ function reval-tlg {
 }
 # aliasfn reval-tlg enve
 
-function tlg-file-captioned() {
+function tlg-file-captioned {
     local files=("$@") file
     local rec="$me"
 
@@ -147,26 +147,33 @@ function tlg-file-captioned() {
         ec "Sent $file to $rec"
     done
 }
-function tlg-clean-copied() {
-    h_tlg-clean-copied "$(h_tlg-clean-copied "$*")" # telegram sometimes uses two of these tags
-}
-function h_tlg-clean-copied() {
-    local text="$*"
-    if [[ "$text" =~ '\[[^]]*\]\s*((.|\n)*)' ]] ; then
-       text="$match[1]"
-    fi
-    print -nr -- "$text"
-}
-function tlg-clean-paste() {
-    tlg-clean-copied "$(pbpaste)"
-}
+###
+# function tlg-clean-copied {
+#     #: @see [agfi:tlg-strip-metadata]
+#     ##
+#     ecgray "$0: deprecated; use 'tlg-strip-metadata'"
+
+#     h_tlg-clean-copied "$(h_tlg-clean-copied "$*")" # telegram sometimes uses two of these tags
+# }
+
+# function h_tlg-clean-copied {
+#     local text="$*"
+#     if [[ "$text" =~ '\[[^]]*\]\s*((.|\n)*)' ]] ; then
+#        text="$match[1]"
+#     fi
+#     print -nr -- "$text"
+# }
+# function tlg-clean-paste {
+#     tlg-clean-copied "$(pbpaste)"
+# }
 ##
 function tlg-strip-metadata {
     in-or-args "$@" |
         perl -CSD -pe 's/^\[\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}\]\s+[^:\r\n]+:\s*//;' |
         cat-copy-rtl-if-tty
 }
-##
+aliasfn tlg-clean-copied tlg-strip-metadata
+###
 function podcast2tel() {
     local dest="${podcast2tel_dest:-${me_tlg}}"
     tlg-dest-assert "$dest" @RET
