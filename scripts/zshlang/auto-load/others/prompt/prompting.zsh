@@ -484,9 +484,12 @@ function prompt-summarize-url {
 }
 ##
 function prompt-pronunciation {
-    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "How is the following pronounced? Include IPA." "$@"
+    local prompt
+    # prompt="How is the following pronounced? Include IPA."
+    prompt="How is the following pronounced? Include exact IPA, English-only IPA (approximate non-English sounds), and English and Persian script (use vowels in Persian script) approximations. I'm a native Farsi speaker. Also explain how the unfamiliar sounds are supposed to be made."
+
+    prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "${prompt}" "$@"
     #
-    # prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input "Define the following, and include its IPA pronunciation in American English." "$@"
 }
 aliasfn prompt-say prompt-pronunciation
 
