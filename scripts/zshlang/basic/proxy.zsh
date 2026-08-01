@@ -252,7 +252,8 @@ function should-proxy-p {
 function proxy-auto-p {
     # local initCountry="$(serr mycountry)"
     if { isLocal && isMe } ; then # test -z "$initCountry" || [[ "$initCountry" == Iran ]] ; then
-        return 0
+        # return 0
+        return 1
     else
         return 1
     fi
