@@ -81,8 +81,10 @@ export deleteusdir=~/tmp/deleteus
 
 export codedir="$HOME/code"
 
-export chat_logs_dir="$BASE_DIR/documents/chat_logs"
+export chat_logs_dir="${BASE_DIR}/documents/chat_logs"
 ##
+export bigWalletDir="${BASE_DIR}/documents/big_wallet"
+
 export nightNotesN="${HOME}/notes"
 export nightNotes="${nightNotesN}/"
 # export nightNotes="$cellar/notes/"
