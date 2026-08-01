@@ -103,83 +103,87 @@ function num2words {
     cat "$wordlist" | revaldbg prefixer --included-only --process-include="${(j.,.)n_safe}"
 }
 ##
-
 function 2fa-code {
-    local input="${1}"
-    local period="${twofa_code_period:-30}"
-    local secret=""
-    local code=""
-    local valid_for=""
-    local oathtool_opts=()
-    local otpauth_params=()
+    local inargs
+    in-or-args3 "$@" @RET
 
-    if test -z "${input}" ; then
-        ecerr "Usage: $0 <BASE32_SECRET_OR_OTPAUTH_URL>"
-        return 1
-    fi
+    local input
+    for input in "${inargs[@]}" ; do
+        local period="${twofa_code_period:-30}"
+        local secret=""
+        local code=""
+        local valid_for=""
+        local oathtool_opts=()
+        local otpauth_params=()
 
-    if [[ "${input}" == otpauth://* ]] ; then
-        otpauth_params=("${(@f)$(perl -e '
-            use strict;
-            use warnings;
-
-            sub url_decode {
-                my ($value) = @_;
-                $value =~ tr/+/ /;
-                $value =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-                return $value;
-            }
-
-            my $url = shift // q{};
-            my %params;
-            if ($url =~ /[?]([^#]*)/) {
-                for my $pair (split /&/, $1) {
-                    my ($key, $value) = split /=/, $pair, 2;
-                    next unless defined $key;
-                    $params{url_decode($key)} = url_decode($value // q{});
-                }
-            }
-
-            if (!exists $params{secret} || $params{secret} eq q{}) {
-                print STDERR "secret= not found in otpauth URL", chr(10);
-                exit 1;
-            }
-
-            print $params{secret}, chr(10);
-            print $params{period}, chr(10) if exists $params{period} && $params{period} ne q{};
-        ' "${input}")}") @RET
-        secret="${otpauth_params[1]}"
-        if (( ${#otpauth_params} >= 2 )) ; then
-            period="${otpauth_params[2]}"
+        if test -z "${input}" ; then
+            ecerr "Usage: $0 <BASE32_SECRET_OR_OTPAUTH_URL>"
+            return 1
         fi
-    else
-        secret="${input}"
-    fi
 
-    secret="${secret:u}"
-    secret="${secret//[[:space:]-]/}"
+        if [[ "${input}" == otpauth://* ]] ; then
+            otpauth_params=("${(@f)$(perl -e '
+                use strict;
+                use warnings;
 
-    if test -z "${secret}" ; then
-        ecerr "$0: empty 2FA secret"
-        return 1
-    fi
+                sub url_decode {
+                    my ($value) = @_;
+                    $value =~ tr/+/ /;
+                    $value =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+                    return $value;
+                }
 
-    if [[ ! "${period}" == <1-> ]] ; then
-        ecerr "$0: invalid TOTP period: $(gquote-sq "${period}")"
-        return 1
-    fi
+                my $url = shift // q{};
+                my %params;
+                if ($url =~ /[?]([^#]*)/) {
+                    for my $pair (split /&/, $1) {
+                        my ($key, $value) = split /=/, $pair, 2;
+                        next unless defined $key;
+                        $params{url_decode($key)} = url_decode($value // q{});
+                    }
+                }
 
-    if ! isdefined-cmd oathtool ; then
-        ecerr "$0: missing command: oathtool (install Homebrew 'oath-toolkit' or apt 'oathtool')"
-        return 1
-    fi
+                if (!exists $params{secret} || $params{secret} eq q{}) {
+                    print STDERR "secret= not found in otpauth URL", chr(10);
+                    exit 1;
+                }
 
-    oathtool_opts=(--totp --base32 --time-step-size="${period}s")
-    code="$(command oathtool "${oathtool_opts[@]}" "${secret}")" @RET
-    ec-copy "${code}"
+                print $params{secret}, chr(10);
+                print $params{period}, chr(10) if exists $params{period} && $params{period} ne q{};
+            ' "${input}")}") @RET
+            secret="${otpauth_params[1]}"
+            if (( ${#otpauth_params} >= 2 )) ; then
+                period="${otpauth_params[2]}"
+            fi
+        else
+            secret="${input}"
+        fi
 
-    valid_for="$(( period - (EPOCHSECONDS % period) ))"
-    ecgray "$0: valid for ${valid_for}s"
+        secret="${secret:u}"
+        secret="${secret//[[:space:]-]/}"
+
+        if test -z "${secret}" ; then
+            ecerr "$0: empty 2FA secret"
+            return 1
+        fi
+
+        if [[ ! "${period}" == <1-> ]] ; then
+            ecerr "$0: invalid TOTP period: $(gquote-sq "${period}")"
+            return 1
+        fi
+
+        if ! isdefined-cmd oathtool ; then
+            ecerr "$0: missing command: oathtool (install Homebrew 'oath-toolkit' or apt 'oathtool')"
+            return 1
+        fi
+
+        oathtool_opts=(--totp --base32 --time-step-size="${period}s")
+        code="$(command oathtool "${oathtool_opts[@]}" "${secret}")" @RET
+        ec-copy "${code}"
+
+        valid_for="$(( period - (EPOCHSECONDS % period) ))"
+        ecgray "$0: valid for ${valid_for}s"
+    done
 }
 ##
 function pass-check() {
