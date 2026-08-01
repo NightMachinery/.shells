@@ -386,8 +386,8 @@ function isNet {
 
 function h-isNet {
     ##
-    local test_ip="${isNet_ip:-185.97.118.92}"
-    # local test_ip="${isNet_ip:-8.8.8.8}"
+    # local test_ip="${isNet_ip:-185.97.118.92}"
+    local test_ip="${isNet_ip:-8.8.8.8}"
 
     if isDarwin ; then
         ping -q -c 1 -W 400 "${test_ip}" &>/dev/null
