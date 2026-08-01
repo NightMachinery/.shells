@@ -63,6 +63,11 @@ function youtube-dl {
         opts+=(--add-header "$(cookies-auto "$@")")
         # opts+=(--add-header "$(referer-auto "$@")")
         opts+=(--add-header "Referer: $(browser-current-url)")
+
+    elif isLocal ; then
+        opts+=(--cookies-from-browser=chrome)
+        #: Youtube failed without cookies. [jalali:1405/04/21]
+
     fi
 
     ##
