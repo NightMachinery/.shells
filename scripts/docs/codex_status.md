@@ -58,6 +58,10 @@ so piped/redirected output stays clean.
 
 ## Color
 
+The color/theme layer (and a few generic env/format helpers) lives in
+`python/libs/common_sub_status.py`, shared with `claude_code_usage.py` (see
+`docs/claude_code_usage.md`).
+
 Human-readable output supports `--color {auto,always,never}`. When color is
 enabled, `--true-color {on,off,auto}` controls RGB color output; `auto` detects
 Kitty first, then `COLORTERM=truecolor|24bit`, then terminfo `RGB`/`Tc`.
