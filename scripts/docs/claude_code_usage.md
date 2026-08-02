@@ -37,6 +37,14 @@ The OAuth access token is looked up in this order:
    one-time Keychain permission prompt),
 3. `~/.claude/.credentials.json` (Linux).
 
+Claude Code has stored the Keychain credential under different account
+names over time (the login username, later `unknown`), and orphaned items
+from old versions can shadow the live one when queried without an account
+filter. The script therefore reads every candidate account (no filter, the
+login username, `unknown`) and uses the credential with the freshest
+expiry, preferring unexpired ones. The chosen account is shown in the
+output source, e.g. `(keychain:unknown)`.
+
 The Keychain/file credential also provides the plan name (`subscriptionType`)
 and token expiry. An expired token only produces a warning — the request is
 still attempted, since Claude Code may have refreshed the Keychain entry. The
