@@ -71,6 +71,16 @@ built-in Purple bindings include:
 - Arrow keys: move the mouse cursor using the keyboard-mouse helpers in
   `boot.lua`.
 
+The avy grids in `core/mouse.lua` (`screenPositionAvy` and its click, drag,
+text-select, and screenshot wrappers) label the screen with two-key
+combinations. The label alphabet adapts to the screen: when a screen needs
+more labels than the base list provides (bigger monitors), the second-char
+alphabet grows minimally with comfort-ordered extension keys
+(`avySecondCharExtension`), so small laptop screens always render the classic
+grid unchanged. Beyond the two-key ceiling (~7.7k labels, e.g. non-HiDPI 4K),
+cells enlarge just enough for full coverage. Extended lists are memoized per
+alphabet size in `avyCombinationsFor`.
+
 `~/.hammerspoon/init.lua` includes a `hyper+w` Wi-Fi chooser.
 
 The chooser shows cached network names immediately when available, refreshes
