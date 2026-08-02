@@ -573,7 +573,14 @@ function bella_zsh_disable1 {
 }
 
 # aliasfn bell-zsh-start bell-sc2-I-return
-aliasfn bell-zsh-start bell-lm-mhm
+function bell-zsh-start {
+    if ai-agent-p ; then
+        #: Skip the startup bell for shells spawned by AI agents (Claude Code, Codex, ...) — they start many shells.
+        return 0
+    fi
+
+    bell-lm-mhm "$@"
+}
 
 function bell-zsh1() {
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"

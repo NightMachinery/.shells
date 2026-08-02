@@ -78,6 +78,31 @@ function isJulia {
 # isborg() { isBorg "$@" ; }
 # isjulia() { isBorg "$@" ; }
 ##
+function claude-code-p {
+    #: Claude Code exports CLAUDECODE=1 (plus CLAUDE_CODE_SESSION_ID, CLAUDE_PID, ...) in every shell it spawns.
+    #: AI_AGENT (e.g., "claude-code_2-1-220_agent") is also set by Claude Code 2.1+.
+    ##
+    [[ "${CLAUDECODE}" == 1 ]] ||
+        [[ "${AI_AGENT}" == claude* ]]
+}
+
+function codex-p {
+    #: Codex CLI exports CODEX_SANDBOX (e.g., "seatbelt") in its sandboxed shells.
+    #: @warn possibly not set when running with full access (no sandbox).
+    ##
+    test -n "${CODEX_SANDBOX}" ||
+        [[ "${AI_AGENT}" == codex* ]]
+}
+
+function ai-agent-p {
+    #: Is the current program being run by an AI agent (Claude Code, Codex, ...)?
+    #: @warn These env vars are inherited by child processes, so this means "was started by an agent (or its descendants)". Not a security boundary; trivially spoofable.
+    ##
+    test -n "${AI_AGENT}" ||
+        claude-code-p ||
+        codex-p
+}
+##
 function isEmacs {
     [[ -n "${NIGHT_EMACS_P}" ]]
 }
