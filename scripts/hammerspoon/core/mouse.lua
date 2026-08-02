@@ -360,8 +360,7 @@ function screenPositionAvy(params)
     local combinations = avy_combinations
     -- local combinations = generateTwoLetterCombinations()
 
-    local screenWidth = hs.screen.mainScreen():frame().w
-    local screenHeight = hs.screen.mainScreen():frame().h
+    local screenFrame = hs.screen.mainScreen():frame()
 
     local overlayHeight = params.overlayHeight
     local overlayWidth = params.overlayWidth
@@ -374,10 +373,10 @@ function screenPositionAvy(params)
     local fontSize = params.fontSize
     local fontAlignment = params.fontAlignment
 
-    local canvas_initial_x = -overlayWidth
-    local canvas_initial_y = -overlayHeight
-    local canvas_width = screenWidth - 2 * canvas_initial_x
-    local canvas_height = screenHeight - 2 * canvas_initial_y + 30
+    local canvas_initial_x = screenFrame.x - overlayWidth
+    local canvas_initial_y = screenFrame.y - overlayHeight
+    local canvas_width = screenFrame.w + 2 * overlayWidth
+    local canvas_height = screenFrame.h + 2 * overlayHeight + 30
     local canvas = hs.canvas.new({x = canvas_initial_x, y = canvas_initial_y, w = canvas_width, h = canvas_height})
     local index = 1
 
