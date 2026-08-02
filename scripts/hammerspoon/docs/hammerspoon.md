@@ -35,6 +35,24 @@ corner. App-scoped modes are temporarily suspended while global modes such as
 Hyper or Purple are active, then re-sync with the frontmost app after the
 global mode stack exits.
 
+Mode overlays are indicator groups (`ModalMode.createIndicatorGroup`): one
+canvas per target screen, cached per screen. `ModalMode.screenWatcher`
+invalidates the cached canvases whenever displays are added, removed, or
+rearranged, so overlay positions self-heal without an `hs.reload()`. Other
+modules can hook the same watcher with `ModalMode.onScreenChange(fn)` (the STT
+recording indicator does this).
+
+Which screens an overlay appears on is controlled by the `overlayScreens`
+style key, resolved by `ModalMode.targetScreens`. Accepted values: `all` (every
+screen), `primary` (menu-bar screen), `internal` (built-in display),
+`all_external` (alias `external`), `active` (alias `main`; the screen with
+keyboard focus), and `mouse` (the screen containing the pointer). Specs that
+match no screen (e.g. `all_external` with no external attached, or `internal`
+in clamshell mode) fall back to the primary screen so the overlay is never
+invisible. App-scoped modes default to `primary`; pass `overlayScreens` in the
+mode's `overlay` table to change it. The Hyper banner defaults to `all` via the
+`hyper_overlay_screens` global in `core/hyper-mode.lua`.
+
 `bind_v3` defines modal key chords. Key arrays use Hammerspoon key names plus
 aliases such as `SPC`, `RET`, and `ESC`. While a chord is pending, the mode
 overlay shows the pressed prefix. Valid next keys are consumed and advance the

@@ -86,13 +86,48 @@ function ModalMode.positionedFrame(screenFrame, frame, position, margin)
     return frame
 end
 
-function ModalMode.updateIndicatorText(indicator, style, text)
+function ModalMode.screenIsInternal(screen)
+    return (screen:name() or ""):lower():match("built%-in") ~= nil
+end
+
+function ModalMode.targetScreens(spec)
+    spec = spec or "all"
+
+    local screens
+    if spec == "all" then
+        screens = hs.screen.allScreens()
+    elseif spec == "primary" then
+        screens = { hs.screen.primaryScreen() }
+    elseif spec == "internal" then
+        screens = fnutils.filter(hs.screen.allScreens(), ModalMode.screenIsInternal)
+    elseif spec == "all_external" or spec == "external" then
+        screens = fnutils.filter(hs.screen.allScreens(), function(screen)
+            return not ModalMode.screenIsInternal(screen)
+        end)
+    elseif spec == "active" or spec == "main" then
+        screens = { hs.screen.mainScreen() }
+    elseif spec == "mouse" then
+        screens = { hs.mouse.getCurrentScreen() or hs.screen.mainScreen() }
+    else
+        print("ModalMode.targetScreens: unknown spec: " .. tostring(spec) .. " (falling back to 'all')")
+        screens = hs.screen.allScreens()
+    end
+
+    if #screens == 0 then
+        -- e.g., "internal" in clamshell mode, or "all_external" with no external attached
+        screens = { hs.screen.primaryScreen() }
+    end
+
+    return screens
+end
+
+function ModalMode.updateIndicatorText(indicator, style, text, screen)
     if not indicator then
         return
     end
 
     local textBoxSize = indicator:minimumTextSize(2, text)
-    local screenFrame = hs.screen.primaryScreen():fullFrame()
+    local screenFrame = (screen or hs.screen.primaryScreen()):fullFrame()
     local frame = {
         w = textBoxSize.w + style.strokeWidth * 2 + style.textSize,
         h = textBoxSize.h + style.strokeWidth * 2 + style.textSize,
@@ -109,7 +144,7 @@ function ModalMode.updateIndicatorText(indicator, style, text)
     indicator:frame(frame)
 end
 
-function ModalMode.createIndicator(style)
+function ModalMode.createIndicator(style, screen)
     local strokeWidth = style.strokeWidth / 1.5
     local text = style.text or style.name or ""
 
@@ -131,10 +166,95 @@ function ModalMode.createIndicator(style)
         textSize = style.textSize,
     }
 
-    ModalMode.updateIndicatorText(indicator, style, text)
+    ModalMode.updateIndicatorText(indicator, style, text, screen)
     indicator:behavior{"canJoinAllSpaces", "transient", "fullScreenAuxiliary"}
 
     return indicator
+end
+
+ModalMode.indicatorGroups = ModalMode.indicatorGroups or {}
+
+function ModalMode.createIndicatorGroup(style)
+    -- One indicator canvas per screen in `style.overlayScreens` (see ModalMode.targetScreens).
+    -- Canvases (and their frames) are cached per screen and rebuilt lazily after
+    -- ModalMode.screenWatcher invalidates them, so geometry never goes stale.
+    local defaultText = style.text or style.name or ""
+    local group = { style = style, canvases = {}, screens = {}, text = defaultText, visible = false }
+
+    function group.show()
+        local shown = {}
+        for _, screen in ipairs(ModalMode.targetScreens(style.overlayScreens)) do
+            local id = screen:id()
+            local canvas = group.canvases[id]
+            if not canvas then
+                canvas = ModalMode.createIndicator(style, screen)
+                if group.text ~= defaultText then
+                    ModalMode.updateIndicatorText(canvas, style, group.text, screen)
+                end
+                group.canvases[id] = canvas
+                group.screens[id] = screen
+            end
+            canvas:show()
+            shown[id] = true
+        end
+
+        for id, canvas in pairs(group.canvases) do
+            if not shown[id] then
+                -- e.g., overlayScreens="active" and the active screen has changed
+                canvas:hide()
+            end
+        end
+
+        group.visible = true
+    end
+
+    function group.hide()
+        for _, canvas in pairs(group.canvases) do
+            canvas:hide()
+        end
+        group.visible = false
+    end
+
+    function group.setText(text)
+        group.text = text
+        for id, canvas in pairs(group.canvases) do
+            ModalMode.updateIndicatorText(canvas, style, text, group.screens[id])
+        end
+    end
+
+    function group.invalidate()
+        for _, canvas in pairs(group.canvases) do
+            canvas:delete()
+        end
+        group.canvases = {}
+        group.screens = {}
+        if group.visible then
+            group.show()
+        end
+    end
+
+    table.insert(ModalMode.indicatorGroups, group)
+    return group
+end
+
+ModalMode.screenChangeCallbacks = ModalMode.screenChangeCallbacks or {}
+
+function ModalMode.onScreenChange(fn)
+    table.insert(ModalMode.screenChangeCallbacks, fn)
+end
+
+if not ModalMode.screenWatcher then
+    ModalMode.screenWatcher = hs.screen.watcher.new(function()
+        -- macOS can fire this several times per display change; invalidation is
+        -- idempotent and cheap, so no debouncing is needed.
+        for _, group in ipairs(ModalMode.indicatorGroups) do
+            group.invalidate()
+        end
+        for _, fn in ipairs(ModalMode.screenChangeCallbacks) do
+            fn()
+        end
+    end)
+    ModalMode.screenWatcher:start()
 end
 
 function ModalMode.defaultStyle(o)
@@ -153,6 +273,7 @@ function ModalMode.defaultStyle(o)
         textYOffset = o.textYOffset,
         overlayPosition = o.overlayPosition or o.position,
         overlayMargin = o.overlayMargin,
+        overlayScreens = o.overlayScreens or o.screens or "primary",
     }
 end
 
@@ -531,12 +652,12 @@ function ModalMode.createAppFocusMode(o)
         overlayStyle = ModalMode.defaultStyle(o.overlay or {})
         overlayStyle.text = overlayStyle.text or o.label or o.appName or o.name
         overlayBaseText = overlayStyle.text
-        indicator = ModalMode.createIndicator(overlayStyle)
+        indicator = ModalMode.createIndicatorGroup(overlayStyle)
     end
 
     function mode.setOverlayText(text)
         if indicator then
-            ModalMode.updateIndicatorText(indicator, overlayStyle, text)
+            indicator.setText(text)
         end
     end
 

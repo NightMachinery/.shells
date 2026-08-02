@@ -22,6 +22,10 @@ end
 
 local hyperAlerts
 
+-- Which screens show the hyper banner: "all" | "primary" | "internal" | "all_external" | "active" | "mouse"
+-- (see ModalMode.targetScreens)
+hyper_overlay_screens = hyper_overlay_screens or "all"
+
 local hyperStyle = {
     -- [[https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/alert/alert.lua#L17][hammerspoon/extensions/alert/alert.lua at master · Hammerspoon/hammerspoon]]
     -- strokeWidth  = 2,
@@ -42,6 +46,7 @@ local hyperStyle = {
     textColor = { white = 0.125 },
     textSize = 48,
     text = "🌟",
+    overlayScreens = hyper_overlay_screens,
 }
 local secureInputStyle = tableShallowCopy(hyperStyle)
 secureInputStyle.fillColor = { red = 1, green = 0, blue = 0, alpha = 0.5 }
@@ -59,61 +64,14 @@ local isSecureInputEnabled = hs.eventtap.isSecureInputEnabled
 hyper_alert_canvas_p = true
 -- canvas mode seems to be more buggy though? It sometimes just doesn't show up.
 
-function hyperModeIndicatorCreate(hyperStyle)
-    local strokeWidth = hyperStyle.strokeWidth / 1.5
-    local text = hyperStyle.text or ""
-
-    local hyperModeIndicator = hs.canvas.new{x=0, y=0, w=0, h=0}:insertElement{
-        id = 'background',
-        type = 'rectangle',
-        action = 'strokeAndFill',
-        fillColor = hyperStyle.fillColor,
-        roundedRectRadii = { xRadius = hyperStyle.radius, yRadius = hyperStyle.radius },
-        strokeColor = hyperStyle.strokeColor,
-        strokeWidth = strokeWidth,
-        padding = strokeWidth / 2,
-}:insertElement{
-        id = 'textBox',
-        type = 'text',
-        text = text,
-        textAlignment = 'center',
-        textColor = hyperStyle.textColor,
-        textSize = hyperStyle.textSize,
-}
-    local hyperTextBoxSize = hyperModeIndicator:minimumTextSize(2, text)
-    local screenFrame = hs.screen.primaryScreen():fullFrame()
-    local hyperFrame = {}
-    hyperFrame.w = hyperTextBoxSize.w + hyperStyle.strokeWidth*2 + hyperStyle.textSize -- default alert padding is 1/2 of font size, but we need it on both sides
-    hyperFrame.h = hyperTextBoxSize.h + hyperStyle.strokeWidth*2 + hyperStyle.textSize -- ditto
-    ModalMode.positionedFrame(screenFrame, hyperFrame, hyperStyle.overlayPosition or "center-top", hyperStyle.overlayMargin)
-    -- hyperFrame.y = hyperFrame.y + 35 -- to be below the notch
-
-    -- Hammerspoon can automatically center the text horizontally, but not vertically, so:
-    hyperModeIndicator.textBox.frame = {
-        x = (hyperFrame.w - hyperTextBoxSize.w)/2,
-        y = ((hyperFrame.h - hyperTextBoxSize.h)/2) + 5,
-        -- I have added =5= to make it look better on the notch.
-        w = hyperTextBoxSize.w,
-        h = hyperTextBoxSize.h,
-    }
-    hyperModeIndicator:frame(hyperFrame)
-
-    hyperModeIndicator:behavior{'canJoinAllSpaces', 'transient', 'fullScreenAuxiliary'} -- canvas will appear in all spaces
-    -- OR
-    -- hyperModeIndicator:behavior{'canJoinAllSpaces', 'stationary', 'fullScreenAuxiliary'} -- canvas will appear in all spaces AND Mission Control
-
-    return hyperModeIndicator
-end
-
-
 local hyperModeIndicator
 local hyperModeIndicatorOrig
 local hyperModeIndicatorSI
 if hyper_alert_canvas_p then
-    hyperModeIndicatorOrig = hyperModeIndicatorCreate(hyperStyle)
+    hyperModeIndicatorOrig = ModalMode.createIndicatorGroup(hyperStyle)
     hyperModeIndicator = hyperModeIndicatorOrig
 
-    hyperModeIndicatorSI = hyperModeIndicatorCreate(secureInputStyle)
+    hyperModeIndicatorSI = ModalMode.createIndicatorGroup(secureInputStyle)
 end
 ---
 hyper_mode = ModalMode.create{name="hyper"}
