@@ -10,6 +10,7 @@ endpoint rate-limits aggressively.
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import subprocess
@@ -97,13 +98,15 @@ class FetchResult:
     stale_reason: str | None = None
 
 
-def read_keychain_credentials(*, timeout: float) -> dict | None:
-    if sys.platform != "darwin":
-        return None
+def read_keychain_item(*, account: str | None, timeout: float) -> dict | None:
+    command = ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE]
+    if account is not None:
+        command.extend(["-a", account])
+    command.append("-w")
 
     try:
         proc = subprocess.run(
-            ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-w"],
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -122,6 +125,49 @@ def read_keychain_credentials(*, timeout: float) -> dict | None:
         return None
 
     return data if isinstance(data, dict) else None
+
+
+def keychain_token_infos(*, timeout: float) -> list[TokenInfo]:
+    if sys.platform != "darwin":
+        return []
+
+    # Claude Code has stored credentials under different keychain account
+    # names over time (the login username, later "unknown"). Orphaned items
+    # from old versions keep their long-expired token and, without an
+    # account filter, `security` returns whichever item comes first -- so
+    # read every candidate and let the caller pick the freshest.
+    try:
+        login_user: str | None = getpass.getuser()
+    except OSError:
+        login_user = None
+    accounts: list[str | None] = []
+    for account in (None, login_user, "unknown"):
+        if account not in accounts:
+            accounts.append(account)
+
+    infos: list[TokenInfo] = []
+    seen_tokens: set[str] = set()
+    for account in accounts:
+        data = read_keychain_item(account=account, timeout=timeout)
+        if data is None:
+            continue
+
+        source = "keychain" if account is None else f"keychain:{account}"
+        info = token_info_from_oauth(data, source=source)
+        if info is None or info.token in seen_tokens:
+            continue
+
+        seen_tokens.add(info.token)
+        infos.append(info)
+
+    return infos
+
+
+def best_token_info(infos: list[TokenInfo]) -> TokenInfo | None:
+    def freshness(info: TokenInfo) -> tuple[bool, float]:
+        return (info.expired is not True, info.expires_at_s or 0.0)
+
+    return max(infos, key=freshness, default=None)
 
 
 def read_credentials_file() -> dict | None:
@@ -161,11 +207,9 @@ def get_token(*, timeout: float) -> TokenInfo:
     if env_token:
         return TokenInfo(token=env_token, source="env")
 
-    keychain = read_keychain_credentials(timeout=timeout)
-    if keychain is not None:
-        info = token_info_from_oauth(keychain, source="keychain")
-        if info is not None:
-            return info
+    keychain_info = best_token_info(keychain_token_infos(timeout=timeout))
+    if keychain_info is not None:
+        return keychain_info
 
     file_creds = read_credentials_file()
     if file_creds is not None:
