@@ -398,7 +398,11 @@ function screenPositionAvy(params)
     local secondModalBgColor = hs.drawing.color.asRGB(params.secondModalBgColor)
     local secondModalFgColor = hs.drawing.color.asRGB(params.secondModalFgColor)
 
-    local screenFrame = hs.screen.mainScreen():frame()
+    local screen = hs.screen.mainScreen()
+    local screenFrame = screen:frame()
+    -- Anchor at the physical top-left corner: frame() starts below the menu bar,
+    -- which would leave a bar of uncovered screen above the grid.
+    local screenOrigin = screen:fullFrame()
 
     local overlayHeight = params.overlayHeight
     local overlayWidth = params.overlayWidth
@@ -429,8 +433,8 @@ function screenPositionAvy(params)
     end
     local combinations = avyCombinationsFor(columns * rows)
 
-    local canvas_initial_x = screenFrame.x - overlayWidth
-    local canvas_initial_y = screenFrame.y - overlayHeight
+    local canvas_initial_x = screenOrigin.x - overlayWidth
+    local canvas_initial_y = screenOrigin.y - overlayHeight
     local canvas = hs.canvas.new({x = canvas_initial_x, y = canvas_initial_y, w = canvas_width, h = canvas_height})
     local index = 1
 
