@@ -113,5 +113,7 @@ function claude-code-usage {
     #: =script_args= before user args so explicit CLI flags win (argparse last-wins).
     $proxyenv revaldbg command claude_code_usage.py "${script_args[@]}" "$@"
 }
+aliasfn claude-code-status claude-code-usage
 alias ccu='claude-code-usage'
+alias ccs='claude-code-usage'
 ##
