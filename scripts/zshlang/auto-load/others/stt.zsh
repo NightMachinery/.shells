@@ -8,6 +8,7 @@ function stt-recordings-rerun {
 }
 ##
 function llm-focus-p {
+    #: @keywords stt-p
     {
         # kitty-tab-codex-p
         ##
@@ -20,7 +21,7 @@ function llm-focus-p {
 
             {
                 browser-focus-p &&
-                    browser-current-match-p '^https://(chatgpt\.|(?:aistudio|gemini)\.google\.)'
+                    browser-current-match-p '^https://(chatgpt\.|(?:aistudio|gemini)\.google\.|claude\.)'
             } ||
                 [[ "${front_app_cached}" == 'com.openai.codex' ]]
         }
