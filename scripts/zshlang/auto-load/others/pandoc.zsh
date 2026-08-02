@@ -33,9 +33,27 @@ function docx2plain {
 }
 
 function md2org {
+    #: The latex filter is on by default (see
+    #: [help:pandoc-convert] and ~/scripts/docs/md2org-latex/readme.md).
+    ##
     cat-paste-if-tty |
     perl -pe 's/^(```+[^\s`]+)(?:\h+.*)?$/$1/' |  #: [[id:840a466b-9e1b-4f15-bac9-e9001e5e87d7][pandoc markdown code block fence attributes]]
         @opts from "${pandoc_md_default}" to org @ pandoc-convert "$@"
+}
+
+function md2org-latex {
+    #: Converts LLM-style markdown (with `\[...\]` and `\(...\)` math) to
+    #: org whose math org-mode can actually parse/preview.
+    ##
+    local pandoc_convert_latex_filter_mode='V1'
+
+    md2org "$@"
+}
+
+function md2org-no-latex {
+    local pandoc_convert_latex_filter_mode='none'
+
+    md2org "$@"
 }
 
 function mediawiki2md {
@@ -209,7 +227,7 @@ function html2text {
 ##
 function pandoc-convert {
     ensure-array pandoc_opts
-    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra:-y}" opts=("$pandoc_opts[@]") delink="${pandoc_delink}" postprocess_p="${pandoc_convert_postprocess_p:-y}"
+    local input="${1}" output="${2:--}" from="${pandoc_convert_from}" to="${pandoc_convert_to}" trim_extra="${pandoc_convert_trim_extra:-y}" opts=("$pandoc_opts[@]") delink="${pandoc_delink}" postprocess_p="${pandoc_convert_postprocess_p:-y}" latex_filter_mode="${pandoc_convert_latex_filter_mode:-y}"
     assert-args from to @RET
     if bool $delink ; then
         ##
@@ -238,12 +256,34 @@ function pandoc-convert {
         # var-show opts
     fi
 
+    if [[ "$to" == org ]] ; then
+        case "${latex_filter_mode}" in
+            (none) ;;
+            (V1|y)
+                #: Makes multi-line `\[...\]` math survive org's parser.
+                #: See ~/scripts/docs/md2org-latex/readme.md
+                opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_math_env.lua") ;;
+            (*)
+                ecerr "$0: unknown pandoc_convert_latex_filter_mode: ${latex_filter_mode}"
+                return 1 ;;
+        esac
+
+        if bool "$trim_extra" ; then
+            #: Hard breaks (org: `\\`) -> soft breaks, at the AST level.
+            #: Replaces the old textual [help:org-trim-forced-newlines],
+            #: which corrupted `\\` row separators inside LaTeX math.
+            opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_soft_linebreaks.lua")
+        fi
+    fi
+
     pandoc --wrap=none "$opts[@]" --from "$from" --to "$to" "$input" -o "-" | {
         if bool ${postprocess_p} ; then
             if [[ "$to" == org ]] ; then
                 pandoc-normalize-whitespace | {
                     if bool $trim_extra ; then
-                        pandoc-org-trim-extra | org-trim-forced-newlines
+                        pandoc-org-trim-extra
+                        #: Forced-newline removal now happens at the AST
+                        #: level via org_soft_linebreaks.lua above.
                     else
                         cat
                     fi
@@ -300,6 +340,9 @@ function pandoc-org-trim-extra {
 
 function org-trim-forced-newlines {
     # @duplicateCode/1102efd8dd0367b8dc12d7e3678dca59
+    #: @deprecated No longer used by [help:pandoc-convert]; superseded by
+    #: pandoc_filters/org_soft_linebreaks.lua (this textual version
+    #: corrupts `\\` row separators inside LaTeX math).
     sd '\\\\' ''
 }
 
