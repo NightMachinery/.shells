@@ -287,8 +287,7 @@ function createIndicator()
     local frame = {}
     frame.w = textBoxSize.w + style.strokeWidth*2 + style.textSize
     frame.h = textBoxSize.h + style.strokeWidth*2 + style.textSize
-    frame.x = (screenFrame.w - frame.w)/2
-    frame.y = (screenFrame.h - frame.h)/2
+    ModalMode.positionedFrame(screenFrame, frame, "center", 0)
 
     indicator.textBox.frame = {
         x = (frame.w - textBoxSize.w)/2,
@@ -302,6 +301,16 @@ function createIndicator()
 
     return indicator
 end
+
+ModalMode.onScreenChange(function()
+    if whisper.indicator then
+        whisper.indicator:delete()
+        whisper.indicator = nil
+        if whisper.state ~= "off" then
+            updateIndicator()
+        end
+    end
+end)
 
 -- Function to toggle between recorder modes
 function whisper.toggleRecorderMode()
