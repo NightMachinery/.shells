@@ -217,7 +217,17 @@ function flatten1(list_of_lists)
     return flat_list
 end
 
-function generateTwoLetterCombinations()
+local avySecondCharExtension = flatten1({
+        -- Extra second chars used only when the screen needs more labels than the
+        -- base alphabet provides; ordered by typing comfort so bigger screens pay
+        -- the smallest possible price. Must stay disjoint from lettersSecondList.
+        strToList("qwertydfgh"),
+        strToList("`123456789"),
+        strToList("ASDFGHJKLQWERTYUIOPZXCVBNM"),
+        strToList("~!@#$%^&*()_+{}|:\"<>?"),
+})
+
+function generateTwoLetterCombinations(secondCount)
     -- @todo Change the order of lettersFirstList so that hard-to-press keys are in positions usually not needed.
     local lettersFirstList = flatten1({
             strToList("r"),
@@ -248,8 +258,18 @@ function generateTwoLetterCombinations()
             {
                 tab_symbol,
             },
-            -- strToList("qwertydfgh"),
+            -- qwertydfgh etc. live in avySecondCharExtension now.
     })
+
+    avy_first_char_count = #lettersFirstList
+    avy_base_second_char_count = #lettersSecondList
+
+    if secondCount and secondCount > #lettersSecondList then
+        local extra = math.min(secondCount - #lettersSecondList, #avySecondCharExtension)
+        for i = 1, extra do
+            table.insert(lettersSecondList, avySecondCharExtension[i])
+        end
+    end
 
     local combinations = {}
     for i, first in ipairs(lettersFirstList) do
@@ -264,6 +284,27 @@ end
 
 avy_combinations = generateTwoLetterCombinations()
 -- No need to recompute this every time
+
+local avyCombinationsCache = {}
+function avyCombinationsFor(cellsNeeded)
+    -- Smallest label alphabet that covers `cellsNeeded`: screens that fit in the
+    -- base list (all laptop sizes) get exactly the classic grid; bigger screens
+    -- grow the second-char list minimally from avySecondCharExtension.
+    local secondCount = math.ceil(cellsNeeded / avy_first_char_count)
+    if secondCount <= avy_base_second_char_count then
+        return avy_combinations
+    end
+
+    secondCount = math.min(secondCount, avy_base_second_char_count + #avySecondCharExtension)
+    if not avyCombinationsCache[secondCount] then
+        avyCombinationsCache[secondCount] = generateTwoLetterCombinations(secondCount)
+    end
+    return avyCombinationsCache[secondCount]
+end
+
+function avyMaxCombinationCount()
+    return avy_first_char_count * (avy_base_second_char_count + #avySecondCharExtension)
+end
 
 function charToKeybinding(char)
     local mods = {}
@@ -357,9 +398,6 @@ function screenPositionAvy(params)
     local secondModalBgColor = hs.drawing.color.asRGB(params.secondModalBgColor)
     local secondModalFgColor = hs.drawing.color.asRGB(params.secondModalFgColor)
 
-    local combinations = avy_combinations
-    -- local combinations = generateTwoLetterCombinations()
-
     local screenFrame = hs.screen.mainScreen():frame()
 
     local overlayHeight = params.overlayHeight
@@ -373,19 +411,31 @@ function screenPositionAvy(params)
     local fontSize = params.fontSize
     local fontAlignment = params.fontAlignment
 
+    -- Calculate the number of overlays to fit the screen
+    local canvas_width, canvas_height, columns, rows
+    local function computeGridDims()
+        canvas_width = screenFrame.w + 2 * overlayWidth
+        canvas_height = screenFrame.h + 2 * overlayHeight + 30
+        columns = math.ceil(canvas_width / overlayWidth)
+        rows = math.ceil(canvas_height / overlayHeight)
+    end
+    computeGridDims()
+    while columns * rows > avyMaxCombinationCount() do
+        -- Enormous screens can exceed even the extended two-key alphabet; coarsen
+        -- the cells just enough that every cell still gets a label.
+        overlayWidth = overlayWidth + 3
+        overlayHeight = overlayHeight + 2
+        computeGridDims()
+    end
+    local combinations = avyCombinationsFor(columns * rows)
+
     local canvas_initial_x = screenFrame.x - overlayWidth
     local canvas_initial_y = screenFrame.y - overlayHeight
-    local canvas_width = screenFrame.w + 2 * overlayWidth
-    local canvas_height = screenFrame.h + 2 * overlayHeight + 30
     local canvas = hs.canvas.new({x = canvas_initial_x, y = canvas_initial_y, w = canvas_width, h = canvas_height})
     local index = 1
 
     -- Variable to store the current offset of the canvas
     local canvasOffset = { x = canvas_initial_x, y = canvas_initial_y }
-
-    -- Calculate the number of overlays to fit the screen
-    local columns = math.ceil(canvas_width / overlayWidth)
-    local rows = math.ceil(canvas_height / overlayHeight) + 0
 
     local function cleanup()
         canvas:hide()
@@ -441,11 +491,19 @@ function screenPositionAvy(params)
 
     -- Create text elements for each position and add them to the canvas
     local text_elements_by_first_char = {}
+    local combinationsExhausted = false
     for row = 0, rows - 1 do
+        if combinationsExhausted then
+            break
+        end
         for col = 0, columns - 1 do
             local combo_obj = combinations[index]
             if not combo_obj then
-                print("screenPositionAvy: insufficient combinations")
+                -- Should be unreachable: the alphabet growth and cell coarsening
+                -- above guarantee enough labels.
+                print(string.format("screenPositionAvy: insufficient combinations (%d needed, %d available)",
+                                    rows * columns, #combinations))
+                combinationsExhausted = true
                 break
             end
 
