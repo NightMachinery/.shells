@@ -107,7 +107,12 @@ function 2fa-code {
     local inargs
     in-or-args3 "$@" @RET
 
-    local input
+    if ! isdefined-cmd oathtool ; then
+        ecerr "$0: missing command: oathtool (install Homebrew 'oath-toolkit' or apt 'oathtool')"
+        return 1
+    fi
+
+    local input retcode=0
     for input in "${inargs[@]}" ; do
         local period="${twofa_code_period:-30}"
         local secret=""
@@ -118,7 +123,8 @@ function 2fa-code {
 
         if test -z "${input}" ; then
             ecerr "Usage: $0 <BASE32_SECRET_OR_OTPAUTH_URL>"
-            return 1
+            retcode=1
+            continue
         fi
 
         if [[ "${input}" == otpauth://* ]] ; then
@@ -150,7 +156,10 @@ function 2fa-code {
 
                 print $params{secret}, chr(10);
                 print $params{period}, chr(10) if exists $params{period} && $params{period} ne q{};
-            ' "${input}")}") @RET
+            ' "${input}")}") || {
+                retcode=$?
+                continue
+            }
             secret="${otpauth_params[1]}"
             if (( ${#otpauth_params} >= 2 )) ; then
                 period="${otpauth_params[2]}"
@@ -164,26 +173,28 @@ function 2fa-code {
 
         if test -z "${secret}" ; then
             ecerr "$0: empty 2FA secret"
-            return 1
+            retcode=1
+            continue
         fi
 
         if [[ ! "${period}" == <1-> ]] ; then
             ecerr "$0: invalid TOTP period: $(gquote-sq "${period}")"
-            return 1
-        fi
-
-        if ! isdefined-cmd oathtool ; then
-            ecerr "$0: missing command: oathtool (install Homebrew 'oath-toolkit' or apt 'oathtool')"
-            return 1
+            retcode=1
+            continue
         fi
 
         oathtool_opts=(--totp --base32 --time-step-size="${period}s")
-        code="$(command oathtool "${oathtool_opts[@]}" "${secret}")" @RET
+        code="$(command oathtool "${oathtool_opts[@]}" "${secret}")" || {
+            retcode=$?
+            continue
+        }
         ec-copy "${code}"
 
         valid_for="$(( period - (EPOCHSECONDS % period) ))"
         ecgray "$0: valid for ${valid_for}s"
     done
+
+    return $retcode
 }
 ##
 function pass-check() {
