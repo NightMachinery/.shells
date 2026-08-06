@@ -180,6 +180,11 @@ function html2plain-std {
     pandoc --wrap=none --from html --to plain - -o -
 }
 
+function html2ansi {
+    #: renders HTML as ANSI-styled text for the terminal
+    pandoc --from html --to ansi --columns="$(terminal-width-get)" - -o -
+}
+
 function html2md-v1 {
     @opts f "${pandoc_md_default}" @ html2org "$@"
 }

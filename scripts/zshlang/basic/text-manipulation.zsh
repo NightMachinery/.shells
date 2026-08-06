@@ -31,6 +31,16 @@ function rget {
         cat-copy-if-tty
 }
 ##
+function terminal-width-get {
+    #: =COLUMNS= can be empty or 0 in non-interactive shells.
+    local w="${COLUMNS}"
+    if [[ "$w" != <-> ]] || (( w <= 0 )) ; then
+        w=80
+    fi
+
+    ec "$w"
+}
+##
 function text-wrap {
     local w="${1:-${text_wrap_columns:-${COLUMNS:-90}}}"
 
