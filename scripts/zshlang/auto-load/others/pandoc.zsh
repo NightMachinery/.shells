@@ -250,6 +250,13 @@ function pandoc-convert {
     tmp_o="$(gmktemp)" @TRET
 
 
+    if bool "$trim_extra" ; then
+        #: Empty inline formatting (e.g., Outlook's `<u></u>` markers) turns
+        #: into junk like `__` in every output format; drop it at the AST
+        #: level.
+        opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/drop_empty_inlines.lua")
+    fi
+
     if [[ "$to" =~ '^(?:gfm|commonmark.*|markdown.*|djot)$' ]] ; then
         #: [[id:1ffc4d15-5baf-44bd-9cd4-98d50b3270b4][Add option to disable indented code blocks? · Issue #2120 · jgm/pandoc]]
         opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/md_code_blocks.lua")
