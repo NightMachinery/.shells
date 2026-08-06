@@ -35,9 +35,10 @@ function docx2plain {
 function md2org {
     #: The latex filter is on by default (see
     #: [help:pandoc-convert] and ~/scripts/docs/md2org-latex/readme.md).
+    #: Markdown input preprocessing (code fence attributes, German
+    #: teachings) happens in [agfi:h-pandoc-md-preprocess].
     ##
     cat-paste-if-tty |
-    perl -pe 's/^(```+[^\s`]+)(?:\h+.*)?$/$1/' |  #: [[id:840a466b-9e1b-4f15-bac9-e9001e5e87d7][pandoc markdown code block fence attributes]]
         @opts from "${pandoc_md_default}" to org @ pandoc-convert "$@"
 }
 
@@ -54,6 +55,34 @@ function md2org-no-latex {
     local pandoc_convert_latex_filter_mode='none'
 
     md2org "$@"
+}
+
+function md-strip-german-teachings {
+    #: Strips the trailing "Learning German" section that my LLM custom
+    #: instructions append after a `---\n\n# Learning German ^_^\n\n`
+    #: separator.
+    #: The separator is a strict output contract for the LLM, but we
+    #: tolerate slight drift: the blank line before the heading may be
+    #: missing, and the heading level may vary.
+    #: Strips from the LAST occurrence to EOF, so an earlier quoted copy
+    #: (e.g., inside a code block) does not truncate the document.
+    ##
+    in-or-args "$@" |
+        perl -0777 -pe 's/(.*)(?:\A|\n)---\n\n?#{1,6} Learning German \^_\^(?:\n.*)?\z/$1/s' |
+        cat-copy-if-tty
+}
+
+function h-pandoc-md-preprocess {
+    #: Input-side fixups [agfi:pandoc-convert] applies to markdown input.
+    ##
+    local strip_german_p="${pandoc_convert_strip_german_p:-y}"
+
+    perl -pe 's/^(```+[^\s`]+)(?:\h+.*)?$/$1/' |  #: [[id:840a466b-9e1b-4f15-bac9-e9001e5e87d7][pandoc markdown code block fence attributes]]
+        if bool "$strip_german_p" ; then
+            md-strip-german-teachings
+        else
+            cat
+        fi
 }
 
 function mediawiki2md {
@@ -254,6 +283,15 @@ function pandoc-convert {
     fi
     tmp_o="$(gmktemp)" @TRET
 
+    if [[ "$from" =~ '^markdown' ]] ; then
+        #: Input-side markdown preprocessing; applies to both file args and
+        #: stdin. Filter into a fresh temp so user-supplied input files are
+        #: not mutated.
+        local input_preprocessed
+        input_preprocessed="$(gmktemp)" @TRET
+        h-pandoc-md-preprocess < "$input" > "$input_preprocessed" @TRET
+        input="$input_preprocessed"
+    fi
 
     if bool "$trim_extra" ; then
         #: Empty inline formatting (e.g., Outlook's `<u></u>` markers) turns
