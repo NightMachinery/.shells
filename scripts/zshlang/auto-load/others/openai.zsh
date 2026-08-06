@@ -263,10 +263,31 @@ function llm-logs {
 }
 aliassafe llml='llm-logs'
 
+function h-llm-attachments-resolve-clipboard {
+    #: Replaces MAGIC_CLIPBOARD entries in the global `llm_attachments` with a
+    #: temp file of the clipboard's current image. Must run before anything
+    #: overwrites the clipboard (e.g., [agfi:llm-send]'s input copy).
+    ##
+    ensure-array llm_attachments @RET
+
+    local i a
+    for (( i=1; i <= ${#llm_attachments} ; i++ )) ; do
+        a="${llm_attachments[i]}"
+        if [[ "${a}" == "MAGIC_CLIPBOARD" ]] ; then
+            a="$(gmktemp --suffix=".png")" @TRET
+            assert pbpaste-image "${a}" @RET
+
+            icat-v "${a}" || true
+
+            llm_attachments[i]="${a}"
+        fi
+    done
+}
+
 function llm-m {
     bella_zsh_disable1
 
-    ensure-array llm_attachments @RET
+    h-llm-attachments-resolve-clipboard @RET
     local attachments=("${llm_attachments[@]}")
     llm_attachments=() #: clear the attachments
 
@@ -311,14 +332,6 @@ function llm-m {
 
     local a
     for a in "${attachments[@]}" ; do
-        if [[ "${a}" == "MAGIC_CLIPBOARD" ]] ; then
-            # Save the image from the clipboard to a temp file using `pbpaste-image`:
-            a="$(gmktemp --suffix=".png")" @TRET
-            assert pbpaste-image "${a}" @RET
-
-            icat-v "${a}" || true
-        fi
-
         if [[ "${a}" =~ '\.(oga|ogg)$' ]] ; then
             opts+=(--attachment-type "$a" 'application/ogg')
             #: Works around upstream bug by explicitly setting the MIME type.
@@ -348,6 +361,10 @@ alias xc='\noglob llm-continue'
 
 function llm-send {
     bella_zsh_disable1
+
+    h-llm-attachments-resolve-clipboard @RET
+    #: Snapshot clipboard image attachments now, before `input_copy_p` below
+    #: overwrites the clipboard with the input text.
 
     local model="${llm_model:-${llm_default_model}}"
     assert-args model @RET
