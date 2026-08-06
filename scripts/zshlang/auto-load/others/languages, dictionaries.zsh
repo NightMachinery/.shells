@@ -19,7 +19,7 @@ function sdc() {
 }
 
 function h-sdc-fa {
-    #: =--only-data-dir= crashes sdcv 0.5.4 on lookups (=map::at: key not found=), so we isolate via =--use-dict= instead.
+    #: We isolate via =--use-dict= rather than =--only-data-dir=: with the latter, the dicts listed in =~/.sdcv_ordering= are not loaded, which crashes sdcv 0.5.4 (=map::at: key not found=) and makes sdcv 0.5.5+ print an "Unknown dictionary" warning per missing dict on every lookup.
     local sdc_opts=(--data-dir "$HOME"/.stardict/dic-fa --use-dict Moin)
     sdc "$@"
 }
@@ -46,7 +46,7 @@ function h-sdcv-de {
     local q="$(in-or-args $*)"
     q="$(ec "$q" | trim)"
 
-    #: =--only-data-dir= crashes sdcv 0.5.4 on lookups (=map::at: key not found=), so we isolate via =--use-dict= instead.
+    #: We isolate via =--use-dict= rather than =--only-data-dir=; see =h-sdc-fa= for why.
     sdcv --non-interactive --json-output --data-dir "$HOME"/.stardict/dic-de --use-dict 'Wiktionary German-English' "$q"
 }
 
