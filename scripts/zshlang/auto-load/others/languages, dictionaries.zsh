@@ -18,9 +18,37 @@ function sdc() {
     # it2prof 'Hotkey Window'
 }
 
+function h-sdcv-xdg-get {
+    #: Prints a per-data-dir XDG config dir for sdcv, creating an empty =sdcv_ordering= in it if needed. (Edit that file to order the dicts within the data dir.)
+    #: Without it, sdcv falls back to the global =~/.sdcv_ordering=, whose dicts are not in the restricted data dir, which crashes sdcv 0.5.4 on lookups (=map::at: key not found=) and makes sdcv 0.5.5+ print an "Unknown dictionary" warning per dict on every lookup.
+    local dic_dir="$1"
+
+    local xdg="${dic_dir}"/xdg
+    if ! test -e "$xdg"/sdcv_ordering ; then
+        mkdir -p "$xdg" @TRET
+        touch "$xdg"/sdcv_ordering @TRET
+    fi
+
+    ec "$xdg"
+}
+
+function h-sdcv-dir {
+    #: Runs sdcv restricted to the dictionaries in the given data dir.
+    local dic_dir="$1" ; shift
+
+    local xdg
+    xdg="$(h-sdcv-xdg-get "$dic_dir")" @TRET
+
+    XDG_CONFIG_HOME="$xdg" sdcv --only-data-dir --data-dir "$dic_dir" "$@"
+}
+
 function h-sdc-fa {
-    #: We isolate via =--use-dict= rather than =--only-data-dir=: with the latter, the dicts listed in =~/.sdcv_ordering= are not loaded, which crashes sdcv 0.5.4 (=map::at: key not found=) and makes sdcv 0.5.5+ print an "Unknown dictionary" warning per missing dict on every lookup.
-    local sdc_opts=(--data-dir "$HOME"/.stardict/dic-fa --use-dict Moin)
+    local dic_dir="$HOME"/.stardict/dic-fa
+
+    local sdc_opts=(--only-data-dir --data-dir "$dic_dir")
+    local -x XDG_CONFIG_HOME
+    XDG_CONFIG_HOME="$(h-sdcv-xdg-get "$dic_dir")" @TRET
+
     sdc "$@"
 }
 
@@ -46,8 +74,7 @@ function h-sdcv-de {
     local q="$(in-or-args $*)"
     q="$(ec "$q" | trim)"
 
-    #: We isolate via =--use-dict= rather than =--only-data-dir=; see =h-sdc-fa= for why.
-    sdcv --non-interactive --json-output --data-dir "$HOME"/.stardict/dic-de --use-dict 'Wiktionary German-English' "$q"
+    h-sdcv-dir "$HOME"/.stardict/dic-de --non-interactive --json-output "$q"
 }
 
 function h-sdcde-impl {
