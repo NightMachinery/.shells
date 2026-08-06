@@ -34,12 +34,15 @@ function docx2plain {
 
 function md2org {
     #: The latex filter is on by default (see
-    #: [help:pandoc-convert] and ~/scripts/docs/md2org-latex/readme.md).
+    #: [agfi:pandoc-convert] and ~/scripts/docs/md2org-latex/readme.md).
     #: Markdown input preprocessing (code fence attributes, German
     #: teachings) happens in [agfi:h-pandoc-md-preprocess].
+    #: Input handling (file arg, stdin, clipboard-if-tty) also happens in
+    #: [agfi:pandoc-convert], so no `cat-paste-if-tty` here: piping it in
+    #: front used to hang `md2org file.md` in non-tty contexts (the pipe
+    #: blocked reading an idle stdin that pandoc-convert never consumed).
     ##
-    cat-paste-if-tty |
-        @opts from "${pandoc_md_default}" to org @ pandoc-convert "$@"
+    @opts from "${pandoc_md_default}" to org @ pandoc-convert "$@"
 }
 
 function md2org-latex {
