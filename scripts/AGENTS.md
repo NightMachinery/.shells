@@ -6,6 +6,8 @@ Read `./PE/Zsh.org`. When you think of something that needs to be in this file, 
 
 Read all scripts in `zshlang/basic`. Reuse functions when possible, DRY.
 
+To link to a zsh function from comments/docs, use `[agfi:function-name]`, not `[help:function-name]`.
+
 ## Plugins
 ### Loading
 
