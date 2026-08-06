@@ -5,7 +5,7 @@ function transi() {
     trans "$*" | erase-ansi
 }
 ##
-function sdc() {
+function sdc {
     bella_zsh_disable1
 
     local opts=("${sdc_opts[@]}")
@@ -14,7 +14,7 @@ function sdc() {
     q="$(ec "$q" | trim)"
 
     # it2prof dark
-    sdcv --non-interactive --color "${opts[@]}" "$q" | less
+    sdcv --non-interactive --color "${opts[@]}" "$q" | pager-if-overflow
     # it2prof 'Hotkey Window'
 }
 
@@ -67,7 +67,7 @@ function sdcfa {
     ec $res | perl -ne '$. == 3 && print' | erase-ansi | rtl-reshaper-fast
 
     wait $future
-    )
+    ) | pager-if-overflow
 }
 ##
 function h-sdcv-de {
@@ -105,7 +105,7 @@ function h-sdcde-impl {
             ec "$entry" | jq -r '.definition' | reval "${renderer[@]}"
             ec
         done
-    } | pager-if-tty
+    } | pager-if-overflow
     local ret=$?
     if (( ret == 141 )) ; then
         #: SIGPIPE from quitting the pager (or a downstream =head=) early is not an error.

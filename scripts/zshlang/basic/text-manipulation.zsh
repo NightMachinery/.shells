@@ -40,6 +40,16 @@ function terminal-width-get {
 
     ec "$w"
 }
+
+function terminal-height-get {
+    #: =LINES= can be empty or 0 in non-interactive shells.
+    local h="${LINES}"
+    if [[ "$h" != <-> ]] || (( h <= 0 )) ; then
+        h=24
+    fi
+
+    ec "$h"
+}
 ##
 function text-wrap {
     local w="${1:-${text_wrap_columns:-${COLUMNS:-90}}}"

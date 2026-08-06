@@ -40,4 +40,28 @@ function pager-if-tty {
         cat
     fi
 }
+
+function pager-if-overflow {
+    #: Pages only when the content would not fit on the screen with =pager_overflow_margin= lines to spare (for the shell prompt drawn afterwards); otherwise prints it directly.
+    #: Unlike =less --quit-if-one-screen=, which tests against the full screen height and so lets the prompt push the top of an almost-screenful out of view.
+    #: (No mainstream pager supports such a margin; apps solve this client-side, e.g., psql's =pager_min_lines=.)
+    local margin="${pager_overflow_margin:-5}"
+
+    if ! isOutTty ; then
+        cat
+        return $?
+    fi
+
+    local content
+    content="$(cat)"
+
+    local lines
+    lines="$(ec "$content" | text-wrap "$(terminal-width-get)" | wc -l | trim)" @TRET
+    if (( lines > $(terminal-height-get) - margin )) ; then
+        #: =-+F= unsets =--quit-if-one-screen= from =$LESS=, as we have already decided to page.
+        ec "$content" | pager -+F
+    else
+        ec "$content"
+    fi
+}
 ##
