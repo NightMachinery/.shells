@@ -60,7 +60,53 @@ function rial2human {
     re rial2human.py ${inargs[@]}
 }
 
+function toman2human {
+    local inargs
+    in-or-args3 "$@" @RET
+    re "rial2human.py --from-toman" ${inargs[@]}
+}
+
+function h-human2number-preview {
+    #: Usage: h-human2number-preview <preview_fn> [human2number.py flags ...] [inputs ...]
+    #: Inputs come from args, stdin, or pbpaste (via in-or-args3).
+    ##
+    local preview="$1" ; shift
+    local pyflags=()
+    while (( $# )) && [[ "$1" == --* ]] ; do pyflags+=("$1") ; shift ; done
+
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local i
+    for i in ${inargs[@]} ; do
+        human2number.py "${pyflags[@]}" "$i"
+    done > >( { colorfg "$gray[@]" ; "$preview" ; resetcolor } >&2) | cat-copy-if-tty
+}
+
 function human2rial {
-    human2number.py --rial "${@:-$(pbpaste)}" > >( { colorfg "$gray[@]" ; rial2human ; resetcolor } >&2) | cat-copy-if-tty
+    h-human2number-preview rial2human --rial "$@"
+}
+
+function human2toman {
+    h-human2number-preview toman2human "$@"
+}
+
+aliasfn toman2rial human2rial
+
+function rial2toman {
+    #: pure numeric rial->toman; rial never goes through the human parser
+    ##
+    local inargs
+    in-or-args3 "$@" @RET
+
+    local i
+    for i in ${inargs[@]} ; do
+        i="${i//,/}"
+        if [[ "$i" != *.* ]] && (( i % 10 == 0 )) ; then
+            ec $(( i / 10 ))
+        else
+            ec $(( i / 10. ))
+        fi
+    done | cat-copy-if-tty
 }
 ##

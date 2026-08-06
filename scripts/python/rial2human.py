@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 
-import sys
-from pynight.common_regex import float_pattern
+import argparse
 
 
-def rial_to_toman(rial):
-    # Convert rial to toman
-    toman = rial / 10
-
+def toman_to_human(toman):
     # Use a dictionary to define the magnitude of the toman
     magnitude = {
         1: "",
@@ -31,10 +27,22 @@ def rial_to_toman(rial):
     return human_readable_toman + " toman"
 
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: <rial_amount>")
-        sys.exit(1)
+def rial_to_toman(rial):
+    return toman_to_human(rial / 10)
 
-    rial = float(sys.argv[1].replace(",", ""))
-    print(rial_to_toman(rial))
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("amount", type=str, help="Amount to humanize (in rial).")
+    parser.add_argument(
+        "--from-toman",
+        action="store_true",
+        help="Interpret the amount as toman instead of rial.",
+    )
+    args = parser.parse_args()
+
+    amount = float(args.amount.replace(",", ""))
+    if args.from_toman:
+        print(toman_to_human(amount))
+    else:
+        print(rial_to_toman(amount))
