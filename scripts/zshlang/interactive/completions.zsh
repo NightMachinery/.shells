@@ -125,6 +125,27 @@ function _words {
     _values 'words' "${(f@)$(cat "$WORDLIST0" | rg "$words[-1]")}"
 }
 compdef _words sp spi ffdict ffdict-wn sdc di dwn
+
+function h-words-complete {
+    local wordlist="$1" dic_dir="$2" transform=("${@[3,-1]}")
+
+    h-wordlist-ensure "$wordlist" "$dic_dir" || return $?
+
+    local cur="$words[-1]"
+    if (( ${#transform} )) ; then
+        cur="$(reval "${transform[@]}" "$cur")"
+    fi
+
+    _values 'words' "${(f@)$(cat "$wordlist" | rg "$cur")}"
+}
+function _words_de {
+    h-words-complete "$WORDLIST_DE" "$HOME"/.stardict/dic-de
+}
+function _words_fa {
+    h-words-complete "$WORDLIST_FA" "$HOME"/.stardict/dic-fa en2per
+}
+compdef _words_de sdcde sdcde-fancy sdcde-plain sdcde-ansi sdcde-w3m sdcde-glow
+compdef _words_fa sdcfa
 ##
 function _opts_completion {
     local at_index=${words[(i)@]}

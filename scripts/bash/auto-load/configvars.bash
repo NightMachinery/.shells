@@ -13,6 +13,8 @@ typeset -g lilf_ip="82.102.10.244"
 typeset -g lilf_user="eva"
 ##
 WORDLIST0='/usr/share/dict/words'
+WORDLIST_DE="$HOME/.stardict/dic-de/wordlist.txt"
+WORDLIST_FA="$HOME/.stardict/dic-fa/wordlist.txt"
 ##
 # BROTHER_IP=192.168.1.230
 BROTHER_IP=192.168.1.238
