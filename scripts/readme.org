@@ -28,6 +28,20 @@ Selected Zsh directories under =./zshlang/= can be structured as public plugins 
 
 See =./docs/zsh_plugins.md= for layout conventions and generic plugin-manager notes.
 
+* Pandoc conversion
+
+[[agfi:pandoc-convert]] (=./zshlang/auto-load/others/pandoc.zsh=) is the single
+gateway behind =md2org=, =org2md=, =html2org=, etc. Output fixups live as Lua
+filters in =./python/pandoc_filters/= rather than as textual postprocessing, so
+they cannot corrupt code/example blocks.
+
+Known conversion problems and their filters are documented per-issue:
+
+- =./docs/md2org-latex/readme.md= — LLM-style =\[...\]= math survives org's parser.
+- =./docs/md2org-details.md= — =<details>=/=<summary>= folding, and pandoc's
+  obsolete =#+begin_html= raw-HTML wrapper.
+- =./docs/html2org-empty-underline.md= — stray =__= from Outlook emails.
+
 * Codex
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.

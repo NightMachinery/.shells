@@ -326,7 +326,24 @@ function pandoc-convert {
             #: Replaces the old textual [help:org-trim-forced-newlines],
             #: which corrupted `\\` row separators inside LaTeX math.
             opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_soft_linebreaks.lua")
+
+            #: `<details>`/`<summary>` (LLM transcripts, GitHub READMEs) reach
+            #: the writer as four sibling raw blocks, i.e. 4 `#+begin_html`
+            #: blocks of noise each, with the summary demoted to plain text.
+            #: Regroups them into a foldable `#+begin_details` special block.
+            #: See ~/scripts/docs/md2org-details.md
+            #: MUST precede org_raw_html.lua, which would otherwise re-tag the
+            #: `<details>` raw blocks before this filter can match them.
+            opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_details.lua")
         fi
+
+        #: @upstreamBug pandoc's org writer hardcodes the Org 7/8-era
+        #: `#+begin_html` for raw HTML blocks; Org 9.2+ parses that as a plain
+        #: special block, so the HTML is no longer passed through on export.
+        #: Rewrites it to `#+begin_export html`. Unconditional: this is a
+        #: correctness fix, not a cleanup, and pandoc's org reader accepts
+        #: both spellings, so round-trips are unaffected.
+        opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_raw_html.lua")
     fi
 
     pandoc --wrap=none "$opts[@]" --from "$from" --to "$to" "$input" -o "-" | {
