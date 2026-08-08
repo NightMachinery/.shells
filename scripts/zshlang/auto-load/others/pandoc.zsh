@@ -337,6 +337,12 @@ function pandoc-convert {
             opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_details.lua")
         fi
 
+        #: The org writer drops raw *inline* HTML, so the `<sup>[...]</sup>`
+        #: citation markers in LLM transcripts lost their superscript and
+        #: collapsed into the prose. Recovers them as Superscript nodes.
+        #: See ~/scripts/docs/md2org-details.md
+        opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_sup_sub.lua")
+
         #: @upstreamBug pandoc's org writer hardcodes the Org 7/8-era
         #: `#+begin_html` for raw HTML blocks; Org 9.2+ parses that as a plain
         #: special block, so the HTML is no longer passed through on export.

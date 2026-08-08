@@ -102,9 +102,10 @@ from body text — which is what made the output read as garbage rather than
 as a labeled section. No writer flag recovers this; it needs an AST filter.
 
 The same mechanism eats the `<sup>[[Title](url)]</sup>` citation markers
-these transcripts use, leaving `[[[https://...][Title]]]`. Org still parses
-that as a valid link, so it is cosmetic stray-bracket noise only — **not
-currently fixed**.
+these transcripts use, leaving `[[[https://...][Title]]]` — three opening
+brackets that read as broken org. It does parse as a link, but only by
+accident of the outer pair being literal text. Fixed by
+`org_sup_sub.lua`, below.
 
 ## Fix
 
@@ -157,11 +158,97 @@ Done at the AST level rather than as a textual
 `#+begin_html` → `#+begin_export html` postprocess so that a literal
 `#+begin_html` inside a source/example block is not rewritten.
 
+### `python/pandoc_filters/org_sup_sub.lua`
+
+Rebuilds `<sup>`/`<sub>` raw inlines as real `Superscript`/`Subscript`
+nodes, so the org writer emits `^{...}` / `_{...}` instead of dropping
+them (cause 3).
+
+Round-trip verified: org parses `^{[[url][title]]}` as a `superscript`
+containing a `link`, and ox-html exports it back to
+`<sup><a href="...">title</a></sup>`.
+
+When the whole superscript is exactly `[` + one link + `]` — the
+transcripts' citation style — the redundant literal brackets are dropped,
+since org links already carry their own. Otherwise `^{[[[url][t]]]}` would
+still show three.
+
+Applied unconditionally for org output: recovering silently-dropped
+content is a correctness fix.
+
 ### Ordering
 
 `org_details.lua` **must** precede `org_raw_html.lua`; otherwise the
 `<details>` raw blocks are re-tagged as org before the details filter can
 match them.
+
+## Is `#+begin_details` valid org?
+
+Yes. `#+begin_NAME` / `#+end_NAME` is org's **special block**, a
+first-class greater element — the same construct as `#+begin_quote`, just
+with a name org has no built-in meaning for. `org-element-at-point`
+returns `special-block` with `:type` `details` and `:parameters` set to
+whatever follows on the begin line. Contents are parsed as normal org, and
+TAB folds it (`org-fold-block`).
+
+It is also the *canonical* choice here, not an invention: `details` and
+`summary` are both in `org-html-html5-elements`, so ox-html knows them
+natively.
+
+### Export caveat
+
+`org-html-special-block` only reaches HTML5 output when **both**
+`org-html-html5-fancy` is non-nil and `org-html-doctype` is `"html5"`.
+The defaults are `nil` and `"xhtml-strict"`, so by default you get:
+
+```html
+<div class="details" id="org30faab2">
+<p>body text</p>
+</div>
+```
+
+With html5-fancy on, `#+begin_details` + a nested `#+begin_summary`
+exports to a genuine collapsible element — verified:
+
+```html
+<details id="org14adad9">
+<summary id="org09fff6e"><p>The Summary</p></summary>
+<p>body text</p>
+</details>
+```
+
+**However**, `org-html-special-block` ignores the block's `:parameters`
+entirely (it reads only `#+ATTR_HTML`), so the summary text in
+`#+begin_details 📚 Sources (8)` is *dropped on export*.
+
+### Why parameters rather than a nested `#+begin_summary`
+
+Two shapes are possible, and they trade off against each other:
+
+- `#+begin_details <summary>` — the summary is visible on the fold line,
+  so a collapsed block still reads as "📚 Sources (8)". Dropped on HTML
+  export.
+- `#+begin_details` + nested `#+begin_summary`…`#+end_summary` — exports
+  to a real `<details>/<summary>`, but folding hides the summary along
+  with everything else, so a collapsed block shows no label at all.
+
+These files are read in Emacs far more often than they are exported, so
+the fold-line label wins and we emit the parameters form. If both are
+wanted, emitting the title in *both* places costs only a duplicated line
+and is otherwise harmless — the parameters are simply ignored on export.
+
+### Alternatives rejected
+
+- **Org drawer** (`:details:` … `:END:`) — folds too and is visually
+  quieter, but drawer names are restricted to `[A-Za-z0-9_-]+`, so an
+  arbitrary summary cannot be the name; it would have to move inside as a
+  bold line, losing the fold-line label.
+- **Headline** — folds natively and would put the summary in the heading,
+  but a headline has no terminator: everything after `</details>` would
+  become its child, wrecking the document outline.
+- **One `#+begin_export html` block** (re-serializing the inner markdown
+  to HTML) — preserves `<details>` exactly, but makes the whole body
+  opaque in Emacs, which defeats the point of converting to org.
 
 ## Gotcha: Lua `%s` corrupts emoji
 
@@ -187,6 +274,9 @@ On the repro file, via the full `md2org` pipeline:
   `details` (11th is inside the trailing section
   [agfi:md-strip-german-teachings] intentionally drops)
 - emoji in titles intact
+- all 23 `<sup>` citation markers become org superscripts; 0 `[[[`
+  leftovers. `org-element-parse-buffer` finds 23 `superscript` elements,
+  each containing a `link`
 - `md2org` on docs/md2org-latex/repro.md still emits its `equation*`
   environment — no regression on the LaTeX path
 
