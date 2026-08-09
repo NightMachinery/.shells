@@ -118,14 +118,39 @@ rm -f "${nc_probe}"
 #: sit inside the 48 GB home quota.
 ensure_dir "${DOOMLOCALDIR}"
 
+#: Pin doom to the same commit as the laptop. Doom 3.x master moves fast and
+#: the doom.d config carries version-specific workarounds -- e.g. config.el
+#: does `(require 'doom-themes-ext-org)` "@workaround for upstream bugs", but
+#: a doom master from [2026-08] no longer installs doom-themes for `:ui doom`,
+#: so a fresh master clone boots with:
+#:   Error caused by user's config: (file-missing ... doom-themes-ext-org)
+#: Bump deliberately, not by accident of clone date.
+: "${NIGHT_DOOM_REF:=fb9b359db}"
+
 if [ -d "${HOME}/.emacs.d/.git" ] ; then
     ok "doom already cloned"
 else
-    #: ~/.emacs is backed up in stage 10; it would shadow ~/.emacs.d/init.el.
+    #: ~/.emacs is backed up in stage 10; it would shadow doom's init.
     log "cloning doomemacs"
-    run git clone --depth 1 https://github.com/doomemacs/doomemacs "${HOME}/.emacs.d" \
+    run git clone https://github.com/doomemacs/doomemacs "${HOME}/.emacs.d" \
         || die "doom clone failed"
 fi
+
+current_ref="$(git -C "${HOME}/.emacs.d" rev-parse --short HEAD 2>/dev/null || echo none)"
+case "${NIGHT_DOOM_REF}" in
+    "${current_ref}"*) ok "doom pinned at ${current_ref}" ;;
+    *)
+        log "pinning doom to ${NIGHT_DOOM_REF} (was ${current_ref})"
+        #: An earlier --depth 1 clone cannot reach an older commit; unshallow
+        #: before fetching or the checkout fails with "reference is not a tree".
+        if [ -f "${HOME}/.emacs.d/.git/shallow" ] ; then
+            run_soft git -C "${HOME}/.emacs.d" fetch --quiet --unshallow origin
+        fi
+        run_soft git -C "${HOME}/.emacs.d" fetch --quiet origin
+        run git -C "${HOME}/.emacs.d" checkout --quiet "${NIGHT_DOOM_REF}" \
+            || die "could not pin doom to ${NIGHT_DOOM_REF}"
+        ;;
+esac
 
 if [ -d "${HOME}/doom.d/.git" ] ; then
     ok "doom.d config already cloned"
