@@ -1,0 +1,107 @@
+#+TITLE: bootstrap-sudoless
+#+PROPERTY: header-args :eval never
+
+Bootstrap the dotfiles onto a Linux host where we have *no sudo*.
+
+Supersedes [[file:../minimal_proxy/][setup/minimal_proxy/]], which entangled "minimal vs full" with
+"proxy vs no proxy". Here the proxy is just one optional stage, and the
+storage layout is chosen from the hostname instead of being hardcoded.
+
+* Run it
+#+begin_src zsh :eval never
+rsync -az ~/scripts/setup/bootstrap-sudoless/ host:bootstrap-sudoless/
+ssh host 'cd ~/bootstrap-sudoless && sh bootstrap.sh'
+#+end_src
+
+Then, once the dotfiles are in place, the copy inside the repo is the real
+one and the rsync'd copy can go:
+#+begin_src zsh :eval never
+ssh host 'sh ~/scripts/setup/bootstrap-sudoless/doctor.sh'
+#+end_src
+
+Single stage, ignoring the completion stamp:
+#+begin_src zsh :eval never
+NIGHT_BOOTSTRAP_FORCE=y sh bootstrap.sh 50
+#+end_src
+
+List stages: =sh bootstrap.sh --list=.
+
+* Tiers
+The point of the split is what each tier is allowed to assume.
+
+- *Tier 0* -- =bootstrap.sh=, =lib.sh=, =profile.sh=, stages =00= and =10=.
+  POSIX sh. May assume only =sh= + =git= + =curl=, because it runs *before*
+  the dotfiles exist. This is the only part that must stay dependency-free.
+
+- *Tier 1* -- stages =20= and up. The repo is on disk, so these may source
+  [[file:../../zshlang/basic/basic.plugin.zsh][zshlang/basic/basic.plugin.zsh]] and use =ec=, =assert=, =reval-ec=, =@RET=
+  instead of hand-rolled sh.
+
+- *Tier 2* -- the full environment via =basic-full.zsh= / [[file:../setup.basic][setup.basic]], plus
+  optional modules behind feature flags.
+
+* The storage contract
+No stage may hardcode a path. Every stage reads these, which =profile.sh=
+sets from the hostname and =stages/00-dirs.sh= writes to
+=~/.night-bootstrap.env= (which =~/.privateShell= then sources, so an
+interactive shell agrees with the bootstrap):
+
+- =NIGHT_BIN= -- =~/.local/bin=. Small and precious; inside the quota.
+- =NIGHT_BIG_STORE= -- conda/pixi envs, package caches, Doom's =straight=
+  tree, HF models, datasets. Unquota'd.
+- =NIGHT_LOCAL_CACHE= -- per-host local disk. Regenerable content *only*.
+
+Override any of them from the environment:
+#+begin_src zsh :eval never
+NIGHT_BIG_STORE=/nfs/gdata/$USER sh bootstrap.sh
+#+end_src
+
+* Profiles
+=profiles/cis-lmu.sh= encodes the LMU CIS cluster: one NFS home shared by
+~12 hosts with a 48 GB quota, =/mounts/work= and =/nfs/gdata= shared and
+unquota'd, =/var/tmp= local and ~10x faster for small files. =profiles/default.sh=
+assumes nothing and keeps everything under =$HOME=.
+
+Add a host family by adding a profile and a case in =night_profile_detect=.
+
+* Feature flags
+- =BOOTSTRAP_WITH_PROXY= -- off on cis-lmu; those hosts have direct
+  international access.
+- =BOOTSTRAP_WITH_JUNEST= -- off. Junest is a last-resort escape hatch, and
+  explicitly not for emacs.
+
+* Things learned the hard way
+Documented at the point of use in each stage; collected here because each
+one cost real debugging time.
+
+- A sourced zsh file returns its *last command's* status. =crossplatform.zsh=
+  ended on =isDarwin=, so on Linux it returned 1, =basic-full.zsh= aborted
+  early, and =debug=/=enhancers= never loaded. The symptom was not an error:
+  =command_not_found_handler= called the (now undefined) =ectrace=, which
+  raised "command not found" again, recursing and forking until the shell
+  hung. Fixed in the dotfiles; the handler is now also re-entry guarded.
+
+- conda-forge emacs 29.2 has *no* native compilation (that landed
+  [2024-12-05]) and 29.4 predates the =malloc_set_state= fix ([2025-03-06]),
+  so it dies instantly on glibc 2.39. 30.2 is the first build that is both
+  native-comp-capable and runnable on Ubuntu 24.04.
+
+- The emacs package does not pull in =sysroot_linux-64= / =gcc_linux-64=, but
+  its bundled libgccjit cannot link without them: every native compile fails
+  with =ld: cannot find crti.o=. =native-comp-available-p= still returns =t=,
+  so this only surfaces once something actually compiles.
+
+- Expose conda's emacs with a *wrapper that execs the absolute path*, never a
+  symlink. Emacs locates its bundled toolchain relative to its own invocation
+  path, so through a symlink native compilation fails while =emacs --version=
+  looks perfectly fine.
+
+- Nothing in a stage may read stdin. =doom install= prompts about git hooks
+  and dies with =end-of-file=; use =--no-hooks= (and =--no-env=, since a
+  shared home would leak one host's env to the other eleven).
+
+- =run_soft= must return 0. Stages run under =set -e=, so a helper that
+  returned non-zero would abort the very stage it exists to keep alive.
+
+- Set =GIT_TERMINAL_PROMPT=0=. On a headless host a git credential prompt is
+  not a question, it is a hung shell.
