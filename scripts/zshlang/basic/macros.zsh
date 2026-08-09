@@ -48,14 +48,18 @@ function h_aliasfnq() {
     local name="$1"
     local goesto=""
     local body=("$@[2,-1]") qbody=""
-    local i flag=''
+    local i flag='' qpart=''
     while true ; do
         if [[ "$body[1]" =~ '^([^=]*)=(.*)$' ]] ; then
-            qbody="${qbody}${match[1]}=$(gq "$match[2]") "
+            #: gquote-to instead of $(gq ...): there are ~648 aliasfn-family
+            #: calls across zshlang, each of which forked once per invocation.
+            gquote-to qpart "$match[2]"
+            qbody="${qbody}${match[1]}=${qpart} "
             shift body
         else
             goesto="$body[1]"
-            qbody="${qbody}$(gq "$body[@]")"
+            gquote-to qpart "$body[@]"
+            qbody="${qbody}${qpart}"
             break
         fi
     done
