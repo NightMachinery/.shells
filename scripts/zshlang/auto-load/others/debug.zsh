@@ -55,7 +55,24 @@ function command_not_found_handler {
     # handler  is  executed  in  a  subshell  forked to execute an external command, hence
     # changes to directories, shell parameters, etc. have no effect on the main shell.
     ##
-    ectrace_ret=127 ectrace_notrace=y ectrace "command not found: $(gq "$@")"
+    #: @warn Do not remove this guard.
+    #: If `ectrace` (or `gq`) is itself undefined -- which happens whenever the
+    #: basic stack aborts partway through loading -- then reporting the missing
+    #: command would itself raise "command not found", re-entering this handler
+    #: forever. Each level forks a subshell and doubles the quoted message, so
+    #: the shell hangs instead of printing anything useful. Degrade loudly.
+    if (( ! ${+functions[ectrace]} )) || (( ! ${+functions[gq]} )) || (( ${_night_cnf_depth:-0} > 0 )) ; then
+        print -ru2 -- "command not found: $*"
+        print -ru2 -- "  (basic stack is incomplete: ectrace/gq undefined; traceback suppressed)"
+        return 895
+    fi
+
+    typeset -g _night_cnf_depth=1
+    {
+        ectrace_ret=127 ectrace_notrace=y ectrace "command not found: $(gq "$@")"
+    } always {
+        typeset -g _night_cnf_depth=0
+    }
     # @old (WARNING: execution not necessarily halted)
 
     # return 127
