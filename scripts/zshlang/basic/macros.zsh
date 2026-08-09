@@ -10,6 +10,28 @@ function extract-head() {
     return 1
 }
 
+function extract-head-to() {
+    #: Fork-free [agfi:extract-head]: assigns the result to the variable named
+    #: $1 instead of printing it.
+    #:
+    #: `h_aliasfn` ran `$(extract-head ...)` on every call, and there are ~648
+    #: aliasfn-family call sites, so this was one fork per alias defined at
+    #: shell startup. Same motivation as [agfi:gquote-to].
+    ##
+    local __eh_name="$1" ; shift
+
+    local i
+    for i in "${=@}" ; do
+        if ! [[ "$i" =~ '=' ]] ; then
+            typeset -g "${__eh_name}"="$i"
+            return 0
+        fi
+    done
+
+    typeset -g "${__eh_name}"=''
+    return 1
+}
+
 function h_aliasfn_save {
     typeset -Ag aliases_fn
     aliases_fn[$1]="$2"
@@ -26,7 +48,9 @@ function h_aliasfn {
     fi
 
     local goesto
-    goesto="$(extract-head "$body[@]")"
+    #: Fork-free; see [agfi:extract-head-to]. `extract-head` returns non-zero
+    #: when every word is an assignment, which left goesto empty before too.
+    extract-head-to goesto "$body[@]" || true
 
     functions[$name]="$body "'"$@"'
     test -z "$goesto" || {
