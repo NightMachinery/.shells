@@ -65,6 +65,32 @@ function gquote() {
     # the first term can be an alias and so we do not quote it using double-quotes. The rest of the terms are not allowed to be global aliases and are all quoted using double quotes.
     ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}" # @did_I_break_sth? Wed May 26 16:34:57 2021
 }
+function gquote-to() {
+    #: Fork-free `gquote`: assigns the quoted string to the variable named $1.
+    #:
+    #: `$(gquote ...)` costs a fork per call. Shell startup makes thousands of
+    #: them -- measured 2349 clone() calls in `zsh -c 'echo hi'` on a CIS
+    #: server, with wait4 alone accounting for 45% of a 5.9s startup. Nothing
+    #: in `gquote` needs a subshell; it is pure parameter expansion.
+    #:
+    #: @warn Keep the quoting rules identical to [agfi:gquote].
+    ##
+    local __gqt_name="$1" ; shift
+
+    if (( $# == 0 )) ; then
+        typeset -g "${__gqt_name}"=''
+        return 0
+    fi
+
+    #: `gquote` is `ec "${(q+@)@[1]}" "${(qq@)@[2,-1]}"`, and `ec` is
+    #: `print -r --`, which joins its arguments with a single space. Building
+    #: the same word list and joining reproduces that exactly, including the
+    #: no-trailing-space case when only one argument was given.
+    local -a __gqt_parts
+    __gqt_parts=( "${(q+@)@[1]}" "${(qq@)@[2,-1]}" )
+    typeset -g "${__gqt_name}"="${(j: :)__gqt_parts}"
+}
+
 function gquote-sq() {
     # uses single-quotes
     ec "${(qq@)@}"
@@ -87,10 +113,13 @@ function run-on-each() {
     ##
 
     # Use unusual name not to shadow actual vars
-    local i98765 ret98765=0
+    local i98765 ret98765=0 q98765
     for i98765 in "${@:2}"
     do
-        eval "$1 $(gquote "$i98765")" || ret98765=$?
+        #: gquote-to, not $(gquote ...): this loop runs once per file at shell
+        #: startup (320 auto-load files), and each command substitution forks.
+        gquote-to q98765 "$i98765"
+        eval "$1 ${q98765}" || ret98765=$?
     done
     return $ret98765
 }
