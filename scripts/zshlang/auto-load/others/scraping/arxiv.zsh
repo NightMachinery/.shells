@@ -100,24 +100,39 @@ function arxiv-url-get {
     return $retcode
 }
 
+function h-arxiv-api-query {
+    #: Queries the arXiv Atom API for a given ID. Outputs XML.
+    #: Must use =https=; arXiv answers plain HTTP with an empty-bodied 301.
+    #: =gurl= supplies =--fail --location=, so HTTP errors become nonzero exits.
+    ##
+    local id="${1}"
+    assert-args id @RET
+
+    gurl "https://export.arxiv.org/api/query?id_list=${id}"
+}
+
 function arxiv-json {
     #: Use =tar xf $file --directory=$name= on the downloaded files.
     ##
     local inargs
     in-or-args3 "$@" @RET
 
-    local url ids api_endpoint title
+    local url ids xml
     for url in ${inargs[@]}; do
         ids=()
         assert sout arxiv-url-get "$url" @RET
 
         for id in ${ids[@]} ; do
-            api_endpoint="http://export.arxiv.org/api/query?id_list=${id}"
-            # re var-show id api_endpoint
+            # re var-show id
 
-            title="$(curl -s "$api_endpoint")" @TRET
+            xml="$(h-arxiv-api-query "${id}")" @TRET
             #  | ggrep -oPm1 "(?<=<title>)[^<]+"
-            ec "${title}" | xml2json
+            if test -z "${xml}" ; then
+                ecerr "$0: empty response from the arXiv API for id: ${id}"
+                return 1
+            fi
+
+            ec "${xml}" | xml2json @RET
         done
     done
 }
@@ -228,13 +243,12 @@ function arxiv-latex-dl {
     #: now @global
     # local paper_dir
 
-    local url paper_id api_url paper_title
+    local url paper_id paper_title
     for url in ${inargs[@]}; do
         paper_id="$(ec "$url" | perl -nE 'say /\/(\d+\.\d+)$/')" @TRET
 
         # Fetch paper's title using arXiv API
-        api_url="http://export.arxiv.org/api/query?id_list=${paper_id}"
-        paper_title="$(gurl "${api_url}")" @TRET
+        paper_title="$(h-arxiv-api-query "${paper_id}")" @TRET
 
         if isDbg ; then
             i="${paper_title}"
