@@ -15,7 +15,9 @@ function h-agents-md-agents {
     ##
     ec "claude"$'\t'"${HOME}/.claude/CLAUDE.md"
     ec "codex"$'\t'"${HOME}/.codex/AGENTS.md"
-    ec "gapcode"$'\t'"${HOME}/.gapcode/AGENTS.md"
+    #: gapcode is not in use. ~/.gapcode/AGENTS.md is left as it was last
+    #: assembled; nothing rewrites it now.
+    # ec "gapcode"$'\t'"${HOME}/.gapcode/AGENTS.md"
     ec "gemini"$'\t'"${HOME}/.gemini/AGENTS.md"
 }
 
@@ -158,5 +160,25 @@ function agents-md-doctor {
             fi
         fi
     done
+}
+function h-agents-md-sync-ask {
+    #: Syncs, and on failure hands the decision to the user instead of making
+    #: it for them: aborting the launch over a stale instruction file is too
+    #: harsh, and starting silently with one is how the old symlink
+    #: arrangement went unnoticed for months.
+    ##
+    if agents-md-sync ; then
+        return 0
+    fi
+
+    ecerr "$0: could not assemble the agent instruction files; see the error above."
+
+    if ! isI ; then
+        #: Nobody is there to answer, and a prompt no one sees is a hang.
+        ecerr "$0: not interactive, launching with the files as they stand."
+        return 0
+    fi
+
+    ask "Launch anyway, with possibly stale instructions?" N
 }
 ##
