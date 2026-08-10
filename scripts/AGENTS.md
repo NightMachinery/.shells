@@ -20,10 +20,11 @@ If you want to document installation for a plugin, read the readme of another pl
 ## Agent Instruction Files
 
 The global instruction files the agents actually read — `~/.claude/CLAUDE.md`,
-`~/.codex/AGENTS.md`, `~/.gapcode/AGENTS.md`, `~/.gemini/AGENTS.md` — are
-**generated**. Never edit them: they are overwritten on the next agent launch.
-Edit the sources under `./PE/Agents/` and run `agents-md-sync`, which the
-`claude` and `codex-m` launchers call for you. `agents-md-doctor` reports what
+`~/.codex/AGENTS.md`, `~/.gemini/AGENTS.md` — are **generated**. Never edit
+them: they are overwritten on the next agent launch. Edit the sources under
+`./PE/Agents/` and run `agents-md-sync`, which the `claude`, `codex-m` and
+`antigravity-m` launchers call for you; one sync refreshes every agent's file,
+not just the caller's. `agents-md-doctor` reports what
 each agent loads and whether anything has drifted. See
 `./PE/Agents/readme.org`, which also explains why this is assembled rather than
 symlinked or `@`-imported.
