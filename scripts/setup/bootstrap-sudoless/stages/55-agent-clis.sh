@@ -188,12 +188,14 @@ else
     agy_installer="${NIGHT_LOCAL_CACHE:-/tmp}/agy-install.sh"
     agy_snap="$(mktemp -d "${NIGHT_LOCAL_CACHE:-/tmp}/agy-rc.XXXXXX")"
 
-    #: @warn `[ -f x ] && cp ...' would abort the stage: when the test fails
-    #: the whole list returns 1, and stages run under `set -e'. Most of these
-    #: rc files do not exist, so that fired on the very first iteration.
+    #: @warn Plain `cp', never `cp -p'. The snapshot lands in NIGHT_LOCAL_CACHE
+    #: (/var/tmp, ext4) while $HOME is NFS with ACLs, and -p then fails with
+    #: "preserving permissions: Operation not supported" -- which, under
+    #: `set -e', aborted the whole stage. Modes do not need preserving here:
+    #: the restore copies onto an existing file, which keeps its own mode.
     for f in ${night_agy_rcfiles} ; do
         if [ -f "${HOME}/${f}" ] ; then
-            cp -p "${HOME}/${f}" "${agy_snap}/${f}"
+            cp "${HOME}/${f}" "${agy_snap}/${f}"
         fi
     done
 
@@ -207,7 +209,7 @@ else
             [ -f "${HOME}/${f}" ] || continue
             grep -q 'Added by Antigravity CLI installer' "${HOME}/${f}" 2>/dev/null || continue
             if [ -f "${agy_snap}/${f}" ] ; then
-                cp -p "${agy_snap}/${f}" "${HOME}/${f}"
+                cp "${agy_snap}/${f}" "${HOME}/${f}"
                 ok "reverted antigravity's PATH line in ~/${f}"
             else
                 #: The installer created this file; it did not exist before.
