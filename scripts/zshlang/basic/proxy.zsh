@@ -43,24 +43,46 @@ function proxy-env-create {
     proxy-env-fill "http://${px_http_ip}:${px_httpport}"
 }
 
+function proxy-env-fill-to {
+    #: Fork-free `proxy-env-fill`: assigns the environment string to the
+    #: variable named $1 instead of writing it to stdout.
+    #:
+    #: `$(proxy-env-create ...)` costs a fork per call, and [agfi:pxa-create]
+    #: runs 33 times at startup. On a CIS server -- where the binaries live on
+    #: NFS -- each of those cost ~85ms, making this 2.8s of a 7.0s zsh
+    #: startup: the single largest entry in the profile. The pipe to
+    #: [agfi:cat-copy-if-tty] is a second fork, and is what made
+    #: [agfi:isOutTty] show up 33 times too.
+    #:
+    #: @warn Keep the variable list identical to [agfi:proxy-env-fill], which
+    #: is defined in terms of this function.
+    ##
+    local __pxf_name="${1}" proxy="${2}"
+    assert-args __pxf_name proxy @RET
+
+    local px_no_proxy='127.0.0.1,localhost,::1'
+
+    typeset -g "${__pxf_name}"="ALL_PROXY=${proxy} all_proxy=${proxy} http_proxy=${proxy} https_proxy=${proxy} HTTP_PROXY=${proxy} HTTPS_PROXY=${proxy} npm_config_proxy=${proxy} npm_config_https_proxy=${proxy} NO_PROXY=${px_no_proxy} no_proxy=${px_no_proxy}"
+}
+
 function proxy-env-fill {
     local proxy="${1}"
     assert-args proxy @RET
 
-    local px_no_proxy='127.0.0.1,localhost,::1'
+    local val
+    proxy-env-fill-to val "${proxy}" @RET
 
-    ec \
-        "ALL_PROXY=${proxy}" \
-        "all_proxy=${proxy}" \
-        "http_proxy=${proxy}" \
-        "https_proxy=${proxy}" \
-        "HTTP_PROXY=${proxy}" \
-        "HTTPS_PROXY=${proxy}" \
-        "npm_config_proxy=${proxy}" \
-        "npm_config_https_proxy=${proxy}" \
-        "NO_PROXY=${px_no_proxy}" \
-        "no_proxy=${px_no_proxy}" |
+    ec "${val}" |
         cat-copy-if-tty
+}
+
+function proxy-env-create-to {
+    #: Fork-free [agfi:proxy-env-create]; see [agfi:proxy-env-fill-to].
+    local __pxc_name="${1}"
+    local px_httpport="${2:-1087}"
+    local px_http_ip="${3:-127.0.0.1}"
+
+    proxy-env-fill-to "${__pxc_name}" "http://${px_http_ip}:${px_httpport}"
 }
 
 function pxa-create {
@@ -74,7 +96,8 @@ function pxa-create {
     local v="${name}_env"
 
     local val
-    val="$(proxy-env-create ${px_httpport} ${px_http_ip})" @RET
+    #: Fork-free; this runs 33 times at startup. See [agfi:proxy-env-fill-to].
+    proxy-env-create-to val "${px_httpport}" "${px_http_ip}" @RET
     export "$v"="${val}"
     ##
 
