@@ -92,30 +92,19 @@ fi
 PATH="${PATH}:${tools_bin}" ; export PATH
 
 ##
-#: --- redis ---
-#: brishzq and the history machinery talk to 127.0.0.1:6379; without it every
-#: new shell prints "Could not connect to Redis at 127.0.0.1:6379".
-#: One instance per host, listening only on loopback. The data directory MUST
-#: be local disk: this NFS mount is local_lock=none, so every lock round-trips
-#: to the server, and redis on NFS is a known corruption risk.
-if have redis-server ; then
-    if redis-cli ping >/dev/null 2>&1 ; then
-        ok "redis already running"
-    else
-        ensure_dir "${NIGHT_LOCAL_CACHE}/redis"
-        run_soft redis-server \
-            --daemonize yes \
-            --bind 127.0.0.1 --port 6379 \
-            --dir "${NIGHT_LOCAL_CACHE}/redis" \
-            --save '' --appendonly no \
-            --logfile "${NIGHT_LOCAL_CACHE}/redis/redis.log"
-        if redis-cli ping >/dev/null 2>&1 ; then
-            ok "redis started (loopback only, data on local disk)"
-        else
-            warn "redis did not come up; see ${NIGHT_LOCAL_CACHE}/redis/redis.log"
-        fi
-    fi
-    dim "redis is per-host and does NOT survive a reboot; rerun this stage"
+#: --- redis credential ---
+#: redis listens on 127.0.0.1, which excludes other *hosts* but not the other
+#: *users* of these shared login nodes -- so it must require a password. The
+#: secret is generated once here; stage 70 starts the server with it, and the
+#: env contract exports REDISCLI_AUTH so existing redis-cli callers are
+#: unchanged. Starting the service itself belongs to stage 70.
+auth_file="${HOME}/.redis-auth"
+if [ -s "${auth_file}" ] ; then
+    ok "redis credential already present"
+elif have redis-server ; then
+    ( umask 077 ; head -c 32 /dev/urandom | base64 | tr -d '\n=' > "${auth_file}" )
+    chmod 600 "${auth_file}"
+    ok "generated ${auth_file} (chmod 600)"
 fi
 
 ##

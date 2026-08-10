@@ -113,128 +113,41 @@ rm -f "${nc_probe}"
 
 ##
 #: --- Doom ---
-#: DOOMLOCALDIR (set in the env contract) moves straight/, builds and the eln
-#: cache onto the big store: tens of thousands of small files that must not
-#: sit inside the 48 GB home quota.
-ensure_dir "${DOOMLOCALDIR}"
+#: Delegated to the config repo. Doom setup is not specific to this bootstrap
+#: (the same config is installed by other methods), so it lives with the
+#: config: ~/doom.d/bootstrap/install.sh, documented in that directory's
+#: README.org. Our job here is only to provide a working `emacs' on PATH and
+#: the storage layout.
+#:
+#: We pass DOOMLOCALDIR so the package tree (tens of thousands of small files)
+#: lands on the big store rather than the quota'd home, and DOOMDIR because
+#: night-loader.el reads it from the *environment* -- an unset value fails with
+#: `wrong-type-argument stringp nil'.
 
-#: Pin doom to the same commit as the laptop. Doom 3.x master moves fast and
-#: the doom.d config carries version-specific workarounds -- e.g. config.el
-#: does `(require 'doom-themes-ext-org)` "@workaround for upstream bugs", but
-#: a doom master from [2026-08] no longer installs doom-themes for `:ui doom`,
-#: so a fresh master clone boots with:
-#:   Error caused by user's config: (file-missing ... doom-themes-ext-org)
-#: Bump deliberately, not by accident of clone date.
-: "${NIGHT_DOOM_REF:=fb9b359db}"
+: "${DOOMDIR:=${HOME}/doom.d}"
+export DOOMDIR
 
-if [ -d "${HOME}/.emacs.d/.git" ] ; then
-    ok "doom already cloned"
-else
-    #: ~/.emacs is backed up in stage 10; it would shadow doom's init.
-    log "cloning doomemacs"
-    run git clone https://github.com/doomemacs/doomemacs "${HOME}/.emacs.d" \
-        || die "doom clone failed"
-fi
-
-current_ref="$(git -C "${HOME}/.emacs.d" rev-parse --short HEAD 2>/dev/null || echo none)"
-case "${NIGHT_DOOM_REF}" in
-    "${current_ref}"*) ok "doom pinned at ${current_ref}" ;;
-    *)
-        log "pinning doom to ${NIGHT_DOOM_REF} (was ${current_ref})"
-        #: An earlier --depth 1 clone cannot reach an older commit; unshallow
-        #: before fetching or the checkout fails with "reference is not a tree".
-        if [ -f "${HOME}/.emacs.d/.git/shallow" ] ; then
-            run_soft git -C "${HOME}/.emacs.d" fetch --quiet --unshallow origin
-        fi
-        run_soft git -C "${HOME}/.emacs.d" fetch --quiet origin
-        run git -C "${HOME}/.emacs.d" checkout --quiet "${NIGHT_DOOM_REF}" \
-            || die "could not pin doom to ${NIGHT_DOOM_REF}"
-        ;;
-esac
-
-#: @warn The package tree is only valid for the doom revision that built it.
-#: Changing NIGHT_DOOM_REF after a sync leaves straight/ pinned to the other
-#: revision's package set; `doom sync` then tries to move already-built repos
-#: and stops on an interactive "How to proceed? (1,2,3,4,5)" conflict prompt.
-#: With stdin closed that aborts with `end-of-file` *before* the profile init
-#: is written, and the next daemon start dies with
-#:   Symbol's value as variable is void: doom--profile-default
-#: A fresh tree cannot conflict, so rebuild whenever the pin moves.
-doom_ref_stamp="${DOOMLOCALDIR}/.night-doom-ref"
-doom_ref_now="$(git -C "${HOME}/.emacs.d" rev-parse HEAD 2>/dev/null || echo unknown)"
-if [ -f "${doom_ref_stamp}" ] && [ "$(cat "${doom_ref_stamp}")" != "${doom_ref_now}" ] ; then
-    warn "doom revision changed since the last sync; rebuilding DOOMLOCALDIR"
-    warn "  was $(cat "${doom_ref_stamp}")"
-    warn "  now ${doom_ref_now}"
-    run_soft mv "${DOOMLOCALDIR%/}" "${DOOMLOCALDIR%/}.stale-$$"
-    ensure_dir "${DOOMLOCALDIR}"
-fi
-
-
-if [ -d "${HOME}/doom.d/.git" ] ; then
-    ok "doom.d config already cloned"
-else
-    log "cloning the doom.d config"
-    run git clone https://github.com/NightMachinery/doom.d "${HOME}/doom.d" \
+if [ ! -d "${DOOMDIR}/.git" ] ; then
+    log "cloning the doom config"
+    run git clone https://github.com/NightMachinery/doom.d "${DOOMDIR}" \
         || die "doom.d clone failed"
 fi
 
-#: Only the submodules that are actually checked out on the laptop and
-#: referenced by the config. `radian` and `emacswiki` are intentionally
-#: skipped -- neither is initialized locally, and emacswiki's .gitmodules URL
-#: uses the git:// protocol, which GitHub disabled in 2022.
-( cd "${HOME}/doom.d" && \
-  run_soft git submodule update --init --depth 1 \
-      gitmodules/fzf.el \
-      gitmodules/osx-clipboard-mode \
-      gitmodules/pdf-continuous-scroll-mode.el )
-
 if [ ! -e "${HOME}/.doom.d" ] ; then
-    run ln -s "${HOME}/doom.d" "${HOME}/.doom.d"
-    ok "linked ~/.doom.d -> ~/doom.d"
+    run ln -s "${DOOMDIR}" "${HOME}/.doom.d"
+    ok "linked ~/.doom.d -> ${DOOMDIR}"
 fi
 
-#: night-loader.el loads ~/.private-config.el with NOERROR, so a missing
-#: secrets file is fine; we deliberately do NOT copy secrets to a shared
-#: university host.
+ensure_dir "${DOOMLOCALDIR}"
 
-##
-log "doom sync (slow on first run: it builds every package)"
-export DOOMLOCALDIR
-#: Doom 3.0.0-pre's `install` accepts only:
-#:   [--aot] [--[no-]config] [--[no-]env] [--[no-]install] [--[no-]hooks]
-#: (no --force, no --fonts).
-#:   --no-config: ~/.doom.d is already cloned.
-#:   --no-env:    a shared NFS home means one host's env dump would be
-#:                inherited by the other eleven.
-#:   --no-hooks:  it otherwise prompts "install git hooks anyway? (y or n)"
-#:                on stdin and dies with end-of-file in a non-interactive run.
-if [ ! -e "${DOOMLOCALDIR}/straight" ] ; then
-    run_soft "${HOME}/.emacs.d/bin/doom" install --no-env --no-config --no-hooks
-fi
-#: Belt and braces: nothing in this stage may ever wait on stdin.
-run_soft "${HOME}/.emacs.d/bin/doom" sync < /dev/null
-
-#: Record the revision this tree was built against, for the check above.
-printf '%s' "${doom_ref_now}" > "${doom_ref_stamp}"
-
-##
-#: @warn A batch load of early-init.el is NOT sufficient: it succeeds even when
-#: the generated profile init is missing, because the interactive path is what
-#: loads it. Start a real daemon -- that is the failure mode users actually hit
-#: (`emc-gateway` / `emacsclient -t`).
-if [ -f "${DOOMLOCALDIR}/etc/@/init.${NIGHT_EMACS_VERSION%.*}.2.el" ] ||
-   find "${DOOMLOCALDIR}/etc" -name 'init*.el' 2>/dev/null | grep -q . ; then
-    ok "generated profile init present"
+doom_installer="${DOOMDIR}/bootstrap/install.sh"
+if [ -x "${doom_installer}" ] || [ -f "${doom_installer}" ] ; then
+    log "running ${doom_installer}"
+    if run sh "${doom_installer}" ; then
+        ok "doom installed and verified"
+    else
+        warn "doom install reported a problem; see ${DOOMDIR}/bootstrap/README.org"
+    fi
 else
-    err "generated profile init MISSING -- doom sync did not complete"
-fi
-
-if timeout -k 5 300 emacs --daemon=night-verify >/dev/null 2>&1 &&
-   emacsclient -s night-verify --eval '(+ 1 1)' >/dev/null 2>&1 ; then
-    ok "doom daemon starts and answers"
-    emacsclient -s night-verify --eval '(kill-emacs)' >/dev/null 2>&1 || true
-else
-    warn "doom daemon did not start; run: emacs --daemon --debug-init"
-    emacsclient -s night-verify --eval '(kill-emacs)' >/dev/null 2>&1 || true
+    warn "no ${doom_installer}; is the doom.d checkout current?"
 fi
