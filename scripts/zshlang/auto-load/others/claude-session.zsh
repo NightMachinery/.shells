@@ -9,6 +9,55 @@ function h-claude-code-session-dep {
     ensure-dep1 claude_session go-install-local "${NIGHTDIR}/golang/claude_session" @RET
 }
 
+function h-claude-code-session-name {
+    #: The session's own name (Claude Code's slug, e.g.
+    #: `sharded-bouncing-clarke`), falling back to its UUID for sessions
+    #: predating the feature. Sanitized for use as a filename.
+    ##
+    local input="${1}"
+
+    h-claude-code-session-dep @RET
+
+    local slug
+    slug="$(claude_session slug "${input}")" @RET
+    slug="${slug//[^A-Za-z0-9._-]/-}"
+
+    if test -z "${slug}" ; then
+        ec "${input:t:r}"
+    else
+        ec "${slug}"
+    fi
+}
+
+function h-claude-code-session-title {
+    #: Emits the document header for a session, in the given syntax.
+    #: Usage: h-claude-code-session-title <org|md> <input>
+    ##
+    local syntax="${1}" input="${2}"
+
+    local id="${input:t:r}"
+    local name
+    name="$(h-claude-code-session-name "${input}")" @RET
+
+    if [[ "${syntax}" == org ]] ; then
+        if [[ "${name}" == "${id}" ]] ; then
+            ec "#+TITLE: Claude Code Session ${id}"
+        else
+            ec "#+TITLE: ${name}"
+            ec "#+SUBTITLE: Claude Code session ${id}"
+        fi
+    else
+        if [[ "${name}" == "${id}" ]] ; then
+            ec "# Claude Code Session ${id}"
+        else
+            ec "# ${name}"
+            ec
+            ec "Claude Code session ${id}"
+        fi
+    fi
+    ec
+}
+
 function h-claude-code-session-render {
     #: Renders a Claude Code session `.jsonl` to stdout.
     #: Usage: h-claude-code-session-render <format> <input>
@@ -49,8 +98,7 @@ function h-claude-code-session-to-md {
     fi
 
     {
-        ec "# Claude Code Session ${input:t:r}"
-        ec
+        h-claude-code-session-title md "${input}" @RET
         h-claude-code-session-render md "${input}" @RET
     } > "${out}"
 }
@@ -69,8 +117,7 @@ function h-claude-code-session-to-org-native {
     fi
 
     {
-        ec "#+TITLE: Claude Code Session ${input:t:r}"
-        ec
+        h-claude-code-session-title org "${input}" @RET
         h-claude-code-session-render org "${input}" @RET
     } > "${out}"
 }
@@ -91,8 +138,7 @@ function h-claude-code-session-to-org-pandoc {
     #: The pandoc run happens inside the renderer, split across processes;
     #: see =docs/claude_session.md=.
     {
-        ec "#+TITLE: Claude Code Session ${input:t:r}"
-        ec
+        h-claude-code-session-title org "${input}" @RET
         h-claude-code-session-render org-pandoc "${input}" @RET
     } > "${out}"
 }
@@ -159,7 +205,15 @@ function h-claude-code-view-session-fz {
     local tmp_dir
     tmp_dir="$(gmktemp --directory)" @TRET
 
-    local out_file="${tmp_dir}/${session_file:t:r}.${ext}"
+    #: Named after the session, so the emacs buffer is recognizable. The id
+    #: disambiguates the (unlikely) case of two sessions sharing a name.
+    local name
+    name="$(h-claude-code-session-name "${session_file}")" @RET
+
+    local out_file="${tmp_dir}/${name}.${ext}"
+    if test -e "${out_file}" ; then
+        out_file="${tmp_dir}/${name}-${${session_file:t:r}[1,8]}.${ext}"
+    fi
     "${converter}" "${session_file}" "${out_file}" @RET
 
     emc-open "${out_file}" @RET
