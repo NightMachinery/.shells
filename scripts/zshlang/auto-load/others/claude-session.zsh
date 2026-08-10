@@ -292,36 +292,79 @@ function h-claude-code-session-registry-dir {
 }
 
 function h-claude-code-session-registry-key {
-    #: kitty numbers its windows from 1 again every time it restarts, so the
+    #: kitty numbers its windows from 1 again every time it restarts, so its
     #: pid is what keeps a dead kitty's entries from being read as live ones.
-    #: Usage: h-claude-code-session-registry-key <kitty-window-id> <kitty-pid>
+    #: Usage: h-claude-code-session-registry-key <kitty-pid> <kitty-window-id>
     ##
-    local win="${1}" pid="${2}"
+    local kpid="${1}" win="${2}"
 
-    if test -z "${pid}" || test -z "${win}" ; then
+    if test -z "${kpid}" || test -z "${win}" ; then
         return 1
     fi
 
-    ec "${pid}-${win}"
+    ec "${kpid}-${win}"
+}
+
+function h-claude-code-session-key-of-pid {
+    #: The registry key for the kitty window a process is running in, found by
+    #: walking the process's ancestors against what kitty reports as each
+    #: window's foreground processes.
+    #:
+    #: `KITTY_WINDOW_ID` would be far simpler, but Claude Code does not pass it
+    #: down: its sessions come out carrying `KITTY_PID` and `KITTY_LISTEN_ON`
+    #: but no window id, and the detached ones carry nothing at all. The
+    #: interactive sessions do show up in `kitty @ ls` though, so ask kitty.
+    #: Usage: h-claude-code-session-key-of-pid <pid>
+    ##
+    local pid="${1}"
+    test -n "${pid}" || return 1
+
+    local sock
+    sock="$(h-claude-code-session-kitty-socket)" || return 1
+
+    local fg
+    fg="$(kitty @ --to "${sock}" ls | jq -r '.[] | .tabs[] | .windows[] | . as $w | .foreground_processes[] | "\(.pid) \($w.id)"')" || return 1
+
+    local -A window_of
+    local line
+    for line in ${(f)fg} ; do
+        window_of[${line%% *}]="${line##* }"
+    done
+
+    #: Bounded: a cycle in the ancestry would otherwise spin forever.
+    local -i hops=0
+    while (( hops < 32 )) && test -n "${pid}" && [[ "${pid}" != 0 ]] ; do
+        if test -n "${window_of[${pid}]}" ; then
+            #: `unix:/Users/evar/tmp/.kitty-527` -> `527`; greedy, so dashes in
+            #: the path do not matter.
+            h-claude-code-session-registry-key "${sock##*-}" "${window_of[${pid}]}"
+            return $?
+        fi
+
+        pid="$(ps -o ppid= -p "${pid}" 2>/dev/null | tr -d ' ')"
+        (( hops++ ))
+    done
+
+    return 1
 }
 
 function claude-code-session-register {
     #: Records the calling Claude Code session's transcript path, keyed by the
     #: kitty window it runs in, so [agfi:claude-code-view-session-focused] can
     #: find it again. For Claude Code's `SessionStart` and `UserPromptSubmit`
-    #: hooks; the payload is JSON, taken from `$3` or from stdin.
+    #: hooks; the payload is JSON, taken from `$2` or from stdin.
     #:
-    #: kitty's variables arrive as arguments rather than from the environment
-    #: because brish posts only the command and its stdin to the garden, so a
-    #: hook's environment does not survive the trip.
-    #: Usage: claude-code-session-register <kitty-window-id> <kitty-pid> [payload]
+    #: The hook passes its own pid because brish posts only the command and its
+    #: stdin to the garden -- a hook's environment does not survive the trip,
+    #: and process ancestry is readable from anywhere anyway.
+    #: Usage: claude-code-session-register <hook-pid> [payload]
     ##
-    local win="${1}" pid="${2}" input="${3}"
+    local pid="${1}" input="${2}"
 
-    #: Not running under kitty (a server, a nested session): there is no window
-    #: to key on, and nothing there could press the hotkey either.
+    #: No kitty window above us: a detached agent, a server, an ssh session.
+    #: Nothing there could press the hotkey either, so this is not an error.
     local key
-    key="$(h-claude-code-session-registry-key "${win}" "${pid}")" || return 0
+    key="$(h-claude-code-session-key-of-pid "${pid}")" || return 0
 
     if test -z "$input" && ! test -t 0 ; then
         #: Bounded: an inherited pipe that never closes must not wedge the agent's hook.
@@ -344,12 +387,12 @@ function claude-code-session-unregister {
     #: Drops a kitty window's registry entry, for Claude Code's `SessionEnd`
     #: hook. Entries already become unreachable when kitty restarts (the key
     #: carries kitty's pid), so this is hygiene rather than correctness.
-    #: Usage: claude-code-session-unregister <kitty-window-id> <kitty-pid>
+    #: Usage: claude-code-session-unregister <hook-pid>
     ##
-    local win="${1}" pid="${2}"
+    local pid="${1}"
 
     local key
-    key="$(h-claude-code-session-registry-key "${win}" "${pid}")" || return 0
+    key="$(h-claude-code-session-key-of-pid "${pid}")" || return 0
 
     local dir
     dir="$(h-claude-code-session-registry-dir)" @RET
@@ -404,12 +447,8 @@ function claude-code-view-session-focused {
     local win
     win="$(ec "${ls_json}" | jq -r 'first(.[] | select(.is_focused) | .tabs[] | select(.is_focused) | .windows[] | select(.is_focused) | .id) // empty')" @RET
 
-    #: `unix:/Users/evar/tmp/.kitty-527` -> `527`; greedy, so dashes in the
-    #: path do not matter.
-    local pid="${sock##*-}"
-
     local key
-    if ! key="$(h-claude-code-session-registry-key "${win}" "${pid}")" ; then
+    if ! key="$(h-claude-code-session-registry-key "${sock##*-}" "${win}")" ; then
         h-claude-code-session-lost "could not identify the focused kitty window"
         return 1
     fi

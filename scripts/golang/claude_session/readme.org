@@ -322,10 +322,19 @@ numbers its windows from 1 again on every restart, so the pid is what stops a
 dead kitty's entries from being read as live ones. =SessionEnd= runs
 =claude-code-session-unregister=; that is hygiene rather than correctness.
 
-kitty exports =KITTY_WINDOW_ID= and =KITTY_PID= into each window's shell, and
-=claude= passes them down to its hook subprocesses. They reach the function as
-*arguments*, not through the environment: brish posts only the command and its
-stdin to the garden, so a hook's environment does not survive the trip.
+Finding the window is the awkward part. =KITTY_WINDOW_ID= would be the obvious
+key, but Claude Code does not pass it down: its processes come out carrying
+=KITTY_PID= and =KITTY_LISTEN_ON= and no window id at all, and the detached
+ones --- background agents, anything reparented to launchd --- carry none of
+it. Interactive sessions do appear in =kitty @ ls= under their window's
+=foreground_processes=, so =h-claude-code-session-key-of-pid= asks kitty
+instead, walking a process's ancestors until one of them matches.
+
+The hook therefore passes its own pid, =$$=, and nothing else. That is also
+what makes it work through brish, which posts only the command and its stdin
+to the garden: a hook's environment does not survive the trip, but process
+ancestry is readable from anywhere. A session with no kitty window above it
+registers nothing, which is right --- nothing there could press the hotkey.
 
 The read side is =claude-code-view-session-focused=, bound in
 =configFiles/kitty/kitty.conf=. It asks =kitty @ ls= which window is focused,
