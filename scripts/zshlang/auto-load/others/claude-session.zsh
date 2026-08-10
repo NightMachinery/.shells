@@ -1,17 +1,28 @@
 ##
-function h-claude-code-session-to-org-jq {
-    #: Converts a Claude Code session `.jsonl` file into an org-mode file.
+function h-claude-code-session-jq-lib {
+    #: Prints jq definitions shared by the session renderers.
+    #:
+    #: `human_timestamp` turns the ISO-8601 UTC timestamps that Claude Code
+    #: writes (e.g. `2026-08-10T03:09:30.631Z`) into inactive org timestamps
+    #: in the local timezone (e.g. `[2026-08-10 Mon 05:09]`).
     ##
-    local input="${1}"
-    local out="${2:-${input:r}.org}"
+    cat <<'EOF'
+def human_timestamp:
+  if type == "string" then
+    (try (sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601
+          | strflocaltime("[%Y-%m-%d %a %H:%M]"))
+     catch .)
+  else "" end;
+EOF
+}
 
-    if ! test -e "${input}" ; then
-        ecerr "$0: input file does not exist: ${input}"
-        return 1
-    fi
+function h-claude-code-session-org-jq-program {
+    #: Prints the jq program that renders a Claude Code session `.jsonl`
+    #: directly as org-mode.
+    ##
+    h-claude-code-session-jq-lib @RET
 
-    local jq_program
-    jq_program="$(cat <<'EOF'
+    cat <<'EOF'
 def esc_block:
   tostring
   | split("\n")
@@ -56,7 +67,7 @@ select(type == "object")
 | select(.type == "user" or .type == "assistant")
 | select(.isMeta != true)
 | "* " + role
-  + (if (.timestamp | type) == "string" then " " + .timestamp else "" end)
+  + (if (.timestamp | type) == "string" then " " + (.timestamp | human_timestamp) else "" end)
   + "\n"
   + ((.message.content // [])
      | if type == "string" then [{type: "text", text: .}] else . end
@@ -64,7 +75,21 @@ select(type == "object")
      | join("\n\n"))
   + "\n"
 EOF
-)" @TRET
+}
+
+function h-claude-code-session-to-org-jq {
+    #: Converts a Claude Code session `.jsonl` file into an org-mode file.
+    ##
+    local input="${1}"
+    local out="${2:-${input:r}.org}"
+
+    if ! test -e "${input}" ; then
+        ecerr "$0: input file does not exist: ${input}"
+        return 1
+    fi
+
+    local jq_program
+    jq_program="$(h-claude-code-session-org-jq-program)" @TRET
 
     {
         ec "#+TITLE: Claude Code Session ${input:t:r}"
@@ -77,6 +102,8 @@ function h-claude-code-session-md-jq-program {
     #: Prints the jq program that renders a Claude Code session `.jsonl`
     #: as markdown.
     ##
+    h-claude-code-session-jq-lib @RET
+
     cat <<'EOF'
 def fence_for:
   ([scan("`+") | length] | max // 0) as $m
@@ -118,7 +145,7 @@ select(type == "object")
 | select(.type == "user" or .type == "assistant")
 | select(.isMeta != true)
 | "# " + role
-  + (if (.timestamp | type) == "string" then " " + .timestamp else "" end)
+  + (if (.timestamp | type) == "string" then " " + (.timestamp | human_timestamp) else "" end)
   + "\n\n"
   + ((.message.content // [])
      | if type == "string" then [{type: "text", text: .}] else . end
