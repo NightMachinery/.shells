@@ -14,14 +14,23 @@ In org files, link to a file **outside the current directory** with a `zf:`
 link and a zsh dynamic named directory, never with a relative `file:` path:
 
 ```org
-[[zf:~[cod]/uni/papers/FairGrad/][the paper]]
-[[zf:~[nt]/public/subjects/Qwen/open-weight/Qwen3.6/arch/Libra.org][Libra.org]]
+[[zf:~\[cod\]/uni/papers/FairGrad/][the paper]]
+[[zf:~\[nt\]/public/subjects/Qwen/open-weight/Qwen3.6/arch/Libra.org][Libra.org]]
 ```
+
+**Escape the brackets as `~\[name\]`.** An unescaped `]` closes the link
+early, so `[[zf:~[nt]/x][y]]` is silently mis-parsed. Org unescapes before
+the handler runs, so [agfi:path-unabbrev] still receives a clean `~[nt]/x`.
+This is the established convention in the notes.
 
 `~[name]` is resolved by [agfi:path-unabbrev], which the `zf:` link handler
 calls before opening. Names come from [agfi:aliasdir]; useful ones are `nt`
 (`~/notes`), `cod` (`~/code`), `dom` (`$DOOMDIR`), `paper`, `base`, `dl`,
 `tmp`, `jrl`, `cel`, `mu`.
+
+`aliasdir` also registers each name with `hash -d`, so the bracket-free
+form `~cod/php/php_playground` works too and needs no escaping. Both appear
+in the notes; the bracketed form is the more common one.
 
 Why, rather than `[[file:../../../foo]]`:
 
