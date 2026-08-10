@@ -105,3 +105,42 @@ one cost real debugging time.
 
 - Set =GIT_TERMINAL_PROMPT=0=. On a headless host a git credential prompt is
   not a question, it is a hung shell.
+
+- Doom's package tree is only valid for the doom revision that built it.
+  Changing the pin *after* a sync leaves =straight/= holding the other
+  revision's package set; =doom sync= then tries to move already-built repos
+  and stops on straight's interactive "How to proceed? (1,2,3,4,5)" prompt.
+  With stdin closed that aborts *before* the generated profile init is written,
+  and the next daemon start dies with
+  =Symbol's value as variable is void: doom--profile-default=. Stage 50 now
+  stamps the built revision and rebuilds when it moves.
+
+- Verify emacs with a *daemon start*, not a batch load. A batch load of
+  =early-init.el= succeeds even when the generated profile init is missing,
+  because only the interactive path loads it. That is exactly the failure a
+  user hits with =emc-gateway=, and the batch check missed it completely.
+
+- =doom.d= reads =DOOMDIR= from the *environment*. We run =doom install
+  --no-env= on purpose (a generated envvars file would bake one host's
+  environment into a home shared by ~12 machines), so the handful of variables
+  the config needs are set explicitly in the env contract instead.
+
+- 134 of the 136 =package!= declarations in =doom.d/packages.el= are unpinned,
+  so a fresh sync gets *today's* upstream instead of whatever the laptop has.
+  That surfaced as =void-variable marginalia-annotator-registry= (the laptop's
+  marginalia still had the obsolete alias; today's dropped it). Fix: read the
+  laptop's =straight/repos/*= HEADs and check the same revisions out on the
+  server, then =doom sync --rebuild= so the byte-code matches the sources.
+  Without =--rebuild= you get stale =.elc= referencing files that no longer
+  exist (=file-missing compat-31.el.gz=).
+
+- A unix socket on the shared NFS home cannot work across hosts (AF_UNIX is
+  kernel-local; the file is only a rendezvous name) *and* collides between them
+  (=server-name= defaults to "server", and =server-start= deletes what it
+  judges a stale socket). doom.d now puts it under =$XDG_RUNTIME_DIR= per host;
+  the env contract points =EMACS_SOCKET_NAME= at the same path so =emacsclient=
+  finds it.
+
+- Beware =pkill -f <pattern>= when the pattern also matches your own command
+  line. =pkill -f "doom"= and =pkill -f "emacs --daemon"= each killed the very
+  shell that was about to do the work, silently. Cost me two debugging cycles.
