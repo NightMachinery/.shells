@@ -12,6 +12,10 @@ function notif-os-dismiss-all {
 
 function notif-os {
     local title="$1" msg="$2"
+    #: On by default: a notification raised by our own code is almost always worth
+    #: seeing, whereas Do Not Disturb is aimed at calls and social apps. Override per
+    #: call with `notif_ignore_dnd_p=n`.
+    local ignore_dnd="${notif_ignore_dnd_p:-y}"
 
     if isServer ; then
         return 0
@@ -21,7 +25,12 @@ function notif-os {
         #: @alt `osascript -e 'display notification "msg" with title "hi"'`
         ##
         if ((${+commands[terminal-notifier]})) ; then
-            terminal-notifier -title "$title" -message "$msg"
+            local opts=()
+            if bool "$ignore_dnd" ; then
+                opts+=(-ignoreDnD)
+            fi
+
+            terminal-notifier -title "$title" -message "$msg" "$opts[@]"
         else
             ectrace "terminal-notifier not found"
             return 1
