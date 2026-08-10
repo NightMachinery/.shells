@@ -264,6 +264,8 @@ function claude-code-view-session-fz {
     ##
     h-claude-code-view-session-fz h-claude-code-session-to-org org @RET
 }
+#: Same, but selects from the sessions of all projects.
+aliasfn claude-code-view-session-all-fz claude_code_view_session_fz_scope=all claude-code-view-session-fz
 
 function claude-code-view-session-md-fz {
     #: Interactively selects a Claude Code session, converts it to
@@ -271,6 +273,8 @@ function claude-code-view-session-md-fz {
     ##
     h-claude-code-view-session-fz h-claude-code-session-to-md md @RET
 }
+#: Same, but selects from the sessions of all projects.
+aliasfn claude-code-view-session-md-all-fz claude_code_view_session_fz_scope=all claude-code-view-session-md-fz
 
 function claude-code-view-session-raw-fz {
     #: Interactively selects a Claude Code session and opens the original
@@ -281,4 +285,6 @@ function claude-code-view-session-raw-fz {
 
     emc-open "${session_file}" @RET
 }
+#: Same, but selects from the sessions of all projects.
+aliasfn claude-code-view-session-raw-all-fz claude_code_view_session_fz_scope=all claude-code-view-session-raw-fz
 ##
