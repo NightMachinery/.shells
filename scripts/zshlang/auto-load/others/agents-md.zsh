@@ -18,7 +18,11 @@ function h-agents-md-agents {
     #: gapcode is not in use. ~/.gapcode/AGENTS.md is left as it was last
     #: assembled; nothing rewrites it now.
     # ec "gapcode"$'\t'"${HOME}/.gapcode/AGENTS.md"
-    ec "gemini"$'\t'"${HOME}/.gemini/AGENTS.md"
+    #: Antigravity's binary is `agy`; its state lives under ~/.gemini/, and
+    #: its global rules file is GEMINI.md there, per
+    #: https://antigravity.google/docs/rules-workflows . A global AGENTS.md is
+    #: read by nothing: that path is workspace-scoped only.
+    ec "antigravity"$'\t'"${HOME}/.gemini/GEMINI.md"
 }
 
 function h-agents-md-parts {

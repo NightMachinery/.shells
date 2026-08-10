@@ -2,26 +2,18 @@
 function antigravity {
     #: Google's Antigravity CLI.
     #:
-    #: It ships as =@google/gemini-cli= and its binary is `gemini`; the
-    #: Antigravity-specific state lives under `~/.gemini/antigravity-cli/`.
-    #: A standalone `antigravity` binary is preferred if one ever appears, so
-    #: this keeps working either way.
+    #: The binary is `agy`, not `antigravity` and not `gemini`; its state
+    #: lives under `~/.gemini/antigravity-cli/`, and its global rules file is
+    #: `~/.gemini/GEMINI.md`.
     #: @duplicateCode/fd706e6b8475e27ca5cf27951b1d8ddc
     ##
-    local cmd=("${antigravity_cmd[@]}")
-    if (( ${#cmd[@]} == 0 )) ; then
-        if isdefined-cmd antigravity-cli ; then
-            cmd=(antigravity-cli)
-        else
-            cmd=(gemini)
-        fi
-    fi
+    local cmd=("${antigravity_cmd[@]:-agy}")
     ensure-cmd "${cmd[1]}" @RET
 
     local -x EDITOR=nvim
     local -x VISUAL="${EDITOR}"
 
-    #: Keeps ~/.gemini/AGENTS.md current with its sources; asks before
+    #: Keeps ~/.gemini/GEMINI.md current with its sources; asks before
     #: launching with stale instructions.
     h-agents-md-sync-ask @RET
 
