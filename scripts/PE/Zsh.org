@@ -224,6 +224,37 @@ Prefer silent errors when the error is inconsequential, like when deleting tempo
 
 - When parsing structured input, use the appropriate tool with robust parsing, e.g., =jq= for JSON.
 
+- Guard external dependencies at the top of the function, so a missing tool reports itself by name instead of failing somewhere deeper with a confusing error.
+
+=isdefined-cmd= tests for a single command and prints nothing:
+#+begin_src zsh :eval never
+if isdefined-cmd bat ; then
+    ...
+fi
+#+end_src
+
+=ensure-cmd= takes one or more commands and fails with =missing command: X=:
+#+begin_src zsh :eval never
+function foo {
+    ensure-cmd pandoc jq @RET
+    ...
+}
+#+end_src
+
+=ensure-dep1= additionally knows how to install what is missing. It checks, runs the install command, =rehash=es, then re-checks, so a fresh clone works on first use rather than after a separate setup step:
+#+begin_src zsh :eval never
+ensure-dep1 claude_session go-install-local "${NIGHTDIR}/golang/claude_session" @RET
+#+end_src
+
+Guard only what the current code path actually needs. E.g. a renderer that only shells out to =pandoc= for one output format should check for it inside that branch, not unconditionally:
+#+begin_src zsh :eval never
+if [[ "${format}" == org-pandoc ]] ; then
+    ensure-cmd pandoc @RET
+fi
+#+end_src
+
+Prefer =ensure-dep1= for things we build ourselves out of this repo (a local Go or Rust tool), and =ensure-cmd= for things the user is expected to install, since we should not silently install system packages on their behalf.
+
 - Heredocs must be used for long literal strings. E.g., when we are embedding a script.
 
 - Helper/internal/private functions should be named =h-...=.
