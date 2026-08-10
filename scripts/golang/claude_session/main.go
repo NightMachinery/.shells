@@ -25,15 +25,28 @@ const (
 
 type record struct {
 	Type      string   `json:"type"`
+	Subtype   string   `json:"subtype"`
 	Slug      string   `json:"slug"`
 	IsMeta    bool     `json:"isMeta"`
 	Timestamp string   `json:"timestamp"`
 	Message   *message `json:"message"`
+
+	// `system` records keep their payload at the top level, unlike messages.
+	// Raw, because other record types put an object here.
+	Content json.RawMessage `json:"content"`
+
+	AITitle     string `json:"aiTitle"`
+	CustomTitle string `json:"customTitle"`
 }
 
 type message struct {
 	Content json.RawMessage `json:"content"`
+	Model   string          `json:"model"`
 }
+
+// A recap: Claude Code's own summary of where things stand, written when you
+// step away. Recorded as a system record rather than a message.
+const recapSubtype = "away_summary"
 
 type block struct {
 	Type      string          `json:"type"`
@@ -57,8 +70,8 @@ func main() {
 		cmdRender(os.Args[2:])
 	case "list":
 		cmdList(os.Args[2:])
-	case "slug":
-		cmdSlug(os.Args[2:])
+	case "name":
+		cmdName(os.Args[2:])
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -71,7 +84,7 @@ func usage() {
 	fmt.Fprint(os.Stderr, `usage:
   claude_session render [flags] <session.jsonl>   #: transcript -> markdown/org on stdout
   claude_session list   [flags] <sessions-dir>    #: TSV of sessions, newest first
-  claude_session slug           <session.jsonl>   #: session name, empty if unnamed
+  claude_session name           <session.jsonl>   #: session name, empty if unnamed
 
 render flags:
   -format md|org|org-pandoc   output syntax (default md). org-pandoc pipes the

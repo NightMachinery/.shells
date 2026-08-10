@@ -64,16 +64,7 @@ func cmdRender(argv []string) {
 	}
 	defer fh.Close()
 
-	var records []record
-	for _, rec := range readRecords(fh) {
-		if rec.Type != "user" && rec.Type != "assistant" {
-			continue
-		}
-		if rec.IsMeta {
-			continue
-		}
-		records = append(records, rec)
-	}
+	records := conversationRecords(readRecords(fh))
 
 	// Decoded once: the result index, the turn grouping and the rendering all
 	// need the blocks.
@@ -177,7 +168,27 @@ func subagentSegments(input string, blocks [][]block, opts renderOpts, orgOut bo
 type turn struct {
 	role   string
 	ts     string
+	model  string
 	blocks []timedBlock
+}
+
+// The records that make up the conversation: the messages, plus the recaps
+// that punctuate them.
+func conversationRecords(all []record) []record {
+	var out []record
+	for _, rec := range all {
+		switch {
+		case rec.Type == "user" || rec.Type == "assistant":
+			if rec.IsMeta {
+				continue
+			}
+		case rec.Type == "system" && rec.Subtype == recapSubtype:
+		default:
+			continue
+		}
+		out = append(out, rec)
+	}
+	return out
 }
 
 // A block plus the timestamp of the record it arrived in, which within a turn
@@ -227,6 +238,26 @@ func buildTurns(records []record, blocks [][]block, results map[string]toolResul
 	var turns []turn
 
 	for i, rec := range records {
+		// A recap belongs to the turn it interrupts, as a section of it.
+		if rec.Type == "system" {
+			var text string
+			if err := json.Unmarshal(rec.Content, &text); err != nil || strings.TrimSpace(text) == "" {
+				continue
+			}
+			tb := timedBlock{b: block{Type: "recap", Text: text}, ts: rec.Timestamp}
+			if n := len(turns); n > 0 {
+				turns[n-1].blocks = append(turns[n-1].blocks, tb)
+			} else {
+				turns = append(turns, turn{role: "assistant", ts: rec.Timestamp, blocks: []timedBlock{tb}})
+			}
+			continue
+		}
+
+		model := ""
+		if rec.Message != nil {
+			model = rec.Message.Model
+		}
+
 		var keep []timedBlock
 		for _, b := range blocks[i] {
 			// Nested under its call; an orphan with no matching call still
@@ -242,11 +273,15 @@ func buildTurns(records []record, blocks [][]block, results map[string]toolResul
 			continue
 		}
 
-		if n := len(turns); n > 0 && turns[n-1].role == rec.Type {
+		// Merging stops at a model change, so a switch mid-answer starts a
+		// new heading rather than hiding inside one. Annotating sub-headings
+		// instead would miss a switch that lands on a plain text block, which
+		// has no heading to annotate.
+		if n := len(turns); n > 0 && turns[n-1].role == rec.Type && turns[n-1].model == model {
 			turns[n-1].blocks = append(turns[n-1].blocks, keep...)
 			continue
 		}
-		turns = append(turns, turn{role: rec.Type, ts: rec.Timestamp, blocks: keep})
+		turns = append(turns, turn{role: rec.Type, ts: rec.Timestamp, model: model, blocks: keep})
 	}
 
 	return turns
@@ -450,6 +485,9 @@ func (r *renderer) renderTurn(t turn) {
 	if ts := humanTimestamp(t.ts); ts != "" {
 		title += " " + ts
 	}
+	if m := shortModel(t.model); m != "" {
+		title += " · " + m
+	}
 	r.heading(1, title)
 	r.out.WriteString(body.out.String())
 	r.ensureBlank()
@@ -512,6 +550,10 @@ func (r *renderer) renderBlock(tb timedBlock) {
 			return
 		}
 		r.prose(b.Text, 1)
+
+	case "recap":
+		r.heading(2, "Recap"+r.stamp(tb.ts))
+		r.prose(b.Text, 2)
 
 	case "thinking":
 		if strings.TrimSpace(b.Thinking) == "" {

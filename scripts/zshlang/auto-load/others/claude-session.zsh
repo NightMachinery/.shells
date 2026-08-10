@@ -10,22 +10,25 @@ function h-claude-code-session-dep {
 }
 
 function h-claude-code-session-name {
-    #: The session's own name (Claude Code's slug, e.g.
-    #: `sharded-bouncing-clarke`), falling back to its UUID for sessions
-    #: predating the feature. Sanitized for use as a filename.
+    #: The session's own name: the title the user set, else the one Claude
+    #: Code generated, else its slug, else its UUID for sessions predating
+    #: all of those. Sanitized for use as a filename.
     ##
     local input="${1}"
 
     h-claude-code-session-dep @RET
 
-    local slug
-    slug="$(claude_session slug "${input}")" @RET
-    slug="${slug//[^A-Za-z0-9._-]/-}"
+    local name
+    name="$(claude_session name "${input}")" @RET
+    name="${name//[^A-Za-z0-9._-]/-}"
+    #: Collapse the runs a title's spaces and punctuation leave behind.
+    name="${${name//---##/-}%%-##}"
+    name="${name##-##}"
 
-    if test -z "${slug}" ; then
+    if test -z "${name}" ; then
         ec "${input:t:r}"
     else
-        ec "${slug}"
+        ec "${name}"
     fi
 }
 
