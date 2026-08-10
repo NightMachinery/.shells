@@ -499,7 +499,77 @@ function bell-repeat() {
 }
 aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 ##
+function h-bell-auto-notify {
+    : "stages 2-4 of the escalation ladder; see [agfi:bell-auto] and ./docs/bell-auto.md
+
+Stage 2 posts a desktop notification, stage 3 quietly watches for the user coming
+back, and stage 4 escalates to Telegram if they never do."
+    ##
+    local msg="${1}" nonce="${2}"
+
+    #: Notifications are opt-in per call site: without a message there is nothing
+    #: worth saying, and this is what keeps `stop_mode=auto` safe for every existing
+    #: caller (e.g. [agfi:bella-zsh] already pops its own `alert "Completed: ..."`).
+    test -z "$msg" && return 0
+
+    #: Stage 2. Desktop only; Telegram is stage 4, deliberately later.
+    notif_tlg=n notif_ignore_dnd_p="${notif_ignore_dnd_p:-y}" notif "$msg"
+
+    if bool "${bell_auto_notif_alert:-n}" ; then
+        #: Off by default: an [agfi:hs-alert] overlay is drawn outside the notification
+        #: system, so it survives Do Not Disturb -- but `notif_ignore_dnd_p` already
+        #: gets the banner through, which makes the overlay pure duplication. Turn it
+        #: back on with `bell_auto_notif_alert=y` if a banner is ever suppressed.
+        #:
+        #: Bounded and silenced: a wedged Hammerspoon otherwise blocks here for the
+        #: 30s baked into [agfi:hammerspoon] and dumps a stacktrace, which is a silly
+        #: way for a notification to fail.
+        silence reval-timeout 10 @opts dur "${bell_auto_alert_dur:-10}" @ alert "$msg" ||
+            ecgray "$0: hs-alert failed; is Hammerspoon responsive?"
+    fi
+
+    local tlg="${bell_auto_tlg:-auto}"
+    if [[ "$tlg" == auto ]] ; then
+        #: At the office the laptop is often left behind, so the phone is the only
+        #: channel that can still reach us. At home we carry the machine with us.
+        if office-p ; then
+            tlg=y
+        else
+            tlg=n
+        fi
+    fi
+    bool "$tlg" || return 0
+
+    #: Stage 3. Silent watch: did they come back after we gave up ringing?
+    local idle_t="${bell_auto_t:-30}"
+    local deadline=$(( EPOCHSECONDS + ${bell_auto_tlg_t:-300} ))
+    while oneinstance bell-auto "$nonce"
+    do
+        if (( $(idle-get) <= idle_t )) ; then
+            ecgray "$0: user came back; skipping the Telegram escalation."
+            return 0
+        fi
+
+        (( EPOCHSECONDS >= deadline )) && break
+        sleep "${bell_auto_tlg_poll:-30}"
+    done
+
+    #: Bail out if we left the loop because a newer bell-auto took the nonce.
+    oneinstance bell-auto "$nonce" || return 0
+
+    #: Stage 4. Time-bounded because this must never be the thing that hangs, no
+    #: matter how [agfi:tsend] behaves. `reval-timeout` rather than `gtimeout`, since
+    #: tnotif is a zsh function and an external timeout binary cannot run one.
+    ec "$0: escalating to Telegram."
+    reval-timeout 60 tnotif "$msg ($(hostname))" ||
+        ecgray "$0: the Telegram escalation failed."
+}
+
 function bell-auto {
+    : "rings <engine> until the user comes back, then escalates; see ./docs/bell-auto.md
+
+bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
+    ##
     if ! isLocal ; then
         ecerr "$0: You're not on a local machine."
         return 1
@@ -516,11 +586,62 @@ function bell-auto {
     local single="${bell_auto_single:-${bell_auto_sm}}"
     local skipfirst="${bell_skip_first:-${bell_auto_sf}}"
     local exit_cmd=("${(@)bell_auto_exit}")
+    local stop_mode="${bell_auto_stop_mode:-auto}"
+    local max_t="${bell_auto_max_t:-3600}"  #: Wall-clock cap on ringing. Named max_t because bell_auto_t is already the idle threshold.
+    local notif_msg="${bell_auto_notif_msg}"
+
+    if [[ "$stop_mode" == auto ]] ; then
+        #: The reason to suppress repeated bells at the office is the colleagues, not
+        #: the office; headphones remove the concern entirely.
+        if office-p && ! headphones-p ; then
+            stop_mode='bell+notif'
+        else
+            stop_mode='idle+timeout'
+        fi
+
+        ecgray "$0: stop_mode=auto resolved to ${stop_mode}."
+    fi
+
+    case "$stop_mode" in
+        idle|idle+timeout|notif|bell+notif) ;;
+        *)
+            ectrace "$0: unknown stop_mode: ${stop_mode}"
+            return 1
+            ;;
+    esac
+
+    if test -n "$exit_cmd[*]" && [[ "$stop_mode" == (notif|bell+notif) ]] ; then
+        #: Those modes do not loop, so an exit command would never run. The sc bells
+        #: ([agfi:bell-auto-sc]) rely on it to stop a *continuous* sound, which would
+        #: otherwise play forever.
+        ecgray "$0: bell_auto_exit is set; downgrading ${stop_mode} to idle+timeout."
+        stop_mode='idle+timeout'
+    fi
 
     local nonce
     nonce="$(oneinstance-setup bell-auto)" || return 1
 
-    ec "$0 (nonce: $nonce) started with timeout $timeout and engine: $engine[@]"
+    ec "$0 (nonce: $nonce) started with stop_mode $stop_mode, timeout $timeout and engine: $engine[@]"
+
+    if [[ "$stop_mode" == (notif|bell+notif) ]] ; then
+        #: `skipfirst` means the user is already looking at the terminal
+        #: (see [agfi:bella-zsh-maybe]), so do not bother them at all.
+        if test -n "$skipfirst" ; then
+            ec "$0 exited without ringing (skipfirst). (nonce: $nonce)"
+            return 0
+        fi
+
+        if [[ "$stop_mode" == 'bell+notif' ]] ; then
+            reval "$engine[@]"
+        fi
+
+        h-bell-auto-notify "$notif_msg" "$nonce"
+        ec "$0 exited. (nonce: $nonce)"
+        return 0
+    fi
+
+    local started="$EPOCHSECONDS"
+    local capped=''
 
     if test -z "$skipfirst" ; then
         reval "$engine[@]"
@@ -535,6 +656,14 @@ function bell-auto {
             break
         fi
 
+        if [[ "$stop_mode" == 'idle+timeout' ]] && (( (EPOCHSECONDS - started) >= max_t )) ; then
+            #: They are clearly not coming back for the sound. Stop making noise and
+            #: leave something behind that they will find later.
+            ec "$0 stopped ringing after ${max_t}s; falling back to a notification."
+            capped=y
+            break
+        fi
+
         if test -z "$single" ; then #: it's better that we we play first and then sleep
             reval "$engine[@]"
         fi
@@ -543,6 +672,11 @@ function bell-auto {
         sleep "$sleep"
     done
     test -n "$exit_cmd[*]" && reval-ec "$exit_cmd[@]"
+
+    if test -n "$capped" ; then
+        h-bell-auto-notify "$notif_msg" "$nonce"
+    fi
+
     ec "$0 exited. (nonce: $nonce)"
 }
 aliasfn bell-auto-stop oneinstance-setup bell-auto # forces active bell-autos to exit
@@ -551,7 +685,9 @@ aliasfn bellaok bell-auto-stop
 aliasfn bellsc-stop ot-stop
 ##
 aliasfn bellsc-heli ot-play-helicopter
-aliasfn bell-auto-sc @opts single y sleep 1 t 1.3 exit bellsc-stop @ bell-auto
+#: `stop_mode idle` is pinned because the engine starts a *continuous* sound and the
+#: loop exists solely to run bellsc-stop afterwards.
+aliasfn bell-auto-sc @opts single y sleep 1 t 1.3 stop_mode idle exit bellsc-stop @ bell-auto
 aliasfn bella-heli bell-auto-sc bellsc-heli
 aliasfn bella-diwhite bell-auto-sc bell-diwhite 9999999 # 9999999/3600/24 = 115.74072916666667
 aliasfn bellr-toy bell-repeat bell-toy
@@ -1182,7 +1318,8 @@ function bell-gpt {
 function h-bell-codex {
     command say -v Whisper -r 90 "Codex awaits!"
 }
-aliasfn bell-codex bell_auto_sleep=10 awaysh bell-auto h-bell-codex
+#: aliasfnq, not aliasfn: the message contains spaces, which plain aliasfn would split.
+aliasfnq bell-codex bell_auto_sleep=10 bell_auto_notif_msg='Codex awaits!' notif_ignore_dnd_p=y awaysh bell-auto h-bell-codex
 
 function h-bell-claude {
     ##
@@ -1191,5 +1328,6 @@ function h-bell-claude {
     bell-sonic-fx-ready
     ##
 }
-aliasfn bell-claude bell_auto_sleep=10 awaysh bell-auto h-bell-claude
+#: aliasfnq, not aliasfn: the message contains spaces, which plain aliasfn would split.
+aliasfnq bell-claude bell_auto_sleep=10 bell_auto_notif_msg='Claude awaits!' notif_ignore_dnd_p=y awaysh bell-auto h-bell-claude
 ##
