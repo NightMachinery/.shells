@@ -139,7 +139,7 @@ function h-claude-code-session-to-org-pandoc {
     fi
 
     #: The pandoc run happens inside the renderer, split across processes;
-    #: see =docs/claude_session.md=.
+    #: see "Performance" in =golang/claude_session/readme.org=.
     {
         h-claude-code-session-title org "${input}" @RET
         h-claude-code-session-render org-pandoc "${input}" @RET
