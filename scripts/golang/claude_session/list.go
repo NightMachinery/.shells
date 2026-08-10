@@ -31,7 +31,7 @@ func cmdList(argv []string) {
 	snippetLen := fs.Int("snippet-len", 120, "max snippet width, in runes")
 	subagentsP := fs.Bool("subagents", false, "also list subagent transcripts")
 	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
-	fs.Parse(argv)
+	fs.Parse(guardPathArgs(fs, argv))
 
 	dir := fs.Arg(0)
 	if dir == "" {

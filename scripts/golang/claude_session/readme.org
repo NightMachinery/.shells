@@ -142,14 +142,23 @@ attaching to the turn it interrupts:
 - =system/turn_duration= is not a section. It measures the turn before it, so it
   lands in that turn's heading as =· 4m2s=.
 
+- *Task reminder* --- =attachment/task_reminder=, the outstanding task list.
+  Rendered only when it has items. All 485 locally are empty (identical
+  56-byte records with =content: []=), because the task tools go unused here,
+  but a populated one is worth reading rather than dropping.
+
 Deliberately left out, all of it bookkeeping: =mode=, =permission-mode=,
-=agent-name=/=agent-color=/=agent-setting=, =bridge-session=,
-=file-history-snapshot= and =-delta=, and =last-prompt=, which only repeats the
-message beside it. =system/stop_hook_summary= is dropped because it never
-carries content --- 0 of 225 locally. Most =attachment= payloads are harness
-internals (=task_reminder=, =skill_listing=, =deferred_tools_delta=,
-=output_style=); only a file you edited yourself says anything about the
-conversation.
+=agent-color=/=agent-setting=, =bridge-session=, =file-history-snapshot= and
+=-delta=, and =last-prompt=, which only repeats the message beside it.
+=system/stop_hook_summary= is dropped because it never carries content --- 0 of
+225 locally. The remaining =attachment= payloads are harness internals
+(=skill_listing=, =deferred_tools_delta=, =output_style=, =plan_mode=).
+
+=agent-name= is left out because it is derived. It holds the session's resolved
+display name, tracking =custom-title= when one is set and =ai-title= otherwise
+--- which is exactly the precedence [[agfi:h-claude-code-session-name]] applies.
+On all 19 local sessions that have one, the last =agent-name= equals what that
+rule already produces, so reading it would change nothing.
 
 =queue-operation= is left out for a subtler reason. Half of what gets enqueued
 is delivered and therefore already appears as an ordinary user message, so
