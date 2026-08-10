@@ -73,6 +73,39 @@ among the session's `user` and `assistant` records, and sorts by it. Files
 with no timestamped message at all — empty or truncated ones — fall back to
 mtime so they still appear in the picker rather than vanishing.
 
+## Document structure
+
+A transcript is not rendered record by record. Claude Code writes one JSONL
+record per content block, so a single assistant turn arrives as a run of
+records that would otherwise become a run of near-identical headings.
+Consecutive records sharing a role are merged into one turn heading, which
+carries the first timestamp. Sub-headings inside the turn show their own
+timestamp only when it falls in a different minute, and show the full date as
+well when the turn crosses midnight.
+
+Tool results are nested under the call they answer, matching `tool_use.id`
+against `tool_result.tool_use_id`. This matters because results are not
+really user messages: the wire format sends them back to the model as user
+turns, so rendering them literally produced a `* User` heading nobody wrote,
+sitting next to — but not under — its call. Records that contain nothing but
+results now produce no heading at all. A result whose call is missing from
+the transcript still renders where it sits, and a user record that mixes
+results with actual typed text keeps its heading for the text.
+
+Together these collapse a 4.5MB session from 1182 top-level headings to 34,
+one per conversational turn:
+
+    * User [2026-08-10 Mon 10:22]
+    * Assistant [2026-08-10 Mon 10:22]
+    ** Thinking
+    ** Tool Use: Bash · Verify LaTeX delimiters
+    *** Result: ok
+    ** Tool Use: Edit · ~/x.zsh [10:24]
+    *** Result (error): Exit code 1
+
+A result that is a single line of 72 characters or fewer goes on its heading
+rather than into a block; an empty one reads `Result: (no output)`.
+
 ## How tool calls are rendered
 
 The old jq renderer dumped every non-`Bash` tool input as compact JSON, so a
@@ -81,6 +114,11 @@ The old jq renderer dumped every non-`Bash` tool input as compact JSON, so a
 
 - Scalars and short strings become bullets (`- **replace_all**: false`).
   Paths are abbreviated to `~`.
+- `command`, `content`, `old_string`, `new_string`, `plan` and `prompt` are
+  always blocks, however short. Beyond a command belonging in a source block
+  anyway, org's `=verbatim=` markup has no escape mechanism, so a one-line
+  command inlined that way breaks apart the moment it contains an `=` — which
+  `echo "=== section ==="` does.
 - Multi-line or long strings become their own fenced block, tagged with a
   language guessed from the input's `file_path` extension. `command` is
   always `zsh`.
