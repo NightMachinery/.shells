@@ -165,7 +165,12 @@ ${umask_stanza}
 #: [agfi:redis-cli-wrapper] and friends need no change.
 #: /proc/PID/environ is owner-readable only, so exporting it does not leak it.
 if [ -r "\${HOME}/.redis-auth" ] ; then
-    REDISCLI_AUTH="\$(cat "\${HOME}/.redis-auth")"
+    #: \`read' rather than \$(cat ...): a command substitution forks, and this
+    #: file is sourced by every shell. Measured at ~150ms per startup on the
+    #: NFS-mounted CIS home -- worth avoiding for a single line of a file.
+    #: \`|| true' because read reports failure when the file has no trailing
+    #: newline, having nonetheless read the value.
+    IFS= read -r REDISCLI_AUTH < "\${HOME}/.redis-auth" || true
     export REDISCLI_AUTH
 fi
 EOF
