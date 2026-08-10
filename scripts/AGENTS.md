@@ -8,6 +8,14 @@ Read all scripts in `zshlang/basic`. Reuse functions when possible, DRY.
 
 To link to a zsh function from comments/docs, use `[agfi:function-name]`, not `[help:function-name]`.
 
+## Brish
+
+BrishGarden keeps persistent zsh shells, so it does **not** see zshlang edits on
+its own. Run `brishz-restart` after changing any zsh code you intend to exercise
+through `brishz`, `brishz2.dash`, or anything driven by them (agent hooks,
+Hammerspoon bindings, iTerm triggers). Testing in a fresh `zsh -ic` proves
+nothing about what the garden is running.
+
 ## Plugins
 ### Loading
 
