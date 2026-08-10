@@ -92,8 +92,14 @@ if have claude && [ -z "${NIGHT_BOOTSTRAP_FORCE:-}" ] ; then
 else
     log "installing claude code"
     claude_installer="${NIGHT_LOCAL_CACHE:-/tmp}/claude-install.sh"
-    if fetch "https://claude.ai/install.sh" "${claude_installer}" ; then
-        run_soft sh "${claude_installer}"
+    #: @warn Must run under bash, not sh. The installer uses [[ ]] and the =~
+    #: regex operator, so under dash (which /bin/sh is on Debian/Ubuntu) it
+    #: dies on a syntax error -- and because the failure is soft, the stage
+    #: otherwise reports success while installing nothing.
+    if ! have bash ; then
+        warn "claude code's installer needs bash, which is not on PATH"
+    elif fetch "https://claude.ai/install.sh" "${claude_installer}" ; then
+        run_soft bash "${claude_installer}"
         rm -f "${claude_installer}"
     else
         warn "could not download the claude code installer"
