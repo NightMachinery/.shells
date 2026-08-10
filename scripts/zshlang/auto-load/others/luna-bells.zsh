@@ -1406,16 +1406,18 @@ Code's Notification but not its Stop), hence the fallback."
         cwd="$(ec "$input" | jq -r '.cwd // empty' 2>/dev/null)" || cwd=''
     fi
 
-    if test -n "$msg" ; then
-        #: Name the agent, so a batched Telegram from several sessions is scannable.
-        #: Only on payload messages -- the fallback already starts with the agent name.
-        msg="${app}: ${msg}"
-    else
-        msg="$fallback"
-    fi
+    #: The project name matters when several sessions are waiting at once, so it goes
+    #: in the prefix rather than trailing the message: a batched Telegram is then
+    #: scannable down its left edge.
+    local tag=''
+    test -n "$cwd" && tag=" [${cwd:t}]"
 
-    #: The project name matters when several sessions are waiting at once.
-    test -n "$cwd" && msg="${msg} [${cwd:t}]"
+    if test -n "$msg" ; then
+        msg="${app}${tag}: ${msg}"
+    else
+        #: The fallback already starts with the agent name, so it only wants the tag.
+        msg="${fallback}${tag}"
+    fi
 
     local icon
     icon="$(silence app-icon-get "$app")" || icon=''

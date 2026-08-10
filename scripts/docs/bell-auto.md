@@ -81,9 +81,12 @@ hook payload as JSON — from `$1`, or from stdin — and builds the message fro
 
 Claude Code's `Notification` event carries a real `message`; its `Stop` event does
 not, so that falls back to `Claude awaits!`. The `cwd` becomes a `[project]` tag,
-which is what tells two waiting sessions apart. Payload-derived messages are prefixed
-with the agent name (`Claude: ...`) so a batched Telegram is scannable; the fallback
-already starts with the agent name, so it is left alone.
+which is what tells two waiting sessions apart.
+
+Both the agent name and the tag go in the prefix — `Claude [scripts]: needs your
+permission to use Bash` — so a batched Telegram is scannable down its left edge. The
+fallback already starts with the agent name, so it takes only the tag:
+`Claude awaits! [scripts]`.
 
 For the payload to arrive, the hook in `~/.claude/settings.json` must forward stdin:
 
