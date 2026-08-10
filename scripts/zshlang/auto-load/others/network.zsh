@@ -457,3 +457,24 @@ function vpn-restart {
 }
 aliasfn 'zz' vpn-restart
 ##
+function net-default-interface {
+    : "outputs the interface carrying the default route, e.g. en0, en10, utun3"
+    #: Used by [agfi:office-p] to tell a physical link apart from a VPN tunnel.
+    ##
+    local out
+    out="$(command route -n get default 2>/dev/null)" || return 1
+
+    #: Matching natively instead of via [agfi:rget] because this is called often,
+    #: and rget forks and can touch the clipboard through `cat-copy-if-tty`.
+    [[ "$out" =~ 'interface:[[:space:]]*([^[:space:]]+)' ]] || return 1
+    ec "$match[1]"
+}
+
+function net-default-ipv4 {
+    : "outputs the IPv4 address of the interface carrying the default route"
+    local iface
+    iface="$(net-default-interface)" || return 1
+
+    command ipconfig getifaddr "$iface" 2>/dev/null
+}
+##
