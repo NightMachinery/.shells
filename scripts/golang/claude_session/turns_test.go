@@ -386,3 +386,50 @@ func TestGuardPathArgsLeavesRealFlagsAlone(t *testing.T) {
 		t.Error("-diff was treated as a path instead of a flag")
 	}
 }
+
+// agent-name is the name Claude Code resolved for itself, so it wins when
+// present; it just does not always exist.
+func TestSessionNamePrecedence(t *testing.T) {
+	line := func(obj map[string]any) string {
+		b, _ := json.Marshal(obj)
+		return string(b) + "\n"
+	}
+
+	cases := []struct{ name, body, want string }{
+		{"agent-name wins",
+			line(map[string]any{"type": "custom-title", "customTitle": "Custom"}) +
+				line(map[string]any{"type": "agent-name", "agentName": "Resolved"}),
+			"Resolved"},
+		{"custom-title beats ai-title",
+			line(map[string]any{"type": "ai-title", "aiTitle": "Generated"}) +
+				line(map[string]any{"type": "custom-title", "customTitle": "Custom"}),
+			"Custom"},
+		{"ai-title beats slug",
+			line(map[string]any{"type": "user", "slug": "sharded-bouncing-clarke"}) +
+				line(map[string]any{"type": "ai-title", "aiTitle": "Generated"}),
+			"Generated"},
+		{"last name wins",
+			line(map[string]any{"type": "agent-name", "agentName": "First"}) +
+				line(map[string]any{"type": "agent-name", "agentName": "Second"}),
+			"Second"},
+		{"unnamed session", line(map[string]any{"type": "user"}), ""},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "s.jsonl")
+			if err := os.WriteFile(path, []byte(c.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			fh, err := os.Open(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer fh.Close()
+
+			if got := sessionName(fh); got != c.want {
+				t.Errorf("sessionName = %q, want %q", got, c.want)
+			}
+		})
+	}
+}

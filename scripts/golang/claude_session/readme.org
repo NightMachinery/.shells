@@ -49,12 +49,18 @@ stdout. Flags:
 - =-pandoc PATH= --- the pandoc binary to use for =org-pandoc=.
 
 =claude_session name <session.jsonl>= prints the session's name, or nothing if
-it has none. Claude Code names a session three ways, in increasing order of
+it has none. Claude Code names a session several ways, in increasing order of
 authority: a generated slug like =sharded-bouncing-clarke=, an =ai-title=
-summarising the work (=fix-org-store-link-title=), and a =custom-title= the
-user set (=Neru=). Titles can be revised during a session, so the last wins; a
-slug never changes. 39 of 52 local sessions have a slug and 28 have a title;
-the rest predate the features and fall back to their uuid.
+summarising the work (=fix-org-store-link-title=), a =custom-title= the user
+set (=Neru=), and =agent-name=, which is the name Claude Code itself resolved
+from those. Names can be revised during a session, so the last wins; a slug
+never changes. 39 of 52 local sessions have a slug and 28 have a title; the
+rest predate the features and fall back to their uuid.
+
+=agent-name= is preferred when present, so a future title source is picked up
+without changing this code. It cannot replace the explicit precedence, though:
+only 19 of the 28 named sessions carry one. Where both exist they agree, on all
+19 --- and adding it changed no name anywhere in the local corpus.
 
 The org header uses it, and so does the filename the viewers write, so a
 session opens in emacs as =Neru.org= rather than a uuid:
@@ -154,13 +160,8 @@ Deliberately left out, all of it bookkeeping: =mode=, =permission-mode=,
 225 locally. The remaining =attachment= payloads are harness internals
 (=skill_listing=, =deferred_tools_delta=, =output_style=, =plan_mode=).
 
-=agent-name= is left out because it is derived, and because it covers less
-ground. It holds the session's resolved display name, tracking =custom-title=
-when one is set and =ai-title= otherwise --- exactly the precedence
-[[agfi:h-claude-code-session-name]] applies, and on all 19 local sessions that
-have one the last =agent-name= equals what that rule produces. But only 19
-sessions have one where 28 have a title, so sourcing the name from it would
-lose the name for 9 of them.
+=agent-name= is not a section either, but it is not discarded: it feeds the
+session name, above.
 
 =queue-operation= is left out for a subtler reason. Half of what gets enqueued
 is delivered and therefore already appears as an ordinary user message, so

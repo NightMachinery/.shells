@@ -308,10 +308,16 @@ func parseRecord(line string) (record, bool) {
 	return rec, true
 }
 
-// Claude Code names a session three ways, in increasing order of authority: a
-// generated slug like `sharded-bouncing-clarke`, an `ai-title` summarising the
-// work, and a `custom-title` the user set. Sessions predating the feature have
-// none, in which case the caller falls back to the uuid.
+// Claude Code names a session several ways, in increasing order of authority:
+// a generated slug like `sharded-bouncing-clarke`, an `ai-title` summarising
+// the work, and a `custom-title` the user set. `agent-name` is the name Claude
+// Code itself resolved from those, so it wins when present — it agrees with the
+// rule below on every local session that has one, and preferring it means a
+// future title source is picked up without changing this code. Only 19 of 28
+// named sessions carry one, though, so the explicit precedence has to stay.
+//
+// Sessions predating all of it have no name, and the caller falls back to the
+// uuid.
 func cmdName(argv []string) {
 	if len(argv) == 0 {
 		fatal("name: no input file given")
@@ -332,15 +338,17 @@ func sessionName(fh *os.File) string {
 	sc := bufio.NewScanner(fh)
 	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
 
-	var slug, aiTitle, customTitle string
+	var slug, aiTitle, customTitle, agentName string
 	for sc.Scan() {
 		rec, ok := parseRecord(sc.Text())
 		if !ok {
 			continue
 		}
-		// Titles can be revised during a session, so the last one wins; a slug
+		// Names can be revised during a session, so the last one wins; a slug
 		// never changes, so the first is as good as any.
 		switch {
+		case rec.AgentName != "":
+			agentName = rec.AgentName
 		case rec.CustomTitle != "":
 			customTitle = rec.CustomTitle
 		case rec.AITitle != "":
@@ -350,7 +358,7 @@ func sessionName(fh *os.File) string {
 		}
 	}
 
-	for _, s := range []string{customTitle, aiTitle, slug} {
+	for _, s := range []string{agentName, customTitle, aiTitle, slug} {
 		if s != "" {
 			return s
 		}
