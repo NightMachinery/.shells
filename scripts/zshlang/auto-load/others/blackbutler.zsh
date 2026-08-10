@@ -1,15 +1,43 @@
 ##
+#: blackbutler is disabled; we no longer need it. It had in fact been dead since
+#: 2026-08-06 without anyone noticing: its `pix2tex` import dies on a
+#: torch/torchvision mismatch (`operator torchvision::nms does not exist`), so
+#: the uvicorn worker never finished starting and nothing listened on 7260. Only
+#: the reloader parent survived, which is why the tmux session looked alive and
+#: [agfi:butler-p] kept saying yes.
+#:
+#: Callers degrade on their own once this is false: [agfi:fsay2] falls back to
+#: [agfi:fsay].
+#:
+#: To re-enable: fix the torch/torchvision pair, set
+#: `blackbutler_disabled_p=''`, then [agfi:blackbutler-boot].
+blackbutler_disabled_p="${blackbutler_disabled_p-y}"
+##
 function butler-p {
+    if bool "$blackbutler_disabled_p" ; then
+        return 1
+    fi
+
     tmux ls |
         rg --smart-case --quiet blackbutler
 }
 ##
 function blackbutler-boot {
+    if bool "$blackbutler_disabled_p" ; then
+        ecgray "$0: blackbutler is disabled; skipping"
+        return 0
+    fi
+
     tmuxnew BlackButler zsh -c 'cdm ~/tmp/blackbutler && BLACKBUTLER_DEBUGME="$BLACKBUTLER_DEBUGME" blackbutler "${@[2,-1]}"'
 }
 ##
 function bb-say {
     local ret
+
+    if bool "$blackbutler_disabled_p" ; then
+        ecerr "$0: blackbutler is disabled"
+        return 1
+    fi
 
     ret="$(in-or-args "$@" |
         bb_say.dash |
