@@ -12,8 +12,7 @@ for f in \
     "${HOME}/.agents.local.md" \
     "${HOME}/.claude.local.md" \
     "${HOME}/.codex.local.md" \
-    "${HOME}/.gapcode.local.md" \
-    "${HOME}/.gemini.local.md" \
+    "${HOME}/.antigravity.local.md" \
     ; do
     if [ -e "${f}" ] ; then
         continue

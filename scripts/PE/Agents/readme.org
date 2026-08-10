@@ -72,7 +72,12 @@ untouched local file costs nothing.
 - claude --- =~/.claude/CLAUDE.md= (Claude Code reads =CLAUDE.md=, never
   =AGENTS.md=)
 - codex --- =~/.codex/AGENTS.md=
-- gemini --- =~/.gemini/AGENTS.md=, Antigravity's cross-tool global file
+- antigravity --- =~/.gemini/GEMINI.md=. The binary is =agy=; its state lives
+  under =~/.gemini/antigravity-cli/=, and
+  [[https://antigravity.google/docs/rules-workflows][the rules documentation]]
+  puts its global rules in =GEMINI.md= there. A *global* =AGENTS.md= is read by
+  nothing: for Antigravity that name is workspace-scoped only, alongside
+  =.agents/rules/=.
 
 gapcode is commented out of the list: it is not in use, and
 =~/.gapcode/AGENTS.md= is left wherever the last assembly put it.
@@ -80,9 +85,11 @@ gapcode is commented out of the list: it is not in use, and
 An agent whose directory does not exist on this host is skipped, so the same
 sync runs everywhere.
 
-Antigravity also honours a =GEMINI.md= tier that overrides =AGENTS.md=. It is
-unused: the per-agent layer is already in the assembly, and a second override
-file would just be somewhere else to look.
+Getting that target right took two corrections. =~/.gemini/= is shared with
+Google's separate =@google/gemini-cli=, whose binary really is =gemini=, and a
+directory name plus a content-farm search result is not evidence of what reads
+what. Check the vendor's own documentation, and the installed binary, before
+wiring a path.
 
 * Usage
 
