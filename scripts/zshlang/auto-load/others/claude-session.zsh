@@ -195,15 +195,19 @@ function h-claude-code-session-select-fz {
     ec "${session_file}"
 }
 
-function h-claude-code-view-session-fz {
-    #: Interactively selects a Claude Code session, converts it using the
-    #: given converter function, and opens the result in emacs.
+function h-claude-code-view-session {
+    #: Converts the given Claude Code session using the given converter
+    #: function, and opens the result in emacs.
+    #: Usage: h-claude-code-view-session <converter> <ext> <session-file>
     ##
     local converter="${1}"
     local ext="${2}"
+    local session_file="${3}"
 
-    local session_file
-    session_file="$(h-claude-code-session-select-fz)" @RET
+    if ! test -e "${session_file}" ; then
+        ecerr "$0: session file does not exist: ${session_file}"
+        return 1
+    fi
 
     local tmp_dir
     tmp_dir="$(gmktemp --directory)" @TRET
@@ -220,6 +224,27 @@ function h-claude-code-view-session-fz {
     "${converter}" "${session_file}" "${out_file}" @RET
 
     emc-open "${out_file}" @RET
+}
+
+function h-claude-code-view-session-fz {
+    #: Interactively selects a Claude Code session, converts it using the
+    #: given converter function, and opens the result in emacs.
+    ##
+    local converter="${1}"
+    local ext="${2}"
+
+    local session_file
+    session_file="$(h-claude-code-session-select-fz)" @RET
+
+    h-claude-code-view-session "${converter}" "${ext}" "${session_file}"
+}
+
+function claude-code-view-session {
+    #: Converts the given Claude Code session `.jsonl` to org-mode and opens
+    #: it in emacs. The non-interactive counterpart of
+    #: [agfi:claude-code-view-session-fz].
+    ##
+    h-claude-code-view-session h-claude-code-session-to-org org "${1}"
 }
 
 function claude-code-view-session-fz {
@@ -251,7 +276,161 @@ function claude-code-view-session-raw-fz {
 }
 #: Same, but selects from the sessions of all projects.
 aliasfn claude-code-view-session-raw-all-fz claude_code_view_session_fz_scope=all claude-code-view-session-raw-fz
+##
+#: Reading the session you are *sitting in* should not need a picker: several
+#: sessions often share a project directory, so "the newest one for this cwd"
+#: is not reliably the right one. Claude Code cannot bind a key to a shell
+#: command -- `keybindings.json` only takes a fixed action enum -- so the
+#: keypress lives in kitty, and the hooks below leave it a note saying which
+#: session runs in which window.
+##
+function h-claude-code-session-registry-dir {
+    #: Where [agfi:claude-code-session-register] records which Claude Code
+    #: session is running in which kitty window.
+    ##
+    ec "${claude_code_session_registry_dir:-${HOME}/tmp/claude-code-sessions}"
+}
 
+function h-claude-code-session-registry-key {
+    #: kitty numbers its windows from 1 again every time it restarts, so the
+    #: pid is what keeps a dead kitty's entries from being read as live ones.
+    #: Usage: h-claude-code-session-registry-key <kitty-window-id> <kitty-pid>
+    ##
+    local win="${1}" pid="${2}"
+
+    if test -z "${pid}" || test -z "${win}" ; then
+        return 1
+    fi
+
+    ec "${pid}-${win}"
+}
+
+function claude-code-session-register {
+    #: Records the calling Claude Code session's transcript path, keyed by the
+    #: kitty window it runs in, so [agfi:claude-code-view-session-focused] can
+    #: find it again. For Claude Code's `SessionStart` and `UserPromptSubmit`
+    #: hooks; the payload is JSON, taken from `$3` or from stdin.
+    #:
+    #: kitty's variables arrive as arguments rather than from the environment
+    #: because brish posts only the command and its stdin to the garden, so a
+    #: hook's environment does not survive the trip.
+    #: Usage: claude-code-session-register <kitty-window-id> <kitty-pid> [payload]
+    ##
+    local win="${1}" pid="${2}" input="${3}"
+
+    #: Not running under kitty (a server, a nested session): there is no window
+    #: to key on, and nothing there could press the hotkey either.
+    local key
+    key="$(h-claude-code-session-registry-key "${win}" "${pid}")" || return 0
+
+    if test -z "$input" && ! test -t 0 ; then
+        #: Bounded: an inherited pipe that never closes must not wedge the agent's hook.
+        input="$(gtimeout 2 cat)" || input=''
+    fi
+    test -n "$input" || return 0
+
+    local transcript
+    transcript="$(ec "$input" | jq -r '.transcript_path // empty' 2>/dev/null)" || return 0
+    test -n "$transcript" || return 0
+
+    local dir
+    dir="$(h-claude-code-session-registry-dir)" @RET
+    mkdir -p "$dir" @TRET
+
+    ec "$transcript" > "${dir}/${key}"
+}
+
+function claude-code-session-unregister {
+    #: Drops a kitty window's registry entry, for Claude Code's `SessionEnd`
+    #: hook. Entries already become unreachable when kitty restarts (the key
+    #: carries kitty's pid), so this is hygiene rather than correctness.
+    #: Usage: claude-code-session-unregister <kitty-window-id> <kitty-pid>
+    ##
+    local win="${1}" pid="${2}"
+
+    local key
+    key="$(h-claude-code-session-registry-key "${win}" "${pid}")" || return 0
+
+    local dir
+    dir="$(h-claude-code-session-registry-dir)" @RET
+
+    command rm -f "${dir}/${key}"
+}
+
+function h-claude-code-session-kitty-socket {
+    #: The kitty instance to talk to.
+    #:
+    #: `KITTY_LISTEN_ON` is only trusted if it still points at a live socket:
+    #: brish's shells outlive kitty, so the garden holds whatever value was in
+    #: the environment the day it was started, which goes stale the moment
+    #: kitty restarts. The glob is both the fallback and the common path.
+    ##
+    if [[ "${KITTY_LISTEN_ON}" == unix:* ]] && test -e "${KITTY_LISTEN_ON#unix:}" ; then
+        ec "${KITTY_LISTEN_ON}"
+        return 0
+    fi
+
+    #: Matches `listen_on` in =configFiles/kitty/kitty.conf=; kitty appends its pid.
+    local socks=( ${~${claude_code_session_kitty_socket_glob:-${HOME}/tmp/.kitty-*}}(N) )
+    if (( ${#socks} != 1 )) ; then
+        ecerr "$0: expected exactly one kitty socket, found ${#socks}"
+        return 1
+    fi
+
+    ec "unix:${socks[1]}"
+}
+
+function h-claude-code-session-lost {
+    #: The hotkey runs detached, so stderr goes nowhere a person will look.
+    ##
+    ecerr "claude-code-view-session-focused: ${1}"
+    silence notif "Claude session: ${1}"
+    return 1
+}
+
+function claude-code-view-session-focused {
+    #: Opens the Claude Code session running in the focused kitty window as an
+    #: org file in emacs. Bound to a kitty hotkey; the window -> session
+    #: mapping comes from [agfi:claude-code-session-register].
+    ##
+    ensure-cmd kitty jq @RET
+
+    local sock
+    sock="$(h-claude-code-session-kitty-socket)" @RET
+
+    local ls_json
+    ls_json="$(kitty @ --to "${sock}" ls)" @RET
+
+    local win
+    win="$(ec "${ls_json}" | jq -r 'first(.[] | select(.is_focused) | .tabs[] | select(.is_focused) | .windows[] | select(.is_focused) | .id) // empty')" @RET
+
+    #: `unix:/Users/evar/tmp/.kitty-527` -> `527`; greedy, so dashes in the
+    #: path do not matter.
+    local pid="${sock##*-}"
+
+    local key
+    if ! key="$(h-claude-code-session-registry-key "${win}" "${pid}")" ; then
+        h-claude-code-session-lost "could not identify the focused kitty window"
+        return 1
+    fi
+
+    local entry
+    entry="$(h-claude-code-session-registry-dir)/${key}" @RET
+    if ! test -e "${entry}" ; then
+        h-claude-code-session-lost "no Claude Code session registered for this window"
+        return 1
+    fi
+
+    local session_file
+    session_file="$(cat "${entry}")" @TRET
+    if ! test -e "${session_file}" ; then
+        h-claude-code-session-lost "session transcript is gone: ${session_file}"
+        return 1
+    fi
+
+    claude-code-view-session "${session_file}"
+}
+##
 function claude-session-selftest {
     #: Runs the renderer's Go tests, then checks its parallel pandoc path
     #: against a single pandoc run over every local session transcript.

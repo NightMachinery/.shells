@@ -280,6 +280,10 @@ message bodies are handed to pandoc.
   emacs.
 - =claude-code-view-session-md-fz= --- same, as markdown.
 - =claude-code-view-session-raw-fz= --- open the original =.jsonl=.
+- =claude-code-view-session= --- the same as the first, for a session path you
+  already have. No picker.
+- =claude-code-view-session-focused= --- open the session running in the
+  focused kitty window. See below.
 - =claude-session-selftest= --- run the Go tests and the corpus parity check.
 
 Each viewer has a =-all-fz= variant that selects from every project's sessions
@@ -295,3 +299,57 @@ Variables:
 - =claude_code_session_max_block_lines= --- passed to =-max-block-lines=.
 - =claude_code_session_diff_p= --- =n= disables diff rendering for =Edit=.
 - =claude_code_session_subagents_p= --- =n= stops inlining subagent transcripts.
+
+* Reading the session you are in
+
+Picking from a list is the wrong tool when you are already inside the session
+you want to read: several sessions routinely share a project directory, so
+"newest for this cwd" is not reliably the right one. =cmd+shift+o= in kitty
+opens the session running in the focused window.
+
+Claude Code cannot do this by itself. Its =~/.claude/keybindings.json= takes
+only a fixed action enum --- =chat:submit=, =app:toggleTranscript= and the
+like --- with no action that runs a shell command and no way to bind a slash
+command. So the keypress lives in kitty, and hooks leave it a note saying which
+session is running where.
+
+The write side is =claude-code-session-register=, wired to Claude Code's
+=SessionStart= and =UserPromptSubmit= hooks in
+=configFiles/claude-code/settings.json=. Every hook event receives
+=transcript_path= on stdin; the function records it in a registry file under
+=~/tmp/claude-code-sessions/=, named =<kitty-pid>-<kitty-window-id>=. kitty
+numbers its windows from 1 again on every restart, so the pid is what stops a
+dead kitty's entries from being read as live ones. =SessionEnd= runs
+=claude-code-session-unregister=; that is hygiene rather than correctness.
+
+kitty exports =KITTY_WINDOW_ID= and =KITTY_PID= into each window's shell, and
+=claude= passes them down to its hook subprocesses. They reach the function as
+*arguments*, not through the environment: brish posts only the command and its
+stdin to the garden, so a hook's environment does not survive the trip.
+
+The read side is =claude-code-view-session-focused=, bound in
+=configFiles/kitty/kitty.conf=. It asks =kitty @ ls= which window is focused,
+reads that window's registry entry, and hands the transcript to
+=claude-code-view-session=. It notifies rather than printing on failure,
+because the hotkey runs detached and stderr goes nowhere a person will look.
+
+Two things that are easy to get wrong here:
+
+- kitty's own =PATH= is just =/usr/bin:/bin:/usr/sbin:/sbin=, so the binding
+  needs an absolute path to =brishz.dash=. It cannot use =brishz2.dash=, whose
+  quoting path needs a =jq= that is not on that =PATH= either. The command is a
+  bare function name, so the unquoted path is safe.
+- =KITTY_LISTEN_ON= is only trusted when it still points at a live socket.
+  Brish's shells outlive kitty, so the garden holds whatever value was in the
+  environment the day it started, which goes stale the moment kitty restarts.
+  Otherwise the socket comes from globbing =~/tmp/.kitty-*=, which matches
+  =listen_on= in =configFiles/kitty/kitty.conf=.
+
+Remember =brishz-restart= after changing any of this: the garden keeps
+persistent shells and will otherwise go on running the old code.
+
+Variables:
+
+- =claude_code_session_registry_dir= --- defaults to
+  =~/tmp/claude-code-sessions=.
+- =claude_code_session_kitty_socket_glob= --- defaults to =~/tmp/.kitty-*=.
