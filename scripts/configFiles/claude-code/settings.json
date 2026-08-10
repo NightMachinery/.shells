@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$KITTY_WINDOW_ID\" \"$KITTY_PID\" >/dev/null 2>&1"
+            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$$\" >/dev/null 2>&1"
           }
         ]
       }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$KITTY_WINDOW_ID\" \"$KITTY_PID\" >/dev/null 2>&1"
+            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$$\" >/dev/null 2>&1"
           }
         ]
       }
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "brishz2.dash claude-code-session-unregister \"$KITTY_WINDOW_ID\" \"$KITTY_PID\" >/dev/null 2>&1"
+            "command": "brishz2.dash claude-code-session-unregister \"$$\" >/dev/null 2>&1"
           }
         ]
       }
