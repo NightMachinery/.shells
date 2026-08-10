@@ -116,3 +116,72 @@ function macos-ventura-or-higher-p {
     (( v >= 13 ))
 }
 ##
+function app-icon-get {
+    #: @warn Keep backticks out of the `:` docstrings; they are double-quoted, so zsh
+    #: runs command substitution on them.
+    : "outputs the path to a cached PNG of <app>'s icon, extracting it on first use
+
+<app> is an app name or a path, e.g. app-icon-get Claude"
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    local app="${1}"
+    assert-args app @RET
+
+    if [[ "$app" != /* ]] ; then
+        app="/Applications/${app%.app}.app"
+    fi
+    test -d "$app" || {
+        ecerr "$0: no such app: ${app}"
+        return 1
+    }
+
+    local cache_dir="${HOME}/tmp/app-icons"
+    local out="${cache_dir}/${${app:t:r}// /_}.png"
+    if test -s "$out" ; then
+        ec "$out"
+        return 0
+    fi
+
+    local icns="${app}/Contents/Resources/$(defaults read "${app}/Contents/Info" CFBundleIconFile 2>/dev/null)"
+    #: CFBundleIconFile is allowed to omit the extension.
+    [[ "$icns" == *.icns ]] || icns="${icns}.icns"
+    test -e "$icns" || {
+        ecerr "$0: could not find an icns for: ${app}"
+        return 1
+    }
+
+    mkdir -p "$cache_dir" @RET
+
+    local tmp
+    tmp="$(gmktemp -d)" @TRET
+    {
+        #: sips also converts icns, but picks an arbitrary (often tiny) representation.
+        iconutil -c iconset "$icns" -o "$tmp/i.iconset" @RET
+
+        local best='' candidate
+        #: 256px is plenty for a notification; the 1024px @2x representation is a
+        #: ~750KB file for no visible gain.
+        for candidate in icon_256x256.png icon_512x512.png icon_128x128.png ; do
+            if test -s "$tmp/i.iconset/${candidate}" ; then
+                best="$tmp/i.iconset/${candidate}"
+                break
+            fi
+        done
+        if test -z "$best" ; then
+            best="$(command ls "$tmp/i.iconset"/*.png(N) 2>/dev/null | gtail -n 1)"
+        fi
+        test -n "$best" || {
+            ecerr "$0: the iconset came out empty for: ${app}"
+            return 1
+        }
+
+        command cp "$best" "$out" @RET
+    } always {
+        command rm -rf "$tmp"
+    }
+
+    ec "$out"
+}
+##
