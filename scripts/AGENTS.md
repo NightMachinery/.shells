@@ -32,6 +32,23 @@ calls before opening. Names come from [agfi:aliasdir]; useful ones are `nt`
 form `~cod/php/php_playground` works too and needs no escaping. Both appear
 in the notes; the bracketed form is the more common one.
 
+**Fuzzy names resolve too, but they are not portable.** When a name is not a
+registered `aliasdir`, [agfi:zsh_directory_name_1] falls back to
+[agfi:ffz-get], a frecency lookup over recently used directories — so
+`~[fair]/` finds the FairGrad paper directory with no alias defined. Handy
+interactively, but it depends on a *machine-local* database. Measured:
+
+```
+                laptop                                   beta.cis.lmu.de
+~[fair]/   ->   /Users/evar/code/uni/papers/FairGrad/    <unresolved>
+~[cod]/    ->   /Users/evar/code/                        /mounts/Users/cisintern/feraidoon/code/
+~[nt]/     ->   /Users/evar/notes/                       /mounts/Users/cisintern/feraidoon/notes/
+```
+
+So for a link that is meant to last, use a registered name plus the explicit
+path (`~[cod]/uni/papers/FairGrad/`): it resolves on every host, and to that
+host's own path. Reserve the fuzzy form for throwaway or interactive use.
+
 Why, rather than `[[file:../../../foo]]`:
 
 - Counting `../` across trees is easy to get wrong and fails silently — org
