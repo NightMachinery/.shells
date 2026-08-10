@@ -555,15 +555,65 @@ def parse_poll_arguments(arguments):
     return poll_data
 
 
+class SendFailed(Exception):
+    """Raised when a send has definitively failed, so the caller can exit non-zero."""
+
+
+def is_permanent_error(e):
+    """True for errors that no amount of retrying will fix.
+
+    Retrying these used to burn max_retries * sleep seconds in complete silence
+    before giving up (and then still exiting 0)."""
+    if isinstance(e, ValueError):
+        #: Telethon raises a bare ValueError ("Could not find the input entity for
+        #: ...") when a peer cannot be resolved at all. Retrying never helps; the
+        #: caller tries a cache refresh once first, and gives up if that fails too.
+        return True
+
+    return type(e).__name__ in (
+        "ChannelInvalidError",
+        "ChannelPrivateError",
+        "PeerIdInvalidError",
+        "ChatWriteForbiddenError",
+        "UserIsBlockedError",
+        "InputUserDeactivatedError",
+    )
+
+
+async def refresh_entity(client, receiver, verbosity=1):
+    """Re-resolve `receiver` against the server and refresh the session's entity cache.
+
+    Telethon caches an access_hash per entity in the session database, and access
+    hashes are per-account. A hash left over from a different account (or an old
+    login) makes the server answer CHANNEL_INVALID forever, even though the peer is
+    perfectly reachable. Asking for the entity re-resolves it and writes the correct
+    hash back."""
+    try:
+        entity = await client.get_entity(receiver)
+        if verbosity >= 1:
+            print(
+                f"Refreshed stale entity cache for {receiver}.", file=sys.stderr
+            )
+        return entity
+    except Exception as e:
+        if verbosity >= 1:
+            print(f"Could not re-resolve {receiver}: {e}", file=sys.stderr)
+        return None
+
+
 async def handle(e, attempt, max_retries, verbosity):
+    #: Errors are surfaced at the default verbosity. They used to be visible only at
+    #: `-vv`, which turned a permanent failure into a silent multi-minute stall.
+    print(f"Error sending (attempt {attempt + 1}/{max_retries}): {e}", file=sys.stderr)
     if verbosity >= 2:
-        print(f"Error sending (attempt {attempt + 1}): {e}")
+        traceback.print_exc()
 
     if attempt == max_retries - 1:  # if it's the last attempt
-        if verbosity >= 1:
-            print(f"Failed after {max_retries} attempts.")
+        print(f"Failed after {max_retries} attempts.", file=sys.stderr)
     else:
-        await asyncio.sleep(10)
+        #: Exponential backoff, capped. A flat 10s * 30 attempts meant a five-minute
+        #: hang for a caller that just wanted to post a notification.
+        await asyncio.sleep(min(2 ** attempt, 30))
 
 
 async def discreet_send(
@@ -576,7 +626,7 @@ async def discreet_send(
     reply_to=None,
     link_preview=False,
     album_mode=True,
-    max_retries=30,
+    max_retries=5,
     verbosity=1,
 ):
     if file and len(file) > 1 and album_mode == False:
@@ -604,6 +654,8 @@ async def discreet_send(
 
     if len(message) == 0:
         if file:
+            sent = False
+            refreshed = False
             for attempt in range(max_retries):
                 try:
                     last_msg = await client.send_file(
@@ -613,11 +665,28 @@ async def discreet_send(
                         allow_cache=False,
                         force_document=force_document,
                     )
+                    sent = True
                     break
                 except Exception as e:
-                    traceback.print_exc()
-                    print(f"Error while sending file (attempt {attempt + 1}/{max_retries})", file=sys.stderr)
+                    if is_permanent_error(e) and not refreshed:
+                        #: Most likely a stale access_hash; re-resolve once and retry.
+                        refreshed = True
+                        entity = await refresh_entity(client, receiver, verbosity)
+                        if entity is not None:
+                            receiver = entity
+                            continue
+
+                    if is_permanent_error(e):
+                        raise SendFailed(
+                            f"Cannot send file to {receiver}: {type(e).__name__}: {e}"
+                        ) from e
+
                     await handle(e, attempt, max_retries, verbosity)
+
+            if not sent:
+                raise SendFailed(
+                    f"Failed to send file to {receiver} after {max_retries} attempts."
+                )
 
         return last_msg
     else:
@@ -625,7 +694,9 @@ async def discreet_send(
         if length <= 12000:
             s = 0
             e = 4000
+            refreshed = False
             while length > s:
+                sent = False
                 for attempt in range(max_retries):
                     try:
                         last_msg = await client.send_message(
@@ -637,10 +708,32 @@ async def discreet_send(
                             link_preview=link_preview,
                             reply_to=(last_msg),
                         )
+                        sent = True
                         break
 
                     except Exception as err:
+                        if is_permanent_error(err) and not refreshed:
+                            #: Most likely a stale access_hash in the session's entity
+                            #: cache; re-resolve once and retry before giving up.
+                            refreshed = True
+                            entity = await refresh_entity(client, receiver, verbosity)
+                            if entity is not None:
+                                receiver = entity
+                                continue
+
+                        if is_permanent_error(err):
+                            raise SendFailed(
+                                f"Cannot send to {receiver}: {type(err).__name__}: {err}"
+                            ) from err
+
                         await handle(err, attempt, max_retries, verbosity)
+
+                if not sent:
+                    #: Previously this fell through silently and the loop just advanced
+                    #: to the next chunk, so tsend exited 0 having sent nothing.
+                    raise SendFailed(
+                        f"Failed to send to {receiver} after {max_retries} attempts."
+                    )
 
                 s = e
                 e = s + 4000
@@ -1108,7 +1201,12 @@ async def tsend(arguments):
                     )
 
             finally:
-                await client.disconnect()
+                #: Telethon returns None from disconnect() when it is already
+                #: disconnected, and `await None` raises TypeError -- which used to
+                #: bury the real error under a confusing traceback.
+                disconnected = client.disconnect()
+                if disconnected is not None:
+                    await disconnected
 
     finally:
         if lock:
@@ -1130,4 +1228,10 @@ if __name__ == "__main__":
 
     # loop = asyncio.get_event_loop()
     loop = asyncio.new_event_loop()
-    loop.run_until_complete(tsend(arguments))
+    try:
+        loop.run_until_complete(tsend(arguments))
+    except SendFailed as e:
+        #: Exit non-zero so callers can actually detect a failed send. This used to
+        #: exit 0 no matter what, which is why a broken destination went unnoticed.
+        print(f"tsend: {e}", file=sys.stderr)
+        sys.exit(1)
