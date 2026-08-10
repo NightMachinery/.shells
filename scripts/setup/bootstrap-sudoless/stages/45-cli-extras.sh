@@ -6,6 +6,9 @@
 #: These are the ones that actually broke a real command line on beta:
 #:   fribidi  -- `l` (the ls wrapper) pipes through `fribidi --nobreak`
 #:   redis    -- brishzq/history machinery connects to 127.0.0.1:6379
+#:   socat    -- [agfi:pbcopy-remote] forwards the clipboard over the ssh
+#:               tunnel with `socat - tcp:127.0.0.1:6030'. Without it every
+#:               copy from the server dies with CNOTFOUND.
 #: The rest are the long tail from setup/brewables and setup/installables that
 #: conda-forge carries as prebuilt binaries.
 
@@ -22,6 +25,7 @@ have micromamba || die "stage 40 (micromamba) must run first"
 night_conda_tools='
 fribidi
 redis-server
+socat
 pandoc
 aria2
 ncdu
