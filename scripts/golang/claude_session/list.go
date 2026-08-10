@@ -308,12 +308,13 @@ func parseRecord(line string) (record, bool) {
 	return rec, true
 }
 
-// Claude Code names a session with a slug like `sharded-bouncing-clarke`,
-// repeated on every record once assigned and never contradicted within a file.
-// Older sessions predate the feature and have none.
-func cmdSlug(argv []string) {
+// Claude Code names a session three ways, in increasing order of authority: a
+// generated slug like `sharded-bouncing-clarke`, an `ai-title` summarising the
+// work, and a `custom-title` the user set. Sessions predating the feature have
+// none, in which case the caller falls back to the uuid.
+func cmdName(argv []string) {
 	if len(argv) == 0 {
-		fatal("slug: no input file given")
+		fatal("name: no input file given")
 	}
 
 	fh, err := os.Open(argv[0])
@@ -322,24 +323,36 @@ func cmdSlug(argv []string) {
 	}
 	defer fh.Close()
 
-	if s := sessionSlug(fh); s != "" {
+	if s := sessionName(fh); s != "" {
 		fmt.Println(s)
 	}
 }
 
-func sessionSlug(fh *os.File) string {
+func sessionName(fh *os.File) string {
 	sc := bufio.NewScanner(fh)
 	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
 
-	read := 0
+	var slug, aiTitle, customTitle string
 	for sc.Scan() {
-		line := sc.Text()
-		read += len(line) + 1
-		if read > headWindow {
-			return ""
+		rec, ok := parseRecord(sc.Text())
+		if !ok {
+			continue
 		}
-		if rec, ok := parseRecord(line); ok && rec.Slug != "" {
-			return rec.Slug
+		// Titles can be revised during a session, so the last one wins; a slug
+		// never changes, so the first is as good as any.
+		switch {
+		case rec.CustomTitle != "":
+			customTitle = rec.CustomTitle
+		case rec.AITitle != "":
+			aiTitle = rec.AITitle
+		case rec.Slug != "" && slug == "":
+			slug = rec.Slug
+		}
+	}
+
+	for _, s := range []string{customTitle, aiTitle, slug} {
+		if s != "" {
+			return s
 		}
 	}
 	return ""

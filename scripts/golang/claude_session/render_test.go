@@ -171,3 +171,19 @@ func TestOrgBlockUsesExampleWithoutLanguage(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestShortModel(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"claude-opus-5", "opus-5"},
+		{"claude-fable-5", "fable-5"},
+		{"claude-sonnet-5", "sonnet-5"},
+		{"claude-haiku-4-5-20251001", "haiku-4.5"},
+		{"<synthetic>", "synthetic"},
+		{"", ""},
+		{"something-unexpected", "something-unexpected"},
+	} {
+		if got := shortModel(c.in); got != c.want {
+			t.Errorf("shortModel(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

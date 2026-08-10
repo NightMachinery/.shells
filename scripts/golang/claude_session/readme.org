@@ -48,6 +48,22 @@ stdout. Flags:
 - =-jobs N= --- worker count, defaulting to the CPU count.
 - =-pandoc PATH= --- the pandoc binary to use for =org-pandoc=.
 
+=claude_session name <session.jsonl>= prints the session's name, or nothing if
+it has none. Claude Code names a session three ways, in increasing order of
+authority: a generated slug like =sharded-bouncing-clarke=, an =ai-title=
+summarising the work (=fix-org-store-link-title=), and a =custom-title= the
+user set (=Neru=). Titles can be revised during a session, so the last wins; a
+slug never changes. 39 of 52 local sessions have a slug and 27 have a title;
+the rest predate the features and fall back to their uuid.
+
+The org header uses it, and so does the filename the viewers write, so a
+session opens in emacs as =Neru.org= rather than a uuid:
+
+#+begin_example
+,#+TITLE: Neru
+,#+SUBTITLE: Claude Code session 3e500e15-2d94-44c6-bac4-4d6634c743f6
+#+end_example
+
 =claude_session list [flags] <sessions-dir>= walks the directory for =.jsonl=
 files and writes one TSV line per session, newest first: =epoch=, absolute
 path, local time, path relative to the scanned directory, and the first user
@@ -92,6 +108,20 @@ per conversational turn:
 
 A result that is a single line of 72 characters or fewer goes on its heading
 rather than into a block; an empty one reads =Result: (no output)=.
+
+Assistant turns carry the model that produced them, shortened for repetition:
+=opus-5=, =fable-5=, =haiku-4.5=, and =synthetic= for the messages Claude Code
+writes itself, such as interruption notices. Merging stops at a model change,
+so a switch mid-answer starts a new heading instead of hiding inside one --- 8
+of 52 local sessions use more than one model, and 3 of 297 merged turns would
+otherwise have spanned two. Annotating sub-headings instead was the
+alternative, but a plain text block has no heading to annotate, so a switch
+landing there would go unrecorded.
+
+Recaps --- the summaries Claude Code writes when you step away, stored as
+=system= records with subtype =away_summary= rather than as messages --- render
+as a =** Recap= section of the turn they interrupt. 26 of 52 local sessions
+have at least one.
 
 * Subagents
 

@@ -157,3 +157,23 @@ func fatal(msg string) {
 	fmt.Fprintln(os.Stderr, "claude_session: "+msg)
 	os.Exit(1)
 }
+
+// Model ids as they read in a heading: the `claude-` prefix and the build date
+// are noise when repeated on every turn, and a dotted version is easier on the
+// eye than a dashed one. `<synthetic>` marks a message Claude Code wrote
+// itself, such as an interruption notice, rather than a model.
+var modelRe = regexp.MustCompile(`^(?:claude-)?([a-z]+)-([0-9](?:-[0-9]{1,3})*)(?:-[0-9]{8})?$`)
+
+func shortModel(model string) string {
+	switch model {
+	case "":
+		return ""
+	case "<synthetic>":
+		return "synthetic"
+	}
+
+	if m := modelRe.FindStringSubmatch(model); m != nil {
+		return m[1] + "-" + strings.ReplaceAll(m[2], "-", ".")
+	}
+	return strings.TrimPrefix(model, "claude-")
+}
