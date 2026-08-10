@@ -32,9 +32,13 @@ function h-agents-md-parts {
     #: every agent, every host
     ec "${dir}/AGENTS.md"
     ec "${private_dir}/AGENTS.md"
-    #: this agent, every host
-    ec "${dir}/${agent}.md"
-    ec "${private_dir}/${agent}.md"
+    #: this agent, every host.
+    #: `agent-` prefixed because a bare `claude.md` is the same file as
+    #: `CLAUDE.md` on a case-insensitive filesystem, and Claude Code would
+    #: discover this source as a nested project memory and load the tier
+    #: twice -- on macOS only, so the two would also disagree per host.
+    ec "${dir}/agent-${agent}.md"
+    ec "${private_dir}/agent-${agent}.md"
     #: every agent, this host
     ec "${dir}/hosts/${host}.md"
     ec "${private_dir}/hosts/${host}.md"
