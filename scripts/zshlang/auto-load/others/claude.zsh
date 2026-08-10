@@ -19,10 +19,14 @@ function claude {
     local -x CLAUDE_CODE_DEBUG_LOG_LEVEL=verbose
 
 
+    #: Keeps ~/.claude/CLAUDE.md current with its sources.
+    agents-md-sync @RET
+
     tty-title "🍼${PWD:t}"
 
     $proxyenv command claude "$@"
 }
+aliasfn claude-m claude
 ##
 function claude-autocommit {
     local -x ANTHROPIC_MODEL="sonnet"
@@ -64,7 +68,7 @@ function claude-pioneer {
     claude "$@"
 }
 
-aliasfn claude-m claude-pioneer
+# aliasfn claude-m claude-pioneer
 ##
 function claude-freemodel {
     local -x ANTHROPIC_AUTH_TOKEN="${freemodel_api_key}"
