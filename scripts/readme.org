@@ -49,3 +49,8 @@ Known conversion problems and their filters are documented per-issue:
 * ntag
 
 ntag notes are tracked in =./docs/ntag/=.
+
+* Bells
+
+=bell-auto= escalates from sound to a desktop notification to Telegram, and picks
+its behaviour from whether we are at the office. See =./docs/bell-auto.md=.
