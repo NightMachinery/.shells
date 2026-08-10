@@ -20,6 +20,11 @@ So every endpoint now requires an API key.
 One file per service, `~/.keys/<service>`: `brishgarden`, `blackbutler`,
 `jupytergarden`. The directory is `0700` and each file is `0600`.
 
+Only BrishGarden actually runs today. JupyterGarden is not installed, and
+blackbutler is disabled — see `blackbutler_disabled_p` in
+`zshlang/auto-load/others/blackbutler.zsh`. Both are wired up regardless, so
+whichever comes back does so with a key already required.
+
 Per-service rather than one shared key, so that rotating or leaking one does not
 touch the others, and so each server can generate its own without coordinating.
 
