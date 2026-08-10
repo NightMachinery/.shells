@@ -162,6 +162,46 @@ else
 fi
 
 ##
+#: --- antigravity (agy) ---
+#: [agfi:antigravity] runs `agy'; see PE/Agents/readme.org.
+#:
+#: @warn Its installer ends by running `agy install', which appends a PATH
+#: line to ~/.profile. That is wrong for us twice over: ~/.profile is tracked
+#: by vcsh, so it silently dirties the repo, and the line it writes hardcodes
+#: an ABSOLUTE path ($HOME expanded on the machine that ran it) into a file
+#: shared with every other host -- including the laptop, where that path does
+#: not exist. NIGHT_BIN is already on PATH via the env contract, so the line
+#: is redundant as well as harmful. There is no flag to suppress it, so undo
+#: it afterwards.
+if have agy && [ -z "${NIGHT_BOOTSTRAP_FORCE:-}" ] ; then
+    ok "agy present ($(agy --version 2>/dev/null | head -1))"
+elif ! have bash ; then
+    warn "antigravity's installer needs bash, which is not on PATH"
+else
+    log "installing antigravity (agy)"
+    agy_installer="${NIGHT_LOCAL_CACHE:-/tmp}/agy-install.sh"
+    agy_profile="${HOME}/.profile"
+    agy_profile_before=''
+    [ -f "${agy_profile}" ] && agy_profile_before="$(cat "${agy_profile}")"
+
+    if fetch "https://antigravity.google/cli/install.sh" "${agy_installer}" ; then
+        run_soft bash "${agy_installer}" --dir "${NIGHT_BIN}"
+        rm -f "${agy_installer}"
+
+        #: Restore ~/.profile only if the sole change is the installer's own
+        #: block; anything else in there is not ours to revert.
+        if [ -f "${agy_profile}" ] && \
+           grep -q 'Added by Antigravity CLI installer' "${agy_profile}" 2>/dev/null
+        then
+            printf '%s\n' "${agy_profile_before}" > "${agy_profile}"
+            ok "reverted the PATH line antigravity appended to ~/.profile"
+        fi
+    else
+        warn "could not download the antigravity installer"
+    fi
+fi
+
+##
 #: --- llm (Simon Willison's) ---
 #: Python, so it gets its own uv-managed venv rather than a release binary.
 #: python/requirements.txt pins the plugin set: llm and llm-gemini.
@@ -194,4 +234,5 @@ fi
 dim "claude:   $(command -v claude   2>/dev/null || echo '-')"
 dim "codex:    $(command -v codex    2>/dev/null || echo '-')"
 dim "opencode: $(command -v opencode 2>/dev/null || echo '-')"
+dim "agy:      $(command -v agy      2>/dev/null || echo '-')"
 dim "llm:      $(command -v llm      2>/dev/null || echo '-')"
