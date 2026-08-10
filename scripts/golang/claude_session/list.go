@@ -307,3 +307,40 @@ func parseRecord(line string) (record, bool) {
 	}
 	return rec, true
 }
+
+// Claude Code names a session with a slug like `sharded-bouncing-clarke`,
+// repeated on every record once assigned and never contradicted within a file.
+// Older sessions predate the feature and have none.
+func cmdSlug(argv []string) {
+	if len(argv) == 0 {
+		fatal("slug: no input file given")
+	}
+
+	fh, err := os.Open(argv[0])
+	if err != nil {
+		fatal(err.Error())
+	}
+	defer fh.Close()
+
+	if s := sessionSlug(fh); s != "" {
+		fmt.Println(s)
+	}
+}
+
+func sessionSlug(fh *os.File) string {
+	sc := bufio.NewScanner(fh)
+	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
+
+	read := 0
+	for sc.Scan() {
+		line := sc.Text()
+		read += len(line) + 1
+		if read > headWindow {
+			return ""
+		}
+		if rec, ok := parseRecord(line); ok && rec.Slug != "" {
+			return rec.Slug
+		}
+	}
+	return ""
+}

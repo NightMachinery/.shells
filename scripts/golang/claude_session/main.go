@@ -25,6 +25,7 @@ const (
 
 type record struct {
 	Type      string   `json:"type"`
+	Slug      string   `json:"slug"`
 	IsMeta    bool     `json:"isMeta"`
 	Timestamp string   `json:"timestamp"`
 	Message   *message `json:"message"`
@@ -56,6 +57,8 @@ func main() {
 		cmdRender(os.Args[2:])
 	case "list":
 		cmdList(os.Args[2:])
+	case "slug":
+		cmdSlug(os.Args[2:])
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -68,6 +71,7 @@ func usage() {
 	fmt.Fprint(os.Stderr, `usage:
   claude_session render [flags] <session.jsonl>   #: transcript -> markdown/org on stdout
   claude_session list   [flags] <sessions-dir>    #: TSV of sessions, newest first
+  claude_session slug           <session.jsonl>   #: session name, empty if unnamed
 
 render flags:
   -format md|org|org-pandoc   output syntax (default md). org-pandoc pipes the
