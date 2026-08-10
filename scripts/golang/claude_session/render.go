@@ -170,19 +170,48 @@ type turn struct {
 	ts     string
 	model  string
 	blocks []timedBlock
+
+	// Overrides the role-derived heading, for turns that are an event rather
+	// than somebody speaking.
+	heading string
+	// Trailing detail, after the timestamp.
+	note string
+	// How long the turn took, when the transcript says so.
+	duration time.Duration
 }
 
-// The records that make up the conversation: the messages, plus the recaps
+// The records that make up the conversation: the messages, plus the events
 // that punctuate them.
+//
+// Everything else in a transcript is bookkeeping and stays out: `mode`,
+// `permission-mode`, `agent-name`/`agent-color`/`agent-setting`,
+// `bridge-session`, `file-history-snapshot`/`-delta`, and `last-prompt`, which
+// only repeats the message next to it. `queue-operation` is left out for a
+// subtler reason: half of what gets enqueued is delivered and so already shows
+// up as an ordinary user message, and the other half was withdrawn before it
+// was ever sent. Most `attachment` payloads are harness internals
+// (`task_reminder`, `skill_listing`, `deferred_tools_delta`); only a file you
+// edited yourself says anything about the conversation.
 func conversationRecords(all []record) []record {
 	var out []record
 	for _, rec := range all {
-		switch {
-		case rec.Type == "user" || rec.Type == "assistant":
+		switch rec.Type {
+		case "user", "assistant":
 			if rec.IsMeta {
 				continue
 			}
-		case rec.Type == "system" && rec.Subtype == recapSubtype:
+		case "system":
+			switch rec.Subtype {
+			case subtypeRecap, subtypeCompact, subtypeCommand, subtypeInfo,
+				subtypeFallback, subtypeDuration:
+			default:
+				continue
+			}
+		case "pr-link":
+		case "attachment":
+			if rec.Attachment == nil || rec.Attachment.Type != "edited_text_file" {
+				continue
+			}
 		default:
 			continue
 		}
@@ -238,18 +267,8 @@ func buildTurns(records []record, blocks [][]block, results map[string]toolResul
 	var turns []turn
 
 	for i, rec := range records {
-		// A recap belongs to the turn it interrupts, as a section of it.
-		if rec.Type == "system" {
-			var text string
-			if err := json.Unmarshal(rec.Content, &text); err != nil || strings.TrimSpace(text) == "" {
-				continue
-			}
-			tb := timedBlock{b: block{Type: "recap", Text: text}, ts: rec.Timestamp}
-			if n := len(turns); n > 0 {
-				turns[n-1].blocks = append(turns[n-1].blocks, tb)
-			} else {
-				turns = append(turns, turn{role: "assistant", ts: rec.Timestamp, blocks: []timedBlock{tb}})
-			}
+		if rec.Type != "user" && rec.Type != "assistant" {
+			turns = appendEvent(turns, rec)
 			continue
 		}
 
@@ -477,16 +496,25 @@ func (r *renderer) renderTurn(t turn) {
 	for _, tb := range t.blocks {
 		body.renderBlock(tb)
 	}
-	if strings.TrimSpace(body.out.String()) == "" {
+	if strings.TrimSpace(body.out.String()) == "" && t.heading == "" {
 		return
 	}
 
-	title := strings.ToUpper(t.role[:1]) + t.role[1:]
+	title := t.heading
+	if title == "" {
+		title = strings.ToUpper(t.role[:1]) + t.role[1:]
+	}
 	if ts := humanTimestamp(t.ts); ts != "" {
 		title += " " + ts
 	}
 	if m := shortModel(t.model); m != "" {
 		title += " · " + m
+	}
+	if d := shortDuration(t.duration); d != "" {
+		title += " · " + d
+	}
+	if t.note != "" {
+		title += " · " + t.note
 	}
 	r.heading(1, title)
 	r.out.WriteString(body.out.String())
@@ -551,9 +579,24 @@ func (r *renderer) renderBlock(tb timedBlock) {
 		}
 		r.prose(b.Text, 1)
 
-	case "recap":
-		r.heading(2, "Recap"+r.stamp(tb.ts))
+	case "notice":
+		r.heading(2, b.Name+r.stamp(tb.ts))
 		r.prose(b.Text, 2)
+
+	case "command":
+		r.heading(2, "Command: "+b.Text+r.stamp(tb.ts))
+
+	case "pr":
+		r.heading(2, "Pull request "+b.Name+r.stamp(tb.ts))
+		if b.Text != "" {
+			r.link(b.Text)
+		}
+
+	case "file-edit":
+		r.heading(2, "Edited outside the session · "+abbrevHome(b.Name)+r.stamp(tb.ts))
+		if strings.TrimSpace(b.Text) != "" {
+			r.block("", b.Text)
+		}
 
 	case "thinking":
 		if strings.TrimSpace(b.Thinking) == "" {
@@ -857,4 +900,99 @@ func toolHeadline(name string, in map[string]json.RawMessage) string {
 	}
 
 	return ""
+}
+
+// Everything in a transcript that is neither a message nor bookkeeping: the
+// recaps, notices, slash commands, compaction boundaries, pull requests and
+// externally edited files. Each attaches to the turn it interrupts, except a
+// compaction, which separates two phases of the conversation and so stands on
+// its own.
+func appendEvent(turns []turn, rec record) []turn {
+	var text string
+	json.Unmarshal(rec.Content, &text)
+	text = strings.TrimSpace(text)
+
+	attach := func(b block) []turn {
+		tb := timedBlock{b: b, ts: rec.Timestamp}
+		if n := len(turns); n > 0 {
+			turns[n-1].blocks = append(turns[n-1].blocks, tb)
+			return turns
+		}
+		return append(turns, turn{role: "assistant", ts: rec.Timestamp, blocks: []timedBlock{tb}})
+	}
+
+	switch {
+	case rec.Type == "pr-link":
+		label := rec.PRRepository
+		if label == "" {
+			label = "Pull request"
+		}
+		return attach(block{Type: "pr", Name: fmt.Sprintf("%s#%d", label, rec.PRNumber), Text: rec.PRUrl})
+
+	case rec.Type == "attachment":
+		path := rec.Attachment.DisplayPath
+		if path == "" {
+			path = rec.Attachment.Filename
+		}
+		return attach(block{Type: "file-edit", Name: path, Text: rec.Attachment.Snippet})
+
+	case rec.Subtype == subtypeDuration:
+		// Belongs to the turn it measures, in its heading.
+		if n := len(turns); n > 0 && rec.DurationMs > 0 {
+			turns[n-1].duration = time.Duration(rec.DurationMs) * time.Millisecond
+		}
+		return turns
+
+	case rec.Subtype == subtypeCompact:
+		note := ""
+		if m := rec.CompactMetadata; m != nil {
+			if m.Trigger != "" {
+				note = m.Trigger
+			}
+			if m.PreTokens > 0 {
+				if note != "" {
+					note += " · "
+				}
+				note += fmt.Sprintf("%d → %d tokens", m.PreTokens, m.PostTokens)
+			}
+		}
+		return append(turns, turn{
+			role: "system", heading: "Context compacted", note: note, ts: rec.Timestamp,
+		})
+
+	case rec.Subtype == subtypeCommand:
+		// The payload is the same `<command-name>` scaffolding the picker
+		// strips, so it reduces to the command that was run.
+		if s := snippetText(text); s != "" {
+			return attach(block{Type: "command", Text: s})
+		}
+		return turns
+
+	case text != "":
+		// away_summary, informational, model_consent_fallback.
+		kind := "Notice"
+		switch rec.Subtype {
+		case subtypeRecap:
+			kind = "Recap"
+		case subtypeFallback:
+			kind = "Model fallback"
+		}
+		return attach(block{Type: "notice", Name: kind, Text: text})
+	}
+
+	return turns
+}
+
+// A turn's wall-clock length, as `4m2s`, for its heading.
+func shortDuration(d time.Duration) string {
+	switch {
+	case d <= 0:
+		return ""
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	default:
+		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+	}
 }

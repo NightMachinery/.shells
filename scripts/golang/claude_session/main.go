@@ -37,6 +37,14 @@ type record struct {
 
 	AITitle     string `json:"aiTitle"`
 	CustomTitle string `json:"customTitle"`
+
+	Attachment      *attachment      `json:"attachment"`
+	CompactMetadata *compactMetadata `json:"compactMetadata"`
+	DurationMs      int64            `json:"durationMs"`
+
+	PRNumber     int    `json:"prNumber"`
+	PRUrl        string `json:"prUrl"`
+	PRRepository string `json:"prRepository"`
 }
 
 type message struct {
@@ -44,9 +52,30 @@ type message struct {
 	Model   string          `json:"model"`
 }
 
-// A recap: Claude Code's own summary of where things stand, written when you
-// step away. Recorded as a system record rather than a message.
-const recapSubtype = "away_summary"
+// `system` record subtypes that carry something worth reading. The rest are
+// bookkeeping: `stop_hook_summary` never has content (0 of 225 locally), and
+// `turn_duration` is folded into the heading of the turn it measures.
+const (
+	subtypeRecap    = "away_summary"
+	subtypeCompact  = "compact_boundary"
+	subtypeCommand  = "local_command"
+	subtypeInfo     = "informational"
+	subtypeFallback = "model_consent_fallback"
+	subtypeDuration = "turn_duration"
+)
+
+type attachment struct {
+	Type        string `json:"type"`
+	Filename    string `json:"filename"`
+	DisplayPath string `json:"displayPath"`
+	Snippet     string `json:"snippet"`
+}
+
+type compactMetadata struct {
+	Trigger    string `json:"trigger"`
+	PreTokens  int    `json:"preTokens"`
+	PostTokens int    `json:"postTokens"`
+}
 
 type block struct {
 	Type      string          `json:"type"`

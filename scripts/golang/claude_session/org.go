@@ -223,3 +223,13 @@ func forEachMarkdownLine(lines []string, fn func(i int, ln string)) {
 		fn(i, ln)
 	}
 }
+
+// A bare URL, as a link in whichever syntax is being written.
+func (r *renderer) link(url string) {
+	r.ensureBlank()
+	if r.org {
+		r.out.WriteString("[[" + url + "]]\n")
+		return
+	}
+	r.out.WriteString("<" + url + ">\n")
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 )
 
 func mkRecord(t *testing.T, role, ts string, blocks ...map[string]any) record {
@@ -201,5 +202,132 @@ func TestEmptyTurnsProduceNoHeading(t *testing.T) {
 	}
 	if got := strings.TrimSpace(renderOne(records, renderOpts{org: true})); got != "" {
 		t.Errorf("want nothing, got:\n%s", got)
+	}
+}
+
+func mkRaw(t *testing.T, obj map[string]any) record {
+	t.Helper()
+	raw, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec record
+	if err := json.Unmarshal(raw, &rec); err != nil {
+		t.Fatal(err)
+	}
+	return rec
+}
+
+// Recaps, notices and the rest are system records, not messages, which is why
+// they were being dropped along with the bookkeeping types.
+func TestEventRecordsRender(t *testing.T) {
+	base := mkRecord(t, "assistant", "2026-08-10T10:00:00.000Z",
+		map[string]any{"type": "text", "text": "working"})
+
+	cases := []struct {
+		name string
+		rec  map[string]any
+		want string
+	}{
+		{"recap", map[string]any{
+			"type": "system", "subtype": "away_summary",
+			"timestamp": "2026-08-10T10:05:00.000Z", "content": "Goal was X; next Y.",
+		}, "** Recap"},
+		{"informational", map[string]any{
+			"type": "system", "subtype": "informational",
+			"timestamp": "2026-08-10T10:05:00.000Z", "content": "Auto mode lets Claude...",
+		}, "** Notice"},
+		{"model fallback", map[string]any{
+			"type": "system", "subtype": "model_consent_fallback",
+			"timestamp": "2026-08-10T10:05:00.000Z", "content": "Switched to Sonnet 5",
+		}, "** Model fallback"},
+		{"slash command", map[string]any{
+			"type": "system", "subtype": "local_command",
+			"timestamp": "2026-08-10T10:05:00.000Z",
+			"content":   "<command-name>/model</command-name>\n<command-message>model</command-message>",
+		}, "** Command: /model"},
+		{"pull request", map[string]any{
+			"type": "pr-link", "timestamp": "2026-08-10T10:05:00.000Z",
+			"prNumber": 1306, "prRepository": "y3owk1n/neru",
+			"prUrl": "https://github.com/y3owk1n/neru/pull/1306",
+		}, "** Pull request y3owk1n/neru#1306"},
+		{"externally edited file", map[string]any{
+			"type": "attachment", "timestamp": "2026-08-10T10:05:00.000Z",
+			"attachment": map[string]any{
+				"type": "edited_text_file", "displayPath": "config.toml", "snippet": "1\tx",
+			},
+		}, "** Edited outside the session · config.toml"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			records := conversationRecords([]record{base, mkRaw(t, c.rec)})
+			if len(records) != 2 {
+				t.Fatalf("record was filtered out: kept %d of 2", len(records))
+			}
+			if got := renderOne(records, renderOpts{org: true}); !strings.Contains(got, c.want) {
+				t.Errorf("want %q in:\n%s", c.want, got)
+			}
+		})
+	}
+}
+
+// A compaction separates two phases of a conversation, so it stands alone
+// rather than hanging off whichever turn happened to precede it.
+func TestCompactBoundaryIsItsOwnTurn(t *testing.T) {
+	rec := mkRaw(t, map[string]any{
+		"type": "system", "subtype": "compact_boundary",
+		"timestamp": "2026-08-10T10:05:00.000Z", "content": "Conversation compacted",
+		"compactMetadata": map[string]any{
+			"trigger": "manual", "preTokens": 476980, "postTokens": 11820,
+		},
+	})
+	got := renderOne(conversationRecords([]record{rec}), renderOpts{org: true})
+	if !strings.Contains(got, "* Context compacted") || !strings.Contains(got, "476980 → 11820 tokens") {
+		t.Errorf("got:\n%s", got)
+	}
+}
+
+// turn_duration measures the turn before it and belongs in its heading.
+func TestTurnDurationLandsOnTheHeading(t *testing.T) {
+	records := conversationRecords([]record{
+		mkRecord(t, "assistant", "2026-08-10T10:00:00.000Z",
+			map[string]any{"type": "text", "text": "working"}),
+		mkRaw(t, map[string]any{
+			"type": "system", "subtype": "turn_duration",
+			"timestamp": "2026-08-10T10:04:02.000Z", "durationMs": 242000,
+		}),
+	})
+	if got := renderOne(records, renderOpts{org: true}); !strings.Contains(got, "· 4m2s") {
+		t.Errorf("want the duration on the heading:\n%s", got)
+	}
+}
+
+// Bookkeeping must not reach the document.
+func TestBookkeepingRecordsAreDropped(t *testing.T) {
+	for _, obj := range []map[string]any{
+		{"type": "mode", "mode": "normal"},
+		{"type": "permission-mode", "permissionMode": "auto"},
+		{"type": "bridge-session", "bridgeSessionId": "cse_x"},
+		{"type": "file-history-snapshot", "messageId": "x"},
+		{"type": "last-prompt", "lastPrompt": "hi"},
+		{"type": "queue-operation", "operation": "enqueue", "content": "later"},
+		{"type": "system", "subtype": "stop_hook_summary", "level": "suggestion"},
+		{"type": "attachment", "attachment": map[string]any{"type": "task_reminder"}},
+	} {
+		if got := conversationRecords([]record{mkRaw(t, obj)}); len(got) != 0 {
+			t.Errorf("%v should have been dropped", obj["type"])
+		}
+	}
+}
+
+func TestShortDuration(t *testing.T) {
+	for _, c := range []struct {
+		ms   int64
+		want string
+	}{{0, ""}, {4500, "4s"}, {242000, "4m2s"}, {566155, "9m26s"}, {7500000, "2h5m"}} {
+		if got := shortDuration(time.Duration(c.ms) * time.Millisecond); got != c.want {
+			t.Errorf("shortDuration(%dms) = %q, want %q", c.ms, got, c.want)
+		}
 	}
 }
