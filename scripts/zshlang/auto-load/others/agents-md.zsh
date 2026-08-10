@@ -164,6 +164,54 @@ function agents-md-doctor {
             fi
         fi
     done
+
+    h-agents-md-doctor-settings
+}
+
+typeset -ga agents_md_settings=(
+    "${HOME}/.claude/settings.json"$'\t'"${NIGHTDIR}/configFiles/claude-code/settings.json"
+)
+
+function h-agents-md-doctor-settings {
+    : "reports whether each agent's settings file is still the tracked one
+
+Claude Code rewrites settings.json whenever a setting changes in the app. If it
+ever does so by rename rather than in place, the symlink is replaced by a plain
+file and the config silently stops being tracked -- the same class of quiet
+failure this doctor exists for."
+    ##
+    local line target tracked resolved
+
+    for line in "${agents_md_settings[@]}" ; do
+        target="${line%%$'\t'*}"
+        tracked="${${line#*$'\t'}:A}"
+
+        ecbold "settings: ${target/#${HOME}/~}"
+
+        if ! test -d "${target:h}" ; then
+            ecgray "  not installed on this host"
+            continue
+        fi
+
+        if ! test -e "${tracked}" ; then
+            ecerr "  MISSING: ${tracked/#${HOME}/~} is not in the repo"
+            continue
+        fi
+
+        if ! test -e "${target}" ; then
+            ecerr "  MISSING: expected a symlink to ${tracked/#${HOME}/~}"
+        elif ! test -L "${target}" ; then
+            ecerr "  UNTRACKED: a plain file, not a symlink; the app replaced it."
+            ecerr "  Diff it against ${tracked/#${HOME}/~}, keep what you want, and re-link."
+        else
+            resolved="${target:A}"
+            if [[ "${resolved}" == "${tracked:A}" ]] ; then
+                ec "  = symlinked to ${tracked/#${HOME}/~}"
+            else
+                ecerr "  WRONG TARGET: points at ${resolved/#${HOME}/~}"
+            fi
+        fi
+    done
 }
 function h-agents-md-sync-ask {
     #: Syncs, and on failure hands the decision to the user instead of making
