@@ -232,32 +232,65 @@ function h-claude-code-session-select-fz {
         return 1
     fi
 
-    local jq_snippet_program
-    jq_snippet_program="$(cat <<'EOF'
-first(inputs
-      | select(.type == "user")
-      | (.message.content? // empty)
-      | if type == "string" then .
-        else (.[]? | objects | select(.type == "text") | .text) end
-      | select(test("\\S")))
+    #: Emits `epoch<TAB>local time<TAB>first user message` for the session.
+    #:
+    #: The time is that of the last user/assistant message, not the file's
+    #: mtime; Claude Code appends bookkeeping records (e.g. `bridge-session`)
+    #: long after the conversation ends, so mtime can be hours or days off.
+    local jq_meta_program
+    jq_meta_program="$(cat <<'EOF'
+def first_text:
+  (.message.content? // empty)
+  | if type == "string" then .
+    else (.[]? | objects | select(.type == "text") | .text) end;
+
+reduce (inputs
+        | select(type == "object")
+        | select(.type == "user" or .type == "assistant")) as $r
+  ({};
+   (if ($r.timestamp | type) == "string" and $r.timestamp > (.ts // "")
+    then .ts = $r.timestamp
+    else . end)
+   | (if (.snippet // "") == "" and $r.type == "user" and $r.isMeta != true
+      then .snippet = ([$r | first_text | select(test("\\S"))] | first // "")
+      else . end))
+| ((.ts // "")
+   | if . == "" then null
+     else (try (sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) catch null) end) as $epoch
+| [ ($epoch // 0 | tostring),
+    (if $epoch == null then "" else ($epoch | strflocaltime("%Y-%m-%d %H:%M")) end),
+    ((.snippet // "") | gsub("[\\t\\r\\n]+"; " "))
+  ]
+| join("\t")
 EOF
 )" @TRET
 
     local -a lines
-    local f mtime rel snippet
+    local f meta epoch stamp rel snippet rest
     for f in "${session_files[@]}" ; do
-        mtime="$(zstat -F '%Y-%m-%d %H:%M' +mtime "$f")" @TRET
+        meta="$(jq --raw-output --null-input "${jq_meta_program}" "$f" 2>/dev/null)" || true
+        epoch="${meta%%$'\t'*}"
+        rest="${meta#*$'\t'}"
+        stamp="${rest%%$'\t'*}"
+        snippet="${rest#*$'\t'}"
+        if test -z "${stamp}" ; then
+            #: Sessions without any timestamped message fall back to mtime.
+            epoch="$(zstat +mtime "$f")" @TRET
+            stamp="$(zstat -F '%Y-%m-%d %H:%M' +mtime "$f")" @TRET
+        fi
+
         rel="${f#"${sessions_dir}/"}"
-        snippet="$(jq --raw-output --null-input "${jq_snippet_program}" "$f" 2>/dev/null)" || true
-        snippet="${${snippet//$'\n'/ }[1,120]}"
-        lines+=("${f}"$'\t'"${mtime}"$'\t'"${rel}"$'\t'"${snippet}")
+        snippet="${snippet[1,120]}"
+        lines+=("${epoch}"$'\t'"${f}"$'\t'"${stamp}"$'\t'"${rel}"$'\t'"${snippet}")
     done
+    #: Most recently active sessions first.
+    lines=("${(@On)lines}")
 
     local selected
-    selected="$(ec "${(F)lines}" | fz --delimiter=$'\t' --with-nth='2..' --no-multi "${fz_opts[@]}")" @RET
+    selected="$(ec "${(F)lines}" | fz --delimiter=$'\t' --with-nth='3..' --no-multi "${fz_opts[@]}")" @RET
     selected="${selected%%$'\n'*}"
 
-    local session_file="${selected%%$'\t'*}"
+    local session_file="${${selected#*$'\t'}%%$'\t'*}"
     if ! test -e "${session_file}" ; then
         ecerr "$0: selected session file does not exist: ${session_file}"
         return 1
