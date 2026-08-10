@@ -1,158 +1,23 @@
 ##
-function h-claude-code-session-jq-lib {
-    #: Prints jq definitions shared by the session renderers.
-    #:
-    #: `human_timestamp` turns the ISO-8601 UTC timestamps that Claude Code
-    #: writes (e.g. `2026-08-10T03:09:30.631Z`) into inactive org timestamps
-    #: in the local timezone (e.g. `[2026-08-10 Mon 05:09]`).
+#: Rendering and session scanning live in =golang/claude_session.go=; these
+#: are thin wrappers around it. See =docs/claude_session.md=.
+##
+function h-claude-code-session-render {
+    #: Renders a Claude Code session `.jsonl` to stdout.
+    #: Usage: h-claude-code-session-render <format> <input>
     ##
-    cat <<'EOF'
-def human_timestamp:
-  if type == "string" then
-    (try (sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601
-          | strflocaltime("[%Y-%m-%d %a %H:%M]"))
-     catch .)
-  else "" end;
-EOF
-}
+    local format="${1}" input="${2}"
 
-function h-claude-code-session-org-jq-program {
-    #: Prints the jq program that renders a Claude Code session `.jsonl`
-    #: directly as org-mode.
-    ##
-    h-claude-code-session-jq-lib @RET
-
-    cat <<'EOF'
-def esc_block:
-  tostring
-  | split("\n")
-  | map(if (startswith("*") or startswith("#+")) then "," + . else . end)
-  | join("\n");
-
-def esc_text:
-  tostring
-  | split("\n")
-  | map(if (startswith("*") or startswith("#+")) then " " + . else . end)
-  | join("\n");
-
-def in_example:
-  "#+begin_example\n" + esc_block + "\n#+end_example";
-
-def render_tool_input:
-  if .name == "Bash" then (.input.command // (.input | tojson))
-  else (.input | tojson)
-  end;
-
-def render_block:
-  if .type == "text" then (.text | esc_text)
-  elif .type == "thinking" then ("** Thinking\n" + (.thinking | in_example))
-  elif .type == "tool_use" then
-    ("** Tool Use: " + (.name // "?") + "\n" + (render_tool_input | in_example))
-  elif .type == "tool_result" then
-    ("** Tool Result"
-     + (if .is_error == true then " (error)" else "" end)
-     + "\n"
-     + (((.content // "")
-         | if type == "array"
-           then (map(if type == "object" then (.text // tojson) else tostring end)
-                 | join("\n"))
-           else . end)
-        | in_example))
-  else empty
-  end;
-
-def role: (.type[0:1] | ascii_upcase) + .type[1:];
-
-select(type == "object")
-| select(.type == "user" or .type == "assistant")
-| select(.isMeta != true)
-| "* " + role
-  + (if (.timestamp | type) == "string" then " " + (.timestamp | human_timestamp) else "" end)
-  + "\n"
-  + ((.message.content // [])
-     | if type == "string" then [{type: "text", text: .}] else . end
-     | map(render_block)
-     | join("\n\n"))
-  + "\n"
-EOF
-}
-
-function h-claude-code-session-to-org-jq {
-    #: Converts a Claude Code session `.jsonl` file into an org-mode file.
-    ##
-    local input="${1}"
-    local out="${2:-${input:r}.org}"
-
-    if ! test -e "${input}" ; then
-        ecerr "$0: input file does not exist: ${input}"
-        return 1
+    local render_args=("-format=${format}")
+    local max_lines="${claude_code_session_max_block_lines:-0}"
+    render_args+=("-max-block-lines=${max_lines}")
+    if bool "${claude_code_session_diff_p:-y}" ; then
+        render_args+=(-diff)
+    else
+        render_args+=(-diff=false)
     fi
 
-    local jq_program
-    jq_program="$(h-claude-code-session-org-jq-program)" @TRET
-
-    {
-        ec "#+TITLE: Claude Code Session ${input:t:r}"
-        ec
-        assert jq --raw-output "${jq_program}" "${input}" @RET
-    } > "${out}"
-}
-
-function h-claude-code-session-md-jq-program {
-    #: Prints the jq program that renders a Claude Code session `.jsonl`
-    #: as markdown.
-    ##
-    h-claude-code-session-jq-lib @RET
-
-    cat <<'EOF'
-def fence_for:
-  ([scan("`+") | length] | max // 0) as $m
-  | (if $m + 1 < 3 then 3 else $m + 1 end) as $len
-  | ("`" * $len);
-
-def fenced($lang):
-  tostring
-  | . as $s
-  | ($s | fence_for) as $f
-  | $f + $lang + "\n" + $s + "\n" + $f;
-
-def render_tool_input:
-  if .name == "Bash" then ((.input.command // (.input | tojson)) | fenced("zsh"))
-  else ((.input | tojson) | fenced("json"))
-  end;
-
-def render_block:
-  if .type == "text" then .text
-  elif .type == "thinking" then ("## Thinking\n\n" + (.thinking | fenced("")))
-  elif .type == "tool_use" then
-    ("## Tool Use: " + (.name // "?") + "\n\n" + render_tool_input)
-  elif .type == "tool_result" then
-    ("## Tool Result"
-     + (if .is_error == true then " (error)" else "" end)
-     + "\n\n"
-     + (((.content // "")
-         | if type == "array"
-           then (map(if type == "object" then (.text // tojson) else tostring end)
-                 | join("\n"))
-           else . end)
-        | fenced("")))
-  else empty
-  end;
-
-def role: (.type[0:1] | ascii_upcase) + .type[1:];
-
-select(type == "object")
-| select(.type == "user" or .type == "assistant")
-| select(.isMeta != true)
-| "# " + role
-  + (if (.timestamp | type) == "string" then " " + (.timestamp | human_timestamp) else "" end)
-  + "\n\n"
-  + ((.message.content // [])
-     | if type == "string" then [{type: "text", text: .}] else . end
-     | map(render_block)
-     | join("\n\n"))
-  + "\n"
-EOF
+    assert claude_session.go render "${render_args[@]}" "${input}" @RET
 }
 
 function h-claude-code-session-to-md {
@@ -166,13 +31,30 @@ function h-claude-code-session-to-md {
         return 1
     fi
 
-    local jq_program
-    jq_program="$(h-claude-code-session-md-jq-program)" @TRET
-
     {
         ec "# Claude Code Session ${input:t:r}"
         ec
-        assert jq --raw-output "${jq_program}" "${input}" @RET
+        h-claude-code-session-render md "${input}" @RET
+    } > "${out}"
+}
+
+function h-claude-code-session-to-org-native {
+    #: Converts a Claude Code session `.jsonl` file into an org-mode file,
+    #: without pandoc. Message bodies stay markdown, so this is only a
+    #: fallback; prefer [agfi:h-claude-code-session-to-org-pandoc].
+    ##
+    local input="${1}"
+    local out="${2:-${input:r}.org}"
+
+    if ! test -e "${input}" ; then
+        ecerr "$0: input file does not exist: ${input}"
+        return 1
+    fi
+
+    {
+        ec "#+TITLE: Claude Code Session ${input:t:r}"
+        ec
+        h-claude-code-session-render org "${input}" @RET
     } > "${out}"
 }
 
@@ -189,16 +71,16 @@ function h-claude-code-session-to-org-pandoc {
         return 1
     fi
 
-    local jq_program
-    jq_program="$(h-claude-code-session-md-jq-program)" @TRET
-
     local markdown
-    markdown="$(jq --raw-output "${jq_program}" "${input}")" @RET
+    markdown="$(h-claude-code-session-render md "${input}")" @RET
 
+    #: =-gfm_auto_identifiers=: otherwise every heading gets a
+    #: =:PROPERTIES:/:CUSTOM_ID:= drawer that nothing here links to.
     {
         ec "#+TITLE: Claude Code Session ${input:t:r}"
         ec
-        ec "${markdown}" | assert pandoc --from=gfm --to=org --wrap=none @RET
+        ec "${markdown}" |
+            assert pandoc --from=gfm-gfm_auto_identifiers --to=org --wrap=none @RET
     } > "${out}"
 }
 aliasfn h-claude-code-session-to-org h-claude-code-session-to-org-pandoc
@@ -212,8 +94,6 @@ function h-claude-code-session-select-fz {
     ensure-array claude_code_view_session_fz_fz_opts
     local fz_opts=("${claude_code_view_session_fz_fz_opts[@]}")
 
-    zmodload -F zsh/stat b:zstat @RET
-
     local sessions_dir="${projects_dir}"
     if [[ "${scope}" != "all" ]] ; then
         local project_dir_name="${${PWD//\//-}//./-}"
@@ -225,69 +105,14 @@ function h-claude-code-session-select-fz {
         return 1
     fi
 
-    local -a session_files
-    session_files=("${sessions_dir}"/**/*.jsonl(N.om))
-    if (( ${#session_files} == 0 )) ; then
-        ecerr "$0: no session files found in: ${sessions_dir}"
-        return 1
-    fi
-
-    #: Emits `epoch<TAB>local time<TAB>first user message` for the session.
-    #:
-    #: The time is that of the last user/assistant message, not the file's
-    #: mtime; Claude Code appends bookkeeping records (e.g. `bridge-session`)
-    #: long after the conversation ends, so mtime can be hours or days off.
-    local jq_meta_program
-    jq_meta_program="$(cat <<'EOF'
-def first_text:
-  (.message.content? // empty)
-  | if type == "string" then .
-    else (.[]? | objects | select(.type == "text") | .text) end;
-
-reduce (inputs
-        | select(type == "object")
-        | select(.type == "user" or .type == "assistant")) as $r
-  ({};
-   (if ($r.timestamp | type) == "string" and $r.timestamp > (.ts // "")
-    then .ts = $r.timestamp
-    else . end)
-   | (if (.snippet // "") == "" and $r.type == "user" and $r.isMeta != true
-      then .snippet = ([$r | first_text | select(test("\\S"))] | first // "")
-      else . end))
-| ((.ts // "")
-   | if . == "" then null
-     else (try (sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) catch null) end) as $epoch
-| [ ($epoch // 0 | tostring),
-    (if $epoch == null then "" else ($epoch | strflocaltime("%Y-%m-%d %H:%M")) end),
-    ((.snippet // "") | gsub("[\\t\\r\\n]+"; " "))
-  ]
-| join("\t")
-EOF
-)" @TRET
-
-    local -a lines
-    local f meta epoch stamp rel snippet rest
-    for f in "${session_files[@]}" ; do
-        meta="$(jq --raw-output --null-input "${jq_meta_program}" "$f" 2>/dev/null)" || true
-        epoch="${meta%%$'\t'*}"
-        rest="${meta#*$'\t'}"
-        stamp="${rest%%$'\t'*}"
-        snippet="${rest#*$'\t'}"
-        if test -z "${stamp}" ; then
-            #: Sessions without any timestamped message fall back to mtime.
-            epoch="$(zstat +mtime "$f")" @TRET
-            stamp="$(zstat -F '%Y-%m-%d %H:%M' +mtime "$f")" @TRET
-        fi
-
-        rel="${f#"${sessions_dir}/"}"
-        snippet="${snippet[1,120]}"
-        lines+=("${epoch}"$'\t'"${f}"$'\t'"${stamp}"$'\t'"${rel}"$'\t'"${snippet}")
-    done
-    #: Most recently active sessions first.
-    lines=("${(@On)lines}")
+    #: `epoch<TAB>path<TAB>local time<TAB>relative path<TAB>snippet`, newest
+    #: first. The time is the last message's, not the file's mtime; see
+    #: =docs/claude_session.md=.
+    local lines
+    lines="$(claude_session.go list "${sessions_dir}")" @RET
 
     local selected
-    selected="$(ec "${(F)lines}" | fz --delimiter=$'\t' --with-nth='3..' --no-multi "${fz_opts[@]}")" @RET
+    selected="$(ec "${lines}" | fz --delimiter=$'\t' --with-nth='3..' --no-multi "${fz_opts[@]}")" @RET
     selected="${selected%%$'\n'*}"
 
     local session_file="${${selected#*$'\t'}%%$'\t'*}"
