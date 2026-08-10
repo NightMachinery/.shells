@@ -1,0 +1,58 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(vcsh night.sh status:*)",
+      "Bash(vcsh night.sh diff:*)",
+      "Bash(vcsh night.sh log:*)",
+      "Bash(vcsh night.sh add:*)",
+      "Bash(vcsh night.sh commit:*)",
+      "Bash(grep:*)",
+      "Bash(python3 -m py_compile:*)",
+      "WebFetch(domain:docs.anthropic.com)"
+    ],
+    "deny": [],
+    "defaultMode": "plan"
+  },
+  "model": "opus[1m]",
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/hooks/statusline.sh"
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "voice": {
+    "enabled": true,
+    "mode": "tap"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "light",
+  "editorMode": "vim",
+  "preferredNotifChannel": "notifications_disabled",
+  "autoCompactEnabled": true,
+  "remoteControlAtStartup": true,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
+  "voiceEnabled": true
+}
