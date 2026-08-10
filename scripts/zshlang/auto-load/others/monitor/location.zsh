@@ -28,7 +28,10 @@ function h-ipv4-to-int {
 }
 
 function h-ipv4-in-subnet-p {
-    : "returns 0 iff <ip> falls inside <cidr>, e.g. `h-ipv4-in-subnet-p 10.0.0.7 10.0.0.0/24`"
+    #: @warn Keep backticks out of the `:` docstrings. They are double-quoted, so zsh
+    #: runs command substitution on them -- a docstring showing an example call of the
+    #: enclosing function makes it recurse on every invocation.
+    : "returns 0 iff <ip> falls inside <cidr>, e.g. h-ipv4-in-subnet-p 10.0.0.7 10.0.0.0/24"
     local ip="${1}" cidr="${2}"
     assert-args ip cidr @RET
 
