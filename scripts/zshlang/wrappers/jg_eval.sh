@@ -17,6 +17,16 @@ if test -n "$nolog" ; then
    endpoint="${endpoint}nolog/"
 fi
 
+#: `--header @file` keeps the key out of argv, which `ps` exposes to other local users.
+apikey_header=''
+case "$endpoint" in
+    http://127.0.0.1*|https://127.0.0.1*|http://localhost*|https://localhost*)
+        if test -r "$HOME/.keys/jupytergarden" ; then
+            apikey_header="@$HOME/.keys/jupytergarden"
+        fi
+        ;;
+esac
+
 
 if test -e "$cmd" ; then
    cmd="$(cat "$cmd")" || {
@@ -36,4 +46,4 @@ if test -n "$DEBUGME" ; then
    printf -- "%s" "$req_json" | jq . >&2
 fi
 
-printf -- "%s" "$req_json" | curl --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
+printf -- "%s" "$req_json" | curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint

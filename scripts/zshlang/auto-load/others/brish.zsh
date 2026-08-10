@@ -54,8 +54,25 @@ function garden-req() {
 }
 aliasfn garden-ip garden-req 'ip/'
 function brishz-tests-nonlocal-access() {
-    reval-ec curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"ec hi","verbose":"0"}' http://127.0.0.1:7230/zsh/
-    reval-ec curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"ec hi","verbose":"0"}' "http://$(ip-internal-get1 | ghead -1):7230/zsh/"
+    #: Expected: `hi`, then `401`, then a connection failure.
+    ec "--- local, with the API key (expected: hi)"
+    reval-ec curl --fail --silent --header "@$HOME/.keys/brishgarden" --header 'Content-Type: application/json' --request POST --data '{"cmd":"ec hi","verbose":"0"}' http://127.0.0.1:7230/zsh/
+
+    ec "--- local, keyless (expected: 401)"
+    reval-ec curl --silent --output /dev/null --write-out '%{http_code}\n' --header 'Content-Type: application/json' --request POST --data '{"cmd":"ec hi","verbose":"0"}' http://127.0.0.1:7230/zsh/
+
+    #: [agfi:ip-internal-get1] lists loopback first, so filter it out; otherwise
+    #: this "nonlocal" check silently tests 127.0.0.1.
+    local nonlocal_ip
+    nonlocal_ip="$(ip-internal-get1 | rg -v '^127\.' | ghead -1)"
+    if test -z "$nonlocal_ip" ; then
+        ecerr "$0: no non-loopback address found; skipping the nonlocal check"
+        return 0
+    fi
+
+    ec "--- non-loopback address ${nonlocal_ip} (expected: connection refused)"
+    #: A firewall usually drops these silently, so cap the wait.
+    reval-ec curl --fail --silent --max-time 5 --header 'Content-Type: application/json' --request POST --data '{"cmd":"ec hi","verbose":"0"}' "http://${nonlocal_ip}:7230/zsh/"
 }
 ##
 function caddypass() {

@@ -4,4 +4,10 @@ if test "$1" = '-c' ; then
    shift
 fi
 
-curl --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"{ '"$*"' } &>/dev/null &","verbose":"0"}' http://127.0.0.1:7230/zsh/
+#: `--header @file` keeps the key out of argv, which `ps` exposes to other local users.
+apikey_header=''
+if test -r "$HOME/.keys/brishgarden" ; then
+   apikey_header="@$HOME/.keys/brishgarden"
+fi
+
+curl ${apikey_header:+--header "$apikey_header"} --fail --silent --header 'Content-Type: application/json' --request POST --data '{"cmd":"{ '"$*"' } &>/dev/null &","verbose":"0"}' http://127.0.0.1:7230/zsh/

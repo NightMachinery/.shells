@@ -197,6 +197,13 @@ fi
 if [[ "$endpoint" =~ 'garden' ]] ; then
     opts+=(--user "Alice:$GARDEN_PASS0")
 fi
+#: Local requests authenticate with the API key; remote ones go through Caddy,
+#: which injects the garden's own key after checking basic auth.
+#: `--header @file` keeps the key out of argv, which `ps` exposes to other local users.
+local apikey_file="$HOME/.keys/brishgarden"
+if [[ "$endpoint" =~ '^https?://(127\.0\.0\.1|localhost)' ]] && [[ -r "$apikey_file" ]] ; then
+    opts+=(--header "@${apikey_file}")
+fi
 local v=1
 local req
 
