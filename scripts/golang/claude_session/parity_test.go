@@ -42,15 +42,30 @@ func TestPandocPathParity(t *testing.T) {
 		t.Skipf("no .jsonl transcripts under %s", corpus)
 	}
 
+	snap := filepath.Join(t.TempDir(), "snapshot.jsonl")
+
 	for _, f := range files {
+		// The corpus is live: a session open in another window grows between
+		// reads, and comparing two passes over a moving file fails for no
+		// reason. Both paths read one snapshot instead.
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Errorf("%s: %v", f, err)
+			continue
+		}
+		if err := os.WriteFile(snap, raw, 0o600); err != nil {
+			t.Fatalf("snapshot: %v", err)
+		}
+
 		// Subagents are skipped here: their section is skeleton, which by
-		// design only the org path can express.
-		want, err := pipeline(bin, f)
+		// design only the org path can express. Snapshotting a session
+		// without its subagents/ directory would break them anyway.
+		want, err := pipeline(bin, snap)
 		if err != nil {
 			t.Errorf("%s: reference conversion: %v", f, err)
 			continue
 		}
-		got, err := run(bin, "render", "-format=org-pandoc", "-subagents=false", f)
+		got, err := run(bin, "render", "-format=org-pandoc", "-subagents=false", snap)
 		if err != nil {
 			t.Errorf("%s: org-pandoc: %v", f, err)
 			continue
