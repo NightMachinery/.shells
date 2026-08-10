@@ -34,13 +34,16 @@ and re-run the sync after changing a source. The launchers do that for you.
 Git-tracked, here:
 
 - =AGENTS.md= --- the shared spine. Every agent, every host.
-- =claude.md=, =codex.md=, =gemini.md= --- one agent, every host.
+- =agent-claude.md=, =agent-codex.md=, =agent-gemini.md= --- one agent, every
+  host. The prefix is load-bearing: a bare =claude.md= is the same file as
+  =CLAUDE.md= on a case-insensitive filesystem, so Claude Code discovered this
+  source as a nested project memory and loaded the tier twice, on macOS only.
 - =hosts/<hostname>.md= --- every agent, one host. Not created by the
   bootstrap: an empty one committed by accident is worse than none.
 - =disabled/= --- parked, assembled into nothing. =VPS.md= lives here.
 
 Git-tracked, private, in =${nightNotesPrivate}/configs/agents/=: the same
-=AGENTS.md=, =<agent>.md= and =hosts/<hostname>.md= names. Nothing in the
+=AGENTS.md=, =agent-<name>.md= and =hosts/<hostname>.md= names. Nothing in the
 public spine is sensitive; anything that is goes here instead.
 
 Untracked, per machine, created empty by bootstrap stage =15-agents-md=:
@@ -53,8 +56,8 @@ Broad to narrow, so the last part to mention something wins:
 #+begin_example
 PE/Agents/AGENTS.md
 notes/private/configs/agents/AGENTS.md
-PE/Agents/<agent>.md
-notes/private/configs/agents/<agent>.md
+PE/Agents/agent-<name>.md
+notes/private/configs/agents/agent-<name>.md
 PE/Agents/hosts/<host>.md
 notes/private/configs/agents/hosts/<host>.md
 ~/.agents.local.md
