@@ -17,6 +17,37 @@ We load our plugins manually in `zshlang/load-others.zsh`.
 
 If you want to document installation for a plugin, read the readme of another plugin first and use its style.
 
+## Agent Instruction Files
+
+The global instruction files the agents actually read — `~/.claude/CLAUDE.md`,
+`~/.codex/AGENTS.md`, `~/.gapcode/AGENTS.md`, `~/.gemini/AGENTS.md` — are
+**generated**. Never edit them: they are overwritten on the next agent launch.
+Edit the sources under `./PE/Agents/` and run `agents-md-sync`, which the
+`claude` and `codex-m` launchers call for you. `agents-md-doctor` reports what
+each agent loads and whether anything has drifted. See
+`./PE/Agents/readme.org`, which also explains why this is assembled rather than
+symlinked or `@`-imported.
+
+Which source to edit:
+
+- `PE/Agents/AGENTS.md` — every agent, every host.
+- `PE/Agents/agent-<name>.md` — one agent, every host. The `agent-` prefix is
+  load-bearing.
+- `PE/Agents/hosts/<hostname>.md` — every agent, one host.
+- `${nightNotesPrivate}/configs/agents/` — the same names again, for anything
+  that should not sit in a public repository.
+- `~/.agents.local.md` and `~/.<agent>.local.md` — one machine, untracked.
+- `PE/Agents/disabled/` — parked; assembled into nothing.
+
+Later parts win, so a machine-local file overrides the shared spine.
+
+This file, `./AGENTS.md`, is the project instruction file for this repository
+rather than a global one, and `./CLAUDE.md` is a symlink to it.
+
+Commit instruction edits on their own, never mixed with code, in either case.
+They change how every future session behaves, so they need to be reviewable
+and revertible without dragging unrelated work along.
+
 ## Parallel Agent Sessions
 
 Multiple agent sessions often work in this worktree at the same time. Follow this ownership discipline:
