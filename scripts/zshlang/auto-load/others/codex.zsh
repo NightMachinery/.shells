@@ -57,8 +57,9 @@ function codex {
 }
 
 function codex-m {
-    #: Keeps ~/.codex/AGENTS.md current with its sources.
-    agents-md-sync @RET
+    #: Keeps ~/.codex/AGENTS.md current with its sources. Never fatal; see
+    #: [agfi:claude].
+    agents-md-sync @STRUE
 
     memoi_expire=$(( 3600*24*1 )) reval-memoi codex-install
     #: run codex-install every once in a while

@@ -53,7 +53,10 @@ function h-agents-md-assemble {
     local agent="${1}"
 
     local -a parts
+    #: `:a` normalizes, so a NIGHTDIR carrying a trailing slash cannot change
+    #: the assembled bytes and make an up-to-date file read as stale.
     parts=("${(@f)$(h-agents-md-parts "${agent}")}") @TRET
+    parts=("${parts[@]:a}")
 
     #: Claude strips block-level HTML comments before loading, so the
     #: provenance costs nothing there and little anywhere else.
@@ -129,7 +132,7 @@ function agents-md-doctor {
             continue
         fi
 
-        for p in "${(@f)$(h-agents-md-parts "${agent}")}" ; do
+        for p in "${${(@f)$(h-agents-md-parts "${agent}")}[@]:a}" ; do
             if test -s "${p}" ; then
                 ec "  + $(wc -l < "${p}" | tr -d ' ')L  ${p/#${HOME}/~}"
             elif test -e "${p}" ; then
