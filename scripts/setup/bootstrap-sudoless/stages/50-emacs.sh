@@ -152,6 +152,25 @@ case "${NIGHT_DOOM_REF}" in
         ;;
 esac
 
+#: @warn The package tree is only valid for the doom revision that built it.
+#: Changing NIGHT_DOOM_REF after a sync leaves straight/ pinned to the other
+#: revision's package set; `doom sync` then tries to move already-built repos
+#: and stops on an interactive "How to proceed? (1,2,3,4,5)" conflict prompt.
+#: With stdin closed that aborts with `end-of-file` *before* the profile init
+#: is written, and the next daemon start dies with
+#:   Symbol's value as variable is void: doom--profile-default
+#: A fresh tree cannot conflict, so rebuild whenever the pin moves.
+doom_ref_stamp="${DOOMLOCALDIR}/.night-doom-ref"
+doom_ref_now="$(git -C "${HOME}/.emacs.d" rev-parse HEAD 2>/dev/null || echo unknown)"
+if [ -f "${doom_ref_stamp}" ] && [ "$(cat "${doom_ref_stamp}")" != "${doom_ref_now}" ] ; then
+    warn "doom revision changed since the last sync; rebuilding DOOMLOCALDIR"
+    warn "  was $(cat "${doom_ref_stamp}")"
+    warn "  now ${doom_ref_now}"
+    run_soft mv "${DOOMLOCALDIR%/}" "${DOOMLOCALDIR%/}.stale-$$"
+    ensure_dir "${DOOMLOCALDIR}"
+fi
+
+
 if [ -d "${HOME}/doom.d/.git" ] ; then
     ok "doom.d config already cloned"
 else
@@ -196,9 +215,26 @@ fi
 #: Belt and braces: nothing in this stage may ever wait on stdin.
 run_soft "${HOME}/.emacs.d/bin/doom" sync < /dev/null
 
+#: Record the revision this tree was built against, for the check above.
+printf '%s' "${doom_ref_now}" > "${doom_ref_stamp}"
+
 ##
-if emacs --batch -l "${HOME}/.emacs.d/early-init.el" --eval '(princ "batch-load-ok")' >/dev/null 2>&1 ; then
-    ok "doom early-init loads"
+#: @warn A batch load of early-init.el is NOT sufficient: it succeeds even when
+#: the generated profile init is missing, because the interactive path is what
+#: loads it. Start a real daemon -- that is the failure mode users actually hit
+#: (`emc-gateway` / `emacsclient -t`).
+if [ -f "${DOOMLOCALDIR}/etc/@/init.${NIGHT_EMACS_VERSION%.*}.2.el" ] ||
+   find "${DOOMLOCALDIR}/etc" -name 'init*.el' 2>/dev/null | grep -q . ; then
+    ok "generated profile init present"
 else
-    warn "doom early-init did not load cleanly; run: doom doctor"
+    err "generated profile init MISSING -- doom sync did not complete"
+fi
+
+if timeout -k 5 300 emacs --daemon=night-verify >/dev/null 2>&1 &&
+   emacsclient -s night-verify --eval '(+ 1 1)' >/dev/null 2>&1 ; then
+    ok "doom daemon starts and answers"
+    emacsclient -s night-verify --eval '(kill-emacs)' >/dev/null 2>&1 || true
+else
+    warn "doom daemon did not start; run: emacs --daemon --debug-init"
+    emacsclient -s night-verify --eval '(kill-emacs)' >/dev/null 2>&1 || true
 fi
