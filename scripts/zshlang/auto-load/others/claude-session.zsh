@@ -486,7 +486,11 @@ function h-claude-code-view-session-focused {
     local session_file
     session_file="$(cat "${entry}")"
     if ! test -e "${session_file}" ; then
-        h-claude-code-session-lost "session transcript is gone: ${session_file}"
+        #: Usually a session that has not been written to yet: `SessionStart`
+        #: reports the path before Claude Code creates the file, or even the
+        #: project directory. `UserPromptSubmit` re-registers, so this clears
+        #: itself as soon as there is anything worth reading.
+        h-claude-code-session-lost "this session has no transcript on disk yet: ${session_file}"
         return 1
     fi
 
