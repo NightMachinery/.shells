@@ -58,17 +58,21 @@ if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ] ; then
     export XDG_RUNTIME_DIR
 fi
 
-#: Enabling lingering starts the user manager asynchronously, and on an NFS
-#: home it is not instant. Two seconds was not enough on rho1; wait properly
-#: rather than reporting "not available" for a manager that is on its way up.
+#: @warn Do NOT probe with `is-system-running'. It answers with the overall
+#: STATE, and exits non-zero for anything but "running" -- including
+#: "starting" and "degraded". On rho1 the manager was perfectly reachable
+#: while our own unit was still activating, so the probe failed and the stage
+#: declared systemd unavailable. Ask whether the manager ANSWERS instead.
+#:
+#: Enabling lingering starts it asynchronously, so give it a few seconds.
 systemd_wait=0
 while [ "${systemd_wait}" -lt 15 ] ; do
-    systemctl --user is-system-running >/dev/null 2>&1 && break
+    systemctl --user show -p Version >/dev/null 2>&1 && break
     sleep 1
     systemd_wait=$((systemd_wait + 1))
 done
 
-if ! systemctl --user is-system-running >/dev/null 2>&1 ; then
+if ! systemctl --user show -p Version >/dev/null 2>&1 ; then
     warn "systemd --user still not available; skipping the unit"
     warn "start services by hand with: zsh ~/.startup..private..zsh"
     return 0 2>/dev/null || exit 0
