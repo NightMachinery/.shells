@@ -10,8 +10,11 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // Session lines carry whole files inline, so the default 64KiB scanner
@@ -69,6 +72,12 @@ type attachment struct {
 	Filename    string `json:"filename"`
 	DisplayPath string `json:"displayPath"`
 	Snippet     string `json:"snippet"`
+
+	// task_reminder: the outstanding task list Claude is reminded of. Every
+	// one of the 485 locally is empty, because the task tools go unused here,
+	// but a populated one is worth reading rather than dropping.
+	Content   json.RawMessage `json:"content"`
+	ItemCount int             `json:"itemCount"`
 }
 
 type compactMetadata struct {
@@ -130,4 +139,30 @@ list flags:
 list emits: epoch <TAB> path <TAB> local time <TAB> relative path <TAB> snippet
 `)
 	os.Exit(2)
+}
+
+// Every relative path inside ~/.claude/projects begins with a dash, because
+// the project directories are named after the cwd they belong to
+// (`-Users-evar-scripts`). The flag package would read those as flags, so an
+// argument that is not a defined flag and does name an existing file is
+// spelled `./…` before parsing. `--` still works for anything this misses.
+func guardPathArgs(fs *flag.FlagSet, argv []string) []string {
+	out := make([]string, len(argv))
+	copy(out, argv)
+
+	for i, a := range out {
+		if !strings.HasPrefix(a, "-") || a == "-" || a == "--" {
+			continue
+		}
+
+		name, _, _ := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		if fs.Lookup(name) != nil {
+			continue
+		}
+		if _, err := os.Stat(a); err == nil {
+			out[i] = "." + string(filepath.Separator) + a
+		}
+	}
+
+	return out
 }

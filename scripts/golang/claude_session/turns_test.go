@@ -2,6 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -329,5 +332,57 @@ func TestShortDuration(t *testing.T) {
 		if got := shortDuration(time.Duration(c.ms) * time.Millisecond); got != c.want {
 			t.Errorf("shortDuration(%dms) = %q, want %q", c.ms, got, c.want)
 		}
+	}
+}
+
+// Paths inside ~/.claude/projects start with a dash, since project
+// directories are named after the cwd they belong to.
+func TestGuardPathArgs(t *testing.T) {
+	dir := t.TempDir()
+	dashed := filepath.Join(dir, "-Users-evar-scripts.jsonl")
+	if err := os.WriteFile(dashed, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	fs := flag.NewFlagSet("render", flag.ContinueOnError)
+	format := fs.String("format", "md", "")
+	diff := fs.Bool("diff", true, "")
+
+	argv := []string{"-format=org", "-diff=false", "-Users-evar-scripts.jsonl"}
+	if err := fs.Parse(guardPathArgs(fs, argv)); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	if *format != "org" || *diff {
+		t.Errorf("real flags stopped parsing: format=%q diff=%v", *format, *diff)
+	}
+	if got := fs.Arg(0); got != "./-Users-evar-scripts.jsonl" {
+		t.Errorf("path argument = %q, want it spelled with a ./ prefix", got)
+	}
+}
+
+// A file named like a flag must not shadow the flag.
+func TestGuardPathArgsLeavesRealFlagsAlone(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "-diff"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cwd, _ := os.Getwd()
+	defer os.Chdir(cwd)
+	os.Chdir(dir)
+
+	fs := flag.NewFlagSet("render", flag.ContinueOnError)
+	diff := fs.Bool("diff", false, "")
+	if err := fs.Parse(guardPathArgs(fs, []string{"-diff"})); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !*diff {
+		t.Error("-diff was treated as a path instead of a flag")
 	}
 }

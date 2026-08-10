@@ -43,7 +43,7 @@ func cmdRender(argv []string) {
 	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
 	pandocBin := fs.String("pandoc", "pandoc", "pandoc binary, for -format=org-pandoc")
 	subagentsP := fs.Bool("subagents", true, "inline the transcripts of spawned subagents")
-	fs.Parse(argv)
+	fs.Parse(guardPathArgs(fs, argv))
 
 	input := fs.Arg(0)
 	if input == "" {
@@ -209,7 +209,16 @@ func conversationRecords(all []record) []record {
 			}
 		case "pr-link":
 		case "attachment":
-			if rec.Attachment == nil || rec.Attachment.Type != "edited_text_file" {
+			if rec.Attachment == nil {
+				continue
+			}
+			switch rec.Attachment.Type {
+			case "edited_text_file":
+			case "task_reminder":
+				if rec.Attachment.ItemCount == 0 {
+					continue
+				}
+			default:
 				continue
 			}
 		default:
@@ -592,6 +601,10 @@ func (r *renderer) renderBlock(tb timedBlock) {
 			r.link(b.Text)
 		}
 
+	case "tasks":
+		r.heading(2, "Task reminder · "+b.Name+r.stamp(tb.ts))
+		r.block("json", b.Text)
+
 	case "file-edit":
 		r.heading(2, "Edited outside the session · "+abbrevHome(b.Name)+r.stamp(tb.ts))
 		if strings.TrimSpace(b.Text) != "" {
@@ -928,6 +941,19 @@ func appendEvent(turns []turn, rec record) []turn {
 			label = "Pull request"
 		}
 		return attach(block{Type: "pr", Name: fmt.Sprintf("%s#%d", label, rec.PRNumber), Text: rec.PRUrl})
+
+	case rec.Type == "attachment" && rec.Attachment.Type == "task_reminder":
+		var pretty strings.Builder
+		enc := json.NewEncoder(&pretty)
+		enc.SetIndent("", "  ")
+		if enc.Encode(rec.Attachment.Content) != nil {
+			return turns
+		}
+		return attach(block{
+			Type: "tasks",
+			Name: fmt.Sprintf("%d outstanding", rec.Attachment.ItemCount),
+			Text: strings.TrimRight(pretty.String(), "\n"),
+		})
 
 	case rec.Type == "attachment":
 		path := rec.Attachment.DisplayPath
