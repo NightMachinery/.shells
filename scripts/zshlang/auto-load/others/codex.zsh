@@ -5,7 +5,7 @@ function h-codex-notify {
     # ec "${info}" | jq . >> ~/logs/codex_notifs|| true
     #: These might leak private data, so only enable it if you need it for debugging.
 
-    bell-codex
+    bell-codex "${info}"
 }
 ##
 function codex-ask {

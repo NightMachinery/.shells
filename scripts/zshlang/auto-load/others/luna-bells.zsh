@@ -499,13 +499,47 @@ function bell-repeat() {
 }
 aliasfn bell-repeat-stop retry_sleep=0.1 retry-limited 500 loop-startover $bellj_socket
 ##
+#: Messages waiting to be escalated to Telegram, shared by every bell-auto on this
+#: machine. A single watcher drains the whole queue, so a bell that gets replaced
+#: before its own escalation fires still gets its message delivered.
+typeset -g bell_notif_queue_key='bell_notif_pending'
+typeset -g bell_notif_since_key='bell_notif_since'
+
+function h-bell-notif-enqueue {
+    local msg="${1}"
+    test -z "$msg" && return 1
+
+    silent redism rpush "$bell_notif_queue_key" "$msg" || return 1
+    #: setnx, so the anchor stays on the OLDEST unsent message.
+    silent redism setnx "$bell_notif_since_key" "$EPOCHSECONDS" || true
+}
+
+function h-bell-notif-since {
+    : "epoch seconds at which the oldest unsent message was queued"
+    redism get "$bell_notif_since_key"
+}
+
+function h-bell-notif-drain {
+    : "outputs every queued message, oldest first, and empties the queue"
+    local out
+    out="$(redism lrange "$bell_notif_queue_key" 0 -1)" || return 1
+
+    h-bell-notif-clear
+    ec "$out"
+}
+
+function h-bell-notif-clear {
+    silent redism del "$bell_notif_queue_key" "$bell_notif_since_key" || true
+}
+aliasfn bell-notif-pending redism lrange bell_notif_pending 0 -1
+##
 function h-bell-auto-notify {
     : "stages 2-4 of the escalation ladder; see [agfi:bell-auto] and ./docs/bell-auto.md
 
 Stage 2 posts a desktop notification, stage 3 quietly watches for the user coming
 back, and stage 4 escalates to Telegram if they never do."
     ##
-    local msg="${1}" nonce="${2}"
+    local msg="${1}"
 
     #: Notifications are opt-in per call site: without a message there is nothing
     #: worth saying, and this is what keeps `stop_mode=auto` safe for every existing
@@ -540,13 +574,32 @@ back, and stage 4 escalates to Telegram if they never do."
     fi
     bool "$tlg" || return 0
 
+    h-bell-notif-enqueue "$msg" || return 0
+
     #: Stage 3. Silent watch: did they come back after we gave up ringing?
+    #:
+    #: The watcher takes its OWN nonce rather than sharing bell-auto's. Otherwise any
+    #: unrelated bell cancels a pending escalation: [agfi:bella-zsh] fires on every
+    #: completed command and the sc bells run with stop_mode=idle, and neither carries
+    #: a message, so they would take the nonce and then never drain the queue --
+    #: stranding the message in redis with nobody watching it.
+    local nonce
+    nonce="$(oneinstance-setup bell-auto-notify)" || return 1
+
     local idle_t="${bell_auto_t:-30}"
-    local deadline=$(( EPOCHSECONDS + ${bell_auto_tlg_t:-300} ))
-    while oneinstance bell-auto "$nonce"
+
+    #: Anchored to the OLDEST unsent message, so a steady drip of bells cannot
+    #: postpone the batch forever.
+    local since
+    since="$(h-bell-notif-since)" || since=''
+    test -n "$since" || since="$EPOCHSECONDS"
+    local deadline=$(( since + ${bell_auto_tlg_t:-900} ))
+
+    while oneinstance bell-auto-notify "$nonce"
     do
         if (( $(idle-get) <= idle_t )) ; then
-            ecgray "$0: user came back; skipping the Telegram escalation."
+            ecgray "$0: user came back; dropping the Telegram escalation."
+            h-bell-notif-clear
             return 0
         fi
 
@@ -554,14 +607,25 @@ back, and stage 4 escalates to Telegram if they never do."
         sleep "${bell_auto_tlg_poll:-30}"
     done
 
-    #: Bail out if we left the loop because a newer bell-auto took the nonce.
-    oneinstance bell-auto "$nonce" || return 0
+    #: Bail out if we left the loop because a newer watcher took over; it owns the
+    #: queue now and will send everything, ours included.
+    oneinstance bell-auto-notify "$nonce" || return 0
 
-    #: Stage 4. Time-bounded because this must never be the thing that hangs, no
-    #: matter how [agfi:tsend] behaves. `reval-timeout` rather than `gtimeout`, since
-    #: tnotif is a zsh function and an external timeout binary cannot run one.
-    ec "$0: escalating to Telegram."
-    reval-timeout 60 tnotif "$msg ($(hostname))" ||
+    #: Stage 4. Everything queued goes out together, including messages from sessions
+    #: whose own bell was long since replaced.
+    local pending
+    pending="$(h-bell-notif-drain)" || return 0
+    test -n "$pending" && ! isSpace "$pending" || return 0
+
+    local lines=( "${(@f)pending}" )
+    lines=( "${(@u)lines}" )  #: the same message from five sessions is still one line
+
+    ec "$0: escalating ${#lines} message(s) to Telegram."
+
+    #: Time-bounded because this must never be the thing that hangs, no matter how
+    #: [agfi:tsend] behaves. `reval-timeout` rather than `gtimeout`, since tnotif is a
+    #: zsh function and an external timeout binary cannot run one.
+    reval-timeout 60 tnotif "${(F)lines}"$'\n'"($(hostname))" ||
         ecgray "$0: the Telegram escalation failed."
 }
 
@@ -635,7 +699,7 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
             reval "$engine[@]"
         fi
 
-        h-bell-auto-notify "$notif_msg" "$nonce"
+        h-bell-auto-notify "$notif_msg"
         ec "$0 exited. (nonce: $nonce)"
         return 0
     fi
@@ -674,12 +738,19 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
     test -n "$exit_cmd[*]" && reval-ec "$exit_cmd[@]"
 
     if test -n "$capped" ; then
-        h-bell-auto-notify "$notif_msg" "$nonce"
+        h-bell-auto-notify "$notif_msg"
     fi
 
     ec "$0 exited. (nonce: $nonce)"
 }
-aliasfn bell-auto-stop oneinstance-setup bell-auto # forces active bell-autos to exit
+function bell-auto-stop {
+    : "forces active bell-autos to exit, and cancels any pending Telegram escalation"
+    #: Both nonces, because the escalation watcher deliberately has its own; and the
+    #: queue too, since 'be quiet' should not resurface later as a phone notification.
+    silent oneinstance-setup bell-auto
+    silent oneinstance-setup bell-auto-notify
+    h-bell-notif-clear
+}
 aliasfn bellaok bell-auto-stop
 ##
 aliasfn bellsc-stop ot-stop
@@ -1315,11 +1386,51 @@ function bell-gpt {
     #: remove `awaysh` if you want to run using `bell-auto`
 }
 
+function h-bell-agent-hook {
+    : "shared entry point for the coding-agent hooks
+
+Turns the agent's hook payload into a bell plus a notification. The payload is JSON,
+taken from \$4 or from stdin, and carries a message only for some hook events (Claude
+Code's Notification but not its Stop), hence the fallback."
+    ##
+    local app="${1}" engine="${2}" fallback="${3}" input="${4}"
+
+    if test -z "$input" && ! test -t 0 ; then
+        #: Bounded: an inherited pipe that never closes must not wedge the agent's hook.
+        input="$(gtimeout 2 cat)" || input=''
+    fi
+
+    local msg='' cwd=''
+    if test -n "$input" ; then
+        msg="$(ec "$input" | jq -r '.message // empty' 2>/dev/null)" || msg=''
+        cwd="$(ec "$input" | jq -r '.cwd // empty' 2>/dev/null)" || cwd=''
+    fi
+
+    if test -n "$msg" ; then
+        #: Name the agent, so a batched Telegram from several sessions is scannable.
+        #: Only on payload messages -- the fallback already starts with the agent name.
+        msg="${app}: ${msg}"
+    else
+        msg="$fallback"
+    fi
+
+    #: The project name matters when several sessions are waiting at once.
+    test -n "$cwd" && msg="${msg} [${cwd:t}]"
+
+    local icon
+    icon="$(silence app-icon-get "$app")" || icon=''
+
+    bell_auto_sleep=10 bell_auto_notif_msg="$msg" notif_ignore_dnd_p=y notif_image="$icon" \
+        awaysh bell-auto "$engine"
+}
+##
 function h-bell-codex {
     command say -v Whisper -r 90 "Codex awaits!"
 }
-#: aliasfnq, not aliasfn: the message contains spaces, which plain aliasfn would split.
-aliasfnq bell-codex bell_auto_sleep=10 bell_auto_notif_msg='Codex awaits!' notif_ignore_dnd_p=y awaysh bell-auto h-bell-codex
+
+function bell-codex {
+    h-bell-agent-hook Codex h-bell-codex 'Codex awaits!' "$@"
+}
 
 function h-bell-claude {
     ##
@@ -1328,6 +1439,8 @@ function h-bell-claude {
     bell-sonic-fx-ready
     ##
 }
-#: aliasfnq, not aliasfn: the message contains spaces, which plain aliasfn would split.
-aliasfnq bell-claude bell_auto_sleep=10 bell_auto_notif_msg='Claude awaits!' notif_ignore_dnd_p=y awaysh bell-auto h-bell-claude
+
+function bell-claude {
+    h-bell-agent-hook Claude h-bell-claude 'Claude awaits!' "$@"
+}
 ##
