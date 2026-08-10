@@ -34,6 +34,36 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$KITTY_WINDOW_ID\" \"$KITTY_PID\" >/dev/null 2>&1"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$KITTY_WINDOW_ID\" \"$KITTY_PID\" >/dev/null 2>&1"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz2.dash claude-code-session-unregister \"$KITTY_WINDOW_ID\" \"$KITTY_PID\" >/dev/null 2>&1"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
