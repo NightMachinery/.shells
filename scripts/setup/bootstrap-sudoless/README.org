@@ -30,6 +30,39 @@ NIGHT_BOOTSTRAP_FORCE=y sh bootstrap.sh 50
 
 List stages: =sh bootstrap.sh --list=.
 
+* A second host at a site you have already bootstrapped
+On a cluster with a shared =$HOME= --- =NIGHT_HOME_SHARED=y= --- almost
+everything is already there the first time you log into a new machine: the
+dotfiles, =~/.night-bootstrap.env=, =~/.night-site=, the binaries in
+=~/.local/bin=, and everything on the big store (conda envs, mise, the HF
+cache, Doom's package tree). An interactive =zsh= comes up working.
+
+What is *not* there is anything per-host, and there is exactly one command
+for it:
+
+#+begin_src zsh :eval never
+ssh newhost 'sh ~/scripts/setup/bootstrap-sudoless/bootstrap.sh 70'
+#+end_src
+
+That enables lingering and starts the services. Without it, redis and the
+emacs daemon are simply not running on that machine, and every shell you
+open greets you with =Could not connect to Redis at 127.0.0.1:6379=.
+
+The per-host things, and why each is per-host:
+
+- *services* --- redis and the emacs daemon are processes, so they exist per
+  machine. Lingering is per-host state under =/var/lib/systemd/linger/=.
+- *=NIGHT_LOCAL_CACHE=* --- =/var/tmp/$USER=, deliberately not shared. The
+  env contract now creates these directories itself when they are missing, so
+  this heals on first login rather than needing a stage. It has to: =TMPDIR=
+  points there, and a dangling =TMPDIR= stops the emacs daemon from starting.
+- *the emacs socket* --- under =$XDG_RUNTIME_DIR=, named per host, so each
+  machine gets its own daemon.
+
+Everything else is idempotent, so a full =sh bootstrap.sh= on the new host is
+also fine --- just slower, since it re-checks every stage to conclude that the
+shared filesystems already have the answer.
+
 * Tiers
 The point of the split is what each tier is allowed to assume.
 
