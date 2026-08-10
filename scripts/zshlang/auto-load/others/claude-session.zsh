@@ -71,16 +71,12 @@ function h-claude-code-session-to-org-pandoc {
         return 1
     fi
 
-    local markdown
-    markdown="$(h-claude-code-session-render md "${input}")" @RET
-
-    #: =-gfm_auto_identifiers=: otherwise every heading gets a
-    #: =:PROPERTIES:/:CUSTOM_ID:= drawer that nothing here links to.
+    #: The pandoc run happens inside the renderer, split across processes;
+    #: see =docs/claude_session.md=.
     {
         ec "#+TITLE: Claude Code Session ${input:t:r}"
         ec
-        ec "${markdown}" |
-            assert pandoc --from=gfm-gfm_auto_identifiers --to=org --wrap=none @RET
+        h-claude-code-session-render org-pandoc "${input}" @RET
     } > "${out}"
 }
 aliasfn h-claude-code-session-to-org h-claude-code-session-to-org-pandoc

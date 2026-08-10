@@ -18,18 +18,49 @@ and no module cache — it works on a freshly bootstrapped, sudoless host.
 `claude_session.go render [flags] <session.jsonl>` writes the transcript to
 stdout. Flags:
 
-- `-format md|org` — output syntax. `md` (the default) is meant to be piped
-  through pandoc; `org` emits org directly and is only a fallback, since
-  message bodies stay markdown.
+- `-format md|org|org-pandoc` — output syntax. `md` (the default) is meant to
+  be piped through pandoc; `org-pandoc` does that internally and in parallel,
+  and is what the zsh wrapper uses; `org` emits org directly without pandoc
+  and is only a fallback, since message bodies stay markdown.
 - `-max-block-lines N` — elide code blocks longer than N lines, leaving a
   `… [N lines elided]` marker. `0`, the default, never elides.
 - `-diff` — render `Edit` tool calls as a unified diff. On by default.
+- `-jobs N` — worker count, defaulting to the CPU count.
+- `-pandoc PATH` — the pandoc binary to use for `org-pandoc`.
 
 `claude_session.go list [flags] <sessions-dir>` walks the directory for
 `.jsonl` files and writes one TSV line per session, newest first:
 `epoch`, absolute path, local time, path relative to the scanned directory,
 and the first user message as a snippet. `-snippet-len N` caps the snippet
-width (default 120).
+width (default 120); `-jobs N` sets the worker count.
+
+## Performance
+
+pandoc dominates the conversion — on a 4.5MB session it was 89% of the
+runtime — so `org-pandoc` splits the rendered markdown into byte-balanced
+chunks and runs one pandoc per chunk concurrently. The seams always fall on
+record boundaries, never inside a code block, so every chunk is a
+self-contained markdown document; the result is byte-identical to converting
+the whole thing in one pandoc, verified across the whole session corpus.
+Documents below a few hundred KB use a single process, because pandoc's ~70ms
+startup would eat the gain. Records also render concurrently, since each is
+independent.
+
+A tempting further step is to keep code blocks away from pandoc entirely —
+they are 84% of a transcript's bytes and pandoc only copies them through, and
+skipping them measured ~40% less pandoc CPU. Do not. Matching pandoc's output
+then means reimplementing its reader's quirks: tab expansion to 4-column
+stops, CRLF folding, outright deletion of lone CRs, comma-escaping after
+indentation, trailing-newline trimming. Each one is a silent corruption if it
+drifts from whatever pandoc does next release, and that is a bad trade for
+CPU on a conversion that runs once per session view.
+
+`list` reads only the two ends of each file: forward from the start until the
+first user message, and backwards from the end over the last 25 timestamped
+messages. Both windows widen if they come up empty. That keeps the picker's
+cost proportional to the number of sessions rather than to total transcript
+volume — across 52 sessions and 48MB it reads well under 1% of the bytes and
+runs in about 30ms, matching a full scan exactly on every session.
 
 ## Why the session time is not the file mtime
 
