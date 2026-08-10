@@ -303,6 +303,77 @@ function lsof-openfiles {
     sudo lsof -n | cut -f1 -d' ' | gsort | guniq -c | gsort | tail -n30 # this merges different processes with the same name. idk what happens in the unmerged case exactly.
 }
 ##
+function displays-get-hs {
+    : "outputs: the name of each attached display, one per line"
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    #: Fast (~8ms warm): IPC to the already-running Hammerspoon instance.
+    hammerspoon -c 'local t = {} ; for _, s in ipairs(hs.screen.allScreens()) do t[#t+1] = s:name() end ; return table.concat(t, "\n")'
+}
+
+function displays-get-system-profiler {
+    : "outputs: the name of each attached display, one per line"
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    #: Slow (~400ms): spawns a fresh process, but works when Hammerspoon is not running.
+    #: The JSON form is used because the indentation-based plain-text output is brittle.
+    system_profiler -json SPDisplaysDataType 2>/dev/null |
+        jq -r '.SPDisplaysDataType[]? | .spdisplays_ndrvs[]? | ._name // empty'
+}
+
+function displays-get {
+    : "outputs: the name of each attached display, one per line
+Gateway: tries the fast Hammerspoon helper, falls back to system_profiler."
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    local out
+    if out="$(displays-get-hs 2>/dev/null)" && [[ -n "$out" ]] ; then
+        ec "$out"
+    else
+        displays-get-system-profiler
+    fi
+}
+
+function external-display-p {
+    : "returns 0 iff at least one attached display is not the built-in panel"
+    # @darwinOnly
+    ##
+    if ! isDarwin ; then
+        ecgray "$0: NA"
+        return 1
+    fi
+
+    #: @warn Do NOT count displays. In clamshell mode the lid is shut, the built-in
+    #: panel is not reported at all, and the single remaining screen IS the external
+    #: one -- so `(( #screens > 1 ))` is wrong exactly when we most need an answer.
+    ##
+    local out
+    out="$(displays-get)" @RET
+
+    local line name
+    for line in "${(@f)out}" ; do
+        name="${(L)line}"
+
+        #: Built-in panels are named "Built-in Retina Display", "Built-in Liquid Retina
+        #: XDR Display", or (on older Macs) "Color LCD". Same test as
+        #: `ModalMode.screenIsInternal` in [[../../../../hammerspoon/modal-mode.lua]].
+        if [[ -z "$name" ]] || [[ "$name" == *built-in* ]] || [[ "$name" == *'color lcd'* ]] ; then
+            continue
+        fi
+
+        return 0
+    done
+
+    return 1
+}
+aliasfn external-display-is external-display-p
+##
 function screen-resolution() {
     : "outputs: width \n height"
     ensure isDarwin @MRET
