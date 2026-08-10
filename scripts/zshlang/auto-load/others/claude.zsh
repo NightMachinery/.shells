@@ -19,8 +19,10 @@ function claude {
     local -x CLAUDE_CODE_DEBUG_LOG_LEVEL=verbose
 
 
-    #: Keeps ~/.claude/CLAUDE.md current with its sources.
-    agents-md-sync @RET
+    #: Keeps ~/.claude/CLAUDE.md current with its sources. Never fatal:
+    #: a stale instruction file is worth far less than a launcher that
+    #: refuses to start.
+    agents-md-sync @STRUE
 
     tty-title "🍼${PWD:t}"
 
