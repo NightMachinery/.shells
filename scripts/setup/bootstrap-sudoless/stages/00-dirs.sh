@@ -25,15 +25,19 @@ ensure_dir "${NIGHT_BIG_STORE}/cache"
 
 ##
 #: --- privacy on a shared login node ---
+#: Only when other people can log in here; on a single-user box these would be
+#: needless friction (e.g. you could no longer hand a collaborator a path).
 #: These directories default to 755, which would expose models, datasets,
 #: fitted lenses and logs to every other user of the cluster. The parent
 #: /mounts/work is 1777 and not ours to change, but that does not matter: a
 #: child directory's own mode gates access to its contents, and the parent's
 #: sticky bit (the `t') is what stops others deleting our directory despite
 #: the parent being world-writable.
-for d in "${NIGHT_BIG_STORE}" "${NIGHT_LOCAL_CACHE}" "${HOME}/code" ; do
-    [ -d "${d}" ] && run_soft chmod 700 "${d}"
-done
+if [ "${NIGHT_MULTIUSER}" = y ] ; then
+    for d in "${NIGHT_BIG_STORE}" "${NIGHT_LOCAL_CACHE}" "${HOME}/code" ; do
+        [ -d "${d}" ] && run_soft chmod 700 "${d}"
+    done
+fi
 
 #: Existing top-level entries in $HOME were created under umask 022 and are
 #: world-readable; $HOME is only 711 (traversable), so anyone who guesses a
@@ -46,26 +50,33 @@ if [ -n "${NIGHT_BOOTSTRAP_HARDEN_HOME:-}" ] ; then
 fi
 
 ##
-#: --- cluster marker ---
-#: night/cis-p in doom.d/config.el (and anything else that must know) tests for
-#: this file rather than inferring. Every inferrable signal was wrong in some
-#: way: the mount point only proves the share is mounted; a $HOME path prefix
-#: is a naming convention, not an identity; the DNS search domain tracks
-#: network connectivity, so the laptop matched it on the LMU VPN; hostnames
-#: need a subprocess and per-machine upkeep. $HOME is the shared mount, so one
-#: file covers every host in the cluster.
-if [ "${NIGHT_PROFILE}" = "cis-lmu" ] && [ ! -e "${HOME}/.cis_mark" ] ; then
-    cat > "${HOME}/.cis_mark" <<'MARK'
-# Marker: this home lives on the LMU CIS cluster.
+#: --- site marker ---
+#: Records which profile this home belongs to, so later runs (and other
+#: programs, e.g. night/cis-p in doom.d/config.el) can *read* the answer
+#: instead of inferring it. Named generically, and holding the profile name,
+#: because the site is a variable here -- CIS is one value, not the concept.
+#: Where $HOME is shared, one file covers every host in the cluster.
+if [ ! -e "${night_site_file}" ] && [ "${NIGHT_PROFILE}" != "default" ] ; then
+    {
+        printf '%s\n' "${NIGHT_PROFILE}"
+        cat <<'MARK'
+
 # Written by setup/bootstrap-sudoless/stages/00-dirs.sh.
-# An explicit declaration on purpose; see that file for why inference failed.
+# The first non-comment line is the profile name.
+#
+# An explicit declaration on purpose: every inferrable signal was wrong in some
+# way. A mount point only proves the share is mounted; a $HOME path prefix is a
+# naming convention, not an identity; the DNS search domain tracks network
+# connectivity (the laptop matched it over VPN); hostnames need per-machine
+# upkeep and collide.
 
 "Begin at the beginning," the King said, very gravely,
 "and go on till you come to the end: then stop."
   -- Alice's Adventures in Wonderland
 MARK
-    chmod 600 "${HOME}/.cis_mark"
-    ok "wrote ${HOME}/.cis_mark"
+    } > "${night_site_file}"
+    chmod 600 "${night_site_file}"
+    ok "wrote ${night_site_file} (${NIGHT_PROFILE})"
 fi
 
 ##
@@ -122,12 +133,17 @@ case ":\${PATH}:" in
     *) export PATH="\${NIGHT_BIN}:\${PATH}" ;;
 esac
 
-#: The terminal's background colour cannot be queried; the only convention is
-#: COLORFGBG, which kitty does not set and which sshd will not forward (its
-#: AcceptEnv here is "LANG LC_*"). The client therefore sends LC_COLORFGBG;
-#: adopt it, so Emacs and friends stop guessing -- and guessing dark.
-if [ -n "\${LC_COLORFGBG:-}" ] && [ -z "\${COLORFGBG:-}" ] ; then
-    export COLORFGBG="\${LC_COLORFGBG}"
+#: --- variables smuggled through ssh ---
+#: sshd forwards only what AcceptEnv permits (commonly, and here, "LANG LC_*"),
+#: so the client sends LC_<NAME> and we restore <NAME>. The implementation is
+#: [agfi:env-load-smuggled-lc-vars] in zshlang/basic/ssh.zsh -- it is ordinary
+#: shell functionality, not bootstrap-specific, so it lives with the rest of
+#: the shell library rather than being duplicated here.
+#:
+#: Guarded because this file is also sourced by POSIX sh (the bootstrap
+#: stages), where zshlang is not loaded; those contexts do not need it.
+if command -v env-load-smuggled-lc-vars >/dev/null 2>&1 ; then
+    env-load-smuggled-lc-vars
 fi
 
 #: These are multi-user login nodes, and the default umask 0022 creates every

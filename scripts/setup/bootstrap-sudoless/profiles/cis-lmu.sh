@@ -13,6 +13,11 @@
 
 NIGHT_PROFILE_NAME='cis-lmu'
 
+#: What the stages actually branch on. "cis-lmu" is just a name; these two
+#: facts are what make this site different from a plain sudo-less box.
+NIGHT_HOME_SHARED=y   #: one NFS home across ~12 hosts
+NIGHT_MULTIUSER=y     #: shared login nodes -- 8 other users were on beta
+
 #: The big store. Single point of change; overridable from the environment:
 #:   NIGHT_BIG_STORE=/nfs/gdata/feraidoon sh bootstrap.sh
 #: Default is /mounts/work (7 TB free). /nfs/gdata (25 TB free) is the
