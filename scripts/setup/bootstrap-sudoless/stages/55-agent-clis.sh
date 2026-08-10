@@ -166,13 +166,19 @@ fi
 #: [agfi:antigravity] runs `agy'; see PE/Agents/readme.org.
 #:
 #: @warn Its installer ends by running `agy install', which appends a PATH
-#: line to ~/.profile. That is wrong for us twice over: ~/.profile is tracked
-#: by vcsh, so it silently dirties the repo, and the line it writes hardcodes
-#: an ABSOLUTE path ($HOME expanded on the machine that ran it) into a file
-#: shared with every other host -- including the laptop, where that path does
-#: not exist. NIGHT_BIN is already on PATH via the env contract, so the line
-#: is redundant as well as harmful. There is no flag to suppress it, so undo
-#: it afterwards.
+#: line to the shell rc files. That is wrong for us twice over: those files
+#: are tracked by vcsh, so it silently dirties the repo -- and blocks the next
+#: `vcsh night.sh pull' with "local changes would be overwritten" -- and the
+#: line hardcodes an ABSOLUTE path ($HOME expanded on the machine that ran it)
+#: into files shared with every other host, including the laptop, where that
+#: path does not exist. NIGHT_BIN is already on PATH via the env contract, so
+#: the line is redundant as well as harmful. There is no flag to suppress it.
+#:
+#: @warn It writes to FOUR files, not just ~/.profile: .zshrc, .zprofile,
+#: .bashrc and .bash_profile were all modified on beta. Reverting only the one
+#: named in its log output left the other three dirty. Snapshot the whole set.
+night_agy_rcfiles=".profile .zshrc .zprofile .zshenv .zlogin .bashrc .bash_profile .bash_login"
+
 if have agy && [ -z "${NIGHT_BOOTSTRAP_FORCE:-}" ] ; then
     ok "agy present ($(agy --version 2>/dev/null | head -1))"
 elif ! have bash ; then
@@ -180,25 +186,34 @@ elif ! have bash ; then
 else
     log "installing antigravity (agy)"
     agy_installer="${NIGHT_LOCAL_CACHE:-/tmp}/agy-install.sh"
-    agy_profile="${HOME}/.profile"
-    agy_profile_before=''
-    [ -f "${agy_profile}" ] && agy_profile_before="$(cat "${agy_profile}")"
+    agy_snap="$(mktemp -d "${NIGHT_LOCAL_CACHE:-/tmp}/agy-rc.XXXXXX")"
+
+    for f in ${night_agy_rcfiles} ; do
+        [ -f "${HOME}/${f}" ] && cp -p "${HOME}/${f}" "${agy_snap}/${f}"
+    done
 
     if fetch "https://antigravity.google/cli/install.sh" "${agy_installer}" ; then
         run_soft bash "${agy_installer}" --dir "${NIGHT_BIN}"
         rm -f "${agy_installer}"
 
-        #: Restore ~/.profile only if the sole change is the installer's own
-        #: block; anything else in there is not ours to revert.
-        if [ -f "${agy_profile}" ] && \
-           grep -q 'Added by Antigravity CLI installer' "${agy_profile}" 2>/dev/null
-        then
-            printf '%s\n' "${agy_profile_before}" > "${agy_profile}"
-            ok "reverted the PATH line antigravity appended to ~/.profile"
-        fi
+        #: Restore only files that gained the installer's own marker; anything
+        #: else that changed meanwhile is not ours to revert.
+        for f in ${night_agy_rcfiles} ; do
+            [ -f "${HOME}/${f}" ] || continue
+            grep -q 'Added by Antigravity CLI installer' "${HOME}/${f}" 2>/dev/null || continue
+            if [ -f "${agy_snap}/${f}" ] ; then
+                cp -p "${agy_snap}/${f}" "${HOME}/${f}"
+                ok "reverted antigravity's PATH line in ~/${f}"
+            else
+                #: The installer created this file; it did not exist before.
+                rm -f "${HOME}/${f}"
+                ok "removed ~/${f}, created by antigravity's installer"
+            fi
+        done
     else
         warn "could not download the antigravity installer"
     fi
+    rm -rf "${agy_snap}"
 fi
 
 ##
