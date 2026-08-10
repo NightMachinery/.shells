@@ -46,6 +46,29 @@ if [ -n "${NIGHT_BOOTSTRAP_HARDEN_HOME:-}" ] ; then
 fi
 
 ##
+#: --- cluster marker ---
+#: night/cis-p in doom.d/config.el (and anything else that must know) tests for
+#: this file rather than inferring. Every inferrable signal was wrong in some
+#: way: the mount point only proves the share is mounted; a $HOME path prefix
+#: is a naming convention, not an identity; the DNS search domain tracks
+#: network connectivity, so the laptop matched it on the LMU VPN; hostnames
+#: need a subprocess and per-machine upkeep. $HOME is the shared mount, so one
+#: file covers every host in the cluster.
+if [ "${NIGHT_PROFILE}" = "cis-lmu" ] && [ ! -e "${HOME}/.cis_mark" ] ; then
+    cat > "${HOME}/.cis_mark" <<'MARK'
+# Marker: this home lives on the LMU CIS cluster.
+# Written by setup/bootstrap-sudoless/stages/00-dirs.sh.
+# An explicit declaration on purpose; see that file for why inference failed.
+
+"Begin at the beginning," the King said, very gravely,
+"and go on till you come to the end: then stop."
+  -- Alice's Adventures in Wonderland
+MARK
+    chmod 600 "${HOME}/.cis_mark"
+    ok "wrote ${HOME}/.cis_mark"
+fi
+
+##
 #: The env contract. Sourced by ~/.privateShell (stage 10) so an interactive
 #: shell agrees with the bootstrap about where things live.
 env_file="${HOME}/.night-bootstrap.env"
@@ -98,6 +121,14 @@ case ":\${PATH}:" in
     *":\${NIGHT_BIN}:"*) : ;;
     *) export PATH="\${NIGHT_BIN}:\${PATH}" ;;
 esac
+
+#: The terminal's background colour cannot be queried; the only convention is
+#: COLORFGBG, which kitty does not set and which sshd will not forward (its
+#: AcceptEnv here is "LANG LC_*"). The client therefore sends LC_COLORFGBG;
+#: adopt it, so Emacs and friends stop guessing -- and guessing dark.
+if [ -n "\${LC_COLORFGBG:-}" ] && [ -z "\${COLORFGBG:-}" ] ; then
+    export COLORFGBG="\${LC_COLORFGBG}"
+fi
 
 #: These are multi-user login nodes, and the default umask 0022 creates every
 #: file world-readable. 077 makes new files 600 and new dirs 700.
