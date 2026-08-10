@@ -1,12 +1,24 @@
 ##
-#: Rendering and session scanning live in =golang/claude_session.go=; these
-#: are thin wrappers around it. See =docs/claude_session.md=.
+#: Rendering and session scanning live in =golang/claude_session=; these are
+#: thin wrappers around it. See =golang/claude_session/readme.org=.
 ##
+function h-claude-code-session-dep {
+    #: Ensures the renderer is built and on PATH, building it on first use.
+    ##
+    ensure-cmd go @RET
+    ensure-dep1 claude_session go-install-local "${NIGHTDIR}/golang/claude_session" @RET
+}
+
 function h-claude-code-session-render {
     #: Renders a Claude Code session `.jsonl` to stdout.
     #: Usage: h-claude-code-session-render <format> <input>
     ##
     local format="${1}" input="${2}"
+
+    h-claude-code-session-dep @RET
+    if [[ "${format}" == org-pandoc ]] ; then
+        ensure-cmd pandoc @RET
+    fi
 
     local render_args=("-format=${format}")
     local max_lines="${claude_code_session_max_block_lines:-0}"
@@ -16,8 +28,13 @@ function h-claude-code-session-render {
     else
         render_args+=(-diff=false)
     fi
+    if bool "${claude_code_session_subagents_p:-y}" ; then
+        render_args+=(-subagents)
+    else
+        render_args+=(-subagents=false)
+    fi
 
-    assert claude_session.go render "${render_args[@]}" "${input}" @RET
+    assert claude_session render "${render_args[@]}" "${input}" @RET
 }
 
 function h-claude-code-session-to-md {
@@ -101,11 +118,20 @@ function h-claude-code-session-select-fz {
         return 1
     fi
 
+    h-claude-code-session-dep @RET
+
     #: `epoch<TAB>path<TAB>local time<TAB>relative path<TAB>snippet`, newest
     #: first. The time is the last message's, not the file's mtime; see
-    #: =docs/claude_session.md=.
+    #: =golang/claude_session/readme.org=.
+    local list_args=()
+    if bool "${claude_code_view_session_fz_subagents_p:-n}" ; then
+        #: Off by default: subagent transcripts are inlined into their parent
+        #: by the renderer, so listing them here too is noise.
+        list_args+=(-subagents)
+    fi
+
     local lines
-    lines="$(claude_session.go list "${sessions_dir}")" @RET
+    lines="$(claude_session list "${list_args[@]}" "${sessions_dir}")" @RET
 
     local selected
     selected="$(ec "${lines}" | fz --delimiter=$'\t' --with-nth='3..' --no-multi "${fz_opts[@]}")" @RET
@@ -168,4 +194,19 @@ function claude-code-view-session-raw-fz {
 }
 #: Same, but selects from the sessions of all projects.
 aliasfn claude-code-view-session-raw-all-fz claude_code_view_session_fz_scope=all claude-code-view-session-raw-fz
+
+function claude-session-selftest {
+    #: Runs the renderer's Go tests, then checks its parallel pandoc path
+    #: against a single pandoc run over every local session transcript.
+    ##
+    ensure-cmd go pandoc @RET
+
+    local dir="${NIGHTDIR}/golang/claude_session"
+    local corpus="${claude_code_view_session_fz_projects_dir:-${HOME}/.claude/projects}"
+
+    pushf "${dir}" && {
+        assert go test -count=1 ./... @RET
+        CLAUDE_SESSION_CORPUS="${corpus}" assert go test -count=1 -v -run Parity ./... @RET
+    } always { popf }
+}
 ##
