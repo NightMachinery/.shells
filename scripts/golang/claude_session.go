@@ -61,13 +61,15 @@ type message struct {
 }
 
 type block struct {
-	Type     string          `json:"type"`
-	Text     string          `json:"text"`
-	Thinking string          `json:"thinking"`
-	Name     string          `json:"name"`
-	Input    json.RawMessage `json:"input"`
-	Content  json.RawMessage `json:"content"`
-	IsError  bool            `json:"is_error"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	Content   json.RawMessage `json:"content"`
+	IsError   bool            `json:"is_error"`
+	ID        string          `json:"id"`
+	ToolUseID string          `json:"tool_use_id"`
 }
 
 func main() {
@@ -117,6 +119,13 @@ type renderer struct {
 	maxBlock int
 	diff     bool
 	out      *strings.Builder
+
+	// Results, keyed by the id of the call they answer, so a call can render
+	// its own result underneath itself.
+	results map[string]toolResult
+	// The enclosing turn's timestamp; sub-headings only show theirs when it
+	// differs.
+	turnTS string
 }
 
 // Below this, splitting the document across pandoc processes costs more in
@@ -162,8 +171,18 @@ func cmdRender(argv []string) {
 		records = append(records, rec)
 	}
 
+	// Decoded once: the result index, the turn grouping and the rendering all
+	// need the blocks.
+	blocks := make([][]block, len(records))
+	for i := range records {
+		blocks[i] = decodeBlocks(records[i].Message)
+	}
+
+	results := indexResults(records, blocks)
+	turns := buildTurns(records, blocks, results)
+
 	opts := renderOpts{org: *format == "org", maxBlock: *maxBlock, diff: *diff}
-	parts := renderRecords(records, opts, *jobs)
+	parts := renderTurns(turns, results, opts, *jobs)
 
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
@@ -190,14 +209,96 @@ type renderOpts struct {
 	diff     bool
 }
 
-// Records are independent, so they render concurrently and are reassembled in
+// One conversational turn: the consecutive records that share a role, flattened
+// into the blocks they contain. Claude Code writes one record per content
+// block, so without this an assistant turn becomes a run of near-identical
+// headings.
+type turn struct {
+	role   string
+	ts     string
+	blocks []timedBlock
+}
+
+// A block plus the timestamp of the record it arrived in, which within a turn
+// is not necessarily the turn's own.
+type timedBlock struct {
+	b  block
+	ts string
+}
+
+// A tool result, keyed elsewhere by the id of the call it answers.
+type toolResult struct {
+	body    string
+	isError bool
+	ts      string
+}
+
+// Results arrive as user turns, because that is how they are sent back to the
+// model. Indexing them by the call they answer lets them be rendered under it
+// instead of as a message nobody wrote.
+func indexResults(records []record, blocks [][]block) map[string]toolResult {
+	calls := map[string]bool{}
+	for _, bs := range blocks {
+		for _, b := range bs {
+			if b.Type == "tool_use" && b.ID != "" {
+				calls[b.ID] = true
+			}
+		}
+	}
+
+	out := map[string]toolResult{}
+	for i, bs := range blocks {
+		for _, b := range bs {
+			if b.Type != "tool_result" || !calls[b.ToolUseID] {
+				continue
+			}
+			out[b.ToolUseID] = toolResult{
+				body:    flattenResult(b.Content),
+				isError: b.IsError,
+				ts:      records[i].Timestamp,
+			}
+		}
+	}
+	return out
+}
+
+func buildTurns(records []record, blocks [][]block, results map[string]toolResult) []turn {
+	var turns []turn
+
+	for i, rec := range records {
+		var keep []timedBlock
+		for _, b := range blocks[i] {
+			// Nested under its call; an orphan with no matching call still
+			// gets rendered where it sits.
+			if b.Type == "tool_result" {
+				if _, nested := results[b.ToolUseID]; nested {
+					continue
+				}
+			}
+			keep = append(keep, timedBlock{b: b, ts: rec.Timestamp})
+		}
+		if len(keep) == 0 {
+			continue
+		}
+
+		if n := len(turns); n > 0 && turns[n-1].role == rec.Type {
+			turns[n-1].blocks = append(turns[n-1].blocks, keep...)
+			continue
+		}
+		turns = append(turns, turn{role: rec.Type, ts: rec.Timestamp, blocks: keep})
+	}
+
+	return turns
+}
+
+// Turns are independent, so they render concurrently and are reassembled in
 // order.
-func renderRecords(records []record, opts renderOpts, jobs int) []string {
-	parts := make([]string, len(records))
+func renderTurns(turns []turn, results map[string]toolResult, opts renderOpts, jobs int) []string {
+	parts := make([]string, len(turns))
 
 	workers := jobs
-	if workers > len(records) {
-		workers = len(records)
+	if workers > len(turns) {
+		workers = len(turns)
 	}
 	if workers < 1 {
 		return nil
@@ -213,16 +314,17 @@ func renderRecords(records []record, opts renderOpts, jobs int) []string {
 				org:      opts.org,
 				maxBlock: opts.maxBlock,
 				diff:     opts.diff,
+				results:  results,
 				out:      &strings.Builder{},
 			}
 			for i := range idx {
 				r.out.Reset()
-				r.renderRecord(records[i])
+				r.renderTurn(turns[i])
 				parts[i] = r.out.String()
 			}
 		}()
 	}
-	for i := range records {
+	for i := range turns {
 		idx <- i
 	}
 	close(idx)
@@ -331,24 +433,58 @@ func readRecords(fh *os.File) []record {
 	return out
 }
 
-func (r *renderer) renderRecord(rec record) {
-	// Rendered first so a record whose blocks are all empty (e.g. a bare
+func (r *renderer) renderTurn(t turn) {
+	// Rendered first so a turn whose blocks are all empty (e.g. a bare
 	// redacted-thinking turn) does not leave a dangling heading behind.
-	body := &renderer{org: r.org, maxBlock: r.maxBlock, diff: r.diff, out: &strings.Builder{}}
-	for _, b := range decodeBlocks(rec.Message) {
-		body.renderBlock(b)
+	body := &renderer{
+		org:      r.org,
+		maxBlock: r.maxBlock,
+		diff:     r.diff,
+		results:  r.results,
+		turnTS:   t.ts,
+		out:      &strings.Builder{},
+	}
+	for _, tb := range t.blocks {
+		body.renderBlock(tb)
 	}
 	if strings.TrimSpace(body.out.String()) == "" {
 		return
 	}
 
-	title := strings.ToUpper(rec.Type[:1]) + rec.Type[1:]
-	if ts := humanTimestamp(rec.Timestamp); ts != "" {
+	title := strings.ToUpper(t.role[:1]) + t.role[1:]
+	if ts := humanTimestamp(t.ts); ts != "" {
 		title += " " + ts
 	}
 	r.heading(1, title)
 	r.out.WriteString(body.out.String())
 	r.ensureBlank()
+}
+
+// A timestamp for a heading inside a turn, shown only when it says something
+// the turn's own heading does not. Same minute means same moment here.
+func (r *renderer) stamp(ts string) string {
+	if ts == "" || r.turnTS == "" {
+		return ""
+	}
+
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return ""
+	}
+	base, err := time.Parse(time.RFC3339, r.turnTS)
+	if err != nil {
+		return ""
+	}
+
+	t, base = t.Local(), base.Local()
+	if t.Format(listStamp) == base.Format(listStamp) {
+		return ""
+	}
+	if t.YearDay() != base.YearDay() || t.Year() != base.Year() {
+		// A turn that crosses midnight needs the date to stay unambiguous.
+		return " " + t.Format(orgStamp)
+	}
+	return " [" + t.Format("15:04") + "]"
 }
 
 func decodeBlocks(m *message) []block {
@@ -368,7 +504,13 @@ func decodeBlocks(m *message) []block {
 	return blocks
 }
 
-func (r *renderer) renderBlock(b block) {
+// A single-line result this short goes on its heading instead of into a block
+// of its own.
+const resultInlineMax = 72
+
+func (r *renderer) renderBlock(tb timedBlock) {
+	b := tb.b
+
 	switch b.Type {
 	case "text":
 		if strings.TrimSpace(b.Text) == "" {
@@ -380,7 +522,7 @@ func (r *renderer) renderBlock(b block) {
 		if strings.TrimSpace(b.Thinking) == "" {
 			return
 		}
-		r.heading(2, "Thinking")
+		r.heading(2, "Thinking"+r.stamp(tb.ts))
 		r.block("", b.Thinking)
 
 	case "tool_use":
@@ -393,18 +535,39 @@ func (r *renderer) renderBlock(b block) {
 		if head := toolHeadline(name, in); head != "" {
 			title += " · " + head
 		}
-		r.heading(2, title)
+		r.heading(2, title+r.stamp(tb.ts))
 		r.renderToolInput(name, in, b.Input)
 
+		if res, ok := r.results[b.ID]; ok {
+			r.renderResult(3, res)
+		}
+
 	case "tool_result":
-		title := "Tool Result"
-		if b.IsError {
-			title += " (error)"
-		}
-		r.heading(2, title)
-		if body := flattenResult(b.Content); body != "" {
-			r.block("", body)
-		}
+		// Orphaned: the call it answers is not in this transcript.
+		r.renderResult(2, toolResult{
+			body:    flattenResult(b.Content),
+			isError: b.IsError,
+			ts:      tb.ts,
+		})
+	}
+}
+
+func (r *renderer) renderResult(level int, res toolResult) {
+	title := "Result"
+	if res.isError {
+		title += " (error)"
+	}
+	stamp := r.stamp(res.ts)
+
+	body := strings.TrimSpace(res.body)
+	switch {
+	case body == "":
+		r.heading(level, title+": (no output)"+stamp)
+	case !strings.ContainsAny(body, "\n\r") && len([]rune(body)) <= resultInlineMax:
+		r.heading(level, title+": "+body+stamp)
+	default:
+		r.heading(level, title+stamp)
+		r.block("", res.body)
 	}
 }
 
@@ -459,6 +622,14 @@ var bulletOrder = []string{
 }
 
 var blockOrder = []string{"command", "old_string", "new_string", "content", "plan", "prompt"}
+
+// Always rendered as a block, however short. A one-line `command` inlined as
+// `=...=` breaks the moment it contains an `=`, and a command belongs in a
+// source block anyway.
+var alwaysBlock = map[string]bool{
+	"command": true, "content": true, "old_string": true, "new_string": true,
+	"plan": true, "prompt": true,
+}
 
 // Rendered as markdown prose (so pandoc turns them into real org markup)
 // rather than as an inert code block.
@@ -518,7 +689,7 @@ func (r *renderer) renderToolInput(name string, in map[string]json.RawMessage, r
 
 	// Scalars and short strings become bullets.
 	for _, k := range orderedKeys(in, bulletOrder) {
-		if handled[k] {
+		if handled[k] || alwaysBlock[k] {
 			continue
 		}
 		v := in[k]
