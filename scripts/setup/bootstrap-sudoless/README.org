@@ -70,6 +70,50 @@ Add a host family by adding a profile and a case in =night_profile_detect=.
 - =BOOTSTRAP_WITH_JUNEST= -- off. Junest is a last-resort escape hatch, and
   explicitly not for emacs.
 
+* Services (stage 70)
+Per-boot services use *systemd user units*, not cron:
+
+- No root needed, and =systemctl --user= runs on these hosts.
+- =~/.config/systemd/user/= is on the shared NFS home, so one unit file
+  configures every host, and =systemctl --user enable= writes its symlink into
+  the shared =default.target.wants/= too. Crontabs live in
+  =/var/spool/cron/crontabs/= on each host's *local* disk, so they would have
+  to be copied to ~12 machines and kept in sync by hand.
+- You also get restart-on-failure, ordering and =journalctl --user=.
+
+The unit runs =~/.startup..private..zsh=, a plain zsh script (edit it to add
+per-boot odds and ends). It starts redis and the emacs daemon, idempotently.
+
+Starting at *boot* rather than at first login additionally needs
+=loginctl enable-linger=, which is per-host state under
+=/var/lib/systemd/linger/= on local disk. It also keeps =$XDG_RUNTIME_DIR=
+alive across logout --- which matters, because the emacs socket lives there
+and logind would otherwise delete it out from under a still-running daemon.
+
+* Security on a shared login node
+These are multi-user machines --- eight other people were logged into =beta=
+while this was written --- so:
+
+- *redis requires a password.* Binding to 127.0.0.1 keeps out other *hosts*,
+  not other *users of the same host*; without =requirepass= anyone on the box
+  could read the shell history and brishgarden state. The secret is generated
+  in stage 45 into =~/.redis-auth= (mode 600); stage 70 starts the server with
+  it; the env contract exports =REDISCLI_AUTH=, which =redis-cli= picks up
+  automatically, so no calling code changes. A 700 unix socket is exposed too.
+  =/proc/PID/environ= is owner-readable only, so exporting the secret does not
+  leak it.
+- *Our directories are mode 700*: =/mounts/work/$USER=, =/var/tmp/$USER=,
+  =~/code=. They default to 755, which would expose models, datasets, fitted
+  lenses and logs to everyone on the cluster.
+- =~/.night-bootstrap.env= is mode 600, since it carries the redis secret.
+
+* Doom is not set up here
+Stage 50 installs a working =emacs= and then *delegates* to
+=~/doom.d/bootstrap/install.sh=. Doom setup is not specific to this bootstrap
+--- the same config is installed by other methods --- so it lives with the
+config, along with its own README covering the version-lockfile policy, why
+=straight-thaw-versions= must run after =doom sync=, and the failure modes.
+
 * Things learned the hard way
 Documented at the point of use in each stage; collected here because each
 one cost real debugging time.
