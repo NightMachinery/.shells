@@ -435,17 +435,40 @@ function claude-code-view-session-focused {
     #: Opens the Claude Code session running in the focused kitty window as an
     #: org file in emacs. Bound to a kitty hotkey; the window -> session
     #: mapping comes from [agfi:claude-code-session-register].
+    #:
+    #: Always succeeds. Every way this comes up empty -- no session in this
+    #: window, kitty not answering -- is a message for a person, and it has
+    #: already been delivered as a notification by the time we get here. A
+    #: non-zero return would only add BrishGarden's failed-command bell on top
+    #: of it, for something that is not a failure.
     ##
-    ensure-cmd kitty jq @RET
+    h-claude-code-view-session-focused || true
+}
+
+function h-claude-code-view-session-focused {
+    #: The body of [agfi:claude-code-view-session-focused], split out so the
+    #: hotkey can swallow the exit code without swallowing the reason. Every
+    #: exit reports through [agfi:h-claude-code-session-lost].
+    ##
+    if ! ensure-cmd kitty jq ; then
+        h-claude-code-session-lost "kitty or jq is not installed"
+        return 1
+    fi
 
     local sock
-    sock="$(h-claude-code-session-kitty-socket)" @RET
+    if ! sock="$(h-claude-code-session-kitty-socket)" ; then
+        h-claude-code-session-lost "could not find kitty's socket"
+        return 1
+    fi
 
     local ls_json
-    ls_json="$(kitty @ --to "${sock}" ls)" @RET
+    if ! ls_json="$(kitty @ --to "${sock}" ls)" ; then
+        h-claude-code-session-lost "kitty did not answer on ${sock}"
+        return 1
+    fi
 
     local win
-    win="$(ec "${ls_json}" | jq -r 'first(.[] | select(.is_focused) | .tabs[] | select(.is_focused) | .windows[] | select(.is_focused) | .id) // empty')" @RET
+    win="$(ec "${ls_json}" | jq -r 'first(.[] | select(.is_focused) | .tabs[] | select(.is_focused) | .windows[] | select(.is_focused) | .id) // empty')"
 
     local key
     if ! key="$(h-claude-code-session-registry-key "${sock##*-}" "${win}")" ; then
@@ -454,14 +477,14 @@ function claude-code-view-session-focused {
     fi
 
     local entry
-    entry="$(h-claude-code-session-registry-dir)/${key}" @RET
+    entry="$(h-claude-code-session-registry-dir)/${key}"
     if ! test -e "${entry}" ; then
         h-claude-code-session-lost "no Claude Code session registered for this window"
         return 1
     fi
 
     local session_file
-    session_file="$(cat "${entry}")" @TRET
+    session_file="$(cat "${entry}")"
     if ! test -e "${session_file}" ; then
         h-claude-code-session-lost "session transcript is gone: ${session_file}"
         return 1

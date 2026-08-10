@@ -342,6 +342,13 @@ reads that window's registry entry, and hands the transcript to
 =claude-code-view-session=. It notifies rather than printing on failure,
 because the hotkey runs detached and stderr goes nowhere a person will look.
 
+It also always exits zero. Pressing the key in a window with no session is an
+ordinary outcome, not an error, and the notification has already said so ---
+but a non-zero return makes BrishGarden log the command as failed and ring its
+failure bell, which is a second, louder answer to a question already answered.
+=h-claude-code-view-session-focused= holds the real body and the real exit
+code, for anything that wants to branch on it.
+
 Two things that are easy to get wrong here:
 
 - kitty's own =PATH= is just =/usr/bin:/bin:/usr/sbin:/sbin=, so the binding
