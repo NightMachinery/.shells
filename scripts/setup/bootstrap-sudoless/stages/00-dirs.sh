@@ -24,6 +24,28 @@ ensure_dir "${NIGHT_BIG_STORE}/envs"
 ensure_dir "${NIGHT_BIG_STORE}/cache"
 
 ##
+#: --- privacy on a shared login node ---
+#: These directories default to 755, which would expose models, datasets,
+#: fitted lenses and logs to every other user of the cluster. The parent
+#: /mounts/work is 1777 and not ours to change, but that does not matter: a
+#: child directory's own mode gates access to its contents, and the parent's
+#: sticky bit (the `t') is what stops others deleting our directory despite
+#: the parent being world-writable.
+for d in "${NIGHT_BIG_STORE}" "${NIGHT_LOCAL_CACHE}" "${HOME}/code" ; do
+    [ -d "${d}" ] && run_soft chmod 700 "${d}"
+done
+
+#: Existing top-level entries in $HOME were created under umask 022 and are
+#: world-readable; $HOME is only 711 (traversable), so anyone who guesses a
+#: standard name -- .privateShell, .zcompdump, .emacs.d -- can read it.
+#: We deliberately do NOT chmod $HOME itself; see the umask note in the env
+#: contract below.
+if [ -n "${NIGHT_BOOTSTRAP_HARDEN_HOME:-}" ] ; then
+    find "${HOME}" -maxdepth 1 -mindepth 1 \! -type l -exec chmod go-rwx {} + 2>/dev/null
+    ok "removed group/other access from top-level \$HOME entries"
+fi
+
+##
 #: The env contract. Sourced by ~/.privateShell (stage 10) so an interactive
 #: shell agrees with the bootstrap about where things live.
 env_file="${HOME}/.night-bootstrap.env"
@@ -76,6 +98,14 @@ case ":\${PATH}:" in
     *":\${NIGHT_BIN}:"*) : ;;
     *) export PATH="\${NIGHT_BIN}:\${PATH}" ;;
 esac
+
+#: These are multi-user login nodes, and the default umask 0022 creates every
+#: file world-readable. 077 makes new files 600 and new dirs 700.
+#: @note \$HOME itself stays at the cluster's 711 convention (103 of 108 homes
+#: use it) rather than 700: sshd reads ~/.ssh/authorized_keys, and on an NFS
+#: home with root_squash a 700 home risks breaking key auth. 711 plus private
+#: contents gives the same privacy without the lockout risk.
+umask 077
 
 #: redis listens on 127.0.0.1, which keeps out other *hosts* but NOT other
 #: *users* of this machine -- and these are shared login nodes. So redis runs
