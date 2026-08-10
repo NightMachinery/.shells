@@ -26,23 +26,47 @@ have systemctl || {
     return 0 2>/dev/null || exit 0
 }
 
-if ! systemctl --user is-system-running >/dev/null 2>&1 ; then
-    warn "systemd --user is not running here; skipping"
-    return 0 2>/dev/null || exit 0
-fi
-
 ##
 #: --- lingering: start at boot, and keep XDG_RUNTIME_DIR alive ---
-if [ -e "/var/lib/systemd/linger/$(id -un)" ] ; then
+#: @warn This MUST come before any `systemctl --user' check. Without
+#: lingering there is no user manager in a non-interactive ssh session, so
+#: `systemctl --user is-system-running' fails -- and bailing out on that
+#: skips the very step that fixes it. On a second host that produced a stage
+#: which reported success while starting nothing, and the first thing every
+#: new shell printed was "Could not connect to Redis at 127.0.0.1:6379".
+#:
+#: `loginctl enable-linger' needs no user manager, which is why it can break
+#: the cycle.
+linger_user="$(id -un)"
+if [ -e "/var/lib/systemd/linger/${linger_user}" ] ; then
     ok "lingering already enabled"
 else
-    if run_soft loginctl enable-linger "$(id -un)" &&
-       [ -e "/var/lib/systemd/linger/$(id -un)" ] ; then
+    if run_soft loginctl enable-linger "${linger_user}" &&
+       [ -e "/var/lib/systemd/linger/${linger_user}" ] ; then
         ok "lingering enabled (services now start at boot)"
     else
         warn "could not enable lingering; services will start at first login only"
         warn "and \$XDG_RUNTIME_DIR will be removed at logout"
     fi
+fi
+
+#: A non-interactive ssh session does not always get XDG_RUNTIME_DIR in the
+#: environment even once the manager is running, and systemctl --user needs it
+#: to find the bus.
+if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ] ; then
+    XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    export XDG_RUNTIME_DIR
+fi
+
+if ! systemctl --user is-system-running >/dev/null 2>&1 ; then
+    #: Give the manager a moment: enabling lingering starts it asynchronously.
+    sleep 2
+fi
+
+if ! systemctl --user is-system-running >/dev/null 2>&1 ; then
+    warn "systemd --user still not available; skipping the unit"
+    warn "start services by hand with: zsh ~/.startup..private..zsh"
+    return 0 2>/dev/null || exit 0
 fi
 
 ##
