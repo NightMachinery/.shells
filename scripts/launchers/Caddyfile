@@ -101,7 +101,13 @@ https://garden.lilf.ir {
   #reverse_proxy /api/v1/* localhost:7230
   route /api/v1/* {
 	uri strip_prefix /api/v1
-	reverse_proxy localhost:7230
+	#: The garden requires an API key on every request. Remote callers never hold
+	#: it; they authenticate with the basicauth above, and we vouch for them by
+	#: injecting this host's key here. `header_up` overwrites any key the client
+	#: sent, so a caller cannot smuggle one past basicauth.
+	reverse_proxy localhost:7230 {
+		header_up X-API-Key {env.GARDEN_KEY}
+	}
   }
 
   # route /* {
