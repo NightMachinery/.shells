@@ -94,12 +94,17 @@ PATH="${PATH}:${tools_bin}" ; export PATH
 ##
 #: --- redis credential ---
 #: redis listens on 127.0.0.1, which excludes other *hosts* but not the other
-#: *users* of these shared login nodes -- so it must require a password. The
-#: secret is generated once here; stage 70 starts the server with it, and the
-#: env contract exports REDISCLI_AUTH so existing redis-cli callers are
-#: unchanged. Starting the service itself belongs to stage 70.
+#: *users* of the same one -- so where anyone else can log in, it must require
+#: a password. The secret is generated once here; stage 70 starts the server
+#: with it, and the env contract exports REDISCLI_AUTH so existing redis-cli
+#: callers are unchanged. Starting the service itself belongs to stage 70.
+#:
+#: Skipped only when the profile *declares* the host single-user; the default
+#: profile says y, so an unconfigured host gets the password.
 auth_file="${HOME}/.redis-auth"
-if [ -s "${auth_file}" ] ; then
+if [ "${NIGHT_MULTIUSER:-y}" != y ] ; then
+    ok "single-user host: redis needs no password"
+elif [ -s "${auth_file}" ] ; then
     ok "redis credential already present"
 elif have redis-server ; then
     ( umask 077 ; head -c 32 /dev/urandom | base64 | tr -d '\n=' > "${auth_file}" )

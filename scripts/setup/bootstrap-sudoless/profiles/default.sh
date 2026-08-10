@@ -18,8 +18,16 @@
 
 NIGHT_PROFILE_NAME='default'
 
-NIGHT_HOME_SHARED=n
-NIGHT_MULTIUSER=n
+#: `:=' so a one-off run can override without inventing a whole profile:
+#:   NIGHT_MULTIUSER=n sh bootstrap.sh
+: "${NIGHT_HOME_SHARED:=n}"
+
+#: Defaults to y on purpose: this is the fail-safe direction. Guessing
+#: "multiuser" on a private box costs a stricter umask and mode 700 on our
+#: own directories -- no lost capability. Guessing "private" on a box that
+#: turns out to be shared leaves our history, tokens and redis data readable
+#: by everyone on it, and we would never notice. Set n only when you know.
+: "${NIGHT_MULTIUSER:=y}"
 
 : "${NIGHT_BIG_STORE:=${HOME}/big}"
 : "${NIGHT_LOCAL_CACHE:=${TMPDIR:-/tmp}/${USER}}"
