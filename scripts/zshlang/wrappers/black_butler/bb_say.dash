@@ -3,6 +3,16 @@
 # BLACKBUTLER_API_ROOT='http://localhost:9000/api'
 endpoint="${BLACKBUTLER_API_ROOT:-http://127.0.0.1:${BLACKBUTLER_PORT:-7260}}/say/"
 
+#: `--header @file` keeps the key out of argv, which `ps` exposes to other local users.
+apikey_header=''
+case "$endpoint" in
+    http://127.0.0.1*|https://127.0.0.1*|http://localhost*|https://localhost*)
+        if test -r "$HOME/.keys/blackbutler" ; then
+            apikey_header="@$HOME/.keys/blackbutler"
+        fi
+        ;;
+esac
+
 stdin="$(cat)"
 
 speed="${bb_say_speed:-1.12}"
@@ -18,4 +28,4 @@ if test -n "${output_path}" ; then
 fi
 
 req="$(printf -- "%s " "$stdin" | jq --arg speed "$speed" --arg output_path "$output_path" --arg mode "$mode" --arg split_mode "${split_mode}" --raw-input --slurp --null-input --compact-output 'inputs as $i | {"text": $i, "mode": $mode, "split_mode": $split_mode, "speed": $speed, "output_path": $output_path}')"
-printf -- "%s" "$req" | curl --silent --fail --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
+printf -- "%s" "$req" | curl ${apikey_header:+--header "$apikey_header"} --silent --fail --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint

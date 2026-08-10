@@ -18,6 +18,16 @@ if test -n "$nolog" ; then
 fi
 v="${brishz_json_output:-0}"
 
+#: `--header @file` keeps the key out of argv, which `ps` exposes to other local users.
+apikey_header=''
+case "$endpoint" in
+    http://127.0.0.1*|https://127.0.0.1*|http://localhost*|https://localhost*)
+        if test -r "$HOME/.keys/brishgarden" ; then
+            apikey_header="@$HOME/.keys/brishgarden"
+        fi
+        ;;
+esac
+
 if test -e "$cmd" ; then
    cmd="$(cat "$cmd")" || {
       echo Bad input to brishz
@@ -26,8 +36,8 @@ if test -e "$cmd" ; then
 fi
 
 if test -z "$brishz_quote" ; then
-   curl --fail --silent --location --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"stdin\":\"$stdin\", \"session\":\"$session\", \"json_output\":\"$v\", \"nolog\":\"$nolog\"}" $endpoint
+   curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"stdin\":\"$stdin\", \"session\":\"$session\", \"json_output\":\"$v\", \"nolog\":\"$nolog\"}" $endpoint
 else
     req="$(printf -- "%s " "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg nolog "$nolog" --arg s "$session" --arg c "$cmd" --arg v $v 'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "verbose": $v, "nolog": $nolog}')"
-    printf -- "%s" "$req" | curl --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
+    printf -- "%s" "$req" | curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
 fi
