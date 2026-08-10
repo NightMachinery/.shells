@@ -118,10 +118,43 @@ otherwise have spanned two. Annotating sub-headings instead was the
 alternative, but a plain text block has no heading to annotate, so a switch
 landing there would go unrecorded.
 
-Recaps --- the summaries Claude Code writes when you step away, stored as
-=system= records with subtype =away_summary= rather than as messages --- render
-as a =** Recap= section of the turn they interrupt. 26 of 52 local sessions
-have at least one.
+* Events
+
+A transcript is not only messages. These record types are rendered too, each
+attaching to the turn it interrupts:
+
+- *Recap* --- the summary Claude Code writes when you step away
+  (=system/away_summary=). 83 locally.
+- *Notice* and *Model fallback* --- =system/informational= and
+  =system/model_consent_fallback=, the latter explaining a model switch
+  ("Switched to Sonnet 5 for this session · Fable 5 requires usage credits").
+- *Command* --- a slash command you ran (=system/local_command=). The payload is
+  the same =<command-name>= scaffolding the picker strips, so it reduces to
+  =** Command: /model=.
+- *Pull request* --- =pr-link=, with the number, repository and URL.
+- *Edited outside the session* --- =attachment/edited_text_file=, a file you
+  changed in your editor mid-conversation, with the snippet Claude was shown.
+  77 locally, and they explain changes Claude did not make.
+- *Context compacted* --- =system/compact_boundary=. This one stands alone
+  rather than attaching to a turn, since it separates two phases of the
+  conversation: =* Context compacted [2026-08-06 Thu 16:25] · manual · 476980 →
+  11820 tokens=.
+- =system/turn_duration= is not a section. It measures the turn before it, so it
+  lands in that turn's heading as =· 4m2s=.
+
+Deliberately left out, all of it bookkeeping: =mode=, =permission-mode=,
+=agent-name=/=agent-color=/=agent-setting=, =bridge-session=,
+=file-history-snapshot= and =-delta=, and =last-prompt=, which only repeats the
+message beside it. =system/stop_hook_summary= is dropped because it never
+carries content --- 0 of 225 locally. Most =attachment= payloads are harness
+internals (=task_reminder=, =skill_listing=, =deferred_tools_delta=,
+=output_style=); only a file you edited yourself says anything about the
+conversation.
+
+=queue-operation= is left out for a subtler reason. Half of what gets enqueued
+is delivered and therefore already appears as an ordinary user message, so
+rendering it would duplicate; the other half was withdrawn before it was ever
+sent. 49 of 96 local enqueues fall in the first group.
 
 * Subagents
 
