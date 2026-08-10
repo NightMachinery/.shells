@@ -61,8 +61,12 @@ fi
 #: Stages must never ask "am I on CIS?". They ask what they actually care
 #: about, and a profile answers. Adding a new cluster is then one profile file
 #: with no changes anywhere else.
+#: Last-resort defaults, for a profile that declares neither. Only n is safe
+#: to assume for HOME_SHARED (guessing "shared" would scatter state to local
+#: disk for no reason), whereas MULTIUSER must default to y: a profile that
+#: forgot to say should get the stricter behaviour, not the laxer one.
 : "${NIGHT_HOME_SHARED:=n}"   #: $HOME is one filesystem across many hosts
-: "${NIGHT_MULTIUSER:=n}"     #: other people can log into this machine
+: "${NIGHT_MULTIUSER:=y}"     #: other people can log into this machine
 export NIGHT_HOME_SHARED NIGHT_MULTIUSER
 export night_site_file
 

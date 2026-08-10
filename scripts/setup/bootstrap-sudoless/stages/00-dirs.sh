@@ -69,10 +69,6 @@ if [ ! -e "${night_site_file}" ] && [ "${NIGHT_PROFILE}" != "default" ] ; then
 # naming convention, not an identity; the DNS search domain tracks network
 # connectivity (the laptop matched it over VPN); hostnames need per-machine
 # upkeep and collide.
-
-"Begin at the beginning," the King said, very gravely,
-"and go on till you come to the end: then stop."
-  -- Alice's Adventures in Wonderland
 MARK
     } > "${night_site_file}"
     chmod 600 "${night_site_file}"
@@ -83,6 +79,15 @@ fi
 #: The env contract. Sourced by ~/.privateShell (stage 10) so an interactive
 #: shell agrees with the bootstrap about where things live.
 env_file="${HOME}/.night-bootstrap.env"
+
+#: Baked in at generation time rather than tested at every shell start: the
+#: contract is sourced by every single shell, and the answer cannot change
+#: without rerunning this stage anyway.
+if [ "${NIGHT_MULTIUSER}" = y ] ; then
+    umask_stanza='umask 077'
+else
+    umask_stanza="#: single-user host: keeping the system default umask."
+fi
 
 cat > "${env_file}" <<EOF
 # -*- mode: sh; -*-
@@ -146,17 +151,17 @@ if command -v env-load-smuggled-lc-vars >/dev/null 2>&1 ; then
     env-load-smuggled-lc-vars
 fi
 
-#: These are multi-user login nodes, and the default umask 0022 creates every
-#: file world-readable. 077 makes new files 600 and new dirs 700.
+#: Where other people can log in, the default umask 0022 creates every file
+#: world-readable. 077 makes new files 600 and new dirs 700.
 #: @note \$HOME itself stays at the cluster's 711 convention (103 of 108 homes
 #: use it) rather than 700: sshd reads ~/.ssh/authorized_keys, and on an NFS
 #: home with root_squash a 700 home risks breaking key auth. 711 plus private
 #: contents gives the same privacy without the lockout risk.
-umask 077
+${umask_stanza}
 
 #: redis listens on 127.0.0.1, which keeps out other *hosts* but NOT other
-#: *users* of this machine -- and these are shared login nodes. So redis runs
-#: with requirepass. redis-cli reads REDISCLI_AUTH automatically, so
+#: *users* of this machine. Where that matters, redis runs with requirepass
+#: and this exports the secret. redis-cli reads REDISCLI_AUTH automatically, so
 #: [agfi:redis-cli-wrapper] and friends need no change.
 #: /proc/PID/environ is owner-readable only, so exporting it does not leak it.
 if [ -r "\${HOME}/.redis-auth" ] ; then

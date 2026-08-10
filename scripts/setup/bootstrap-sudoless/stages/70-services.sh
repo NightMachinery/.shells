@@ -70,18 +70,27 @@ source "${HOME}/.night-bootstrap.env" || return 1
 path=( "${NIGHT_BIN}" "${MISE_DATA_DIR}/shims" $path "${NIGHT_TOOLS_BIN}" )
 
 ##
-#: redis. Loopback-only *and* password-protected: 127.0.0.1 keeps out other
-#: hosts but not the other users of this shared login node.
+#: redis. Loopback-only, and password-protected wherever a password exists:
+#: 127.0.0.1 keeps out other hosts but not the other users of this one.
+#: Stage 45 generates ~/.redis-auth on multi-user hosts and skips it on hosts
+#: the profile declares single-user, so presence of the file is the signal --
+#: reading it unconditionally would abort startup on a host that has none.
 function night-startup-redis {
     (( ${+commands[redis-server]} )) || return 0
     redis-cli ping &>/dev/null && return 0   #: already up
 
     mkdir -p "${NIGHT_LOCAL_CACHE}/redis"
     chmod 700 "${NIGHT_LOCAL_CACHE}/redis"
+
+    local -a auth_args=()
+    if [[ -s "${HOME}/.redis-auth" ]] ; then
+        auth_args=( --requirepass "$(<"${HOME}/.redis-auth")" )
+    fi
+
     redis-server \
         --daemonize yes \
         --bind 127.0.0.1 --port 6379 \
-        --requirepass "$(<"${HOME}/.redis-auth")" \
+        "${auth_args[@]}" \
         --unixsocket "${NIGHT_LOCAL_CACHE}/redis/redis.sock" --unixsocketperm 700 \
         --dir "${NIGHT_LOCAL_CACHE}/redis" --save '' --appendonly no \
         --logfile "${NIGHT_LOCAL_CACHE}/redis/redis.log"

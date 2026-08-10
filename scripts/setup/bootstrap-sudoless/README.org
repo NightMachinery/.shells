@@ -5,7 +5,11 @@ Bootstrap the dotfiles onto a Linux host where we have *no sudo*.
 
 Supersedes [[file:../minimal_proxy/][setup/minimal_proxy/]], which entangled "minimal vs full" with
 "proxy vs no proxy". Here the proxy is just one optional stage, and the
-storage layout is chosen from the hostname instead of being hardcoded.
+storage layout comes from a profile instead of being hardcoded.
+
+The target is *any* sudo-less Linux host. The LMU CIS cluster is not the
+subject of these scripts; it is one profile among others, enabled with a
+single flag. A host nobody has configured needs no flag at all.
 
 * Run it
 #+begin_src zsh :eval never
@@ -42,7 +46,7 @@ The point of the split is what each tier is allowed to assume.
 
 * The storage contract
 No stage may hardcode a path. Every stage reads these, which =profile.sh=
-sets from the hostname and =stages/00-dirs.sh= writes to
+sets and =stages/00-dirs.sh= writes to
 =~/.night-bootstrap.env= (which =~/.privateShell= then sources, so an
 interactive shell agrees with the bootstrap):
 
@@ -57,12 +61,57 @@ NIGHT_BIG_STORE=/nfs/gdata/$USER sh bootstrap.sh
 #+end_src
 
 * Profiles
+** The profile is declared, never inferred
+=night_profile_detect= consults, in order, and stops at the first hit:
+
+1. =NIGHT_PROFILE=<name>= -- an explicit override, for a one-off run.
+2. =BOOTSTRAP_CIS_P=y= -- the CIS special case. Needed *once*: stage 00
+   records the result, and CIS shares one home across every host, so that
+   one file covers all ~12 of them.
+3. =~/.night-site= -- first non-comment line is the profile name.
+4. =default=.
+
+There is deliberately *no* probing of hostnames or mount points. Both were
+tried and both were wrong: hostname patterns break the moment a host is
+renamed or a new one is added, and =/mounts/Users= exists on the laptop too
+whenever the VPN is up -- so the laptop would have identified as a CIS
+server. A marker we write ourselves cannot be spoofed by someone else's
+naming choices.
+
+The same file is the signal Emacs reads (=night/cis-p= in =doom.d/config.el=),
+so the shell and the editor cannot disagree.
+
+** Stages branch on capabilities, not on the profile name
+A profile sets two flags, and those -- not its name -- are what stages test:
+
+- =NIGHT_HOME_SHARED= -- =$HOME= is one filesystem across several machines.
+  Then per-host state (emacs sockets, caches, redis data) must go to local
+  disk, and anything written to =$HOME= must *derive* host-specific values
+  rather than bake one host's answer in.
+- =NIGHT_MULTIUSER= -- other people can log in here. Then: =umask 077=, mode
+  700 directories, and any service on loopback needs authentication --
+  =127.0.0.1= excludes other *hosts*, not the other *users* of this one.
+
+So no stage tests the profile *name* -- the only mentions of "cis" or
+"beta" left under =stages/= are comments recording where a fact was
+verified. A stage that asked "is this CIS?" would silently do the wrong
+thing on the next cluster; one that asks "can other people read this?"
+stays correct, and keeps the hardening off a declared single-user box.
+
+=NIGHT_MULTIUSER= defaults to *y*, which is the fail-safe direction: a
+wrong "multiuser" costs a stricter umask on our own files, while a wrong
+"private" silently exposes history, tokens and redis to everyone on the
+host. You opt out by declaring it, not by forgetting to declare it.
+
+** Adding a host family
+Copy =profiles/default.sh=, set =NIGHT_PROFILE_NAME=, the two flags, and the
+three storage paths. No stage changes, and no edit to =night_profile_detect=
+-- write the name into =~/.night-site= on that host, or pass =NIGHT_PROFILE=.
+
 =profiles/cis-lmu.sh= encodes the LMU CIS cluster: one NFS home shared by
 ~12 hosts with a 48 GB quota, =/mounts/work= and =/nfs/gdata= shared and
-unquota'd, =/var/tmp= local and ~10x faster for small files. =profiles/default.sh=
-assumes nothing and keeps everything under =$HOME=.
-
-Add a host family by adding a profile and a case in =night_profile_detect=.
+unquota'd, =/var/tmp= local and ~10x faster for small files.
+=profiles/default.sh= assumes nothing and keeps everything under =$HOME=.
 
 * Feature flags
 - =BOOTSTRAP_WITH_PROXY= -- off on cis-lmu; those hosts have direct
