@@ -505,14 +505,14 @@ function bell-auto {
         return 1
     fi
 
-    # You might need to use `sleep $timeout ; ...` to test bell-auto.
+    #: You might need to use `sleep $timeout ; ...` to test bell-auto.
 
     bella_zsh_disable1
     local bell_awaysh=no
 
     local engine=( "${@:-bello}" )
-    local timeout="${bell_auto_t:-30}" # The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
-    local sleep="${bell_auto_sleep:-${bell_auto_st:-0}}" # The lower, the more CPU usage in single mode.
+    local timeout="${bell_auto_t:-30}"  #: The timeout should perhaps be bigger than sleep+engine, otherwise activity can get ignored.
+    local sleep="${bell_auto_sleep:-${bell_auto_st:-0}}"  #: The lower, the more CPU usage in single mode.
     local single="${bell_auto_single:-${bell_auto_sm}}"
     local skipfirst="${bell_skip_first:-${bell_auto_sf}}"
     local exit_cmd=("${(@)bell_auto_exit}")
@@ -524,7 +524,8 @@ function bell-auto {
 
     if test -z "$skipfirst" ; then
         reval "$engine[@]"
-        sleep "$sleep" # necessary for succesfully exiting sc bells because they take time to initialize. It also makes it act as a onetime bell in case of an active user.
+        sleep "$sleep"
+        #: necessary for succesfully exiting sc bells because they take time to initialize. It also makes it act as a onetime bell in case of an active user.
     fi
 
     while oneinstance $0 $nonce
@@ -533,10 +534,12 @@ function bell-auto {
             ec "$0 exited because of user activity."
             break
         fi
-        if test -z "$single" ; then # it's better that we we play first and then sleep
+
+        if test -z "$single" ; then #: it's better that we we play first and then sleep
             reval "$engine[@]"
         fi
-        # @optional We can repeat the checks here, to exit more aggressively
+
+        #: @optional We can repeat the checks here, to exit more aggressively
         sleep "$sleep"
     done
     test -n "$exit_cmd[*]" && reval-ec "$exit_cmd[@]"
@@ -572,7 +575,6 @@ function bella_zsh_disable1 {
     fi
 }
 
-# aliasfn bell-zsh-start bell-sc2-I-return
 function bell-zsh-start {
     if ai-agent-p ; then
         #: Skip the startup bell for shells spawned by AI agents (Claude Code, Codex, ...) — they start many shells.
@@ -582,11 +584,11 @@ function bell-zsh-start {
     bell-lm-mhm "$@"
 }
 
-function bell-zsh1() {
+function bell-zsh1 {
     @opts v 70 @ hearinvisible "$(rndarr $NIGHTDIR/resources/audio/zsh1/$~audioglob)"
 }
 # aliasfn bell-zsh bell-zsh1
-function bell-zsh() {
+function bell-zsh {
      local cmd head=''
         if cmd=($(hist-last)) ; then
             @opts dur 2 @ alert "Completed: $cmd"
