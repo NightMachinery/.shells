@@ -58,10 +58,15 @@ if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ] ; then
     export XDG_RUNTIME_DIR
 fi
 
-if ! systemctl --user is-system-running >/dev/null 2>&1 ; then
-    #: Give the manager a moment: enabling lingering starts it asynchronously.
-    sleep 2
-fi
+#: Enabling lingering starts the user manager asynchronously, and on an NFS
+#: home it is not instant. Two seconds was not enough on rho1; wait properly
+#: rather than reporting "not available" for a manager that is on its way up.
+systemd_wait=0
+while [ "${systemd_wait}" -lt 15 ] ; do
+    systemctl --user is-system-running >/dev/null 2>&1 && break
+    sleep 1
+    systemd_wait=$((systemd_wait + 1))
+done
 
 if ! systemctl --user is-system-running >/dev/null 2>&1 ; then
     warn "systemd --user still not available; skipping the unit"
