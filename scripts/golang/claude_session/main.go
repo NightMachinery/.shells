@@ -40,6 +40,7 @@ type record struct {
 
 	AITitle     string `json:"aiTitle"`
 	CustomTitle string `json:"customTitle"`
+	AgentName   string `json:"agentName"`
 
 	Attachment      *attachment      `json:"attachment"`
 	CompactMetadata *compactMetadata `json:"compactMetadata"`
