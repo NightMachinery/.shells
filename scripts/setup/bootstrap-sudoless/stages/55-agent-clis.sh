@@ -188,8 +188,13 @@ else
     agy_installer="${NIGHT_LOCAL_CACHE:-/tmp}/agy-install.sh"
     agy_snap="$(mktemp -d "${NIGHT_LOCAL_CACHE:-/tmp}/agy-rc.XXXXXX")"
 
+    #: @warn `[ -f x ] && cp ...' would abort the stage: when the test fails
+    #: the whole list returns 1, and stages run under `set -e'. Most of these
+    #: rc files do not exist, so that fired on the very first iteration.
     for f in ${night_agy_rcfiles} ; do
-        [ -f "${HOME}/${f}" ] && cp -p "${HOME}/${f}" "${agy_snap}/${f}"
+        if [ -f "${HOME}/${f}" ] ; then
+            cp -p "${HOME}/${f}" "${agy_snap}/${f}"
+        fi
     done
 
     if fetch "https://antigravity.google/cli/install.sh" "${agy_installer}" ; then
