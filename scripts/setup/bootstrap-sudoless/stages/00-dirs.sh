@@ -23,6 +23,15 @@ rm -f "${NIGHT_BIG_STORE}/.write-test"
 ensure_dir "${NIGHT_BIG_STORE}/envs"
 ensure_dir "${NIGHT_BIG_STORE}/cache"
 
+#: The cache tiers the env contract points at. Created here so the first
+#: process to use one does not race, and so TMPDIR exists before any stage
+#: (or login shell) tries to use it.
+ensure_dir "${NIGHT_BIG_STORE}/hf"
+ensure_dir "${NIGHT_BIG_STORE}/torch"
+for d in tmp xdg triton torchinductor nv pip npm ; do
+    ensure_dir "${NIGHT_LOCAL_CACHE}/${d}"
+done
+
 ##
 #: --- privacy on a shared login node ---
 #: Only when other people can log in here; on a single-user box these would be
@@ -132,6 +141,45 @@ export DOOMLOCALDIR="\${NIGHT_BIG_STORE}/doom-local/"
 #: mise manages the static CLI binaries and language runtimes.
 export MISE_DATA_DIR="\${NIGHT_BIG_STORE}/mise"
 export MISE_CACHE_DIR="\${NIGHT_LOCAL_CACHE}/mise"
+
+##
+#: --- caches ---
+#: The split below is the whole policy, and it follows from two measurements
+#: on beta (see CIS/caches.org):
+#:
+#:   sequential read, O_DIRECT   local 3395 MB/s   NFS 610 MB/s   (5.6x)
+#:   file creation               local 0.1 ms      NFS 0.6 ms     (6x)
+#:
+#: So: things that are LARGE, IMMUTABLE and WORTH SHARING go to the big
+#: store, where they are downloaded once for every host and cost no quota.
+#: Things that are SMALL, NUMEROUS and REGENERABLE go to local disk, where
+#: the 6x metadata advantage actually matters and nothing is lost if the
+#: machine wipes them.
+#:
+#: Nothing goes to \$HOME. It is the only quota'd filesystem here (48 GB, and
+#: one 27B checkpoint is 54 GB), and on a shared home every host would be
+#: writing the same cache over NFS at once.
+export HF_HOME="\${NIGHT_BIG_STORE}/hf"
+export HUGGINGFACE_HUB_CACHE="\${NIGHT_BIG_STORE}/hf/hub"
+export TORCH_HOME="\${NIGHT_BIG_STORE}/torch"
+
+#: Compiler caches: thousands of tiny files, rebuilt on demand, and tied to
+#: this host's GPU and driver -- sharing them between hosts buys nothing.
+export TRITON_CACHE_DIR="\${NIGHT_LOCAL_CACHE}/triton"
+export TORCHINDUCTOR_CACHE_DIR="\${NIGHT_LOCAL_CACHE}/torchinductor"
+export CUDA_CACHE_PATH="\${NIGHT_LOCAL_CACHE}/nv"
+export PIP_CACHE_DIR="\${NIGHT_LOCAL_CACHE}/pip"
+export NPM_CONFIG_CACHE="\${NIGHT_LOCAL_CACHE}/npm"
+
+#: Everything that follows the XDG spec. On a shared home this also removes a
+#: correctness hazard, not just a slow one: ~/.cache would otherwise be one
+#: directory written concurrently by every host we are logged into.
+export XDG_CACHE_HOME="\${NIGHT_LOCAL_CACHE}/xdg"
+
+#: /tmp here is world-writable and carries a tmpfiles rule that ages it out
+#: (D /tmp 1777 root root 30d); /var/tmp has no such rule. A private TMPDIR
+#: keeps our scratch off a directory every other user can list.
+export TMPDIR="\${NIGHT_LOCAL_CACHE}/tmp"
 
 case ":\${PATH}:" in
     *":\${NIGHT_BIN}:"*) : ;;
