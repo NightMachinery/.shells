@@ -16,6 +16,8 @@ function notif-os {
     #: seeing, whereas Do Not Disturb is aimed at calls and social apps. Override per
     #: call with `notif_ignore_dnd_p=n`.
     local ignore_dnd="${notif_ignore_dnd_p:-y}"
+    #: Path to an image shown inside the notification body. See [agfi:app-icon-get].
+    local image="${notif_image}"
 
     if isServer ; then
         return 0
@@ -28,6 +30,18 @@ function notif-os {
             local opts=()
             if bool "$ignore_dnd" ; then
                 opts+=(-ignoreDnD)
+            fi
+
+            if test -n "$image" ; then
+                #: -contentImage, not -appIcon: macOS takes the icon from the sending
+                #: bundle and silently ignores -appIcon, so the only way to show our
+                #: own artwork is the image in the notification body.
+                #: @warn terminal-notifier exits 0 for a missing image, so check first.
+                if test -e "$image" ; then
+                    opts+=(-contentImage "$image")
+                else
+                    ecgray "$0: notif_image does not exist: ${image}"
+                fi
             fi
 
             terminal-notifier -title "$title" -message "$msg" "$opts[@]"
