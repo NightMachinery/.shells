@@ -252,7 +252,17 @@ function nightsh-load-zshrc() {
 
     fpath=(~/.zsh.d/ $fpath[@])
 
-    autoload -Uz compinit && compinit # @heavy >0.35s
+    #: -C skips compaudit, the security check that stats every directory in
+    #: $fpath looking for ones writable by other users. It measured 0.50s of a
+    #: 4.4s startup on the CIS servers, where $fpath sits on NFS and each stat
+    #: is a network round trip.
+    #:
+    #: What we give up: if someone could write into an fpath directory, they
+    #: could plant a completion function that runs as us. On the CIS boxes the
+    #: relevant directories are ours and mode 700 (stage 00), and $HOME is 711,
+    #: so the check has nothing to find. Rerun `compaudit' by hand after adding
+    #: a new completion source from outside.
+    autoload -Uz compinit && compinit -C # @heavy: was >0.35s with the audit
     autoload -U +X bashcompinit && bashcompinit
     zmodload -i zsh/complist
     _comp_options+=(globdots)
