@@ -32,9 +32,14 @@ function api-key-get {
         chmod 700 "${key_file:h}" || return $?
         #: The redirection must stay *inside* the subshell, or the file is
         #: created by the caller under the caller's umask.
+        #: Some `base64` builds (linuxbrew's, on our VPS) emit CRLF, and a stray
+        #: CR makes the key an invalid HTTP header value - Caddy rejects it with
+        #: `invalid header field value` and every proxied request 502s. Delete
+        #: CR along with LF and the padding, and map to URL-safe base64 so the
+        #: key matches what `secrets.token_urlsafe` produces on the Python side.
         (
             umask 077
-            printf -- 'X-API-Key: %s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '\n=')" > "$key_file"
+            printf -- 'X-API-Key: %s\n' "$(head -c 32 /dev/urandom | base64 | tr -d '\r\n=' | tr '+/' '-_')" > "$key_file"
         ) || return $?
         #: macOS `chmod` has no `--`; `$key_file` is always absolute, so it needs none.
         chmod 600 "$key_file" || return $?
@@ -44,6 +49,9 @@ function api-key-get {
     #: `read <` instead of `$(<...)` to avoid a fork, and `|| true` to tolerate a
     #: missing trailing newline.
     IFS= read -r line < "$key_file" || true
+
+    #: `read` splits on LF only, so strip a CR from a file written elsewhere.
+    line="${line%$'\r'}"
 
     print -r -- "${line#X-API-Key: }"
 }
