@@ -8,6 +8,46 @@ Read all scripts in `zshlang/basic`. Reuse functions when possible, DRY.
 
 To link to a zsh function from comments/docs, use `[agfi:function-name]`, not `[help:function-name]`.
 
+## Org-mode Links to Files
+
+In org files, link to a file **outside the current directory** with a `zf:`
+link and a zsh dynamic named directory, never with a relative `file:` path:
+
+```org
+[[zf:~[cod]/uni/papers/FairGrad/][the paper]]
+[[zf:~[nt]/public/subjects/Qwen/open-weight/Qwen3.6/arch/Libra.org][Libra.org]]
+```
+
+`~[name]` is resolved by [agfi:path-unabbrev], which the `zf:` link handler
+calls before opening. Names come from [agfi:aliasdir]; useful ones are `nt`
+(`~/notes`), `cod` (`~/code`), `dom` (`$DOOMDIR`), `paper`, `base`, `dl`,
+`tmp`, `jrl`, `cel`, `mu`.
+
+Why, rather than `[[file:../../../foo]]`:
+
+- Counting `../` across trees is easy to get wrong and fails silently — org
+  renders a broken link exactly like a working one. Two links written that
+  way were off by one level each: from
+  `notes/private/research/J-Space/spectral-clipping/`, `../../../../code/`
+  resolves to `notes/code/` and `../../../public/` to `private/public/`.
+- A relative link breaks when *either* file moves; a `zf:` link only breaks
+  if the target moves.
+
+Rules:
+
+- Same-directory or sibling links (`[[file:models.org]]`) stay relative.
+  They are readable and move together with the file.
+- `~[nightNotesPrivate]` and `~[nightNotesPublic]` are **not** named
+  directories and resolve to nothing, despite the environment variables of
+  those names existing. Use `~[nt]/private/...` and `~[nt]/public/...`.
+- **Verify before committing.** A `zf:` link is only durable if it resolves:
+
+  ```zsh
+  path-unabbrev '~[nt]/public/subjects/Qwen/open-weight/Qwen3.6/arch/Libra.org'
+  ```
+
+  Check the printed path exists. Do not trust the link because it looks right.
+
 ## Brish
 
 BrishGarden keeps persistent zsh shells, so it does **not** see zshlang edits on
