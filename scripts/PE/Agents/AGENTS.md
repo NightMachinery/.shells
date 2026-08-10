@@ -35,6 +35,28 @@
 - If there is so little free disk space that you cannot continue working, stop and ask the user to handle it manually.
 - Do **not** try to clean caches, temporary files, or other disk usage yourself.
 
+## Matching Processes: `pgrep -f` / `pkill -f` Match You Too
+
+`-f` matches against the whole command line, and your own shell's command
+line contains the pattern you just typed. So `pkill -f emacs` kills the shell
+running it, and `pgrep -f install.sh` reports "still running" forever because
+it is finding itself.
+
+- Prefer `pgrep -x NAME` (exact process name), or an explicit PID list.
+- When `-f` is unavoidable, use a pattern that cannot appear in your own
+  command line (`daemon=night-verify`, not `emacs`), and skip `$$`.
+- Verify a "nothing is running" conclusion some other way — check that the
+  resource is actually free (GPU memory, port, lock file), not just that a
+  pattern failed to match.
+
+**Killing a parent does not kill its children.** After terminating a process
+tree, re-check for orphans and kill them by PID. A `doom sync --rebuild` that
+outlived the parent I had killed went on rewriting the package tree while I
+believed it was stopped, and corrupted it.
+
+This is worth its own rule because it is silent: the failure mode is a
+command that reports success while doing the opposite of what you intended.
+
 # Git Commit Guidelines
 
 ## General Rules
