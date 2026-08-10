@@ -24,10 +24,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -92,12 +94,16 @@ func usage() {
   claude_session.go list   [flags] <sessions-dir>    #: TSV of sessions, newest first
 
 render flags:
-  -format md|org        output syntax (default md; md is meant for pandoc)
-  -max-block-lines N    elide code blocks longer than N lines (0 = never)
-  -diff                 render Edit as a unified diff (default true)
+  -format md|org|org-pandoc   output syntax (default md). org-pandoc pipes the
+                              markdown through pandoc, in parallel chunks
+  -max-block-lines N          elide code blocks longer than N lines (0 = never)
+  -diff                       render Edit as a unified diff (default true)
+  -jobs N                     worker count (default: CPU count)
+  -pandoc PATH                pandoc binary for org-pandoc (default "pandoc")
 
 list flags:
   -snippet-len N        max snippet width (default 120)
+  -jobs N               worker count (default: CPU count)
 
 list emits: epoch <TAB> path <TAB> local time <TAB> relative path <TAB> snippet
 `)
@@ -113,19 +119,30 @@ type renderer struct {
 	out      *strings.Builder
 }
 
+// Below this, splitting the document across pandoc processes costs more in
+// process startup (~70ms each) than it saves.
+const minPandocChunk = 96 << 10
+
 func cmdRender(argv []string) {
 	fs := flag.NewFlagSet("render", flag.ExitOnError)
-	format := fs.String("format", "md", "output syntax: md or org")
+	format := fs.String("format", "md", "output syntax: md, org or org-pandoc")
 	maxBlock := fs.Int("max-block-lines", 0, "elide code blocks longer than N lines (0 = never)")
 	diff := fs.Bool("diff", true, "render Edit tool calls as a unified diff")
+	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
+	pandocBin := fs.String("pandoc", "pandoc", "pandoc binary, for -format=org-pandoc")
 	fs.Parse(argv)
 
 	input := fs.Arg(0)
 	if input == "" {
 		fatal("render: no input file given")
 	}
-	if *format != "md" && *format != "org" {
+	switch *format {
+	case "md", "org", "org-pandoc":
+	default:
 		fatal("render: unknown format: " + *format)
+	}
+	if *jobs < 1 {
+		*jobs = 1
 	}
 
 	fh, err := os.Open(input)
@@ -134,16 +151,7 @@ func cmdRender(argv []string) {
 	}
 	defer fh.Close()
 
-	r := &renderer{
-		org:      *format == "org",
-		maxBlock: *maxBlock,
-		diff:     *diff,
-		out:      &strings.Builder{},
-	}
-
-	w := bufio.NewWriter(os.Stdout)
-	defer w.Flush()
-
+	var records []record
 	for _, rec := range readRecords(fh) {
 		if rec.Type != "user" && rec.Type != "assistant" {
 			continue
@@ -151,16 +159,163 @@ func cmdRender(argv []string) {
 		if rec.IsMeta {
 			continue
 		}
-		r.out.Reset()
-		r.renderRecord(rec)
-		w.WriteString(r.out.String())
+		records = append(records, rec)
 	}
+
+	opts := renderOpts{org: *format == "org", maxBlock: *maxBlock, diff: *diff}
+	parts := renderRecords(records, opts, *jobs)
+
+	w := bufio.NewWriter(os.Stdout)
+	defer w.Flush()
+
+	if *format != "org-pandoc" {
+		for _, p := range parts {
+			w.WriteString(p)
+		}
+		return
+	}
+
+	for i, chunk := range pandocChunks(parts, *jobs, *pandocBin) {
+		if i > 0 {
+			w.WriteString("\n\n")
+		}
+		w.WriteString(chunk)
+	}
+	w.WriteString("\n")
+}
+
+type renderOpts struct {
+	org      bool
+	maxBlock int
+	diff     bool
+}
+
+// Records are independent, so they render concurrently and are reassembled in
+// order.
+func renderRecords(records []record, opts renderOpts, jobs int) []string {
+	parts := make([]string, len(records))
+
+	workers := jobs
+	if workers > len(records) {
+		workers = len(records)
+	}
+	if workers < 1 {
+		return nil
+	}
+
+	var wg sync.WaitGroup
+	idx := make(chan int)
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r := &renderer{
+				org:      opts.org,
+				maxBlock: opts.maxBlock,
+				diff:     opts.diff,
+				out:      &strings.Builder{},
+			}
+			for i := range idx {
+				r.out.Reset()
+				r.renderRecord(records[i])
+				parts[i] = r.out.String()
+			}
+		}()
+	}
+	for i := range records {
+		idx <- i
+	}
+	close(idx)
+	wg.Wait()
+
+	return parts
+}
+
+// Splits the rendered records into byte-balanced chunks and converts each with
+// its own pandoc. Chunk seams fall on record boundaries, never inside a code
+// block, so each chunk is a self-contained markdown document and the result is
+// identical to converting the whole thing at once.
+func pandocChunks(parts []string, jobs int, bin string) []string {
+	total := 0
+	for _, p := range parts {
+		total += len(p)
+	}
+
+	n := total / minPandocChunk
+	if n > jobs {
+		n = jobs
+	}
+	if n < 1 {
+		n = 1
+	}
+
+	chunks := make([]string, 0, n)
+	var cur strings.Builder
+	target := total / n
+	for _, p := range parts {
+		cur.WriteString(p)
+		if cur.Len() >= target && len(chunks) < n-1 {
+			chunks = append(chunks, cur.String())
+			cur.Reset()
+		}
+	}
+	if cur.Len() > 0 {
+		chunks = append(chunks, cur.String())
+	}
+
+	out := make([]string, len(chunks))
+	errs := make([]error, len(chunks))
+
+	var wg sync.WaitGroup
+	for i := range chunks {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			out[i], errs[i] = runPandoc(bin, chunks[i])
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			fatal(fmt.Sprintf("pandoc (chunk %d/%d): %v", i+1, len(chunks), err))
+		}
+	}
+
+	// Only the trailing newlines are normalized, so that joining the chunks
+	// leaves exactly one blank line at each seam. Leading ones are left alone:
+	// they are part of what a single pandoc run would have produced.
+	for i := range out {
+		out[i] = strings.TrimRight(out[i], "\n")
+	}
+	return out
+}
+
+func runPandoc(bin, input string) (string, error) {
+	// -gfm_auto_identifiers: otherwise every heading gets a
+	// :PROPERTIES:/:CUSTOM_ID: drawer that nothing here links to.
+	cmd := exec.Command(bin,
+		"--from=gfm-gfm_auto_identifiers", "--to=org", "--wrap=none")
+	cmd.Stdin = strings.NewReader(input)
+
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg != "" {
+			return "", fmt.Errorf("%v: %s", err, msg)
+		}
+		return "", err
+	}
+	return stdout.String(), nil
 }
 
 func readRecords(fh *os.File) []record {
 	var out []record
 	sc := bufio.NewScanner(fh)
-	sc.Buffer(make([]byte, 0, 1<<20), maxLineBytes)
+	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if len(line) == 0 || line[0] != '{' {
@@ -558,21 +713,28 @@ func (r *renderer) prose(s string, parentLevel int) {
 }
 
 func (r *renderer) block(lang, body string) {
-	body = r.elide(body)
+	// The closing fence supplies the final newline; keeping the body's would
+	// leave a blank line that pandoc drops, splitting the two paths.
+	body = strings.TrimRight(r.elide(body), "\n")
 	// A fence glued to a preceding bullet would be swallowed by the list.
 	r.ensureBlank()
 
 	if r.org {
-		if lang == "" {
-			r.out.WriteString("#+begin_example\n" + escOrgBlock(body) + "\n#+end_example\n")
-			return
-		}
-		r.out.WriteString("#+begin_src " + lang + "\n" + escOrgBlock(body) + "\n#+end_src\n")
+		r.out.WriteString(orgBlock(lang, body) + "\n")
 		return
 	}
 
 	fence := fenceFor(body)
 	r.out.WriteString(fence + lang + "\n" + body + "\n" + fence + "\n\n")
+}
+
+// Matches what pandoc's org writer emits for a fenced code block, including
+// its comma-escaping of lines org would otherwise read as structure.
+func orgBlock(lang, body string) string {
+	if lang == "" {
+		return "#+begin_example\n" + escOrgBlock(body) + "\n#+end_example"
+	}
+	return "#+begin_src " + lang + "\n" + escOrgBlock(body) + "\n#+end_src"
 }
 
 func (r *renderer) elide(body string) string {
@@ -607,11 +769,16 @@ func fenceFor(body string) string {
 	return strings.Repeat("`", n)
 }
 
+// Org would read `*` or `#+` at the start of a block line as structure, so it
+// is escaped with a comma. The comma goes after any indentation, which is
+// where pandoc's org writer puts it.
 func escOrgBlock(s string) string {
 	lines := strings.Split(s, "\n")
 	for i, ln := range lines {
-		if strings.HasPrefix(ln, "*") || strings.HasPrefix(ln, "#+") {
-			lines[i] = "," + ln
+		indent := len(ln) - len(strings.TrimLeft(ln, " \t"))
+		rest := ln[indent:]
+		if strings.HasPrefix(rest, "*") || strings.HasPrefix(rest, "#+") {
+			lines[i] = ln[:indent] + "," + rest
 		}
 	}
 	return strings.Join(lines, "\n")
@@ -835,6 +1002,7 @@ type sessionInfo struct {
 func cmdList(argv []string) {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	snippetLen := fs.Int("snippet-len", 120, "max snippet width, in runes")
+	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
 	fs.Parse(argv)
 
 	dir := fs.Arg(0)
@@ -860,26 +1028,29 @@ func cmdList(argv []string) {
 	}
 
 	infos := make([]sessionInfo, len(files))
-	workers := runtime.NumCPU()
+	workers := *jobs
 	if workers > len(files) {
 		workers = len(files)
 	}
+	if workers < 1 {
+		workers = 1
+	}
 
 	var wg sync.WaitGroup
-	jobs := make(chan int)
+	queue := make(chan int)
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for idx := range jobs {
+			for idx := range queue {
 				infos[idx] = scanSession(files[idx], dir, *snippetLen)
 			}
 		}()
 	}
 	for i := range files {
-		jobs <- i
+		queue <- i
 	}
-	close(jobs)
+	close(queue)
 	wg.Wait()
 
 	sort.SliceStable(infos, func(i, j int) bool {
@@ -896,10 +1067,22 @@ func cmdList(argv []string) {
 	}
 }
 
+// How much of the file's end is searched for the last message's timestamp,
+// and how far into the start the first user message is looked for. Both grow
+// on demand, so these only decide how much is read in the common case.
+const (
+	tailWindow = 64 << 10
+	headWindow = 4 << 20
+)
+
 // The session's time is that of its last user/assistant message. The file's
 // mtime is not usable: Claude Code appends bookkeeping records (e.g.
 // `bridge-session`) long after the conversation ends, which can put mtime
 // hours or days past the last message.
+//
+// Only the two ends of the file are read. Reading all of it would make the
+// picker cost grow with total transcript volume rather than with the number
+// of sessions.
 func scanSession(path, root string, snippetLen int) sessionInfo {
 	info := sessionInfo{path: path}
 	if rel, err := filepath.Rel(root, path); err == nil {
@@ -913,22 +1096,10 @@ func scanSession(path, root string, snippetLen int) sessionInfo {
 
 	if fh, err := os.Open(path); err == nil {
 		defer fh.Close()
-		for _, rec := range readRecords(fh) {
-			if rec.Type != "user" && rec.Type != "assistant" {
-				continue
-			}
-			if t, err := time.Parse(time.RFC3339, rec.Timestamp); err == nil && t.After(last) {
-				last = t
-			}
-			if snippet == "" && rec.Type == "user" && !rec.IsMeta {
-				for _, b := range decodeBlocks(rec.Message) {
-					if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
-						snippet = b.Text
-						break
-					}
-				}
-			}
+		if st, err := fh.Stat(); err == nil {
+			last = lastMessageTime(fh, st.Size())
 		}
+		snippet = firstUserText(fh)
 	}
 
 	if last.IsZero() {
@@ -942,6 +1113,114 @@ func scanSession(path, root string, snippetLen int) sessionInfo {
 	info.stamp = last.Local().Format(listStamp)
 	info.snippet = truncate(oneLine(snippet), snippetLen)
 	return info
+}
+
+// How many timestamped messages to look back over. Records are written in
+// order, so the last one almost always wins; the slack only has to cover the
+// millisecond-scale reordering that does occur in practice.
+const tailRecords = 25
+
+// Only the type and timestamp are needed to date a session. Decoding into the
+// full record would copy every message body in the window for nothing.
+type stampOnly struct {
+	Type      string `json:"type"`
+	Timestamp string `json:"timestamp"`
+}
+
+// Newest user/assistant timestamp, found by walking backwards from the end of
+// the file and widening the window until something turns up.
+func lastMessageTime(fh *os.File, size int64) time.Time {
+	for window := int64(tailWindow); ; window *= 4 {
+		if window > size {
+			window = size
+		}
+
+		buf := make([]byte, window)
+		if _, err := fh.ReadAt(buf, size-window); err != nil {
+			return time.Time{}
+		}
+
+		var last time.Time
+		seen := 0
+
+		// Backwards, line by line, so a long transcript costs the same as a
+		// short one.
+		end := len(buf)
+		for end > 0 && seen < tailRecords {
+			start := bytes.LastIndexByte(buf[:end], '\n') + 1
+			if start == 0 && window < size {
+				// The window cut this line in half; it is not parseable.
+				break
+			}
+
+			line := strings.TrimSpace(string(buf[start:end]))
+			end = start - 1
+
+			if len(line) == 0 || line[0] != '{' {
+				continue
+			}
+			var rec stampOnly
+			if err := json.Unmarshal([]byte(line), &rec); err != nil {
+				continue
+			}
+			if rec.Type != "user" && rec.Type != "assistant" {
+				continue
+			}
+			if t, err := time.Parse(time.RFC3339, rec.Timestamp); err == nil {
+				seen++
+				if t.After(last) {
+					last = t
+				}
+			}
+		}
+
+		if !last.IsZero() || window >= size {
+			return last
+		}
+	}
+}
+
+// First non-meta user message with text, read from the start and abandoned
+// once the file stops being worth scanning for one.
+func firstUserText(fh *os.File) string {
+	if _, err := fh.Seek(0, 0); err != nil {
+		return ""
+	}
+
+	sc := bufio.NewScanner(fh)
+	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
+
+	read := 0
+	for sc.Scan() {
+		line := sc.Text()
+		read += len(line) + 1
+		if read > headWindow {
+			return ""
+		}
+
+		rec, ok := parseRecord(line)
+		if !ok || rec.Type != "user" || rec.IsMeta {
+			continue
+		}
+		for _, b := range decodeBlocks(rec.Message) {
+			if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
+				return b.Text
+			}
+		}
+	}
+	return ""
+}
+
+func parseRecord(line string) (record, bool) {
+	line = strings.TrimSpace(line)
+	if len(line) == 0 || line[0] != '{' {
+		return record{}, false
+	}
+	var rec record
+	if err := json.Unmarshal([]byte(line), &rec); err != nil {
+		return record{}, false
+	}
+	return rec, true
 }
 
 // ** helpers
