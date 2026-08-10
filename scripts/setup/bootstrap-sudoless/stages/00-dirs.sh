@@ -181,6 +181,23 @@ export XDG_CACHE_HOME="\${NIGHT_LOCAL_CACHE}/xdg"
 #: keeps our scratch off a directory every other user can list.
 export TMPDIR="\${NIGHT_LOCAL_CACHE}/tmp"
 
+#: @warn Self-healing, and not optional. This file lives in a SHARED \$HOME
+#: but points at a PER-HOST directory, so on any host where stage 00 has not
+#: run those paths do not exist -- and a TMPDIR that does not exist breaks
+#: real things. It broke the emacs daemon on a second host with
+#:   (file-missing "Creating directory with prefix" ... "/var/tmp/USER/tmp/babel-")
+#: which is a confusing way to be told that \$TMPDIR is a dangling path.
+#:
+#: The \`[ -d ]' test is a shell builtin, so the common case costs no fork;
+#: mkdir runs once per host, ever. That matters because this file is sourced
+#: by every single shell.
+for _night_d in "\${TMPDIR}" "\${XDG_CACHE_HOME}" "\${TRITON_CACHE_DIR}" \\
+                "\${TORCHINDUCTOR_CACHE_DIR}" "\${CUDA_CACHE_PATH}" \\
+                "\${PIP_CACHE_DIR}" "\${NPM_CONFIG_CACHE}" ; do
+    [ -d "\${_night_d}" ] || mkdir -p "\${_night_d}" 2>/dev/null || true
+done
+unset _night_d
+
 case ":\${PATH}:" in
     *":\${NIGHT_BIN}:"*) : ;;
     *) export PATH="\${NIGHT_BIN}:\${PATH}" ;;
