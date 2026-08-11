@@ -284,6 +284,32 @@ function h-llm-attachments-resolve-clipboard {
     done
 }
 
+function h-llm-keys-path {
+    if [[ -z "${LLM_KEYS_PATH}" ]] ; then
+        local p
+        p="$(reval-memoi command llm keys path)" || return 1
+        typeset -g LLM_KEYS_PATH="$p"
+    fi
+    REPLY="${LLM_KEYS_PATH}"
+}
+
+function h-llm-key-alias-p {
+    local REPLY keys_path
+    h-llm-keys-path || return 2
+    keys_path="$REPLY"
+    [[ -r "${keys_path}" ]] || return 2
+
+    local jq_status
+    command jq -e --arg k "$1" 'has($k)' "${keys_path}" >/dev/null 2>&1
+    jq_status=$?
+
+    case ${jq_status} in
+        0)   return 0 ;;   # alias exists
+        1)   return 1 ;;   # valid JSON, no such alias
+        *)   return 2 ;;   # jq failed: unreadable or malformed
+    esac
+}
+
 function llm-m {
     bella_zsh_disable1
 
@@ -342,6 +368,16 @@ function llm-m {
 
         # log+=$'\n'"Attached:"$'\t'"${a}"
     done
+
+    if test -n "${llm_key}" ; then
+        opts+=(--key "${llm_key}")
+
+        if h-llm-key-alias-p "${llm_key}" ; then
+            log+=$'\n'"Using LLM key alias: ${llm_key}"
+        else
+            log+=$'\n'"Using custom LLM key: ${llm_key:0:4}…${llm_key: -4}"
+        fi
+    fi
 
     ecgray "$log"
 
@@ -534,6 +570,26 @@ function define-llm-model-v2 {
 }
 ## * Models
 ## ** Google Gemini
+# typeset -A vertex_gemini_31_pro_obj=(
+#     model_name "vertex-gemini-3.1-pro-preview"
+#     long_name 'vertex_gemini_31_pro'
+#     short_name 'vertex-g31'
+#     reval_to_aliases 'rvg31 vg31'
+#     send_aliases 'lvg31'
+# )
+# define-llm-model-v2 vertex_gemini_31_pro_obj
+
+# typeset -A vertex_gemini_flash_latest_obj=(
+#     # model_name 'vertex-gemini-flash-latest'  #: @unsupported
+#     #: `llm models -q vertex`
+#     model_name "vertex-gemini-3-flash-preview"
+#     long_name 'vertex_gemini_flash_latest'
+#     short_name 'vertex-flash'
+#     reval_to_aliases 'rvflash vfl'
+#     send_aliases 'lvflash'
+# )
+# define-llm-model-v2 vertex_gemini_flash_latest_obj
+
 typeset -A gemini_flash_latest_obj=(
     model_name 'gemini-flash-latest'
     long_name 'gemini_flash_latest'
