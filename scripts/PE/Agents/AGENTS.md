@@ -57,6 +57,25 @@ believed it was stopped, and corrupted it.
 This is worth its own rule because it is silent: the failure mode is a
 command that reports success while doing the opposite of what you intended.
 
+## Use `command ...` When You Mean the Real Binary
+
+In scripts, when you need a specific external program and not whatever the
+user's environment has bound that name to, write `command od`, not `od`.
+
+Aliases and functions shadow command names, and my shell defines a great many
+of both. Short, common names are the dangerous ones — `od`, `tr`, `ln`, `rm`,
+`grep`, `chmod`, `head` — because they are exactly the names a wrapper is
+likely to have claimed. A script that silently gets a wrapper instead of the
+binary can produce subtly wrong output rather than an error.
+
+- Use `command` for the fixed, load-bearing calls in library code: the ones
+  whose behaviour the surrounding logic depends on.
+- Do **not** blanket-prefix everything. Where calling my wrapper is the point,
+  calling it is correct; `command` there just breaks the customisation.
+- Where recursion is the hazard — a function calling the command it wraps, or
+  a helper called from inside the very wrapper it would re-enter — `command`
+  is mandatory, not stylistic.
+
 # Git Commit Guidelines
 
 ## General Rules
