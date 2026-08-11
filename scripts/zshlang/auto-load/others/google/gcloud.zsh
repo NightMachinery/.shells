@@ -48,6 +48,24 @@ typeset -g gcp_gpu_retry_sleep="${gcp_gpu_retry_sleep:-60}"
 typeset -g gcp_gpu_retry_max="${gcp_gpu_retry_max:-60}"
 typeset -g gcp_gpu_tmux_session="${gcp_gpu_tmux_session:-work}"
 ##
+#: Reaper thresholds. These exist to catch a FAILURE of the two mechanisms that
+#: normally stop this box (GCE's --max-run-duration and the on-VM idle timer),
+#: not to compete with them -- see `gcp-gpu-reap`.
+#:
+#: The grace period is added to --max-run-duration before the reaper considers
+#: layer 1 to have failed; GCE is not instantaneous.
+typeset -g gcp_gpu_reap_grace_min="${gcp_gpu_reap_grace_min:-30}"
+#: Consider CPU "flat" below this mean percentage. A g2-standard-8 driving an
+#: L4 sits well above it -- you cannot feed a GPU with zero host CPU -- so this
+#: is a conservative superset of "GPU idle" and will not kill a CPU-bound
+#: preprocessing or download stage.
+typeset -g gcp_gpu_reap_cpu_pct="${gcp_gpu_reap_cpu_pct:-3}"
+#: How long CPU must stay flat. Longer than the on-VM idle threshold on
+#: purpose: if the timer were alive, the box would already be gone.
+typeset -g gcp_gpu_reap_idle_min="${gcp_gpu_reap_idle_min:-60}"
+#: A heartbeat older than this means the on-VM idle timer is not running.
+typeset -g gcp_gpu_reap_heartbeat_max_min="${gcp_gpu_reap_heartbeat_max_min:-10}"
+##
 #: ===========================================================================
 #: PRICE TABLE -- EUR/hour, list price, region `europe-west4`.
 #:
@@ -556,6 +574,82 @@ function h-gcp-gpu-retry {
     done
 }
 ##
+function h-gcp-gpu-max-run-min {
+    #: `--max-run-duration` as minutes. Accepts `8h`, `90m`, `3600s` or a bare
+    #: number of seconds, which is what gcloud itself takes.
+    local v="${gcp_gpu_max_run}"
+
+    case "$v" in
+        *h) ec $(( ${v%h} * 60 )) ;;
+        *m) ec "${v%m}" ;;
+        *s) ec $(( ${v%s} / 60 )) ;;
+        *)  ec $(( v / 60 )) ;;
+    esac
+}
+
+function h-gcp-gpu-deadline-min {
+    #: The on-VM absolute deadline sits one grace period beyond GCE's own
+    #: ceiling, so it only ever fires when --max-run-duration did not.
+    local m
+    m="$(h-gcp-gpu-max-run-min)" || return $?
+
+    ec $(( m + gcp_gpu_reap_grace_min ))
+}
+##
+function h-gcp-gpu-cpu-util-max {
+    #: `h-gcp-gpu-cpu-util-max INSTANCE_ID MINUTES` -> peak mean CPU percent.
+    #:
+    #: Cloud Monitoring, not ssh and not the Ops Agent: CPU utilization is a
+    #: built-in Compute metric that needs no agent installed, and it keeps
+    #: working when the box is wedged -- exactly the case an outside-in reaper
+    #: exists for.
+    #:
+    #: Peak-of-means rather than mean-of-means: one busy sample anywhere in the
+    #: window must be enough to call the box "not idle".
+    local id="${1:?}" minutes="${2:?}"
+
+    local token
+    token="$(command gcloud auth print-access-token 2>/dev/null)" || return 1
+    test -n "$token" || return 1
+
+    local start end
+    local -x TZ=UTC
+    strftime -s end   '%Y-%m-%dT%H:%M:%SZ' $EPOCHSECONDS || return $?
+    strftime -s start '%Y-%m-%dT%H:%M:%SZ' $(( EPOCHSECONDS - minutes * 60 )) || return $?
+
+    local url="https://monitoring.googleapis.com/v3/projects/${gcp_gpu_project}/timeSeries"
+    command curl -s --max-time 30 -H "Authorization: Bearer ${token}" -G "$url" \
+        --data-urlencode "filter=metric.type=\"compute.googleapis.com/instance/cpu/utilization\" AND resource.labels.instance_id=\"${id}\"" \
+        --data-urlencode "interval.startTime=${start}" \
+        --data-urlencode "interval.endTime=${end}" \
+        --data-urlencode "aggregation.alignmentPeriod=300s" \
+        --data-urlencode "aggregation.perSeriesAligner=ALIGN_MEAN" \
+        2>/dev/null \
+        | command jq -r '[.timeSeries[]?.points[]?.value.doubleValue] | if length == 0 then "" else (max * 100) end'
+}
+
+function h-gcp-gpu-heartbeat {
+    #: `h-gcp-gpu-heartbeat [NAME] [ZONE]` -> the guest attribute the on-VM idle
+    #: checker publishes each minute, or empty if absent/unreachable.
+    local name="${1:-${gcp_gpu_instance}}" zone="${2:-${gcp_gpu_zone}}"
+
+    h-gcp-gpu-gcloud compute instances get-guest-attributes "$name" \
+        --zone="$zone" --query-path=gcp-gpu/status \
+        --format='value(value)' 2>/dev/null
+}
+
+function h-gcp-gpu-heartbeat-age {
+    #: Seconds since the last heartbeat, or empty when there is none.
+    local hb ts
+    hb="$(h-gcp-gpu-heartbeat "$@")" || return 0
+    test -n "$hb" || return 0
+
+    ts="${${(M)${(z)hb}:#ts=*}#ts=}"
+    test -n "$ts" || return 0
+
+    ec $(( EPOCHSECONDS - ts ))
+}
+##
 function h-gcp-gpu-startup-script {
     #: Runs as root on every boot. Idempotent by construction: each stage
     #: checks for its own completion, because a preempted spot VM re-runs this
@@ -565,6 +659,7 @@ function h-gcp-gpu-startup-script {
 GCP_GPU_DATA_DEVICE="/dev/disk/by-id/google-${gcp_gpu_data_disk}"
 GCP_GPU_BUCKET="${gcp_gpu_bucket}"
 GCP_GPU_IDLE_MIN="${gcp_gpu_idle_min}"
+GCP_GPU_DEADLINE_MIN="$(h-gcp-gpu-deadline-min)"
 EOF
 
     cat <<'GCP_GPU_STARTUP_EOF'
@@ -647,6 +742,17 @@ else
 fi
 echo "$count" > "$IDLE_STATE_FILE"
 
+#: Publish a heartbeat the outside world can read without ssh. This is what
+#: lets `gcp-gpu-reap` tell "the timer is alive and deliberately not shutting
+#: down, because someone is attached" from "the timer is dead". Without it, a
+#: reaper cannot distinguish a human sitting at a quiet prompt from a wedged
+#: box, and would kill the human.
+curl -s -X PUT --max-time 5 \
+    --data "ts=$(date +%s) idle=${count} gpu=${util} clients=${attached}" \
+    -H "Metadata-Flavor: Google" \
+    "http://metadata.google.internal/computeMetadata/v1/instance/guest-attributes/gcp-gpu/status" \
+    >/dev/null 2>&1 || true
+
 if [ "$count" -ge "$IDLE_THRESHOLD_MIN" ] ; then
     logger -t gcp-gpu-idle "idle ${count}m (gpu=${util}% clients=${attached}); shutting down"
     /sbin/shutdown -h now
@@ -680,6 +786,21 @@ IDLETMR_EOF
 
 systemctl daemon-reload
 systemctl enable --now gcp-gpu-idle.timer
+
+## absolute deadline backstop ------------------------------------------
+#: Independent of both the idle timer above and GCE's --max-run-duration.
+#: Those are the two things that normally stop this box; this fires only if
+#: BOTH failed, and it is deliberately the dumbest mechanism available -- a
+#: single `shutdown` scheduled at boot, with no dependency on nvidia-smi, the
+#: metadata server, or a working network.
+if [ -n "${GCP_GPU_DEADLINE_MIN:-}" ] && [ "${GCP_GPU_DEADLINE_MIN}" -gt 0 ] 2>/dev/null ; then
+    #: `shutdown -c` first: a resumed spot VM re-runs this script, and without
+    #: cancelling we would stack schedules from the previous boot.
+    shutdown -c >/dev/null 2>&1 || true
+    shutdown -h "+${GCP_GPU_DEADLINE_MIN}" \
+        "gcp-gpu: absolute deadline reached (${GCP_GPU_DEADLINE_MIN}m since boot)" >/dev/null 2>&1 || true
+    echo "absolute deadline armed: shutdown in ${GCP_GPU_DEADLINE_MIN} minutes"
+fi
 
 echo "=== gcp-gpu startup done $(date -Is) ==="
 GCP_GPU_STARTUP_EOF
@@ -823,6 +944,9 @@ function gcp-gpu-up {
         --service-account="${gcp_gpu_sa}"
         --scopes=https://www.googleapis.com/auth/devstorage.read_write,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write
         --labels="$(h-gcp-gpu-labels)"
+        #: Lets the idle checker publish the heartbeat that `gcp-gpu-reap`
+        #: reads to tell a live-but-deliberately-quiet box from a dead timer.
+        --metadata=enable-guest-attributes=TRUE
         --metadata-from-file="startup-script=${startup}"
     )
 
@@ -1144,6 +1268,306 @@ function gcp-gpu-queue {
 
     test -n "$pending" && { ec "instances coming up:" ; ec "$pending" }
     test -n "$mig"     && { ec "MIG resize requests:" ; ec "$mig" }
+}
+##
+function h-gcp-gpu-verdict {
+    #: `h-gcp-gpu-verdict NAME ZONE ID UPTIME_S` -> `CODE<TAB>explanation`.
+    #:
+    #: The whole design in one function. Two mechanisms already stop this box:
+    #: GCE's --max-run-duration and the on-VM idle timer. This never second-
+    #: guesses either -- it reports ANOMALY only when one of them is
+    #: demonstrably broken, so it cannot misfire on work that is merely quiet.
+    local name="${1:?}" zone="${2:?}" id="${3:?}"
+    integer uptime_s="${4:?}"
+
+    integer deadline_s=$(( ($(h-gcp-gpu-max-run-min) + gcp_gpu_reap_grace_min) * 60 ))
+    if (( uptime_s > deadline_s )) ; then
+        printf 'ANOMALY\t--max-run-duration=%s did not fire (up %s, %dm past the ceiling)\n' \
+            "${gcp_gpu_max_run}" "$(h-gcp-gpu-dur-human $uptime_s)" \
+            $(( (uptime_s - deadline_s) / 60 ))
+        return 0
+    fi
+
+    #: A fresh heartbeat means the idle timer is alive. If it is alive and has
+    #: not shut the box down, it has a reason -- an attached tmux client, or a
+    #: busy GPU -- and that reason is better informed than anything visible
+    #: from out here. Trust it and stop.
+    local hb_age
+    hb_age="$(h-gcp-gpu-heartbeat-age "$name" "$zone")"
+    if test -n "$hb_age" && (( hb_age < gcp_gpu_reap_heartbeat_max_min * 60 )) ; then
+        printf 'OK\tidle timer alive (heartbeat %ds ago); deferring to it\n' "$hb_age"
+        return 0
+    fi
+
+    #: No usable heartbeat. Fall back to CPU: if the timer were working, a box
+    #: this quiet would already be gone.
+    local cpu
+    cpu="$(h-gcp-gpu-cpu-util-max "$id" "${gcp_gpu_reap_idle_min}")"
+
+    if test -z "$cpu" ; then
+        printf 'UNKNOWN\tno heartbeat and no CPU samples yet; too new to judge\n'
+        return 0
+    fi
+
+    if (( uptime_s < gcp_gpu_reap_idle_min * 60 )) ; then
+        printf 'OK\tup only %s; less than the %dm idle window\n' \
+            "$(h-gcp-gpu-dur-human $uptime_s)" "${gcp_gpu_reap_idle_min}"
+        return 0
+    fi
+
+    if (( cpu < gcp_gpu_reap_cpu_pct )) ; then
+        printf 'ANOMALY\tidle timer silent%s and CPU peaked at %.1f%% over %dm\n' \
+            "${hb_age:+ (heartbeat ${hb_age}s old)}" "$cpu" "${gcp_gpu_reap_idle_min}"
+        return 0
+    fi
+
+    printf 'OK\tno heartbeat, but CPU peaked at %.1f%% over %dm; something is running\n' \
+        "$cpu" "${gcp_gpu_reap_idle_min}"
+}
+
+function gcp-gpu-idle {
+    #: Read-only. Never stops anything.
+    h-gcp-gpu-deps @RET
+
+    local rows
+    rows="$(h-gcp-gpu-gcloud compute instances list \
+        --filter="$(h-gcp-gpu-label-filter) AND status=RUNNING" --format=json 2>/dev/null \
+        | command jq -r '.[]? | [.name, (.zone | split("/") | last), .id,
+                                 (.machineType | split("/") | last),
+                                 (.lastStartTimestamp // "")] | @tsv')"
+
+    if test -z "$rows" ; then
+        ec "nothing running under owner=${gcp_gpu_owner}."
+        return 0
+    fi
+
+    local name zone id machine started epoch verdict code why hb cpu
+    integer uptime_s
+    while IFS=$'\t' read -r name zone id machine started ; do
+        test -z "$name" && continue
+
+        uptime_s=0
+        if test -n "$started" ; then
+            strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
+                && uptime_s=$(( EPOCHSECONDS - epoch ))
+        fi
+
+        verdict="$(h-gcp-gpu-verdict "$name" "$zone" "$id" "$uptime_s")"
+        code="${verdict%%$'\t'*}"
+        why="${verdict#*$'\t'}"
+
+        hb="$(h-gcp-gpu-heartbeat-age "$name" "$zone")"
+        cpu="$(h-gcp-gpu-cpu-util-max "$id" 30)"
+
+        ec "${name}  (${zone}, ${machine})"
+        ec "  uptime      $(h-gcp-gpu-dur-human $uptime_s)  of ${gcp_gpu_max_run} ceiling"
+        ec "  cpu peak    ${cpu:-n/a}% over the last 30m"
+        ec "  heartbeat   ${hb:+${hb}s ago}${hb:-none -- on-VM idle timer is not reporting}"
+        ec "  verdict     ${code}: ${why}"
+    done <<< "$rows"
+
+    ecgray "read-only. 'gcp-gpu-reap' acts on ANOMALY; 'gcp-gpu-reap --kill' stops them."
+}
+
+function gcp-gpu-reap {
+    #: `gcp-gpu-reap [--kill]`. Default reports and changes nothing.
+    #:
+    #: Fires only when a safety net demonstrably failed, never on an idle
+    #: threshold of its own -- the on-VM timer already owns that decision and
+    #: is better informed. See `h-gcp-gpu-verdict`.
+    h-gcp-gpu-deps @RET
+
+    local kill_p=''
+    case "${1}" in
+        --kill) kill_p=y ;;
+        '') ;;
+        *) ecerr "$0: usage: $0 [--kill]" ; return 1 ;;
+    esac
+
+    local rows
+    rows="$(h-gcp-gpu-gcloud compute instances list \
+        --filter="$(h-gcp-gpu-label-filter) AND status=RUNNING" --format=json 2>/dev/null \
+        | command jq -r '.[]? | [.name, (.zone | split("/") | last), .id,
+                                 (.lastStartTimestamp // "")] | @tsv')"
+
+    if test -z "$rows" ; then
+        ec "nothing running under owner=${gcp_gpu_owner}. Nothing to reap."
+        return 0
+    fi
+
+    local name zone id started epoch verdict code why
+    integer uptime_s reaped=0
+    while IFS=$'\t' read -r name zone id started ; do
+        test -z "$name" && continue
+
+        uptime_s=0
+        if test -n "$started" ; then
+            strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
+                && uptime_s=$(( EPOCHSECONDS - epoch ))
+        fi
+
+        verdict="$(h-gcp-gpu-verdict "$name" "$zone" "$id" "$uptime_s")"
+        code="${verdict%%$'\t'*}"
+        why="${verdict#*$'\t'}"
+
+        if [[ "$code" != ANOMALY ]] ; then
+            ec "${name}: ${code} -- ${why}"
+            continue
+        fi
+
+        reaped=$(( reaped + 1 ))
+        ecerr "${name}: ANOMALY -- ${why}"
+
+        if bool "$kill_p" ; then
+            h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances stop \
+                "$name" --zone="$zone" --quiet
+            ec "${name}: stopped."
+        else
+            ec "${name}: would stop it. Re-run with --kill, or: gcp-gpu-down"
+        fi
+    done <<< "$rows"
+
+    if (( reaped == 0 )) ; then
+        ec "no anomalies. Every running instance is accounted for."
+    fi
+}
+
+function gcp-gpu-project-cost {
+    #: Whole-project spend, not just mine -- read out of the budget-alert
+    #: function's own logs, which print `costAmount` every ~30 minutes.
+    #:
+    #: This is a side effect of someone else's Cloud Function, not an interface
+    #: anyone promised to keep. It is here because it is the only real spend
+    #: figure available while the BigQuery export does not exist. If it stops
+    #: returning anything, that function was changed or removed.
+    h-gcp-gpu-deps @RET
+    local days="${1:-30}"
+
+    ec "project-wide cost (all seven editors), last ${days}d:"
+    memoi_expire=1800 memoi_skiperr=y memoi-eval \
+        h-gcp-gpu-gcloud logging read \
+        'resource.type="cloud_run_revision" AND resource.labels.service_name="budget-notification-logger" AND textPayload:"Current cost"' \
+        --freshness="${days}d" --limit=500 --format='value(timestamp,textPayload)' 2>/dev/null \
+        | command awk '$1 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}/ {
+                         d = substr($1, 1, 10) ; c = $NF ; gsub(/[()]/, "", c)
+                         if (!(d in seen)) { seen[d] = c ; print "  " d "  " c } }' \
+        | command sort
+
+    ecgray "budget-period totals, so the series resets when the period rolls over."
+    ecgray "Your own share is 'gcp-gpu-spend'; this is the shared project."
+}
+##
+typeset -g gcp_gpu_reaper_src="${gcp_gpu_reaper_src:-${HOME}/scripts/python/gcp/gpu_reaper}"
+typeset -g gcp_gpu_reaper_fn="${gcp_gpu_reaper_fn:-gpu-reaper-${gcp_gpu_owner}}"
+typeset -g gcp_gpu_reaper_role="${gcp_gpu_reaper_role:-gcpGpuReaper}"
+typeset -g gcp_gpu_reaper_schedule="${gcp_gpu_reaper_schedule:-*/15 * * * *}"
+
+function gcp-gpu-reaper-iam-cmds {
+    #: Prints the setup this project needs but that nothing here will perform.
+    #:
+    #: Section 8 of the brief is absolute: never modify IAM policy. Enabling an
+    #: API and minting a role on a SHARED lab project are exactly the changes
+    #: six other editors would not expect, so they stay a deliberate act by a
+    #: human who has read them.
+    ##
+    ec "# 1. Cloud Scheduler is not enabled on this project yet."
+    ec "gcloud services enable cloudscheduler.googleapis.com --project=${gcp_gpu_project}"
+    ec ""
+    ec "# 2. A custom role with exactly the four permissions the reaper needs."
+    ec "#    Deliberately NOT roles/compute.instanceAdmin.v1: that would let the"
+    ec "#    function stop any instance in a project shared with six other people."
+    ec "gcloud iam roles create ${gcp_gpu_reaper_role} --project=${gcp_gpu_project} \\"
+    ec "  --title='GCP GPU reaper' \\"
+    ec "  --permissions=compute.instances.list,compute.instances.stop,compute.instances.getGuestAttributes,monitoring.timeSeries.list"
+    ec ""
+    ec "# 3. Bind it to the runner SA, which today holds only objectAdmin on one bucket."
+    ec "gcloud projects add-iam-policy-binding ${gcp_gpu_project} \\"
+    ec "  --member=serviceAccount:${gcp_gpu_sa} \\"
+    ec "  --role=projects/${gcp_gpu_project}/roles/${gcp_gpu_reaper_role}"
+    ec ""
+    ec "# Note: the role is still project-scoped, so the function COULD stop"
+    ec "# anyone's instance. The code never does -- every query filters on"
+    ec "# labels.owner=${gcp_gpu_owner} -- but the permission is broader than the"
+    ec "# behaviour. GCE has no per-instance grant that survives recreation."
+}
+
+function h-gcp-gpu-reaper-ready-p {
+    command gcloud services list --enabled --project="${gcp_gpu_project}" \
+        --format='value(config.name)' 2>/dev/null \
+        | command grep -qx 'cloudscheduler.googleapis.com'
+}
+
+function gcp-gpu-reaper-deploy {
+    #: Deploys the server-side reaper. Refuses until the IAM work above is done,
+    #: rather than half-deploying something that will fail at 03:00 with a
+    #: permission error nobody is awake to read.
+    h-gcp-gpu-deps @RET
+
+    if ! test -f "${gcp_gpu_reaper_src}/main.py" ; then
+        ecerr "$0: no function source at ${gcp_gpu_reaper_src}/main.py"
+        return 1
+    fi
+
+    if ! h-gcp-gpu-reaper-ready-p ; then
+        ecerr "$0: Cloud Scheduler is not enabled, and the reaper SA has no role yet."
+        ecerr "These change a SHARED project, so run them yourself and re-run this:"
+        ecerr ""
+        gcp-gpu-reaper-iam-cmds >&2
+        return 1
+    fi
+
+    local max_run_min
+    max_run_min="$(h-gcp-gpu-max-run-min)" @RET
+
+    ec "deploying ${gcp_gpu_reaper_fn} to ${gcp_gpu_region} (schedule: ${gcp_gpu_reaper_schedule})"
+    h-gcp-gpu-reval h-gcp-gpu-gcloud functions deploy "${gcp_gpu_reaper_fn}" \
+        --gen2 --region="${gcp_gpu_region}" \
+        --runtime=python312 --entry-point=reap \
+        --source="${gcp_gpu_reaper_src}" \
+        --trigger-http --no-allow-unauthenticated \
+        --service-account="${gcp_gpu_sa}" \
+        --set-env-vars="GCP_GPU_PROJECT=${gcp_gpu_project},GCP_GPU_OWNER=${gcp_gpu_owner},GCP_GPU_MAX_RUN_MIN=${max_run_min},GCP_GPU_GRACE_MIN=${gcp_gpu_reap_grace_min},GCP_GPU_IDLE_MIN=${gcp_gpu_reap_idle_min},GCP_GPU_CPU_PCT=${gcp_gpu_reap_cpu_pct},GCP_GPU_HEARTBEAT_MAX_MIN=${gcp_gpu_reap_heartbeat_max_min},GCP_GPU_ENABLE_KILL=1" @RET
+
+    local uri
+    uri="$(h-gcp-gpu-gcloud functions describe "${gcp_gpu_reaper_fn}" \
+        --gen2 --region="${gcp_gpu_region}" --format='value(serviceConfig.uri)' 2>/dev/null)"
+
+    ec "scheduling ${gcp_gpu_reaper_schedule}"
+    h-gcp-gpu-reval h-gcp-gpu-gcloud scheduler jobs create http "${gcp_gpu_reaper_fn}" \
+        --location="${gcp_gpu_region}" \
+        --schedule="${gcp_gpu_reaper_schedule}" \
+        --uri="${uri}" --http-method=GET \
+        --oidc-service-account-email="${gcp_gpu_sa}" \
+        --oidc-token-audience="${uri}" @RET
+
+    ec ""
+    ec "deployed. It reports to Cloud Logging on every run:"
+    ec "  gcp-gpu-reaper-logs"
+    ec "Dry it out first with:  GCP_GPU_ENABLE_KILL=0 (redeploy to change)"
+}
+
+function gcp-gpu-reaper-logs {
+    h-gcp-gpu-deps @RET
+
+    h-gcp-gpu-gcloud logging read \
+        "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"${gcp_gpu_reaper_fn}\"" \
+        --freshness="${1:-7d}" --limit=50 --format='value(timestamp,textPayload)'
+}
+
+function gcp-gpu-reaper-destroy {
+    h-gcp-gpu-deps @RET
+
+    ask "Delete the scheduler job and reaper function?" n || return 1
+
+    h-gcp-gpu-reval h-gcp-gpu-gcloud scheduler jobs delete "${gcp_gpu_reaper_fn}" \
+        --location="${gcp_gpu_region}" --quiet
+    h-gcp-gpu-reval h-gcp-gpu-gcloud functions delete "${gcp_gpu_reaper_fn}" \
+        --gen2 --region="${gcp_gpu_region}" --quiet
+
+    ec "removed. The custom role and its binding are IAM, so they are yours to revoke:"
+    ec "  gcloud projects remove-iam-policy-binding ${gcp_gpu_project} \\"
+    ec "    --member=serviceAccount:${gcp_gpu_sa} \\"
+    ec "    --role=projects/${gcp_gpu_project}/roles/${gcp_gpu_reaper_role}"
 }
 ##
 function gcp-gpu-panic {
