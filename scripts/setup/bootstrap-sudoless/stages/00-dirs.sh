@@ -33,6 +33,38 @@ for d in tmp xdg triton torchinductor nv pip npm ; do
 done
 
 ##
+#: --- the default cache paths, symlinked onto the big store ---
+#: The env contract below exports HF_HOME and TORCH_HOME, but exports only help
+#: a process that inherited them. `ssh host cmd' runs a NON-INTERACTIVE shell,
+#: which sources neither ~/.zshrc nor anything the login path pulls in, so a
+#: remote one-liner silently gets the *default* ~/.cache paths and fills the
+#: 48GB home quota. That is not hypothetical: a remote eval launched this way
+#: re-downloaded 30GB of a model that was already on the big store and died
+#: with `Errno 122 Disk quota exceeded' partway through.
+#:
+#: A symlink needs no environment at all, so it also covers tools that ignore
+#: the env vars and hardcode the default. Both sides are shared NFS here, so
+#: one link serves every host.
+#:
+#: Only ever replace a symlink or an empty directory -- never a populated one,
+#: which would strand real data.
+for _pair in "huggingface:hf" "torch:torch" ; do
+    _link="${HOME}/.cache/${_pair%%:*}"
+    _target="${NIGHT_BIG_STORE}/${_pair##*:}"
+    ensure_dir "$(dirname "${_link}")"
+    if [ -L "${_link}" ] ; then
+        [ "$(readlink "${_link}")" = "${_target}" ] || run_soft ln -sfn "${_target}" "${_link}"
+    elif [ ! -e "${_link}" ] ; then
+        run_soft ln -sfn "${_target}" "${_link}"
+    elif [ -d "${_link}" ] && [ -z "$(ls -A "${_link}" 2>/dev/null)" ] ; then
+        rmdir "${_link}" 2>/dev/null && run_soft ln -sfn "${_target}" "${_link}"
+    else
+        warn "not linking ${_link}: exists and is not empty (move it to ${_target} by hand)"
+    fi
+done
+unset _pair _link _target
+
+##
 #: --- privacy on a shared login node ---
 #: Only when other people can log in here; on a single-user box these would be
 #: needless friction (e.g. you could no longer hand a collaborator a path).
@@ -244,3 +276,38 @@ chmod 600 "${env_file}"
 ok "wrote ${env_file} (chmod 600; shared by every host)"
 dim "big store:   ${NIGHT_BIG_STORE}"
 dim "local cache: ${NIGHT_LOCAL_CACHE}"
+
+##
+#: --- make the contract reach NON-interactive shells ---
+#: `ssh host cmd' runs the LOGIN shell non-interactively, so anything wired up
+#: only through the interactive path is invisible to remote one-liners. That is
+#: how a remote job wrote 30GB to the home quota instead of the big store:
+#: `ssh beta "echo \$HF_HOME"' printed nothing while `zsh -ic' printed it
+#: correctly.
+#:
+#: Two files, because two shells with different rules, and the login shell on
+#: the CIS hosts is bash even though the interactive shell is zsh:
+#:   ~/.zshenv  read by EVERY zsh, interactive or not.
+#:   ~/.bashrc  read by non-interactive bash ONLY when sshd starts it -- which
+#:              is exactly the case we need. Note this breaks if the file ever
+#:              grows the usual `[ -z "$PS1" ] && return' guard at the top,
+#:              since our line is appended at the bottom.
+#:
+#: The env file is pure exports and one guarded `read', so it is cheap enough
+#: to source unconditionally. Appended idempotently: neither file is ours.
+for _rc in "${HOME}/.zshenv" "${HOME}/.bashrc" ; do
+    if [ -e "${_rc}" ] && grep -q 'night-bootstrap\.env' "${_rc}" 2>/dev/null ; then
+        dim "${_rc} already sources the env contract"
+        continue
+    fi
+    cat >> "${_rc}" <<'EOF'
+
+#: Storage contract (HF_HOME, TORCH_HOME, TMPDIR, ...). Sourced here rather than
+#: from an interactive-only rc on purpose: `ssh host cmd' is non-interactive and
+#: would otherwise get the default ~/.cache paths and fill the home quota.
+#: Added by setup/bootstrap-sudoless stage 00.
+[ -r "${HOME}/.night-bootstrap.env" ] && . "${HOME}/.night-bootstrap.env"
+EOF
+    ok "wired ${env_file} into ${_rc} (reaches non-interactive shells)"
+done
+unset _rc
