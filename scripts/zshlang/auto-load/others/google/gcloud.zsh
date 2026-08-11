@@ -69,40 +69,68 @@ typeset -g gcp_gpu_reap_heartbeat_max_min="${gcp_gpu_reap_heartbeat_max_min:-10}
 #: ===========================================================================
 #: PRICE TABLE -- EUR/hour, list price, region `europe-west4`.
 #:
-#: @warn THESE GO STALE. Checked <2026-08-11 Tue>. They drive every estimate
+#: @warn THESE GO STALE. Refreshed <2026-08-11 Tue> from the *live* Cloud
+#: Billing Catalog API, not from the pricing page. They drive every estimate
 #: printed by `gcp-gpu-burn`, `gcp-gpu-budget` and the audit-log fallback in
-#: `gcp-gpu-spend`; none of those are billed euros. Re-check against
-#: https://cloud.google.com/compute/all-pricing every few months, and treat
-#: the BigQuery export as the truth the moment it exists.
+#: `gcp-gpu-spend`; none of those are billed euros. Treat the BigQuery export
+#: as the truth the moment it exists.
 #:
-#: Spot prices float. `PREEMPTIBLE_NVIDIA_A100_80GB_GPUS` quota is 0 in this
-#: region, so `a2-ultragpu-*` has no spot entry at all.
+#: Each figure is a whole-machine rate: vCPU + RAM + GPU, summed from the SKUs.
+#: An earlier hand-entered table quoted GPU-ish numbers that understated spot
+#: badly (g2-standard-8 spot as 0.20 against a real 0.47, a3-highgpu-8g as 9.00
+#: against a real 44.32), which is why this is now derived mechanically.
+#:
+#: REFRESH RECIPE (repeatable, no API key -- OAuth via gcloud):
+#:   TOKEN=$(gcloud auth print-access-token)
+#:   curl -s -H "Authorization: Bearer $TOKEN" \
+#:     'https://cloudbilling.googleapis.com/v1/services/6F81-5844-456A/skus?pageSize=5000&currencyCode=EUR'
+#: Page through `nextPageToken` (~32k SKUs, 7 pages). For a machine type sum
+#:   nCPU * "<FAM> Instance Core running in Netherlands"
+#: + nGB  * "<FAM> Instance Ram running in Netherlands"
+#: + nGPU * "<GPU> running in Netherlands"
+#: prefixing all three with "Spot Preemptible " for spot. 6F81-5844-456A is the
+#: Compute Engine service id; "Netherlands" is europe-west4.
+#:
+#: @note Availability is quota, not price. A SKU existing proves nothing:
+#: `a2-ultragpu-1g` HAS a spot SKU (2.46) but PREEMPTIBLE_NVIDIA_A100_80GB
+#: quota is 0 here, so it cannot be created. Conversely spot H100/H200/B200
+#: quota is 64 each -- see `gcp-gpu-quota`, and note the legacy
+#: `compute regions describe` view does NOT list A3-family metrics at all.
 #: ===========================================================================
 typeset -gA gcp_gpu_price_ondemand=(
-    g2-standard-4    0.45
-    g2-standard-8    0.65
-    g2-standard-12   0.85
-    g2-standard-16   1.05
-    g2-standard-32   1.75
-    a2-highgpu-1g    3.20
-    a2-ultragpu-1g   4.30
-    a3-highgpu-8g   29.00
+    g2-standard-4    0.65
+    g2-standard-8    0.79
+    g2-standard-12   0.92
+    g2-standard-16   1.06
+    g2-standard-32   1.60
+    a2-highgpu-1g    3.29
+    a2-highgpu-2g    6.58
+    a2-ultragpu-1g   4.86
+    a3-highgpu-1g   12.27
+    a3-highgpu-2g   24.54
+    a3-highgpu-8g   98.15
 )
 typeset -gA gcp_gpu_price_spot=(
-    g2-standard-4    0.14
-    g2-standard-8    0.20
-    g2-standard-12   0.26
-    g2-standard-16   0.32
-    g2-standard-32   0.54
-    a2-highgpu-1g    1.05
-    a3-highgpu-8g    9.00
+    g2-standard-4    0.39
+    g2-standard-8    0.47
+    g2-standard-12   0.55
+    g2-standard-16   0.64
+    g2-standard-32   0.96
+    a2-highgpu-1g    1.80
+    a2-highgpu-2g    3.60
+    #: SKU exists but quota is 0 in europe-west4; kept so estimates are honest
+    #: if quota is ever granted.
+    a2-ultragpu-1g   2.46
+    a3-highgpu-1g    5.54
+    a3-highgpu-2g   11.08
+    a3-highgpu-8g   44.32
 )
 #: EUR per GB-month.
 typeset -gA gcp_gpu_price_disk=(
-    pd-balanced          0.11
-    pd-ssd               0.19
-    pd-standard          0.045
-    hyperdisk-balanced   0.13
+    pd-balanced          0.0966
+    pd-ssd               0.1641
+    pd-standard          0.0386
+    hyperdisk-balanced   0.0737
 )
 ##
 function h-gcp-gpu-gcloud {
