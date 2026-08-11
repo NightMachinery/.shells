@@ -13,13 +13,30 @@
 --
 -- `applicationsForBundleID()` maps to NSRunningApplication's
 -- runningApplicationsWithBundleIdentifier:, a direct lookup that never touches
--- another app's accessibility interface. Almost every appName below is already
--- a bundle ID; the slow path stays as a fallback for the few that are not
--- ('mpv', 'Thunderbird').
+-- another app's accessibility interface. Every appName below is a bundle ID,
+-- so the fast path always applies.
+--
+-- The name fallback is skipped for bundle IDs, and that is the point rather
+-- than an optimisation. A bundle lookup returns nothing in two cases: the ID
+-- is wrong, or -- far more commonly -- the app simply is not running. In the
+-- second case falling through cost a full enumeration on *every* press of a
+-- hotkey for a not-currently-running app: measured at 114 ms across 98 apps
+-- with nothing hung, and it is exactly the path that took 60+ seconds with a
+-- SIGSTOPped app on it.
+--
+-- Falling through cannot help there anyway. `hs.application.get()` matches on
+-- bundle ID or name, so if the bundle lookup found nothing, the only way the
+-- name lookup finds something is if an app is literally *named* "io.mpv".
+-- A dot is the test because bundle IDs are reverse-DNS and app names are not;
+-- a plain name like 'mpv' keeps the old behaviour.
 function getApp(appName)
     local apps = hs.application.applicationsForBundleID(appName)
     if apps and #apps > 0 then
         return apps[1]
+    end
+
+    if appName:find(".", 1, true) then
+        return nil
     end
 
     return hs.application.get(appName)
@@ -200,7 +217,7 @@ appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
 
-appHotkey{ key='m', appName='mpv' }
+appHotkey{ key='m', appName='io.mpv' }
 -- appHotkey{ key='m', appName='com.adobe.Reader' }
 
 appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
@@ -216,7 +233,7 @@ appHotkey{ key='p', appName='com.apple.Preview' }
 
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
 
-appHotkey{ key='t', appName='Thunderbird' }
+appHotkey{ key='t', appName='org.mozilla.thunderbird' }
 
 
 hyper_bind_v1("d", function()
