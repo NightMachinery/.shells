@@ -9,3 +9,48 @@ function router-mac-darwin {
         cat-copy-if-tty
 }
 ##
+function wifi-internet-sharing-fix-ap1 {
+    ##
+    # Repair macOS Internet Sharing when clients hang at "Obtaining IP address".
+    #
+    # On Apple Silicon the Wi-Fi chip exposes en0 (station radio) and ap1 (SoftAP).
+    # Internet Sharing must bridge ap1, but macOS 14 enrols en0 into bridge100
+    # instead, so client DHCP DISCOVERs land on ap1 and never reach bootpd (which
+    # listens only on bridge100). Nothing in the prefs can be edited to fix it.
+    #
+    # Normally the local.internetsharing.apbridge LaunchDaemon handles this; this is
+    # for the rare miss, or before installing the daemon.
+    #
+    # See: [[id:f0c71d19-2c6f-4b48-82f1-d28ccaed5e90][breadcrumbs/ap1-bug]]
+    ##
+    assert isDarwin @RET
+
+    local br=bridge100 ap=ap1
+
+    if ! ifconfig "$br" &>/dev/null ; then
+        ecerr "$0: $br does not exist; is Internet Sharing on?"
+        return 1
+    fi
+
+    if ifconfig "$br" 2>/dev/null | grep -q "member: $ap" ; then
+        ecgray "$0: $ap is already enrolled in $br; nothing to do."
+        ifconfig "$br" | grep -E 'member:|status:'
+        return 0
+    fi
+
+    if ! ifconfig "$ap" 2>/dev/null | grep -q 'status: active' ; then
+        ecerr "$0: warning: $ap is not active; the hotspot might not be running."
+    fi
+
+    ecgray "$0: enrolling $ap into $br (needs sudo) ..."
+    sudo ifconfig "$br" addm "$ap" @RET
+
+    ec-sep-h
+    ifconfig "$br" | grep -E 'member:|status:'
+
+    ec-sep-h
+    # bootpd is socket-activated; a non-zero run count means DHCP is being served.
+    sudo launchctl print system/com.apple.bootpd 2>/dev/null |
+        grep -E '^[[:space:]]+(state|runs) '
+}
+##
