@@ -27,12 +27,20 @@
   },
   "sftpd": {
     "bindings": [
+      // 2026-08-10: was "0.0.0.0". This host is on a public IP with no NAT and
+      // no firewall, so SFTP was open to the internet. Split into explicit
+      // loopback + hotspot binds. NOTE: "mb2.local" is NOT a safe alternative,
+      // it resolves to the PUBLIC address.
       {
         "port": 8115,
-        "address": "0.0.0.0",
-        // "address": "mb2.local",
-      // "address": "192.168.2.1",
-      // "address": "192.168.1.57",
+        "address": "127.0.0.1",
+        "apply_proxy_config": true
+      },
+      {
+        // bridge100, i.e. Internet Sharing clients only
+        "port": 8115,
+        "address": "192.168.2.1",
+        // "address": "0.0.0.0", // GLOBAL: open to the internet
         "apply_proxy_config": true
       }
     ],
@@ -56,11 +64,23 @@
   },
   "ftpd": {
     "bindings": [
+      // 2026-08-10: was "0.0.0.0" -- plaintext FTP open to the internet.
+      // Now loopback + hotspot only. "tls_mode": 0 means credentials still
+      // cross the wire unencrypted, so keep this off any untrusted network.
       {
         "port": 8116,
-        "address": "0.0.0.0",
-        // "address": "mb2.local",
-        // "address": "192.168.1.57",
+        "address": "127.0.0.1",
+        "apply_proxy_config": true,
+        "tls_mode": 0,
+        "force_passive_ip": "",
+        "client_auth_type": 0,
+        "tls_cipher_suites": []
+      },
+      {
+        // bridge100, i.e. Internet Sharing clients only
+        "port": 8116,
+        "address": "192.168.2.1",
+        // "address": "0.0.0.0", // GLOBAL: open to the internet
         "apply_proxy_config": true,
         "tls_mode": 0,
         "force_passive_ip": "",
@@ -88,7 +108,11 @@
     "bindings": [
       {
         "port": 8114,
-      "address": "mb2.local",
+        // 2026-08-10: was "mb2.local", which resolves to the PUBLIC IP
+        // (<redacted>) and duly bound WebDAV to the internet. Confirmed in
+        // the sftpgo log: "listener registered, address: <redacted>:8114".
+        // Never use mb2.local as a bind target on this host.
+        "address": "127.0.0.1",
         // "address": "192.168.1.57",
         "enable_https": false,
         "client_auth_type": 0,

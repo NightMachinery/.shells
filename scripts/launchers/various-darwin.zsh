@@ -12,6 +12,8 @@ if test -n "${MDNS_NAME}" ; then
     # mdns-init-darwin
 fi
 ##
+tmuxnew neru neru launch
+##
 
 brishgarden-boot 64
 
@@ -61,7 +63,13 @@ fi
 
 if isMe ; then
     ##
-    tmuxnew direct-proxy gost -L socks5://0.0.0.0:3081 -L http://0.0.0.0:3087
+    # 2026-08-10: disabled. Explicitly bound to 0.0.0.0, i.e. an open
+    # unauthenticated SOCKS+HTTP relay reachable from the internet. A sibling
+    # xray config with the same exposure was found being abused (353
+    # connections, 1.27TB relayed). See
+    # notes/private/configs/zii/v2ray/open-proxy-incident-2026-08-10.org
+    # To re-enable safely, bind to loopback: socks5://127.0.0.1:3081
+    # tmuxnew direct-proxy gost -L socks5://0.0.0.0:3081 -L http://0.0.0.0:3087
     ##
     # tmuxnew v2ray v2ray -config $nightNotes/private/configs/zii/v2ray/v1.zii.json
     ##
