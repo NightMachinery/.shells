@@ -229,15 +229,45 @@ hyper_bind_v2({
 })
 
 hyper_toggler_1 = hs.hotkey.bind({}, "F18", hyper_down, hyper_up, nil)
--- Trigger existing hyper key shortcuts
-for _, key in ipairs({"v", "\\", "delete", "space", "j"}) do
-    -- "o",
-    --
-    -- If you can't bind a key here, it's most probably because you have bound it later in the code.
-    ---
-    -- hs.keycodes.map['left'], hs.keycodes.map['right'], "right"
-    -- [[https://github.com/Hammerspoon/hammerspoon/issues/2282][Having trouble sending arrow key events · Issue #2282 · Hammerspoon/hammerspoon]]
-    ---
+
+-- Keys that re-emit the real modifier chord, so an existing
+-- ctrl+alt+cmd+shift+<key> shortcut keeps working from hyper mode.
+--
+-- "o",
+--
+-- If you can't bind a key here, it's most probably because you have bound it later in the code.
+---
+-- hs.keycodes.map['left'], hs.keycodes.map['right'], "right"
+-- [[https://github.com/Hammerspoon/hammerspoon/issues/2282][Having trouble sending arrow key events · Issue #2282 · Hammerspoon/hammerspoon]]
+---
+hyper_passthrough_keys = hyper_passthrough_keys or {"v", "\\", "delete", "j"}
+
+---
+-- What hyper+space does: "emit_key" | "neru"
+hyper_space_mode = "neru"
+
+neru_bin = "/Applications/Neru.app/Contents/MacOS/neru"
+-- hs.task takes the argv directly, so no shell is spawned. Built once.
+neru_hints_args = {"hints", "--action", "left_click"}
+
+if hyper_space_mode == "emit_key" then
+    table.insert(hyper_passthrough_keys, "space")
+else
+    hyper_bind_v2{key="space", pressedfn=function()
+                      hs.task.new(neru_bin, nil, neru_hints_args):start()
+    end}
+
+    -- Fallback: hyper+shift+space still emits the original chord.
+    hyper_bind_v2{mods={"shift"}, key="space", pressedfn=function()
+                      hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, "space")
+    end}
+end
+
+neru_recursive_grid_left_click_args = {"recursive_grid", "--action", "left_click"}
+
+---
+
+for _, key in ipairs(hyper_passthrough_keys) do
     hyper_bind_v2{key=key, pressedfn=function()
                       hs.eventtap.keyStroke({"cmd","alt","shift","ctrl"}, key)
     end}
