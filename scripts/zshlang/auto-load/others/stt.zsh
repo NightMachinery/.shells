@@ -23,7 +23,7 @@ function llm-focus-p {
                 browser-focus-p &&
                     browser-current-match-p '^https://(chatgpt\.|(?:aistudio|gemini)\.google\.|claude\.)'
             } ||
-                [[ "${front_app_cached}" == 'com.openai.codex' ]]
+                [[ "${front_app_cached}" == 'com.openai.codex' || "${front_app_cached}" == 'com.anthropic.claudefordesktop' ]]
         }
 }
 
