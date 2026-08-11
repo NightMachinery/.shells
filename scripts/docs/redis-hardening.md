@@ -1,9 +1,19 @@
 # Hardening redis
 
-Redis binds to `127.0.0.1`. That excludes other *hosts*; it does not exclude the
-other *users* of the same machine, who can otherwise read and write everything
-in it — shell history, memoi caches, brishgarden state. On any box where someone
-else can log in, redis needs `requirepass`.
+Redis binds to `127.0.0.1`. That excludes other *hosts*, and nothing else.
+
+On a shared box — the CIS login nodes — it does not exclude the other *users*,
+who can otherwise read and write everything in it: shell history, memoi caches,
+brishgarden state.
+
+On a single-user laptop like mb2 the threat is different but not absent. Anything
+that can reach loopback can talk to redis: a web page you visit, which can make
+your browser POST to port 6379; a sandboxed build step; a compromised dependency
+in some project's `node_modules`. None of those are "another user", and all of
+them get in through a passwordless loopback port. This is the same reasoning as
+`docs/api-keys.md`, which is why the localhost HTTP services grew API keys.
+
+Either way, redis needs `requirepass`.
 
 ## The two halves
 
@@ -42,11 +52,31 @@ It is on a hot path, so it is written to cost one `test` per call once the
 variable is set, and it remembers a failed generation attempt in
 `h_redis_auth_attempted` rather than forking `od` on every subsequent call.
 
-Generation writes 32 bytes of `/dev/urandom` as **hex**, not base64. base64 on
-some hosts emits CRLF, and a stray `\r` that `tr -d '\n'` misses would silently
-become part of the password — see `docs/` history and the linuxbrew base64 on
-the VPS. `od` is used rather than `xxd` because `xxd` ships with vim and is not
-guaranteed present.
+It is called at the bottom of `redis.zsh` as well, so every zsh exports the
+secret at startup rather than only after its first `redism` call. That is what
+covers the callers which never go through `redism` — memoi's write path uses
+`redis-cli` directly, and `python/iterm/iterm_focus.py` shells out to it through
+brish — since those inherit their shell's environment.
+
+### Generating the secret
+
+`openssl rand -hex 32` when openssl is present, otherwise
+`od -An -tx1 -N32 /dev/urandom`.
+
+Both draw from the same kernel CSPRNG: `openssl rand` seeds from
+`/dev/urandom`, so neither is "more random" than the other, and the `od` form
+was never the weak link. openssl is preferred because it emits the digits
+directly, with no whitespace-stripping step to get subtly wrong. The `od`
+fallback is POSIX and needs no openssl, which is not guaranteed on a stripped
+host.
+
+Hex rather than base64 either way: base64 on some hosts emits CRLF, and a stray
+`\r` that `tr -d '\n'` misses would silently become part of the password. `od`
+rather than `xxd` because `xxd` ships with vim and is not guaranteed present.
+
+Both calls are `command`-prefixed. `od` and `tr` are exactly the kind of short
+name a wrapper is likely to have claimed, and here the surrounding logic depends
+on getting the real binary's output format.
 
 The write is `write-to-temp` then `ln`, not a plain redirect. `ln` fails if the
 target exists, atomically and over NFS, so two shells racing on the shared CIS
@@ -78,40 +108,74 @@ case for `night-startup-redis` in `setup/bootstrap-sudoless/stages/70-services.s
 which passes everything on the command line — harmlessly, because that path
 re-reads `~/.redis-auth` and passes `--requirepass` on every start anyway.
 
-## What is still not covered
+## The other clients
 
-`h-redis-auth-ensure` only reaches clients that go through `redism` or that
-inherit `REDISCLI_AUTH` from a shell which ran it. Hardening the server breaks
-everything else. Known clients that do not go through it:
+Hardening the server breaks every client that does not send the password, and
+`redism` is not the only way we talk to redis. Three kinds of caller, three
+fixes:
 
-- `python/redis/redis_smembers0.py` and `python/redis/redis-delete-idle.py`
-  construct `redis.StrictRedis(host='localhost', port=6379, db=0)` with no
-  password. These fail outright against a hardened server.
-- `zshlang/wrappers/bicon_zsh.dash` calls `redis-cli --raw get` directly. With
-  `--raw`, a NOAUTH error arrives on *stdout with exit status 0*, so its
-  `|| dis=y` fallback does not trigger; `dis` becomes the error string, which is
-  non-empty, so bicon silently switches off. Fails safe, but silently.
-- `sh/power_from_adapter_event.sh` and `sh/power_from_battery_event.sh` call
-  bare `redis-cli set`. These run from power events, whose environment is
-  whatever launchd handed them.
-- `python/iterm/iterm_focus.py` shells out to `redis-cli set` via brish, so it
-  inherits the garden's environment.
-- `hammerspoon/core/redis.lua` calls `redis.connect('127.0.0.1', 6379)` with no
-  AUTH. Connecting still succeeds against a hardened server — redis only
-  rejects the *commands* — so its retry logic sees a live client whose every
-  `set` fails. Today this is masked by `redisModalityUpdateP = false`, which
-  makes `redisSetMode` return before touching redis at all; turning that flag
-  on without adding AUTH would fail a write, null the client and schedule a
-  reconnect on every hyper-key press.
+**Anything descended from a zsh** now inherits `REDISCLI_AUTH`, because
+`redis.zsh` calls `h-redis-auth-ensure` at load time. This covers memoi's
+`redis-cli` write path and `python/iterm/iterm_focus.py`, which reaches
+`redis-cli` through brish.
 
-These all work today only because they inherit `REDISCLI_AUTH` from an
-environment that had it. On a host where the secret is minted *after* those
-processes started, they break until restarted.
+**POSIX-sh scripts launched by something that is not a shell** source
+`sh/redis-auth.sh`, a fork-free snippet that exports the variable and nothing
+else:
 
-Also note that a password in the environment is visible in `/proc/PID/environ`,
-which is owner-readable only — so exporting it does not leak it to other users
-on Linux. It is not in argv, which `ps` does show to everyone; that is why
-`REDISCLI_AUTH` is used rather than `redis-cli -a`.
+- `sh/power_from_adapter_event.sh`, `sh/power_from_battery_event.sh` — power
+  events hand these launchd's environment.
+- `zshlang/wrappers/bicon_zsh.dash` — iTerm launches it with whatever
+  environment iTerm itself started with.
+
+`sh/redis-auth.sh` deliberately only *reads* the secret; minting stays in
+`h-redis-auth-ensure` alone, so there is only one generator to keep correct.
+
+**Python** uses `libs/redis_client.py`:
+
+```python
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from libs.redis_client import redis_client
+r = redis_client()
+```
+
+`redis_auth_get()` returns None when the host has no secret, so
+`redis_client()` reproduces the old passwordless behaviour exactly and keeps
+working against an un-hardened redis.
+
+Adding `~/scripts/python/` to `sys.path` is safe even though
+`~/scripts/python/redis/` looks like a package named `redis`: a directory with
+no `__init__.py` is only a namespace *portion*, so the import machinery keeps
+scanning `sys.path` and `import redis` still resolves to the installed library.
+Verified, not assumed.
+
+### bicon's NOAUTH trap
+
+`bicon_zsh.dash` keeps `--raw`, because without it a string reply comes back
+quoted and the `test -z "$dis"` check would see a non-empty `""` and disable
+bicon unconditionally. The cost of `--raw` is that server-side errors arrive on
+**stdout with exit status 0** — `NOAUTH Authentication required.` becomes the
+value of `$dis` instead of tripping the `|| dis=y` fallback. That fails in the
+safe direction, since any non-empty `$dis` disables bicon, but silently. Do not
+"fix" it into a fail-open check.
+
+### Still outstanding
+
+`hammerspoon/core/redis.lua` calls `redis.connect('127.0.0.1', 6379)` with no
+AUTH. Connecting still *succeeds* against a hardened server — redis rejects the
+commands, not the connection — so its retry logic sees a live client whose every
+write fails. This is currently inert: `redisModalityUpdateP = false` makes
+`redisSetMode` return before touching redis at all. Turning that flag on without
+adding AUTH would fail a write, null the client and schedule a reconnect on
+every hyper-key press.
+
+### Why the environment, not `-a`
+
+A password in the environment is visible in `/proc/PID/environ`, which is
+owner-readable only, so exporting it does not leak it to other users on Linux.
+It is *not* in argv, which `ps` shows to everyone — that is why every caller
+here uses `REDISCLI_AUTH` rather than `redis-cli -a`. Same reasoning as the
+`curl --header @file` convention in `docs/api-keys.md`.
 
 ## Applying it
 

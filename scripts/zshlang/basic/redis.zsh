@@ -57,11 +57,21 @@ function h-redis-auth-generate {
     fi
 
     local secret
-    #: hex, not base64: base64 on some hosts emits CRLF, and a stray CR that
-    #: `tr -d '\n'` misses would silently become part of the password. `od' is
-    #: POSIX, so this works where xxd (a vim dependency) is missing.
-    secret="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \r\n')" || {
-        ecerr "$0: could not read /dev/urandom"
+    #: 256 bits as hex. Hex rather than base64 because base64 on some hosts
+    #: emits CRLF, and a stray CR that `tr -d '\n'` misses would silently
+    #: become part of the password.
+    #:
+    #: Both branches below draw from the same kernel CSPRNG - `openssl rand`
+    #: seeds from /dev/urandom - so neither is "more random" than the other.
+    #: openssl is preferred only because it emits the digits directly, with no
+    #: whitespace-stripping step to get subtly wrong. The `od' fallback is
+    #: POSIX and needs no openssl, which is not guaranteed on a stripped host.
+    if (( ${+commands[openssl]} )) ; then
+        secret="$(command openssl rand -hex 32 | command tr -d ' \r\n')"
+    else
+        secret="$(command od -An -tx1 -N32 /dev/urandom | command tr -d ' \r\n')"
+    fi || {
+        ecerr "$0: could not generate a secret"
         return 1
     }
     if (( ${#secret} != 64 )) ; then
@@ -75,7 +85,7 @@ function h-redis-auth-generate {
     local tmp="${auth_file}.$$.tmp"
     {
         ( umask 077 ; print -rn -- "${secret}" > "${tmp}" ) &&
-            chmod 600 "${tmp}"
+            command chmod 600 "${tmp}"
     } || {
         ecerr "$0: could not write ${tmp}"
         command rm -f "${tmp}"
@@ -163,7 +173,7 @@ function redis-harden {
         conf="$(command redis-cli --no-auth-warning --raw INFO server 2>/dev/null | command grep -m1 '^config_file:')"
         conf="${${conf#config_file:}%$'\r'}"
         if test -n "${conf}" && test -f "${conf}" ; then
-            chmod 600 "${conf}" 2>/dev/null ||
+            command chmod 600 "${conf}" 2>/dev/null ||
                 ecerr "$0: WARNING: could not chmod 600 ${conf}; it now contains the password in plaintext"
         fi
 
@@ -234,3 +244,14 @@ function redis-defvar {
     fndef "${name}_del" silent redism del "$name"
 }
 ##
+#: Export the secret at load time, not merely on the first [agfi:redism] call.
+#:
+#: Plenty of redis access never goes through redism - [agfi:memoi]'s write path
+#: calls `redis-cli' directly, iterm_focus.py shells out to it through brish -
+#: and those inherit whatever environment their shell had. Doing this once at
+#: startup means every child process gets REDISCLI_AUTH, so bare `redis-cli'
+#: keeps working rather than failing with NOAUTH.
+#:
+#: It costs one `read' of a 64-byte file per shell (no fork); the generator
+#: runs at most once per machine.
+h-redis-auth-ensure
