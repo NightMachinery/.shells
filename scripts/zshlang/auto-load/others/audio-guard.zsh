@@ -9,6 +9,11 @@ typeset -g audio_guard_idle_t="${audio_guard_idle_t:-3600}"
 typeset -g audio_guard_back_t="${audio_guard_back_t:-60}"
 typeset -g audio_guard_notif_p="${audio_guard_notif_p:-y}"
 typeset -g audio_guard_snooze_default="${audio_guard_snooze_default:-2h}"
+#: A claim we never manage to undo -- a device that vanished for good, say a
+#: headset that was unpaired while muted -- would otherwise sit in redis forever.
+#: Anchored to when we muted, deliberately not refreshed by failed retries, so
+#: this bounds the total lifetime rather than the retry gap.
+typeset -g audio_guard_claim_ttl="${audio_guard_claim_ttl:-604800}"  #: 7 days
 #: Off because the screen lock always beats the idle threshold here, so the
 #: unlock hook already covers it. See the doc for the one case that it misses.
 typeset -g audio_guard_restore_at_tick_p="${audio_guard_restore_at_tick_p:-n}"
@@ -200,9 +205,28 @@ Takes the same optional <name> <transport> as [agfi:office-public-audio-p]."
     return 0
 }
 
+function h-audio-guard-claim-set {
+    : "records which device we muted, with a bounded lifetime
+
+Use this rather than audio_guard_muted_set, which redis-defvar generates as a
+plain SET with no expiry."
+    local name="${1}"
+    assert-args name @RET
+
+    silent redism setex audio_guard_muted "${audio_guard_claim_ttl}" "$name"
+}
+
 function h-audio-guard-mute {
     local reason="${1}" name="${2}"
     test -n "$name" || name="$(h-audio-guard-device-name)" || name=''
+
+    #: Without a name there is no way to restore by name later, so the mute would
+    #: be unattributable and effectively permanent. Both output-device backends
+    #: having failed also means we should not be acting at all.
+    if test -z "$name" ; then
+        ecerr "$0: could not identify the output device; refusing to mute."
+        return 1
+    fi
 
     volume-mute @RET
 
@@ -218,7 +242,7 @@ function h-audio-guard-mute {
         return 1
     fi
 
-    audio_guard_muted_set "$name"
+    h-audio-guard-claim-set "$name"
 
     ecdate "$0: muted ${name:-the output device} (${reason})"
     if bool "${audio_guard_notif_p}" ; then
@@ -238,11 +262,45 @@ until you next trip over it."
     local cur
     cur="$(h-audio-guard-device-name 2>/dev/null)" || cur=''
     if [[ "$name" == "$cur" ]] ; then
-        volume-unmute
-        return $?
+        volume-unmute @RET
+
+        #: Verified for the same reason the mute is: a device that ignores a mute
+        #: request ignores an unmute too.
+        if volume-mute-p ; then
+            ecerr "$0: ${name} is still muted after the unmute request."
+            return 1
+        fi
+
+        return 0
     fi
 
-    silence hammerspoon -c "local d = hs.audiodevice.findOutputByName([[${name}]]) ; if d then d:setOutputMuted(false) ; return true else return false end"
+    #: Not the default device, so neither osascript nor [agfi:volume-mute-p] can
+    #: reach it; go through Hammerspoon by name.
+    #:
+    #: The RESULT STRING is what has to be checked, not the exit status: hs exits
+    #: 0 whether or not findOutputByName found anything, so a vanished device --
+    #: a headset unpaired while muted -- would otherwise look like success.
+    local out
+    out="$(hammerspoon -c "local d = hs.audiodevice.findOutputByName([[${name}]]) ; if d then d:setOutputMuted(false) ; return tostring(not d:outputMuted()) else return [[nodevice]] end" 2>/dev/null)" || {
+        ecerr "$0: could not reach Hammerspoon to unmute ${name}."
+        return 1
+    }
+
+    #: Hammerspoon interleaves lines like "-- Loading extension: task" into its
+    #: output the first time an extension is used -- which is exactly when a
+    #: watcher-spawned task has just loaded one. Without this filter the result
+    #: reads as "true-- Loading extension: task" and a successful unmute is
+    #: reported as a failure. [agfi:location-get-darwin] drops the same chatter.
+    local -a lines
+    lines=( "${(@f)out}" )
+    lines=( "${(@)lines:#-- *}" )
+    out="${(j::)lines}"
+
+    out="${out//[[:space:]]/}"
+    if [[ "$out" != true ]] ; then
+        ecerr "$0: could not unmute ${name} (Hammerspoon said: ${out:-<empty>})."
+        return 1
+    fi
 }
 
 function audio-guard-restore {
@@ -254,7 +312,16 @@ disabled the trigger that placed it in the meantime."
     held="$(audio_guard_muted_get 2>/dev/null)" || held=''
     test -n "$held" || return 0
 
-    h-audio-guard-unmute-device "$held"
+    #: Keep the claim when the unmute fails, so the next unlock or tick retries.
+    #: Clearing it regardless would leave the device muted with nothing tracking
+    #: it -- the exact failure the ownership record exists to prevent. The claim
+    #: expires after audio_guard_claim_ttl, so a device that never comes back
+    #: cannot strand it forever.
+    h-audio-guard-unmute-device "$held" || {
+        ecerr "$0: keeping the claim on ${held} for a later retry."
+        return 1
+    }
+
     audio_guard_muted_del
 
     ecdate "$0: restored ${held}."
@@ -338,7 +405,16 @@ The only window into a job you never watch run; modelled on [agfi:office-p-expla
 
     local held
     held="$(audio_guard_muted_get 2>/dev/null)" || held=''
-    ec "our mute: ${held:-<none>}"
+    if test -n "$held" ; then
+        #: A claim that survives repeated restores is a stuck one: the device is
+        #: probably gone. Showing the countdown makes that visible instead of
+        #: leaving it to be inferred.
+        local claim_ttl
+        claim_ttl="$(redism ttl audio_guard_muted 2>/dev/null)" || claim_ttl=''
+        ec "our mute: ${held} (claim expires in ${claim_ttl:-?}s)"
+    else
+        ec "our mute: <none>"
+    fi
 
     ec "idle: $(idle-get)s (threshold ${audio_guard_idle_t}s)"
     ec "output: $(audio-output-get 2>/dev/null | prefixer -o ' / ' --skip-empty)"
