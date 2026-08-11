@@ -1,0 +1,14 @@
+#!/usr/bin/env dash
+##
+# The launchd payload for com.user.audio-guard; see ../../launchers/audio-guard/.
+#
+# Shells the job into the persistent BrishGarden zsh so that the full zshlang
+# environment is available in launchd's bare non-interactive context, the same
+# way rem-today-notify.dash does.
+#
+# Run brishz-restart after editing audio-guard.zsh, or this keeps executing the
+# code the garden loaded at startup.
+##
+PATH="$HOME/scripts/zshlang/wrappers/brishz/:$PATH"
+##
+brishz.dash audio-guard-tick

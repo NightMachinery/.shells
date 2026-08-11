@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.user.audio-guard</string>
+
+	<!-- The payload shells into BrishGarden; the real logic is the zsh function
+	     audio-guard-tick in zshlang/auto-load/others/audio-guard.zsh. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/evar/scripts/zshlang/wrappers/audio-guard-tick.dash</string>
+	</array>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- /opt/homebrew/bin is load-bearing: dash lives there and the payload's
+		     shebang is #!/usr/bin/env dash, so a PATH without it means the job
+		     never launches at all. The PATH copied from reminday.plist omits it. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+	</dict>
+
+	<!-- 10 minutes. The guard is an hour late by construction, so a worst-case
+	     extra 10 minutes costs nothing, and it keeps the duty cycle negligible.
+	     StartInterval does not fire while asleep; it coalesces to one firing on
+	     wake, which is what we want. -->
+	<key>StartInterval</key>
+	<integer>600</integer>
+
+	<key>RunAtLoad</key>
+	<true/>
+
+	<key>ProcessType</key>
+	<string>Background</string>
+
+	<key>LowPriorityIO</key>
+	<true/>
+
+	<key>StandardOutPath</key>
+	<string>/Users/evar/logs/audio-guard.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/evar/logs/audio-guard.log</string>
+</dict>
+</plist>
