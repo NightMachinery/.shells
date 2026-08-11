@@ -159,15 +159,24 @@ value of `$dis` instead of tripping the `|| dis=y` fallback. That fails in the
 safe direction, since any non-empty `$dis` disables bicon, but silently. Do not
 "fix" it into a fail-open check.
 
-### Still outstanding
+### Lua
 
-`hammerspoon/core/redis.lua` calls `redis.connect('127.0.0.1', 6379)` with no
-AUTH. Connecting still *succeeds* against a hardened server — redis rejects the
-commands, not the connection — so its retry logic sees a live client whose every
-write fails. This is currently inert: `redisModalityUpdateP = false` makes
-`redisSetMode` return before touching redis at all. Turning that flag on without
-adding AUTH would fail a write, null the client and schedule a reconnect on
-every hyper-key press.
+`hammerspoon/core/redis.lua` authenticates in `connectToRedis`, after
+connecting. Connecting is not the step that fails: `redis.connect` *succeeds*
+against a hardened server, because redis rejects the commands and not the
+connection, so an unauthenticated client looks healthy while every write returns
+NOAUTH — nulling the client and scheduling a reconnect on each hyper-key press.
+
+The `client:auth()` call is wrapped in `pcall`. AUTH against a server with *no*
+password configured is an error, and letting it propagate would turn a working
+unprotected redis into a connection that retries forever. A genuinely wrong
+secret still surfaces through the existing reconnect path.
+
+Worth knowing when editing this file: `init.lua` loads the core files with a
+bare `dofile` loop and no `pcall`, so an error raised in `core/redis.lua` takes
+down every file listed after it — wifi-watcher, hyper-mode, mouse, app-hotkeys,
+stt, reload. Reload deliberately and check, rather than assuming a Lua error
+would be local to the file that raised it.
 
 ### Why the environment, not `-a`
 
