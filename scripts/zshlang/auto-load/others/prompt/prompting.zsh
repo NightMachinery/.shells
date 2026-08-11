@@ -492,6 +492,7 @@ function prompt-pronunciation {
     #
 }
 aliasfn prompt-say prompt-pronunciation
+alias ipa='\noglob reval-memoi llm-run prompt-pronunciation'
 
 function prompt-explain-meaning {
     prompt_input_mode="${prompt_input_mode:-block}" prompt-instruction-input 'What does the following text mean?' "$@"
