@@ -11,7 +11,22 @@ if ! test -e "$zsh" ; then
     fi
 fi
 
-dis="$(redis-cli --raw get bicon_zsh_disabled)" || dis=y
+#: iTerm launches this with whatever environment it was itself started with,
+#: which need not have been through zshlang, so load the redis password here.
+#: Sourcing costs no fork; see sh/redis-auth.sh.
+: "${NIGHTDIR:=$HOME/scripts}"
+. "${NIGHTDIR}/sh/redis-auth.sh"
+
+#: Keep `--raw'. Without it a string reply comes back quoted, and the `test -z'
+#: below would then see a non-empty `""' and disable bicon unconditionally.
+#:
+#: The cost of --raw is that a server-side error arrives on *stdout with exit
+#: status 0* -- `NOAUTH Authentication required.' becomes the value of $dis
+#: rather than tripping the `|| dis=y' fallback. That happens to fail in the
+#: safe direction (any non-empty $dis disables bicon), but silently, which is
+#: how an unauthenticated redis-cli here would have turned bicon off with no
+#: hint as to why. Do not "fix" this into a fail-open check.
+dis="$(redis-cli --raw get bicon_zsh_disabled 2>/dev/null)" || dis=y
 if test -z "$dis" && ( command -v bicon.bin >/dev/null ) ; then # the subshell is needed
     BICON_MODE=y bicon.bin "$zsh" "$@"
 else

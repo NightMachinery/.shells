@@ -5,12 +5,16 @@
 ##
 
 import os
+import sys
+
 add_ttl = bool(os.environ.get("redis_add_ttl", ''))
 if add_ttl:
     print("ttl mode")
 
-import redis
-r = redis.StrictRedis(host='localhost', port=6379, db=0)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from libs.redis_client import redis_client
+
+r = redis_client()
 for key in r.scan_iter("*"):
     key_str = str(key, 'utf-8')
     idle = r.object("idletime", key) # restarting redis resets all idletimes to zero
