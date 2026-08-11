@@ -132,6 +132,8 @@ addToPATH ~/anaconda/bin
 addToPATH ~/miniconda3/bin
 addToPATH ~/.cargo/bin/
 
+addToPATH ~/google-cloud-sdk/bin/
+
 ## perl
 # [[id:162e013e-ce1b-405a-9d45-e0e223f56d6d][perl/cpanm.org]]
 if false; then
