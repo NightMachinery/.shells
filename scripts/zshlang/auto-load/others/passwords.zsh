@@ -104,6 +104,7 @@ function num2words {
 }
 ##
 function 2fa-code {
+    local period="${twofa_code_period:-30}"
     local inargs
     in-or-args3 "$@" @RET
 
@@ -113,19 +114,12 @@ function 2fa-code {
     fi
 
     local input retcode=0
-    for input in "${inargs[@]}" ; do
-        local period="${twofa_code_period:-30}"
+    for input in ${inargs[@]} ; do
         local secret=""
         local code=""
         local valid_for=""
         local oathtool_opts=()
         local otpauth_params=()
-
-        if test -z "${input}" ; then
-            ecerr "Usage: $0 <BASE32_SECRET_OR_OTPAUTH_URL>"
-            retcode=1
-            continue
-        fi
 
         if [[ "${input}" == otpauth://* ]] ; then
             otpauth_params=("${(@f)$(perl -e '
@@ -197,7 +191,7 @@ function 2fa-code {
     return $retcode
 }
 ##
-function pass-check() {
+function pass-check {
     # * pass_check_additional: user data to be added to the dictionaries that are tested against (name, birthdate, etc)
     # * Check out `crack_times_display` in the output
     # * Gives a score to the password, from 0 (terrible) to 4 (great)
