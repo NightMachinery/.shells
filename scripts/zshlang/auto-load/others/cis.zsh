@@ -28,7 +28,8 @@ night_cis_gpu_hosts=(
 function cis-gpus {
     #: Passing the hosts via --hosts rather than positionally keeps every user
     #: flag working, e.g. `cis-gpus --format yaml --min-free 40G`.
-    gpu-status --hosts "${(j:,:)night_cis_gpu_hosts}" "$@"
+    gpu-status --hosts "${(j:,:)night_cis_gpu_hosts}" "$@" |
+        pager-if-overflow
 }
 
 function cis-hosts {
