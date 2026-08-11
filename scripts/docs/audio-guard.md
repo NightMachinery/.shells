@@ -90,6 +90,23 @@ A mute is only claimed if it actually took effect. Not every device supports
 software mute — the DisplayPort monitor here reports a nil volume and ignores
 the request outright — and claiming a mute that never happened is worse than not
 muting, because the next restore would unmute a device the guard never touched.
+For the same reason the guard refuses to mute at all when it cannot name the
+output device: an unnamed mute could never be restored by name, so it would be
+effectively permanent.
+
+Symmetrically, the claim is only *cleared* if the unmute actually took effect.
+Restore can fail — Hammerspoon wedged, or the device simply gone, a headset
+unpaired while it was muted — and clearing the claim anyway would leave that
+device muted with nothing tracking it. On failure the claim is kept and the next
+unlock or tick retries.
+
+That is why the claim carries a TTL (`audio_guard_claim_ttl`, default 7 days).
+Retrying forever is right for a device that comes back, but a device that never
+does would otherwise leave a claim in redis permanently. The TTL is anchored to
+when the mute happened and is deliberately not refreshed by failed retries, so
+it bounds the claim's total lifetime rather than the gap between attempts.
+`audio-guard-status` prints the remaining time, so a stuck claim is visible
+rather than something to infer.
 
 ## Restore happens at unlock, not on the tick
 
@@ -221,6 +238,14 @@ is what works, and it already handles this.
 **`office-p` includes an external-display fallback**, so the guard also fires at
 home when docked to a monitor. Accepted rather than special-cased: restore makes
 it cheap, and `office-off` overrides it.
+
+**`hammerspoon -c` interleaves `-- Loading extension: <name>` into its output**,
+the first time each extension is used — which for a watcher-driven call is
+exactly when a task has just loaded one. Any caller that compares the result
+against an expected value has to drop `^-- ` lines first, or a correct result
+reads as `true-- Loading extension: task` and is treated as a failure. This cost
+`h-audio-guard-unmute-device` a spurious failure before it was spotted;
+`location-get-darwin` in `system.zsh` already filters the same chatter.
 
 **BrishGarden caches shells.** Run `brishz-restart` after editing
 `audio-guard.zsh`, or the LaunchAgent keeps executing whatever the garden loaded
