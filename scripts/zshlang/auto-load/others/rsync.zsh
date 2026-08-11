@@ -66,6 +66,7 @@ function rsp-notes-export {
 
     ec $'\n\n#####################\n\n'
     lilf-link-notes "${entries[@]}"
+    #: For private exports, we CAN append the user-password into the URLs themselves, which would make them easily usable while they would stay private.
 }
 
 function rsp-notes {
