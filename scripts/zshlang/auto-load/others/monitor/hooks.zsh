@@ -15,6 +15,11 @@ function h-hook-lock {
     h-lunaquit-force-skip-reset
 
     lock-security
+
+    #: Backgrounded on purpose. [agfi:hammerspoon] is `gtimeout 30s hs -A -t 5',
+    #: so a wedged Hammerspoon would otherwise stall locking the screen for
+    #: seconds. Disabled by default; see [agfi:audio-guard-trigger-p].
+    awaysh-fast audio-guard-on-lock
 }
 
 function h-hook-unlock {
@@ -25,6 +30,11 @@ function h-hook-unlock {
 
     reval-ecdate last-idle-reset
     reval-ecdate luna-skip-reset
+
+    #: Not gated on any trigger: a mute the guard placed must stay reversible
+    #: even if the trigger that placed it has since been turned off. This is the
+    #: primary restore path -- the tick deliberately never unmutes.
+    reval-ecdate audio-guard-restore
 
     if false ; then
         # ec $'\n\n'"$0" | sync-append-in "${KARABINER_RESET_LOG}"
