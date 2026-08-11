@@ -163,6 +163,13 @@ bell but the answer changes when you walk somewhere.
 Add a second site by editing `office_p_domains` / `office_p_subnets` in
 `zshlang/auto-load/others/monitor/location.zsh` — a data change, not a code change.
 
+`office-public-audio-p` names the question `stop_mode=auto` actually asks: at the
+office **and** not on headphones, i.e. would a sound right now be audible to
+colleagues. It is shared with the audio leak guard, which mutes the output
+device when that holds and nobody is at the desk — see `audio-guard.md`. It takes
+the same optional `<name> <transport>` arguments as `headphones-p`, for callers
+that already know the output device and want to skip the lookup.
+
 ### external-display-p
 
 `external-display-p` matches display **names**, and deliberately does not count

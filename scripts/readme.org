@@ -54,3 +54,9 @@ ntag notes are tracked in =./docs/ntag/=.
 
 =bell-auto= escalates from sound to a desktop notification to Telegram, and picks
 its behaviour from whether we are at the office. See =./docs/bell-auto.md=.
+
+* Audio leak guard
+
+=audio-guard= mutes the output device when audio would be audible to colleagues
+at the office and nobody is at the desk, and unmutes when you unlock. Installed
+as a LaunchAgent from =./launchers/audio-guard/=. See =./docs/audio-guard.md=.
