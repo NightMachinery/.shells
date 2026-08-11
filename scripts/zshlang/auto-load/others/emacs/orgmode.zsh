@@ -388,7 +388,7 @@ function h-org-export-recursive {
 
     local f f_hashed id_link file_link file_links text h outs exported_file
     for f in ${fs[@]} ; do
-        f="$(realpath "$f")" @TRET
+        { dvar f root_dir ; f="$(realpath "$f")" } @TRET
 
         file_links=()
 
@@ -453,8 +453,13 @@ function h-org-export-recursive {
         done
 
         file_links+=( ${(@f)"$(ec "$text" | { org-link-extract-file || true } | { rg '\.org(?:::.*)?$' || true } )"}) @TRET
+        # dvar file_links
+
         for file_link in ${file_links[@]} ; do
-            outs+="$("$0" "$file_link")"$'\n' @TRET
+            outs+="$(cdd "${f}" ; "$0" "${${file_link/#\~\//$HOME/}:a}")"$'\n' @TRET
+            #: ${file_link/#\~\//$HOME/} replaces a leading ~/ only (# anchors to the start), then :a makes it realpath.
+            #: By going to f's directory first, we can use relative paths in the org file.
+            #: E.g., `[[file:a.org]]` would work if `./a.org` exists.
         done
 
         outs+="$(org-img-used "$f")" @TRET
