@@ -22,7 +22,7 @@ function tex2pdf {
 
     dest_dir="${dest:h}"
 
-    local pkgs=( ${tex2pdf_pkgs[@]} amsmath amssymb )
+    local pkgs=( ${tex2pdf_pkgs[@]} amsmath amssymb bbm )
 
     local extra_pkgs="${(j:,:)pkgs}"
 
@@ -33,6 +33,7 @@ function tex2pdf {
 
         cat > "$tmp_tex_file" <<EOF
 \documentclass[preview,border=1pt,varwidth]{standalone}
+\usepackage[bb=boondox]{mathalpha}  % Fixes '\mathbb{1}' rendering
 \usepackage{${extra_pkgs}}
 \begin{document}
 \(
