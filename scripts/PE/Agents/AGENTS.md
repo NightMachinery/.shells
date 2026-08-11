@@ -1,5 +1,7 @@
 # General Working Guidelines
 
+- Root commands must be run as `sudo -kA <command>`. Never run bare `sudo`: there is no TTY, so it will hang until the tool times out.
+
 - Keep `./docs/` updated as you investigate or make changes.
   - If a `readme.org` (or `readme.md`) file exists, keep it updated too.
   - Avoid using tables in docs. They can be difficult to read in plain-text on a laptop screen.
