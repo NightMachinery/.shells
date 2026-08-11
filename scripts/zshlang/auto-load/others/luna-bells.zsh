@@ -657,7 +657,7 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
     if [[ "$stop_mode" == auto ]] ; then
         #: The reason to suppress repeated bells at the office is the colleagues, not
         #: the office; headphones remove the concern entirely.
-        if office-p && ! headphones-p ; then
+        if office-public-audio-p ; then
             stop_mode='bell+notif'
         else
             stop_mode='idle+timeout'

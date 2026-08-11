@@ -265,28 +265,46 @@ function audio-output-get {
     fi
 }
 
+function h-headphones-classify-p {
+    : "returns 0 iff <name> <transport> describes a device likely worn in/on the ear
+
+Pure classification, no lookup. Split out of [agfi:headphones-p] so that a caller
+which already knows the device can decide without paying for a query -- notably
+the Hammerspoon audio watcher, whose Lua callback hands us the new device and
+must not be made to call back into Hammerspoon to re-discover it."
+    local name="${(L)1}" transport="${2}"
+
+    if [[ "$name" == *(headphone|earphone|headset|buds|pods)* ]] ; then
+        #: Name says it's worn: the wired jack shows up as "External Headphones",
+        #: and this also catches AirPods, Galaxy Buds, etc.
+        return 0
+    elif [[ "$transport" == "Bluetooth" && "$name" != *speaker* ]] ; then
+        #: Heuristic: a Bluetooth audio device without "speaker" in its name is assumed worn
+        #: (catches e.g. Sony WF/WH-1000XM*, Bose QC, whose names lack headphone-ish words).
+        return 0
+    else
+        return 1
+    fi
+}
+
 function headphones-p {
-    : "returns 0 iff the default audio output is likely worn in/on the ear (headphones, earbuds, headset)"
+    : "returns 0 iff the default audio output is likely worn in/on the ear (headphones, earbuds, headset)
+
+With no arguments, asks [agfi:audio-output-get]. Given <name> <transport>, skips
+the lookup and classifies those directly."
     # @darwinOnly
     ##
+    if (( $# >= 1 )) ; then
+        h-headphones-classify-p "$@"
+        return $?
+    fi
+
     if isDarwin ; then
         local out
         out="$(audio-output-get)" @RET
 
         local lines=("${(@f)out}")
-        local name="${(L)lines[1]}" transport="${lines[2]}"
-
-        if [[ "$name" == *(headphone|earphone|headset|buds|pods)* ]] ; then
-            #: Name says it's worn: the wired jack shows up as "External Headphones",
-            #: and this also catches AirPods, Galaxy Buds, etc.
-            return 0
-        elif [[ "$transport" == "Bluetooth" && "$name" != *speaker* ]] ; then
-            #: Heuristic: a Bluetooth audio device without "speaker" in its name is assumed worn
-            #: (catches e.g. Sony WF/WH-1000XM*, Bose QC, whose names lack headphone-ish words).
-            return 0
-        else
-            return 1
-        fi
+        h-headphones-classify-p "${lines[1]}" "${lines[2]}"
     else
         ecgray "$0: NA"
         return 1

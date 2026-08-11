@@ -125,6 +125,18 @@ then the network fingerprint, then an attached external display."
 }
 aliasfn office-is office-p
 
+function office-public-audio-p {
+    : "returns 0 iff audio playing right now would be audible to colleagues
+
+At the office and not on headphones. The concern is the people in the room
+rather than the room itself, so headphones remove it entirely.
+
+Accepts the same optional <name> <transport> arguments as [agfi:headphones-p],
+for callers that already know the output device and want to avoid the lookup."
+    office-p && ! headphones-p "$@"
+}
+aliasfn office-public-audio-is office-public-audio-p
+
 function office-p-explain {
     : "shows what each [agfi:office-p] backend thinks, bypassing the cache"
     local override
