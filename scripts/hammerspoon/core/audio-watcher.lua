@@ -30,6 +30,7 @@
 -- brishz2.dash exactly like this.
 
 audioWatcherDebounceTimer = nil
+audioWatcherMuteDevice = nil
 
 local DEBOUNCE = 1.0
 
@@ -54,6 +55,19 @@ local function taskWithPath(bin, callback, args)
     return task
 end
 
+-- A nil callback would discard the exit code and both streams, which is how the
+-- missing-jq failure above stayed invisible. Log failures instead.
+local function runInGarden(cmd)
+    local task = taskWithPath("/usr/local/bin/brishz2.dash", function(exitCode, _, stdErr)
+        if exitCode ~= 0 then
+            print("audio-watcher: brishz2.dash exited " .. tostring(exitCode) ..
+                      ": " .. tostring(stdErr))
+        end
+    end, {cmd})
+
+    if task then task:start() end
+end
+
 -- A single device switch emits a burst of events; without coalescing, one
 -- AirPods disconnect becomes several garden round-trips.
 local function notifyAudioChanged()
@@ -64,19 +78,61 @@ local function notifyAudioChanged()
     -- zsh side rediscover them via audio-output-get-hs, i.e. a subprocess we
     -- spawned calling IPC back into the very Hammerspoon that spawned it. We
     -- already know the answer here, so we hand it over.
-    local cmd = ("audio-guard-on-audio-change %q %q"):format(
-        device:name() or "", device:transportType() or "")
+    runInGarden(("audio-guard-on-audio-change %q %q"):format(
+                    device:name() or "", device:transportType() or ""))
 
-    -- A nil callback would discard the exit code and both streams, which is how
-    -- the missing-jq failure above stayed invisible. Log failures instead.
-    local task = taskWithPath("/usr/local/bin/brishz2.dash", function(exitCode, _, stdErr)
-        if exitCode ~= 0 then
-            print("audio-watcher: brishz2.dash exited " .. tostring(exitCode) ..
-                      ": " .. tostring(stdErr))
-        end
-    end, {cmd})
+    -- The mute watcher below is bound to one specific device, so it has to
+    -- follow the default around.
+    attachMuteWatcher()
+end
 
-    if task then task:start() end
+--- ** Ownership reconciliation
+--
+-- The guard remembers which device it muted, and that claim goes stale the
+-- moment you unmute by hand: it mutes, you unmute, you later mute again for your
+-- own reason, and a restore would clobber your mute. The tick reconciles every
+-- 10 minutes; this closes the window to about a second.
+--
+-- Doing it here rather than in the zsh volume-unmute is what makes it general.
+-- hyper+F10 is volumeMuteKey -> systemKey("MUTE"), a synthetic key event that
+-- never enters zsh, and the menu bar and System Settings do not either. This
+-- watcher listens to the CoreAudio property instead of to any one input method,
+-- so it sees all of them: verified by toggling mute with osascript, which
+-- bypasses Hammerspoon entirely, and still receiving mute(scope=outp).
+--
+-- Not gated on any trigger, for the same reason audio-guard-restore is not: a
+-- stale claim is a correctness problem no matter which trigger created it.
+local function deviceMuteCallback(uid, event, scope)
+    -- Muting also emits vmvc (virtual main volume change), twice; we want only
+    -- the mute property, on the output scope.
+    if event ~= "mute" or scope ~= "outp" then return end
+
+    local device = audioWatcherMuteDevice
+    if not device then return end
+
+    -- Only an unmute can invalidate a claim. Returning here on our own mutes
+    -- keeps this from spawning a garden round-trip every time the guard fires.
+    if device:outputMuted() then return end
+
+    runInGarden("audio-guard-reconcile")
+end
+
+-- Per-device rather than global: hs.audiodevice.watcher reports the device list
+-- and the default changing, not a device's own mute property.
+function attachMuteWatcher()
+    if audioWatcherMuteDevice then
+        audioWatcherMuteDevice:watcherStop()
+        audioWatcherMuteDevice = nil
+    end
+
+    local device = hs.audiodevice.defaultOutputDevice()
+    if not device then return end
+
+    -- Kept in a global so it is not garbage collected, which would silently stop
+    -- the watcher.
+    audioWatcherMuteDevice = device
+    device:watcherCallback(deviceMuteCallback)
+    device:watcherStart()
 end
 
 local function audioDeviceCallback(event)
@@ -96,6 +152,8 @@ end
 -- callback rather than call setCallback again, which would silently replace it.
 hs.audiodevice.watcher.setCallback(audioDeviceCallback)
 hs.audiodevice.watcher.start()
+
+attachMuteWatcher()
 
 -- Registered unconditionally, with the trigger check left to the zsh side.
 -- Gating here would mean reading Redis from Hammerspoon, and redisClient in

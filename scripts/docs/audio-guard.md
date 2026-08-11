@@ -57,10 +57,29 @@ that claim is held, so it can never unmute a mute you set yourself.
 
 That is necessary but not sufficient, because the claim goes stale: the guard
 mutes, you unmute by hand, you later mute again for your own reason — and the
-claim still says the mute is the guard's. `h-audio-guard-reconcile` closes it.
-Any time the claim is held but the device is observed unmuted, the claim is
-dropped, because that is proof the mute is no longer ours. It runs on every
-tick, and only ever touches the guard's own bookkeeping, never the mute state.
+claim still says the mute is the guard's. `audio-guard-reconcile` closes it. Any
+time the claim is held but the device is observed unmuted, the claim is dropped,
+because that is proof the mute is no longer ours. It only ever touches the
+guard's own bookkeeping, never the mute state, so it is always safe to run.
+
+It runs from two places. The tick reconciles every 10 minutes, which is the
+backstop for a Hammerspoon that is down or reloading. `audio-watcher.lua`
+reconciles within about a second, by watching the device's own mute property.
+
+Watching the property rather than any one input path is what makes that general.
+There is no useful zsh-side hook here: hyper+F10 is `volumeMuteKey` →
+`systemKey("MUTE")`, a synthetic key event that never enters zsh, and the menu
+bar and System Settings do not either. The CoreAudio property is what all of
+them ultimately change. Verified by toggling mute with `osascript`, which
+bypasses Hammerspoon entirely, and still receiving `mute(scope=outp)`.
+
+The callback returns immediately unless the device is now *unmuted*: only an
+unmute can invalidate a claim, so the guard's own mutes cost a string compare
+rather than a garden round-trip. Muting also emits two `vmvc` (virtual main
+volume change) events, which are filtered out for the same reason.
+
+Reconciliation is not gated on any trigger, for the same reason restore is not:
+a stale claim is a correctness problem regardless of which trigger created it.
 
 Restore unmutes **by device name**, through Hammerspoon's `findOutputByName`,
 rather than unmuting "the default device". macOS mute is per-device and
@@ -164,6 +183,13 @@ Gating in Lua would mean reading redis from Hammerspoon, and `redisClient` in
 a constructor. It was unused elsewhere when this was written; a second consumer
 must chain onto the existing callback rather than call `setCallback` again,
 which would silently replace it.
+
+The mute watcher is a separate, *per-device* watcher, because
+`hs.audiodevice.watcher` reports the device list and the default changing, not a
+device's own mute property. Being bound to one device, it has to follow the
+default around: `attachMuteWatcher` re-attaches whenever the default output
+changes. The device is held in a global so it is not garbage collected, which
+would silently stop the watcher.
 
 ## Gotchas
 

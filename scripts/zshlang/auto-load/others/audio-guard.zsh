@@ -172,6 +172,9 @@ Touches only our own bookkeeping, never the mute state, so it is always safe."
         audio_guard_muted_del
     fi
 }
+#: Public name because hammerspoon/core/audio-watcher.lua calls this from
+#: outside; the h- prefix marks helpers internal to this file.
+aliasfn audio-guard-reconcile h-audio-guard-reconcile
 
 function h-audio-guard-act-p {
     : "the gate shared by every trigger: may we mute right now?
