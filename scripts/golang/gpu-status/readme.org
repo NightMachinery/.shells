@@ -1,0 +1,67 @@
+#+TITLE: gpu-status
+
+Reports NVIDIA GPU occupancy across a set of hosts. Knows nothing about any
+particular cluster --- callers supply the host list. For the CIS machines use
+the =cis-gpus= wrapper in [[file:../../zshlang/auto-load/others/cis.zsh][cis.zsh]].
+
+* Install
+#+begin_src zsh :eval never
+go-install-local "${NIGHTDIR}/golang/gpu-status"
+#+end_src
+
+* Use
+#+begin_src sh :eval never
+gpu-status                          # this machine, no ssh
+gpu-status beta rho1                # hosts as arguments
+gpu-status --hosts beta,rho1,rho2   # or comma-separated
+printf '%s\n' beta rho1 | gpu-status
+
+gpu-status --format yaml            # or json; same schema
+gpu-status --min-free 54G           # only GPUs that could hold a 54G model
+gpu-status --sort count             # rank by idle-GPU count instead
+#+end_src
+
+With no hosts it queries the local machine directly, so it is also the everyday
+tool *on* a server, and =ssh beta gpu-status= works as a one-off.
+
+* Output
+#+begin_example
+HOST  GPU  MODEL           FREE   TOTAL  UTIL  USERS
+beta  0    A100-SXM4-80GB  50.3G  80.0G   36%  yuetianlu
+rho2  0    RTX A6000       47.4G  48.0G    0%  -
+
+72 fully-free GPUs across 9 hosts.
+epsilon5: driver-missing
+#+end_example
+
+*The =USERS= column is the point.* On a shared cluster "busy" is far less
+actionable than "busy with someone else's job" versus "busy with mine". It is
+resolved by pairing =nvidia-smi --query-compute-apps= PIDs with =ps -o user=,
+since the PID alone does not say whose job it is.
+
+* Sorting
+Default =--sort free= ranks hosts by their *largest single free block*, because
+the question being asked is almost always "can one GPU hold this model?" --- a
+host with 4x12GB free is useless for a 54GB job however many cards are idle.
+Ties break on idle-GPU count, then host name.
+
+=--sort count= promotes idle-GPU count to primary, for multi-GPU fan-outs.
+=--sort host= is stable alphabetical, for diffing two runs.
+
+* Design notes
+- *Concurrent, with a per-host deadline.* Twelve hosts in ~2.3s; serial would be
+  ~30s. One hung host cannot stall the sweep (=--timeout=, =--concurrency=).
+- *Failures are reported, never silently dropped.* A missing host would
+  otherwise read as "nothing free there", which misleads in the dangerous
+  direction. Three states are kept distinct: =unreachable=, =no-gpu=, and
+  =driver-missing= --- the last found =epsilon5= on the first real run.
+- *Idle means no processes*, not zero free memory: a few hundred MiB of driver
+  overhead should not make an unused card look occupied.
+- *=ssh= is exec'd directly*, never through a shell, so the interactive =ssh=
+  wrapper in [[file:../../zshlang/auto-load/others/ssh.zsh][ssh.zsh]] cannot inject =stty sane= into captured output.
+- Colour only when stdout is a TTY, so piping stays clean.
+
+* Trap
+=ssh_config= has *no line-continuation syntax*. A trailing =\= is parsed as part
+of the host pattern and the following line becomes a "Bad configuration option".
+Relevant because the CIS host list lives on one long line in =~/.ssh/config=.
