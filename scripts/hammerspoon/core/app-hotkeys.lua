@@ -1,5 +1,67 @@
+-- Look up a running app without walking every process on the system.
+--
+-- `hs.application.get()` wraps `hs.application.find()`, which enumerates every
+-- running application and builds an accessibility object for each one. An AX
+-- query against a process that cannot answer -- one that is hung, or SIGSTOPped
+-- -- blocks until the AX timeout. Since these hotkeys call this on every press,
+-- and Hammerspoon's event taps share the same Lua thread, one stuck app adds
+-- latency to app switching *and* to every keystroke on the machine.
+--
+-- That is not hypothetical: on 2026-08-10 a SIGSTOPped Microsoft AutoUpdate,
+-- stopped for over two days, made `hs.application.runningApplications()` take
+-- more than 60 seconds, and the whole machine felt sluggish as a result.
+--
+-- `applicationsForBundleID()` maps to NSRunningApplication's
+-- runningApplicationsWithBundleIdentifier:, a direct lookup that never touches
+-- another app's accessibility interface. Almost every appName below is already
+-- a bundle ID; the slow path stays as a fallback for the few that are not
+-- ('mpv', 'Thunderbird').
+function getApp(appName)
+    local apps = hs.application.applicationsForBundleID(appName)
+    if apps and #apps > 0 then
+        return apps[1]
+    end
+
+    return hs.application.get(appName)
+end
+
+-- Find which app is making app-switching slow.
+--
+-- `toggleFocus` calls app:isFrontmost() and app:activate(), which are
+-- accessibility round-trips to the *target* app. An app that is slow to answer
+-- -- busy, hung, or paged out into the compressor -- makes its own hotkey feel
+-- laggy, and any code that enumerates all apps feel laggy for everything.
+--
+-- Run `axLatencyReport()` from the Hammerspoon console while things feel slow.
+-- Anything over ~50 ms is suspect; hundreds of ms is your culprit.
+function axLatencyReport(limit)
+    limit = limit or 20
+
+    local rows = {}
+    for _, app in ipairs(hs.application.runningApplications()) do
+        local name = app:name() or app:bundleID() or "?"
+        local t = hs.timer.absoluteTime()
+        -- Cheap AX query: forces a round-trip without changing any state.
+        pcall(function() return app:isFrontmost() end)
+        local ms = (hs.timer.absoluteTime() - t) / 1e6
+        table.insert(rows, { name = name, ms = ms })
+    end
+
+    table.sort(rows, function(a, b) return a.ms > b.ms end)
+
+    local out = { string.format("%-34s %10s", "APP", "AX ms") }
+    for i = 1, math.min(limit, #rows) do
+        table.insert(out, string.format("%-34s %10.1f", rows[i].name:sub(1, 34), rows[i].ms))
+    end
+    table.insert(out, string.format("(%d apps; anything over ~50 ms is worth a look)", #rows))
+
+    local report = table.concat(out, "\n")
+    print(report)
+    return report
+end
+
 function focusAppYabai(appName)
-    local app = hs.application.get(appName)
+    local app = getApp(appName)
     if app then
         local mainWindow = app:mainWindow()
         if mainWindow then
@@ -14,7 +76,7 @@ function focusApp(appName)
     local launch_p = false
 
     local app = nil
-    app = hs.application.get(appName)
+    app = getApp(appName)
 
     if app then
         if app:isFrontmost() then
@@ -24,7 +86,7 @@ function focusApp(appName)
     else
         if launch_p then
             hs.application.launchOrFocus(appName)
-            app = hs.application.get(appName)
+            app = getApp(appName)
         end
     end
 end
@@ -33,7 +95,7 @@ function toggleFocus(appName)
     local launch_p = false
 
     local app = nil
-    app = hs.application.get(appName)
+    app = getApp(appName)
 
     if app then
         if app:isFrontmost() then
@@ -45,7 +107,7 @@ function toggleFocus(appName)
     else
         if launch_p then
             hs.application.launchOrFocus(appName)
-            app = hs.application.get(appName)
+            app = getApp(appName)
         end
     end
 end
@@ -81,6 +143,11 @@ end
 
 appHotkey{ key='/', appName='company.thebrowser.Browser' }
 appHotkey{
+    key="'",
+    mods={'shift'},
+    appName='com.apple.Safari'
+}
+appHotkey{
     key='.',
     mods={'shift'},
     appName='com.google.Chrome'
@@ -100,7 +167,8 @@ appHotkey{ key=';', appName='chat.delta.desktop.electron' }
 
 -- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 -- appHotkey{ key='c', appName='com.apple.Terminal' }
-appHotkey{ key='c', appName='com.openai.codex' }
+-- appHotkey{ key='c', appName='com.openai.codex' }
+appHotkey{ key='c', appName='com.apple.iCal' }
 -- appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor VSCode App
 
 emacsAppName = 'org.gnu.Emacs'
@@ -108,7 +176,13 @@ appHotkey{ key='x', appName=emacsAppName }
 
 appHotkey{ key='l', appName='com.tdesktop.Telegram' }
 
-appHotkey{ key='\\', appName='moe.Throne.macosx' }
+appHotkey{ key='\\', appName='com.anthropic.claudefordesktop' }
+appHotkey{
+    mods={'shift'},
+    key='\\',
+    appName='com.claudecode.context' }
+-- appHotkey{ key='\\', appName='moe.Throne.macosx' }
+-- appHotkey{ key='\\', appName='com.apple.iCal' }
 
 -- appHotkey{ key='b', appName='com.apple.Preview' }
 -- appHotkey{ key='b', appName='zathura' }
@@ -125,7 +199,6 @@ appHotkey{ key='k', appName='info.sioyek.sioyek' }
 appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
--- appHotkey{ key='\\', appName='com.apple.iCal' }
 
 appHotkey{ key='m', appName='mpv' }
 -- appHotkey{ key='m', appName='com.adobe.Reader' }
