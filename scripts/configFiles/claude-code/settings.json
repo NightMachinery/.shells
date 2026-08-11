@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "ask": [
+      "Bash(sudo *)",
+      "Bash(*sudo *)"
+    ],
     "allow": [
       "Bash(vcsh night.sh status:*)",
       "Bash(vcsh night.sh diff:*)",
@@ -12,6 +16,10 @@
     ],
     "deny": [],
     "defaultMode": "plan"
+  },
+  "env": {
+    "SUDO_ASKPASS": "/usr/local/libexec/claude-askpass",
+    "SUDO_PROMPT": "sudo password for %p (requested by Claude Code)"
   },
   "model": "opus[1m]",
   "hooks": {
@@ -51,16 +59,6 @@
           {
             "type": "command",
             "command": "brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$$\" >/dev/null 2>&1"
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "brishz2.dash claude-code-session-unregister \"$$\" >/dev/null 2>&1"
           }
         ]
       }

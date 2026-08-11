@@ -388,6 +388,8 @@ function claude-code-session-unregister {
     #: hook. Entries already become unreachable when kitty restarts (the key
     #: carries kitty's pid), so this is hygiene rather than correctness.
     #: Usage: claude-code-session-unregister <hook-pid>
+    #:
+    #: This is a rather useless function, I removed its hook. It strictly makes things worse.
     ##
     local pid="${1}"
 

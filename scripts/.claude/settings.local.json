@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(echo $NIGHTDIR)"
+      "Bash(echo $NIGHTDIR)",
+      "Read(//Users/evar/**)"
     ],
     "deny": []
   }
