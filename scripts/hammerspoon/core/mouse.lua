@@ -810,12 +810,27 @@ end
 for _, binder in ipairs({purple_bind_v2, hyper_bind_v2}) do
     binder{mods={"ctrl"}, key="return", pressedfn=screenPositionAvy,}
     binder{mods={}, key="return", auto_trigger_p=false, pressedfn=(function()
+                   ---
+                   -- @duplicateCode/78539f2b55cbae6ba6fa536be009ab80
                    prevFocusedElement = nil -- We do not want the focus to return to a SecureInput element.
                    hyper_triggered()
+                   ---
 
                    leftClickAvy()
                end),}
+    binder{mods={"ctrl"}, key="return", auto_trigger_p=false, pressedfn=(function()
+                   ---
+                   -- @duplicateCode/78539f2b55cbae6ba6fa536be009ab80
+                   prevFocusedElement = nil -- We do not want the focus to return to a SecureInput element.
+                   hyper_triggered()
+                   ---
+
+                   hs.task.new(neru_bin, nil, neru_recursive_grid_left_click_args):start()
+
+               end),}
+    -- shift+return does not seem to be bindable. [2026-08-08 Sat]
     -- binder{mods={"shift"}, key="return", pressedfn=leftDrag,}
+
     binder{mods={}, key="]", pressedfn=rightClickAvy,}
     binder{mods={}, key="o", pressedfn=textSelectAvyV2,}
 
