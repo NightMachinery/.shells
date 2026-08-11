@@ -53,7 +53,13 @@ export PATH="$PATH:/usr/local/bin"
 stopwatch_text="$(brishz.dash menu_stopwatch_format=min serr reval-true menu-stopwatch-text-get)"
 
 last_idle_min="$(brishz.dash last-idle-get-min)"
-current_date="$(date "+%b%-m/%d")"
+
+
+# current_date="$(date "+%b%-m/%d")"
+#: Gregorian
+
+current_date="$(brishz.dash datej)"
+#: Jalali
 
 if [ -n "$stopwatch_text" ]; then
     printf '⏱️%s ¦ %d ¦ %s\n' "$stopwatch_text" "$last_idle_min" "$current_date"

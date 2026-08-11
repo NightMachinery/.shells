@@ -807,7 +807,9 @@ function datej-all {
         # Abbrev: (We don't want it occupying two lines on the widget.)
         ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg"
     elif (( mode == 1 )) ; then
-        local dateg="$(jalalicli togregorian --gregorian-format='Monday January1/2/2006' "$datej")"
+        # local dateg="$(jalalicli togregorian --gregorian-format='Monday January1/2/2006' "$datej")"
+        local dateg="$(jalalicli togregorian --gregorian-format='Monday 2/January1/2006' "$datej")"
+
         ec "$cyear/$(monthj2en $cmonth)$cmonth/$cday $dateg"
     elif (( mode == 2 )) ; then
         ec "$cyear/$(monthj2en $cmonth)/$cday"
