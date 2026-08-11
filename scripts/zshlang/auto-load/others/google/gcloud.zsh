@@ -852,10 +852,14 @@ function h-gcp-gpu-ensure-disk {
 }
 ##
 function gcp-gpu-up {
-    : "usage: gcp-gpu-up [--on-demand] [--machine TYPE] [--dry-run]"
+    : "usage: gcp-gpu-up [--on-demand] [--machine TYPE] [--max-run DUR] [--dry-run]"
     h-gcp-gpu-deps @RET
 
     local model=SPOT machine="${gcp_gpu_machine}" gcp_gpu_dry_run="${gcp_gpu_dry_run}"
+    #: Local shadow so a per-call override is picked up dynamically by
+    #: `h-gcp-gpu-startup-script` and `h-gcp-gpu-deadline-min` without
+    #: leaking into the session.
+    local gcp_gpu_max_run="${gcp_gpu_max_run}" max_run_explicit=''
     #: Kept because the arg loop shifts `$@` away, and the override hint below
     #: has to echo back what was actually typed to be copy-pasteable.
     local -a orig_args=( "$@" )
@@ -864,6 +868,9 @@ function gcp-gpu-up {
             --on-demand) model=STANDARD ; shift ;;
             --spot)      model=SPOT ; shift ;;
             --machine)   machine="${2:?--machine needs a type}" ; shift 2 ;;
+            --max-run)
+                gcp_gpu_max_run="${2:?--max-run needs a duration (8h, 90m, ...)}"
+                max_run_explicit=y ; shift 2 ;;
             --dry-run)   gcp_gpu_dry_run=y ; shift ;;
             *) ecerr "$0: unknown argument: $1" ; return 1 ;;
         esac
@@ -901,6 +908,30 @@ function gcp-gpu-up {
                 return 0 ;;
             TERMINATED|SUSPENDED)
                 ec "${gcp_gpu_instance} exists but is ${status}; starting it."
+                if bool "$max_run_explicit" ; then
+                    #: The cap counts from each start, so updating it on a
+                    #: stopped instance takes effect for the whole next run.
+                    ec "updating max-run-duration to ${gcp_gpu_max_run} before starting"
+                    h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances set-scheduling \
+                        "${gcp_gpu_instance}" --zone="${gcp_gpu_zone}" \
+                        --max-run-duration="${gcp_gpu_max_run}" \
+                        --instance-termination-action=STOP @RET
+
+                    #: The on-VM absolute deadline is baked into the
+                    #: startup-script metadata. Without regenerating it, that
+                    #: deadline would still fire at the OLD cap and kill a
+                    #: legitimately longer session -- inverting its one
+                    #: guarantee, that it only acts after GCE's cap failed.
+                    local startup
+                    startup="$(mktemp)" @RET
+                    h-gcp-gpu-startup-script > "$startup" @RET
+                    h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances add-metadata \
+                        "${gcp_gpu_instance}" --zone="${gcp_gpu_zone}" \
+                        --metadata-from-file="startup-script=${startup}"
+                    local ret=$?
+                    command rm -f -- "$startup"
+                    (( ret )) && return $ret
+                fi
                 #: Resuming can hit a stockout exactly like creation can.
                 h-gcp-gpu-retry h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances start \
                     "${gcp_gpu_instance}" --zone="${gcp_gpu_zone}" @RET
@@ -1511,6 +1542,14 @@ function h-gcp-gpu-reaper-ready-p {
 }
 
 function gcp-gpu-reaper-deploy {
+    #: PARKED [2026-08-11]: deliberately not deployed. Step 3 of the IAM
+    #: checklist needs resourcemanager.projects.setIamPolicy (Owner-only; we
+    #: hold editor), so deploying means asking the owner for a standing
+    #: project-scoped stop permission. Decided not worth it: the on-VM
+    #: absolute deadline covers the same anomaly for free, and `gcp-gpu-reap`
+    #: covers the rest from the laptop. Kept because it refuses cleanly and
+    #: the checklist below is the documentation of record.
+    #:
     #: Deploys the server-side reaper. Refuses until the IAM work above is done,
     #: rather than half-deploying something that will fail at 03:00 with a
     #: permission error nobody is awake to read.
