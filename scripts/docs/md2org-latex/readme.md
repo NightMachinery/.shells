@@ -65,6 +65,63 @@ line. Org-mode's element parser then breaks on it:
 multi-line math → `(plain-list latex-fragment latex-fragment latex-fragment
 latex-fragment)`; reflowed math → `(latex-fragment latex-fragment)`.
 
+### 4. Line-initial `\begin{...}` — the same org break, with no pandoc involved
+
+Failure mode 3 is usually described in terms of lone `+`/`-`/`=` lines, but
+the paragraph terminator that matters most in practice is a nested
+environment. `org-element--latex-begin-environment` is
+
+```
+^[ \t]*\\begin{\([A-Za-z0-9*]+\)}
+```
+
+with **no `$` anchor**: any line whose first non-blank text is `\begin{`
+opens a `latex-environment` *element*, whatever follows it on that line.
+So the extremely common LLM shape
+
+```
+\[
+\text{layer } \ell \;\text{is}\;
+\begin{cases}
+\text{full attention}, & \ell \equiv 3 \pmod 4,\\
+\text{linear attention}, & \text{otherwise},
+\end{cases}
+\qquad \ell = 0,1,\dots,L-1 .
+\]
+```
+
+parses as `((paragraph) (latex-environment) (paragraph))` — only the
+`cases` block previews or exports; the `\[`, the surrounding `\text`/
+`\qquad` lines, and the `\]` are literal prose.
+
+`md2org` is **not** the culprit here — it emits `equation*` for exactly
+this input, and the routes that bypass pass 2 of `org_math_env.lua` were
+checked and are safe (lead-in text and list items are reflowed onto one
+line by pass 3, blockquotes get a proper `equation*`, table cells are
+single-line by pass 1). This failure reaches org by the routes with no
+pandoc in the loop:
+
+- a coding agent (Claude Code, aider) editing an `.org` file directly;
+- a plain clipboard paste (`night/org-paste-yank`, bound to `p` in
+  org buffers — only `night/paste-md2org` and `night/smart-text-paste`
+  go through `md2org`);
+- hand-typed or hand-copied math;
+- gfm-based converters, which have no `tex_math_single_backslash` at all.
+
+Note that `\begin{cases} x, & y` at column 0 fails too; putting content
+after the `}` does not help, since there is no `$` anchor to defeat.
+Moving `\begin{cases}` off the start of its line *does* work, but only
+until the body is reflowed or gains a blank line.
+
+For those org-side arrivals, `[help:night/org-latex-fix-begin-env-bug]`
+(`$DOOMDIR/autoload/org/night-latex.el`) rewrites affected `\[...\]`
+blocks into the same `equation*` normal form this filter produces, so
+both routes converge on one style. It decides per block by asking
+`org-element-context` whether the block already parses as a single
+`latex-fragment`, so it covers the `+`/`-`/`=` cases above as well, and it
+skips src/example blocks, verbatim and tables. Details in
+`$DOOMDIR/docs/org/latex-preview/begin-env-bug.md`.
+
 ## Working conversion
 
 Reflow each math element onto a single line with a tiny Lua filter
