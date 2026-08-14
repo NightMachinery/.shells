@@ -122,6 +122,29 @@ both routes converge on one style. It decides per block by asking
 skips src/example blocks, verbatim and tables. Details in
 `$DOOMDIR/docs/org/latex-preview/begin-env-bug.md`.
 
+### 5. Text that arrives with the delimiters already stripped
+
+All four failure modes above assume the markdown reaching pandoc still has its
+backslashes. Markdown copied from ChatGPT does not: its copy button round-trips
+the message through a CommonMark parse/serialize that is not math-aware, so
+`\[` arrives as `[`, `\(` as `(`, and — inside the body — `\!`, `\,`, `\;`,
+`\{`, `\}` lose their backslash while `\\` collapses to a single `\`.
+Backslashes before *letters* survive, so `\frac` and `\to` look fine and the
+damage is easy to miss.
+
+No pandoc setting helps here, because there is no math left to recognize: the
+reader sees `[ ... ]` and `( ... )` as ordinary punctuation, and
+`org_math_env.lua` never sees a `DisplayMath` node. The fix has to happen
+before the text is copied.
+
+`~/scripts/javascript/userscripts/chatgpt-copy-markdown.user.js` does that. It
+serializes the rendered DOM instead of trusting the copy path, reading the
+verbatim TeX out of ChatGPT's `data-math-source` attribute, and emits `$…$` /
+`$$…$$` — which `pandoc_md_default` accepts via `tex_math_dollars` and which
+`org_math_env.lua` turns into `equation*` as usual. Details, including why the
+customary `annotation[encoding="application/x-tex"]` approach finds nothing on
+ChatGPT, are in `../chatgpt-copy-markdown/readme.md`.
+
 ## Working conversion
 
 Reflow each math element onto a single line with a tiny Lua filter
