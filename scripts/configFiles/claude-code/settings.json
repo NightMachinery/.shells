@@ -1,9 +1,9 @@
 {
+  "env": {
+    "SUDO_ASKPASS": "/usr/local/libexec/claude-askpass",
+    "SUDO_PROMPT": "sudo password for %p (requested by Claude Code)"
+  },
   "permissions": {
-    "ask": [
-      "Bash(sudo *)",
-      "Bash(*sudo *)"
-    ],
     "allow": [
       "Bash(vcsh night.sh status:*)",
       "Bash(vcsh night.sh diff:*)",
@@ -15,11 +15,11 @@
       "WebFetch(domain:docs.anthropic.com)"
     ],
     "deny": [],
+    "ask": [
+      "Bash(sudo *)",
+      "Bash(*sudo *)"
+    ],
     "defaultMode": "plan"
-  },
-  "env": {
-    "SUDO_ASKPASS": "/usr/local/libexec/claude-askpass",
-    "SUDO_PROMPT": "sudo password for %p (requested by Claude Code)"
   },
   "model": "opus[1m]",
   "hooks": {
@@ -75,7 +75,7 @@
     "mode": "tap"
   },
   "skipDangerousModePermissionPrompt": true,
-  "theme": "light",
+  "theme": "light-daltonized",
   "editorMode": "vim",
   "preferredNotifChannel": "notifications_disabled",
   "autoCompactEnabled": true,
