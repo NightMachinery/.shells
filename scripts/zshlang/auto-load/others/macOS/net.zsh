@@ -21,6 +21,23 @@ function wifi-internet-sharing-fix-ap1 {
     # Normally the local.internetsharing.apbridge LaunchDaemon handles this; this is
     # for the rare miss, or before installing the daemon.
     #
+    # This ADDS ap1 and deliberately does not remove en0, leaving both enrolled.
+    # Do not "tidy that up" with `ifconfig bridge100 deletem en0': measured on
+    # [2026-08-14], that takes the SoftAP down -- ap1 and bridge100 both go
+    # inactive the instant it runs and the hotspot drops -- and it does NOT undo
+    # with `addm'. Re-adding restores the membership list but leaves the radio
+    # down; recovery is toggling Internet Sharing off and on, which rebuilds the
+    # bridge and re-enrols en0 anyway.
+    #
+    # Bridge membership is owned by Internet Sharing, so mutating it out from
+    # under the service tears down the AP it manages. Adding is the safe
+    # direction; the inverse is not.
+    #
+    # The cost of leaving en0 enrolled: bridge100 is the interface bootpd serves,
+    # so joining a Wi-Fi network while sharing is active would put that network
+    # in our DHCP server's segment. The uplink here is wired (en10), so en0 is
+    # normally associated with nothing. See ./docs/internet-sharing-bridge.md.
+    #
     # See: [[id:f0c71d19-2c6f-4b48-82f1-d28ccaed5e90][breadcrumbs/ap1-bug]]
     ##
     assert isDarwin @RET
