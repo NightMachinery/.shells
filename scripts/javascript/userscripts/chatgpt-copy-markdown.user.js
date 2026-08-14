@@ -93,7 +93,19 @@
     citation: '[data-testid="webpage-citation-pill"], [data-testid*="citation"], [data-mdx-inline-links]',
     citationLinksAttribute: 'data-mdx-inline-links',
     streaming: '[data-testid="stop-button"]',
+    // Each turn is a <section data-turn="user|assistant"> holding both the
+    // message and its action bar. The bar is the copy button's parent; its
+    // buttons are direct children.
+    turn: 'section[data-turn]',
+    assistantTurn: 'section[data-turn="assistant"]',
+    turnRoleAttribute: 'data-turn',
+    copyButton: 'button[data-testid="copy-turn-action-button"]',
   };
+
+  // Marks our injected controls so a re-render does not stack duplicates.
+  const INJECTED_ATTRIBUTE = 'data-nm-md-copy';
+
+  const ROLE_LABELS = { user: 'User', assistant: 'ChatGPT' };
 
   // Option+Shift+C on macOS. Ignored while the composer has focus.
   const HOTKEY = (event) =>
@@ -104,6 +116,10 @@
 
   // Tracking parameter ChatGPT appends to every citation it hands out.
   const STRIP_QUERY_PARAMS = ['utm_source'];
+
+  // Keep every turn's action bar visible instead of only on hover. Set false to
+  // leave ChatGPT's hover behaviour alone.
+  const ALWAYS_SHOW_ACTIONS = true;
 
   // --------------------------------------------------------------------------
   // Math extraction
@@ -395,9 +411,11 @@
 
   const messageBody = (message) => message.querySelector(SELECTORS.body) || message;
 
+  // Note that the unresolved-math counter is NOT reset here: a whole-chat
+  // export calls this once per turn and needs the total across all of them.
+  // Callers reset it.
   const messageToMarkdown = (message) => {
     if (!turndown) turndown = buildTurndown();
-    unresolvedMath = 0;
     // Convert a detached clone so nothing mutates the live page.
     const clone = messageBody(message).cloneNode(true);
     const markdown = turndown.turndown(clone);
@@ -425,8 +443,38 @@
     return all.length ? all[all.length - 1] : null;
   };
 
-  const copyMessage = async () => {
-    const message = targetMessage();
+  // Role headings are H1 so that a message's own H2/H3 nest underneath rather
+  // than colliding with them. After md2org that gives `* User` / `* ChatGPT`
+  // with the content headings below at `**`.
+  const chatToMarkdown = () => {
+    unresolvedMath = 0;
+    const parts = [];
+
+    const title = document.title.replace(/\s*[-–—|]\s*ChatGPT\s*$/i, '').trim();
+    const header = [];
+    if (title && title.toLowerCase() !== 'chatgpt') header.push(title);
+    header.push(location.href.split(/[?#]/)[0]);
+    parts.push(header.join('\n'));
+
+    let turns = 0;
+    for (const turn of document.querySelectorAll(SELECTORS.turn)) {
+      const message = turn.querySelector(SELECTORS.message);
+      if (!message) continue;
+      const body = messageToMarkdown(message);
+      if (!body) continue;
+      const role = turn.getAttribute(SELECTORS.turnRoleAttribute) || 'unknown';
+      parts.push('# ' + (ROLE_LABELS[role] || role) + '\n\n' + body);
+      turns += 1;
+    }
+
+    return { markdown: parts.join('\n\n'), turns, title };
+  };
+
+  // EXPLICIT is the message a per-turn button was clicked on; without it the
+  // selection or the last assistant turn is used (the hotkey path).
+  const copyMessage = async (explicit) => {
+    unresolvedMath = 0;
+    const message = explicit || targetMessage();
     if (!message) {
       toast('No assistant message found on this page.', 'error');
       return;
@@ -499,70 +547,331 @@
     true
   );
 
-  // Built with createElementNS rather than innerHTML: chatgpt.com may enforce
-  // Trusted Types, under which innerHTML is a guarded sink and throws.
-  const copyIcon = () => {
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
+  // Icons are built with createElementNS rather than innerHTML: chatgpt.com may
+  // enforce Trusted Types, under which innerHTML is a guarded sink and throws.
+  // ChatGPT's own icons come from a versioned sprite sheet via <use href>, so
+  // they cannot be referenced without pinning a hash that changes on deploy.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  const svgIcon = (size, paths) => {
+    const svg = document.createElementNS(SVG_NS, 'svg');
     svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('width', '17');
-    svg.setAttribute('height', '17');
+    svg.setAttribute('width', String(size));
+    svg.setAttribute('height', String(size));
     svg.setAttribute('fill', 'none');
     svg.setAttribute('stroke', 'currentColor');
     svg.setAttribute('stroke-width', '2');
     svg.setAttribute('stroke-linecap', 'round');
     svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of paths) {
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    }
+    return svg;
+  };
 
-    const back = document.createElementNS(ns, 'rect');
-    back.setAttribute('x', '9');
-    back.setAttribute('y', '9');
-    back.setAttribute('width', '13');
-    back.setAttribute('height', '13');
-    back.setAttribute('rx', '2');
-    svg.appendChild(back);
+  const chevronIcon = () => svgIcon(14, ['M6 9l6 6 6-6']);
 
-    const front = document.createElementNS(ns, 'path');
-    front.setAttribute('d', 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
-    svg.appendChild(front);
+  // The canonical Markdown mark, deliberately not a second clipboard glyph:
+  // ours sits beside ChatGPT's own copy button and has to be told apart from it
+  // at a glance.
+  const markdownIcon = () => {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 208 128');
+    svg.setAttribute('width', '20');
+    svg.setAttribute('height', '13');
+    svg.setAttribute('aria-hidden', 'true');
+
+    const frame = document.createElementNS(SVG_NS, 'rect');
+    frame.setAttribute('x', '5');
+    frame.setAttribute('y', '5');
+    frame.setAttribute('width', '198');
+    frame.setAttribute('height', '118');
+    frame.setAttribute('ry', '10');
+    frame.setAttribute('fill', 'none');
+    frame.setAttribute('stroke', 'currentColor');
+    frame.setAttribute('stroke-width', '10');
+    svg.appendChild(frame);
+
+    const glyph = document.createElementNS(SVG_NS, 'path');
+    glyph.setAttribute('fill', 'currentColor');
+    glyph.setAttribute(
+      'd',
+      'M30 98V30h20l20 25 20-25h20v68H90V59L70 84 50 59v39zm125 0l-30-33h20V30h20v35h20z'
+    );
+    svg.appendChild(glyph);
 
     return svg;
   };
 
-  const addButton = () => {
+  // Styling is cloned from the adjacent native copy button rather than
+  // hardcoded, so ChatGPT's own theme tokens and hover states apply and a
+  // restyle on their side carries over for free.
+  const nativeButton = (template, { narrow } = {}) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.appendChild(copyIcon());
-    button.setAttribute('aria-label', 'Copy message as clean Markdown');
-    button.title = 'Copy this (or the last) assistant message as clean Markdown';
-    Object.assign(button.style, {
-      position: 'fixed',
-      right: '16px',
-      bottom: '16px',
-      zIndex: '2147483646',
-      width: '38px',
-      height: '38px',
-      borderRadius: '19px',
-      border: '1px solid rgba(127,127,127,.45)',
-      background: 'rgba(127,127,127,.16)',
-      color: 'inherit',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '0',
-      cursor: 'pointer',
-      backdropFilter: 'blur(6px)',
-    });
-    button.addEventListener('click', (event) => {
-      event.preventDefault();
-      copyMessage();
-    });
-    document.body.appendChild(button);
+    button.className = template.className;
+    button.setAttribute(INJECTED_ATTRIBUTE, '');
+    button.setAttribute('data-state', 'closed');
+
+    const templateWrap = template.querySelector('span');
+    const wrap = document.createElement('span');
+    wrap.className = templateWrap ? templateWrap.className : 'flex items-center justify-center h-8 w-8';
+    if (narrow) wrap.className = wrap.className.replace(/\bw-8\b/g, 'w-5').replace(/\btouch:w-10\b/g, 'touch:w-6');
+    button.appendChild(wrap);
+
+    return { button, wrap };
   };
 
-  addButton();
+  // --------------------------------------------------------------------------
+  // Dropdown
+  // --------------------------------------------------------------------------
+
+  let openMenu = null;
+
+  const closeMenu = () => {
+    if (!openMenu) return;
+    openMenu.element.remove();
+    for (const button of openMenu.owners) button.setAttribute('data-state', 'closed');
+    document.removeEventListener('mousedown', openMenu.onOutside, true);
+    document.removeEventListener('keydown', openMenu.onKey, true);
+    window.removeEventListener('scroll', closeMenu, true);
+    window.removeEventListener('resize', closeMenu);
+    openMenu = null;
+  };
+
+  const showMenu = (anchor, owners, items) => {
+    closeMenu();
+
+    const element = document.createElement('div');
+    Object.assign(element.style, {
+      position: 'fixed',
+      zIndex: '2147483646',
+      minWidth: '232px',
+      padding: '4px',
+      borderRadius: '12px',
+      border: '1px solid rgba(127,127,127,.24)',
+      background: 'var(--main-surface-primary, Canvas)',
+      color: 'inherit',
+      boxShadow: '0 10px 32px rgba(0,0,0,.22)',
+      font: '14px/1.35 ui-sans-serif, system-ui, sans-serif',
+    });
+
+    for (const item of items) {
+      const entry = document.createElement('button');
+      entry.type = 'button';
+      entry.textContent = item.label;
+      Object.assign(entry.style, {
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '8px 10px',
+        borderRadius: '8px',
+        border: '0',
+        background: 'transparent',
+        color: 'inherit',
+        font: 'inherit',
+        cursor: 'pointer',
+      });
+      entry.addEventListener('mouseenter', () => {
+        entry.style.background = 'rgba(127,127,127,.16)';
+      });
+      entry.addEventListener('mouseleave', () => {
+        entry.style.background = 'transparent';
+      });
+      entry.addEventListener('click', (event) => {
+        event.preventDefault();
+        closeMenu();
+        item.run();
+      });
+      element.appendChild(entry);
+    }
+
+    document.body.appendChild(element);
+
+    // Anchor below the control, flipping up or left when it would overflow.
+    const box = anchor.getBoundingClientRect();
+    const size = element.getBoundingClientRect();
+    let top = box.bottom + 6;
+    if (top + size.height > window.innerHeight - 8) top = Math.max(8, box.top - size.height - 6);
+    let left = box.right - size.width;
+    if (left < 8) left = 8;
+    element.style.top = top + 'px';
+    element.style.left = left + 'px';
+
+    const onOutside = (event) => {
+      if (!element.contains(event.target) && !owners.some((b) => b.contains(event.target))) {
+        closeMenu();
+      }
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+
+    // The action bar is pointer-events-none behind a mask until the turn is
+    // hovered, but ChatGPT reveals it for `has-data-[state=open]`. Reusing that
+    // keeps the bar visible while the menu is open, exactly as their own
+    // "More actions" menu does.
+    for (const button of owners) button.setAttribute('data-state', 'open');
+
+    document.addEventListener('mousedown', onOutside, true);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('resize', closeMenu);
+
+    openMenu = { element, owners, onOutside, onKey };
+  };
+
+  // --------------------------------------------------------------------------
+  // Whole-chat actions
+  // --------------------------------------------------------------------------
+
+  const withChat = async (deliver, verb) => {
+    let result;
+    try {
+      result = chatToMarkdown();
+    } catch (error) {
+      toast('Export failed: ' + error.message, 'error');
+      return;
+    }
+    if (!result.turns) {
+      toast('No turns found to export — the selectors are probably stale.', 'error');
+      return;
+    }
+    try {
+      await deliver(result);
+    } catch (error) {
+      toast(verb + ' failed: ' + error.message, 'error');
+      return;
+    }
+    const warning = unresolvedMath
+      ? ' ' + unresolvedMath + ' math node(s) had no readable source.'
+      : '';
+    toast(
+      verb + ' ' + result.turns + ' turns, ' + result.markdown.length + ' chars.' + warning,
+      unresolvedMath ? 'warn' : 'ok'
+    );
+  };
+
+  const copyChat = () => withChat((r) => copyToClipboard(r.markdown), 'Copied');
+
+  const downloadChat = () =>
+    withChat((r) => {
+      const name = (r.title || 'chatgpt-conversation')
+        .replace(/[^\w\s.-]+/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .slice(0, 80) || 'chatgpt-conversation';
+      const url = URL.createObjectURL(
+        new Blob([r.markdown], { type: 'text/markdown;charset=utf-8' })
+      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = name + '.md';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }, 'Downloaded');
+
+  // --------------------------------------------------------------------------
+  // Per-turn controls
+  // --------------------------------------------------------------------------
+
+  const injectInto = (turn) => {
+    if (turn.querySelector('[' + INJECTED_ATTRIBUTE + ']')) return;
+    const template = turn.querySelector(SELECTORS.copyButton);
+    if (!template) return;
+    const bar = template.parentElement;
+    if (!bar) return;
+    const message = turn.querySelector(SELECTORS.message);
+    if (!message) return;
+
+    const main = nativeButton(template);
+    main.button.setAttribute('aria-label', 'Copy as clean Markdown');
+    main.button.title = 'Copy this message as Markdown, with the LaTeX intact';
+    main.wrap.appendChild(markdownIcon());
+    main.button.addEventListener('click', (event) => {
+      event.preventDefault();
+      copyMessage(message);
+    });
+
+    const more = nativeButton(template, { narrow: true });
+    more.button.setAttribute('aria-label', 'Markdown export options');
+    more.button.title = 'Markdown export options';
+    more.button.setAttribute('aria-haspopup', 'menu');
+    more.wrap.appendChild(chevronIcon());
+    more.button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (openMenu) {
+        closeMenu();
+        return;
+      }
+      showMenu(more.button, [main.button, more.button], [
+        { label: 'Copy this message', run: () => copyMessage(message) },
+        { label: 'Copy whole chat', run: copyChat },
+        { label: 'Download whole chat (.md)', run: downloadChat },
+      ]);
+    });
+
+    // Appended, not inserted after the copy button: ours belongs at the far
+    // right of the bar, past ChatGPT's own actions.
+    bar.appendChild(main.button);
+    bar.appendChild(more.button);
+  };
+
+  // The bar is `pointer-events-none` behind a mask that only slides open on
+  // `group-hover/turn-messages`. Both are overridden inline on the element we
+  // already have a handle on, rather than by matching their utility class
+  // names, which are arbitrary-value Tailwind and change freely.
+  const revealActionBar = (turn) => {
+    const template = turn.querySelector(SELECTORS.copyButton);
+    const bar = template && template.parentElement;
+    if (!bar) return;
+    // Drop the mask entirely rather than sliding it to `0 0` as their hover
+    // rule does. The gradient is `black 33%` over a `300%` wide mask, so at
+    // position 0 the reveal ends right at the element's edge -- which fades
+    // our buttons, since they sit at the far right of the bar.
+    bar.style.setProperty('mask-image', 'none', 'important');
+    bar.style.setProperty('-webkit-mask-image', 'none', 'important');
+    bar.style.setProperty('pointer-events', 'auto', 'important');
+  };
+
+  const injectAll = () => {
+    if (ALWAYS_SHOW_ACTIONS) {
+      for (const turn of document.querySelectorAll(SELECTORS.turn)) revealActionBar(turn);
+    }
+    for (const turn of document.querySelectorAll(SELECTORS.assistantTurn)) {
+      injectInto(turn);
+    }
+  };
+
+  // ChatGPT re-renders turns constantly (streaming, virtualization, model
+  // switches), so injection has to be idempotent and repeated rather than
+  // one-shot at load.
+  let injectScheduled = false;
+  const scheduleInject = () => {
+    if (injectScheduled) return;
+    injectScheduled = true;
+    requestAnimationFrame(() => {
+      injectScheduled = false;
+      injectAll();
+    });
+  };
+
+  new MutationObserver(scheduleInject).observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+  injectAll();
 
   if (typeof GM_registerMenuCommand === 'function') {
-    GM_registerMenuCommand('Copy message as clean Markdown', copyMessage);
+    GM_registerMenuCommand('Copy message as clean Markdown', () => copyMessage());
+    GM_registerMenuCommand('Copy whole chat as Markdown', copyChat);
+    GM_registerMenuCommand('Download whole chat as Markdown', downloadChat);
   }
 
   // Exposed so the conversion can be exercised without the clipboard, which is
@@ -570,9 +879,13 @@
   // redesign. See the verification section of the docs.
   window.__chatgptCopyMarkdown = {
     messageToMarkdown,
+    chatToMarkdown,
     targetMessage,
     assistantMessages,
     copyMessage,
+    copyChat,
+    downloadChat,
+    injectAll,
     unresolvedMath: () => unresolvedMath,
     SELECTORS,
   };
