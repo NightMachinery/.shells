@@ -637,8 +637,8 @@
     for (const button of openMenu.owners) button.setAttribute('data-state', 'closed');
     document.removeEventListener('mousedown', openMenu.onOutside, true);
     document.removeEventListener('keydown', openMenu.onKey, true);
-    window.removeEventListener('scroll', closeMenu, true);
-    window.removeEventListener('resize', closeMenu);
+    window.removeEventListener('scroll', openMenu.place, true);
+    window.removeEventListener('resize', openMenu.place);
     openMenu = null;
   };
 
@@ -692,14 +692,28 @@
     document.body.appendChild(element);
 
     // Anchor below the control, flipping up or left when it would overflow.
-    const box = anchor.getBoundingClientRect();
-    const size = element.getBoundingClientRect();
-    let top = box.bottom + 6;
-    if (top + size.height > window.innerHeight - 8) top = Math.max(8, box.top - size.height - 6);
-    let left = box.right - size.width;
-    if (left < 8) left = 8;
-    element.style.top = top + 'px';
-    element.style.left = left + 'px';
+    //
+    // Scrolling repositions the menu rather than closing it. Closing on any
+    // scroll event looks reasonable until you remember the thread scrolls on
+    // its own -- smooth-scroll settling, streaming replies, images loading --
+    // which made the menu snap shut a fraction of a second after opening.
+    const place = () => {
+      const box = anchor.getBoundingClientRect();
+      if (box.bottom < 0 || box.top > window.innerHeight) {
+        closeMenu();
+        return;
+      }
+      const size = element.getBoundingClientRect();
+      let top = box.bottom + 6;
+      if (top + size.height > window.innerHeight - 8) {
+        top = Math.max(8, box.top - size.height - 6);
+      }
+      let left = box.right - size.width;
+      if (left < 8) left = 8;
+      element.style.top = top + 'px';
+      element.style.left = left + 'px';
+    };
+    place();
 
     const onOutside = (event) => {
       if (!element.contains(event.target) && !owners.some((b) => b.contains(event.target))) {
@@ -718,10 +732,10 @@
 
     document.addEventListener('mousedown', onOutside, true);
     document.addEventListener('keydown', onKey, true);
-    window.addEventListener('scroll', closeMenu, true);
-    window.addEventListener('resize', closeMenu);
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
 
-    openMenu = { element, owners, onOutside, onKey };
+    openMenu = { element, owners, onOutside, onKey, place };
   };
 
   // --------------------------------------------------------------------------

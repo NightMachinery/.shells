@@ -110,18 +110,44 @@ release and re-run the verification below.
 
 ## Use
 
-- The copy-icon button, bottom right, copies a message.
-- **Option+Shift+C** does the same. It is ignored while the composer has focus.
-- Tampermonkey's menu has a *Copy message as clean Markdown* entry.
+Every assistant message gets two controls at the **far right** of its own action
+bar, past ChatGPT's copy/rate/share/more buttons:
 
-Which message: if the caret or a text selection is inside an assistant message,
-that one is copied; otherwise the last assistant message is. This is how older
-messages are reachable without injecting per-message buttons into ChatGPT's
-markup, which changes often.
+- The **Markdown mark** copies that message. It is deliberately not a second
+  clipboard glyph — it sits next to ChatGPT's own copy button and has to be
+  distinguishable at a glance.
+- The **chevron** opens a menu: *Copy this message*, *Copy whole chat*,
+  *Download whole chat (.md)*.
+
+Also available:
+
+- **Option+Shift+C** copies the message containing the caret or selection, or
+  the last assistant message. Ignored while the composer has focus.
+- Tampermonkey's menu carries all three actions, for when no message is in view.
+
+Action bars are forced visible rather than appearing on hover. ChatGPT keeps
+them `pointer-events-none` behind a sliding mask; both are overridden inline on
+the bar element, not by matching their utility class names, which are
+arbitrary-value Tailwind and change freely. Set `ALWAYS_SHOW_ACTIONS` to false
+to leave the hover behaviour alone.
+
+Button styling is cloned from the adjacent native copy button at injection time,
+so ChatGPT's theme tokens and hover states apply and a restyle on their side
+carries over for free. Injection is idempotent and driven by a `MutationObserver`,
+because turns are re-rendered constantly by streaming, virtualization and model
+switches.
 
 A toast reports the character count and how many equations were recovered, or
 warns when something degraded. It never fails silently — silent degradation is
 the entire reason this script exists.
+
+### Whole-chat export
+
+Both whole-chat actions walk every `section[data-turn]` in order and emit the
+conversation title and URL, then one section per turn. Role headings are **H1**
+so that a message's own H2/H3 nest underneath rather than colliding with them;
+after `md2org` that gives `* User` / `* ChatGPT` with content headings below at
+`**`. User turns are included, read from `.whitespace-pre-wrap`.
 
 ## Output conventions
 
@@ -175,8 +201,59 @@ chrome-cli execute "$(command cat bundle.js)"
 `unresolved` must be 0. A non-zero count means math was found whose source
 could not be read, which is the signal that `SELECTORS` needs updating.
 
-Injecting this way appends a second floating button to the live page; drop the
-last `button[title^="Copy this (or the last)"]` in the tail, or just reload.
+Injecting this way adds a second set of controls to each turn; reload to clear
+them.
+
+Two constraints on driving Arc this way, both learned the hard way:
+
+- `chrome-cli` only reaches Arc's **active** tab. Any `-t` query against a
+  background tab returns empty, and Arc reassigns tab ids between invocations,
+  so `chrome-cli activate -t` cannot be used to get to the tab you want. The
+  tab has to already be the visible one.
+- Neither `osascript -e 'tell application "Arc" to activate'` nor `open -a Arc`
+  brings Arc forward here; both return success and change nothing.
+  `hs -c 'hs.application.launchOrFocus("Arc")'` does work.
+
+### Screenshotting Arc
+
+`screencapture -l <windowid>` captures one window without activating it, which
+is what you want when the terminal should keep focus. Get the id from Quartz —
+Arc's main window is the largest one at layer 0:
+
+```zsh
+wid=$(python3 -c "
+from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionAll, kCGNullWindowID
+best = None
+for w in CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID):
+    if (w.get('kCGWindowOwnerName') or '') != 'Arc' or w.get('kCGWindowLayer') != 0:
+        continue
+    b = w.get('kCGWindowBounds', {})
+    area = b.get('Width', 0) * b.get('Height', 0)
+    if best is None or area > best[1]:
+        best = (w.get('kCGWindowNumber'), area)
+print(best[0] if best else '')
+")
+screencapture -x -o -l "$wid" shot.png
+```
+
+Use `kCGWindowListOptionAll`, not `...OnScreenOnly`: an occluded window is not
+"on screen" and will not be listed at all.
+
+The catch is that this captures the window's **backing store**, and a fully
+occluded window does not redraw — so you get a frame from whenever it was last
+visible, silently missing any DOM changes you just made. If the capture has to
+reflect a fresh mutation, Arc must be frontmost at capture time:
+
+```zsh
+hs -c 'hs.application.launchOrFocus("Arc")'
+osascript -e 'delay 2'
+# ... inject / pose / open the menu via chrome-cli ...
+screencapture -x -o -l "$wid" shot.png
+hs -c 'hs.application.launchOrFocus("kitty")'   # hand focus back
+```
+
+Use `osascript -e 'delay N'` rather than `sleep` when the runner blocks
+foreground sleeps.
 
 Note that `window.__chatgptCopyMarkdown` is only reachable this way when the
 code is injected into page context; under Tampermonkey's sandbox it lives on
