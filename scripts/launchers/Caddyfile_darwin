@@ -8,7 +8,7 @@
 }
 
 # 2026-08-10: every site below was bound to all interfaces. This host sits on a
-# public university IP (<redacted>/25, plus public IPv6) with no NAT and
+# public, routable university IP (plus public IPv6) with no NAT and
 # the macOS firewall disabled, so ":PORT" meant "open to the internet".
 # 127.0.0.1 = this machine, 192.168.2.1 = bridge100 (Internet Sharing hotspot).
 # Note: do NOT use mb2.local as a bind target -- it resolves to the PUBLIC IP.
