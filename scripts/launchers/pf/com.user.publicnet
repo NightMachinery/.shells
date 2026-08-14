@@ -105,7 +105,7 @@ pass in on lo0 all
 #   hotspot client   192.168.2.5 -> 192.168.2.1        private -> private, passes
 #   phone hotspot    172.20.10.1 -> 172.20.10.2        private -> private, passes
 #   home wifi        192.168.1.9 -> 192.168.1.x        private -> private, passes
-#   the forgery      10.5.5.5    -> <redacted>    private -> PUBLIC,  blocked
+#   the forgery      10.5.5.5    -> <our public addr>  private -> PUBLIC,  blocked
 #
 # Note this still names no interface, so the roaming property argued for at the
 # top of this file is intact. Replies to our own outbound connections do not

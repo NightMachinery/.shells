@@ -109,8 +109,8 @@
       {
         "port": 8114,
         // 2026-08-10: was "mb2.local", which resolves to the PUBLIC IP
-        // (<redacted>) and duly bound WebDAV to the internet. Confirmed in
-        // the sftpgo log: "listener registered, address: <redacted>:8114".
+        // and duly bound WebDAV to the internet. Confirmed in the sftpgo log,
+        // which registered a listener on the public address, port 8114.
         // Never use mb2.local as a bind target on this host.
         "address": "127.0.0.1",
         // "address": "192.168.1.57",

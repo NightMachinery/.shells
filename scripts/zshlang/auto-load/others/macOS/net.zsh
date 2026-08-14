@@ -36,7 +36,9 @@ function wifi-internet-sharing-fix-ap1 {
     # The cost of leaving en0 enrolled: bridge100 is the interface bootpd serves,
     # so joining a Wi-Fi network while sharing is active would put that network
     # in our DHCP server's segment. The uplink here is wired (en10), so en0 is
-    # normally associated with nothing. See ./docs/internet-sharing-bridge.md.
+    # normally associated with nothing. Written up in
+    # ~[nt]/public/cheatsheets/OS/macOS/internet sharing/breadcrumbs/internet-sharing-bridge.md
+    # -- kept out of this repo, which is public.
     #
     # See: [[id:f0c71d19-2c6f-4b48-82f1-d28ccaed5e90][breadcrumbs/ap1-bug]]
     ##
