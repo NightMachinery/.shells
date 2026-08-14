@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.publicnet.pf</string>
+
+    <!-- Runs a self-healing script rather than pfctl directly, so that a macOS
+         update which replaces /etc/pf.conf (dropping our anchor lines) is
+         repaired instead of silently disabling the firewall.
+
+         The script lives in /usr/local/libexec and must be root:wheel 755.
+         A root LaunchDaemon executing a user-writable script would be a
+         privilege-escalation path. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/libexec/publicnet-pf-boot.sh</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Re-check whenever the main ruleset changes. Internet Sharing and
+         system updates both rewrite this file; without the watch we would not
+         notice until the next reboot. -->
+    <key>WatchPaths</key>
+    <array>
+        <string>/etc/pf.conf</string>
+    </array>
+
+    <key>KeepAlive</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/com.user.publicnet.pf.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/com.user.publicnet.pf.log</string>
+</dict>
+</plist>
