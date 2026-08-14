@@ -90,15 +90,27 @@ Two structural details that are easy to get wrong:
 Tampermonkey, then open the raw file and accept the install prompt. It matches
 `https://chatgpt.com/*` and `https://chat.openai.com/*`.
 
-It `@require`s Turndown 7.2.0 and turndown-plugin-gfm 1.0.2 from jsDelivr,
-both pinned to an exact version with a `#sha256=` integrity hash, so a
-compromised or mutated CDN response is refused rather than executed. If the CDN
-dependency is unwanted, the two files total about 31 KB and can be pasted
-inline; drop the `@require` lines if you do that.
+The script is self-contained: Turndown 7.2.0 and turndown-plugin-gfm 1.0.2 are
+vendored verbatim at the bottom of the file, so there is no network dependency
+and nothing to fetch at install time.
+
+This started as two `@require` lines pinned to jsDelivr with `#sha256=`
+integrity hashes, which failed in practice. Tampermonkey "refuses to load the
+resource" when an integrity check does not line up, and it does so *silently* —
+the script installs cleanly and then reports `TurndownService failed to load`
+on the first click, with nothing indicating a rejected dependency. Vendoring
+removes that failure mode along with CDN availability, and it is arguably the
+better supply-chain position anyway: the exact bytes that run are in the repo
+and diffable, rather than behind a hash pointing at someone else's server.
+
+Both vendored blocks are the upstream browser builds unmodified. Each declares
+a single `var`, so they land in the script's own IIFE scope rather than on any
+global. To update, swap in the corresponding `dist/*.js` from the tagged
+release and re-run the verification below.
 
 ## Use
 
-- The **MD** button, bottom right, copies a message.
+- The copy-icon button, bottom right, copies a message.
 - **Option+Shift+C** does the same. It is ignored while the composer has focus.
 - Tampermonkey's menu has a *Copy message as clean Markdown* entry.
 
@@ -143,13 +155,28 @@ fragile parts are in the `SELECTORS` object and the `mathSource` /
 
 The conversion can be exercised against the live page without touching the
 clipboard. The script exposes `window.__chatgptCopyMarkdown`, and `chrome-cli`
-(which the zsh wrapper points at Arc by default) can drive it. Concatenate the
-two vendored libraries with the userscript and a small tail that calls the
-exposed API, then:
+(which the zsh wrapper points at Arc by default) can drive it. Because the file
+is self-contained, injecting it is just the file plus a small tail that calls
+the exposed API:
 
 ```zsh
+cp chatgpt-copy-markdown.user.js bundle.js
+cat >> bundle.js <<'EOF'
+;(function () {
+  var api = window.__chatgptCopyMarkdown;
+  var msgs = api.assistantMessages();
+  var md = api.messageToMarkdown(msgs[msgs.length - 1]);
+  return JSON.stringify({ len: md.length, unresolved: api.unresolvedMath(), md: md });
+})();
+EOF
 chrome-cli execute "$(command cat bundle.js)"
 ```
+
+`unresolved` must be 0. A non-zero count means math was found whose source
+could not be read, which is the signal that `SELECTORS` needs updating.
+
+Injecting this way appends a second floating button to the live page; drop the
+last `button[title^="Copy this (or the last)"]` in the tail, or just reload.
 
 Note that `window.__chatgptCopyMarkdown` is only reachable this way when the
 code is injected into page context; under Tampermonkey's sandbox it lives on
