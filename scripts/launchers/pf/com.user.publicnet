@@ -1,0 +1,150 @@
+# com.user.publicnet -- deny inbound from public sources, everywhere.
+#
+# Installed to /etc/pf.anchors/ and loaded as an anchor from /etc/pf.conf.
+# See install.org in this directory for the installer and the rollback.
+#
+# ---------------------------------------------------------------------------
+# WHY THIS FILTERS BY SOURCE, NOT BY INTERFACE
+#
+# Two earlier designs were both wrong:
+#
+#   1. "block drop in on en10 all" -- named the interface that happens to hold
+#      the public university address. Protects nothing the moment the laptop
+#      moves: on a phone hotspot the uplink is en0, on another adapter en11.
+#      A firewall that only works in one building is worse than none, because
+#      you believe you are covered.
+#
+#   2. "block drop in all" with per-interface allows -- robust while roaming,
+#      but it also blocks the phone reaching this laptop over its own hotspot,
+#      and any other trusted private network. Too blunt.
+#
+# What actually distinguishes the threat is the SOURCE ADDRESS. The university
+# network hands out routable addresses, so hosts there are public-sourced and
+# get blocked. A phone hotspot, home wifi, and our own Internet Sharing clients
+# are all RFC1918 and get through. This holds on every network without naming
+# a single interface.
+# ---------------------------------------------------------------------------
+#
+# WHY THE pass-out RULE COMES FIRST, AND IS NOT OPTIONAL
+#
+# macOS ships /etc/pf.conf with no filter rules, only anchors, so pf's default
+# action is "pass" and NO STATE IS CREATED. With only a block rule, the replies
+# to your own outbound connections arrive inbound, match no state, hit the
+# block, and are dropped -- taking all connectivity with them. The explicit
+# state-creating rule below is what lets replies back, because pf consults the
+# state table before evaluating rules.
+#
+# ORDER MATTERS: pf is last-match-wins unless a rule says "quick", so the broad
+# block comes BEFORE the narrower passes.
+
+# Private ranges we consider trusted-ish: any network that is not routable
+# from the internet.
+rfc1918 = "{ 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 }"
+
+# Everything we initiate goes out and creates state, so replies return.
+pass out all keep state
+
+# --- bootstrap traffic, allowed before the anti-spoof check -----------------
+#
+# These use "quick" so they terminate evaluation immediately. They must come
+# before the urpf rule below: during DHCP acquisition and IPv6 neighbour
+# discovery there is not yet a route back towards the peer, so a reverse-path
+# check would drop exactly the packets needed to establish one. Getting this
+# order wrong produces a machine that cannot obtain a lease -- and it fails at
+# renewal time, hours later, not when you load the rules.
+
+pass in quick proto udp from any port 67 to any port 68
+pass in quick inet6 proto udp from any port 547 to any port 546
+pass in quick inet6 proto icmp6 from fe80::/10
+
+# --- anti-spoofing ----------------------------------------------------------
+#
+# Drop any packet whose source address has no route back out of the interface
+# it arrived on. A packet reaching the public interface claiming to be
+# 192.168.2.5 fails, because the route to 192.168.2.0/24 points at bridge100.
+#
+# This rule does NOT, on its own, close the forged-RFC1918-source hole. It only
+# catches source ranges that have a MORE SPECIFIC route pointing elsewhere. On
+# this host that is 192.168.2.0/24 (-> bridge100) and 192.168.1.57 (-> lo0);
+# everything else in RFC1918 falls through to the default route, which points
+# out the public interface. So a packet arriving there claiming to be 10.5.5.5,
+# or 192.168.3.5, has its return path resolve back out the same interface, urpf
+# SUCCEEDS, and it reaches the pass rules below. The destination test on those
+# rules is what actually closes the hole; see there.
+#
+# Deliberately uses urpf-failed rather than "block in on en10 from $rfc1918".
+# This one names no interface, so it keeps working on a hotspot, on another
+# adapter, or after any network change.
+#
+# If asymmetric routing is ever introduced (multiple uplinks, unusual VPN
+# setups), this is the first rule to suspect, and removing this single line
+# reverts to the previous behaviour.
+block drop in quick from urpf-failed
+
+# Default deny for anything arriving unsolicited, every interface, both
+# address families.
+block drop in all
+
+# --- allow back what is not internet-routable ------------------------------
+
+# Loopback. Nothing works without this.
+pass in on lo0 all
+
+# Any peer on a private network: phone hotspot, home wifi, our own Internet
+# Sharing clients on bridge100/ap1. Hosts on the university subnet hold public
+# addresses and therefore do NOT match this.
+#
+# BOTH ends must be private, and the destination half is not decoration. With
+# only a source test, a host on the university network could forge a source in
+# any RFC1918 range that has no more-specific route here -- 10.5.5.5, or
+# 192.168.3.5 -- and walk straight through: urpf accepts it (see above) and
+# this rule then passed it. Testing the destination kills that, because the
+# forgery is aimed at our PUBLIC address while every genuine private peer is
+# aimed at a private one:
+#
+#   hotspot client   192.168.2.5 -> 192.168.2.1        private -> private, passes
+#   phone hotspot    172.20.10.1 -> 172.20.10.2        private -> private, passes
+#   home wifi        192.168.1.9 -> 192.168.1.x        private -> private, passes
+#   the forgery      10.5.5.5    -> <redacted>    private -> PUBLIC,  blocked
+#
+# Note this still names no interface, so the roaming property argued for at the
+# top of this file is intact. Replies to our own outbound connections do not
+# depend on these rules at all; they ride the state table from `pass out'.
+pass in inet from $rfc1918 to $rfc1918
+
+# IPv6 equivalents: unique-local and link-local.
+#
+# fe80 needs ff02 in its destination set. Neighbour discovery sends from a
+# link-local source to a MULTICAST destination (ff02::1, ff02::1:ff00:0/104),
+# so a bare "to fe80::/10" would drop ND and break IPv6 -- minutes to hours
+# later, not at load time, exactly like the DHCP ordering trap above.
+pass in inet6 from fc00::/7 to fc00::/7
+pass in inet6 from fe80::/10 to { fe80::/10, ff02::/16 }
+
+# --- narrow exceptions, any source -----------------------------------------
+
+# DHCP and link-local ICMPv6 are handled above, before the anti-spoof check.
+
+# ICMP "fragmentation needed", or path-MTU discovery breaks and large transfers
+# hang rather than failing cleanly.
+pass in inet proto icmp icmp-type unreach code needfrag
+
+# The IPv6 equivalent. Note the keyword is "toobig": pf rejects both
+# "packettoobig" and "packet-too-big", and -- worse -- prints
+# "unknown icmp6-type" while still exiting 0, so a typo here fails silently.
+# Always check pfctl's output, never just its exit status.
+pass in inet6 proto icmp6 icmp6-type toobig
+
+# Other ICMPv6 from public sources stays denied. Neighbour discovery and router
+# advertisement, which IPv6 genuinely cannot work without, come from link-local
+# addresses and are passed by the bootstrap rule above.
+
+# --- optional --------------------------------------------------------------
+
+# mDNS/Bonjour from public sources stays blocked, which is correct. Private
+# sources already pass via the $rfc1918 rule, so AirDrop and printer discovery
+# keep working on home and hotspot networks.
+
+# SSH from anywhere on a private network, if you want to reach this laptop from
+# your phone. Nothing is listening on 22 by default.
+# pass in from $rfc1918 proto tcp to port 22

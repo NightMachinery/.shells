@@ -1,0 +1,227 @@
+#+TITLE: pf: deny inbound from public sources
+
+Denies unsolicited inbound traffic whose *source address* is internet-routable,
+while allowing loopback, any RFC1918 peer (phone hotspot, home wifi, our own
+Internet Sharing clients), and all outbound/established traffic. Functionally
+equivalent to sitting behind NAT, for inbound purposes, on every network rather
+than just one.
+
+This is a *backstop*, not the primary control. Services are already bound to
+=127.0.0.1= and =192.168.2.1=. Keep both: narrow binds fail closed and you
+notice; a firewall fails open and you do not.
+
+It does close one thing nothing else can: Internet Sharing makes
+=mDNSResponder= bind =*:53= as a DNS proxy for its clients, with no supported
+way to restrict it to the bridge. That is an open resolver on a public IP, and
+only a packet filter can fix it without turning Internet Sharing off.
+
+* Just run the script
+
+: ~/scripts/launchers/pf/install-publicnet-pf.zsh              # install
+: ~/scripts/launchers/pf/install-publicnet-pf.zsh --no-ipv6    # also disable IPv6
+: ~/scripts/launchers/pf/install-publicnet-pf.zsh --check      # report only
+: ~/scripts/launchers/pf/install-publicnet-pf.zsh --uninstall  # full rollback
+
+IPv6 is *left enabled by default*. The ruleset filters on source address and
+covers both address families, so a public v6 peer is denied either way.
+=--no-ipv6= only additionally covers the window where pf is not loaded at all:
+early boot before the LaunchDaemon runs, or after a manual =pfctl -d=. Pass
+=--ipv6= to state the default explicitly.
+
+The script prompts for sudo once and keeps the timestamp warm, is idempotent,
+aborts before touching anything if the ruleset does not parse, and verifies
+outbound connectivity at the end.
+
+*Run it as your normal user, not with sudo* -- it elevates individual commands
+itself, and running the whole thing as root would resolve =~= to =/var/root=.
+
+The manual steps below are what the script does, kept for reference and for
+when something needs doing by hand.
+
+* Safety first
+
+This is a local machine, so a mistake is always recoverable at the keyboard:
+
+: sudo pfctl -d
+
+That disables pf entirely and restores the previous behaviour. Know it before
+you start. Do not do this over SSH on a remote host.
+
+* Why source-based rather than per-interface
+
+Two earlier designs were both wrong, and the reasoning is worth keeping:
+
+- =block drop in on en10 all= named the interface holding the public address.
+  It protects nothing once the laptop moves -- on a phone hotspot the uplink is
+  =en0=, on another adapter =en11=. A firewall that works in one building only
+  is worse than none, because you believe you are covered.
+- =block drop in all= with per-interface allows roams correctly but also blocks
+  the phone reaching this laptop over the phone's own hotspot, and every other
+  trusted private network. Too blunt.
+
+What actually separates threat from friend is the source address. The
+university hands out routable addresses, so hosts there are public-sourced and
+blocked; a hotspot or home network is RFC1918 and passes. No interface name
+appears in the security-critical path.
+
+** Closing the spoofing hole without naming an interface
+
+Source-based filtering leaves one gap: a public host can forge an RFC1918
+source address and pass the allow rule. The obvious patch is interface-shaped:
+
+: block drop in on en10 from $rfc1918
+
+...which drags the interface name back in and stops working the moment the
+machine moves. Reverse-path filtering does the same job without one:
+
+: block drop in quick from urpf-failed
+
+It drops any packet whose source has no route back out of the interface it
+arrived on. A packet reaching the public interface claiming to be
+=192.168.2.5= fails, because the route to =192.168.2.0/24= points at
+=bridge100=. Confirmed with:
+
+: route -n get 192.168.2.5   # interface: bridge100
+: route -n get 8.8.8.8       # interface: en10
+
+*Ordering matters and the failure is delayed.* DHCP and IPv6 neighbour
+discovery happen before a route to the peer exists, so a reverse-path check
+would drop exactly the packets needed to establish one. Those bootstrap rules
+therefore come first and use =quick=:
+
+: pass in quick proto udp from any port 67 to any port 68
+: pass in quick inet6 proto udp from any port 547 to any port 546
+: pass in quick inet6 proto icmp6 from fe80::/10
+: block drop in quick from urpf-failed
+
+Get that wrong and the machine keeps working until the DHCP lease expires,
+hours or days later.
+
+If asymmetric routing is ever introduced -- multiple uplinks, some VPN setups
+-- the urpf line is the first thing to suspect, and deleting that one line
+reverts to the previous behaviour.
+
+* Install by hand
+
+** 1. Anchor file
+
+: sudo cp ~/scripts/launchers/pf/com.user.publicnet /etc/pf.anchors/com.user.publicnet
+: sudo chown root:wheel /etc/pf.anchors/com.user.publicnet
+: sudo chmod 644 /etc/pf.anchors/com.user.publicnet
+
+** 2. Hook it into the main ruleset
+
+Back up first, because this file is *replaced by macOS updates*.
+
+: sudo cp /etc/pf.conf /etc/pf.conf.bak-$(date +%Y%m%d)
+: printf '\nanchor "com.user.publicnet"\nload anchor "com.user.publicnet" from "/etc/pf.anchors/com.user.publicnet"\n' | sudo tee -a /etc/pf.conf
+
+Anchor order matters: these must come *after* the existing =com.apple= anchors,
+which appending guarantees.
+
+** 3. Dry run, then load
+
+: sudo pfctl -n -f /etc/pf.conf      # parse only; fix any error before continuing
+: sudo pfctl -E -f /etc/pf.conf
+
+** 4. Verify
+
+: sudo pfctl -a com.user.publicnet -s rules
+: sudo pfctl -s info | head -3
+: curl -sS -o /dev/null -w '%{http_code}\n' https://example.com
+
+Then from the phone, load something served on =192.168.2.1= to confirm the
+hotspot still works.
+
+Check the open resolver is closed, from another machine:
+
+: dig @<your-public-ip> example.com
+
+** 5. Self-healing boot job
+
+The boot script is what makes this survive macOS updates: it restores the
+anchor file if deleted, re-appends the anchor lines if =/etc/pf.conf= was
+replaced, validates, loads, and confirms rules actually landed.
+
+: sudo mkdir -p /usr/local/libexec
+: sudo cp ~/scripts/launchers/pf/publicnet-pf-boot.sh /usr/local/libexec/
+: sudo cp ~/scripts/launchers/pf/com.user.publicnet /usr/local/libexec/com.user.publicnet.anchor
+: sudo chown root:wheel /usr/local/libexec/publicnet-pf-boot.sh /usr/local/libexec/com.user.publicnet.anchor
+: sudo chmod 755 /usr/local/libexec/publicnet-pf-boot.sh
+: sudo chmod 644 /usr/local/libexec/com.user.publicnet.anchor
+: sudo cp ~/scripts/launchers/pf/com.user.publicnet.pf.plist /Library/LaunchDaemons/
+: sudo chown root:wheel /Library/LaunchDaemons/com.user.publicnet.pf.plist
+: sudo chmod 644 /Library/LaunchDaemons/com.user.publicnet.pf.plist
+: sudo launchctl load -w /Library/LaunchDaemons/com.user.publicnet.pf.plist
+
+*The boot script must be root-owned and not user-writable.* The LaunchDaemon
+runs it as root, so a copy under =~/scripts= would let anything running as your
+user obtain root. That is why it is installed to =/usr/local/libexec= rather
+than run from the repo.
+
+The daemon also sets =WatchPaths= on =/etc/pf.conf=, so it re-heals when that
+file changes rather than waiting for the next boot.
+
+Its log:
+
+: sudo tail -20 /var/log/com.user.publicnet.pf.log
+
+* IPv6 (only with --no-ipv6)
+
+=networksetup -getinfo= reports "IPv6 IP address: none" for this service, but
+that reflects only *manually configured* addresses. The interface really does
+hold several SLAAC addresses in =2001:4ca0:4f01:1::/64=, fully routable. Trust
+=ifconfig=:
+
+: ifconfig en10 | grep 'inet6 2001'
+: sudo networksetup -setv6off "USB 10/100/1000 LAN"
+: sudo networksetup -setv6automatic "USB 10/100/1000 LAN"   # revert
+
+Note the anchor deliberately passes ICMPv6 in full. Blocking it does not harden
+IPv6, it breaks it: neighbour discovery and router advertisement ride on
+ICMPv6.
+
+* Rollback
+
+: sudo pfctl -d                                                   # immediate
+: sudo launchctl unload -w /Library/LaunchDaemons/com.user.publicnet.pf.plist
+: sudo rm /Library/LaunchDaemons/com.user.publicnet.pf.plist
+: sudo rm /usr/local/libexec/publicnet-pf-boot.sh /usr/local/libexec/com.user.publicnet.anchor
+: sudo cp /etc/pf.conf.bak-YYYYMMDD /etc/pf.conf
+: sudo rm /etc/pf.anchors/com.user.publicnet
+: sudo networksetup -setv6automatic "USB 10/100/1000 LAN"
+
+Or just =install-publicnet-pf.zsh --uninstall=.
+
+* Caveats worth remembering
+
+- */etc/pf.conf is overwritten by macOS updates.* The boot script repairs this
+  automatically, but check with =--check= after a major update rather than
+  assuming.
+- *Internet Sharing also drives pf.* It enables pf and loads its own NAT
+  anchors. =pfctl -E= rather than =-e= keeps a reference count so neither turns
+  pf off while the other still needs it.
+- *The bridge100/ap1 names are the one place interfaces still appear*, and only
+  in allow rules. If Internet Sharing ever uses different names, hotspot
+  clients get blocked -- a visible failure, not a silent one.
+- *Blocking inbound ICMP echo* means the host stops answering pings. That is
+  intentional and matches stealth mode, but it will confuse you later when
+  debugging connectivity.
+- *pfctl reports success while rejecting a rule.* A typo such as
+  =icmp6-type packettoobig= (the correct keyword is =toobig=) makes pfctl print
+  "unknown icmp6-type" and *exit 0*, so the rule is silently dropped from the
+  loaded set. Both the installer and the boot script therefore treat any
+  unexpected output as a failure rather than trusting the exit status. Never
+  write =pfctl -n -f foo && echo ok=.
+- *A private-network peer is trusted by this ruleset.* On a hostile cafe LAN
+  handing out 192.168.x, other clients are allowed through the filter. The
+  narrow service binds are what protect you there, which is why both layers
+  matter.
+
+* Verify the whole posture
+
+: lsof -nP -iTCP -sTCP:LISTEN | awk 'NR>1 && $9 !~ /^(127\.0\.0\.1|\[::1\]|192\.168\.)/ {print $9, $1}' | sort -u
+: port-foreign-inbounds
+
+The first should be empty or show only Apple daemons; the second should report
+no foreign hosts.
