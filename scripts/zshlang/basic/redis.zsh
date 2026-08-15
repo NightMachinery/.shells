@@ -15,7 +15,7 @@ function h-redis-auth-ensure {
     #: When no secret exists at all, mint one. Note what this does and does
     #: NOT buy you: it only makes our *clients* send a password. Nothing here
     #: makes the *server* demand one - that is [agfi:redis-harden]. On a host
-    #: bootstrapped by setup/bootstrap-sudoless, the file existing is enough,
+    #: bootstrapped by setup/bootstrap, the file existing is enough,
     #: because [agfi:night-startup-redis] passes it as --requirepass on the
     #: next start; anywhere redis is started by brew/systemd/the distro it is
     #: not, and the server stays open until something applies the secret.
@@ -46,7 +46,7 @@ function h-redis-auth-generate {
     #: Mints ~/.redis-auth (mode 600) and exports it, idempotently.
     #:
     #: @duplicateCode/1eb4b0a0e4b4b0a3f0b7f56bd4d40e0a (stage 45 of
-    #: setup/bootstrap-sudoless generates the same file at bootstrap time.)
+    #: setup/bootstrap generates the same file at bootstrap time.)
     ##
     local auth_file="${redis_auth_file}"
 

@@ -98,7 +98,7 @@ fi
 if ! grep -q 'night-bootstrap.env' "${HOME}/.privateShell" 2>/dev/null ; then
     cat >> "${HOME}/.privateShell" <<'EOF'
 ##
-#: Added by setup/bootstrap-sudoless. Storage contract for this host.
+#: Added by setup/bootstrap. Storage contract for this host.
 if [ -r "${HOME}/.night-bootstrap.env" ] ; then
     . "${HOME}/.night-bootstrap.env"
 fi
