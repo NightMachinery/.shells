@@ -1,26 +1,77 @@
-#+TITLE: bootstrap-sudoless
+#+TITLE: bootstrap
 #+PROPERTY: header-args :eval never
 
-Bootstrap the dotfiles onto a Linux host where we have *no sudo*.
+Bootstrap the dotfiles onto a Linux host, with or without root.
 
 Supersedes [[file:../minimal_proxy/][setup/minimal_proxy/]], which entangled "minimal vs full" with
 "proxy vs no proxy". Here the proxy is just one optional stage, and the
 storage layout comes from a profile instead of being hardcoded.
 
-The target is *any* sudo-less Linux host. The LMU CIS cluster is not the
-subject of these scripts; it is one profile among others, enabled with a
-single flag. A host nobody has configured needs no flag at all.
+The target is *any* Linux host. The LMU CIS cluster is not the subject of
+these scripts; it is one profile among others, enabled with a single flag. A
+host nobody has configured needs no flag at all.
+
+@note This directory was =bootstrap-sudoless/= until [2026-08-14 Fri]. It was
+renamed when the sudo flavour landed, because the old name had become a lie
+about half of what lives here.
+
+* One tree, two flavours
+There is *one* driver, *one* set of stages and *one* set of profiles. The only
+difference between the flavours is a single capability flag, =NIGHT_SUDO=:
+
+#+begin_src zsh :eval never
+sh bootstrap-sudo.sh        # we have root; stage 05 installs system packages
+sh bootstrap-sudoless.sh    # we do not; everything comes from user space
+sh bootstrap.sh             # probe with `sudo -n true` and pick one
+#+end_src
+
+The two named entry points are four lines each: set =NIGHT_SUDO=, =exec
+bootstrap.sh=. They exist so the choice is *declared at the call site* and
+visible in shell history, not buried in whatever the host happened to answer.
+
+Only =stages/05-system-packages.sh= reads the flag, and without root it exits
+immediately. So the sudo-less path is byte-for-byte the behaviour it had
+before the flavour split existed --- that is the property worth protecting,
+and the reason this is one tree rather than two.
+
+** Why the sudo capability is probed when the site profile is not
+=profile.sh= is emphatic that the site is *declared, never inferred*, because
+every probe for it turned out to be a proxy: a mount point only proves a share
+is mounted, a =$HOME= prefix is a naming convention, a DNS search domain
+tracks the VPN.
+
+=NIGHT_SUDO= is different, and the difference is the whole justification:
+=sudo -n true= is not a proxy for "can this process run root commands", it
+*is* that question, executed. There is nothing left to be wrong about.
+
+@warn It must never *prompt*. =sudo -n= throughout, never a bare =sudo=: a
+password prompt on a headless host is a hung bootstrap, not a question --- the
+same failure mode as =GIT_TERMINAL_PROMPT= in stage 30.
+
+** What may go in stage 05
+Only things that (a) some stage hard-requires and (b) genuinely cannot be had
+in user space. Today that is =zsh= (stage 30 dies without it and there is no
+good user-space build) and a C toolchain.
+
+Anything mise or conda can provide belongs in stage 20 or 40 instead, where it
+works on *every* host rather than only the rooted ones. The temptation with a
+root flag is to start reaching for it everywhere; resist it, or the sudo-less
+path silently rots.
 
 * Run it
 #+begin_src zsh :eval never
-rsync -az ~/scripts/setup/bootstrap-sudoless/ host:bootstrap-sudoless/
-ssh host 'cd ~/bootstrap-sudoless && sh bootstrap.sh'
+rsync -az ~/scripts/setup/bootstrap/ host:bootstrap/
+ssh host 'cd ~/bootstrap && sh bootstrap-sudo.sh'      # or bootstrap-sudoless.sh
 #+end_src
+
+The directory is self-contained on purpose: the wrappers live *beside* the
+driver rather than delegating to a shared parent, so a single =rsync= of this
+one directory is still all a fresh host needs.
 
 Then, once the dotfiles are in place, the copy inside the repo is the real
 one and the rsync'd copy can go:
 #+begin_src zsh :eval never
-ssh host 'sh ~/scripts/setup/bootstrap-sudoless/doctor.sh'
+ssh host 'sh ~/scripts/setup/bootstrap/doctor.sh'
 #+end_src
 
 Single stage, ignoring the completion stamp:
@@ -41,7 +92,7 @@ What is *not* there is anything per-host, and there is exactly one command
 for it:
 
 #+begin_src zsh :eval never
-ssh newhost 'sh ~/scripts/setup/bootstrap-sudoless/bootstrap.sh 70'
+ssh newhost 'sh ~/scripts/setup/bootstrap/bootstrap.sh 70'
 #+end_src
 
 That enables lingering and starts the services. Without it, redis and the
@@ -66,9 +117,11 @@ shared filesystems already have the answer.
 * Tiers
 The point of the split is what each tier is allowed to assume.
 
-- *Tier 0* -- =bootstrap.sh=, =lib.sh=, =profile.sh=, stages =00= and =10=.
-  POSIX sh. May assume only =sh= + =git= + =curl=, because it runs *before*
-  the dotfiles exist. This is the only part that must stay dependency-free.
+- *Tier 0* -- =bootstrap.sh=, the two flavour wrappers, =lib.sh=, =profile.sh=,
+  stages =00=, =05= and =10=. POSIX sh. May assume only =sh= + =git= + =curl=,
+  because it runs *before* the dotfiles exist. This is the only part that must
+  stay dependency-free --- which is also why stage 05 shells out to the system
+  package manager directly instead of using anything from zshlang.
 
 - *Tier 1* -- stages =20= and up. The repo is on disk, so these may source
   [[file:../../zshlang/basic/basic.plugin.zsh][zshlang/basic/basic.plugin.zsh]] and use =ec=, =assert=, =reval-ec=, =@RET=

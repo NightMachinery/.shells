@@ -1,9 +1,16 @@
 #!/usr/bin/env sh
 # -*- mode: sh; sh-shell: sh; -*-
-#: Sudo-less bootstrap entry point.
+#: Bootstrap entry point -- the shared driver for both flavours.
 #:
 #: Supersedes setup/minimal_proxy/, which entangled "minimal vs full" with
 #: "proxy vs no proxy". Here the proxy is just one optional stage.
+#:
+#: Prefer one of the two named entry points, which *declare* the answer rather
+#: than letting it be probed:
+#:   sh bootstrap-sudo.sh            # we have root; stage 05 may install
+#:   sh bootstrap-sudoless.sh        # we do not; everything in user space
+#: Running bootstrap.sh directly probes with `sudo -n true` and is fine when
+#: you genuinely do not care which one you get.
 #:
 #: Usage:
 #:   sh bootstrap.sh                 # run all default stages
@@ -50,6 +57,7 @@ esac
 
 ##
 log "profile: ${NIGHT_PROFILE_NAME}  host: ${night_host}"
+dim "NIGHT_SUDO        = ${NIGHT_SUDO}$([ "${NIGHT_SUDO}" = y ] && printf ' (stage 05 may install system packages)' || printf ' (user space only)')"
 dim "NIGHT_BIN         = ${NIGHT_BIN}"
 dim "NIGHT_BIG_STORE   = ${NIGHT_BIG_STORE}"
 dim "NIGHT_LOCAL_CACHE = ${NIGHT_LOCAL_CACHE}"

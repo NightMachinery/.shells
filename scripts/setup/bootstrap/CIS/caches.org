@@ -132,7 +132,7 @@ state.
 
 * See also
 
-- [[file:../README.org][bootstrap-sudoless/README.org]] --- the storage
+- [[file:../README.org][bootstrap/README.org]] --- the storage
   contract and the =NIGHT_BIG_STORE= / =NIGHT_LOCAL_CACHE= tiers.
 - [[file:../profiles/cis-lmu.sh][profiles/cis-lmu.sh]] --- where the three
   paths are actually chosen.

@@ -104,7 +104,7 @@ Applies the secret to the running server:
   secret to every local user through a world-readable file.
 
 `CONFIG REWRITE` fails when redis was started without a config file. That is the
-case for `night-startup-redis` in `setup/bootstrap-sudoless/stages/70-services.sh`,
+case for `night-startup-redis` in `setup/bootstrap/stages/70-services.sh`,
 which passes everything on the command line — harmlessly, because that path
 re-reads `~/.redis-auth` and passes `--requirepass` on every start anyway.
 
@@ -191,7 +191,7 @@ here uses `REDISCLI_AUTH` rather than `redis-cli -a`. Same reasoning as the
 After changing any of this, run `brishz-restart`: BrishGarden keeps persistent
 zsh shells and does not see zshlang edits on its own.
 
-On a host bootstrapped by `setup/bootstrap-sudoless`, stage 45 already generates
+On a host bootstrapped by `setup/bootstrap`, stage 45 already generates
 `~/.redis-auth` (skipped only where the profile declares `NIGHT_MULTIUSER=n`)
 and stage 70 starts redis with it, so both halves are covered on the next start.
 Anywhere redis is started by brew, systemd or the distro, `redis-harden` is the

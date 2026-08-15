@@ -67,7 +67,28 @@ fi
 #: forgot to say should get the stricter behaviour, not the laxer one.
 : "${NIGHT_HOME_SHARED:=n}"   #: $HOME is one filesystem across many hosts
 : "${NIGHT_MULTIUSER:=y}"     #: other people can log into this machine
-export NIGHT_HOME_SHARED NIGHT_MULTIUSER
+
+#: --- may we install system packages? ---
+#: The one capability it is safe to *probe* rather than declare, because the
+#: probe is the operation itself: `sudo -n true` succeeds only if this very
+#: process can already run root commands without a prompt. That is not an
+#: inference about the host, it is a direct test of the thing stages need.
+#:
+#: Contrast the site profile, which is declared precisely because every probe
+#: for it was a proxy for the real question. Here there is no proxy.
+#:
+#: @warn Must never *prompt*. A password prompt on a headless host is a hung
+#: bootstrap, not a question -- the same failure mode as GIT_TERMINAL_PROMPT.
+#: Hence `-n` (non-interactive) everywhere, never a bare `sudo`.
+night_sudo_detect() {
+    #: Already root: no sudo needed, and none may exist (containers).
+    [ "$(id -u)" -eq 0 ] && { printf 'y' ; return 0 ; }
+    command -v sudo >/dev/null 2>&1 || { printf 'n' ; return 0 ; }
+    if sudo -n true >/dev/null 2>&1 ; then printf 'y' ; else printf 'n' ; fi
+}
+: "${NIGHT_SUDO:="$(night_sudo_detect)"}"
+
+export NIGHT_HOME_SHARED NIGHT_MULTIUSER NIGHT_SUDO
 export night_site_file
 
 export NIGHT_PROFILE NIGHT_PROFILE_NAME
