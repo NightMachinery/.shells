@@ -180,80 +180,27 @@ fragile parts are in the `SELECTORS` object and the `mathSource` /
 `isDisplayMath` functions at the top.
 
 The conversion can be exercised against the live page without touching the
-clipboard. The script exposes `window.__chatgptCopyMarkdown`, and `chrome-cli`
-(which the zsh wrapper points at Arc by default) can drive it. Because the file
-is self-contained, injecting it is just the file plus a small tail that calls
-the exposed API:
+clipboard. The script exposes `window.__chatgptCopyMarkdown`, so with a
+ChatGPT conversation open, paste the contents of the userscript into the browser
+console followed by:
 
-```zsh
-cp chatgpt-copy-markdown.user.js bundle.js
-cat >> bundle.js <<'EOF'
-;(function () {
+```js
+(function () {
   var api = window.__chatgptCopyMarkdown;
   var msgs = api.assistantMessages();
   var md = api.messageToMarkdown(msgs[msgs.length - 1]);
-  return JSON.stringify({ len: md.length, unresolved: api.unresolvedMath(), md: md });
+  return { len: md.length, unresolved: api.unresolvedMath(), md: md };
 })();
-EOF
-chrome-cli execute "$(command cat bundle.js)"
 ```
 
 `unresolved` must be 0. A non-zero count means math was found whose source
 could not be read, which is the signal that `SELECTORS` needs updating.
 
-Injecting this way adds a second set of controls to each turn; reload to clear
-them.
+`api.chatToMarkdown()` does the same for the whole conversation and reports the
+turn count.
 
-Two constraints on driving Arc this way, both learned the hard way:
-
-- `chrome-cli` only reaches Arc's **active** tab. Any `-t` query against a
-  background tab returns empty, and Arc reassigns tab ids between invocations,
-  so `chrome-cli activate -t` cannot be used to get to the tab you want. The
-  tab has to already be the visible one.
-- Neither `osascript -e 'tell application "Arc" to activate'` nor `open -a Arc`
-  brings Arc forward here; both return success and change nothing.
-  `hs -c 'hs.application.launchOrFocus("Arc")'` does work.
-
-### Screenshotting Arc
-
-`screencapture -l <windowid>` captures one window without activating it, which
-is what you want when the terminal should keep focus. Get the id from Quartz —
-Arc's main window is the largest one at layer 0:
-
-```zsh
-wid=$(python3 -c "
-from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionAll, kCGNullWindowID
-best = None
-for w in CGWindowListCopyWindowInfo(kCGWindowListOptionAll, kCGNullWindowID):
-    if (w.get('kCGWindowOwnerName') or '') != 'Arc' or w.get('kCGWindowLayer') != 0:
-        continue
-    b = w.get('kCGWindowBounds', {})
-    area = b.get('Width', 0) * b.get('Height', 0)
-    if best is None or area > best[1]:
-        best = (w.get('kCGWindowNumber'), area)
-print(best[0] if best else '')
-")
-screencapture -x -o -l "$wid" shot.png
-```
-
-Use `kCGWindowListOptionAll`, not `...OnScreenOnly`: an occluded window is not
-"on screen" and will not be listed at all.
-
-The catch is that this captures the window's **backing store**, and a fully
-occluded window does not redraw — so you get a frame from whenever it was last
-visible, silently missing any DOM changes you just made. If the capture has to
-reflect a fresh mutation, Arc must be frontmost at capture time:
-
-```zsh
-hs -c 'hs.application.launchOrFocus("Arc")'
-osascript -e 'delay 2'
-# ... inject / pose / open the menu via chrome-cli ...
-screencapture -x -o -l "$wid" shot.png
-hs -c 'hs.application.launchOrFocus("kitty")'   # hand focus back
-```
-
-Use `osascript -e 'delay N'` rather than `sleep` when the runner blocks
-foreground sleeps.
+Pasting it in this way adds a second set of controls to each turn, on top of the
+installed script's; reload to clear them.
 
 Note that `window.__chatgptCopyMarkdown` is only reachable this way when the
 code is injected into page context; under Tampermonkey's sandbox it lives on
