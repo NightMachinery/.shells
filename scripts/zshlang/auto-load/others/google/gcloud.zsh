@@ -855,12 +855,19 @@ if [ -b "$GCP_GPU_DATA_DEVICE" ]; then
     if ! grep -q '^/dev/disk/by-id/google-' /etc/fstab ; then
         echo "$GCP_GPU_DATA_DEVICE /mnt/data ext4 discard,defaults,nofail 0 2" >> /etc/fstab
     fi
-    mkdir -p /mnt/data/runs /mnt/data/venvs
-    #: The login user owns it; nothing here should need root.
-    for u in $(ls /home 2>/dev/null) ; do chown -R "$u:$u" /mnt/data || true ; done
 else
-    echo "WARN: $GCP_GPU_DATA_DEVICE absent; /mnt/data is on the BOOT disk and will not survive deletion"
+    echo "NOTE: $GCP_GPU_DATA_DEVICE absent; /mnt/data is on the BOOT disk and dies with the VM."
+    echo "      This is the DEFAULT now (gcp_gpu_data_disk_p=n). Sync to GCS or lose it."
 fi
+
+#: @warn Outside the branch on purpose. These used to run only when a data
+#: disk was attached, so with the disk defaulted off /mnt/data existed but
+#: /mnt/data/runs did not and /mnt/data stayed root-owned -- silently breaking
+#: both "write your results to /mnt/data/runs" and `gcp-gpu-sync`, which would
+#: then sync nothing at all and report success.
+mkdir -p /mnt/data/runs /mnt/data/venvs
+#: The login user owns it; nothing here should need root.
+for u in $(ls /home 2>/dev/null) ; do chown -R "$u:$u" /mnt/data || true ; done
 
 ## nvidia driver ---------------------------------------------------------
 #: @note Normally a no-op now. The claim that G2/A3 "cannot use the Deep
@@ -1496,7 +1503,9 @@ function gcp-gpu-avail {
     local -a zones
     zones=( "$@" )
     if (( ${#zones} == 0 )) ; then
-        zones=( europe-west4-a europe-west4-b europe-west4-c europe-west3-b )
+        #: Was hardcoded to europe-west4/3, which no longer matches the
+        #: defaults and listed zones with no H100 at all.
+        zones=( "${gcp_gpu_zone_candidates[@]}" )
     fi
 
     local z types
