@@ -106,6 +106,25 @@ binary can produce subtly wrong output rather than an error.
 - If one file contains multiple unrelated changes, split those changes into separate commits.
 - Do not treat “one file” as automatically meaning “one commit.”
 
+## Concurrent Sessions
+
+Another agent or a human may be staging and committing in the same repository
+while you work. The index is shared state, so a plain `git commit` picks up
+whatever *they* staged, even when you only ever `git add`ed your own paths.
+
+- Commit with an explicit pathspec — `git commit -- <paths>` — so the commit
+  contains only what you name, regardless of what else is sitting in the index.
+- Re-check `status` immediately before committing. A check from earlier in the
+  session proves nothing; the index may have changed since.
+- After committing, confirm with `show --stat` that only the intended paths
+  landed.
+- Expect the mirror case too: work you leave uncommitted can be swept into
+  someone else's commit. Commit your own work promptly rather than letting it
+  sit in the worktree.
+- If a commit does end up mixing their work with yours, do not rewrite or
+  force-push to fix it. They may already be working from that history. Report
+  it and let me decide.
+
 # Unexpected File Changes
 
 If you notice files changed since you last read/wrote them, it's possible the user updated them manually. Leave these changes be; if they conflict with your instructions, ask the user explicitly for instructions.
