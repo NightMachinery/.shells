@@ -38,7 +38,11 @@ typeset -g gcp_gpu_bucket="${gcp_gpu_bucket:-gs://rnd-results-${gcp_gpu_owner}}"
 typeset -g gcp_gpu_max_run="${gcp_gpu_max_run:-8h}"
 typeset -g gcp_gpu_idle_min="${gcp_gpu_idle_min:-30}"
 typeset -g gcp_gpu_budget_config="${gcp_gpu_budget_config:-${HOME}/.config/gcp-gpu-budget}"
-typeset -g gcp_gpu_budget_default="${gcp_gpu_budget_default:-50}"
+#: EUR/month soft cap when `${gcp_gpu_budget_config}` does not exist. Raised
+#: from 50 to 5000 on [2026-08-14 Fri]: 50 was an arbitrary conservative
+#: placeholder, and a single 5-day flex-start H100 costs ~EUR 500, so the old
+#: default refused the very work this tooling exists to run.
+typeset -g gcp_gpu_budget_default="${gcp_gpu_budget_default:-5000}"
 #: How far before a spend window to scan the audit log, and how long to cache
 #: the scan. Both exist because `gcloud logging read` is slow enough to matter
 #: in `gcp-gpu-status`. See `h-gcp-gpu-audit-events`.
