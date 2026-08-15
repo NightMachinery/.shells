@@ -14,19 +14,53 @@
 #: `~[nt]/private/research/Hinrich Schutze/GCloud/GPU/usage.org`.
 ##
 typeset -g gcp_gpu_project="${gcp_gpu_project:-relation-neuron-detection}"
-typeset -g gcp_gpu_zone="${gcp_gpu_zone:-europe-west4-a}"
-typeset -g gcp_gpu_region="${gcp_gpu_region:-europe-west4}"
+#: @warn Retargeted <2026-08-14 Fri> from `europe-west4-a`, which has NO H100
+#: in any form -- the old default could not reach the one GPU worth reaching.
+#: `europe-west9-c` (Paris) is the cheapest *obtainable* single H100 in the EU
+#: (EUR 2.33/hr spot vs 5.59 in europe-west4) and was verified by creating one.
+#:
+#: @warn Finland (`europe-north1-c`) prices an H100 at EUR 1.02/hr and is a
+#: trap: `a3-highgpu-1g` is catalogued and priced there but every create
+#: returns `reason: stockout` with `zonesAvailable: ''`. Price and catalogue
+#: presence prove nothing; see `gcp-gpu-advice`.
+typeset -g gcp_gpu_zone="${gcp_gpu_zone:-europe-west9-c}"
+typeset -g gcp_gpu_region="${gcp_gpu_region:-europe-west9}"
 typeset -g gcp_gpu_instance="${gcp_gpu_instance:-rnd-gpu}"
-typeset -g gcp_gpu_machine="${gcp_gpu_machine:-g2-standard-8}"
-typeset -g gcp_gpu_boot_gb="${gcp_gpu_boot_gb:-100}"
-#: G2 does not support `pd-standard`.
+#: @warn `europe-west9` has NO G2 and NO A2 in any zone -- only A3. So the
+#: cheap L4/A100 spot rates in the Paris column of the price table below are
+#: unreachable *here*, and a small-model tier needs a different zone (and the
+#: image, which is global, is what makes that painless).
+typeset -g gcp_gpu_machine="${gcp_gpu_machine:-a3-highgpu-1g}"
+#: 150 to match the baked image; the DLVM base alone is 100.
+typeset -g gcp_gpu_boot_gb="${gcp_gpu_boot_gb:-150}"
+#: Neither G2 nor A3 supports `pd-standard`.
 typeset -g gcp_gpu_boot_type="${gcp_gpu_boot_type:-pd-balanced}"
-typeset -g gcp_gpu_image_family="${gcp_gpu_image_family:-ubuntu-2404-lts-amd64}"
-typeset -g gcp_gpu_image_project="${gcp_gpu_image_project:-ubuntu-os-cloud}"
-#: Persistent disks are zonal. This disk pins the instance to `$gcp_gpu_zone`.
+#: Our own image: Ubuntu 24.04 + driver 580 + CUDA 12.9 + PyTorch 2.9, with
+#: setup/bootstrap already applied (zsh, mise, micromamba, emacs+doom).
+#: Images are GLOBAL, which is what makes hunting capacity across zones
+#: practical. Built from `rnd-boot` in europe-west9-c; see report.org.
+#: For a bare base instead: ubuntu-2404-lts-amd64 / ubuntu-os-cloud, or
+#: pytorch-2-9-cu129-ubuntu-2404-nvidia-580 / deeplearning-platform-release.
+typeset -g gcp_gpu_image_family="${gcp_gpu_image_family:-rnd-night}"
+typeset -g gcp_gpu_image_project="${gcp_gpu_image_project:-${gcp_gpu_project}}"
+#: Persistent disks are zonal, so a data disk pins the instance to
+#: `$gcp_gpu_zone` -- exactly the lock-in the global image exists to avoid.
+#: Off by default: the image carries the environment and GCS carries results,
+#: which leaves a data disk as pure standing cost (~EUR 30/month for 300GB,
+#: billed whether or not anything runs). Turn it on only for scratch that a
+#: job genuinely needs on fast local storage.
+typeset -g gcp_gpu_data_disk_p="${gcp_gpu_data_disk_p:-n}"
 typeset -g gcp_gpu_data_disk="${gcp_gpu_data_disk:-rnd-data}"
 typeset -g gcp_gpu_data_gb="${gcp_gpu_data_gb:-300}"
 typeset -g gcp_gpu_data_type="${gcp_gpu_data_type:-pd-balanced}"
+#: Zones to consider when hunting capacity, cheapest obtainable first. Only
+#: zones that actually offer `a3-highgpu-1g` AND that `advice capacity`
+#: accepts; Finland, London, Tokyo, Sydney, Delhi and Toronto are all excluded
+#: for one of those two reasons despite looking attractive on price.
+typeset -ga gcp_gpu_zone_candidates
+gcp_gpu_zone_candidates=(
+    ${=gcp_gpu_zone_candidates:-europe-west9-c europe-west1-c europe-west1-b europe-west3-c europe-west4-c europe-west4-b us-east4-a us-east5-a}
+)
 #: `$USERNAME` rather than `$USER`: zsh maintains it from the effective UID, so
 #: it is always set. `$USER` is empty in a non-login shell, which would silently
 #: turn every `owner=` filter below into `owner=` and match nothing.
@@ -71,9 +105,9 @@ typeset -g gcp_gpu_reap_idle_min="${gcp_gpu_reap_idle_min:-60}"
 typeset -g gcp_gpu_reap_heartbeat_max_min="${gcp_gpu_reap_heartbeat_max_min:-10}"
 ##
 #: ===========================================================================
-#: PRICE TABLE -- EUR/hour, list price, region `europe-west4`.
+#: PRICE TABLE -- EUR/hour, list price, region `europe-west9` (Paris).
 #:
-#: @warn THESE GO STALE. Refreshed <2026-08-11 Tue> from the *live* Cloud
+#: @warn THESE GO STALE. Refreshed <2026-08-14 Fri> from the *live* Cloud
 #: Billing Catalog API, not from the pricing page. They drive every estimate
 #: printed by `gcp-gpu-burn`, `gcp-gpu-budget` and the audit-log fallback in
 #: `gcp-gpu-spend`; none of those are billed euros. Treat the BigQuery export
@@ -92,49 +126,76 @@ typeset -g gcp_gpu_reap_heartbeat_max_min="${gcp_gpu_reap_heartbeat_max_min:-10}
 #:   nCPU * "<FAM> Instance Core running in Netherlands"
 #: + nGB  * "<FAM> Instance Ram running in Netherlands"
 #: + nGPU * "<GPU> running in Netherlands"
-#: prefixing all three with "Spot Preemptible " for spot. 6F81-5844-456A is the
-#: Compute Engine service id; "Netherlands" is europe-west4.
+#: prefixing all three with "Spot Preemptible " for spot, or "DWS Defined
+#: Duration " for flex-start. A3 also carries local SSD, billed per GB-MONTH:
+#: add nGB_lssd * "SSD backed Local Storage in <COUNTRY>" / 730. 6F81-5844-456A
+#: is the Compute Engine service id; "Paris" is europe-west9.
 #:
-#: @note Availability is quota, not price. A SKU existing proves nothing:
-#: `a2-ultragpu-1g` HAS a spot SKU (2.46) but PREEMPTIBLE_NVIDIA_A100_80GB
-#: quota is 0 here, so it cannot be created. Conversely spot H100/H200/B200
-#: quota is 64 each -- see `gcp-gpu-quota`, and note the legacy
-#: `compute regions describe` view does NOT list A3-family metrics at all.
+#: @note Availability is not price, and it is not quota either. Three separate
+#: things must all hold, and each has burned us once:
+#:   1. a priced SKU        -- `a2-ultragpu-1g` has a spot SKU at 0.58 here
+#:   2. quota               -- but PREEMPTIBLE_NVIDIA_A100_80GB quota is 0
+#:   3. actual capacity     -- and `europe-north1-c` has H100 quota AND a
+#:                             catalogued machine type, yet every create
+#:                             returns `stockout` with `zonesAvailable: ''`
+#: `gcp-gpu-quota` covers (2); `gcp-gpu-advice` covers (3) for free, without
+#: creating anything. Note the legacy `compute regions describe` view does NOT
+#: list A3-family metrics at all, so it makes H100 quota look absent.
+#:
+#: @note The G2/A2 rows are priced for Paris but *unreachable* there: the
+#: region has no G2 and no A2 in any zone. They are kept so an estimate is
+#: honest if `$gcp_gpu_zone` is pointed somewhere that does have them.
 #: ===========================================================================
 typeset -gA gcp_gpu_price_ondemand=(
-    g2-standard-4    0.65
-    g2-standard-8    0.79
-    g2-standard-12   0.92
-    g2-standard-16   1.06
-    g2-standard-32   1.60
-    a2-highgpu-1g    3.29
-    a2-highgpu-2g    6.58
-    a2-ultragpu-1g   4.86
-    a3-highgpu-1g   12.27
-    a3-highgpu-2g   24.54
-    a3-highgpu-8g   98.15
+    g2-standard-4    0.72
+    g2-standard-8    0.87
+    g2-standard-12   1.02
+    g2-standard-16   1.17
+    g2-standard-32   1.77
+    a2-highgpu-1g    3.74
+    a2-highgpu-2g    7.48
+    a2-ultragpu-1g   5.12
+    #: @warn a3-highgpu-1g/2g/4g CANNOT be created on demand at all -- they
+    #: exist only as Spot or Flex-start, which is also why there is no
+    #: NVIDIA-H100-GPUS quota metric. Kept for comparison only.
+    a3-highgpu-1g   11.26
+    a3-highgpu-2g   22.53
+    a3-highgpu-8g   90.10
 )
 typeset -gA gcp_gpu_price_spot=(
-    g2-standard-4    0.39
-    g2-standard-8    0.47
-    g2-standard-12   0.55
-    g2-standard-16   0.64
-    g2-standard-32   0.96
-    a2-highgpu-1g    1.80
-    a2-highgpu-2g    3.60
-    #: SKU exists but quota is 0 in europe-west4; kept so estimates are honest
-    #: if quota is ever granted.
-    a2-ultragpu-1g   2.46
-    a3-highgpu-1g    5.54
-    a3-highgpu-2g   11.08
-    a3-highgpu-8g   44.32
+    g2-standard-4    0.11
+    g2-standard-8    0.13
+    g2-standard-12   0.16
+    g2-standard-16   0.18
+    g2-standard-32   0.27
+    a2-highgpu-1g    0.34
+    a2-highgpu-2g    0.67
+    #: SKU exists but PREEMPTIBLE_NVIDIA_A100_80GB quota is 0 everywhere; kept
+    #: so estimates are honest if quota is ever granted.
+    a2-ultragpu-1g   0.58
+    a3-highgpu-1g    2.33
+    a3-highgpu-2g    4.65
+    a3-highgpu-8g   18.62
 )
-#: EUR per GB-month.
+#: Flex-start (Dynamic Workload Scheduler, `--provisioning-model=FLEX_START`).
+#: Runs uninterrupted for up to 7 days, draws on the same PREEMPTIBLE quota we
+#: already hold, and is the only way to hold a single H100 for days.
+#:
+#: @note The GPU component is priced GLOBALLY FLAT (EUR 3.687/H100-hour), so
+#: unlike spot -- which ranges 2.33 to 6.04 across zones for the same machine
+#: -- there is nothing to shop around for. Choose a flex-start region for
+#: latency and residency. Only A3/A4 have flex-start SKUs; G2 and A2 do not.
+typeset -gA gcp_gpu_price_flexstart=(
+    a3-highgpu-1g    4.22
+    a3-highgpu-2g    8.43
+    a3-highgpu-8g   33.73
+)
+#: EUR per GB-month, europe-west9.
 typeset -gA gcp_gpu_price_disk=(
-    pd-balanced          0.0966
-    pd-ssd               0.1641
-    pd-standard          0.0386
-    hyperdisk-balanced   0.0737
+    pd-balanced          0.1018
+    pd-ssd               0.1731
+    pd-standard          0.0407
+    hyperdisk-balanced   0.0816
 )
 ##
 function h-gcp-gpu-gcloud {
@@ -172,9 +233,13 @@ function h-gcp-gpu-price {
     #: `h-gcp-gpu-price MACHINE [PROVISIONING_MODEL]` -> EUR/hour, or 0 if unknown.
     local machine="${1:?}" model="${2:-STANDARD}" price
 
-    if [[ "${model:u}" == SPOT ]] ; then
-        price="${gcp_gpu_price_spot[$machine]}"
-    fi
+    case "${model:u}" in
+        SPOT)       price="${gcp_gpu_price_spot[$machine]}" ;;
+        FLEX_START) price="${gcp_gpu_price_flexstart[$machine]}" ;;
+    esac
+    #: Falling back to on-demand keeps an unknown model from silently costing
+    #: 0, and on-demand is the *highest* rate -- so the error is always in the
+    #: over-reporting direction, which is the safe one for a spend cap.
     if test -z "$price" ; then
         price="${gcp_gpu_price_ondemand[$machine]}"
     fi
@@ -570,6 +635,75 @@ function gcp-gpu-spend {
     h-gcp-gpu-spend-source-note
 }
 ##
+function gcp-gpu-advice {
+    #: `gcp-gpu-advice [MACHINE] [MODEL]` -> per-zone obtainability, for free.
+    #:
+    #: Wraps `gcloud beta compute advice capacity`, which is the ONLY source
+    #: that answers "can I actually get one", as opposed to "does this name
+    #: exist". Everything else lies by omission:
+    #:
+    #:   Billing Catalog SKU     -> priced in Finland at EUR 0.86/GPU-hr
+    #:   accelerator-types list  -> nvidia-h100-80gb present in europe-west2-b
+    #:   machine-types list      -> a3-highgpu-1g present in europe-north1-c
+    #:   advice capacity         -> not supported in ANY europe-north1 zone
+    #:
+    #: The first three are catalogue views: they describe what the API knows
+    #: the name of. Only this one asks whether capacity exists. Confirmed by
+    #: creating: europe-north1-c returns `reason: stockout`.
+    #:
+    #: @note Recommendation, not proof -- a create is the definitive test. But
+    #: it costs nothing and creates nothing, so it belongs before every hunt.
+    #: @note `advice capacity` for FLEX_START returns "service is not available
+    #: for this project", and gcloud 579 crashes on `--max-run-duration`, so
+    #: only SPOT is checkable. Credit: Ali Modarressi.
+    local machine="${1:-${gcp_gpu_machine}}" model="${2:-SPOT}"
+    local -a zones
+    zones=( "${@[3,-1]}" )
+    (( ${#zones} )) || zones=( "${gcp_gpu_zone_candidates[@]}" )
+
+    h-gcp-gpu-deps @RET
+    if ! command gcloud beta --help &>/dev/null ; then
+        ecerr "$0: needs the beta component: gcloud components install beta"
+        return 1
+    fi
+
+    #: Region-level API, so collapse the candidate zones to their regions and
+    #: let it name the best zone in each.
+    local -a regions
+    regions=( ${(u)${zones[@]}%-*} )
+
+    printf '%-22s %-26s %-8s %s\n' REGION BEST-ZONE OBTAIN EST-UPTIME
+    local r out obtain uptime zone
+    for r in "${regions[@]}" ; do
+        out="$(h-gcp-gpu-gcloud beta compute advice capacity \
+            --provisioning-model="${model}" \
+            --instance-selection-machine-types="${machine}" \
+            --target-distribution-shape=ANY_SINGLE_ZONE \
+            --size=1 --region="$r" --format=json 2>&1)"
+
+        if [[ "$out" == *'not supported in location'* ]] ; then
+            printf '%-22s %-26s %-8s %s\n' "$r" '--' 'NO' 'machine spec unsupported here'
+            continue
+        fi
+        if ! jq -e . <<<"$out" &>/dev/null ; then
+            printf '%-22s %-26s %-8s %s\n' "$r" '--' '?' "${${out##*ERROR: }%%$'\n'*}"
+            continue
+        fi
+
+        zone="$(jq -r '(.recommendations[0].shards[0].zone // "?") | split("/") | last' <<<"$out")"
+        obtain="$(jq -r '.recommendations[0].scores.obtainability // "?"' <<<"$out")"
+        uptime="$(jq -r '.recommendations[0].scores.estimatedUptime // "?"' <<<"$out")"
+        printf '%-22s %-26s %-8s %s\n' "$r" "$zone" "$obtain" "$uptime"
+    done
+
+    #: The uptime column is the one that decides spot vs flex-start: it has
+    #: been observed to top out at 3600s, i.e. a spot H100 is expected to
+    #: survive about an hour. A multi-day spot run is ~N attempts at one hour,
+    #: not one long run, and nothing in the fit pipeline checkpoints mid-prompt.
+    ecgray "obtainability 0.9 good / 0.5 marginal / 0.1 forget it."
+    ecgray "est-uptime 3600s appears to be the ceiling; for days, use --flex-start."
+}
+
 function h-gcp-gpu-stockout-p {
     #: Spot VMs do not queue. Creation fails immediately, and "waiting for a
     #: spot VM" means retrying in a loop rather than an API-side queue.
@@ -596,7 +730,16 @@ function h-gcp-gpu-retry {
 
         if (( attempt >= gcp_gpu_retry_max )) ; then
             ecerr "$0: still no capacity in ${gcp_gpu_zone} after ${attempt} attempts. Giving up."
-            ecerr "Try --on-demand, or a different machine type."
+            ecerr ""
+            ecerr "  Which zones actually have it right now:  gcp-gpu-advice"
+            ecerr "  Then retry there:                        gcp_gpu_zone=<zone> $0"
+            ecerr "  For a run that must not be interrupted:  gcp-gpu-up --flex-start"
+            #: Deliberately NOT suggesting --on-demand for A3: a3-highgpu-1g,
+            #: -2g and -4g have no on-demand form at all, so that advice would
+            #: send you to a guaranteed failure.
+            if [[ "${gcp_gpu_machine}" != a3-* ]] ; then
+                ecerr "  Or uninterruptible at list price:        $0 --on-demand"
+            fi
             return 1
         fi
 
@@ -720,8 +863,15 @@ else
 fi
 
 ## nvidia driver ---------------------------------------------------------
-#: G2 machine types cannot use the Deep Learning VM images, so the driver is
-#: ours to install. This is the one stage that can take ~10 minutes.
+#: @note Normally a no-op now. The claim that G2/A3 "cannot use the Deep
+#: Learning VM images" was wrong: `$gcp_gpu_image_family` defaults to our own
+#: image, built on pytorch-2-9-cu129-ubuntu-2404-nvidia-580, which ships the
+#: driver, CUDA and PyTorch. Verified on an H100 in europe-west9-c: driver
+#: 580.173.02, torch 2.9.1+cu129, cuda.is_available() True.
+#:
+#: Kept as a fallback for the bare-Ubuntu case (someone points
+#: `$gcp_gpu_image_family` at ubuntu-2404-lts-amd64), where it still costs the
+#: ~10 minutes it always did.
 if ! command -v nvidia-smi >/dev/null 2>&1 ; then
     echo "installing NVIDIA driver"
     export DEBIAN_FRONTEND=noninteractive
@@ -868,6 +1018,13 @@ function h-gcp-gpu-ensure-bucket {
 }
 
 function h-gcp-gpu-ensure-disk {
+    #: The single most expensive default in this file used to be here: a disk
+    #: created speculatively bills forever, whether or not the VM ever boots
+    #: again, and nothing in this file deletes a disk. Opt in.
+    if ! bool "${gcp_gpu_data_disk_p}" ; then
+        return 0
+    fi
+
     if h-gcp-gpu-disk-exists-p ; then
         return 0
     fi
@@ -884,7 +1041,7 @@ function h-gcp-gpu-ensure-disk {
 }
 ##
 function gcp-gpu-up {
-    : "usage: gcp-gpu-up [--on-demand] [--machine TYPE] [--max-run DUR] [--dry-run]"
+    : "usage: gcp-gpu-up [--on-demand|--spot|--flex-start] [--machine TYPE] [--max-run DUR] [--dry-run]"
     h-gcp-gpu-deps @RET
 
     local model=SPOT machine="${gcp_gpu_machine}" gcp_gpu_dry_run="${gcp_gpu_dry_run}"
@@ -899,6 +1056,13 @@ function gcp-gpu-up {
         case "$1" in
             --on-demand) model=STANDARD ; shift ;;
             --spot)      model=SPOT ; shift ;;
+            #: Flex-start: uninterrupted for up to 7 days, on the PREEMPTIBLE
+            #: quota we already hold. The only way to hold a single H100 for
+            #: days -- `a3-highgpu-1g` has no on-demand form, and calendar-mode
+            #: reservations start at EIGHT GPUs (~EUR 36/hr).
+            #: @warn Cannot be stopped and resumed; `gcp-gpu-down` will not
+            #: save money mid-run. Delete to stop the bill.
+            --flex-start) model=FLEX_START ; shift ;;
             --machine)   machine="${2:?--machine needs a type}" ; shift 2 ;;
             --max-run)
                 gcp_gpu_max_run="${2:?--max-run needs a duration (8h, 90m, ...)}"
@@ -907,6 +1071,14 @@ function gcp-gpu-up {
             *) ecerr "$0: unknown argument: $1" ; return 1 ;;
         esac
     done
+
+    #: After the loop, so `--flex-start --max-run 3d` and `--max-run 3d
+    #: --flex-start` mean the same thing. 7d is GCE's hard ceiling for
+    #: flex-start; the ordinary 8h default would silently throw away most of
+    #: what you asked flex-start for.
+    if [[ "$model" == FLEX_START ]] && ! bool "$max_run_explicit" ; then
+        gcp_gpu_max_run=7d
+    fi
 
     ## preflight ---------------------------------------------------------
     if ! h-gcp-gpu-budget-ok-p ; then
@@ -1003,7 +1175,6 @@ function gcp-gpu-up {
         --image-project="${gcp_gpu_image_project}"
         --boot-disk-size="${gcp_gpu_boot_gb}GB"
         --boot-disk-type="${gcp_gpu_boot_type}"
-        --disk="name=${gcp_gpu_data_disk},device-name=${gcp_gpu_data_disk},mode=rw,auto-delete=no"
         --service-account="${gcp_gpu_sa}"
         --scopes=https://www.googleapis.com/auth/devstorage.read_write,https://www.googleapis.com/auth/logging.write,https://www.googleapis.com/auth/monitoring.write
         --labels="$(h-gcp-gpu-labels)"
@@ -1012,6 +1183,26 @@ function gcp-gpu-up {
         --metadata=enable-guest-attributes=TRUE
         --metadata-from-file="startup-script=${startup}"
     )
+
+    #: A3 machine types come with local SSD attached, and GCE refuses
+    #: `--instance-termination-action=STOP` on such a machine unless you say
+    #: out loud that the local SSD contents may be discarded. Without this the
+    #: create fails outright, so it is not optional for the default machine.
+    #: Harmless on machine types with no local SSD.
+    if [[ "$machine" == a3-* || "$machine" == a4-* ]] ; then
+        opts+=( --discard-local-ssds-at-termination-timestamp=true )
+    fi
+
+    #: Flex-start refuses to consume a reservation, and must be told so.
+    if [[ "$model" == FLEX_START ]] ; then
+        opts+=( --reservation-affinity=none )
+    fi
+
+    #: Off by default -- a zonal disk pins the instance to one zone, which is
+    #: what the global image exists to avoid, and it bills forever once made.
+    if bool "${gcp_gpu_data_disk_p}" ; then
+        opts+=( --disk="name=${gcp_gpu_data_disk},device-name=${gcp_gpu_data_disk},mode=rw,auto-delete=no" )
+    fi
 
     h-gcp-gpu-retry h-gcp-gpu-reval h-gcp-gpu-gcloud "${opts[@]}"
     local ret=$?
@@ -1022,9 +1213,20 @@ function gcp-gpu-up {
     fi
 
     ec ""
-    ec "created. The first boot installs the NVIDIA driver and takes ~10 minutes."
-    ec "  watch it:   gcp-gpu-ssh 'sudo tail -f /var/log/gcp-gpu-startup.log'"
-    ec "  then:       gcp-gpu-attach"
+    #: The ~10-minute driver install is gone: the default image already has
+    #: driver 580 / CUDA 12.9 / PyTorch 2.9 and the whole bootstrapped
+    #: environment. Boot to usable shell is well under a minute.
+    ec "created. The image already carries the driver and the bootstrap."
+    ec "  watch boot:  gcp-gpu-ssh 'sudo tail -f /var/log/gcp-gpu-startup.log'"
+    ec "  then:        gcp-gpu-attach"
+    if [[ "$model" == FLEX_START ]] ; then
+        ec ""
+        ec "flex-start: uninterrupted for up to ${gcp_gpu_max_run}, then ${gcp_gpu_instance} STOPs."
+        #: Worth saying every time, because it inverts the habit the rest of
+        #: this file trains: with spot, `gcp-gpu-down` is how you save money.
+        ec "@warn it CANNOT be stopped and resumed. gcp-gpu-down will not save money here;"
+        ec "      only gcp-gpu-destroy ends the bill early."
+    fi
 }
 
 function gcp-gpu-down {
