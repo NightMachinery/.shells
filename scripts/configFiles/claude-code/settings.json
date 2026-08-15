@@ -16,8 +16,7 @@
     ],
     "deny": [],
     "ask": [
-      "Bash(sudo *)",
-      "Bash(*sudo *)"
+      "Bash(sudo *)"
     ],
     "defaultMode": "plan"
   },
