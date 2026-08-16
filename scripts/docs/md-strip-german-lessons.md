@@ -5,7 +5,7 @@ answers. Two functions remove it, and they are not interchangeable.
 
 ## Which one to use
 
-[agfi:md-strip-german-teachings] (`zshlang/auto-load/others/pandoc.zsh:63`)
+[agfi:md-strip-german-lessons-last] (`zshlang/auto-load/others/pandoc.zsh:63`)
 handles the *single-answer* case. It deletes from the last
 `---\n\n# Learning German ^_^` to EOF. Because it only ever matches the last
 occurrence, an earlier quoted copy cannot truncate the document. This is what
@@ -15,10 +15,10 @@ occurrence, an earlier quoted copy cannot truncate the document. This is what
 [agfi:md-strip-german-lessons] handles *conversation exports*, where a lesson
 follows every assistant message. `Saving_contact_photos_on_Xiaomi_Note_13_Pro.md`
 carries 9 of them, `ChatGPT-MoE_Gradients_and_Routing.md` 4,
-`German_English_dictionary_for_Android_with_IPA.md` 3. The teachings version
+`German_English_dictionary_for_Android_with_IPA.md` 3. The `-last` variant
 would remove only the last of those and take everything after it with it.
 
-The lessons version is not wired into `pandoc-convert`; run it yourself.
+The plain version is not wired into `pandoc-convert`; run it yourself.
 Arguments are file paths, not text — [agfi:in-or-args-or-files] rather than
 the usual [agfi:in-or-args], because passing a path to a filter that treats
 it as content is a silent footgun:
@@ -68,7 +68,7 @@ cannot perturb whitespace elsewhere in the document.
 
 ## Fenced code blocks are skipped
 
-`md-strip-german-teachings` gets an implicit guard from matching only the
+`md-strip-german-lessons-last` gets an implicit guard from matching only the
 last occurrence. A global pass has no such luck, so
 `perllang/md_strip_german_lessons.pl` tracks ``` and `~~~` fences (only a
 fence of the same character closes one) and refuses to match inside them.

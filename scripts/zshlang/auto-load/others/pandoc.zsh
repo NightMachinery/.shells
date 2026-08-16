@@ -35,8 +35,8 @@ function docx2plain {
 function md2org {
     #: The latex filter is on by default (see
     #: [agfi:pandoc-convert] and ~/scripts/docs/md2org-latex/readme.md).
-    #: Markdown input preprocessing (code fence attributes, German
-    #: teachings) happens in [agfi:h-pandoc-md-preprocess].
+    #: Markdown input preprocessing (code fence attributes, the trailing
+    #: German lesson) happens in [agfi:h-pandoc-md-preprocess].
     #: Input handling (file arg, stdin, clipboard-if-tty) also happens in
     #: [agfi:pandoc-convert], so no `cat-paste-if-tty` here: piping it in
     #: front used to hang `md2org file.md` in non-tty contexts (the pipe
@@ -60,7 +60,7 @@ function md2org-no-latex {
     md2org "$@"
 }
 
-function md-strip-german-teachings {
+function md-strip-german-lessons-last {
     #: Strips the trailing "Learning German" section that my LLM custom
     #: instructions append after a `---\n\n# Learning German ^_^\n\n`
     #: separator.
@@ -80,7 +80,7 @@ function md-strip-german-teachings {
 function md-strip-german-lessons {
     #: Strips EVERY "Learning German ^_^" section, including the mid-document
     #: ones that LLM conversation exports carry after each assistant message.
-    #: Contrast [agfi:md-strip-german-teachings], which only drops the
+    #: Contrast [agfi:md-strip-german-lessons-last], which only drops the
     #: trailing section and everything after it.
     #: The heading is a strict output contract, but we tolerate drift in
     #: heading level and in surrounding whitespace. Override the whole
@@ -105,7 +105,7 @@ function h-pandoc-md-preprocess {
 
     perl -pe 's/^(```+[^\s`]+)(?:\h+.*)?$/$1/' |  #: [[id:840a466b-9e1b-4f15-bac9-e9001e5e87d7][pandoc markdown code block fence attributes]]
         if bool "$strip_german_p" ; then
-            md-strip-german-teachings
+            md-strip-german-lessons-last
         else
             cat
         fi
