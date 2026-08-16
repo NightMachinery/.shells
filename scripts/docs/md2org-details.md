@@ -272,7 +272,7 @@ On the repro file, via the full `md2org` pipeline:
   balanced
 - `org-element-parse-buffer` finds 10 special blocks, all of type
   `details` (11th is inside the trailing section
-  [agfi:md-strip-german-teachings] intentionally drops — see
+  [agfi:md-strip-german-lessons-last] intentionally drops — see
   `./md-strip-german-lessons.md` for that function and its
   conversation-export sibling)
 - emoji in titles intact

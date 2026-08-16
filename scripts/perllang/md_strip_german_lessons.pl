@@ -3,7 +3,7 @@
 #: including the mid-document ones that LLM conversation exports carry after
 #: each assistant message. Reads STDIN, writes STDOUT.
 #: Driven by [agfi:md-strip-german-lessons]; contrast
-#: [agfi:md-strip-german-teachings], which only drops the trailing section.
+#: [agfi:md-strip-german-lessons-last], which only drops the trailing section.
 #:
 #: $md_german_lesson_re overrides the heading pattern.
 use strict;
