@@ -42,6 +42,10 @@ Known conversion problems and their filters are documented per-issue:
   obsolete =#+begin_html= raw-HTML wrapper.
 - =./docs/html2org-empty-underline.md= — stray =__= from Outlook emails.
 
+=./docs/md-strip-german-lessons.md= covers the two functions that remove the
+=Learning German ^_^= sections my LLM instructions append: the =md2org=-path
+one for single answers, and the standalone one for conversation exports.
+
 * Codex
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.
