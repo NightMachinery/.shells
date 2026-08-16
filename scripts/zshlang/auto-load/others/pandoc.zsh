@@ -69,9 +69,32 @@ function md-strip-german-teachings {
     #: missing, and the heading level may vary.
     #: Strips from the LAST occurrence to EOF, so an earlier quoted copy
     #: (e.g., inside a code block) does not truncate the document.
+    #: For conversation exports, where a lesson follows every assistant
+    #: message, use [agfi:md-strip-german-lessons] instead.
     ##
     in-or-args "$@" |
         perl -0777 -pe 's/(.*)(?:\A|\n)---\n\n?#{1,6} Learning German \^_\^(?:\n.*)?\z/$1/s' |
+        cat-copy-if-tty
+}
+
+function md-strip-german-lessons {
+    #: Strips EVERY "Learning German ^_^" section, including the mid-document
+    #: ones that LLM conversation exports carry after each assistant message.
+    #: Contrast [agfi:md-strip-german-teachings], which only drops the
+    #: trailing section and everything after it.
+    #: The heading is a strict output contract, but we tolerate drift in
+    #: heading level and in surrounding whitespace. Override the whole
+    #: pattern with $md_german_lesson_re.
+    #: A section runs to the first of: a `---` rule, a `<details>` block (the
+    #: "Sources" footer, which belongs to the preceding message and is kept),
+    #: a heading at the same level or shallower, a speaker heading, or EOF.
+    #: One adjacent `---` goes with it, so no doubled separators are left
+    #: behind. Fenced code blocks are skipped.
+    #: Arguments are file paths ([agfi:in-or-args-or-files]), since the input
+    #: is always a whole exported document.
+    ##
+    in-or-args-or-files "$@" |
+        md_german_lesson_re="${md_german_lesson_re:-}" md_strip_german_lessons.pl |
         cat-copy-if-tty
 }
 

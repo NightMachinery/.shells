@@ -63,6 +63,21 @@ function in-or-args {
         fi
     fi
 }
+
+function in-or-args-or-files {
+    #: Like [agfi:in-or-args], but arguments are file paths rather than
+    #: literal text. For filters whose input is always a document on disk,
+    #: where `fn some.md` treating its argument as content is a silent
+    #: footgun.
+    #: With no arguments, falls back to [agfi:in-or-args] (stdin, or the
+    #: clipboard when stdin is a tty).
+    ##
+    if (( $# )) ; then
+        command cat -- "$@"
+    else
+        in-or-args
+    fi
+}
 ##
 function pcat {
     possiblycat "${@:-50}"
