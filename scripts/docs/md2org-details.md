@@ -272,7 +272,9 @@ On the repro file, via the full `md2org` pipeline:
   balanced
 - `org-element-parse-buffer` finds 10 special blocks, all of type
   `details` (11th is inside the trailing section
-  [agfi:md-strip-german-teachings] intentionally drops)
+  [agfi:md-strip-german-teachings] intentionally drops — see
+  `./md-strip-german-lessons.md` for that function and its
+  conversation-export sibling)
 - emoji in titles intact
 - all 23 `<sup>` citation markers become org superscripts; 0 `[[[`
   leftovers. `org-element-parse-buffer` finds 23 `superscript` elements,
