@@ -187,9 +187,8 @@ function browser-focus-p {
     local frontapp
     frontapp="$(frontapp-get)" @RET
 
-    [[ "${frontapp}" == "${CHROME_BUNDLE_IDENTIFIER:-company.thebrowser.Browser}" ]]
+    [[ "${frontapp}" == "${CHROME_BUNDLE_IDENTIFIER:-$browser_default_bundle_id}" ]]
 
-    # [[ "${frontapp}" =~ '(?:company\.thebrowser\.Browser)' ]]
     #: We CAN check other browsers, too, but is it useful?
     #: [agfi:browser-current-match-p] only checks the default.
 }

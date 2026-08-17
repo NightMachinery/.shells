@@ -1,6 +1,10 @@
 ##
+#: The default browser for all the browser-* functions. Override it to switch
+#: defaults; [agfi:browser-focus-p] reads it, too, so both stay in sync.
+typeset -g browser_default_bundle_id="${browser_default_bundle_id:-com.vivaldi.Vivaldi}"
+
 function chrome-cli {
-    CHROME_BUNDLE_IDENTIFIER="${CHROME_BUNDLE_IDENTIFIER:-company.thebrowser.Browser}" \
+    CHROME_BUNDLE_IDENTIFIER="${CHROME_BUNDLE_IDENTIFIER:-$browser_default_bundle_id}" \
     command chrome-cli "$@"
 }
 
@@ -14,6 +18,14 @@ function with-arc {
 
 function with-edge {
     CHROME_BUNDLE_IDENTIFIER='com.microsoft.edgemac' reval-env "$@"
+}
+
+function with-brave {
+    CHROME_BUNDLE_IDENTIFIER='com.brave.Browser' reval-env "$@"
+}
+
+function with-vivaldi {
+    CHROME_BUNDLE_IDENTIFIER='com.vivaldi.Vivaldi' reval-env "$@"
 }
 ##
 function browser-recording-postprocess {
@@ -150,6 +162,20 @@ aliasfn arc-all-urls with-arc browser-all-urls
 aliasfn arc-current-title with-arc browser-current-title
 aliasfn org-link-arc-current with-arc org-link-browser-current
 ##
+aliasfn brave-current-html with-brave browser-current-html
+aliasfn brave-current-links with-brave browser-current-links
+aliasfn brave-current-url with-brave browser-current-url
+aliasfn brave-all-urls with-brave browser-all-urls
+aliasfn brave-current-title with-brave browser-current-title
+aliasfn org-link-brave-current with-brave org-link-browser-current
+##
+aliasfn vivaldi-current-html with-vivaldi browser-current-html
+aliasfn vivaldi-current-links with-vivaldi browser-current-links
+aliasfn vivaldi-current-url with-vivaldi browser-current-url
+aliasfn vivaldi-all-urls with-vivaldi browser-all-urls
+aliasfn vivaldi-current-title with-vivaldi browser-current-title
+aliasfn org-link-vivaldi-current with-vivaldi org-link-browser-current
+##
 function browser-open {
     @darwinOnly
 
@@ -171,6 +197,8 @@ function browser-open {
     chrome-cli open "$urls[@]"
 }
 aliasfn chrome-open with-chrome browser-open
+aliasfn brave-open with-brave browser-open
+aliasfn vivaldi-open with-vivaldi browser-open
 
 function browser-open-file {
     @darwinOnly
@@ -210,7 +238,7 @@ function browser-open-pdf {
 reify browser-open-pdf
 ##
 function browser-open-mindful {
-    local browser_command="${browser_open_mindful_engine:-chrome-open}"
+    local browser_command="${browser_open_mindful_engine:-browser-open}"
     local timer_duration="${browser_open_mindful_timer_duration:-10}"
 
     reval-ecgray "$browser_command" "$@" @RET
