@@ -182,6 +182,6 @@ function spotify-artist-fz-re() {
 }
 ##
 function spotdl-current-browser-links {
-    arc-current-links | rg '/album' | inargsf rgeval spotdl download
+    browser-current-links | rg '/album' | inargsf rgeval spotdl download
 }
 ##
