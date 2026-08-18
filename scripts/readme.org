@@ -59,6 +59,18 @@ ntag notes are tracked in =./docs/ntag/=.
 =bell-auto= escalates from sound to a desktop notification to Telegram, and picks
 its behaviour from whether we are at the office. See =./docs/bell-auto.md=.
 
+* CIS thesis applications
+
+=cis-applications2org= converts the Schütze Lab (CIS) thesis/internship
+application form export into a filtered org-mode tree. It lives in its own repo
+rather than here, because it handles applicants' personal data and needs a
+=.gitignore= that refuses the exports outright:
+[[zf:~\[cod\]/python/cis-applications2org/][~\[cod\]/python/cis-applications2org/]].
+
+#+begin_src zsh :eval never
+uv tool install 'git+https://github.com/NightMachinery/cis-applications2org.git'
+#+end_src
+
 * Audio leak guard
 
 =audio-guard= mutes the output device when audio would be audible to colleagues
