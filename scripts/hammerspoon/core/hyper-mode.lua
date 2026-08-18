@@ -244,7 +244,8 @@ hyper_passthrough_keys = hyper_passthrough_keys or {"v", "\\", "delete", "j"}
 
 ---
 -- What hyper+space does: "emit_key" | "neru"
-hyper_space_mode = "neru"
+hyper_space_mode = "emit_key"
+-- hyper_space_mode = "neru"
 
 neru_bin = "/Applications/Neru.app/Contents/MacOS/neru"
 -- hs.task takes the argv directly, so no shell is spawned. Built once.
@@ -252,6 +253,11 @@ neru_hints_args = {"hints", "--action", "left_click"}
 
 if hyper_space_mode == "emit_key" then
     table.insert(hyper_passthrough_keys, "space")
+
+    hyper_bind_v2{mods={"shift"}, key="space", pressedfn=function()
+                      hs.task.new(neru_bin, nil, neru_hints_args):start()
+    end}
+
 else
     hyper_bind_v2{key="space", pressedfn=function()
                       hs.task.new(neru_bin, nil, neru_hints_args):start()
