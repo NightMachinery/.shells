@@ -143,6 +143,54 @@ Details:
   separates it from its neighbors with blank lines — bare raw blocks are
   glued tightly. Same trick as `org_math_env.lua`.
 
+#### Exception: a `<details>` wrapping one code block is unwrapped
+
+Chat exporters wrap *every* fenced block in its own collapsible section:
+
+````markdown
+<details>
+<summary><strong>💻 Code Block (bash) — 9 lines</strong></summary>
+
+```bash
+jq '...' > out.json
+```
+
+</details>
+````
+
+Regrouping that gives two layers of wrapper and a summary that only restates
+the language and the line count already visible on the `#+begin_src` line —
+and an org src block folds with TAB on its own, so the special block buys no
+folding either. In `~/Downloads/Backup_Brave_Settings.md`, 18 of 31
+`<details>` are this shape.
+
+So when the body left after the summary is *exactly* one code block, the
+filter emits that code block bare and drops both the wrapper and the summary.
+
+- The trigger is **structural**, not a match on the summary wording. Another
+  exporter phrasing its label differently is handled for free, and there is no
+  phrase list to maintain. The accepted cost: a hand-written
+  `<summary>Full nginx config for reference</summary>` around a lone code
+  block loses that label, since the summary is the only place it exists.
+- `#body == 1` exactly. Pandoc's reader emits no node for the blank lines that
+  delimit the body, so a wrapped code block arrives as precisely
+  `[CodeBlock ("",["bash"],[]) "..."]`; anything richer is a real body and
+  keeps its wrapper.
+- Checked before the recursion into nested `<details>`. A lone `CodeBlock`
+  contains none, so the order cannot change the verdict — and an outer
+  `<details>` holding prose plus a nested code-block one keeps its own wrapper
+  while the inner one unwraps.
+- The summary-less form (`<details>`, code block, `</details>`) unwraps too.
+- No `Div` wrapper here: unlike a bare raw org block, a real `CodeBlock` is
+  already separated from its neighbors by the writer.
+
+Set `pandoc_convert_details_unwrap_code_p=n` to keep every `<details>`
+wrapped. `pandoc-convert` passes it through as the pandoc metadata key
+`org_details_unwrap_code`, and only when switching the unwrap *off*, so the
+usual command line stays clean. The filter reads it in a `Meta` pass of its
+own — a single filter table walks the blocks before the metadata — and then
+deletes the key so it cannot leak into `--standalone` output.
+
 ### `python/pandoc_filters/org_raw_html.lua`
 
 `@upstreamBug` workaround for cause 2: re-tags every remaining
@@ -282,9 +330,22 @@ On the repro file, via the full `md2org` pipeline:
 - `md2org` on docs/md2org-latex/repro.md still emits its `equation*`
   environment — no regression on the LaTeX path
 
+For the code-block unwrap, on `~/Downloads/Backup_Brave_Settings.md` (31
+`<details>`, 18 of them single-code-block wrappers):
+
+- `#+begin_details`: 31 → **13**, still balanced with `#+end_details`, and
+  `org-element-parse-buffer` reports all 13 as `special-block` of type
+  `details`
+- `#+begin_src` blocks: 24, unchanged — the unwrapped ones survive as ordinary
+  src blocks, which org parses as `src-block`
+- `#+begin_html`: 0
+- `pandoc_convert_details_unwrap_code_p=n` restores all 31
+- the German dictionary file has no such wrappers, and its output is
+  byte-identical with the unwrap on and off
+
 ## Reproduction commands
 
-```zsh
+````zsh
 f=~/Downloads/German_English_dictionary_for_Android_with_IPA.md
 
 #: before/after
@@ -298,7 +359,16 @@ printf '<details>\n<summary>T</summary>\n\nbody\n</details>\n' \
 
 #: dropped inline html, straight from pandoc
 printf 'a <strong>b</strong> c\n' | pandoc --verbose -f markdown -t org
-```
+
+#: the code-block unwrap
+b=~/Downloads/Backup_Brave_Settings.md
+md2org "$b" | grep -c '#+begin_details'
+pandoc_convert_details_unwrap_code_p=n md2org "$b" | grep -c '#+begin_details'
+
+#: nested: outer keeps its wrapper, inner code block comes out bare
+printf '<details>\n<summary>outer</summary>\n\nprose\n\n<details>\n<summary>inner</summary>\n\n```sh\necho hi\n```\n\n</details>\n\n</details>\n' \
+    | md2org
+````
 
 To check the org side, parse the output with `org-element-parse-buffer`
 and confirm the blocks come back as `special-block` of type `details`.
