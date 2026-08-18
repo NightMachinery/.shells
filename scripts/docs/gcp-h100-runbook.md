@@ -118,6 +118,17 @@ The environment is baked into the image; **the machine itself is disposable.**
 Rule: **if it is not in GCS, it does not exist.** Sync before stopping, and
 periodically during long runs — not just at the end.
 
+**One-time setup per service account:** a freshly created `gpu-runner` SA
+has no bucket grant, so `gcp-gpu-sync` fails with a 403
+(`storage.objects.get` denied). Fix once, from a machine authenticated as
+the bucket owner (verified 2026-08-18):
+
+```zsh
+h-gcp-gpu-gcloud storage buckets add-iam-policy-binding gs://rnd-results-evar \
+  --member=serviceAccount:gpu-runner@relation-neuron-detection.iam.gserviceaccount.com \
+  --role=roles/storage.objectAdmin
+```
+
 **Checkpoint any job longer than ~30 minutes on spot**, and write checkpoints
 to `/mnt/data/runs/` with a periodic sync. A spot preemption is a stop, not a
 crash: the disk survives, but in-flight GPU state and running processes do not.
