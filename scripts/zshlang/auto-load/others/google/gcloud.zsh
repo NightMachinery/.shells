@@ -1108,17 +1108,17 @@ function gcp-gpu-up {
     fi
 
     ## idempotence -------------------------------------------------------
-    local json status
+    local json vm_state
     json="$(h-gcp-gpu-instance-json)"
     if test -n "$json" ; then
-        status="$(ec "$json" | command jq -r '.status')"
-        case "$status" in
+        vm_state="$(ec "$json" | command jq -r '.status')"
+        case "$vm_state" in
             RUNNING)
                 ec "${gcp_gpu_instance} is already RUNNING in ${gcp_gpu_zone}. Nothing to do."
                 gcp-gpu-status
                 return 0 ;;
             TERMINATED|SUSPENDED)
-                ec "${gcp_gpu_instance} exists but is ${status}; starting it."
+                ec "${gcp_gpu_instance} exists but is ${vm_state}; starting it."
                 if bool "$max_run_explicit" ; then
                     #: The cap counts from each start, so updating it on a
                     #: stopped instance takes effect for the whole next run.
@@ -1149,7 +1149,7 @@ function gcp-gpu-up {
                 ec "started ${gcp_gpu_instance}."
                 return 0 ;;
             *)
-                ec "${gcp_gpu_instance} is ${status}; leaving it alone."
+                ec "${gcp_gpu_instance} is ${vm_state}; leaving it alone."
                 return 0 ;;
         esac
     fi
@@ -1342,28 +1342,28 @@ function gcp-gpu-status {
         ec "state          ABSENT -- no instance by that name in this zone"
         ec "burn           EUR 0.00/hr"
     else
-        local status machine model gpu started
-        status="$(ec "$json"  | command jq -r '.status')"
+        local vm_state machine model gpu started
+        vm_state="$(ec "$json"  | command jq -r '.status')"
         machine="$(ec "$json" | command jq -r '.machineType | split("/") | last')"
         model="$(ec "$json"   | command jq -r '.scheduling.provisioningModel // "STANDARD"')"
         gpu="$(ec "$json"     | command jq -r '[.guestAccelerators[]? | "\(.acceleratorCount)x \(.acceleratorType | split("/") | last)"] | join(", ") // ""')"
         started="$(ec "$json" | command jq -r '.lastStartTimestamp // empty')"
 
-        ec "state          ${status}"
+        ec "state          ${vm_state}"
         ec "machine        ${machine}   ${model}"
         ec "gpu            ${gpu:-(none reported)}"
 
-        if [[ "$status" == RUNNING ]] && test -n "$started" ; then
+        if [[ "$vm_state" == RUNNING ]] && test -n "$started" ; then
             local epoch
             strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
                 && ec "uptime         $(h-gcp-gpu-dur-human $(( EPOCHSECONDS - epoch )))"
         fi
 
-        if [[ "$status" == TERMINATED ]] ; then
+        if [[ "$vm_state" == TERMINATED ]] ; then
             ec "why            $(h-gcp-gpu-last-stop-reason)"
         fi
 
-        if [[ "$status" == RUNNING ]] ; then
+        if [[ "$vm_state" == RUNNING ]] ; then
             ec "idle timer     $(h-gcp-gpu-idle-timer-state)  (threshold ${gcp_gpu_idle_min}m)"
             ec "burn           EUR $(h-gcp-gpu-price "$machine" "$model")/hr"
         else
@@ -1431,15 +1431,15 @@ function gcp-gpu-ps {
     fi
 
     printf '%-18s %-18s %-12s %-16s %-9s %s\n' NAME ZONE STATE MACHINE MODEL UPTIME
-    local name zone status machine model started epoch up
-    while IFS=$'\t' read -r name zone status machine model started ; do
+    local name zone vm_state machine model started epoch up
+    while IFS=$'\t' read -r name zone vm_state machine model started ; do
         test -z "$name" && continue
         up='-'
-        if [[ "$status" == RUNNING ]] && test -n "$started" ; then
+        if [[ "$vm_state" == RUNNING ]] && test -n "$started" ; then
             strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
                 && up="$(h-gcp-gpu-dur-human $(( EPOCHSECONDS - epoch )))"
         fi
-        printf '%-18s %-18s %-12s %-16s %-9s %s\n' "$name" "$zone" "$status" "$machine" "$model" "$up"
+        printf '%-18s %-18s %-12s %-16s %-9s %s\n' "$name" "$zone" "$vm_state" "$machine" "$model" "$up"
     done <<< "$rows"
 }
 
@@ -1957,7 +1957,7 @@ function gcp-gpu-babysit {
         local status
         status="$(h-gcp-gpu-instance-json | command jq -r '.status // "ABSENT"')"
 
-        case "$status" in
+        case "$vm_state" in
             RUNNING)
                 sleep 60 ;;
             TERMINATED)
