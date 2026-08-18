@@ -353,11 +353,19 @@ function pandoc-convert {
             #: `<details>`/`<summary>` (LLM transcripts, GitHub READMEs) reach
             #: the writer as four sibling raw blocks, i.e. 4 `#+begin_html`
             #: blocks of noise each, with the summary demoted to plain text.
-            #: Regroups them into a foldable `#+begin_details` special block.
+            #: Regroups them into a foldable `#+begin_details` special block,
+            #: except when the body is a single code block: chat exporters wrap
+            #: every fenced block in a `💻 Code Block (bash) — 9 lines` summary
+            #: that just restates the `#+begin_src` line, so those are unwrapped
+            #: to the bare src block. `pandoc_convert_details_unwrap_code_p=n`
+            #: keeps them wrapped.
             #: See ~/scripts/docs/md2org-details.md
             #: MUST precede org_raw_html.lua, which would otherwise re-tag the
             #: `<details>` raw blocks before this filter can match them.
             opts+=(--lua-filter="${NIGHTDIR}/python/pandoc_filters/org_details.lua")
+            if ! bool "${pandoc_convert_details_unwrap_code_p:-y}" ; then
+                opts+=(--metadata=org_details_unwrap_code=n)
+            fi
         fi
 
         #: The org writer drops raw *inline* HTML, so the `<sup>[...]</sup>`

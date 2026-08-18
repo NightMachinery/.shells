@@ -29,12 +29,28 @@
 --: Nested `<details>` are handled. A `<details>` whose whole subtree lives in
 --: a single RawBlock (no blank line anywhere inside) is left alone;
 --: org_raw_html.lua turns that into a valid export block instead.
+--:
+--: One shape is *unwrapped* rather than regrouped: a `<details>` whose body is
+--: exactly one code block emits that code block bare, dropping both the
+--: wrapper and the summary. Chat exporters wrap every fenced block in
+--: `<summary>💻 Code Block (bash) — 9 lines</summary>`, which restates the
+--: language and line count that `#+begin_src bash` already carries, and an org
+--: src block folds with TAB on its own -- so the special block adds a second
+--: layer of wrapper and no information. The trigger is structural rather than
+--: a match on the summary wording, so other exporters' code wrappers are
+--: handled without maintaining a phrase list; the cost is that a hand-written
+--: informative summary around a lone code block is dropped too. Disable with
+--: `pandoc_convert_details_unwrap_code_p=n` (see [agfi:pandoc-convert]).
 
 --: Lua patterns are byte-based and `%s` calls the locale's `isspace()`, which
 --: matches 0xA0 (Latin-1 NBSP) under some locales -- that byte also occurs
 --: *inside* UTF-8 sequences, e.g. 🛠 (U+1F6E0) = F0 9F 9B A0, so `%s` would
 --: shred emoji in summary titles. Match ASCII whitespace explicitly instead.
 local WS = "[ \t\r\n\v\f]"
+
+--: Set from the `org_details_unwrap_code` metadata key, which
+--: [agfi:pandoc-convert] passes only to turn the unwrap off.
+local unwrap_code = true
 
 local function is_raw_html(b)
   return b.t == "RawBlock" and b.format == "html"
@@ -117,17 +133,26 @@ convert = function(blocks)
     local close = tag_is(b, DETAILS_OPEN) and find_close(blocks, i) or nil
     if close then
       local title, body = split_summary({table.unpack(blocks, i + 1, close - 1)})
-      local header = title and title ~= "" and ("#+begin_details " .. title)
-        or "#+begin_details"
-      local inner = pandoc.List()
-      inner:insert(pandoc.RawBlock("org", header))
-      inner:extend(convert(body))
-      inner:insert(pandoc.RawBlock("org", "#+end_details"))
-      --: The Div wrapper makes the org writer separate the block from its
-      --: neighbors with blank lines; bare raw blocks are glued tightly.
-      --: Same trick as org_math_env.lua. An attribute-less Div emits nothing
-      --: of its own.
-      out:insert(pandoc.Div(inner))
+      if unwrap_code and #body == 1 and body[1].t == "CodeBlock" then
+        --: Wrapper and summary are pure redundancy here; emit the code block
+        --: bare. Checked before the `convert` recursion below -- a lone
+        --: CodeBlock holds no nested `<details>`, so recursion cannot change
+        --: the verdict. No Div either: unlike a raw org block, a real
+        --: CodeBlock is already separated from its neighbors by the writer.
+        out:insert(body[1])
+      else
+        local header = title and title ~= "" and ("#+begin_details " .. title)
+          or "#+begin_details"
+        local inner = pandoc.List()
+        inner:insert(pandoc.RawBlock("org", header))
+        inner:extend(convert(body))
+        inner:insert(pandoc.RawBlock("org", "#+end_details"))
+        --: The Div wrapper makes the org writer separate the block from its
+        --: neighbors with blank lines; bare raw blocks are glued tightly.
+        --: Same trick as org_math_env.lua. An attribute-less Div emits nothing
+        --: of its own.
+        out:insert(pandoc.Div(inner))
+      end
       i = close + 1
     else
       out:insert(b)
@@ -137,6 +162,19 @@ convert = function(blocks)
   return out
 end
 
+--: A single filter table walks the blocks before the metadata, so the switch
+--: has to be read in a pass of its own that runs first.
+local function read_meta(meta)
+  local v = meta.org_details_unwrap_code
+  if v ~= nil then
+    unwrap_code = pandoc.utils.stringify(v) ~= "n"
+    --: Keep our own knob out of any --standalone output.
+    meta.org_details_unwrap_code = nil
+  end
+  return meta
+end
+
 return {
+  { Meta = read_meta },
   { Blocks = convert },
 }
