@@ -1,7 +1,8 @@
 ##
 #: The default browser for all the browser-* functions. Override it to switch
 #: defaults; [agfi:browser-focus-p] reads it, too, so both stay in sync.
-typeset -g browser_default_bundle_id="${browser_default_bundle_id:-com.vivaldi.Vivaldi}"
+typeset -g browser_default_bundle_id="${browser_default_bundle_id:-com.brave.Browser}"
+# typeset -g browser_default_bundle_id="${browser_default_bundle_id:-com.vivaldi.Vivaldi}"
 
 function chrome-cli {
     CHROME_BUNDLE_IDENTIFIER="${CHROME_BUNDLE_IDENTIFIER:-$browser_default_bundle_id}" \
