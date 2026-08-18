@@ -105,7 +105,8 @@ function h-pandoc-md-preprocess {
 
     perl -pe 's/^(```+[^\s`]+)(?:\h+.*)?$/$1/' |  #: [[id:840a466b-9e1b-4f15-bac9-e9001e5e87d7][pandoc markdown code block fence attributes]]
         if bool "$strip_german_p" ; then
-            md-strip-german-lessons-last
+            md-strip-german-lessons
+            # md-strip-german-lessons-last
         else
             cat
         fi
