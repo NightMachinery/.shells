@@ -134,6 +134,10 @@ function pdflatex-m {
     local fast_p="${pdflatex_fast_p:-n}"
     local bell_p="${pdflatex_bell_p:-y}"
     local bib_mode="${pdflatex_bib_mode:-bibtex_ignore}"
+    #: Keep the build intermediates (.log, .aux, .nav, ...) instead of trashing
+    #: them, renamed from the opaque temp jobname to the output name, so you can
+    #: grep them for overfull boxes, undefined references, missing citations.
+    local keep_p="${pdflatex_keep_p:-n}"
     local var_escaper
     #: [[id:a7185750-2d2e-4b83-af93-94ffdc9fb07e][latex/escaping]]
     var_escaper=(ec)
@@ -264,10 +268,27 @@ function pdflatex-m {
 
             success_p=y
 
-            trs "${name_tmp}"*(.DN) || true
             sioyek-reload || true
 
         } always {
+            #: Intermediates carry the temp jobname. Keep them (renamed to
+            #: ${name}.*, so `slides.log` etc.) when debugging; otherwise trash
+            #: them on success only, leaving them in place after a failure.
+            #: The PDF is never renamed here: it only lands via the gmv above,
+            #: on success, so a failed run cannot clobber a good PDF.
+            if bool "${keep_p}" ; then
+                local intermediate
+                for intermediate in "${name_tmp}"*(.DN) ; do
+                    case "${intermediate:e}" in
+                        ''|pdf) continue ;;
+                    esac
+
+                    gmv -v "${intermediate}" "${name}.${intermediate:e}"
+                done
+            elif bool "${success_p}" ; then
+                trs "${name_tmp}"*(.DN) || true
+            fi
+
             if bool "${success_p}" ; then
                 if bool "${bell_p}" ; then
                     bell-insaniquarium-sing
