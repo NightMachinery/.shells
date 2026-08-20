@@ -107,7 +107,7 @@ function gradS-get() {
 #     retry_sleep=0.1 serr retry h_gradS-get
 # }
 ##
-function hs-alert {
+function hs-alert-v1 {
     @darwinOnly
 
     local msg="$*" dur="${alert_dur:-5}"
@@ -116,6 +116,48 @@ function hs-alert {
     sout hammerspoon -c "hs.alert (\"$msg\", ${dur})" # outputs a UUID thingy
     # https://www.hammerspoon.org/docs/hs.alert.html
 }
+##
+# The v2 engine lives in hammerspoon/core/alert-engine.lua: coloured bands that
+# stack instead of hiding each other, wrap instead of being cut off, and can
+# flash the whole screen first.
+#
+# Knobs, all overridable per call:
+#   alert_dur    seconds on screen (default 5)
+#   alert_flash  fullscreen flash before settling, in seconds; 0 skips it
+#   alert_pos    top (default), center, bottom
+#   alert_id     reusing an id updates that alert in place instead of stacking
+#
+# The message travels in a file rather than in the command string. `hammerspoon
+# -c` hangs on payloads of a few hundred characters and takes the ipc port down
+# with it until the client is killed, so inlining the text - escaped or
+# base64-encoded, it makes no difference - breaks on exactly the long command
+# output this is most useful for. Only the path goes over ipc; the Lua side
+# reads the file and deletes it.
+#
+# No text-wrap either: the engine wraps against actual pixels, so it knows the
+# screen width and we do not have to guess at 90 columns.
+function hs-alert-v2 {
+    @darwinOnly
+
+    local msg="$*" dur="${alert_dur:-5}"
+    local flash="${alert_flash:-0.05}" pos="${alert_pos:-top}"
+    local id="${alert_id:-}"
+
+    # Not `local path`: `path` is the array tied to $PATH, so declaring it local
+    # and assigning a string to it empties PATH for the rest of the function.
+    # Everything after that, `command mktemp` included, is a command-not-found.
+    local msgfile
+    msgfile="$(command mktemp "${TMPDIR:-/tmp}/hs-alert-v2.XXXXXX")" @TRET
+    ecn "$msg" > "$msgfile" @TRET
+
+    local opts="seconds = ${dur}, flashSeconds = ${flash}, position = \"${pos}\""
+    if test -n "$id" ; then
+        opts+=", id = \"${id}\""
+    fi
+
+    sout hammerspoon -c "alertV2FromFile(\"${msgfile}\", { ${opts} })"
+}
+aliasfn hs-alert hs-alert-v2
 aliasfn alert hs-alert
 ##
 function hs-reval-alert {
