@@ -12,12 +12,6 @@ typeset -g sony_battery_bud_min="${sony_battery_bud_min:-15}"
 typeset -g sony_battery_alert_dur="${sony_battery_alert_dur:-3}"
 #: Charging means the number is on its way up, so warning about it is noise.
 typeset -g sony_battery_charging_skip_p="${sony_battery_charging_skip_p:-y}"
-#: The case reports 0% whenever the buds are out of it -- that is the absence of
-#: a reading, not a reading of zero, and `present' is still true so sonyctl
-#: cannot filter it. Without this every single run would report the case as
-#: critically low. The cost is that a genuinely flat case never warns, which is
-#: cheap: the buds still work, and a real number appears as soon as they dock.
-typeset -g sony_battery_case_zero_skip_p="${sony_battery_case_zero_skip_p:-y}"
 ##
 function sony-battery {
     : "battery levels, for a human"
@@ -50,7 +44,6 @@ is safe to run on a timer. Knows nothing about scheduling; drive it from cron."
     local bud_min="${sony_battery_bud_min:-15}"
     local dur="${sony_battery_alert_dur:-3}"
     local charging_skip_p="${sony_battery_charging_skip_p:-y}"
-    local case_zero_skip_p="${sony_battery_case_zero_skip_p:-y}"
 
     @darwinOnly
     ensure-cmd jq @RET
@@ -61,18 +54,16 @@ is safe to run on a timer. Knows nothing about scheduling; drive it from cron."
 
     #: One pass produces both lines of the message: the parts that are actually
     #: low, then the full picture for context. The second is skipped when every
-    #: known part is already in the first, where it would only repeat itself.
+    #: part is already in the first, where it would only repeat itself.
     #: `label' is a jq keyword, hence `abbr'.
     local prog='
 def abbr: {"left":"L","right":"R","case":"case","battery":"bat"}[.part] // .part;
 def threshold: if .part == "case" then $case_min else $bud_min end;
-def stale: $skip_case_zero == "y" and .part == "case" and .level_percent == 0;
 def charging_now: .charging == "yes" or .charging == "complete";
 def mark: if .charging == "yes" then "+" elif .charging == "complete" then "=" else "" end;
-def show: if stale then "\(abbr) NA" else "\(abbr) \(.level_percent)%\(mark)" end;
+def show: "\(abbr) \(.level_percent)%\(mark)";
 [ .batteries[] ] as $known
 | [ $known[]
-    | select(stale | not)
     | select( ($skip_charging == "y" and charging_now) | not )
     | select(.level_percent < threshold) ] as $low
 | if ($low | length) == 0 then empty
@@ -87,7 +78,6 @@ def show: if stale then "\(abbr) NA" else "\(abbr) \(.level_percent)%\(mark)" en
         --argjson case_min "${case_min}" \
         --argjson bud_min "${bud_min}" \
         --arg skip_charging "${charging_skip_p}" \
-        --arg skip_case_zero "${case_zero_skip_p}" \
         "$prog" 2>/dev/null)" || return 0
 
     #: Nothing low. The overwhelmingly common case, and it must stay silent.
