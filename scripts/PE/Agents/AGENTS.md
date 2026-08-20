@@ -22,6 +22,8 @@
 
 - Always analyze and discuss trade-offs of different solutions.
 
+- We are usually pushing to public git remotes. Be deliberate about what personal information we put into commits. Ask the user if in doubt.
+
 ## Svelte Guidelines
 
 - Skip running `npx @sveltejs/mcp svelte-autofixer`. It often hangs and gives useless output.
@@ -124,6 +126,35 @@ whatever *they* staged, even when you only ever `git add`ed your own paths.
 - If a commit does end up mixing their work with yours, do not rewrite or
   force-push to fix it. They may already be working from that history. Report
   it and let me decide.
+
+# Sharing the Screen (macOS)
+
+We often work on the same machine at the same time. When you need to drive the
+GUI yourself — clicking through an app, taking screenshots that must not catch
+my windows, anything where me touching the keyboard would corrupt your result —
+do not ask me to stay away and do not silently steal focus. Put up a banner:
+
+```
+hs -c 'agentBannerOn("what you are doing", 900)'   # seconds; omit for 30 min
+hs -c 'agentBannerOff()'                            # as soon as you are done
+hs -c 'return agentBannerActive()'
+```
+
+It covers every screen for a moment so I cannot miss it, then collapses to a
+strip across the top of each one, on every space. It never takes focus and
+never swallows clicks. Turning it off flashes "Screen is yours" the same way.
+Source: `~/scripts/hammerspoon/core/agent-banner.lua`.
+
+- Turn it off the moment you no longer need it, including when you stop early
+  or hand back with the job unfinished.
+- It always expires on its own, so a crash cannot leave the screen branded.
+  Call `agentBannerOn` again to refresh the countdown during a long stretch;
+  re-sending the same message will not re-flash.
+- Say in the message what you are actually doing, not just "working". I decide
+  whether to wait based on that line.
+
+If `hs` is missing, the machine has no Hammerspoon; just say what you need
+instead.
 
 # Unexpected File Changes
 
