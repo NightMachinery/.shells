@@ -343,33 +343,250 @@ function display-gray-on {
     awaysh-bnamed "$SCREEN_GRAY_MARKER" screen-gamma-set-dur 99999999 0.4 1
 }
 ##
-function brightness-get {
-	if isDarwin ; then
-		if [[ "$(brightness -l)" =~ 'display 0: brightness (\S+)' ]] ; then
-			ec "$match[1]"
-		else
-			return 1
-		fi
-	else
-    @NA
-	fi
+#: Brightness is split into per-backend helpers plus gateways, because no single
+#: API covers every panel:
+#:   internal  nriley `brightness`, IOKit. Built-in panels only; it cannot even
+#:             read an external one ("unable to get brightness of display 0x2").
+#:   ddc       `m1ddc`, DDC/CI over USB-C/DP-Alt-Mode. External panels only,
+#:             Apple Silicon only.
+#: The public API stays on the 0..1 float scale; the DDC 0..100 luminance scale
+#: is an implementation detail of the `-ddc` helpers.
+##
+brightness_ddc_max="${brightness_ddc_max:-100}"
+#: Denominator for the 0..1 <-> luminance conversion. m1ddc can report a panel's
+#: own `max luminance`, but that is an extra DDC round trip on every single call
+#: and virtually every monitor answers 100. See [agfi:brightness-ddc-max] to
+#: check yours, and pin this variable if it differs.
+
+brightness_ddc_retries="${brightness_ddc_retries:-3}"
+#: How many times [agfi:brightness-get-ddc] will re-read a luminance that came
+#: back out of range. See the comment there.
+
+function brightness-displays-internal {
+    : "Every display, as CoreGraphics sees it.
+Output (TSV): index, main|-, built-in|external, CGDirectDisplayID (decimal)"
+    # @darwinOnly
+    ##
+    assert isDarwin @MRET
+
+    #: `brightness` exits 0 even when it cannot read a display, and writes that
+    #: complaint to stderr; the listing on stdout is still good. Its per-display
+    #: value lines carry no ", ID 0x", so the regex skips them.
+    local out
+    out="$(command brightness -l 2>/dev/null)" @TRET
+
+    local line kind main
+    for line in "${(@f)out}" ; do
+        [[ "$line" =~ '^display ([0-9]+): (.*), ID 0x([0-9a-fA-F]+)$' ]] || continue
+
+        if [[ "$match[2]" == *built-in* ]] ; then
+            kind=built-in
+        else
+            kind=external
+        fi
+
+        if [[ "$match[2]" == *main* ]] ; then
+            main=main
+        else
+            main='-'
+        fi
+
+        printf '%s\t%s\t%s\t%s\n' "$match[1]" "$main" "$kind" "$((16#$match[3]))"
+    done
 }
 
-function brightness-set {
-	local i="$1"
+function brightness-displays-ddc {
+    : "DDC/CI-capable displays.
+Output (TSV): m1ddc display number, CGDirectDisplayID (decimal), product name"
+    # @darwinOnly @appleSiliconOnly
+    ##
+    assert isAppleSilicon @MRET
+    #: Deliberately does NOT auto-install: this runs on every brightness key
+    #: repeat and on [agfi:brightness-auto-loop]'s 3s cycle. Use
+    #: [agfi:ensure-dep-m1ddc] to install it.
+    assert isdefined-cmd m1ddc @MRET
 
-	if isDarwin ; then
-		brightness "$i"
-	else
-    @NA
-	fi
+    local out
+    out="$(command m1ddc display list detailed 2>/dev/null)" @TRET
+
+    local line n='' name='' id=''
+    for line in "${(@f)out}" ; do
+        if [[ "$line" =~ '^\[([0-9]+)\] (.*) \(' ]] ; then
+            #: A new record starts; flush the previous one.
+            [[ -n "$n" && -n "$id" ]] && printf '%s\t%s\t%s\n' "$n" "$id" "$name"
+
+            n="$match[1]" name="$match[2]" id=''
+        elif [[ "$line" =~ '^[[:space:]]*-[[:space:]]*Display ID:[[:space:]]+([0-9]+)' ]] ; then
+            id="$match[1]"
+        fi
+    done
+    [[ -n "$n" && -n "$id" ]] && printf '%s\t%s\t%s\n' "$n" "$id" "$name"
+
+    return 0
 }
 
-function brightness-inc {
-    local inc="${1:-0.01}"
+function brightness-displays {
+    : "Every display with the backend that can drive its brightness.
+Output (TSV): index, backend (internal|ddc|none), backend-local id, main|-,
+built-in|external, name
+
+The two backends number displays differently, so they are joined on the
+CGDirectDisplayID: \`brightness -l\` prints it as 'ID 0x2', m1ddc as
+'Display ID: 2'."
+    # @darwinOnly
+    ##
+    assert isDarwin @MRET
+
+    local internal
+    internal="$(brightness-displays-internal)" @TRET
+
+    #: DDC is optional. Intel, no m1ddc, or no DDC-capable panel all just mean
+    #: the external displays end up with backend `none`.
+    local ddc
+    ddc="$(brightness-displays-ddc 2>/dev/null)" || ddc=''
+
+    local line dline backend local_id name
+    local -a f d
+    for line in "${(@f)internal}" ; do
+        [[ -n "$line" ]] || continue
+        f=("${(@ps:\t:)line}")
+        #: f: 1 index  2 main|-  3 built-in|external  4 display-id
+
+        backend=none local_id='' name=''
+        if [[ "$f[3]" == built-in ]] ; then
+            backend=internal local_id="$f[1]" name='Built-in'
+        else
+            for dline in "${(@f)ddc}" ; do
+                [[ -n "$dline" ]] || continue
+                d=("${(@ps:\t:)dline}")
+                #: d: 1 m1ddc number  2 display-id  3 name
+
+                if [[ "$d[2]" == "$f[4]" ]] ; then
+                    backend=ddc local_id="$d[1]" name="$d[3]"
+                    break
+                fi
+            done
+            : ${name:='External'}
+        fi
+
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$f[1]" "$backend" "$local_id" "$f[2]" "$f[3]" "$name"
+    done
+}
+
+function h-brightness-select {
+    : "usage: h-brightness-select [<selector>]
+Resolves a selector to the matching [agfi:brightness-displays] lines.
+
+  main       (default)  the display macOS considers main
+  all                   every display
+  internal, built-in    built-in panel(s)
+  external, ddc         external panel(s)
+  <integer>             index, as listed by [agfi:brightness-displays]
+  <anything else>       regex, matched against the display name"
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
+    local all
+    all="$(brightness-displays)" @TRET
+
+    local line
+    local -a f out=()
+    for line in "${(@f)all}" ; do
+        [[ -n "$line" ]] || continue
+        f=("${(@ps:\t:)line}")
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name
+
+        case "$sel" in
+            all) out+=("$line") ;;
+            main) [[ "$f[4]" == main ]] && out+=("$line") ;;
+            internal|built-in) [[ "$f[5]" == built-in ]] && out+=("$line") ;;
+            external|ddc) [[ "$f[5]" == external ]] && out+=("$line") ;;
+            #: A bare integer is an index; anything else is a name regex.
+            <->) [[ "$f[1]" == "$sel" ]] && out+=("$line") ;;
+            *) [[ "$f[6]" =~ "$sel" ]] && out+=("$line") ;;
+        esac
+    done
+
+    if (( ! $#out )) ; then
+        ecerr "$0: no display matched selector $(gquote-sq "$sel")"
+        return 1
+    fi
+
+    printf '%s\n' "$out[@]"
+}
+
+function h-brightness-dispatch {
+    : "usage: h-brightness-dispatch <selector> <get|set|inc> [<value>]
+Runs brightness-<op>-<backend> once per selected display, so each panel is
+driven through whichever API can actually reach it."
+    ##
+    local sel="$1" op="$2" ; shift 2
+    assert-args sel op @RET
+
+    local lines
+    lines="$(h-brightness-select "$sel")" @TRET
+
+    local line ret=0
+    local -a f
+    for line in "${(@f)lines}" ; do
+        [[ -n "$line" ]] || continue
+        f=("${(@ps:\t:)line}")
+
+        if [[ "$f[2]" == none ]] ; then
+            ecerr "$0: display $f[1] ($f[6]) has no brightness backend; for an external panel on Apple Silicon, run: ensure-dep-m1ddc"
+            ret=1
+            continue
+        fi
+
+        #: get takes just the id; set and inc take a value first.
+        "brightness-${op}-$f[2]" "$@" "$f[3]" || ret=$?
+    done
+
+    return $ret
+}
+##
+function brightness-get-internal {
+    : "usage: brightness-get-internal [<display-index>]"
+    # @darwinOnly
+    ##
+    local i="${1:-0}"
+
+    if isDarwin ; then
+        local out
+        out="$(command brightness -l 2>/dev/null)" @TRET
+
+        if [[ "$out" =~ "display ${i}: brightness (\S+)" ]] ; then
+            ec "$match[1]"
+        else
+            ecerr "$0: could not read the brightness of display ${i}"
+            return 1
+        fi
+    else
+        @NA
+    fi
+}
+
+function brightness-set-internal {
+    : "usage: brightness-set-internal <0..1> [<display-index>]"
+    # @darwinOnly
+    ##
+    local v="$1" i="${2:-0}"
+    assert-args v @RET
+
+    if isDarwin ; then
+        command brightness -d "$i" "$v"
+    else
+        @NA
+    fi
+}
+
+function brightness-inc-internal {
+    : "usage: brightness-inc-internal [<delta>] [<display-index>]"
+    ##
+    local inc="${1:-0.01}" i="${2:-0}"
 
     local curr
-    curr="$(brightness-get)" @TRET
+    curr="$(brightness-get-internal "$i")" @TRET
 
     local n=$((curr+inc))
     if (( n > 1 )) ; then
@@ -378,12 +595,138 @@ function brightness-inc {
         n=0
     fi
 
-    brightness-set "$n"
+    brightness-set-internal "$n" "$i"
+}
+##
+function brightness-ddc-max {
+    : "usage: brightness-ddc-max [<m1ddc-display>]
+The panel's own maximum luminance. Costs a DDC round trip, which is why the
+conversion helpers read \$brightness_ddc_max instead."
+    # @appleSiliconOnly
+    ##
+    local i="${1:-1}"
+
+    assert isAppleSilicon @MRET
+    ensure-dep-m1ddc @RET
+
+    command m1ddc display "$i" max luminance
+}
+
+function brightness-get-ddc {
+    : "usage: brightness-get-ddc [<m1ddc-display>]"
+    # @appleSiliconOnly
+    ##
+    local i="${1:-1}"
+
+    assert isAppleSilicon @MRET
+    ensure-dep-m1ddc @RET
+
+    local max="${brightness_ddc_max:-100}"
+
+    #: DDC reads come back corrupt now and then — measured here at roughly 1 in
+    #: 13 over a USB-C hub, returning '-7' for a panel pinned at 50. m1ddc still
+    #: exits 0 on those, so the exit code tells us nothing and the only usable
+    #: signal is the value being out of range. Re-read when it is.
+    #:
+    #: Writes are not affected, and neither is `chg` (m1ddc does that read
+    #: internally): 40 consecutive +1/-1 round trips landed back on exactly 50.
+    local -i tries="${brightness_ddc_retries:-3}"
+    local raw='' n=0
+    while (( n < tries )) ; do
+        (( n++ ))
+
+        raw="$(command m1ddc display "$i" get luminance 2>/dev/null)" || continue
+
+        #: `<->` matches non-negative integers, so a corrupt '-7' fails here.
+        if [[ "$raw" == <-> ]] && (( raw <= max )) ; then
+            #: %f, to match the format nriley `brightness` prints. Bare zsh
+            #: float arithmetic would give '0.34999999999999998' here.
+            printf '%f\n' $((raw*1.0/max))
+            return 0
+        fi
+    done
+
+    ecerr "$0: display ${i} gave no valid luminance in ${tries} tries (last: $(gquote-sq "$raw"))"
+    return 1
+}
+
+function brightness-set-ddc {
+    : "usage: brightness-set-ddc <0..1> [<m1ddc-display>]"
+    # @appleSiliconOnly
+    ##
+    local v="$1" i="${2:-1}"
+    assert-args v @RET
+
+    assert isAppleSilicon @MRET
+    ensure-dep-m1ddc @RET
+
+    local max="${brightness_ddc_max:-100}"
+    local n
+    n="$(printf '%.0f' $((v*max)))"
+    if (( n > max )) ; then
+        n=$max
+    elif (( n < 0 )) ; then
+        n=0
+    fi
+
+    silent command m1ddc display "$i" set luminance "$n"
+}
+
+function brightness-inc-ddc {
+    : "usage: brightness-inc-ddc [<delta>] [<m1ddc-display>]
+Uses m1ddc's own \`chg\`, so this is one DDC round trip rather than the
+get-then-set the internal backend needs. The hyper+F1/F2 key repeat comes
+through here, and some panels misbehave under rapid interleaved reads/writes."
+    # @appleSiliconOnly
+    ##
+    local inc="${1:-0.01}" i="${2:-1}"
+
+    assert isAppleSilicon @MRET
+    ensure-dep-m1ddc @RET
+
+    local max="${brightness_ddc_max:-100}"
+    local n
+    n="$(printf '%.0f' $((inc*max)))"
+
+    #: printf rounds a small delta to 0 (or to '-0'); skip the pointless write.
+    (( n == 0 )) && return 0
+
+    silent command m1ddc display "$i" chg luminance "$n"
+}
+##
+function brightness-get {
+    : "usage: brightness-get [<selector>]
+Brightness as 0..1, one line per selected display.
+Selectors: see [agfi:h-brightness-select]."
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
+    h-brightness-dispatch "$sel" get
+}
+
+function brightness-set {
+    : "usage: brightness-set <0..1> [<selector>]"
+    ##
+    local v="$1" sel="${2:-${brightness_display:-main}}"
+    assert-args v @RET
+
+    h-brightness-dispatch "$sel" set "$v"
+}
+
+function brightness-inc {
+    : "usage: brightness-inc [<delta>] [<selector>]"
+    ##
+    local inc="${1:-0.01}" sel="${2:-${brightness_display:-main}}"
+
+    h-brightness-dispatch "$sel" inc "$inc"
 }
 
 function brightness-dec {
-    local amount="${1:-0.01}"
-    brightness-inc $((amount*-1))
+    : "usage: brightness-dec [<delta>] [<selector>]"
+    ##
+    local amount="${1:-0.01}" sel="${2:-${brightness_display:-main}}"
+
+    brightness-inc $((amount*-1)) "$sel"
 }
 ##
 function brightness-screen {
