@@ -48,6 +48,25 @@ function h-hook-unlock {
     #: If the laptop's battery dies and we turn it on again, our restart hooks won't run but the limit would be reset.
 }
 ##
+function h-hook-audio-output-change {
+    : "fired when the default audio output device changes
+
+Called by hammerspoon/core/audio-watcher.lua with the new device's name and
+transport, already debounced and filtered to dOut events.
+
+The fan-out lives here rather than in the Lua because hs.audiodevice.watcher is
+a module-level singleton with a single callback slot, which audio-watcher.lua
+has already claimed. A second consumer calling setCallback would silently
+replace it and disable the audio guard, so consumers are added here instead.
+
+Each consumer is isolated: one that fails, or blocks on something slow, must
+not stop the others from running."
+    local name="${1}" transport="${2}"
+
+    awaysh-fast audio-guard-on-audio-change "$name" "$transport"
+    awaysh-fast sony-battery-on-audio-change "$name" "$transport"
+}
+##
 function tealy-connect-hook {
     # fsay "Tealy connected"
 

@@ -78,7 +78,11 @@ local function notifyAudioChanged()
     -- zsh side rediscover them via audio-output-get-hs, i.e. a subprocess we
     -- spawned calling IPC back into the very Hammerspoon that spawned it. We
     -- already know the answer here, so we hand it over.
-    runInGarden(("audio-guard-on-audio-change %q %q"):format(
+    -- Dispatched through a general hook rather than straight to the audio
+    -- guard: this watcher is a singleton with one callback slot (see the note
+    -- at setCallback below), so a second feature cannot subscribe here. The zsh
+    -- side fans out to consumers instead.
+    runInGarden(("h-hook-audio-output-change %q %q"):format(
                     device:name() or "", device:transportType() or ""))
 
     -- The mute watcher below is bound to one specific device, so it has to
