@@ -183,6 +183,21 @@ addToPATH "/usr/local/opt/curl/bin"
 
 if test -z "$NIGHTDIR_PATH_MODE" ; then
     run-on-each addToPATH "$NIGHTDIR"/**/
+
+    if isZsh ; then
+        #: The .app bundles under NIGHTDIR are Platypus build output - the
+        #: copies that actually run live in /Applications and are launched by
+        #: bundle id - so their Contents/, MacOS/, Resources/ and MainMenu.nib/
+        #: directories are ten PATH entries that can never resolve a command.
+        #:
+        #: `:#' drops every array element matching the pattern, and in
+        #: parameter matching (unlike globbing) `*' spans `/', so a single `*'
+        #: covers the whole subtree. Anchored at NIGHTDIR so the deliberate
+        #: /Applications/kitty.app and SuperCollider.app entries survive, and
+        #: `.app/' rather than `.app' so it has to be a whole path component:
+        #: `*.app*' alone also matches anything under a com.apple... directory.
+        path=( ${path:#${NIGHTDIR}/*.app/*} )
+    fi
 fi
 
 addToPATH /myBin/
