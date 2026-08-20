@@ -40,6 +40,8 @@ end
 local hammerspoonCoreFiles = {
     "core/helpers.lua",
     "modal-mode.lua",
+    -- After modal-mode.lua: reuses its screen watcher and targetScreens().
+    "core/agent-banner.lua",
     "core/redis.lua",
     "core/wifi-watcher.lua",
     "core/audio-watcher.lua",

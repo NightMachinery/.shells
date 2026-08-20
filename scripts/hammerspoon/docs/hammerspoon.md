@@ -8,6 +8,7 @@ The explicit core load order is:
 
 - `helpers.lua`
 - `modal-mode.lua`
+- `agent-banner.lua`
 - `redis.lua`
 - `wifi-watcher.lua`
 - `hyper-mode.lua`
@@ -80,6 +81,37 @@ alphabet grows minimally with comfort-ordered extension keys
 grid unchanged. Beyond the two-key ceiling (~7.7k labels, e.g. non-HiDPI 4K),
 cells enlarge just enough for full coverage. Extended lists are memoized per
 alphabet size in `avyCombinationsFor`.
+
+## Agent focus banner
+
+`core/agent-banner.lua` shows a banner while a coding agent is driving the GUI
+and needs the focus left alone, so a human and an agent can share the machine
+without either guessing about the other. It is driven from the shell:
+
+```sh
+hs -c 'agentBannerOn("what it is doing", 900)'   # seconds; default 30 min
+hs -c 'agentBannerOff()'
+hs -c 'return agentBannerActive()'
+```
+
+It loads after `modal-mode.lua` because it reuses `ModalMode.targetScreens`
+and `ModalMode.onScreenChange` rather than running a second screen watcher.
+No canvas mouse events are registered, so it is inert to the pointer and
+clicks pass through to whatever is underneath.
+
+It covers each screen whole for `agentBannerFlashSeconds` (0.2 by default; 0
+skips it, and a third argument to `agentBannerOn` sets it) before collapsing
+to a 30px strip. The text is drawn in the strip's band at the strip's size
+throughout, and shrinks rather than wraps when the message is long: the words
+must not move, resize or reflow as the flash collapses, or they get yanked out
+from under whoever started reading them. Only the coloured area changes.
+`agentBannerOff` flashes `agentBannerReleaseFlashSeconds` of blue the same way
+— the moment the machine is free again is the one worth noticing.
+
+Re-calling `agentBannerOn` with the same message refreshes the countdown
+without re-flashing, so a long task can heartbeat without strobing. A changed
+message does flash again. The banner always expires on its own, so an agent
+that crashes or forgets cannot leave the screen branded.
 
 `~/.hammerspoon/init.lua` includes a `hyper+w` Wi-Fi chooser.
 
