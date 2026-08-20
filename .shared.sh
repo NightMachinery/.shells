@@ -182,7 +182,10 @@ export BOOT_CLOJURE_VERSION='1.9.0'
 addToPATH "/usr/local/opt/curl/bin"
 
 if test -z "$NIGHTDIR_PATH_MODE" ; then
-    run-on-each addToPATH "$NIGHTDIR"/**/
+    #: Not `run-on-each addToPATH': addToPATH already loops over its arguments,
+    #: so run-on-each only added a gquote-to and an eval per directory - 253 of
+    #: each - to reach the same loop.
+    addToPATH "$NIGHTDIR"/**/
 
     if isZsh ; then
         #: Collapse `//' to `/'. NIGHTDIR used to carry a trailing slash, which
