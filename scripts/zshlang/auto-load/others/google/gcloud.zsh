@@ -636,73 +636,46 @@ function gcp-gpu-spend {
 }
 ##
 function gcp-gpu-advice {
-    #: `gcp-gpu-advice [MACHINE] [MODEL]` -> per-zone obtainability, for free.
+    #: `gcp-gpu-advice [SHAPE...]` -> which region can actually GIVE me this
+    #: GPU right now. Free: it creates nothing.
     #:
-    #: Wraps `gcloud beta compute advice capacity`, which is the ONLY source
-    #: that answers "can I actually get one", as opposed to "does this name
-    #: exist". Everything else lies by omission:
+    #: The implementation is Go (`${NIGHTDIR}/golang/gcp-gpu-advice`), not zsh.
+    #: A full sweep is |shapes| x |regions| round trips -- about 90 -- which is
+    #: minutes serially, and zsh's job control was not reliable enough to fan
+    #: them out. The Go version does it in ~8s with a progress bar.
     #:
-    #:   Billing Catalog SKU     -> priced in Finland at EUR 0.86/GPU-hr
-    #:   accelerator-types list  -> nvidia-h100-80gb present in europe-west2-b
-    #:   machine-types list      -> a3-highgpu-1g present in europe-north1-c
-    #:   advice capacity         -> not supported in ANY europe-north1 zone
+    #: The shape registry (human name -> machine type, GPU count, VRAM) lives
+    #: in that program and nowhere else, so there is one place to add a card.
+    #: List it with `gcp-gpu-shapes`.
     #:
-    #: The first three are catalogue views: they describe what the API knows
-    #: the name of. Only this one asks whether capacity exists. Confirmed by
-    #: creating: europe-north1-c returns `reason: stockout`.
-    #:
-    #: @note Recommendation, not proof -- a create is the definitive test. But
-    #: it costs nothing and creates nothing, so it belongs before every hunt.
-    #: @note `advice capacity` for FLEX_START returns "service is not available
-    #: for this project", and gcloud 579 crashes on `--max-run-duration`, so
-    #: only SPOT is checkable. Credit: Ali Modarressi.
-    local machine="${1:-${gcp_gpu_machine}}" model="${2:-SPOT}"
-    local -a zones
-    zones=( "${@[3,-1]}" )
-    (( ${#zones} )) || zones=( "${gcp_gpu_zone_candidates[@]}" )
-
-    h-gcp-gpu-deps @RET
-    if ! command gcloud beta --help &>/dev/null ; then
-        ecerr "$0: needs the beta component: gcloud components install beta"
+    #: @note `command` is mandatory: without it this function re-enters itself.
+    if ! command -v gcp-gpu-advice &>/dev/null ; then
+        ecerr "$0: binary missing. Install: go-install-local \"\${NIGHTDIR}/golang/gcp-gpu-advice\""
         return 1
     fi
 
-    #: Region-level API, so collapse the candidate zones to their regions and
-    #: let it name the best zone in each.
-    local -a regions
-    regions=( ${(u)${zones[@]}%-*} )
+    local -a extra
+    extra=( --project="${gcp_gpu_project}" )
+    #: Default to our candidate zones, collapsed to regions (`advice capacity`
+    #: is region-level and names the best zone itself). An explicit --regions
+    #: from the caller wins.
+    if [[ "$*" != *--regions* ]] ; then
+        #: `%-*` must sit INSIDE the array subscript so it strips per element.
+        #: `${(u)${arr[@]}%-*}` applies it to the JOINED string instead, which
+        #: silently leaves every zone but the last one unstripped.
+        local -a regions
+        regions=( ${(u)gcp_gpu_zone_candidates[@]%-*} )
+        extra+=( --regions="${(j:,:)regions}" )
+    fi
 
-    printf '%-22s %-26s %-8s %s\n' REGION BEST-ZONE OBTAIN EST-UPTIME
-    local r out obtain uptime zone
-    for r in "${regions[@]}" ; do
-        out="$(h-gcp-gpu-gcloud beta compute advice capacity \
-            --provisioning-model="${model}" \
-            --instance-selection-machine-types="${machine}" \
-            --target-distribution-shape=ANY_SINGLE_ZONE \
-            --size=1 --region="$r" --format=json 2>&1)"
-
-        if [[ "$out" == *'not supported in location'* ]] ; then
-            printf '%-22s %-26s %-8s %s\n' "$r" '--' 'NO' 'machine spec unsupported here'
-            continue
-        fi
-        if ! jq -e . <<<"$out" &>/dev/null ; then
-            printf '%-22s %-26s %-8s %s\n' "$r" '--' '?' "${${out##*ERROR: }%%$'\n'*}"
-            continue
-        fi
-
-        zone="$(jq -r '(.recommendations[0].shards[0].zone // "?") | split("/") | last' <<<"$out")"
-        obtain="$(jq -r '.recommendations[0].scores.obtainability // "?"' <<<"$out")"
-        uptime="$(jq -r '.recommendations[0].scores.estimatedUptime // "?"' <<<"$out")"
-        printf '%-22s %-26s %-8s %s\n' "$r" "$zone" "$obtain" "$uptime"
-    done
-
-    #: The uptime column is the one that decides spot vs flex-start: it has
-    #: been observed to top out at 3600s, i.e. a spot H100 is expected to
-    #: survive about an hour. A multi-day spot run is ~N attempts at one hour,
-    #: not one long run, and nothing in the fit pipeline checkpoints mid-prompt.
-    ecgray "obtainability 0.9 good / 0.5 marginal / 0.1 forget it."
-    ecgray "est-uptime 3600s appears to be the ceiling; for days, use --flex-start."
+    command gcp-gpu-advice "${extra[@]}" "$@"
 }
+
+function gcp-gpu-shapes {
+    #: The machine-shape registry, smallest node first.
+    gcp-gpu-advice --list-shapes
+}
+
 
 function h-gcp-gpu-stockout-p {
     #: Spot VMs do not queue. Creation fails immediately, and "waiting for a

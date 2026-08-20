@@ -1,0 +1,97 @@
+#+TITLE: gcp-gpu-advice
+
+Answers *"which GCP region can actually give me this GPU right now"*, for
+every machine shape at once. Creates nothing and costs nothing, so it belongs
+before every hunt.
+
+* Why this exists at all
+A priced, catalogued machine type can still be impossible to create. The
+hierarchy, weakest evidence first:
+
+#+begin_example
+Cloud Billing Catalog SKU      "it has a price"        proves nothing
+accelerator-types list         "the GPU is in a zone"  proves nothing
+machine-types list             "the type is in a zone" proves nothing
+Cloud Quotas API               "we are allowed N"      necessary, not enough
+advice capacity                "capacity exists"       best free signal
+instances create               the only definitive test
+#+end_example
+
+=europe-north1-c= (Finland) prices an H100 at EUR 1.02/hr, lists the
+accelerator, lists =a3-highgpu-1g=, and has 64 H100 spot quota. Creating one
+returns =reason: stockout=. This tool wraps the only line of that table that
+asks about capacity.
+
+* Why Go
+This was a zsh function first. A full sweep is |shapes| x |regions| round
+trips --- about 90 --- which took minutes serially, and zsh's job control was
+not reliable enough to fan them out. The Go version finishes in ~8s and draws
+a progress bar while it works.
+
+The *shape registry lives here and nowhere else*: one table maps a human name
+to machine type, GPU count, model and VRAM. Adding a card is one line.
+
+* Install
+#+begin_src zsh :eval never
+go-install-local "${NIGHTDIR}/golang/gcp-gpu-advice"
+#+end_src
+
+The =gcp-gpu-advice= zsh function in [[file:../../zshlang/auto-load/others/google/gcloud.zsh][gcloud.zsh]] is a thin wrapper that
+supplies =--project= and our candidate regions. Call the binary directly with
+=command gcp-gpu-advice= to bypass it.
+
+* Use
+#+begin_src sh :eval never
+gcp-gpu-advice                       # every shape, all candidate regions
+gcp-gpu-advice h100-1x               # just one shape
+gcp-gpu-advice h100-8x h200-8x       # several
+gcp-gpu-advice --summary             # skip the per-shape tables
+gcp-gpu-advice --vram 320            # only shapes with >= 320GB total
+gcp-gpu-advice --list-shapes         # the registry (alias: gcp-gpu-shapes)
+gcp-gpu-advice --json | jq           # raw results
+gcp-gpu-advice --regions=us-east5,europe-west4
+gcp-gpu-advice --provisioning-model=STANDARD
+#+end_src
+
+Shapes: =l4-1x=, =a100-1x=, =a100-80-1x=, =a100-80-4x=, =h100-1x=, =h100-2x=,
+=h100-4x=, =h100-8x=, =h100mega-8x=, =h200-8x=, =b200-8x=.
+
+* Output
+#+begin_example
+== h100-8x       8x H100 (640GB)    a3-highgpu-8g    (SPOT)
+  REGION        BEST-ZONE       OBTAIN  EST-UPTIME
+  europe-west9  europe-west9-c  0.50    3600s
+  europe-west3  europe-west3-c  0.10    60s
+  europe-west4  europe-west4-c  0.90    3600s
+
+== executive summary (SPOT): smallest obtainable node per VRAM need
+  NEED    SHAPE       GPUS              REGION / ZONE                  OBTAIN
+  80GB    a100-80-1x  1x A100 (80GB)    europe-west4 / europe-west4-a  0.90
+  640GB   h100-8x     8x H100 (640GB)   europe-west4 / europe-west4-c  0.90
+#+end_example
+
+The summary is keyed on *how much VRAM you need*, and names the smallest node
+that supplies it plus the region to ask for. Shapes scoring below
+=--min-obtainability= (default 0.3) are skipped rather than recommended: 0.1
+means "forget it", and a bad recommendation is worse than none.
+
+* Reading the numbers
+- *obtainability* --- 0.9 good, 0.5 marginal, 0.1 forget it. A recommendation,
+  not proof; =instances create= remains the only definitive test.
+- *est-uptime* --- tops out at 3600s. A spot H100 is expected to survive about
+  an hour, so a multi-day run is N attempts at one hour rather than one long
+  run. For work that must not be interrupted use =gcp-gpu-up --flex-start=.
+- =NO= in the OBTAIN column means the machine spec does not exist in that
+  region at all --- a catalogue gap, not a capacity shortage. =?= means the
+  call itself failed; the note carries the error.
+
+* Notes and limits
+- A3 (=a3-*=) and A4 (=a4-*=) machines have *no on-demand form at all*, so
+  =SPOT= is the only provisioning model worth asking about for
+  H100/H200/B200. =--on-demand= there is a guaranteed failure, not a fallback.
+- =advice capacity= for =FLEX_START= returns "service is not available for
+  this project", so only =SPOT= (and =STANDARD=, where it applies) is
+  checkable. Credit: Ali Modarressi.
+- The progress bar is drawn on stderr but gated on whether *stdout* is a
+  terminal, so redirecting or piping the output stays clean. Override with
+  =--progress=always|never=.
