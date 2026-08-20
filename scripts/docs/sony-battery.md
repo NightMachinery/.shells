@@ -31,26 +31,22 @@ per call.
     sony_battery_bud_min            15    alert below this, for a bud
     sony_battery_alert_dur          3     seconds the alert stays up
     sony_battery_charging_skip_p    y     ignore parts that are charging
-    sony_battery_case_zero_skip_p   y     treat case 0% as "no reading"
     sony_battery_connect_delay      3     settle time before the connect hook reads
 
 So a one-off with different limits:
 
     sony_battery_bud_min=30 sony-battery-alert-low
 
-## Why the case reads 0%
+## The case is usually absent
 
-Whenever the buds are out of the case, the case reports `level_percent: 0`.
-That is the absence of a reading, not a reading of zero — and the `present`
-flag is still true, so sonyctl cannot filter it out. Taken at face value it is
-below any sane threshold, so the alert would fire on every single run forever.
+The earbuds only learn the case's level while docked in it, so most of the time
+`sonyctl` reports no `case` entry at all and the alert simply says nothing about
+it. A case level appears once the buds are docked.
 
-`sony_battery_case_zero_skip_p` stops it counting as low. The case still
-appears in the alert, shown as `case NA` — an unknown reading is worth seeing,
-and silently omitting it would leave you wondering where the case went. The
-cost is that a genuinely flat case never warns, which is cheap: the buds still
-work, and a real number appears the moment they dock. Set it to `n` to treat
-the raw `0%` as a real reading.
+This used to be handled here, with a knob that ignored a case reading of `0%`.
+It is now fixed in sonyctl, which is what actually knows the reading is absent —
+so the case never reaches this script as a bogus zero, and `status` and every
+other consumer are fixed too rather than just this one. See the readme there.
 
 ## Two triggers, deliberately
 
@@ -106,8 +102,4 @@ executing the old code otherwise. After editing the Lua, `hsr`.
   the alert, in the manner of `audio_guard_snooze`.
 - A WH- model reports one battery rather than left/right/case; it is compared
   against `sony_battery_bud_min` and shown as `bat`.
-- In the alert, `+` means charging, `=` means charged, and `NA` means the part
-  did not report a usable level.
-- `sony-battery` is a plain passthrough to `sonyctl battery`, so it still prints
-  the raw `case: 0%`. Rendering that as `NA` belongs in sonyctl rather than
-  here, since sonyctl is what knows the reading is absent.
+- In the alert, `+` means charging and `=` means charged.
