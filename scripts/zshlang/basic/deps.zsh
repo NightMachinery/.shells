@@ -2,6 +2,12 @@ function ensure-dep-pdftk {
     ensure-dep1 pdftk brew install pdftk-java || return $?
 }
 ##
+function ensure-dep-m1ddc {
+    #: DDC/CI brightness for external displays; Apple Silicon only.
+    #: See [agfi:brightness-displays-ddc].
+    ensure-dep1 m1ddc brew install m1ddc || return $?
+}
+##
 function kitty-theme-install {
     pip-install psutil 'git+git://github.com/fretboardfreak/kitty-theme-changer.git@master'
     # psutil is needed by kitty_theme_changer.conf.py
