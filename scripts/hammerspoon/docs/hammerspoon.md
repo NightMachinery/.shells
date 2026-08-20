@@ -8,6 +8,7 @@ The explicit core load order is:
 
 - `helpers.lua`
 - `modal-mode.lua`
+- `alert-engine.lua`
 - `agent-banner.lua`
 - `redis.lua`
 - `wifi-watcher.lua`
@@ -82,11 +83,75 @@ grid unchanged. Beyond the two-key ceiling (~7.7k labels, e.g. non-HiDPI 4K),
 cells enlarge just enough for full coverage. Extended lists are memoized per
 alphabet size in `avyCombinationsFor`.
 
+## Alerts
+
+`core/alert-engine.lua` draws alerts as coloured bands across the screen, one
+per live alert, stacked. It replaces `hs.alert`'s single centred box for
+everything that goes through `hs-alert` in zshlang: several alerts can be up at
+once without hiding each other, long text wraps and the band grows rather than
+being cut off, and an optional fullscreen flash makes one impossible to miss.
+
+It loads after `modal-mode.lua` because it reuses `ModalMode.targetScreens` and
+`ModalMode.onScreenChange` rather than running a second screen watcher. No
+canvas mouse events are registered, so every canvas is inert to the pointer and
+clicks pass through to whatever is underneath.
+
+```sh
+hs -c 'alertV2("hello", { seconds = 5 })'
+hs -c 'alertV2FromFile("/tmp/message.txt", { position = "bottom" })'
+hs -c 'alertV2Dismiss("some-id")'
+hs -c 'alertV2DismissAll()'
+```
+
+Options: `id` (re-showing the same id updates that alert in place), `seconds`,
+`color`, `position`, `flashSeconds`, `countdown`, `pinned`, and `screens` (a
+`ModalMode.targetScreens` spec). Everything expires on its own, so a caller
+that crashes cannot leave the screen branded.
+
+`alertV2FromFile` is the entry point the shell uses: it reads the message from
+the file and deletes it. `hammerspoon -c` hangs on payloads of a few hundred
+characters and takes the ipc port down with it until the stuck client is
+killed, so the text must not travel in the command string — escaping it or
+base64-encoding it makes no difference. `alertV2FromBase64` exists for short
+messages typed by hand, where quoting is the only problem.
+
+### Stacking and positions
+
+Positions are `top` (the default), `center` and `bottom`, each an independent
+stack. Two positions can overlap on a small screen; that is accepted rather
+than prevented.
+
+A stack grows away from its anchor edge with the oldest band at the anchor, so
+a new alert never shifts the words someone is part-way through reading. For a
+top stack that puts the newest at the bottom; a bottom stack anchors at the
+bottom edge, which puts the newest on top.
+
+### Height, wrapping and the cap
+
+Text wraps against the actual pixel width and the band grows to fit. The font
+is never shrunk. Menlo is used because it is monospaced, which makes wrapping
+arithmetic rather than a measuring call per word, and makes command output line
+up.
+
+No position may use more than `alertV2MaxStackFraction` (0.45) of a screen's
+usable height. Within that budget every alert gets one line before any alert
+gets two, and the surplus then goes to the pinned alert and the newest one. So
+a sixty-line command output does not push everything else off the screen: the
+older alerts collapse to a single line reading `first line ... (+59 more
+lines)`. An alert only disappears entirely when there is not room for one line,
+and then a band at the anchor edge says how many are hidden. Nothing is
+silently dropped.
+
+`pinned` alerts claim their space before everyone else. The agent banner uses
+it, so a wall of text elsewhere cannot push it off.
+
 ## Agent focus banner
 
 `core/agent-banner.lua` shows a banner while a coding agent is driving the GUI
 and needs the focus left alone, so a human and an agent can share the machine
-without either guessing about the other. It is driven from the shell:
+without either guessing about the other. It is a thin wrapper over the alert
+engine: a crimson, pinned, counting-down alert with a fixed id. It is driven
+from the shell:
 
 ```sh
 hs -c 'agentBannerOn("what it is doing", 900)'   # seconds; default 30 min
@@ -94,19 +159,14 @@ hs -c 'agentBannerOff()'
 hs -c 'return agentBannerActive()'
 ```
 
-It loads after `modal-mode.lua` because it reuses `ModalMode.targetScreens`
-and `ModalMode.onScreenChange` rather than running a second screen watcher.
-No canvas mouse events are registered, so it is inert to the pointer and
-clicks pass through to whatever is underneath.
-
 It covers each screen whole for `agentBannerFlashSeconds` (0.2 by default; 0
-skips it, and a third argument to `agentBannerOn` sets it) before collapsing
-to a 30px strip. The text is drawn in the strip's band at the strip's size
-throughout, and shrinks rather than wraps when the message is long: the words
-must not move, resize or reflow as the flash collapses, or they get yanked out
-from under whoever started reading them. Only the coloured area changes.
-`agentBannerOff` flashes `agentBannerReleaseFlashSeconds` of blue the same way
-— the moment the machine is free again is the one worth noticing.
+skips it, and a third argument to `agentBannerOn` sets it) before collapsing to
+its strip. During the flash every band is drawn at exactly the geometry it will
+keep, so when the colour drains away the words do not move, resize or reflow —
+a flash that re-centred its own text would yank it out from under whoever
+started reading it. `agentBannerOff` flashes `agentBannerReleaseFlashSeconds`
+of blue the same way; the moment the machine is free again is the one worth
+noticing.
 
 Re-calling `agentBannerOn` with the same message refreshes the countdown
 without re-flashing, so a long task can heartbeat without strobing. A changed
