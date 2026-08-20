@@ -185,6 +185,14 @@ if test -z "$NIGHTDIR_PATH_MODE" ; then
     run-on-each addToPATH "$NIGHTDIR"/**/
 
     if isZsh ; then
+        #: Collapse `//' to `/'. NIGHTDIR used to carry a trailing slash, which
+        #: put a `//' into most entries; that is fixed at the source now, but
+        #: this also heals a PATH inherited from a shell that predates the fix,
+        #: where the two spellings are textually different and so survive the
+        #: -U dedup as separate entries. One expansion over the array, and -U
+        #: then collapses the stale twins on its own.
+        path=( ${path//\/\//\/} )
+
         #: The .app bundles under NIGHTDIR are Platypus build output - the
         #: copies that actually run live in /Applications and are launched by
         #: bundle id - so their Contents/, MacOS/, Resources/ and MainMenu.nib/
