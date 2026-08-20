@@ -1,5 +1,25 @@
 typeset -Ug path
 function addToPATH {
+    #: One assignment to the array, not one assignment to the string per
+    #: argument. PATH and path are tied, so `PATH="$x:$PATH"' re-splits the
+    #: whole (12k character, ~300 entry) string every time round the loop,
+    #: which made the recursive add in ~/.shared.sh quadratic: 253 directories
+    #: cost 42ms, against 0.3ms for a single array assignment.
+    #:
+    #: (Oa) reverses, because prepending one at a time leaves the arguments in
+    #: reverse order and callers depend on which directory wins a name clash.
+    #: Verified byte-identical to what the old loop produced.
+    #:
+    #: Assigning the array also applies the -U above, so duplicates go now
+    #: rather than surviving until the `typeset -Ug path' at the end of
+    #: ~/.shared.sh. Same final PATH, just without the bloat in between.
+    (( $# )) || return 0
+    path=( ${(Oa)@} $path )
+}
+
+function addToPATH-v1 {
+    #: The original, kept because it is the portable shape: no zsh array
+    #: syntax, so it is what a non-zsh shell would need.
     local newPath
     for newPath in $@ ; do
         ##
