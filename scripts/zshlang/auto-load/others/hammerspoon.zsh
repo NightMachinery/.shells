@@ -140,7 +140,7 @@ function hs-alert-v2 {
     @darwinOnly
 
     local msg="$*" dur="${alert_dur:-5}"
-    local flash="${alert_flash:-0.05}" pos="${alert_pos:-top}"
+    local flash="${alert_flash:-0.2}" pos="${alert_pos:-top}"
     local id="${alert_id:-}"
 
     # Not `local path`: `path` is the array tied to $PATH, so declaring it local
