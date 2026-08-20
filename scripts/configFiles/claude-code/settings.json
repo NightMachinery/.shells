@@ -20,7 +20,7 @@
     ],
     "defaultMode": "plan"
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus[1m]",
   "hooks": {
     "Notification": [
       {
@@ -66,6 +66,9 @@
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/hooks/statusline.sh"
+  },
+  "enabledPlugins": {
+    "clangd-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
