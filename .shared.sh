@@ -215,5 +215,21 @@ addToPATH /myBin/
 addToPATH ~/bin # should be last
 
 if isZsh ; then
+    #: Drop the trailing slash the `**/' glob leaves on every entry, and that
+    #: some literal calls above write too. It is not wrong, but zsh appends
+    #: `/name' to it, so resolved commands read
+    #: `.../wrappers/brishz//brishz2.dash', and an entry that appears both with
+    #: and without the slash is two entries as far as -U is concerned.
+    #:
+    #: Here rather than up in the NIGHTDIR block so it also catches the two
+    #: additions above, and because it has to run after the .app filter: that
+    #: pattern ends in `.app/*' and matches the bundle root only by its
+    #: trailing slash.
+    #:
+    #: The `:#' with an empty pattern drops elements that stripping emptied - a
+    #: lone `/' would become "", and an empty PATH entry means the current
+    #: directory, which is not something to leave lying around.
+    path=( ${${path%/}:#} )
+
     typeset -Ug path
 fi
