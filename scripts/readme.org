@@ -76,3 +76,14 @@ uv tool install 'git+https://github.com/NightMachinery/cis-applications2org.git'
 =audio-guard= mutes the output device when audio would be audible to colleagues
 at the office and nobody is at the desk, and unmutes when you unlock. Installed
 as a LaunchAgent from =./launchers/audio-guard/=. See =./docs/audio-guard.md=.
+
+* External display brightness
+
+=brightness-get= / =-set= / =-inc= / =-dec= drive external monitors over DDC/CI,
+not just the built-in panel, because IOKit cannot reach an external one at all.
+Each display is routed to whichever backend can talk to it —
+[[agfi:brightness-displays]] shows which — and a selector picks the display when
+several are attached, defaulting to the main one.
+
+See =./docs/external-display-brightness.md=, which also records how often DDC
+reads come back corrupt and what is done about it.
