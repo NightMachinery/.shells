@@ -145,6 +145,18 @@ silently dropped.
 `pinned` alerts claim their space before everyone else. The agent banner uses
 it, so a wall of text elsewhere cannot push it off.
 
+### The fullscreen flash
+
+`flashSeconds` washes every screen in the alert's colour before the alert
+settles into its band. During the flash all bands are drawn at exactly the
+geometry they will keep, so when the wash drains away the words do not move,
+resize or reflow — a flash that re-centred its own text would yank it out from
+under whoever started reading it. Two flashes at once: last one wins.
+
+The wash is see-through, `alertV2FloodAlpha` (0.33). It has to be impossible to
+miss, but it covers every screen and should not black out what you were looking
+at to do it. The bands keep their own opacity and stay readable on top of it.
+
 ## Agent focus banner
 
 `core/agent-banner.lua` shows a banner while a coding agent is driving the GUI
@@ -159,14 +171,11 @@ hs -c 'agentBannerOff()'
 hs -c 'return agentBannerActive()'
 ```
 
-It covers each screen whole for `agentBannerFlashSeconds` (0.2 by default; 0
-skips it, and a third argument to `agentBannerOn` sets it) before collapsing to
-its strip. During the flash every band is drawn at exactly the geometry it will
-keep, so when the colour drains away the words do not move, resize or reflow —
-a flash that re-centred its own text would yank it out from under whoever
-started reading it. `agentBannerOff` flashes `agentBannerReleaseFlashSeconds`
-of blue the same way; the moment the machine is free again is the one worth
-noticing.
+It washes each screen for `agentBannerFlashSeconds` (0.2 by default; 0 skips
+it, and a third argument to `agentBannerOn` sets it) before settling into its
+strip — see the flash notes above. `agentBannerOff` flashes
+`agentBannerReleaseFlashSeconds` of blue the same way; the moment the machine
+is free again is the one worth noticing.
 
 Re-calling `agentBannerOn` with the same message refreshes the countdown
 without re-flashing, so a long task can heartbeat without strobing. A changed

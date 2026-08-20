@@ -48,6 +48,11 @@ alertV2AgentColor = alertV2AgentColor
 alertV2FreeColor = alertV2FreeColor
     or { red = 0.09, green = 0.055, blue = 0.42, alpha = 1.0 }
 
+--- How opaque the fullscreen flash is. The alert's own colour, but see-through:
+--- the flash has to be impossible to miss without blacking out the screen it
+--- covers. The bands drawn on top of it keep their own opacity.
+alertV2FloodAlpha = alertV2FloodAlpha or 0.33
+
 --- Dimmed grey for the "earlier alerts hidden" notice, so it reads as chrome
 --- rather than as another alert.
 alertV2NoticeColor = alertV2NoticeColor
@@ -426,21 +431,31 @@ local function destroyFlood()
 end
 
 --- The flood is a separate canvas per screen, one level above the strips, that
---- fills the whole display with the flashing alert's colour and then redraws
+--- washes the whole display in the flashing alert's colour and then redraws
 --- every band at exactly the geometry it already has. So when the flood is
 --- deleted the words do not move, resize or reflow - only the colour drains
 --- away from around them. A flash that re-centred its own text would yank it
 --- out from under whoever started reading it.
+---
+--- The wash is deliberately see-through: it has to be impossible to miss, but
+--- it covers every screen and it should not black out what you were looking at
+--- to do it. The bands themselves keep their own opacity, so the alert stays
+--- readable against whatever is underneath.
 local function renderFlood()
     destroyFlood()
     local flood = alertEngineState.flood
     if not flood then
         return
     end
+    local wash = {}
+    for key, value in pairs(flood.color) do
+        wash[key] = value
+    end
+    wash.alpha = alertV2FloodAlpha
     for _, screen in ipairs(ModalMode.targetScreens("all")) do
         local full = screen:fullFrame()
         local elements = {
-            { type = "rectangle", action = "fill", fillColor = flood.color },
+            { type = "rectangle", action = "fill", fillColor = wash },
         }
         for _, position in ipairs(kPositions) do
             local stack = layoutStack(screen, position)
