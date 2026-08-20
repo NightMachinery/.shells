@@ -19,30 +19,6 @@ typeset -g sony_battery_charging_skip_p="${sony_battery_charging_skip_p:-y}"
 #: cheap: the buds still work, and a real number appears as soon as they dock.
 typeset -g sony_battery_case_zero_skip_p="${sony_battery_case_zero_skip_p:-y}"
 ##
-#: One pass produces both lines of the message: the parts that are actually low,
-#: then the full picture for context. The second is skipped when every known
-#: part is already in the first, where it would only repeat itself.
-#: `label' is a jq keyword, hence `abbr'.
-typeset -g h_sony_battery_jq
-IFS=$'\n' read -r -d '' h_sony_battery_jq <<'EOF'
-def abbr: {"left":"L","right":"R","case":"case","battery":"bat"}[.part] // .part;
-def threshold: if .part == "case" then $case_min else $bud_min end;
-def stale: $skip_case_zero == "y" and .part == "case" and .level_percent == 0;
-def charging_now: .charging == "yes" or .charging == "complete";
-def mark: if .charging == "yes" then "+" elif .charging == "complete" then "=" else "" end;
-def show: "\(abbr) \(.level_percent)%\(mark)";
-[ .batteries[] | select(stale | not) ] as $known
-| [ $known[]
-    | select( ($skip_charging == "y" and charging_now) | not )
-    | select(.level_percent < threshold) ] as $low
-| if ($low | length) == 0 then empty
-  else
-    ( $low | map(show) | join(", ") ),
-    ( if ($known | length) > ($low | length)
-      then ($known | map(show) | join("  ")) else empty end )
-  end
-EOF
-##
 function sony-battery {
     : "battery levels, for a human"
     @darwinOnly
@@ -83,13 +59,35 @@ is safe to run on a timer. Knows nothing about scheduling; drive it from cron."
     json="$(h-sony-battery-json)" || return 0
     test -n "$json" || return 0
 
+    #: One pass produces both lines of the message: the parts that are actually
+    #: low, then the full picture for context. The second is skipped when every
+    #: known part is already in the first, where it would only repeat itself.
+    #: `label' is a jq keyword, hence `abbr'.
+    local prog='
+def abbr: {"left":"L","right":"R","case":"case","battery":"bat"}[.part] // .part;
+def threshold: if .part == "case" then $case_min else $bud_min end;
+def stale: $skip_case_zero == "y" and .part == "case" and .level_percent == 0;
+def charging_now: .charging == "yes" or .charging == "complete";
+def mark: if .charging == "yes" then "+" elif .charging == "complete" then "=" else "" end;
+def show: "\(abbr) \(.level_percent)%\(mark)";
+[ .batteries[] | select(stale | not) ] as $known
+| [ $known[]
+    | select( ($skip_charging == "y" and charging_now) | not )
+    | select(.level_percent < threshold) ] as $low
+| if ($low | length) == 0 then empty
+  else
+    ( $low | map(show) | join(", ") ),
+    ( if ($known | length) > ($low | length)
+      then ($known | map(show) | join("  ")) else empty end )
+  end
+'
     local out
     out="$(ec "$json" | jq --raw-output \
         --argjson case_min "${case_min}" \
         --argjson bud_min "${bud_min}" \
         --arg skip_charging "${charging_skip_p}" \
         --arg skip_case_zero "${case_zero_skip_p}" \
-        "${h_sony_battery_jq}" 2>/dev/null)" || return 0
+        "$prog" 2>/dev/null)" || return 0
 
     #: Nothing low. The overwhelmingly common case, and it must stay silent.
     test -n "$out" || return 0
