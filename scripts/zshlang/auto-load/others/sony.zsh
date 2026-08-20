@@ -69,9 +69,10 @@ def threshold: if .part == "case" then $case_min else $bud_min end;
 def stale: $skip_case_zero == "y" and .part == "case" and .level_percent == 0;
 def charging_now: .charging == "yes" or .charging == "complete";
 def mark: if .charging == "yes" then "+" elif .charging == "complete" then "=" else "" end;
-def show: "\(abbr) \(.level_percent)%\(mark)";
-[ .batteries[] | select(stale | not) ] as $known
+def show: if stale then "\(abbr) NA" else "\(abbr) \(.level_percent)%\(mark)" end;
+[ .batteries[] ] as $known
 | [ $known[]
+    | select(stale | not)
     | select( ($skip_charging == "y" and charging_now) | not )
     | select(.level_percent < threshold) ] as $low
 | if ($low | length) == 0 then empty
