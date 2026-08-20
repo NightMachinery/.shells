@@ -35,28 +35,35 @@ alertEngineState = alertEngineState or {
 
 --- Dark slate. Quiet enough to live on screen for a few seconds without being
 --- the loudest thing on the monitor.
+--- How opaque a band is. Slightly see-through, so a band lying across a window
+--- does not read as a hole punched in it - you can still tell what it is
+--- covering. One knob rather than an alpha buried in each colour below; a
+--- colour passed in by a caller keeps whatever alpha it carries.
+alertV2BandAlpha = alertV2BandAlpha or 0.8
+
+--- How opaque the fullscreen flash is. The alert's own colour, but much more
+--- see-through than a band: the flash has to be impossible to miss without
+--- blacking out the screen it covers. The bands drawn on top of it keep their
+--- own opacity.
+alertV2FloodAlpha = alertV2FloodAlpha or 0.33
+
 alertV2DefaultColor = alertV2DefaultColor
-    or { red = 0.16, green = 0.19, blue = 0.24, alpha = 0.95 }
+    or { red = 0.16, green = 0.19, blue = 0.24, alpha = alertV2BandAlpha }
 --- Amber, the colour the agent banner shipped with, kept as an alternative:
--- alertV2DefaultColor = { red = 0.80, green = 0.36, blue = 0.02, alpha = 0.95 }
+-- alertV2DefaultColor = { red = 0.80, green = 0.36, blue = 0.02, alpha = alertV2BandAlpha }
 
 --- Crimson: "a machine is driving this screen, do not touch the keyboard".
 alertV2AgentColor = alertV2AgentColor
-    or { red = 0.62, green = 0.06, blue = 0.10, alpha = 1.0 }
+    or { red = 0.62, green = 0.06, blue = 0.10, alpha = alertV2BandAlpha }
 
 --- Blue: the screen is yours again.
 alertV2FreeColor = alertV2FreeColor
-    or { red = 0.09, green = 0.055, blue = 0.42, alpha = 1.0 }
-
---- How opaque the fullscreen flash is. The alert's own colour, but see-through:
---- the flash has to be impossible to miss without blacking out the screen it
---- covers. The bands drawn on top of it keep their own opacity.
-alertV2FloodAlpha = alertV2FloodAlpha or 0.33
+    or { red = 0.09, green = 0.055, blue = 0.42, alpha = alertV2BandAlpha }
 
 --- Dimmed grey for the "earlier alerts hidden" notice, so it reads as chrome
 --- rather than as another alert.
 alertV2NoticeColor = alertV2NoticeColor
-    or { red = 0.25, green = 0.25, blue = 0.28, alpha = 0.9 }
+    or { red = 0.25, green = 0.25, blue = 0.28, alpha = alertV2BandAlpha }
 
 local kFont = "Menlo"
 local kTextSize = 15

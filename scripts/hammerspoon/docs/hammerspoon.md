@@ -157,6 +157,17 @@ The wash is see-through, `alertV2FloodAlpha` (0.33). It has to be impossible to
 miss, but it covers every screen and should not black out what you were looking
 at to do it. The bands keep their own opacity and stay readable on top of it.
 
+### Colours
+
+`alertV2DefaultColor` (dark slate) for ordinary alerts, `alertV2AgentColor`
+(crimson) for the agent banner, `alertV2FreeColor` (blue) for its release
+flash, `alertV2NoticeColor` (grey) for the hidden-alerts band. Amber, the
+colour the banner shipped with, is kept commented out next to the default.
+
+All four take their opacity from `alertV2BandAlpha` (0.8), so a band lying
+across a window does not read as a hole punched in it — you can still tell what
+it is covering. A colour passed in per alert keeps whatever alpha it carries.
+
 ## Agent focus banner
 
 `core/agent-banner.lua` shows a banner while a coding agent is driving the GUI
