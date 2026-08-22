@@ -122,10 +122,21 @@ function hs-alert-v1 {
 # flash the whole screen first.
 #
 # Knobs, all overridable per call:
-#   alert_dur    seconds on screen (default 5)
-#   alert_flash  fullscreen flash before settling, in seconds; 0 skips it
-#   alert_pos    top (default), center, bottom
-#   alert_id     reusing an id updates that alert in place instead of stacking
+#   alert_dur     seconds on screen (default 5)
+#   alert_flash   fullscreen flash before settling, in seconds; 0 skips it
+#   alert_pos     top (default), center, bottom
+#   alert_id      reusing an id updates that alert in place instead of stacking
+#   alert_markup  plain (default) or md
+#   alert_color   band colour by name: default, warn/amber, crit, agent, free
+#
+# `md` is a small markdown subset - **bold**, *italic*, ~~strike~~, and
+# [text]{red bold} for colour, which markdown has none of. Anything that does
+# not parse renders literally, so a typo shows up rather than vanishing. See
+# the "** Markup" section of alert-engine.lua for the whole grammar.
+#
+# Both new knobs are bare words, so unlike the message they are safe to inline
+# in the command string; the colour is resolved by name on the Lua side rather
+# than sending an RGB table over ipc.
 #
 # The message travels in a file rather than in the command string. `hammerspoon
 # -c` hangs on payloads of a few hundred characters and takes the ipc port down
@@ -142,6 +153,7 @@ function hs-alert-v2 {
     local msg="$*" dur="${alert_dur:-5}"
     local flash="${alert_flash:-0.2}" pos="${alert_pos:-top}"
     local id="${alert_id:-}"
+    local markup="${alert_markup:-plain}" color="${alert_color:-}"
 
     # Not `local path`: `path` is the array tied to $PATH, so declaring it local
     # and assigning a string to it empties PATH for the rest of the function.
@@ -151,11 +163,15 @@ function hs-alert-v2 {
     ecn "$msg" > "$msgfile" @TRET
 
     local opts="seconds = ${dur}, flashSeconds = ${flash}, position = \"${pos}\""
+    opts+=", markup = \"${markup}\""
     if test -n "$id" ; then
         opts+=", id = \"${id}\""
     fi
+    if test -n "$color" ; then
+        opts+=", color = \"${color}\""
+    fi
 
-    sout hammerspoon -c "alertV2FromFile(\"${msgfile}\", { ${opts} })"
+    reval-dbg sout hammerspoon -c "alertV2FromFile(\"${msgfile}\", { ${opts} })"
 }
 aliasfn hs-alert hs-alert-v2
 aliasfn alert hs-alert
