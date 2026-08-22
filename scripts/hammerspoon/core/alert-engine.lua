@@ -15,6 +15,7 @@
 ---
 --- Shell interface:
 ---   hs -c 'alertV2("hello", { seconds = 5 })'
+---   hs -c 'alertV2("**low** [12%]{red}", { markup = "md" })'
 ---   hs -c 'alertV2FromBase64("aGVsbG8=", { position = "bottom" })'
 ---   hs -c 'alertV2DismissAll()'
 ---
@@ -49,8 +50,11 @@ alertV2FloodAlpha = alertV2FloodAlpha or 0.33
 
 alertV2DefaultColor = alertV2DefaultColor
     or { red = 0.16, green = 0.19, blue = 0.24, alpha = alertV2BandAlpha }
---- Amber, the colour the agent banner shipped with, kept as an alternative:
--- alertV2DefaultColor = { red = 0.80, green = 0.36, blue = 0.02, alpha = alertV2BandAlpha }
+
+--- Amber, the colour the agent banner shipped with: something wants attention
+--- but nothing is on fire.
+alertV2WarnColor = alertV2WarnColor
+    or { red = 0.80, green = 0.36, blue = 0.02, alpha = alertV2BandAlpha }
 
 --- Crimson: "a machine is driving this screen, do not touch the keyboard".
 alertV2AgentColor = alertV2AgentColor
@@ -65,6 +69,235 @@ alertV2FreeColor = alertV2FreeColor
 alertV2NoticeColor = alertV2NoticeColor
     or { red = 0.25, green = 0.25, blue = 0.28, alpha = alertV2BandAlpha }
 
+--- Band colours by name, so a caller reachable only through a shell -- where a
+--- table literal would have to survive `hammerspoon -c' quoting -- can say
+--- `color = "warn"'. Resolved per call rather than cached in a table, so
+--- reassigning one of the colours above takes effect immediately.
+local function resolveBandColor(color)
+    if type(color) == "table" then
+        return color
+    end
+    if type(color) ~= "string" then
+        return alertV2DefaultColor
+    end
+    return ({
+        default = alertV2DefaultColor,
+        warn    = alertV2WarnColor,
+        amber   = alertV2WarnColor,
+        crit    = alertV2AgentColor,
+        agent   = alertV2AgentColor,
+        free    = alertV2FreeColor,
+        notice  = alertV2NoticeColor,
+    })[color] or alertV2DefaultColor
+end
+
+--- Text colours for markup runs. Deliberately separate from the band colours
+--- above: these sit *on* a band, so they are light and saturated rather than
+--- dark and translucent.
+alertV2MarkupColors = alertV2MarkupColors or {
+    red    = { red = 1.00, green = 0.45, blue = 0.40 },
+    amber  = { red = 1.00, green = 0.76, blue = 0.33 },
+    green  = { red = 0.56, green = 0.87, blue = 0.52 },
+    blue   = { red = 0.58, green = 0.76, blue = 1.00 },
+    grey   = { white = 0.62 },
+    dim    = { white = 0.55 },
+    white  = { white = 1.00 },
+}
+
+--- ** Markup
+--- Two input modes. `plain' is the default and is byte-for-byte what the caller
+--- passed, so nothing that predates this renders differently.
+---
+--- `md' is a deliberately small markdown subset. A band is one font at one
+--- size, so headings, lists and links have nothing to render into; what a band
+--- *can* express is weight, slant, line decoration and colour, and that is
+--- exactly the subset:
+---
+---   **bold**   *italic*   ~~strike~~   [text]{attrs}   \*  (escape)
+---
+--- `[text]{attrs}' is Pandoc's attribute-span syntax, borrowed because markdown
+--- has no colour of its own. Attributes are space-separated and combine freely:
+--- `[R 12%]{red bold}'. A leading dot is accepted too, so Pandoc's own
+--- `{.red}' works. Colour names come from alertV2MarkupColors; the rest are
+--- bold, italic, underline and strike.
+---
+--- Anything that does not parse -- an unclosed delimiter, an unknown attribute
+--- name -- renders literally rather than being swallowed, so a typo is visible
+--- instead of silently doing nothing.
+---
+--- Parsing produces a plain string plus runs of byte offsets into it, and
+--- everything downstream keeps working on the plain string. That is what keeps
+--- wrapping, truncation and the height budget untouched: the layout never
+--- learns that markup exists.
+local kMarkupFlags = { bold = true, italic = true, underline = true, strike = true }
+
+local function parseAttrs(spec)
+    local attrs = {}
+    local any = false
+    for token in spec:gmatch("%S+") do
+        token = token:gsub("^%.", "")
+        if kMarkupFlags[token] then
+            attrs[token] = true
+        elseif alertV2MarkupColors[token] then
+            attrs.color = token
+        else
+            return nil -- unknown name: render the whole span literally
+        end
+        any = true
+    end
+    return any and attrs or nil
+end
+
+--- Returns plain, runs. `runs' is { from, to, attrs } with inclusive 1-based
+--- byte offsets into `plain', outermost first so that a nested span's own
+--- styling is applied last and wins.
+local function parseMarkup(text)
+    local chunks, runs = {}, {}
+    local pos, len = 1, #text
+    local plainLen = 0
+    local parse
+
+    local function emit(s)
+        chunks[#chunks + 1] = s
+        plainLen = plainLen + #s
+    end
+
+    local function merge(base, extra)
+        local out = {}
+        for k, v in pairs(base or {}) do out[k] = v end
+        for k, v in pairs(extra or {}) do out[k] = v end
+        return out
+    end
+
+    local function mark()
+        return { pos = pos, chunks = #chunks, runs = #runs, plainLen = plainLen }
+    end
+
+    local function rewind(save)
+        pos = save.pos
+        plainLen = save.plainLen
+        for i = #chunks, save.chunks + 1, -1 do chunks[i] = nil end
+        for i = #runs, save.runs + 1, -1 do runs[i] = nil end
+    end
+
+    --- Record a span covering everything emitted since `save'. Inserted at the
+    --- span's own position rather than appended, so runs stay outermost-first.
+    local function record(save, from, attrs)
+        if plainLen >= from then
+            table.insert(runs, save.runs + 1, { from = from, to = plainLen, attrs = attrs })
+        end
+    end
+
+    local function delimited(open, close, attrs, inherited)
+        local save = mark()
+        pos = pos + #open
+        local from = plainLen + 1
+        local merged = merge(inherited, attrs)
+        if parse(close, merged) then
+            pos = pos + #close
+            record(save, from, merged)
+            return true
+        end
+        rewind(save)
+        return false
+    end
+
+    --- `[' ... `]{attrs}'. The attributes are only known after the closing
+    --- bracket, so the span's extent is found first -- tracking bracket depth,
+    --- and honouring `%b{}' for the attribute block so `{a {b}}' cannot end it
+    --- early.
+    local function attrSpan(inherited)
+        local depth, i = 0, pos + 1
+        local rb, attrEnd
+        while i <= len do
+            local c = text:sub(i, i)
+            if c == "\\" then
+                i = i + 2
+            elseif c == "[" then
+                depth = depth + 1
+                i = i + 1
+            elseif c == "]" then
+                if depth == 0 then
+                    local _, close = text:find("^%b{}", i + 1)
+                    if close then rb, attrEnd = i, close end
+                    break
+                end
+                depth = depth - 1
+                i = i + 1
+            else
+                i = i + 1
+            end
+        end
+        if not rb then
+            return false
+        end
+        local attrs = parseAttrs(text:sub(rb + 2, attrEnd - 1))
+        if not attrs then
+            return false
+        end
+
+        local save = mark()
+        pos = pos + 1
+        local from = plainLen + 1
+        local merged = merge(inherited, attrs)
+        if parse("]", merged) and pos == rb then
+            pos = attrEnd + 1
+            record(save, from, merged)
+            return true
+        end
+        rewind(save)
+        return false
+    end
+
+    parse = function(close, inherited)
+        while pos <= len do
+            local atClose = close ~= nil and text:sub(pos, pos + #close - 1) == close
+            -- `**' inside an italic span opens a nested one; it is not the
+            -- single `*' that would close it.
+            if atClose and close == "*" and text:sub(pos, pos + 1) == "**" then
+                atClose = false
+            end
+            if atClose then
+                return true
+            end
+
+            local ch = text:sub(pos, pos)
+            if ch == "\\" and pos < len then
+                emit(text:sub(pos + 1, pos + 1))
+                pos = pos + 2
+            elseif text:sub(pos, pos + 1) == "**" then
+                if not delimited("**", "**", { bold = true }, inherited) then
+                    emit("**")
+                    pos = pos + 2
+                end
+            elseif text:sub(pos, pos + 1) == "~~" then
+                if not delimited("~~", "~~", { strike = true }, inherited) then
+                    emit("~~")
+                    pos = pos + 2
+                end
+            elseif ch == "*" then
+                if not delimited("*", "*", { italic = true }, inherited) then
+                    emit("*")
+                    pos = pos + 1
+                end
+            elseif ch == "[" then
+                if not attrSpan(inherited) then
+                    emit("[")
+                    pos = pos + 1
+                end
+            else
+                emit(ch)
+                pos = pos + 1
+            end
+        end
+        return close == nil
+    end
+
+    parse(nil, nil)
+    return table.concat(chunks), runs
+end
+
+--- ** Geometry
 local kFont = "Menlo"
 local kTextSize = 15
 local kLineHeight = kTextSize * 1.4
@@ -129,9 +362,19 @@ end
 --- Greedy word wrap, breaking mid-word only when a single word is longer than
 --- the line. Leading whitespace is preserved, because command output is one of
 --- the main callers and its indentation carries meaning.
-local function wrapLine(raw, maxChars, out)
+---
+--- Also records, per output line, where it came from in the input:
+--- { at = byte offset, len = bytes taken from the input }. Markup runs are
+--- offsets into that same input, so this is what lets them be mapped onto the
+--- wrapped lines exactly, rather than by searching the wrapped text for the
+--- substring -- which would style every other occurrence of it as well, and
+--- would miss any run a line break happened to split. `len' is tracked
+--- separately from the line's own length because truncation can append text
+--- that came from nowhere.
+local function wrapLine(raw, maxChars, out, spans, base)
     if raw == "" then
-        table.insert(out, "")
+        out[#out + 1] = ""
+        spans[#spans + 1] = { at = base, len = 0 }
         return
     end
     while charLen(raw) > maxChars do
@@ -142,32 +385,43 @@ local function wrapLine(raw, maxChars, out)
                 break
             end
         end
+        local piece, dropped
         if cut then
-            table.insert(out, charSub(raw, 1, cut - 1))
+            piece = charSub(raw, 1, cut - 1)
             raw = charSub(raw, cut + 1)
+            dropped = 1 -- the space we broke on
         else
-            table.insert(out, charSub(raw, 1, maxChars))
+            piece = charSub(raw, 1, maxChars)
             raw = charSub(raw, maxChars + 1)
+            dropped = 0
         end
+        out[#out + 1] = piece
+        spans[#spans + 1] = { at = base, len = #piece }
+        base = base + #piece + dropped
         if raw == "" then
             return
         end
     end
-    table.insert(out, raw)
+    out[#out + 1] = raw
+    spans[#spans + 1] = { at = base, len = #raw }
 end
 
+--- Returns lines, spans. Callers that do not care about markup can ignore the
+--- second value.
 local function wrapText(text, maxChars)
     if maxChars < 1 then
         maxChars = 1
     end
-    local out = {}
+    local out, spans = {}, {}
+    local base = 1
     for raw in (tostring(text) .. "\n"):gmatch("(.-)\n") do
-        wrapLine(raw, maxChars, out)
+        wrapLine(raw, maxChars, out, spans, base)
+        base = base + #raw + 1 -- the newline
     end
     if #out == 0 then
-        out = { "" }
+        out, spans = { "" }, { { at = 1, len = 0 } }
     end
-    return out
+    return out, spans
 end
 
 --- ** Alert records
@@ -257,18 +511,23 @@ local function layoutStack(screen, position)
     -- Keep the first `fits` lines, with the last one saying what was cut. At
     -- one line the marker has to share it: a band that says only "(+59 more
     -- lines)" tells you nothing about which alert it was.
-    local function truncate(lines, fits)
+    --- Source spans travel alongside so markup survives truncation. The
+    --- synthetic marker line gets a zero-length span: it is text this file
+    --- invented, so no run can possibly refer to it.
+    local function truncate(lines, spans, fits)
         if fits >= #lines then
-            return lines
+            return lines, spans
         end
         if fits > 1 then
-            local kept = {}
+            local kept, keptSpans = {}, {}
             for line = 1, fits - 1 do
                 table.insert(kept, lines[line])
+                table.insert(keptSpans, spans[line])
             end
             table.insert(kept, string.format("... (+%d more lines)",
                                              #lines - (fits - 1)))
-            return kept
+            table.insert(keptSpans, { at = 1, len = 0 })
+            return kept, keptSpans
         end
         local marker = string.format("  ... (+%d more lines)", #lines - 1)
         local head = lines[1]
@@ -276,7 +535,10 @@ local function layoutStack(screen, position)
         if charLen(head) > room then
             head = charSub(head, 1, math.max(0, room))
         end
-        return { head .. marker }
+        -- The head is a prefix of line 1, so it keeps that line's offset; `len'
+        -- shrinks to the head alone, which is what keeps the marker glued onto
+        -- the end from being styled as if it came from the message.
+        return { head .. marker }, { { at = spans[1].at, len = #head } }
     end
 
     local oneLine = kLineHeight + 2 * kPaddingY
@@ -301,16 +563,19 @@ local function layoutStack(screen, position)
         local bands = {}
         for _, index in ipairs(chosen) do
             local alert = list[index]
-            local lines = wrapText(alertDisplayText(alert), maxChars)
+            local lines, spans = wrapText(alertDisplayText(alert), maxChars)
             local full = math.max(kMinBandHeight,
                                   #lines * kLineHeight + 2 * kPaddingY)
             local grant = math.max(0, math.min(full - oneLine, remaining))
             remaining = remaining - grant
             local height = oneLine + grant
             local fits = math.floor((height - 2 * kPaddingY) / kLineHeight)
+            local kept, keptSpans = truncate(lines, spans, fits)
             bands[index] = {
                 alert = alert,
-                lines = truncate(lines, fits),
+                lines = kept,
+                spans = keptSpans,
+                runs = alert.runs,
                 -- Centring is for a short message that fits on its line. A
                 -- truncated one reads as a fragment of something longer, so it
                 -- lines up with the multi-line bands instead.
@@ -381,6 +646,75 @@ local function layoutStack(screen, position)
 end
 
 --- ** Rendering
+local function bandAlignment(band)
+    -- Centring is for a short message that fits on its line. A truncated one
+    -- reads as a fragment of something longer, so it lines up with the
+    -- multi-line bands instead.
+    return (#band.lines == 1 and not band.truncated) and "center" or "left"
+end
+
+local function runAttributes(attrs)
+    local face = kFont
+    if attrs.bold and attrs.italic then
+        face = kFont .. "-BoldItalic"
+    elseif attrs.bold then
+        face = kFont .. "-Bold"
+    elseif attrs.italic then
+        face = kFont .. "-Italic"
+    end
+    local out = { font = { name = face, size = kTextSize } }
+    if attrs.color then
+        out.color = alertV2MarkupColors[attrs.color]
+    end
+    if attrs.underline then
+        out.underlineStyle = hs.styledtext.lineStyles.single
+    end
+    if attrs.strike then
+        out.strikethroughStyle = hs.styledtext.lineStyles.single
+    end
+    return out
+end
+
+--- The band's text, as a plain string when there is no markup -- which is every
+--- caller that predates it -- and as an hs.styledtext when there is.
+---
+--- hs.styledtext indexes by *byte*, the same as string offsets, so runs map
+--- across without any utf8 conversion; a message with an emoji in it is not a
+--- special case. A styledtext ignores the element's textAlignment, though, so
+--- the alignment moves into the base attributes to keep short bands centred.
+local function bandText(band)
+    local plain = table.concat(band.lines, "\n")
+    if not band.runs or #band.runs == 0 then
+        return plain
+    end
+
+    local styled = hs.styledtext.new(plain, {
+        font = { name = kFont, size = kTextSize },
+        color = { white = 1 },
+        paragraphStyle = { alignment = bandAlignment(band) },
+    })
+
+    -- Where each wrapped line ended up in the joined string.
+    local placed, cursor = {}, 1
+    for index, line in ipairs(band.lines) do
+        placed[index] = cursor
+        cursor = cursor + #line + 1 -- the "\n"
+    end
+
+    for _, run in ipairs(band.runs) do
+        for index, span in ipairs(band.spans or {}) do
+            local from = math.max(run.from, span.at)
+            local to = math.min(run.to, span.at + span.len - 1)
+            if to >= from then
+                styled = styled:setStyle(runAttributes(run.attrs),
+                                         placed[index] + (from - span.at),
+                                         placed[index] + (to - span.at))
+            end
+        end
+    end
+    return styled
+end
+
 local function canvasElements(stack, origin)
     local elements = {}
     for _, band in ipairs(stack.bands) do
@@ -397,12 +731,11 @@ local function canvasElements(stack, origin)
         local textHeight = #band.lines * kLineHeight
         table.insert(elements, {
             type = "text",
-            text = table.concat(band.lines, "\n"),
+            text = bandText(band),
             textColor = { white = 1 },
             textFont = kFont,
             textSize = kTextSize,
-            textAlignment = (#band.lines == 1 and not band.truncated)
-                and "center" or "left",
+            textAlignment = bandAlignment(band),
             frame = {
                 x = x + kPaddingX,
                 y = y + (band.height - textHeight) / 2,
@@ -535,13 +868,13 @@ local function tick()
             math.floor((work.w - 2 * kPaddingX) / charWidth()))
         for index, band in ipairs(record.stack.bands) do
             if band.alert and band.alert.countdown then
-                local lines = wrapText(alertDisplayText(band.alert), maxChars)
+                local lines, spans = wrapText(alertDisplayText(band.alert), maxChars)
                 if #lines ~= #band.lines then
                     render()
                     return
                 end
-                band.lines = lines
-                record.canvas[index * 2].text = table.concat(lines, "\n")
+                band.lines, band.spans = lines, spans
+                record.canvas[index * 2].text = bandText(band)
             end
         end
     end
@@ -610,7 +943,9 @@ end
 --- opts (all optional):
 ---   id           re-showing the same id updates that alert in place
 ---   seconds      lifetime, default 5
----   color        band colour, default dark slate
+---   markup       "plain" (default) or "md"; see ** Markup above
+---   color        band colour, default dark slate. A table, or one of the
+---                names default/warn/amber/crit/agent/free/notice
 ---   position     "top" (default), "center", "bottom"
 ---   flashSeconds fullscreen flash before settling into the band; 0 skips it
 ---   countdown    append "clears in M:SS", refreshed once a second
@@ -621,6 +956,14 @@ end
 function alertV2(text, opts)
     opts = opts or {}
     text = tostring(text or "")
+
+    -- Parse before anything else touches the text: everything downstream --
+    -- the id heartbeat below included -- works on the marker-free string, so
+    -- markup never leaks into layout or into a comparison.
+    local runs = nil
+    if opts.markup == "md" then
+        text, runs = parseMarkup(text)
+    end
 
     local seconds = math.max(kMinSeconds,
         math.min(tonumber(opts.seconds) or kDefaultSeconds, kMaxSeconds))
@@ -642,7 +985,8 @@ function alertV2(text, opts)
         table.insert(alertEngineState.alerts, alert)
     end
     alert.text = text
-    alert.color = opts.color or alertV2DefaultColor
+    alert.runs = runs
+    alert.color = resolveBandColor(opts.color)
     alert.position = normalizePosition(opts.position)
     alert.countdown = opts.countdown and true or false
     alert.pinned = opts.pinned and true or false
