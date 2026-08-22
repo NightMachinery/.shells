@@ -27,26 +27,48 @@ headphones are fine, unreachable, or off, so it is safe to run unattended:
 Every one is an environment variable with a `sony_battery_` prefix, overridable
 per call.
 
-    sony_battery_case_min           35    alert below this, for the case
-    sony_battery_bud_min            15    alert below this, for a bud
-    sony_battery_alert_dur          3     seconds the alert stays up
-    sony_battery_charging_skip_p    y     ignore parts that are charging
-    sony_battery_connect_delay      3     settle time before the connect hook reads
+    sony_battery_case_min           35     alert below this, for the case
+    sony_battery_bud_min            15     alert below this, for a bud
+    sony_battery_alert_dur          15     seconds the alert stays up
+    sony_battery_charging_skip_p    y      ignore parts that are charging
+    sony_battery_alert_color        warn   band colour, amber by default
+    sony_battery_connect_delay      3      settle time before the connect hook reads
 
 So a one-off with different limits:
 
     sony_battery_bud_min=30 sony-battery-alert-low
 
-## The case is usually absent
+## What the alert looks like
 
-The earbuds only learn the case's level while docked in it, so most of the time
-`sonyctl` reports no `case` entry at all and the alert simply says nothing about
-it. A case level appears once the buds are docked.
+One line with every part on it, the low ones in bold and the rest dimmed:
 
-This used to be handled here, with a knob that ignored a case reading of `0%`.
-It is now fixed in sonyctl, which is what actually knows the reading is absent —
-so the case never reaches this script as a bogus zero, and `status` and every
-other consumer are fixed too rather than just this one. See the readme there.
+    🎧 Sony battery  L 80%  R 12%  case NA
+                                ^^^^^^ bold, on an amber band
+
+It only appears when something is actually low; the parts that are fine are
+there for context, not as a reason to interrupt you. In the levels, `+` means
+charging and `=` means charged.
+
+The emphasis uses `hs-alert-v2`'s `md` markup mode — see
+`hammerspoon/core/alert-engine.lua`. The jq program emits `**bold**` around the
+low parts and `[...]{dim}` around the rest.
+
+## `NA` means no reading, and it never counts as low
+
+Two everyday situations leave a part with no level at all. The earbuds only
+learn the case's level while docked in it, so out of the case there is nothing
+to report. And an earbud sitting in the case is invisible to the one still in
+your ear.
+
+`sonyctl` reports those as `null`, which this script renders as `NA`. Getting
+this right is the whole reason the distinction exists in sonyctl rather than
+here: `status` and every other consumer are fixed by the same change.
+
+**The trap:** in jq, `null < 35` is **true**. A plain
+`select(.level_percent < threshold)` would therefore treat every unknown part
+as critically low — which is exactly the bug being avoided. The jq program
+guards every comparison behind `known`, i.e. `.level_percent != null`. Anything
+new that reads this JSON has to do the same.
 
 ## Two triggers, deliberately
 
@@ -102,4 +124,3 @@ executing the old code otherwise. After editing the Lua, `hsr`.
   the alert, in the manner of `audio_guard_snooze`.
 - A WH- model reports one battery rather than left/right/case; it is compared
   against `sony_battery_bud_min` and shown as `bat`.
-- In the alert, `+` means charging and `=` means charged.

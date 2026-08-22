@@ -7,12 +7,6 @@
 #: (Magic Keyboard, Magic Trackpad). The MDR protocol is the only source, so
 #: every reading here costs a ~1s Bluetooth session.
 ##
-typeset -g sony_battery_case_min="${sony_battery_case_min:-35}"
-typeset -g sony_battery_bud_min="${sony_battery_bud_min:-15}"
-typeset -g sony_battery_alert_dur="${sony_battery_alert_dur:-3}"
-#: Charging means the number is on its way up, so warning about it is noise.
-typeset -g sony_battery_charging_skip_p="${sony_battery_charging_skip_p:-y}"
-##
 function sony-battery {
     : "battery levels, for a human"
     @darwinOnly
@@ -42,8 +36,9 @@ Says nothing at all when the headphones are fine, unreachable, or absent, so it
 is safe to run on a timer. Knows nothing about scheduling; drive it from cron."
     local case_min="${sony_battery_case_min:-35}"
     local bud_min="${sony_battery_bud_min:-15}"
-    local dur="${sony_battery_alert_dur:-3}"
+    local dur="${sony_battery_alert_dur:-15}"
     local charging_skip_p="${sony_battery_charging_skip_p:-y}"
+    local color="${sony_battery_alert_color:-warn}"
 
     @darwinOnly
     ensure-cmd jq @RET
@@ -52,26 +47,31 @@ is safe to run on a timer. Knows nothing about scheduling; drive it from cron."
     json="$(h-sony-battery-json)" || return 0
     test -n "$json" || return 0
 
-    #: One pass produces both lines of the message: the parts that are actually
-    #: low, then the full picture for context. The second is skipped when every
-    #: part is already in the first, where it would only repeat itself.
+    #: One line carrying every part, marked up for [agfi:hs-alert-v2]'s `md'
+    #: mode: the low ones bold, everything else dimmed, so the part you have to
+    #: do something about is the part that stands out. Splitting this into a
+    #: "what is low" line plus a "what everything is" line only said the same
+    #: thing twice.
+    #:
+    #: A level of null means sonyctl has no reading -- see [[../../../docs/sony-battery.md]].
+    #: It renders as NA and never counts as low: in jq `null < 35' is *true*, so
+    #: every comparison has to be guarded, which is what `known' is for.
+    #:
     #: `label' is a jq keyword, hence `abbr'.
     local prog='
 def abbr: {"left":"L","right":"R","case":"case","battery":"bat"}[.part] // .part;
 def threshold: if .part == "case" then $case_min else $bud_min end;
 def charging_now: .charging == "yes" or .charging == "complete";
 def mark: if .charging == "yes" then "+" elif .charging == "complete" then "=" else "" end;
-def show: "\(abbr) \(.level_percent)%\(mark)";
-[ .batteries[] ] as $known
-| [ $known[]
-    | select( ($skip_charging == "y" and charging_now) | not )
-    | select(.level_percent < threshold) ] as $low
-| if ($low | length) == 0 then empty
-  else
-    ( $low | map(show) | join(", ") ),
-    ( if ($known | length) > ($low | length)
-      then ($known | map(show) | join("  ")) else empty end )
-  end
+def known: .level_percent != null;
+def low: known
+    and (($skip_charging == "y" and charging_now) | not)
+    and (.level_percent < threshold);
+def show: "\(abbr) " + (if known then "\(.level_percent)%\(mark)" else "NA" end);
+def render: if low then "**\(show)**" else "[\(show)]{dim}" end;
+if [ .batteries[] | select(low) ] | length == 0 then empty
+else [ .batteries[] | render ] | join("  ")
+end
 '
     local out
     out="$(ec "$json" | jq --raw-output \
@@ -83,14 +83,11 @@ def show: "\(abbr) \(.level_percent)%\(mark)";
     #: Nothing low. The overwhelmingly common case, and it must stay silent.
     test -n "$out" || return 0
 
-    local lines=( "${(@f)out}" )
-    local msg="🎧 Sony battery low: ${lines[1]}"
-    test -z "${lines[2]}" || msg="${msg}"$'\n'"${lines[2]}"
-
     #: [agfi:hammerspoon] is `gtimeout 30s hs -A -t 5', so a wedged Hammerspoon
     #: could stall this for half a minute; a warning we cannot deliver must not
     #: become a cron job that never exits.
-    silence reval-timeout 10 @opts dur "${dur}" @ alert "$msg" ||
+    reval-timeout 10 @opts dur "${dur}" markup md color "${color}" @ \
+        alert "🎧 Sony battery  ${out}" ||
         ecgray "$0: hs-alert failed; is Hammerspoon responsive?"
 }
 ##
