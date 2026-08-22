@@ -42,10 +42,18 @@ on top of these and needed no changes, as do the hyper+F1/F2 and
 hyper+shift+F1/F2 bindings in `hammerspoon/core/window-media-bindings.lua`.
 
 `brightness-displays` prints TSV — index, backend, backend-local id, `main`,
-built-in/external, name:
+built-in/external, name, CGDirectDisplayID:
 
-    0	internal	0	-	built-in	Built-in
-    1	ddc		1	main	external	ACME X270Q
+    0	internal	0	-	built-in	Built-in	1
+    1	ddc		1	main	external	ACME X270Q	2
+
+That last field is what `hs.screen:id()` returns, which is how blanking finds
+the right screen to gamma out.
+
+Contrast rides along on the same 0..1 scale, for external panels only:
+
+    contrast-get-ddc [n]
+    contrast-set-ddc 0.5 [n]
 
 ## Selectors
 
@@ -80,6 +88,52 @@ Environment variables, overridable per call.
 `m1ddc` can report a panel's own ceiling, but that is an extra DDC round trip on
 every call and virtually every monitor answers 100. `brightness-ddc-max` asks,
 if you want to check yours and pin the variable.
+
+## Blanking: "brightness 0" means two different things
+
+    display-black-on     [sel]
+    display-black-off              # no selector; restores exactly what it blanked
+    display-black-toggle [sel]
+    display-black-p                # is anything blanked?
+
+The reason this is not just `brightness-set 0`:
+
+    built-in   IOKit brightness 0 really does cut the backlight. The panel goes
+               black and nothing else is needed.
+    external   DDC luminance 0 is the *dimmest backlight setting*, not off. The
+               panel stays visibly lit — a grey glow, not a dark screen.
+
+So external panels get the image blacked in software with a zero gamma table
+(`hs.screen:setGamma`), with DDC luminance and contrast floored underneath it so
+what leaks through the backlight is as dark as the hardware allows. Built-in
+panels are left alone gamma-wise; the backlight being off is enough, and not
+touching their gamma keeps the working display's colour intact.
+
+Neither is a power-off. The backlight on an external panel is still running, so
+this saves nothing and still glows faintly in a dark room. `display-off` /
+`displaysleep` (`pmset displaysleepnow`) remain the only real power saving, at
+the cost of sleeping every display and waking on any keypress.
+
+`display-black-on` records each display's prior brightness and contrast in redis
+(`display_black_saved`), and `display-black-off` puts those exact values back —
+so unlike the old fixed 0.435, you land where you started.
+
+### hyper+shift+F1 / F2
+
+`brightness-off` and `brightness-on` in `zshlang/auto-load/others/power.zsh` now
+call `display-black-on` / `display-black-off`, so the existing bindings in
+`hammerspoon/core/window-media-bindings.lua` needed no change and keep their
+`caffeinate-on` behaviour — blank the screen, leave the machine running.
+
+### If a screen is ever left black
+
+`display-black-off` restores gamma unconditionally, before it looks at any saved
+state, so running it blind is the fix. Failing that, from another machine or
+blind-typed:
+
+    hs -c 'hs.screen.restoreGamma()'
+
+Unplugging and replugging the monitor also resets the gamma table.
 
 ## DDC reads are unreliable; writes are not
 
