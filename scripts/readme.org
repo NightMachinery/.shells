@@ -85,5 +85,10 @@ Each display is routed to whichever backend can talk to it —
 [[agfi:brightness-displays]] shows which — and a selector picks the display when
 several are attached, defaulting to the main one.
 
+=display-black-on= / =-off= / =-toggle= blank a display outright. That is not the
+same as brightness 0: on a built-in panel IOKit really does cut the backlight,
+but DDC luminance 0 leaves an external one visibly lit, so those get a zero gamma
+table with the DDC levels floored underneath. hyper+shift+F1/F2 go through here.
+
 See =./docs/external-display-brightness.md=, which also records how often DDC
 reads come back corrupt and what is done about it.
