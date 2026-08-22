@@ -92,9 +92,21 @@ if you want to check yours and pin the variable.
 ## Blanking: "brightness 0" means two different things
 
     display-black-on     [sel]
-    display-black-off              # no selector; restores exactly what it blanked
+    display-black-off    [sel]     # bare: restores everything that was blanked
     display-black-toggle [sel]
     display-black-p                # is anything blanked?
+
+Each of those, plus `brightness-off` / `brightness-on`, has `-main`, `-all`,
+`-internal` and `-external` suffixed forms:
+
+    display-black-on-all
+    display-black-toggle-external
+    brightness-off-all
+
+Only this family gets them. `brightness-get-internal` and `brightness-get-ddc`
+already exist as *backend* helpers taking a display index, and `brightness-set`
+takes its value first, so `brightness-set-all 0.5` would put the selector where
+the value goes.
 
 The reason this is not just `brightness-set 0`:
 
@@ -118,12 +130,21 @@ the cost of sleeping every display and waking on any keypress.
 (`display_black_saved`), and `display-black-off` puts those exact values back —
 so unlike the old fixed 0.435, you land where you started.
 
+Restoring a subset works: `display-black-off internal` un-blanks the laptop and
+leaves the monitor black. That needs a little care, because `hs.screen.restoreGamma()`
+is global — so anything still meant to be blanked has its gamma re-applied
+afterwards. Whether a display was gamma'd is the last field of the saved state.
+
 ### hyper+shift+F1 / F2
 
-`brightness-off` and `brightness-on` in `zshlang/auto-load/others/power.zsh` now
-call `display-black-on` / `display-black-off`, so the existing bindings in
-`hammerspoon/core/window-media-bindings.lua` needed no change and keep their
-`caffeinate-on` behaviour — blank the screen, leave the machine running.
+`brightness-off` and `brightness-on` in `zshlang/auto-load/others/power.zsh` call
+`display-black-on` / `display-black-off` and pass a selector straight through, so
+they keep their `caffeinate-on` behaviour — blank the screen, leave the machine
+running.
+
+The bindings in `hammerspoon/core/window-media-bindings.lua` use the `-all`
+forms. Blanking only the main display leaves the other screen lit, which defeats
+the point with the lid open.
 
 ### If a screen is ever left black
 
