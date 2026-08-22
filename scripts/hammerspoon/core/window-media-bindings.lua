@@ -67,18 +67,21 @@ bindWithRepeatV2{
     auto_trigger_p=false
 }
 
+-- `-all`, so these blank every display rather than just whichever is currently
+-- main. Blanking only the main one leaves the other screen lit, which defeats
+-- the point when the lid is open.
 hyper_bind_v2{
     mods={"shift"},
     key="F1",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-off')
+        brishzeval('awaysh-fast brightness-off-all')
     end,
 }
 hyper_bind_v2{
     mods={"shift"},
     key="F2",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-on')
+        brishzeval('awaysh-fast brightness-on-all')
     end,
 }
 ---
