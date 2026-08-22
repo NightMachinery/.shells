@@ -2,14 +2,22 @@
 aliasfn displaysleep-darwin pmset displaysleepnow
 aliasfn displaysleep displaysleep-darwin
 ##
+#: These two are what hyper+shift+F1 / F2 are bound to in
+#: `hammerspoon/core/window-media-bindings.lua`. They blank the screen rather
+#: than merely dim it, so they go through [agfi:display-black-on], which knows
+#: that DDC luminance 0 leaves an external panel visibly lit while IOKit
+#: brightness 0 really does cut a built-in backlight.
+##
 function brightness-off {
     caffeinate-on
-    brightness-set 0
+    display-black-on
 }
 
 function brightness-on {
     # caffeinate-off
-    brightness-set 0.435
+    #: Restores whatever the levels were, rather than the fixed 0.435 this used
+    #: to jump to.
+    display-black-off
 }
 
 function caffeinate-on {
