@@ -428,7 +428,7 @@ Output (TSV): m1ddc display number, CGDirectDisplayID (decimal), product name"
 function brightness-displays {
     : "Every display with the backend that can drive its brightness.
 Output (TSV): index, backend (internal|ddc|none), backend-local id, main|-,
-built-in|external, name
+built-in|external, name, CGDirectDisplayID
 
 The two backends number displays differently, so they are joined on the
 CGDirectDisplayID: \`brightness -l\` prints it as 'ID 0x2', m1ddc as
@@ -469,7 +469,10 @@ CGDirectDisplayID: \`brightness -l\` prints it as 'ID 0x2', m1ddc as
             : ${name:='External'}
         fi
 
-        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$f[1]" "$backend" "$local_id" "$f[2]" "$f[3]" "$name"
+        #: The display id is carried through as the last field: it is what
+        #: `hs.screen:id()` returns, so [agfi:h-display-black-gamma] can find
+        #: the same screen without re-deriving anything.
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$f[1]" "$backend" "$local_id" "$f[2]" "$f[3]" "$name" "$f[4]"
     done
 }
 
@@ -494,7 +497,7 @@ Resolves a selector to the matching [agfi:brightness-displays] lines.
     for line in "${(@f)all}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
-        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
 
         case "$sel" in
             all) out+=("$line") ;;
@@ -622,6 +625,20 @@ function brightness-get-ddc {
     ensure-dep-m1ddc @RET
 
     local max="${brightness_ddc_max:-100}"
+    local raw
+    raw="$(h-m1ddc-get "$i" luminance)" @TRET
+
+    #: %f, to match the format nriley `brightness` prints. Bare zsh float
+    #: arithmetic would give '0.34999999999999998' here.
+    printf '%f\n' $((raw*1.0/max))
+}
+
+function h-m1ddc-get {
+    : "usage: h-m1ddc-get <m1ddc-display> <luminance|contrast|...>
+One validated DDC reading, as a raw integer."
+    ##
+    local i="$1" attr="$2"
+    assert-args i attr @RET
 
     #: DDC reads come back corrupt now and then — measured here at roughly 1 in
     #: 13 over a USB-C hub, returning '-7' for a panel pinned at 50. m1ddc still
@@ -630,24 +647,62 @@ function brightness-get-ddc {
     #:
     #: Writes are not affected, and neither is `chg` (m1ddc does that read
     #: internally): 40 consecutive +1/-1 round trips landed back on exactly 50.
+    local max="${brightness_ddc_max:-100}"
     local -i tries="${brightness_ddc_retries:-3}"
     local raw='' n=0
     while (( n < tries )) ; do
         (( n++ ))
 
-        raw="$(command m1ddc display "$i" get luminance 2>/dev/null)" || continue
+        raw="$(command m1ddc display "$i" get "$attr" 2>/dev/null)" || continue
 
         #: `<->` matches non-negative integers, so a corrupt '-7' fails here.
         if [[ "$raw" == <-> ]] && (( raw <= max )) ; then
-            #: %f, to match the format nriley `brightness` prints. Bare zsh
-            #: float arithmetic would give '0.34999999999999998' here.
-            printf '%f\n' $((raw*1.0/max))
+            ec "$raw"
             return 0
         fi
     done
 
-    ecerr "$0: display ${i} gave no valid luminance in ${tries} tries (last: $(gquote-sq "$raw"))"
+    ecerr "$0: display ${i} gave no valid ${attr} in ${tries} tries (last: $(gquote-sq "$raw"))"
     return 1
+}
+
+function contrast-get-ddc {
+    : "usage: contrast-get-ddc [<m1ddc-display>]
+Contrast as 0..1, on the same scale as the brightness functions."
+    # @appleSiliconOnly
+    ##
+    local i="${1:-1}"
+
+    assert isAppleSilicon @MRET
+    ensure-dep-m1ddc @RET
+
+    local max="${brightness_ddc_max:-100}"
+    local raw
+    raw="$(h-m1ddc-get "$i" contrast)" @TRET
+
+    printf '%f\n' $((raw*1.0/max))
+}
+
+function contrast-set-ddc {
+    : "usage: contrast-set-ddc <0..1> [<m1ddc-display>]"
+    # @appleSiliconOnly
+    ##
+    local v="$1" i="${2:-1}"
+    assert-args v @RET
+
+    assert isAppleSilicon @MRET
+    ensure-dep-m1ddc @RET
+
+    local max="${brightness_ddc_max:-100}"
+    local n
+    n="$(printf '%.0f' $((v*max)))"
+    if (( n > max )) ; then
+        n=$max
+    elif (( n < 0 )) ; then
+        n=0
+    fi
+
+    silent command m1ddc display "$i" set contrast "$n"
 }
 
 function brightness-set-ddc {
@@ -727,6 +782,136 @@ function brightness-dec {
     local amount="${1:-0.01}" sel="${2:-${brightness_display:-main}}"
 
     brightness-inc $((amount*-1)) "$sel"
+}
+##
+#: Blanking a display takes a different route per panel, because "brightness 0"
+#: does not mean the same thing on both:
+#:   built-in  IOKit brightness 0 really does cut the backlight; the panel goes
+#:             black and that is all it takes.
+#:   external  DDC luminance 0 is only the *dimmest* backlight setting, not off.
+#:             It stays visibly lit, so the image is blacked in software with a
+#:             zero gamma table and the DDC levels are floored underneath it.
+#: Neither one powers the monitor down — see `display-off` for that.
+##
+redis-defvar display_black_saved
+#: TSV lines: display-id, backend, backend-local id, brightness, contrast.
+#: Doubles as the "is anything blanked" flag for [agfi:display-black-p].
+
+function h-display-black-gamma {
+    : "usage: h-display-black-gamma <display-id> on|off
+Zeroes one screen's gamma table. Matched on the CGDirectDisplayID, which is
+exactly what \`hs.screen:id()\` returns."
+    ##
+    local id="$1" mode="$2"
+    assert-args id mode @RET
+
+    if [[ "$mode" == on ]] ; then
+        silent hammerspoon -c "for _, s in ipairs(hs.screen.allScreens()) do if s:id() == ${id} then s:setGamma({red=0,green=0,blue=0},{red=0,green=0,blue=0}) end end"
+    else
+        #: Global, and deliberately so. Per-screen we could only force gamma
+        #: back to identity, which would flatten a real calibration or Night
+        #: Shift; `restoreGamma` puts back what macOS actually had. Blanking is
+        #: the only thing here that touches gamma, so restoring every screen
+        #: cannot lose anything.
+        silent hammerspoon -c 'hs.screen.restoreGamma()'
+    fi
+}
+
+function display-black-on {
+    : "usage: display-black-on [<selector>]
+Blanks the selected display(s), remembering their levels so
+[agfi:display-black-off] can put them back. Selectors: see
+[agfi:h-brightness-select]."
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
+    local lines
+    lines="$(h-brightness-select "$sel")" @TRET
+
+    local line b c ret=0
+    local -a f saved=()
+    for line in "${(@f)lines}" ; do
+        [[ -n "$line" ]] || continue
+        f=("${(@ps:\t:)line}")
+        #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
+
+        b='-' c='-'
+        if [[ "$f[2]" != none ]] ; then
+            b="$(brightness-get-$f[2] "$f[3]" 2>/dev/null)" || b='-'
+            brightness-set-$f[2] 0 "$f[3]" || ret=$?
+        fi
+
+        if [[ "$f[2]" == ddc ]] ; then
+            c="$(contrast-get-ddc "$f[3]" 2>/dev/null)" || c='-'
+            contrast-set-ddc 0 "$f[3]" || ret=$?
+        fi
+
+        #: Only external panels need the software blackout; a built-in one is
+        #: already dark from the backlight being off, and leaving its gamma
+        #: alone keeps the working display's colour untouched.
+        if [[ "$f[5]" == external ]] ; then
+            h-display-black-gamma "$f[7]" on || ret=$?
+        fi
+
+        saved+=("$f[7]"$'\t'"$f[2]"$'\t'"$f[3]"$'\t'"$b"$'\t'"$c")
+    done
+
+    (( $#saved )) && display_black_saved_set "${(pj:\n:)saved}"
+
+    return $ret
+}
+
+function display-black-off {
+    : "Undoes [agfi:display-black-on], restoring gamma and the remembered levels.
+Takes no selector: it puts back exactly what was blanked."
+    ##
+    #: Unconditional, so this doubles as the way out if the saved state was
+    #: ever lost while a screen was left black.
+    h-display-black-gamma 0 off
+
+    local saved
+    saved="$(display_black_saved_get)" || saved=''
+    if [[ -z "$saved" ]] ; then
+        return 0
+    fi
+
+    local line ret=0
+    local -a f
+    for line in "${(@f)saved}" ; do
+        [[ -n "$line" ]] || continue
+        f=("${(@ps:\t:)line}")
+        #: f: 1 display-id  2 backend  3 local-id  4 brightness  5 contrast
+
+        if [[ "$f[4]" != '-' && "$f[2]" != none ]] ; then
+            brightness-set-$f[2] "$f[4]" "$f[3]" || ret=$?
+        fi
+
+        if [[ "$f[5]" != '-' ]] ; then
+            contrast-set-ddc "$f[5]" "$f[3]" || ret=$?
+        fi
+    done
+
+    display_black_saved_del
+
+    return $ret
+}
+
+function display-black-p {
+    : "Whether anything is currently blanked."
+    ##
+    test -n "$(display_black_saved_get)"
+}
+
+function display-black-toggle {
+    : "usage: display-black-toggle [<selector>]"
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
+    if display-black-p ; then
+        display-black-off
+    else
+        display-black-on "$sel"
+    fi
 }
 ##
 function brightness-screen {
