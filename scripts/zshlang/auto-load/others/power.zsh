@@ -9,16 +9,32 @@ aliasfn displaysleep displaysleep-darwin
 #: brightness 0 really does cut a built-in backlight.
 ##
 function brightness-off {
+    : "usage: brightness-off [<selector>]
+Selectors: see [agfi:h-brightness-select]."
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
     caffeinate-on
-    display-black-on
+    display-black-on "$sel"
 }
 
 function brightness-on {
+    : "usage: brightness-on [<selector>]
+With no selector, restores every blanked display."
+    ##
     # caffeinate-off
     #: Restores whatever the levels were, rather than the fixed 0.435 this used
     #: to jump to.
-    display-black-off
+    display-black-off "$1"
 }
+
+#: See the note in system.zsh on why only this family gets selector suffixes.
+for h_db_fn in brightness-off brightness-on ; do
+    for h_db_sel in main all internal external ; do
+        h_aliasfn "${h_db_fn}-${h_db_sel}" "${h_db_fn}" "${h_db_sel}"
+    done
+done
+unset h_db_fn h_db_sel
 
 function caffeinate-on {
     reval-ecgray tmuxnewsh2 caffeinate reval-ec caffeinate -d

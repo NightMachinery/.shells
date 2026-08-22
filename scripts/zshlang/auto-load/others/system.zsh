@@ -794,8 +794,9 @@ function brightness-dec {
 #: Neither one powers the monitor down — see `display-off` for that.
 ##
 redis-defvar display_black_saved
-#: TSV lines: display-id, backend, backend-local id, brightness, contrast.
-#: Doubles as the "is anything blanked" flag for [agfi:display-black-p].
+#: TSV lines: display-id, backend, backend-local id, brightness, contrast,
+#: gamma-applied. Doubles as the "is anything blanked" flag for
+#: [agfi:display-black-p].
 
 function h-display-black-gamma {
     : "usage: h-display-black-gamma <display-id> on|off
@@ -828,14 +829,14 @@ Blanks the selected display(s), remembering their levels so
     local lines
     lines="$(h-brightness-select "$sel")" @TRET
 
-    local line b c ret=0
+    local line b c g ret=0
     local -a f saved=()
     for line in "${(@f)lines}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
         #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
 
-        b='-' c='-'
+        b='-' c='-' g=n
         if [[ "$f[2]" != none ]] ; then
             b="$(brightness-get-$f[2] "$f[3]" 2>/dev/null)" || b='-'
             brightness-set-$f[2] 0 "$f[3]" || ret=$?
@@ -851,9 +852,10 @@ Blanks the selected display(s), remembering their levels so
         #: alone keeps the working display's colour untouched.
         if [[ "$f[5]" == external ]] ; then
             h-display-black-gamma "$f[7]" on || ret=$?
+            g=y
         fi
 
-        saved+=("$f[7]"$'\t'"$f[2]"$'\t'"$f[3]"$'\t'"$b"$'\t'"$c")
+        saved+=("$f[7]"$'\t'"$f[2]"$'\t'"$f[3]"$'\t'"$b"$'\t'"$c"$'\t'"$g")
     done
 
     (( $#saved )) && display_black_saved_set "${(pj:\n:)saved}"
@@ -862,11 +864,15 @@ Blanks the selected display(s), remembering their levels so
 }
 
 function display-black-off {
-    : "Undoes [agfi:display-black-on], restoring gamma and the remembered levels.
-Takes no selector: it puts back exactly what was blanked."
+    : "usage: display-black-off [<selector>]
+Undoes [agfi:display-black-on], restoring gamma and the remembered levels. With
+no selector it puts back everything that was blanked; with one, only the
+displays it matches. Selectors: see [agfi:h-brightness-select]."
     ##
-    #: Unconditional, so this doubles as the way out if the saved state was
-    #: ever lost while a screen was left black.
+    local sel="$1"
+
+    #: Unconditional, and before anything else, so running this bare is always
+    #: the way out of a screen left black.
     h-display-black-gamma 0 off
 
     local saved
@@ -875,12 +881,33 @@ Takes no selector: it puts back exactly what was blanked."
         return 0
     fi
 
+    #: No selector means everything. Otherwise collect the display ids it
+    #: resolves to, and put back only those.
+    local -a wanted=()
+    if [[ -n "$sel" ]] ; then
+        local sline
+        local -a sf
+        for sline in "${(@f)$(h-brightness-select "$sel")}" ; do
+            [[ -n "$sline" ]] || continue
+            sf=("${(@ps:\t:)sline}")
+            wanted+=("$sf[7]")
+        done
+    fi
+
     local line ret=0
-    local -a f
+    local -a f keep=()
     for line in "${(@f)saved}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
-        #: f: 1 display-id  2 backend  3 local-id  4 brightness  5 contrast
+        #: f: 1 display-id  2 backend  3 local-id  4 brightness  5 contrast  6 gamma-applied
+
+        if (( $#wanted )) && (( ! $wanted[(Ie)$f[1]] )) ; then
+            #: Not selected, so it stays blanked — but the gamma restore above
+            #: was global, so put its blackout back.
+            keep+=("$line")
+            [[ "$f[6]" == y ]] && h-display-black-gamma "$f[1]" on
+            continue
+        fi
 
         if [[ "$f[4]" != '-' && "$f[2]" != none ]] ; then
             brightness-set-$f[2] "$f[4]" "$f[3]" || ret=$?
@@ -891,7 +918,11 @@ Takes no selector: it puts back exactly what was blanked."
         fi
     done
 
-    display_black_saved_del
+    if (( $#keep )) ; then
+        display_black_saved_set "${(pj:\n:)keep}"
+    else
+        display_black_saved_del
+    fi
 
     return $ret
 }
@@ -908,11 +939,27 @@ function display-black-toggle {
     local sel="${1:-${brightness_display:-main}}"
 
     if display-black-p ; then
-        display-black-off
+        display-black-off "$sel"
     else
         display-black-on "$sel"
     fi
 }
+##
+#: Selector-suffixed conveniences: display-black-on-all, display-black-toggle-external, ...
+#:
+#: Only for this family. The brightness getters must NOT get the same treatment:
+#: `brightness-get-internal` and `brightness-get-ddc` already exist as backend
+#: helpers taking a display index, and `brightness-set-all 0.5` would put the
+#: selector where the value goes.
+#:
+#: h_aliasfn rather than the `aliasfn` alias, since aliases are resolved at parse
+#: time and this is built in a loop.
+for h_db_fn in display-black-on display-black-off display-black-toggle ; do
+    for h_db_sel in main all internal external ; do
+        h_aliasfn "${h_db_fn}-${h_db_sel}" "${h_db_fn}" "${h_db_sel}"
+    done
+done
+unset h_db_fn h_db_sel
 ##
 function brightness-screen {
 	local mode="${1:-1}"
