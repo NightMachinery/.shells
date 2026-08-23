@@ -12,7 +12,7 @@ function sony-battery {
     @darwinOnly
     ensure-cmd sonyctl @RET
 
-    sonyctl battery
+    sonyctl battery "$@"
 }
 
 function h-sony-battery-json {
