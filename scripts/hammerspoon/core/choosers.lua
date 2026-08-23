@@ -146,7 +146,7 @@ local function loadEmojiData()
     local filePath = os.getenv("HOME") .. "/code/misc/unicode-emoji-json/data-by-emoji.json"
     local file = io.open(filePath, "r")
     if not file then
-        hs.alert.show("Emoji data file not found")
+        alertV2("Emoji data file not found", { color = "warn" })
         return
     end
 
@@ -157,41 +157,30 @@ local function loadEmojiData()
 end
 loadEmojiData()
 
-local emojiAlert -- Reference to the alert
-
-local emojiStyle = {
-    -- Define your custom style here, similar to hyperStyle
-    atScreenEdge = 1,
-    fadeInDuration = 0.001,
-    fadeOutDuration = 0.001,
-    fillColor = { white = 1, alpha = 2 / 3 },
-
-    radius = 24,
-    strokeColor = { red = 19 / 255, green = 182 / 255, blue = 133 / 255, alpha = 1},
-    strokeWidth = 16,
-    textColor = { white = 0.125 },
-    textSize = 48,
-}
+-- A fixed id rather than a handle: re-showing it rewrites the running tally of
+-- picked emoji in place, so there is nothing to close before showing the next
+-- one.
+local kEmojiAlertId = "emoji-chooser"
 
 function emojiChooser()
     local selectedEmojis = {} -- Table to store selected emojis
 
     local function updateAlert()
-        if emojiAlert then
-            hs.alert.closeSpecific(emojiAlert)
-        end
-
         if #selectedEmojis >= 1 then
-            local message = table.concat(selectedEmojis)
-            emojiAlert = hs.alert.show(message, emojiStyle, hs.screen.mainScreen(), 'infinite')
+            alertV2(table.concat(selectedEmojis), {
+                id = kEmojiAlertId,
+                -- The chooser clears this itself; the engine's own 4h ceiling is
+                -- only a backstop against a crash leaving it on screen.
+                seconds = math.huge,
+                screens = "primary",
+            })
+        else
+            alertV2Dismiss(kEmojiAlertId)
         end
     end
 
     local function clearAlert()
-        if emojiAlert then
-            hs.alert.closeSpecific(emojiAlert)
-            emojiAlert = nil
-        end
+        alertV2Dismiss(kEmojiAlertId)
     end
 
     local chooser = hs.chooser.new(function(choice)
@@ -290,7 +279,7 @@ function emojiChooser()
 
     -- If an error occurred, clean up and rethrow the error
     if not success then
-        hs.alert("emojiChooser error:" .. err)
+        alertV2("emojiChooser error:" .. err, { color = "crit", seconds = 10 })
 
         cleanup()
         error(err)
@@ -305,6 +294,10 @@ function emojiChooser()
 end
 hyper_bind_v2{mods={}, key="a", pressedfn=emojiChooser}
 --- * Wi-Fi Chooser
+-- One id for the whole connect flow, so "Connecting" is replaced by its own
+-- outcome rather than leaving two bands stacked.
+local kWifiAlertId = "wifi-chooser"
+
 local wifiChooserScan = nil
 local wifiChooserNetworkCache = nil
 local wifiChooserNetworkCacheAt = nil
@@ -341,22 +334,22 @@ function wifiChooser()
 
             if choice.connected then
                 wifi.disassociate(interface)
-                hs.alert("Disconnected from Wi-Fi: " .. choice.ssid)
+                alertV2("Disconnected from Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
                 return
             end
 
             if not interface then
-                hs.alert("No Wi-Fi interface found")
+                alertV2("No Wi-Fi interface found", { id = kWifiAlertId, color = "warn" })
                 return
             end
 
-            hs.alert("Connecting Wi-Fi: " .. choice.ssid)
+            alertV2("Connecting Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
             hs.task.new("/usr/sbin/networksetup", function(exitCode, stdOut, stdErr)
                     if exitCode == 0 then
-                        hs.alert("Connected Wi-Fi: " .. choice.ssid)
+                        alertV2("Connected Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
                     else
                         local err = stdErr or stdOut or ""
-                        hs.alert("Wi-Fi connect failed: " .. choice.ssid .. "\n" .. err)
+                        alertV2("Wi-Fi connect failed: " .. choice.ssid .. "\n" .. err, { id = kWifiAlertId, color = "crit" })
                     end
             end, {"-setairportnetwork", interface, choice.ssid}):start()
     end)
