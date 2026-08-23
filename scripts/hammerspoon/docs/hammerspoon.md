@@ -100,11 +100,24 @@ everything that goes through `hs-alert` in zshlang: several alerts can be up at
 once without hiding each other, long text wraps and the band grows rather than
 being cut off, and an optional fullscreen flash makes one impossible to miss.
 
-It is the engine for the Lua config too. Nothing here calls `hs.alert` any
-more; every caller uses `alertV2` directly, which is why alerts raised from a
-hotkey and alerts raised from the shell now look and stack the same way. The
-`alert` global in `boot.lua` still points at stock `hs.alert` as a console
-convenience, so the old engine remains reachable by hand.
+It is the engine for the Lua config too, which is why alerts raised from a
+hotkey and alerts raised from the shell now look and stack the same way.
+
+Callers do not name it, though. Everything goes through `alert_gateway`, with
+`alert_gateway_dismiss` and `alert_gateway_exists` beside it, and only those
+three functions know that the engine is `alertV2`. Changing which engine draws
+an alert, or routing a subset of them somewhere else, is an edit at the bottom
+of `core/alert-engine.lua` rather than a sweep over every caller. `opts` is
+passed through untouched, so callers still use the option names below. The zsh
+side has the same shape: `hs-alert` is a gateway over `hs-alert-v2`, with
+`hs-alert-v1` still beside it.
+
+For the same reason callers ask for colours by name (`color = "agent"`) rather
+than by referencing an `alertV2*Color` table.
+
+Stock `hs.alert` is the `alert_v1` global in `boot.lua` — named for what it is
+so nothing reaches for it by accident, and kept only so the old engine stays
+reachable by hand from the console.
 
 Anything fired repeatedly passes a stable `id`, which is what keeps a held
 volume key from stacking one band per repeat: re-showing an id rewrites that
@@ -116,9 +129,9 @@ chooser shares a single id across the whole connect flow, so `Connecting` is
 replaced by its own outcome rather than leaving two bands up.
 
 Callers that used to hold an alert handle and close it now use a fixed id and
-`alertV2Dismiss`, and pass `seconds = math.huge` where they mean "until I clear
-it" — the engine clamps that to its own ceiling, so a caller that dies cannot
-leave a band on screen.
+`alert_gateway_dismiss`, and pass `seconds = math.huge` where they mean "until
+I clear it" — the engine clamps that to its own ceiling, so a caller that dies
+cannot leave a band on screen.
 
 It loads after `modal-mode.lua` because it reuses `ModalMode.targetScreens` and
 `ModalMode.onScreenChange` rather than running a second screen watcher. No
@@ -126,11 +139,16 @@ canvas mouse events are registered, so every canvas is inert to the pointer and
 clicks pass through to whatever is underneath.
 
 ```sh
-hs -c 'alertV2("hello", { seconds = 5 })'
+hs -c 'alert_gateway("hello", { seconds = 5 })'
+hs -c 'alert_gateway_dismiss("some-id")'
 hs -c 'alertV2FromFile("/tmp/message.txt", { position = "bottom" })'
-hs -c 'alertV2Dismiss("some-id")'
 hs -c 'alertV2DismissAll()'
 ```
+
+The first two are the gateway. The last two are engine entry points with no
+gateway of their own: `alertV2FromFile` is what the shell wrapper calls, and
+`alertV2DismissAll` has no caller in the Lua config, so neither was given an
+indirection that nothing would use.
 
 Options: `id` (re-showing the same id updates that alert in place), `seconds`,
 `color`, `position`, `flashSeconds`, `countdown`, `pinned`, and `screens` (a
