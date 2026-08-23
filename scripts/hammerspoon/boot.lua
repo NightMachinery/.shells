@@ -20,7 +20,10 @@ window = require "hs.window"
 hotkey = require "hs.hotkey"
 keycodes = require "hs.keycodes"
 fnutils = require "hs.fnutils"
-alert = require "hs.alert"
+-- Stock hs.alert, kept reachable by hand for the console. Named for what it is
+-- so that nothing reaches for it by accident: alerts go through alert_gateway,
+-- which is v2. Mirrors [agfi:hs-alert-v1] on the zsh side.
+alert_v1 = require "hs.alert"
 screen = require "hs.screen"
 grid = require "hs.grid"
 hints = require "hs.hints"
