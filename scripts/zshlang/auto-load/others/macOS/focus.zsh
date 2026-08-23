@@ -1,9 +1,18 @@
 ##
+#: Whether DND is on is one fact, so both sides of the toggle raise their alert
+#: under the same id. The v2 engine stacks a band per alert, so without an id a
+#: run of toggles leaves a column of contradictory bands on screen; re-using the
+#: id rewrites the existing band instead. The text still differs between on and
+#: off, so the change is not treated as a heartbeat and does flash.
+#: See [agfi:hs-alert-v2] for the knob, and the "** Gateway" section of
+#: hammerspoon/core/alert-engine.lua for the engine side.
+typeset -g focus_dnd_alert_id='focus-dnd'
+##
 function focus-off {
     if isDarwin ; then
        shortcuts run 'Focus Off'
 
-        alert "Do Not Disturb: off"
+        alert_id="$focus_dnd_alert_id" alert "Do Not Disturb: off"
     else
         @NA
     fi
@@ -40,7 +49,7 @@ function focus-do-not-disturb-on {
     if isDarwin ; then
         shortcuts run 'Focus Set: Do Not Disturb'
 
-        alert "Do Not Disturb: ON"
+        alert_id="$focus_dnd_alert_id" alert "Do Not Disturb: ON"
     else
         @NA
     fi
