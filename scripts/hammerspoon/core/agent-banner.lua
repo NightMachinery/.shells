@@ -41,7 +41,7 @@ local kDefaultSeconds = 30 * 60
 local kMaxSeconds = 4 * 60 * 60
 
 function agentBannerActive()
-    return alertV2Exists(kBannerId)
+    return alert_gateway_exists(kBannerId)
 end
 
 function agentBannerOn(message, seconds, flashSeconds)
@@ -61,14 +61,14 @@ function agentBannerOn(message, seconds, flashSeconds)
 
     -- Raising the banner inside the release flash would otherwise leave both
     -- bands stacked, saying opposite things.
-    alertV2Dismiss(kReleaseId)
+    alert_gateway_dismiss(kReleaseId)
 
     -- The engine's same-id, same-text rule is what makes a heartbeat quiet: it
     -- pushes the deadline out without flashing again. A changed message does
     -- flash, because it is new information.
-    alertV2(text, {
+    alert_gateway(text, {
         id = kBannerId,
-        color = alertV2AgentColor,
+        color = "agent",
         seconds = duration,
         countdown = true,
         -- Somebody alerting sixty lines of command output must not be able to
@@ -85,14 +85,14 @@ function agentBannerOff(silent)
     local wasActive = agentBannerActive()
 
     agentBannerState.message = nil
-    alertV2Dismiss(kBannerId)
+    alert_gateway_dismiss(kBannerId)
 
     if wasActive and not silent and agentBannerReleaseFlashSeconds > 0 then
         -- Lives exactly as long as its own flash, so the blue drains away and
         -- takes the words with it.
-        alertV2("Screen is yours", {
+        alert_gateway("Screen is yours", {
             id = kReleaseId,
-            color = alertV2FreeColor,
+            color = "free",
             seconds = agentBannerReleaseFlashSeconds,
             flashSeconds = agentBannerReleaseFlashSeconds,
             position = "top",

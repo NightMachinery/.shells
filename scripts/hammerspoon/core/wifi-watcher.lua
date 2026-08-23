@@ -14,13 +14,13 @@ function ssidChangedCallback()
 
     if newSSID ~= previousSSID then
         if not newSSID then
-            alertV2("Disconnected from Wi-Fi network: " .. (previousSSID or "None"),
+            alert_gateway("Disconnected from Wi-Fi network: " .. (previousSSID or "None"),
                     { id = kWifiWatcherAlertId, seconds = alert_dur, color = "warn" })
 
             brishzeval2bg("wifi-disconnect-hook")
 
         else
-            alertV2("Connected to Wi-Fi network: " .. (newSSID or "None"),
+            alert_gateway("Connected to Wi-Fi network: " .. (newSSID or "None"),
                     { id = kWifiWatcherAlertId, seconds = alert_dur })
 
             if newSSID == "Tealy" then

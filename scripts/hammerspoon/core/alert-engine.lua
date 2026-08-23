@@ -1047,4 +1047,25 @@ function alertV2FromFile(path, opts)
     text = (text or ""):gsub("%s+$", "")
     return alertV2(text, opts)
 end
+
+--- ** Gateway
+--- What the rest of the config calls. Nothing outside this file names an engine
+--- directly, so changing which engine draws an alert -- or sending a subset of
+--- them somewhere else entirely -- is an edit here rather than a sweep over
+--- every caller. The zsh side has the same shape: [agfi:hs-alert] is a gateway
+--- over [agfi:hs-alert-v2], with [agfi:hs-alert-v1] still beside it.
+---
+--- `opts' is passed through untouched, so callers use the option names
+--- documented on alertV2 above.
+function alert_gateway(text, opts)
+    return alertV2(text, opts)
+end
+
+function alert_gateway_dismiss(id)
+    return alertV2Dismiss(id)
+end
+
+function alert_gateway_exists(id)
+    return alertV2Exists(id)
+end
 --- @end

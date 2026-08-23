@@ -146,7 +146,7 @@ local function loadEmojiData()
     local filePath = os.getenv("HOME") .. "/code/misc/unicode-emoji-json/data-by-emoji.json"
     local file = io.open(filePath, "r")
     if not file then
-        alertV2("Emoji data file not found", { color = "warn" })
+        alert_gateway("Emoji data file not found", { color = "warn" })
         return
     end
 
@@ -167,7 +167,7 @@ function emojiChooser()
 
     local function updateAlert()
         if #selectedEmojis >= 1 then
-            alertV2(table.concat(selectedEmojis), {
+            alert_gateway(table.concat(selectedEmojis), {
                 id = kEmojiAlertId,
                 -- The chooser clears this itself; the engine's own 4h ceiling is
                 -- only a backstop against a crash leaving it on screen.
@@ -175,12 +175,12 @@ function emojiChooser()
                 screens = "primary",
             })
         else
-            alertV2Dismiss(kEmojiAlertId)
+            alert_gateway_dismiss(kEmojiAlertId)
         end
     end
 
     local function clearAlert()
-        alertV2Dismiss(kEmojiAlertId)
+        alert_gateway_dismiss(kEmojiAlertId)
     end
 
     local chooser = hs.chooser.new(function(choice)
@@ -279,7 +279,7 @@ function emojiChooser()
 
     -- If an error occurred, clean up and rethrow the error
     if not success then
-        alertV2("emojiChooser error:" .. err, { color = "crit", seconds = 10 })
+        alert_gateway("emojiChooser error:" .. err, { color = "crit", seconds = 10 })
 
         cleanup()
         error(err)
@@ -334,22 +334,22 @@ function wifiChooser()
 
             if choice.connected then
                 wifi.disassociate(interface)
-                alertV2("Disconnected from Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
+                alert_gateway("Disconnected from Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
                 return
             end
 
             if not interface then
-                alertV2("No Wi-Fi interface found", { id = kWifiAlertId, color = "warn" })
+                alert_gateway("No Wi-Fi interface found", { id = kWifiAlertId, color = "warn" })
                 return
             end
 
-            alertV2("Connecting Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
+            alert_gateway("Connecting Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
             hs.task.new("/usr/sbin/networksetup", function(exitCode, stdOut, stdErr)
                     if exitCode == 0 then
-                        alertV2("Connected Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
+                        alert_gateway("Connected Wi-Fi: " .. choice.ssid, { id = kWifiAlertId })
                     else
                         local err = stdErr or stdOut or ""
-                        alertV2("Wi-Fi connect failed: " .. choice.ssid .. "\n" .. err, { id = kWifiAlertId, color = "crit" })
+                        alert_gateway("Wi-Fi connect failed: " .. choice.ssid .. "\n" .. err, { id = kWifiAlertId, color = "crit" })
                     end
             end, {"-setairportnetwork", interface, choice.ssid}):start()
     end)

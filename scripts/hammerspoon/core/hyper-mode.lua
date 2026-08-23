@@ -141,10 +141,10 @@ function hyper_modality:entered()
                     msg = msg:gsub('^%s*(.-)%s*$', '%1')
 
                     print(msg) -- leave a copy of the message in the console, so you can still see it after the alert goes away
-                    -- One alert, not one per screen: alertV2 draws a band on every
-                    -- screen it targets, so the loop this replaces would have
-                    -- stacked N copies of the same warning.
-                    alertV2(msg, {
+                    -- One alert, not one per screen: the engine draws a band on
+                    -- every screen it targets, so the loop this replaces would
+                    -- have stacked N copies of the same warning.
+                    alert_gateway(msg, {
                         id = kHyperSIMAlertId,
                         color = "crit",
                         -- Cleared on exit; the engine's ceiling is the backstop.
@@ -167,7 +167,7 @@ function hyper_modality:exited()
     hyper_modality.entered_p = false
     hyper_modality.exit_on_release_p = false
 
-    alertV2Dismiss(kHyperSIMAlertId)
+    alert_gateway_dismiss(kHyperSIMAlertId)
 
     if realCurrentWindow then
         realCurrentWindow:focus()
