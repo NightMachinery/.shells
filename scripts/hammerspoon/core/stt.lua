@@ -22,19 +22,47 @@ whisper.languageConfig = {
     }
 }
 
+--: Returns the avfoundation input spec for the *system default* input device,
+--: plus its human-readable name (nil when we had to fall back).
+--:
+--: `-i ":0"` is an avfoundation device *index*, not the default device, and the
+--: indices renumber as devices connect/disconnect. avfoundation also accepts a
+--: device name there, so we resolve the name at record time instead.
+--: See [[file:~/scripts/docs/stt-input-device.md]].
+function whisper.getInputDeviceSpec()
+    local dev = hs.audiodevice.defaultInputDevice()
+    local name = dev and dev:name()
+
+    --: A name containing ":" would be mis-parsed by ffmpeg's "[video]:[audio]"
+    --: syntax rather than rejected, so refuse it instead of recording silence.
+    if name and name ~= "" and not name:find(":") then
+        return ":" .. name, name
+    end
+
+    return ":0", nil
+end
+
 function whisper.getRecordCommand(outputFile)
     local cmd
     if whisper.recorderMode == "sox-rec" then
+        --: sox's coreaudio driver opens the system default input on its own.
         cmd = {
             command = "/opt/homebrew/bin/rec",
             args = {"-c", "1", outputFile}
         }
+        whisper.resolvedInputDevice = nil
     else  -- ffmpeg
+        local deviceSpec, deviceName = whisper.getInputDeviceSpec()
+        whisper.resolvedInputDevice = deviceName
+        if not deviceName then
+            hs.alert.show("STT: cannot resolve default mic, using :0")
+        end
+
         cmd = {
             command = "/opt/homebrew/bin/ffmpeg",
             args = {
                 "-f", "avfoundation",  -- Input format for macOS
-                "-i", ":0",  -- Default audio input device
+                "-i", deviceSpec,  -- System default input device, by name
                 "-t", tostring(whisper.recordingTimeout),
                 "-ar", "16000",
                 "-y", outputFile
@@ -121,6 +149,14 @@ function whisper_run(language)
             -- Start recording
             whisper.state = "recording"
             whisper.processing_interrupted_p = false  -- Reset interrupt flag when starting new recording
+
+            --: Show which mic we ended up on. A surprising choice (e.g. the
+            --: built-in mic with the lid closed, or a Bluetooth headset whose
+            --: playback drops to narrowband while its mic is live) is then
+            --: visible now, rather than later as a bad transcript.
+            if whisper.resolvedInputDevice then
+                hs.alert.show(whisper.resolvedInputDevice, 1)
+            end
 
             -- sleep a bit to allow the recorder to become active
             hs.timer.usleep(0.3 * 1000000) -- usleep takes microseconds
