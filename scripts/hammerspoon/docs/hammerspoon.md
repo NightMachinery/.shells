@@ -53,7 +53,16 @@ match no screen (e.g. `all_external` with no external attached, or `internal`
 in clamshell mode) fall back to the primary screen so the overlay is never
 invisible. App-scoped modes default to `primary`; pass `overlayScreens` in the
 mode's `overlay` table to change it. The Hyper banner defaults to `all` via the
-`hyper_overlay_screens` global in `core/hyper-mode.lua`.
+`hyper_overlay_screens` global in `core/hyper-mode.lua`, and the Purple banner
+via `purple_overlay_screens` in `purple-mode.lua`.
+
+Both global modes draw their banner this way. Hyper and Purple each used to
+build one `hs.alert` per screen instead, rebuilt on every entry from
+`hs.screen.allScreens()`; neither could draw over a fullscreen space
+([issue 3586](https://github.com/Hammerspoon/hammerspoon/issues/3586)) and
+neither followed a display being plugged in or unplugged. Hyper moved to a
+canvas group behind a `hyper_alert_canvas_p` flag, which is gone: the alert
+path it selected between was dead and has been removed.
 
 `bind_v3` defines modal key chords. Key arrays use Hammerspoon key names plus
 aliases such as `SPC`, `RET`, and `ESC`. While a chord is pending, the mode
@@ -90,6 +99,26 @@ per live alert, stacked. It replaces `hs.alert`'s single centred box for
 everything that goes through `hs-alert` in zshlang: several alerts can be up at
 once without hiding each other, long text wraps and the band grows rather than
 being cut off, and an optional fullscreen flash makes one impossible to miss.
+
+It is the engine for the Lua config too. Nothing here calls `hs.alert` any
+more; every caller uses `alertV2` directly, which is why alerts raised from a
+hotkey and alerts raised from the shell now look and stack the same way. The
+`alert` global in `boot.lua` still points at stock `hs.alert` as a console
+convenience, so the old engine remains reachable by hand.
+
+Anything fired repeatedly passes a stable `id`, which is what keeps a held
+volume key from stacking one band per repeat: re-showing an id rewrites that
+band in place. The ids in use are `volume`, `input-language`,
+`stt-input-device`, `stt-recorder-mode`, `emoji-chooser`, `wifi-chooser`,
+`wifi-watcher`, `hyper-secure-input`, `purple-secure-input` and `nop`. A
+message that can be superseded rather than repeated wants one too: the Wi-Fi
+chooser shares a single id across the whole connect flow, so `Connecting` is
+replaced by its own outcome rather than leaving two bands up.
+
+Callers that used to hold an alert handle and close it now use a fixed id and
+`alertV2Dismiss`, and pass `seconds = math.huge` where they mean "until I clear
+it" — the engine clamps that to its own ceiling, so a caller that dies cannot
+leave a band on screen.
 
 It loads after `modal-mode.lua` because it reuses `ModalMode.targetScreens` and
 `ModalMode.onScreenChange` rather than running a second screen watcher. No
