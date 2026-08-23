@@ -4,7 +4,13 @@
 purple_mode = ModalMode.create{name="purple"}
 ModalMode.installGlobals(purple_mode, "purple")
 
-local purpleAlerts
+-- Which screens show the purple banner: "all" | "primary" | "internal" |
+-- "all_external" | "active" | "mouse" (see ModalMode.targetScreens)
+purple_overlay_screens = purple_overlay_screens or "all"
+
+-- Entering with Secure Input on is a transient warning, not the indicator; the
+-- id keeps repeated entries from stacking copies of it.
+local kPurpleSIMAlertId = "purple-secure-input"
 
 local purpleStyle = {
     -- [[https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/alert/alert.lua#L17][hammerspoon/extensions/alert/alert.lua at master · Hammerspoon/hammerspoon]]
@@ -25,34 +31,36 @@ local purpleStyle = {
     strokeWidth = 16,
     textColor = { white = 0.125 },
     textSize = 48,
+    text = "Purple",
+    -- text = "Purple Mode 🌟"
+    -- text = "Purple Mode ✈"
+    overlayScreens = purple_overlay_screens,
 }
+
+-- A canvas group, the same as Hyper's indicator. The per-screen hs.alert loop
+-- this replaces could not draw over fullscreen spaces:
+-- [[https://github.com/Hammerspoon/hammerspoon/issues/3586][How do I show an alert on all fullscreen spaces? · Issue #3586 · Hammerspoon/hammerspoon]]
+-- The group also rebuilds its canvases when the screen layout changes, which
+-- the loop -- built once per entry from hs.screen.allScreens() -- did not.
+local purpleModeIndicator = ModalMode.createIndicatorGroup(purpleStyle)
 
 function purple_modality:entered()
     purple_modality.entered_p = true
 
     if hs.eventtap.isSecureInputEnabled() then
-        hs.alert("⚠️ Secure Input is on. Our Purple Mode commands might not work.")
+        alertV2("⚠️ Secure Input is on. Our Purple Mode commands might not work.",
+                { id = kPurpleSIMAlertId, color = "warn" })
         -- [[https://github.com/Hammerspoon/hammerspoon/issues/3555][Hammerspoon hangs spradically when entering hyper mode and displaying a modal window · Issue #3555 · Hammerspoon/hammerspoon]]
     end
 
-    purpleAlerts = {}
-    for i, screen in pairs(hs.screen.allScreens()) do
-        local msg = "Purple"
-        -- msg = "Purple Mode 🌟"
-        -- msg = "Purple Mode ✈"
-
-        local alert = hs.alert(msg, purpleStyle, screen, "")
-        purpleAlerts[i] = alert
-    end
+    purpleModeIndicator:show()
 end
 
 function purple_modality:exited()
     purple_modality.entered_p = false
     purple_modality.exit_on_release_p = false
 
-    for i, alert in pairs(purpleAlerts) do
-        hs.alert.closeSpecific(alert, 0.25)
-    end
+    purpleModeIndicator:hide()
 end
 
 function purple_triggered()

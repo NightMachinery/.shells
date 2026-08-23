@@ -20,8 +20,6 @@ if false then
     end)
 end
 
-local hyperAlerts
-
 -- Which screens show the hyper banner: "all" | "primary" | "internal" | "all_external" | "active" | "mouse"
 -- (see ModalMode.targetScreens)
 hyper_overlay_screens = hyper_overlay_screens or "all"
@@ -57,22 +55,21 @@ local maxSIMWaitTime <const> = 0.75 -- seconds
 local focusStealingWebview = hs.webview.new{x=0, y=0, w=500, h=500}
 -- local focusStealingWebview = hs.webview.new{x=0, y=0, w=0, h=0}
 
-local hyperSIMAlerts
 local isSecureInputEnabled = hs.eventtap.isSecureInputEnabled
+
+-- The Secure Input warning is one alert with a fixed id rather than a handle
+-- per screen, so exiting the mode has a single thing to dismiss.
+local kHyperSIMAlertId = "hyper-secure-input"
 ---
--- hyper_alert_canvas_p = false
-hyper_alert_canvas_p = true
--- canvas mode seems to be more buggy though? It sometimes just doesn't show up.
-
-local hyperModeIndicator
-local hyperModeIndicatorOrig
-local hyperModeIndicatorSI
-if hyper_alert_canvas_p then
-    hyperModeIndicatorOrig = ModalMode.createIndicatorGroup(hyperStyle)
-    hyperModeIndicator = hyperModeIndicatorOrig
-
-    hyperModeIndicatorSI = ModalMode.createIndicatorGroup(secureInputStyle)
-end
+-- The indicator is a canvas group, not an hs.alert. The hs.alert route this
+-- replaced could not show over fullscreen spaces at all:
+-- [[https://github.com/Hammerspoon/hammerspoon/issues/3586][How do I show an alert on all fullscreen spaces? · Issue #3586 · Hammerspoon/hammerspoon]]
+-- Canvas mode has been seen to occasionally not show up; if that resurfaces,
+-- the fix belongs in ModalMode.createIndicatorGroup rather than in a fallback
+-- here.
+local hyperModeIndicatorOrig = ModalMode.createIndicatorGroup(hyperStyle)
+local hyperModeIndicatorSI = ModalMode.createIndicatorGroup(secureInputStyle)
+local hyperModeIndicator = hyperModeIndicatorOrig
 ---
 hyper_mode = ModalMode.create{name="hyper"}
 ModalMode.installGlobals(hyper_mode, "hyper")
@@ -144,10 +141,16 @@ function hyper_modality:entered()
                     msg = msg:gsub('^%s*(.-)%s*$', '%1')
 
                     print(msg) -- leave a copy of the message in the console, so you can still see it after the alert goes away
-                    hyperSIMAlerts = {}
-                    for i, screen in pairs(hs.screen.allScreens()) do
-                        hyperSIMAlerts[i] = hs.alert(msg, screen, "")
-                    end
+                    -- One alert, not one per screen: alertV2 draws a band on every
+                    -- screen it targets, so the loop this replaces would have
+                    -- stacked N copies of the same warning.
+                    alertV2(msg, {
+                        id = kHyperSIMAlertId,
+                        color = "crit",
+                        -- Cleared on exit; the engine's ceiling is the backstop.
+                        seconds = math.huge,
+                        screens = "all",
+                    })
                 end
             end
         end
@@ -157,33 +160,15 @@ function hyper_modality:entered()
         hyperModeIndicator = hyperModeIndicatorOrig
     end
 
-    if hyper_alert_canvas_p then
-        hyperModeIndicator:show()
-    else
-        -- @todo Use secureInputStyle if secure input is enabled.
-        ---
-        hyperAlerts = {}
-        -- WAIT @me [[https://github.com/Hammerspoon/hammerspoon/issues/3586][How do I show an alert on all fullscreen spaces? · Issue #3586 · Hammerspoon/hammerspoon]]
-        for i, screen in pairs(hs.screen.allScreens()) do
-            msg = "🌟"
-            -- msg = "Hyper Mode 🌟"
-            -- msg = "Hyper Mode ✈"
-
-            alert = hs.alert(msg, hyperStyle, screen, "")
-            hyperAlerts[i] = alert
-        end
-    end
+    hyperModeIndicator:show()
 end
 
 function hyper_modality:exited()
     hyper_modality.entered_p = false
     hyper_modality.exit_on_release_p = false
 
-    if hyperSIMAlerts then
-        for i, alert in pairs(hyperSIMAlerts) do
-            hs.alert.closeSpecific(alert, 0.25)
-        end
-    end
+    alertV2Dismiss(kHyperSIMAlertId)
+
     if realCurrentWindow then
         realCurrentWindow:focus()
         realCurrentWindow = nil
@@ -195,13 +180,7 @@ function hyper_modality:exited()
     end
     prevFocusedElement = nil
 
-    if hyper_alert_canvas_p then
-        hyperModeIndicator:hide()
-    else
-        for i, alert in pairs(hyperAlerts) do
-            hs.alert.closeSpecific(alert, 0.25)
-        end
-    end
+    hyperModeIndicator:hide()
 
     redisDeactivateMode("hyper_modality")
 end
