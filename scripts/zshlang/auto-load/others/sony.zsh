@@ -29,6 +29,12 @@ case means nothing to report, and sonyctl says so in milliseconds."
     reval-timeout 30 sonyctl --json --color=never battery 2>/dev/null
 }
 
+#: How low the battery is is one fact, restated every time this runs -- on a
+#: timer and again on each connect -- so every warning is raised under the same
+#: id and rewrites the band in place. Without it, a cron run landing while the
+#: connect warning is still up leaves two bands disagreeing about the level.
+typeset -g sony_battery_alert_id='sony-battery'
+
 function sony-battery-alert-low {
     : "alerts via Hammerspoon iff the case or a bud is below its threshold
 
@@ -86,7 +92,7 @@ end
     #: [agfi:hammerspoon] is `gtimeout 30s hs -A -t 5', so a wedged Hammerspoon
     #: could stall this for half a minute; a warning we cannot deliver must not
     #: become a cron job that never exits.
-    reval-timeout 10 @opts dur "${dur}" markup md color "${color}" @ \
+    reval-timeout 10 @opts dur "${dur}" markup md color "${color}" id "${sony_battery_alert_id}" @ \
         alert "🎧 Sony battery  ${out}" ||
         ecgray "$0: hs-alert failed; is Hammerspoon responsive?"
 }
