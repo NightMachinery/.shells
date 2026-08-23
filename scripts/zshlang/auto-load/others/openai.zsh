@@ -1,4 +1,6 @@
 ##
+aliasfn with-lab-gemini 'llm_key=gemini-lab' reval
+##
 typeset -g openai_completion_engine=(openai-chatgpt)
 ##
 function openai-p {
