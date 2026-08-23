@@ -225,29 +225,67 @@ function lsport {
     ((${#opts})) && sudo lsof -n $opts[@]
 }
 ##
-function audio-output-get-hs {
-    : "outputs: default output device name \n transport (Bluetooth|Built-in|USB|DisplayPort|...)"
+#: The h-audio-default-get* helpers below are shared by the input and output
+#: families; `audio_default_what` selects which (input|output). Use the
+#: user-facing [agfi:audio-output-get] / [agfi:audio-input-get] wrappers, which
+#: set it for you.
+function h-audio-default-get-hs {
     # @darwinOnly
     ##
     ensure isDarwin @MRET
 
+    local what="${audio_default_what:-output}"
+    local whatC="$what" ; whatC[1]="${whatC[1]:u}"
+
     #: Fast (~8ms warm, ~140ms cold): IPC to the already-running Hammerspoon instance.
-    hammerspoon -c 'local d = hs.audiodevice.defaultOutputDevice(); return d:name() .. "\n" .. d:transportType()'
+    hammerspoon -c "local d = hs.audiodevice.default${whatC}Device(); return d:name() .. \"\n\" .. d:transportType()"
+}
+
+function h-audio-default-get-system-profiler {
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    local what="${audio_default_what:-output}"
+    local whatC="$what" ; whatC[1]="${whatC[1]:u}"
+
+    #: Slow (~200ms): spawns a fresh process and re-enumerates all audio devices,
+    #: but works even when Hammerspoon is not running.
+    #: Prints the name and Transport of the device block marked "Default <What> Device: Yes".
+    #: (Each device is an 8-space-indented "Name:" line followed by 10-space-indented properties;
+    #: the default device can appear twice, once as input and once as output.)
+    #: The What token is passed through the environment so the perl script can stay
+    #: single-quoted and keep its own $1/$b/$t unmangled by the shell.
+    system_profiler SPAudioDataType |
+        audio_default_what_c="$whatC" perl -0777 -ne 'while (m/^ {8}(.+?):\n\n((?: {10}.*\n)+)/mg) { my ($n, $b) = ($1, $2); if ($b =~ m/^ {10}Default $ENV{audio_default_what_c} Device: Yes/m) { my ($t) = $b =~ m/^ {10}Transport: (.*?)\s*$/m; print "$n\n$t\n"; exit 0 } } exit 1'
+}
+
+function h-audio-default-get {
+    #: Gateway: tries the fast Hammerspoon helper, falls back to system_profiler.
+    # @darwinOnly
+    ##
+    ensure isDarwin @MRET
+
+    local out
+    if out="$(h-audio-default-get-hs 2>/dev/null)" && [[ -n "$out" ]] ; then
+        ec "$out"
+    else
+        h-audio-default-get-system-profiler
+    fi
+}
+##
+function audio-output-get-hs {
+    : "outputs: default output device name \n transport (Bluetooth|Built-in|USB|DisplayPort|...)"
+    # @darwinOnly
+    ##
+    audio_default_what=output h-audio-default-get-hs
 }
 
 function audio-output-get-system-profiler {
     : "outputs: default output device name \n transport (Bluetooth|Built-in|USB|DisplayPort|...)"
     # @darwinOnly
     ##
-    ensure isDarwin @MRET
-
-    #: Slow (~200ms): spawns a fresh process and re-enumerates all audio devices,
-    #: but works even when Hammerspoon is not running.
-    #: Prints the name and Transport of the device block marked "Default Output Device: Yes".
-    #: (Each device is an 8-space-indented "Name:" line followed by 10-space-indented properties;
-    #: the default device can appear twice, once as input and once as output.)
-    system_profiler SPAudioDataType |
-        perl -0777 -ne 'while (m/^ {8}(.+?):\n\n((?: {10}.*\n)+)/mg) { my ($n, $b) = ($1, $2); if ($b =~ m/^ {10}Default Output Device: Yes/m) { my ($t) = $b =~ m/^ {10}Transport: (.*?)\s*$/m; print "$n\n$t\n"; exit 0 } } exit 1'
+    audio_default_what=output h-audio-default-get-system-profiler
 }
 
 function audio-output-get {
@@ -255,14 +293,30 @@ function audio-output-get {
     #: Gateway: tries the fast Hammerspoon helper, falls back to system_profiler.
     # @darwinOnly
     ##
-    ensure isDarwin @MRET
+    audio_default_what=output h-audio-default-get
+}
+##
+function audio-input-get-hs {
+    : "outputs: default input (microphone) device name \n transport (Bluetooth|Built-in|USB|...)"
+    # @darwinOnly
+    ##
+    audio_default_what=input h-audio-default-get-hs
+}
 
-    local out
-    if out="$(audio-output-get-hs 2>/dev/null)" && [[ -n "$out" ]] ; then
-        ec "$out"
-    else
-        audio-output-get-system-profiler
-    fi
+function audio-input-get-system-profiler {
+    : "outputs: default input (microphone) device name \n transport (Bluetooth|Built-in|USB|...)"
+    # @darwinOnly
+    ##
+    audio_default_what=input h-audio-default-get-system-profiler
+}
+
+function audio-input-get {
+    : "outputs: default input (microphone) device name \n transport (Bluetooth|Built-in|USB|...)"
+    #: Gateway: tries the fast Hammerspoon helper, falls back to system_profiler.
+    #: Used by [agfi:ffmpeg-record]; see [[file:~/scripts/docs/stt-input-device.md]].
+    # @darwinOnly
+    ##
+    audio_default_what=input h-audio-default-get
 }
 
 function h-headphones-classify-p {

@@ -375,9 +375,23 @@ function ffmpeg-record {
 
     local timeout="${record_timeout:-300}"
 
+    #: `-i ":0"` would be an avfoundation device *index*, not the default device,
+    #: and the indices renumber as devices connect/disconnect. avfoundation also
+    #: accepts a device name, so resolve the system default input by name here.
+    #: A name containing ":" would be mis-parsed by ffmpeg's "[video]:[audio]"
+    #: syntax rather than rejected, so refuse it.
+    #: See [[file:~/scripts/docs/stt-input-device.md]].
+    local device_name device_spec=':0'
+    device_name="$(audio-input-get 2>/dev/null | ghead -n 1)"
+    if [[ -n "$device_name" && "$device_name" != *:* ]] ; then
+        device_spec=":${device_name}"
+    else
+        ecerr "$0: could not resolve the default input device, using ${device_spec}"
+    fi
+
     #: Press Ctrl-C to stop recording.
     #: Does NOT work well. I need to press Ctrl-C two times. I don't know why it works better when we invoke it from Hammerspoon.
-    ffmpeg -f avfoundation -i ":0" -t "${timeout}" -ar 16000 -y "$output" >&2 || true
+    ffmpeg -f avfoundation -i "${device_spec}" -t "${timeout}" -ar 16000 -y "$output" >&2 || true
 
     ec "${output}" |
         cat-copy-if-tty
