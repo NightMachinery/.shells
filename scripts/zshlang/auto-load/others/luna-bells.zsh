@@ -100,6 +100,11 @@ function luna-advanced-bell {
 redis-defvar luna_signal1
 redis-defvar luna_skipped
 
+#: The skip count is one running number reported from two branches below, so
+#: both raise it under the same id and the band is rewritten in place rather
+#: than leaving a column of stale counts.
+typeset -g luna_skip_alert_id='luna-skip'
+
 function h_luna-advanced-bell {
     #: @warn Env vars should be forwarded in [[agfi:luna-advanced-bell]]
     ##
@@ -122,7 +127,7 @@ function h_luna-advanced-bell {
 
             if true ; then
                 if (( skipped >= 1 )) ; then
-                    alert_dur=0.5 alert "LUNA/skip: ${skipped}"
+                    alert_dur=0.5 alert_id="$luna_skip_alert_id" alert "LUNA/skip: ${skipped}"
                 fi
             else
                 if (( skipped >= 1 )) ; then
@@ -135,7 +140,7 @@ function h_luna-advanced-bell {
             if (( skipped >= 1 )) ; then
                 display-gray-on-v1
                 sleep 2 #: to wait for the macOS popup to fade
-                alert_dur=4 alert "LUNA/skip: ${skipped}"
+                alert_dur=4 alert_id="$luna_skip_alert_id" alert "LUNA/skip: ${skipped}"
             else
                 display-gray-on
             fi
