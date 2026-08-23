@@ -147,10 +147,22 @@ function volume-unmute {
   fi
 }
 
+#: Mute state is one fact per device class, so everything that reports it uses
+#: the same id and the band gets rewritten rather than stacked. Suffixed by
+#: `what', or muting the mic would overwrite the speakers' band.
+#:
+#: Deliberately not the "volume" id that the level indicator uses on the
+#: Hammerspoon side (window-media-bindings.lua), so a mute message and a
+#: "vol: N" message can be on screen at the same time.
+typeset -g volume_mute_alert_id_prefix='volume-mute-'
+
 function volume-mute-toggle {
   local what="${volume_what:-output}"
 
   local alert_dur=0.5
+  #: `local', not a prefix assignment: the alert goes out through awaysh-fast,
+  #: whose subshell inherits the enclosing scope. Same reason as alert_dur.
+  local alert_id="${volume_mute_alert_id_prefix}${what}"
 
   if volume-mute-p ; then
     volume-unmute
@@ -172,6 +184,9 @@ function input-volume-mute-toggle {
       ##
     } always {
       local alert_dur=2
+      #: The same fact [agfi:volume-mute-toggle] reports, from a second entry
+      #: point, so it shares that id rather than opening a band of its own.
+      local alert_id="${volume_mute_alert_id_prefix}input"
       ##
       if with-input-volume volume-mute-p-hs  ; then
         alert "input muted"

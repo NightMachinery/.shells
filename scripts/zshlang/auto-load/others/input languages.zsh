@@ -185,8 +185,16 @@ function input-lang-get() {
 
 }
 
+#: Which language the keyboard is in is one fact, restated on every switch, so
+#: the band is rewritten rather than stacked.
+#:
+#: This string is a contract with Hammerspoon: core/input-language.lua alerts
+#: the same fact under the same id, so the two paths replace each other instead
+#: of ending up as two bands saying different things.
+typeset -g input_lang_alert_id='input-language'
+
 function input-lang-show() {
-    alert "$(input_lang_get_darwin_noHS=y input-lang-get)"
+    alert_id="$input_lang_alert_id" alert "$(input_lang_get_darwin_noHS=y input-lang-get)"
     # using hammerspoon can cause a deadlock as this function is called from within hammerspoon
     # for the same reason, we can not call this function from hammerpoon
 }
