@@ -48,7 +48,7 @@ function purple_modality:entered()
     purple_modality.entered_p = true
 
     if hs.eventtap.isSecureInputEnabled() then
-        alertV2("⚠️ Secure Input is on. Our Purple Mode commands might not work.",
+        alert_gateway("⚠️ Secure Input is on. Our Purple Mode commands might not work.",
                 { id = kPurpleSIMAlertId, color = "warn" })
         -- [[https://github.com/Hammerspoon/hammerspoon/issues/3555][Hammerspoon hangs spradically when entering hyper mode and displaying a modal window · Issue #3555 · Hammerspoon/hammerspoon]]
     end

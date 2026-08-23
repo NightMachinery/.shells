@@ -55,7 +55,7 @@ function whisper.getRecordCommand(outputFile)
         local deviceSpec, deviceName = whisper.getInputDeviceSpec()
         whisper.resolvedInputDevice = deviceName
         if not deviceName then
-            alertV2("STT: cannot resolve default mic, using :0", { color = "warn" })
+            alert_gateway("STT: cannot resolve default mic, using :0", { color = "warn" })
         end
 
         cmd = {
@@ -128,20 +128,20 @@ function whisper_run(language)
                                        if exitCode ~= 0 and whisper.state == "recording" then
                                            local msg = "Recording stopped unexpectedly. Exit code: " .. exitCode .. "\nError: " .. stdErr
                                            print(msg)
-                                           alertV2(msg, { seconds = 10, color = "crit" })
+                                           alert_gateway(msg, { seconds = 10, color = "crit" })
                                        end
                                        whisper.state = "off"
                                        updateIndicator()
                                        if hs.fs.attributes(wavFile) then
                                            processRecording(wavFile, language)
                                        else
-                                           alertV2("Failed to create recording file", { color = "crit" })
+                                           alert_gateway("Failed to create recording file", { color = "crit" })
                                        end
         end, recordCommand.args)
 
         local success = whisper.task:start()
         if not success then
-            alertV2("Failed to start recording process", { color = "crit" })
+            alert_gateway("Failed to start recording process", { color = "crit" })
             whisper.state = "off"
             updateIndicator()
             return
@@ -155,7 +155,7 @@ function whisper_run(language)
             --: playback drops to narrowband while its mic is live) is then
             --: visible now, rather than later as a bad transcript.
             if whisper.resolvedInputDevice then
-                alertV2(whisper.resolvedInputDevice, { id = "stt-input-device", seconds = 1 })
+                alert_gateway(whisper.resolvedInputDevice, { id = "stt-input-device", seconds = 1 })
             end
 
             -- sleep a bit to allow the recorder to become active
@@ -241,17 +241,17 @@ function processRecording(wavFile, language, backend)
             if content and not content:match("^%s*$") then
                 handleTranscription(content)
             else
-                alertV2("Transcription empty", { color = "warn" })
+                alert_gateway("Transcription empty", { color = "warn" })
             end
         else
-            alertV2("Transcription failed. Exit code: " .. exitCode .. "\nError: " .. stdErr, { color = "crit" })
+            alert_gateway("Transcription failed. Exit code: " .. exitCode .. "\nError: " .. stdErr, { color = "crit" })
         end
         resetState()
     end, transcribeCommand.args)
 
     local success = whisperTask:start()
     if not success then
-        alertV2("Failed to start transcription process", { color = "crit" })
+        alert_gateway("Failed to start transcription process", { color = "crit" })
         resetState()
     end
 end
@@ -351,7 +351,7 @@ end)
 -- Function to toggle between recorder modes
 function whisper.toggleRecorderMode()
     whisper.recorderMode = (whisper.recorderMode == "sox-rec") and "ffmpeg" or "sox-rec"
-    alertV2("Recorder mode set to: " .. whisper.recorderMode, { id = "stt-recorder-mode" })
+    alert_gateway("Recorder mode set to: " .. whisper.recorderMode, { id = "stt-recorder-mode" })
 end
 
 -- Language-specific run functions
