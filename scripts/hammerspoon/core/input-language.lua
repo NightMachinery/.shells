@@ -83,7 +83,7 @@ appWatcher:start()
 
 hyper_bind_v1("i", function()
                   langSetToggle()
-                  hs.alert(langGet(), 1)
+                  alertV2(langGet(), { id = "input-language", seconds = 1 })
                   brishzeval('input_lang_push_lang_del')
                   input_lang_push_lang = nil
 end)

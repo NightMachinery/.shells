@@ -1,7 +1,7 @@
 --- * Core helpers
 
 function nop()
-    hs.alert("repeating")
+    alertV2("repeating", { id = "nop" })
 end
 ---
 function sanitizeLocationTable(location)

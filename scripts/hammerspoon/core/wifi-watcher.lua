@@ -1,4 +1,8 @@
 --- * Wi-Fi Watcher
+-- Connect and disconnect share an id: the network you are on is one fact, so
+-- a later change replaces the earlier band instead of stacking on it.
+local kWifiWatcherAlertId = "wifi-watcher"
+
 wifiWatcher = nil
 previousSSID = hs.wifi.currentNetwork()
 
@@ -10,12 +14,14 @@ function ssidChangedCallback()
 
     if newSSID ~= previousSSID then
         if not newSSID then
-            hs.alert("Disconnected from Wi-Fi network: " .. (previousSSID or "None"), alert_dur)
+            alertV2("Disconnected from Wi-Fi network: " .. (previousSSID or "None"),
+                    { id = kWifiWatcherAlertId, seconds = alert_dur, color = "warn" })
 
             brishzeval2bg("wifi-disconnect-hook")
 
         else
-            hs.alert("Connected to Wi-Fi network: " .. (newSSID or "None"), alert_dur)
+            alertV2("Connected to Wi-Fi network: " .. (newSSID or "None"),
+                    { id = kWifiWatcherAlertId, seconds = alert_dur })
 
             if newSSID == "Tealy" then
                 brishzeval2bg("tealy-connect-hook")

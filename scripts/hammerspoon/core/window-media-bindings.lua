@@ -11,7 +11,7 @@ function bindWithRepeat(mods, key, pressedfn)
             repeatfn=pressedfn,
         }
     else
-        hs.alert("bindWithRepeat: with mods")
+        alertV2("bindWithRepeat: with mods", { color = "notice" })
         hs.hotkey.bind(mods, key, pressedfn, nil, pressedfn)
     end
 end
@@ -124,7 +124,9 @@ function volumeInc(v, device)
 
     d:setOutputVolume(v)
 
-    hs.alert("vol: " .. math.floor(v + 0.5), 0.4)
+    -- A held volume key fires this repeatedly; the id makes each press rewrite
+    -- the same band rather than stacking a new one per repeat.
+    alertV2("vol: " .. math.floor(v + 0.5), { id = "volume", seconds = 0.4 })
 end
 
 bindWithRepeatV2{
