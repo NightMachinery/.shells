@@ -659,9 +659,23 @@ bell_auto_stop_mode: idle | idle+timeout | notif | bell+notif | auto (default)"
     local notif_msg="${bell_auto_notif_msg}"
 
     if [[ "$stop_mode" == auto ]] ; then
-        #: The reason to suppress repeated bells at the office is the colleagues, not
-        #: the office; headphones remove the concern entirely.
-        if office-public-audio-p ; then
+        #: The ringing loop earns its keep in exactly one situation: open speakers
+        #: in a private space, where repetition reaches a person the first ring
+        #: missed. Everything else defeats it --
+        #:
+        #: - In a meeting, even one ring is wrong: speakers feed it into the mic,
+        #:   headphones play it over whoever is talking. Notification only.
+        #:   [agfi:meeting-p] reads the *current* browser tab, so a meeting behind
+        #:   another tab still rings; that failure direction (an annoying ring, not
+        #:   a missed one) is the tolerable one.
+        #: - At the office on speakers, the colleagues hear every repeat.
+        #: - On headphones, ring once: if they are on your ears the first ring did
+        #:   the job and the loop would just keep ducking your audio; if they are
+        #:   on the desk, nobody hears any number of rings and looping would only
+        #:   delay the notification ladder by up to max_t.
+        if meeting-p ; then
+            stop_mode='notif'
+        elif office-public-audio-p || headphones-p ; then
             stop_mode='bell+notif'
         else
             stop_mode='idle+timeout'
