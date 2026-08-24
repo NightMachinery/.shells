@@ -24,6 +24,9 @@
 
 - We are usually pushing to public git remotes. Be deliberate about what personal information we put into commits. Ask the user if in doubt.
 
+## `~/scripts`
+- If you ever need to edit anything here, read `~/scripts/AGENTS.md` first.
+
 ## Svelte Guidelines
 
 - Skip running `npx @sveltejs/mcp svelte-autofixer`. It often hangs and gives useless output.
