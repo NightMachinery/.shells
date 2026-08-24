@@ -219,6 +219,79 @@ aliasfn mpv-play-on fnswap hear-do mpv-do hear-play-on
 aliasfn mpv-play-off fnswap hear-do mpv-do hear-play-off
 
 
+function h_mpv-url-p {
+    #: Deliberately cheaper than [agfi:url-p], which shells out to =rg=; we only
+    #: need to tell "has a scheme, leave it to mpv" from "is a local path".
+    [[ "$1" == *://* ]]
+}
+
+function h_mpv-load-alert {
+    local dur="${mpv_load_alert_dur:-8}" color="${mpv_load_alert_color:-warn}"
+    local timeout="${mpv_load_alert_timeout:-10}"
+
+    local msg="$*"
+
+    #: Never let a wedged Hammerspoon hold up playback: the [agfi:hammerspoon]
+    #: wrapper has a 30s timeout baked in. Same defensive shape as
+    #: [agfi:bell-auto-alert].
+    silence reval-timeout "${timeout}" @opts dur "${dur}" color "${color}" @ alert "$msg" ||
+        ecgray "$0: hs-alert failed; is Hammerspoon responsive?"
+}
+
+function h_mpv-playlist-prune {
+    #: Drop entries whose files have gone missing, so a single dead track cannot
+    #: empty the whole playlist. Prints the playlist to actually load on stdout.
+    ##
+    local playlist="$1"
+    assert-args playlist @RET
+
+    local -a lines alive dead
+    lines=( "${(@f)$(< "$playlist")}" ) @TRET
+
+    local l
+    for l in "${lines[@]}" ; do
+        if test -z "$l" || [[ "$l" == '#'* ]] || h_mpv-url-p "$l" ; then
+            #: blank lines, m3u directives (=#EXTM3U=, =#EXTINF=) and URLs pass through
+            alive+=( "$l" )
+        elif test -e "$l" ; then
+            alive+=( "$l" )
+        else
+            dead+=( "$l" )
+        fi
+    done
+
+    if (( ${#dead} == 0 )) ; then
+        ec "$playlist"
+        return 0
+    fi
+
+    #: Count only real entries, so the numbers we report are about tracks.
+    local -a tracks
+    tracks=( "${(@)alive:#(|\#*)}" )
+
+    ecerr "$0: ${#dead} missing file(s) in ${playlist}:"
+    ecerr "${(F)dead}"
+
+    if (( ${#tracks} == 0 )) ; then
+        h_mpv-load-alert "mpv: playlist has no playable files"$'\n'"all ${#dead} entries are missing"
+        return 1
+    fi
+    h_mpv-load-alert "mpv: skipping ${#dead} missing file(s)"$'\n'"${#tracks} still playable"
+
+    #: Write a pruned copy instead of rewriting the input; callers can hand us a
+    #: playlist we do not own (e.g. a user's =.m3u=). Keep the original suffix,
+    #: as mpv dispatches on it.
+    local -a mktemp_opts
+    if test -n "${playlist:e}" ; then
+        mktemp_opts=( --suffix=".${playlist:e}" )
+    fi
+
+    local pruned
+    pruned="$(gmktemp "${mktemp_opts[@]}")" @TRET
+    print -rl -- "${alive[@]}" > "$pruned" @TRET
+    ec "$pruned"
+}
+
 function hear-loadfile {
     local url="$1"
     local mode="${2:-${mpv_load_mode:-replace}}"
@@ -231,8 +304,22 @@ function hear-loadfile {
     local mpv_command="${mpv_load_command:-loadfile}"
 
     assert-args url
-    if test -e "$url" ; then
+
+    #: Never hand mpv a path that is not there. =loadfile ... replace= discards
+    #: the current playlist before loading, so a failed load can leave the server
+    #: with an empty playlist; see the =--idle=yes= note in
+    #: [agfi:hear-start-server].
+    if ! h_mpv-url-p "$url" ; then
+        if ! test -e "$url" ; then
+            ecerr "$0: file does not exist: $url"
+            h_mpv-load-alert "mpv: file not found"$'\n'"$(path-abbrev "$url")"
+            return 1
+        fi
         url="$(grealpath -- "$url")" @TRET
+    fi
+
+    if [[ "${mpv_command}" == 'loadlist' ]] ; then
+        url="$(h_mpv-playlist-prune "$url")" @RET
     fi
 
     if [[ "${mpv_command}" == 'loadfile' ]] ; then
