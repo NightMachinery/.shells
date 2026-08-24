@@ -436,13 +436,20 @@ function hear-start-server {
         assert test -e "$f" @RET
     fi
 
-    #: =--idle=yes= keeps the server alive when its playlist empties out. This
-    #: is load-bearing: [agfi:hear-loadfile] sends =loadfile ... replace=, which
-    #: discards the seed playlist, so a file that fails to load (missing,
-    #: unmounted volume, unsupported codec) would otherwise leave mpv with
-    #: nothing to play. With =--keep-open=no= (from [agfi:hear-noipc]) and no
-    #: =--idle=, mpv then exits and takes "$mpv_audio_ipc" with it, breaking
-    #: every later =hear-*= call.
+    #: =--idle=yes= keeps the server alive when its playlist empties out.
+    #:
+    #: Measured, on servers otherwise identical to this one:
+    #: - =loadlist= whose entries ALL fail to load -> the playlist is replaced,
+    #:   every entry fails, the playlist is exhausted, and with =--keep-open=no=
+    #:   (from [agfi:hear-noipc]) and no =--idle= mpv exits, taking
+    #:   "$mpv_audio_ipc" with it and breaking every later =hear-*= call.
+    #:   This is the [agfi:hear-load-playlist] path.
+    #: - A single =loadfile= of a missing file does NOT kill it, even with the
+    #:   whole [agfi:hear-loadfile-begin] sequence: =--loop-playlist=inf= keeps
+    #:   looping the failed entry.
+    #: - =loadlist= of a missing or empty playlist file does not kill it either;
+    #:   that fails outright and leaves the previous playlist in place.
+    #:
     #: Do NOT move this into [agfi:hear-ipc]; that is also used as a one-shot
     #: instance player (see [agfi:hear-playlist], mode =instance=).
     reval-ec hear-ipc --idle=yes --no-resume-playback --pause --loop-playlist=inf "$f"
