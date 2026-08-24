@@ -18,6 +18,12 @@ function notif-os {
     local ignore_dnd="${notif_ignore_dnd_p:-y}"
     #: Path to an image shown inside the notification body. See [agfi:app-icon-get].
     local image="${notif_image}"
+    #: Notifications sharing a group replace each other: posting removes the
+    #: previous undismissed notification of the same group first. For sources
+    #: that restate one fact (an agent still waiting), set this to a stable key
+    #: so repeats update the existing notification instead of piling up.
+    #: Empty (the default) posts an ordinary ungrouped notification.
+    local group="${notif_group}"
 
     if isServer ; then
         return 0
@@ -30,6 +36,10 @@ function notif-os {
             local opts=()
             if bool "$ignore_dnd" ; then
                 opts+=(-ignoreDnD)
+            fi
+
+            if test -n "$group" ; then
+                opts+=(-group "$group")
             fi
 
             if test -n "$image" ; then
