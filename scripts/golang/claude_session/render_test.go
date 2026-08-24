@@ -35,6 +35,12 @@ func TestShiftHeadings(t *testing.T) {
 			want: "## a\n\n````\n```\n# nope\n````\n\n## b",
 		},
 		{
+			name: "a fence with an info string does not close one",
+			min:  2,
+			in:   "# a\n\n```\n```sh\n# nope\n```\n\n# b",
+			want: "## a\n\n```\n```sh\n# nope\n```\n\n## b",
+		},
+		{
 			name: "no headings, no change",
 			min:  3,
 			// `#no-space` is not an ATX heading, and neither is `####### x`.
@@ -55,6 +61,30 @@ func TestShiftHeadings(t *testing.T) {
 				t.Errorf("shiftHeadings(%q, %d)\n got: %q\nwant: %q", c.in, c.min, got, c.want)
 			}
 		})
+	}
+}
+
+// An unbalanced fence in a message eats the next turn: pandoc reads everything
+// after it as one code block, and whether a chunk seam falls in between decides
+// how much it eats.
+func TestCloseOpenFence(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"balanced\n```\nx\n```", "balanced\n```\nx\n```"},
+		{"no fence at all", "no fence at all"},
+		// The closing fence is the run alone; an info string would open a
+		// second block instead of closing the first.
+		{"left open\n```zsh\nx", "left open\n```zsh\nx\n```"},
+		{"~~~\nx", "~~~\nx\n~~~"},
+		{"````\n```\nnot a close\n", "````\n```\nnot a close\n\n````"},
+		{"```\nclosed\n```\n```\nopen", "```\nclosed\n```\n```\nopen\n```"},
+		// An info string can only open. Reading ```sh as the end of the block
+		// above it walks the rest of the message one block out of step, and
+		// appends a fence to text that was already balanced.
+		{"```\na\n```sh\nb\n```", "```\na\n```sh\nb\n```"},
+	} {
+		if got := closeOpenFence(c.in); got != c.want {
+			t.Errorf("closeOpenFence(%q) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }
 

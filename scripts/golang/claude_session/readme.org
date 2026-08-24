@@ -221,6 +221,13 @@ relative depths. This mirrors [[agfi:org-header-rm-shared-level]] followed by
 fenced code blocks are skipped, because a shell snippet's =# comment= lines are
 not headings. Assistant and user message text gets the same treatment.
 
+A message that opens a fence and never closes it gets one appended. Otherwise it
+swallows everything after it --- the next turn's headings included --- into a
+single code block, and a chunk seam landing inside that block converts
+differently from no seam at all. Only a bare run closes a fence: ~```sh~ inside
+a ~```~ block is content, not the end of it, and reading it as the end walks the
+rest of the message one block out of step.
+
 * Performance
 
 pandoc dominates the conversion --- on a 4.5MB session it was 89% of the
