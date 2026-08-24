@@ -175,6 +175,13 @@ function hs-alert-v2 {
 }
 aliasfn hs-alert hs-alert-v2
 aliasfn alert hs-alert
+#: Without these, `@opts dur 10 @ hs-alert msg` derives its prefix from the
+#: command name and sets =hs_alert_dur=, which nothing reads.
+#: [agfi:ensure-var-name] sanitises the dash away instead of erroring, so the
+#: knob is silently ignored. `alert` happens to work by accident; pin all three.
+@opts-setprefix hs-alert-v2 alert
+@opts-setprefix hs-alert alert
+@opts-setprefix alert alert
 ##
 function hs-reval-alert {
     local alert_dur="${alert_dur:-1}"
