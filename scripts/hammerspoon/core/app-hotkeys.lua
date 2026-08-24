@@ -195,7 +195,10 @@ appHotkey{ key='c', appName='com.apple.iCal' }
 emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='x', appName=emacsAppName }
 
-appHotkey{ key='l', appName='com.tdesktop.Telegram' }
+appHotkey{ key='l',
+           appName='com.tdesktop.PurpleTelegram'
+           -- appName='com.tdesktop.Telegram'
+}
 
 appHotkey{ key='\\', appName='com.anthropic.claudefordesktop' }
 appHotkey{
