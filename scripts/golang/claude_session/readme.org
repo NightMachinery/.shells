@@ -212,21 +212,61 @@ the quadratic LCS table wasteful fall back to printing =old_string= and
 
 * Prose fields and heading levels
 
-=plan= and =prompt= are markdown, not code, so they are emitted as prose and
-pandoc turns them into real org markup. To stop a plan's own =## Foo= from
-escaping the transcript's outline, its headings are renumbered so the
-shallowest one sits directly under the enclosing heading, keeping their
-relative depths. This mirrors [[agfi:org-header-rm-shared-level]] followed by
-[[agfi:org-header-indent]], with one addition those cannot make: headings inside
-fenced code blocks are skipped, because a shell snippet's =# comment= lines are
-not headings. Assistant and user message text gets the same treatment.
+Message text, and the =plan= and =prompt= tool fields, are markdown rather than
+code, so pandoc turns them into real org markup --- headings included. A
+message's own =## Foo= must not escape the transcript's outline, so its headings
+are renumbered to sit two levels under the turn they belong to, keeping their
+relative depths. Two rather than one: the sub-headings a turn is made of
+(=Tool Use=, =Thinking=, =Recap= …) sit one level under it, and message content
+that landed on the same level would be indistinguishable from the transcript's
+own structure.
 
-A message that opens a fence and never closes it gets one appended. Otherwise it
-swallows everything after it --- the next turn's headings included --- into a
-single code block, and a chunk seam landing inside that block converts
-differently from no seam at all. Only a bare run closes a fence: ~```sh~ inside
-a ~```~ block is content, not the end of it, and reading it as the end walks the
-rest of the message one block out of step.
+The renumbering happens on the *org* side, after pandoc, not on the markdown
+going in. It has to: /pandoc/ decides what a heading is, and the markdown side
+cannot see everything it will call one. That was not a hypothetical. A subagent
+wrote banner rules around its section titles,
+
+#+begin_example
+====================================================================
+SECTION 1. Hernandez et al., …
+====================================================================
+#+end_example
+
+which CommonMark reads as one lazily-continued paragraph closed by a setext
+underline --- a level-1 heading, with no =#= anywhere for the markdown side to
+find. Seven of them came out as =* = at column zero, siblings of the =* User=
+and =* Assistant= turn headings, and re-parented the rest of the document.
+
+So each heading this program emits carries a tag instead: two private-use runes
+around a kind letter (=T= for a turn, =S= for everything else) and the heading's
+true level. Markdown ignores them, pandoc passes them through untouched, and
+=normalizeOrgLevels= strips them again while restoring the level each one
+declares. Anything else that is a heading by then came out of a message, and is
+demoted as a unit. Two things fall out of doing it this way:
+
+- A =*= at the start of a line in pandoc's org output is /always/ a heading. The
+  writer zero-width-space-escapes prose org would misread (=#+TITLE:=, a literal
+  =* = line) and comma-escapes block interiors, so there are no false positives
+  to sort out.
+- Heading levels are no longer capped at six. Markdown stops there; org does
+  not, and the tag carries the unclamped level, which matters inside a subagent
+  where the transcript already starts at level three.
+
+Two smaller rules the markdown side still enforces, both about fences:
+
+- Headings inside fenced code blocks are skipped, because a shell snippet's
+  =# comment= lines are not headings.
+- A message that opens a fence and never closes it gets one appended. Otherwise
+  it swallows everything after it --- the next turn's headings included --- into
+  a single code block, and a chunk seam landing inside that block converts
+  differently from no seam at all.
+
+Only a bare run closes a fence: ~```sh~ inside a ~```~ block is content, not the
+end of it. Reading it as the end walks the rest of the message one block out of
+step, which is how the fence-closing rule above first went wrong.
+
+[[agfi:org-header-rm-shared-level]] followed by [[agfi:org-header-indent]] is the
+same idea, on a document that is already org.
 
 * Performance
 
@@ -236,7 +276,11 @@ chunks and runs one pandoc per chunk concurrently. The seams always fall on
 record boundaries, never inside a code block, so every chunk is a
 self-contained markdown document; the result is byte-identical to converting
 the whole thing in one pandoc, which =TestPandocPathParity= checks against the
-whole local corpus. Documents below a few hundred KB use a single process,
+whole local corpus by comparing the path against itself run with =-jobs=1=. Its
+reference used to be =-format=md | pandoc=, which no longer works as one: the
+org-pandoc path tags its headings and rewrites their levels afterwards, and a
+bare pandoc pipeline can do neither. The test exists for the chunk seams, and
+still covers them. Documents below a few hundred KB use a single process,
 because pandoc's ~70ms startup would eat the gain. Records also render
 concurrently, since each is independent.
 
@@ -279,7 +323,9 @@ Avoid the em dash in generated headings: pandoc's org writer rewrites it as
 cannot be expressed through pandoc at all --- a =:PROPERTIES:= paragraph is
 collapsed onto one line, and =header_attributes= is not supported for gfm ---
 which is why the Subagents skeleton is emitted directly as org and only the
-message bodies are handed to pandoc.
+message bodies are handed to pandoc. Its two headings still carry the level tags
+described above, so that =normalizeOrgLevels= sees one uniform document rather
+than mistaking =* Subagents= for something a message wrote.
 
 * zsh entry points
 

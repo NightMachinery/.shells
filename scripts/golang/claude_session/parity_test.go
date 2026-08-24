@@ -14,6 +14,13 @@ import (
 // have silently broken that in the past — once on a chunk seam, once on a
 // stray newline at a seam. This checks it against real transcripts.
 //
+// The reference is the same path run with `-jobs=1`, which is one pandoc for
+// the whole document (`pandocChunks` computes n = 1). It used to be
+// `-format=md | pandoc`, which no longer works as a reference: the org-pandoc
+// path tags its headings and rewrites their levels afterwards, and a bare
+// pandoc pipeline has no way to do either. That trade is deliberate — this test
+// exists for the chunk seams, which is what has actually broken.
+//
 // Needs data and pandoc, so it only runs when pointed at a corpus:
 //
 //	CLAUDE_SESSION_CORPUS=~/.claude/projects go test -run Parity ./...
@@ -57,10 +64,9 @@ func TestPandocPathParity(t *testing.T) {
 			t.Fatalf("snapshot: %v", err)
 		}
 
-		// Subagents are skipped here: their section is skeleton, which by
-		// design only the org path can express. Snapshotting a session
-		// without its subagents/ directory would break them anyway.
-		want, err := pipeline(bin, snap)
+		// Subagents are skipped: the snapshot has no subagents/ directory
+		// beside it, so their section would be empty on both sides anyway.
+		want, err := run(bin, "render", "-format=org-pandoc", "-subagents=false", "-jobs=1", snap)
 		if err != nil {
 			t.Errorf("%s: reference conversion: %v", f, err)
 			continue
@@ -80,22 +86,4 @@ func TestPandocPathParity(t *testing.T) {
 func run(bin string, args ...string) (string, error) {
 	out, err := exec.Command(bin, args...).Output()
 	return string(out), err
-}
-
-func pipeline(bin, file string) (string, error) {
-	md := exec.Command(bin, "render", "-format=md", "-subagents=false", file)
-	pd := exec.Command("pandoc", "--from=gfm-gfm_auto_identifiers", "--to=org", "--wrap=none")
-
-	var err error
-	if pd.Stdin, err = md.StdoutPipe(); err != nil {
-		return "", err
-	}
-	if err = md.Start(); err != nil {
-		return "", err
-	}
-	out, err := pd.Output()
-	if err != nil {
-		return "", err
-	}
-	return string(out), md.Wait()
 }
