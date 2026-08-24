@@ -64,9 +64,85 @@ func TestShiftHeadings(t *testing.T) {
 	}
 }
 
-// An unbalanced fence in a message eats the next turn: pandoc reads everything
-// after it as one code block, and whether a chunk seam falls in between decides
-// how much it eats.
+// The tags are written on the markdown side, so this is what pandoc's org
+// output looks like by the time [normalizeOrgLevels] sees it.
+func org(kind byte, level int, text string) string {
+	return strings.Repeat("*", level) + " " + levelTag(kind, level) + " " + text
+}
+
+func TestNormalizeOrgLevels(t *testing.T) {
+	cases := []struct {
+		name, in, want string
+	}{
+		{
+			name: "a message heading nests below the turn's own sub-headings",
+			in: org(tagTurn, 1, "Assistant") + "\n\n" +
+				org(tagSub, 2, "Tool Use: Bash") + "\n\n" +
+				"* mine\n\n** deeper\n",
+			want: "* Assistant\n\n** Tool Use: Bash\n\n*** mine\n\n**** deeper\n",
+		},
+		{
+			// The bug this was written for: `Title` over `====` is a setext
+			// heading, which the markdown side cannot see, so it reached org as
+			// a level-1 heading and re-parented the rest of the document.
+			name: "a setext heading pandoc made cannot escape the turn",
+			in: org(tagTurn, 1, "Assistant") + "\n\n" +
+				"* ==== SECTION 1\n\nbody\n\n" + org(tagTurn, 1, "User") + "\n",
+			want: "* Assistant\n\n*** ==== SECTION 1\n\nbody\n\n* User\n",
+		},
+		{
+			name: "a run keeps its relative depths, anchored at its shallowest",
+			in: org(tagTurn, 1, "Assistant") + "\n\n" +
+				"*** a\n\n**** b\n\n*** c\n",
+			want: "* Assistant\n\n*** a\n\n**** b\n\n*** c\n",
+		},
+		{
+			name: "message headings anchor to the turn, not to what precedes them",
+			in: org(tagTurn, 1, "Assistant") + "\n\n" +
+				org(tagSub, 2, "Tool Use: Bash") + "\n\n" +
+				org(tagSub, 3, "Result") + "\n\n* mine\n",
+			want: "* Assistant\n\n** Tool Use: Bash\n\n*** Result\n\n*** mine\n",
+		},
+		{
+			name: "levels deeper than markdown can express survive",
+			in:   org(tagTurn, 7, "Assistant") + "\n\n* mine\n",
+			want: strings.Repeat("*", 7) + " Assistant\n\n" +
+				strings.Repeat("*", 9) + " mine\n",
+		},
+		{
+			name: "stars inside a block are left alone",
+			in: org(tagTurn, 1, "Assistant") + "\n\n" +
+				"#+begin_example\n* not a heading\n#+end_example\n\n* mine\n",
+			want: "* Assistant\n\n#+begin_example\n* not a heading\n#+end_example\n\n*** mine\n",
+		},
+		{
+			name: "nested blocks close one at a time",
+			in: org(tagTurn, 1, "Assistant") + "\n\n" +
+				"#+begin_quote\n#+begin_example\n* no\n#+end_example\n* still no\n#+end_quote\n\n* mine\n",
+			want: "* Assistant\n\n#+begin_quote\n#+begin_example\n* no\n#+end_example\n* still no\n#+end_quote\n\n*** mine\n",
+		},
+		{
+			name: "the subagents skeleton is structure, not a message",
+			in: org(tagSub, 1, "Subagents") + "\n\n" +
+				org(tagSub, 2, "general-purpose · x") + "\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n" +
+				org(tagTurn, 3, "User") + "\n",
+			want: "* Subagents\n\n** general-purpose · x\n" +
+				":PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n*** User\n",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := normalizeOrgLevels(c.in); got != c.want {
+				t.Errorf("got:\n%q\nwant:\n%q", got, c.want)
+			}
+		})
+	}
+}
+
+// An unbalanced fence in a message used to eat the next turn: pandoc read
+// everything after it as one code block, and whether a chunk seam fell in
+// between decided how much it ate.
 func TestCloseOpenFence(t *testing.T) {
 	for _, c := range []struct{ in, want string }{
 		{"balanced\n```\nx\n```", "balanced\n```\nx\n```"},
@@ -79,12 +155,21 @@ func TestCloseOpenFence(t *testing.T) {
 		{"```\nclosed\n```\n```\nopen", "```\nclosed\n```\n```\nopen\n```"},
 		// An info string can only open. Reading ```sh as the end of the block
 		// above it walks the rest of the message one block out of step, and
-		// appends a fence to text that was already balanced.
+		// used to have this append a fence to text that was already balanced.
 		{"```\na\n```sh\nb\n```", "```\na\n```sh\nb\n```"},
 	} {
 		if got := closeOpenFence(c.in); got != c.want {
 			t.Errorf("closeOpenFence(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+// A message cannot dress its own text up as a heading of this program's.
+func TestStripTagsDefusesForgedTags(t *testing.T) {
+	forged := levelTag(tagTurn, 1) + " User"
+	if got := stripTags(forged); strings.ContainsRune(got, tagOpen) ||
+		strings.ContainsRune(got, tagClose) {
+		t.Errorf("tag runes survived: %q", got)
 	}
 }
 

@@ -19,7 +19,12 @@ type renderer struct {
 	org      bool
 	maxBlock int
 	diff     bool
-	out      *strings.Builder
+	// Tag every heading with its level, for [normalizeOrgLevels] to restore
+	// once pandoc has converted the document. Only the org-pandoc path needs
+	// it, because only there does something other than this program decide what
+	// a heading is.
+	tag bool
+	out *strings.Builder
 
 	// Results, keyed by the id of the call they answer, so a call can render
 	// its own result underneath itself.
@@ -76,7 +81,12 @@ func cmdRender(argv []string) {
 	results := indexResults(records, blocks)
 	turns := buildTurns(records, blocks, results)
 
-	opts := renderOpts{org: *format == "org", maxBlock: *maxBlock, diff: *diff}
+	opts := renderOpts{
+		org:      *format == "org",
+		maxBlock: *maxBlock,
+		diff:     *diff,
+		tag:      *format == "org-pandoc",
+	}
 
 	// The skeleton Go emits is in the *output* syntax, which for org-pandoc is
 	// org even though the bodies it wraps are still markdown.
@@ -104,13 +114,17 @@ func cmdRender(argv []string) {
 	for _, s := range convertSegments(segs, *jobs, *pandocBin) {
 		doc.WriteString(s)
 	}
-	w.WriteString(strings.TrimRight(doc.String(), "\n") + "\n")
+	// Over the assembled document rather than per chunk, so how it was split
+	// across pandoc processes cannot change the result.
+	out := normalizeOrgLevels(doc.String())
+	w.WriteString(strings.TrimRight(out, "\n") + "\n")
 }
 
 type renderOpts struct {
 	org      bool
 	maxBlock int
 	diff     bool
+	tag      bool
 	// Added to every heading level, so a transcript can be nested inside
 	// another document.
 	base int
@@ -138,20 +152,25 @@ func subagentSegments(input string, blocks [][]block, opts renderOpts, orgOut bo
 	if orgOut {
 		mark = "*"
 	}
-	head := func(level int, text string) string {
-		return strings.Repeat(mark, level) + " " + text + "\n\n"
+	// Tagged like every other heading: this section is skeleton, so it never
+	// meets pandoc, but [normalizeOrgLevels] still has to know it is not
+	// something a message wrote.
+	head := func(level int, text, trailer string) string {
+		if opts.tag {
+			text = levelTag(tagSub, level) + " " + stripTags(text)
+		}
+		return strings.Repeat(mark, level) + " " + text + "\n" + trailer + "\n"
 	}
 
-	segs := []segment{{text: head(1, "Subagents")}}
+	segs := []segment{{text: head(1, "Subagents", "")}}
 
 	for _, s := range subs {
-		title := head(2, s.title())
+		trailer := ""
 		if orgOut {
 			// VISIBILITY is honoured at startup, so each agent opens folded.
-			title = strings.Repeat(mark, 2) + " " + s.title() +
-				"\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n"
+			trailer = ":PROPERTIES:\n:VISIBILITY: folded\n:END:\n"
 		}
-		segs = append(segs, segment{text: title})
+		segs = append(segs, segment{text: head(2, s.title(), trailer)})
 
 		for _, p := range renderSubagent(s, opts, jobs) {
 			segs = append(segs, segment{text: p, body: true})
@@ -338,6 +357,7 @@ func renderTurns(turns []turn, results map[string]toolResult, opts renderOpts, j
 				org:      opts.org,
 				maxBlock: opts.maxBlock,
 				diff:     opts.diff,
+				tag:      opts.tag,
 				base:     opts.base,
 				results:  results,
 				out:      &strings.Builder{},
@@ -497,6 +517,7 @@ func (r *renderer) renderTurn(t turn) {
 		org:      r.org,
 		maxBlock: r.maxBlock,
 		diff:     r.diff,
+		tag:      r.tag,
 		base:     r.base,
 		results:  r.results,
 		turnTS:   t.ts,
@@ -525,7 +546,7 @@ func (r *renderer) renderTurn(t turn) {
 	if t.note != "" {
 		title += " · " + t.note
 	}
-	r.heading(1, title)
+	r.turnHeading(1, title)
 	r.out.WriteString(body.out.String())
 	r.ensureBlank()
 }

@@ -3,23 +3,42 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 // ** output primitives
 
 func (r *renderer) heading(level int, text string) {
+	r.taggedHeading(tagSub, level, text)
+}
+
+// The turn's own heading. Message text nests below the sub-headings this file
+// emits for the turn's parts, so the tag records which heading is the turn.
+func (r *renderer) turnHeading(level int, text string) {
+	r.taggedHeading(tagTurn, level, text)
+}
+
+func (r *renderer) taggedHeading(kind byte, level int, text string) {
 	mark := "#"
 	if r.org {
 		mark = "*"
 	}
 	level += r.base
-	if level > 6 && !r.org {
+
+	marks := level
+	if marks > 6 && !r.org {
 		// Markdown stops at six; org does not care.
-		level = 6
+		marks = 6
 	}
+	if r.tag {
+		// The tag carries the unclamped level, so a heading deeper than markdown
+		// can express is restored rather than lost.
+		text = levelTag(kind, level) + " " + stripTags(text)
+	}
+
 	r.ensureBlank()
-	r.out.WriteString(strings.Repeat(mark, level) + " " + text + "\n\n")
+	r.out.WriteString(strings.Repeat(mark, marks) + " " + text + "\n\n")
 }
 
 // A `**key:**` line introducing the block that follows.
@@ -69,7 +88,16 @@ func (r *renderer) prose(s string, parentLevel int) {
 		r.out.WriteString(escOrgText(s) + "\n")
 		return
 	}
-	r.out.WriteString(shiftHeadings(closeOpenFence(s), parentLevel+r.base+1) + "\n")
+	s = closeOpenFence(s)
+	if r.tag {
+		// [normalizeOrgLevels] places these once pandoc has said which of them
+		// are headings at all. Shifting here would only re-clamp them at six and
+		// lose their relative depth, and would still miss every heading this
+		// file's markdown cannot see.
+		r.out.WriteString(stripTags(s) + "\n")
+		return
+	}
+	r.out.WriteString(shiftHeadings(s, parentLevel+r.base+1) + "\n")
 }
 
 func (r *renderer) block(lang, body string) {
@@ -203,9 +231,9 @@ func shiftHeadings(text string, minLevel int) string {
 
 // A message that opens a fenced code block and never closes it swallows
 // everything after it — the next turn's headings included — into one code
-// block. It also breaks the promise that every chunk is a self-contained
-// markdown document, so where the seams fell would change the conversion.
-// Close whatever the message left open.
+// block. It also breaks the promise every chunk is a self-contained markdown
+// document, so where the seams fell would change the conversion. Close
+// whatever the message left open.
 func closeOpenFence(s string) string {
 	open := ""
 	for _, ln := range strings.Split(s, "\n") {
@@ -221,9 +249,9 @@ func closeOpenFence(s string) string {
 // The fence a line leaves open, given the one it found open. Returns "" outside
 // a fenced block and the opening run inside one.
 //
-// Only a bare run closes a fence: ```sh inside a ``` block is content, not the
-// end of it, and reading it as the end walks the rest of the message one block
-// out of step.
+// Only a bare run closes a fence: ```` ```sh ```` inside a ```` ``` ```` block
+// is content, not the end of it, and reading it as the end walks the rest of
+// the message one block out of step.
 func fenceStep(open, ln string) string {
 	m := fenceRe.FindStringSubmatch(ln)
 	if m == nil {
@@ -250,6 +278,152 @@ func forEachMarkdownLine(lines []string, fn func(i int, ln string)) {
 		}
 		fn(i, ln)
 	}
+}
+
+// ** heading tags
+//
+// On the org-pandoc path the skeleton is emitted as markdown and *pandoc*
+// decides what a heading is, so by the time the document is org there is
+// nothing left to tell this program's headings from a message's. Each
+// structural heading therefore carries a tag: two private-use runes around a
+// kind letter and the heading's true level. They mean nothing to markdown,
+// survive pandoc untouched, and [normalizeOrgLevels] strips them again.
+//
+// The alternative — teaching the markdown side every construct pandoc's reader
+// promotes to a heading — is the reimplementation `readme.org` argues against
+// under Performance, and it had already gone wrong: setext underlines
+// (`Title` over `====`) were invisible to [shiftHeadings], so a message full of
+// them escaped the outline entirely.
+const (
+	tagOpen  = ''
+	tagClose = ''
+
+	tagTurn = 'T'
+	tagSub  = 'S'
+)
+
+var tagStripper = strings.NewReplacer(string(tagOpen), "", string(tagClose), "")
+
+func levelTag(kind byte, level int) string {
+	return string(tagOpen) + string(kind) + strconv.Itoa(level) + string(tagClose)
+}
+
+// Keeps a message from forging a tag of its own.
+func stripTags(s string) string {
+	if !strings.ContainsRune(s, tagOpen) && !strings.ContainsRune(s, tagClose) {
+		return s
+	}
+	return tagStripper.Replace(s)
+}
+
+var orgHeadingRe = regexp.MustCompile(`^(\*+) `)
+var orgBlockRe = regexp.MustCompile(`(?i)^[ \t]*#\+(begin|end)_`)
+var headingTagRe = regexp.MustCompile("^([TS])([0-9]+) ?")
+
+// Where message headings start, relative to their turn: below the sub-headings
+// the turn is made of (`Tool Use`, `Thinking`, `Recap` …), which sit one level
+// under it. So a message can never be mistaken for the transcript's own
+// structure.
+const contentDepth = 2
+
+type orgHeading struct {
+	line  int
+	stars int
+	text  string
+	// The tag's kind letter, or 0 for a heading that came out of a message.
+	kind byte
+	// The tagged heading's true level.
+	level int
+}
+
+// Restores heading levels in pandoc's org output: tagged headings go back to
+// the level they were emitted at, and everything else — which by definition
+// came out of a message — is demoted to sit under its turn.
+//
+// This is only possible on the org side. A `*` at the start of a line in
+// pandoc's org output is always a heading: the writer zero-width-space-escapes
+// prose that org would misread (`#+TITLE:`, a literal `* ` line) and
+// comma-escapes block interiors, so there are no false positives to sort out.
+func normalizeOrgLevels(doc string) string {
+	lines := strings.Split(doc, "\n")
+	heads := scanOrgHeadings(lines)
+
+	set := func(h orgHeading, level int) {
+		if level < 1 {
+			level = 1
+		}
+		lines[h.line] = strings.Repeat("*", level) + " " + h.text
+	}
+
+	contentBase := 0
+	for i := 0; i < len(heads); {
+		if h := heads[i]; h.kind != 0 {
+			set(h, h.level)
+			switch {
+			case h.kind == tagTurn:
+				contentBase = h.level + contentDepth
+			case contentBase == 0:
+				// The `* Subagents` skeleton, before any turn.
+				contentBase = h.level + 1
+			}
+			i++
+			continue
+		}
+
+		// This heading and every untagged one after it came out of the same
+		// message, so they shift as a unit and keep their relative depths.
+		j, min := i, 0
+		for ; j < len(heads) && heads[j].kind == 0; j++ {
+			if min == 0 || heads[j].stars < min {
+				min = heads[j].stars
+			}
+		}
+		base := contentBase
+		if base == 0 {
+			base = min
+		}
+		for ; i < j; i++ {
+			set(heads[i], heads[i].stars+base-min)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func scanOrgHeadings(lines []string) []orgHeading {
+	var out []orgHeading
+	depth := 0
+
+	for i, ln := range lines {
+		if m := orgBlockRe.FindStringSubmatch(ln); m != nil {
+			if strings.EqualFold(m[1], "begin") {
+				depth++
+			} else if depth > 0 {
+				depth--
+			}
+			continue
+		}
+		if depth > 0 {
+			continue
+		}
+		m := orgHeadingRe.FindStringSubmatch(ln)
+		if m == nil {
+			continue
+		}
+
+		h := orgHeading{line: i, stars: len(m[1]), text: ln[len(m[0]):]}
+		if t := headingTagRe.FindStringSubmatch(h.text); t != nil {
+			h.kind = t[1][0]
+			h.level, _ = strconv.Atoi(t[2])
+			if h.level < 1 {
+				h.level = 1
+			}
+			h.text = h.text[len(t[0]):]
+		}
+		out = append(out, h)
+	}
+
+	return out
 }
 
 // A bare URL, as a link in whichever syntax is being written.
