@@ -36,9 +36,26 @@ Set with `bell_auto_stop_mode`, or `@opts stop_mode <mode> @ bell-auto`.
 - `notif` — no bell at all; straight to stage 2.
 - `bell+notif` — one bell, then stage 2.
 
-`auto` resolves to `bell+notif` when `office-p` is true **and** `headphones-p` is
-false; otherwise `idle+timeout`. The reason to suppress repeated bells at the office
-is the colleagues, not the office, so headphones remove the concern.
+`auto` resolves in order:
+
+- `meeting-p` → `notif`. Even one ring is wrong in a meeting: speakers feed it
+  into the mic, headphones play it over whoever is talking. `meeting-p` reads the
+  *current* browser tab, so a meeting behind another tab still rings — an annoying
+  failure rather than a silent one, which is the tolerable direction.
+- `office-public-audio-p` or `headphones-p` → `bell+notif`. On office speakers the
+  colleagues hear every repeat. On headphones, one ring is all the loop can
+  usefully deliver: worn, the first ring did the job and repeats just keep ducking
+  your audio; on the desk, no number of rings reaches anyone and looping would
+  only delay the notification ladder by up to `bell_auto_max_t`.
+- otherwise → `idle+timeout`. Open speakers in a private space is the one
+  situation where the ringing loop earns its keep: repetition reaches a person the
+  first ring missed, and bothers nobody else.
+
+`headphones-p` classifies the default audio *output device*, not your ears. Buds
+in their case disconnect and stop being the default, so that resolves to speakers;
+buds connected but lying on the desk still classify as worn, which costs one
+unheard ring and an immediate notification — still better than an hour of equally
+unheard looping.
 
 ## Notifications are opt-in
 
