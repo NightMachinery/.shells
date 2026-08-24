@@ -69,7 +69,7 @@ func (r *renderer) prose(s string, parentLevel int) {
 		r.out.WriteString(escOrgText(s) + "\n")
 		return
 	}
-	r.out.WriteString(shiftHeadings(s, parentLevel+r.base+1) + "\n")
+	r.out.WriteString(shiftHeadings(closeOpenFence(s), parentLevel+r.base+1) + "\n")
 }
 
 func (r *renderer) block(lang, body string) {
@@ -201,23 +201,51 @@ func shiftHeadings(text string, minLevel int) string {
 	return strings.Join(lines, "\n")
 }
 
+// A message that opens a fenced code block and never closes it swallows
+// everything after it — the next turn's headings included — into one code
+// block. It also breaks the promise that every chunk is a self-contained
+// markdown document, so where the seams fell would change the conversion.
+// Close whatever the message left open.
+func closeOpenFence(s string) string {
+	open := ""
+	for _, ln := range strings.Split(s, "\n") {
+		open = fenceStep(open, ln)
+	}
+	if open == "" {
+		return s
+	}
+	// The run alone, never the info string with it.
+	return s + "\n" + open
+}
+
+// The fence a line leaves open, given the one it found open. Returns "" outside
+// a fenced block and the opening run inside one.
+//
+// Only a bare run closes a fence: ```sh inside a ``` block is content, not the
+// end of it, and reading it as the end walks the rest of the message one block
+// out of step.
+func fenceStep(open, ln string) string {
+	m := fenceRe.FindStringSubmatch(ln)
+	if m == nil {
+		return open
+	}
+	if open == "" {
+		return m[1]
+	}
+	if m[1][0] == open[0] && len(m[1]) >= len(open) &&
+		strings.TrimSpace(ln[len(m[0]):]) == "" {
+		return ""
+	}
+	return open
+}
+
 // Calls fn for every line outside a fenced code block.
 func forEachMarkdownLine(lines []string, fn func(i int, ln string)) {
-	inFence := false
-	var fenceChar byte
-	fenceLen := 0
-
+	open := ""
 	for i, ln := range lines {
-		if m := fenceRe.FindStringSubmatch(ln); m != nil {
-			mark := m[1]
-			if !inFence {
-				inFence, fenceChar, fenceLen = true, mark[0], len(mark)
-			} else if mark[0] == fenceChar && len(mark) >= fenceLen {
-				inFence = false
-			}
-			continue
-		}
-		if inFence {
+		// A fence line, or any line inside a block: neither is a heading.
+		if open != "" || fenceRe.MatchString(ln) {
+			open = fenceStep(open, ln)
 			continue
 		}
 		fn(i, ln)
