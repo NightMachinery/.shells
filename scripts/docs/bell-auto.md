@@ -95,6 +95,34 @@ For the payload to arrive, the hook in `~/.claude/settings.json` must forward st
 Reading stdin is bounded by a 2s `gtimeout`, so an inherited pipe that never closes
 cannot wedge the agent's hook.
 
+### One notification per waiting session
+
+Agent hooks fire repeatedly — every permission prompt, every stop — and each firing
+used to leave another notification behind. They now pass a `notif_group` of
+`agent-<app>-<project>`, and `notif-os` forwards it as `terminal-notifier -group`:
+posting removes the previous undismissed notification of the same group first, so
+repeats *update* the one notification instead of piling up.
+
+The key is per app+project, not per app, because a new project's wait would
+otherwise overwrite another project's still-pending one — exactly the information
+the `[project]` tag exists to carry. Sessions without a `cwd` share the app's key.
+
+`notif_group` is a general `notif-os` knob; anything else that restates one fact can
+set it. Empty (the default) posts an ordinary ungrouped notification.
+
+### Making them persist until dismissed
+
+Whether a notification fades on its own is decided by its *style*, not by the
+sender: banners fade, alerts stay until closed. To make the agent notifications
+persistent, set **System Settings → Notifications → terminal-notifier → Alerts**.
+Combined with the grouping above this yields one persistent, self-updating
+notification per waiting session, each with macOS's own close button — no custom
+overlay needed.
+
+The style applies to everything `terminal-notifier` posts, so casual `notif` calls
+stop fading too; that is the price of the zero-code route. `notif-os-dismiss-all`
+(and the Hyper+D binding that calls it) clears alerts the same as banners.
+
 ## Do Not Disturb
 
 `notif-os` passes `-ignoreDnD` by default (`notif_ignore_dnd_p`). A notification

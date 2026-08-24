@@ -1426,7 +1426,17 @@ Code's Notification but not its Stop), hence the fallback."
     local icon
     icon="$(silence app-icon-get "$app")" || icon=''
 
+    #: "This session is waiting" is one fact per session, so repeats replace the
+    #: previous undismissed notification rather than piling up. Keyed per
+    #: app+project: coarser (per app) and a new project's wait would overwrite
+    #: another project's still-pending one, losing exactly the information the
+    #: tag above exists to carry. Sessions without a cwd share the app's key.
+    #: See the Notifications section of ./docs/bell-auto.md.
+    local group="agent-${app}"
+    test -n "$cwd" && group+="-${cwd:t}"
+
     bell_auto_sleep=10 bell_auto_notif_msg="$msg" notif_ignore_dnd_p=y notif_image="$icon" \
+        notif_group="$group" \
         awaysh bell-auto "$engine"
 }
 ##
