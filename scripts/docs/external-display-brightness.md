@@ -103,6 +103,9 @@ Each of those, plus `brightness-off` / `brightness-on`, has `-main`, `-all`,
     display-black-toggle-external
     brightness-off-all
 
+Every one of those also has a `-loop` version, suffixed last
+(`display-black-on-all-loop`); see "Keeping it blank" below.
+
 Only this family gets them. `brightness-get-internal` and `brightness-get-ddc`
 already exist as *backend* helpers taking a display index, and `brightness-set`
 takes its value first, so `brightness-set-all 0.5` would put the selector where
@@ -130,10 +133,47 @@ the cost of sleeping every display and waking on any keypress.
 (`display_black_saved`), and `display-black-off` puts those exact values back —
 so unlike the old fixed 0.435, you land where you started.
 
+It is idempotent: run on a display that is already blanked, it re-applies the
+zeros and the gamma table but keeps the levels it remembered the first time. It
+has to be, because a blanked display reads back as 0 — remembering *that* would
+make `display-black-off` "restore" the screen to black. As a side effect, the
+repeat call skips the DDC read entirely, which is the slow and unreliable half
+of the operation. Rows for displays outside the selector are kept rather than
+overwritten, so blanking the internal panel after the external one does not
+forget how to restore the external one.
+
 Restoring a subset works: `display-black-off internal` un-blanks the laptop and
 leaves the monitor black. That needs a little care, because `hs.screen.restoreGamma()`
 is global — so anything still meant to be blanked has its gamma re-applied
 afterwards. Whether a display was gamma'd is the last field of the saved state.
+
+### Keeping it blank
+
+A one-shot blackout does not stay. macOS restores gamma and brightness on wake,
+on a display reconfiguration, and whenever a DDC write is lost, so the screen
+quietly comes back. Every function above therefore has a `-loop` version, with
+the suffix last:
+
+    lo_s=30 display-black-on-all-loop     # blank now, re-assert every 30s
+    display-black-off-all-loop            # stop the loop, restore the levels
+    display-black-toggle-all-loop
+    display-black-loop-p                  # is the loop running?
+
+`lo_s` is the interval in seconds and defaults to 5. It is read when the loop is
+started, so changing it means restarting: `display-black-on-loop` kills any
+existing loop first, and there is only ever one.
+
+The loop is a background subshell whose argv is marked `DBLACK_LOOP_MARKER`
+(`awaysh-bnamed`, so it runs in the brish garden and outlives the terminal that
+started it), and stopping it is `kill-marker` plus a final `display-black-off`.
+See the mark-me pattern in `PE/Zsh.org`. To check on it or kill it by hand:
+
+    pgrep -fl DBLACK_LOOP_MARKER
+    kill-marker DBLACK_LOOP_MARKER
+
+The loop body is just `display-black-on`, so a display plugged in while the loop
+is running gets blanked on the next tick, and raising the brightness by hand is
+undone within `lo_s` seconds.
 
 ### hyper+shift+F1 / F2
 
@@ -145,6 +185,12 @@ running.
 The bindings in `hammerspoon/core/window-media-bindings.lua` use the `-all`
 forms. Blanking only the main display leaves the other screen lit, which defeats
 the point with the lid open.
+
+They also use the `-loop` forms — `brightness-off-all-loop` and
+`brightness-on-all-loop` — so F1 starts the keep-blank loop and F2 stops it and
+restores. `brightness-off-loop` keeps the `caffeinate-on` of its one-shot
+sibling, which is the reason the keys go through `power.zsh` at all rather than
+calling `display-black-on-all-loop` directly.
 
 ### If a screen is ever left black
 
