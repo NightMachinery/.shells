@@ -70,18 +70,23 @@ bindWithRepeatV2{
 -- `-all`, so these blank every display rather than just whichever is currently
 -- main. Blanking only the main one leaves the other screen lit, which defeats
 -- the point when the lid is open.
+--
+-- The `-loop` versions, because a one-shot blackout does not stay: macOS
+-- restores gamma and brightness on wake, on a display reconfiguration, and
+-- whenever a DDC write is lost. F1 starts a background loop that re-asserts it
+-- every few seconds; F2 stops that loop and restores the levels.
 hyper_bind_v2{
     mods={"shift"},
     key="F1",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-off-all')
+        brishzeval('awaysh-fast brightness-off-all-loop')
     end,
 }
 hyper_bind_v2{
     mods={"shift"},
     key="F2",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-on-all')
+        brishzeval('awaysh-fast brightness-on-all-loop')
     end,
 }
 ---
