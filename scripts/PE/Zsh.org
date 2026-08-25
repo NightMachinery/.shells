@@ -299,6 +299,57 @@ input_volume_cached_del
 
 The redis-backed variables should be used when some state needs to be shared between multiple shell instances.
 
+- Stoppable background jobs (the =mark-me= pattern):
+
+A job that has to be stopped from somewhere else — another shell, a keybinding, a hook — needs a name that survives the fork. =mark-me= gives it one by rewriting the subshell's own argv, so =pgrep= can find it again later:
+#+begin_src zsh :eval never
+function mark-me {
+    local mark
+    mark="$(marker-preprocess "$1")" @RET
+
+    jobs -Z "zsh $mark $(gq "${@[2,-1]}")"
+
+    typeset -g mark_current="$mark"
+}
+#+end_src
+
+You rarely call it yourself: =awaysh-named= backgrounds a subshell, marks it, and evals the command inside it. =awaysh-bnamed= is the same thing in the brish garden, so the job outlives the terminal that started it.
+
+The above can be used like this:
+#+begin_src zsh :eval never
+typeset -g SOME_JOB_MARKER='SOME_JOB_MARKER'
+
+function h-some-job-loop {
+    #: The loop body, as a function. See below for why.
+    local dur="$1" sel="$2"
+    assert-args dur sel @RET
+
+    lo_s="$dur" loop some-job "$sel"
+}
+
+# To start it (one instance; restarting is how you change its arguments):
+kill-marker "$SOME_JOB_MARKER" || true
+awaysh-bnamed "$SOME_JOB_MARKER" h-some-job-loop "${lo_s:-5}" "$sel"
+
+# To ask whether it is running:
+silent pgrep -f "$SOME_JOB_MARKER"
+
+# To stop it, and then undo whatever it was maintaining:
+kill-marker "$SOME_JOB_MARKER" || true
+some-job-cleanup
+#+end_src
+
+Four things that go wrong if you deviate:
+
+  - The marker must be short. =mark-me= writes into the argv space the shell already reserved, and outside brish that is not much. =marker-preprocess= upcases it, turns =-= into =_=, and appends =_MARKER=, so =DBLACK_LOOP= and =DBLACK_LOOP_MARKER= name the same job.
+  - The body must be a function. A bare builtin or simple command does not keep the marked subshell alive, and then there is nothing left carrying the marker.
+  - Parameters travel as arguments, not in the environment. =awaysh-bnamed= crosses into the garden, which does not inherit our environment, and =gquote= would turn a =lo_s=5= word into a command name rather than an assignment.
+  - Stop with =kill-marker=, never a hand-rolled =pkill -f=. =kill-marker= goes through =kill-withchildren=, which is what takes the =sleep= or =socat= that =loop= is currently blocked on down with the loop. Beware also that =pgrep -f= matches your own command line, so keep the marker out of it.
+
+The cleanup belongs in the stopper, right after =kill-marker=, not in an =always= block inside the job: a killed process is not guaranteed to run one. =display-black-on-loop= / =display-black-off-loop= in =zshlang/auto-load/others/system.zsh= are the worked example.
+
+Use this whenever a job must keep running until something else says stop. When you only need one instance of a job that quits on its own, =oneinstance-setup= is the lighter option.
+
 - Things that should NOT be dependency-injected unless the user asks explicitly:
   - commands
 --------------
