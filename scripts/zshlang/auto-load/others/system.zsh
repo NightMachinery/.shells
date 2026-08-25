@@ -836,29 +836,57 @@ exactly what \`hs.screen:id()\` returns."
 function display-black-on {
     : "usage: display-black-on [<selector>]
 Blanks the selected display(s), remembering their levels so
-[agfi:display-black-off] can put them back. Selectors: see
-[agfi:h-brightness-select]."
+[agfi:display-black-off] can put them back. Idempotent: run on an
+already-blanked display it re-asserts the blackout and keeps the levels it
+remembered the first time, which is what makes [agfi:display-black-on-loop]
+possible. Selectors: see [agfi:h-brightness-select]."
     ##
     local sel="${1:-${brightness_display:-main}}"
 
     local lines
     lines="$(h-brightness-select "$sel")" @TRET
 
-    local line b c g ret=0
-    local -a f saved=()
+    #: What we already remember, keyed by display-id. A remembered level always
+    #: wins over a fresh reading, because it is by definition a pre-blank one:
+    #: a blanked display reads back as 0, and remembering *that* would make
+    #: [agfi:display-black-off] "restore" the screen to black. Skipping the
+    #: getter also keeps a slow, flaky DDC read out of every loop iteration.
+    local prev line
+    prev="$(display_black_saved_get)" || prev=''
+    local -A prev_b prev_c
+    local -a pf
+    for line in "${(@f)prev}" ; do
+        [[ -n "$line" ]] || continue
+        pf=("${(@ps:\t:)line}")
+        prev_b[$pf[1]]="$pf[4]"
+        prev_c[$pf[1]]="$pf[5]"
+    done
+
+    local b c g known ret=0
+    local -a f saved=() seen=()
     for line in "${(@f)lines}" ; do
         [[ -n "$line" ]] || continue
         f=("${(@ps:\t:)line}")
         #: f: 1 index  2 backend  3 local-id  4 main|-  5 built-in|external  6 name  7 display-id
 
-        b='-' c='-' g=n
+        b='-' c='-' g=n known=''
+        if (( ${+prev_b[$f[7]]} )) ; then
+            known=y
+            b="$prev_b[$f[7]]"
+            c="$prev_c[$f[7]]"
+        fi
+
         if [[ "$f[2]" != none ]] ; then
-            b="$(brightness-get-$f[2] "$f[3]" 2>/dev/null)" || b='-'
+            if test -z "$known" ; then
+                b="$(brightness-get-$f[2] "$f[3]" 2>/dev/null)" || b='-'
+            fi
             brightness-set-$f[2] 0 "$f[3]" || ret=$?
         fi
 
         if [[ "$f[2]" == ddc ]] ; then
-            c="$(contrast-get-ddc "$f[3]" 2>/dev/null)" || c='-'
+            if test -z "$known" ; then
+                c="$(contrast-get-ddc "$f[3]" 2>/dev/null)" || c='-'
+            fi
             contrast-set-ddc 0 "$f[3]" || ret=$?
         fi
 
@@ -871,6 +899,16 @@ Blanks the selected display(s), remembering their levels so
         fi
 
         saved+=("$f[7]"$'\t'"$f[2]"$'\t'"$f[3]"$'\t'"$b"$'\t'"$c"$'\t'"$g")
+        seen+=("$f[7]")
+    done
+
+    #: Displays this selector did not touch keep their rows; otherwise blanking
+    #: the internal panel after the external one would forget how to restore
+    #: the external one.
+    for line in "${(@f)prev}" ; do
+        [[ -n "$line" ]] || continue
+        pf=("${(@ps:\t:)line}")
+        (( $seen[(Ie)$pf[1]] )) || saved+=("$line")
     done
 
     (( $#saved )) && display_black_saved_set "${(pj:\n:)saved}"
@@ -960,6 +998,83 @@ function display-black-toggle {
     fi
 }
 ##
+#: A one-shot blackout does not stay. macOS restores gamma and brightness on
+#: wake, on a display reconfiguration, and whenever a DDC write is lost, so the
+#: screen quietly comes back. The `-loop' family re-asserts it every `lo_s'
+#: seconds until told to stop.
+#:
+#: The loop is a marked background subshell, so stopping it is
+#: [agfi:kill-marker] and nothing else needs to know it exists.
+#: @seeAlso the mark-me pattern in `PE/Zsh.org'.
+##
+typeset -g DISPLAY_BLACK_LOOP_MARKER='DBLACK_LOOP_MARKER'
+#: Short on purpose: [agfi:mark-me] rewrites argv in place, and outside brish
+#: there is only as much room as the shell reserved. @seeAlso the note in
+#: [agfi:fairgrad-paper-build].
+
+function h-display-black-loop {
+    : "usage: h-display-black-loop <interval> <selector>
+The body of [agfi:display-black-on-loop]. A function rather than an inline
+command, both because the marked subshell does not survive a bare builtin (see
+[agfi:awaysh-named]) and because the interval has to travel as an argument:
+[agfi:awaysh-bnamed] crosses into the brish garden, where our environment does
+not follow it, and a quoted \`lo_s=5' word would be read as a command name
+rather than an assignment."
+    ##
+    local dur="$1" sel="$2"
+    assert-args dur sel @RET
+
+    lo_s="$dur" loop display-black-on "$sel"
+}
+
+function display-black-loop-p {
+    : "Whether the keep-blank loop is running."
+    ##
+    silent pgrep -f "$DISPLAY_BLACK_LOOP_MARKER"
+}
+
+function display-black-on-loop {
+    : "usage: [lo_s=<seconds>] display-black-on-loop [<selector>]
+Blanks the selected display(s) and keeps them blanked, re-asserting every lo_s
+seconds (default 5). Stop it with [agfi:display-black-off-loop]. Selectors: see
+[agfi:h-brightness-select]."
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+    local dur="${lo_s:-5}"
+
+    #: One instance. Restarting is how you change the interval or the selector.
+    kill-marker "$DISPLAY_BLACK_LOOP_MARKER" || true
+
+    #: The brish variant, so the loop outlives the terminal that started it.
+    #: [agfi:loop] runs its first iteration immediately, so the screen goes
+    #: black now rather than in `dur' seconds.
+    awaysh-bnamed "$DISPLAY_BLACK_LOOP_MARKER" h-display-black-loop "$dur" "$sel"
+}
+
+function display-black-off-loop {
+    : "usage: display-black-off-loop [<selector>]
+Stops the keep-blank loop and restores the display(s). The selector only
+narrows the restore; the loop is global, so it always stops."
+    ##
+    kill-marker "$DISPLAY_BLACK_LOOP_MARKER" || true
+
+    display-black-off "$1"
+}
+
+function display-black-toggle-loop {
+    : "usage: [lo_s=<seconds>] display-black-toggle-loop [<selector>]"
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
+    #: [agfi:display-black-p] as well, so this also gets you out of a blackout
+    #: left behind by the non-loop functions.
+    if display-black-loop-p || display-black-p ; then
+        display-black-off-loop "$sel"
+    else
+        display-black-on-loop "$sel"
+    fi
+}
+##
 #: Selector-suffixed conveniences: display-black-on-all, display-black-toggle-external, ...
 #:
 #: Only for this family. The brightness getters must NOT get the same treatment:
@@ -972,6 +1087,10 @@ function display-black-toggle {
 for h_db_fn in display-black-on display-black-off display-black-toggle ; do
     for h_db_sel in main all internal external ; do
         h_aliasfn "${h_db_fn}-${h_db_sel}" "${h_db_fn}" "${h_db_sel}"
+
+        #: The `-loop' versions read as "the -loop version of
+        #: display-black-on-all", so the suffix goes last: display-black-on-all-loop.
+        h_aliasfn "${h_db_fn}-${h_db_sel}-loop" "${h_db_fn}-loop" "${h_db_sel}"
     done
 done
 unset h_db_fn h_db_sel
