@@ -114,6 +114,68 @@ Everything else is idempotent, so a full =sh bootstrap.sh= on the new host is
 also fine --- just slower, since it re-checks every stage to conclude that the
 shared filesystems already have the answer.
 
+* Installing one more package later
+Once a host is bootstrapped, =ins= is the front door, and it no longer assumes
+anything about root:
+
+#+begin_src zsh :eval never
+ins tealdeer            # picks a half for you
+ins-sudo tealdeer       # explicitly the system package manager, as root
+ins-sudoless tealdeer   # explicitly user space, no root
+#+end_src
+
+[agfi:install] branches on [agfi:sudo-usable-p]. With root it goes to
+[agfi:ins-sudo], which dispatches over apt-get, dnf, yum, pacman, zypper or apk
+--- the same table as =pkg_install= in [[file:lib.sh][lib.sh]], rather than the
+=sudo apt install= that used to be hardcoded there. Without root it falls to
+[agfi:ins-sudoless]. macOS is untouched: brew needs no root, so the question
+never arises.
+
+[agfi:ins-sudoless] walks the first two tiers of the ladder in
+[[file:stages/optional/junest.sh][stages/optional/junest.sh]] --- mise, then
+conda-forge into the =tools= env stage 45 created --- and stops there. It
+installs no package manager of its own: where neither =mise= nor =micromamba=
+exists it says to run the bootstrap, rather than curl-piping an installer from
+an interactive shell function. When both tiers miss it names the remaining
+manual ones instead of failing quietly.
+
+@note The conda tools env is *appended* to =PATH=, so a package the system also
+provides stays shadowed by the system copy even after =ins-sudoless= installs
+it. That is stage 45's one-owner-per-binary rule, not an accident.
+
+** How root is detected
+Two questions, and neither signal answers the other:
+
+- *Are we a sudoer at all?* --- group membership, via =id -nG=: =sudo=,
+  =wheel=, =admin=, =root=. Deliberately not the stderr of =sudo -n -v=, whose
+  strings are localized and differ across sudo versions, so a check built on
+  them is silently wrong under a non-English locale.
+- *Can we get root right now without a prompt?* --- =sudo -n true=, the same
+  probe =night_sudo_detect= uses.
+
+[agfi:sudo-mode] combines them into one of =root=, =nopass=, =password= or
+=none=, memoised per shell. Each covers the other's blind spot: a per-binary
+=NOPASSWD:= entry granted with no group membership is caught by the probe, and
+a group member whose credential timestamp has expired is caught by the group
+check --- and then gets a prompt, rather than a silent degrade to a user-local
+install. Where nobody can type that password (=isI= is false), =password= is
+treated as unusable, because a prompt with no one watching is a hang.
+
+Force the answer where you know better than the probe does:
+
+#+begin_src zsh :eval never
+NIGHT_SUDO=n ins foo                 # the same variable profile.sh reads
+sudo_mode_force=password sudo-mode   # root | nopass | password | none
+sudo_mode_recheck=y sudo-mode        # bust the per-shell memo
+#+end_src
+
+Both overrides are read *before* the memo, so they take effect in a shell that
+has already answered the question once.
+
+The answer is deliberately not written into =~/.night-bootstrap.env=. That file
+is one file shared by every host in the cluster, and whether we have root here
+is per-host --- exactly the kind of value the warning at the top of it forbids.
+
 * Tiers
 The point of the split is what each tier is allowed to assume.
 
