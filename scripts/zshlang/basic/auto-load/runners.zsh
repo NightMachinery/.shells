@@ -211,6 +211,118 @@ function env-clean() {
     @opts clean y @ reval-env "$@"
 }
 ##
+function sudo-group-p {
+    #: Are we in a group that customarily grants sudo?
+    #:
+    #: This answers "am I a sudoer", which is NOT the same question as "can I
+    #: get root right now without a password prompt" -- see [agfi:sudo-mode],
+    #: which needs both.
+    #:
+    #: Deliberately not parsing the stderr of `sudo -n -v`: those strings are
+    #: localized and differ between sudo versions, so a check built on them is
+    #: silently wrong under a non-English locale. `id -nG` is neither. It also
+    #: runs no `sudo` at all, so it cannot prompt.
+    ##
+    local groups=(${=$(command id -nG 2>/dev/null)})
+
+    local g
+    for g in ${groups[@]} ; do
+        case "$g" in
+            sudo|wheel|admin|root) return 0 ;;
+        esac
+    done
+
+    return 1
+}
+
+typeset -g night_sudo_mode_cached=''
+
+function sudo-mode {
+    #: Prints exactly one of: root | nopass | password | none
+    #:
+    #: @warn Must never *prompt*. A password prompt on a headless host is a
+    #: hang, not a question -- so `-n` throughout, never a bare `sudo`.
+    #: @duplicateCode/1f9c2a6e [[NIGHTDIR:setup/bootstrap/profile.sh::night_sudo_detect]]
+    #: shares this policy for the bootstrap, which runs before zshlang exists.
+    #:
+    #: Overrides, both read before the memo so they take effect in an already
+    #: warm shell:
+    #:   sudo_mode_force=<mode>  full manual override
+    #:   NIGHT_SUDO=y|n          the same variable the bootstrap profile sets,
+    #:                           so the two cannot disagree when it is explicit
+    ##
+    local forced="${sudo_mode_force}"
+    if test -n "$forced" ; then
+        case "$forced" in
+            root|nopass|password|none) ec "$forced" ; return 0 ;;
+            *)
+                ecerr "$0: bad sudo_mode_force: $(gquote-sq "$forced")"
+                return 1
+                ;;
+        esac
+    fi
+
+    case "${NIGHT_SUDO}" in
+        y|yes|1|true|Y) ec nopass ; return 0 ;;
+        n|no|0|false|N) ec none   ; return 0 ;;
+    esac
+
+    if test -n "$sudo_mode_recheck" ; then
+        night_sudo_mode_cached=''
+    fi
+    if test -n "$night_sudo_mode_cached" ; then
+        ec "$night_sudo_mode_cached"
+        return 0
+    fi
+
+    local mode
+    if (( EUID == 0 )) ; then
+        #: Already root. sudo need not even be installed (containers).
+        mode=root
+    elif (( ! ${+commands[sudo]} )) ; then
+        mode=none
+    elif command sudo -n true < /dev/null &> /dev/null ; then
+        #: The probe *is* the operation, so this needs no inference. It also
+        #: catches a per-binary NOPASSWD: entry granted with no group at all --
+        #: the shape [agfi:h-sudoers-no-pass] emits, invisible to the group check.
+        mode=nopass
+    elif sudo-group-p ; then
+        #: A sudoer whose credential timestamp has expired. Distinguishing this
+        #: from "not a sudoer" is the whole point: interactively it deserves a
+        #: prompt, not a silent degrade to a user-local install.
+        mode=password
+    else
+        #: Fail-safe direction. A wrong "none" costs us a fallback path; a
+        #: wrong "yes" costs a hang on a host nobody is watching.
+        mode=none
+    fi
+
+    night_sudo_mode_cached="$mode"
+    ec "$mode"
+}
+
+function isSudoer {
+    #: Can we reach root at all, password or not?
+    local mode="$(sudo-mode)"
+
+    [[ "$mode" == (root|nopass|password) ]]
+}
+
+function isSudoNopass {
+    #: Can we reach root without anyone typing anything?
+    local mode="$(sudo-mode)"
+
+    [[ "$mode" == (root|nopass) ]]
+}
+
+function sudo-usable-p {
+    #: May we get root *here*? Same as [agfi:isSudoer], except that a
+    #: password-requiring sudo is useless where there is nobody to type it.
+    #: This is the predicate callers should branch on.
+    ##
+    isSudoNopass || { isSudoer && isI }
+}
+##
 function sudo-patch-touchid-darwin {
     if [[ "$(uname)" == 'Darwin' ]] ; then
         local dir=''
