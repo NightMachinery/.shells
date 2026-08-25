@@ -28,10 +28,33 @@ With no selector, restores every blanked display."
     display-black-off "$1"
 }
 
+#: The keep-blank variants of the above. hyper+shift+F1 / F2 are bound to these
+#: rather than the one-shot ones, because macOS undoes a plain blackout on its
+#: own; see the header comment on [agfi:display-black-on-loop].
+##
+function brightness-off-loop {
+    : "usage: [lo_s=<seconds>] brightness-off-loop [<selector>]
+Selectors: see [agfi:h-brightness-select]."
+    ##
+    local sel="${1:-${brightness_display:-main}}"
+
+    caffeinate-on
+    display-black-on-loop "$sel"
+}
+
+function brightness-on-loop {
+    : "usage: brightness-on-loop [<selector>]
+Stops the keep-blank loop and restores. With no selector, restores every
+blanked display."
+    ##
+    display-black-off-loop "$1"
+}
+
 #: See the note in system.zsh on why only this family gets selector suffixes.
 for h_db_fn in brightness-off brightness-on ; do
     for h_db_sel in main all internal external ; do
         h_aliasfn "${h_db_fn}-${h_db_sel}" "${h_db_fn}" "${h_db_sel}"
+        h_aliasfn "${h_db_fn}-${h_db_sel}-loop" "${h_db_fn}-loop" "${h_db_sel}"
     done
 done
 unset h_db_fn h_db_sel
