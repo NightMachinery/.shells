@@ -46,6 +46,27 @@ function h-hook-unlock {
 
     battery-charge-limit-restore-status
     #: If the laptop's battery dies and we turn it on again, our restart hooks won't run but the limit would be reset.
+
+    #: Belt and braces for [agfi:h-hook-wake]. That one runs from
+    #: hammerspoon/core/power-watcher.lua; this path is the Swift lock watcher,
+    #: so a Hammerspoon that failed to load its config still leaves us with a
+    #: usable screen. Foreground: the guard makes the usual case free, and the
+    #: screen is already unlocked by the time we get here.
+    reval-ecdate h-blackout-release
+}
+##
+function h-hook-wake {
+    : "fired when the machine wakes from sleep
+
+Called by hammerspoon/core/power-watcher.lua. Fans out here rather than in the
+Lua, for the same reason [agfi:h-hook-audio-output-change] does: the watcher has
+a single callback slot, and adding consumers to it there would mean editing the
+Lua for each one.
+
+Idempotent -- macOS fires several wake events per wake, and every consumer here
+must tolerate being run again."
+    ##
+    h-blackout-release
 }
 ##
 function h-hook-audio-output-change {
