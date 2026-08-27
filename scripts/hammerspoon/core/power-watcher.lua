@@ -28,5 +28,12 @@ local function onPowerEvent(event)
     end
 end
 
+-- A reload builds a fresh Lua state, and core/reload.lua path-watches this
+-- directory, so saving this file is already enough to load it. The stop is for
+-- the other way in -- dofile'ing this file into a live Hammerspoon -- where the
+-- previous watcher would otherwise keep firing until it is collected, and every
+-- wake would round-trip to the garden twice.
+if powerWatcher then powerWatcher:stop() end
+
 powerWatcher = hs.caffeinate.watcher.new(onPowerEvent)
 powerWatcher:start()
