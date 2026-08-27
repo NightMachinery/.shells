@@ -8,7 +8,7 @@ aliasfn displaysleep displaysleep-darwin
 #: that DDC luminance 0 leaves an external panel visibly lit while IOKit
 #: brightness 0 really does cut a built-in backlight.
 ##
-caffeinate_key_blackout='blackout'
+typeset -g caffeinate_key_blackout='blackout'
 #: The key these hold display sleep with; see [agfi:caffeinate-on]. Blanking the
 #: screen is only useful while the machine stays up, but it must not drop an
 #: assertion something else is relying on.
@@ -58,6 +58,26 @@ blanked display."
     display-black-off-loop "$1"
 }
 
+function h-blackout-release {
+    : "Ends a blackout if one is up, and lets go of the display sleep it was
+holding. Cheap enough to call from a hook on every wake and every unlock.
+
+Waking ends a blackout by definition: the machine only got here by sleeping, so
+whatever the black screen was for is over. Left alone,
+[agfi:display-black-on-loop] would re-assert brightness 0 every few seconds at a
+login screen the brightness keys can no longer fix."
+    ##
+    if display-black-loop-p || display-black-p ; then
+        brightness-on-loop
+        return $?
+    fi
+
+    #: Nothing is blanked, but our key can outlive the blackout that took it (a
+    #: garden restart, a crash). Nothing else holds display sleep on our behalf,
+    #: so releasing it here is safe.
+    caffeinate-off "$caffeinate_key_blackout"
+}
+
 #: See the note in system.zsh on why only this family gets selector suffixes.
 for h_db_fn in brightness-off brightness-on ; do
     for h_db_sel in main all internal external ; do
@@ -81,7 +101,7 @@ unset h_db_fn h_db_sel
 #: @warn None of this can defeat closing the lid. That is the clamshell path,
 #: not idle sleep, and no assertion applies to it. See ./docs/caffeinate.md.
 ##
-caffeinate_session_prefix='caffeinate-'
+typeset -g caffeinate_session_prefix='caffeinate-'
 
 function h-caffeinate-session {
     : "usage: h-caffeinate-session [<key>]
