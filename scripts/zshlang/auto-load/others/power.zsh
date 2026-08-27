@@ -8,13 +8,18 @@ aliasfn displaysleep displaysleep-darwin
 #: that DDC luminance 0 leaves an external panel visibly lit while IOKit
 #: brightness 0 really does cut a built-in backlight.
 ##
+caffeinate_key_blackout='blackout'
+#: The key these hold display sleep with; see [agfi:caffeinate-on]. Blanking the
+#: screen is only useful while the machine stays up, but it must not drop an
+#: assertion something else is relying on.
+
 function brightness-off {
     : "usage: brightness-off [<selector>]
 Selectors: see [agfi:h-brightness-select]."
     ##
     local sel="${1:-${brightness_display:-main}}"
 
-    caffeinate-on
+    caffeinate-on "$caffeinate_key_blackout"
     display-black-on "$sel"
 }
 
@@ -22,7 +27,8 @@ function brightness-on {
     : "usage: brightness-on [<selector>]
 With no selector, restores every blanked display."
     ##
-    # caffeinate-off
+    caffeinate-off "$caffeinate_key_blackout"
+
     #: Restores whatever the levels were, rather than the fixed 0.435 this used
     #: to jump to.
     display-black-off "$1"
@@ -38,7 +44,7 @@ Selectors: see [agfi:h-brightness-select]."
     ##
     local sel="${1:-${brightness_display:-main}}"
 
-    caffeinate-on
+    caffeinate-on "$caffeinate_key_blackout"
     display-black-on-loop "$sel"
 }
 
@@ -47,6 +53,8 @@ function brightness-on-loop {
 Stops the keep-blank loop and restores. With no selector, restores every
 blanked display."
     ##
+    caffeinate-off "$caffeinate_key_blackout"
+
     display-black-off-loop "$1"
 }
 
@@ -59,12 +67,110 @@ for h_db_fn in brightness-off brightness-on ; do
 done
 unset h_db_fn h_db_sel
 
+##
+#: Display sleep is held per key: one `caffeinate -d' per key, each in its own
+#: tmux session. Nothing counts the holders -- "every key has released" is
+#: exactly "no such process is left", which the kernel already tracks, so there
+#: is no refcount to go stale across a reboot or a crashed holder, and no way
+#: for our bookkeeping to disagree with the actual assertion.
+#:
+#: Holders do not interfere. An assertion is per-process, and the system-wide
+#: status `pmset -g assertions' prints is the OR over every holder listed under
+#: it, so the display may sleep again only once the last one exits.
+#:
+#: @warn None of this can defeat closing the lid. That is the clamshell path,
+#: not idle sleep, and no assertion applies to it. See ./docs/caffeinate.md.
+##
+caffeinate_session_prefix='caffeinate-'
+
+function h-caffeinate-session {
+    : "usage: h-caffeinate-session [<key>]
+The tmux session name holding <key>'s assertion."
+    ##
+    local key="${1:-${caffeinate_key:-misc}}"
+
+    #: tmux rejects `:' and `.' in session names.
+    key="$(str2tmuxname "$key")" @TRET
+    key="${key:-misc}"
+
+    ec "${caffeinate_session_prefix}${key}"
+}
+
 function caffeinate-on {
-    reval-ecgray tmuxnewsh2 caffeinate reval-ec caffeinate -d
+    : "usage: [caffeinate_key=<key>] caffeinate-on [<key>]
+Prevents display sleep on behalf of <key>. [agfi:caffeinate-off] releases only
+that key; the display can sleep again once the last key has let go."
+    ##
+    local session
+    session="$(h-caffeinate-session "$@")" @TRET
+
+    #: Not `tmuxnewsh2' blind: [agfi:tmuxnew] kills a session of the same name
+    #: before creating it, so asking twice for a key we already hold would
+    #: restart its assertion rather than do nothing.
+    if tmux-alive-p "$session" ; then
+        return 0
+    fi
+
+    reval-ecgray tmuxnewsh2 "$session" reval-ec caffeinate -d
 }
 
 function caffeinate-off {
-    reval-ecgray tmux kill-session -t caffeinate
+    : "usage: [caffeinate_key=<key>] caffeinate-off [<key>]
+Releases <key>. Any other key keeps the display awake; see
+[agfi:caffeinate-holders]."
+    ##
+    local session
+    session="$(h-caffeinate-session "$@")" @TRET
+
+    if tmux-alive-p "$session" ; then
+        reval-ecgray tmux kill-session -t "=${session}"
+    fi
+
+    local rest
+    rest="$(caffeinate-holders)" || rest=''
+    if test -n "$rest" ; then
+        ecgray "$0: display sleep still held by: ${(j:, :)${(@f)rest}}"
+    fi
+}
+
+function caffeinate-holders {
+    : "The keys currently holding display sleep off, one per line."
+    ##
+    local out
+    out="$(tmux list-sessions -F '#{session_name}' 2>/dev/null)" || return 0
+
+    local line
+    for line in "${(@f)out}" ; do
+        if [[ "$line" == "${caffeinate_session_prefix}"* ]] ; then
+            ec "${line#${caffeinate_session_prefix}}"
+
+        elif [[ "$line" == caffeinate ]] ; then
+            #: The unkeyed session name this scheme replaced. It can still be
+            #: around from before, and it is still asserting. Only
+            #: [agfi:caffeinate-off-all] can release it.
+            ec legacy
+        fi
+    done
+}
+
+function caffeinate-p {
+    : "Whether anything is holding display sleep off."
+    ##
+    test -n "$(caffeinate-holders)"
+}
+
+function caffeinate-off-all {
+    : "Releases every key, including the unkeyed session this predates."
+    ##
+    local out
+    out="$(tmux list-sessions -F '#{session_name}' 2>/dev/null)" || return 0
+
+    local line
+    for line in "${(@f)out}" ; do
+        [[ "$line" == "${caffeinate_session_prefix}"* || "$line" == caffeinate ]] || continue
+
+        reval-ecgray tmux kill-session -t "=${line}"
+    done
 }
 ##
 function display-off-brightness {
