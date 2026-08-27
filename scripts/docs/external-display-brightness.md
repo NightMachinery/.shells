@@ -175,6 +175,34 @@ The loop body is just `display-black-on`, so a display plugged in while the loop
 is running gets blanked on the next tick, and raising the brightness by hand is
 undone within `lo_s` seconds.
 
+### Waking always ends it
+
+Sleep does not stop the loop, it freezes it. Without help you would wake to a
+black panel, re-blacked every `lo_s` seconds, at a login screen where the
+brightness keys can no longer win — and the way to get there is ordinary:
+blank the screen, then close the lid.
+
+Closing the lid sleeps the machine no matter what we assert. That is the
+clamshell path, and `caffeinate` only creates idle-sleep assertions; see
+`caffeinate.md`. With only the built-in panel attached, blanking it before
+shutting the lid therefore gains nothing and costs the wake.
+
+So `h-blackout-release` ends the blackout, and is called from two deliberately
+independent places:
+
+- `h-hook-wake`, fired by `hammerspoon/core/power-watcher.lua` on
+  `systemDidWake` and `screensDidWake`.
+- `h-hook-unlock`, fired by the Swift `lock-watcher` — no Hammerspoon involved,
+  so a config that failed to load still leaves a usable screen.
+
+It returns immediately when nothing is blanked, which matters because it runs on
+every wake and every unlock and `display-black-off` always calls out to
+Hammerspoon. When nothing is blanked it still releases the `blackout` caffeinate
+key, since that key can outlive its blackout when the garden restarts.
+
+The reverse order was always safe: with the lid already shut, `brightness -l`
+does not report the built-in panel at all, so `-all` cannot blank it.
+
 ### hyper+shift+F1 / F2
 
 `brightness-off` and `brightness-on` in `zshlang/auto-load/others/power.zsh` call
@@ -191,6 +219,10 @@ They also use the `-loop` forms — `brightness-off-all-loop` and
 restores. `brightness-off-loop` keeps the `caffeinate-on` of its one-shot
 sibling, which is the reason the keys go through `power.zsh` at all rather than
 calling `display-black-on-all-loop` directly.
+
+That assertion is held under the key `blackout` and released by F2, so it cannot
+switch off a `caffeinate-on` something else is relying on, and it no longer
+outlives the blackout the way it used to. See `caffeinate.md`.
 
 ### If a screen is ever left black
 

@@ -121,7 +121,9 @@ unlock.
 The gap is `caffeinate-on`, which passes `caffeinate -d` and prevents display
 sleep, so there is no lock and no unlock event. Covered by the notification and
 a manual `audio-guard-restore`, or turn the backstop on with
-`audio_guard_restore_at_tick_p=y`.
+`audio_guard_restore_at_tick_p=y`. The gap is at least bounded now: the
+assertion is keyed and released when whatever took it lets go, rather than
+outliving it indefinitely — see `caffeinate.md`.
 
 Restore is not gated on any trigger: a mute the guard placed must stay
 reversible even if you have since turned off the trigger that placed it.
