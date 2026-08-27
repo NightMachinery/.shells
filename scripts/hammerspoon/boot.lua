@@ -50,6 +50,7 @@ local hammerspoonCoreFiles = {
     "core/redis.lua",
     "core/wifi-watcher.lua",
     "core/audio-watcher.lua",
+    "core/power-watcher.lua",
     "core/hyper-mode.lua",
     "purple-mode.lua",
     "core/mouse.lua",
