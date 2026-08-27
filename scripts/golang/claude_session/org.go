@@ -88,7 +88,7 @@ func (r *renderer) prose(s string, parentLevel int) {
 		r.out.WriteString(escOrgText(s) + "\n")
 		return
 	}
-	s = closeOpenFence(s)
+	s = closeOpenFence(repairMidLineFences(s))
 	if r.tag {
 		// [normalizeOrgLevels] places these once pandoc has said which of them
 		// are headings at all. Shifting here would only re-clamp them at six and
@@ -139,8 +139,16 @@ func (r *renderer) elide(body string) string {
 
 // A fence longer than any backtick run inside the body.
 func fenceFor(body string) string {
+	n := longestBacktickRun(body) + 1
+	if n < 3 {
+		n = 3
+	}
+	return strings.Repeat("`", n)
+}
+
+func longestBacktickRun(s string) int {
 	longest, run := 0, 0
-	for _, c := range body {
+	for _, c := range s {
 		if c == '`' {
 			run++
 			if run > longest {
@@ -150,11 +158,17 @@ func fenceFor(body string) string {
 			run = 0
 		}
 	}
-	n := longest + 1
-	if n < 3 {
-		n = 3
+	return longest
+}
+
+// The body as an inline code span, delimited by a run longer than any inside it.
+func inlineCode(s string) string {
+	d := strings.Repeat("`", longestBacktickRun(s)+1)
+	if strings.HasPrefix(s, "`") || strings.HasSuffix(s, "`") {
+		// Otherwise delimiter and body run together into one longer run.
+		s = " " + s + " "
 	}
-	return strings.Repeat("`", n)
+	return d + s + d
 }
 
 // Org would read `*` or `#+` at the start of a block line as structure, so it
@@ -265,6 +279,142 @@ func fenceStep(open, ln string) string {
 		return ""
 	}
 	return open
+}
+
+// A fence has to start its own line, so `I want to print ` + "```" is not one.
+// CommonMark reads it as an inline code span, keeps the paragraph going, and
+// then takes the *closing* run — which does start its own line — as an opening
+// fence, swallowing the rest of the sentence. Code and prose come out swapped.
+//
+// This is what `pasteBlockified` produces whenever the paste lands anywhere but
+// column 0, so it is common in the transcripts. Re-cut the block around what
+// was meant: CommonMark was already going to read this text as a code block, so
+// moving its boundaries cannot break a message that would otherwise have worked.
+//
+// A body of one line was a quotation inside a sentence, and becomes an inline
+// span so the sentence survives; anything longer becomes the block it looks
+// like. A run with no matching closer later in the message is left alone rather
+// than guessed at.
+func repairMidLineFences(s string) string {
+	if !strings.Contains(s, "```") && !strings.Contains(s, "~~~") {
+		return s
+	}
+
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines)+2)
+	open := ""
+
+	for i := 0; i < len(lines); i++ {
+		ln := lines[i]
+		if open != "" || fenceRe.MatchString(ln) {
+			// A well-formed fence, or a line inside one: nothing to repair.
+			open = fenceStep(open, ln)
+			out = append(out, ln)
+			continue
+		}
+
+		run, at := trailingFenceRun(ln)
+		if run == "" {
+			out = append(out, ln)
+			continue
+		}
+		prefix := strings.TrimRight(ln[:at], " \t")
+		if prefix == "" {
+			out = append(out, ln)
+			continue
+		}
+		end, rest, ok := findFenceCloser(lines, i+1, run)
+		if !ok {
+			out = append(out, ln)
+			continue
+		}
+
+		if body := oneLineBody(lines, i, end); body != "" {
+			// The sentence usually resumes on the line after the closer. Pulling
+			// it up too is what keeps pandoc from rendering the soft break as a
+			// space, which would strand one before a leading `,`.
+			tail, last := rest, end
+			if strings.TrimSpace(tail) == "" && end+1 < len(lines) &&
+				continuesParagraph(lines[end+1]) {
+				tail, last = lines[end+1], end+1
+			}
+			// Fed back through rather than emitted, so a second fence opened on
+			// the text just pulled up is repaired as well.
+			lines[last] = prefix + " " + inlineCode(body) + tail
+			i = last - 1
+			continue
+		}
+
+		out = append(out, prefix, run)
+		out = append(out, lines[i+1:end]...)
+		out = append(out, run)
+		if strings.TrimSpace(rest) == "" {
+			i = end
+			continue
+		}
+		lines[end] = rest
+		i = end - 1
+	}
+
+	return strings.Join(out, "\n")
+}
+
+// The run of fence characters a line ends with, and the index it starts at.
+// Returns "" unless the line ends in a run of three or more.
+func trailingFenceRun(ln string) (string, int) {
+	s := strings.TrimRight(ln, " \t")
+	if s == "" {
+		return "", -1
+	}
+	c := s[len(s)-1]
+	if c != '`' && c != '~' {
+		return "", -1
+	}
+	i := len(s)
+	for i > 0 && s[i-1] == c {
+		i--
+	}
+	if len(s)-i < 3 {
+		return "", -1
+	}
+	return s[i:], i
+}
+
+// The first line from `from` on that opens with a run able to close `run`, and
+// whatever it carries after that run.
+func findFenceCloser(lines []string, from int, run string) (int, string, bool) {
+	for j := from; j < len(lines); j++ {
+		m := fenceRe.FindStringSubmatch(lines[j])
+		if m != nil && m[1][0] == run[0] && len(m[1]) >= len(run) {
+			return j, lines[j][len(m[0]):], true
+		}
+	}
+	return 0, "", false
+}
+
+// The single line between the fences, or "" if there is not exactly one.
+func oneLineBody(lines []string, open, end int) string {
+	if end != open+2 {
+		return ""
+	}
+	return strings.TrimSpace(lines[open+1])
+}
+
+// A line that starts a block of its own — list item, heading, quote, fence,
+// thematic break, setext underline — is not a paragraph continuation and must
+// not be pulled up into an inlined sentence.
+var blockStartRe = regexp.MustCompile(
+	"^ {0,3}(?:" +
+		"[-*+](?:[ \t]|$)" +
+		"|[0-9]{1,9}[.)](?:[ \t]|$)" +
+		"|#{1,6}(?:[ \t]|$)" +
+		"|>" +
+		"|`{3,}|~{3,}" +
+		"|(?:=+|-{3,}|\\*{3,}|_{3,})[ \t]*$" +
+		")")
+
+func continuesParagraph(ln string) bool {
+	return strings.TrimSpace(ln) != "" && !blockStartRe.MatchString(ln)
 }
 
 // Calls fn for every line outside a fenced code block.

@@ -162,6 +162,97 @@ func TestCloseOpenFence(t *testing.T) {
 			t.Errorf("closeOpenFence(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
+
+	// A mid-sentence fence looks unbalanced to this, and used to make it seal
+	// the sentence into the block. Once repaired there is nothing left to close.
+	repaired := repairMidLineFences("I want to print ```\n/Users/evar/x.pdf\n```\n in duplex.")
+	if got := closeOpenFence(repaired); got != repaired {
+		t.Errorf("closeOpenFence still fired on repaired text: %q", got)
+	}
+}
+
+// Pasting a fenced block into the middle of a sentence opens the fence where
+// CommonMark cannot see it, so the closing run is read as the opening one and
+// the sentence ends up inside the block instead of the code.
+func TestRepairMidLineFences(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{
+			name: "a one-line body becomes an inline span, sentence intact",
+			in:   "I want to print ```\n/Users/evar/x.pdf\n```\n in duplex (double sided).",
+			want: "I want to print `/Users/evar/x.pdf` in duplex (double sided).",
+		},
+		{
+			name: "the sentence resumes without a stray space before punctuation",
+			in:   "rather naming ```\n#+TITLE: a session\n```\n, can we use the name?",
+			want: "rather naming `#+TITLE: a session`, can we use the name?",
+		},
+		{
+			name: "a longer body becomes the block it looks like",
+			in:   "use ```\n    local inargs\n    in-or-args3 \"$@\"\n```\nand do a loop",
+			want: "use\n```\n    local inargs\n    in-or-args3 \"$@\"\n```\nand do a loop",
+		},
+		{
+			// The fence lands at column 0 rather than nesting in the item, so
+			// what follows trails the list. Accepted: keeping the nesting means
+			// measuring list markers.
+			name: "in a list item, a longer body still splits out",
+			in:   "- rename ```\n[lists]\ntitle = \"x\"\n```\n to y",
+			want: "- rename\n```\n[lists]\ntitle = \"x\"\n```\n to y",
+		},
+		{
+			name: "text after the closing run moves to its own line",
+			in:   "use ```\na\nb\n``` and do a loop",
+			want: "use\n```\na\nb\n```\n and do a loop",
+		},
+		{
+			name: "a delimiter longer than any run in the body",
+			in:   "see ```\na `b` c\n```\n done",
+			want: "see ``a `b` c`` done",
+		},
+		{
+			name: "a body that starts with a backtick is padded",
+			in:   "x ```\n`tick\n```",
+			want: "x `` `tick ``",
+		},
+		{
+			name: "the next line is not pulled up when it starts a block",
+			in:   "- ```\ncurl x\n```\n- next bullet",
+			want: "- `curl x`\n- next bullet",
+		},
+		{
+			name: "a run with no closer is left alone",
+			in:   "left open ```\nx",
+			want: "left open ```\nx",
+		},
+		{
+			name: "a run that does not end the line is left alone",
+			in:   "the ``` delimiter is three\n```\nx\n```",
+			want: "the ``` delimiter is three\n```\nx\n```",
+		},
+		{
+			name: "a run inside an open block is left alone",
+			in:   "```\nsee foo ```\nx\n```\nafter",
+			want: "```\nsee foo ```\nx\n```\nafter",
+		},
+		{
+			name: "well-formed markdown is untouched",
+			in:   "text\n```\ncode\n```\nmore",
+			want: "text\n```\ncode\n```\nmore",
+		},
+		{
+			name: "two in one message are both repaired",
+			in:   "first ```\na\n```\n then second ```\nb\n```\n end",
+			want: "first `a` then second `b` end",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := repairMidLineFences(c.in); got != c.want {
+				t.Errorf("got:\n%q\nwant:\n%q", got, c.want)
+			}
+		})
+	}
 }
 
 // A message cannot dress its own text up as a heading of this program's.

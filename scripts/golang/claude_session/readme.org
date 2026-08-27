@@ -252,7 +252,7 @@ demoted as a unit. Two things fall out of doing it this way:
   not, and the tag carries the unclamped level, which matters inside a subagent
   where the transcript already starts at level three.
 
-Two smaller rules the markdown side still enforces, both about fences:
+Three smaller rules the markdown side still enforces, all about fences:
 
 - Headings inside fenced code blocks are skipped, because a shell snippet's
   =# comment= lines are not headings.
@@ -260,10 +260,32 @@ Two smaller rules the markdown side still enforces, both about fences:
   it swallows everything after it --- the next turn's headings included --- into
   a single code block, and a chunk seam landing inside that block converts
   differently from no seam at all.
+- A fence opened mid-sentence is re-cut around what was meant. A fence has to
+  start its own line, so ~I want to print ```~ is not one: CommonMark reads the
+  run as an inline code span, keeps the paragraph going, and then takes the
+  /closing/ run --- which does start its own line --- as the opening fence. Code
+  and prose come out swapped, with the rest of the sentence sealed into the
+  block by the rule above.
 
 Only a bare run closes a fence: ~```sh~ inside a ~```~ block is content, not the
 end of it. Reading it as the end walks the rest of the message one block out of
 step, which is how the fence-closing rule above first went wrong.
+
+The mid-sentence shape is common because =pasteBlockified= (hyper+=,=) wraps the
+clipboard in ~```~ with no leading newline, so any paste not landing at column
+zero produces it --- 28 times across 18 of the local transcripts. Re-cutting is
+safe because CommonMark was already going to read that text as a code block;
+only the boundaries move, so a message that would otherwise have rendered
+correctly cannot be broken by it. A run with no matching closer later in the
+message is left alone rather than guessed at.
+
+A body of one line was a quotation inside a sentence, and becomes an inline code
+span so the sentence survives. The line after the closer is pulled up with it
+unless it starts a block of its own, because a soft break there leaves pandoc a
+space to strand before a leading comma. Anything longer becomes the block it
+looks like. What that costs is nesting: an opener inside a list item puts the
+fence at column zero, so the block and the text after it trail the list instead
+of sitting in the item. Measuring list markers to keep it was not worth it.
 
 [[agfi:org-header-rm-shared-level]] followed by [[agfi:org-header-indent]] is the
 same idea, on a document that is already org.
