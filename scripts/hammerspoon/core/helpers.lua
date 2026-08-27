@@ -125,6 +125,66 @@ function tableShallowCopy(orig)
     return copy
 end
 
+--- * Running zsh in the brish garden
+--
+-- Hammerspoon runs Lua on the main thread, which is also its UI and event
+-- thread. Anything blocking here freezes hotkeys, window management and every
+-- keystroke for the duration. Compare core/redis.lua, which documents a
+-- previous version that could freeze the machine for up to 50 minutes.
+--
+-- So watchers must NOT use brishzeval2bg. Its name is misleading: the trailing
+-- `&' backgrounds the command inside the garden, but Hammerspoon still
+-- synchronously waits for the round-trip, because brishzeval2 goes through
+-- pipe_simple (lua/pipe.lua), which does blocking posix.read loops and then
+-- posix.wait. Measured on this machine with hs.timer.absoluteTime:
+--
+--   brishzeval2bg("true")                            780.6 ms cold, 51.9 ms warm
+--   hs.task.new("brishz2.dash", nil, {"true"}):start()          1.5 ms
+--
+-- hs.task is genuinely asynchronous (NSTask, callback on completion), and is
+-- already the idiom elsewhere in this config: core/hyper-mode.lua,
+-- core/mouse.lua, and core/choosers.lua all use it, the last one to run
+-- brishz2.dash exactly like this.
+
+-- hs.task does NOT inherit an interactive PATH. It gets the bare launchd one,
+-- /usr/bin:/bin:/usr/sbin:/sbin, and brishz.dash shells out to jq, which lives
+-- in /opt/homebrew/bin. Without this the task exits 22 with
+-- "brishz.dash: 41: jq: not found" and, because a nil callback discards both
+-- streams, fails completely silently. Same class of bug as the PATH in
+-- launchers/audio-guard/com.user.audio-guard.plist.
+local BREW_PATHS = "/opt/homebrew/bin:/usr/local/bin"
+
+function taskWithPath(bin, callback, args)
+    local task = hs.task.new(bin, callback, args)
+    if not task then return nil end
+
+    -- Repair PATH rather than replacing the environment wholesale: brishz needs
+    -- HOME, and setEnvironment replaces the table entirely.
+    local env = task:environment() or {}
+    env.PATH = BREW_PATHS .. ":" .. (env.PATH or "/usr/bin:/bin:/usr/sbin:/sbin")
+    task:setEnvironment(env)
+
+    return task
+end
+
+-- Runs `cmd' in the garden without blocking. `label' only prefixes the failure
+-- log, so you can tell which watcher's call failed.
+--
+-- A nil callback would discard the exit code and both streams, which is how the
+-- missing-jq failure above stayed invisible. Log failures instead.
+function runInGarden(cmd, label)
+    label = label or "runInGarden"
+
+    local task = taskWithPath("/usr/local/bin/brishz2.dash", function(exitCode, _, stdErr)
+        if exitCode ~= 0 then
+            print(label .. ": brishz2.dash exited " .. tostring(exitCode) ..
+                      ": " .. tostring(stdErr))
+        end
+    end, {cmd})
+
+    if task then task:start() end
+end
+
 --- * _
 function has_value (tab, val)
     for index, value in ipairs(tab) do
