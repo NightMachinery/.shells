@@ -32,7 +32,14 @@ function fz {
     # "Use `fnswap fzf-gateway gq fz` to get the final command for use in other envs
     local opts emptyMode="${fz_empty}"
     opts=(${(@)fz_opts} --exit-0) #Don't quote it or it'll insert empty args
-    # --exit-0 : By using this we'll lose the automatic streaming feature of fzf as we need to wait for the whole input. (Update: It doesn't seem that the streaming feature is useful at all, as it doesn't show anything until completion in my tests ...)
+    # --exit-0 : exit immediately if there are no matches.
+    #: An earlier note here said --exit-0 costs us fzf's input streaming, and that
+    #: streaming showed nothing until completion anyway. Both halves were wrong:
+    #: --exit-0 only decides what happens once input is exhausted, and the reason
+    #: nothing appeared early was [agfi:fzf-noempty], which used to slurp the whole
+    #: of stdin into a variable before launching fzf. It peeks a single line now,
+    #: so input does stream. (The 'sponge' in [agfi:fzf-gateway] buffers fzf's
+    #: output, not its input, so it is unrelated.)
     # --select-1 : auto-selects if only one match
     test -n "$fz_no_preview" || opts+=(--preview "$FZF_SIMPLE_PREVIEW" --preview-window up:7:wrap:nohidden:nocycle)
 
@@ -46,8 +53,18 @@ function fz {
 }
 
 function fzf-noempty {
-    local in="$(</dev/stdin)" # So we need to wait for the whole input to finish first.
-    test -z "$in" && { return 130 } || { ecn "$in" | fzf-gateway "$@" }
+    : "Launches fzf only when stdin is non-empty, returning 130 otherwise.
+
+Peeks a single line instead of slurping all of stdin, so fzf paints while the
+producer is still running and we never hold the whole stream in memory. The old
+version materialised everything in a variable first, which is how a 735MB corpus
+in [agfi:ffz-get] got copied twice before fzf even started."
+    local first
+    #: 'read' returns non-zero on a final line with no trailing newline, but still
+    #: sets the variable -- so test the variable too, or single-line input that
+    #: does not end in a newline is silently dropped.
+    IFS= read -r first || test -n "$first" || return 130
+    { print -r -- "$first" ; command cat } | fzf-gateway "$@"
 }
 
 function fzf-gateway() {
