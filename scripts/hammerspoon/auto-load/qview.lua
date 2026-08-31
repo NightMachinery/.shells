@@ -23,7 +23,7 @@ qview_bind_v2{
     -- mods={},
     key="g",
     pressedfn=function()
-        brishzeval('awaysh-fast h-hs-on-qview green')
+        brishz_eval_hs('awaysh-fast h-hs-on-qview green')
     end,
 }
 
@@ -31,7 +31,7 @@ qview_bind_v2{
     -- mods={},
     key="b",
     pressedfn=function()
-        brishzeval('awaysh-fast h-hs-on-qview blue')
+        brishz_eval_hs('awaysh-fast h-hs-on-qview blue')
     end,
 }
 
@@ -39,7 +39,7 @@ qview_bind_v2{
     -- mods={},
     key="r",
     pressedfn=function()
-        brishzeval('awaysh-fast h-hs-on-qview red')
+        brishz_eval_hs('awaysh-fast h-hs-on-qview red')
     end,
 }
 
@@ -47,7 +47,7 @@ qview_bind_v2{
     -- mods={},
     key="n",
     pressedfn=function()
-        brishzeval('awaysh-fast h-hs-on-qview navy')
+        brishz_eval_hs('awaysh-fast h-hs-on-qview navy')
     end,
 }
 
@@ -55,7 +55,7 @@ qview_bind_v2{
     -- mods={},
     key="m",
     pressedfn=function()
-        brishzeval('awaysh-fast h-hs-on-qview lightsalmon')
+        brishz_eval_hs('awaysh-fast h-hs-on-qview lightsalmon')
     end,
 }
 
@@ -63,7 +63,7 @@ qview_bind_v2{
     -- mods={},
     key="x",
     pressedfn=function()
-        brishzeval('awaysh-fast h-hs-on-qview gray')
+        brishz_eval_hs('awaysh-fast h-hs-on-qview gray')
     end,
 }
 
@@ -71,7 +71,7 @@ qview_bind_v2{
     -- mods={"shift"},
     key="d",
     pressedfn=function()
-        brishzeval('awaysh-fast hs-reval-alert qview-trs')
+        brishz_eval_hs('awaysh-fast hs-reval-alert qview-trs')
     end,
 }
 
@@ -79,7 +79,7 @@ qview_bind_v2{
     -- mods={"shift"},
     key="u",
     pressedfn=function()
-        brishzeval('awaysh-fast hs-reval-alert qview-restore-last')
+        brishz_eval_hs('awaysh-fast hs-reval-alert qview-restore-last')
     end,
 }
 
@@ -87,6 +87,6 @@ qview_bind_v3{
     -- mods={},
     key={"SPC", "c", "c"},
     pressedfn=function()
-        brishzeval('awaysh-fast h-hs-on-qview dup')
+        brishz_eval_hs('awaysh-fast h-hs-on-qview dup')
     end,
 }

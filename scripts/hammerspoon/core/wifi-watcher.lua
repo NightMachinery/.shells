@@ -17,17 +17,17 @@ function ssidChangedCallback()
             alert_gateway("Disconnected from Wi-Fi network: " .. (previousSSID or "None"),
                     { id = kWifiWatcherAlertId, seconds = alert_dur, color = "warn" })
 
-            brishzeval2bg("wifi-disconnect-hook")
+            brishz_eval_hs("wifi-disconnect-hook")
 
         else
             alert_gateway("Connected to Wi-Fi network: " .. (newSSID or "None"),
                     { id = kWifiWatcherAlertId, seconds = alert_dur })
 
             if newSSID == "Tealy" then
-                brishzeval2bg("tealy-connect-hook")
+                brishz_eval_hs("tealy-connect-hook")
 
             else
-                brishzeval2bg("wifi-unknown-connect-hook")
+                brishz_eval_hs("wifi-unknown-connect-hook")
             end
         end
 

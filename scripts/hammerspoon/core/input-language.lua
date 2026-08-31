@@ -49,7 +49,7 @@ if false then
         end
         if bshcode ~= '' then
             bshcode = "{ " .. bshcode .. " } &>/dev/null & # appName: " .. appName .. ", event: " .. tostring(event)
-            brishzeval(bshcode)
+            brishz_eval_hs(bshcode)
         end
     end
 else
@@ -84,6 +84,6 @@ appWatcher:start()
 hyper_bind_v1("i", function()
                   langSetToggle()
                   alert_gateway(langGet(), { id = "input-language", seconds = 1 })
-                  brishzeval('input_lang_push_lang_del')
+                  brishz_eval_hs('input_lang_push_lang_del')
                   input_lang_push_lang = nil
 end)

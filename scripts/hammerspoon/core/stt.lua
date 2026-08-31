@@ -229,7 +229,7 @@ function processRecording(wavFile, language, backend)
             -- doPaste()
             -- Pasting makes us need to wait for the processing without doing anything.
             -- Let us just copy it and ring a bell.
-            brishzeval("bell-transcription-ready")
+            brishz_eval_hs("bell-transcription-ready")
         end
     end
 

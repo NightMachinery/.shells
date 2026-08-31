@@ -112,9 +112,9 @@ function scrollHandler(evNum)
             --   end
             -- end
         elseif evNum == 1 then
-            -- brishzeval("bello")
+            -- brishz_eval_hs("bello")
             if appName == "mpv" then
-                -- brishzeval("bell-lm-timetoparty")
+                -- brishz_eval_hs("bell-lm-timetoparty")
                 -- timerS = hs.timer.doAfter(0.9, function() hs.eventtap.keyStroke({}, hs.keycodes.map['space']) end)
                 timerS = timer.doEvery(0.01, function()
                                            gradS = gradS + 0.2
@@ -173,7 +173,7 @@ function popclickInit()
     --- @workaround_lisflag we use the flag to control acting on the events to work around the bug that sometimes starting the listener can take ~6 seconds. Update: When that bug happens, it doesn't seem that listener can listen at all! Restarting hammerspoon completely seems to solve this issue.
     -- listener:start()
     ---
-    -- brishzeval('awaysh hs-popclick-btt-refresh')
+    -- brishz_eval_hs('awaysh hs-popclick-btt-refresh')
 end
 
 ---

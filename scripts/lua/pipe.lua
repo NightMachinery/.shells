@@ -2,12 +2,12 @@ local posix = require("posix")
 
 brishzq_binary = "/usr/local/bin/brishzq.zsh"
 ---
-function shell_quote(str)
-    -- Quote a string using Lua's %q format specifier
-    -- Returns a quoted string suitable for reuse as a Lua string
-    -- Example: hello"world -> "hello\"world"
-    return string.format("%q", str)
-end
+--- shell_quote used to live here and quoted with Lua's %q, which is Lua
+--- quoting, not shell quoting -- it escapes for a Lua source file, not for a
+--- shell word. Every caller that interpolated a value with it was one quote
+--- away from a command that silently did nothing, or worse. Nothing quotes for
+--- a shell any more: the brishz_eval_q functions below pass an argument list
+--- and let the garden's own client do it.
 ---
 -- froked from https://stackoverflow.com/a/16515126/1410221
 --
@@ -118,45 +118,159 @@ function trim1(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
 
-function brishz(cmd)
-  -- @duplicateCode/e0d4c801e9f8b4200d78468857610ae1 (mpv_shared.lua)
-  cmdq = "brishz_eval_file_p=y /usr/local/bin/brishzq.zsh " .. cmd
-  return exec(cmdq)
+--- * Brish
+--- Running a command in the garden. Every one of these execs a client binary
+--- directly with an argument list -- there is no shell in the middle, so there
+--- is nothing to quote and nothing that can be mis-quoted into code.
+---
+--- Two clients, because they answer two different needs:
+---
+---   brishz2.dash  43 lines of dash. Takes one string, a command line for the
+---                 garden to evaluate. ~55ms. Enough when the command is a
+---                 constant.
+---   brishzq.zsh   the real client. Takes an argument list and quotes each
+---                 element itself, so a value may contain quotes, semicolons,
+---                 newlines or anything else without becoming code. Also
+---                 returns the command's own exit code, forwards its stderr,
+---                 and can pick a session. ~85ms: zsh startup plus quoting.
+---
+--- Hence the `_q' in the names: pay for quoting when a value is involved, not
+--- when the command is a constant. Read the names as
+--- brishz_eval[_q][_bg]: `_q' takes an argv table, `_bg' does not wait.
+---
+--- In the `_bg' forms the quoting is free, because nothing waits for the reply
+--- at all. Prefer `_q' there whenever a value is interpolated.
+
+local kBrishzDash = "/usr/local/bin/brishz2.dash"
+local kBrishzq = "/usr/local/bin/brishzq.zsh"
+
+--- Brish is configured through environment variables, and `env' sets them for
+--- the child alone. posix.setenv would change Hammerspoon's own environment and
+--- leak into every later call.
+---
+--- opts: session, evalFile (send the command as a file, for binary-unsafe
+--- payloads), outFile (receive the output as a file), stdin.
+local function brishzArgv(quoted, cmd, opts)
+    opts = opts or {}
+    -- Only the full client understands these, so asking for one sends a string
+    -- command there too, in its no-quoting mode.
+    local useZsh = quoted or opts.session or opts.evalFile or opts.outFile
+
+    local vars = {}
+    if useZsh and not quoted then
+        -- Without this brishzq.zsh quotes the whole command line into a single
+        -- word, and the garden looks for a command by that name.
+        table.insert(vars, "brishz_noquote=y")
+    end
+    if opts.session then
+        table.insert(vars, "brishz_session=" .. opts.session)
+    end
+    if opts.evalFile then
+        table.insert(vars, "brishz_eval_file_p=y")
+    end
+    if opts.outFile then
+        table.insert(vars, "brishz_out_file_p=y")
+    end
+    if opts.stdin then
+        table.insert(vars, "brishz_in=" .. opts.stdin)
+    end
+
+    -- `env' is only worth an extra exec when there is something to set, and the
+    -- common case -- a constant command line, no options -- sets nothing.
+    local argv = {}
+    if #vars > 0 then
+        table.insert(argv, "/usr/bin/env")
+        for _, v in ipairs(vars) do
+            table.insert(argv, v)
+        end
+    end
+
+    table.insert(argv, useZsh and kBrishzq or kBrishzDash)
+    if quoted then
+        for _, word in ipairs(cmd) do
+            table.insert(argv, tostring(word))
+        end
+    else
+        table.insert(argv, cmd)
+    end
+
+    return argv
 end
 
-function brishzeval(cmd)
-  local cmdq = ("/usr/local/bin/brishz.dash %q"):format(cmd)
-  return exec(cmdq)
-end
-function brishzeval2Old(cmd)
-  -- can not handle newlines well. %q quotes them wrongly. It also quotes \ wrongly, I think.
-  local cmdq = ("brishz_quote=y /usr/local/bin/brishz.dash %q"):format(cmd)
-  print("cmdq: " .. cmdq)
-  return exec(cmdq)
-end
-function brishzeval2bg(cmd)
-  brishzeval2("{ " .. cmd .. " } &>/dev/null &")
-end
-function brishzevalbg(cmd)
-  brishzeval("{ " .. cmd .. " } &>/dev/null &")
+--- Fire and forget. Forks twice: the middle child exits at once and is reaped
+--- here, so the grandchild is reparented and cannot come back as a zombie. The
+--- caller waits only for that first fork, which is why this costs about 3ms
+--- against 55 for waiting on the garden.
+---
+--- Nothing can be reported back, by construction -- not even a failure to
+--- start. Use brishz_eval when the answer matters.
+local function spawnDetached(argv)
+    local path = argv[1]
+    local args = {table.unpack(argv, 2)}
+
+    local pid = posix.fork()
+    assert(pid ~= nil, "fork() failed")
+    if pid == 0 then
+        local pid2 = posix.fork()
+        if pid2 == 0 then
+            local devnull = posix.open("/dev/null", posix.O_WRONLY)
+            if devnull then
+                posix.dup2(devnull, posix.fileno(io.stdout))
+                posix.dup2(devnull, posix.fileno(io.stderr))
+            end
+            posix.execp(path, table.unpack(args))
+            posix._exit(1)
+        end
+        posix._exit(0)
+    end
+    posix.wait(pid)
 end
 
-function brishzeval2(cmd)
-  local my_in = cmd
-  local my_cmd = "/usr/local/bin/bsh.dash" -- susceptible to getting stuck as bsh.dash uses a single session
-  local my_args = {} -- no arguments
-  local my_status, my_out, my_err = pipe_simple(my_in, my_cmd, table.unpack(my_args))
-
-  return my_out .. my_err
+local function brishzRun(quoted, cmd, opts)
+    local argv = brishzArgv(quoted, cmd, opts)
+    local status, out, err = pipe_simple("", table.unpack(argv))
+    return trim1(out or ""), err or "", status
 end
 
-function brishzeval2_out(cmd)
-  local my_in = cmd
-  local my_cmd = "/usr/local/bin/bsh.dash" -- susceptible to getting stuck as bsh.dash uses a single session
-  local my_args = {} -- no arguments
-  local my_status, my_out, my_err = pipe_simple(my_in, my_cmd, table.unpack(my_args))
+--- Runs a command line in the garden and waits. Returns its output, its stderr
+--- and its exit status -- all three, because the old version returned only
+--- stdout and a silent failure was indistinguishable from empty output.
+---
+--- The status here is the client's, so it reports that the call failed but not
+--- what the command itself returned. brishz_eval_q gives the real code.
+function brishz_eval(cmd, opts)
+    return brishzRun(false, cmd, opts)
+end
 
-  return my_out
+--- The same, with the command as a list: brishz_eval_q({"ecn", whatever}). Each
+--- element is quoted for you, so `whatever' is data no matter what is in it.
+--- Returns the command's own exit status, not the client's.
+function brishz_eval_q(argv, opts)
+    return brishzRun(true, argv, opts)
+end
+
+--- Does not wait, for anything: not for the command, and not for the HTTP
+--- round-trip either. The `bg' in the old brishzevalbg only backgrounded the
+--- command *inside* the garden, so Hammerspoon still blocked for the reply --
+--- which made it slower than a plain synchronous call, not faster.
+function brishz_eval_bg(cmd, opts)
+    spawnDetached(brishzArgv(false, cmd, opts))
+end
+
+--- Argument-list form of brishz_eval_bg. Costs nothing extra, since nothing is
+--- waited for; use it for anything with a value in it.
+function brishz_eval_q_bg(argv, opts)
+    spawnDetached(brishzArgv(true, argv, opts))
+end
+
+--- A shell that keeps its state between calls -- variables, cwd, anything --
+--- because every call lands in the same named garden session. That is the only
+--- thing this adds; being one session is also its hazard, since a command that
+--- hangs there blocks every later call to it.
+function brishz_eval_bsh(cmd, opts)
+    opts = opts or {}
+    opts.session = opts.session or "bsh"
+    return brishz_eval(cmd, opts)
 end
 ---
 function mkdir(path)

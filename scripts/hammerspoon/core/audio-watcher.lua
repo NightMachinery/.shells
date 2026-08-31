@@ -10,9 +10,9 @@
 --
 --- ** Why this file is so careful about blocking
 --
--- Every garden call here goes through runInGarden (core/helpers.lua), which is
--- hs.task-based and asynchronous. This file must NOT use brishzeval2bg, which
--- blocks the main thread despite its name; the measurements and the reasoning
+-- Every garden call here goes through brishz_eval_hs (core/helpers.lua), which
+-- is hs.task-based and asynchronous. It must not use the synchronous
+-- brishz_eval, which blocks the main thread; the measurements and the reasoning
 -- live with the helper.
 
 audioWatcherDebounceTimer = nil
@@ -34,7 +34,7 @@ local function notifyAudioChanged()
     -- guard: this watcher is a singleton with one callback slot (see the note
     -- at setCallback below), so a second feature cannot subscribe here. The zsh
     -- side fans out to consumers instead.
-    runInGarden(("h-hook-audio-output-change %q %q"):format(
+    brishz_eval_hs(("h-hook-audio-output-change %q %q"):format(
                     device:name() or "", device:transportType() or ""), "audio-watcher")
 
     -- The mute watcher below is bound to one specific device, so it has to
@@ -70,7 +70,7 @@ local function deviceMuteCallback(uid, event, scope)
     -- keeps this from spawning a garden round-trip every time the guard fires.
     if device:outputMuted() then return end
 
-    runInGarden("audio-guard-reconcile", "audio-watcher")
+    brishz_eval_hs("audio-guard-reconcile", "audio-watcher")
 end
 
 -- Per-device rather than global: hs.audiodevice.watcher reports the device list

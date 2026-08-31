@@ -84,7 +84,7 @@ function focusAppYabai(appName)
         if mainWindow then
             local windowID = mainWindow:id()
             hs.execute("/opt/homebrew/bin/yabai -m window --focus " .. windowID)
-            -- brishzeval("yabai -m window --focus " .. windowID)
+            -- brishz_eval_hs("yabai -m window --focus " .. windowID)
         end
     end
 end
@@ -244,5 +244,5 @@ appHotkey{ key='t', appName='org.mozilla.thunderbird' }
 
 
 hyper_bind_v1("d", function()
-                  brishzeval2bg("notif-os-dismiss-all")
+                  brishz_eval_hs("notif-os-dismiss-all")
 end)
