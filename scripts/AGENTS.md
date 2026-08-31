@@ -82,6 +82,41 @@ through `brishz`, `brishz2.dash`, or anything driven by them (agent hooks,
 Hammerspoon bindings, iTerm triggers). Testing in a fresh `zsh -ic` proves
 nothing about what the garden is running.
 
+## Hammerspoon
+
+Hammerspoon watches `./hammerspoon/` and reloads its entire config the moment
+any `.lua` under it changes. That is fine for a human saving one finished file
+and bad for you: it loads your half-written module, and it leaves the *previous*
+code's canvases and timers running underneath. The result reads exactly like a
+real bug. One session lost a detour to a phantom colour fault that was only
+stale canvases from a reload that landed between two edits.
+
+So take a hold before editing any `.lua` there, and reload by hand when you
+actually want to see your changes:
+
+```
+hs-reload-hold "what you are editing" 30m   #: duration optional, default 30m
+hs-reload                                   #: load your changes, when ready
+hs-reload-release                           #: as soon as you are done
+hs-reload-holds                             #: who is holding, and why
+```
+
+Source: `./hammerspoon/core/reload.lua` and [agfi:hs-reload-hold].
+
+- Release as soon as you are done, including when you stop early or hand back
+  unfinished. Releasing reloads for you — but only if nobody else still holds
+  one, so you cannot yank the config out from under a parallel session.
+- It expires on its own, so a crash cannot leave auto-reload off for good. Call
+  `hs-reload-hold` again to push your deadline out during a long stretch; it
+  renews rather than stacking.
+- Holds are per-session, keyed on `$CLAUDE_CODE_SESSION_ID`, so several agents
+  can hold at once without interfering. Do not delete `~/.hs-no-reload/` files
+  you did not create.
+- A hold suppresses only the *automatic* reload. `hs-reload` and Hyper+Cmd+R
+  always work, so this never stops you testing.
+- `hs -c 'return hammerspoonReloadHeldBy()'` answers "why did my save not do
+  anything" — suppression is silent by default.
+
 ## Plugins
 ### Loading
 
