@@ -104,6 +104,17 @@ being cut off, and an optional fullscreen flash makes one impossible to miss.
 It is the engine for the Lua config too, which is why alerts raised from a
 hotkey and alerts raised from the shell now look and stack the same way.
 
+It is one module in six files: `state.lua` (the namespace, the live state, every
+tunable), `colors.lua` (both palettes and how a name resolves), `markup.lua`,
+`layout.lua` (measuring, wrapping, where each band goes), `render.lua` (canvases,
+the flood, the countdown ticker, animation) and `api.lua`. `boot.lua` lists them
+in that order rather than globbing the directory, so the order is visible where
+the loading happens. Since it loads files with `dofile`, each file is its own
+chunk and a file-local is invisible to the next one, so everything shared across
+the cut hangs off an `AlertEngine` table — the same shape `modal-mode.lua` uses
+for `ModalMode`. Only the public `alertV2*`/`alert_gateway*` functions and the
+tunable `alertV2*` knobs are globals in their own right.
+
 Callers do not name it, though. Everything goes through `alert_gateway`, with
 `alert_gateway_dismiss` and `alert_gateway_exists` beside it, and only those
 three functions know that the engine is `alertV2`. Changing which engine draws
@@ -216,8 +227,9 @@ Neither ramp may take more than 40% of the window, so even a very short flash
 still reaches full colour in the middle. `alertV2FloodFadeInSeconds` (0.10) is
 shorter than `alertV2FloodFadeOutSeconds` (0.20) because arriving is an alarm
 and wants to be abrupt, while leaving is a release and wants to drain. The ramp
-is a smoothstep, redrawn `alertV2FloodFadeFps` (30) times a second; a linear
-ramp reads as stopping abruptly at both ends.
+is a smoothstep, redrawn `alertV2AnimationFps` (30) times a second; a linear
+ramp reads as stopping abruptly at both ends. That knob now paces every animated
+thing, not just the fade — see Colours below.
 
 `floodFade = false` restores the hard cut, and a number sets both ramps to that
 many seconds. Only the wash rectangle is animated, never the canvas: fading the
@@ -229,16 +241,79 @@ wiped by the first of those.
 
 ### Colours
 
-`alertV2DefaultColor` (dark slate) for ordinary alerts, `alertV2WarnColor`
-(amber, the colour the banner shipped with) for something that wants attention
-without being on fire, `alertV2AgentColor` (crimson) for the agent banner,
-`alertV2FreeColor` (blue) for its release flash, `alertV2NoticeColor` (grey)
-for the hidden-alerts band. A caller reachable only through the shell names one
-of these as a string: `color = "warn"`.
+All of it lives in `alert/colors.lua`, which is the point of that file existing:
+the palette should be readable at a glance rather than reconstructed from the
+engine around it.
 
-All of them take their opacity from `alertV2BandAlpha` (0.8), so a band lying
-across a window does not read as a hole punched in it — you can still tell what
-it is covering. A colour passed in per alert keeps whatever alpha it carries.
+Callers name a colour as a string rather than passing a table, because the shell
+is a first-class caller here and a table literal would have to survive
+`hammerspoon -c` quoting. A name resolves in this order, first match winning:
+
+- the five originals — `default`/`warn`/`amber`/`crit`/`agent`/`free`/`notice`,
+  backed by `alertV2DefaultColor` (dark slate) for ordinary alerts,
+  `alertV2WarnColor` (amber) for something that wants attention without being on
+  fire, `alertV2AgentColor` (crimson) for the agent banner, `alertV2FreeColor`
+  (blue) for its release flash and `alertV2NoticeColor` (grey) for the
+  hidden-alerts band. These stay separate globals, read live, so overriding one
+  in a console takes effect immediately;
+- the curated palette, `AlertEngine.bandColors`: `success`/`green`, `forest`,
+  `ocean`/`info`, `teal`, `sky`, `violet`, `plum`, `rose`, `blood`, `rust`,
+  `gold`, `olive`, `slate`, `graphite`, `midnight`, `ink`;
+- the animated colours, below;
+- any of the ~140 `hs.drawing.color.x11` names, with brightness capped at 0.85
+  so `white` or `yellow` becomes a band rather than a highlighter.
+
+Ours resolve before x11 on purpose: several names (`green`, `gold`, `violet`,
+`rose`, `teal`, `slate`) exist in both, and a name that reads as a mood should
+render as a band. An unknown name is not an error — it falls back to the default
+band, because no alert at all is a worse outcome than a plain one.
+
+Everything curated takes its opacity from `alertV2BandAlpha` (0.8), applied by a
+constructor so a palette author cannot forget it, and stays dark enough that
+white text sits on it. A colour passed in per alert keeps whatever alpha it
+carries.
+
+Text colour is not fixed. `AlertEngine.textColorFor` picks black or white from
+the band's relative luminance, so an x11 `khaki` band is legible without the
+caller thinking about it. The threshold sits above the midpoint, biasing toward
+white, because bands are translucent: whatever is behind one bleeds through and
+drags its effective brightness down, so a band that measures as borderline light
+usually looks darker than it measures.
+
+#### Animated colours
+
+`rainbow-1` walks the hue circle in ten seconds, `silver-pulse-1` breathes a
+pale metal band, `wolf-eye-1` swells from near-black to amber-gold and sinks
+back. The `-1` is a version, not a count: a variant that spins faster becomes
+`rainbow-2` rather than replacing the original.
+
+A colour may be a descriptor instead of a table:
+
+```lua
+{ animated = true, period = 10, textColor = { white = 1 },
+  at = function(now) return <colour table> end }
+```
+
+`at` must be a pure function of the wall clock, because that is the only kind of
+animation this engine can keep — canvases are torn down and rebuilt on every new
+alert, every dismissal and every countdown tick, so animation state stored
+anywhere would be wiped. Phase from `now % period` survives all of it, needs no
+per-alert bookkeeping, and makes two bands wearing the same colour move in step.
+Adding one is a few lines in `colors.lua`; `wave` and `lerp` are there for it.
+
+`textColor` is fixed for the whole cycle rather than recomputed per frame, since
+text flipping between black and white mid-cycle would strobe. That is why each
+animation's brightness is capped rather than swinging the full range: it has to
+stay inside one contrast regime. Anything an `at` returns must carry its own
+alpha — assigning an HSB table without one resets the element to fully opaque.
+
+One timer paints all of it, at `alertV2AnimationFps`, shared with the flash's
+fade ramps because they are the same job: writing a colour onto an element that
+already exists. It runs while a flood is fading, a flood is animated, or a band
+that layout actually placed is animated, and stops when none of that holds — so
+an ordinary static alert starts no timer at all.
+
+#### Markup spans
 
 Markup spans have their own palette, `alertV2MarkupColors`, because that text
 sits *on* a band rather than being one. `grey` and `dim` there are translucent
@@ -246,6 +321,12 @@ white rather than fixed greys: dimness is a relation to the background, so a
 dimmed span recedes into whichever band happens to carry it instead of assuming
 a dark one. A fixed grey looked right on the slate default and was unreadable on
 amber.
+
+That palette assumes a dark band, which every curated name is. On a light band —
+an x11 name, or `silver-pulse-1` — spans wash out, and `grey`/`dim` disappear
+into it entirely. Left alone rather than second-guessed: someone who asked for a
+light band with coloured spans on it gets what they asked for, and silently
+dropping the colour they named would be the worse answer.
 
 ## Agent focus banner
 
