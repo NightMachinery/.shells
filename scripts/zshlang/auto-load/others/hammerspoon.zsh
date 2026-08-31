@@ -130,7 +130,13 @@ function hs-alert-v1 {
 #   alert_pos     top (default), center, bottom
 #   alert_id      reusing an id updates that alert in place instead of stacking
 #   alert_markup  plain (default) or md
-#   alert_color   band colour by name: default, warn/amber, crit, agent, free
+#   alert_color   band colour by name. The originals are default, warn/amber,
+#                 crit, agent, free and notice; there is also a palette
+#                 (ocean, violet, blood, gold, forest, midnight, ...), three
+#                 animated ones (rainbow-1, silver-pulse-1, wolf-eye-1), and
+#                 any x11 colour name. An unknown name draws a default band.
+#                 The text goes black or white to suit whichever it lands on.
+#                 See hammerspoon/alert/colors.lua for the whole palette.
 #
 # `md` is a small markdown subset - **bold**, *italic*, ~~strike~~, and
 # [text]{red bold} for colour, which markdown has none of. Anything that does
