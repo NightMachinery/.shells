@@ -5,7 +5,7 @@
 #: id rewrites the existing band instead. The text still differs between on and
 #: off, so the change is not treated as a heartbeat and does flash.
 #: See [agfi:hs-alert-v2] for the knob, and the "** Gateway" section of
-#: hammerspoon/core/alert-engine.lua for the engine side.
+#: hammerspoon/alert/api.lua for the engine side.
 typeset -g focus_dnd_alert_id='focus-dnd'
 ##
 function focus-off {

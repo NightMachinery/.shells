@@ -4,7 +4,7 @@
 --- agent can click through an app without having to guess whether a human is
 --- about to reach for the same keyboard.
 ---
---- This is a thin wrapper over the v2 alert engine (core/alert-engine.lua):
+--- This is a thin wrapper over the v2 alert engine (hammerspoon/alert/):
 --- the banner is an alert with a crimson colour, a countdown, and a fixed id.
 --- The rendering, stacking, wrapping, screen watching and click-through all
 --- live there, so an agent banner and an ordinary alert can be on screen at

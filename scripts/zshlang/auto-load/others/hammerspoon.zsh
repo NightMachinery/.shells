@@ -117,7 +117,7 @@ function hs-alert-v1 {
     # https://www.hammerspoon.org/docs/hs.alert.html
 }
 ##
-# The v2 engine lives in hammerspoon/core/alert-engine.lua: coloured bands that
+# The v2 engine lives in hammerspoon/alert/: coloured bands that
 # stack instead of hiding each other, wrap instead of being cut off, and can
 # flash the whole screen first.
 #
@@ -135,7 +135,7 @@ function hs-alert-v1 {
 # `md` is a small markdown subset - **bold**, *italic*, ~~strike~~, and
 # [text]{red bold} for colour, which markdown has none of. Anything that does
 # not parse renders literally, so a typo shows up rather than vanishing. See
-# the "** Markup" section of alert-engine.lua for the whole grammar.
+# hammerspoon/alert/markup.lua for the whole grammar.
 #
 # Both new knobs are bare words, so unlike the message they are safe to inline
 # in the command string; the colour is resolved by name on the Lua side rather

@@ -50,7 +50,7 @@ there for context, not as a reason to interrupt you. In the levels, `+` means
 charging and `=` means charged.
 
 The emphasis uses `hs-alert-v2`'s `md` markup mode — see
-`hammerspoon/core/alert-engine.lua`. The jq program emits `**bold**` around the
+`hammerspoon/alert/markup.lua`. The jq program emits `**bold**` around the
 low parts and `[...]{dim}` around the rest.
 
 ## `NA` means no reading, and it never counts as low

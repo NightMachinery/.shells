@@ -1,14 +1,15 @@
 # Hammerspoon
 
 `~/.hammerspoon/init.lua` is a symlink to `~/scripts/hammerspoon/boot.lua`.
-The boot file only sets up Lua/Hammerspoon dependencies and then loads the
-ordered core module list from `~/scripts/hammerspoon/core/`.
+The boot file only sets up Lua/Hammerspoon dependencies and then loads an
+ordered module list, mostly from `~/scripts/hammerspoon/core/`.
 
 The explicit core load order is:
 
 - `helpers.lua`
 - `modal-mode.lua`
-- `alert-engine.lua`
+- `alert/state.lua`, `alert/colors.lua`, `alert/markup.lua`,
+  `alert/layout.lua`, `alert/render.lua`, `alert/api.lua`
 - `agent-banner.lua`
 - `redis.lua`
 - `wifi-watcher.lua`
@@ -94,7 +95,7 @@ alphabet size in `avyCombinationsFor`.
 
 ## Alerts
 
-`core/alert-engine.lua` draws alerts as coloured bands across the screen, one
+`alert/` draws alerts as coloured bands across the screen, one
 per live alert, stacked. It replaces `hs.alert`'s single centred box for
 everything that goes through `hs-alert` in zshlang: several alerts can be up at
 once without hiding each other, long text wraps and the band grows rather than
@@ -107,7 +108,7 @@ Callers do not name it, though. Everything goes through `alert_gateway`, with
 `alert_gateway_dismiss` and `alert_gateway_exists` beside it, and only those
 three functions know that the engine is `alertV2`. Changing which engine draws
 an alert, or routing a subset of them somewhere else, is an edit at the bottom
-of `core/alert-engine.lua` rather than a sweep over every caller. `opts` is
+of `alert/api.lua` rather than a sweep over every caller. `opts` is
 passed through untouched, so callers still use the option names below. The zsh
 side has the same shape: `hs-alert` is a gateway over `hs-alert-v2`, with
 `hs-alert-v1` still beside it.

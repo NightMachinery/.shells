@@ -44,8 +44,16 @@ local hammerspoonCoreFiles = {
     "core/helpers.lua",
     "modal-mode.lua",
     -- After modal-mode.lua: reuses its screen watcher and targetScreens().
-    "core/alert-engine.lua",
-    -- After core/alert-engine.lua: the banner is a wrapper over it.
+    -- alert/ is one module in six files, listed rather than globbed so the
+    -- order is visible here. state.lua first: it declares the AlertEngine
+    -- table the rest hang off, and the alpha knob colors.lua bakes in.
+    "alert/state.lua",
+    "alert/colors.lua",
+    "alert/markup.lua",
+    "alert/layout.lua",
+    "alert/render.lua",
+    "alert/api.lua",
+    -- After alert/: the banner is a wrapper over it.
     "core/agent-banner.lua",
     "core/redis.lua",
     "core/wifi-watcher.lua",
