@@ -29,11 +29,17 @@ agentBannerState = agentBannerState or {
 --- The banner covers the whole screen for this long before collapsing to the
 --- strip, so it cannot be missed by someone looking at the middle of a monitor.
 --- Set to 0 to go straight to the strip.
-agentBannerFlashSeconds = agentBannerFlashSeconds or 0.2
+---
+--- The engine fades the wash in and out inside this window rather than around
+--- it, so the number is still the whole life of the flash - but it now has to
+--- pay for two ramps as well as the plateau, which is why it is not as short as
+--- it was when the flash was a hard cut.
+agentBannerFlashSeconds = agentBannerFlashSeconds or 0.35
 
 --- The same, for the "screen is yours" flash when the banner comes down. The
---- end is the moment a human actually wants to notice.
-agentBannerReleaseFlashSeconds = agentBannerReleaseFlashSeconds or 0.35
+--- end is the moment a human actually wants to notice, so it gets longer than
+--- the raise.
+agentBannerReleaseFlashSeconds = agentBannerReleaseFlashSeconds or 0.5
 
 local kBannerId = "agent-banner"
 local kReleaseId = "agent-banner-release"

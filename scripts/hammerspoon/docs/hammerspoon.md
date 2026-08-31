@@ -151,9 +151,9 @@ gateway of their own: `alertV2FromFile` is what the shell wrapper calls, and
 indirection that nothing would use.
 
 Options: `id` (re-showing the same id updates that alert in place), `seconds`,
-`color`, `position`, `flashSeconds`, `countdown`, `pinned`, and `screens` (a
-`ModalMode.targetScreens` spec). Everything expires on its own, so a caller
-that crashes cannot leave the screen branded.
+`color`, `position`, `flashSeconds`, `floodFade`, `countdown`, `pinned`, and
+`screens` (a `ModalMode.targetScreens` spec). Everything expires on its own, so
+a caller that crashes cannot leave the screen branded.
 
 `alertV2FromFile` is the entry point the shell uses: it reads the message from
 the file and deletes it. `hammerspoon -c` hangs on payloads of a few hundred
@@ -204,6 +204,28 @@ The wash is see-through, `alertV2FloodAlpha` (0.33). It has to be impossible to
 miss, but it covers every screen and should not black out what you were looking
 at to do it. The bands keep their own opacity and stay readable on top of it.
 
+The wash fades in and back out rather than snapping, which otherwise reads as a
+glitch instead of as something arriving. Both ramps live *inside*
+`flashSeconds`: the flood's total life is exactly what the caller asked for, and
+adding the animation moved nobody's timing. The alternative — `flashSeconds`
+meaning "time at full opacity", with the ramps added around it — would have
+stretched every existing caller silently, and would have broken the banner's
+release flash, which is built so that its alert and its flash end together.
+Neither ramp may take more than 40% of the window, so even a very short flash
+still reaches full colour in the middle. `alertV2FloodFadeInSeconds` (0.10) is
+shorter than `alertV2FloodFadeOutSeconds` (0.20) because arriving is an alarm
+and wants to be abrupt, while leaving is a release and wants to drain. The ramp
+is a smoothstep, redrawn `alertV2FloodFadeFps` (30) times a second; a linear
+ramp reads as stopping abruptly at both ends.
+
+`floodFade = false` restores the hard cut, and a number sets both ramps to that
+many seconds. Only the wash rectangle is animated, never the canvas: fading the
+canvas would fade the band copies drawn on it and then pop them back to full
+opacity the moment the flood died. The fade is derived from the clock rather
+than stored on the canvas, because the flood is torn down and rebuilt whenever
+an alert arrives or a countdown ticks, and a fade held on the canvas would be
+wiped by the first of those.
+
 ### Colours
 
 `alertV2DefaultColor` (dark slate) for ordinary alerts, `alertV2WarnColor`
@@ -238,11 +260,13 @@ hs -c 'agentBannerOff()'
 hs -c 'return agentBannerActive()'
 ```
 
-It washes each screen for `agentBannerFlashSeconds` (0.2 by default; 0 skips
+It washes each screen for `agentBannerFlashSeconds` (0.35 by default; 0 skips
 it, and a third argument to `agentBannerOn` sets it) before settling into its
 strip — see the flash notes above. `agentBannerOff` flashes
-`agentBannerReleaseFlashSeconds` of blue the same way; the moment the machine
-is free again is the one worth noticing.
+`agentBannerReleaseFlashSeconds` (0.5) of blue the same way; the moment the
+machine is free again is the one worth noticing, so it lingers longer than the
+raise. Both are long enough to pay for the flash's fade in and out, which the
+old hard-cut values were not.
 
 Re-calling `agentBannerOn` with the same message refreshes the countdown
 without re-flashing, so a long task can heartbeat without strobing. A changed
