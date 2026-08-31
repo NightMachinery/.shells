@@ -395,6 +395,18 @@ animation's brightness is capped rather than swinging the full range: it has to
 stay inside one contrast regime. Anything an `at` returns must carry its own
 alpha — assigning an HSB table without one resets the element to fully opaque.
 
+The fullscreen flash does not animate, even when the band does. It uses one
+fixed shade: `floodColor` if the descriptor names one, otherwise the brightest
+point of the cycle, found by sampling once. A flash is a moment whose whole job
+is to be impossible to miss, and following the cycle makes it miss twice over —
+the phase comes from the wall clock, so a short flash lands wherever the clock
+happens to be, and a long one spends seconds at the dark end. Measured on
+`wolf-eye-1`, whose cycle spans 0.079 to 0.244 in luminance, the same command
+flashed anywhere across that threefold range from run to run, including a
+near-black that read as no flash at all. It is now pinned at 0.244 every time.
+The band keeps its cycle: it is on screen long enough for one to be a slow glow
+rather than a light going out.
+
 One timer paints all of it, at `alertV2AnimationFps`, shared with the flash's
 fade ramps because they are the same job: writing a colour onto an element that
 already exists. It runs while a flood is fading, a flood is animated, or a band
