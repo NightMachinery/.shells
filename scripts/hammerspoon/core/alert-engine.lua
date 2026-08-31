@@ -94,13 +94,21 @@ end
 --- Text colours for markup runs. Deliberately separate from the band colours
 --- above: these sit *on* a band, so they are light and saturated rather than
 --- dark and translucent.
+---
+--- `grey' and `dim' are translucent white rather than a fixed grey, because
+--- dimness is a relation to the background and not a value. A fixed grey has to
+--- pick a background to be dim against, and the one it picked was the dark slate
+--- default -- so `[x]{dim}' on the amber band was mid-grey on orange at about
+--- 1.6:1, i.e. unreadable, and would have failed the same way on crimson or
+--- blue. Blending toward whatever band is underneath dims against all of them:
+--- soft on slate, and readable with a warm tint on amber.
 alertV2MarkupColors = alertV2MarkupColors or {
     red    = { red = 1.00, green = 0.45, blue = 0.40 },
     amber  = { red = 1.00, green = 0.76, blue = 0.33 },
     green  = { red = 0.56, green = 0.87, blue = 0.52 },
     blue   = { red = 0.58, green = 0.76, blue = 1.00 },
-    grey   = { white = 0.62 },
-    dim    = { white = 0.55 },
+    grey   = { white = 1.00, alpha = 0.85 },
+    dim    = { white = 1.00, alpha = 0.75 },
     white  = { white = 1.00 },
 }
 
