@@ -95,6 +95,32 @@ function rem-comingup-v1 {
     trim "$out"
 }
 ###
+function dur2sec {
+    : "converts 90s, 30m, 2h, 3d or a bare seconds count to seconds
+
+The inverse of [agfi:seconds-fmt-short]. Lives here rather than in whichever
+module first needed it, so the next one does not write a fourth copy."
+    local d="${1}"
+    assert-args d @RET
+
+    local n="${d%[smhd]}" unit="${d##*[0-9]}"
+    if [[ "$n" != <-> ]] ; then
+        ectrace "$0: bad duration: ${d}"
+        return 1
+    fi
+
+    case "$unit" in
+        d) ec $(( n * 86400 )) ;;
+        h) ec $(( n * 3600 )) ;;
+        m) ec $(( n * 60 )) ;;
+        s|'') ec "$n" ;;
+        *)
+            ectrace "$0: bad duration unit: ${d}"
+            return 1
+            ;;
+    esac
+}
+##
 function seconds-fmt-short() {
     integer secs="${1:?}"
 

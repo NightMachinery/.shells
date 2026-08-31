@@ -31,6 +31,59 @@ alphabetical order after the core modules are ready.
 Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
+## Auto-reload
+
+`reload.lua` watches `~/.hammerspoon/` and `~/scripts/hammerspoon/` recursively
+and reloads the whole config when a `.lua` under either changes. Hyper+Cmd+R and
+`hs-reload` call `hs.reload` directly, so a manual reload is never affected by
+anything below.
+
+A save is rarely a single write — editors write a temp file and rename it, and
+anything touching several files fires the watcher repeatedly — so the reload is
+coalesced: each event restarts a timer, and the reload happens
+`hammerspoonReloadCoalesceSeconds` (0.2) after the last one. Measured, five
+saves 100ms apart become one reload, while three saves a second apart still
+produce three, which is right: a burst is one edit, a pause means you meant it.
+Set `hammerspoonReloadCoalesce` to false for the old reload-per-event behaviour.
+
+### Holds
+
+Any file in `~/.hs-no-reload/` whose mtime is in the **future** is a live claim
+on the reloader, and while one exists nothing reloads by itself. That is what
+`hs-reload-hold` writes and what `hammerspoonReloadHeldBy()` reads; `hs -c
+'return hammerspoonReloadHeldBy()'` answers "why did my save not do anything".
+
+It exists for agentic editing. Reloading mid-edit loads a half-written module,
+and worse, leaves the previous code's canvases and timers behind — a state that
+reads exactly like a real bug and is not one, which has already cost one
+session a detour to disprove.
+
+A directory rather than a single flag file, because several agents edit this
+repo at once. One shared flag would let whoever finished first re-enable
+reloading under someone still typing; a counter would be worse still, since the
+first agent to be killed would leave it stuck above zero and auto-reload dead
+for good, silently. One file per holder has no shared mutable state to race on.
+
+The deadline lives in the mtime rather than the contents so the check is one
+`hs.fs.attributes` stat with no parsing and no file reads — it runs on
+Hammerspoon's main thread, where blocking freezes every keystroke on the
+machine. Redis would have fit the house style for flags, but reading it there
+means a blocking socket round-trip on that same thread, and an outage would
+force a choice between suppression silently failing and auto-reload never
+running again. A missing directory simply means nothing is holding.
+
+Holds expire on their own, and that is the point rather than a limitation: an
+agent that crashes, is killed, or just forgets must not be able to leave
+auto-reload off permanently. A hold that ends early is a far smaller problem
+than one that never ends.
+
+Setting `hammerspoonReloadHeldAlert` to true puts a grey band on screen naming
+the holder whenever a reload is suppressed. It is off by default because that is
+a band on every save; it uses a fixed alert id, so a burst refreshes one band
+rather than stacking a wall of them. Note that all of these knobs are ordinary
+globals, so changing one from the console lasts only until the next reload —
+edit `reload.lua` to change one for good.
+
 App-scoped modes should use the shared `ModalMode` helpers. qView is defined in
 `auto-load/qview.lua`, exposes `qview_bind_v2` and `qview_bind_v3`, and enters
 while qView is the frontmost app. Its overlay is positioned in the top-left
