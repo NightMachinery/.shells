@@ -23,8 +23,8 @@ local function onPowerEvent(event)
     if event == hs.caffeinate.watcher.systemDidWake or event ==
         hs.caffeinate.watcher.screensDidWake then
         -- Asynchronous: never block Hammerspoon's main thread on the garden.
-        -- See runInGarden in core/helpers.lua.
-        runInGarden("h-hook-wake", "power-watcher")
+        -- See brishz_eval_hs in core/helpers.lua.
+        brishz_eval_hs("h-hook-wake", "power-watcher")
     end
 end
 

@@ -5,7 +5,7 @@ function chis()
     c = hs.chooser.new(function(x)
             if tab then tab:delete() end
             if not x then return end
-            brishzeval2bg(("chis_clean %q | inargsf open"):format(x.text))
+            brishz_eval_hs(("chis_clean %q | inargsf open"):format(x.text))
     end)
     c:placeholderText("Search history ...")
     c:width(95)
@@ -15,7 +15,7 @@ function chis()
                              if not x then
                                  return
                              end
-                             brishzeval2bg(("bell-lm-mhm ; chis_clean %q | inargsf open ; "):format(x.text))
+                             brishz_eval_hs(("bell-lm-mhm ; chis_clean %q | inargsf open ; "):format(x.text))
     end)
     chis_first = true
     local timer
@@ -26,7 +26,7 @@ function chis()
                 chis_first = false
                 cmd = "deus " .. cmd
             end
-            local res = brishzeval2(cmd)
+            local res = brishz_eval(cmd)
             local out = {}
             for l in res:gmatch("([^\r\n]+)\r?\n?") do
                 table.insert(out, {["text"] = l})
@@ -54,7 +54,7 @@ function ntagFinder()
             if tab then tab:delete() end
             if antitab then antitab:delete() end
             if not x then return end
-            brishzeval2_out(("ntag-finder-sel-add %q"):format(x.text))
+            brishz_eval_q({"ntag-finder-sel-add", x.text})
     end)
     c:placeholderText("ntag ...")
     -- c:width(95)
@@ -64,21 +64,21 @@ function ntagFinder()
                              if not x then
                                  return
                              end
-                             -- brishzeval2bg(("ntag-finder-sel-add %q ; bell-lm-mhm"):format(x.text))
-                             brishzeval2bg(("bell-lm-mhm ; ntag-finder-sel-add %q ; "):format(x.text))
+                             -- brishz_eval_hs(("ntag-finder-sel-add %q ; bell-lm-mhm"):format(x.text))
+                             brishz_eval_hs(("bell-lm-mhm ; ntag-finder-sel-add %q ; "):format(x.text))
     end)
     antitab = hs.hotkey.bind('shift', 'tab', function()
                                  local x = c:selectedRowContents()
                                  if not x then
                                      return
                                  end
-                                 -- brishzeval2bg(("ntag-finder-sel-rm %q ; bell-pp-piece"):format(x.text))
-                                 brishzeval2bg(("bell-pp-piece ; ntag-finder-sel-rm %q ; "):format(x.text))
+                                 -- brishz_eval_hs(("ntag-finder-sel-rm %q ; bell-pp-piece"):format(x.text))
+                                 brishz_eval_hs(("bell-pp-piece ; ntag-finder-sel-rm %q ; "):format(x.text))
     end)
     c:choices(function()
             local q = c:query()
             local cmd = ("ntag-select %q"):format(q)
-            local res = brishzeval2(cmd)
+            local res = brishz_eval(cmd)
             local out = {}
             for l in res:gmatch("([^\r\n]+)\r?\n?") do
                 -- @upstreambug https://github.com/Hammerspoon/hammerspoon/issues/2574
@@ -515,7 +515,7 @@ function anycomplete()
     --     local q = c:query()
     --     local cmd = ("autosuggestions-gateway %q"):format(q)
     --     print("cmd: " .. cmd)
-    --     local res = brishzeval2(cmd)
+    --     local res = brishz_eval(cmd)
     --     local out = {}
     --     for l in res:gmatch("([^\r\n]+)\r?\n?") do
     --       table.insert(out, {["text"] = l})

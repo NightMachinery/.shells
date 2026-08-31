@@ -49,7 +49,7 @@ end
 if false then
     hyper_bind_v1("p", function()
                       appName = application.frontmostApplication():name()
-                      -- brishzeval("true " .. hs.pasteboard.getContents())
+                      -- brishz_eval_hs("true " .. hs.pasteboard.getContents())
                       if appName == "Screen Sharing" then
                           -- Doesn't work, test with `sleep 2 ; hs -c 'hs.eventtap.keyStrokes("hi jungle")'`
                           -- hs.eventtap.keyStrokes(hs.pasteboard.getContents())
@@ -62,12 +62,18 @@ if false then
                           eventtap.keyStroke({"cmd"}, 0)
                           eventtap.keyStroke({"cmd"}, 8)
                           local res
-                          -- res = brishzeval2(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
+                          -- res = brishz_eval(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
+                          -- The clipboard goes in on stdin rather than being
+                          -- interpolated into the command. It used to be
+                          -- ("ecn %q | en2per"):format(...), and %q is *Lua*
+                          -- quoting, not shell quoting: a newline in the
+                          -- clipboard came out as a backslash and a line break,
+                          -- which the garden then read as two commands.
                           if hs.keycodes.currentSourceID() == inputEnglish then
-                              res = brishzeval2(("ecn %q | en2per"):format(hs.pasteboard.getContents()))
+                              res = brishz_eval("en2per", {stdin = hs.pasteboard.getContents()})
                               langSetPer()
                           else
-                              res = brishzeval2(("ecn %q | per2en"):format(hs.pasteboard.getContents()))
+                              res = brishz_eval("per2en", {stdin = hs.pasteboard.getContents()})
                               langSetEn()
                           end
                           hs.eventtap.keyStrokes(tostring(res))

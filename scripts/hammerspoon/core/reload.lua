@@ -1,5 +1,5 @@
 function display_off()
-    brishzeval2bg("display-off")
+    brishz_eval_hs("display-off")
 end
 hyper_bind_v2{mods={"cmd"}, key="l", pressedfn=display_off}
 ---
@@ -10,7 +10,7 @@ function install()
     hs.ipc.cliUninstall()
     res = hs.ipc.cliInstall()
     -- res = hs.ipc.cliInstall('/Users/evar/bin', false)
-    -- brishzeval(string.format("echo hs cli result: %s", res))
+    -- brishz_eval_hs(string.format("echo hs cli result: %s", res))
 end
 -- install()
 ---
@@ -160,5 +160,5 @@ loadHammerspoonAutoLoad()
 printLocation()
 -- We need to call this here so that Hammerspoon appears in the System location permissions. The first call to it also sometimes doesn't work, and this solves that, too.
 ---
-brishzeval("bell-lm-eternalhappiness")
+brishz_eval_hs("bell-lm-eternalhappiness")
 --- @end

@@ -132,14 +132,20 @@ end
 -- keystroke for the duration. Compare core/redis.lua, which documents a
 -- previous version that could freeze the machine for up to 50 minutes.
 --
--- So watchers must NOT use brishzeval2bg. Its name is misleading: the trailing
--- `&' backgrounds the command inside the garden, but Hammerspoon still
--- synchronously waits for the round-trip, because brishzeval2 goes through
--- pipe_simple (lua/pipe.lua), which does blocking posix.read loops and then
--- posix.wait. Measured on this machine with hs.timer.absoluteTime:
+-- There used to be a brishzeval2bg for this, and its name was a lie: the
+-- trailing `&' backgrounded the command inside the garden, but Hammerspoon
+-- still waited for the HTTP round-trip, which made it *slower* than a plain
+-- synchronous call. Measured on this machine with hs.timer.absoluteTime,
+-- averaged over six warm runs:
 --
---   brishzeval2bg("true")                            780.6 ms cold, 51.9 ms warm
---   hs.task.new("brishz2.dash", nil, {"true"}):start()          1.5 ms
+--   brishzeval2bg("true")   71.9 ms   the old "background" call
+--   brishz_eval("true")     53.4 ms   synchronous, honest about it
+--   brishz_eval_bg("true")  19.6 ms   fork twice and forget
+--   brishz_eval_hs("true")   7.5 ms   hs.task
+--
+-- So inside Hammerspoon this is the one to reach for: it is the cheapest of
+-- them, and the only one that can report a failure. brishz_eval_bg is for plain
+-- Lua, where there is no hs.task to use.
 --
 -- hs.task is genuinely asynchronous (NSTask, callback on completion), and is
 -- already the idiom elsewhere in this config: core/hyper-mode.lua,
@@ -167,13 +173,23 @@ function taskWithPath(bin, callback, args)
     return task
 end
 
--- Runs `cmd' in the garden without blocking. `label' only prefixes the failure
--- log, so you can tell which watcher's call failed.
+-- Runs `cmd' in the garden without blocking, and says so when it fails.
+-- `label' prefixes that log line, so you can tell which caller's call failed.
 --
--- A nil callback would discard the exit code and both streams, which is how the
--- missing-jq failure above stayed invisible. Log failures instead.
-function runInGarden(cmd, label)
-    label = label or "runInGarden"
+-- Reporting the failure is the thing brishz_eval_bg cannot do at all: it forks
+-- away and forgets, so nobody is left to notice a non-zero exit. A nil callback
+-- here would throw away the exit code and both streams just as thoroughly,
+-- which is exactly how the missing-jq failure above stayed invisible for so
+-- long. Hence the log line rather than a nil.
+--
+-- Inside Hammerspoon this is also the faster of the two (7.5ms against 19.6),
+-- because forking a process this large costs more than handing the work to
+-- NSTask. Prefer it here; brishz_eval_bg is for Lua without Hammerspoon.
+--
+-- Lives here rather than in lua/pipe.lua because hs.task is Hammerspoon's;
+-- pipe.lua is plain Lua over posix and stays that way.
+function brishz_eval_hs(cmd, label)
+    label = label or "brishz_eval_hs"
 
     local task = taskWithPath("/usr/local/bin/brishz2.dash", function(exitCode, _, stdErr)
         if exitCode ~= 0 then

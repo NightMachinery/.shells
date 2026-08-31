@@ -46,7 +46,7 @@ end)
 ---
 -- You can set hyper+F5 to the dictation command in macOS settings.
 hyper_bind_v1("f5", function()
-                  brishzeval('awaysh-fast input-volume-mute-toggle')
+                  brishz_eval_hs('awaysh-fast input-volume-mute-toggle')
                   -- @needed awaysh-fast
 end)
 
@@ -54,7 +54,7 @@ bindWithRepeatV2{
     binder=hyper_bind_v2,
     key="F1",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-dec')
+        brishz_eval_hs('awaysh-fast brightness-dec')
     end,
     auto_trigger_p=false
 }
@@ -62,7 +62,7 @@ bindWithRepeatV2{
     binder=hyper_bind_v2,
     key="F2",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-inc')
+        brishz_eval_hs('awaysh-fast brightness-inc')
     end,
     auto_trigger_p=false
 }
@@ -79,39 +79,39 @@ hyper_bind_v2{
     mods={"shift"},
     key="F1",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-off-all-loop')
+        brishz_eval_hs('awaysh-fast brightness-off-all-loop')
     end,
 }
 hyper_bind_v2{
     mods={"shift"},
     key="F2",
     pressedfn=function()
-        brishzeval('awaysh-fast brightness-on-all-loop')
+        brishz_eval_hs('awaysh-fast brightness-on-all-loop')
     end,
 }
 ---
 
 hyper_bind_v1("F6", function()
-                  brishzeval('awaysh-fast focus-do-not-disturb-toggle')
+                  brishz_eval_hs('awaysh-fast focus-do-not-disturb-toggle')
 end)
 
 hyper_bind_v1("F7", function()
-                  -- brishzeval('awaysh-fast hear-prev')
+                  -- brishz_eval_hs('awaysh-fast hear-prev')
                   mediaPreviousKey()
 end)
 
 hyper_bind_v1("F8", function()
-                  -- brishzeval('awaysh-fast hear-play-toggle')
+                  -- brishz_eval_hs('awaysh-fast hear-play-toggle')
                   mediaPlayPauseKey()
 end)
 
 hyper_bind_v1("F9", function()
-                  -- brishzeval('awaysh-fast hear-next')
+                  -- brishz_eval_hs('awaysh-fast hear-next')
                   mediaNextKey()
 end)
 
 hyper_bind_v1("F10", function()
-                  -- brishzeval('awaysh-fast volume-mute-toggle')
+                  -- brishz_eval_hs('awaysh-fast volume-mute-toggle')
                   volumeMuteKey()
 end)
 
@@ -139,7 +139,7 @@ bindWithRepeatV2{
     key="F11",
     pressedfn=function()
         ---
-        -- brishzeval('awaysh-fast volume-dec')
+        -- brishz_eval_hs('awaysh-fast volume-dec')
         ---
         -- volumeInc(-5)
         volumeDecKey()
@@ -152,7 +152,7 @@ bindWithRepeatV2{
     key="F12",
     pressedfn=function()
         ---
-        -- brishzeval('awaysh-fast volume-inc')
+        -- brishz_eval_hs('awaysh-fast volume-inc')
         ---
         -- volumeInc(5)
         volumeIncKey()
