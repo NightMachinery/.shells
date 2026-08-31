@@ -42,15 +42,34 @@ AlertEngine = AlertEngine or {}
 alertEngineState = alertEngineState or {
     alerts = {},         -- ordered oldest first; the render order too
     canvases = {},       -- { canvas, screen, position, stack }
-    floodCanvases = {},
+    floodCanvases = {},  -- { canvas, animated }
     flood = nil,         -- { color, startedAt, duration, fadeIn, fadeOut }
     floodTimer = nil,
-    floodFadeTimer = nil,
+    animator = nil,      -- repaints fades and animated bands; see render.lua
     ticker = nil,
     hooked = false,
     counter = 0,
 }
---- the loudest thing on the monitor.
+
+--- Reloading Hammerspoon builds a fresh Lua state, so these only matter when a
+--- file is dofile'd onto a running one -- which is how this module gets probed
+--- while it is being worked on. Left behind, either would keep painting
+--- alongside the current code.
+if alertEngineState.floodFadeTimer then
+    -- The flood fade had its own timer before the animator absorbed it.
+    alertEngineState.floodFadeTimer:stop()
+    alertEngineState.floodFadeTimer = nil
+end
+if alertEngineState.floodCanvases[1] ~= nil
+        and alertEngineState.floodCanvases[1].canvas == nil then
+    -- Entries used to be bare canvases rather than records. A flood lives well
+    -- under a second, so dropping it is simpler than converting it.
+    for _, canvas in ipairs(alertEngineState.floodCanvases) do
+        canvas:delete()
+    end
+    alertEngineState.floodCanvases = {}
+end
+
 --- How opaque a band is. Slightly see-through, so a band lying across a window
 --- does not read as a hole punched in it - you can still tell what it is
 --- covering. One knob rather than an alpha buried in each colour below; a
@@ -76,9 +95,13 @@ alertV2FloodAlpha = alertV2FloodAlpha or 0.33
 alertV2FloodFadeInSeconds = alertV2FloodFadeInSeconds or 0.10
 alertV2FloodFadeOutSeconds = alertV2FloodFadeOutSeconds or 0.20
 
---- How often the ramp is redrawn. Each step assigns one colour per screen, so
---- this is cheap; it is nowhere near a full re-render.
-alertV2FloodFadeFps = alertV2FloodFadeFps or 30
+--- How often anything animated is redrawn: the flash's fade ramps and every
+--- band wearing an animated colour, which share one timer. Each step assigns a
+--- handful of colours onto elements that already exist; it is nowhere near a
+--- full re-render.
+---
+--- Was alertV2FloodFadeFps back when the fade was the only thing that moved.
+alertV2AnimationFps = alertV2AnimationFps or alertV2FloodFadeFps or 30
 
 --- ** Geometry
 AlertEngine.kFont = "Menlo"

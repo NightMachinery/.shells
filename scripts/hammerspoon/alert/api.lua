@@ -41,8 +41,11 @@ end
 ---   id           re-showing the same id updates that alert in place
 ---   seconds      lifetime, default 5
 ---   markup       "plain" (default) or "md"; see ** Markup above
----   color        band colour, default dark slate. A table, or one of the
----                names default/warn/amber/crit/agent/free/notice
+---   color        band colour, default dark slate. A table, or a name: the
+---                originals default/warn/amber/crit/agent/free/notice, one of
+---                the palette in colors.lua (ocean, violet, blood, gold, ...),
+---                an animated one (rainbow-1, silver-pulse-1, wolf-eye-1), or
+---                any x11 colour name. Text goes black or white to suit it
 ---   position     "top" (default), "center", "bottom"
 ---   flashSeconds fullscreen flash before settling into the band; 0 skips it
 ---   floodFade    fade the flash in and out, on by default. false for a hard
@@ -119,6 +122,10 @@ function alertV2(text, opts)
             alertEngineState.floodTimer = nil
             alertEngineState.flood = nil
             AlertEngine.destroyFlood()
+            -- This path does not render, so it is the one place the animator
+            -- has to be told itself. A band underneath may still be animating,
+            -- so it is a re-check rather than a stop.
+            AlertEngine.syncAnimator()
         end)
     end
 

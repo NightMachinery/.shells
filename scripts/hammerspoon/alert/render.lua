@@ -53,7 +53,7 @@ local function bandText(band)
 
     local styled = hs.styledtext.new(plain, {
         font = { name = AlertEngine.kFont, size = AlertEngine.kTextSize },
-        color = { white = 1 },
+        color = AlertEngine.textColorFor(band.color),
         paragraphStyle = { alignment = bandAlignment(band) },
     })
 
@@ -78,24 +78,33 @@ local function bandText(band)
     return styled
 end
 
+--- Returns the elements, and alongside them the positions of any band whose
+--- colour animates, so the caller can hand those to the animator without
+--- having to work out the element numbering for itself. Two elements per band,
+--- rectangle then text, is an arithmetic relation on a strip canvas but not on
+--- the flood, which prepends a wash and concatenates three stacks.
 local function canvasElements(stack, origin)
     local elements = {}
+    local animated = {}
     for _, band in ipairs(stack.bands) do
         local x = stack.x - origin.x
         local y = band.y - origin.y
         table.insert(elements, {
             type = "rectangle",
             action = "fill",
-            fillColor = band.color,
+            fillColor = AlertEngine.colorAt(band.color),
             frame = { x = x, y = y, w = stack.w, h = band.height },
         })
+        if AlertEngine.isAnimated(band.color) then
+            table.insert(animated, { offset = #elements, color = band.color })
+        end
         -- hs.canvas has no vertical alignment for text, so the block is centred
         -- in the band by placing its own frame.
         local textHeight = #band.lines * AlertEngine.kLineHeight
         table.insert(elements, {
             type = "text",
             text = bandText(band),
-            textColor = { white = 1 },
+            textColor = AlertEngine.textColorFor(band.color),
             textFont = AlertEngine.kFont,
             textSize = AlertEngine.kTextSize,
             textAlignment = bandAlignment(band),
@@ -107,7 +116,7 @@ local function canvasElements(stack, origin)
             },
         })
     end
-    return elements
+    return elements, animated
 end
 
 local function newCanvas(frame, level)
@@ -126,13 +135,12 @@ local function destroyStrips()
     alertEngineState.canvases = {}
 end
 
+--- Deliberately does not stop the animator: a flood dying is not the end of
+--- animation, because a band underneath it may still be animating. Callers that
+--- destroy a flood follow with AlertEngine.syncAnimator, which decides.
 function AlertEngine.destroyFlood()
-    if alertEngineState.floodFadeTimer then
-        alertEngineState.floodFadeTimer:stop()
-        alertEngineState.floodFadeTimer = nil
-    end
-    for _, canvas in ipairs(alertEngineState.floodCanvases) do
-        canvas:delete()
+    for _, entry in ipairs(alertEngineState.floodCanvases) do
+        entry.canvas:delete()
     end
     alertEngineState.floodCanvases = {}
 end
@@ -161,7 +169,7 @@ end
 ---
 --- Smoothstep rather than a straight line: a linear ramp reads as stopping
 --- abruptly at both ends, and this is three multiplications.
-local function floodWashAlpha()
+local function floodWashAlpha(now)
     local flood = alertEngineState.flood
     if not flood then
         return 0
@@ -172,7 +180,7 @@ local function floodWashAlpha()
         return t * t * (3 - 2 * t)
     end
 
-    local elapsed = hs.timer.secondsSinceEpoch() - flood.startedAt
+    local elapsed = (now or hs.timer.secondsSinceEpoch()) - flood.startedAt
     if flood.fadeIn > 0 and elapsed < flood.fadeIn then
         return peak * ease(elapsed / flood.fadeIn)
     end
@@ -186,51 +194,97 @@ end
 --- The flashing alert's colour at the wash's current opacity. The alert's own
 --- alpha is deliberately dropped: a band and the flash behind it are not the
 --- same thing and do not want the same opacity.
-local function floodWash()
+---
+--- Resolve first, then override the alpha, so an animated colour floods in
+--- whatever shade it is wearing at this instant. The copy is not optional even
+--- for a static colour: the table would otherwise be the palette entry itself,
+--- and writing an alpha into it would repaint every band using that name.
+local function floodWash(now)
     local flood = alertEngineState.flood
     if not flood then
         return nil
     end
     local wash = {}
-    for key, value in pairs(flood.color) do
+    for key, value in pairs(AlertEngine.colorAt(flood.color, now)) do
         wash[key] = value
     end
-    wash.alpha = floodWashAlpha()
+    wash.alpha = floodWashAlpha(now)
     return wash
 end
 
---- Repaint the wash in place, the way tick() rewrites countdown digits in place:
---- rebuilding the canvases thirty times a second would re-lay-out every band on
---- every screen. Element 1 is the wash rectangle and the bands are drawn after
---- it, so only the colour moves - fading the whole canvas would fade the words
---- too and then pop them back to full opacity when the flood died.
+--- ** Animation
+--- One timer drives everything that moves: the flood's fade ramps and any band
+--- wearing an animated colour. They are the same job -- write a colour onto an
+--- element that already exists -- and running two timers for it would mean two
+--- clocks, two lifecycles, and colours computed at slightly different instants.
+---
+--- Repainting in place is the whole point, the way tick() rewrites countdown
+--- digits in place: rebuilding canvases thirty times a second would re-lay-out
+--- every band on every screen. And it is only ever the fill that moves, never
+--- the canvas alpha -- fading a whole canvas would fade the words drawn on it
+--- and pop them back the moment it died.
 ---
 --- hs.canvas hands back a copy of an element's fields, so mutating
 --- `canvas[1].fillColor.alpha` writes to nothing; the whole table is assigned.
-local function floodFadeStep()
-    local wash = floodWash()
-    if not wash then
-        return
+local function animationStep()
+    local now = hs.timer.secondsSinceEpoch()
+
+    local wash = floodWash(now)
+    for _, entry in ipairs(alertEngineState.floodCanvases) do
+        if wash then
+            entry.canvas[1].fillColor = wash
+        end
+        for _, animated in ipairs(entry.animated) do
+            entry.canvas[animated.offset].fillColor =
+                AlertEngine.colorAt(animated.color, now)
+        end
     end
-    for _, canvas in ipairs(alertEngineState.floodCanvases) do
-        canvas[1].fillColor = wash
+
+    for _, record in ipairs(alertEngineState.canvases) do
+        for index, band in ipairs(record.stack.bands) do
+            if AlertEngine.isAnimated(band.color) then
+                -- Two elements per band, rectangle first.
+                record.canvas[index * 2 - 1].fillColor =
+                    AlertEngine.colorAt(band.color, now)
+            end
+        end
     end
 end
 
-local function startFloodFade()
-    if alertEngineState.floodFadeTimer then
-        alertEngineState.floodFadeTimer:stop()
-        alertEngineState.floodFadeTimer = nil
-    end
+--- A fading flood, an animated flood, or an animated band that layout actually
+--- placed. The last of those matters: an alert whose band was squeezed off the
+--- screen has nothing to repaint, and should not hold the timer open.
+local function animationNeeded()
     local flood = alertEngineState.flood
-    if not flood or (flood.fadeIn <= 0 and flood.fadeOut <= 0) then
-        return
+    if flood and (flood.fadeIn > 0 or flood.fadeOut > 0
+                      or AlertEngine.isAnimated(flood.color)) then
+        return true
     end
-    -- One timer for the whole flood rather than stopping it across the hold:
-    -- the flash is well under a second in every caller here, and a step is a
-    -- colour assignment on at most a handful of canvases.
-    alertEngineState.floodFadeTimer =
-        hs.timer.doEvery(1 / alertV2FloodFadeFps, floodFadeStep)
+    for _, record in ipairs(alertEngineState.canvases) do
+        for _, band in ipairs(record.stack.bands) do
+            if AlertEngine.isAnimated(band.color) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+--- Same shape as syncTicker: called after anything that could have changed the
+--- answer, and it decides whether a timer should be running rather than each
+--- caller having to know. One timer for a whole flood rather than stopping it
+--- across the hold, too -- a step is a colour assignment on a handful of
+--- elements, and the flash is well under a second in every caller here.
+function AlertEngine.syncAnimator()
+    if animationNeeded() then
+        if not alertEngineState.animator then
+            alertEngineState.animator =
+                hs.timer.doEvery(1 / alertV2AnimationFps, animationStep)
+        end
+    elseif alertEngineState.animator then
+        alertEngineState.animator:stop()
+        alertEngineState.animator = nil
+    end
 end
 
 --- The flood is a separate canvas per screen, one level above the strips, that
@@ -255,24 +309,30 @@ local function renderFlood()
         local elements = {
             { type = "rectangle", action = "fill", fillColor = wash },
         }
+        -- Where each animated band ended up on this canvas. Unlike a strip, the
+        -- flood prepends the wash and concatenates every position's stack, so
+        -- there is no arithmetic that recovers these later.
+        local animated = {}
         for _, position in ipairs(AlertEngine.kPositions) do
             local stack = AlertEngine.layoutStack(screen, position)
             if stack then
-                for _, element in ipairs(canvasElements(stack, full)) do
+                local stackElements, stackAnimated = canvasElements(stack, full)
+                local base = #elements
+                for _, element in ipairs(stackElements) do
                     table.insert(elements, element)
+                end
+                for _, entry in ipairs(stackAnimated) do
+                    table.insert(animated,
+                        { offset = base + entry.offset, color = entry.color })
                 end
             end
         end
         local canvas = newCanvas(full, hs.canvas.windowLevels.overlay + 1)
         canvas:appendElements(table.unpack(elements))
         canvas:show()
-        table.insert(alertEngineState.floodCanvases, canvas)
+        table.insert(alertEngineState.floodCanvases,
+                     { canvas = canvas, animated = animated })
     end
-    -- AlertEngine.destroyFlood above stopped the ramp along with the old canvases, so every
-    -- path that rebuilds the flood restarts it here. That keeps the fade correct
-    -- through a mid-flash AlertEngine.render() or tick() without either of them knowing the
-    -- flood is animating.
-    startFloodFade()
 end
 
 local function renderStrips()
@@ -290,8 +350,13 @@ local function renderStrips()
                           + stack.bands[#stack.bands].height
                           - stack.bands[1].y },
                     hs.canvas.windowLevels.overlay)
-                canvas:appendElements(table.unpack(
-                    canvasElements(stack, { x = stack.x, y = stack.bands[1].y })))
+                -- Bound to a local first: canvasElements returns the animated
+                -- offsets as a second value, and table.unpack would read that
+                -- as its start index. A strip needs no offsets anyway -- its
+                -- bands are elements 1,3,5..., which the animator derives.
+                local elements = canvasElements(
+                    stack, { x = stack.x, y = stack.bands[1].y })
+                canvas:appendElements(table.unpack(elements))
                 canvas:show()
                 table.insert(alertEngineState.canvases, {
                     canvas = canvas,
@@ -309,6 +374,10 @@ function AlertEngine.render()
     if alertEngineState.flood then
         renderFlood()
     end
+    -- Last, because it is the freshly built canvases the animator has to paint,
+    -- and because whether anything needs animating is only knowable once layout
+    -- has decided which bands are actually on screen.
+    AlertEngine.syncAnimator()
 end
 
 --- ** Countdown ticker
