@@ -231,6 +231,50 @@ function AlertEngine.colorAt(color, now)
     return color
 end
 
+--- The shade the fullscreen flash uses, which for an animated colour is a fixed
+--- one rather than whatever the cycle is doing.
+---
+--- A flash is a moment and its whole job is to be impossible to miss, so it
+--- cannot afford to be dim. Following the animation makes it both: the phase
+--- comes from the wall clock, so a short flash lands wherever the clock happens
+--- to be -- for wolf-eye-1 that is anywhere across a threefold spread of
+--- brightness, including a near-black that reads as no flash at all -- and a
+--- long flash spends whole seconds at the dark end of the swell. The band keeps
+--- animating either way; it is on screen long enough for a cycle to be a slow
+--- glow rather than a light going out.
+---
+--- A descriptor may name its own with floodColor. Otherwise the brightest point
+--- of the cycle is used, found once by sampling and then remembered on the
+--- descriptor.
+local kFloodSamples = 60
+
+function AlertEngine.floodColorFor(color)
+    if not AlertEngine.isAnimated(color) then
+        return color
+    end
+    if color.floodColor then
+        return color.floodColor
+    end
+    if not color.brightestColor then
+        local period = color.period or 1
+        local best, bestLuminance = nil, -1
+        for i = 0, kFloodSamples - 1 do
+            local sample = color.at(i * period / kFloodSamples)
+            local ok, rgb = pcall(hs.drawing.color.asRGB, sample)
+            if ok and type(rgb) == "table" then
+                local luminance = 0.2126 * (rgb.red or 0)
+                    + 0.7152 * (rgb.green or 0)
+                    + 0.0722 * (rgb.blue or 0)
+                if luminance > bestLuminance then
+                    bestLuminance, best = luminance, sample
+                end
+            end
+        end
+        color.brightestColor = best or color.at(0)
+    end
+    return color.brightestColor
+end
+
 --- Black or white text, whichever the band can carry. Relative luminance with
 --- the usual coefficients: the eye is far more sensitive to green than to blue,
 --- so a plain average would call amber dark and navy light, which is backwards.

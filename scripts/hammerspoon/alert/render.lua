@@ -195,17 +195,19 @@ end
 --- alpha is deliberately dropped: a band and the flash behind it are not the
 --- same thing and do not want the same opacity.
 ---
---- Resolve first, then override the alpha, so an animated colour floods in
---- whatever shade it is wearing at this instant. The copy is not optional even
---- for a static colour: the table would otherwise be the palette entry itself,
---- and writing an alpha into it would repaint every band using that name.
+--- Resolve first, then override the alpha. An animated colour resolves to one
+--- fixed shade here rather than to the phase it happens to be in - see
+--- AlertEngine.floodColorFor for why a flash must not animate. The copy is not
+--- optional even for a static colour: the table would otherwise be the palette
+--- entry itself, and writing an alpha into it would repaint every band using
+--- that name.
 local function floodWash(now)
     local flood = alertEngineState.flood
     if not flood then
         return nil
     end
     local wash = {}
-    for key, value in pairs(AlertEngine.colorAt(flood.color, now)) do
+    for key, value in pairs(AlertEngine.floodColorFor(flood.color)) do
         wash[key] = value
     end
     wash.alpha = floodWashAlpha(now)
