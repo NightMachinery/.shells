@@ -1,6 +1,17 @@
 ##
 typeset -g ZDIRS_ENABLED=y
 typeset -g ZDIRS_NAME=zdirs
+##
+#: Bounds for the 'fd' corpus that [agfi:ffz-get] feeds to fzf. Left unbounded,
+#: that walk grew to 4.2M dirs / 735MB / ~85s, which also exceeds redis'
+#: proto-max-bulk-len (512MB), so [agfi:memoi-eval] could never cache it and
+#: every query paid the full cost. Capped, it is ~57k dirs / 3.7MB / ~1.1s.
+#: Set 'ffz_depth' to the empty string to disable the cap; see [agfi:z-deep].
+typeset -g ZDIRS_CORPUS_DEPTH=6
+#: '_Code' is the '~/base/_Code -> ~/code' symlink. 'list-dirs' passes --follow
+#: and 'fd --absolute-path' resolves it, so without this we walk ~/code twice and
+#: emit 2M byte-identical lines.
+typeset -ga ZDIRS_CORPUS_EXCLUDE=( FairGrad_Metrics _Code )
 
 function z-add {
     if test -z "$HISTFILE" ; then
@@ -105,6 +116,9 @@ function ffz-get {
     ##
 
     local cd_mode="${ffz_cd}" redis_dict='zdirs_choices' nocache="$ffz_nocache"
+    #: '-' not ':-', so unset means "use the default" while set-but-empty means
+    #: "no cap at all". [agfi:z-deep] relies on this distinction.
+    local corpus_depth="${ffz_depth-$ZDIRS_CORPUS_DEPTH}"
     if whitespace-p "$query" ; then
         query="$ffz_last_query"
         nocache=y
@@ -112,6 +126,9 @@ function ffz-get {
         ffz_last_query="$query"
     fi
     local redis_key="$query"
+    #: Only suffix for a non-default depth, so existing cached choices stay valid.
+    #: Without this, a shallow answer would be served back to [agfi:z-deep].
+    [[ "$corpus_depth" == "$ZDIRS_CORPUS_DEPTH" ]] || redis_key="${query}|depth=${corpus_depth:-inf}"
 
     local sel
     if test -z "$nocache" && test -n "$redis_key" && silence redism hexists "$redis_dict" "$redis_key" ; then
@@ -140,7 +157,16 @@ function ffz-get {
             list_dirs_d=3 list-dirs ~/Downloads
 
             list-dirs ~/base/cache ~/base/Lectures ~/base/series ~/base/anime ~/"base/_Local TMP" ~/base/docu ~/base/movies ~/base/V ~/base/dls # takes ~0.2s
-            memoi_expire=$((3600*24*7)) memoi_skiperr=y serr memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
+            #: ~1.1s capped at depth 6; ~8.7s uncapped (z-deep); ~85s with no
+            #: excludes either, which is too big for redis to cache at all.
+            #: 'memoi_key' is load-bearing: memoi-eval keys off the command alone,
+            #: so 'list_dirs_d'/'list_dirs_fd' are invisible to it and z/z-deep
+            #: would otherwise share one cache entry.
+            list_dirs_d="$corpus_depth" \
+                list_dirs_fd=( "${ZDIRS_CORPUS_EXCLUDE[@]/#/--exclude=}" ) \
+                memoi_key="zdirs-corpus-v2-d${corpus_depth:-inf} " \
+                memoi_expire=$((3600*24*7)) memoi_skiperr=y serr \
+                memoi-eval list-dirs $NIGHTDIR $codedir $cellar $DOOMDIR ~/base ~/.julia $music_dir ~/Downloads
             true
             } | fzp "$query " | ghead -n 1 || retcode)" ||  {
             # local r=$? msg="$0: $(retcode 2>&1)"
@@ -184,7 +210,12 @@ function ffz {
 }
 aliasfn z ffz
 aliasfn zi ffz_nocache=y ffz
+aliasfn ffz-deep ffz_depth= ffz
+aliasfn z-deep ffz-deep
 #: =z= (invoked with no query) is the same as =zi=.
+#: =z-deep= drops the [agfi:ffz-get] corpus depth cap (=ZDIRS_CORPUS_DEPTH=), so it
+#: also finds dirs you have never visited that sit deeper than that. Costs ~8.7s on
+#: a cold cache vs ~1.1s for =z=; it caches separately for a week.
 ##
 function ffz-b() {
     # z-back
