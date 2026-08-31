@@ -21,9 +21,9 @@ end
 --- ** Coalescing
 --- A save is rarely one write. An editor writes a temp file and renames it, and
 --- anything editing several files at once fires the watcher several times in a
---- row - which used to mean reloading again while the previous reload was still
---- running. Waiting a moment for the burst to end and reloading once is both
---- calmer and faster.
+--- row, which without this would reload again while the previous reload is
+--- still running. Waiting a moment for the burst to end and reloading once is
+--- both calmer and faster.
 hammerspoonReloadCoalesceSeconds = hammerspoonReloadCoalesceSeconds or 0.2
 
 --- `x = x or true' cannot express a switch that defaults to on: `false or true'

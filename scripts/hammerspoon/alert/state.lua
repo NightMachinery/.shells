@@ -51,25 +51,6 @@ alertEngineState = alertEngineState or {
     counter = 0,
 }
 
---- Reloading Hammerspoon builds a fresh Lua state, so these only matter when a
---- file is dofile'd onto a running one -- which is how this module gets probed
---- while it is being worked on. Left behind, either would keep painting
---- alongside the current code.
-if alertEngineState.floodFadeTimer then
-    -- The flood fade had its own timer before the animator absorbed it.
-    alertEngineState.floodFadeTimer:stop()
-    alertEngineState.floodFadeTimer = nil
-end
-if alertEngineState.floodCanvases[1] ~= nil
-        and alertEngineState.floodCanvases[1].canvas == nil then
-    -- Entries used to be bare canvases rather than records. A flood lives well
-    -- under a second, so dropping it is simpler than converting it.
-    for _, canvas in ipairs(alertEngineState.floodCanvases) do
-        canvas:delete()
-    end
-    alertEngineState.floodCanvases = {}
-end
-
 --- How opaque a band is. Slightly see-through, so a band lying across a window
 --- does not read as a hole punched in it - you can still tell what it is
 --- covering. One knob rather than an alpha buried in each colour below; a
@@ -99,9 +80,7 @@ alertV2FloodFadeOutSeconds = alertV2FloodFadeOutSeconds or 0.20
 --- band wearing an animated colour, which share one timer. Each step assigns a
 --- handful of colours onto elements that already exist; it is nowhere near a
 --- full re-render.
----
---- Was alertV2FloodFadeFps back when the fade was the only thing that moved.
-alertV2AnimationFps = alertV2AnimationFps or alertV2FloodFadeFps or 30
+alertV2AnimationFps = alertV2AnimationFps or 30
 
 --- ** Geometry
 AlertEngine.kFont = "Menlo"

@@ -66,13 +66,6 @@ list, so there is no quoting step that can turn a value into code. `opts` covers
 to feed a pipeline something arbitrary, as `system-keys.lua` does with the
 clipboard.
 
-The predecessors were worth replacing: `brishzevalbg` and `brishzeval2bg` only
-backgrounded the command *inside* the garden, so Lua still waited for the HTTP
-round-trip and they measured slower than a plain synchronous call. `brishzeval`
-quoted with Lua's `%q`, which is Lua quoting rather than shell quoting, so a
-payload containing a double quote silently ran nothing at all — the client
-failed, and the exit code was discarded.
-
 ## Auto-reload
 
 `reload.lua` watches `~/.hammerspoon/` and `~/scripts/hammerspoon/` recursively
@@ -86,7 +79,7 @@ coalesced: each event restarts a timer, and the reload happens
 `hammerspoonReloadCoalesceSeconds` (0.2) after the last one. Measured, five
 saves 100ms apart become one reload, while three saves a second apart still
 produce three, which is right: a burst is one edit, a pause means you meant it.
-Set `hammerspoonReloadCoalesce` to false for the old reload-per-event behaviour.
+Set `hammerspoonReloadCoalesce` to false to reload on every event instead.
 
 ### Holds
 

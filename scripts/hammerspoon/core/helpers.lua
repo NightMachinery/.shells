@@ -132,14 +132,10 @@ end
 -- keystroke for the duration. Compare core/redis.lua, which documents a
 -- previous version that could freeze the machine for up to 50 minutes.
 --
--- There used to be a brishzeval2bg for this, and its name was a lie: the
--- trailing `&' backgrounded the command inside the garden, but Hammerspoon
--- still waited for the HTTP round-trip, which made it *slower* than a plain
--- synchronous call. Measured on this machine with hs.timer.absoluteTime,
--- averaged over six warm runs:
+-- Measured on this machine with hs.timer.absoluteTime, averaged over six warm
+-- runs:
 --
---   brishzeval2bg("true")   71.9 ms   the old "background" call
---   brishz_eval("true")     53.4 ms   synchronous, honest about it
+--   brishz_eval("true")     53.4 ms   synchronous
 --   brishz_eval_bg("true")  19.6 ms   fork twice and forget
 --   brishz_eval_hs("true")   7.5 ms   hs.task
 --
@@ -178,9 +174,8 @@ end
 --
 -- Reporting the failure is the thing brishz_eval_bg cannot do at all: it forks
 -- away and forgets, so nobody is left to notice a non-zero exit. A nil callback
--- here would throw away the exit code and both streams just as thoroughly,
--- which is exactly how the missing-jq failure above stayed invisible for so
--- long. Hence the log line rather than a nil.
+-- here would throw the exit code and both streams away just as thoroughly,
+-- which is why there is a log line instead of one.
 --
 -- Inside Hammerspoon this is also the faster of the two (7.5ms against 19.6),
 -- because forking a process this large costs more than handing the work to
@@ -188,17 +183,36 @@ end
 --
 -- Lives here rather than in lua/pipe.lua because hs.task is Hammerspoon's;
 -- pipe.lua is plain Lua over posix and stays that way.
-function brishz_eval_hs(cmd, label)
-    label = label or "brishz_eval_hs"
-
-    local task = taskWithPath("/usr/local/bin/brishz2.dash", function(exitCode, _, stdErr)
+local function brishzTask(bin, args, label)
+    local task = taskWithPath(bin, function(exitCode, _, stdErr)
         if exitCode ~= 0 then
-            print(label .. ": brishz2.dash exited " .. tostring(exitCode) ..
+            print(label .. ": " .. bin .. " exited " .. tostring(exitCode) ..
                       ": " .. tostring(stdErr))
         end
-    end, {cmd})
+    end, args)
 
     if task then task:start() end
+end
+
+function brishz_eval_hs(cmd, label)
+    brishzTask("/usr/local/bin/brishz2.dash", {cmd}, label or "brishz_eval_hs")
+end
+
+--- The argument-list form: brishz_eval_q_hs({"some-hook", value, other}). Each
+--- element is quoted by the client, so a value may contain anything at all and
+--- still arrive as one word rather than as code. Use it whenever a value is
+--- interpolated; the extra ~25ms of zsh startup costs nothing here, because
+--- nothing waits for the reply.
+---
+--- It cannot express a pipeline or a `;' sequence -- an argument list is one
+--- command by definition. Those still go through brishz_eval_hs with a string.
+---
+--- One difference worth knowing: brishzq.zsh reports the command's own exit
+--- code, where brishz2.dash reports only the client's. So this logs when the
+--- command itself fails, which is usually what you want and is occasionally
+--- noisier than you expect from something that merely exits non-zero.
+function brishz_eval_q_hs(argv, label)
+    brishzTask("/usr/local/bin/brishzq.zsh", argv, label or "brishz_eval_q_hs")
 end
 
 --- * _

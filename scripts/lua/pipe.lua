@@ -2,12 +2,6 @@ local posix = require("posix")
 
 brishzq_binary = "/usr/local/bin/brishzq.zsh"
 ---
---- shell_quote used to live here and quoted with Lua's %q, which is Lua
---- quoting, not shell quoting -- it escapes for a Lua source file, not for a
---- shell word. Every caller that interpolated a value with it was one quote
---- away from a command that silently did nothing, or worse. Nothing quotes for
---- a shell any more: the brishz_eval_q functions below pass an argument list
---- and let the garden's own client do it.
 ---
 -- froked from https://stackoverflow.com/a/16515126/1410221
 --
@@ -140,6 +134,11 @@ end
 ---
 --- In the `_bg' forms the quoting is free, because nothing waits for the reply
 --- at all. Prefer `_q' there whenever a value is interpolated.
+---
+--- Some of these have no callers today, and are kept anyway. This file is plain
+--- Lua over posix and does not know it is inside Hammerspoon, which has hs.task
+--- and so a cheaper way to not wait (brishz_eval_hs, in core/helpers.lua). The
+--- set stays complete so that the name you reach for exists.
 
 local kBrishzDash = "/usr/local/bin/brishz2.dash"
 local kBrishzq = "/usr/local/bin/brishzq.zsh"
@@ -233,8 +232,8 @@ local function brishzRun(quoted, cmd, opts)
 end
 
 --- Runs a command line in the garden and waits. Returns its output, its stderr
---- and its exit status -- all three, because the old version returned only
---- stdout and a silent failure was indistinguishable from empty output.
+--- and its exit status -- all three, so that a failure is distinguishable from
+--- empty output.
 ---
 --- The status here is the client's, so it reports that the call failed but not
 --- what the command itself returned. brishz_eval_q gives the real code.
@@ -249,10 +248,9 @@ function brishz_eval_q(argv, opts)
     return brishzRun(true, argv, opts)
 end
 
---- Does not wait, for anything: not for the command, and not for the HTTP
---- round-trip either. The `bg' in the old brishzevalbg only backgrounded the
---- command *inside* the garden, so Hammerspoon still blocked for the reply --
---- which made it slower than a plain synchronous call, not faster.
+--- Does not wait for anything: not for the command, and not for the HTTP
+--- round-trip either. Backgrounding the command *inside* the garden would not
+--- achieve that, since the reply is still waited for.
 function brishz_eval_bg(cmd, opts)
     spawnDetached(brishzArgv(false, cmd, opts))
 end
