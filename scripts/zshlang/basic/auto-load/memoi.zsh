@@ -12,6 +12,25 @@ function expirein() {
   memoi_expire=$(( $1 * 60 )) reval "$@"
 }
 
+typeset -g MEMOI_MAXBULK=''
+function h-memoi-maxbulk {
+    : "Sets 'MEMOI_MAXBULK' to redis' proto-max-bulk-len. Redis silently rejects
+any single value larger than this, and 'redis-cli' reports nothing, so a store
+that is too big looks exactly like a successful one. Cached, as the value cannot
+change without restarting redis."
+    if test -z "$MEMOI_MAXBULK" ; then
+        MEMOI_MAXBULK="$(command redis-cli --raw CONFIG GET proto-max-bulk-len 2>/dev/null | gtail -n 1)"
+        [[ "$MEMOI_MAXBULK" == <-> ]] || MEMOI_MAXBULK=$((512*1024*1024)) #: redis' own default
+    fi
+}
+
+function h-memoi-bytelen {
+    : "Sets 'memoi_bytelen' to the byte (not character) length of \$1. Fork-free;
+'nomultibyte' is what makes \${#} count bytes."
+    setopt localoptions nomultibyte
+    typeset -g memoi_bytelen=${#1}
+}
+
 function memoi-eval() {
 ###
 # GLOBAL OUT (as always these do not survive  a fork): memoi_cache_used
@@ -97,6 +116,13 @@ function memoi-eval() {
             ##
             delme=y
         fi
+        ##
+        #: Warn, but still store: an oversize 'hset' fails silently, so without
+        #: this the command just re-evaluates forever with no indication why.
+        h-memoi-maxbulk
+        h-memoi-bytelen "$out"
+        (( memoi_bytelen < MEMOI_MAXBULK )) || ecerr "$0: output is ${memoi_bytelen}B, over redis' proto-max-bulk-len (${MEMOI_MAXBULK}B); it will NOT be cached, so this will re-evaluate every time: $cmd"
+        ##
         print -nr -- "$out" | silent redis-cli -x hset $rediskey stdout
         if test -z "$skiperr" ; then
             silent redis-cli hset $rediskey exit $retcode
