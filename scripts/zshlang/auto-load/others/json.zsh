@@ -5,6 +5,36 @@ function json5-to-json {
         cat-copy-if-tty
 }
 ##
+function python2json {
+    #: Pretty-prints a Python literal/repr as JSON, e.g. the output of
+    #: `print(obj.to_dict())` or `print(obj)`. Input from args, stdin, or the
+    #: clipboard. See [agfi:json5-to-json] for the JSON5 equivalent.
+    #:
+    #: Objects with no JSON equivalent become strings; memory addresses are
+    #: stripped so that two dumps of the same object compare equal. Set
+    #: `python2json_address_p=y` to keep them.
+    ##
+    local address_p="${python2json_address_p:-n}"
+    local opts=()
+    if bool "$address_p" ; then
+        opts+=(--keep-address)
+    fi
+
+    ensure-cmd jq @RET
+
+    local i
+    i="$(in-or-args "$@")" @TRET
+
+    ec "$i" |
+        python2json.py "${opts[@]}" |
+        command jq . |
+        cat-copy-if-tty
+    ## tests:
+    # `ec "{'id': 7, 'ok': True, 'x': None, 'tup': (1, 2), 'photo': <mod.pkg.Thing object at 0x1>}" | python2json`
+    # `ec "Contact(id=1, name='someone', photo=None)" | python2json`
+    ##
+}
+##
 function jqm {
     # --raw-output / -r: With this option, if the filter's result is a string then it will be written directly to standard output rather than being formatted as a JSON string with quotes. This can be useful for making jq filters talk to non-JSON-based systems.
     # --join-output / -j: Like -r but jq won't print a newline after each output.
