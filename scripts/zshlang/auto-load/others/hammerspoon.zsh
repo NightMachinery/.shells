@@ -124,6 +124,9 @@ function hs-alert-v1 {
 # Knobs, all overridable per call:
 #   alert_dur     seconds on screen (default 5)
 #   alert_flash   fullscreen flash before settling, in seconds; 0 skips it
+#   alert_fade    the flash fades in and out by default; 0/no for a hard cut,
+#                 or a number of seconds for each ramp. The ramps fit inside
+#                 alert_flash rather than lengthening it
 #   alert_pos     top (default), center, bottom
 #   alert_id      reusing an id updates that alert in place instead of stacking
 #   alert_markup  plain (default) or md
@@ -151,7 +154,8 @@ function hs-alert-v2 {
     @darwinOnly
 
     local msg="$*" dur="${alert_dur:-5}"
-    local flash="${alert_flash:-0.2}" pos="${alert_pos:-top}"
+    local flash="${alert_flash:-0.35}" pos="${alert_pos:-top}"
+    local fade="${alert_fade:-}"
     local id="${alert_id:-}"
     local markup="${alert_markup:-plain}" color="${alert_color:-}"
 
@@ -169,6 +173,19 @@ function hs-alert-v2 {
     fi
     if test -n "$color" ; then
         opts+=", color = \"${color}\""
+    fi
+    #: Unset means the engine's own fade defaults, so say nothing at all. A bare
+    #: number is passed through as the ramp length; anything else truthy just
+    #: asks for the defaults explicitly. Never emit the word itself - an unquoted
+    #: `yes` would reach Lua as an undefined global rather than as an error.
+    if test -n "$fade" ; then
+        if ! bool "$fade" ; then
+            opts+=", floodFade = false"
+        elif [[ "$fade" == (<->|<->.<->|.<->) ]] ; then
+            opts+=", floodFade = ${fade}"
+        else
+            opts+=", floodFade = true"
+        fi
     fi
 
     reval-dbg sout hammerspoon -c "alertV2FromFile(\"${msgfile}\", { ${opts} })"
