@@ -206,14 +206,23 @@ at to do it. The bands keep their own opacity and stay readable on top of it.
 
 ### Colours
 
-`alertV2DefaultColor` (dark slate) for ordinary alerts, `alertV2AgentColor`
-(crimson) for the agent banner, `alertV2FreeColor` (blue) for its release
-flash, `alertV2NoticeColor` (grey) for the hidden-alerts band. Amber, the
-colour the banner shipped with, is kept commented out next to the default.
+`alertV2DefaultColor` (dark slate) for ordinary alerts, `alertV2WarnColor`
+(amber, the colour the banner shipped with) for something that wants attention
+without being on fire, `alertV2AgentColor` (crimson) for the agent banner,
+`alertV2FreeColor` (blue) for its release flash, `alertV2NoticeColor` (grey)
+for the hidden-alerts band. A caller reachable only through the shell names one
+of these as a string: `color = "warn"`.
 
-All four take their opacity from `alertV2BandAlpha` (0.8), so a band lying
+All of them take their opacity from `alertV2BandAlpha` (0.8), so a band lying
 across a window does not read as a hole punched in it — you can still tell what
 it is covering. A colour passed in per alert keeps whatever alpha it carries.
+
+Markup spans have their own palette, `alertV2MarkupColors`, because that text
+sits *on* a band rather than being one. `grey` and `dim` there are translucent
+white rather than fixed greys: dimness is a relation to the background, so a
+dimmed span recedes into whichever band happens to carry it instead of assuming
+a dark one. A fixed grey looked right on the slate default and was unreadable on
+amber.
 
 ## Agent focus banner
 
