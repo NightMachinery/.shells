@@ -31,6 +31,48 @@ alphabetical order after the core modules are ready.
 Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
+## Running zsh in the garden
+
+`lua/pipe.lua` holds the clients, named `brishz_eval[_q][_bg]`. `_q` takes an
+argument list instead of a command line, `_bg` does not wait. `brishz_eval_hs`
+lives in `core/helpers.lua` instead, because it uses `hs.task`, and `pipe.lua`
+is plain Lua over posix.
+
+Which to use, with warm measurements from this machine:
+
+- `brishz_eval(cmd, opts)` — 53ms, waits, returns output, stderr and exit status
+- `brishz_eval_q(argv, opts)` — 78ms, same but the client quotes each element,
+  and the status is the command's own rather than the client's
+- `brishz_eval_bg(cmd, opts)` — 20ms, forks twice and forgets
+- `brishz_eval_q_bg(argv, opts)` — 22ms, the same with an argument list
+- `brishz_eval_bsh(cmd)` — a session that keeps its state between calls
+- `brishz_eval_hs(cmd, label)` — 7.5ms, and the only one that reports a failure
+
+Inside Hammerspoon prefer `brishz_eval_hs` for anything whose output you do not
+need: it is the cheapest of them and it logs a non-zero exit. `brishz_eval_bg`
+exists for Lua without Hammerspoon. Anything synchronous blocks the main thread,
+which is also the hotkey and event thread, so treat 53ms as 53ms of frozen
+keyboard.
+
+The `_q` distinction is about cost. Quoting means going through `brishzq.zsh`
+rather than the small dash client, which is about 25ms of zsh startup — worth it
+when a value is interpolated, wasted when the command is a constant. In the
+`_bg` forms it is free, since nothing waits, so prefer `_q` there whenever a
+value is involved.
+
+Nothing here builds a shell string. Every call execs a client with an argument
+list, so there is no quoting step that can turn a value into code. `opts` covers
+`session`, `stdin`, `evalFile` and `outFile`; passing data on `stdin` is the way
+to feed a pipeline something arbitrary, as `system-keys.lua` does with the
+clipboard.
+
+The predecessors were worth replacing: `brishzevalbg` and `brishzeval2bg` only
+backgrounded the command *inside* the garden, so Lua still waited for the HTTP
+round-trip and they measured slower than a plain synchronous call. `brishzeval`
+quoted with Lua's `%q`, which is Lua quoting rather than shell quoting, so a
+payload containing a double quote silently ran nothing at all — the client
+failed, and the exit code was discarded.
+
 ## Auto-reload
 
 `reload.lua` watches `~/.hammerspoon/` and `~/scripts/hammerspoon/` recursively
