@@ -96,6 +96,10 @@ backend = getenv("TSEND_BACKEND", None)
 if backend is not None:
     backend = int(backend)
 
+#: Telethon session file; only used by backend 1, as the Bot API backend is
+#: stateless. See [agfi:tsend-main] for injecting a different account's session.
+session_path = getenv("TELEGRAM_SESSION", None)
+
 # ic(token, backend)
 if not ((backend == 2 and token) or (api_id and api_hash and token and backend)):
     with open(str(Path.home()) + "/.telegram-config") as f:
@@ -1149,15 +1153,27 @@ async def tsend(arguments):
                 api_id=api_id,
                 proxy=proxy,
             )
-            client_params["session"] = str(Path.home()) + "/alice_is_happy"
+            #: Telethon appends `.session` when it is missing, so both forms of
+            #: the path work. `expanduser` matters because callers pass
+            #: shell-style paths that zsh never expanded.
+            client_params["session"] = os.path.expanduser(
+                session_path or "~/alice_is_happy"
+            )
             client = TelegramClient(**client_params)
 
-            if token:
-                # ic(token)
-                await client.start(bot_token=token)
+            await client.connect()
+            if await client.get_me() is None:
+                #: Only log in when the session is not already authorized. This
+                #: mirrors Telethon's own `start` (client/auth.py), minus its
+                #: warning when an authorized user session is handed a bot
+                #: token -- which we hit on every call, since TSEND_TOKEN is set
+                #: globally while `tsend-main` uses a user session.
+                if token:
+                    # ic(token)
+                    await client.start(bot_token=token)
 
-            else:
-                await client.start()
+                else:
+                    await client.start()
 
             try:
                 if poll_mode:
