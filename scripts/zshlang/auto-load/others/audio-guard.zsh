@@ -98,27 +98,8 @@ function audio-guard-toggle {
     done
 }
 ##
-function h-audio-guard-dur2sec {
-    : "converts 90s, 30m, 2h or a bare seconds count to seconds"
-    local d="${1}"
-    assert-args d @RET
-
-    local n="${d%[smh]}" unit="${d##*[0-9]}"
-    if [[ "$n" != <-> ]] ; then
-        ectrace "$0: bad duration: ${d}"
-        return 1
-    fi
-
-    case "$unit" in
-        h) ec $(( n * 3600 )) ;;
-        m) ec $(( n * 60 )) ;;
-        s|'') ec "$n" ;;
-        *)
-            ectrace "$0: bad duration unit: ${d}"
-            return 1
-            ;;
-    esac
-}
+#: Was a private copy here until something else needed the same parsing.
+aliasfn h-audio-guard-dur2sec dur2sec
 
 function audio-guard-snooze {
     : "suppresses every trigger for <dur>, default 2h

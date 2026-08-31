@@ -1,10 +1,146 @@
 BTT_HS_NOISES_UID='5DBF0BE7-5822-459A-B450-36E3396124F9'
 ##
-function hammerspoon-reload {
-     hammerspoon -c "hs.reload()"
+function hs-reload {
+    : "reload the Hammerspoon config now, whether or not a hold is up"
+
+    hammerspoon -c "hs.reload()"
 }
-alias hsr='hammerspoon-reload'
-alias hhh='hammerspoon-reload'
+aliasfn hammerspoon-reload hs-reload
+alias hsr='hs-reload'
+alias hhh='hs-reload'
+##
+#: Holding off the auto-reloader.
+#:
+#: Hammerspoon watches ~/scripts/hammerspoon/ and reloads the whole config the
+#: moment a .lua changes. Mid-edit that loads a half-written module, and worse,
+#: leaves the *old* code's canvases and timers behind - a state that reads like
+#: a real bug and is not one. So take a hold while editing, and reload by hand
+#: with [agfi:hs-reload] when you actually want to see your changes.
+#:
+#: One file per holder in ${hs_no_reload_dir}, its mtime the deadline. Several
+#: agents edit this repo at once; a single flag would let whoever finished first
+#: re-enable reloading under someone still typing, and a counter would stay
+#: stuck forever the first time one of them was killed. See the "** Holds"
+#: section of hammerspoon/core/reload.lua for the reading side.
+typeset -g hs_no_reload_dir="${HOME}/.hs-no-reload"
+#: Same default as the agent banner, and for the same reason: long enough to be
+#: useful, short enough that forgetting it is not a lasting problem.
+typeset -g hs_reload_hold_default="${hs_reload_hold_default:-30m}"
+
+function h-hs-reload-holder {
+    : "a name for whoever is asking, stable across calls, distinct between concurrent sessions"
+
+    local id="${hs_reload_holder:-}"
+    #: Exported into every shell Claude Code spawns (see [agfi:claude-code-p]),
+    #: and unlike \$PPID it is the same in the shell that takes the hold and the
+    #: one that releases it minutes later.
+    test -n "$id" || id="${CLAUDE_CODE_SESSION_ID:-}"
+    test -n "$id" || id="${TERM_SESSION_ID:-}"
+    test -n "$id" || id=default
+
+    #: It becomes a filename, so keep it to something that cannot escape the
+    #: directory or need quoting.
+    ec "${id//[^A-Za-z0-9_-]/-}"
+}
+
+function hs-reload-hold {
+    : "hold off the auto-reloader for <dur>, default ${hs_reload_hold_default}
+
+Renews rather than stacks: calling it again while you already hold one just
+pushes your own deadline out."
+    @darwinOnly
+
+    local reason="${1:-editing}" dur="${2:-${hs_reload_hold_default}}"
+
+    local secs
+    secs="$(dur2sec "$dur")" @RET
+
+    local holder
+    holder="$(h-hs-reload-holder)" @RET
+
+    #: strftime and EPOCHSECONDS rather than `date': GNU and BSD date disagree
+    #: about how to add an offset, and both are on the PATH here. `touch -t'
+    #: takes the same format either way, so it is safe unqualified.
+    local until=$(( EPOCHSECONDS + secs ))
+
+    mkdir -p "$hs_no_reload_dir" @TRET
+    #: Contents are for humans only; nothing reads them to decide anything.
+    local body
+    body="reason: ${reason}"$'\n'"holder: ${holder}"$'\n'"until:  $(strftime '%Y-%m-%d %H:%M:%S' "$until")"
+    ec "$body" > "${hs_no_reload_dir}/${holder}" @TRET
+    #: A deadline in the mtime keeps the reading side to a single stat with no
+    #: parsing, which matters because it runs on Hammerspoon's main thread.
+    #: Written last, because writing the contents would otherwise reset it.
+    touch -t "$(strftime '%Y%m%d%H%M.%S' "$until")" \
+        "${hs_no_reload_dir}/${holder}" @TRET
+
+    ecgray "$0: held for $(seconds-fmt-short "$secs") (${reason}); release with hs-reload-release"
+}
+
+function hs-reload-release {
+    : "drop this session's hold; reloads if it was the last one"
+    @darwinOnly
+
+    local holder
+    holder="$(h-hs-reload-holder)" @RET
+    command rm -f "${hs_no_reload_dir}/${holder}"
+
+    #: Only when nobody else is still editing. Reloading here is the point of
+    #: releasing: everything changed while the hold was up is still unloaded.
+    local remaining
+    remaining="$(h-hs-reload-holds-live)"
+    if test -n "$remaining" ; then
+        ecgray "$0: released, but still held by: ${remaining}"
+        return 0
+    fi
+
+    ecgray "$0: released, reloading"
+    hs-reload
+}
+
+function h-hs-reload-holds-live {
+    : "names of the holders whose deadline has not passed, one per line"
+
+    test -d "$hs_no_reload_dir" || return 0
+
+    #: zstat, not `stat': the binary is BSD on this machine and GNU on others,
+    #: and they spell mtime differently. This is a zsh builtin, so neither.
+    zmodload -F zsh/stat b:zstat 2>/dev/null
+
+    local f
+    for f in "${hs_no_reload_dir}"/*(N) ; do
+        if [[ "$(zstat +mtime "$f")" -gt "$EPOCHSECONDS" ]] ; then
+            ec "${f:t}"
+        else
+            #: Expired. Nothing depends on the cleanup - the reader ignores it
+            #: either way - but leaving corpses around makes `hs-reload-holds'
+            #: harder to read.
+            command rm -f "$f"
+        fi
+    done
+}
+
+function hs-reload-holds {
+    : "who is holding the auto-reloader, why, and for how much longer"
+    @darwinOnly
+
+    local live
+    live="$(h-hs-reload-holds-live)"
+    if test -z "$live" ; then
+        ec "auto-reload: not held"
+        return 0
+    fi
+
+    zmodload -F zsh/stat b:zstat 2>/dev/null
+
+    local holder f left reason
+    ec "$live" | while read -r holder ; do
+        f="${hs_no_reload_dir}/${holder}"
+        left=$(( $(zstat +mtime "$f") - EPOCHSECONDS ))
+        reason="$(command grep -m1 '^reason: ' "$f" 2>/dev/null)"
+        ec "auto-reload held by ${holder}, $(seconds-fmt-short "$left") left, ${reason#reason: }"
+    done
+}
 ##
 function hs-popclickBttToggle() {
     local lis="$(serr hammerspoon -c 'popclickBttToggle()')"
