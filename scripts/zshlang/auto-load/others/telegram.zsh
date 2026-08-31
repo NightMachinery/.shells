@@ -128,6 +128,45 @@ function hear-cd {
 }
 alias air-cd='hear-cd'
 ##
+typeset -ga tsend_main_variants=(
+    tsend
+    tsend-retry
+    tsendf
+    tsendf-discrete
+    tsendf-book
+    tsend-url
+    tsend-urls
+    air
+)
+
+function tlg-main-run {
+    #: Runs its arguments as the main account instead of the bot.
+    #: [agfi:tsend] reads `TELEGRAM_SESSION`, and the export reaches nested
+    #: callers too, so wrapping [agfi:tsendf] or [agfi:air] needs nothing more.
+    #:
+    #: `telegram_session_main` is host-specific and set privately, so we abort
+    #: instead of silently falling back to the bot session.
+    ##
+    local session="${telegram_session_main}"
+
+    if isSpace "$session" ; then
+        ecerr "${funcstack[2]:-$0}: telegram_session_main is unset; aborting."
+        return 1
+    fi
+
+    TELEGRAM_SESSION="$session" "$@"
+}
+
+() {
+    #: Defines `tsend-main`, `tsendf-main`, `air-main`, ... .
+    ##
+    local fn
+    for fn in ${tsend_main_variants[@]} ; do
+        aliasfn "${fn}-main" tlg-main-run "$fn"
+        @opts-setprefixas "${fn}-main" "$fn"
+    done
+}
+##
 function reval-tlg {
     local rec="${reval_tlg_receiver:-${reval_tlg_r:-$me}}"
     local out="$(eval "$(gquote "$@")" 2>&1)"
