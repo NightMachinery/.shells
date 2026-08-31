@@ -27,8 +27,9 @@ alertEngineState = alertEngineState or {
     alerts = {},         -- ordered oldest first; the render order too
     canvases = {},       -- { canvas, screen, position, stack }
     floodCanvases = {},
-    flood = nil,         -- { color = ... } while a fullscreen flash is up
+    flood = nil,         -- { color, startedAt, duration, fadeIn, fadeOut }
     floodTimer = nil,
+    floodFadeTimer = nil,
     ticker = nil,
     hooked = false,
     counter = 0,
@@ -47,6 +48,29 @@ alertV2BandAlpha = alertV2BandAlpha or 0.8
 --- blacking out the screen it covers. The bands drawn on top of it keep their
 --- own opacity.
 alertV2FloodAlpha = alertV2FloodAlpha or 0.33
+
+--- The flash ramps its opacity up and back down instead of snapping on and off,
+--- which reads as a glitch rather than as something arriving. Both ramps live
+--- *inside* flashSeconds, so adding them does not lengthen the flood: a caller
+--- that asked for half a second still gets exactly half a second. The alternative
+--- - flashSeconds meaning "time at full opacity", with the ramps added around it
+--- - would silently stretch every existing caller, and would break the release
+--- banner, which is built so that its alert and its flash end together.
+---
+--- In is quicker than out: arriving is an alarm and wants to be abrupt, leaving
+--- is a release and wants to drain.
+alertV2FloodFadeInSeconds = alertV2FloodFadeInSeconds or 0.10
+alertV2FloodFadeOutSeconds = alertV2FloodFadeOutSeconds or 0.20
+
+--- How often the ramp is redrawn. Each step assigns one colour per screen, so
+--- this is cheap; it is nowhere near a full re-render.
+alertV2FloodFadeFps = alertV2FloodFadeFps or 30
+
+--- Neither ramp may eat more than this share of the flash, so there is always a
+--- stretch at full opacity in the middle however short flashSeconds is. Without
+--- it a 0.1s flash would be nothing but ramps and would never actually reach the
+--- colour it is meant to be impossible to miss in.
+local kFloodFadeMaxFraction = 0.4
 
 alertV2DefaultColor = alertV2DefaultColor
     or { red = 0.16, green = 0.19, blue = 0.24, alpha = alertV2BandAlpha }
@@ -772,10 +796,110 @@ local function destroyStrips()
 end
 
 local function destroyFlood()
+    if alertEngineState.floodFadeTimer then
+        alertEngineState.floodFadeTimer:stop()
+        alertEngineState.floodFadeTimer = nil
+    end
     for _, canvas in ipairs(alertEngineState.floodCanvases) do
         canvas:delete()
     end
     alertEngineState.floodCanvases = {}
+end
+
+--- How long each ramp gets, given the caller's floodFade and the flash it has to
+--- fit inside. Omitted means the module defaults, which is the on-by-default
+--- case; false is the old hard cut; a number sets both ramps.
+local function floodFadeRamps(floodFade, flashSeconds)
+    if flashSeconds <= 0 or floodFade == false then
+        return 0, 0
+    end
+    local fadeIn, fadeOut = alertV2FloodFadeInSeconds, alertV2FloodFadeOutSeconds
+    local requested = tonumber(floodFade)
+    if requested then
+        fadeIn, fadeOut = requested, requested
+    end
+    local cap = flashSeconds * kFloodFadeMaxFraction
+    return math.max(0, math.min(fadeIn, cap)), math.max(0, math.min(fadeOut, cap))
+end
+
+--- The wash's opacity right now, as a pure function of the clock. It has to be
+--- derived rather than stored on the canvas, because renderFlood below throws
+--- its canvases away and rebuilds them - from render() on every new alert and
+--- from tick() once a second while any countdown is alive. A fade held on the
+--- canvas would be wiped by the first of those and snap back to full opacity.
+---
+--- Smoothstep rather than a straight line: a linear ramp reads as stopping
+--- abruptly at both ends, and this is three multiplications.
+local function floodWashAlpha()
+    local flood = alertEngineState.flood
+    if not flood then
+        return 0
+    end
+    local peak = alertV2FloodAlpha
+    local function ease(t)
+        t = math.max(0, math.min(t, 1))
+        return t * t * (3 - 2 * t)
+    end
+
+    local elapsed = hs.timer.secondsSinceEpoch() - flood.startedAt
+    if flood.fadeIn > 0 and elapsed < flood.fadeIn then
+        return peak * ease(elapsed / flood.fadeIn)
+    end
+    local remaining = flood.duration - elapsed
+    if flood.fadeOut > 0 and remaining < flood.fadeOut then
+        return peak * ease(remaining / flood.fadeOut)
+    end
+    return peak
+end
+
+--- The flashing alert's colour at the wash's current opacity. The alert's own
+--- alpha is deliberately dropped: a band and the flash behind it are not the
+--- same thing and do not want the same opacity.
+local function floodWash()
+    local flood = alertEngineState.flood
+    if not flood then
+        return nil
+    end
+    local wash = {}
+    for key, value in pairs(flood.color) do
+        wash[key] = value
+    end
+    wash.alpha = floodWashAlpha()
+    return wash
+end
+
+--- Repaint the wash in place, the way tick() rewrites countdown digits in place:
+--- rebuilding the canvases thirty times a second would re-lay-out every band on
+--- every screen. Element 1 is the wash rectangle and the bands are drawn after
+--- it, so only the colour moves - fading the whole canvas would fade the words
+--- too and then pop them back to full opacity when the flood died.
+---
+--- hs.canvas hands back a copy of an element's fields, so mutating
+--- `canvas[1].fillColor.alpha` writes to nothing; the whole table is assigned.
+local function floodFadeStep()
+    local wash = floodWash()
+    if not wash then
+        return
+    end
+    for _, canvas in ipairs(alertEngineState.floodCanvases) do
+        canvas[1].fillColor = wash
+    end
+end
+
+local function startFloodFade()
+    if alertEngineState.floodFadeTimer then
+        alertEngineState.floodFadeTimer:stop()
+        alertEngineState.floodFadeTimer = nil
+    end
+    local flood = alertEngineState.flood
+    if not flood or (flood.fadeIn <= 0 and flood.fadeOut <= 0) then
+        return
+    end
+    -- One timer for the whole flood rather than stopping it across the hold:
+    -- the flash is well under a second in every caller here, and a step is a
+    -- colour assignment on at most a handful of canvases.
+    alertEngineState.floodFadeTimer =
+        hs.timer.doEvery(1 / alertV2FloodFadeFps, floodFadeStep)
 end
 
 --- The flood is a separate canvas per screen, one level above the strips, that
@@ -791,15 +915,10 @@ end
 --- readable against whatever is underneath.
 local function renderFlood()
     destroyFlood()
-    local flood = alertEngineState.flood
-    if not flood then
+    local wash = floodWash()
+    if not wash then
         return
     end
-    local wash = {}
-    for key, value in pairs(flood.color) do
-        wash[key] = value
-    end
-    wash.alpha = alertV2FloodAlpha
     for _, screen in ipairs(ModalMode.targetScreens("all")) do
         local full = screen:fullFrame()
         local elements = {
@@ -818,6 +937,11 @@ local function renderFlood()
         canvas:show()
         table.insert(alertEngineState.floodCanvases, canvas)
     end
+    -- destroyFlood above stopped the ramp along with the old canvases, so every
+    -- path that rebuilds the flood restarts it here. That keeps the fade correct
+    -- through a mid-flash render() or tick() without either of them knowing the
+    -- flood is animating.
+    startFloodFade()
 end
 
 local function renderStrips()
@@ -956,6 +1080,9 @@ end
 ---                names default/warn/amber/crit/agent/free/notice
 ---   position     "top" (default), "center", "bottom"
 ---   flashSeconds fullscreen flash before settling into the band; 0 skips it
+---   floodFade    fade the flash in and out, on by default. false for a hard
+---                cut, a number for that many seconds on each ramp. Both ramps
+---                fit inside flashSeconds rather than lengthening it
 ---   countdown    append "clears in M:SS", refreshed once a second
 ---   pinned       claim space before every unpinned alert, so a wall of text
 ---                elsewhere cannot push this one off the screen
@@ -976,6 +1103,7 @@ function alertV2(text, opts)
     local seconds = math.max(kMinSeconds,
         math.min(tonumber(opts.seconds) or kDefaultSeconds, kMaxSeconds))
     local flashSeconds = tonumber(opts.flashSeconds) or 0
+    local fadeIn, fadeOut = floodFadeRamps(opts.floodFade, flashSeconds)
 
     local id = opts.id
     if not id then
@@ -1015,7 +1143,13 @@ function alertV2(text, opts)
         if alertEngineState.floodTimer then
             alertEngineState.floodTimer:stop()
         end
-        alertEngineState.flood = { color = alert.color }
+        alertEngineState.flood = {
+            color = alert.color,
+            startedAt = hs.timer.secondsSinceEpoch(),
+            duration = flashSeconds,
+            fadeIn = fadeIn,
+            fadeOut = fadeOut,
+        }
         alertEngineState.floodTimer = hs.timer.doAfter(flashSeconds, function()
             alertEngineState.floodTimer = nil
             alertEngineState.flood = nil
