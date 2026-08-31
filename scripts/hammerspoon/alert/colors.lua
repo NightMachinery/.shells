@@ -86,7 +86,9 @@ AlertEngine.bandColors.error = alertV2AgentColor
 ---   { animated = true,
 ---     period    = <seconds>,
 ---     textColor = <colour table>,   -- fixed for the whole cycle
----     at        = function(now) return <colour table> end }
+---     at        = function(now) return <colour table> end,
+---     animate_flood_color_p = <bool>,  -- optional, default true
+---     floodColor = <colour table> }    -- optional, used when that is false
 ---
 --- `at' must be a pure function of the wall clock, because that is the only
 --- kind of animation this engine can keep. Canvases are torn down and rebuilt
@@ -145,8 +147,13 @@ AlertEngine.animatedColors = AlertEngine.animatedColors or {
     --- Something watching from the dark: a near-black blue-grey that swells
     --- toward amber-gold and sinks back. The blend tops out at 30%, so it
     --- glows rather than lights up, and the band stays dark throughout.
+    ---
+    --- The one colour here whose flash is pinned rather than animated. Going
+    --- near black is the whole idea of it, and a fullscreen wash that does the
+    --- same is a flash you can miss; the band keeps the swell.
     ["wolf-eye-1"] = {
         animated = true, period = 6, textColor = { white = 1 },
+        animate_flood_color_p = false,
         at = function(now)
             local w = 0.30 * wave(now, 6)
             return { red   = lerp(0.06, 0.85, w),
@@ -231,24 +238,33 @@ function AlertEngine.colorAt(color, now)
     return color
 end
 
---- The shade the fullscreen flash uses, which for an animated colour is a fixed
---- one rather than whatever the cycle is doing.
+--- Whether the fullscreen flash follows the cycle, `animate_flood_color_p' on
+--- the descriptor. On unless a colour says otherwise.
 ---
---- A flash is a moment and its whole job is to be impossible to miss, so it
---- cannot afford to be dim. Following the animation makes it both: the phase
---- comes from the wall clock, so a short flash lands wherever the clock happens
---- to be -- for wolf-eye-1 that is anywhere across a threefold spread of
---- brightness, including a near-black that reads as no flash at all -- and a
---- long flash spends whole seconds at the dark end of the swell. The band keeps
---- animating either way; it is on screen long enough for a cycle to be a slow
---- glow rather than a light going out.
+--- Turning it off is for a colour whose cycle goes dark. A flash is a moment
+--- and its whole job is to be impossible to miss, and the phase comes from the
+--- wall clock rather than from when the alert fires -- so a colour that dips
+--- near black flashes at whatever brightness the clock happens to be at, which
+--- for a short flash can be no visible flash at all. Only wolf-eye-1 is like
+--- that here, spanning a threefold range down to near black; silver-pulse-1 and
+--- rainbow-1 never drop far enough to matter.
 ---
---- A descriptor may name its own with floodColor. Otherwise the brightest point
---- of the cycle is used, found once by sampling and then remembered on the
---- descriptor.
+--- The band animates regardless. It is on screen long enough for a cycle to
+--- read as a slow glow rather than as a light going out.
+function AlertEngine.floodAnimates(color)
+    return AlertEngine.isAnimated(color)
+        and color.animate_flood_color_p ~= false
+end
+
+--- The shade the flash paints. Follows the cycle when that is allowed; when it
+--- is not, the descriptor's own floodColor, and failing that the brightest
+--- point of the cycle, found once by sampling and remembered.
 local kFloodSamples = 60
 
-function AlertEngine.floodColorFor(color)
+function AlertEngine.floodColorFor(color, now)
+    if AlertEngine.floodAnimates(color) then
+        return AlertEngine.colorAt(color, now)
+    end
     if not AlertEngine.isAnimated(color) then
         return color
     end

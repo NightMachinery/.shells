@@ -195,19 +195,18 @@ end
 --- alpha is deliberately dropped: a band and the flash behind it are not the
 --- same thing and do not want the same opacity.
 ---
---- Resolve first, then override the alpha. An animated colour resolves to one
---- fixed shade here rather than to the phase it happens to be in - see
---- AlertEngine.floodColorFor for why a flash must not animate. The copy is not
---- optional even for a static colour: the table would otherwise be the palette
---- entry itself, and writing an alpha into it would repaint every band using
---- that name.
+--- Resolve first, then override the alpha. An animated colour follows its cycle
+--- here unless it turned that off - see AlertEngine.floodColorFor. The copy is
+--- not optional even for a static colour: the table would otherwise be the
+--- palette entry itself, and writing an alpha into it would repaint every band
+--- using that name.
 local function floodWash(now)
     local flood = alertEngineState.flood
     if not flood then
         return nil
     end
     local wash = {}
-    for key, value in pairs(AlertEngine.floodColorFor(flood.color)) do
+    for key, value in pairs(AlertEngine.floodColorFor(flood.color, now)) do
         wash[key] = value
     end
     wash.alpha = floodWashAlpha(now)
@@ -258,8 +257,10 @@ end
 --- screen has nothing to repaint, and should not hold the timer open.
 local function animationNeeded()
     local flood = alertEngineState.flood
+    -- floodAnimates rather than isAnimated: a colour whose flash is pinned has
+    -- nothing to repaint, so it should not hold the timer open by itself.
     if flood and (flood.fadeIn > 0 or flood.fadeOut > 0
-                      or AlertEngine.isAnimated(flood.color)) then
+                      or AlertEngine.floodAnimates(flood.color)) then
         return true
     end
     for _, record in ipairs(alertEngineState.canvases) do
