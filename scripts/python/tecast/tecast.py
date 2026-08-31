@@ -24,14 +24,17 @@ from docopt import docopt
 from telethon import TelegramClient, sync, functions
 import traceback
 import IPython
+import os
 from pathlib import Path
 
 arguments = docopt(__doc__, version='tecast 0.1')
 with open(str(Path.home()) + '/.telegram-config') as f:
     api_id = f.readline()
     api_hash = f.readline()
+    #: Same session selection as tsend.py; see docs/telegram.md.
     with TelegramClient(
-            str(Path.home()) + '/alice_is_happy', api_id, api_hash) as client:
+            os.path.expanduser(os.getenv('TELEGRAM_SESSION') or '~/alice_is_happy'),
+            api_id, api_hash) as client:
         bw = client.get_entity(arguments['<input-chat>'])
         bwf = client(functions.channels.GetFullChannelRequest(bw)).full_chat
         limit = int(arguments['--limit'])
