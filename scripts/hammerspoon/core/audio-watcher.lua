@@ -34,8 +34,11 @@ local function notifyAudioChanged()
     -- guard: this watcher is a singleton with one callback slot (see the note
     -- at setCallback below), so a second feature cannot subscribe here. The zsh
     -- side fans out to consumers instead.
-    brishz_eval_hs(("h-hook-audio-output-change %q %q"):format(
-                    device:name() or "", device:transportType() or ""), "audio-watcher")
+    -- An argument list rather than a formatted string: a device name is data,
+    -- and this way nothing has to quote it.
+    brishz_eval_q_hs({"h-hook-audio-output-change",
+                      device:name() or "", device:transportType() or ""},
+                     "audio-watcher")
 
     -- The mute watcher below is bound to one specific device, so it has to
     -- follow the default around.

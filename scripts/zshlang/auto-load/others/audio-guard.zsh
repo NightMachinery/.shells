@@ -98,7 +98,6 @@ function audio-guard-toggle {
     done
 }
 ##
-#: Was a private copy here until something else needed the same parsing.
 aliasfn h-audio-guard-dur2sec dur2sec
 
 function audio-guard-snooze {

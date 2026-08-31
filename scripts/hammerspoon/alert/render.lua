@@ -147,7 +147,7 @@ end
 
 --- How long each ramp gets, given the caller's floodFade and the flash it has to
 --- fit inside. Omitted means the module defaults, which is the on-by-default
---- case; false is the old hard cut; a number sets both ramps.
+--- case; false means no ramps at all; a number sets both.
 function AlertEngine.floodFadeRamps(floodFade, flashSeconds)
     if flashSeconds <= 0 or floodFade == false then
         return 0, 0

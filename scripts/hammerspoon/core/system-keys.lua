@@ -64,11 +64,8 @@ if false then
                           local res
                           -- res = brishz_eval(("lang-toggle %q"):format(hs.pasteboard.getContents())) -- got into deadlocks since we hammerspoon in getting and setting the input lang now
                           -- The clipboard goes in on stdin rather than being
-                          -- interpolated into the command. It used to be
-                          -- ("ecn %q | en2per"):format(...), and %q is *Lua*
-                          -- quoting, not shell quoting: a newline in the
-                          -- clipboard came out as a backslash and a line break,
-                          -- which the garden then read as two commands.
+                          -- interpolated into the command, so that whatever is
+                          -- in it stays data.
                           if hs.keycodes.currentSourceID() == inputEnglish then
                               res = brishz_eval("en2per", {stdin = hs.pasteboard.getContents()})
                               langSetPer()
