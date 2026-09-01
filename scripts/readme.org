@@ -107,6 +107,13 @@ interactive-only, in =zshlang/interactive/auto-load/FIM.zsh=. The Emacs twin is
 =night/fim-get= in =~[dom]/autoload/night-mistral-fim.el=; the two speak the same
 body to the same providers and want changing together.
 
-See =./docs/fim.md=, which records the two things that cost real time: ZLE's
+The prefix is =${PREBUFFER}${LBUFFER}=, so a completion asked for inside a
+continuation -- an unclosed quote, a =for= still waiting for its =done= -- sees
+the lines you already typed rather than just the one you are on. The completion
+itself is still capped at a line.
+
+See =./docs/fim.md=, which records the two things that cost real time (ZLE's
 =BUFFER= and =CURSOR= are not bound inside a =zle -F= handler, and cancelling a
-request by process group takes the request that replaces it down too.
+request by process group takes the request that replaces it down too), and why
+=fim_strip_space_p= is off: the leading space these models return is almost
+always the right one.

@@ -124,7 +124,7 @@ function fim-get {
     #:   fim_temperature  default 0
     #:   fim_timeout      seconds, default 20
     #:   fim_proxy_p      default y, and a no-op unless a proxy is configured
-    #:   fim_strip_space_p  default y; see below
+    #:   fim_strip_space_p  drop one leading space; default n, see below
     ensure-cmd curl jq @RET
 
     local provider="${fim_provider:-codestral}"
@@ -144,7 +144,7 @@ function fim-get {
     local temperature="${fim_temperature:-0}"
     local timeout="${fim_timeout:-20}"
     local proxy_p="${fim_proxy_p:-y}"
-    local strip_space_p="${fim_strip_space_p:-y}"
+    local strip_space_p="${fim_strip_space_p:-n}"
 
     local key_var="${fim_provider_key_var[${provider}]}"
     local api_key="${(P)key_var}"
@@ -220,8 +220,23 @@ function fim-get {
     local out
     out="$(print -r -- "${res}" | jq --raw-output --join-output "${extract} // empty")" @TRET
 
-    #: Codestral is buggy and often prepends a space. Dropping it can
-    #: occasionally be wrong too, but much less often than keeping it.
+    #: Off by default. This used to be unconditional, on the belief that
+    #: Codestral had a bug that prepended a stray space. Measured over 29
+    #: contexts per provider, that is not what is happening:
+    #:
+    #:   - All three providers do it at the same rate, so it was never a
+    #:     Codestral bug.
+    #:   - Where the prefix ends in an operator (`x =', `=>', `|', `a +') the
+    #:     space is simply correct, and dropping it gives `count =0'.
+    #:   - Where the cursor sits on an empty line, the model supplies the whole
+    #:     indent; dropping one space turned eight into seven and broke the
+    #:     Python it was completing.
+    #:   - Where it really was spurious, it was usually *two* spaces (the model
+    #:     re-emitting an indent the prefix already had), which dropping one
+    #:     leaves misaligned anyway.
+    #:
+    #: One case in 87 came out better for it. Left in as a flag rather than
+    #: deleted, because a future model may well go back to prepending one.
     if bool "${strip_space_p}" ; then
         out="${out#\ }"
     fi
