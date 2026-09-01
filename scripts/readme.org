@@ -112,8 +112,15 @@ continuation -- an unclosed quote, a =for= still waiting for its =done= -- sees
 the lines you already typed rather than just the one you are on. The completion
 itself is still capped at a line.
 
-See =./docs/fim.md=, which records the two things that cost real time (ZLE's
-=BUFFER= and =CURSOR= are not bound inside a =zle -F= handler, and cancelling a
-request by process group takes the request that replaces it down too), and why
+Status is gray and failures red, in =POSTDISPLAY= rather than =zle -M=, which
+cannot carry colour at all: it visualises control characters instead of
+emitting them, so an SGR escape shows up as literal =^[[38;2;...m= text.
+
+See =./docs/fim.md=, which records the things that cost real time (ZLE's
+=BUFFER=, =CURSOR= and =POSTDISPLAY= are not bound inside a =zle -F= handler;
+cancelling a request by process group takes the request that replaces it down
+too; fast-syntax-highlighting strips =region_highlight= off any widget it
+wrapped; and =cat -v= renders a real ESC byte and a literal =^[= pair
+identically, so it cannot be used to check any of this), and why
 =fim_strip_space_p= is off: the leading space these models return is almost
 always the right one.
