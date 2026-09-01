@@ -24,21 +24,69 @@ typeset -gi fim_zle_cursor=0
 
 typeset -g fim_zle_us=$'\x1f'  #: field separator of the child's payload
 
-#: `zle -M' takes a plain string and does no prompt expansion, so the escapes
-#: are baked in by hand. Once, at load time: [agfi:colorfg] probes the terminal,
-#: and from a widget that probe would run on every request.
-typeset -g fim_zle_color_dim="$(colorfg "${gray[@]}")"
-typeset -g fim_zle_color_error="${fg[red]}"
-typeset -g fim_zle_color_reset="$(resetcolor)"
+#: Status goes in POSTDISPLAY, not `zle -M'.
+#:
+#: `zle -M' cannot carry colour at all: it renders the string through ZLE's
+#: display code, which *visualises* control characters rather than emitting
+#: them, so an SGR escape arrives as a reverse-video `^[' followed by a
+#: literal `[38;2;170;170;170m'. That is not a quirk of `-M'; `zle -R' does
+#: the same. Measured on the wire, not inferred -- and easy to miss, because
+#: `cat -v' renders a real ESC byte and a literal `^'+`[' pair identically.
+#:
+#: POSTDISPLAY plus `region_highlight' is the mechanism that does work, and it
+#: is what zsh-autosuggestions greys its ghost text with: zle applies the
+#: colour itself, so what reaches the terminal is a real `\e[38;5;242m'.
+typeset -g fim_zle_style="${fim_zle_style:-fg=242}"
+typeset -g fim_zle_style_error="${fim_zle_style_error:-fg=red}"
+
+#: What we last put in POSTDISPLAY, and in which style, so the colour can be
+#: put back after something else rebuilds `region_highlight'.
+typeset -g fim_zle_post_text=''
+typeset -g fim_zle_post_style=''
 ##
+function h-fim-zle-highlight {
+    #: (Re-)colour whatever we last posted.
+    if test -z "${fim_zle_post_style}" ; then
+        return 0
+    fi
+
+    #: Only if POSTDISPLAY is still ours: zsh-autosuggestions owns the same
+    #: slot and takes it back the moment you type.
+    if [[ "${POSTDISPLAY}" != "${fim_zle_post_text}" ]] ; then
+        return 0
+    fi
+
+    region_highlight+=(
+        "${#BUFFER} $(( ${#BUFFER} + ${#POSTDISPLAY} )) ${fim_zle_post_style}"
+    )
+}
+
+function h-fim-zle-post {
+    local text="${1}" style="${2}"
+
+    #: Two spaces so it reads as an annotation rather than as buffer text.
+    typeset -g fim_zle_post_text="  ${text}"
+    typeset -g fim_zle_post_style="${style}"
+    POSTDISPLAY="${fim_zle_post_text}"
+
+    h-fim-zle-highlight
+}
+
 function h-fim-zle-say {
-    #: Status is gray: it is a footnote to what you are typing, not part of it.
-    zle -M "${fim_zle_color_dim}FIM: ${1}${fim_zle_color_reset}"
+    #: Status is dim: a footnote to what you are typing, not part of it.
+    h-fim-zle-post "FIM: ${1}" "${fim_zle_style}"
 }
 
 function h-fim-zle-say-error {
     #: Failures are the one thing here worth looking up for.
-    zle -M "${fim_zle_color_error}FIM: ${1}${fim_zle_color_reset}"
+    h-fim-zle-post "FIM: ${1}" "${fim_zle_style_error}"
+}
+
+function zle-fim-say {
+    #: The same, reachable from the `zle -F' handler. POSTDISPLAY and
+    #: `region_highlight' are ZLE parameters, so they are only bound inside a
+    #: widget -- exactly like BUFFER and CURSOR, and exactly as silent about it.
+    h-fim-zle-post "FIM: ${1}" "${2:-${fim_zle_style}}"
 }
 ##
 function h-fim-zle-child {
@@ -128,6 +176,15 @@ function zle-fim-accept {
     fi
 
     LBUFFER+="${out}"
+
+    #: We take this widget back from fast-syntax-highlighting at startup (see
+    #: [agfi:h-fim-zle-unwrap]), so nothing re-colours the code we just
+    #: inserted. Do it by hand -- before our own entry goes on, because
+    #: `_zsh_highlight' rebuilds `region_highlight' from scratch.
+    if (( ${+functions[_zsh_highlight]} )) ; then
+        _zsh_highlight
+    fi
+
     h-fim-zle-say "inserted ${#out} chars${took}"
 }
 
@@ -212,7 +269,7 @@ function h-fim-zle-response {
     typeset -g fim_zle_fd='' fim_zle_pid='' fim_zle_started=''
 
     if [[ "${payload}" != *"${fim_zle_us}"* ]] ; then
-        h-fim-zle-say-error "no response${took}"
+        zle zle-fim-say -- "no response${took}" "${fim_zle_style_error}"
         return 0
     fi
 
@@ -227,12 +284,12 @@ function h-fim-zle-response {
     err="${err#fim-get: }"
 
     if [[ "${ret}" != 0 ]] ; then
-        h-fim-zle-say-error "${err:-failed (${ret})}"
+        zle zle-fim-say -- "${err:-failed (${ret})}" "${fim_zle_style_error}"
         return 0
     fi
 
     if test -z "${out}" ; then
-        h-fim-zle-say "empty completion${took}"
+        zle zle-fim-say -- "empty completion${took}"
         return 0
     fi
 
@@ -245,9 +302,19 @@ function h-fim-zle-response {
 #: two would leave Escape wedged.
 function zle-fim-escape {
     if h-fim-zle-cancel ; then
+        #: One press, one job. Escape cancelled a request, so it does not also
+        #: leave insert mode -- press it again for that.
+        #:
+        #: This is also the only ordering that works. `vi-cmd-mode' is still
+        #: one of fast-syntax-highlighting's wrapped widgets, so calling it
+        #: runs `_zsh_highlight', which rebuilds `region_highlight' and drops
+        #: the colour off the message; and posting the message *after* the
+        #: call leaves it a redraw behind, so it never appears at all.
         h-fim-zle-say 'aborted'
+        return 0
     fi
 
+    #: Nothing of ours to cancel, so Escape is just Escape.
     zle vi-cmd-mode
 }
 
@@ -255,6 +322,7 @@ function zle-fim-escape-vicmd {
     if h-fim-zle-cancel ; then
         h-fim-zle-say 'aborted'
     else
+        #: What Escape did here before.
         zle beep
     fi
 }
@@ -265,6 +333,7 @@ function zle-fim-escape-vicmd {
 #: reason.
 zle -N zle-fim-widget
 zle -N zle-fim-accept
+zle -N zle-fim-say
 zle -N zle-fim-escape
 zle -N zle-fim-escape-vicmd
 
@@ -272,4 +341,31 @@ bindkey -M viins '^[.' zle-fim-widget
 bindkey -M vicmd '^[.' zle-fim-widget
 bindkey -M viins '^[' zle-fim-escape    #: was vi-cmd-mode
 bindkey -M vicmd '^[' zle-fim-escape-vicmd  #: was beep
+##
+autoload -Uz add-zsh-hook
+
+function h-fim-zle-unwrap {
+    #: Take our widgets back from fast-syntax-highlighting.
+    #:
+    #: f-sy-h wraps every widget that exists when it loads, and its wrapper
+    #: runs `_zsh_highlight' *after* the widget body -- which rebuilds
+    #: `region_highlight' from scratch and throws away the entry that colours
+    #: our POSTDISPLAY. The in-flight message then came out in whatever style
+    #: f-sy-h had left covering that column (38;5;16, near-black) instead of
+    #: gray. Widgets created after f-sy-h loads are never wrapped, which is
+    #: why an ad-hoc one sourced at the prompt kept its colour and ours did
+    #: not: we load at =.zshrc:271= and f-sy-h at =:572=.
+    #:
+    #: Re-running `zle -N' binds the name straight back to our function. This
+    #: has to happen after the whole of =.zshrc=, hence a one-shot precmd.
+    zle -N zle-fim-widget
+    zle -N zle-fim-accept
+    zle -N zle-fim-say
+    zle -N zle-fim-escape
+    zle -N zle-fim-escape-vicmd
+
+    add-zsh-hook -d precmd h-fim-zle-unwrap
+}
+
+add-zsh-hook precmd h-fim-zle-unwrap
 ##

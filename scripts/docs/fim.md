@@ -156,8 +156,7 @@ own.
 The completion is still capped at one line (`fim_stop`), which is a separate
 question from how much context goes in.
 
-It reports in the `zle -M` message area below the prompt, in gray, with
-failures in red:
+It reports just past the end of the line, in gray, with failures in red:
 
 ```
 FIM: requesting codestral-latest…
@@ -168,14 +167,11 @@ FIM: aborted
 FIM: codestral: HTTP 401 — Invalid API Key
 ```
 
-`zle -M` rather than `POSTDISPLAY`, which is where a ghost-text plugin would
-put it: POSTDISPLAY only renders at the end of the buffer, which is the wrong
-place whenever there is a suffix, and zsh-autosuggestions clears it from under
-you.
+The message goes in `POSTDISPLAY` with a `region_highlight` entry over it —
+the mechanism zsh-autosuggestions greys its ghost text with — rather than in
+the `zle -M` area below the prompt. `zle -M` was the obvious choice and is the
+wrong one, because **it cannot carry colour at all**: see below.
 
-`zle -M` does no prompt expansion, so the colours are raw escapes baked into
-the string by [agfi:h-fim-zle-say] — built once at load time, since
-[agfi:colorfg] probes the terminal and doing that per request would be waste.
 Status is gray because it is a footnote to what you are typing; errors are the
 one thing here worth looking up for, so they are not.
 
@@ -192,27 +188,66 @@ snapshot taken when it was asked for — if you kept typing, it no longer fits
 where it was going to go.
 
 `Escape` cancels. It is bound permanently rather than only while a request is
-in flight, and chains into what it replaced: `vi-cmd-mode` in `viins`, `beep`
-in `vicmd`, so idle behaviour is unchanged. A binding installed only for the
-duration of a request has to be removed again on every exit path, and a crash
-between the two leaves Escape wedged. Note that cancelling costs up to
-`KEYTIMEOUT` (0.4s here), because Escape is also the prefix of every arrow key
-— that delay is already there today when entering command mode.
+in flight, because a binding installed for the duration of a request has to be
+removed again on every exit path and a crash between the two leaves Escape
+wedged. One press does one job: if there was a request to cancel it cancels
+and stops there, and only if there was nothing of ours does it fall through to
+what it replaced (`vi-cmd-mode` in `viins`, `beep` in `vicmd`). So idle Escape
+behaves exactly as before, and cancelling costs you a second press to leave
+insert mode. Note that cancelling costs up to `KEYTIMEOUT` (0.4s here) because
+Escape is also the prefix of every arrow key — a delay that is already there
+today when entering command mode.
 
 The widgets are named `zle-fim-*` on purpose: `zle-*` is in the default
 `ZSH_AUTOSUGGEST_IGNORE_WIDGETS`, so zsh-autosuggestions leaves them alone
 instead of wrapping them and clearing the message.
 [agfi:zle-complete-with-dots] in `.zshrc` is named that way for the same
-reason.
+reason. Fast-syntax-highlighting has no such list, so it is dealt with
+separately — see [agfi:h-fim-zle-unwrap] below.
 
-## Two things that cost real time
+## Things that cost real time
 
 **ZLE's special parameters are not bound in a `zle -F` handler.** `BUFFER` and
 `CURSOR` read as empty there, so the snapshot check compared the live buffer
 against `''` and reported `line changed` on every single request, including
 ones where nothing had changed. Anything touching line state has to go through
 a widget; the handler calls [agfi:zle-fim-accept] with `zle`, which is also
-why the insertion lives in its own widget rather than inline.
+why the insertion lives in its own widget rather than inline. `POSTDISPLAY`
+and `region_highlight` are in the same boat, hence [agfi:zle-fim-say].
+
+**`zle -M` cannot show colour.** It renders the string through ZLE's display
+code, which *visualises* control characters instead of emitting them, so an
+SGR escape arrives as a reverse-video `^[` followed by a literal
+`[38;2;170;170;170m` printed as text. `zle -R` behaves identically. Confirmed
+on the wire: for `zle -R $'\e[31mX\e[0m'` the terminal received
+`\x1b[7m` `^[` `\x1b[27m` `[31mX`. `POSTDISPLAY` plus a `region_highlight`
+entry is the mechanism that works, because there zle applies the colour itself
+and what reaches the terminal is a real `\e[38;5;242m`.
+
+The trap in measuring this: **`cat -v` renders a real ESC byte and a literal
+`^`+`[` pair identically**, so a pty capture piped through it cannot tell a
+working colour from a broken one. That is how a first attempt got confirmed as
+working when it was in fact printing escape codes as text. Compare raw bytes —
+`\x1b` versus `0x5E 0x5B` — or check for `\x1b[` in the capture with Python.
+
+**Fast-syntax-highlighting takes the colour back off.** It wraps every widget
+that exists when it loads and runs `_zsh_highlight` *after* the widget body,
+which rebuilds `region_highlight` from scratch and discards our entry; the
+message then rendered in whatever style f-sy-h had left covering that column
+(38;5;16, near-black). Widgets created *after* it loads are never wrapped —
+which is why an ad-hoc test widget sourced at the prompt kept its colour while
+the real one did not, since this file loads at `.zshrc:271` and f-sy-h at
+`:572`. [agfi:h-fim-zle-unwrap] re-runs `zle -N` from a one-shot `precmd`,
+after the whole of `.zshrc`, binding the names straight back to our functions.
+
+Two consequences of being unwrapped. [agfi:zle-fim-accept] must call
+`_zsh_highlight` itself, or the code it just inserted stays uncoloured until
+the next keystroke — and it must do so *before* posting its own message, since
+that call rebuilds `region_highlight`. And [agfi:zle-fim-escape] must not
+chain into `vi-cmd-mode` after posting, because `vi-cmd-mode` is still wrapped
+and its `_zsh_highlight` would strip the colour again; posting after the call
+instead leaves the message a redraw behind and it never appears at all. Hence
+one press, one job.
 
 **Do not kill the process group.** zsh-autosuggestions cancels with
 `kill -TERM -$pid` to reap whatever its strategy forked. With job control on,
@@ -224,8 +259,14 @@ against a real endpoint and every single time with the network stubbed out.
 [agfi:h-fim-zle-cancel] kills the pid alone; nothing is orphaned, because curl
 is writing into the pipe that child holds and takes SIGPIPE as soon as it dies.
 
-Both were found by driving a real line editor through `zsh/zpty` rather than by
-reading the code. Stubbing `fim-get` out to a `sleep` is what turned the second
-one from intermittent into deterministic, and that is the move worth
-remembering: an async bug that reproduces 40% of the time is usually a timing
-race in something you are not looking at.
+All of these were found by driving a real line editor through `zsh/zpty`
+rather than by reading the code. Stubbing `fim-get` out to a `sleep` is what
+turned the process-group bug from intermittent into deterministic, and that is
+the move worth remembering: an async bug that reproduces 40% of the time is
+usually a timing race in something you are not looking at.
+
+One note on the harness itself, `fim-zpty.zsh` in the session scratchpad: it
+must wait for the prompt (`\e[?2004h`, bracketed-paste on) before typing, not
+for a fixed number of seconds. A five-second guess was enough until the
+machine got busy, and then every scenario went intermittent in a way that
+looked exactly like a bug in the widget.
