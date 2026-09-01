@@ -92,3 +92,21 @@ table with the DDC levels floored underneath. hyper+shift+F1/F2 go through here.
 
 See =./docs/external-display-brightness.md=, which also records how often DDC
 reads come back corrupt and what is done about it.
+
+* Fill-in-the-middle completion
+
+=alt+.= completes the line you are halfway through writing, sending the text
+left of the cursor as the prefix and the text right of it as the suffix, and
+inserting one line at the cursor. Codestral answers in about 0.3s;
+[[agfi:fim-provider-select]] switches to DeepSeek when the output matters more
+than the wait.
+
+[[agfi:fim-get]] is the request on its own, in =zshlang/auto-load/others/fim.zsh=,
+so it also works in a pipe or over brish. Only the widget and the bindings are
+interactive-only, in =zshlang/interactive/auto-load/FIM.zsh=. The Emacs twin is
+=night/fim-get= in =~[dom]/autoload/night-mistral-fim.el=; the two speak the same
+body to the same providers and want changing together.
+
+See =./docs/fim.md=, which records the two things that cost real time: ZLE's
+=BUFFER= and =CURSOR= are not bound inside a =zle -F= handler, and cancelling a
+request by process group takes the request that replaces it down too.
