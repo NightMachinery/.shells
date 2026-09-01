@@ -23,6 +23,23 @@ typeset -g fim_zle_buffer=''
 typeset -gi fim_zle_cursor=0
 
 typeset -g fim_zle_us=$'\x1f'  #: field separator of the child's payload
+
+#: `zle -M' takes a plain string and does no prompt expansion, so the escapes
+#: are baked in by hand. Once, at load time: [agfi:colorfg] probes the terminal,
+#: and from a widget that probe would run on every request.
+typeset -g fim_zle_color_dim="$(colorfg "${gray[@]}")"
+typeset -g fim_zle_color_error="${fg[red]}"
+typeset -g fim_zle_color_reset="$(resetcolor)"
+##
+function h-fim-zle-say {
+    #: Status is gray: it is a footnote to what you are typing, not part of it.
+    zle -M "${fim_zle_color_dim}FIM: ${1}${fim_zle_color_reset}"
+}
+
+function h-fim-zle-say-error {
+    #: Failures are the one thing here worth looking up for.
+    zle -M "${fim_zle_color_error}FIM: ${1}${fim_zle_color_reset}"
+}
 ##
 function h-fim-zle-child {
     #: Runs in the forked child. Writes one payload to stdout:
@@ -106,12 +123,12 @@ function zle-fim-accept {
     if [[ "${BUFFER}" != "${fim_zle_buffer}" ]] || (( CURSOR != fim_zle_cursor )) ; then
         #: The line moved under us, so the completion no longer fits where it
         #: was asked for. Dropping it beats inserting it in the wrong place.
-        zle -M "FIM: line changed, discarded completion${took}"
+        h-fim-zle-say "line changed, discarded completion${took}"
         return 0
     fi
 
     LBUFFER+="${out}"
-    zle -M "FIM: inserted ${#out} chars${took}"
+    h-fim-zle-say "inserted ${#out} chars${took}"
 }
 
 function zle-fim-widget {
@@ -120,13 +137,21 @@ function zle-fim-widget {
     local provider="${fim_provider:-codestral}"
     local model="${fim_provider_model[${provider}]}"
     if test -z "${model}" ; then
-        zle -M "FIM: unknown provider '${provider}'"
+        h-fim-zle-say-error "unknown provider '${provider}'"
         return 1
     fi
 
     h-fim-zle-cancel
 
-    local buffer="${BUFFER}" prefix="${LBUFFER}" suffix="${RBUFFER}"
+    #: `$PREBUFFER', not just `$LBUFFER'. Once zsh is reading a continuation --
+    #: an unclosed quote, a `for' waiting for its `done' -- every line before
+    #: the current one lives in PREBUFFER, and BUFFER holds only the line being
+    #: edited. Without it the model is asked to complete `    ' with no idea
+    #: that it is inside a function you opened two lines ago.
+    #:
+    #: A buffer can also hold real newlines without any continuation, from
+    #: ^V^J or from `edit-command-line'; LBUFFER covers that case by itself.
+    local buffer="${BUFFER}" prefix="${PREBUFFER}${LBUFFER}" suffix="${RBUFFER}"
     local -i cursor="${CURSOR}"
     local started="${EPOCHREALTIME}"
 
@@ -150,7 +175,7 @@ function zle-fim-widget {
     local pid
     if ! read pid <&$fd ; then
         exec {fd}<&- 2>/dev/null
-        zle -M 'FIM: could not start the request'
+        h-fim-zle-say-error 'could not start the request'
         return 1
     fi
 
@@ -160,7 +185,7 @@ function zle-fim-widget {
     typeset -g fim_zle_fd="${fd}" fim_zle_pid="${pid}"
 
     zle -F "${fd}" h-fim-zle-response
-    zle -M "FIM: requesting ${model}…"
+    h-fim-zle-say "requesting ${model}…"
 }
 
 function h-fim-zle-response {
@@ -187,7 +212,7 @@ function h-fim-zle-response {
     typeset -g fim_zle_fd='' fim_zle_pid='' fim_zle_started=''
 
     if [[ "${payload}" != *"${fim_zle_us}"* ]] ; then
-        zle -M "FIM: no response${took}"
+        h-fim-zle-say-error "no response${took}"
         return 0
     fi
 
@@ -202,12 +227,12 @@ function h-fim-zle-response {
     err="${err#fim-get: }"
 
     if [[ "${ret}" != 0 ]] ; then
-        zle -M "FIM: ${err:-failed (${ret})}"
+        h-fim-zle-say-error "${err:-failed (${ret})}"
         return 0
     fi
 
     if test -z "${out}" ; then
-        zle -M "FIM: empty completion${took}"
+        h-fim-zle-say "empty completion${took}"
         return 0
     fi
 
@@ -220,7 +245,7 @@ function h-fim-zle-response {
 #: two would leave Escape wedged.
 function zle-fim-escape {
     if h-fim-zle-cancel ; then
-        zle -M 'FIM: aborted'
+        h-fim-zle-say 'aborted'
     fi
 
     zle vi-cmd-mode
@@ -228,7 +253,7 @@ function zle-fim-escape {
 
 function zle-fim-escape-vicmd {
     if h-fim-zle-cancel ; then
-        zle -M 'FIM: aborted'
+        h-fim-zle-say 'aborted'
     else
         zle beep
     fi

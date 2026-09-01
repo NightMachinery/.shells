@@ -73,16 +73,43 @@ namespaced globals, and `@opts` works too:
 - `fim_temperature` — 0
 - `fim_timeout` — 20 seconds, as `curl --max-time`
 - `fim_proxy_p` — `y`, and a no-op unless a proxy is configured
-- `fim_strip_space_p` — `y`; see below
+- `fim_strip_space_p` — drop one leading space; `n`, see below
 
 ```zsh
 fim_provider=deepseek fim_max_tokens=200 fim-get 'def is_prime(n):
     '
 ```
 
-Codestral is buggy and often prepends a single space, which
-`fim_strip_space_p` drops. Removing it is occasionally wrong too, just much
-less often than keeping it. The Emacs twin does the same thing.
+## The leading space is not a bug
+
+Both this and the Emacs twin used to drop one leading space from every
+completion, on the belief that Codestral had a bug that prepended one. It is
+now a flag, `fim_strip_space_p` / `night/fim-strip-leading-space`, and it is
+**off**. Measured over 29 contexts against each of the three providers:
+
+- All three do it at the same rate — Codestral 7 of 29, both DeepSeeks 8 of 29
+  — so it was never a Codestral bug. It is the ordinary whitespace ambiguity
+  of infilling: nothing in the prompt says whether the boundary space belongs
+  to the prefix or to the middle.
+- Where the prefix ends in an operator, the space is simply *correct*. All
+  three return ` 0` for `count =`, ` b` for `return a +`, ` {` for
+  `const f = (x) =>`, and ` tr -s ...` for `cat file.txt |`. Stripping gives
+  you `count =0` and `cat file.txt |tr`.
+- Where point sits on an otherwise empty line, the model supplies the whole
+  indent. All three answered `        self.x = 1` inside a Python
+  `__init__`; dropping one space makes it seven and breaks the file.
+- Where the space really was spurious it was usually *two* of them — the model
+  re-emitting an indent the prefix already carried — so dropping one leaves
+  the line misaligned either way.
+
+Across 87 samples exactly one came out better for the strip: DeepSeek
+returning ` import random` after a four-space indent. The flag stays, unset,
+because a later model may well go back to prepending one; the probes are in
+this session's scratchpad and are cheap to re-run.
+
+Notably, the completions where a stray space would actually *corrupt* code —
+prefix ending mid-token, like `os.pa` or `arr.len` — never had one, on any
+provider.
 
 Errors go to stderr as exactly one line and the return code propagates:
 
@@ -109,8 +136,28 @@ Note that after editing either file you must `brishz-restart` before the garden
 
 ## The widget
 
-`alt+.` sends `LBUFFER` as the prefix and `RBUFFER` as the suffix. It reports
-in the `zle -M` message area below the prompt:
+`alt+.` sends everything left of the cursor as the prefix and everything right
+of it as the suffix. That is `${PREBUFFER}${LBUFFER}`, not just `LBUFFER`:
+once zsh is reading a continuation — an unclosed quote, a `for` still waiting
+for its `done` — the lines you already typed live in `PREBUFFER` and `BUFFER`
+holds only the line being edited. Without it, completing
+
+```
+: python3 -c "
+def is_prime(n):
+    <alt+.>
+```
+
+asks the model to continue four spaces of nothing. With it you get
+`if n <= 1:`. Buffers can also hold real newlines with no continuation
+involved, from `^V^J` or `edit-command-line`, and `LBUFFER` covers that on its
+own.
+
+The completion is still capped at one line (`fim_stop`), which is a separate
+question from how much context goes in.
+
+It reports in the `zle -M` message area below the prompt, in gray, with
+failures in red:
 
 ```
 FIM: requesting codestral-latest…
@@ -125,6 +172,12 @@ FIM: codestral: HTTP 401 — Invalid API Key
 put it: POSTDISPLAY only renders at the end of the buffer, which is the wrong
 place whenever there is a suffix, and zsh-autosuggestions clears it from under
 you.
+
+`zle -M` does no prompt expansion, so the colours are raw escapes baked into
+the string by [agfi:h-fim-zle-say] — built once at load time, since
+[agfi:colorfg] probes the terminal and doing that per request would be waste.
+Status is gray because it is a footnote to what you are typing; errors are the
+one thing here worth looking up for, so they are not.
 
 Async, following the `exec {fd}< <(...)` plus `zle -F` pattern from
 zsh-autosuggestions' `src/async.zsh`. The child prints its pid first so it can
