@@ -260,23 +260,16 @@ until you next trip over it."
     #: The RESULT STRING is what has to be checked, not the exit status: hs exits
     #: 0 whether or not findOutputByName found anything, so a vanished device --
     #: a headset unpaired while muted -- would otherwise look like success.
+    #: [agfi:h-hammerspoon-eval] rather than a bare `hammerspoon -c', because
+    #: Hammerspoon interleaves "-- Loading extension: task" lines into its output
+    #: the first time an extension is used -- which is exactly when a
+    #: watcher-spawned task has just loaded one.
     local out
-    out="$(hammerspoon -c "local d = hs.audiodevice.findOutputByName([[${name}]]) ; if d then d:setOutputMuted(false) ; return tostring(not d:outputMuted()) else return [[nodevice]] end" 2>/dev/null)" || {
+    out="$(h-hammerspoon-eval "local d = hs.audiodevice.findOutputByName([[${name}]]) ; if d then d:setOutputMuted(false) ; return tostring(not d:outputMuted()) else return [[nodevice]] end" 2>/dev/null)" || {
         ecerr "$0: could not reach Hammerspoon to unmute ${name}."
         return 1
     }
 
-    #: Hammerspoon interleaves lines like "-- Loading extension: task" into its
-    #: output the first time an extension is used -- which is exactly when a
-    #: watcher-spawned task has just loaded one. Without this filter the result
-    #: reads as "true-- Loading extension: task" and a successful unmute is
-    #: reported as a failure. [agfi:location-get-darwin] drops the same chatter.
-    local -a lines
-    lines=( "${(@f)out}" )
-    lines=( "${(@)lines:#-- *}" )
-    out="${(j::)lines}"
-
-    out="${out//[[:space:]]/}"
     if [[ "$out" != true ]] ; then
         ecerr "$0: could not unmute ${name} (Hammerspoon said: ${out:-<empty>})."
         return 1
