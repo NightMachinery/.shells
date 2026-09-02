@@ -14,6 +14,13 @@ inspect = require "hs.inspect"
 location = require "hs.location"
 wifi = require "hs.wifi"
 ipc = require "hs.ipc"
+--- Immediately after hs.ipc, and before anything else can print: hs.ipc has
+--- just replaced the global `print` with one that recurses without bound
+--- whenever a print happens while an `hs -c` command is being handled, wedging
+--- the client. See hammerspoon/core/ipc-fix.lua. Loaded here with an explicit
+--- dofile rather than from the core list below, because "before anything else
+--- prints" is the whole point and loadHammerspoonFile is not defined yet.
+dofile(nightdir .. "/hammerspoon/core/ipc-fix.lua")
 popclick = require "hs.noises"
 application = require "hs.application"
 window = require "hs.window"

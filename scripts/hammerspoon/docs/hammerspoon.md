@@ -4,6 +4,10 @@
 The boot file only sets up Lua/Hammerspoon dependencies and then loads an
 ordered module list, mostly from `~/scripts/hammerspoon/core/`.
 
+`core/ipc-fix.lua` is loaded before all of them, by an explicit `dofile` right
+after `require "hs.ipc"` — see the ipc print recursion section below for why it
+has to sit exactly there.
+
 The explicit core load order is:
 
 - `helpers.lua`
@@ -30,6 +34,61 @@ alphabetical order after the core modules are ready.
 
 Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
+
+## The ipc print recursion fix
+
+`hs -c` used to wedge whenever anything printed to the Hammerspoon console
+while the command was being handled. It spun until the client's receive
+timeout: one measured run produced 39,984 warning lines and 4.6MB of output in
+four seconds, and Hammerspoon has been seen to restart afterwards. The usual
+trigger was lazy extension loading, since `-- Loading extension: pasteboard` is
+a console print like any other, so the *first* `hs -c` that touched an
+extension wedged and every later one was fine — which is exactly the shape that
+makes it look like an intermittent fault rather than a bug.
+
+The cause, in the installed `hs/ipc.lua` (1.1.1, identical to upstream master):
+
+- `hs.ipc` replaces the global `print` (lines 65-87) with one that prints to
+  the console and then mirrors the text to every registered CLI instance. It
+  guards against re-entering itself with `module.print_inside(id)`, and when
+  the guard trips it *reports* that with `log.w(...)`.
+- `hs.logger` formats through `hs.printf`, which is `print(string.format(...))`
+  (`_coresetup.lua:26`) — a global `print` lookup, so the warning re-enters the
+  replacement while the guard counter is still raised, trips the guard, and
+  warns again, without bound. The guard is what floods.
+- A client's default console mode is the string `"none"` (line 373), which is
+  truthy, so the mirroring branch runs for every `hs -c`, not only for `hs -C`.
+  Only `-q` (line 384) skips it, and it must come before `-c`, since flag
+  parsing stops at the first argument that is `--` or looks like a path.
+
+Upstream issue: https://github.com/Hammerspoon/hammerspoon/issues/3872
+
+`core/ipc-fix.lua` replaces the global `print` again, with a correct guard: a
+depth counter, and a nested print goes straight to the console and stops there.
+Nested output is still visible, it just never reaches the mirror, so it cannot
+recurse — and the warning that was the fuel is never emitted at all. The
+console write is a local `rawPrint` rebuilt on `hs._logmessage`, the same
+primitive `_coresetup.lua` uses, so it never touches the global `print`.
+
+It is loaded by an explicit `dofile` in `boot.lua` immediately after
+`ipc = require "hs.ipc"`: it has to run after `hs.ipc` has replaced `print` and
+before anything else in the config can print.
+
+The whole patch is guarded. It applies only if `hs.ipc` really is loaded and
+really has replaced `print`, and otherwise writes one line to the console
+saying why it did not. `ipcFixApplied` says which happened:
+
+```sh
+hs -q -c 'return tostring(ipcFixApplied)'
+```
+
+The `"none"` default is deliberately left alone. That is upstream's bug, and
+flipping it here would also change what `hs -i` shows in this config; the guard
+fixes the hang without changing what anyone asked to see.
+
+Scripted callers should still pass `-q` — [agfi:hammerspoon] does it for you —
+since a mirrored console line lands in the middle of the output a caller is
+parsing. It is no longer a hazard, just noise.
 
 ## Running zsh in the garden
 
@@ -261,6 +320,13 @@ characters and takes the ipc port down with it until the stuck client is
 killed, so the text must not travel in the command string — escaping it or
 base64-encoding it makes no difference. `alertV2FromBase64` exists for short
 messages typed by hand, where quoting is the only problem.
+
+Payload size is not the only way to wedge `hs -c` — printing to the console
+during a command used to do it too. That one is fixed now, by
+`core/ipc-fix.lua`; see "The ipc print recursion fix" above. So the old advice
+here, to warm every extension with a call of its own before driving anything
+interesting from the shell, is no longer needed. Passing a large payload in a
+file still is: that is a separate wedge and the patch does nothing for it.
 
 ### Stacking and positions
 
