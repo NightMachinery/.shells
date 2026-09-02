@@ -11,15 +11,18 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import time
+import unicodedata
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -40,8 +43,12 @@ from libs.common_sub_status import (
 
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 OAUTH_BETA = "oauth-2025-04-20"
-KEYCHAIN_SERVICE = "Claude Code-credentials"
+KEYCHAIN_SERVICE_BASE = "Claude Code-credentials"
+KEYCHAIN_ACCOUNT_FALLBACK = "claude-code-user"
+#: Claude Code rejects any account name outside this set and falls back.
+KEYCHAIN_ACCOUNT_RE = re.compile(r"^[a-zA-Z0-9._-]+$")
 CREDENTIALS_FILE = Path(os.path.expanduser("~/.claude/.credentials.json"))
+DEFAULT_PROFILE_CONFIG = Path(os.path.expanduser("~/.claude.json"))
 CACHE_FILE_NAME = "usage.json"
 LOGIN_HINT = "open `claude` (or run `/login` inside it) to refresh the token"
 
@@ -96,10 +103,82 @@ class FetchResult:
     fetched_at_s: float
     from_cache: bool = False
     stale_reason: str | None = None
+    #: "api" (fresh fetch), "api-cache" (our own response cache), or
+    #: "config-cache" (the profile's own cachedUsageUtilization).
+    source: str = "api"
 
 
-def read_keychain_item(*, account: str | None, timeout: float) -> dict | None:
-    command = ["security", "find-generic-password", "-s", KEYCHAIN_SERVICE]
+def keychain_service_for(config_dir: str | None) -> str:
+    """The Keychain service name Claude Code itself would use.
+
+    Mirrors the derivation in the Claude Code bundle: the service is
+    ``Claude Code-credentials`` plus, for any non-default config dir, ``-`` and
+    the first 8 hex digits of sha256 over the NFC-normalized config dir path.
+    ``CLAUDE_SECURESTORAGE_CONFIG_DIR`` wins over the config dir when it is set.
+    The suffix goes at the *end*, after ``-credentials``.
+    """
+    secure_dir = os.environ.get("CLAUDE_SECURESTORAGE_CONFIG_DIR")
+    if secure_dir is not None:
+        hashed = secure_dir
+    else:
+        hashed = config_dir or ""
+
+    if not hashed:
+        return KEYCHAIN_SERVICE_BASE
+
+    digest = hashlib.sha256(
+        unicodedata.normalize("NFC", hashed).encode("utf-8")
+    ).hexdigest()[:8]
+    return f"{KEYCHAIN_SERVICE_BASE}-{digest}"
+
+
+def keychain_account_default() -> str:
+    """The Keychain account name Claude Code itself would use ($USER)."""
+    try:
+        name = os.environ.get("USER") or getpass.getuser()
+    except OSError:
+        return KEYCHAIN_ACCOUNT_FALLBACK
+
+    if not name or not KEYCHAIN_ACCOUNT_RE.match(name):
+        return KEYCHAIN_ACCOUNT_FALLBACK
+
+    return name
+
+
+def profile_config_path(config_dir: str | None) -> Path:
+    # The default profile keeps its config at ~/.claude.json -- home root, not
+    # inside ~/.claude/, which has no .claude.json at all. A custom config dir
+    # keeps it inside that dir.
+    if config_dir:
+        return Path(os.path.expanduser(config_dir)) / ".claude.json"
+
+    return DEFAULT_PROFILE_CONFIG
+
+
+def credentials_file_paths(config_dir: str | None) -> list[Path]:
+    paths: list[Path] = []
+    if config_dir:
+        paths.append(Path(os.path.expanduser(config_dir)) / ".credentials.json")
+    if CREDENTIALS_FILE not in paths:
+        paths.append(CREDENTIALS_FILE)
+
+    return paths
+
+
+def read_json_file(path: Path) -> dict | None:
+    try:
+        with path.open(encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    return data if isinstance(data, dict) else None
+
+
+def read_keychain_item(
+    *, service: str, account: str | None, timeout: float
+) -> dict | None:
+    command = ["security", "find-generic-password", "-s", service]
     if account is not None:
         command.extend(["-a", account])
     command.append("-w")
@@ -127,28 +206,21 @@ def read_keychain_item(*, account: str | None, timeout: float) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
-def keychain_token_infos(*, timeout: float) -> list[TokenInfo]:
+def keychain_token_infos(
+    *, service: str, accounts: list[str | None], timeout: float
+) -> list[TokenInfo]:
     if sys.platform != "darwin":
         return []
 
-    # Claude Code has stored credentials under different keychain account
-    # names over time (the login username, later "unknown"). Orphaned items
-    # from old versions keep their long-expired token and, without an
-    # account filter, `security` returns whichever item comes first -- so
-    # read every candidate and let the caller pick the freshest.
-    try:
-        login_user: str | None = getpass.getuser()
-    except OSError:
-        login_user = None
-    accounts: list[str | None] = []
-    for account in (None, login_user, "unknown"):
-        if account not in accounts:
-            accounts.append(account)
-
     infos: list[TokenInfo] = []
     seen_tokens: set[str] = set()
+    seen_accounts: list[str | None] = []
     for account in accounts:
-        data = read_keychain_item(account=account, timeout=timeout)
+        if account in seen_accounts:
+            continue
+        seen_accounts.append(account)
+
+        data = read_keychain_item(service=service, account=account, timeout=timeout)
         if data is None:
             continue
 
@@ -170,14 +242,13 @@ def best_token_info(infos: list[TokenInfo]) -> TokenInfo | None:
     return max(infos, key=freshness, default=None)
 
 
-def read_credentials_file() -> dict | None:
-    try:
-        with CREDENTIALS_FILE.open(encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, json.JSONDecodeError):
-        return None
+def read_credentials_file(config_dir: str | None = None) -> tuple[dict, Path] | None:
+    for path in credentials_file_paths(config_dir):
+        data = read_json_file(path)
+        if data is not None:
+            return data, path
 
-    return data if isinstance(data, dict) else None
+    return None
 
 
 def token_info_from_oauth(data: dict, *, source: str) -> TokenInfo | None:
@@ -202,24 +273,53 @@ def token_info_from_oauth(data: dict, *, source: str) -> TokenInfo | None:
     )
 
 
-def get_token(*, timeout: float) -> TokenInfo:
+def get_token(
+    *,
+    timeout: float,
+    config_dir: str | None = None,
+    keychain_service: str | None = None,
+    keychain_account: str | None = None,
+) -> TokenInfo:
     env_token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
     if env_token:
         return TokenInfo(token=env_token, source="env")
 
-    keychain_info = best_token_info(keychain_token_infos(timeout=timeout))
+    service = keychain_service or keychain_service_for(config_dir)
+    account = keychain_account or keychain_account_default()
+
+    # The derived (service, account) pair is what current Claude Code writes,
+    # so it is authoritative and unambiguous even with several profiles logged
+    # in. Older versions stored the *default* profile under other account names
+    # ("unknown", or no filter at all), so probe those as a fallback -- but only
+    # for the default profile and only when the account was not pinned: a
+    # hashed service name can only have been written by a version that already
+    # used $USER, and probing without a filter there would just pick whichever
+    # orphan `security` returns first.
+    infos = keychain_token_infos(
+        service=service, accounts=[account], timeout=timeout
+    )
+    if not infos and keychain_account is None and not config_dir:
+        infos = keychain_token_infos(
+            service=service,
+            accounts=[None, account, "unknown"],
+            timeout=timeout,
+        )
+
+    keychain_info = best_token_info(infos)
     if keychain_info is not None:
         return keychain_info
 
-    file_creds = read_credentials_file()
+    file_creds = read_credentials_file(config_dir)
     if file_creds is not None:
-        info = token_info_from_oauth(file_creds, source="credentials-file")
+        data, path = file_creds
+        info = token_info_from_oauth(data, source=f"credentials-file:{path}")
         if info is not None:
             return info
 
+    tried = ", ".join(str(path) for path in credentials_file_paths(config_dir))
     raise UsageError(
         "no OAuth token found (tried CLAUDE_CODE_OAUTH_TOKEN, "
-        f"Keychain item {KEYCHAIN_SERVICE!r}, and {CREDENTIALS_FILE}); "
+        f"Keychain item {service!r} account {account!r}, and {tried}); "
         + LOGIN_HINT
     )
 
@@ -243,7 +343,12 @@ def read_cache(path: Path) -> FetchResult | None:
     if not isinstance(fetched_at, (int, float)) or not isinstance(payload, dict):
         return None
 
-    return FetchResult(payload=payload, fetched_at_s=float(fetched_at), from_cache=True)
+    return FetchResult(
+        payload=payload,
+        fetched_at_s=float(fetched_at),
+        from_cache=True,
+        source="api-cache",
+    )
 
 
 def write_cache(path: Path, payload: dict) -> None:
@@ -337,11 +442,47 @@ def get_usage(
                 fetched_at_s=cached.fetched_at_s,
                 from_cache=True,
                 stale_reason=str(exc),
+                source="api-cache",
             )
         raise
 
     write_cache(cache_file, payload)
-    return FetchResult(payload=payload, fetched_at_s=time.time())
+    return FetchResult(payload=payload, fetched_at_s=time.time(), source="api")
+
+
+def config_cache_result(config_path: Path) -> FetchResult | None:
+    """The profile's own usage cache, as written by Claude Code itself.
+
+    Claude Code stores the whole usage payload per profile under
+    ``cachedUsageUtilization`` in that profile's ``.claude.json``, in exactly
+    the shape the endpoint returns. That makes a credential-free, network-free
+    fallback possible for any profile. It is only as fresh as the last Claude
+    Code session in that profile, which is why callers annotate its age.
+    """
+    data = read_json_file(config_path)
+    if data is None:
+        return None
+
+    cached = data.get("cachedUsageUtilization")
+    if not isinstance(cached, dict):
+        return None
+
+    payload = cached.get("utilization")
+    if not isinstance(payload, dict):
+        return None
+
+    fetched_at_ms = cached.get("fetchedAtMs")
+    if isinstance(fetched_at_ms, bool) or not isinstance(fetched_at_ms, (int, float)):
+        fetched_at_s = 0.0
+    else:
+        fetched_at_s = float(fetched_at_ms) / 1000.0
+
+    return FetchResult(
+        payload=payload,
+        fetched_at_s=fetched_at_s,
+        from_cache=True,
+        source="config-cache",
+    )
 
 
 def parse_utilization(value: object) -> float | None:
@@ -464,6 +605,11 @@ def render_window(style: Style, window: UsageWindow) -> str:
             f"resets {format_relative(window.resets_at_s)} "
             f"({format_timestamp(window.resets_at_s)})"
         )
+        if window.resets_at_s < time.time():
+            # Only reachable with cached data. The percent is no longer
+            # meaningful, but do not rewrite it to 0 -- that would fabricate a
+            # reading we never took.
+            bits.append(style.dim("(rolled over)"))
 
     if window.severity is not None and window.severity != "normal":
         bits.append(style.red(window.severity))
@@ -490,13 +636,26 @@ def render_extra_usage(style: Style, extra: object) -> str | None:
     return f"{style.bold('Extra usage')}: " + ", ".join(bits)
 
 
-def render_human(style: Style, *, token_info: TokenInfo, result: FetchResult) -> str:
-    lines = [style.bold(style.cyan("Claude Code plan usage"))]
+def render_human(
+    style: Style,
+    *,
+    token_info: TokenInfo | None,
+    result: FetchResult,
+    profile: str = "",
+    warnings: list[str] | None = None,
+    keychain: dict | None = None,
+) -> str:
+    del keychain  # reported in --json only; the human header stays terse
+    heading = "Claude Code plan usage"
+    if profile:
+        heading += f" [{profile}]"
+    lines = [style.bold(style.cyan(heading))]
 
-    plan = token_info.subscription_type or "unknown"
-    lines.append(f"Plan: {style.magenta(plan)} ({token_info.source})")
+    plan = (token_info.subscription_type if token_info else None) or "unknown"
+    token_source = token_info.source if token_info else result.source
+    lines.append(f"Plan: {style.magenta(plan)} ({token_source})")
 
-    if token_info.expired:
+    if token_info is not None and token_info.expired:
         lines.append(
             style.yellow(
                 "OAuth token expired "
@@ -514,20 +673,43 @@ def render_human(style: Style, *, token_info: TokenInfo, result: FetchResult) ->
     if extra_line is not None:
         lines.append(extra_line)
 
+    lines.extend(style.yellow(warning) for warning in warnings or ())
+
     fetched = f"Fetched: {format_timestamp(result.fetched_at_s)}"
+    annotated = False
+
+    if result.source == "config-cache":
+        age = (
+            format_relative(result.fetched_at_s)
+            if result.fetched_at_s > 0
+            else "age unknown"
+        )
+        fetched += " " + style.yellow(f"[local cache: {age}]")
+        annotated = True
+    elif result.from_cache and result.stale_reason is None:
+        fetched += " " + style.dim("(cached)")
+
     if result.stale_reason is not None:
         reason = result.stale_reason
         if len(reason) > 80:
             reason = reason[:77] + "..."
-        fetched += " " + style.red(f"[stale cache: {reason}]")
-    elif result.from_cache:
-        fetched += " " + style.dim("(cached)")
-    lines.append(style.dim(fetched) if result.stale_reason is None else fetched)
+        label = "no live data" if result.source == "config-cache" else "stale cache"
+        fetched += " " + style.red(f"[{label}: {reason}]")
+        annotated = True
+
+    lines.append(fetched if annotated else style.dim(fetched))
 
     return "\n".join(lines)
 
 
-def render_json(*, token_info: TokenInfo, result: FetchResult) -> str:
+def render_json(
+    *,
+    token_info: TokenInfo | None,
+    result: FetchResult,
+    profile: str = "",
+    warnings: list[str] | None = None,
+    keychain: dict | None = None,
+) -> str:
     windows = [
         {
             "key": window.key,
@@ -547,9 +729,13 @@ def render_json(*, token_info: TokenInfo, result: FetchResult) -> str:
 
     return json.dumps(
         {
-            "plan": token_info.subscription_type,
-            "token_source": token_info.source,
-            "token_expired": token_info.expired,
+            "profile": profile or None,
+            "source": result.source,
+            "keychain": keychain,
+            "warnings": list(warnings or ()),
+            "plan": token_info.subscription_type if token_info else None,
+            "token_source": token_info.source if token_info else None,
+            "token_expired": token_info.expired if token_info else None,
             "windows": windows,
             "extra_usage": result.payload.get("extra_usage"),
             "cache": {
@@ -645,6 +831,47 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--config-dir",
+        default=env_first(
+            "claude_code_usage_config_dir",
+            "CLAUDE_CODE_USAGE_CONFIG_DIR",
+            default="",
+        ),
+        help=(
+            "The profile's CLAUDE_CONFIG_DIR. Empty means the default profile: "
+            "config at ~/.claude.json and a Keychain service with no hash "
+            "suffix. Deliberately NOT defaulted from CLAUDE_CONFIG_DIR itself, "
+            "so running inside a Claude Code session cannot silently switch "
+            "which profile is reported (default: %(default)r)."
+        ),
+    )
+    parser.add_argument(
+        "--profile-label",
+        default=env_first(
+            "claude_code_usage_profile_label",
+            "CLAUDE_CODE_USAGE_PROFILE_LABEL",
+            default="",
+        ),
+        help="Profile name shown in the header (default: %(default)r).",
+    )
+    parser.add_argument(
+        "--keychain-service",
+        default=None,
+        help=(
+            "Override the derived Keychain service name. Only needed if a "
+            "Claude Code build changes the derivation (default: derived from "
+            "--config-dir)."
+        ),
+    )
+    parser.add_argument(
+        "--keychain-account",
+        default=None,
+        help=(
+            "Override the derived Keychain account name; also disables the "
+            "legacy account probe (default: $USER)."
+        ),
+    )
+    parser.add_argument(
         "--color",
         choices=("auto", "always", "never"),
         default="auto",
@@ -682,24 +909,68 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     style = build_style(args)
 
+    config_dir = args.config_dir or None
+    config_path = profile_config_path(config_dir)
+    warnings: list[str] = []
+
+    token_info: TokenInfo | None = None
+    failure: str | None = None
     try:
-        token_info = get_token(timeout=args.timeout)
-        result = get_usage(
-            token_info,
-            cache_file=cache_path(args.cache_dir),
-            ttl_s=args.cache_ttl,
-            refresh=args.refresh,
+        token_info = get_token(
             timeout=args.timeout,
-            user_agent=args.user_agent,
+            config_dir=config_dir,
+            keychain_service=args.keychain_service,
+            keychain_account=args.keychain_account,
         )
     except UsageError as exc:
-        print(f"claude_code_usage: {exc}", file=sys.stderr)
-        return 1
+        failure = str(exc)
 
+    result: FetchResult | None = None
+    if token_info is not None:
+        try:
+            result = get_usage(
+                token_info,
+                cache_file=cache_path(args.cache_dir),
+                ttl_s=args.cache_ttl,
+                refresh=args.refresh,
+                timeout=args.timeout,
+                user_agent=args.user_agent,
+            )
+        except UsageError as exc:
+            failure = str(exc)
+
+    if result is None:
+        # No token at all, or a fetch failure with no response cache to fall
+        # back on (which used to be a fatal exit 1). The profile's own cache is
+        # written by Claude Code itself, so it is the right last resort.
+        result = config_cache_result(config_path)
+        if result is None:
+            print(
+                f"claude_code_usage: {failure or 'no usage data available'}",
+                file=sys.stderr,
+            )
+            return 1
+        result = replace(result, stale_reason=failure)
+
+    render_kwargs = {
+        "token_info": token_info,
+        "result": result,
+        "profile": args.profile_label,
+        "warnings": warnings,
+        # No usable cross-check exists that a token belongs to this profile:
+        # the payload carries no account id, the tokens are opaque, and
+        # resets_at is recomputed per response (so it is not a fingerprint) and
+        # re-anchors on each new session. Report the item that was used and let
+        # a human judge instead of emitting a guess that cries wolf.
+        "keychain": {
+            "service": args.keychain_service or keychain_service_for(config_dir),
+            "account": args.keychain_account or keychain_account_default(),
+        },
+    }
     if args.json:
-        print(render_json(token_info=token_info, result=result))
+        print(render_json(**render_kwargs))
     else:
-        print(render_human(style, token_info=token_info, result=result))
+        print(render_human(style, **render_kwargs))
 
     return 0
 
