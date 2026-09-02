@@ -558,14 +558,20 @@ function claude-session-selftest {
     ensure-cmd go pandoc @RET
 
     local dir="${NIGHTDIR}/golang/claude_session"
-    #: One profile's transcripts are corpus enough for a parity check.
+    #: Every profile's transcripts, one run each: the parity check takes a
+    #: single directory, and picking just one of them would quietly shrink the
+    #: corpus to whichever sorted first.
     local -a corpus_dirs
     corpus_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
-    local corpus="${corpus_dirs[1]}"
 
     pushf "${dir}" && {
         assert go test -count=1 ./... @RET
-        CLAUDE_SESSION_CORPUS="${corpus}" assert go test -count=1 -v -run Parity ./... @RET
+
+        local corpus
+        for corpus in "${corpus_dirs[@]}" ; do
+            ecgray "$0: parity over ${corpus/#${HOME}/~}"
+            CLAUDE_SESSION_CORPUS="${corpus}" assert go test -count=1 -v -run Parity ./... @RET
+        done
     } always { popf }
 }
 ##
