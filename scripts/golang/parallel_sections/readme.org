@@ -1,0 +1,49 @@
+#+TITLE: parallel_sections
+
+Runs several labelled commands at once and prints their output in the order they
+were *given*, not the order they finished.
+
+* Why this is not a shell loop
+
+Backgrounded zsh subshells cannot return anything, so every section has to be
+routed through a temporary file. Reassembling those in declared order, keeping
+each section's stderr attributable while they interleave, and reducing the set to
+a single exit status is a surprising amount of bookkeeping, and all of it is easy
+to get subtly wrong. Doing it once here is cheaper than doing it badly at each
+call site.
+
+* Interface
+
+The spec is JSON on stdin, so a caller never has to quote a command line into a
+string:
+
+#+begin_src json
+{"mode": "text",
+ "sections": [{"label": "default", "argv": ["some-cmd", "--flag"]},
+              {"label": "work",    "argv": ["some-cmd", "--other"]}]}
+#+end_src
+
+- =mode: "text"= concatenates the sections' stdout in order, separated by a
+  blank line.
+- =mode: "json"= parses each section's stdout as one JSON document and emits the
+  lot as an array. A caller splicing reports together needs this: two bare
+  objects in a row are not JSON.
+
+Anything a section writes to stderr is forwarded with its label prefixed, even
+when that section succeeded -- a warning about serving stale data is exactly the
+sort of thing worth seeing. A section that fails does not stop the others. The
+exit status is 1 if any section failed, 2 if the spec itself was unusable, and 0
+otherwise.
+
+* Callers
+
+- [agfi:claude-code-usage-all], which fans out one =claude_code_usage.py= per
+  Claude Code profile. See =docs/claude_code_usage.md=.
+
+* Installing
+
+Built from this directory, the same way as the other Go tools here:
+
+#+begin_src zsh
+ensure-dep1 parallel_sections go-install-local "${NIGHTDIR}/golang/parallel_sections"
+#+end_src

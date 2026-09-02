@@ -53,8 +53,7 @@ The OAuth access token is looked up in this order:
 
 1. the `CLAUDE_CODE_OAUTH_TOKEN` environment variable,
 2. the macOS Keychain generic password for this profile (read via
-   `security find-generic-password`; the first read may pop a one-time Keychain
-   permission prompt),
+   `security find-generic-password`),
 3. `<config dir>/.credentials.json`, then `~/.claude/.credentials.json` (Linux),
 4. the profile's own usage cache — see Caching below.
 
@@ -95,6 +94,14 @@ window re-anchors whenever a session starts after a gap. So instead of guessing,
 `--json` reports the `keychain` service and account actually used, which makes a
 wrong derivation visible by eye. The chosen account also appears in the
 human-readable output source, e.g. `(keychain:evar)`.
+
+Keychain items are ACL'd per item, and `security` is not the application that
+created them, so the *first* read of each one can pop a one-time authorization
+prompt. That is per profile: granting access for the default profile does
+nothing for a newly added one. A denied or unanswered prompt makes the token
+lookup fail, and the report then silently drops to the config-cache fallback —
+so if a profile shows `[local cache: ...]` when you expected live data, read the
+`[no live data: ...]` reason next to it before suspecting the derivation.
 
 The Keychain/file credential also provides the plan name (`subscriptionType`)
 and token expiry. An expired token only produces a warning — the request is
@@ -167,11 +174,19 @@ is the work profile, i.e. `claude_code_usage_profile=work`.
 `claude-code-usage-all` runs the profiles in parallel — separate accounts and
 separate requests, so there is nothing to serialize — but prints them in
 `claude_code_profile_order` so the output does not shuffle with whichever
-request happened to finish first. A profile that fails prints its error on
-stderr and makes the function return nonzero, without costing the other
-profiles their reports. With `--json` (or `claude_code_usage_json_p`) the
-per-profile objects are slurped into a JSON array, since two bare objects in a
-row are not JSON.
+request happened to finish first. A profile that fails has its error forwarded
+to stderr, labelled with the profile name, and makes the function return
+nonzero without costing the other profiles their reports. With `--json` (or
+`claude_code_usage_json_p`) the per-profile objects are emitted as a JSON array,
+since two bare objects in a row are not JSON.
+
+The fan-out itself is `golang/parallel_sections`, not shell: backgrounded zsh
+subshells cannot return anything, so each profile would need a temporary file,
+and reassembling those in declared order while keeping stderr attributable and
+reducing the set to one exit status is bookkeeping better done once in Go. Both
+paths build their argv through the same `h-claude-code-usage-argv`, so the
+single-profile and fan-out invocations cannot drift apart. See
+`golang/parallel_sections/readme.org`.
 
 Knobs (set as env vars): `claude_code_usage_profile` (default `default`),
 `claude_code_usage_timeout_s`, `claude_code_usage_cache_ttl_s`, and the
