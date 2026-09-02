@@ -150,6 +150,26 @@ function zle-fim-accept {
     fi
 
     LBUFFER+="${out}"
+
+    #: Invalidate the autosuggestion, which was computed for the line as it was
+    #: before this insertion. Because our widgets are named `zle-*' the plugin
+    #: never sees the edit and will not do this itself, and a stale suggestion
+    #: is not merely out of date:
+    #:
+    #:   - its `region_highlight' entry still covers the columns the completion
+    #:     just landed in, so the code we inserted is painted in the suggestion
+    #:     colour and reads as ghost text rather than as the real thing;
+    #:   - right arrow still accepts it, appending something that no longer
+    #:     follows from the line. With `ec hello' suggesting ` world and then
+    #:     some', completing to `ec hello world' left the rest of that
+    #:     suggestion live.
+    #:
+    #: `autosuggest-fetch' rather than `autosuggest-clear', so a suggestion
+    #: that fits the *new* line takes its place instead of nothing.
+    if (( ${+widgets[autosuggest-fetch]} )) ; then
+        zle autosuggest-fetch
+    fi
+
     h-fim-zle-say "${fim_zle_sym_ok}" "inserted ${#out} chars${took}"
 }
 
