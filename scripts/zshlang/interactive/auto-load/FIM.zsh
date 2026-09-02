@@ -24,69 +24,43 @@ typeset -gi fim_zle_cursor=0
 
 typeset -g fim_zle_us=$'\x1f'  #: field separator of the child's payload
 
-#: Status goes in POSTDISPLAY, not `zle -M'.
+#: Status goes to `zle -M', below the prompt, and is told apart by a symbol
+#: rather than by colour.
 #:
-#: `zle -M' cannot carry colour at all: it renders the string through ZLE's
-#: display code, which *visualises* control characters rather than emitting
-#: them, so an SGR escape arrives as a reverse-video `^[' followed by a
-#: literal `[38;2;170;170;170m'. That is not a quirk of `-M'; `zle -R' does
-#: the same. Measured on the wire, not inferred -- and easy to miss, because
-#: `cat -v' renders a real ESC byte and a literal `^'+`[' pair identically.
+#: `zle -M' cannot carry colour: it renders the string through ZLE's display
+#: code, which *visualises* control characters rather than emitting them, so an
+#: SGR escape arrives as a reverse-video `^[' followed by a literal
+#: `[38;2;170;170;170m'. `zle -R' behaves the same. Measured on the wire, and
+#: easy to get wrong, because `cat -v' renders a real ESC byte and a literal
+#: `^'+`[' pair identically.
 #:
-#: POSTDISPLAY plus `region_highlight' is the mechanism that does work, and it
-#: is what zsh-autosuggestions greys its ghost text with: zle applies the
-#: colour itself, so what reaches the terminal is a real `\e[38;5;242m'.
-typeset -g fim_zle_style="${fim_zle_style:-fg=242}"
-typeset -g fim_zle_style_error="${fim_zle_style_error:-fg=red}"
-
-#: What we last put in POSTDISPLAY, and in which style, so the colour can be
-#: put back after something else rebuilds `region_highlight'.
-typeset -g fim_zle_post_text=''
-typeset -g fim_zle_post_style=''
+#: The mechanism that *can* carry colour is POSTDISPLAY plus `region_highlight',
+#: which is how zsh-autosuggestions greys its ghost text. Do not use it here.
+#: POSTDISPLAY is not a neutral scratch area, it is the suggestion slot, and
+#: [agfi:_zsh_autosuggest_accept] does `BUFFER="$BUFFER$POSTDISPLAY"' whenever
+#: the cursor is at the end of the line -- so right arrow, `^E', and eleven
+#: other accept and partial-accept widgets splice the status message into the
+#: command line as real text. Putting a message there also evicts the
+#: suggestion you were about to accept, and puts grey text just past the cursor
+#: where the trained reflex is to accept it.
+#:
+#: Hence symbols. They cost nothing, survive anywhere, and are legible on a
+#: monochrome terminal or in a pasted transcript.
+typeset -g fim_zle_sym_lead="${fim_zle_sym_lead:-❄}"   #: this line is ours
+typeset -g fim_zle_sym_wait="${fim_zle_sym_wait:-⋯}"   #: in flight
+typeset -g fim_zle_sym_ok="${fim_zle_sym_ok:-✓}"       #: something was inserted
+typeset -g fim_zle_sym_none="${fim_zle_sym_none:-∅}"   #: nothing, but no fault
+typeset -g fim_zle_sym_err="${fim_zle_sym_err:-✗}"     #: it failed
 ##
-function h-fim-zle-highlight {
-    #: (Re-)colour whatever we last posted.
-    if test -z "${fim_zle_post_style}" ; then
-        return 0
-    fi
-
-    #: Only if POSTDISPLAY is still ours: zsh-autosuggestions owns the same
-    #: slot and takes it back the moment you type.
-    if [[ "${POSTDISPLAY}" != "${fim_zle_post_text}" ]] ; then
-        return 0
-    fi
-
-    region_highlight+=(
-        "${#BUFFER} $(( ${#BUFFER} + ${#POSTDISPLAY} )) ${fim_zle_post_style}"
-    )
-}
-
-function h-fim-zle-post {
-    local text="${1}" style="${2}"
-
-    #: Two spaces so it reads as an annotation rather than as buffer text.
-    typeset -g fim_zle_post_text="  ${text}"
-    typeset -g fim_zle_post_style="${style}"
-    POSTDISPLAY="${fim_zle_post_text}"
-
-    h-fim-zle-highlight
-}
-
 function h-fim-zle-say {
-    #: Status is dim: a footnote to what you are typing, not part of it.
-    h-fim-zle-post "FIM: ${1}" "${fim_zle_style}"
-}
-
-function h-fim-zle-say-error {
-    #: Failures are the one thing here worth looking up for.
-    h-fim-zle-post "FIM: ${1}" "${fim_zle_style_error}"
-}
-
-function zle-fim-say {
-    #: The same, reachable from the `zle -F' handler. POSTDISPLAY and
-    #: `region_highlight' are ZLE parameters, so they are only bound inside a
-    #: widget -- exactly like BUFFER and CURSOR, and exactly as silent about it.
-    h-fim-zle-post "FIM: ${1}" "${2:-${fim_zle_style}}"
+    #: Callable from a widget *and* from the `zle -F' handler: unlike BUFFER,
+    #: POSTDISPLAY and friends, `zle -M' works in both.
+    #:
+    #: A blank line first, so status can never be read as a continuation of
+    #: the command you are writing. A newline is safe here even though `zle -M'
+    #: visualises control characters -- that treatment is for the unprintable
+    #: ones, and a newline comes out as a real line break.
+    zle -M $'\n'"${fim_zle_sym_lead} FIM ${1} ${2}"
 }
 ##
 function h-fim-zle-child {
@@ -171,21 +145,12 @@ function zle-fim-accept {
     if [[ "${BUFFER}" != "${fim_zle_buffer}" ]] || (( CURSOR != fim_zle_cursor )) ; then
         #: The line moved under us, so the completion no longer fits where it
         #: was asked for. Dropping it beats inserting it in the wrong place.
-        h-fim-zle-say "line changed, discarded completion${took}"
+        h-fim-zle-say "${fim_zle_sym_none}" "line changed, discarded completion${took}"
         return 0
     fi
 
     LBUFFER+="${out}"
-
-    #: We take this widget back from fast-syntax-highlighting at startup (see
-    #: [agfi:h-fim-zle-unwrap]), so nothing re-colours the code we just
-    #: inserted. Do it by hand -- before our own entry goes on, because
-    #: `_zsh_highlight' rebuilds `region_highlight' from scratch.
-    if (( ${+functions[_zsh_highlight]} )) ; then
-        _zsh_highlight
-    fi
-
-    h-fim-zle-say "inserted ${#out} chars${took}"
+    h-fim-zle-say "${fim_zle_sym_ok}" "inserted ${#out} chars${took}"
 }
 
 function zle-fim-widget {
@@ -194,7 +159,7 @@ function zle-fim-widget {
     local provider="${fim_provider:-codestral}"
     local model="${fim_provider_model[${provider}]}"
     if test -z "${model}" ; then
-        h-fim-zle-say-error "unknown provider '${provider}'"
+        h-fim-zle-say "${fim_zle_sym_err}" "unknown provider '${provider}'"
         return 1
     fi
 
@@ -232,7 +197,7 @@ function zle-fim-widget {
     local pid
     if ! read pid <&$fd ; then
         exec {fd}<&- 2>/dev/null
-        h-fim-zle-say-error 'could not start the request'
+        h-fim-zle-say "${fim_zle_sym_err}" 'could not start the request'
         return 1
     fi
 
@@ -242,7 +207,7 @@ function zle-fim-widget {
     typeset -g fim_zle_fd="${fd}" fim_zle_pid="${pid}"
 
     zle -F "${fd}" h-fim-zle-response
-    h-fim-zle-say "requesting ${model}…"
+    h-fim-zle-say "${fim_zle_sym_wait}" "requesting ${model}"
 }
 
 function h-fim-zle-response {
@@ -269,7 +234,7 @@ function h-fim-zle-response {
     typeset -g fim_zle_fd='' fim_zle_pid='' fim_zle_started=''
 
     if [[ "${payload}" != *"${fim_zle_us}"* ]] ; then
-        zle zle-fim-say -- "no response${took}" "${fim_zle_style_error}"
+        h-fim-zle-say "${fim_zle_sym_err}" "no response${took}"
         return 0
     fi
 
@@ -284,12 +249,12 @@ function h-fim-zle-response {
     err="${err#fim-get: }"
 
     if [[ "${ret}" != 0 ]] ; then
-        zle zle-fim-say -- "${err:-failed (${ret})}" "${fim_zle_style_error}"
+        h-fim-zle-say "${fim_zle_sym_err}" "${err:-failed (${ret})}"
         return 0
     fi
 
     if test -z "${out}" ; then
-        zle zle-fim-say -- "empty completion${took}"
+        h-fim-zle-say "${fim_zle_sym_none}" "empty completion${took}"
         return 0
     fi
 
@@ -302,25 +267,18 @@ function h-fim-zle-response {
 #: two would leave Escape wedged.
 function zle-fim-escape {
     if h-fim-zle-cancel ; then
-        #: One press, one job. Escape cancelled a request, so it does not also
-        #: leave insert mode -- press it again for that.
-        #:
-        #: This is also the only ordering that works. `vi-cmd-mode' is still
-        #: one of fast-syntax-highlighting's wrapped widgets, so calling it
-        #: runs `_zsh_highlight', which rebuilds `region_highlight' and drops
-        #: the colour off the message; and posting the message *after* the
-        #: call leaves it a redraw behind, so it never appears at all.
-        h-fim-zle-say 'aborted'
-        return 0
+        h-fim-zle-say "${fim_zle_sym_none}" 'aborted'
     fi
 
-    #: Nothing of ours to cancel, so Escape is just Escape.
+    #: Whatever Escape did before we took the key over. Safe to call after
+    #: reporting now: `zle -M' is not something `_zsh_highlight' can undo,
+    #: which it was back when the message lived in `region_highlight'.
     zle vi-cmd-mode
 }
 
 function zle-fim-escape-vicmd {
     if h-fim-zle-cancel ; then
-        h-fim-zle-say 'aborted'
+        h-fim-zle-say "${fim_zle_sym_none}" 'aborted'
     else
         #: What Escape did here before.
         zle beep
@@ -333,7 +291,6 @@ function zle-fim-escape-vicmd {
 #: reason.
 zle -N zle-fim-widget
 zle -N zle-fim-accept
-zle -N zle-fim-say
 zle -N zle-fim-escape
 zle -N zle-fim-escape-vicmd
 
@@ -342,30 +299,4 @@ bindkey -M vicmd '^[.' zle-fim-widget
 bindkey -M viins '^[' zle-fim-escape    #: was vi-cmd-mode
 bindkey -M vicmd '^[' zle-fim-escape-vicmd  #: was beep
 ##
-autoload -Uz add-zsh-hook
-
-function h-fim-zle-unwrap {
-    #: Take our widgets back from fast-syntax-highlighting.
-    #:
-    #: f-sy-h wraps every widget that exists when it loads, and its wrapper
-    #: runs `_zsh_highlight' *after* the widget body -- which rebuilds
-    #: `region_highlight' from scratch and throws away the entry that colours
-    #: our POSTDISPLAY. The in-flight message then came out in whatever style
-    #: f-sy-h had left covering that column (38;5;16, near-black) instead of
-    #: gray. Widgets created after f-sy-h loads are never wrapped, which is
-    #: why an ad-hoc one sourced at the prompt kept its colour and ours did
-    #: not: we load at =.zshrc:271= and f-sy-h at =:572=.
-    #:
-    #: Re-running `zle -N' binds the name straight back to our function. This
-    #: has to happen after the whole of =.zshrc=, hence a one-shot precmd.
-    zle -N zle-fim-widget
-    zle -N zle-fim-accept
-    zle -N zle-fim-say
-    zle -N zle-fim-escape
-    zle -N zle-fim-escape-vicmd
-
-    add-zsh-hook -d precmd h-fim-zle-unwrap
-}
-
-add-zsh-hook precmd h-fim-zle-unwrap
 ##
