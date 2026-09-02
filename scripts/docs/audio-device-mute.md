@@ -11,15 +11,15 @@ speakers muted?", answered correctly while you are wearing headphones.
 macOS mute is per-device and persistent. `volume-mute-p`
 (`zshlang/auto-load/others/system.zsh`) asks
 `osascript -e "output muted of (get volume settings)"`, and that only ever
-reports the **current default output device**. A representative moment on this
-laptop:
+reports the **current default output device**. A representative moment, with a
+monitor, some earbuds and the laptop all present (invented values):
 
-    PHL 279P1             uid=410C…2278             muted=nil    DisplayPort
-    WF-1000XM6            uid=58-18-…:output        muted=false  Bluetooth   ← default
-    MacBook Air Speakers  uid=BuiltInSpeakerDevice  muted=true   Built-in
+    Some Monitor          uid=00000000-…-000000000000  muted=nil    DisplayPort
+    Some Earbuds          uid=00-00-00-00-00-00:output muted=false  Bluetooth   ← default
+    MacBook Air Speakers  uid=BuiltInSpeakerDevice     muted=true   Built-in
 
 `volume-mute-p` says "not muted". The internal speakers are muted. Unplug the
-headphones and you land on silent speakers with nothing having reported it.
+earbuds and you land on silent speakers with nothing having reported it.
 
 `audio-guard` already had to reach past the default device for the same reason;
 `h-audio-guard-unmute-device` unmutes by name, and its comment spells out why.
@@ -82,7 +82,7 @@ the built-in *microphone*, which is a different device with its own mute flag.
     2   could not tell
 
 `2` covers: no backend reachable, no such device, and a device with no mute
-control at all — a DisplayPort monitor genuinely has none, which is also why
+control at all — a DisplayPort monitor typically has none, which is also why
 `h-audio-guard-mute` re-checks after every write.
 
 This departs from the rest of the `-p` family on purpose. Folding "unknown" into
