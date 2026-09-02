@@ -122,7 +122,7 @@ func main() {
 func usage() {
 	fmt.Fprint(os.Stderr, `usage:
   claude_session render [flags] <session.jsonl>   #: transcript -> markdown/org on stdout
-  claude_session list   [flags] <sessions-dir>    #: TSV of sessions, newest first
+  claude_session list   [flags] <sessions-dir>... #: TSV of sessions, newest first
   claude_session name           <session.jsonl>   #: session name, empty if unnamed
 
 render flags:
@@ -136,6 +136,11 @@ render flags:
 list flags:
   -snippet-len N        max snippet width (default 120)
   -jobs N               worker count (default: CPU count)
+
+Several session directories may be given: they are merged and sorted together.
+With more than one, each relative path is prefixed by its root's profile -- the
+parent directory's name, e.g. .claude / .claude-work -- since the same project
+appears under each. A single directory is listed exactly as before.
 
 list emits: epoch <TAB> path <TAB> local time <TAB> relative path <TAB> snippet
 `)
