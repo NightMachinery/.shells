@@ -138,10 +138,15 @@ my windows, anything where me touching the keyboard would corrupt your result â€
 do not ask me to stay away and do not silently steal focus. Put up a banner:
 
 ```
-hs -c 'agentBannerOn("what you are doing", 900)'   # seconds; omit for 30 min
-hs -c 'agentBannerOff()'                            # as soon as you are done
-hs -c 'return agentBannerActive()'
+hs -q -c 'agentBannerOn("what you are doing", 900)'   # seconds; omit for 30 min
+hs -q -c 'agentBannerOff()'                            # as soon as you are done
+hs -q -c 'return agentBannerActive()'
 ```
+
+`-q` because without it Hammerspoon relays everything printed to its console
+back to you for the duration of the command, so an unrelated hotkey logging a
+line lands in the middle of your output. It has to come before `-c`. (From zsh
+the `hammerspoon` function passes it for you, but your shell is not zsh.)
 
 It covers every screen for a moment so I cannot miss it, then collapses to a
 strip across the top of each one, on every space. It never takes focus and

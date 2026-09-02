@@ -15,6 +15,10 @@ function sanitizeLocationTable(location)
     return sanitized
 end
 
+--- Prints *and* returns the JSON. The shell reads it through
+--- [agfi:h-hammerspoon-eval], which now passes `-q' to hs.ipc - and `-q'
+--- suppresses print but not the command's return value, so a function that only
+--- printed would come back empty. The print stays for use from the console.
 function printLocation()
     local location = hs.location.get()
     if location then
@@ -26,12 +30,15 @@ function printLocation()
 
         if success then
             print(jsonOrError)
+            return jsonOrError
         else
             -- If encoding fails, print the error message
             print("Error encoding location data to JSON:", jsonOrError)
+            return
         end
     else
         print("No location data available.")
+        return
     end
 end
 
