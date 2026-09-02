@@ -70,10 +70,23 @@ session opens in emacs as =Neru.org= rather than a uuid:
 ,#+SUBTITLE: Claude Code session 3e500e15-2d94-44c6-bac4-4d6634c743f6
 #+end_example
 
-=claude_session list [flags] <sessions-dir>= walks the directory for =.jsonl=
-files and writes one TSV line per session, newest first: =epoch=, absolute
-path, local time, path relative to the scanned directory, and the first user
-message as a snippet.
+=claude_session list [flags] <sessions-dir>...= walks the directories for
+=.jsonl= files and writes one TSV line per session, newest first: =epoch=,
+absolute path, local time, path relative to the scanned directory, and the
+first user message as a snippet.
+
+More than one directory may be given, and they are merged and sorted together
+rather than listed one after another. Claude Code keeps a projects directory
+per config home, and [[agfi:claude-work]] runs a second one, so a single root
+would leave every work session invisible.
+
+With several roots the relative path is prefixed by a label, because it is
+otherwise ambiguous --- every profile holds a =-Users-evar-scripts/=. The label
+is the first path component in which the roots *differ*: =.claude= and
+=.claude-work= for the profile roots, and still those two when the caller
+scopes each root down to a single project, where the last component is the same
+for both and the parent is =projects= for both. A single root is listed exactly
+as before, with no label.
 
 - =-snippet-len N= --- snippet width cap, default 120.
 - =-subagents= --- also list subagent transcripts. Off by default: =render=
@@ -367,7 +380,12 @@ instead of the current directory's.
 Variables:
 
 - =claude_code_view_session_fz_scope= --- =project= (default) or =all=.
-- =claude_code_view_session_fz_projects_dir= --- defaults to =~/.claude/projects=.
+- =claude_code_session_projects_dirs= --- an array of projects directories to
+  search. Defaults to every profile's, found by globbing
+  =~/.claude*/projects=, so a new config home needs no wiring.
+- =claude_code_session_projects_dirs_glob= --- overrides that glob.
+- =claude_code_view_session_fz_projects_dir= --- the older singular name, still
+  honoured as a single-directory override.
 - =claude_code_view_session_fz_fz_opts= --- extra options for =fz=.
 - =claude_code_view_session_fz_subagents_p= --- =y= to also list subagent
   transcripts in the picker.

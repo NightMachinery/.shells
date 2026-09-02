@@ -33,34 +33,44 @@ func cmdList(argv []string) {
 	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
 	fs.Parse(guardPathArgs(fs, argv))
 
-	dir := fs.Arg(0)
-	if dir == "" {
+	// Several roots, because Claude Code keeps one projects directory per
+	// config home and `claude-work` runs a second one. Merged here rather than
+	// by the caller, so the sort below is over all of them at once.
+	roots := fs.Args()
+	if len(roots) == 0 {
 		fatal("list: no sessions directory given")
 	}
+	labels := profileLabels(roots)
 
-	var files []string
-	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+	// Which root a file came from travels with it: `rel` is relative to that
+	// root, and carries its label when there is more than one.
+	type found struct{ path, root string }
+	var files []found
+
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() || !strings.HasSuffix(p, ".jsonl") {
+				return nil
+			}
+			// Subagent transcripts live under `<session>/subagents/`. render
+			// inlines them into their parent, so listing them next to real
+			// sessions is just noise -- they were a third of the list.
+			sep := string(filepath.Separator)
+			if !*subagentsP && strings.Contains(p, sep+"subagents"+sep) {
+				return nil
+			}
+			files = append(files, found{path: p, root: root})
+			return nil
+		})
 		if err != nil {
-			return nil
+			fatal(err.Error())
 		}
-		if d.IsDir() || !strings.HasSuffix(p, ".jsonl") {
-			return nil
-		}
-		// Subagent transcripts live under `<session>/subagents/`. render
-		// inlines them into their parent, so listing them next to real
-		// sessions is just noise -- they were a third of the list.
-		sep := string(filepath.Separator)
-		if !*subagentsP && strings.Contains(p, sep+"subagents"+sep) {
-			return nil
-		}
-		files = append(files, p)
-		return nil
-	})
-	if err != nil {
-		fatal(err.Error())
 	}
 	if len(files) == 0 {
-		fatal("list: no session files found in: " + dir)
+		fatal("list: no session files found in: " + strings.Join(roots, " "))
 	}
 
 	infos := make([]sessionInfo, len(files))
@@ -79,7 +89,12 @@ func cmdList(argv []string) {
 		go func() {
 			defer wg.Done()
 			for idx := range queue {
-				infos[idx] = scanSession(files[idx], dir, *snippetLen)
+				f := files[idx]
+				info := scanSession(f.path, f.root, *snippetLen)
+				if l := labels[f.root]; l != "" {
+					info.rel = filepath.Join(l, info.rel)
+				}
+				infos[idx] = info
 			}
 		}()
 	}
@@ -101,6 +116,59 @@ func cmdList(argv []string) {
 	for _, s := range infos {
 		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", s.epoch, s.path, s.stamp, s.rel, s.snippet)
 	}
+}
+
+// How each root is labelled in the listing, keyed by root. The relative path
+// alone is ambiguous the moment more than one root is listed: every profile
+// has a -Users-evar-scripts/ under it, and in project scope the roots end in
+// that same component.
+//
+// So the label is the first path component in which the roots actually
+// differ. For ~/.claude/projects and ~/.claude-work/projects that is .claude
+// and .claude-work, and it stays right when the caller scopes the roots down
+// to one project apiece -- which taking a fixed component would not: their
+// parent is then "projects" for both.
+//
+// Empty for a single root, so single-root output is unchanged.
+func profileLabels(roots []string) map[string]string {
+	labels := make(map[string]string, len(roots))
+	if len(roots) < 2 {
+		return labels
+	}
+
+	split := make([][]string, len(roots))
+	shortest := -1
+	for i, r := range roots {
+		split[i] = strings.Split(filepath.Clean(r), string(filepath.Separator))
+		if shortest < 0 || len(split[i]) < shortest {
+			shortest = len(split[i])
+		}
+	}
+
+	at := 0
+	for ; at < shortest; at++ {
+		same := true
+		for i := 1; i < len(split); i++ {
+			if split[i][at] != split[0][at] {
+				same = false
+				break
+			}
+		}
+		if !same {
+			break
+		}
+	}
+
+	// One root is a prefix of another, so there is no differing component for
+	// the shorter one; its own last component is the best it has.
+	for i, r := range roots {
+		idx := at
+		if idx >= len(split[i]) {
+			idx = len(split[i]) - 1
+		}
+		labels[r] = split[i][idx]
+	}
+	return labels
 }
 
 // How much of the file's end is searched for the last message's timestamp,
