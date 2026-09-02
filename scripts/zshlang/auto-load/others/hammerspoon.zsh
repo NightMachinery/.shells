@@ -1,5 +1,30 @@
 BTT_HS_NOISES_UID='5DBF0BE7-5822-459A-B450-36E3396124F9'
 ##
+function h-hammerspoon-eval {
+    : "[agfi:hammerspoon] -c <lua>, with its extension-loading chatter stripped
+
+Hammerspoon interleaves lines like '-- Loading extension: task' into stdout the
+first time an extension is used -- which is exactly when a watcher-spawned task
+has just loaded one. Unfiltered, a result reads as
+'true-- Loading extension: task' and a successful call is reported as a failure.
+
+Only those lines and the outer whitespace go; everything else comes back
+verbatim, so this is safe over multi-line results such as JSON. The exit status
+is Hammerspoon's own -- and note that it is 0 whether or not the Lua found
+anything, so callers must check the RESULT string, not the status."
+    setopt localoptions extendedglob
+
+    local out
+    out="$(hammerspoon -c "$@")" || return $?
+
+    local -a lines
+    lines=( "${(@f)out}" )
+    lines=( "${(@)lines:#-- *}" )
+    out="${(pj:\n:)lines}"
+
+    print -r -- "${${out##[[:space:]]##}%%[[:space:]]##}"
+}
+##
 function hs-reload {
     : "reload the Hammerspoon config now, whether or not a hold is up"
 

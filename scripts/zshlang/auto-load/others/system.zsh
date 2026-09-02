@@ -1154,10 +1154,9 @@ function location-get-darwin {
 	##
   # CoreLocationCLI -json | jq .
   ##
-  hammerspoon -c 'printLocation()' |
-    rg -v '^-- ' |
-    jq .
-  #: Sometimes outputs '-- Loading extension: inspect'
+  #: [agfi:h-hammerspoon-eval] and not a bare `hammerspoon -c', which sometimes
+  #: interleaves '-- Loading extension: inspect' into the JSON.
+  h-hammerspoon-eval 'printLocation()' | jq .
   ##
 }
 
