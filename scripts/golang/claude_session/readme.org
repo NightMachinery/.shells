@@ -415,6 +415,12 @@ numbers its windows from 1 again on every restart, so the pid is what stops a
 dead kitty's entries from being read as live ones. =SessionEnd= runs
 =claude-code-session-unregister=; that is hygiene rather than correctness.
 
+This path needs nothing done to it for a second profile, unlike the picker.
+The registry stores the absolute =transcript_path= the hook was handed, so a
+[[agfi:claude-work]] session records a path under =~/.claude-work/projects/=
+without anything here knowing that profiles exist; and the hooks fire at all
+because =~/.claude-work/settings.json= symlinks to the same tracked file.
+
 Finding the window is the awkward part. =KITTY_WINDOW_ID= would be the obvious
 key, but Claude Code does not pass it down: its processes come out carrying
 =KITTY_PID= and =KITTY_LISTEN_ON= and no window id at all, and the detached

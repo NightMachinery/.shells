@@ -147,23 +147,73 @@ function h-claude-code-session-to-org-pandoc {
 }
 aliasfn h-claude-code-session-to-org h-claude-code-session-to-org-pandoc
 
+function h-claude-code-session-projects-dirs {
+    #: Every Claude Code profile's projects directory, one per line.
+    #:
+    #: Claude Code keeps its state under `$CLAUDE_CONFIG_DIR`, and
+    #: [agfi:claude-work] runs a second config home for the work account, so
+    #: there is more than one of these and a session started there is
+    #: otherwise invisible to the picker. A glob rather than a written-out
+    #: list, so a third profile needs no wiring -- the same reasoning as the
+    #: socket glob in [agfi:h-claude-code-session-kitty-socket].
+    ##
+    ensure-array claude_code_session_projects_dirs
+    if (( ${#claude_code_session_projects_dirs} )) ; then
+        print -rl -- "${claude_code_session_projects_dirs[@]}"
+        return 0
+    fi
+
+    #: The older singular name, so an existing override still works.
+    if test -n "${claude_code_view_session_fz_projects_dir}" ; then
+        ec "${claude_code_view_session_fz_projects_dir}"
+        return 0
+    fi
+
+    local -a dirs
+    dirs=( ${~${claude_code_session_projects_dirs_glob:-${HOME}/.claude*/projects}}(N/) )
+    if (( ${#dirs} == 0 )) ; then
+        ecerr "$0: no Claude Code projects directory found"
+        return 1
+    fi
+
+    print -rl -- "${dirs[@]}"
+}
+
 function h-claude-code-session-select-fz {
     #: Interactively selects a Claude Code session `.jsonl` file and
     #: prints its path.
     ##
     local scope="${claude_code_view_session_fz_scope:-project}"
-    local projects_dir="${claude_code_view_session_fz_projects_dir:-${HOME}/.claude/projects}"
     ensure-array claude_code_view_session_fz_fz_opts
     local fz_opts=("${claude_code_view_session_fz_fz_opts[@]}")
 
-    local sessions_dir="${projects_dir}"
-    if [[ "${scope}" != "all" ]] ; then
+    local -a projects_dirs
+    projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
+
+    #: Every profile's copy of this project, not just the personal one.
+    local -a wanted
+    local d
+    if [[ "${scope}" == "all" ]] ; then
+        wanted=("${projects_dirs[@]}")
+    else
         local project_dir_name="${${PWD//\//-}//./-}"
-        sessions_dir="${projects_dir}/${project_dir_name}"
+        for d in "${projects_dirs[@]}" ; do
+            wanted+=("${d}/${project_dir_name}")
+        done
     fi
 
-    if ! test -d "${sessions_dir}" ; then
-        ecerr "$0: sessions directory does not exist: ${sessions_dir}"
+    #: A profile that has never been used in this directory simply has no such
+    #: directory, which is normal rather than an error.
+    local -a sessions_dirs
+    for d in "${wanted[@]}" ; do
+        if test -d "${d}" ; then
+            sessions_dirs+=("${d}")
+        fi
+    done
+
+    if (( ${#sessions_dirs} == 0 )) ; then
+        ecerr "$0: no sessions directory exists for scope '${scope}':"
+        ecerr "  ${(j: :)wanted}"
         return 1
     fi
 
@@ -179,8 +229,10 @@ function h-claude-code-session-select-fz {
         list_args+=(-subagents)
     fi
 
+    #: `list` merges the roots and sorts across all of them, and labels each
+    #: relative path with its profile when there is more than one.
     local lines
-    lines="$(claude_session list "${list_args[@]}" "${sessions_dir}")" @RET
+    lines="$(claude_session list "${list_args[@]}" "${sessions_dirs[@]}")" @RET
 
     local selected
     selected="$(ec "${lines}" | fz --delimiter=$'\t' --with-nth='3..' --no-multi "${fz_opts[@]}")" @RET
@@ -506,7 +558,10 @@ function claude-session-selftest {
     ensure-cmd go pandoc @RET
 
     local dir="${NIGHTDIR}/golang/claude_session"
-    local corpus="${claude_code_view_session_fz_projects_dir:-${HOME}/.claude/projects}"
+    #: One profile's transcripts are corpus enough for a parity check.
+    local -a corpus_dirs
+    corpus_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
+    local corpus="${corpus_dirs[1]}"
 
     pushf "${dir}" && {
         assert go test -count=1 ./... @RET
