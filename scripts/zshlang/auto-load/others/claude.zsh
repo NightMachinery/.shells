@@ -187,6 +187,7 @@ function claude-code-usage {
 #: it on. Do not confuse these with the =-notif= functions further down, which
 #: only arm and print no report.
 aliasfnq claude-code-usage-notify claude_code_usage_notif_p=y claude-code-usage
+aliasfn ccun claude-code-usage-notify
 
 function claude-code-usage-work {
     claude_code_usage_profile=work claude-code-usage "$@"
@@ -454,26 +455,48 @@ function h-claude-code-usage-notif-for-profile {
     h-claude-code-usage-notif "${session}" "${profile}" session weekly_all
 }
 
-function claude-code-usage-notif {
-    #: Arms a notification for when the default profile's limits have reset.
-    #: Arms only; prints no report. [agfi:claude-code-usage-notify] and its
-    #: siblings do both. See =docs/claude_code_usage.md=.
-    ##
+#: Scheduling entry points. These schedule a notifier and print no report,
+#: which is not the intended way in -- the =-notify= reports are -- so they are
+#: =h-=. They stay callable as an escape hatch for when you already have a
+#: report in front of you.
+#:
+#: The tmux session names they schedule into keep the older, unprefixed
+#: spelling: those are what shows up in `tmux ls`, they collide with nothing,
+#: and renaming them would orphan any notifier already armed.
+function h-claude-code-usage-notif-schedule {
     h-claude-code-usage-notif-for-profile default
 }
-aliasfn ccun claude-code-usage-notif
 
-function claude-code-usage-work-notif {
+function h-claude-code-usage-work-notif-schedule {
     h-claude-code-usage-notif-for-profile work
 }
 
-function claude-code-usage-fable-notif {
+function h-claude-code-usage-fable-notif-schedule {
     #: The weekly Fable window as well as the windows that block everything.
-    #: Its own tmux session, so it can be armed alongside
-    #: [agfi:claude-code-usage-notif] rather than replacing it.
+    #: Its own tmux session, so it can be scheduled alongside the default
+    #: profile's notifier rather than replacing it.
     ##
     h-claude-code-usage-notif 'claude-code-usage-fable-notif' default \
         session weekly_all 'weekly:Fable'
+}
+
+function claude-code-usage-fable-notify {
+    #: The default profile's report, then schedules the *Fable* watcher rather
+    #: than the profile one. Fable is not a profile -- it is an extra window on
+    #: the default profile -- so it cannot be reached by setting
+    #: =claude_code_usage_notif_p=, and needs its own entry point.
+    ##
+    local retcode=0
+    claude_code_usage_notif_p=n claude-code-usage "$@" || retcode=$?
+
+    if (( retcode == 0 )) ; then
+        #: =>&2= because our stdout may be a JSON document a caller is about to
+        #: parse; non-fatal because a failed schedule must not make a working
+        #: report look broken.
+        h-claude-code-usage-fable-notif-schedule >&2 || true
+    fi
+
+    return "${retcode}"
 }
 
 function claude-code-usage-notif-sessions {
