@@ -249,6 +249,253 @@ function volume-dec {
   volume-inc $((amount*-1))
 }
 ##
+#: * Mute state of a SPECIFIC output device
+#:
+#: macOS mute is per-device and persistent, so [agfi:volume-mute-p] -- which
+#: asks osascript about the current DEFAULT output -- cannot say whether the
+#: laptop speakers are muted while you are on headphones. These can.
+#:
+#: <device> is `builtin', a device UID, or an exact device name. `builtin'
+#: resolves by the UID `BuiltInSpeakerDevice' first and by a Built-in transport
+#: scan second, never by name: the name is model dependent ("MacBook Air
+#: Speakers", "MacBook Pro Speakers", ...).
+#:
+#: EXIT STATUS OF THE PREDICATES IS THREE-VALUED: 0 muted, 1 NOT muted, 2 could
+#: not tell -- no backend reachable, no such device, or a device with no mute
+#: control at all (a DisplayPort monitor has none). A bare
+#: `if volume-mute-internal-p' therefore reads 2 as "not muted"; callers that
+#: must distinguish have to inspect $? themselves. The alternative -- folding
+#: unknown into 1 -- would let a guard silently conclude the speakers are live
+#: when it has no idea.
+#:
+#: There is no system_profiler backend here, and there cannot be: SPAudioDataType
+#: reports name, manufacturer, transport and which device is default, and no mute
+#: field at all. That is why the Hammerspoon-free backend is CoreAudio.
+#: See [[file:~/scripts/docs/audio-device-mute.md]].
+##
+typeset -g volume_mute_device_unknown=2
+
+#: ** Backends
+#:
+#: Each echoes one word -- true, false, nodevice, or nomute -- and fails ONLY
+#: when the backend itself could not run. That split is what lets the gateway
+#: fall through on "no backend" while treating "no such device" as the answer it
+#: is, without asking the same question twice.
+
+function h-volume-mute-device-get-hs {
+    : "<device> -> true|false|nodevice|nomute; fails iff Hammerspoon is unreachable"
+    #: Fast (~10ms warm): IPC to the already-running Hammerspoon instance.
+    #: A NAMED Lua function, not an inline expression: `hammerspoon -c' hangs on
+    #: payloads of a few hundred characters and takes the ipc port down with it.
+    #: See hammerspoon/core/audio-devices.lua.
+    h-hammerspoon-eval "return audioDeviceMutedGet([[${1}]])" 2>/dev/null
+}
+
+function h-volume-mute-device-set-hs {
+    : "<device> <true|false> -> the state AFTER the write, or nodevice|nomute"
+    h-hammerspoon-eval "return audioDeviceMutedSet([[${1}]], ${2})" 2>/dev/null
+}
+
+#: Slower than the Hammerspoon path (a fresh process), but it needs nothing
+#: running. The FIRST call after an edit compiles via scriptisto and takes
+#: seconds; every call after that is cached.
+function h-volume-mute-device-swift {
+    : "runs audio_device_mute.swift, translating its exit codes into the words"
+    local res retcode=0
+    res="$(audio_device_mute.swift "$@" 2>/dev/null)" || retcode=$?
+
+    case "$retcode" in
+        0) ec "$res" ;;
+        3) ec nodevice ;;
+        4) ec nomute ;;
+        *) return "$retcode" ;;
+    esac
+}
+aliasfn h-volume-mute-device-get-swift h-volume-mute-device-swift get
+aliasfn h-volume-mute-device-set-swift h-volume-mute-device-swift set
+
+function h-volume-mute-device-status {
+    : "maps a backend's word to this family's 0-muted/1-not/2-unknown status"
+    local res="${1}" ctx="${2}"
+    #: Blame the public function, not this helper: the caller is what the user
+    #: typed and what they can act on.
+    local me="${funcstack[2]:-$0}"
+
+    case "$res" in
+        true)  return 0 ;;
+        false) return 1 ;;
+        nodevice)
+            ecerr "${me}: no such output device: ${ctx}"
+            return $volume_mute_device_unknown ;;
+        nomute)
+            ecerr "${me}: ${ctx} has no mute control."
+            return $volume_mute_device_unknown ;;
+        *)
+            ecerr "${me}: unexpected answer for ${ctx}: ${res:-<empty>}"
+            return $volume_mute_device_unknown ;;
+    esac
+}
+
+#: ** Predicates
+
+function volume-mute-device-p-hs {
+    : "returns 0 muted, 1 not muted, 2 unknown, for <device>, via Hammerspoon"
+    @darwinOnly
+
+    local device="${1}"
+    assert-args device @RET
+
+    local res
+    res="$(h-volume-mute-device-get-hs "$device")" || {
+        ecerr "$0: could not reach Hammerspoon."
+        return $volume_mute_device_unknown
+    }
+
+    h-volume-mute-device-status "$res" "$device"
+}
+
+function volume-mute-device-p-swift {
+    : "returns 0 muted, 1 not muted, 2 unknown, for <device>, via CoreAudio"
+    @darwinOnly
+
+    local device="${1}"
+    assert-args device @RET
+
+    local res
+    res="$(h-volume-mute-device-get-swift "$device")" || {
+        ecerr "$0: audio_device_mute.swift could not run."
+        return $volume_mute_device_unknown
+    }
+
+    h-volume-mute-device-status "$res" "$device"
+}
+
+function volume-mute-device-p {
+    : "returns 0 muted, 1 not muted, 2 unknown, for <device>
+
+Gateway: the fast Hammerspoon helper, falling back to the CoreAudio one. Only an
+UNREACHABLE backend falls through; 'no such device' and 'no mute control' are
+answers, and retrying them on the second backend would just pay for the same no
+twice."
+    @darwinOnly
+
+    local device="${1}"
+    assert-args device @RET
+
+    local res
+    res="$(h-volume-mute-device-get-hs "$device")" || {
+        ecgray "$0: Hammerspoon unreachable, falling back to CoreAudio."
+        res="$(h-volume-mute-device-get-swift "$device")" || {
+            ecerr "$0: no working backend for ${device}."
+            return $volume_mute_device_unknown
+        }
+    }
+
+    h-volume-mute-device-status "$res" "$device"
+}
+aliasfn volume-mute-device-is volume-mute-device-p
+
+#: ** Setters
+
+function volume-mute-device {
+    : "mute <device>; set volume_what_v=false to unmute. Returns 2 if unknown.
+
+Reports on the state AFTER the write rather than on the request being accepted:
+a device that ignores a mute ignores an unmute too, and calling that success is
+exactly the failure [agfi:h-audio-guard-mute] exists to work around."
+    @darwinOnly
+
+    local device="${1}"
+    assert-args device @RET
+    local v="${volume_what_v:-true}"
+
+    local res
+    res="$(h-volume-mute-device-set-hs "$device" "$v")" || {
+        ecgray "$0: Hammerspoon unreachable, falling back to CoreAudio."
+        res="$(h-volume-mute-device-set-swift "$device" "$v")" || {
+            ecerr "$0: no working backend for ${device}."
+            return $volume_mute_device_unknown
+        }
+    }
+
+    h-volume-mute-device-status "$res" "$device"
+    local now=$?
+
+    if (( now == volume_mute_device_unknown )) ; then
+        return $volume_mute_device_unknown
+    elif [[ "$v" == true ]] && (( now == 0 )) ; then
+        return 0
+    elif [[ "$v" != true ]] && (( now == 1 )) ; then
+        return 0
+    fi
+
+    ecerr "$0: ${device} ignored the request to set muted=${v}."
+    return 1
+}
+aliasfn volume-unmute-device volume_what_v=false volume-mute-device
+
+function volume-mute-device-toggle {
+    : "flip <device>'s mute; refuses to guess when the state is unknown"
+    local device="${1}"
+    assert-args device @RET
+
+    volume-mute-device-p "$device"
+    local state=$?
+
+    if (( state == volume_mute_device_unknown )) ; then
+        ecerr "$0: cannot toggle ${device}: its mute state is unknown."
+        return $volume_mute_device_unknown
+    elif (( state == 0 )) ; then
+        volume-unmute-device "$device"
+    else
+        volume-mute-device "$device"
+    fi
+}
+##
+#: ** The built-in speakers, whether or not they are the current output
+
+function volume-mute-internal-p {
+    : "returns 0 iff the INTERNAL laptop speakers are muted; 2 if it cannot tell
+
+Not [agfi:volume-mute-p], which answers for whichever device is default right
+now and so reports the headphones instead."
+    volume-mute-device-p builtin
+}
+aliasfn volume-mute-internal-is volume-mute-internal-p
+aliasfn volume-mute-internal-p-hs volume-mute-device-p-hs builtin
+aliasfn volume-mute-internal-p-swift volume-mute-device-p-swift builtin
+
+function volume-mute-internal {
+    : "mute the INTERNAL laptop speakers, leaving the default output alone"
+    volume-mute-device builtin
+}
+
+function volume-unmute-internal {
+    : "unmute the INTERNAL laptop speakers, leaving the default output alone"
+    volume-unmute-device builtin
+}
+
+function volume-mute-internal-toggle {
+    volume-mute-device-toggle builtin
+    local retcode=$?
+
+    local alert_dur=0.5
+    #: The same fact [agfi:volume-mute-toggle] reports, for a second device, so
+    #: it shares that id prefix rather than opening a band of its own -- and is
+    #: suffixed, or muting the speakers would overwrite the output band.
+    local alert_id="${volume_mute_alert_id_prefix}internal"
+
+    if (( retcode == volume_mute_device_unknown )) ; then
+        awaysh-fast alert "internal speakers: mute state UNKNOWN"
+    elif volume-mute-internal-p ; then
+        awaysh-fast alert "internal speakers muted"
+    else
+        awaysh-fast alert "internal speakers UNMUTED"
+    fi
+
+    return $retcode
+}
+##
 function mute-external_() {
 	: "You probably want to use mute-external which calls this in a loop.
 Usage: mute-external_ [<headphone-volume-from-100>=1]"

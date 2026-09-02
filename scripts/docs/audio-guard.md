@@ -16,6 +16,10 @@ predicate; see `bell-auto.md`.
 The logic is `zshlang/auto-load/others/audio-guard.zsh`. The periodic half is a
 LaunchAgent, installed from `launchers/audio-guard/`.
 
+The guard reaches past the default output device to mute and unmute a device by
+name; the general form of that, including a predicate for the internal speakers
+specifically, is in `audio-device-mute.md`.
+
 ## Triggers
 
 Three, each independently switchable. Only `idle` is enabled out of the box.
