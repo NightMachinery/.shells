@@ -1,5 +1,53 @@
 BTT_HS_NOISES_UID='5DBF0BE7-5822-459A-B450-36E3396124F9'
 ##
+#: Every scripted call to the Hammerspoon CLI should go through
+#: [agfi:hammerspoon] rather than calling `hs' directly, so that the timeout,
+#: the retry flag and the quiet default are decided in one place.
+#:
+#: Quiet by default: without `-q', hs.ipc mirrors everything printed to the
+#: Hammerspoon console back to the client for the duration of the command, so
+#: an unrelated hotkey logging a line lands in the middle of the output the
+#: caller is parsing. `-q' leaves errors and the command's own return value.
+#: Until hammerspoon/core/ipc-fix.lua that mirroring was worse than noise - it
+#: recursed and wedged the client - see hammerspoon/docs/hammerspoon.md.
+#:
+#: hammerspoon_quiet_p=n opts out, for Lua that produces its result with
+#: `print' rather than with `return'. `-i', `-C' and `-P' opt out on their own:
+#: they exist to show console output, so quieting them would be perverse.
+
+function h-hammerspoon-console-wanted-p {
+    : "true when the arguments already ask for console output: -i, -C or -P"
+
+    #: Exact matches only. hs.ipc compares whole arguments too (ipc.lua ~line
+    #: 384), so a bundled `-Cc' would not turn console mode on there either.
+    local arg
+    for arg in "$@" ; do
+        case "$arg" in
+            -i|-C|-P) return 0 ;;
+        esac
+    done
+
+    return 1
+}
+
+function hammerspoon {
+    : "the Hammerspoon CLI, quiet by default; hammerspoon_quiet_p=n to let console output through"
+
+    local quiet_p="${hammerspoon_quiet_p:-y}"
+
+    local -a quiet_opts=()
+    if bool "$quiet_p" && ! h-hammerspoon-console-wanted-p "$@" ; then
+        #: Before the caller's arguments: hs.ipc stops reading flags at the
+        #: first argument that is `--' or looks like a path, so `-q' after
+        #: `-c <lua>' can be missed.
+        quiet_opts=(-q)
+    fi
+
+    #: -t is the client's own receive timeout (default 4); the gtimeout is the
+    #: backstop for a Hammerspoon that never answers at all.
+    assert gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" @RET
+}
+##
 function h-hammerspoon-eval {
     : "[agfi:hammerspoon] -c <lua>, with its extension-loading chatter stripped
 
@@ -11,7 +59,11 @@ has just loaded one. Unfiltered, a result reads as
 Only those lines and the outer whitespace go; everything else comes back
 verbatim, so this is safe over multi-line results such as JSON. The exit status
 is Hammerspoon's own -- and note that it is 0 whether or not the Lua found
-anything, so callers must check the RESULT string, not the status."
+anything, so callers must check the RESULT string, not the status.
+
+[agfi:hammerspoon] now passes -q, which stops that chatter at the source, so
+the stripping is belt and braces: it still covers a caller that opts out with
+hammerspoon_quiet_p=n."
     setopt localoptions extendedglob
 
     local out

@@ -2,10 +2,8 @@ function '$' {
   reval "$@"
 }
 ##
-function hammerspoon() {
-  # -t timeout (default 4)
-  assert gtimeout 30s hs -A -t 5 "$@" @RET
-}
+#: [agfi:hammerspoon] now lives in zshlang/auto-load/others/hammerspoon.zsh,
+#: next to the rest of the Hammerspoon functions and to the knob it grew.
 ##
 function mcli-getexecpath_h() {
   brew unlink m-cli
