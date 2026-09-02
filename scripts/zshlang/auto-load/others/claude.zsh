@@ -116,26 +116,28 @@ function h-claude-code-profile-assert {
     fi
 }
 
-function claude-code-usage {
-    #: Shows the usage stats of one Claude Code profile's plan (like the in-app
-    #: =/usage=). [agfi:claude-code-usage-all] does every registered profile at
-    #: once, and is what the bare =ccu=/=ccs= aliases run.
-    #: See =docs/claude_code_usage.md=.
+function h-claude-code-usage-argv {
+    #: Prints the full argv for reporting one profile, one word per line.
+    #: Shared by [agfi:claude-code-usage] and the fan-out in
+    #: [agfi:claude-code-usage-all], so the two cannot drift apart.
     ##
-    local profile="${claude_code_usage_profile:-default}"
     local timeout_s="${claude_code_usage_timeout_s:-10}"
     local cache_ttl_s="${claude_code_usage_cache_ttl_s:-300}"
     local refresh_p="${claude_code_usage_refresh_p:-n}"
     local json_p="${claude_code_usage_json_p:-n}"
     local strip_ansi_p="${claude_code_usage_strip_ansi_p:-n}"
-    local notif_p="${claude_code_usage_notif_p:-y}"
 
-    ensure-cmd claude_code_usage.py @RET
+    local profile="${1}"
+    assert-args profile @RET
+    shift
+    local extra=("$@")
+
     h-claude-code-profile-assert "${profile}" @RET
 
     #: Per-profile cache dir: profiles share the endpoint but not the account,
     #: so one shared cache file would have them overwrite each other.
-    local script_args=(
+    local args=(
+        claude_code_usage.py
         --profile-label "${profile}"
         --config-dir "${claude_code_profiles[$profile]}"
         --cache-dir "${HOME}/tmp/.claude-usage/${profile}"
@@ -143,18 +145,37 @@ function claude-code-usage {
         --cache-ttl "${cache_ttl_s}"
     )
     if bool "${refresh_p}" ; then
-        script_args+=(--refresh)
+        args+=(--refresh)
     fi
     if bool "${json_p}" ; then
-        script_args+=(--json)
+        args+=(--json)
     fi
     if bool "${strip_ansi_p}" ; then
-        script_args+=(--color never)
+        args+=(--color never)
     fi
 
-    #: =script_args= before user args so explicit CLI flags win (argparse last-wins).
+    #: Caller args last, so explicit CLI flags win (argparse last-wins).
+    args+=("${extra[@]}")
+
+    ec "${(F)args}"
+}
+
+function claude-code-usage {
+    #: Shows the usage stats of one Claude Code profile's plan (like the in-app
+    #: =/usage=). [agfi:claude-code-usage-all] does every registered profile at
+    #: once, and is what the bare =ccu=/=ccs= aliases run.
+    #: See =docs/claude_code_usage.md=.
+    ##
+    local profile="${claude_code_usage_profile:-default}"
+    local notif_p="${claude_code_usage_notif_p:-y}"
+
+    ensure-cmd claude_code_usage.py @RET
+
+    local args
+    args=("${(@f)$(h-claude-code-usage-argv "${profile}" "$@")}") @TRET
+
     local retcode=0
-    $proxyenv revaldbg command claude_code_usage.py "${script_args[@]}" "$@" || retcode=$?
+    $proxyenv revaldbg command "${args[@]}" || retcode=$?
 
     if (( retcode == 0 )) && bool "${notif_p}" ; then
         #: After the report, so the human output is not held up and the
@@ -177,15 +198,24 @@ alias ccu-work='claude-code-usage-work'
 alias ccs-work='claude-code-usage-work'
 
 function claude-code-usage-all {
-    #: Every registered profile. Fetched in parallel -- each profile is a
-    #: separate account and a separate request, so there is nothing to
-    #: serialize -- but printed in =claude_code_profile_order= so the output
-    #: does not shuffle with whichever request finished first.
+    #: Every registered profile: separate accounts and separate requests, so
+    #: there is nothing to serialize.
+    #:
+    #: The fan-out itself is =golang/parallel_sections=, not shell. Backgrounded
+    #: zsh subshells cannot return anything, so each profile would need a temp
+    #: file, and then reassembling those in declared order, keeping each
+    #: profile's stderr attributable, and reducing the set to one exit status is
+    #: a pile of bookkeeping that is easy to get subtly wrong. Go does it once,
+    #: properly, and hands back ordered output.
     ##
     local profiles=("${claude_code_profile_order[@]}")
     assert-args profiles @RET
 
+    ensure-cmd claude_code_usage.py jq @RET
+    ensure-dep1 parallel_sections go-install-local "${NIGHTDIR}/golang/parallel_sections" @RET
+
     local json_p="${claude_code_usage_json_p:-n}"
+    local notif_p="${claude_code_usage_notif_p:-y}"
     local arg
     for arg in "$@" ; do
         #: =-all= splices several reports together, so it has to know whether
@@ -195,53 +225,42 @@ function claude-code-usage-all {
         fi
     done
 
-    local tmp_dir
-    tmp_dir="$(gmktemp -d)" @TRET
+    local mode=text
+    if bool "${json_p}" ; then
+        mode=json
+    fi
 
-    {
-        local p
+    local sections=() p args
+    for p in "${profiles[@]}" ; do
+        args=("${(@f)$(h-claude-code-usage-argv "${p}" "$@")}") @TRET
+
+        #: Built with jq rather than by hand, so an argument containing a
+        #: quote or a backslash cannot corrupt the spec. Fed in on stdin and
+        #: split, rather than via =--args=: jq still option-parses positional
+        #: arguments, so a =--profile-label= among them is taken as a jq flag.
+        sections+=("$(ec "${(F)args}" | jq -Rsc --arg label "${p}" '{label: $label, argv: (rtrimstr("\n") | split("\n"))}')") @TRET
+    done
+
+    local retcode=0
+    ec "${(F)sections}" |
+        jq -sc --arg mode "${mode}" '{mode: $mode, sections: .}' |
+        $proxyenv parallel_sections || retcode=$?
+
+    if bool "${notif_p}" ; then
+        #: The fan-out runs =claude_code_usage.py= directly rather than through
+        #: [agfi:claude-code-usage], so it does not inherit that function's
+        #: arming and has to do it here -- otherwise the bare =ccu= alias, which
+        #: is this function, would never arm anything at all.
+        #:
+        #: =>&2= because our stdout may be a JSON document a caller is about to
+        #: parse; non-fatal because a failed arm must not make a working report
+        #: look broken.
         for p in "${profiles[@]}" ; do
-            (
-                claude_code_usage_profile="${p}" claude-code-usage "$@" \
-                    >"${tmp_dir}/${p}.out" 2>"${tmp_dir}/${p}.err"
-                ec "$?" >"${tmp_dir}/${p}.ret"
-            ) &
+            h-claude-code-usage-notif-for-profile "${p}" >&2 || true
         done
-        wait
+    fi
 
-        local retcode=0 sep='' out=() ret=''
-        for p in "${profiles[@]}" ; do
-            out+=("${tmp_dir}/${p}.out")
-
-            ret="$(<"${tmp_dir}/${p}.ret")" || ret=1
-            if [[ "${ret}" != 0 ]] ; then
-                #: One dead profile must not cost us the others' reports.
-                retcode=1
-                ecerr "$0: profile ${p} failed:"
-                command cat -- "${tmp_dir}/${p}.err" >&2
-            fi
-        done
-
-        if bool "${json_p}" ; then
-            ensure-cmd jq @RET
-
-            command cat -- "${out[@]}" | jq -s '.'
-            #: Slurped into an array: two bare objects in a row are not JSON.
-        else
-            for p in "${profiles[@]}" ; do
-                ecn "${sep}"
-                sep=$'\n'
-
-                command cat -- "${tmp_dir}/${p}.out"
-            done
-        fi
-
-        return "${retcode}"
-    } always {
-        silent trs-rm "${tmp_dir}" || true
-        #: =silent= because [agfi:trs-rm] narrates its own =rm=, which would
-        #: land in the middle of the report.
-    }
+    return "${retcode}"
 }
 aliasfn claude-code-status claude-code-usage-all
 alias ccu='claude-code-usage-all'
@@ -369,7 +388,7 @@ function h-claude-code-usage-notif {
     #: =claude_code_usage_notif_p=n= is the recursion guard, and load-bearing:
     #: the report arms the notifier and the notifier reads the report.
     local json
-    json="$(claude_code_usage_notif_p=n claude_code_usage_json_p=y claude_code_usage_profile="${profile}" claude-code-usage)" @TRET
+    json="$(claude_code_usage_notif_p=n claude_code_usage_json_p=y claude_code_usage_profile="${profile}" claude-code-usage)" @RET
 
     local blocked_labels=() role out pct resets label
     integer blocked_at=0
