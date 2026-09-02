@@ -153,10 +153,31 @@ also reports `profile`, the data `source` (`api`, `api-cache` or
 
 ## Zsh wrapper
 
-`claude-code-usage` (alias `ccu`) forwards to the script. Knobs (set as env
-vars): `claude_code_usage_timeout_s`, `claude_code_usage_cache_ttl_s`, and the
-boolean `claude_code_usage_refresh_p`, `claude_code_usage_json_p`,
-`claude_code_usage_strip_ansi_p`. Extra CLI args are passed through after the
+`claude-code-usage` in `zshlang/auto-load/others/claude.zsh` reports one
+profile; `claude-code-usage-all` reports every registered profile, and is what
+the bare `ccu` / `ccs` / `claude-code-status` names run.
+
+Profiles are registered in the `claude_code_profiles` associative array, which
+maps a profile name to its `CLAUDE_CONFIG_DIR` (empty for the default profile),
+and are ordered by `claude_code_profile_order`. Adding a profile is one line in
+each: the config file path, the Keychain service and the cache dir all derive
+from the config dir. `claude-code-usage-work` (aliases `ccu-work`, `ccs-work`)
+is the work profile, i.e. `claude_code_usage_profile=work`.
+
+`claude-code-usage-all` runs the profiles in parallel — separate accounts and
+separate requests, so there is nothing to serialize — but prints them in
+`claude_code_profile_order` so the output does not shuffle with whichever
+request happened to finish first. A profile that fails prints its error on
+stderr and makes the function return nonzero, without costing the other
+profiles their reports. With `--json` (or `claude_code_usage_json_p`) the
+per-profile objects are slurped into a JSON array, since two bare objects in a
+row are not JSON.
+
+Knobs (set as env vars): `claude_code_usage_profile` (default `default`),
+`claude_code_usage_timeout_s`, `claude_code_usage_cache_ttl_s`, and the
+booleans `claude_code_usage_refresh_p`, `claude_code_usage_json_p`,
+`claude_code_usage_strip_ansi_p`. Each profile caches under
+`~/tmp/.claude-usage/<profile>/`. Extra CLI args are passed through after the
 derived ones, so explicit flags win.
 
 ## Color
