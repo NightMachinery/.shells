@@ -180,6 +180,49 @@ booleans `claude_code_usage_refresh_p`, `claude_code_usage_json_p`,
 `~/tmp/.claude-usage/<profile>/`. Extra CLI args are passed through after the
 derived ones, so explicit flags win.
 
+## Reset notifications
+
+Every `claude-code-usage` run also arms a one-shot background job that fires
+`notif` once the limits currently blocking that profile have reset, so you find
+out without having to keep re-running the report. Set
+`claude_code_usage_notif_p=n` to skip arming.
+
+- `claude-code-usage-notif` (alias `ccun`) — the default profile.
+- `claude-code-usage-work-notif` — the work profile.
+- `claude-code-usage-fable-notif` — the default profile, watching the weekly
+  Fable window as well. It has its own session, so it can be armed alongside
+  the plain one rather than replacing it.
+- `claude-code-usage-notif-cancel [session...]` — cancels, defaulting to all of
+  them.
+- `claude-code-usage-notif-status` — what is armed, and for when.
+
+A window counts as blocking at or above `claude_code_usage_notif_full_pct`
+(default 100). The deadline is the **latest** reset among the blocked windows,
+because a 5-hour rollover buys nothing while the weekly limit is still spent.
+When nothing is blocking, arming is skipped with a note; running it under `deus`
+arms for the next 5-hour rollover anyway, which is how to exercise the whole
+mechanism without having to be rate-limited first. A window the profile does not
+have at all — a team seat has no weekly window — is skipped.
+
+The job lives in a tmux session made by `tmuxnewsh2`, one per variant. `tmuxnew`
+kills the previous session's processes before creating the replacement, so
+re-arming *replaces* the pending notifier rather than stacking another one, and
+needs no lock, marker or redis key of its own. The tmux server is also
+independent of BrishGarden, so `brishz-restart` does not silently disarm
+anything. A reboot does, and the next report re-arms.
+
+The job polls the wall clock every `claude_code_usage_notif_poll_s` seconds
+(default 30) instead of issuing one long `sleep`, so suspending the laptop
+cannot skew a five-hour wait and it fires promptly on wake. It fires
+`claude_code_usage_notif_grace_s` seconds (default 30) after the reset so the
+endpoint has actually flipped by the time it says so, and notifies under a fixed
+`notif_group` so repeats replace each other instead of piling up.
+
+Since `remain-on-exit` is on here, a notifier that has fired leaves its tmux
+session behind holding a dead pane. `claude-code-usage-notif-status` reports
+that as already fired — which is also how to check whether a notification went
+off — and the next arm, or a cancel, clears it away.
+
 ## Color
 
 Color handling (`--color`, `--true-color`, `--dark-mode`, `--dark-theme`,
