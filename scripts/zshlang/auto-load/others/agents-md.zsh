@@ -11,7 +11,10 @@
 #: See =PE/Agents/readme.org=.
 ##
 function h-agents-md-agents {
-    #: The agents to assemble for, as `name<TAB>output path`.
+    #: The agents to assemble for, as `name<TAB>output path<TAB>mode`.
+    #:
+    #: The mode is empty for an ordinary target and `overlay` for one that
+    #: assembles only its own per-agent tiers; see [agfi:h-agents-md-parts].
     ##
     ec "claude"$'\t'"${HOME}/.claude/CLAUDE.md"
     ec "codex"$'\t'"${HOME}/.codex/AGENTS.md"
@@ -23,21 +26,45 @@ function h-agents-md-agents {
     #: https://antigravity.google/docs/rules-workflows . A global AGENTS.md is
     #: read by nothing: that path is workspace-scoped only.
     ec "antigravity"$'\t'"${HOME}/.gemini/GEMINI.md"
+    #: [agfi:claude-work] is Claude Code on a second config home, so a second
+    #: account. Claude Code takes its user memory from
+    #: `$CLAUDE_CONFIG_DIR/CLAUDE.md`, which is this path.
+    #:
+    #: An *overlay*, because the shared spine already reaches that profile
+    #: without us. Claude Code also walks every ancestor of the session's cwd
+    #: looking for `<dir>/CLAUDE.md` and `<dir>/.claude/CLAUDE.md`, and $HOME is
+    #: an ancestor of every project here -- so ~/.claude/CLAUDE.md loads as
+    #: *project* memory. Under ~/.claude itself that pickup is deduplicated
+    #: against the user-tier file; here there is nothing to dedup against, so
+    #: writing the spine again would carry all of it twice.
+    #:
+    #: The cost is that the spine reaches a work session only when its cwd is
+    #: under $HOME. [agfi:agents-md-doctor] says so out loud rather than
+    #: leaving the dependency implicit.
+    ec "claude-work"$'\t'"${HOME}/.claude-work/CLAUDE.md"$'\t'"overlay"
 }
 
 function h-agents-md-parts {
     #: The source files for one agent, broad to narrow: whatever comes last
     #: wins where they disagree. Missing parts are normal and skipped.
+    #:
+    #: In `overlay` mode only the agent's own tiers are emitted; the shared
+    #: spine, the host tier and ~/.agents.local.md are left out, because an
+    #: overlay is a second profile of an agent that already receives those by
+    #: another route. See [agfi:h-agents-md-agents].
+    #: Usage: h-agents-md-parts <agent> [mode]
     ##
-    local agent="${1}"
+    local agent="${1}" mode="${2}"
 
     local dir="${agents_md_dir:-${NIGHTDIR}/PE/Agents}"
     local private_dir="${agents_md_private_dir:-${nightNotesPrivate}/configs/agents}"
     local host="${agents_md_host:-${HOST:-$(hostname)}}"
 
-    #: every agent, every host
-    ec "${dir}/AGENTS.md"
-    ec "${private_dir}/AGENTS.md"
+    if [[ "${mode}" != overlay ]] ; then
+        #: every agent, every host
+        ec "${dir}/AGENTS.md"
+        ec "${private_dir}/AGENTS.md"
+    fi
     #: this agent, every host.
     #: `agent-` prefixed because a bare `claude.md` is the same file as
     #: `CLAUDE.md` on a case-insensitive filesystem, and Claude Code would
@@ -45,34 +72,42 @@ function h-agents-md-parts {
     #: twice -- on macOS only, so the two would also disagree per host.
     ec "${dir}/agent-${agent}.md"
     ec "${private_dir}/agent-${agent}.md"
-    #: every agent, this host
-    ec "${dir}/hosts/${host}.md"
-    ec "${private_dir}/hosts/${host}.md"
-    #: this machine, untracked
-    ec "${HOME}/.agents.local.md"
+    if [[ "${mode}" != overlay ]] ; then
+        #: every agent, this host
+        ec "${dir}/hosts/${host}.md"
+        ec "${private_dir}/hosts/${host}.md"
+        #: this machine, untracked
+        ec "${HOME}/.agents.local.md"
+    fi
     ec "${HOME}/.${agent}.local.md"
 }
 
 function h-agents-md-assemble {
-    #: Prints the assembled instruction file for one agent.
+    #: Prints the assembled instruction file for one agent, or nothing at all
+    #: when no source contributed anything. That is the normal state of an
+    #: overlay whose tiers are still empty, and [agfi:agents-md-sync] reads it
+    #: as "there should be no file here".
+    #: Usage: h-agents-md-assemble <agent> [mode]
     ##
-    local agent="${1}"
+    local agent="${1}" mode="${2}"
 
     local -a parts
     #: `:a` normalizes, so a NIGHTDIR carrying a trailing slash cannot change
     #: the assembled bytes and make an up-to-date file read as stale.
-    parts=("${(@f)$(h-agents-md-parts "${agent}")}") @TRET
+    parts=("${(@f)$(h-agents-md-parts "${agent}" "${mode}")}") @TRET
     parts=("${parts[@]:a}")
-
-    #: Claude strips block-level HTML comments before loading, so the
-    #: provenance costs nothing there and little anywhere else.
-    ec "<!-- Assembled by agents-md-sync. Edit the sources, not this file. -->"
 
     local p first=y
     for p in "${parts[@]}" ; do
         test -s "${p}" || continue
 
-        if test -z "${first}" ; then
+        if test -n "${first}" ; then
+            #: Claude strips block-level HTML comments before loading, so the
+            #: provenance costs nothing there and little anywhere else. Held
+            #: back until the first real part so that an empty assembly comes
+            #: out empty, rather than as a lone header.
+            ec "<!-- Assembled by agents-md-sync. Edit the sources, not this file. -->"
+        else
             ec
         fi
         first=''
@@ -90,15 +125,42 @@ function agents-md-sync {
     ##
     local verbose_p="${agents_md_sync_verbose_p:-n}"
 
-    local line agent target assembled
+    local line agent target mode assembled
+    local -a fields
     for line in "${(@f)$(h-agents-md-agents)}" ; do
-        agent="${line%%$'\t'*}"
-        target="${line#*$'\t'}"
+        #: `p` is what makes `\t` a tab, and `@` inside the quotes is what
+        #: keeps a missing third field empty instead of shifting the others.
+        fields=("${(@ps:\t:)line}")
+        agent="${fields[1]}"
+        target="${fields[2]}"
+        mode="${fields[3]}"
 
         #: Only for agents that are actually installed here.
         test -d "${target:h}" || continue
 
-        assembled="$(h-agents-md-assemble "${agent}")" @TRET
+        assembled="$(h-agents-md-assemble "${agent}" "${mode}")" @TRET
+
+        if test -z "${assembled}" ; then
+            if [[ "${mode}" != overlay ]] ; then
+                #: Every source for an ordinary target is missing or empty,
+                #: which is a broken checkout rather than an intended state.
+                #: Leave what is on disk alone instead of replacing a good
+                #: file with nothing.
+                ecerr "$0: no sources for ${agent}; leaving ${target/#${HOME}/~} as it is"
+                continue
+            fi
+
+            #: An overlay with nothing in it yet. A file holding only the
+            #: provenance comment is noise, and a leftover one is a lie, so
+            #: the right state is no file at all.
+            if test -e "${target}" || test -L "${target}" ; then
+                command rm -f -- "${target}" @RET
+                if bool "${verbose_p}" ; then
+                    ecgray "$0: removed empty ${target/#${HOME}/~}"
+                fi
+            fi
+            continue
+        fi
 
         #: Before the content check, not after: a symlink to another agent's
         #: file reads as up to date for exactly as long as the two assemble
@@ -126,19 +188,35 @@ function agents-md-doctor {
     #: =CLAUDE.md=, never loaded either. Silent is the failure mode worth
     #: engineering against.
     ##
-    local line agent target assembled p
+    local line agent target mode assembled p
+    local -a fields
     for line in "${(@f)$(h-agents-md-agents)}" ; do
-        agent="${line%%$'\t'*}"
-        target="${line#*$'\t'}"
+        fields=("${(@ps:\t:)line}")
+        agent="${fields[1]}"
+        target="${fields[2]}"
+        mode="${fields[3]}"
 
-        ecbold "${agent} -> ${target/#${HOME}/~}"
+        if [[ "${mode}" == overlay ]] ; then
+            ecbold "${agent} -> ${target/#${HOME}/~} (overlay)"
+        else
+            ecbold "${agent} -> ${target/#${HOME}/~}"
+        fi
 
         if ! test -d "${target:h}" ; then
             ecgray "  not installed on this host"
             continue
         fi
 
-        for p in "${${(@f)$(h-agents-md-parts "${agent}")}[@]:a}" ; do
+        if [[ "${mode}" == overlay ]] ; then
+            #: The whole point of the doctor is that a silent dependency is
+            #: worse than a loud one, and this target has one.
+            ecgray "  the shared spine is not written here. It arrives as project"
+            ecgray "  memory from ~/.claude/CLAUDE.md, which Claude Code picks up"
+            ecgray "  walking down from \$HOME -- so only while the session's cwd"
+            ecgray "  is under \$HOME."
+        fi
+
+        for p in "${${(@f)$(h-agents-md-parts "${agent}" "${mode}")}[@]:a}" ; do
             if test -s "${p}" ; then
                 ec "  + $(wc -l < "${p}" | tr -d ' ')L  ${p/#${HOME}/~}"
             elif test -e "${p}" ; then
@@ -148,9 +226,18 @@ function agents-md-doctor {
             fi
         done
 
-        assembled="$(h-agents-md-assemble "${agent}")" @TRET
+        assembled="$(h-agents-md-assemble "${agent}" "${mode}")" @TRET
 
-        if ! test -e "${target}" ; then
+        if test -z "${assembled}" ; then
+            if [[ "${mode}" != overlay ]] ; then
+                ecerr "  NO SOURCES: nothing to assemble from"
+            elif test -e "${target}" ; then
+                ecerr "  STALE: every source is empty, but the file is still there;"
+                ecerr "  run agents-md-sync"
+            else
+                ec "  = empty overlay, nothing written"
+            fi
+        elif ! test -e "${target}" ; then
             ecerr "  MISSING: run agents-md-sync"
         elif [[ "$(command cat -- "${target}")" != "${assembled}" ]] ; then
             ecerr "  STALE: differs from its sources, run agents-md-sync"
@@ -170,6 +257,9 @@ function agents-md-doctor {
 
 typeset -ga agents_md_settings=(
     "${HOME}/.claude/settings.json"$'\t'"${NIGHTDIR}/configFiles/claude-code/settings.json"
+    #: [agfi:claude-work] shares the tracked settings with the personal
+    #: profile; only the account, history and projects differ.
+    "${HOME}/.claude-work/settings.json"$'\t'"${NIGHTDIR}/configFiles/claude-code/settings.json"
 )
 
 function h-agents-md-doctor-settings {

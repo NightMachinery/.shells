@@ -13,6 +13,7 @@ for f in \
     "${HOME}/.claude.local.md" \
     "${HOME}/.codex.local.md" \
     "${HOME}/.antigravity.local.md" \
+    "${HOME}/.claude-work.local.md" \
     ; do
     if [ -e "${f}" ] ; then
         continue

@@ -34,7 +34,8 @@ and re-run the sync after changing a source. The launchers do that for you.
 Git-tracked, here:
 
 - =AGENTS.md= --- the shared spine. Every agent, every host.
-- =agent-claude.md=, =agent-codex.md=, =agent-gemini.md= --- one agent, every
+- =agent-claude.md=, =agent-codex.md=, =agent-antigravity.md=,
+  =agent-claude-work.md= --- one agent, every
   host. The prefix is load-bearing: a bare =claude.md= is the same file as
   =CLAUDE.md= on a case-insensitive filesystem, so Claude Code discovered this
   source as a nested project memory and loaded the tier twice, on macOS only.
@@ -67,6 +68,21 @@ notes/private/configs/agents/hosts/<host>.md
 Missing parts are normal and skipped. Empty ones are skipped too, so an
 untouched local file costs nothing.
 
+An *overlay* target assembles only the agent's own tiers:
+
+#+begin_example
+PE/Agents/agent-<name>.md
+notes/private/configs/agents/agent-<name>.md
+~/.<name>.local.md
+#+end_example
+
+The spine, the host tier and =~/.agents.local.md= are left out, because an
+overlay is a second profile of an agent that already receives those by another
+route. When every one of its tiers is empty the overlay assembles to nothing,
+and the sync writes no file at all --- removing a stale one if it finds it.
+A file holding only the provenance comment would be noise, and a leftover one
+would be a lie.
+
 * Targets
 
 - claude --- =~/.claude/CLAUDE.md= (Claude Code reads =CLAUDE.md=, never
@@ -78,6 +94,23 @@ untouched local file costs nothing.
   puts its global rules in =GEMINI.md= there. A *global* =AGENTS.md= is read by
   nothing: for Antigravity that name is workspace-scoped only, alongside
   =.agents/rules/=.
+
+- claude-work --- =~/.claude-work/CLAUDE.md=, an *overlay*. See
+  [[agfi:claude-work]]: a second config home, so a second account, and Claude
+  Code takes its user memory from =$CLAUDE_CONFIG_DIR/CLAUDE.md=.
+
+  The spine is deliberately not written there. Claude Code also walks every
+  ancestor of the session's cwd looking for =<dir>/CLAUDE.md= and
+  =<dir>/.claude/CLAUDE.md=, and =$HOME= is an ancestor of every project here,
+  so =~/.claude/CLAUDE.md= already loads --- as *project* memory. Under
+  =~/.claude= itself that pickup is deduplicated against the user-tier file;
+  in a second profile there is nothing to dedup against, so assembling the
+  spine again would carry all of it twice.
+
+  The cost of leaning on that is a real one, and worth stating rather than
+  discovering: the spine reaches a work session only while its cwd is under
+  =$HOME=. Started in =/tmp= or =/Volumes=, such a session gets the overlay
+  alone. =agents-md-doctor= prints the dependency on every run.
 
 gapcode is commented out of the list: it is not in use, and
 =~/.gapcode/AGENTS.md= is left wherever the last assembly put it.
