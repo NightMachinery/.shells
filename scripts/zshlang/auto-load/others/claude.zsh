@@ -13,11 +13,11 @@ function claude {
     local -x CLAUDE_ENABLE_STREAM_WATCHDOG=1
     local -x CLAUDE_ENABLE_BYTE_WATCHDOG=1
     # local -x CLAUDE_STREAM_IDLE_TIMEOUT_MS=90000
+    local -x CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1
 
     # Debug logging. Use a stable per-run file so you can tail it.
     local debug_file="${HOME}/tmp/claude-code/${EPOCHSECONDS}.debug.log"
     local -x CLAUDE_CODE_DEBUG_LOG_LEVEL=verbose
-
 
     #: Keeps ~/.claude/CLAUDE.md current with its sources; asks before
     #: launching with stale instructions.
