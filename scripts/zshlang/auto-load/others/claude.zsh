@@ -23,7 +23,10 @@ function claude {
     #: launching with stale instructions.
     h-agents-md-sync-ask @RET
 
-    tty-title "🍼${PWD:t}"
+    #: The marker is how a work tab is told apart from a personal one; see
+    #: [agfi:claude-work]. `local` is dynamically scoped in zsh, so a caller
+    #: can set it without exporting anything.
+    tty-title "${claude_tty_title_marker:-🍼}${PWD:t}"
 
     $proxyenv command claude "$@"
 }
@@ -121,4 +124,29 @@ function claude-code-usage {
 aliasfn claude-code-status claude-code-usage
 alias ccu='claude-code-usage'
 alias ccs='claude-code-usage'
+##
+function claude-work {
+    #: Claude Code on the CIS-OE67 LMU team seat: a second config home, so a
+    #: separate account, history, projects and plugins. `settings.json` there
+    #: symlinks to the same tracked file as the personal profile.
+    #:
+    #: Goes through [agfi:claude] rather than `command claude`, so it gets
+    #: [agfi:h-agents-md-sync-ask] -- which is what keeps
+    #: ~/.claude-work/CLAUDE.md current -- along with the watchdogs, the retry
+    #: cap and `$proxyenv`. Two consequences worth knowing: `$proxyenv` now
+    #: applies to work sessions too (a no-op unless proxy mode is on), and the
+    #: exported CLAUDE_CONFIG_DIR is inherited, so anything the session
+    #: launches -- [agfi:claude-autocommit], [agfi:claude-vcsh-commit] -- stays
+    #: on this seat.
+    #:
+    #: The personal profile is deliberately *not* pinned the same way. Claude
+    #: Code hashes the config dir into the keychain service name, using a bare
+    #: `Claude Code-credentials` only while CLAUDE_CONFIG_DIR is unset, so
+    #: setting it there would cost a re-login for nothing.
+    ##
+    local -x CLAUDE_CONFIG_DIR="${HOME}/.claude-work"
+    local claude_tty_title_marker='🏛'
+
+    claude "$@"
+}
 ##
