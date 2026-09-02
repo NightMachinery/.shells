@@ -223,25 +223,34 @@ This is **off by default** — checking your usage is not the same act as asking
 to be told about it. Every report command has a `-notify` twin that turns it on,
 or set `claude_code_usage_notif_p=y` on a plain one:
 
-- `claude-code-usage-notify` — one profile, report plus arm.
+- `claude-code-usage-notify` (alias `ccun`) — one profile, report plus
+  schedule.
 - `claude-code-usage-work-notify` (aliases `ccu-work-notify`,
   `ccs-work-notify`) — the work profile.
 - `claude-code-usage-all-notify` (aliases `ccu-notify`, `ccs-notify`,
   `claude-code-status-notify`) — every profile, like the bare short names.
+- `claude-code-usage-fable-notify` — the default profile's report, but
+  scheduling the weekly **Fable** watcher rather than the profile one. Fable is
+  not a profile, only an extra window on the default profile, so it cannot be
+  reached through `claude_code_usage_notif_p` and needs its own entry point. It
+  gets its own tmux session and so can be scheduled alongside the profile
+  watcher instead of replacing it.
 
-To arm without printing a report at all:
+Managing what is scheduled:
 
-- `claude-code-usage-notif` (alias `ccun`) — the default profile.
-- `claude-code-usage-work-notif` — the work profile.
-- `claude-code-usage-fable-notif` — the default profile, watching the weekly
-  Fable window as well. It has its own session, so it can be armed alongside
-  the plain one rather than replacing it.
 - `claude-code-usage-notif-cancel [session...]` — cancels, defaulting to all of
   them.
-- `claude-code-usage-notif-status` — what is armed, and for when.
+- `claude-code-usage-notif-status` — what is scheduled, and for when.
 
-Mind the one-letter difference between the two groups: `-notify` reports *and*
-arms, `-notif` only arms.
+To schedule without printing a report, call
+`h-claude-code-usage-notif-schedule`, `h-claude-code-usage-work-notif-schedule`
+or `h-claude-code-usage-fable-notif-schedule` directly. They carry the `h-`
+prefix because the `-notify` reports are the intended way in, not because they
+are off limits — reach for one when you already have a report in front of you.
+
+The tmux sessions themselves keep the shorter `claude-code-usage-*-notif`
+spelling, since that is what `tmux ls` shows and renaming them would orphan any
+notifier already scheduled.
 
 A window counts as blocking at or above `claude_code_usage_notif_full_pct`
 (default 100). The deadline is the **latest** reset among the blocked windows,
