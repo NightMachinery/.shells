@@ -156,24 +156,32 @@ own.
 The completion is still capped at one line (`fim_stop`), which is a separate
 question from how much context goes in.
 
-It reports just past the end of the line, in gray, with failures in red:
+It reports through `zle -M`, below the prompt, after a blank line so the status
+can never be read as a continuation of the command you are writing. The kind of
+message is carried by a symbol rather than by colour:
 
 ```
-FIM: requesting codestral-latest…
-FIM: inserted 13 chars in 0.3s
-FIM: empty completion in 0.3s
-FIM: line changed, discarded completion in 0.2s
-FIM: aborted
-FIM: codestral: HTTP 401 — Invalid API Key
+
+❄ FIM ⋯ requesting codestral-latest
+❄ FIM ✓ inserted 13 chars in 0.3s
+❄ FIM ∅ empty completion in 0.3s
+❄ FIM ∅ line changed, discarded completion in 0.2s
+❄ FIM ∅ aborted
+❄ FIM ✗ codestral: HTTP 401 — Invalid API Key
 ```
 
-The message goes in `POSTDISPLAY` with a `region_highlight` entry over it —
-the mechanism zsh-autosuggestions greys its ghost text with — rather than in
-the `zle -M` area below the prompt. `zle -M` was the obvious choice and is the
-wrong one, because **it cannot carry colour at all**: see below.
+`❄` says the line is ours; then four states, which are the whole vocabulary:
+`⋯` in flight, `✓` something was inserted, `∅` nothing happened but nothing is
+wrong, `✗` it failed. Overridable as `fim_zle_sym_lead` / `_wait` / `_ok` /
+`_none` / `_err`.
 
-Status is gray because it is a footnote to what you are typing; errors are the
-one thing here worth looking up for, so they are not.
+The leading newline is safe even though `zle -M` visualises control characters:
+that treatment is for the unprintable ones, and a newline comes out as a real
+line break. Verified on the wire rather than assumed.
+
+Symbols rather than colour because **`zle -M` cannot carry colour**, and the
+one mechanism that can must not be used here. Both halves of that are worth
+reading before trying to improve it — see below.
 
 Async, following the `exec {fd}< <(...)` plus `zle -F` pattern from
 zsh-autosuggestions' `src/async.zsh`. The child prints its pid first so it can
@@ -187,23 +195,18 @@ arrival the completion is dropped unless `BUFFER` and `CURSOR` still match the
 snapshot taken when it was asked for — if you kept typing, it no longer fits
 where it was going to go.
 
-`Escape` cancels. It is bound permanently rather than only while a request is
-in flight, because a binding installed for the duration of a request has to be
-removed again on every exit path and a crash between the two leaves Escape
-wedged. One press does one job: if there was a request to cancel it cancels
-and stops there, and only if there was nothing of ours does it fall through to
-what it replaced (`vi-cmd-mode` in `viins`, `beep` in `vicmd`). So idle Escape
-behaves exactly as before, and cancelling costs you a second press to leave
-insert mode. Note that cancelling costs up to `KEYTIMEOUT` (0.4s here) because
-Escape is also the prefix of every arrow key — a delay that is already there
-today when entering command mode.
+`Escape` cancels, and then does whatever it did before — `vi-cmd-mode` in
+`viins`, `beep` in `vicmd` — so idle Escape is unchanged. It is bound
+permanently rather than only while a request is in flight, because a binding
+installed for the duration of a request has to be removed again on every exit
+path and a crash between the two leaves Escape wedged. Cancelling costs up to
+`KEYTIMEOUT` (0.4s here) because Escape is also the prefix of every arrow key —
+a delay that is already there today when entering command mode.
 
 The widgets are named `zle-fim-*` on purpose: `zle-*` is in the default
 `ZSH_AUTOSUGGEST_IGNORE_WIDGETS`, so zsh-autosuggestions leaves them alone
-instead of wrapping them and clearing the message.
-[agfi:zle-complete-with-dots] in `.zshrc` is named that way for the same
-reason. Fast-syntax-highlighting has no such list, so it is dealt with
-separately — see [agfi:h-fim-zle-unwrap] below.
+rather than wrapping them. [agfi:zle-complete-with-dots] in `.zshrc` is named
+that way for the same reason.
 
 ## Things that cost real time
 
@@ -213,41 +216,8 @@ against `''` and reported `line changed` on every single request, including
 ones where nothing had changed. Anything touching line state has to go through
 a widget; the handler calls [agfi:zle-fim-accept] with `zle`, which is also
 why the insertion lives in its own widget rather than inline. `POSTDISPLAY`
-and `region_highlight` are in the same boat, hence [agfi:zle-fim-say].
-
-**`zle -M` cannot show colour.** It renders the string through ZLE's display
-code, which *visualises* control characters instead of emitting them, so an
-SGR escape arrives as a reverse-video `^[` followed by a literal
-`[38;2;170;170;170m` printed as text. `zle -R` behaves identically. Confirmed
-on the wire: for `zle -R $'\e[31mX\e[0m'` the terminal received
-`\x1b[7m` `^[` `\x1b[27m` `[31mX`. `POSTDISPLAY` plus a `region_highlight`
-entry is the mechanism that works, because there zle applies the colour itself
-and what reaches the terminal is a real `\e[38;5;242m`.
-
-The trap in measuring this: **`cat -v` renders a real ESC byte and a literal
-`^`+`[` pair identically**, so a pty capture piped through it cannot tell a
-working colour from a broken one. That is how a first attempt got confirmed as
-working when it was in fact printing escape codes as text. Compare raw bytes —
-`\x1b` versus `0x5E 0x5B` — or check for `\x1b[` in the capture with Python.
-
-**Fast-syntax-highlighting takes the colour back off.** It wraps every widget
-that exists when it loads and runs `_zsh_highlight` *after* the widget body,
-which rebuilds `region_highlight` from scratch and discards our entry; the
-message then rendered in whatever style f-sy-h had left covering that column
-(38;5;16, near-black). Widgets created *after* it loads are never wrapped —
-which is why an ad-hoc test widget sourced at the prompt kept its colour while
-the real one did not, since this file loads at `.zshrc:271` and f-sy-h at
-`:572`. [agfi:h-fim-zle-unwrap] re-runs `zle -N` from a one-shot `precmd`,
-after the whole of `.zshrc`, binding the names straight back to our functions.
-
-Two consequences of being unwrapped. [agfi:zle-fim-accept] must call
-`_zsh_highlight` itself, or the code it just inserted stays uncoloured until
-the next keystroke — and it must do so *before* posting its own message, since
-that call rebuilds `region_highlight`. And [agfi:zle-fim-escape] must not
-chain into `vi-cmd-mode` after posting, because `vi-cmd-mode` is still wrapped
-and its `_zsh_highlight` would strip the colour again; posting after the call
-instead leaves the message a redraw behind and it never appears at all. Hence
-one press, one job.
+and `region_highlight` are bound the same way, which matters if you ever try
+the colour route below.
 
 **Do not kill the process group.** zsh-autosuggestions cancels with
 `kill -TERM -$pid` to reap whatever its strategy forked. With job control on,
@@ -265,7 +235,67 @@ turned the process-group bug from intermittent into deterministic, and that is
 the move worth remembering: an async bug that reproduces 40% of the time is
 usually a timing race in something you are not looking at.
 
-One note on the harness itself, `fim-zpty.zsh` in the session scratchpad: it
+## Why the status is not coloured
+
+Worth writing down, because "just make it gray" looks like a five-minute job
+and is not. Two independent walls, and a measurement trap that hid both.
+
+**`zle -M` cannot carry colour.** It renders its argument through ZLE's
+display code, which *visualises* control characters instead of emitting them,
+so an SGR escape arrives as a reverse-video `^[` followed by a literal
+`[38;2;170;170;170m` printed as text. `zle -R` behaves identically. Measured:
+for `zle -R $'\e[31mX\e[0m'` the terminal received
+`\x1b[7m` `^[` `\x1b[27m` `[31mX`.
+
+**The mechanism that can carry colour must not be used here.** `POSTDISPLAY`
+plus a `region_highlight` entry does work — zle applies the colour itself, so a
+real `\e[38;5;242m` reaches the terminal — and it is how zsh-autosuggestions
+greys its ghost text. But `POSTDISPLAY` is not a neutral scratch area, it *is*
+the suggestion slot, and `_zsh_autosuggest_accept` does
+
+```zsh
+BUFFER="$BUFFER$POSTDISPLAY"
+```
+
+whenever the cursor is at the end of the line. So right arrow silently splices
+`  FIM: inserted 2 chars in 0.3s` into your command line as real text, and so
+do `end-of-line` (`^E`), `vi-forward-char`, `vi-end-of-line` and `vi-add-eol`,
+while the eight `ZSH_AUTOSUGGEST_PARTIAL_ACCEPT_WIDGETS` — `forward-word`
+(alt-f), `vi-find-next-char` and friends — splice in a *fragment*. If
+`ZSH_AUTOSUGGEST_EXECUTE_WIDGETS` is ever populated, the same text gets run.
+Squatting there also evicts the suggestion you were about to accept, and puts
+grey text just past the cursor where the trained reflex is to accept it.
+
+Defending it would mean wrapping thirteen widgets to clear our message before
+delegating, and it would still evict suggestions and still invite the reflex.
+Not worth it for a colour.
+
+**Fast-syntax-highlighting would fight it too**, if you go that way anyway: it
+wraps every widget existing when it loads and runs `_zsh_highlight` *after* the
+widget body, rebuilding `region_highlight` from scratch and discarding the
+entry. Widgets created after it loads are never wrapped, which is why an
+ad-hoc test widget sourced at the prompt kept its colour while the real one did
+not — this file loads at `.zshrc:271` and f-sy-h at `:572`. Re-running `zle -N`
+from a one-shot `precmd` takes the names back, at the cost of having to call
+`_zsh_highlight` by hand after inserting.
+
+**The measurement trap**, and the reason a first attempt was reported as
+working when it was printing escape codes to the screen: **`cat -v` renders a
+real ESC byte and a literal `^`+`[` pair identically**. A pty capture piped
+through it cannot distinguish working colour from broken colour. Compare raw
+bytes — `\x1b` versus `0x5E 0x5B` — and note that this cuts the other way too,
+since the UTF-8 status symbols come out of `cat -v` as `M-` sequences that no
+plain grep will match.
+
+The remaining colour-capable option is `RPROMPT`, which never touches `BUFFER`.
+It needs composing with pure prompt and with the existing
+`$(vi_mode_prompt_info)` rather than assigning over them, and zsh hides
+`RPROMPT` entirely when the command line is long — which would swallow exactly
+the error messages that most need seeing.
+
+## The test harness
+
+One note on `fim-zpty.zsh` in the session scratchpad: it
 must wait for the prompt (`\e[?2004h`, bracketed-paste on) before typing, not
 for a fixed number of seconds. A five-second guess was enough until the
 machine got busy, and then every scenario went intermittent in a way that
