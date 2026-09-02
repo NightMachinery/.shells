@@ -195,6 +195,19 @@ arrival the completion is dropped unless `BUFFER` and `CURSOR` still match the
 snapshot taken when it was asked for — if you kept typing, it no longer fits
 where it was going to go.
 
+Inserting invalidates the autosuggestion, via `zle autosuggest-fetch`. Our
+widgets are named `zle-*`, so zsh-autosuggestions never sees the edit and will
+not do this itself, and the suggestion it computed for the *old* line does two
+bad things. Its `region_highlight` entry still covers the columns the
+completion just landed in, so the code we inserted is painted in the suggestion
+colour and reads as ghost text; and it is still live, so right arrow appends
+something that no longer follows from the line. With `ec hello` suggesting
+` world and then some`, completing to `ec hello world` and pressing right
+arrow gave `ec hello world world and then some`. `autosuggest-fetch` rather
+than `autosuggest-clear`, so a suggestion that fits the new line takes its
+place instead of nothing — measured, the suggestion becomes ` and then some`
+and right arrow now yields `ec hello world and then some`.
+
 `Escape` cancels, and then does whatever it did before — `vi-cmd-mode` in
 `viins`, `beep` in `vicmd` — so idle Escape is unchanged. It is bound
 permanently rather than only while a request is in flight, because a binding

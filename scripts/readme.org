@@ -107,6 +107,13 @@ interactive-only, in =zshlang/interactive/auto-load/FIM.zsh=. The Emacs twin is
 =night/fim-get= in =~[dom]/autoload/night-mistral-fim.el=; the two speak the same
 body to the same providers and want changing together.
 
+Inserting refetches the autosuggestion. Our widgets are named =zle-*= so
+zsh-autosuggestions never sees the edit, and the suggestion computed for the
+old line both paints the freshly inserted text in the suggestion colour and
+stays acceptable: with =ec hello= suggesting =' world and then some'=,
+completing to =ec hello world= and pressing right arrow gave =ec hello world
+world and then some=.
+
 The prefix is =${PREBUFFER}${LBUFFER}=, so a completion asked for inside a
 continuation -- an unclosed quote, a =for= still waiting for its =done= -- sees
 the lines you already typed rather than just the one you are on. The completion
