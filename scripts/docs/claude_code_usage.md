@@ -215,10 +215,21 @@ derived ones, so explicit flags win.
 
 ## Reset notifications
 
-Every `claude-code-usage` run also arms a one-shot background job that fires
-`notif` once the limits currently blocking that profile have reset, so you find
-out without having to keep re-running the report. Set
-`claude_code_usage_notif_p=n` to skip arming.
+A report can also arm a one-shot background job that fires `notif` once the
+limits currently blocking that profile have reset, so you find out without
+having to keep re-running the report.
+
+This is **off by default** — checking your usage is not the same act as asking
+to be told about it. Every report command has a `-notify` twin that turns it on,
+or set `claude_code_usage_notif_p=y` on a plain one:
+
+- `claude-code-usage-notify` — one profile, report plus arm.
+- `claude-code-usage-work-notify` (aliases `ccu-work-notify`,
+  `ccs-work-notify`) — the work profile.
+- `claude-code-usage-all-notify` (aliases `ccu-notify`, `ccs-notify`,
+  `claude-code-status-notify`) — every profile, like the bare short names.
+
+To arm without printing a report at all:
 
 - `claude-code-usage-notif` (alias `ccun`) — the default profile.
 - `claude-code-usage-work-notif` — the work profile.
@@ -228,6 +239,9 @@ out without having to keep re-running the report. Set
 - `claude-code-usage-notif-cancel [session...]` — cancels, defaulting to all of
   them.
 - `claude-code-usage-notif-status` — what is armed, and for when.
+
+Mind the one-letter difference between the two groups: `-notify` reports *and*
+arms, `-notif` only arms.
 
 A window counts as blocking at or above `claude_code_usage_notif_full_pct`
 (default 100). The deadline is the **latest** reset among the blocked windows,
