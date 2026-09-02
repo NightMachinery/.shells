@@ -57,6 +57,9 @@ local hammerspoonCoreFiles = {
     "core/agent-banner.lua",
     "core/redis.lua",
     "core/wifi-watcher.lua",
+    -- Before core/audio-watcher.lua only for readability; there is no
+    -- dependency between them.
+    "core/audio-devices.lua",
     "core/audio-watcher.lua",
     "core/power-watcher.lua",
     "core/hyper-mode.lua",
