@@ -10,6 +10,7 @@ endpoint rate-limits aggressively.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import getpass
 import hashlib
 import json
@@ -22,7 +23,7 @@ import time
 import unicodedata
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -39,6 +40,7 @@ from libs.common_sub_status import (
     format_used_percent,
     get_path,
     nonnegative_int,
+    positive_int,
 )
 
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
@@ -64,6 +66,17 @@ LIMIT_KIND_LABELS = {
     "session": "5h session",
     "weekly_all": "7d (all models)",
 }
+
+
+@dataclass
+class ProfileReport:
+    profile: Profile
+    token_info: "TokenInfo | None" = None
+    result: "FetchResult | None" = None
+    #: Set only when there is nothing to show at all -- not when a fallback
+    #: succeeded, which is a degraded report rather than a failed one.
+    error: str | None = None
+    warnings: list[str] = field(default_factory=list)
 
 
 class UsageError(RuntimeError):
@@ -95,6 +108,13 @@ class UsageWindow:
     raw: dict
     severity: str | None = None
     is_active: bool | None = None
+
+
+@dataclass(frozen=True)
+class Profile:
+    label: str
+    #: The profile's CLAUDE_CONFIG_DIR, or None for the default profile.
+    config_dir: str | None = None
 
 
 @dataclass(frozen=True)
@@ -324,8 +344,10 @@ def get_token(
     )
 
 
-def cache_path(cache_dir: str) -> Path:
-    return Path(os.path.expanduser(cache_dir)) / CACHE_FILE_NAME
+def cache_path(cache_dir: str, label: str) -> Path:
+    # Keyed by profile: profiles share the endpoint but not the account, so one
+    # shared cache file would have them overwrite each other's response.
+    return Path(os.path.expanduser(cache_dir)) / label / CACHE_FILE_NAME
 
 
 def read_cache(path: Path) -> FetchResult | None:
@@ -485,6 +507,106 @@ def config_cache_result(config_path: Path) -> FetchResult | None:
     )
 
 
+def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileReport:
+    """Everything needed to render one profile, with no rendering and no I/O
+    on stdout -- so several of these can run at once."""
+    report = ProfileReport(profile=profile)
+    config_path = profile_config_path(profile.config_dir)
+
+    failure: str | None = None
+    try:
+        report.token_info = get_token(
+            timeout=args.timeout,
+            config_dir=profile.config_dir,
+            keychain_service=args.keychain_service,
+            keychain_account=args.keychain_account,
+        )
+    except UsageError as exc:
+        failure = str(exc)
+
+    if report.token_info is not None:
+        try:
+            report.result = get_usage(
+                report.token_info,
+                cache_file=cache_path(args.cache_dir, profile.label),
+                ttl_s=args.cache_ttl,
+                refresh=args.refresh,
+                timeout=args.timeout,
+                user_agent=args.user_agent,
+            )
+        except UsageError as exc:
+            failure = str(exc)
+
+    if report.result is None:
+        # No token at all, or a fetch failure with no response cache to fall
+        # back on. The profile's own cache is written by Claude Code itself, so
+        # it is the right last resort before giving up.
+        fallback = config_cache_result(config_path)
+        if fallback is None:
+            report.error = failure or "no usage data available"
+            return report
+
+        report.result = replace(fallback, stale_reason=failure)
+
+    return report
+
+
+def gather_reports(
+    profiles: list[Profile], *, args: argparse.Namespace
+) -> list[ProfileReport]:
+    if len(profiles) == 1:
+        return [gather_report(profiles[0], args=args)]
+
+    # Threads, not processes: every profile is a separate account doing its own
+    # network round trip, so this is all I/O wait and the GIL is irrelevant.
+    # Results are written by index and never appended, so the report order is
+    # the order the profiles were given no matter which one finishes first.
+    reports: list[ProfileReport | None] = [None] * len(profiles)
+    workers = max(1, min(args.workers, len(profiles)))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_index = {
+            executor.submit(gather_report, profile, args=args): index
+            for index, profile in enumerate(profiles)
+        }
+
+        for future in concurrent.futures.as_completed(future_to_index):
+            index = future_to_index[future]
+            try:
+                reports[index] = future.result()
+            except Exception as exc:
+                # One profile blowing up must not cost the others their report.
+                reports[index] = ProfileReport(
+                    profile=profiles[index],
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+
+    return [report for report in reports if report is not None]
+
+
+def resolve_profiles(args: argparse.Namespace) -> list[Profile]:
+    if not args.all:
+        return [
+            Profile(
+                label=args.profile_label or "default",
+                config_dir=args.config_dir or None,
+            )
+        ]
+
+    if not args.profile:
+        raise ValueError("--all needs at least one --profile NAME=CONFIG_DIR")
+
+    profiles = []
+    for spec in args.profile:
+        label, sep, config_dir = spec.partition("=")
+        if not sep or not label:
+            raise ValueError(f"--profile wants NAME=CONFIG_DIR, got {spec!r}")
+
+        profiles.append(Profile(label=label, config_dir=config_dir or None))
+
+    return profiles
+
+
 def parse_utilization(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -636,20 +758,22 @@ def render_extra_usage(style: Style, extra: object) -> str | None:
     return f"{style.bold('Extra usage')}: " + ", ".join(bits)
 
 
-def render_human(
-    style: Style,
-    *,
-    token_info: TokenInfo | None,
-    result: FetchResult,
-    profile: str = "",
-    warnings: list[str] | None = None,
-    keychain: dict | None = None,
-) -> str:
-    del keychain  # reported in --json only; the human header stays terse
+def render_human(style: Style, report: ProfileReport) -> str:
     heading = "Claude Code plan usage"
-    if profile:
-        heading += f" [{profile}]"
+    if report.profile.label:
+        heading += f" [{report.profile.label}]"
     lines = [style.bold(style.cyan(heading))]
+
+    if report.error is not None:
+        # Rendered as this profile's own section rather than dumped on stderr,
+        # so a multi-profile report still shows which one is missing and why.
+        lines.append(style.red(report.error))
+        return "\n".join(lines)
+
+    token_info = report.token_info
+    result = report.result
+    assert result is not None
+    warnings = report.warnings
 
     plan = (token_info.subscription_type if token_info else None) or "unknown"
     token_source = token_info.source if token_info else result.source
@@ -702,14 +826,22 @@ def render_human(
     return "\n".join(lines)
 
 
-def render_json(
-    *,
-    token_info: TokenInfo | None,
-    result: FetchResult,
-    profile: str = "",
-    warnings: list[str] | None = None,
-    keychain: dict | None = None,
-) -> str:
+def build_json(report: ProfileReport, *, keychain: dict | None = None) -> dict:
+    # A dict rather than a string, so --all can put several of these in one
+    # array: two bare objects in a row are not JSON.
+    if report.error is not None:
+        return {
+            "profile": report.profile.label or None,
+            "error": report.error,
+            "keychain": keychain,
+        }
+
+    token_info = report.token_info
+    result = report.result
+    assert result is not None
+    warnings = report.warnings
+    profile = report.profile.label
+
     windows = [
         {
             "key": window.key,
@@ -727,26 +859,24 @@ def render_json(
         for window in extract_windows(result.payload)
     ]
 
-    return json.dumps(
-        {
-            "profile": profile or None,
-            "source": result.source,
-            "keychain": keychain,
-            "warnings": list(warnings or ()),
-            "plan": token_info.subscription_type if token_info else None,
-            "token_source": token_info.source if token_info else None,
-            "token_expired": token_info.expired if token_info else None,
-            "windows": windows,
-            "extra_usage": result.payload.get("extra_usage"),
-            "cache": {
-                "from_cache": result.from_cache,
-                "stale_reason": result.stale_reason,
-                "fetched_at": result.fetched_at_s,
-            },
-            "raw": result.payload,
+    return {
+        "profile": profile or None,
+        "error": None,
+        "source": result.source,
+        "keychain": keychain,
+        "warnings": list(warnings or ()),
+        "plan": token_info.subscription_type if token_info else None,
+        "token_source": token_info.source if token_info else None,
+        "token_expired": token_info.expired if token_info else None,
+        "windows": windows,
+        "extra_usage": result.payload.get("extra_usage"),
+        "cache": {
+            "from_cache": result.from_cache,
+            "stale_reason": result.stale_reason,
+            "fetched_at": result.fetched_at_s,
         },
-        indent=2,
-    )
+        "raw": result.payload,
+    }
 
 
 def parse_timeout_default() -> float:
@@ -846,6 +976,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--all",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Report every profile given with --profile, fetched concurrently "
+            "and printed in the order given (default: %(default)s)."
+        ),
+    )
+    parser.add_argument(
+        "--profile",
+        action="append",
+        default=[],
+        metavar="NAME=CONFIG_DIR",
+        help=(
+            "A profile for --all, as NAME=CONFIG_DIR; an empty CONFIG_DIR "
+            "means the default profile. Repeatable."
+        ),
+    )
+    parser.add_argument(
+        "--workers",
+        type=positive_int,
+        default=8,
+        help="Maximum concurrent profile fetches for --all (default: %(default)s).",
+    )
+    parser.add_argument(
         "--profile-label",
         default=env_first(
             "claude_code_usage_profile_label",
@@ -909,70 +1064,36 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     style = build_style(args)
 
-    config_dir = args.config_dir or None
-    config_path = profile_config_path(config_dir)
-    warnings: list[str] = []
-
-    token_info: TokenInfo | None = None
-    failure: str | None = None
     try:
-        token_info = get_token(
-            timeout=args.timeout,
-            config_dir=config_dir,
-            keychain_service=args.keychain_service,
-            keychain_account=args.keychain_account,
-        )
-    except UsageError as exc:
-        failure = str(exc)
+        profiles = resolve_profiles(args)
+    except ValueError as exc:
+        print(f"claude_code_usage: {exc}", file=sys.stderr)
+        return 2
 
-    result: FetchResult | None = None
-    if token_info is not None:
-        try:
-            result = get_usage(
-                token_info,
-                cache_file=cache_path(args.cache_dir),
-                ttl_s=args.cache_ttl,
-                refresh=args.refresh,
-                timeout=args.timeout,
-                user_agent=args.user_agent,
-            )
-        except UsageError as exc:
-            failure = str(exc)
+    reports = gather_reports(profiles, args=args)
 
-    if result is None:
-        # No token at all, or a fetch failure with no response cache to fall
-        # back on (which used to be a fatal exit 1). The profile's own cache is
-        # written by Claude Code itself, so it is the right last resort.
-        result = config_cache_result(config_path)
-        if result is None:
-            print(
-                f"claude_code_usage: {failure or 'no usage data available'}",
-                file=sys.stderr,
-            )
-            return 1
-        result = replace(result, stale_reason=failure)
-
-    render_kwargs = {
-        "token_info": token_info,
-        "result": result,
-        "profile": args.profile_label,
-        "warnings": warnings,
+    def keychain_of(report: ProfileReport) -> dict:
         # No usable cross-check exists that a token belongs to this profile:
         # the payload carries no account id, the tokens are opaque, and
         # resets_at is recomputed per response (so it is not a fingerprint) and
-        # re-anchors on each new session. Report the item that was used and let
-        # a human judge instead of emitting a guess that cries wolf.
-        "keychain": {
-            "service": args.keychain_service or keychain_service_for(config_dir),
+        # re-anchors on each new session. Report the item that was actually
+        # used and let a human judge, instead of emitting a guess that cries
+        # wolf on a correct setup.
+        return {
+            "service": args.keychain_service
+            or keychain_service_for(report.profile.config_dir),
             "account": args.keychain_account or keychain_account_default(),
-        },
-    }
-    if args.json:
-        print(render_json(**render_kwargs))
-    else:
-        print(render_human(style, **render_kwargs))
+        }
 
-    return 0
+    if args.json:
+        objects = [build_json(report, keychain=keychain_of(report)) for report in reports]
+        # An array only for --all: a single report stays a bare object, which is
+        # what every existing caller parses.
+        print(json.dumps(objects if args.all else objects[0], indent=2))
+    else:
+        print("\n\n".join(render_human(style, report) for report in reports))
+
+    return 1 if any(report.error is not None for report in reports) else 0
 
 
 if __name__ == "__main__":

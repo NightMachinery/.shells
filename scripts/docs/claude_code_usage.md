@@ -111,8 +111,10 @@ it) to refresh.
 
 ## Caching
 
-Successful responses are cached in `~/tmp/.claude-usage/usage.json`
-(`--cache-dir` to relocate). Cached data younger than `--cache-ttl` seconds
+Successful responses are cached in `~/tmp/.claude-usage/<profile>/usage.json`
+(`--cache-dir` to relocate; the profile name is always appended, since profiles
+share the endpoint but not the account and would otherwise overwrite each
+other's cached response). Cached data younger than `--cache-ttl` seconds
 (default 300) is reused without hitting the network; `--refresh` skips the
 cache read but still updates the cache afterwards. Do not disable caching in
 tight loops — the endpoint rate-limits quickly and recovers slowly.
@@ -148,6 +150,11 @@ the default.
   `CLAUDE_CODE_USAGE_USER_AGENT`; `claude-code/2.1.220`.
 - `--config-dir` — `claude_code_usage_config_dir` /
   `CLAUDE_CODE_USAGE_CONFIG_DIR`; empty, meaning the default profile.
+- `--all` — no env fallback; off. Reports every `--profile` given, fetching them
+  concurrently.
+- `--profile NAME=CONFIG_DIR` — no env fallback; repeatable, used with `--all`.
+  An empty `CONFIG_DIR` means the default profile.
+- `--workers` — no env fallback; 8. Maximum concurrent profile fetches.
 - `--profile-label` — `claude_code_usage_profile_label` /
   `CLAUDE_CODE_USAGE_PROFILE_LABEL`; empty.
 - `--keychain-service`, `--keychain-account` — no env fallback; both derived as
@@ -155,8 +162,14 @@ the default.
 
 `--json` output contains normalized `windows` (percent, epoch and ISO reset
 times, severity, is_active) plus the `raw` payload for forward compatibility. It
-also reports `profile`, the data `source` (`api`, `api-cache` or
+also reports `profile`, `error`, the data `source` (`api`, `api-cache` or
 `config-cache`), the `keychain` service and account used, and any `warnings`.
+With `--all` it is an array of those objects, one per profile, in the order the
+profiles were given; without it, a single bare object as before.
+
+A profile that yields nothing at all renders as its own section carrying the
+error, rather than aborting the run, and makes the exit status 1. So one dead
+profile never costs the others their report.
 
 ## Zsh wrapper
 
@@ -171,22 +184,27 @@ each: the config file path, the Keychain service and the cache dir all derive
 from the config dir. `claude-code-usage-work` (aliases `ccu-work`, `ccs-work`)
 is the work profile, i.e. `claude_code_usage_profile=work`.
 
-`claude-code-usage-all` runs the profiles in parallel — separate accounts and
-separate requests, so there is nothing to serialize — but prints them in
-`claude_code_profile_order` so the output does not shuffle with whichever
-request happened to finish first. A profile that fails has its error forwarded
-to stderr, labelled with the profile name, and makes the function return
-nonzero without costing the other profiles their reports. With `--json` (or
-`claude_code_usage_json_p`) the per-profile objects are emitted as a JSON array,
-since two bare objects in a row are not JSON.
+`claude-code-usage-all` passes the registry to the script as repeated
+`--profile NAME=CONFIG_DIR` and lets it do the work.
 
-The fan-out itself is `golang/parallel_sections`, not shell: backgrounded zsh
-subshells cannot return anything, so each profile would need a temporary file,
-and reassembling those in declared order while keeping stderr attributable and
-reducing the set to one exit status is bookkeeping better done once in Go. Both
-paths build their argv through the same `h-claude-code-usage-argv`, so the
-single-profile and fan-out invocations cannot drift apart. See
-`golang/parallel_sections/readme.org`.
+The fan-out is inside the Python — one process running a `ThreadPoolExecutor`
+over what is pure network wait, so the GIL is irrelevant — matching
+`codex_status.py`, which checks several auth files the same way. Results are
+stored by index, so the report order is `claude_code_profile_order` regardless
+of which request finishes first.
+
+Doing it in the shell instead was tried and is worse. Backgrounded subshells
+cannot return anything, so each profile needs a temporary file, and then
+reassembling those in order, keeping stderr attributable, and reducing the set
+to one exit status is a lot of bookkeeping. Worse, every such scheme — a helper
+process, GNU `parallel`, anything that captures output in order to reorder it —
+gives each child a pipe for stdout instead of the terminal, so `--color auto`
+resolves to "no colour" and the command you run most often silently loses its
+colour. In-process keeps stdout the terminal.
+
+Both entry points build their shared flags through
+`h-claude-code-usage-argv-common`, so the single-profile and all-profile
+invocations cannot drift apart.
 
 Knobs (set as env vars): `claude_code_usage_profile` (default `default`),
 `claude_code_usage_timeout_s`, `claude_code_usage_cache_ttl_s`, and the
