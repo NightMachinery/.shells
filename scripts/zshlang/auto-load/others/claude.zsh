@@ -151,7 +151,7 @@ function claude-code-usage {
     #: See =docs/claude_code_usage.md=.
     ##
     local profile="${claude_code_usage_profile:-default}"
-    local notif_p="${claude_code_usage_notif_p:-y}"
+    local notif_p="${claude_code_usage_notif_p:-n}"
 
     ensure-cmd claude_code_usage.py @RET
     h-claude-code-profile-assert "${profile}" @RET
@@ -182,12 +182,22 @@ function claude-code-usage {
     return "${retcode}"
 }
 
+#: Arming is off by default -- checking usage should not be the same act as
+#: asking to be told about it -- so each report has a =-notify= twin that turns
+#: it on. Do not confuse these with the =-notif= functions further down, which
+#: only arm and print no report.
+aliasfnq claude-code-usage-notify claude_code_usage_notif_p=y claude-code-usage
+
 function claude-code-usage-work {
     claude_code_usage_profile=work claude-code-usage "$@"
 }
 aliasfn claude-code-status-work claude-code-usage-work
 alias ccu-work='claude-code-usage-work'
 alias ccs-work='claude-code-usage-work'
+
+aliasfnq claude-code-usage-work-notify claude_code_usage_notif_p=y claude-code-usage-work
+alias ccu-work-notify='claude-code-usage-work-notify'
+alias ccs-work-notify='claude-code-usage-work-notify'
 
 function claude-code-usage-all {
     #: Every registered profile: separate accounts and separate requests, so
@@ -202,7 +212,7 @@ function claude-code-usage-all {
     local profiles=("${claude_code_profile_order[@]}")
     assert-args profiles @RET
 
-    local notif_p="${claude_code_usage_notif_p:-y}"
+    local notif_p="${claude_code_usage_notif_p:-n}"
 
     ensure-cmd claude_code_usage.py @RET
 
@@ -238,6 +248,12 @@ function claude-code-usage-all {
 aliasfn claude-code-status claude-code-usage-all
 alias ccu='claude-code-usage-all'
 alias ccs='claude-code-usage-all'
+
+aliasfnq claude-code-usage-all-notify claude_code_usage_notif_p=y claude-code-usage-all
+#: The bare short names mean every profile, so their =-notify= twins do too.
+aliasfn claude-code-status-notify claude-code-usage-all-notify
+alias ccu-notify='claude-code-usage-all-notify'
+alias ccs-notify='claude-code-usage-all-notify'
 ##
 #: How often the armed job re-checks the wall clock.
 typeset -g claude_code_usage_notif_poll_s="${claude_code_usage_notif_poll_s:-30}"
@@ -440,8 +456,8 @@ function h-claude-code-usage-notif-for-profile {
 
 function claude-code-usage-notif {
     #: Arms a notification for when the default profile's limits have reset.
-    #: On by default after every [agfi:claude-code-usage]; see
-    #: =docs/claude_code_usage.md=.
+    #: Arms only; prints no report. [agfi:claude-code-usage-notify] and its
+    #: siblings do both. See =docs/claude_code_usage.md=.
     ##
     h-claude-code-usage-notif-for-profile default
 }
