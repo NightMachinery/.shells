@@ -129,8 +129,9 @@ If you want to document installation for a plugin, read the readme of another pl
 ## Agent Instruction Files
 
 The global instruction files the agents actually read — `~/.claude/CLAUDE.md`,
-`~/.codex/AGENTS.md`, `~/.gemini/AGENTS.md` — are **generated**. Never edit
-them: they are overwritten on the next agent launch. Edit the sources under
+`~/.claude-work/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md` — are
+**generated**. Never edit them: they are overwritten on the next agent
+launch. Edit the sources under
 `./PE/Agents/` and run `agents-md-sync`, which the `claude`, `codex-m` and
 `antigravity-m` launchers call for you; one sync refreshes every agent's file,
 not just the caller's. `agents-md-doctor` reports what
@@ -143,6 +144,9 @@ Which source to edit:
 - `PE/Agents/AGENTS.md` — every agent, every host.
 - `PE/Agents/agent-<name>.md` — one agent, every host. The `agent-` prefix is
   load-bearing.
+- `PE/Agents/agent-claude-work.md` — the `claude-work` seat only. An *overlay*:
+  it carries this tier alone, never the spine, which already reaches that
+  profile as project memory from `~/.claude/CLAUDE.md`.
 - `PE/Agents/hosts/<hostname>.md` — every agent, one host.
 - `${nightNotesPrivate}/configs/agents/` — the same names again, for anything
   that should not sit in a public repository.
