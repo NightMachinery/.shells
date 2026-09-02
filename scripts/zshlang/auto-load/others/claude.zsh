@@ -116,10 +116,10 @@ function h-claude-code-profile-assert {
     fi
 }
 
-function h-claude-code-usage-argv {
-    #: Prints the full argv for reporting one profile, one word per line.
-    #: Shared by [agfi:claude-code-usage] and the fan-out in
-    #: [agfi:claude-code-usage-all], so the two cannot drift apart.
+function h-claude-code-usage-argv-common {
+    #: The flags that do not depend on which profile is being reported.
+    #: Shared by [agfi:claude-code-usage] and [agfi:claude-code-usage-all], so
+    #: the two cannot drift apart.
     ##
     local timeout_s="${claude_code_usage_timeout_s:-10}"
     local cache_ttl_s="${claude_code_usage_cache_ttl_s:-300}"
@@ -127,20 +127,7 @@ function h-claude-code-usage-argv {
     local json_p="${claude_code_usage_json_p:-n}"
     local strip_ansi_p="${claude_code_usage_strip_ansi_p:-n}"
 
-    local profile="${1}"
-    assert-args profile @RET
-    shift
-    local extra=("$@")
-
-    h-claude-code-profile-assert "${profile}" @RET
-
-    #: Per-profile cache dir: profiles share the endpoint but not the account,
-    #: so one shared cache file would have them overwrite each other.
     local args=(
-        claude_code_usage.py
-        --profile-label "${profile}"
-        --config-dir "${claude_code_profiles[$profile]}"
-        --cache-dir "${HOME}/tmp/.claude-usage/${profile}"
         --timeout "${timeout_s}"
         --cache-ttl "${cache_ttl_s}"
     )
@@ -153,9 +140,6 @@ function h-claude-code-usage-argv {
     if bool "${strip_ansi_p}" ; then
         args+=(--color never)
     fi
-
-    #: Caller args last, so explicit CLI flags win (argparse last-wins).
-    args+=("${extra[@]}")
 
     ec "${(F)args}"
 }
@@ -170,12 +154,20 @@ function claude-code-usage {
     local notif_p="${claude_code_usage_notif_p:-y}"
 
     ensure-cmd claude_code_usage.py @RET
+    h-claude-code-profile-assert "${profile}" @RET
 
-    local args
-    args=("${(@f)$(h-claude-code-usage-argv "${profile}" "$@")}") @TRET
+    local common
+    common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
 
+    local script_args=(
+        --profile-label "${profile}"
+        --config-dir "${claude_code_profiles[$profile]}"
+        "${common[@]}"
+    )
+
+    #: =script_args= before user args so explicit CLI flags win (argparse last-wins).
     local retcode=0
-    $proxyenv revaldbg command "${args[@]}" || retcode=$?
+    $proxyenv revaldbg command claude_code_usage.py "${script_args[@]}" "$@" || retcode=$?
 
     if (( retcode == 0 )) && bool "${notif_p}" ; then
         #: After the report, so the human output is not held up and the
@@ -201,56 +193,37 @@ function claude-code-usage-all {
     #: Every registered profile: separate accounts and separate requests, so
     #: there is nothing to serialize.
     #:
-    #: The fan-out itself is =golang/parallel_sections=, not shell. Backgrounded
-    #: zsh subshells cannot return anything, so each profile would need a temp
-    #: file, and then reassembling those in declared order, keeping each
-    #: profile's stderr attributable, and reducing the set to one exit status is
-    #: a pile of bookkeeping that is easy to get subtly wrong. Go does it once,
-    #: properly, and hands back ordered output.
+    #: The fan-out lives in the Python, one process running threads over what
+    #: is pure network wait, the same way =codex_status.py= checks several auth
+    #: files. Fanning out in the shell instead would mean a process per profile
+    #: whose stdout is a pipe rather than the terminal, and =--color auto= would
+    #: then quietly resolve to "no colour" for the command run most often.
     ##
     local profiles=("${claude_code_profile_order[@]}")
     assert-args profiles @RET
 
-    ensure-cmd claude_code_usage.py jq @RET
-    ensure-dep1 parallel_sections go-install-local "${NIGHTDIR}/golang/parallel_sections" @RET
-
-    local json_p="${claude_code_usage_json_p:-n}"
     local notif_p="${claude_code_usage_notif_p:-y}"
-    local arg
-    for arg in "$@" ; do
-        #: =-all= splices several reports together, so it has to know whether
-        #: they are JSON regardless of how that was asked for.
-        if [[ "${arg}" == '--json' ]] ; then
-            json_p=y
-        fi
-    done
 
-    local mode=text
-    if bool "${json_p}" ; then
-        mode=json
-    fi
+    ensure-cmd claude_code_usage.py @RET
 
-    local sections=() p args
+    local common
+    common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
+
+    local script_args=(--all "${common[@]}")
+    local p
     for p in "${profiles[@]}" ; do
-        args=("${(@f)$(h-claude-code-usage-argv "${p}" "$@")}") @TRET
+        h-claude-code-profile-assert "${p}" @RET
 
-        #: Built with jq rather than by hand, so an argument containing a
-        #: quote or a backslash cannot corrupt the spec. Fed in on stdin and
-        #: split, rather than via =--args=: jq still option-parses positional
-        #: arguments, so a =--profile-label= among them is taken as a jq flag.
-        sections+=("$(ec "${(F)args}" | jq -Rsc --arg label "${p}" '{label: $label, argv: (rtrimstr("\n") | split("\n"))}')") @TRET
+        script_args+=(--profile "${p}=${claude_code_profiles[$p]}")
     done
 
     local retcode=0
-    ec "${(F)sections}" |
-        jq -sc --arg mode "${mode}" '{mode: $mode, sections: .}' |
-        $proxyenv parallel_sections || retcode=$?
+    $proxyenv revaldbg command claude_code_usage.py "${script_args[@]}" "$@" || retcode=$?
 
     if bool "${notif_p}" ; then
-        #: The fan-out runs =claude_code_usage.py= directly rather than through
-        #: [agfi:claude-code-usage], so it does not inherit that function's
-        #: arming and has to do it here -- otherwise the bare =ccu= alias, which
-        #: is this function, would never arm anything at all.
+        #: Not gated on the exit status, unlike the single-profile case: with
+        #: several profiles a nonzero status only means *one* of them failed,
+        #: and the rest still deserve their notifier.
         #:
         #: =>&2= because our stdout may be a JSON document a caller is about to
         #: parse; non-fatal because a failed arm must not make a working report
