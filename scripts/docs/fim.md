@@ -18,6 +18,10 @@ The Emacs twin is `night/fim-get` in `~/doom.d/autoload/night-mistral-fim.el`,
 documented at `~/doom.d/docs/mistral-fim.md`. It speaks the same body to the
 same providers, so the two want changing together.
 
+Outside a terminal it is `hammerspoon/core/fim.lua`, on `hyper+shift+right` —
+the same request, at the cursor of whatever text field is focused. See
+**The Hammerspoon hotkey** below.
+
 ## Providers
 
 Every native FIM API takes an *identical* request body — `model`, `prompt`,
@@ -220,6 +224,228 @@ The widgets are named `zle-fim-*` on purpose: `zle-*` is in the default
 `ZSH_AUTOSUGGEST_IGNORE_WIDGETS`, so zsh-autosuggestions leaves them alone
 rather than wrapping them. [agfi:zle-complete-with-dots] in `.zshrc` is named
 that way for the same reason.
+
+## The Hammerspoon hotkey
+
+The same completion, everywhere else on the machine. `core/fim.lua` binds two
+chords, and both insert one line at the cursor of whatever text field happens
+to be focused:
+
+- `hyper+shift+right` — the default provider, `fimDefaultProvider`, which is
+  `codestral`. At 0.3s the answer is usually up before you have decided whether
+  you wanted it.
+- `hyper+ctrl+right` — `deepseek`, for when the output matters more than the
+  1.4s.
+
+`hyper+shift+right` used to move the mouse pointer. Those four
+`hyper_bind_v2` arrow bindings in `hammerspoon/core/mouse.lua` are retired —
+wrapped in `if false then`, not deleted — because purple mode's bare arrows
+already do the same job and the chord is worth more here.
+
+### Two ways to read the text
+
+There is no per-app hook worth writing: a Telegram draft, a browser textarea
+and a native Cocoa field all want the same completion and none of them share
+an extension point. What they do not share is a way to *read* the text, so
+there are two capture paths, and which one ran is shown in the in-flight
+status: `❄ FIM ⋯ codestral (ax)` or `(keys)`.
+
+`ax` asks the Accessibility API for the focused element's `AXValue` and
+`AXSelectedTextRange`, and slices the value at the cursor. It is exact, it
+costs nothing, it is invisible to the user, and it is the only path that can
+tell afterwards whether the cursor moved. Native Cocoa fields have it, and so
+do some Qt apps — sioyek does.
+
+`keys` is the fallback, and it exists because Purple Telegram does not expose
+its message draft field through Accessibility **at all** — not an empty value,
+no element — and kitty exposes a text area that is always empty. Those are the
+two apps this feature is most wanted in, so the ugly path is not optional. It
+is `shift+cmd+up`, `cmd+c`, `right`, `shift+cmd+down`, `cmd+c`, `left`: the
+first selection is cursor-to-start and gives the prefix, the right arrow
+collapses it back to the cursor, the second selection is cursor-to-end and
+gives the suffix, and the left arrow collapses that one back to the cursor
+again. The clipboard is saved before the first copy and put back before the
+request goes out.
+
+The two arrow keys in the middle of that are not decoration, and leaving them
+out is the bug this was first written with. The obvious assumption is that the
+anchor stays at the original cursor across both extensions, so that
+`shift+cmd+down` swings straight from prefix to suffix. It does not. Measured
+in TextEdit with the cursor at offset 28 of a three-line document:
+`shift+cmd+up` leaves the selection's *origin* at the top, so the following
+`shift+cmd+down` grows `[0, end)` and hands back the entire document as the
+"suffix", and the final left arrow collapses to 0 rather than to 28 — the
+user's cursor silently teleports to the top of their document. A right arrow
+collapses a selection to its right edge, which is exactly the cursor we
+started from, and a left arrow to its left edge; with both in place the same
+test captured `"def add(a, b):\n    return a "` and `"+ b\nprint(add(1, 2))"`
+and put the cursor back at 28.
+
+Each collapse is skipped when its copy timed out, because a timeout means the
+selection was empty — and on an empty selection an arrow key is an ordinary
+cursor move that would walk one character in the wrong direction.
+
+A synthetic `cmd+c` into an *empty* selection changes nothing at all, and
+there is no event to wait for and no way to ask the app, so the code polls the
+pasteboard's change count every 20ms and treats `fimCopyTimeoutSeconds` (0.35)
+of no change as "that selection was empty". Both selections empty means there
+was nothing to complete, and the run stops there. Every bit of this is a chain
+of timer callbacks rather than a loop: Hammerspoon's Lua thread is also its
+event thread, and blocking it freezes every keystroke on the machine.
+
+`fimForceKeystrokePath = true` makes the module skip `ax` and always take the
+keystroke path. It is a debugging global — set it from the console with
+`hs -c 'fimForceKeystrokePath = true'` — and it is the only way to exercise
+half this code without opening Telegram.
+
+### The state machine
+
+A keyDown eventtap is started the moment the request goes out and stopped when
+the run ends. It never exists at any other time: a permanently installed tap
+sees every keystroke of every app, which is both a privacy cost and a latency
+one, and the tap is deliberately started *after* the last synthetic keystroke
+of the capture so it can never mistake our own `cmd+c` for the user typing.
+
+While **requesting**:
+
+- `Escape` cancels. The task is terminated, the key is swallowed, and the band
+  says `❄ FIM ✗ cancelled`.
+- Any other key **detaches**. The key goes through to the app untouched, the
+  tap stops, and the request keeps running — you already paid for it. When it
+  lands, the completion goes to the clipboard:
+  `❄ FIM 📋 copied to clipboard (you kept typing) 0.4s`. The same happens if
+  the frontmost application changed while you waited.
+
+Once the completion is back it becomes a **ghost**: the band shows it verbatim
+under a line reading `❄ FIM ✓ 0.3s · any key inserts, Esc discards`, and
+nothing has been inserted yet.
+
+- `Escape` discards it: `❄ FIM ∅ discarded`.
+- A chord carrying `cmd` or `ctrl` — `cmd+tab`, `cmd+c` — is a command rather
+  than typing, so the ghost gets out of the way: the completion goes to the
+  clipboard and the chord is delivered. So does a change of frontmost app.
+- Anything else **accepts**. The completion goes onto the pasteboard and the
+  tap returns three replacement events — `cmd+v` down, `cmd+v` up, and a copy
+  of the key you actually pressed — so the paste is delivered *before* your
+  keystroke rather than racing it. Swallowing the key and re-posting it from a
+  timer would leave a window in which the two arrive the wrong way round.
+  The clipboard is restored 0.3s later, and only if it still holds the
+  completion, so a copy you made in between is not clobbered.
+- Nothing at all, for `fimGhostSeconds` (45), and the ghost times out — to the
+  clipboard again, `❄ FIM 📋 copied to clipboard (timed out)`.
+
+On the `ax` path the cursor position is re-read at accept time, and a
+completion computed for a cursor that has since moved is *not* pasted: it
+corrupts the line rather than completing it, so it goes to the clipboard with
+`❄ FIM 📋 cursor moved, copied to clipboard`. The `keys` path cannot check
+this, which is one more reason to prefer `ax` where it works.
+
+The clipboard is the fallback destination for every case where we could not
+paste. A completion that was paid for is never silently thrown away.
+
+A second press supersedes the first rather than racing it, exactly as the zsh
+widget does. `fimCancel()` — the public escape hatch, and what a new press
+calls first — stops the tap, terminates the task, stops the timers and
+dismisses the band. The run id it bumps is what makes the superseded request's
+callback a no-op when it eventually arrives. `fimState` is a global for the
+same reason: after `hs.reload()` the previous chunk's eventtap is still alive,
+held by the objc runtime rather than by any Lua reference, and the module
+finds it there and stops it at load time.
+
+Status goes to a band through `alert_gateway` with a fixed id, on the active
+screen only and with no fullscreen flash, and carries the same symbols as the
+zsh widget: `❄` marks it as ours, then `⋯` in flight, `✓` inserted, `∅`
+nothing but nothing wrong, `✗` failed, and `📋` for the clipboard fallback,
+which the zsh side has no need of. Markup is explicitly plain, because
+completions are code and `*` and `_` in code must not be eaten.
+
+### What it sends, and what it refuses to
+
+Whatever field is focused when you press the chord is what gets sent to the
+provider. There is no filter on which app, which field, or what the text looks
+like. That is the deal, and it is worth being plain about rather than burying.
+
+Two limits on it. `fimPrefixMaxChars` (4000) and `fimSuffixMaxChars` (1000) cap
+the context — the prefix keeps its last N characters, the suffix its first N,
+cut on code-point boundaries so the provider never receives invalid UTF-8 —
+so a chord pressed at the bottom of a very long document does not ship the
+whole thing. And if `hs.eventtap.isSecureInputEnabled()`, the run refuses
+before touching anything at all: `❄ FIM ✗ Secure Input is on`. Nothing is
+read and no keystroke is sent. A password field somewhere has told the system
+that nobody may observe the keyboard, and that is exactly what both capture
+paths would otherwise do.
+
+`AXSelectedTextRange.location` counts UTF-16 code units, not bytes and not
+code points, so slicing a Lua byte string at it needs a walk that charges two
+units for anything outside the BMP. Getting this wrong splits an emoji and
+sends the provider a broken byte, which is the sort of bug that only shows up
+in someone's chat message months later.
+
+### What is verified
+
+Driven end to end in a scratch TextEdit document, with the completions and
+documents quoted as they came back.
+
+The **ax** path, from `def add(a, b):` and a four-space second line with the
+cursor at offset 19: band `❄ FIM ⋯ codestral (ax)`, then a ghost holding
+`return a + b` at 0.4s. Typing `#` accepted it and the document read
+
+```
+def add(a, b):
+    return a + b#
+```
+
+so the paste landed *before* the typed character. The returned-replacement-
+events route worked on the first try; the swallow-and-re-post fallback was
+never needed and is not in the code.
+
+The **keys** path, forced with `fimForceKeystrokePath`, cursor at offset 19 of
+a three-line document: captured prefix `"def add(a, b):\n    "` and suffix
+`"\nprint(add(1, 2))"`, both exactly what lay either side of the cursor;
+ghost `return a + b`; accepting with `#` gave
+
+```
+def add(a, b):
+    return a + b#
+print(add(1, 2))
+```
+
+with the third line untouched, the cursor back where it started and the
+clipboard back to its previous contents. The whole run took 1.6s against the
+ax path's 0.4s, which is the honest price of the clipboard dance.
+
+`Escape` on a ghost left the document byte-identical and cleared the state.
+Typing during flight detached as intended: the key reached the document
+(`def add(a, b):\n    X`), the tap stopped, the task kept running, and the
+completion — DeepSeek's `" return a + b"`, leading space intact — arrived on
+the clipboard instead of in the text. A second press superseded the first: the
+run id went 6 to 7, there was never more than one band, `❄ FIM ⋯ deepseek (ax)`
+was replaced in place by `❄ FIM ⋯ codestral (ax)`, and the abandoned task's
+callback never fired. A bogus provider put its own stderr on the band:
+
+```
+❄ FIM ✗ fim-get: unknown provider 'NOSUCH'; known: codestral deepseek deepseek-flash
+```
+
+Asking for a completion between `return a ` and `+ b`, where nothing belongs,
+gave `❄ FIM ∅ empty completion 0.4s` and changed nothing.
+
+Checked separately in Hammerspoon's own Lua: the UTF-16 offset walk against a
+string containing `é`, an emoji and a right-to-left mark (offset 3 of
+`a é 😀 b` lands after the emoji, offsets 1/2/5 where they should); the caps
+against ten `é` and five emoji, both cut to the requested number of code points
+with valid UTF-8 on both sides; the invalid-UTF-8 fallbacks, which return
+something rather than throwing.
+
+Not verified: **Telegram**, which is the app the keystroke path exists for. Try
+`hyper+shift+right` in a draft, then a key to accept it. If the band says
+`(ax)` rather than `(keys)` then Telegram has grown an accessible draft field
+since this was written. If the capture comes back wrong, the thing to compare
+against is a plain TextEdit window with `fimForceKeystrokePath` set — and the
+first thing to suspect is the selection-anchor behaviour above, since nothing
+guarantees a Qt text widget collapses selections the way NSTextView does.
+
+Also unverified: kitty, sioyek, and any browser text area.
 
 ## Things that cost real time
 
