@@ -27,6 +27,7 @@ The explicit core load order is:
 - `app-hotkeys.lua`
 - `window-media-bindings.lua`
 - `stt.lua`
+- `fim.lua`
 - `reload.lua`
 
 `reload.lua` loads every Lua file in `~/scripts/hammerspoon/auto-load/` in
@@ -527,6 +528,35 @@ Re-calling `agentBannerOn` with the same message refreshes the countdown
 without re-flashing, so a long task can heartbeat without strobing. A changed
 message does flash again. The banner always expires on its own, so an agent
 that crashes or forgets cannot leave the screen branded.
+
+## FIM completion
+
+`core/fim.lua` puts the fill-in-the-middle completion of `docs/fim.md` on two
+hyper chords, inserting one line at the cursor of whatever text field is
+focused:
+
+- `Hyper+Shift+Right`: complete with the default provider (`codestral`, ~0.3s).
+- `Hyper+Ctrl+Right`: complete with `deepseek` (~1.4s, better output).
+
+It reads the text around the cursor through `hs.axuielement` where the app
+exposes `AXValue` and `AXSelectedTextRange`, and otherwise through a
+`shift+cmd+up` / `cmd+c` / `right` / `shift+cmd+down` / `cmd+c` / `left` dance
+over the clipboard — Purple Telegram's Qt draft box is not in the accessibility
+tree at all, and kitty's text area is always empty. The two arrow keys collapse
+each selection back to the original cursor: the anchor does *not* stay put
+across the two extensions, and without them the second copy returns the whole
+document and the cursor ends up at offset 0. See `docs/fim.md`.
+
+The completion appears as a ghost in an alert band with the id `fim`: any key
+inserts it, `Escape` discards it, a `cmd`/`ctrl` chord or a change of app
+copies it to the clipboard. A keyDown eventtap exists only for the duration of
+a run, never permanently.
+
+`Hyper+Shift+Right` used to move the mouse pointer. Those four
+`hyper_bind_v2{mods={"shift"}, key=<arrow>}` bindings in `core/mouse.lua` are
+retired — wrapped in `if false then` rather than deleted — since purple mode's
+bare arrows already cover keyboard mouse movement. The `purple_bind_v2` arrow
+bindings beside them are untouched.
 
 `~/.hammerspoon/init.lua` includes a `hyper+w` Wi-Fi chooser.
 

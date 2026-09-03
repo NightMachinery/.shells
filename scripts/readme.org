@@ -127,6 +127,15 @@ characters instead of emitting them -- and because the slot that *can*,
 =POSTDISPLAY=, belongs to zsh-autosuggestions: right arrow and twelve other
 widgets splice whatever sits there into the command line as real text.
 
+Outside a terminal the same completion is on =hyper+shift+right= (and
+=hyper+ctrl+right= for DeepSeek), from =hammerspoon/core/fim.lua=. It reads the
+text around the cursor through the Accessibility API where the app exposes it,
+and otherwise through a =shift+cmd+up= / =cmd+c= / =shift+cmd+down= / =cmd+c=
+dance over the clipboard -- Purple Telegram's Qt draft box does not appear in
+the accessibility tree at all, and kitty's is always empty. The completion
+arrives as a ghost in an alert band: any key inserts it, =Esc= discards it, and
+anything we could not paste lands on the clipboard instead.
+
 See =./docs/fim.md=, which records the things that cost real time (ZLE's
 =BUFFER= and =CURSOR= are not bound inside a =zle -F= handler; cancelling a
 request by process group takes the request that replaces it down too; and
