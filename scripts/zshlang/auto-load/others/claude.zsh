@@ -189,6 +189,19 @@ function claude-code-usage {
 aliasfnq claude-code-usage-notify claude_code_usage_notif_p=y claude-code-usage
 aliasfn ccun claude-code-usage-notify
 
+#: An explicit name for the profile [agfi:claude-code-usage] already reports by
+#: default, so a caller never has to rely on that default being what they think.
+function claude-code-usage-default {
+    claude_code_usage_profile=default claude-code-usage "$@"
+}
+aliasfn claude-code-status-default claude-code-usage-default
+alias ccu-default='claude-code-usage-default'
+alias ccs-default='claude-code-usage-default'
+
+aliasfnq claude-code-usage-default-notify claude_code_usage_notif_p=y claude-code-usage-default
+alias ccu-default-notify='claude-code-usage-default-notify'
+alias ccs-default-notify='claude-code-usage-default-notify'
+
 function claude-code-usage-work {
     claude_code_usage_profile=work claude-code-usage "$@"
 }
@@ -313,16 +326,13 @@ function h-claude-code-usage-notif-window {
 }
 
 function h-claude-code-usage-notif-session {
-    #: The tmux session a profile's notifier lives in. The default profile
-    #: keeps the unqualified name, being the one armed by hand most often.
+    #: The tmux session a profile's notifier lives in, named after the
+    #: scheduling function minus the =h-= so that `tmux ls` and the function
+    #: you called line up. Uniform across profiles, the default one included.
     local profile="${1}"
     assert-args profile @RET
 
-    if [[ "${profile}" == default ]] ; then
-        ec 'claude-code-usage-notif'
-    else
-        ec "claude-code-usage-${profile}-notif"
-    fi
+    ec "claude-code-usage-${profile}-notif-schedule"
 }
 
 function h-claude-code-usage-notif-wait {
@@ -459,10 +469,6 @@ function h-claude-code-usage-notif-for-profile {
 #: which is not the intended way in -- the =-notify= reports are -- so they are
 #: =h-=. They stay callable as an escape hatch for when you already have a
 #: report in front of you.
-#:
-#: The tmux session names they schedule into keep the older, unprefixed
-#: spelling: those are what shows up in `tmux ls`, they collide with nothing,
-#: and renaming them would orphan any notifier already armed.
 function h-claude-code-usage-notif-schedule {
     h-claude-code-usage-notif-for-profile default
 }
@@ -476,7 +482,7 @@ function h-claude-code-usage-fable-notif-schedule {
     #: Its own tmux session, so it can be scheduled alongside the default
     #: profile's notifier rather than replacing it.
     ##
-    h-claude-code-usage-notif 'claude-code-usage-fable-notif' default \
+    h-claude-code-usage-notif 'claude-code-usage-fable-notif-schedule' default \
         session weekly_all 'weekly:Fable'
 }
 
@@ -505,7 +511,7 @@ function claude-code-usage-notif-sessions {
     for profile in "${claude_code_profile_order[@]}" ; do
         out+=("$(h-claude-code-usage-notif-session "${profile}")")
     done
-    out+=('claude-code-usage-fable-notif')
+    out+=('claude-code-usage-fable-notif-schedule')
 
     ec "${(F)out}"
 }

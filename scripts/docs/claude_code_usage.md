@@ -193,8 +193,11 @@ Profiles are registered in the `claude_code_profiles` associative array, which
 maps a profile name to its `CLAUDE_CONFIG_DIR` (empty for the default profile),
 and are ordered by `claude_code_profile_order`. Adding a profile is one line in
 each: the config file path, the Keychain service and the cache dir all derive
-from the config dir. `claude-code-usage-work` (aliases `ccu-work`, `ccs-work`)
-is the work profile, i.e. `claude_code_usage_profile=work`.
+from the config dir. Each registered profile gets a named command:
+`claude-code-usage-default` (aliases `ccu-default`, `ccs-default`) and
+`claude-code-usage-work` (aliases `ccu-work`, `ccs-work`), which are just
+`claude_code_usage_profile=<name>`. The `-default` one is redundant with plain
+`claude-code-usage` but says out loud which account you meant.
 
 `claude-code-usage-all` passes the registry to the script as repeated
 `--profile NAME=CONFIG_DIR` and lets it do the work.
@@ -237,6 +240,8 @@ or set `claude_code_usage_notif_p=y` on a plain one:
 
 - `claude-code-usage-notify` (alias `ccun`) — one profile, report plus
   schedule.
+- `claude-code-usage-default-notify` (aliases `ccu-default-notify`,
+  `ccs-default-notify`) — the default profile, named explicitly.
 - `claude-code-usage-work-notify` (aliases `ccu-work-notify`,
   `ccs-work-notify`) — the work profile.
 - `claude-code-usage-all-notify` (aliases `ccu-notify`, `ccs-notify`,
@@ -260,9 +265,10 @@ or `h-claude-code-usage-fable-notif-schedule` directly. They carry the `h-`
 prefix because the `-notify` reports are the intended way in, not because they
 are off limits — reach for one when you already have a report in front of you.
 
-The tmux sessions themselves keep the shorter `claude-code-usage-*-notif`
-spelling, since that is what `tmux ls` shows and renaming them would orphan any
-notifier already scheduled.
+Each scheduled notifier lives in a tmux session named after the scheduling
+function minus the `h-`: `claude-code-usage-<profile>-notif-schedule`, plus
+`claude-code-usage-fable-notif-schedule`. So what `tmux ls` shows and the
+function you called line up.
 
 A window counts as blocking at or above `claude_code_usage_notif_full_pct`
 (default 100). The deadline is the **latest** reset among the blocked windows,
