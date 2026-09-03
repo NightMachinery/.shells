@@ -615,6 +615,14 @@ app that pastes asynchronously (Qt, Electron, WebKit), so an arrow navigated the
 old text. Keys typed while the paste is in flight queue behind it and are posted
 in order. Auto-repeat across an accept is lost. See `docs/fim.md`.
 
+`fimAppPolicy` decides what the chord does per app, keyed by bundle ID. kitty
+(`net.kovidgoyal.kitty`) and Emacs (`org.gnu.Emacs`) are mapped to
+`{ hotkey = { mods = {"alt"}, key = "." } }`, so the chord posts *their* FIM
+binding instead of running this one — both know their own buffer exactly, and
+kitty's text area is not readable through Accessibility anyway. Other values are
+`"default"` (run FIM, and what an unlisted app gets via `fimAppPolicyDefault`),
+`"ignore"`, and `"ignore_and_notify"`.
+
 `Hyper+Shift+Right` used to move the mouse pointer. Those four
 `hyper_bind_v2{mods={"shift"}, key=<arrow>}` bindings in `core/mouse.lua` are
 retired — wrapped in `if false then` rather than deleted — since purple mode's
