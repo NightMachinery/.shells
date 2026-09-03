@@ -98,10 +98,19 @@ human-readable output source, e.g. `(keychain:evar)`.
 Keychain items are ACL'd per item, and `security` is not the application that
 created them, so the *first* read of each one can pop a one-time authorization
 prompt. That is per profile: granting access for the default profile does
-nothing for a newly added one. A denied or unanswered prompt makes the token
-lookup fail, and the report then silently drops to the config-cache fallback —
-so if a profile shows `[local cache: ...]` when you expected live data, read the
-`[no live data: ...]` reason next to it before suspecting the derivation.
+nothing for a newly added one.
+
+A read that fails for any reason other than "no such item" — a locked keychain,
+a denied or unanswered prompt — is reported as exactly that, rather than as an
+absent credential. The distinction matters: treating them alike turns a locked
+keychain into a silent fallback onto hours-old cached numbers that look
+perfectly normal. `security` signals a genuinely missing item with exit 44;
+anything else is surfaced as `could not read the Keychain credential ...`.
+
+Because an authorization prompt has to be answered by a human, the Keychain read
+gets its own `--keychain-timeout` (default 30s) rather than sharing the HTTP
+`--timeout` (default 10s), which was short enough to expire while the dialog was
+still on screen.
 
 The Keychain/file credential also provides the plan name (`subscriptionType`)
 and token expiry. An expired token only produces a warning — the request is
@@ -141,6 +150,9 @@ the default.
 
 - `--json` — no env fallback; off.
 - `--timeout` — `claude_code_usage_timeout_s` / `CLAUDE_CODE_USAGE_TIMEOUT_S`; 10.
+- `--keychain-timeout` — `claude_code_usage_keychain_timeout_s` /
+  `CLAUDE_CODE_USAGE_KEYCHAIN_TIMEOUT_S`; 30. Separate from `--timeout` because
+  a Keychain read can block on an authorization prompt.
 - `--cache-ttl` — `claude_code_usage_cache_ttl_s` /
   `CLAUDE_CODE_USAGE_CACHE_TTL_S`; 300.
 - `--refresh` — no env fallback; off.
