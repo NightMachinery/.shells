@@ -49,6 +49,10 @@ KEYCHAIN_SERVICE_BASE = "Claude Code-credentials"
 KEYCHAIN_ACCOUNT_FALLBACK = "claude-code-user"
 #: Claude Code rejects any account name outside this set and falls back.
 KEYCHAIN_ACCOUNT_RE = re.compile(r"^[a-zA-Z0-9._-]+$")
+#: `security` exit code for errSecItemNotFound. Any *other* nonzero exit is a
+#: real problem -- a locked keychain, a denied authorization -- and must not be
+#: mistaken for "this profile has no credential".
+KEYCHAIN_NOT_FOUND = 44
 CREDENTIALS_FILE = Path(os.path.expanduser("~/.claude/.credentials.json"))
 DEFAULT_PROFILE_CONFIG = Path(os.path.expanduser("~/.claude.json"))
 CACHE_FILE_NAME = "usage.json"
@@ -108,6 +112,14 @@ class UsageWindow:
     raw: dict
     severity: str | None = None
     is_active: bool | None = None
+
+
+@dataclass(frozen=True)
+class KeychainRead:
+    data: dict | None = None
+    #: None when the item simply is not there, which is unremarkable; set for
+    #: every other failure, which is worth telling the user about.
+    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -197,7 +209,7 @@ def read_json_file(path: Path) -> dict | None:
 
 def read_keychain_item(
     *, service: str, account: str | None, timeout: float
-) -> dict | None:
+) -> KeychainRead:
     command = ["security", "find-generic-password", "-s", service]
     if account is not None:
         command.extend(["-a", account])
@@ -207,32 +219,66 @@ def read_keychain_item(
         proc = subprocess.run(
             command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
             timeout=timeout,
             check=False,
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
+    except subprocess.TimeoutExpired:
+        # Almost always an authorization dialog nobody answered. `security` is
+        # not the application that created these items, so the first read of
+        # each one can prompt -- and that is per item, so granting access for
+        # one profile does nothing for the next.
+        return KeychainRead(
+            error=(
+                f"timed out after {timeout:g}s reading Keychain item {service!r} "
+                "(an authorization prompt may be waiting for you)"
+            )
+        )
+    except OSError as exc:
+        return KeychainRead(error=f"could not run security: {exc}")
+
+    if proc.returncode == KEYCHAIN_NOT_FOUND:
+        return KeychainRead()
 
     if proc.returncode != 0:
-        return None
+        # stderr only; stdout would be the secret.
+        detail = [line for line in (proc.stderr or "").splitlines() if line.strip()]
+        return KeychainRead(
+            error=(
+                f"Keychain item {service!r} could not be read "
+                f"(security exit {proc.returncode})"
+                + (f": {detail[-1].strip()}" if detail else "")
+            )
+        )
 
     try:
         data = json.loads(proc.stdout.strip())
     except json.JSONDecodeError:
-        return None
+        return KeychainRead(error=f"Keychain item {service!r} does not contain JSON")
 
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return KeychainRead(
+            error=f"Keychain item {service!r} does not contain a JSON object"
+        )
+
+    return KeychainRead(data=data)
 
 
 def keychain_token_infos(
     *, service: str, accounts: list[str | None], timeout: float
-) -> list[TokenInfo]:
+) -> tuple[list[TokenInfo], list[str]]:
+    """Returns the credentials found, and separately anything that went wrong.
+
+    A read that fails for any reason other than "no such item" must not look
+    like an absent credential: that turns a locked keychain into a silent
+    fallback onto stale data.
+    """
     if sys.platform != "darwin":
-        return []
+        return [], []
 
     infos: list[TokenInfo] = []
+    errors: list[str] = []
     seen_tokens: set[str] = set()
     seen_accounts: list[str | None] = []
     for account in accounts:
@@ -240,19 +286,22 @@ def keychain_token_infos(
             continue
         seen_accounts.append(account)
 
-        data = read_keychain_item(service=service, account=account, timeout=timeout)
-        if data is None:
+        read = read_keychain_item(service=service, account=account, timeout=timeout)
+        if read.error is not None:
+            errors.append(read.error)
+            continue
+        if read.data is None:
             continue
 
         source = "keychain" if account is None else f"keychain:{account}"
-        info = token_info_from_oauth(data, source=source)
+        info = token_info_from_oauth(read.data, source=source)
         if info is None or info.token in seen_tokens:
             continue
 
         seen_tokens.add(info.token)
         infos.append(info)
 
-    return infos
+    return infos, errors
 
 
 def best_token_info(infos: list[TokenInfo]) -> TokenInfo | None:
@@ -299,6 +348,7 @@ def get_token(
     config_dir: str | None = None,
     keychain_service: str | None = None,
     keychain_account: str | None = None,
+    keychain_timeout: float | None = None,
 ) -> TokenInfo:
     env_token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
     if env_token:
@@ -315,14 +365,19 @@ def get_token(
     # hashed service name can only have been written by a version that already
     # used $USER, and probing without a filter there would just pick whichever
     # orphan `security` returns first.
-    infos = keychain_token_infos(
-        service=service, accounts=[account], timeout=timeout
+    # Read with its own budget: this one can block on an authorization dialog,
+    # which has nothing to do with how long an HTTP request may take.
+    if keychain_timeout is None:
+        keychain_timeout = timeout
+
+    infos, errors = keychain_token_infos(
+        service=service, accounts=[account], timeout=keychain_timeout
     )
-    if not infos and keychain_account is None and not config_dir:
-        infos = keychain_token_infos(
+    if not infos and not errors and keychain_account is None and not config_dir:
+        infos, errors = keychain_token_infos(
             service=service,
             accounts=[None, account, "unknown"],
-            timeout=timeout,
+            timeout=keychain_timeout,
         )
 
     keychain_info = best_token_info(infos)
@@ -335,6 +390,15 @@ def get_token(
         info = token_info_from_oauth(data, source=f"credentials-file:{path}")
         if info is not None:
             return info
+
+    if errors:
+        # Distinct from "no credential exists": say so, rather than letting a
+        # locked keychain masquerade as a profile that was never logged in and
+        # silently drop to whatever stale cache is lying around.
+        raise UsageError(
+            f"could not read the Keychain credential for account {account!r}: "
+            + "; ".join(errors)
+        )
 
     tried = ", ".join(str(path) for path in credentials_file_paths(config_dir))
     raise UsageError(
@@ -520,6 +584,7 @@ def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileRepor
             config_dir=profile.config_dir,
             keychain_service=args.keychain_service,
             keychain_account=args.keychain_account,
+            keychain_timeout=args.keychain_timeout,
         )
     except UsageError as exc:
         failure = str(exc)
@@ -1008,6 +1073,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             default="",
         ),
         help="Profile name shown in the header (default: %(default)r).",
+    )
+    parser.add_argument(
+        "--keychain-timeout",
+        type=float,
+        default=env_first(
+            "claude_code_usage_keychain_timeout_s",
+            "CLAUDE_CODE_USAGE_KEYCHAIN_TIMEOUT_S",
+            default="30",
+        ),
+        help=(
+            "Seconds to wait for a Keychain read. Separate from --timeout "
+            "because the first read of each item can put up an authorization "
+            "prompt that a human has to answer (default: %(default)s)."
+        ),
     )
     parser.add_argument(
         "--keychain-service",
