@@ -284,6 +284,128 @@ function hotspot-http-open {
     open "http://$(ip-router):8181/"
 }
 ##
+##
+#: Captive-portal handling: the public Wi-Fi that hands out DHCP and DNS but
+#: intercepts all HTTP until you click a button on a login page. The probing
+#: lives in =golang/wifi-login-site=; these are thin wrappers around it. See
+#: =golang/wifi-login-site/readme.org=.
+##
+typeset -g wifi_login_site_bait_url="${wifi_login_site_bait_url:-http://neverssl.com}"
+#: neverssl.com exists for exactly this job: plain HTTP, no HSTS, no-store. A
+#: hostname you type gets forced to HTTPS by every modern browser, which a
+#: portal cannot intercept, so you get a TLS error instead of a login form.
+##
+function h-wifi-login-site-dep {
+    #: Builds the detector on first use. It is stdlib-only and pinned below the
+    #: installed Go toolchain precisely so that this build needs no network --
+    #: the first run happens on a Wi-Fi that has no internet yet.
+    ##
+    ensure-cmd go jq @RET
+    ensure-dep1 wifi-login-site go-install-local "${NIGHTDIR}/golang/wifi-login-site" @RET
+}
+
+function h-wifi-login-site-raw {
+    : "runs the detector, printing its JSON verdict"
+    h-wifi-login-site-dep @RET
+
+    local opts=()
+    test -z "${wifi_login_site_timeout}" ||
+        opts+=(-timeout "${wifi_login_site_timeout}")
+
+    wifi-login-site detect "$opts[@]"
+}
+
+function h-wifi-login-site-detect {
+    : "prints this network's verdict as tab-separated state, url and via"
+    h-wifi-login-site-raw | jq -r '[.state, .url // "", .via // ""] | @tsv'
+}
+
+function wifi-login-site-explain {
+    : "shows the full per-probe detection detail, for when the verdict looks wrong"
+    h-wifi-login-site-raw | jq .
+}
+
+function net-captive-portal-p {
+    : "returns 0 iff HTTP on this network is being intercepted by a captive portal"
+    #: Deliberately not built on [agfi:isNet], which pings 8.8.8.8. Captive
+    #: networks usually drop ICMP, so gating on [agfi:assert-net] would abort
+    #: the very commands you need here; and the portals that do let a ping
+    #: through still hijack every HTTP request. Only an HTTP probe can answer
+    #: this, which is why [agfi:isNet] is left alone rather than extended.
+    ##
+    local tsv
+    tsv="$(h-wifi-login-site-detect)" @TRET
+
+    local -a f
+    f=("${(@ps:\t:)tsv}")
+    [[ "${f[1]}" == portal ]]
+}
+
+function wifi-login-site-get {
+    : "prints the URL to open to log into the current public Wi-Fi"
+    #: Cascade, strongest evidence first. The reasoning behind each rung is in
+    #: =golang/wifi-login-site/readme.org=.
+    ##
+    local tsv=''
+    tsv="$(h-wifi-login-site-detect)" || tsv=''
+
+    if test -z "${tsv}" ; then
+        #: Degrade instead of failing. The detector being missing or
+        #: unbuildable coincides with having no internet to build it with, and
+        #: the bait URL is what an unnamed portal would have got anyway.
+        ecgray "$0: detection unavailable; falling back to ${wifi_login_site_bait_url}"
+        ec "${wifi_login_site_bait_url}" | cat-copy-if-tty
+        return 0
+    fi
+
+    local -a f
+    f=("${(@ps:\t:)tsv}")
+    local state="${f[1]}" url="${f[2]}" out=''
+
+    case "${state}" in
+        portal)
+            if test -n "${url}" ; then
+                #: The network named its own login page; nothing beats that.
+                out="${url}"
+            else
+                #: Hijacked in place, so any plain-HTTP page lands on the portal.
+                out="${wifi_login_site_bait_url}"
+            fi
+            ;;
+        blocked|unknown)
+            #: HTTP is not being intercepted at all, so a portal, if there is
+            #: one, is most likely served by the gateway itself. Generalises
+            #: [agfi:hotspot-http-open], which hardcodes port 8181.
+            local router
+            router="$(router-ip)" @TRET
+            out="http://${router}"
+            ;;
+        online)
+            if bool "${wifi_login_site_force}" ; then
+                out="${wifi_login_site_bait_url}"
+            else
+                ecgray "$0: no captive portal detected; you are already online"
+                return 1
+            fi
+            ;;
+        *)
+            ecerr "$0: unrecognized state from wifi-login-site: ${state}"
+            return 1
+            ;;
+    esac
+
+    ec "${out}" | cat-copy-if-tty
+}
+
+function wifi-login-site-open {
+    : "opens the login page of the current public Wi-Fi in the browser"
+    local url
+    #: Plain @RET rather than @TRET: being already online is an ordinary
+    #: outcome of this command, not an exception worth a stacktrace.
+    url="$(wifi-login-site-get)" @RET
+
+    reval-ec browser-open "${url}"
+}
 function ip-internal-get {
     : "Use 'ipconfig getifaddr en1' for wireless, or 'ipconfig getifaddr en0' for ethernet."
 
