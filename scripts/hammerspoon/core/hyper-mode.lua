@@ -92,6 +92,14 @@ prevFocusedElement = nil
 function hyper_modality:entered()
     hyper_modality.entered_p = true
 
+    -- Peek: fade any alert band down to a whisper for as long as hyper is
+    -- held, so a band lying over a tab bar or a title bar stops hiding the
+    -- thing you are about to run a command on. Visual only -- the alerts keep
+    -- their own timers and die on schedule even while invisible. Guarded
+    -- because hyper mode must still load if the alert engine did not.
+    -- Deliberately not on purple, which is a mode you sit in for minutes.
+    if alertV2PeekBegin then alertV2PeekBegin() end
+
     -- I have not yet added the redis updaters for purple_modality.
     redisActivateMode("hyper_modality")
 
@@ -166,6 +174,8 @@ end
 function hyper_modality:exited()
     hyper_modality.entered_p = false
     hyper_modality.exit_on_release_p = false
+
+    if alertV2PeekEnd then alertV2PeekEnd() end
 
     alert_gateway_dismiss(kHyperSIMAlertId)
 

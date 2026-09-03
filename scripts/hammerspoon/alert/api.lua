@@ -162,6 +162,42 @@ function alertV2FromFile(path, opts)
     return alertV2(text, opts)
 end
 
+--- ** Peek
+--- Fade every band down so the window underneath can be read, and back. Called
+--- from hyper-mode's entered/exited hooks; see ** Peek in state.lua for why
+--- hyper and not purple.
+---
+--- The state is a flag, not a counter, because that is what the hooks are: a
+--- modal that is entered while already entered fires entered() again, and a
+--- stray exited() must land on "not peeking" rather than on -1. So two begins
+--- and one end leaves the peek *off*, which is the safe direction -- the worst
+--- an uneven pair can do is show alerts that could have stayed hidden.
+function alertV2PeekSet(peeking)
+    peeking = peeking and true or false
+    if alertEngineState.peeking == peeking then
+        return peeking
+    end
+    alertEngineState.peeking = peeking
+    -- Alpha only. Deliberately not a render: no timer is stopped, no layout is
+    -- recomputed, and an alert that expires mid-peek expires on time.
+    AlertEngine.applyPeek()
+    return peeking
+end
+
+function alertV2PeekBegin()
+    return alertV2PeekSet(true)
+end
+
+function alertV2PeekEnd()
+    return alertV2PeekSet(false)
+end
+
+--- The flag, for callers and for tests. The alpha the canvases are actually
+--- wearing is AlertEngine.peekAlpha().
+function alertV2PeekActive()
+    return alertEngineState.peeking and true or false
+end
+
 --- ** Gateway
 --- What the rest of the config calls. Nothing outside this file names an engine
 --- directly, so changing which engine draws an alert -- or sending a subset of
