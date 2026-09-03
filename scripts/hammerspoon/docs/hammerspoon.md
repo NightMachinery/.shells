@@ -502,6 +502,52 @@ into it entirely. Left alone rather than second-guessed: someone who asked for a
 light band with coloured spans on it gets what they asked for, and silently
 dropping the colour they named would be the worse answer.
 
+### Peek: holding hyper fades the bands
+
+Bands live at the top of the screen, which is also where tab bars, title bars
+and status lines live. So while the hyper modality is held, every band drops to
+`alertV2PeekOpacity` (0.08) and comes back the moment hyper is released —
+`alertV2PeekBegin` and `alertV2PeekEnd` in `alert/api.lua`, called from
+`hyper_modality:entered`/`:exited`, with `alertV2PeekActive` to query it and
+`alertV2PeekEnabled = false` to turn the whole thing off. Both knobs are read at
+the moment of the peek rather than captured, so either can be changed from the
+console without a reload.
+
+What moves is `hs.canvas:alpha()` on the live canvases, not the palette: one
+setter per canvas, instantly reversible, no colour recomputed, and with no
+alerts up it is two walks over empty tables — which matters, because hyper is
+entered and left constantly. The alpha is applied in `newCanvas` rather than
+only at the moment hyper is entered, so a band raised *during* a peek comes up
+already faint, and so does a canvas rebuilt mid-peek by a new alert, a
+rewrapping countdown tick or a screen change. Nothing fades: `alpha()` and
+`show()` with no fade time are both immediate, so it reads as a card being
+lifted rather than as an animation.
+
+It is visual only. No timer is touched, so an alert whose lifetime runs out
+mid-peek dies on schedule instead of reappearing stale when you let go.
+
+The state is a flag rather than a counter, because that is the shape of the
+hooks: a modality entered while already entered fires `entered()` again, and a
+stray `exited()` has to land on "not peeking" rather than on -1. Two begins and
+one end therefore leave the peek off, which is the safe direction — the worst an
+uneven pair can do is show alerts that could have stayed hidden.
+
+Three things are deliberately excluded:
+
+Purple. It is a sticky mode you can sit in for minutes at a time, and hiding
+alerts for minutes is not peeking, it is hiding them.
+
+The hyper indicator. The star at the top of the screen is a `hs.canvas` from
+`ModalMode.createIndicatorGroup`, not an alert, and it stays fully opaque: it is
+the mode indicator itself, and its red variant is the Secure Input warning. The
+peek only ever walks `alertEngineState.canvases` and `floodCanvases`, so the
+indicator groups are never reachable from it.
+
+`hs.alert` (v1). Its canvases live in a module-local table with no public
+accessor, so fading them would mean a `debug.getupvalue` reach into the
+extension's internals — fragile, and for nothing: v1 is down to a `require` in
+`boot.lua` and one call inside an `if false then` block. Not worth retrying.
+
 ## Agent focus banner
 
 `core/agent-banner.lua` shows a banner while a coding agent is driving the GUI

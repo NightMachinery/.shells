@@ -119,12 +119,53 @@ local function canvasElements(stack, origin)
     return elements, animated
 end
 
+--- ** Peek
+--- What every alert canvas' alpha should be right now: faint while hyper is
+--- held, otherwise fully opaque. Both knobs are read here rather than captured
+--- anywhere, so setting either from the console takes effect on the next peek.
+--- Turning the feature off mid-peek therefore restores opacity as well.
+function AlertEngine.peekAlpha()
+    if not (alertEngineState.peeking and alertV2PeekEnabled) then
+        return 1
+    end
+    return math.max(0, math.min(tonumber(alertV2PeekOpacity) or 0, 1))
+end
+
+--- Push that alpha onto every canvas that is already on screen. A band raised
+--- *during* a peek does not come through here at all -- newCanvas below sets
+--- the alpha as it builds, which is what keeps a new alert from flashing up at
+--- full opacity for the instant before anything corrects it.
+---
+--- Nothing here is a no-op check: hyper is entered and left constantly, and
+--- with no alerts up both loops are empty, so a peek costs two table walks
+--- over nothing.
+function AlertEngine.applyPeek()
+    local alpha = AlertEngine.peekAlpha()
+    for _, record in ipairs(alertEngineState.canvases) do
+        record.canvas:alpha(alpha)
+    end
+    -- The flood draws its own copy of every band on top of the strips, so
+    -- leaving it out would peek the bands and not the words on the wash.
+    for _, entry in ipairs(alertEngineState.floodCanvases) do
+        entry.canvas:alpha(alpha)
+    end
+end
+
 local function newCanvas(frame, level)
     local canvas = hs.canvas.new(frame)
     canvas:level(level)
     canvas:behavior(hs.canvas.windowBehaviors.canJoinAllSpaces
                         + hs.canvas.windowBehaviors.stationary
                         + hs.canvas.windowBehaviors.fullScreenAuxiliary)
+    -- On the render path, not only at the moment hyper is entered: render()
+    -- throws canvases away and rebuilds them (a new alert, a countdown tick
+    -- that rewraps, a screen change), and a rebuild mid-peek would otherwise
+    -- come back at full opacity.
+    --
+    -- alpha() is a window-level setter and takes effect immediately; show()
+    -- below is called with no fade time, so a peek is a card being lifted
+    -- rather than an animation.
+    canvas:alpha(AlertEngine.peekAlpha())
     return canvas
 end
 
