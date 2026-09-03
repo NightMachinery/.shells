@@ -110,7 +110,12 @@ function h-hs-reload-holder {
     local id="${hs_reload_holder:-}"
     #: Exported into every shell Claude Code spawns (see [agfi:claude-code-p]),
     #: and unlike \$PPID it is the same in the shell that takes the hold and the
-    #: one that releases it minutes later.
+    #: one that releases it minutes later -- within one session. It is per
+    #: session, not per conversation, so a compaction or a resume changes it
+    #: mid-task and the hold becomes unreleasable by name. Nothing available
+    #: here is stable across that (the job directory is named after the same
+    #: id), so [agfi:hs-reload-release] reports it instead, and the deadline in
+    #: the mtime remains the real backstop.
     test -n "$id" || id="${CLAUDE_CODE_SESSION_ID:-}"
     test -n "$id" || id="${TERM_SESSION_ID:-}"
     test -n "$id" || id=default
@@ -160,6 +165,20 @@ function hs-reload-release {
 
     local holder
     holder="$(h-hs-reload-holder)" @RET
+
+    #: A hold taken before a Claude Code compaction cannot be released by name
+    #: afterwards: the session id is per *session*, and resuming a conversation
+    #: starts a new one. Say so and show what is actually held, rather than
+    #: reporting success for a file we never removed. Releasing someone else's
+    #: hold is not ours to guess at -- with concurrent agents it would re-enable
+    #: the reloader under whoever is still typing -- so the caller picks:
+    #:   hs_reload_holder=<name> hs-reload-release
+    if ! test -e "${hs_no_reload_dir}/${holder}" ; then
+        ecgray "$0: no hold named ${holder}"
+        hs-reload-holds
+        return 0
+    fi
+
     command rm -f "${hs_no_reload_dir}/${holder}"
 
     #: Only when nobody else is still editing. Reloading here is the point of
@@ -454,8 +473,19 @@ function hs-cmd-v() {
 function hs-type {
     local input
     input="$(in-or-args "$@")" @RET
+    # input="${$(in-or-args "$@" ; print -n .)[1,-2]}"
+    #: Newline needs `hs.eventtap.keyStroke({}, "return")` anyway
 
-    reval-ec hammerspoon -c "hs.eventtap.keyStrokes($(js-quote "$input"))"
+    reval-ec hammerspoon -c "hs.eventtap.keyStrokes($(jq_quote_trim_right_p=n js-quote "$input"))"
+    #: Since we have already decided on trimming the input or not, there is never a need for js-quote to trim it again.
+}
+
+function hs-type-continue {
+    local sleep_dur="${1}"
+    assert-args sleep_dur @RET
+
+    sleep "${sleep_dur}" @RET
+    hammerspoon -c 'hs.eventtap.keyStrokes("Continue."); hs.eventtap.keyStroke({}, "return");'
 }
 ##
 function hs-focus-app {
