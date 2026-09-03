@@ -49,6 +49,7 @@ alertEngineState = alertEngineState or {
     ticker = nil,
     hooked = false,
     counter = 0,
+    peeking = false,     -- see ** Peek below; canvas alpha only, never geometry
 }
 
 --- How opaque a band is. Slightly see-through, so a band lying across a window
@@ -81,6 +82,27 @@ alertV2FloodFadeOutSeconds = alertV2FloodFadeOutSeconds or 0.20
 --- handful of colours onto elements that already exist; it is nowhere near a
 --- full re-render.
 alertV2AnimationFps = alertV2AnimationFps or 30
+
+--- ** Peek
+--- Holding hyper drops every band to a whisper so you can read the window
+--- underneath, and releasing it brings them back. Bands sit at the top of the
+--- screen where tab bars, title bars and status lines live, so the one moment
+--- you want them out of the way is the moment you are reaching for a command
+--- about the thing they are covering.
+---
+--- It is the canvas alpha that moves, not the palette: one setter per live
+--- canvas, instantly reversible, and no colour is recomputed. Timers are not
+--- touched at all -- an alert whose lifetime runs out mid-peek still dies on
+--- schedule rather than reappearing stale when you let go.
+---
+--- Hyper only. Purple is a sticky mode you can sit in for minutes, and hiding
+--- alerts for minutes is hiding them.
+alertV2PeekOpacity = alertV2PeekOpacity or 0.08
+
+--- The off switch. Both knobs are read at the moment of the peek rather than
+--- captured, so changing either from the console takes effect on the next
+--- hyper press with no reload.
+if alertV2PeekEnabled == nil then alertV2PeekEnabled = true end
 
 --- ** Geometry
 AlertEngine.kFont = "Menlo"
