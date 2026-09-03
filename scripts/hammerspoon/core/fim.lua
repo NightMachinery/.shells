@@ -128,6 +128,10 @@ local kPasteConfirmPollSeconds = 0.015
 local kInjectedMarker = 0x1F117
 local kUserDataProperty = hs.eventtap.event.properties.eventSourceUserData
 
+--- The hyper toggle. Hard-coded rather than looked up per event, and checked by
+--- keycode because it arrives with no flags of its own.
+local kF18KeyCode = hs.keycodes.map.f18 or 79
+
 --- ** State
 --- One table, global, so that a reload can find the previous run's tap and
 --- timers and stop them. A dangling eventtap survives `hs.reload()' -- it is
@@ -496,6 +500,25 @@ local function isEscape(event)
     return keyCodeOf(event) == hs.keycodes.map.escape
 end
 
+--- Hyper and purple are held modalities rather than real modifier chords -- the
+--- hyper key is F18, and hyper-mode carries no flags at all -- so their keys
+--- reach this tap looking exactly like ordinary typing. That made hyper+anything
+--- *accept* the ghost, which is to say you could not switch apps to think about
+--- a completion. F18 itself is checked by keycode: it is the toggle, and on the
+--- way in it arrives before entered_p is set.
+---
+--- rawget, so the module still loads on a machine with hyper-mode disabled. A
+--- plain global read would be nil there too; rawget says it is deliberate.
+local function inModality(event)
+    local hyper = rawget(_G, "hyper_modality")
+    if hyper and hyper.entered_p then return true end
+
+    local purple = rawget(_G, "purple_modality")
+    if purple and purple.entered_p then return true end
+
+    return keyCodeOf(event) == kF18KeyCode
+end
+
 local function copyCompletionToClipboard(st, message, color)
     local completion = st.completion
     teardown(st, true)
@@ -700,6 +723,10 @@ local function acceptGhost(st, event)
 end
 
 local function handleKeyDown(st, event)
+    -- Transparent, in every state: the modality's own key handling runs and the
+    -- ghost is neither accepted nor discarded.
+    if inModality(event) then return false end
+
     if st.state == "draining" then
         if isInjected(event) then return false end
         -- Held, not passed through: the point of the whole exercise is that
@@ -728,13 +755,22 @@ local function handleKeyDown(st, event)
     end
 
     if st.state == "ghost" then
+        local flags = event:getFlags()
+
+        -- Flags are read before the escape branch and not after it, which is
+        -- the whole fix: isEscape ignores them, so shift+Escape used to fall
+        -- into the discard it was meant to be the opposite of. Purple mode uses
+        -- the same shift+Escape idiom.
         if isEscape(event) then
+            if flags.shift and not flags.cmd and not flags.ctrl then
+                copyCompletionToClipboard(st, fimHead(fimSymCopied) .. " copied to clipboard")
+                return true
+            end
             teardown(st, true)
             fimBand(fimHead(fimSymNone) .. " discarded", "warn")
             return true
         end
 
-        local flags = event:getFlags()
         if flags.cmd or flags.ctrl or frontmostPid() ~= st.pid then
             copyCompletionToClipboard(st, fimHead(fimSymCopied) .. " copied to clipboard")
             return false
