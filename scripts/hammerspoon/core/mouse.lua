@@ -79,10 +79,14 @@ purple_bind_v2{mods={}, key="left", pressedfn=function() updateKeyStateAndMove('
 purple_bind_v2{mods={}, key="up", pressedfn=function() updateKeyStateAndMove('up', true) end, repeatfn=cursorMoveRelative, releasedfn=function() resetSpeedAndKeyState('up') end}
 purple_bind_v2{mods={}, key="down", pressedfn=function() updateKeyStateAndMove('down', true) end, repeatfn=cursorMoveRelative, releasedfn=function() resetSpeedAndKeyState('down') end}
 
+-- Retired 2026-09-02: hyper+shift+right now belongs to FIM (core/fim.lua), and
+-- purple mode's bare arrows above already cover keyboard mouse movement.
+if false then
 hyper_bind_v2{auto_trigger_p=false, mods={"shift"}, key="right", pressedfn=function() updateKeyStateAndMove('right', true) end, repeatfn=cursorMoveRelative, releasedfn=function() resetSpeedAndKeyState('right') end}
 hyper_bind_v2{auto_trigger_p=false, mods={"shift"}, key="left", pressedfn=function() updateKeyStateAndMove('left', true) end, repeatfn=cursorMoveRelative, releasedfn=function() resetSpeedAndKeyState('left') end}
 hyper_bind_v2{auto_trigger_p=false, mods={"shift"}, key="up", pressedfn=function() updateKeyStateAndMove('up', true) end, repeatfn=cursorMoveRelative, releasedfn=function() resetSpeedAndKeyState('up') end}
 hyper_bind_v2{auto_trigger_p=false, mods={"shift"}, key="down", pressedfn=function() updateKeyStateAndMove('down', true) end, repeatfn=cursorMoveRelative, releasedfn=function() resetSpeedAndKeyState('down') end}
+end
 
 -- *** Mouse Avy
 -- **** showOverlay

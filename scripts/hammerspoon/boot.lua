@@ -79,6 +79,9 @@ local hammerspoonCoreFiles = {
     "core/app-hotkeys.lua",
     "core/window-media-bindings.lua",
     "core/stt.lua",
+    -- After core/helpers.lua, alert/ and core/hyper-mode.lua: it uses
+    -- taskWithPath, hyper_exit, alert_gateway and hyper_bind_v2.
+    "core/fim.lua",
     "core/reload.lua",
 }
 
