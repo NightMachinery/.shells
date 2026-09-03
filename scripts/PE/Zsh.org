@@ -255,6 +255,24 @@ fi
 
 Prefer =ensure-dep1= for things we build ourselves out of this repo (a local Go or Rust tool), and =ensure-cmd= for things the user is expected to install, since we should not silently install system packages on their behalf.
 
+- The Go helper binary pattern: when a function's real work is better done in Go, it lives in =golang/<name>/= as its own module (=go.mod= with =module <name>=), with a =readme.org= documenting install and use, and tests as =*_test.go=.
+
+zsh keeps the policy, Go does the work. The zsh side stays a thin wrapper that reuses the existing helpers, decides the fallbacks and formats the output; the binary is a pure computation/IO unit that emits JSON (or another parseable format) and takes no interactive decisions of its own.
+
+Never check in a binary. Build on first use with an =h-<thing>-dep= guard, called from every wrapper that needs the tool:
+#+begin_src zsh :eval never
+function h-claude-code-session-dep {
+    ensure-cmd go @RET
+    ensure-dep1 claude_session go-install-local "${NIGHTDIR}/golang/claude_session" @RET
+}
+#+end_src
+
+=ensure-dep1= only builds when the command is missing, and =rehash=es afterwards, so a fresh clone works on first use rather than after a separate setup step.
+
+Keep these tools stdlib-only where you can, and pin an older =go= line in =go.mod= than the installed toolchain (ours use =go 1.21=) so =GOTOOLCHAIN= never tries to fetch one. Both keep =go install= working offline, which matters for any tool that may have to run before the network is up.
+
+Most functions should stay in zsh. Reach for Go only when the shell is the wrong tool: genuine concurrency, typed errors or protocol control that =curl= exit codes only approximate, non-trivial parsing or data structures, or hot paths where repeated forking dominates.
+
 - Heredocs must be used for long literal strings. E.g., when we are embedding a script.
 
 - Helper/internal/private functions should be named =h-...=.
