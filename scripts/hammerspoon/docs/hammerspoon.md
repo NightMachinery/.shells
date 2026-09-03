@@ -598,6 +598,14 @@ inserts it, `Escape` discards it, a `cmd`/`ctrl` chord or a change of app
 copies it to the clipboard. A keyDown eventtap exists only for the duration of
 a run, never permanently.
 
+Accepting swallows the key you pressed and posts it once the paste has landed —
+watched through `AXNumberOfCharacters` where the app exposes it, on a fixed 60ms
+delay where it does not. Returning the key from the tap alongside `cmd+v`, which
+is what this used to do, has it processed against the pre-paste buffer in any
+app that pastes asynchronously (Qt, Electron, WebKit), so an arrow navigated the
+old text. Keys typed while the paste is in flight queue behind it and are posted
+in order. Auto-repeat across an accept is lost. See `docs/fim.md`.
+
 `Hyper+Shift+Right` used to move the mouse pointer. Those four
 `hyper_bind_v2{mods={"shift"}, key=<arrow>}` bindings in `core/mouse.lua` are
 retired — wrapped in `if false then` rather than deleted — since purple mode's

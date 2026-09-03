@@ -31,6 +31,9 @@
 ---               Any key inserts it (and is itself delivered afterwards),
 ---               Escape discards it, a cmd/ctrl chord or a change of app
 ---               copies it to the clipboard and gets out of the way.
+---   draining    the paste has been sent and has not been seen to land yet.
+---               The key that accepted the ghost, and anything typed behind
+---               it, is held here and posted in order once it has.
 ---
 --- The clipboard is the fallback destination for every case where we could not
 --- paste. A completion is never silently lost.
@@ -72,6 +75,29 @@ fimStatusSeconds = fimStatusSeconds or 2.5
 --- the keystroke path that is a guess about someone else's app.
 fimCopyTimeoutSeconds = fimCopyTimeoutSeconds or 0.35
 
+--- How long to hold the key you accepted with while waiting for the paste to
+--- appear. Past this the key goes out anyway: a cursor one character off is a
+--- far smaller harm than a keyboard that stopped responding.
+fimPasteConfirmSeconds = fimPasteConfirmSeconds or 0.4
+
+--- The blind version of the same wait, for every path that cannot watch the
+--- text: the keystroke capture, and any focused element that does not answer
+--- AXNumberOfCharacters (Emacs and sioyek hand back an AXWindow, which does
+--- not).
+fimPasteSettleSeconds = fimPasteSettleSeconds or 0.06
+
+--- A cached-element AX read costs 0.02-0.15ms when the app is healthy, so the
+--- first read slower than this is not noise, it is an app that has begun to
+--- struggle. Stop watching and take the blind wait: these reads are
+--- synchronous on the thread that carries every keystroke on the machine, and
+--- polling a hanging app would freeze the keyboard outright.
+fimAxSlowReadSeconds = fimAxSlowReadSeconds or 0.005
+
+--- Per-element AX timeout for the confirmation reads. Without one a wedged app
+--- blocks for the system default, which is multiple seconds. Never set this to
+--- 0.0: that is not "no timeout", it is "reset to the system default".
+fimAxTimeoutSeconds = fimAxTimeoutSeconds or 0.05
+
 fimAlertId = fimAlertId or "fim"
 
 --- Force the keystroke path even where AX would work. For debugging the half
@@ -93,6 +119,14 @@ local kPollSeconds = 0.02
 local kPasteRestoreSeconds = 0.3
 local kRequestBandSeconds = 30
 local kMaxErrorChars = 200
+local kPasteConfirmPollSeconds = 0.015
+
+--- Our own injected events carry this in the event source's user-data field.
+--- CGEventTapPostEvent puts a replacement event back into the stream *after*
+--- the tap that produced it, so the drain should never see our cmd+v -- but a
+--- doubled paste is an expensive way to discover otherwise.
+local kInjectedMarker = 0x1F117
+local kUserDataProperty = hs.eventtap.event.properties.eventSourceUserData
 
 --- ** State
 --- One table, global, so that a reload can find the previous run's tap and
@@ -157,6 +191,24 @@ local function utf16OffsetToByte(s, units)
     if ok then return result end
     return math.min(units, #s)
 end
+
+--- The same unit, counted rather than located: AXNumberOfCharacters is an
+--- NSString length, so it is UTF-16 code units too, and an emoji moves it by
+--- two. This is how much the count must grow by for a paste to have landed.
+local function utf16Length(s)
+    local ok, result = pcall(function()
+        local count = 0
+        for _, cp in utf8.codes(s) do
+            count = count + ((cp > 0xFFFF) and 2 or 1)
+        end
+        return count
+    end)
+    if ok then return result end
+    return #s
+end
+
+--- Exposed for testing from `hs -c'; nothing else calls it by this name.
+fimUtf16Length = utf16Length
 
 --- Trim any dangling UTF-8 continuation bytes from the front of a byte slice.
 --- Only reachable through the invalid-input fallbacks below.
@@ -253,7 +305,7 @@ local function stopTap(st)
 end
 
 local function stopTimers(st)
-    for _, key in ipairs({ "pollTimer", "ghostTimer" }) do
+    for _, key in ipairs({ "pollTimer", "ghostTimer", "confirmTimer", "drainTimer" }) do
         if st[key] then
             st[key]:stop()
             st[key] = nil
@@ -272,6 +324,7 @@ local function teardown(st, keepBand)
     st.state = "idle"
     st.completion = nil
     st.detached = false
+    st.drainQueue = nil
     if not keepBand then
         alert_gateway_dismiss(fimAlertId)
     end
@@ -452,32 +505,173 @@ local function copyCompletionToClipboard(st, message, color)
     fimBand(message, color or "notice")
 end
 
+local function markInjected(event)
+    event:setProperty(kUserDataProperty, kInjectedMarker)
+    return event
+end
+
+local function isInjected(event)
+    return event:getProperty(kUserDataProperty) == kInjectedMarker
+end
+
+--- Everything the confirmation loop needs, resolved *before* cmd+v goes out.
+---
+--- Resolving AXFocusedUIElement is the expensive call -- around 1ms typically,
+--- with a 53ms tail measured against System Settings -- while a read on an
+--- element already in hand is 0.02-0.15ms. Doing the resolution once here is
+--- what makes a 15ms poll cost about 1% of its own tick instead of dominating
+--- it, and it is also the only correct place for the baseline: after the paste
+--- the count has already moved.
+---
+--- AXNumberOfCharacters, not AXValue: the latter marshals the entire buffer
+--- across the process boundary on every read, which for a terminal is a
+--- screenful of text per poll.
+local function pasteConfirmPlan(st, completion, selectionLength)
+    if st.path ~= "ax" or not st.axElement then return nil end
+
+    local element = st.axElement
+    pcall(function() element:setTimeout(fimAxTimeoutSeconds) end)
+
+    -- Once, here, and not on every tick of the loop below. isValid is itself an
+    -- AX round trip -- it asks the app for the element's attribute names -- so
+    -- per-poll it would roughly double the cost of a loop that is deliberately
+    -- cheap, and it would learn nothing: an element that dies mid-paste answers
+    -- nil to the count read, and a nil read already aborts.
+    local valid, alive = pcall(function() return element:isValid() end)
+    if not valid or not alive then return nil end
+
+    local base = axGet(element, "AXNumberOfCharacters")
+    if type(base) ~= "number" then return nil end
+
+    -- A paste over a selection replaces it, so the net growth is the
+    -- completion minus whatever was highlighted.
+    local target = base + utf16Length(completion) - (selectionLength or 0)
+    if target <= base then return nil end
+
+    return {
+        element = element,
+        target = target,
+        pollsLeft = math.max(1, math.ceil(fimPasteConfirmSeconds / kPasteConfirmPollSeconds)),
+    }
+end
+
+--- Wait for the paste, then call `done'. With a plan, that means watching the
+--- character count; without one, a fixed delay.
+---
+--- Every exit here is a *bounded* one. The reads are synchronous on
+--- Hammerspoon's single Lua thread, which is also its event thread, so a loop
+--- that kept trying against an unresponsive app would freeze every keystroke
+--- on the machine -- strictly worse than the wrong cursor position this is
+--- trying to avoid.
+local function confirmPaste(st, plan, done)
+    if not plan then
+        st.confirmTimer = hs.timer.doAfter(fimPasteSettleSeconds, function()
+            st.confirmTimer = nil
+            done()
+        end)
+        return
+    end
+
+    local element = plan.element
+    local deadline = hs.timer.secondsSinceEpoch() + fimPasteConfirmSeconds
+    local timer
+    timer = hs.timer.doEvery(kPasteConfirmPollSeconds, function()
+        plan.pollsLeft = plan.pollsLeft - 1
+
+        local startedAt = hs.timer.secondsSinceEpoch()
+        local ok, count = pcall(function()
+            return element:attributeValue("AXNumberOfCharacters")
+        end)
+        local spent = hs.timer.secondsSinceEpoch() - startedAt
+
+        local stop
+        if not ok or type(count) ~= "number" then
+            -- A nil read is "the element is gone or the app will not answer",
+            -- never "unchanged". Reading it as unchanged would hold the key
+            -- back for the whole window for nothing.
+            stop = true
+        elseif count >= plan.target then
+            stop = true
+        elseif spent > fimAxSlowReadSeconds then
+            stop = true
+        elseif plan.pollsLeft <= 0 or startedAt >= deadline then
+            stop = true
+        end
+
+        if stop then
+            timer:stop()
+            if st.confirmTimer == timer then st.confirmTimer = nil end
+            done()
+        end
+    end)
+    st.confirmTimer = timer
+end
+
+--- Post everything the drain held, in the order it was typed, and end the run.
+--- The tap goes down first: these are real CGEventPosts and would otherwise
+--- come straight back to us.
+local function flushDrain(st, runId)
+    if st.runId ~= runId or st.state ~= "draining" then return end
+
+    local queue = st.drainQueue or {}
+    st.drainQueue = nil
+    teardown(st, true)
+
+    for _, queued in ipairs(queue) do
+        queued:post()
+    end
+end
+
 --- Accept: put the completion in through the pasteboard, then let the key the
 --- user actually pressed through behind it.
 ---
---- Returning replacement events from the tap is what keeps the order right. The
---- alternative -- swallow, keyStroke cmd+v, re-post the original from a timer --
---- has a visible window in which the two can arrive the wrong way round.
+--- The first version of this returned all three events from the tap at once --
+--- cmd+v down, cmd+v up, and a copy of your key. That is only correct in an app
+--- that handles a paste synchronously. Qt, Electron and WebKit do not, so in
+--- Telegram the key was consumed against the *pre-paste* buffer: an arrow
+--- navigated the old text rather than the text just inserted.
+---
+--- So the key is swallowed here and posted once the paste has been seen to
+--- land, and the tap stays up in `draining' meanwhile so that anything typed
+--- during that window queues behind it instead of overtaking it.
+---
+--- One physical press still yields one keyDown: auto-repeat across an accept is
+--- lost, and emulating it would mean inventing keystrokes the user did not make.
 local function acceptGhost(st, event)
     local completion = st.completion
 
     -- The AX path is the only one that can check this, and it is worth
     -- checking: pasting a completion computed for a cursor that has since
     -- moved corrupts the line rather than completing it.
+    local selectionLength = 0
     if st.path == "ax" and st.axElement then
-        local location = axCursorLocation(st.axElement)
+        local location, length = axCursorLocation(st.axElement)
         if location ~= st.axLocation then
             copyCompletionToClipboard(st,
                 fimHead(fimSymCopied) .. " cursor moved, copied to clipboard", "warn")
             return false
         end
+        selectionLength = length or 0
     end
+
+    local plan = pasteConfirmPlan(st, completion, selectionLength)
 
     local saved = hs.pasteboard.getContents()
     setPasteboard(completion)
 
     local elapsed = elapsedString(st.startedAt)
-    teardown(st, true)
+    local runId = st.runId
+
+    -- Not a teardown: the tap is the whole mechanism here and has to stay up.
+    -- Everything else that could still fire does go.
+    stopTimers(st)
+    if st.task then
+        pcall(function() st.task:terminate() end)
+        st.task = nil
+    end
+    st.state = "draining"
+    st.completion = nil
+    st.drainQueue = { event:copy() }
 
     fimBand(fimHead(fimSymOk) .. " inserted " .. tostring(utf8.len(completion) or #completion)
                 .. " chars" .. elapsed, "free")
@@ -490,17 +684,35 @@ local function acceptGhost(st, event)
         end
     end)
 
+    confirmPaste(st, plan, function() flushDrain(st, runId) end)
+
+    -- A backstop on the drain itself, not on the confirmation: whatever goes
+    -- wrong in there, the keyboard comes back.
+    st.drainTimer = hs.timer.doAfter(fimPasteConfirmSeconds + fimPasteSettleSeconds, function()
+        st.drainTimer = nil
+        flushDrain(st, runId)
+    end)
+
     return true, {
-        hs.eventtap.event.newKeyEvent({"cmd"}, "v", true),
-        hs.eventtap.event.newKeyEvent({"cmd"}, "v", false),
-        event:copy(),
+        markInjected(hs.eventtap.event.newKeyEvent({"cmd"}, "v", true)),
+        markInjected(hs.eventtap.event.newKeyEvent({"cmd"}, "v", false)),
     }
 end
 
 local function handleKeyDown(st, event)
+    if st.state == "draining" then
+        if isInjected(event) then return false end
+        -- Held, not passed through: the point of the whole exercise is that
+        -- these land after the key that accepted the ghost, in the order they
+        -- were typed.
+        local queue = st.drainQueue
+        if queue then queue[#queue + 1] = event:copy() end
+        return true
+    end
+
     if st.state == "requesting" then
         if isEscape(event) then
-            fimState.runId = (fimState.runId or 0) + 1
+            st.runId = (st.runId or 0) + 1
             teardown(st, true)
             fimBand(fimHead(fimSymErr) .. " cancelled", "warn")
             return true
