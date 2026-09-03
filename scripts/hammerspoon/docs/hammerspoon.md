@@ -593,12 +593,19 @@ each selection back to the original cursor: the anchor does *not* stay put
 across the two extensions, and without them the second copy returns the whole
 document and the cursor ends up at offset 0. See `docs/fim.md`.
 
-The completion appears as a ghost in an alert band with the id `fim`: any key
-inserts it, `Escape` discards it, and `⇧Escape`, a `cmd`/`ctrl` chord or a
+The completion appears as a ghost in a violet alert band with the id `fim`: any
+key inserts it, `Escape` discards it, and `⇧Escape`, a `cmd`/`ctrl` chord or a
 change of app copies it to the clipboard. Hyper and purple keys pass straight
 through and do neither — they are held modalities carrying no modifier flags, so
 until this they read as ordinary typing and accepted the ghost. A keyDown
 eventtap exists only for the duration of a run, never permanently.
+
+The band also shows the context that was sent, dimmed, above the completion —
+60 characters of prefix, a `‸` cursor mark, 40 of suffix, with the two newlines
+nearest the cursor kept as real line breaks and the rest collapsed to `⏎`.
+That is a deliberate exposure of whatever field you were typing in, at readable
+size on your own screen; `fimContextInBand = false` turns it off. Because the
+band is now `md` markup, every value interpolated into it is escaped first.
 
 Accepting swallows the key you pressed and posts it once the paste has landed —
 watched through `AXNumberOfCharacters` where the app exposes it, on a fixed 60ms
