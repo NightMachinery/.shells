@@ -324,15 +324,75 @@ nothing has been inserted yet.
 - A chord carrying `cmd` or `ctrl` — `cmd+tab`, `cmd+c` — is a command rather
   than typing, so the ghost gets out of the way: the completion goes to the
   clipboard and the chord is delivered. So does a change of frontmost app.
-- Anything else **accepts**. The completion goes onto the pasteboard and the
-  tap returns three replacement events — `cmd+v` down, `cmd+v` up, and a copy
-  of the key you actually pressed — so the paste is delivered *before* your
-  keystroke rather than racing it. Swallowing the key and re-posting it from a
-  timer would leave a window in which the two arrive the wrong way round.
-  The clipboard is restored 0.3s later, and only if it still holds the
-  completion, so a copy you made in between is not clobbered.
+- Anything else **accepts**. The completion goes onto the pasteboard, the tap
+  returns `cmd+v` down and up as replacement events, and the key you actually
+  pressed is *held* — see **Delivering the typed key** below. The clipboard is
+  restored 0.3s later, and only if it still holds the completion, so a copy you
+  made in between is not clobbered.
 - Nothing at all, for `fimGhostSeconds` (45), and the ghost times out — to the
   clipboard again, `❄ FIM 📋 copied to clipboard (timed out)`.
+
+### Delivering the typed key
+
+The first version of the accept path returned three events from the eventtap at
+once: `cmd+v` down, `cmd+v` up, and a copy of the key you pressed. The copy is
+faithful — keycode and flags survive — and in TextEdit it worked on the first
+try, which is exactly why the bug took using it to find.
+
+It is only correct in an app that handles a paste *synchronously*. Qt, Electron
+and WebKit do not, and Telegram is Qt: the three events are delivered back to
+back, the app takes the paste onto a queue, and your key is processed against
+the **pre-paste** buffer. An arrow navigates the old text instead of the text
+that was just inserted, which is the one thing you are most likely to press
+straight after accepting.
+
+So the key is swallowed and posted after the paste has been seen to land.
+
+On the `ax` path "seen to land" is literal. The focused element and its
+`AXNumberOfCharacters` are read *before* `cmd+v` goes out and cached, then the
+count is polled every 15ms until it has grown by the completion's UTF-16 length
+(minus anything the paste replaced), up to `fimPasteConfirmSeconds` (0.4). The
+resolution has to happen up front: `AXFocusedUIElement` costs about a
+millisecond typically, with a 53ms tail measured against System Settings, while
+a read on an element already in hand is 0.02–0.15ms — so a poll on the cached
+element spends about 1% of its own tick. `AXNumberOfCharacters` rather than
+`AXValue` because the latter marshals the whole buffer across the process
+boundary every read, which for a terminal is a screenful of text per poll.
+
+Everywhere else it is a fixed `fimPasteSettleSeconds` (0.06): the keystroke
+capture path has no element, and neither does a focused element that will not
+answer `AXNumberOfCharacters` — Emacs and sioyek hand back an `AXWindow`, which
+does not.
+
+These reads are synchronous on Hammerspoon's single Lua thread, which is also
+the thread every keystroke on the machine passes through, so the polling has
+three rails and any of them ends it:
+
+- `setTimeout(0.05)` on the cached element, so a wedged app blocks for 50ms
+  rather than the multi-second system default. Never `0.0`, which does not mean
+  "no timeout" but "reset to the system default".
+- The first read slower than `fimAxSlowReadSeconds` (0.005) aborts to the fixed
+  delay, and so does a `nil` read — which means *abort*, never "unchanged", and
+  is also how an element that died mid-paste is noticed. `isValid` is checked
+  once, when the plan is built, rather than on every tick: it is itself an AX
+  round trip (it asks the app for the element's attribute names), so polling it
+  would roughly double the cost of a deliberately cheap loop to learn what the
+  nil read already says.
+- A poll count cap as well as the wall-clock one.
+
+Nothing was hung during the measurements above, so the tail against a hung app
+is unmeasured; the rails are there because it is unmeasured, not because it was
+seen.
+
+Keys typed during that window must not overtake the one being held, so the tap
+stays up in a third state, `draining`: it swallows keyDowns and queues them, and
+when the paste is confirmed it stops the tap and posts the whole queue in the
+order it was typed. A backstop timer flushes the queue regardless, so a
+confirmation that somehow never finishes cannot eat the keyboard.
+
+One physical press yields one keyDown, so **auto-repeat across an accept is
+lost**: hold a key to accept and you get one character, not a run of them. The
+alternative is inventing keystrokes the user did not make, which is worse.
 
 On the `ax` path the cursor position is re-read at accept time, and a
 completion computed for a cursor that has since moved is *not* pasted: it
