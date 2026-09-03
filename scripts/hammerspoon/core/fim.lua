@@ -55,6 +55,32 @@ fimHotkeyDeepseek = fimHotkeyDeepseek or { mods = {"ctrl"}, key = "right" }
 
 fimDefaultProvider = fimDefaultProvider or "codestral"
 
+--- What the chord does per app, keyed by bundle ID -- house style throughout
+--- `core/app-hotkeys.lua', and the reason that file never pays for a full
+--- application enumeration. Values:
+---
+---   "default"            run FIM here
+---   "ignore"             do nothing at all
+---   "ignore_and_notify"  say FIM is off here, and do nothing
+---   { hotkey = {...} }   post that chord to the app instead
+---
+--- kitty and Emacs get the last one, because each already has a FIM of its own
+--- on `alt+.': the zsh widget in `zshlang/interactive/auto-load/FIM.zsh' and
+--- `night/fim-get' in doom.d. Theirs know the buffer exactly; ours has to infer
+--- it through the Accessibility API, and in kitty's case cannot -- its text
+--- area reads empty, which is why kitty is on the clipboard capture path at
+--- all. Deferring beats competing.
+---
+--- kitty already sets `macos_option_as_alt yes' and `core/input-language.lua'
+--- forces the US layout for both apps, so the synthetic chord arrives as a real
+--- `Alt-.' in each rather than as a dead key or a `≥'.
+fimAppPolicy = fimAppPolicy or {
+    ["net.kovidgoyal.kitty"] = { hotkey = { mods = {"alt"}, key = "." } },
+    ["org.gnu.Emacs"]        = { hotkey = { mods = {"alt"}, key = "." } },
+}
+
+fimAppPolicyDefault = fimAppPolicyDefault or "default"
+
 --- Context caps. The prefix keeps its LAST N characters and the suffix its
 --- FIRST N: the model only ever needs the text nearest the cursor, and this is
 --- also the privacy limit -- it bounds how much of whatever you happen to have
@@ -406,9 +432,19 @@ local function contextBlock(st)
     return "[" .. escapeMarkup(window) .. "]{dim}"
 end
 
-local function frontmostPid()
+--- Both at once. The pid is what the ghost compares against to notice you
+--- changed apps; the bundle ID is what selects the policy. One lookup, since
+--- frontmostApplication is the expensive half and the old frontmostPid threw
+--- the app object away before anyone could ask it anything else.
+local function frontmostApp()
     local app = hs.application.frontmostApplication()
-    return app and app:pid() or nil
+    if not app then return nil, nil end
+    return app:pid(), app:bundleID()
+end
+
+local function frontmostPid()
+    local pid = frontmostApp()
+    return pid
 end
 
 local function setPasteboard(text)
@@ -1025,13 +1061,29 @@ function fimComplete(provider)
 
     local st = fimState
     local runId = st.runId
-    st.pid = frontmostPid()
+    st.pid, st.bundleID = frontmostApp()
     st.axElement = nil
     st.axLocation = nil
     st.detached = false
 
     if not st.pid then
         fimBand(fimHead(fimSymNone) .. " nothing to complete", "warn")
+        return false
+    end
+
+    local policy = fimAppPolicy[st.bundleID or ""] or fimAppPolicyDefault
+    if type(policy) == "table" and policy.hotkey then
+        -- hyper_exit() has already run, unconditionally, above -- which is
+        -- exactly what doPaste does before its own synthetic chord. Leave the
+        -- modality entered and its focus-stealing webview still up, and the
+        -- chord lands somewhere other than the app you were typing in.
+        hs.eventtap.keyStroke(policy.hotkey.mods or {}, policy.hotkey.key, 0)
+        return true
+    elseif policy == "ignore" then
+        return false
+    elseif policy == "ignore_and_notify" then
+        fimBand(fimHead(fimSymNone) .. " off in "
+                    .. escapeMarkup(st.bundleID or "this app"), "notice")
         return false
     end
 
