@@ -6,7 +6,10 @@ button on a login page --- and reports the URL to open.
 
 It only probes. Which URL to fall back on, and whether to open a browser at
 all, is policy and stays in zsh: see =wifi-login-site-open= in
-[[file:../../zshlang/auto-load/others/network.zsh][network.zsh]].
+[[file:../../zshlang/auto-load/others/network.zsh][network.zsh]]. That surface
+is aliased under the other name the thing goes by, too ---
+=captive-portal-open=, =captive-portal-url=, =captive-portal-explain= and
+=captive-portal-p=.
 
 * Install
 #+begin_src zsh :eval never
