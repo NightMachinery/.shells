@@ -363,9 +363,16 @@ local function waitForPasteboard(st, baseCount, callback)
     st.pollTimer = timer
 end
 
---- shift+cmd+up selects cursor..start, shift+cmd+down then swings the *same*
---- anchor to the end so the second selection is cursor..end, and a plain left
---- arrow collapses that back to its start, which is where the cursor began.
+--- shift+cmd+up selects cursor..start and a copy gives us the prefix; a right
+--- arrow collapses that back to the cursor; shift+cmd+down then selects
+--- cursor..end for the suffix; a left arrow collapses back again. Each collapse
+--- is skipped when its copy timed out, since an arrow key on an empty selection
+--- is an ordinary cursor move and would walk the cursor one character away.
+---
+--- Both collapses are load-bearing, and finding that out cost a test run: the
+--- selection anchor does NOT survive the two extensions. See the comment on the
+--- right arrow below for what goes wrong without it.
+---
 --- Every keystroke passes delay 0: hs.eventtap.keyStroke defaults to 200ms, and
 --- five of those is a whole second of the user watching their document flash.
 local function captureViaKeystrokes(st, runId, callback)
