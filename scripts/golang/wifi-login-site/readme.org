@@ -1,0 +1,89 @@
+#+TITLE: wifi-login-site
+
+Detects whether the current network is behind a *captive portal* --- the public
+Wi-Fi that hands out DHCP and DNS but intercepts all HTTP until you click a
+button on a login page --- and reports the URL to open.
+
+It only probes. Which URL to fall back on, and whether to open a browser at
+all, is policy and stays in zsh: see =wifi-login-site-open= in
+[[file:../../zshlang/auto-load/others/network.zsh][network.zsh]].
+
+* Install
+#+begin_src zsh :eval never
+go-install-local "${NIGHTDIR}/golang/wifi-login-site"
+#+end_src
+
+Built automatically on first use by =h-wifi-login-site-dep=.
+
+* Use
+#+begin_src sh :eval never
+wifi-login-site detect                  # JSON verdict; the only subcommand
+wifi-login-site detect -timeout 2s      # default 5s, applied per probe
+wifi-login-site detect -probe apple=http://127.0.0.1:8099/x   # for testing
+#+end_src
+
+* Output
+#+begin_example
+{
+  "state": "portal",
+  "url": "https://portal.hotel.example/login?ap=12",
+  "via": "apple",
+  "probes": [
+    { "name": "apple",   "state": "portal", "status": 302,
+      "location": "https://portal.hotel.example/login?ap=12" },
+    { "name": "firefox", "state": "online", "status": 200 },
+    { "name": "gstatic", "state": "online", "status": 204 }
+  ]
+}
+#+end_example
+
+=state= is one of =online=, =portal=, =blocked= or =unknown=. =url= is set only
+when a probe was actually redirected somewhere; a portal that hijacks in place
+offers nothing to open, and the caller must supply its own plain-HTTP bait URL.
+
+The exit status is 0 whenever detection ran. =online= is a successful
+detection, not a failure of the command.
+
+* Design notes
+- *Three probes, not one.* Portals routinely whitelist =captive.apple.com= to
+  stop macOS raising its "sign in to Wi-Fi" sheet, and macOS hits it constantly
+  anyway, so a portal-free answer from Apple alone is the least trustworthy of
+  the three. =detectportal.firefox.com= and
+  =connectivitycheck.gstatic.com/generate_204= are probed alongside it, each
+  against its own sentinel body or status.
+- *Concurrent.* Every failure mode here is a timeout: a portal that blackholes
+  traffic makes each probe hang to its deadline, so probing in sequence would
+  cost the sum of the timeouts rather than the largest. ~50ms on a clean
+  network.
+- *Redirects are not followed.* The redirect target /is/ the answer; following
+  it would replace that answer with whatever the login page happens to serve.
+- *Proxies are ignored*, explicitly (=Transport.Proxy = nil=) rather than by
+  environment. Through a proxy we would measure the proxy's connectivity,
+  which says nothing about whether the Wi-Fi in front of us wants a login.
+  This matters here because this repo sets proxy variables freely.
+- *=portal= outranks =online=, and =online= outranks =blocked=.* One probe
+  succeeding while another is demonstrably intercepted means the whitelist is
+  lying. But a probe failing next to one that succeeded is far more likely
+  censorship or an outage than a portal --- Google and Mozilla are not
+  reachable everywhere --- so positive evidence that HTTP works beats the
+  absence of an answer elsewhere.
+- *Requests go out as the OS probe* (=CaptiveNetworkSupport/1.0 wispr=), since
+  portals serve different things to different agents and some let the OS probes
+  through untouched.
+
+* Stdlib only, and =go 1.21=
+Both are load-bearing rather than incidental. The first run of this tool
+happens exactly when there is no internet, so its build must download nothing:
+no dependencies means no module fetch, and declaring an older Go than the
+installed toolchain stops =GOTOOLCHAIN= reaching out for one. Keep it that way
+--- adding a single dependency breaks the one case the tool exists for.
+
+* Tests
+#+begin_src sh :eval never
+go test ./...
+#+end_src
+
+=httptest= servers stand in for each portal shape --- redirect (absolute and
+relative), hijack-in-place, wrong status, refused connection --- so all four
+states and the precedence rules are covered without a real portal. One test
+asserts the probes really do run concurrently.
