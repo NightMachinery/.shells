@@ -475,6 +475,44 @@ completion, the context window, provider names, error text — goes through
 what keeps a following `{…}` inert too, since an attribute span cannot start
 without its `]`.
 
+### Per-app policy
+
+`fimAppPolicy` is a table keyed by bundle ID — house style throughout
+`core/app-hotkeys.lua`, and the reason that file never pays for a full
+application enumeration. Four kinds of value:
+
+- `"default"` — run FIM. This is `fimAppPolicyDefault`, so it is what an app
+  not in the table gets.
+- `"ignore"` — do nothing at all.
+- `"ignore_and_notify"` — a band saying FIM is off for this app, and nothing
+  else.
+- `{ hotkey = { mods = {...}, key = "..." } }` — post that chord to the app
+  instead of running anything.
+
+kitty and Emacs are in the table with `alt+.`, which is *their own* FIM: the zsh
+widget for kitty, `night/fim-get` for Emacs. Both know the buffer exactly, where
+this has to infer it through the Accessibility API — and in kitty's case cannot
+infer it at all, since its text area reads empty, which is the reason kitty is
+on the clipboard capture path to begin with. Deferring beats competing, and it
+means one chord does the right thing everywhere.
+
+kitty already sets `macos_option_as_alt yes`, and `core/input-language.lua`
+forces the US layout for both apps, so the synthetic chord arrives as a real
+`Alt-.` rather than as a dead key or a `≥`.
+
+The dispatch sits in `fimComplete` after the Secure Input refusal and after
+`fimCancel()`, so pressing the chord in kitty still supersedes a ghost left
+standing somewhere else. The `hotkey` case relies on the `hyper_exit()` that
+runs just above it, exactly as `doPaste` in `core/helpers.lua` does: leave the
+modality entered and its focus-stealing webview up, and the chord lands
+somewhere other than the app you were typing in. `hs.eventtap.keyStroke` is
+passed a delay of 0, per the house rule; the 200ms default is a visible stall.
+`hyper-mode.lua`'s own `bindToKey` is *not* the thing to copy here — its
+`releasedfn` references an undeclared global.
+
+`fimState.bundleID` is recorded alongside `fimState.pid` at the start of a run,
+from a single `frontmostApp()` that returns both.
+
 ### What it sends, and what it refuses to
 
 Whatever field is focused when you press the chord is what gets sent to the
