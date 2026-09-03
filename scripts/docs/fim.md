@@ -316,9 +316,11 @@ While **requesting**:
   `❄ FIM 📋 copied to clipboard (you kept typing) 0.4s`. The same happens if
   the frontmost application changed while you waited.
 
-Once the completion is back it becomes a **ghost**: the band shows it verbatim
-under a line reading `❄ FIM ✓ 0.3s · any key inserts, Esc discards`, and
-nothing has been inserted yet.
+Once the completion is back it becomes a **ghost**, on a violet band — not a
+success colour and not a warning one, because a ghost is a question nobody has
+answered yet. The status line reads
+`❄ FIM ✓ 0.3s  ·  any key inserts · Esc discards · ⇧Esc copies`, then the
+context window, then the completion verbatim. Nothing has been inserted yet.
 
 - `Escape` discards it: `❄ FIM ∅ discarded`.
 - `⇧Escape` copies it to the clipboard instead, which is the same idiom purple
@@ -426,12 +428,52 @@ same reason: after `hs.reload()` the previous chunk's eventtap is still alive,
 held by the objc runtime rather than by any Lua reference, and the module
 finds it there and stops it at load time.
 
+### The context window on the band
+
+Both the in-flight band and the ghost band show what was actually sent, dimmed,
+above the completion: the last `fimContextPrefixChars` (60) of the prefix, a
+`‸` where the cursor is, and the first `fimContextSuffixChars` (40) of the
+suffix, with `…` where either side was clipped and `→` for a tab. This is worth
+the space because the capture is the part that fails *silently* — a keystroke
+capture that grabbed the wrong end of the document still produces a plausible
+completion, just for text you were not writing.
+
+It shows the truncated strings the request was built from rather than
+re-deriving them, so it cannot disagree with what went out. Those live on
+`fimState` past the end of a run, so rendering is gated on the run id and a
+stale pair is never painted under the next run's band.
+
+Newlines render in two phases. Walking outward from the cursor, the first
+`fimContextRealLinesBefore` (2) newlines in the prefix and
+`fimContextRealLinesAfter` (2) in the suffix stay real line breaks; every
+newline beyond them collapses to an inline `⏎`. So a completion inside a
+function shows its own line and the one above it laid out as code, while the
+rest of the window sits on one trailing line and cannot grow the band. Band
+height is a pixel budget rather than a line count — 45% of the screen,
+`alertV2MaxStackFraction` — and past it the layout truncates with
+`... (+N more lines)`; four real lines plus a status line and a completion sit
+well inside that, and these two counts are the knob if a future default does
+not.
+
+**This is an exposure, and a different one from the request.** It paints
+whatever field you were typing in onto the screen at readable size, where a
+provider at least is not standing behind you. `fimContextInBand = false` turns
+it off.
+
 Status goes to a band through `alert_gateway` with a fixed id, on the active
 screen only and with no fullscreen flash, and carries the same symbols as the
 zsh widget: `❄` marks it as ours, then `⋯` in flight, `✓` inserted, `∅`
 nothing but nothing wrong, `✗` failed, and `📋` for the clipboard fallback,
-which the zsh side has no need of. Markup is explicitly plain, because
-completions are code and `*` and `_` in code must not be eaten.
+which the zsh side has no need of.
+
+Markup is `md`, which it has to be for `[…]{dim}` to dim the context, and that
+makes escaping mandatory rather than optional: under `md` a `**` or a `~~` pair
+in a completion silently styles itself and swallows its own markers, and a
+trailing `\` eats the character after it. Every interpolated value — the
+completion, the context window, provider names, error text — goes through
+`escapeMarkup`, which backslashes each of `\ * ~ [ ]`. Escaping both brackets is
+what keeps a following `{…}` inert too, since an attribute span cannot start
+without its `]`.
 
 ### What it sends, and what it refuses to
 
