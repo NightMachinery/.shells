@@ -321,9 +321,23 @@ under a line reading `❄ FIM ✓ 0.3s · any key inserts, Esc discards`, and
 nothing has been inserted yet.
 
 - `Escape` discards it: `❄ FIM ∅ discarded`.
+- `⇧Escape` copies it to the clipboard instead, which is the same idiom purple
+  mode uses for "get out of the way but keep what you have". The flags are read
+  *before* the escape branch, not after it: `isEscape` looks only at the
+  keycode, so testing it first made `⇧Escape` discard the completion it was
+  meant to save. `cmd+Escape` and `ctrl+Escape` still discard.
 - A chord carrying `cmd` or `ctrl` — `cmd+tab`, `cmd+c` — is a command rather
   than typing, so the ghost gets out of the way: the completion goes to the
   clipboard and the chord is delivered. So does a change of frontmost app.
+- **Hyper and purple pass straight through**, in every state, and neither
+  accepts nor discards. They are held modalities rather than real modifier
+  chords — hyper is F18 held down, and its keys carry no flags at all — so
+  before this they looked to the tap exactly like ordinary typing, and
+  `hyper+<anything>` *accepted* the ghost. Which meant you could not switch apps
+  to think about a completion, since the app switcher is on hyper. F18 is
+  matched by keycode as well, because it is the toggle and arrives before
+  `entered_p` is set. Both globals are read with `rawget`, so the module still
+  loads on a machine with hyper-mode disabled.
 - Anything else **accepts**. The completion goes onto the pasteboard, the tap
   returns `cmd+v` down and up as replacement events, and the key you actually
   pressed is *held* — see **Delivering the typed key** below. The clipboard is
