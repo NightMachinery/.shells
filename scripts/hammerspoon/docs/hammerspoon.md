@@ -594,9 +594,11 @@ across the two extensions, and without them the second copy returns the whole
 document and the cursor ends up at offset 0. See `docs/fim.md`.
 
 The completion appears as a ghost in an alert band with the id `fim`: any key
-inserts it, `Escape` discards it, a `cmd`/`ctrl` chord or a change of app
-copies it to the clipboard. A keyDown eventtap exists only for the duration of
-a run, never permanently.
+inserts it, `Escape` discards it, and `⇧Escape`, a `cmd`/`ctrl` chord or a
+change of app copies it to the clipboard. Hyper and purple keys pass straight
+through and do neither — they are held modalities carrying no modifier flags, so
+until this they read as ordinary typing and accepted the ghost. A keyDown
+eventtap exists only for the duration of a run, never permanently.
 
 Accepting swallows the key you pressed and posts it once the paste has landed —
 watched through `AXNumberOfCharacters` where the app exposes it, on a fixed 60ms

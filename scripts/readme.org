@@ -133,8 +133,9 @@ text around the cursor through the Accessibility API where the app exposes it,
 and otherwise through a =shift+cmd+up= / =cmd+c= / =shift+cmd+down= / =cmd+c=
 dance over the clipboard -- Purple Telegram's Qt draft box does not appear in
 the accessibility tree at all, and kitty's is always empty. The completion
-arrives as a ghost in an alert band: any key inserts it, =Esc= discards it, and
-anything we could not paste lands on the clipboard instead.
+arrives as a ghost in an alert band: any key inserts it, =Esc= discards it,
+=⇧Esc= puts it on the clipboard, and anything we could not paste lands there
+too. Hyper and purple keys pass through the ghost untouched.
 
 See =./docs/fim.md=, which records the things that cost real time (ZLE's
 =BUFFER= and =CURSOR= are not bound inside a =zle -F= handler; cancelling a
