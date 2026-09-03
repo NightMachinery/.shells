@@ -31,9 +31,15 @@ function h-hammerspoon-console-wanted-p {
 }
 
 function hammerspoon {
-    : "the Hammerspoon CLI, quiet by default; hammerspoon_quiet_p=n to let console output through"
+    : "the Hammerspoon CLI, quiet by default; hammerspoon_quiet_p=n to let console output through
+
+hammerspoon_assert_p=n returns the client's exit code instead of raising, for
+the rare caller that expects a failure -- probing a Hammerspoon that may be
+mid-reload, say. Everyone else wants the assert: a silent non-zero here means a
+hotkey or a watcher did not get installed."
 
     local quiet_p="${hammerspoon_quiet_p:-y}"
+    local assert_p="${hammerspoon_assert_p:-y}"
 
     local -a quiet_opts=()
     if bool "$quiet_p" && ! h-hammerspoon-console-wanted-p "$@" ; then
@@ -45,7 +51,11 @@ function hammerspoon {
 
     #: -t is the client's own receive timeout (default 4); the gtimeout is the
     #: backstop for a Hammerspoon that never answers at all.
-    assert gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" @RET
+    if bool "$assert_p" ; then
+        assert gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@" @RET
+    else
+        gtimeout 30s hs "${quiet_opts[@]}" -A -t 5 "$@"
+    fi
 }
 ##
 function h-hammerspoon-eval {
@@ -77,10 +87,66 @@ hammerspoon_quiet_p=n."
     print -r -- "${${out##[[:space:]]##}%%[[:space:]]##}"
 }
 ##
-function hs-reload {
-    : "reload the Hammerspoon config now, whether or not a hold is up"
+#: How long to wait for the config to finish loading again before giving up.
+typeset -g hs_reload_wait_default="${hs_reload_wait_default:-10}"
 
-    hammerspoon -c "hs.reload()"
+function hs-reload {
+    : "reload the Hammerspoon config now, whether or not a hold is up
+
+Waits for the config to come back and fails loudly if it does not, so a module
+that no longer loads is reported here rather than discovered later as a hotkey
+that quietly stopped working."
+    @darwinOnly
+
+    #: Deferred rather than called outright, because `hs.reload()' tears down
+    #: the very message port the CLI is waiting on: the reply is dropped, the
+    #: client exits 69 (EX_UNAVAILABLE, the same code as a Hammerspoon that is
+    #: not running), and [agfi:hammerspoon]'s assert paints a FATAL over a
+    #: reload that in fact worked. A timer lets it answer and hang up first.
+    #: The delay has to be on Hammerspoon's side; sleeping in zsh beforehand
+    #: changes nothing, since the port dies while `hs.reload()' runs and the
+    #: connection is open by then.
+    #: A marker in the *current* Lua state, so that the wait below can tell a
+    #: finished reload from a reload that has not started yet. `hs.reload()'
+    #: builds a fresh state, so this global exists on one side of it and not on
+    #: the other; the config's own functions cannot say that, since they are
+    #: equally present before and after.
+    hammerspoon -c "hsReloadProbe = true" >/dev/null @RET
+
+    #: stdout discarded, stderr kept: the CLI prints whatever the chunk
+    #: evaluates to, and that is the timer object -- `hs.timer: running (0x...)'
+    #: is not something a caller of hs-reload wants to read.
+    hammerspoon -c "hs.timer.doAfter(0.05, hs.reload)" >/dev/null @RET
+
+    #: Two conditions, and both are needed. The marker being gone proves the
+    #: state was rebuilt; `hammerspoonReloadHeldBy' -- from
+    #: hammerspoon/core/reload.lua, the last file boot.lua loads -- proves the
+    #: rebuild got all the way to the end rather than dying in the middle of
+    #: some module. Poll rather than sleep a fixed time: a cold reload's
+    #: duration depends on what the config pulls in, and this returns as soon
+    #: as it is up.
+    #: `hammerspoon_assert_p=n' because every probe until the config is back is
+    #: *expected* to fail -- the port is down for most of this window, and the
+    #: asserting form would paint a FATAL for each one, which is the noise this
+    #: function exists to remove. `-t 2' so a probe that lands mid-reload gives
+    #: up quickly instead of sitting on the client's default receive timeout.
+    local deadline=$(( EPOCHSECONDS + hs_reload_wait_default ))
+    local up=''
+    while (( EPOCHSECONDS < deadline )) ; do
+        if [[ "$(hammerspoon_assert_p=n hammerspoon -t 2 -c 'return tostring(hsReloadProbe == nil and type(hammerspoonReloadHeldBy) == "function")' 2>/dev/null)" == true ]] ; then
+            up=y
+            break
+        fi
+
+        sleep 0.1
+    done
+
+    if test -z "$up" ; then
+        ecerr "$0: config did not come back within ${hs_reload_wait_default}s; check the Hammerspoon console"
+        return 1
+    fi
+
+    ecgray "$0: reloaded"
 }
 aliasfn hammerspoon-reload hs-reload
 alias hsr='hs-reload'
