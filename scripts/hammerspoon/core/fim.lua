@@ -98,6 +98,31 @@ fimAxSlowReadSeconds = fimAxSlowReadSeconds or 0.005
 --- 0.0: that is not "no timeout", it is "reset to the system default".
 fimAxTimeoutSeconds = fimAxTimeoutSeconds or 0.05
 
+--- The band shows the context it actually sent, either side of a cursor mark.
+--- Worth knowing, because the capture is the part that goes wrong silently: a
+--- keystroke capture that grabbed the wrong end of the document produces a
+--- plausible-looking completion for text you were not writing.
+---
+--- It is also an exposure. This paints whatever field you were typing in onto
+--- the screen at readable size, which is a different risk from sending it to a
+--- provider -- a provider is not standing behind you. Off with
+---   hs -c 'fimContextInBand = false'
+if fimContextInBand == nil then fimContextInBand = true end
+
+--- How much of each side to show. These are display caps, well under the
+--- fimPrefixMaxChars/fimSuffixMaxChars that bound what is *sent*.
+fimContextPrefixChars = fimContextPrefixChars or 60
+fimContextSuffixChars = fimContextSuffixChars or 40
+
+--- Newlines are rendered in two phases, so that the text nearest the cursor
+--- reads like the code it is while distant context cannot grow the band.
+--- Walking outward from the cursor, this many newlines on each side stay real
+--- line breaks; every one beyond them collapses to an inline glyph. Two and two
+--- means a completion inside a function shows its own line and the one above it
+--- laid out properly, with the rest of the window on a single trailing line.
+fimContextRealLinesBefore = fimContextRealLinesBefore or 2
+fimContextRealLinesAfter = fimContextRealLinesAfter or 2
+
 fimAlertId = fimAlertId or "fim"
 
 --- Force the keystroke path even where AX would work. For debugging the half
@@ -120,6 +145,17 @@ local kPasteRestoreSeconds = 0.3
 local kRequestBandSeconds = 30
 local kMaxErrorChars = 200
 local kPasteConfirmPollSeconds = 0.015
+local kCursorGlyph = "‸"
+local kTabGlyph = "→"
+local kNewlineGlyph = "⏎"
+local kEllipsis = "…"
+local kGhostHint = "any key inserts · Esc discards · ⇧Esc copies"
+
+--- The ghost timer and the ghost band are both set to fimGhostSeconds, and
+--- which one fires first is otherwise a coin toss -- lose it and the band
+--- vanishes with no word of where the completion went. The timer wins by this
+--- much.
+local kGhostTimerLead = 0.25
 
 --- Our own injected events carry this in the event source's user-data field.
 --- CGEventTapPostEvent puts a replacement event back into the stream *after*
@@ -155,11 +191,23 @@ local function fimBand(text, color, seconds)
         -- monitor, and a fullscreen wash for a 0.3s completion would be absurd.
         screens = "active",
         flashSeconds = 0,
-        -- Plain, emphatically: completions are code, and `*' and `_' in code
-        -- must not be eaten as markup.
-        markup = "plain",
+        -- `md', so the context can be dimmed away from the completion. Every
+        -- interpolated value must go through escapeMarkup: completions are
+        -- code, and a `**' or a `~~' pair in code would otherwise style itself
+        -- and swallow its own markers.
+        markup = "md",
     })
 end
+
+--- Backslash before each character the md parser can act on. `[' and `]' are
+--- both escaped so an attribute span cannot form, which is also what keeps a
+--- following `{...}' inert.
+local function escapeMarkup(s)
+    return (tostring(s or ""):gsub("[\\%*~%[%]]", "\\%0"))
+end
+
+--- Exposed for testing from `hs -c'; nothing else calls it by this name.
+fimEscapeMarkup = escapeMarkup
 
 local function fimHead(sym)
     return fimSymLead .. " FIM " .. sym
@@ -277,10 +325,85 @@ end
 local function oneLine(s, maxChars)
     s = tostring(s or "")
     s = s:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-    if #s > maxChars then
-        s = firstChars(s, maxChars) .. "…"
+    -- utf8.len, not #s: the cap is in characters, and comparing bytes against
+    -- it truncated any error message with an accent in it early.
+    if (utf8.len(s) or #s) > maxChars then
+        s = firstChars(s, maxChars) .. kEllipsis
     end
     return s
+end
+
+local function splitLines(s)
+    local out, from = {}, 1
+    while true do
+        local at = s:find("\n", from, true)
+        if not at then
+            out[#out + 1] = s:sub(from)
+            return out
+        end
+        out[#out + 1] = s:sub(from, at - 1)
+        from = at + 1
+    end
+end
+
+--- Keep the `keep' newlines nearest the cursor as real line breaks and collapse
+--- the rest to a glyph. `nearestAtEnd' is true for the prefix, whose cursor end
+--- is its last character, and false for the suffix.
+local function collapseDistantNewlines(s, keep, nearestAtEnd)
+    local parts = splitLines(s)
+    local breaks = #parts - 1
+    if breaks <= 0 then return s end
+
+    local out = { parts[1] }
+    for i = 1, breaks do
+        local real
+        if nearestAtEnd then
+            real = i > (breaks - keep)
+        else
+            real = i <= keep
+        end
+        out[#out + 1] = real and "\n" or kNewlineGlyph
+        out[#out + 1] = parts[i + 1]
+    end
+    return table.concat(out)
+end
+
+--- What the band shows of the context: the tail of the prefix, a cursor mark,
+--- the head of the suffix.
+---
+--- `st.prefix' and `st.suffix' hold the text as it was *truncated for sending*,
+--- which is exactly what we want to show -- but teardown leaves them behind, so
+--- a stale pair would be painted under the next run's band. Hence the run id.
+local function contextWindow(st)
+    if not fimContextInBand then return nil end
+    if st.contextRunId ~= st.runId then return nil end
+
+    local prefix, suffix = st.prefix or "", st.suffix or ""
+    if prefix == "" and suffix == "" then return nil end
+
+    local head = lastChars(prefix, fimContextPrefixChars)
+    if #head < #prefix then head = kEllipsis .. head end
+
+    local tail = firstChars(suffix, fimContextSuffixChars)
+    if #tail < #suffix then tail = tail .. kEllipsis end
+
+    head = collapseDistantNewlines(head, fimContextRealLinesBefore, true)
+    tail = collapseDistantNewlines(tail, fimContextRealLinesAfter, false)
+
+    head = head:gsub("\t", kTabGlyph)
+    tail = tail:gsub("\t", kTabGlyph)
+
+    return head .. kCursorGlyph .. tail
+end
+
+--- Exposed for testing from `hs -c'; nothing else calls it by this name.
+fimContextWindow = contextWindow
+
+--- Already escaped and dimmed, ready to sit above a band's body, or nil.
+local function contextBlock(st)
+    local window = contextWindow(st)
+    if not window then return nil end
+    return "[" .. escapeMarkup(window) .. "]{dim}"
 end
 
 local function frontmostPid()
@@ -796,11 +919,19 @@ local function showGhost(st, completion)
     st.state = "ghost"
     st.completion = completion
 
-    fimBand(fimHead(fimSymOk) .. elapsedString(st.startedAt)
-                .. "  ·  any key inserts, Esc discards\n" .. completion,
-            "notice", fimGhostSeconds)
+    -- Violet: not success, not a warning, and unused by any of the legacy
+    -- colour aliases. A ghost is a question that has not been answered yet.
+    local body = escapeMarkup(completion)
+    local context = contextBlock(st)
+    if context then
+        body = context .. "\n\n" .. body
+    end
 
-    st.ghostTimer = hs.timer.doAfter(fimGhostSeconds, function()
+    fimBand(fimHead(fimSymOk) .. elapsedString(st.startedAt)
+                .. "  ·  " .. kGhostHint .. "\n\n" .. body,
+            "violet", fimGhostSeconds)
+
+    st.ghostTimer = hs.timer.doAfter(math.max(0.1, fimGhostSeconds - kGhostTimerLead), function()
         st.ghostTimer = nil
         copyCompletionToClipboard(st, fimHead(fimSymCopied) .. " copied to clipboard (timed out)")
     end)
@@ -813,6 +944,7 @@ local function request(st, runId, provider, prefix, suffix)
     -- bad capture -- and the keystroke path is easy to get subtly wrong.
     st.prefix = prefix
     st.suffix = suffix
+    st.contextRunId = runId
 
     local task = taskWithPath(kBrishzq, function(exitCode, stdOut, stdErr)
         -- A superseded run's callback must do nothing at all: it would
@@ -829,7 +961,7 @@ local function request(st, runId, provider, prefix, suffix)
             if message == "" then
                 message = "exit " .. tostring(exitCode)
             end
-            fimBand(fimHead(fimSymErr) .. " " .. message, "crit")
+            fimBand(fimHead(fimSymErr) .. " " .. escapeMarkup(message), "crit")
             return
         end
 
@@ -859,8 +991,13 @@ local function request(st, runId, provider, prefix, suffix)
     st.task = task
     st.state = "requesting"
 
-    fimBand(fimHead(fimSymWait) .. " " .. provider .. " (" .. st.path .. ")",
-            "default", kRequestBandSeconds)
+    local waiting = fimHead(fimSymWait) .. " " .. escapeMarkup(provider)
+        .. " (" .. escapeMarkup(st.path) .. ")"
+    local context = contextBlock(st)
+    if context then
+        waiting = waiting .. "\n\n" .. context
+    end
+    fimBand(waiting, "default", kRequestBandSeconds)
 
     task:start()
 
