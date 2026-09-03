@@ -406,6 +406,16 @@ function wifi-login-site-open {
 
     reval-ec browser-open "${url}"
 }
+##
+#: The same surface under the other name this thing goes by. [agfi:aliasfn]
+#: defines real functions, so these complete and can be swapped like any other.
+aliasfn captive-portal-open wifi-login-site-open
+aliasfn captive-portal-url wifi-login-site-get
+aliasfn captive-portal-explain wifi-login-site-explain
+aliasfn captive-portal-p net-captive-portal-p
+#: ... and the predicate under the wifi-login-site prefix, for symmetry.
+aliasfn wifi-login-site-p net-captive-portal-p
+##
 function ip-internal-get {
     : "Use 'ipconfig getifaddr en1' for wireless, or 'ipconfig getifaddr en0' for ethernet."
 
