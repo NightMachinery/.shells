@@ -297,6 +297,107 @@ session behind holding a dead pane. `claude-code-usage-notif-status` reports
 that as already fired — which is also how to check whether a notification went
 off — and the next arm, or a cancel, clears it away.
 
+### Resuming instead of announcing
+
+Instead of only telling you the limits have reset, the armed job can type
+`Continue.` straight into the Claude Code session that was blocked. Each entry
+point is the profile's ordinary report plus an arm whose action is to resume
+rather than notify:
+
+- `claude-code-usage-type-continue` (alias `cctc`) — the current profile.
+- `claude-code-usage-default-type-continue` (alias `cctc-default`).
+- `claude-code-usage-work-type-continue` (alias `cctc-work`).
+- `h-claude-code-usage-type-continue-schedule` and
+  `h-claude-code-usage-work-type-continue-schedule` arm without printing a
+  report, matching the existing `h-…-notif-schedule` escape hatches.
+
+There is deliberately no `-all` variant: the action needs an interactively
+chosen target per profile, and prompting twice from one command is worse than
+just running the two commands.
+
+It is one job per profile: a resume reuses the profile's existing tmux
+session, so arming one *replaces* a plain notifier for that profile, and the
+reverse also holds — last arm wins, and exactly one thing happens per reset.
+`claude-code-usage-notif-status` now prints the pending action and target
+alongside the deadline, for example `[action: type-continue -> kitty:95]`, so
+a downgrade from resume back to notify (or the other way around) is visible
+rather than silent.
+
+**Choosing the target, and why it is not automatic.** `hs-type-continue` types
+through `hs.eventtap.keyStrokes`, a *global* synthetic keystroke with no
+window targeting: it types wherever the keyboard focus happens to be, then
+presses Return. In practice there are usually several Claude Code sessions
+open at once, plus chat apps and a browser, so firing that blind risks sending
+`Continue.` as a chat message, or into the wrong session entirely. All
+sessions on a profile share one rate limit, so "the session that was blocked"
+is ambiguous by construction, and the target has to be *chosen*, not guessed.
+
+So arming opens an fzf picker, `h-claude-code-usage-type-continue-target-fz`,
+built on `claude-code-session-live-fz`, over the Claude Code sessions
+currently live in a kitty window, with a preview showing the session's title,
+when it last moved, and the last prompt it was given. It is multi-select, so
+several tabs can be resumed at once. Above the sessions sits one synthetic
+choice, `frontmost`, which falls back to `hs-type-continue`. It stays in the
+list because a session outside kitty cannot be reached any other way, but it
+is never the default.
+
+The picker runs only once the job is actually going to be armed, so a report
+that changes nothing never puts a picker in your way. Presetting
+`claude_code_usage_notif_targets` (space separated, e.g. `kitty:95
+frontmost`) skips the picker entirely, which is what makes the whole thing
+callable from a script or a test.
+
+**Delivery.** A `kitty:<window-id>` target is delivered with `kitty @
+send-text --match id:<n>`, straight into that one window: no focus stealing,
+no global keystrokes, and it does not care which window is frontmost or
+whether the display is asleep. `send-text` documents that it always succeeds
+"even if no text was sent to any window", so its exit status proves nothing —
+the window is checked for separately first, otherwise a tab closed during the
+wait would swallow the resume while the job reported success. A vanished
+window degrades to a notification saying so.
+
+The `frontmost` target instead wakes the display via
+`hs.caffeinate.declareUserActivity()` and pauses a beat before typing, because
+`displaysleep` is ten minutes on this machine — the same as the idle
+threshold below — so by the time the job fires the screen is asleep, and the
+first synthetic keypress would otherwise be eaten waking it, typing
+`ontinue.` instead.
+
+**The idle gate, and failing safe.** It only types if the keyboard has been
+untouched for at least `claude_code_usage_type_continue_idle_min_s` (default
+600). If you are at the machine you get an ordinary notification instead and
+can resume yourself. It also declines if the screen is locked, or if the idle
+time cannot be read at all. The principle is the same in every case: the
+notification goes out either way, so an unwanted resume is the worse of the
+two errors, and anything that cannot be established counts against typing.
+The idle time itself comes from `hs.host.idleTime()` through
+`h-hammerspoon-eval`, and what gets checked is the returned string rather than
+the exit status, because Hammerspoon exits 0 whether or not the Lua found
+anything.
+
+**Knobs:**
+
+- `claude_code_usage_notif_action` — `notif` or `type-continue`.
+- `claude_code_usage_type_continue_idle_min_s` (default `600`) — how long the
+  keyboard must have been untouched before a resume is allowed.
+- `claude_code_usage_type_continue_grace_s` (default `60`) — deliberately
+  longer than the notifier's own `30`, because an early notification is
+  harmless while an early resume is spent on a session that is still blocked.
+- `claude_code_usage_type_continue_text` (default `Continue.`).
+- `claude_code_usage_notif_targets` — preset targets, skipping the picker.
+- `claude_code_usage_notif_log` (default `~/logs/claude-code-usage-notif.log`).
+
+**The log.** Every fire writes one line saying which target it tried and
+whether it typed or declined, and why. The tmux pane a fired job leaves
+behind says the same thing, but only until the next reboot, and a job that
+types into your session while you are away should stay answerable for it
+afterwards.
+
+One caveat worth stating plainly: the job trusts the reset timestamp plus the
+grace period, and does not re-check usage when it actually fires. If the
+endpoint lags behind its own `resets_at`, the resume is spent on a session
+that is still blocked, and nothing remains armed afterwards.
+
 ## Color
 
 Color handling (`--color`, `--true-color`, `--dark-mode`, `--dark-theme`,
