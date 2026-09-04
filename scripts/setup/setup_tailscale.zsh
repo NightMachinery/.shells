@@ -22,7 +22,7 @@ function warn {
 
 function die {
     print -ru2 -- " err $*"
-    return 1
+    exit 1
 }
 
 function have {
@@ -36,19 +36,20 @@ function run {
 
 function as-root {
     if (( EUID == 0 )) ; then
-        run "$@"
+        run "$@" || die "root command failed: ${(j: :)${(q-)@}}"
     else
         have sudo || die "sudo is required for Linux Tailscale setup"
-        run sudo -kA "$@"
+        run sudo -kA "$@" || die "root command failed: sudo -kA ${(j: :)${(q-)@}}"
     fi
 }
 
 function usage {
     print -r -- "Usage: setup/setup_tailscale.zsh [--install-only]"
     print -r -- ""
-    print -r -- "Installs Tailscale, starts/enables the daemon or app, then runs"
-    print -r -- "the public-safe login flow. No auth keys or tailnet names are"
-    print -r -- "stored in this repository."
+    print -r -- "Installs the Tailscale CLI daemon, starts/enables it, then runs"
+    print -r -- "the public-safe login flow. GUI removal is reported and confirmed"
+    print -r -- "before the script uninstalls anything. No auth keys or tailnet"
+    print -r -- "names are stored in this repository."
 }
 
 typeset -g install_only_p=n
@@ -70,37 +71,118 @@ while (( $# > 0 )) ; do
     esac
 done
 
+function confirm-destructive {
+    local action="$1"
+    local answer=''
+
+    warn "${action}"
+    if [[ ! -t 0 ]] ; then
+        warn "stdin is not interactive; skipping destructive action"
+        return 1
+    fi
+
+    print -ru2 -- "Type 'yes' to continue:"
+    read -r answer
+    [[ "${answer}" == yes ]]
+}
+
+function tailscale-bin {
+    if [[ -n "${tailscale_cli_bin:-}" ]] ; then
+        print -r -- "${tailscale_cli_bin}"
+        return 0
+    fi
+
+    if have brew && command brew list --formula tailscale >/dev/null 2>&1 ; then
+        print -r -- "$(command brew --prefix tailscale)/bin/tailscale"
+        return 0
+    fi
+
+    if have tailscale ; then
+        command -v tailscale
+        return 0
+    fi
+
+    return 1
+}
+
 function tailscale-login-needed-p {
-    have tailscale || return 0
-    command tailscale ip --4 >/dev/null 2>&1 && return 1
+    local tailscale_bin
+    tailscale_bin="$(tailscale-bin)" || return 0
+    command "${tailscale_bin}" ip --4 >/dev/null 2>&1 && return 1
     return 0
 }
 
-function setup-tailscale-darwin {
+function remove-tailscale-gui-darwin {
     have brew || die "Homebrew is required to install Tailscale on macOS"
 
-    if command brew list --cask tailscale-app >/dev/null 2>&1 || [[ -d /Applications/Tailscale.app ]] ; then
-        ok "Tailscale.app already installed"
-    else
-        log "installing Tailscale standalone app"
-        run brew install --cask tailscale-app
+    local cask_installed_p=n
+    local app_present_p=n
+
+    command brew list --cask tailscale-app >/dev/null 2>&1 && cask_installed_p=y
+    [[ -d /Applications/Tailscale.app ]] && app_present_p=y
+
+    if [[ "${cask_installed_p}" != y && "${app_present_p}" != y ]] ; then
+        ok "Tailscale GUI app not present"
+        return 0
     fi
 
-    log "opening Tailscale"
-    run open -a Tailscale
+    warn "Tailscale GUI app detected"
+    [[ "${cask_installed_p}" == y ]] && warn "Homebrew cask installed: tailscale-app"
+    [[ "${app_present_p}" == y ]] && warn "Application bundle exists: /Applications/Tailscale.app"
+
+    if [[ "${cask_installed_p}" == y ]] ; then
+        if confirm-destructive "Uninstall Homebrew cask 'tailscale-app'?" ; then
+            run brew uninstall --cask tailscale-app || die "failed to uninstall tailscale-app cask"
+        else
+            warn "leaving Homebrew cask installed"
+        fi
+    fi
+
+    if [[ -d /Applications/Tailscale.app ]] ; then
+        if confirm-destructive "Remove remaining /Applications/Tailscale.app bundle?" ; then
+            as-root /bin/rm -rf /Applications/Tailscale.app
+        else
+            warn "leaving /Applications/Tailscale.app in place"
+        fi
+    fi
+
+    if command brew list --cask tailscale-app >/dev/null 2>&1 || [[ -d /Applications/Tailscale.app ]] ; then
+        die "Tailscale GUI app is still present; not installing CLI variant alongside it"
+    fi
+}
+
+function install-tailscale-darwin-cli {
+    have brew || die "Homebrew is required to install Tailscale CLI on macOS"
+
+    if command brew list --formula tailscale >/dev/null 2>&1 ; then
+        ok "Tailscale CLI formula already installed"
+    else
+        log "installing Tailscale CLI formula"
+        run brew install tailscale || die "failed to install Tailscale CLI formula"
+    fi
+
+    typeset -g tailscale_cli_bin="$(command brew --prefix tailscale)/bin/tailscale"
+    [[ -x "${tailscale_cli_bin}" ]] || die "tailscale CLI not executable: ${tailscale_cli_bin}"
+}
+
+function start-tailscale-darwin-cli {
+    log "starting Tailscale CLI daemon via Homebrew services"
+    as-root brew services start tailscale
+}
+
+function setup-tailscale-darwin {
+    remove-tailscale-gui-darwin
+    install-tailscale-darwin-cli
+    start-tailscale-darwin-cli
 
     if [[ "${install_only_p}" == y ]] ; then
-        ok "install-only requested; finish login in the Tailscale app"
+        ok "install-only requested; run 'sudo -kA ${tailscale_cli_bin} up' when ready to log in"
         return 0
     fi
 
     if tailscale-login-needed-p ; then
-        if have tailscale ; then
-            log "starting Tailscale login flow"
-            command tailscale up || warn "finish onboarding in the Tailscale app"
-        else
-            warn "tailscale CLI is not on PATH yet; finish onboarding in the Tailscale app"
-        fi
+        log "starting Tailscale CLI login flow"
+        as-root "${tailscale_cli_bin}" up
     else
         ok "Tailscale already has an IPv4 address"
     fi
@@ -120,7 +202,7 @@ function install-tailscale-linux {
         log "fetching Tailscale Linux installer"
         run curl --fail --location --show-error --silent \
             --output "${installer}" \
-            https://tailscale.com/install.sh
+            https://tailscale.com/install.sh || die "failed to fetch Tailscale Linux installer"
         as-root sh "${installer}"
     } always {
         command rm -f -- "${installer}" || true
