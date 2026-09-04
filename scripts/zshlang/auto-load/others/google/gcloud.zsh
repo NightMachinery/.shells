@@ -2079,8 +2079,13 @@ function gcp-gpu-babysit {
 
     integer n=0
     while (( n < max )) ; do
-        local status
-        status="$(h-gcp-gpu-instance-json | command jq -r '.status // "ABSENT"')"
+        #: NOT `status`: that is a zsh special-ish name in wide use here and,
+        #: more to the point, the case below read `$vm_state`, which this loop
+        #: never set. Every arm fell through to `*)` and the babysitter did
+        #: nothing but sleep 30 for `$max` iterations -- it has never once
+        #: restarted a preempted instance.
+        local vm_state
+        vm_state="$(h-gcp-gpu-instance-json | command jq -r '.status // "ABSENT"')"
 
         case "$vm_state" in
             RUNNING)
