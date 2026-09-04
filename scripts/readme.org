@@ -50,6 +50,12 @@ one for single answers, and the standalone one for conversation exports.
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.
 
+* Tailscale
+
+=setup/setup_tailscale.zsh= installs and enables Tailscale without storing
+tailnet, account, hostname, or auth-key material in this public repo. See
+=./docs/tailscale-setup.md=.
+
 * ntag
 
 ntag notes are tracked in =./docs/ntag/=.
