@@ -1319,6 +1319,37 @@ function gcp-gpu-up {
     fi
 }
 
+function h-gcp-gpu-stop-flags {
+    #: `h-gcp-gpu-stop-flags [NAME] [ZONE]` -> sets `$gcp_gpu_stop_flags` to
+    #: the flags `instances stop` needs for THIS instance.
+    #:
+    #: A machine with local SSD refuses to stop unless the request says out
+    #: loud what happens to it: `VM has a Local SSD attached but an undefined
+    #: value for discard-local-ssd`. Every A3 type has local SSD, so without
+    #: this `gcp-gpu-down` could not stop the whole GPU fleet -- the E2 batch
+    #: had to fall back to a hand-written gcloud call.
+    #:
+    #: Discarding is the contract already agreed at create time: `gcp-gpu-up`
+    #: passes --discard-local-ssds-at-termination-timestamp=true, and
+    #: `docs/gcp_spot_runs.md` is built on local SSD not surviving (which is
+    #: why checkpoints go to /mnt/data). Preserving it is also billed.
+    #:
+    #: Conditional rather than unconditional: the flag is only meaningful for
+    #: an instance that has a SCRATCH disk, and this file is not A3-only.
+    local name="${1:-${gcp_gpu_instance}}" zone="${2:-${gcp_gpu_zone}}"
+
+    typeset -ga gcp_gpu_stop_flags=()
+
+    local scratch
+    scratch="$(h-gcp-gpu-gcloud compute instances describe "$name" \
+        --zone="$zone" --format=json 2>/dev/null \
+        | command jq -r '[.disks[]? | select(.type == "SCRATCH")] | length')"
+
+    if [[ "$scratch" == <1-> ]] ; then
+        gcp_gpu_stop_flags+=( --discard-local-ssd=true )
+    fi
+}
+
 function gcp-gpu-down {
     h-gcp-gpu-deps @RET
 
@@ -1327,8 +1358,14 @@ function gcp-gpu-down {
         return 0
     fi
 
+    h-gcp-gpu-stop-flags @RET
+    if (( ${#gcp_gpu_stop_flags} )) ; then
+        ecgray "local SSD attached; stopping with ${gcp_gpu_stop_flags[*]} -- its contents are discarded."
+    fi
+
     h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances stop \
-        "${gcp_gpu_instance}" --zone="${gcp_gpu_zone}" @RET
+        "${gcp_gpu_instance}" --zone="${gcp_gpu_zone}" \
+        "${gcp_gpu_stop_flags[@]}" @RET
 
     ec "stopped ${gcp_gpu_instance}. Boot disk, /mnt/data, drivers and packages all survive."
     ec "Disks keep billing while stopped: gcp-gpu-disks"
@@ -1776,8 +1813,9 @@ function gcp-gpu-reap {
         ecerr "${name}: ANOMALY -- ${why}"
 
         if bool "$kill_p" ; then
+            h-gcp-gpu-stop-flags "$name" "$zone"
             h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances stop \
-                "$name" --zone="$zone" --quiet
+                "$name" --zone="$zone" "${gcp_gpu_stop_flags[@]}" --quiet
             ec "${name}: stopped."
         else
             ec "${name}: would stop it. Re-run with --kill, or: gcp-gpu-down"
@@ -1967,7 +2005,11 @@ function gcp-gpu-panic {
     while IFS=$'\t' read -r name zone ; do
         test -z "$name" && continue
         ec "stopping ${name} (${zone})"
-        h-gcp-gpu-gcloud compute instances stop "$name" --zone="$zone" --quiet &
+        #: Per instance: an A3 will not stop without it, and this loop is the
+        #: one place that must not fail on the machine I most want stopped.
+        h-gcp-gpu-stop-flags "$name" "$zone"
+        h-gcp-gpu-gcloud compute instances stop "$name" --zone="$zone" \
+            "${gcp_gpu_stop_flags[@]}" --quiet &
     done <<< "$names"
 
     wait
