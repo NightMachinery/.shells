@@ -156,6 +156,16 @@ typeset -g gcp_gpu_reap_heartbeat_max_min="${gcp_gpu_reap_heartbeat_max_min:-10}
 #: honest if `$gcp_gpu_zone` is pointed somewhere that does have them.
 #: ===========================================================================
 typeset -gA gcp_gpu_price_ondemand=(
+    #: No GPU, and here only because `gcp-gpu-controller-deploy` creates an
+    #: e2-micro: without a row, `h-gcp-gpu-price` counts it as 0 and prints
+    #: "Budget figures are now UNDER-reported" on every `gcp-gpu-burn`.
+    #: Derived the same way as the rest -- 0.021714176/vCPU-hour +
+    #: 0.002910156/GiB-hour, from the live catalog on 2026-09-04, times the
+    #: shape (e2-micro is 0.25 vCPU + 1 GB). 6.09 EUR/month, which is the
+    #: "about EUR 6" the controller is costed at in gcp/CONTROLLER.md.
+    e2-micro         0.0083
+    e2-small         0.0167
+    e2-medium        0.0334
     g2-standard-4    0.72
     g2-standard-8    0.87
     g2-standard-12   1.02
