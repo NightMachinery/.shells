@@ -372,6 +372,8 @@ than mistaking =* Subagents= for something a message wrote.
   already have. No picker.
 - =claude-code-view-session-focused= --- open the session running in the
   focused kitty window. See below.
+- =claude-code-session-live-fz= --- pick among the sessions currently live in
+  a kitty window. See below.
 - =claude-session-selftest= --- run the Go tests and the corpus parity check.
 
 Each viewer has a =-all-fz= variant that selects from every project's sessions
@@ -468,3 +470,23 @@ Variables:
 - =claude_code_session_registry_dir= --- defaults to
   =~/tmp/claude-code-sessions=.
 - =claude_code_session_kitty_socket_glob= --- defaults to =~/tmp/.kitty-*=.
+
+* Sessions live in a kitty window
+
+=claude-code-session-live-fz= picks among the Claude Code sessions currently
+live in a kitty window, printing =<kitty-window-id> <TAB> <transcript path>=
+per choice. It is built from the same window→session registry that
+=claude-code-view-session-focused= uses, so a session only appears once it has
+actually registered itself, and it disappears the moment its window closes.
+
+Each row's metadata comes from a single =claude_session list= call over every
+profile's projects directory, joined back onto the live rows by transcript
+path, rather than one metadata call per row. =list= walks the whole corpus in
+about 45ms, while =claude_session name= alone costs about 230ms on a large
+transcript — a per-row call would have made the picker's startup cost scale
+with however many sessions happen to be open. The fzf preview goes further
+still and skips =claude_session render= entirely: rendering a 46MB transcript
+takes about eight seconds, far too slow for a preview pane that has to feel
+instant. Instead it tail-scans the last few hundred KB of the transcript for
+the =ai-title= and =last-prompt= records Claude Code already writes there,
+which costs about 17ms.
