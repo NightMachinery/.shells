@@ -2,6 +2,8 @@
 
 `setup/setup_tailscale.zsh` installs and enables Tailscale without committing
 any account, tailnet, hostname, or auth-key material to this public repo.
+It runs with xtrace enabled and `PS4='> '`, so setup commands are visible while
+it works.
 
 Run it from this repo:
 
