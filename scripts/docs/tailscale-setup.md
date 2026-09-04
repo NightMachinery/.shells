@@ -1,7 +1,8 @@
 # Tailscale Setup
 
-`setup/setup_tailscale.zsh` installs and enables Tailscale without committing
-any account, tailnet, hostname, or auth-key material to this public repo.
+`setup/setup_tailscale.zsh` installs and enables the Tailscale CLI daemon
+without committing any account, tailnet, hostname, or auth-key material to this
+public repo.
 It runs with xtrace enabled and `PS4='> '`, so setup commands are visible while
 it works.
 
@@ -18,10 +19,14 @@ want to authenticate later:
 setup/setup_tailscale.zsh --install-only
 ```
 
-On macOS, the script installs Homebrew's `tailscale-app` cask, which is the
-standalone app variant Tailscale recommends for normal macOS use, then opens
-the app so macOS can approve the VPN configuration and the user can complete
-login.
+On macOS, the script targets the CLI/headless Homebrew formula, not the GUI
+app. If it finds the `tailscale-app` cask or `/Applications/Tailscale.app`, it
+reports what it found and asks for explicit confirmation before uninstalling or
+removing anything. Then it installs `brew install tailscale`, starts it with
+Homebrew services, and uses the formula's own `tailscale` binary for login and
+status checks so a stale GUI shim does not get mistaken for the CLI install. If
+the GUI remains installed after the confirmation step, the script stops rather
+than installing two macOS Tailscale variants side by side.
 
 On Linux, the script downloads Tailscale's official installer at runtime, starts
 and enables `tailscaled` with the system service manager when available, then
@@ -32,6 +37,11 @@ The script deliberately does not use `--authkey`, `--login-server`,
 `--hostname`, route advertisements, exit-node settings, or Tailscale SSH flags.
 Those can reveal private topology, policy, or identity choices and should live
 in an untracked local wrapper if needed.
+
+The CLI/headless macOS variant is more scriptable and can run before GUI login,
+but it is an administrator-oriented path. The GUI app is friendlier and is
+Tailscale's normal recommendation for most macOS users; this repo chooses CLI
+mode because setup should be reproducible from shell.
 
 References:
 
