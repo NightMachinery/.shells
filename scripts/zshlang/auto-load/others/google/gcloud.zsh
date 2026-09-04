@@ -219,6 +219,20 @@ function h-gcp-gpu-label-filter {
     ec "labels.owner=${gcp_gpu_owner}"
 }
 
+function h-gcp-gpu-reap-filter {
+    #: Mine, minus the controller. `gcp-gpu-reap` calls an instance an ANOMALY
+    #: when it is past its --max-run-duration or has been quiet for an hour
+    #: with no heartbeat -- and the controller is a labelled instance of mine
+    #: that is BY DESIGN up forever and doing nothing. Without this exclusion
+    #: it becomes the reaper's first victim about eight hours after deploy, and
+    #: the failure is silent: the box that restarts the GPU stops existing, and
+    #: the next preemption simply waits until morning.
+    #:
+    #: `gcp-gpu-panic` deliberately does NOT use this filter. Panic means stop
+    #: everything of mine, and the controller is mine.
+    ec "$(h-gcp-gpu-label-filter) AND NOT labels.purpose=gpu-controller"
+}
+
 function h-gcp-gpu-deps {
     ensure-cmd gcloud jq
 }
@@ -1752,7 +1766,7 @@ function gcp-gpu-idle {
 
     local rows
     rows="$(h-gcp-gpu-gcloud compute instances list \
-        --filter="$(h-gcp-gpu-label-filter) AND status=RUNNING" --format=json 2>/dev/null \
+        --filter="$(h-gcp-gpu-reap-filter) AND status=RUNNING" --format=json 2>/dev/null \
         | command jq -r '.[]? | [.name, (.zone | split("/") | last), .id,
                                  (.machineType | split("/") | last),
                                  (.lastStartTimestamp // "")] | @tsv')"
@@ -1807,12 +1821,12 @@ function gcp-gpu-reap {
 
     local rows
     rows="$(h-gcp-gpu-gcloud compute instances list \
-        --filter="$(h-gcp-gpu-label-filter) AND status=RUNNING" --format=json 2>/dev/null \
+        --filter="$(h-gcp-gpu-reap-filter) AND status=RUNNING" --format=json 2>/dev/null \
         | command jq -r '.[]? | [.name, (.zone | split("/") | last), .id,
                                  (.lastStartTimestamp // "")] | @tsv')"
 
     if test -z "$rows" ; then
-        ec "nothing running under owner=${gcp_gpu_owner}. Nothing to reap."
+        ec "nothing reapable running under owner=${gcp_gpu_owner}. Nothing to reap."
         return 0
     fi
 
