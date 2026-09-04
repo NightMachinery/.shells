@@ -817,6 +817,7 @@ GCP_GPU_DATA_DEVICE="/dev/disk/by-id/google-${gcp_gpu_data_disk}"
 GCP_GPU_BUCKET="${gcp_gpu_bucket}"
 GCP_GPU_IDLE_MIN="${gcp_gpu_idle_min}"
 GCP_GPU_DEADLINE_MIN="$(h-gcp-gpu-deadline-min)"
+GCP_GPU_RUN_USER="${gcp_gpu_owner}"
 EOF
 
     cat <<'GCP_GPU_STARTUP_EOF'
@@ -848,8 +849,36 @@ fi
 #: both "write your results to /mnt/data/runs" and `gcp-gpu-sync`, which would
 #: then sync nothing at all and report success.
 mkdir -p /mnt/data/runs /mnt/data/venvs
-#: The login user owns it; nothing here should need root.
-for u in $(ls /home 2>/dev/null) ; do chown -R "$u:$u" /mnt/data || true ; done
+
+## /mnt/data ownership ---------------------------------------------------
+#: @warn This was `for u in $(ls /home) ; do chown -R "$u:$u" /mnt/data ; done`,
+#: which hands the disk to whichever name sorts LAST -- and that is not the
+#: login user. `relation-neuron-detection` carries ~22 project-level ssh-keys
+#: entries for the whole lab, and the guest agent makes a home directory for
+#: every one of them, so `yuetianlu` won every boot and the login user lost
+#: /mnt/data (and any batch running out of it) at each resume. Three reboots
+#: went into this during the E2 batch; see LineFine gcp/README.md, "What the
+#: machine got wrong".
+#:
+#: $GCP_GPU_RUN_USER is the same name the rest of this tooling means by "me":
+#: `$gcp_gpu_owner`, from `$USERNAME`, which is also the remote user
+#: `gcloud compute ssh` logs in as when nobody passes `--ssh-key-file` or a
+#: `user@` prefix. So it names the account the ssh session actually lands on
+#: rather than guessing from a directory listing.
+if id -u "$GCP_GPU_RUN_USER" >/dev/null 2>&1 ; then
+    chown -R "$GCP_GPU_RUN_USER:$GCP_GPU_RUN_USER" /mnt/data || true
+else
+    #: The very first boot can precede the guest agent creating the account
+    #: from the ssh-keys metadata -- it does that on first login, not at boot.
+    #: Fall back to the group every ssh user is placed in, setgid so files
+    #: created later stay in it. This is the README's "stop guessing" option;
+    #: the next boot, once the account exists, takes the chown branch.
+    echo "NOTE: ${GCP_GPU_RUN_USER} does not exist yet (no login on this instance);"
+    echo "      leaving /mnt/data group-writable to google-sudoers until it does."
+    chgrp -R google-sudoers /mnt/data 2>/dev/null || true
+    chmod -R g+rwX /mnt/data 2>/dev/null || true
+    find /mnt/data -type d -exec chmod g+s {} + 2>/dev/null || true
+fi
 
 ## nvidia driver ---------------------------------------------------------
 #: @note Normally a no-op now. The claim that G2/A3 "cannot use the Deep
