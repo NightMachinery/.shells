@@ -1002,6 +1002,35 @@ if [ -n "${GCP_GPU_DEADLINE_MIN:-}" ] && [ "${GCP_GPU_DEADLINE_MIN}" -gt 0 ] 2>/
     echo "absolute deadline armed: shutdown in ${GCP_GPU_DEADLINE_MIN} minutes"
 fi
 
+## queue boot hook -------------------------------------------------------
+#: LineFine gcp/run_queue.sh, Part B of docs/gcp_spot_runs.md: a batch of
+#: training arms driven from one JSON file, safe to start again on every boot.
+#: A spot preemption is a stop, so "start it again" is the whole resume
+#: story -- something has to relaunch the queue after the VM comes back, and
+#: this is the only place that cannot drift or be forgotten, because the
+#: startup script is regenerated on every `gcp-gpu-up`. The alternative the
+#: E2 batch used, an @reboot crontab installed from inside the VM, lives on
+#: the boot disk and dies with the instance.
+#:
+#: A no-op unless BOTH the driver and a queue file are there, so an ordinary
+#: interactive session on this image is completely unaffected.
+#:
+#: Last in the script on purpose: the queue needs /mnt/data mounted, owned by
+#: the run user, and tmux installed -- all of which happen above. The
+#: crontab version had to poll for this script to finish; here it is just
+#: statement order.
+if [ -x /mnt/data/LineFine/gcp/run_queue.sh ] && [ -f /mnt/data/queue.json ] ; then
+    if id -u "$GCP_GPU_RUN_USER" >/dev/null 2>&1 ; then
+        echo "queue hook: starting run_queue.sh as ${GCP_GPU_RUN_USER}"
+        #: `|| true` because a `queue` session surviving from this boot is not
+        #: an error, and run_queue.sh holds an flock against a second driver.
+        su - "$GCP_GPU_RUN_USER" -c \
+            'tmux new-session -d -s queue /mnt/data/LineFine/gcp/run_queue.sh' || true
+    else
+        echo "queue hook: ${GCP_GPU_RUN_USER} does not exist yet; not starting the queue."
+    fi
+fi
+
 echo "=== gcp-gpu startup done $(date -Is) ==="
 GCP_GPU_STARTUP_EOF
 }
