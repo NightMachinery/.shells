@@ -68,7 +68,10 @@ function seal() {
     doc Use exor to remove seals.
 
     local n=''
-    ! test -e "$attic" || n=$''
+    #: Only an attic that already holds a record needs a separator in front
+    #: of the next one. `test -e` also fired on an existing-but-empty file,
+    #: writing a leading separator that read back as a phantom empty record.
+    ! test -s "$attic" || n=$''
     print -r -n -- "$n$i"$'\n' >> "$attic"
 }
 
