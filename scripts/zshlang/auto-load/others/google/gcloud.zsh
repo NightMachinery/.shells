@@ -305,6 +305,33 @@ function h-gcp-gpu-day-start {
     ec "$out"
 }
 
+function h-gcp-gpu-epoch-of {
+    #: `h-gcp-gpu-epoch-of RFC3339` -> epoch seconds, honouring the offset.
+    #:
+    #: Every timestamp GCE returns carries one -- `.lastStartTimestamp` looks
+    #: like `2026-09-04T08:40:15.123-07:00`, in the ZONE'''s local time, not
+    #: mine and not UTC. This used to be `strftime -r '''%Y-%m-%dT%H:%M:%S'''
+    #: "${started%.*}"`, which drops the offset with the fractional seconds and
+    #: then reads what is left as LOCAL time. Measured 2026-09-04: an e2-micro
+    #: eight minutes old reported an uptime of 9h 07m, the sum of the two
+    #: offsets it ignored.
+    #:
+    #: Cosmetic in `gcp-gpu-ps`; not cosmetic in `h-gcp-gpu-verdict`, which
+    #: calls anything past `--max-run-duration` plus a grace period an ANOMALY.
+    #: A nine-hour phantom uptime is past the 8h default, so `gcp-gpu-reap
+    #: --kill` would have stopped a healthy box a few minutes into its run.
+    #:
+    #: python3 rather than `strftime` or `date`: zsh'''s strftime has no offset
+    #: directive, and `date -d` is GNU-only. gcloud already requires python3.
+    local ts="${1}"
+    test -n "$ts" || return 1
+
+    command python3 -c '''
+import sys, datetime
+print(int(datetime.datetime.fromisoformat(sys.argv[1]).timestamp()))
+''' "$ts" 2>/dev/null
+}
+
 function h-gcp-gpu-dur-human {
     #: seconds -> `3d 04h 12m`
     integer s="${1:-0}"
@@ -1475,7 +1502,7 @@ function gcp-gpu-status {
 
         if [[ "$vm_state" == RUNNING ]] && test -n "$started" ; then
             local epoch
-            strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
+            epoch="$(h-gcp-gpu-epoch-of "$started")" && test -n "$epoch" \
                 && ec "uptime         $(h-gcp-gpu-dur-human $(( EPOCHSECONDS - epoch )))"
         fi
 
@@ -1556,7 +1583,7 @@ function gcp-gpu-ps {
         test -z "$name" && continue
         up='-'
         if [[ "$vm_state" == RUNNING ]] && test -n "$started" ; then
-            strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
+            epoch="$(h-gcp-gpu-epoch-of "$started")" && test -n "$epoch" \
                 && up="$(h-gcp-gpu-dur-human $(( EPOCHSECONDS - epoch )))"
         fi
         printf '%-18s %-18s %-12s %-16s %-9s %s\n' "$name" "$zone" "$vm_state" "$machine" "$model" "$up"
@@ -1742,7 +1769,7 @@ function gcp-gpu-idle {
 
         uptime_s=0
         if test -n "$started" ; then
-            strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
+            epoch="$(h-gcp-gpu-epoch-of "$started")" && test -n "$epoch" \
                 && uptime_s=$(( EPOCHSECONDS - epoch ))
         fi
 
@@ -1796,7 +1823,7 @@ function gcp-gpu-reap {
 
         uptime_s=0
         if test -n "$started" ; then
-            strftime -r -s epoch '%Y-%m-%dT%H:%M:%S' "${started%.*}" 2>/dev/null \
+            epoch="$(h-gcp-gpu-epoch-of "$started")" && test -n "$epoch" \
                 && uptime_s=$(( EPOCHSECONDS - epoch ))
         fi
 
