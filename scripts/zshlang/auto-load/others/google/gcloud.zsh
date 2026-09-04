@@ -53,6 +53,15 @@ typeset -g gcp_gpu_data_disk_p="${gcp_gpu_data_disk_p:-n}"
 typeset -g gcp_gpu_data_disk="${gcp_gpu_data_disk:-rnd-data}"
 typeset -g gcp_gpu_data_gb="${gcp_gpu_data_gb:-300}"
 typeset -g gcp_gpu_data_type="${gcp_gpu_data_type:-pd-balanced}"
+#: Hyperdisk sells capacity and performance as separate line items, so a create
+#: that passes only `--size` lands on the API *defaults* -- which is how a
+#: 400GB `hyperdisk-balanced` meant to sustain 1 GB/s silently became a slow
+#: disk and made the checkpoint cadence it was costed against a fiction.
+#: MB/s and IOPS respectively; only sent for types that accept them, see
+#: [agfi:h-gcp-gpu-disk-provisioned-flags]. 1000/20000 is what the E2 batch
+#: measured 527+528 MB/s of concurrent `dd` against.
+typeset -g gcp_gpu_data_throughput="${gcp_gpu_data_throughput:-1000}"
+typeset -g gcp_gpu_data_iops="${gcp_gpu_data_iops:-20000}"
 #: Zones to consider when hunting capacity, cheapest obtainable first. Only
 #: zones that actually offer `a3-highgpu-1g` AND that `advice capacity`
 #: accepts; Finland, London, Tokyo, Sydney, Delhi and Toronto are all excluded
@@ -997,6 +1006,39 @@ function h-gcp-gpu-ensure-bucket {
         --role=roles/storage.objectAdmin @RET
 }
 
+function h-gcp-gpu-disk-provisioned-flags {
+    #: `h-gcp-gpu-disk-provisioned-flags TYPE` -> sets the global array
+    #: `$gcp_gpu_disk_provisioned_flags` to the `--provisioned-*` flags TYPE
+    #: actually accepts, from `$gcp_gpu_data_throughput`/`$gcp_gpu_data_iops`.
+    #:
+    #: Per type rather than unconditionally: `hyperdisk-throughput` rejects
+    #: `--provisioned-iops`, `hyperdisk-extreme` rejects
+    #: `--provisioned-throughput`, and every `pd-*` type rejects both -- so a
+    #: blanket pass would break the DEFAULT disk to fix the opt-in one.
+    #:
+    #: @warn hyperdisk-balanced is not attachable to every machine family, and
+    #: a zonal disk pins the instance to one zone -- the lock-in the global
+    #: image exists to avoid. Hence `$gcp_gpu_data_disk_p` stays opt-in.
+    local type="${1:?}"
+    local throughput="${gcp_gpu_data_throughput}" iops="${gcp_gpu_data_iops}"
+
+    typeset -ga gcp_gpu_disk_provisioned_flags=()
+
+    case "$type" in
+        hyperdisk-balanced|hyperdisk-balanced-high-availability|hyperdisk-extreme)
+            if test -n "$iops" ; then
+                gcp_gpu_disk_provisioned_flags+=( "--provisioned-iops=${iops}" )
+            fi ;;
+    esac
+
+    case "$type" in
+        hyperdisk-balanced|hyperdisk-balanced-high-availability|hyperdisk-throughput|hyperdisk-ml)
+            if test -n "$throughput" ; then
+                gcp_gpu_disk_provisioned_flags+=( "--provisioned-throughput=${throughput}" )
+            fi ;;
+    esac
+}
+
 function h-gcp-gpu-ensure-disk {
     #: The single most expensive default in this file used to be here: a disk
     #: created speculatively bills forever, whether or not the VM ever boots
@@ -1013,10 +1055,20 @@ function h-gcp-gpu-ensure-disk {
     monthly="$(h-gcp-gpu-disk-price "${gcp_gpu_data_type}" "${gcp_gpu_data_gb}")"
     ec "creating data disk ${gcp_gpu_data_disk} (${gcp_gpu_data_gb}GB ${gcp_gpu_data_type}, ~EUR ${monthly}/month, billed whether or not the VM runs)"
 
+    h-gcp-gpu-disk-provisioned-flags "${gcp_gpu_data_type}" @RET
+    if (( ${#gcp_gpu_disk_provisioned_flags} )) ; then
+        ec "  performance: ${gcp_gpu_disk_provisioned_flags[*]}"
+        #: Provisioned IOPS and throughput are billed as their own SKUs on top
+        #: of capacity, and `$gcp_gpu_price_disk` prices capacity only. Say so
+        #: rather than quietly under-reporting the standing cost.
+        ecgray "  ~EUR ${monthly}/month is CAPACITY ONLY; provisioned IOPS/throughput bill separately."
+    fi
+
     h-gcp-gpu-reval h-gcp-gpu-gcloud compute disks create "${gcp_gpu_data_disk}" \
         --zone="${gcp_gpu_zone}" \
         --size="${gcp_gpu_data_gb}GB" \
         --type="${gcp_gpu_data_type}" \
+        "${gcp_gpu_disk_provisioned_flags[@]}" \
         --labels="$(h-gcp-gpu-labels)" @RET
 }
 ##
