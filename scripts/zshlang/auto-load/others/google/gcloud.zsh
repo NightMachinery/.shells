@@ -2111,6 +2111,727 @@ function gcp-gpu-babysit {
     ec "$0: hit the ${max}-restart ceiling. Stopping so this cannot run away."
 }
 ##
+#: ===========================================================================
+#: THE CONTROLLER -- Part C of LineFine `docs/gcp_spot_runs.md`.
+#:
+#: `gcp-gpu-babysit` is the right logic in the wrong place: it lives exactly as
+#: long as the shell that runs it, and the laptop sleeps. A spot A3 is
+#: preempted about hourly, so an overnight batch without a resumer waits until
+#: a human types `gcp-gpu-up`. This is that loop moved onto an `e2-micro`
+#: (~EUR 6/month) that is never preempted and never closes its lid.
+#:
+#: It is deliberately the dumbest thing that can work: a systemd timer, a bash
+#: script, and three small objects in the results bucket. No Cloud Function, no
+#: Scheduler, no Pub/Sub -- `gcp-gpu-reaper-deploy` is the version with all of
+#: those and it has been parked since 2026-08-11 because its IAM needs the
+#: project Owner. This needs the Owner too (see `gcp-gpu-controller-iam-cmds`),
+#: but only for one binding, and everything else is inspectable with `cat`.
+#:
+#: THE FOUR GUARDS, in the order the script checks them:
+#:   1. `queue.halted` in the bucket -- two consecutive failures of one run is
+#:      a bug, and restarting the box would burn the budget re-running it.
+#:   2. the queue is finished -- `queue.done`, or every run `done` in
+#:      `queue.json`. Nothing to come back for.
+#:   3. a restart ceiling, and a euro ceiling on what those restarts could
+#:      possibly authorize. Both are per batch and reset when the batch does.
+#:   4. the month-to-date spend check, when the controller SA can see enough
+#:      to make one. It usually cannot -- see `h-gcp-gpu-controller-script`.
+#:
+#: And one refusal that is not a guard but a rule: it re-reads
+#: `labels.owner` on every tick and stops if the instance it is about to start
+#: is not mine. `relation-neuron-detection` is shared with six other people.
+#: ===========================================================================
+typeset -g gcp_gpu_controller_instance="${gcp_gpu_controller_instance:-rnd-controller}"
+#: Same zone as the GPU by default -- not required (the API is global), but it
+#: keeps `gcp-gpu-ps` output readable and the two lifetimes visibly linked.
+typeset -g gcp_gpu_controller_zone="${gcp_gpu_controller_zone:-${gcp_gpu_zone}}"
+typeset -g gcp_gpu_controller_machine="${gcp_gpu_controller_machine:-e2-micro}"
+typeset -g gcp_gpu_controller_boot_gb="${gcp_gpu_controller_boot_gb:-10}"
+typeset -g gcp_gpu_controller_image_family="${gcp_gpu_controller_image_family:-debian-12}"
+typeset -g gcp_gpu_controller_image_project="${gcp_gpu_controller_image_project:-debian-cloud}"
+#: NOT `$gcp_gpu_sa`: the runner SA rides on the GPU box, where an experiment
+#: runs, and giving that token the power to start instances would mean any
+#: code I run on the GPU could start instances. Separate SA, separate blast
+#: radius. And never the default compute SA, which holds roles/editor.
+typeset -g gcp_gpu_controller_sa="${gcp_gpu_controller_sa:-gpu-controller@${gcp_gpu_project}.iam.gserviceaccount.com}"
+typeset -g gcp_gpu_controller_role="${gcp_gpu_controller_role:-gcpGpuController}"
+#: systemd `OnUnitActiveSec`. Two minutes is the design's number: a preemption
+#: costs at most that plus boot before the queue is running again, against a
+#: checkpoint cadence measured in minutes.
+typeset -g gcp_gpu_controller_interval="${gcp_gpu_controller_interval:-2min}"
+#: Per batch, reset when the batch changes. 20 x a 6h max-run is more machine
+#: time than any batch we have run; it exists to bound a restart loop nobody is
+#: awake to see, not to be reached.
+typeset -g gcp_gpu_controller_max_restarts="${gcp_gpu_controller_max_restarts:-20}"
+#: The euro ceiling the controller may AUTHORIZE, which is not the same thing
+#: as spend. Each restart can bill at most `rate x max-run-duration`, so the
+#: script accumulates that upper bound and stops at this number. This is the
+#: guard that still works when the SA cannot see the billing data -- see the
+#: budget section of `h-gcp-gpu-controller-script`.
+typeset -g gcp_gpu_controller_max_eur="${gcp_gpu_controller_max_eur:-400}"
+#: Where the controller keeps its state, and where `run_queue.sh` publishes the
+#: queue. Both under the results bucket, so there is exactly one durable tier.
+typeset -g gcp_gpu_controller_prefix="${gcp_gpu_controller_prefix:-controller}"
+typeset -g gcp_gpu_controller_queue_prefix="${gcp_gpu_controller_queue_prefix:-runs}"
+
+function h-gcp-gpu-controller-env {
+    #: The controller's whole configuration, as an env file. Written to
+    #: /etc/gcp-gpu-controller.env on the VM and regenerated on every deploy,
+    #: so the box never drifts from this file. Also what makes the script
+    #: testable off the VM: point `$GCP_GPU_CONTROLLER_ENV` at another copy.
+    local rate max_run_min cap
+    rate="$(h-gcp-gpu-price "${gcp_gpu_machine}" SPOT)"
+    max_run_min="$(h-gcp-gpu-max-run-min)" @RET
+    cap="$(h-gcp-gpu-budget-cap)"
+
+    cat <<EOF
+GCP_GPU_PROJECT=${gcp_gpu_project}
+GCP_GPU_OWNER=${gcp_gpu_owner}
+GCP_GPU_INSTANCE=${gcp_gpu_instance}
+GCP_GPU_ZONE=${gcp_gpu_zone}
+GCP_GPU_BUCKET=${gcp_gpu_bucket}
+GCP_GPU_QUEUE_PREFIX=${gcp_gpu_controller_queue_prefix}
+GCP_GPU_STATE_PREFIX=${gcp_gpu_controller_prefix}
+GCP_GPU_MAX_RESTARTS=${gcp_gpu_controller_max_restarts}
+GCP_GPU_MAX_EUR=${gcp_gpu_controller_max_eur}
+GCP_GPU_BUDGET_EUR=${cap}
+GCP_GPU_RATE_EUR_H=${rate}
+GCP_GPU_MAX_RUN_MIN=${max_run_min}
+EOF
+}
+
+function h-gcp-gpu-controller-script {
+    #: The thing the timer runs. One decision per tick, four guards, one line
+    #: of log when the decision changes.
+    cat <<'GCP_GPU_CONTROLLER_EOF'
+#!/bin/bash
+#: Restart the GPU instance after a spot preemption, from somewhere that is
+#: not a laptop. Part C of LineFine docs/gcp_spot_runs.md; deployed by
+#: `gcp-gpu-controller-deploy` in ~/scripts/zshlang/auto-load/others/google/gcloud.zsh.
+#:
+#: Reads three things and writes three things, all in the results bucket:
+#:   read   <bucket>/runs/queue.json      what run_queue.sh is doing
+#:          <bucket>/runs/queue.halted    a crash loop; stop
+#:          <bucket>/runs/queue.done      the batch finished
+#:   write  <bucket>/controller/state.json    restarts and euros authorized
+#:          <bucket>/controller/controller.log  one line per CHANGE of decision
+#:          <bucket>/controller/heartbeat     one line, overwritten every tick
+#:
+#: The log records transitions rather than ticks on purpose: at one tick every
+#: two minutes, logging "nothing to do" 720 times a day would bury the one line
+#: that matters. `heartbeat` is how you tell "idle" from "dead".
+#:
+#: usage: gcp-gpu-controller [--dry-run] [--verbose]
+set -uo pipefail
+
+ENV_FILE="${GCP_GPU_CONTROLLER_ENV:-/etc/gcp-gpu-controller.env}"
+if [ -r "$ENV_FILE" ] ; then
+    #: shellcheck disable=SC1090
+    . "$ENV_FILE"
+fi
+
+DRY=n
+VERBOSE=n
+while [ $# -gt 0 ] ; do
+    case "$1" in
+        --dry-run) DRY=y ; shift ;;
+        --verbose) VERBOSE=y ; shift ;;
+        -h|--help) sed -n '2,25p' "$0" ; exit 0 ;;
+        *) echo "$0: unknown argument: $1" >&2 ; exit 2 ;;
+    esac
+done
+
+: "${GCP_GPU_PROJECT:?GCP_GPU_PROJECT is required}"
+: "${GCP_GPU_INSTANCE:?GCP_GPU_INSTANCE is required}"
+: "${GCP_GPU_ZONE:?GCP_GPU_ZONE is required}"
+: "${GCP_GPU_BUCKET:?GCP_GPU_BUCKET is required}"
+: "${GCP_GPU_OWNER:=evar}"
+: "${GCP_GPU_QUEUE_PREFIX:=runs}"
+: "${GCP_GPU_STATE_PREFIX:=controller}"
+: "${GCP_GPU_MAX_RESTARTS:=20}"
+: "${GCP_GPU_MAX_EUR:=400}"
+: "${GCP_GPU_BUDGET_EUR:=5000}"
+: "${GCP_GPU_RATE_EUR_H:=0}"
+: "${GCP_GPU_MAX_RUN_MIN:=480}"
+: "${GCP_GPU_LOG_LINES:=2000}"
+
+Q="${GCP_GPU_BUCKET}/${GCP_GPU_QUEUE_PREFIX}"
+S="${GCP_GPU_BUCKET}/${GCP_GPU_STATE_PREFIX}"
+STATE_OBJ="${S}/state.json"
+LOG_OBJ="${S}/controller.log"
+BEAT_OBJ="${S}/heartbeat"
+
+now() { date -uIseconds ; }
+gc() { gcloud --project="$GCP_GPU_PROJECT" --quiet "$@" ; }
+gs_exists() { gcloud storage ls "$1" >/dev/null 2>&1 ; }
+note() { [ "$VERBOSE" = y ] && echo "$(now) [controller] $*" >&2 ; return 0 ; }
+
+TMPD="$(mktemp -d)"
+trap 'rm -rf "$TMPD"' EXIT
+
+## ------------------------------------------------------------- state ------
+#: One JSON object. `batch_key` is what makes the ceilings per batch: it is a
+#: digest of the repo commit and the run tags, so a NEW batch resets the
+#: counters, while a resumed one keeps counting. Without it, a ceiling reached
+#: last week would silently refuse to start this week's work.
+state_get() {
+    gcloud storage cat "$STATE_OBJ" 2>/dev/null \
+        | python3 -c '
+import json,sys
+d = {}
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    d = {}
+if not isinstance(d, dict):
+    d = {}
+print(d.get("batch_key",""))
+print(int(d.get("restarts",0) or 0))
+print(float(d.get("authorized_eur",0) or 0))
+print((d.get("last_decision","") or "").replace("\n"," "))
+' 2>/dev/null
+}
+
+state_put() {
+    #: state_put BATCH_KEY RESTARTS AUTHORIZED_EUR DECISION
+    [ "$DRY" = y ] && { note "DRY: state <- $*" ; return 0 ; }
+    python3 -c '
+import json,sys,datetime
+print(json.dumps({
+    "batch_key": sys.argv[1],
+    "restarts": int(sys.argv[2]),
+    "authorized_eur": round(float(sys.argv[3]), 4),
+    "last_decision": sys.argv[4],
+    "updated_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+}, indent=2))
+' "$1" "$2" "$3" "$4" > "$TMPD/state.json" \
+        && gcloud storage cp "$TMPD/state.json" "$STATE_OBJ" >/dev/null 2>&1 \
+        || echo "WARN: cannot write $STATE_OBJ" >&2
+}
+
+log_append() {
+    #: One line, appended. GCS has no append, so this is read-modify-write --
+    #: safe because there is exactly one controller and systemd will not start
+    #: a second run of a oneshot service while the first is going.
+    local line="$1"
+    logger -t gcp-gpu-controller -- "$line" 2>/dev/null || true
+    echo "$(now) $line"
+    [ "$DRY" = y ] && return 0
+    gcloud storage cat "$LOG_OBJ" > "$TMPD/log" 2>/dev/null || : > "$TMPD/log"
+    printf '%s %s\n' "$(now)" "$line" >> "$TMPD/log"
+    tail -n "$GCP_GPU_LOG_LINES" "$TMPD/log" > "$TMPD/log.trim" 2>/dev/null \
+        && mv "$TMPD/log.trim" "$TMPD/log"
+    gcloud storage cp "$TMPD/log" "$LOG_OBJ" >/dev/null 2>&1 \
+        || echo "WARN: cannot write $LOG_OBJ" >&2
+}
+
+heartbeat() {
+    [ "$DRY" = y ] && return 0
+    printf '%s %s\n' "$(now)" "$1" > "$TMPD/beat"
+    gcloud storage cp "$TMPD/beat" "$BEAT_OBJ" >/dev/null 2>&1 || true
+}
+
+BATCH_KEY=''
+RESTARTS=0
+AUTHORIZED=0
+LAST_DECISION=''
+{ read -r BATCH_KEY ; read -r RESTARTS ; read -r AUTHORIZED ; read -r LAST_DECISION ; } < <(state_get) || true
+: "${RESTARTS:=0}" ; : "${AUTHORIZED:=0}"
+
+NEW_BATCH_KEY="$BATCH_KEY"
+
+finish() {
+    #: finish DECISION [acted]
+    #: Writes the log line only when the decision CHANGED or something was
+    #: done, so a quiet week is one line rather than five thousand.
+    local decision="$1" acted="${2:-n}"
+    heartbeat "$decision"
+    if [ "$acted" = y ] || [ "$decision" != "$LAST_DECISION" ] ; then
+        log_append "$decision"
+        state_put "$NEW_BATCH_KEY" "$RESTARTS" "$AUTHORIZED" "$decision"
+    fi
+    exit 0
+}
+
+## --------------------------------------------------------- guard 1: halt --
+if gs_exists "$Q/queue.halted" ; then
+    finish "nothing to do: queue.halted is present -- a run failed twice; fix it and remove it"
+fi
+
+## -------------------------------------------------------- guard 2: queue --
+if ! gcloud storage cat "$Q/queue.json" > "$TMPD/queue.json" 2>/dev/null ; then
+    finish "nothing to do: no $Q/queue.json -- no batch is running"
+fi
+
+read -r Q_N Q_PENDING Q_HALTED NEW_BATCH_KEY < <(python3 -c '
+import hashlib, json, sys
+q = json.load(open(sys.argv[1]))
+runs = q.get("runs") or []
+maxf = int(q.get("max_fails", 2) or 2)
+pending = sum(1 for r in runs if r.get("status") != "done")
+halted = any(r.get("status") == "failed" and int(r.get("fails", 0) or 0) >= maxf
+             for r in runs)
+#: The identity of the BATCH, not of the file: statuses change on every
+#: transition, the commit and the run list do not.
+key = hashlib.sha256(
+    ("\x00".join([str(q.get("repo_commit", ""))]
+                 + [str(r.get("tag", "")) for r in runs])).encode()
+).hexdigest()[:16]
+print(len(runs), pending, "y" if halted else "n", key)
+' "$TMPD/queue.json" 2>/dev/null) || finish "nothing to do: $Q/queue.json is not readable JSON"
+
+if [ "$NEW_BATCH_KEY" != "$BATCH_KEY" ] ; then
+    note "new batch $NEW_BATCH_KEY (was ${BATCH_KEY:-none}); resetting the ceilings"
+    RESTARTS=0
+    AUTHORIZED=0
+    LAST_DECISION=''
+fi
+
+if [ "$Q_HALTED" = y ] ; then
+    finish "nothing to do: queue.json shows a run at its failure ceiling"
+fi
+if [ "$Q_PENDING" -eq 0 ] ; then
+    finish "nothing to do: all $Q_N runs are done"
+fi
+if gs_exists "$Q/queue.done" ; then
+    finish "nothing to do: queue.done is present"
+fi
+
+## ----------------------------------------------------- guard 3: instance --
+if ! gc compute instances describe "$GCP_GPU_INSTANCE" --zone="$GCP_GPU_ZONE" \
+        --format=json > "$TMPD/vm.json" 2>"$TMPD/vm.err" ; then
+    finish "cannot read $GCP_GPU_INSTANCE in $GCP_GPU_ZONE: $(tr '\n' ' ' < "$TMPD/vm.err" | cut -c1-200)"
+fi
+
+read -r VM_STATE VM_OWNER < <(python3 -c '
+import json,sys
+d = json.load(open(sys.argv[1]))
+print(d.get("status","UNKNOWN"), (d.get("labels") or {}).get("owner","<unlabelled>"))
+' "$TMPD/vm.json")
+
+#: Re-checked every tick, not trusted from deploy time: labels are mutable and
+#: this project is shared with six other editors. If the name I was pointed at
+#: is no longer mine, I do not touch it.
+if [ "$VM_OWNER" != "$GCP_GPU_OWNER" ] ; then
+    finish "REFUSING: $GCP_GPU_INSTANCE is labelled owner=$VM_OWNER, not $GCP_GPU_OWNER"
+fi
+
+if [ "$VM_STATE" != TERMINATED ] ; then
+    finish "nothing to do: $GCP_GPU_INSTANCE is $VM_STATE ($Q_PENDING of $Q_N runs pending)"
+fi
+
+## ----------------------------------------------------- guard 4: ceilings --
+if [ "$RESTARTS" -ge "$GCP_GPU_MAX_RESTARTS" ]; then
+    finish "CEILING: $RESTARTS restarts for this batch, ceiling $GCP_GPU_MAX_RESTARTS -- not starting $GCP_GPU_INSTANCE again"
+fi
+
+#: What one more restart could bill, at worst: the whole max-run window at the
+#: spot rate. Not a spend measurement -- an upper bound on what this script is
+#: allowed to authorize, which is the guard that survives having no billing
+#: access at all.
+WOULD_AUTHORIZE="$(python3 -c '
+import sys
+print(round(float(sys.argv[1]) + float(sys.argv[2]) * float(sys.argv[3]) / 60.0, 4))
+' "$AUTHORIZED" "$GCP_GPU_RATE_EUR_H" "$GCP_GPU_MAX_RUN_MIN")"
+
+if python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) > float(sys.argv[2]) else 1)' \
+        "$WOULD_AUTHORIZE" "$GCP_GPU_MAX_EUR" ; then
+    finish "CEILING: one more restart would authorize EUR $WOULD_AUTHORIZE for this batch, ceiling EUR $GCP_GPU_MAX_EUR"
+fi
+
+## ------------------------------------------------- guard 5: month-to-date --
+#: The same question `gcp-gpu-up` asks through h-gcp-gpu-budget-ok-p: is
+#: month-to-date spend under the cap? It answers it from the BigQuery billing
+#: export, and failing that by reconstructing running intervals from the Admin
+#: Activity audit log and multiplying by the price table.
+#:
+#: This SA has neither. The export was never enabled into
+#: relation-neuron-detection:cloud_billing, and reading the audit log needs
+#: roles/logging.viewer, which is a PROJECT-level grant we cannot make -- the
+#: same wall that parked gcp-gpu-reaper-deploy. So this is best-effort: if the
+#: read works the answer is used, and if it does not, the two ceilings above
+#: are the budget guard. They are deliberately the conservative kind: they
+#: bound what CAN be spent rather than observing what HAS been, so they cannot
+#: be wrong in the expensive direction.
+budget_verdict() {
+    local since spent
+    since="$(date -u +%Y-%m-01T00:00:00Z)"
+    if ! gc logging read \
+            "logName:\"cloudaudit.googleapis.com%2Factivity\" AND resource.type=\"gce_instance\" AND protoPayload.resourceName:\"/instances/${GCP_GPU_INSTANCE}\" AND timestamp>=\"${since}\"" \
+            --limit=1000 --format=json > "$TMPD/audit.json" 2>/dev/null ; then
+        echo "unavailable"
+        return 0
+    fi
+    spent="$(python3 -c '
+import json, sys, datetime
+ev = json.load(open(sys.argv[1]))
+rate = float(sys.argv[2])
+now = datetime.datetime.now(datetime.timezone.utc)
+pts = []
+for e in ev:
+    t = e.get("timestamp","")
+    m = (e.get("protoPayload") or {}).get("methodName","").split(".")[-1]
+    if not t or not m:
+        continue
+    try:
+        ts = datetime.datetime.fromisoformat(t.replace("Z","+00:00"))
+    except ValueError:
+        continue
+    pts.append((ts, m))
+pts.sort()
+run = None ; total = 0.0
+for ts, m in pts:
+    if m in ("insert", "start"):
+        if run is None: run = ts
+    elif m in ("stop", "delete", "preempted", "guestTerminate"):
+        if run is not None:
+            total += (ts - run).total_seconds() ; run = None
+if run is not None:
+    total += (now - run).total_seconds()
+print(round(rate * total / 3600.0, 2))
+' "$TMPD/audit.json" "$GCP_GPU_RATE_EUR_H" 2>/dev/null)"
+    [ -n "$spent" ] || { echo "unavailable" ; return 0 ; }
+    echo "$spent"
+}
+
+BUDGET="$(budget_verdict)"
+if [ "$BUDGET" != unavailable ] ; then
+    if python3 -c 'import sys; sys.exit(0 if float(sys.argv[1]) >= float(sys.argv[2]) else 1)' \
+            "$BUDGET" "$GCP_GPU_BUDGET_EUR" ; then
+        finish "REFUSING: month-to-date EUR $BUDGET is at or over the cap of EUR $GCP_GPU_BUDGET_EUR"
+    fi
+    note "month-to-date EUR $BUDGET of EUR $GCP_GPU_BUDGET_EUR"
+else
+    note "month-to-date unavailable to this SA; relying on the restart and euro ceilings"
+fi
+
+## ------------------------------------------------------------- the action --
+if [ "$DRY" = y ] ; then
+    finish "DRY-RUN: would start $GCP_GPU_INSTANCE (restart $((RESTARTS + 1)) of $GCP_GPU_MAX_RESTARTS, budget=$BUDGET)" y
+fi
+
+if gc compute instances start "$GCP_GPU_INSTANCE" --zone="$GCP_GPU_ZONE" \
+        > "$TMPD/start.out" 2>&1 ; then
+    RESTARTS=$((RESTARTS + 1))
+    AUTHORIZED="$WOULD_AUTHORIZE"
+    finish "STARTED $GCP_GPU_INSTANCE: restart $RESTARTS of $GCP_GPU_MAX_RESTARTS, EUR $AUTHORIZED authorized of $GCP_GPU_MAX_EUR, $Q_PENDING of $Q_N runs pending, budget=$BUDGET" y
+else
+    finish "FAILED to start $GCP_GPU_INSTANCE: $(tr '\n' ' ' < "$TMPD/start.out" | cut -c1-200)" y
+fi
+GCP_GPU_CONTROLLER_EOF
+}
+
+function h-gcp-gpu-controller-startup-script {
+    #: Runs as root on every boot of the controller VM. Regenerated on every
+    #: deploy, so the box cannot drift from this file.
+    cat <<'EOF'
+#!/bin/bash
+set -uo pipefail
+exec > >(tee -a /var/log/gcp-gpu-controller-startup.log) 2>&1
+echo "=== gcp-gpu-controller startup $(date -Is) ==="
+
+#: The Debian GCE images ship the CLI, but say so out loud rather than
+#: discovering it is missing at 03:00 with nothing awake to read the error.
+if ! command -v gcloud >/dev/null 2>&1 ; then
+    echo "installing google-cloud-cli"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y && apt-get install -y google-cloud-cli
+fi
+command -v python3 >/dev/null 2>&1 || apt-get install -y python3
+EOF
+
+    ec 'cat > /etc/gcp-gpu-controller.env <<'\''GCP_GPU_ENV_EOF'\'''
+    h-gcp-gpu-controller-env @RET
+    ec 'GCP_GPU_ENV_EOF'
+    ec 'chmod 0644 /etc/gcp-gpu-controller.env'
+    ec ''
+    ec 'cat > /usr/local/bin/gcp-gpu-controller <<'\''GCP_GPU_CTRL_EOF'\'''
+    h-gcp-gpu-controller-script @RET
+    ec 'GCP_GPU_CTRL_EOF'
+    ec 'chmod +x /usr/local/bin/gcp-gpu-controller'
+
+    cat <<EOF
+
+cat > /etc/systemd/system/gcp-gpu-controller.service <<'SVC_EOF'
+[Unit]
+Description=Restart the GPU instance after a spot preemption
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gcp-gpu-controller
+SVC_EOF
+
+cat > /etc/systemd/system/gcp-gpu-controller.timer <<'TMR_EOF'
+[Unit]
+Description=Run the GPU controller every ${gcp_gpu_controller_interval}
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=${gcp_gpu_controller_interval}
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+TMR_EOF
+
+systemctl daemon-reload
+systemctl enable --now gcp-gpu-controller.timer
+echo "=== gcp-gpu-controller startup done \$(date -Is) ==="
+EOF
+}
+
+function gcp-gpu-controller-iam-cmds {
+    #: Prints the setup this needs and that nothing here will perform, for the
+    #: same reason as `gcp-gpu-reaper-iam-cmds`: minting a role and binding it
+    #: on a SHARED lab project is exactly the change six other editors would
+    #: not expect, and we could not do it anyway -- `roles/editor` holds
+    #: neither `iam.roles.create` nor `resourcemanager.projects.setIamPolicy`.
+    #: Verified against the live policy on 2026-09-04.
+    ##
+    ec "# The project Owner is user:schuetzelab@gmail.com; the seven of us hold"
+    ec "# roles/editor, which cannot create a role or bind one. Steps 1 and 2 are"
+    ec "# therefore a request, not a command you can run. Step 3 you CAN run."
+    ec ""
+    ec "# 1. A custom role with exactly the three permissions the controller needs."
+    ec "#    Deliberately NOT roles/compute.instanceAdmin.v1, which would let a"
+    ec "#    box in a shared project create and delete anyone's instances."
+    ec "gcloud iam roles create ${gcp_gpu_controller_role} --project=${gcp_gpu_project} \\"
+    ec "  --title='GCP GPU controller' \\"
+    ec "  --description='Start a preempted GPU instance; used by ${gcp_gpu_controller_instance}' \\"
+    ec "  --permissions=compute.instances.get,compute.instances.list,compute.instances.start"
+    ec ""
+    ec "# 2. Bind it to the controller SA -- and to nothing else."
+    ec "#    Needs resourcemanager.projects.setIamPolicy: Owner only."
+    ec "gcloud projects add-iam-policy-binding ${gcp_gpu_project} \\"
+    ec "  --member=serviceAccount:${gcp_gpu_controller_sa} \\"
+    ec "  --role=projects/${gcp_gpu_project}/roles/${gcp_gpu_controller_role}"
+    ec ""
+    ec "# 3. The bucket, for the queue state and the controller's own log."
+    ec "#    Bucket-scoped, and projectEditor already holds legacyBucketOwner"
+    ec "#    there, so this one we can do -- 'gcp-gpu-controller-deploy' does."
+    ec "gcloud storage buckets add-iam-policy-binding ${gcp_gpu_bucket} \\"
+    ec "  --project=${gcp_gpu_project} \\"
+    ec "  --member=serviceAccount:${gcp_gpu_controller_sa} \\"
+    ec "  --role=roles/storage.objectAdmin"
+    ec ""
+    ec "# WHY THE ROLE IS STILL BROADER THAN THE BEHAVIOUR: a project-scoped"
+    ec "# binding lets the SA start ANY instance in ${gcp_gpu_project}. GCE has"
+    ec "# no per-instance grant for start (compute.instances.setIamPolicy is not"
+    ec "# in roles/editor either, and instance-level policies do not carry it),"
+    ec "# so the code closes the gap instead: every tick re-reads labels.owner"
+    ec "# on ${gcp_gpu_instance} and refuses if it is not ${gcp_gpu_owner}."
+    ec ""
+    ec "# To revoke everything later:"
+    ec "gcloud projects remove-iam-policy-binding ${gcp_gpu_project} \\"
+    ec "  --member=serviceAccount:${gcp_gpu_controller_sa} \\"
+    ec "  --role=projects/${gcp_gpu_project}/roles/${gcp_gpu_controller_role}"
+    ec "gcloud iam service-accounts delete ${gcp_gpu_controller_sa} --project=${gcp_gpu_project}"
+}
+
+function h-gcp-gpu-controller-sa-bound-p {
+    #: Does the controller SA hold anything at all in the project policy? A
+    #: proxy for step 2 above: we cannot test another principal's permissions
+    #: without impersonating it, and we cannot impersonate it either.
+    h-gcp-gpu-gcloud projects get-iam-policy "${gcp_gpu_project}" --format=json 2>/dev/null \
+        | command jq -e --arg sa "serviceAccount:${gcp_gpu_controller_sa}" \
+            '[.bindings[]? | select(.members[]? == $sa)] | length > 0' >/dev/null
+}
+
+function h-gcp-gpu-controller-exists-p {
+    h-gcp-gpu-gcloud compute instances describe "${gcp_gpu_controller_instance}" \
+        --zone="${gcp_gpu_controller_zone}" &>/dev/null
+}
+
+function h-gcp-gpu-controller-ensure-sa {
+    if h-gcp-gpu-gcloud iam service-accounts describe "${gcp_gpu_controller_sa}" &>/dev/null ; then
+        return 0
+    fi
+
+    ec "creating service account ${gcp_gpu_controller_sa}"
+    h-gcp-gpu-reval h-gcp-gpu-gcloud iam service-accounts create \
+        "${${gcp_gpu_controller_sa%%@*}}" \
+        --display-name="GPU spot controller (${gcp_gpu_owner})" \
+        --description="Restarts ${gcp_gpu_instance} after a preemption" @RET
+}
+
+function gcp-gpu-controller-deploy {
+    : "usage: gcp-gpu-controller-deploy [--dry-run]"
+    #: Idempotent: re-running it re-pushes the script, the env file and the
+    #: unit, which is how you change a ceiling or an interval. The instance is
+    #: created once and reset afterwards so the new startup script runs.
+    h-gcp-gpu-deps @RET
+
+    local gcp_gpu_dry_run="${gcp_gpu_dry_run}"
+    local force_p="${gcp_gpu_controller_force_p:-n}"
+    if [[ "${1}" == --dry-run ]] ; then
+        gcp_gpu_dry_run=y
+        shift
+    fi
+
+    h-gcp-gpu-controller-ensure-sa @RET
+
+    #: Bucket-scoped and ours to grant, unlike the compute role. Same call
+    #: `h-gcp-gpu-ensure-bucket` already makes for the runner SA.
+    ec "granting ${gcp_gpu_controller_sa} objectAdmin on ${gcp_gpu_bucket}"
+    h-gcp-gpu-reval command gcloud storage buckets add-iam-policy-binding "${gcp_gpu_bucket}" \
+        --project="${gcp_gpu_project}" \
+        --member="serviceAccount:${gcp_gpu_controller_sa}" \
+        --role=roles/storage.objectAdmin @STRUE
+
+    if ! h-gcp-gpu-controller-sa-bound-p && ! bool "$force_p" ; then
+        ecerr "$0: ${gcp_gpu_controller_sa} holds nothing in ${gcp_gpu_project}."
+        ecerr "Without a compute role it can read the queue and write its log, but it"
+        ecerr "CANNOT start ${gcp_gpu_instance} -- which is the entire point. Ask the"
+        ecerr "project Owner for this, then re-run:"
+        ecerr ""
+        gcp-gpu-controller-iam-cmds >&2
+        ecerr ""
+        ecerr "To deploy anyway (plumbing test; every tick will log a permission error):"
+        ecerr "    gcp_gpu_controller_force_p=y $0"
+        return 1
+    fi
+
+    local startup
+    startup="$(mktemp)" @RET
+    h-gcp-gpu-controller-startup-script > "$startup" @RET
+
+    if h-gcp-gpu-controller-exists-p ; then
+        ec "${gcp_gpu_controller_instance} exists; updating its startup script and rebooting it"
+        h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances add-metadata \
+            "${gcp_gpu_controller_instance}" --zone="${gcp_gpu_controller_zone}" \
+            --metadata-from-file="startup-script=${startup}"
+        local ret=$?
+        if (( ret == 0 )) ; then
+            h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances reset \
+                "${gcp_gpu_controller_instance}" --zone="${gcp_gpu_controller_zone}"
+            ret=$?
+        fi
+        command rm -f -- "$startup"
+        (( ret )) && return $ret
+    else
+        ec "creating ${gcp_gpu_controller_instance}: ${gcp_gpu_controller_machine}, ${gcp_gpu_controller_zone}, ~EUR 6/month"
+
+        local -a opts
+        opts=(
+            compute instances create "${gcp_gpu_controller_instance}"
+            --zone="${gcp_gpu_controller_zone}"
+            --machine-type="${gcp_gpu_controller_machine}"
+            --image-family="${gcp_gpu_controller_image_family}"
+            --image-project="${gcp_gpu_controller_image_project}"
+            --boot-disk-size="${gcp_gpu_controller_boot_gb}GB"
+            --boot-disk-type=pd-balanced
+            --service-account="${gcp_gpu_controller_sa}"
+            #: Scopes cap the token independently of IAM. Even if someone later
+            #: points `$gcp_gpu_controller_sa` at a broader account, this box
+            #: can only ever reach Compute and Storage.
+            --scopes=https://www.googleapis.com/auth/compute,https://www.googleapis.com/auth/devstorage.read_write
+            --labels="$(h-gcp-gpu-labels-controller)"
+            --metadata-from-file="startup-script=${startup}"
+        )
+
+        h-gcp-gpu-reval h-gcp-gpu-gcloud "${opts[@]}"
+        local ret=$?
+        command rm -f -- "$startup"
+        (( ret )) && return $ret
+    fi
+
+    ec ""
+    ec "deployed. It ticks every ${gcp_gpu_controller_interval}; first tick ~1 minute after boot."
+    ec "  what it is doing:  gcp-gpu-controller-status"
+    ec "  ceilings:          ${gcp_gpu_controller_max_restarts} restarts, EUR ${gcp_gpu_controller_max_eur} authorized, per batch"
+    ec "  it stops itself on queue.halted, queue.done, or a queue with nothing pending."
+    ec "@warn this is an ordinary VM and nothing here deletes it: gcp-gpu-controller-destroy."
+}
+
+function h-gcp-gpu-labels-controller {
+    ec "owner=${gcp_gpu_owner},budget=personal,purpose=gpu-controller"
+}
+
+function gcp-gpu-controller-status {
+    : "usage: gcp-gpu-controller-status [LOG_LINES]"
+    h-gcp-gpu-deps @RET
+    integer lines="${1:-15}"
+
+    local prefix="${gcp_gpu_bucket}/${gcp_gpu_controller_prefix}"
+
+    ec "controller     ${gcp_gpu_controller_instance}  (${gcp_gpu_controller_zone}, ${gcp_gpu_controller_machine})"
+
+    local json
+    json="$(h-gcp-gpu-gcloud compute instances describe "${gcp_gpu_controller_instance}" \
+        --zone="${gcp_gpu_controller_zone}" --format=json 2>/dev/null)"
+    if test -z "$json" ; then
+        ec "state          ABSENT -- gcp-gpu-controller-deploy"
+    else
+        ec "state          $(ec "$json" | command jq -r '.status')"
+    fi
+
+    ec "sa             ${gcp_gpu_controller_sa}"
+    if h-gcp-gpu-controller-sa-bound-p ; then
+        ec "sa role        bound in ${gcp_gpu_project}"
+    else
+        ec "sa role        NOT BOUND -- it cannot start anything; gcp-gpu-controller-iam-cmds"
+    fi
+
+    local beat
+    beat="$(command gcloud storage cat "${prefix}/heartbeat" 2>/dev/null)"
+    if test -n "$beat" ; then
+        local ts age
+        ts="${beat%% *}"
+        strftime -r -s age '%Y-%m-%dT%H:%M:%S' "${ts%%+*}" 2>/dev/null \
+            && ec "last tick      $(( EPOCHSECONDS - age ))s ago  (UTC clock)"
+        ec "last decision  ${beat#* }"
+    else
+        ec "last tick      none -- no ${prefix}/heartbeat yet"
+    fi
+
+    local state
+    state="$(command gcloud storage cat "${prefix}/state.json" 2>/dev/null)"
+    if test -n "$state" ; then
+        ec "restarts       $(ec "$state" | command jq -r '.restarts') of ${gcp_gpu_controller_max_restarts}  (batch $(ec "$state" | command jq -r '.batch_key'))"
+        ec "authorized     EUR $(ec "$state" | command jq -r '.authorized_eur') of ${gcp_gpu_controller_max_eur}"
+    fi
+
+    ec ""
+    ec "log (last ${lines}), ${prefix}/controller.log:"
+    command gcloud storage cat "${prefix}/controller.log" 2>/dev/null \
+        | command tail -n "$lines" | command sed 's/^/  /' \
+        || ec "  (none yet)"
+}
+
+function gcp-gpu-controller-logs {
+    h-gcp-gpu-deps @RET
+    command gcloud storage cat "${gcp_gpu_bucket}/${gcp_gpu_controller_prefix}/controller.log" 2>/dev/null \
+        | command tail -n "${1:-50}"
+}
+
+function gcp-gpu-controller-destroy {
+    h-gcp-gpu-deps @RET
+
+    if ! h-gcp-gpu-controller-exists-p ; then
+        ec "${gcp_gpu_controller_instance} does not exist in ${gcp_gpu_controller_zone}. Nothing to delete."
+    else
+        ask "Delete ${gcp_gpu_controller_instance} (${gcp_gpu_controller_zone})?" n || {
+            ec "aborted."
+            return 1
+        }
+        h-gcp-gpu-reval h-gcp-gpu-gcloud compute instances delete \
+            "${gcp_gpu_controller_instance}" --zone="${gcp_gpu_controller_zone}" --quiet @RET
+        ec "deleted ${gcp_gpu_controller_instance}; its boot disk goes with it."
+    fi
+
+    ec ""
+    ec "Left alone on purpose:"
+    ec "  ${gcp_gpu_bucket}/${gcp_gpu_controller_prefix}/  -- the log and the restart counts, which are the post-mortem"
+    ec "  ${gcp_gpu_controller_sa}  -- and its IAM, which is yours to revoke:"
+    ec ""
+    ec "gcloud projects remove-iam-policy-binding ${gcp_gpu_project} \\"
+    ec "  --member=serviceAccount:${gcp_gpu_controller_sa} \\"
+    ec "  --role=projects/${gcp_gpu_project}/roles/${gcp_gpu_controller_role}"
+}
+##
+##
 #: `ggu` (`git pull --rebase`) and `gga` (`git gui citool --amend`) already
 #: exist in git/git.zsh, which loads before this file. Defining them here would
 #: silently clobber them, so `gcp-gpu-up` and `gcp-gpu-attach` get no alias.
