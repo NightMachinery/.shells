@@ -575,3 +575,182 @@ function claude-session-selftest {
     } always { popf }
 }
 ##
+function h-claude-code-session-live-pairs {
+    #: `<kitty-window-id> <TAB> <transcript path>` for every Claude Code session
+    #: currently live in a kitty window, one per line.
+    #:
+    #: The registry is the same one [agfi:claude-code-view-session-focused]
+    #: reads; this just asks for all of its live entries instead of the focused
+    #: one. Because the key carries kitty's pid, a previous kitty's entries can
+    #: never be mistaken for live windows -- there are stale ones lying about.
+    ##
+    ensure-cmd kitty jq @RET
+
+    local sock
+    sock="$(h-claude-code-session-kitty-socket)" @RET
+
+    #: `unix:/Users/evar/tmp/.kitty-548` -> `548`; greedy, so dashes in the path
+    #: do not matter. Same derivation as [agfi:h-claude-code-session-key-of-pid].
+    local kpid="${sock##*-}"
+
+    local ls_json
+    ls_json="$(kitty @ --to "${sock}" ls)" @RET
+
+    local dir
+    dir="$(h-claude-code-session-registry-dir)" @RET
+
+    local -a ids
+    ids=("${(@f)$(ec "${ls_json}" | jq -r '.[].tabs[].windows[].id')}") @TRET
+
+    local id key entry transcript
+    for id in "${ids[@]}" ; do
+        test -n "${id}" || continue
+
+        key="$(h-claude-code-session-registry-key "${kpid}" "${id}")" || continue
+        entry="${dir}/${key}"
+        test -e "${entry}" || continue
+
+        transcript="$(<"${entry}")"
+        #: `SessionStart` registers the path before Claude Code creates the
+        #: file, so an entry can point at nothing yet. Such a session is not a
+        #: target until there is something to show for it.
+        test -n "${transcript}" && test -e "${transcript}" || continue
+
+        printf '%s\t%s\n' "${id}" "${transcript}"
+    done
+}
+
+function h-claude-code-session-live-rows {
+    #: The rows [agfi:claude-code-session-live-fz] offers, tab separated:
+    #: window id, transcript, `w<id>`, profile, last activity, relative path,
+    #: snippet. The first two are for the caller, the rest for the person
+    #: choosing.
+    ##
+    local pairs
+    pairs="$(h-claude-code-session-live-pairs)" @RET
+    if test -z "${pairs}" ; then
+        ecerr "$0: no Claude Code session is registered in a live kitty window"
+        return 1
+    fi
+
+    local -a projects_dirs
+    projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
+
+    h-claude-code-session-dep @RET
+
+    #: One `list` over every root and then a join, rather than a metadata call
+    #: per row: `list` does the whole corpus in ~45ms, while `claude_session
+    #: name` alone costs ~230ms on a large transcript. Anything the join misses
+    #: still gets a row, just a barer one.
+    local meta
+    meta="$(claude_session list "${projects_dirs[@]}")" || meta=''
+
+    ec "${pairs}" |
+        gawk -F'\t' -v OFS='\t' '
+            NR == FNR { when[$2] = $3 ; rel[$2] = $4 ; snip[$2] = $5 ; next }
+            {
+                path = $2
+
+                #: The profile is the config home the transcript sits under --
+                #: .claude, .claude-work -- which is the same label
+                #: `claude_session list` puts on its own relative paths.
+                profile = path
+                sub(/\/projects\/.*$/, "", profile)
+                sub(/^.*\//, "", profile)
+
+                print $1, path, "w" $1, profile, \
+                    (when[path] ? when[path] : "?"), \
+                    (rel[path] ? rel[path] : path), \
+                    snip[path]
+            }
+        ' <(ec "${meta}") -
+}
+
+function h-claude-code-session-preview {
+    #: The fzf preview body for [agfi:claude-code-session-live-fz]: what this
+    #: session is called, when it last moved, and what was last asked of it.
+    #:
+    #: A tail scan rather than `claude_session render`, because a preview has to
+    #: be instant and rendering a 46MB transcript takes eight seconds. Claude
+    #: Code writes its own `ai-title` and `last-prompt` records, so the two
+    #: things worth previewing are already sitting there in plain form.
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local bytes="${claude_code_session_preview_bytes:-400000}"
+
+    #: `tail -n +2` drops the partial line a byte-tail necessarily starts on,
+    #: and `fromjson?` drops anything else that does not parse. The timestamp
+    #: branch comes last: the title and prompt records carry no timestamp, and
+    #: putting it first would swallow them.
+    local tagged
+    tagged="$(command tail -c "${bytes}" "${transcript}" 2>/dev/null |
+        command tail -n +2 |
+        jq -Rr 'fromjson?
+            | if   .type == "ai-title"    then "T\t" + (.aiTitle    | tostring)
+              elif .type == "last-prompt" then "P\t" + (.lastPrompt | tostring)
+              elif .timestamp             then "S\t" + (.timestamp  | tostring)
+              else empty end' 2>/dev/null)" || tagged=''
+
+    #: `cut -f2-` drops the tag the scan above put on, and keeps a value that
+    #: itself contains tabs intact.
+    local title prompt stamp
+    title="$(ec "${tagged}"  | command grep $'^T\t' | command tail -n 1 | command cut -f2-)"
+    prompt="$(ec "${tagged}" | command grep $'^P\t' | command tail -n 1 | command cut -f2-)"
+    stamp="$(ec "${tagged}"  | command grep $'^S\t' | command tail -n 1 | command cut -f2-)"
+
+    ec "${title:-Claude Code session ${transcript:t:r}}"
+    ec
+    ec "session:  ${transcript:t:r}"
+    ec "modified: ${stamp:-unknown}"
+    ec
+    ec 'last prompt:'
+    ec "${prompt:-(none in the scanned tail)}"
+}
+
+function claude-code-session-live-fz {
+    #: Picks among the Claude Code sessions currently live in a kitty window,
+    #: and prints `<kitty-window-id> <TAB> <transcript path>` for each choice.
+    #:
+    #: Multi-select by default, since the callers want to act on several tabs at
+    #: once; set claude_code_session_live_fz_no_multi_p=y for one.
+    #: claude_code_session_live_fz_extra_rows prepends synthetic choices, which
+    #: is how [agfi:h-claude-code-usage-type-continue-target-fz] offers
+    #: "frontmost" alongside the real sessions.
+    ##
+    local rows
+    rows="$(h-claude-code-session-live-rows)" @RET
+
+    ensure-array claude_code_session_live_fz_extra_rows
+    if (( ${#claude_code_session_live_fz_extra_rows} )) ; then
+        rows="${(F)claude_code_session_live_fz_extra_rows}"$'\n'"${rows}"
+    fi
+
+    ensure-array claude_code_session_live_fz_opts
+    local fz_opts=("${claude_code_session_live_fz_opts[@]}")
+
+    local multi_opt='--multi'
+    if bool "${claude_code_session_live_fz_no_multi_p:-n}" ; then
+        multi_opt='--no-multi'
+    fi
+
+    #: Through the garden, the established way to reach a zsh function from
+    #: fzf's own shell (cf. the `execute-silent` binds in [agfi:h-grep-output-to-fz]).
+    #: Remember `brishz-restart` after editing the preview, or fzf keeps calling
+    #: whatever the garden loaded at startup.
+    local selected
+    selected="$(ec "${rows}" |
+        fz_no_preview=y fz \
+            --delimiter=$'\t' --with-nth='3..' \
+            "${multi_opt}" \
+            --preview 'brishzq.zsh h-claude-code-session-preview {2}' \
+            --preview-window 'down,60%,wrap' \
+            "${fz_opts[@]}")" @RET
+
+    test -n "${selected}" || return 1
+
+    #: The display columns were only ever for the person choosing.
+    ec "${selected}" | command cut -f1,2
+}
+##
