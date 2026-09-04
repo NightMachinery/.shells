@@ -2779,8 +2779,13 @@ function gcp-gpu-controller-status {
     if test -n "$beat" ; then
         local ts age
         ts="${beat%% *}"
+        #: The controller writes `date -uIseconds`, so the stamp is UTC. Without
+        #: forcing TZ, `strftime -r` reads it as local time and every age comes
+        #: back off by the local offset -- two hours, in CEST, which reads as a
+        #: dead controller.
+        local -x TZ=UTC
         strftime -r -s age '%Y-%m-%dT%H:%M:%S' "${ts%%+*}" 2>/dev/null \
-            && ec "last tick      $(( EPOCHSECONDS - age ))s ago  (UTC clock)"
+            && ec "last tick      $(( EPOCHSECONDS - age ))s ago"
         ec "last decision  ${beat#* }"
     else
         ec "last tick      none -- no ${prefix}/heartbeat yet"
