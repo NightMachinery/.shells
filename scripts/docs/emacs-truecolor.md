@@ -31,6 +31,14 @@ In that terminal frame, `M-: (display-color-cells)` should return `16777216`.
 An already-open frame may retain the old capabilities; reopen it before
 checking. Android rendering still needs verification on the actual device.
 
+For mobile use, `emc-mobile` delegates to `emc-gateway` with
+`TERM=xterm-emacs` and `--frame-parameters '((night/mobile . t))'`.
+It forwards file arguments and preserves server selection. With the Doom
+`night-mobile` module loaded, marked terminal frames hide line numbers except
+on the final logical line (trailing blank lines may also retain numbers).
+Desktop windows retain their buffer settings. Existing terminal frames can
+opt in or out with `M-x night/mobile-frame-toggle`.
+
 References:
 
 - [Emacs truecolor capabilities](https://www.gnu.org/software/emacs/manual/html_node/efaq/Colors-on-a-TTY.html)
