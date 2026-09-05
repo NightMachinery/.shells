@@ -3,10 +3,10 @@
 # emacs no longer shows italic text correctly, and it might be this terminfo's fault. Try using the old one?
 # update: the old terminfo didn't work, either. It must be sth else.
 ##
+# Semicolon RGB sequences preserve truecolor in both Termux and Kitty.
 xterm-emacs|xterm with 24-bit direct color mode for Emacs,
   use=xterm-256color,
-  setb24=\E[48\:2\:\:%p1%{65536}%/%d\:%p1%{256}%/%{255}%&\
-     %d\:%p1%{255}%&%dm,
-  setf24=\E[38\:2\:\:%p1%{65536}%/%d\:%p1%{256}%/%{255}%&\
-     %d\:%p1%{255}%&%dm,
-
+  setb24=\E[48;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&\
+     %d;%p1%{255}%&%dm,
+  setf24=\E[38;2;%p1%{65536}%/%d;%p1%{256}%/%{255}%&\
+     %d;%p1%{255}%&%dm,
