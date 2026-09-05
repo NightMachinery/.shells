@@ -60,6 +60,7 @@ tailnet, account, hostname, or auth-key material in this public repo. See
 
 =setup/terminfo-24bit.src= provides one truecolor definition for Kitty and
 Termux. Installation and verification: =./docs/emacs-truecolor.md=.
+=emc-mobile= opens a truecolor terminal frame with mobile line-number suppression.
 
 * ntag
 

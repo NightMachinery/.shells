@@ -127,6 +127,10 @@ function emc-gateway {
         reval "${emc_engine[@]}" "$@"
 }
 
+function emc-mobile {
+    TERM=xterm-emacs emc-gateway --frame-parameters '((night/mobile . t))' "$@"
+}
+
 function emc-open-no-server {
     emc_gateway_engine=(emacs) emc-gateway "$@"
 }
