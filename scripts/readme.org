@@ -56,6 +56,11 @@ one for single answers, and the standalone one for conversation exports.
 tailnet, account, hostname, or auth-key material in this public repo. See
 =./docs/tailscale-setup.md=.
 
+* Emacs terminal colors
+
+=setup/terminfo-24bit.src= provides one truecolor definition for Kitty and
+Termux. Installation and verification: =./docs/emacs-truecolor.md=.
+
 * ntag
 
 ntag notes are tracked in =./docs/ntag/=.
