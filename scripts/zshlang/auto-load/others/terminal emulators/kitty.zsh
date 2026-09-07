@@ -475,3 +475,50 @@ function kitty-panel-hide {
 
     kitty @ --to "${sock}" resize-os-window --match all --action=hide >/dev/null
 }
+
+function kitty-panel-recreate {
+    #: Rebuilds the panel: a fresh panel OS window takes over every tab, in
+    #: order, and the old one closes itself once empty. Needed when a setting
+    #: that kitty applies only at creation has changed, such as
+    #: `macos_ns_window_layer' in =configFiles/kitty/kitty.conf= (run
+    #: `kitty @ load-config' first so kitty has the new value).
+    #:
+    #: Existing panels are renamed out of the way first, or kitty-panel-ensure
+    #: would treat the old panel as the one to keep. `resize-os-window
+    #: --action=os-panel' cannot change an OS window's class, so the rename is
+    #: done through the tabs: they are moved into a temporary *normal* OS
+    #: window, and kitty-panel-ensure then does what it always does with tabs
+    #: outside the panel.
+    ##
+    local sock
+    sock="$(kitty-socket-get)" || return $?
+
+    local ls_json
+    ls_json="$(kitty @ --to "${sock}" ls)" || return $?
+
+    local -a panel_tabs
+    panel_tabs=( ${(f)"$(command jq -r '.[] | select(.wm_class == "kitty-panel") | .tabs[].id' <<<"${ls_json}")"} )
+    panel_tabs=( ${panel_tabs:#} )
+    if (( ${#panel_tabs} == 0 )) ; then
+        ecerr "$0: no panel to recreate"
+        return 1
+    fi
+
+    #: A holding window, normal class. Its shell tab is closed once the real
+    #: tabs have arrived.
+    local holder_win
+    holder_win="$(kitty @ --to "${sock}" launch --type=os-window --dont-take-focus)" || return $?
+    local holder_tab
+    holder_tab="$(kitty @ --to "${sock}" ls | command jq -r --argjson w "${holder_win}" '[.[] | .tabs[] | select(any(.windows[]; .id == $w)) | .id][0]')"
+
+    local t
+    for t in "${panel_tabs[@]}" ; do
+        kitty @ --to "${sock}" detach-tab --match "id:${t}" --target-tab "id:${holder_tab}" >/dev/null ||
+            ecerr "$0: could not move tab ${t} to the holding window"
+    done
+    kitty @ --to "${sock}" close-tab --match "id:${holder_tab}" >/dev/null
+
+    #: The old panel is now empty and gone; this creates the new one and moves
+    #: the tabs in from the holding window, which then closes itself too.
+    kitty-panel-ensure >/dev/null
+}
