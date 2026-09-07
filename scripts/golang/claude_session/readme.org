@@ -433,15 +433,29 @@ The first three read only what exists at the moment of the keypress, so they
 cannot go stale. The fourth can, which is why it comes last.
 
 What counts as live comes from =claude agents --json=, the supported interface
-and what the agent view itself shows. It is scoped to one config home, so
-=h-claude-code-session-live-list= runs it once per profile, and asks the
-personal profile with =CLAUDE_CONFIG_DIR= unset, since Claude Code hashes a
-set value into its keychain entry name. The transcript path is derived rather
-than read: the session's id under the projects directory named after its cwd,
-in the same config home, with every non-alphanumeric character of the cwd
-turned into =-= --- slashes, dots, spaces and underscores alike, which is the
-rule Claude Code uses. The whole resolution takes about half a second, most of
-it those two listings.
+and what the agent view itself shows. This is decided inside Claude Code's
+daemon and nothing on disk reproduces it: an assigned background session and an
+idle pre-forked spare share the identical argv, so filtering session records by
+liveness ourselves would drop real sessions or surface spares. So the listing
+stays the authority.
+
+It is scoped to one config home, and each call costs about 180ms. Because the
+homes are independent, the =live= subcommand of the =claude_session= Go binary
+runs them concurrently and does the record reads and transcript derivation in
+the same process, which roughly halves the wall time and removes a dozen shell
+forks; =h-claude-code-session-live-list= calls it, falling back to an
+identical-output shell path (=...-list-sh=) when the binary is not built. The
+personal profile is asked with =CLAUDE_CONFIG_DIR= unset, since Claude Code
+hashes a set value into its keychain entry name. The transcript path is
+derived rather than read: the session's id under the projects directory named
+after its cwd, in the same config home, with every non-alphanumeric character
+of the cwd turned into =-= --- slashes, dots, spaces and underscores alike,
+which is the rule Claude Code uses. The resolution takes about 300ms end to
+end, most of it that one parallelised listing.
+
+The Go probe is by =command -v=, a real PATH lookup, not by the shell's command
+hash: the garden's hash is stale for a binary installed after it started, and
+trusting it would send every call down the slow build-check path.
 
 When none of the four resolves, the hotkey does not notify and give up. It
 opens a picker over every live session as a kitty overlay in that same window,

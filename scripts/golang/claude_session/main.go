@@ -111,6 +111,8 @@ func main() {
 		cmdList(os.Args[2:])
 	case "name":
 		cmdName(os.Args[2:])
+	case "live":
+		cmdLive(os.Args[2:])
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -124,6 +126,7 @@ func usage() {
   claude_session render [flags] <session.jsonl>   #: transcript -> markdown/org on stdout
   claude_session list   [flags] <sessions-dir>... #: TSV of sessions, newest first
   claude_session name           <session.jsonl>   #: session name, empty if unnamed
+  claude_session live           <projects-dir>...  #: TSV of live sessions (pid, id, name, cwd, transcript, tmux, status)
 
 render flags:
   -format md|org|org-pandoc   output syntax (default md). org-pandoc pipes the
