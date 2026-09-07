@@ -352,13 +352,13 @@ function kitty-theme-reload {
 }
 ##
 ##
-#: hyper+shift+z: a kitty *panel* OS window in the same instance, for testing.
-#: The panel design (all tabs in a panel that floats over fullscreen apps) was
-#: reverted on 2026-09-07 over black frames on key presses; a kitty restart
-#: then cured the same frames on the normal window, so the blame moved from
-#: panels to that long-running process. This route keeps the panel with its
-#: own tabs next to the normal window on hyper+z, so it can be tried by hand.
-#: Story: ~/notes/public/subjects/tools/CLI/terminal emulators/Kitty/hotkey window.org
+#: hyper+z in panel mode (the default, see `kitty_hotkey_mode' in
+#: hammerspoon/core/window-media-bindings.lua): every tab of the one kitty
+#: instance lives in a *panel* OS window that floats over fullscreen apps.
+#: The design was reverted once on 2026-09-07 over black frames on key
+#: presses, until a kitty restart cured the same frames on the normal window;
+#: the long-running process was to blame, not the panel. Story:
+#: ~/notes/public/subjects/tools/CLI/terminal emulators/Kitty/hotkey window.org
 
 function kitty-panel-window-id {
     #: Some kitty window living in the panel OS window (wm_class kitty-panel),
@@ -368,8 +368,13 @@ function kitty-panel-window-id {
 }
 
 function kitty-panel-ensure {
-    #: kitty running, with a panel OS window present. Prints the socket. Does
-    #: not touch the normal window or its tabs.
+    #: kitty running, with every tab inside its one panel OS window. Prints the
+    #: socket. The startup session opens in a normal window (kitty cannot start
+    #: as a panel), and scripts sometimes open another; their tabs are moved in
+    #: with `detach-tab', in order, and an OS window left without tabs closes
+    #: itself. Nothing here may focus anything: focusing a hidden panel
+    #: activates kitty on the desktop space before `show' has joined the
+    #: current one. That is kitty-panel-show's job, after the show.
     local sock
     sock="$(kitty-socket-get 2>/dev/null)" || {
         command open -b net.kovidgoyal.kitty --args --start-as minimized || return $?
@@ -384,6 +389,7 @@ function kitty-panel-ensure {
         test -n "${sock}" || { ecerr "$0: kitty did not come up within 20 seconds"; return 1 }
     }
 
+    local fresh_tab=
     if test -z "$(kitty-panel-window-id "${sock}")" ; then
         #: `edge center' covers the display; the window level comes from
         #: `macos_ns_window_layer' in kitty.conf (4: above every window in the
@@ -397,6 +403,27 @@ function kitty-panel-ensure {
         #: no-op while macOS has put it on the desktop space only. Hidden once,
         #: the next `show' orders it onto whatever space is current.
         kitty @ --to "${sock}" resize-os-window --match "id:${fresh_win}" --action=hide >/dev/null
+        fresh_tab="$(kitty @ --to "${sock}" ls | command jq -r --argjson w "${fresh_win}" '[.[] | .tabs[] | select(any(.windows[]; .id == $w)) | .id][0] // empty')"
+    fi
+
+    local panel_tab
+    panel_tab="$(kitty @ --to "${sock}" ls | command jq -r '[.[] | select(.wm_class == "kitty-panel") | .tabs[0].id][0] // empty')"
+    test -n "${panel_tab}" || { ecerr "$0: no panel tab to move into"; return 1 }
+
+    local -a stray
+    stray=( ${(f)"$(kitty @ --to "${sock}" ls | command jq -r '.[] | select(.wm_class != "kitty-panel") | .tabs[].id')"} )
+    stray=( ${stray:#} )
+
+    local t
+    for t in "${stray[@]}" ; do
+        kitty @ --to "${sock}" detach-tab --match "id:${t}" --target-tab "id:${panel_tab}" >/dev/null ||
+            ecerr "$0: could not move tab ${t} into the panel"
+    done
+
+    #: The shell tab the panel was born with is only scaffolding once real
+    #: tabs have arrived.
+    if test -n "${fresh_tab}" && (( ${#stray} > 0 )) ; then
+        kitty @ --to "${sock}" close-tab --match "id:${fresh_tab}" >/dev/null
     fi
 
     ec "${sock}"
@@ -415,8 +442,8 @@ function kitty-panel-show {
 }
 
 function kitty-panel-hide {
-    #: Hides the panel only; the normal window is left alone. No kitty, no
-    #: panel: nothing to do.
+    #: Hides the panel. No kitty, no panel: nothing to do. A stray normal
+    #: window is left alone here; the next show folds its tabs in.
     local sock win
     sock="$(kitty-socket-get 2>/dev/null)" || return 0
     win="$(kitty-panel-window-id "${sock}")"
