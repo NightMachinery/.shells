@@ -647,161 +647,71 @@ networks may still need credentials added through macOS first.
 ## kitty: hyper+z
 
 `kittyHandler` in `core/window-media-bindings.lua` is the hyper+z toggle for
-kitty, and hyper+z is the only way kitty is ever reached. A press has to show
-all the tabs of the one kitty instance over whatever is in front, fullscreen
-apps included, and the next press has to put them away again. One constraint
-shapes everything below: only the main bundle, `net.kovidgoyal.kitty`, may
-exist, because every per-app rule elsewhere in this config assumes that ID.
+kitty, and hyper+z is the only way kitty is ever reached. kitty is a normal OS
+window again. A press shows it maximized on the screen the mouse is on; the
+next press hides it and hands focus back to the app you came from. From a
+fullscreen app, a press switches to kitty's desktop and a second press
+switches back, which is exactly what macOS itself would do with any normal
+window. Putting kitty over a fullscreen app is deliberately not attempted; the
+last paragraph says what was tried instead.
 
-A normal OS window cannot meet the first requirement. macOS keeps normal
-windows off fullscreen spaces, and Hammerspoon cannot put one there: a plain
-`hs.spaces.moveWindowToSpace` into a fullscreen space is refused, and a forced
-one returns true and does nothing (measured 2026-09-07, macOS 14.3.1,
-Hammerspoon 1.1.1, kitty 0.48.1). The previous handler tried exactly that on
-every press. Meanwhile kitty's window had been created while Purple Telegram's
-fullscreen space was active, and macOS parks a new window in whatever space is
-active, so every activation of kitty jumped to Telegram, and to the desktop
-once Telegram left fullscreen. An intermediate fix evicted the window from
-fullscreen spaces with `force = true`, which worked as far as it went but
-still could not show kitty over a fullscreen app. kitty's quick-access kitten
-can, but it runs as a second app bundle, `net.kovidgoyal.kitty-quick-access`,
-and so does the panel kitten, so both were rejected.
+It is not an `appHotkey`, for three reasons. kitty quits when its last window
+closes (`macos_quit_when_last_window_closed`), so the key has to launch it,
+through `hs.application.launchOrFocusByBundleID`, and "not running" is a
+normal state. A kitty window can be born inside another app's fullscreen
+space, because macOS parks a new window in whatever space is active; after
+that every activation of kitty jumps to that app's space, and to the desktop
+once that app leaves fullscreen. That was the original "hyper+z keeps opening
+Telegram" bug. And hiding a window that was shown by switching spaces leaves
+you wherever macOS pleases, so the return has to be explicit.
 
-What does float over fullscreen apps, with macOS's blessing, is a kitty
-*panel* OS window, and the main kitty can create one for itself over remote
-control:
+The cure for the born-into-Telegram case is an eviction before every show and
+every hide. `kittyEvictFromFullscreen` checks whether the window is in any
+user space (`hs.spaces.windowSpaces` against `hs.spaces.spaceType`); if not,
+`hs.spaces.moveWindowToSpace(win, home, true)` moves it to `kittyHomeSpace`,
+the first user space of its screen. The `force` flag is required to leave a
+fullscreen space; without it the call fails with "source space ... is not a
+user space". The reverse direction never works: a plain move into a
+fullscreen space is refused, and a forced one returns true and does nothing
+(measured 2026-09-07, macOS 14.3.1, Hammerspoon 1.1.1). The handler this
+replaces tried it on every press. Between user spaces a plain move does work
+and saves a space switch, so on show, when the mouse screen's active space is
+a user space the window is not already in, it is moved there.
 
-```sh
-kitty @ launch --type=os-panel --os-panel edge=center --os-panel layer=top \
-    --os-panel focus-policy=on-demand --os-window-class kitty-panel --dont-take-focus
-```
+Focus on hide is the part macOS will not do for you. `kittyReturnTo` holds the
+last activated app other than kitty, kept by `kittyFocusWatcher`, an
+`hs.application.watcher`, so the memory is refreshed by every switch you make
+and is never stale, which the old `kitty_prev_app` was whenever kitty had been
+reached by another route, and nil after every reload. Apps that take focus
+for a moment and give it back are excluded through `kittyTransientBundles`:
+Hammerspoon itself, for choosers and the Secure Input webview; Maccy, whose
+popup is the hyper+v passthrough key; and Handy, whose dictation overlay is
+cmd+'. The handler reads the value before calling `hide()`, because the
+activation the hide causes would update it. Then `kittyFocusAfterHide`
+focuses that app's focused window, falling back to `activate()`, inside
+`pcall` in case the app has quit since. Nothing in the kitty path enumerates
+windows: `hs.window.orderedWindows` asks every process through Accessibility,
+and the two "Handy Web Content" processes take 1.5 s each to answer (see
+`axLatencyReport` in `core/app-hotkeys.lua`), so one such call stalled
+Hammerspoon for three seconds.
 
-`edge=center` anchors the panel to all four edges, so it covers the display.
-`layer=top` stays in the launch command, but the panel's actual window level
-comes from `macos_ns_window_layer` in `configFiles/kitty/kitty.conf`, set to
-`NSFloatingWindowLevel + 1`, that is level 4. The layer names alone do not
-land where they need to. Measured with CoreGraphics' window list
-(`kCGWindowLayer`): fullscreen app windows sit at level 0, Spotlight at 23,
-Handy's dictation overlay at 25, and a `layer=top` panel at 99, with `overlay`
-higher still. So the panel began by covering Handy's speech-to-text overlay,
-which then could not be seen while dictating into kitty, and at `top` it
-still covered Spotlight and Handy. kitty 0.48's `macos_ns_window_layer` pins
-the exact level. Measured with a throwaway panel from a fullscreen Brave: 20,
-8 and 4 all come up over the fullscreen space on show, so anything from 4 to
-22 works, and 4 keeps the most room under the system overlays; 3,
-`NSFloatingWindowLevel` itself, does not, the panel staying on the desktop
-space while kitty was activated, so it was invisible. After the change the
-rebuilt panel passed three hyper+z rounds from fullscreen Brave: on screen at
-level 4, space unchanged, frame 0,24,1920,1056, hide back to Brave.
+Every press logs one line to the Hammerspoon console,
+`kittyHandler: press; kitty <frontmost|running|not running>; frontmost=<app>;
+-> show|hide`, so a press that "did nothing" can be traced to which way it
+went and what was in front. To confirm the eviction is doing its job, run
+`hs.inspect(hs.spaces.windowSpaces(<kitty window id>))` after a hide and
+check the result with `hs.spaces.spaceType`: it must name a user space.
 
-The class `kitty-panel` shows up as `wm_class` in `kitty @ ls`
-for the OS window's whole life, which is how the panel is recognised
-afterwards. A normal window cannot be turned into a panel (`resize-os-window
---action=os-panel` answers "is not a panel"), so the tabs move rather than the
-window: tabs in any other OS window (the startup session from `me.conf` opens
-in a normal one; scripts sometimes open another) are moved in with `kitty @
-detach-tab --match id:<tab> --target-tab id:<panel tab>`, in listed order, and
-then the shell tab the panel was born with is closed. The move renumbers tab
-ids, and the tab folded in last simply becomes the active one; nothing is done
-to restore the previously active tab, for a reason given below. An OS window
-left without tabs closes itself, and `macos_quit_when_last_window_closed` does
-not fire because the panel remains. Measured: all ten session tabs arrived in
-order, the panel covered the display, and from a fullscreen Brave it appeared
-over Brave with no space switch.
-
-Show and hide are `kitty @ resize-os-window --match all --action=show` and
-`--action=hide`. Showing does not focus the panel by itself (measured), so
-`kitty-panel-show` follows with `focus-window --match id:<window>`, the
-active window of the panel's active tab. Hiding is idempotent, and a kitty
-that is not running counts as hidden.
-
-The order, show first and focus second, is load-bearing, and it is why
-`kitty-panel-ensure` no longer focuses anything. While the panel is hidden,
-macOS collapses its space memberships back to the desktop space alone:
-`hs.spaces.windowSpaces` went from {1774, 5, 1835} to {5} after Brave
-re-entered fullscreen with the panel hidden. Each `show` then joins the
-current space, one more per show (5, then 5 and 1990). An earlier version of
-`kitty-panel-ensure` ran `focus-tab` to restore the previously active tab
-before the show. Focusing activates kitty, and activating an app whose only
-window is on the desktop can make macOS switch to the desktop, so the show
-that followed sometimes landed there instead of over the fullscreen Brave.
-With every focus moved after the show, two show/hide rounds from a freshly
-created fullscreen Brave space both showed the panel over Brave, space
-unchanged, and returned to Brave.
-
-When `kitty-socket-get` finds no socket, `kitty-panel-ensure` launches kitty
-with `open -b net.kovidgoyal.kitty --args --start-as minimized`, through
-Launch Services like the Dock does, so it gets the same environment, and polls
-the socket for up to 20 seconds. Minimized, so the session's normal window
-does not drag the display to the desktop before its tabs are moved. This
-launch path is the one piece not exercised today, because testing it means
-quitting the running kitty.
-
-The work is split. The zsh side, `kitty-panel-ensure`, `kitty-panel-show` and
-`kitty-panel-hide` in `zshlang/auto-load/others/terminal emulators/kitty.zsh`,
-does the chain of dependent `kitty @` calls with `jq` in between. Hammerspoon
-calls them through `brishz_eval_hs`, which runs them in the Brish garden
-without blocking this thread; remember `brishz-restart` after editing the zsh,
-or the garden keeps running the old code. `kittyHandler` itself only decides
-show or hide, by whether kitty is frontmost, and handles focus on hide.
-
-Focus on hide is the part macOS will not do for you. Hiding a panel leaves
-focus on a window-less kitty, macOS does not hand it on, and if the show
-switched no space there is nothing for it to switch back to either. So
-`kittyReturnTo` holds the application to go back to. It is kept by
-`kittyFocusWatcher`, an `hs.application.watcher`: every activation of an app
-other than kitty (and other than the transient ones below) stores that app, so
-the memory is refreshed by every switch you make and is never stale, which the
-old `kitty_prev_app` was whenever kitty had been reached by another route.
-`kittyHandler` also stores the frontmost app at show time. On hide the value
-is read synchronously at press time, before the asynchronous hide could
-activate something and have the watcher overwrite it, and 0.35 s later
-`kittyFocusAfterHide` focuses that app's focused window, falling back to
-`activate()`, all inside `pcall` in case the app has quit since. It is an
-application rather than a window, and there is no fallback that walks
-`hs.window.orderedWindows()`: that call asks every process through
-Accessibility, and the two "Handy Web Content" processes take 1.5 s each to
-answer (`axLatencyReport`), so one call stalled Hammerspoon for three seconds.
-Nothing in the kitty path enumerates windows now. Measured: from a fullscreen
-Brave, press one showed the panel over Brave and press two returned to Brave,
-twice in a row; from ChatGPT on the desktop likewise.
-
-The same watcher hides the panel when kitty is left by any route other than
-hyper+z: an app hotkey, Cmd-Tab, a click. This is the price of a floating panel.
-With the old normal window, activating Telegram put Telegram in front of it;
-a panel cannot be put behind anything. Measured: hyper+l (Telegram's app
-hotkey) with the panel showing activated Telegram and switched to its
-fullscreen space, but the still-visible panel, a member of that space and
-above its fullscreen window, covered Telegram, so "hyper+l showed kitty".
-kitty's own panel option `hide-on-focus-loss` fixes this and was rejected
-after a live test: it also hides kitty when Maccy's clipboard popup (hyper+v,
-a passthrough key) or another transient app takes focus. So on activation of
-any app that is neither kitty nor in the allowlist `kittyTransientBundles`
-(Hammerspoon itself, for choosers and the Secure Input webview; Maccy; Handy,
-whose dictation overlay is cmd+'), the watcher stores the app as the return
-target and, if kitty has a visible window, runs `kitty-panel-hide`. The
-visibility check is one Accessibility query to kitty alone, `allWindows()` on
-that app; a hidden panel has none. Measured: with the panel showing,
-`toggleFocus` on Telegram left Telegram frontmost with no kitty window
-visible, and hyper+z rounds still worked afterwards.
-
-To check kitty is healthy, run `kitty-remote ls` (or `kitty @ --to
-"$(kitty-socket-get)" ls`) through `jq -c '.[] | {id, wm_class, ntabs:
-(.tabs|length)}'`. It should list exactly one OS window, with `wm_class`
-`kitty-panel`. A second OS window means something opened a normal window; the
-next hyper+z folds it in. kitty applies `macos_ns_window_layer` only when a
-panel is created, so after changing it run `kitty @ load-config` (or
-`kitty-remote load-config`) and then `kitty-panel-recreate`: it moves every
-tab of the existing panel into a temporary normal OS window (a window's class
-cannot be changed in place, and `kitty-panel-ensure` would otherwise keep the
-old panel), lets the empty panel close itself, and calls `kitty-panel-ensure`,
-which creates the new panel and folds the tabs back in; about a second for 13
-tabs. The panel-kitten settings (`edge`, `layer`, `focus-policy`) can be
-changed on the live panel with `kitty @ resize-os-window --match all
---action=os-panel --incremental layer=top`, but that does not touch the
-NSWindow level. In the Hammerspoon console, every press logs one
-line, `kittyHandler: press; kitty <state>; frontmost=<app>; -> show|hide`,
-where the state is `frontmost`, `running` or `not running`, so a press that
-"did nothing" can be traced to which way it went and what was in front. Other
-`hs.console.getConsole()` lines mentioning `kittyHandler` or
-`kittyFocusWatcher` are failures reported by `brishz_eval_hs`.
+The panel design that this replaces deserves a note, so it is not tried
+twice. A kitty panel OS window created by the main instance (`launch
+--type=os-panel`) does float over fullscreen apps, and a full day went into
+it; it worked end to end. It was reverted the same day because the panel
+draws black frames for about 0.35 s on most Cmd+arrow presses and some other
+keys, a kitty rendering defect that no setting changed: window level,
+`sync_to_monitor`, a physical screen frame, focus policy, opacity. The full
+account, with measurements, is in the notes under
+`~/notes/public/subjects/tools/CLI/terminal emulators/Kitty/hotkey window.org`,
+heading "Trying to Use Kitty Panel". kitty's own quick-access kitten had been
+rejected earlier for a different reason: it runs as a second app bundle,
+`net.kovidgoyal.kitty-quick-access`, and every per-app rule in this config
+assumes only `net.kovidgoyal.kitty` exists.
