@@ -239,10 +239,35 @@ local kittyBundleID = "net.kovidgoyal.kitty"
 -- The app to return to on hide: the last one activated that is not kitty.
 local kittyReturnTo = nil
 
+-- Apps that take focus for a moment and give it straight back. The panel
+-- must survive them, and they must not become the return target either.
+-- hyper+v is a passthrough key (core/hyper-mode.lua) that reaches Maccy;
+-- cmd+' is Handy's dictation overlay; Hammerspoon activates itself for
+-- choosers and for the Secure Input webview on hyper.
+local kittyTransientBundles = {
+    ["org.hammerspoon.Hammerspoon"] = true,
+    ["org.p0deje.Maccy"] = true,
+    ["com.pais.handy"] = true,
+}
+
+-- Leaving kitty by any route other than hyper+z (an app hotkey, Cmd-Tab, a
+-- click) must hide the panel too. It sits in the overlay layer, above even
+-- fullscreen windows, so unlike the old normal window it cannot be put
+-- behind the app you just switched to: hyper+l used to "show kitty" because
+-- the still-visible panel covered Telegram. kitty's own hide-on-focus-loss
+-- would do this, but it also hides on Maccy and Handy, hence this watcher
+-- with an allowlist instead. The visibility check is one Accessibility
+-- query to kitty alone; a hidden panel has no visible windows.
 local kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
-    if event == hs.application.watcher.activated
-        and app and app:bundleID() ~= kittyBundleID then
-        kittyReturnTo = app
+    if event ~= hs.application.watcher.activated or not app then return end
+    local bid = app:bundleID()
+    if bid == kittyBundleID or kittyTransientBundles[bid] then return end
+
+    kittyReturnTo = app
+
+    local kitty = getApp(kittyBundleID)
+    if kitty and #kitty:allWindows() > 0 then
+        brishz_eval_hs("kitty-panel-hide", "kittyFocusWatcher")
     end
 end)
 kittyFocusWatcher:start()
