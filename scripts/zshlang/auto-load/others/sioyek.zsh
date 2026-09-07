@@ -1,7 +1,24 @@
 ##
 function sioyek-reload {
-    # sioyek --execute-command reload
-    awaysh sioyek --execute-command reload_no_flicker
+    #: =reload_no_flicker= exists only in our fork; upstream has =reload=.
+    #:
+    #: Without =--nofocus=, the running instance calls =raise()= on its window,
+    #: which Qt implements on macOS as =[NSApp activateIgnoringOtherApps:YES]=,
+    #: so every reload steals focus. That is unbearable when an agent
+    #: recompiles a deck dozens of times. =--nofocus= is upstream since 2022
+    #: and present in the stock binary, too.
+    #:
+    #: Set =sioyek_reload_focus_p=y= to let the reload raise the window. It
+    #: controls only sioyek's own raise; it does not call [agfi:sioyek-focus].
+    ##
+    local focus_p="${sioyek_reload_focus_p:-n}"
+
+    local opts=()
+    if ! bool "${focus_p}" ; then
+        opts+=(--nofocus)
+    fi
+
+    awaysh sioyek --execute-command reload_no_flicker "${opts[@]}"
 }
 
 function sioyek-focus {

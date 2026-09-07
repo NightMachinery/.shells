@@ -133,6 +133,10 @@ function pdflatex-m {
     local autodir="${pdflatex_autodir:-n}"
     local fast_p="${pdflatex_fast_p:-n}"
     local bell_p="${pdflatex_bell_p:-y}"
+    #: Let the post-compile [agfi:sioyek-reload] raise the viewer. Off by
+    #: default, so an agent recompiling in a loop does not steal focus on
+    #: every run. See `docs/sioyek.md`.
+    local focus_p="${pdflatex_focus_p:-n}"
     local bib_mode="${pdflatex_bib_mode:-bibtex_ignore}"
     #: Keep the build intermediates (.log, .aux, .nav, ...) instead of trashing
     #: them, renamed from the opaque temp jobname to the output name, so you can
@@ -268,7 +272,7 @@ function pdflatex-m {
 
             success_p=y
 
-            sioyek-reload || true
+            sioyek_reload_focus_p="${focus_p}" sioyek-reload || true
 
         } always {
             #: Intermediates carry the temp jobname. Keep them (renamed to
