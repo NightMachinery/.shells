@@ -667,9 +667,11 @@ kitty over whatever fullscreen app was showing. That never worked: `hs.spaces`
 refuses a plain move into a fullscreen space, and a forced one returns true
 and does nothing (both measured on 2026-09-07, macOS 14.3.1, Hammerspoon
 1.1.1, kitty 0.48.1). Two smaller faults sat beside it. The toggle-off path
-hid kitty and activated a remembered `kitty_prev_app`, stale whenever kitty
-had been reached by any other route and nil after every reload. And the lookup
-was `hs.application.get("kitty")`, the slow by-name enumeration
+hid kitty and activated a remembered `kitty_prev_app`. Remembering was the
+right idea, but the memory went stale whenever kitty had been reached by any
+other route and was nil after every reload, so it as often sent you somewhere
+you had not been as back where you were. And the lookup was
+`hs.application.get("kitty")`, the slow by-name enumeration
 `core/app-hotkeys.lua` explains at its top, followed by `app:focusedWindow()`
 and `win:screen()` before any nil check, so with kitty not running the handler
 threw rather than launching it.
@@ -693,9 +695,21 @@ not already in, moved there with a plain user-to-user move, which saves a
 space switch. A fullscreen target is left alone, and the handler just
 activates, focuses and maximizes: from a fullscreen app, hyper+z switches you
 to kitty's desktop, which is what macOS itself does. Either move failing
-raises a warning through `alert_gateway` rather than failing silently. On
-hide, kitty is evicted and hidden; nothing remembers a previous app, since
-hiding hands focus to whatever is underneath on its own.
+raises a warning through `alert_gateway` rather than failing silently.
+
+Hiding has to put you back where you were, and macOS will not do that for you.
+When showing kitty switched spaces (you on a fullscreen Brave, kitty on the
+desktop), hiding it does not switch back: macOS activates whatever is next in
+its own order, which was Telegram. So at show time the handler remembers
+`hs.window.frontmostWindow()` in `kittyReturnTo`, and on hide, after evicting
+and hiding kitty, `kittyReturn` focuses that window again, which also switches
+back to its space. What keeps this from going stale the way `kitty_prev_app`
+did is `kittyFocusWatcher`, an `hs.application.watcher` that forgets the
+remembered window the moment any application other than kitty is activated.
+The memory therefore only ever describes a show that is still in effect; reach
+kitty by Cmd-Tab instead and there is nothing to return to, which is right,
+since nothing was displaced. A remembered window that has closed in the
+meantime is caught with `pcall` and logged rather than thrown.
 
 hyper+shift+z is the route that floats over fullscreen apps: kitty's own
 quick-access terminal, run as
