@@ -32,7 +32,7 @@ function langSetToggle()
     end
 end
 ---
-enOnly = { "iTerm2", "Terminal", "kitty", "kitty-quick-access", "Code", "Code - Insiders", "Emacs", "mpv", "zathura", "sioyek", "Maccy" } --
+enOnly = { "iTerm2", "Terminal", "kitty", "Code", "Code - Insiders", "Emacs", "mpv", "zathura", "sioyek", "Maccy" } --
 if false then
     function appWatch(appName, event, app)
         -- @deprecated as it was too slow. In general, calling Zsh functions that will then call Hammerspoon functions is a bad idea.
