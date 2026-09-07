@@ -4,6 +4,8 @@ Zsh Coding Guidelines:
 
 - Always use long option/argument forms for CLI commands. This makes the code more readable.
 
+- Always use =typeset -g= for variables that are global. Most variables outside functions are meant to be global.
+
 - Use =gmv=, =gmkdir=, etc. when you want to use a GNU-specific feature, as the code must run on both macOS and Linux.
 
 - Some basic functions/aliases are already defined, and should be used if needed:
@@ -107,6 +109,46 @@ function ffmpeg-to-audio {
 #+end_src
 
 Notice how we need to first define =audio_extension=, then =output=.
+
+- =@opts= is the caller side of that convention. It sets the namespaced globals
+  around a single call, so you do not have to write the assignments yourself:
+
+#+begin_src zsh :eval never
+@opts key1 val1 key2 val2 @ cmd arg...
+#+end_src
+
+  =@= terminates the key/value list; everything after it is the command that
+  gets =reval='d. The default prefix is the command name plus =_=, with =-= and
+  =.= mapped to =_= (see =ensure-var-name=), so =@opts out foo @ imgseq2vidNI=
+  sets =imgseq2vidNI_out=.
+
+  Override the prefix per command with =@opts-setprefix <cmd> <prefix>= — the
+  =_= is still appended, so =@opts-setprefix rss-dl-fz rss_dl= gives you
+  =rss_dl_e=. =@opts-setprefixas <newcmd> <existingcmd>= makes two commands
+  share one prefix. Declare it right after the function, next to its definition.
+
+  Scalar values are set as =local -x=, i.e. *exported*, so they cross into
+  subprocesses. Array values use bracket syntax and are =local -a= and *not*
+  exported, because zsh cannot export arrays:
+
+#+begin_src zsh :eval never
+@opts rm [ red bad ] add [ yellow blue ] @ ntag-rmadd
+#+end_src
+
+  Keys must come in pairs; an odd number of arguments or an empty key aborts.
+  For nesting, the underlying =@gather= takes a custom terminator: open with
+  =@FOO= and close with =FOO@= instead of a bare =@=.
+
+  Combined with =aliasfn=, this is how a family of variants is defined without
+  writing a wrapper function for each:
+
+#+begin_src zsh :eval never
+aliasfn green2red @opts rm green add red @ ntag-rmadd
+aliasfn ffbi @opts e install search-engine search @ ffbrew
+#+end_src
+
+  Implementation: =h_@opts= and =h_@gather= in =zshlang/basic/macros.zsh=, with
+  the runnable =opts-test1= / =opts-test2= pair in the same file.
 
 - Do not use =~= in parameter-expansion defaults; it will not be expanded there. Prefer =${HOME}=:
 
