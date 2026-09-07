@@ -3,6 +3,12 @@ mkdir -p ~/bin
 
 mkdir -p ~/.ssh/sockets/
 
+#: Every UNIX socket we own lives here; see ~/.shared.sh for why it is not
+#: `~/tmp'. kitty binds `listen_on' at startup and does not create the parent
+#: directory, so a fresh host with no ~/.local/state would fail to listen at
+#: all -- silently, since kitty logs that nowhere a person looks.
+mkdir -p "${NIGHT_SOCKETS_DIR:-${HOME}/.local/state}"
+
 ln -s ~/.nvimrc ~/.config/nvim/init.vim
 ##
 zsh_alt_path='/opt/homebrew/bin/zsh'
