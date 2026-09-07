@@ -351,3 +351,124 @@ function kitty-theme-reload {
     kitty-theme --live
 }
 ##
+##
+function kitty-panel-ensure {
+    #: kitty, running, with every tab inside its one panel OS window. Prints
+    #: the remote-control socket as `unix:<path>'.
+    #:
+    #: We only ever reach kitty through hyper+z (see
+    #: =hammerspoon/core/window-media-bindings.lua=), and what the hotkey must
+    #: show is *all* the tabs, over whatever is in front, fullscreen apps
+    #: included. A normal OS window cannot do that: macOS will not put one over
+    #: a fullscreen space, and Hammerspoon cannot move one there either (a
+    #: forced `hs.spaces.moveWindowToSpace' into a fullscreen space returns true
+    #: and does nothing). A *panel* window can, and kitty can create one for
+    #: itself with `launch --type=os-panel'. kitty's own quick-access and panel
+    #: kittens do the same thing but run as a second app bundle
+    #: (net.kovidgoyal.kitty-quick-access), which the rest of our code does not
+    #: know; this keeps the one instance, the one bundle ID, and the one socket.
+    #:
+    #: The panel is recognised by its window class, `kitty-panel', which `ls'
+    #: reports as `wm_class' for the OS window's whole life. Tabs living in any
+    #: other OS window (the startup session opens in a normal one; scripts
+    #: sometimes open another) are moved in with `detach-tab', in order, and
+    #: the shell tab the panel was born with is closed once real tabs have
+    #: arrived. An OS window left without tabs closes itself, and
+    #: `macos_quit_when_last_window_closed' does not fire because the panel is
+    #: still there.
+    #:
+    #: When kitty is not running it is started through Launch Services, like
+    #: the Dock does, minimized so the session's normal window does not drag
+    #: the display to the desktop before its tabs are moved.
+    ##
+    local sock
+    sock="$(kitty-socket-get 2>/dev/null)" || {
+        command open -b net.kovidgoyal.kitty --args --start-as minimized || return $?
+
+        local i
+        for i in {1..80} ; do
+            sleep 0.25
+            if sock="$(kitty-socket-get 2>/dev/null)" && kitty @ --to "${sock}" ls >/dev/null 2>&1 ; then
+                break
+            fi
+            sock=
+        done
+        if test -z "${sock}" ; then
+            ecerr "$0: kitty did not come up within 20 seconds"
+            return 1
+        fi
+    }
+
+    local ls_json
+    ls_json="$(kitty @ --to "${sock}" ls)" || return $?
+
+    local panel_q='[.[] | select(.wm_class == "kitty-panel")][0] | .tabs[0].id // empty'
+    local panel_tab fresh_tab=
+    panel_tab="$(command jq -r "${panel_q}" <<<"${ls_json}")"
+    if test -z "${panel_tab}" ; then
+        #: `edge center' anchors to all four edges, so it covers the display.
+        #: `layer overlay' puts it above fullscreen windows.
+        kitty @ --to "${sock}" launch --type=os-panel \
+            --os-panel edge=center --os-panel layer=overlay \
+            --os-panel focus-policy=on-demand \
+            --os-window-class kitty-panel --dont-take-focus >/dev/null || return $?
+        ls_json="$(kitty @ --to "${sock}" ls)" || return $?
+        panel_tab="$(command jq -r "${panel_q}" <<<"${ls_json}")"
+        fresh_tab="${panel_tab}"
+        if test -z "${panel_tab}" ; then
+            ecerr "$0: created a panel but cannot find it in 'kitty @ ls'"
+            return 1
+        fi
+    fi
+
+    #: The tab that was active before we shuffle things, to make active again.
+    local active_tab
+    active_tab="$(command jq -r '[.[] | select(.is_active) | .tabs[] | select(.is_active) | .id][0] // empty' <<<"${ls_json}")"
+
+    local -a stray
+    stray=( ${(f)"$(command jq -r '.[] | select(.wm_class != "kitty-panel") | .tabs[].id' <<<"${ls_json}")"} )
+    stray=( ${stray:#} )
+
+    local t
+    for t in "${stray[@]}" ; do
+        kitty @ --to "${sock}" detach-tab --match "id:${t}" --target-tab "id:${panel_tab}" >/dev/null ||
+            ecerr "$0: could not move tab ${t} into the panel"
+    done
+
+    if test -n "${fresh_tab}" && (( ${#stray} > 0 )) ; then
+        kitty @ --to "${sock}" close-tab --match "id:${fresh_tab}" >/dev/null
+    fi
+
+    if test -n "${active_tab}" ; then
+        kitty @ --to "${sock}" focus-tab --match "id:${active_tab}" >/dev/null 2>&1
+    fi
+
+    ec "${sock}"
+}
+
+function kitty-panel-show {
+    #: Shows the panel, with keyboard focus in its active window. Idempotent.
+    #: Showing a panel does not focus it by itself (measured), hence the
+    #: explicit focus-window on the active tab's active window.
+    ##
+    local sock
+    sock="$(kitty-panel-ensure)" || return $?
+
+    kitty @ --to "${sock}" resize-os-window --match all --action=show >/dev/null || return $?
+
+    local win
+    win="$(kitty @ --to "${sock}" ls | command jq -r '[.[] | select(.wm_class == "kitty-panel") | .tabs[] | select(.is_active) | .windows[] | select(.is_active) | .id][0] // empty')"
+    if test -n "${win}" ; then
+        kitty @ --to "${sock}" focus-window --match "id:${win}" >/dev/null
+    fi
+}
+
+function kitty-panel-hide {
+    #: Hides every kitty OS window. A kitty that is not running is already
+    #: hidden, so that is a success.
+    ##
+    local sock
+    sock="$(kitty-socket-get 2>/dev/null)" || return 0
+
+    kitty @ --to "${sock}" resize-os-window --match all --action=hide >/dev/null
+}
