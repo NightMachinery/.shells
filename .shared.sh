@@ -35,11 +35,34 @@ fi
 export GCM_TRACE=~/tmp/gcm.log
 ##
 # export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
-export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${HOME}/tmp/.emacs-servers/server}"
+#: --- where our UNIX domain sockets live ---
+#:
+#: Not `~/tmp'. That is a scratch directory, pruned by hand and by
+#: [agfi:rm-caches], and a socket deleted from under a live listener cannot be
+#: restored: an unlinked socket path cannot be re-linked, so the process keeps
+#: the bound inode while every client gets ENOENT. That is exactly how kitty's
+#: remote-control socket died, silently, taking `cmd+shift+o' with it.
+#:
+#: `~/.local/state' is mode 0700, exists on every host, and nothing sweeps it.
+#:
+#: Overridable, because on the CIS cluster $HOME is one NFS mount shared by
+#: ~12 machines and a socket there cannot work: AF_UNIX is a kernel-local
+#: endpoint, the file is only a rendezvous name, so a client on another host
+#: gets ECONNREFUSED -- and worse, the hosts collide on the same path. Those
+#: hosts point this at host-local storage via ~/.night-bootstrap.env.
+#:
+#: @warn Consumers that run without a shell environment cannot see this and so
+#: carry the literal instead: `listen_on' in configFiles/kitty/kitty.conf
+#: (kitty is launched by macOS Launch Services), and `night/emacs-socket-dir'
+#: in ~/doom.d/config.el (Emacs.app is launched by Finder). Grep for
+#: NIGHT_SOCKETS_DIR to find every site before moving this.
+export NIGHT_SOCKETS_DIR="${NIGHT_SOCKETS_DIR:-${HOME}/.local/state}"
 
-EMACS_ALT1_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server_alt1"
+export EMACS_SOCKET_NAME="${EMACS_SOCKET_NAME:-${NIGHT_SOCKETS_DIR}/emacs-servers/server}"
 
-EMACS_GUI_SOCKET_NAME="${HOME}/tmp/.emacs-servers/server_gui"
+EMACS_ALT1_SOCKET_NAME="${NIGHT_SOCKETS_DIR}/emacs-servers/server_alt1"
+
+EMACS_GUI_SOCKET_NAME="${NIGHT_SOCKETS_DIR}/emacs-servers/server_gui"
 ###
 if true ; then # ! command -v brew &> /dev/null ; then # it's faster to just not check
     # Sometimes brew itself is in path but its dirs are not. Also, we want to be able to rerun the code to correct the PATH ordering
