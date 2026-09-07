@@ -196,7 +196,10 @@ function h-claude-code-session-select-fz {
     if [[ "${scope}" == "all" ]] ; then
         wanted=("${projects_dirs[@]}")
     else
-        local project_dir_name="${${PWD//\//-}//./-}"
+        #: Claude Code's rule: every non-alphanumeric character becomes `-',
+        #: not only slashes and dots. `~/notes/x y' and `~/tmp/_cdtmp_1' were
+        #: looked up under the wrong name before.
+        local project_dir_name="${PWD//[^[:alnum:]]/-}"
         for d in "${projects_dirs[@]}" ; do
             wanted+=("${d}/${project_dir_name}")
         done
