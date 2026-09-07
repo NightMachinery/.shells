@@ -223,9 +223,15 @@ end
 -- switches to kitty's user space, which is what macOS itself does; the
 -- quick-access kitty on hyper+shift+z is the one that floats over fullscreen.
 --
--- No remembered "previous app": hiding kitty hands focus to whatever is
--- underneath on its own, and a remembered app was stale whenever kitty had
--- been reached by any other route (and nil after every reload).
+-- Hiding has to put you back where you were. When showing switched spaces
+-- (kitty on the desktop, you on a fullscreen Brave), macOS does not switch
+-- back on hide; it activates whatever is next in its own order, which was
+-- Telegram. So the window that was in front at show time is remembered and
+-- focused again on hide. The old handler kept a "previous app" too, but it
+-- went stale whenever kitty was reached by any other route (and nil after
+-- every reload). Here the memory is a window, and an application watcher
+-- forgets it the moment anything other than kitty is activated, so it only
+-- ever describes the show that is still in effect.
 
 local kittyBundleID = "net.kovidgoyal.kitty"
 
@@ -250,6 +256,30 @@ local function windowInAnyUserSpace(win)
         if spaceIsUser(sid) then return true end
     end
     return false
+end
+
+-- The window to return to on hide; nil unless a hyper+z show is in effect.
+local kittyReturnTo = nil
+
+local kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
+    if event == hs.application.watcher.activated
+        and app and app:bundleID() ~= kittyBundleID then
+        kittyReturnTo = nil
+    end
+end)
+kittyFocusWatcher:start()
+
+local function kittyReturn()
+    local back = kittyReturnTo
+    kittyReturnTo = nil
+    if not back then return end
+    -- The window may have closed since; a dead hs.window answers nil.
+    local ok = pcall(function()
+        if back:application() then back:focus() end
+    end)
+    if not ok then
+        print("kittyHandler: could not return to the previous window")
+    end
 end
 
 -- Evicts `win` from a fullscreen space to the user space of its screen.
@@ -282,8 +312,14 @@ function kittyHandler()
     if app:isFrontmost() then
         kittyEvictFromFullscreen(win)
         app:hide()
+        -- Must stay synchronous right after hide(): the activation that
+        -- hide() causes reaches kittyFocusWatcher on the next run-loop turn
+        -- and clears kittyReturnTo. A doAfter here would return nowhere.
+        kittyReturn()
         return
     end
+
+    kittyReturnTo = hs.window.frontmostWindow()
 
     -- Show, on the screen the mouse is on.
     local mouseScreen = hs.mouse.getCurrentScreen()
