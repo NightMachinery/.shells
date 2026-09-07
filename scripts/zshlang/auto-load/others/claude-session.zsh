@@ -738,9 +738,12 @@ function h-claude-code-session-pick-overlay {
     #: script gets its rows and hands its choice back through the garden.
     #:
     #: kitty's own environment has the bare macOS PATH, so ours is passed in.
-    #: Usage: h-claude-code-session-pick-overlay <kitty socket>
+    #: The tab key, when given, travels the same way, so the picker's choice
+    #: comes back through [agfi:claude-code-view-session-bg] under the tab it
+    #: was opened from, with the same band and cancel as the hotkey.
+    #: Usage: h-claude-code-session-pick-overlay <kitty socket> [tab-key]
     ##
-    local sock="${1}"
+    local sock="${1}" key="${2}"
     assert-args sock @RET
 
     local wrappers="${NIGHTDIR:-${HOME}/scripts}/zshlang/wrappers"
@@ -749,6 +752,7 @@ function h-claude-code-session-pick-overlay {
         --env "PATH=${PATH}" \
         --env "NIGHTDIR=${NIGHTDIR:-${HOME}/scripts}" \
         --env "FZF_DEFAULT_OPTS=${FZF_DEFAULT_OPTS}" \
+        --env "CLAUDE_VIEW_TAB_KEY=${key}" \
         "${wrappers}/zshplain.dash" "${wrappers}/claude-code-session-pick.zsh" >/dev/null
 }
 
@@ -801,12 +805,18 @@ function h-claude-code-view-session-focused {
     #: The body of [agfi:claude-code-view-session-focused], split out so the
     #: hotkey can swallow the exit code without swallowing the reason.
     #:
-    #: The focused window goes through [agfi:h-claude-code-session-of-kitty-window]
-    #: and whatever that finds is opened. When it finds nothing, the answer is a
-    #: picker over every live session, as an overlay in that same window, rather
-    #: than a notification: "which one did you mean" is a question, not a
-    #: failure. Everything that *is* a failure reports through
-    #: [agfi:h-claude-code-session-lost].
+    #: A toggle. The tab is identified (about 30ms, kitty only); if a conversion
+    #: is already running for it, this press cancels it. Otherwise the tab is
+    #: claimed and the work goes to the background: the 300ms session lookup,
+    #: the conversion and the emacs open all happen in
+    #: [agfi:h-claude-code-view-job], behind a band that names the session and
+    #: says a second press cancels. Resolving *before* claiming would leave a
+    #: 300ms window in which a second press starts a second job; this way a
+    #: double-tap deterministically cancels.
+    #:
+    #: Everything that is a failure reports through
+    #: [agfi:h-claude-code-session-lost]; "which one did you mean" is a question
+    #: and gets the picker instead.
     ##
     if ! ensure-cmd kitty jq ; then
         h-claude-code-session-lost "kitty or jq is not installed"
@@ -834,19 +844,269 @@ function h-claude-code-view-session-focused {
         return 1
     fi
 
-    local kpid
+    local kpid key
     kpid="$(kitty-socket-pid "${sock}")" @RET
+    key="$(h-claude-code-session-registry-key "${kpid}" "${win}")" @RET
 
-    local transcript
-    if transcript="$(h-claude-code-session-of-kitty-window "${ls_json}" "${win}" "${kpid}")" ; then
-        claude-code-view-session "${transcript}"
-        return $?
+    local name
+    name="$(h-claude-code-view-name-of "${key}")" @RET
+
+    if tmux-alive-p "${name}" ; then
+        h-claude-code-view-cancel "${key}"
+        return 0
     fi
 
-    if ! h-claude-code-session-pick-overlay "${sock}" ; then
-        h-claude-code-session-lost "could not tell which session this window shows, and could not open the picker either"
+    h-claude-code-view-launch "${key}" \
+        "**Claude session** → org: finding the session…   (⌘⇧O again cancels)" \
+        h-claude-code-view-job "${key}" "${win}" "${sock}"
+}
+
+function claude-code-view-session-bg {
+    #: Converts a known transcript to org and opens it in emacs, in the
+    #: background, with the same per-tab band and press-again-to-cancel as the
+    #: hotkey. For the overlay picker, whose choice arrives with the key of the
+    #: tab it was opened from.
+    #: Usage: claude-code-view-session-bg <transcript> <tab-key>
+    ##
+    local transcript="${1}" key="${2}"
+    assert-args transcript key @RET
+
+    h-claude-code-view-launch "${key}" \
+        "**Claude session** → org: starting…   (⌘⇧O again cancels)" \
+        h-claude-code-view-convert "$(h-claude-code-view-name-of "${key}")" "${transcript}"
+}
+
+function h-claude-code-view-name-of {
+    #: The tmux session, and the alert id, that a tab's conversion runs under:
+    #: `claude-view-<kitty-pid>-<window-id>'. One name for both, so what
+    #: `tmux ls' shows and what is on screen line up. tmux forbids `:' and `.'
+    #: in session names; the key has neither.
+    #: Usage: h-claude-code-view-name-of <tab-key>
+    ##
+    local key="${1}"
+    assert-args key @RET
+
+    ec "claude-view-${key}"
+}
+
+function h-claude-code-view-banner {
+    #: The per-tab band, through hs-alert v2. Re-showing an id updates that band
+    #: in place, and an unchanged message on an existing id is a heartbeat, so
+    #: calling this again with new text is how the job reports progress. A
+    #: flash of 0 for updates: a changed message on an existing id would
+    #: otherwise flash the screen again.
+    #:
+    #: Wrapped in `reval-timeout' like every zsh caller of hs-alert, and never
+    #: allowed to fail the caller: a Hammerspoon that is mid-reload must not
+    #: hang a hotkey or fail a conversion.
+    #: Usage: h-claude-code-view-banner <name> <color> <seconds> <flash-seconds> <md text>
+    ##
+    local name="${1}" color="${2}" dur="${3}" flash="${4}"
+    shift 4
+    local text="$*"
+
+    silence reval-timeout 10 \
+        @opts id "${name}" color "${color}" dur "${dur}" flash "${flash}" markup md @ \
+        alert "${text}" || true
+}
+
+function h-claude-code-view-dismiss {
+    #: Takes a tab's band down. Same guards as [agfi:h-claude-code-view-banner].
+    #: Usage: h-claude-code-view-dismiss <name>
+    ##
+    silence reval-timeout 10 hs-alert-dismiss "${1}" || true
+}
+
+function h-claude-code-view-launch {
+    #: Claims a tab and starts its conversion in the background.
+    #:
+    #: The job lives in a tmux session named for the tab, the repository's
+    #: detached-job primitive: `tmuxnew' kills any previous session of that
+    #: name before creating the new one, `tmux-alive-p' says whether the job is
+    #: still running, and `tmux-session-processes-kill' takes the whole process
+    #: tree down. The session name is the lock, the handle and the cancel
+    #: target at once -- no marker, pid file or redis key -- exactly as the
+    #: usage notifier arms itself ([agfi:h-claude-code-usage-notif]).
+    #:
+    #: Two things are done here, in the foreground, so a cancel never has to
+    #: kill them: the renderer's build check (a first use compiles Go) and the
+    #: temp directory, which is recorded on the tmux session for the canceller
+    #: to remove -- bookkeeping that cannot outlive the job.
+    #: Usage: h-claude-code-view-launch <tab-key> <banner text> <fn> [args...]
+    #: The function receives its args followed by the temp directory.
+    ##
+    local key="${1}" text="${2}"
+    shift 2
+    local -a job
+    job=("$@")
+    (( ${#job} )) || return 1
+
+    local name
+    name="$(h-claude-code-view-name-of "${key}")" @RET
+
+    h-claude-code-session-dep @RET
+
+    local tmp_dir
+    tmp_dir="$(gmktemp --directory)" @TRET
+
+    h-claude-code-view-banner "${name}" notice 600 0.35 "${text}"
+
+    #: `silent': `tmuxnew' narrates the kill of any previous session.
+    if ! silent tmuxnewsh2 "${name}" "${job[@]}" "${tmp_dir}" ; then
+        h-claude-code-view-fail "${name}" "${tmp_dir}" "could not start the conversion job"
         return 1
     fi
+
+    #: No `=' exact-match prefix on the target: unlike =has-session=,
+    #: =set-option= does not accept one.
+    silent tmux set-option -t "${name}" '@ccv_tmp' "${tmp_dir}" || true
+}
+
+function h-claude-code-view-job {
+    #: The body of the hotkey's conversion, inside the tmux session
+    #: [agfi:h-claude-code-view-launch] creates. A function, because a bare
+    #: command would not keep the session alive.
+    #:
+    #: Resolves the window the key was pressed in -- by id, not "the focused
+    #: one": focus may have moved during the lookup -- and converts what it
+    #: finds. When it finds nothing, the picker takes over the screen, so the
+    #: band goes and the temp directory with it; the picker's choice comes back
+    #: through [agfi:claude-code-view-session-bg] under this same key.
+    #: Usage: h-claude-code-view-job <tab-key> <window-id> <kitty socket> <tmp dir>
+    ##
+    local key="${1}" win="${2}" sock="${3}" tmp_dir="${4}"
+    assert-args key win sock tmp_dir @RET
+
+    local name
+    name="$(h-claude-code-view-name-of "${key}")" @RET
+
+    local ls_json
+    if ! ls_json="$(kitty @ --to "${sock}" ls)" ; then
+        h-claude-code-view-fail "${name}" "${tmp_dir}" "kitty did not answer on ${sock}"
+        return 1
+    fi
+
+    local kpid
+    kpid="$(kitty-socket-pid "${sock}")" || kpid=''
+
+    local transcript
+    if ! transcript="$(h-claude-code-session-of-kitty-window "${ls_json}" "${win}" "${kpid}")" ; then
+        h-claude-code-view-dismiss "${name}"
+        command rm -rf -- "${tmp_dir}"
+
+        if ! h-claude-code-session-pick-overlay "${sock}" "${key}" ; then
+            h-claude-code-session-lost "could not tell which session this window shows, and could not open the picker either"
+            return 1
+        fi
+        return 0
+    fi
+
+    h-claude-code-view-convert "${name}" "${transcript}" "${tmp_dir}"
+}
+
+function h-claude-code-view-convert {
+    #: Converts one transcript to org under the given band and opens it in
+    #: emacs. The band is updated with the session's name as soon as it is
+    #: known, and taken down once emacs has the file. On failure it turns red
+    #: with the reason, a notification is sent as well, and the temp directory
+    #: is removed.
+    #:
+    #: On success the temp directory stays, as it always has: emacs has the file
+    #: open.
+    #: Usage: h-claude-code-view-convert <name> <transcript> <tmp dir>
+    ##
+    local name="${1}" transcript="${2}" tmp_dir="${3}"
+    assert-args name transcript tmp_dir @RET
+
+    if ! test -e "${transcript}" ; then
+        h-claude-code-view-fail "${name}" "${tmp_dir}" "this session has no transcript on disk yet"
+        return 1
+    fi
+
+    local title
+    title="$(h-claude-code-session-name "${transcript}")" || title=''
+    title="${title:-${transcript:t:r}}"
+
+    h-claude-code-view-banner "${name}" notice 600 0 "**Claude session** → org: *${title}*   (⌘⇧O again cancels)"
+
+    #: Named after the session, so the emacs buffer is recognizable; the id
+    #: disambiguates two sessions sharing a name.
+    local out_file="${tmp_dir}/${title}.org"
+    if test -e "${out_file}" ; then
+        out_file="${tmp_dir}/${title}-${${transcript:t:r}[1,8]}.org"
+    fi
+
+    if ! h-claude-code-session-to-org "${transcript}" "${out_file}" ; then
+        h-claude-code-view-fail "${name}" "${tmp_dir}" "conversion failed: ${title}"
+        return 1
+    fi
+
+    if ! emc-open "${out_file}" ; then
+        h-claude-code-view-fail "${name}" '' "emacs did not open ${out_file:t}"
+        return 1
+    fi
+
+    h-claude-code-view-dismiss "${name}"
+}
+
+function h-claude-code-view-fail {
+    #: Reports a failed conversion the only ways a detached job can be heard --
+    #: a red band and a notification -- and removes its temp directory, which
+    #: may hold a truncated .org. An empty tmp dir means there is nothing to
+    #: remove.
+    #: Usage: h-claude-code-view-fail <name> <tmp dir or empty> <reason>
+    ##
+    local name="${1}" tmp_dir="${2}" reason="${3}"
+
+    ecerr "claude-code-view-session-focused: ${reason}"
+    h-claude-code-view-banner "${name}" crit 8 0.35 "**Claude session**: ${reason}"
+    silence notif "Claude session: ${reason}"
+
+    h-claude-code-view-rm-tmp "${tmp_dir}"
+    return 1
+}
+
+function h-claude-code-view-rm-tmp {
+    #: Removes a conversion's temp directory, and only something that looks like
+    #: one: a `gmktemp --directory' path, `tmp.XXXXXX' under a temp root. A
+    #: bookkeeping value that is empty or odd is left alone rather than fed to
+    #: `rm -rf'.
+    ##
+    local d="${1}"
+    test -n "${d}" || return 0
+    [[ "${d}" == /*/* && "${d:t}" == tmp.* ]] || return 0
+
+    command rm -rf -- "${d}"
+}
+
+function h-claude-code-view-cancel {
+    #: Cancels a tab's running conversion. Bound to the same key that started
+    #: it: [agfi:h-claude-code-view-session-focused] calls this when the tab's
+    #: session is alive.
+    #:
+    #: Order matters, twice. The bookkeeping is read before the kill, since
+    #: killing the session discards its options. And the band is changed before
+    #: the kill, so that nothing the death triggers can repaint it -- the same
+    #: rule the FIM canceller follows. The tree kill is
+    #: `tmux-session-processes-kill', which recurses through the renderer's
+    #: pandoc children; the cleanup is here rather than in the job, because a
+    #: killed process is not guaranteed to run an `always' block.
+    #: Usage: h-claude-code-view-cancel <tab-key>
+    ##
+    local key="${1}"
+    assert-args key @RET
+
+    local name
+    name="$(h-claude-code-view-name-of "${key}")" @RET
+
+    local tmp_dir
+    tmp_dir="$(tmux show-options -qv -t "${name}" '@ccv_tmp' 2>/dev/null)" || tmp_dir=''
+
+    h-claude-code-view-banner "${name}" warn 2 0 "**Claude session** → org: cancelled"
+
+    silent tmux-session-processes-kill "${name}"
+
+    h-claude-code-view-rm-tmp "${tmp_dir}"
 }
 ##
 function claude-session-selftest {
