@@ -351,3 +351,75 @@ function kitty-theme-reload {
     kitty-theme --live
 }
 ##
+##
+#: hyper+shift+z: a kitty *panel* OS window in the same instance, for testing.
+#: The panel design (all tabs in a panel that floats over fullscreen apps) was
+#: reverted on 2026-09-07 over black frames on key presses; a kitty restart
+#: then cured the same frames on the normal window, so the blame moved from
+#: panels to that long-running process. This route keeps the panel with its
+#: own tabs next to the normal window on hyper+z, so it can be tried by hand.
+#: Story: ~/notes/public/subjects/tools/CLI/terminal emulators/Kitty/hotkey window.org
+
+function kitty-panel-window-id {
+    #: Some kitty window living in the panel OS window (wm_class kitty-panel),
+    #: for `--match id:'. Empty when there is no panel.
+    local sock="$1"
+    kitty @ --to "${sock}" ls | command jq -r '[.[] | select(.wm_class == "kitty-panel") | .tabs[] | .windows[] | .id][0] // empty'
+}
+
+function kitty-panel-ensure {
+    #: kitty running, with a panel OS window present. Prints the socket. Does
+    #: not touch the normal window or its tabs.
+    local sock
+    sock="$(kitty-socket-get 2>/dev/null)" || {
+        command open -b net.kovidgoyal.kitty --args --start-as minimized || return $?
+        local i
+        for i in {1..80} ; do
+            sleep 0.25
+            if sock="$(kitty-socket-get 2>/dev/null)" && kitty @ --to "${sock}" ls >/dev/null 2>&1 ; then
+                break
+            fi
+            sock=
+        done
+        test -n "${sock}" || { ecerr "$0: kitty did not come up within 20 seconds"; return 1 }
+    }
+
+    if test -z "$(kitty-panel-window-id "${sock}")" ; then
+        #: `edge center' covers the display; the window level comes from
+        #: `macos_ns_window_layer' in kitty.conf (4: above every window in the
+        #: space, below Spotlight at 23 and Handy at 25).
+        local fresh_win
+        fresh_win="$(kitty @ --to "${sock}" launch --type=os-panel \
+            --os-panel edge=center --os-panel layer=top \
+            --os-panel focus-policy=on-demand \
+            --os-window-class kitty-panel --dont-take-focus)" || return $?
+        #: A new panel counts as shown for kitty, so a first `show' would be a
+        #: no-op while macOS has put it on the desktop space only. Hidden once,
+        #: the next `show' orders it onto whatever space is current.
+        kitty @ --to "${sock}" resize-os-window --match "id:${fresh_win}" --action=hide >/dev/null
+    fi
+
+    ec "${sock}"
+}
+
+function kitty-panel-show {
+    #: Shows the panel and focuses its active window. Show first, then focus:
+    #: focusing a hidden panel activates kitty on the desktop space instead.
+    local sock win
+    sock="$(kitty-panel-ensure)" || return $?
+    win="$(kitty-panel-window-id "${sock}")"
+    test -n "${win}" || return 1
+    kitty @ --to "${sock}" resize-os-window --match "id:${win}" --action=show >/dev/null || return $?
+    win="$(kitty @ --to "${sock}" ls | command jq -r '[.[] | select(.wm_class == "kitty-panel") | .tabs[] | select(.is_active) | .windows[] | select(.is_active) | .id][0] // empty')"
+    test -n "${win}" && kitty @ --to "${sock}" focus-window --match "id:${win}" >/dev/null
+}
+
+function kitty-panel-hide {
+    #: Hides the panel only; the normal window is left alone. No kitty, no
+    #: panel: nothing to do.
+    local sock win
+    sock="$(kitty-socket-get 2>/dev/null)" || return 0
+    win="$(kitty-panel-window-id "${sock}")"
+    test -n "${win}" || return 0
+    kitty @ --to "${sock}" resize-os-window --match "id:${win}" --action=hide >/dev/null
+}
