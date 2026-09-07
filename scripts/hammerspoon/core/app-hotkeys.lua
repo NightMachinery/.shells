@@ -171,12 +171,12 @@ appHotkey{
 }
 appHotkey{
     key='.',
-    mods={'shift'},
+    -- mods={'shift'},
     appName='com.google.Chrome'
 }
 appHotkey{
     key='.',
-    -- mods={'shift'},
+    mods={'shift'},
     appName='com.microsoft.edgemac'
 }
 -- appHotkey{ key='.', mods={'shift'}, appName='com.openai.atlas' }
