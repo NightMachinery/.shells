@@ -387,9 +387,7 @@ function h-claude-code-session-key-of-pid {
     local -i hops=0
     while (( hops < 32 )) && test -n "${pid}" && [[ "${pid}" != 0 ]] ; do
         if test -n "${window_of[${pid}]}" ; then
-            #: `unix:/Users/evar/tmp/.kitty-527` -> `527`; greedy, so dashes in
-            #: the path do not matter.
-            h-claude-code-session-registry-key "${sock##*-}" "${window_of[${pid}]}"
+            h-claude-code-session-registry-key "$(kitty-socket-pid "${sock}")" "${window_of[${pid}]}"
             return $?
         fi
 
@@ -455,26 +453,26 @@ function claude-code-session-unregister {
 }
 
 function h-claude-code-session-kitty-socket {
-    #: The kitty instance to talk to.
+    #: The kitty instance to talk to, as `unix:<path>'.
     #:
-    #: `KITTY_LISTEN_ON` is only trusted if it still points at a live socket:
-    #: brish's shells outlive kitty, so the garden holds whatever value was in
-    #: the environment the day it was started, which goes stale the moment
-    #: kitty restarts. The glob is both the fallback and the common path.
+    #: A thin wrapper over [agfi:kitty-socket-get], which owns everything about
+    #: where the socket lives and which kitty owns it. It used to demand
+    #: *exactly one* match from the glob, so a single socket left behind by a
+    #: crashed kitty was enough to break this; the shared resolver filters by
+    #: live pid instead, and so needs no such rule.
+    #:
+    #: On failure the reason is on stderr, which
+    #: [agfi:h-claude-code-view-session-focused] captures verbatim -- the reason
+    #: is the whole point, since "no socket" and "kitty is running but its
+    #: socket is gone, restart it" want completely different responses.
+    #:
+    #: `claude_code_session_kitty_socket_glob' stays as the documented override
+    #: for the tests; zsh scopes it dynamically, so assigning it here is
+    #: visible to the resolver.
     ##
-    if [[ "${KITTY_LISTEN_ON}" == unix:* ]] && test -e "${KITTY_LISTEN_ON#unix:}" ; then
-        ec "${KITTY_LISTEN_ON}"
-        return 0
-    fi
+    local kitty_sockets_list_glob="${claude_code_session_kitty_socket_glob:-${kitty_sockets_list_glob}}"
 
-    #: Matches `listen_on` in =configFiles/kitty/kitty.conf=; kitty appends its pid.
-    local socks=( ${~${claude_code_session_kitty_socket_glob:-${HOME}/tmp/.kitty-*}}(N) )
-    if (( ${#socks} != 1 )) ; then
-        ecerr "$0: expected exactly one kitty socket, found ${#socks}"
-        return 1
-    fi
-
-    ec "unix:${socks[1]}"
+    kitty-socket-get
 }
 
 function h-claude-code-session-lost {
@@ -509,9 +507,12 @@ function h-claude-code-view-session-focused {
         return 1
     fi
 
+    #: stdout and stderr together: on success this is the socket, on failure it
+    #: is the reason, and a subshell cannot hand a variable back to us.
     local sock
-    if ! sock="$(h-claude-code-session-kitty-socket)" ; then
-        h-claude-code-session-lost "could not find kitty's socket"
+    sock="$(h-claude-code-session-kitty-socket 2>&1)"
+    if [[ "${sock}" != unix:* ]] ; then
+        h-claude-code-session-lost "${${sock#kitty-socket-get: }:-could not find kitty's socket}"
         return 1
     fi
 
@@ -525,7 +526,7 @@ function h-claude-code-view-session-focused {
     win="$(ec "${ls_json}" | jq -r 'first(.[] | select(.is_focused) | .tabs[] | select(.is_focused) | .windows[] | select(.is_focused) | .id) // empty')"
 
     local key
-    if ! key="$(h-claude-code-session-registry-key "${sock##*-}" "${win}")" ; then
+    if ! key="$(h-claude-code-session-registry-key "$(kitty-socket-pid "${sock}")" "${win}")" ; then
         h-claude-code-session-lost "could not identify the focused kitty window"
         return 1
     fi
@@ -589,9 +590,8 @@ function h-claude-code-session-live-pairs {
     local sock
     sock="$(h-claude-code-session-kitty-socket)" @RET
 
-    #: `unix:/Users/evar/tmp/.kitty-548` -> `548`; greedy, so dashes in the path
-    #: do not matter. Same derivation as [agfi:h-claude-code-session-key-of-pid].
-    local kpid="${sock##*-}"
+    local kpid
+    kpid="$(kitty-socket-pid "${sock}")" @RET
 
     local ls_json
     ls_json="$(kitty @ --to "${sock}" ls)" @RET

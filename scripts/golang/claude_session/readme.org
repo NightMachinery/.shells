@@ -459,8 +459,21 @@ Two things that are easy to get wrong here:
 - =KITTY_LISTEN_ON= is only trusted when it still points at a live socket.
   Brish's shells outlive kitty, so the garden holds whatever value was in the
   environment the day it started, which goes stale the moment kitty restarts.
-  Otherwise the socket comes from globbing =~/tmp/.kitty-*=, which matches
-  =listen_on= in =configFiles/kitty/kitty.conf=.
+  Otherwise the socket comes from [agfi:kitty-socket-get], which owns that
+  knowledge for everything that talks to kitty and matches =listen_on= in
+  =configFiles/kitty/kitty.conf=.
+- The socket lives in =$NIGHT_SOCKETS_DIR=, =~/.local/state= by default, and
+  emphatically not in =~/tmp=. It sat there once, and a stray deletion killed
+  kitty's remote control outright: an unlinked socket path cannot be
+  re-linked, and =listen_on= is applied only at startup, so kitty went on
+  holding the bound inode while every client got ENOENT. Nothing short of
+  restarting kitty brings it back, which is why
+  [agfi:kitty-socket-get] says so by name instead of reporting "no socket".
+- Sockets left behind by a kitty that crashed are ignored rather than deleted.
+  =listen_on= puts kitty's pid in the socket's name, so
+  [agfi:kitty-sockets-list] can filter by whether that pid is still a live
+  kitty. Deleting them used to be the strategy, and a =kitty @= that failed
+  for any unrelated reason would take a working socket with it.
 
 Remember =brishz-restart= after changing any of this: the garden keeps
 persistent shells and will otherwise go on running the old code.
@@ -469,7 +482,10 @@ Variables:
 
 - =claude_code_session_registry_dir= --- defaults to
   =~/tmp/claude-code-sessions=.
-- =claude_code_session_kitty_socket_glob= --- defaults to =~/tmp/.kitty-*=.
+- =claude_code_session_kitty_socket_glob= --- defaults to
+  =$NIGHT_SOCKETS_DIR/kitty-*.sock=. Passed through to
+  =kitty_sockets_list_glob=, which is the same override under the name the
+  shared resolver uses.
 
 * Sessions live in a kitty window
 
