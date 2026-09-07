@@ -368,10 +368,10 @@ function kitty-panel-window-id {
 }
 
 function kitty-panel-ensure {
-    #: kitty running, with every tab inside its one panel OS window. Prints the
+    #: kitty running, with a panel OS window holding the tabs. Prints the
     #: socket. The startup session opens in a normal window (kitty cannot start
-    #: as a panel), and scripts sometimes open another; their tabs are moved in
-    #: with `detach-tab', in order, and an OS window left without tabs closes
+    #: as a panel); when the panel is created its tabs are moved in with
+    #: `detach-tab', in order, and an OS window left without tabs closes
     #: itself. Nothing here may focus anything: focusing a hidden panel
     #: activates kitty on the desktop space before `show' has joined the
     #: current one. That is kitty-panel-show's job, after the show.
@@ -404,6 +404,17 @@ function kitty-panel-ensure {
         #: the next `show' orders it onto whatever space is current.
         kitty @ --to "${sock}" resize-os-window --match "id:${fresh_win}" --action=hide >/dev/null
         fresh_tab="$(kitty @ --to "${sock}" ls | command jq -r --argjson w "${fresh_win}" '[.[] | .tabs[] | select(any(.windows[]; .id == $w)) | .id][0] // empty')"
+    fi
+
+    #: Tabs outside the panel are moved in when the panel has just been
+    #: created, which is every kitty launch: kitty cannot start as a panel, so
+    #: the startup session always opens in a normal window first. Windows that
+    #: scripts open later are left alone unless `kitty_panel_fold_strays' says
+    #: otherwise (set it to y in a private startup file to fold them in on
+    #: every show).
+    if test -z "${fresh_tab}" && ! bool "${kitty_panel_fold_strays:-n}" ; then
+        ec "${sock}"
+        return 0
     fi
 
     local panel_tab
