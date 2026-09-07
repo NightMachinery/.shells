@@ -323,7 +323,12 @@ end
 -- app you just switched to. kitty's own hide-on-focus-loss would do this too,
 -- but it also hides on Maccy and Handy. The check is one Accessibility query
 -- to kitty alone; a hidden panel has no visible windows.
-local kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
+--
+-- Global, not local: Hammerspoon only keeps a watcher alive while something
+-- references it, and a file-level local is gone once the file has loaded.
+-- As a local this watcher worked for a few minutes after every reload and
+-- then silently stopped, which looked like "hyper+l leaves the panel on top".
+kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     if event ~= hs.application.watcher.activated or not app then return end
     local bid = app:bundleID()
     if bid == kittyBundleID or kittyTransientBundles[bid] then return end
