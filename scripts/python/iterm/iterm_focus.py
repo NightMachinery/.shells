@@ -54,7 +54,7 @@ async def main(connection):
     # if z("isdbg"):
     #     nest_asyncio.apply()
 
-    server = await asyncio.start_unix_server(await handle_client_factory(connection), path=f"{HOME}/tmp/.iterm_socket")
+    server = await asyncio.start_unix_server(await handle_client_factory(connection), path=ITERM_SOCKET)
     await asyncio.gather(serve(server), iterm_focus_monitor(connection))
 
 
@@ -94,4 +94,13 @@ async def iterm_focus_monitor(connection):
                 zp('reval-ec redis-cli set iterm_active_session {window.current_tab.active_session_id} 2>&1')
 
 HOME = os.environ["HOME"]
+
+#: One source of truth with `iterm_socket' in bash/auto-load/configvars.bash.
+#: The literal is only the fallback for being started without a shell
+#: environment; $NIGHT_SOCKETS_DIR is where our sockets live, and it is
+#: deliberately not `~/tmp', which gets swept.
+ITERM_SOCKET = os.environ.get("iterm_socket") or os.path.join(
+    os.environ.get("NIGHT_SOCKETS_DIR") or os.path.join(HOME, ".local", "state"),
+    "iterm.sock",
+)
 iterm2.run_forever(main)
