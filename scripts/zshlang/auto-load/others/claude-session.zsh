@@ -1354,35 +1354,23 @@ function claude-code-session-resume {
     #: Resumes a Claude Code session under a profile: the one that owns it, or
     #: another one, in which case [agfi:claude-code-session-import] forks it
     #: there first. Starts that profile's launcher from
-    #: `claude_code_profile_launchers' with `--resume <uuid>'.
+    #: `claude_code_profile_launchers' with `--resume <uuid>'. The
+    #: non-interactive counterpart of [agfi:claude-code-session-resume-fz].
     #:
-    #: With no session given, picks one with [agfi:h-claude-code-session-select-fz]
-    #: over every profile's copy of the current project (its rows are labelled
-    #: by profile); claude_code_session_resume_all_p=y widens that to every
-    #: project. Anything after the second argument goes to the launcher.
+    #: Anything after the second argument goes to the launcher. Tools run in
+    #: the current directory, not the one the session was started in, so this
+    #: warns when the two differ.
     #:
-    #: Tools run in the current directory, not the one the session was started
-    #: in, so this warns when the two differ.
-    #:
-    #: Usage: claude-code-session-resume [transcript|uuid] [to-profile] [claude args...]
+    #: Usage: claude-code-session-resume <transcript|uuid> [to-profile] [claude args...]
     ##
-    local all_p="${claude_code_session_resume_all_p:-n}"
-
     local session="${1}"
     local to_profile="${2}"
     local -a extra
     extra=("${@[3,-1]}")
+    assert-args session @RET
 
     local source
-    if test -z "${session}" ; then
-        local claude_code_view_session_fz_scope='project'
-        if bool "${all_p}" ; then
-            claude_code_view_session_fz_scope='all'
-        fi
-        source="$(h-claude-code-session-select-fz)" @RET
-    else
-        source="$(h-claude-code-session-resolve "${session}")" @RET
-    fi
+    source="$(h-claude-code-session-resolve "${session}")" @RET
 
     local from_profile
     from_profile="$(h-claude-code-session-profile-of "${source}")" @RET
@@ -1409,18 +1397,42 @@ function claude-code-session-resume {
 }
 aliasfn claude-resume claude-code-session-resume
 
+function claude-code-session-resume-fz {
+    #: Picks a session with [agfi:h-claude-code-session-select-fz] -- every
+    #: profile's copy of the current project, rows labelled by profile -- and
+    #: hands it to [agfi:claude-code-session-resume].
+    #: claude_code_session_resume_all_p=y widens the choice to every project.
+    #:
+    #: Usage: claude-code-session-resume-fz [to-profile] [claude args...]
+    ##
+    local all_p="${claude_code_session_resume_all_p:-n}"
+
+    local claude_code_view_session_fz_scope='project'
+    if bool "${all_p}" ; then
+        claude_code_view_session_fz_scope='all'
+    fi
+
+    local source
+    source="$(h-claude-code-session-select-fz)" @RET
+
+    claude-code-session-resume "${source}" "$@"
+}
+aliasfn claude-resume-fz claude-code-session-resume-fz
+
 function claude-resume-personal {
     #: [agfi:claude-code-session-resume] into the default profile: continue a
     #: work session on the personal account.
-    #: Usage: claude-resume-personal [transcript|uuid] [claude args...]
+    #: Usage: claude-resume-personal <transcript|uuid> [claude args...]
     ##
     claude-code-session-resume "${1}" default "${@[2,-1]}"
 }
+aliasfn claude-resume-personal-fz claude-code-session-resume-fz default
 
 function claude-resume-work {
     #: [agfi:claude-code-session-resume] into the work profile.
-    #: Usage: claude-resume-work [transcript|uuid] [claude args...]
+    #: Usage: claude-resume-work <transcript|uuid> [claude args...]
     ##
     claude-code-session-resume "${1}" work "${@[2,-1]}"
 }
+aliasfn claude-resume-work-fz claude-code-session-resume-fz work
 ##

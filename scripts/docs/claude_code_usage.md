@@ -236,19 +236,21 @@ the other way round. `claude-code-session-resume` in
 `zshlang/auto-load/others/claude-session.zsh` closes that gap:
 
 ```
-claude-code-session-resume                    # pick a session of this project, any profile
+claude-code-session-resume-fz                 # pick a session of this project, any profile
 claude-code-session-resume <uuid>             # resume it under the profile that owns it
 claude-code-session-resume <uuid> default     # fork it into the personal profile and resume there
 claude-resume-personal <uuid>                 # the same
+claude-resume-personal-fz                     # the same, picking the session with fzf
 claude-resume-work <uuid>                     # the reverse
 ```
 
 The first argument is a transcript path or a session uuid (a unique prefix is
 enough); it is looked up under every profile. The second names the target
-profile; anything after that goes to the launcher. The launcher comes from
-`claude_code_profile_launchers` next to `claude_code_profiles`, so the work
-seat keeps its tty marker and every profile keeps the sync and watchdogs of
-the `claude` wrapper.
+profile; anything after that goes to the launcher. The `-fz` forms take the
+profile first and pick the session interactively; `claude-resume-work-fz`
+exists too. The launcher comes from `claude_code_profile_launchers` next to
+`claude_code_profiles`, so the work seat keeps its tty marker and every
+profile keeps the sync and watchdogs of the `claude` wrapper.
 
 When the target differs from the owner, `claude-code-session-import` forks
 the session there under a **new** uuid: it copies the transcript, the
