@@ -8,9 +8,12 @@
 #: Everything but fzf itself goes through the garden. The rows come from
 #: [agfi:h-claude-code-session-pick-rows], the preview from
 #: [agfi:h-claude-code-session-preview], and the choice goes back to
-#: [agfi:claude-code-view-session]. `brishzq.zsh' rather than `brishz.dash'
-#: because it quotes its arguments, so a path is never pasted into a command
-#: line raw.
+#: [agfi:claude-code-view-session-bg] when the hotkey opened us -- it passes
+#: the tab's key as CLAUDE_VIEW_TAB_KEY, so the conversion runs in the
+#: background under that tab's band and a second cmd+shift+o cancels it -- or
+#: to the plain [agfi:claude-code-view-session] otherwise. `brishzq.zsh' rather
+#: than `brishz.dash' because it quotes its arguments, so a path is never
+#: pasted into a command line raw.
 #:
 #: Plain `zsh -f' via zshplain.dash: loading zshlang here would cost seconds on
 #: every miss, and everything heavy already lives in the garden.
@@ -37,4 +40,7 @@ fields=( "${(@ps:\t:)selected}" )
 transcript="${fields[2]}"
 [[ -n "${transcript}" ]] || exit 0
 
+if [[ -n "${CLAUDE_VIEW_TAB_KEY}" ]] ; then
+    exec "${brishzq}" claude-code-view-session-bg "${transcript}" "${CLAUDE_VIEW_TAB_KEY}"
+fi
 exec "${brishzq}" claude-code-view-session "${transcript}"

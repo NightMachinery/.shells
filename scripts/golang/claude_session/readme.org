@@ -457,13 +457,63 @@ The Go probe is by =command -v=, a real PATH lookup, not by the shell's command
 hash: the garden's hash is stale for a binary installed after it started, and
 trusting it would send every call down the slow build-check path.
 
+** In the background, with a band, press again to cancel
+
+The conversion is the slow part -- =claude_session render= plus a fan-out of
+pandoc processes, seconds on a large transcript -- so none of it runs in the
+hotkey. The press itself only identifies the tab (kitty, about 30ms), claims
+it, raises a band and returns. Everything else, the 300ms lookup included,
+happens in =h-claude-code-view-job= behind that band, which names the session
+once it is known and comes down when emacs has the file. Resolving *before*
+claiming would leave a 300ms window in which a second press starts a second
+job; this way a double-tap deterministically cancels.
+
+The key is a toggle. A press while the tab's conversion is running cancels it:
+the band turns amber and says so, the process tree goes, the temp directory
+with its truncated =.org= is removed. The next press starts afresh.
+
+The job lives in a tmux session named for the tab, =claude-view-<kitty-pid>-<window-id>=,
+which is the repository's detached-job primitive and, here, also the lock, the
+handle and the cancel target: =tmuxnew= kills any previous session of that
+name before creating the new one, =tmux-alive-p= says whether the job still
+runs (=has-session= alone does not, with =remain-on-exit= on), and
+=tmux-session-processes-kill= takes the whole tree down, pandoc children
+included. No marker, pid file or redis key -- the same shape as the usage
+notifier. The temp directory is recorded on the session with
+=tmux set-option '@ccv_tmp'= for the canceller, so the bookkeeping cannot
+outlive the job. The renderer's build check runs in the foreground before the
+job starts, so a cancel never has to kill a Go toolchain on a first use.
+
+The band is hs-alert v2 under the same name as the tmux session. Re-showing an
+id updates the band in place, and an unchanged message is a heartbeat, so the
+job reports progress by re-showing; bands stack, so two tabs converting at once
+show two. =hs-alert-dismiss= takes one down. Every alert call is wrapped in
+=reval-timeout= and never fails the caller, so a Hammerspoon mid-reload cannot
+hang a hotkey. On failure the band turns red with the reason and a
+notification goes out too; the band would otherwise expire on its own in ten
+minutes, so a crashed job cannot brand the screen.
+
+Two ordering rules in the canceller, both learned elsewhere in the repository:
+read the session's options before killing it, since the kill discards them; and
+change the band before the kill, so nothing the death triggers can repaint it.
+Cleanup lives in the canceller, not in an =always= block inside the job,
+because a killed process is not guaranteed to run one.
+
+On success the temp directory stays, as it always has: emacs has the file
+open.
+
+** The picker
+
 When none of the four resolves, the hotkey does not notify and give up. It
 opens a picker over every live session as a kitty overlay in that same window,
 =zshlang/wrappers/claude-code-session-pick.zsh=: "which one did you mean" is a
 question, not a failure. It is an overlay running its own script because fzf
 needs a terminal and neither the background hotkey nor the garden's shells
 have one; the script runs fzf itself and goes through the garden for the rows,
-the preview and the final open.
+the preview and the final open. The tab's key travels into the overlay as
+=CLAUDE_VIEW_TAB_KEY=, so the choice comes back through
+=claude-code-view-session-bg= and gets the same band and cancel as a direct
+hit.
 
 ** The registry, as insurance
 
