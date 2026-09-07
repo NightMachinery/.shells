@@ -228,6 +228,60 @@ booleans `claude_code_usage_refresh_p`, `claude_code_usage_json_p`,
 `~/tmp/.claude-usage/<profile>/`. Extra CLI args are passed through after the
 derived ones, so explicit flags win.
 
+## Resuming across profiles
+
+`claude --resume` only searches the active profile's config home, so a
+session started on the work seat is invisible to the personal `claude`, and
+the other way round. `claude-code-session-resume` in
+`zshlang/auto-load/others/claude-session.zsh` closes that gap:
+
+```
+claude-code-session-resume                    # pick a session of this project, any profile
+claude-code-session-resume <uuid>             # resume it under the profile that owns it
+claude-code-session-resume <uuid> default     # fork it into the personal profile and resume there
+claude-resume-personal <uuid>                 # the same
+claude-resume-work <uuid>                     # the reverse
+```
+
+The first argument is a transcript path or a session uuid (a unique prefix is
+enough); it is looked up under every profile. The second names the target
+profile; anything after that goes to the launcher. The launcher comes from
+`claude_code_profile_launchers` next to `claude_code_profiles`, so the work
+seat keeps its tty marker and every profile keeps the sync and watchdogs of
+the `claude` wrapper.
+
+When the target differs from the owner, `claude-code-session-import` forks
+the session there under a **new** uuid: it copies the transcript, the
+`<uuid>/` directory holding subagent transcripts and tool results, and
+`file-history/<uuid>/`, which `/rewind` uses, then rewrites the uuid inside
+the copies. The same uuid in two profiles would make the kitty hotkey's title
+match and Claude Code's own `--resume <name>` ambiguous, and resuming the
+stale copy later would fork it silently. The fork is renamed to the source's
+name plus ` ⑂ <profile>` (`claude_code_session_import_name_suffix`, a printf
+format; a fork of a fork keeps one suffix, not a trail), written as both an
+`agent-name` and a `custom-title` line so the `claude_session` resolver and
+Claude Code's picker agree. The source is never modified;
+`claude_code_session_import_remove_source_p=y` trashes it afterwards so the
+session leaves the source profile's picker.
+
+Not copied, because they are per profile rather than per session: plan files
+(their names are not derivable from the transcript), the per-project auto
+memory, and the prompt history.
+
+Instruction files are not stored in a transcript. Claude Code injects them
+from the active config dir at launch, so the fork runs under the *target*
+profile's assembled CLAUDE.md. Going from work to personal this drops the
+work overlay's privacy guardrails, which is right: they protect the work
+store, and new turns now land in the personal one while the work original is
+untouched. Going the other way puts the whole history into the work store
+before those guardrails ever apply, so importing into any non-default profile
+asks for confirmation first (`claude_code_session_import_yes_p=y` skips it).
+
+A live source is refused, since the running process keeps appending to it
+and the fork would be stale at once; quit that session first, or set
+`claude_code_session_import_force_p=y` to fork whatever exists now.
+
+
 ## Reset notifications
 
 A report can also arm a one-shot background job that fires `notif` once the
