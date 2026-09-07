@@ -56,14 +56,34 @@ fi
 #: by the app itself, so this asserts truecolor only where we really are inside
 #: Termux -- never on a VPS, where COLORTERM must come from the client.
 #:
-#: sshd forwards only what AcceptEnv permits, commonly "LANG LC_*", so mirror an
-#: LC_ copy too; the far side restores the plain name in env-load-smuggled-lc-vars.
 if [ -n "${TERMUX_VERSION}" ] && [ -z "${COLORTERM}" ] ; then
   export COLORTERM=truecolor
 fi
-if [ -n "${COLORTERM}" ] && [ -z "${LC_COLORTERM}" ] ; then
-  export LC_COLORTERM="${COLORTERM}"
-fi
+
+#: --- variables smuggled through ssh, both directions ---
+#:
+#: sshd forwards only what AcceptEnv permits, and the widespread default is
+#: "LANG LC_*", so the sending side mirrors LC_<NAME> and the receiving side
+#: restores <NAME>. The full stack does this in env-save-smuggled-lc-vars and
+#: env-load-smuggled-lc-vars; this is the standalone equivalent, because
+#: minimal_proxy must not depend on zshlang being present.
+#:
+#: Restoring matters at least as much as mirroring here: a minimal_proxy host
+#: is normally the far end of the connection, so without this the LC_ copies
+#: arrive and are simply ignored. Mirroring keeps a further hop working.
+#:
+#: Never clobber a plain name that is already set -- the local environment
+#: knows better than a value forwarded from somewhere else.
+for night_h_smuggled in COLORFGBG COLORTERM TERM_PROGRAM KITTY_WINDOW_ID ; do
+  eval "night_h_plain=\${${night_h_smuggled}:-}"
+  eval "night_h_lc=\${LC_${night_h_smuggled}:-}"
+  if [ -z "${night_h_plain}" ] && [ -n "${night_h_lc}" ] ; then
+    export "${night_h_smuggled}=${night_h_lc}"
+  elif [ -n "${night_h_plain}" ] && [ -z "${night_h_lc}" ] ; then
+    export "LC_${night_h_smuggled}=${night_h_plain}"
+  fi
+done
+unset night_h_smuggled night_h_plain night_h_lc
 # export TERM="xterm-kitty"
 # export TERMINFO=/usr/share/terminfo
 # export TERM="xterm+256color"
