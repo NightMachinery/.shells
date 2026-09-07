@@ -62,6 +62,10 @@ tailnet, account, hostname, or auth-key material in this public repo. See
 Termux. Installation and verification: =./docs/emacs-truecolor.md=.
 =emc-mobile= opens a truecolor terminal frame with mobile line-number suppression.
 
+Under tmux the colors are re-encoded through the attached client's terminfo, so a
+Termux client reporting =xterm-kitty= received a spelling it cannot parse and
+printed the escapes as text. Cause and fix: =./docs/tmux-termux-truecolor.md=.
+
 * UNIX sockets
 
 kitty's remote control, the Emacs server and the iTerm focus helper all bind a
