@@ -1,3 +1,117 @@
+function kitty-sockets-list {
+    #: Every kitty remote-control socket belonging to a kitty that is still
+    #: alive, one path per line.
+    #:
+    #: `listen_on' puts kitty's pid in the socket's name (see
+    #: =configFiles/kitty/kitty.conf=), so a socket left behind by a kitty that
+    #: crashed is *identifiable* rather than merely ambiguous. That is the whole
+    #: reason nothing here deletes anything: a stale socket costs a `pgrep'
+    #: lookup, whereas deleting one you misjudged costs a running kitty its
+    #: remote control until it is restarted, unrecoverably.
+    #:
+    #: `pgrep -x', never `-f': `-f' matches whole command lines, including our
+    #: own.
+    ##
+    local dir="${NIGHT_SOCKETS_DIR:-${HOME}/.local/state}"
+
+    #: `(N)' so no match yields nothing rather than an error. Do NOT add `.':
+    #: these are sockets, not regular files.
+    local -a socks
+    socks=( ${~${kitty_sockets_list_glob:-${dir}/kitty-*.sock}}(N) )
+    (( ${#socks} )) || return 0
+
+    local -a live
+    live=( ${(f)"$(command pgrep -x kitty)"} )
+
+    local s pid
+    for s in "${socks[@]}" ; do
+        #: `kitty-548.sock' -> `548'
+        pid="${${s:t}#kitty-}"
+        pid="${pid%.sock}"
+
+        if (( ${live[(Ie)${pid}]} )) ; then
+            ec "${s}"
+        fi
+    done
+}
+
+function kitty-socket-pid {
+    #: kitty's pid, read out of the socket path that names it:
+    #: `unix:/Users/evar/.local/state/kitty-548.sock' -> `548'.
+    #:
+    #: The pid is in the name because `listen_on' puts it there; see
+    #: =configFiles/kitty/kitty.conf=. Knowing the owning kitty is what lets a
+    #: registry key survive a kitty restart without ever matching the previous
+    #: instance's windows.
+    #: Usage: kitty-socket-pid <socket>
+    ##
+    local sock="${1}"
+    test -n "${sock}" || return 1
+
+    #: Greedy to the last `-', so dashes anywhere in the directory are
+    #: harmless, then drop the suffix.
+    local pid="${${sock##*-}%.sock}"
+
+    #: `<->' is any run of digits: refuse to hand back half a filename.
+    [[ "${pid}" == <-> ]] || return 1
+
+    ec "${pid}"
+}
+
+function kitty-socket-get {
+    #: The one live kitty's remote-control socket, as `unix:<path>'. Prints the
+    #: reason to stderr and to $kitty_socket_get_err when there is not exactly
+    #: one, so a caller wiring this into a notification can say *which* way it
+    #: failed instead of a single unhelpful "no socket".
+    #:
+    #: `KITTY_LISTEN_ON' is trusted only while it still points at a socket that
+    #: exists: BrishGarden's shells outlive kitty, so the garden holds whatever
+    #: value was in the environment the day it started, and that goes stale the
+    #: moment kitty restarts.
+    ##
+    unset kitty_socket_get_err
+
+    if [[ "${KITTY_LISTEN_ON}" == unix:* ]] && test -e "${KITTY_LISTEN_ON#unix:}" ; then
+        ec "${KITTY_LISTEN_ON}"
+        return 0
+    fi
+
+    local -a socks
+    socks=( ${(f)"$(kitty-sockets-list)"} )
+    socks=( ${socks:#} )
+
+    if (( ${#socks} == 1 )) ; then
+        ec "unix:${socks[1]}"
+        return 0
+    fi
+
+    #: Derived from the glob that was actually used, so an overridden glob
+    #: cannot make the message name a directory we never looked in.
+    local dir="${${kitty_sockets_list_glob:-${NIGHT_SOCKETS_DIR:-${HOME}/.local/state}/kitty-*.sock}:h}"
+
+    if (( ${#socks} == 0 )) ; then
+        local -a live
+        live=( ${(f)"$(command pgrep -x kitty)"} )
+        live=( ${live:#} )
+
+        if (( ${#live} == 0 )) ; then
+            kitty_socket_get_err="kitty is not running"
+        else
+            #: The failure that is invisible without being told: `listen_on' is
+            #: startup-only ("Changing this option by reloading the config is
+            #: not supported"), and an unlinked socket path cannot be re-linked,
+            #: so kitty keeps the bound inode while every client gets ENOENT.
+            #: Reloading the config will not help. Only a restart will.
+            kitty_socket_get_err="kitty is running (pid ${live[1]}) but has no socket in ${dir/#${HOME}/~}; restart kitty, a config reload cannot re-create it"
+        fi
+    else
+        kitty_socket_get_err="several live kitty sockets in ${dir/#${HOME}/~}: ${(j:, :)${socks[@]:t}}"
+    fi
+
+    ecerr "$0: ${kitty_socket_get_err}"
+    return 1
+}
+
 function kitty-remote() {
     : "Invoke with no args to enter the kitty shell"
 
@@ -5,16 +119,18 @@ function kitty-remote() {
         kitty @ "$@"
     else
         local s i ret=1
-        s=("$HOME/tmp/.kitty"*(DN)) # do NOT use '.' glob as these aren't 'files'
+        s=( ${(f)"$(kitty-sockets-list)"} )
+        s=( ${s:#} )
         if (( $#s >= 1 )) ; then
-            # dead kitties can leave trash sockets behind
             for i in ${s[@]} ; do
                 if kitty @ --to unix:${i} "$@" ; then
                     ret=0
-                else
-                    silent trs "$i" # garbage collecting dead sockets
-                    # @futureCron did this delete live sockets as well?
                 fi
+                #: Deliberately no cleanup of sockets that do not answer. This
+                #: used to `trs' them, and a `kitty @' that failed for any other
+                #: reason -- a bad subcommand, a kitty too busy to reply -- took
+                #: a live socket with it. [agfi:kitty-sockets-list] already
+                #: filters by pid, so there is nothing left to collect.
             done
         fi
 
@@ -161,7 +277,7 @@ function kitty-launch-emc {
     # The retry is to work around the recent emacs/doom issue that kills the starting frame (and sometimes all the frames, when doom themes are used).
     ##
     # This doesn't work, as somehow our config is not loaded. It will work if there is already a server running on EMACS_SOCKET_NAME though
-    # kitty @ launch '--type=tab' bash -c 'TERM=xterm-emacs EMACS_SOCKET_NAME=$HOME/tmp/.emacs ALTERNATE_EDITOR= emacsclient -t ; sleep 10'
+    # kitty @ launch '--type=tab' bash -c 'TERM=xterm-emacs EMACS_SOCKET_NAME="$EMACS_SOCKET_NAME" ALTERNATE_EDITOR= emacsclient -t ; sleep 10'
     ##
 }
 alias kemc='kitty-launch-emc'
