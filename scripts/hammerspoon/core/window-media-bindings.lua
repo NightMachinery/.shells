@@ -223,45 +223,37 @@ end
 -- puts you back where you were. When kitty had to be launched, the show can
 -- take a few seconds while the session's tabs start; nothing here waits.
 --
--- Hiding has to return to the window that was in front at show time: a panel
--- that goes away leaves focus on a window-less kitty (measured with the
--- quick-access kitten), so macOS does not hand it on by itself. The old
--- handler kept a "previous app" that went stale whenever kitty was reached by
--- another route. Here the memory is a window, an application watcher forgets
--- it the moment anything other than kitty is activated, and it is taken out of
--- the variable synchronously at press time, before the asynchronous hide can
--- trigger that watcher. With nothing remembered, the topmost other window on
--- the current space is focused instead.
+-- Hiding has to put you back where you were: a panel that goes away leaves
+-- focus on a window-less kitty, and macOS does not hand it on by itself. The
+-- old handler kept a "previous app" that went stale whenever kitty was
+-- reached by another route. Here an application watcher keeps the last
+-- non-kitty app that was activated, so the memory is refreshed by every
+-- switch you make and is never older than the show in effect. It is an app
+-- rather than a window, and nothing enumerates windows: hs.window.orderedWindows
+-- asks every process through Accessibility, and the "Handy Web Content"
+-- processes take 1.5 s each to answer (axLatencyReport), so one call stalled
+-- Hammerspoon for three seconds.
 
 local kittyBundleID = "net.kovidgoyal.kitty"
 
--- The window to return to on hide; nil unless a hyper+z show is in effect.
+-- The app to return to on hide: the last one activated that is not kitty.
 local kittyReturnTo = nil
 
 local kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     if event == hs.application.watcher.activated
         and app and app:bundleID() ~= kittyBundleID then
-        kittyReturnTo = nil
+        kittyReturnTo = app
     end
 end)
 kittyFocusWatcher:start()
 
--- Focuses `back', or failing that the topmost window that is not kitty's.
 local function kittyFocusAfterHide(back)
-    if back then
-        -- The window may have closed since; a dead hs.window answers nil.
-        local ok = pcall(function()
-            if back:application() then back:focus() end
-        end)
-        if ok then return end
-    end
-    for _, win in ipairs(hs.window.orderedWindows()) do
-        local app = win:application()
-        if app and app:bundleID() ~= kittyBundleID then
-            win:focus()
-            return
-        end
-    end
+    if not back then return end
+    -- The app may have quit since; a dead hs.application answers nil.
+    pcall(function()
+        local win = back:focusedWindow()
+        if win then win:focus() else back:activate() end
+    end)
 end
 
 function kittyHandler()
@@ -269,15 +261,26 @@ function kittyHandler()
     -- enumerates every running process.
     local app = getApp(kittyBundleID)
 
+    -- One line per press in the console, so "it did nothing" can be traced:
+    -- what was in front, and which way this press went.
+    local front = hs.application.frontmostApplication()
+    print(string.format("kittyHandler: press; kitty %s; frontmost=%s; -> %s",
+                        app and (app:isFrontmost() and "frontmost" or "running") or "not running",
+                        front and front:name() or "?",
+                        (app and app:isFrontmost()) and "hide" or "show"))
+
     if app and app:isFrontmost() then
+        -- Read now, not in the timer: the hide may activate something and
+        -- the watcher would overwrite the memory before the timer fires.
         local back = kittyReturnTo
-        kittyReturnTo = nil
         brishz_eval_hs("kitty-panel-hide", "kittyHandler")
         hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
         return
     end
 
-    kittyReturnTo = hs.window.frontmostWindow()
+    if front and front:bundleID() ~= kittyBundleID then
+        kittyReturnTo = front
+    end
     brishz_eval_hs("kitty-panel-show", "kittyHandler")
 end
 

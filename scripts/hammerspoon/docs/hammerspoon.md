@@ -684,20 +684,34 @@ into a panel (`resize-os-window --action=os-panel` answers "is not a panel"),
 so the tabs move rather than the window: tabs in any other OS window (the
 startup session from `me.conf` opens in a normal one; scripts sometimes open
 another) are moved in with `kitty @ detach-tab --match id:<tab> --target-tab
-id:<panel tab>`, in listed order; then the shell tab the panel was born with
-is closed, and the tab that was active before the shuffle is re-activated with
-`focus-tab`, since tab ids are renumbered by the move. An OS window left
-without tabs closes itself, and `macos_quit_when_last_window_closed` does not
-fire because the panel remains. Measured: all ten session tabs arrived in
-order, the active tab stayed active, the panel covered the display (frame
-0,24,1920,1056), and from a fullscreen Brave it appeared over Brave with no
-space switch.
+id:<panel tab>`, in listed order, and then the shell tab the panel was born
+with is closed. The move renumbers tab ids, and the tab folded in last simply
+becomes the active one; nothing is done to restore the previously active tab,
+for a reason given below. An OS window left without tabs closes itself, and
+`macos_quit_when_last_window_closed` does not fire because the panel remains.
+Measured: all ten session tabs arrived in order, the panel covered the display
+(frame 0,24,1920,1056), and from a fullscreen Brave it appeared over Brave
+with no space switch.
 
 Show and hide are `kitty @ resize-os-window --match all --action=show` and
 `--action=hide`. Showing does not focus the panel by itself (measured), so
 `kitty-panel-show` follows with `focus-window --match id:<window>`, the
 active window of the panel's active tab. Hiding is idempotent, and a kitty
 that is not running counts as hidden.
+
+The order, show first and focus second, is load-bearing, and it is why
+`kitty-panel-ensure` no longer focuses anything. While the panel is hidden,
+macOS collapses its space memberships back to the desktop space alone:
+`hs.spaces.windowSpaces` went from {1774, 5, 1835} to {5} after Brave
+re-entered fullscreen with the panel hidden. Each `show` then joins the
+current space, one more per show (5, then 5 and 1990). An earlier version of
+`kitty-panel-ensure` ran `focus-tab` to restore the previously active tab
+before the show. Focusing activates kitty, and activating an app whose only
+window is on the desktop can make macOS switch to the desktop, so the show
+that followed sometimes landed there instead of over the fullscreen Brave.
+With every focus moved after the show, two show/hide rounds from a freshly
+created fullscreen Brave space both showed the panel over Brave, space
+unchanged, and returned to Brave.
 
 When `kitty-socket-get` finds no socket, `kitty-panel-ensure` launches kitty
 with `open -b net.kovidgoyal.kitty --args --start-as minimized`, through
@@ -717,22 +731,31 @@ show or hide, by whether kitty is frontmost, and handles focus on hide.
 
 Focus on hide is the part macOS will not do for you. Hiding a panel leaves
 focus on a window-less kitty, macOS does not hand it on, and if the show
-switched no space there is nothing for it to switch back to either. So at show
-time `kittyHandler` remembers `hs.window.frontmostWindow()` in
-`kittyReturnTo`. An `hs.application.watcher` forgets it the moment any
-application other than kitty is activated, so it can never be stale, which the
-old `kitty_prev_app` was whenever kitty had been reached by another route. On
-hide the value is taken out of the variable synchronously at press time,
-before the asynchronous hide could trigger that watcher, and focused 0.35 s
-later by `kittyFocusAfterHide`; a window that has closed in the meantime is
-caught with `pcall`. With nothing remembered, the topmost window on the
-current space that is not kitty's is focused instead. Measured: from a
-fullscreen Brave, press one showed the panel over Brave and press two returned
-to Brave, twice in a row; from ChatGPT on the desktop likewise.
+switched no space there is nothing for it to switch back to either. So
+`kittyReturnTo` holds the application to go back to. It is kept by an
+`hs.application.watcher`: every activation of an app other than kitty stores
+that app, so the memory is refreshed by every switch you make and is never
+stale, which the old `kitty_prev_app` was whenever kitty had been reached by
+another route. `kittyHandler` also stores the frontmost app at show time. On
+hide the value is read synchronously at press time, before the asynchronous
+hide could activate something and have the watcher overwrite it, and 0.35 s
+later `kittyFocusAfterHide` focuses that app's focused window, falling back to
+`activate()`, all inside `pcall` in case the app has quit since. It is an
+application rather than a window, and there is no fallback that walks
+`hs.window.orderedWindows()`: that call asks every process through
+Accessibility, and the two "Handy Web Content" processes take 1.5 s each to
+answer (`axLatencyReport`), so one call stalled Hammerspoon for three seconds.
+Nothing in the kitty path enumerates windows now. Measured: from a fullscreen
+Brave, press one showed the panel over Brave and press two returned to Brave,
+twice in a row; from ChatGPT on the desktop likewise.
 
 To check kitty is healthy, run `kitty-remote ls` (or `kitty @ --to
 "$(kitty-socket-get)" ls`) through `jq -c '.[] | {id, wm_class, ntabs:
 (.tabs|length)}'`. It should list exactly one OS window, with `wm_class`
 `kitty-panel`. A second OS window means something opened a normal window; the
-next hyper+z folds it in. In the Hammerspoon console, `hs.console.getConsole()`
-lines mentioning `kittyHandler` are failures reported by `brishz_eval_hs`.
+next hyper+z folds it in. In the Hammerspoon console, every press logs one
+line, `kittyHandler: press; kitty <state>; frontmost=<app>; -> show|hide`,
+where the state is `frontmost`, `running` or `not running`, so a press that
+"did nothing" can be traced to which way it went and what was in front. Other
+`hs.console.getConsole()` lines mentioning `kittyHandler` are failures
+reported by `brishz_eval_hs`.
