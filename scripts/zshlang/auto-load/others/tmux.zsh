@@ -5,6 +5,38 @@ function tmux-client-terminal-get {
     ##
     tmux display-message -p '#{client_termname}' 2>/dev/null
 }
+
+function tmux-client-termtype-get {
+    #: The terminal's own answer to tmux's XTVERSION query, e.g. `kitty(0.48.2)`.
+    #: Unlike [agfi:tmux-client-terminal-get], TERM cannot spoof this.
+    #: Empty on tmux <3.3 (the format does not exist) and on terminals that stay
+    #: silent, which is why the callers must treat empty as "not that terminal".
+    ##
+    tmux display-message -p '#{client_termtype}' 2>/dev/null
+}
+
+function tmux-client-termtype-supported-p {
+    #: Memoized: [agfi:isKitty] sits on the hot path of every [agfi:colorfg] call
+    #: through [agfi:true-color-p], so this must not fork on each invocation.
+    ##
+    if test -n "${tmux_client_termtype_supported_p}" ; then
+        bool "${tmux_client_termtype_supported_p}"
+        return $?
+    fi
+
+    local v ver='' res=n
+    #: `tmux -V` prints e.g. `tmux 3.6a` or `tmux next-3.7`.
+    v="$(tmux -V 2>/dev/null)"
+    if [[ "$v" =~ '([0-9]+\.[0-9]+)' ]] ; then
+        ver="$match[1]"
+    fi
+    if test -n "$ver" && is-at-least 3.3 "$ver" ; then
+        res=y
+    fi
+
+    typeset -g tmux_client_termtype_supported_p="$res"
+    bool "$res"
+}
 ##
 
 function tmux-alive-p {

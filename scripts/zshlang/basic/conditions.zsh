@@ -179,7 +179,20 @@ function isKitty {
 
     if isTmux ; then
         #: [[id:6f98aca5-a5a3-449e-833c-ba58627f1ad4][detect kitty terminal when inside tmux]]
+        #:
+        #: Prefer the XTVERSION reply over TERM. A client can claim `xterm-kitty`
+        #: without being kitty (Termux is commonly set that way by hand, to
+        #: unlock truecolor), and trusting TERM made us hand kitty-only
+        #: capabilities to an emulator that garbles them.
+        #: @see =docs/tmux-termux-truecolor.md=
         ##
+        if tmux-client-termtype-supported-p ; then
+            #: A terminal that does not answer the query is not kitty.
+            [[ "$(tmux-client-termtype-get)" =~ '\bkitty\b' ]]
+            return $?
+        fi
+
+        #: tmux <3.3 has no =#{client_termtype}=; fall back to the spoofable TERM.
         [[ "$(tmux-client-terminal-get)" =~ '\bkitty\b' ]]
         return $?
     fi
