@@ -643,3 +643,96 @@ networksetup -setairportnetwork <interface> <ssid>
 
 This works best for open or previously remembered networks. New protected
 networks may still need credentials added through macOS first.
+
+## kitty: hyper+z and hyper+shift+z
+
+`kittyHandler` in `core/window-media-bindings.lua` is the hyper+z toggle for
+the regular kitty: bring its window to the screen the mouse is on, or hide it
+if it is already in front. It is not an `appHotkey`, because kitty quits when
+its last window closes and the hotkey has to be able to launch it, and because
+kitty's window has a way of ending up somewhere it should not be.
+
+macOS parks a newly created window in whatever space is active at the moment
+of creation, a fullscreen one included. kitty's "claude-work-slides" window was
+found living inside Purple Telegram's fullscreen space for exactly that
+reason. Once that happens, every activation of kitty from anywhere, hyper+z or
+Cmd-Tab, jumps to Telegram's space; and when Telegram later leaves fullscreen,
+macOS dumps the orphaned window on the lone desktop, so activating kitty
+"shows the desktop" instead. This machine has one regular desktop and eight
+fullscreen spaces, so the trap is easy to fall into.
+
+The old handler made none of this better. On every press it called
+`hs.spaces.moveWindowToSpace(win, hs.spaces.focusedSpace())`, hoping to drag
+kitty over whatever fullscreen app was showing. That never worked: `hs.spaces`
+refuses a plain move into a fullscreen space, and a forced one returns true
+and does nothing (both measured on 2026-09-07, macOS 14.3.1, Hammerspoon
+1.1.1, kitty 0.48.1). Two smaller faults sat beside it. The toggle-off path
+hid kitty and activated a remembered `kitty_prev_app`, stale whenever kitty
+had been reached by any other route and nil after every reload. And the lookup
+was `hs.application.get("kitty")`, the slow by-name enumeration
+`core/app-hotkeys.lua` explains at its top, followed by `app:focusedWindow()`
+and `win:screen()` before any nil check, so with kitty not running the handler
+threw rather than launching it.
+
+The direction that does work is out. Leaving a fullscreen space succeeds with
+the `force` flag of `moveWindowToSpace`; without it Hammerspoon refuses with
+"source space ... is not a user space". Measured: a forced move from 1774
+(fullscreen) to 5 (user) returned true and took effect. So the actual fix is
+`kittyEvictFromFullscreen`: whenever kitty's window sits in no user space, it
+is moved back to the first user space of its screen (`kittyHomeSpace`). The
+handler does this both before showing and before hiding, so activation always
+lands on kitty's own space and never on someone else's fullscreen one, and a
+window put back every time it is put away cannot be left fused anywhere.
+
+The rest of the handler: kitty is looked up by bundle ID with
+`getApp('net.kovidgoyal.kitty')` and launched if it is not running; a window is
+chosen without assuming one exists. On show, the window is moved to the mouse
+screen if it is elsewhere, evicted if needed, and then, if the mouse screen's
+active space (`hs.spaces.activeSpaceOnScreen`) is a user space the window is
+not already in, moved there with a plain user-to-user move, which saves a
+space switch. A fullscreen target is left alone, and the handler just
+activates, focuses and maximizes: from a fullscreen app, hyper+z switches you
+to kitty's desktop, which is what macOS itself does. Either move failing
+raises a warning through `alert_gateway` rather than failing silently. On
+hide, kitty is evicted and hidden; nothing remembers a previous app, since
+hiding hands focus to whatever is underneath on its own.
+
+hyper+shift+z is the route that floats over fullscreen apps: kitty's own
+quick-access terminal, run as
+`/Applications/kitty.app/Contents/MacOS/kitten quick-access-terminal` through
+`hs.task` via `taskWithPath` in `core/helpers.lua`. The kitten toggles. The
+first run *is* the instance and stays a running task for as long as the panel
+lives, kept in a table so it is not garbage-collected; later runs tell it to
+show or hide and exit at once. Measured: the panel appeared covering the
+display (frame 0,24,1920,1056) over Telegram's fullscreen space with no space
+switch, and the next run hid it. `--detach` is deliberately not used: on this
+machine the detached child died silently, kitten exit 0, no log file, no
+instance.
+
+One wrinkle: after a hide, the quick-access app stays frontmost with no window,
+so keystrokes go nowhere. The binding checks before running the kitten whether
+quick-access is already frontmost, meaning this press is a hide, and if so
+waits 0.3 s and then focuses the first window from `hs.window.orderedWindows()`
+that does not belong to the quick-access bundle (`quickAccessRefocus`).
+
+It is a separate kitty instance with its own bundle ID,
+`net.kovidgoyal.kitty-quick-access` (app name `kitty-quick-access`), so it does
+not show the regular kitty's windows, and every per-app rule keyed on kitty's
+bundle ID had to be extended to the second one: `fimAppPolicy` in
+`core/fim.lua` and `enOnly` in `core/input-language.lua`.
+
+Its config is `configFiles/kitty/quick-access-terminal.conf` in
+`~/scripts/configFiles/kitty/`, symlinked into `~/.config/kitty/` like
+`kitty.conf`, which it inherits. It adds `edge center`, so the panel covers the
+whole display except the menu bar and dock; `background_opacity 1.0`, since
+the default 0.85 lets the window underneath bleed through;
+`hide_on_focus_loss no`, so it stays until toggled away; and `kitty_override
+allow_remote_control=socket-only` with `kitty_override
+listen_on=unix:${HOME}/.local/state/kitty-quick-access.sock`, so the instance
+can be remote-controlled like the regular one.
+
+To check the regular kitty is healthy, press hyper+z and then, from the
+Hammerspoon console, run `hs.inspect(hs.spaces.windowSpaces(<kitty window
+id>))`. It must name a user space; `hs.spaces.spaceType(id)` tells user from
+fullscreen. A fullscreen space in that list after hyper+z means the eviction
+has stopped working.
