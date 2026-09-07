@@ -45,7 +45,9 @@ aliasfn () {
 #: which was the useful half of the old unconditional assignment (otherwise:
 #: `terminals database is inaccessible`).
 ##
-if [ -z "${TERM}" ] || ! infocmp "${TERM}" > /dev/null 2>&1 ; then
+if [ -z "${TERM}" ] ; then
+  export TERM="xterm-256color"
+elif command -v infocmp > /dev/null 2>&1 && ! infocmp "${TERM}" > /dev/null 2>&1 ; then
   export TERM="xterm-256color"
 fi
 # export TERM="xterm-kitty"

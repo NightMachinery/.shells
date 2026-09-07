@@ -11,7 +11,18 @@ fi
 ##
 source "$NIGHTDIR"/zshlang/basic/conditions.zsh
 ##
-export TERM=xterm-256color # @surprise
+#: Do not overwrite the TERM the client sent. Hardcoding it meant every shell
+#: here reported xterm-256color whatever terminal was attached, so a kitty
+#: client lost its own terminfo even on hosts that had the entry installed.
+#: Downgrade only a TERM this host cannot actually resolve.
+#: @see ~/scripts/docs/tmux-termux-truecolor.md
+#: @duplicateCode of the same guard in setup/minimal_proxy/.shared.sh, which
+#: must stay standalone and cannot call into zshlang.
+if [ -z "${TERM}" ] ; then
+    export TERM=xterm-256color
+elif command -v infocmp > /dev/null 2>&1 && ! infocmp "${TERM}" > /dev/null 2>&1 ; then
+    export TERM=xterm-256color
+fi
 ##
 if isBash ; then
     if (( BASH_VERSINFO[0] >= 5 )) ; then

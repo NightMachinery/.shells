@@ -129,10 +129,20 @@ is how the phone came to announce `xterm-kitty` to every machine it reached.
 It now downgrades only a TERM this host cannot resolve, and never invents one:
 
 ```sh
-if [ -z "${TERM}" ] || ! infocmp "${TERM}" > /dev/null 2>&1 ; then
+if [ -z "${TERM}" ] ; then
+  export TERM="xterm-256color"
+elif command -v infocmp > /dev/null 2>&1 && ! infocmp "${TERM}" > /dev/null 2>&1 ; then
   export TERM="xterm-256color"
 fi
 ```
+
+The same guard is repeated verbatim in `~/.bashrc`, which had its own hardcoded
+`export TERM=xterm-256color` since commit 638ad035. On a host whose login shell
+is bash -- eva, for one -- bash sources `~/.bashrc` for ssh sessions too, so
+every connection reported xterm-256color no matter which terminal was attached,
+and a kitty client lost its own terminfo even though eva has the entry
+installed. The guard is duplicated rather than shared because `.shared.sh` must
+stay standalone and cannot call into zshlang.
 
 A genuine kitty client keeps `xterm-kitty`, tmux panes keep `tmux-256color`,
 and an unresolvable value still falls back rather than producing `terminals
