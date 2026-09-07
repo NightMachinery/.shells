@@ -2,6 +2,9 @@
 function xelatex-m {
     local opts=("${@[1,-2]}") name="${@[-1]:-main}"
     local open_p="${xelatex_open_p:-n}"
+    #: Let the post-compile [agfi:sioyek-reload] raise the viewer. See
+    #: `docs/sioyek.md`.
+    local focus_p="${xelatex_focus_p:-n}"
     local interactive_p="${xelatex_interactive:-n}"
     local build_dictionary_script="${xelatex_build_dictionary_script:-scripts/build_dictionary.py}"
 
@@ -46,7 +49,7 @@ function xelatex-m {
             open-sioyek "${name}.pdf" || true
         fi
 
-        sioyek-reload || true
+        sioyek_reload_focus_p="${focus_p}" sioyek-reload || true
     } always {
         if bool "${success_p}" ; then
             bell-insaniquarium-sing
