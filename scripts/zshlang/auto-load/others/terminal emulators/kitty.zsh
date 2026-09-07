@@ -421,10 +421,12 @@ function kitty-panel-ensure {
         fi
     fi
 
-    #: The tab that was active before we shuffle things, to make active again.
-    local active_tab
-    active_tab="$(command jq -r '[.[] | select(.is_active) | .tabs[] | select(.is_active) | .id][0] // empty' <<<"${ls_json}")"
-
+    #: Nothing here may focus anything. While the panel is hidden macOS keeps
+    #: it on the desktop space only, and activating kitty in that state (which
+    #: `focus-tab' and `focus-window' do) can switch the display to the desktop
+    #: before `show' has had the chance to join the current space. That was the
+    #: "hyper+z from a fullscreen Brave lands on the desktop" bug. Focusing is
+    #: kitty-panel-show's job, after the show.
     local -a stray
     stray=( ${(f)"$(command jq -r '.[] | select(.wm_class != "kitty-panel") | .tabs[].id' <<<"${ls_json}")"} )
     stray=( ${stray:#} )
@@ -439,17 +441,15 @@ function kitty-panel-ensure {
         kitty @ --to "${sock}" close-tab --match "id:${fresh_tab}" >/dev/null
     fi
 
-    if test -n "${active_tab}" ; then
-        kitty @ --to "${sock}" focus-tab --match "id:${active_tab}" >/dev/null 2>&1
-    fi
-
     ec "${sock}"
 }
 
 function kitty-panel-show {
     #: Shows the panel, with keyboard focus in its active window. Idempotent.
     #: Showing a panel does not focus it by itself (measured), hence the
-    #: explicit focus-window on the active tab's active window.
+    #: explicit focus-window on the active tab's active window. The order is
+    #: load-bearing: show first, so the panel has joined the current space,
+    #: then focus. See the note in kitty-panel-ensure.
     ##
     local sock
     sock="$(kitty-panel-ensure)" || return $?
