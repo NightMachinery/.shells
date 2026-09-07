@@ -151,3 +151,42 @@ database is inaccessible`.
 Redeploy with the rsync in `setup/minimal_proxy/gen.org` for the phone to pick
 this up; until then the `terminal-overrides` line above is what keeps its
 colors readable.
+
+## Truecolor inward, to the panes
+
+`terminal-overrides` and `terminal-features` govern what tmux sends *outward*,
+to the attached client. They say nothing to the programs running inside a pane,
+which learn what the terminal can do from the TERM tmux sets for them,
+`default-terminal`. With `tmux-256color` that advertises 256 colors, which is
+why overwriting TERM with the outer terminal's name was ever tempting.
+
+`tmux-direct` is the ncurses direct-color variant: `colors#0x1000000`, and
+`setaf`/`setab` take a 24-bit RGB value instead of a palette index. It gives
+panes truecolor honestly, through terminfo, with no lie about which terminal is
+attached.
+
+Measured on a throwaway server, pane writing through `tput`, client attached as
+`xterm-kitty`:
+
+- `tmux-256color`: pane sees `colors=256`; `tput setaf 65280` is out of range
+  and produces nothing.
+- `tmux-direct`: pane sees `colors=16777216`; `tput setaf 65280` reaches the
+  client as `ESC[38;2;0;255;0m`, semicolons included, because the override
+  above still governs the outward spelling.
+
+The cost is that `setaf`'s parameter changes meaning:
+
+- `tput setaf 2` is `ESC[32m` either way, since indices under 8 take the
+  ANSI branch.
+- a program writing `ESC[38;5;46m` itself is passed through untouched.
+- `tput setaf 46` becomes `ESC[38;2;0;0;46m`, near-black, rather than palette
+  index 46.
+
+So the only programs affected are those calling terminfo `setaf` with an index
+of 8..255 without first checking `colors`. Tools that emit raw SGR, which is
+most of them, are unaffected.
+
+`default-terminal` applies to panes created after the change; existing ones
+keep their TERM until recreated. The entry must exist on the machine running
+the tmux *server*, not on the client: it is present on macOS ncurses, on eva
+and on beta, and absent on the phone, which does not need it.
