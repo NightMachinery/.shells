@@ -677,12 +677,24 @@ kitty @ launch --type=os-panel --os-panel edge=center --os-panel layer=top \
 ```
 
 `edge=center` anchors the panel to all four edges, so it covers the display.
-`layer=top` is the lowest layer that still floats above fullscreen windows
-(measured over a fullscreen Brave: space unchanged, frame 0,24,1920,1056). It
-started out as `layer=overlay`, which sat above Handy's speech-to-text overlay
-too, so that could not be seen while dictating into kitty. Should `top` ever
-need tuning, kitty 0.48 also offers `macos_ns_window_layer` for an exact
-NSWindow level. The class `kitty-panel` shows up as `wm_class` in `kitty @ ls`
+`layer=top` stays in the launch command, but the panel's actual window level
+comes from `macos_ns_window_layer` in `configFiles/kitty/kitty.conf`, set to
+`NSFloatingWindowLevel + 1`, that is level 4. The layer names alone do not
+land where they need to. Measured with CoreGraphics' window list
+(`kCGWindowLayer`): fullscreen app windows sit at level 0, Spotlight at 23,
+Handy's dictation overlay at 25, and a `layer=top` panel at 99, with `overlay`
+higher still. So the panel began by covering Handy's speech-to-text overlay,
+which then could not be seen while dictating into kitty, and at `top` it
+still covered Spotlight and Handy. kitty 0.48's `macos_ns_window_layer` pins
+the exact level. Measured with a throwaway panel from a fullscreen Brave: 20,
+8 and 4 all come up over the fullscreen space on show, so anything from 4 to
+22 works, and 4 keeps the most room under the system overlays; 3,
+`NSFloatingWindowLevel` itself, does not, the panel staying on the desktop
+space while kitty was activated, so it was invisible. After the change the
+rebuilt panel passed three hyper+z rounds from fullscreen Brave: on screen at
+level 4, space unchanged, frame 0,24,1920,1056, hide back to Brave.
+
+The class `kitty-panel` shows up as `wm_class` in `kitty @ ls`
 for the OS window's whole life, which is how the panel is recognised
 afterwards. A normal window cannot be turned into a panel (`resize-os-window
 --action=os-panel` answers "is not a panel"), so the tabs move rather than the
@@ -777,10 +789,17 @@ To check kitty is healthy, run `kitty-remote ls` (or `kitty @ --to
 "$(kitty-socket-get)" ls`) through `jq -c '.[] | {id, wm_class, ntabs:
 (.tabs|length)}'`. It should list exactly one OS window, with `wm_class`
 `kitty-panel`. A second OS window means something opened a normal window; the
-next hyper+z folds it in. A panel setting can be changed on the live panel
-without recreating it: `kitty @ resize-os-window --match all
---action=os-panel --incremental layer=top` is how the running panel was moved
-from `overlay` to `top`. In the Hammerspoon console, every press logs one
+next hyper+z folds it in. kitty applies `macos_ns_window_layer` only when a
+panel is created, so after changing it run `kitty @ load-config` (or
+`kitty-remote load-config`) and then `kitty-panel-recreate`: it moves every
+tab of the existing panel into a temporary normal OS window (a window's class
+cannot be changed in place, and `kitty-panel-ensure` would otherwise keep the
+old panel), lets the empty panel close itself, and calls `kitty-panel-ensure`,
+which creates the new panel and folds the tabs back in; about a second for 13
+tabs. The panel-kitten settings (`edge`, `layer`, `focus-policy`) can be
+changed on the live panel with `kitty @ resize-os-window --match all
+--action=os-panel --incremental layer=top`, but that does not touch the
+NSWindow level. In the Hammerspoon console, every press logs one
 line, `kittyHandler: press; kitty <state>; frontmost=<app>; -> show|hide`,
 where the state is `frontmost`, `running` or `not running`, so a press that
 "did nothing" can be traced to which way it went and what was in front. Other
