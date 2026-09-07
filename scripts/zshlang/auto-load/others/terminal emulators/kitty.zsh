@@ -411,10 +411,11 @@ function kitty-panel-ensure {
         #: windows (measured over a fullscreen Brave). Not `overlay': that sat
         #: above Handy's speech-to-text overlay too, which then could not be
         #: seen while dictating into kitty.
-        kitty @ --to "${sock}" launch --type=os-panel \
+        local fresh_win
+        fresh_win="$(kitty @ --to "${sock}" launch --type=os-panel \
             --os-panel edge=center --os-panel layer=top \
             --os-panel focus-policy=on-demand \
-            --os-window-class kitty-panel --dont-take-focus >/dev/null || return $?
+            --os-window-class kitty-panel --dont-take-focus)" || return $?
         ls_json="$(kitty @ --to "${sock}" ls)" || return $?
         panel_tab="$(command jq -r "${panel_q}" <<<"${ls_json}")"
         fresh_tab="${panel_tab}"
@@ -422,6 +423,13 @@ function kitty-panel-ensure {
             ecerr "$0: created a panel but cannot find it in 'kitty @ ls'"
             return 1
         fi
+
+        #: A new panel counts as shown for kitty, so the `show' that follows
+        #: would be a no-op, yet macOS has put it on the desktop space only:
+        #: from a fullscreen space the first hyper+z activated kitty with no
+        #: window in sight (measured, twice). Hidden once, the next `show'
+        #: orders it onto whatever space is current, like every later one.
+        kitty @ --to "${sock}" resize-os-window --match "id:${fresh_win}" --action=hide >/dev/null
     fi
 
     #: Nothing here may focus anything. While the panel is hidden macOS keeps
