@@ -53,7 +53,10 @@ export SHELL=/bin/dash #"${commands[dash]}" # fzf uses this shell to run the def
 export FZF_SHELL="$SHELL" # night.sh's variable
 ###
 export ITERMMAGIC=ITERM_MAGIC
-export iterm_socket="$HOME/tmp/.iterm_socket"
+#: $NIGHT_SOCKETS_DIR is set in ~/.shared.sh, which .zshenv and .bashrc both
+#: source before this file loads. Not `~/tmp': that directory is swept, and a
+#: deleted socket cannot be restored under a live listener.
+export iterm_socket="${NIGHT_SOCKETS_DIR}/iterm.sock"
 ##
 dl_base_url='https://files.lilf.ir'
 
