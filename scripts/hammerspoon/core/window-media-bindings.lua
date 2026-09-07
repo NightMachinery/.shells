@@ -322,7 +322,12 @@ function kittyHandler()
         return
     end
 
-    local win = app:focusedWindow() or app:mainWindow() or app:allWindows()[1]
+    -- The normal window only: the hyper+shift+z panel below is kitty's one
+    -- non-standard window and must not be maximized or evicted from here.
+    local win = nil
+    for _, w in ipairs(app:allWindows()) do
+        if w:isStandard() then win = w; break end
+    end
     if not win then
         app:activate()
         return
@@ -365,6 +370,62 @@ function kittyHandler()
 end
 
 hyper_bind_v1('z', kittyHandler)
+
+--- * kitty panel (hyper+shift+z), for testing
+-- A kitty *panel* OS window in the same instance, with its own tabs, next
+-- to the normal window above. The all-tabs-in-a-panel design was reverted
+-- today over black frames on key presses; a kitty restart then cured the
+-- same frames on the normal window, so the panel may have been innocent.
+-- This route exists so the panel can be tried by hand, with hyper+z intact.
+-- The zsh side is [agfi:kitty-panel-show] / [agfi:kitty-panel-hide]; this
+-- side decides show or hide (the panel is kitty's only non-standard window)
+-- and puts focus back afterwards, sharing kittyReturnTo with hyper+z.
+--
+-- A panel floats above fullscreen windows, so leaving kitty by any other
+-- route would leave it covering the app you switched to; the focus watcher
+-- below hides it then, except for the transient apps in
+-- kittyTransientBundles.
+
+local function kittyPanelWindow(app)
+    for _, w in ipairs(app:allWindows()) do
+        if not w:isStandard() then return w end
+    end
+    return nil
+end
+
+function kittyPanelToggle()
+    local app = getApp(kittyBundleID)
+    local front = hs.application.frontmostApplication()
+    local panelUp = app and app:isFrontmost() and kittyPanelWindow(app) ~= nil
+    print(string.format("kittyPanelToggle: press; frontmost=%s; -> %s",
+                        front and front:name() or "?", panelUp and "hide" or "show"))
+
+    if panelUp then
+        local back = kittyReturnTo
+        brishz_eval_hs("kitty-panel-hide", "kittyPanelToggle")
+        hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
+        return
+    end
+
+    if front and front:bundleID() ~= kittyBundleID and not kittyTransientBundles[front:bundleID()] then
+        kittyReturnTo = front
+    end
+    brishz_eval_hs("kitty-panel-show", "kittyPanelToggle")
+end
+
+hyper_bind_v2{ mods={"shift"}, key='z', pressedfn=kittyPanelToggle }
+
+-- Hide the panel when kitty is left by any other route (see above).
+local kittyPanelWatcher = hs.application.watcher.new(function(_, event, app)
+    if event ~= hs.application.watcher.activated or not app then return end
+    local bid = app:bundleID()
+    if bid == kittyBundleID or kittyTransientBundles[bid] then return end
+    local kitty = getApp(kittyBundleID)
+    if kitty and kittyPanelWindow(kitty) then
+        brishz_eval_hs("kitty-panel-hide", "kittyPanelWatcher")
+    end
+end)
+kittyPanelWatcher:start()
 
 ---
 function escapeTripleQuotes(s)

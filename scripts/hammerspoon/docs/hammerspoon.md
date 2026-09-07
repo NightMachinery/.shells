@@ -644,7 +644,7 @@ networksetup -setairportnetwork <interface> <ssid>
 This works best for open or previously remembered networks. New protected
 networks may still need credentials added through macOS first.
 
-## kitty: hyper+z
+## kitty: hyper+z and hyper+shift+z
 
 `kittyHandler` in `core/window-media-bindings.lua` is the hyper+z toggle for
 kitty, and hyper+z is the only way kitty is ever reached. kitty is a normal OS
@@ -653,7 +653,7 @@ next press hides it and hands focus back to the app you came from. From a
 fullscreen app, a press switches to kitty's desktop and a second press
 switches back, which is exactly what macOS itself would do with any normal
 window. Putting kitty over a fullscreen app is deliberately not attempted; the
-last paragraph says what was tried instead.
+last two paragraphs say what was tried instead, and what is still on trial.
 
 It is not an `appHotkey`, for three reasons. kitty quits when its last window
 closes (`macos_quit_when_last_window_closed`), so the key has to launch it,
@@ -702,16 +702,42 @@ went and what was in front. To confirm the eviction is doing its job, run
 `hs.inspect(hs.spaces.windowSpaces(<kitty window id>))` after a hide and
 check the result with `hs.spaces.spaceType`: it must name a user space.
 
-The panel design that this replaces deserves a note, so it is not tried
-twice. A kitty panel OS window created by the main instance (`launch
+The panel design that this replaces deserves a note, so the same day is not
+spent twice. A kitty panel OS window created by the main instance (`launch
 --type=os-panel`) does float over fullscreen apps, and a full day went into
 it; it worked end to end. It was reverted the same day because the panel
-draws black frames for about 0.35 s on most Cmd+arrow presses and some other
-keys, a kitty rendering defect that no setting changed: window level,
-`sync_to_monitor`, a physical screen frame, focus policy, opacity. The full
-account, with measurements, is in the notes under
+drew black frames for about 0.35 s on most Cmd+arrow presses and some other
+keys, and no setting changed that: window level, `sync_to_monitor`, a
+physical screen frame, focus policy, opacity. Later the same day the normal
+window drew the same frames, in the same kitty process, which by then had
+been through many config reloads, panel creations and tab moves, and a kitty
+restart cured them. So the blame has moved from panels to the state of that
+long-running process, and the panel is only suspected, not convicted. The
+full account, with measurements, is in the notes under
 `~/notes/public/subjects/tools/CLI/terminal emulators/Kitty/hotkey window.org`,
 heading "Trying to Use Kitty Panel". kitty's own quick-access kitten had been
 rejected earlier for a different reason: it runs as a second app bundle,
 `net.kovidgoyal.kitty-quick-access`, and every per-app rule in this config
 assumes only `net.kovidgoyal.kitty` exists.
+
+That is why the panel survives as a test route on hyper+shift+z.
+`kittyPanelToggle`, in the same file, toggles a kitty panel OS window in the
+same instance, with its own tabs, next to the normal window that hyper+z
+owns; it exists so the panel can be tried by hand, and if it holds up the
+all-tabs design can return. The zsh side is `kitty-panel-show` and
+`kitty-panel-hide`, built on `kitty-panel-ensure` and
+`kitty-panel-window-id`, in `zshlang/auto-load/others/terminal
+emulators/kitty.zsh`. Hammerspoon recognises the panel as kitty's only
+non-standard window; kitty recognises it by `wm_class` `kitty-panel` in
+`kitty @ ls`. Show first, then focus: focusing a hidden panel activates
+kitty on the desktop space instead. A freshly created panel counts as shown
+for kitty while macOS has put it on the desktop space only, so it is hidden
+once, and its first show orders it onto the current space. Show and hide
+match a window inside the panel by id, so the normal window is left alone.
+`kittyPanelWatcher` hides the panel when any app outside
+`kittyTransientBundles` is activated, because an overlay cannot go behind
+the app you switch to. The window level is `macos_ns_window_layer
+NSFloatingWindowLevel + 1` in `configFiles/kitty/kitty.conf`, level 4: above
+every window in a space, below Spotlight at 23 and Handy at 25; 3 never came
+up over a fullscreen space. `kittyHandler` on hyper+z now only considers
+standard windows, so it never maximizes or evicts the panel.
