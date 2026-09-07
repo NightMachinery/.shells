@@ -132,6 +132,30 @@ function emc-gateway {
 }
 
 function emc-mobile {
+    #: A daemon of its own, deliberately.
+    #:
+    #: Emacs 29.2 leaks minibuffer depth when one terminal tries to prompt
+    #: while another already holds a minibuffer read: read_minibuf increments
+    #: minibuf_level, then temporarily_switch_to_single_kboard can signal
+    #: "Terminal N is locked, cannot read from it" *before* read_minibuf_unwind
+    #: is registered, so the increment has no cleanup. recursion-depth then only
+    #: grows, later frames open inside the pile, and nothing in Lisp repairs it:
+    #: measured on a wedged daemon, top-level, abort-recursive-edit and deleting
+    #: the owning frames all left the count untouched. Restarting is the only
+    #: exit. @see ~/scripts/docs/emacs-minibuffer-wedge.md
+    #:
+    #: Mobile ssh sessions are the ones that drop, reconnect and pile up frames,
+    #: so this does not prevent the leak -- it bounds what the leak can cost.
+    #: A wedged mobile daemon is a restart of nothing; wedging the shared daemon
+    #: cost 21 open buffers and 6 registers the day this was written.
+    ##
+    local socket="${EMACS_MOBILE_SOCKET_NAME:-${EMACS_SOCKET_NAME:h}/server_mobile}"
+    local -x EMACS_SOCKET_NAME="${socket}"
+    local -x emacs_night_server_name="${socket}"
+    #: Empty ALTERNATE_EDITOR makes emacsclient start the daemon when this
+    #: socket has none yet; the first launch pays a full Doom startup.
+    local -x ALTERNATE_EDITOR=""
+
     TERM=xterm-emacs emc-gateway --frame-parameters '((night/mobile . t))' "$@"
 }
 

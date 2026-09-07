@@ -1,7 +1,9 @@
 # Emacs daemon wedges into an unexitable minibuffer stack
 
-A handout for independent review. Everything below is measured, not inferred;
-where something is a hypothesis it says so. Network addresses and the phone's
+Written as a handout for independent review, then revised after that review.
+The measurements are unchanged; the mechanism section is not, because the
+review found a better explanation and refuted several claims. Corrections are
+marked as such rather than quietly edited away. Network addresses and the phone's
 hostname are redacted; paths are otherwise verbatim.
 
 ## Summary
@@ -117,84 +119,91 @@ Each was run from `emacsclient -e` against the wedged daemon, with
 Restarting the daemon was the only thing that worked. The replacement daemon
 reports `recursion-depth 0`.
 
-## Mechanism as currently understood
+## Mechanism, as revised after review
 
-Stated as the current hypothesis, which is what most needs checking.
+The first version of this document blamed stranded per-terminal command loops.
+That was wrong. The better explanation is a cleanup defect in Emacs 29.2.
 
-1. Something prompts on a tty frame. In incident one this was
-   `save-some-buffers`; in incident two the trigger was not captured before
-   `*Messages*` rolled.
-2. Several tty frames coexist in one daemon. Three concurrent mobile frames
-   were present in incident two.
-3. Minibuffer reads belonging to different terminals interleave. An older
-   frame's minibuffer stops being the innermost one, and Emacs then refuses to
-   exit it: `exit-minibuffer: Not in most nested command loop`.
-4. A terminal dies while one of its minibuffer reads is live. Emacs reports
-   `Terminal 0 is locked, cannot read from it`. That level now sits on a
-   command loop that no input can reach, because the terminal is gone, and that
-   no external eval can unwind, because a `throw` evaluated in an
-   `emacsclient -e` context returns to the top of *its* command loop while the
-   stranded read remains nested on another terminal's stack.
-5. Depth therefore only grows. Every later frame opens inside the pile.
+`read_minibuf` in `minibuf.c` runs in this order: `minibuf_level++` (line 664),
+then `temporarily_switch_to_single_kboard` (line 715), which can signal an
+error, and only then does it register `read_minibuf_unwind` (line 740) and
+enter `recursive_edit_1` (line 905). The decrement lives in
+`read_minibuf_unwind`. So when that call signals, the increment has already
+happened and nothing is registered to undo it. The level is leaked.
 
-Step 4 is the part believed to be unrecoverable, and the measurements above are
-the evidence for it.
+The error it signals is "Terminal N is locked, cannot read from it". That does
+not mean a terminal died. `temporarily_switch_to_single_kboard` raises it when
+Emacs is already restricting input to one keyboard and code tries to read from
+another, which is exactly what happens when a second terminal frame tries to
+prompt while a first one is prompting.
 
-## Explicitly ruled out
+`recursion-depth` returns `command_loop_level + minibuf_level`. A reading of
+8 with `minibuffer-depth` also 8 therefore means `command_loop_level` was zero,
+not that eight client recursive edits existed.
 
-Considerable time was lost to a terminal-layer theory before `*Messages*` was
-read, so it is worth stating what is not involved.
+This accounts for every measurement above: empty minibuffer buffers, a
+`top-level` that genuinely ran and reported success while the number did not
+move, `No catch for tag: exit`, and frame deletion changing nothing. There is
+no stranded stack to unwind, only a counter that no cleanup record owns.
 
-- Not TERM or terminfo. Concurrent work had changed the phone's TERM from a
-  false `xterm-kitty` to an honest `xterm-256color`, and this was initially
-  blamed. But `emc-mobile` sets `TERM=xterm-emacs` as a command prefix, so
-  Emacs receives the same TERM before and after; verified by reading the
-  computed value.
-- Not the tmux layer. The affected sessions run `emc-mobile` in a plain ssh
-  session with no tmux involved.
-- Not a keymap problem. `<escape>` is bound to `abort-recursive-edit` in
-  `minibuffer-local-map` and `ivy-minibuffer-map`; `C-]` likewise;
-  `ESC ESC ESC` is `keyboard-escape-quit`. ESC does escape -- one level per
-  press, which at depth 8 with no depth indicator looks like doing nothing.
-- Not the debugger. No `*Backtrace*` buffer, `debug-on-error` nil.
-- Not unsaved work piling up. Zero modified file-visiting buffers at the time
-  of the second wedge.
+## Corrections to the first version
 
-## Mitigations already committed, in ~/doom.d/autoload/night-minibuffer.el
+- `with-temp-buffer` killing a modified file-visiting buffer: the reviewer
+  tested stock 29.2 and it *is* killed, because the save confirmation in
+  `kill-buffer` is conditional on an interactive call. The phantom buffer was
+  real, but how it survived is unexplained.
+- `save-some-buffers` explaining the depth: `map-y-or-n-p` shows an echo-area
+  message and calls `read-event`; it never enters `read_minibuf`. Its response
+  map also accepts space as "act". So it explains the rejected keys, not the
+  depth.
+- "Not in most nested command loop" was read as "another terminal's minibuffer
+  is newer". `exit-minibuffer` checks command-loop membership and innermost
+  minibuffer identity separately, with distinct errors.
+- Frame F1 being named as the minibuffer owner after the other frames were
+  deleted proves less than assumed. `active-minibuffer-window` falls back to
+  `minibuf_window` when it cannot find the level's buffer displayed, so with
+  leaked levels it can name a frame that owns no prompt.
+- The claim that each waiting `emacsclient -t` must keep its own recursive
+  edit is contradicted by `server-goto-toplevel` in `server.el`, which calls
+  `top-level` when a minibuffer is active.
+- The two incidents are probably not independent. Depth stayed at 6 after the
+  first and was 8 at the second; one corruption worsening fits better than a
+  recovery followed by a fresh failure.
 
-- `minibuffer-depth-indicate-mode` enabled, so nesting is visible. Emacs only
-  draws the indicator above depth 1, so ordinary single prompts are unchanged.
-- `save-some-buffers-default-predicate` set to skip buffers whose name begins
-  with a space. Internal buffers are never the user's to save, and one only
-  acquires a `buffer-file-name` because some code set it by hand. This removes
-  incident one's trigger specifically, not the class.
-- `night/minibuffer-diagnose`, a manual report of depth, clients, orphaned
-  clients and phantom buffers, which offers to kill the phantoms. It
-  deliberately does not call `top-level`, because in a daemon each waiting
-  `emacsclient -t` legitimately holds a recursive edit of its own and
-  unwinding would end live sessions.
-- A `server-after-make-frame-hook` warning that fires when a new frame opens
-  inside existing minibuffer levels, distinguishing an answerable live prompt
-  (owning frame has a tty) from a wedged daemon (owning frame has none).
+## Mitigations
 
-Two heavier options were considered and deferred: allowing only one
-`night/mobile` frame at a time, and giving `emc-mobile` its own daemon so a
-wedged phone session cannot take down the laptop's Emacs.
+In `~/doom.d/autoload/night-minibuffer.el`:
 
-## Questions
+- `minibuffer-depth-indicate-mode`, so nesting is visible. Emacs draws the
+  indicator only above depth 1, so ordinary prompts are unchanged. A leaked
+  count is not a count of answerable prompts, which is worth remembering when
+  reading it.
+- `save-some-buffers-default-predicate` skipping leading-space internal
+  buffers. This removes a prompt that should never have existed, though it is
+  broader than the one buffer that caused it and does not address the depth.
+- `night/minibuffer-diagnose`, a manual inventory. It does not unwind anything,
+  because leaked C state cannot be repaired from Lisp.
+- A `server-after-make-frame-hook` report when a frame opens inside existing
+  levels. It states depth and ownership and stops short of declaring the daemon
+  recoverable or not, since neither a nil nor a non-nil tty establishes that.
 
-1. Is the step-4 mechanism correct? Specifically, is a minibuffer read whose
-   terminal has died genuinely unrecoverable in Emacs 29, or is there a way to
-   unwind it that was not tried?
-2. Why did `top-level` report "Back to top level" while `recursion-depth`
-   stayed at 8? Is the multi-terminal command-loop explanation right, and does
-   it imply anything about where a repair would have to run from?
-3. After `delete-frame` on the frame owning the active minibuffer, ownership
-   moved to the daemon's initial frame F1 rather than the level being
-   released. Is that expected, and does it offer any handle for recovery?
-4. Is there a supported way to make a prompt on one tty frame not block or
-   nest with other frames' command loops -- something equivalent to per-frame
-   minibuffer isolation?
-5. Is the mitigation set proportionate, or is the separate-daemon option the
-   only design that actually contains this?
-6. Anything above that looks like a misreading of the evidence.
+In `zshlang/auto-load/others/emacs/emacs.zsh`:
+
+- `emc-mobile` now runs against its own daemon, `server_mobile`. This does not
+  prevent the leak. It bounds the cost: mobile ssh sessions are the ones that
+  drop, reconnect and pile up frames, and a wedged mobile daemon is a restart
+  of nothing, where wedging the shared daemon cost 21 open buffers and 6
+  registers.
+
+Rejected: limiting the daemon to one `night/mobile` frame. Several concurrent
+mobile frames are a workflow in use here, not an accident.
+
+## Still open
+
+- Whether the leak is fixed in a later Emacs. That would be the actual repair;
+  everything above is containment.
+- What actually kept the phantom ` *temp*' buffer alive, now that
+  `with-temp-buffer` is ruled out.
+- A reproducer: two tty frames, one prompting, the other made to prompt, with
+  `minibuffer-depth` sampled before and after. That would confirm the leak
+  directly rather than by inference.
