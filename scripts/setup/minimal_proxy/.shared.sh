@@ -33,11 +33,19 @@ aliasfn () {
     fi
 }
 ##
-if infocmp xterm-kitty > /dev/null 2>&1; then
-  export TERM="xterm-kitty"
-else
-  # echo "The terminfo entry for xterm-kitty does not exist." >&2
-
+#: Never invent a TERM. The inherited value describes the terminal that is
+#: actually attached; `infocmp xterm-kitty` succeeding only says this host has
+#: the entry in its terminfo database, which is true anywhere kitty-terminfo
+#: was ever installed and says nothing about the client. Claiming xterm-kitty
+#: from a terminal that is not kitty makes tmux repaint panes with kitty-only
+#: sequences: Termux then printed colon-form truecolor as literal text.
+#: @see ~/scripts/docs/tmux-termux-truecolor.md
+#:
+#: What is still worth doing is downgrading a TERM this host cannot resolve,
+#: which was the useful half of the old unconditional assignment (otherwise:
+#: `terminals database is inaccessible`).
+##
+if [ -z "${TERM}" ] || ! infocmp "${TERM}" > /dev/null 2>&1 ; then
   export TERM="xterm-256color"
 fi
 # export TERM="xterm-kitty"
