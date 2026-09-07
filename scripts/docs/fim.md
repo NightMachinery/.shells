@@ -225,6 +225,36 @@ The widgets are named `zle-fim-*` on purpose: `zle-*` is in the default
 rather than wrapping them. [agfi:zle-complete-with-dots] in `.zshrc` is named
 that way for the same reason.
 
+## What the Emacs twin refuses to complete
+
+The zsh widget completes a command line and the Hammerspoon hotkey completes
+whatever field is focused; neither has a file to reason about. The Emacs twin
+does, and it is the surface where a decrypted file is a real prospect — an
+encrypted note is edited in a plaintext buffer like any other, so a reflex
+`M-.` in one would post its contents to the provider.
+
+So `night/fim-path-policy` there decides, per buffer, whether a completion may
+run: an ordered list of rules pairing a matcher — a PCRE, or a symbol naming a
+predicate such as `encrypted` — with `refuse`, `confirm` or `allow`. The first
+match decides, so an `allow` rule above a broader `confirm` carves out a
+subtree. By default it refuses in encrypted buffers and in the usual plaintext
+secret files (`.ssh/`, `.netrc`, `.authinfo`, the key directory), and asks once
+per buffer under a path containing `private`.
+
+Every pattern is matched against both the buffer's file name and its truename,
+since a symlink can point either way across the boundary. A rule that cannot
+be evaluated — an unknown predicate, an undefined level, a PCRE that will not
+convert — refuses rather than being skipped, so a typo cannot quietly widen
+the policy.
+
+Full detail lives with the implementation, in
+`~/doom.d/docs/mistral-fim.md` under **What it refuses to complete**.
+
+None of this touches [agfi:fim-get] itself. The guard sits at the Emacs entry
+point, which is the only place that knows what buffer the text came from;
+`fim-get` takes a bare prefix and suffix and remains the documented
+non-interactive API.
+
 ## The Hammerspoon hotkey
 
 The same completion, everywhere else on the machine. `core/fim.lua` binds two
@@ -518,6 +548,10 @@ from a single `frontmostApp()` that returns both.
 Whatever field is focused when you press the chord is what gets sent to the
 provider. There is no filter on which app, which field, or what the text looks
 like. That is the deal, and it is worth being plain about rather than burying.
+
+The Emacs twin does filter, on which buffer rather than on the text; see
+**What the Emacs twin refuses to complete** above. Nothing equivalent exists
+here, because a focused text field carries no filename to judge.
 
 Two limits on it. `fimPrefixMaxChars` (4000) and `fimSuffixMaxChars` (1000) cap
 the context — the prefix keeps its last N characters, the suffix its first N,
