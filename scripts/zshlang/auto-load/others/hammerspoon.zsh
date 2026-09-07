@@ -504,6 +504,29 @@ aliasfn alert hs-alert
 @opts-setprefix hs-alert alert
 @opts-setprefix alert alert
 ##
+function hs-alert-dismiss {
+    #: Takes down the v2 alert with the given id, if it is showing. The
+    #: counterpart of `alert_id=... hs-alert', for a job that put up a band
+    #: while working and has finished: until this, nothing in zsh could remove
+    #: a band before its own timer did.
+    #:
+    #: Quiet when there is no such band. `alert_gateway_dismiss' returns false
+    #: rather than erroring, and the usual caller cannot know whether the band
+    #: is still up or has already expired on its own.
+    #: Usage: hs-alert-dismiss <id>
+    ##
+    @darwinOnly
+
+    local id="${1}"
+    assert-args id @RET
+
+    #: Ids are our own short tokens, but they still travel inside a Lua string.
+    local lua_id="${id//\\/\\\\}"
+    lua_id="${lua_id//\"/\\\"}"
+
+    reval-dbg sout hammerspoon -c "alert_gateway_dismiss(\"${lua_id}\")"
+}
+##
 function hs-reval-alert {
     local alert_dur="${alert_dur:-1}"
 
