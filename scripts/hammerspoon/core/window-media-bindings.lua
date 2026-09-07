@@ -199,76 +199,97 @@ if false then
 end
 --- * kitty (hyper+z)
 --
--- We only ever reach kitty through this key, and a press must show *all* the
--- tabs over whatever is in front, fullscreen apps included. That rules out a
--- normal OS window: macOS keeps those off fullscreen spaces, and Hammerspoon
--- cannot move one there (a forced hs.spaces.moveWindowToSpace into a
--- fullscreen space returns true and does nothing; measured 2026-09-07, macOS
--- 14.3.1 / Hammerspoon 1.1.1). A previous handler tried exactly that on every
--- press. kitty's window had meanwhile been born inside Telegram's fullscreen
--- space (macOS parks a new window in whatever space is active), so every
--- activation jumped to Telegram, and to the desktop once Telegram left
--- fullscreen.
+-- kitty is only ever reached through this key. It is a normal OS window,
+-- toggled: shown maximized on the screen the mouse is on, hidden again on
+-- the next press, with focus handed back to the app you came from.
 --
--- A *panel* window floats over everything, and the main kitty can create one
--- for itself and move its tabs into it. That part lives in zsh,
--- [agfi:kitty-panel-ensure] / [agfi:kitty-panel-show] / [agfi:kitty-panel-hide]
--- (zshlang/auto-load/others/terminal emulators/kitty.zsh), because it is a
--- chain of dependent `kitty @' calls with jq in between; the garden runs it
--- without blocking this thread. kitty's own quick-access kitten was rejected:
--- it runs as a second app bundle (net.kovidgoyal.kitty-quick-access) that
--- nothing else in our code knows about.
+-- Not an `appHotkey`, for three reasons. kitty quits when its last window
+-- closes, so the key has to launch it. A kitty window can be *born* inside
+-- someone else's fullscreen space (macOS parks a new window in whatever
+-- space is active), after which every activation of kitty jumps to that
+-- app's space, and to the desktop once that app leaves fullscreen; that was
+-- "hyper+z keeps opening Telegram". And hiding a window that was shown by
+-- switching spaces leaves you wherever macOS pleases, not where you were.
 --
--- This side only decides show or hide, by whether kitty is frontmost, and
--- puts you back where you were. When kitty had to be launched, the show can
--- take a few seconds while the session's tabs start; nothing here waits.
+-- What this deliberately does not try: putting kitty *over* a fullscreen
+-- app. hs.spaces refuses a plain moveWindowToSpace into a fullscreen space
+-- and a forced one returns true and does nothing (measured 2026-09-07,
+-- macOS 14.3.1 / Hammerspoon 1.1.1); the handler this replaces tried it on
+-- every press. A kitty *panel* window can float there, and a full day went
+-- into that design; it was abandoned because the panel draws black frames
+-- for ~0.35 s on most Cmd+arrow presses and some other keys, a kitty
+-- rendering defect no setting touched. The story, with measurements:
+-- ~/notes/public/subjects/tools/CLI/terminal emulators/Kitty/hotkey window.org
+-- So from a fullscreen app, hyper+z switches to kitty's desktop, as macOS
+-- itself would, and hyper+z again switches back.
 --
--- Hiding has to put you back where you were: a panel that goes away leaves
--- focus on a window-less kitty, and macOS does not hand it on by itself. The
--- old handler kept a "previous app" that went stale whenever kitty was
--- reached by another route. Here an application watcher keeps the last
--- non-kitty app that was activated, so the memory is refreshed by every
--- switch you make and is never older than the show in effect. It is an app
--- rather than a window, and nothing enumerates windows: hs.window.orderedWindows
--- asks every process through Accessibility, and the "Handy Web Content"
--- processes take 1.5 s each to answer (axLatencyReport), so one call stalled
--- Hammerspoon for three seconds.
+-- Leaving a fullscreen space *does* work, with the `force' flag (without it:
+-- "source space ... is not a user space"), and that is the actual cure for
+-- the born-into-Telegram case: the window is evicted to a user space before
+-- every show and every hide, so activation always lands on kitty's own
+-- space.
 
 local kittyBundleID = "net.kovidgoyal.kitty"
 
--- The app to return to on hide: the last one activated that is not kitty.
-local kittyReturnTo = nil
+local function spaceIsUser(spaceID)
+    return hs.spaces.spaceType(spaceID) == "user"
+end
 
--- Apps that take focus for a moment and give it straight back. The panel
--- must survive them, and they must not become the return target either.
--- hyper+v is a passthrough key (core/hyper-mode.lua) that reaches Maccy;
--- cmd+' is Handy's dictation overlay; Hammerspoon activates itself for
--- choosers and for the Secure Input webview on hyper.
+-- The first user space on `screen`: where kitty lives when it is not a guest.
+local function kittyHomeSpace(screen)
+    for _, sid in ipairs(hs.spaces.spacesForScreen(screen) or {}) do
+        if spaceIsUser(sid) then return sid end
+    end
+    return nil
+end
+
+local function windowInSpace(win, spaceID)
+    return has_value(hs.spaces.windowSpaces(win) or {}, spaceID)
+end
+
+local function windowInAnyUserSpace(win)
+    for _, sid in ipairs(hs.spaces.windowSpaces(win) or {}) do
+        if spaceIsUser(sid) then return true end
+    end
+    return false
+end
+
+-- Evicts `win` from a fullscreen space to the user space of its screen.
+-- No-op when it already sits in a user space.
+local function kittyEvictFromFullscreen(win)
+    if windowInAnyUserSpace(win) then return end
+    local home = kittyHomeSpace(win:screen())
+    if not home then return end
+    local ok, err = hs.spaces.moveWindowToSpace(win, home, true)
+    if not ok then
+        alert_gateway("kitty: could not leave fullscreen space: " .. tostring(err), { color = "warn" })
+    end
+end
+
+-- Where hiding puts you back. An application watcher keeps the last app
+-- other than kitty that was activated, so the memory is refreshed by every
+-- switch you make and is never stale (the old `kitty_prev_app' was, whenever
+-- kitty had been reached by another route, and nil after every reload).
+-- Nothing here enumerates windows: hs.window.orderedWindows asks every
+-- process through Accessibility, and the "Handy Web Content" processes take
+-- 1.5 s each to answer (see axLatencyReport in core/app-hotkeys.lua).
+--
+-- Apps that take focus for a moment and give it back must not become the
+-- return target: Maccy's popup (hyper+v is a passthrough key), Handy's
+-- dictation overlay (cmd+'), Hammerspoon itself for choosers and the Secure
+-- Input webview on hyper.
+local kittyReturnTo = nil
 local kittyTransientBundles = {
     ["org.hammerspoon.Hammerspoon"] = true,
     ["org.p0deje.Maccy"] = true,
     ["com.pais.handy"] = true,
 }
 
--- Leaving kitty by any route other than hyper+z (an app hotkey, Cmd-Tab, a
--- click) must hide the panel too. It sits in the overlay layer, above even
--- fullscreen windows, so unlike the old normal window it cannot be put
--- behind the app you just switched to: hyper+l used to "show kitty" because
--- the still-visible panel covered Telegram. kitty's own hide-on-focus-loss
--- would do this, but it also hides on Maccy and Handy, hence this watcher
--- with an allowlist instead. The visibility check is one Accessibility
--- query to kitty alone; a hidden panel has no visible windows.
 local kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
     if event ~= hs.application.watcher.activated or not app then return end
     local bid = app:bundleID()
     if bid == kittyBundleID or kittyTransientBundles[bid] then return end
-
     kittyReturnTo = app
-
-    local kitty = getApp(kittyBundleID)
-    if kitty and #kitty:allWindows() > 0 then
-        brishz_eval_hs("kitty-panel-hide", "kittyFocusWatcher")
-    end
 end)
 kittyFocusWatcher:start()
 
@@ -294,19 +315,53 @@ function kittyHandler()
                         front and front:name() or "?",
                         (app and app:isFrontmost()) and "hide" or "show"))
 
-    if app and app:isFrontmost() then
-        -- Read now, not in the timer: the hide may activate something and
-        -- the watcher would overwrite the memory before the timer fires.
-        local back = kittyReturnTo
-        brishz_eval_hs("kitty-panel-hide", "kittyHandler")
-        hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
+    if not app then
+        -- kitty quits when its last window closes
+        -- (macos_quit_when_last_window_closed), so "not running" is normal.
+        hs.application.launchOrFocusByBundleID(kittyBundleID)
         return
     end
 
-    if front and front:bundleID() ~= kittyBundleID then
+    local win = app:focusedWindow() or app:mainWindow() or app:allWindows()[1]
+    if not win then
+        app:activate()
+        return
+    end
+
+    if app:isFrontmost() then
+        -- Read before hide(): the activation hide() causes updates the memory.
+        local back = kittyReturnTo
+        kittyEvictFromFullscreen(win)
+        app:hide()
+        kittyFocusAfterHide(back)
+        return
+    end
+
+    if front and front:bundleID() ~= kittyBundleID and not kittyTransientBundles[front:bundleID()] then
         kittyReturnTo = front
     end
-    brishz_eval_hs("kitty-panel-show", "kittyHandler")
+
+    -- Show, on the screen the mouse is on.
+    local mouseScreen = hs.mouse.getCurrentScreen()
+    if win:screen():id() ~= mouseScreen:id() then
+        win:moveToScreen(mouseScreen)
+    end
+
+    kittyEvictFromFullscreen(win)
+
+    -- Between user spaces the move works and saves a space switch. A
+    -- fullscreen target is left alone: see the header.
+    local target = hs.spaces.activeSpaceOnScreen(mouseScreen)
+    if target and spaceIsUser(target) and not windowInSpace(win, target) then
+        local ok, err = hs.spaces.moveWindowToSpace(win, target)
+        if not ok then
+            alert_gateway("kitty: could not move to this space: " .. tostring(err), { color = "warn" })
+        end
+    end
+
+    app:activate()
+    win:focus()
+    win:maximize()
 end
 
 hyper_bind_v1('z', kittyHandler)
