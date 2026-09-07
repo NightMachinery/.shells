@@ -115,7 +115,11 @@ function emc-gateway {
     tty_title_f=y tty-title "$title"
 
     local my_term="$TERM"
-    if isKitty || isiTerm ; then
+    #: xterm-emacs is our 24-bit entry (setup/terminfo-24bit.src). The real
+    #: condition is "does this terminal do truecolor"; kitty and iTerm were only
+    #: standing in for it. Spelling it out also covers Termux, which reports an
+    #: honest xterm-256color and would otherwise lose the entry.
+    if true-color-p ; then
         my_term='xterm-emacs'
     fi
 

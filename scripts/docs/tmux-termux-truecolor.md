@@ -190,3 +190,48 @@ most of them, are unaffected.
 keep their TERM until recreated. The entry must exist on the machine running
 the tmux *server*, not on the client: it is present on macOS ncurses, on eva
 and on beta, and absent on the phone, which does not need it.
+
+## Telling a remote host the terminal does truecolor
+
+Making TERM honest cost something: `xterm-256color` is indistinguishable from a
+terminal that really is limited to 256 colours, so [agfi:true-color-p] failed
+every one of its branches over ssh and [agfi:colorfg] emitted nothing at all.
+The colours did not merely degrade, they vanished. Kitty had never hit this,
+because `xterm-kitty` answers the `isKitty` branch.
+
+The signal that carries this properly is `COLORTERM`, and the repository
+already had the machinery to move it: sshd forwards only what `AcceptEnv`
+permits, commonly `LANG LC_*`, so a client mirrors `LC_<NAME>` and the server
+restores `<NAME>`. Three things were missing.
+
+`COLORTERM` was not in `env_smuggled_lc_vars`. Termux sets no `COLORTERM` of
+its own, though its emulator does 24-bit colour; `.shared.sh` now asserts it
+where `TERMUX_VERSION` proves we are actually inside Termux, and never on a
+VPS, where the value must come from the client. And
+[agfi:env-load-smuggled-lc-vars] ran only from `~/.night-bootstrap.env`, which
+the bootstrap generates -- so on a host that never ran the bootstrap, this
+laptop included, the restore half never happened at all and the LC_ copies
+arrived and were ignored. It is now called from `zshlang/basic/ssh.zsh` under
+`isSSH`, before the outward mirroring, so a chained hop keeps working.
+
+Verified end to end, phone to laptop:
+
+```
+TERM=xterm-256color COLORTERM=truecolor
+true-color-p=0
+isKitty=1
+helloworld: ESC[48;2;0;0;255mESC[38;2;0;255;0mHELLO ...
+```
+
+The client also needs `SendEnv`, which OpenSSH leaves empty by default. The
+laptop's `~/.ssh/config` has had those lines for a while; the phone had no ssh
+config at all and now carries a matching `Host *` block.
+
+## Choosing the Emacs terminfo entry
+
+[agfi:emc-gateway] selected `xterm-emacs` with `if isKitty || isiTerm`. That is
+a proxy for the real question -- does this terminal do 24-bit colour -- and it
+silently answered no for Termux once TERM stopped claiming kitty, handing Emacs
+a plain `xterm-256color` and losing `setf24`/`setb24`. It now asks
+[agfi:true-color-p] directly, which covers kitty and iTerm as before and Termux
+as well.

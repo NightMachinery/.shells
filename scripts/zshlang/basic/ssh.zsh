@@ -33,7 +33,7 @@ function isSSH() {
 #: <NAME>. The two functions below are the two halves of that.
 ##
 typeset -ga env_smuggled_lc_vars
-env_smuggled_lc_vars=( COLORFGBG TERM_PROGRAM KITTY_WINDOW_ID )
+env_smuggled_lc_vars=( COLORFGBG COLORTERM TERM_PROGRAM KITTY_WINDOW_ID )
 #: COLORFGBG is the load-bearing one: a terminal cannot be asked for its
 #: background colour, so without it Emacs guesses -- and guesses dark, which
 #: renders every face for the wrong polarity on a light terminal.
@@ -61,5 +61,17 @@ function env-load-smuggled-lc-vars {
         fi
     done
 }
+
+#: Server side first, so a value the client smuggled in is restored before we
+#: mirror our own outward for any onward hop. Both are idempotent and neither
+#: clobbers a plain name that is already set.
+#:
+#: This used to run only from ~/.night-bootstrap.env, which the bootstrap
+#: generates; on a host that never ran the bootstrap -- this laptop -- the
+#: restore half simply never happened, so COLORFGBG and friends arrived as
+#: LC_ copies and were never unpacked.
+if isSSH ; then
+    env-load-smuggled-lc-vars
+fi
 
 env-save-smuggled-lc-vars

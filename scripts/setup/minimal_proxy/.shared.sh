@@ -50,6 +50,20 @@ if [ -z "${TERM}" ] ; then
 elif command -v infocmp > /dev/null 2>&1 && ! infocmp "${TERM}" > /dev/null 2>&1 ; then
   export TERM="xterm-256color"
 fi
+
+#: Termux's emulator does 24-bit colour but sets no COLORTERM, and now that TERM
+#: is honest a remote host has no other way to learn that. TERMUX_VERSION is set
+#: by the app itself, so this asserts truecolor only where we really are inside
+#: Termux -- never on a VPS, where COLORTERM must come from the client.
+#:
+#: sshd forwards only what AcceptEnv permits, commonly "LANG LC_*", so mirror an
+#: LC_ copy too; the far side restores the plain name in env-load-smuggled-lc-vars.
+if [ -n "${TERMUX_VERSION}" ] && [ -z "${COLORTERM}" ] ; then
+  export COLORTERM=truecolor
+fi
+if [ -n "${COLORTERM}" ] && [ -z "${LC_COLORTERM}" ] ; then
+  export LC_COLORTERM="${COLORTERM}"
+fi
 # export TERM="xterm-kitty"
 # export TERMINFO=/usr/share/terminfo
 # export TERM="xterm+256color"
