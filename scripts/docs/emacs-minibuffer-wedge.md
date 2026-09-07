@@ -189,19 +189,29 @@ In `~/doom.d/autoload/night-minibuffer.el`:
 
 In `zshlang/auto-load/others/emacs/emacs.zsh`:
 
-- `emc-mobile` now runs against its own daemon, `server_mobile`. This does not
-  prevent the leak. It bounds the cost: mobile ssh sessions are the ones that
-  drop, reconnect and pile up frames, and a wedged mobile daemon is a restart
-  of nothing, where wedging the shared daemon cost 21 open buffers and 6
-  registers.
+- `emc-mobile` can run against its own daemon, `server_mobile`, behind
+  `emc_mobile_own_daemon_p`. It defaults to off. A separate daemon would bound
+  what a wedge costs, since mobile ssh sessions are the ones that drop and
+  reconnect, but restarting is cheap and the split is not free: separate
+  buffers, registers and session state, plus a full Doom startup on first
+  launch. The flag exists for the day a wedge costs more than a restart is
+  worth.
 
 Rejected: limiting the daemon to one `night/mobile` frame. Several concurrent
 mobile frames are a workflow in use here, not an accident.
 
 ## Still open
 
-- Whether the leak is fixed in a later Emacs. That would be the actual repair;
-  everything above is containment.
+- Not fixed upstream, as far as the source shows. On current master
+  `read_minibuf` still increments `minibuf_level`, registers
+  `minibuffer_unwind` -- which does not touch that counter -- calls
+  `temporarily_switch_to_single_kboard`, and only afterwards registers
+  `read_minibuf_unwind`, which holds the file's single decrement. The code has
+  been reshuffled since 29, but the ordering that allows the leak has not
+  changed, so there is no version to upgrade to. The closest upstream report is
+  bug#17170 (2014), same visible symptom in a daemon over ssh and tmux, closed
+  for 24.5 by fixing a caller (`debugger-previous-window`) rather than the
+  ordering. Worth filing, with a reproducer.
 - What actually kept the phantom ` *temp*' buffer alive, now that
   `with-temp-buffer` is ruled out.
 - A reproducer: two tty frames, one prompting, the other made to prompt, with
