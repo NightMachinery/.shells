@@ -435,6 +435,52 @@ function h-claude-code-session-live-list {
     #: Every live Claude Code session, one per line, tab separated: pid, session
     #: id, name, cwd, transcript, tmux session (or `-'), status.
     #:
+    #: The work is done by the `live' subcommand of the `claude_session' Go
+    #: binary: it runs `claude agents --json' once per config home *in
+    #: parallel*, which is the whole cost (~180ms each, and independent), then
+    #: reads the tmux field from each session's record and derives the
+    #: transcript path. In shell those calls were serial and the resolver spent
+    #: most of half a second here; see golang/claude_session/live.go.
+    #:
+    #: `claude agents' stays the authority on what is live -- that is decided in
+    #: Claude Code's daemon and nothing on disk reproduces it. The Go helper
+    #: only makes the same call cheaper. [agfi:h-claude-code-session-live-list-sh]
+    #: is the identical-output shell fallback for a host where the binary is not
+    #: built.
+    #:
+    #: Set claude_code_session_live_list_cache to reuse one listing across
+    #: several lookups; `local' is dynamically scoped, so a caller's assignment
+    #: is visible here.
+    ##
+    if test -n "${claude_code_session_live_list_cache}" ; then
+        ec "${claude_code_session_live_list_cache}"
+        return 0
+    fi
+
+    local -a projects_dirs
+    projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
+
+    #: The hot path must not pay for a build check every time, so probe with
+    #: `command -v' (a real PATH lookup) rather than `isdefined-cmd', whose
+    #: answer comes from zsh's command hash -- and the garden's hash is stale
+    #: for a binary installed after it started, which would send every call
+    #: down the build path. `h-claude-code-session-dep' (which also probes for
+    #: `go' and can rebuild) runs only on a genuine first miss.
+    if ! command -v claude_session > /dev/null 2>&1 ; then
+        h-claude-code-session-dep 2>/dev/null || true
+    fi
+
+    if command -v claude_session > /dev/null 2>&1 ; then
+        claude_session live "${projects_dirs[@]}" && return 0
+    fi
+
+    h-claude-code-session-live-list-sh
+}
+
+function h-claude-code-session-live-list-sh {
+    #: The pure-shell implementation of [agfi:h-claude-code-session-live-list],
+    #: kept as a fallback for when the Go helper is not built. Same columns.
+    #:
     #: `claude agents --json' says what is live: it is the supported interface,
     #: it is what the agent view shows, and it costs ~180ms. It is scoped to one
     #: config home, so it runs once per profile -- [agfi:claude-work] keeps a
@@ -456,11 +502,6 @@ function h-claude-code-session-live-list {
     #: several lookups; `local' is dynamically scoped, so a caller's assignment
     #: is visible here.
     ##
-    if test -n "${claude_code_session_live_list_cache}" ; then
-        ec "${claude_code_session_live_list_cache}"
-        return 0
-    fi
-
     ensure-cmd claude jq @RET
 
     local -a projects_dirs
