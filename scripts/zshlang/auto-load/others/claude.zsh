@@ -103,6 +103,15 @@ typeset -gA claude_code_profiles=(
 #: Iteration and display order for [agfi:claude-code-usage-all]; an associative
 #: array has no order of its own.
 typeset -ga claude_code_profile_order=( default work )
+#: The command that starts a profile's Claude Code, so a session can be
+#: resumed under whichever profile owns it -- or is to own it -- by
+#: [agfi:claude-code-session-resume]. Through the launcher rather than a bare
+#: `CLAUDE_CONFIG_DIR=... claude', so the work seat keeps its tty marker and
+#: every profile keeps the sync, watchdogs and `$proxyenv' of [agfi:claude].
+typeset -gA claude_code_profile_launchers=(
+    default  claude
+    work     claude-work
+)
 
 function h-claude-code-profile-assert {
     local profile="${1}"

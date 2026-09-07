@@ -1085,3 +1085,342 @@ function claude-code-session-live-fz {
     ec "${selected}" | command cut -f1,2
 }
 ##
+#: Resuming a session under another profile
+##
+function h-claude-code-profile-config-home {
+    #: The config home of a registered profile: the directory holding its
+    #: `projects/', `file-history/' and `sessions/'. The default profile has no
+    #: CLAUDE_CONFIG_DIR and lives at =~/.claude= (its `.claude.json' is at
+    #: =~/.claude.json=, which nothing here needs). Registry:
+    #: `claude_code_profiles' in claude.zsh, see [agfi:claude-work].
+    ##
+    local profile="${1}"
+    assert-args profile @RET
+    h-claude-code-profile-assert "${profile}" @RET
+
+    local dir="${claude_code_profiles[${profile}]}"
+    ec "${dir:-${HOME}/.claude}"
+}
+
+function h-claude-code-session-profile-of {
+    #: The registered profile whose config home holds the given transcript.
+    #: Longest matching home wins, so a profile nested under another's home
+    #: would still resolve correctly.
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local transcript_abs="${transcript:a}"
+    local profile home best='' best_len=0
+    for profile in "${claude_code_profile_order[@]}" ; do
+        home="$(h-claude-code-profile-config-home "${profile}")" @RET
+        home="${home:a}"
+        if [[ "${transcript_abs}" == "${home}"/* ]] && (( ${#home} > best_len )) ; then
+            best="${profile}"
+            best_len="${#home}"
+        fi
+    done
+
+    if test -z "${best}" ; then
+        ecerr "$0: transcript is under no registered profile: ${transcript}"
+        return 1
+    fi
+
+    ec "${best}"
+}
+
+function h-claude-code-session-resolve {
+    #: A transcript path from either a path or a session uuid (a unique prefix
+    #: of one will do). A uuid is looked up under every profile's projects
+    #: directory, [agfi:h-claude-code-session-projects-dirs], since the caller
+    #: usually does not know which seat a session was started on. Several
+    #: matches are an error rather than a guess: the same uuid in two profiles
+    #: is exactly what [agfi:claude-code-session-import] exists to avoid.
+    ##
+    local input="${1}"
+    assert-args input @RET
+
+    if [[ "${input}" == *.jsonl ]] || [[ "${input}" == */* ]] ; then
+        if ! test -e "${input}" ; then
+            ecerr "$0: transcript does not exist: ${input}"
+            return 1
+        fi
+        ec "${input:a}"
+        return 0
+    fi
+
+    local -a projects_dirs
+    projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
+
+    local -a hits
+    local d
+    for d in "${projects_dirs[@]}" ; do
+        hits+=( "${d}"/*/"${input}"*.jsonl(N) )
+    done
+
+    if (( ${#hits} == 0 )) ; then
+        ecerr "$0: no session matches '${input}' under: ${(j:, :)projects_dirs}"
+        return 1
+    elif (( ${#hits} > 1 )) ; then
+        ecerr "$0: '${input}' is ambiguous:"
+        ecerr "  ${(pj:\n  :)hits}"
+        return 1
+    fi
+
+    ec "${hits[1]}"
+}
+
+function h-claude-code-session-live-row-of {
+    #: The [agfi:h-claude-code-session-live-list] row whose transcript is the
+    #: given file, or failure when no running session is writing it.
+    ##
+    local transcript="${1:a}"
+    assert-args transcript @RET
+
+    local claude_code_session_live_list_cache="${claude_code_session_live_list_cache:-$(h-claude-code-session-live-list)}"
+
+    local row t
+    for row in "${(f)claude_code_session_live_list_cache}" ; do
+        t="$(h-claude-code-session-row-transcript "${row}")" || continue
+        if [[ "${t:a}" == "${transcript}" ]] ; then
+            ec "${row}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+function claude-code-session-import {
+    #: Forks a session into another profile: copies its transcript and the
+    #: state keyed by its uuid into the target profile's config home under a
+    #: *new* uuid, and prints the new transcript's path. The source is never
+    #: modified. The point is to continue a conversation on a different
+    #: account -- the work seat has hit its usage limit, say -- since
+    #: `claude --resume' only ever searches the active profile.
+    #:
+    #: A new uuid, not a same-uuid copy: a uuid present in two profiles makes
+    #: the agent-view title match in [agfi:h-claude-code-session-of-kitty-window]
+    #: and Claude Code's own `--resume <name>' ambiguous, and resuming the
+    #: stale copy later would fork it silently. The uuid appears in the
+    #: transcript only as `sessionId' (one distinct value, ~one per line), in
+    #: the subagent transcripts, and in directory names, so it is rewritten in
+    #: place in the copies. The fork gets the source's name plus a suffix
+    #: (`claude_code_session_import_name_suffix', a printf format taking the
+    #: target profile; `⑂' is the glyph Claude Code appends on
+    #: `--fork-session'), written as both an `agent-name' line, which
+    #: `claude_session name' prefers, and a `custom-title' line, which is what
+    #: `/rename' writes and stops Claude Code re-titling.
+    #:
+    #: Copied: `<uuid>.jsonl', `<uuid>/' (subagents, tool results),
+    #: `file-history/<uuid>/' (for `/rewind'). Not copied: `plans/' (the file
+    #: name is not derivable from the transcript), the per-project auto-memory
+    #: and the prompt history, which are per profile by design.
+    #:
+    #: Instruction files are not part of a transcript: Claude Code injects
+    #: them from the active config dir at launch, so the fork runs under the
+    #: *target* profile's assembled CLAUDE.md. Into a non-default profile that
+    #: means the whole history enters that profile's store before its overlay
+    #: -- the privacy guardrails of [agfi:claude-work] -- ever applies, so it
+    #: asks first unless claude_code_session_import_yes_p=y.
+    #:
+    #: Refuses a live source unless claude_code_session_import_force_p=y: the
+    #: running process keeps appending to it, so the fork would be stale at
+    #: once. claude_code_session_import_remove_source_p=y trashes the source
+    #: afterwards, so the session leaves the source profile's picker; off by
+    #: default, since with distinct uuids the leftover is clutter, not a
+    #: hazard.
+    #:
+    #: Usage: claude-code-session-import <transcript|uuid> <to-profile>
+    ##
+    local remove_source_p="${claude_code_session_import_remove_source_p:-n}"
+    local force_p="${claude_code_session_import_force_p:-n}"
+    local yes_p="${claude_code_session_import_yes_p:-n}"
+    local name_suffix="${claude_code_session_import_name_suffix:- ⑂ %s}"
+
+    local to_profile="${2}"
+    assert-args to_profile @RET
+    h-claude-code-profile-assert "${to_profile}" @RET
+    ensure-cmd gcp perl jq uuidgen @RET
+    h-claude-code-session-dep @RET
+
+    local source
+    source="$(h-claude-code-session-resolve "${1}")" @RET
+
+    local from_profile
+    from_profile="$(h-claude-code-session-profile-of "${source}")" @RET
+    if [[ "${from_profile}" == "${to_profile}" ]] ; then
+        ecerr "$0: session already belongs to profile '${to_profile}': ${source}"
+        return 1
+    fi
+
+    local from_home to_home
+    from_home="$(h-claude-code-profile-config-home "${from_profile}")" @RET
+    to_home="$(h-claude-code-profile-config-home "${to_profile}")" @RET
+
+    #: =<home>/projects/<encoded cwd>/<uuid>.jsonl=
+    local enc="${source:h:t}"
+    local old="${source:t:r}"
+    local new
+    new="${$(uuidgen):l}" @TRET
+
+    local live_row
+    if live_row="$(h-claude-code-session-live-row-of "${source}")" ; then
+        local -a f
+        f=( "${(@ps:\t:)live_row}" )
+        if bool "${force_p}" ; then
+            ecerr "$0: warning: source session is live (pid ${f[1]}, tmux ${f[6]}); the fork stops where it is now"
+        else
+            ecerr "$0: source session is live (pid ${f[1]}, tmux ${f[6]}). Quit it first so the fork is complete, or set claude_code_session_import_force_p=y."
+            return 1
+        fi
+    fi
+
+    if [[ "${to_profile}" != default ]] && ! bool "${yes_p}" ; then
+        ecerr "$0: the whole conversation so far will be stored under profile '${to_profile}' (${to_home}); its own instruction files, including any privacy guardrails, only apply from here on."
+        if ! { : </dev/tty ; } 2>/dev/null ; then
+            ecerr "$0: no terminal to confirm on; set claude_code_session_import_yes_p=y to proceed"
+            return 1
+        fi
+        if ! ask "Import into '${to_profile}' anyway?" n ; then
+            ecerr "$0: aborted; nothing was written"
+            return 1
+        fi
+    fi
+
+    local target_dir="${to_home}/projects/${enc}"
+    local target="${target_dir}/${new}.jsonl"
+    assert mkdir -p "${target_dir}" @RET
+    assert gcp --archive -- "${source}" "${target}" @RET
+
+    local source_side="${source:r}"
+    if test -d "${source_side}" ; then
+        assert gcp --archive -- "${source_side}" "${target_dir}/${new}" @RET
+    fi
+
+    local source_fh="${from_home}/file-history/${old}"
+    if test -d "${source_fh}" ; then
+        assert mkdir -p "${to_home}/file-history" @RET
+        assert gcp --archive -- "${source_fh}" "${to_home}/file-history/${new}" @RET
+    fi
+
+    #: Only the copies are touched. A uuid is `[0-9a-f-]', so nothing in it
+    #: needs escaping, but \Q..\E costs nothing.
+    local -a rewrite_files
+    rewrite_files=( "${target}" "${target_dir}/${new}"/subagents/*.jsonl(N) )
+    assert perl -pi -e "s/\\Q${old}\\E/${new}/g" -- "${rewrite_files[@]}" @RET
+
+    local name
+    name="$(claude_session name "${source}")" @RET
+    if test -z "${name}" ; then
+        name="${old[1,8]}"
+    fi
+    #: A fork of a fork keeps one suffix, not a trail of them.
+    local p sfx
+    for p in "${claude_code_profile_order[@]}" ; do
+        sfx="$(printf -- "${name_suffix}" "${p}")"
+        name="${name%"${sfx}"}"
+    done
+    local new_name
+    new_name="${name}$(printf -- "${name_suffix}" "${to_profile}")" @TRET
+
+    #: The transcript is a jsonl; make sure the new lines start on their own.
+    if [[ "$(tail -c 1 "${target}")" != $'\n' ]] ; then
+        ec >> "${target}"
+    fi
+    jq --compact-output --null-input \
+        --arg name "${new_name}" --arg sid "${new}" \
+        '{type: "agent-name", agentName: $name, sessionId: $sid},
+         {type: "custom-title", customTitle: $name, sessionId: $sid}' >> "${target}" @RET
+
+    if bool "${remove_source_p}" ; then
+        #: `trs' narrates on stdout; keep stdout for the path.
+        {
+            trs "${source}" @RET
+            if test -d "${source_side}" ; then
+                trs "${source_side}" @RET
+            fi
+            if test -d "${source_fh}" ; then
+                trs "${source_fh}" @RET
+            fi
+        } 1>&2
+    fi
+
+    ecerr "$0: ${from_profile} -> ${to_profile}: '${new_name}' (${new})"
+    ec "${target}"
+}
+
+function claude-code-session-resume {
+    #: Resumes a Claude Code session under a profile: the one that owns it, or
+    #: another one, in which case [agfi:claude-code-session-import] forks it
+    #: there first. Starts that profile's launcher from
+    #: `claude_code_profile_launchers' with `--resume <uuid>'.
+    #:
+    #: With no session given, picks one with [agfi:h-claude-code-session-select-fz]
+    #: over every profile's copy of the current project (its rows are labelled
+    #: by profile); claude_code_session_resume_all_p=y widens that to every
+    #: project. Anything after the second argument goes to the launcher.
+    #:
+    #: Tools run in the current directory, not the one the session was started
+    #: in, so this warns when the two differ.
+    #:
+    #: Usage: claude-code-session-resume [transcript|uuid] [to-profile] [claude args...]
+    ##
+    local all_p="${claude_code_session_resume_all_p:-n}"
+
+    local session="${1}"
+    local to_profile="${2}"
+    local -a extra
+    extra=("${@[3,-1]}")
+
+    local source
+    if test -z "${session}" ; then
+        local claude_code_view_session_fz_scope='project'
+        if bool "${all_p}" ; then
+            claude_code_view_session_fz_scope='all'
+        fi
+        source="$(h-claude-code-session-select-fz)" @RET
+    else
+        source="$(h-claude-code-session-resolve "${session}")" @RET
+    fi
+
+    local from_profile
+    from_profile="$(h-claude-code-session-profile-of "${source}")" @RET
+    to_profile="${to_profile:-${from_profile}}"
+    h-claude-code-profile-assert "${to_profile}" @RET
+
+    local launcher="${claude_code_profile_launchers[${to_profile}]}"
+    if test -z "${launcher}" ; then
+        ecerr "$0: no launcher registered for profile '${to_profile}' in claude_code_profile_launchers"
+        return 1
+    fi
+
+    local transcript="${source}"
+    if [[ "${to_profile}" != "${from_profile}" ]] ; then
+        transcript="$(claude-code-session-import "${source}" "${to_profile}")" @RET
+    fi
+
+    local enc_pwd="${PWD//[^[:alnum:]]/-}"
+    if [[ "${transcript:h:t}" != "${enc_pwd}" ]] ; then
+        ecerr "$0: warning: session was started in another directory (${transcript:h:t}); tools will run in ${PWD}"
+    fi
+
+    "${launcher}" --resume "${transcript:t:r}" "${extra[@]}"
+}
+aliasfn claude-resume claude-code-session-resume
+
+function claude-resume-personal {
+    #: [agfi:claude-code-session-resume] into the default profile: continue a
+    #: work session on the personal account.
+    #: Usage: claude-resume-personal [transcript|uuid] [claude args...]
+    ##
+    claude-code-session-resume "${1}" default "${@[2,-1]}"
+}
+
+function claude-resume-work {
+    #: [agfi:claude-code-session-resume] into the work profile.
+    #: Usage: claude-resume-work [transcript|uuid] [claude args...]
+    ##
+    claude-code-session-resume "${1}" work "${@[2,-1]}"
+}
+##
