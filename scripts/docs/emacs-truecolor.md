@@ -5,6 +5,8 @@ RGB escapes supported by Kitty and Termux. The `setf24` and `setb24`
 capabilities retain full 24-bit color despite inheriting `xterm-256color`.
 The previous colon-separated form included an empty colorspace parameter
 that Termux does not handle correctly; older versions reject colons entirely.
+The same limitation bites under tmux, which re-encodes a pane through the
+attached client's terminfo: see `./tmux-termux-truecolor.md`.
 
 Install on the machine running Emacs (the remote host for SSH sessions),
 from the scripts directory:
