@@ -1,7 +1,7 @@
 '''A config module for the Kitty Theme Changer Tool.'''
 
 from pathlib import Path
-from os import getpid
+from os import environ, getpid
 from psutil import process_iter
 
 conf_dir = Path('~/.config/kitty').expanduser()
@@ -20,4 +20,9 @@ def kitty_pid():
      cp = cp.parent()
   return cp.pid
 
-socket = 'unix:' + str(Path('~/tmp/.kitty-').expanduser()) + str(kitty_pid())
+#: $NIGHT_SOCKETS_DIR, with the literal as a fallback: this module is imported
+#: by a tool that kitty may launch itself, and kitty's own environment carries
+#: no shell variables. Keep in step with `listen_on' in kitty.conf.
+sockets_dir = Path(environ.get('NIGHT_SOCKETS_DIR') or '~/.local/state').expanduser()
+
+socket = 'unix:' + str(sockets_dir / 'kitty-{}.sock'.format(kitty_pid()))
