@@ -197,66 +197,43 @@ if false then
     -- then bind to a hotkey
     hyper_bind_v2{mods={"ctrl"}, key='[', pressedfn=function()expose:toggleShow()end}
 end
---- * kitty toggle (hyper+z)
+--- * kitty (hyper+z)
 --
--- Not an `appHotkey`, for two reasons. kitty quits when its last window
--- closes, so the hotkey has to launch it. And a window of kitty's can end up
--- inside someone else's *fullscreen* space (macOS parks a window there when
--- it is created while that space is active; kitty's "claude-work-slides"
--- window was found living in Purple Telegram's), after which every activation
--- of kitty, from anywhere, jumps to that app's space. That was the "hyper+z
--- keeps opening Telegram" bug, and its cousin "shows the desktop": once the
--- owner left fullscreen, macOS dumped the window on the lone user space.
+-- We only ever reach kitty through this key, and a press must show *all* the
+-- tabs over whatever is in front, fullscreen apps included. That rules out a
+-- normal OS window: macOS keeps those off fullscreen spaces, and Hammerspoon
+-- cannot move one there (a forced hs.spaces.moveWindowToSpace into a
+-- fullscreen space returns true and does nothing; measured 2026-09-07, macOS
+-- 14.3.1 / Hammerspoon 1.1.1). A previous handler tried exactly that on every
+-- press. kitty's window had meanwhile been born inside Telegram's fullscreen
+-- space (macOS parks a new window in whatever space is active), so every
+-- activation jumped to Telegram, and to the desktop once Telegram left
+-- fullscreen.
 --
--- The cure is to evict the window back to a user space whenever it is found
--- in a fullscreen one, both before showing and before hiding, so activation
--- always lands on kitty's own space. This needs the `force' flag of
--- hs.spaces.moveWindowToSpace; without it, leaving a fullscreen space is
--- refused ("source space ... is not a user space"). Measured 2026-09-07 on
--- macOS 14.3.1 / Hammerspoon 1.1.1: forced 1774 (fullscreen) -> 5 (user)
--- returned true and took effect.
+-- A *panel* window floats over everything, and the main kitty can create one
+-- for itself and move its tabs into it. That part lives in zsh,
+-- [agfi:kitty-panel-ensure] / [agfi:kitty-panel-show] / [agfi:kitty-panel-hide]
+-- (zshlang/auto-load/others/terminal emulators/kitty.zsh), because it is a
+-- chain of dependent `kitty @' calls with jq in between; the garden runs it
+-- without blocking this thread. kitty's own quick-access kitten was rejected:
+-- it runs as a second app bundle (net.kovidgoyal.kitty-quick-access) that
+-- nothing else in our code knows about.
 --
--- What this cannot do is the reverse: bring kitty *over* a fullscreen app.
--- hs.spaces refuses a plain move into a fullscreen space, and a forced one
--- returns true and does nothing (also measured). The previous handler tried
--- exactly that on every press. From a fullscreen space, hyper+z therefore
--- switches to kitty's user space, which is what macOS itself does; the
--- quick-access kitty on hyper+shift+z is the one that floats over fullscreen.
+-- This side only decides show or hide, by whether kitty is frontmost, and
+-- puts you back where you were. When kitty had to be launched, the show can
+-- take a few seconds while the session's tabs start; nothing here waits.
 --
--- Hiding has to put you back where you were. When showing switched spaces
--- (kitty on the desktop, you on a fullscreen Brave), macOS does not switch
--- back on hide; it activates whatever is next in its own order, which was
--- Telegram. So the window that was in front at show time is remembered and
--- focused again on hide. The old handler kept a "previous app" too, but it
--- went stale whenever kitty was reached by any other route (and nil after
--- every reload). Here the memory is a window, and an application watcher
--- forgets it the moment anything other than kitty is activated, so it only
--- ever describes the show that is still in effect.
+-- Hiding has to return to the window that was in front at show time: a panel
+-- that goes away leaves focus on a window-less kitty (measured with the
+-- quick-access kitten), so macOS does not hand it on by itself. The old
+-- handler kept a "previous app" that went stale whenever kitty was reached by
+-- another route. Here the memory is a window, an application watcher forgets
+-- it the moment anything other than kitty is activated, and it is taken out of
+-- the variable synchronously at press time, before the asynchronous hide can
+-- trigger that watcher. With nothing remembered, the topmost other window on
+-- the current space is focused instead.
 
 local kittyBundleID = "net.kovidgoyal.kitty"
-
-local function spaceIsUser(spaceID)
-    return hs.spaces.spaceType(spaceID) == "user"
-end
-
--- The first user space on `screen`: where kitty lives when it is not a guest.
-local function kittyHomeSpace(screen)
-    for _, sid in ipairs(hs.spaces.spacesForScreen(screen) or {}) do
-        if spaceIsUser(sid) then return sid end
-    end
-    return nil
-end
-
-local function windowInSpace(win, spaceID)
-    return has_value(hs.spaces.windowSpaces(win) or {}, spaceID)
-end
-
-local function windowInAnyUserSpace(win)
-    for _, sid in ipairs(hs.spaces.windowSpaces(win) or {}) do
-        if spaceIsUser(sid) then return true end
-    end
-    return false
-end
 
 -- The window to return to on hide; nil unless a hyper+z show is in effect.
 local kittyReturnTo = nil
@@ -269,28 +246,21 @@ local kittyFocusWatcher = hs.application.watcher.new(function(_, event, app)
 end)
 kittyFocusWatcher:start()
 
-local function kittyReturn()
-    local back = kittyReturnTo
-    kittyReturnTo = nil
-    if not back then return end
-    -- The window may have closed since; a dead hs.window answers nil.
-    local ok = pcall(function()
-        if back:application() then back:focus() end
-    end)
-    if not ok then
-        print("kittyHandler: could not return to the previous window")
+-- Focuses `back', or failing that the topmost window that is not kitty's.
+local function kittyFocusAfterHide(back)
+    if back then
+        -- The window may have closed since; a dead hs.window answers nil.
+        local ok = pcall(function()
+            if back:application() then back:focus() end
+        end)
+        if ok then return end
     end
-end
-
--- Evicts `win` from a fullscreen space to the user space of its screen.
--- No-op when it already sits in a user space.
-local function kittyEvictFromFullscreen(win)
-    if windowInAnyUserSpace(win) then return end
-    local home = kittyHomeSpace(win:screen())
-    if not home then return end
-    local ok, err = hs.spaces.moveWindowToSpace(win, home, true)
-    if not ok then
-        alert_gateway("kitty: could not leave fullscreen space: " .. tostring(err), { color = "warn" })
+    for _, win in ipairs(hs.window.orderedWindows()) do
+        local app = win:application()
+        if app and app:bundleID() ~= kittyBundleID then
+            win:focus()
+            return
+        end
     end
 end
 
@@ -298,107 +268,21 @@ function kittyHandler()
     -- getApp (core/app-hotkeys.lua) is a bundle-ID lookup that never
     -- enumerates every running process.
     local app = getApp(kittyBundleID)
-    if not app then
-        hs.application.launchOrFocusByBundleID(kittyBundleID)
-        return
-    end
 
-    local win = app:focusedWindow() or app:mainWindow() or app:allWindows()[1]
-    if not win then
-        app:activate()
-        return
-    end
-
-    if app:isFrontmost() then
-        kittyEvictFromFullscreen(win)
-        app:hide()
-        -- Must stay synchronous right after hide(): the activation that
-        -- hide() causes reaches kittyFocusWatcher on the next run-loop turn
-        -- and clears kittyReturnTo. A doAfter here would return nowhere.
-        kittyReturn()
+    if app and app:isFrontmost() then
+        local back = kittyReturnTo
+        kittyReturnTo = nil
+        brishz_eval_hs("kitty-panel-hide", "kittyHandler")
+        hs.timer.doAfter(0.35, function() kittyFocusAfterHide(back) end)
         return
     end
 
     kittyReturnTo = hs.window.frontmostWindow()
-
-    -- Show, on the screen the mouse is on.
-    local mouseScreen = hs.mouse.getCurrentScreen()
-    if win:screen():id() ~= mouseScreen:id() then
-        win:moveToScreen(mouseScreen)
-    end
-
-    kittyEvictFromFullscreen(win)
-
-    -- Between user spaces the move works and saves a space switch. A
-    -- fullscreen target is left alone: see the header.
-    local target = hs.spaces.activeSpaceOnScreen(mouseScreen)
-    if target and spaceIsUser(target) and not windowInSpace(win, target) then
-        local ok, err = hs.spaces.moveWindowToSpace(win, target)
-        if not ok then
-            alert_gateway("kitty: could not move to this space: " .. tostring(err), { color = "warn" })
-        end
-    end
-
-    app:activate()
-    win:focus()
-    win:maximize()
+    brishz_eval_hs("kitty-panel-show", "kittyHandler")
 end
 
 hyper_bind_v1('z', kittyHandler)
 
---- * Quick-access kitty (hyper+shift+z)
--- kitty's own dropdown terminal. It is a panel window that floats over
--- fullscreen apps (measured: shown over Telegram's fullscreen space with no
--- space switch), so it needs none of the juggling above. Running the kitten
--- toggles it: the first run *is* the instance and lives as long as it does,
--- later runs tell it to show or hide and exit at once. It is a separate kitty
--- instance (bundle net.kovidgoyal.kitty-quick-access, app name
--- kitty-quick-access), configured fullscreen and opaque in
--- configFiles/kitty/quick-access-terminal.conf; it does not show the regular
--- kitty's windows.
---
--- Not `--detach`: on this machine the detached child died silently (exit 0,
--- no log, no instance). hs.task is already asynchronous, so the first run
--- simply stays a running task; the table keeps it from being collected.
---
--- Hiding leaves the quick-access app active with no window (measured), so
--- keystrokes would go nowhere. When the press is a hide, focus the topmost
--- remaining window on the current space once the panel is gone.
-local kittenBin = "/Applications/kitty.app/Contents/MacOS/kitten"
-local quickAccessBundleID = "net.kovidgoyal.kitty-quick-access"
-local quickAccessTasks = {}
-
-local function quickAccessRefocus()
-    for _, win in ipairs(hs.window.orderedWindows()) do
-        local app = win:application()
-        if app and app:bundleID() ~= quickAccessBundleID then
-            win:focus()
-            return
-        end
-    end
-end
-
-function quickAccessKittyToggle()
-    local hiding = hs.application.frontmostApplication():bundleID() == quickAccessBundleID
-
-    local task
-    task = taskWithPath(kittenBin, function(code, _, err)
-        quickAccessTasks[task] = nil
-        if code ~= 0 then
-            print("quick-access kitty: kitten exited " .. tostring(code) .. ": " .. tostring(err))
-        end
-    end, {"quick-access-terminal"})
-    if task then
-        quickAccessTasks[task] = true
-        task:start()
-    end
-
-    if hiding then
-        hs.timer.doAfter(0.3, quickAccessRefocus)
-    end
-end
-
-hyper_bind_v2{ mods={"shift"}, key='z', pressedfn=quickAccessKittyToggle }
 ---
 function escapeTripleQuotes(s)
     local result = {}

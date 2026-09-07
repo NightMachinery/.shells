@@ -76,7 +76,6 @@ fimDefaultProvider = fimDefaultProvider or "codestral"
 --- `Alt-.' in each rather than as a dead key or a `≥'.
 fimAppPolicy = fimAppPolicy or {
     ["net.kovidgoyal.kitty"] = { hotkey = { mods = {"alt"}, key = "." } },
-    ["net.kovidgoyal.kitty-quick-access"] = { hotkey = { mods = {"alt"}, key = "." } },
     ["org.gnu.Emacs"]        = { hotkey = { mods = {"alt"}, key = "." } },
 }
 
