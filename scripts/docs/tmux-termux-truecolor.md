@@ -106,3 +106,38 @@ References:
 - [tmux terminal-features](https://man.openbsd.org/tmux#terminal-features)
 - [Termux RGB handler](https://github.com/termux/termux-app/blob/master/terminal-emulator/src/main/java/com/termux/terminal/TerminalEmulator.java)
 - [termstandard/colors](https://github.com/termstandard/colors)
+
+## Where the false xterm-kitty came from
+
+`setup/minimal_proxy/.shared.sh` used to assign TERM unconditionally:
+
+```sh
+if infocmp xterm-kitty > /dev/null 2>&1; then
+  export TERM="xterm-kitty"
+else
+  export TERM="xterm-256color"
+fi
+```
+
+That clobbers the inherited TERM on the strength of the terminfo *database*
+holding the entry, which is true on every host where kitty-terminfo was ever
+installed and says nothing about the terminal on the other end. It has no
+check for ssh or tmux either, so it also overrode the TERM tmux sets for its
+own panes. `setup/minimal_proxy/gen.org` rsyncs the file to remote hosts, which
+is how the phone came to announce `xterm-kitty` to every machine it reached.
+
+It now downgrades only a TERM this host cannot resolve, and never invents one:
+
+```sh
+if [ -z "${TERM}" ] || ! infocmp "${TERM}" > /dev/null 2>&1 ; then
+  export TERM="xterm-256color"
+fi
+```
+
+A genuine kitty client keeps `xterm-kitty`, tmux panes keep `tmux-256color`,
+and an unresolvable value still falls back rather than producing `terminals
+database is inaccessible`.
+
+Redeploy with the rsync in `setup/minimal_proxy/gen.org` for the phone to pick
+this up; until then the `terminal-overrides` line above is what keeps its
+colors readable.
