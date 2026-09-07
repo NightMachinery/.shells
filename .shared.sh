@@ -37,13 +37,15 @@ export GCM_TRACE=~/tmp/gcm.log
 # export EMACS_SOCKET_NAME=/tmp/sockets/.emacs
 #: --- where our UNIX domain sockets live ---
 #:
-#: Not `~/tmp'. That is a scratch directory, pruned by hand and by
-#: [agfi:rm-caches], and a socket deleted from under a live listener cannot be
-#: restored: an unlinked socket path cannot be re-linked, so the process keeps
-#: the bound inode while every client gets ENOENT. That is exactly how kitty's
-#: remote-control socket died, silently, taking `cmd+shift+o' with it.
+#: Not `~/tmp'. That is a scratch directory: things get deleted there by hand,
+#: and [agfi:rm-caches] prunes inside it. A socket deleted from under a live
+#: listener cannot be restored -- an unlinked socket path cannot be re-linked,
+#: so the process keeps the bound inode while every client gets ENOENT. That is
+#: exactly how kitty's remote-control socket died, silently, taking
+#: `cmd+shift+o' with it.
 #:
 #: `~/.local/state' is mode 0700, exists on every host, and nothing sweeps it.
+#: See ~/scripts/docs/unix-sockets.md.
 #:
 #: Overridable, because on the CIS cluster $HOME is one NFS mount shared by
 #: ~12 machines and a socket there cannot work: AF_UNIX is a kernel-local
