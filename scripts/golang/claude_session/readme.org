@@ -405,57 +405,104 @@ opens the session running in the focused window.
 Claude Code cannot do this by itself. Its =~/.claude/keybindings.json= takes
 only a fixed action enum --- =chat:submit=, =app:toggleTranscript= and the
 like --- with no action that runs a shell command and no way to bind a slash
-command. So the keypress lives in kitty, and hooks leave it a note saying which
-session is running where.
+command. So the keypress lives in kitty.
+
+** What the window can say for itself
+
+The hotkey is =claude-code-view-session-focused=, bound in
+=configFiles/kitty/kitty.conf=. It asks =kitty @ ls= which window is focused
+and hands that window to =h-claude-code-session-of-kitty-window=, which tries
+four things, in order of how sure each one is:
+
+1. Claude Code runs in the window itself. One of the window's foreground pids
+   is then a live session's pid.
+2. The window shows a tmux client, =tmux a -t NAME=. Sessions here mostly live
+   in detached tmux sessions --- that is what lets them outlive a kitty
+   restart --- and the kitty tab merely displays one. Claude Code's own record
+   of each session, =<config home>/sessions/<pid>.json=, carries a =tmux= field
+   naming the tmux session it runs in, and NAME is matched against that.
+3. The window shows the agent view, =claude agents= or =claude attach=. The
+   view sets the window title to the attached session's name, at times with a
+   status glyph in front, and the title is matched against the live sessions'
+   names. This is observed behaviour, not documented, so it has to match
+   exactly one session or it is ignored.
+4. The registry described below: where the session was showing the last time
+   it was prompted.
+
+The first three read only what exists at the moment of the keypress, so they
+cannot go stale. The fourth can, which is why it comes last.
+
+What counts as live comes from =claude agents --json=, the supported interface
+and what the agent view itself shows. It is scoped to one config home, so
+=h-claude-code-session-live-list= runs it once per profile, and asks the
+personal profile with =CLAUDE_CONFIG_DIR= unset, since Claude Code hashes a
+set value into its keychain entry name. The transcript path is derived rather
+than read: the session's id under the projects directory named after its cwd,
+in the same config home, with every non-alphanumeric character of the cwd
+turned into =-= --- slashes, dots, spaces and underscores alike, which is the
+rule Claude Code uses. The whole resolution takes about half a second, most of
+it those two listings.
+
+When none of the four resolves, the hotkey does not notify and give up. It
+opens a picker over every live session as a kitty overlay in that same window,
+=zshlang/wrappers/claude-code-session-pick.zsh=: "which one did you mean" is a
+question, not a failure. It is an overlay running its own script because fzf
+needs a terminal and neither the background hotkey nor the garden's shells
+have one; the script runs fzf itself and goes through the garden for the rows,
+the preview and the final open.
+
+** The registry, as insurance
 
 The write side is =claude-code-session-register=, wired to Claude Code's
 =SessionStart= and =UserPromptSubmit= hooks in
-=configFiles/claude-code/settings.json=. Every hook event receives
-=transcript_path= on stdin; the function records it in a registry file under
-=~/tmp/claude-code-sessions/=, named =<kitty-pid>-<kitty-window-id>=. kitty
-numbers its windows from 1 again on every restart, so the pid is what stops a
-dead kitty's entries from being read as live ones. =SessionEnd= runs
-=claude-code-session-unregister=; that is hygiene rather than correctness.
+=configFiles/claude-code/settings.json=. Under
+=~/.local/state/claude-code-sessions/=, in a file named
+=<kitty-pid>-<kitty-window-id>=, it records the =transcript_path= the hook was
+handed. kitty numbers its windows from 1 again on every restart, so the pid is
+what stops a dead kitty's entries from being read as live ones.
 
-This path needs nothing done to it for a second profile, unlike the picker.
-The registry stores the absolute =transcript_path= the hook was handed, so a
-[[agfi:claude-work]] session records a path under =~/.claude-work/projects/=
-without anything here knowing that profiles exist; and the hooks fire at all
-because =~/.claude-work/settings.json= symlinks to the same tracked file.
+It records the one fact a hook knows that nothing else does. When
+=UserPromptSubmit= fires, Enter was just pressed, so the kitty window focused
+at that instant is the one showing the session, whatever the attach mechanism.
+It used to walk its own process ancestry looking for kitty instead. That finds
+kitty only for a session run directly in a tab; for anything attached, the
+walk ends at tmux or at Claude's pty host, and the hook silently recorded
+nothing. No hook fires on attach itself, and none runs in the attaching
+client, so a prompt is as close as a hook can get.
 
-Finding the window is the awkward part. =KITTY_WINDOW_ID= would be the obvious
-key, but Claude Code does not pass it down: its processes come out carrying
-=KITTY_PID= and =KITTY_LISTEN_ON= and no window id at all, and the detached
-ones --- background agents, anything reparented to launchd --- carry none of
-it. Interactive sessions do appear in =kitty @ ls= under their window's
-=foreground_processes=, so =h-claude-code-session-key-of-pid= asks kitty
-instead, walking a process's ancestors until one of them matches.
+Two guards keep the record honest. If kitty has no focused window, the prompt
+did not come from one --- a message from another agent, say, or the usage
+auto-continue --- and nothing is written. If the focused window resolves to a
+/different/ session, the prompt was injected while you sat elsewhere, and
+nothing is written either. Only a window the live lookups cannot explain, or
+one they agree with, is recorded. That is what makes it insurance rather than
+a competing answer: it covers the attach path nobody has invented yet, and the
+day the agent view stops putting the name in the title.
 
-The hook therefore passes its own pid, =$$=, and nothing else. That is also
-what makes it work through brish, which posts only the command and its stdin
-to the garden: a hook's environment does not survive the trip, but process
-ancestry is readable from anywhere. A session with no kitty window above it
-registers nothing, which is right --- nothing there could press the hotkey.
+Nothing here needs doing for a second profile. The registry stores the
+absolute transcript path, so a [[agfi:claude-work]] session records a path
+under =~/.claude-work/projects/= without anything knowing that profiles exist,
+and the hooks fire at all because =~/.claude-work/settings.json= symlinks to
+the same tracked file.
 
-The read side is =claude-code-view-session-focused=, bound in
-=configFiles/kitty/kitty.conf=. It asks =kitty @ ls= which window is focused,
-reads that window's registry entry, and hands the transcript to
-=claude-code-view-session=. It notifies rather than printing on failure,
-because the hotkey runs detached and stderr goes nowhere a person will look.
+** Exit codes and the notification
 
-It also always exits zero. Pressing the key in a window with no session is an
-ordinary outcome, not an error, and the notification has already said so ---
-but a non-zero return makes BrishGarden log the command as failed and ring its
+The hotkey notifies rather than printing on failure, because it runs detached
+and stderr goes nowhere a person will look. It also always exits zero.
+Pressing the key in a window with no session is an ordinary outcome, not an
+error, and the picker or the notification has already answered --- but a
+non-zero return makes BrishGarden log the command as failed and ring its
 failure bell, which is a second, louder answer to a question already answered.
 =h-claude-code-view-session-focused= holds the real body and the real exit
 code, for anything that wants to branch on it.
 
-Two things that are easy to get wrong here:
+Things that are easy to get wrong here:
 
 - kitty's own =PATH= is just =/usr/bin:/bin:/usr/sbin:/sbin=, so the binding
   needs an absolute path to =brishz.dash=. It cannot use =brishz2.dash=, whose
   quoting path needs a =jq= that is not on that =PATH= either. The command is a
-  bare function name, so the unquoted path is safe.
+  bare function name, so the unquoted path is safe. The overlay picker has the
+  same problem from the other side, and gets our =PATH= passed in explicitly.
 - =KITTY_LISTEN_ON= is only trusted when it still points at a live socket.
   Brish's shells outlive kitty, so the garden holds whatever value was in the
   environment the day it started, which goes stale the moment kitty restarts.
@@ -469,6 +516,8 @@ Two things that are easy to get wrong here:
   holding the bound inode while every client got ENOENT. Nothing short of
   restarting kitty brings it back, which is why
   [agfi:kitty-socket-get] says so by name instead of reporting "no socket".
+  The registry moved out of =~/tmp= for the same reason; it vanished in the
+  same sweep.
 - Sockets left behind by a kitty that crashed are ignored rather than deleted.
   =listen_on= puts kitty's pid in the socket's name, so
   [agfi:kitty-sockets-list] can filter by whether that pid is still a live
@@ -481,7 +530,13 @@ persistent shells and will otherwise go on running the old code.
 Variables:
 
 - =claude_code_session_registry_dir= --- defaults to
-  =~/tmp/claude-code-sessions=.
+  =$XDG_STATE_HOME/claude-code-sessions=, with =~/.local/state= standing in
+  for an unset =XDG_STATE_HOME=.
+- =claude_code_session_live_list_cache= --- a listing to reuse instead of
+  asking =claude agents= again; set it (a =local= suffices) around several
+  lookups.
+- =claude_code_session_live_rows_scope= --- =windows= (default) or =all=; see
+  the next section.
 - =claude_code_session_kitty_socket_glob= --- defaults to
   =$NIGHT_SOCKETS_DIR/kitty-*.sock=. Passed through to
   =kitty_sockets_list_glob=, which is the same override under the name the
@@ -491,9 +546,13 @@ Variables:
 
 =claude-code-session-live-fz= picks among the Claude Code sessions currently
 live in a kitty window, printing =<kitty-window-id> <TAB> <transcript path>=
-per choice. It is built from the same window→session registry that
-=claude-code-view-session-focused= uses, so a session only appears once it has
-actually registered itself, and it disappears the moment its window closes.
+per choice. Each window goes through the same
+=h-claude-code-session-of-kitty-window= the hotkey uses, so a session shows
+up whether it runs in the tab, sits behind a tmux client, or is attached
+through the agent view, and it disappears the moment its window closes. With
+=claude_code_session_live_rows_scope=all= the rows cover every live session,
+with =-= in the window column for one no kitty window is showing; that is what
+the hotkey's overlay picker offers, via =h-claude-code-session-pick-rows=.
 
 Each row's metadata comes from a single =claude_session list= call over every
 profile's projects directory, joined back onto the live rows by transcript
