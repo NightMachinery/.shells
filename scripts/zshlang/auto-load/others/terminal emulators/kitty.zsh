@@ -407,9 +407,12 @@ function kitty-panel-ensure {
     panel_tab="$(command jq -r "${panel_q}" <<<"${ls_json}")"
     if test -z "${panel_tab}" ; then
         #: `edge center' anchors to all four edges, so it covers the display.
-        #: `layer overlay' puts it above fullscreen windows.
+        #: `layer top' is the lowest layer that still floats above fullscreen
+        #: windows (measured over a fullscreen Brave). Not `overlay': that sat
+        #: above Handy's speech-to-text overlay too, which then could not be
+        #: seen while dictating into kitty.
         kitty @ --to "${sock}" launch --type=os-panel \
-            --os-panel edge=center --os-panel layer=overlay \
+            --os-panel edge=center --os-panel layer=top \
             --os-panel focus-policy=on-demand \
             --os-window-class kitty-panel --dont-take-focus >/dev/null || return $?
         ls_json="$(kitty @ --to "${sock}" ls)" || return $?
