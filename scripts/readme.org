@@ -62,6 +62,15 @@ tailnet, account, hostname, or auth-key material in this public repo. See
 Termux. Installation and verification: =./docs/emacs-truecolor.md=.
 =emc-mobile= opens a truecolor terminal frame with mobile line-number suppression.
 
+* UNIX sockets
+
+kitty's remote control, the Emacs server and the iTerm focus helper all bind a
+socket under =$NIGHT_SOCKETS_DIR=, =~/.local/state= by default, and
+emphatically not under =~/tmp=: that directory gets swept, and a socket deleted
+from under a live listener cannot be restored at all. See
+=./docs/unix-sockets.md=, which also covers why kitty in particular can then
+only be fixed by restarting it.
+
 * ntag
 
 ntag notes are tracked in =./docs/ntag/=.

@@ -11,6 +11,8 @@ function kitty-sockets-list {
     #:
     #: `pgrep -x', never `-f': `-f' matches whole command lines, including our
     #: own.
+    #:
+    #: See docs/unix-sockets.md.
     ##
     local dir="${NIGHT_SOCKETS_DIR:-${HOME}/.local/state}"
 
