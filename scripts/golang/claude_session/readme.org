@@ -334,16 +334,35 @@ same idea, on a document that is already org.
 pandoc dominates the conversion --- on a 4.5MB session it was 89% of the
 runtime --- so =org-pandoc= splits the rendered markdown into byte-balanced
 chunks and runs one pandoc per chunk concurrently. The seams always fall on
-record boundaries, never inside a code block, so every chunk is a
-self-contained markdown document; the result is byte-identical to converting
-the whole thing in one pandoc, which =TestPandocPathParity= checks against the
-whole local corpus by comparing the path against itself run with =-jobs=1=. Its
-reference used to be =-format=md | pandoc=, which no longer works as one: the
-org-pandoc path tags its headings and rewrites their levels afterwards, and a
-bare pandoc pipeline can do neither. The test exists for the chunk seams, and
+record boundaries, never inside a code block and never just after a heading, so
+every chunk is a self-contained markdown document; the result is byte-identical
+to converting the whole thing in one pandoc, which =TestPandocPathParity= checks
+against the whole local corpus by comparing the path against itself run with
+=-jobs=1=. Its reference used to be =-format=md | pandoc=, which no longer
+works as one: the org-pandoc path tags its headings and rewrites their levels
+afterwards, and a bare pandoc pipeline can do neither. The test exists for the chunk seams, and
 still covers them. Documents below a few hundred KB use a single process,
 because pandoc's ~70ms startup would eat the gain. Records also render
 concurrently, since each is independent.
+
+The no-heading rule is the newer half, and the parity test failed on one
+transcript for a long time without it: the parallel output carried one blank
+line a single pandoc did not. An org headline is a container, so pandoc's org
+writer emits whatever follows a headline with no blank line between the two,
+while the chunk join always puts one there. Probed against every block type the
+renderer emits, that is the whole of the difference --- a chunk ending on a
+heading, followed by a heading, paragraph, list, code block or table, all
+diverge, and nothing else does. So when the byte target is reached at a part
+whose markdown ends with an ATX heading, the seam moves on to the next part
+instead; =endsWithMarkdownHeading= is the test, and it only has to know our own
+markdown. Deciding the separator at the seam instead would mean knowing pandoc's
+spacing rules, which is the trade the next paragraph refuses. The cost is
+nothing measurable: only a part ending in a bodyless heading (a =### Result:=
+with no content under it) can push a seam, those are rare, and in the worst case
+the chunks merely come out less balanced. Parity now holds over the whole
+corpus --- 112 transcripts under =~/.claude-work/projects= and 376 under
+=~/.claude/projects=, 488 in all --- and the single-pandoc output is
+byte-identical to what it was before the fix.
 
 A tempting further step is to keep code blocks away from pandoc entirely ---
 they are 84% of a transcript's bytes and pandoc only copies them through, and

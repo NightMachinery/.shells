@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -412,8 +413,9 @@ func convertSegments(segs []segment, jobs int, bin string) []string {
 
 // Splits the rendered records into byte-balanced chunks and converts each with
 // its own pandoc. Chunk seams fall on record boundaries, never inside a code
-// block, so each chunk is a self-contained markdown document and the result is
-// identical to converting the whole thing at once.
+// block and never just after a heading, so each chunk is a self-contained
+// markdown document and the result is identical to converting the whole thing
+// at once.
 func pandocChunks(parts []string, jobs int, bin string) []string {
 	total := 0
 	for _, p := range parts {
@@ -433,10 +435,24 @@ func pandocChunks(parts []string, jobs int, bin string) []string {
 	target := total / n
 	for _, p := range parts {
 		cur.WriteString(p)
-		if cur.Len() >= target && len(chunks) < n-1 {
-			chunks = append(chunks, cur.String())
-			cur.Reset()
+
+		if cur.Len() < target || len(chunks) >= n-1 {
+			continue
 		}
+		// A chunk must not end on a heading. An org headline is a container,
+		// so pandoc writes whatever follows one with no blank line between the
+		// two, while joining the chunks' outputs always puts one there --- and
+		// that is the whole of the difference from a single run, measured over
+		// every block type the renderer emits. Deciding it at the seam instead
+		// would mean reimplementing pandoc's spacing rules, which is exactly
+		// the trade the Performance section refuses; moving the seam needs to
+		// know only about our own markdown.
+		if endsWithMarkdownHeading(p) {
+			continue
+		}
+
+		chunks = append(chunks, cur.String())
+		cur.Reset()
 	}
 	if cur.Len() > 0 {
 		chunks = append(chunks, cur.String())
@@ -468,6 +484,19 @@ func pandocChunks(parts []string, jobs int, bin string) []string {
 		out[i] = strings.TrimRight(out[i], "\n")
 	}
 	return out
+}
+
+// Whether this piece of markdown ends on an ATX heading, which is all the
+// renderer emits. Trailing blank lines do not change the answer: a heading is
+// written with one after it.
+var mdHeadingRe = regexp.MustCompile(`^#{1,6} `)
+
+func endsWithMarkdownHeading(md string) bool {
+	md = strings.TrimRight(md, "\n \t")
+	if i := strings.LastIndexByte(md, '\n'); i >= 0 {
+		md = md[i+1:]
+	}
+	return mdHeadingRe.MatchString(md)
 }
 
 func runPandoc(bin, input string) (string, error) {
