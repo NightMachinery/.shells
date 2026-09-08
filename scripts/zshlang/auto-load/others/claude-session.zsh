@@ -240,12 +240,13 @@ function h-claude-code-session-select-fz {
 
     #: Through the garden, the established way to reach a zsh function from
     #: fzf's own shell; see the note in [agfi:claude-code-session-live-fz], and
-    #: remember `brishz-restart' after editing the preview. `fz_opts' is
-    #: appended last, so an explicit `--preview-window hidden' there wins.
+    #: remember `brishz-restart' after editing the preview. `--ansi' because the
+    #: preview is coloured. `fz_opts' is appended last, so an explicit
+    #: `--preview-window hidden' there wins.
     local selected
     selected="$(ec "${lines}" |
         fz_no_preview=y fz \
-            --delimiter=$'\t' --with-nth='3..' --no-multi \
+            --delimiter=$'\t' --with-nth='3..' --no-multi --ansi \
             --preview 'brishzq.zsh h-claude-code-session-preview {2}' \
             --preview-window 'down,60%,wrap' \
             "${fz_opts[@]}")" @RET
@@ -1272,20 +1273,77 @@ function h-claude-code-session-live-rows {
         ' <(ec "${meta}") -
 }
 
+function h-claude-code-session-epoch-of {
+    #: Claude Code's ISO-8601 UTC timestamp as an epoch, or nothing.
+    #:
+    #: Its own function because the parse has to happen under TZ=UTC --- strptime
+    #: has no field for a timezone, so the trailing `Z' is honoured by parsing
+    #: there --- and `local -x' is scoped to a function, not to a block. strftime
+    #: rather than `date' because GNU and BSD date disagree on parsing and this
+    #: runs on both.
+    ##
+    local stamp="${1}"
+    test -n "${stamp}" || return 1
+
+    local -x TZ=UTC
+    zmodload -F zsh/datetime b:strftime 2>/dev/null
+
+    #: strptime has no field for the fractional second either, so it goes.
+    strftime -r '%Y-%m-%dT%H:%M:%S' "${${stamp%%.*}%Z}" 2>/dev/null
+}
+
+function h-claude-code-session-age {
+    #: A count of seconds as its largest unit: `44s', `6m', `3h', `2d'. The
+    #: question a preview answers is how stale the session is, so one unit is
+    #: enough and a second would only be noise.
+    ##
+    local secs="${1}"
+
+    (( secs < 0 )) && secs=0
+    if   (( secs < 60 ))    ; then ec "${secs}s"
+    elif (( secs < 3600 ))  ; then ec "$(( secs / 60 ))m"
+    elif (( secs < 86400 )) ; then ec "$(( secs / 3600 ))h"
+    else                          ec "$(( secs / 86400 ))d"
+    fi
+}
+
+#: What colour a session's name is previewed in, keyed by the config home it
+#: lives under, as the rgb triples [agfi:colorfg] takes. Which account a session
+#: belongs to is the thing worth seeing at a glance here -- the whole point of
+#: [agfi:claude-code-session-resume] is that the two are otherwise
+#: interchangeable -- so the profile gets the colour rather than the label.
+#: A profile with no entry falls back to no colour rather than a wrong one.
+#:
+#: Not Claude Code's own `agent-color': it writes that record once, wherever in
+#: the session the name was settled, which is nowhere near either end of the
+#: file -- 210MB into a 398MB transcript in one case -- so a tail scan cannot
+#: reach it, and only 5 of 123 local sessions have one at all.
+typeset -gA claude_code_session_profile_colors=(
+    .claude       '90 150 240'
+    .claude-work  '235 145 60'
+)
+
 function h-claude-code-session-preview {
     #: The fzf preview body for [agfi:h-claude-code-session-select-fz] and
-    #: [agfi:claude-code-session-live-fz]: what this session is called, when it
-    #: last moved, and what was last asked of it.
+    #: [agfi:claude-code-session-live-fz]: what this session is called, what it
+    #: was running as, where, when it last moved, and what was last asked of it.
     #:
     #: A tail scan rather than `claude_session render`, because a preview has to
-    #: be instant and rendering a 46MB transcript takes eight seconds. Claude
-    #: Code writes its own name and `last-prompt` records, so the two things
-    #: worth previewing are already sitting there in plain form.
+    #: be instant and rendering a 46MB transcript takes eight seconds. Every
+    #: field below is one Claude Code already writes into the transcript in plain
+    #: form, so the whole preview is one jq pass over the last few hundred KB.
+    #:
+    #: The output carries ANSI escapes, so every caller passes fzf `--ansi'.
+    #: claude_code_session_preview_color_p=n turns them off.
     ##
     local transcript="${1}"
     assert-args transcript @RET
 
     local bytes="${claude_code_session_preview_bytes:-400000}"
+    #: The preview pane is a terminal, but this function reaches it down a pipe
+    #: from a non-interactive garden shell, so the tty test would say no.
+    local isColor_override="${claude_code_session_preview_color_p:-y}"
+    local true_color_p_force_p=y
 
     #: A byte-tail necessarily starts on a partial line, so drop it -- but only
     #: when the tail really is a tail. On a transcript smaller than the window
@@ -1304,22 +1362,32 @@ function h-claude-code-session-preview {
     fi
 
     #: `objects' drops any fragment that survived `fromjson?' as a scalar: a
-    #: bare number would make the `.type' test below a fatal type error, and
-    #: jq's non-zero exit would then discard the whole scan. The `.slug' and
-    #: `.timestamp' branches come last, and in that order: a slug rides on the
-    #: same message records that carry a timestamp, while the name and prompt
-    #: records carry neither, so putting either first would swallow them.
+    #: bare number would make the `.type' tests below a fatal type error, and
+    #: jq's non-zero exit would then discard the whole scan.
     local tagged
     tagged="$(command tail -c "${bytes}" "${transcript}" 2>/dev/null |
         "${drop_partial[@]}" |
         jq -Rr 'fromjson? | objects
-            | if   .type == "agent-name"   then "N\t" + (.agentName   | tostring)
-              elif .type == "custom-title" then "C\t" + (.customTitle | tostring)
-              elif .type == "ai-title"     then "T\t" + (.aiTitle     | tostring)
-              elif .type == "last-prompt"  then "P\t" + (.lastPrompt  | tostring)
-              elif .slug                   then "G\t" + (.slug        | tostring)
-              elif .timestamp              then "S\t" + (.timestamp   | tostring)
-              else empty end' 2>/dev/null)" || tagged=''
+            | ( #: Records that exist only to say one thing, one kind each.
+                if   .type == "agent-name"      then "N\t" + (.agentName      | tostring)
+                elif .type == "custom-title"    then "C\t" + (.customTitle    | tostring)
+                elif .type == "ai-title"        then "T\t" + (.aiTitle        | tostring)
+                elif .type == "last-prompt"     then "P\t" + (.lastPrompt     | tostring)
+                elif .type == "permission-mode" then "R\t" + (.permissionMode | tostring)
+                elif .type == "mode"            then "O\t" + (.mode           | tostring)
+                else empty end
+              ),
+              ( #: These ride on the ordinary message records, so they are read
+                #: as well as whatever the chain above matched, not instead of
+                #: it -- which is also why neither group can swallow the other.
+                (.slug      // empty | "G\t" + tostring),
+                (.cwd       // empty | "W\t" + tostring),
+                (.gitBranch // empty | "B\t" + tostring),
+                (.version   // empty | "V\t" + tostring),
+                (.effort    // empty | "E\t" + tostring),
+                (.timestamp // empty | "S\t" + tostring),
+                (.message | objects | .model // empty | "M\t" + tostring)
+              )' 2>/dev/null)" || tagged=''
 
     #: The tags arrive in file order, so one pass keeps the last of each -- the
     #: rule `claude_session name' uses for a name that was revised mid-session.
@@ -1335,16 +1403,80 @@ function h-claude-code-session-preview {
     #: whole file: the name Claude Code resolved, else the title the user set,
     #: else the one it generated, else the slug.
     local name="${last_of[N]:-${last_of[C]:-${last_of[T]:-${last_of[G]}}}}"
-    local prompt="${last_of[P]}"
-    local stamp="${last_of[S]}"
 
-    ec "${name:-Claude Code session ${transcript:t:r}}"
+    local id="${transcript:t:r}"
+    #: The config home the transcript sits under -- .claude, .claude-work -- the
+    #: same label `claude_session list' puts on its own relative paths.
+    local profile="${${transcript%%/projects/*}:t}"
+
+    #: Heading: the session's own name, in its profile's colour.
+    local -a name_rgb
+    name_rgb=( ${=claude_code_session_profile_colors[${profile}]} )
+    {
+        Bold
+        (( ${#name_rgb} == 3 )) && colorfg "${name_rgb[@]}"
+        ecn "${name:-Claude Code session ${id}}"
+        resetcolor
+        ec
+    }
+
+    local -a subtitle
+    subtitle=( "${id}" )
+    test -n "${profile}" && subtitle+=( "${profile}" )
+    test -n "${last_of[V]}" && subtitle+=( "v${last_of[V]}" )
+    { colorfg "${gray[@]}" ; ecn "${(j: · :)subtitle}" ; resetcolor ; ec }
     ec
-    ec "session:  ${transcript:t:r}"
-    ec "modified: ${stamp:-unknown}"
+
+    #: Every row is skipped when it has nothing to say, so a session that
+    #: predates a field does not get a line of blanks for it.
+    local when age
+    local epoch
+    epoch="$(h-claude-code-session-epoch-of "${last_of[S]}")" || epoch=''
+    if test -n "${epoch}" ; then
+        when="$(strftime '%Y-%m-%d %H:%M' "${epoch}")"
+        age="$(h-claude-code-session-age $(( EPOCHSECONDS - epoch )))"
+    fi
+
+    local model="${last_of[M]#claude-}"
+    test -n "${model}" && test -n "${last_of[E]}" &&
+        model="${model} · ${last_of[E]} effort"
+
+    local mode="${last_of[R]}"
+    test -n "${mode}" && test -n "${last_of[O]}" &&
+        mode="${mode} · ${last_of[O]}"
+
+    local where="${last_of[W]/#${HOME}/~}"
+    test -n "${where}" && test -n "${last_of[B]}" &&
+        where="${where} @ ${last_of[B]}"
+
+    h-claude-code-session-preview-row 'last activity' "${when}" "${age:+(${age} ago)}"
+    h-claude-code-session-preview-row 'model'         "${model}"
+    h-claude-code-session-preview-row 'mode'          "${mode}"
+    h-claude-code-session-preview-row 'cwd'           "${where}"
+
     ec
-    ec 'last prompt:'
-    ec "${prompt:-(none in the scanned tail)}"
+    { Bold ; ecn 'last prompt' ; resetcolor ; ec }
+    ec "${last_of[P]:-(none in the scanned tail)}"
+}
+
+function h-claude-code-session-preview-row {
+    #: One `<label>  <value>  <aside>' line of [agfi:h-claude-code-session-preview],
+    #: printed only when there is a value: a session predating a field should
+    #: not get a row of blanks for it.
+    ##
+    local label="${1}" value="${2}" aside="${3}"
+
+    test -n "${value}" || return 0
+
+    local isColor_override="${claude_code_session_preview_color_p:-y}"
+    local true_color_p_force_p=y
+
+    { colorfg "${gray[@]}" ; printf '%-14s' "${label}" ; resetcolor }
+    ecn "${value}"
+    if test -n "${aside}" ; then
+        { ecn ' ' ; colorfg "${gray[@]}" ; ecn "${aside}" ; resetcolor }
+    fi
+    ec
 }
 
 function claude-code-session-live-fz {
@@ -1380,7 +1512,7 @@ function claude-code-session-live-fz {
     local selected
     selected="$(ec "${rows}" |
         fz_no_preview=y fz \
-            --delimiter=$'\t' --with-nth='3..' \
+            --delimiter=$'\t' --with-nth='3..' --ansi \
             "${multi_opt}" \
             --preview 'brishzq.zsh h-claude-code-session-preview {2}' \
             --preview-window 'down,60%,wrap' \
