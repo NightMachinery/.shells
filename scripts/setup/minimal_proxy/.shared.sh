@@ -594,18 +594,63 @@ alias ci='myip-ipinfo'
 function npm-install {
     #: @duplicateCode/b00b656b70d11d5d26d81a77f2d2b970
     ##
+    #: `npm_install_engine' is an enum: auto (pnpm when installed, npm
+    #: otherwise), pnpm, or npm. Force npm for any package whose tarball is
+    #: larger than roughly 50MB -- pnpm hashes the tarball in a worker thread,
+    #: where the structured clone has downgraded the Buffer to a plain
+    #: Uint8Array, and Node's `crypto.hash' stringifies those. The comma-joined
+    #: string overruns V8's maximum string length and kills the process with
+    #:   FATAL ERROR: invalid array length Allocation failed
+    #: See scripts/docs/npm-global-installs.md.
+    ##
+    local engine="${npm_install_engine:-auto}"
+    if [[ "${engine}" == auto ]] ; then
+        if test -n "${commands[pnpm]}" ; then
+            engine=pnpm
+        else
+            engine=npm
+        fi
+    fi
+
+    local pnpm_opts=("${npm_install_pnpm_opts[@]}")
+
     local pkg
     for pkg in $@ ; do
-        if test -n "${commands[pnpm]}" ; then
-            reval-ecgray pnpm install -g "${pkg}" --include=optional --loglevel=silly
-        else
-            reval-ecgray npm install -g "$pkg" --progress=true --loglevel=verbose
-        fi
+        case "${engine}" in
+            pnpm)
+                reval-ecgray pnpm add -g "${pnpm_opts[@]}" "${pkg}" --include=optional --loglevel=silly @RET
+                ;;
+            npm)
+                reval-ecgray npm install -g "${pkg}" --progress=true --loglevel=verbose @RET
+                ;;
+            *)
+                ecerr "$0: unsupported npm_install_engine: ${engine}"
+                return 1
+                ;;
+        esac
     done
 }
 
+function npm-install-npm {
+    npm_install_engine=npm npm-install "$@"
+}
+
+function npm-install-pnpm {
+    npm_install_engine=pnpm npm-install "$@"
+}
+
+function codex-install-npm {
+    reval-ecgray npm-install-npm '@openai/codex'
+}
+
+function codex-install-pnpm {
+    #: Currently broken; codex's tarball is ~110MB. See [agfi:npm-install].
+    reval-ecgray npm-install-pnpm '@openai/codex'
+}
+
 function codex-install {
-    reval-ecgray npm-install '@openai/codex'
+    #: npm for now, because pnpm cannot install codex at all.
+    codex-install-npm "$@"
 }
 ##
 function nvm-load {
