@@ -362,7 +362,19 @@ function emc-nowait2 {
     # tmp="$(serr grealpath -e -- "$f")" && f="$tmp" || true # can be, e.g., an scp path
     ##
     
-    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD"))) (mapc #'${cmd} '($(emc-quote "${f[@]}"))) ${other_commands} t)"
+    #: `vlf-application' is bound because its default, `ask', means "prompt when
+    #: the file is over `large-file-warning-threshold'" --- 50MB in night-config.el
+    #: --- and this reaches emacs through `server-eval-at', with nobody there to
+    #: answer. The prompt then blocks for ever rather than failing: one 108MB org
+    #: file sat on it for three hours, looking exactly like a hung conversion.
+    #: `dont-ask' uses vlf for those files instead, which is the only practical
+    #: way to read one anyway --- plain `find-file' on 108MB of org is not
+    #: something emacs finishes either.
+    #:
+    #: night-vlf.el sets this too. Bound here as well because that is the config
+    #: of one machine and this is the code path: a host whose doom config
+    #: predates it, or an emacs started before it, must not hang.
+    revaldbg emc-eval "(let ((default-directory $(emc-quote "$PWD")) (vlf-application 'dont-ask)) (mapc #'${cmd} '($(emc-quote "${f[@]}"))) ${other_commands} t)"
     # throws useless error 'Invalid read syntax: "#"', but works anyway
 
     emc-focus
