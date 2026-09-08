@@ -783,6 +783,14 @@ function claude {
 
     tty-title "🍼${PWD:t}"
 
+    #: Claude Code rewrites the terminal title continuously (`✳ <summary>'),
+    #: overwriting the marker above within seconds. This makes it leave the
+    #: title alone. Off by default; see =~/scripts/docs/tmux-tty-title.md=.
+    #: A plain test rather than `bool', which this standalone file lacks.
+    if test -n "${claude_tty_title_keep_p}" && [[ "${claude_tty_title_keep_p}" != (n|no|false|0) ]] ; then
+        local -x CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+    fi
+
     $proxyenv command claude "$@"
 }
 
