@@ -317,12 +317,12 @@ tmux-ensure-attach () {
 }
 alias tma='tmux-ensure-attach'
 
+
 tma-z () {
-    local name="${1}"
+    local name="${*}"
     assert-args name @RET
 
-    tmux-ensure-attach "${name}" zsh -c "cd ~/ ; z $(gq ${name%-*}) && exec zsh"
-    #: `cd ~/` because z rejects CWD when jumping and so needs a neutral starting point.
+    tmux-ensure-attach "${name}" zsh -c "cd ~/ && FORCE_INTERACTIVE=${TMA_Z_FORCE_INTERACTIVE:-y} z $(gq ${name%-*}) && ZSH_PWD=MAGIC_KEEP_CURRENT exec zsh"
     #: `%-*`: remove last dash and everything after it
 }
 ###
