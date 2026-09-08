@@ -164,6 +164,19 @@ func fatal(msg string) {
 // itself, such as an interruption notice, rather than a model.
 var modelRe = regexp.MustCompile(`^(?:claude-)?([a-z]+)-([0-9](?:-[0-9]{1,3})*)(?:-[0-9]{8})?$`)
 
+// A model id as it reads in a subagent's heading: `Opus5', `Fable5.1'. The
+// family capitalised and `shortModel`'s separator dropped, so the tag is one
+// word and scans as a name rather than as a version string.
+func modelLabel(model string) string {
+	short := strings.ReplaceAll(shortModel(model), "-", "")
+	if short == "" {
+		return ""
+	}
+
+	r := []rune(short)
+	return strings.ToUpper(string(r[0])) + string(r[1:])
+}
+
 func shortModel(model string) string {
 	switch model {
 	case "":
