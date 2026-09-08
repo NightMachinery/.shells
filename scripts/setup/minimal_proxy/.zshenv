@@ -548,8 +548,15 @@ function isInTty {
 function title {
     # forked from OMZ, see https://superuser.com/a/344397/856545 for setting tab and window separately
     emulate -L zsh
-    setopt prompt_subst
 
+    #: No `prompt_subst' and no `print -P' below, deliberately: prompt
+    #: expansion *executes* a `$(...)' in the title text, and the `:q' this was
+    #: forked with does not stop it -- `:q' backslash-escapes, then `print'
+    #: (without -r) strips exactly those backslashes again before the expansion
+    #: runs. Titles come from media filenames [agfi:mpv], `$PWD' [agfi:iloop]
+    #: and the fuzzy pickers, so that was reachable. `printf' takes its
+    #: arguments as data.
+    ##
     {
         [[ "$EMACS" == *term* ]] && return
 
@@ -557,24 +564,28 @@ function title {
         # if it is set and empty, leave it as is
         : ${2=$1}
 
+        #: A control character in the title would end the OSC early, letting
+        #: the tail through as a fresh escape sequence.
+        local tab="${1//[$'\n\r\a\e']/ }" win="${2//[$'\n\r\a\e']/ }"
+
         case "$TERM" in
             cygwin|xterm*|putty*|rxvt*|ansi)
-                print -Pn "\e]2;$2:q\a" # set window name
-                print -Pn "\e]1;$1:q\a" # set tab name
+                printf '\e]2;%s\a' "${win}" # set window name
+                printf '\e]1;%s\a' "${tab}" # set tab name
                 ;;
             screen*)
-                print -Pn "\ek$1:q\e\\" # set screen hardstatus
+                printf '\ek%s\e\\' "${tab}" # set screen hardstatus
                 ;;
             *)
                 if [[ "$TERM_PROGRAM" == "iTerm.app" ]]; then
-                    print -Pn "\e]2;$2:q\a" # set window name
-                    print -Pn "\e]1;$1:q\a" # set tab name
+                    printf '\e]2;%s\a' "${win}" # set window name
+                    printf '\e]1;%s\a' "${tab}" # set tab name
                 else
                     # Try to use terminfo to set the title
                     # If the feature is available set title
                     if [[ -n "$terminfo[fsl]" ]] && [[ -n "$terminfo[tsl]" ]]; then
                         echoti tsl
-                        print -Pn "$1"
+                        printf '%s' "${tab}"
                         echoti fsl
                     fi
                 fi
@@ -582,7 +593,6 @@ function title {
         esac
     } >/dev/tty
 }
-
 function tty-title {
     if bool "${tty_title_f}" || { isTty && isI } ; then
         local text="$@"
