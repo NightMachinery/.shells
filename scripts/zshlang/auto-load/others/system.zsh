@@ -458,7 +458,7 @@ function volume-mute-internal-p {
     : "returns 0 iff the INTERNAL laptop speakers are muted; 2 if it cannot tell
 
 Not [agfi:volume-mute-p], which answers for whichever device is default right
-now and so reports the headphones instead."
+now."
     volume-mute-device-p builtin
 }
 aliasfn volume-mute-internal-is volume-mute-internal-p
