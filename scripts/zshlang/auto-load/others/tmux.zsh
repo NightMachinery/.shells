@@ -217,8 +217,9 @@ aliasfn tcgar tmux-capture BrishGarden
 ##
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 
-function ivy {
-    ###
+function ivy-tty-title-get {
+    #: The label the ivy tab carries. Override with `ivy_tty_title'.
+    ##
     local tty_title="${ivy_tty_title}"
     if test -z "$tty_title" ; then
         # tty_title="🪴"
@@ -232,6 +233,39 @@ function ivy {
         # tty_title="ivy"
     fi
 
+    ec "${tty_title}"
+}
+
+function ivy-tmux-title-set {
+    #: `set-titles-string' is a *session* option, so this pins ivy's tab label
+    #: without touching any other session. It is needed because the global
+    #: string follows the active pane, and ivy's panes are mpv and friends --
+    #: which would leave the tab reading whatever is playing rather than the
+    #: label [agfi:ivy] sets with [agfi:tty-title] just before attaching.
+    #: See =./docs/tmux-tty-title.md=.
+    #:
+    #: Set at session creation, so it covers every later attach and not just
+    #: the one [agfi:ivy] performs itself.
+    ##
+    if ! silent tmux has-session -t '=ivy' ; then
+        ecerr "$0: no ivy session"
+        return 1
+    fi
+
+    #: `#' opens a format substitution in a tmux option; `##' is a literal one.
+    local tty_title="$(ivy-tty-title-get)"
+
+    #: No `=' exact-match prefix here, unlike the =has-session= above:
+    #: =set-option= rejects it outright (`no such session: =ivy'). The bare
+    #: name is safe anyway, because the exact check has already run and tmux
+    #: resolves an exact session name before trying it as a prefix.
+    tmux set-option -t 'ivy' set-titles-string "${tty_title//\#/##}"
+}
+
+function ivy {
+    ###
+    local tty_title="$(ivy-tty-title-get)"
+
     tty-title "${tty_title}"
     ###
     ## ivy acts as the terminal emulator's startup hook, as well
@@ -239,6 +273,7 @@ function ivy {
     ##
     if ! whitespace-is "$(pgrep tmux)" ; then
         if ! ask "$0: tmux seems to be running already; Proceed?" N ; then
+            ivy-tmux-title-set
             tmux attach -t ivy
             return 0
         fi
@@ -257,6 +292,7 @@ function ivy-self {
 
     tmux kill-session -t "ivy" &> /dev/null
     tmux new-session -s ivy -d 'zsh'
+    ivy-tmux-title-set
 
     #: We add a space before our commands to avoid cluttering the shell history.
     tmux send-keys " hear-start-server "$'\n'
