@@ -398,6 +398,17 @@ trailing-newline trimming. Each is a silent corruption if it drifts from
 whatever pandoc does next release, and that is a bad trade for CPU on a
 conversion that runs once per session view.
 
+The fan-out assumes one conversion at a time, and the pickers broke that
+assumption: =alt+enter= on ten rows meant ten renderers each spawning a CPU count
+of pandocs. The zsh side now hands each conversion =-jobs= equal to the CPU count
+divided by the number of live conversions, floored at one. On 8 cores that is 8
+for a lone conversion, 4 each for two, 2 each for three or four, so the machine
+runs about one machine's worth of pandoc whatever is started. Earlier conversions
+keep the share they began with; their chunks finish in well under a second, so
+the excess is transient. The count is taken by the job itself after its tmux
+session exists, which is what lets two simultaneous starts both count two without
+a lock; the section on the per-transcript key has the reasoning.
+
 =list= reads only the two ends of each file: forward from the start until the
 first user message, and backwards from the end over a 64KiB tail window. Both
 windows widen if they come up empty. That keeps the picker's cost proportional
@@ -477,6 +488,11 @@ than mistaking =* Subagents= for something a message wrote.
   focused kitty window. See below.
 - =claude-code-session-live-fz= --- pick among the sessions currently live in
   a kitty window. See below.
+- =claude-code-view-reap= --- remove the tmux sessions of conversions that have
+  finished, and their temp directories. The launcher runs it before every new
+  conversion; running it by hand is safe.
+- =claude-code-view-sessions= --- list every conversion's tmux session, alive or
+  dead, by prefix. What the reaper and the CPU share count.
 - =claude-code-session-resume-fz= --- pick a session of this project from any
   profile and resume it, forking it into another profile first when asked.
   =claude-resume-fz=, =claude-resume-personal-fz= and =claude-resume-work-fz=
@@ -540,6 +556,17 @@ Variables:
 - =claude_code_session_max_block_lines= --- passed to =-max-block-lines=.
 - =claude_code_session_diff_p= --- =n= disables diff rendering for =Edit=.
 - =claude_code_session_subagents_p= --- =n= stops inlining subagent transcripts.
+- =claude_code_session_render_jobs= --- passed to =-jobs=. Unset, the renderer
+  keeps its own default, the CPU count. The background viewers set it per
+  conversion from =h-claude-code-view-jobs-share=; a value set from outside wins
+  over that.
+- =claude_code_session_render_jobs_max= --- the CPU count the share is divided
+  from, overriding what =getconf _NPROCESSORS_ONLN= reports. When neither gives a
+  number the share is not applied and the renderer's default stands.
+- =claude_code_view_session_prefix= --- the prefix every conversion's tmux session
+  and band share, =claude-view-=. =claude-code-view-sessions= scans for it and
+  =h-claude-code-view-name-of= builds from it, so it is one variable rather than
+  two literals.
 
 * Reading the session you are in
 
@@ -645,8 +672,47 @@ change the band before the kill, so nothing the death triggers can repaint it.
 Cleanup lives in the canceller, not in an =always= block inside the job,
 because a killed process is not guaranteed to run one.
 
+The same discard rule bit the launcher. =tmuxnew= replaces any session of the
+name it is given, and replacing it throws away its options, =@ccv_tmp=
+included --- so a relaunch orphaned the previous job's temp directory for good.
+It happened two ways: a press landing between a caller's =tmux-alive-p= test and
+the claim, which starts a second launch under the first one's name; and a
+finished job's leftover, whose pane is dead but whose session and options survive
+=remain-on-exit=. =h-claude-code-view-launch= now reads =@ccv_tmp= and removes
+the directory before replacing the session, which also reclaims a dead
+leftover's directory in passing. The other end had a window too: =tmux-alive-p=
+stays true through =emc-open=, so a cancel arriving while emacs was opening the
+file deleted it from under the buffer. =h-claude-code-view-convert= unsets
+=@ccv_tmp= immediately before the handoff, so a cancel in that window reads an
+empty value and =h-claude-code-view-rm-tmp= returns early on it. The band still
+turns amber and the process tree still goes; only the file is spared.
+
 On success the temp directory stays, as it always has: emacs has the file
 open.
+
+** A big transcript makes an org file emacs will not open
+
+A transcript renders to an org file far bigger than itself: one 41MB transcript
+produced 108MB of org. That size crossed a threshold nothing here had thought
+about. =vlf-application= defaults to =ask=, which means "prompt when the file is
+over =large-file-warning-threshold=", 50MB in this config. The conversion reaches
+emacs through =emc-open= and =emc-eval=, which is =emacs --batch= driving
+=server-eval-at=, and nobody is on that end to answer a prompt. So the open did
+not fail; it blocked. One such job sat there for three hours, holding its tmux
+session and its temp directory, and since a band lasts ten minutes, nothing on
+screen said it was still there. From the outside it looked exactly like a hung
+conversion.
+
+=emc-nowait2= now binds =vlf-application= to =dont-ask= around the open, so a
+file over the threshold goes straight to vlf, and =night-vlf.el= sets the same
+default in the config. Both, because the config belongs to one machine and the
+zsh is the code path: a host whose doom config predates the setting, or an emacs
+started before it, must not hang. Verified on a 62MB org: =vlf-mode= on, one 1MB
+chunk in the buffer against 65377804 bytes on disk.
+
+This is a fix rather than a workaround. Plain =find-file= on 108MB of org is not
+something emacs finishes either, so the prompt was never offering a usable
+alternative; it was only a place to get stuck.
 
 ** From a picker, with alt+enter
 
@@ -720,6 +786,53 @@ pickers a printed query came back as the selection and failed the =test -e= on
 it, which is all it ever did. Every picker also carries a =--header= from the
 shared =claude_code_session_fz_header=, because a binding nobody knows about
 will never be pressed.
+
+** What a per-transcript key costs, and how it is paid for
+
+Keying conversions on the transcript let several run at once, and two things that
+were bounded when the key was a kitty window stopped being bounded.
+
+The first is leftovers. =remain-on-exit= is on, so a finished job leaves its tmux
+session behind. Elsewhere that is deliberate --- it is how "did my notifier
+already fire?" is answered --- but a conversion has a band and a buffer to show
+for itself and needs no dead session as a receipt. Under the hotkey's per-window
+keys the leftovers could not outnumber the kitty windows; under a picker's
+per-transcript keys there is one for every transcript ever opened.
+=claude-code-view-reap= removes the dead ones, and their temp directories with
+them, and =h-claude-code-view-launch= calls it first thing, so the thing that
+creates them clears them and nothing has to be scheduled. It is safe to run by
+hand. It needs to find them, and it cannot do so the way
+=claude-code-usage-notif-sessions= does, by regenerating a list of known names:
+there is no finite set of transcript names to reconstruct. So
+=claude-code-view-sessions= scans =tmux list-sessions= for the shared prefix
+=claude_code_view_session_prefix= instead, the same shape as
+=caffeinate-holders=.
+
+The second is CPU. =-jobs= defaults to the CPU count and =pandocChunks= spawns
+that many pandocs, which was fine at one conversion per kitty window. A picker
+that stays open to invite pressing again made =alt+enter= down a list of ten mean
+ten times the CPU count in pandoc processes. =h-claude-code-view-jobs-share=
+divides the machine by the number of live conversions, so the total stays at
+roughly one machine's worth however many are started, and nothing is ever
+refused. Measured on 8 cores: one live conversion gets 8, two get 4 each, three
+get 2, four get 2. A conversion already running keeps the larger share it was
+given; its chunks are short-lived, so the overshoot drains rather than
+persisting.
+
+The count happens /inside/ the job, not at launch, and that is what makes it safe
+without a lock. =tmuxnewsh2= creates the session before the body runs, so a
+conversion always counts itself; two starting at once both see two and both take
+half, which is the right answer rather than a race. A redis token was considered
+and rejected: it would have to be released, and the main verb here is cancel,
+which SIGKILLs the job --- the launcher's own note already says "no marker, pid
+file or redis key". Liveness is a property of the process, so this self-heals
+where a record would drift.
+
+=h-claude-code-session-render= gained the =-jobs= knob this needs, read from
+=claude_code_session_render_jobs=. Unset, the renderer keeps its own default, so
+every other caller is unchanged; =h-claude-code-view-convert= sets it as a
+=local=, which dynamic scope carries down to the renderer without exporting
+anything, and an explicit setting from further out wins.
 
 ** The picker
 
