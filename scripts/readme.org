@@ -50,6 +50,16 @@ one for single answers, and the standalone one for conversation exports.
 
 =codex_status.py= notes are tracked in =./docs/codex_status.md=.
 
+* Global npm installs
+
+pnpm cannot install any package whose tarball is larger than roughly 50MB: it
+hashes the tarball in a worker thread, where the structured clone has already
+downgraded the =Buffer= to a plain =Uint8Array=, and Node stringifies those.
+Both codex and claude-code are over that line, so [agfi:codex-install] and
+[agfi:claude-install] go through npm. See =./docs/npm-global-installs.md=,
+which also covers the orphaned npm staging directory that silently broke
+reinstalls for eight months.
+
 * Tailscale
 
 =setup/setup_tailscale.zsh= installs and enables Tailscale without storing

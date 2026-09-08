@@ -32,6 +32,44 @@ function claude {
 }
 aliasfn claude-m claude
 ##
+function claude-install-npm {
+    #: npm runs postinstall scripts unconditionally, so there is no
+    #: --allow-build equivalent to pass here.
+    ##
+    h-npm-install-clean-staging '@anthropic-ai/claude-code' @RET
+
+    reval-ecgray npm-install-npm '@anthropic-ai/claude-code@latest' @RET
+    h-npm-install-report claude
+}
+
+function claude-install-pnpm {
+    #: Currently broken, the same way [agfi:codex-install-pnpm] is:
+    #: claude-code's darwin-arm64 tarball is ~83MB, over the size at which
+    #: pnpm's worker-thread integrity check aborts the process. See
+    #: [agfi:npm-install]. Kept so the pnpm route stays one word away once
+    #: pnpm or node fixes it.
+    #:
+    #: pnpm 10 does not run a dependency's postinstall script unless the
+    #: package is named in --allow-build, and claude-code's postinstall
+    #: (`install.cjs') is what puts the native binary in place. Without it the
+    #: install "succeeds" and leaves you with no working `claude'.
+    #:
+    #: `local' is dynamically scoped in zsh, so [agfi:npm-install] picks this
+    #: up without it being exported.
+    ##
+    local npm_install_pnpm_opts=(--allow-build='@anthropic-ai/claude-code')
+
+    reval-ecgray npm-install-pnpm '@anthropic-ai/claude-code@latest' @RET
+    h-npm-install-report claude
+}
+
+function claude-install {
+    #: npm for now, because pnpm cannot install claude-code at all; see
+    #: [agfi:claude-install-pnpm].
+    ##
+    claude-install-npm "$@"
+}
+##
 function claude-autocommit {
     local -x ANTHROPIC_MODEL="sonnet"
 
