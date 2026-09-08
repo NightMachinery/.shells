@@ -23,12 +23,14 @@ type sessionInfo struct {
 	rel     string
 	epoch   int64
 	stamp   string
+	name    string
 	snippet string
 }
 
 func cmdList(argv []string) {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	snippetLen := fs.Int("snippet-len", 120, "max snippet width, in runes")
+	nameLen := fs.Int("name-len", 40, "max session-name width, in runes")
 	subagentsP := fs.Bool("subagents", false, "also list subagent transcripts")
 	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
 	fs.Parse(guardPathArgs(fs, argv))
@@ -90,7 +92,7 @@ func cmdList(argv []string) {
 			defer wg.Done()
 			for idx := range queue {
 				f := files[idx]
-				info := scanSession(f.path, f.root, *snippetLen)
+				info := scanSession(f.path, f.root, *snippetLen, *nameLen)
 				if l := labels[f.root]; l != "" {
 					info.rel = filepath.Join(l, info.rel)
 				}
@@ -114,7 +116,8 @@ func cmdList(argv []string) {
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
 	for _, s := range infos {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", s.epoch, s.path, s.stamp, s.rel, s.snippet)
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
+			s.epoch, s.path, s.stamp, s.name, s.rel, s.snippet)
 	}
 }
 
@@ -171,11 +174,19 @@ func profileLabels(roots []string) map[string]string {
 	return labels
 }
 
-// How much of the file's end is searched for the last message's timestamp,
-// and how far into the start the first user message is looked for. Both grow
-// on demand, so these only decide how much is read in the common case.
+// How much of the file's end is searched for the last message's timestamp and
+// the session's name, how far back the name search will widen at most, and how
+// far into the start the first user message is looked for. The tail window
+// grows on demand, so these only decide how much is read in the common case.
+//
+// The name search alone is capped. Missing a timestamp means the session gets
+// dated by mtime, which is wrong in a way worth reading the whole file to
+// avoid; missing a title only means falling back to the slug, and a session
+// that has no title anywhere would otherwise pull a 26MB transcript through
+// here to establish that.
 const (
 	tailWindow = 64 << 10
+	nameWindow = 1 << 20
 	headWindow = 4 << 20
 )
 
@@ -187,7 +198,7 @@ const (
 // Only the two ends of the file are read. Reading all of it would make the
 // picker cost grow with total transcript volume rather than with the number
 // of sessions.
-func scanSession(path, root string, snippetLen int) sessionInfo {
+func scanSession(path, root string, snippetLen, nameLen int) sessionInfo {
 	info := sessionInfo{path: path}
 	if rel, err := filepath.Rel(root, path); err == nil {
 		info.rel = rel
@@ -196,12 +207,13 @@ func scanSession(path, root string, snippetLen int) sessionInfo {
 	}
 
 	var last time.Time
+	var name nameParts
 	var snippet string
 
 	if fh, err := os.Open(path); err == nil {
 		defer fh.Close()
 		if st, err := fh.Stat(); err == nil {
-			last = lastMessageTime(fh, st.Size())
+			last, name = scanTail(fh, st.Size())
 		}
 		snippet = firstUserText(fh)
 	}
@@ -215,6 +227,7 @@ func scanSession(path, root string, snippetLen int) sessionInfo {
 
 	info.epoch = last.Unix()
 	info.stamp = last.Local().Format(listStamp)
+	info.name = truncate(oneLine(name.resolve()), nameLen)
 	info.snippet = truncate(oneLine(snippet), snippetLen)
 	return info
 }
@@ -224,16 +237,25 @@ func scanSession(path, root string, snippetLen int) sessionInfo {
 // millisecond-scale reordering that does occur in practice.
 const tailRecords = 25
 
-// Only the type and timestamp are needed to date a session. Decoding into the
-// full record would copy every message body in the window for nothing.
-type stampOnly struct {
+// Only the type, the timestamp and the name fields are needed here. Decoding
+// into the full record would copy every message body in the window for
+// nothing.
+type tailRecord struct {
 	Type      string `json:"type"`
 	Timestamp string `json:"timestamp"`
+
+	nameFields
 }
 
-// Newest user/assistant timestamp, found by walking backwards from the end of
-// the file and widening the window until something turns up.
-func lastMessageTime(fh *os.File, size int64) time.Time {
+// Newest user/assistant timestamp and the session's name, found by walking
+// backwards from the end of the file and widening the window until both turn
+// up.
+//
+// Both come out of the one buffer. The timestamp walk already visits every
+// line in the window and has already paid to decode it, so noticing the name
+// records it passes costs nothing beyond the four extra fields of
+// `nameFields`.
+func scanTail(fh *os.File, size int64) (time.Time, nameParts) {
 	for window := int64(tailWindow); ; window *= 4 {
 		if window > size {
 			window = size
@@ -241,16 +263,17 @@ func lastMessageTime(fh *os.File, size int64) time.Time {
 
 		buf := make([]byte, window)
 		if _, err := fh.ReadAt(buf, size-window); err != nil {
-			return time.Time{}
+			return time.Time{}, nameParts{}
 		}
 
 		var last time.Time
+		var name nameParts
 		seen := 0
 
 		// Backwards, line by line, so a long transcript costs the same as a
 		// short one.
 		end := len(buf)
-		for end > 0 && seen < tailRecords {
+		for end > 0 {
 			start := bytes.LastIndexByte(buf[:end], '\n') + 1
 			if start == 0 && window < size {
 				// The window cut this line in half; it is not parseable.
@@ -263,11 +286,22 @@ func lastMessageTime(fh *os.File, size int64) time.Time {
 			if len(line) == 0 || line[0] != '{' {
 				continue
 			}
-			var rec stampOnly
+			var rec tailRecord
 			if err := json.Unmarshal([]byte(line), &rec); err != nil {
 				continue
 			}
+
+			// Reading backwards, the first name of each kind we meet is the
+			// last one written, which is the rule the titles want.
+			name.observe(rec.nameFields, true)
+
 			if rec.Type != "user" && rec.Type != "assistant" {
+				continue
+			}
+			// Records are written in order, so the newest timestamp is within
+			// the first few messages met; the rest of the window is walked
+			// only for the name.
+			if seen >= tailRecords {
 				continue
 			}
 			if t, err := time.Parse(time.RFC3339, rec.Timestamp); err == nil {
@@ -278,8 +312,15 @@ func lastMessageTime(fh *os.File, size int64) time.Time {
 			}
 		}
 
-		if !last.IsZero() || window >= size {
-			return last
+		switch {
+		case !last.IsZero() && name.hasTitle():
+			return last, name
+		case window >= size:
+			return last, name
+		case window >= nameWindow && !last.IsZero():
+			// Only the title is still missing, and it is not worth widening
+			// any further for; `resolve` falls back to the slug.
+			return last, name
 		}
 	}
 }
@@ -406,27 +447,58 @@ func sessionName(fh *os.File) string {
 	sc := bufio.NewScanner(fh)
 	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
 
-	var slug, aiTitle, customTitle, agentName string
+	var name nameParts
 	for sc.Scan() {
 		rec, ok := parseRecord(sc.Text())
 		if !ok {
 			continue
 		}
-		// Names can be revised during a session, so the last one wins; a slug
-		// never changes, so the first is as good as any.
-		switch {
-		case rec.AgentName != "":
-			agentName = rec.AgentName
-		case rec.CustomTitle != "":
-			customTitle = rec.CustomTitle
-		case rec.AITitle != "":
-			aiTitle = rec.AITitle
-		case rec.Slug != "" && slug == "":
-			slug = rec.Slug
+		name.observe(rec.nameFields, false)
+	}
+	return name.resolve()
+}
+
+// What a transcript said about its own name, gathered as it is read. Shared by
+// the full scan above and the tail scan in `list`, so the picker's column and
+// the name a viewer writes into a filename cannot disagree.
+type nameParts struct {
+	slug        string
+	aiTitle     string
+	customTitle string
+	agentName   string
+}
+
+// Each record names the session in at most one of these ways -- the titles
+// have record types of their own, and only ordinary message records carry a
+// slug -- so all four are taken independently rather than in precedence order.
+//
+// `keepFirst` says which occurrence to keep. Names can be revised during a
+// session, so the last one written wins: that is the last occurrence when
+// reading forwards and the first when reading backwards. A slug never changes,
+// so either end of the file gives the same one.
+func (n *nameParts) observe(f nameFields, keepFirst bool) {
+	set := func(dst *string, v string) {
+		if v == "" || (keepFirst && *dst != "") {
+			return
 		}
+		*dst = v
 	}
 
-	for _, s := range []string{agentName, customTitle, aiTitle, slug} {
+	set(&n.agentName, f.AgentName)
+	set(&n.customTitle, f.CustomTitle)
+	set(&n.aiTitle, f.AITitle)
+	set(&n.slug, f.Slug)
+}
+
+// Whether a title was seen, as opposed to only a slug. A slug rides on nearly
+// every message record, so finding one proves nothing about how far back the
+// scan has looked -- which is what the widening in `scanTail` needs to know.
+func (n nameParts) hasTitle() bool {
+	return n.agentName != "" || n.customTitle != "" || n.aiTitle != ""
+}
+
+func (n nameParts) resolve() string {
+	for _, s := range []string{n.agentName, n.customTitle, n.aiTitle, n.slug} {
 		if s != "" {
 			return s
 		}

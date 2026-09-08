@@ -29,7 +29,6 @@ const (
 type record struct {
 	Type      string   `json:"type"`
 	Subtype   string   `json:"subtype"`
-	Slug      string   `json:"slug"`
 	IsMeta    bool     `json:"isMeta"`
 	Timestamp string   `json:"timestamp"`
 	Message   *message `json:"message"`
@@ -38,9 +37,7 @@ type record struct {
 	// Raw, because other record types put an object here.
 	Content json.RawMessage `json:"content"`
 
-	AITitle     string `json:"aiTitle"`
-	CustomTitle string `json:"customTitle"`
-	AgentName   string `json:"agentName"`
+	nameFields
 
 	Attachment      *attachment      `json:"attachment"`
 	CompactMetadata *compactMetadata `json:"compactMetadata"`
@@ -49,6 +46,17 @@ type record struct {
 	PRNumber     int    `json:"prNumber"`
 	PRUrl        string `json:"prUrl"`
 	PRRepository string `json:"prRepository"`
+}
+
+// The four ways Claude Code names a session. Its own struct, embedded rather
+// than spelled out in `record`, because the tail scan in `list` wants exactly
+// these fields and nothing else: decoding a full record per line would copy
+// every message body in its window just to read a title.
+type nameFields struct {
+	Slug        string `json:"slug"`
+	AITitle     string `json:"aiTitle"`
+	CustomTitle string `json:"customTitle"`
+	AgentName   string `json:"agentName"`
 }
 
 type message struct {
@@ -138,6 +146,7 @@ render flags:
 
 list flags:
   -snippet-len N        max snippet width (default 120)
+  -name-len N           max session-name width (default 40)
   -jobs N               worker count (default: CPU count)
 
 Several session directories may be given: they are merged and sorted together.
@@ -145,7 +154,9 @@ With more than one, each relative path is prefixed by its root's profile -- the
 parent directory's name, e.g. .claude / .claude-work -- since the same project
 appears under each. A single directory is listed exactly as before.
 
-list emits: epoch <TAB> path <TAB> local time <TAB> relative path <TAB> snippet
+list emits: epoch <TAB> path <TAB> local time <TAB> name <TAB> relative path
+<TAB> snippet. The name is empty for a session that has none; its uuid is in
+the relative path either way.
 `)
 	os.Exit(2)
 }
