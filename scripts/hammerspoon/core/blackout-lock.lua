@@ -20,9 +20,17 @@
 --- ending it should not hand the desktop to whoever pressed the chord. Past
 --- blackoutLockScreenAfterSeconds, blackoutRestore locks the macOS session
 --- first and restores the display second, so the person meets the login
---- screen. hyper+shift+cmd+F2 does that regardless of age. The invariant: the
---- keyboard lock never releases into an unlocked session on its own. Only F2
---- inside the grace period does that, and that is a person's deliberate act.
+--- screen. hyper+shift+cmd+F1 starts a blackout marked lock-first, which does
+--- that regardless of age: the one who *starts* the black decides, because
+--- whoever presses F2 later may be a stranger. The invariant: the keyboard
+--- lock never releases into an unlocked session on its own. Only F2 inside
+--- the grace period does that, and that is a person's deliberate act.
+---
+--- The start time and the lock-first mark are saved in redis (key
+--- blackout_lock) when redis is up, so a Hammerspoon reload loses neither:
+--- on load, the module reads them back, re-installs the tap with the expiry
+--- that remains, and trusts the key only while zsh's display_black_saved says
+--- something is still blanked.
 ---
 --- Shell interface:
 ---   hs -c 'blackoutLockOn()'          -- or blackoutLockOn(30), for a test
@@ -57,9 +65,10 @@ if blackoutLockScreenAfterSeconds == nil then blackoutLockScreenAfterSeconds = 6
 
 --- Backstop. After this long, the blackout is treated as forgotten: the session
 --- is locked and the display restored, so the failure state is a visible login
---- screen and never a live keyboard on an unlocked desktop behind black. Long,
---- because the real ways out are the chord, a wake, and display-black-off.
-blackoutLockMaxSeconds = blackoutLockMaxSeconds or 12 * 60 * 60
+--- screen and never a live keyboard on an unlocked desktop behind black. A
+--- week, because the real ways out are the chord, a wake, and
+--- display-black-off, and a blackout over a holiday must not end on its own.
+blackoutLockMaxSeconds = blackoutLockMaxSeconds or 7 * 24 * 60 * 60
 
 --- ** State
 --- Global, so a dofile into a live Hammerspoon can find the previous run's tap
@@ -70,10 +79,13 @@ local previousState = blackoutLockState
 blackoutLockState = blackoutLockState or {
     tap = nil,
     timer = nil,
-    -- Epoch seconds the current blackout began, or nil when none is up (or
-    -- when a reload lost track: then F2 restores without locking).
+    -- Epoch seconds the current blackout began, or nil when none is up.
     since = nil,
+    -- Started with hyper+shift+cmd+F1: lock the session before restoring,
+    -- whatever the age.
+    lockFirst = false,
     restoreTimer = nil,
+    recoverTimer = nil,
 }
 
 --- How long the lock screen gets to come up before the display is restored
@@ -117,6 +129,25 @@ local function hyperEntered()
     return hyper_modality ~= nil and hyper_modality.entered_p == true
 end
 
+--- ** Persistence
+--- "<epoch seconds> <0|1>": when the black began, and whether it is
+--- lock-first. Absent when nothing is black. Written on every begin and
+--- cleared on every release; a no-op when redis is down, which then costs only
+--- the reload survival.
+local kRedisKey = "blackout_lock"
+--- zsh's "is anything blanked" flag (redis-defvar in system.zsh), consulted
+--- so a saved start is never trusted after the black itself is gone.
+local kRedisBlackKey = "display_black_saved"
+
+local function persist(st)
+    if not redisSet then return end
+    if st.since then
+        redisSet(kRedisKey, string.format("%d %d", math.floor(st.since), st.lockFirst and 1 or 0))
+    else
+        redisDel(kRedisKey)
+    end
+end
+
 --- true drops the event, false lets it through.
 local function handleEvent(event)
     local t = event:getType()
@@ -128,10 +159,9 @@ local function handleEvent(event)
             return false
         end
 
-        -- hyper+shift+F2 restores; hyper+shift+cmd+F2 locks the session first.
         if keyCode == kEscapeKeyCode and hyperEntered() then
             local flags = event:getFlags()
-            if flags.shift and not flags.alt and not flags.ctrl then
+            if flags.shift and not flags.cmd and not flags.alt and not flags.ctrl then
                 return false
             end
         end
@@ -228,6 +258,8 @@ function blackoutLockOff(silent)
 
     stopTap(st)
     st.since = nil
+    st.lockFirst = false
+    persist(st)
     dismiss(kAlertId)
     dismiss(kSecureInputAlertId)
 
@@ -243,14 +275,20 @@ function blackoutLockOff(silent)
     return true
 end
 
---- What hyper+shift+F1 calls. Records when the black began, whether or not
---- the keyboard lock is on, because the lock-before-restore rule needs the age
---- either way. A second F1 during a blackout keeps the original time.
-function blackoutBegin()
+--- What hyper+shift+F1 calls, and hyper+shift+cmd+F1 with lockFirst=true.
+--- Records when the black began, whether or not the keyboard lock is on,
+--- because the lock-before-restore rule needs the age either way. A second F1
+--- during a blackout keeps the original time; a cmd+F1 during one upgrades it
+--- to lock-first, and nothing downgrades it short of ending the black.
+function blackoutBegin(lockFirst)
     local st = blackoutLockState
     if not st.since then
         st.since = hs.timer.secondsSinceEpoch()
     end
+    if lockFirst then
+        st.lockFirst = true
+    end
+    persist(st)
     if blackoutLockEnabled then
         blackoutLockOn()
     end
@@ -258,7 +296,7 @@ function blackoutBegin()
 end
 
 local function shouldLockScreen(force)
-    if force then return true end
+    if force or blackoutLockState.lockFirst then return true end
     local after = blackoutLockScreenAfterSeconds
     if not after then return false end
     local since = blackoutLockState.since
@@ -292,4 +330,55 @@ function blackoutRestore(forceLock)
 
     return lockFirst
 end
+
+--- ** Surviving a reload
+--- Reads the saved start back. Trusted only while zsh's display_black_saved
+--- key is present: if the black ended while Hammerspoon was not running to
+--- hear display-black-off, the saved start is stale and is deleted rather than
+--- locking a keyboard in front of a lit screen. Returns what it did.
+function blackoutLockRecover()
+    local st = blackoutLockState
+    if st.since then return "already" end
+    if not redisGet then return "no-redis" end
+
+    local raw, ok = redisGet(kRedisKey)
+    if not ok then return "no-redis" end
+    if not raw or raw == "" then return "nothing" end
+
+    local black = redisGet(kRedisBlackKey)
+    local since, first = tostring(raw):match("^(%d+)%s+([01])")
+    if not black or black == "" or not since then
+        redisDel(kRedisKey)
+        return "stale"
+    end
+
+    st.since = tonumber(since)
+    st.lockFirst = (first == "1")
+
+    if blackoutLockEnabled then
+        local remaining = blackoutLockMaxSeconds - (hs.timer.secondsSinceEpoch() - st.since)
+        blackoutLockOn(math.max(kMinSeconds, remaining))
+    end
+    return "recovered"
+end
+
+local function scheduleRecover(delay, attempt)
+    local st = blackoutLockState
+    st.recoverTimer = hs.timer.doAfter(delay, function()
+        st.recoverTimer = nil
+        local result = blackoutLockRecover()
+        -- redis.lua connects on a retry timer of its own when redis is slow to
+        -- come up; follow it for a while rather than giving up at boot.
+        if result == "no-redis" and attempt < 6 then
+            scheduleRecover(5, attempt + 1)
+        elseif result ~= "already" and result ~= "nothing" then
+            print("blackout-lock: recover: " .. result)
+        end
+    end)
+end
+
+if previousState and previousState.recoverTimer then
+    previousState.recoverTimer:stop()
+end
+scheduleRecover(0.5, 1)
 --- @end
