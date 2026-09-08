@@ -857,9 +857,12 @@ binary directly, with no shell in between.
 
 It was a zsh function first, and it cost about 600ms per cursor move, which is
 unusable in a pane that repaints on every keystroke. Measured, that was roughly
-380ms for the brish garden round trip (=brishzq.zsh true= alone measures
-350--400ms), paid every keystroke because fzf reached the function through the
-garden; about 122ms for colour, since the repository's =colorfg=, =Bold= and =resetcolor= gate on a tty through
+380ms for the brish garden round trip, paid every keystroke because fzf reached
+the function through the garden --- though that component was taken on a loaded
+machine and does not reproduce: =brishzq.zsh true= measures ~60ms idle. The
+600ms total and its 15ms replacement were measured the same way, so the
+comparison stands even though the parts have shrunk; about 122ms for colour,
+since the repository's =colorfg=, =Bold= and =resetcolor= gate on a tty through
 =isColor= and =isColorTty=, which call =h-color-p-override= inside a command
 substitution --- a fork per call, about 25 calls at ~5ms each; and about 155ms
 for =tail -c= and =jq=, two more forks, plus a zsh loop over the several
