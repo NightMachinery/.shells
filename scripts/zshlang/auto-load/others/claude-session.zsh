@@ -1708,16 +1708,14 @@ function claude-code-session-resume-fz {
     #: Picks a session with [agfi:h-claude-code-session-select-fz] -- every
     #: profile's copy of the current project, rows labelled by profile -- and
     #: hands it to [agfi:claude-code-session-resume].
-    #: claude_code_session_resume_all_p=y widens the choice to every project.
     #:
     #: Usage: claude-code-session-resume-fz [to-profile] [claude args...]
     ##
-    local all_p="${claude_code_session_resume_all_p:-n}"
-
-    local claude_code_view_session_fz_scope='project'
-    if bool "${all_p}" ; then
-        claude_code_view_session_fz_scope='all'
-    fi
+    #: `project' (default), or `all' to choose from every project's sessions
+    #: rather than this directory's. The picker's own knob under a name of our
+    #: own, so the `-all-fz' variants below can set it the way the viewers do.
+    local scope="${claude_code_session_resume_scope:-project}"
+    local claude_code_view_session_fz_scope="${scope}"
 
     local source
     source="$(h-claude-code-session-select-fz)" @RET
@@ -1725,6 +1723,9 @@ function claude-code-session-resume-fz {
     claude-code-session-resume "${source}" "$@"
 }
 aliasfn claude-resume-fz claude-code-session-resume-fz
+#: Same, but selects from the sessions of all projects.
+aliasfn claude-code-session-resume-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz
+aliasfn claude-resume-all-fz claude-code-session-resume-all-fz
 
 function claude-resume-personal {
     #: [agfi:claude-code-session-resume] into the default profile: continue a
@@ -1734,6 +1735,7 @@ function claude-resume-personal {
     claude-code-session-resume "${1}" default "${@[2,-1]}"
 }
 aliasfn claude-resume-personal-fz claude-code-session-resume-fz default
+aliasfn claude-resume-personal-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz default
 
 function claude-resume-work {
     #: [agfi:claude-code-session-resume] into the work profile.
@@ -1742,4 +1744,5 @@ function claude-resume-work {
     claude-code-session-resume "${1}" work "${@[2,-1]}"
 }
 aliasfn claude-resume-work-fz claude-code-session-resume-fz work
+aliasfn claude-resume-work-all-fz claude_code_session_resume_scope=all claude-code-session-resume-fz work
 ##
