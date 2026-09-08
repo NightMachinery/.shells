@@ -36,25 +36,40 @@ right keychain.
 
 `security` is not the application that created these items, so macOS raises a
 GUI authorization prompt the first time it reads one. This is per item —
-granting access for one network does nothing for the next. There is no way to
-avoid it short of running as root, and the function does not try; answering the
-prompt is the point of the exercise.
+granting access for one network does nothing for the next.
 
 `python/claude_code_usage.py` hit the same wall for its own keychain reads and
 has a longer note on it, including why a timeout there almost always means an
 unanswered dialog.
 
-## Exit 44 is an answer, not a failure
+## Reading the exit codes
 
-`security` exits **44** (`errSecItemNotFound`) when there is no such item, and
-it does so without prompting. `wifi-password-get` treats that as an ordinary
-"this network has no saved password" and returns 1 with a clear message, because
-a remembered network legitimately has no stored secret when it is open, or when
-it is 802.1X and the credential lives elsewhere.
+`security` exits with the **low byte of the OSStatus**, which is the only reason
+its exit codes look arbitrary. `security error <n>` decodes an OSStatus but not
+these exit codes, so you have to do the arithmetic yourself:
 
-Any other non-zero exit is reported differently, with the exit code and a note
-that the authorization prompt may have been denied. Keeping the two apart is
-what stops a denied dialog from looking like an absent password. `security`'s
+- `errSecItemNotFound` is `-25300` = `0xFFFF9D2C`, and `0x2C` is **44**
+- `errSecInteractionNotAllowed` is `-25308` = `0xFFFF9D24`, and `0x24` is **36**
+- `userCanceled` is `-128` = `0xFFFFFF80`, so **128**
+
+**44 is an answer, not a failure.** There is no such item, and `security` says so
+without prompting. `wifi-password-get` reports "no saved password" and returns 1,
+because a remembered network legitimately has no stored secret when it is open,
+or when it is 802.1X and the credential lives elsewhere.
+
+**36 does not mean the prompt was denied.** It means macOS refused to *show*
+one, because the calling process is not attached to the GUI session. Running
+inside tmux without `pam_reattach`, over ssh, or from the brish garden all land
+here. The message is misleading enough that it is worth stating plainly: the
+network does have a password and you did not do anything wrong.
+
+Root reads the System keychain with no dialog at all, so on a 36 the function
+retries once as `sudo` rather than telling you to go find a different terminal.
+Turn that off with `wifi_password_get_sudo_fallback_p=n` if you would rather see
+the failure. Both paths were checked to return byte-identical values.
+
+**128 is a genuine cancel**, reported as such. Keeping all of these apart is what
+stops an undisplayable dialog from looking like an absent password. `security`'s
 own stderr is deliberately not redirected, so its message appears alongside ours.
 
 ## Two sources for the network list
@@ -129,6 +144,7 @@ Keyword arguments, in the usual `@opts` style:
 
     @opts source known @ wifi-password-get-fz
     @opts keychain /path/to/other.keychain @ wifi-password-get 'Example Net'
+    @opts sudo-fallback-p n @ wifi-password-get 'Example Net'
     @opts device en1 @ wifi-ssid-list
 
 ## Known limitation, unverified
