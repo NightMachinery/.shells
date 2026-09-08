@@ -587,47 +587,54 @@ all of that, and the only input that does anything is the one that ends it.
 
 It is an `hs.eventtap`, which runs before Carbon hotkeys and before any app, so
 returning `true` from its callback drops an event for everyone at once — every
-other hyper binding and every app shortcut included. It taps `keyDown`,
-`keyUp` and `systemDefined` (the hardware brightness and media keys, which are
-not ordinary key events), and with `blackoutLockMouse` on, also the left, right
-and other mouse buttons, down and up, and the scroll wheel. Mouse movement is
-left alone. `flagsChanged` is not tapped either: a modifier on its own is
-harmless, and the modifiers for the escape chords are read from the F2 event's
-own flags rather than tracked separately.
+other hyper binding and every app shortcut included. It taps `keyDown`, `keyUp`
+and `systemDefined` (the hardware brightness and media keys), and with
+`blackoutLockMouse` on, mouse buttons and scroll. Movement and `flagsChanged`
+are left alone: a lone modifier is harmless, and the escape chord's modifiers
+are read off the F2 event itself.
 
 Exactly two things pass through. F18, the physical hyper key, so the hyper
-modal can still be entered; and F2 with shift while hyper mode is entered, with
-or without cmd — alt or ctrl on the same event still block it. Both chords go
-through `blackoutRestore`, which releases the lock synchronously, before it
-asks the garden to run `brightness-on-all-loop`, so the keyboard is back the
-instant the chord lands.
+modal can still be entered; and F2 with shift only while hyper mode is entered
+— cmd, alt or ctrl on the same event block it. The chord goes through
+`blackoutRestore`, which releases the lock synchronously before asking the
+garden to run `brightness-on-all-loop`, so the keyboard is back at once.
 
-The two chords differ in what they leave on screen. hyper+shift+F2 is the
-existing black-off binding: within the grace period it restores straight to the
-desktop. Past it, or always for hyper+shift+cmd+F2, the session is locked with
-`hs.caffeinate.lockScreen()` first, a moment is given for the lock screen to
-come up, and only then does the brightness return — so whoever ends the
-blackout meets the login screen, not the desktop: a blackout that has been up
-for an hour is one nobody is watching. The age is measured from
-`blackoutBegin()`, which hyper+shift+F1 calls whether or not the keyboard lock
-is enabled, so the rule holds with `blackoutLockEnabled = false` too. The one
-gap is a Hammerspoon reload: the start time is lost with it, and F2 then
-restores without locking.
+What F2 leaves on screen is decided when the blackout starts, not when it
+ends. After hyper+shift+F1, F2 within the grace period restores straight to
+the desktop; past it, the session is locked with `hs.caffeinate.lockScreen()`
+first and the display restored a moment later — a blackout up for an hour is
+one nobody is watching, so whoever ends it meets the login screen.
+hyper+shift+cmd+F1 starts a blackout marked lock-first, via
+`blackoutBegin(true)`, and F2 then locks first at any age. The mark belongs to
+whoever *starts* the black, because the person who presses F2 might be an
+adversary; that is why there is no cmd chord on F2. A reload used to lose the
+start time, so F2 restored without locking; now it does not, while redis is up.
+
+Start time and mark are kept in redis under `blackout_lock` — epoch seconds, a
+space, `0` or `1` — whenever redis is available. On load the module reads the
+key back, but trusts it only if the zsh side's `display_black_saved`, the "is
+anything blanked" flag, is present too; otherwise the blackout ended while
+Hammerspoon was not running to hear it, and the stale key is deleted. A
+recovered blackout gets its tap re-installed with the expiry that remains, so
+a reload no longer drops the keyboard lock either. `redisGet`, `redisSet` and
+`redisDel` in `core/redis.lua` return `(value, ok)`, `ok` false meaning redis
+unreachable rather than key absent; if it is down at load, recovery retries.
 
 The knobs are globals in the usual `x = x or default` style:
 
-- `blackoutLockEnabled`, default true. When false, hyper+shift+F1 blacks the
-  screen as it always did and installs no tap.
+- `blackoutLockEnabled`, default true. When false, the F1 chords black the
+  screen as they always did and install no tap; they still call
+  `blackoutBegin`, so the age rule above holds regardless.
 - `blackoutLockMouse`, default true. Whether clicks and scroll are swallowed.
 - `blackoutLockScreenAfterSeconds`, default one hour. A blackout older than
   this locks the session before the display is restored. 0 locks first every
-  time; false never does. hyper+shift+cmd+F2 ignores it and always locks.
-- `blackoutLockMaxSeconds`, default 12 hours. An expiry backstop, after which
-  the blackout ends on its own by way of `blackoutRestore(true)`: the session
-  is locked, then the screen comes back. It is long because the escape chords,
-  a wake and the shell are the real ways out; it exists so the lock always
-  ends on its own, like the agent banner, and it ends on a login screen rather
-  than an unlocked desktop behind black.
+  time; false never does. A lock-first blackout ignores it and always locks.
+- `blackoutLockMaxSeconds`, default a week. An expiry backstop: a blackout
+  older than this is forgotten and ends by way of `blackoutRestore(true)`, the
+  session locked, then the screen back. A week, because the chord, a wake and
+  the shell are the real ways out and a blackout over a holiday must not end
+  by itself; it exists so the lock always ends, on a login screen rather than
+  an unlocked desktop behind black.
 
 It is driven from the shell too:
 
@@ -636,41 +643,34 @@ hs -c 'blackoutLockOn(seconds)'       # seconds optional; a short value is for t
 hs -c 'blackoutLockOff()'
 hs -c 'return blackoutLockActive()'
 hs -c 'blackoutRestore()'             # what hyper+shift+F2 does
-hs -c 'blackoutRestore(true)'         # lock the session first, always
+hs -c 'blackoutRestore(true)'         # lock the session first, always; shell only
 ```
 
 There are four ways out, and every path that ends a blackout takes one of them.
-The F2 chords, through `blackoutRestore`. The wake watcher in
-`core/power-watcher.lua`, which calls `blackoutLockOff` on `systemDidWake` and
-`screensDidWake`, since a wake ends the blackout anyway and already lands on a
-login screen. The zsh `display-black-off`, which calls `blackoutLockOff` over
-`hammerspoon -c` right after its unconditional gamma restore — that is the one
-point every unblack path reaches, whether F2, `h-hook-wake`, `h-hook-unlock`
-from the Swift lock-watcher or the function run bare from another machine, so
-the lock can never outlive the black. And the expiry.
+F2, through `blackoutRestore`. The wake watcher in `core/power-watcher.lua`,
+which calls `blackoutLockOff` on `systemDidWake` and `screensDidWake`, since a
+wake lands on a login screen anyway. The zsh `display-black-off`, which calls
+`blackoutLockOff` over `hammerspoon -c` right after its unconditional gamma
+restore — the one point every unblack path reaches, whether F2, `h-hook-wake`,
+`h-hook-unlock` from the Swift lock-watcher or the function run bare from
+another machine, so the lock can never outlive the black. And the expiry.
 
-Only the Hammerspoon side locks the session. A bare `display-black-off` or
-`brightness-on-all-loop` from a shell releases the keyboard lock and restores
-the display, nothing more: a shell restore is the owner acting from ssh, not a
-hand at the keyboard. The invariant that falls out of all this is that the
+Only the Hammerspoon side locks the session; a shell restore releases the lock
+and brings the display back, nothing more, because it is the owner acting from
+ssh, not a hand at the keyboard. The invariant that falls out of all this: the
 keyboard lock never releases into an unlocked session on its own. The expiry
 locks first, a wake is a login screen already, and the only path onto a live
-desktop is F2 within the grace period — a person's deliberate act.
+desktop is F2 inside the grace period of an unmarked blackout — a person's act.
 
-The tap is installed only for the life of a blackout, for the reason given in
-`core/fim.lua`: a permanently installed tap sees every keystroke of every app,
-which is a privacy cost and a latency one. Here it is up only while there is
-nothing on screen to type into.
-
-Its limits all fail toward "the keys come back", never toward a locked machine.
-Secure Input — a focused password field, the login screen — hides keystrokes
-from event taps, so the lock cannot block typing there; engaging while Secure
-Input is on shows a warning alert saying so. A Hammerspoon reload or crash drops
-the tap silently while the screen stays black, and with it the blackout's start
-time. macOS itself disables a tap whose callback stalls. On engage a short alert
-reads "Keyboard locked. hyper+shift+F2 releases." — it is visible for the moment
-before the screen goes black, because black-on is asynchronous through the brish
-garden.
+The tap is installed only for the life of a blackout, for the privacy and
+latency reasons given in `core/fim.lua`. Its limits all fail toward "the keys
+come back", never toward a locked machine. Secure Input — a focused password
+field, the login screen — hides keystrokes from event taps, so the lock cannot
+block typing there; engaging while it is on shows a warning alert saying so. A
+Hammerspoon crash drops the tap silently while the screen stays black, until
+the next load recovers it from redis, and macOS disables a tap whose callback
+stalls. The engage alert, "Keyboard locked. hyper+shift+F2 releases.", shows
+before the screen goes black, since black-on is asynchronous through the garden.
 
 ## FIM completion
 

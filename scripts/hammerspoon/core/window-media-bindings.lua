@@ -78,12 +78,13 @@ bindWithRepeatV2{
 --
 -- F1 also locks the keyboard and mouse for the life of the blackout (see
 -- core/blackout-lock.lua), unless blackoutLockEnabled is false. The lock lets
--- exactly the F2 chords through. F2 goes through blackoutRestore, which
+-- exactly the F2 chord through. F2 goes through blackoutRestore, which
 -- releases the lock synchronously and, once the blackout is older than
 -- blackoutLockScreenAfterSeconds, locks the session before restoring, so a
--- long-unwatched screen comes back as a login window. shift+cmd+F2 locks
--- first regardless of age. The else branches keep the keys working on a
--- Hammerspoon where that module failed to load.
+-- long-unwatched screen comes back as a login window. shift+cmd+F1 starts a
+-- blackout that locks first regardless of age: the person starting the black
+-- decides, since whoever presses F2 later may be a stranger. The else branch
+-- keeps F2 working on a Hammerspoon where that module failed to load.
 hyper_bind_v2{
     mods={"shift"},
     key="F1",
@@ -93,24 +94,20 @@ hyper_bind_v2{
     end,
 }
 hyper_bind_v2{
+    mods={"shift", "cmd"},
+    key="F1",
+    pressedfn=function()
+        brishz_eval_hs('awaysh-fast brightness-off-all-loop')
+        if blackoutBegin then blackoutBegin(true) end
+    end,
+}
+hyper_bind_v2{
     mods={"shift"},
     key="F2",
     pressedfn=function()
         if blackoutRestore then
             blackoutRestore()
         else
-            brishz_eval_hs('awaysh-fast brightness-on-all-loop')
-        end
-    end,
-}
-hyper_bind_v2{
-    mods={"shift", "cmd"},
-    key="F2",
-    pressedfn=function()
-        if blackoutRestore then
-            blackoutRestore(true)
-        else
-            hs.caffeinate.lockScreen()
             brishz_eval_hs('awaysh-fast brightness-on-all-loop')
         end
     end,

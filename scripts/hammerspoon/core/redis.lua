@@ -111,3 +111,34 @@ end
 function redisDeactivateMode(mode)
     redisSetMode(mode, false)
 end
+
+--- * Plain key access for other modules
+-- redisClient stays local on purpose; these three are the only door. Each
+-- returns (value, ok): ok false means redis was unreachable, which callers
+-- must tell apart from a key that is simply absent. A failed command drops the
+-- connection and reconnects, the same way redisSetMode does, so one dead
+-- socket cannot fail every later call.
+local function redisCall(fn)
+    if not redisClient then return nil, false end
+
+    local ok, result = pcall(fn, redisClient)
+    if not ok then
+        print("redis: command failed: " .. tostring(result))
+        redisClient = nil
+        scheduleRedisConnect()
+        return nil, false
+    end
+    return result, true
+end
+
+function redisGet(key)
+    return redisCall(function(c) return c:get(key) end)
+end
+
+function redisSet(key, value)
+    return redisCall(function(c) return c:set(key, tostring(value)) end)
+end
+
+function redisDel(key)
+    return redisCall(function(c) return c:del(key) end)
+end

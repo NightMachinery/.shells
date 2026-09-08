@@ -238,22 +238,25 @@ cannot block typing there.
 
 A blackout that has been up for more than an hour is one nobody is watching, so
 F2 then locks the macOS session before it restores the display — whoever ends
-it meets the login screen, not the desktop. hyper+shift+cmd+F2 does the same
-regardless of age, for when you want the lock now. Both go through
-`blackoutRestore` in Hammerspoon; a bare `display-black-off` or
-`brightness-on-all-loop` from a shell restores the display without locking the
-session, because a shell restore is the owner acting from ssh, not a hand at the
-keyboard.
+it meets the login screen, not the desktop. hyper+shift+cmd+F1 starts a blackout
+that does the same regardless of age, for when you want the lock now; the
+choice belongs to whoever starts the black, not whoever ends it, because the
+hand that presses F2 later may not be yours. Both end through `blackoutRestore`
+in Hammerspoon, and both survive a Hammerspoon reload — the start time and the
+lock-first mark are kept in redis while the screen is black. A bare
+`display-black-off` or `brightness-on-all-loop` from a shell restores the
+display without locking the session, because a shell restore is the owner
+acting from ssh, not a hand at the keyboard.
 
 The lock can never outlive the black. `display-black-off` calls `blackoutLockOff`
 over `hammerspoon -c` immediately after its unconditional gamma restore, and it
 is the single point every unblack path reaches — F2, `h-hook-wake`, `h-hook-unlock`
 from the Swift lock-watcher, or the function run bare from another machine. The
-wake watcher releases it independently as well, and after twelve hours it ends
-on its own as a last resort — locking the session first, then restoring, so the
-worst case is a login screen and never a live keyboard on an unlocked desktop
-behind a black screen. Whichever way the screen comes back, the keyboard comes
-back with it.
+wake watcher releases it independently as well, and after a week it ends on its
+own as a last resort — locking the session first, then restoring, so the worst
+case is a login screen and never a live keyboard on an unlocked desktop behind a
+black screen. Whichever way the screen comes back, the keyboard comes back with
+it.
 
 ### If a screen is ever left black
 
