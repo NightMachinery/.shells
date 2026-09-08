@@ -600,12 +600,17 @@ function h-claude-code-usage-type-continue-target-fz {
     #: rather than whatever happens to hold the keyboard hours later. Prints one
     #: target per line: `kitty:<window-id>`, or `frontmost`.
     ##
-    #: `local` is dynamically scoped in zsh, so the picker sees this without
+    #: `local` is dynamically scoped in zsh, so the picker sees these without
     #: anything being exported.
     local -a claude_code_session_live_fz_extra_rows
     claude_code_session_live_fz_extra_rows=(
         $'frontmost\t-\tfrontmost\t-\t-\t-\twhatever holds the keyboard when the limits reset'
     )
+
+    #: No header: the picker's own advertises alt+enter, which converts a
+    #: transcript to org. This picker is choosing what to resume, and that is
+    #: noise here. The binding still works, it is just not announced.
+    local claude_code_session_fz_header=''
 
     local selected
     selected="$(claude-code-session-live-fz)" @RET

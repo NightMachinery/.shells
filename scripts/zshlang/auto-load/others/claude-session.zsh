@@ -249,6 +249,13 @@ function h-claude-code-session-select-fz {
     preview_cmd="$(h-claude-code-session-preview-cmd)" @RET
     open_cmd="$(h-claude-code-session-open-cmd)" @RET
 
+    #: An array, so an empty header is no `--header' at all rather than a blank
+    #: row: a caller that does not want the advertisement sets the variable to
+    #: the empty string.
+    local -a header_opt
+    test -n "${claude_code_session_fz_header}" &&
+        header_opt=( --header "${claude_code_session_fz_header}" )
+
     local selected
     selected="$(ec "${lines}" |
         fz_no_preview=y fz \
@@ -256,7 +263,7 @@ function h-claude-code-session-select-fz {
             --preview "${preview_cmd} {2}" \
             --preview-window 'down,60%,wrap' \
             --bind "alt-enter:execute-silent(${open_cmd} {2})" \
-            --header "${claude_code_session_fz_header}" \
+            "${header_opt[@]}" \
             "${fz_opts[@]}")" @RET
     selected="${selected%%$'\n'*}"
 
@@ -899,7 +906,7 @@ function claude-code-view-session-bg {
 
     h-claude-code-view-launch "${key}" \
         "**Claude session** → org: starting…   (⌘⇧O again cancels)" \
-        h-claude-code-view-convert "$(h-claude-code-view-name-of "${key}")" "${transcript}"
+        h-claude-code-view-convert "$(h-claude-code-view-name-of "${key}")" '⌘⇧O' "${transcript}"
 }
 
 function claude-code-view-session-toggle {
@@ -920,10 +927,25 @@ function claude-code-view-session-toggle {
     #: Usage: claude-code-view-session-toggle <transcript>
     ##
     local transcript="${1}"
-    assert-args transcript @RET
+
+    #: Neither of these is a row worth a band, and both arrive by ordinary use:
+    #: fzf fires the binding with an empty `{2}' when nothing matches, and the
+    #: live picker's synthetic "frontmost" row has `-' in that column.
+    if test -z "${transcript}" || [[ "${transcript}" == '-' ]] ; then
+        return 0
+    fi
 
     local key
     key="$(h-claude-code-view-transcript-key "${transcript}")" @RET
+
+    #: Checked here rather than left to [agfi:h-claude-code-view-convert],
+    #: which only reaches its own `test -e' after a tmux session, a renderer
+    #: build check and a temp directory have been created for nothing.
+    if ! test -e "${transcript}" ; then
+        h-claude-code-view-fail "$(h-claude-code-view-name-of "${key}")" '' \
+            "no transcript on disk: ${transcript:t}"
+        return 1
+    fi
 
     local name
     name="$(h-claude-code-view-name-of "${key}")" @RET
@@ -935,7 +957,7 @@ function claude-code-view-session-toggle {
 
     h-claude-code-view-launch "${key}" \
         "**Claude session** → org: starting…   (⌥⏎ again cancels)" \
-        h-claude-code-view-convert "${name}" "${transcript}"
+        h-claude-code-view-convert "${name}" '⌥⏎' "${transcript}"
 }
 
 function h-claude-code-view-transcript-key {
@@ -1093,7 +1115,7 @@ function h-claude-code-view-job {
         return 0
     fi
 
-    h-claude-code-view-convert "${name}" "${transcript}" "${tmp_dir}"
+    h-claude-code-view-convert "${name}" '⌘⇧O' "${transcript}" "${tmp_dir}"
 }
 
 function h-claude-code-view-convert {
@@ -1105,10 +1127,17 @@ function h-claude-code-view-convert {
     #:
     #: On success the temp directory stays, as it always has: emacs has the file
     #: open.
-    #: Usage: h-claude-code-view-convert <name> <transcript> <tmp dir>
+    #:
+    #: The cancel hint is an argument because this repaint is shared by every
+    #: entry point and they are not cancelled by the same key: it used to say
+    #: `⌘⇧O' unconditionally, so a conversion started from a picker spent its
+    #: whole life advertising a key that would not cancel it. It cannot be a
+    #: `local' in the caller either --- this runs inside the tmux session, a
+    #: different process, so dynamic scope does not reach here.
+    #: Usage: h-claude-code-view-convert <name> <cancel hint> <transcript> <tmp dir>
     ##
-    local name="${1}" transcript="${2}" tmp_dir="${3}"
-    assert-args name transcript tmp_dir @RET
+    local name="${1}" hint="${2}" transcript="${3}" tmp_dir="${4}"
+    assert-args name hint transcript tmp_dir @RET
 
     if ! test -e "${transcript}" ; then
         h-claude-code-view-fail "${name}" "${tmp_dir}" "this session has no transcript on disk yet"
@@ -1119,7 +1148,7 @@ function h-claude-code-view-convert {
     title="$(h-claude-code-session-name "${transcript}")" || title=''
     title="${title:-${transcript:t:r}}"
 
-    h-claude-code-view-banner "${name}" notice 600 0 "**Claude session** → org: *${title}*   (⌘⇧O again cancels)"
+    h-claude-code-view-banner "${name}" notice 600 0 "**Claude session** → org: *${title}*   (${hint} again cancels)"
 
     #: Named after the session, so the emacs buffer is recognizable; the id
     #: disambiguates two sessions sharing a name.
@@ -1150,7 +1179,9 @@ function h-claude-code-view-fail {
     ##
     local name="${1}" tmp_dir="${2}" reason="${3}"
 
-    ecerr "claude-code-view-session-focused: ${reason}"
+    #: `funcstack[2]' rather than the hotkey's name, which was hardcoded here
+    #: when the hotkey was the only caller.
+    ecerr "${funcstack[2]:-$0}: ${reason}"
     h-claude-code-view-banner "${name}" crit 8 0.35 "**Claude session**: ${reason}"
     silence notif "Claude session: ${reason}"
 
@@ -1417,6 +1448,12 @@ function h-claude-code-session-open-cmd {
     #:
     #: The absolute path comes from `$commands', so nothing depends on whatever
     #: PATH fzf happens to have.
+    #:
+    #: One trap for a future caller: fzf's `--expect' beats `--bind' for the
+    #: same key whatever the order, so an `--expect=alt-enter' anywhere in a
+    #: picker's `fz_opts' silently disables this and makes alt+enter accept
+    #: instead, returning the literal string `alt-enter' as the choice. The
+    #: idiom is in use nearby, in [agfi:h-grep-output-to-fz] and [agfi:rgf_].
     ##
     local brishzb="${commands[brishzb.dash]:-brishzb.dash}"
 
@@ -1425,7 +1462,11 @@ function h-claude-code-session-open-cmd {
 
 #: What the pickers put in their `--header', so the binding is discoverable at
 #: all. A person who does not know it exists will never press it.
-typeset -g claude_code_session_fz_header='alt+enter: convert & open in emacs (press again to cancel)'
+#: `${x:-...}' because =zshlang/load-others.zsh= sources `personal/' before
+#: `auto-load/', so a bare assignment would silently overwrite an override.
+#: Names the format, since Enter does something different in each picker ---
+#: resume, raw `.jsonl', markdown --- while alt+enter is always org.
+typeset -g claude_code_session_fz_header="${claude_code_session_fz_header:-alt+enter: → org in emacs, in the background (again cancels)}"
 
 function h-claude-code-session-fz-parts {
     #: The three things a picker outside zshlang needs from us, one per line:
@@ -1498,6 +1539,10 @@ function claude-code-session-live-fz {
     preview_cmd="$(h-claude-code-session-preview-cmd)" @RET
     open_cmd="$(h-claude-code-session-open-cmd)" @RET
 
+    local -a header_opt
+    test -n "${claude_code_session_fz_header}" &&
+        header_opt=( --header "${claude_code_session_fz_header}" )
+
     local selected
     selected="$(ec "${rows}" |
         fz_no_preview=y fz \
@@ -1506,7 +1551,7 @@ function claude-code-session-live-fz {
             --preview "${preview_cmd} {2}" \
             --preview-window 'down,60%,wrap' \
             --bind "alt-enter:execute-silent(${open_cmd} {2})" \
-            --header "${claude_code_session_fz_header}" \
+            "${header_opt[@]}" \
             "${fz_opts[@]}")" @RET
 
     test -n "${selected}" || return 1

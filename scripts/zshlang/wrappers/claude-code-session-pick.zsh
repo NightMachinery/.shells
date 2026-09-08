@@ -48,7 +48,13 @@ fi
 parts=( ${(@f)"$("${brishzq}" h-claude-code-session-fz-parts)"} )
 preview_cmd="${parts[1]:-claude_session preview}"
 open_cmd="${parts[2]:-brishzb.dash claude-code-view-session-toggle}"
-header="${parts[3]}"
+#: An array, not `${header:+--header "${header}"}': zsh does not word-split an
+#: unquoted expansion, so that form reaches fzf as the single argument
+#: `--header alt+enter: ...' rather than as two.
+typeset -a header_opt=()
+if [[ -n "${parts[3]}" ]] ; then
+    header_opt=( --header "${parts[3]}" )
+fi
 
 selected="$(print -r -- "${rows}" |
     fzf --delimiter=$'\t' --with-nth='3..' --no-multi --ansi \
@@ -56,7 +62,7 @@ selected="$(print -r -- "${rows}" |
         --preview "${preview_cmd} {2}" \
         --preview-window 'down,60%,wrap' \
         --bind "alt-enter:execute-silent(${open_cmd} {2})" \
-        ${header:+--header "${header}"})" || exit 0
+        "${header_opt[@]}")" || exit 0
 
 fields=( "${(@ps:\t:)selected}" )
 transcript="${fields[2]}"
