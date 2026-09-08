@@ -18,6 +18,7 @@ The explicit core load order is:
 - `redis.lua`
 - `wifi-watcher.lua`
 - `hyper-mode.lua`
+- `blackout-lock.lua`
 - `purple-mode.lua`
 - `mouse.lua`
 - `input-language.lua`
@@ -574,6 +575,72 @@ Re-calling `agentBannerOn` with the same message refreshes the countdown
 without re-flashing, so a long task can heartbeat without strobing. A changed
 message does flash again. The banner always expires on its own, so an agent
 that crashes or forgets cannot leave the screen branded.
+
+## Blackout keyboard lock
+
+`core/blackout-lock.lua` makes a blacked-out screen deaf as well as dark.
+hyper+shift+F1 blanks every display, but on its own that changes nothing about
+input: whatever had focus still has it, so a brushed key types into a window
+you cannot see, a hardware brightness key raises the level you just cut, and
+any other hyper chord fires blind. While the blackout is up, the lock swallows
+all of that, and the only input that does anything is the one that ends it.
+
+It is an `hs.eventtap`, which runs before Carbon hotkeys and before any app, so
+returning `true` from its callback drops an event for everyone at once — every
+other hyper binding and every app shortcut included. It taps `keyDown`,
+`keyUp` and `systemDefined` (the hardware brightness and media keys, which are
+not ordinary key events), and with `blackoutLockMouse` on, also the left, right
+and other mouse buttons, down and up, and the scroll wheel. Mouse movement is
+left alone. `flagsChanged` is not tapped either: a modifier on its own is
+harmless, and the shift for the escape chord is read from the F2 event's own
+flags rather than tracked separately.
+
+Exactly two things pass through. F18, the physical hyper key, so the hyper
+modal can still be entered; and F2 with shift while hyper mode is entered —
+hyper+shift+F2, the existing black-off binding. That binding also releases the
+lock synchronously, before it asks the garden to restore the screen, so the
+keyboard is back the instant the chord lands.
+
+The knobs are globals in the usual `x = x or default` style:
+
+- `blackoutLockEnabled`, default true. When false, hyper+shift+F1 blacks the
+  screen as it always did and installs no tap.
+- `blackoutLockMouse`, default true. Whether clicks and scroll are swallowed.
+- `blackoutLockMaxSeconds`, default 12 hours. An expiry backstop, after which
+  the lock releases while the screen stays black. It is long because the escape
+  chord, a wake and the shell are the real ways out; it exists so the lock
+  always ends on its own, like the agent banner.
+
+It is driven from the shell too:
+
+```sh
+hs -c 'blackoutLockOn(seconds)'       # seconds optional; a short value is for testing
+hs -c 'blackoutLockOff()'
+hs -c 'return blackoutLockActive()'
+```
+
+There are four ways out, and every path that ends a blackout takes one of them.
+hyper+shift+F2. The wake watcher in `core/power-watcher.lua`, which calls
+`blackoutLockOff` on `systemDidWake` and `screensDidWake`, since a wake ends
+the blackout anyway. The zsh `display-black-off`, which calls `blackoutLockOff`
+over `hammerspoon -c` right after its unconditional gamma restore — that is the
+one point every unblack path reaches, whether F2, `h-hook-wake`, `h-hook-unlock`
+from the Swift lock-watcher or the function run bare from another machine, so
+the lock can never outlive the black. And the expiry.
+
+The tap is installed only for the life of a blackout, for the reason given in
+`core/fim.lua`: a permanently installed tap sees every keystroke of every app,
+which is a privacy cost and a latency one. Here it is up only while there is
+nothing on screen to type into.
+
+Its limits all fail toward "the keys come back", never toward a locked machine.
+Secure Input — a focused password field, the login screen — hides keystrokes
+from event taps, so the lock cannot block typing there; engaging while Secure
+Input is on shows a warning alert saying so. A Hammerspoon reload or crash drops
+the tap silently while the screen stays black. macOS itself disables a tap whose
+callback stalls. On engage a short alert reads "Keyboard locked. hyper+shift+F2
+releases." — it is visible for the moment before the screen goes black, because
+black-on is asynchronous through the brish garden.
 
 ## FIM completion
 

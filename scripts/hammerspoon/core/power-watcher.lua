@@ -25,6 +25,12 @@ local function onPowerEvent(event)
         -- Asynchronous: never block Hammerspoon's main thread on the garden.
         -- See brishz_eval_hs in core/helpers.lua.
         brishz_eval_hs("h-hook-wake", "power-watcher")
+
+        -- A wake ends the blackout, so it ends the keyboard lock that came with
+        -- it (core/blackout-lock.lua). Done here as well as from
+        -- display-black-off, so the keys come back even if the garden is slow
+        -- or down. Guarded: that module loads after this one.
+        if blackoutLockOff then blackoutLockOff(true) end
     end
 end
 
