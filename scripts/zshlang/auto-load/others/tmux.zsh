@@ -87,10 +87,10 @@ function tmux-ensure-attach {
 alias tma='tmux-ensure-attach'
 
 function tma-z {
-    local name="${1}"
+    local name="${*}"
     assert-args name @RET
 
-    tmux-ensure-attach "${name}" zsh -c "z $(gq ${name%-*}) && exec zsh"
+    tmux-ensure-attach "${name}" zsh -c "cd ~/ && FORCE_INTERACTIVE=${TMA_Z_FORCE_INTERACTIVE:-y} z $(gq ${name%-*}) && ZSH_PWD=MAGIC_KEEP_CURRENT exec zsh"
     #: `%-*`: remove last dash and everything after it
 }
 ##
