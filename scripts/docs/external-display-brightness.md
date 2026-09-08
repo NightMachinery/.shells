@@ -224,6 +224,25 @@ That assertion is held under the key `blackout` and released by F2, so it cannot
 switch off a `caffeinate-on` something else is relying on, and it no longer
 outlives the blackout the way it used to. See `caffeinate.md`.
 
+F1 also locks the keyboard. A black screen on its own is not a safe one: the
+focused window still has focus, so a brushed key types into it unseen, and the
+hardware brightness keys undo the blackout from the inside. So while the screen
+is black, `hammerspoon/core/blackout-lock.lua` swallows every key, and by default
+every click and scroll, with two exceptions — the hyper key itself and
+hyper+shift+F2, so the way out is exactly the way out it was. The knobs
+(`blackoutLockEnabled`, `blackoutLockMouse`), the shell interface and the limits
+are in `hammerspoon/docs/hammerspoon.md` under "Blackout keyboard lock". The one
+worth repeating here is Secure Input: a password field or the login screen hides
+keystrokes from event taps, so the lock cannot block typing there.
+
+The lock can never outlive the black. `display-black-off` calls `blackoutLockOff`
+over `hammerspoon -c` immediately after its unconditional gamma restore, and it
+is the single point every unblack path reaches — F2, `h-hook-wake`, `h-hook-unlock`
+from the Swift lock-watcher, or the function run bare from another machine. The
+wake watcher releases it independently as well, and it expires on its own after
+twelve hours as a last resort. Whichever way the screen comes back, the keyboard
+comes back with it.
+
 ### If a screen is ever left black
 
 `display-black-off` restores gamma unconditionally, before it looks at any saved

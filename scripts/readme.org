@@ -114,6 +114,10 @@ several are attached, defaulting to the main one.
 same as brightness 0: on a built-in panel IOKit really does cut the backlight,
 but DDC luminance 0 leaves an external one visibly lit, so those get a zero gamma
 table with the DDC levels floored underneath. hyper+shift+F1/F2 go through here.
+F1 also locks the keyboard and mouse for as long as the screen is black, so a
+brushed key cannot type into an unseen window or turn the brightness back up;
+hyper+shift+F2 releases both, and so does [[agfi:display-black-off]], which
+every unblack path runs through.
 
 See =./docs/external-display-brightness.md=, which also records how often DDC
 reads come back corrupt and what is done about it.

@@ -1175,6 +1175,15 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
     #: the way out of a screen left black.
     h-display-black-gamma 0 off
 
+    #: The keyboard lock that hyper+shift+F1 puts up with the blackout
+    #: (hammerspoon/core/blackout-lock.lua) comes down here, and unconditionally
+    #: for the same reason: this is the one point every unblack path reaches --
+    #: F2, [agfi:h-hook-wake], [agfi:h-hook-unlock], or this run bare from
+    #: another machine -- so the lock can never outlive the black. Guarded,
+    #: because the function is missing on a Hammerspoon whose config failed to
+    #: load, and `hs -c` of a nil call would only print an error.
+    silent hammerspoon -c 'if blackoutLockOff then blackoutLockOff() end'
+
     local saved
     saved="$(display_black_saved_get)" || saved=''
     if [[ -z "$saved" ]] ; then
