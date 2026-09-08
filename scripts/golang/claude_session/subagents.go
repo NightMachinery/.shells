@@ -25,19 +25,70 @@ type subagentMeta struct {
 	SpawnDepth  int    `json:"spawnDepth"`
 }
 
-// A subagent's heading: what it was and what it was asked to do.
-func (s subagent) title() string {
+// A subagent's heading: which model it ran as, what it was, and what it was
+// asked to do. The model leads, because it is the thing you scan a list of
+// agents for -- which of these was the expensive one, which was the cheap one.
+// Empty when the transcript never said, in which case the heading is what it
+// always was.
+func (s subagent) title(model string) string {
 	parts := []string{}
+	if label := modelLabel(model); label != "" {
+		parts = append(parts, "@"+label)
+	}
+
+	rest := []string{}
 	if s.meta.AgentType != "" {
-		parts = append(parts, s.meta.AgentType)
+		rest = append(rest, s.meta.AgentType)
 	}
 	if s.meta.Description != "" {
-		parts = append(parts, s.meta.Description)
+		rest = append(rest, s.meta.Description)
 	}
-	if len(parts) == 0 {
-		return "Subagent " + s.id
+	if len(rest) == 0 {
+		rest = append(rest, "Subagent "+s.id)
 	}
-	return strings.Join(parts, " · ")
+
+	// A middle dot between what it was and what it did, a space after the
+	// model: the tag is an attribute of the agent, not another field of equal
+	// weight.
+	return strings.TrimSpace(strings.Join(parts, " ") + " " + strings.Join(rest, " · "))
+}
+
+// The model a subagent ran as: the most frequent across its own assistant
+// messages. Most run one model throughout, but a model switch mid-agent is
+// possible and an interrupted one carries `<synthetic>` records, so the mode is
+// what survives both without being thrown off by a stray record.
+//
+// `<synthetic>` does not get a vote. It marks a message Claude Code wrote
+// itself -- an interruption notice, say -- and is not a model at all.
+//
+// Ties go to whichever appeared first, so the answer cannot depend on map
+// iteration order: the rendered document has to be byte-identical run to run,
+// which is what `TestPandocPathParity` checks.
+func modelMode(records []record) string {
+	counts := map[string]int{}
+	var order []string
+
+	for _, rec := range records {
+		if rec.Type != "assistant" || rec.Message == nil {
+			continue
+		}
+		m := rec.Message.Model
+		if m == "" || m == "<synthetic>" {
+			continue
+		}
+		if _, seen := counts[m]; !seen {
+			order = append(order, m)
+		}
+		counts[m]++
+	}
+
+	best := ""
+	for _, m := range order {
+		if best == "" || counts[m] > counts[best] {
+			best = m
+		}
+	}
+	return best
 }
 
 // Transcripts of the agents this session spawned, ordered by where their
@@ -101,11 +152,13 @@ func toolCallOrder(blocks [][]block) map[string]int {
 }
 
 // Reads a subagent transcript and renders its turns, indented to sit under its
-// heading in the parent document.
-func renderSubagent(s subagent, opts renderOpts, jobs int) []string {
+// heading in the parent document. Also reports the model it ran as, from the
+// same read: the heading needs it, and reading the file twice for a field that
+// is already in hand would be silly.
+func renderSubagent(s subagent, opts renderOpts, jobs int) ([]string, string) {
 	fh, err := os.Open(s.path)
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 	defer fh.Close()
 
@@ -131,5 +184,5 @@ func renderSubagent(s subagent, opts renderOpts, jobs int) []string {
 	// Under `* Subagents` / `** <agent>`, so the transcript starts at level 3.
 	sub := opts
 	sub.base = 2
-	return renderTurns(turns, results, sub, jobs)
+	return renderTurns(turns, results, sub, jobs), modelMode(records)
 }

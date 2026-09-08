@@ -171,9 +171,12 @@ func subagentSegments(input string, blocks [][]block, opts renderOpts, orgOut bo
 			// VISIBILITY is honoured at startup, so each agent opens folded.
 			trailer = ":PROPERTIES:\n:VISIBILITY: folded\n:END:\n"
 		}
-		segs = append(segs, segment{text: head(2, s.title(), trailer)})
+		// The body first, because the model in the heading comes out of the
+		// same read; the heading is still appended ahead of it.
+		parts, model := renderSubagent(s, opts, jobs)
 
-		for _, p := range renderSubagent(s, opts, jobs) {
+		segs = append(segs, segment{text: head(2, s.title(model), trailer)})
+		for _, p := range parts {
 			segs = append(segs, segment{text: p, body: true})
 		}
 	}

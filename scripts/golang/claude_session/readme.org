@@ -241,6 +241,41 @@ call that spawned it. Those transcripts are inlined into a =* Subagents=
 section at the top of the document, ordered by where their spawning call
 appears in the parent.
 
+Each agent's heading leads with the model it ran as, then the agent type and the
+description it was launched with, so the roster says at a glance which agent was
+the expensive one and which the cheap one:
+
+#+begin_example
+,** @Opus5 Explore · Find claude session name storage
+,** @Fable5.1 general-purpose · Draft docs for the alt+enter binding
+#+end_example
+
+The model is the mode across the agent's own assistant records --- the most
+frequent, not the first or the last. Most subagents run one model throughout,
+but a switch mid-agent is possible and an interrupted one carries =<synthetic>=
+records, and the mode survives both without being thrown off by a stray record.
+=<synthetic>= gets no vote: it marks a message Claude Code wrote itself, an
+interruption notice say, and is not a model at all. A transcript with nothing
+but synthetic records has no model to report, and its heading is exactly what it
+always was. Ties go to whichever model appeared first, and that is deliberate
+rather than incidental: iterating a Go map is randomised, so a tie broken that
+way would make the document differ run to run, and =TestPandocPathParity=
+compares the parallel path against a single pandoc run byte for byte.
+=modelMode= in =subagents.go= is the vote.
+
+=modelLabel= formats it as one word --- =shortModel='s output with the family
+capitalised and the separator dropped, so =claude-opus-5= is =Opus5= and
+=claude-fable-5-1= is =Fable5.1= --- so it scans as a name rather than as a
+version string; =shortModel= already drops a build date, so
+=claude-haiku-4-5-20251001= is =Haiku4.5=. The model comes out of the read
+=renderSubagent= already does, which is why it returns the model beside the
+rendered parts and why =subagentSegments= renders each agent's body before
+emitting its heading: reading the transcript a second time for a field already
+in hand would be waste. Checked against the local corpus on a session with
+eleven subagents, the six whose assistant records are mostly =claude-opus-5=
+render as =@Opus5= and the five mostly =claude-fable-5-1= as =@Fable5.1=,
+matching a =jq= count of the raw records exactly.
+
 The section itself stays unfolded so the roster of agents is visible at a
 glance; each agent's own heading carries =:VISIBILITY: folded= so its
 transcript stays out of the way until wanted.
