@@ -23,6 +23,13 @@
 #: for the command line, once, since that is where the knobs live --- see
 #: [agfi:h-claude-code-session-preview-cmd].
 #:
+#: alt+enter converts the highlighted transcript in the background and leaves
+#: the picker up, so several can be opened without closing it; pressing it again
+#: on the same row cancels that one. Its command line comes from the garden the
+#: same way, once --- see [agfi:h-claude-code-session-open-cmd]. Enter still
+#: opens under the *tab's* key, this under the *transcript's*, which is why the
+#: two do not cancel each other.
+#:
 #: Row layout, tab separated: window id, transcript, label, profile, last
 #: activity, relative path, snippet. fzf shows from the label on; the
 #: transcript is field 2.
@@ -35,19 +42,21 @@ if ! rows="$("${brishzq}" h-claude-code-session-pick-rows)" || [[ -z "${rows}" ]
     exit 1
 fi
 
-#: A bare command name if the garden could not be reached, rather than an empty
-#: string: `--preview " {2}"' would have fzf try to run the transcript path.
-preview_cmd="$("${brishzq}" h-claude-code-session-preview-cmd)" ||
-    preview_cmd='claude_session preview'
-if [[ -z "${preview_cmd}" ]] ; then
-    preview_cmd='claude_session preview'
-fi
+#: The preview command, the alt+enter command and the header, in one round trip.
+#: Bare command names when the garden could not be reached, rather than empty
+#: strings: `--preview " {2}"' would have fzf try to run the transcript path.
+parts=( ${(@f)"$("${brishzq}" h-claude-code-session-fz-parts)"} )
+preview_cmd="${parts[1]:-claude_session preview}"
+open_cmd="${parts[2]:-brishzb.dash claude-code-view-session-toggle}"
+header="${parts[3]}"
 
 selected="$(print -r -- "${rows}" |
     fzf --delimiter=$'\t' --with-nth='3..' --no-multi --ansi \
         --prompt='Claude Code session> ' \
         --preview "${preview_cmd} {2}" \
-        --preview-window 'down,60%,wrap')" || exit 0
+        --preview-window 'down,60%,wrap' \
+        --bind "alt-enter:execute-silent(${open_cmd} {2})" \
+        ${header:+--header "${header}"})" || exit 0
 
 fields=( "${(@ps:\t:)selected}" )
 transcript="${fields[2]}"

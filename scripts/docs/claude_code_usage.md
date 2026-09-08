@@ -284,6 +284,14 @@ shows under its ` ⑂ <profile>` name rather than the title it had before the
 fork. The preview used to read `ai-title` alone and got exactly that case
 wrong.
 
+Enter resumes the highlighted session. `alt+enter` instead converts that
+transcript to org and opens it in emacs in the background, without leaving the
+picker, so a session can be read before deciding whether to resume it; pressing
+it again on the same row cancels that conversion. The function behind the key is
+`claude-code-view-session-toggle`, and the readme for `golang/claude_session`
+explains why it is keyed on the transcript rather than on the kitty window, and
+why it does not freeze the picker.
+
 When the target differs from the owner, `claude-code-session-import` forks
 the session there under a **new** uuid: it copies the transcript, the
 `<uuid>/` directory holding subagent transcripts and tool results, and

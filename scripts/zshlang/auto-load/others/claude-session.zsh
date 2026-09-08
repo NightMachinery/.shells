@@ -241,8 +241,13 @@ function h-claude-code-session-select-fz {
     #: `--ansi' because the preview is coloured, and `{2}' is the transcript
     #: path. `fz_opts' is appended last, so an explicit `--preview-window
     #: hidden' there wins.
-    local preview_cmd
+    #:
+    #: alt+enter overrides the `print-query' that FZF_DEFAULT_OPTS binds to it,
+    #: and nothing is lost: a printed query would come back here as `selected'
+    #: and fail the `test -e' below, which is all it ever did.
+    local preview_cmd open_cmd
     preview_cmd="$(h-claude-code-session-preview-cmd)" @RET
+    open_cmd="$(h-claude-code-session-open-cmd)" @RET
 
     local selected
     selected="$(ec "${lines}" |
@@ -250,6 +255,8 @@ function h-claude-code-session-select-fz {
             --delimiter=$'\t' --with-nth='3..' --no-multi --ansi \
             --preview "${preview_cmd} {2}" \
             --preview-window 'down,60%,wrap' \
+            --bind "alt-enter:execute-silent(${open_cmd} {2})" \
+            --header "${claude_code_session_fz_header}" \
             "${fz_opts[@]}")" @RET
     selected="${selected%%$'\n'*}"
 
@@ -875,9 +882,16 @@ function h-claude-code-view-session-focused {
 
 function claude-code-view-session-bg {
     #: Converts a known transcript to org and opens it in emacs, in the
-    #: background, with the same per-tab band and press-again-to-cancel as the
-    #: hotkey. For the overlay picker, whose choice arrives with the key of the
-    #: tab it was opened from.
+    #: background, under the same per-tab band as the hotkey. For the overlay
+    #: picker, whose choice arrives with the key of the tab it was opened from.
+    #:
+    #: Starts, and only starts. It is deliberately not the toggle the hotkey is,
+    #: even though it shares the key: its caller is the overlay's Enter, which
+    #: runs while the job that opened the overlay may still be winding down --
+    #: [agfi:h-claude-code-view-job] launches the picker from *inside* that tmux
+    #: session and only then returns. A toggle here would sometimes answer "I
+    #: picked this one" with "cancelled", silently. The picker's own alt+enter
+    #: is where toggling belongs; see [agfi:claude-code-view-session-toggle].
     #: Usage: claude-code-view-session-bg <transcript> <tab-key>
     ##
     local transcript="${1}" key="${2}"
@@ -888,12 +902,78 @@ function claude-code-view-session-bg {
         h-claude-code-view-convert "$(h-claude-code-view-name-of "${key}")" "${transcript}"
 }
 
+function claude-code-view-session-toggle {
+    #: Converts a transcript to org in the background and opens it in emacs, or
+    #: cancels that transcript's conversion when one is already running. What
+    #: alt+enter in the session pickers is bound to.
+    #:
+    #: Keyed on the transcript rather than on a kitty window, unlike the hotkey.
+    #: A picker moves between rows, so "press again" has to mean "again on this
+    #: row"; keying on the window would make alt+enter on a *different* row
+    #: cancel the running conversion instead of starting the new one. Two
+    #: consequences, both wanted: several conversions can run at once and their
+    #: bands stack, and nothing here needs kitty, so this works over ssh and on
+    #: Linux (only the band is macOS-only, and it already fails soft).
+    #:
+    #: The flip side is that ⌘⇧O cannot cancel one of these and this cannot
+    #: cancel one of ⌘⇧O's: they are separate key namespaces on purpose.
+    #: Usage: claude-code-view-session-toggle <transcript>
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local key
+    key="$(h-claude-code-view-transcript-key "${transcript}")" @RET
+
+    local name
+    name="$(h-claude-code-view-name-of "${key}")" @RET
+
+    if tmux-alive-p "${name}" ; then
+        h-claude-code-view-cancel "${key}"
+        return 0
+    fi
+
+    h-claude-code-view-launch "${key}" \
+        "**Claude session** → org: starting…   (⌥⏎ again cancels)" \
+        h-claude-code-view-convert "${name}" "${transcript}"
+}
+
+function h-claude-code-view-transcript-key {
+    #: The key a transcript's own conversion runs under: its uuid, which is what
+    #: the file is named. Sanitised because the name becomes a tmux session:
+    #: tmux forbids `:' and `.', and a subagent transcript is
+    #: `<session>/subagents/<name>.jsonl', whose basename is not a uuid at all.
+    #: Usage: h-claude-code-view-transcript-key <transcript>
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local key="${transcript:t:r}"
+    key="${key//[^A-Za-z0-9-]/-}"
+    #: Collapse the runs the substitution leaves behind, and refuse to hand back
+    #: a name that is all separator.
+    key="${${key//---##/-}##-##}"
+    key="${key%%-##}"
+
+    if test -z "${key}" ; then
+        ecerr "$0: could not derive a key from: ${transcript}"
+        return 1
+    fi
+
+    ec "${key}"
+}
+
 function h-claude-code-view-name-of {
-    #: The tmux session, and the alert id, that a tab's conversion runs under:
-    #: `claude-view-<kitty-pid>-<window-id>'. One name for both, so what
-    #: `tmux ls' shows and what is on screen line up. tmux forbids `:' and `.'
-    #: in session names; the key has neither.
-    #: Usage: h-claude-code-view-name-of <tab-key>
+    #: The tmux session, and the alert id, that a conversion runs under:
+    #: `claude-view-<key>'. One name for both, so what `tmux ls' shows and what
+    #: is on screen line up.
+    #:
+    #: Two kinds of key reach here, and they are separate namespaces by design:
+    #: `<kitty-pid>-<window-id>' for the hotkey, from
+    #: [agfi:h-claude-code-session-registry-key], and a transcript's uuid for a
+    #: picker's alt+enter, from [agfi:h-claude-code-view-transcript-key]. tmux
+    #: forbids `:' and `.' in session names; neither kind contains either.
+    #: Usage: h-claude-code-view-name-of <key>
     ##
     local key="${1}"
     assert-args key @RET
@@ -1307,6 +1387,56 @@ function h-claude-code-session-preview-cmd {
     gquote "${cmd[@]}"
 }
 
+function h-claude-code-session-open-cmd {
+    #: The fzf `--bind alt-enter' command for a session row, shell-quoted and
+    #: ready to have a field placeholder appended:
+    #:
+    #:     --bind "alt-enter:execute-silent($(h-claude-code-session-open-cmd) {2})"
+    #:
+    #: Fire-and-forget, through `brishzb.dash' rather than `brishzq.zsh'.
+    #: `execute-silent' blocks fzf until the command returns, and brishzq waits
+    #: for the whole call -- 250ms measured, most of it not the garden hop
+    #: (~60ms) but [agfi:h-claude-code-view-launch]'s own foreground work: the
+    #: Hammerspoon band call, `gmktemp' and `tmuxnewsh2'. brishzb posts
+    #: `{ cmd } &>/dev/null &' and returns as soon as the garden forks: 20ms.
+    #:
+    #: Losing stdout and the exit status costs nothing here, because the work is
+    #: asynchronous either way -- every failure already reports through the band
+    #: and a notification, in [agfi:h-claude-code-view-fail].
+    #:
+    #: brishzb splices its arguments into JSON unquoted, which brishzq would
+    #: not, and that is safe here rather than by luck: fzf shell-quotes `{2}'
+    #: with single quotes, and a transcript path cannot contain a `"' or a `\'
+    #: --- Claude Code names the project directory after its cwd with every
+    #: non-alphanumeric character replaced by `-', and the file after a uuid.
+    #:
+    #: The absolute path comes from `$commands', so nothing depends on whatever
+    #: PATH fzf happens to have.
+    ##
+    local brishzb="${commands[brishzb.dash]:-brishzb.dash}"
+
+    gquote "${brishzb}" claude-code-view-session-toggle
+}
+
+#: What the pickers put in their `--header', so the binding is discoverable at
+#: all. A person who does not know it exists will never press it.
+typeset -g claude_code_session_fz_header='alt+enter: convert & open in emacs (press again to cancel)'
+
+function h-claude-code-session-fz-parts {
+    #: The three things a picker outside zshlang needs from us, one per line:
+    #: the preview command, the alt+enter command, and the header. For
+    #: =zshlang/wrappers/claude-code-session-pick.zsh=, which runs under `zsh -f'
+    #: in a kitty overlay and can only reach us through the garden.
+    #:
+    #: One call rather than three. Each garden round trip is ~380ms, and the
+    #: overlay pays them at startup while a person waits. None of the three
+    #: values can contain a newline, so a line per value needs no quoting.
+    ##
+    h-claude-code-session-preview-cmd @RET
+    h-claude-code-session-open-cmd @RET
+    ec "${claude_code_session_fz_header}"
+}
+
 function h-claude-code-session-preview {
     #: The fzf preview body for one session: what it is called, what it was
     #: running as, where, when it last moved, and what was last asked of it.
@@ -1357,8 +1487,11 @@ function claude-code-session-live-fz {
     #: fzf execs the preview binary itself; see
     #: [agfi:h-claude-code-session-preview-cmd] for why it is not a zsh function
     #: reached through the garden any more.
-    local preview_cmd
+    #: `{2}' under `--multi' is the highlighted row, not the selection, which
+    #: is what alt+enter wants: it acts on the one row you are looking at.
+    local preview_cmd open_cmd
     preview_cmd="$(h-claude-code-session-preview-cmd)" @RET
+    open_cmd="$(h-claude-code-session-open-cmd)" @RET
 
     local selected
     selected="$(ec "${rows}" |
@@ -1367,6 +1500,8 @@ function claude-code-session-live-fz {
             "${multi_opt}" \
             --preview "${preview_cmd} {2}" \
             --preview-window 'down,60%,wrap' \
+            --bind "alt-enter:execute-silent(${open_cmd} {2})" \
+            --header "${claude_code_session_fz_header}" \
             "${fz_opts[@]}")" @RET
 
     test -n "${selected}" || return 1
