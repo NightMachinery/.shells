@@ -187,10 +187,52 @@ here.
   for a session whose shell has exited. Prefixing `#{?pane_dead,[dead] ,}`
   would fix that and break `kitty-tab-codex-p`'s `^⚡` anchor; left out
   deliberately.
-- `ivy` loses its `🌳` while attached, replaced by the active pane's title or,
-  through the fallback, `ivy`. A session-local
-  `tmux set-option -t ivy set-titles-string '🌳'` inside [agfi:ivy-self] is
-  the clean way back if the emoji matters.
+- `ivy` is a special case, handled below. Any other session that wants a fixed
+  label rather than its active pane's title can do the same thing.
+
+## Pinning one session's label: `ivy`
+
+The global string follows the active pane, and `ivy`'s panes are mpv and
+friends, so the tab came to read whatever was playing instead of the `🌳` that
+[agfi:ivy] sets with `tty-title` just before attaching.
+
+`set-titles-string` is a *session* option, so [agfi:ivy-tmux-title-set] pins
+`ivy`'s label without touching any other session:
+
+```
+tmux set-option -t 'ivy' set-titles-string '🌳'
+```
+
+It runs right after `tmux new-session` in [agfi:ivy-self], so it covers every
+later attach and not only the one `ivy` performs itself.
+[agfi:ivy-tty-title-get] holds the label, still overridable with
+`ivy_tty_title`; a `#` in it is doubled, because `#` opens a format
+substitution in a tmux option.
+
+The pane titles are left alone, so `status-right` still shows what is playing:
+
+```
+$ tmux list-panes -t ivy -F '#{pane_index} #{pane_title}'
+0 Christmas Classics (2000)
+1 tmp
+2 tmp
+$ kitty @ ls | jq -r '.[].tabs[].windows[]|select(.id==1)|.title'
+🌳
+```
+
+One trap. `set-option` rejects the `=` exact-match prefix that `has-session`
+accepts, so the session-exists check and the write cannot share a target
+string:
+
+```
+$ tmux has-session -t '=ivy' && echo ok
+ok
+$ tmux set-option -t '=ivy' set-titles-string TEST
+no such session: =ivy
+```
+
+The bare name is safe after the exact check, because tmux resolves an exact
+session name before trying it as a prefix.
 
 ## Testing
 
