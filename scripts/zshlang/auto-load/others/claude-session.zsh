@@ -1058,6 +1058,17 @@ function h-claude-code-view-launch {
     local name
     name="$(h-claude-code-view-name-of "${key}")" @RET
 
+    #: `tmuxnew' inside `tmuxnewsh2' replaces any session of this name, and that
+    #: discards its options -- so the predecessor's temp directory has to be
+    #: read and removed here or it is orphaned for good. Two ways that happened:
+    #: a press inside the window between our callers' `tmux-alive-p' test and the
+    #: claim below, which starts a second launch and strands the first one's
+    #: directory; and a finished job's leftover, whose pane is dead but whose
+    #: session and options survive `remain-on-exit'.
+    local prev_tmp
+    prev_tmp="$(tmux show-options -qv -t "${name}" '@ccv_tmp' 2>/dev/null)" || prev_tmp=''
+    h-claude-code-view-rm-tmp "${prev_tmp}"
+
     h-claude-code-session-dep @RET
 
     local tmp_dir
@@ -1161,6 +1172,14 @@ function h-claude-code-view-convert {
         h-claude-code-view-fail "${name}" "${tmp_dir}" "conversion failed: ${title}"
         return 1
     fi
+
+    #: Hand the bookkeeping back before handing the file over. From here the
+    #: directory has to survive: emacs will be holding the file open, and a
+    #: cancel landing in this window would otherwise delete it underneath, which
+    #: leaves a buffer pointing at nothing. The canceller reads an empty value
+    #: and [agfi:h-claude-code-view-rm-tmp] returns early on it; on success the
+    #: directory stays regardless, which is what it always did.
+    silent tmux set-option -u -t "${name}" '@ccv_tmp' || true
 
     if ! emc-open "${out_file}" ; then
         h-claude-code-view-fail "${name}" '' "emacs did not open ${out_file:t}"
