@@ -28,6 +28,18 @@ function claude {
     #: can set it without exporting anything.
     tty-title "${claude_tty_title_marker:-🍼}${PWD:t}"
 
+    #: Claude Code rewrites the terminal title continuously (`✳ <summary>'),
+    #: overwriting the marker above within seconds. This makes it leave the
+    #: title alone -- at the cost of strategy 3 in
+    #: [agfi:h-claude-code-session-of-kitty-window], which maps a kitty window
+    #: to a session *by* that title. Strategies 1, 2 and 4 (foreground PID,
+    #: tmux client, registry) are unaffected, and inside tmux it is strategy 2
+    #: that fires, so this is cheap there and costly outside. Hence off by
+    #: default. See =./docs/tmux-tty-title.md=.
+    if bool "${claude_tty_title_keep_p}" ; then
+        local -x CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
+    fi
+
     $proxyenv command claude "$@"
 }
 aliasfn claude-m claude
