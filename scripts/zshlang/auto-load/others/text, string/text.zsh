@@ -125,10 +125,17 @@ alias pdn='p-double-newlines'
 ##
 function newline2space {
     cat-paste-if-tty |
-        perl -CS -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ;
-        s/^\h+//g if $. == 1 ;
- s/\x{2}//g ; s/\R\s*/ /g ; s/\h+/ /g ; s/(*plb:\w)-\h//g' |
+        perl -0777 -CS -pe 'BEGIN { use utf8; use open qw/:std :utf8/; } ;
+        s/^\h+// ;
+ s/\x{2}//g ; s/\R\s*/ /g ; s/\h+/ /g ; s/(*plb:\w)-\h//g ; s/\s+$//' |
         cat-copy-if-tty
+
+    #: =-0777= slurps the whole input so that =\h+= sees a wrap's trailing
+    #: whitespace and the space substituted for its newline together. Line-at-a-
+    #: time (=-pe=) handled them in separate invocations and so left a doubled
+    #: space at every join. Slurping also makes =^= match only the string start,
+    #: which is what the old =if $. == 1= guard was for. Cf. [agfi:newline-strip],
+    #: which already slurped.
 
     #: =\x{2}= is the ASCII character two, which in emacs shows as =^B= and can be inserted using [kbd:C-q C-b].
     #: =(*plb:\w)-\h= changes, e.g., =com- ponent= to =component=
