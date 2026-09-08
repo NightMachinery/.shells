@@ -103,14 +103,133 @@ aliasfn gmiadd gemiadd
 function npm-install {
     #: @duplicateCode/b00b656b70d11d5d26d81a77f2d2b970
     ##
+    #: `npm_install_engine' chooses the package manager:
+    #:   auto  -- pnpm when it is installed, npm otherwise (the default)
+    #:   pnpm
+    #:   npm
+    #: [agfi:npm-install-npm] and [agfi:npm-install-pnpm] are the shorthands.
+    #:
+    #: Force `npm' for any package whose *tarball* is larger than roughly 50MB.
+    #: pnpm verifies the tarball's integrity inside a worker thread, and the
+    #: structured clone that carries it there downgrades the Buffer to a plain
+    #: Uint8Array. Node's `crypto.hash' does not fast-path a plain Uint8Array;
+    #: it stringifies it by joining the bytes with commas, and compressed bytes
+    #: are high-entropy enough that this costs ~4.5 characters -- 9 bytes -- per
+    #: input byte. Past V8's maximum string length the worker dies with
+    #:   FATAL ERROR: invalid array length Allocation failed
+    #: and pnpm exits 134, having left a half-extracted package behind.
+    #: `NODE_OPTIONS=--max-old-space-size' cannot help, because the ceiling
+    #: being hit is the string length rather than the heap.
+    #:
+    #: Measured on node v24.4.1 / pnpm 10.32.1: 50MB of random bytes hashes,
+    #: 55MB is fatal. Both [agfi:codex-install-pnpm] (110MB tarball) and
+    #: [agfi:claude-install-pnpm] (83MB) are over the line. See
+    #: ./docs/npm-global-installs.md.
+    #:
+    #: `npm_install_pnpm_opts' passes extra flags to pnpm, e.g.
+    #: `--allow-build=<pkg>' for a package whose postinstall script has to run;
+    #: see [agfi:claude-install-pnpm]. npm needs no such flag, so the array is
+    #: ignored by the npm engine.
+    ##
+    local engine="${npm_install_engine:-auto}"
+    if [[ "${engine}" == auto ]] ; then
+        if test -n "${commands[pnpm]}" ; then
+            engine=pnpm
+        else
+            engine=npm
+        fi
+    fi
+
+    ensure-array npm_install_pnpm_opts
+    local pnpm_opts=("${npm_install_pnpm_opts[@]}")
+
     local pkg
     for pkg in $@ ; do
-        if test -n "${commands[pnpm]}" ; then
-            reval-ecgray pnpm install -g "${pkg}" --include=optional --loglevel=silly
-        else
-            reval-ecgray npm install -g "$pkg" --progress=true --loglevel=verbose
-        fi
+        case "${engine}" in
+            pnpm)
+                #: `add -g' rather than `install -g': it is pnpm's documented
+                #: verb for a global install, and the only one whose --help
+                #: lists --allow-build.
+                reval-ecgray pnpm add -g "${pnpm_opts[@]}" "${pkg}" --include=optional --loglevel=silly @RET
+                ;;
+            npm)
+                reval-ecgray npm install -g "${pkg}" --progress=true --loglevel=verbose @RET
+                ;;
+            *)
+                ecerr "$0: unsupported npm_install_engine: ${engine}"
+                return 1
+                ;;
+        esac
     done
+}
+
+function npm-install-npm {
+    npm_install_engine=npm npm-install "$@"
+}
+
+function npm-install-pnpm {
+    npm_install_engine=pnpm npm-install "$@"
+}
+
+function h-npm-global-dir {
+    #: Where npm would put a globally installed package, whether or not it is
+    #: installed. pnpm keeps its own tree under $PNPM_HOME and is unaffected.
+    ##
+    local pkg="$1"
+    assert-args pkg @RET
+
+    local root
+    root="$(npm root -g)" @TRET
+
+    ec "${root}/${pkg}"
+}
+
+function h-npm-install-clean-staging {
+    #: `npm install -g' upgrades a package by renaming the old directory out of
+    #: the way to `.<name>-<random>' beside it, then renaming it back or
+    #: deleting it at the end. A crash between those two steps leaves the
+    #: staging directory behind, and npm never collects it. Every later install
+    #: of that package then dies before it downloads anything:
+    #:   ENOTEMPTY: directory not empty, rename '<pkg>' -> '.<name>-<random>'
+    #: because npm derives the same staging name again and refuses to overwrite
+    #: a non-empty one. One of these sat under @openai for eight months, which
+    #: is what [agfi:codex-install]'s `isDeus' branch was groping at.
+    ##
+    local pkg="$1"
+    assert-args pkg @RET
+
+    local dir
+    dir="$(h-npm-global-dir "${pkg}")" @TRET
+
+    local stale=("${dir:h}/.${dir:t}-"*(N))
+    (( ${#stale} )) || return 0
+
+    ecgray "$0: trashing stale npm staging leftovers: ${stale[*]}"
+    trs "${stale[@]}"
+}
+
+function h-npm-install-report {
+    #: npm's global prefix and $PNPM_HOME both put shims on PATH, so a package
+    #: installed through one engine can sit shadowed behind an older copy from
+    #: the other and the install will look like it did nothing. List every
+    #: match in PATH order; the first one is the one that runs.
+    ##
+    local cmd="$1"
+    local paths=(${(f)"$(whence -pa -- "${cmd}" 2>/dev/null)"})
+
+    if (( ${#paths} == 0 )) ; then
+        ecerr "$0: '${cmd}' is not on PATH after installing it"
+        return 1
+    fi
+
+    local p
+    for p in "${paths[@]}" ; do
+        ecgray "$0: ${p}: $("${p}" --version 2>&1 | head -n 1)"
+    done
+
+    if (( ${#paths} > 1 )) ; then
+        ecgray "$0: ${#paths} copies of '${cmd}' are on PATH; the first wins."
+    fi
 }
 
 function ins-npm {
