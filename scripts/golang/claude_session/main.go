@@ -119,6 +119,8 @@ func main() {
 		cmdList(os.Args[2:])
 	case "name":
 		cmdName(os.Args[2:])
+	case "preview":
+		cmdPreview(os.Args[2:])
 	case "live":
 		cmdLive(os.Args[2:])
 	case "-h", "--help", "help":
@@ -134,6 +136,7 @@ func usage() {
   claude_session render [flags] <session.jsonl>   #: transcript -> markdown/org on stdout
   claude_session list   [flags] <sessions-dir>... #: TSV of sessions, newest first
   claude_session name           <session.jsonl>   #: session name, empty if unnamed
+  claude_session preview [flags] <session.jsonl>   #: fzf preview body for a session
   claude_session live           <projects-dir>...  #: TSV of live sessions (pid, id, name, cwd, transcript, tmux, status)
 
 render flags:
@@ -143,6 +146,10 @@ render flags:
   -diff                       render Edit as a unified diff (default true)
   -jobs N                     worker count (default: CPU count)
   -pandoc PATH                pandoc binary for org-pandoc (default "pandoc")
+
+preview flags:
+  -bytes N              how much of the transcript's tail to read (default 409600)
+  -color                emit ANSI colour (default true; NO_COLOR also disables it)
 
 list flags:
   -snippet-len N        max snippet width (default 120)
