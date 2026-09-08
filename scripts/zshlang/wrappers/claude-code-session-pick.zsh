@@ -5,9 +5,8 @@
 #: terminal and nothing on the other side has one: the hotkey runs in the
 #: background, and the garden's shells are not interactive.
 #:
-#: Everything but fzf itself goes through the garden. The rows come from
-#: [agfi:h-claude-code-session-pick-rows], the preview from
-#: [agfi:h-claude-code-session-preview], and the choice goes back to
+#: Everything but fzf and the preview goes through the garden. The rows come
+#: from [agfi:h-claude-code-session-pick-rows], and the choice goes back to
 #: [agfi:claude-code-view-session-bg] when the hotkey opened us -- it passes
 #: the tab's key as CLAUDE_VIEW_TAB_KEY, so the conversion runs in the
 #: background under that tab's band and a second cmd+shift+o cancels it -- or
@@ -17,6 +16,12 @@
 #:
 #: Plain `zsh -f' via zshplain.dash: loading zshlang here would cost seconds on
 #: every miss, and everything heavy already lives in the garden.
+#:
+#: The preview is the one thing fzf runs itself, as a bare binary: it fires on
+#: every cursor move, and going through the garden for it cost ~380ms a
+#: keystroke on top of the shell version's own ~200ms. The garden is still asked
+#: for the command line, once, since that is where the knobs live --- see
+#: [agfi:h-claude-code-session-preview-cmd].
 #:
 #: Row layout, tab separated: window id, transcript, label, profile, last
 #: activity, relative path, snippet. fzf shows from the label on; the
@@ -30,10 +35,18 @@ if ! rows="$("${brishzq}" h-claude-code-session-pick-rows)" || [[ -z "${rows}" ]
     exit 1
 fi
 
+#: A bare command name if the garden could not be reached, rather than an empty
+#: string: `--preview " {2}"' would have fzf try to run the transcript path.
+preview_cmd="$("${brishzq}" h-claude-code-session-preview-cmd)" ||
+    preview_cmd='claude_session preview'
+if [[ -z "${preview_cmd}" ]] ; then
+    preview_cmd='claude_session preview'
+fi
+
 selected="$(print -r -- "${rows}" |
     fzf --delimiter=$'\t' --with-nth='3..' --no-multi --ansi \
         --prompt='Claude Code session> ' \
-        --preview 'brishzq.zsh h-claude-code-session-preview {2}' \
+        --preview "${preview_cmd} {2}" \
         --preview-window 'down,60%,wrap')" || exit 0
 
 fields=( "${(@ps:\t:)selected}" )

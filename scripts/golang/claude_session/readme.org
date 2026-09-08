@@ -1,8 +1,9 @@
 #+TITLE: claude_session
 
 Renders Claude Code session transcripts (=~/.claude/projects/**/*.jsonl=) into
-org-mode or markdown, and scans a directory of them for the fuzzy session
-picker. The zsh wrappers live in =zshlang/auto-load/others/claude-session.zsh=.
+org-mode or markdown, scans a directory of them for the fuzzy session picker,
+and writes the picker's preview pane. The zsh wrappers live in
+=zshlang/auto-load/others/claude-session.zsh=.
 
 Standard library only, so =go build= needs no network and no module cache. It
 works on a freshly bootstrapped, sudoless host.
@@ -63,12 +64,14 @@ only 19 of the 28 named sessions carry one. Where both exist they agree, on all
 19 --- and adding it changed no name anywhere in the local corpus.
 
 That precedence lives in one place, the =nameParts= accumulator in =list.go=,
-and is reached two ways. =name= reads the whole file forwards and feeds every
+and is reached three ways. =name= reads the whole file forwards and feeds every
 record to it. =list= feeds it the records its tail scan is already decoding for
-the timestamp, reading backwards. Both end in the same =resolve=, so the name in
-the picker's column and the name a viewer writes into a filename cannot drift
-apart. The direction only decides which occurrence to keep: the last one written
-is the last met reading forwards and the first met reading backwards, which is
+the timestamp, reading backwards. =preview= feeds it the records of its own tail
+window, forwards. All end in the same =resolve=, so the name in the picker's
+column, the headline in its preview pane and the name a viewer writes into a
+filename cannot drift apart. The direction only decides which occurrence to
+keep: the last one written is the last met reading forwards and the first met
+reading backwards, which is
 what the =keepFirst= flag of =observe= selects.
 
 The two differ in reach. =list= widens its tail window in search of a title only
@@ -87,6 +90,28 @@ session opens in emacs as =Neru.org= rather than a uuid:
 ,#+TITLE: Neru
 ,#+SUBTITLE: Claude Code session 3e500e15-2d94-44c6-bac4-4d6634c743f6
 #+end_example
+
+=claude_session preview [flags] <session.jsonl>= writes the fzf preview body for
+one session: what it is called, what it was running as, where, when it last
+moved, and what was last asked of it. Each row is omitted when the session has
+nothing to say for it: the name, bold, in its profile's colour; a gray subtitle
+of uuid, profile and Claude Code version; =last activity=, the newest timestamp
+in local time plus a relative age, =2026-09-08 17:55 (39s ago)=; =model=, the
+model that answered last with =claude-= stripped and the reasoning effort,
+=opus-5 · high effort=; =mode=, the permission mode and the interaction mode,
+=auto · normal=; =cwd=, with =$HOME= abbreviated to =~= and the git branch after
+an =@=; and the last prompt. A session with no name is headlined =Claude Code
+session <uuid>=. Only the tail of the file is read, so the cost does not depend
+on the transcript's size; the section on sessions live in a kitty window says
+why this is a subcommand at all.
+
+- =-bytes N= --- how much of the transcript's tail to read, in bytes. Default
+  409600. A title written earlier than that falls back to the slug, the same
+  trade =list= makes with =nameWindow=. 0 or less reads the whole file, which is
+  the escape hatch for a title further back than the window reaches.
+- =-color= --- emit ANSI colour. On by default; =-color=false= turns it off, and
+  so does a =NO_COLOR= variable in the environment, whatever its value, which is
+  the cross-tool convention.
 
 =claude_session list [flags] <sessions-dir>...= walks the directories for
 =.jsonl= files and writes one TSV line per session, newest first: =epoch=,
@@ -331,19 +356,19 @@ same idea, on a document that is already org.
 
 * Performance
 
-pandoc dominates the conversion --- on a 4.5MB session it was 89% of the
-runtime --- so =org-pandoc= splits the rendered markdown into byte-balanced
-chunks and runs one pandoc per chunk concurrently. The seams always fall on
-record boundaries, never inside a code block and never just after a heading, so
-every chunk is a self-contained markdown document; the result is byte-identical
-to converting the whole thing in one pandoc, which =TestPandocPathParity= checks
+pandoc dominates the conversion --- on a 4.5MB session it was 89% of the runtime
+--- so =org-pandoc= splits the rendered markdown into byte-balanced chunks and
+runs one pandoc per chunk concurrently. The seams always fall on record
+boundaries, never inside a code block and never just after a heading, so every
+chunk is a self-contained markdown document; the result is byte-identical to
+converting the whole thing in one pandoc, which =TestPandocPathParity= checks
 against the whole local corpus by comparing the path against itself run with
-=-jobs=1=. Its reference used to be =-format=md | pandoc=, which no longer
-works as one: the org-pandoc path tags its headings and rewrites their levels
-afterwards, and a bare pandoc pipeline can do neither. The test exists for the chunk seams, and
-still covers them. Documents below a few hundred KB use a single process,
-because pandoc's ~70ms startup would eat the gain. Records also render
-concurrently, since each is independent.
+=-jobs=1=. Its reference used to be =-format=md | pandoc=, which no longer works
+as one: the org-pandoc path tags its headings and rewrites their levels
+afterwards, and a bare pandoc pipeline can do neither. The test exists for the
+chunk seams, and still covers them. Documents below a few hundred KB use a
+single process, because pandoc's ~70ms startup would eat the gain. Records also
+render concurrently, since each is independent.
 
 The no-heading rule is the newer half, and the parity test failed on one
 transcript for a long time without it: the parallel output carried one blank
@@ -399,6 +424,15 @@ which is wrong in a way worth reading a whole file to avoid. The title search
 stops at =nameWindow= (1MiB): missing it only means falling back to the slug,
 and a session with no title anywhere would otherwise pull a 26MB transcript
 through the scan just to establish that.
+
+=preview= reads one tail window, 400KiB by default, and decodes it into a record
+as narrow as =list='s, so no message body is copied on the way. Through fzf's own
+dash it measures 15.4ms, of which 10.7ms is the binary's startup and 4.3ms the
+dash spawn --- so the scan itself is about 5ms, and it does not grow with the
+transcript: 26MB measures 16.1ms against 2MB's 15.4ms. That is what makes it
+usable as an fzf preview, which runs it on every cursor move. The zsh version it
+replaced took about 600ms a keystroke; the kitty-window section has the
+breakdown.
 
 * Why the session time is not the file mtime
 
@@ -461,12 +495,13 @@ long as it did.
 All of them pick through =h-claude-code-session-select-fz=, which shows the
 =list= columns from the local time onwards --- time, name, profile-labelled
 relative path, first-prompt snippet --- and previews the highlighted row with
-=h-claude-code-session-preview=, the same tail-scan body the live picker and the
-kitty overlay use (see the section on sessions live in a kitty window). It used
-to pass no =--preview= at all, so it fell back to =fz='s generic
-=FZF_SIMPLE_PREVIEW=, which just echoes the row back. There is no separate knob
-for turning the preview off: =claude_code_view_session_fz_fz_opts= is appended
-after the preview options, so a =--preview-window hidden= there wins.
+=claude_session preview=, which fzf execs directly; the live picker and the
+kitty overlay run the same binary the same way (see the section on sessions live
+in a kitty window). It used to pass no =--preview= at all, so it fell back to
+=fz='s generic =FZF_SIMPLE_PREVIEW=, which just echoes the row back. There is no
+separate knob for turning the preview off: =claude_code_view_session_fz_fz_opts=
+is appended after the preview options, so a =--preview-window hidden= there
+wins.
 
 Variables:
 
@@ -485,9 +520,13 @@ Variables:
 - =claude_code_view_session_fz_subagents_p= --- =y= to also list subagent
   transcripts in the picker.
 - =claude_code_session_preview_bytes= --- how much of the transcript's tail the
-  fzf preview scans, in bytes. Default 400000.
+  fzf preview scans, in bytes. Baked into the picker's =--preview= command as
+  =-bytes= when set; unset, the binary's own default of 409600 applies.
 - =claude_code_session_preview_color_p= --- =n= turns off the ANSI colour in the
-  preview. The callers still pass =--ansi=, which is harmless on plain text.
+  preview, baked in as =-color=false=. The callers still pass =--ansi=, which is
+  harmless on plain text. Both knobs are read when the picker starts rather than
+  per cursor move, since fzf spawns the preview itself and a zsh global cannot
+  reach a process it did not start.
 - =claude_code_session_max_block_lines= --- passed to =-max-block-lines=.
 - =claude_code_session_diff_p= --- =n= disables diff rendering for =Edit=.
 - =claude_code_session_subagents_p= --- =n= stops inlining subagent transcripts.
@@ -607,8 +646,9 @@ opens a picker over every live session as a kitty overlay in that same window,
 question, not a failure. It is an overlay running its own script because fzf
 needs a terminal and neither the background hotkey nor the garden's shells
 have one; the script runs fzf itself and goes through the garden for the rows,
-the preview and the final open. The tab's key travels into the overlay as
-=CLAUDE_VIEW_TAB_KEY=, so the choice comes back through
+the preview's command line and the final open. The preview itself is a binary
+fzf execs on every cursor move, with no garden hop. The tab's key travels into
+the overlay as =CLAUDE_VIEW_TAB_KEY=, so the choice comes back through
 =claude-code-view-session-bg= and gets the same band and cancel as a direct
 hit.
 
@@ -723,61 +763,84 @@ transcript — a per-row call would have made the picker's startup cost scale
 with however many sessions happen to be open. The fzf preview goes further
 still and skips =claude_session render= entirely: rendering a 46MB transcript
 takes about eight seconds, far too slow for a preview pane that has to feel
-instant. Instead =h-claude-code-session-preview= tail-scans the last few hundred
-KB (=claude_code_session_preview_bytes=, 400000 by default) for fields Claude
-Code already writes there in plain form, and shows, each row omitted when the
-session has nothing to say for it: the name, bold, in its profile's colour; a
-gray subtitle of uuid, profile and Claude Code version; =last activity=, the
-newest timestamp in local time plus a relative age, =2026-09-08 17:55 (39s
-ago)=; =model=, the model that answered last with =claude-= stripped and the
-reasoning effort, =opus-5 · high effort=; =mode=, the permission mode and the
-interaction mode, =auto · normal=; =cwd=, with =$HOME= abbreviated to =~= and
-the git branch after an =@=; and the last prompt. All of it comes out of one jq
-pass. Measured through the garden on a 26MB transcript it takes 127ms end to
-end, most of which is the brishz round trip rather than the scan.
+instant. Instead =claude_session preview=
+tail-scans the last few hundred KB for fields Claude Code already writes there
+in plain form --- the rows are listed under Commands --- and fzf execs the
+binary directly, with no shell in between.
+
+It was a zsh function first, and it cost about 600ms per cursor move, which is
+unusable in a pane that repaints on every keystroke. Measured, that was roughly
+380ms for the brish garden round trip (=brishzq.zsh true= alone measures
+350--400ms), paid every keystroke because fzf reached the function through the
+garden; about 122ms for colour, since the repository's =colorfg=, =Bold= and
+=resetcolor= gate on a tty through =isColor= and =isColorTty=, which call
+=h-color-p-override= inside a command substitution --- a fork per call, about 25
+calls at ~5ms each; and about 155ms for =tail -c= and =jq=, two more forks, plus
+a zsh loop over the several thousand tagged lines the jq pass emitted. In the
+binary the whole thing is 15.4ms, most of it process startup; the Performance
+section has the split. That is the criterion =PE/Zsh.org= sets for reaching for
+Go --- hot paths where repeated forking dominates --- and the same reasoning
+that moved =list= and =live= there. It also takes the =brishz-restart= gotcha
+out of the preview entirely: there is no zsh left in the hot path to go stale.
 
 The name is resolved from all four sources in the Go resolver's precedence ---
 =agent-name=, =custom-title=, =ai-title=, slug --- rather than from =ai-title=
 alone, as it once was. =claude-code-session-import= names a fork with
 =agent-name= and =custom-title= records, so the old scan showed a fork under its
-pre-fork title, in exactly the workflow the resume family exists for. Checked
-over all 123 local sessions, the preview's headline agrees with the
-authoritative =claude_session name= on every one.
+pre-fork title, in exactly the workflow the resume family exists for. The
+precedence used to be implemented twice, once as =nameParts= and once as a jq
+if/elif chain that had to be kept in step with it; now only =nameParts= exists,
+and it serves =name=, =list= and =preview= alike. Checked over all 125 local
+sessions, the preview's headline agrees with the authoritative =claude_session
+name= on every one.
 
-The jq expression is two groups, not one chain. The records that exist only to
-say one thing --- =agent-name=, =custom-title=, =ai-title=, =last-prompt=,
-=permission-mode=, =mode= --- are mutually exclusive and stay an if/elif chain.
-=slug=, =cwd=, =gitBranch=, =version=, =effort=, =timestamp= and the assistant's
-model ride on the ordinary message records, so a second group reads them from
-every record as well as whatever the first group matched, not instead of it. The
-old single chain had an ordering hazard this removes: its =.timestamp= branch
-had to come last or it swallowed the title records, which carry no timestamp of
-their own. The partial line a byte-tail starts on is dropped only when the tail
-really is a tail; on a transcript smaller than the window that =tail -n +2= was
-throwing away a whole genuine record, which for a session of one or two records
-was everything there was to read.
+One accuracy improvement fell out of the move. The jq version keyed each field
+on the record type that names it, so the permission mode came from
+=permission-mode= events alone. The Go version decodes a narrow record with no
+type field at all and takes each value from whichever record carries it, and for
+=permissionMode= that is not merely equivalent: Claude Code writes it on every
+ordinary =user= record as well as on its own =permission-mode= events --- 281 of
+the former across the local tails --- so the newest of the two is more current
+than the last change event. Everything else the preview shows already rode on
+the message records and is read the same way. The partial line a byte-tail
+starts on is dropped only when the tail really is a tail; on a transcript
+smaller than the window there is no partial line, and a session of one or two
+records would otherwise lose everything there was to read.
 
-The colour is keyed on the profile, from the =claude_code_session_profile_colors=
-table: =.claude= blue, =.claude-work= orange, and an unknown profile gets no
-colour rather than a wrong one. Which account a session belongs to is the thing
-worth seeing at a glance, since the whole point of =claude-code-session-resume=
-is that the two are otherwise interchangeable. It is deliberately not Claude
-Code's own =agent-color=: that record is written once, wherever in the session
-the name got settled, which is nowhere near either end of the file --- 210MB
-into a 398MB transcript in one measured case --- so a tail scan cannot reach it,
-and only 5 of 123 local sessions have one at all. The escapes come from the
-repository's own =colorfg=, =Bold= and =resetcolor=, which gate on a tty; the
-preview reaches its pane down a pipe from a non-interactive garden shell, so it
-sets =isColor_override= rather than emitting escapes by hand. Because the output
-carries ANSI, every caller passes fzf =--ansi=:
-=h-claude-code-session-select-fz=, =claude-code-session-live-fz= and the overlay
-front end =zshlang/wrappers/claude-code-session-pick.zsh=.
+The colour is keyed on the profile, from the =profileColors= table in
+=preview.go=: =.claude= blue, =.claude-work= orange, and an unknown profile gets
+no colour rather than a wrong one. Which account a session belongs to is the
+thing worth seeing at a glance, since the whole point of
+=claude-code-session-resume= is that the two are otherwise interchangeable. It
+is deliberately not Claude Code's own =agent-color=: that record is written
+once, wherever in the session the name got settled, which is nowhere near either
+end of the file --- 210MB into a 398MB transcript in one measured case --- so a
+tail scan cannot reach it, and only 5 of 125 local sessions have one at all.
 
-Two small helpers came with it. =h-claude-code-session-epoch-of= parses Claude
-Code's ISO-8601 UTC stamp with =strftime -r= under =TZ=UTC=, since strptime has
-no timezone field and that is how the trailing =Z= is honoured; it is its own
-function because =local -x= scopes to a function, not a block, and it uses
-=strftime= rather than =date= because GNU and BSD date disagree on parsing and
-this runs on both. =h-claude-code-session-age= prints a duration as its single
-largest unit --- =44s=, =6m=, =3h=, =2d= --- since what a preview answers is how
-stale the session is.
+The table lives in Go rather than zsh because it has to: fzf spawns the preview
+on its own, and a zsh global cannot reach a process it did not start. The zsh
+=claude_code_session_profile_colors= array is gone for that reason, as are the
+two helpers the shell version needed --- =time.Parse= reads the RFC3339 stamp
+with its offset, so the =TZ=UTC= trick =h-claude-code-session-epoch-of= existed
+for has nothing left to do, and =humanAge= replaces
+=h-claude-code-session-age=, printing the single largest unit (=44s=, =6m=,
+=3h=, =2d=) since what a preview answers is how stale the session is. The
+escapes are 24-bit SGR written directly, with bold and colour in one escape for
+the headline: nesting bold inside colour would end the bold at the inner reset
+and leave two resets saying one thing. Because the output carries ANSI, every
+caller passes fzf =--ansi=: =h-claude-code-session-select-fz=,
+=claude-code-session-live-fz= and the overlay front end
+=zshlang/wrappers/claude-code-session-pick.zsh=.
+
+The knobs still reach it, but from the other end.
+=claude_code_session_preview_bytes= and =claude_code_session_preview_color_p=
+are read once, when a picker builds its =--preview= command line, and baked into
+it as =-bytes= and =-color=false=. =h-claude-code-session-preview-cmd= does
+that, printing the shell-quoted command ready to have a field placeholder
+appended, so a picker writes =--preview "$(h-claude-code-session-preview-cmd)
+{2}"=. It resolves the binary's absolute path from =$commands=, so nothing
+depends on whatever =PATH= fzf happens to have.
+=h-claude-code-session-preview= survives as a thin wrapper over the same
+command, because the overlay picker reaches it by name through the garden and
+because it is the convenient way to see a session's preview by hand; the
+pickers themselves no longer go through it.
