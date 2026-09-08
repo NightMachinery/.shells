@@ -222,8 +222,9 @@ function h-claude-code-session-select-fz {
 
     h-claude-code-session-dep @RET
 
-    #: `epoch<TAB>path<TAB>local time<TAB>relative path<TAB>snippet`, newest
-    #: first. The time is the last message's, not the file's mtime; see
+    #: `epoch<TAB>path<TAB>local time<TAB>name<TAB>relative path<TAB>snippet`,
+    #: newest first. The time is the last message's, not the file's mtime, and
+    #: the name is empty for a session that has none; see
     #: =golang/claude_session/readme.org=.
     local list_args=()
     if bool "${claude_code_view_session_fz_subagents_p:-n}" ; then
@@ -237,8 +238,17 @@ function h-claude-code-session-select-fz {
     local lines
     lines="$(claude_session list "${list_args[@]}" "${sessions_dirs[@]}")" @RET
 
+    #: Through the garden, the established way to reach a zsh function from
+    #: fzf's own shell; see the note in [agfi:claude-code-session-live-fz], and
+    #: remember `brishz-restart' after editing the preview. `fz_opts' is
+    #: appended last, so an explicit `--preview-window hidden' there wins.
     local selected
-    selected="$(ec "${lines}" | fz --delimiter=$'\t' --with-nth='3..' --no-multi "${fz_opts[@]}")" @RET
+    selected="$(ec "${lines}" |
+        fz_no_preview=y fz \
+            --delimiter=$'\t' --with-nth='3..' --no-multi \
+            --preview 'brishzq.zsh h-claude-code-session-preview {2}' \
+            --preview-window 'down,60%,wrap' \
+            "${fz_opts[@]}")" @RET
     selected="${selected%%$'\n'*}"
 
     local session_file="${${selected#*$'\t'}%%$'\t'*}"
@@ -1231,12 +1241,16 @@ function h-claude-code-session-live-rows {
     #: per row: `list` does the whole corpus in ~45ms, while `claude_session
     #: name` alone costs ~230ms on a large transcript. Anything the join misses
     #: still gets a row, just a barer one.
+    #:
+    #: `list` carries a name of its own now, which is the same name by another
+    #: route -- read out of the transcript rather than asked of `claude agents`
+    #: -- so it stands in when the live listing has none.
     local meta
     meta="$(claude_session list "${projects_dirs[@]}")" || meta=''
 
     ec "${pairs}" |
         gawk -F'\t' -v OFS='\t' '
-            NR == FNR { when[$2] = $3 ; rel[$2] = $4 ; snip[$2] = $5 ; next }
+            NR == FNR { when[$2] = $3 ; nm[$2] = $4 ; rel[$2] = $5 ; snip[$2] = $6 ; next }
             {
                 path = $2
 
@@ -1247,7 +1261,8 @@ function h-claude-code-session-live-rows {
                 sub(/\/projects\/.*$/, "", profile)
                 sub(/^.*\//, "", profile)
 
-                label = ($1 == "-") ? $3 : ("w" $1 "  " $3)
+                name = ($3 == "-" && nm[path]) ? nm[path] : $3
+                label = ($1 == "-") ? name : ("w" $1 "  " name)
 
                 print $1, path, label, profile, \
                     (when[path] ? when[path] : "?"), \
@@ -1258,40 +1273,72 @@ function h-claude-code-session-live-rows {
 }
 
 function h-claude-code-session-preview {
-    #: The fzf preview body for [agfi:claude-code-session-live-fz]: what this
-    #: session is called, when it last moved, and what was last asked of it.
+    #: The fzf preview body for [agfi:h-claude-code-session-select-fz] and
+    #: [agfi:claude-code-session-live-fz]: what this session is called, when it
+    #: last moved, and what was last asked of it.
     #:
     #: A tail scan rather than `claude_session render`, because a preview has to
     #: be instant and rendering a 46MB transcript takes eight seconds. Claude
-    #: Code writes its own `ai-title` and `last-prompt` records, so the two
-    #: things worth previewing are already sitting there in plain form.
+    #: Code writes its own name and `last-prompt` records, so the two things
+    #: worth previewing are already sitting there in plain form.
     ##
     local transcript="${1}"
     assert-args transcript @RET
 
     local bytes="${claude_code_session_preview_bytes:-400000}"
 
-    #: `tail -n +2` drops the partial line a byte-tail necessarily starts on,
-    #: and `fromjson?` drops anything else that does not parse. The timestamp
-    #: branch comes last: the title and prompt records carry no timestamp, and
-    #: putting it first would swallow them.
+    #: A byte-tail necessarily starts on a partial line, so drop it -- but only
+    #: when the tail really is a tail. On a transcript smaller than the window
+    #: there is no partial line, and for a session of one or two records that
+    #: threw away the only thing there was to read.
+    #:
+    #: zstat, not `stat': the binary is BSD on this machine and GNU on others.
+    zmodload -F zsh/stat b:zstat 2>/dev/null
+    local -a size
+    zstat -A size +size -- "${transcript}" 2>/dev/null || size=( 0 )
+
+    local -a drop_partial
+    drop_partial=(command cat)
+    if (( size[1] > bytes )) ; then
+        drop_partial=(command tail -n +2)
+    fi
+
+    #: `objects' drops any fragment that survived `fromjson?' as a scalar: a
+    #: bare number would make the `.type' test below a fatal type error, and
+    #: jq's non-zero exit would then discard the whole scan. The `.slug' and
+    #: `.timestamp' branches come last, and in that order: a slug rides on the
+    #: same message records that carry a timestamp, while the name and prompt
+    #: records carry neither, so putting either first would swallow them.
     local tagged
     tagged="$(command tail -c "${bytes}" "${transcript}" 2>/dev/null |
-        command tail -n +2 |
-        jq -Rr 'fromjson?
-            | if   .type == "ai-title"    then "T\t" + (.aiTitle    | tostring)
-              elif .type == "last-prompt" then "P\t" + (.lastPrompt | tostring)
-              elif .timestamp             then "S\t" + (.timestamp  | tostring)
+        "${drop_partial[@]}" |
+        jq -Rr 'fromjson? | objects
+            | if   .type == "agent-name"   then "N\t" + (.agentName   | tostring)
+              elif .type == "custom-title" then "C\t" + (.customTitle | tostring)
+              elif .type == "ai-title"     then "T\t" + (.aiTitle     | tostring)
+              elif .type == "last-prompt"  then "P\t" + (.lastPrompt  | tostring)
+              elif .slug                   then "G\t" + (.slug        | tostring)
+              elif .timestamp              then "S\t" + (.timestamp   | tostring)
               else empty end' 2>/dev/null)" || tagged=''
 
-    #: `cut -f2-` drops the tag the scan above put on, and keeps a value that
-    #: itself contains tabs intact.
-    local title prompt stamp
-    title="$(ec "${tagged}"  | command grep $'^T\t' | command tail -n 1 | command cut -f2-)"
-    prompt="$(ec "${tagged}" | command grep $'^P\t' | command tail -n 1 | command cut -f2-)"
-    stamp="$(ec "${tagged}"  | command grep $'^S\t' | command tail -n 1 | command cut -f2-)"
+    #: The tags arrive in file order, so one pass keeps the last of each -- the
+    #: rule `claude_session name' uses for a name that was revised mid-session.
+    #: Splitting on the first tab only, so a value containing tabs survives.
+    local -A last_of
+    local line
+    for line in "${(@f)tagged}" ; do
+        test -n "${line}" || continue
+        last_of[${line%%$'\t'*}]="${line#*$'\t'}"
+    done
 
-    ec "${title:-Claude Code session ${transcript:t:r}}"
+    #: The same precedence as [agfi:h-claude-code-session-name], which reads the
+    #: whole file: the name Claude Code resolved, else the title the user set,
+    #: else the one it generated, else the slug.
+    local name="${last_of[N]:-${last_of[C]:-${last_of[T]:-${last_of[G]}}}}"
+    local prompt="${last_of[P]}"
+    local stamp="${last_of[S]}"
+
+    ec "${name:-Claude Code session ${transcript:t:r}}"
     ec
     ec "session:  ${transcript:t:r}"
     ec "modified: ${stamp:-unknown}"

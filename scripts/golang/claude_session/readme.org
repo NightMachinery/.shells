@@ -62,6 +62,24 @@ without changing this code. It cannot replace the explicit precedence, though:
 only 19 of the 28 named sessions carry one. Where both exist they agree, on all
 19 --- and adding it changed no name anywhere in the local corpus.
 
+That precedence lives in one place, the =nameParts= accumulator in =list.go=,
+and is reached two ways. =name= reads the whole file forwards and feeds every
+record to it. =list= feeds it the records its tail scan is already decoding for
+the timestamp, reading backwards. Both end in the same =resolve=, so the name in
+the picker's column and the name a viewer writes into a filename cannot drift
+apart. The direction only decides which occurrence to keep: the last one written
+is the last met reading forwards and the first met reading backwards, which is
+what the =keepFirst= flag of =observe= selects.
+
+The two differ in reach. =list= widens its tail window in search of a title only
+up to =nameWindow=, one MiB (the Performance section says why); the slug does not
+count as having found one, since it rides on nearly every message record and so
+proves nothing about how far back the scan has looked. A title written more than
+a megabyte before the end of the transcript is therefore beyond the column,
+which shows the slug instead. Measured over all 119 local sessions across both
+profile roots, including the 26MB ones, the column and the full =name= scan agree
+on every single one. The cap is a theoretical limit here, not an observed one.
+
 The org header uses it, and so does the filename the viewers write, so a
 session opens in emacs as =Neru.org= rather than a uuid:
 
@@ -72,8 +90,15 @@ session opens in emacs as =Neru.org= rather than a uuid:
 
 =claude_session list [flags] <sessions-dir>...= walks the directories for
 =.jsonl= files and writes one TSV line per session, newest first: =epoch=,
-absolute path, local time, path relative to the scanned directory, and the
-first user message as a snippet.
+absolute path, local time, the session's name, path relative to the scanned
+directory, and the first user message as a snippet.
+
+The name sits before the relative path on purpose. The relative path runs to
+about fifty characters (=.claude-work/-Users-evar-scripts/87e1476d-….jsonl=),
+which would push a name placed after it off the right edge of an ordinary
+terminal, and seeing the name without scrolling is the whole point of the
+column. A session with no name leaves the field empty; its uuid is in the
+relative path either way.
 
 More than one directory may be given, and they are merged and sorted together
 rather than listed one after another. Claude Code keeps a projects directory
@@ -89,6 +114,7 @@ for both and the parent is =projects= for both. A single root is listed exactly
 as before, with no label.
 
 - =-snippet-len N= --- snippet width cap, default 120.
+- =-name-len N= --- name width cap, default 40.
 - =-subagents= --- also list subagent transcripts. Off by default: =render=
   inlines them into their parent, and they were a third of the list.
 - =-jobs N= --- worker count.
@@ -329,11 +355,31 @@ whatever pandoc does next release, and that is a bad trade for CPU on a
 conversion that runs once per session view.
 
 =list= reads only the two ends of each file: forward from the start until the
-first user message, and backwards from the end over the last 25 timestamped
-messages. Both windows widen if they come up empty. That keeps the picker's
-cost proportional to the number of sessions rather than to total transcript
-volume --- across 52 sessions and 48MB it reads well under 1% of the bytes and
-runs in about 30ms, matching a full scan exactly on every session.
+first user message, and backwards from the end over a 64KiB tail window. Both
+windows widen if they come up empty. That keeps the picker's cost proportional
+to the number of sessions rather than to total transcript volume --- across 52
+sessions and 48MB it reads well under 1% of the bytes and runs in about 30ms,
+matching a full scan exactly on every session.
+
+The name column costs =list= nothing. The backwards walk already decodes every
+line in its window, so noticing the =slug=, =aiTitle=, =customTitle= and
+=agentName= fields on the records it passes is free. =scanTail= returns both the
+newest timestamp and the name parts from the one buffer, decoding into a narrow
+=tailRecord= that carries the type, the timestamp and those four fields and
+nothing else, so no message body is copied on the way. Measured over the real
+corpus --- 119 sessions across both profile roots, warm cache --- the walk took
+0.03s before the column and 0.03s after.
+
+What did change is how far the walk goes and when it stops widening. The
+timestamp is settled after =tailRecords= (25) messages, since records are
+written in order and the newest is always among the first few met; the name
+search wants the rest of the window, so the walk now carries on past that point
+and only skips the timestamp work. The two searches also widen differently. The
+timestamp search is unbounded: missing it means dating the session by mtime,
+which is wrong in a way worth reading a whole file to avoid. The title search
+stops at =nameWindow= (1MiB): missing it only means falling back to the slug,
+and a session with no title anywhere would otherwise pull a 26MB transcript
+through the scan just to establish that.
 
 * Why the session time is not the file mtime
 
@@ -378,6 +424,16 @@ than mistaking =* Subagents= for something a message wrote.
 
 Each viewer has a =-all-fz= variant that selects from every project's sessions
 instead of the current directory's.
+
+Every picker goes through =h-claude-code-session-select-fz=, which shows the
+=list= columns from the local time onwards --- time, name, profile-labelled
+relative path, first-prompt snippet --- and previews the highlighted row with
+=h-claude-code-session-preview=, the same tail-scan body the live picker and the
+kitty overlay use (see the section on sessions live in a kitty window). It used
+to pass no =--preview= at all, so it fell back to =fz='s generic
+=FZF_SIMPLE_PREVIEW=, which just echoes the row back. There is no separate knob
+for turning the preview off: =claude_code_view_session_fz_fz_opts= is appended
+after the preview options, so a =--preview-window hidden= there wins.
 
 Variables:
 
@@ -626,6 +682,19 @@ transcript — a per-row call would have made the picker's startup cost scale
 with however many sessions happen to be open. The fzf preview goes further
 still and skips =claude_session render= entirely: rendering a 46MB transcript
 takes about eight seconds, far too slow for a preview pane that has to feel
-instant. Instead it tail-scans the last few hundred KB of the transcript for
-the =ai-title= and =last-prompt= records Claude Code already writes there,
+instant. Instead it tail-scans the last few hundred KB of the transcript for the
+name records and the =last-prompt= record Claude Code already writes there,
 which costs about 17ms.
+
+The name is resolved from all four sources in the Go resolver's precedence ---
+=agent-name=, =custom-title=, =ai-title=, slug --- rather than from =ai-title=
+alone, as it once was. =claude-code-session-import= names a fork with
+=agent-name= and =custom-title= records, so the old scan showed a fork under its
+pre-fork title, in exactly the workflow the resume family exists for. In the jq
+expression the =.slug= and =.timestamp= branches come last and in that order: a
+slug rides on the same message records that carry a timestamp, while the title
+records carry neither, so putting either branch earlier would swallow the
+titles. The partial line a byte-tail starts on is dropped only when the tail
+really is a tail; on a transcript smaller than the window that =tail -n +2= was
+throwing away a whole genuine record, which for a session of one or two records
+was everything there was to read.
