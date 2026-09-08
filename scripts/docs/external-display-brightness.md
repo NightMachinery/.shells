@@ -228,20 +228,32 @@ F1 also locks the keyboard. A black screen on its own is not a safe one: the
 focused window still has focus, so a brushed key types into it unseen, and the
 hardware brightness keys undo the blackout from the inside. So while the screen
 is black, `hammerspoon/core/blackout-lock.lua` swallows every key, and by default
-every click and scroll, with two exceptions — the hyper key itself and
-hyper+shift+F2, so the way out is exactly the way out it was. The knobs
-(`blackoutLockEnabled`, `blackoutLockMouse`), the shell interface and the limits
-are in `hammerspoon/docs/hammerspoon.md` under "Blackout keyboard lock". The one
-worth repeating here is Secure Input: a password field or the login screen hides
-keystrokes from event taps, so the lock cannot block typing there.
+every click and scroll, with two exceptions — the hyper key itself and F2 with
+shift under hyper, so the way out is exactly the way out it was. The knobs
+(`blackoutLockEnabled`, `blackoutLockMouse`, `blackoutLockScreenAfterSeconds`),
+the shell interface and the limits are in `hammerspoon/docs/hammerspoon.md`
+under "Blackout keyboard lock". The one worth repeating here is Secure Input: a
+password field or the login screen hides keystrokes from event taps, so the lock
+cannot block typing there.
+
+A blackout that has been up for more than an hour is one nobody is watching, so
+F2 then locks the macOS session before it restores the display — whoever ends
+it meets the login screen, not the desktop. hyper+shift+cmd+F2 does the same
+regardless of age, for when you want the lock now. Both go through
+`blackoutRestore` in Hammerspoon; a bare `display-black-off` or
+`brightness-on-all-loop` from a shell restores the display without locking the
+session, because a shell restore is the owner acting from ssh, not a hand at the
+keyboard.
 
 The lock can never outlive the black. `display-black-off` calls `blackoutLockOff`
 over `hammerspoon -c` immediately after its unconditional gamma restore, and it
 is the single point every unblack path reaches — F2, `h-hook-wake`, `h-hook-unlock`
 from the Swift lock-watcher, or the function run bare from another machine. The
-wake watcher releases it independently as well, and it expires on its own after
-twelve hours as a last resort. Whichever way the screen comes back, the keyboard
-comes back with it.
+wake watcher releases it independently as well, and after twelve hours it ends
+on its own as a last resort — locking the session first, then restoring, so the
+worst case is a login screen and never a live keyboard on an unlocked desktop
+behind a black screen. Whichever way the screen comes back, the keyboard comes
+back with it.
 
 ### If a screen is ever left black
 
