@@ -188,7 +188,7 @@ appHotkey{ key=';', appName='chat.delta.desktop.electron' }
 
 -- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 -- appHotkey{ key='c', appName='com.apple.Terminal' }
--- appHotkey{ key='c', appName='com.openai.codex' }
+-- appHotkey{ key='b', appName='com.openai.codex' }
 appHotkey{ key='c', appName='com.apple.iCal' }
 -- appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor VSCode App
 
