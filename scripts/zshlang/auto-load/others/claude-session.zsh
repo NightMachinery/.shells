@@ -75,6 +75,13 @@ function h-claude-code-session-render {
     local render_args=("-format=${format}")
     local max_lines="${claude_code_session_max_block_lines:-0}"
     render_args+=("-max-block-lines=${max_lines}")
+    #: Unset leaves the renderer's own default, the CPU count. Set by
+    #: [agfi:h-claude-code-view-convert], which has more than one conversion to
+    #: think about; see [agfi:h-claude-code-view-jobs-share].
+    local jobs="${claude_code_session_render_jobs}"
+    if test -n "${jobs}" ; then
+        render_args+=("-jobs=${jobs}")
+    fi
     if bool "${claude_code_session_diff_p:-y}" ; then
         render_args+=(-diff)
     else
@@ -985,6 +992,115 @@ function h-claude-code-view-transcript-key {
     ec "${key}"
 }
 
+#: The prefix every conversion's tmux session and hs-alert band share. Its own
+#: variable because [agfi:claude-code-view-sessions] scans for it and
+#: [agfi:h-claude-code-view-name-of] builds from it.
+typeset -g claude_code_view_session_prefix='claude-view-'
+
+function claude-code-view-sessions {
+    #: Every conversion job's tmux session, one per line, alive or a finished
+    #: leftover.
+    #:
+    #: A prefix scan, the way [agfi:caffeinate-holders] does it, rather than
+    #: regenerating a list of known names the way
+    #: [agfi:claude-code-usage-notif-sessions] can: the hotkey's keys are
+    #: bounded by the number of kitty windows, but a picker's are one per
+    #: transcript, so there is no finite set of names to reconstruct.
+    ##
+    local out
+    out="$(tmux list-sessions -F '#{session_name}' 2>/dev/null)" || return 0
+
+    local line
+    for line in "${(@f)out}" ; do
+        if [[ "${line}" == "${claude_code_view_session_prefix}"* ]] ; then
+            ec "${line}"
+        fi
+    done
+}
+
+function claude-code-view-reap {
+    #: Removes the tmux sessions of conversions that have already finished, and
+    #: their temp directories with them.
+    #:
+    #: They accumulate because =remain-on-exit= is on, so a finished job leaves
+    #: its session behind. Elsewhere that is the point --- it is how "did my
+    #: notifier already fire?" is answered --- but a conversion has a band and a
+    #: buffer to show for itself, and under a picker's per-transcript keys it is
+    #: one dead session for every transcript ever opened rather than one per
+    #: kitty window.
+    #:
+    #: [agfi:h-claude-code-view-launch] calls this, so the thing that creates
+    #: them clears them and nothing has to be scheduled. Safe to run by hand.
+    ##
+    local s reaped=0 tmp
+    for s in ${(@f)"$(claude-code-view-sessions)"} ; do
+        test -n "${s}" || continue
+        #: Alive means a pane that is not dead; `has-session' alone cannot tell,
+        #: which is the whole reason [agfi:tmux-alive-p] exists.
+        if tmux-alive-p "${s}" ; then
+            continue
+        fi
+
+        #: Read before the kill: killing the session discards its options.
+        tmp="$(tmux show-options -qv -t "${s}" '@ccv_tmp' 2>/dev/null)" || tmp=''
+        h-claude-code-view-rm-tmp "${tmp}"
+        silent tmux kill-session -t "=${s}" || true
+        reaped=$(( reaped + 1 ))
+    done
+
+    if (( reaped )) ; then
+        ecgray "$0: reaped ${reaped} finished conversion(s)"
+    fi
+    return 0
+}
+
+function h-claude-code-view-jobs-share {
+    #: How many workers one conversion should ask the renderer for: this
+    #: machine's share of it, divided by the number of conversions running.
+    #:
+    #: `-jobs' defaults to the CPU count and `pandocChunks' spawns that many
+    #: pandocs, which was fine while the hotkey allowed one conversion per kitty
+    #: window. A picker keys them per transcript and stays open to invite
+    #: pressing again, so alt+enter down a list of ten used to mean ten times
+    #: the CPU count in pandoc processes. Dividing keeps the total at roughly
+    #: one machine's worth however many are started, and refuses nothing.
+    #:
+    #: Counted here rather than at launch, and that is what makes it safe
+    #: without a lock: `tmuxnewsh2' creates the session before the body runs, so
+    #: a conversion always counts itself. Two starting at once therefore both
+    #: see two and both take half --- which is the right answer, not a race. A
+    #: redis token would need releasing, and the main verb here is cancel, which
+    #: SIGKILLs the job; liveness is a property of the process, so this
+    #: self-heals where a record would drift.
+    #:
+    #: Conversions already running keep the larger share they were given. Their
+    #: chunks are short-lived, so the overshoot drains rather than persisting.
+    ##
+    local cpus="${claude_code_session_render_jobs_max}"
+    if test -z "${cpus}" ; then
+        cpus="$(getconf _NPROCESSORS_ONLN 2>/dev/null)" || cpus=''
+    fi
+    #: A machine that will not say gets the renderer's own default.
+    if [[ "${cpus}" != <-> ]] || (( cpus < 1 )) ; then
+        return 1
+    fi
+
+    local s live=0
+    for s in ${(@f)"$(claude-code-view-sessions)"} ; do
+        test -n "${s}" || continue
+        if tmux-alive-p "${s}" ; then
+            live=$(( live + 1 ))
+        fi
+    done
+    #: Nothing alive means we are not running under a job at all, so speak for
+    #: one conversion rather than dividing by zero.
+    (( live < 1 )) && live=1
+
+    local share=$(( cpus / live ))
+    (( share < 1 )) && share=1
+    ec "${share}"
+}
+
 function h-claude-code-view-name-of {
     #: The tmux session, and the alert id, that a conversion runs under:
     #: `claude-view-<key>'. One name for both, so what `tmux ls' shows and what
@@ -1000,7 +1116,7 @@ function h-claude-code-view-name-of {
     local key="${1}"
     assert-args key @RET
 
-    ec "claude-view-${key}"
+    ec "${claude_code_view_session_prefix}${key}"
 }
 
 function h-claude-code-view-banner {
@@ -1057,6 +1173,10 @@ function h-claude-code-view-launch {
 
     local name
     name="$(h-claude-code-view-name-of "${key}")" @RET
+
+    #: Finished jobs first, so their sessions and temp directories do not
+    #: outlive their usefulness; see [agfi:claude-code-view-reap].
+    silent claude-code-view-reap || true
 
     #: `tmuxnew' inside `tmuxnewsh2' replaces any session of this name, and that
     #: discards its options -- so the predecessor's temp directory has to be
@@ -1167,6 +1287,10 @@ function h-claude-code-view-convert {
     if test -e "${out_file}" ; then
         out_file="${tmp_dir}/${title}-${${transcript:t:r}[1,8]}.org"
     fi
+
+    #: `local' is dynamically scoped, so the renderer several calls down sees
+    #: this without anything being exported. An explicit setting wins.
+    local claude_code_session_render_jobs="${claude_code_session_render_jobs:-$(h-claude-code-view-jobs-share)}"
 
     if ! h-claude-code-session-to-org "${transcript}" "${out_file}" ; then
         h-claude-code-view-fail "${name}" "${tmp_dir}" "conversion failed: ${title}"
