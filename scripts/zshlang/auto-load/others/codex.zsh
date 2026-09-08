@@ -86,19 +86,40 @@ function codex-yolo {
     codex_security_opts=(--dangerously-bypass-approvals-and-sandbox) codex-m "$@"
 }
 ##
-function codex-install {
-    if false ; then
-        # pnpm i -g
-        NODE_OPTIONS="--max-old-space-size=4096" pnpm install -g @openai/codex@latest --include=optional --loglevel=silly
+function h-codex-install-pre {
+    h-npm-install-clean-staging '@openai/codex' @RET
 
-    else
-        if isDeus ; then
-            #: I don't know what causes the bug that this directory needs to be removed.
-            trs '/opt/homebrew/lib/node_modules/@openai/codex'
-        fi
-
-        reval-ecgray npm-install '@openai/codex'
+    if isDeus ; then
+        #: Not just the staging leftovers: throw away the install itself and
+        #: let it be rebuilt from scratch.
+        trs "$(h-npm-global-dir '@openai/codex')"
     fi
+}
+
+function codex-install-npm {
+    h-codex-install-pre @RET
+
+    reval-ecgray npm-install-npm '@openai/codex' @RET
+    h-npm-install-report codex
+}
+
+function codex-install-pnpm {
+    #: Currently broken. codex's darwin-arm64 payload unpacks to ~288MB, and
+    #: its tarball is over the size where pnpm's worker-thread integrity check
+    #: aborts the process; see [agfi:npm-install] for the mechanism. Kept so
+    #: the pnpm route stays one word away once pnpm or node fixes it.
+    ##
+    h-codex-install-pre @RET
+
+    reval-ecgray npm-install-pnpm '@openai/codex' @RET
+    h-npm-install-report codex
+}
+
+function codex-install {
+    #: npm for now, because pnpm cannot install codex at all; see
+    #: [agfi:codex-install-pnpm].
+    ##
+    codex-install-npm "$@"
 }
 ##
 function codex-clean-text {
