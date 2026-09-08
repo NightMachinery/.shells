@@ -70,6 +70,10 @@ local hammerspoonCoreFiles = {
     "core/audio-watcher.lua",
     "core/power-watcher.lua",
     "core/hyper-mode.lua",
+    -- After core/hyper-mode.lua and alert/: it reads hyper_modality.entered_p
+    -- and alerts through alert_gateway. Before core/window-media-bindings.lua,
+    -- which calls it from the hyper+shift+F1/F2 handlers.
+    "core/blackout-lock.lua",
     "purple-mode.lua",
     "core/mouse.lua",
     "core/input-language.lua",

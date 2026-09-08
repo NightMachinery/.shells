@@ -75,17 +75,26 @@ bindWithRepeatV2{
 -- restores gamma and brightness on wake, on a display reconfiguration, and
 -- whenever a DDC write is lost. F1 starts a background loop that re-asserts it
 -- every few seconds; F2 stops that loop and restores the levels.
+--
+-- F1 also locks the keyboard and mouse for the life of the blackout (see
+-- core/blackout-lock.lua), unless blackoutLockEnabled is false. The lock lets
+-- exactly this F2 chord through, and F2 releases it here synchronously rather
+-- than waiting for display-black-off to do it through the garden.
 hyper_bind_v2{
     mods={"shift"},
     key="F1",
     pressedfn=function()
         brishz_eval_hs('awaysh-fast brightness-off-all-loop')
+        if blackoutLockEnabled and blackoutLockOn then
+            blackoutLockOn()
+        end
     end,
 }
 hyper_bind_v2{
     mods={"shift"},
     key="F2",
     pressedfn=function()
+        if blackoutLockOff then blackoutLockOff() end
         brishz_eval_hs('awaysh-fast brightness-on-all-loop')
     end,
 }
