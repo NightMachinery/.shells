@@ -265,15 +265,21 @@ of the `claude` wrapper.
 
 The picker is `h-claude-code-session-select-fz`, the one the viewers use. Each
 row shows the session's last-message time, its name, its profile-labelled path
-and the first prompt; the preview pane shows the highlighted session's name,
-last-message time and last prompt, read from the tail of the transcript rather
-than rendered, so it appears at once even for a 26 MB file. The name is what
-makes choosing among a project's sessions workable — several routinely share a
-directory and differ in nothing else visible. It is resolved the way
-`claude_session name` resolves it, `agent-name` over `custom-title` over
-`ai-title` over the slug, so a fork made by `claude-code-session-import` shows
-under its ` ⑂ <profile>` name rather than the title it had before the fork.
-The preview used to read `ai-title` alone and got exactly that case wrong.
+and the first prompt. The preview pane shows the highlighted session's name,
+coloured by profile (`.claude` blue, `.claude-work` orange), its uuid, profile
+and Claude Code version, when it was last active and how long ago, the model
+and effort that answered last, its permission and interaction modes, its
+working directory and branch, and the last prompt. All of it is read from the
+tail of the transcript rather than rendered, so it appears at once even for a
+26 MB file. The colour is there because a work session and a personal one look
+identical otherwise, and telling them apart is exactly what you want when the
+two are interchangeable. The name is what makes choosing among a project's
+sessions workable — several routinely share a directory and differ in nothing
+else visible. It is resolved the way `claude_session name` resolves it,
+`agent-name` over `custom-title` over `ai-title` over the slug, so a fork made
+by `claude-code-session-import` shows under its ` ⑂ <profile>` name rather than
+the title it had before the fork. The preview used to read `ai-title` alone
+and got exactly that case wrong.
 
 When the target differs from the owner, `claude-code-session-import` forks
 the session there under a **new** uuid: it copies the transcript, the

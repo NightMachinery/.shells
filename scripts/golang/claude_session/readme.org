@@ -484,6 +484,10 @@ Variables:
 - =claude_code_view_session_fz_fz_opts= --- extra options for =fz=.
 - =claude_code_view_session_fz_subagents_p= --- =y= to also list subagent
   transcripts in the picker.
+- =claude_code_session_preview_bytes= --- how much of the transcript's tail the
+  fzf preview scans, in bytes. Default 400000.
+- =claude_code_session_preview_color_p= --- =n= turns off the ANSI colour in the
+  preview. The callers still pass =--ansi=, which is harmless on plain text.
 - =claude_code_session_max_block_lines= --- passed to =-max-block-lines=.
 - =claude_code_session_diff_p= --- =n= disables diff rendering for =Edit=.
 - =claude_code_session_subagents_p= --- =n= stops inlining subagent transcripts.
@@ -719,19 +723,61 @@ transcript — a per-row call would have made the picker's startup cost scale
 with however many sessions happen to be open. The fzf preview goes further
 still and skips =claude_session render= entirely: rendering a 46MB transcript
 takes about eight seconds, far too slow for a preview pane that has to feel
-instant. Instead it tail-scans the last few hundred KB of the transcript for the
-name records and the =last-prompt= record Claude Code already writes there,
-which costs about 17ms.
+instant. Instead =h-claude-code-session-preview= tail-scans the last few hundred
+KB (=claude_code_session_preview_bytes=, 400000 by default) for fields Claude
+Code already writes there in plain form, and shows, each row omitted when the
+session has nothing to say for it: the name, bold, in its profile's colour; a
+gray subtitle of uuid, profile and Claude Code version; =last activity=, the
+newest timestamp in local time plus a relative age, =2026-09-08 17:55 (39s
+ago)=; =model=, the model that answered last with =claude-= stripped and the
+reasoning effort, =opus-5 · high effort=; =mode=, the permission mode and the
+interaction mode, =auto · normal=; =cwd=, with =$HOME= abbreviated to =~= and
+the git branch after an =@=; and the last prompt. All of it comes out of one jq
+pass. Measured through the garden on a 26MB transcript it takes 127ms end to
+end, most of which is the brishz round trip rather than the scan.
 
 The name is resolved from all four sources in the Go resolver's precedence ---
 =agent-name=, =custom-title=, =ai-title=, slug --- rather than from =ai-title=
 alone, as it once was. =claude-code-session-import= names a fork with
 =agent-name= and =custom-title= records, so the old scan showed a fork under its
-pre-fork title, in exactly the workflow the resume family exists for. In the jq
-expression the =.slug= and =.timestamp= branches come last and in that order: a
-slug rides on the same message records that carry a timestamp, while the title
-records carry neither, so putting either branch earlier would swallow the
-titles. The partial line a byte-tail starts on is dropped only when the tail
+pre-fork title, in exactly the workflow the resume family exists for. Checked
+over all 123 local sessions, the preview's headline agrees with the
+authoritative =claude_session name= on every one.
+
+The jq expression is two groups, not one chain. The records that exist only to
+say one thing --- =agent-name=, =custom-title=, =ai-title=, =last-prompt=,
+=permission-mode=, =mode= --- are mutually exclusive and stay an if/elif chain.
+=slug=, =cwd=, =gitBranch=, =version=, =effort=, =timestamp= and the assistant's
+model ride on the ordinary message records, so a second group reads them from
+every record as well as whatever the first group matched, not instead of it. The
+old single chain had an ordering hazard this removes: its =.timestamp= branch
+had to come last or it swallowed the title records, which carry no timestamp of
+their own. The partial line a byte-tail starts on is dropped only when the tail
 really is a tail; on a transcript smaller than the window that =tail -n +2= was
 throwing away a whole genuine record, which for a session of one or two records
 was everything there was to read.
+
+The colour is keyed on the profile, from the =claude_code_session_profile_colors=
+table: =.claude= blue, =.claude-work= orange, and an unknown profile gets no
+colour rather than a wrong one. Which account a session belongs to is the thing
+worth seeing at a glance, since the whole point of =claude-code-session-resume=
+is that the two are otherwise interchangeable. It is deliberately not Claude
+Code's own =agent-color=: that record is written once, wherever in the session
+the name got settled, which is nowhere near either end of the file --- 210MB
+into a 398MB transcript in one measured case --- so a tail scan cannot reach it,
+and only 5 of 123 local sessions have one at all. The escapes come from the
+repository's own =colorfg=, =Bold= and =resetcolor=, which gate on a tty; the
+preview reaches its pane down a pipe from a non-interactive garden shell, so it
+sets =isColor_override= rather than emitting escapes by hand. Because the output
+carries ANSI, every caller passes fzf =--ansi=:
+=h-claude-code-session-select-fz=, =claude-code-session-live-fz= and the overlay
+front end =zshlang/wrappers/claude-code-session-pick.zsh=.
+
+Two small helpers came with it. =h-claude-code-session-epoch-of= parses Claude
+Code's ISO-8601 UTC stamp with =strftime -r= under =TZ=UTC=, since strptime has
+no timezone field and that is how the trailing =Z= is honoured; it is its own
+function because =local -x= scopes to a function, not a block, and it uses
+=strftime= rather than =date= because GNU and BSD date disagree on parsing and
+this runs on both. =h-claude-code-session-age= prints a duration as its single
+largest unit --- =44s=, =6m=, =3h=, =2d= --- since what a preview answers is how
+stale the session is.

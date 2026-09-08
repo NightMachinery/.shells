@@ -31,7 +31,7 @@ if ! rows="$("${brishzq}" h-claude-code-session-pick-rows)" || [[ -z "${rows}" ]
 fi
 
 selected="$(print -r -- "${rows}" |
-    fzf --delimiter=$'\t' --with-nth='3..' --no-multi \
+    fzf --delimiter=$'\t' --with-nth='3..' --no-multi --ansi \
         --prompt='Claude Code session> ' \
         --preview 'brishzq.zsh h-claude-code-session-preview {2}' \
         --preview-window 'down,60%,wrap')" || exit 0
