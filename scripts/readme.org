@@ -76,6 +76,13 @@ Under tmux the colors are re-encoded through the attached client's terminfo, so 
 Termux client reporting =xterm-kitty= received a spelling it cannot parse and
 printed the escapes as text. Cause and fix: =./docs/tmux-termux-truecolor.md=.
 
+* Terminal titles
+
+[agfi:tty-title] labels a kitty tab with what it is running. Inside tmux it
+reached only the pane title: =set-titles= is off by default, so tmux never
+forwarded it to the attached client. Cause and fix, along with a command
+injection found in the same function: =./docs/tmux-tty-title.md=.
+
 * UNIX sockets
 
 kitty's remote control, the Emacs server and the iTerm focus helper all bind a
