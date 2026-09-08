@@ -159,6 +159,19 @@ function wifi-ssid-list-known {
                   }'
 }
 
+function h-wifi-password-security {
+    #: Usage: h-wifi-password-security <SSID> <keychain> [runner ...]
+    #:
+    #: The one place the keychain query is spelled out, so the plain attempt and
+    #: the root retry cannot drift apart. `runner' is an optional command
+    #: prefix, i.e. `sudo'.
+    ##
+    local ssid="${1}" keychain="${2}"
+    local runner=("${@[3,-1]}")
+
+    "${runner[@]}" security find-generic-password -D 'AirPort network password' -a "${ssid}" -w "${keychain}"
+}
+
 function wifi-password-get-darwin {
     #: Usage: wifi-password-get <SSID>
     #:
@@ -170,6 +183,7 @@ function wifi-password-get-darwin {
     assert-args ssid @RET
 
     local keychain="${wifi_password_get_keychain:-/Library/Keychains/System.keychain}"
+    local sudo_fallback_p="${wifi_password_get_sudo_fallback_p:-y}"
 
     #: -D selects the item *kind*, and the System keychain has to be named
     #: explicitly because it is not on the default search list. Without both,
@@ -182,7 +196,25 @@ function wifi-password-get-darwin {
     #: security's own stderr is deliberately not redirected, so its message
     #: reaches the user alongside ours.
     local password retcode=0
-    password="$(security find-generic-password -D 'AirPort network password' -a "${ssid}" -w "${keychain}")" || retcode=$?
+    password="$(h-wifi-password-security "${ssid}" "${keychain}")" || retcode=$?
+
+    #: `security' exits with the low byte of the OSStatus, which is where these
+    #: otherwise baffling numbers come from: errSecItemNotFound is -25300 =
+    #: 0xFFFF9D2C, and 0x2C is 44; errSecInteractionNotAllowed is -25308 =
+    #: 0xFFFF9D24, and 0x24 is 36; userCanceled is -128 = 0xFFFFFF80, so 128.
+    #: `security error <n>' decodes an OSStatus but not these exit codes, so
+    #: that arithmetic is the only way to read them.
+    if (( retcode == 36 )) && bool "${sudo_fallback_p}" ; then
+        #: 36 does NOT mean the prompt was denied -- it means macOS refused to
+        #: *show* one, because this process is not attached to the GUI session.
+        #: tmux without pam_reattach, ssh, and the brish garden all land here.
+        #: Root reads the System keychain with no dialog at all, so retry there
+        #: rather than telling the user to go find a different terminal.
+        ecgray "$0: no GUI authorization possible in this context; retrying as root ..."
+
+        retcode=0
+        password="$(h-wifi-password-security "${ssid}" "${keychain}" sudo)" || retcode=$?
+    fi
 
     if (( retcode == 44 )) ; then
         #: 44 is errSecItemNotFound. A remembered network with no stored
@@ -190,8 +222,14 @@ function wifi-password-get-darwin {
         #: here, so this is an ordinary answer and not a fault worth a trace.
         ecerr "$0: no saved password for SSID $(gquote-sq "${ssid}")"
         return 1
+    elif (( retcode == 36 )) ; then
+        ecerr "$0: macOS would not show an authorization prompt in this context, and the root fallback is off (wifi_password_get_sudo_fallback_p)"
+        return 1
+    elif (( retcode == 128 )) ; then
+        ecerr "$0: authorization cancelled for SSID $(gquote-sq "${ssid}")"
+        return 1
     elif (( retcode != 0 )) ; then
-        ecerr "$0: could not read the keychain for SSID $(gquote-sq "${ssid}") (security exited ${retcode}); the authorization prompt may have been denied"
+        ecerr "$0: could not read the keychain for SSID $(gquote-sq "${ssid}") (security exited ${retcode})"
         return "${retcode}"
     fi
 
