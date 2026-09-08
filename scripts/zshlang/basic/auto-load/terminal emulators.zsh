@@ -17,7 +17,7 @@ function title {
     #: (without -r) strips exactly those backslashes again before the expansion
     #: runs. Titles come from media filenames [agfi:mpv], `$PWD' [agfi:iloop]
     #: and the fuzzy pickers, so that was reachable. `printf' takes its
-    #: arguments as data.
+    #: arguments as data. See =./docs/tmux-tty-title.md=.
     ##
     {
         [[ "$EMACS" == *term* ]] && return
@@ -30,8 +30,26 @@ function title {
         #: the tail through as a fresh escape sequence.
         local tab="${1//[$'\n\r\a\e']/ }" win="${2//[$'\n\r\a\e']/ }"
 
+        #: tmux understands OSC 2 whatever TERM it advertises inward, and
+        #: `$TMUX' says so without depending on that TERM. Without this branch
+        #: `tmux-direct' matched no arm below and worked only by way of the
+        #: terminfo tsl/fsl fallback, while a tmux advertising `screen-256color'
+        #: took the `screen*' arm -- whose \ek is a *window rename*, discarded
+        #: outright under `allow-rename off'. tmux drops OSC 1, so only OSC 2
+        #: is sent. Reaching kitty from here also needs `set-titles on'; see
+        #: =./docs/tmux-tty-title.md=. [agfi:isTmux]
+        if isTmux ; then
+            printf '\e]2;%s\a' "${win}"
+            return 0
+        fi
+
         case "$TERM" in
-            cygwin|xterm*|putty*|rxvt*|ansi)
+            #: `tmux*' is for a shell reached by ssh *from* a pane: [agfi:ssh]
+            #: forwards TERM but not `$TMUX', and the outer tmux is still what
+            #: parses the escape. `screen*' below is left alone -- it is
+            #: ambiguous between real GNU screen and a tmux set to a `screen*'
+            #: default-terminal, and \ek is all real screen understands.
+            cygwin|xterm*|putty*|rxvt*|tmux*|ansi)
                 printf '\e]2;%s\a' "${win}" # set window name
                 printf '\e]1;%s\a' "${tab}" # set tab name
                 ;;
