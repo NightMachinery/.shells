@@ -237,20 +237,43 @@ the other way round. `claude-code-session-resume` in
 
 ```
 claude-code-session-resume-fz                 # pick a session of this project, any profile
+claude-code-session-resume-all-fz             # the same, picking from every project
 claude-code-session-resume <uuid>             # resume it under the profile that owns it
 claude-code-session-resume <uuid> default     # fork it into the personal profile and resume there
 claude-resume-personal <uuid>                 # the same
 claude-resume-personal-fz                     # the same, picking the session with fzf
+claude-resume-personal-all-fz                 # the same, picking from every project
 claude-resume-work <uuid>                     # the reverse
+claude-resume-work-fz                         # the reverse, picking with fzf
+claude-resume-work-all-fz                     # the reverse, picking from every project
 ```
 
 The first argument is a transcript path or a session uuid (a unique prefix is
 enough); it is looked up under every profile. The second names the target
 profile; anything after that goes to the launcher. The `-fz` forms take the
-profile first and pick the session interactively; `claude-resume-work-fz`
-exists too. The launcher comes from `claude_code_profile_launchers` next to
-`claude_code_profiles`, so the work seat keeps its tty marker and every
-profile keeps the sync and watchdogs of the `claude` wrapper.
+profile first and pick the session interactively. What they offer is set by
+`claude_code_session_resume_scope`: `project`, the default, lists every
+profile's sessions for the current directory, and `all` lists every profile's
+sessions for every project. The `-all-fz` forms are the `-fz` forms with that
+set to `all`: `claude-code-session-resume-all-fz`, `claude-resume-all-fz`,
+`claude-resume-personal-all-fz` and `claude-resume-work-all-fz`.
+`claude-resume`, `claude-resume-fz` and `claude-resume-all-fz` are the short
+names for their `claude-code-session-resume` counterparts. The launcher comes
+from `claude_code_profile_launchers` next to `claude_code_profiles`, so the
+work seat keeps its tty marker and every profile keeps the sync and watchdogs
+of the `claude` wrapper.
+
+The picker is `h-claude-code-session-select-fz`, the one the viewers use. Each
+row shows the session's last-message time, its name, its profile-labelled path
+and the first prompt; the preview pane shows the highlighted session's name,
+last-message time and last prompt, read from the tail of the transcript rather
+than rendered, so it appears at once even for a 26 MB file. The name is what
+makes choosing among a project's sessions workable — several routinely share a
+directory and differ in nothing else visible. It is resolved the way
+`claude_session name` resolves it, `agent-name` over `custom-title` over
+`ai-title` over the slug, so a fork made by `claude-code-session-import` shows
+under its ` ⑂ <profile>` name rather than the title it had before the fork.
+The preview used to read `ai-title` alone and got exactly that case wrong.
 
 When the target differs from the owner, `claude-code-session-import` forks
 the session there under a **new** uuid: it copies the transcript, the

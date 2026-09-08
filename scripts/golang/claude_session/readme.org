@@ -420,12 +420,26 @@ than mistaking =* Subagents= for something a message wrote.
   focused kitty window. See below.
 - =claude-code-session-live-fz= --- pick among the sessions currently live in
   a kitty window. See below.
+- =claude-code-session-resume-fz= --- pick a session of this project from any
+  profile and resume it, forking it into another profile first when asked.
+  =claude-resume-fz=, =claude-resume-personal-fz= and =claude-resume-work-fz=
+  fix the target profile. The family is documented in
+  =docs/claude_code_usage.md=.
 - =claude-session-selftest= --- run the Go tests and the corpus parity check.
 
-Each viewer has a =-all-fz= variant that selects from every project's sessions
-instead of the current directory's.
+Each viewer and each resume picker has a =-all-fz= variant that selects from
+every project's sessions instead of the current directory's:
+=claude-code-view-session-all-fz=, =claude-code-session-resume-all-fz=,
+=claude-resume-all-fz=, =claude-resume-personal-all-fz=,
+=claude-resume-work-all-fz=, and so on. The viewers set the picker's
+=claude_code_view_session_fz_scope= directly; the resume family sets its own
+=claude_code_session_resume_scope=, which =claude-code-session-resume-fz=
+forwards into the picker's knob. It used to declare the picker's variable
+=local= and hardcode it, which silently shadowed whatever an =aliasfn= wrapper
+had set --- the reason the resume family went without =-all-fz= variants for as
+long as it did.
 
-Every picker goes through =h-claude-code-session-select-fz=, which shows the
+All of them pick through =h-claude-code-session-select-fz=, which shows the
 =list= columns from the local time onwards --- time, name, profile-labelled
 relative path, first-prompt snippet --- and previews the highlighted row with
 =h-claude-code-session-preview=, the same tail-scan body the live picker and the
@@ -438,6 +452,10 @@ after the preview options, so a =--preview-window hidden= there wins.
 Variables:
 
 - =claude_code_view_session_fz_scope= --- =project= (default) or =all=.
+- =claude_code_session_resume_scope= --- the same choice for the resume family,
+  =project= (default) or =all=, forwarded into the picker's knob so the two
+  cannot disagree. Replaces =claude_code_session_resume_all_p=, a boolean that
+  was set by nothing and documented nowhere.
 - =claude_code_session_projects_dirs= --- an array of projects directories to
   search. Defaults to every profile's, found by globbing
   =~/.claude*/projects=, so a new config home needs no wiring.
