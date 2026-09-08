@@ -1365,7 +1365,12 @@ function h-claude-code-session-preview-cmd {
     #: between costs real time. The shell version of the preview forked for
     #: [agfi:h-color-p-override] on each of ~25 colour calls (122ms of 277ms),
     #: shelled out to `tail' and `jq', and then reached us through the brish
-    #: garden, whose round trip alone measured ~380ms -- about 600ms a keystroke.
+    #: garden -- about 600ms a keystroke, end to end.
+    #:
+    #: Those component figures were taken on a loaded machine and do not all
+    #: reproduce: the garden round trip measured ~380ms then and measures ~60ms
+    #: idle. The 600ms total and the 15ms replacement were both measured the
+    #: same way, so the comparison holds even though the parts have shrunk.
     #: Exec'ing the binary is 15ms, most of it process startup rather than
     #: work: `claude_session --help' alone is 10.7ms and the dash spawn 4.3ms,
     #: so the scan is about 5ms and does not grow with the transcript --- a
