@@ -400,8 +400,10 @@ function tmux-session-rename-current-with-agent {
 }
 
 function tmux-session-rename-current-auto {
-    : "renames to <agent prefix>-<the agent session's own name>; needs no argument"
-    #: Only Claude Code exports enough to find its transcript
+    : "renames to @claude/<profile>-<the Claude Code session's own name>; needs no argument"
+    #: The same name the hooks would give it ([agfi:h-claude-code-session-tmux-name]),
+    #: so doing it by hand and letting the hook do it agree. Only Claude Code
+    #: exports enough to find its transcript
     #: ([agfi:claude-code-session-current-file]); Codex and agy would need
     #: their own lookups.
     ##
@@ -415,13 +417,79 @@ function tmux-session-rename-current-auto {
         return 1
     fi
 
-    local name
-    name="$(claude-code-session-current-name)" @RET
+    local transcript name
+    transcript="$(claude-code-session-current-file)" @RET
+    name="$(h-claude-code-session-tmux-name "${transcript}")" @RET
 
-    tmux-session-rename-current-with-agent "${name}"
+    tmux-session-rename-current "${name}"
 }
 aliasfn tsrc tmux-session-rename-current
 aliasfn tsrcag tmux-session-rename-current-with-agent
 aliasfn tsrca tmux-session-rename-current-auto
 aliasfn tnameme tmux-session-rename-current-auto
+##
+function tmux-session-autoname {
+    : "on|off|unset|status: may Claude Code's hooks rename the tmux session this shell runs in?"
+    #: Sets the session-level =@claude_autoname=, which beats the global default
+    #: from =~/.tmux.conf=. `unset' returns to that default. `on' also renames
+    #: right away when run from inside Claude Code, so the effect is visible.
+    ##
+    local mode="${1:-status}"
+    local opt="${claude_code_tmux_autoname_option}"
+
+    if ! isTmux ; then
+        ecerr "$0: not inside tmux"
+        return 1
+    fi
+
+    case "${mode}" in
+        on|off)
+            command tmux set-option -t "${TMUX_PANE}" "${opt}" "${mode}" @RET
+            ecgray "$0: $(tmux-session-current-get): ${mode}"
+            if [[ "${mode}" == on ]] && claude-code-p ; then
+                tmux-session-rename-current-auto
+            fi
+            ;;
+        unset)
+            command tmux set-option -u -t "${TMUX_PANE}" "${opt}" @RET
+            ecgray "$0: $(tmux-session-current-get): back to the global default"
+            ;;
+        status)
+            local own effective global
+            own="$(command tmux show-option -qv -t "${TMUX_PANE}" "${opt}")"
+            effective="$(command tmux show-option -qvA -t "${TMUX_PANE}" "${opt}")"
+            global="$(command tmux show-option -gqv "${opt}")"
+            ec "effective: ${effective:-unset}"
+            ec "this session: ${own:-unset}"
+            ec "global default: ${global:-unset}"
+            ;;
+        *)
+            ecerr "$0: usage: $0 on|off|unset|status"
+            return 1
+            ;;
+    esac
+}
+
+function tmux-session-autoname-global {
+    : "on|off|unset: the default for every tmux session without its own @claude_autoname"
+    #: For the running server only; the persistent default lives in =~/.tmux.conf=.
+    local mode="${1}"
+    assert-args mode @RET
+    local opt="${claude_code_tmux_autoname_option}"
+
+    case "${mode}" in
+        on|off) command tmux set-option -g "${opt}" "${mode}" @RET ;;
+        unset) command tmux set-option -gu "${opt}" @RET ;;
+        *)
+            ecerr "$0: usage: $0 on|off|unset"
+            return 1
+            ;;
+    esac
+    local global
+    global="$(command tmux show-option -gqv "${opt}")"
+    ecgray "$0: global default: ${global:-unset}"
+}
+aliasfn tnameme-on tmux-session-autoname on
+aliasfn tnameme-off tmux-session-autoname off
+aliasfn tnameme-status tmux-session-autoname status
 ##

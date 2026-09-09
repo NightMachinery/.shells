@@ -447,6 +447,114 @@ function h-claude-code-session-registry-key {
     ec "${kpid}-${win}"
 }
 
+function h-claude-code-hook-payload {
+    #: The JSON a Claude Code hook was handed: `$1' when non-empty, else stdin.
+    #: Bounded: an inherited pipe that never closes must not wedge the agent's hook.
+    ##
+    local input="${1}"
+
+    if test -z "$input" && ! test -t 0 ; then
+        input="$(gtimeout 2 cat)" || input=''
+    fi
+
+    ec "${input}"
+}
+
+function h-claude-code-hook-transcript {
+    #: The `transcript_path' of the hook payload, or nothing. Fails only when
+    #: there was no payload at all.
+    ##
+    local input
+    input="$(h-claude-code-hook-payload "${1}")"
+    test -n "$input" || return 1
+
+    ec "$input" | jq -r '.transcript_path // empty' 2>/dev/null
+}
+
+function claude-code-profile-of-transcript {
+    #: Which profile owns a transcript, from the projects directory it sits in.
+    #: The hook-side twin of [agfi:claude-code-profile-current], which reads
+    #: the environment instead; a hook body runs in the garden and has no
+    #: CLAUDE_CONFIG_DIR to read.
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local p dir
+    for p in "${claude_code_profile_order[@]}" ; do
+        dir="${claude_code_profiles[$p]:-${HOME}/.claude}"
+        if [[ "${transcript}" == "${dir%/}"/projects/* ]] ; then
+            ec "${p}"
+            return 0
+        fi
+    done
+
+    #: <config dir>/projects/<project>/<id>.jsonl, unregistered: name the dir.
+    local home="${transcript:h:h:h}"
+    ec "${${home:t}#.}"
+}
+
+function h-claude-code-session-tmux-name {
+    : "prints the tmux session name for a Claude Code transcript: @claude/<profile>-<name>"
+    #: The `@' marks a name the hooks own and keep current, as opposed to one
+    #: a person chose with [agfi:tmux-session-rename-current]. Shared by
+    #: [agfi:tmux-session-rename-current-auto] and the hook, so the two can
+    #: never disagree about what a session should be called.
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local profile name
+    profile="$(claude-code-profile-of-transcript "${transcript}")" @RET
+    name="$(h-claude-code-session-name "${transcript}")" @RET
+
+    ec "@claude/${profile}-${name}"
+}
+
+#: The tmux user option that lets the hooks rename a session. Read with
+#: `show-option -A', so a session-level value overrides the global default
+#: set in =~/.tmux.conf=. See =docs/tmux-session-rename.md=.
+typeset -g claude_code_tmux_autoname_option='@claude_autoname'
+
+function claude-code-session-tmux-autoname {
+    #: Renames the tmux session around the calling Claude Code to
+    #: [agfi:h-claude-code-session-tmux-name], for the `SessionStart' and
+    #: `UserPromptSubmit' hooks. `$1' is the pane, passed by the hook line as
+    #: "$TMUX_PANE": this body runs in the garden, whose environment knows
+    #: nothing of the pane the agent sits in. Payload from `$2' or stdin.
+    #:
+    #: Every early return is an ordinary outcome, not an error: no tmux, the
+    #: option off, a name that is already right. Silent throughout; the hook
+    #: line discards output anyway.
+    #:
+    #: Sessions named `ag--*' are never touched, whatever the option says.
+    #: They belong to the tmux-subagents skill, which encodes lineage and
+    #: model in the name and would lose that identity to a rename.
+    #: Usage: claude-code-session-tmux-autoname <tmux-pane> [payload]
+    ##
+    local pane="${1}"
+    test -n "${pane}" || return 0
+
+    local transcript
+    transcript="$(h-claude-code-hook-transcript "${2}")" || return 0
+    test -n "${transcript}" || return 0
+
+    local current
+    current="$(command tmux display-message -p -t "${pane}" '#S' 2>/dev/null)" || return 0
+    [[ "${current}" == ag--* ]] && return 0
+
+    local opt
+    opt="$(command tmux show-option -qvA -t "${pane}" "${claude_code_tmux_autoname_option}" 2>/dev/null)"
+    [[ "${opt}" == on ]] || return 0
+
+    local target
+    target="$(h-claude-code-session-tmux-name "${transcript}")" || return 0
+    target="${target//[.:]/-}"
+    [[ "${target}" == "${current}" ]] && return 0
+
+    command tmux rename-session -t "${pane}" "${target}" 2>/dev/null || return 0
+}
+
 function claude-code-session-register {
     #: Records which kitty window the calling Claude Code session is showing in,
     #: so [agfi:claude-code-view-session-focused] has something to fall back on
@@ -478,16 +586,8 @@ function claude-code-session-register {
     #: =configFiles/claude-code/settings.json= passes it.
     #: Usage: claude-code-session-register <hook-pid> [payload]
     ##
-    local input="${2}"
-
-    if test -z "$input" && ! test -t 0 ; then
-        #: Bounded: an inherited pipe that never closes must not wedge the agent's hook.
-        input="$(gtimeout 2 cat)" || input=''
-    fi
-    test -n "$input" || return 0
-
     local transcript
-    transcript="$(ec "$input" | jq -r '.transcript_path // empty' 2>/dev/null)" || return 0
+    transcript="$(h-claude-code-hook-transcript "${2}")" || return 0
     test -n "$transcript" || return 0
 
     #: Every early exit below means "not prompted from a kitty window", which is

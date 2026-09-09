@@ -768,6 +768,9 @@ function h-claude-code-usage-notif {
     silent tmux set-option -t "${session}" '@ccu_notif_deadline' "${deadline}" || true
     silent tmux set-option -t "${session}" '@ccu_notif_action' "${action}" || true
     silent tmux set-option -t "${session}" '@ccu_notif_targets' "${targets}" || true
+    #: The name is how this job is found and re-armed; the Claude Code it
+    #: resumes must not rename it ([agfi:claude-code-session-tmux-autoname]).
+    silent tmux set-option -t "${session}" "${claude_code_tmux_autoname_option}" off || true
 }
 
 function h-claude-code-usage-notif-for-profile {
