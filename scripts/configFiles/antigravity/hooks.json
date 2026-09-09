@@ -1,0 +1,18 @@
+{
+  "tmux-autoname": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agy-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1; echo '{}'",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agy-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1; echo '{}'",
+        "timeout": 5
+      }
+    ]
+  }
+}
