@@ -374,7 +374,7 @@ function tmux-session-rename-current {
 }
 
 function h-tmux-session-agent-prefix {
-    : "prints Claude/<profile>, Codex or Agy for the agent that spawned this shell"
+    : "prints @Claude/<profile>, @Codex or @Agy for the agent that spawned this shell"
     local agent
     if ! agent="$(ai-agent-name)" ; then
         ecerr "$0: no AI agent detected in this shell's environment"
@@ -382,15 +382,15 @@ function h-tmux-session-agent-prefix {
     fi
 
     case "${agent}" in
-        claude) ec "Claude/$(claude-code-profile-current)" ;;
-        codex) ec Codex ;;
-        agy) ec Agy ;;
-        *) ec "${agent}" ;;
+        claude) ec "@Claude/$(claude-code-profile-current)" ;;
+        codex) ec @Codex ;;
+        agy) ec @Agy ;;
+        *) ec "@${agent}" ;;
     esac
 }
 
 function tmux-session-rename-current-with-agent {
-    : "like [agfi:tmux-session-rename-current], prefixed by the agent running this shell, e.g. 'Claude/work NAME'"
+    : "like [agfi:tmux-session-rename-current], prefixed by the agent running this shell, e.g. '@Claude/work NAME'"
     local name="${1}"
     assert-args name @RET
 
