@@ -1,41 +1,116 @@
-#+TITLE: claude_session
+#+TITLE: agent_session
 
-Renders Claude Code session transcripts (=~/.claude/projects/**/*.jsonl=) into
-org-mode or markdown, scans a directory of them for the fuzzy session picker,
-and writes the picker's preview pane. The zsh wrappers live in
-=zshlang/auto-load/others/claude-session.zsh=.
+Renders coding-agent session transcripts into org-mode or markdown, scans a
+directory of them for the fuzzy session picker, and writes the picker's preview
+pane. One binary, one adapter per agent. Today the only adapter is Claude Code
+(=~/.claude*/projects/**/*.jsonl=); Codex and Antigravity are next, and the
+layout below is arranged so that they slot in without the renderer noticing.
+The zsh wrappers live in =zshlang/auto-load/others/claude-session.zsh=.
 
 Standard library only, so =go build= needs no network and no module cache. It
 works on a freshly bootstrapped, sudoless host.
 
+It was =claude_session= until it grew a second agent's worth of structure. The
+old name survives as a zsh =aliasfn= for =agent_session claude=, so anything
+still spelling it keeps working.
+
 * Install
 #+begin_src zsh :eval never
-go-install-local "${NIGHTDIR}/golang/claude_session"
+go-install-local "${NIGHTDIR}/golang/agent_session"
 #+end_src
 
 Registered in =setup/setup_go=, so a full setup run installs it. The zsh
-wrappers also install it on first use via [[agfi:ensure-dep1]], so a fresh clone
-works without a separate step as long as Go is present.
+wrappers also install it on first use, through [[agfi:h-claude-code-session-dep]]
+and [[agfi:ensure-dep1]], so a fresh clone works without a separate step as long
+as Go is present.
 
 * Test
 #+begin_src zsh :eval never
 claude-session-selftest
 #+end_src
 
-That runs =go test= plus the parity check below. The Go tests alone:
+That runs =go test= plus the parity check below, once per profile root. The Go
+tests alone, one package at a time:
 #+begin_src zsh :eval never
-cd "${NIGHTDIR}/golang/claude_session" && go test ./...
+cd "${NIGHTDIR}/golang/agent_session" && go test ./...
 #+end_src
 
-The parity test needs real transcripts and pandoc, so it is skipped unless
-pointed at a corpus:
+Each package tests what it owns: =internal/turns= the writer, fence repair,
+heading levels and the diff; =internal/claude= the record model, turn merging,
+name precedence and the tail scans; =internal/session= the root labels and the
+dash-guard; =internal/preview= the row primitives. The parity test sits at the
+module root, in =parity_test.go=, because it builds the binary and runs it. It
+needs real transcripts and pandoc, so it is skipped unless pointed at a corpus:
 #+begin_src zsh :eval never
-CLAUDE_SESSION_CORPUS=~/.claude/projects go test -run Parity ./...
+AGENT_SESSION_CORPUS=~/.claude/projects go test -run Parity ./...
 #+end_src
+
+=AGENT_SESSION_CORPUS_AGENT= names the agent the corpus belongs to and defaults
+to =claude=; the old =CLAUDE_SESSION_CORPUS= name is still honoured.
+[[agfi:claude-session-selftest]] sets the variable itself.
+
+The rename and split were checked the blunt way: every subcommand run over a
+synthetic fixture, byte for byte against what =claude_session= printed for the
+same arguments. Nothing in the output moved.
+
+* Layout
+
+One module, =agent_session=, with =main.go= doing nothing but dispatch. The work
+is in four internal packages, and the seam between them is the point of the
+split: an adapter translates one agent's records into a =turns.Document=, and
+everything after that is shared. A Codex or Antigravity adapter therefore gets
+the same org output, the same picker columns and the same preview pane for
+free, and a fix to the writer reaches every agent at once.
+
+- =internal/session= --- the contract between the CLI and the adapters. The
+  =Adapter= interface, =List=, =Name=, =Meta=, =Preview=, =Live= and =Document=;
+  the =Info=, =Live= and =Meta= row types, each with the TSV =Row()= the zsh side
+  reads back; the option structs =ListOpts=, =PreviewOpts= and =DocOpts=;
+  =ErrUnsupported=, for a subcommand an agent has no equivalent of; and the
+  helpers every adapter wants --- =Fatal=, =GuardPathArgs=, =ProfileLabels=, the
+  =ForEach= worker pool, and =MaxLineBytes=, the scanner buffer sized for lines
+  that carry whole files inline.
+- =internal/turns= --- the agent-neutral half of the renderer: the
+  =Document=/=Subdoc=/=Turn=/=Block=/=TimedBlock=/=ToolResult= model,
+  =Render(doc, Options)= and =RenderTurns=, =Style=, the org and markdown
+  writer, fence repair, the heading tags, pandoc chunking, the unified diff, and
+  the text helpers (=ShortModel=, =ModelLabel=, =AbbrevHome=, =Truncate= …).
+  Nothing in it knows how any agent stores a session.
+- =internal/preview= --- what the fzf previews of different agents are built
+  from, so they line up and read alike: =Painter=, =Row=, =JoinParts=,
+  =Annotate=, =HumanAge=, =VersionLabel=.
+- =internal/claude= --- the code that used to be the whole program, as the first
+  adapter: the record model, =conversationRecords=, =buildTurns= and
+  =appendEvent=, the subagent loader, the tail scan behind =list=, the preview
+  scan, and =live= over =claude agents --json=. It implements =session.Adapter=,
+  and nothing outside =main.go= imports it.
+
+The block vocabulary is the renderer's, not any agent's: =text=, =thinking=,
+=tool_use=, =tool_result= (an orphan whose call is not in the document),
+=notice=, =command=, =pr=, =tasks= and =file-edit=. The JSON tags on
+=turns.Block= match the Anthropic content-block schema, so the Claude adapter
+decodes =message.content= straight into it; another adapter fills the fields by
+hand.
+
+Adding an agent is a package under =internal/<agent>= that satisfies the
+interface, plus one line each in =agentNames= and =adapters= in =main.go=. A
+subcommand the agent cannot answer returns =session.ErrUnsupported=, which the
+CLI turns into exit status 3.
 
 * Commands
 
-=claude_session render [flags] <session.jsonl>= writes the transcript to
+Every call names the agent first: =agent_session <agent> <subcommand> [flags]
+args=. =agent_session agents= lists the known agents, one per line; today that
+is =claude= alone. Exit status 2 is a usage error --- no agent, an unknown agent
+or subcommand --- 1 a failure, and 3 an agent that does not support the
+subcommand (no Claude subcommand returns it; it is there for the adapters to
+come). A path argument beginning with a dash is guarded before flag parsing:
+every relative path under a projects directory starts with one, because the
+directories are named after the cwd (=-Users-evar-scripts=), and the flag
+package would otherwise read it as a flag. =--= still works for anything the
+guard misses.
+
+=agent_session claude render [flags] <session.jsonl>= writes the transcript to
 stdout. Flags:
 
 - =-format md|org|org-pandoc= --- output syntax. =md= (the default) is meant to
@@ -49,13 +124,16 @@ stdout. Flags:
 - =-jobs N= --- worker count, defaulting to the CPU count.
 - =-pandoc PATH= --- the pandoc binary to use for =org-pandoc=.
 
-=claude_session name <session.jsonl>= prints the session's name, or nothing if
-it has none. Claude Code names a session several ways, in increasing order of
-authority: a generated slug like =sharded-bouncing-clarke=, an =ai-title=
-summarising the work (=fix-org-store-link-title=), a =custom-title= the user
-set (=Neru=), and =agent-name=, which is the name Claude Code itself resolved
-from those. Names can be revised during a session, so the last wins; a slug
-never changes. 39 of 52 local sessions have a slug and 28 have a title; the
+Only =-subagents= reaches the adapter, as =DocOpts=; the rest are =turns.Options=
+and apply to any agent's document.
+
+=agent_session claude name <session.jsonl>= prints the session's name, or
+nothing if it has none. Claude Code names a session several ways, in increasing
+order of authority: a generated slug like =sharded-bouncing-clarke=, an
+=ai-title= summarising the work (=fix-org-store-link-title=), a =custom-title=
+the user set (=Neru=), and =agent-name=, which is the name Claude Code itself
+resolved from those. Names can be revised during a session, so the last wins; a
+slug never changes. 39 of 52 local sessions have a slug and 28 have a title; the
 rest predate the features and fall back to their uuid.
 
 =agent-name= is preferred when present, so a future title source is picked up
@@ -63,16 +141,16 @@ without changing this code. It cannot replace the explicit precedence, though:
 only 19 of the 28 named sessions carry one. Where both exist they agree, on all
 19 --- and adding it changed no name anywhere in the local corpus.
 
-That precedence lives in one place, the =nameParts= accumulator in =list.go=,
-and is reached three ways. =name= reads the whole file forwards and feeds every
-record to it. =list= feeds it the records its tail scan is already decoding for
-the timestamp, reading backwards. =preview= feeds it the records of its own tail
-window, forwards. All end in the same =resolve=, so the name in the picker's
-column, the headline in its preview pane and the name a viewer writes into a
-filename cannot drift apart. The direction only decides which occurrence to
-keep: the last one written is the last met reading forwards and the first met
-reading backwards, which is
-what the =keepFirst= flag of =observe= selects.
+That precedence lives in one place, the =nameParts= accumulator in
+=internal/claude/list.go=, and is reached three ways. =name= reads the whole
+file forwards and feeds every record to it. =list= feeds it the records its
+tail scan is already decoding for the timestamp, reading backwards. =preview=
+feeds it the records of its own tail window, forwards. All end in the same
+=resolve=, so the name in the picker's column, the headline in its preview pane
+and the name a viewer writes into a filename cannot drift apart. The direction
+only decides which occurrence to keep: the last one written is the last met
+reading forwards and the first met reading backwards, which is what the
+=keepFirst= flag of =observe= selects.
 
 The two differ in reach. =list= widens its tail window in search of a title only
 up to =nameWindow=, one MiB (the Performance section says why); the slug does not
@@ -91,19 +169,25 @@ session opens in emacs as =Neru.org= rather than a uuid:
 ,#+SUBTITLE: Claude Code session 3e500e15-2d94-44c6-bac4-4d6634c743f6
 #+end_example
 
-=claude_session preview [flags] <session.jsonl>= writes the fzf preview body for
-one session: what it is called, what it was running as, where, when it last
-moved, and what was last asked of it. Each row is omitted when the session has
-nothing to say for it: the name, bold, in its profile's colour; a gray subtitle
-of uuid, profile and Claude Code version; =last activity=, the newest timestamp
-in local time plus a relative age, =2026-09-08 17:55 (39s ago)=; =model=, the
-model that answered last with =claude-= stripped and the reasoning effort,
-=opus-5 · high effort=; =mode=, the permission mode and the interaction mode,
-=auto · normal=; =cwd=, with =$HOME= abbreviated to =~= and the git branch after
-an =@=; and the last prompt. A session with no name is headlined =Claude Code
-session <uuid>=. Only the tail of the file is read, so the cost does not depend
-on the transcript's size; the section on sessions live in a kitty window says
-why this is a subcommand at all.
+=agent_session claude meta <session.jsonl>= prints =id=, name and cwd on one
+tab-separated line: the id off the filename, the name by the same full scan
+=name= does, and the cwd from the tail window =preview= reads, which is enough
+because Claude Code writes it on every message record. It is for a caller that
+wants all three of a transcript and would otherwise pay three calls for them.
+
+=agent_session claude preview [flags] <session.jsonl>= writes the fzf preview
+body for one session: what it is called, what it was running as, where, when it
+last moved, and what was last asked of it. Each row is omitted when the session
+has nothing to say for it: the name, bold, in its profile's colour; a gray
+subtitle of uuid, profile and Claude Code version; =last activity=, the newest
+timestamp in local time plus a relative age, =2026-09-08 17:55 (39s ago)=;
+=model=, the model that answered last with =claude-= stripped and the reasoning
+effort, =opus-5 · high effort=; =mode=, the permission mode and the interaction
+mode, =auto · normal=; =cwd=, with =$HOME= abbreviated to =~= and the git branch
+after an =@=; and the last prompt. A session with no name is headlined =Claude
+Code session <uuid>=. Only the tail of the file is read, so the cost does not
+depend on the transcript's size; the section on sessions live in a kitty window
+says why this is a subcommand at all.
 
 - =-bytes N= --- how much of the transcript's tail to read, in bytes. Default
   409600. A title written earlier than that falls back to the slug, the same
@@ -113,7 +197,7 @@ why this is a subcommand at all.
   so does a =NO_COLOR= variable in the environment, whatever its value, which is
   the cross-tool convention.
 
-=claude_session list [flags] <sessions-dir>...= walks the directories for
+=agent_session claude list [flags] <sessions-dir>...= walks the directories for
 =.jsonl= files and writes one TSV line per session, newest first: =epoch=,
 absolute path, local time, the session's name, path relative to the scanned
 directory, and the first user message as a snippet.
@@ -138,11 +222,23 @@ scopes each root down to a single project, where the last component is the same
 for both and the parent is =projects= for both. A single root is listed exactly
 as before, with no label.
 
+- =-cwd DIR= --- only the sessions that ran in DIR. The adapter does the
+  scoping: Claude Code names each project directory after the cwd with every
+  non-alphanumeric character turned into =-=, so the flag walks that one
+  directory under each root, with paths relative to it, and the rows come out
+  identical to handing the scoped directories in as roots. What the flag buys is
+  that the caller no longer has to know how the slug is spelled, which is what
+  lets the same call work for an agent that scopes a project some other way.
 - =-snippet-len N= --- snippet width cap, default 120.
 - =-name-len N= --- name width cap, default 40.
 - =-subagents= --- also list subagent transcripts. Off by default: =render=
   inlines them into their parent, and they were a third of the list.
 - =-jobs N= --- worker count.
+
+=agent_session claude live <sessions-dir>...= prints one TSV row per session
+currently running: pid, id, name, cwd, transcript path, the tmux session it runs
+in or =-=, and its status. The section on reading the session you are in says
+what it is for and why it lives here.
 
 * Document structure
 
@@ -261,20 +357,21 @@ always was. Ties go to whichever model appeared first, and that is deliberate
 rather than incidental: iterating a Go map is randomised, so a tie broken that
 way would make the document differ run to run, and =TestPandocPathParity=
 compares the parallel path against a single pandoc run byte for byte.
-=modelMode= in =subagents.go= is the vote.
+=modelMode= in =internal/claude/subagents.go= is the vote.
 
-=modelLabel= formats it as one word --- =shortModel='s output with the family
-capitalised and the separator dropped, so =claude-opus-5= is =Opus5= and
+=turns.ModelLabel= formats it as one word --- =ShortModel='s output with the
+family capitalised and the separator dropped, so =claude-opus-5= is =Opus5= and
 =claude-fable-5-1= is =Fable5.1= --- so it scans as a name rather than as a
-version string; =shortModel= already drops a build date, so
-=claude-haiku-4-5-20251001= is =Haiku4.5=. The model comes out of the read
-=renderSubagent= already does, which is why it returns the model beside the
-rendered parts and why =subagentSegments= renders each agent's body before
-emitting its heading: reading the transcript a second time for a field already
-in hand would be waste. Checked against the local corpus on a session with
-eleven subagents, the six whose assistant records are mostly =claude-opus-5=
-render as =@Opus5= and the five mostly =claude-fable-5-1= as =@Fable5.1=,
-matching a =jq= count of the raw records exactly.
+version string; =ShortModel= already drops a build date, so
+=claude-haiku-4-5-20251001= is =Haiku4.5=. The model comes out of the one read
+the adapter's =subdoc= already does: it reads the agent's transcript once and
+hands back a =turns.Subdoc= whose title carries the vote, so =subagentSegments=
+in =internal/turns= only has to write the skeleton around it. Reading the
+transcript a second time for a field already in hand would be waste. Checked
+against the local corpus on a session with eleven subagents, the six whose
+assistant records are mostly =claude-opus-5= render as =@Opus5= and the five
+mostly =claude-fable-5-1= as =@Fable5.1=, matching a =jq= count of the raw
+records exactly.
 
 The section itself stays unfolded so the roster of agents is visible at a
 glance; each agent's own heading carries =:VISIBILITY: folded= so its
@@ -509,6 +606,9 @@ than mistaking =* Subagents= for something a message wrote.
 
 * zsh entry points
 
+The names still say =claude-code-=. A later commit renames the family to
+=agent-*= with compatibility aliases, and this readme gets another pass then.
+
 - =claude-code-view-session-fz= --- pick a session, convert to org, open in
   emacs.
 - =claude-code-view-session-md-fz= --- same, as markdown.
@@ -550,7 +650,7 @@ long as it did.
 All of them pick through =h-claude-code-session-select-fz=, which shows the
 =list= columns from the local time onwards --- time, name, profile-labelled
 relative path, first-prompt snippet --- and previews the highlighted row with
-=claude_session preview=, which fzf execs directly; the live picker and the
+=agent_session claude preview=, which fzf execs directly; the live picker and the
 kitty overlay run the same binary the same way (see the section on sessions live
 in a kitty window). In all three, =alt+enter= converts the highlighted row to
 org and opens it in emacs in the background without closing the picker, and a
@@ -648,11 +748,11 @@ liveness ourselves would drop real sessions or surface spares. So the listing
 stays the authority.
 
 It is scoped to one config home, and each call costs about 180ms. Because the
-homes are independent, the =live= subcommand of the =claude_session= Go binary
-runs them concurrently and does the record reads and transcript derivation in
-the same process, which roughly halves the wall time and removes a dozen shell
-forks; =h-claude-code-session-live-list= calls it, falling back to an
-identical-output shell path (=...-list-sh=) when the binary is not built. The
+homes are independent, =agent_session claude live= runs them concurrently and
+does the record reads and transcript derivation in the same process, which
+roughly halves the wall time and removes a dozen shell forks;
+=h-claude-code-session-live-list= calls it, falling back to an identical-output
+shell path (=...-list-sh=) when the binary is not built. The
 personal profile is asked with =CLAUDE_CONFIG_DIR= unset, since Claude Code
 hashes a set value into its keychain entry name. The transcript path is
 derived rather than read: the session's id under the projects directory named
@@ -667,14 +767,14 @@ trusting it would send every call down the slow build-check path.
 
 ** In the background, with a band, press again to cancel
 
-The conversion is the slow part -- =claude_session render= plus a fan-out of
-pandoc processes, seconds on a large transcript -- so none of it runs in the
-hotkey. The press itself only identifies the tab (kitty, about 30ms), claims
-it, raises a band and returns. Everything else, the 300ms lookup included,
-happens in =h-claude-code-view-job= behind that band, which names the session
-once it is known and comes down when emacs has the file. Resolving *before*
-claiming would leave a 300ms window in which a second press starts a second
-job; this way a double-tap deterministically cancels.
+The conversion is the slow part -- =agent_session claude render= plus a
+fan-out of pandoc processes, seconds on a large transcript -- so none of it runs
+in the hotkey. The press itself only identifies the tab (kitty, about 30ms),
+claims it, raises a band and returns. Everything else, the 300ms lookup
+included, happens in =h-claude-code-view-job= behind that band, which names the
+session once it is known and comes down when emacs has the file. Resolving
+*before* claiming would leave a 300ms window in which a second press starts a
+second job; this way a double-tap deterministically cancels.
 
 The key is a toggle. A press while the tab's conversion is running cancels it:
 the band turns amber and says so, the process tree goes, the temp directory
@@ -990,18 +1090,18 @@ since it acts on the one row you are looking at. With
 with =-= in the window column for one no kitty window is showing; that is what
 the hotkey's overlay picker offers, via =h-claude-code-session-pick-rows=.
 
-Each row's metadata comes from a single =claude_session list= call over every
-profile's projects directory, joined back onto the live rows by transcript
-path, rather than one metadata call per row. =list= walks the whole corpus in
-about 45ms, while =claude_session name= alone costs about 230ms on a large
-transcript — a per-row call would have made the picker's startup cost scale
-with however many sessions happen to be open. The fzf preview goes further
-still and skips =claude_session render= entirely: rendering a 46MB transcript
-takes about eight seconds, far too slow for a preview pane that has to feel
-instant. Instead =claude_session preview=
-tail-scans the last few hundred KB for fields Claude Code already writes there
-in plain form --- the rows are listed under Commands --- and fzf execs the
-binary directly, with no shell in between.
+Each row's metadata comes from a single =agent_session claude list= call over
+every profile's projects directory, joined back onto the live rows by
+transcript path, rather than one metadata call per row. =list= walks the whole
+corpus in about 45ms, while =agent_session claude name= alone costs about 230ms
+on a large transcript — a per-row call would have made the picker's startup
+cost scale with however many sessions happen to be open. The fzf preview goes
+further still and skips =agent_session claude render= entirely: rendering a
+46MB transcript takes about eight seconds, far too slow for a preview pane that
+has to feel instant. Instead =agent_session claude preview= tail-scans the last
+few hundred KB for fields Claude Code already writes there in plain form --- the
+rows are listed under Commands --- and fzf execs the binary directly, with no
+shell in between.
 
 It was a zsh function first, and it cost about 600ms per cursor move, which is
 unusable in a pane that repaints on every keystroke. Measured, that was roughly
@@ -1029,8 +1129,8 @@ pre-fork title, in exactly the workflow the resume family exists for. The
 precedence used to be implemented twice, once as =nameParts= and once as a jq
 if/elif chain that had to be kept in step with it; now only =nameParts= exists,
 and it serves =name=, =list= and =preview= alike. Checked over all 125 local
-sessions, the preview's headline agrees with the authoritative =claude_session
-name= on every one.
+sessions, the preview's headline agrees with the authoritative =agent_session
+claude name= on every one.
 
 One accuracy improvement fell out of the move. The jq version keyed each field
 on the record type that names it, so the permission mode came from
@@ -1046,8 +1146,9 @@ smaller than the window there is no partial line, and a session of one or two
 records would otherwise lose everything there was to read.
 
 The colour is keyed on the profile, from the =profileColors= table in
-=preview.go=: =.claude= blue, =.claude-work= orange, and an unknown profile gets
-no colour rather than a wrong one. Which account a session belongs to is the
+=internal/claude/preview.go=: =.claude= blue, =.claude-work= orange, and an
+unknown profile gets no colour rather than a wrong one. Which account a session
+belongs to is the
 thing worth seeing at a glance, since the whole point of
 =claude-code-session-resume= is that the two are otherwise interchangeable. It
 is deliberately not Claude Code's own =agent-color=: that record is written
@@ -1060,7 +1161,7 @@ on its own, and a zsh global cannot reach a process it did not start. The zsh
 =claude_code_session_profile_colors= array is gone for that reason, as are the
 two helpers the shell version needed --- =time.Parse= reads the RFC3339 stamp
 with its offset, so the =TZ=UTC= trick =h-claude-code-session-epoch-of= existed
-for has nothing left to do, and =humanAge= replaces
+for has nothing left to do, and =preview.HumanAge= replaces
 =h-claude-code-session-age=, printing the single largest unit (=44s=, =6m=,
 =3h=, =2d=) since what a preview answers is how stale the session is. The
 escapes are 24-bit SGR written directly, with bold and colour in one escape for
