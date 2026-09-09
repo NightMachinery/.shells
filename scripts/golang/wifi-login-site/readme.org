@@ -8,8 +8,8 @@ It only probes. Which URL to fall back on, and whether to open a browser at
 all, is policy and stays in zsh: see =wifi-login-site-open= in
 [[file:../../zshlang/auto-load/others/network.zsh][network.zsh]]. That surface
 is aliased under the other name the thing goes by, too ---
-=captive-portal-open=, =captive-portal-url=, =captive-portal-explain= and
-=captive-portal-p=.
+=wifi-captive-portal-open=, =wifi-captive-portal-url=, =wifi-captive-portal-explain= and
+=wifi-captive-portal-p=.
 
 * Install
 #+begin_src zsh :eval never
@@ -135,7 +135,7 @@ idempotent, so all three may fire.
   driven from Hammerspoon, restore on leaving the network. The watcher's
   fifteen minutes would otherwise leave you on the hotel's resolver at the
   next cafe.
-- *By hand.* =captive-portal-dns-restore=, for when the login page hangs and
+- *By hand.* =wifi-captive-portal-dns-restore=, for when the login page hangs and
   you want your DNS back now.
 
 For the length of the login window, everything on that service resolves

@@ -604,12 +604,12 @@ function h-wifi-login-site-dns-watch {
 ##
 #: The same surface under the other name this thing goes by. [agfi:aliasfn]
 #: defines real functions, so these complete and can be swapped like any other.
-aliasfn captive-portal-open wifi-login-site-open
-aliasfn captive-portal-url wifi-login-site-get
-aliasfn captive-portal-explain wifi-login-site-explain
-aliasfn captive-portal-p net-captive-portal-p
-aliasfn captive-portal-dns-switch wifi-login-site-dns-switch
-aliasfn captive-portal-dns-restore wifi-login-site-dns-restore
+aliasfn wifi-captive-portal-open wifi-login-site-open
+aliasfn wifi-captive-portal-url wifi-login-site-get
+aliasfn wifi-captive-portal-explain wifi-login-site-explain
+aliasfn wifi-captive-portal-p net-captive-portal-p
+aliasfn wifi-captive-portal-dns-switch wifi-login-site-dns-switch
+aliasfn wifi-captive-portal-dns-restore wifi-login-site-dns-restore
 #: ... and the predicate under the wifi-login-site prefix, for symmetry.
 aliasfn wifi-login-site-p net-captive-portal-p
 ##
