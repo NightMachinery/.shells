@@ -495,7 +495,7 @@ function claude-code-profile-of-transcript {
 }
 
 function h-claude-code-session-tmux-name {
-    : "prints the tmux session name for a Claude Code transcript: @claude/<profile>-<name>"
+    : "prints the tmux session name for a Claude Code transcript: '@Claude/<profile> <name>'"
     #: The `@' marks a name the hooks own and keep current, as opposed to one
     #: a person chose with [agfi:tmux-session-rename-current]. Shared by
     #: [agfi:tmux-session-rename-current-auto] and the hook, so the two can
@@ -508,7 +508,9 @@ function h-claude-code-session-tmux-name {
     profile="$(claude-code-profile-of-transcript "${transcript}")" @RET
     name="$(h-claude-code-session-name "${transcript}")" @RET
 
-    ec "@claude/${profile}-${name}"
+    #: A space, not a hyphen, between the agent and the name: tmux allows it,
+    #: and it reads as two things, which it is.
+    ec "@Claude/${profile} ${name}"
 }
 
 #: The tmux user option that lets the hooks rename a session. Read with

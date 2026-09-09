@@ -2,7 +2,7 @@
 
 A tmux session that has a Claude Code session inside it is renamed after
 that session automatically, by a hook: `scripts-claudework2` becomes
-`@claude/work-wifi-dns-captive-portal` on the first prompt, and follows the
+`@Claude/work wifi-dns-captive-portal` on the first prompt, and follows the
 title as it changes. `tmux-session-rename-current-auto` (`tnameme`) does the
 same by hand -- type `! tnameme` at a Claude Code prompt -- and is the entry
 point for shells the hook does not reach.
@@ -22,8 +22,8 @@ that name and hand it to tmux.
 - `tmux-session-rename-current NAME` (`tsrc`) renames it. `.` and `:` in NAME
   become `-`.
 - `tmux-session-rename-current-with-agent NAME` (`tsrcag`) prefixes NAME with
-  the agent that spawned the shell: `claude/<profile>-NAME`, `codex-NAME`,
-  `agy-NAME`. Outside an agent it fails and says so.
+  the agent that spawned the shell: `Claude/<profile> NAME`, `Codex NAME`,
+  `Agy NAME`. Outside an agent it fails and says so.
 - `tmux-session-rename-current-auto` (`tsrca`, `tnameme`) takes no argument
   and uses the agent session's own name.
 
@@ -75,8 +75,8 @@ off it too -- whichever profile's projects directory it sits under
 garden's environment. It costs about 0.12 s per prompt on a 23 MB
 transcript.
 
-Automatic names carry an `@` prefix: `@claude/work-wifi-dns-captive-portal`,
-`@claude/default-LinFine-1`. The `@` marks a name the hook owns and will
+Automatic names carry an `@` prefix: `@Claude/work wifi-dns-captive-portal`,
+`@Claude/default LinFine-1`. The `@` marks a name the hook owns and will
 keep updating. A name you chose with `tsrcag NAME` has no `@`. `tnameme`
 produces the same `@` name as the hook, since both go through
 [agfi:h-claude-code-session-tmux-name].
@@ -104,8 +104,8 @@ hook discards output, and a broken rename must not cost a prompt.
 
 ## Usage
 
-    ! tnameme                    # inside Claude Code: claude/work-<session name>
-    tsrcag fix-wifi              # claude/work-fix-wifi, codex-fix-wifi or agy-fix-wifi
+    ! tnameme                    # inside Claude Code: @Claude/work <session name>
+    tsrcag fix-wifi              # Claude/work fix-wifi, Codex fix-wifi or Agy fix-wifi
     tsrc scratch                 # any shell in tmux, no prefix
     tmux-session-current-get
 
