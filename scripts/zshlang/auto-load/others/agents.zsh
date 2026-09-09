@@ -14,6 +14,8 @@ function h-agents-table {
     #: hide one.
     ##
     print -r -- $'claude\tClaude Code\t🍼\tclaude claude.exe\tclaude'
+    print -r -- $'codex\tCodex\t⚡\tcodex codex.js\tcodex'
+    print -r -- $'agy\tAntigravity\t🪐\tagy\tantigravity'
 }
 
 function h-agents {
@@ -92,4 +94,35 @@ function h-agent-session-agent-of {
 
     ecerr "$0: no agent owns: ${transcript}"
     return 1
+}
+##
+function h-agent-launch {
+    #: The preamble every agent launcher shares, then the agent: `nvim' as the
+    #: editor, the instruction files synced ([agfi:h-agents-md-sync-ask];
+    #: `agent_launch_sync_p=n' skips it), the terminal titled `<glyph><cwd>' so
+    #: a tab can be told apart at a glance (`agent_launch_glyph' overrides the
+    #: table's glyph; [agfi:claude-work] uses that), and the proxy environment.
+    #: Anything agent-specific -- Claude's watchdog variables, say -- is set by
+    #: the caller before this runs; `local -x' reaches the child from there.
+    #: Usage: h-agent-launch <agent> <command...>
+    ##
+    local agent="${1}"
+    shift
+    assert-args agent @RET
+    (( $# )) || return 1
+
+    local -x EDITOR=nvim
+    local -x VISUAL="${EDITOR}"
+
+    if bool "${agent_launch_sync_p:-y}" ; then
+        h-agents-md-sync-ask @RET
+    fi
+
+    local glyph="${agent_launch_glyph}"
+    if test -z "${glyph}" ; then
+        glyph="$(h-agent-field "${agent}" glyph)" @RET
+    fi
+    tty-title "${glyph}${PWD:t}"
+
+    $proxyenv "$@"
 }

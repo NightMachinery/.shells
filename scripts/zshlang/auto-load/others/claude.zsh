@@ -1,11 +1,8 @@
 ##
 function claude {
-    #: @duplicateCode/fd706e6b8475e27ca5cf27951b1d8ddc
+    #: The shared preamble (editor, instruction sync, tab title, proxy) is
+    #: [agfi:h-agent-launch]; what follows is Claude Code's own environment.
     ##
-    local -x EDITOR=nvim
-    local -x VISUAL="${EDITOR}"
-    #: not sure if EDITOR is actually used
-
     #: Dynamic override: `claude_max_retries=30 claude ...` (or `claude-m`,
     #: `claude-work`, which call this function). Unattended children started
     #: by the tmux-subagents skill need a finite count so an API outage makes
@@ -24,17 +21,8 @@ function claude {
     local debug_file="${HOME}/tmp/claude-code/${EPOCHSECONDS}.debug.log"
     local -x CLAUDE_CODE_DEBUG_LOG_LEVEL=verbose
 
-    #: Keeps ~/.claude/CLAUDE.md current with its sources; asks before
-    #: launching with stale instructions.
-    h-agents-md-sync-ask @RET
-
-    #: The marker is how a work tab is told apart from a personal one; see
-    #: [agfi:claude-work]. `local` is dynamically scoped in zsh, so a caller
-    #: can set it without exporting anything.
-    tty-title "${claude_tty_title_marker:-🍼}${PWD:t}"
-
     #: Claude Code rewrites the terminal title continuously (`✳ <summary>'),
-    #: overwriting the marker above within seconds. This makes it leave the
+    #: overwriting the marker [agfi:h-agent-launch] sets within seconds. This makes it leave the
     #: title alone -- at the cost of strategy 3 in
     #: [agfi:h-claude-code-session-of-kitty-window], which maps a kitty window
     #: to a session *by* that title. Strategies 1, 2 and 4 (foreground PID,
@@ -45,7 +33,11 @@ function claude {
         local -x CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
     fi
 
-    $proxyenv command claude "$@"
+    #: The marker is how a work tab is told apart from a personal one; see
+    #: [agfi:claude-work]. `local` is dynamically scoped in zsh, so a caller
+    #: can set it without exporting anything.
+    agent_launch_glyph="${claude_tty_title_marker:-$(h-agent-field claude glyph)}" \
+        h-agent-launch claude command claude "$@"
 }
 aliasfn claude-m claude
 ##
