@@ -97,12 +97,19 @@ function tealy-connect-hook {
 }
 
 function wifi-disconnect-hook {
+    #: A captive-portal login may have lent the Wi-Fi service the network's
+    #: DNS ([agfi:wifi-login-site-dns-switch]); leaving the network is the
+    #: last moment to take it back. A no-op when nothing was switched.
+    wifi-login-site-dns-restore
+
     darwin-net-static-unset
     sleep 5
     darwin-net-static-unset
 }
 
 function wifi-unknown-connect-hook {
+    wifi-login-site-dns-restore
+
     darwin-net-static-unset
     sleep 5
     darwin-net-static-unset

@@ -103,6 +103,47 @@ detection, not a failure of the command.
   to enforce. The prober is a pure function of the network; keeping it one is
   what keeps it testable against =httptest=.
 
+* System DNS switch
+The prober can see the portal through the network's resolver, but the browser
+cannot: it resolves through the pinned 8.8.8.8 and would time out on the
+portal's hostname, and =neverssl.com= along with it. So when the verdict is
+=portal=, the system resolver is =blocked=, and the login URL names a host
+rather than an IP literal, =wifi-login-site-get= calls
+=wifi-login-site-dns-switch=. Gated by =wifi_login_site_dns_switch_p=
+(default =y=); =wifi_login_site_dns_p= (default =y=) gates passing =-dns= at all.
+
+The switch touches only the service carrying the default route
+(=net-default-service=), never every service. It saves that service's manual
+DNS list and name to redis (=wifi_login_site_dns_saved=,
+=wifi_login_site_dns_saved_service=) --- =setnx=, so an earlier save that was
+never restored is not overwritten --- then runs
+=networksetup -setdnsservers <service> Empty=, macOS for "use what the network
+hands out"; no sudo needed on this Mac. The network's resolver itself comes
+from =State:/Network/Service/<primary>/DNS= via =scutil=, which covers DHCP
+and IPv6 RDNSS alike (=ipconfig getoption= is empty here, since IPv4 is
+manual), falling back to the router IP. It is checked with a one-second =dig=
+before it is passed in, because it can be just as dead as ours.
+
+Three paths lead back to =wifi-login-site-dns-restore=, which kills the
+watcher, re-applies the saved list, and deletes the redis vars. It is
+idempotent, so all three may fire.
+- *The watcher.* One marker-named background job in the brish garden
+  (=WIFI_LOGIN_DNS=) polls the detector every five seconds and restores once
+  the verdict is =online=, or after fifteen minutes regardless
+  (=wifi_login_site_dns_poll_s=, =wifi_login_site_dns_timeout_s=).
+- *The SSID hooks.* =wifi-disconnect-hook= and =wifi-unknown-connect-hook=,
+  driven from Hammerspoon, restore on leaving the network. The watcher's
+  fifteen minutes would otherwise leave you on the hotel's resolver at the
+  next cafe.
+- *By hand.* =captive-portal-dns-restore=, for when the login page hangs and
+  you want your DNS back now.
+
+For the length of the login window, everything on that service resolves
+through the hotel's resolver, not just the browser tab. That is the point ---
+it is what makes hostname redirect targets and the =neverssl= bait work --- but
+it also means every other process on the machine sees the hijack until
+=online= comes back or you restore by hand.
+
 * Stdlib only, and =go 1.21=
 Both are load-bearing rather than incidental. The first run of this tool
 happens exactly when there is no internet, so its build must download nothing:
