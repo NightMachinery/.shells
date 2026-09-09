@@ -1,9 +1,14 @@
 ##
-# function var-show {
-#     >&2 typeset -p "$@"
-# }
-alias var-show='>&2 typeset -p'
-alias typ='var-show'
+function var-show {
+    local vars=( "$@" )
+
+    if fn-isTop && isOutTty ; then
+        pbcopy "${(j: :)vars}" || true
+    fi
+
+    >&2 typeset -p "${vars[@]}"
+}
+alias typ='var-show'  #: Do NOT use aliasfn here since we are using fn-isTop
 
 function var-get {
     ec "${(P)1}"
