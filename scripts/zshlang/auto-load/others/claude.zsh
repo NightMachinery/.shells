@@ -6,7 +6,12 @@ function claude {
     local -x VISUAL="${EDITOR}"
     #: not sure if EDITOR is actually used
 
-    local -x CLAUDE_CODE_MAX_RETRIES=2147483647
+    #: Dynamic override: `claude_max_retries=30 claude ...` (or `claude-m`,
+    #: `claude-work`, which call this function). Unattended children started
+    #: by the tmux-subagents skill need a finite count so an API outage makes
+    #: the process exit (the pane dies, the waiter fires) instead of retrying
+    #: forever and looking alive.
+    local -x CLAUDE_CODE_MAX_RETRIES="${claude_max_retries:-2147483647}"
 
     #: [[https://code.claude.com/docs/en/monitoring-usage][Monitoring - Claude Code Docs]]
     # Make stalled streaming connections fail/retry instead of hanging forever-ish.
