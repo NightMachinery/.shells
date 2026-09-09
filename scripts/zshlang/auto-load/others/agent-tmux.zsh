@@ -173,9 +173,16 @@ function codex-session-tmux-autoname {
     h-agent-tmux-autoname codex "${pane}" "${id}" "${transcript}"
 }
 ##
-#: Antigravity. Conversations are summarised in a sqlite database; `title'
-#: has been empty on every conversation seen so far, and `preview' holds a
-#: short generated summary, so that is what gets used.
+#: Antigravity. Conversations are summarised in a sqlite database: `title'
+#: is the name the user gave with `/rename' (or F2 in `/resume'), empty until
+#: then, and `preview' is the title the model generated. The user's wins.
+#:
+#: Hooks live in =~/.gemini/config/hooks.json= (=configFiles/antigravity/=),
+#: run via `sh -c' with agy's environment plus ANTIGRAVITY_CONVERSATION_ID,
+#: synchronously, so the hook line backgrounds the garden call and answers
+#: `{}' to keep agy's log clean. `SessionStart' fires at conversation start
+#: and `Stop' once per turn; `PostInvocation' would fire per model call.
+#: Non-tool events take the handler object directly, not a matcher group.
 typeset -g agy_summaries_db="${HOME}/.gemini/antigravity-cli/conversation_summaries.db"
 
 function agy-conversation-name {

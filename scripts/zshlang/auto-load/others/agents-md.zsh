@@ -263,6 +263,9 @@ typeset -ga agents_md_settings=(
     #: Codex reads hooks from its own file rather than its settings; see
     #: [agfi:codex-session-tmux-autoname].
     "${HOME}/.codex/hooks.json"$'\t'"${NIGHTDIR}/configFiles/codex/hooks.json"
+    #: Antigravity's shared hooks file (the TUI's /hooks writes here too); see
+    #: [agfi:agy-session-tmux-autoname].
+    "${HOME}/.gemini/config/hooks.json"$'\t'"${NIGHTDIR}/configFiles/antigravity/hooks.json"
 )
 
 function h-agents-md-doctor-settings {
