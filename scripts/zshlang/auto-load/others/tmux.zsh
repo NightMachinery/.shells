@@ -366,8 +366,7 @@ function tmux-session-rename-current {
         return 1
     fi
 
-    #: tmux refuses '.' and ':' in session names (they are target syntax).
-    name="${name//[.:]/-}"
+    name="$(h-tmux-session-name-sanitize "${name}")"
 
     command tmux rename-session -t "${TMUX_PANE}" "${name}" @RET
     ecgray "$0: ${name}"
@@ -401,12 +400,15 @@ function tmux-session-rename-current-with-agent {
 }
 
 function tmux-session-rename-current-auto {
-    : "renames to '@Claude/<profile> <the Claude Code session's own name>'; needs no argument"
-    #: The same name the hooks would give it ([agfi:h-claude-code-session-tmux-name]),
-    #: so doing it by hand and letting the hook do it agree. Only Claude Code
-    #: exports enough to find its transcript
-    #: ([agfi:claude-code-session-current-file]); Codex and agy would need
-    #: their own lookups.
+    : "renames to '@<Agent> <the agent session's own name>'; needs no argument"
+    #: The same name the hooks would give it ([agfi:h-agent-session-tmux-name]),
+    #: so doing it by hand and letting the hook do it agree.
+    #:
+    #: Finding *which* session we are in differs per agent. Claude Code
+    #: exports its session id ([agfi:claude-code-session-current-file]).
+    #: Codex and agy export nothing usable, so their hooks leave the identity
+    #: on the tmux session itself ([agfi:agent-tmux-identity-get]), and this
+    #: reads it back; until the first hook has fired there is nothing to read.
     ##
     local agent
     agent="$(ai-agent-name)" || {
@@ -416,14 +418,37 @@ function tmux-session-rename-current-auto {
         ecgray "$0: not inside an AI agent; leaving the session name alone"
         return 0
     }
-    if [[ "${agent}" != claude ]] ; then
-        ecerr "$0: reading the session name is only implemented for Claude Code, not ${agent}"
-        return 1
+
+    local id='' transcript=''
+    case "${agent}" in
+        claude)
+            transcript="$(claude-code-session-current-file)" @RET
+            ;;
+        codex)
+            id="${CODEX_THREAD_ID:-${CODEX_SESSION_ID}}"
+            ;;
+        agy)
+            id="${ANTIGRAVITY_CONVERSATION_ID}"
+            ;;
+    esac
+
+    if test -z "${id}${transcript}" ; then
+        local recorded
+        recorded="$(agent-tmux-identity-get 2>/dev/null)" || {
+            ecerr "$0: cannot tell which ${agent} session this is: nothing in the environment, and its hook has not recorded one on this tmux session yet"
+            return 1
+        }
+        local -a f
+        f=("${(@ps:\t:)recorded}")
+        if [[ "${f[1]}" != "${agent}" ]] ; then
+            ecerr "$0: this tmux session was last claimed by ${f[1]}, not ${agent}"
+            return 1
+        fi
+        id="${f[2]}" transcript="${f[3]}"
     fi
 
-    local transcript name
-    transcript="$(claude-code-session-current-file)" @RET
-    name="$(h-claude-code-session-tmux-name "${transcript}")" @RET
+    local name
+    name="$(h-agent-session-tmux-name "${agent}" "${id}" "${transcript}")" @RET
 
     tmux-session-rename-current "${name}"
 }
@@ -434,12 +459,12 @@ aliasfn tnameme tmux-session-rename-current-auto
 ##
 function tmux-session-autoname {
     : "on|off|unset|status: may Claude Code's hooks rename the tmux session this shell runs in?"
-    #: Sets the session-level =@claude_autoname=, which beats the global default
+    #: Sets the session-level =@agent_autoname=, which beats the global default
     #: from =~/.tmux.conf=. `unset' returns to that default. `on' also renames
     #: right away when run from inside Claude Code, so the effect is visible.
     ##
     local mode="${1:-status}"
-    local opt="${claude_code_tmux_autoname_option}"
+    local opt="${agent_tmux_autoname_option}"
 
     if ! isTmux ; then
         ecerr "$0: not inside tmux"
@@ -475,11 +500,11 @@ function tmux-session-autoname {
 }
 
 function tmux-session-autoname-global {
-    : "on|off|unset: the default for every tmux session without its own @claude_autoname"
+    : "on|off|unset: the default for every tmux session without its own @agent_autoname"
     #: For the running server only; the persistent default lives in =~/.tmux.conf=.
     local mode="${1}"
     assert-args mode @RET
-    local opt="${claude_code_tmux_autoname_option}"
+    local opt="${agent_tmux_autoname_option}"
 
     case "${mode}" in
         on|off) command tmux set-option -g "${opt}" "${mode}" @RET ;;

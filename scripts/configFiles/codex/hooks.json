@@ -1,0 +1,29 @@
+{
+  "description": "Name the tmux session after the Codex thread; see ~/scripts/docs/tmux-session-rename.md",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
