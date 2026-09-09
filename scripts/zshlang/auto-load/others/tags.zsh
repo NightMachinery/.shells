@@ -100,6 +100,10 @@ function ntag-filter-or-toggle {
 ##
 function ntag-l {
     if isI && istty ; then
+        if fn-isTop l ; then
+            exa --no-quotes -a --color never "$@" | pbcopy
+        fi
+
         exa --no-quotes -a --color always "$@" | ntag-color | rtl-reshaper-fast
     else
         exa --no-quotes -a "$@"
