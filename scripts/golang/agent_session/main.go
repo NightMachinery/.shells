@@ -18,15 +18,17 @@ import (
 	"runtime"
 
 	"agent_session/internal/claude"
+	"agent_session/internal/codex"
 	"agent_session/internal/session"
 	"agent_session/internal/turns"
 )
 
 // The agents this binary knows, in the order `agents` lists them.
-var agentNames = []string{"claude"}
+var agentNames = []string{"claude", "codex"}
 
 var adapters = map[string]session.Adapter{
 	"claude": claude.Adapter{},
+	"codex":  codex.Adapter{},
 }
 
 func main() {
@@ -99,6 +101,7 @@ func usage() {
   agent_session <agent> live           <root>...      #: TSV of live sessions (pid, id, name, cwd, transcript, tmux, status)
 
 agents: claude (Claude Code; roots are <config-home>/projects directories)
+        codex  (Codex CLI; roots are <CODEX_HOME>/sessions directories)
 
 render flags:
   -format md|org|org-pandoc   output syntax (default md). org-pandoc pipes the

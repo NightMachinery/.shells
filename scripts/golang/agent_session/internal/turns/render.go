@@ -723,7 +723,7 @@ func (r *renderer) renderToolInput(name string, in map[string]json.RawMessage, r
 		v := in[k]
 
 		if s, ok := asString(v); ok {
-			sections = append(sections, section{key: k, lang: langForKey(k, lang), body: s, prose: proseKeys[k]})
+			sections = append(sections, section{key: k, lang: langForKey(k, lang, s), body: s, prose: proseKeys[k]})
 			continue
 		}
 
@@ -750,12 +750,17 @@ func (r *renderer) renderToolInput(name string, in map[string]json.RawMessage, r
 	}
 }
 
-func langForKey(key, pathLang string) string {
+func langForKey(key, pathLang, body string) string {
 	switch key {
 	case "command":
 		return "zsh"
 	case "content", "old_string", "new_string":
 		return pathLang
+	case "input":
+		// Codex's apply_patch carries its patch here.
+		if strings.HasPrefix(strings.TrimSpace(body), "*** Begin Patch") {
+			return "diff"
+		}
 	}
 	return ""
 }
@@ -824,6 +829,33 @@ func toolHeadline(name string, in map[string]json.RawMessage) string {
 		if d, ok := stringAt(in, "description"); ok {
 			return Truncate(OneLine(d), 80)
 		}
+
+	// Codex.
+	case "shell", "exec_command", "container.exec":
+		if c := FirstString(in, "command", "cmd"); c != "" {
+			return Truncate(FirstLine(c), 80)
+		}
+
+	case "apply_patch":
+		if p, ok := stringAt(in, "input"); ok {
+			return Truncate(patchFiles(p), 80)
+		}
+
+	case "update_plan":
+		if e, ok := stringAt(in, "explanation"); ok && e != "" {
+			return Truncate(OneLine(e), 80)
+		}
+		var plan []struct {
+			Step string `json:"step"`
+		}
+		if json.Unmarshal(in["plan"], &plan) == nil && len(plan) > 0 {
+			return Truncate(OneLine(plan[0].Step), 80)
+		}
+
+	case "web_search":
+		if q, ok := stringAt(in, "query"); ok {
+			return Truncate(OneLine(q), 80)
+		}
 	}
 
 	return ""
@@ -841,4 +873,18 @@ func ShortDuration(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
 	}
+}
+
+// The files an apply_patch input touches, for its heading: `*** Update File:
+// a.go`, `*** Add File: b.go`, `*** Delete File: c.go` lines, in order.
+func patchFiles(patch string) string {
+	var files []string
+	for _, ln := range strings.Split(patch, "\n") {
+		for _, prefix := range []string{"*** Update File: ", "*** Add File: ", "*** Delete File: "} {
+			if strings.HasPrefix(ln, prefix) {
+				files = append(files, AbbrevHome(strings.TrimSpace(strings.TrimPrefix(ln, prefix))))
+			}
+		}
+	}
+	return strings.Join(files, ", ")
 }
