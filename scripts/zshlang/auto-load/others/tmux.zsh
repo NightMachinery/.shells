@@ -341,3 +341,87 @@ function tmux-attach {
     tmux a -t "${session}"
 }
 ##
+#: Naming the session you are in. Aimed at shells spawned by an AI agent
+#: inside tmux, so the tmux session can carry the agent session's name. Every
+#: target goes through =$TMUX_PANE=: an agent's shell has no attached client,
+#: so "the current session" has to be derived from the pane.
+##
+function tmux-session-current-get {
+    : "prints the name of the tmux session this shell runs in"
+    if ! isTmux ; then
+        ecerr "$0: not inside tmux"
+        return 1
+    fi
+
+    command tmux display-message -p -t "${TMUX_PANE}" '#S'
+}
+
+function tmux-session-rename-current {
+    : "renames the tmux session this shell runs in"
+    local name="${1}"
+    assert-args name @RET
+
+    if ! isTmux ; then
+        ecerr "$0: not inside tmux"
+        return 1
+    fi
+
+    #: tmux refuses '.' and ':' in session names (they are target syntax).
+    name="${name//[.:]/-}"
+
+    command tmux rename-session -t "${TMUX_PANE}" "${name}" @RET
+    ecgray "$0: ${name}"
+}
+
+function h-tmux-session-agent-prefix {
+    : "prints claude/<profile>, codex or agy for the agent that spawned this shell"
+    local agent
+    if ! agent="$(ai-agent-name)" ; then
+        ecerr "$0: no AI agent detected in this shell's environment"
+        return 1
+    fi
+
+    if [[ "${agent}" == claude ]] ; then
+        ec "claude/$(claude-code-profile-current)"
+    else
+        ec "${agent}"
+    fi
+}
+
+function tmux-session-rename-current-with-agent {
+    : "like [agfi:tmux-session-rename-current], prefixed by the agent running this shell, e.g. claude/work-NAME"
+    local name="${1}"
+    assert-args name @RET
+
+    local prefix
+    prefix="$(h-tmux-session-agent-prefix)" @RET
+
+    tmux-session-rename-current "${prefix}-${name}"
+}
+
+function tmux-session-rename-current-auto {
+    : "renames to <agent prefix>-<the agent session's own name>; needs no argument"
+    #: Only Claude Code exports enough to find its transcript
+    #: ([agfi:claude-code-session-current-file]); Codex and agy would need
+    #: their own lookups.
+    ##
+    local agent
+    agent="$(ai-agent-name)" || {
+        ecerr "$0: no AI agent detected in this shell's environment"
+        return 1
+    }
+    if [[ "${agent}" != claude ]] ; then
+        ecerr "$0: reading the session name is only implemented for Claude Code, not ${agent}"
+        return 1
+    fi
+
+    local name
+    name="$(claude-code-session-current-name)" @RET
+
+    tmux-session-rename-current-with-agent "${name}"
+}
+aliasfn tsrc tmux-session-rename-current
+aliasfn tsrcag tmux-session-rename-current-with-agent
+aliasfn tsrca tmux-session-rename-current-auto
+aliasfn tnameme tmux-session-rename-current-auto
+##
