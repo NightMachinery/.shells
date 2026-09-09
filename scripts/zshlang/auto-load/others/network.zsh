@@ -304,20 +304,85 @@ function h-wifi-login-site-dep {
     ensure-dep1 wifi-login-site go-install-local "${NIGHTDIR}/golang/wifi-login-site" @RET
 }
 
+function net-dns-network-get {
+    : "prints the DNS servers this network advertised (DHCP or IPv6 RA), one per line, falling back to the router"
+    #: macOS keeps them in the State store even when the Setup store pins
+    #: manual servers, which is exactly the case where we need them: a captive
+    #: network blocks our 8.8.8.8 until we log in, but its own resolver works.
+    #: `ipconfig getoption en0 domain_name_server` is empty on this Mac, since
+    #: [agfi:darwin-net-static-set] leaves it with no DHCP lease at all.
+    ##
+    @darwinOnly
+
+    local global
+    global="$(ec 'show State:/Network/Global/IPv4' | scutil)" @TRET
+
+    local servers=()
+    if [[ "${global}" =~ 'PrimaryService\s*:\s*(\S+)' ]] ; then
+        servers=( ${(@f)"$(ec "show State:/Network/Service/${match[1]}/DNS" |
+            scutil |
+            perl -ne 'if (/ServerAddresses\s*:\s*<array>/) { $in = 1 ; next }
+                      if ($in && /^\s*}/) { $in = 0 }
+                      if ($in && /^\s*\d+\s*:\s*(\S+)/) { print "$1\n" }')"} )
+    fi
+
+    if (( ${#servers} == 0 )) ; then
+        #: Gateways on captive networks nearly always forward DNS themselves.
+        servers=( "$(router-ip)" ) @TRET
+    fi
+
+    print -rl -- "${servers[@]}"
+}
+
+function net-dns-alive-p {
+    : "returns 0 iff the given DNS server answers a query within a second"
+    local server="${1:?}"
+    local name="${net_dns_alive_name:-captive.apple.com}"
+    ensure-cmd dig @RET
+
+    #: dig exits 0 on any answer, NXDOMAIN included, and 9 when nothing
+    #: replied; an answered query is all "alive" means here.
+    command dig +short +time=1 +tries=1 "${name}" "@${server}" &> /dev/null
+}
+
+function net-dns-network-alive-get {
+    : "prints the first advertised DNS server that answers, or fails"
+    local s
+    for s in ${(@f)"$(net-dns-network-get)"} ; do
+        if net-dns-alive-p "${s}" ; then
+            ec "${s}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+##
 function h-wifi-login-site-raw {
     : "runs the detector, printing its JSON verdict"
+    local dns_p="${wifi_login_site_dns_p:-y}"
     h-wifi-login-site-dep @RET
 
     local opts=()
     test -z "${wifi_login_site_timeout}" ||
         opts+=(-timeout "${wifi_login_site_timeout}")
 
+    if bool "${dns_p}" ; then
+        #: Ask the network's own resolver as well; see [agfi:net-dns-network-get].
+        #: Only a live one: a dead one would cost a full timeout for nothing.
+        local dns
+        if dns="$(net-dns-network-alive-get 2>/dev/null)" && test -n "${dns}" ; then
+            opts+=(-dns "${dns}")
+        fi
+    fi
+
     wifi-login-site detect "$opts[@]"
 }
 
 function h-wifi-login-site-detect {
-    : "prints this network's verdict as tab-separated state, url and via"
-    h-wifi-login-site-raw | jq -r '[.state, .url // "", .via // ""] | @tsv'
+    : "prints this network's verdict as tab-separated state, url, via and the system resolver's own state"
+    h-wifi-login-site-raw |
+        jq -r '[.state, .url // "", .via // "", .resolvers.system // ""] | @tsv'
 }
 
 function wifi-login-site-explain {
@@ -341,11 +406,20 @@ function net-captive-portal-p {
     [[ "${f[1]}" == portal ]]
 }
 
+function h-url-host-ip-p {
+    : "returns 0 iff the URL's host is an IP literal, which no resolver is needed for"
+    local url="${1:?}"
+
+    [[ "${url}" =~ '^[a-zA-Z][a-zA-Z0-9+.-]*://(\d{1,3}(\.\d{1,3}){3}|\[[0-9a-fA-F:.]+\])(:\d+)?(/|\?|#|$)' ]]
+}
+
 function wifi-login-site-get {
     : "prints the URL to open to log into the current public Wi-Fi"
     #: Cascade, strongest evidence first. The reasoning behind each rung is in
     #: =golang/wifi-login-site/readme.org=.
     ##
+    local dns_switch_p="${wifi_login_site_dns_switch_p:-y}"
+
     local tsv=''
     tsv="$(h-wifi-login-site-detect)" || tsv=''
 
@@ -360,7 +434,7 @@ function wifi-login-site-get {
 
     local -a f
     f=("${(@ps:\t:)tsv}")
-    local state="${f[1]}" url="${f[2]}" out=''
+    local state="${f[1]}" url="${f[2]}" system_dns="${f[4]}" out=''
 
     case "${state}" in
         portal)
@@ -370,6 +444,15 @@ function wifi-login-site-get {
             else
                 #: Hijacked in place, so any plain-HTTP page lands on the portal.
                 out="${wifi_login_site_bait_url}"
+            fi
+
+            if bool "${dns_switch_p}" && [[ "${system_dns}" == blocked ]] &&
+                    ! h-url-host-ip-p "${out}" ; then
+                #: The portal was seen only through the network's resolver; the
+                #: browser, resolving through our pinned servers, would never
+                #: find that hostname. Lend it the network's DNS until the
+                #: login is done. Chatter to stderr: stdout is the URL.
+                wifi-login-site-dns-switch >&2 @STRUE
             fi
             ;;
         blocked|unknown)
@@ -407,12 +490,126 @@ function wifi-login-site-open {
     reval-ec browser-open "${url}"
 }
 ##
+#: Lending the browser the network's DNS. The prober can see a portal through
+#: the network's resolver (=-dns=), but the browser resolves through the
+#: manual list pinned on the Wi-Fi service, which the portal blocks. So for the
+#: duration of the login the service's manual list is cleared -- =Empty= is
+#: macOS for "use what the network handed out" -- and put back afterwards.
+#: Needs no sudo on this Mac. Three things put it back, all idempotent:
+#:   - the WIFI_LOGIN_DNS watcher, once the verdict is online or on timeout;
+#:   - the SSID hooks in =monitor/hooks.zsh=, on leaving the network;
+#:   - [agfi:wifi-login-site-dns-restore], by hand.
+#: The saved list lives in redis so any of the three, in any shell, can find it.
+##
+typeset -g WIFI_LOGIN_DNS_MARKER='WIFI_LOGIN_DNS'
+redis-defvar wifi_login_site_dns_saved
+redis-defvar wifi_login_site_dns_saved_service
+
+function h-wifi-login-site-dns-current {
+    : "prints the manual DNS list of the given service, space-joined, or Empty"
+    local svc="${1:?}"
+
+    local out
+    out="$(@opts networks [ "${svc}" ] quiet_p y @ darwin-dns-get)" @TRET
+
+    if [[ "${out}" == *"There aren't any DNS Servers"* ]] ; then
+        ec Empty
+    else
+        ec "${(j: :)${(f)out}}"
+    fi
+}
+
+function wifi-login-site-dns-switch {
+    : "makes the default-route service use the network's own DNS until [agfi:wifi-login-site-dns-restore]"
+    local timeout_s="${wifi_login_site_dns_timeout_s:-900}"
+    @darwinOnly
+
+    local svc
+    svc="$(net-default-service)" @TRET
+    if test -z "${svc}" ; then
+        ecerr "$0: no network service carries the default route"
+        return 1
+    fi
+
+    local current
+    current="$(h-wifi-login-site-dns-current "${svc}")" @TRET
+
+    if [[ "${current}" == Empty ]] && test -z "$(wifi_login_site_dns_saved_get)" ; then
+        ecgray "$0: ${svc} already uses the network's DNS; nothing to switch"
+        return 0
+    fi
+
+    #: setnx: if an earlier switch was never restored, the real list is the
+    #: one already saved, and what we see now is just our own Empty.
+    wifi_login_site_dns_saved_service_setnx "${svc}"
+    wifi_login_site_dns_saved_setnx "${current}"
+
+    @opts networks [ "${svc}" ] @ darwin-dns-set Empty @RET
+
+    #: One watcher at a time; restarting it is how the deadline is refreshed.
+    #: In the garden, so it outlives the terminal that opened the portal.
+    kill-marker "${WIFI_LOGIN_DNS_MARKER}" &> /dev/null || true
+    awaysh-bnamed "${WIFI_LOGIN_DNS_MARKER}" h-wifi-login-site-dns-watch "${timeout_s}"
+
+    ecgray "$0: ${svc} now resolves through the network's DNS; restoring once online or in ${timeout_s}s"
+}
+
+function h-wifi-login-site-dns-restore-apply {
+    : "puts the saved DNS list back and forgets it; does not touch the watcher"
+    #: Split from [agfi:wifi-login-site-dns-restore] because the watcher calls
+    #: this on itself, and killing its own marker first would leave the list
+    #: un-restored.
+    ##
+    local saved svc
+    saved="$(wifi_login_site_dns_saved_get)" @TRET
+    svc="$(wifi_login_site_dns_saved_service_get)" @TRET
+
+    if test -z "${saved}" || test -z "${svc}" ; then
+        #: Nothing switched, or already restored. Silent: the SSID hooks call
+        #: this on every network change.
+        return 0
+    fi
+
+    @opts networks [ "${svc}" ] @ darwin-dns-set ${=saved} @RET
+
+    wifi_login_site_dns_saved_del
+    wifi_login_site_dns_saved_service_del
+    ecgray "$0: ${svc} DNS restored to: ${saved}"
+}
+
+function wifi-login-site-dns-restore {
+    : "undoes [agfi:wifi-login-site-dns-switch]: stops the watcher and puts the saved DNS list back"
+    kill-marker "${WIFI_LOGIN_DNS_MARKER}" &> /dev/null || true
+    h-wifi-login-site-dns-restore-apply
+}
+
+function h-wifi-login-site-dns-watch {
+    : "the WIFI_LOGIN_DNS job: polls until the portal is solved or the deadline passes, then restores"
+    local deadline_s="${1:-900}"
+    local poll_s="${wifi_login_site_dns_poll_s:-5}"
+
+    local start="${EPOCHSECONDS}" tsv state
+    while (( EPOCHSECONDS - start < deadline_s )) ; do
+        sleep "${poll_s}"
+
+        tsv="$(h-wifi-login-site-detect 2> /dev/null)" || continue
+        state="${${(@ps:\t:)tsv}[1]}"
+        if [[ "${state}" == online ]] ; then
+            break
+        fi
+    done
+
+    h-wifi-login-site-dns-restore-apply
+}
+##
 #: The same surface under the other name this thing goes by. [agfi:aliasfn]
 #: defines real functions, so these complete and can be swapped like any other.
 aliasfn captive-portal-open wifi-login-site-open
 aliasfn captive-portal-url wifi-login-site-get
 aliasfn captive-portal-explain wifi-login-site-explain
 aliasfn captive-portal-p net-captive-portal-p
+aliasfn captive-portal-dns-switch wifi-login-site-dns-switch
+aliasfn captive-portal-dns-restore wifi-login-site-dns-restore
 #: ... and the predicate under the wifi-login-site prefix, for symmetry.
 aliasfn wifi-login-site-p net-captive-portal-p
 ##
@@ -608,5 +805,26 @@ function net-default-ipv4 {
     iface="$(net-default-interface)" || return 1
 
     command ipconfig getifaddr "$iface" 2>/dev/null
+}
+
+function net-default-service {
+    : "outputs the networksetup service name of the interface carrying the default route, e.g. Wi-Fi"
+    #: For the `networksetup -set*` family, which wants the service, not the
+    #: device. [agfi:darwin-proxies-gen] walks every service; this names the
+    #: one to pass when a setting must not leak into the VPN tunnels.
+    ##
+    @darwinOnly
+
+    local iface
+    iface="$(net-default-interface)" || return 1
+
+    #: Two lines per service:
+    #:   (4) Wi-Fi
+    #:   (Hardware Port: Wi-Fi, Device: en0)
+    #: A disabled service has `(*)` in place of the number.
+    iface="${iface}" perl -ne '
+        if (/^\((?:\*|\d+)\)\s+(.*?)\s*$/) { $svc = $1 ; next }
+        if (/^\(Hardware Port:.*,\s*Device:\s*\Q$ENV{iface}\E\)/) { print "$svc\n" ; exit }
+    ' <<< "$(command networksetup -listnetworkserviceorder)"
 }
 ##
