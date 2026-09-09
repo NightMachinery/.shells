@@ -116,8 +116,10 @@ hook discards output, and a broken rename must not cost a prompt.
   `tmux display-message -p -t "$TMUX_PANE" '#S'`. That inherits
   `$TMUX_PANE`'s failure modes from `./tmux-tty-title.md`: `tmux run-shell`
   and garden shells.
-- `tnameme` is Claude Code only. Codex and Antigravity have no session-name
-  lookup yet; use `tsrcag NAME` there.
+- `tnameme` renames only inside Claude Code. In a plain shell it does nothing
+  and succeeds, so it is safe in launchers that run in both. Codex and
+  Antigravity have no session-name lookup yet and get an error; use
+  `tsrcag NAME` there.
 - The `agy` detection marker is carried over from Gemini CLI, not verified
   against a real `agy` shell.
 - tmux rejects `.` and `:` in session names, so they are replaced with `-`
