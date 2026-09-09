@@ -46,7 +46,7 @@ fi
 #: Bare command names when the garden could not be reached, rather than empty
 #: strings: `--preview " {2}"' would have fzf try to run the transcript path.
 parts=( ${(@f)"$("${brishzq}" h-claude-code-session-fz-parts)"} )
-preview_cmd="${parts[1]:-claude_session preview}"
+preview_cmd="${parts[1]:-agent_session claude preview}"
 open_cmd="${parts[2]:-brishzb.dash claude-code-view-session-toggle}"
 #: An array, not `${header:+--header "${header}"}': zsh does not word-split an
 #: unquoted expansion, so that form reaches fzf as the single argument
