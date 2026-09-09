@@ -460,7 +460,7 @@ aliasfn tsrca tmux-session-rename-current-auto
 aliasfn tnameme tmux-session-rename-current-auto
 ##
 function tmux-session-autoname {
-    : "on|off|unset|status: may Claude Code's hooks rename the tmux session this shell runs in?"
+    : "on|off|unset|status: may the agents' hooks rename the tmux session this shell runs in?"
     #: Sets the session-level =@agent_autoname=, which beats the global default
     #: from =~/.tmux.conf=. `unset' returns to that default. `on' also renames
     #: right away when run from inside Claude Code, so the effect is visible.
@@ -477,7 +477,8 @@ function tmux-session-autoname {
         on|off)
             command tmux set-option -t "${TMUX_PANE}" "${opt}" "${mode}" @RET
             ecgray "$0: $(tmux-session-current-get): ${mode}"
-            if [[ "${mode}" == on ]] && claude-code-p ; then
+            if [[ "${mode}" == on ]] ; then
+                #: A silent no-op outside an agent, so no guard is needed.
                 tmux-session-rename-current-auto
             fi
             ;;
