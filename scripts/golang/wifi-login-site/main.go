@@ -17,6 +17,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -24,6 +25,10 @@ import (
 	"sync"
 	"time"
 )
+
+// resolverSystem names the OS resolver in probe results. Any other resolver is
+// named by the DNS server address it was given with -dns.
+const resolverSystem = "system"
 
 // The aggregate verdict, and each probe's own verdict.
 const (
@@ -79,10 +84,13 @@ func defaultProbes() []probe {
 }
 
 type ProbeResult struct {
-	Name   string `json:"name"`
-	URL    string `json:"url"`
-	State  string `json:"state"`
-	Status int    `json:"status,omitempty"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
+	// Resolver is which DNS answered for this probe: "system", or a server
+	// passed with -dns.
+	Resolver string `json:"resolver"`
+	State    string `json:"state"`
+	Status   int    `json:"status,omitempty"`
 	// Location is the login URL the network handed us, when it sent a redirect.
 	Location string `json:"location,omitempty"`
 	Detail   string `json:"detail,omitempty"`
@@ -91,10 +99,23 @@ type ProbeResult struct {
 type Result struct {
 	State string `json:"state"`
 	// URL is the page to open, set only when a probe was redirected to one.
-	URL    string        `json:"url,omitempty"`
-	Via    string        `json:"via,omitempty"`
-	Detail string        `json:"detail,omitempty"`
-	Probes []ProbeResult `json:"probes"`
+	URL    string `json:"url,omitempty"`
+	Via    string `json:"via,omitempty"`
+	Detail string `json:"detail,omitempty"`
+	// Resolvers is each resolver's own verdict, keyed like ProbeResult.Resolver.
+	// The caller compares them: "portal" through the network's DNS next to
+	// "blocked" through the system's means the system resolver is what this
+	// network is blocking, and the browser will need the network's until the
+	// login is done.
+	Resolvers map[string]string `json:"resolvers,omitempty"`
+	Probes    []ProbeResult     `json:"probes"`
+}
+
+// resolverClient pairs an HTTP client with the name of the DNS resolver it
+// dials through, so results can say which one they came from.
+type resolverClient struct {
+	Name   string
+	Client *http.Client
 }
 
 // newClient returns a client suitable for probing the network in front of us.
@@ -104,21 +125,62 @@ type Result struct {
 // about whether this Wi-Fi wants a login. Redirects are not followed either --
 // a portal's redirect target is the very answer we want, and following it
 // would replace that answer with whatever the login page happens to serve.
-func newClient(timeout time.Duration) *http.Client {
+//
+// dnsAddr, when non-empty, is a host:port DNS server that every hostname in a
+// probe URL is resolved through, bypassing the OS resolver. Captive networks
+// commonly block outside DNS until you log in while their own resolver keeps
+// answering (often with the portal's own address for every name), so the OS
+// resolver, when it is pinned to public servers, cannot see the portal at all.
+func newClient(timeout time.Duration, dnsAddr string) *http.Client {
+	tr := &http.Transport{
+		Proxy:             nil,
+		DisableKeepAlives: true,
+	}
+	if dnsAddr != "" {
+		r := &net.Resolver{
+			// The pure-Go resolver is the only one that honours Dial.
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, network, dnsAddr)
+			},
+		}
+		tr.DialContext = (&net.Dialer{Resolver: r}).DialContext
+	}
 	return &http.Client{
-		Timeout: timeout,
-		Transport: &http.Transport{
-			Proxy:             nil,
-			DisableKeepAlives: true,
-		},
+		Timeout:   timeout,
+		Transport: tr,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
 }
 
-func runProbe(ctx context.Context, c *http.Client, p probe) ProbeResult {
-	out := ProbeResult{Name: p.Name, URL: p.URL}
+// newClients builds the system-resolver client plus one per -dns server.
+func newClients(timeout time.Duration, dnsServers []string) []resolverClient {
+	out := []resolverClient{{Name: resolverSystem, Client: newClient(timeout, "")}}
+	for _, s := range dnsServers {
+		out = append(out, resolverClient{Name: s, Client: newClient(timeout, withDNSPort(s))})
+	}
+	return out
+}
+
+// withDNSPort appends :53 to a bare IP (v4 or v6) and leaves host:port alone.
+func withDNSPort(s string) string {
+	if _, _, err := net.SplitHostPort(s); err == nil {
+		return s
+	}
+	return net.JoinHostPort(strings.Trim(s, "[]"), "53")
+}
+
+func runProbe(ctx context.Context, rc resolverClient, p probe) ProbeResult {
+	c := rc.Client
+	out := ProbeResult{Name: p.Name, URL: p.URL, Resolver: rc.Name}
+	if rc.Name != resolverSystem {
+		// Keep the names unique across resolvers, so a reader can tell
+		// apple-through-the-network from apple-through-the-system at a glance.
+		out.Name = p.Name + "@" + rc.Name
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.URL, nil)
 	if err != nil {
@@ -181,26 +243,51 @@ func absolutize(base, loc string) string {
 	return l.String()
 }
 
-func detect(ctx context.Context, c *http.Client, ps []probe) Result {
-	results := make([]ProbeResult, len(ps))
+// detect runs every probe once through every resolver, all at once.
+func detect(ctx context.Context, cs []resolverClient, ps []probe) Result {
+	results := make([]ProbeResult, len(cs)*len(ps))
 
 	// Concurrent because every failure mode here is a timeout: a portal that
 	// blackholes traffic makes each probe hang to its deadline, so probing in
 	// sequence would cost the sum of the timeouts rather than the largest.
 	var wg sync.WaitGroup
-	for i, p := range ps {
-		wg.Add(1)
-		go func(i int, p probe) {
-			defer wg.Done()
-			results[i] = runProbe(ctx, c, p)
-		}(i, p)
+	for ci, rc := range cs {
+		for pi, p := range ps {
+			wg.Add(1)
+			go func(i int, rc resolverClient, p probe) {
+				defer wg.Done()
+				results[i] = runProbe(ctx, rc, p)
+			}(ci*len(ps)+pi, rc, p)
+		}
 	}
 	wg.Wait()
 
 	return aggregate(results)
 }
 
-// aggregate reduces the per-probe verdicts to one.
+// aggregate reduces the per-probe verdicts to one, and records each
+// resolver's own verdict alongside.
+//
+// The overall verdict is taken across all resolvers, so a portal seen only
+// through the network's DNS still wins: that is the whole point of asking it.
+func aggregate(results []ProbeResult) Result {
+	out := summarize(results)
+	out.Probes = results
+
+	byResolver := map[string][]ProbeResult{}
+	for _, r := range results {
+		byResolver[r.Resolver] = append(byResolver[r.Resolver], r)
+	}
+	if len(byResolver) > 0 {
+		out.Resolvers = make(map[string]string, len(byResolver))
+		for name, rs := range byResolver {
+			out.Resolvers[name] = summarize(rs).State
+		}
+	}
+	return out
+}
+
+// summarize reduces a set of probe verdicts to one state, URL and detail.
 //
 // Precedence: a portal that named its login URL, then a portal that did not,
 // then online, then blocked.
@@ -214,8 +301,8 @@ func detect(ctx context.Context, c *http.Client, ps []probe) Result {
 // only where Google and Mozilla are, which is not everywhere -- so positive
 // evidence that HTTP works beats the absence of an answer elsewhere. Reading
 // online+blocked as a portal would misfire under plain censorship.
-func aggregate(results []ProbeResult) Result {
-	out := Result{Probes: results}
+func summarize(results []ProbeResult) Result {
+	var out Result
 
 	var online, portal, blocked int
 	for _, r := range results {
@@ -301,8 +388,10 @@ func run(args []string) error {
 	timeout := fs.Duration("timeout", 5*time.Second, "give up on a probe after this long")
 	over := probeFlag{}
 	fs.Var(&over, "probe", "override a probe's URL, as name=url (repeatable; for testing)")
+	var dns listFlag
+	fs.Var(&dns, "dns", "also probe through this DNS server, an IP with optional :port (repeatable)")
 	fs.Usage = func() {
-		fmt.Fprint(fs.Output(), "usage: wifi-login-site detect [-timeout 5s] [-probe name=url]\n\n"+
+		fmt.Fprint(fs.Output(), "usage: wifi-login-site detect [-timeout 5s] [-dns ip] [-probe name=url]\n\n"+
 			"Reports, as JSON, whether this network is behind a captive portal\n"+
 			"and which URL to open to log in.\n\n")
 		fs.PrintDefaults()
@@ -326,7 +415,20 @@ func run(args []string) error {
 	// detection, not a failure of this command.
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	return enc.Encode(detect(ctx, newClient(*timeout), ps))
+	return enc.Encode(detect(ctx, newClients(*timeout, dns), ps))
+}
+
+// listFlag collects a repeatable string flag.
+type listFlag []string
+
+func (f *listFlag) String() string { return strings.Join(*f, ",") }
+
+func (f *listFlag) Set(v string) error {
+	if v == "" {
+		return fmt.Errorf("empty value")
+	}
+	*f = append(*f, v)
+	return nil
 }
 
 func main() {
