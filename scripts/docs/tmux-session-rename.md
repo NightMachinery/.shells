@@ -1,9 +1,11 @@
 # Naming a tmux session after the agent inside it
 
-`tmux-session-rename-current-auto` (`tnameme`) renames the tmux session a
-shell runs in after the Claude Code session running inside it. Type
-`! tnameme` at a Claude Code prompt and `scripts-claudework2` becomes
-`claude/work-wifi-dns-captive-portal`.
+A tmux session that has a Claude Code session inside it is renamed after
+that session automatically, by a hook: `scripts-claudework2` becomes
+`@claude/work-wifi-dns-captive-portal` on the first prompt, and follows the
+title as it changes. `tmux-session-rename-current-auto` (`tnameme`) does the
+same by hand -- type `! tnameme` at a Claude Code prompt -- and is the entry
+point for shells the hook does not reach.
 
 ## Why
 
@@ -50,6 +52,51 @@ The `!` prefix is what makes this work. It runs the command in the agent's own
 shell, where that environment exists. From another pane of the same session
 the variables are absent and `tnameme` has nothing to read.
 
+## Automatic renaming
+
+Two hook entries in `configFiles/claude-code/settings.json` (shared: both
+profiles symlink to it) do the renaming without anyone typing `tnameme`.
+`SessionStart` fires on startup, `--resume`, `/clear` and compaction;
+`UserPromptSubmit` fires on every prompt, so a `/rename` or a title Claude
+generates on its own is picked up at the next turn. Both run
+
+    brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-tmux-autoname "$TMUX_PANE"
+
+The body runs in the brish garden, which has no `$TMUX_PANE` of its own, so
+the hook line passes it in. The hook payload supplies the rest:
+`transcript_path` is the file the name comes from, and the profile is read
+off it too -- whichever profile's projects directory it sits under
+([agfi:claude-code-profile-of-transcript]) -- so nothing depends on the
+garden's environment. It costs about 0.12 s per prompt on a 23 MB
+transcript.
+
+Automatic names carry an `@` prefix: `@claude/work-wifi-dns-captive-portal`,
+`@claude/default-LinFine-1`. The `@` marks a name the hook owns and will
+keep updating. A name you chose with `tsrcag NAME` has no `@`. `tnameme`
+produces the same `@` name as the hook, since both go through
+[agfi:h-claude-code-session-tmux-name].
+
+The switch is the tmux user option `@claude_autoname`. It is on globally
+(`set -g @claude_autoname on` in the tmux config), so every tmux session
+with a Claude Code session inside gets renamed. A session option beats the
+global, which is how you exempt one session:
+
+    tnameme-off                          # this session: leave my name alone
+    tnameme-on                           # this session: rename now and keep renaming
+    tnameme-status                       # which value applies, and from where
+    tmux-session-autoname unset          # drop the session option, follow the global
+    tmux-session-autoname-global off     # change the default for the running server
+
+Sessions whose name starts with `ag--` are never renamed, whatever the
+option says. They belong to the tmux-subagents skill
+(`~/code/skills/tmux-subagents`), which treats the session name as an
+identity label with lineage and model fields; renaming one would destroy
+it. The guard is a prefix check, so the skill needs no change.
+
+The hook renames only when the computed name differs from the current one,
+so on most prompts it is a no-op. Every failure path exits silently: the
+hook discards output, and a broken rename must not cost a prompt.
+
 ## Usage
 
     ! tnameme                    # inside Claude Code: claude/work-<session name>
@@ -74,3 +121,10 @@ the variables are absent and `tnameme` has nothing to read.
   `NO_EXTENDED_GLOB`, so a bare `(N)` qualifier is a literal there and any
   function using one fails with "no matches found" when run via `!`. The
   session lookups set `bareglobqual` locally for that reason.
+- A name you set by hand (`tsrc scratch`, `tsrcag x`) in a session with Claude
+  Code inside lasts until the next prompt, when the hook puts the `@` name
+  back. Run `tnameme-off` in that session first.
+- The global default means any tmux session in which a Claude Code process is
+  running gets renamed, including scheduled or scripted ones. Launchers that
+  care about their session name should set the option off:
+  `tmux set-option -t "$session" @claude_autoname off`.
