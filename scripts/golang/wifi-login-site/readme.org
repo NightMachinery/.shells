@@ -22,6 +22,7 @@ Built automatically on first use by =h-wifi-login-site-dep=.
 #+begin_src sh :eval never
 wifi-login-site detect                  # JSON verdict; the only subcommand
 wifi-login-site detect -timeout 2s      # default 5s, applied per probe
+wifi-login-site detect -dns 10.0.0.1    # also probe through this resolver (repeatable; IPv6 ok, port 53)
 wifi-login-site detect -probe apple=http://127.0.0.1:8099/x   # for testing
 #+end_src
 
@@ -29,13 +30,22 @@ wifi-login-site detect -probe apple=http://127.0.0.1:8099/x   # for testing
 #+begin_example
 {
   "state": "portal",
-  "url": "https://portal.hotel.example/login?ap=12",
-  "via": "apple",
+  "url": "http://10.0.0.1/login?ap=12",
+  "via": "apple@10.0.0.1",
+  "resolvers": { "system": "blocked", "10.0.0.1": "portal" },
   "probes": [
-    { "name": "apple",   "state": "portal", "status": 302,
-      "location": "https://portal.hotel.example/login?ap=12" },
-    { "name": "firefox", "state": "online", "status": 200 },
-    { "name": "gstatic", "state": "online", "status": 204 }
+    { "name": "apple",   "resolver": "system", "state": "blocked",
+      "detail": "Get \"http://captive.apple.com/hotspot-detect.html\": dial tcp: lookup captive.apple.com: i/o timeout" },
+    { "name": "firefox", "resolver": "system", "state": "blocked",
+      "detail": "Get \"http://detectportal.firefox.com/success.txt\": dial tcp: lookup detectportal.firefox.com: i/o timeout" },
+    { "name": "gstatic", "resolver": "system", "state": "blocked",
+      "detail": "Get \"http://connectivitycheck.gstatic.com/generate_204\": dial tcp: lookup connectivitycheck.gstatic.com: i/o timeout" },
+    { "name": "apple@10.0.0.1",   "resolver": "10.0.0.1", "state": "portal", "status": 302,
+      "location": "http://10.0.0.1/login?ap=12" },
+    { "name": "firefox@10.0.0.1", "resolver": "10.0.0.1", "state": "portal", "status": 302,
+      "location": "http://10.0.0.1/login?ap=12" },
+    { "name": "gstatic@10.0.0.1", "resolver": "10.0.0.1", "state": "portal", "status": 302,
+      "location": "http://10.0.0.1/login?ap=12" }
   ]
 }
 #+end_example
@@ -43,6 +53,7 @@ wifi-login-site detect -probe apple=http://127.0.0.1:8099/x   # for testing
 =state= is one of =online=, =portal=, =blocked= or =unknown=. =url= is set only
 when a probe was actually redirected somewhere; a portal that hijacks in place
 offers nothing to open, and the caller must supply its own plain-HTTP bait URL.
+=resolvers= is each resolver's own verdict; without =-dns= it has only =system=.
 
 The exit status is 0 whenever detection ran. =online= is a successful
 detection, not a failure of the command.
@@ -73,6 +84,24 @@ detection, not a failure of the command.
 - *Requests go out as the OS probe* (=CaptiveNetworkSupport/1.0 wispr=), since
   portals serve different things to different agents and some let the OS probes
   through untouched.
+- *A second resolver, when asked.* This Mac pins Wi-Fi DNS to 8.8.8.8 and
+  1.1.1.1. Captive networks commonly block outside DNS until you log in while
+  running their own resolver, which answers every name with the portal's
+  address. Probed through the system resolver alone, every name times out and
+  the verdict is =blocked= --- a lie; the portal is right there. Each =-dns=
+  server gets its own resolver (Go's =PreferGo=, dialing that server) and the
+  full probe set runs once per resolver, all concurrently, so it sees the
+  hijack and says =portal=. Without =-dns= nothing changes. Which server to
+  pass, and whether it is alive, is zsh's problem.
+- *=resolvers= exists for the caller, not the verdict.* The overall =state=
+  aggregates every probe with the usual precedence, so it already says
+  =portal=. What it cannot say is that the system resolver is dead: that is
+  the difference between =system: blocked= and =10.0.0.1: portal=, and it is
+  exactly the signal zsh needs before deciding to swap the system DNS.
+- *The DNS switch lives in zsh.* Rewriting a network service's resolver list
+  is a mutation with state to save and restore, hooks to wire, and a timeout
+  to enforce. The prober is a pure function of the network; keeping it one is
+  what keeps it testable against =httptest=.
 
 * Stdlib only, and =go 1.21=
 Both are load-bearing rather than incidental. The first run of this tool
@@ -89,4 +118,6 @@ go test ./...
 =httptest= servers stand in for each portal shape --- redirect (absolute and
 relative), hijack-in-place, wrong status, refused connection --- so all four
 states and the precedence rules are covered without a real portal. One test
-asserts the probes really do run concurrently.
+asserts the probes really do run concurrently. A fake DNS server of a few dozen
+lines answers every A query with 127.0.0.1, which is how the =-dns= path is
+shown to consult the given resolver and nothing else.

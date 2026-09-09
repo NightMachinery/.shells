@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -31,7 +35,7 @@ func probeAgainst(t *testing.T, name, url string) ProbeResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	return runProbe(ctx, newClient(5*time.Second), p)
+	return runProbe(ctx, resolverClient{Name: resolverSystem, Client: newClient(5*time.Second, "")}, p)
 }
 
 func TestProbeAbsoluteRedirect(t *testing.T) {
@@ -293,7 +297,7 @@ func TestDetectProbesConcurrently(t *testing.T) {
 	defer cancel()
 
 	start := time.Now()
-	got := detect(ctx, newClient(timeout), ps)
+	got := detect(ctx, newClients(timeout, nil), ps)
 	elapsed := time.Since(start)
 
 	if elapsed > 2*timeout {
@@ -302,5 +306,216 @@ func TestDetectProbesConcurrently(t *testing.T) {
 	}
 	if got.State != StateBlocked {
 		t.Errorf("state = %q, want %q", got.State, StateBlocked)
+	}
+}
+
+// fakeDNS is the smallest possible DNS server: it answers every A query with
+// 127.0.0.1 and every other query with an empty NOERROR, so a hostname in a
+// probe URL lands on the local httptest server -- but only when the client
+// really does resolve through this server rather than the OS.
+func fakeDNS(t *testing.T) (addr string, queries *int32) {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { pc.Close() })
+
+	var n int32
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			ln, from, err := pc.ReadFrom(buf)
+			if err != nil {
+				return
+			}
+			q := buf[:ln]
+			if len(q) < 12 {
+				continue
+			}
+			atomic.AddInt32(&n, 1)
+
+			// Walk the question name to find its end, then type and class.
+			i := 12
+			for i < len(q) && q[i] != 0 {
+				i += int(q[i]) + 1
+			}
+			end := i + 5 // the zero label plus qtype and qclass
+			if end > len(q) {
+				continue
+			}
+			qtype := binary.BigEndian.Uint16(q[i+1 : i+3])
+
+			resp := make([]byte, 0, end+16)
+			resp = append(resp, q[:2]...)     // ID
+			resp = append(resp, 0x81, 0x80)   // QR, RD, RA; NOERROR
+			resp = append(resp, 0, 1)         // QDCOUNT
+			resp = append(resp, 0, 0)         // ANCOUNT, patched below
+			resp = append(resp, 0, 0, 0, 0)   // NSCOUNT, ARCOUNT
+			resp = append(resp, q[12:end]...) // the question, verbatim
+			if qtype == 1 {                   // A
+				resp[7] = 1
+				resp = append(resp,
+					0xC0, 0x0C, // name: pointer to the question
+					0, 1, 0, 1, // type A, class IN
+					0, 0, 0, 60, // TTL
+					0, 4, // RDLENGTH
+					127, 0, 0, 1)
+			}
+			pc.WriteTo(resp, from)
+		}
+	}()
+	return pc.LocalAddr().String(), &n
+}
+
+// hostURL swaps the 127.0.0.1 of an httptest URL for a hostname, so the
+// request has to go through a resolver.
+func hostURL(t *testing.T, srvURL string) string {
+	t.Helper()
+	u, err := url.Parse(srvURL)
+	if err != nil {
+		t.Fatalf("parse %q: %v", srvURL, err)
+	}
+	u.Host = "probe.test:" + u.Port()
+	return u.String()
+}
+
+// A -dns resolver is really consulted, and the answer really is used.
+func TestProbeThroughGivenDNS(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "http://10.0.0.1/login")
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer srv.Close()
+
+	dns, queries := fakeDNS(t)
+	rc := resolverClient{Name: dns, Client: newClient(5*time.Second, dns)}
+	p := probeNamed(t, "apple")
+	p.URL = hostURL(t, srv.URL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	got := runProbe(ctx, rc, p)
+
+	if got.State != StatePortal {
+		t.Fatalf("state = %q (detail %q), want %q", got.State, got.Detail, StatePortal)
+	}
+	if got.Location != "http://10.0.0.1/login" {
+		t.Errorf("location = %q", got.Location)
+	}
+	if got.Resolver != dns {
+		t.Errorf("resolver = %q, want %q", got.Resolver, dns)
+	}
+	if want := "apple@" + dns; got.Name != want {
+		t.Errorf("name = %q, want %q", got.Name, want)
+	}
+	if atomic.LoadInt32(queries) == 0 {
+		t.Error("the fake DNS server saw no query; the OS resolver was used instead")
+	}
+}
+
+// A -dns server that does not answer makes the hostname probes blocked, with
+// the resolver error carried through, and never falls back to the OS resolver.
+func TestProbeThroughDeadDNS(t *testing.T) {
+	// A closed UDP port answers with ICMP unreachable, so this fails fast.
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dead := pc.LocalAddr().String()
+	pc.Close()
+
+	rc := resolverClient{Name: dead, Client: newClient(2*time.Second, dead)}
+	p := probeNamed(t, "apple")
+	p.URL = "http://probe.test:1/x"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	got := runProbe(ctx, rc, p)
+
+	if got.State != StateBlocked {
+		t.Errorf("state = %q, want %q", got.State, StateBlocked)
+	}
+	if !strings.Contains(got.Detail, "probe.test") {
+		t.Errorf("detail %q should name the host that failed to resolve", got.Detail)
+	}
+}
+
+// Every probe runs once per resolver, and each resolver gets its own verdict.
+func TestDetectPerResolver(t *testing.T) {
+	online := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer online.Close()
+
+	ps := []probe{probeNamed(t, "gstatic")}
+	ps[0].URL = online.URL // an IP literal: no resolver involved, both succeed
+
+	dns, _ := fakeDNS(t)
+	cs := newClients(5*time.Second, []string{dns})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	got := detect(ctx, cs, ps)
+
+	if len(got.Probes) != 2 {
+		t.Fatalf("got %d probe results, want 2", len(got.Probes))
+	}
+	if got.State != StateOnline {
+		t.Errorf("state = %q, want %q", got.State, StateOnline)
+	}
+	for _, name := range []string{resolverSystem, dns} {
+		if got.Resolvers[name] != StateOnline {
+			t.Errorf("resolvers[%q] = %q, want %q", name, got.Resolvers[name], StateOnline)
+		}
+	}
+	if len(got.Resolvers) != 2 {
+		t.Errorf("resolvers = %v, want exactly two entries", got.Resolvers)
+	}
+}
+
+// The case this exists for: the system resolver is dead, the network's sees the
+// portal. The overall verdict must be portal, and the map must show the split.
+func TestAggregateSplitResolvers(t *testing.T) {
+	got := aggregate([]ProbeResult{
+		{Name: "apple", Resolver: resolverSystem, State: StateBlocked, Detail: "i/o timeout"},
+		{Name: "firefox", Resolver: resolverSystem, State: StateBlocked, Detail: "i/o timeout"},
+		{Name: "apple@10.0.0.1", Resolver: "10.0.0.1", State: StatePortal, Location: "http://10.0.0.1/login"},
+		{Name: "firefox@10.0.0.1", Resolver: "10.0.0.1", State: StatePortal},
+	})
+	if got.State != StatePortal || got.URL != "http://10.0.0.1/login" {
+		t.Errorf("state/url = %q/%q, want portal with the login URL", got.State, got.URL)
+	}
+	if got.Via != "apple@10.0.0.1" {
+		t.Errorf("via = %q", got.Via)
+	}
+	if got.Resolvers[resolverSystem] != StateBlocked {
+		t.Errorf("resolvers[system] = %q, want blocked", got.Resolvers[resolverSystem])
+	}
+	if got.Resolvers["10.0.0.1"] != StatePortal {
+		t.Errorf("resolvers[10.0.0.1] = %q, want portal", got.Resolvers["10.0.0.1"])
+	}
+}
+
+func TestWithDNSPort(t *testing.T) {
+	cases := map[string]string{
+		"10.0.0.1":                  "10.0.0.1:53",
+		"10.0.0.1:5353":             "10.0.0.1:5353",
+		"2a01:599:904:408::66":      "[2a01:599:904:408::66]:53",
+		"[2a01:599:904:408::66]:53": "[2a01:599:904:408::66]:53",
+		"[2a01:599:904:408::66]":    "[2a01:599:904:408::66]:53",
+	}
+	for in, want := range cases {
+		if got := withDNSPort(in); got != want {
+			t.Errorf("withDNSPort(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// Without -dns the output is what it always was: three probes, one resolver.
+func TestNewClientsDefault(t *testing.T) {
+	cs := newClients(time.Second, nil)
+	if len(cs) != 1 || cs[0].Name != resolverSystem {
+		t.Errorf("newClients(nil) = %d clients, first %q", len(cs), cs[0].Name)
 	}
 }
