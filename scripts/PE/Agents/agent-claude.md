@@ -14,3 +14,5 @@
   or Antigravity, and split instructions are the reason `VPS.md` sat wired up
   but unread for months. Everything lives in the assembled file instead; see
   `PE/Agents/readme.org`.
+  
+- If the auto-classifier denies you permission to run some commands, try making the harness ask me directly for permission. This is easier UX for me than copy-pasting commands and running them manually.
