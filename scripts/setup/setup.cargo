@@ -17,3 +17,4 @@ cargo install cargo-edit
 cargo install gping
 cargo install procs
 cargo install choose
+cargo install cargo-sweep
