@@ -50,10 +50,10 @@ function codex-ask-med {
     codex_reasoning_effort=medium codex-ask "$@"
 }
 ##
-#: @duplicateCode/5a56c1bf4c428167af08cffefb52d3aa
 function codex {
-    tty-title "⚡${PWD:t}"
-    $proxyenv command codex "$@"
+    #: The bare launcher: no instruction sync, which [agfi:codex-m] does.
+    ##
+    agent_launch_sync_p=n h-agent-launch codex command codex "$@"
 }
 
 function codex-m {
