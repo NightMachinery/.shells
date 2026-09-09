@@ -22,8 +22,8 @@ that name and hand it to tmux.
 - `tmux-session-rename-current NAME` (`tsrc`) renames it. `.` and `:` in NAME
   become `-`.
 - `tmux-session-rename-current-with-agent NAME` (`tsrcag`) prefixes NAME with
-  the agent that spawned the shell: `Claude/<profile> NAME`, `Codex NAME`,
-  `Agy NAME`. Outside an agent it fails and says so.
+  the agent that spawned the shell: `@Claude/<profile> NAME`, `@Codex NAME`,
+  `@Agy NAME`. Outside an agent it fails and says so.
 - `tmux-session-rename-current-auto` (`tsrca`, `tnameme`) takes no argument
   and uses the agent session's own name.
 
@@ -76,10 +76,10 @@ garden's environment. It costs about 0.12 s per prompt on a 23 MB
 transcript.
 
 Automatic names carry an `@` prefix: `@Claude/work wifi-dns-captive-portal`,
-`@Claude/default LinFine-1`. The `@` marks a name the hook owns and will
-keep updating. A name you chose with `tsrcag NAME` has no `@`. `tnameme`
-produces the same `@` name as the hook, since both go through
-[agfi:h-claude-code-session-tmux-name].
+`@Claude/default LinFine-1`. The `@` marks a session with an agent inside;
+`tsrcag NAME` uses it too. `tnameme` produces exactly the hook's name, since
+both go through [agfi:h-claude-code-session-tmux-name]; `tnameme-status`
+says whether the hook will keep a session's name current.
 
 The switch is the tmux user option `@claude_autoname`. It is on globally
 (`set -g @claude_autoname on` in the tmux config), so every tmux session
@@ -105,7 +105,7 @@ hook discards output, and a broken rename must not cost a prompt.
 ## Usage
 
     ! tnameme                    # inside Claude Code: @Claude/work <session name>
-    tsrcag fix-wifi              # Claude/work fix-wifi, Codex fix-wifi or Agy fix-wifi
+    tsrcag fix-wifi              # @Claude/work fix-wifi, @Codex fix-wifi or @Agy fix-wifi
     tsrc scratch                 # any shell in tmux, no prefix
     tmux-session-current-get
 
