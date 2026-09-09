@@ -1,13 +1,16 @@
 ##
-#: Rendering and session scanning live in =golang/claude_session=; these are
-#: thin wrappers around it. See =golang/claude_session/readme.org=.
+#: Rendering and session scanning live in =golang/agent_session=; these are
+#: thin wrappers around it. See =golang/agent_session/readme.org=.
 ##
 function h-claude-code-session-dep {
     #: Ensures the renderer is built and on PATH, building it on first use.
     ##
     ensure-cmd go @RET
-    ensure-dep1 claude_session go-install-local "${NIGHTDIR}/golang/claude_session" @RET
+    ensure-dep1 agent_session go-install-local "${NIGHTDIR}/golang/agent_session" @RET
 }
+
+#: The old binary name, for anything outside this file still calling it.
+aliasfn claude_session agent_session claude
 
 function h-claude-code-session-name {
     #: The session's own name: the title the user set, else the one Claude
@@ -19,7 +22,7 @@ function h-claude-code-session-name {
     h-claude-code-session-dep @RET
 
     local name
-    name="$(claude_session name "${input}")" @RET
+    name="$(agent_session claude name "${input}")" @RET
     name="${name//[^A-Za-z0-9._-]/-}"
     #: Collapse the runs a title's spaces and punctuation leave behind.
     name="${${name//---##/-}%%-##}"
@@ -149,7 +152,7 @@ function h-claude-code-session-render {
         render_args+=(-subagents=false)
     fi
 
-    assert claude_session render "${render_args[@]}" "${input}" @RET
+    assert agent_session claude render "${render_args[@]}" "${input}" @RET
 }
 
 function h-claude-code-session-to-md {
@@ -202,7 +205,7 @@ function h-claude-code-session-to-org-pandoc {
     fi
 
     #: The pandoc run happens inside the renderer, split across processes;
-    #: see "Performance" in =golang/claude_session/readme.org=.
+    #: see "Performance" in =golang/agent_session/readme.org=.
     {
         h-claude-code-session-title org "${input}" @RET
         h-claude-code-session-render org-pandoc "${input}" @RET
@@ -293,7 +296,7 @@ function h-claude-code-session-select-fz {
     #: `epoch<TAB>path<TAB>local time<TAB>name<TAB>relative path<TAB>snippet`,
     #: newest first. The time is the last message's, not the file's mtime, and
     #: the name is empty for a session that has none; see
-    #: =golang/claude_session/readme.org=.
+    #: =golang/agent_session/readme.org=.
     local list_args=()
     if bool "${claude_code_view_session_fz_subagents_p:-n}" ; then
         #: Off by default: subagent transcripts are inlined into their parent
@@ -304,7 +307,7 @@ function h-claude-code-session-select-fz {
     #: `list` merges the roots and sorts across all of them, and labels each
     #: relative path with its profile when there is more than one.
     local lines
-    lines="$(claude_session list "${list_args[@]}" "${sessions_dirs[@]}")" @RET
+    lines="$(agent_session claude list "${list_args[@]}" "${sessions_dirs[@]}")" @RET
 
     #: `--ansi' because the preview is coloured, and `{2}' is the transcript
     #: path. `fz_opts' is appended last, so an explicit `--preview-window
@@ -574,12 +577,12 @@ function h-claude-code-session-live-list {
     #: Every live Claude Code session, one per line, tab separated: pid, session
     #: id, name, cwd, transcript, tmux session (or `-'), status.
     #:
-    #: The work is done by the `live' subcommand of the `claude_session' Go
+    #: The work is done by the `live' subcommand of the `agent_session' Go
     #: binary: it runs `claude agents --json' once per config home *in
     #: parallel*, which is the whole cost (~180ms each, and independent), then
     #: reads the tmux field from each session's record and derives the
     #: transcript path. In shell those calls were serial and the resolver spent
-    #: most of half a second here; see golang/claude_session/live.go.
+    #: most of half a second here; see golang/agent_session/internal/claude/live.go.
     #:
     #: `claude agents' stays the authority on what is live -- that is decided in
     #: Claude Code's daemon and nothing on disk reproduces it. The Go helper
@@ -605,12 +608,12 @@ function h-claude-code-session-live-list {
     #: for a binary installed after it started, which would send every call
     #: down the build path. `h-claude-code-session-dep' (which also probes for
     #: `go' and can rebuild) runs only on a genuine first miss.
-    if ! command -v claude_session > /dev/null 2>&1 ; then
+    if ! command -v agent_session > /dev/null 2>&1 ; then
         h-claude-code-session-dep 2>/dev/null || true
     fi
 
-    if command -v claude_session > /dev/null 2>&1 ; then
-        claude_session live "${projects_dirs[@]}" && return 0
+    if command -v agent_session > /dev/null 2>&1 ; then
+        agent_session claude live "${projects_dirs[@]}" && return 0
     fi
 
     h-claude-code-session-live-list-sh
@@ -1487,7 +1490,7 @@ function claude-session-selftest {
     ##
     ensure-cmd go pandoc @RET
 
-    local dir="${NIGHTDIR}/golang/claude_session"
+    local dir="${NIGHTDIR}/golang/agent_session"
     #: Every profile's transcripts, one run each: the parity check takes a
     #: single directory, and picking just one of them would quietly shrink the
     #: corpus to whichever sorted first.
@@ -1500,7 +1503,7 @@ function claude-session-selftest {
         local corpus
         for corpus in "${corpus_dirs[@]}" ; do
             ecgray "$0: parity over ${corpus/#${HOME}/~}"
-            CLAUDE_SESSION_CORPUS="${corpus}" assert go test -count=1 -v -run Parity ./... @RET
+            AGENT_SESSION_CORPUS="${corpus}" assert go test -count=1 -v -run Parity ./... @RET
         done
     } always { popf }
 }
@@ -1600,7 +1603,7 @@ function h-claude-code-session-live-rows {
     h-claude-code-session-dep @RET
 
     #: One `list` over every root and then a join, rather than a metadata call
-    #: per row: `list` does the whole corpus in ~45ms, while `claude_session
+    #: per row: `list` does the whole corpus in ~45ms, while `agent_session claude
     #: name` alone costs ~230ms on a large transcript. Anything the join misses
     #: still gets a row, just a barer one.
     #:
@@ -1608,7 +1611,7 @@ function h-claude-code-session-live-rows {
     #: route -- read out of the transcript rather than asked of `claude agents`
     #: -- so it stands in when the live listing has none.
     local meta
-    meta="$(claude_session list "${projects_dirs[@]}")" || meta=''
+    meta="$(agent_session claude list "${projects_dirs[@]}")" || meta=''
 
     ec "${pairs}" |
         gawk -F'\t' -v OFS='\t' '
@@ -1618,7 +1621,7 @@ function h-claude-code-session-live-rows {
 
                 #: The profile is the config home the transcript sits under --
                 #: .claude, .claude-work -- which is the same label
-                #: `claude_session list` puts on its own relative paths.
+                #: `agent_session claude list` puts on its own relative paths.
                 profile = path
                 sub(/\/projects\/.*$/, "", profile)
                 sub(/^.*\//, "", profile)
@@ -1652,7 +1655,7 @@ function h-claude-code-session-preview-cmd {
     #: idle. The 600ms total and the 15ms replacement were both measured the
     #: same way, so the comparison holds even though the parts have shrunk.
     #: Exec'ing the binary is 15ms, most of it process startup rather than
-    #: work: `claude_session --help' alone is 10.7ms and the dash spawn 4.3ms,
+    #: work: `agent_session --help' alone is 10.7ms and the dash spawn 4.3ms,
     #: so the scan is about 5ms and does not grow with the transcript --- a
     #: 26MB one measures 16.1ms, since only the tail is read.
     #:
@@ -1665,7 +1668,7 @@ function h-claude-code-session-preview-cmd {
     h-claude-code-session-dep @RET
 
     local -a cmd
-    cmd=( "${commands[claude_session]:-claude_session}" preview )
+    cmd=( "${commands[agent_session]:-agent_session}" claude preview )
     test -n "${bytes}" && cmd+=( "-bytes=${bytes}" )
     bool "${color_p}" || cmd+=( '-color=false' )
 
@@ -1736,7 +1739,7 @@ function h-claude-code-session-preview {
     #: The fzf preview body for one session: what it is called, what it was
     #: running as, where, when it last moved, and what was last asked of it.
     #:
-    #: A wrapper over `claude_session preview' now, kept because the hotkey's
+    #: A wrapper over `agent_session claude preview' now, kept because the hotkey's
     #: overlay picker reaches it by name through the garden, and because it is
     #: the convenient way to see the preview for a session by hand. The pickers
     #: themselves do not come through here; see
@@ -1933,7 +1936,7 @@ function claude-code-session-import {
     #: (`claude_code_session_import_name_suffix', a printf format taking the
     #: target profile; `⑂' is the glyph Claude Code appends on
     #: `--fork-session'), written as both an `agent-name' line, which
-    #: `claude_session name' prefers, and a `custom-title' line, which is what
+    #: `agent_session claude name' prefers, and a `custom-title' line, which is what
     #: `/rename' writes and stops Claude Code re-titling.
     #:
     #: Copied: `<uuid>.jsonl', `<uuid>/' (subagents, tool results),
@@ -2035,7 +2038,7 @@ function claude-code-session-import {
     assert perl -pi -e "s/\\Q${old}\\E/${new}/g" -- "${rewrite_files[@]}" @RET
 
     local name
-    name="$(claude_session name "${source}")" @RET
+    name="$(agent_session claude name "${source}")" @RET
     if test -z "${name}" ; then
         name="${old[1,8]}"
     fi
