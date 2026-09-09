@@ -374,33 +374,34 @@ function tmux-session-rename-current {
 }
 
 function h-tmux-session-agent-prefix {
-    : "prints claude/<profile>, codex or agy for the agent that spawned this shell"
+    : "prints Claude/<profile>, Codex or Agy for the agent that spawned this shell"
     local agent
     if ! agent="$(ai-agent-name)" ; then
         ecerr "$0: no AI agent detected in this shell's environment"
         return 1
     fi
 
-    if [[ "${agent}" == claude ]] ; then
-        ec "claude/$(claude-code-profile-current)"
-    else
-        ec "${agent}"
-    fi
+    case "${agent}" in
+        claude) ec "Claude/$(claude-code-profile-current)" ;;
+        codex) ec Codex ;;
+        agy) ec Agy ;;
+        *) ec "${agent}" ;;
+    esac
 }
 
 function tmux-session-rename-current-with-agent {
-    : "like [agfi:tmux-session-rename-current], prefixed by the agent running this shell, e.g. claude/work-NAME"
+    : "like [agfi:tmux-session-rename-current], prefixed by the agent running this shell, e.g. 'Claude/work NAME'"
     local name="${1}"
     assert-args name @RET
 
     local prefix
     prefix="$(h-tmux-session-agent-prefix)" @RET
 
-    tmux-session-rename-current "${prefix}-${name}"
+    tmux-session-rename-current "${prefix} ${name}"
 }
 
 function tmux-session-rename-current-auto {
-    : "renames to @claude/<profile>-<the Claude Code session's own name>; needs no argument"
+    : "renames to '@Claude/<profile> <the Claude Code session's own name>'; needs no argument"
     #: The same name the hooks would give it ([agfi:h-claude-code-session-tmux-name]),
     #: so doing it by hand and letting the hook do it agree. Only Claude Code
     #: exports enough to find its transcript
