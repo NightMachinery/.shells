@@ -1,6 +1,10 @@
-package main
+package claude
 
-import "testing"
+import (
+	"testing"
+
+	"agent_session/internal/turns"
+)
 
 func TestModelLabel(t *testing.T) {
 	cases := []struct{ in, want string }{
@@ -18,8 +22,8 @@ func TestModelLabel(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if got := modelLabel(c.in); got != c.want {
-			t.Errorf("modelLabel(%q) = %q, want %q", c.in, got, c.want)
+		if got := turns.ModelLabel(c.in); got != c.want {
+			t.Errorf("turns.ModelLabel(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

@@ -1,4 +1,4 @@
-package main
+package turns
 
 import (
 	"fmt"
@@ -21,17 +21,17 @@ func (r *renderer) turnHeading(level int, text string) {
 
 func (r *renderer) taggedHeading(kind byte, level int, text string) {
 	mark := "#"
-	if r.org {
+	if r.Org {
 		mark = "*"
 	}
-	level += r.base
+	level += r.Base
 
 	marks := level
-	if marks > 6 && !r.org {
+	if marks > 6 && !r.Org {
 		// Markdown stops at six; org does not care.
 		marks = 6
 	}
-	if r.tag {
+	if r.Tag {
 		// The tag carries the unclamped level, so a heading deeper than markdown
 		// can express is restored rather than lost.
 		text = levelTag(kind, level) + " " + stripTags(text)
@@ -44,7 +44,7 @@ func (r *renderer) taggedHeading(kind byte, level int, text string) {
 // A `**key:**` line introducing the block that follows.
 func (r *renderer) label(key string) {
 	r.ensureBlank()
-	if r.org {
+	if r.Org {
 		r.out.WriteString("*" + key + ":*\n")
 		return
 	}
@@ -65,12 +65,12 @@ func (r *renderer) ensureBlank() {
 }
 
 func (r *renderer) bullet(key, val string) {
-	if r.org {
+	if r.Org {
 		r.out.WriteString("- " + key + " :: =" + val + "=\n")
 		return
 	}
 	if strings.ContainsAny(val, "`\n") {
-		r.out.WriteString("- **" + key + "**: " + oneLine(val) + "\n")
+		r.out.WriteString("- **" + key + "**: " + OneLine(val) + "\n")
 		return
 	}
 	r.out.WriteString("- **" + key + "**: `" + val + "`\n")
@@ -84,12 +84,12 @@ func (r *renderer) prose(s string, parentLevel int) {
 		return
 	}
 	r.ensureBlank()
-	if r.org {
+	if r.Org {
 		r.out.WriteString(escOrgText(s) + "\n")
 		return
 	}
 	s = closeOpenFence(repairMidLineFences(s))
-	if r.tag {
+	if r.Tag {
 		// [normalizeOrgLevels] places these once pandoc has said which of them
 		// are headings at all. Shifting here would only re-clamp them at six and
 		// lose their relative depth, and would still miss every heading this
@@ -97,7 +97,7 @@ func (r *renderer) prose(s string, parentLevel int) {
 		r.out.WriteString(stripTags(s) + "\n")
 		return
 	}
-	r.out.WriteString(shiftHeadings(s, parentLevel+r.base+1) + "\n")
+	r.out.WriteString(shiftHeadings(s, parentLevel+r.Base+1) + "\n")
 }
 
 func (r *renderer) block(lang, body string) {
@@ -107,7 +107,7 @@ func (r *renderer) block(lang, body string) {
 	// A fence glued to a preceding bullet would be swallowed by the list.
 	r.ensureBlank()
 
-	if r.org {
+	if r.Org {
 		r.out.WriteString(orgBlock(lang, body) + "\n")
 		return
 	}
@@ -126,15 +126,15 @@ func orgBlock(lang, body string) string {
 }
 
 func (r *renderer) elide(body string) string {
-	if r.maxBlock <= 0 {
+	if r.MaxBlock <= 0 {
 		return body
 	}
 	lines := strings.Split(body, "\n")
-	if len(lines) <= r.maxBlock {
+	if len(lines) <= r.MaxBlock {
 		return body
 	}
-	return strings.Join(lines[:r.maxBlock], "\n") +
-		fmt.Sprintf("\n… [%d lines elided]", len(lines)-r.maxBlock)
+	return strings.Join(lines[:r.MaxBlock], "\n") +
+		fmt.Sprintf("\n… [%d lines elided]", len(lines)-r.MaxBlock)
 }
 
 // A fence longer than any backtick run inside the body.
@@ -263,7 +263,7 @@ func closeOpenFence(s string) string {
 // The fence a line leaves open, given the one it found open. Returns "" outside
 // a fenced block and the opening run inside one.
 //
-// Only a bare run closes a fence: ```` ```sh ```` inside a ```` ``` ```` block
+// Only a bare run closes a fence: ```` `“sh ```` inside a ```` ``` ```` block
 // is content, not the end of it, and reading it as the end walks the rest of
 // the message one block out of step.
 func fenceStep(open, ln string) string {
@@ -579,7 +579,7 @@ func scanOrgHeadings(lines []string) []orgHeading {
 // A bare URL, as a link in whichever syntax is being written.
 func (r *renderer) link(url string) {
 	r.ensureBlank()
-	if r.org {
+	if r.Org {
 		r.out.WriteString("[[" + url + "]]\n")
 		return
 	}

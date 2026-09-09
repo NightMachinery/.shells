@@ -1,4 +1,4 @@
-package main
+package claude
 
 import (
 	"encoding/json"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"agent_session/internal/turns"
 )
 
 // Claude Code writes a subagent's transcript beside its parent, under
@@ -32,7 +34,7 @@ type subagentMeta struct {
 // always was.
 func (s subagent) title(model string) string {
 	parts := []string{}
-	if label := modelLabel(model); label != "" {
+	if label := turns.ModelLabel(model); label != "" {
 		parts = append(parts, "@"+label)
 	}
 
@@ -135,30 +137,14 @@ func loadSubagents(sessionPath string, callOrder map[string]int) []subagent {
 	return out
 }
 
-// Where each tool call sits in the transcript, so subagents can be ordered by
-// the call that spawned them.
-func toolCallOrder(blocks [][]block) map[string]int {
-	order := map[string]int{}
-	n := 0
-	for _, bs := range blocks {
-		for _, b := range bs {
-			if b.Type == "tool_use" && b.ID != "" {
-				order[b.ID] = n
-				n++
-			}
-		}
-	}
-	return order
-}
-
-// Reads a subagent transcript and renders its turns, indented to sit under its
-// heading in the parent document. Also reports the model it ran as, from the
-// same read: the heading needs it, and reading the file twice for a field that
-// is already in hand would be silly.
-func renderSubagent(s subagent, opts renderOpts, jobs int) ([]string, string) {
+// Reads a subagent transcript into its own document. The model in the heading
+// comes out of the same read: reading the file twice for a field that is
+// already in hand would be silly. An unreadable transcript still gets its
+// heading, with nothing under it.
+func (s subagent) subdoc() turns.Subdoc {
 	fh, err := os.Open(s.path)
 	if err != nil {
-		return nil, ""
+		return turns.Subdoc{Title: s.title("")}
 	}
 	defer fh.Close()
 
@@ -173,16 +159,15 @@ func renderSubagent(s subagent, opts renderOpts, jobs int) ([]string, string) {
 		records = append(records, rec)
 	}
 
-	blocks := make([][]block, len(records))
+	blocks := make([][]turns.Block, len(records))
 	for i := range records {
 		blocks[i] = decodeBlocks(records[i].Message)
 	}
 
 	results := indexResults(records, blocks)
-	turns := buildTurns(records, blocks, results)
-
-	// Under `* Subagents` / `** <agent>`, so the transcript starts at level 3.
-	sub := opts
-	sub.base = 2
-	return renderTurns(turns, results, sub, jobs), modelMode(records)
+	return turns.Subdoc{
+		Title:   s.title(modelMode(records)),
+		Turns:   buildTurns(records, blocks, results),
+		Results: results,
+	}
 }

@@ -3,5 +3,5 @@ go-install-local "${NIGHTDIR}/golang/goremind"
 
 go-install-local "${NIGHTDIR}/golang/tcp_to_process"
 
-go-install-local "${NIGHTDIR}/golang/claude_session"
+go-install-local "${NIGHTDIR}/golang/agent_session"
 ##

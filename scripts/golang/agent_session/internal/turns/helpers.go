@@ -1,8 +1,7 @@
-package main
+package turns
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,9 +11,11 @@ import (
 	"time"
 )
 
-// ** helpers
+// ** text helpers, shared by every adapter
 
-func humanTimestamp(ts string) string {
+// HumanTimestamp is an RFC 3339 timestamp as an org inactive stamp in local
+// time; anything unparseable is returned as it came.
+func HumanTimestamp(ts string) string {
 	if ts == "" {
 		return ""
 	}
@@ -22,7 +23,7 @@ func humanTimestamp(ts string) string {
 	if err != nil {
 		return ts
 	}
-	return t.Local().Format(orgStamp)
+	return t.Local().Format(OrgStamp)
 }
 
 func orderedKeys(in map[string]json.RawMessage, preferred []string) []string {
@@ -47,13 +48,16 @@ func orderedKeys(in map[string]json.RawMessage, preferred []string) []string {
 	return append(out, rest...)
 }
 
-func asString(raw json.RawMessage) (string, bool) {
+// AsString decodes a JSON string, reporting false for anything else.
+func AsString(raw json.RawMessage) (string, bool) {
 	var s string
 	if err := json.Unmarshal(raw, &s); err != nil {
 		return "", false
 	}
 	return s, true
 }
+
+func asString(raw json.RawMessage) (string, bool) { return AsString(raw) }
 
 func isScalar(raw json.RawMessage) bool {
 	s := strings.TrimSpace(string(raw))
@@ -63,12 +67,17 @@ func isScalar(raw json.RawMessage) bool {
 	return s[0] != '{' && s[0] != '['
 }
 
-func stringAt(in map[string]json.RawMessage, key string) (string, bool) {
+// StringAt is the string under key, if there is one and it is a string.
+func StringAt(in map[string]json.RawMessage, key string) (string, bool) {
 	raw, ok := in[key]
 	if !ok {
 		return "", false
 	}
-	return asString(raw)
+	return AsString(raw)
+}
+
+func stringAt(in map[string]json.RawMessage, key string) (string, bool) {
+	return StringAt(in, key)
 }
 
 func intAt(in map[string]json.RawMessage, key string) (int, bool) {
@@ -83,13 +92,18 @@ func intAt(in map[string]json.RawMessage, key string) (int, bool) {
 	return n, true
 }
 
-func firstString(in map[string]json.RawMessage, keys ...string) string {
+// FirstString is the first non-empty string among keys.
+func FirstString(in map[string]json.RawMessage, keys ...string) string {
 	for _, k := range keys {
-		if s, ok := stringAt(in, k); ok && s != "" {
+		if s, ok := StringAt(in, k); ok && s != "" {
 			return s
 		}
 	}
 	return ""
+}
+
+func firstString(in map[string]json.RawMessage, keys ...string) string {
+	return FirstString(in, keys...)
 }
 
 var langByExt = map[string]string{
@@ -103,14 +117,16 @@ var langByExt = map[string]string{
 	".yml": "yaml", ".zsh": "zsh",
 }
 
-func langForPath(p string) string {
+// LangForPath is the source-block language for a file, by extension.
+func LangForPath(p string) string {
 	if p == "" {
 		return ""
 	}
 	return langByExt[strings.ToLower(filepath.Ext(p))]
 }
 
-func abbrevHome(p string) string {
+// AbbrevHome replaces the home directory prefix with `~`.
+func AbbrevHome(p string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
 		return p
@@ -124,7 +140,8 @@ func abbrevHome(p string) string {
 	return p
 }
 
-func splitLines(s string) []string {
+// SplitLines splits on newlines, dropping one trailing newline; "" is nil.
+func SplitLines(s string) []string {
 	s = strings.TrimSuffix(s, "\n")
 	if s == "" {
 		return nil
@@ -132,7 +149,8 @@ func splitLines(s string) []string {
 	return strings.Split(s, "\n")
 }
 
-func firstLine(s string) string {
+// FirstLine is the first line, trimmed.
+func FirstLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		return strings.TrimSpace(s[:i])
 	}
@@ -141,21 +159,18 @@ func firstLine(s string) string {
 
 var wsRe = regexp.MustCompile(`\s+`)
 
-func oneLine(s string) string {
+// OneLine collapses all whitespace runs to single spaces.
+func OneLine(s string) string {
 	return strings.TrimSpace(wsRe.ReplaceAllString(s, " "))
 }
 
-func truncate(s string, n int) string {
+// Truncate cuts to n runes.
+func Truncate(s string, n int) string {
 	runes := []rune(s)
 	if len(runes) <= n {
 		return s
 	}
 	return string(runes[:n])
-}
-
-func fatal(msg string) {
-	fmt.Fprintln(os.Stderr, "claude_session: "+msg)
-	os.Exit(1)
 }
 
 // Model ids as they read in a heading: the `claude-` prefix and the build date
@@ -164,11 +179,11 @@ func fatal(msg string) {
 // itself, such as an interruption notice, rather than a model.
 var modelRe = regexp.MustCompile(`^(?:claude-)?([a-z]+)-([0-9](?:-[0-9]{1,3})*)(?:-[0-9]{8})?$`)
 
-// A model id as it reads in a subagent's heading: `Opus5', `Fable5.1'. The
-// family capitalised and `shortModel`'s separator dropped, so the tag is one
-// word and scans as a name rather than as a version string.
-func modelLabel(model string) string {
-	short := strings.ReplaceAll(shortModel(model), "-", "")
+// ModelLabel is a model id as it reads in a subagent's heading: `Opus5',
+// `Fable5.1'. The family capitalised and [ShortModel]'s separator dropped, so
+// the tag is one word and scans as a name rather than as a version string.
+func ModelLabel(model string) string {
+	short := strings.ReplaceAll(ShortModel(model), "-", "")
 	if short == "" {
 		return ""
 	}
@@ -177,7 +192,10 @@ func modelLabel(model string) string {
 	return strings.ToUpper(string(r[0])) + string(r[1:])
 }
 
-func shortModel(model string) string {
+// ShortModel is a model id as it reads in a turn heading: `opus-5`,
+// `fable-5.1`. Ids that do not follow Anthropic's naming come back with only
+// the `claude-` prefix dropped, so another agent's models read as they are.
+func ShortModel(model string) string {
 	switch model {
 	case "":
 		return ""
