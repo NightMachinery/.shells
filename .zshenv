@@ -43,6 +43,10 @@ function nightsh-load-zshenv {
         unset ZSH_PWD
         ##
 
+        if [[ "$d" == "MAGIC_KEEP_CURRENT" ]] ; then
+            return 0
+        fi
+
         if test -z "$d" ; then
             d="$(cat "$ZSH_PWD_CACHE" 2>/dev/null)" || return 0
         fi
