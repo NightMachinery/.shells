@@ -60,7 +60,12 @@ profiles symlink to it) do the renaming without anyone typing `tnameme`.
 `UserPromptSubmit` fires on every prompt, so a `/rename` or a title Claude
 generates on its own is picked up at the next turn. Both run
 
-    brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-tmux-autoname "$TMUX_PANE"
+    brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-tmux-autoname "$TMUX_PANE"
+
+`brishz_async=y` makes `brishz.dash` post the request from a background
+process and return at once, so the prompt does not wait for the garden or
+even for the HTTP round trip. Every garden hook line in `settings.json` uses
+it now.
 
 The body runs in the brish garden, which has no `$TMUX_PANE` of its own, so
 the hook line passes it in. The hook payload supplies the rest:

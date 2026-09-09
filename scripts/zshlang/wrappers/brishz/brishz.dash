@@ -35,9 +35,22 @@ if test -e "$cmd" ; then
    }
 fi
 
+#: brishz_async=y: fire and forget. The request goes out from a background
+#: process and this script returns at once, without the garden's answer and
+#: without even the HTTP round trip. For callers that discard the output
+#: anyway and must not add latency, such as Claude Code's per-prompt hooks.
+#: stdin has already been read above, so the payload still arrives intact.
 if test -z "$brishz_quote" ; then
-   curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"stdin\":\"$stdin\", \"session\":\"$session\", \"json_output\":\"$v\", \"nolog\":\"$nolog\"}" $endpoint
+   if test -n "$brishz_async" ; then
+      curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"stdin\":\"$stdin\", \"session\":\"$session\", \"json_output\":\"$v\", \"nolog\":\"$nolog\"}" $endpoint >/dev/null 2>&1 </dev/null &
+   else
+      curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header 'Content-Type: application/json' --request POST --data "{\"cmd\":\"$cmd\", \"stdin\":\"$stdin\", \"session\":\"$session\", \"json_output\":\"$v\", \"nolog\":\"$nolog\"}" $endpoint
+   fi
 else
     req="$(printf -- "%s " "$stdin" | jq --raw-input --slurp --null-input --compact-output --arg nolog "$nolog" --arg s "$session" --arg c "$cmd" --arg v $v 'inputs as $i | {"cmd": $c, "session": $s, "stdin": $i, "verbose": $v, "nolog": $nolog}')"
-    printf -- "%s" "$req" | curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
+    if test -n "$brishz_async" ; then
+       { printf -- "%s" "$req" | curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint ; } >/dev/null 2>&1 </dev/null &
+    else
+       printf -- "%s" "$req" | curl ${apikey_header:+--header "$apikey_header"} --fail --silent --location --header "Content-Type: application/json" --request POST --data '@-' $endpoint
+    fi
 fi
