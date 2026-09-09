@@ -94,13 +94,39 @@ function codex-p {
         [[ "${AI_AGENT}" == codex* ]]
 }
 
+function antigravity-p {
+    #: Google's Antigravity CLI (`agy`) is a Gemini CLI derivative, and Gemini
+    #: CLI exports GEMINI_CLI=1 in the shells it spawns.
+    #: @unverified against a real `agy` shell; refine when one is at hand.
+    ##
+    test -n "${GEMINI_CLI}" ||
+        test -n "${ANTIGRAVITY_CLI}" ||
+        [[ "${AI_AGENT}" == (antigravity|agy|gemini)* ]]
+}
+
 function ai-agent-p {
     #: Is the current program being run by an AI agent (Claude Code, Codex, ...)?
     #: @warn These env vars are inherited by child processes, so this means "was started by an agent (or its descendants)". Not a security boundary; trivially spoofable.
     ##
     test -n "${AI_AGENT}" ||
         claude-code-p ||
-        codex-p
+        codex-p ||
+        antigravity-p
+}
+
+function ai-agent-name {
+    #: Prints which agent spawned this shell: claude, codex or agy. Fails when
+    #: none did. Same caveats as [agfi:ai-agent-p].
+    ##
+    if claude-code-p ; then
+        ec claude
+    elif codex-p ; then
+        ec codex
+    elif antigravity-p ; then
+        ec agy
+    else
+        return 1
+    fi
 }
 ##
 function isEmacs {

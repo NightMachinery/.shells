@@ -32,6 +32,41 @@ function h-claude-code-session-name {
     fi
 }
 
+function claude-code-session-current-file {
+    #: The transcript of the Claude Code session that spawned this shell,
+    #: located from the environment Claude Code exports into every shell it
+    #: runs. Works from a `! cmd' typed at the Claude Code prompt, too.
+    ##
+    local id="${CLAUDE_CODE_SESSION_ID}"
+    if test -z "${id}" ; then
+        ecerr "$0: not inside a Claude Code session (CLAUDE_CODE_SESSION_ID is unset)"
+        return 1
+    fi
+
+    #: Default profile keeps its state at ~/.claude; the others export their dir.
+    local home="${CLAUDE_CONFIG_DIR:-${HOME}/.claude}"
+
+    #: The project directory encodes the launch cwd; globbing beats re-encoding it.
+    local -a files
+    files=( "${home}"/projects/*/"${id}".jsonl(N) )
+    if (( ${#files} == 0 )) ; then
+        ecerr "$0: no transcript for session ${id} under ${home}/projects"
+        return 1
+    fi
+
+    ec "${files[1]}"
+}
+
+function claude-code-session-current-name {
+    #: The name of the Claude Code session that spawned this shell; see
+    #: [agfi:h-claude-code-session-name] for which of its names wins.
+    ##
+    local file
+    file="$(claude-code-session-current-file)" @RET
+
+    h-claude-code-session-name "${file}"
+}
+
 function h-claude-code-session-title {
     #: Emits the document header for a session, in the given syntax.
     #: Usage: h-claude-code-session-title <org|md> <input>

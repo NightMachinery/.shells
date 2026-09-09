@@ -163,6 +163,26 @@ typeset -gA claude_code_profile_launchers=(
     work     claude-work
 )
 
+function claude-code-profile-current {
+    #: Prints the profile the Claude Code that spawned this shell runs under,
+    #: by matching the CLAUDE_CONFIG_DIR it exports against
+    #: =claude_code_profiles=. Unset means =default=. An unregistered config
+    #: dir is named after its directory, so a third profile still gets a
+    #: readable answer.
+    ##
+    local dir="${CLAUDE_CONFIG_DIR%/}"
+
+    local p
+    for p in "${claude_code_profile_order[@]}" ; do
+        if [[ "${claude_code_profiles[$p]%/}" == "${dir}" ]] ; then
+            ec "${p}"
+            return 0
+        fi
+    done
+
+    ec "${${dir:t}#.}"
+}
+
 function h-claude-code-profile-assert {
     local profile="${1}"
     assert-args profile @RET
