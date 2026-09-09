@@ -83,9 +83,14 @@ function watchm() {
 }
 ##
 function fd {
-  command fd -u "$@"
-  #: -i,  --ignore-case
-  #: -u: include ignored files by default
+  if fn-isTop ; then
+    reval-ecgray command fd -u "$@"
+    #: -i,  --ignore-case
+    #:   By default, fd uses case-insensitive searches, unless the pattern contains an uppercase character (smart case).
+    #: -u: include ignored files by default
+  else
+    command fd "$@"
+  fi
 }
 
 function fd-m {
