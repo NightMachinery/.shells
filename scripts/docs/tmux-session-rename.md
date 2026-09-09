@@ -1,137 +1,162 @@
 # Naming a tmux session after the agent inside it
 
-A tmux session that has a Claude Code session inside it is renamed after
-that session automatically, by a hook: `scripts-claudework2` becomes
-`@Claude/work wifi-dns-captive-portal` on the first prompt, and follows the
-title as it changes. `tmux-session-rename-current-auto` (`tnameme`) does the
-same by hand -- type `! tnameme` at a Claude Code prompt -- and is the entry
-point for shells the hook does not reach.
+A tmux session with an agent session inside it is renamed after that
+session, by a hook the agent fires: `scripts-claudework2` becomes
+`@Claude/work wifi-dns-captive-portal` on the first prompt and follows the
+title as it changes. It works for Claude Code, Codex and Antigravity (`agy`)
+alike; the names are `@Claude/work <name>`, `@Claude/default <name>`,
+`@Codex <name>` and `@Agy <name>`. The `@` marks a session with an agent
+inside; a space separates the agent from the name. Without it a server with
+a dozen agent sessions is a list of launch directories and counters.
 
-## Why
+## By hand
 
-A tmux server with a dozen agent sessions is a list of names like
-`scripts-claudework2` and `scripts-codex1`: the launch directory and a
-counter, nothing about the work. The agent already knows what it is working
-on -- Claude Code titles its own session -- so the shell it spawns can ask for
-that name and hand it to tmux.
+- `tsrc NAME` ([agfi:tmux-session-rename-current]) renames the session
+  containing this shell, no prefix.
+- `tsrcag NAME` ([agfi:tmux-session-rename-current-with-agent]) gives the
+  hooks' shape with a name you chose. Outside an agent it fails and says so.
+- `tnameme` (`tsrca`, [agfi:tmux-session-rename-current-auto]) uses the agent
+  session's own name -- `! tnameme` at a Claude Code prompt. Outside any agent
+  it is a silent no-op that succeeds, so launchers can run it in either shell.
 
-## The helpers
+Agent detection is [agfi:ai-agent-name] in `zshlang/basic/conditions.zsh`.
 
-- `tmux-session-current-get` prints the name of the session containing this
-  shell.
-- `tmux-session-rename-current NAME` (`tsrc`) renames it. `.` and `:` in NAME
-  become `-`.
-- `tmux-session-rename-current-with-agent NAME` (`tsrcag`) prefixes NAME with
-  the agent that spawned the shell: `@Claude/<profile> NAME`, `@Codex NAME`,
-  `@Agy NAME`. Outside an agent it fails and says so.
-- `tmux-session-rename-current-auto` (`tsrca`, `tnameme`) takes no argument
-  and uses the agent session's own name.
+## The shared core
 
-Detection is [agfi:ai-agent-name] in `zshlang/basic/conditions.zsh`, built on
-the existing [agfi:claude-code-p] (`CLAUDECODE=1` or `AI_AGENT=claude*`) and
-[agfi:codex-p] (`CODEX_SANDBOX` or `AI_AGENT=codex*`), plus a new
-[agfi:antigravity-p] (`GEMINI_CLI` or `ANTIGRAVITY_CLI` set, or
-`AI_AGENT=antigravity*|agy*|gemini*`). The Claude profile, `work` or
-`default`, comes from matching `CLAUDE_CONFIG_DIR` against the
-`claude_code_profiles` table in `claude.zsh`; unset means `default`.
+Everything lives in `zshlang/auto-load/others/agent-tmux.zsh`. Each agent's
+hook body is a thin parser that ends in one call,
+[agfi:h-agent-tmux-autoname] `<agent> <pane> <id> <transcript>`, which
 
-## Where the name comes from
+- records the identity on the tmux session as the user option
+  `@agent_session` (agent, id, transcript, tab-separated; read it back with
+  [agfi:agent-tmux-identity-get]);
+- stops if the session is named `ag--*`. Those belong to the tmux-subagents
+  skill, whose names carry lineage and model identity;
+- stops unless the user option `@agent_autoname` resolves to `on`. It is read
+  with `show-option -A`, so a session value beats the global default, which
+  `~/.tmux.conf` sets to `on`;
+- computes the name, runs it through [agfi:h-tmux-session-name-sanitize]
+  (`.` and `:` become `-`, whitespace squeezed, cut at 60) and renames only
+  when the result differs from the current name.
 
-Claude Code exports `CLAUDE_CODE_SESSION_ID` into every shell it spawns. The
-transcript is `<projects dir>/*/${CLAUDE_CODE_SESSION_ID}.jsonl`, searched in
-every profile's projects directory ([agfi:h-claude-code-session-projects-dirs],
-the same list the kitty `cmd+shift+o` picker uses), so it does not matter which
-profile started the session. The glob is over project directories because the
-directory name encodes the launch cwd, which the shell has no other way to
-recover.
-[agfi:h-claude-code-session-name] hands the file to `claude_session name`
-(`golang/claude_session`), which returns the user-set title, else Claude's own
-generated name, else the slug, else the UUID, sanitized for filenames.
+Every early return is an ordinary outcome and every path is silent: a broken
+rename must not cost a prompt.
 
-The `!` prefix is what makes this work. It runs the command in the agent's own
-shell, where that environment exists. From another pane of the same session
-the variables are absent and `tnameme` has nothing to read.
+The hook bodies are [agfi:claude-code-session-tmux-autoname],
+[agfi:codex-session-tmux-autoname] and [agfi:agy-session-tmux-autoname], each
+`<tmux-pane> [payload]` with the payload on stdin. They run in the brish
+garden, which has no pane of its own, so every hook line passes `"$TMUX_PANE"`
+in. All three use `brishz_async=y`, so the agent never waits on the garden or
+even the HTTP round trip; measured 0.15 s down to 0.03 s per prompt.
 
-## Automatic renaming
+`agents-md-doctor` checks all three hook and settings symlinks
+(`agents_md_settings` in `agents-md.zsh`) and warns when an app has replaced
+one with a plain file.
 
-Two hook entries in `configFiles/claude-code/settings.json` (shared: both
-profiles symlink to it) do the renaming without anyone typing `tnameme`.
-`SessionStart` fires on startup, `--resume`, `/clear` and compaction;
-`UserPromptSubmit` fires on every prompt, so a `/rename` or a title Claude
-generates on its own is picked up at the next turn. Both run
+## Toggles
 
-    brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-tmux-autoname "$TMUX_PANE"
-
-`brishz_async=y` makes `brishz.dash` post the request from a background
-process and return at once, so the prompt does not wait for the garden or
-even for the HTTP round trip. Every garden hook line in `settings.json` uses
-it now.
-
-The body runs in the brish garden, which has no `$TMUX_PANE` of its own, so
-the hook line passes it in. The hook payload supplies the rest:
-`transcript_path` is the file the name comes from, and the profile is read
-off it too -- whichever profile's projects directory it sits under
-([agfi:claude-code-profile-of-transcript]) -- so nothing depends on the
-garden's environment. It costs about 0.12 s per prompt on a 23 MB
-transcript.
-
-Automatic names carry an `@` prefix: `@Claude/work wifi-dns-captive-portal`,
-`@Claude/default LinFine-1`. The `@` marks a session with an agent inside;
-`tsrcag NAME` uses it too. `tnameme` produces exactly the hook's name, since
-both go through [agfi:h-claude-code-session-tmux-name]; `tnameme-status`
-says whether the hook will keep a session's name current.
-
-The switch is the tmux user option `@agent_autoname`. It is on globally
-(`set -g @agent_autoname on` in the tmux config), so every tmux session
-with a Claude Code session inside gets renamed. A session option beats the
-global, which is how you exempt one session:
-
-    tnameme-off                          # this session: leave my name alone
     tnameme-on                           # this session: rename now and keep renaming
+    tnameme-off                          # this session: leave my name alone
     tnameme-status                       # which value applies, and from where
     tmux-session-autoname unset          # drop the session option, follow the global
-    tmux-session-autoname-global off     # change the default for the running server
+    tmux-session-autoname-global on|off|unset   # the running server's default
 
-Sessions whose name starts with `ag--` are never renamed, whatever the
-option says. They belong to the tmux-subagents skill
-(`~/code/skills/tmux-subagents`), which treats the session name as an
-identity label with lineage and model fields; renaming one would destroy
-it. The guard is a prefix check, so the skill needs no change.
+`tnameme-on` also renames right away when run inside an agent. The
+usage-notification scheduler sets the option off on its own session, because
+it re-arms by name.
 
-The hook renames only when the computed name differs from the current one,
-so on most prompts it is a no-op. Every failure path exits silently: the
-hook discards output, and a broken rename must not cost a prompt.
+## Claude Code
+
+Hooks sit in the shared `configFiles/claude-code/settings.json` (both
+profiles symlink to it) on `SessionStart` and `UserPromptSubmit`; stdin
+carries `session_id` and `transcript_path`. The profile is whichever one's
+projects directory the transcript sits under
+([agfi:claude-code-profile-of-transcript]); the name is
+[agfi:h-claude-code-session-name]: the user's title, else the generated
+title, else the slug, else the uuid.
+
+`tnameme` finds its own session through `CLAUDE_CODE_SESSION_ID`, exported
+into every shell Claude Code spawns, `! cmd` included
+([agfi:claude-code-session-current-id], `-file`, `-name`). Claude Code
+snapshots hooks at startup, but in practice a newly added hook applied to a
+running session at its next prompt; if it does not, `/hooks` or a resume.
+
+## Codex
+
+Verified in source at tag `rust-v0.153.4`; the hook body has been run with
+real payloads, not yet by a real Codex turn. Hooks live in
+`~/.codex/hooks.json`, symlinked to `configFiles/codex/hooks.json`, on
+`SessionStart` and `UserPromptSubmit`, in the grouped shape
+`{"hooks":[{"type":"command","command":...,"async":true,"timeout":10}]}`.
+The command runs through the user's shell with a snapshot of Codex's
+environment from session start, so `TMUX_PANE` is present. stdin carries
+`session_id` (the thread uuid, also the rollout file id; a subagent gets the
+root session's) and `transcript_path`.
+
+The name is `thread_name` from `$CODEX_HOME/session_index.jsonl`, last line
+per id wins ([agfi:codex-thread-name]). Codex writes it on `/rename`, as a
+provisional first-36-characters title, then as a model-generated title; a
+cleared name appends an empty row, and we fall back to the first 8
+characters of the id.
+
+## Antigravity (agy)
+
+Verified by disassembling the 1.1.28 binary; the hook body has been run with
+real payloads, not yet by a real agy turn. Hooks live in
+`~/.gemini/config/hooks.json`, symlinked to `configFiles/antigravity/hooks.json`,
+keyed at the top level by a hook name (`"tmux-autoname"`). Events used:
+`SessionStart` (undocumented but parsed; conversation start) and `Stop` (once
+per turn end). Non-tool events take the handler object directly,
+`{"type":"command","command":...,"timeout":5}`, not a matcher group.
+
+Hooks run via `sh -c`, synchronously (default timeout 30 s, blocking the
+agent loop), with agy's environment plus `ANTIGRAVITY_CONVERSATION_ID`, and
+the directory containing `hooks.json` as cwd. stdin carries `conversationId`,
+`transcriptPath`, `workspacePaths`, `lastUserInput` and more, but no title.
+Empty stdout is tolerated but logs an ERROR per turn, so the hook line ends
+with `echo '{}'`.
+
+The name is `title` (set with `/rename` or F2 in `/resume`), else `preview`
+(the model-generated title), from
+`~/.gemini/antigravity-cli/conversation_summaries.db`
+([agfi:agy-conversation-name]), else the first 8 characters of the id.
 
 ## Usage
 
-    ! tnameme                    # inside Claude Code: @Claude/work <session name>
+    ! tnameme                    # inside an agent: @Claude/work <session name>
     tsrcag fix-wifi              # @Claude/work fix-wifi, @Codex fix-wifi or @Agy fix-wifi
     tsrc scratch                 # any shell in tmux, no prefix
-    tmux-session-current-get
+    tnameme-off                  # keep a hand-set name
+    tnameme-status
+    agent-tmux-identity-get      # who the hook says lives here
 
 ## Gotchas
 
 - An agent's shell has no attached client, so tmux has no "current session"
-  for it. Every helper derives one from the pane instead:
-  `tmux display-message -p -t "$TMUX_PANE" '#S'`. That inherits
-  `$TMUX_PANE`'s failure modes from `./tmux-tty-title.md`: `tmux run-shell`
-  and garden shells.
-- `tnameme` renames only inside Claude Code. In a plain shell it does nothing
-  and succeeds, so it is safe in launchers that run in both. Codex and
-  Antigravity have no session-name lookup yet and get an error; use
-  `tsrcag NAME` there.
-- The `agy` detection marker is carried over from Gemini CLI, not verified
-  against a real `agy` shell.
-- tmux rejects `.` and `:` in session names, so they are replaced with `-`
-  rather than failing: `v1.2:fix` lands as `v1-2-fix`.
-- Claude Code's shell runs every command under `NO_BARE_GLOB_QUAL` and
-  `NO_EXTENDED_GLOB`, so a bare `(N)` qualifier is a literal there and any
-  function using one fails with "no matches found" when run via `!`. The
-  session lookups set `bareglobqual` locally for that reason.
-- A name you set by hand (`tsrc scratch`, `tsrcag x`) in a session with Claude
-  Code inside lasts until the next prompt, when the hook puts the `@` name
-  back. Run `tnameme-off` in that session first.
-- The global default means any tmux session in which a Claude Code process is
-  running gets renamed, including scheduled or scripted ones. Launchers that
-  care about their session name should set the option off:
+  for it. Every helper derives one from the pane,
+  `tmux display-message -p -t "$TMUX_PANE" '#S'`, and inherits `$TMUX_PANE`'s
+  failure modes from `./tmux-tty-title.md`: `tmux run-shell` and garden shells.
+- A hand-set name (`tsrc scratch`, `tsrcag x`) in a session with an agent
+  inside lasts until the next prompt, when the hook puts the `@` name back.
+  Run `tnameme-off` there first.
+- The global default catches scheduled and scripted sessions too. Launchers
+  that care about their name should set the option off:
   `tmux set-option -t "$session" @agent_autoname off`.
+- Claude Code's Bash tool runs with `NO_BARE_GLOB_QUAL` and
+  `NO_EXTENDED_GLOB`, so a bare `(N)` is a literal there and a function using
+  one fails with "no matches found" under `!`; it needs
+  `setopt localoptions bareglobqual`.
+- Codex trusts no new hook handler until you accept it in the review it shows
+  at startup (persisted as `hooks.state.<key>.trusted_hash` in
+  `config.toml`), so the first `codex` launch after adding hooks asks once.
+- Codex injects any non-JSON stdout from a hook into the model's context as
+  `additionalContext`. Exit 0 with empty stdout is harmless; the `>/dev/null`
+  in the hook line is load-bearing.
+- `CODEX_THREAD_ID` and `CODEX_SESSION_ID` reach Codex's shell tool, so
+  `tnameme` works from the environment there, but not hooks or notify.
+- agy wants the flat handler shape for non-tool events. The grouped form makes
+  it drop the whole file with a warning visible only under `--log-file`
+  (issue #925).
+- `ANTIGRAVITY_CONVERSATION_ID` reaches only hook commands, never the user's
+  shell, so `tnameme` in an agy shell reads the identity the hook recorded on
+  the tmux session. It works once the first hook has fired, not before.
