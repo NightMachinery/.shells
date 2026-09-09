@@ -1,18 +1,18 @@
-package main
+package claude
 
 // ** live
 //
-// `claude_session live <projects-dir>...` prints one row per live Claude Code
-// session, tab separated: pid, sessionId, name, cwd, transcript, tmux session
-// (or "-"), status.
+// `agent_session claude live <projects-dir>...` prints one row per live Claude
+// Code session, tab separated: pid, sessionId, name, cwd, transcript, tmux
+// session (or "-"), status.
 //
-// This exists to make [agfi:h-claude-code-session-of-kitty-window] fast. The
-// shell version asked `claude agents --json` once per config home, serially,
-// and each call costs ~180ms, so the resolver spent most of half a second
-// there. The two calls are independent, one daemon per config home, so running
-// them concurrently in one process roughly halves the wall time (measured
-// 341ms -> 183ms), and doing the record reads and transcript derivation here
-// too collapses a dozen shell forks into nothing.
+// This exists to make [agfi:h-agent-session-of-kitty-window] fast. The shell
+// version asked `claude agents --json` once per config home, serially, and each
+// call costs ~180ms, so the resolver spent most of half a second there. The two
+// calls are independent, one daemon per config home, so running them
+// concurrently in one process roughly halves the wall time (measured 341ms ->
+// 183ms), and doing the record reads and transcript derivation here too
+// collapses a dozen shell forks into nothing.
 //
 // `claude agents --json` stays the source of truth deliberately. Which
 // sessions are live is decided inside Claude Code's daemon, and there is no
@@ -24,13 +24,15 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
+
+	"agent_session/internal/session"
 )
 
 // A config home is the parent of a `projects` directory: `~/.claude-work` for
@@ -38,16 +40,6 @@ import (
 type profile struct {
 	home string // absolute path of the config home
 	root string // the projects dir we were handed
-}
-
-type liveSession struct {
-	pid        int
-	sessionID  string
-	name       string
-	cwd        string
-	transcript string
-	tmux       string
-	status     string
 }
 
 // The shape of one `claude agents --json` entry that we use. The listing
@@ -67,20 +59,13 @@ type sessionRecord struct {
 	Tmux string `json:"tmux"`
 }
 
-// Claude Code names a project directory after its cwd with every character
-// that is not ASCII alphanumeric replaced by a dash -- slashes, dots, spaces
-// and underscores alike. Matched against the live sessions when this was
-// written; a cwd with non-ASCII letters is the one case left unverified, and a
-// miss there falls through to the picker rather than opening the wrong thing.
-var nonAlnum = regexp.MustCompile(`[^A-Za-z0-9]`)
-
-func cmdLive(argv []string) {
-	if len(argv) == 0 {
-		fatal("live: no projects directory given")
+func (Adapter) Live(roots []string) ([]session.Live, error) {
+	if len(roots) == 0 {
+		return nil, errors.New("live: no projects directory given")
 	}
 
-	profiles := make([]profile, 0, len(argv))
-	for _, root := range argv {
+	profiles := make([]profile, 0, len(roots))
+	for _, root := range roots {
 		profiles = append(profiles, profile{home: filepath.Dir(root), root: root})
 	}
 
@@ -88,7 +73,7 @@ func cmdLive(argv []string) {
 	// cost and they do not depend on each other.
 	var (
 		mu       sync.Mutex
-		sessions []liveSession
+		sessions []session.Live
 		wg       sync.WaitGroup
 	)
 	for _, p := range profiles {
@@ -103,56 +88,42 @@ func cmdLive(argv []string) {
 	}
 	wg.Wait()
 
-	var b strings.Builder
-	for _, s := range sessions {
-		tmux := s.tmux
-		if tmux == "" {
-			tmux = "-"
-		}
-		status := s.status
-		if status == "" {
-			status = "-"
-		}
-		fmt.Fprintf(&b, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			s.pid, s.sessionID, s.name, s.cwd, s.transcript, tmux, status)
-	}
-	os.Stdout.WriteString(b.String())
+	return sessions, nil
 }
 
-func liveForProfile(p profile) []liveSession {
+func liveForProfile(p profile) []session.Live {
 	out, err := runAgents(p.home)
 	if err != nil {
 		// A profile that cannot be listed is not fatal: the other one may
 		// still answer, and a broken listing should never take the hotkey
 		// down. The reason goes to stderr for a human, not into the rows.
-		fmt.Fprintf(os.Stderr, "claude_session live: %s: %v\n", p.home, err)
+		fmt.Fprintf(os.Stderr, "agent_session claude live: %s: %v\n", p.home, err)
 		return nil
 	}
 
 	var entries []agentEntry
 	if err := json.Unmarshal(out, &entries); err != nil {
-		fmt.Fprintf(os.Stderr, "claude_session live: %s: parsing agents json: %v\n", p.home, err)
+		fmt.Fprintf(os.Stderr, "agent_session claude live: %s: parsing agents json: %v\n", p.home, err)
 		return nil
 	}
 
-	sessions := make([]liveSession, 0, len(entries))
+	sessions := make([]session.Live, 0, len(entries))
 	for _, e := range entries {
 		// A finished session comes back with no pid; nothing to open.
 		if e.PID == 0 || e.SessionID == "" {
 			continue
 		}
 
-		slug := nonAlnum.ReplaceAllString(e.Cwd, "-")
-		transcript := filepath.Join(p.home, "projects", slug, e.SessionID+".jsonl")
+		transcript := filepath.Join(p.home, "projects", projectSlug(e.Cwd), e.SessionID+".jsonl")
 
-		sessions = append(sessions, liveSession{
-			pid:        e.PID,
-			sessionID:  e.SessionID,
-			name:       e.Name,
-			cwd:        e.Cwd,
-			transcript: transcript,
-			tmux:       tmuxOf(p.home, e.PID),
-			status:     e.Status,
+		sessions = append(sessions, session.Live{
+			PID:        e.PID,
+			ID:         e.SessionID,
+			Name:       e.Name,
+			Cwd:        e.Cwd,
+			Transcript: transcript,
+			Tmux:       tmuxOf(p.home, e.PID),
+			Status:     e.Status,
 		})
 	}
 	return sessions

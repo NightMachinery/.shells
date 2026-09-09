@@ -1,9 +1,9 @@
-package main
+package claude
 
 // ** preview
 //
-// `claude_session preview <session.jsonl>` writes the fzf preview body for a
-// session: what it is called, what it was running as, where, when it last
+// `agent_session claude preview <session.jsonl>` writes the fzf preview body
+// for a session: what it is called, what it was running as, where, when it last
 // moved, and what was last asked of it.
 //
 // This exists to make the preview cheap enough to run on every cursor move.
@@ -23,21 +23,20 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
+
+	"agent_session/internal/preview"
+	"agent_session/internal/session"
+	"agent_session/internal/turns"
 )
 
 // How much of the transcript's end is read. Everything worth previewing is
 // written repeatedly, so the newest of each is near the end; a title older than
 // this window falls back to the slug, which is the same trade `list` makes.
 const previewWindow = 400 << 10
-
-// The width the labels are padded to, so the values line up in a column.
-const previewLabelWidth = 14
 
 // What a session's name is coloured by: the config home it lives under. Which
 // account a session belongs to is the thing worth seeing at a glance, since the
@@ -95,24 +94,9 @@ type previewData struct {
 	model    string
 }
 
-func cmdPreview(argv []string) {
-	fs := flag.NewFlagSet("preview", flag.ExitOnError)
-	window := fs.Int("bytes", previewWindow,
-		"how much of the transcript's tail to read; 0 or less reads all of it")
-	colorP := fs.Bool("color", true, "emit ANSI colour")
-	fs.Parse(guardPathArgs(fs, argv))
-
-	if fs.NArg() == 0 {
-		fatal("preview: no session file given")
-	}
-	path := fs.Arg(0)
-
-	// NO_COLOR is the cross-tool convention, and costs one lookup to honour.
-	// Its presence is what counts, whatever the value.
-	_, noColor := os.LookupEnv("NO_COLOR")
-	c := painter{on: *colorP && !noColor}
-
-	data := scanPreview(path, int64(*window))
+func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
+	c := preview.Painter{On: o.Color}
+	data := scanPreview(path, o.Bytes)
 
 	w := &strings.Builder{}
 	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
@@ -122,16 +106,16 @@ func cmdPreview(argv []string) {
 	if name == "" {
 		name = "Claude Code session " + id
 	}
-	w.WriteString(c.boldFg(profileColors[profile], name) + "\n")
+	w.WriteString(c.BoldFg(profileColors[profile], name) + "\n")
 
-	w.WriteString(c.gray(joinParts(" · ", id, profile, versionLabel(data.version))) + "\n\n")
+	w.WriteString(c.Gray(preview.JoinParts(" · ", id, profile, preview.VersionLabel(data.version))) + "\n\n")
 
 	// Every row is skipped when it has nothing to say, so a session predating a
 	// field does not get a line of blanks for it.
 	when, aside := "", ""
 	if t, err := time.Parse(time.RFC3339, data.stamp); err == nil {
-		when = t.Local().Format(listStamp)
-		aside = "(" + humanAge(time.Since(t)) + " ago)"
+		when = t.Local().Format(turns.ListStamp)
+		aside = "(" + preview.HumanAge(time.Since(t)) + " ago)"
 	}
 
 	// Two shapes of row, and the difference matters when a field is missing.
@@ -143,73 +127,23 @@ func cmdPreview(argv []string) {
 	if data.effort != "" {
 		effort = data.effort + " effort"
 	}
-	model := annotate(strings.TrimPrefix(data.model, "claude-"), " · ", effort)
-	mode := joinParts(" · ", data.permMode, data.mode)
-	where := annotate(abbrevHome(data.cwd), " @ ", data.branch)
+	model := preview.Annotate(strings.TrimPrefix(data.model, "claude-"), " · ", effort)
+	mode := preview.JoinParts(" · ", data.permMode, data.mode)
+	where := preview.Annotate(turns.AbbrevHome(data.cwd), " @ ", data.branch)
 
-	row(w, c, "last activity", when, aside)
-	row(w, c, "model", model, "")
-	row(w, c, "mode", mode, "")
-	row(w, c, "cwd", where, "")
+	preview.Row(w, c, "last activity", when, aside)
+	preview.Row(w, c, "model", model, "")
+	preview.Row(w, c, "mode", mode, "")
+	preview.Row(w, c, "cwd", where, "")
 
-	w.WriteString("\n" + c.bold("last prompt") + "\n")
+	w.WriteString("\n" + c.Bold("last prompt") + "\n")
 	if data.prompt == "" {
 		w.WriteString("(none in the scanned tail)\n")
 	} else {
 		w.WriteString(data.prompt + "\n")
 	}
 
-	os.Stdout.WriteString(w.String())
-}
-
-// The non-empty parts, joined. Every field the preview shows is one Claude Code
-// may simply not have written, and a row built by concatenation would then read
-// as a stray separator or vanish because its first half was the missing one.
-func joinParts(sep string, parts ...string) string {
-	kept := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if p != "" {
-			kept = append(kept, p)
-		}
-	}
-	return strings.Join(kept, sep)
-}
-
-// A principal with a note appended, or nothing at all: a note that cannot
-// stand on its own is not worth a row of its own either.
-func annotate(principal, sep, note string) string {
-	if principal == "" {
-		return ""
-	}
-	if note == "" {
-		return principal
-	}
-	return principal + sep + note
-}
-
-func versionLabel(v string) string {
-	if v == "" {
-		return ""
-	}
-	return "v" + v
-}
-
-// One `<label>  <value>  <aside>' line, or nothing when there is no value.
-func row(w *strings.Builder, c painter, label, value, aside string) {
-	if value == "" {
-		return
-	}
-
-	pad := label
-	if n := previewLabelWidth - len(label); n > 0 {
-		pad += strings.Repeat(" ", n)
-	}
-
-	w.WriteString(c.gray(pad) + value)
-	if aside != "" {
-		w.WriteString(" " + c.gray(aside))
-	}
-	w.WriteString("\n")
+	return w.String(), nil
 }
 
 // The config home the transcript sits under -- .claude, .claude-work -- which
@@ -224,27 +158,6 @@ func profileOf(path string) string {
 		return filepath.Base(abs[:i+1])
 	}
 	return ""
-}
-
-// A duration as its single largest unit: `44s', `6m', `3h', `2d'. What a
-// preview answers is how stale the session is, so one unit is enough and a
-// second would only be noise.
-func humanAge(d time.Duration) string {
-	secs := int64(d.Seconds())
-	if secs < 0 {
-		secs = 0
-	}
-
-	switch {
-	case secs < 60:
-		return strconv.FormatInt(secs, 10) + "s"
-	case secs < 3600:
-		return strconv.FormatInt(secs/60, 10) + "m"
-	case secs < 86400:
-		return strconv.FormatInt(secs/3600, 10) + "h"
-	default:
-		return strconv.FormatInt(secs/86400, 10) + "d"
-	}
 }
 
 // Reads the tail once and keeps the newest of each field. Forward over the
@@ -330,40 +243,6 @@ func scanPreview(path string, window int64) previewData {
 		}
 	}
 
-	data.prompt = oneLine(data.prompt)
+	data.prompt = turns.OneLine(data.prompt)
 	return data
-}
-
-// Wraps text in ANSI escapes, or does not. A value rather than a package flag
-// so nothing can colour output the caller asked to be plain.
-type painter struct{ on bool }
-
-const grayRGB = "170;170;170"
-
-func (c painter) fg(rgb, s string) string {
-	if !c.on || rgb == "" || s == "" {
-		return s
-	}
-	return "\x1b[38;2;" + rgb + "m" + s + "\x1b[0m"
-}
-
-func (c painter) gray(s string) string { return c.fg(grayRGB, s) }
-
-// Bold and coloured in one escape. Nesting `bold(fg(...))` would work, but the
-// inner reset ends the bold too, leaving two resets to say one thing.
-func (c painter) boldFg(rgb, s string) string {
-	if !c.on || s == "" {
-		return s
-	}
-	if rgb == "" {
-		return c.bold(s)
-	}
-	return "\x1b[1;38;2;" + rgb + "m" + s + "\x1b[0m"
-}
-
-func (c painter) bold(s string) string {
-	if !c.on || s == "" {
-		return s
-	}
-	return "\x1b[1m" + s + "\x1b[0m"
 }

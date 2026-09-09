@@ -1,4 +1,4 @@
-package main
+package turns
 
 import (
 	"os/exec"
@@ -54,8 +54,16 @@ func TestPandocChunksSeamAfterHeading(t *testing.T) {
 		"## Turn two\n\n" + pad,
 	}
 
-	whole := strings.Join(pandocChunks(parts, 1, "pandoc"), "\n\n")
-	split := strings.Join(pandocChunks(parts, 4, "pandoc"), "\n\n")
+	one, err := pandocChunks(parts, 1, "pandoc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	many, err := pandocChunks(parts, 4, "pandoc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	whole := strings.Join(one, "\n\n")
+	split := strings.Join(many, "\n\n")
 
 	if whole != split {
 		t.Errorf("parallel output differs from a single run:\n%s", firstDifference(whole, split))

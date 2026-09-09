@@ -1,134 +1,195 @@
-package main
+// Package turns is the agent-neutral half of the renderer: a document model of
+// turns, blocks and tool results that every adapter (Claude Code, Codex,
+// Antigravity) builds, and the markdown/org writer that turns it into a
+// transcript. Nothing here knows how any agent stores its sessions; the
+// adapters under internal/<agent> translate their records into a Document and
+// hand it over.
+package turns
 
 import (
-	"bufio"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
-// ** render
+const (
+	OrgStamp  = "[2006-01-02 Mon 15:04]"
+	ListStamp = "2006-01-02 15:04"
+)
 
-type renderer struct {
-	org      bool
-	maxBlock int
-	diff     bool
+// A Document is one session, ready to render: the conversation's turns, the
+// tool results keyed by the call they answer, and the transcripts of the
+// subagents it spawned.
+type Document struct {
+	Turns   []Turn
+	Results map[string]ToolResult
+	// The `* Subagents` section at the top of the document, in the order the
+	// agents were launched.
+	Subagents []Subdoc
+}
+
+// A Subdoc is a subagent's transcript, nested under its own heading.
+type Subdoc struct {
+	Title   string
+	Turns   []Turn
+	Results map[string]ToolResult
+}
+
+// One conversational turn: the consecutive records that share a role, flattened
+// into the blocks they contain.
+type Turn struct {
+	Role   string
+	TS     string
+	Model  string
+	Blocks []TimedBlock
+
+	// Overrides the role-derived heading, for turns that are an event rather
+	// than somebody speaking.
+	Heading string
+	// Trailing detail, after the timestamp.
+	Note string
+	// How long the turn took, when the transcript says so.
+	Duration time.Duration
+}
+
+// A Block is one piece of a turn. The vocabulary is the renderer's, not any
+// agent's: `text`, `thinking`, `tool_use` (Name + Input, with ID for its
+// result), `tool_result` (an orphan whose call is not in the document),
+// `notice` (Name is the kind, Text the body), `command`, `pr`, `tasks` and
+// `file-edit`. The JSON tags match the Anthropic content-block schema so the
+// Claude adapter can decode into it directly; other adapters fill the fields
+// by hand.
+type Block struct {
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"`
+	Name      string          `json:"name"`
+	Input     json.RawMessage `json:"input"`
+	Content   json.RawMessage `json:"content"`
+	IsError   bool            `json:"is_error"`
+	ID        string          `json:"id"`
+	ToolUseID string          `json:"tool_use_id"`
+}
+
+// A block plus the timestamp of the record it arrived in, which within a turn
+// is not necessarily the turn's own.
+type TimedBlock struct {
+	B  Block
+	TS string
+}
+
+// A tool result, keyed elsewhere by the id of the call it answers.
+type ToolResult struct {
+	Body    string
+	IsError bool
+	TS      string
+}
+
+// Options for Render.
+type Options struct {
+	// `md`, `org` or `org-pandoc`. `md` is meant to be piped through pandoc;
+	// `org-pandoc` does that here, in parallel chunks; `org` writes org
+	// directly and leaves message bodies as markdown.
+	Format string
+	// Elide code blocks longer than this many lines; 0 never elides.
+	MaxBlock int
+	// Render Edit-style calls (old_string/new_string) as a unified diff.
+	Diff bool
+	// Worker count for rendering and for pandoc chunks.
+	Jobs int
+	// The pandoc binary, for org-pandoc.
+	Pandoc string
+}
+
+// Style is how one run of turns is written: the syntax, the elision and diff
+// settings, and the heading offset for a transcript nested inside another
+// document. Exported for the adapters' tests, which render a handful of turns
+// and look at the result.
+type Style struct {
+	Org      bool
+	MaxBlock int
+	Diff     bool
 	// Tag every heading with its level, for [normalizeOrgLevels] to restore
 	// once pandoc has converted the document. Only the org-pandoc path needs
 	// it, because only there does something other than this program decide what
 	// a heading is.
-	tag bool
+	Tag bool
+	// Added to every heading level.
+	Base int
+}
+
+type renderer struct {
+	Style
 	out *strings.Builder
 
 	// Results, keyed by the id of the call they answer, so a call can render
 	// its own result underneath itself.
-	results map[string]toolResult
+	results map[string]ToolResult
 	// The enclosing turn's timestamp; sub-headings only show theirs when it
 	// differs.
 	turnTS string
-	// Heading offset, for a transcript nested inside another document.
-	base int
 }
 
 // Below this, splitting the document across pandoc processes costs more in
 // process startup (~70ms each) than it saves.
 const minPandocChunk = 96 << 10
 
-func cmdRender(argv []string) {
-	fs := flag.NewFlagSet("render", flag.ExitOnError)
-	format := fs.String("format", "md", "output syntax: md, org or org-pandoc")
-	maxBlock := fs.Int("max-block-lines", 0, "elide code blocks longer than N lines (0 = never)")
-	diff := fs.Bool("diff", true, "render Edit tool calls as a unified diff")
-	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
-	pandocBin := fs.String("pandoc", "pandoc", "pandoc binary, for -format=org-pandoc")
-	subagentsP := fs.Bool("subagents", true, "inline the transcripts of spawned subagents")
-	fs.Parse(guardPathArgs(fs, argv))
-
-	input := fs.Arg(0)
-	if input == "" {
-		fatal("render: no input file given")
-	}
-	switch *format {
+// Render writes the document in the requested format.
+func Render(doc *Document, o Options) (string, error) {
+	switch o.Format {
 	case "md", "org", "org-pandoc":
 	default:
-		fatal("render: unknown format: " + *format)
+		return "", fmt.Errorf("unknown format: %s", o.Format)
 	}
-	if *jobs < 1 {
-		*jobs = 1
-	}
-
-	fh, err := os.Open(input)
-	if err != nil {
-		fatal(err.Error())
-	}
-	defer fh.Close()
-
-	records := conversationRecords(readRecords(fh))
-
-	// Decoded once: the result index, the turn grouping and the rendering all
-	// need the blocks.
-	blocks := make([][]block, len(records))
-	for i := range records {
-		blocks[i] = decodeBlocks(records[i].Message)
+	jobs := o.Jobs
+	if jobs < 1 {
+		jobs = 1
 	}
 
-	results := indexResults(records, blocks)
-	turns := buildTurns(records, blocks, results)
-
-	opts := renderOpts{
-		org:      *format == "org",
-		maxBlock: *maxBlock,
-		diff:     *diff,
-		tag:      *format == "org-pandoc",
+	st := Style{
+		Org:      o.Format == "org",
+		MaxBlock: o.MaxBlock,
+		Diff:     o.Diff,
+		Tag:      o.Format == "org-pandoc",
 	}
 
 	// The skeleton Go emits is in the *output* syntax, which for org-pandoc is
 	// org even though the bodies it wraps are still markdown.
-	orgOut := *format != "md"
+	orgOut := o.Format != "md"
 
-	var segs []segment
-	if *subagentsP {
-		segs = append(segs, subagentSegments(input, blocks, opts, orgOut, *jobs)...)
-	}
-	for _, p := range renderTurns(turns, results, opts, *jobs) {
+	segs := subagentSegments(doc.Subagents, st, orgOut, jobs)
+	for _, p := range RenderTurns(doc.Turns, doc.Results, st, jobs) {
 		segs = append(segs, segment{text: p, body: true})
 	}
 
-	w := bufio.NewWriter(os.Stdout)
-	defer w.Flush()
-
-	if *format != "org-pandoc" {
+	var w strings.Builder
+	if o.Format != "org-pandoc" {
 		for _, s := range segs {
 			w.WriteString(s.text)
 		}
-		return
+		return w.String(), nil
 	}
 
-	var doc strings.Builder
-	for _, s := range convertSegments(segs, *jobs, *pandocBin) {
-		doc.WriteString(s)
+	bin := o.Pandoc
+	if bin == "" {
+		bin = "pandoc"
+	}
+	converted, err := convertSegments(segs, jobs, bin)
+	if err != nil {
+		return "", err
+	}
+	var body strings.Builder
+	for _, s := range converted {
+		body.WriteString(s)
 	}
 	// Over the assembled document rather than per chunk, so how it was split
 	// across pandoc processes cannot change the result.
-	out := normalizeOrgLevels(doc.String())
-	w.WriteString(strings.TrimRight(out, "\n") + "\n")
-}
-
-type renderOpts struct {
-	org      bool
-	maxBlock int
-	diff     bool
-	tag      bool
-	// Added to every heading level, so a transcript can be nested inside
-	// another document.
-	base int
+	out := normalizeOrgLevels(body.String())
+	return strings.TrimRight(out, "\n") + "\n", nil
 }
 
 // A piece of the output document. Message bodies are markdown and go through
@@ -143,8 +204,7 @@ type segment struct {
 // The `* Subagents` section at the top of the document: every agent this
 // session spawned. The section itself stays open so the roster is visible at a
 // glance; each agent's own transcript is folded away.
-func subagentSegments(input string, blocks [][]block, opts renderOpts, orgOut bool, jobs int) []segment {
-	subs := loadSubagents(input, toolCallOrder(blocks))
+func subagentSegments(subs []Subdoc, st Style, orgOut bool, jobs int) []segment {
 	if len(subs) == 0 {
 		return nil
 	}
@@ -157,7 +217,7 @@ func subagentSegments(input string, blocks [][]block, opts renderOpts, orgOut bo
 	// meets pandoc, but [normalizeOrgLevels] still has to know it is not
 	// something a message wrote.
 	head := func(level int, text, trailer string) string {
-		if opts.tag {
+		if st.Tag {
 			text = levelTag(tagSub, level) + " " + stripTags(text)
 		}
 		return strings.Repeat(mark, level) + " " + text + "\n" + trailer + "\n"
@@ -165,18 +225,18 @@ func subagentSegments(input string, blocks [][]block, opts renderOpts, orgOut bo
 
 	segs := []segment{{text: head(1, "Subagents", "")}}
 
+	// Under `* Subagents` / `** <agent>`, so the transcript starts at level 3.
+	sub := st
+	sub.Base = 2
+
 	for _, s := range subs {
 		trailer := ""
 		if orgOut {
 			// VISIBILITY is honoured at startup, so each agent opens folded.
 			trailer = ":PROPERTIES:\n:VISIBILITY: folded\n:END:\n"
 		}
-		// The body first, because the model in the heading comes out of the
-		// same read; the heading is still appended ahead of it.
-		parts, model := renderSubagent(s, opts, jobs)
-
-		segs = append(segs, segment{text: head(2, s.title(model), trailer)})
-		for _, p := range parts {
+		segs = append(segs, segment{text: head(2, s.Title, trailer)})
+		for _, p := range RenderTurns(s.Turns, s.Results, sub, jobs) {
 			segs = append(segs, segment{text: p, body: true})
 		}
 	}
@@ -184,163 +244,9 @@ func subagentSegments(input string, blocks [][]block, opts renderOpts, orgOut bo
 	return segs
 }
 
-// One conversational turn: the consecutive records that share a role, flattened
-// into the blocks they contain. Claude Code writes one record per content
-// block, so without this an assistant turn becomes a run of near-identical
-// headings.
-type turn struct {
-	role   string
-	ts     string
-	model  string
-	blocks []timedBlock
-
-	// Overrides the role-derived heading, for turns that are an event rather
-	// than somebody speaking.
-	heading string
-	// Trailing detail, after the timestamp.
-	note string
-	// How long the turn took, when the transcript says so.
-	duration time.Duration
-}
-
-// The records that make up the conversation: the messages, plus the events
-// that punctuate them.
-//
-// Everything else in a transcript is bookkeeping and stays out: `mode`,
-// `permission-mode`, `agent-name`/`agent-color`/`agent-setting`,
-// `bridge-session`, `file-history-snapshot`/`-delta`, and `last-prompt`, which
-// only repeats the message next to it. `queue-operation` is left out for a
-// subtler reason: half of what gets enqueued is delivered and so already shows
-// up as an ordinary user message, and the other half was withdrawn before it
-// was ever sent. Most `attachment` payloads are harness internals
-// (`task_reminder`, `skill_listing`, `deferred_tools_delta`); only a file you
-// edited yourself says anything about the conversation.
-func conversationRecords(all []record) []record {
-	var out []record
-	for _, rec := range all {
-		switch rec.Type {
-		case "user", "assistant":
-			if rec.IsMeta {
-				continue
-			}
-		case "system":
-			switch rec.Subtype {
-			case subtypeRecap, subtypeCompact, subtypeCommand, subtypeInfo,
-				subtypeFallback, subtypeDuration:
-			default:
-				continue
-			}
-		case "pr-link":
-		case "attachment":
-			if rec.Attachment == nil {
-				continue
-			}
-			switch rec.Attachment.Type {
-			case "edited_text_file":
-			case "task_reminder":
-				if rec.Attachment.ItemCount == 0 {
-					continue
-				}
-			default:
-				continue
-			}
-		default:
-			continue
-		}
-		out = append(out, rec)
-	}
-	return out
-}
-
-// A block plus the timestamp of the record it arrived in, which within a turn
-// is not necessarily the turn's own.
-type timedBlock struct {
-	b  block
-	ts string
-}
-
-// A tool result, keyed elsewhere by the id of the call it answers.
-type toolResult struct {
-	body    string
-	isError bool
-	ts      string
-}
-
-// Results arrive as user turns, because that is how they are sent back to the
-// model. Indexing them by the call they answer lets them be rendered under it
-// instead of as a message nobody wrote.
-func indexResults(records []record, blocks [][]block) map[string]toolResult {
-	calls := map[string]bool{}
-	for _, bs := range blocks {
-		for _, b := range bs {
-			if b.Type == "tool_use" && b.ID != "" {
-				calls[b.ID] = true
-			}
-		}
-	}
-
-	out := map[string]toolResult{}
-	for i, bs := range blocks {
-		for _, b := range bs {
-			if b.Type != "tool_result" || !calls[b.ToolUseID] {
-				continue
-			}
-			out[b.ToolUseID] = toolResult{
-				body:    flattenResult(b.Content),
-				isError: b.IsError,
-				ts:      records[i].Timestamp,
-			}
-		}
-	}
-	return out
-}
-
-func buildTurns(records []record, blocks [][]block, results map[string]toolResult) []turn {
-	var turns []turn
-
-	for i, rec := range records {
-		if rec.Type != "user" && rec.Type != "assistant" {
-			turns = appendEvent(turns, rec)
-			continue
-		}
-
-		model := ""
-		if rec.Message != nil {
-			model = rec.Message.Model
-		}
-
-		var keep []timedBlock
-		for _, b := range blocks[i] {
-			// Nested under its call; an orphan with no matching call still
-			// gets rendered where it sits.
-			if b.Type == "tool_result" {
-				if _, nested := results[b.ToolUseID]; nested {
-					continue
-				}
-			}
-			keep = append(keep, timedBlock{b: b, ts: rec.Timestamp})
-		}
-		if len(keep) == 0 {
-			continue
-		}
-
-		// Merging stops at a model change, so a switch mid-answer starts a
-		// new heading rather than hiding inside one. Annotating sub-headings
-		// instead would miss a switch that lands on a plain text block, which
-		// has no heading to annotate.
-		if n := len(turns); n > 0 && turns[n-1].role == rec.Type && turns[n-1].model == model {
-			turns[n-1].blocks = append(turns[n-1].blocks, keep...)
-			continue
-		}
-		turns = append(turns, turn{role: rec.Type, ts: rec.Timestamp, model: model, blocks: keep})
-	}
-
-	return turns
-}
-
-// Turns are independent, so they render concurrently and are reassembled in
-// order.
-func renderTurns(turns []turn, results map[string]toolResult, opts renderOpts, jobs int) []string {
+// RenderTurns writes each turn as its own piece of the document. Turns are
+// independent, so they render concurrently and are reassembled in order.
+func RenderTurns(turns []Turn, results map[string]ToolResult, st Style, jobs int) []string {
 	parts := make([]string, len(turns))
 
 	workers := jobs
@@ -357,15 +263,7 @@ func renderTurns(turns []turn, results map[string]toolResult, opts renderOpts, j
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r := &renderer{
-				org:      opts.org,
-				maxBlock: opts.maxBlock,
-				diff:     opts.diff,
-				tag:      opts.tag,
-				base:     opts.base,
-				results:  results,
-				out:      &strings.Builder{},
-			}
+			r := &renderer{Style: st, results: results, out: &strings.Builder{}}
 			for i := range idx {
 				r.out.Reset()
 				r.renderTurn(turns[i])
@@ -385,7 +283,7 @@ func renderTurns(turns []turn, results map[string]toolResult, opts renderOpts, j
 // Converts the markdown segments, leaving the skeleton ones alone. Contiguous
 // runs of markdown are converted as units so pandoc never sees a document
 // fragment that starts mid-structure.
-func convertSegments(segs []segment, jobs int, bin string) []string {
+func convertSegments(segs []segment, jobs int, bin string) ([]string, error) {
 	out := make([]string, len(segs))
 
 	for i := 0; i < len(segs); {
@@ -402,16 +300,20 @@ func convertSegments(segs []segment, jobs int, bin string) []string {
 			j++
 		}
 
+		chunks, err := pandocChunks(run, jobs, bin)
+		if err != nil {
+			return nil, err
+		}
 		// Trailing blank line so a skeleton heading after this run is its own
 		// block; the caller trims whatever is left over at the very end.
-		out[i] = strings.Join(pandocChunks(run, jobs, bin), "\n\n") + "\n\n"
+		out[i] = strings.Join(chunks, "\n\n") + "\n\n"
 		for k := i + 1; k < j; k++ {
 			out[k] = ""
 		}
 		i = j
 	}
 
-	return out
+	return out, nil
 }
 
 // Splits the rendered records into byte-balanced chunks and converts each with
@@ -419,7 +321,7 @@ func convertSegments(segs []segment, jobs int, bin string) []string {
 // block and never just after a heading, so each chunk is a self-contained
 // markdown document and the result is identical to converting the whole thing
 // at once.
-func pandocChunks(parts []string, jobs int, bin string) []string {
+func pandocChunks(parts []string, jobs int, bin string) ([]string, error) {
 	total := 0
 	for _, p := range parts {
 		total += len(p)
@@ -476,7 +378,7 @@ func pandocChunks(parts []string, jobs int, bin string) []string {
 
 	for i, err := range errs {
 		if err != nil {
-			fatal(fmt.Sprintf("pandoc (chunk %d/%d): %v", i+1, len(chunks), err))
+			return nil, fmt.Errorf("pandoc (chunk %d/%d): %v", i+1, len(chunks), err)
 		}
 	}
 
@@ -486,7 +388,7 @@ func pandocChunks(parts []string, jobs int, bin string) []string {
 	for i := range out {
 		out[i] = strings.TrimRight(out[i], "\n")
 	}
-	return out
+	return out, nil
 }
 
 // Whether this piece of markdown ends on an ATX heading, which is all the
@@ -523,60 +425,32 @@ func runPandoc(bin, input string) (string, error) {
 	return stdout.String(), nil
 }
 
-func readRecords(fh *os.File) []record {
-	var out []record
-	sc := bufio.NewScanner(fh)
-	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if len(line) == 0 || line[0] != '{' {
-			continue
-		}
-		var rec record
-		if err := json.Unmarshal([]byte(line), &rec); err != nil {
-			// A truncated or malformed line loses one message, not the file.
-			continue
-		}
-		out = append(out, rec)
-	}
-	return out
-}
-
-func (r *renderer) renderTurn(t turn) {
+func (r *renderer) renderTurn(t Turn) {
 	// Rendered first so a turn whose blocks are all empty (e.g. a bare
 	// redacted-thinking turn) does not leave a dangling heading behind.
-	body := &renderer{
-		org:      r.org,
-		maxBlock: r.maxBlock,
-		diff:     r.diff,
-		tag:      r.tag,
-		base:     r.base,
-		results:  r.results,
-		turnTS:   t.ts,
-		out:      &strings.Builder{},
-	}
-	for _, tb := range t.blocks {
+	body := &renderer{Style: r.Style, results: r.results, turnTS: t.TS, out: &strings.Builder{}}
+	for _, tb := range t.Blocks {
 		body.renderBlock(tb)
 	}
-	if strings.TrimSpace(body.out.String()) == "" && t.heading == "" {
+	if strings.TrimSpace(body.out.String()) == "" && t.Heading == "" {
 		return
 	}
 
-	title := t.heading
-	if title == "" {
-		title = strings.ToUpper(t.role[:1]) + t.role[1:]
+	title := t.Heading
+	if title == "" && t.Role != "" {
+		title = strings.ToUpper(t.Role[:1]) + t.Role[1:]
 	}
-	if ts := humanTimestamp(t.ts); ts != "" {
+	if ts := HumanTimestamp(t.TS); ts != "" {
 		title += " " + ts
 	}
-	if m := shortModel(t.model); m != "" {
+	if m := ShortModel(t.Model); m != "" {
 		title += " · " + m
 	}
-	if d := shortDuration(t.duration); d != "" {
+	if d := ShortDuration(t.Duration); d != "" {
 		title += " · " + d
 	}
-	if t.note != "" {
-		title += " · " + t.note
+	if t.Note != "" {
+		title += " · " + t.Note
 	}
 	r.turnHeading(1, title)
 	r.out.WriteString(body.out.String())
@@ -600,39 +474,22 @@ func (r *renderer) stamp(ts string) string {
 	}
 
 	t, base = t.Local(), base.Local()
-	if t.Format(listStamp) == base.Format(listStamp) {
+	if t.Format(ListStamp) == base.Format(ListStamp) {
 		return ""
 	}
 	if t.YearDay() != base.YearDay() || t.Year() != base.Year() {
 		// A turn that crosses midnight needs the date to stay unambiguous.
-		return " " + t.Format(orgStamp)
+		return " " + t.Format(OrgStamp)
 	}
 	return " [" + t.Format("15:04") + "]"
 }
 
-func decodeBlocks(m *message) []block {
-	if m == nil || len(m.Content) == 0 {
-		return nil
-	}
-
-	var s string
-	if err := json.Unmarshal(m.Content, &s); err == nil {
-		return []block{{Type: "text", Text: s}}
-	}
-
-	var blocks []block
-	if err := json.Unmarshal(m.Content, &blocks); err != nil {
-		return nil
-	}
-	return blocks
-}
-
 // A single-line result this short goes on its heading instead of into a block
 // of its own.
-const resultInlineMax = 72
+const ResultInlineMax = 72
 
-func (r *renderer) renderBlock(tb timedBlock) {
-	b := tb.b
+func (r *renderer) renderBlock(tb TimedBlock) {
+	b := tb.B
 
 	switch b.Type {
 	case "text":
@@ -642,24 +499,24 @@ func (r *renderer) renderBlock(tb timedBlock) {
 		r.prose(b.Text, 1)
 
 	case "notice":
-		r.heading(2, b.Name+r.stamp(tb.ts))
+		r.heading(2, b.Name+r.stamp(tb.TS))
 		r.prose(b.Text, 2)
 
 	case "command":
-		r.heading(2, "Command: "+b.Text+r.stamp(tb.ts))
+		r.heading(2, "Command: "+b.Text+r.stamp(tb.TS))
 
 	case "pr":
-		r.heading(2, "Pull request "+b.Name+r.stamp(tb.ts))
+		r.heading(2, "Pull request "+b.Name+r.stamp(tb.TS))
 		if b.Text != "" {
 			r.link(b.Text)
 		}
 
 	case "tasks":
-		r.heading(2, "Task reminder · "+b.Name+r.stamp(tb.ts))
+		r.heading(2, "Task reminder · "+b.Name+r.stamp(tb.TS))
 		r.block("json", b.Text)
 
 	case "file-edit":
-		r.heading(2, "Edited outside the session · "+abbrevHome(b.Name)+r.stamp(tb.ts))
+		r.heading(2, "Edited outside the session · "+AbbrevHome(b.Name)+r.stamp(tb.TS))
 		if strings.TrimSpace(b.Text) != "" {
 			r.block("", b.Text)
 		}
@@ -668,7 +525,7 @@ func (r *renderer) renderBlock(tb timedBlock) {
 		if strings.TrimSpace(b.Thinking) == "" {
 			return
 		}
-		r.heading(2, "Thinking"+r.stamp(tb.ts))
+		r.heading(2, "Thinking"+r.stamp(tb.TS))
 		r.block("", b.Thinking)
 
 	case "tool_use":
@@ -681,7 +538,7 @@ func (r *renderer) renderBlock(tb timedBlock) {
 		if head := toolHeadline(name, in); head != "" {
 			title += " · " + head
 		}
-		r.heading(2, title+r.stamp(tb.ts))
+		r.heading(2, title+r.stamp(tb.TS))
 		r.renderToolInput(name, in, b.Input)
 
 		if res, ok := r.results[b.ID]; ok {
@@ -690,30 +547,30 @@ func (r *renderer) renderBlock(tb timedBlock) {
 
 	case "tool_result":
 		// Orphaned: the call it answers is not in this transcript.
-		r.renderResult(2, toolResult{
-			body:    flattenResult(b.Content),
-			isError: b.IsError,
-			ts:      tb.ts,
+		r.renderResult(2, ToolResult{
+			Body:    FlattenResult(b.Content),
+			IsError: b.IsError,
+			TS:      tb.TS,
 		})
 	}
 }
 
-func (r *renderer) renderResult(level int, res toolResult) {
+func (r *renderer) renderResult(level int, res ToolResult) {
 	title := "Result"
-	if res.isError {
+	if res.IsError {
 		title += " (error)"
 	}
-	stamp := r.stamp(res.ts)
+	stamp := r.stamp(res.TS)
 
-	body := strings.TrimSpace(res.body)
+	body := strings.TrimSpace(res.Body)
 	switch {
 	case body == "":
 		r.heading(level, title+": (no output)"+stamp)
-	case !strings.ContainsAny(body, "\n\r") && len([]rune(body)) <= resultInlineMax:
+	case !strings.ContainsAny(body, "\n\r") && len([]rune(body)) <= ResultInlineMax:
 		r.heading(level, title+": "+body+stamp)
 	default:
 		r.heading(level, title+stamp)
-		r.block("", res.body)
+		r.block("", res.Body)
 	}
 }
 
@@ -728,7 +585,9 @@ func decodeInput(raw json.RawMessage) map[string]json.RawMessage {
 	return in
 }
 
-func flattenResult(raw json.RawMessage) string {
+// FlattenResult reads a tool result's content as text: a plain string, or a
+// list of content items whose `text` fields are joined.
+func FlattenResult(raw json.RawMessage) string {
 	if len(raw) == 0 {
 		return ""
 	}
@@ -801,10 +660,10 @@ func (r *renderer) renderToolInput(name string, in map[string]json.RawMessage, r
 	}
 
 	handled := map[string]bool{}
-	lang := langForPath(firstString(in, "file_path", "notebook_path", "path"))
+	lang := LangForPath(firstString(in, "file_path", "notebook_path", "path"))
 	var sections []section
 
-	// Whatever [agfi:toolHeadline] put in the heading must not be repeated.
+	// Whatever [toolHeadline] put in the heading must not be repeated.
 	switch name {
 	case "Read":
 		handled["file_path"], handled["offset"], handled["limit"] = true, true, true
@@ -825,8 +684,8 @@ func (r *renderer) renderToolInput(name string, in map[string]json.RawMessage, r
 	if name == "Edit" {
 		oldS, hasOld := stringAt(in, "old_string")
 		newS, hasNew := stringAt(in, "new_string")
-		if r.diff && hasOld && hasNew && oldS != "" {
-			if d, ok := unifiedDiff(splitLines(oldS), splitLines(newS), 3); ok {
+		if r.Diff && hasOld && hasNew && oldS != "" {
+			if d, ok := unifiedDiff(SplitLines(oldS), SplitLines(newS), 3); ok {
 				sections = append(sections, section{key: "diff", lang: "diff", body: strings.Join(d, "\n")})
 				handled["old_string"], handled["new_string"] = true, true
 			}
@@ -844,7 +703,7 @@ func (r *renderer) renderToolInput(name string, in map[string]json.RawMessage, r
 				continue
 			}
 			if k == "file_path" || k == "notebook_path" || k == "path" || k == "planFilePath" {
-				s = abbrevHome(s)
+				s = AbbrevHome(s)
 			}
 			r.bullet(k, s)
 			handled[k] = true
@@ -901,7 +760,9 @@ func langForKey(key, pathLang string) string {
 	return ""
 }
 
-// A short, scannable summary for the tool-use heading.
+// A short, scannable summary for the tool-use heading. Keyed on the tool's
+// name as the agent spells it; the names of every supported agent live here,
+// since a display table is not worth an indirection per agent.
 func toolHeadline(name string, in map[string]json.RawMessage) string {
 	if in == nil {
 		return ""
@@ -910,15 +771,15 @@ func toolHeadline(name string, in map[string]json.RawMessage) string {
 	switch name {
 	case "Bash":
 		if d, ok := stringAt(in, "description"); ok && d != "" {
-			return truncate(oneLine(d), 80)
+			return Truncate(OneLine(d), 80)
 		}
 		if c, ok := stringAt(in, "command"); ok {
-			return truncate(firstLine(c), 80)
+			return Truncate(FirstLine(c), 80)
 		}
 
 	case "Read":
 		if p, ok := stringAt(in, "file_path"); ok {
-			head := abbrevHome(p)
+			head := AbbrevHome(p)
 			off, hasOff := intAt(in, "offset")
 			lim, hasLim := intAt(in, "limit")
 			switch {
@@ -934,24 +795,24 @@ func toolHeadline(name string, in map[string]json.RawMessage) string {
 
 	case "Write", "Edit", "NotebookEdit":
 		if p := firstString(in, "file_path", "notebook_path"); p != "" {
-			return abbrevHome(p)
+			return AbbrevHome(p)
 		}
 
 	case "Glob", "Grep":
 		p, _ := stringAt(in, "pattern")
 		if dir, ok := stringAt(in, "path"); ok && dir != "" {
-			return truncate(p+" in "+abbrevHome(dir), 80)
+			return Truncate(p+" in "+AbbrevHome(dir), 80)
 		}
-		return truncate(p, 80)
+		return Truncate(p, 80)
 
 	case "WebFetch":
 		if u, ok := stringAt(in, "url"); ok {
-			return truncate(u, 80)
+			return Truncate(u, 80)
 		}
 
 	case "WebSearch", "ToolSearch":
 		if q, ok := stringAt(in, "query"); ok {
-			return truncate(oneLine(q), 80)
+			return Truncate(OneLine(q), 80)
 		}
 
 	case "Skill":
@@ -961,109 +822,15 @@ func toolHeadline(name string, in map[string]json.RawMessage) string {
 
 	case "Agent", "Task":
 		if d, ok := stringAt(in, "description"); ok {
-			return truncate(oneLine(d), 80)
+			return Truncate(OneLine(d), 80)
 		}
 	}
 
 	return ""
 }
 
-// Everything in a transcript that is neither a message nor bookkeeping: the
-// recaps, notices, slash commands, compaction boundaries, pull requests and
-// externally edited files. Each attaches to the turn it interrupts, except a
-// compaction, which separates two phases of the conversation and so stands on
-// its own.
-func appendEvent(turns []turn, rec record) []turn {
-	var text string
-	json.Unmarshal(rec.Content, &text)
-	text = strings.TrimSpace(text)
-
-	attach := func(b block) []turn {
-		tb := timedBlock{b: b, ts: rec.Timestamp}
-		if n := len(turns); n > 0 {
-			turns[n-1].blocks = append(turns[n-1].blocks, tb)
-			return turns
-		}
-		return append(turns, turn{role: "assistant", ts: rec.Timestamp, blocks: []timedBlock{tb}})
-	}
-
-	switch {
-	case rec.Type == "pr-link":
-		label := rec.PRRepository
-		if label == "" {
-			label = "Pull request"
-		}
-		return attach(block{Type: "pr", Name: fmt.Sprintf("%s#%d", label, rec.PRNumber), Text: rec.PRUrl})
-
-	case rec.Type == "attachment" && rec.Attachment.Type == "task_reminder":
-		var pretty strings.Builder
-		enc := json.NewEncoder(&pretty)
-		enc.SetIndent("", "  ")
-		if enc.Encode(rec.Attachment.Content) != nil {
-			return turns
-		}
-		return attach(block{
-			Type: "tasks",
-			Name: fmt.Sprintf("%d outstanding", rec.Attachment.ItemCount),
-			Text: strings.TrimRight(pretty.String(), "\n"),
-		})
-
-	case rec.Type == "attachment":
-		path := rec.Attachment.DisplayPath
-		if path == "" {
-			path = rec.Attachment.Filename
-		}
-		return attach(block{Type: "file-edit", Name: path, Text: rec.Attachment.Snippet})
-
-	case rec.Subtype == subtypeDuration:
-		// Belongs to the turn it measures, in its heading.
-		if n := len(turns); n > 0 && rec.DurationMs > 0 {
-			turns[n-1].duration = time.Duration(rec.DurationMs) * time.Millisecond
-		}
-		return turns
-
-	case rec.Subtype == subtypeCompact:
-		note := ""
-		if m := rec.CompactMetadata; m != nil {
-			if m.Trigger != "" {
-				note = m.Trigger
-			}
-			if m.PreTokens > 0 {
-				if note != "" {
-					note += " · "
-				}
-				note += fmt.Sprintf("%d → %d tokens", m.PreTokens, m.PostTokens)
-			}
-		}
-		return append(turns, turn{
-			role: "system", heading: "Context compacted", note: note, ts: rec.Timestamp,
-		})
-
-	case rec.Subtype == subtypeCommand:
-		// The payload is the same `<command-name>` scaffolding the picker
-		// strips, so it reduces to the command that was run.
-		if s := snippetText(text); s != "" {
-			return attach(block{Type: "command", Text: s})
-		}
-		return turns
-
-	case text != "":
-		// away_summary, informational, model_consent_fallback.
-		kind := "Notice"
-		switch rec.Subtype {
-		case subtypeRecap:
-			kind = "Recap"
-		case subtypeFallback:
-			kind = "Model fallback"
-		}
-		return attach(block{Type: "notice", Name: kind, Text: text})
-	}
-
-	return turns
-}
-
-// A turn's wall-clock length, as `4m2s`, for its heading.
-func shortDuration(d time.Duration) string {
+// ShortDuration is a turn's wall-clock length, as `4m2s`, for its heading.
+func ShortDuration(d time.Duration) string {
 	switch {
 	case d <= 0:
 		return ""

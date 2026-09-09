@@ -23,17 +23,27 @@ import (
 //
 // Needs data and pandoc, so it only runs when pointed at a corpus:
 //
-//	CLAUDE_SESSION_CORPUS=~/.claude/projects go test -run Parity ./...
+//	AGENT_SESSION_CORPUS=~/.claude/projects go test -run Parity ./...
+//
+// The corpus is Claude Code transcripts; AGENT_SESSION_CORPUS_AGENT names another
+// agent (default claude). The old CLAUDE_SESSION_CORPUS name still works.
 func TestPandocPathParity(t *testing.T) {
-	corpus := os.Getenv("CLAUDE_SESSION_CORPUS")
+	corpus := os.Getenv("AGENT_SESSION_CORPUS")
 	if corpus == "" {
-		t.Skip("set CLAUDE_SESSION_CORPUS to a directory of session transcripts")
+		corpus = os.Getenv("CLAUDE_SESSION_CORPUS")
+	}
+	if corpus == "" {
+		t.Skip("set AGENT_SESSION_CORPUS to a directory of session transcripts")
+	}
+	agent := os.Getenv("AGENT_SESSION_CORPUS_AGENT")
+	if agent == "" {
+		agent = "claude"
 	}
 	if _, err := exec.LookPath("pandoc"); err != nil {
 		t.Skip("pandoc not installed")
 	}
 
-	bin := filepath.Join(t.TempDir(), "claude_session")
+	bin := filepath.Join(t.TempDir(), "agent_session")
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
@@ -66,12 +76,12 @@ func TestPandocPathParity(t *testing.T) {
 
 		// Subagents are skipped: the snapshot has no subagents/ directory
 		// beside it, so their section would be empty on both sides anyway.
-		want, err := run(bin, "render", "-format=org-pandoc", "-subagents=false", "-jobs=1", snap)
+		want, err := run(bin, agent, "render", "-format=org-pandoc", "-subagents=false", "-jobs=1", snap)
 		if err != nil {
 			t.Errorf("%s: reference conversion: %v", f, err)
 			continue
 		}
-		got, err := run(bin, "render", "-format=org-pandoc", "-subagents=false", snap)
+		got, err := run(bin, agent, "render", "-format=org-pandoc", "-subagents=false", snap)
 		if err != nil {
 			t.Errorf("%s: org-pandoc: %v", f, err)
 			continue

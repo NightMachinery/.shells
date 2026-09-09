@@ -1,56 +1,57 @@
-package main
+package claude
 
 import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"flag"
-	"fmt"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
-	"sort"
 	"strings"
-	"sync"
 	"time"
+
+	"agent_session/internal/session"
+	"agent_session/internal/turns"
 )
 
 // ** list
 
-type sessionInfo struct {
-	path    string
-	rel     string
-	epoch   int64
-	stamp   string
-	name    string
-	snippet string
-}
-
-func cmdList(argv []string) {
-	fs := flag.NewFlagSet("list", flag.ExitOnError)
-	snippetLen := fs.Int("snippet-len", 120, "max snippet width, in runes")
-	nameLen := fs.Int("name-len", 40, "max session-name width, in runes")
-	subagentsP := fs.Bool("subagents", false, "also list subagent transcripts")
-	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
-	fs.Parse(guardPathArgs(fs, argv))
-
-	// Several roots, because Claude Code keeps one projects directory per
-	// config home and `claude-work` runs a second one. Merged here rather than
-	// by the caller, so the sort below is over all of them at once.
-	roots := fs.Args()
+// List walks the roots for transcripts. Several roots, because Claude Code
+// keeps one projects directory per config home and `claude-work` runs a second
+// one; they are merged here rather than by the caller so the sort is over all
+// of them at once.
+//
+// With a cwd, only that project's directory under each root is walked, and
+// paths are relative to it -- the same rows the caller used to get by scoping
+// the roots down itself.
+func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) {
 	if len(roots) == 0 {
-		fatal("list: no sessions directory given")
+		return nil, errors.New("list: no sessions directory given")
 	}
-	labels := profileLabels(roots)
+	labels := session.ProfileLabels(roots)
+
+	slug := ""
+	if o.Cwd != "" {
+		slug = projectSlug(o.Cwd)
+	}
 
 	// Which root a file came from travels with it: `rel` is relative to that
-	// root, and carries its label when there is more than one.
-	type found struct{ path, root string }
+	// root (or its project directory), and carries its label when there is
+	// more than one.
+	type found struct{ path, base, root string }
 	var files []found
 
+	sep := string(filepath.Separator)
 	for _, root := range roots {
-		err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		base := root
+		if slug != "" {
+			base = filepath.Join(root, slug)
+			if st, err := os.Stat(base); err != nil || !st.IsDir() {
+				continue
+			}
+		}
+		err := filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -60,118 +61,30 @@ func cmdList(argv []string) {
 			// Subagent transcripts live under `<session>/subagents/`. render
 			// inlines them into their parent, so listing them next to real
 			// sessions is just noise -- they were a third of the list.
-			sep := string(filepath.Separator)
-			if !*subagentsP && strings.Contains(p, sep+"subagents"+sep) {
+			if !o.Subagents && strings.Contains(p, sep+"subagents"+sep) {
 				return nil
 			}
-			files = append(files, found{path: p, root: root})
+			files = append(files, found{path: p, base: base, root: root})
 			return nil
 		})
 		if err != nil {
-			fatal(err.Error())
+			return nil, err
 		}
 	}
 	if len(files) == 0 {
-		fatal("list: no session files found in: " + strings.Join(roots, " "))
+		return nil, errors.New("list: no session files found in: " + strings.Join(roots, " "))
 	}
 
-	infos := make([]sessionInfo, len(files))
-	workers := *jobs
-	if workers > len(files) {
-		workers = len(files)
-	}
-	if workers < 1 {
-		workers = 1
-	}
-
-	var wg sync.WaitGroup
-	queue := make(chan int)
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for idx := range queue {
-				f := files[idx]
-				info := scanSession(f.path, f.root, *snippetLen, *nameLen)
-				if l := labels[f.root]; l != "" {
-					info.rel = filepath.Join(l, info.rel)
-				}
-				infos[idx] = info
-			}
-		}()
-	}
-	for i := range files {
-		queue <- i
-	}
-	close(queue)
-	wg.Wait()
-
-	sort.SliceStable(infos, func(i, j int) bool {
-		if infos[i].epoch != infos[j].epoch {
-			return infos[i].epoch > infos[j].epoch
+	infos := make([]session.Info, len(files))
+	session.ForEach(len(files), o.Jobs, func(i int) {
+		f := files[i]
+		info := scanSession(f.path, f.base, o.SnippetLen, o.NameLen)
+		if l := labels[f.root]; l != "" {
+			info.Rel = filepath.Join(l, info.Rel)
 		}
-		return infos[i].path < infos[j].path
+		infos[i] = info
 	})
-
-	w := bufio.NewWriter(os.Stdout)
-	defer w.Flush()
-	for _, s := range infos {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\t%s\n",
-			s.epoch, s.path, s.stamp, s.name, s.rel, s.snippet)
-	}
-}
-
-// How each root is labelled in the listing, keyed by root. The relative path
-// alone is ambiguous the moment more than one root is listed: every profile
-// has a -Users-evar-scripts/ under it, and in project scope the roots end in
-// that same component.
-//
-// So the label is the first path component in which the roots actually
-// differ. For ~/.claude/projects and ~/.claude-work/projects that is .claude
-// and .claude-work, and it stays right when the caller scopes the roots down
-// to one project apiece -- which taking a fixed component would not: their
-// parent is then "projects" for both.
-//
-// Empty for a single root, so single-root output is unchanged.
-func profileLabels(roots []string) map[string]string {
-	labels := make(map[string]string, len(roots))
-	if len(roots) < 2 {
-		return labels
-	}
-
-	split := make([][]string, len(roots))
-	shortest := -1
-	for i, r := range roots {
-		split[i] = strings.Split(filepath.Clean(r), string(filepath.Separator))
-		if shortest < 0 || len(split[i]) < shortest {
-			shortest = len(split[i])
-		}
-	}
-
-	at := 0
-	for ; at < shortest; at++ {
-		same := true
-		for i := 1; i < len(split); i++ {
-			if split[i][at] != split[0][at] {
-				same = false
-				break
-			}
-		}
-		if !same {
-			break
-		}
-	}
-
-	// One root is a prefix of another, so there is no differing component for
-	// the shorter one; its own last component is the best it has.
-	for i, r := range roots {
-		idx := at
-		if idx >= len(split[i]) {
-			idx = len(split[i]) - 1
-		}
-		labels[r] = split[i][idx]
-	}
-	return labels
+	return infos, nil
 }
 
 // How much of the file's end is searched for the last message's timestamp and
@@ -198,12 +111,12 @@ const (
 // Only the two ends of the file are read. Reading all of it would make the
 // picker cost grow with total transcript volume rather than with the number
 // of sessions.
-func scanSession(path, root string, snippetLen, nameLen int) sessionInfo {
-	info := sessionInfo{path: path}
+func scanSession(path, root string, snippetLen, nameLen int) session.Info {
+	info := session.Info{Path: path}
 	if rel, err := filepath.Rel(root, path); err == nil {
-		info.rel = rel
+		info.Rel = rel
 	} else {
-		info.rel = filepath.Base(path)
+		info.Rel = filepath.Base(path)
 	}
 
 	var last time.Time
@@ -225,10 +138,10 @@ func scanSession(path, root string, snippetLen, nameLen int) sessionInfo {
 		}
 	}
 
-	info.epoch = last.Unix()
-	info.stamp = last.Local().Format(listStamp)
-	info.name = truncate(oneLine(name.resolve()), nameLen)
-	info.snippet = truncate(oneLine(snippet), snippetLen)
+	info.Epoch = last.Unix()
+	info.Stamp = last.Local().Format(turns.ListStamp)
+	info.Name = turns.Truncate(turns.OneLine(name.resolve()), nameLen)
+	info.Snippet = turns.Truncate(turns.OneLine(snippet), snippetLen)
 	return info
 }
 
@@ -333,7 +246,7 @@ func firstUserText(fh *os.File) string {
 	}
 
 	sc := bufio.NewScanner(fh)
-	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
+	sc.Buffer(make([]byte, 0, 64<<10), session.MaxLineBytes)
 
 	read := 0
 	for sc.Scan() {
@@ -405,18 +318,8 @@ func snippetText(text string) string {
 	return ""
 }
 
-func parseRecord(line string) (record, bool) {
-	line = strings.TrimSpace(line)
-	if len(line) == 0 || line[0] != '{' {
-		return record{}, false
-	}
-	var rec record
-	if err := json.Unmarshal([]byte(line), &rec); err != nil {
-		return record{}, false
-	}
-	return rec, true
-}
-
+// ** name
+//
 // Claude Code names a session several ways, in increasing order of authority:
 // a generated slug like `sharded-bouncing-clarke`, an `ai-title` summarising
 // the work, and a `custom-title` the user set. `agent-name` is the name Claude
@@ -427,25 +330,9 @@ func parseRecord(line string) (record, bool) {
 //
 // Sessions predating all of it have no name, and the caller falls back to the
 // uuid.
-func cmdName(argv []string) {
-	if len(argv) == 0 {
-		fatal("name: no input file given")
-	}
-
-	fh, err := os.Open(argv[0])
-	if err != nil {
-		fatal(err.Error())
-	}
-	defer fh.Close()
-
-	if s := sessionName(fh); s != "" {
-		fmt.Println(s)
-	}
-}
-
 func sessionName(fh *os.File) string {
 	sc := bufio.NewScanner(fh)
-	sc.Buffer(make([]byte, 0, 64<<10), maxLineBytes)
+	sc.Buffer(make([]byte, 0, 64<<10), session.MaxLineBytes)
 
 	var name nameParts
 	for sc.Scan() {

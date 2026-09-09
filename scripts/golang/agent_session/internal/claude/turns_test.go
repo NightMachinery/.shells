@@ -1,13 +1,13 @@
-package main
+package claude
 
 import (
 	"encoding/json"
-	"flag"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
+
+	"agent_session/internal/turns"
 )
 
 func mkRecord(t *testing.T, role, ts string, blocks ...map[string]any) record {
@@ -19,19 +19,19 @@ func mkRecord(t *testing.T, role, ts string, blocks ...map[string]any) record {
 	return record{Type: role, Timestamp: ts, Message: &message{Content: raw}}
 }
 
-func decodeAll(records []record) [][]block {
-	out := make([][]block, len(records))
+func decodeAll(records []record) [][]turns.Block {
+	out := make([][]turns.Block, len(records))
 	for i := range records {
 		out[i] = decodeBlocks(records[i].Message)
 	}
 	return out
 }
 
-func renderOne(records []record, opts renderOpts) string {
+func renderOne(records []record, opts turns.Style) string {
 	blocks := decodeAll(records)
 	results := indexResults(records, blocks)
-	turns := buildTurns(records, blocks, results)
-	return strings.Join(renderTurns(turns, results, opts, 1), "")
+	ts := buildTurns(records, blocks, results)
+	return strings.Join(turns.RenderTurns(ts, results, opts, 1), "")
 }
 
 // Claude Code writes one record per content block, so an assistant turn must
@@ -44,7 +44,7 @@ func TestConsecutiveSameRoleRecordsMerge(t *testing.T) {
 		mkRecord(t, "assistant", "2026-08-10T10:01:20.000Z", map[string]any{"type": "text", "text": "three"}),
 	}
 
-	got := renderOne(records, renderOpts{org: true})
+	got := renderOne(records, turns.Style{Org: true})
 	if n := strings.Count(got, "* Assistant"); n != 1 {
 		t.Errorf("want 1 assistant heading, got %d:\n%s", n, got)
 	}
@@ -68,7 +68,7 @@ func TestToolResultNestsUnderItsCall(t *testing.T) {
 		}),
 	}
 
-	got := renderOne(records, renderOpts{org: true})
+	got := renderOne(records, turns.Style{Org: true})
 	if strings.Contains(got, "* User") {
 		t.Errorf("a results-only record should not produce a user heading:\n%s", got)
 	}
@@ -88,7 +88,7 @@ func TestOrphanToolResultStillRenders(t *testing.T) {
 		}),
 	}
 
-	got := renderOne(records, renderOpts{org: true})
+	got := renderOne(records, turns.Style{Org: true})
 	if !strings.Contains(got, "stranded") {
 		t.Errorf("orphan result was dropped:\n%s", got)
 	}
@@ -108,7 +108,7 @@ func TestUserRecordWithBothResultAndText(t *testing.T) {
 		),
 	}
 
-	got := renderOne(records, renderOpts{org: true})
+	got := renderOne(records, turns.Style{Org: true})
 	if !strings.Contains(got, "* User") {
 		t.Errorf("typed text needs its own user heading:\n%s", got)
 	}
@@ -127,7 +127,7 @@ func TestShortResultGoesOnTheHeading(t *testing.T) {
 		{"Exit code 1", "*** Result: Exit code 1"},
 		{"", "*** Result: (no output)"},
 		{"line one\nline two", "*** Result\n"},
-		{strings.Repeat("x", resultInlineMax+1), "*** Result\n"},
+		{strings.Repeat("x", turns.ResultInlineMax+1), "*** Result\n"},
 	} {
 		records := []record{
 			mkRecord(t, "assistant", "2026-08-10T10:00:00.000Z", call),
@@ -135,7 +135,7 @@ func TestShortResultGoesOnTheHeading(t *testing.T) {
 				"type": "tool_result", "tool_use_id": "tu_1", "content": c.content,
 			}),
 		}
-		got := renderOne(records, renderOpts{org: true})
+		got := renderOne(records, turns.Style{Org: true})
 		if !strings.Contains(got, c.want) {
 			t.Errorf("content %q: want %q in:\n%s", c.content, c.want, got)
 		}
@@ -152,7 +152,7 @@ func TestCommandAlwaysRendersAsABlock(t *testing.T) {
 		}),
 	}
 
-	got := renderOne(records, renderOpts{org: true})
+	got := renderOne(records, turns.Style{Org: true})
 	if strings.Contains(got, "- command ::") {
 		t.Errorf("command must not be inlined as a bullet:\n%s", got)
 	}
@@ -172,7 +172,7 @@ func TestSubHeadingStampsOnlyWhenTheyDiffer(t *testing.T) {
 			"type": "tool_use", "id": "b", "name": "Bash", "input": map[string]any{"command": "pwd"},
 		}),
 	}
-	if got := renderOne(same, renderOpts{org: true}); strings.Contains(got, "[10:0") {
+	if got := renderOne(same, turns.Style{Org: true}); strings.Contains(got, "[10:0") {
 		t.Errorf("same minute should not be restamped:\n%s", got)
 	}
 
@@ -182,7 +182,7 @@ func TestSubHeadingStampsOnlyWhenTheyDiffer(t *testing.T) {
 			"type": "tool_use", "id": "b", "name": "Bash", "input": map[string]any{"command": "pwd"},
 		}),
 	}
-	got := renderOne(later, renderOpts{org: true})
+	got := renderOne(later, turns.Style{Org: true})
 	if !strings.Contains(got, "]") || !strings.Contains(got, ":07]") {
 		t.Errorf("a different minute should be stamped:\n%s", got)
 	}
@@ -193,7 +193,7 @@ func TestBaseLevelOffsetsHeadings(t *testing.T) {
 	records := []record{
 		mkRecord(t, "user", "2026-08-10T10:00:00.000Z", map[string]any{"type": "text", "text": "hi"}),
 	}
-	got := renderOne(records, renderOpts{org: true, base: 2})
+	got := renderOne(records, turns.Style{Org: true, Base: 2})
 	if !strings.Contains(got, "*** User") {
 		t.Errorf("want a level-3 heading with base=2:\n%s", got)
 	}
@@ -203,7 +203,7 @@ func TestEmptyTurnsProduceNoHeading(t *testing.T) {
 	records := []record{
 		mkRecord(t, "assistant", "2026-08-10T10:00:00.000Z", map[string]any{"type": "thinking", "thinking": "   "}),
 	}
-	if got := strings.TrimSpace(renderOne(records, renderOpts{org: true})); got != "" {
+	if got := strings.TrimSpace(renderOne(records, turns.Style{Org: true})); got != "" {
 		t.Errorf("want nothing, got:\n%s", got)
 	}
 }
@@ -268,7 +268,7 @@ func TestEventRecordsRender(t *testing.T) {
 			if len(records) != 2 {
 				t.Fatalf("record was filtered out: kept %d of 2", len(records))
 			}
-			if got := renderOne(records, renderOpts{org: true}); !strings.Contains(got, c.want) {
+			if got := renderOne(records, turns.Style{Org: true}); !strings.Contains(got, c.want) {
 				t.Errorf("want %q in:\n%s", c.want, got)
 			}
 		})
@@ -285,7 +285,7 @@ func TestCompactBoundaryIsItsOwnTurn(t *testing.T) {
 			"trigger": "manual", "preTokens": 476980, "postTokens": 11820,
 		},
 	})
-	got := renderOne(conversationRecords([]record{rec}), renderOpts{org: true})
+	got := renderOne(conversationRecords([]record{rec}), turns.Style{Org: true})
 	if !strings.Contains(got, "* Context compacted") || !strings.Contains(got, "476980 → 11820 tokens") {
 		t.Errorf("got:\n%s", got)
 	}
@@ -301,7 +301,7 @@ func TestTurnDurationLandsOnTheHeading(t *testing.T) {
 			"timestamp": "2026-08-10T10:04:02.000Z", "durationMs": 242000,
 		}),
 	})
-	if got := renderOne(records, renderOpts{org: true}); !strings.Contains(got, "· 4m2s") {
+	if got := renderOne(records, turns.Style{Org: true}); !strings.Contains(got, "· 4m2s") {
 		t.Errorf("want the duration on the heading:\n%s", got)
 	}
 }
@@ -321,69 +321,6 @@ func TestBookkeepingRecordsAreDropped(t *testing.T) {
 		if got := conversationRecords([]record{mkRaw(t, obj)}); len(got) != 0 {
 			t.Errorf("%v should have been dropped", obj["type"])
 		}
-	}
-}
-
-func TestShortDuration(t *testing.T) {
-	for _, c := range []struct {
-		ms   int64
-		want string
-	}{{0, ""}, {4500, "4s"}, {242000, "4m2s"}, {566155, "9m26s"}, {7500000, "2h5m"}} {
-		if got := shortDuration(time.Duration(c.ms) * time.Millisecond); got != c.want {
-			t.Errorf("shortDuration(%dms) = %q, want %q", c.ms, got, c.want)
-		}
-	}
-}
-
-// Paths inside ~/.claude/projects start with a dash, since project
-// directories are named after the cwd they belong to.
-func TestGuardPathArgs(t *testing.T) {
-	dir := t.TempDir()
-	dashed := filepath.Join(dir, "-Users-evar-scripts.jsonl")
-	if err := os.WriteFile(dashed, []byte("{}\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	cwd, _ := os.Getwd()
-	defer os.Chdir(cwd)
-	if err := os.Chdir(dir); err != nil {
-		t.Fatal(err)
-	}
-
-	fs := flag.NewFlagSet("render", flag.ContinueOnError)
-	format := fs.String("format", "md", "")
-	diff := fs.Bool("diff", true, "")
-
-	argv := []string{"-format=org", "-diff=false", "-Users-evar-scripts.jsonl"}
-	if err := fs.Parse(guardPathArgs(fs, argv)); err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-
-	if *format != "org" || *diff {
-		t.Errorf("real flags stopped parsing: format=%q diff=%v", *format, *diff)
-	}
-	if got := fs.Arg(0); got != "./-Users-evar-scripts.jsonl" {
-		t.Errorf("path argument = %q, want it spelled with a ./ prefix", got)
-	}
-}
-
-// A file named like a flag must not shadow the flag.
-func TestGuardPathArgsLeavesRealFlagsAlone(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "-diff"), []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cwd, _ := os.Getwd()
-	defer os.Chdir(cwd)
-	os.Chdir(dir)
-
-	fs := flag.NewFlagSet("render", flag.ContinueOnError)
-	diff := fs.Bool("diff", false, "")
-	if err := fs.Parse(guardPathArgs(fs, []string{"-diff"})); err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	if !*diff {
-		t.Error("-diff was treated as a path instead of a flag")
 	}
 }
 
