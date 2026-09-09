@@ -37,20 +37,30 @@ function claude-code-session-current-file {
     #: located from the environment Claude Code exports into every shell it
     #: runs. Works from a `! cmd' typed at the Claude Code prompt, too.
     ##
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL, which
+    #: turns `(N)' into a literal and this glob into a "no matches" error.
+    setopt localoptions bareglobqual
+
     local id="${CLAUDE_CODE_SESSION_ID}"
     if test -z "${id}" ; then
         ecerr "$0: not inside a Claude Code session (CLAUDE_CODE_SESSION_ID is unset)"
         return 1
     fi
 
-    #: Default profile keeps its state at ~/.claude; the others export their dir.
-    local home="${CLAUDE_CONFIG_DIR:-${HOME}/.claude}"
+    #: Every profile's projects directory, not just this shell's
+    #: CLAUDE_CONFIG_DIR: session ids are unique, so searching them all costs
+    #: nothing and does not trust the environment further than it must. The
+    #: project directory encodes the launch cwd; globbing beats re-encoding it.
+    local -a dirs files
+    dirs=( ${(f)"$(h-claude-code-session-projects-dirs)"} ) @TRET
 
-    #: The project directory encodes the launch cwd; globbing beats re-encoding it.
-    local -a files
-    files=( "${home}"/projects/*/"${id}".jsonl(N) )
+    local d
+    for d in "${dirs[@]}" ; do
+        files+=( "${d}"/*/"${id}".jsonl(N) )
+    done
+
     if (( ${#files} == 0 )) ; then
-        ecerr "$0: no transcript for session ${id} under ${home}/projects"
+        ecerr "$0: no transcript for session ${id} under: ${(j:, :)dirs}"
         return 1
     fi
 
@@ -198,7 +208,12 @@ function h-claude-code-session-projects-dirs {
     #: otherwise invisible to the picker. A glob rather than a written-out
     #: list, so a third profile needs no wiring -- the same reasoning as the
     #: socket glob in [agfi:h-claude-code-session-kitty-socket].
+    #:
+    #: Claude Code's own shell runs commands under NO_BARE_GLOB_QUAL, so the
+    #: `(N/)' below needs the option back to be a qualifier at all.
     ##
+    setopt localoptions bareglobqual
+
     ensure-array claude_code_session_projects_dirs
     if (( ${#claude_code_session_projects_dirs} )) ; then
         print -rl -- "${claude_code_session_projects_dirs[@]}"

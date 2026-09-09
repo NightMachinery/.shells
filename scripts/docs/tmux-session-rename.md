@@ -35,11 +35,13 @@ the existing [agfi:claude-code-p] (`CLAUDECODE=1` or `AI_AGENT=claude*`) and
 
 ## Where the name comes from
 
-Claude Code exports `CLAUDE_CODE_SESSION_ID`, and `CLAUDE_CONFIG_DIR` for a
-non-default profile, into every shell it spawns. The transcript is at
-`${CLAUDE_CONFIG_DIR:-~/.claude}/projects/*/${CLAUDE_CODE_SESSION_ID}.jsonl`.
-The glob is over project directories because the directory name encodes the
-launch cwd, which the shell has no other way to recover.
+Claude Code exports `CLAUDE_CODE_SESSION_ID` into every shell it spawns. The
+transcript is `<projects dir>/*/${CLAUDE_CODE_SESSION_ID}.jsonl`, searched in
+every profile's projects directory ([agfi:h-claude-code-session-projects-dirs],
+the same list the kitty `cmd+shift+o` picker uses), so it does not matter which
+profile started the session. The glob is over project directories because the
+directory name encodes the launch cwd, which the shell has no other way to
+recover.
 [agfi:h-claude-code-session-name] hands the file to `claude_session name`
 (`golang/claude_session`), which returns the user-set title, else Claude's own
 generated name, else the slug, else the UUID, sanitized for filenames.
@@ -68,3 +70,7 @@ the variables are absent and `tnameme` has nothing to read.
   against a real `agy` shell.
 - tmux rejects `.` and `:` in session names, so they are replaced with `-`
   rather than failing: `v1.2:fix` lands as `v1-2-fix`.
+- Claude Code's shell runs every command under `NO_BARE_GLOB_QUAL` and
+  `NO_EXTENDED_GLOB`, so a bare `(N)` qualifier is a literal there and any
+  function using one fails with "no matches found" when run via `!`. The
+  session lookups set `bareglobqual` locally for that reason.
