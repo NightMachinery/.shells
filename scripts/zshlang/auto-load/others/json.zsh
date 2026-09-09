@@ -27,7 +27,7 @@ function python2json {
 
     ec "$i" |
         python2json.py "${opts[@]}" |
-        command jq . |
+        command jq -e . |
         cat-copy-if-tty
     ## tests:
     # `ec "{'id': 7, 'ok': True, 'x': None, 'tup': (1, 2), 'photo': <mod.pkg.Thing object at 0x1>}" | python2json`
@@ -62,8 +62,15 @@ function json-rm-keys-empty {
 }
 ##
 function jq-quote {
+    local trim_right_p="${jq_quote_trim_right_p:-y}"
+
     local i
-    i="$(in-or-args "$@")" @TRET # this trim-rights the input, which seems desirable
+    if bool "${trim_right_p}" ; then
+        i="$(in-or-args "$@")" @TRET
+    else
+        i="${$(in-or-args "$@" ; print -n .)[1,-2]}"
+    fi
+
     ecn "$i" | jq --raw-input --slurp --null-input --compact-output 'inputs' |
         cat-copy-if-tty
     ## tests:
