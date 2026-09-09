@@ -81,8 +81,8 @@ Automatic names carry an `@` prefix: `@Claude/work wifi-dns-captive-portal`,
 both go through [agfi:h-claude-code-session-tmux-name]; `tnameme-status`
 says whether the hook will keep a session's name current.
 
-The switch is the tmux user option `@claude_autoname`. It is on globally
-(`set -g @claude_autoname on` in the tmux config), so every tmux session
+The switch is the tmux user option `@agent_autoname`. It is on globally
+(`set -g @agent_autoname on` in the tmux config), so every tmux session
 with a Claude Code session inside gets renamed. A session option beats the
 global, which is how you exempt one session:
 
@@ -134,4 +134,4 @@ hook discards output, and a broken rename must not cost a prompt.
 - The global default means any tmux session in which a Claude Code process is
   running gets renamed, including scheduled or scripted ones. Launchers that
   care about their session name should set the option off:
-  `tmux set-option -t "$session" @claude_autoname off`.
+  `tmux set-option -t "$session" @agent_autoname off`.

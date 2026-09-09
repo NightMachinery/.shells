@@ -447,25 +447,12 @@ function h-claude-code-session-registry-key {
     ec "${kpid}-${win}"
 }
 
-function h-claude-code-hook-payload {
-    #: The JSON a Claude Code hook was handed: `$1' when non-empty, else stdin.
-    #: Bounded: an inherited pipe that never closes must not wedge the agent's hook.
-    ##
-    local input="${1}"
-
-    if test -z "$input" && ! test -t 0 ; then
-        input="$(gtimeout 2 cat)" || input=''
-    fi
-
-    ec "${input}"
-}
-
 function h-claude-code-hook-transcript {
     #: The `transcript_path' of the hook payload, or nothing. Fails only when
     #: there was no payload at all.
     ##
     local input
-    input="$(h-claude-code-hook-payload "${1}")"
+    input="$(h-agent-hook-payload "${1}")"
     test -n "$input" || return 1
 
     ec "$input" | jq -r '.transcript_path // empty' 2>/dev/null
@@ -511,50 +498,6 @@ function h-claude-code-session-tmux-name {
     #: A space, not a hyphen, between the agent and the name: tmux allows it,
     #: and it reads as two things, which it is.
     ec "@Claude/${profile} ${name}"
-}
-
-#: The tmux user option that lets the hooks rename a session. Read with
-#: `show-option -A', so a session-level value overrides the global default
-#: set in =~/.tmux.conf=. See =docs/tmux-session-rename.md=.
-typeset -g claude_code_tmux_autoname_option='@claude_autoname'
-
-function claude-code-session-tmux-autoname {
-    #: Renames the tmux session around the calling Claude Code to
-    #: [agfi:h-claude-code-session-tmux-name], for the `SessionStart' and
-    #: `UserPromptSubmit' hooks. `$1' is the pane, passed by the hook line as
-    #: "$TMUX_PANE": this body runs in the garden, whose environment knows
-    #: nothing of the pane the agent sits in. Payload from `$2' or stdin.
-    #:
-    #: Every early return is an ordinary outcome, not an error: no tmux, the
-    #: option off, a name that is already right. Silent throughout; the hook
-    #: line discards output anyway.
-    #:
-    #: Sessions named `ag--*' are never touched, whatever the option says.
-    #: They belong to the tmux-subagents skill, which encodes lineage and
-    #: model in the name and would lose that identity to a rename.
-    #: Usage: claude-code-session-tmux-autoname <tmux-pane> [payload]
-    ##
-    local pane="${1}"
-    test -n "${pane}" || return 0
-
-    local transcript
-    transcript="$(h-claude-code-hook-transcript "${2}")" || return 0
-    test -n "${transcript}" || return 0
-
-    local current
-    current="$(command tmux display-message -p -t "${pane}" '#S' 2>/dev/null)" || return 0
-    [[ "${current}" == ag--* ]] && return 0
-
-    local opt
-    opt="$(command tmux show-option -qvA -t "${pane}" "${claude_code_tmux_autoname_option}" 2>/dev/null)"
-    [[ "${opt}" == on ]] || return 0
-
-    local target
-    target="$(h-claude-code-session-tmux-name "${transcript}")" || return 0
-    target="${target//[.:]/-}"
-    [[ "${target}" == "${current}" ]] && return 0
-
-    command tmux rename-session -t "${pane}" "${target}" 2>/dev/null || return 0
 }
 
 function claude-code-session-register {

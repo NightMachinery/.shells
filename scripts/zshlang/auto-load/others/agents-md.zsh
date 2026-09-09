@@ -260,6 +260,9 @@ typeset -ga agents_md_settings=(
     #: [agfi:claude-work] shares the tracked settings with the personal
     #: profile; only the account, history and projects differ.
     "${HOME}/.claude-work/settings.json"$'\t'"${NIGHTDIR}/configFiles/claude-code/settings.json"
+    #: Codex reads hooks from its own file rather than its settings; see
+    #: [agfi:codex-session-tmux-autoname].
+    "${HOME}/.codex/hooks.json"$'\t'"${NIGHTDIR}/configFiles/codex/hooks.json"
 )
 
 function h-agents-md-doctor-settings {
