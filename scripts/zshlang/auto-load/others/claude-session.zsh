@@ -32,6 +32,20 @@ function h-claude-code-session-name {
     fi
 }
 
+function claude-code-session-current-id {
+    #: The id of the Claude Code session that spawned this shell. Claude Code
+    #: exports it into every shell it runs, `! cmd' at its prompt included; a
+    #: plain shell has none, and that is the one failure here.
+    ##
+    local id="${CLAUDE_CODE_SESSION_ID}"
+    if test -z "${id}" ; then
+        ecerr "$0: not inside a Claude Code session (CLAUDE_CODE_SESSION_ID is unset)"
+        return 1
+    fi
+
+    ec "${id}"
+}
+
 function claude-code-session-current-file {
     #: The transcript of the Claude Code session that spawned this shell,
     #: located from the environment Claude Code exports into every shell it
@@ -41,11 +55,8 @@ function claude-code-session-current-file {
     #: turns `(N)' into a literal and this glob into a "no matches" error.
     setopt localoptions bareglobqual
 
-    local id="${CLAUDE_CODE_SESSION_ID}"
-    if test -z "${id}" ; then
-        ecerr "$0: not inside a Claude Code session (CLAUDE_CODE_SESSION_ID is unset)"
-        return 1
-    fi
+    local id
+    id="$(claude-code-session-current-id)" @RET
 
     #: Every profile's projects directory, not just this shell's
     #: CLAUDE_CONFIG_DIR: session ids are unique, so searching them all costs
