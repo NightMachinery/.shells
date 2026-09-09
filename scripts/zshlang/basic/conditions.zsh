@@ -95,13 +95,16 @@ function codex-p {
 }
 
 function antigravity-p {
-    #: Google's Antigravity CLI (`agy`) is a Gemini CLI derivative, and Gemini
-    #: CLI exports GEMINI_CLI=1 in the shells it spawns.
-    #: @unverified against a real `agy` shell; refine when one is at hand.
+    #: Google's Antigravity CLI (`agy`) exports ANTIGRAVITY_AGENT=1,
+    #: ANTIGRAVITY_TRAJECTORY_ID and ANTIGRAVITY_CONVERSATION_ID (plus
+    #: TERM=dumb, PAGER=cat) in the shells its run_command tool spawns. Read
+    #: off the binary: `cortex/command/command.(*goRunner).Run', agy 1.1.28.
+    #: It is not Gemini CLI and does not set GEMINI_CLI.
     ##
-    test -n "${GEMINI_CLI}" ||
-        test -n "${ANTIGRAVITY_CLI}" ||
-        [[ "${AI_AGENT}" == (antigravity|agy|gemini)* ]]
+    test -n "${ANTIGRAVITY_AGENT}" ||
+        test -n "${ANTIGRAVITY_TRAJECTORY_ID}" ||
+        test -n "${ANTIGRAVITY_CONVERSATION_ID}" ||
+        [[ "${AI_AGENT}" == (antigravity|agy)* ]]
 }
 
 function ai-agent-p {

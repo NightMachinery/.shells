@@ -406,11 +406,12 @@ function tmux-session-rename-current-auto {
     #:
     #: Finding *which* session we are in differs per agent. Claude Code
     #: exports its session id ([agfi:claude-code-session-current-file]);
-    #: Codex exports CODEX_THREAD_ID into its shell tool. agy exports its
-    #: conversation id only to hook commands, never to the shell, so its hook
-    #: leaves the identity on the tmux session ([agfi:agent-tmux-identity-get])
-    #: and this reads it back; until its first hook has fired there is
-    #: nothing to read. The same fallback covers the others.
+    #: Codex exports CODEX_THREAD_ID into its shell tool; agy exports
+    #: ANTIGRAVITY_CONVERSATION_ID into its run_command shells (and to hooks).
+    #: When the environment has nothing, e.g. a terminal opened next to the
+    #: agent, this falls back to the identity the agent's hook left on the
+    #: tmux session ([agfi:agent-tmux-identity-get]); until that hook has
+    #: fired there is nothing to read.
     ##
     local agent
     agent="$(ai-agent-name)" || {

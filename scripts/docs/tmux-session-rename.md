@@ -110,7 +110,8 @@ per turn end). Non-tool events take the handler object directly,
 `{"type":"command","command":...,"timeout":5}`, not a matcher group.
 
 Hooks run via `sh -c`, synchronously (default timeout 30 s, blocking the
-agent loop), with agy's environment plus `ANTIGRAVITY_CONVERSATION_ID`, and
+agent loop), with agy's environment plus `ANTIGRAVITY_CONVERSATION_ID` (its
+`run_command` shells get that too, plus `ANTIGRAVITY_AGENT=1`), and
 the directory containing `hooks.json` as cwd. stdin carries `conversationId`,
 `transcriptPath`, `workspacePaths`, `lastUserInput` and more, but no title.
 Empty stdout is tolerated but logs an ERROR per turn, so the hook line ends
@@ -157,6 +158,13 @@ The name is `title` (set with `/rename` or F2 in `/resume`), else `preview`
 - agy wants the flat handler shape for non-tool events. The grouped form makes
   it drop the whole file with a warning visible only under `--log-file`
   (issue #925).
-- `ANTIGRAVITY_CONVERSATION_ID` reaches only hook commands, never the user's
-  shell, so `tnameme` in an agy shell reads the identity the hook recorded on
-  the tmux session. It works once the first hook has fired, not before.
+- agy's `run_command` shells carry `ANTIGRAVITY_AGENT=1`,
+  `ANTIGRAVITY_TRAJECTORY_ID`, `ANTIGRAVITY_CONVERSATION_ID`, `TERM=dumb` and
+  `PAGER=cat` (read off `command.(*goRunner).Run` in the 1.1.28 binary). That
+  is what [agfi:antigravity-p] keys on; agy is not Gemini CLI and sets no
+  `GEMINI_CLI`. So `tnameme` works from the environment there. A shell agy
+  did not spawn falls back to the identity the hook recorded on the tmux
+  session, which exists once the first hook has fired, not before.
+- The trajectory id is not the conversation id (the two differ in
+  `conversations/<id>.db`), so only `ANTIGRAVITY_CONVERSATION_ID` names a
+  session.
