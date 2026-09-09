@@ -66,9 +66,9 @@ if blackoutLockScreenAfterSeconds == nil then blackoutLockScreenAfterSeconds = 6
 --- Backstop. After this long, the blackout is treated as forgotten: the session
 --- is locked and the display restored, so the failure state is a visible login
 --- screen and never a live keyboard on an unlocked desktop behind black. A
---- week, because the real ways out are the chord, a wake, and
+--- long time, because the real ways out are the chord, a wake, and
 --- display-black-off, and a blackout over a holiday must not end on its own.
-blackoutLockMaxSeconds = blackoutLockMaxSeconds or 7 * 24 * 60 * 60
+blackoutLockMaxSeconds = blackoutLockMaxSeconds or 14 * 24 * 60 * 60  -- 2 weeks
 
 --- ** State
 --- Global, so a dofile into a live Hammerspoon can find the previous run's tap
@@ -231,7 +231,7 @@ function blackoutLockOn(seconds)
 
     -- Visible for the moment before the screen goes black: black-on is
     -- asynchronous through the garden, and this is synchronous.
-    alert("Keyboard locked. hyper+shift+F2 releases.", {
+    alert("Input locked.", {
         id = kAlertId,
         color = "warn",
         seconds = 4,
@@ -264,7 +264,7 @@ function blackoutLockOff(silent)
     dismiss(kSecureInputAlertId)
 
     if wasActive and not silent then
-        alert("Keyboard unlocked", {
+        alert("Input unlocked", {
             id = kReleaseAlertId,
             color = "free",
             seconds = 1.5,
