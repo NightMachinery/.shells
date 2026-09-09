@@ -20,7 +20,7 @@
     ],
     "defaultMode": "plan"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5-1[1m]",
   "hooks": {
     "Notification": [
       {
@@ -70,8 +70,10 @@
   "enabledPlugins": {
     "clangd-lsp@claude-plugins-official": true
   },
+  "feedbackSurveyRate": 0,
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
+  "autoCompactWindow": 500000,
   "voice": {
     "enabled": true,
     "mode": "tap"
@@ -84,5 +86,5 @@
   "remoteControlAtStartup": true,
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
-  "voiceEnabled": true
+  "voiceEnabled": false
 }
