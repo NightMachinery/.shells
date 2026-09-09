@@ -410,8 +410,11 @@ function tmux-session-rename-current-auto {
     ##
     local agent
     agent="$(ai-agent-name)" || {
-        ecerr "$0: no AI agent detected in this shell's environment"
-        return 1
+        #: A plain shell has no agent session to be named after. Doing nothing
+        #: and succeeding keeps this safe to put in launchers and hooks that
+        #: run in both kinds of shell.
+        ecgray "$0: not inside an AI agent; leaving the session name alone"
+        return 0
     }
     if [[ "${agent}" != claude ]] ; then
         ecerr "$0: reading the session name is only implemented for Claude Code, not ${agent}"
