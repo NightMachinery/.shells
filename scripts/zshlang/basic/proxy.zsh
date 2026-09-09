@@ -328,32 +328,56 @@ function darwin-proxy-getns-v1 {
 aliasfn darwin-proxy-getns-cached darwin-proxy-getns #: no longer needs caching
 
 function darwin-proxies-gen {
-    local networks
-    networks=(
-        ${(@f)"$(darwin-proxy-getns-cached)"}
+    #: Runs the given command once per network service, with =$ns= bound to
+    #: the service name. The command is passed unexpanded ('$ns' in single
+    #: quotes) and evaled here.
+    #:
+    #: - =networks=: an explicit list of services to target. Defaults to every
+    #:   active service minus the exclusions below, which is what the proxy
+    #:   toggles want. Pass one service ([agfi:net-default-service]) when a
+    #:   setting must not leak into the VPN tunnels:
+    #:     @opts networks [ Wi-Fi ] @ darwin-dns-set Empty
+    #: - =quiet_p=: print neither the =ns:= line nor the command, so the
+    #:   output is just the command's own, fit for capturing:
+    #:     @opts networks [ Wi-Fi ] quiet_p y @ darwin-dns-get
+    ##
+    ensure-array darwin_proxies_gen_networks
+    local networks=("${darwin_proxies_gen_networks[@]}")
+    local quiet_p="${darwin_proxies_gen_quiet_p}"
 
-        ##
-        #: having invalid/inactive entries here is okay
-        # Wi-Fi
-        # 'iPhone USB'
-        # 'iPad USB'
-        ##
-    )
+    if (( ${#networks} == 0 )) ; then
+        networks=(
+            ${(@f)"$(darwin-proxy-getns-cached)"}
 
-    excluded=(
-        'Loopback'
-        'FakeNet'
-        'Sharif1'
-        'eva-1'
-        'VPN (Cisco IPSec)'
-    )
+            ##
+            #: having invalid/inactive entries here is okay
+            # Wi-Fi
+            # 'iPhone USB'
+            # 'iPad USB'
+            ##
+        )
 
-    networks=(${(@)networks:|excluded})
+        local excluded=(
+            'Loopback'
+            'FakeNet'
+            'Sharif1'
+            'eva-1'
+            'VPN (Cisco IPSec)'
+        )
+
+        networks=(${(@)networks:|excluded})
+    fi
+    #: An explicit list is taken as given; the exclusions only prune the
+    #: discovered one.
 
     local ns
     for ns in ${(@u)networks} ; do
-        ec "ns: $ns"
-        eval-ec "$*"
+        if bool "${quiet_p}" ; then
+            eval "$*"
+        else
+            ec "ns: $ns"
+            eval-ec "$*"
+        fi
     done
 }
 
@@ -369,6 +393,10 @@ aliasfnq darwin-proxies-off darwin-proxies-gen networksetup -setsocksfirewallpro
 ##
 aliasfnq darwin-dns-get darwin-proxies-gen networksetup -getdnsservers '$ns'
 aliasfnq darwin-dns-set darwin-proxies-gen networksetup -setdnsservers '$ns'
+#: Share the generator's prefix, so =@opts networks [ ... ] @ darwin-dns-set=
+#: reaches [agfi:darwin-proxies-gen] rather than a =darwin_dns_set_= nobody reads.
+@opts-setprefixas darwin-dns-get darwin-proxies-gen
+@opts-setprefixas darwin-dns-set darwin-proxies-gen
 ##
 function proxy-on {
     # proxy on
