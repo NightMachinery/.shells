@@ -267,13 +267,25 @@ during the pick can be gone by the time you act on it. [agfi:h-fftmux-act],
 which `fft` and `ffta` share, takes the id from the first column and asks tmux
 for a name only to say what it is doing.
 
-That staleness is not hypothetical here, because the tmux column of a Claude
-row is the session name Claude recorded in `sessions/<pid>.json` when it
-*started*. Measured while writing this: five of seventeen live sessions named a
-tmux session that no longer existed, including the one doing the measuring. So
-when the name misses, the row is resolved through the process tree instead --
-the agent's pid walked up to the pane holding it, over one `tmux list-panes -a`
-and one `ps` shared by every row. A pane does not get renamed.
+That staleness bit the tmux column itself for a while. Claude Code records the
+tmux session it launched in, in `sessions/<pid>.json`, and the live listing used
+to report that name -- so it aged exactly as fast as the hooks renamed things.
+Measured while writing this: five of seventeen live sessions named a tmux
+session that no longer existed, including the one doing the measuring.
+
+The listing answers with the session the process *sits in* now. `tmuxOf` in
+`golang/agent_session/internal/claude/live.go` walks the agent's pid up its
+parents to the tmux pane holding it, over one `ps` and one `tmux list-panes -a`
+that the whole run shares (`proc.ListShared`, `proc.PanesShared`), which is what
+the Codex and Antigravity adapters already did. A pane does not get renamed, so
+the answer is current whatever the session is called. The record is only the
+fallback, for a session started outside tmux, a process the table no longer has,
+or a host with no tmux running.
+
+So [agfi:h-agent-session-tmux-rows] does no walking of its own: it maps the
+column's name to a session id through one `tmux list-sessions`, takes the label
+back off that id so it reads as tmux spells it right now, and skips a name that
+matches nothing -- a session that ended between the two calls.
 
 The order is by the last *message*, not by the transcript's mtime: an agent
 appends bookkeeping records to a transcript long after the conversation ends,
