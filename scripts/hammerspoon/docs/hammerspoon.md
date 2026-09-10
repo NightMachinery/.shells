@@ -599,6 +599,17 @@ modal can still be entered; and F2 with shift only while hyper mode is entered
 `blackoutRestore`, which releases the lock synchronously before asking the
 garden to run `brightness-on-all-loop`, so the keyboard is back at once.
 
+Two taps are in play during a blackout, and they do different jobs. The lock
+tap above only ever decides what to *drop*. The chord tap is separate: it runs
+whenever hyper mode is entered, black screen or not, and it is what actually
+dispatches hyper+shift+F1, hyper+cmd+shift+F1, hyper+shift+F2 and the bare
+hyper+F1/F2 brightness keys, because Carbon drops those presses — see "When a
+hyper chord does nothing" below. Since a tap that deletes an event hides it
+from every tap after it, the order macOS calls them in must not change the
+outcome, so the chord tap repeats the lock's own rule rather than relying on
+it: while the lock is up, the only chord that does anything is the one that
+ends it.
+
 What F2 leaves on screen is decided when the blackout starts, not when it
 ends. After hyper+shift+F1, F2 within the grace period restores straight to
 the desktop; past it, the session is locked with `hs.caffeinate.lockScreen()`
@@ -679,6 +690,66 @@ it is set, so this band is the only moment it is ever confirmed, and it has to
 be legible at a glance rather than by reading. `blood` is darker than the
 crimson `crit` of the Secure Input warning above as well, which can land in the
 very same instant.
+
+## When a hyper chord does nothing
+
+A hyper chord fails silently perhaps one press in five, and pressing again
+works. Nothing is logged and nothing visibly happens, yet the keypress is still
+delivered to the focused app — so a latched Sticky Keys shift is consumed,
+which makes the chord look as though it registered. Seen on hyper+shift+F1 and
+hyper+shift+F2, and reported independently on the bare hyper+F1/F2 brightness
+keys.
+
+What was measured, over fourteen presses: at every failure hyper mode was
+entered, the chord's hotkey was listed by `hs.hotkey.getHotkeys()`, the event
+carried exactly the right modifiers, Secure Input was off, and the press was
+not an autorepeat. Every one of those was identical on the presses that worked,
+and the timings overlap completely — 402.2 ms after the modal entered
+succeeded, 403.6 ms failed. The single asymmetry: an eventtap watching the same
+two keycodes saw all fourteen, including every failure, while Carbon delivered
+about four in five. The loss is inside `RegisterEventHotKey`, underneath
+anything Lua can observe. That is why these chords are dispatched from a tap in
+`core/blackout-lock.lua`, and why a chord that must not fail has no business on
+`hs.hotkey`.
+
+Dead ends, recorded so nobody walks them twice:
+
+- The modal's own state. `mode.down` in `modal-mode.lua` genuinely does toggle,
+  so a mode that is already entered gets turned *off* by the next F18 press —
+  a trap worth knowing, but not this one: the failures all logged
+  `entered=true`.
+- Sticky Keys. It is on (`stickyKey = 1`), and both the event flags and the
+  live hardware modifier state showed shift on every failure.
+- Autorepeat. Carbon does not fire a hotkey for an autorepeat keyDown, but
+  every captured press had autorepeat 0.
+- The `fn` flag. Every F-key press here carries it, successes included, so
+  Carbon evidently ignores it.
+- Chord bindings. There are none; `chordRoots` is empty, so the chord eventtap
+  cannot have swallowed anything.
+- A registration race after modal entry. Ruled out by the overlapping timings,
+  and by a failure and a success in the same hyper session with no F18 between
+  them.
+- The `hs -c` wedge that `core/ipc-fix.lua` documents. IPC calls into
+  Hammerspoon did land 0.5–1.1 s before all eight early failures, and
+  `hs.hotkey` printed a conflict warning on every modal transition because
+  STT's global bare F1/F2 collided with the modal's own. Silencing those prints
+  with `hs.hotkey.setLogLevel("error")` changed nothing at all.
+
+How to investigate the next one. Instrument at runtime through `hs -c` rather
+than by editing files: nothing reloads, so no state is lost and the
+auto-reloader stays out of it. Log to a file, because `hs.console.getConsole()`
+does not update from inside an `hs -c` call. Filter the tap to the keycodes
+under investigation and log nothing else — anything wider is a keylogger. Above
+all, wrap the *handler* as well as the key, so that "the hotkey never fired"
+can be told apart from "the handler ran and did nothing"; those two have
+nothing in common and confusing them wastes the afternoon. Such instrumentation
+is runtime-only, so any `hs-reload` clears it — the right default, but it means
+a reload mid-investigation silently disarms you.
+
+Synthetic events cannot test a Carbon problem. `hs.eventtap.keyStroke` never
+triggers an `hs.hotkey` binding at all, so a posted-keystroke harness reports
+failure at every delay and proves nothing. It does reach an eventtap, which is
+what makes the tap dispatch testable end to end without blanking the screen.
 
 ## FIM completion
 

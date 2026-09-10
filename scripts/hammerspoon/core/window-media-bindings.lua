@@ -50,22 +50,16 @@ hyper_bind_v1("f5", function()
                   -- @needed awaysh-fast
 end)
 
-bindWithRepeatV2{
-    binder=hyper_bind_v2,
-    key="F1",
-    pressedfn=function()
-        brishz_eval_hs('awaysh-fast brightness-dec')
-    end,
-    auto_trigger_p=false
-}
-bindWithRepeatV2{
-    binder=hyper_bind_v2,
-    key="F2",
-    pressedfn=function()
-        brishz_eval_hs('awaysh-fast brightness-inc')
-    end,
-    auto_trigger_p=false
-}
+-- Bare hyper+F1/F2. Dispatched from the eventtap in core/blackout-lock.lua
+-- along with the blackout chords, because Carbon drops these too. Key repeat
+-- comes free there: a tap sees the autorepeat keyDowns, which is what
+-- bindWithRepeatV2's repeatfn was for.
+--
+-- `dir' is the direction, not a boolean: the underlying functions are
+-- brightness-dec and brightness-inc, so that is what travels.
+function hyperBrightnessStep(dir)
+    brishz_eval_hs('awaysh-fast brightness-' .. dir)
+end
 
 -- `-all`, so these blank every display rather than just whichever is currently
 -- main. Blanking only the main one leaves the other screen lit, which defeats
@@ -83,35 +77,40 @@ bindWithRepeatV2{
 -- blackoutLockScreenAfterSeconds, locks the session before restoring, so a
 -- long-unwatched screen comes back as a login window. shift+cmd+F1 starts a
 -- blackout that locks first regardless of age: the person starting the black
--- decides, since whoever presses F2 later may be a stranger. The else branch
--- keeps F2 working on a Hammerspoon where that module failed to load.
-hyper_bind_v2{
-    mods={"shift"},
-    key="F1",
-    pressedfn=function()
-        brishz_eval_hs('awaysh-fast brightness-off-all-loop')
-        if blackoutBegin then blackoutBegin() end
-    end,
-}
-hyper_bind_v2{
-    mods={"shift", "cmd"},
-    key="F1",
-    pressedfn=function()
-        brishz_eval_hs('awaysh-fast brightness-off-all-loop')
-        if blackoutBegin then blackoutBegin(true) end
-    end,
-}
-hyper_bind_v2{
-    mods={"shift"},
-    key="F2",
-    pressedfn=function()
-        if blackoutRestore then
-            blackoutRestore()
-        else
-            brishz_eval_hs('awaysh-fast brightness-on-all-loop')
-        end
-    end,
-}
+-- decides, since whoever presses F2 later may be a stranger.
+--
+-- These three chords are not hs.hotkey bindings, which is why only their
+-- actions live here. Carbon drops roughly one press in five -- a shrug for a
+-- brightness step, unacceptable for a chord that blanks the screen and for the
+-- only way back from a locked keyboard -- so core/blackout-lock.lua dispatches
+-- them from an eventtap and owns their delivery. The bare F1/F2 brightness
+-- keys above stay on hs.hotkey. See "When a hyper chord does nothing" in
+-- docs/hammerspoon.md.
+function blackoutChordBegin(lockFirst)
+    brishz_eval_hs('awaysh-fast brightness-off-all-loop')
+    if blackoutBegin then blackoutBegin(lockFirst) end
+end
+
+function blackoutChordRestore()
+    if blackoutRestore then
+        blackoutRestore()
+    else
+        brishz_eval_hs('awaysh-fast brightness-on-all-loop')
+    end
+end
+
+-- Nothing dispatches the chords if that module failed to load, since the tap
+-- is its. Fall back to hs.hotkey for the way *out*, which is the one that has
+-- to exist even on a half-loaded config -- a flaky F2 beats no F2 at all. The
+-- blackout chords themselves are deliberately not restored here: without
+-- blackout-lock there is no keyboard lock to escape from either.
+if not blackoutChordTapStart then
+    hyper_bind_v2{
+        mods={"shift"},
+        key="F2",
+        pressedfn=blackoutChordRestore,
+    }
+end
 ---
 
 hyper_bind_v1("F6", function()
