@@ -356,9 +356,17 @@ function h-claude-tmux-label-row-restore {
     ##
     test -n "${TMUX_PANE}" || return 0
 
-    local ours
+    #: Two ways to recognise our own row, and either is enough. The window
+    #: option is the one [agfi:h-claude-tmux-label-set] writes; the format is
+    #: recognisable on its own because it names our pane option, and that is
+    #: what covers a window whose row was set by a session older than the
+    #: marker -- or one that lost it.
+    local ours format
     ours="$(command tmux show-options -wqv -t "${TMUX_PANE}" "${claude_tmux_label_row_option}" 2>/dev/null)"
-    test -n "${ours}" || return 0
+    format="$(command tmux show-options -wqv -t "${TMUX_PANE}" pane-border-format 2>/dev/null)"
+    if test -z "${ours}" && [[ "${format}" != *"${claude_tmux_label_option}"* ]] ; then
+        return 0
+    fi
 
     local pane label
     for pane in ${(f)"$(command tmux list-panes -F '#{pane_id}' -t "${TMUX_PANE}" 2>/dev/null)"} ; do
