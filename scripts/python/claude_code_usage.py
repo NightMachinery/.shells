@@ -604,9 +604,24 @@ def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileRepor
 
     if report.result is None:
         # No token at all, or a fetch failure with no response cache to fall
-        # back on. The profile's own cache is written by Claude Code itself, so
-        # it is the right last resort before giving up.
-        fallback = config_cache_result(config_path)
+        # back on. Two caches can answer, and the order between them matters:
+        # our own response cache holds a real response for *this* account,
+        # while the profile's `cachedUsageUtilization` is only whatever the
+        # last local Claude Code session happened to record, so it is
+        # routinely much older and may not exist at all.
+        #
+        # `get_usage` already consults the response cache, but only once a
+        # token has resolved -- so with no token it was never read, and a
+        # GUI-less session fell back to hours-old config data, or failed
+        # outright, while a fresh response sat on disk unused.
+        #
+        # `--cache-ttl` is deliberately not applied here. It governs when to
+        # skip the network, and there is no network to skip; an expired real
+        # response still beats the config cache.
+        fallback = read_cache(cache_path(args.cache_dir, profile.label))
+        if fallback is None:
+            fallback = config_cache_result(config_path)
+
         if fallback is None:
             report.error = failure or "no usage data available"
             return report
