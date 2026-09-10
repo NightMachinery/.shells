@@ -156,6 +156,15 @@ aliasfn ffbi @opts e install search-engine search @ ffbrew
 local config_path="${1:-${HOME}/example/config.yaml}"
 #+end_src
 
+- Never take a name zsh has tied to a special parameter as a local, and above all not as a loop variable. =path= is the array view of =PATH=, so this permanently truncates the shell's search path:
+#+begin_src zsh :eval never
+for path in "${transcripts[@]}" ; do   #: WRONG: rewrites PATH
+    ...
+done
+#+end_src
+
+In a persistent shell -- the brish garden, or any long-lived interactive one -- the damage outlives the function, and surfaces minutes later as =command not found: cat= for some unrelated command, with nothing in the error pointing back at the loop. Use another name (=t=, =p1=, =transcripts=). Declaring =local path= does contain it, in that =PATH= is restored when the function returns, but it is still clobbered for the duration of the call, so every command the function runs sees the wrong path. The same holds for =cdpath=, =fpath=, =manpath=, =module_path=, =argv= and =options=.
+
 - When the function needs to be passed an array, use this pattern:
 
 #+begin_src :eval never
@@ -166,6 +175,26 @@ function ffmpeg-to-video {
     ...
 }
 #+end_src
+
+- zsh has no namerefs. =local -n= is a bash feature; zsh 5.9 answers =local: bad option: -n=. Hand a value back through =REPLY= (or =reply= for an array), which is the shell's own convention:
+#+begin_src zsh :eval never
+function h-agent-session-agent-in-roots {
+    ...
+    REPLY="${agent}"
+}
+#+end_src
+
+Real indirection does exist, for the case where the *caller* must choose the name. =${(P)name}= expands the parameter that =name= spells -- scalars, arrays and associative arrays alike, including subscripts as =${${(P)name}[key]}= -- and the write side is =typeset -g=/=set -A=:
+#+begin_src zsh :eval never
+function h-fill {
+    local name="$1"
+    typeset -g "${name}=scalar"          #: scalar
+    typeset -g "${name}[key]=value"      #: one associative element
+    set -A "${name}" a b "c d"           #: whole array
+}
+#+end_src
+
+These assign to the caller's =local= and leak no global, which is what makes the pattern usable at all. The hazard is shadowing: if the callee happens to have a =local= of the same name, the write silently lands on its own copy and the caller sees nothing change -- no error, no clue. So prefer =REPLY=, and reach for =(P)= only when a name has to be passed in, keeping the callee's own locals distinctively named when you do.
 
 - All values should be quoted, including subshells:
 #+begin_src zsh :eval never
@@ -285,7 +314,7 @@ function foo {
 
 =ensure-dep1= additionally knows how to install what is missing. It checks, runs the install command, =rehash=es, then re-checks, so a fresh clone works on first use rather than after a separate setup step:
 #+begin_src zsh :eval never
-ensure-dep1 claude_session go-install-local "${NIGHTDIR}/golang/claude_session" @RET
+ensure-dep1 agent_session go-install-local "${NIGHTDIR}/golang/agent_session" @RET
 #+end_src
 
 Guard only what the current code path actually needs. E.g. a renderer that only shells out to =pandoc= for one output format should check for it inside that branch, not unconditionally:
@@ -303,13 +332,26 @@ zsh keeps the policy, Go does the work. The zsh side stays a thin wrapper that r
 
 Never check in a binary. Build on first use with an =h-<thing>-dep= guard, called from every wrapper that needs the tool:
 #+begin_src zsh :eval never
-function h-claude-code-session-dep {
+function h-agent-session-dep {
     ensure-cmd go @RET
-    ensure-dep1 claude_session go-install-local "${NIGHTDIR}/golang/claude_session" @RET
+    ensure-dep1 agent_session go-install-local "${NIGHTDIR}/golang/agent_session" @RET
 }
 #+end_src
 
 =ensure-dep1= only builds when the command is missing, and =rehash=es afterwards, so a fresh clone works on first use rather than after a separate setup step.
+
+When such a guard sits on a hot path, probe with =whence -p= and return early, rather than testing =$+commands=:
+#+begin_src zsh :eval never
+function h-agent-session-dep {
+    if whence -p agent_session > /dev/null 2>&1 ; then
+        return 0
+    fi
+    ensure-cmd go @RET
+    ...
+}
+#+end_src
+
+Reading =$commands= (which is what =isdefined-cmd= and =(( $+commands[x] ))= do) makes zsh hash every directory in =PATH=. In a brish garden shell, which forks per call and so never has a warm hash, that measured 65ms against 6ms for =whence -p=, which stops at the first hit. The guard above is in front of every render, listing and preview of a session, and the early return took it from 124ms to about 1ms per call.
 
 Keep these tools stdlib-only where you can, and pin an older =go= line in =go.mod= than the installed toolchain (ours use =go 1.21=) so =GOTOOLCHAIN= never tries to fetch one. Both keep =go install= working offline, which matters for any tool that may have to run before the network is up.
 
