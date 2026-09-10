@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"agent_session/internal/preview"
+	"agent_session/internal/profiles"
 	"agent_session/internal/session"
 	"agent_session/internal/turns"
 )
@@ -44,17 +45,15 @@ const previewWindow = 400 << 10
 // otherwise interchangeable. A profile with no entry gets no colour rather than
 // a wrong one.
 //
+// The table itself is [profiles.PickerColors], generated from
+// =configFiles/claude-code/profiles.yaml= so that the zsh launcher, the status
+// line and this binary cannot disagree about which seat is which colour; the
+// reasoning behind each value lives there, beside the value.
+//
 // Not Claude Code's own `agent-color': it writes that record once, wherever in
 // the session the name got settled, which is nowhere near either end of the
 // file -- 210MB into a 398MB transcript in one measured case -- so a tail scan
 // cannot reach it, and only 5 of 123 local sessions have one at all.
-// The pair is orange and violet rather than blue and violet: work moved to
-// violet when its whole identity did, and blue next to violet is a poor
-// distinction at a glance. Orange was free once work stopped using it.
-var profileColors = map[string]string{
-	".claude":      "235;145;60",
-	".claude-work": "108;113;196",
-}
 
 // Only the fields the preview shows. A narrow struct on purpose: decoding the
 // full record would copy every message body in the window, and the only thing
@@ -109,7 +108,7 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	if name == "" {
 		name = "Claude Code session " + id
 	}
-	w.WriteString(c.BoldFg(profileColors[profile], name) + "\n")
+	w.WriteString(c.BoldFg(profiles.PickerColors[profile], name) + "\n")
 
 	w.WriteString(c.Gray(preview.JoinParts(" · ", id, profile, preview.VersionLabel(data.version))) + "\n\n")
 

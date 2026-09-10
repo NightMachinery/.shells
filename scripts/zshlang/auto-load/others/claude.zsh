@@ -36,7 +36,7 @@ function claude {
     #: Which seat this is, resolved once from the effective CLAUDE_CONFIG_DIR
     #: rather than from the launcher's name, so `claude-m` typed inside a work
     #: session is still a work session. Every visual cue below keys off it; the
-    #: tables live next to =claude_code_profiles=.
+    #: tables are generated from =configFiles/claude-code/profiles.yaml=.
     local profile
     profile="$(claude-code-profile-current)"
 
@@ -220,110 +220,51 @@ function claude-highwayai {
     claude "$@"
 }
 ##
-#: A profile's =CLAUDE_CONFIG_DIR=, or the empty string for the default profile,
-#: which has no =CLAUDE_CONFIG_DIR= and keeps its config at =~/.claude.json=.
-#: Everything else -- config file, Keychain service, cache dir -- derives from
-#: this, so registering a profile is one line here. See [agfi:claude-work].
-typeset -gA claude_code_profiles=(
-    default  ''
-    work     "${HOME}/.claude-work"
-)
-#: Iteration and display order for [agfi:claude-code-usage-all]; an associative
-#: array has no order of its own.
-typeset -ga claude_code_profile_order=( default work )
-#: The command that starts a profile's Claude Code, so a session can be
-#: resumed under whichever profile owns it -- or is to own it -- by
-#: [agfi:claude-code-session-resume]. Through the launcher rather than a bare
-#: `CLAUDE_CONFIG_DIR=... claude', so the work seat keeps its tty marker and
-#: every profile keeps the sync, watchdogs and `$proxyenv' of [agfi:claude].
-typeset -gA claude_code_profile_launchers=(
-    default  claude-m
-    work     claude-work
-)
+#: The seats themselves -- their config dirs, launchers, markers, labels,
+#: colours, tints, borders and themes -- are not defined here. They come from
+#: =configFiles/claude-code/profiles.yaml= via
+#: =zshlang/auto-load/others/claude-profiles.gen.zsh=, which this file sources
+#: at startup like any other auto-load file:
+#:
+#:   claude_code_profiles            each seat's =CLAUDE_CONFIG_DIR=, or empty
+#:   claude_code_profile_order       iteration and display order
+#:   claude_code_profile_homes       the basename of each config home
+#:   claude_code_profile_launchers   the command that starts a seat
+#:   claude_code_profile_markers     one emoji per seat
+#:   claude_code_profile_labels      the word a human reads
+#:   claude_code_profile_colors      an `R;G;B' identity colour
+#:   claude_code_profile_tints       the pane background wash
+#:   claude_code_profile_borders     the tmux border attributes
+#:   claude_code_profile_themes      which tracked theme file to link
+#:
+#: One YAML rather than three hand-kept copies, because the same seats have to
+#: be known to this launcher, to the Go session pickers
+#: (=internal/profiles=) and to the bash status line, and they had already
+#: drifted once. Nothing parses the YAML at runtime -- a parse costs 30ms and
+#: this file is sourced by every interactive shell -- so edit the YAML and run
+#: [agfi:agent-profiles-sync]; `go test ./internal/profiles/' fails if any
+#: generated copy is stale.
+#:
+#: The convention throughout is that a seat with no entry gets no cue: the
+#: default seat is the baseline the terminal is already set up for, and is
+#: recognised by being left alone. Every cue is derived from the *effective*
+#: config dir ([agfi:claude-code-profile-current]), never from the launcher's
+#: name, so `claude-m' typed inside a work session is still work. See
+#: =docs/claude_code_usage.md=.
 ##
-#: The visual identity of a seat. Both profiles run the same tracked
-#: settings.json, so without these a work session and a personal one are
-#: indistinguishable from inside the TUI. Every cue is derived from the
-#: *effective* config dir ([agfi:claude-code-profile-current]), never from the
-#: launcher's name, so `claude-m' typed inside a work session is still work.
-#: See =docs/claude_code_usage.md=.
-##
-#: One emoji per profile, used by the tty title, the status line badge and the
-#: tmux pane label alike, so the same glyph means the same seat everywhere.
-typeset -gA claude_code_profile_markers=(
-    default  🦋
-    work     🏫
-)
-#: The word a seat goes by in cues meant for a human to read, the tmux pane
-#: label being the one that has to spell it out. The default profile's *key* is
-#: `default', because that is what Claude Code calls an unset CLAUDE_CONFIG_DIR,
-#: but the seat itself is the personal one.
-typeset -gA claude_code_profile_labels=(
-    default  PERSONAL
-    work     WORK
-)
-#: The seats that need a colour written out here as an `R;G;B' triplet, for
-#: [agfi:h-claude-profile-color-hex] to hand to tmux. The convention is shared
-#: with `profileColors' in
-#: =golang/agent_session/internal/claude/preview.go=, which paints the session
-#: pickers: personal blue, work violet.
-#:
-#: The personal seat is commented out because nothing derives a colour for it:
-#: it takes no tint and no border, and its theme is the stock one, so the only
-#: place it is still coloured is the picker's own table, which keeps its blue.
-#: A seat with no entry simply has no colour to give tmux.
-typeset -gA claude_code_profile_colors=(
-    # default  '90;150;240'
-    work     '108;113;196'
-)
-#: The pane background each seat tints to ([agfi:claude]): a wash of the
-#: profile colour, pale enough to leave the daltonized theme legible.
-#:
-#: A seat with no entry here is not tinted at all, which is why the personal
-#: one is commented out rather than removed: it is the seat the terminal is
-#: normally set up for, so it keeps the background it already had. Only the
-#: seat that is easy to mistake for it gets repainted.
-#: A faint green, chosen by eye from the candidates after comparing violet,
-#: cyan and green side by side in a real session. It sits under a screenful of
-#: text all day, so it is chosen to be noticed only when looked for.
-#:
-#: Deliberately not the seat's own violet, which the border and the theme carry
-#: at full strength. A background wash carries no meaning, only identity, so it
-#: is free to be whichever hue is most comfortable; the accents are the ones
-#: that must stay legible and must not lean on a red/green distinction, this
-#: being a daltonized theme. Solarized's green would measure 2.97 against this
-#: wash where the violet measures 4.06.
-#:
-#: The value comes from =color_background_palette= as `solar-green-faint',
-#: which is at the exact CIELAB lightness of this terminal's Solarized Light
-#: background, so it changes hue without touching the contrast of the text on
-#: top. Compare the alternatives with [agfi:color-background-palette] and try
-#: them live with [agfi:color-background].
-typeset -gA claude_code_profile_tints=(
-    # default  '#eef3fc'
-    work     '#f2f8f1'
-)
-#: Which seats get a coloured pane border ([agfi:h-claude-tmux-border-set]),
-#: under the same convention: no entry, no border. The value is the tmux style
-#: attributes to add on top of the seat's own colour, so the colour itself
-#: stays defined once, in =claude_code_profile_colors=.
-typeset -gA claude_code_profile_borders=(
-    # default  bold
-    work     bold
-)
-#: Which tracked theme file a seat's =themes/profile.json= points at. The slug
-#: is deliberately the same in every config dir, so the one shared
-#: settings.json can say `"theme": "custom:profile"' and still give each seat
-#: its own palette; see [agfi:claude-themes-link].
-#:
-#: Only =work.json= overrides any colours. =personal.json= is the stock
-#: `light-daltonized' under a name, and exists only because the shared slug has
-#: to resolve in both config dirs: the default seat is the baseline the
-#: terminal is already set up for, and is recognised by being left alone.
-typeset -gA claude_code_profile_themes=(
-    default  personal
-    work     work
-)
+
+function agent-profiles-sync {
+    : "regenerates the per-language seat tables from profiles.yaml"
+    #: The zsh tables, the Go module's =internal/profiles= and the status
+    #: line's JSON all come from one YAML. Run this after editing it; the
+    #: launchers do not, because a stale copy is caught by
+    #: `go test ./internal/profiles/' and re-generating on every launch would
+    #: put python on the startup path.
+    ##
+    ensure-cmd python3 @RET
+    revaldbg python3 "${NIGHTDIR}/python/agent_profiles_gen.py" "$@"
+}
+aliasfn agent-profiles-check agent-profiles-sync --check
 
 function claude-themes-link {
     : "points each profile's themes/profile.json at its tracked theme file"

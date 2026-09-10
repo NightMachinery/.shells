@@ -31,20 +31,25 @@ SETTINGS_FILE="${SETTINGS_FILE:-$PROFILE_DIR/settings.json}"
 
 # ── Profile badge ─────────────────────────────────────────────────────────────
 # One emoji naming the seat, so a work session is recognisable at a glance even
-# though both seats share this file and settings.json. The table is mirrored
-# from claude_code_profile_markers in
-# ~/scripts/zshlang/auto-load/others/claude.zsh, which is the source of truth;
-# an unregistered config dir gets a question mark and its own basename.
+# though both seats share this file and settings.json. The table is not written
+# here: profiles.gen.bash sits beside this file, generated from profiles.yaml so
+# that the zsh launcher, the Go session pickers and this status line cannot
+# disagree about which seat is which. Sourced rather than queried with jq --
+# this runs on every render, and an array lookup costs no fork.
+#
+# An unregistered config dir gets a question mark and its own basename, which is
+# also what happens if the generated file is missing.
 # CLAUDE_CODE_PROFILE_BADGE_P=n turns it off (claude_statusline_badge_p=n).
+declare -A claude_code_profile_markers=()
+PROFILES_BASH="${BASH_SOURCE[0]%/*}/profiles.gen.bash"
+[ -r "$PROFILES_BASH" ] && . "$PROFILES_BASH"
+
 PROFILE_BADGE=""
 case "${CLAUDE_CODE_PROFILE_BADGE_P:-1}" in
     0|n|no|false|off) ;;
     *)
-        case "$PROFILE_DIR" in
-            "$HOME/.claude")      PROFILE_BADGE="🦋" ;;
-            "$HOME/.claude-work") PROFILE_BADGE="🏫" ;;
-            *)                    PROFILE_BADGE="❓${PROFILE_DIR##*/}" ;;
-        esac
+        PROFILE_HOME="${PROFILE_DIR##*/}"
+        PROFILE_BADGE="${claude_code_profile_markers[$PROFILE_HOME]:-❓$PROFILE_HOME}"
         ;;
 esac
 
