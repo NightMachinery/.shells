@@ -549,6 +549,27 @@ accessor, so fading them would mean a `debug.getupvalue` reach into the
 extension's internals — fragile, and for nothing: v1 is down to a `require` in
 `boot.lua` and one call inside an `if false then` block. Not worth retrying.
 
+#### Bands that must not fade
+
+An alert raised with `peek = false` is exempt: `AlertEngine.peekAlpha` returns 1
+for as long as any such band is up. It exists for the hyper+F1/F2 brightness
+band, a case the peek could not have anticipated — those keys deliberately leave
+hyper *entered* so the level can be stepped repeatedly, so the peek was fading
+the one band the keypress exists to show.
+
+The exemption is coarse on purpose: one exempt band holds the peek off for every
+band on screen, not only for itself. Exempting a single band would mean
+splitting a stack across a canvas per group, because a canvas carries the whole
+stack for one screen and position, and `hs.canvas` has no per-element alpha —
+`c[1].alpha = 0.2` is rejected outright, only `fillColor` carries an alpha
+channel, and rewriting colours would collide with the animator that repaints
+them. Worth doing if it ever grates; in the case it was written for, the exempt
+band is normally the only one up.
+
+It re-dims on its own. `alertV2Dismiss` calls `AlertEngine.render`, which
+rebuilds every canvas through `peekAlpha`, so the moment the exempt band expires
+the rest go faint again if hyper is still being held.
+
 ## Agent focus banner
 
 `core/agent-banner.lua` shows a banner while a coding agent is driving the GUI

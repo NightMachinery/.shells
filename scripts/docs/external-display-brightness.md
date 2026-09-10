@@ -391,6 +391,12 @@ being briefly uninformative beats being briefly wrong, and the monitor's own
 buttons cannot be observed at all. So the first press of a burst may show `…`
 for one frame before the true value arrives.
 
+The band is raised with `peek = false`. Holding hyper normally fades every
+alert band to a whisper so it stops covering whatever you are about to act on —
+but these keys deliberately leave hyper entered so the level can be stepped
+repeatedly, which meant the peek faded the one band the keypress exists to
+show. See "Bands that must not fade" in `hammerspoon/docs/hammerspoon.md`.
+
 The knobs are globals in the usual `x = x or default` style:
 `hyper_brightness_step` (0.01), `hyper_brightness_band_seconds` (1.5),
 `hyper_brightness_bar_cells` (20) and `hyper_brightness_trust_seconds` (3).
