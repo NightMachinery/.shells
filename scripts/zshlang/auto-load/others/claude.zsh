@@ -88,11 +88,13 @@ function claude {
         h-claude-tmux-border-set "${profile}"
     fi
 
-    #: Off by default. A pane already labelled keeps its label afterwards: the
-    #: value was somebody else's to begin with, so only a label we introduced
-    #: is taken away again.
+    #: On by default, since the border above already costs the window its
+    #: border row: once that row exists it may as well name the seat instead of
+    #: showing tmux's default `0 "<pane title>"'. A pane already labelled keeps
+    #: its label afterwards, the value having been somebody else's to begin
+    #: with, so only a label we introduced is taken away again.
     local label_p=n label_had=''
-    if bool "${claude_tmux_label_p:-n}" && isTmux ; then
+    if bool "${claude_tmux_label_p:-y}" && isTmux ; then
         label_p=y
         label_had="$(command tmux show-options -pqv -t "${TMUX_PANE}" "${claude_tmux_label_option}" 2>/dev/null)"
         h-claude-tmux-label-set "${profile}"
@@ -281,9 +283,12 @@ typeset -gA claude_code_profile_colors=(
 #: one is commented out rather than removed: it is the seat the terminal is
 #: normally set up for, so it keeps the background it already had. Only the
 #: seat that is easy to mistake for it gets repainted.
+#: The wash is a faint purple rather than the seat's own orange: it has to sit
+#: under cream-coloured text all day, so it is chosen to be noticed only when
+#: looked for, and the orange is carried by the border and the theme instead.
 typeset -gA claude_code_profile_tints=(
     # default  '#eef3fc'
-    work     '#fff6ec'
+    work     '#f6f2f8'
 )
 #: Which seats get a coloured pane border ([agfi:h-claude-tmux-border-set]),
 #: under the same convention: no entry, no border. The value is the tmux style
@@ -358,9 +363,12 @@ function h-claude-tmux-label-set {
     existing="$(command tmux show-options -wqv -t "${TMUX_PANE}" pane-border-format 2>/dev/null)"
     test -n "${existing}" && return 0
 
+    #: The pane index is shown only in a split window. tmux's own format leads
+    #: with it, which in the usual one-pane window is a bare `0' in front of
+    #: the name and tells the reader nothing.
     command tmux set-option -w -t "${TMUX_PANE}" pane-border-status top 2>/dev/null
     command tmux set-option -w -t "${TMUX_PANE}" pane-border-format \
-        "#[bold] #{?#{${claude_tmux_label_option}},#{${claude_tmux_label_option}},SHELL} #[default]#{pane_index}" 2>/dev/null
+        "#[bold] #{?#{${claude_tmux_label_option}},#{${claude_tmux_label_option}},SHELL} #[default]#{?#{>:#{window_panes},1},#{pane_index} ,}" 2>/dev/null
 }
 
 function h-claude-tmux-label-unset {

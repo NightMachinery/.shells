@@ -52,12 +52,12 @@ response.
 Both seats symlink the same tracked `configFiles/claude-code/settings.json`, so
 a work session and a personal one used to be indistinguishable once the TUI was
 up. Five cues now name the seat from inside: the theme, the status line badge,
-the pane tint, the pane border and the pane-border label. All but the label are
-on by default.
+the pane tint, the pane border and the pane-border label. All five are on by
+default.
 
 Two of them apply to the work seat alone. The personal seat is the one the
-terminal is already set up for, so it keeps its own background and its own
-border and is named by its emoji and its theme alone. That is
+terminal is already set up for, so it keeps the background it had and gets no
+border, and is named by its emoji, its theme and its pane label. That is
 expressed by leaving it out of `claude_code_profile_tints` and
 `claude_code_profile_borders`: for both tables, a seat with no entry does not
 get the cue, and the personal entries are commented out rather than deleted so
@@ -85,11 +85,15 @@ are avoided because the base theme is a daltonized one.
 On by default, `claude_theme_p`. Each config dir gets a `themes/profile.json`
 symlinked to a tracked file, `configFiles/claude-code/themes/personal.json` or
 `work.json`. Both start from `light-daltonized` and override `claude`,
-`claudeShimmer`, `promptBorder`, `promptBorderShimmer`, `planMode`,
-`briefLabelYou` and `userMessageBackground`, so the spinner, the assistant
-label, the input border, the plan-mode accent, the `You` label and the message
-wash all carry the seat's colour. `/theme` lists them as "Personal 🦋" and
-"Work seat 🏫".
+`claudeShimmer`, `promptBorder`, `promptBorderShimmer`, `planMode` and
+`briefLabelYou`, so the spinner, the assistant label, the input border, the
+plan-mode accent and the `You` label all carry the seat's colour. `/theme`
+lists them as "Personal 🦋" and "Work seat 🏫".
+
+Only the work theme also sets `userMessageBackground`, the wash behind your own
+messages, and it is the faint purple of the pane tint rather than the seat's
+orange. The personal theme sets no background of any kind, so that seat keeps
+whatever the terminal was already showing.
 
 The slug is deliberately the same in both config dirs. That is what lets the
 one shared settings file say `"theme": "custom:profile"` and still hand each
@@ -136,7 +140,9 @@ inherits the launcher's environment, and its stdin JSON has no profile field.
 ### The pane tint
 
 On by default for the work seat under tmux, `claude_tint_p`. The launcher
-writes OSC 11 before starting the session, washing the background to `#fff6ec`,
+writes OSC 11 before starting the session, washing the background to `#f6f2f8`,
+a faint purple rather than the seat's orange, since it sits under a screenful
+of text all day and should be noticed only when looked for,
 and OSC 111 afterwards in an `always` block, so a normal quit and Ctrl-C both
 undo it and neither can change the session's exit status. Cells the TUI paints
 with a background of their own are unaffected, so it reads as a tint rather
@@ -181,11 +187,16 @@ the pane already carried one.
 
 ### The tmux pane-border label
 
-Off by default; `claude_tmux_label_p=y` asks for it. It sets the pane option
+On by default, `claude_tmux_label_p`, for both seats. It sets the pane option
 `@claude_profile` to `🏫 WORK` or `🦋 PERSONAL` and turns the window's border
-row on. It stays off by default because that row costs a line of every pane in
-the window, a poor trade when the theme and the tint already say the same
-thing.
+row on. It was off while the border cue did not exist, because the row costs
+the window a line; now that the border has already bought that line for the
+work seat, the row may as well name the seat instead of showing tmux's own
+format, which leads with the pane index and gives a bare `0` in front of the
+pane title.
+
+The format shows the pane index only when the window actually holds more than
+one pane, since in a single-pane window it identifies nothing.
 
 The label is a *pane* option, since one tmux session can host several seats in
 several panes. The border row and its format are *window* properties, so they
@@ -199,7 +210,7 @@ away again.
 
 Every flag is read with [agfi:bool] and is dynamically scoped, so a one-off is
 a prefix: `claude_tint_p=n claude-work`, `claude_theme_p=n claude-m`,
-`claude_tmux_border_p=n claude-work`, `claude_tmux_label_p=y claude-work`.
+`claude_tmux_border_p=n claude-work`, `claude_tmux_label_p=n claude-work`.
 `claude_tint_scope` is the exception, being an enum rather than a boolean.
 
 Turning a cue on for a seat that has no entry in the tint or border table does

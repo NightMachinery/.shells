@@ -7,7 +7,6 @@
     "promptBorder": "rgb(90,150,240)",
     "promptBorderShimmer": "rgb(150,190,250)",
     "planMode": "rgb(90,150,240)",
-    "briefLabelYou": "rgb(90,150,240)",
-    "userMessageBackground": "#e9f0fd"
+    "briefLabelYou": "rgb(90,150,240)"
   }
 }
