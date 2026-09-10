@@ -58,10 +58,14 @@ KEYCHAIN_NOT_FOUND = 44
 KEYCHAIN_NO_GUI = 36
 #: userCanceled: a prompt was shown and dismissed.
 KEYCHAIN_USER_CANCELED = 128
-#: The way past a GUI-detached session, named wherever we hit one.
+#: The environment variable holding a token, and the stem of its per-profile
+#: forms. `claude setup-token` mints a long-lived token to put in one.
+TOKEN_ENV_BASE = "CLAUDE_CODE_OAUTH_TOKEN"
+#: The two ways past a GUI-detached session, named wherever we hit one.
 GUI_LESS_HINT = (
     "run the report through `brishz`, whose shells are attached to the GUI "
-    "session (see docs/claude_code_usage.md)"
+    "session, or set a per-profile token variable (see "
+    "docs/claude_code_usage.md)"
 )
 CREDENTIALS_FILE = Path(os.path.expanduser("~/.claude/.credentials.json"))
 DEFAULT_PROFILE_CONFIG = Path(os.path.expanduser("~/.claude.json"))
@@ -410,17 +414,47 @@ def token_info_from_oauth(data: dict, *, source: str) -> TokenInfo | None:
     )
 
 
+def token_env_name(label: str) -> str:
+    """The per-profile token variable for a profile label.
+
+    Uppercased with any run of non-alphanumerics collapsed to a single ``_``,
+    so ``default`` gives ``CLAUDE_CODE_OAUTH_TOKEN_DEFAULT`` and ``work`` gives
+    ``CLAUDE_CODE_OAUTH_TOKEN_WORK``.
+    """
+    suffix = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_").upper()
+
+    return f"{TOKEN_ENV_BASE}_{suffix}" if suffix else TOKEN_ENV_BASE
+
+
 def get_token(
     *,
     timeout: float,
+    profile_label: str,
     config_dir: str | None = None,
     keychain_service: str | None = None,
     keychain_account: str | None = None,
     keychain_timeout: float | None = None,
+    token_env: str | None = None,
+    allow_global_env: bool = True,
 ) -> TokenInfo:
-    env_token = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
-    if env_token:
-        return TokenInfo(token=env_token, source="env")
+    #: Per-profile variables come first, and the bare global one is accepted
+    #: only for a single-profile report. One token cannot stand for two
+    #: accounts: used for both profiles it would report the same account twice
+    #: under two different headers, which is worse than reporting nothing.
+    env_names: list[str] = []
+    if token_env:
+        env_names.append(token_env)
+    if token_env_name(profile_label) not in env_names:
+        env_names.append(token_env_name(profile_label))
+    if allow_global_env and TOKEN_ENV_BASE not in env_names:
+        env_names.append(TOKEN_ENV_BASE)
+
+    for name in env_names:
+        env_token = os.environ.get(name)
+        if env_token:
+            #: Which variable was used, for the same reason the Keychain
+            #: account is reported: a wrong one should be visible by eye.
+            return TokenInfo(token=env_token, source=f"env:{name}")
 
     service = keychain_service or keychain_service_for(config_dir)
     account = keychain_account or keychain_account_default()
@@ -470,7 +504,7 @@ def get_token(
 
     tried = ", ".join(str(path) for path in credentials_file_paths(config_dir))
     raise UsageError(
-        "no OAuth token found (tried CLAUDE_CODE_OAUTH_TOKEN, "
+        f"no OAuth token found (tried {', '.join(env_names)}, "
         f"Keychain item {service!r} account {account!r}, and {tried}); "
         + LOGIN_HINT
     )
@@ -649,13 +683,27 @@ def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileRepor
     try:
         report.token_info = get_token(
             timeout=args.timeout,
+            profile_label=profile.label,
             config_dir=profile.config_dir,
             keychain_service=args.keychain_service,
             keychain_account=args.keychain_account,
             keychain_timeout=args.keychain_timeout,
+            token_env=getattr(args, "token_env_map", {}).get(profile.label),
+            #: See get_token: the bare global variable cannot serve two
+            #: profiles, so --all ignores it and says so.
+            allow_global_env=not args.all,
         )
     except UsageError as exc:
         failure = str(exc)
+
+    if args.all and os.environ.get(TOKEN_ENV_BASE):
+        #: Silence here would be the trap: the global variable looks like it is
+        #: in use, and a report that quietly ignored it would be indistinguish-
+        #: able from one that honoured it.
+        report.warnings.append(
+            f"{TOKEN_ENV_BASE} is set but ignored for --all; use "
+            f"{token_env_name(profile.label)} instead"
+        )
 
     if report.token_info is not None:
         try:
@@ -730,6 +778,45 @@ def gather_reports(
                 )
 
     return [report for report in reports if report is not None]
+
+
+def resolve_token_envs(
+    args: argparse.Namespace, profiles: list[Profile]
+) -> dict[str, str]:
+    """Maps profile label to the token variable named for it on the argv.
+
+    Each ``--token-env`` is either ``NAME=VAR``, naming the profile it belongs
+    to, or a bare ``VAR``. The bare form is a convenience for a single-profile
+    report and is refused under ``--all``, where it could only mean one token
+    standing for every account.
+    """
+    mapping: dict[str, str] = {}
+    for spec in args.token_env or ():
+        label, sep, var = spec.partition("=")
+        if not sep:
+            if len(profiles) != 1:
+                raise ValueError(
+                    "--token-env wants NAME=VAR when reporting several "
+                    f"profiles, got {spec!r}"
+                )
+            mapping[profiles[0].label] = label
+            continue
+
+        if not label or not var:
+            raise ValueError(f"--token-env wants NAME=VAR, got {spec!r}")
+        mapping[label] = var
+
+    known = {profile.label for profile in profiles}
+    unknown = sorted(set(mapping) - known)
+    if unknown:
+        #: A typo here fails silently otherwise: the profile keeps falling
+        #: through to the Keychain and the variable is simply never read.
+        raise ValueError(
+            f"--token-env names unknown profiles: {', '.join(unknown)} "
+            f"(known: {', '.join(sorted(known))})"
+        )
+
+    return mapping
 
 
 def resolve_profiles(args: argparse.Namespace) -> list[Profile]:
@@ -1143,6 +1230,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--token-env",
+        action="append",
+        default=[],
+        metavar="NAME=VAR",
+        help=(
+            "Read a profile's OAuth token from environment variable VAR, as "
+            "NAME=VAR; a bare VAR is allowed when reporting a single profile. "
+            f"Defaults to {TOKEN_ENV_BASE}_<PROFILE>. Repeatable."
+        ),
+    )
+    parser.add_argument(
         "--workers",
         type=positive_int,
         default=8,
@@ -1228,6 +1326,10 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         profiles = resolve_profiles(args)
+        #: Resolved once, up front: it validates, and a ValueError raised
+        #: inside a worker thread would be reported as one profile's failure
+        #: rather than as the argv mistake it is.
+        args.token_env_map = resolve_token_envs(args, profiles)
     except ValueError as exc:
         print(f"claude_code_usage: {exc}", file=sys.stderr)
         return 2
