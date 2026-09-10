@@ -1,9 +1,9 @@
 # STT input device selection
 
-The voice-recording hotkeys (F11/F12, F1/F2, hyper-`.`, hyper-`'`) record from
-the **system default input device**, resolved fresh on every keypress. This
-note explains why it has to be resolved rather than configured, and what the
-remaining caveats are.
+The voice-recording hotkeys (hyper-`cmd`-`.`, hyper-`ctrl`-`.`, hyper-`'`)
+record from the **system default input device**, resolved fresh on every
+keypress. This note explains why it has to be resolved rather than configured,
+and what the remaining caveats are.
 
 ## Why not `-i ":0"`
 

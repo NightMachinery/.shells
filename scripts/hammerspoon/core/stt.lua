@@ -368,16 +368,19 @@ end
 hyper_bind_v2{mods={"cmd"}, key=".", pressedfn=whisper_run_en}
 hyper_bind_v2{mods={"ctrl"}, key=".", pressedfn=whisper_run_fa}
 
--- Unused in practice, and they were the last global hotkeys colliding with
--- hyper's own F1/F2: hs.hotkey shadowed one with the other on every single
--- hyper transition, which is what filled the console with "Disabled previous
--- hotkey F1" pairs. F11/F12 below run the same two functions, so nothing is
--- lost. (The hyper F1/F2 chords no longer go through hs.hotkey at all; see
--- the chord dispatch section of core/blackout-lock.lua.)
+-- Retired, all four. These bare F-keys were the last global hotkeys contending
+-- with hyper's own: F1/F2 against the blackout chords and the brightness steps,
+-- F11/F12 against the volume keys. hs.hotkey shadowed one with the other on
+-- every single hyper transition, which is what filled the console with
+-- "Disabled previous hotkey" pairs and made it useless for reading anything
+-- else. Dictation lives on the hyper chords around this block -- hyper+cmd+.
+-- and hyper+' for English, hyper+ctrl+. for Persian -- so nothing is lost and
+-- nothing bare is left to collide. (The hyper F1/F2 chords no longer go
+-- through hs.hotkey at all either; see the chord dispatch section of
+-- core/blackout-lock.lua.)
 -- hs.hotkey.bind({}, 'F1', whisper_run_en)
 -- hs.hotkey.bind({}, 'F2', whisper_run_fa)
-
-hs.hotkey.bind({}, 'F11', whisper_run_en)
-hs.hotkey.bind({}, 'F12', whisper_run_fa)
+-- hs.hotkey.bind({}, 'F11', whisper_run_en)
+-- hs.hotkey.bind({}, 'F12', whisper_run_fa)
 
 hyper_bind_v2{mods={}, key="'", pressedfn=whisper_run_en}

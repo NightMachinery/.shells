@@ -362,8 +362,8 @@ end
 --- A side effect worth keeping: nothing modal binds bare F1/F2 any more, which
 --- is what used to shadow STT's globals on every hyper transition and fill the
 --- console with "Disabled previous hotkey F1" pairs. Those STT binds have since
---- been retired as well -- core/stt.lua keeps dictation on F11/F12 -- so no
---- hs.hotkey contends for these two keycodes at all now.
+--- been retired as well -- core/stt.lua keeps dictation on its hyper chords --
+--- so no hs.hotkey contends for these two keycodes at all now.
 ---
 --- The tap runs only while hyper mode is entered -- which pressing the chord
 --- requires anyway -- so it is off almost always, for the privacy and latency
