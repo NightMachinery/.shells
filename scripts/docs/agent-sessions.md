@@ -41,30 +41,92 @@ Only the functions that have no transcript yet take an agent argument: `roots`,
 ## Window to session, in order of how much each can promise
 
 [agfi:h-agent-session-of-kitty-window] is what the hotkey leans on. It is given
-kitty's `ls` JSON and a window id, and tries four things:
+kitty's `ls` JSON and a window id, and tries five things:
 
-1. **The agent runs in the window.** A foreground pid of the window equals a
+1. **The hooks already wrote the answer on the tmux session.** When the window
+   shows a tmux client, the autoname hooks have recorded the identity on that
+   client's session as the `@agent_session` user option -- agent, id and
+   transcript, tab separated -- so the option answers directly, for any agent.
+   This is tried before anything else because it is the only answer that needs
+   no live listing, and the listing is where the time goes; the next section
+   has the numbers. It cannot contradict the tests below either, since a window
+   showing a tmux client has none of the agent's own processes in the
+   foreground.
+
+   The subtlety is which session to ask. The session has to be found from the
+   client's *pid*, through one `tmux list-clients`
+   ([agfi:h-agent-session-tmux-clients]), and not from the name the window's
+   command line spells: the autoname hooks rename a session after the agent
+   living in it, so a window still running `tmux attach -t scripts-claudework1`
+   is attached to something now called `@Claude/work claude-session-helpers-refactor`.
+   Matching the spelled name looks right and silently never matches.
+2. **The agent runs in the window.** A foreground pid of the window equals a
    live session's pid. Nothing to go stale here.
-2. **The window shows a tmux client.** The autoname hooks record the identity
-   on the tmux session as the `@agent_session` user option -- agent, id and
-   transcript, tab separated -- so that option answers directly, for any agent.
-   Failing that, the session name is matched against the live rows' tmux
-   column, and only an unambiguous single hit counts: one tmux session can host
-   several agents in several panes.
-3. **The window shows an agent's own view** (`claude agents`, `claude attach`).
+3. **A tmux client whose session the hooks never recorded.** The session name is
+   matched against the live rows' tmux column, and only an unambiguous single
+   hit counts: one tmux session can host several agents in several panes. This
+   is what covers an agent whose hooks are not trusted yet.
+4. **The window shows an agent's own view** (`claude agents`, `claude attach`).
    Those set the window title to the attached session's name, sometimes behind
    a status glyph. That is observed rather than documented, so it counts only
    when a foreground process is one of the agents' binaries and the title
    matches exactly one live session.
-4. **The registry.** A file per kitty window under
+5. **The registry.** A file per kitty window under
    `$XDG_STATE_HOME/agent-sessions`, written by the hooks, saying where the
    session was showing the last time it was prompted.
 
-The first three read only what is true this instant. The fourth is a memory,
-so it comes last. When all four come up empty the hotkey does not guess: it
-opens the picker as a kitty overlay over the window
+The first four read only what is true this instant. The fifth is a memory, so
+it comes last. When all five come up empty the hotkey does not guess: it opens
+the picker as a kitty overlay over the window
 ([agfi:h-agent-session-pick-overlay]), and `enter` there opens the choice in
 the background under the same band.
+
+## Why the lookup is fast
+
+Pressing `cmd+shift+o` used to cost about 400ms before anything appeared on
+screen, and almost none of that was reading the transcript. It was spent asking
+every agent what was running, which the resolver did up front whether it needed
+the answer or not.
+
+Reading the hooks' record off the tmux session first is what removed most of
+it. A hooked tmux window now resolves in 16ms instead of 365ms, because nothing
+is listed at all: one `tmux list-clients`, one `tmux list-sessions`, and the
+transcript path is in hand. A session the hooks never recorded -- a Codex whose
+hook handlers have not been trusted yet, say -- still falls through to the live
+listing and takes about 235ms, which is the honest cost of the question.
+
+When the listing is genuinely needed, it is one call rather than three.
+`agent_session live-all claude=<root> codex=<root> agy=<root>` runs the three
+adapters concurrently and shares one process table, one `lsof` and one
+`tmux list-panes` between them; an agent that fails contributes no rows instead
+of failing the batch. Three sequential per-agent calls cost about 950ms, mostly
+paid three times over for the same process listing. Batched it is about 205ms,
+of which `claude agents --json` is 190ms -- so the remaining cost is Claude's
+own, not ours.
+
+Where a caller already knows which transcripts it cares about, it says so:
+`list -only <transcript>` (repeatable) resolves those paths directly instead of
+walking a corpus, which took `codex list` from 276ms to 6ms, and the pickers
+pass `-only` per agent to attach a name and a timestamp to rows they already
+have. Codex's liveness probe restricts `lsof` to pids in Codex's own process
+ancestry and does one glob over the rollout tree rather than fourteen, which
+took it from 541ms to 158ms.
+
+The rest was repetition. Reads that used to happen once per kitty window are
+batched: one `kitty @ ls` through one `jq` ([agfi:h-agent-session-windows], one
+line per window carrying its id, title, foreground pids and their command
+lines), one `tmux list-sessions` for every identity, one `tmux list-clients`
+for every client. And [agfi:h-agent-session-dep], which guards every render,
+name, listing and preview, probes with `whence -p agent_session` rather than
+reading `$commands`: the latter makes zsh hash the whole `PATH`, 65ms in a
+garden shell that forks per call and so never has a warm hash. That guard went
+from 124ms to about 1ms.
+
+Every number here is measured through the BrishGarden fork, which itself costs
+about 62ms, so the floor is not zero. The corpus picker is the one path still
+measured in hundreds of milliseconds ([agfi:h-agent-session-pick-rows], about
+685ms for 27 rows); it reads every root and is deliberately not on the hotkey's
+path.
 
 ## The adapter contract
 

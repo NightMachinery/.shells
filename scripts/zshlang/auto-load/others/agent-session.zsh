@@ -14,7 +14,18 @@
 ##
 function h-agent-session-dep {
     #: Ensures the renderer is built and on PATH, building it on first use.
+    #:
+    #: The probe is `whence -p', a PATH search that stops at the first hit, and
+    #: not [agfi:isdefined-cmd]. Reading `$commands' fills the whole command
+    #: hash, and in a garden shell -- which forks per call, so the hash is
+    #: never warm -- that measured 65ms every time, against 6ms for a lookup
+    #: that stops early. This guard is on the path of every render, name, live
+    #: listing and preview, so it is worth the odd spelling.
     ##
+    if whence -p agent_session > /dev/null 2>&1 ; then
+        return 0
+    fi
+
     ensure-cmd go @RET
     ensure-dep1 agent_session go-install-local "${NIGHTDIR}/golang/agent_session" @RET
 }
@@ -537,7 +548,30 @@ function h-agent-session-live-list {
         return 0
     fi
 
-    local agent out rows=''
+    #: One call for every agent, which the binary answers concurrently and with
+    #: a single process table and `tmux list-panes' between them. Asking each
+    #: adapter in turn cost about a second before anything reached the screen:
+    #: `claude agents --json' 190ms, the process table 115ms twice over, two
+    #: `lsof' runs, three binary starts. Batched it is around 200ms.
+    local -a specs
+    local agent root
+    for agent in ${(f)"$(h-agents)"} ; do
+        for root in ${(f)"$(h-agent-session-call "${agent}" roots 2>/dev/null)"} ; do
+            test -n "${root}" || continue
+            specs+=( "${agent}=${root}" )
+        done
+    done
+
+    if (( ${#specs} )) && h-agent-session-dep 2>/dev/null ; then
+        #: An agent the binary has no adapter for makes it refuse the whole
+        #: call, and so does a missing binary; either way the loop below still
+        #: knows how to ask each adapter itself.
+        if agent_session live-all "${specs[@]}" 2>/dev/null ; then
+            return 0
+        fi
+    fi
+
+    local out rows=''
     for agent in ${(f)"$(h-agents)"} ; do
         out="$(h-agent-session-call "${agent}" live-list)" || continue
         test -n "${out}" || continue
@@ -652,14 +686,140 @@ function h-agent-session-window-agent-p {
     local ls_json="${1}" win="${2}"
     test -n "${ls_json}" && test -n "${win}" || return 1
 
-    local -a cmds
-    cmds=( ${(f)"$(ec "${ls_json}" | jq -r --argjson w "${win}" '.[].tabs[].windows[] | select(.id == $w) | .foreground_processes[] | .cmdline | join(" ")' 2>/dev/null)"} )
+    local -a row cmds
+    row=( "${(@ps:\t:)$(h-agent-session-window-row "${ls_json}" "${win}")}" )
+    (( ${#row} )) || return 1
+    cmds=( "${(@ps:\037:)row[4]}" )
 
     h-agent-session-cmds-agent-p "${cmds[@]}" && return 0
 
     local cmd
     for cmd in "${cmds[@]}" ; do
         h-agent-session-tmux-target "${cmd}" >/dev/null && return 0
+    done
+    return 1
+}
+
+function h-agent-session-tmux-identities {
+    #: `<session name><TAB><@agent_session>' for every tmux session that has
+    #: the option set, from one `tmux list-sessions'.
+    #:
+    #: The hooks write the option per session ([agfi:h-agent-tmux-autoname]),
+    #: and asking `show-option' once per kitty window meant a tmux round trip
+    #: per window. One listing answers for all of them.
+    ##
+    command tmux list-sessions -F \
+        "#{session_name}"$'\t'"#{${agent_tmux_identity_option:-@agent_session}}" 2>/dev/null
+}
+
+function h-agent-session-tmux-clients {
+    #: `<client pid><TAB><session name>' for every attached tmux client, from
+    #: one `tmux list-clients'.
+    #:
+    #: Which session a kitty window's tmux client is *actually* attached to,
+    #: rather than the name its command line happens to spell. The autoname
+    #: hooks rename a session after the agent inside it, so a window running
+    #: `tmux attach -t scripts-claudework1' is attached to a session now called
+    #: `@Claude/work <name>' -- and matching the command line's name against
+    #: anything current cannot work.
+    ##
+    command tmux list-clients -F "#{client_pid}"$'\t'"#{client_session}" 2>/dev/null
+}
+
+function h-agent-session-tmux-client-session {
+    #: The tmux session a client pid is attached to, from the cache when a
+    #: caller primed `agent_session_tmux_clients' and a fresh listing
+    #: otherwise.
+    #: Usage: h-agent-session-tmux-client-session <pid>
+    ##
+    local pid="${1}"
+    test -n "${pid}" || return 1
+
+    local table="${agent_session_tmux_clients}"
+    if test -z "${table}" ; then
+        table="$(h-agent-session-tmux-clients)" || return 1
+    fi
+
+    local row
+    for row in ${(f)table} ; do
+        if [[ "${row%%$'\t'*}" == "${pid}" ]] ; then
+            row="${row#*$'\t'}"
+            test -n "${row}" || return 1
+            print -r -- "${row}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+function h-agent-session-tmux-identity {
+    #: One tmux session's `@agent_session' value, from the cache when a caller
+    #: primed `agent_session_tmux_identities' and from a fresh listing
+    #: otherwise. Fails when the session has none.
+    #: Usage: h-agent-session-tmux-identity <tmux session name>
+    ##
+    local tname="${1}"
+    test -n "${tname}" || return 1
+
+    local table="${agent_session_tmux_identities}"
+    if test -z "${table}" ; then
+        table="$(h-agent-session-tmux-identities)" || return 1
+    fi
+
+    local row
+    for row in ${(f)table} ; do
+        if [[ "${row%%$'\t'*}" == "${tname}" ]] ; then
+            row="${row#*$'\t'}"
+            test -n "${row}" || return 1
+            print -r -- "${row}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+function h-agent-session-windows {
+    #: One line per kitty window: id, title, its foreground pids (space
+    #: separated), and their command lines (separated by a unit separator,
+    #: which no command line carries).
+    #:
+    #: One `jq' for the whole listing. The pickers resolve every window in
+    #: turn, and a `jq' per window per field was most of what they spent:
+    #: twenty windows meant forty processes for one listing already in hand.
+    #: Set `agent_session_windows_cache' to this and every resolution reuses
+    #: it, the same way `agent_session_live_list_cache' works.
+    #: Usage: h-agent-session-windows <kitty ls json>
+    ##
+    local ls_json="${1}"
+    test -n "${ls_json}" || return 1
+
+    ec "${ls_json}" | jq -r '
+        .[].tabs[].windows[] | [
+            (.id | tostring),
+            (.title // ""),
+            ([.foreground_processes[]? | .pid | tostring] | join(" ")),
+            ([.foreground_processes[]? | (.cmdline // []) | join(" ")] | join("\u001f"))
+        ] | @tsv'
+}
+
+function h-agent-session-window-row {
+    #: One window's row of [agfi:h-agent-session-windows], from the cache when
+    #: a caller set one and from a fresh read otherwise.
+    #: Usage: h-agent-session-window-row <kitty ls json> <window id>
+    ##
+    local ls_json="${1}" win="${2}"
+
+    local table="${agent_session_windows_cache}"
+    if test -z "${table}" ; then
+        table="$(h-agent-session-windows "${ls_json}")" || return 1
+    fi
+
+    local row
+    for row in ${(f)table} ; do
+        if [[ "${row%%$'\t'*}" == "${win}" ]] ; then
+            print -r -- "${row}"
+            return 0
+        fi
     done
     return 1
 }
@@ -671,11 +831,21 @@ function h-agent-session-of-kitty-window {
     #: A session reaches a kitty window several ways, each leaving a different
     #: trace, so this tries them in order of how sure each one is:
     #:
+    #: 0. The window shows a tmux client, and the hooks have recorded who
+    #:    lives in the session that client is attached to (=agent-tmux.zsh=).
+    #:    The session is found from the client's *pid* through `tmux
+    #:    list-clients', not from the name its command line spells: the hooks
+    #:    rename a session after the agent in it, so `tmux attach -t
+    #:    scripts-claudework1' is attached to something now called
+    #:    `@Claude/work <name>'. Tried first because it is the one answer that
+    #:    needs no live listing, and a listing costs 200ms -- `claude agents
+    #:    --json' alone is 190ms of it. It cannot contradict the tests below
+    #:    either: a window showing a tmux client has none of the agent's own
+    #:    processes in the foreground, so the pid test would not have fired.
     #: 1. The agent runs in the window itself: a foreground pid of the window
     #:    is a live session's pid.
-    #: 2. The window shows a tmux client (`tmux a -t NAME'). The hooks record
-    #:    who lives in a tmux session on it (=agent-tmux.zsh=), and failing
-    #:    that NAME is matched against the live rows' tmux column.
+    #: 2. The window shows a tmux client whose NAME matches the live rows' tmux
+    #:    column, for a session whose hooks have not written the option.
     #: 3. The window shows an agent's own view (`claude agents', `claude
     #:    attach'): the view sets the window title to the attached session's
     #:    name, at times with a status glyph in front. Observed rather than
@@ -693,19 +863,35 @@ function h-agent-session-of-kitty-window {
     local ls_json="${1}" win="${2}" kpid="${3}"
     test -n "${ls_json}" && test -n "${win}" || return 1
 
-    local title
-    title="$(ec "${ls_json}" | jq -r --argjson w "${win}" 'first(.[].tabs[].windows[] | select(.id == $w) | .title) // empty' 2>/dev/null)"
+    local -a row
+    row=( "${(@ps:\t:)$(h-agent-session-window-row "${ls_json}" "${win}")}" )
+    (( ${#row} )) || return 1
 
-    local -a fg fg_pids fg_cmds
-    fg=( ${(f)"$(ec "${ls_json}" | jq -r --argjson w "${win}" '.[].tabs[].windows[] | select(.id == $w) | .foreground_processes[] | "\(.pid)\t\(.cmdline | join(" "))"' 2>/dev/null)"} )
-    local l
-    for l in "${fg[@]}" ; do
-        fg_pids+=("${l%%$'\t'*}")
-        fg_cmds+=("${l#*$'\t'}")
+    local title="${row[2]}"
+    local -a fg_pids fg_cmds
+    fg_pids=( ${=row[3]} )
+    fg_cmds=( "${(@ps:\037:)row[4]}" )
+
+    local -a f
+    local cmd tname identity
+
+    #: 0. The hooks' record on the tmux session this window's client is
+    #: attached to: `agent<TAB>id<TAB>transcript'. Before the live listing,
+    #: since this needs none.
+    local pid
+    for pid in "${fg_pids[@]}" ; do
+        tname="$(h-agent-session-tmux-client-session "${pid}")" || continue
+        identity="$(h-agent-session-tmux-identity "${tname}")" || continue
+
+        f=( "${(@ps:\t:)identity}" )
+        if test -n "${f[3]}" && test -e "${f[3]}" ; then
+            ec "${f[3]}"
+            return 0
+        fi
     done
 
     local agent_session_live_list_cache="${agent_session_live_list_cache:-$(h-agent-session-live-list)}"
-    local -a live f hits
+    local -a live hits
     live=( ${(f)agent_session_live_list_cache} )
 
     local row
@@ -716,20 +902,9 @@ function h-agent-session-of-kitty-window {
         fi
     done
 
-    #: 2. A tmux client.
-    local cmd tname identity
+    #: 2. A tmux client whose session the hooks never recorded.
     for cmd in "${fg_cmds[@]}" ; do
         tname="$(h-agent-session-tmux-target "${cmd}")" || continue
-
-        #: The hooks' own record: `agent<TAB>id<TAB>transcript'.
-        identity="$(command tmux show-option -qv -t "=${tname}" "${agent_tmux_identity_option:-@agent_session}" 2>/dev/null)" || identity=''
-        if test -n "${identity}" ; then
-            f=( "${(@ps:\t:)identity}" )
-            if test -n "${f[3]}" && test -e "${f[3]}" ; then
-                ec "${f[3]}"
-                return 0
-            fi
-        fi
 
         hits=()
         for row in "${live[@]}" ; do
@@ -1440,19 +1615,84 @@ function h-agent-session-live-pairs {
     ls_json="$(kitty @ --to "${sock}" ls)" @RET
 
     local agent_session_live_list_cache="${agent_session_live_list_cache:-$(h-agent-session-live-list)}"
+    #: Parsed once here, so resolving twenty windows costs one `jq' rather
+    #: than one per window per field.
+    local agent_session_windows_cache="${agent_session_windows_cache:-$(h-agent-session-windows "${ls_json}")}"
+    #: And the hooks' record for every tmux session, one listing rather than a
+    #: `show-option' per window.
+    local agent_session_tmux_identities="${agent_session_tmux_identities:-$(h-agent-session-tmux-identities)}"
+    local agent_session_tmux_clients="${agent_session_tmux_clients:-$(h-agent-session-tmux-clients)}"
 
     local -a ids
-    ids=("${(@f)$(ec "${ls_json}" | jq -r '.[].tabs[].windows[].id')}") @TRET
+    ids=( ${(f)"$(ec "${agent_session_windows_cache}" | command cut -f1)"} )
+    (( ${#ids} )) || return 1
+
+    #: Two maps built once, so the loop below forks for nothing but the
+    #: resolution itself. A command substitution is a fork, and the name and
+    #: the agent used to cost one each per window: twenty windows, forty forks,
+    #: a third of what this function spent.
+    local -A names
+    local row
+    local -a nf
+    for row in ${(f)agent_session_live_list_cache} ; do
+        nf=( "${(@ps:\t:)row}" )
+        test -n "${nf[5]}" || continue
+        names[${nf[5]}]="${nf[3]:--}"
+    done
+
+    local -a root_agents
+    root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
 
     local id transcript agent
     for id in "${ids[@]}" ; do
         test -n "${id}" || continue
 
         transcript="$(h-agent-session-of-kitty-window "${ls_json}" "${id}" "${kpid}")" || continue
-        agent="$(h-agent-session-agent-of "${transcript}" 2>/dev/null)" || agent='-'
+        h-agent-session-agent-in-roots "${transcript}" "${root_agents[@]}"
 
-        printf '%s\t%s\t%s\t%s\n' "${id}" "${transcript}" "${agent}" "$(h-agent-session-name-of-transcript "${transcript}")"
+        printf '%s\t%s\t%s\t%s\n' "${id}" "${transcript}" "${REPLY}" "${names[${transcript}]:--}"
     done
+}
+
+function h-agent-session-root-agents {
+    #: `<root><TAB><agent>' for every root of every agent [agfi:h-agents]
+    #: lists. What [agfi:h-agent-session-agent-in-roots] matches against, so a
+    #: loop over transcripts can name their agents without a fork each.
+    ##
+    local agent root
+    for agent in ${(f)"$(h-agents)"} ; do
+        for root in ${(f)"$(h-agent-session-call "${agent}" roots 2>/dev/null)"} ; do
+            test -n "${root}" || continue
+            print -r -- "${root%/}"$'\t'"${agent}"
+        done
+    done
+}
+
+function h-agent-session-agent-in-roots {
+    #: Sets `REPLY' to the agent whose store holds the transcript $1, or to
+    #: `-'. The remaining arguments are [agfi:h-agent-session-root-agents]
+    #: rows.
+    #:
+    #: The same answer [agfi:h-agent-session-agent-of] gives for a path inside a
+    #: store, without the fork a command substitution costs -- zsh has no
+    #: namerefs, so `REPLY' is how a helper hands a value back in a loop. A
+    #: transcript outside every store is left to the sniffing path, which
+    #: nothing in a picker needs.
+    #: Usage: h-agent-session-agent-in-roots <transcript> <root<TAB>agent>...
+    ##
+    local transcript="${1}"
+    shift
+
+    local row
+    for row in "$@" ; do
+        if [[ "${transcript}" == "${row%%$'\t'*}"/* ]] ; then
+            REPLY="${row#*$'\t'}"
+            return 0
+        fi
+    done
+
+    REPLY='-'
+    return 1
 }
 
 function h-agent-session-all-pairs {
@@ -1469,14 +1709,18 @@ function h-agent-session-all-pairs {
     local -a live f
     live=( ${(f)agent_session_live_list_cache} )
 
-    local row t agent
+    local -a root_agents
+    root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
+
+    local row t
     for row in "${live[@]}" ; do
-        t="$(h-agent-session-row-transcript "${row}")" || continue
+        f=( "${(@ps:\t:)row}" )
+        t="${f[5]}"
+        test -n "${t}" && test -e "${t}" || continue
         [[ "${in_windows}" == *$'\t'"${t}"$'\t'* ]] && continue
 
-        f=( "${(@ps:\t:)row}" )
-        agent="$(h-agent-session-agent-of "${t}" 2>/dev/null)" || agent='-'
-        printf -- '-\t%s\t%s\t%s\n' "${t}" "${agent}" "${f[3]}"
+        h-agent-session-agent-in-roots "${t}" "${root_agents[@]}"
+        printf -- '-\t%s\t%s\t%s\n' "${t}" "${REPLY}" "${f[3]}"
     done
 }
 
@@ -1513,21 +1757,39 @@ function h-agent-session-live-rows {
 
     h-agent-session-dep @RET
 
-    #: One `list` over every root and then a join, rather than a metadata call
-    #: per row: `list` does the whole corpus in ~45ms, while `name` alone costs
-    #: ~230ms on a large transcript. Anything the join misses still gets a row,
-    #: just a barer one.
+    #: One `list` per agent and then a join, rather than a metadata call per
+    #: row: `name` alone costs ~230ms on a large transcript. Anything the join
+    #: misses still gets a row, just a barer one.
+    #:
+    #: `-only` names the transcripts these rows are about, so the corpus is not
+    #: walked at all: annotating twenty live sessions used to mean listing
+    #: every session on disk, which for Codex is fifteen hundred rollouts and
+    #: 280ms of the picker's startup. With the paths in hand it is 6ms.
     #:
     #: `list` carries a name of its own, which is the same name by another route
     #: -- read out of the transcript rather than asked of the agent -- so it
     #: stands in when the live listing has none.
-    local agent meta='' glyphs=''
-    local -a roots
+    #: `t', not `path': zsh ties `path' to `PATH', so a loop over transcripts
+    #: named `path' replaces PATH with the transcript it is holding and every
+    #: command after it is not found.
+    local agent meta='' glyphs='' t
+    local -a roots only transcripts
+    transcripts=( ${(f)"$(ec "${pairs}" | command cut -f2)"} )
+
     for agent in ${(f)"$(h-agents)"} ; do
         glyphs+="${agent}"$'\t'"$(h-agent-field "${agent}" glyph)"$'\n'
         roots=( ${(f)"$(h-agent-session-call "${agent}" roots 2>/dev/null)"} ) || continue
         (( ${#roots} )) || continue
-        meta+="$(agent_session "${agent}" list "${roots[@]}" 2>/dev/null)"$'\n'
+
+        only=()
+        for t in "${transcripts[@]}" ; do
+            test -n "${t}" || continue
+            h-agent-session-call "${agent}" owns-p "${t}" || continue
+            only+=( -only "${t}" )
+        done
+        (( ${#only} )) || continue
+
+        meta+="$(agent_session "${agent}" list "${only[@]}" "${roots[@]}" 2>/dev/null)"$'\n'
     done
 
     ec "${pairs}" |

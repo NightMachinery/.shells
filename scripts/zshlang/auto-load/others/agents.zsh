@@ -28,7 +28,12 @@ function h-agents {
         return 0
     fi
 
-    h-agents-table | command cut -f1
+    #: Split in the shell rather than through `cut': this is called on every
+    #: session lookup, and a subprocess for three lines is not worth 3ms.
+    local row
+    for row in ${(f)"$(h-agents-table)"} ; do
+        print -r -- "${row%%$'\t'*}"
+    done
 }
 
 function h-agent-field {
@@ -51,13 +56,20 @@ function h-agent-field {
             ;;
     esac
 
+    #: Shell field splitting rather than `gawk': a lookup per agent per picker
+    #: adds up, and the table is three lines.
     local row
-    row="$(h-agents-table | gawk -F'\t' -v a="${agent}" -v n="${n}" '$1 == a { print $n ; exit }')" @RET
-    if test -z "${row}" ; then
-        ecerr "$0: unknown agent: ${agent}"
-        return 1
-    fi
-    ec "${row}"
+    local -a f
+    for row in ${(f)"$(h-agents-table)"} ; do
+        f=( "${(@ps:\t:)row}" )
+        if [[ "${f[1]}" == "${agent}" ]] ; then
+            ec "${f[$n]}"
+            return 0
+        fi
+    done
+
+    ecerr "$0: unknown agent: ${agent}"
+    return 1
 }
 
 function h-agent-session-call {
