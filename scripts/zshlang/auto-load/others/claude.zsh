@@ -66,10 +66,26 @@ function claude {
     #: needs no reading at all. Only when our stdout is a terminal, since a
     #: piped or captured run must not be handed escape codes, and only where
     #: the wash stays inside our own pane ([agfi:h-claude-tint-scope-p]).
+    #: A seat with no entry in =claude_code_profile_tints= is not tinted, and
+    #: is not reset on the way out either, so nothing is undone that was never
+    #: done.
     local tint_p=n
-    if bool "${claude_tint_p:-y}" && isTty && h-claude-tint-scope-p ; then
+    if bool "${claude_tint_p:-y}" && isTty && h-claude-tint-scope-p &&
+        test -n "${claude_code_profile_tints[$profile]}" ; then
         tint_p=y
         h-claude-tint-set "${profile}"
+    fi
+
+    #: The seat's colour on the pane's own border: the same signal as the tint
+    #: without repainting anything the session writes over. On by default, but
+    #: only for a seat listed in =claude_code_profile_borders=, and only inside
+    #: tmux, which is the only thing here that has a pane border to colour.
+    local border_p=n border_had=''
+    if bool "${claude_tmux_border_p:-y}" && isTmux &&
+        test -n "${claude_code_profile_borders[$profile]}" ; then
+        border_p=y
+        border_had="$(command tmux show-options -pqv -t "${TMUX_PANE}" pane-border-style 2>/dev/null)"
+        h-claude-tmux-border-set "${profile}"
     fi
 
     #: Off by default. A pane already labelled keeps its label afterwards: the
@@ -96,6 +112,9 @@ function claude {
         fi
         if bool "${label_p}" && test -z "${label_had}" ; then
             h-claude-tmux-label-unset || true
+        fi
+        if bool "${border_p}" && test -z "${border_had}" ; then
+            h-claude-tmux-border-unset || true
         fi
     }
 }
@@ -216,7 +235,7 @@ typeset -ga claude_code_profile_order=( default work )
 #: `CLAUDE_CONFIG_DIR=... claude', so the work seat keeps its tty marker and
 #: every profile keeps the sync, watchdogs and `$proxyenv' of [agfi:claude].
 typeset -gA claude_code_profile_launchers=(
-    default  claude
+    default  claude-m
     work     claude-work
 )
 ##
@@ -241,19 +260,38 @@ typeset -gA claude_code_profile_labels=(
     default  PERSONAL
     work     WORK
 )
-#: The same seats as an `R;G;B' triplet. The convention is shared with
-#: `profileColors' in =golang/agent_session/internal/claude/preview.go=, which
-#: paints the session pickers, so a seat is one colour across the whole
-#: toolchain: personal blue, work orange.
+#: The seats that need a colour written out here as an `R;G;B' triplet, for
+#: [agfi:h-claude-profile-color-hex] to hand to tmux. The convention is shared
+#: with `profileColors' in
+#: =golang/agent_session/internal/claude/preview.go=, which paints the session
+#: pickers: personal blue, work orange.
+#:
+#: The personal seat is commented out because nothing derives a colour for it
+#: -- it takes no tint and no border -- and its blue is still carried by its
+#: theme file and by the picker's own table. A seat with no entry simply has
+#: no colour to give tmux.
 typeset -gA claude_code_profile_colors=(
-    default  '90;150;240'
+    # default  '90;150;240'
     work     '235;145;60'
 )
 #: The pane background each seat tints to ([agfi:claude]): a wash of the
 #: profile colour, pale enough to leave the daltonized theme legible.
+#:
+#: A seat with no entry here is not tinted at all, which is why the personal
+#: one is commented out rather than removed: it is the seat the terminal is
+#: normally set up for, so it keeps the background it already had. Only the
+#: seat that is easy to mistake for it gets repainted.
 typeset -gA claude_code_profile_tints=(
-    default  '#eef3fc'
+    # default  '#eef3fc'
     work     '#fff6ec'
+)
+#: Which seats get a coloured pane border ([agfi:h-claude-tmux-border-set]),
+#: under the same convention: no entry, no border. The value is the tmux style
+#: attributes to add on top of the seat's own colour, so the colour itself
+#: stays defined once, in =claude_code_profile_colors=.
+typeset -gA claude_code_profile_borders=(
+    # default  bold
+    work     bold
 )
 #: Which tracked theme file a seat's =themes/profile.json= points at. The slug
 #: is deliberately the same in every config dir, so the one shared
@@ -331,6 +369,69 @@ function h-claude-tmux-label-unset {
 
     command tmux set-option -pu -t "${TMUX_PANE}" \
         "${claude_tmux_label_option}" 2>/dev/null || true
+}
+
+function h-claude-profile-color-hex {
+    : "prints a profile's colour as #rrggbb, from its R;G;B triplet"
+    #: tmux styles want a hex colour or a palette index, while the theme files
+    #: and the Go pickers want the triplet. Deriving one from the other keeps
+    #: the colour itself written down exactly once.
+    ##
+    local profile="${1}"
+    assert-args profile @RET
+
+    local rgb="${claude_code_profile_colors[$profile]}"
+    test -n "${rgb}" || return 1
+
+    local -a c
+    c=("${(@s.;.)rgb}")
+    (( ${#c} == 3 )) || return 1
+
+    printf '#%02x%02x%02x\n' "${c[1]}" "${c[2]}" "${c[3]}"
+}
+
+#: Both halves of a pane's border, since tmux picks between them by whether the
+#: pane is the active one and we want the seat's colour either way.
+typeset -ga claude_tmux_border_options=(pane-border-style pane-active-border-style)
+
+function h-claude-tmux-border-set {
+    : "colours this pane's borders in the seat's colour; see =claude_code_profile_borders="
+    local profile="${1}"
+    assert-args profile @RET
+    test -n "${TMUX_PANE}" || return 0
+
+    local attrs="${claude_code_profile_borders[$profile]}"
+    test -n "${attrs}" || return 0
+
+    local hex
+    hex="$(h-claude-profile-color-hex "${profile}")" || return 0
+
+    local opt
+    for opt in "${claude_tmux_border_options[@]}" ; do
+        command tmux set-option -p -t "${TMUX_PANE}" "${opt}" "fg=${hex},${attrs}" 2>/dev/null
+    done
+
+    #: A window with one pane draws no borders at all, so without this the cue
+    #: would be invisible in exactly the common case: one agent, one pane, one
+    #: window. Turning the border row on costs that window a line, which is
+    #: the whole price of this cue. Left on afterwards, like the label's window
+    #: options, because clearing it would blank the border of any other pane
+    #: that is relying on it.
+    local status_now
+    status_now="$(command tmux show-options -wqv -t "${TMUX_PANE}" pane-border-status 2>/dev/null)"
+    if [[ "${status_now}" == (''|off) ]] ; then
+        command tmux set-option -w -t "${TMUX_PANE}" pane-border-status top 2>/dev/null
+    fi
+}
+
+function h-claude-tmux-border-unset {
+    : "drops the per-pane border styles [agfi:h-claude-tmux-border-set] set"
+    test -n "${TMUX_PANE}" || return 0
+
+    local opt
+    for opt in "${claude_tmux_border_options[@]}" ; do
+        command tmux set-option -pu -t "${TMUX_PANE}" "${opt}" 2>/dev/null || true
+    done
 }
 
 function h-claude-tint-scope-p {
