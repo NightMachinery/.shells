@@ -106,6 +106,16 @@ Each of those, plus `brightness-off` / `brightness-on`, has `-main`, `-all`,
 Every one of those also has a `-loop` version, suffixed last
 (`display-black-on-all-loop`); see "Keeping it blank" below.
 
+These names are generated rather than written out, so grepping the source for
+`brightness-off-all-loop` finds only its callers and never a definition. Two
+nested `h_aliasfn` loops build them from the base name and the selector — one
+in `system.zsh` for the `display-black-*` family, one in `power.zsh` for
+`brightness-off` / `brightness-on` — which means the assembled string appears
+nowhere in the repository. Ask the shell instead of grep:
+
+    whence -w brightness-off-all-loop     # -> shell function
+    agfi brightness-off-loop              # the real body it forwards to
+
 Only this family gets them. `brightness-get-internal` and `brightness-get-ddc`
 already exist as *backend* helpers taking a display index, and `brightness-set`
 takes its value first, so `brightness-set-all 0.5` would put the selector where
@@ -165,7 +175,15 @@ existing loop first, and there is only ever one.
 
 The loop is a background subshell whose argv is marked `DBLACK_LOOP_MARKER`
 (`awaysh-bnamed`, so it runs in the brish garden and outlives the terminal that
-started it), and stopping it is `kill-marker` plus a final `display-black-off`.
+started it), and stopping it is `kill-marker`, a short wait, then a final
+`display-black-off`. The wait is not ceremony: `kill-marker` goes through
+`kill-withchildren`, so the loop's own children do die with it, but a
+grandchild spawned while it was enumerating can outlive the kill and an
+iteration killed midway may still be holding a slow DDC write. Either one
+lands *after* the restore, re-blanking the screen or writing a blanked reading
+over the remembered levels, so the teardown waits for `display-black-loop-p` to
+go quiet rather than trusting the kill. A kill that worked leaves on the first
+check.
 See the mark-me pattern in `PE/Zsh.org`. To check on it or kill it by hand:
 
     pgrep -fl DBLACK_LOOP_MARKER
@@ -174,6 +192,24 @@ See the mark-me pattern in `PE/Zsh.org`. To check on it or kill it by hand:
 The loop body is just `display-black-on`, so a display plugged in while the loop
 is running gets blanked on the next tick, and raising the brightness by hand is
 undone within `lo_s` seconds.
+
+### Why a remembered level is never zero
+
+`display-black-on` prefers a level it already remembers over a fresh reading,
+which is what lets the loop re-assert a blackout every few seconds without
+forgetting where the brightness started: a blanked display reads back as 0, and
+remembering *that* would make `display-black-off` "restore" the screen to black.
+
+The same trap reaches past the loop, though. `display-black-off` deletes the
+remembered row when it restores, so a blackout started again straight after one
+ends finds nothing remembered and falls through to a fresh reading — taken
+while the restore it just issued has not landed, because DDC writes are slow.
+Pressing F1 again right after F2 hits that window exactly, and each round of
+on-off ratchets the level down a little further. That was a real bug, and it is
+why `h-display-black-level-usable` refuses to remember a reading of zero in any
+of its spellings, recording `-` (unknown) instead. `display-black-off` leaves an
+unknown level alone, so the worst case became a brightness that did not change
+rather than one that walks towards black.
 
 ### Waking always ends it
 

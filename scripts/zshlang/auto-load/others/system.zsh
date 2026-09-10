@@ -1080,6 +1080,26 @@ exactly what \`hs.screen:id()\` returns."
     fi
 }
 
+function h-display-black-level-usable {
+    : "usage: h-display-black-level-usable <level>
+Whether a freshly read level is worth remembering as a pre-blank one.
+
+Zero is not. It is either a display we have already blanked, or -- the case
+that actually bit -- a restore that has not landed yet: DDC writes are slow,
+and pressing F1 again right after F2 catches exactly that window. Remembering
+a zero makes the next [agfi:display-black-off] \"restore\" the screen to black,
+and a few rounds of on-off ratchet the level down for good. Treating it as
+unknown instead means the worst case is a level left alone."
+    ##
+    local level="$1"
+
+    [[ -n "$level" && "$level" != '-' ]] || return 1
+    #: 0, 00, 0.0, .0, 0. and the comma-decimal forms of each.
+    [[ "$level" =~ '^0*[.,]?0*$' ]] && return 1
+
+    return 0
+}
+
 function display-black-on {
     : "usage: display-black-on [<selector>]
 Blanks the selected display(s), remembering their levels so
@@ -1126,6 +1146,7 @@ possible. Selectors: see [agfi:h-brightness-select]."
         if [[ "$f[2]" != none ]] ; then
             if test -z "$known" ; then
                 b="$(brightness-get-$f[2] "$f[3]" 2>/dev/null)" || b='-'
+                h-display-black-level-usable "$b" || b='-'
             fi
             brightness-set-$f[2] 0 "$f[3]" || ret=$?
         fi
@@ -1133,6 +1154,7 @@ possible. Selectors: see [agfi:h-brightness-select]."
         if [[ "$f[2]" == ddc ]] ; then
             if test -z "$known" ; then
                 c="$(contrast-get-ddc "$f[3]" 2>/dev/null)" || c='-'
+                h-display-black-level-usable "$c" || c='-'
             fi
             contrast-set-ddc 0 "$f[3]" || ret=$?
         fi
@@ -1313,6 +1335,19 @@ Stops the keep-blank loop and restores the display(s). The selector only
 narrows the restore; the loop is global, so it always stops."
     ##
     kill-marker "$DISPLAY_BLACK_LOOP_MARKER" || true
+
+    #: [agfi:kill-marker] goes through [agfi:kill-withchildren], so the loop's
+    #: own children die with it -- but a grandchild spawned while it was
+    #: enumerating can outlive the kill, and an iteration killed midway may
+    #: still be holding a slow DDC write. Either one lands *after* the restore
+    #: below: re-blanking the screen, or rewriting the remembered levels with a
+    #: blanked reading. So wait for the marker to be gone rather than trusting
+    #: the kill; a kill that worked breaks out on the first check.
+    local i
+    for i in {1..20} ; do
+        display-black-loop-p || break
+        sleep 0.05
+    done
 
     display-black-off "$1"
 }
