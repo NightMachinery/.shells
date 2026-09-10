@@ -143,6 +143,37 @@ function lsofp() {
 aliasfn fflsof lsofp
 aliasfn plsof lsofp
 ##
+function h-fftmux-act {
+    : "acts on picked tmux rows: field 1 of each row is the session id"
+    #: Shared by [agfi:fftmux] and [agfi:fftmux-agent], which pick over
+    #: different row layouts but agree on their first column. The name is asked
+    #: of tmux rather than parsed back out of the row: only fftmux's own rows
+    #: carry one, and the autoname hooks may have rewritten it since the
+    #: listing anyway.
+    #: Usage: h-fftmux-act "<picked rows>"   (newline separated)
+    ##
+    local picks="${1}"
+
+    #: [agfi:tmux-session-goto], not `tmux a -t': attaching cannot nest, so the
+    #: old default could never hop sessions from inside tmux -- which is where
+    #: a session picker is most useful.
+    local engine=(tmux-session-goto)
+    test -n "$ftE[*]" && engine=("$ftE[@]")
+
+    local i id name
+    for i in "${(@f)picks}"
+    do
+        test -n "$i" || continue
+
+        id="${i%%$'\t'*}"
+        name="$(tmux-session-name-of "${id}" 2>/dev/null)" || name="${id}"
+
+        ecgray "acting on session ${name} (${id})"
+        tty-title "${name}"
+        reval-ec "${engine[@]}" "${id}"
+    done
+}
+
 function fftmux() {
     : "fuzzy-pick tmux sessions; the engine is called with each pick's session id"
     #: Ids, not names. A name is not a usable `-t' target when it starts with
@@ -151,11 +182,6 @@ function fftmux() {
     #: =docs/tmux-session-rename.md= have the details.
     ##
     local query="$*"
-    #: [agfi:tmux-session-goto], not `tmux a -t': attaching cannot nest, so the
-    #: old default could never hop sessions from inside tmux -- which is where
-    #: a session picker is most useful.
-    local engine=(tmux-session-goto)
-    test -n "$ftE[*]" && engine=("$ftE[@]")
 
     bella_zsh_disable1
 
@@ -165,18 +191,7 @@ function fftmux() {
     picks="$(command tmux list-sessions -F '#{session_id}'$'\t''#{session_name}: #{session_windows} windows#{?session_attached, (attached),}' |
         fz --query "$query" --delimiter=$'\t' --with-nth=2)" || return $?
 
-    local i id name
-    for i in "${(@f)picks}"
-    do
-        test -n "$i" || continue
-
-        id="${i%%$'\t'*}"
-        name="${${i#*$'\t'}%%:*}"
-
-        ecgray "acting on session ${name} (${id})"
-        tty-title "${name}"
-        reval-ec "${engine[@]}" "${id}"
-    done
+    h-fftmux-act "${picks}"
 }
 alias fft=fftmux
 

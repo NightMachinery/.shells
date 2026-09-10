@@ -1764,6 +1764,40 @@ function h-agent-session-live-rows {
         return 1
     fi
 
+    #: The kitty label is this picker's own, so it is built here and the
+    #: annotator is left generic. A name still unknown at this point is left as
+    #: `-' for [agfi:h-agent-session-annotate-rows] to fill in from the
+    #: transcript, in the label's last position.
+    ec "${pairs}" |
+        gawk -F'\t' -v OFS='\t' \
+            '{ print $1, $2, $3, (($1 == "-") ? $4 : ("w" $1 "  " $4)) }' |
+        h-agent-session-annotate-rows
+}
+
+function h-agent-session-annotate-rows {
+    #: Turns `<caller><TAB><transcript><TAB><agent><TAB><label>' pairs on stdin
+    #: into the eight column rows [agfi:h-agent-session-fz] reads: the caller's
+    #: own column, the transcript, the agent, `<glyph> <label>', the profile
+    #: (Claude's config home; `-' otherwise), the last activity, the relative
+    #: path and the snippet.
+    #:
+    #: Shared by [agfi:h-agent-session-live-rows] and
+    #: [agfi:h-agent-session-tmux-rows]: what a picker knows on its own is the
+    #: first column and the label, and everything else is read out of the
+    #: transcripts the same way for all of them.
+    #:
+    #: agent_session_rows_sort orders the result: empty (the default) keeps the
+    #: caller's order, `last' puts the most recently active session first, and
+    #: `user' does the same by your last message rather than the agent's last
+    #: word. The sort is done on an epoch-prefixed copy of the rows and the
+    #: prefix cut off again, so the row layout never sees it.
+    ##
+    local sort_by="${agent_session_rows_sort}"
+
+    local pairs
+    pairs="$(command cat)" @RET
+    test -n "${pairs}" || return 1
+
     h-agent-session-dep @RET
 
     #: One `list` per agent and then a join, rather than a metadata call per
@@ -1782,8 +1816,11 @@ function h-agent-session-live-rows {
     #: named `path' replaces PATH with the transcript it is holding and every
     #: command after it is not found.
     local agent meta='' glyphs='' t
-    local -a roots only transcripts
+    local -a roots only transcripts list_args
     transcripts=( ${(f)"$(ec "${pairs}" | command cut -f2)"} )
+
+    #: Which timestamp `list` reports, and hence what `last' sorts on.
+    [[ "${sort_by}" == user ]] && list_args+=( -last-by user )
 
     for agent in ${(f)"$(h-agents)"} ; do
         glyphs+="${agent}"$'\t'"$(h-agent-field "${agent}" glyph)"$'\n'
@@ -1798,13 +1835,16 @@ function h-agent-session-live-rows {
         done
         (( ${#only} )) || continue
 
-        meta+="$(agent_session "${agent}" list "${only[@]}" "${roots[@]}" 2>/dev/null)"$'\n'
+        meta+="$(agent_session "${agent}" list "${list_args[@]}" "${only[@]}" "${roots[@]}" 2>/dev/null)"$'\n'
     done
 
+    local sort_p=''
+    test -n "${sort_by}" && sort_p=y
+
     ec "${pairs}" |
-        gawk -F'\t' -v OFS='\t' '
+        gawk -F'\t' -v OFS='\t' -v sort_p="${sort_p}" '
             FILENAME == ARGV[1] { glyph[$1] = $2 ; next }
-            FILENAME == ARGV[2] { when[$2] = $3 ; nm[$2] = $4 ; rel[$2] = $5 ; snip[$2] = $6 ; next }
+            FILENAME == ARGV[2] { ep[$2] = $1 ; when[$2] = $3 ; nm[$2] = $4 ; rel[$2] = $5 ; snip[$2] = $6 ; next }
             {
                 path = $2
                 agent = $3
@@ -1819,16 +1859,31 @@ function h-agent-session-live-rows {
                     sub(/^.*\//, "", profile)
                 }
 
-                name = ($4 == "-" && nm[path]) ? nm[path] : $4
-                label = ($1 == "-") ? name : ("w" $1 "  " name)
+                #: A label whose name position is still a dash gets the name
+                #: the transcript carries; the caller had no way to know it.
+                #: Spelled out rather than with sub(), where a literal & in the
+                #: replacement would stand for the match.
+                label = $4
+                if (nm[path] != "") {
+                    if (label == "-") label = nm[path]
+                    else if (label ~ /  -$/) label = substr(label, 1, length(label) - 1) nm[path]
+                }
                 if (glyph[agent] != "") label = glyph[agent] " " label
+
+                #: A transcript the join missed sorts last rather than first.
+                if (sort_p != "") printf "%s\t", (ep[path] ? ep[path] : 0)
 
                 print $1, path, agent, label, profile, \
                     (when[path] ? when[path] : "?"), \
                     (rel[path] ? rel[path] : path), \
                     snip[path]
             }
-        ' <(ec "${glyphs}") <(ec "${meta}") -
+        ' <(ec "${glyphs}") <(ec "${meta}") - |
+        if test -n "${sort_p}" ; then
+            command sort -t $'\t' -k1,1nr | command cut -f2-
+        else
+            command cat
+        fi
 }
 
 function h-agent-session-preview-cmd {
