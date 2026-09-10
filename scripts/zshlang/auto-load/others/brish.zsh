@@ -14,6 +14,34 @@ function brishgarden-boot {
 function brishgarden-count() {
     fnswap isI false ffps BRIIIII | wc -l
 }
+
+function brishz-alive-p {
+    #: Whether the garden is answering, without running a command through it.
+    #: For callers that want to delegate *if they can* and do the work
+    #: themselves otherwise, since a failed [agfi:brishzq.zsh] cannot be told
+    #: apart from a command that legitimately exited nonzero.
+    #:
+    #: A TCP probe rather than an HTTP request: the endpoint is POST-only and
+    #: authenticated, so a liveness request would have to carry the API key and
+    #: could still be refused for reasons unrelated to the garden being up.
+    ##
+    #: A remote garden is not probed -- the endpoint may be behind Caddy, a
+    #: tunnel or a name that does not resolve here -- so assume the caller who
+    #: set it knows. See =docs/api-keys.md= on the tunnelling gotcha.
+    test -z "${bshEndpoint}" || return 0
+
+    #: The same default as the clients use; see [agfi:brishz]. Kept in step by
+    #: hand because =brishzq.zsh= is a standalone wrapper, not sourced from
+    #: here.
+    local host="${brishz_alive_host:-127.0.0.1}" port="${GARDEN_PORT:-7230}"
+
+    zmodload zsh/net/tcp 2>/dev/null || return 1
+
+    ztcp "${host}" "${port}" 2>/dev/null || return 1
+    ztcp -c "${REPLY}" 2>/dev/null
+
+    return 0
+}
 ##
 function brishz {
     ## PERF:
