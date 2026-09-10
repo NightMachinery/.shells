@@ -71,6 +71,16 @@ function claude {
         h-claude-tint-set "${profile}"
     fi
 
+    #: Off by default. A pane already labelled keeps its label afterwards: the
+    #: value was somebody else's to begin with, so only a label we introduced
+    #: is taken away again.
+    local label_p=n label_had=''
+    if bool "${claude_tmux_label_p:-n}" && isTmux ; then
+        label_p=y
+        label_had="$(command tmux show-options -pqv -t "${TMUX_PANE}" "${claude_tmux_label_option}" 2>/dev/null)"
+        h-claude-tmux-label-set "${profile}"
+    fi
+
     {
         #: The marker is how a work tab is told apart from a personal one, in
         #: the tty title and in every other cue. `local` is dynamically scoped
@@ -82,6 +92,9 @@ function claude {
         #: it. Never allowed to change the session's own exit status.
         if bool "${tint_p}" ; then
             h-claude-tint-reset || true
+        fi
+        if bool "${label_p}" && test -z "${label_had}" ; then
+            h-claude-tmux-label-unset || true
         fi
     }
 }
@@ -219,6 +232,14 @@ typeset -gA claude_code_profile_markers=(
     default  🦋
     work     🏫
 )
+#: The word a seat goes by in cues meant for a human to read, the tmux pane
+#: label being the one that has to spell it out. The default profile's *key* is
+#: `default', because that is what Claude Code calls an unset CLAUDE_CONFIG_DIR,
+#: but the seat itself is the personal one.
+typeset -gA claude_code_profile_labels=(
+    default  PERSONAL
+    work     WORK
+)
 #: The same seats as an `R;G;B' triplet. The convention is shared with
 #: `profileColors' in =golang/agent_session/internal/claude/preview.go=, which
 #: paints the session pickers, so a seat is one colour across the whole
@@ -266,6 +287,49 @@ function claude-themes-link {
         mkdir -p "${dir}/themes" @RET
         command ln -sf "${src}" "${dir}/themes/profile.json" @RET
     done
+}
+
+#: The tmux pane option [agfi:h-claude-tmux-label-set] writes and the
+#: pane-border format reads. A pane option, so it describes one pane and not
+#: the session, which may hold several seats at once.
+typeset -g claude_tmux_label_option='@claude_profile'
+
+function h-claude-tmux-label-set {
+    : "labels this tmux pane with the profile and shows the border row"
+    #: Unlike the other cues this one is off by default
+    #: (`claude_tmux_label_p=y' to ask for it): the border row costs a line of
+    #: every pane in the window, which is a poor trade when the theme and the
+    #: tint already say the same thing.
+    ##
+    local profile="${1}"
+    assert-args profile @RET
+    test -n "${TMUX_PANE}" || return 0
+
+    local marker="${claude_code_profile_markers[$profile]}"
+    local label="${marker:+${marker} }${claude_code_profile_labels[$profile]:-${(U)profile}}"
+
+    command tmux set-option -p -t "${TMUX_PANE}" \
+        "${claude_tmux_label_option}" "${label}" 2>/dev/null || return 0
+
+    #: The border row and its format are *window* properties, so they are only
+    #: set when the window has no format of its own to lose, and are left in
+    #: place afterwards: clearing them would blank the label of any other
+    #: labelled pane in the same window. Panes without the option read `SHELL'.
+    local existing
+    existing="$(command tmux show-options -wqv -t "${TMUX_PANE}" pane-border-format 2>/dev/null)"
+    test -n "${existing}" && return 0
+
+    command tmux set-option -w -t "${TMUX_PANE}" pane-border-status top 2>/dev/null
+    command tmux set-option -w -t "${TMUX_PANE}" pane-border-format \
+        "#[bold] #{?#{${claude_tmux_label_option}},#{${claude_tmux_label_option}},SHELL} #[default]#{pane_index}" 2>/dev/null
+}
+
+function h-claude-tmux-label-unset {
+    : "removes the pane label [agfi:h-claude-tmux-label-set] wrote"
+    test -n "${TMUX_PANE}" || return 0
+
+    command tmux set-option -pu -t "${TMUX_PANE}" \
+        "${claude_tmux_label_option}" 2>/dev/null || true
 }
 
 function h-claude-tint-set {
