@@ -59,7 +59,8 @@ type Turn struct {
 // A Block is one piece of a turn. The vocabulary is the renderer's, not any
 // agent's: `text`, `thinking`, `tool_use` (Name + Input, with ID for its
 // result), `tool_result` (an orphan whose call is not in the document),
-// `notice` (Name is the kind, Text the body), `command`, `pr`, `tasks` and
+// `notice` (Name is the kind, Text the body, rendered as prose), `event` (the
+// same, with the body kept verbatim in a block), `command`, `pr`, `tasks` and
 // `file-edit`. The JSON tags match the Anthropic content-block schema so the
 // Claude adapter can decode into it directly; other adapters fill the fields
 // by hand.
@@ -501,6 +502,15 @@ func (r *renderer) renderBlock(tb TimedBlock) {
 	case "notice":
 		r.heading(2, b.Name+r.stamp(tb.TS))
 		r.prose(b.Text, 2)
+
+	case "event":
+		// Like a notice, but the body is output rather than prose: an agent
+		// whose steps are an open enum renders the ones this file has no
+		// vocabulary for through here, and their text is not markdown.
+		r.heading(2, b.Name+r.stamp(tb.TS))
+		if strings.TrimSpace(b.Text) != "" {
+			r.block("", b.Text)
+		}
 
 	case "command":
 		r.heading(2, "Command: "+b.Text+r.stamp(tb.TS))
