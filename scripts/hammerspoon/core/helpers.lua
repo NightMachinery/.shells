@@ -222,6 +222,36 @@ function brishz_eval_q_hs(argv, label)
     brishzTask("/usr/local/bin/brishzq.zsh", argv, label or "brishz_eval_q_hs")
 end
 
+--- Like brishz_eval_hs, but hands stdout to a callback instead of discarding
+--- it. The only async way to read a value out of the garden: brishz_eval
+--- returns one, but it blocks the main thread for the whole round trip, and a
+--- DDC read alone is ~340ms -- long enough to stall an eventtap callback, which
+--- macOS answers by disabling the tap.
+---
+--- The callback gets the trimmed stdout, or nil if the client failed. It is
+--- also how a caller can serialise garden work: keep one call in flight and
+--- send the next from the callback. See hyperBrightnessStep in
+--- core/window-media-bindings.lua, where doing that is the difference between
+--- ten brightness steps landing and one.
+function brishz_eval_out_hs(cmd, callback, label)
+    label = label or "brishz_eval_out_hs"
+
+    local task = taskWithPath("/usr/local/bin/brishz2.dash", function(exitCode, stdOut, stdErr)
+        if exitCode ~= 0 then
+            print(label .. ": exited " .. tostring(exitCode) .. ": " .. tostring(stdErr))
+            callback(nil)
+            return
+        end
+        callback((tostring(stdOut or "")):gsub("^%s+", ""):gsub("%s+$", ""))
+    end, {cmd})
+
+    if task then
+        task:start()
+    else
+        callback(nil)
+    end
+end
+
 --- * _
 function has_value (tab, val)
     for index, value in ipairs(tab) do
