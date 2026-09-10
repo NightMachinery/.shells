@@ -242,29 +242,40 @@ function h-agent-done-report {
 }
 
 function h-agent-done-session-dir {
-    #: Which directory the session belongs to, which is not the same question
-    #: as where the shell running this happens to be. Resuming does *not*
-    #: restore it: [agfi:claude-code-session-resume] says so and warns when
-    #: `$PWD' and the session's project disagree, and Codex and agy simply run
-    #: their launcher wherever you are. So somebody has to know it, and the
-    #: transcript path is the only record that survives the session.
+    #: Which directory the session was working in, which is not the same
+    #: question as where the shell running this happens to be. It matters
+    #: because resuming does *not* restore it: [agfi:claude-code-session-resume]
+    #: runs the launcher wherever you are and only warns when that disagrees
+    #: with the session's project, and Codex and agy do not even warn.
     #:
-    #: Claude Code names its project directory after the directory the session
-    #: started in, with every non-alphanumeric character replaced by a dash.
-    #: That is lossy -- `-Users-evar-my-dir' could be `/Users/evar/my-dir' or
-    #: `/Users/evar/my/dir' -- so turn the dashes back into slashes and keep
-    #: the answer only if it is a directory. Right in the common case, and it
-    #: declines rather than guesses in the ambiguous one.
+    #: Every agent records it, so nothing here needs to be inferred: each
+    #: transcript carries the cwd, and `agent_session <agent> meta' prints it
+    #: as its third field for all three. That is the exact directory, from the
+    #: newest record that has one.
     #:
-    #: Codex and agy file their transcripts by date and id, so their paths say
-    #: nothing about a directory and the fallback stands.
+    #: The path is the fallback, not the source. Claude Code does name its
+    #: project directory after the directory a session started in, with every
+    #: non-alphanumeric character replaced by a dash, but that is lossy --
+    #: `-Users-evar-my-dir' could be `/Users/evar/my-dir' or
+    #: `/Users/evar/my/dir' -- so it is only consulted when no record answered,
+    #: and only if the result is really a directory.
     #: Usage: h-agent-done-session-dir <agent> <transcript> <fallback>
     ##
     local agent="${1}" transcript="${2}" fallback="${3}"
 
+    if test -n "${transcript}" ; then
+        local meta cwd
+        if meta="$(agent_session "${agent}" meta "${transcript}" 2>/dev/null)" ; then
+            cwd="${${(@ps:\t:)meta}[3]}"
+            if test -n "${cwd}" && test -d "${cwd}" ; then
+                ec "${cwd}"
+                return 0
+            fi
+        fi
+    fi
+
     if [[ "${agent}" == claude ]] && test -n "${transcript}" ; then
-        local encoded="${transcript:h:t}" candidate
-        candidate="${encoded//-//}"
+        local candidate="${${transcript:h:t}//-//}"
         if test -d "${candidate}" ; then
             ec "${candidate}"
             return 0
