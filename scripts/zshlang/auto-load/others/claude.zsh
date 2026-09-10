@@ -266,7 +266,7 @@ typeset -gA claude_code_profile_labels=(
 #: [agfi:h-claude-profile-color-hex] to hand to tmux. The convention is shared
 #: with `profileColors' in
 #: =golang/agent_session/internal/claude/preview.go=, which paints the session
-#: pickers: personal blue, work orange.
+#: pickers: personal blue, work violet.
 #:
 #: The personal seat is commented out because nothing derives a colour for it
 #: -- it takes no tint and no border -- and its blue is still carried by its
@@ -274,7 +274,7 @@ typeset -gA claude_code_profile_labels=(
 #: no colour to give tmux.
 typeset -gA claude_code_profile_colors=(
     # default  '90;150;240'
-    work     '235;145;60'
+    work     '108;113;196'
 )
 #: The pane background each seat tints to ([agfi:claude]): a wash of the
 #: profile colour, pale enough to leave the daltonized theme legible.
@@ -283,12 +283,18 @@ typeset -gA claude_code_profile_colors=(
 #: one is commented out rather than removed: it is the seat the terminal is
 #: normally set up for, so it keeps the background it already had. Only the
 #: seat that is easy to mistake for it gets repainted.
-#: The wash is a faint purple rather than the seat's own orange: it has to sit
-#: under cream-coloured text all day, so it is chosen to be noticed only when
-#: looked for, and the orange is carried by the border and the theme instead.
+#: A far paler version of the seat's own violet: it sits under a screenful of
+#: text all day, so it is chosen to be noticed only when looked for, while the
+#: border and the theme carry the colour at full strength.
+#:
+#: The value comes from =color_background_palette= as `solar-violet-faint',
+#: which is at the exact CIELAB lightness of this terminal's Solarized Light
+#: background, so it changes hue without touching the contrast of the text on
+#: top. Compare the alternatives with [agfi:color-background-palette] and try
+#: them live with [agfi:color-background].
 typeset -gA claude_code_profile_tints=(
     # default  '#eef3fc'
-    work     '#f6f2f8'
+    work     '#f7f5fd'
 )
 #: Which seats get a coloured pane border ([agfi:h-claude-tmux-border-set]),
 #: under the same convention: no entry, no border. The value is the tmux style
@@ -477,91 +483,15 @@ function h-claude-tint-set {
     local tint="${claude_code_profile_tints[$profile]}"
     test -n "${tint}" || return 0
 
-    printf '\e]11;%s\a' "${tint}"
+    color-background "${tint}"
 }
-
-#: Candidates to choose between by eye, because a wash this faint cannot be
-#: judged from its hex. [agfi:claude-tint-list] shows them as swatches with
-#: text on top, since what matters is whether the theme stays legible over
-#: them, and [agfi:claude-tint-try] paints the current pane with one so several
-#: can be compared without relaunching anything. The winner goes into
-#: =claude_code_profile_tints=.
-typeset -gA claude_tint_palette=(
-    purple-faintest  '#fcfbfd'
-    purple-faint     '#faf8fc'
-    purple           '#f6f2f8'
-    purple-deep      '#f0eaf6'
-    green-faintest   '#fbfdfa'
-    green-faint      '#f8fbf7'
-    green            '#f2f8f0'
-    green-deep       '#eaf5e8'
-    teal             '#f0f8f8'
-    blue             '#f2f6fc'
-    rose             '#fdf4f7'
-    slate            '#f4f6f8'
-    amber            '#fff6ec'
-)
-#: An associative array has no order of its own, and these want to be read
-#: faintest first within each hue.
-typeset -ga claude_tint_palette_order=(
-    purple-faintest purple-faint purple purple-deep
-    green-faintest green-faint green green-deep
-    teal blue rose slate amber
-)
-
-function claude-tint-list {
-    : "shows every candidate tint as a swatch, marking the one in use"
-    local current="${claude_code_profile_tints[work]}"
-
-    local name hex marker
-    local -a rgb
-    for name in "${claude_tint_palette_order[@]}" ; do
-        hex="${claude_tint_palette[$name]}"
-        rgb=(${=$(color-hex-to-rgb "${hex}")}) || continue
-
-        #: Dark text over the wash, because the question being asked is
-        #: whether the daltonized theme is still comfortable on it.
-        colorbg "${rgb[@]}"
-        colorfg 51 51 51
-        printf '  The quick brown fox jumps over the lazy dog  '
-        resetcolor
-
-        marker=''
-        [[ "${hex}" == "${current}" ]] && marker='  <- in use'
-        printf ' %-16s %s%s\n' "${name}" "${hex}" "${marker}"
-    done
-}
-
-function claude-tint-try {
-    : "paints this pane with a candidate tint: a palette name, or a #rrggbb"
-    #: Takes effect in the pane it is run in, immediately, so the choice can be
-    #: made by looking rather than by guessing. [agfi:claude-tint-reset] puts
-    #: the terminal's own background back. With no argument it lists.
-    ##
-    local want="${1}"
-    if test -z "${want}" ; then
-        claude-tint-list
-        return 0
-    fi
-
-    local hex="${claude_tint_palette[$want]:-${want}}"
-    if [[ "${hex}" != '#'[0-9a-fA-F]* ]] ; then
-        ecerr "$0: no such tint: ${want}"
-        claude-tint-list >&2
-        return 1
-    fi
-
-    printf '\e]11;%s\a' "${hex}"
-    ecgray "$0: ${hex}${claude_tint_palette[$want]:+ (${want})}"
-}
-aliasfn claude-tint-reset h-claude-tint-reset
 
 function h-claude-tint-reset {
     : "restores the terminal's own background, undoing [agfi:h-claude-tint-set]"
-    #: OSC 111 resets what OSC 11 set. A `kill -9` of the session skips this,
-    #: leaving the pane tinted until the next reset or a new pane.
+    #: A `kill -9` of the session skips this, leaving the pane tinted until
+    #: something else resets it or a new pane replaces it.
     ##
-    printf '\e]111;\a'
+    color-background-reset
 }
 
 function h-claude-profile-theme-link {

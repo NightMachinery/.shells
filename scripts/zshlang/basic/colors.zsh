@@ -96,6 +96,142 @@ function color-cursor {
 function cursor-color { color-cursor "$@" }
 alias cursor-color='color-cursor' # to not increase ${#funcstack}
 
+#: Candidate background washes, for telling one terminal window or tmux pane
+#: apart from another without making it harder to read.
+#:
+#: The `solar-' entries are computed to sit at exactly the CIELAB lightness of
+#: Solarized Light's background, base3 `#fdf6e3' (L* 97), and differ from it
+#: only in hue. That is the property worth having: contrast against the
+#: theme's own text is left alone. Solarized body text (base00, `#657b83')
+#: measures 4.13 against base3 and between 4.12 and 4.14 against every one of
+#: these, so none of them costs any legibility. Violet is the most
+#: recognisable per unit of colour, base3's hue being a warm yellow and violet
+#: its opposite; cyan and green are gentler still.
+#:
+#: The entries without the prefix are ordinary pale washes that predate the
+#: measurement, kept so the two can be compared.
+typeset -gA color_background_palette=(
+    solar-violet-faint  '#f7f5fd'
+    solar-violet        '#f8f5ff'
+    solar-violet-deep   '#f9f4ff'
+    solar-lilac-faint   '#f5f6fe'
+    solar-lilac         '#f4f6ff'
+    solar-cyan-faint    '#edf9f9'
+    solar-cyan          '#e6fafb'
+    solar-teal-faint    '#eef9f6'
+    solar-green-faint   '#f2f8f1'
+    solar-green         '#eff9ed'
+    solar-slate-faint   '#f0f7fd'
+    solar-slate         '#ebf8ff'
+    purple-faint        '#faf8fc'
+    purple              '#f6f2f8'
+    green-faint         '#f8fbf7'
+    rose                '#fdf4f7'
+    amber               '#fff6ec'
+)
+#: An associative array has no order of its own, and these want reading
+#: faintest first within each hue.
+typeset -ga color_background_palette_order=(
+    solar-violet-faint solar-violet solar-violet-deep
+    solar-lilac-faint solar-lilac
+    solar-cyan-faint solar-cyan solar-teal-faint
+    solar-green-faint solar-green
+    solar-slate-faint solar-slate
+    purple-faint purple green-faint rose amber
+)
+
+function h-color-tty-write {
+    : "writes to the controlling terminal, falling back to stdout"
+    #: Run as `! color-background ...' inside an agent session, our stdout is a
+    #: pipe the agent reads, so an escape written there is captured and shown
+    #: as text instead of reaching the terminal. The controlling terminal is
+    #: still the pane, and stays writable even when stdout is not a tty.
+    ##
+    local text="${1}"
+
+    if test -w /dev/tty ; then
+        printf '%s' "${text}" > /dev/tty
+    else
+        printf '%s' "${text}"
+    fi
+}
+
+function color-background {
+    : "sets the terminal background: a name from =color_background_palette=, or a #rrggbb"
+    #: OSC 11. Under tmux 3.0 and later this applies to the sending pane alone,
+    #: so a sibling pane is untouched; in a bare terminal window it applies to
+    #: the window. Cells an application paints with a background of their own
+    #: are unaffected, so it reads as a tint rather than a repaint.
+    #: [agfi:color-background-reset] undoes it. With no argument it shows the
+    #: palette instead. Silent, like [agfi:color-cursor]: the terminal changing
+    #: colour is the feedback.
+    ##
+    local want="${1}"
+    if test -z "${want}" ; then
+        color-background-palette
+        return 0
+    fi
+
+    local hex="${color_background_palette[$want]:-${want}}"
+
+    #: Round-tripped through [agfi:color-hex-to-rgb], which both validates the
+    #: colour and expands a `#abc' shorthand: terminals are not obliged to
+    #: understand the short form in an OSC.
+    local -a rgb
+    if ! rgb=(${=$(color-hex-to-rgb "${hex}" 2>/dev/null)}) || (( ${#rgb} != 3 )) ; then
+        ecerr "$0: not a palette name or a hex colour: ${want}"
+        color-background-palette >&2
+        return 1
+    fi
+    hex="$(printf '#%02x%02x%02x' "${rgb[@]}")"
+
+    h-color-tty-write $'\e]11;'"${hex}"$'\a'
+}
+#: `aliasfn' is not defined yet this early in the load order, so these follow
+#: the plain-wrapper style [agfi:cursor-color] already uses in this file.
+function background-color { color-background "$@" }
+
+function color-background-reset {
+    : "restores the terminal's configured background, undoing [agfi:color-background]"
+    #: OSC 111.
+    h-color-tty-write $'\e]111;\a'
+}
+function background-color-reset { color-background-reset "$@" }
+
+function color-background-palette {
+    : "shows the candidate backgrounds as swatches, marking <hex> if one is given"
+    #: Straight to the terminal for the reason [agfi:h-color-tty-write] gives:
+    #: captured, a swatch is just an escape code in a transcript.
+    ##
+    if test -w /dev/tty ; then
+        h-color-background-palette-body "$@" > /dev/tty
+    else
+        h-color-background-palette-body "$@"
+    fi
+}
+
+function h-color-background-palette-body {
+    local mark="${1}"
+
+    local name hex marker
+    local -a rgb
+    for name in "${color_background_palette_order[@]}" ; do
+        hex="${color_background_palette[$name]}"
+        rgb=(${=$(color-hex-to-rgb "${hex}")}) || continue
+
+        #: Dark text over the wash, because the question being asked of a
+        #: colour this pale is whether it is comfortable to read on.
+        colorbg "${rgb[@]}"
+        colorfg 51 51 51
+        printf '  The quick brown fox jumps over the lazy dog  '
+        resetcolor
+
+        marker=''
+        [[ -n "${mark}" && "${hex}" == "${mark}" ]] && marker='  <- in use'
+        printf ' %-20s %s%s\n' "${name}" "${hex}" "${marker}"
+    done
+}
+##
 function colorfg {
     if isColor && true-color-p ; then
         printf "\x1b[38;2;${1:-0};${2:-0};${3:-0}m"

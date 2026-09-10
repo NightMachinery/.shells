@@ -50,7 +50,7 @@ const previewWindow = 400 << 10
 // cannot reach it, and only 5 of 123 local sessions have one at all.
 var profileColors = map[string]string{
 	".claude":      "90;150;240",
-	".claude-work": "235;145;60",
+	".claude-work": "108;113;196",
 }
 
 // Only the fields the preview shows. A narrow struct on purpose: decoding the
