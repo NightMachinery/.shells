@@ -400,6 +400,55 @@ func TestModelTag(t *testing.T) {
 	}
 }
 
+// The model tag leads a turn heading, the way a subagent's does. The rest of
+// the heading keeps the order it always had, and a turn with no model recorded
+// must render exactly as it did before there were tags at all: no leading
+// space, no stray separator.
+func TestTurnHeadingLeadsWithTheModel(t *testing.T) {
+	const ts = "2026-09-08T17:37:00Z"
+	// Computed rather than written out, since the stamp is local time.
+	stamp := HumanTimestamp(ts)
+	said := []TimedBlock{{B: Block{Type: "text", Text: "hi"}}}
+
+	for _, c := range []struct {
+		name string
+		turn Turn
+		want string
+	}{
+		{
+			name: "before the role, not after the timestamp",
+			turn: Turn{Role: "assistant", TS: ts, Model: "gpt-6-astra", Blocks: said},
+			want: "* @GPT6Astra Assistant " + stamp,
+		},
+		{
+			name: "before an explicit heading too",
+			turn: Turn{Role: "assistant", TS: ts, Model: "claude-opus-5", Heading: "Recap", Blocks: said},
+			want: "* @Opus5 Recap " + stamp,
+		},
+		{
+			name: "duration and note stay where they were",
+			turn: Turn{
+				Role: "assistant", TS: ts, Model: "claude-fable-5-1", Blocks: said,
+				Duration: 242 * time.Second, Note: "interrupted",
+			},
+			want: "* @Fable5.1 Assistant " + stamp + " · 4m2s · interrupted",
+		},
+		{
+			name: "no model, no tag and nothing in its place",
+			turn: Turn{Role: "user", TS: ts, Blocks: said},
+			want: "* User " + stamp,
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			parts := RenderTurns([]Turn{c.turn}, nil, Style{Org: true}, 1)
+			got := strings.SplitN(parts[0], "\n", 2)[0]
+			if got != c.want {
+				t.Errorf("got %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
 func TestShortDuration(t *testing.T) {
 	for _, c := range []struct {
 		ms   int64
