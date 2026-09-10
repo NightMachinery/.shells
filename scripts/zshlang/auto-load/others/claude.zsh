@@ -64,9 +64,10 @@ function claude {
 
     #: A pale wash of the seat's colour behind the session: the one cue that
     #: needs no reading at all. Only when our stdout is a terminal, since a
-    #: piped or captured run must not be handed escape codes.
+    #: piped or captured run must not be handed escape codes, and only where
+    #: the wash stays inside our own pane ([agfi:h-claude-tint-scope-p]).
     local tint_p=n
-    if bool "${claude_tint_p:-y}" && isTty ; then
+    if bool "${claude_tint_p:-y}" && isTty && h-claude-tint-scope-p ; then
         tint_p=y
         h-claude-tint-set "${profile}"
     fi
@@ -330,6 +331,27 @@ function h-claude-tmux-label-unset {
 
     command tmux set-option -pu -t "${TMUX_PANE}" \
         "${claude_tmux_label_option}" 2>/dev/null || true
+}
+
+function h-claude-tint-scope-p {
+    : "true when the tint applies in this context; see =claude_tint_scope="
+    #: OSC 11 reaches only our own pane under tmux, but a bare terminal has no
+    #: panes, so outside tmux the same escape recolours the entire window --
+    #: the user's terminal, not just the session's corner of it. That is too
+    #: much to take by default, so `tmux' is the default scope and `always'
+    #: opts into the window-wide version.
+    ##
+    local scope="${claude_tint_scope:-tmux}"
+
+    case "${scope}" in
+        always) return 0 ;;
+        tmux) isTmux ;;
+        never) return 1 ;;
+        *)
+            ecerr "$0: unknown claude_tint_scope: ${scope} (tmux, always, never)"
+            return 1
+            ;;
+    esac
 }
 
 function h-claude-tint-set {
