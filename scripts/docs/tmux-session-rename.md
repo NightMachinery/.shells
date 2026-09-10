@@ -173,8 +173,14 @@ Use [agfi:tmux-session-id]. It takes a name or an id and prints an id, which
 is unambiguous in every target position. It also closes a race the autoname
 hooks make routine: they rename on every prompt, so a name captured from
 `tmux ls` can be gone by the time you act on it. [agfi:fftmux] (`fft`,
-`fftk`, `fftr`) and [agfi:tmux-alive-p] all go through it now; use
+`fftk`, `fftr`), [agfi:fftmux-agent] (`ffta`, the picker over the sessions
+running an agent) and [agfi:tmux-alive-p] all go through it now; use
 [agfi:tmux-session-name-of] to turn an id back into something a human reads.
+
+`ffta` is where a rename bites hardest, since the tmux name a Claude session
+reports is the one it was launched under: see the tmux picker section of
+`./agent-sessions.md` for how a name that no longer names anything is resolved
+through the pane instead.
 
 One more helper lives beside those: [agfi:tmux-session-goto], the verb `fft`
 now uses. `attach-session` refuses to nest, so a bare `tmux a -t` from inside
