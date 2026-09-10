@@ -198,7 +198,9 @@ func cmdList(ad session.Adapter, argv []string) error {
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
 	for _, s := range infos {
-		w.WriteString(s.Row() + "\n")
+		// A snippet is transcript text, so it can carry the same stray bytes
+		// a rendered document can; a row of it goes into an fzf line.
+		w.WriteString(turns.ScrubText(s.Row()) + "\n")
 	}
 	return nil
 }
@@ -248,7 +250,7 @@ func cmdPreview(ad session.Adapter, argv []string) error {
 	if err != nil {
 		return err
 	}
-	os.Stdout.WriteString(out)
+	os.Stdout.WriteString(turns.ScrubText(out))
 	return nil
 }
 

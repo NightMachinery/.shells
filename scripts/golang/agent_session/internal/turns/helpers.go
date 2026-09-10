@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // ** text helpers, shared by every adapter
@@ -179,17 +180,54 @@ func Truncate(s string, n int) string {
 // itself, such as an interruption notice, rather than a model.
 var modelRe = regexp.MustCompile(`^(?:claude-)?([a-z]+)-([0-9](?:-[0-9]{1,3})*)(?:-[0-9]{8})?$`)
 
-// ModelLabel is a model id as it reads in a subagent's heading: `Opus5',
-// `Fable5.1'. The family capitalised and [ShortModel]'s separator dropped, so
-// the tag is one word and scans as a name rather than as a version string.
+// Tokens of a model id that are acronyms rather than words, so that
+// capitalising a name does not produce `Gpt`.
+var modelWords = map[string]string{
+	"gpt": "GPT",
+	"ai":  "AI",
+	"llm": "LLM",
+}
+
+// ModelLabel is a model id as it reads in a tag: `Opus5`, `Fable5.1`,
+// `CodexAutoReview`. Every dash-separated word of [ShortModel]'s output is
+// capitalised and the dashes dropped, so the tag is one word; a version keeps
+// the dot ShortModel gave it, since `Fable51` would read as a number.
+//
+// Capitalising each word rather than only the first is what keeps a
+// multi-word id legible: an id that does not follow Anthropic's
+// family-and-version shape passes through here too, and `Codexautoreview` is
+// not a name anybody can read.
 func ModelLabel(model string) string {
-	short := strings.ReplaceAll(ShortModel(model), "-", "")
+	short := ShortModel(model)
 	if short == "" {
 		return ""
 	}
 
-	r := []rune(short)
-	return strings.ToUpper(string(r[0])) + string(r[1:])
+	parts := strings.Split(short, "-")
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		if w, ok := modelWords[p]; ok {
+			parts[i] = w
+			continue
+		}
+		r := []rune(p)
+		parts[i] = strings.ToUpper(string(r[0])) + string(r[1:])
+	}
+	return strings.Join(parts, "")
+}
+
+// ModelTag is how a model is named where it stands for whoever spoke: `@Opus5`
+// on a turn heading, `@Fable5.1` on a subagent's. The `@` is this
+// repository's mark for an agent identity, the same one the tmux session
+// names carry, and one word after it reads as a name rather than as a version
+// string.
+func ModelTag(model string) string {
+	if label := ModelLabel(model); label != "" {
+		return "@" + label
+	}
+	return ""
 }
 
 // ShortModel is a model id as it reads in a turn heading: `opus-5`,
@@ -207,4 +245,67 @@ func ShortModel(model string) string {
 		return m[1] + "-" + strings.ReplaceAll(m[2], "-", ".")
 	}
 	return strings.TrimPrefix(model, "claude-")
+}
+
+// ScrubText makes rendered output safe to open as text.
+//
+// A single NUL byte anywhere in a file makes emacs decode the *whole* file as
+// binary (`no-conversion`), and in that buffer every non-ASCII byte shows as
+// an octal escape -- a `·` separator reads as `\302\267`, and so does anything
+// the person typed. Tool output carries such bytes whenever a command printed
+// a binary file, and invalid UTF-8 has the same class of effect one step down:
+// emacs falls back to latin-1 and a `·` reads as `Â·`.
+//
+// So the renderer emits only what it can honestly show: the C0 controls that
+// are never text are dropped, and a byte sequence that is not valid UTF-8
+// becomes U+FFFD. Tab, newline and carriage return survive because they are
+// layout, and ESC survives because dropping it alone would leave the rest of
+// an ANSI sequence behind as literal text.
+func ScrubText(s string) string {
+	if !needsScrub(s) {
+		return s
+	}
+
+	var w strings.Builder
+	w.Grow(len(s))
+	for i := 0; i < len(s); {
+		b := s[i]
+		if b < utf8.RuneSelf {
+			if !dropByte(b) {
+				w.WriteByte(b)
+			}
+			i++
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 {
+			w.WriteRune(utf8.RuneError)
+			i++
+			continue
+		}
+		w.WriteString(s[i : i+size])
+		i += size
+	}
+	return w.String()
+}
+
+// Whether a string has anything [ScrubText] would change. Almost every
+// document is clean, and this keeps the common case one pass with no copy.
+func needsScrub(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if b := s[i]; b < utf8.RuneSelf && dropByte(b) {
+			return true
+		}
+	}
+	return !utf8.ValidString(s)
+}
+
+// A byte that must not reach the output: the C0 controls other than tab,
+// newline, carriage return and ESC, plus DEL.
+func dropByte(b byte) bool {
+	switch b {
+	case '\t', '\n', '\r', 0x1b:
+		return false
+	}
+	return b < 0x20 || b == 0x7f
 }

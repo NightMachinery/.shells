@@ -241,8 +241,8 @@ func subdoc(path string) turns.Subdoc {
 		if l.Type == "turn_context" {
 			var tc turnContext
 			if json.Unmarshal(l.Payload, &tc) == nil && tc.Model != "" {
-				if label := turns.ModelLabel(tc.Model); label != "" {
-					title = "@" + label + " " + title
+				if tag := turns.ModelTag(tc.Model); tag != "" {
+					title = tag + " " + title
 				}
 				break
 			}

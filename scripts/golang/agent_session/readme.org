@@ -103,7 +103,8 @@ whether a seam is in the right place.
   =Document=/=Subdoc=/=Turn=/=Block=/=TimedBlock=/=ToolResult= model,
   =Render(doc, Options)= and =RenderTurns=, =Style=, the org and markdown
   writer, fence repair, the heading tags, pandoc chunking, the unified diff, and
-  the text helpers (=ShortModel=, =ModelLabel=, =AbbrevHome=, =Truncate= …).
+  the text helpers (=ShortModel=, =ModelLabel=, =ModelTag=, =ScrubText=,
+  =AbbrevHome=, =Truncate= …).
   Nothing in it knows how any agent stores a session.
 - =internal/preview= --- what the fzf previews of different agents are built
   from, so they line up and read alike: =Painter=, =Row=, =JoinParts=,
@@ -327,14 +328,14 @@ per conversational turn:
 A result that is a single line of 72 characters or fewer goes on its heading
 rather than into a block; an empty one reads =Result: (no output)=.
 
-Assistant turns carry the model that produced them, shortened for repetition:
-=opus-5=, =fable-5=, =haiku-4.5=, and =synthetic= for the messages Claude Code
-writes itself, such as interruption notices. Merging stops at a model change,
-so a switch mid-answer starts a new heading instead of hiding inside one --- 8
-of 52 local sessions use more than one model, and 3 of 297 merged turns would
-otherwise have spanned two. Annotating sub-headings instead was the
-alternative, but a plain text block has no heading to annotate, so a switch
-landing there would go unrecorded.
+Assistant turns carry the model that produced them, as the same =@= tag a
+subagent's heading uses: =@Opus5=, =@Fable5.1=, =@Haiku4.5=, and =@Synthetic=
+for the messages Claude Code writes itself, such as interruption notices.
+Merging stops at a model change, so a switch mid-answer starts a new heading
+instead of hiding inside one --- 8 of 52 local sessions use more than one model,
+and 3 of 297 merged turns would otherwise have spanned two. Annotating
+sub-headings instead was the alternative, but a plain text block has no heading
+to annotate, so a switch landing there would go unrecorded.
 
 * Events
 
@@ -411,11 +412,21 @@ way would make the document differ run to run, and =TestPandocPathParity=
 compares the parallel path against a single pandoc run byte for byte.
 =modelMode= in =internal/claude/subagents.go= is the vote.
 
-=turns.ModelLabel= formats it as one word --- =ShortModel='s output with the
-family capitalised and the separator dropped, so =claude-opus-5= is =Opus5= and
-=claude-fable-5-1= is =Fable5.1= --- so it scans as a name rather than as a
-version string; =ShortModel= already drops a build date, so
-=claude-haiku-4-5-20251001= is =Haiku4.5=. The model comes out of the one read
+=turns.ModelTag= formats it, and every place a model stands for whoever spoke
+goes through that one function: a turn heading, a Claude subagent's heading, a
+Codex child rollout's. It is =@= plus =turns.ModelLabel=, which is
+=ShortModel='s output with every dash-separated word capitalised and the dashes
+dropped, so =claude-opus-5= is =@Opus5= and =claude-fable-5-1= is =@Fable5.1=
+--- one word, scanning as a name rather than as a version string. =ShortModel=
+already drops a build date, so =claude-haiku-4-5-20251001= is =@Haiku4.5=.
+
+A word per capital, rather than only the first, is what keeps an id that does
+not follow Anthropic's family-and-version shape legible: those reach the same
+function, and =codex-auto-review= as =@Codexautoreview= is not a name anybody
+can read, where =@CodexAutoReview= is. A short table of vendor tokens that are
+acronyms rather than words keeps =gpt-5-codex= from becoming =@Gpt5Codex=; it
+is =@GPT5Codex=. A version keeps the dot =ShortModel= gave it, since =Fable51=
+would read as a number. The model comes out of the one read
 the adapter's =subdoc= already does: it reads the agent's transcript once and
 hands back a =turns.Subdoc= whose title carries the vote, so =subagentSegments=
 in =internal/turns= only has to write the skeleton around it. Reading the
@@ -537,6 +548,41 @@ of sitting in the item. Measuring list markers to keep it was not worth it.
 
 [[agfi:org-header-rm-shared-level]] followed by [[agfi:org-header-indent]] is the
 same idea, on a document that is already org.
+
+* Bytes that are not text
+
+Tool output is copied into the document as it was captured, and a command that
+printed a binary file captures bytes that are not text. One of them, NUL, is
+enough to ruin the whole file: emacs decides a file's encoding by sniffing it,
+a single NUL makes it choose =no-conversion=, and in that buffer every
+non-ASCII byte is displayed as an octal escape. The symptom is a document whose
+heading separators read =\302\267= instead of =·=, and whose prose is mangled
+wherever it was not ASCII --- for one stray byte in one tool result, possibly
+thousands of lines away. Invalid UTF-8 does the same thing one step down: emacs
+falls back to latin-1 and =·= reads as =Â·=.
+
+So =turns.ScrubText= emits only what the renderer can honestly show. The C0
+controls that are never text are dropped, and a byte sequence that is not valid
+UTF-8 becomes U+FFFD, one per bad byte. Tab, newline and carriage return
+survive because they are layout. ESC survives on purpose: dropping the
+introducer alone would leave the rest of an ANSI sequence behind as literal
+text, which is worse than the escape, and turning colour into org markup is a
+separate job nobody has asked for yet.
+
+It runs over each segment before pandoc rather than over the finished document,
+so no chunk carries a byte pandoc would have to guess about, and the =md= and
+=org= paths get the same treatment on the way out. =list= rows and the =preview=
+body go through it too, since a snippet is transcript text and ends up on an
+fzf line. Almost every document is clean, and the check is one pass with no
+copy when it is.
+
+The zsh side adds the second line of defence: [[agfi:h-agent-session-title]]
+writes a coding cookie as the file's first line --- =# -*- coding: utf-8 -*-=
+for org, an HTML comment for markdown, since =#= there would be a heading ---
+which makes emacs decode as UTF-8 whatever its sniffing would have concluded.
+Measured on a file with a NUL still in it, the cookie alone is enough to render
+the separators correctly. On the reader's side =inhibit-null-byte-detection=
+does the same thing globally, for files this renderer did not write.
 
 * The Codex adapter
 
