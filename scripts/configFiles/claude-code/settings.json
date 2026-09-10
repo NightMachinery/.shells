@@ -89,7 +89,7 @@
   "feedbackSurveyRate": 0,
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
-  "autoCompactWindow": 500000,
+  "autoCompactWindow": 600000,
   "voice": {
     "enabled": true,
     "mode": "tap"
