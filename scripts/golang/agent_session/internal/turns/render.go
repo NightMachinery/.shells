@@ -453,11 +453,21 @@ func (r *renderer) renderTurn(t Turn) {
 	if title == "" && t.Role != "" {
 		title = strings.ToUpper(t.Role[:1]) + t.Role[1:]
 	}
+	// The model leads the heading, the way a subagent's does (`** @Opus5
+	// Explore · Find claude session name storage`): that is the convention
+	// the readme already documents, and the turn heading was the one place
+	// that disagreed. It earns the position by lining up in a column down a
+	// long transcript where models alternate. A single space after the tag,
+	// matching the subagent form, not a `·`.
+	if m := ModelTag(t.Model); m != "" {
+		if title == "" {
+			title = m
+		} else {
+			title = m + " " + title
+		}
+	}
 	if ts := HumanTimestamp(t.TS); ts != "" {
 		title += " " + ts
-	}
-	if m := ModelTag(t.Model); m != "" {
-		title += " · " + m
 	}
 	if d := ShortDuration(t.Duration); d != "" {
 		title += " · " + d

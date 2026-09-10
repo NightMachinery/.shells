@@ -359,7 +359,7 @@ per conversational turn:
 
 #+begin_example
 ,* User [2026-08-10 Mon 10:22]
-,* Assistant [2026-08-10 Mon 10:22]
+,* @Opus5 Assistant [2026-08-10 Mon 10:22]
 ,** Thinking
 ,** Tool Use: Bash · Verify LaTeX delimiters
 ,*** Result: ok
@@ -381,12 +381,15 @@ and all.
 
 Assistant turns carry the model that produced them, as the same =@= tag a
 subagent's heading uses: =@Opus5=, =@Fable5.1=, =@Haiku4.5=, and =@Synthetic=
-for the messages Claude Code writes itself, such as interruption notices.
-Merging stops at a model change, so a switch mid-answer starts a new heading
-instead of hiding inside one --- 8 of 52 local sessions use more than one model,
-and 3 of 297 merged turns would otherwise have spanned two. Annotating
-sub-headings instead was the alternative, but a plain text block has no heading
-to annotate, so a switch landing there would go unrecorded.
+for the messages Claude Code writes itself, such as interruption notices. The
+tag leads the heading, ahead of the role and the timestamp, exactly as it does
+on a subagent's --- one space after it, no separator --- so it lines up in a
+column down a transcript where models alternate. Merging stops at a model
+change, so a switch mid-answer starts a new heading instead of hiding inside
+one --- 8 of 52 local sessions use more than one model, and 3 of 297 merged
+turns would otherwise have spanned two. Annotating sub-headings instead was the
+alternative, but a plain text block has no heading to annotate, so a switch
+landing there would go unrecorded.
 
 * Events
 
