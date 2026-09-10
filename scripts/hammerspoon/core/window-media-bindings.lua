@@ -109,18 +109,30 @@ local function brightnessOutstanding()
     return brightnessSentDelta + brightnessPending
 end
 
---- Where each display is heading, or nil when there is no reading worth
---- trusting -- in which case the target is unknowable, however many presses are
---- outstanding.
-local function brightnessTargets()
+--- The reading, but only while it is still worth trusting. Every consumer has
+--- to ask the same question: a reading too old for the band to show is too old
+--- to suppress a write on the strength of. The clamp below used to test only
+--- that a reading existed, which at the top of the range made a stale 1.0
+--- authoritative enough to swallow the keypress and not authoritative enough
+--- to display -- so the band sat at the ellipsis and never recovered.
+local function brightnessTrusted()
     if not brightnessReading or #brightnessReading == 0 then return nil end
     if (hs.timer.secondsSinceEpoch() - brightnessReadingAt) > hyper_brightness_trust_seconds then
         return nil
     end
+    return brightnessReading
+end
+
+--- Where each display is heading, or nil when there is no reading worth
+--- trusting -- in which case the target is unknowable, however many presses are
+--- outstanding.
+local function brightnessTargets()
+    local reading = brightnessTrusted()
+    if not reading then return nil end
 
     local outstanding = brightnessOutstanding()
     local targets = {}
-    for index, level in ipairs(brightnessReading) do
+    for index, level in ipairs(reading) do
         targets[index] = math.max(0, math.min(1, level + outstanding))
     end
     return targets
@@ -191,8 +203,16 @@ end
 
 local brightnessFlush
 
-brightnessFlush = function()
-    if brightnessInFlight or brightnessPending == 0 then return end
+--- `readIfIdle' asks for a bare reading when there is no delta to send and
+--- nothing the band would trust. Only a keypress passes it; the tail call
+--- below must not, or a read that keeps failing would spin.
+brightnessFlush = function(readIfIdle)
+    if brightnessInFlight then return end
+    if brightnessPending == 0 then
+        --- Nothing to write. Bail out if the band already has a level it would
+        --- show, or if this was not a keypress; otherwise fall through to ask.
+        if brightnessTargets() or not readIfIdle then return end
+    end
 
     brightnessSentDelta = brightnessPending
     brightnessPending = 0
@@ -200,8 +220,12 @@ brightnessFlush = function()
 
     --- One command, one round trip: step, then report where that landed. The
     --- shell's own lock makes the pair atomic against the blackout loop and
-    --- brightness-auto.
-    local cmd = string.format("brightness-inc %.4f ; brightness-get", brightnessSentDelta)
+    --- brightness-auto. With no step to make -- at either end of the range,
+    --- where the clamp takes the whole delta -- it is the read alone, because
+    --- the band still has to be told where the panel is.
+    local cmd = brightnessSentDelta ~= 0
+        and string.format("brightness-inc %.4f ; brightness-get", brightnessSentDelta)
+        or "brightness-get"
     brishz_eval_out_hs(cmd, function(out)
         brightnessInFlight = false
         --- Whatever it carried is either in the reading below or lost with the
@@ -236,13 +260,14 @@ function hyperBrightnessStep(dir)
     --- need forty more before anything moved. Clamped against the first
     --- display: with one panel that is exact, and with several it is the best a
     --- single scalar accumulator can do.
-    if brightnessReading and brightnessReading[1] then
-        local base = brightnessReading[1] + brightnessSentDelta
+    local reading = brightnessTrusted()
+    if reading and reading[1] then
+        local base = reading[1] + brightnessSentDelta
         brightnessPending = math.max(-base, math.min(1 - base, brightnessPending))
     end
 
     brightnessBandShow()
-    brightnessFlush()
+    brightnessFlush(true)
 end
 -- `-all`, so these blank every display rather than just whichever is currently
 -- main. Blanking only the main one leaves the other screen lit, which defeats
