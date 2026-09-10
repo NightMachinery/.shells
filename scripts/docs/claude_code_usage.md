@@ -420,6 +420,56 @@ still attempted, since Claude Code may have refreshed the Keychain entry. The
 script never refreshes the token itself; open `claude` (or run `/login` inside
 it) to refresh.
 
+## GUI-less sessions
+
+In a GUI-detached session — an inbound ssh session, or a `tmux` without
+`pam_reattach` — the Keychain is not reachable, and the way it fails is
+misleading. There are two layers to it, and they were measured rather than
+inferred:
+
+- The session's keychain search list collapses to `/Library/Keychains/System.keychain`
+  alone. The login keychain is not on it, so the lookup genuinely finds nothing
+  and `security` exits 44, `errSecItemNotFound` — indistinguishable from a
+  profile that was never logged in. `security list-keychains` showing only the
+  System keychain is how to recognise this from the inside.
+- Naming the keychain on the command line finds the item at once. `security`
+  takes trailing `[keychain...]` arguments and documents that "if no keychains
+  are specified to search, the default search list is used", so the script now
+  names the user's own keychains explicitly and that first layer is gone. But
+  reading the *secret* then exits 36, `errSecInteractionNotAllowed`: macOS
+  refuses to display the authorization dialog, because the process is not
+  attached to the GUI session.
+
+The keychains are globbed from `~/Library/Keychains` rather than hardcoded, since
+a renamed login keychain is ordinary and a machine may carry several. The
+canonical `login.keychain-db` is forced first regardless, so a stale duplicate in
+a renamed copy cannot win the search.
+
+The second layer is a macOS boundary and not something the script can talk its
+way past. The root retry that rescues `wifi-password-get-darwin` does **not**
+transfer: that item lives in the System keychain, which root opens with no
+dialog, whereas these live in the login keychain, where root has no privilege
+that helps.
+
+**Delegate to the garden.** BrishGarden's worker shells *are* attached to the GUI
+session, and they read the login keychain with no dialog even when the request
+comes from an ssh session. So the wrapper runs the whole report through
+`brishzq.zsh` instead. The whole report, not merely the Keychain read: that way
+the token never leaves the GUI-attached process and only the rendered output or
+the JSON payload comes back. This is proactive rather than a retry, because in a
+GUI-detached session the local read *cannot* succeed — attempting it first would
+buy only a round trip and a misleading error. `claude_code_usage_garden_p`
+selects the behaviour: `auto`, the default, delegates when the shell is an ssh
+session; `y` always delegates; `n` never does. If the garden is not answering the
+wrapper falls through to the local path rather than failing, so a stopped garden
+costs freshness and not the report. Because the garden's stdout is a pipe,
+`--color always` is passed when our own stdout is a terminal, or the command run
+most often would quietly lose its colour.
+
+With the garden unavailable the report still renders, from the freshest cache
+there is, and the reason names the garden rather than claiming the credential is
+missing.
+
 ## Caching
 
 Successful responses are cached in `~/tmp/.claude-usage/<profile>/usage.json`
@@ -476,6 +526,8 @@ the default.
   concurrently.
 - `--profile NAME=CONFIG_DIR` — no env fallback; repeatable, used with `--all`.
   An empty `CONFIG_DIR` means the default profile.
+- `claude_code_usage_garden_p` — a zsh wrapper knob rather than a script flag;
+  `auto`, `y` or `n`. See GUI-less sessions above.
 - `--workers` — no env fallback; 8. Maximum concurrent profile fetches.
 - `--profile-label` — `claude_code_usage_profile_label` /
   `CLAUDE_CODE_USAGE_PROFILE_LABEL`; empty.

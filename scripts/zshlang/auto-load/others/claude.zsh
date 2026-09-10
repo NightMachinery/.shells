@@ -579,6 +579,57 @@ function h-claude-code-usage-argv-common {
     ec "${(F)args}"
 }
 
+function h-claude-code-usage-garden-p {
+    #: Whether to run the report inside the brish garden rather than here.
+    #:
+    #: The garden's worker shells are attached to the GUI session, so they can
+    #: read the login keychain. A GUI-detached session cannot: its keychain
+    #: search list collapses to the System keychain alone, so the lookup finds
+    #: nothing and =security= reports the credential as simply absent. See
+    #: =docs/claude_code_usage.md=.
+    #:
+    #: Proactive rather than a retry, because over ssh the local read *cannot*
+    #: succeed -- attempting it first would only buy a round trip and a
+    #: misleading error.
+    ##
+    local mode="${claude_code_usage_garden_p:-auto}"
+
+    case "${mode}" in
+        y) return 0 ;;
+        n) return 1 ;;
+        auto) isSSH ;;
+        *)
+            ecerr "$0: unknown claude_code_usage_garden_p: ${mode} (auto, y, n)"
+            return 1
+            ;;
+    esac
+}
+
+function h-claude-code-usage-run {
+    #: The one place the script is invoked, so [agfi:claude-code-usage] and
+    #: [agfi:claude-code-usage-all] cannot drift apart and the garden fallback
+    #: covers both.
+    #:
+    #: The whole report is delegated, not just the keychain read, so the token
+    #: never leaves the GUI-attached process: only the rendered report or the
+    #: JSON payload comes back.
+    ##
+    if h-claude-code-usage-garden-p && brishz-alive-p ; then
+        local -a color_opts
+        #: The garden's stdout is a pipe, so =--color auto= would resolve to no
+        #: colour for the command run most often. Placed first, so an explicit
+        #: =--color= from the caller still wins (argparse is last-wins).
+        [[ -t 1 ]] && color_opts=(--color always)
+
+        #: Non-ASCII survives the trip this way; the inline transport mangles
+        #: it, and the report is full of box drawing.
+        brishz_out_file_p=y brishzq.zsh claude_code_usage.py "${color_opts[@]}" "$@"
+        return $?
+    fi
+
+    $proxyenv revaldbg command claude_code_usage.py "$@"
+}
+
 function claude-code-usage {
     #: Shows the usage stats of one Claude Code profile's plan (like the in-app
     #: =/usage=). [agfi:claude-code-usage-all] does every registered profile at
@@ -602,7 +653,7 @@ function claude-code-usage {
 
     #: =script_args= before user args so explicit CLI flags win (argparse last-wins).
     local retcode=0
-    $proxyenv revaldbg command claude_code_usage.py "${script_args[@]}" "$@" || retcode=$?
+    h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
 
     if (( retcode == 0 )) && bool "${notif_p}" ; then
         #: After the report, so the human output is not held up and the
@@ -677,7 +728,7 @@ function claude-code-usage-all {
     done
 
     local retcode=0
-    $proxyenv revaldbg command claude_code_usage.py "${script_args[@]}" "$@" || retcode=$?
+    h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
 
     if bool "${notif_p}" ; then
         #: Not gated on the exit status, unlike the single-profile case: with
