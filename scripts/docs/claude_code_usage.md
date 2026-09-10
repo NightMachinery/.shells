@@ -81,9 +81,10 @@ which tracked theme file the seat uses.
 Work is violet `rgb(108,113,196)` with 🏫, and that violet is also what
 `profileColors` in `golang/agent_session/internal/claude/preview.go` paints
 the seat with in the session pickers, so it keeps one colour across the
-toolchain. The pickers still colour personal sessions blue, since there a
-colour per row is useful and nothing is being restyled; inside the TUI the
-personal seat is left stock.
+toolchain. The pickers colour personal sessions orange, which fell free when
+work took the violet, and reads apart from it better than the blue it replaced.
+That is a list where a colour per row helps you scan and nothing is being
+restyled; inside the TUI the personal seat is left stock.
 
 ### The theme
 

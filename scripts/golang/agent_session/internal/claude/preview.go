@@ -48,8 +48,11 @@ const previewWindow = 400 << 10
 // the session the name got settled, which is nowhere near either end of the
 // file -- 210MB into a 398MB transcript in one measured case -- so a tail scan
 // cannot reach it, and only 5 of 123 local sessions have one at all.
+// The pair is orange and violet rather than blue and violet: work moved to
+// violet when its whole identity did, and blue next to violet is a poor
+// distinction at a glance. Orange was free once work stopped using it.
 var profileColors = map[string]string{
-	".claude":      "90;150;240",
+	".claude":      "235;145;60",
 	".claude-work": "108;113;196",
 }
 
