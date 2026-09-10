@@ -58,9 +58,9 @@ say `UNTRACKED` if an agent has replaced one with a file of its own.
 In order: resolve which agent this is ([agfi:ai-agent-name]) and which session
 ([agfi:h-agent-done-id], which dispatches to the adapter that knows how that
 agent exports its id); find its name from the live registry; write the summary
-plus a header — name, id, transcript, directory, timestamp — to a file under
-`$(h-agent-done-dir)`; find the agent's own process; send it `SIGTERM`; and
-arrange for the report to appear once it is gone.
+plus a header — name, seat, id, transcript, directory, timestamp — to a file
+under `$(h-agent-done-dir)`; find the agent's own process; send it `SIGTERM`;
+and arrange for the report to appear once it is gone.
 
 `--dry-run` does everything except the killing and prints what it resolved,
 which is how the whole path is testable without ending a session.
@@ -78,12 +78,36 @@ back on the screen afterwards. Under tmux that something is
 survives the pane by construction. It waits for the agent's process to go
 (`agent_done_wait_s`, 20s, then `SIGKILL`), and then:
 
-- `respawn-pane -k` replaces the pane's dead shell with a `cat` of the report.
-  This is also what kills the pane: `-k` takes out whatever is still in it.
+- `respawn-pane -k` replaces the pane's dead shell with the script that shows
+  the report (see the next section). This is also what kills the pane: `-k`
+  takes out whatever is still in it.
 - `remain-on-exit` was turned on *before* anything was killed, so when that
   `cat` returns, the pane stays on screen with the report in it and tmux's own
   `Pane is dead (status 0, ...)` line beneath. `kill-pane` would have taken the
   report away along with the pane, which is the opposite of the point.
+
+## Restarting the pane resumes the session
+
+tmux gives a pane one command slot, and `respawn-pane -k` — `prefix-r` in this
+configuration — re-runs whatever the pane last ran. Left alone that would mean
+re-printing the report, so the command the dead pane is left holding is a small
+generated script, `<report>.pane.sh`, that does two different things:
+
+- first run: mark itself as shown, clear the pane, `cat` the report, exit. The
+  pane dies with the summary on it, as before.
+- any later run: `cd` to the session's directory and resume it.
+
+Resuming goes through [agfi:agent-session-resume], which resolves the agent
+from the transcript path and calls that agent's own launcher. So a work session
+comes back on the work seat with its cues repainted, and none of this needs to
+know which agent it just ended. A session whose transcript could not be
+resolved gets an interactive shell instead, which is still better than the same
+report twice. `agent_done_resume_cmd` replaces the resume outright — the escape
+hatch for resuming with extra flags, and how the branch is tested without
+starting a real session.
+
+`remain-on-exit` stays on for that pane afterwards, so the loop holds: quit the
+resumed session and the pane dies visibly again, and `prefix-r` brings it back.
 
 Outside tmux there is no pane to respawn, so the watcher writes the report to
 the terminal directly. Two details make that work. The terminal is found from
@@ -110,6 +134,11 @@ first. Most of those cues are pane options and die with the pane anyway; the
 border row is a *window* option and does not, so without this the window would
 be left with a border line labelling a session that no longer exists — on a
 dead pane, no less.
+
+The seat is not lost by removing the row, only moved: the report's header
+carries a `seat:` line. That is the right place for it once the session is
+over — the border says which session is *live*, and this one is not, but which
+account did the work is worth recording.
 
 ## Two tmux behaviours worth knowing
 
@@ -150,6 +179,8 @@ All dynamically scoped, all read with [agfi:bool] where they are boolean:
   override what would otherwise be detected. These exist for testing, and are
   what let a probe run the whole path against a `sleep` standing in for an
   agent.
+- `agent_done_resume_cmd` — what `prefix-r` runs in the dead pane instead of
+  the default resume.
 - `agent_skills_link_verbose_p` — say which links were made.
 - `agent_skills_src_dir`, `agy_config_dir` — where the tracked skills are, and
   where Antigravity's configuration is.
