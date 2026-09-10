@@ -266,6 +266,15 @@ typeset -ga agents_md_settings=(
     #: Antigravity's shared hooks file (the TUI's /hooks writes here too); see
     #: [agfi:agy-session-tmux-autoname].
     "${HOME}/.gemini/config/hooks.json"$'\t'"${NIGHTDIR}/configFiles/antigravity/hooks.json"
+    #: The per-seat theme. Same slug in both config dirs -- the shared
+    #: settings.json asks for `custom:profile' -- pointing at a different
+    #: tracked file, which is what makes a work session orange and a personal
+    #: one blue. Written by [agfi:claude-themes-link]; listed here because
+    #: Claude Code rewrites its own themes directory when you edit a theme in
+    #: =/theme=, and a symlink replaced by a plain file would silently stop
+    #: tracking.
+    "${HOME}/.claude/themes/profile.json"$'\t'"${NIGHTDIR}/configFiles/claude-code/themes/personal.json"
+    "${HOME}/.claude-work/themes/profile.json"$'\t'"${NIGHTDIR}/configFiles/claude-code/themes/work.json"
 )
 
 function h-agents-md-doctor-settings {
