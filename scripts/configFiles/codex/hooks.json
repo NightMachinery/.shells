@@ -1,5 +1,5 @@
 {
-  "description": "Name the tmux session after the Codex thread; see ~/scripts/docs/tmux-session-rename.md",
+  "description": "Name the tmux session after the Codex thread, and record which kitty window shows it (cmd+shift+o); see ~/scripts/docs/tmux-session-rename.md and ~/scripts/docs/agent-sessions.md",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,12 @@
           {
             "type": "command",
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
+            "async": true,
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-session-register codex >/dev/null 2>&1",
             "async": true,
             "timeout": 10
           }
@@ -19,6 +25,12 @@
           {
             "type": "command",
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash codex-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1",
+            "async": true,
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-session-register codex >/dev/null 2>&1",
             "async": true,
             "timeout": 10
           }
