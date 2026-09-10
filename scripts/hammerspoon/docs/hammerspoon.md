@@ -652,21 +652,24 @@ a reload no longer drops the keyboard lock either. `redisGet`, `redisSet` and
 `redisDel` in `core/redis.lua` return `(value, ok)`, `ok` false meaning redis
 unreachable rather than key absent; if it is down at load, recovery retries.
 
-The knobs are globals in the usual `x = x or default` style:
+The knobs are globals in the usual `x = x or default` style. The values are
+deliberately not repeated here: they are in `core/blackout-lock.lua`, and a
+number written in two places is a number that drifts — this section said a week
+for a while after the code had moved on.
 
-- `blackoutLockEnabled`, default true. When false, the F1 chords black the
-  screen as they always did and install no tap; they still call
-  `blackoutBegin`, so the age rule above holds regardless.
-- `blackoutLockMouse`, default true. Whether clicks and scroll are swallowed.
-- `blackoutLockScreenAfterSeconds`, default one hour. A blackout older than
-  this locks the session before the display is restored. 0 locks first every
-  time; false never does. A lock-first blackout ignores it and always locks.
-- `blackoutLockMaxSeconds`, default a week. An expiry backstop: a blackout
-  older than this is forgotten and ends by way of `blackoutRestore(true)`, the
-  session locked, then the screen back. A week, because the chord, a wake and
-  the shell are the real ways out and a blackout over a holiday must not end
-  by itself; it exists so the lock always ends, on a login screen rather than
-  an unlocked desktop behind black.
+- `blackoutLockEnabled`. When false, the F1 chords black the screen as they
+  always did and install no tap; they still call `blackoutBegin`, so the age
+  rule above holds regardless.
+- `blackoutLockMouse`. Whether clicks and scroll are swallowed.
+- `blackoutLockScreenAfterSeconds`. A blackout older than this locks the
+  session before the display is restored. 0 locks first every time; false
+  never does. A lock-first blackout ignores it and always locks.
+- `blackoutLockMaxSeconds`. An expiry backstop: a blackout older than this is
+  forgotten and ends by way of `blackoutRestore(true)`, the session locked,
+  then the screen back. Deliberately long, because the chord, a wake and the
+  shell are the real ways out and a blackout over a holiday must not end by
+  itself; it exists so the lock always ends, on a login screen rather than an
+  unlocked desktop behind black.
 
 It is driven from the shell too:
 
