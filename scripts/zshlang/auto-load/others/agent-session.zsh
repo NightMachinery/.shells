@@ -92,33 +92,42 @@ function h-agent-session-title {
     #: accounts, and a rendered document said nothing about which was which.
     account="$(h-agent-session-call "${agent}" account "${input}" 2>/dev/null)" || account=''
 
+    #: Which session this is and who ran it are two different facts, so they
+    #: get two lines rather than one run-on string: `Codex session <uuid> ·
+    #: someone@example.com · plus' reads as a single opaque identifier, and the
+    #: account is the half a reader actually recognises. In org that second
+    #: fact is `AUTHOR', which is org's own word for who produced a document
+    #: and is exactly what an account is, so exporters give it its own line
+    #: instead of rendering it as a tail on the subtitle.
     local subtitle="${label} session ${id}"
-    test -n "${account}" && subtitle+=" · ${account}"
 
     if [[ "${syntax}" == org ]] ; then
         #: An org comment, so it is invisible in an exported document.
         ec "# -*- coding: utf-8 -*-"
         if [[ "${name}" == "${id}" ]] ; then
+            #: The title already carries the id, so a subtitle repeating it
+            #: would say nothing.
             ec "#+TITLE: ${label} Session ${id}"
-            test -n "${account}" && ec "#+SUBTITLE: ${account}"
         else
             ec "#+TITLE: ${name}"
             ec "#+SUBTITLE: ${subtitle}"
         fi
+        test -n "${account}" && ec "#+AUTHOR: ${account}"
     else
         #: An HTML comment: `# ...' would be a markdown heading, and emacs
         #: reads the cookie out of the first line whatever its comment syntax.
         ec "<!-- -*- coding: utf-8 -*- -->"
         if [[ "${name}" == "${id}" ]] ; then
             ec "# ${label} Session ${id}"
-            if test -n "${account}" ; then
-                ec
-                ec "${account}"
-            fi
         else
             ec "# ${name}"
             ec
             ec "${subtitle}"
+        fi
+        #: Its own paragraph, for the same reason org gets its own keyword.
+        if test -n "${account}" ; then
+            ec
+            ec "${account}"
         fi
     fi
     ec
