@@ -207,7 +207,10 @@ function wifi-password-get-darwin {
     if (( retcode == 36 )) && bool "${sudo_fallback_p}" ; then
         #: 36 does NOT mean the prompt was denied -- it means macOS refused to
         #: *show* one, because this process is not attached to the GUI session.
-        #: tmux without pam_reattach, ssh, and the brish garden all land here.
+        #: tmux without pam_reattach and ssh land here. The brish garden does
+        #: not: its shells are GUI-attached, and on a System keychain item they
+        #: raise the dialog rather than being refused, so delegating there would
+        #: leave a prompt standing with nobody to answer it.
         #: Root reads the System keychain with no dialog at all, so retry there
         #: rather than telling the user to go find a different terminal.
         ecgray "$0: no GUI authorization possible in this context; retrying as root ..."

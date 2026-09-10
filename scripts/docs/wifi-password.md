@@ -59,14 +59,29 @@ or when it is 802.1X and the credential lives elsewhere.
 
 **36 does not mean the prompt was denied.** It means macOS refused to *show*
 one, because the calling process is not attached to the GUI session. Running
-inside tmux without `pam_reattach`, over ssh, or from the brish garden all land
-here. The message is misleading enough that it is worth stating plainly: the
-network does have a password and you did not do anything wrong.
+inside tmux without `pam_reattach`, or over ssh, lands here. The message is
+misleading enough that it is worth stating plainly: the network does have a
+password and you did not do anything wrong.
 
-Root reads the System keychain with no dialog at all, so on a 36 the function
-retries once as `sudo` rather than telling you to go find a different terminal.
-Turn that off with `wifi_password_get_sudo_fallback_p=n` if you would rather see
-the failure. Both paths were checked to return byte-identical values.
+The brish garden is **not** one of these contexts, and an earlier version of
+this document wrongly said it was. The garden's worker shells are attached to
+the GUI session: they see the full keychain search list, and they read login
+keychain items without a dialog even when the request arrives from an ssh
+session. On a System keychain item like a wifi password the garden is not
+refused either — it *raises* the dialog, which is a different problem. A probe
+through the garden simply blocks, with `SecurityAgent` waiting for an answer,
+until something kills it.
+
+That is precisely why the root fallback stays the default here rather than being
+replaced by delegation. Root reads the System keychain with no dialog at all, so
+on a 36 the function retries once as `sudo` rather than telling you to go find a
+different terminal. Turn that off with `wifi_password_get_sudo_fallback_p=n` if
+you would rather see the failure. Both paths were checked to return
+byte-identical values. Routing this through the garden instead would trade a
+clean answer for a dialog left standing on a machine with nobody in front of
+it — so do not "fix" it that way. Delegation to the garden is the right answer
+for a *login* keychain read, where root does not help;
+`docs/claude_code_usage.md` covers that case.
 
 **128 is a genuine cancel**, reported as such. Keeping all of these apart is what
 stops an undisplayable dialog from looking like an absent password. `security`'s
