@@ -249,6 +249,32 @@ says why this is a subcommand at all.
 - =-color= --- emit ANSI colour. On by default; =-color=false= turns it off, and
   so does a =NO_COLOR= variable in the environment, whatever its value, which is
   the cross-tool convention.
+- =-compact auto|true|false= --- lay the body out for a pane the ordinary two
+  columns do not fit in, which in practice means a phone-sized terminal under
+  Termux or a deliberately narrow preview window. The label column shrinks from
+  fourteen to six and the long labels shrink with it (=last activity= becomes
+  =when=, =last step= becomes =step=, through one table in =internal/preview= so
+  the adapters cannot disagree); the blank lines between the blocks go; the uuid
+  leaves the gray subtitle, keeping the profile or agent and the version, since
+  it is the longest thing there and the row the session was picked from carried
+  it anyway; and the last prompt is cut to 240 runes, because a wrapped wall of
+  text pushes everything above it off the top of such a pane.
+
+  =auto=, the default, asks the environment rather than the terminal: fzf
+  exports the pane's size to the preview process as =FZF_PREVIEW_COLUMNS= and
+  =FZF_PREVIEW_LINES=, and a preview run by hand has the shell's =COLUMNS= and
+  =LINES= to fall back on. Under 70 columns or 15 lines is compact; a variable
+  that is unset or not a positive number says nothing, and with neither
+  readable the ordinary layout is what you get. No ioctl, both because this is
+  a stdlib-only binary and because the preview's stdout is a pipe fzf reads, so
+  measuring it would answer the wrong question.
+
+  The zsh side bakes the decision in when the picker starts, through the knob
+  =agent_session_preview_compact_p= in [[agfi:h-agent-session-preview-cmd]]:
+  unset it emits nothing and =auto= applies, =y= and =n= bake =-compact=true=
+  and =-compact=false=. Same reason the bytes and colour knobs are baked rather
+  than exported --- fzf spawns the preview itself, and a zsh global cannot reach
+  a process it did not start.
 
 =agent_session claude list [flags] <sessions-dir>...= walks the directories for
 =.jsonl= files and writes one TSV line per session, newest first: =epoch=,
@@ -1054,9 +1080,12 @@ that way.
   =-bytes= when set; unset, the binary's own default of 409600 applies.
 - =agent_session_preview_color_p= --- =n= turns off the ANSI colour in the
   preview, baked in as =-color=false=. The callers still pass =--ansi=, which is
-  harmless on plain text. Both knobs are read when the picker starts rather than
-  per cursor move, since fzf spawns the preview itself and a zsh global cannot
-  reach a process it did not start.
+  harmless on plain text. These knobs are read when the picker starts rather
+  than per cursor move, since fzf spawns the preview itself and a zsh global
+  cannot reach a process it did not start.
+- =agent_session_preview_compact_p= --- =y= and =n= bake =-compact=true= and
+  =-compact=false=; unset, nothing is baked and the binary's own =auto= reads
+  the pane size out of the environment fzf hands it.
 - =agent_session_max_block_lines= --- passed to =-max-block-lines=.
 - =agent_session_diff_p= --- =n= disables diff rendering for =Edit=.
 - =agent_session_subagents_p= --- =n= stops inlining subagent transcripts.

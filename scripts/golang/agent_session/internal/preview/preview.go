@@ -9,8 +9,18 @@ import (
 	"time"
 )
 
-// LabelWidth is what row labels are padded to, so the values line up.
-const LabelWidth = 14
+// LabelWidth is what row labels are padded to, so the values line up, and
+// CompactLabelWidth the same for a pane too narrow to spend fourteen columns
+// on saying what a value is.
+const (
+	LabelWidth        = 14
+	CompactLabelWidth = 6
+)
+
+// CompactTextLen is how much of a free-text field -- the last prompt, the last
+// step -- a compact preview shows, in runes. A phone-width pane wraps anything
+// longer into a wall that pushes the rows above it off the top.
+const CompactTextLen = 240
 
 // GrayRGB is the colour of labels and asides.
 const GrayRGB = "170;170;170"
@@ -49,15 +59,38 @@ func VersionLabel(v string) string {
 	return "v" + v
 }
 
+// The short spelling of a label in compact mode. Only the ones that do not
+// already fit the narrow column; a label with no entry here is written as it
+// is. One table for every adapter, so `last activity' cannot become `when' in
+// one preview and `time' in the next.
+var compactLabels = map[string]string{
+	"last activity": "when",
+	"last step":     "step",
+}
+
+// A Layout writes the rows of one preview. Compact is for a pane the ordinary
+// layout does not fit in -- a phone-sized terminal under Termux, or a narrow
+// fzf preview window -- where a fourteen-column label and a blank line between
+// every block cost more than they explain.
+type Layout struct{ Compact bool }
+
 // Row writes one `<label>  <value>  <aside>' line, or nothing when there is no
 // value.
-func Row(w *strings.Builder, c Painter, label, value, aside string) {
+func (l Layout) Row(w *strings.Builder, c Painter, label, value, aside string) {
 	if value == "" {
 		return
 	}
 
+	width := LabelWidth
+	if l.Compact {
+		width = CompactLabelWidth
+		if short := compactLabels[label]; short != "" {
+			label = short
+		}
+	}
+
 	pad := label
-	if n := LabelWidth - len(label); n > 0 {
+	if n := width - len(label); n > 0 {
 		pad += strings.Repeat(" ", n)
 	}
 
@@ -66,6 +99,20 @@ func Row(w *strings.Builder, c Painter, label, value, aside string) {
 		w.WriteString(" " + c.Gray(aside))
 	}
 	w.WriteString("\n")
+}
+
+// Gap separates two blocks of a preview. It writes nothing in compact mode: a
+// blank line is a fifteenth of what such a pane has to show anything in.
+func (l Layout) Gap(w *strings.Builder) {
+	if !l.Compact {
+		w.WriteString("\n")
+	}
+}
+
+// Row writes one row in the ordinary layout, for a caller with no layout of
+// its own to carry.
+func Row(w *strings.Builder, c Painter, label, value, aside string) {
+	Layout{}.Row(w, c, label, value, aside)
 }
 
 // HumanAge is a duration as its single largest unit: `44s', `6m', `3h', `2d'.

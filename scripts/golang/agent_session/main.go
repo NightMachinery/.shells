@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -126,6 +127,12 @@ render flags:
 preview flags:
   -bytes N              how much of the transcript's tail to read (default 409600)
   -color                emit ANSI colour (default true; NO_COLOR also disables it)
+  -compact auto|true|false
+                        lay the body out for a small pane: short labels, no
+                        blank lines, long fields cut short. auto (the default)
+                        reads FZF_PREVIEW_COLUMNS/FZF_PREVIEW_LINES, else
+                        COLUMNS/LINES, and is compact under 70 columns or 15
+                        lines
 
 list flags:
   -cwd DIR              only sessions that ran in DIR
@@ -272,22 +279,74 @@ func cmdPreview(ad session.Adapter, argv []string) error {
 	window := fs.Int64("bytes", 400<<10,
 		"how much of the transcript's tail to read; 0 or less reads all of it")
 	colorP := fs.Bool("color", true, "emit ANSI colour")
+	compactP := fs.String("compact", "auto", "lay the body out for a small pane: auto, true or false")
 	fs.Parse(session.GuardPathArgs(fs, argv))
 
 	if fs.NArg() == 0 {
 		return errors.New("no session file given")
 	}
 
+	compact, err := compactMode(*compactP)
+	if err != nil {
+		return err
+	}
+
 	// NO_COLOR is the cross-tool convention, and costs one lookup to honour.
 	// Its presence is what counts, whatever the value.
 	_, noColor := os.LookupEnv("NO_COLOR")
 
-	out, err := ad.Preview(fs.Arg(0), session.PreviewOpts{Bytes: *window, Color: *colorP && !noColor})
+	out, err := ad.Preview(fs.Arg(0), session.PreviewOpts{
+		Bytes:   *window,
+		Color:   *colorP && !noColor,
+		Compact: compact,
+	})
 	if err != nil {
 		return err
 	}
 	os.Stdout.WriteString(turns.ScrubText(out))
 	return nil
+}
+
+// Below these the ordinary layout does not fit: the rows wrap, and a wrapped
+// row costs two of the few lines there are.
+const (
+	compactColumns = 70
+	compactLines   = 15
+)
+
+// Whether the preview should be laid out for a small pane. `true` and `false`
+// say so outright; `auto` asks the environment, because the pane is not this
+// process's terminal -- its stdout is a pipe fzf reads -- so an ioctl on it
+// would measure the wrong thing even if the stdlib offered one. fzf exports
+// the pane's size to the preview process as FZF_PREVIEW_COLUMNS and
+// FZF_PREVIEW_LINES; a preview run by hand has the shell's COLUMNS and LINES
+// instead. Neither being readable means the ordinary layout, since that is
+// what a terminal usually is.
+func compactMode(flag string) (bool, error) {
+	switch flag {
+	case "auto":
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("-compact: want auto, true or false, got %q", flag)
+	}
+
+	cols := envSize("FZF_PREVIEW_COLUMNS", "COLUMNS")
+	lines := envSize("FZF_PREVIEW_LINES", "LINES")
+	return (cols > 0 && cols < compactColumns) || (lines > 0 && lines < compactLines), nil
+}
+
+// The first of the named variables that holds a positive number, or 0 when
+// none does: unset and unparsable both mean "no idea", not "zero columns".
+func envSize(names ...string) int {
+	for _, n := range names {
+		if v, err := strconv.Atoi(strings.TrimSpace(os.Getenv(n))); err == nil && v > 0 {
+			return v
+		}
+	}
+	return 0
 }
 
 // live-all lists the live sessions of several agents at once, from specs of

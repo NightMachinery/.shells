@@ -98,6 +98,7 @@ type previewData struct {
 
 func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	c := preview.Painter{On: o.Color}
+	l := preview.Layout{Compact: o.Compact}
 	data := scanPreview(path, o.Bytes)
 
 	w := &strings.Builder{}
@@ -110,7 +111,15 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	}
 	w.WriteString(c.BoldFg(profiles.PickerColors[profile], name) + "\n")
 
-	w.WriteString(c.Gray(preview.JoinParts(" · ", id, profile, preview.VersionLabel(data.version))) + "\n\n")
+	// The uuid goes first when the pane is narrow: it is the longest thing on
+	// the line by far, and the least worth reading of the three -- the profile
+	// says which seat this is, and the row it was picked from carried the id.
+	subtitle := preview.JoinParts(" · ", id, profile, preview.VersionLabel(data.version))
+	if o.Compact {
+		subtitle = preview.JoinParts(" · ", profile, preview.VersionLabel(data.version))
+	}
+	w.WriteString(c.Gray(subtitle) + "\n")
+	l.Gap(w)
 
 	// Every row is skipped when it has nothing to say, so a session predating a
 	// field does not get a line of blanks for it.
@@ -133,16 +142,21 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	mode := preview.JoinParts(" · ", data.permMode, data.mode)
 	where := preview.Annotate(turns.AbbrevHome(data.cwd), " @ ", data.branch)
 
-	preview.Row(w, c, "last activity", when, aside)
-	preview.Row(w, c, "model", model, "")
-	preview.Row(w, c, "mode", mode, "")
-	preview.Row(w, c, "cwd", where, "")
+	l.Row(w, c, "last activity", when, aside)
+	l.Row(w, c, "model", model, "")
+	l.Row(w, c, "mode", mode, "")
+	l.Row(w, c, "cwd", where, "")
 
-	w.WriteString("\n" + c.Bold("last prompt") + "\n")
-	if data.prompt == "" {
+	l.Gap(w)
+	w.WriteString(c.Bold("last prompt") + "\n")
+	prompt := data.prompt
+	if o.Compact {
+		prompt = turns.Truncate(prompt, preview.CompactTextLen)
+	}
+	if prompt == "" {
 		w.WriteString("(none in the scanned tail)\n")
 	} else {
-		w.WriteString(data.prompt + "\n")
+		w.WriteString(prompt + "\n")
 	}
 
 	return w.String(), nil

@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"agent_session/internal/preview"
+	"agent_session/internal/session"
 )
 
 func TestProfileOf(t *testing.T) {
@@ -42,6 +45,49 @@ func writePreviewTranscript(t *testing.T, name string, lines []string) string {
 		t.Fatalf("write: %v", err)
 	}
 	return p
+}
+
+// What compact mode is for: a pane that cannot fit the ordinary layout. The
+// uuid leaves the subtitle, the labels shrink, and the blank lines go -- but
+// nothing a reader actually needs is lost.
+func TestPreviewCompact(t *testing.T) {
+	const uuid = "87e1476d-1111-4111-8111-87e1476d0000"
+	p := writePreviewTranscript(t, uuid+".jsonl", []string{
+		previewMsgLine("snuggly-orbit", "2026-09-08T10:00:00.000Z", "/tmp/a", "main", "2.1.1", "high", "claude-opus-5"),
+		`{"type":"ai-title","aiTitle":"a session with a name"}`,
+		`{"type":"last-prompt","lastPrompt":"` + strings.Repeat("x", 400) + `"}`,
+	})
+
+	full, err := Adapter{}.Preview(p, session.PreviewOpts{Bytes: previewWindow, Color: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	compact, err := Adapter{}.Preview(p, session.PreviewOpts{Bytes: previewWindow, Color: false, Compact: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(full, uuid) || !strings.Contains(full, "last activity") {
+		t.Errorf("the ordinary layout changed:\n%s", full)
+	}
+	if strings.Contains(compact, uuid) {
+		t.Errorf("compact still carries the uuid:\n%s", compact)
+	}
+	if !strings.Contains(compact, "when ") || strings.Contains(compact, "last activity") {
+		t.Errorf("compact should label the time `when':\n%s", compact)
+	}
+	if strings.Contains(compact, "\n\n") {
+		t.Errorf("compact should have no blank lines:\n%s", compact)
+	}
+	// Everything that says what the session is stays.
+	for _, want := range []string{"a session with a name", "opus-5 · high effort", "/tmp/a @ main", "last prompt"} {
+		if !strings.Contains(compact, want) {
+			t.Errorf("compact lacks %q:\n%s", want, compact)
+		}
+	}
+	if strings.Contains(compact, strings.Repeat("x", preview.CompactTextLen+1)) {
+		t.Errorf("compact should cut the prompt to %d runes:\n%s", preview.CompactTextLen, compact)
+	}
 }
 
 func TestScanPreviewKeepsTheNewestOfEach(t *testing.T) {
