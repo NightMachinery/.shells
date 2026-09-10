@@ -268,10 +268,10 @@ typeset -gA claude_code_profile_labels=(
 #: =golang/agent_session/internal/claude/preview.go=, which paints the session
 #: pickers: personal blue, work violet.
 #:
-#: The personal seat is commented out because nothing derives a colour for it
-#: -- it takes no tint and no border -- and its blue is still carried by its
-#: theme file and by the picker's own table. A seat with no entry simply has
-#: no colour to give tmux.
+#: The personal seat is commented out because nothing derives a colour for it:
+#: it takes no tint and no border, and its theme is the stock one, so the only
+#: place it is still coloured is the picker's own table, which keeps its blue.
+#: A seat with no entry simply has no colour to give tmux.
 typeset -gA claude_code_profile_colors=(
     # default  '90;150;240'
     work     '108;113;196'
@@ -315,6 +315,11 @@ typeset -gA claude_code_profile_borders=(
 #: is deliberately the same in every config dir, so the one shared
 #: settings.json can say `"theme": "custom:profile"' and still give each seat
 #: its own palette; see [agfi:claude-themes-link].
+#:
+#: Only =work.json= overrides any colours. =personal.json= is the stock
+#: `light-daltonized' under a name, and exists only because the shared slug has
+#: to resolve in both config dirs: the default seat is the baseline the
+#: terminal is already set up for, and is recognised by being left alone.
 typeset -gA claude_code_profile_themes=(
     default  personal
     work     work
