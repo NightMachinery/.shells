@@ -256,11 +256,25 @@ one pane, since in a single-pane window it identifies nothing.
 
 The label is a *pane* option, since one tmux session can host several seats in
 several panes. The border row and its format are *window* properties, so they
-are set only when the window has no `pane-border-format` of its own to lose,
-and are left in place afterwards: clearing them would blank the label of any
-other labelled pane. Panes with no label read `SHELL`. A pane that already
-carried a label keeps it, since only a label this launch introduced is taken
-away again.
+are set only when the window has no `pane-border-format` of its own to lose.
+Panes with no label read `SHELL`. A pane that already carried a label keeps it,
+since only a label this launch introduced is taken away again.
+
+On the way out the label goes, and so does the row. It used to be left behind,
+on the grounds that clearing a window option would blank the label of any other
+labelled pane -- true, but it meant a finished session left the window with a
+border line reading `SHELL`, which costs a line and says nothing. So the row is
+now removed too, under two conditions: this launch is the one that turned it on
+(recorded in the window option `@claude_border_row`), and no other pane in the
+window still carries a label. With a second seat open in the same window the
+row therefore stays, and it goes when the last of them ends.
+
+Both conditions are checked by [agfi:h-claude-tmux-label-row-restore], which
+the launcher calls on the way out and [agfi:agent-done] calls before it kills
+the pane -- the launcher's own cleanup never runs in that case, and a *dead*
+pane still labelled `WORK` would be the worst of the three outcomes. The row is
+unset rather than set to `off`, so the window goes back to whatever the session
+or the global default says.
 
 ### Where the seats are defined
 

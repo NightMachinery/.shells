@@ -113,7 +113,10 @@ function claude {
             h-claude-tint-reset || true
         fi
         if bool "${label_p}" && test -z "${label_had}" ; then
+            #: The pane's own label first: the row is only taken away once no
+            #: pane in the window still needs it, and this pane no longer does.
             h-claude-tmux-label-unset || true
+            h-claude-tmux-label-row-restore || true
         fi
         if bool "${border_p}" && test -z "${border_had}" ; then
             h-claude-tmux-border-unset || true
@@ -296,6 +299,10 @@ function claude-themes-link {
 #: pane-border format reads. A pane option, so it describes one pane and not
 #: the session, which may hold several seats at once.
 typeset -g claude_tmux_label_option='@claude_profile'
+#: Set on the *window* when [agfi:h-claude-tmux-label-set] turns the border row
+#: on, so [agfi:h-claude-tmux-label-row-restore] can tell a row we introduced
+#: from one the window already had.
+typeset -g claude_tmux_label_row_option='@claude_border_row'
 
 function h-claude-tmux-label-set {
     : "labels this tmux pane with the profile and shows the border row"
@@ -328,6 +335,55 @@ function h-claude-tmux-label-set {
     command tmux set-option -w -t "${TMUX_PANE}" pane-border-status top 2>/dev/null
     command tmux set-option -w -t "${TMUX_PANE}" pane-border-format \
         "#[bold] #{?#{${claude_tmux_label_option}},#{${claude_tmux_label_option}},SHELL} #[default]#{?#{>:#{window_panes},1},#{pane_index} ,}" 2>/dev/null
+
+    #: Remembered on the window, not in a shell variable: whoever takes the row
+    #: away again may be a different shell entirely ([agfi:agent-done] runs
+    #: from the agent's tool shell, not from this launcher).
+    command tmux set-option -w -t "${TMUX_PANE}" "${claude_tmux_label_row_option}" 1 2>/dev/null
+}
+
+function h-claude-tmux-label-row-restore {
+    : "hides the pane border row again, if we are the ones who showed it"
+    #: The row and its format are *window* options, so they outlive the pane
+    #: the session ran in: without this, a finished session leaves the window
+    #: with a border line that has nothing left to say and reads `SHELL'.
+    #:
+    #: Only removed when we turned it on -- recorded by
+    #: [agfi:h-claude-tmux-label-set] -- and when no other pane in the window
+    #: still carries a label, since every labelled pane in the window is drawn
+    #: by this one format. Unset rather than set to `off', so the window goes
+    #: back to whatever the session or the global default says.
+    ##
+    test -n "${TMUX_PANE}" || return 0
+
+    local ours
+    ours="$(command tmux show-options -wqv -t "${TMUX_PANE}" "${claude_tmux_label_row_option}" 2>/dev/null)"
+    test -n "${ours}" || return 0
+
+    local pane label
+    for pane in ${(f)"$(command tmux list-panes -F '#{pane_id}' -t "${TMUX_PANE}" 2>/dev/null)"} ; do
+        [[ "${pane}" == "${TMUX_PANE}" ]] && continue
+        label="$(command tmux show-options -pqv -t "${pane}" "${claude_tmux_label_option}" 2>/dev/null)"
+        #: Another session is still using the row; leave it and its format be.
+        test -n "${label}" && return 0
+    done
+
+    command tmux set-option -wu -t "${TMUX_PANE}" pane-border-format 2>/dev/null || true
+    command tmux set-option -wu -t "${TMUX_PANE}" pane-border-status 2>/dev/null || true
+    command tmux set-option -wu -t "${TMUX_PANE}" "${claude_tmux_label_row_option}" 2>/dev/null || true
+}
+
+function h-claude-tmux-cues-teardown {
+    : "undoes every cue [agfi:claude] painted, for a session that is being killed"
+    #: [agfi:agent-done] calls this instead of relying on the launcher's
+    #: `always' block, which a killed pane never reaches. Unconditional on
+    #: purpose: the pane is about to go, so restoring a pane option somebody
+    #: else set is moot, while leaving the window's border row behind is not.
+    ##
+    h-claude-tmux-label-unset || true
+    h-claude-tmux-border-unset || true
+    h-claude-tmux-label-row-restore || true
+    h-claude-tint-reset || true
 }
 
 function h-claude-tmux-label-unset {
