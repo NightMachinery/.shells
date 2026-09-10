@@ -421,6 +421,22 @@ holding the key past either end would run it off to -0.5 while the panel sat at
 clamps against the first display, which is exact for one panel and the best a
 single scalar accumulator can do for several.
 
+The clamp has to ask the same trust question the band does, and for a while it
+did not: it tested only that a reading existed. At the top of the range that
+was enough to swallow the keypress — the clamp took the whole delta, so there
+was nothing left to send — while the band, applying the trust window, refused
+to show the same reading. And since the read travelled as the tail of a write,
+suppressing the write suppressed the refresh that would have resolved the
+staleness. The result was a band stuck on `…` that never recovered, because
+every further press clamped to nothing in exactly the same way. Both halves are
+fixed: one trust test serves the band and the clamp, and a step with no delta
+left to send still issues the bare `brightness-get`, because the band has to be
+told where the panel is whether or not it moved.
+
+That the band's lifetime is shorter than the trust window is why this only ever
+showed up at the rail. Anywhere else a press has a delta to send, so the read
+comes along with it and the reading is fresh again before the band expires.
+
 The band is raised with `peek = false`. Holding hyper normally fades every
 alert band to a whisper so it stops covering whatever you are about to act on —
 but these keys deliberately leave hyper entered so the level can be stepped
