@@ -141,19 +141,37 @@ typeset -ga color_background_palette_order=(
 )
 
 function h-color-tty-write {
-    : "writes to the controlling terminal, falling back to stdout"
-    #: Run as `! color-background ...' inside an agent session, our stdout is a
+    : "sends escapes to the terminal itself, not to our stdout"
+    #: Run as `! color-background ...' inside an agent session, stdout is a
     #: pipe the agent reads, so an escape written there is captured and shown
-    #: as text instead of reaching the terminal. The controlling terminal is
-    #: still the pane, and stays writable even when stdout is not a tty.
+    #: as text instead of reaching the terminal. Three channels, in order:
+    #:
+    #: 1. =/dev/tty=, the controlling terminal, which is right for any ordinary
+    #:    interactive shell. Note the test is an *open*, not `test -w': access(2)
+    #:    happily reports /dev/tty writable in a process that has no controlling
+    #:    terminal, and the open then fails with ENXIO ("device not configured").
+    #:    That is exactly what an agent's shell gets.
+    #: 2. The tmux pane's own tty. Bytes written there enter the pane's output
+    #:    stream, so tmux parses them as if the program in the pane had printed
+    #:    them -- which is the whole point, since OSC 11 under tmux applies to
+    #:    the pane that emitted it.
+    #: 3. stdout, so a plain pipeline still sees something rather than nothing.
     ##
     local text="${1}"
 
-    if test -w /dev/tty ; then
-        printf '%s' "${text}" > /dev/tty
-    else
-        printf '%s' "${text}"
+    if { printf '%s' "${text}" > /dev/tty } 2>/dev/null ; then
+        return 0
     fi
+
+    if test -n "${TMUX_PANE}" ; then
+        local pane_tty
+        pane_tty="$(command tmux display-message -p -t "${TMUX_PANE}" '#{pane_tty}' 2>/dev/null)"
+        if test -n "${pane_tty}" && { printf '%s' "${text}" > "${pane_tty}" } 2>/dev/null ; then
+            return 0
+        fi
+    fi
+
+    printf '%s' "${text}"
 }
 
 function color-background {
