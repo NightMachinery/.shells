@@ -261,7 +261,7 @@ func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) 
 		}
 
 		steps := readSteps(f.path)
-		last := lastStamp(steps)
+		last := lastStamp(steps, o.UserOnly())
 		if last.IsZero() {
 			if st, err := os.Stat(f.path); err == nil {
 				last = st.ModTime()
@@ -288,9 +288,15 @@ func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) 
 	return out, nil
 }
 
-func lastStamp(steps []step) time.Time {
+// When the conversation last moved: the newest step's time. With `userOnly`,
+// the newest step the user is the source of, which is the last thing they
+// typed -- everything after it is the agent working.
+func lastStamp(steps []step, userOnly bool) time.Time {
 	var last time.Time
 	for i := len(steps) - 1; i >= 0; i-- {
+		if userOnly && steps[i].Source != sourceUser {
+			continue
+		}
 		if t, err := time.Parse(time.RFC3339, steps[i].CreatedAt); err == nil {
 			if t.After(last) {
 				last = t

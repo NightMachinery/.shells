@@ -78,7 +78,7 @@ func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) 
 			info.Rel = filepath.Join(l, info.Rel)
 		}
 
-		last := lastTimestamp(f.path)
+		last := lastTimestamp(f.path, o.UserOnly())
 		if last.IsZero() {
 			if st, err := os.Stat(f.path); err == nil {
 				last = st.ModTime()
@@ -138,4 +138,20 @@ func firstUserText(path string) string {
 		return text
 	}
 	return ""
+}
+
+// Whether a record is a message the user typed, which is what `-last-by user`
+// dates a thread by. The same three tests [firstUserText] makes: the model's
+// own turns and the tool traffic are `response_item`s too, and the context
+// Codex injects ahead of a prompt is a user message like any other.
+func typedPrompt(l line) bool {
+	if l.Type != "response_item" {
+		return false
+	}
+	var it responseItem
+	if json.Unmarshal(l.Payload, &it) != nil || it.Type != "message" || it.Role != "user" {
+		return false
+	}
+	text := partsText(it.Content)
+	return strings.TrimSpace(text) != "" && !scaffoldText(text)
 }
