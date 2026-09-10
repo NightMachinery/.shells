@@ -119,8 +119,8 @@ whether a seam is in the right place.
 - =internal/claude= --- the code that used to be the whole program, as the first
   adapter: the record model, =conversationRecords=, =buildTurns= and
   =appendEvent=, the subagent loader, the tail scan behind =list=, the preview
-  scan, and =live= over =claude agents --json=. It implements =session.Adapter=,
-  and nothing outside =main.go= imports it.
+  scan, and =live= over the session records in =<config-home>/sessions/=. It
+  implements =session.Adapter=, and nothing outside =main.go= imports it.
 - =internal/codex= --- the Codex adapter: =rollout.go= for the record model and
   the input normalising, =index.go= for the append-only name index, =list.go=,
   =preview.go=, and =live.go= over the writer locks.
@@ -380,8 +380,12 @@ Where the caller has no such list, =Holders= asks about the files alone, as
 before.
 
 The measured result: three sequential per-agent calls, about 950ms, became one
-=live-all= at about 205ms, of which =claude agents --json= is 190ms. The rest is
-now noise around Claude Code's own answer.
+=live-all= at about 205ms, of which 190ms was =claude agents --json=, one call
+per config home. Reading Claude Code's own session records instead of running
+that CLI removed the last of it: =live-all= now measures about 105ms, and a
+=ps= over some 1500 processes on its own measures about 105ms too. The shared
+process table is the whole remaining cost, which is exactly what =live-all=
+exists to pay once.
 
 * Document structure
 
@@ -845,13 +849,17 @@ conversation that outgrows the assumption.
 =live= is what lets the kitty hotkey answer "which session is in this window",
 and the three agents can promise very different amounts.
 
-Claude Code is authoritative: =claude agents --json= answers the question
-directly, and the adapter asks every config home in parallel. Codex is exact
-but undocumented: the writer locks say which process holds which thread, and
-the ancestry walk says which pid a terminal can see. Antigravity is a pairing:
-a running =agy= process's cwd is looked up in =cache/last_conversations.json=,
-the same map =agy= itself uses to resume in a directory, which is right whenever
-a workspace hosts one conversation at a time.
+Claude Code publishes the answer: every running session writes
+=<config-home>/sessions/<pid>.json= and removes it on exit, so the adapter
+reads those files rather than asking the CLI. A crash can leave a record
+behind, so each one is checked against its pid before it becomes a row.
+
+Codex is exact but undocumented: the writer locks say which process holds
+which thread, and the ancestry walk says which pid a terminal can see.
+Antigravity is a pairing: a running =agy= process's cwd is looked up in
+=cache/last_conversations.json=, the same map =agy= itself uses to resume in a
+directory, which is right whenever a workspace hosts one conversation at a
+time.
 
 The rule all three follow is that a row names only a process that was really
 traced. A session that cannot be paired to one gets no row at all rather than a
@@ -1189,7 +1197,7 @@ five things, in order of how sure each one is:
    panes. That column names the session the process actually sits in, found by
    walking its ancestry to a pane, so it stays right across the renames the
    autoname hooks do on every prompt. This is the path an agent takes while its
-   hooks are still untrusted, and it costs the full listing: about 235ms.
+   hooks are still untrusted, and it costs the full listing: about 160ms.
 4. The window shows an agent's own view, =claude agents= or =claude attach=. The
    view sets the window title to the attached session's name, at times with a
    status glyph in front, and the title is matched against the live sessions'
@@ -1220,28 +1228,34 @@ or the honest =-=. The rest of this section is how Claude's own row is found,
 which is the most involved of the three; the Codex and Antigravity sections
 above cover theirs.
 
-What counts as live for Claude Code comes from =claude agents --json=, the
-supported interface and what the agent view itself shows. This is decided inside
-Claude Code's daemon and nothing on disk reproduces it: an assigned background
-session and an idle pre-forked spare share the identical argv, so filtering
-session records by liveness ourselves would drop real sessions or surface
-spares. So the listing stays the authority.
+What counts as live for Claude Code comes from its own session records: a
+running session writes =<config-home>/sessions/<pid>.json= --- its pid, session
+id, name, cwd, kind, busy/idle status and the tmux location it launched in ---
+and removes the file when it exits. Compared against =claude agents --json= on
+this machine the two agree exactly: the CLI's only extra entries are finished
+background agents that carry no pid, which never had a row anyway.
 
-It is scoped to one config home, and each call costs about 180ms. Because the
-homes are independent, =agent_session claude live= runs them concurrently and
-does the record reads and transcript derivation in the same process, which
-roughly halves the wall time and removes a dozen shell forks;
+The records are read directly, and the CLI is not run at all. That is not us
+second-guessing liveness from the process table, which we still refuse to do:
+an assigned background session and an idle pre-forked spare share the identical
+argv, so nothing in =ps= tells them apart. It is Claude Code's own statement
+that the session exists. The one case a record gets wrong is a session killed
+without cleanup, which leaves the file behind, so every record is checked
+against its pid --- signal 0, which asks the kernel and costs nothing --- and a
+dead one is dropped.
+
+This is what took the listing from 170ms per config home to a few file reads.
+=agent_session claude live= reads every home it is given and derives the
+transcript paths in the same process, which also removes a dozen shell forks;
 =h-claude-session-live-list= calls it, falling back to an identical-output
 shell path (=h-claude-code-session-live-list-sh=) when the binary is not built;
 =h-agent-session-live-list= is what concatenates that with the other agents'
-rows. The
-personal profile is asked with =CLAUDE_CONFIG_DIR= unset, since Claude Code
-hashes a set value into its keychain entry name. The transcript path is
-derived rather than read: the session's id under the projects directory named
-after its cwd, in the same config home, with every non-alphanumeric character
-of the cwd turned into =-= --- slashes, dots, spaces and underscores alike,
-which is the rule Claude Code uses. The resolution takes about 300ms end to
-end, most of it that one parallelised listing.
+rows. The status column comes straight out of the record: =busy= or =idle=.
+The transcript path is derived rather than read: the session's id under the
+projects directory named after its cwd, in the same config home, with every
+non-alphanumeric character of the cwd turned into =-= --- slashes, dots,
+spaces and underscores alike, which is the rule Claude Code uses. What is left
+of the resolution is the shared process table, not Claude Code.
 
 The Go probe is by =command -v=, a real PATH lookup, not by the shell's command
 hash: the garden's hash is stale for a binary installed after it started, and
@@ -1565,8 +1579,8 @@ Variables:
   for an unset =XDG_STATE_HOME=. The old =claude-code-sessions= is still read.
 - =agent_session_live_list_cache= --- a listing to reuse instead of asking
   every agent again; set it (a =local= suffices) around several lookups. It
-  matters more now than it did: one lookup costs =claude agents --json= per
-  config home, an =lsof= over the Codex locks and a process listing.
+  matters more now than it did: one lookup costs an =lsof= over the Codex
+  locks and a process listing.
 - =agent_session_live_rows_scope= --- =windows= (default) or =all=; see
   the next section.
 - =agent_session_kitty_socket_glob= --- defaults to

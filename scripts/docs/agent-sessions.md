@@ -95,16 +95,18 @@ it. A hooked tmux window now resolves in 16ms instead of 365ms, because nothing
 is listed at all: one `tmux list-clients`, one `tmux list-sessions`, and the
 transcript path is in hand. A session the hooks never recorded -- a Codex whose
 hook handlers have not been trusted yet, say -- still falls through to the live
-listing and takes about 235ms, which is the honest cost of the question.
+listing and takes about 160ms, which is the honest cost of the question.
 
 When the listing is genuinely needed, it is one call rather than three.
 `agent_session live-all claude=<root> codex=<root> agy=<root>` runs the three
 adapters concurrently and shares one process table, one `lsof` and one
 `tmux list-panes` between them; an agent that fails contributes no rows instead
 of failing the batch. Three sequential per-agent calls cost about 950ms, mostly
-paid three times over for the same process listing. Batched it is about 205ms,
-of which `claude agents --json` is 190ms -- so the remaining cost is Claude's
-own, not ours.
+paid three times over for the same process listing. Batched that came to about
+205ms, of which `claude agents --json` was 190ms; reading Claude Code's own
+session records instead of running that CLI took the batch to about 105ms,
+which is what one `ps` over some 1500 processes costs on its own. Sharing that
+one listing is now the whole of what batching buys.
 
 Where a caller already knows which transcripts it cares about, it says so:
 `list -only <transcript>` (repeatable) resolves those paths directly instead of
@@ -206,8 +208,13 @@ installed shows up as an agent whose rows are simply missing.
 
 **Claude Code** writes one JSONL per session under
 `~/.claude*/projects/<mangled-cwd>/<uuid>.jsonl`, one projects directory per
-profile. Liveness is authoritative: `claude agents --json` answers it, and the
-Go side asks every config home in parallel.
+profile. Liveness comes from Claude Code's own records: a running session
+writes `~/.claude*/sessions/<pid>.json` -- pid, session id, name, cwd, kind,
+busy/idle status, the tmux location it launched in -- and removes it on exit.
+The Go side reads those files and drops any record whose pid is no longer
+alive, which is the one thing the file cannot say for itself after a crash.
+Measured against `claude agents --json`, the two agree exactly, minus the
+CLI's finished background agents that carry no pid.
 
 **Codex** writes a rollout per thread at
 `~/.codex/sessions/YYYY/MM/DD/rollout-<local-timestamp>-<uuid>.jsonl`. Names

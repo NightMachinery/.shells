@@ -353,11 +353,14 @@ func envSize(names ...string) int {
 // the form `<agent>=<root>` -- repeated for an agent with several roots.
 //
 // One process rather than one per agent, and the adapters run concurrently,
-// because the cost here is external commands: `claude agents --json` takes
-// 190ms, tracing the Codex locks 40ms, the process table 115ms. Run in
-// sequence from zsh that was near a second before anything appeared on
-// screen; run together, sharing one process table and one `tmux list-panes`
-// (see [proc.ListShared]), it is about a quarter of that.
+// because the cost here is external commands: the process table 115ms,
+// tracing the Codex locks 40ms. Run in sequence from zsh that was near a
+// second before anything appeared on screen, most of it the same process
+// listing paid for three times over; run together, sharing one process table
+// and one `tmux list-panes` (see [proc.ListShared]), it is a fraction of that.
+// The sharing is the whole point now that no adapter shells out to its agent:
+// Claude's rows come from its session records (see [claude.Adapter.Live]),
+// which used to cost a 190ms `claude agents --json` per config home.
 //
 // An agent that fails contributes no rows rather than failing the call, which
 // is what the zsh loop did before: a host without Codex installed is not an
