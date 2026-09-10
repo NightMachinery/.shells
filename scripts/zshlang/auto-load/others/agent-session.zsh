@@ -1914,25 +1914,6 @@ function h-agent-session-tmux-rows {
         tnames[${line%%$'\t'*}]="${line#*$'\t'}"
     done
 
-    #: Claude reports the session name it was *launched* in, read back out of
-    #: its own `sessions/<pid>.json' record, and the autoname hooks rename on
-    #: every prompt: measured while writing this, five of seventeen live
-    #: sessions named a tmux session that no longer existed. The pane an agent
-    #: runs in does not move, so a name that misses is resolved through the
-    #: process tree instead -- one `list-panes' and one `ps' shared by every
-    #: row, rather than one of each per row.
-    local -A pane_ids parents
-    for line in ${(f)"$(command tmux list-panes -a -F '#{pane_pid}'$'\t''#{session_id}' 2>/dev/null)"} ; do
-        test -n "${line}" || continue
-        pane_ids[${line%%$'\t'*}]="${line#*$'\t'}"
-    done
-    local -a pf
-    for line in ${(f)"$(command ps -Ao pid=,ppid= 2>/dev/null)"} ; do
-        pf=( ${=line} )
-        (( ${#pf} == 2 )) || continue
-        parents[${pf[1]}]="${pf[2]}"
-    done
-
     local -a root_agents
     root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
 
@@ -1940,7 +1921,6 @@ function h-agent-session-tmux-rows {
     live=( ${(f)agent_session_live_list_cache} )
 
     local row t tname id name label rows=''
-    local -i p guard
     for row in "${live[@]}" ; do
         f=( "${(@ps:\t:)row}" )
 
@@ -1951,27 +1931,21 @@ function h-agent-session-tmux-rows {
         t="${f[5]}"
         test -n "${t}" && test -e "${t}" || continue
 
+        #: The live listing names the tmux session the agent *sits in*, not
+        #: the one it was launched in: every adapter walks the process up to
+        #: the pane holding it, so this name is current however often the
+        #: autoname hooks have renamed the session. A name that still matches
+        #: nothing -- a session gone between the two calls -- is skipped. See
+        #: [agfi:h-agent-session-live-list] and `tmuxOf' in the Go adapter,
+        #: =golang/agent_session/internal/claude/live.go=.
         id="${ids[${tname}]}"
-        if test -z "${id}" ; then
-            #: A stale name; walk the agent process up to the pane holding it.
-            #: The guard is for a parent chain that loops, which a reparented
-            #: process can produce while the table is being read.
-            p="${f[1]}"
-            guard=0
-            while test -n "${p}" && (( p > 1 && guard++ < 64 )) ; do
-                if test -n "${pane_ids[${p}]}" ; then
-                    id="${pane_ids[${p}]}"
-                    break
-                fi
-                p="${parents[${p}]}"
-            done
-        fi
         test -n "${id}" || continue
 
-        #: The tmux name, as the person knows the session, but from tmux rather
-        #: than from the row: the recorded one may be several renames old. The
-        #: agent's own name goes after it when it adds anything -- the hooks
-        #: name a session after its agent session, so usually it does not.
+        #: The name is taken back off the id rather than kept from the row, so
+        #: the label is what tmux calls the session at this instant.
+        #: The agent's own name goes after it when it adds anything -- the
+        #: hooks name a session after its agent session, so usually it does
+        #: not.
         tname="${tnames[${id}]:-${tname}}"
         label="${tname}"
         name="${f[3]}"

@@ -177,10 +177,11 @@ hooks make routine: they rename on every prompt, so a name captured from
 running an agent) and [agfi:tmux-alive-p] all go through it now; use
 [agfi:tmux-session-name-of] to turn an id back into something a human reads.
 
-`ffta` is where a rename bites hardest, since the tmux name a Claude session
-reports is the one it was launched under: see the tmux picker section of
-`./agent-sessions.md` for how a name that no longer names anything is resolved
-through the pane instead.
+`ffta` is where a rename bit hardest, because the tmux name a Claude session
+reported was the one it was launched under, and so went stale at the first
+prompt. The live listing now names the session the process *sits in*, found by
+walking its pid up to the pane holding it; see the tmux picker section of
+`./agent-sessions.md`.
 
 One more helper lives beside those: [agfi:tmux-session-goto], the verb `fft`
 now uses. `attach-session` refuses to nest, so a bare `tmux a -t` from inside
