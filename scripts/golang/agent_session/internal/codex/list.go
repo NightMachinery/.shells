@@ -35,10 +35,18 @@ func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) 
 
 	type found struct{ path, root string }
 	var files []found
-	for _, root := range roots {
-		matches, _ := filepath.Glob(filepath.Join(root, "*", "*", "*", "rollout-*.jsonl"))
-		for _, p := range matches {
-			files = append(files, found{path: p, root: root})
+	if len(o.Only) > 0 {
+		// The paths are known, so the date tree is not swept. See
+		// [session.ListOpts.Only].
+		for _, pair := range session.Under(o.Only, roots) {
+			files = append(files, found{path: pair[0], root: pair[1]})
+		}
+	} else {
+		for _, root := range roots {
+			matches, _ := filepath.Glob(filepath.Join(root, "*", "*", "*", "rollout-*.jsonl"))
+			for _, p := range matches {
+				files = append(files, found{path: p, root: root})
+			}
 		}
 	}
 	if len(files) == 0 {

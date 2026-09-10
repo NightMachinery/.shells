@@ -97,6 +97,11 @@ type ListOpts struct {
 	SnippetLen int
 	NameLen    int
 	Jobs       int
+	// List exactly these transcripts instead of walking the roots. What the
+	// live pickers want: they have a handful of paths in hand and need the
+	// columns for those, and walking a corpus of a thousand-odd sessions to
+	// annotate twenty of them was most of what a picker cost.
+	Only []string
 }
 
 // PreviewOpts are the `preview` flags.
@@ -136,6 +141,27 @@ var ErrUnsupported = errors.New("not supported for this agent")
 func Fatal(msg string) {
 	fmt.Fprintln(os.Stderr, "agent_session: "+msg)
 	os.Exit(1)
+}
+
+// Under is the roots each of the given paths sits under, as pairs, keeping the
+// order the paths were given in. A path under none of the roots is left out,
+// since the columns are relative to a root. For [ListOpts.Only].
+func Under(paths, roots []string) [][2]string {
+	var out [][2]string
+	for _, p := range paths {
+		abs := p
+		if a, err := filepath.Abs(p); err == nil {
+			abs = a
+		}
+		for _, root := range roots {
+			r := filepath.Clean(root)
+			if abs == r || strings.HasPrefix(abs, r+string(filepath.Separator)) {
+				out = append(out, [2]string{abs, root})
+				break
+			}
+		}
+	}
+	return out
 }
 
 // GuardPathArgs spells dash-leading path arguments as `./…` before flag

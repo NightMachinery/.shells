@@ -214,17 +214,25 @@ func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) 
 
 	type found struct{ path, root string }
 	var files []found
-	for _, root := range roots {
-		entries, err := os.ReadDir(root)
-		if err != nil {
-			continue
+	if len(o.Only) > 0 {
+		// The paths are known, so the brain directory is not read. See
+		// [session.ListOpts.Only].
+		for _, pair := range session.Under(o.Only, roots) {
+			files = append(files, found{path: pair[0], root: pair[1]})
 		}
-		for _, e := range entries {
-			if !e.IsDir() {
+	} else {
+		for _, root := range roots {
+			entries, err := os.ReadDir(root)
+			if err != nil {
 				continue
 			}
-			if t := transcriptOf(filepath.Join(root, e.Name())); t != "" {
-				files = append(files, found{path: t, root: root})
+			for _, e := range entries {
+				if !e.IsDir() {
+					continue
+				}
+				if t := transcriptOf(filepath.Join(root, e.Name())); t != "" {
+					files = append(files, found{path: t, root: root})
+				}
 			}
 		}
 	}

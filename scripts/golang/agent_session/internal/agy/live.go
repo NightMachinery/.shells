@@ -67,7 +67,7 @@ func (Adapter) Live(roots []string) ([]session.Live, error) {
 		return nil, errors.New("live: no brain directory given")
 	}
 
-	procs, err := proc.List()
+	procs, err := proc.ListShared()
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (Adapter) Live(roots []string) ([]session.Live, error) {
 		return nil, nil
 	}
 	cwds := proc.Cwds(pids)
-	panes := proc.TmuxPanes()
+	panes := proc.PanesShared()
 
 	var out []session.Live
 	for _, root := range roots {

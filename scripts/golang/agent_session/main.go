@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
+	"sync"
 
 	"agent_session/internal/agy"
 	"agent_session/internal/claude"
@@ -45,6 +47,11 @@ func main() {
 	case "agents":
 		for _, a := range agentNames {
 			fmt.Println(a)
+		}
+		return
+	case "live-all":
+		if err := cmdLiveAll(args[1:]); err != nil {
+			session.Fatal(err.Error())
 		}
 		return
 	}
@@ -94,6 +101,7 @@ func main() {
 func usage() {
 	fmt.Fprint(os.Stderr, `usage: agent_session <agent> <subcommand> [flags] args...
        agent_session agents                          #: the known agents, one per line
+       agent_session live-all <agent>=<root>...      #: every agent's live sessions, concurrently
 
   agent_session <agent> render [flags] <transcript>   #: transcript -> markdown/org on stdout
   agent_session <agent> list   [flags] <root>...      #: TSV of sessions, one per transcript
@@ -124,6 +132,8 @@ list flags:
   -snippet-len N        max snippet width (default 120)
   -name-len N           max session-name width (default 40)
   -subagents            also list subagent transcripts
+  -only <transcript>    list exactly this transcript rather than walking the
+                        roots; repeatable, for a caller that knows its paths
   -jobs N               worker count (default: CPU count)
 
 Several roots may be given: they are merged and sorted together. With more than
@@ -174,6 +184,19 @@ func cmdRender(ad session.Adapter, argv []string) error {
 	return err
 }
 
+// A repeatable path flag: `-only <transcript>`, once per transcript.
+type pathList []string
+
+func (p *pathList) String() string { return strings.Join(*p, " ") }
+
+func (p *pathList) Set(v string) error {
+	if v == "" {
+		return errors.New("empty path")
+	}
+	*p = append(*p, v)
+	return nil
+}
+
 func cmdList(ad session.Adapter, argv []string) error {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 	cwd := fs.String("cwd", "", "only sessions that ran in this directory")
@@ -181,6 +204,8 @@ func cmdList(ad session.Adapter, argv []string) error {
 	nameLen := fs.Int("name-len", 40, "max session-name width, in runes")
 	subagentsP := fs.Bool("subagents", false, "also list subagent transcripts")
 	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
+	var only pathList
+	fs.Var(&only, "only", "list exactly this transcript instead of walking the roots; repeatable")
 	fs.Parse(session.GuardPathArgs(fs, argv))
 
 	infos, err := ad.List(fs.Args(), session.ListOpts{
@@ -189,6 +214,7 @@ func cmdList(ad session.Adapter, argv []string) error {
 		SnippetLen: *snippetLen,
 		NameLen:    *nameLen,
 		Jobs:       *jobs,
+		Only:       only,
 	})
 	if err != nil {
 		return err
@@ -251,6 +277,67 @@ func cmdPreview(ad session.Adapter, argv []string) error {
 		return err
 	}
 	os.Stdout.WriteString(turns.ScrubText(out))
+	return nil
+}
+
+// live-all lists the live sessions of several agents at once, from specs of
+// the form `<agent>=<root>` -- repeated for an agent with several roots.
+//
+// One process rather than one per agent, and the adapters run concurrently,
+// because the cost here is external commands: `claude agents --json` takes
+// 190ms, tracing the Codex locks 40ms, the process table 115ms. Run in
+// sequence from zsh that was near a second before anything appeared on
+// screen; run together, sharing one process table and one `tmux list-panes`
+// (see [proc.ListShared]), it is about a quarter of that.
+//
+// An agent that fails contributes no rows rather than failing the call, which
+// is what the zsh loop did before: a host without Codex installed is not an
+// error. Rows stay grouped by agent, in the order the specs named them, each
+// group in its own adapter's order, so the output is what concatenating the
+// separate calls produced.
+func cmdLiveAll(args []string) error {
+	if len(args) == 0 {
+		return errors.New("live-all: no <agent>=<root> given")
+	}
+
+	roots := map[string][]string{}
+	var order []string
+	for _, spec := range args {
+		agent, root, ok := strings.Cut(spec, "=")
+		if !ok || agent == "" || root == "" {
+			return fmt.Errorf("live-all: not an <agent>=<root> spec: %s", spec)
+		}
+		if _, known := adapters[agent]; !known {
+			return fmt.Errorf("live-all: unknown agent: %s", agent)
+		}
+		if _, seen := roots[agent]; !seen {
+			order = append(order, agent)
+		}
+		roots[agent] = append(roots[agent], root)
+	}
+
+	rows := make([][]session.Live, len(order))
+	var wg sync.WaitGroup
+	for i, agent := range order {
+		wg.Add(1)
+		go func(i int, agent string) {
+			defer wg.Done()
+			out, err := adapters[agent].Live(roots[agent])
+			if err != nil {
+				return
+			}
+			rows[i] = out
+		}(i, agent)
+	}
+	wg.Wait()
+
+	w := bufio.NewWriter(os.Stdout)
+	defer w.Flush()
+	for _, group := range rows {
+		for _, r := range group {
+			w.WriteString(r.Row() + "\n")
+		}
+	}
 	return nil
 }
 
