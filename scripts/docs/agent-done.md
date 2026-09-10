@@ -101,20 +101,24 @@ Resuming does not restore the directory on its own, which is worth stating
 because it looks as though it should: [agfi:claude-code-session-resume] runs
 the launcher wherever you are and only *warns* when that disagrees with the
 session's project, and Codex's and agy's resume verbs do not even warn. So the
-script `cd`s first, and to the session's own directory rather than the pane's.
-[agfi:h-agent-done-session-dir] recovers it from the transcript path: Claude
-Code names its project directory after the directory the session started in,
-with every non-alphanumeric character replaced by a dash, so turning the dashes
-back into slashes and keeping the answer only if it is a directory gets the
-common case right and declines the ambiguous one (`-Users-evar-my-dir` could be
-two different paths). Codex and agy file transcripts by date and id, so there
-the pane's directory stands. The report's `cwd:` line shows whichever won, so
-it names the place a resume will land.
+script `cd`s first — and to the session's own directory, not the pane's.
 
-The two differ more often than it seems. This very feature was written in a
-session that had been restarted into a scratch directory while its transcript
-still belonged to `~/scripts`; taking the pane's path would have resumed it in
-the scratch directory, without the project's instructions.
+Nothing is inferred to find it: every agent records the cwd in its transcript,
+and `agent_session <agent> meta <transcript>` prints it as the third field for
+all three. [agfi:h-agent-done-session-dir] asks for exactly that. Two
+fallbacks stand behind it, in order: Claude Code's project directory, which
+names the directory a session started in with every non-alphanumeric character
+replaced by a dash — lossy, since `-Users-evar-my-dir` could be two different
+paths, so it is accepted only when the result really is a directory — and then
+the pane's own path. The report's `cwd:` line shows whichever won, so it names
+the place a resume will land, and `agent_done_cwd` overrides all three.
+
+The pane's path is a genuinely different answer, not a cheaper one. This
+feature was written in a session that had been restarted into a scratch
+directory: the pane said the scratch directory, the transcript's project said
+`~/scripts`, and the recorded cwd said the scratch directory too — because
+that is where the session really was working. Recorded wins, which is why the
+answer can be checked rather than argued about.
 
 Resuming goes through [agfi:agent-session-resume], which resolves the agent
 from the transcript path and calls that agent's own launcher. So a work session
