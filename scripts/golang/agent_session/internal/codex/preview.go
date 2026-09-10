@@ -31,6 +31,7 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 		return "", err
 	}
 	c := preview.Painter{On: o.Color}
+	l := preview.Layout{Compact: o.Compact}
 	data := scanPreview(path, o.Bytes)
 	id := data.meta.ID
 	if id == "" {
@@ -43,7 +44,14 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 		name = "Codex thread " + id
 	}
 	w.WriteString(c.BoldFg(nameRGB, name) + "\n")
-	w.WriteString(c.Gray(preview.JoinParts(" · ", id, "codex", preview.VersionLabel(data.meta.CLIVersion))) + "\n\n")
+	// A narrow pane cannot afford the uuid; the agent and the version are what
+	// the line is for. See the same choice in the Claude adapter.
+	subtitle := preview.JoinParts(" · ", id, "codex", preview.VersionLabel(data.meta.CLIVersion))
+	if o.Compact {
+		subtitle = preview.JoinParts(" · ", "codex", preview.VersionLabel(data.meta.CLIVersion))
+	}
+	w.WriteString(c.Gray(subtitle) + "\n")
+	l.Gap(w)
 
 	when, aside := "", ""
 	if t, err := time.Parse(time.RFC3339, data.stamp); err == nil {
@@ -55,15 +63,20 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	if data.effort != "" {
 		effort = data.effort + " effort"
 	}
-	preview.Row(w, c, "last activity", when, aside)
-	preview.Row(w, c, "model", preview.Annotate(data.model, " · ", effort), "")
-	preview.Row(w, c, "cwd", turns.AbbrevHome(data.meta.Cwd), "")
+	l.Row(w, c, "last activity", when, aside)
+	l.Row(w, c, "model", preview.Annotate(data.model, " · ", effort), "")
+	l.Row(w, c, "cwd", turns.AbbrevHome(data.meta.Cwd), "")
 
-	w.WriteString("\n" + c.Bold("last prompt") + "\n")
-	if data.prompt == "" {
+	l.Gap(w)
+	w.WriteString(c.Bold("last prompt") + "\n")
+	prompt := data.prompt
+	if o.Compact {
+		prompt = turns.Truncate(prompt, preview.CompactTextLen)
+	}
+	if prompt == "" {
 		w.WriteString("(none in the scanned tail)\n")
 	} else {
-		w.WriteString(data.prompt + "\n")
+		w.WriteString(prompt + "\n")
 	}
 	return w.String(), nil
 }

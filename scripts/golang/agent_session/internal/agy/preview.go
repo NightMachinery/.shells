@@ -26,6 +26,7 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 		return "", err
 	}
 	c := preview.Painter{On: o.Color}
+	l := preview.Layout{Compact: o.Compact}
 	home, id := homeOf(path), idOf(path)
 	sum := summaries(home)[id]
 
@@ -40,7 +41,14 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 		name = "Antigravity conversation " + id
 	}
 	w.WriteString(c.BoldFg(nameRGB, name) + "\n")
-	w.WriteString(c.Gray(preview.JoinParts(" · ", id, "agy", sum.AgentName)) + "\n\n")
+	// A narrow pane cannot afford the uuid; the agent's name is what the line
+	// is for. See the same choice in the Claude adapter.
+	subtitle := preview.JoinParts(" · ", id, "agy", sum.AgentName)
+	if o.Compact {
+		subtitle = preview.JoinParts(" · ", "agy", sum.AgentName)
+	}
+	w.WriteString(c.Gray(subtitle) + "\n")
+	l.Gap(w)
 
 	when, aside := "", ""
 	if t := lastStamp(steps, false); !t.IsZero() {
@@ -53,13 +61,18 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 		steps_ = itoa(n) + " steps"
 	}
 
-	preview.Row(w, c, "last activity", when, aside)
-	preview.Row(w, c, "steps", steps_, "")
-	preview.Row(w, c, "cwd", turns.AbbrevHome(cwdOf(home, id)), "")
-	preview.Row(w, c, "last step", preview.JoinParts(" · ", typeLabel(lastType(steps)), statusNote(lastStatus(steps))), "")
+	l.Row(w, c, "last activity", when, aside)
+	l.Row(w, c, "steps", steps_, "")
+	l.Row(w, c, "cwd", turns.AbbrevHome(cwdOf(home, id)), "")
+	l.Row(w, c, "last step", preview.JoinParts(" · ", typeLabel(lastType(steps)), statusNote(lastStatus(steps))), "")
 
-	w.WriteString("\n" + c.Bold("last prompt") + "\n")
-	if p := turns.OneLine(lastUserText(steps)); p == "" {
+	l.Gap(w)
+	w.WriteString(c.Bold("last prompt") + "\n")
+	p := turns.OneLine(lastUserText(steps))
+	if o.Compact {
+		p = turns.Truncate(p, preview.CompactTextLen)
+	}
+	if p == "" {
 		w.WriteString("(none in this transcript)\n")
 	} else {
 		w.WriteString(p + "\n")

@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -71,6 +72,69 @@ func TestAnnotate(t *testing.T) {
 		if got := Annotate(tc.principal, " @ ", tc.note); got != tc.want {
 			t.Errorf("Annotate(%q, %q) = %q, want %q", tc.principal, tc.note, got, tc.want)
 		}
+	}
+}
+
+// The two layouts differ in three ways and no more: how wide the label column
+// is, what the long labels are called, and whether a gap is a blank line.
+func TestLayoutRow(t *testing.T) {
+	off := Painter{On: false}
+
+	cases := []struct {
+		name    string
+		compact bool
+		label   string
+		want    string
+	}{
+		{"ordinary pads to LabelWidth", false, "cwd", "cwd           ~/scripts (2m ago)\n"},
+		{"ordinary keeps the long label", false, "last activity", "last activity ~/scripts (2m ago)\n"},
+		{"compact pads to CompactLabelWidth", true, "cwd", "cwd   ~/scripts (2m ago)\n"},
+		{"compact shortens the long label", true, "last activity", "when  ~/scripts (2m ago)\n"},
+		{"compact shortens the agy label", true, "last step", "step  ~/scripts (2m ago)\n"},
+		// Longer than the compact column: it keeps its one separating space
+		// rather than running into the value.
+		{"compact leaves an unmapped label alone", true, "steps", "steps ~/scripts (2m ago)\n"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := &strings.Builder{}
+			Layout{Compact: tc.compact}.Row(w, off, tc.label, "~/scripts", "(2m ago)")
+			if got := w.String(); got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	// A row with nothing to say is no row at all, in either layout.
+	for _, compact := range []bool{false, true} {
+		w := &strings.Builder{}
+		Layout{Compact: compact}.Row(w, off, "cwd", "", "(2m ago)")
+		if w.String() != "" {
+			t.Errorf("compact=%v: an empty value wrote %q", compact, w.String())
+		}
+	}
+
+	// The package-level Row is the ordinary layout and nothing else.
+	plain, viaLayout := &strings.Builder{}, &strings.Builder{}
+	Row(plain, off, "last activity", "now", "")
+	Layout{}.Row(viaLayout, off, "last activity", "now", "")
+	if plain.String() != viaLayout.String() {
+		t.Errorf("Row = %q, Layout{}.Row = %q", plain.String(), viaLayout.String())
+	}
+}
+
+func TestLayoutGap(t *testing.T) {
+	w := &strings.Builder{}
+	Layout{}.Gap(w)
+	if w.String() != "\n" {
+		t.Errorf("ordinary gap = %q, want a blank line", w.String())
+	}
+
+	w = &strings.Builder{}
+	Layout{Compact: true}.Gap(w)
+	if w.String() != "" {
+		t.Errorf("compact gap = %q, want nothing", w.String())
 	}
 }
 

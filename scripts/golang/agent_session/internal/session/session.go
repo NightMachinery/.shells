@@ -126,6 +126,10 @@ type PreviewOpts struct {
 	// How much of the transcript's tail to read; 0 or less reads all of it.
 	Bytes int64
 	Color bool
+	// Lay the body out for a pane too small for the ordinary two columns:
+	// short labels, no blank lines between the blocks, and the long fields
+	// cut short. See [preview.Layout].
+	Compact bool
 }
 
 // DocOpts are the `render` flags an adapter cares about; the rest belong to
