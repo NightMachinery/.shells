@@ -592,9 +592,10 @@ function claude-code-session-resume {
     #: `claude_code_profile_launchers' with `--resume <uuid>'. The
     #: non-interactive counterpart of [agfi:claude-code-session-resume-fz].
     #:
-    #: Anything after the second argument goes to the launcher. Tools run in
-    #: the current directory, not the one the session was started in, so this
-    #: warns when the two differ.
+    #: Anything after the second argument goes to the launcher, and the
+    #: session resumes in the directory it was working in rather than in this
+    #: one ([agfi:h-agent-session-resume-run]; `agent_session_resume_cd_p=n'
+    #: for the old behaviour, which warned instead of moving).
     #:
     #: Usage: claude-code-session-resume <transcript|uuid> [to-profile] [claude args...]
     ##
@@ -623,12 +624,10 @@ function claude-code-session-resume {
         transcript="$(claude-code-session-import "${source}" "${to_profile}")" @RET
     fi
 
-    local enc_pwd="${PWD//[^[:alnum:]]/-}"
-    if [[ "${transcript:h:t}" != "${enc_pwd}" ]] ; then
-        ecerr "$0: warning: session was started in another directory (${transcript:h:t}); tools will run in ${PWD}"
-    fi
-
-    "${launcher}" --resume "${transcript:t:r}" "${extra[@]}"
+    #: In the session's own directory, which this used to only warn about; see
+    #: [agfi:h-agent-session-resume-run] and `agent_session_resume_cd_p'.
+    h-agent-session-resume-run "${transcript}" \
+        "${launcher}" --resume "${transcript:t:r}" "${extra[@]}"
 }
 aliasfn claude-resume claude-code-session-resume
 

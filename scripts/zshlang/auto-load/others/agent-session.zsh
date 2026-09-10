@@ -2099,6 +2099,88 @@ function agent-session-current-name {
     h-agent-session-name "${file}"
 }
 
+function h-agent-session-dir {
+    #: The directory a session was working in. Nothing here is inferred if it
+    #: can be helped: every agent records the cwd in its transcript, and
+    #: `agent_session <agent> meta' prints it as the third field for all three,
+    #: so the exact directory is available for the asking.
+    #:
+    #: Two fallbacks stand behind that, in order. Claude Code names its project
+    #: directory after the directory a session started in, with every
+    #: non-alphanumeric character replaced by a dash -- lossy, since
+    #: `-Users-evar-my-dir' could be `/Users/evar/my-dir' or
+    #: `/Users/evar/my/dir', so the inversion is accepted only when the result
+    #: really is a directory. Then whatever the caller offered.
+    #: Usage: h-agent-session-dir <transcript> [agent] [fallback]
+    ##
+    local transcript="${1}" agent="${2}" fallback="${3}"
+    assert-args transcript @RET
+
+    if test -z "${agent}" ; then
+        agent="$(h-agent-session-agent-of "${transcript}" 2>/dev/null)" || agent=''
+    fi
+
+    if test -n "${agent}" ; then
+        local meta cwd
+        if meta="$(agent_session "${agent}" meta "${transcript}" 2>/dev/null)" ; then
+            cwd="${${(@ps:\t:)meta}[3]}"
+            if test -n "${cwd}" && test -d "${cwd}" ; then
+                ec "${cwd}"
+                return 0
+            fi
+        fi
+    fi
+
+    if [[ "${agent}" == claude ]] ; then
+        local candidate="${${transcript:h:t}//-//}"
+        if test -d "${candidate}" ; then
+            ec "${candidate}"
+            return 0
+        fi
+    fi
+
+    test -n "${fallback}" || return 1
+    ec "${fallback}"
+}
+
+function h-agent-session-resume-run {
+    #: Runs an agent's resume command in the session's own directory. None of
+    #: the three agents does this for you: [agfi:claude-code-session-resume]
+    #: used to only *warn* that "tools will run in ${PWD}", and Codex and agy
+    #: did not even warn. Resuming a session into a directory it knows nothing
+    #: about is the kind of thing you notice three tool calls later, when a
+    #: relative path or a project instruction file has quietly gone missing.
+    #:
+    #: `agent_session_resume_cd_p=n' keeps the old behaviour and restores the
+    #: warning with it, for resuming a session deliberately somewhere else.
+    #:
+    #: In a subshell, so an interactive caller is not silently left in another
+    #: directory once the session exits.
+    #: Usage: h-agent-session-resume-run <transcript> <command...>
+    ##
+    local transcript="${1}"
+    shift
+    assert-args transcript @RET
+    (( $# )) || return 1
+
+    local dir=''
+    dir="$(h-agent-session-dir "${transcript}" 2>/dev/null)" || dir=''
+
+    if test -z "${dir}" || [[ "${dir:A}" == "${PWD:A}" ]] ; then
+        "$@"
+        return $?
+    fi
+
+    if ! bool "${agent_session_resume_cd_p:-y}" ; then
+        ecerr "$0: warning: this session was working in ${dir/#${HOME}/~}; tools will run in ${PWD/#${HOME}/~}"
+        "$@"
+        return $?
+    fi
+
+    ecgray "$0: resuming in ${dir/#${HOME}/~}"
+    ( builtin cd -q -- "${dir}" && "$@" )
+}
+
 function agent-session-resume {
     #: Resumes a session in its own agent: the adapter's `resume' verb runs the
     #: launcher with whatever "continue this one" spelling the agent has.

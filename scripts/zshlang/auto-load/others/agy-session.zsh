@@ -168,7 +168,8 @@ function h-agy-session-resume {
     local id
     id="$(h-agy-session-id-of "${transcript}")" @RET
 
-    antigravity --conversation "${id}" "$@"
+    #: In the session's own directory ([agfi:h-agent-session-resume-run]).
+    h-agent-session-resume-run "${transcript}" antigravity --conversation "${id}" "$@"
 }
 
 function h-agy-session-hook-transcript {
