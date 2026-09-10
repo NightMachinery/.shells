@@ -231,10 +231,19 @@ function blackoutLockOn(seconds)
 
     -- Visible for the moment before the screen goes black: black-on is
     -- asynchronous through the garden, and this is synchronous.
-    alert("Input locked.", {
+    --
+    -- The lock-first mark shows up nowhere else: both chords go equally black,
+    -- and the mark cannot be revoked once set, so this band is the only chance
+    -- to confirm it. Hence its own sentence and its own colour -- blood, darker
+    -- than the amber the plain chord keeps and darker than the crimson `crit'
+    -- the Secure Input warning below may fire alongside it.
+    local lockFirst = st.lockFirst
+
+    alert(lockFirst and "Input locked. Ending the blackout locks the screen."
+                     or "Input locked.", {
         id = kAlertId,
-        color = "warn",
-        seconds = 4,
+        color = lockFirst and "blood" or "warn",
+        seconds = lockFirst and 5 or 4,
         screens = "all",
     })
 
