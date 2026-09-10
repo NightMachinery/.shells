@@ -1065,6 +1065,16 @@ either builds it inline at the call site or hands values back through =REPLY=,
 which is what =h-agent-session-agent-in-roots= does. Nothing in these files
 takes a variable name as an argument.
 
+Indirection is available when a caller genuinely has to name the parameter:
+=${(P)name}= reads whatever =name= spells --- scalar, array or associative
+array, subscripts included --- and =typeset -g "${name}=..."= or =set -A
+"${name}" ...= writes it, reaching the caller's =local= without leaving a
+global behind. It is not used here because the callers all want one value and
+=REPLY= says so more plainly, and because =(P)= brings a trap =REPLY= does not:
+if the callee happens to hold a =local= of the name it was handed, the write
+lands on its own copy and the caller silently sees no change. =PE/Zsh.org= has
+the pattern and the caveat.
+
 * Reading the session you are in
 
 Picking from a list is the wrong tool when you are already inside the session
