@@ -56,6 +56,12 @@ function claude {
         claude_args+=(--settings '{"theme":"light-daltonized"}')
     fi
 
+    #: Read by =configFiles/claude-code/statusline.sh=, which puts the seat's
+    #: emoji first in the status line. The status line command inherits our
+    #: environment, which is the only channel it has: its stdin JSON carries no
+    #: profile field.
+    local -x CLAUDE_CODE_PROFILE_BADGE_P="${claude_statusline_badge_p:-y}"
+
     #: The marker is how a work tab is told apart from a personal one, in the
     #: tty title and in every other cue. `local` is dynamically scoped in zsh,
     #: so a caller can override it without exporting anything.
