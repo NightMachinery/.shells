@@ -97,6 +97,25 @@ generated script, `<report>.pane.sh`, that does two different things:
   pane dies with the summary on it, as before.
 - any later run: `cd` to the session's directory and resume it.
 
+Resuming does not restore the directory on its own, which is worth stating
+because it looks as though it should: [agfi:claude-code-session-resume] runs
+the launcher wherever you are and only *warns* when that disagrees with the
+session's project, and Codex's and agy's resume verbs do not even warn. So the
+script `cd`s first, and to the session's own directory rather than the pane's.
+[agfi:h-agent-done-session-dir] recovers it from the transcript path: Claude
+Code names its project directory after the directory the session started in,
+with every non-alphanumeric character replaced by a dash, so turning the dashes
+back into slashes and keeping the answer only if it is a directory gets the
+common case right and declines the ambiguous one (`-Users-evar-my-dir` could be
+two different paths). Codex and agy file transcripts by date and id, so there
+the pane's directory stands. The report's `cwd:` line shows whichever won, so
+it names the place a resume will land.
+
+The two differ more often than it seems. This very feature was written in a
+session that had been restarted into a scratch directory while its transcript
+still belonged to `~/scripts`; taking the pane's path would have resumed it in
+the scratch directory, without the project's instructions.
+
 Resuming goes through [agfi:agent-session-resume], which resolves the agent
 from the transcript path and calls that agent's own launcher. So a work session
 comes back on the work seat with its cues repainted, and none of this needs to
