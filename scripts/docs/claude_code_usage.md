@@ -47,6 +47,132 @@ gets reported. `--profile-label` sets the name shown in the header.
 Give each profile its own `--cache-dir`, or they overwrite each other's cached
 response.
 
+## Telling the profiles apart
+
+Both seats symlink the same tracked `configFiles/claude-code/settings.json`, so
+a work session and a personal one used to be indistinguishable once the TUI was
+up. Four cues now name the seat from inside. Three are on by default and the
+fourth is off.
+
+Every cue is derived from the *effective* config dir, resolved once per launch
+by [agfi:claude-code-profile-current] inside [agfi:claude], and never from the
+launcher's name. `claude-m` typed inside a work session inherits
+`CLAUDE_CONFIG_DIR` and is still a work session, cues included. The seat's
+identity lives in tables beside `claude_code_profiles` in
+`zshlang/auto-load/others/claude.zsh`: `claude_code_profile_markers` holds the
+emoji and is the source of truth for it, `claude_code_profile_labels` the word
+a human reads, `claude_code_profile_colors` an `R;G;B` triplet,
+`claude_code_profile_tints` the pane wash, and `claude_code_profile_themes`
+which tracked theme file the seat uses.
+
+Personal is blue `rgb(90,150,240)` with 🦋; work is orange `rgb(235,145,60)`
+with 🏫. These are the same values as `profileColors` in
+`golang/agent_session/internal/claude/preview.go`, which paints the session
+pickers, so a seat keeps one colour across the whole toolchain. Red and green
+are avoided because the base theme is a daltonized one.
+
+### The theme
+
+On by default, `claude_theme_p`. Each config dir gets a `themes/profile.json`
+symlinked to a tracked file, `configFiles/claude-code/themes/personal.json` or
+`work.json`. Both start from `light-daltonized` and override `claude`,
+`claudeShimmer`, `promptBorder`, `promptBorderShimmer`, `planMode`,
+`briefLabelYou` and `userMessageBackground`, so the spinner, the assistant
+label, the input border, the plan-mode accent, the `You` label and the message
+wash all carry the seat's colour. `/theme` lists them as "Personal 🦋" and
+"Work seat 🏫".
+
+The slug is deliberately the same in both config dirs. That is what lets the
+one shared settings file say `"theme": "custom:profile"` and still hand each
+seat a different palette. Passing `--settings` per launch was rejected instead:
+the tmux-subagents launcher already passes its own, and repeated flags are not
+known to merge.
+
+[agfi:claude-themes-link] writes the symlinks and is idempotent. [agfi:claude]
+calls it before launching, behind a single stat, because Claude Code only
+watches a themes directory that already existed when the session started — a
+theme file added under a directory that was absent needs one restart, after
+which edits apply to a running session. Both symlinks are listed in the
+`agents_md_settings` table, so `agents-md-doctor` says so if editing a theme
+through `/theme` ever replaces one with a plain file.
+
+`claude_theme_p=n` passes `--settings '{"theme":"light-daltonized"}'` for that
+session alone. A caller passing its own `--settings` may not merge with it.
+
+### The status line badge
+
+On by default, `claude_statusline_badge_p`. The seat's emoji is the first field
+of the status line, ahead of the git branch. The script that prints it was
+untracked at `~/.claude/hooks/statusline.sh`; it now lives at
+`configFiles/claude-code/statusline.sh`, with a symlink left at the old path
+and `statusLine.command` pointing at the tracked copy. It is MIT-licensed
+third-party work.
+
+Being bash, it cannot read a zsh table, so the emoji are mirrored there behind
+a comment naming `claude_code_profile_markers` as the source of truth. An
+unregistered config dir gets `❓` and the directory's basename, so a third seat
+still says something true.
+
+Two long-standing faults went with it. `USAGE_FILE`, `CREDENTIALS_FILE` and
+`SETTINGS_FILE` all defaulted to `~/.claude/...` for both seats, so a work
+session reported the personal seat's quota, credentials and settings; they now
+follow the effective config dir. And the effort level now comes from the
+`effort.level` field of the status line's stdin JSON, which tracks `/effort`
+live, falling back to `effortLevel` in the seat's own settings file.
+
+`claude_statusline_badge_p=n` reaches the script as
+`CLAUDE_CODE_PROFILE_BADGE_P`. That is the only channel there is: the command
+inherits the launcher's environment, and its stdin JSON has no profile field.
+
+### The pane tint
+
+On by default, `claude_tint_p`. The launcher writes OSC 11 before starting the
+session, washing the background to `#eef3fc` for personal or `#fff6ec` for
+work, and OSC 111 afterwards in an `always` block, so a normal quit and Ctrl-C
+both undo it and neither can change the session's exit status. Under tmux 3.0
+and later it reaches only the pane that sent it, leaving a sibling pane in the
+same window alone; outside tmux, kitty applies it to the whole window. Cells
+the TUI paints with a background of their own are unaffected, so it reads as a
+tint rather than a repaint.
+
+It is skipped unless stdout is a terminal, so a piped or captured run is never
+handed escape codes. A `kill -9` outruns the reset and leaves the pane tinted
+until the next reset or a new pane.
+
+### The tmux pane-border label
+
+Off by default; `claude_tmux_label_p=y` asks for it. It sets the pane option
+`@claude_profile` to `🏫 WORK` or `🦋 PERSONAL` and turns the window's border
+row on. It stays off by default because that row costs a line of every pane in
+the window, a poor trade when the theme and the tint already say the same
+thing.
+
+The label is a *pane* option, since one tmux session can host several seats in
+several panes. The border row and its format are *window* properties, so they
+are set only when the window has no `pane-border-format` of its own to lose,
+and are left in place afterwards: clearing them would blank the label of any
+other labelled pane. Panes with no label read `SHELL`. A pane that already
+carried a label keeps it, since only a label this launch introduced is taken
+away again.
+
+### The flags, and a bare `command claude`
+
+Every flag is read with [agfi:bool] and is dynamically scoped, so a one-off is
+a prefix: `claude_tint_p=n claude-work`, `claude_theme_p=n claude-m`,
+`claude_tmux_label_p=y claude-work`.
+
+A bare `command claude` skips the launcher, so it gets neither the tint nor the
+label. It still gets the theme and the badge, which live in the config dir and
+the shared settings rather than in the launcher's environment. That asymmetry
+was accepted when the design was chosen.
+
+### The `/color` caveat
+
+`/color blue|orange|default` sets a prompt-bar colour for one session, and it
+is remembered when that session is resumed, so a resumed session can show a
+prompt border that disagrees with its theme. This is documented behaviour
+rather than a bug, and `/color default` clears it.
+
 ## Credentials
 
 The OAuth access token is looked up in this order:
