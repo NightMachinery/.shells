@@ -1,0 +1,110 @@
+# The Claude Code seats, and everything that distinguishes one from another.
+#
+# This file is the single source of truth. It is never read at runtime: the
+# consumers read generated literals instead, because a YAML parse costs 30ms in
+# python and 57ms in yq, and the zsh side is sourced by every interactive
+# shell. Run `agent-profiles-sync` (python/agent_profiles_gen.py) after editing,
+# which rewrites all three generated files:
+#
+#   zshlang/auto-load/others/claude-profiles.gen.zsh   the zsh tables
+#   golang/agent_session/internal/profiles/profiles_gen.go   the pickers
+#   configFiles/claude-code/profiles.gen.bash          the status line (bash)
+#
+# Staleness is not left to memory: each generated file records the SHA-256 of
+# this file, and `go test ./internal/profiles/` fails if any of them disagrees.
+#
+# Both seats run the same tracked settings.json, so without these cues a work
+# session and a personal one are indistinguishable from inside the TUI. Every
+# cue is derived from the *effective* config dir, never from the launcher's
+# name, so `claude-m` typed inside a work session is still work. See
+# docs/claude_code_usage.md.
+#
+# The default seat is the baseline the terminal and the theme are already set
+# up for, and is recognised by being left alone: it takes no tint and no
+# border, and its theme overrides nothing. Only the seat that could be mistaken
+# for it is marked. A field left out means "no cue", which is why the absent
+# keys below are absences rather than omissions.
+
+# `CLAUDE_CONFIG_DIR` is not a field: it is derived from `home`, because the
+# rule has no exceptions. The seat whose home is `.claude` exports nothing at
+# all, since that is already where Claude Code keeps its config with the
+# variable unset; every other seat exports `${HOME}/<home>`. A seat living
+# somewhere other than under $HOME would be the first thing to need a field of
+# its own here.
+#
+# Iteration and display order. A mapping has no order of its own, and the
+# generated tables need one for reports that list every seat.
+order:
+  - default
+  - work
+
+profiles:
+  default:
+    # The basename of the config home. The default seat exports no
+    # CLAUDE_CONFIG_DIR at all, and Claude Code then keeps its config in
+    # ~/.claude, so this is where it lands either way. The pickers key on it,
+    # since a transcript's path is what says which seat owns it.
+    home: .claude
+
+    # The command that starts this seat, so a session can be resumed under
+    # whichever seat owns it. Always a launcher rather than a bare
+    # `CLAUDE_CONFIG_DIR=... claude`, so the seat keeps its tty marker and its
+    # sync, watchdogs and proxy environment.
+    launcher: claude-m
+
+    # One emoji per seat, used by the tty title, the status line badge and the
+    # tmux pane label alike, so the same glyph means the same seat everywhere.
+    marker: "🦋"
+
+    # The word a seat goes by where a cue has to spell it out, the tmux pane
+    # label being the one that does. The *key* is `default`, because that is
+    # what Claude Code calls an unset CLAUDE_CONFIG_DIR, but the seat itself is
+    # the personal one.
+    label: PERSONAL
+
+    # Which tracked file under configFiles/claude-code/themes/ this seat's
+    # themes/profile.json points at. The slug is deliberately the same in every
+    # config dir, so the one shared settings.json can ask for `custom:profile`
+    # and still hand each seat its own palette.
+    theme: personal
+
+    # What the session pickers paint this seat's rows. Every seat gets one,
+    # because there a colour per row is what makes a list scannable, and
+    # nothing is being restyled. Orange fell free when work took the violet,
+    # and reads apart from it better than the blue it replaced.
+    picker_color: "235;145;60"
+
+    # No `color`: this seat has no identity colour, because it takes neither
+    # the pane border nor the tint that would need one.
+    # No `tint`: it keeps the background the terminal was already showing.
+    # No `border`: same reason.
+
+  work:
+    home: .claude-work
+    launcher: claude-work
+    marker: "🏫"
+    label: WORK
+    theme: work
+
+    # The seat's identity colour, as an `R;G;B` triplet. It colours the tmux
+    # pane border, and the pickers inherit it unless `picker_color` overrides.
+    # Solarized's own violet, which the terminal already uses, so it sits
+    # correctly on this background: it measures 4.06 against Solarized Light
+    # where the orange it replaced measured 2.25.
+    color: "108;113;196"
+
+    # The pane background wash. A faint green, chosen by eye after comparing
+    # violet, cyan and green in a real session. It is at the exact CIELAB
+    # lightness of the Solarized Light background, so it shifts hue without
+    # touching the contrast of the text on top; `color-background-palette` in
+    # zshlang/basic/colors.zsh holds the candidates it was chosen from.
+    #
+    # Deliberately not the seat's own violet. A wash carries identity but no
+    # meaning, so it is free to be whichever hue is most comfortable, while
+    # the accents must stay legible and must not lean on a red/green
+    # distinction, this being a daltonized theme.
+    tint: "#f2f8f1"
+
+    # The tmux style attributes added on top of `color` for the pane border.
+    # Presence is what enables the border at all.
+    border: bold

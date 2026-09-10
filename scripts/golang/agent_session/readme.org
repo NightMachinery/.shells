@@ -1584,10 +1584,13 @@ starts on is dropped only when the tail really is a tail; on a transcript
 smaller than the window there is no partial line, and a session of one or two
 records would otherwise lose everything there was to read.
 
-The colour is keyed on the profile, from the =profileColors= table in
-=internal/claude/preview.go=: =.claude= blue, =.claude-work= orange, and an
-unknown profile gets no colour rather than a wrong one. Which account a session
-belongs to is the
+The colour is keyed on the profile, from =profiles.PickerColors=: =.claude=
+orange, =.claude-work= violet, and an unknown profile gets no colour rather
+than a wrong one. That table is generated from
+=configFiles/claude-code/profiles.yaml= along with the zsh launcher's own
+tables and the status line's, so the seat that is violet here is the violet one
+everywhere; see =internal/profiles= and =docs/claude_code_usage.md=. Which
+account a session belongs to is the
 thing worth seeing at a glance, since the whole point of
 =claude-code-session-resume= is that the two are otherwise interchangeable. It
 is deliberately not Claude Code's own =agent-color=: that record is written

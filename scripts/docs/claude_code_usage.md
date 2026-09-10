@@ -63,26 +63,30 @@ is named by its emoji and by its pane label, both of which only add a name and
 repaint nothing.
 
 For the tint and the border that is expressed by leaving the personal seat out
-of `claude_code_profile_tints` and `claude_code_profile_borders`: in both
-tables a seat with no entry does not get the cue, and the personal rows are
-commented out rather than deleted so the convention stays visible.
+of the `tint` and `border` fields: a seat with no entry does not get the cue.
+The generated tables render an absent field as a commented row reading
+`# default  <none>` rather than omitting the seat, so the convention stays
+visible in the table instead of looking like an oversight.
 
 Every cue is derived from the *effective* config dir, resolved once per launch
 by [agfi:claude-code-profile-current] inside [agfi:claude], and never from the
 launcher's name. `claude-m` typed inside a work session inherits
 `CLAUDE_CONFIG_DIR` and is still a work session, cues included. The seat's
-identity lives in tables beside `claude_code_profiles` in
-`zshlang/auto-load/others/claude.zsh`: `claude_code_profile_markers` holds the
-emoji and is the source of truth for it, `claude_code_profile_labels` the word
-a human reads, `claude_code_profile_colors` an `R;G;B` triplet,
-`claude_code_profile_tints` the pane wash, and `claude_code_profile_themes`
-which tracked theme file the seat uses.
+identity is declared once, in `configFiles/claude-code/profiles.yaml`: the
+`marker` is the emoji, `label` the word a human reads, `color` an `R;G;B`
+triplet, `tint` the pane wash, `border` the tmux style attributes and `theme`
+which tracked theme file the seat uses. The zsh tables the launcher reads --
+`claude_code_profile_markers` and friends -- are generated from it, and so are
+the pickers' and the status line's copies. See "Where the seats are defined"
+below.
 
-Work is violet `rgb(108,113,196)` with 🏫, and that violet is also what
-`profileColors` in `golang/agent_session/internal/claude/preview.go` paints
-the seat with in the session pickers, so it keeps one colour across the
-toolchain. The pickers colour personal sessions orange, which fell free when
-work took the violet, and reads apart from it better than the blue it replaced.
+Work is violet `rgb(108,113,196)` with 🏫, and that violet is also what the
+session pickers paint the seat with, because
+`golang/agent_session/internal/claude/preview.go` reads the same generated
+table the launcher does. One colour across the toolchain is therefore enforced
+rather than kept in step by hand; it was not, before. The pickers colour
+personal sessions orange, which fell free when work took the violet, and reads
+apart from it better than the blue it replaced.
 That is a list where a colour per row helps you scan and nothing is being
 restyled; inside the TUI the personal seat is left stock.
 
@@ -132,10 +136,13 @@ untracked at `~/.claude/hooks/statusline.sh`; it now lives at
 and `statusLine.command` pointing at the tracked copy. It is MIT-licensed
 third-party work.
 
-Being bash, it cannot read a zsh table, so the emoji are mirrored there behind
-a comment naming `claude_code_profile_markers` as the source of truth. An
-unregistered config dir gets `❓` and the directory's basename, so a third seat
-still says something true.
+Being bash, it cannot read a zsh table, so it sources
+`configFiles/claude-code/profiles.gen.bash`, which sits beside it and is
+generated from the same YAML the zsh tables are. That is a plain associative
+array lookup with no subshell, where reaching for `jq` would have cost a fork
+on every render. An unregistered config dir gets `❓` and the directory's
+basename, so a third seat still says something true; a missing generated file
+lands in that same branch rather than breaking the line.
 
 Two long-standing faults went with it. `USAGE_FILE`, `CREDENTIALS_FILE` and
 `SETTINGS_FILE` all defaulted to `~/.claude/...` for both seats, so a work
@@ -182,7 +189,7 @@ over each one, which is the question that actually matters, and marks a colour
 you name. [agfi:color-background] takes a palette name or any hex and repaints
 the pane you run it in straight away, so several can be compared side by side;
 [agfi:color-background-reset] restores the terminal's configured background.
-Whichever wins goes into `claude_code_profile_tints`.
+Whichever wins goes into the seat's `tint` in `profiles.yaml`.
 
 The entries prefixed `solar-` are computed for Solarized Light. Each sits at
 exactly the CIELAB lightness of that theme's background, `#fdf6e3`, and differs
@@ -218,11 +225,11 @@ both `pane-border-style` and `pane-active-border-style` as *pane* options, so
 the border carries the seat's colour whether or not the pane is the active one.
 The style is `fg=<colour>,bold`.
 
-The colour is not written in `claude_code_profile_borders`. That table says
-only *which* seats get a border, and its value is the extra tmux style
-attributes to add, `bold` here. The colour itself comes from
-`claude_code_profile_colors`, converted from the `R;G;B` triplet to the
-`#rrggbb` that tmux styles want by [agfi:h-claude-profile-color-hex]. So a
+The colour is not written in the seat's `border`. That field says only *which*
+seats get a border, and its value is the extra tmux style attributes to add,
+`bold` here. The colour itself comes from the seat's `color`, converted from
+the `R;G;B` triplet to the `#rrggbb` that tmux styles want by
+[agfi:h-claude-profile-color-hex]. So a
 seat's colour is written down once and the theme, the pickers and the border
 cannot drift apart.
 
@@ -254,6 +261,50 @@ and are left in place afterwards: clearing them would blank the label of any
 other labelled pane. Panes with no label read `SHELL`. A pane that already
 carried a label keeps it, since only a label this launch introduced is taken
 away again.
+
+### Where the seats are defined
+
+`configFiles/claude-code/profiles.yaml` is the single source of truth for what
+a seat *is*. Each entry carries the basename of its config home, the launcher
+that starts it, its emoji, its label, which tracked theme file it uses, and
+then whichever of `color`, `picker_color`, `tint` and `border` it has any use
+for. A top-level `order` list fixes iteration and display order, which a
+mapping has none of. The reasoning behind each value lives in the YAML next to
+the value, which is the one place it can be read together with what it affects.
+
+It was three places before. The zsh launcher had its tables, the Go session
+pickers had a `profileColors` map of their own, and the status line had an
+emoji `case`, and they had already drifted: the pickers were still painting
+work orange after the seat had moved to violet everywhere else.
+
+Nothing reads the YAML at runtime, though. It must stay fast: the zsh tables
+are sourced by *every* interactive shell, since `zshlang/load-others.zsh`
+sources every auto-load file at startup; the status line is re-rendered
+constantly; and `golang/agent_session` deliberately has no dependencies at all,
+which a YAML parser would end. Measured, a parse costs 56.7ms through `yq` and
+30.2ms through python's `yaml`, against 2.6ms for a `jq` fork and 0.0ms for a
+zsh literal. So the YAML is a build-time input, and each consumer reads
+generated literals:
+
+- `zshlang/auto-load/others/claude-profiles.gen.zsh` holds the zsh tables,
+  under the same names they had when they were written by hand, so nothing that
+  reads them had to change.
+- `golang/agent_session/internal/profiles/profiles_gen.go` exports `Order`,
+  `PickerColors` and `Markers` for the session pickers.
+- `configFiles/claude-code/profiles.gen.bash` is sourced by the status line.
+
+[agfi:agent-profiles-sync] regenerates all three, and prints only what it
+actually rewrote. [agfi:agent-profiles-check] writes nothing and fails if
+anything is out of date. The launchers deliberately do *not* regenerate on
+every start: that would put python on the startup path for no benefit.
+
+Staleness is not left to memory. Each generated file records the SHA-256 of the
+YAML it came from, and `go test ./internal/profiles/` recomputes that digest
+and fails if the Go, zsh or bash copy disagrees -- naming the sync command in
+the failure. The same test asserts that the tables are not empty and that every
+picker colour is a well-formed `R;G;B` triplet, because a generator bug that
+emitted an empty map would otherwise look like a styling decision rather than a
+fault.
 
 ### The flags, and a bare `command claude`
 
@@ -420,12 +471,17 @@ profile never costs the others their report.
 profile; `claude-code-usage-all` reports every registered profile, and is what
 the bare `ccu` / `ccs` / `claude-code-status` names run.
 
-Profiles are registered in the `claude_code_profiles` associative array, which
-maps a profile name to its `CLAUDE_CONFIG_DIR` (empty for the default profile),
-and are ordered by `claude_code_profile_order`. Adding a profile is one line in
-each: the config file path, the Keychain service and the cache dir all derive
-from the config dir. Each registered profile gets a named command:
-`claude-code-usage-default` (aliases `ccu-default`, `ccs-default`) and
+Profiles are read from the `claude_code_profiles` associative array, which maps
+a profile name to its `CLAUDE_CONFIG_DIR` (empty for the default profile), and
+are ordered by `claude_code_profile_order`. Both are generated from
+`configFiles/claude-code/profiles.yaml`, where the config dir is not itself a
+field: it is derived from the seat's `home`, since the seat whose home is
+`.claude` exports nothing at all -- that being where Claude Code keeps its
+config with the variable unset -- and every other seat exports
+`${HOME}/<home>`. Adding a profile is therefore one entry in the YAML plus
+[agfi:agent-profiles-sync]: the config file path, the Keychain service and the
+cache dir all derive from the config dir. Each registered profile gets a named
+command: `claude-code-usage-default` (aliases `ccu-default`, `ccs-default`) and
 `claude-code-usage-work` (aliases `ccu-work`, `ccs-work`), which are just
 `claude_code_usage_profile=<name>`. The `-default` one is redundant with plain
 `claude-code-usage` but says out loud which account you meant.
@@ -494,10 +550,10 @@ Antigravity have resume commands of their own now — `codex-resume-fz`,
 `codex-resume`, `agy-resume-fz`, `agy-resume` — which pick from that agent's
 sessions and hand the choice to `codex resume` or `agy --conversation`; they
 know nothing about profiles, which are a Claude Code idea.
-`docs/agent-sessions.md` covers the family. The launcher comes
-from `claude_code_profile_launchers` next to `claude_code_profiles`, so the
-work seat keeps its tty marker and every profile keeps the sync and watchdogs
-of the `claude` wrapper.
+`docs/agent-sessions.md` covers the family. The launcher comes from
+`claude_code_profile_launchers`, generated beside `claude_code_profiles`, so
+the work seat keeps its tty marker and every profile keeps the sync and
+watchdogs of the `claude` wrapper.
 
 The picker is `h-claude-code-session-select-fz`, the one the viewers use. Each
 row shows the session's last-message time, its name, its profile-labelled path
