@@ -151,7 +151,10 @@ function fftmux() {
     #: =docs/tmux-session-rename.md= have the details.
     ##
     local query="$*"
-    local engine=(tmux a -t)
+    #: [agfi:tmux-session-goto], not `tmux a -t': attaching cannot nest, so the
+    #: old default could never hop sessions from inside tmux -- which is where
+    #: a session picker is most useful.
+    local engine=(tmux-session-goto)
     test -n "$ftE[*]" && engine=("$ftE[@]")
 
     bella_zsh_disable1

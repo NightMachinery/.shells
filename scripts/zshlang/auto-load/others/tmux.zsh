@@ -77,6 +77,28 @@ function tmux-session-name-of {
     command tmux display-message -p -t "${target}" '#{session_name}'
 }
 
+function tmux-session-goto {
+    : "goes to a tmux session: attaches from outside tmux, switches the client from inside"
+    #: `attach-session' refuses to nest, so a bare `tmux a -t' run from inside
+    #: tmux only ever prints "sessions should be nested with care, unset $TMUX
+    #: to force". The verb for a client that already exists is
+    #: `switch-client', which resolves that client from `$TMUX'. A shell with
+    #: no client at all -- an agent's, a `run-shell' -- has nothing to switch
+    #: and says so, which is still a better answer than the nesting refusal.
+    ##
+    local session="${1}"
+    assert-args session @RET
+
+    local target
+    target="$(tmux-session-id "${session}")" @RET
+
+    if isTmux ; then
+        command tmux switch-client -t "${target}"
+    else
+        command tmux attach-session -t "${target}"
+    fi
+}
+
 function tmux-alive-p {
     local session="${1}"
     assert-args session @RET
@@ -118,7 +140,7 @@ function tmux-ensure-attach {
     local command=("${@:-zsh}")
 
     tmuxnew-ensure "${session}" "${command[@]}"
-    tmux attach -t "$(tmux-session-id "${session}")"
+    tmux-session-goto "${session}"
 }
 alias tma='tmux-ensure-attach'
 
@@ -377,7 +399,7 @@ function tmux-attach {
     target="$(tmux-session-id "${session}")" @RET
 
     tty-title "$(tmux-session-name-of "${target}")"
-    tmux a -t "${target}"
+    tmux-session-goto "${target}"
 }
 ##
 #: Naming the session you are in. Aimed at shells spawned by an AI agent

@@ -176,6 +176,13 @@ hooks make routine: they rename on every prompt, so a name captured from
 `fftk`, `fftr`) and [agfi:tmux-alive-p] all go through it now; use
 [agfi:tmux-session-name-of] to turn an id back into something a human reads.
 
+One more helper lives beside those: [agfi:tmux-session-goto], the verb `fft`
+now uses. `attach-session` refuses to nest, so a bare `tmux a -t` from inside
+tmux only ever prints *sessions should be nested with care* -- which is where
+a session picker is most useful. `tmux-session-goto` switches the client
+instead when `$TMUX` is set, and attaches when it is not; `tmux-attach` and
+`tma` go through it too.
+
 This is why the marker is `+` and not `@`. `@` was window-id syntax, which
 made every agent-named session unusable as a target -- `fft` on one failed
 with *can't find window* -- and no amount of `=` fixed the window-typed half.
