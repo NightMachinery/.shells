@@ -54,6 +54,11 @@ end
 ---   countdown    append "clears in M:SS", refreshed once a second
 ---   pinned       claim space before every unpinned alert, so a wall of text
 ---                elsewhere cannot push this one off the screen
+---   peek         false exempts the alert from the hyper peek below, for a
+---                band you read *while* holding hyper -- the brightness OSD of
+---                hyper+F1/F2 being the case it was added for. Currently it
+---                holds the peek off for every band on screen, not just this
+---                one; see AlertEngine.peekAlpha
 ---   screens      a ModalMode.targetScreens spec, default "all"
 --- Returns the alert's id.
 function alertV2(text, opts)
@@ -94,6 +99,8 @@ function alertV2(text, opts)
     alert.position = AlertEngine.normalizePosition(opts.position)
     alert.countdown = opts.countdown and true or false
     alert.pinned = opts.pinned and true or false
+    -- Only an explicit false opts out; nil means the ordinary peeking band.
+    alert.peek = opts.peek ~= false
     alert.screens = opts.screens
     alert.expiry = hs.timer.secondsSinceEpoch() + seconds
 

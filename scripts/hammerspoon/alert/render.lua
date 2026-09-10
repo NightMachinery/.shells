@@ -128,6 +128,20 @@ function AlertEngine.peekAlpha()
     if not (alertEngineState.peeking and alertV2PeekEnabled) then
         return 1
     end
+
+    -- A band raised with `peek = false' holds the peek off for every band, not
+    -- only for itself. Deliberately coarse: a canvas carries a whole stack and
+    -- hs.canvas has no per-element alpha, so exempting one band on its own
+    -- would mean splitting the stack across a canvas per group. Worth doing if
+    -- it ever grates -- see "Bands that must not fade" in docs/hammerspoon.md --
+    -- but the case it exists for is hyper+F1/F2, where the exempt band is
+    -- normally the only one up.
+    for _, alert in ipairs(alertEngineState.alerts) do
+        if alert.peek == false then
+            return 1
+        end
+    end
+
     return math.max(0, math.min(tonumber(alertV2PeekOpacity) or 0, 1))
 end
 

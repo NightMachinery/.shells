@@ -125,6 +125,10 @@ local function brightnessBandShow()
         seconds = hyper_brightness_band_seconds,
         flashSeconds = 0,
         screens = "all",
+        -- The whole point of this band is to be read while hyper is held: the
+        -- brightness keys leave the mode entered on purpose, so the peek would
+        -- otherwise fade the one band the keypress exists to show.
+        peek = false,
     })
 end
 
