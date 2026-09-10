@@ -860,6 +860,18 @@ the lock holders it found, and Antigravity only for a cwd that its workspace map
 answers. A session that has a pid but no tmux session carries =-= in that
 column, which no window name can match.
 
+The tmux column itself is resolved from the process tree in all three adapters:
+=proc.TmuxOf= walks a session's parents up to the tmux pane containing it, over
+the one =tmux list-panes -a= the whole run shares. Claude Code does record its
+own location, in =<config home>/sessions/<pid>.json=, but that is the tmux
+session name as it stood *at launch*, and the autoname hooks rename tmux
+sessions on every prompt --- measured, five of seventeen live sessions named a
+tmux session that no longer existed. So =tmuxOf= in the Claude adapter asks the
+walk first and reads the record only when the walk finds nothing: a session
+started outside tmux, a process the table no longer has, or a host with no tmux
+running at all. The zsh side used to re-do this walk itself to repair the stale
+names; it no longer has to.
+
 That is what makes the window resolver safe. Every strategy in
 [[agfi:h-agent-session-of-kitty-window]] matches a window against these rows,
 so an invented pid would not produce a miss --- it would produce the wrong
@@ -1174,10 +1186,10 @@ five things, in order of how sure each one is:
    is what lets them outlive a kitty restart --- and the kitty tab merely
    displays one. NAME is matched against the live rows' tmux column, and only a
    single hit counts, since one tmux session can host several agents in several
-   panes. Claude Code's own record of a session,
-   =<config home>/sessions/<pid>.json=, carries the =tmux= field that column
-   comes from for Claude. This is the path an agent takes while its hooks are
-   still untrusted, and it costs the full listing: about 235ms.
+   panes. That column names the session the process actually sits in, found by
+   walking its ancestry to a pane, so it stays right across the renames the
+   autoname hooks do on every prompt. This is the path an agent takes while its
+   hooks are still untrusted, and it costs the full listing: about 235ms.
 4. The window shows an agent's own view, =claude agents= or =claude attach=. The
    view sets the window title to the attached session's name, at times with a
    status glyph in front, and the title is matched against the live sessions'

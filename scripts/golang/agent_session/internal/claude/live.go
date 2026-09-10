@@ -32,6 +32,7 @@ import (
 	"strings"
 	"sync"
 
+	"agent_session/internal/proc"
 	"agent_session/internal/session"
 )
 
@@ -53,10 +54,40 @@ type agentEntry struct {
 }
 
 // The part of a session record (`<home>/sessions/<pid>.json`) we read. The
-// listing itself does not carry the tmux location, but this record does, and
-// it is what the listing is built from anyway.
+// listing carries no tmux location at all; this record carries the one the
+// session launched in, which is the fallback when the process tree cannot
+// answer. See [tmuxOf].
 type sessionRecord struct {
 	Tmux string `json:"tmux"`
+}
+
+// procInfo is the process table and the tmux panes, read once for the whole
+// call and shared by every profile. Both are external commands and neither
+// needs an answer from `claude agents`, so they are read alongside it and
+// waited on only when the rows are built.
+type procInfo struct {
+	ready chan struct{}
+	byPID map[int]proc.Process
+	panes map[int]string
+}
+
+func readProcInfo() *procInfo {
+	pi := &procInfo{ready: make(chan struct{})}
+	go func() {
+		defer close(pi.ready)
+		if procs, err := proc.ListShared(); err == nil {
+			pi.byPID = proc.ByPID(procs)
+		}
+		pi.panes = proc.PanesShared()
+	}()
+	return pi
+}
+
+// wait blocks until the reads are done. Nothing writes the fields afterwards,
+// so every profile may read them at once.
+func (pi *procInfo) wait() (map[int]proc.Process, map[int]string) {
+	<-pi.ready
+	return pi.byPID, pi.panes
 }
 
 func (Adapter) Live(roots []string) ([]session.Live, error) {
@@ -69,6 +100,12 @@ func (Adapter) Live(roots []string) ([]session.Live, error) {
 		profiles = append(profiles, profile{home: filepath.Dir(root), root: root})
 	}
 
+	// Started first so it runs under the `claude agents` calls rather than
+	// after them. [proc.ListShared] and [proc.PanesShared] read the process
+	// table and `tmux list-panes` once per process, so `live-all` pays for
+	// neither twice however many adapters ask.
+	pi := readProcInfo()
+
 	// One goroutine per config home: the `claude agents` calls are the whole
 	// cost and they do not depend on each other.
 	var (
@@ -80,7 +117,7 @@ func (Adapter) Live(roots []string) ([]session.Live, error) {
 		wg.Add(1)
 		go func(p profile) {
 			defer wg.Done()
-			got := liveForProfile(p)
+			got := liveForProfile(p, pi)
 			mu.Lock()
 			sessions = append(sessions, got...)
 			mu.Unlock()
@@ -91,7 +128,7 @@ func (Adapter) Live(roots []string) ([]session.Live, error) {
 	return sessions, nil
 }
 
-func liveForProfile(p profile) []session.Live {
+func liveForProfile(p profile, pi *procInfo) []session.Live {
 	out, err := runAgents(p.home)
 	if err != nil {
 		// A profile that cannot be listed is not fatal: the other one may
@@ -106,6 +143,8 @@ func liveForProfile(p profile) []session.Live {
 		fmt.Fprintf(os.Stderr, "agent_session claude live: %s: parsing agents json: %v\n", p.home, err)
 		return nil
 	}
+
+	byPID, panes := pi.wait()
 
 	sessions := make([]session.Live, 0, len(entries))
 	for _, e := range entries {
@@ -122,7 +161,7 @@ func liveForProfile(p profile) []session.Live {
 			Name:       e.Name,
 			Cwd:        e.Cwd,
 			Transcript: transcript,
-			Tmux:       tmuxOf(p.home, e.PID),
+			Tmux:       tmuxOf(p.home, e.PID, byPID, panes),
 			Status:     e.Status,
 		})
 	}
@@ -171,12 +210,31 @@ func defaultHome() string {
 	return filepath.Join(h, ".claude")
 }
 
-// tmuxOf returns the tmux session a Claude Code session runs in, from its own
-// record, or "" when there is none (an attach via `claude agents`, or a
-// session run directly in a terminal). The record's `tmux` field looks like
-// `claude-work-scripts-2:@149.%151`; only the session name before the first
-// colon matters to the resolver.
-func tmuxOf(home string, pid int) string {
+// tmuxOf is the tmux session a Claude Code session runs in, or "" when there
+// is none (an attach via `claude agents`, or a session run outside tmux).
+//
+// The process tree is asked first, and the session's own record
+// (`<home>/sessions/<pid>.json`) only when the walk finds nothing. The record
+// carries the tmux session name as it stood when the session launched, and the
+// autoname hooks rename tmux sessions on every prompt, so that name goes stale
+// the moment the work is named: five of seventeen live sessions named a tmux
+// session that no longer existed. Walking the parents up to a pane instead
+// reports where the process actually sits, whatever the session is called now.
+//
+// The record is still the answer for a process the table no longer has, and
+// for one whose pane cannot be found -- and it is the only answer when tmux is
+// not running at all.
+func tmuxOf(home string, pid int, byPID map[int]proc.Process, panes map[int]string) string {
+	if name := proc.TmuxOf(pid, byPID, panes); name != "" {
+		return name
+	}
+	return recordedTmux(home, pid)
+}
+
+// recordedTmux is the tmux session named in the session's own record. The
+// field looks like `claude-work-scripts-2:@149.%151`; only the session name
+// before the first colon matters to the resolver.
+func recordedTmux(home string, pid int) string {
 	path := filepath.Join(home, "sessions", fmt.Sprintf("%d.json", pid))
 	data, err := os.ReadFile(path)
 	if err != nil {
