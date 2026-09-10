@@ -21,6 +21,7 @@ type previewData struct {
 	model  string
 	effort string
 	prompt string
+	reply  string
 }
 
 // Preview writes the fzf preview body: the thread's name, where and as what
@@ -68,16 +69,8 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	l.Row(w, c, "cwd", turns.AbbrevHome(data.meta.Cwd), "")
 
 	l.Gap(w)
-	w.WriteString(c.Bold("last prompt") + "\n")
-	prompt := data.prompt
-	if o.Compact {
-		prompt = turns.Truncate(prompt, preview.CompactTextLen)
-	}
-	if prompt == "" {
-		w.WriteString("(none in the scanned tail)\n")
-	} else {
-		w.WriteString(prompt + "\n")
-	}
+	l.Section(w, c, "last prompt", data.prompt, "none in the scanned tail")
+	l.Section(w, c, "last reply", data.reply, "no answer in the scanned tail")
 	return w.String(), nil
 }
 
@@ -137,16 +130,28 @@ func scanPreview(path string, window int64) previewData {
 				}
 			}
 		case "response_item":
+			// Both sides of the conversation, since the tail is already being
+			// read and decoded: the user's last prompt and the model's last
+			// answer. No status row goes with them -- see the note on `live`
+			// -- but what was last said is in hand either way.
 			var it responseItem
-			if json.Unmarshal(l.Payload, &it) != nil || it.Type != "message" || it.Role != "user" {
+			if json.Unmarshal(l.Payload, &it) != nil || it.Type != "message" {
 				continue
 			}
-			if text := partsText(it.Content); !scaffoldText(text) && strings.TrimSpace(text) != "" {
+			text := partsText(it.Content)
+			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			switch {
+			case it.Role == "user" && !scaffoldText(text):
 				data.prompt = text
+			case it.Role == "assistant":
+				data.reply = text
 			}
 		}
 	}
 
 	data.prompt = turns.OneLine(data.prompt)
+	data.reply = turns.OneLine(data.reply)
 	return data
 }

@@ -56,6 +56,64 @@ type message struct {
 	Model   string          `json:"model"`
 }
 
+// The message fields the two tail scans -- `list`'s and `preview`'s -- both
+// key on: who wrote the record, whether the harness wrote it rather than a
+// person, and the content itself. Embedded by each of them rather than spelled
+// out twice, so what counts as a typed prompt is decided in one place.
+//
+// Narrow on purpose. Decoding the full [record] per line would copy every
+// message body in the window; the content here is kept raw and only decoded
+// for the records that turn out to be worth reading.
+type msgRecord struct {
+	Type    string   `json:"type"`
+	IsMeta  bool     `json:"isMeta"`
+	Message *message `json:"message"`
+}
+
+// Whether this record is a message the user actually typed, which is what
+// `-last-by user` dates a session by and what the preview shows as the last
+// prompt. Two things wear the `user` type without being that: the harness's
+// own meta records, and the tool results, which come back as user turns
+// because that is how they are sent to the model.
+func (r msgRecord) typed() bool {
+	if r.Type != "user" || r.IsMeta || r.Message == nil || len(r.Message.Content) == 0 {
+		return false
+	}
+
+	// A bare string is a prompt and nothing else; only the block form can
+	// carry a tool result, so that is the only shape worth decoding.
+	var s string
+	if json.Unmarshal(r.Message.Content, &s) == nil {
+		return true
+	}
+	var blocks []struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(r.Message.Content, &blocks) != nil {
+		return false
+	}
+	for _, b := range blocks {
+		if b.Type == "tool_result" {
+			return false
+		}
+	}
+	return true
+}
+
+// The text of a message, its text blocks joined. Everything else a turn can
+// carry -- a tool call, a thinking block, a tool result -- has no text of its
+// own, so a record holding only those reads as empty here and the caller can
+// look further back for one that says something.
+func (r msgRecord) text() string {
+	var parts []string
+	for _, b := range decodeBlocks(r.Message) {
+		if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
+			parts = append(parts, b.Text)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
 // `system` record subtypes that carry something worth reading. The rest are
 // bookkeeping: `stop_hook_summary` never has content (0 of 225 locally), and
 // `turn_duration` is folded into the heading of the turn it measures.

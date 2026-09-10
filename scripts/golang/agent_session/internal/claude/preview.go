@@ -3,8 +3,10 @@ package claude
 // ** preview
 //
 // `agent_session claude preview <session.jsonl>` writes the fzf preview body
-// for a session: what it is called, what it was running as, where, when it last
-// moved, and what was last asked of it.
+// for a session: what it is called, whether it is still running, what it was
+// running as, where, when it last moved, and the last exchange of the
+// conversation -- the last thing the user typed and the last thing the model
+// said back.
 //
 // This exists to make the preview cheap enough to run on every cursor move.
 // The shell version tail-scanned with `tail -c | jq` and coloured its output
@@ -68,6 +70,7 @@ const previewWindow = 400 << 10
 type previewRecord struct {
 	Timestamp string `json:"timestamp"`
 
+	msgRecord
 	nameFields
 
 	LastPrompt     string `json:"lastPrompt"`
@@ -77,15 +80,16 @@ type previewRecord struct {
 	GitBranch      string `json:"gitBranch"`
 	Version        string `json:"version"`
 	Effort         string `json:"effort"`
-
-	Message *struct {
-		Model string `json:"model"`
-	} `json:"message"`
 }
 
 type previewData struct {
-	name     nameParts
-	prompt   string
+	name nameParts
+	// What the user last typed, and what the assistant last said, both found
+	// in the tail window; `record` is the `last-prompt` bookkeeping record,
+	// which is only a fallback. See [scanPreview].
+	typed    string
+	reply    string
+	record   string
 	stamp    string
 	permMode string
 	mode     string
@@ -99,7 +103,19 @@ type previewData struct {
 func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	c := preview.Painter{On: o.Color}
 	l := preview.Layout{Compact: o.Compact}
+
+	// Started before the tail read and usually abandoned. The head scan is
+	// only wanted when the tail turns out to hold no typed prompt, which is
+	// rare, and it is bounded by `headWindow` and satisfied within the first
+	// kilobyte in the ordinary case -- so running it beside the tail read
+	// costs a goroutine and no wall clock, where running it afterwards would
+	// add a second pass to the one preview that already had its answer.
+	// Nothing waits on it when the tail answered: `main` returns and the
+	// goroutine dies with the process.
+	first := firstPromptAsync(path)
+
 	data := scanPreview(path, o.Bytes)
+	status := statusOf(path)
 
 	w := &strings.Builder{}
 	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
@@ -109,7 +125,9 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	if name == "" {
 		name = "Claude Code session " + id
 	}
-	w.WriteString(c.BoldFg(profiles.PickerColors[profile], name) + "\n")
+	// The status emoji goes outside the colour escape: it is not part of the
+	// name, and a bold hourglass is no more legible than a plain one.
+	w.WriteString(statusEmoji(status) + c.BoldFg(profiles.PickerColors[profile], name) + "\n")
 
 	// The uuid goes first when the pane is narrow: it is the longest thing on
 	// the line by far, and the least worth reading of the three -- the profile
@@ -142,36 +160,134 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	mode := preview.JoinParts(" · ", data.permMode, data.mode)
 	where := preview.Annotate(turns.AbbrevHome(data.cwd), " @ ", data.branch)
 
+	// Only in the ordinary layout: a compact pane reads the status off the
+	// emoji on the name line, and cannot spare a row to spell it out.
+	if !o.Compact {
+		l.Row(w, c, "status", status, "")
+	}
 	l.Row(w, c, "last activity", when, aside)
 	l.Row(w, c, "model", model, "")
 	l.Row(w, c, "mode", mode, "")
 	l.Row(w, c, "cwd", where, "")
 
 	l.Gap(w)
-	w.WriteString(c.Bold("last prompt") + "\n")
-	prompt := data.prompt
-	if o.Compact {
-		prompt = turns.Truncate(prompt, preview.CompactTextLen)
-	}
-	if prompt == "" {
-		w.WriteString("(none in the scanned tail)\n")
-	} else {
-		w.WriteString(prompt + "\n")
-	}
+	l.Section(w, c, promptLabel(data), promptText(data, first), "nothing asked yet")
+	l.Section(w, c, "last reply", turns.OneLine(data.reply), "no answer in the scanned tail")
 
 	return w.String(), nil
+}
+
+// Which prompt the preview is about to show, in the order [promptText] finds
+// them.
+func promptLabel(data previewData) string {
+	if data.typed == "" && data.record == "" {
+		return "first prompt"
+	}
+	return "last prompt"
+}
+
+// What was last asked, in decreasing order of authority:
+//
+//   - the last message the user typed inside the tail window, which is what
+//     the section claims to show and is present in nearly every transcript;
+//   - the `last-prompt` bookkeeping record, which repeats one prompt but is
+//     written rarely -- of 77 local transcripts every one has such a record
+//     and only 2 have one inside a 400KB tail, which is why it cannot be the
+//     primary source;
+//   - the *first* thing the session was asked, from the head scan, for a tail
+//     that is all tool traffic. A session identifies itself better by what it
+//     was started for than by an empty section; the heading says which it is.
+func promptText(data previewData, first <-chan string) string {
+	switch {
+	case data.typed != "":
+		return data.typed
+	case data.record != "":
+		return data.record
+	}
+	return <-first
+}
+
+// The live status as one character on the name line: an hourglass for a
+// session working, a sleep sign for one waiting on its user, nothing at all
+// for a transcript with no live session behind it.
+func statusEmoji(status string) string {
+	switch status {
+	case "busy":
+		return "⏳ "
+	case "idle":
+		return "💤 "
+	}
+	return ""
+}
+
+// The status Claude Code records for the session this transcript belongs to,
+// or "" when it is not running.
+//
+// The record is `<config-home>/sessions/<pid>.json`, the same file `live`
+// reads, matched on its `sessionId`: a session writes one while it runs and
+// removes it on exit, so a transcript with no matching record is a finished
+// session. A crash leaves the file behind, so [recordAlive] checks the pid --
+// with no process table, because the point of doing this here is that it costs
+// a handful of small reads. On a platform where the kernel cannot be asked
+// directly that means trusting the record, which is the same trade `live`
+// makes when the table cannot be read.
+func statusOf(path string) string {
+	home := configHome(path)
+	if home == "" {
+		return ""
+	}
+	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
+
+	for _, rec := range readSessionRecords(home) {
+		if rec.SessionID != id || rec.PID == 0 || !recordAlive(rec, nil) {
+			continue
+		}
+		return rec.Status
+	}
+	return ""
+}
+
+// firstPromptAsync starts the head scan and hands back where its answer will
+// arrive. The channel is buffered, so a caller that never reads it leaks
+// nothing.
+func firstPromptAsync(path string) <-chan string {
+	out := make(chan string, 1)
+	go func() {
+		fh, err := os.Open(path)
+		if err != nil {
+			out <- ""
+			return
+		}
+		defer fh.Close()
+		out <- turns.OneLine(firstUserText(fh))
+	}()
+	return out
 }
 
 // The config home the transcript sits under -- .claude, .claude-work -- which
 // is the same label `list` puts on its own relative paths.
 func profileOf(path string) string {
+	home := configHome(path)
+	if home == "" {
+		return ""
+	}
+	return filepath.Base(home)
+}
+
+// The config home directory itself: everything above the `projects` directory
+// a transcript lives in. `~/.claude` for
+// `~/.claude/projects/-Users-e-scripts/<uuid>.jsonl`. That is where the live
+// session records sit, so the same rule that names the profile also finds
+// them -- a work session must not be matched against the personal seat's
+// records, and vice versa.
+func configHome(path string) string {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		abs = path
 	}
 	sep := string(filepath.Separator)
-	if i := strings.Index(abs, sep+"projects"+sep); i >= 0 {
-		return filepath.Base(abs[:i+1])
+	if i := strings.Index(abs, sep+"projects"+sep); i > 0 {
+		return abs[:i]
 	}
 	return ""
 }
@@ -246,7 +362,20 @@ func scanPreview(path string, window int64) previewData {
 
 		data.name.observe(rec.nameFields, false)
 
-		set(&data.prompt, rec.LastPrompt)
+		// The conversation itself, as opposed to the bookkeeping around it.
+		// Both are "last one wins" like every other field here, and both are
+		// allowed to find nothing: a message that is only a system reminder
+		// or only a tool call reduces to "" and leaves the previous one
+		// standing, which is what makes the sections show something a person
+		// would recognise rather than the newest record's scaffolding.
+		switch {
+		case rec.typed():
+			set(&data.typed, snippetText(rec.text()))
+		case rec.Type == "assistant" && !rec.IsMeta:
+			set(&data.reply, rec.text())
+		}
+
+		set(&data.record, rec.LastPrompt)
 		set(&data.stamp, rec.Timestamp)
 		set(&data.permMode, rec.PermissionMode)
 		set(&data.mode, rec.Mode)
@@ -259,6 +388,7 @@ func scanPreview(path string, window int64) previewData {
 		}
 	}
 
-	data.prompt = turns.OneLine(data.prompt)
+	data.typed = turns.OneLine(data.typed)
+	data.record = turns.OneLine(data.record)
 	return data
 }

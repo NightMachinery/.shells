@@ -167,49 +167,15 @@ func scanSession(path, root string, snippetLen, nameLen int, userOnly bool) sess
 // millisecond-scale reordering that does occur in practice.
 const tailRecords = 25
 
-// Only the type, the timestamp and the name fields are needed here, plus what
-// `-last-by user` has to tell a prompt from the rest. Decoding into the full
-// record would copy every message body in the window for nothing; the content
-// is kept raw and only looked at when the flag asks for it.
+// Only the timestamp and the name fields are needed here, on top of the
+// message fields [msgRecord] carries -- which is where `-last-by user` gets
+// its rule for telling a prompt from a tool result, shared with the preview's
+// own tail scan.
 type tailRecord struct {
-	Type      string `json:"type"`
 	Timestamp string `json:"timestamp"`
-	IsMeta    bool   `json:"isMeta"`
 
-	Message *struct {
-		Content json.RawMessage `json:"content"`
-	} `json:"message"`
-
+	msgRecord
 	nameFields
-}
-
-// Whether this record is a message the user actually typed, which is what
-// `-last-by user` dates a session by. Two things wear the `user` type without
-// being that: the harness's own meta records, and the tool results, which come
-// back as user turns because that is how they are sent to the model.
-func (r tailRecord) typed() bool {
-	if r.Type != "user" || r.IsMeta || r.Message == nil || len(r.Message.Content) == 0 {
-		return false
-	}
-
-	// A bare string is a prompt and nothing else; only the block form can
-	// carry a tool result, so that is the only shape worth decoding.
-	var s string
-	if json.Unmarshal(r.Message.Content, &s) == nil {
-		return true
-	}
-	var blocks []struct {
-		Type string `json:"type"`
-	}
-	if json.Unmarshal(r.Message.Content, &blocks) != nil {
-		return false
-	}
-	for _, b := range blocks {
-		if b.Type == "tool_result" {
-			return false
-		}
-	}
-	return true
 }
 
 // Newest user/assistant timestamp and the session's name, found by walking
