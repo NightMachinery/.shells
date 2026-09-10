@@ -1,0 +1,13 @@
+{
+  "name": "Work seat 🏫",
+  "base": "light-daltonized",
+  "overrides": {
+    "claude": "rgb(235,145,60)",
+    "claudeShimmer": "rgb(250,190,120)",
+    "promptBorder": "rgb(235,145,60)",
+    "promptBorderShimmer": "rgb(250,190,120)",
+    "planMode": "rgb(235,145,60)",
+    "briefLabelYou": "rgb(235,145,60)",
+    "userMessageBackground": "#fff1e3"
+  }
+}

@@ -95,7 +95,7 @@
     "mode": "tap"
   },
   "skipDangerousModePermissionPrompt": true,
-  "theme": "light-daltonized",
+  "theme": "custom:profile",
   "editorMode": "vim",
   "preferredNotifChannel": "notifications_disabled",
   "autoCompactEnabled": true,

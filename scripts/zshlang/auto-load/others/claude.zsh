@@ -33,11 +33,34 @@ function claude {
         local -x CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1
     fi
 
-    #: The marker is how a work tab is told apart from a personal one; see
-    #: [agfi:claude-work]. `local` is dynamically scoped in zsh, so a caller
-    #: can set it without exporting anything.
-    agent_launch_glyph="${claude_tty_title_marker:-$(h-agent-field claude glyph)}" \
-        h-agent-launch claude command claude "$@"
+    #: Which seat this is, resolved once from the effective CLAUDE_CONFIG_DIR
+    #: rather than from the launcher's name, so `claude-m` typed inside a work
+    #: session is still a work session. Every visual cue below keys off it; the
+    #: tables live next to =claude_code_profiles=.
+    local profile
+    profile="$(claude-code-profile-current)"
+
+    #: The seat's own palette, as a =themes/profile.json= per config dir
+    #: ([agfi:claude-themes-link]). The link must exist before the session
+    #: starts: Claude Code only watches a themes directory that was already
+    #: there. One stat in the common case, where the link is already right.
+    local -a claude_args=()
+    if bool "${claude_theme_p:-y}" ; then
+        test -e "$(h-claude-profile-theme-link "${profile}")" ||
+            claude-themes-link || true
+    else
+        #: `--settings` merges above the user settings for this session only.
+        #: A caller that passes its own `--settings` may not merge with this
+        #: one -- the tmux-subagents launcher is the case to watch -- which is
+        #: why the default path passes none.
+        claude_args+=(--settings '{"theme":"light-daltonized"}')
+    fi
+
+    #: The marker is how a work tab is told apart from a personal one, in the
+    #: tty title and in every other cue. `local` is dynamically scoped in zsh,
+    #: so a caller can override it without exporting anything.
+    agent_launch_glyph="${claude_tty_title_marker:-${claude_code_profile_markers[$profile]:-$(h-agent-field claude glyph)}}" \
+        h-agent-launch claude command claude "${claude_args[@]}" "$@"
 }
 aliasfn claude-m claude
 ##
@@ -159,6 +182,76 @@ typeset -gA claude_code_profile_launchers=(
     default  claude
     work     claude-work
 )
+##
+#: The visual identity of a seat. Both profiles run the same tracked
+#: settings.json, so without these a work session and a personal one are
+#: indistinguishable from inside the TUI. Every cue is derived from the
+#: *effective* config dir ([agfi:claude-code-profile-current]), never from the
+#: launcher's name, so `claude-m' typed inside a work session is still work.
+#: See =docs/claude_code_usage.md=.
+##
+#: One emoji per profile, used by the tty title, the status line badge and the
+#: tmux pane label alike, so the same glyph means the same seat everywhere.
+typeset -gA claude_code_profile_markers=(
+    default  🦋
+    work     🏫
+)
+#: The same seats as an `R;G;B' triplet. The convention is shared with
+#: `profileColors' in =golang/agent_session/internal/claude/preview.go=, which
+#: paints the session pickers, so a seat is one colour across the whole
+#: toolchain: personal blue, work orange.
+typeset -gA claude_code_profile_colors=(
+    default  '90;150;240'
+    work     '235;145;60'
+)
+#: The pane background each seat tints to ([agfi:claude]): a wash of the
+#: profile colour, pale enough to leave the daltonized theme legible.
+typeset -gA claude_code_profile_tints=(
+    default  '#eef3fc'
+    work     '#fff6ec'
+)
+#: Which tracked theme file a seat's =themes/profile.json= points at. The slug
+#: is deliberately the same in every config dir, so the one shared
+#: settings.json can say `"theme": "custom:profile"' and still give each seat
+#: its own palette; see [agfi:claude-themes-link].
+typeset -gA claude_code_profile_themes=(
+    default  personal
+    work     work
+)
+
+function claude-themes-link {
+    : "points each profile's themes/profile.json at its tracked theme file"
+    #: Claude Code reads custom themes from =<config dir>/themes/<slug>.json=
+    #: and watches that directory afterwards -- but only if it existed when the
+    #: session started, which is why [agfi:claude] links before launching
+    #: rather than after. Idempotent, and silent about profiles that are not
+    #: installed on this host.
+    ##
+    local profile dir src
+    for profile in "${claude_code_profile_order[@]}" ; do
+        #: The default profile has no CLAUDE_CONFIG_DIR; its config home is
+        #: =~/.claude=.
+        dir="${claude_code_profiles[$profile]:-${HOME}/.claude}"
+        test -d "${dir}" || continue
+
+        src="${NIGHTDIR}/configFiles/claude-code/themes/${claude_code_profile_themes[$profile]}.json"
+        if ! test -e "${src}" ; then
+            ecerr "$0: missing tracked theme: ${src}"
+            return 1
+        fi
+
+        mkdir -p "${dir}/themes" @RET
+        command ln -sf "${src}" "${dir}/themes/profile.json" @RET
+    done
+}
+
+function h-claude-profile-theme-link {
+    : "prints the path of a profile's themes/profile.json"
+    local profile="${1}"
+    assert-args profile @RET
+
+    ec "${claude_code_profiles[$profile]:-${HOME}/.claude}/themes/profile.json"
+}
 
 function claude-code-profile-current {
     #: Prints the profile the Claude Code that spawned this shell runs under,
@@ -983,8 +1076,11 @@ function claude-work {
     #: `Claude Code-credentials` only while CLAUDE_CONFIG_DIR is unset, so
     #: setting it there would cost a re-login for nothing.
     ##
+    #: The visual cues -- glyph, theme, tint, tmux label -- are not set here.
+    #: [agfi:claude] derives all of them from this config dir via
+    #: =claude_code_profile_markers= and friends, so a work session looks like
+    #: one however it was started, including a bare `CLAUDE_CONFIG_DIR=... claude`.
     local -x CLAUDE_CONFIG_DIR="${HOME}/.claude-work"
-    local claude_tty_title_marker='🏛'
 
     claude "$@"
 }
