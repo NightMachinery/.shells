@@ -1886,6 +1886,111 @@ function h-agent-session-annotate-rows {
         fi
 }
 
+function h-agent-session-tmux-rows {
+    #: The rows [agfi:fftmux-agent] offers: one for every live agent session
+    #: sitting in a tmux session, in the layout [agfi:h-agent-session-fz] reads,
+    #: with the tmux session *id* in the caller column.
+    #:
+    #: The source is [agfi:h-agent-session-live-list] rather than `tmux ls':
+    #: a tmux session runs an agent exactly when a live agent process sits in
+    #: one, and the name says nothing -- a session the autoname hooks have not
+    #: reached yet looks like any other.
+    #:
+    #: Ids, not names: a name is not a safe `-t' target, and the hooks rename on
+    #: every prompt, so a name can go stale between the pick and the goto. See
+    #: [agfi:tmux-session-id] and =docs/tmux-session-rename.md=.
+    #:
+    #: Two agents sharing one tmux session give two rows, which is honest: they
+    #: are two conversations, and the engine lands in the same place either way.
+    ##
+    local agent_session_live_list_cache="${agent_session_live_list_cache:-$(h-agent-session-live-list)}"
+
+    #: One listing for every row. [agfi:tmux-session-id] would fork per row.
+    local -A ids tnames
+    local line
+    for line in ${(f)"$(command tmux list-sessions -F '#{session_id}'$'\t''#{session_name}' 2>/dev/null)"} ; do
+        test -n "${line}" || continue
+        ids[${line#*$'\t'}]="${line%%$'\t'*}"
+        tnames[${line%%$'\t'*}]="${line#*$'\t'}"
+    done
+
+    #: Claude reports the session name it was *launched* in, read back out of
+    #: its own `sessions/<pid>.json' record, and the autoname hooks rename on
+    #: every prompt: measured while writing this, five of seventeen live
+    #: sessions named a tmux session that no longer existed. The pane an agent
+    #: runs in does not move, so a name that misses is resolved through the
+    #: process tree instead -- one `list-panes' and one `ps' shared by every
+    #: row, rather than one of each per row.
+    local -A pane_ids parents
+    for line in ${(f)"$(command tmux list-panes -a -F '#{pane_pid}'$'\t''#{session_id}' 2>/dev/null)"} ; do
+        test -n "${line}" || continue
+        pane_ids[${line%%$'\t'*}]="${line#*$'\t'}"
+    done
+    local -a pf
+    for line in ${(f)"$(command ps -Ao pid=,ppid= 2>/dev/null)"} ; do
+        pf=( ${=line} )
+        (( ${#pf} == 2 )) || continue
+        parents[${pf[1]}]="${pf[2]}"
+    done
+
+    local -a root_agents
+    root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
+
+    local -a live f
+    live=( ${(f)agent_session_live_list_cache} )
+
+    local row t tname id name label rows=''
+    local -i p guard
+    for row in "${live[@]}" ; do
+        f=( "${(@ps:\t:)row}" )
+
+        tname="${f[6]}"
+        test -n "${tname}" && [[ "${tname}" != '-' ]] || continue
+
+        #: A session that has written nothing has nothing to preview.
+        t="${f[5]}"
+        test -n "${t}" && test -e "${t}" || continue
+
+        id="${ids[${tname}]}"
+        if test -z "${id}" ; then
+            #: A stale name; walk the agent process up to the pane holding it.
+            #: The guard is for a parent chain that loops, which a reparented
+            #: process can produce while the table is being read.
+            p="${f[1]}"
+            guard=0
+            while test -n "${p}" && (( p > 1 && guard++ < 64 )) ; do
+                if test -n "${pane_ids[${p}]}" ; then
+                    id="${pane_ids[${p}]}"
+                    break
+                fi
+                p="${parents[${p}]}"
+            done
+        fi
+        test -n "${id}" || continue
+
+        #: The tmux name, as the person knows the session, but from tmux rather
+        #: than from the row: the recorded one may be several renames old. The
+        #: agent's own name goes after it when it adds anything -- the hooks
+        #: name a session after its agent session, so usually it does not.
+        tname="${tnames[${id}]:-${tname}}"
+        label="${tname}"
+        name="${f[3]}"
+        if test -n "${name}" && [[ "${name}" != '-' && "${label}" != *"${name}"* ]] ; then
+            label+="  ${name}"
+        fi
+
+        h-agent-session-agent-in-roots "${t}" "${root_agents[@]}"
+        rows+="${id}"$'\t'"${t}"$'\t'"${REPLY}"$'\t'"${label}"$'\n'
+    done
+
+    if test -z "${rows}" ; then
+        ecerr "$0: no live agent session in a tmux session"
+        return 1
+    fi
+
+    ec "${rows%$'\n'}" | h-agent-session-annotate-rows
+}
+
 function h-agent-session-preview-cmd {
     #: The fzf `--preview' command for a session row, shell-quoted and ready to
     #: have a field placeholder appended:
@@ -1923,6 +2028,11 @@ function h-agent-session-preview-cmd {
 
     local bytes="${agent_session_preview_bytes:-${claude_code_session_preview_bytes}}"
     local color_p="${agent_session_preview_color_p:-${claude_code_session_preview_color_p:-y}}"
+    #: `auto' (the default) says nothing and lets the binary decide from the
+    #: preview size fzf exports to it, FZF_PREVIEW_COLUMNS and
+    #: FZF_PREVIEW_LINES, which is the only place the real width is known: this
+    #: function runs in the picker's shell, not in the preview pane.
+    local compact_p="${agent_session_preview_compact_p:-auto}"
 
     h-agent-session-dep @RET
 
@@ -1930,6 +2040,13 @@ function h-agent-session-preview-cmd {
     cmd=( preview )
     test -n "${bytes}" && cmd+=( "-bytes=${bytes}" )
     bool "${color_p}" || cmd+=( '-color=false' )
+    if [[ "${compact_p}" != auto ]] ; then
+        if bool "${compact_p}" ; then
+            cmd+=( '-compact=true' )
+        else
+            cmd+=( '-compact=false' )
+        fi
+    fi
 
     ec "$(gquote "${commands[agent_session]:-agent_session}") ${agent} $(gquote "${cmd[@]}")"
 }

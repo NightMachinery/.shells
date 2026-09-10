@@ -211,6 +211,42 @@ function fftmux-name {
     ftE=(tmux-session-name-of) fftmux "$@"
 }
 
+function fftmux-agent {
+    : "fuzzy-pick the tmux sessions running an agent; the engine gets each pick's session id"
+    #: The rows come from the live listing, not from `tmux ls': a tmux session
+    #: runs an agent exactly when a live agent process sits in it, which only
+    #: [agfi:h-agent-session-tmux-rows] can say. So this lists fewer sessions
+    #: than [agfi:fftmux] and knows much more about each.
+    #:
+    #: Newest first by the last *message*, not by the transcript's mtime: an
+    #: agent appends bookkeeping records long after the conversation ends, so
+    #: mtime can rank a session you have not spoken to in hours above the one
+    #: you just left. See the comment above `scanSession' in
+    #: =golang/agent_session/internal/claude/list.go=.
+    #:
+    #: fftmux_agent_sort chooses the order, through
+    #: [agfi:h-agent-session-annotate-rows]: `last' (the default) is the last
+    #: message either way round, `user' the last one from you, and empty is the
+    #: listing's own order. [agfi:fftmux-agent-sort-by-user] is the second.
+    ##
+    local query="$*"
+
+    bella_zsh_disable1
+
+    local rows
+    rows="$(agent_session_rows_sort="${fftmux_agent_sort:-last}" h-agent-session-tmux-rows)" @RET
+
+    #: [agfi:h-agent-session-fz] brings the Go previewer and the alt+enter
+    #: binding with it, and hides everything but the display columns; the tmux
+    #: session id is field 1, which is what comes back to us.
+    local picks
+    picks="$(ec "${rows}" | h-agent-session-fz multi --query "${query}")" || return $?
+
+    h-fftmux-act "${picks}"
+}
+aliasfn ffta fftmux-agent
+aliasfn fftmux-agent-sort-by-user fftmux_agent_sort=user fftmux-agent
+
 function tmux-pane-list {
     : "Usage: <session-name-or-id>"
     #: `lsp' resolves a *window* target even under `-s', so neither a bare

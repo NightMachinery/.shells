@@ -15,8 +15,10 @@ Start here:
 - `agent-session-live-fz` picks from the sessions running right now.
 - `agent-session-resume-fz` resumes one, handing off to that agent's own resume
   command.
+- `ffta` picks among the tmux sessions that are running an agent, the one you
+  spoke to last at the top, and goes to it.
 
-Everything below is why those four work, and what to change when they do not.
+Everything below is why those five work, and what to change when they do not.
 
 ## The agent travels with the transcript path
 
@@ -241,6 +243,61 @@ The reading itself is all in one Go binary, run as
 models, the org and markdown writer, the parallel pandoc path and the
 performance work. The zsh side keeps the policy; Go does the work.
 
+## Picking a tmux session that runs an agent
+
+[agfi:fftmux-agent], `ffta`, is [agfi:fftmux] narrowed to the sessions that
+have an agent in them, with the session pickers' rich preview attached. You get
+one row per live agent session that sits in a tmux session, showing the tmux
+name, the agent's own name for the conversation when it adds anything, the
+glyph of which agent it is, when the conversation last moved and its first
+prompt; picking one hands its session *id* to the engine, which by default is
+[agfi:tmux-session-goto].
+
+The rows come from [agfi:h-agent-session-tmux-rows], over
+[agfi:h-agent-session-live-list] rather than over `tmux ls`. A tmux session
+runs an agent exactly when a live agent process sits in it, and that is not
+something a name can tell you: an autoname hook may not have reached the
+session yet, and a session named after an agent may be one the agent has since
+left. The live listing already knows, because it traced the process.
+
+It prints ids, `$374` and not `+Claude/default whatever`, for the reasons in
+`docs/tmux-session-rename.md`: a name beginning with a sigil is not a usable
+`-t` target, and the autoname hooks rename on every prompt, so a name captured
+during the pick can be gone by the time you act on it. [agfi:h-fftmux-act],
+which `fft` and `ffta` share, takes the id from the first column and asks tmux
+for a name only to say what it is doing.
+
+That staleness is not hypothetical here, because the tmux column of a Claude
+row is the session name Claude recorded in `sessions/<pid>.json` when it
+*started*. Measured while writing this: five of seventeen live sessions named a
+tmux session that no longer existed, including the one doing the measuring. So
+when the name misses, the row is resolved through the process tree instead --
+the agent's pid walked up to the pane holding it, over one `tmux list-panes -a`
+and one `ps` shared by every row. A pane does not get renamed.
+
+The order is by the last *message*, not by the transcript's mtime: an agent
+appends bookkeeping records to a transcript long after the conversation ends,
+so mtime floats a session you have not spoken to in hours above the one you
+just left. `list` reports
+that timestamp, and [agfi:h-agent-session-annotate-rows] sorts on it when
+`agent_session_rows_sort` is set: `last` for either side's last message, `user`
+for your last one, empty for the caller's own order. `ffta` sets it to `last`
+through `fftmux_agent_sort`, and [agfi:fftmux-agent-sort-by-user] is the same
+picker with `user`, which is what you want when the question is "where did I
+leave off" rather than "what has just finished".
+
+The engine is `fft`'s, so everything that works there works here:
+`ftE=(ec) ffta` prints the picked ids instead of going to them,
+`ftE=(tmux-session-processes-kill) ffta` kills the session behind a
+conversation, and any function taking a session target can stand there.
+
+The preview is the same Go previewer the other pickers use, and it goes compact
+on a narrow terminal -- Termux over ssh, a phone-sized split -- by itself: fzf
+exports `FZF_PREVIEW_COLUMNS` and `FZF_PREVIEW_LINES` to the preview process,
+and the binary reads them, since a zsh knob cannot reach a process fzf spawns
+on its own. `agent_session_preview_compact_p` overrides the guess, `y` or `n`,
+and its default `auto` is what leaves the decision to the binary.
+
 ## Hooks, the registry, and trust
 
 The registry is insurance, not the mechanism. [agfi:agent-session-register]
@@ -296,8 +353,15 @@ Claude helpers first: `agent_session_max_block_lines`,
 no `claude_code_*` spelling, because the behaviour it switches off did not
 exist before.
 
-Two are new and belong to this design rather than to Claude:
+These are new and belong to this design rather than to Claude:
 
+- `agent_session_rows_sort` -- how [agfi:h-agent-session-annotate-rows] orders
+  what it emits: empty for the caller's order, `last` for the newest message
+  first, `user` for the newest message of yours. `fftmux_agent_sort` is the
+  same value in `ffta`'s spelling, and defaults to `last` there.
+- `agent_session_preview_compact_p` -- `y` or `n` to force the preview's
+  compact layout, `auto` (the default) to let the binary read the preview size
+  fzf gives it.
 - `agent_session_agents` -- whitespace separated agent tokens, narrowing every
   picker and resolver. This is the whole implementation of the per-agent
   commands: `codex-resume-fz` is `agent_session_agents=codex
@@ -340,6 +404,9 @@ change here, in rough order of how much it would hurt to lose:
   than start a second conversion.
 - `codex-resume-fz` and `agy-resume-fz`, and `agent-session-live-fz` with more
   than one agent running, to see the glyph column and per-row previews.
+- `ffta` from inside tmux and from outside it, and `ftE=(ec) ffta` to read the
+  ids back; check that a session you renamed a moment ago is still in the list
+  and still lands in the right place.
 - `agent-session-selftest`, which runs the Go tests and then the pandoc parity
   check over your real transcripts.
 - `agents-md-doctor`, after any hook or settings change.
