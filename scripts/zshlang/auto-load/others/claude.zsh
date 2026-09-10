@@ -62,11 +62,28 @@ function claude {
     #: profile field.
     local -x CLAUDE_CODE_PROFILE_BADGE_P="${claude_statusline_badge_p:-y}"
 
-    #: The marker is how a work tab is told apart from a personal one, in the
-    #: tty title and in every other cue. `local` is dynamically scoped in zsh,
-    #: so a caller can override it without exporting anything.
-    agent_launch_glyph="${claude_tty_title_marker:-${claude_code_profile_markers[$profile]:-$(h-agent-field claude glyph)}}" \
-        h-agent-launch claude command claude "${claude_args[@]}" "$@"
+    #: A pale wash of the seat's colour behind the session: the one cue that
+    #: needs no reading at all. Only when our stdout is a terminal, since a
+    #: piped or captured run must not be handed escape codes.
+    local tint_p=n
+    if bool "${claude_tint_p:-y}" && isTty ; then
+        tint_p=y
+        h-claude-tint-set "${profile}"
+    fi
+
+    {
+        #: The marker is how a work tab is told apart from a personal one, in
+        #: the tty title and in every other cue. `local` is dynamically scoped
+        #: in zsh, so a caller can override it without exporting anything.
+        agent_launch_glyph="${claude_tty_title_marker:-${claude_code_profile_markers[$profile]:-$(h-agent-field claude glyph)}}" \
+            h-agent-launch claude command claude "${claude_args[@]}" "$@"
+    } always {
+        #: Runs on a normal quit and on Ctrl-C alike; only a `kill -9` escapes
+        #: it. Never allowed to change the session's own exit status.
+        if bool "${tint_p}" ; then
+            h-claude-tint-reset || true
+        fi
+    }
 }
 aliasfn claude-m claude
 ##
@@ -249,6 +266,31 @@ function claude-themes-link {
         mkdir -p "${dir}/themes" @RET
         command ln -sf "${src}" "${dir}/themes/profile.json" @RET
     done
+}
+
+function h-claude-tint-set {
+    : "tints this pane (under tmux) or window (bare) to a profile's wash"
+    #: OSC 11 sets the default background colour. tmux 3.0 and later apply it
+    #: to the pane that sent it, so a sibling pane in the same window is
+    #: untouched; outside tmux, kitty applies it to the whole window. Cells the
+    #: TUI paints with a background of their own are unaffected, so this reads
+    #: as a tint rather than a repaint.
+    ##
+    local profile="${1}"
+    assert-args profile @RET
+
+    local tint="${claude_code_profile_tints[$profile]}"
+    test -n "${tint}" || return 0
+
+    printf '\e]11;%s\a' "${tint}"
+}
+
+function h-claude-tint-reset {
+    : "restores the terminal's own background, undoing [agfi:h-claude-tint-set]"
+    #: OSC 111 resets what OSC 11 set. A `kill -9` of the session skips this,
+    #: leaving the pane tinted until the next reset or a new pane.
+    ##
+    printf '\e]111;\a'
 }
 
 function h-claude-profile-theme-link {
