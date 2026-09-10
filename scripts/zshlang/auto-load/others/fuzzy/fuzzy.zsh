@@ -182,19 +182,19 @@ function tmux-pane-list {
 function tmux-pane-list-pid {
     : "Usage: <session-name>"
 
-    @opts o '#{pane_pid' @ tmux-pane-list "$@"
+    @opts o '#{pane_pid}' @ tmux-pane-list "$@"
 }
 
 function fftmux-pane-list {
-    : "Usage: <session-name>"
+    : "Usage: [fuzzy-query]"
 
-    ftE='tmux-pane-list' fftmux
+    ftE=(tmux-pane-list) fftmux "$@"
 }
 
 function fftmux-pane-list-pid {
-    : "Usage: <session-name>"
+    : "Usage: [fuzzy-query]"
 
-    ftE='tmux-pane-list-pid' fftmux
+    ftE=(tmux-pane-list-pid) fftmux "$@"
 }
 
 function tmux-pane-restart-nokill {
@@ -215,12 +215,12 @@ function tmux-session-processes-kill {
     local s
     for s in ${(@f)sessions} ; do
         ecgray $'\n'"$0: killing the processes of session $(gquote-sq "$s"):"
-        local panes
+        local pane_pids
         pane_pids="$(tmux-pane-list-pid "$s")"
 
         local p
         for p in ${(@f)pane_pids} ; do
-            reval-ec kill-withchildren "$kill_opts" "$p"
+            reval-ec kill-withchildren "$kill_opts[@]" "$p"
         done
 
         command tmux kill-session -t "${s}" || true
@@ -238,13 +238,13 @@ function tmux-session-restart {
     local s
     for s in ${(@f)sessions} ; do
         ecgray $'\n'"$0: restarting session $(gquote-sq "$s"):"
-        local panes
+        local panes pane_pids
         panes="$(tmux-pane-list "$s")"
         pane_pids="$(tmux-pane-list-pid "$s")"
 
         local p
         for p in ${(@f)pane_pids} ; do
-            reval-ec kill-withchildren "$kill_opts" "$p"
+            reval-ec kill-withchildren "$kill_opts[@]" "$p"
         done
         for p in ${(@f)panes} ; do
             reval-ec tmux-pane-restart-nokill "$p"
