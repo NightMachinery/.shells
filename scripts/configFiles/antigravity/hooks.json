@@ -14,5 +14,21 @@
         "timeout": 5
       }
     ]
+  },
+  "kitty-register": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-session-register agy >/dev/null 2>&1; echo '{}'",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-session-register agy >/dev/null 2>&1; echo '{}'",
+        "timeout": 5
+      }
+    ]
   }
 }
