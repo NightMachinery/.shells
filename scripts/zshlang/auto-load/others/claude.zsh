@@ -1260,9 +1260,9 @@ function claude-code-usage-notif-status {
 }
 ##
 function claude-work {
-    #: Claude Code on the work team seat: a second config home, so a
-    #: separate account, history, projects and plugins. `settings.json` there
-    #: symlinks to the same tracked file as the personal profile.
+    #: Claude Code on the work seat: a second config home, so a separate
+    #: account, history, projects and plugins. `settings.json` there symlinks
+    #: to the same tracked file as the personal profile.
     #:
     #: Goes through [agfi:claude] rather than `command claude`, so it gets
     #: [agfi:h-agents-md-sync-ask] -- which is what keeps
