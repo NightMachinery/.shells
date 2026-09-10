@@ -81,7 +81,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash ~/.claude/hooks/statusline.sh"
+    "command": "bash ~/scripts/configFiles/claude-code/statusline.sh"
   },
   "enabledPlugins": {
     "clangd-lsp@claude-plugins-official": true
