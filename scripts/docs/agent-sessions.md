@@ -138,10 +138,13 @@ the three: a running `agy` is paired to a conversation through its cwd and
 directory. That is right whenever a workspace hosts one conversation at a time,
 and when it does not, the hooks' record on the tmux session settles it.
 
-A session that cannot be paired to a process gets pid 0 and tmux `-`. That is
-the load-bearing convention: a row that admits it does not know where it is
-running can never be matched to the wrong window, and the picker takes over
-instead.
+The rule all three follow is that a live row names only a process that was
+really traced. A session that cannot be paired to one gets no row rather than a
+plausible pid, and a session with a pid but no tmux session carries `-` in that
+column, which no window name can match. This is load-bearing: the resolver
+matches windows against these rows, so an invented pid would not show up as a
+miss, it would open the wrong transcript silently. A missing row opens the
+picker instead.
 
 The reading itself is all in one Go binary, run as
 `agent_session <agent> <subcommand>`, whose `readme.org` covers the record

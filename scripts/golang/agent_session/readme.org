@@ -2,10 +2,20 @@
 
 Renders coding-agent session transcripts into org-mode or markdown, scans a
 directory of them for the fuzzy session picker, and writes the picker's preview
-pane. One binary, one adapter per agent. Today the only adapter is Claude Code
-(=~/.claude*/projects/**/*.jsonl=); Codex and Antigravity are next, and the
-layout below is arranged so that they slot in without the renderer noticing.
-The zsh wrappers live in =zshlang/auto-load/others/claude-session.zsh=.
+pane. One binary, one adapter per agent, and there are three of them now:
+
+- Claude Code, one JSONL per session (=~/.claude*/projects/**/*.jsonl=);
+- Codex, one rollout per thread
+  (=~/.codex/sessions/YYYY/MM/DD/rollout-<local-timestamp>-<uuid>.jsonl=);
+- Antigravity, whose conversations are *directories* rather than files
+  (=~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript_full.jsonl=,
+  falling back to the truncated =transcript.jsonl= beside it).
+
+The zsh side is =zshlang/auto-load/others/agent-session.zsh= for everything
+agent-neutral, one =<agent>-session.zsh= per adapter, and =agents.zsh= for the
+table of agents. =docs/agent-sessions.md= is the prose about that half --- the
+kitty hotkey, the pickers, the window-to-session resolution order, the hook
+wiring --- and this readme stays about the binary.
 
 Standard library only, so =go build= needs no network and no module cache. It
 works on a freshly bootstrapped, sudoless host.
@@ -20,13 +30,13 @@ go-install-local "${NIGHTDIR}/golang/agent_session"
 #+end_src
 
 Registered in =setup/setup_go=, so a full setup run installs it. The zsh
-wrappers also install it on first use, through [[agfi:h-claude-code-session-dep]]
+wrappers also install it on first use, through [[agfi:h-agent-session-dep]]
 and [[agfi:ensure-dep1]], so a fresh clone works without a separate step as long
 as Go is present.
 
 * Test
 #+begin_src zsh :eval never
-claude-session-selftest
+agent-session-selftest
 #+end_src
 
 That runs =go test= plus the parity check below, once per profile root. The Go
@@ -37,9 +47,16 @@ cd "${NIGHTDIR}/golang/agent_session" && go test ./...
 
 Each package tests what it owns: =internal/turns= the writer, fence repair,
 heading levels and the diff; =internal/claude= the record model, turn merging,
-name precedence and the tail scans; =internal/session= the root labels and the
-dash-guard; =internal/preview= the row primitives. The parity test sits at the
-module root, in =parity_test.go=, because it builds the binary and runs it. It
+name precedence and the tail scans; =internal/codex= the rollout model, the
+subagent filter, the last-wins name index and the argv unwrapping;
+=internal/agy= the step model, the =<USER_REQUEST>= unwrapping, an unknown step
+type and the subagent inlining; =internal/session= the root labels and the
+dash-guard; =internal/preview= the row primitives. The two new adapters' tests
+build a whole store under =t.TempDir()=, so nothing there reads a real
+transcript, and =internal/proc= has no tests of its own because its =Run= is a
+variable: the two liveness tests replace it and hand back the =ps=, =lsof= and
+=tmux= output they want, so nothing is shelled out to. The parity test sits at
+the module root, in =parity_test.go=, because it builds the binary and runs it. It
 needs real transcripts and pandoc, so it is skipped unless pointed at a corpus:
 #+begin_src zsh :eval never
 AGENT_SESSION_CORPUS=~/.claude/projects go test -run Parity ./...
@@ -47,7 +64,9 @@ AGENT_SESSION_CORPUS=~/.claude/projects go test -run Parity ./...
 
 =AGENT_SESSION_CORPUS_AGENT= names the agent the corpus belongs to and defaults
 to =claude=; the old =CLAUDE_SESSION_CORPUS= name is still honoured.
-[[agfi:claude-session-selftest]] sets the variable itself.
+[[agfi:agent-session-selftest]] sets the variable itself, and
+=claude-session-selftest= still reaches it as an alias, as do the other old
+names.
 
 The rename and split were checked the blunt way: every subcommand run over a
 synthetic fixture, byte for byte against what =claude_session= printed for the
@@ -56,11 +75,21 @@ same arguments. Nothing in the output moved.
 * Layout
 
 One module, =agent_session=, with =main.go= doing nothing but dispatch. The work
-is in four internal packages, and the seam between them is the point of the
+is in seven internal packages, and the seam between them is the point of the
 split: an adapter translates one agent's records into a =turns.Document=, and
-everything after that is shared. A Codex or Antigravity adapter therefore gets
-the same org output, the same picker columns and the same preview pane for
-free, and a fix to the writer reaches every agent at once.
+everything after that is shared, so a fix to the writer reaches every agent at
+once.
+
+That seam held when the second and third agents arrived, but it was not free.
+Codex needed tool headlines of its own in =internal/turns= --- =shell=,
+=exec_command= and =container.exec= as commands, =apply_patch= rendered as the
+diff it already is (=patchFiles=), =update_plan= and =web_search= --- and
+=langForKey= to pick the fence language for them. Antigravity needed a new
+block type, =event=: like a =notice=, but its body is *output* rather than
+prose and is not markdown, which is what an agent whose step types are an open
+enum needs for the ones this code has never heard of. Both changes are in the
+shared half and both are available to every adapter, which is the test of
+whether a seam is in the right place.
 
 - =internal/session= --- the contract between the CLI and the adapters. The
   =Adapter= interface, =List=, =Name=, =Meta=, =Preview=, =Live= and =Document=;
@@ -79,15 +108,28 @@ free, and a fix to the writer reaches every agent at once.
 - =internal/preview= --- what the fzf previews of different agents are built
   from, so they line up and read alike: =Painter=, =Row=, =JoinParts=,
   =Annotate=, =HumanAge=, =VersionLabel=.
+- =internal/proc= --- what the adapters need to know about the machine, each
+  answer costing one command rather than one per process: =List= over a single
+  =ps -axo pid=,ppid=,args==, =ByPID=, =Cwds= over a single =lsof -a -d cwd
+  -Fpn=, =Holders= mapping each of several files to the pids holding it *open*
+  over a single =lsof -Fpn --=, =TmuxPanes=, =TmuxOf= walking a process's
+  ancestry to the pane that contains it, and =Descendants=. =Run= is a variable,
+  so the tests replace it instead of running anything.
 - =internal/claude= --- the code that used to be the whole program, as the first
   adapter: the record model, =conversationRecords=, =buildTurns= and
   =appendEvent=, the subagent loader, the tail scan behind =list=, the preview
   scan, and =live= over =claude agents --json=. It implements =session.Adapter=,
   and nothing outside =main.go= imports it.
+- =internal/codex= --- the Codex adapter: =rollout.go= for the record model and
+  the input normalising, =index.go= for the append-only name index, =list.go=,
+  =preview.go=, and =live.go= over the writer locks.
+- =internal/agy= --- the Antigravity adapter: =steps.go= for the step model and
+  the type labels, =meta.go= for the JSON summaries mirror, =adapter.go= for
+  the turns and the listing, =preview.go=, =live.go=.
 
 The block vocabulary is the renderer's, not any agent's: =text=, =thinking=,
 =tool_use=, =tool_result= (an orphan whose call is not in the document),
-=notice=, =command=, =pr=, =tasks= and =file-edit=. The JSON tags on
+=notice=, =event=, =command=, =pr=, =tasks= and =file-edit=. The JSON tags on
 =turns.Block= match the Anthropic content-block schema, so the Claude adapter
 decodes =message.content= straight into it; another adapter fills the fields by
 hand.
@@ -100,11 +142,21 @@ CLI turns into exit status 3.
 * Commands
 
 Every call names the agent first: =agent_session <agent> <subcommand> [flags]
-args=. =agent_session agents= lists the known agents, one per line; today that
-is =claude= alone. Exit status 2 is a usage error --- no agent, an unknown agent
-or subcommand --- 1 a failure, and 3 an agent that does not support the
-subcommand (no Claude subcommand returns it; it is there for the adapters to
-come). A path argument beginning with a dash is guarded before flag parsing:
+args=. =agent_session agents= lists the known agents, one per line: =claude=,
+=codex=, =agy=. Exit status 2 is a usage error --- no agent, an unknown agent or
+subcommand --- 1 a failure, and 3 an agent that does not support the subcommand.
+Nothing returns 3 today: all three adapters answer all six subcommands. It is
+=session.ErrUnsupported=, and it exists so that the fourth agent can decline one
+without the zsh side having to special-case it --- [agfi:h-agent-session-call]
+makes the same distinction on its side, returning 2 for a verb an adapter never
+defined.
+
+The subcommands are described below with =claude= in the examples, because that
+is where each one grew up. The flags mean the same thing for every agent, with
+the two differences the adapter sections spell out: =-subagents= selects Codex's
+child rollouts and Antigravity's spawned conversations rather than Claude's Task
+transcripts, and =-cwd= is answered by each adapter's own idea of where a
+session ran. A path argument beginning with a dash is guarded before flag parsing:
 every relative path under a projects directory starts with one, because the
 directories are named after the cwd (=-Users-evar-scripts=), and the flag
 package would otherwise read it as a flag. =--= still works for anything the
@@ -486,6 +538,129 @@ of sitting in the item. Measuring list markers to keep it was not worth it.
 [[agfi:org-header-rm-shared-level]] followed by [[agfi:org-header-indent]] is the
 same idea, on a document that is already org.
 
+* The Codex adapter
+
+A Codex rollout is a JSONL of typed lines, and a handful of those types are all
+a reader needs. The first line is =session_meta= and carries the thread id (the same
+uuid the filename ends with), the cwd it was started in, and the CLI version. A
+=session_meta= whose =parent_thread_id= is non-null belongs to a *subagent*, and
+those are left out of =list= unless =-subagents= is given: =render= inlines them
+into their parent, found by =subRollouts= grouping the day directories by
+parent id, so listing them separately would show the same work twice. Then
+=turn_context= lines carry the cwd, the model and the reasoning effort in force
+for the turn that follows, which is where the model label on an assistant turn
+comes from. Everything else is a =response_item=, whose payload type is one of
+=message=, =reasoning=, =function_call=, =function_call_output=,
+=custom_tool_call= and its output, or =local_shell_call=; a =compacted= line
+marks a compaction and becomes its own =Context compacted= turn, as Claude's
+does.
+
+Consecutive records of one role merge into a turn, exactly as they do for
+Claude, because Codex also writes the reasoning, each tool call and the final
+message as separate records of the same turn.
+
+Two filters earn their place. =normalizeInput= joins a =command= given as an
+argv array into a single line and unwraps =bash -lc <script>= to the script
+itself, so a shell call renders as the command a person would have typed rather
+than as JSON; it also drops =workdir= when that is the only other key, since it
+merely repeats the cwd. =scaffoldText= drops the =<environment_context>=-style
+user messages the harness injects, which are not anything the person said and
+would otherwise open the transcript with a wall of machine text.
+
+Names are not in the rollout. Codex keeps them in
+=$CODEX_HOME/session_index.jsonl=, which is append-only: one record per change,
+so the *last* line for an id is the current name, and a record with an empty
+=thread_name= is a name that was *cleared* rather than one set to the empty
+string. The index is loaded once per home and kept for the process.
+
+Liveness is the part that could have been a guess and is not. A running Codex
+holds =~/.codex/thread-writer-locks/<id>.lock= *open*, so one =lsof= through
+=proc.Holders= says exactly which process owns which thread --- no pairing by
+cwd, no nearest start time. The holder is the native binary, which is not the
+process kitty can see: the window is running the =node .../codex.js= launcher
+that spawned it. So =topmostCodex= walks up the ancestry from the holder to the
+outermost Codex process and reports *that* pid, which is the one the window
+resolver can match. The walk is not a nicety: the ChatGPT desktop app holds
+these locks too, and without following the ancestry its threads would be
+reported as if they were in a terminal.
+
+* The Antigravity adapter
+
+Antigravity does not write a conversation, it writes *steps*. Each line of the
+transcript has a =step_index=, a =source= (=USER_EXPLICIT=, =MODEL= or
+=SYSTEM=), a =type=, a =status= (=DONE=, =RUNNING=, =ERROR=), a =created_at=,
+and then =content=, =thinking= and =tool_calls= with a name and arguments. The
+types seen so far are =USER_INPUT=, =PLANNER_RESPONSE=, =RUN_COMMAND=,
+=VIEW_FILE=, =LIST_DIRECTORY=, =GREP_SEARCH=, =SEARCH_WEB=, =CODE_ACTION=,
+=CONVERSATION_HISTORY=, =CHECKPOINT=, =SYSTEM_MESSAGE=, =GENERIC= and
+=INVOKE_SUBAGENT= --- and that list is an *open enum*, not a schema. The next
+release will add to it.
+
+That is what the =event= block is for. A step this code has no vocabulary for
+is not dropped and not rendered as JSON: =typeLabel= humanises its type
+(=RUN_COMMAND= becomes "Run command", and an unheard-of =FOO_BAR= becomes "Foo
+bar"), =statusNote= appends =running= or =error= when the status says something
+a reader needs, and the body goes through as output. A step type nobody has
+written code for still reads correctly, which is the only defence against an
+enum that grows.
+
+The mapping, in =buildTurns=: a step whose source is the user becomes a user
+turn, with =userText= stripping the =<USER_REQUEST>...</USER_REQUEST>= wrapper
+Antigravity puts around what was typed. A =PLANNER_RESPONSE= with content is the
+agent talking, and becomes markdown text in an assistant turn; =thinking= on any
+step folds in ahead of it. =CONVERSATION_HISTORY= is Antigravity's compaction and
+gets a turn of its own, so the phases either side of it read as separate.
+Everything else becomes an =event= attached to whatever turn it followed. Tool
+calls become =tool_use= blocks, with =callArgs= accepting arguments as either an
+object or a JSON string, and falling back to the step's own label when the call
+has no name.
+
+=INVOKE_SUBAGENT= steps are inlined under =-subagents=, but only where the
+child is really there: which key carries the child's conversation id is not
+documented, so =subConversations= takes every uuid in the step and keeps the
+ones whose brain directory has a transcript. A guess that names nothing on disk
+inlines nothing.
+
+Names and cwd come from beside the transcript rather than from it.
+=conversation_summaries.db= is the authority --- the zsh side reads it with
+sqlite3 --- and =cache/conversation_metadata.json= is Antigravity's own mirror
+of it, which is what this package reads, so a host without sqlite3 still gets a
+name: =nameOf= prefers the Title and falls back to the Preview. The cwd is the
+workspace from =history.jsonl=, else a =file://= WorkspaceURI from the
+summaries. =list= walks =brain/*/= and skips a conversation that has written no
+transcript, because there would be nothing to open.
+
+Unlike the other two, =preview= reads the whole transcript rather than a tail of
+it: these files are steps, not message bodies, and the fields the preview wants
+most are in the JSON mirror anyway. The =-bytes= window is still honoured, for a
+conversation that outgrows the assumption.
+
+* Liveness, and why no adapter guesses a pid
+
+=live= is what lets the kitty hotkey answer "which session is in this window",
+and the three agents can promise very different amounts.
+
+Claude Code is authoritative: =claude agents --json= answers the question
+directly, and the adapter asks every config home in parallel. Codex is exact
+but undocumented: the writer locks say which process holds which thread, and
+the ancestry walk says which pid a terminal can see. Antigravity is a pairing:
+a running =agy= process's cwd is looked up in =cache/last_conversations.json=,
+the same map =agy= itself uses to resume in a directory, which is right whenever
+a workspace hosts one conversation at a time.
+
+The rule all three follow is that a row names only a process that was really
+traced. A session that cannot be paired to one gets no row at all rather than a
+plausible pid: Claude drops an entry whose pid is 0, Codex emits rows only for
+the lock holders it found, and Antigravity only for a cwd that its workspace map
+answers. A session that has a pid but no tmux session carries =-= in that
+column, which no window name can match.
+
+That is what makes the window resolver safe. Every strategy in
+[[agfi:h-agent-session-of-kitty-window]] matches a window against these rows,
+so an invented pid would not produce a miss --- it would produce the wrong
+transcript, opened silently. A missing row produces the picker instead, and a
+question beats a wrong answer.
+
 * Performance
 
 pandoc dominates the conversion --- on a 4.5MB session it was 89% of the runtime
@@ -606,65 +781,80 @@ than mistaking =* Subagents= for something a message wrote.
 
 * zsh entry points
 
-The names still say =claude-code-=. A later commit renames the family to
-=agent-*= with compatibility aliases, and this readme gets another pass then.
+The names are =agent-*= and mean every agent. Each one's old =claude-code-*=
+spelling survives as an =aliasfn= that narrows the same function to Claude with
+=agent_session_agents=claude=, so nothing that used to work stopped, and
+=agent_session_agents= is equally how the per-agent names are built:
+=codex-view-session-fz= is this list's first entry with =codex= in front.
 
-- =claude-code-view-session-fz= --- pick a session, convert to org, open in
-  emacs.
-- =claude-code-view-session-md-fz= --- same, as markdown.
-- =claude-code-view-session-raw-fz= --- open the original =.jsonl=.
-- =claude-code-view-session= --- the same as the first, for a session path you
+- =agent-view-session-fz= --- pick a session, convert to org, open in emacs.
+- =agent-view-session-md-fz= --- same, as markdown.
+- =agent-view-session-raw-fz= --- open the original transcript.
+- =agent-view-session= --- the same as the first, for a session path you
   already have. No picker.
-- =claude-code-view-session-toggle= --- convert a session path to org and open
+- =agent-view-session-toggle= --- convert a session path to org and open
   it in emacs in the background, or cancel that transcript's running
   conversion. What =alt+enter= in the pickers runs. See the section on reading
   the session you are in.
-- =claude-code-view-session-focused= --- open the session running in the
-  focused kitty window. See below.
-- =claude-code-session-live-fz= --- pick among the sessions currently live in
+- =agent-view-session-focused= --- open the session running in the
+  focused kitty window, whichever agent it belongs to. See below.
+- =agent-session-live-fz= --- pick among the sessions currently live in
   a kitty window. See below.
-- =claude-code-view-reap= --- remove the tmux sessions of conversions that have
+- =agent-view-reap= --- remove the tmux sessions of conversions that have
   finished, and their temp directories. The launcher runs it before every new
   conversion; running it by hand is safe.
-- =claude-code-view-sessions= --- list every conversion's tmux session, alive or
+- =agent-view-sessions= --- list every conversion's tmux session, alive or
   dead, by prefix. What the reaper and the CPU share count.
+- =agent-session-resume-fz= --- pick a session and hand it to its own agent's
+  resume, =codex-resume-fz= and =agy-resume-fz= being the narrowed forms.
 - =claude-code-session-resume-fz= --- pick a session of this project from any
   profile and resume it, forking it into another profile first when asked.
   =claude-resume-fz=, =claude-resume-personal-fz= and =claude-resume-work-fz=
-  fix the target profile. The family is documented in
-  =docs/claude_code_usage.md=.
-- =claude-session-selftest= --- run the Go tests and the corpus parity check.
+  fix the target profile. This one stays Claude-only: profiles are a Claude
+  Code idea, and the other agents have nothing to map them onto. The family is
+  documented in =docs/claude_code_usage.md=.
+- =agent-session-selftest= --- run the Go tests and the corpus parity check.
+- =agent-session-current-file=, =agent-session-current-name= and
+  =agent-session-current-agent= --- what session this shell is inside, for the
+  agent whose environment says so.
 
 Each viewer and each resume picker has a =-all-fz= variant that selects from
 every project's sessions instead of the current directory's:
-=claude-code-view-session-all-fz=, =claude-code-session-resume-all-fz=,
+=agent-view-session-all-fz=, =claude-code-session-resume-all-fz=,
 =claude-resume-all-fz=, =claude-resume-personal-all-fz=,
 =claude-resume-work-all-fz=, and so on. The viewers set the picker's
-=claude_code_view_session_fz_scope= directly; the resume family sets its own
-=claude_code_session_resume_scope=, which =claude-code-session-resume-fz=
+=agent_session_fz_scope= directly; the resume family sets its own
+=agent_session_resume_scope=, which =claude-code-session-resume-fz=
 forwards into the picker's knob. It used to declare the picker's variable
 =local= and hardcode it, which silently shadowed whatever an =aliasfn= wrapper
 had set --- the reason the resume family went without =-all-fz= variants for as
 long as it did.
 
-All of them pick through =h-claude-code-session-select-fz=, which shows the
-=list= columns from the local time onwards --- time, name, profile-labelled
-relative path, first-prompt snippet --- and previews the highlighted row with
-=agent_session claude preview=, which fzf execs directly; the live picker and the
+All of them pick through =h-agent-session-select-fz=, which shows the
+=list= columns from the local time onwards --- time, agent glyph, name,
+labelled relative path, first-prompt snippet --- and previews the highlighted
+row with =agent_session <agent> preview=, the agent coming from the row itself,
+which fzf execs directly; the live picker and the
 kitty overlay run the same binary the same way (see the section on sessions live
 in a kitty window). In all three, =alt+enter= converts the highlighted row to
 org and opens it in emacs in the background without closing the picker, and a
 second press on the same row cancels; the section on reading the session you are
 in says how. It used to pass no =--preview= at all, so it fell back to
 =fz='s generic =FZF_SIMPLE_PREVIEW=, which just echoes the row back. There is no
-separate knob for turning the preview off: =claude_code_view_session_fz_fz_opts=
+separate knob for turning the preview off: =agent_session_fz_opts=
 is appended after the preview options, so a =--preview-window hidden= there
 wins.
 
-Variables:
+Variables. Every =agent_session_*= name below also answers to its old
+=claude_code_*= spelling, read as a fallback, so a preset from before the rename
+still applies; the ones still spelled =claude_code_= are Claude-only and stayed
+that way.
 
-- =claude_code_view_session_fz_scope= --- =project= (default) or =all=.
-- =claude_code_session_resume_scope= --- the same choice for the resume family,
+- =agent_session_agents= --- whitespace-separated agent tokens, narrowing every
+  picker and resolver to those agents. The per-agent and Claude-compat command
+  names are all this variable with a value in front.
+- =agent_session_fz_scope= --- =project= (default) or =all=.
+- =agent_session_resume_scope= --- the same choice for the resume family,
   =project= (default) or =all=, forwarded into the picker's knob so the two
   cannot disagree. Replaces =claude_code_session_resume_all_p=, a boolean that
   was set by nothing and documented nowhere.
@@ -674,33 +864,35 @@ Variables:
 - =claude_code_session_projects_dirs_glob= --- overrides that glob.
 - =claude_code_view_session_fz_projects_dir= --- the older singular name, still
   honoured as a single-directory override.
-- =claude_code_view_session_fz_fz_opts= --- extra options for =fz=.
-- =claude_code_view_session_fz_subagents_p= --- =y= to also list subagent
+- =agent_session_fz_opts= --- extra options for =fz=.
+- =agent_session_fz_subagents_p= --- =y= to also list subagent
   transcripts in the picker.
-- =claude_code_session_fz_header= --- the =--header= every picker shows, naming
+- =agent_session_fz_header= --- the =--header= every picker shows, naming
   the =alt+enter= binding. One variable rather than three literals, so the
   pickers cannot describe the key differently.
-- =claude_code_session_preview_bytes= --- how much of the transcript's tail the
+- =agent_session_preview_bytes= --- how much of the transcript's tail the
   fzf preview scans, in bytes. Baked into the picker's =--preview= command as
   =-bytes= when set; unset, the binary's own default of 409600 applies.
-- =claude_code_session_preview_color_p= --- =n= turns off the ANSI colour in the
+- =agent_session_preview_color_p= --- =n= turns off the ANSI colour in the
   preview, baked in as =-color=false=. The callers still pass =--ansi=, which is
   harmless on plain text. Both knobs are read when the picker starts rather than
   per cursor move, since fzf spawns the preview itself and a zsh global cannot
   reach a process it did not start.
-- =claude_code_session_max_block_lines= --- passed to =-max-block-lines=.
-- =claude_code_session_diff_p= --- =n= disables diff rendering for =Edit=.
-- =claude_code_session_subagents_p= --- =n= stops inlining subagent transcripts.
-- =claude_code_session_render_jobs= --- passed to =-jobs=. Unset, the renderer
+- =agent_session_max_block_lines= --- passed to =-max-block-lines=.
+- =agent_session_diff_p= --- =n= disables diff rendering for =Edit=.
+- =agent_session_subagents_p= --- =n= stops inlining subagent transcripts.
+- =agent_session_render_jobs= --- passed to =-jobs=. Unset, the renderer
   keeps its own default, the CPU count. The background viewers set it per
-  conversion from =h-claude-code-view-jobs-share=; a value set from outside wins
+  conversion from =h-agent-view-jobs-share=; a value set from outside wins
   over that.
-- =claude_code_session_render_jobs_max= --- the CPU count the share is divided
+- =agent_session_render_jobs_max= --- the CPU count the share is divided
   from, overriding what =getconf _NPROCESSORS_ONLN= reports. When neither gives a
   number the share is not applied and the renderer's default stands.
-- =claude_code_view_session_prefix= --- the prefix every conversion's tmux session
-  and band share, =claude-view-=. =claude-code-view-sessions= scans for it and
-  =h-claude-code-view-name-of= builds from it, so it is one variable rather than
+- =agent_view_session_prefix= --- the prefix every conversion's tmux session
+  and band share, =agent-view-=. The reaper also scans the old =claude-view-=
+  for one release, so a conversion running across the rename is still cleaned
+  up. =agent-view-sessions= scans for it and
+  =h-agent-view-name-of= builds from it, so it is one variable rather than
   two literals.
 
 * Reading the session you are in
@@ -708,51 +900,67 @@ Variables:
 Picking from a list is the wrong tool when you are already inside the session
 you want to read: several sessions routinely share a project directory, so
 "newest for this cwd" is not reliably the right one. =cmd+shift+o= in kitty
-opens the session running in the focused window.
+opens the session running in the focused window, whichever agent that is; it
+works out the agent for itself, and there is one binding rather than three.
 
-Claude Code cannot do this by itself. Its =~/.claude/keybindings.json= takes
-only a fixed action enum --- =chat:submit=, =app:toggleTranscript= and the
-like --- with no action that runs a shell command and no way to bind a slash
-command. So the keypress lives in kitty.
+None of the three agents can do this by itself. Claude Code's
+=~/.claude/keybindings.json= takes only a fixed action enum --- =chat:submit=,
+=app:toggleTranscript= and the like --- with no action that runs a shell command
+and no way to bind a slash command, and neither Codex nor Antigravity offers a
+keybinding to a command either. So the keypress lives in kitty.
 
 ** What the window can say for itself
 
-The hotkey is =claude-code-view-session-focused=, bound in
+The hotkey is =agent-view-session-focused=, bound in
 =configFiles/kitty/kitty.conf=. It asks =kitty @ ls= which window is focused
-and hands that window to =h-claude-code-session-of-kitty-window=, which tries
+and hands that window to =h-agent-session-of-kitty-window=, which tries
 four things, in order of how sure each one is:
 
-1. Claude Code runs in the window itself. One of the window's foreground pids
-   is then a live session's pid.
+1. An agent runs in the window itself. One of the window's foreground pids is
+   then a live session's pid --- which is why a session whose process was never
+   traced must have no row rather than a guessed pid.
 2. The window shows a tmux client, =tmux a -t NAME=. Sessions here mostly live
    in detached tmux sessions --- that is what lets them outlive a kitty
-   restart --- and the kitty tab merely displays one. Claude Code's own record
-   of each session, =<config home>/sessions/<pid>.json=, carries a =tmux= field
-   naming the tmux session it runs in, and NAME is matched against that.
-3. The window shows the agent view, =claude agents= or =claude attach=. The
+   restart --- and the kitty tab merely displays one. The autoname hooks record
+   the identity on the tmux session as the =@agent_session= user option (agent,
+   id and transcript), which answers directly for any agent; failing that, NAME
+   is matched against the live rows' tmux column, and only a single hit counts,
+   since one tmux session can host several agents in several panes. Claude
+   Code's own record of a session, =<config home>/sessions/<pid>.json=, carries
+   the =tmux= field that column comes from for Claude.
+3. The window shows an agent's own view, =claude agents= or =claude attach=. The
    view sets the window title to the attached session's name, at times with a
    status glyph in front, and the title is matched against the live sessions'
    names. This is observed behaviour, not documented, so it has to match
-   exactly one session or it is ignored.
+   exactly one session or it is ignored, and only when a foreground process is
+   one of the agents' binaries.
 4. The registry described below: where the session was showing the last time
    it was prompted.
 
 The first three read only what exists at the moment of the keypress, so they
 cannot go stale. The fourth can, which is why it comes last.
 
-What counts as live comes from =claude agents --json=, the supported interface
-and what the agent view itself shows. This is decided inside Claude Code's
-daemon and nothing on disk reproduces it: an assigned background session and an
-idle pre-forked spare share the identical argv, so filtering session records by
-liveness ourselves would drop real sessions or surface spares. So the listing
-stays the authority.
+The live rows are every agent's =live= output concatenated, so the four
+strategies above are agent-neutral: each row carries a pid and a tmux session
+or the honest =-=. The rest of this section is how Claude's own row is found,
+which is the most involved of the three; the Codex and Antigravity sections
+above cover theirs.
+
+What counts as live for Claude Code comes from =claude agents --json=, the
+supported interface and what the agent view itself shows. This is decided inside
+Claude Code's daemon and nothing on disk reproduces it: an assigned background
+session and an idle pre-forked spare share the identical argv, so filtering
+session records by liveness ourselves would drop real sessions or surface
+spares. So the listing stays the authority.
 
 It is scoped to one config home, and each call costs about 180ms. Because the
 homes are independent, =agent_session claude live= runs them concurrently and
 does the record reads and transcript derivation in the same process, which
 roughly halves the wall time and removes a dozen shell forks;
-=h-claude-code-session-live-list= calls it, falling back to an identical-output
-shell path (=...-list-sh=) when the binary is not built. The
+=h-claude-session-live-list= calls it, falling back to an identical-output
+shell path (=h-claude-code-session-live-list-sh=) when the binary is not built;
+=h-agent-session-live-list= is what concatenates that with the other agents'
+rows. The
 personal profile is asked with =CLAUDE_CONFIG_DIR= unset, since Claude Code
 hashes a set value into its keychain entry name. The transcript path is
 derived rather than read: the session's id under the projects directory named
@@ -767,11 +975,11 @@ trusting it would send every call down the slow build-check path.
 
 ** In the background, with a band, press again to cancel
 
-The conversion is the slow part -- =agent_session claude render= plus a
+The conversion is the slow part -- =agent_session <agent> render= plus a
 fan-out of pandoc processes, seconds on a large transcript -- so none of it runs
 in the hotkey. The press itself only identifies the tab (kitty, about 30ms),
 claims it, raises a band and returns. Everything else, the 300ms lookup
-included, happens in =h-claude-code-view-job= behind that band, which names the
+included, happens in =h-agent-view-job= behind that band, which names the
 session once it is known and comes down when emacs has the file. Resolving
 *before* claiming would leave a 300ms window in which a second press starts a
 second job; this way a double-tap deterministically cancels.
@@ -780,7 +988,7 @@ The key is a toggle. A press while the tab's conversion is running cancels it:
 the band turns amber and says so, the process tree goes, the temp directory
 with its truncated =.org= is removed. The next press starts afresh.
 
-The job lives in a tmux session named for the tab, =claude-view-<kitty-pid>-<window-id>=,
+The job lives in a tmux session named for the tab, =agent-view-<kitty-pid>-<window-id>=,
 which is the repository's detached-job primitive and, here, also the lock, the
 handle and the cancel target: =tmuxnew= kills any previous session of that
 name before creating the new one, =tmux-alive-p= says whether the job still
@@ -813,13 +1021,13 @@ included --- so a relaunch orphaned the previous job's temp directory for good.
 It happened two ways: a press landing between a caller's =tmux-alive-p= test and
 the claim, which starts a second launch under the first one's name; and a
 finished job's leftover, whose pane is dead but whose session and options survive
-=remain-on-exit=. =h-claude-code-view-launch= now reads =@ccv_tmp= and removes
+=remain-on-exit=. =h-agent-view-launch= now reads =@ccv_tmp= and removes
 the directory before replacing the session, which also reclaims a dead
 leftover's directory in passing. The other end had a window too: =tmux-alive-p=
 stays true through =emc-open=, so a cancel arriving while emacs was opening the
-file deleted it from under the buffer. =h-claude-code-view-convert= unsets
+file deleted it from under the buffer. =h-agent-view-convert= unsets
 =@ccv_tmp= immediately before the handoff, so a cancel in that window reads an
-empty value and =h-claude-code-view-rm-tmp= returns early on it. The band still
+empty value and =h-agent-view-rm-tmp= returns early on it. The band still
 turns amber and the process tree still goes; only the file is spared.
 
 On success the temp directory stays, as it always has: emacs has the file
@@ -851,17 +1059,17 @@ alternative; it was only a place to get stuck.
 
 ** From a picker, with alt+enter
 
-In each of the three session pickers --- =h-claude-code-session-select-fz=,
+In each of the three session pickers --- =h-agent-session-select-fz=,
 which the viewers and the whole resume family go through,
-=claude-code-session-live-fz=, and the kitty overlay described next ---
+=agent-session-live-fz=, and the kitty overlay described next ---
 =alt+enter= converts the highlighted transcript to org and opens it in emacs in
 the background, under the same band and cancel machinery as =cmd+shift+o=. The
 picker stays open, so you can keep looking, or open several; pressing
 =alt+enter= again on the same row cancels that row's conversion. The function
-behind the key is =claude-code-view-session-toggle=.
+behind the key is =agent-view-session-toggle=.
 
 Before this, a picker's only exit was Enter, which handed the path back to the
-caller. For =claude-code-view-session-fz= that meant converting in the
+caller. For =agent-view-session-fz= that meant converting in the
 foreground, and the terminal was blocked for seconds on a large transcript.
 
 The job is keyed on the transcript, not on the kitty window. The hotkey's key is
@@ -869,7 +1077,7 @@ The job is keyed on the transcript, not on the kitty window. The hotkey's key is
 window. A picker moves between rows, so "press again" has to mean "again on this
 row": keyed on the window, =alt+enter= on a /different/ row would cancel the
 running conversion instead of starting the new one, and a third press would be
-needed to start it. =h-claude-code-view-transcript-key= derives the key from the
+needed to start it. =h-agent-view-transcript-key= derives the key from the
 uuid the file is named after, sanitised to =[A-Za-z0-9-]= and refused if nothing
 survives. It has to be sanitised because the key becomes a tmux session name and
 tmux forbids =:= and =.=, and because a subagent transcript is
@@ -883,43 +1091,45 @@ macOS-only, and it already fails soft.
 
 The flip side is accepted: =cmd+shift+o= cannot cancel an =alt+enter=
 conversion, and =alt+enter= cannot cancel one of =cmd+shift+o='s. They are
-separate key namespaces on purpose, and =h-claude-code-view-name-of= documents
+separate key namespaces on purpose, and =h-agent-view-name-of= documents
 both kinds of key it receives.
 
-=claude-code-view-session-bg=, which the overlay's Enter calls, is deliberately
+=agent-view-session-bg=, which the overlay's Enter calls, is deliberately
 not a toggle, although its docstring used to claim a press-again-to-cancel it
 never implemented. Its one caller runs while the job that /opened/ that overlay
-may still be winding down: =h-claude-code-view-job= launches the picker from
+may still be winding down: =h-agent-view-job= launches the picker from
 inside its own tmux session, dismisses the band, and only then returns. A toggle
 there would sometimes answer "I picked this one" with "cancelled", silently. The
 docstring was corrected instead; toggling lives in the picker's =alt+enter=.
 
-=h-claude-code-session-open-cmd= builds the bind command once, in zsh, exactly
-as =h-claude-code-session-preview-cmd= builds the preview command, and a picker
-writes =--bind "alt-enter:execute-silent($(h-claude-code-session-open-cmd) {2})"=.
+=h-agent-session-open-cmd= builds the bind command once, in zsh, exactly
+as =h-agent-session-preview-cmd= builds the preview command, and a picker
+writes =--bind "alt-enter:execute-silent($(h-agent-session-open-cmd) {2})"=.
 It goes through =brishzb.dash=, not =brishzq.zsh=, for a reason of the same class
 as the preview's: =execute-silent= blocks fzf until the command returns, and
 brishzq waits for the whole call. That measures 250ms, most of it not the garden
-hop (~60ms) but =h-claude-code-view-launch='s own foreground work --- the
+hop (~60ms) but =h-agent-view-launch='s own foreground work --- the
 Hammerspoon band call, =gmktemp= and =tmuxnewsh2=. =brishzb.dash= posts
 ={ cmd } &>/dev/null &= and returns as soon as the garden forks: 20ms. Losing
 stdout and the exit status costs nothing, because the work is asynchronous
 either way and every failure already reports through the band and a notification
-in =h-claude-code-view-fail=.
+in =h-agent-view-fail=.
 
 =brishzb.dash= splices its arguments into JSON unquoted, which =brishzq.zsh=
 would not. That is safe here by construction rather than by luck: fzf
 shell-quotes ={2}= with single quotes, and a transcript path cannot contain a
-double quote or a backslash --- Claude Code names the project directory after
-its cwd with every non-alphanumeric character replaced by =-=, and the file
-after a uuid. The wrapper's absolute path comes from =$commands=, so nothing
-depends on whatever =PATH= fzf happens to have.
+double quote or a backslash, whichever agent wrote it --- Claude Code names the
+project directory after its cwd with every non-alphanumeric character replaced
+by =-= and the file after a uuid; a Codex rollout is date directories plus
+=rollout-<timestamp>-<uuid>.jsonl=; an Antigravity transcript is a uuid
+directory plus a fixed =.system_generated/logs/= path. The wrapper's absolute
+path comes from =$commands=, so nothing depends on whatever =PATH= fzf happens to have.
 
 The =--bind= overrides the =alt-enter:print-query= that =FZF_DEFAULT_OPTS= sets
 globally, in =bash/auto-load/configvars.bash=, and nothing is lost: in these
 pickers a printed query came back as the selection and failed the =test -e= on
 it, which is all it ever did. Every picker also carries a =--header= from the
-shared =claude_code_session_fz_header=, because a binding nobody knows about
+shared =agent_session_fz_header=, because a binding nobody knows about
 will never be pressed.
 
 ** What a per-transcript key costs, and how it is paid for
@@ -933,20 +1143,20 @@ already fire?" is answered --- but a conversion has a band and a buffer to show
 for itself and needs no dead session as a receipt. Under the hotkey's per-window
 keys the leftovers could not outnumber the kitty windows; under a picker's
 per-transcript keys there is one for every transcript ever opened.
-=claude-code-view-reap= removes the dead ones, and their temp directories with
-them, and =h-claude-code-view-launch= calls it first thing, so the thing that
+=agent-view-reap= removes the dead ones, and their temp directories with
+them, and =h-agent-view-launch= calls it first thing, so the thing that
 creates them clears them and nothing has to be scheduled. It is safe to run by
 hand. It needs to find them, and it cannot do so the way
 =claude-code-usage-notif-sessions= does, by regenerating a list of known names:
 there is no finite set of transcript names to reconstruct. So
-=claude-code-view-sessions= scans =tmux list-sessions= for the shared prefix
-=claude_code_view_session_prefix= instead, the same shape as
+=agent-view-sessions= scans =tmux list-sessions= for the shared prefix
+=agent_view_session_prefix= instead, the same shape as
 =caffeinate-holders=.
 
 The second is CPU. =-jobs= defaults to the CPU count and =pandocChunks= spawns
 that many pandocs, which was fine at one conversion per kitty window. A picker
 that stays open to invite pressing again made =alt+enter= down a list of ten mean
-ten times the CPU count in pandoc processes. =h-claude-code-view-jobs-share=
+ten times the CPU count in pandoc processes. =h-agent-view-jobs-share=
 divides the machine by the number of live conversions, so the total stays at
 roughly one machine's worth however many are started, and nothing is ever
 refused. Measured on 8 cores: one live conversion gets 8, two get 4 each, three
@@ -963,9 +1173,9 @@ which SIGKILLs the job --- the launcher's own note already says "no marker, pid
 file or redis key". Liveness is a property of the process, so this self-heals
 where a record would drift.
 
-=h-claude-code-session-render= gained the =-jobs= knob this needs, read from
-=claude_code_session_render_jobs=. Unset, the renderer keeps its own default, so
-every other caller is unchanged; =h-claude-code-view-convert= sets it as a
+=h-agent-session-render= gained the =-jobs= knob this needs, read from
+=agent_session_render_jobs=. Unset, the renderer keeps its own default, so
+every other caller is unchanged; =h-agent-view-convert= sets it as a
 =local=, which dynamic scope carries down to the renderer without exporting
 anything, and an explicit setting from further out wins.
 
@@ -973,25 +1183,30 @@ anything, and an explicit setting from further out wins.
 
 When none of the four resolves, the hotkey does not notify and give up. It
 opens a picker over every live session as a kitty overlay in that same window,
-=zshlang/wrappers/claude-code-session-pick.zsh=: "which one did you mean" is a
+=zshlang/wrappers/agent-session-pick.zsh=: "which one did you mean" is a
 question, not a failure. It is an overlay running its own script because fzf
 needs a terminal and neither the background hotkey nor the garden's shells have
 one; the script runs fzf itself and goes through the garden for the rows, the
 preview's and =alt+enter='s command lines, the header, and the final open. The
 preview itself is a binary fzf execs on every cursor move, with no garden hop.
-The tab's key travels into the overlay as =CLAUDE_VIEW_TAB_KEY=, so the choice
-comes back through =claude-code-view-session-bg= and gets the same band and
+The tab's key travels into the overlay as =AGENT_VIEW_TAB_KEY=, so the choice
+comes back through =agent-view-session-bg= and gets the same band and
 cancel as a direct hit.
 
 ** The registry, as insurance
 
-The write side is =claude-code-session-register=, wired to Claude Code's
-=SessionStart= and =UserPromptSubmit= hooks in
-=configFiles/claude-code/settings.json=. Under
-=~/.local/state/claude-code-sessions/=, in a file named
-=<kitty-pid>-<kitty-window-id>=, it records the =transcript_path= the hook was
-handed. kitty numbers its windows from 1 again on every restart, so the pid is
-what stops a dead kitty's entries from being read as live ones.
+The write side is =agent-session-register <agent>=, wired to every agent's
+prompt hooks: Claude Code's =SessionStart= and =UserPromptSubmit= in
+=configFiles/claude-code/settings.json=, the same two events in
+=configFiles/codex/hooks.json=, and =PreInvocation= and =Stop= in
+=configFiles/antigravity/hooks.json=. Under
+=~/.local/state/agent-sessions/=, in a file named
+=<kitty-pid>-<kitty-window-id>=, it records the transcript the payload named,
+which the adapter's =hook-transcript= verb digs out of that agent's own field
+spellings. kitty numbers its windows from 1 again on every restart, so the pid
+is what stops a dead kitty's entries from being read as live ones. The old
+=claude-code-sessions= directory is still read, so a record written before the
+rename is not lost.
 
 It records the one fact a hook knows that nothing else does. When
 =UserPromptSubmit= fires, Enter was just pressed, so the kitty window focused
@@ -1002,12 +1217,16 @@ walk ends at tmux or at Claude's pty host, and the hook silently recorded
 nothing. No hook fires on attach itself, and none runs in the attaching
 client, so a prompt is as close as a hook can get.
 
-Two guards keep the record honest. If kitty has no focused window, the prompt
-did not come from one --- a message from another agent, say, or the usage
-auto-continue --- and nothing is written. If the focused window resolves to a
-/different/ session, the prompt was injected while you sat elsewhere, and
-nothing is written either. Only a window the live lookups cannot explain, or
-one they agree with, is recorded. That is what makes it insurance rather than
+Two guards keep the record honest, and a third arrived with Antigravity. If
+kitty has no focused window, the prompt did not come from one --- a message
+from another agent, say, or the usage auto-continue --- and nothing is written.
+If the focused window resolves to a /different/ session, the prompt was
+injected while you sat elsewhere, and nothing is written either. Only a window
+the live lookups cannot explain, or one they agree with, is recorded. And a
+window running no agent at all is not showing this session either, which the
+first two guards would both have accepted: Antigravity's =PreInvocation= fires
+once per model call rather than once per prompt, so by the time it runs the
+focus may have moved to an ordinary shell. That is what makes it insurance rather than
 a competing answer: it covers the attach path nobody has invented yet, and the
 day the agent view stops putting the name in the title.
 
@@ -1025,7 +1244,7 @@ Pressing the key in a window with no session is an ordinary outcome, not an
 error, and the picker or the notification has already answered --- but a
 non-zero return makes BrishGarden log the command as failed and ring its
 failure bell, which is a second, louder answer to a question already answered.
-=h-claude-code-view-session-focused= holds the real body and the real exit
+=h-agent-view-session-focused= holds the real body and the real exit
 code, for anything that wants to branch on it.
 
 Things that are easy to get wrong here:
@@ -1061,47 +1280,50 @@ persistent shells and will otherwise go on running the old code.
 
 Variables:
 
-- =claude_code_session_registry_dir= --- defaults to
-  =$XDG_STATE_HOME/claude-code-sessions=, with =~/.local/state= standing in
-  for an unset =XDG_STATE_HOME=.
-- =claude_code_session_live_list_cache= --- a listing to reuse instead of
-  asking =claude agents= again; set it (a =local= suffices) around several
-  lookups.
-- =claude_code_session_live_rows_scope= --- =windows= (default) or =all=; see
+- =agent_session_registry_dir= --- defaults to
+  =$XDG_STATE_HOME/agent-sessions=, with =~/.local/state= standing in
+  for an unset =XDG_STATE_HOME=. The old =claude-code-sessions= is still read.
+- =agent_session_live_list_cache= --- a listing to reuse instead of asking
+  every agent again; set it (a =local= suffices) around several lookups. It
+  matters more now than it did: one lookup costs =claude agents --json= per
+  config home, an =lsof= over the Codex locks and a process listing.
+- =agent_session_live_rows_scope= --- =windows= (default) or =all=; see
   the next section.
-- =claude_code_session_kitty_socket_glob= --- defaults to
+- =agent_session_kitty_socket_glob= --- defaults to
   =$NIGHT_SOCKETS_DIR/kitty-*.sock=. Passed through to
   =kitty_sockets_list_glob=, which is the same override under the name the
   shared resolver uses.
 
 * Sessions live in a kitty window
 
-=claude-code-session-live-fz= picks among the Claude Code sessions currently
-live in a kitty window, printing =<kitty-window-id> <TAB> <transcript path>=
-per choice. Each window goes through the same
-=h-claude-code-session-of-kitty-window= the hotkey uses, so a session shows
+=agent-session-live-fz= picks among the agent sessions currently live in a
+kitty window --- every agent at once, each row carrying its glyph --- and
+prints =<kitty-window-id> <TAB> <transcript path>= per choice. The agent is
+recovered from the path afterwards, which is why the row needs no column for
+it. Each window goes through the same
+=h-agent-session-of-kitty-window= the hotkey uses, so a session shows
 up whether it runs in the tab, sits behind a tmux client, or is attached
 through the agent view, and it disappears the moment its window closes.
 =alt+enter= on a row converts that transcript to org and opens it in emacs in
 the background, leaving the picker up; under =--multi=, fzf's ={2}= is the
 highlighted row rather than the selection, which is what the binding wants,
 since it acts on the one row you are looking at. With
-=claude_code_session_live_rows_scope=all= the rows cover every live session,
+=agent_session_live_rows_scope=all= the rows cover every live session,
 with =-= in the window column for one no kitty window is showing; that is what
-the hotkey's overlay picker offers, via =h-claude-code-session-pick-rows=.
+the hotkey's overlay picker offers, via =h-agent-session-pick-rows=.
 
-Each row's metadata comes from a single =agent_session claude list= call over
-every profile's projects directory, joined back onto the live rows by
-transcript path, rather than one metadata call per row. =list= walks the whole
-corpus in about 45ms, while =agent_session claude name= alone costs about 230ms
-on a large transcript — a per-row call would have made the picker's startup
-cost scale with however many sessions happen to be open. The fzf preview goes
-further still and skips =agent_session claude render= entirely: rendering a
-46MB transcript takes about eight seconds, far too slow for a preview pane that
-has to feel instant. Instead =agent_session claude preview= tail-scans the last
-few hundred KB for fields Claude Code already writes there in plain form --- the
-rows are listed under Commands --- and fzf execs the binary directly, with no
-shell in between.
+Each row's metadata comes from one =agent_session <agent> list= call per agent
+--- for Claude, over every profile's projects directory --- joined back onto the
+live rows by transcript path, rather than one metadata call per row. =list=
+walks the whole corpus in about 45ms, while =agent_session claude name= alone
+costs about 230ms on a large transcript — a per-row call would have made the
+picker's startup cost scale with however many sessions happen to be open. The
+fzf preview goes further still and skips =agent_session claude render= entirely:
+rendering a 46MB transcript takes about eight seconds, far too slow for a
+preview pane that has to feel instant. Instead =agent_session claude preview=
+tail-scans the last few hundred KB for fields Claude Code already writes there
+in plain form --- the rows are listed under Commands --- and fzf execs the
+binary directly, with no shell in between.
 
 It was a zsh function first, and it cost about 600ms per cursor move, which is
 unusable in a pane that repaints on every keystroke. Measured, that was roughly
@@ -1167,19 +1389,19 @@ for has nothing left to do, and =preview.HumanAge= replaces
 escapes are 24-bit SGR written directly, with bold and colour in one escape for
 the headline: nesting bold inside colour would end the bold at the inner reset
 and leave two resets saying one thing. Because the output carries ANSI, every
-caller passes fzf =--ansi=: =h-claude-code-session-select-fz=,
-=claude-code-session-live-fz= and the overlay front end
-=zshlang/wrappers/claude-code-session-pick.zsh=.
+caller passes fzf =--ansi=: =h-agent-session-select-fz=,
+=agent-session-live-fz= and the overlay front end
+=zshlang/wrappers/agent-session-pick.zsh=.
 
 The knobs still reach it, but from the other end.
-=claude_code_session_preview_bytes= and =claude_code_session_preview_color_p=
+=agent_session_preview_bytes= and =agent_session_preview_color_p=
 are read once, when a picker builds its =--preview= command line, and baked into
-it as =-bytes= and =-color=false=. =h-claude-code-session-preview-cmd= does
+it as =-bytes= and =-color=false=. =h-agent-session-preview-cmd= does
 that, printing the shell-quoted command ready to have a field placeholder
-appended, so a picker writes =--preview "$(h-claude-code-session-preview-cmd)
+appended, so a picker writes =--preview "$(h-agent-session-preview-cmd)
 {2}"=. It resolves the binary's absolute path from =$commands=, so nothing
 depends on whatever =PATH= fzf happens to have.
-=h-claude-code-session-preview= survives as a thin wrapper over the same
+=h-agent-session-preview= survives as a thin wrapper over the same
 command, because the overlay picker reaches it by name through the garden and
 because it is the convenient way to see a session's preview by hand; the
 pickers themselves no longer go through it.
