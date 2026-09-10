@@ -434,7 +434,15 @@ If a fetch fails (401, 429, network) and any cache exists — even an expired
 one — the cached data is shown with a red `[stale cache: ...]` annotation and
 the script exits 0.
 
-If no token resolves at all, or a fetch fails and there is no cached response,
+If no token resolves at all, the script reads that same response cache before
+looking any further, and `--cache-ttl` is deliberately not applied to it: the
+TTL governs when to skip the network, and here there is no network to skip, so
+an expired real response still beats anything below it. This path used to be
+missed entirely — the response cache was consulted only from inside the fetch,
+which needs a token — so a GUI-detached session fell back to far older data, or
+failed outright, while a fresh response sat on disk unused.
+
+Only then, or when a fetch fails and there is no cached response,
 the script falls back to the profile's *own* cache. Claude Code stores the whole
 usage payload under `cachedUsageUtilization` in each profile's `.claude.json`,
 in exactly the shape the endpoint returns, so this path needs no credentials and
