@@ -359,10 +359,11 @@ end
 --- merely irritating, and was reported independently. All four now take the
 --- delivery path this module already trusts for the lock itself.
 ---
---- A side effect worth keeping: nothing modal binds bare F1/F2 any more, so
---- hs.hotkey has stopped shadowing STT's globals on every single hyper
---- transition -- which is where the "Disabled previous hotkey F1" pairs that
---- used to bury the console came from.
+--- A side effect worth keeping: nothing modal binds bare F1/F2 any more, which
+--- is what used to shadow STT's globals on every hyper transition and fill the
+--- console with "Disabled previous hotkey F1" pairs. Those STT binds have since
+--- been retired as well -- core/stt.lua keeps dictation on F11/F12 -- so no
+--- hs.hotkey contends for these two keycodes at all now.
 ---
 --- The tap runs only while hyper mode is entered -- which pressing the chord
 --- requires anyway -- so it is off almost always, for the privacy and latency
@@ -392,10 +393,10 @@ local function chordFor(keyName, flags)
     end
 
     --- No shift: the brightness keys, dispatched here for the same reason --
-    --- they get dropped too. Swallowing them is load-bearing rather than
-    --- tidiness now: no modal hotkey shadows STT's global bare F1/F2
-    --- (core/stt.lua) any more, so letting one through would start dictation
-    --- from inside hyper mode.
+    --- they get dropped too. Swallowed rather than passed on, so that nothing
+    --- downstream can claim them: hyper+F1 meant dictation for as long as STT
+    --- bound the bare keys globally, and the next binder would collide the
+    --- same way.
     if flags.cmd then return nil end
     if keyName == "f1" then return "brightness-dec" end
     if keyName == "f2" then return "brightness-inc" end
