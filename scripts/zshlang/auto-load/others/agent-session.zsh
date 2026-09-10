@@ -729,7 +729,7 @@ function h-agent-session-tmux-clients {
     #: rather than the name its command line happens to spell. The autoname
     #: hooks rename a session after the agent inside it, so a window running
     #: `tmux attach -t scripts-claudework1' is attached to a session now called
-    #: `@Claude/work <name>' -- and matching the command line's name against
+    #: `+Claude/work <name>' -- and matching the command line's name against
     #: anything current cannot work.
     ##
     command tmux list-clients -F "#{client_pid}"$'\t'"#{client_session}" 2>/dev/null
@@ -846,7 +846,7 @@ function h-agent-session-of-kitty-window {
     #:    list-clients', not from the name its command line spells: the hooks
     #:    rename a session after the agent in it, so `tmux attach -t
     #:    scripts-claudework1' is attached to something now called
-    #:    `@Claude/work <name>'. Tried first because it is the one answer that
+    #:    `+Claude/work <name>'. Tried first because it is the one answer that
     #:    needs no live listing, and a listing costs 200ms -- `claude agents
     #:    --json' alone is 190ms of it. It cannot contradict the tests below
     #:    either: a window showing a tmux client has none of the agent's own

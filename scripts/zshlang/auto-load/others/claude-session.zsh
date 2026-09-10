@@ -177,9 +177,10 @@ function h-claude-session-account {
 }
 
 function h-claude-code-session-tmux-name {
-    : "prints the tmux session name for a Claude Code transcript: '@Claude/<profile> <name>'"
-    #: The `@' marks a name the hooks own and keep current, as opposed to one
-    #: a person chose with [agfi:tmux-session-rename-current]. Shared by
+    : "prints the tmux session name for a Claude Code transcript: '+Claude/<profile> <name>'"
+    #: The marker is [agfi:agent_tmux_name_marker]; it says the hooks own this
+    #: name and keep it current, as opposed to one a person chose with
+    #: [agfi:tmux-session-rename-current]. Shared by
     #: [agfi:tmux-session-rename-current-auto] and the hook, so the two can
     #: never disagree about what a session should be called.
     ##
@@ -192,7 +193,7 @@ function h-claude-code-session-tmux-name {
 
     #: A space, not a hyphen, between the agent and the name: tmux allows it,
     #: and it reads as two things, which it is.
-    ec "@Claude/${profile} ${name}"
+    ec "${agent_tmux_name_marker}Claude/${profile} ${name}"
 }
 
 
