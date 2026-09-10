@@ -140,9 +140,10 @@ inherits the launcher's environment, and its stdin JSON has no profile field.
 ### The pane tint
 
 On by default for the work seat under tmux, `claude_tint_p`. The launcher
-writes OSC 11 before starting the session, washing the background to `#f7f5fd`,
-a far paler version of the seat's violet, since it sits under a screenful of
-text all day and should be noticed only when looked for,
+writes OSC 11 before starting the session, washing the background to `#f2f8f1`,
+a faint green chosen by eye after comparing candidates in a real session, since
+it sits under a screenful of text all day and should be noticed only when
+looked for,
 and OSC 111 afterwards in an `always` block, so a normal quit and Ctrl-C both
 undo it and neither can change the session's exit status. Cells the TUI paints
 with a background of their own are unaffected, so it reads as a tint rather
@@ -178,8 +179,15 @@ only in hue, so the contrast of the text on top is left as Solarized tuned it.
 Measured against Solarized's body text, the background itself scores 4.13 and
 every one of those tints scores between 4.12 and 4.14, so none of them costs
 any legibility. Violet is the most recognisable for the least colour, the
-background being a warm yellow and violet its opposite, which is why the work
-seat uses `solar-violet-faint`.
+background being a warm yellow and violet its opposite, but the work seat uses
+`solar-green-faint`, picked by eye from the candidates: at equal lightness the
+choice between hues is a matter of comfort rather than measurement, and green
+was the more comfortable one to sit in front of.
+
+The seat's accents stay violet even so. A background wash carries identity but
+no meaning, so any hue will do; an accent has to stay legible and must not lean
+on a red/green distinction, the base theme being daltonized. Solarized's green
+would measure 2.97 against this wash where its violet measures 4.06.
 
 Both commands send their escape to the terminal rather than to stdout, because
 run as `! color-background ...` from inside an agent session stdout is a pipe
