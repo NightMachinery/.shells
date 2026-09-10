@@ -1,6 +1,7 @@
 // Package claude reads Claude Code's session store: one `.jsonl` transcript per
 // session under `<config-home>/projects/<cwd-slug>/`, with subagent transcripts
-// beside it, and `claude agents --json` for what is live.
+// beside it, and the session records under `<config-home>/sessions/` for what
+// is live.
 package claude
 
 import (

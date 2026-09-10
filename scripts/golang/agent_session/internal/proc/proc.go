@@ -1,7 +1,7 @@
 // Package proc reads the process table, the working directories of processes
 // and which tmux session a process sits in. It is how the Codex and Antigravity
 // adapters decide which of their sessions are live: neither agent publishes a
-// listing the way `claude agents --json` does, so liveness comes from the
+// session record the way Claude Code does, so liveness comes from the
 // processes themselves.
 //
 // Each source is read once per call (one `ps`, one `lsof`, one `tmux`), which

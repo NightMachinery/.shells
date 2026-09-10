@@ -223,17 +223,19 @@ function h-claude-session-live-list {
     #: adapter verb; [agfi:h-agent-session-live-list] gathers every agent's.
     #:
     #: The work is done by the `live' subcommand of the `agent_session' Go
-    #: binary: it runs `claude agents --json' once per config home *in
-    #: parallel*, which is the whole cost (~180ms each, and independent), then
-    #: reads the tmux field from each session's record and derives the
-    #: transcript path. In shell those calls were serial and the resolver spent
-    #: most of half a second here; see golang/agent_session/internal/claude/live.go.
+    #: binary: it reads Claude Code's own session records,
+    #: =<config home>/sessions/<pid>.json= -- one file per running session,
+    #: carrying the pid, session id, name, cwd, busy/idle status and the tmux
+    #: location it launched in -- drops any whose pid is no longer alive, and
+    #: derives the transcript path. That is exactly what `claude agents --json'
+    #: prints, minus finished background agents with no pid, and it costs file
+    #: reads instead of ~170ms of subprocess per config home. In shell those
+    #: calls were serial and the resolver spent most of half a second here; see
+    #: golang/agent_session/internal/claude/live.go.
     #:
-    #: `claude agents' stays the authority on what is live -- that is decided in
-    #: Claude Code's daemon and nothing on disk reproduces it. The Go helper
-    #: only makes the same call cheaper. [agfi:h-claude-code-session-live-list-sh]
-    #: is the identical-output shell fallback for a host where the binary is not
-    #: built.
+    #: [agfi:h-claude-code-session-live-list-sh] is the shell fallback for a
+    #: host where the binary is not built. It still shells out to
+    #: `claude agents --json', which is slower but prints the same columns.
     ##
     local -a projects_dirs
     projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
