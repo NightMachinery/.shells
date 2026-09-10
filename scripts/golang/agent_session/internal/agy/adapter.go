@@ -63,11 +63,12 @@ func buildTurns(steps []step) []turns.Turn {
 		}
 		out = append(out, turns.Turn{Role: role, TS: ts, Blocks: []turns.TimedBlock{tb}})
 	}
-	// An event belongs to whatever turn it followed; before the first turn it
-	// starts an assistant one, as the harness is speaking for the agent.
+	// An event belongs to whatever turn it followed, except a user's: the
+	// harness is speaking for the agent, so a step that follows a prompt opens
+	// the agent's turn rather than being filed under the person who asked.
 	event := func(ts string, b turns.Block) {
 		tb := turns.TimedBlock{B: b, TS: ts}
-		if n := len(out); n > 0 {
+		if n := len(out); n > 0 && out[n-1].Role != "user" {
 			out[n-1].Blocks = append(out[n-1].Blocks, tb)
 			return
 		}
@@ -90,7 +91,7 @@ func buildTurns(steps []step) []turns.Turn {
 			// as separate.
 			out = append(out, turns.Turn{
 				Role: "system", Heading: "Conversation history", TS: s.CreatedAt,
-				Blocks: []turns.TimedBlock{{B: turns.Block{Type: "event", Name: "Summary", Text: s.Content}, TS: s.CreatedAt}},
+				Blocks: []turns.TimedBlock{{B: turns.Block{Type: "notice", Name: "Summary", Text: s.Content}, TS: s.CreatedAt}},
 			})
 			continue
 		}
@@ -115,7 +116,14 @@ func buildTurns(steps []step) []turns.Turn {
 				// The thinking above was the whole step.
 				break
 			}
-			event(s.CreatedAt, turns.Block{Type: "event", Name: name, Text: s.Content})
+			// A search summary is markdown and a command's output is not, so
+			// the block type follows the step rather than being fixed. See
+			// [proseStep].
+			kind := "event"
+			if proseStep(s.Type, s.Content) {
+				kind = "notice"
+			}
+			event(s.CreatedAt, turns.Block{Type: kind, Name: name, Text: s.Content})
 		}
 
 		for _, c := range s.ToolCalls {

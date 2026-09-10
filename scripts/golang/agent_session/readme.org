@@ -326,7 +326,16 @@ per conversational turn:
 #+end_example
 
 A result that is a single line of 72 characters or fewer goes on its heading
-rather than into a block; an empty one reads =Result: (no output)=.
+rather than into a block; an empty one reads =Result: (no output)=. A result the
+adapter pretty-printed says so, and its block is =#+begin_src json= rather than
+an example block --- =turns.ToolResult= carries a =Lang= for exactly that, left
+empty for output whose syntax nobody can vouch for.
+
+=Thinking= is prose, not a block. Every agent's reasoning summary is markdown:
+=**Checking the CLI help**= paragraphs from Codex, the same shape from Claude
+and Antigravity. Rendered verbatim it showed its own asterisks and lost its
+paragraphs, so it goes through the same prose path as message text, headings
+and all.
 
 Assistant turns carry the model that produced them, as the same =@= tag a
 subagent's heading uses: =@Opus5=, =@Fable5.1=, =@Haiku4.5=, and =@Synthetic=
@@ -480,6 +489,23 @@ relative depths. Two rather than one: the sub-headings a turn is made of
 that landed on the same level would be indistinguishable from the transcript's
 own structure.
 
+Before any of that, the prose is defused: a =<= that would open markup gets a
+backslash, which markdown renders as the character itself. A transcript is full
+of angle brackets that are not HTML --- =<INSTRUCTIONS>= around an agent's own
+instructions, a =<system-reminder>=, an XML-ish tool payload --- and pandoc
+reads a line starting with one as an HTML block, which swallows everything up to
+the next blank line into =#+begin_html=. That is how a whole instruction file
+once arrived in a document as one unparsed lump, its markdown headings with it.
+Inline the loss was quieter: a =<inline>= mid-sentence was dropped from the
+output altogether.
+
+=defuseHTML= escapes only what CommonMark would really read as markup: a
+comment, or a tag that closes. A comparison (=c<d=, =a < b=) is left alone,
+because the closing =>= is what CommonMark itself requires, and an autolink
+(=<https://…>=) is left alone because escaping one would turn a link into text.
+Fenced blocks and inline code spans are skipped entirely: their content is
+already verbatim, and a backslash there would be shown rather than consumed.
+
 The renumbering happens on the *org* side, after pandoc, not on the markdown
 going in. It has to: /pandoc/ decides what a heading is, and the markdown side
 cannot see everything it will call one. That was not a hypothetical. A subagent
@@ -609,9 +635,38 @@ Two filters earn their place. =normalizeInput= joins a =command= given as an
 argv array into a single line and unwraps =bash -lc <script>= to the script
 itself, so a shell call renders as the command a person would have typed rather
 than as JSON; it also drops =workdir= when that is the only other key, since it
-merely repeats the cwd. =scaffoldText= drops the =<environment_context>=-style
-user messages the harness injects, which are not anything the person said and
-would otherwise open the transcript with a wall of machine text.
+merely repeats the cwd.
+
+The other is about the *first* user message, which is not one message. Codex
+sends the instructions a session was launched with, and the environment it runs
+in, as part of it: the whole assembled =AGENTS.md= inside =<INSTRUCTIONS>=, then
+an =<environment_context>= of cwd, shell, date and sandbox policy, then whatever
+the person typed. Rendered as one lump it read as though somebody had typed
+their own instruction file. So =splitSections= takes the =<tag>=-wrapped
+sections out --- an opening tag alone on its own line, its close found by hand
+because Go's regexp has no backreference --- and the pieces go their own ways:
+the launch scaffold becomes one folded turn, =Session instructions=, and the
+typed remainder is the user's turn. A section that is not scaffold, an aborted
+turn say, gets a turn of its own rather than being dropped. Instructions render
+as prose, since they are markdown; the environment blocks stay verbatim, since
+they are XML.
+
+A folded turn is how a transcript can carry that much bulk without burying the
+conversation: =Turn.Folded= puts a =:VISIBILITY: folded= drawer under the
+heading, which emacs honours at startup. On the pandoc path the drawer cannot be
+written inline --- a body segment's drawer would come back from pandoc as a
+paragraph --- so the heading tag carries the fact across and
+=normalizeOrgLevels= writes the drawer when it places the heading.
+
+Tool results get the same treatment one layer down. Codex hands a result back in
+whatever shape the tool produced: a plain string, an object with an =output=
+field, or a list of content parts each with a =text= --- and a part's text is
+itself often another JSON document, since MCP tools answer in JSON. Rendered raw
+that is one unreadable line. =outputText= peels the layers, up to three deep,
+and indents what is left when it is JSON, reporting =json= as the block's
+language. A list is only taken apart when *every* element is a content part: an
+ordinary JSON array is a document, and decomposing it would lose the array
+itself.
 
 Names are not in the rollout. Codex keeps them in
 =$CODEX_HOME/session_index.jsonl=, which is append-only: one record per change,
@@ -656,10 +711,21 @@ Antigravity puts around what was typed. A =PLANNER_RESPONSE= with content is the
 agent talking, and becomes markdown text in an assistant turn; =thinking= on any
 step folds in ahead of it. =CONVERSATION_HISTORY= is Antigravity's compaction and
 gets a turn of its own, so the phases either side of it read as separate.
-Everything else becomes an =event= attached to whatever turn it followed. Tool
+Everything else becomes an event attached to whatever turn it followed --- except
+a user's, since the harness speaks for the agent and a step following a prompt
+opens the agent's turn rather than being filed under the person who asked. Tool
 calls become =tool_use= blocks, with =callArgs= accepting arguments as either an
 object or a JSON string, and falling back to the step's own label when the call
 has no name.
+
+Whether an event's body is prose or output is a decision, not a constant. A web
+search summary is markdown --- headings, bullets, links --- and reading it as a
+verbatim block showed the =###= and the =*= to the reader instead of converting
+them; a command's output, a file's contents or a grep's hits must be shown
+exactly as they came. So =proseStep= consults a table of known kinds and, since
+the enum is open, judges an unknown kind by its body: a heading or a bullet by
+CommonMark's rule (=#include= is not a heading, =-fPIC= is not a list item), an
+inline link, or bold. Prose becomes a =notice= block and output an =event=.
 
 =INVOKE_SUBAGENT= steps are inlined under =-subagents=, but only where the
 child is really there: which key carries the child's conversation id is not

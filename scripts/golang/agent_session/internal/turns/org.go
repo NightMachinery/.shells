@@ -15,8 +15,19 @@ func (r *renderer) heading(level int, text string) {
 
 // The turn's own heading. Message text nests below the sub-headings this file
 // emits for the turn's parts, so the tag records which heading is the turn.
-func (r *renderer) turnHeading(level int, text string) {
-	r.taggedHeading(tagTurn, level, text)
+// A turn's own heading. A folded one opens closed in emacs: on the org path
+// the drawer is written here, and on the pandoc path the tag carries the fact
+// across pandoc, since a drawer inside a body segment would come back from it
+// as a paragraph. See [normalizeOrgLevels].
+func (r *renderer) turnHeading(level int, text string, folded bool) {
+	kind := byte(tagTurn)
+	if folded && r.Tag {
+		kind = tagFold
+	}
+	r.taggedHeading(kind, level, text)
+	if folded && r.Org {
+		r.drawer(":VISIBILITY: folded")
+	}
 }
 
 func (r *renderer) taggedHeading(kind byte, level int, text string) {
@@ -39,6 +50,19 @@ func (r *renderer) taggedHeading(kind byte, level int, text string) {
 
 	r.ensureBlank()
 	r.out.WriteString(strings.Repeat(mark, marks) + " " + text + "\n\n")
+}
+
+// A property drawer under the heading just written. Org only: markdown has no
+// equivalent, and the md path is an intermediate anyway.
+func (r *renderer) drawer(lines ...string) {
+	if !r.Org {
+		return
+	}
+	r.out.WriteString(":PROPERTIES:\n")
+	for _, l := range lines {
+		r.out.WriteString(l + "\n")
+	}
+	r.out.WriteString(":END:\n\n")
 }
 
 // A `**key:**` line introducing the block that follows.
@@ -88,7 +112,7 @@ func (r *renderer) prose(s string, parentLevel int) {
 		r.out.WriteString(escOrgText(s) + "\n")
 		return
 	}
-	s = closeOpenFence(repairMidLineFences(s))
+	s = defuseHTML(closeOpenFence(repairMidLineFences(s)))
 	if r.Tag {
 		// [normalizeOrgLevels] places these once pandoc has said which of them
 		// are headings at all. Shifting here would only re-clamp them at six and
@@ -450,6 +474,8 @@ const (
 
 	tagTurn = 'T'
 	tagSub  = 'S'
+	// A turn heading that must come back carrying a folded-visibility drawer.
+	tagFold = 'F'
 )
 
 var tagStripper = strings.NewReplacer(string(tagOpen), "", string(tagClose), "")
@@ -468,7 +494,7 @@ func stripTags(s string) string {
 
 var orgHeadingRe = regexp.MustCompile(`^(\*+) `)
 var orgBlockRe = regexp.MustCompile(`(?i)^[ \t]*#\+(begin|end)_`)
-var headingTagRe = regexp.MustCompile("^([TS])([0-9]+) ?")
+var headingTagRe = regexp.MustCompile("^([TSF])([0-9]+) ?")
 
 // Where message headings start, relative to their turn: below the sub-headings
 // the turn is made of (`Tool Use`, `Thinking`, `Recap` …), which sit one level
@@ -502,7 +528,13 @@ func normalizeOrgLevels(doc string) string {
 		if level < 1 {
 			level = 1
 		}
-		lines[h.line] = strings.Repeat("*", level) + " " + h.text
+		line := strings.Repeat("*", level) + " " + h.text
+		if h.kind == tagFold {
+			// Embedded in the line rather than inserted after it, so no line
+			// index shifts under the headings still to be placed.
+			line += "\n:PROPERTIES:\n:VISIBILITY: folded\n:END:"
+		}
+		lines[h.line] = line
 	}
 
 	contentBase := 0
@@ -510,7 +542,7 @@ func normalizeOrgLevels(doc string) string {
 		if h := heads[i]; h.kind != 0 {
 			set(h, h.level)
 			switch {
-			case h.kind == tagTurn:
+			case h.kind == tagTurn || h.kind == tagFold:
 				contentBase = h.level + contentDepth
 			case contentBase == 0:
 				// The `* Subagents` skeleton, before any turn.
@@ -584,4 +616,119 @@ func (r *renderer) link(url string) {
 		return
 	}
 	r.out.WriteString("<" + url + ">\n")
+}
+
+// ** raw HTML in a transcript
+
+// A `<` that opens what pandoc would read as HTML: a comment, or a tag that
+// actually closes. The closing `>` is what keeps a comparison (`c<d`, `a < b`)
+// out of it, which is CommonMark's own rule. An autolink (`<https://…>`,
+// `<a@b.c>`) is left out too, since escaping one would turn a link into text.
+var htmlishRe = regexp.MustCompile(`^<(?:!--|/?[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>)`)
+var autolinkRe = regexp.MustCompile(`^<[A-Za-z][A-Za-z0-9+.-]*:|^<[^<>@\s]+@[^<>@\s]+>`)
+
+// defuseHTML escapes the tag-shaped text in a message so that pandoc renders
+// it rather than reading it as markup.
+//
+// A transcript is text, and its prose is full of angle brackets that are not
+// HTML: `<INSTRUCTIONS>` around an agent's own instructions, a
+// `<system-reminder>`, an XML-ish tool payload. Pandoc reads a line that
+// starts with one as an HTML block, and then everything up to the next blank
+// line goes into a `#+begin_html` block -- including the markdown headings
+// after it, which is how a whole instruction file arrived in the document as
+// one unparsed lump. Inline, the loss is quieter: `<inline>` mid-sentence is
+// dropped from the output entirely.
+//
+// So a `<` that would open markup gets a backslash, which markdown renders as
+// the character itself. Fenced blocks and inline code spans are left exactly
+// as they are: their content is already verbatim, and a backslash there would
+// be shown rather than consumed.
+func defuseHTML(s string) string {
+	if !strings.Contains(s, "<") {
+		return s
+	}
+
+	lines := strings.Split(s, "\n")
+	open := ""
+	for i, ln := range lines {
+		if open != "" {
+			open = fenceStep(open, ln)
+			continue
+		}
+		if fenceRe.MatchString(ln) {
+			open = fenceStep(open, ln)
+			continue
+		}
+		lines[i] = defuseHTMLLine(ln)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// One line of prose, outside any fenced block. Inline code spans are skipped.
+func defuseHTMLLine(ln string) string {
+	if !strings.Contains(ln, "<") {
+		return ln
+	}
+
+	var w strings.Builder
+	w.Grow(len(ln) + 8)
+	for i := 0; i < len(ln); {
+		switch ln[i] {
+		case '`':
+			// A code span runs to the next run of the same length; an unclosed
+			// run is not a span, so only the backticks are copied.
+			run := backtickRun(ln, i)
+			if end := spanCloser(ln, i+run, run); end > 0 {
+				w.WriteString(ln[i : end+run])
+				i = end + run
+				continue
+			}
+			w.WriteString(ln[i : i+run])
+			i += run
+		case '\\':
+			// An escape already in the text takes its next byte with it.
+			if i+1 < len(ln) {
+				w.WriteString(ln[i : i+2])
+				i += 2
+				continue
+			}
+			w.WriteByte(ln[i])
+			i++
+		case '<':
+			rest := ln[i:]
+			if htmlishRe.MatchString(rest) && !autolinkRe.MatchString(rest) {
+				w.WriteString("\\<")
+			} else {
+				w.WriteByte('<')
+			}
+			i++
+		default:
+			w.WriteByte(ln[i])
+			i++
+		}
+	}
+	return w.String()
+}
+
+// The length of the backtick run starting at i.
+func backtickRun(s string, i int) int {
+	n := 0
+	for i+n < len(s) && s[i+n] == '`' {
+		n++
+	}
+	return n
+}
+
+// Where a code span opened with a run of n backticks closes, or -1.
+func spanCloser(s string, from, n int) int {
+	for i := from; i < len(s); i++ {
+		if s[i] != '`' {
+			continue
+		}
+		if backtickRun(s, i) == n {
+			return i
+		}
+		i += backtickRun(s, i) - 1
+	}
+	return -1
 }

@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"agent_session/internal/session"
@@ -59,6 +60,75 @@ const (
 	typeConversationLog = "CONVERSATION_HISTORY"
 	typeSubagent        = "INVOKE_SUBAGENT"
 )
+
+// ** prose or output
+//
+// A step's content is one of two things, and they have to be told apart: a web
+// search summary or a system message is *markdown* and reads as a document,
+// while a command's output, a file's contents or a grep's hits are text that
+// must be shown exactly as it came. Rendering the first kind verbatim was
+// visible in an org file as a block of `###` headings and `*` bullets that
+// nothing had converted.
+//
+// The type decides it where the type is known. It is an open enum, so an
+// unknown kind is judged by its body instead.
+
+// Types whose content is markdown.
+var proseTypes = map[string]bool{
+	typePlanner:         true,
+	typeConversationLog: true,
+	typeSubagent:        true,
+	"SEARCH_WEB":        true,
+	"WEB_SEARCH":        true,
+	"SYSTEM_MESSAGE":    true,
+	"USER_INPUT":        true,
+	"MEMORY":            true,
+	"PLAN":              true,
+}
+
+// Types whose content is output, whatever it happens to look like.
+var outputTypes = map[string]bool{
+	"RUN_COMMAND":    true,
+	"VIEW_FILE":      true,
+	"LIST_DIRECTORY": true,
+	"GREP_SEARCH":    true,
+	"CODE_ACTION":    true,
+	"EDIT_FILE":      true,
+	"WRITE_FILE":     true,
+	"TERMINAL":       true,
+}
+
+// Whether a step's body should be rendered as markdown rather than kept
+// verbatim.
+func proseStep(t, body string) bool {
+	u := strings.ToUpper(t)
+	if proseTypes[u] {
+		return true
+	}
+	if outputTypes[u] {
+		return false
+	}
+	return markdownish(body)
+}
+
+// Whether a body carries enough markdown to be worth converting: a heading, a
+// bullet list, bold, or an inline link. Output that happens to contain one of
+// these reads no worse for it; prose rendered verbatim reads much worse.
+func markdownish(body string) bool {
+	if strings.Contains(body, "](http") || strings.Contains(body, "**") {
+		return true
+	}
+	for _, ln := range strings.Split(body, "\n") {
+		if mdLineRe.MatchString(strings.TrimLeft(ln, " \t")) {
+			return true
+		}
+	}
+	return false
+}
+
+// A heading or a bullet, by CommonMark's rule rather than by eye: `#include`
+// is not a heading and `-fPIC` is not a list item, and both turn up in output.
+var mdLineRe = regexp.MustCompile(`^(?:#{1,6} |[-*+] )`)
 
 // The transcript of a conversation directory: the full one, else the compact
 // one. "" when the conversation has written neither, which is the normal state

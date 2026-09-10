@@ -54,6 +54,9 @@ type Turn struct {
 	Note string
 	// How long the turn took, when the transcript says so.
 	Duration time.Duration
+	// Open the turn closed in emacs: for a turn that is bulk rather than
+	// conversation, such as the instructions a session was launched with.
+	Folded bool
 }
 
 // A Block is one piece of a turn. The vocabulary is the renderer's, not any
@@ -88,6 +91,9 @@ type ToolResult struct {
 	Body    string
 	IsError bool
 	TS      string
+	// The body's language, when the adapter knows it: `json` for a result it
+	// pretty-printed, empty for output whose syntax nobody can vouch for.
+	Lang string
 }
 
 // Options for Render.
@@ -459,7 +465,9 @@ func (r *renderer) renderTurn(t Turn) {
 	if t.Note != "" {
 		title += " · " + t.Note
 	}
-	r.turnHeading(1, title)
+	// VISIBILITY is honoured at startup, so a turn nobody reads twice -- the
+	// instructions a session was launched with, say -- opens closed.
+	r.turnHeading(1, title, t.Folded)
 	r.out.WriteString(body.out.String())
 	r.ensureBlank()
 }
@@ -541,8 +549,13 @@ func (r *renderer) renderBlock(tb TimedBlock) {
 		if strings.TrimSpace(b.Thinking) == "" {
 			return
 		}
+		// Prose, not a block. Every agent's reasoning summary is markdown --
+		// `**Checking the CLI help**` paragraphs from Codex, the same from
+		// Claude and Antigravity -- so a verbatim block showed the asterisks
+		// and lost the paragraphs. Its headings nest under this one like any
+		// other prose field's.
 		r.heading(2, "Thinking"+r.stamp(tb.TS))
-		r.block("", b.Thinking)
+		r.prose(b.Thinking, 2)
 
 	case "tool_use":
 		name := b.Name
@@ -586,7 +599,7 @@ func (r *renderer) renderResult(level int, res ToolResult) {
 		r.heading(level, title+": "+body+stamp)
 	default:
 		r.heading(level, title+stamp)
-		r.block("", res.Body)
+		r.block(res.Lang, res.Body)
 	}
 }
 

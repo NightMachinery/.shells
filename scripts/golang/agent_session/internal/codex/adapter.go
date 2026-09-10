@@ -116,10 +116,21 @@ func buildTurns(lines []line) ([]turns.Turn, map[string]turns.ToolResult) {
 				text := partsText(it.Content)
 				switch it.Role {
 				case "user":
-					if scaffoldText(text) || strings.TrimSpace(text) == "" {
+					if strings.TrimSpace(text) == "" {
 						continue
 					}
-					add("user", l.Timestamp, turns.Block{Type: "text", Text: text})
+					// The launch scaffold rides along in the first user
+					// message; it is not something anybody typed, so it gets
+					// its own folded turn rather than opening the transcript
+					// as if it were a prompt. See [splitSections].
+					sections, typed := splitSections(text)
+					for _, t := range scaffoldTurns(sections, l.Timestamp) {
+						out = append(out, t)
+					}
+					if strings.TrimSpace(typed) == "" {
+						continue
+					}
+					add("user", l.Timestamp, turns.Block{Type: "text", Text: typed})
 				case "assistant":
 					add("assistant", l.Timestamp, turns.Block{Type: "text", Text: text})
 				}
@@ -157,8 +168,10 @@ func buildTurns(lines []line) ([]turns.Turn, map[string]turns.ToolResult) {
 				if it.CallID == "" {
 					continue
 				}
+				body, lang := outputText(it.Output)
 				results[it.CallID] = turns.ToolResult{
-					Body:    outputText(it.Output),
+					Body:    body,
+					Lang:    lang,
 					IsError: strings.EqualFold(it.Status, "failed") || strings.EqualFold(it.Status, "error"),
 					TS:      l.Timestamp,
 				}
@@ -167,6 +180,39 @@ func buildTurns(lines []line) ([]turns.Turn, map[string]turns.ToolResult) {
 	}
 
 	return out, results
+}
+
+// The turns a user message's `<tag>` sections become: one folded turn for the
+// launch scaffold, and one turn each for anything else the harness wrapped in
+// a tag, such as an aborted turn.
+func scaffoldTurns(sections []section, ts string) []turns.Turn {
+	var out []turns.Turn
+	var scaffold []turns.TimedBlock
+
+	for _, sec := range sections {
+		kind := "event"
+		if proseSection(sec.tag) {
+			kind = "notice"
+		}
+		b := turns.Block{Type: kind, Name: sectionLabel(sec.tag), Text: sec.body}
+
+		if scaffoldSection(sec.tag) {
+			scaffold = append(scaffold, turns.TimedBlock{B: b, TS: ts})
+			continue
+		}
+		out = append(out, turns.Turn{
+			Role: "system", Heading: sectionLabel(sec.tag), TS: ts,
+			Blocks: []turns.TimedBlock{{B: b, TS: ts}},
+		})
+	}
+
+	if len(scaffold) > 0 {
+		out = append([]turns.Turn{{
+			Role: "system", Heading: "Session instructions", TS: ts,
+			Folded: true, Blocks: scaffold,
+		}}, out...)
+	}
+	return out
 }
 
 // A tool's arguments as the renderer wants them. Codex sends `arguments` as a
