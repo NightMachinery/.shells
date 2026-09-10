@@ -22,6 +22,11 @@ function h-agent-session-dep {
 function h-agent-session-name {
     #: The session's own name -- whatever the agent calls it, else its id for
     #: sessions predating names. Sanitized for use as a filename.
+    #:
+    #: The Go side answers this, unless the agent defines a `name' verb of its
+    #: own: Antigravity does, because its titles live in a SQLite database that
+    #: the stdlib-only renderer cannot read, and the picker's column has to
+    #: agree with the tmux session name, which comes from there.
     ##
     local input="${1}"
     assert-args input @RET
@@ -29,10 +34,15 @@ function h-agent-session-name {
     local agent
     agent="$(h-agent-session-agent-of "${input}")" @RET
 
-    h-agent-session-dep @RET
-
-    local name
-    name="$(agent_session "${agent}" name "${input}")" @RET
+    local name ret
+    name="$(h-agent-session-call "${agent}" name "${input}")"
+    ret=$?
+    if (( ret == 2 )) ; then
+        h-agent-session-dep @RET
+        name="$(agent_session "${agent}" name "${input}")" @RET
+    elif (( ret != 0 )) ; then
+        return "${ret}"
+    fi
     name="${name//[^A-Za-z0-9._-]/-}"
     #: Collapse the runs a title's spaces and punctuation leave behind.
     name="${${name//---##/-}%%-##}"
@@ -468,6 +478,13 @@ function agent-session-register {
     local shown
     if shown="$(h-agent-session-of-kitty-window "${ls_json}" "${win}")" ; then
         [[ "${shown}" == "${transcript}" ]] || return 0
+    elif ! h-agent-session-window-agent-p "${ls_json}" "${win}" ; then
+        #: A window running no agent at all is not showing this session, so it
+        #: must not be recorded as doing so. This matters for an agent whose
+        #: hook fires more than once a turn -- Antigravity's PreInvocation runs
+        #: per model call -- since by then the focus may have moved to an
+        #: ordinary shell, which the two guards above would both accept.
+        return 0
     fi
 
     local dir
@@ -579,6 +596,49 @@ function h-agent-session-focused-window {
     ec "${win}"
 }
 
+function h-agent-session-cmds-agent-p {
+    #: Whether any of the given command lines runs an agent: its own binary, or
+    #: a shell that was handed one. The binary names come from
+    #: [agfi:h-agents-table], so an agent added there is recognised here too.
+    #: Usage: h-agent-session-cmds-agent-p <cmdline>...
+    ##
+    local -a bins
+    bins=( ${=$(h-agents-table | command cut -f4)} )
+
+    local cmd
+    local -a w
+    for cmd in "$@" ; do
+        w=( ${(z)cmd} )
+        if (( ${bins[(Ie)${w[1]:t}]} )) ; then
+            return 0
+        fi
+        if [[ "${w[1]:t}" == (sh|bash|dash|zsh) ]] && (( ${bins[(Ie)${w[2]:t}]} )) ; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+function h-agent-session-window-agent-p {
+    #: Whether a kitty window is plausibly showing an agent at all: it runs one
+    #: itself, or a tmux client (behind which one may sit).
+    #: Usage: h-agent-session-window-agent-p <kitty ls json> <window id>
+    ##
+    local ls_json="${1}" win="${2}"
+    test -n "${ls_json}" && test -n "${win}" || return 1
+
+    local -a cmds
+    cmds=( ${(f)"$(ec "${ls_json}" | jq -r --argjson w "${win}" '.[].tabs[].windows[] | select(.id == $w) | .foreground_processes[] | .cmdline | join(" ")' 2>/dev/null)"} )
+
+    h-agent-session-cmds-agent-p "${cmds[@]}" && return 0
+
+    local cmd
+    for cmd in "${cmds[@]}" ; do
+        h-agent-session-tmux-target "${cmd}" >/dev/null && return 0
+    done
+    return 1
+}
+
 function h-agent-session-of-kitty-window {
     #: The transcript of the agent session showing in a kitty window, or
     #: failure when that cannot be established.
@@ -659,17 +719,10 @@ function h-agent-session-of-kitty-window {
     done
 
     #: 3. An agent's view, by title.
-    local -a bins
-    bins=( ${=$(h-agents-table | command cut -f4)} )
     local attach_p=n
-    local -a w
-    for cmd in "${fg_cmds[@]}" ; do
-        w=( ${(z)cmd} )
-        if (( ${bins[(Ie)${w[1]:t}]} )) || [[ "${w[1]:t}" == (sh|bash|dash|zsh) ]] && (( ${bins[(Ie)${w[2]:t}]} )) ; then
-            attach_p=y
-            break
-        fi
-    done
+    if h-agent-session-cmds-agent-p "${fg_cmds[@]}" ; then
+        attach_p=y
+    fi
     if [[ "${attach_p}" == y ]] && test -n "${title}" ; then
         #: `✳ LinFine-0' -> `LinFine-0'. The exact title is tried too, for a
         #: name that itself begins with a symbol.
