@@ -105,8 +105,10 @@ script `cd`s first — and to the session's own directory, not the pane's.
 
 Nothing is inferred to find it: every agent records the cwd in its transcript,
 and `agent_session <agent> meta <transcript>` prints it as the third field for
-all three. [agfi:h-agent-done-session-dir] asks for exactly that. Two
-fallbacks stand behind it, in order: Claude Code's project directory, which
+all three. [agfi:h-agent-session-dir] asks for exactly that — the same
+resolver the resume helpers themselves use, so the directory this report names
+and the directory a resume lands in cannot disagree. Two fallbacks stand
+behind it, in order: Claude Code's project directory, which
 names the directory a session started in with every non-alphanumeric character
 replaced by a dash — lossy, since `-Users-evar-my-dir` could be two different
 paths, so it is accepted only when the result really is a directory — and then
@@ -128,6 +130,11 @@ resolved gets an interactive shell instead, which is still better than the same
 report twice. `agent_done_resume_cmd` replaces the resume outright — the escape
 hatch for resuming with extra flags, and how the branch is tested without
 starting a real session.
+
+Since the resume helpers now `cd` on their own
+([agfi:h-agent-session-resume-run]), the script's own `cd` is belt and braces:
+it also covers the shell that a session with no resolvable transcript falls
+back to.
 
 `remain-on-exit` stays on for that pane afterwards, so the loop holds: quit the
 resumed session and the pane dies visibly again, and `prefix-r` brings it back.

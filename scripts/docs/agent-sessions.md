@@ -155,6 +155,28 @@ has fields:
 - `name <transcript>` and `tmux-name <transcript>` are optional; an agent that
   omits `name` gets the Go binary's answer.
 
+### Resuming lands in the session's own directory
+
+None of the three agents restores the working directory when you resume:
+Claude Code's helper used to only *warn* that "tools will run in `$PWD`", and
+Codex and agy did not even warn. Resuming a session into a directory it knows
+nothing about is the kind of thing you notice three tool calls later, when a
+relative path or a project instruction file has quietly gone missing.
+
+So every resume goes through [agfi:h-agent-session-resume-run], which runs the
+agent's launcher in the directory the session was working in. That directory
+comes from [agfi:h-agent-session-dir], and it is read rather than guessed:
+every agent records the cwd in its transcript and `agent_session <agent> meta`
+prints it as the third field. Behind that sit two fallbacks — Claude Code's
+project directory name, which encodes the starting directory with every
+non-alphanumeric character replaced by a dash and is therefore accepted only
+when the inversion is really a directory, and then whatever the caller offers.
+
+`agent_session_resume_cd_p=n` restores the old behaviour, warning instead of
+moving, for when resuming somewhere else is the point. The move happens in a
+subshell, so an interactive caller is not left in another directory once the
+session exits.
+
 `current-id` is also what [agfi:agent-done] leans on: `/done` is one skill
 shared by all three agents, and the only agent-specific thing it needs is which
 session it is in. See `agent-done.md`.
@@ -269,6 +291,10 @@ Claude helpers first: `agent_session_max_block_lines`,
 `agent_session_preview_bytes`, `agent_session_preview_color_p`,
 `agent_session_registry_dir`, `agent_session_kitty_socket_glob`,
 `agent_session_resume_scope` and `agent_view_session_prefix`.
+
+`agent_session_resume_cd_p` (default on) is the exception to that list: it has
+no `claude_code_*` spelling, because the behaviour it switches off did not
+exist before.
 
 Two are new and belong to this design rather than to Claude:
 
