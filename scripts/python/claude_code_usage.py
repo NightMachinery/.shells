@@ -53,6 +53,16 @@ KEYCHAIN_ACCOUNT_RE = re.compile(r"^[a-zA-Z0-9._-]+$")
 #: real problem -- a locked keychain, a denied authorization -- and must not be
 #: mistaken for "this profile has no credential".
 KEYCHAIN_NOT_FOUND = 44
+#: errSecInteractionNotAllowed. NOT a denied prompt -- macOS refused to *show*
+#: one, because the process is not attached to the GUI session.
+KEYCHAIN_NO_GUI = 36
+#: userCanceled: a prompt was shown and dismissed.
+KEYCHAIN_USER_CANCELED = 128
+#: The way past a GUI-detached session, named wherever we hit one.
+GUI_LESS_HINT = (
+    "run the report through `brishz`, whose shells are attached to the GUI "
+    "session (see docs/claude_code_usage.md)"
+)
 CREDENTIALS_FILE = Path(os.path.expanduser("~/.claude/.credentials.json"))
 DEFAULT_PROFILE_CONFIG = Path(os.path.expanduser("~/.claude.json"))
 CACHE_FILE_NAME = "usage.json"
@@ -207,6 +217,36 @@ def read_json_file(path: Path) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def user_keychain_paths() -> list[str]:
+    """The user's own keychains, to be named explicitly on the `security` argv.
+
+    In a GUI-detached session the keychain search list collapses to
+    ``/Library/Keychains/System.keychain`` alone, so a lookup that relies on
+    that list finds nothing and ``security`` exits 44 -- indistinguishable from
+    a profile that was never logged in. ``security`` takes trailing
+    ``[keychain...]`` arguments and documents that "if no keychains are
+    specified to search, the default search list is used", so naming them
+    removes the dependency on the session.
+
+    Globbed rather than hardcoded: a renamed login keychain is ordinary, and a
+    machine may carry several. The canonical login keychain is forced first all
+    the same, so a stale duplicate sitting in a renamed copy cannot win the
+    search.
+    """
+    directory = Path(os.path.expanduser("~/Library/Keychains"))
+    try:
+        paths = sorted(str(path) for path in directory.glob("*.keychain-db"))
+    except OSError:
+        return []
+
+    login = str(directory / "login.keychain-db")
+    if login in paths:
+        paths.remove(login)
+        paths.insert(0, login)
+
+    return paths
+
+
 def read_keychain_item(
     *, service: str, account: str | None, timeout: float
 ) -> KeychainRead:
@@ -214,6 +254,9 @@ def read_keychain_item(
     if account is not None:
         command.extend(["-a", account])
     command.append("-w")
+    #: Keychain arguments go last. An empty list is fine and leaves the default
+    #: search list in play, which is the right behaviour when the glob is empty.
+    command.extend(user_keychain_paths())
 
     try:
         proc = subprocess.run(
@@ -240,6 +283,31 @@ def read_keychain_item(
 
     if proc.returncode == KEYCHAIN_NOT_FOUND:
         return KeychainRead()
+
+    #: `security` exits with the low byte of the OSStatus, which is where these
+    #: otherwise baffling numbers come from: errSecItemNotFound is -25300 =
+    #: 0xFFFF9D2C, and 0x2C is 44; errSecInteractionNotAllowed is -25308 =
+    #: 0xFFFF9D24, and 0x24 is 36; userCanceled is -128, so 128. The same
+    #: taxonomy is spelled out for [agfi:wifi-password-get-darwin].
+    if proc.returncode == KEYCHAIN_NO_GUI:
+        #: Root does not rescue this the way it rescues a wifi password: that
+        #: item lives in the System keychain, which root opens with no dialog,
+        #: whereas these live in the login keychain.
+        return KeychainRead(
+            error=(
+                f"Keychain item {service!r} needs authorization and macOS would "
+                "not show a prompt, because this process is not attached to the "
+                f"GUI session (security exit 36); {GUI_LESS_HINT}"
+            )
+        )
+
+    if proc.returncode == KEYCHAIN_USER_CANCELED:
+        return KeychainRead(
+            error=(
+                f"Keychain authorization for item {service!r} was cancelled "
+                "(security exit 128)"
+            )
+        )
 
     if proc.returncode != 0:
         # stderr only; stdout would be the secret.
