@@ -58,7 +58,7 @@ kitty's `ls` JSON and a window id, and tries five things:
    ([agfi:h-agent-session-tmux-clients]), and not from the name the window's
    command line spells: the autoname hooks rename a session after the agent
    living in it, so a window still running `tmux attach -t scripts-claudework1`
-   is attached to something now called `@Claude/work claude-session-helpers-refactor`.
+   is attached to something now called `+Claude/work claude-session-helpers-refactor`.
    Matching the spelled name looks right and silently never matches.
 2. **The agent runs in the window.** A foreground pid of the window equals a
    live session's pid. Nothing to go stale here.

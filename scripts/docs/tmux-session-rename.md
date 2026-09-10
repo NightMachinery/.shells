@@ -2,12 +2,16 @@
 
 A tmux session with an agent session inside it is renamed after that
 session, by a hook the agent fires: `scripts-claudework2` becomes
-`@Claude/work wifi-dns-captive-portal` on the first prompt and follows the
+`+Claude/work tidy-up-the-lint-config` on the first prompt and follows the
 title as it changes. It works for Claude Code, Codex and Antigravity (`agy`)
-alike; the names are `@Claude/work <name>`, `@Claude/default <name>`,
-`@Codex <name>` and `@Agy <name>`. The `@` marks a session with an agent
+alike; the names are `+Claude/work <name>`, `+Claude/default <name>`,
+`+Codex <name>` and `+Agy <name>`. The `+` marks a session with an agent
 inside; a space separates the agent from the name. Without it a server with
 a dozen agent sessions is a list of launch directories and counters.
+
+The marker is [agfi:agent_tmux_name_marker], one `typeset` in
+`zshlang/auto-load/others/agent-tmux.zsh`. It used to be `@`, which tmux
+reads as window-id syntax; see "Session names are not tmux targets" below.
 
 ## By hand
 
@@ -37,7 +41,9 @@ hook body is a thin parser that ends in one call,
   `~/.tmux.conf` sets to `on`;
 - computes the name, runs it through [agfi:h-tmux-session-name-sanitize]
   (`.` and `:` become `-`, whitespace squeezed, cut at 60) and renames only
-  when the result differs from the current name.
+  when the result differs from the current name. That last test is also the
+  migration path: a session still carrying an old `@` name renames itself at
+  its next prompt.
 
 Every early return is an ordinary outcome and every path is silent: a broken
 rename must not cost a prompt.
@@ -137,8 +143,8 @@ The name is `title` (set with `/rename` or F2 in `/resume`), else `preview`
 
 ## Usage
 
-    ! tnameme                    # inside an agent: @Claude/work <session name>
-    tsrcag fix-wifi              # @Claude/work fix-wifi, @Codex fix-wifi or @Agy fix-wifi
+    ! tnameme                    # inside an agent: +Claude/work <session name>
+    tsrcag fix-wifi              # +Claude/work fix-wifi, +Codex fix-wifi or +Agy fix-wifi
     tsrc scratch                 # any shell in tmux, no prefix
     tnameme-off                  # keep a hand-set name
     tnameme-status
@@ -170,6 +176,20 @@ hooks make routine: they rename on every prompt, so a name captured from
 `fftk`, `fftr`) and [agfi:tmux-alive-p] all go through it now; use
 [agfi:tmux-session-name-of] to turn an id back into something a human reads.
 
+This is why the marker is `+` and not `@`. `@` was window-id syntax, which
+made every agent-named session unusable as a target -- `fft` on one failed
+with *can't find window* -- and no amount of `=` fixed the window-typed half.
+`+` is an ordinary character to tmux, and still sorts agent sessions to the
+top of `tmux ls`, ahead of where `@` put them.
+
+Sessions whose agent is still running rename themselves at the next prompt.
+Anything left over from before the change can be swept up with:
+
+    command tmux ls -F '#{session_id}'$'\t''#{session_name}' |
+        while IFS=$'\t' read -r id name ; do
+            [[ "${name}" == @* ]] && command tmux rename-session -t "${id}" "+${name#@}"
+        done
+
 ## Gotchas
 
 - An agent's shell has no attached client, so tmux has no "current session"
@@ -177,7 +197,7 @@ hooks make routine: they rename on every prompt, so a name captured from
   `tmux display-message -p -t "$TMUX_PANE" '#S'`, and inherits `$TMUX_PANE`'s
   failure modes from `./tmux-tty-title.md`: `tmux run-shell` and garden shells.
 - A hand-set name (`tsrc scratch`, `tsrcag x`) in a session with an agent
-  inside lasts until the next prompt, when the hook puts the `@` name back.
+  inside lasts until the next prompt, when the hook puts the `+` name back.
   Run `tnameme-off` there first.
 - The global default catches scheduled and scripted sessions too. Launchers
   that care about their name should set the option off:

@@ -3,7 +3,7 @@
 #: Code, Codex and Antigravity (`agy') alike. Each agent fires a hook with
 #: its session id and transcript; the hook bodies here hand those to one
 #: core that records the identity on the tmux session and renames it to
-#: `@Claude/work <name>', `@Codex <name>' or `@Agy <name>'. The by-hand
+#: `+Claude/work <name>', `+Codex <name>' or `+Agy <name>'. The by-hand
 #: commands live in =tmux.zsh= ([agfi:tmux-session-rename-current-auto]).
 #: See =docs/tmux-session-rename.md=.
 ##
@@ -15,6 +15,13 @@ typeset -g agent_tmux_autoname_option='@agent_autoname'
 #: tab-separated. It is what lets [agfi:tmux-session-rename-current-auto]
 #: work in a Codex or agy shell, which export no id of their own.
 typeset -g agent_tmux_identity_option='@agent_session'
+#: The marker on a session name the hooks own, as opposed to one a person
+#: chose with [agfi:tmux-session-rename-current]. Not `@': a leading `@' is
+#: tmux window-id syntax, so `@Claude/work x' was unusable as a `-t' target
+#: and `fft' on such a session failed with `can't find window'. `+' is an
+#: ordinary character to tmux, and still sorts agent sessions to the top of
+#: `tmux ls'. See =docs/tmux-session-rename.md=.
+typeset -g agent_tmux_name_marker='+'
 
 function h-agent-hook-payload {
     #: The JSON an agent's hook was handed: `$1' when non-empty, else stdin.
@@ -150,13 +157,13 @@ function codex-thread-name {
 }
 
 function h-codex-session-tmux-name {
-    : "prints the tmux session name for a Codex thread: '@Codex <name>'"
+    : "prints the tmux session name for a Codex thread: '+Codex <name>'"
     local id="${1}"
     assert-args id @RET
 
     local name
     name="$(codex-thread-name "${id}")"
-    ec "@Codex ${name:-${id[1,8]}}"
+    ec "${agent_tmux_name_marker}Codex ${name:-${id[1,8]}}"
 }
 
 function codex-session-tmux-autoname {
@@ -204,13 +211,13 @@ function agy-conversation-name {
 }
 
 function h-agy-session-tmux-name {
-    : "prints the tmux session name for an Antigravity conversation: '@Agy <name>'"
+    : "prints the tmux session name for an Antigravity conversation: '+Agy <name>'"
     local id="${1}"
     assert-args id @RET
 
     local name
     name="$(agy-conversation-name "${id}")"
-    ec "@Agy ${name:-${id[1,8]}}"
+    ec "${agent_tmux_name_marker}Agy ${name:-${id[1,8]}}"
 }
 
 function agy-session-tmux-autoname {

@@ -1112,7 +1112,7 @@ five things, in order of how sure each one is:
    client's *pid*, through one =tmux list-clients=, and not from the name in the
    window's command line: the autoname hooks rename a session after the agent
    in it, so a window still running =tmux attach -t scripts-claudework1= is
-   attached to a session now called =@Claude/work claude-session-helpers-refactor=.
+   attached to a session now called =+Claude/work claude-session-helpers-refactor=.
    The first version of this matched the spelled name, which reads perfectly and
    never once fired.
 2. An agent runs in the window itself. One of the window's foreground pids is
