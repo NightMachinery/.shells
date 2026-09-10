@@ -368,28 +368,49 @@ as well.
 
 ## The brightness band
 
-hyper+F1/F2 put an alert-v2 band on every screen showing where the level
-landed. The coalescing above had to be written regardless, and once Hammerspoon
-is accumulating the delta it may as well say what it did.
+hyper+F1/F2 put an alert-v2 band on every screen showing where the level is
+heading. The coalescing above had to be written regardless, and once
+Hammerspoon is accumulating the delta it may as well say what it did.
 
 The dispatch keeps exactly one garden call in flight. Presses arriving during a
 flight accumulate and leave as a single larger delta, so the total always
 matches what was pressed while the number of DDC round trips stays proportional
 to time rather than to keystrokes. Ten presses measured as two calls — an
 immediate `brightness-inc -0.0100`, then `brightness-inc -0.0900` for the other
-nine — landing exactly -0.10.
+nine — landing exactly -0.10. Five presses, measured with the deltas logged:
+`-0.0100` then `-0.0400`, and the panel moved exactly -0.05.
 
 The call is `brightness-inc <delta> ; brightness-get`, so the reply carries the
-new level and the band never needs a read of its own. Between replies the band
-shows the level stepped by the same delta the shell is applying, which is what
-makes it feel immediate: a reply is ~600ms behind the press.
+new level and the band never needs a read of its own.
 
-That cached level is trusted only for `hyper_brightness_trust_seconds` — three
-by default, matched to `brightness-auto-loop`'s cycle, the fastest of the other
+What the band shows is the *target*, not the last reading: the reading, plus
+the delta of the call in flight, plus everything pressed since it left. Showing
+the reading alone was wrong in a way that was visible — a reply only ever
+confirms the delta it carried, so mid-hold the band jumped back up as a reply
+landed and then down again on the next flush. Held as a target it is stable
+across the whole burst, and it is the number you actually want: where the panel
+will be when it stops moving, about 600ms behind the press.
+
+While anything is still outstanding the row ends in `↓` or `↑`. That cue cannot
+be the ellipsis, which already means "no reading worth trusting", and it cannot
+be a region of the bar either: at 20 cells one cell is 5%, so the one to three
+steps typically outstanding would not move a single cell.
+
+The reading is trusted only for `hyper_brightness_trust_seconds` — three by
+default, matched to `brightness-auto-loop`'s cycle, the fastest of the other
 writers. Past that the band shows an ellipsis instead of a number, because
 being briefly uninformative beats being briefly wrong, and the monitor's own
 buttons cannot be observed at all. So the first press of a burst may show `…`
-for one frame before the true value arrives.
+for one frame; the arrow still appears beside it, so a press is visibly doing
+something even when the level is not ours to report. A failed call drops the
+reading rather than keeping it, since a failure says nothing about whether its
+write landed.
+
+The accumulator is clamped so that the target stays inside 0..1. Without it,
+holding the key past either end would run it off to -0.5 while the panel sat at
+0, and the first press back up would need forty more before anything moved. It
+clamps against the first display, which is exact for one panel and the best a
+single scalar accumulator can do for several.
 
 The band is raised with `peek = false`. Holding hyper normally fades every
 alert band to a whisper so it stops covering whatever you are about to act on —
