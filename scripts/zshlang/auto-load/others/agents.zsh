@@ -92,8 +92,40 @@ function h-agent-session-agent-of {
         fi
     done
 
+    #: A transcript outside every store -- one copied to ~/tmp, or a file a
+    #: colleague sent -- is still worth reading, so the shape of its first
+    #: record decides. Last, and only then: a path under a store is the
+    #: authority, and this cannot tell a fork from its original.
+    if agent="$(h-agent-session-sniff "${transcript}")" ; then
+        ec "${agent}"
+        return 0
+    fi
+
     ecerr "$0: no agent owns: ${transcript}"
     return 1
+}
+
+function h-agent-session-sniff {
+    #: Which agent wrote a transcript, from the first record's own keys. Each
+    #: format names itself: a Codex rollout opens with a `session_meta' record
+    #: carrying a payload, an Antigravity step has a `step_index', and a Claude
+    #: Code record has a `sessionId' or one of its record types.
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+    test -r "${transcript}" || return 1
+    isdefined-cmd jq || return 1
+
+    local agent
+    agent="$(command head -n 1 -- "${transcript}" 2>/dev/null | jq -r '
+        if type != "object" then empty
+        elif has("payload") and (.type // "" | test("^session_meta$|^response_item$|^turn_context$")) then "codex"
+        elif has("step_index") then "agy"
+        elif has("sessionId") or has("isMeta") or ((.type // "") | test("^(user|assistant|summary)$")) then "claude"
+        else empty end' 2>/dev/null)" || return 1
+
+    test -n "${agent}" || return 1
+    ec "${agent}"
 }
 ##
 function h-agent-launch {
