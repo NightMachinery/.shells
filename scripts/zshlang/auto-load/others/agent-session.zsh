@@ -72,19 +72,27 @@ function h-agent-session-title {
     local agent
     agent="$(h-agent-session-agent-of "${input}")" @RET
 
-    local label id name
+    local label id name account
     label="$(h-agent-field "${agent}" label)" @RET
     id="$(h-agent-session-call "${agent}" id-of "${input}")" @RET
     name="$(h-agent-session-name "${input}")" @RET
+    #: Which seat this session came from: the Claude Code profile, or the
+    #: signed-in account for an agent that has one. Two profiles are two
+    #: accounts, and a rendered document said nothing about which was which.
+    account="$(h-agent-session-call "${agent}" account "${input}" 2>/dev/null)" || account=''
+
+    local subtitle="${label} session ${id}"
+    test -n "${account}" && subtitle+=" · ${account}"
 
     if [[ "${syntax}" == org ]] ; then
         #: An org comment, so it is invisible in an exported document.
         ec "# -*- coding: utf-8 -*-"
         if [[ "${name}" == "${id}" ]] ; then
             ec "#+TITLE: ${label} Session ${id}"
+            test -n "${account}" && ec "#+SUBTITLE: ${account}"
         else
             ec "#+TITLE: ${name}"
-            ec "#+SUBTITLE: ${label} session ${id}"
+            ec "#+SUBTITLE: ${subtitle}"
         fi
     else
         #: An HTML comment: `# ...' would be a markdown heading, and emacs
@@ -92,10 +100,14 @@ function h-agent-session-title {
         ec "<!-- -*- coding: utf-8 -*- -->"
         if [[ "${name}" == "${id}" ]] ; then
             ec "# ${label} Session ${id}"
+            if test -n "${account}" ; then
+                ec
+                ec "${account}"
+            fi
         else
             ec "# ${name}"
             ec
-            ec "${label} session ${id}"
+            ec "${subtitle}"
         fi
     fi
     ec

@@ -23,6 +23,7 @@ function claude-code-session-current-id {
 
     ec "${id}"
 }
+aliasfn sesid claude-code-session-current-id
 
 function claude-code-session-current-file {
     #: The transcript of the Claude Code session that spawned this shell,
@@ -137,6 +138,42 @@ function claude-code-profile-of-transcript {
     #: <config dir>/projects/<project>/<id>.jsonl, unregistered: name the dir.
     local home="${transcript:h:h:h}"
     ec "${${home:t}#.}"
+}
+
+function h-claude-session-account {
+    #: Which profile and account a transcript belongs to: `profile work ·
+    #: someone@example.com'. The profile comes from the projects directory the
+    #: transcript sits in, and the email from that config home's
+    #: `.claude.json', which is where Claude Code records the signed-in
+    #: account. Two profiles are two accounts, and which one a transcript came
+    #: from is otherwise invisible in a rendered document.
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local profile home email
+    profile="$(claude-code-profile-of-transcript "${transcript}" 2>/dev/null)" || profile=''
+
+    if test -n "${profile}" ; then
+        home="$(h-claude-code-profile-config-home "${profile}" 2>/dev/null)" || home=''
+    fi
+    : "${home:=${HOME}/.claude}"
+
+    #: The default profile keeps its `.claude.json' beside the config home
+    #: rather than inside it; a second config home keeps its own.
+    local f
+    for f in "${home}/.claude.json" "${HOME}/.claude.json" ; do
+        test -e "${f}" || continue
+        email="$(jq -r '.oauthAccount.emailAddress // empty' "${f}" 2>/dev/null)" || email=''
+        test -n "${email}" && break
+    done
+
+    local -a parts
+    test -n "${profile}" && parts+=( "profile ${profile}" )
+    test -n "${email}" && parts+=( "${email}" )
+    (( ${#parts} )) || return 1
+
+    print -r -- "${(j: · :)parts}"
 }
 
 function h-claude-code-session-tmux-name {

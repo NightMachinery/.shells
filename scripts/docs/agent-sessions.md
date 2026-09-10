@@ -253,6 +253,20 @@ change here, in rough order of how much it would hurt to lose:
 `brishz-restart` after every zsh edit: the garden holds persistent shells and
 sees none of it otherwise, and every hook here runs inside the garden.
 
+## What the header says
+
+A converted transcript opens with its name, then a subtitle naming the agent,
+the session id and which seat it came from. For Claude Code that is the profile
+and the account of that profile, `profile work · someone@example.com`, because
+two profiles are two accounts and nothing else in a rendered document says
+which one you are reading. Codex reports the signed-in ChatGPT account and plan,
+read from the claims of the id token it already stores, and Antigravity reports
+the Google account from the file it shares with Gemini CLI. No token is printed
+and nothing goes to the network: a document header must not wait on an API.
+
+Each agent answers that through an optional `account` adapter verb, so an agent
+that cannot say who is signed in simply contributes no line.
+
 ## When a converted transcript opens as octal escapes
 
 If an org file shows `\302\267` where a `·` should be, and the prose around it
