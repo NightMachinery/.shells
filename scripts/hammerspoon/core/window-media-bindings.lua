@@ -55,10 +55,140 @@ end)
 -- comes free there: a tap sees the autorepeat keyDowns, which is what
 -- bindWithRepeatV2's repeatfn was for.
 --
--- `dir' is the direction, not a boolean: the underlying functions are
--- brightness-dec and brightness-inc, so that is what travels.
+-- One DDC operation costs 200-380ms on this panel and a locked `chg' is a read
+-- plus a write, so ~600ms; key repeat is ~30ms. Firing one detached job per
+-- press used to overlap them ten to one, and unserialised DDC does not lose
+-- steps so much as invent them: ten concurrent decrements measured *one step
+-- brighter* than they started. h-ddc-lock-do in system.zsh fixed the
+-- corruption, but a lock alone turns a one-second key hold into twenty seconds
+-- of queue. So the presses are coalesced here, at the source.
+--
+-- The rule is one garden call in flight at a time. Presses arriving during a
+-- flight accumulate into `pending' and leave as a single larger delta, so the
+-- total always matches what was pressed while the number of DDC round trips
+-- stays proportional to time rather than to keystrokes. The call asks for the
+-- new level in the same breath, which costs nothing extra -- the reply is what
+-- the band displays, and it makes the optimistic level self-correcting after
+-- every flush rather than drifting.
+hyper_brightness_step = hyper_brightness_step or 0.01
+hyper_brightness_band_seconds = hyper_brightness_band_seconds or 1.5
+hyper_brightness_bar_cells = hyper_brightness_bar_cells or 20
+
+--- How long a level read from the panel is worth believing. The cache is only
+--- ever authoritative until something else writes, and three other things do:
+--- brightness-auto-loop on a 3s cycle, display-black-on-loop on a 5s one, and
+--- the monitor's own buttons, which we cannot see at all. Past this the band
+--- shows an ellipsis rather than a stale number -- the reply is ~600ms behind
+--- the press, and being briefly uninformative beats being briefly wrong.
+--- Matched to the fastest of those writers.
+hyper_brightness_trust_seconds = hyper_brightness_trust_seconds or 3
+
+local kBrightnessBandId = "hyper-brightness"
+
+--- Accumulated but unsent, in 0..1. Signed.
+local brightnessPending = 0
+--- True while a garden call is out. The whole serialisation is this flag.
+local brightnessInFlight = false
+--- Last known levels, one per selected display, or nil before the first reply.
+local brightnessLevels = nil
+--- When those came off the panel, for hyper_brightness_trust_seconds.
+local brightnessLevelsAt = 0
+
+local function brightnessBar(level)
+    local cells = hyper_brightness_bar_cells
+    local filled = math.max(0, math.min(cells, math.floor(level * cells + 0.5)))
+    return string.rep("\u{25AE}", filled) .. string.rep("\u{25AF}", cells - filled)
+end
+
+local function brightnessBandShow()
+    local fresh = brightnessLevels and #brightnessLevels > 0
+        and (hs.timer.secondsSinceEpoch() - brightnessLevelsAt) <= hyper_brightness_trust_seconds
+
+    local text
+    if not fresh then
+        --- Either nothing has come back yet, or what did is old enough that
+        --- another writer may have moved the panel since.
+        text = "Brightness\n" .. ("\u{2026}")
+    else
+        local rows = {}
+        for _, level in ipairs(brightnessLevels) do
+            rows[#rows + 1] = string.format("%s  %d%%", brightnessBar(level), math.floor(level * 100 + 0.5))
+        end
+        text = "Brightness\n" .. table.concat(rows, "\n")
+    end
+
+    --- flashSeconds 0 deliberately: a fullscreen wash on every step of a key
+    --- hold would be unusable. Same id throughout, so the band updates in place
+    --- and its deadline is pushed out rather than a second one stacking up.
+    alert_gateway(text, {
+        id = kBrightnessBandId,
+        seconds = hyper_brightness_band_seconds,
+        flashSeconds = 0,
+        screens = "all",
+    })
+end
+
+local function brightnessParse(out)
+    if not out or out == "" then return nil end
+
+    local levels = {}
+    for line in tostring(out):gmatch("[^\r\n]+") do
+        local n = tonumber((line:gsub("%s", "")))
+        if n then levels[#levels + 1] = math.max(0, math.min(1, n)) end
+    end
+
+    if #levels == 0 then return nil end
+    return levels
+end
+
+local brightnessFlush
+
+--- Applies the delta to what we believe the levels are, so the band can move
+--- on the press rather than on the reply. Corrected by every flush.
+--- Deliberately leaves brightnessLevelsAt alone: stepping our own guess is not
+--- evidence about the panel, so a stale cache stays stale until a reply lands.
+local function brightnessStepOptimistic(delta)
+    if not brightnessLevels then return end
+    for i, level in ipairs(brightnessLevels) do
+        brightnessLevels[i] = math.max(0, math.min(1, level + delta))
+    end
+end
+
+brightnessFlush = function()
+    if brightnessInFlight or brightnessPending == 0 then return end
+
+    local delta = brightnessPending
+    brightnessPending = 0
+    brightnessInFlight = true
+
+    --- One command, one round trip: step, then report where that landed. The
+    --- shell's own lock makes the pair atomic against the blackout loop and
+    --- brightness-auto.
+    local cmd = string.format("brightness-inc %.4f ; brightness-get", delta)
+    brishz_eval_out_hs(cmd, function(out)
+        brightnessInFlight = false
+
+        local levels = brightnessParse(out)
+        if levels then
+            brightnessLevels = levels
+            brightnessLevelsAt = hs.timer.secondsSinceEpoch()
+            brightnessBandShow()
+        end
+
+        --- Whatever was pressed while that was out.
+        brightnessFlush()
+    end, "hyperBrightnessStep")
+end
+
+--- `dir' is the direction, not a boolean: the shell side is brightness-dec and
+--- brightness-inc, so that is what travels.
 function hyperBrightnessStep(dir)
-    brishz_eval_hs('awaysh-fast brightness-' .. dir)
+    local delta = (dir == "dec") and -hyper_brightness_step or hyper_brightness_step
+
+    brightnessPending = brightnessPending + delta
+    brightnessStepOptimistic(delta)
+    brightnessBandShow()
+    brightnessFlush()
 end
 
 -- `-all`, so these blank every display rather than just whichever is currently

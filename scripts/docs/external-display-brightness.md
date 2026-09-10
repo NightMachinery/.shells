@@ -323,14 +323,77 @@ Do not assume a different monitor, cable or hub behaves the same; DDC/CI over
 cheap hubs and HDMI adapters is where this class of tool usually fails. Some
 monitors also ship with DDC/CI switched off in their OSD menu.
 
-## Held-down brightness keys drift slightly
+## Concurrent DDC access, and the lock
 
-The Hammerspoon bindings fire `awaysh-fast brightness-dec` on every key repeat,
-which backgrounds each one, so a held key issues overlapping read-modify-write
-cycles and a few steps get lost. Ten *serial* calls are exact; ten racing ones
-land a step or two short. This predates the DDC backend — get-then-set raced the
-same way — and it does not matter much for a brightness key, which only has to
-ramp in the right direction.
+This section used to say that a held key "lands a step or two short" and that it
+"does not matter much for a brightness key, which only has to ramp in the right
+direction". Both halves were wrong, and measuring them is what found the bug.
+
+The bindings fired `awaysh-fast brightness-dec` on every key repeat, and
+`awaysh1` is `( insubshell-eval "$cmd" &| ) &|` — doubly detached, with no
+serialisation of any kind. A repeat arrives roughly every 30ms and one m1ddc
+round trip costs 200–380ms here, so a held key ran about ten overlapping
+read-modify-write cycles at once — and `chg` is a read-modify-write m1ddc
+performs internally. Ten at once, measured:
+
+    parallel, unlocked    0.99 -> 1.00    ten decrements, one step BRIGHTER
+    sequential            0.99 -> 0.91    eight of ten landed
+
+Not a step or two short: arbitrary, and able to move the level the opposite way
+from the key being pressed. It is also the honest explanation for "the
+brightness keys sometimes do nothing".
+
+It was never only the keys. Four writers reach the same bus independently — the
+key repeat, `display-black-on-loop`'s re-assert every `lo_s` seconds,
+`brightness-auto-loop`'s 3-second cycle, and `display-black-off`'s restore —
+and none of them took a lock, so any two that overlapped could corrupt each
+other. The blackout loop racing the restore is the same shape as "why a
+remembered level is never zero" above, one layer down.
+
+So every per-panel DDC access now goes through `h-m1ddc`, which holds a
+per-display `zsystem flock` (`h-ddc-lock-do`). With it, ten racing decrements
+land ten of ten.
+
+`zsystem flock` rather than redis because the lock must be released when its
+holder dies, which a file descriptor does for free and a redis key with a TTL
+cannot: too short an expiry silently restores the two-writer bug, too long
+wedges the brightness keys until it lapses. It is built into zsh, so unlike
+`flock(1)` — homebrew-only on darwin — it can never be the missing dependency.
+Only `m1ddc display list` stays outside the lock, since it takes no display
+number.
+
+A lock on its own would turn a one-second key hold into twenty seconds of
+queue, at ~600ms per locked `chg`, so the presses are coalesced at the source
+as well.
+
+## The brightness band
+
+hyper+F1/F2 put an alert-v2 band on every screen showing where the level
+landed. The coalescing above had to be written regardless, and once Hammerspoon
+is accumulating the delta it may as well say what it did.
+
+The dispatch keeps exactly one garden call in flight. Presses arriving during a
+flight accumulate and leave as a single larger delta, so the total always
+matches what was pressed while the number of DDC round trips stays proportional
+to time rather than to keystrokes. Ten presses measured as two calls — an
+immediate `brightness-inc -0.0100`, then `brightness-inc -0.0900` for the other
+nine — landing exactly -0.10.
+
+The call is `brightness-inc <delta> ; brightness-get`, so the reply carries the
+new level and the band never needs a read of its own. Between replies the band
+shows the level stepped by the same delta the shell is applying, which is what
+makes it feel immediate: a reply is ~600ms behind the press.
+
+That cached level is trusted only for `hyper_brightness_trust_seconds` — three
+by default, matched to `brightness-auto-loop`'s cycle, the fastest of the other
+writers. Past that the band shows an ellipsis instead of a number, because
+being briefly uninformative beats being briefly wrong, and the monitor's own
+buttons cannot be observed at all. So the first press of a burst may show `…`
+for one frame before the true value arrives.
+
+The knobs are globals in the usual `x = x or default` style:
+`hyper_brightness_step` (0.01), `hyper_brightness_band_seconds` (1.5),
+`hyper_brightness_bar_cells` (20) and `hyper_brightness_trust_seconds` (3).
 
 ## Install
 

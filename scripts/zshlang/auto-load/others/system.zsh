@@ -863,6 +863,69 @@ function brightness-inc-internal {
     brightness-set-internal "$n" "$i"
 }
 ##
+function h-ddc-lock-do {
+    : "usage: h-ddc-lock-do <m1ddc-display> <command> [<args>...]
+Runs the command holding an exclusive lock on that panel's DDC bus.
+
+DDC is one shared resource with no atomicity, and four writers reach it
+independently: the hyper+F1/F2 key repeat, [agfi:display-black-on-loop]'s
+re-assert, [agfi:brightness-auto-loop], and [agfi:display-black-off]'s restore.
+One m1ddc round trip costs 200-380ms here while key repeat is ~30ms, and
+[agfi:awaysh-fast] detaches every press, so they overlap by roughly ten to one.
+
+Unserialised they do not merely lose steps. Measured on a PHL 279P1: ten
+concurrent \`brightness-dec' left the panel one step *brighter* than it
+started, where ten sequential ones moved it eight. \`chg' is a
+read-modify-write that m1ddc performs internally -- reliable on its own (see
+the note in [agfi:brightness-get-ddc], 40 consecutive round trips landing
+exactly) and arbitrary under contention.
+
+\`zsystem flock' rather than redis: the lock must be released when its holder
+dies, which a file descriptor does for free and a redis key with a TTL cannot.
+Too short a TTL expires mid-write and silently restores the two-writer bug;
+too long wedges the brightness keys until it lapses. It is also built into
+zsh, so it can never be the missing dependency that flock(1) -- homebrew-only
+on darwin -- would be."
+    ##
+    local i="$1" ; shift
+    assert-args i @RET
+
+    local timeout="${ddc_lock_timeout:-10}"
+    local lockfile="${TMPDIR:-/tmp}/ddc-lock-${i}"
+
+    zmodload zsh/system @RET
+    : >> "$lockfile" 2>/dev/null || true
+
+    local lock_fd
+    if ! zsystem flock -t "$timeout" -f lock_fd "$lockfile" 2>/dev/null ; then
+        #: A wait this long means something is wedged, and a brightness key that
+        #: does nothing at all is worse than one that races. Say so and proceed.
+        ecerr "$0: timed out after ${timeout}s waiting for the DDC lock on display ${i}; proceeding unserialised"
+        reval "$@"
+        return $?
+    fi
+
+    {
+        reval "$@"
+    } always {
+        exec {lock_fd}>&-
+    }
+}
+
+function h-m1ddc {
+    : "usage: h-m1ddc <m1ddc-display> <m1ddc-args>...
+Every per-panel DDC access goes through here, so the lock in
+[agfi:h-ddc-lock-do] cannot be bypassed by adding a call site. The display
+number is passed on to m1ddc as well as used as the lock key.
+
+Not used by the \`display list' enumeration, which takes no display number."
+    ##
+    local i="$1" ; shift
+    assert-args i @RET
+
+    h-ddc-lock-do "$i" command m1ddc display "$i" "$@"
+}
+
 function brightness-ddc-max {
     : "usage: brightness-ddc-max [<m1ddc-display>]
 The panel's own maximum luminance. Costs a DDC round trip, which is why the
@@ -874,7 +937,7 @@ conversion helpers read \$brightness_ddc_max instead."
     assert isAppleSilicon @MRET
     ensure-dep-m1ddc @RET
 
-    command m1ddc display "$i" max luminance
+    h-m1ddc "$i" max luminance
 }
 
 function brightness-get-ddc {
@@ -915,7 +978,7 @@ One validated DDC reading, as a raw integer."
     while (( n < tries )) ; do
         (( n++ ))
 
-        raw="$(command m1ddc display "$i" get "$attr" 2>/dev/null)" || continue
+        raw="$(h-m1ddc "$i" get "$attr" 2>/dev/null)" || continue
 
         #: `<->` matches non-negative integers, so a corrupt '-7' fails here.
         if [[ "$raw" == <-> ]] && (( raw <= max )) ; then
@@ -964,7 +1027,7 @@ function contrast-set-ddc {
         n=0
     fi
 
-    silent command m1ddc display "$i" set contrast "$n"
+    silent h-m1ddc "$i" set contrast "$n"
 }
 
 function brightness-set-ddc {
@@ -986,7 +1049,7 @@ function brightness-set-ddc {
         n=0
     fi
 
-    silent command m1ddc display "$i" set luminance "$n"
+    silent h-m1ddc "$i" set luminance "$n"
 }
 
 function brightness-inc-ddc {
@@ -1008,7 +1071,7 @@ through here, and some panels misbehave under rapid interleaved reads/writes."
     #: printf rounds a small delta to 0 (or to '-0'); skip the pointless write.
     (( n == 0 )) && return 0
 
-    silent command m1ddc display "$i" chg luminance "$n"
+    silent h-m1ddc "$i" chg luminance "$n"
 }
 ##
 function brightness-get {
