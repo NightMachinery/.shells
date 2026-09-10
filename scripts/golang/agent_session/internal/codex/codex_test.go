@@ -175,18 +175,30 @@ func TestDocumentTurns(t *testing.T) {
 		}
 		roles = append(roles, tu.Role)
 	}
-	want := []string{"user", "assistant", "Context compacted", "user"}
+	want := []string{"Session instructions", "user", "assistant", "Context compacted", "user"}
 	if strings.Join(roles, ",") != strings.Join(want, ",") {
 		t.Errorf("turns = %v, want %v", roles, want)
 	}
 
-	// The developer message and the environment scaffolding are not turns.
-	if doc.Turns[0].Blocks[0].B.Text != "please list the files" {
-		t.Errorf("first user block = %q", doc.Turns[0].Blocks[0].B.Text)
+	// The launch scaffold is its own folded turn, kept verbatim because it is
+	// XML rather than prose, and the developer message is not a turn at all.
+	sc := doc.Turns[0]
+	if !sc.Folded {
+		t.Errorf("scaffold turn is not folded")
+	}
+	if len(sc.Blocks) != 1 || sc.Blocks[0].B.Type != "event" ||
+		sc.Blocks[0].B.Name != "Environment context" ||
+		sc.Blocks[0].B.Text != "<cwd>/tmp/proj</cwd>" {
+		t.Errorf("scaffold block = %+v", sc.Blocks[0].B)
+	}
+
+	// What the person typed is the user turn, with no scaffolding in it.
+	if doc.Turns[1].Blocks[0].B.Text != "please list the files" {
+		t.Errorf("first user block = %q", doc.Turns[1].Blocks[0].B.Text)
 	}
 
 	// Reasoning, two tool calls and the message merge into one assistant turn.
-	a := doc.Turns[1]
+	a := doc.Turns[2]
 	if a.Model != "gpt-5.3-codex" {
 		t.Errorf("model = %q", a.Model)
 	}
@@ -236,6 +248,66 @@ func TestDocumentTurns(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered document lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestSplitSections(t *testing.T) {
+	// The shape of a real first message: instructions, environment, then what
+	// the person typed.
+	text := "<INSTRUCTIONS>\n# Guidelines\n\nbe careful\n</INSTRUCTIONS>\n" +
+		"<environment_context>\n  <cwd>/tmp</cwd>\n</environment_context>\n" +
+		"design the thing"
+
+	secs, typed := splitSections(text)
+	if len(secs) != 2 {
+		t.Fatalf("sections = %+v", secs)
+	}
+	if secs[0].tag != "INSTRUCTIONS" || secs[0].body != "# Guidelines\n\nbe careful" {
+		t.Errorf("first section = %+v", secs[0])
+	}
+	if secs[1].tag != "environment_context" || secs[1].body != "  <cwd>/tmp</cwd>" {
+		t.Errorf("second section = %+v", secs[1])
+	}
+	if typed != "design the thing" {
+		t.Errorf("typed = %q", typed)
+	}
+
+	// A close on the body's own last line, which some sections use.
+	secs, typed = splitSections("<user_instructions>\nx</user_instructions>")
+	if len(secs) != 1 || secs[0].body != "x" || typed != "" {
+		t.Errorf("same-line close: %+v, typed %q", secs, typed)
+	}
+
+	// A tag inside a sentence is text, not a section.
+	secs, typed = splitSections("use <b>bold</b> here")
+	if len(secs) != 0 || typed != "use <b>bold</b> here" {
+		t.Errorf("inline tag: %+v, typed %q", secs, typed)
+	}
+
+	// An unclosed opening tag is text too.
+	secs, typed = splitSections("<open>\nbody")
+	if len(secs) != 0 || typed != "<open>\nbody" {
+		t.Errorf("unclosed: %+v, typed %q", secs, typed)
+	}
+
+	for _, c := range []struct {
+		tag              string
+		scaffold, prose_ bool
+	}{
+		{"INSTRUCTIONS", true, true},
+		{"user_instructions", true, true},
+		{"environment_context", true, false},
+		{"turn_aborted", false, false},
+	} {
+		if got := scaffoldSection(c.tag); got != c.scaffold {
+			t.Errorf("scaffoldSection(%q) = %v", c.tag, got)
+		}
+		if got := proseSection(c.tag); got != c.prose_ {
+			t.Errorf("proseSection(%q) = %v", c.tag, got)
+		}
+	}
+	if got := sectionLabel("environment_context"); got != "Environment context" {
+		t.Errorf("sectionLabel = %q", got)
 	}
 }
 
@@ -351,5 +423,51 @@ func TestTopmostCodex(t *testing.T) {
 	}
 	if got := topmostCodex(300, byPID); got != 300 {
 		t.Errorf("a non-codex pid stays itself, got %d", got)
+	}
+}
+
+func TestOutputTextUnwraps(t *testing.T) {
+	// A plain string result: text, no language.
+	if body, lang := outputText(json.RawMessage(`"a\nb"`)); body != "a\nb" || lang != "" {
+		t.Errorf("string result = %q, %q", body, lang)
+	}
+
+	// The shell shape: the object's `output` is what the command printed.
+	raw := json.RawMessage(`{"exit_code":0,"output":"one\ntwo","wall_time_seconds":1.4}`)
+	if body, lang := outputText(raw); body != "one\ntwo" || lang != "" {
+		t.Errorf("shell result = %q, %q", body, lang)
+	}
+
+	// A list of content parts whose single text is itself a JSON document:
+	// unwrapped, then indented, and marked as json.
+	raw = json.RawMessage(`[{"type":"input_text","text":"[{\"name\":\"apply_patch\"}]"}]`)
+	body, lang := outputText(raw)
+	if lang != "json" {
+		t.Errorf("lang = %q", lang)
+	}
+	if !strings.Contains(body, "\n    \"name\": \"apply_patch\"") {
+		t.Errorf("not pretty printed: %q", body)
+	}
+
+	// Several parts stay several documents, separated by a blank line.
+	raw = json.RawMessage(`[{"type":"input_text","text":"first"},{"type":"input_text","text":"{\"output\":\"second\"}"}]`)
+	body, lang = outputText(raw)
+	if body != "first\n\nsecond" || lang != "" {
+		t.Errorf("two parts = %q, %q", body, lang)
+	}
+
+	// An object with no output field is shown as an indented document.
+	raw = json.RawMessage(`{"chunk_id":"a6","exit_code":0}`)
+	body, lang = outputText(raw)
+	if lang != "json" || !strings.Contains(body, "\n  \"chunk_id\": \"a6\"") {
+		t.Errorf("object = %q, %q", body, lang)
+	}
+
+	// Not JSON at all, and nothing at all.
+	if body, _ := outputText(json.RawMessage(`plain text`)); body != "plain text" {
+		t.Errorf("plain = %q", body)
+	}
+	if body, _ := outputText(nil); body != "" {
+		t.Errorf("empty = %q", body)
 	}
 }

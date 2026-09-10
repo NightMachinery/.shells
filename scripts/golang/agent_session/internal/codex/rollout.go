@@ -5,9 +5,11 @@ package codex
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"agent_session/internal/session"
@@ -151,25 +153,115 @@ func homeOf(path string) string {
 	return filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(abs)))))
 }
 
-// Whether a user message is scaffolding Codex injects -- `<environment_context>`,
-// `<user_instructions>`, `<turn_aborted>` -- rather than something typed. The
-// whole text is one tag, so a real message that merely starts with `<` passes.
-func scaffoldText(s string) bool {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "<") {
-		return false
+// ** the scaffolding around a typed message
+//
+// Codex sends the instructions a session was launched with, and the
+// environment it runs in, as part of the *first user message*: the whole
+// assembled AGENTS.md inside `<INSTRUCTIONS>`, then an
+// `<environment_context>` block of cwd, shell, date and sandbox policy, then
+// whatever the person actually typed. Rendered as one lump that reads as if
+// the person had typed their own instruction file, and pandoc made it worse:
+// a line that starts with a tag is an HTML block, so the markdown headings
+// inside arrived unparsed.
+//
+// So a user message is split. The scaffold sections become a turn of their
+// own, folded, and the typed remainder is the user's turn.
+
+// A line that is nothing but an opening `<tag>`. Alone on the line is what
+// keeps a `<foo>` inside a sentence from being mistaken for one of these; Go's
+// regexp has no backreference, so the matching close is found by hand.
+var openTagRe = regexp.MustCompile(`^[ \t]*<([A-Za-z_][A-Za-z0-9_-]*)>[ \t]*$`)
+
+// One `<tag>`-wrapped section of a message.
+type section struct {
+	tag  string
+	body string
+}
+
+// The sections of a message and what is left when they are taken out.
+func splitSections(text string) ([]section, string) {
+	if !strings.Contains(text, "<") {
+		return nil, strings.TrimSpace(text)
 	}
-	end := strings.IndexByte(s, '>')
-	if end < 1 {
-		return false
-	}
-	tag := s[1:end]
-	for _, c := range tag {
-		if !(c == '_' || c == '-' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
-			return false
+
+	lines := strings.Split(text, "\n")
+	var out []section
+	var rest []string
+
+	for i := 0; i < len(lines); i++ {
+		m := openTagRe.FindStringSubmatch(lines[i])
+		if m == nil {
+			rest = append(rest, lines[i])
+			continue
 		}
+		close := "</" + m[1] + ">"
+		end, tail := -1, ""
+		for j := i + 1; j < len(lines); j++ {
+			trimmed := strings.TrimRight(lines[j], " \t")
+			if trimmed == close || strings.TrimSpace(lines[j]) == close {
+				end = j
+				break
+			}
+			// Codex closes some sections on the body's last line rather than
+			// on one of their own.
+			if strings.HasSuffix(trimmed, close) {
+				end, tail = j, strings.TrimSuffix(trimmed, close)
+				break
+			}
+		}
+		if end < 0 {
+			// An opening tag with no close is just a line of text.
+			rest = append(rest, lines[i])
+			continue
+		}
+		body := lines[i+1 : end]
+		if tail != "" {
+			body = append(append([]string{}, body...), tail)
+		}
+		out = append(out, section{tag: m[1], body: strings.Join(body, "\n")})
+		i = end
 	}
-	return strings.HasSuffix(s, "</"+tag+">")
+	return out, strings.TrimSpace(strings.Join(rest, "\n"))
+}
+
+// Whether a section is the launch scaffold rather than something that happened
+// during the session: the instructions and the environment description, which
+// are the same every turn and are nobody's message.
+func scaffoldSection(tag string) bool {
+	t := strings.ToLower(tag)
+	switch t {
+	case "environment_context", "filesystem", "sandbox_policy", "workspace_roots":
+		return true
+	}
+	return strings.Contains(t, "instruction") || strings.Contains(t, "guideline") ||
+		strings.Contains(t, "agents_md") || strings.Contains(t, "user_prompt_prefix")
+}
+
+// Whether a section's body is prose to be converted, or data to be shown as it
+// is. The instruction files are markdown; the environment blocks are XML.
+func proseSection(tag string) bool {
+	t := strings.ToLower(tag)
+	return strings.Contains(t, "instruction") || strings.Contains(t, "guideline") ||
+		strings.Contains(t, "agents_md")
+}
+
+// `environment_context` -> `Environment context`.
+func sectionLabel(tag string) string {
+	t := strings.ReplaceAll(strings.ToLower(tag), "_", " ")
+	t = strings.ReplaceAll(t, "-", " ")
+	if t == "" {
+		return "Section"
+	}
+	r := []rune(t)
+	return strings.ToUpper(string(r[0])) + string(r[1:])
+}
+
+// Whether a user message is nothing but scaffolding, so it is not a turn of
+// its own. Kept for the listing and the preview, which want the first thing
+// the person actually typed and do not build turns.
+func scaffoldText(s string) bool {
+	_, typed := splitSections(s)
+	return strings.TrimSpace(typed) == ""
 }
 
 // The text of a message's parts, joined; images become a marker.
@@ -197,19 +289,119 @@ func partsText(parts []contentPart) string {
 
 // A tool output as text: a plain string, or the `{"output": ..., "metadata":
 // ...}` object older rollouts wrote.
-func outputText(raw json.RawMessage) string {
+// The text of a tool result, with the layers Codex wraps it in taken off and
+// what is left pretty-printed when it is JSON.
+//
+// Codex hands a result back in whatever shape the tool produced: a plain
+// string, an argv-style object with an `output` field, or a list of content
+// parts each with a `text` -- and a part's text is itself often another JSON
+// document, since MCP tools answer in JSON. Rendered raw that is one
+// unreadable line, so each layer is unwrapped and the innermost JSON is
+// indented. Returns the body and the language for its block: `json` for
+// something this pretty-printed, empty for text nobody can vouch for.
+func outputText(raw json.RawMessage) (string, string) {
 	if len(raw) == 0 {
-		return ""
+		return "", ""
 	}
-	var s string
-	if err := json.Unmarshal(raw, &s); err == nil {
-		return s
+	return unwrapJSON(strings.TrimSpace(string(raw)), 0)
+}
+
+// How deep the unwrapping goes. Three layers covers list-of-parts, a part's
+// own JSON document and one `output` inside that; more than that is a payload
+// nobody is reading in a transcript anyway.
+const unwrapDepth = 3
+
+func unwrapJSON(s string, depth int) (string, string) {
+	if depth > unwrapDepth || !looksJSON(s) {
+		return s, ""
 	}
-	var obj struct {
-		Output string `json:"output"`
+	raw := json.RawMessage(s)
+
+	// A JSON string: its content is the result, and may itself be JSON.
+	var str string
+	if json.Unmarshal(raw, &str) == nil {
+		return unwrapJSON(strings.TrimSpace(str), depth+1)
 	}
-	if err := json.Unmarshal(raw, &obj); err == nil && obj.Output != "" {
-		return obj.Output
+
+	// A list of content parts, each with its own text. Only when *every*
+	// element is one: an ordinary JSON array is a document, and taking it
+	// apart would lose the array itself.
+	var items []json.RawMessage
+	if json.Unmarshal(raw, &items) == nil {
+		texts, ok := contentParts(items)
+		if !ok {
+			return indentJSON(raw), "json"
+		}
+		parts := make([]string, 0, len(texts))
+		lang := "json"
+		for _, text := range texts {
+			body, l := unwrapJSON(strings.TrimSpace(text), depth+1)
+			parts = append(parts, body)
+			if l == "" {
+				lang = ""
+			}
+		}
+		if len(parts) == 1 {
+			return parts[0], lang
+		}
+		// Several parts are several documents; the block cannot be one
+		// language, and blank lines keep them apart.
+		return strings.Join(parts, "\n\n"), ""
 	}
-	return string(raw)
+
+	// An object: the `output` field when it has one, since that is the text
+	// the tool printed, and the whole document indented otherwise.
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(raw, &obj) == nil {
+		if out, ok := obj["output"]; ok {
+			var text string
+			if json.Unmarshal(out, &text) == nil {
+				body, lang := unwrapJSON(strings.TrimSpace(text), depth+1)
+				return body, lang
+			}
+		}
+		return indentJSON(raw), "json"
+	}
+	return s, ""
+}
+
+// The texts of a list of content parts, and whether the list is one: every
+// element an object carrying a non-empty `text`.
+func contentParts(items []json.RawMessage) ([]string, bool) {
+	if len(items) == 0 {
+		return nil, false
+	}
+	out := make([]string, 0, len(items))
+	for _, it := range items {
+		var obj struct {
+			Text string `json:"text"`
+		}
+		if json.Unmarshal(it, &obj) != nil || obj.Text == "" {
+			return nil, false
+		}
+		out = append(out, obj.Text)
+	}
+	return out, true
+}
+
+// Whether a string is worth handing to the JSON decoder at all.
+func looksJSON(s string) bool {
+	if s == "" {
+		return false
+	}
+	switch s[0] {
+	case '{', '[', '"':
+		return true
+	}
+	return false
+}
+
+// A JSON document, indented. The document itself when it cannot be parsed, so
+// this never loses anything.
+func indentJSON(raw json.RawMessage) string {
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, raw, "", "  "); err != nil {
+		return string(raw)
+	}
+	return buf.String()
 }

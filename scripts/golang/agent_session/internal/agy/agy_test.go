@@ -294,10 +294,10 @@ func TestDocumentTurns(t *testing.T) {
 	for _, b := range doc.Turns[1].Blocks {
 		types = append(types, b.B.Type)
 	}
-	// thinking, the planner's prose, its tool call, the directory listing as an
-	// event, the failed command's event and call, the unknown kind, the
-	// subagent step.
-	if strings.Join(types, ",") != "thinking,text,tool_use,event,event,tool_use,event,event" {
+	// thinking, the planner's prose, its tool call, the directory listing as a
+	// verbatim event, the failed command's event and call, the unknown kind,
+	// and the subagent step, whose description is prose.
+	if strings.Join(types, ",") != "thinking,text,tool_use,event,event,tool_use,event,notice" {
 		t.Errorf("assistant blocks = %v", types)
 	}
 
@@ -417,5 +417,36 @@ func TestLiveWithNoProcesses(t *testing.T) {
 	rows, err := ad.Live([]string{brain})
 	if err != nil || len(rows) != 0 {
 		t.Errorf("want no rows and no error, got %+v (%v)", rows, err)
+	}
+}
+
+func TestProseStep(t *testing.T) {
+	plain := "total 8\ndrwxr-xr-x  2 evar staff"
+	md := "### Key factors\n\n- one\n- two"
+
+	for _, c := range []struct {
+		typ, body string
+		want      bool
+	}{
+		// A known prose kind, whatever its body looks like.
+		{"SEARCH_WEB", plain, true},
+		{"PLANNER_RESPONSE", plain, true},
+		{"CONVERSATION_HISTORY", plain, true},
+		// A known output kind, even when the output contains markdown.
+		{"RUN_COMMAND", md, false},
+		{"VIEW_FILE", md, false},
+		{"GREP_SEARCH", md, false},
+		// An unknown kind is judged by its body, since the enum keeps growing.
+		{"SOME_FUTURE_KIND", md, true},
+		{"SOME_FUTURE_KIND", plain, false},
+		{"SOME_FUTURE_KIND", "see [docs](https://example.com)", true},
+		{"SOME_FUTURE_KIND", "a **bold** claim", true},
+		{"SOME_FUTURE_KIND", "", false},
+		// `#include` is not a heading, and `-fPIC` is not a bullet.
+		{"SOME_FUTURE_KIND", "#include <stdio.h>\n-fPIC", false},
+	} {
+		if got := proseStep(c.typ, c.body); got != c.want {
+			t.Errorf("proseStep(%q, %q) = %v, want %v", c.typ, c.body, got, c.want)
+		}
 	}
 }
