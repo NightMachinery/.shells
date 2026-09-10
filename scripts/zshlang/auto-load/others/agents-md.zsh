@@ -253,6 +253,7 @@ function agents-md-doctor {
     done
 
     h-agents-md-doctor-settings
+    h-agent-skills-doctor
 }
 
 typeset -ga agents_md_settings=(

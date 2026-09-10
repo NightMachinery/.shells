@@ -155,6 +155,10 @@ has fields:
 - `name <transcript>` and `tmux-name <transcript>` are optional; an agent that
   omits `name` gets the Go binary's answer.
 
+`current-id` is also what [agfi:agent-done] leans on: `/done` is one skill
+shared by all three agents, and the only agent-specific thing it needs is which
+session it is in. See `agent-done.md`.
+
 ### Adding a fourth agent
 
 1. A row in [agfi:h-agents-table]: token, label, glyph, the binary names its
@@ -166,6 +170,8 @@ has fields:
    each in `agentNames` and `adapters` in `main.go`. See
    `golang/agent_session/readme.org`.
 4. A hook that calls `agent-session-register <token>`, if the agent has hooks.
+5. A line in [agfi:h-agent-skills-dirs] naming where it reads user skills, so
+   the shared `/done` skill reaches it too.
 
 Nothing else. The pickers, the previews, the band, the toggle, the reaper and
 the resolver are already agent-neutral, and `go install` is the step people

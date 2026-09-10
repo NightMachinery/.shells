@@ -25,6 +25,15 @@ function claude-code-session-current-id {
 }
 aliasfn sesid claude-code-session-current-id
 
+function h-claude-session-current-id {
+    #: The adapter verb ([agfi:h-agent-session-call]), so agent-neutral code
+    #: can ask any of the three which session it is in without a `case'. Codex
+    #: and agy have had one since they were added; Claude Code's answer was
+    #: only reachable under its own name.
+    ##
+    claude-code-session-current-id
+}
+
 function claude-code-session-current-file {
     #: The transcript of the Claude Code session that spawned this shell,
     #: located from the environment Claude Code exports into every shell it

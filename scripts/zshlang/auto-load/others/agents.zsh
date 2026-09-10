@@ -199,6 +199,11 @@ function h-agent-launch {
 
     if bool "${agent_launch_sync_p:-y}" ; then
         h-agents-md-sync-ask @RET
+        #: The shared skills (=configFiles/agent-skills/=) are installed on the
+        #: same schedule and for the same reason as the instruction files: an
+        #: agent reads them at startup, so the moment to make sure they are
+        #: there is just before one starts. A stat per skill per agent.
+        agent-skills-link || true
     fi
 
     local glyph="${agent_launch_glyph}"
