@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"agent_session/internal/turns"
 )
 
 // LabelWidth is what row labels are padded to, so the values line up, and
@@ -18,9 +20,17 @@ const (
 )
 
 // CompactTextLen is how much of a free-text field -- the last prompt, the last
-// step -- a compact preview shows, in runes. A phone-width pane wraps anything
+// reply -- a compact preview shows, in runes. A phone-width pane wraps anything
 // longer into a wall that pushes the rows above it off the top.
-const CompactTextLen = 240
+//
+// WideTextLen is the same cap for the ordinary layout. It is generous rather
+// than absent because a preview now shows two free-text blocks: an assistant
+// turn runs to thousands of characters routinely, and one such answer would
+// otherwise fill the pane and push the prompt it answers out of sight.
+const (
+	CompactTextLen = 240
+	WideTextLen    = 600
+)
 
 // GrayRGB is the colour of labels and asides.
 const GrayRGB = "170;170;170"
@@ -63,6 +73,11 @@ func VersionLabel(v string) string {
 // already fit the narrow column; a label with no entry here is written as it
 // is. One table for every adapter, so `last activity' cannot become `when' in
 // one preview and `time' in the next.
+//
+// `status', `first prompt', `last prompt' and `last reply' have no entry:
+// `status' already fits the narrow column, and the other three are block
+// headings written by [Layout.Section], which never pads a label to a column
+// width in the first place.
 var compactLabels = map[string]string{
 	"last activity": "when",
 	"last step":     "step",
@@ -99,6 +114,30 @@ func (l Layout) Row(w *strings.Builder, c Painter, label, value, aside string) {
 		w.WriteString(" " + c.Gray(aside))
 	}
 	w.WriteString("\n")
+}
+
+// TextLen is how much of a free-text field this layout shows, in runes.
+func (l Layout) TextLen() int {
+	if l.Compact {
+		return CompactTextLen
+	}
+	return WideTextLen
+}
+
+// Section writes a block of free text under a bold heading: the last prompt,
+// the last reply. `text` is cut to what the layout allows, and `empty` is what
+// stands in when there is no text at all -- said in parentheses, because it is
+// a note about the transcript rather than something out of it.
+//
+// One helper rather than four copies of the same six lines, so a heading, its
+// truncation and its "nothing here" note cannot drift between adapters.
+func (l Layout) Section(w *strings.Builder, c Painter, label, text, empty string) {
+	w.WriteString(c.Bold(label) + "\n")
+	if text == "" {
+		w.WriteString("(" + empty + ")\n")
+		return
+	}
+	w.WriteString(turns.Truncate(text, l.TextLen()) + "\n")
 }
 
 // Gap separates two blocks of a preview. It writes nothing in compact mode: a

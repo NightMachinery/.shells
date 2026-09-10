@@ -67,16 +67,8 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	l.Row(w, c, "last step", preview.JoinParts(" · ", typeLabel(lastType(steps)), statusNote(lastStatus(steps))), "")
 
 	l.Gap(w)
-	w.WriteString(c.Bold("last prompt") + "\n")
-	p := turns.OneLine(lastUserText(steps))
-	if o.Compact {
-		p = turns.Truncate(p, preview.CompactTextLen)
-	}
-	if p == "" {
-		w.WriteString("(none in this transcript)\n")
-	} else {
-		w.WriteString(p + "\n")
-	}
+	l.Section(w, c, "last prompt", turns.OneLine(lastUserText(steps)), "none in this transcript")
+	l.Section(w, c, "last reply", turns.OneLine(lastModelText(steps)), "no answer in this transcript")
 	return w.String(), nil
 }
 
@@ -132,6 +124,22 @@ func lastUserText(steps []step) string {
 			continue
 		}
 		if text := userText(steps[i].Content); text != "" {
+			return text
+		}
+	}
+	return ""
+}
+
+// What the agent last said. The steps are already in hand, so this is the same
+// walk as [lastUserText] from the other end of the conversation: the newest
+// step the model wrote that has prose of its own. A tool call or a step whose
+// content was truncated away carries none, and the walk keeps going.
+func lastModelText(steps []step) string {
+	for i := len(steps) - 1; i >= 0; i-- {
+		if steps[i].Source != sourceModel {
+			continue
+		}
+		if text := strings.TrimSpace(steps[i].Content); text != "" {
 			return text
 		}
 	}

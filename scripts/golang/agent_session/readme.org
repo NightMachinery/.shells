@@ -229,18 +229,68 @@ because Claude Code writes it on every message record. It is for a caller that
 wants all three of a transcript and would otherwise pay three calls for them.
 
 =agent_session claude preview [flags] <session.jsonl>= writes the fzf preview
-body for one session: what it is called, what it was running as, where, when it
-last moved, and what was last asked of it. Each row is omitted when the session
-has nothing to say for it: the name, bold, in its profile's colour; a gray
-subtitle of uuid, profile and Claude Code version; =last activity=, the newest
-timestamp in local time plus a relative age, =2026-09-08 17:55 (39s ago)=;
-=model=, the model that answered last with =claude-= stripped and the reasoning
-effort, =opus-5 · high effort=; =mode=, the permission mode and the interaction
-mode, =auto · normal=; =cwd=, with =$HOME= abbreviated to =~= and the git branch
-after an =@=; and the last prompt. A session with no name is headlined =Claude
-Code session <uuid>=. Only the tail of the file is read, so the cost does not
-depend on the transcript's size; the section on sessions live in a kitty window
-says why this is a subcommand at all.
+body for one session: what it is called, whether it is running, what it was
+running as, where, when it last moved, and the last exchange of the
+conversation. Each row is omitted when the session has nothing to say for it:
+the name, bold, in its profile's colour, prefixed by a status emoji when the
+session is live; a gray subtitle of uuid, profile and Claude Code version;
+=status=, =busy= or =idle=; =last activity=, the newest timestamp in local time
+plus a relative age, =2026-09-08 17:55 (39s ago)=; =model=, the model that
+answered last with =claude-= stripped and the reasoning effort, =opus-5 · high
+effort=; =mode=, the permission mode and the interaction mode, =auto · normal=;
+=cwd=, with =$HOME= abbreviated to =~= and the git branch after an =@=; then the
+=last prompt= and =last reply= blocks. A session with no name is headlined
+=Claude Code session <uuid>=. Only the tail of the file is read, so the cost
+does not depend on the transcript's size; the section on sessions live in a
+kitty window says why this is a subcommand at all.
+
+The two conversation blocks come out of the tail window itself rather than out
+of bookkeeping. =last prompt= is the newest message the *user typed* in the
+window --- a =user= record that is not =isMeta= and whose content carries no
+=tool_result= block, which is the same =typed= predicate =list= dates a session
+by under =-last-by user=, shared as a method on =msgRecord= so the two scans
+cannot disagree about what a prompt is. Its text blocks are joined and put
+through the same =snippetText= the picker's snippet column uses, so a system
+reminder or =<command-name>= scaffolding is stripped and a message that is
+nothing but scaffolding leaves the previous prompt standing. =last reply= is the
+newest =assistant= record in the window with a non-empty =text= block: a turn
+ends in a tool call more often than not, and a record holding only =tool_use= or
+=thinking= has nothing a reader can use, so the walk keeps going back.
+
+The fallback order for the prompt block is typed message, then the
+=last-prompt= record, then --- under the heading =first prompt= --- the first
+user message in the file. The =last-prompt= record used to be the only source,
+and measured over the 77 local transcripts it is a bad one: every transcript has
+such a record and in 75 of them it sits earlier than a 400KiB tail reaches, so
+the block read =(none in the scanned tail)= in the common case, while a typed
+message was in the tail almost always. The =first prompt= fallback covers the
+remaining case, a window that is all tool traffic: what a session was started
+for identifies it better than an empty block, and the heading says which of the
+two you are looking at.
+
+That head scan runs *beside* the tail read, not after it. It is started in a
+goroutine before =scanPreview= and its answer is read only if the tail turns out
+to hold no prompt, so in the ordinary case nothing waits on it: =main= returns
+and the goroutine dies with the process. It is bounded by =headWindow= and
+satisfied within the first kilobyte in practice, so running it speculatively
+costs a goroutine rather than wall clock --- a 383MB transcript still previews
+in about 20ms.
+
+The status is Claude Code's own: =<config-home>/sessions/<pid>.json=, the record
+=live= reads, matched on its =sessionId= against the transcript's uuid. The
+config home is derived from the transcript's path the same way its profile label
+is --- everything above the =projects= directory --- so a =.claude-work= session
+is never matched against the personal seat's records. A session writes the
+record while it runs and removes it on exit, so a transcript with no matching
+record is a finished session and gets no emoji and no row; a crash leaves the
+file behind, so =recordAlive= checks the pid with signal 0 first. Nothing else
+is consulted: no =claude agents= subprocess (170ms per config home) and no =ps=,
+because the whole point of doing this in a preview is that it costs a handful of
+small reads. ⏳ is busy, 💤 is idle.
+
+Codex and Antigravity get the =last reply= block too --- both scans already had
+the text in hand --- but no status. Their live listings hardcode =running=, and
+guessing busy or idle from the tail would misreport a thread killed mid-turn.
 
 - =-bytes N= --- how much of the transcript's tail to read, in bytes. Default
   409600. A title written earlier than that falls back to the slug, the same
@@ -257,8 +307,13 @@ says why this is a subcommand at all.
   the adapters cannot disagree); the blank lines between the blocks go; the uuid
   leaves the gray subtitle, keeping the profile or agent and the version, since
   it is the longest thing there and the row the session was picked from carried
-  it anyway; and the last prompt is cut to 240 runes, because a wrapped wall of
-  text pushes everything above it off the top of such a pane.
+  it anyway; the =status= row goes, since the emoji on the name line already
+  says it; and the prompt and reply blocks are cut to 240 runes
+  (=preview.CompactTextLen=), because a wrapped wall of text pushes everything
+  above it off the top of such a pane. The ordinary layout cuts them at 600
+  (=preview.WideTextLen=): generous, but not absent, because an assistant turn
+  runs to thousands of characters routinely and one such answer would otherwise
+  fill the pane and push the prompt it answers out of sight.
 
   =auto=, the default, asks the environment rather than the terminal: fzf
   exports the pane's size to the preview process as =FZF_PREVIEW_COLUMNS= and
@@ -976,6 +1031,12 @@ transcript: 26MB measures 16.1ms against 2MB's 15.4ms. That is what makes it
 usable as an fzf preview, which runs it on every cursor move. The zsh version it
 replaced took about 600ms a keystroke; the kitty-window section has the
 breakdown.
+
+The conversation blocks and the status did not change that. The status is a
+glob of =<config-home>/sessions/= and a =kill(pid, 0)=; the head scan for the
+=first prompt= fallback runs in a goroutine beside the tail read and is
+abandoned unread whenever the tail answered. Measured by hand, a live session's
+preview is about 20ms and the largest local transcript (383MB) the same.
 
 * Why the session time is not the file mtime
 
