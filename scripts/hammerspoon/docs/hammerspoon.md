@@ -669,8 +669,16 @@ field, the login screen — hides keystrokes from event taps, so the lock cannot
 block typing there; engaging while it is on shows a warning alert saying so. A
 Hammerspoon crash drops the tap silently while the screen stays black, until
 the next load recovers it from redis, and macOS disables a tap whose callback
-stalls. The engage alert, "Keyboard locked. hyper+shift+F2 releases.", shows
-before the screen goes black, since black-on is asynchronous through the garden.
+stalls. The engage alert shows before the screen goes black, since black-on is
+asynchronous through the garden and the alert is not. There are two of them: a
+plain blackout says "Input locked." in the amber `warn` band, and a lock-first
+one says "Input locked. Ending the blackout locks the screen." in `blood`, a
+far darker red. The colour carries that difference because nothing else can —
+both chords leave a screen equally black, and the mark cannot be revoked once
+it is set, so this band is the only moment it is ever confirmed, and it has to
+be legible at a glance rather than by reading. `blood` is darker than the
+crimson `crit` of the Secure Input warning above as well, which can land in the
+very same instant.
 
 ## FIM completion
 
