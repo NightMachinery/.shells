@@ -144,6 +144,32 @@ The name is `title` (set with `/rename` or F2 in `/resume`), else `preview`
     tnameme-status
     agent-tmux-identity-get      # who the hook says lives here
 
+## Session names are not tmux targets
+
+A leading sigil in a `-t` target declares a *type*, not a name: `$` is a
+session id, `@` a window id, `%` a pane id, and `=` asks for an exact name
+match. Session names are free to start with any of those, so a name handed
+straight to `-t` can be read as something else entirely. Measured on tmux
+3.6a, against a session actually called `@Claude/work tidy-up-the-lint-config`:
+
+    tmux has-session -t '@Claude/work tidy-up-the-lint-config'    # can't find window
+    tmux has-session -t '=@Claude/work tidy-up-the-lint-config'   # ok
+    tmux lsp -s -t '=@Claude/work tidy-up-the-lint-config'        # can't find window
+    tmux lsp -s -t '=@Claude/work tidy-up-the-lint-config:'       # ok
+    tmux lsp -s -t '$41'                                          # ok
+
+So `=` rescues only the *session*-typed targets -- `attach-session`,
+`has-session`, `kill-session`, `switch-client`, `set-option`. `list-panes`
+declares a **window** target even under `-s`, and wants a trailing `:` on top
+of the `=`. A session id needs neither.
+
+Use [agfi:tmux-session-id]. It takes a name or an id and prints an id, which
+is unambiguous in every target position. It also closes a race the autoname
+hooks make routine: they rename on every prompt, so a name captured from
+`tmux ls` can be gone by the time you act on it. [agfi:fftmux] (`fft`,
+`fftk`, `fftr`) and [agfi:tmux-alive-p] all go through it now; use
+[agfi:tmux-session-name-of] to turn an id back into something a human reads.
+
 ## Gotchas
 
 - An agent's shell has no attached client, so tmux has no "current session"

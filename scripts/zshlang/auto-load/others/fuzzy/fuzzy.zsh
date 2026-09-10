@@ -144,22 +144,35 @@ aliasfn fflsof lsofp
 aliasfn plsof lsofp
 ##
 function fftmux() {
+    : "fuzzy-pick tmux sessions; the engine is called with each pick's session id"
+    #: Ids, not names. A name is not a usable `-t' target when it starts with
+    #: a sigil, and it can go stale between the pick and the action: the agent
+    #: autoname hooks rename on every prompt. [agfi:tmux-session-id] and
+    #: =docs/tmux-session-rename.md= have the details.
+    ##
     local query="$*"
     local engine=(tmux a -t)
     test -n "$ftE[*]" && engine=("$ftE[@]")
 
     bella_zsh_disable1
 
-    local sessions
-    sessions="$(tmux ls|fz --query "$query")" || return $?
-    local i
-    for i in "${(f@)sessions}"
+    #: The id is field 1 and hidden from fzf with `--with-nth', which changes
+    #: what is shown and matched but not what is printed back to us.
+    local picks
+    picks="$(command tmux list-sessions -F '#{session_id}'$'\t''#{session_name}: #{session_windows} windows#{?session_attached, (attached),}' |
+        fz --query "$query" --delimiter=$'\t' --with-nth=2)" || return $?
+
+    local i id name
+    for i in "${(@f)picks}"
     do
-        [[ $i =~ '([^:]*):.*' ]] && {
-            ecgray "acting on session $match[1]"
-            tty-title "${match[1]}"
-            reval-ec "${engine[@]}" "$match[1]"
-        }
+        test -n "$i" || continue
+
+        id="${i%%$'\t'*}"
+        name="${${i#*$'\t'}%%:*}"
+
+        ecgray "acting on session ${name} (${id})"
+        tty-title "${name}"
+        reval-ec "${engine[@]}" "${id}"
     done
 }
 alias fft=fftmux
@@ -168,15 +181,34 @@ function fftmuxkill {
     ftE=(tmux-session-processes-kill) fftmux "$@"
 }
 
-function fftmux-name {
+function fftmux-id {
+    : "fuzzy-pick tmux sessions and print their ids"
     ftE=(ec) fftmux "$@"
 }
 
-function tmux-pane-list {
-    : "Usage: <session-name>"
+function fftmux-name {
+    : "fuzzy-pick tmux sessions and print their names"
+    #: For a human to read. Anything that then acts on the session wants
+    #: [agfi:fftmux-id] instead.
+    ftE=(tmux-session-name-of) fftmux "$@"
+}
 
-    local out="${tmux_pane_list_o:-#{pane_id}}"
-    tmux lsp -s -F"$out" -t "$@"
+function tmux-pane-list {
+    : "Usage: <session-name-or-id>"
+    #: `lsp' resolves a *window* target even under `-s', so neither a bare
+    #: name nor `=name' is enough; [agfi:tmux-session-id] gives it an id.
+    ##
+    local target
+    target="$(tmux-session-id "$1")" @RET
+
+    #: Not `${tmux_pane_list_o:-#{pane_id}}': the `}' of the tmux format
+    #: closes the expansion early, so a caller-set value came back with a
+    #: stray `}' glued on. That is what the old `#{pane_pid' -- unbalanced on
+    #: purpose -- was compensating for.
+    local out="${tmux_pane_list_o}"
+    test -n "$out" || out='#{pane_id}'
+
+    tmux lsp -s -F"$out" -t "${target}"
 }
 
 function tmux-pane-list-pid {
@@ -212,18 +244,19 @@ function tmux-session-processes-kill {
     fi
     local sessions=("$@")
 
-    local s
+    local s sid
     for s in ${(@f)sessions} ; do
-        ecgray $'\n'"$0: killing the processes of session $(gquote-sq "$s"):"
+        sid="$(tmux-session-id "$s" 2>/dev/null)" || continue
+        ecgray $'\n'"$0: killing the processes of session $(gquote-sq "$(tmux-session-name-of "$sid")"):"
         local pane_pids
-        pane_pids="$(tmux-pane-list-pid "$s")"
+        pane_pids="$(tmux-pane-list-pid "$sid")"
 
         local p
         for p in ${(@f)pane_pids} ; do
             reval-ec kill-withchildren "$kill_opts[@]" "$p"
         done
 
-        command tmux kill-session -t "${s}" || true
+        command tmux kill-session -t "${sid}" || true
     done
 }
 
@@ -235,12 +268,13 @@ function tmux-session-restart {
     fi
     local sessions=("$@")
 
-    local s
+    local s sid
     for s in ${(@f)sessions} ; do
-        ecgray $'\n'"$0: restarting session $(gquote-sq "$s"):"
+        sid="$(tmux-session-id "$s" 2>/dev/null)" || continue
+        ecgray $'\n'"$0: restarting session $(gquote-sq "$(tmux-session-name-of "$sid")"):"
         local panes pane_pids
-        panes="$(tmux-pane-list "$s")"
-        pane_pids="$(tmux-pane-list-pid "$s")"
+        panes="$(tmux-pane-list "$sid")"
+        pane_pids="$(tmux-pane-list-pid "$sid")"
 
         local p
         for p in ${(@f)pane_pids} ; do
@@ -262,8 +296,8 @@ function fftmux-session-restart {
 
     bella_zsh_disable1
 
-    local session
-    sessions="$(fftmux-name "$q")" @RET
+    local sessions
+    sessions="$(fftmux-id "$q")" @RET
     "$engine[@]" "$kill_opts[@]" "$sessions[@]"
 }
 aliasfn fftr fftmux-session-restart
