@@ -258,7 +258,12 @@ sessions for every project. The `-all-fz` forms are the `-fz` forms with that
 set to `all`: `claude-code-session-resume-all-fz`, `claude-resume-all-fz`,
 `claude-resume-personal-all-fz` and `claude-resume-work-all-fz`.
 `claude-resume`, `claude-resume-fz` and `claude-resume-all-fz` are the short
-names for their `claude-code-session-resume` counterparts. The launcher comes
+names for their `claude-code-session-resume` counterparts. Codex and
+Antigravity have resume commands of their own now — `codex-resume-fz`,
+`codex-resume`, `agy-resume-fz`, `agy-resume` — which pick from that agent's
+sessions and hand the choice to `codex resume` or `agy --conversation`; they
+know nothing about profiles, which are a Claude Code idea.
+`docs/agent-sessions.md` covers the family. The launcher comes
 from `claude_code_profile_launchers` next to `claude_code_profiles`, so the
 work seat keeps its tty marker and every profile keeps the sync and watchdogs
 of the `claude` wrapper.
@@ -270,26 +275,26 @@ coloured by profile (`.claude` blue, `.claude-work` orange), its uuid, profile
 and Claude Code version, when it was last active and how long ago, the model
 and effort that answered last, its permission and interaction modes, its
 working directory and branch, and the last prompt. The pane is
-`claude_session preview`, a single binary fzf runs directly on each cursor
-move; it reads only the tail of the transcript rather than rendering it, so it
-is instant even on a 26 MB file — the readme for `golang/claude_session`
+`agent_session claude preview`, a single binary fzf runs directly on each
+cursor move; it reads only the tail of the transcript rather than rendering it,
+so it is instant even on a 26 MB file — the readme for `golang/agent_session`
 records what the earlier shell version cost and where. The colour is there
 because a work session and a personal one look identical otherwise, and
 telling them apart is exactly what you want when the two are interchangeable.
 The name is what makes choosing among a project's sessions workable — several
 routinely share a directory and differ in nothing else visible. It is resolved
-by the same code `claude_session name` uses, `agent-name` over `custom-title`
-over `ai-title` over the slug, so a fork made by `claude-code-session-import`
-shows under its ` ⑂ <profile>` name rather than the title it had before the
-fork. The preview used to read `ai-title` alone and got exactly that case
+by the same code `agent_session claude name` uses, `agent-name` over
+`custom-title` over `ai-title` over the slug, so a fork made by
+`claude-code-session-import` shows under its ` ⑂ <profile>` name rather than
+the title it had before the fork. The preview used to read `ai-title` alone and got exactly that case
 wrong.
 
 Enter resumes the highlighted session. `alt+enter` instead converts that
 transcript to org and opens it in emacs in the background, without leaving the
 picker, so a session can be read before deciding whether to resume it; pressing
 it again on the same row cancels that conversion. The function behind the key is
-`claude-code-view-session-toggle`, and the readme for `golang/claude_session`
-explains why it is keyed on the transcript rather than on the kitty window, and
+`agent-view-session-toggle`, and the readme for `golang/agent_session` explains
+why it is keyed on the transcript rather than on the kitty window, and
 why it does not freeze the picker.
 
 When the target differs from the owner, `claude-code-session-import` forks
@@ -301,8 +306,8 @@ match and Claude Code's own `--resume <name>` ambiguous, and resuming the
 stale copy later would fork it silently. The fork is renamed to the source's
 name plus ` ⑂ <profile>` (`claude_code_session_import_name_suffix`, a printf
 format; a fork of a fork keeps one suffix, not a trail), written as both an
-`agent-name` and a `custom-title` line so the `claude_session` resolver and
-Claude Code's picker agree. The source is never modified;
+`agent-name` and a `custom-title` line so the `agent_session claude` resolver
+and Claude Code's picker agree. The source is never modified;
 `claude_code_session_import_remove_source_p=y` trashes it afterwards so the
 session leaves the source profile's picker.
 
@@ -429,10 +434,11 @@ sessions on a profile share one rate limit, so "the session that was blocked"
 is ambiguous by construction, and the target has to be *chosen*, not guessed.
 
 So arming opens an fzf picker, `h-claude-code-usage-type-continue-target-fz`,
-built on `claude-code-session-live-fz`, over the Claude Code sessions
-currently live in a kitty window, with a preview showing the session's title,
-when it last moved, and the last prompt it was given. It is multi-select, so
-several tabs can be resumed at once. Above the sessions sits one synthetic
+built on `agent-session-live-fz`, over every agent session currently live in a
+kitty window — Claude Code, Codex and Antigravity alike, each row carrying its
+agent's glyph — with a preview showing the session's title, when it last moved,
+and the last prompt it was given. It is multi-select, so several tabs can be
+resumed at once. Above the sessions sits one synthetic
 choice, `frontmost`, which falls back to `hs-type-continue`. It stays in the
 list because a session outside kitty cannot be reached any other way, but it
 is never the default.
@@ -451,6 +457,13 @@ whether the display is asleep. `send-text` documents that it always succeeds
 the window is checked for separately first, otherwise a tab closed during the
 wait would swallow the resume while the job reported success. A vanished
 window degrades to a notification saying so.
+
+A Codex row becomes a `codex:<thread-id>` target instead, delivered with
+`codex queue --thread <id> --message <text>`. Codex accepts a message for a
+thread by name, so that path needs no window, no focus and no awake display,
+and it cannot land in the wrong place; the picker prefers it whenever the
+chosen session is a Codex one. Antigravity has no such command, so an agy
+session is typed into its kitty window like a Claude one.
 
 The `frontmost` target instead wakes the display via
 `hs.caffeinate.declareUserActivity()` and pauses a beat before typing, because
