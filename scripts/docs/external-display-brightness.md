@@ -169,9 +169,10 @@ the suffix last:
     display-black-toggle-all-loop
     display-black-loop-p                  # is the loop running?
 
-`lo_s` is the interval in seconds and defaults to 5. It is read when the loop is
-started, so changing it means restarting: `display-black-on-loop` kills any
-existing loop first, and there is only ever one.
+`lo_s` is the interval in seconds; the default is in
+[agfi:display-black-on-loop]. It is read when the loop is started, so changing
+it means restarting: `display-black-on-loop` kills any existing loop first, and
+there is only ever one.
 
 The loop is a background subshell whose argv is marked `DBLACK_LOOP_MARKER`
 (`awaysh-bnamed`, so it runs in the brish garden and outlives the terminal that
@@ -359,8 +360,16 @@ holder dies, which a file descriptor does for free and a redis key with a TTL
 cannot: too short an expiry silently restores the two-writer bug, too long
 wedges the brightness keys until it lapses. It is built into zsh, so unlike
 `flock(1)` — homebrew-only on darwin — it can never be the missing dependency.
-Only `m1ddc display list` stays outside the lock, since it takes no display
-number.
+`m1ddc display list` stays outside the lock, and not because it takes no
+display number to key one on: it does not touch the bus at all. Measured at
+36-66ms against 180-380ms for a real DDC round trip, it is CoreDisplay and
+IOKit metadata — display numbers, IDs, product names — read from the window
+server. Locking it would add contention and buy nothing.
+
+Worth knowing while you are here: `h-brightness-select` costs ~75ms and runs
+uncached on every brightness operation, so each coalesced flush pays it once.
+Caching would mean invalidating on display reconfiguration and on wake, which
+is a staleness problem in exchange for about a tenth of a flush. Left alone.
 
 A lock on its own would turn a one-second key hold into twenty seconds of
 queue, at ~600ms per locked `chg`, so the presses are coalesced at the source
@@ -396,10 +405,10 @@ be the ellipsis, which already means "no reading worth trusting", and it cannot
 be a region of the bar either: at 20 cells one cell is 5%, so the one to three
 steps typically outstanding would not move a single cell.
 
-The reading is trusted only for `hyper_brightness_trust_seconds` — three by
-default, matched to `brightness-auto-loop`'s cycle, the fastest of the other
-writers. Past that the band shows an ellipsis instead of a number, because
-being briefly uninformative beats being briefly wrong, and the monitor's own
+The reading is trusted only for `hyper_brightness_trust_seconds`, matched to
+`brightness-auto-loop`'s cycle as the fastest of the other writers. Past that
+the band shows an ellipsis instead of a number, because being briefly
+uninformative beats being briefly wrong, and the monitor's own
 buttons cannot be observed at all. So the first press of a burst may show `…`
 for one frame; the arrow still appears beside it, so a press is visibly doing
 something even when the level is not ours to report. A failed call drops the
@@ -419,8 +428,9 @@ repeatedly, which meant the peek faded the one band the keypress exists to
 show. See "Bands that must not fade" in `hammerspoon/docs/hammerspoon.md`.
 
 The knobs are globals in the usual `x = x or default` style:
-`hyper_brightness_step` (0.01), `hyper_brightness_band_seconds` (1.5),
-`hyper_brightness_bar_cells` (20) and `hyper_brightness_trust_seconds` (3).
+`hyper_brightness_step`, `hyper_brightness_band_seconds`,
+`hyper_brightness_bar_cells` and `hyper_brightness_trust_seconds`. Their values
+live in `hammerspoon/core/window-media-bindings.lua` and are not repeated here.
 
 ## Install
 
