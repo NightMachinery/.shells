@@ -499,13 +499,24 @@ function h-claude-code-usage-screen-locked-p {
 }
 
 function h-claude-code-usage-type-continue-send {
-    #: Types the resume text into one target: `kitty:<window-id>` goes straight
-    #: into that window, `frontmost` wherever the keyboard focus happens to be.
+    #: Delivers the resume text to one target: `kitty:<window-id>` types into
+    #: that window, `codex:<thread-id>` queues the message with Codex itself,
+    #: and `frontmost` types wherever the keyboard focus happens to be.
     ##
     local target="${1}"
     assert-args target @RET
 
     local text="${claude_code_usage_type_continue_text:-Continue.}"
+
+    if [[ "${target}" == codex:* ]] ; then
+        #: Codex takes a message for a thread by name, which beats typing: it
+        #: needs no window, no focus and no awake display, and it cannot land
+        #: in the wrong place. See [agfi:h-codex-session-live-list] for where
+        #: the thread id comes from.
+        ensure-cmd codex @RET
+        reval-ec command codex queue --thread "${target#codex:}" --message "${text}"
+        return $?
+    fi
 
     if [[ "${target}" == frontmost ]] ; then
         #: Wake the display first and give it a beat. `displaysleep` is ten
@@ -615,32 +626,52 @@ function h-claude-code-usage-notif-fire {
 function h-claude-code-usage-type-continue-target-fz {
     #: Chooses what gets resumed, at ARM time, so the target is what you picked
     #: rather than whatever happens to hold the keyboard hours later. Prints one
-    #: target per line: `kitty:<window-id>`, or `frontmost`.
+    #: target per line: `kitty:<window-id>`, `codex:<thread-id>`, or
+    #: `frontmost`.
+    #:
+    #: Every agent's live sessions are offered, not only Claude Code's: what
+    #: the reset unblocks is often one conversation among several, and the
+    #: waiting one may be a Codex thread told to hold off.
     ##
     #: `local` is dynamically scoped in zsh, so the picker sees these without
-    #: anything being exported.
-    local -a claude_code_session_live_fz_extra_rows
-    claude_code_session_live_fz_extra_rows=(
+    #: anything being exported. The row layout is
+    #: [agfi:h-agent-session-live-rows]'s.
+    local -a agent_session_live_fz_extra_rows
+    agent_session_live_fz_extra_rows=(
         $'frontmost\t-\t-\tfrontmost\t-\t-\t-\twhatever holds the keyboard when the limits reset'
     )
 
     #: No header: the picker's own advertises alt+enter, which converts a
     #: transcript to org. This picker is choosing what to resume, and that is
     #: noise here. The binding still works, it is just not announced.
-    local claude_code_session_fz_header=''
+    local agent_session_fz_header=''
 
     local selected
-    selected="$(claude-code-session-live-fz)" @RET
+    selected="$(agent-session-live-fz)" @RET
 
-    local id rest
-    while IFS=$'\t' read -r id rest ; do
-        test -n "${id}" || continue
+    #: `(ps:\t:)' rather than `read': tab is IFS whitespace, so `read' would
+    #: collapse an empty field rather than keep the columns lined up.
+    local line agent
+    local -a f
+    while IFS= read -r line ; do
+        test -n "${line}" || continue
+        f=( "${(@ps:\t:)line}" )
 
-        if [[ "${id}" == frontmost ]] ; then
+        if [[ "${f[1]}" == frontmost ]] ; then
             ec frontmost
-        else
-            ec "kitty:${id}"
+            continue
         fi
+
+        #: A Codex thread is reachable without a window at all, which is
+        #: strictly better; anything else is typed into its kitty window.
+        agent="$(h-agent-session-agent-of "${f[2]}" 2>/dev/null)" || agent=''
+        if [[ "${agent}" == codex ]] ; then
+            ec "codex:$(h-agent-session-call codex id-of "${f[2]}")"
+            continue
+        fi
+
+        test -n "${f[1]}" && [[ "${f[1]}" != '-' ]] || continue
+        ec "kitty:${f[1]}"
     done <<< "${selected}"
 }
 
