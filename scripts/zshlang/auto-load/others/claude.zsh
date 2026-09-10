@@ -579,6 +579,33 @@ function h-claude-code-usage-argv-common {
     ec "${(F)args}"
 }
 
+function h-claude-code-usage-token-env-load {
+    #: Prints =typeset -x= lines for every named profile that has a token file
+    #: at =~/.keys/claude-code-oauth-<profile>=, for the caller to =eval=.
+    #: Usage: eval "$(h-claude-code-usage-token-env-load <profile>...)"
+    #:
+    #: A long-lived token (minted with =claude setup-token=) is what makes the
+    #: report work in a GUI-detached session with no garden to delegate to.
+    #:
+    #: =eval= rather than an argv prefix, and scoped to the caller rather than
+    #: exported globally: a token in a command's arguments is visible in =ps=
+    #: to anyone on the machine, and would be recorded in the garden's command
+    #: log whenever the report is delegated.
+    ##
+    local profile var file
+    for profile in "$@" ; do
+        file="${HOME}/.keys/claude-code-oauth-${profile}"
+        test -r "${file}" || continue
+
+        var="CLAUDE_CODE_OAUTH_TOKEN_${${(U)profile}//[^A-Z0-9]/_}"
+        #: A variable already in the environment is a deliberate override of
+        #: whatever is on disk, so it wins.
+        test -n "${(P)var}" && continue
+
+        ec "typeset -x ${var}=${(q)$(<${file})}"
+    done
+}
+
 function h-claude-code-usage-garden-p {
     #: Whether to run the report inside the brish garden rather than here.
     #:
@@ -644,6 +671,8 @@ function claude-code-usage {
 
     local common
     common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
+
+    eval "$(h-claude-code-usage-token-env-load "${profile}")"
 
     local script_args=(
         --profile-label "${profile}"
@@ -718,6 +747,8 @@ function claude-code-usage-all {
 
     local common
     common=("${(@f)$(h-claude-code-usage-argv-common)}") @RET
+
+    eval "$(h-claude-code-usage-token-env-load "${profiles[@]}")"
 
     local script_args=(--all "${common[@]}")
     local p

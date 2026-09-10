@@ -353,11 +353,38 @@ rather than a bug, and `/color default` clears it.
 
 The OAuth access token is looked up in this order:
 
-1. the `CLAUDE_CODE_OAUTH_TOKEN` environment variable,
-2. the macOS Keychain generic password for this profile (read via
+1. the variable named by `--token-env` for this profile,
+2. `CLAUDE_CODE_OAUTH_TOKEN_<PROFILE>`, the profile label uppercased with any
+   run of non-alphanumerics collapsed to `_`, so `default` gives
+   `CLAUDE_CODE_OAUTH_TOKEN_DEFAULT` and `work` gives `..._WORK`,
+3. the plain `CLAUDE_CODE_OAUTH_TOKEN`, for a single-profile report only,
+4. the macOS Keychain generic password for this profile (read via
    `security find-generic-password`),
-3. `<config dir>/.credentials.json`, then `~/.claude/.credentials.json` (Linux),
-4. the profile's own usage cache — see Caching below.
+5. `<config dir>/.credentials.json`, then `~/.claude/.credentials.json` (Linux),
+6. our own response cache, then the profile's own usage cache — see Caching
+   below.
+
+The bare `CLAUDE_CODE_OAUTH_TOKEN` is deliberately **ignored under `--all`**,
+and a warning says so on every profile. One token is one account, so honouring
+it there would report the same account twice under two different headers, which
+is a worse failure than reporting nothing: both numbers look plausible and
+nothing marks either as wrong. A per-profile variable has no such ambiguity, so
+it is always honoured.
+
+The token source is reported as `env:<VAR>` rather than a bare `env`, naming the
+variable that was used. That is the same reasoning that already puts the Keychain
+account in the source string: a credential cannot be attributed to a profile
+from its contents, so the way a wrong one becomes visible is by saying out loud
+where it came from.
+
+Long-lived tokens are minted with `claude setup-token`, one per account. The
+wrapper reads `~/.keys/claude-code-oauth-<profile>` when it exists and exports
+the matching variable for the child process alone, rather than into the ambient
+environment of every shell. A variable already set in the environment wins over
+the file, being the more deliberate of the two. Tokens live in `~/.keys/`, never
+in this repository, and are passed by environment rather than on an argv — an
+argument is visible in `ps` to anyone on the machine, and would be recorded in
+the garden's command log whenever a report is delegated.
 
 The Keychain service name is derived exactly the way Claude Code derives it:
 
@@ -449,7 +476,7 @@ The second layer is a macOS boundary and not something the script can talk its
 way past. The root retry that rescues `wifi-password-get-darwin` does **not**
 transfer: that item lives in the System keychain, which root opens with no
 dialog, whereas these live in the login keychain, where root has no privilege
-that helps.
+that helps. So there are exactly two ways round it.
 
 **Delegate to the garden.** BrishGarden's worker shells *are* attached to the GUI
 session, and they read the login keychain with no dialog even when the request
@@ -466,9 +493,12 @@ costs freshness and not the report. Because the garden's stdout is a pipe,
 `--color always` is passed when our own stdout is a terminal, or the command run
 most often would quietly lose its colour.
 
-With the garden unavailable the report still renders, from the freshest cache
-there is, and the reason names the garden rather than claiming the credential is
-missing.
+**Or use a per-profile token.** A long-lived token needs no Keychain and no
+garden, so it works with the GUI logged out entirely; see Credentials above.
+
+With neither available the report still renders, from the freshest cache there
+is, and says which of the two it wants — the failure names the garden and the
+token variable rather than claiming the credential is missing.
 
 ## Caching
 
@@ -526,6 +556,13 @@ the default.
   concurrently.
 - `--profile NAME=CONFIG_DIR` — no env fallback; repeatable, used with `--all`.
   An empty `CONFIG_DIR` means the default profile.
+- `--token-env NAME=VAR` — no env fallback; repeatable. Reads that profile's
+  token from environment variable `VAR`. A bare `VAR` is accepted when a single
+  profile is being reported, and refused under `--all`, where it could only mean
+  one token standing for every account. Naming a profile that is not being
+  reported is an error rather than a silent no-op, since the typo would
+  otherwise show up only as a profile that inexplicably still consults the
+  Keychain.
 - `claude_code_usage_garden_p` — a zsh wrapper knob rather than a script flag;
   `auto`, `y` or `n`. See GUI-less sessions above.
 - `--workers` — no env fallback; 8. Maximum concurrent profile fetches.
