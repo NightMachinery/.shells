@@ -283,18 +283,25 @@ typeset -gA claude_code_profile_colors=(
 #: one is commented out rather than removed: it is the seat the terminal is
 #: normally set up for, so it keeps the background it already had. Only the
 #: seat that is easy to mistake for it gets repainted.
-#: A far paler version of the seat's own violet: it sits under a screenful of
-#: text all day, so it is chosen to be noticed only when looked for, while the
-#: border and the theme carry the colour at full strength.
+#: A faint green, chosen by eye from the candidates after comparing violet,
+#: cyan and green side by side in a real session. It sits under a screenful of
+#: text all day, so it is chosen to be noticed only when looked for.
 #:
-#: The value comes from =color_background_palette= as `solar-violet-faint',
+#: Deliberately not the seat's own violet, which the border and the theme carry
+#: at full strength. A background wash carries no meaning, only identity, so it
+#: is free to be whichever hue is most comfortable; the accents are the ones
+#: that must stay legible and must not lean on a red/green distinction, this
+#: being a daltonized theme. Solarized's green would measure 2.97 against this
+#: wash where the violet measures 4.06.
+#:
+#: The value comes from =color_background_palette= as `solar-green-faint',
 #: which is at the exact CIELAB lightness of this terminal's Solarized Light
 #: background, so it changes hue without touching the contrast of the text on
 #: top. Compare the alternatives with [agfi:color-background-palette] and try
 #: them live with [agfi:color-background].
 typeset -gA claude_code_profile_tints=(
     # default  '#eef3fc'
-    work     '#f7f5fd'
+    work     '#f2f8f1'
 )
 #: Which seats get a coloured pane border ([agfi:h-claude-tmux-border-set]),
 #: under the same convention: no entry, no border. The value is the tmux style
