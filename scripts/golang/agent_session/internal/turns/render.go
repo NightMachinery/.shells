@@ -166,6 +166,12 @@ func Render(doc *Document, o Options) (string, error) {
 	for _, p := range RenderTurns(doc.Turns, doc.Results, st, jobs) {
 		segs = append(segs, segment{text: p, body: true})
 	}
+	// Before pandoc rather than after, so no chunk carries a byte pandoc
+	// would have to guess about, and before the org path returns, so every
+	// format leaves a file that opens as text. See [ScrubText].
+	for i := range segs {
+		segs[i].text = ScrubText(segs[i].text)
+	}
 
 	var w strings.Builder
 	if o.Format != "org-pandoc" {
@@ -444,7 +450,7 @@ func (r *renderer) renderTurn(t Turn) {
 	if ts := HumanTimestamp(t.TS); ts != "" {
 		title += " " + ts
 	}
-	if m := ShortModel(t.Model); m != "" {
+	if m := ModelTag(t.Model); m != "" {
 		title += " · " + m
 	}
 	if d := ShortDuration(t.Duration); d != "" {

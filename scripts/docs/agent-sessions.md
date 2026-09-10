@@ -252,3 +252,20 @@ change here, in rough order of how much it would hurt to lose:
 
 `brishz-restart` after every zsh edit: the garden holds persistent shells and
 sees none of it otherwise, and every hook here runs inside the garden.
+
+## When a converted transcript opens as octal escapes
+
+If an org file shows `\302\267` where a `·` should be, and the prose around it
+is mangled wherever it was not ASCII, the file is not broken: emacs decoded it
+as binary. One NUL byte anywhere in a file is enough for that, and tool output
+gets one whenever a command printed a binary file. Invalid UTF-8 has the same
+effect one step down, giving `Â·` from a latin-1 fallback.
+
+Two things now prevent it. The renderer drops the control bytes that are never
+text and turns invalid UTF-8 into a replacement character, and the converter
+writes a `-*- coding: utf-8 -*-` cookie as the file's first line, which settles
+the encoding whatever emacs would have sniffed. Either one alone is enough.
+
+For a file this pipeline did not write, `inhibit-null-byte-detection` set to
+`t` makes emacs stop treating a NUL as a reason to open something as binary,
+and `C-x RET r utf-8 RET` re-reads the buffer you already have.

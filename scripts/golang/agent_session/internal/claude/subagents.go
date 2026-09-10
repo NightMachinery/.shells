@@ -34,8 +34,8 @@ type subagentMeta struct {
 // always was.
 func (s subagent) title(model string) string {
 	parts := []string{}
-	if label := turns.ModelLabel(model); label != "" {
-		parts = append(parts, "@"+label)
+	if tag := turns.ModelTag(model); tag != "" {
+		parts = append(parts, tag)
 	}
 
 	rest := []string{}

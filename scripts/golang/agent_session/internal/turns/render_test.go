@@ -380,6 +380,26 @@ func TestShortModel(t *testing.T) {
 	}
 }
 
+func TestModelTag(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"claude-opus-5", "@Opus5"},
+		{"claude-fable-5-1", "@Fable5.1"},
+		{"claude-haiku-4-5-20251001", "@Haiku4.5"},
+		{"<synthetic>", "@Synthetic"},
+		{"", ""},
+		// A multi-word id gets a word per capital rather than one long
+		// lowercase run, and a vendor acronym stays an acronym.
+		{"gpt-5-codex", "@GPT5Codex"},
+		{"gemini-3-pro", "@Gemini3Pro"},
+		{"codex-auto-review", "@CodexAutoReview"},
+		{"something-unexpected", "@SomethingUnexpected"},
+	} {
+		if got := ModelTag(c.in); got != c.want {
+			t.Errorf("ModelTag(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
 func TestShortDuration(t *testing.T) {
 	for _, c := range []struct {
 		ms   int64
@@ -387,6 +407,29 @@ func TestShortDuration(t *testing.T) {
 	}{{0, ""}, {4500, "4s"}, {242000, "4m2s"}, {566155, "9m26s"}, {7500000, "2h5m"}} {
 		if got := ShortDuration(time.Duration(c.ms) * time.Millisecond); got != c.want {
 			t.Errorf("ShortDuration(%dms) = %q, want %q", c.ms, got, c.want)
+		}
+	}
+}
+
+func TestScrubText(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		// Left exactly as it is: the common case must not copy.
+		{"plain · text\n\twith layout\r\n", "plain · text\n\twith layout\r\n"},
+		// The byte that makes emacs read the whole file as binary.
+		{"before\x00after", "beforeafter"},
+		{"bell\a and \x7f del", "bell and  del"},
+		// An ANSI sequence keeps its ESC: dropping only the introducer would
+		// leave the rest behind as literal text.
+		{"\x1b[31mred\x1b[0m", "\x1b[31mred\x1b[0m"},
+		// Invalid UTF-8 becomes the replacement character, one per bad byte.
+		{"bad \xff byte", "bad \ufffd byte"},
+		{"truncated \xc2", "truncated \ufffd"},
+		// A NUL after a valid multibyte character is still caught.
+		{"· \x00", "· "},
+		{"", ""},
+	} {
+		if got := ScrubText(c.in); got != c.want {
+			t.Errorf("ScrubText(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

@@ -17,8 +17,11 @@ func TestModelLabel(t *testing.T) {
 		// Not a model, but if it ever reached here it must not crash.
 		{"<synthetic>", "Synthetic"},
 		{"", ""},
-		// Anything unrecognised keeps its shape minus the vendor prefix.
-		{"claude-something-odd", "Somethingodd"},
+		// Anything unrecognised keeps its words, one capital each, minus the
+		// vendor prefix.
+		{"claude-something-odd", "SomethingOdd"},
+		{"codex-auto-review", "CodexAutoReview"},
+		{"gpt-5-codex", "GPT5Codex"},
 	}
 
 	for _, c := range cases {

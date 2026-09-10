@@ -57,6 +57,14 @@ function h-agent-session-name {
 
 function h-agent-session-title {
     #: Emits the document header for a session, in the given syntax.
+    #:
+    #: The first line is a coding cookie. Emacs decides a file's encoding by
+    #: sniffing it, and one stray byte in a transcript -- a command that
+    #: printed a binary file, say -- makes it read the whole file as binary,
+    #: at which point every non-ASCII character shows as an octal escape
+    #: (`\302\267' for the `·' separators). The renderer strips those bytes
+    #: (`ScrubText' in =internal/turns/helpers.go=), so this is the second
+    #: line of defence rather than the fix; it costs one comment line.
     #: Usage: h-agent-session-title <org|md> <input>
     ##
     local syntax="${1}" input="${2}"
@@ -70,6 +78,8 @@ function h-agent-session-title {
     name="$(h-agent-session-name "${input}")" @RET
 
     if [[ "${syntax}" == org ]] ; then
+        #: An org comment, so it is invisible in an exported document.
+        ec "# -*- coding: utf-8 -*-"
         if [[ "${name}" == "${id}" ]] ; then
             ec "#+TITLE: ${label} Session ${id}"
         else
@@ -77,6 +87,9 @@ function h-agent-session-title {
             ec "#+SUBTITLE: ${label} session ${id}"
         fi
     else
+        #: An HTML comment: `# ...' would be a markdown heading, and emacs
+        #: reads the cookie out of the first line whatever its comment syntax.
+        ec "<!-- -*- coding: utf-8 -*- -->"
         if [[ "${name}" == "${id}" ]] ; then
             ec "# ${label} Session ${id}"
         else
