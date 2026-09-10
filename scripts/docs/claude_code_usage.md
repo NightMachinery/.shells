@@ -74,7 +74,7 @@ a human reads, `claude_code_profile_colors` an `R;G;B` triplet,
 `claude_code_profile_tints` the pane wash, and `claude_code_profile_themes`
 which tracked theme file the seat uses.
 
-Personal is blue `rgb(90,150,240)` with 🦋; work is orange `rgb(235,145,60)`
+Personal is blue `rgb(90,150,240)` with 🦋; work is violet `rgb(108,113,196)`
 with 🏫. These are the same values as `profileColors` in
 `golang/agent_session/internal/claude/preview.go`, which paints the session
 pickers, so a seat keeps one colour across the whole toolchain. Red and green
@@ -91,9 +91,9 @@ plan-mode accent and the `You` label all carry the seat's colour. `/theme`
 lists them as "Personal 🦋" and "Work seat 🏫".
 
 Only the work theme also sets `userMessageBackground`, the wash behind your own
-messages, and it is the faint purple of the pane tint rather than the seat's
-orange. The personal theme sets no background of any kind, so that seat keeps
-whatever the terminal was already showing.
+messages, a shade deeper than the pane tint so a message still separates from
+the background. The personal theme sets no background of any kind, so that seat
+keeps whatever the terminal was already showing.
 
 The slug is deliberately the same in both config dirs. That is what lets the
 one shared settings file say `"theme": "custom:profile"` and still hand each
@@ -140,9 +140,9 @@ inherits the launcher's environment, and its stdin JSON has no profile field.
 ### The pane tint
 
 On by default for the work seat under tmux, `claude_tint_p`. The launcher
-writes OSC 11 before starting the session, washing the background to `#f6f2f8`,
-a faint purple rather than the seat's orange, since it sits under a screenful
-of text all day and should be noticed only when looked for,
+writes OSC 11 before starting the session, washing the background to `#f7f5fd`,
+a far paler version of the seat's violet, since it sits under a screenful of
+text all day and should be noticed only when looked for,
 and OSC 111 afterwards in an `always` block, so a normal quit and Ctrl-C both
 undo it and neither can change the session's exit status. Cells the TUI paints
 with a background of their own are unaffected, so it reads as a tint rather
@@ -161,15 +161,30 @@ It is also skipped unless stdout is a terminal, so a piped or captured run is
 never handed escape codes. A `kill -9` outruns the reset and leaves the pane
 tinted until the next reset or a new pane.
 
-A wash this faint cannot be judged from its hex, so there is a short menu of
-candidates in `claude_tint_palette`, in four purples, four greens and a teal,
-blue, rose, slate and the original amber. [agfi:claude-tint-list] prints them
-as swatches with dark text over each one, which is the question that actually
-matters, and marks the one in use. [agfi:claude-tint-try] takes a palette name
-or any `#rrggbb` and paints the pane you run it in straight away, so several
-can be compared side by side without relaunching anything;
-[agfi:claude-tint-reset] restores the terminal's own background. Whichever wins
-goes into `claude_code_profile_tints`.
+A wash this faint cannot be judged from its hex, so the candidates live in
+`color_background_palette` in `zshlang/basic/colors.zsh`. They are nothing to
+do with Claude: setting a terminal's background is an ordinary terminal
+operation, so they sit beside [agfi:color-cursor] under names that say what
+they do. [agfi:color-background-palette] prints them as swatches with dark text
+over each one, which is the question that actually matters, and marks a colour
+you name. [agfi:color-background] takes a palette name or any hex and repaints
+the pane you run it in straight away, so several can be compared side by side;
+[agfi:color-background-reset] restores the terminal's configured background.
+Whichever wins goes into `claude_code_profile_tints`.
+
+The entries prefixed `solar-` are computed for Solarized Light. Each sits at
+exactly the CIELAB lightness of that theme's background, `#fdf6e3`, and differs
+only in hue, so the contrast of the text on top is left as Solarized tuned it.
+Measured against Solarized's body text, the background itself scores 4.13 and
+every one of those tints scores between 4.12 and 4.14, so none of them costs
+any legibility. Violet is the most recognisable for the least colour, the
+background being a warm yellow and violet its opposite, which is why the work
+seat uses `solar-violet-faint`.
+
+Both commands write to the controlling terminal rather than to stdout. Run as
+`! color-background ...` from inside an agent session, stdout is a pipe the
+agent reads, and an escape sent there is printed as text instead of reaching
+the terminal.
 
 ### The pane border
 
@@ -463,7 +478,7 @@ of the `claude` wrapper.
 The picker is `h-claude-code-session-select-fz`, the one the viewers use. Each
 row shows the session's last-message time, its name, its profile-labelled path
 and the first prompt. The preview pane shows the highlighted session's name,
-coloured by profile (`.claude` blue, `.claude-work` orange), its uuid, profile
+coloured by profile (`.claude` blue, `.claude-work` violet), its uuid, profile
 and Claude Code version, when it was last active and how long ago, the model
 and effort that answered last, its permission and interaction modes, its
 working directory and branch, and the last prompt. The pane is
