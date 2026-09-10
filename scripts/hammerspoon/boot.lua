@@ -72,7 +72,9 @@ local hammerspoonCoreFiles = {
     "core/hyper-mode.lua",
     -- After core/hyper-mode.lua and alert/: it reads hyper_modality.entered_p
     -- and alerts through alert_gateway. Before core/window-media-bindings.lua,
-    -- which calls it from the hyper+shift+F1/F2 handlers.
+    -- which defines the blackout chord actions this module's tap dispatches,
+    -- and which tests blackoutChordTapStart to decide whether it must fall
+    -- back to an hs.hotkey binding for the way out.
     "core/blackout-lock.lua",
     "purple-mode.lua",
     "core/mouse.lua",

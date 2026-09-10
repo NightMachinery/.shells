@@ -86,6 +86,9 @@ blackoutLockState = blackoutLockState or {
     lockFirst = false,
     restoreTimer = nil,
     recoverTimer = nil,
+    -- The chord dispatch tap; see ** Chord dispatch below. Lives here rather
+    -- than in a local so a reload can find and stop the previous run's.
+    chordTap = nil,
 }
 
 --- How long the lock screen gets to come up before the display is restored
@@ -197,6 +200,7 @@ end
 if previousState and previousState ~= blackoutLockState then
     stopTap(previousState)
     stopRestoreTimer(previousState)
+    if previousState.chordTap then previousState.chordTap:stop() end
 end
 
 --- ** Interface
@@ -338,6 +342,140 @@ function blackoutRestore(forceLock)
     end
 
     return lockFirst
+end
+
+--- ** Chord dispatch
+--- The hyper F1/F2 chords do not go through `hs.hotkey' like every other
+--- hyper binding, because Carbon drops them. Measured over fourteen presses in
+--- one afternoon: hyper mode was entered, the hotkey was listed by
+--- `hs.hotkey.getHotkeys()', the event carried exactly the right modifiers, and
+--- about a fifth of the presses never reached their callback regardless -- while
+--- an eventtap watching the same two keys saw every single one. What that
+--- investigation ruled out, and how to run the next one, is in "When a hyper
+--- chord does nothing" in docs/hammerspoon.md.
+---
+--- A dropped blackout leaves the screen lit; a dropped escape chord leaves a
+--- locked keyboard in front of a lit screen; a dropped brightness step is
+--- merely irritating, and was reported independently. All four now take the
+--- delivery path this module already trusts for the lock itself.
+---
+--- A side effect worth keeping: nothing modal binds bare F1/F2 any more, so
+--- hs.hotkey has stopped shadowing STT's globals on every single hyper
+--- transition -- which is where the "Disabled previous hotkey F1" pairs that
+--- used to bury the console came from.
+---
+--- The tap runs only while hyper mode is entered -- which pressing the chord
+--- requires anyway -- so it is off almost always, for the privacy and latency
+--- reasons in core/fim.lua. hyper-mode.lua starts and stops it from the
+--- modality's entered/exited callbacks.
+
+local kChordKeys = {
+    [hs.keycodes.map.f1 or 122] = "f1",
+    [hs.keycodes.map.f2 or 120] = "f2",
+}
+
+--- Which chord this event is, or nil for anything the tap must not touch.
+--- `fn' is deliberately not tested: every F-key press here carries it,
+--- successes included, so Carbon ignores it too and matching on it would
+--- reject every real press.
+local function chordFor(keyName, flags)
+    if flags.alt or flags.ctrl then return nil end
+
+    if flags.shift then
+        if keyName == "f1" then
+            return flags.cmd and "black-lock-first" or "black"
+        end
+        if keyName == "f2" and not flags.cmd then
+            return "restore"
+        end
+        return nil
+    end
+
+    --- No shift: the brightness keys, dispatched here for the same reason --
+    --- they get dropped too. Swallowing them is load-bearing rather than
+    --- tidiness now: no modal hotkey shadows STT's global bare F1/F2
+    --- (core/stt.lua) any more, so letting one through would start dictation
+    --- from inside hyper mode.
+    if flags.cmd then return nil end
+    if keyName == "f1" then return "brightness-dec" end
+    if keyName == "f2" then return "brightness-inc" end
+    return nil
+end
+
+--- The blackout chords are one-shot and leave the mode, exactly as an
+--- auto-trigger hs.hotkey binding did. The brightness keys deliberately do
+--- not: holding hyper and stepping the level repeatedly is the point, which
+--- is why they were bound with auto_trigger_p=false.
+local kChordExitsMode = {
+    ["black"] = true,
+    ["black-lock-first"] = true,
+    ["restore"] = true,
+}
+
+local function runChord(chord)
+    if chord == "restore" then
+        if blackoutChordRestore then blackoutChordRestore() end
+    elseif kChordExitsMode[chord] then
+        if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first") end
+    elseif hyperBrightnessStep then
+        hyperBrightnessStep(chord == "brightness-dec" and "dec" or "inc")
+    end
+end
+
+local function handleChordEvent(event)
+    local keyName = kChordKeys[event:getKeyCode()]
+    if not keyName then return false end
+
+    local chord = chordFor(keyName, event:getFlags())
+    --: Bare F1/F2 are the brightness keys, and they stay on hs.hotkey.
+    if not chord then return false end
+
+    --- While the lock is up the only chord that does anything is the one that
+    --- ends it -- the same rule handleEvent enforces above, repeated here so
+    --- the outcome does not depend on which of the two taps macOS happens to
+    --- call first.
+    if blackoutLockActive() and chord ~= "restore" then
+        return true
+    end
+
+    --- Act on the press; the release is swallowed too, so the focused app
+    --- never sees half a chord.
+    if event:getType() == types.keyDown then
+        --- Both off the callback. macOS disables a tap whose callback stalls,
+        --- and these actions cross into the garden and may lock the session.
+        --- The exit has to be deferred for a second reason: it runs
+        --- blackoutChordTapStop, and stopping this very tap from inside its own
+        --- callback is not a thing worth finding out the hard way.
+        hs.timer.doAfter(0, function()
+            --- What the auto-trigger wrapper in modal-mode.lua would have
+            --- done, in the same order: leaving the mode entered would make
+            --- the next F18 press toggle it off rather than on.
+            if kChordExitsMode[chord] and hyper_triggered then hyper_triggered() end
+            runChord(chord)
+        end)
+    end
+
+    return true
+end
+
+function blackoutChordTapStart()
+    local st = blackoutLockState
+
+    --- Rebuilt rather than reused, so a reload can never leave the previous
+    --- chunk's closure taking keys -- the same reason blackoutLockOn rebuilds
+    --- its own tap. Cheap at this rate: once per hyper entry.
+    if st.chordTap then st.chordTap:stop() end
+    st.chordTap = hs.eventtap.new({ types.keyDown, types.keyUp }, handleChordEvent)
+    st.chordTap:start()
+
+    return true
+end
+
+function blackoutChordTapStop()
+    local st = blackoutLockState
+    if st.chordTap then st.chordTap:stop() end
+
+    return true
 end
 
 --- ** Surviving a reload

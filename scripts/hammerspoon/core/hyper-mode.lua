@@ -92,6 +92,12 @@ prevFocusedElement = nil
 function hyper_modality:entered()
     hyper_modality.entered_p = true
 
+    -- First, before the Secure Input dance below, which does synchronous AX
+    -- work and can take its time: the blackout chords are dispatched from this
+    -- tap rather than from hs.hotkey (see the header of core/blackout-lock.lua)
+    -- and they must be live for the whole of the mode, not most of it.
+    if blackoutChordTapStart then blackoutChordTapStart() end
+
     -- Peek: fade any alert band down to a whisper for as long as hyper is
     -- held, so a band lying over a tab bar or a title bar stops hiding the
     -- thing you are about to run a command on. Visual only -- the alerts keep
@@ -174,6 +180,8 @@ end
 function hyper_modality:exited()
     hyper_modality.entered_p = false
     hyper_modality.exit_on_release_p = false
+
+    if blackoutChordTapStop then blackoutChordTapStop() end
 
     if alertV2PeekEnd then alertV2PeekEnd() end
 
