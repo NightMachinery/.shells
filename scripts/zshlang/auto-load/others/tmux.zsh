@@ -39,17 +39,53 @@ function tmux-client-termtype-supported-p {
 }
 ##
 
+function tmux-session-id {
+    : "prints the tmux session id of the session named <1>; an id passes through"
+    #: A session *name* is not a safe tmux target. A leading sigil declares a
+    #: target type -- `$' session, `@' window, `%' pane -- and `=' (exact name
+    #: match) disarms that only for session-typed targets: `list-panes'
+    #: resolves a *window* even under `-s', and would want a trailing `:' too.
+    #: An id is unambiguous in every target position, and it survives a rename
+    #: landing mid-operation, which the agent autoname hooks make routine.
+    #: See =docs/tmux-session-rename.md=.
+    ##
+    local session="${1}"
+    assert-args session @RET
+
+    if [[ "${session}" =~ '^\$[0-9]+$' ]] ; then
+        ec "${session}"
+        return 0
+    fi
+
+    local line
+    for line in "${(@f)$(command tmux list-sessions -F '#{session_id}'$'\t''#{session_name}' 2>/dev/null)}" ; do
+        if [[ "${line#*$'\t'}" == "${session}" ]] ; then
+            ec "${line%%$'\t'*}"
+            return 0
+        fi
+    done
+
+    ecerr "$0: no tmux session named: ${session}"
+    return 1
+}
+
+function tmux-session-name-of {
+    : "prints the session name behind a tmux target (a session id, a pane, ...)"
+    local target="${1}"
+    assert-args target @RET
+
+    command tmux display-message -p -t "${target}" '#{session_name}'
+}
+
 function tmux-alive-p {
     local session="${1}"
     assert-args session @RET
 
-    local tmux_target="=${session}"
+    local tmux_target
+    #: Resolving the id doubles as the existence check.
+    tmux_target="$(tmux-session-id "${session}" 2>/dev/null)" || return 1
+
     local pane_dead_values
-
-    if ! tmux has-session -t "${tmux_target}" &>/dev/null ; then
-        return 1
-    fi
-
     pane_dead_values=("${(@f)$(tmux list-panes -t "${tmux_target}" -F '#{pane_dead}')}" ) @RET
 
     local pane_dead
@@ -82,7 +118,7 @@ function tmux-ensure-attach {
     local command=("${@:-zsh}")
 
     tmuxnew-ensure "${session}" "${command[@]}"
-    tmux attach -t "${session}"
+    tmux attach -t "$(tmux-session-id "${session}")"
 }
 alias tma='tmux-ensure-attach'
 
@@ -180,7 +216,7 @@ aliasfn tzkill tmuxzombie-kill
 
 function tmuxzombie() {
     # kills the pane of a session, thus turning it to a "dead pane"
-    tmux list-panes  -s -F '#{pane_pid}' -t "$1" | inargsf serr kill
+    tmux list-panes  -s -F '#{pane_pid}' -t "$(tmux-session-id "$1")" | inargsf serr kill
 }
 ##
 function str2tmuxname() {
@@ -337,8 +373,11 @@ function tmux-attach {
     local session="$1"
     assert-args session @RET
 
-    tty-title "${session}"
-    tmux a -t "${session}"
+    local target
+    target="$(tmux-session-id "${session}")" @RET
+
+    tty-title "$(tmux-session-name-of "${target}")"
+    tmux a -t "${target}"
 }
 ##
 #: Naming the session you are in. Aimed at shells spawned by an AI agent
