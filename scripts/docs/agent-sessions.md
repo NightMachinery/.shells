@@ -317,6 +317,130 @@ and the binary reads them, since a zsh knob cannot reach a process fzf spawns
 on its own. `agent_session_preview_compact_p` overrides the guess, `y` or `n`,
 and its default `auto` is what leaves the decision to the binary.
 
+## Closing the subagents a skill launched
+
+The `tmux-subagents` skill (`~/code/skills/tmux-subagents`) starts child agents
+in detached tmux sessions named `ag--<project>--<run>--<lineage>--<model>--<role>`
+and registers each one in a JSON file keyed by node id, which is also the
+session name. Cleaning them up afterwards is
+`zshlang/auto-load/others/agent-subagents.zsh`: [agfi:agent-subagents-list],
+[agfi:agent-subagents-reconcile], [agfi:agent-subagents-close],
+[agfi:agent-subagents-preview] and the picker [agfi:agent-clean-fz], with
+[agfi:agent-clean-all-fz] as the same picker showing busy children too.
+
+The tooling lives here rather than in the skill on purpose. The skill is
+public, portable and installed on machines that have none of this; a picker
+built on `fz`, the Go previewer and the brish garden would be an undeclared
+dependency on a personal scripts checkout. The skill therefore documents the
+*procedure* a parent follows, and this is that procedure implemented.
+
+### State is derived on every read, never stored
+
+The registry writes `process_state: running` and `task_outcome: unknown` at
+launch and never updates them. On 2026-09-09 two finished Codex children still
+read `running`, which is exactly the failure a stored lifecycle field invites:
+a second source of truth that disagrees with the first and no way to tell which
+one is stale. So nothing here reads those fields, and nothing here writes a
+state anywhere. Every row is recomputed, each time, from five things that
+cannot lie -- whether the tmux session exists, whether its pane is dead,
+whether the task's result file exists *and names this very node*, the newest
+line the child's turn-end hook appended to `status.jsonl`, and the agent's own
+live listing ([agfi:h-agent-session-live-list]).
+
+The cost of deriving is one fixed set of processes for the whole registry, not
+a few per entry: one `tmux list-sessions`, one `tmux list-panes -a`, one `jq`
+over the registry, one over the status log, one live listing, and one
+`agent_session list` per agent that still has a row to date -- batched with
+`-only` the way [agfi:h-agent-session-annotate-rows] batches, so no corpus is
+walked.
+
+### The order the states are decided in
+
+`gone` first: the tmux session is not there any more. Then `exited`: the pane
+is dead, which `remain-on-exit` keeps around on purpose so the child's last
+screen is still readable. Then `done`: a result file exists whose front matter
+names this task *and* this node. A result file naming someone else is
+`mismatch`, never quietly believed -- each assignment gets a new task id and a
+new result path precisely so an old file cannot satisfy a new one. Then
+`needs-input`, when the needs-input sibling exists.
+
+Only then is the session considered alive with nothing published, and the
+question becomes what it is doing. `busy` when the live listing says so. `-`
+there is unknown, not idle: an adapter that reports no status has said nothing
+about the agent. Otherwise the child is dated -- newest `status.jsonl` line for
+its task, else its transcript's last message -- and it is `stuck` past
+`agent_subagents_stuck_after` (600s) and `idle` under it. `unknown` when even
+that could not be read.
+
+`stuck` sits in the middle of that ordering rather than at either end because
+that is what it means: a live session that has not written a status line, a
+result, or a transcript message in ten minutes is usually finished in a way
+tmux cannot see -- waiting on a prompt nobody will answer, or retrying an API
+forever -- but it is not *known* finished the way a result file is known.
+
+The picker offers them in that order, newest activity first inside each state:
+done, mismatch, needs-input, stuck, idle, unknown, busy.
+
+### What the picker will not show you
+
+`gone` rows never reach it, because [agfi:agent-subagents-reconcile] runs first
+and forgets them: there is no process to kill and no session to close, so the
+entry is all that is left. `exited` rows are skipped too, and that is a
+division of labour rather than an omission -- a dead pane is
+[agfi:tmuxzombie-kill]'s job, and it clears every one of them in a single pass,
+which this picker would only be a slower way to do. Close such a child by
+running `tzkill` and then `agent-subagents-reconcile`.
+
+`busy` rows are hidden unless `agent_clean_fz_all_p=y`, so that the fastest
+thing anyone does with a multi-select picker -- select all, press enter --
+cannot close a child in the middle of a turn.
+
+### The lock, and why the check happens twice
+
+Every writer of the registry holds the stable `agents.json.lock` sidecar across
+the whole read-update-replace cycle and publishes through a unique temporary
+file in the same directory, then renames. The sidecar, not `agents.json`
+itself: that file is replaced on every write, so two writers locking it would
+hold locks on two different inodes and both win. [agfi:h-agent-subagents-lock-do]
+does this with `zsystem flock` for the same reason [agfi:h-ddc-lock-do] does --
+the lock dies with its holder for free -- but it refuses on timeout instead of
+proceeding unserialised, because a registry write that races loses an agent.
+
+`flock` is per file descriptor, so a second lock from the same process would
+deadlock it against itself. That is why closing a subtree recurses into the
+already-under-lock helper and never re-enters the locking one.
+
+A picker's rows are as old as the person reading them, so
+[agfi:agent-subagents-close] re-derives the state *inside* the lock before
+touching anything, and the picker's own listing is only ever a proposal.
+
+### Closing is verified by pid
+
+Killing the pane proves nothing about what the agent forked. So the close
+collects every pane pid of the session and every process below each one
+*before* the kill, sends TERM through [agfi:kill-withchildren], waits up to five
+seconds for them to go, escalates to KILL, kills the session, and only then
+checks the collected pids again. Right after a `kill-session` on 2026-09-09 a
+child `claude` was still listed and exited a second later; a session that has
+vanished is no evidence its processes have. A failed verification leaves the
+registry entry alone and prints the survivors, so a half-closed agent stays
+visible instead of becoming a ghost.
+
+Then the entry is deleted and a `closed` line is appended through the skill's
+own `tmux-subagent-status.sh`, so that log keeps one writer and one format.
+Task directories are never touched: a result file is the record of what the
+child did, and closing a terminal is not deleting a report.
+
+### The two knobs that let you do it anyway
+
+`agent_subagents_close_force=y`, or `-f`, closes a `busy` child.
+`agent_subagents_close_subtree=y` closes a parent's live descendants with it,
+deepest first, each one going through the same verification. Without them a
+busy child and a parent with live descendants are both refused with the list of
+what is in the way. Neither is on by default because the whole value of the
+check is that it happens after the list you were looking at went stale. A child
+that is `gone`, `exited` or `done` is not a live descendant and blocks nothing.
+
 ## Hooks, the registry, and trust
 
 The registry is insurance, not the mechanism. [agfi:agent-session-register]
@@ -385,6 +509,16 @@ These are new and belong to this design rather than to Claude:
   picker and resolver. This is the whole implementation of the per-agent
   commands: `codex-resume-fz` is `agent_session_agents=codex
   agent-session-resume-fz`, and the Claude compat names are the same trick.
+- `agent_subagents_state_dir`, `agent_subagents_skill_dir`,
+  `agent_subagents_stuck_after` and `agent_subagents_lock_timeout` -- the
+  cleanup family's own. The first is empty by default rather than resolved at
+  load time, so `TMUX_SUBAGENTS_STATE` in the environment still decides, which
+  is what lets a test run point one command at a scratch registry.
+- `agent_subagents_close_force` and `agent_subagents_close_subtree` -- close a
+  busy child, and close a parent's live descendants with it. See the section
+  above.
+- `agent_clean_fz_all_p` -- show busy children in [agfi:agent-clean-fz];
+  [agfi:agent-clean-all-fz] is that spelling.
 - `agent_launch_glyph` and `agent_launch_sync_p` -- the tab-title glyph and
   whether to sync the instruction files, for the shared launcher preamble
   [agfi:h-agent-launch] that the three launchers now share instead of each
