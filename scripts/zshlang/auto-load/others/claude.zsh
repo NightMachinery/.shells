@@ -480,6 +480,82 @@ function h-claude-tint-set {
     printf '\e]11;%s\a' "${tint}"
 }
 
+#: Candidates to choose between by eye, because a wash this faint cannot be
+#: judged from its hex. [agfi:claude-tint-list] shows them as swatches with
+#: text on top, since what matters is whether the theme stays legible over
+#: them, and [agfi:claude-tint-try] paints the current pane with one so several
+#: can be compared without relaunching anything. The winner goes into
+#: =claude_code_profile_tints=.
+typeset -gA claude_tint_palette=(
+    purple-faintest  '#fcfbfd'
+    purple-faint     '#faf8fc'
+    purple           '#f6f2f8'
+    purple-deep      '#f0eaf6'
+    green-faintest   '#fbfdfa'
+    green-faint      '#f8fbf7'
+    green            '#f2f8f0'
+    green-deep       '#eaf5e8'
+    teal             '#f0f8f8'
+    blue             '#f2f6fc'
+    rose             '#fdf4f7'
+    slate            '#f4f6f8'
+    amber            '#fff6ec'
+)
+#: An associative array has no order of its own, and these want to be read
+#: faintest first within each hue.
+typeset -ga claude_tint_palette_order=(
+    purple-faintest purple-faint purple purple-deep
+    green-faintest green-faint green green-deep
+    teal blue rose slate amber
+)
+
+function claude-tint-list {
+    : "shows every candidate tint as a swatch, marking the one in use"
+    local current="${claude_code_profile_tints[work]}"
+
+    local name hex marker
+    local -a rgb
+    for name in "${claude_tint_palette_order[@]}" ; do
+        hex="${claude_tint_palette[$name]}"
+        rgb=(${=$(color-hex-to-rgb "${hex}")}) || continue
+
+        #: Dark text over the wash, because the question being asked is
+        #: whether the daltonized theme is still comfortable on it.
+        colorbg "${rgb[@]}"
+        colorfg 51 51 51
+        printf '  The quick brown fox jumps over the lazy dog  '
+        resetcolor
+
+        marker=''
+        [[ "${hex}" == "${current}" ]] && marker='  <- in use'
+        printf ' %-16s %s%s\n' "${name}" "${hex}" "${marker}"
+    done
+}
+
+function claude-tint-try {
+    : "paints this pane with a candidate tint: a palette name, or a #rrggbb"
+    #: Takes effect in the pane it is run in, immediately, so the choice can be
+    #: made by looking rather than by guessing. [agfi:claude-tint-reset] puts
+    #: the terminal's own background back. With no argument it lists.
+    ##
+    local want="${1}"
+    if test -z "${want}" ; then
+        claude-tint-list
+        return 0
+    fi
+
+    local hex="${claude_tint_palette[$want]:-${want}}"
+    if [[ "${hex}" != '#'[0-9a-fA-F]* ]] ; then
+        ecerr "$0: no such tint: ${want}"
+        claude-tint-list >&2
+        return 1
+    fi
+
+    printf '\e]11;%s\a' "${hex}"
+    ecgray "$0: ${hex}${claude_tint_palette[$want]:+ (${want})}"
+}
+aliasfn claude-tint-reset h-claude-tint-reset
+
 function h-claude-tint-reset {
     : "restores the terminal's own background, undoing [agfi:h-claude-tint-set]"
     #: OSC 111 resets what OSC 11 set. A `kill -9` of the session skips this,

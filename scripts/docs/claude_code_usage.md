@@ -161,6 +161,16 @@ It is also skipped unless stdout is a terminal, so a piped or captured run is
 never handed escape codes. A `kill -9` outruns the reset and leaves the pane
 tinted until the next reset or a new pane.
 
+A wash this faint cannot be judged from its hex, so there is a short menu of
+candidates in `claude_tint_palette`, in four purples, four greens and a teal,
+blue, rose, slate and the original amber. [agfi:claude-tint-list] prints them
+as swatches with dark text over each one, which is the question that actually
+matters, and marks the one in use. [agfi:claude-tint-try] takes a palette name
+or any `#rrggbb` and paints the pane you run it in straight away, so several
+can be compared side by side without relaunching anything;
+[agfi:claude-tint-reset] restores the terminal's own background. Whichever wins
+goes into `claude_code_profile_tints`.
+
 ### The pane border
 
 On by default for the work seat, `claude_tmux_border_p`, and inside tmux only,
