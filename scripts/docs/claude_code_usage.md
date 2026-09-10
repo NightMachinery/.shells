@@ -51,8 +51,17 @@ response.
 
 Both seats symlink the same tracked `configFiles/claude-code/settings.json`, so
 a work session and a personal one used to be indistinguishable once the TUI was
-up. Four cues now name the seat from inside. Three are on by default and the
-fourth is off.
+up. Five cues now name the seat from inside: the theme, the status line badge,
+the pane tint, the pane border and the pane-border label. All but the label are
+on by default.
+
+Two of them apply to the work seat alone. The personal seat is the one the
+terminal is already set up for, so it keeps its own background and its own
+border and is named by its emoji and its theme alone. That is
+expressed by leaving it out of `claude_code_profile_tints` and
+`claude_code_profile_borders`: for both tables, a seat with no entry does not
+get the cue, and the personal entries are commented out rather than deleted so
+the convention stays visible.
 
 Every cue is derived from the *effective* config dir, resolved once per launch
 by [agfi:claude-code-profile-current] inside [agfi:claude], and never from the
@@ -126,12 +135,14 @@ inherits the launcher's environment, and its stdin JSON has no profile field.
 
 ### The pane tint
 
-On by default under tmux only, `claude_tint_p`. The launcher writes OSC 11
-before starting the session, washing the background to `#eef3fc` for personal
-or `#fff6ec` for work, and OSC 111 afterwards in an `always` block, so a normal
-quit and Ctrl-C both undo it and neither can change the session's exit status.
-Cells the TUI paints with a background of their own are unaffected, so it reads
-as a tint rather than a repaint.
+On by default for the work seat under tmux, `claude_tint_p`. The launcher
+writes OSC 11 before starting the session, washing the background to `#fff6ec`,
+and OSC 111 afterwards in an `always` block, so a normal quit and Ctrl-C both
+undo it and neither can change the session's exit status. Cells the TUI paints
+with a background of their own are unaffected, so it reads as a tint rather
+than a repaint. A seat with no entry in `claude_code_profile_tints` is not
+tinted, and is not reset on the way out either, so nothing is undone that was
+never done.
 
 Where it applies is `claude_tint_scope`, and it is not a boolean. Under tmux 3.0
 and later the escape reaches only the pane that sent it, leaving a sibling pane
@@ -143,6 +154,30 @@ that and `never` disables the tint the way `claude_tint_p=n` does.
 It is also skipped unless stdout is a terminal, so a piped or captured run is
 never handed escape codes. A `kill -9` outruns the reset and leaves the pane
 tinted until the next reset or a new pane.
+
+### The pane border
+
+On by default for the work seat, `claude_tmux_border_p`, and inside tmux only,
+which is the only thing here with a pane border to colour. The launcher sets
+both `pane-border-style` and `pane-active-border-style` as *pane* options, so
+the border carries the seat's colour whether or not the pane is the active one.
+The style is `fg=<colour>,bold`.
+
+The colour is not written in `claude_code_profile_borders`. That table says
+only *which* seats get a border, and its value is the extra tmux style
+attributes to add, `bold` here. The colour itself comes from
+`claude_code_profile_colors`, converted from the `R;G;B` triplet to the
+`#rrggbb` that tmux styles want by [agfi:h-claude-profile-color-hex]. So a
+seat's colour is written down once and the theme, the pickers and the border
+cannot drift apart.
+
+One cost worth knowing. A tmux window showing a single pane draws no borders at
+all, which is the common case for an agent session, so the launcher turns
+`pane-border-status` on for the window when it is off. That takes a line from
+the window, exactly the price the label below pays, and it is left on
+afterwards, since clearing it would blank the border of any other pane relying
+on it. The per-pane styles themselves are removed when the session ends, unless
+the pane already carried one.
 
 ### The tmux pane-border label
 
@@ -164,7 +199,12 @@ away again.
 
 Every flag is read with [agfi:bool] and is dynamically scoped, so a one-off is
 a prefix: `claude_tint_p=n claude-work`, `claude_theme_p=n claude-m`,
-`claude_tmux_label_p=y claude-work`.
+`claude_tmux_border_p=n claude-work`, `claude_tmux_label_p=y claude-work`.
+`claude_tint_scope` is the exception, being an enum rather than a boolean.
+
+Turning a cue on for a seat that has no entry in the tint or border table does
+nothing: the flag says whether the cue may run at all, and the table says which
+seats it describes. Give the seat an entry there to change that.
 
 A bare `command claude` skips the launcher, so it gets neither the tint nor the
 label. It still gets the theme and the badge, which live in the config dir and
