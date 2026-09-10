@@ -241,6 +241,39 @@ function h-agent-done-report {
     } > "${out}" @RET
 }
 
+function h-agent-done-session-dir {
+    #: Which directory the session belongs to, which is not the same question
+    #: as where the shell running this happens to be. Resuming does *not*
+    #: restore it: [agfi:claude-code-session-resume] says so and warns when
+    #: `$PWD' and the session's project disagree, and Codex and agy simply run
+    #: their launcher wherever you are. So somebody has to know it, and the
+    #: transcript path is the only record that survives the session.
+    #:
+    #: Claude Code names its project directory after the directory the session
+    #: started in, with every non-alphanumeric character replaced by a dash.
+    #: That is lossy -- `-Users-evar-my-dir' could be `/Users/evar/my-dir' or
+    #: `/Users/evar/my/dir' -- so turn the dashes back into slashes and keep
+    #: the answer only if it is a directory. Right in the common case, and it
+    #: declines rather than guesses in the ambiguous one.
+    #:
+    #: Codex and agy file their transcripts by date and id, so their paths say
+    #: nothing about a directory and the fallback stands.
+    #: Usage: h-agent-done-session-dir <agent> <transcript> <fallback>
+    ##
+    local agent="${1}" transcript="${2}" fallback="${3}"
+
+    if [[ "${agent}" == claude ]] && test -n "${transcript}" ; then
+        local encoded="${transcript:h:t}" candidate
+        candidate="${encoded//-//}"
+        if test -d "${candidate}" ; then
+            ec "${candidate}"
+            return 0
+        fi
+    fi
+
+    ec "${fallback}"
+}
+
 function h-agent-done-pane-script {
     #: The command the dead pane is left holding, which has to do two different
     #: things because tmux gives it only one slot: `respawn-pane -k' -- bound to
@@ -425,6 +458,10 @@ work is actually finished. --dry-run writes the report and kills nothing."
         test -n "${cwd}" || cwd="$(command tmux display-message -p -t "${pane}" '#{pane_current_path}' 2>/dev/null)" || cwd=''
     fi
     test -n "${cwd}" || cwd="${PWD}"
+    #: The session's own directory in preference to the pane's: they are the
+    #: same until somebody starts a session somewhere and works elsewhere, and
+    #: this is the one a resume has to return to.
+    cwd="$(h-agent-done-session-dir "${agent}" "${transcript}" "${cwd}")"
 
     #: Outside tmux there is no pane to ask, and `tty' is no help either: the
     #: shell an agent runs its tools in has no controlling terminal, so it
