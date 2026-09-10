@@ -55,13 +55,17 @@ up. Five cues now name the seat from inside: the theme, the status line badge,
 the pane tint, the pane border and the pane-border label. All five are on by
 default.
 
-Two of them apply to the work seat alone. The personal seat is the one the
-terminal is already set up for, so it keeps the background it had and gets no
-border, and is named by its emoji, its theme and its pane label. That is
-expressed by leaving it out of `claude_code_profile_tints` and
-`claude_code_profile_borders`: for both tables, a seat with no entry does not
-get the cue, and the personal entries are commented out rather than deleted so
-the convention stays visible.
+Three of them apply to the work seat alone. The personal seat is the baseline
+the terminal and the theme were already set up for, and it is recognised by
+*being* unchanged: it keeps the stock colours, keeps the background it had, and
+gets no border. Only one seat needs marking for two to be distinguishable. It
+is named by its emoji and by its pane label, both of which only add a name and
+repaint nothing.
+
+For the tint and the border that is expressed by leaving the personal seat out
+of `claude_code_profile_tints` and `claude_code_profile_borders`: in both
+tables a seat with no entry does not get the cue, and the personal rows are
+commented out rather than deleted so the convention stays visible.
 
 Every cue is derived from the *effective* config dir, resolved once per launch
 by [agfi:claude-code-profile-current] inside [agfi:claude], and never from the
@@ -74,26 +78,32 @@ a human reads, `claude_code_profile_colors` an `R;G;B` triplet,
 `claude_code_profile_tints` the pane wash, and `claude_code_profile_themes`
 which tracked theme file the seat uses.
 
-Personal is blue `rgb(90,150,240)` with 🦋; work is violet `rgb(108,113,196)`
-with 🏫. These are the same values as `profileColors` in
-`golang/agent_session/internal/claude/preview.go`, which paints the session
-pickers, so a seat keeps one colour across the whole toolchain. Red and green
-are avoided because the base theme is a daltonized one.
+Work is violet `rgb(108,113,196)` with 🏫, and that violet is also what
+`profileColors` in `golang/agent_session/internal/claude/preview.go` paints
+the seat with in the session pickers, so it keeps one colour across the
+toolchain. The pickers still colour personal sessions blue, since there a
+colour per row is useful and nothing is being restyled; inside the TUI the
+personal seat is left stock.
 
 ### The theme
 
 On by default, `claude_theme_p`. Each config dir gets a `themes/profile.json`
 symlinked to a tracked file, `configFiles/claude-code/themes/personal.json` or
-`work.json`. Both start from `light-daltonized` and override `claude`,
-`claudeShimmer`, `promptBorder`, `promptBorderShimmer`, `planMode` and
-`briefLabelYou`, so the spinner, the assistant label, the input border, the
-plan-mode accent and the `You` label all carry the seat's colour. `/theme`
-lists them as "Personal 🦋" and "Work seat 🏫".
+`work.json`. Both start from `light-daltonized`, and `/theme` lists them as
+"Personal 🦋" and "Work seat 🏫".
 
-Only the work theme also sets `userMessageBackground`, the wash behind your own
-messages, a shade deeper than the pane tint so a message still separates from
-the background. The personal theme sets no background of any kind, so that seat
-keeps whatever the terminal was already showing.
+Only the work theme overrides any colours. It sets `claude`, `claudeShimmer`,
+`promptBorder`, `promptBorderShimmer`, `planMode` and `briefLabelYou`, so the
+spinner, the assistant label, the input border, the plan-mode accent and the
+`You` label all carry the seat's violet, plus `userMessageBackground`, the wash
+behind your own messages, a shade deeper than the pane tint so a message still
+separates from it.
+
+The personal theme overrides nothing at all: it is the stock
+`light-daltonized` under a name. It exists only because the one shared
+settings file asks both seats for `custom:profile`, so the slug has to resolve
+in both config dirs. Leaving it empty is the point rather than an omission, the
+stock palette being the baseline everything else is told apart from.
 
 The slug is deliberately the same in both config dirs. That is what lets the
 one shared settings file say `"theme": "custom:profile"` and still hand each
