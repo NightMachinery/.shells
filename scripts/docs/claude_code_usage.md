@@ -269,6 +269,12 @@ now removed too, under two conditions: this launch is the one that turned it on
 window still carries a label. With a second seat open in the same window the
 row therefore stays, and it goes when the last of them ends.
 
+The row is recognised as ours by either of two marks: that window option, or a
+`pane-border-format` that names `@claude_profile`, which is visibly our own
+format. The second matters because it covers a window whose row was set by a
+session older than the marker, or one that lost it — without it, such a window
+keeps a border line reading `SHELL` forever.
+
 Both conditions are checked by [agfi:h-claude-tmux-label-row-restore], which
 the launcher calls on the way out and [agfi:agent-done] calls before it kills
 the pane -- the launcher's own cleanup never runs in that case, and a *dead*
