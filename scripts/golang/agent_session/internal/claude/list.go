@@ -300,9 +300,16 @@ var commandNameRe = regexp.MustCompile(`(?s)<command-name>\s*(.*?)\s*</command-n
 
 // Harness scaffolding that carries no meaning in a one-line preview. RE2 has
 // no backreferences, so each pair is spelled out.
+//
+// `task-notification` is the block Claude Code injects as a user message when
+// a background agent finishes. It is neither meta nor a tool result, so it
+// passes `typed()`, and in a session that delegates work it is usually the
+// newest such record: without this the preview's "last prompt" read as a
+// subagent's completion notice rather than what the person last asked.
 var scaffoldTags = []string{
 	"command-name", "command-message", "command-args", "command-contents",
 	"local-command-stdout", "local-command-stderr", "system-reminder",
+	"task-notification",
 }
 
 var tagRe = func() *regexp.Regexp {
