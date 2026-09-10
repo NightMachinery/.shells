@@ -45,6 +45,29 @@ function color-name-to-hex {
     ec "$res" | cat-copy-if-tty
 }
 ##
+function color-hex-to-rgb {
+    : "prints the decimal R G B of a #rrggbb (or #rgb) colour, space separated"
+    #: The direction [agfi:color-name-to-hex] does not go, for the truecolor
+    #: escapes of [agfi:colorfg] and [agfi:colorbg], which want numbers.
+    ##
+    local hex="${1#\#}"
+    assert-args hex @RET
+
+    if (( ${#hex} == 3 )) ; then
+        #: `#abc' is shorthand for `#aabbcc'.
+        hex="${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}"
+    fi
+
+    #: Spelled out rather than with a repeat count, which would need
+    #: EXTENDED_GLOB to be on in the caller.
+    if [[ "${hex}" != [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F] ]] ; then
+        ecerr "$0: not a hex colour: ${1}"
+        return 1
+    fi
+
+    printf '%d %d %d\n' "0x${hex[1,2]}" "0x${hex[3,4]}" "0x${hex[5,6]}"
+}
+##
 function color-cursor {
     # [help:etcc--make-cursor-color-seq]
     #
