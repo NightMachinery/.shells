@@ -301,8 +301,11 @@ func subdoc(path string) turns.Subdoc {
 	return turns.Subdoc{Title: title, Turns: ts, Results: results}
 }
 
-// The newest timestamp among the rollout's records, from its tail.
-func lastTimestamp(path string) time.Time {
+// The newest timestamp among the rollout's records, from its tail. With
+// `userOnly` only a message the user typed counts, so the window widens until
+// one is found rather than settling for the reasoning and tool output the
+// thread has been writing since.
+func lastTimestamp(path string, userOnly bool) time.Time {
 	fh, err := os.Open(path)
 	if err != nil {
 		return time.Time{}
@@ -330,10 +333,11 @@ func lastTimestamp(path string) time.Time {
 			if len(raw) == 0 || raw[0] != '{' {
 				continue
 			}
-			var l struct {
-				Timestamp string `json:"timestamp"`
-			}
+			var l line
 			if json.Unmarshal([]byte(raw), &l) != nil {
+				continue
+			}
+			if userOnly && !typedPrompt(l) {
 				continue
 			}
 			if t, err := time.Parse(time.RFC3339, l.Timestamp); err == nil && t.After(last) {

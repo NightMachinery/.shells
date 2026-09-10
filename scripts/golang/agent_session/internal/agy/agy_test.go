@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"agent_session/internal/proc"
 	"agent_session/internal/session"
@@ -245,6 +246,51 @@ func TestListSkipsTranscriptlessAndPrefersFull(t *testing.T) {
 		t.Error("-cwd on a stale workspace should match nothing")
 	}
 	_ = home
+}
+
+// `-last-by user` dates a conversation by the last step the user is the
+// source of. Everything after it is the agent working on its own, which is
+// exactly what a picker sorted by conversation must not be moved by.
+func TestListLastByUser(t *testing.T) {
+	_, brain, main := writeStore(t)
+
+	// The fixture ends on the user's "thanks"; give it a tail of the agent
+	// still working, so the two modes differ.
+	step, err := json.Marshal(map[string]any{"step_index": 8, "source": "MODEL", "type": "RUN_COMMAND",
+		"status": "DONE", "created_at": "2026-09-08T10:02:00Z", "content": "ok"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fh, err := os.OpenFile(main, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fh.Write(append(step, '\n')); err != nil {
+		t.Fatal(err)
+	}
+	fh.Close()
+
+	stamp := func(o session.ListOpts) string {
+		o.SnippetLen, o.NameLen, o.Jobs = 120, 40, 1
+		infos, err := ad.List([]string{brain}, o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, i := range infos {
+			if i.Path == main {
+				return time.Unix(i.Epoch, 0).UTC().Format(time.RFC3339)
+			}
+		}
+		t.Fatalf("the main conversation is missing from %+v", infos)
+		return ""
+	}
+
+	if got := stamp(session.ListOpts{}); got != "2026-09-08T10:02:00Z" {
+		t.Errorf("-last-by any: got %q, want the newest step", got)
+	}
+	if got := stamp(session.ListOpts{LastBy: session.LastByUser}); got != "2026-09-08T10:01:00Z" {
+		t.Errorf("-last-by user: got %q, want the last user step", got)
+	}
 }
 
 func TestNameAndMeta(t *testing.T) {

@@ -134,6 +134,8 @@ list flags:
   -subagents            also list subagent transcripts
   -only <transcript>    list exactly this transcript rather than walking the
                         roots; repeatable, for a caller that knows its paths
+  -last-by any|user     which record dates a session: any of them (default), or
+                        only the last message the user typed
   -jobs N               worker count (default: CPU count)
 
 Several roots may be given: they are merged and sorted together. With more than
@@ -204,9 +206,16 @@ func cmdList(ad session.Adapter, argv []string) error {
 	nameLen := fs.Int("name-len", 40, "max session-name width, in runes")
 	subagentsP := fs.Bool("subagents", false, "also list subagent transcripts")
 	jobs := fs.Int("jobs", runtime.NumCPU(), "worker count")
+	lastBy := fs.String("last-by", session.LastByAny, "which record dates a session: any or user")
 	var only pathList
 	fs.Var(&only, "only", "list exactly this transcript instead of walking the roots; repeatable")
 	fs.Parse(session.GuardPathArgs(fs, argv))
+
+	switch *lastBy {
+	case session.LastByAny, session.LastByUser:
+	default:
+		return fmt.Errorf("-last-by: want %s or %s, got %q", session.LastByAny, session.LastByUser, *lastBy)
+	}
 
 	infos, err := ad.List(fs.Args(), session.ListOpts{
 		Cwd:        *cwd,
@@ -215,6 +224,7 @@ func cmdList(ad session.Adapter, argv []string) error {
 		NameLen:    *nameLen,
 		Jobs:       *jobs,
 		Only:       only,
+		LastBy:     *lastBy,
 	})
 	if err != nil {
 		return err

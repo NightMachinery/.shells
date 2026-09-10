@@ -93,7 +93,7 @@ func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) 
 	infos := make([]session.Info, len(files))
 	session.ForEach(len(files), o.Jobs, func(i int) {
 		f := files[i]
-		info := scanSession(f.path, f.base, o.SnippetLen, o.NameLen)
+		info := scanSession(f.path, f.base, o.SnippetLen, o.NameLen, o.UserOnly())
 		if l := labels[f.root]; l != "" {
 			info.Rel = filepath.Join(l, info.Rel)
 		}
@@ -123,10 +123,12 @@ const (
 // `bridge-session`) long after the conversation ends, which can put mtime
 // hours or days past the last message.
 //
+// With `userOnly`, only what the user typed counts; see [tailRecord.typed].
+//
 // Only the two ends of the file are read. Reading all of it would make the
 // picker cost grow with total transcript volume rather than with the number
 // of sessions.
-func scanSession(path, root string, snippetLen, nameLen int) session.Info {
+func scanSession(path, root string, snippetLen, nameLen int, userOnly bool) session.Info {
 	info := session.Info{Path: path}
 	if rel, err := filepath.Rel(root, path); err == nil {
 		info.Rel = rel
@@ -141,7 +143,7 @@ func scanSession(path, root string, snippetLen, nameLen int) session.Info {
 	if fh, err := os.Open(path); err == nil {
 		defer fh.Close()
 		if st, err := fh.Stat(); err == nil {
-			last, name = scanTail(fh, st.Size())
+			last, name = scanTail(fh, st.Size(), userOnly)
 		}
 		snippet = firstUserText(fh)
 	}
@@ -165,25 +167,62 @@ func scanSession(path, root string, snippetLen, nameLen int) session.Info {
 // millisecond-scale reordering that does occur in practice.
 const tailRecords = 25
 
-// Only the type, the timestamp and the name fields are needed here. Decoding
-// into the full record would copy every message body in the window for
-// nothing.
+// Only the type, the timestamp and the name fields are needed here, plus what
+// `-last-by user` has to tell a prompt from the rest. Decoding into the full
+// record would copy every message body in the window for nothing; the content
+// is kept raw and only looked at when the flag asks for it.
 type tailRecord struct {
 	Type      string `json:"type"`
 	Timestamp string `json:"timestamp"`
+	IsMeta    bool   `json:"isMeta"`
+
+	Message *struct {
+		Content json.RawMessage `json:"content"`
+	} `json:"message"`
 
 	nameFields
 }
 
+// Whether this record is a message the user actually typed, which is what
+// `-last-by user` dates a session by. Two things wear the `user` type without
+// being that: the harness's own meta records, and the tool results, which come
+// back as user turns because that is how they are sent to the model.
+func (r tailRecord) typed() bool {
+	if r.Type != "user" || r.IsMeta || r.Message == nil || len(r.Message.Content) == 0 {
+		return false
+	}
+
+	// A bare string is a prompt and nothing else; only the block form can
+	// carry a tool result, so that is the only shape worth decoding.
+	var s string
+	if json.Unmarshal(r.Message.Content, &s) == nil {
+		return true
+	}
+	var blocks []struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(r.Message.Content, &blocks) != nil {
+		return false
+	}
+	for _, b := range blocks {
+		if b.Type == "tool_result" {
+			return false
+		}
+	}
+	return true
+}
+
 // Newest user/assistant timestamp and the session's name, found by walking
 // backwards from the end of the file and widening the window until both turn
-// up.
+// up. With `userOnly`, only a typed prompt counts as a timestamp, so the
+// window widens until one is found -- an agent can run for an hour on its own
+// after the last thing it was asked.
 //
 // Both come out of the one buffer. The timestamp walk already visits every
 // line in the window and has already paid to decode it, so noticing the name
 // records it passes costs nothing beyond the four extra fields of
 // `nameFields`.
-func scanTail(fh *os.File, size int64) (time.Time, nameParts) {
+func scanTail(fh *os.File, size int64, userOnly bool) (time.Time, nameParts) {
 	for window := int64(tailWindow); ; window *= 4 {
 		if window > size {
 			window = size
@@ -223,7 +262,11 @@ func scanTail(fh *os.File, size int64) (time.Time, nameParts) {
 			// last one written, which is the rule the titles want.
 			name.observe(rec.nameFields, true)
 
-			if rec.Type != "user" && rec.Type != "assistant" {
+			if userOnly {
+				if !rec.typed() {
+					continue
+				}
+			} else if rec.Type != "user" && rec.Type != "assistant" {
 				continue
 			}
 			// Records are written in order, so the newest timestamp is within

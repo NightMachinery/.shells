@@ -293,6 +293,28 @@ as before, with no label.
 - =-name-len N= --- name width cap, default 40.
 - =-subagents= --- also list subagent transcripts. Off by default: =render=
   inlines them into their parent, and they were a third of the list.
+- =-last-by any|user= --- which record dates a row. =any=, the default, is the
+  session's last record of any kind, which is what every caller got before this
+  flag existed. =user= dates it by the last message the *user* typed instead.
+  The difference is what an agent does on its own: a session left running writes
+  tool calls and their results for as long as it works, so by =any= it keeps
+  floating to the top of a picker hours after anybody spoke to it, and by =user=
+  it sits where the conversation left it.
+
+  Each adapter answers this from its own store. Claude Code's tool results come
+  back as =user= records --- that is how they are sent to the model --- and the
+  harness writes its own notes as =isMeta= ones, so a record counts only when it
+  is neither: a =user= record whose content is a plain string, or a block list
+  with no =tool_result= in it. Codex counts a =response_item= that is a =message=
+  with =role: user= and text the scaffolding filter does not claim, the same
+  three tests the snippet makes. Antigravity counts the newest step whose
+  =source= is =USER_EXPLICIT=.
+
+  It can cost more reading than =any=. Both tail scans widen their window until
+  they find a timestamp, and under =user= the qualifying record may be a long
+  way behind the end --- an hour of tool calls is a lot of bytes. The mtime
+  fallback is unchanged: a transcript with no typed prompt in reach is dated by
+  the file, as one with no timestamp at all always was.
 - =-jobs N= --- worker count.
 
 =agent_session claude live <sessions-dir>...= prints one TSV row per session

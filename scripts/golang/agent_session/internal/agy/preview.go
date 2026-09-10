@@ -43,7 +43,7 @@ func (Adapter) Preview(path string, o session.PreviewOpts) (string, error) {
 	w.WriteString(c.Gray(preview.JoinParts(" · ", id, "agy", sum.AgentName)) + "\n\n")
 
 	when, aside := "", ""
-	if t := lastStamp(steps); !t.IsZero() {
+	if t := lastStamp(steps, false); !t.IsZero() {
 		when = t.Local().Format(turns.ListStamp)
 		aside = "(" + preview.HumanAge(time.Since(t)) + " ago)"
 	}

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The precedence is Claude Code's, not ours: `agent-name` is the name it
@@ -148,7 +149,7 @@ func TestScanTailName(t *testing.T) {
 				t.Fatalf("stat: %v", err)
 			}
 
-			_, name := scanTail(fh, st.Size())
+			_, name := scanTail(fh, st.Size(), false)
 			if got := name.resolve(); got != tc.want {
 				t.Errorf("scanTail: got %q, want %q", got, tc.want)
 			}
@@ -184,7 +185,7 @@ func TestScanTailNameWindowCap(t *testing.T) {
 		t.Fatalf("transcript is %d bytes, needs to exceed nameWindow (%d)", st.Size(), nameWindow)
 	}
 
-	last, name := scanTail(fh, st.Size())
+	last, name := scanTail(fh, st.Size(), false)
 	if got := name.resolve(); got != "snuggly-orbit" {
 		t.Errorf("scanTail: got %q, want the slug fallback %q", got, "snuggly-orbit")
 	}
@@ -193,6 +194,41 @@ func TestScanTailNameWindowCap(t *testing.T) {
 	}
 	if got := sessionName(fh); got != "out of reach" {
 		t.Errorf("sessionName: got %q, want %q", got, "out of reach")
+	}
+}
+
+// `-last-by user` dates a session by the last thing the person typed. What
+// makes this worth a scan of its own is that everything newer than that
+// prompt also wears the `user` type: a tool result comes back as a user turn,
+// and the harness writes its own notes as meta records.
+func TestScanTailLastByUser(t *testing.T) {
+	const (
+		prompt = "2026-09-08T16:00:00Z"
+		newest = "2026-09-08T17:00:00Z"
+	)
+
+	lines := []string{
+		msgLine("snuggly-orbit", "2026-09-08T15:00:00Z", 8),
+		fmt.Sprintf(`{"type":"user","timestamp":%q,"slug":"snuggly-orbit","message":{"content":"just the string form"}}`, prompt),
+		fmt.Sprintf(`{"type":"assistant","timestamp":%q,"slug":"snuggly-orbit","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash"}]}}`, "2026-09-08T16:30:00Z"),
+		fmt.Sprintf(`{"type":"user","timestamp":%q,"slug":"snuggly-orbit","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"done"}]}}`, "2026-09-08T16:31:00Z"),
+		fmt.Sprintf(`{"type":"user","timestamp":%q,"slug":"snuggly-orbit","isMeta":true,"message":{"content":[{"type":"text","text":"<system-reminder>"}]}}`, newest),
+	}
+
+	fh := writeTranscript(t, lines)
+	st, err := fh.Stat()
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+
+	last, _ := scanTail(fh, st.Size(), false)
+	if got := last.UTC().Format(time.RFC3339); got != newest {
+		t.Errorf("-last-by any: got %q, want the newest record %q", got, newest)
+	}
+
+	lastUser, _ := scanTail(fh, st.Size(), true)
+	if got := lastUser.UTC().Format(time.RFC3339); got != prompt {
+		t.Errorf("-last-by user: got %q, want the last typed prompt %q", got, prompt)
 	}
 }
 

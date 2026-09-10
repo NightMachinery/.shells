@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"agent_session/internal/proc"
 	"agent_session/internal/session"
@@ -135,6 +136,57 @@ func TestListFiltersSubagentsAndCwd(t *testing.T) {
 	scoped, err := ad.List([]string{root}, session.ListOpts{Cwd: "/tmp/proj/", SnippetLen: 1, NameLen: 1, Jobs: 1})
 	if err != nil || len(scoped) != 1 {
 		t.Errorf("-cwd should match the cleaned cwd: %v %d", err, len(scoped))
+	}
+}
+
+// `-last-by user` dates a thread by the last message the user typed. A thread
+// left running writes reasoning and tool output for as long as it works, and
+// the context Codex injects ahead of a prompt is a user message too, so
+// neither may be what the row is dated by.
+func TestListLastByUser(t *testing.T) {
+	home, main, _ := writeStore(t)
+	root := filepath.Join(home, "sessions")
+
+	// The fixture ends on the user's "thanks"; give it a tail of the kind
+	// that makes the two modes differ.
+	rec := func(ts, typ string, payload any) string {
+		raw, _ := json.Marshal(payload)
+		b, _ := json.Marshal(map[string]any{"timestamp": ts, "type": typ, "payload": json.RawMessage(raw)})
+		return string(b)
+	}
+	tail := strings.Join([]string{
+		rec("2026-09-08T10:03:00.000Z", "response_item", map[string]any{"type": "message", "role": "assistant",
+			"content": []map[string]any{{"type": "output_text", "text": "you are welcome"}}}),
+		rec("2026-09-08T10:04:00.000Z", "response_item", map[string]any{"type": "message", "role": "user",
+			"content": []map[string]any{{"type": "input_text", "text": "<environment_context>\n<cwd>/tmp/proj</cwd>\n</environment_context>"}}}),
+	}, "\n") + "\n"
+
+	fh, err := os.OpenFile(main, os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fh.WriteString(tail); err != nil {
+		t.Fatal(err)
+	}
+	fh.Close()
+
+	stamp := func(o session.ListOpts) string {
+		o.SnippetLen, o.NameLen, o.Jobs = 120, 40, 1
+		infos, err := ad.List([]string{root}, o)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(infos) != 1 {
+			t.Fatalf("want one rollout, got %d", len(infos))
+		}
+		return time.Unix(infos[0].Epoch, 0).UTC().Format(time.RFC3339)
+	}
+
+	if got := stamp(session.ListOpts{}); got != "2026-09-08T10:04:00Z" {
+		t.Errorf("-last-by any: got %q, want the newest record", got)
+	}
+	if got := stamp(session.ListOpts{LastBy: session.LastByUser}); got != "2026-09-08T10:02:00Z" {
+		t.Errorf("-last-by user: got %q, want the last typed prompt", got)
 	}
 }
 

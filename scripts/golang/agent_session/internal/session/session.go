@@ -102,7 +102,24 @@ type ListOpts struct {
 	// columns for those, and walking a corpus of a thousand-odd sessions to
 	// annotate twenty of them was most of what a picker cost.
 	Only []string
+	// Which record dates a session: [LastByAny] (the default, and what an
+	// empty string is read as) or [LastByUser]. The zero value is the old
+	// behaviour, so a caller that never heard of this needs no change.
+	LastBy string
 }
+
+// The values of [ListOpts.LastBy]. A session whose agent has been grinding
+// through its own tool calls for an hour was not touched an hour ago, and a
+// picker that sorts by conversation rather than by machine noise needs to say
+// which of the two it means.
+const (
+	LastByAny  = "any"
+	LastByUser = "user"
+)
+
+// UserOnly is whether these options date a session by the last message the
+// user typed, rather than by its last record of any kind.
+func (o ListOpts) UserOnly() bool { return o.LastBy == LastByUser }
 
 // PreviewOpts are the `preview` flags.
 type PreviewOpts struct {
