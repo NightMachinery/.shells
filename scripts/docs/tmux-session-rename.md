@@ -42,6 +42,12 @@ hook body is a thin parser that ends in one call,
 Every early return is an ordinary outcome and every path is silent: a broken
 rename must not cost a prompt.
 
+The `@agent_session` option has a second reader: the resolver behind
+`cmd+shift+o`, which jumps to the kitty window showing an agent session. When
+that window holds a tmux client the option answers directly, for any agent,
+and it beats that feature's own record of where a session was last seen. See
+`docs/agent-sessions.md`.
+
 The hook bodies are [agfi:claude-code-session-tmux-autoname],
 [agfi:codex-session-tmux-autoname] and [agfi:agy-session-tmux-autoname], each
 `<tmux-pane> [payload]` with the payload on stdin. They run in the brish
@@ -52,6 +58,13 @@ even the HTTP round trip; measured 0.15 s down to 0.03 s per prompt.
 `agents-md-doctor` checks all three hook and settings symlinks
 (`agents_md_settings` in `agents-md.zsh`) and warns when an app has replaced
 one with a plain file.
+
+Every agent's hook config also carries a second handler beside the autoname
+one, calling `claude-code-session-register` or [agfi:agent-session-register]
+to record which kitty window is showing the session, under
+`$XDG_STATE_HOME/agent-sessions`. Antigravity keeps it in its own top-level
+group `kitty-register`, leaving `tmux-autoname` alone. The two are
+independent, and neither waits on the other.
 
 ## Toggles
 
@@ -150,6 +163,8 @@ The name is `title` (set with `/rename` or F2 in `/resume`), else `preview`
 - Codex trusts no new hook handler until you accept it in the review it shows
   at startup (persisted as `hooks.state.<key>.trusted_hash` in
   `config.toml`), so the first `codex` launch after adding hooks asks once.
+  Both handlers in that file are hashed, so editing either one makes both
+  untrusted and the next launch asks again.
 - Codex injects any non-JSON stdout from a hook into the model's context as
   `additionalContext`. Exit 0 with empty stdout is harmless; the `>/dev/null`
   in the hook line is load-bearing.
