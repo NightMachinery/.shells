@@ -181,10 +181,15 @@ any legibility. Violet is the most recognisable for the least colour, the
 background being a warm yellow and violet its opposite, which is why the work
 seat uses `solar-violet-faint`.
 
-Both commands write to the controlling terminal rather than to stdout. Run as
-`! color-background ...` from inside an agent session, stdout is a pipe the
-agent reads, and an escape sent there is printed as text instead of reaching
-the terminal.
+Both commands send their escape to the terminal rather than to stdout, because
+run as `! color-background ...` from inside an agent session stdout is a pipe
+the agent reads, and an escape sent there is printed as text instead of
+reaching the terminal. They try `/dev/tty` first, then the tmux pane's own tty,
+then stdout. The second step is what makes it work inside an agent at all: that
+shell has no controlling terminal, so opening `/dev/tty` fails with "device not
+configured". Worth knowing that `test -w /dev/tty` reports it writable anyway,
+since access(2) does not check for a controlling terminal, so the guard has to
+be an actual open.
 
 ### The pane border
 
