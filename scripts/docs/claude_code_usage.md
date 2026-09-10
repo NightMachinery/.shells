@@ -126,18 +126,23 @@ inherits the launcher's environment, and its stdin JSON has no profile field.
 
 ### The pane tint
 
-On by default, `claude_tint_p`. The launcher writes OSC 11 before starting the
-session, washing the background to `#eef3fc` for personal or `#fff6ec` for
-work, and OSC 111 afterwards in an `always` block, so a normal quit and Ctrl-C
-both undo it and neither can change the session's exit status. Under tmux 3.0
-and later it reaches only the pane that sent it, leaving a sibling pane in the
-same window alone; outside tmux, kitty applies it to the whole window. Cells
-the TUI paints with a background of their own are unaffected, so it reads as a
-tint rather than a repaint.
+On by default under tmux only, `claude_tint_p`. The launcher writes OSC 11
+before starting the session, washing the background to `#eef3fc` for personal
+or `#fff6ec` for work, and OSC 111 afterwards in an `always` block, so a normal
+quit and Ctrl-C both undo it and neither can change the session's exit status.
+Cells the TUI paints with a background of their own are unaffected, so it reads
+as a tint rather than a repaint.
 
-It is skipped unless stdout is a terminal, so a piped or captured run is never
-handed escape codes. A `kill -9` outruns the reset and leaves the pane tinted
-until the next reset or a new pane.
+Where it applies is `claude_tint_scope`, and it is not a boolean. Under tmux 3.0
+and later the escape reaches only the pane that sent it, leaving a sibling pane
+in the same window alone, which is why `tmux` is the default scope. A bare
+terminal has no panes, so the same escape there recolours the whole window,
+the user's terminal rather than the session's corner of it; `always` opts into
+that and `never` disables the tint the way `claude_tint_p=n` does.
+
+It is also skipped unless stdout is a terminal, so a piped or captured run is
+never handed escape codes. A `kill -9` outruns the reset and leaves the pane
+tinted until the next reset or a new pane.
 
 ### The tmux pane-border label
 
