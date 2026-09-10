@@ -365,6 +365,8 @@ func TestIsAgyCmd(t *testing.T) {
 func TestLivePairsByWorkspace(t *testing.T) {
 	_, brain, main := writeStore(t)
 
+	proc.ResetShared()
+	defer proc.ResetShared()
 	oldRun := proc.Run
 	proc.Run = func(name string, args ...string) ([]byte, error) {
 		switch name {
@@ -405,6 +407,8 @@ func TestLivePairsByWorkspace(t *testing.T) {
 func TestLiveWithNoProcesses(t *testing.T) {
 	_, brain, _ := writeStore(t)
 
+	proc.ResetShared()
+	defer proc.ResetShared()
 	oldRun := proc.Run
 	proc.Run = func(name string, args ...string) ([]byte, error) {
 		if name == "ps" {

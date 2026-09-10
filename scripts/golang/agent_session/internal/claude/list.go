@@ -43,7 +43,22 @@ func (Adapter) List(roots []string, o session.ListOpts) ([]session.Info, error) 
 	var files []found
 
 	sep := string(filepath.Separator)
+	if len(o.Only) > 0 {
+		// The paths are already known, so nothing is walked. `base` is the
+		// project directory when the caller scoped to a cwd and the root
+		// otherwise, exactly as the walk below sets it.
+		for _, pair := range session.Under(o.Only, roots) {
+			base := pair[1]
+			if slug != "" {
+				base = filepath.Join(pair[1], slug)
+			}
+			files = append(files, found{path: pair[0], base: base, root: pair[1]})
+		}
+	}
 	for _, root := range roots {
+		if len(o.Only) > 0 {
+			break
+		}
 		base := root
 		if slug != "" {
 			base = filepath.Join(root, slug)

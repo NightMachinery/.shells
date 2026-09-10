@@ -282,6 +282,13 @@ as before, with no label.
   identical to handing the scoped directories in as roots. What the flag buys is
   that the caller no longer has to know how the slug is spelled, which is what
   lets the same call work for an agent that scopes a project some other way.
+- =-only PATH= --- answer for these transcripts and no others, repeatable.
+  Nothing is walked: =session.Under= sorts each path under whichever root
+  contains it, and the adapter reads exactly those files. It is for a caller
+  that already has the paths and only wants the name and the timestamp that go
+  with them, which is what the pickers want; asking that way took =codex list=
+  from 276ms to 6ms. A path under none of the roots is skipped rather than
+  rejected, so a stale row in a cache cannot fail the call.
 - =-snippet-len N= --- snippet width cap, default 120.
 - =-name-len N= --- name width cap, default 40.
 - =-subagents= --- also list subagent transcripts. Off by default: =render=
@@ -292,6 +299,41 @@ as before, with no label.
 currently running: pid, id, name, cwd, transcript path, the tmux session it runs
 in or =-=, and its status. The section on reading the session you are in says
 what it is for and why it lives here.
+
+=agent_session live-all <agent>=<sessions-dir>...= is the same thing for every
+agent at once, and is the only subcommand that does not start with an agent
+name. Each argument pairs an agent with one of its roots, repeated as often as
+needed (=claude=~/.claude/projects claude=~/.claude-work/projects
+codex=~/.codex/sessions agy=~/.gemini/antigravity-cli/brain=); the rows come out
+grouped by agent, in the order the agents were first named. An adapter that
+fails contributes no rows and does not fail the run, because a host with no
+Codex installed should still get a picker. The next chapter says why it exists.
+
+* One listing for every agent
+
+Asking the three adapters in turn cost about a second before anything reached
+the screen, and most of that was the same work done three times: a process
+table each, an =lsof= each, three binary startups. =live-all= runs them
+concurrently in one process instead, and they share the expensive reads.
+
+=proc.ListShared= and =proc.PanesShared= do their =ps= and their =tmux
+list-panes= once per process, behind a mutex, and hand every later caller the
+same slice. So the three adapters in one =live-all= see one process table
+between them, however they interleave. =proc.ResetShared= drops the memo; it
+exists for the tests, which replace =proc.Run= with a fake and would otherwise
+be answered from whatever the previous test cached.
+
+=proc.Holders(files, pids)= narrows the question rather than the answer. Given a
+pid list it passes =-a -p <pids>= to =lsof=, so the kernel is only asked about
+processes that could possibly hold the file. Codex's lock probe knows its
+candidates --- everything with =codex= in its command line, plus their
+descendants --- and restricting the call that way took it from 238ms to 41ms.
+Where the caller has no such list, =Holders= asks about the files alone, as
+before.
+
+The measured result: three sequential per-agent calls, about 950ms, became one
+=live-all= at about 205ms, of which =claude agents --json= is 190ms. The rest is
+now noise around Claude Code's own answer.
 
 * Document structure
 
@@ -1007,6 +1049,22 @@ that way.
   =h-agent-view-name-of= builds from it, so it is one variable rather than
   two literals.
 
+** Two zsh hazards these helpers ran into
+
+=path= is tied to =PATH=. It is not an ordinary array: zsh keeps the two in
+sync, so =for path in ...= rewrites the shell's search path element by element
+and leaves it wherever the loop ended. In a garden shell, which persists between
+calls, that produced =command not found: cat= for unrelated commands minutes
+later, and nothing in the traceback pointed at the loop. Any loop over paths
+here uses =t=, or a hoisted =transcripts= array, and never that name. The same
+applies to =cdpath=, =fpath=, =manpath= and =PROMPT=-adjacent specials.
+
+zsh has no namerefs. =local -n= is a bash feature and zsh 5.9 answers =local:
+bad option: -n=, so a helper that has to fill a caller's associative array
+either builds it inline at the call site or hands values back through =REPLY=,
+which is what =h-agent-session-agent-in-roots= does. Nothing in these files
+takes a variable name as an argument.
+
 * Reading the session you are in
 
 Picking from a list is the wrong tool when you are already inside the session
@@ -1026,31 +1084,59 @@ keybinding to a command either. So the keypress lives in kitty.
 The hotkey is =agent-view-session-focused=, bound in
 =configFiles/kitty/kitty.conf=. It asks =kitty @ ls= which window is focused
 and hands that window to =h-agent-session-of-kitty-window=, which tries
-four things, in order of how sure each one is:
+five things, in order of how sure each one is:
 
-1. An agent runs in the window itself. One of the window's foreground pids is
+1. The window shows a tmux client and the autoname hooks have already recorded
+   who lives in that session, as the =@agent_session= user option: agent, id
+   and transcript. That answers directly, for any agent, and it is tried first
+   for one reason --- it is the only answer that needs no live listing, and the
+   listing is what the keypress waits on. A hooked tmux window resolves in
+   16ms; the same window went through the listing at 365ms before. It cannot
+   contradict the two tests below either, since a window displaying a tmux
+   client has none of the agent's own processes in the foreground.
+
+   Which session to ask is the part worth writing down. It has to come from the
+   client's *pid*, through one =tmux list-clients=, and not from the name in the
+   window's command line: the autoname hooks rename a session after the agent
+   in it, so a window still running =tmux attach -t scripts-claudework1= is
+   attached to a session now called =@Claude/work claude-session-helpers-refactor=.
+   The first version of this matched the spelled name, which reads perfectly and
+   never once fired.
+2. An agent runs in the window itself. One of the window's foreground pids is
    then a live session's pid --- which is why a session whose process was never
    traced must have no row rather than a guessed pid.
-2. The window shows a tmux client, =tmux a -t NAME=. Sessions here mostly live
-   in detached tmux sessions --- that is what lets them outlive a kitty
-   restart --- and the kitty tab merely displays one. The autoname hooks record
-   the identity on the tmux session as the =@agent_session= user option (agent,
-   id and transcript), which answers directly for any agent; failing that, NAME
-   is matched against the live rows' tmux column, and only a single hit counts,
-   since one tmux session can host several agents in several panes. Claude
-   Code's own record of a session, =<config home>/sessions/<pid>.json=, carries
-   the =tmux= field that column comes from for Claude.
-3. The window shows an agent's own view, =claude agents= or =claude attach=. The
+3. The window shows a tmux client, =tmux a -t NAME=, whose session the hooks
+   never recorded. Sessions here mostly live in detached tmux sessions --- that
+   is what lets them outlive a kitty restart --- and the kitty tab merely
+   displays one. NAME is matched against the live rows' tmux column, and only a
+   single hit counts, since one tmux session can host several agents in several
+   panes. Claude Code's own record of a session,
+   =<config home>/sessions/<pid>.json=, carries the =tmux= field that column
+   comes from for Claude. This is the path an agent takes while its hooks are
+   still untrusted, and it costs the full listing: about 235ms.
+4. The window shows an agent's own view, =claude agents= or =claude attach=. The
    view sets the window title to the attached session's name, at times with a
    status glyph in front, and the title is matched against the live sessions'
    names. This is observed behaviour, not documented, so it has to match
    exactly one session or it is ignored, and only when a foreground process is
    one of the agents' binaries.
-4. The registry described below: where the session was showing the last time
+5. The registry described below: where the session was showing the last time
    it was prompted.
 
-The first three read only what exists at the moment of the keypress, so they
-cannot go stale. The fourth can, which is why it comes last.
+The first four read only what exists at the moment of the keypress, so they
+cannot go stale. The fifth can, which is why it comes last.
+
+Everything the five strategies read about a window comes from one =kitty @ ls=
+put through one =jq=: =h-agent-session-windows= emits a line per window with its
+id, its title, its foreground pids and their command lines, the last separated
+by a unit separator because no command line carries one. A =jq= per window per
+field was most of what the pickers spent, twenty windows meaning forty processes
+to re-read a listing already in hand. The tmux side is batched the same way: one
+=tmux list-sessions= for every session's identity
+(=h-agent-session-tmux-identities=) and one =tmux list-clients= for every
+client's session (=h-agent-session-tmux-clients=). A caller that resolves many
+windows primes =agent_session_windows_cache= and the two tables and pays for
+each read once.
 
 The live rows are every agent's =live= output concatenated, so the four
 strategies above are agent-neutral: each row carries a pid and a tmux session
@@ -1083,7 +1169,13 @@ end, most of it that one parallelised listing.
 
 The Go probe is by =command -v=, a real PATH lookup, not by the shell's command
 hash: the garden's hash is stale for a binary installed after it started, and
-trusting it would send every call down the slow build-check path.
+trusting it would send every call down the slow build-check path. The zsh guard
+in front of it, =h-agent-session-dep=, spells the same idea as =whence -p
+agent_session=, and that spelling is load-bearing: =isdefined-cmd= reads
+=$commands=, which makes zsh hash every directory in =PATH= --- 65ms in a garden
+shell, which forks per call and so never has a warm hash --- while =whence -p=
+stops at the first hit. Since the guard sits in front of every render, name,
+listing and preview, that took it from 124ms to about 1ms.
 
 ** In the background, with a band, press again to cancel
 

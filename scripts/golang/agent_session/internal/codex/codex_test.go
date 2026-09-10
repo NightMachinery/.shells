@@ -365,6 +365,8 @@ func TestLivePairsLockHolders(t *testing.T) {
 	}
 	_ = sub
 
+	proc.ResetShared()
+	defer proc.ResetShared()
 	oldRun := proc.Run
 	proc.Run = func(name string, args ...string) ([]byte, error) {
 		switch name {
