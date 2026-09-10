@@ -128,6 +128,45 @@ function h-agent-session-sniff {
     ec "${agent}"
 }
 ##
+function h-jwt-payload {
+    #: The payload of a JWT on stdin, as JSON on stdout. The signature is not
+    #: checked and cannot be: this is for reading the claims of a token we
+    #: already stored ourselves -- which account is signed in -- not for
+    #: trusting one that arrived from somewhere.
+    ##
+    local tok body
+    tok="$(command cat)"
+    tok="${tok//[[:space:]]/}"
+    test -n "${tok}" || return 1
+
+    body="${${tok#*.}%%.*}"
+    test -n "${body}" && [[ "${body}" != "${tok}" ]] || return 1
+
+    #: base64url to base64, then pad to a multiple of four.
+    body="${body//-/+}"
+    body="${body//_//}"
+    while (( ${#body} % 4 )) ; do
+        body+='='
+    done
+
+    print -r -- "${body}" | command base64 -d 2>/dev/null
+}
+
+function h-agent-session-account {
+    #: Which account and profile a transcript belongs to, as one short line, or
+    #: failure when the agent cannot say. Each adapter's `account' verb reads
+    #: the agent's own config; none of them prints a token.
+    #: Usage: h-agent-session-account <transcript>
+    ##
+    local transcript="${1}"
+    assert-args transcript @RET
+
+    local agent
+    agent="$(h-agent-session-agent-of "${transcript}")" @RET
+
+    h-agent-session-call "${agent}" account "${transcript}" 2>/dev/null
+}
+
 function h-agent-launch {
     #: The preamble every agent launcher shares, then the agent: `nvim' as the
     #: editor, the instruction files synced ([agfi:h-agents-md-sync-ask];

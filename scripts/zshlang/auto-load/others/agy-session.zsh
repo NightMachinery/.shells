@@ -140,6 +140,23 @@ function h-agy-session-name {
     agent_session agy name "${transcript}"
 }
 
+function h-agy-session-account {
+    #: The signed-in Google account. Antigravity is a Gemini CLI derivative and
+    #: shares its account file, `~/.gemini/google_accounts.json', whose
+    #: `active' is the address in use; the old ones beside it are not.
+    ##
+    local f
+    f="$(h-agy-session-home)/../google_accounts.json"
+    test -e "${f}" || return 1
+    isdefined-cmd jq || return 1
+
+    local email
+    email="$(jq -r '.active // empty' "${f}" 2>/dev/null)" || return 1
+    test -n "${email}" || return 1
+
+    print -r -- "${email}"
+}
+
 function h-agy-session-resume {
     #: `agy --conversation <id>', through the [agfi:antigravity] launcher.
     #: Usage: h-agy-session-resume <transcript> [agy args...]

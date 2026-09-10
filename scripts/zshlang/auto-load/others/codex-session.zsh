@@ -102,6 +102,33 @@ function h-codex-session-resume {
     codex resume "${id}" "$@"
 }
 
+function h-codex-session-account {
+    #: The signed-in ChatGPT account, as `someone@example.com · pro'. Codex
+    #: stores an id token in `auth.json'; two of its claims say who is signed
+    #: in and on what plan. The token itself is never printed, and nothing here
+    #: goes to the network -- a document header must not wait on an API.
+    ##
+    local f
+    f="$(h-codex-session-home)/auth.json"
+    test -e "${f}" || return 1
+    isdefined-cmd jq || return 1
+
+    local claims
+    claims="$(jq -r '.tokens.id_token // empty' "${f}" 2>/dev/null | h-jwt-payload)" || return 1
+    test -n "${claims}" || return 1
+
+    local email plan
+    email="$(ec "${claims}" | jq -r '.email // empty' 2>/dev/null)" || email=''
+    plan="$(ec "${claims}" | jq -r '.["https://api.openai.com/auth"].chatgpt_plan_type // empty' 2>/dev/null)" || plan=''
+
+    local -a parts
+    test -n "${email}" && parts+=( "${email}" )
+    test -n "${plan}" && parts+=( "${plan:l}" )
+    (( ${#parts} )) || return 1
+
+    print -r -- "${(j: · :)parts}"
+}
+
 function h-codex-session-hook-transcript {
     #: The transcript a Codex hook payload is about, or nothing. Codex gives
     #: `transcript_path', but may leave it null; then the thread is found from
