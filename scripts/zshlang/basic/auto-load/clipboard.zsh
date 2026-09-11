@@ -6,8 +6,18 @@ function cat-eol {
     #: million lines (2026-09-11) it costs 2.45s against plain `cat''s 2.39s,
     #: where `gawk "{print; fflush()}"' costs 3.09s for the same guarantee and
     #: a bare `awk 1' does not stream at all.
+    #:
+    #: `binmode', not `perl -CS': the point is to move bytes, not characters.
+    #: Encoding layers would have `sysread' hand back characters and mangle a
+    #: multi-byte sequence split across a read, and they can arrive from the
+    #: environment rather than the command line -- with PERL_UNICODE=SDA set,
+    #: this emitted nothing at all before the binmode calls. Raw handles make
+    #: UTF-8, a boundary-straddling character and arbitrary binary all pass
+    #: through untouched; the newline test only ever looks at the last byte.
     ##
     command perl -e '
+binmode(STDIN);
+binmode(STDOUT);
 my $last;
 while ((my $n = sysread(STDIN, my $buf, 65536)) > 0) {
     syswrite(STDOUT, $buf);
