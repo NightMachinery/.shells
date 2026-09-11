@@ -808,7 +808,7 @@ Sets REPLY to the picker's sort rank for that state, and to its emoji."
 
 function agent-clean-fz {
     : "usage: agent-clean-fz [<query>]
-Fuzzy-picks finished tmux subagents and closes them."
+Fuzzy-picks finished tmux subagents and closes them; busy ones are hidden, see agent-clean-all-fz."
     #: `gone' and `exited' rows are never offered: a gone entry is dropped by
     #: the reconcile above before the list is even built, and a dead pane is
     #: [agfi:tmuxzombie-kill]'s business -- it removes every one of them in one
@@ -898,6 +898,10 @@ Fuzzy-picks finished tmux subagents and closes them."
 
     agent-subagents-close "${nodes[@]}"
 }
-#: Same, but offers busy children too.
-aliasfn agent-clean-all-fz agent_clean_fz_all_p=y agent-clean-fz
+function agent-clean-all-fz {
+    : "usage: agent-clean-all-fz [<query>]
+Like agent-clean-fz, but offers busy children too; closing one still needs -f (agent_subagents_close_force=y)."
+
+    agent_clean_fz_all_p=y agent-clean-fz "$@"
+}
 ##
