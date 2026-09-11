@@ -247,7 +247,7 @@ aliases.
 `agent-status` (alias `agst`) prints the Claude Code, Codex and Antigravity
 reports one after another, each under a header carrying the agent's glyph
 and name. The three commands run concurrently through the repo's GNU
-parallel wrapper, `para`, so the whole thing takes about as long as the
+parallel wrapper, `parallelm`, so the whole thing takes about as long as the
 slowest of them rather than the sum, and `--keep-order` keeps the sections
 in the configured order however the jobs happen to finish. The output goes
 through `pager-if-overflow`, so a report longer than the screen pages and a
