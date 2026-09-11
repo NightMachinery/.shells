@@ -67,7 +67,9 @@ and one usage check per tick serves all of them.
 ## The registry
 
 One file per session, `<dir>/<scope>/<agent>-<id>`, tab separated: agent, id,
-transcript, targets (space separated, sorted), registered-at epoch. The
+transcript, targets (space separated, sorted), registered-at epoch. Beside
+them, dotfiles the globs skip: `.kicked`, `.blocked_at`, `.blocked-<agent>-<id>`
+and `.fn_ran`, all explained below. The
 directory is beside the kitty-window registry ([agfi:h-agent-session-registry-dir]),
 not under `~/tmp`, which gets swept; `agent_auto_continue_dir` overrides.
 
@@ -126,9 +128,10 @@ Each tick: prune the scope's registrations against one live listing, run
 
 [agfi:agent-auto-continue-check] is idempotent, and the watcher, the hooks,
 `on` and `off` all call it. With nothing registered it cancels the scope's
-armed jobs and returns. Otherwise it gathers every registration's targets and
-hands them, preset in `agent_usage_arm_targets` with
-`agent_usage_arm_action=continue`, to the scope's own deadline source:
+armed jobs and returns. Otherwise it gathers the targets of every registration
+that passes the eligibility gate (next section) and hands them, with
+`agent_usage_arm_action=continue` and through `agent_usage_continue_via=fn`, to
+the scope's own deadline source:
 
 - Claude Code: [agfi:h-claude-code-usage-arm], with roles
   `agent_auto_continue_claude_roles` (`session` and `weekly_all` by default)
@@ -161,6 +164,43 @@ job is already armed for exactly this target set, do nothing. Without it a
 blocked scope would kill and recreate its job on every tick. A changed set — a
 session registered or pruned while blocked — re-arms, which is what keeps the
 job's targets in step with the registrations.
+
+## Only sessions that were still working
+
+The scope is what gets blocked, but a registration says nothing about whether
+*this* session was still working when it happened. Without a gate, a session
+that finished its task an hour earlier would be resumed anyway, and again at
+every later cycle. Three things close that:
+
+- **The activity gate.** The first tick that finds the scope blocked records
+  the time in `.blocked_at` in the scope directory; the engine tells the check
+  it is arming by calling [agfi:h-agent-auto-continue-targets-fn] (through
+  `agent_usage_continue_via=fn`), which is invoked only once arming is
+  certain. [agfi:h-agent-auto-continue-eligible-p] then resumes a registration
+  only if its transcript changed within one poll interval plus
+  `agent_auto_continue_activity_slack_s` before that reference — the sighting
+  is up to one interval late — and the reference stays put for the whole wait,
+  so the eligible set does not drift. A tick that finds the scope unblocked
+  clears the reference and the marks for the next cycle. A registration with
+  no transcript to ask is let through: "cannot tell" is not "finished".
+- **The hook mark.** When a session's own turn ends on the limit — Claude
+  Code's `StopFailure/rate_limit`, Antigravity's `Stop` with
+  `terminationReason: error` — [agfi:agent-auto-continue-hook] leaves
+  `.blocked-<agent>-<id>` beside the registration, and a marked session is
+  eligible regardless of its transcript's mtime. Exact where a hook exists;
+  Codex has none, so it relies on the gate alone.
+- **`/done` unregisters.** [agfi:agent-done] calls
+  [agfi:agent-auto-continue-off] for the session it ends.
+
+And one safety net: the text typed is `agent_auto_continue_text`, which by
+default asks the session to say so briefly and run `agent-auto-continue-off`
+if the task is already finished. A wrong resume that slips past the gate then
+happens once, not at every reset.
+
+Trade-offs, stated: the gate is a heuristic. A session that finished a few
+minutes before the limit hit is still resumed, and pays one short reply; a
+session blocked in the middle of a long silent tool run could fall outside the
+window and be missed, which a larger slack makes rarer.
 
 ## Hooks: sooner, not instead
 
@@ -197,6 +237,9 @@ All `typeset -g` in `agent-auto-continue.zsh`, defaults in the code:
 - `agent_auto_continue_session_prefix` — the tmux session prefix for watchers
   and jobs.
 - `agent_auto_continue_frontmost_p` — what `--frontmost` sets.
+- `agent_auto_continue_activity_slack_s` — added to the poll interval to form
+  the activity window a registration must fall in to be resumed.
+- `agent_auto_continue_text` — what gets typed; self-limiting by default.
 - `codex_status_arm_full_pct` — in `codex.zsh`; the utilization at which one
   auth's window counts as blocking.
 

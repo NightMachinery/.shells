@@ -45,6 +45,16 @@ typeset -g agent_auto_continue_claude_roles="${agent_auto_continue_claude_roles:
 #: The tmux sessions this file creates all start with this; the watchers are
 #: `<prefix>-watch-<scope>', the armed jobs `<prefix>-<scope>[-<group>]'.
 typeset -g agent_auto_continue_session_prefix="${agent_auto_continue_session_prefix:-agent-auto-continue}"
+#: A registered session is resumed only if it was still working when the limit
+#: hit: its transcript changed within one poll interval plus this slack before
+#: the scope was first seen blocked, or its own failed turn marked it. A
+#: session that finished an hour earlier is left alone.
+#: See [agfi:h-agent-auto-continue-eligible-p].
+typeset -g agent_auto_continue_activity_slack_s="${agent_auto_continue_activity_slack_s:-120}"
+#: What gets typed. Self-limiting: a session that was resumed although its task
+#: was already finished is asked to take itself off the list, so a wrong resume
+#: happens once rather than at every reset.
+typeset -g agent_auto_continue_text="${agent_auto_continue_text:-Continue. If the task is already finished, say so briefly and run: zsh -ic agent-auto-continue-off}"
 ##
 #: Naming
 ##
@@ -233,6 +243,132 @@ function h-agent-auto-continue-live-p {
     done
 
     return 1
+}
+
+##
+#: Who was actually blocked
+##
+#: The scope directory also holds three kinds of dotfile, which the
+#: registration globs skip: `.kicked' (the hook debounce stamp), `.blocked_at'
+#: (when a check first found the scope blocked, epoch) and
+#: `.blocked-<agent>-<id>' (a session's own failed turn, left by the hook).
+##
+function h-agent-auto-continue-blocked-stamp {
+    local scope="${1}"
+    assert-args scope @RET
+
+    ec "$(h-agent-auto-continue-dir)/${scope}/.blocked_at"
+}
+
+function h-agent-auto-continue-mark-file {
+    #: Usage: h-agent-auto-continue-mark-file <scope> <agent> <id>
+    local scope="${1}" agent="${2}" id="${3}"
+    assert-args scope agent id @RET
+
+    ec "$(h-agent-auto-continue-dir)/${scope}/.blocked-${agent}-${id}"
+}
+
+function h-agent-auto-continue-blocked-since {
+    #: The epoch at which the scope was first seen blocked in the current
+    #: cycle, or nothing.
+    local scope="${1}"
+    assert-args scope @RET
+
+    local stamp
+    stamp="$(h-agent-auto-continue-blocked-stamp "${scope}")"
+    test -e "${stamp}" || return 1
+
+    local v
+    v="$(<"${stamp}")"
+    [[ "${v}" == [0-9]## ]] || return 1
+    ec "${v}"
+}
+
+function h-agent-auto-continue-blocked-now {
+    #: Records that the scope is blocked as of now, unless a cycle is already
+    #: recorded: the first sighting is the reference every later tick judges
+    #: activity against, so the eligible set stays put while the wait lasts.
+    ##
+    local scope="${1}"
+    assert-args scope @RET
+
+    zmodload zsh/datetime 2>/dev/null
+
+    local stamp
+    stamp="$(h-agent-auto-continue-blocked-stamp "${scope}")"
+    test -e "${stamp}" && return 0
+
+    mkdir -p -- "${stamp:h}" @RET
+    ec "${EPOCHSECONDS}" > "${stamp}"
+}
+
+function h-agent-auto-continue-unblocked {
+    #: The scope's usage is possible again: the cycle is over, so its reference
+    #: time and the hook's marks go, and the next limit starts clean.
+    ##
+    setopt localoptions bareglobqual
+
+    local scope="${1}"
+    assert-args scope @RET
+
+    local dir
+    dir="$(h-agent-auto-continue-dir)/${scope}"
+    test -d "${dir}" || return 0
+
+    command rm -f -- "${dir}/.blocked_at" "${dir}"/.blocked-*(N) 2>/dev/null || true
+}
+
+function h-agent-auto-continue-eligible-p {
+    #: Whether a registered session should be resumed for the current block.
+    #: Yes if its own failed turn marked it (the hooks do that where the agent
+    #: has one), or if its transcript changed within the activity window before
+    #: the reference time: the scope's first sighting as blocked, which is up to
+    #: one poll interval late, hence the poll interval plus slack. A session
+    #: with no transcript to ask is let through rather than dropped, since
+    #: "cannot tell" is not "finished".
+    #: Usage: h-agent-auto-continue-eligible-p <scope> <agent> <id> <transcript> <ref-epoch>
+    ##
+    local poll_s="${agent_auto_continue_poll_s:-300}"
+    local slack_s="${agent_auto_continue_activity_slack_s:-120}"
+
+    local scope="${1}" agent="${2}" id="${3}" transcript="${4}" ref="${5}"
+    assert-args scope agent id ref @RET
+
+    if test -e "$(h-agent-auto-continue-mark-file "${scope}" "${agent}" "${id}")" ; then
+        return 0
+    fi
+
+    test -n "${transcript}" && test -e "${transcript}" || return 0
+
+    zmodload -F zsh/stat b:zstat 2>/dev/null
+    local -a st
+    zstat -A st +mtime "${transcript}" 2>/dev/null || return 0
+
+    (( ${st[1]:-0} >= ref - poll_s - slack_s ))
+}
+
+function h-agent-auto-continue-ran-stamp {
+    local scope="${1}"
+    assert-args scope @RET
+
+    ec "$(h-agent-auto-continue-dir)/${scope}/.fn_ran"
+}
+
+function h-agent-auto-continue-targets-fn {
+    #: What [agfi:h-agent-usage-arm] calls, through
+    #: `agent_usage_continue_via=fn', once it has decided to arm: prints the
+    #: targets [agfi:h-agent-auto-continue-arm-group] chose, and notes that the
+    #: scope is in fact blocked. The targets and the scope arrive as
+    #: dynamically scoped variables of the callers; the note goes out as a
+    #: file, because the engine runs this inside a command substitution and a
+    #: variable set here would die with that subshell.
+    ##
+    ec "${agent_auto_continue_fn_targets}"
+
+    local scope="${agent_auto_continue_fn_scope}"
+    if test -n "${scope}" ; then
+        command touch -- "$(h-agent-auto-continue-ran-stamp "${scope}")" 2>/dev/null || true
+    fi
 }
 
 function h-agent-auto-continue-prune {
@@ -430,9 +566,10 @@ cancels the scope's armed job and stops its watcher."
     left="$(h-agent-auto-continue-registrations "${scope}")"
     if test -z "${left}" ; then
         h-agent-auto-continue-watch-stop "${scope}" >&2 || true
-        #: The kick stamp and the directory go too, so an emptied scope leaves
+        #: The stamps and the directory go too, so an emptied scope leaves
         #: nothing behind for [agfi:agent-auto-continue-list] to show.
-        command rm -f -- "${file:h}/.kicked" 2>/dev/null || true
+        h-agent-auto-continue-unblocked "${scope}"
+        command rm -f -- "${file:h}/.kicked" "${file:h}/.fn_ran" 2>/dev/null || true
         command rmdir -- "${file:h}" 2>/dev/null || true
         ec "auto-continue off: ${scope} has no registered session left; its watcher is stopped"
     else
@@ -510,12 +647,15 @@ watchers and armed jobs. --prune forgets the dead ones."
     local agent_auto_continue_live_list
     agent_auto_continue_live_list="$(h-agent-session-live-list 2>/dev/null)"
 
-    local scope line state
+    local scope line state since mark
     local -a f
     for scope in "${scopes[@]}" ; do
         ecbold "${scope}"
         if bool "${prune_p}" ; then
             h-agent-auto-continue-prune "${scope}" >/dev/null
+        fi
+        if since="$(h-agent-auto-continue-blocked-since "${scope}")" ; then
+            ec "  blocked since $(date-unix-to-3339 "${since}")"
         fi
         for line in ${(f)"$(h-agent-auto-continue-registrations "${scope}")"} ; do
             f=( "${(@ps:\t:)line}" )
@@ -524,7 +664,11 @@ watchers and armed jobs. --prune forgets the dead ones."
             else
                 state=dead
             fi
-            ec "  ${state}  ${f[1]} ${f[2]}  -> ${f[4]}"
+            mark=''
+            if test -e "$(h-agent-auto-continue-mark-file "${scope}" "${f[1]}" "${f[2]}")" ; then
+                mark='  (its own turn hit the limit)'
+            fi
+            ec "  ${state}  ${f[1]} ${f[2]}  -> ${f[4]}${mark}"
         done
         h-agent-auto-continue-scope-status "${scope}" | command sed 's/^/  /'
     done
@@ -649,10 +793,17 @@ function h-agent-auto-continue-arm-group {
     #: Arms one job for one target set through the scope's deadline source,
     #: unless that job is already armed for exactly these targets -- a blocked
     #: scope must not kill and recreate its job every tick. A different set
-    #: (a session registered or pruned while blocked) re-arms, which is what
-    #: makes the job's targets follow the registrations.
+    #: (a session registered, pruned or newly eligible while blocked) re-arms,
+    #: which is what makes the job's targets follow the registrations.
+    #:
+    #: The targets are handed over through `agent_usage_continue_via=fn'
+    #: rather than preset in `agent_usage_arm_targets': the engine calls the
+    #: function only once it has decided to arm, so its being called is how the
+    #: caller learns the scope is blocked. Either path skips the picker.
     #: Usage: h-agent-auto-continue-arm-group <job-session> <targets> <arm-fn> [args...]
     ##
+    local text="${agent_auto_continue_text}"
+
     local session="${1}" targets="${2}"
     shift 2
     assert-args session targets @RET
@@ -667,14 +818,20 @@ function h-agent-auto-continue-arm-group {
         deadline="$(tmux show-options -qv -t "${session}" '@agent_usage_arm_deadline' 2>/dev/null)" || deadline=''
         if test -n "${deadline}" && [[ "${recorded}" == "${targets}" ]] ; then
             ecgray "$0: ${session}: already armed for these targets"
+            #: Armed is blocked: the cycle is still on.
+            agent_auto_continue_blocked_seen=y
             return 0
         fi
     fi
 
-    #: `local' is dynamically scoped, so [agfi:h-agent-usage-arm] reads these
-    #: from here, and presetting the targets is what skips its picker.
+    #: `local' is dynamically scoped, so [agfi:h-agent-usage-arm] and
+    #: [agfi:h-agent-auto-continue-targets-fn] read these from here.
     local agent_usage_arm_action=continue
-    local agent_usage_arm_targets="${targets}"
+    local agent_usage_arm_targets=''
+    local agent_usage_continue_via=fn
+    local agent_usage_continue_targets_fn=h-agent-auto-continue-targets-fn
+    local agent_auto_continue_fn_targets="${targets}"
+    local agent_usage_continue_text="${text:-${agent_usage_continue_text}}"
 
     reval "$@"
 }
@@ -707,6 +864,20 @@ registered session's target; cancels it when nothing is registered."
     local agent
     agent="$(h-agent-auto-continue-scope-agent "${scope}")" @RET
 
+    zmodload zsh/datetime 2>/dev/null
+
+    #: The reference time for "was it still working": the scope's first
+    #: sighting as blocked in this cycle, or now if this tick is that sighting.
+    #: Set by [agfi:h-agent-auto-continue-targets-fn] from inside the arm, or
+    #: by the skip in [agfi:h-agent-auto-continue-arm-group]; read afterwards.
+    local agent_auto_continue_blocked_seen=n
+    local agent_auto_continue_fn_scope="${scope}"
+    local ran_stamp
+    ran_stamp="$(h-agent-auto-continue-ran-stamp "${scope}")"
+    command rm -f -- "${ran_stamp}" 2>/dev/null || true
+    local ref
+    ref="$(h-agent-auto-continue-blocked-since "${scope}")" || ref="${EPOCHSECONDS}"
+
     #: Targets per group, space separated and sorted, in the form
     #: `agent_usage_arm_targets' takes. Only Claude Code has more than one
     #: group: sessions on different models are blocked by different weekly
@@ -718,6 +889,11 @@ registered session's target; cancels it when nothing is registered."
     for reg in "${regs[@]}" ; do
         f=( "${(@ps:\t:)reg}" )
         test -n "${f[4]}" || continue
+
+        if ! h-agent-auto-continue-eligible-p "${scope}" "${f[1]}" "${f[2]}" "${f[3]}" "${ref}" ; then
+            ecgray "$0: ${scope}: ${f[1]} ${f[2]} was not working when the limit hit, not resuming it"
+            continue
+        fi
 
         family=''
         if [[ "${agent}" == claude ]] ; then
@@ -762,6 +938,20 @@ registered session's target; cancels it when nothing is registered."
                 ;;
         esac
     done
+
+    #: Blocked: fix the reference time if this was the first sighting. Not
+    #: blocked, and we would know, having asked: the cycle is over, so the
+    #: reference and the hook's marks are cleared for the next one. With no
+    #: eligible target nothing was asked, and the state is left as it was.
+    if test -e "${ran_stamp}" ; then
+        agent_auto_continue_blocked_seen=y
+        command rm -f -- "${ran_stamp}" 2>/dev/null || true
+    fi
+    if bool "${agent_auto_continue_blocked_seen}" ; then
+        h-agent-auto-continue-blocked-now "${scope}"
+    elif (( ${#group_targets} )) ; then
+        h-agent-auto-continue-unblocked "${scope}"
+    fi
 }
 ##
 #: The hook
@@ -786,10 +976,16 @@ function agent-auto-continue-hook {
     input="$(h-agent-hook-payload "${3}")"
     test -n "${input}" || return 0
 
-    local id=''
+    #: `failed_p': whether this payload says the session's own turn ended on
+    #: an error, which is what marks it as blocked for
+    #: [agfi:h-agent-auto-continue-eligible-p]. Claude Code's StopFailure only
+    #: fires on one, and the hook line's matcher narrows it to `rate_limit';
+    #: Antigravity's Stop fires on every turn end and says why.
+    local id='' failed_p=n
     case "${agent}" in
         claude)
             id="$(ec "${input}" | jq -r '.session_id // empty' 2>/dev/null)"
+            failed_p=y
             ;;
         codex)
             #: A subagent's payload carries `agent_id'; its `session_id' is
@@ -798,6 +994,9 @@ function agent-auto-continue-hook {
             ;;
         agy)
             id="$(ec "${input}" | jq -r '.conversationId // empty' 2>/dev/null)"
+            if [[ "$(ec "${input}" | jq -r '.terminationReason // empty' 2>/dev/null)" == error ]] ; then
+                failed_p=y
+            fi
             ;;
     esac
     test -n "${id}" || return 0
@@ -809,6 +1008,10 @@ function agent-auto-continue-hook {
     (( ${#files} )) || return 0
 
     local scope="${files[1]:h:t}"
+
+    if bool "${failed_p}" ; then
+        command touch -- "$(h-agent-auto-continue-mark-file "${scope}" "${agent}" "${id}")" 2>/dev/null || true
+    fi
 
     #: Debounced per scope on a stamp file's mtime.
     zmodload zsh/datetime 2>/dev/null
