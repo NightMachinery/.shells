@@ -64,7 +64,7 @@ beside it so a disagreement between the two is something you can see.
 `agy-status` can arm the one-shot background job that the Claude Code and
 Codex notifiers use, the job that waits in a tmux session for a reset time and
 then either tells you or types `Continue.` into the sessions you picked;
-`docs/agent-usage-notif.md` covers the job itself, its idle gate, its knobs
+`docs/agent-usage-armed.md` covers the job itself, its idle gate, its knobs
 and how to cancel it. This section is what is Antigravity's: the deadline, and
 the delivery.
 
@@ -73,13 +73,13 @@ the delivery.
   (alias `agyt`) and `agy-status-continue-frontmost` (alias `agyfront`) print
   the report and arm a resume, named by how the text is delivered, like their
   Claude counterparts `cck`, `cct` and `ccfront`.
-- `h-agy-status-notif-schedule` arms without printing a report, for when the
+- `h-agy-status-arm-schedule` arms without printing a report, for when the
   report is already in front of you. The `h-` says the `-notify` forms are the
   intended way in, not that it is off limits.
-- `agy-status-notif-cancel` and `agy-status-notif-status` are wrappers over
-  the shared `h-agent-usage-notif-cancel` / `-status` for Antigravity's one
-  session, `agy-status-notif-schedule`. That session is also in
-  `agent-usage-notif-sessions`, so a call over that list sees it alongside the
+- `agy-status-armed-cancel` and `agy-status-armed-status` are wrappers over
+  the shared `h-agent-usage-armed-cancel` / `-status` for Antigravity's one
+  session, `agy-status-armed`. That session is also in
+  `agent-usage-armed-sessions`, so a call over that list sees it alongside the
   Claude, Codex and manual jobs.
 
 `agys` is the short alias for `agy-status` itself.
@@ -87,8 +87,8 @@ the delivery.
 ### The deadline
 
 A group counts as exhausted when what remains is at or below
-`100 - agy_status_notif_full_pct`. The knob is a *used* percentage, the same
-sense as `claude_code_usage_notif_full_pct`, and the complement is taken here
+`100 - agy_status_arm_full_pct`. The knob is a *used* percentage, the same
+sense as `claude_code_usage_arm_full_pct`, and the complement is taken here
 rather than exposing a remaining-percent knob, so that the two mean the same
 thing even though agy reports the other side of the fraction.
 

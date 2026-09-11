@@ -816,12 +816,12 @@ limits currently blocking that profile have reset, so you find out without
 having to keep re-running the report. The job itself — the tmux session it
 lives in, the polling, the grace, the idle gate, the delivery mechanisms and
 the log — is shared with the Codex notifier and documented once, in
-`docs/agent-usage-notif.md`. This section covers what is Claude's: where the
+`docs/agent-usage-armed.md`. This section covers what is Claude's: where the
 deadline comes from, and the entry points.
 
 This is **off by default** — checking your usage is not the same act as asking
 to be told about it. Every report command has a `-notify` twin that turns it on,
-or set `claude_code_usage_notif_p=y` on a plain one:
+or set `claude_code_usage_arm_p=y` on a plain one:
 
 - `claude-code-usage-notify` (alias `ccun`) — one profile, report plus
   schedule.
@@ -834,49 +834,48 @@ or set `claude_code_usage_notif_p=y` on a plain one:
 - `claude-code-usage-fable-notify` — the default profile's report, but
   scheduling the weekly **Fable** watcher rather than the profile one. Fable is
   not a profile, only an extra window on the default profile, so it cannot be
-  reached through `claude_code_usage_notif_p` and needs its own entry point. It
+  reached through `claude_code_usage_arm_p` and needs its own entry point. It
   gets its own tmux session and so can be scheduled alongside the profile
   watcher instead of replacing it.
 
 Managing what is scheduled:
 
-- `claude-code-usage-notif-cancel [session...]` — cancels, defaulting to all
+- `claude-code-usage-armed-cancel [session...]` — cancels, defaulting to all
   of Claude's.
-- `claude-code-usage-notif-status` — what is scheduled, for when, and with
+- `claude-code-usage-armed-status` — what is scheduled, for when, and with
   which action and targets.
 
-Both are thin wrappers over the shared `h-agent-usage-notif-cancel` and
-`-status`, handed `claude-code-usage-notif-sessions`, the list of every tmux
-session a Claude notifier can live in.
+Both are thin wrappers over the shared `h-agent-usage-armed-cancel` and
+`-status`, handed `claude-code-usage-armed-sessions`, the list of every tmux
+session a Claude armed job can live in.
 
 To schedule without printing a report, call
-`h-claude-code-usage-notif-schedule`, `h-claude-code-usage-work-notif-schedule`
-or `h-claude-code-usage-fable-notif-schedule` directly. They carry the `h-`
+`h-claude-code-usage-arm-schedule`, `h-claude-code-usage-work-arm-schedule`
+or `h-claude-code-usage-fable-arm-schedule` directly. They carry the `h-`
 prefix because the `-notify` reports are the intended way in, not because they
 are off limits — reach for one when you already have a report in front of you.
 
-Each scheduled notifier lives in a tmux session named after the scheduling
-function minus the `h-`: `claude-code-usage-<profile>-notif-schedule`, plus
-`claude-code-usage-fable-notif-schedule`. So what `tmux ls` shows and the
-function you called line up, and the name doubles as the lock that keeps one
-job per profile.
+Each armed job lives in a tmux session named for the profile it watches:
+`claude-code-usage-<profile>-armed`, plus `claude-code-usage-fable-armed`.
+So `tmux ls` says which profile is waiting on what, and the name doubles as
+the lock that keeps one job per profile.
 
 ### Where the deadline comes from
 
-`h-claude-code-usage-notif` fetches the profile's report as JSON and reduces
+`h-claude-code-usage-arm` fetches the profile's report as JSON and reduces
 its windows to one deadline. A window counts as blocking at or above
-`claude_code_usage_notif_full_pct`. The deadline is the **latest** reset among
+`claude_code_usage_arm_full_pct`. The deadline is the **latest** reset among
 the blocked windows, because a 5-hour rollover buys nothing while the weekly
 limit is still spent. A window the profile does not have at all — a team seat
 has no weekly window — is skipped. The result goes to
-`h-agent-usage-notif-arm`, which adds the grace and does the rest.
+`h-agent-usage-arm`, which adds the grace and does the rest.
 
 When nothing is blocking, arming is skipped with a note; running it under
 `deus` arms for the next 5-hour rollover anyway, which is how to exercise the
 whole mechanism without having to be rate-limited first.
 
-`claude_code_usage_notif_p=n` inside the fetch is the recursion guard, and
-load-bearing: the report arms the notifier and the notifier reads the report.
+`claude_code_usage_arm_p=n` inside the fetch is the recursion guard, and
+load-bearing: the report arms the job and the job reads the report.
 
 ### Resuming instead of announcing
 
@@ -896,11 +895,11 @@ Each has `-default-` and `-work-` forms naming the profile explicitly —
 `claude-code-usage-default-continue-tmux-fz`, and so on — with aliases in the
 `cck-default`, `cct-work` shape, matching `ccu-default`. The bare forms follow
 the current profile, like `ccu` itself. Under the hood they set
-`agent_usage_notif_action=continue` and `agent_usage_continue_via` on the
+`agent_usage_arm_action=continue` and `agent_usage_continue_via` on the
 matching `-notify` report and nothing else.
 
 `h-claude-code-usage-continue-schedule [profile]` arms without printing a
-report, matching the `h-…-notif-schedule` escape hatches above; it reads
+report, matching the `h-…-arm-schedule` escape hatches above; it reads
 `agent_usage_continue_via` from the environment rather than having a hatch
 per mechanism.
 
@@ -911,7 +910,7 @@ just running the two commands.
 It is one job per profile: a resume reuses the profile's tmux session, so
 arming one *replaces* a plain notifier for that profile, and the reverse also
 holds — last arm wins, and exactly one thing happens per reset.
-`claude-code-usage-notif-status` prints the pending action and targets
+`claude-code-usage-armed-status` prints the pending action and targets
 alongside the deadline, for example `[action: continue -> tmux:%3]`, so a
 downgrade from resume back to notify, or the other way around, is visible
 rather than silent.
@@ -925,7 +924,7 @@ the one waiting may be a Codex thread told to hold off until Claude is usable
 again, or an Antigravity tab. A Codex row is turned into a queue target rather
 than a window in either picker. The targets, the delivery per kind, the idle
 gate that keeps the job from typing while you are at the keyboard, and the
-knobs are all in `docs/agent-usage-notif.md`; the one caveat worth repeating
+knobs are all in `docs/agent-usage-armed.md`; the one caveat worth repeating
 here is that the job trusts `resets_at` and does not re-check usage when it
 fires.
 

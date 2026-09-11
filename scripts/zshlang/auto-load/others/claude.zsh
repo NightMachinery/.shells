@@ -674,7 +674,7 @@ function claude-code-usage {
     #: See =docs/claude_code_usage.md=.
     ##
     local profile="${claude_code_usage_profile:-default}"
-    local notif_p="${claude_code_usage_notif_p:-n}"
+    local arm_p="${claude_code_usage_arm_p:-n}"
 
     ensure-cmd claude_code_usage.py @RET
     h-claude-code-profile-assert "${profile}" @RET
@@ -694,14 +694,14 @@ function claude-code-usage {
     local retcode=0
     h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
 
-    if (( retcode == 0 )) && bool "${notif_p}" ; then
+    if (( retcode == 0 )) && bool "${arm_p}" ; then
         #: After the report, so the human output is not held up and the
-        #: notifier reads the cache this call has just written.
+        #: armed job reads the cache this call has just written.
         #:
         #: =>&2= because our stdout may be a JSON document that a caller is
         #: about to parse; and never fatal, since a failed arm must not make a
         #: working usage report look broken.
-        h-claude-code-usage-notif-for-profile "${profile}" >&2 || true
+        h-claude-code-usage-arm-for-profile "${profile}" >&2 || true
     fi
 
     return "${retcode}"
@@ -709,9 +709,9 @@ function claude-code-usage {
 
 #: Arming is off by default -- checking usage should not be the same act as
 #: asking to be told about it -- so each report has a =-notify= twin that turns
-#: it on. Do not confuse these with the =-notif= functions further down, which
+#: it on. Do not confuse these with the =-arm= functions further down, which
 #: only arm and print no report.
-aliasfnq claude-code-usage-notify claude_code_usage_notif_p=y claude-code-usage
+aliasfnq claude-code-usage-notify claude_code_usage_arm_p=y claude-code-usage
 aliasfn ccun claude-code-usage-notify
 
 #: An explicit name for the profile [agfi:claude-code-usage] already reports by
@@ -723,7 +723,7 @@ aliasfn claude-code-status-default claude-code-usage-default
 alias ccu-default='claude-code-usage-default'
 alias ccs-default='claude-code-usage-default'
 
-aliasfnq claude-code-usage-default-notify claude_code_usage_notif_p=y claude-code-usage-default
+aliasfnq claude-code-usage-default-notify claude_code_usage_arm_p=y claude-code-usage-default
 alias ccu-default-notify='claude-code-usage-default-notify'
 alias ccs-default-notify='claude-code-usage-default-notify'
 
@@ -734,7 +734,7 @@ aliasfn claude-code-status-work claude-code-usage-work
 alias ccu-work='claude-code-usage-work'
 alias ccs-work='claude-code-usage-work'
 
-aliasfnq claude-code-usage-work-notify claude_code_usage_notif_p=y claude-code-usage-work
+aliasfnq claude-code-usage-work-notify claude_code_usage_arm_p=y claude-code-usage-work
 alias ccu-work-notify='claude-code-usage-work-notify'
 alias ccs-work-notify='claude-code-usage-work-notify'
 
@@ -751,7 +751,7 @@ function claude-code-usage-all {
     local profiles=("${claude_code_profile_order[@]}")
     assert-args profiles @RET
 
-    local notif_p="${claude_code_usage_notif_p:-n}"
+    local arm_p="${claude_code_usage_arm_p:-n}"
 
     ensure-cmd claude_code_usage.py @RET
 
@@ -771,16 +771,16 @@ function claude-code-usage-all {
     local retcode=0
     h-claude-code-usage-run "${script_args[@]}" "$@" || retcode=$?
 
-    if bool "${notif_p}" ; then
+    if bool "${arm_p}" ; then
         #: Not gated on the exit status, unlike the single-profile case: with
         #: several profiles a nonzero status only means *one* of them failed,
-        #: and the rest still deserve their notifier.
+        #: and the rest still deserve their armed job.
         #:
         #: =>&2= because our stdout may be a JSON document a caller is about to
         #: parse; non-fatal because a failed arm must not make a working report
         #: look broken.
         for p in "${profiles[@]}" ; do
-            h-claude-code-usage-notif-for-profile "${p}" >&2 || true
+            h-claude-code-usage-arm-for-profile "${p}" >&2 || true
         done
     fi
 
@@ -790,19 +790,19 @@ aliasfn claude-code-status claude-code-usage-all
 alias ccu='claude-code-usage-all'
 alias ccs='claude-code-usage-all'
 
-aliasfnq claude-code-usage-all-notify claude_code_usage_notif_p=y claude-code-usage-all
+aliasfnq claude-code-usage-all-notify claude_code_usage_arm_p=y claude-code-usage-all
 #: The bare short names mean every profile, so their =-notify= twins do too.
 aliasfn claude-code-status-notify claude-code-usage-all-notify
 alias ccu-notify='claude-code-usage-all-notify'
 alias ccs-notify='claude-code-usage-all-notify'
 ##
 #: Utilization at or above which a window counts as blocking us. The only knob
-#: of the notifier that is Claude Code's own: everything about waiting the
+#: of the armed job that is Claude Code's own: everything about waiting the
 #: reset out and resuming afterwards is agent-neutral and lives in
-#: =agent-usage.zsh= under `agent_usage_*'. See =docs/agent-usage-notif.md=.
-typeset -g claude_code_usage_notif_full_pct="${claude_code_usage_notif_full_pct:-100}"
+#: =agent-usage.zsh= under `agent_usage_*'. See =docs/agent-usage-armed.md=.
+typeset -g claude_code_usage_arm_full_pct="${claude_code_usage_arm_full_pct:-100}"
 
-function h-claude-code-usage-notif-window {
+function h-claude-code-usage-arm-window {
     #: Prints "<percent>\t<resets_at_epoch>\t<label>" for one window of a
     #: =claude-code-usage --json= payload, and fails when that window is
     #: absent -- a team seat, for one, has no weekly window at all.
@@ -850,31 +850,31 @@ function h-claude-code-usage-notif-window {
             | @tsv"
 }
 
-function h-claude-code-usage-notif-session {
-    #: The tmux session a profile's notifier lives in, named after the
-    #: scheduling function minus the =h-= so that `tmux ls` and the function
-    #: you called line up. Uniform across profiles, the default one included.
+function h-claude-code-usage-arm-session {
+    #: The tmux session a profile's armed job lives in. Uniform across
+    #: profiles, the default one included, and a function rather than a
+    #: literal so the name lives in one place.
     local profile="${1}"
     assert-args profile @RET
 
-    ec "claude-code-usage-${profile}-notif-schedule"
+    ec "claude-code-usage-${profile}-armed"
 }
 
-function h-claude-code-usage-notif {
+function h-claude-code-usage-arm {
     #: Arms, or re-arms, a one-shot notification for when the limits that
     #: currently block us have reset.
     #:
     #: $1 is the tmux session to live in, $2 the profile to read, and the rest
     #: the roles this variant cares about (see
-    #: [agfi:h-claude-code-usage-notif-window]).
+    #: [agfi:h-claude-code-usage-arm-window]).
     #:
     #: Only the *when* and the *what to say* are worked out here. Waiting the
     #: reset out, deciding whether resuming is safe and delivering the resume
     #: text are agent-neutral, and belong to
-    #: [agfi:h-agent-usage-notif-arm] -- grace, the picker, the tmux job and
-    #: its bookkeeping included. See =docs/agent-usage-notif.md=.
+    #: [agfi:h-agent-usage-arm] -- grace, the picker, the tmux job and
+    #: its bookkeeping included. See =docs/agent-usage-armed.md=.
     ##
-    local full_pct="${claude_code_usage_notif_full_pct:-100}"
+    local full_pct="${claude_code_usage_arm_full_pct:-100}"
 
     local session="${1}" profile="${2}"
     assert-args session profile @RET
@@ -883,15 +883,15 @@ function h-claude-code-usage-notif {
 
     ensure-cmd jq @RET
 
-    #: =claude_code_usage_notif_p=n= is the recursion guard, and load-bearing:
-    #: the report arms the notifier and the notifier reads the report.
+    #: =claude_code_usage_arm_p=n= is the recursion guard, and load-bearing:
+    #: the report arms the job and the job reads the report.
     local json
-    json="$(claude_code_usage_notif_p=n claude_code_usage_json_p=y claude_code_usage_profile="${profile}" claude-code-usage)" @RET
+    json="$(claude_code_usage_arm_p=n claude_code_usage_json_p=y claude_code_usage_profile="${profile}" claude-code-usage)" @RET
 
     local blocked_labels=() role out pct resets label
     integer blocked_at=0
     for role in "${roles[@]}" ; do
-        if ! out="$(h-claude-code-usage-notif-window "${json}" "${role}")" ; then
+        if ! out="$(h-claude-code-usage-arm-window "${json}" "${role}")" ; then
             ecgray "$0: ${profile}: no ${role} window, skipping"
             continue
         fi
@@ -922,7 +922,7 @@ function h-claude-code-usage-notif {
 
         #: deus: arm for the next 5h rollover anyway, so the mechanism can be
         #: exercised without having to be rate-limited first.
-        out="$(h-claude-code-usage-notif-window "${json}" session)" @RET
+        out="$(h-claude-code-usage-arm-window "${json}" session)" @RET
         reset_at=${${${out#*$'\t'}%%$'\t'*}%.*}
         msg="Claude Code (${profile}): ${out##*$'\t'} window rolled over"
     else
@@ -941,37 +941,37 @@ function h-claude-code-usage-notif {
     #: [agfi:h-agent-usage-continue-targets-kitty-fz].
     local agent_usage_continue_profile="${profile}"
 
-    h-agent-usage-notif-arm "${session}" "${reset_at}" "${msg}"
+    h-agent-usage-arm "${session}" "${reset_at}" "${msg}"
 }
 
-function h-claude-code-usage-notif-for-profile {
+function h-claude-code-usage-arm-for-profile {
     local profile="${1}"
     assert-args profile @RET
 
     local session
-    session="$(h-claude-code-usage-notif-session "${profile}")" @RET
+    session="$(h-claude-code-usage-arm-session "${profile}")" @RET
 
-    h-claude-code-usage-notif "${session}" "${profile}" session weekly_all
+    h-claude-code-usage-arm "${session}" "${profile}" session weekly_all
 }
 
-#: Scheduling entry points. These schedule a notifier and print no report,
+#: Scheduling entry points. These arm the job and print no report,
 #: which is not the intended way in -- the =-notify= reports are -- so they are
 #: =h-=. They stay callable as an escape hatch for when you already have a
 #: report in front of you.
-function h-claude-code-usage-notif-schedule {
-    h-claude-code-usage-notif-for-profile default
+function h-claude-code-usage-arm-schedule {
+    h-claude-code-usage-arm-for-profile default
 }
 
-function h-claude-code-usage-work-notif-schedule {
-    h-claude-code-usage-notif-for-profile work
+function h-claude-code-usage-work-arm-schedule {
+    h-claude-code-usage-arm-for-profile work
 }
 
-function h-claude-code-usage-fable-notif-schedule {
+function h-claude-code-usage-fable-arm-schedule {
     #: The weekly Fable window as well as the windows that block everything.
     #: Its own tmux session, so it can be scheduled alongside the default
-    #: profile's notifier rather than replacing it.
+    #: profile's armed job rather than replacing it.
     ##
-    h-claude-code-usage-notif 'claude-code-usage-fable-notif-schedule' default \
+    h-claude-code-usage-arm 'claude-code-usage-fable-armed' default \
         session weekly_all 'weekly:Fable'
 }
 
@@ -979,16 +979,16 @@ function claude-code-usage-fable-notify {
     #: The default profile's report, then schedules the *Fable* watcher rather
     #: than the profile one. Fable is not a profile -- it is an extra window on
     #: the default profile -- so it cannot be reached by setting
-    #: =claude_code_usage_notif_p=, and needs its own entry point.
+    #: =claude_code_usage_arm_p=, and needs its own entry point.
     ##
     local retcode=0
-    claude_code_usage_notif_p=n claude-code-usage "$@" || retcode=$?
+    claude_code_usage_arm_p=n claude-code-usage "$@" || retcode=$?
 
     if (( retcode == 0 )) ; then
         #: =>&2= because our stdout may be a JSON document a caller is about to
         #: parse; non-fatal because a failed schedule must not make a working
         #: report look broken.
-        h-claude-code-usage-fable-notif-schedule >&2 || true
+        h-claude-code-usage-fable-arm-schedule >&2 || true
     fi
 
     return "${retcode}"
@@ -1024,8 +1024,8 @@ function claude-code-usage-fable-notify {
             #: names the mechanism: `-continue-tmux-fz' arms
             #: `agent_usage_continue_via=tmux'.
             aliasfnq "${name}" \
-                claude_code_usage_notif_p=y \
-                agent_usage_notif_action=continue \
+                claude_code_usage_arm_p=y \
+                agent_usage_arm_action=continue \
                 agent_usage_continue_via="${via%-fz}" \
                 "${base}"
         done
@@ -1047,47 +1047,47 @@ aliasfn ccfront-work claude-code-usage-work-continue-frontmost
 
 function h-claude-code-usage-continue-schedule {
     #: Arming a resume without printing a report, matching the
-    #: =h-...-notif-schedule= escape hatches above. One hatch for all three
+    #: =h-...-arm-schedule= escape hatches above. One hatch for all three
     #: mechanisms, since `agent_usage_continue_via' already names them and a
     #: function per mechanism would say nothing the knob does not.
     #: Usage: h-claude-code-usage-continue-schedule [profile]
     ##
     local profile="${1:-default}"
 
-    agent_usage_notif_action=continue h-claude-code-usage-notif-for-profile "${profile}"
+    agent_usage_arm_action=continue h-claude-code-usage-arm-for-profile "${profile}"
 }
 ##
-function claude-code-usage-notif-sessions {
-    #: Every tmux session a notifier can live in, one per line.
+function claude-code-usage-armed-sessions {
+    #: Every tmux session an armed job can live in, one per line.
     local profile out=()
     for profile in "${claude_code_profile_order[@]}" ; do
-        out+=("$(h-claude-code-usage-notif-session "${profile}")")
+        out+=("$(h-claude-code-usage-arm-session "${profile}")")
     done
-    out+=('claude-code-usage-fable-notif-schedule')
+    out+=('claude-code-usage-fable-armed')
 
     ec "${(F)out}"
 }
 
 #: Cancelling and reporting are the same act whatever armed the job, so both
-#: are [agfi:h-agent-usage-notif-cancel] and [agfi:h-agent-usage-notif-status]
+#: are [agfi:h-agent-usage-armed-cancel] and [agfi:h-agent-usage-armed-status]
 #: over the sessions this profile family owns. Named arguments still narrow it
 #: to one session.
-function claude-code-usage-notif-cancel {
+function claude-code-usage-armed-cancel {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(claude-code-usage-notif-sessions)}")
+        sessions=("${(@f)$(claude-code-usage-armed-sessions)}")
     fi
 
-    h-agent-usage-notif-cancel "${sessions[@]}"
+    h-agent-usage-armed-cancel "${sessions[@]}"
 }
 
-function claude-code-usage-notif-status {
+function claude-code-usage-armed-status {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(claude-code-usage-notif-sessions)}")
+        sessions=("${(@f)$(claude-code-usage-armed-sessions)}")
     fi
 
-    h-agent-usage-notif-status "${sessions[@]}"
+    h-agent-usage-armed-status "${sessions[@]}"
 }
 ##
 function claude-work {

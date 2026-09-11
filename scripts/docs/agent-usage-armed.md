@@ -1,9 +1,9 @@
 # Resuming an agent when its usage limit resets
 
 `zshlang/auto-load/others/agent-usage.zsh` is the half of the rate-limit
-notifier that does not care which agent hit the limit: a one-shot background
-job that waits for a reset time, then either tells you or types `Continue.`
-into the sessions you picked when you armed it. What it does *not* know is
+handling that does not care which agent hit the limit: a one-shot background
+job, armed for the reset, that waits for the time to come and then either
+tells you or types `Continue.` into the sessions you picked when you armed it. What it does *not* know is
 where the reset time comes from. Each agent supplies that and hands the
 deadline over:
 
@@ -21,7 +21,7 @@ deadline over:
 That list is where the per-agent deadline sources are enumerated; the linked
 docs say how each one is read and reduced to a single time.
 
-The shared entry is `h-agent-usage-notif-arm <session> <reset-epoch> <msg>`.
+The shared entry is `h-agent-usage-arm <session> <reset-epoch> <msg>`.
 Everything below is what happens once it has been called.
 
 ## Arming
@@ -34,8 +34,8 @@ job rather than stacking a second one, and exactly one thing happens per
 reset. No marker file, redis key or pidfile is needed, and the bookkeeping
 cannot drift from whether the job exists: the deadline, the action and the
 targets are recorded as options on the session itself,
-`@agent_usage_notif_deadline`, `@agent_usage_notif_action` and
-`@agent_usage_notif_targets`, and vanish with it. The autoname hooks are
+`@agent_usage_arm_deadline`, `@agent_usage_arm_action` and
+`@agent_usage_arm_targets`, and vanish with it. The autoname hooks are
 switched off on that session, because the name is how the job is found and
 re-armed, and the agent it resumes must not rename it out from under the next
 arm.
@@ -46,7 +46,7 @@ silently disarm anything. A reboot does, and the next report re-arms.
 Arming adds the grace period to the reset time and refuses a deadline that is
 already past, which is what stale usage data looks like. The target picker runs
 only once the job is actually going to be armed, so a report that changes
-nothing never puts a picker in your way; presetting `agent_usage_notif_targets`
+nothing never puts a picker in your way; presetting `agent_usage_arm_targets`
 (space separated, `kitty:95 tmux:%3 frontmost`) skips the picker altogether,
 which is what makes the whole thing callable from a script or a test.
 
@@ -58,14 +58,14 @@ cancel, clears it.
 
 ## Waiting
 
-The job polls the wall clock every `agent_usage_notif_poll_s` seconds instead
+The job polls the wall clock every `agent_usage_arm_poll_s` seconds instead
 of issuing one long `sleep`. A suspend skews a single five-hour sleep by however
 long the lid was closed; a poll notices on wake that the deadline has passed
 and fires at once.
 
 It fires a little after the reset rather than on it, so the endpoint has
 actually flipped by the time the job claims it has. The margin is
-`agent_usage_notif_grace_s` when the action is a notification and
+`agent_usage_arm_grace_s` when the action is a notification and
 `agent_usage_continue_grace_s` when it is a resume, and the second is
 deliberately the longer of the two: an early notification is harmless, an
 early resume is spent on a session that is still blocked. The manual
@@ -78,7 +78,7 @@ repeat replaces the previous one instead of piling up in Notification Center;
 
 ## What it does when it fires
 
-`agent_usage_notif_action` is `notif`, a notification saying which limits
+`agent_usage_arm_action` is `notif`, a notification saying which limits
 reset, or `continue`, which additionally types `agent_usage_continue_text`
 into each recorded target and then notifies with what it managed to reach.
 
@@ -177,11 +177,11 @@ Hammerspoon exits 0 whether or not the Lua found anything; a non-number means
 All are `typeset -g` in `agent-usage.zsh`, which is the one place their
 defaults live.
 
-- `agent_usage_notif_action` -- `notif` or `continue`.
+- `agent_usage_arm_action` -- `notif` or `continue`.
 - `agent_usage_continue_via` -- `kitty`, `tmux` or `frontmost`; which picker
   runs at arm time and, for `frontmost`, that none does.
-- `agent_usage_notif_poll_s` -- how often the waiting job re-reads the clock.
-- `agent_usage_notif_grace_s` -- how long after the reset a notification
+- `agent_usage_arm_poll_s` -- how often the waiting job re-reads the clock.
+- `agent_usage_arm_grace_s` -- how long after the reset a notification
   fires.
 - `agent_usage_continue_grace_s` -- the same for a resume; keep it the longer
   of the two.
@@ -189,12 +189,12 @@ defaults live.
   untouched before typing is allowed.
 - `agent_usage_continue_text` -- what gets typed; the newline that submits it
   is added per mechanism.
-- `agent_usage_notif_targets` -- preset targets, skipping the picker.
-- `agent_usage_notif_log` -- where fires are logged.
+- `agent_usage_arm_targets` -- preset targets, skipping the picker.
+- `agent_usage_arm_log` -- where fires are logged.
 
 ## The log
 
-Every fire appends one line to `agent_usage_notif_log`: which session fired,
+Every fire appends one line to `agent_usage_arm_log`: which session fired,
 which targets it tried, whether it typed or declined, and why. The dead tmux
 pane a fired job leaves behind says the same thing, but only until the next
 reboot, and a job that types into your sessions while you are away should stay
@@ -202,9 +202,9 @@ answerable for it afterwards.
 
 ## Cancel and status
 
-`h-agent-usage-notif-cancel <session…>` kills the named jobs, reaping the
+`h-agent-usage-armed-cancel <session…>` kills the named jobs, reaping the
 already-fired ones too, since clearing those out is what someone running a
-cancel actually wants. `h-agent-usage-notif-status <session…>` prints, per
+cancel actually wants. `h-agent-usage-armed-status <session…>` prints, per
 session, whether it is armed, for when and how long from now, and the pending
 action and targets, for example `[action: continue -> tmux:%3 codex:0199…]`.
 The action is shown because arming a resume replaces a plain notifier in the
@@ -212,9 +212,9 @@ same session and the reverse, and a downgrade should be visible rather than
 silent.
 
 Each agent wraps these with its own session list --
-`claude-code-usage-notif-cancel` / `-status`, `codex-status-notif-cancel` /
-`-status`, `agy-status-notif-cancel` / `-status` -- and
-`agent-usage-notif-sessions` prints every session any of them can live in,
+`claude-code-usage-armed-cancel` / `-status`, `codex-status-armed-cancel` /
+`-status`, `agy-status-armed-cancel` / `-status` -- and
+`agent-usage-armed-sessions` prints every session any of them can live in,
 Claude's, Codex's, Antigravity's and the manual one, so a single call over
 that list sees them all.
 
@@ -223,7 +223,7 @@ that list sees them all.
 `agent-usage-continue-at <when>` arms a resume for a time you give in natural
 language -- `2h`, `tomorrow 9am`, `in 45 minutes` -- parsed by `datenat-unix`.
 A phrase that resolves to the past is refused, but by the arm rather than the
-parser: `h-agent-usage-notif-arm` rejects any deadline that has already gone,
+parser: `h-agent-usage-arm` rejects any deadline that has already gone,
 whoever computed it. The parser's own future-only mode is deliberately not
 used, because it rounds down to midnight before it checks and so would refuse
 `in 45 minutes` on any day that still has one. No grace is added, because you
@@ -235,7 +235,7 @@ is wrong, or you know something it does not, this is how to override it. It
 lives in its own session,
 `agent-usage-continue-at`, so it coexists with the Claude and Codex jobs
 instead of replacing one, and shows up in their status through
-`agent-usage-notif-sessions`.
+`agent-usage-armed-sessions`.
 
 `agent-usage-continue-at-tmux-fz`, `agent-usage-continue-at-kitty-fz` and
 `agent-usage-continue-at-frontmost` are presets over

@@ -13,19 +13,19 @@
 #: Everything after "when does it reset" -- arming the job, waiting the clock
 #: out, deciding whether resuming is safe, delivering the resume text -- is
 #: agent-neutral and lives in =agent-usage.zsh=. See =docs/agy_status.md= and
-#: =docs/agent-usage-notif.md=.
+#: =docs/agent-usage-armed.md=.
 ##
 #: How long =agy -p= gets before we give up on it.
 typeset -g agy_status_timeout_s="${agy_status_timeout_s:-60}"
 #: Emit the report as a JSON array instead of prose, for a caller that parses
-#: it ([agfi:h-agy-status-notif-deadline] is one).
+#: it ([agfi:h-agy-status-arm-deadline] is one).
 typeset -g agy_status_json_p="${agy_status_json_p:-n}"
 #: Also show the pay-as-you-go credit balance, which is a second `agy' start-up
 #: and hence off by default.
 typeset -g agy_status_credits_p="${agy_status_credits_p:-n}"
 #: Utilization at or above which a model group counts as blocking us. The only
-#: knob of the notifier that is Antigravity's own.
-typeset -g agy_status_notif_full_pct="${agy_status_notif_full_pct:-100}"
+#: knob of the armed job that is Antigravity's own.
+typeset -g agy_status_arm_full_pct="${agy_status_arm_full_pct:-100}"
 #: Colour of the prose report: =auto= is "colour iff our stdout is a terminal",
 #: resolved by [agfi:h-color-mode-p]. An enum rather than a switch,
 #: because a caller that has already decided has to be able to say so:
@@ -237,7 +237,7 @@ function agy-status {
         fi
 
         #: Presentation only, so deliberately not knobs: nothing branches on
-        #: these but the escape codes, and [agfi:agy_status_notif_full_pct] is
+        #: these but the escape codes, and [agfi:agy_status_arm_full_pct] is
         #: the one threshold that actually decides anything.
         if (( f[3] <= 10 )) ; then
             c_pct="${pct_colors[low]}"
@@ -258,15 +258,15 @@ aliasfn agys agy-status
 ##
 #: Waiting the quota out
 ##
-function h-agy-status-notif-deadline {
+function h-agy-status-arm-deadline {
     #: Prints "<reset-epoch>\t<msg>" for the reset worth waiting on, or
     #: nothing at all when there is nothing to wait for.
     #:
-    #: Split out from [agfi:h-agy-status-notif] because it is the only part
+    #: Split out from [agfi:h-agy-status-arm] because it is the only part
     #: with a decision in it, and the only part that can be exercised without
     #: arming a real job.
     ##
-    local full_pct="${agy_status_notif_full_pct:-100}"
+    local full_pct="${agy_status_arm_full_pct:-100}"
 
     ensure-cmd jq @RET
 
@@ -308,7 +308,7 @@ function h-agy-status-notif-deadline {
         "Antigravity: ${out#*$'\t'} quota window rolled over"
 }
 
-function h-agy-status-notif {
+function h-agy-status-arm {
     #: Arms, or re-arms, a one-shot job for when Antigravity's quota comes
     #: back. $1 is the tmux session it lives in.
     ##
@@ -316,7 +316,7 @@ function h-agy-status-notif {
     assert-args session @RET
 
     local out
-    out="$(h-agy-status-notif-deadline)" @TRET
+    out="$(h-agy-status-arm-deadline)" @TRET
     #: Nothing to wait for; the reason was already said on stderr.
     test -n "${out}" || return 0
 
@@ -327,16 +327,15 @@ function h-agy-status-notif {
     #: exported.
     local agent_session_agents=agy
 
-    h-agent-usage-notif-arm "${session}" "${out%%$'\t'*}" "${out#*$'\t'}"
+    h-agent-usage-arm "${session}" "${out%%$'\t'*}" "${out#*$'\t'}"
 }
 
-function h-agy-status-notif-schedule {
+function h-agy-status-arm-schedule {
     #: Arms without printing a report, matching Claude Code's
-    #: =h-...-notif-schedule= escape hatch. The tmux session is named after
-    #: this function minus the =h-=, so that `tmux ls` and the function you
-    #: called line up.
+    #: =h-...-arm-schedule= escape hatch. The tmux session it lives in is
+    #: named once, here and in [agfi:agy-status-armed-sessions].
     ##
-    h-agy-status-notif 'agy-status-notif-schedule'
+    h-agy-status-arm 'agy-status-armed'
 }
 
 function agy-status-notify {
@@ -350,7 +349,7 @@ function agy-status-notify {
         #: =>&2= because our stdout may be a JSON document a caller is about
         #: to parse; non-fatal because a failed schedule must not make a
         #: working report look broken.
-        h-agy-status-notif-schedule >&2 || true
+        h-agy-status-arm-schedule >&2 || true
     fi
 
     return "${retcode}"
@@ -361,52 +360,52 @@ function agy-status-notify {
 #: [agfi:h-agent-usage-continue-targets].
 ##
 aliasfnq agy-status-continue-kitty-fz \
-    agent_usage_notif_action=continue agent_usage_continue_via=kitty \
+    agent_usage_arm_action=continue agent_usage_continue_via=kitty \
     agy-status-notify
 
 aliasfnq agy-status-continue-tmux-fz \
-    agent_usage_notif_action=continue agent_usage_continue_via=tmux \
+    agent_usage_arm_action=continue agent_usage_continue_via=tmux \
     agy-status-notify
 
 aliasfnq agy-status-continue-frontmost \
-    agent_usage_notif_action=continue agent_usage_continue_via=frontmost \
+    agent_usage_arm_action=continue agent_usage_continue_via=frontmost \
     agy-status-notify
 
 aliasfn agyk agy-status-continue-kitty-fz
 aliasfn agyt agy-status-continue-tmux-fz
 aliasfn agyfront agy-status-continue-frontmost
 ##
-function agy-status-notif-sessions {
-    #: Every tmux session an Antigravity notifier can live in, one per line.
+function agy-status-armed-sessions {
+    #: Every tmux session an Antigravity armed job can live in, one per line.
     #: One today; a function anyway, so the cancel/status wrappers below ask
     #: rather than each spelling the name out.
     #:
-    #: [agfi:agent-usage-notif-sessions] calls this when it is defined and
+    #: [agfi:agent-usage-armed-sessions] calls this when it is defined and
     #: skips it otherwise, so the name lives here only and a renamed session
     #: needs changing in one place.
     ##
-    ec 'agy-status-notif-schedule'
+    ec 'agy-status-armed'
 }
 
 #: Cancelling and reporting are the same act whatever armed the job, so both
-#: are [agfi:h-agent-usage-notif-cancel] and [agfi:h-agent-usage-notif-status]
+#: are [agfi:h-agent-usage-armed-cancel] and [agfi:h-agent-usage-armed-status]
 #: over the sessions this family owns. Named arguments still narrow it to one
 #: session.
-function agy-status-notif-cancel {
+function agy-status-armed-cancel {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(agy-status-notif-sessions)}")
+        sessions=("${(@f)$(agy-status-armed-sessions)}")
     fi
 
-    h-agent-usage-notif-cancel "${sessions[@]}"
+    h-agent-usage-armed-cancel "${sessions[@]}"
 }
 
-function agy-status-notif-status {
+function agy-status-armed-status {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(agy-status-notif-sessions)}")
+        sessions=("${(@f)$(agy-status-armed-sessions)}")
     fi
 
-    h-agent-usage-notif-status "${sessions[@]}"
+    h-agent-usage-armed-status "${sessions[@]}"
 }
 ##

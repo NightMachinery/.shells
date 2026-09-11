@@ -1348,7 +1348,7 @@ function agent-view-sessions {
     #:
     #: A prefix scan, the way [agfi:caffeinate-holders] does it, rather than
     #: regenerating a list of known names the way
-    #: [agfi:claude-code-usage-notif-sessions] can: the hotkey's keys are
+    #: [agfi:claude-code-usage-armed-sessions] can: the hotkey's keys are
     #: bounded by the number of kitty windows, but a picker's are one per
     #: transcript, so there is no finite set of names to reconstruct.
     #:
@@ -1504,7 +1504,7 @@ function h-agent-view-launch {
     #: still running, and `tmux-session-processes-kill' takes the whole process
     #: tree down. The session name is the lock, the handle and the cancel
     #: target at once -- no marker, pid file or redis key -- exactly as the
-    #: usage notifier arms itself ([agfi:h-claude-code-usage-notif]).
+    #: usage notifier arms itself ([agfi:h-claude-code-usage-arm]).
     #:
     #: Two things are done here, in the foreground, so a cancel never has to
     #: kill them: the renderer's build check (a first use compiles Go) and the

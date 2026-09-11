@@ -99,7 +99,7 @@ the checked auth blocks and average usage.
 ## Reset notifications
 
 `codex-status` can also arm a one-shot background job for when the rate limit
-resets, the same job the Claude Code notifier uses; `docs/agent-usage-notif.md`
+resets, the same job the Claude Code notifier uses; `docs/agent-usage-armed.md`
 covers the job itself, its idle gate, its knobs and how to cancel it. This
 section is what is Codex's: the deadline, and the delivery.
 
@@ -107,12 +107,12 @@ section is what is Codex's: the deadline, and the delivery.
 - `codex-status-continue-fz` prints the report and arms a resume: an fzf
   picker over every live Codex thread, multi-select, and at reset time the
   job queues `Continue.` into each one you chose.
-- `h-codex-status-notif-schedule` arms without printing a report, for when
+- `h-codex-status-arm-schedule` arms without printing a report, for when
   the report is already in front of you. The `h-` says the `-notify` forms are
   the intended way in, not that it is off limits.
-- `codex-status-notif-cancel` and `codex-status-notif-status` are wrappers
-  over the shared `h-agent-usage-notif-cancel` / `-status` for Codex's one
-  session, `codex-status-notif-schedule`.
+- `codex-status-armed-cancel` and `codex-status-armed-status` are wrappers
+  over the shared `h-agent-usage-armed-cancel` / `-status` for Codex's one
+  session, `codex-status-armed`.
 
 The deadline is `averageUsage.firstTimeToReset` from `codex-status --json`,
 read with ANSI stripped. That field is only present when *every* checked auth

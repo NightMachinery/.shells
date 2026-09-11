@@ -18,7 +18,7 @@
 #: garden must be restarted (=brishz-restart=) after any edit to the functions
 #: below, or it will keep running the versions it loaded at start-up.
 #:
-#: See =docs/agent-usage-notif.md=.
+#: See =docs/agent-usage-armed.md=.
 ##
 #: Colour of the combined report: =auto= means "colour iff our own stdout is a
 #: terminal". An enum rather than a switch, because "decide for me" is a third
@@ -143,7 +143,7 @@ function h-agent-status-one {
 }
 
 function agent-status {
-    #: Every agent's quota at once. See =docs/agent-usage-notif.md=.
+    #: Every agent's quota at once. See =docs/agent-usage-armed.md=.
     ##
     local color_mode="${agent_status_color:-auto}"
 
