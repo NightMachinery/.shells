@@ -472,9 +472,22 @@ work is actually finished. --dry-run writes the report and kills nothing."
     if bool "${dry_p}" ; then
         ec "would end: ${agent}${name:+ (${name})}${id:+ ${id}}"
         ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>}"
+        ec "would forget this session's /auto-continue registration, if it has one"
         ec "report: ${report}"
         ec "pane script (prefix-r resumes): ${script}"
         return 0
+    fi
+
+    #: A session ending on purpose is finished, and must not be typed into at
+    #: the next reset because it once asked to be ([agfi:agent-auto-continue-off]).
+    #: Guarded, since that file is independent of this one; and quiet when
+    #: there was nothing to forget.
+    if (( ${+functions[agent-auto-continue-off]} )) ; then
+        local forgot
+        forgot="$(agent-auto-continue-off 2>/dev/null)" || forgot=''
+        if [[ "${forgot}" == 'auto-continue off'* ]] ; then
+            ecgray "$0: ${forgot}"
+        fi
     fi
 
     if test -z "${pid}" && test -z "${pane}" ; then
