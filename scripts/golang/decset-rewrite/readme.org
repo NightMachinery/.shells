@@ -25,17 +25,19 @@ Built automatically on first use by =h-decset-rewrite-dep= in
 
 * Use
 #+begin_src sh :eval never
-decset-rewrite [-map FROM=TO]... [-trace FILE] [-no-pty] [--] <command> [args...]
+decset-rewrite [-termux] [-map FROM=TO]... [-trace FILE] [-no-pty] [--] <command> [args...]
 #+end_src
 
-=-map= is repeatable and takes decimal private mode numbers; with no =-map= at
-all the tool is a pure pass-through proxy, which is the cheapest way to check
-that the proxying itself is not what broke something. A malformed flag exits 2
-with the usage on stderr.
+=-termux= is the shorthand for the mouse fix above, and the only flag anyone
+hitting that bug needs. =-map= is the general form: repeatable, decimal private
+mode numbers, and an explicit =-map= for a mode beats the shorthand. With no
+rewrites at all the tool is a pure pass-through proxy, which is the cheapest way
+to check that the proxying itself is not what broke something. A malformed flag
+exits 2 with the usage on stderr.
 
 #+begin_src sh :eval never
-decset-rewrite -map 1003=1002 -- claude
-decset-rewrite -map 1003=1002 -map 1015=1006 -- htop
+decset-rewrite -termux -- claude
+decset-rewrite -termux -map 1015=1006 -- htop
 #+end_src
 
 Filter mode reads stdin and writes stdout, runs no command and opens no pty. It
@@ -165,3 +167,10 @@ at random points and checks the incremental machine against that oracle.
 The pty tests run =sh= under =run= with a =bytes.Buffer= standing in for the
 terminal, and cover the rewrite end to end, exit status, death by signal, and
 that the child's window size is already correct the first time it asks.
+
+* Published separately
+The same code is a standalone repository at
+[[https://github.com/NightMachinery/decset-rewrite][github.com/NightMachinery/decset-rewrite]], for people who arrive from
+termux-app PR 5281 and want the tool without the rest of this one. The Go
+sources are meant to stay identical; only the readme differs, since that one
+cannot assume any of this repository. Keep them in step when either changes.

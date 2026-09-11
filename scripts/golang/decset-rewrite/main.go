@@ -26,16 +26,28 @@ import (
 	"golang.org/x/term"
 )
 
-const usageText = `usage: decset-rewrite [-map FROM=TO]... [-trace FILE] [-no-pty] [--] <command> [args...]
+const usageText = `usage: decset-rewrite [-termux] [-map FROM=TO]... [-trace FILE] [-no-pty] [--] <command> [args...]
 
 Runs <command> on a pty and rewrites DECSET/DECRST private mode numbers in its
-output. With no -map it is a pass-through proxy.
+output. With no rewrites it is a pass-through proxy.
 
+  -termux        shorthand for -map 1003=1002: downgrade any-event mouse
+                 tracking to button-event tracking, which is what Termux
+                 understands. This is the mouse fix; see the readme.
   -map FROM=TO   rewrite private mode FROM to TO (repeatable, decimal)
   -trace FILE    append one line per private-mode sequence seen (mode numbers only)
   -no-pty        filter stdin to stdout instead of running a command
   -h, --help     this message
 `
+
+// The DECSET private modes for any-event and button-event mouse tracking.
+// -termux maps the first to the second: terminals that never implemented
+// any-event tracking gate mouse reporting on a mode they do know, so an app
+// whose last request is 1003 gets no mouse at all rather than a coarser one.
+const (
+	anyEventMouse    = 1003
+	buttonEventMouse = 1002
+)
 
 // drainTimeout caps how long we wait for the child's last output after it has
 // exited. Short enough not to hang on a stuck reader, long enough for the
@@ -82,6 +94,22 @@ func (f *modeMap) Set(s string) error {
 	return nil
 }
 
+// resolveMaps folds the -termux shorthand into the -map set. An explicit -map
+// for the same mode wins, so a wrapper script can pass -termux by default
+// without overriding what its caller asked for.
+func resolveMaps(m map[int]int, termux bool) map[int]int {
+	if !termux {
+		return m
+	}
+	if m == nil {
+		m = map[int]int{}
+	}
+	if _, ok := m[anyEventMouse]; !ok {
+		m[anyEventMouse] = buttonEventMouse
+	}
+	return m
+}
+
 func parseModeArg(s string) (int, error) {
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 0 {
@@ -105,6 +133,7 @@ func realMain(args []string) int {
 	fs.Var(&maps, "map", "rewrite private mode FROM=TO (repeatable)")
 	tracePath := fs.String("trace", "", "append a line per private-mode sequence to FILE")
 	noPTY := fs.Bool("no-pty", false, "filter stdin to stdout, run no command")
+	termux := fs.Bool("termux", false, "shorthand for -map 1003=1002")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -114,6 +143,8 @@ func realMain(args []string) int {
 		return usageErr(err)
 	}
 	argv := fs.Args()
+
+	maps.m = resolveMaps(maps.m, *termux)
 
 	if *noPTY {
 		if len(argv) > 0 {

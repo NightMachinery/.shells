@@ -1,4 +1,4 @@
-module decset-rewrite
+module github.com/NightMachinery/decset-rewrite
 
 go 1.21
 
