@@ -111,6 +111,10 @@ class TokenInfo:
     source: str
     expires_at_s: float | None = None
     subscription_type: str | None = None
+    #: Set when the credential came from somewhere other than the account we
+    #: derived, so the report can say so instead of quietly answering from
+    #: whatever else matched.
+    warning: str | None = None
 
     @property
     def expired(self) -> bool | None:
@@ -526,6 +530,30 @@ def get_token(
 
     keychain_info = best_token_info(infos)
     if keychain_info is not None:
+        expected = f"keychain:{account}"
+        if keychain_account is None and keychain_info.source != expected:
+            #: The silent version of this is how a stale LOGNAME turned into a
+            #: 401 from an orphan credential: the fallback worked well enough
+            #: to look like an answer. Naming the account that was absent, and
+            #: where it came from, makes the next one a one-line diagnosis.
+            origin = (
+                "this uid's passwd name"
+                if account == keychain_account_passwd()
+                else "$USER"
+            )
+            used = (
+                "an unfiltered match"
+                if keychain_info.source == "keychain"
+                else f"account {keychain_info.source.split(':', 1)[1]!r}"
+            )
+            keychain_info = replace(
+                keychain_info,
+                warning=(
+                    f"Keychain item {service!r} has no entry for account "
+                    f"{account!r} ({origin}); used {used} instead"
+                ),
+            )
+
         return keychain_info
 
     file_creds = read_credentials_file(config_dir)
@@ -737,6 +765,9 @@ def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileRepor
         )
     except UsageError as exc:
         failure = str(exc)
+
+    if report.token_info is not None and report.token_info.warning:
+        report.warnings.append(report.token_info.warning)
 
     if args.all and os.environ.get(TOKEN_ENV_BASE):
         #: Silence here would be the trap: the global variable looks like it is

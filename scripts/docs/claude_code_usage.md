@@ -371,6 +371,17 @@ is a worse failure than reporting nothing: both numbers look plausible and
 nothing marks either as wrong. A per-profile variable has no such ambiguity, so
 it is always honoured.
 
+When the credential ends up coming from anywhere other than the account that
+was derived, the report says so rather than answering quietly:
+
+    Keychain item 'Claude Code-credentials' has no entry for account 'root'
+    (this uid's passwd name); used an unfiltered match instead
+
+That line is the whole point of the fallbacks being visible. Without it, a
+derivation that missed still produced a plausible-looking report — off the
+first orphan `security` happened to return — and nothing said which credential
+had answered.
+
 The token source is reported as `env:<VAR>` rather than a bare `env`, naming the
 variable that was used. That is the same reasoning that already puts the Keychain
 account in the source string: a credential cannot be attributed to a profile
