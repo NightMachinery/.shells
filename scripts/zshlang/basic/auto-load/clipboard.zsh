@@ -3,7 +3,15 @@ function cat-copy {
     local inargs
     in_or_args_newline_p=n in-or-args2 "$@"
 
-    ec "$inargs" #: Yes, we are adding a newline here, to work around some functions which do not output their trailing newline.
+    #: The newline works around functions that do not end their output with
+    #: one. Unconditionally it doubled the newline for every function that
+    #: does, so it is added only when the input actually lacks one; what goes
+    #: on the clipboard stays byte-exact either way.
+    if [[ "$inargs" == *$'\n' ]] ; then
+        ecn "$inargs"
+    else
+        ec "$inargs"
+    fi
     ecn "$inargs" | pbcopy
 }
 # alias pc='\noglob cat-copy'
