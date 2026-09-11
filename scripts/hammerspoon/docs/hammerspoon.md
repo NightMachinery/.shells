@@ -615,9 +615,9 @@ and `systemDefined` (the hardware brightness and media keys), and with
 are left alone: a lone modifier is harmless, and the escape chord's modifiers
 are read off the F2 event itself.
 
-Exactly three things pass through. F18, the physical hyper key, so the hyper
-modal can still be entered; F2 with shift only while hyper mode is entered —
-cmd, alt or ctrl on the same event block it — which goes through
+Exactly three things pass through from a keyboard. F18, the physical hyper key,
+so the hyper modal can still be entered; F2 with shift only while hyper mode is
+entered — cmd, alt or ctrl on the same event block it — which goes through
 `blackoutRestore`, releasing the lock synchronously before asking the garden to
 run `brightness-on-all-loop`, so the keyboard is back at once; and F1 with
 shift *and* cmd while hyper mode is entered, which marks the blackout
@@ -629,6 +629,46 @@ three; the chord tap below swallows the two chords itself, so neither ever
 reaches an app. The `hyperEntered()` guard is what makes that safe — the chord
 tap runs exactly while hyper mode is entered, so nothing is let by that has no
 tap waiting to eat it.
+
+### Automation is not what the lock is for
+
+The lock exists to stop another *person* physically using the machine while the
+screen is black. It was never meant to stop software, and for a while it did
+anyway — which cost two nights of unattended GUI testing, and swallowed the
+clipboard manager and the speech-to-text tool along with the stranger. So the
+allowlist above applies to physical input only; locally generated events go
+through untouched, whatever key or button they carry.
+
+The discriminator is the event source state id, read off the event itself as
+`eventSourceStateID` and tested before any of the key rules. There are two
+well-known values, and both are still dropped:
+
+- `kCGEventSourceStateHIDSystemState`, `1`. The physical input stream — the
+  hand on this keyboard, the hand on this trackpad. The case the lock is for.
+- `kCGEventSourceStateCombinedSessionState`, `0`. The generic source an event
+  carries when whoever posted it created none of its own. Denied deliberately,
+  and denying it is the reason the check tests two values rather than "not
+  HID": being the generic state makes it the likelier vehicle for something
+  injected, or arriving from off the machine, which is exactly what the lock
+  must still catch. It costs local tools nothing, because a local tool posting
+  events always has a source of its own.
+
+Anything else is a *private* source id, minted per event source and unique to
+it — two Hammerspoon-made events measured on different days came back
+`1364438702` and `841834532`, so do not match on a value, only on "neither
+well-known one". A private id can only come from a process running on this
+machine, so it passes: this config, an agent driving a test instance, and any
+other local tool that posts events.
+`eventSourceUserData` is `0` throughout and carries nothing, so it is not used.
+An id that is not a number at all falls through to the key rules rather than
+passing — the read fails toward the lock, not away from it.
+
+Nothing is logged per event, which at keystroke rates would be its own problem.
+Instead the module counts what the rule let through, and
+`hs -c 'return blackoutLockPassed()'` reads the count: take it before and after
+posting a synthetic event and the difference answers "did it land". It counts
+only this rule, so F18 and the two chords — a hand at the keyboard — do not
+move it, and a Hammerspoon reload resets it along with the chunk.
 
 Two taps are in play during a blackout, and they do different jobs. The lock
 tap above only ever decides what to *drop*. The chord tap is separate: it runs
@@ -705,6 +745,7 @@ It is driven from the shell too:
 hs -c 'blackoutLockOn(seconds)'       # seconds optional; a short value is for testing
 hs -c 'blackoutLockOff()'
 hs -c 'return blackoutLockActive()'
+hs -c 'return blackoutLockPassed()'   # automated events let through since load
 hs -c 'blackoutRestore()'             # what hyper+shift+F2 does
 hs -c 'blackoutRestore(true)'         # lock the session first, always; shell only
 hs -c 'blackoutUpgrade()'             # mark a blackout already up as lock-first

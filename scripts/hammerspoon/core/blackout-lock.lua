@@ -14,6 +14,17 @@
 --- it marks the blackout lock-first. Neither of those two reaches an app: the
 --- lock tap only passes them, and the chord tap below swallows them itself.
 ---
+--- Those three are the allowlist for a *person*. Software is not held to it:
+--- this lock is here to stop another person physically using the machine, and
+--- it was never meant to stop local tools. Every event carries the state id of
+--- the source that made it, and anything that made a source of its own -- this
+--- config, the clipboard manager, the speech-to-text tool, an agent driving a
+--- test instance -- carries a private id that is neither of the two well-known
+--- states. Those pass, ahead of every rule above. The physical HID stream and
+--- the generic combined-session state are both dropped as before; the note in
+--- handleEvent says why the generic one is denied alongside the hand at the
+--- keyboard.
+---
 --- The tap exists only while a blackout is up. A permanently installed tap
 --- would see every keystroke of every app (see the note in core/fim.lua), so
 --- it is installed on black-on and torn down on black-off.
@@ -40,6 +51,7 @@
 ---   hs -c 'blackoutLockOn()'          -- or blackoutLockOn(30), for a test
 ---   hs -c 'blackoutLockOff()'
 ---   hs -c 'return blackoutLockActive()'
+---   hs -c 'return blackoutLockPassed()' -- automated events let through
 ---   hs -c 'blackoutRestore()'         -- what hyper+shift+F2 does
 ---   hs -c 'blackoutRestore(true)'     -- lock the session first, always
 ---   hs -c 'blackoutUpgrade()'         -- what hyper+shift+cmd+F1 does to a
@@ -127,6 +139,15 @@ local kEscapeKeyCode = hs.keycodes.map.f2 or 120
 local kBlackKeyCode = hs.keycodes.map.f1 or 122
 
 local types = hs.eventtap.event.types
+local properties = hs.eventtap.event.properties
+
+--- The two well-known CGEvent source states, the ones the lock still drops.
+--- kCGEventSourceStateHIDSystemState: the physical input stream, a hand on
+--- this keyboard or this trackpad.
+local kSourceHID = 1
+--- kCGEventSourceStateCombinedSessionState: the generic source an event gets
+--- when whoever posted it created none of its own.
+local kSourceCombinedSession = 0
 
 local kKeyTypes = { types.keyDown, types.keyUp, types.systemDefined }
 local kMouseTypes = {
@@ -172,8 +193,44 @@ local function persist(st)
     end
 end
 
+--- Events let through by the source-state rule below, since this file loaded.
+--- Cheap enough to keep unconditionally, which a log line per event would not
+--- be; blackoutLockPassed reads it.
+local passedCount = 0
+
 --- true drops the event, false lets it through.
 local function handleEvent(event)
+    --- Local automation goes through; a person at this machine does not. What
+    --- the lock is for is keeping someone else from using the machine while
+    --- the screen is black, and software was only ever collateral: an agent
+    --- driving a test instance, the clipboard manager and the speech-to-text
+    --- tool were all swallowed along with the stranger.
+    ---
+    --- The discriminator is the source state id. Anything that is neither of
+    --- the two well-known states is a *private* source, and a private source
+    --- can only be minted by a process running on this machine -- which is
+    --- what every local tool that posts events does, this config included.
+    ---
+    --- Denying the combined-session state as well as the HID one is
+    --- deliberate, and it is why this is a two-value test rather than "not
+    --- HID". kSourceHID is the hand on the keyboard the lock exists for.
+    --- kSourceCombinedSession is the generic state an event carries when
+    --- nothing claimed a source of its own, which makes it the likelier
+    --- vehicle for something injected, or arriving from off the machine --
+    --- precisely the case the lock must still catch. Denying it costs local
+    --- automation nothing, because local automation always has a source of
+    --- its own.
+    ---
+    --- Read defensively and fail toward the lock: an id that is not a number
+    --- falls through to the rules below rather than passing.
+    local sourceState = event:getProperty(properties.eventSourceStateID)
+    if type(sourceState) == "number"
+        and sourceState ~= kSourceHID
+        and sourceState ~= kSourceCombinedSession then
+        passedCount = passedCount + 1
+        return false
+    end
+
     local t = event:getType()
 
     if t == types.keyDown or t == types.keyUp then
@@ -244,6 +301,15 @@ end
 
 function blackoutLockActive()
     return blackoutLockState.tap ~= nil
+end
+
+--- How many events the source-state rule has let through since this file was
+--- loaded, so "did my synthetic click land" is answerable without a log line
+--- per event: read it, post the event, read it again. Counts only that rule --
+--- F18 and the two chords are a hand at the keyboard, not automation. A
+--- Hammerspoon reload resets it, since it reloads this chunk.
+function blackoutLockPassed()
+    return passedCount
 end
 
 function blackoutLockOn(seconds)
