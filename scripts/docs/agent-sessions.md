@@ -517,12 +517,48 @@ These are new and belong to this design rather than to Claude:
 - `agent_subagents_close_force` and `agent_subagents_close_subtree` -- close a
   busy child, and close a parent's live descendants with it. See the section
   above.
+- `agent_session_exclude_pcres` and `agent_session_exclude_p` -- an array of
+  PCREs naming sessions no picker should offer, and the switch that turns the
+  whole thing off. See the section below.
 - `agent_clean_fz_all_p` -- show busy children in [agfi:agent-clean-fz];
   [agfi:agent-clean-all-fz] is that spelling.
 - `agent_launch_glyph` and `agent_launch_sync_p` -- the tab-title glyph and
   whether to sync the instruction files, for the shared launcher preamble
   [agfi:h-agent-launch] that the three launchers now share instead of each
   carrying its own copy.
+
+## Sessions the pickers should not offer
+
+Not every live session is a place you would ever want to go. One started for a
+side effect and then abandoned -- a Claude Code session opened purely so that it
+refreshes an OAuth token, say -- is live, has a transcript, and is never the
+answer to "which session did you mean". It is noise in every picker, and worse
+in the resume-target picker, where picking it by accident types into a session
+nobody is reading.
+
+`agent_session_exclude_pcres` is an array of PCREs for exactly those. A session
+is dropped when any pattern matches **either** its own name **or** the tmux
+session it sits in. Both, because the two routinely disagree: the autoname hooks
+name a tmux session after its agent session, but a session started by hand for a
+side effect keeps whatever name the agent gave it, so it can be `tmp-2e` sitting
+in a tmux session called `claude-work-refresh-token`, and the only recognisable
+string is the tmux one. Set `agent_session_exclude_p=n` to offer everything
+again without emptying the list.
+
+Two things about where the filter is applied are load-bearing.
+
+It is **not** applied inside [agfi:h-agent-session-live-list]. A session hidden
+from a menu must still count as live everywhere else, or
+[agfi:claude-code-session-import] would fork a running session believing it had
+quit. Only the picker row builders filter.
+
+And for the kitty picker it is applied to the *pairs*, not to the live listing
+they were built from. [agfi:h-agent-session-live-pairs] resolves each kitty
+window on its own and consults that listing only as a cache, so a row taken out
+of the cache still resolves by the slower route and still reaches the picker --
+filtering the cache there looks like it works and does nothing. The tmux picker
+builds its rows straight from the listing, so it filters the listing. Because a
+pair carries no tmux name, the kitty path looks that name up by transcript.
 
 ## The names that were kept
 
