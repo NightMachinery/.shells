@@ -265,8 +265,9 @@ F1 also locks the keyboard. A black screen on its own is not a safe one: the
 focused window still has focus, so a brushed key types into it unseen, and the
 hardware brightness keys undo the blackout from the inside. So while the screen
 is black, `hammerspoon/core/blackout-lock.lua` swallows every key, and by default
-every click and scroll, with two exceptions — the hyper key itself and F2 with
-shift under hyper, so the way out is exactly the way out it was. The knobs
+every click and scroll, with three exceptions — the hyper key itself, F2 with
+shift under hyper, so the way out is exactly the way out it was, and
+shift+cmd+F1 under hyper, which only makes that way out stricter. The knobs
 (`blackoutLockEnabled`, `blackoutLockMouse`, `blackoutLockScreenAfterSeconds`),
 the shell interface and the limits are in `hammerspoon/docs/hammerspoon.md`
 under "Blackout keyboard lock". The one worth repeating here is Secure Input: a
@@ -276,10 +277,14 @@ cannot block typing there.
 A blackout that has been up for more than an hour is one nobody is watching, so
 F2 then locks the macOS session before it restores the display — whoever ends
 it meets the login screen, not the desktop. hyper+shift+cmd+F1 starts a blackout
-that does the same regardless of age, for when you want the lock now; the
-choice belongs to whoever starts the black, not whoever ends it, because the
-hand that presses F2 later may not be yours. Both end through `blackoutRestore`
-in Hammerspoon, and both survive a Hammerspoon reload — the start time and the
+that does the same regardless of age, for when you want the lock now, and
+pressed during a blackout already up it marks that one instead — so you can
+decide to lock after the screen has gone dark, without ending it and starting
+again. It only ever goes that way: nothing turns a marked blackout back into a
+relaxed one short of ending it. The choice belongs to whoever starts the black,
+not whoever ends it, because the hand that presses F2 later may not be yours.
+Both end through `blackoutRestore` in Hammerspoon, and both survive a
+Hammerspoon reload — the start time and the
 lock-first mark are kept in redis while the screen is black. A bare
 `display-black-off` or `brightness-on-all-loop` from a shell restores the
 display without locking the session, because a shell restore is the owner
@@ -289,11 +294,11 @@ The lock can never outlive the black. `display-black-off` calls `blackoutLockOff
 over `hammerspoon -c` immediately after its unconditional gamma restore, and it
 is the single point every unblack path reaches — F2, `h-hook-wake`, `h-hook-unlock`
 from the Swift lock-watcher, or the function run bare from another machine. The
-wake watcher releases it independently as well, and after a week it ends on its
-own as a last resort — locking the session first, then restoring, so the worst
-case is a login screen and never a live keyboard on an unlocked desktop behind a
-black screen. Whichever way the screen comes back, the keyboard comes back with
-it.
+wake watcher releases it independently as well, and past
+`blackoutLockMaxSeconds` it ends on its own as a last resort — locking the
+session first, then restoring, so the worst case is a login screen and never a
+live keyboard on an unlocked desktop behind a black screen. Whichever way the
+screen comes back, the keyboard comes back with it.
 
 ### If a screen is ever left black
 

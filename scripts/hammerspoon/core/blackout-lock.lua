@@ -7,10 +7,12 @@
 ---
 --- It is an hs.eventtap. Taps run before Carbon hotkeys and before any app, so
 --- a callback returning true drops the event for everyone -- every other hyper
---- binding included. The allowlist is two things: F18, the physical hyper key,
---- so the hyper modal can still be entered; and F2 with shift while hyper mode
---- is entered, so the existing black-off binding in window-media-bindings.lua
---- fires. That binding also calls blackoutLockOff, synchronously.
+--- binding included. The allowlist is three things: F18, the physical hyper
+--- key, so the hyper modal can still be entered; F2 with shift while hyper
+--- mode is entered, which ends the blackout; and F1 with shift and cmd while
+--- hyper mode is entered, the one chord that may act *without* ending it --
+--- it marks the blackout lock-first. Neither of those two reaches an app: the
+--- lock tap only passes them, and the chord tap below swallows them itself.
 ---
 --- The tap exists only while a blackout is up. A permanently installed tap
 --- would see every keystroke of every app (see the note in core/fim.lua), so
@@ -21,7 +23,9 @@
 --- blackoutLockScreenAfterSeconds, blackoutRestore locks the macOS session
 --- first and restores the display second, so the person meets the login
 --- screen. hyper+shift+cmd+F1 starts a blackout marked lock-first, which does
---- that regardless of age: the one who *starts* the black decides, because
+--- that regardless of age; pressed during a blackout already up, it marks that
+--- one instead. The mark only ever moves toward locking, so whoever *starts*
+--- the black can never be talked back out of it, and that is the point:
 --- whoever presses F2 later may be a stranger. The invariant: the keyboard
 --- lock never releases into an unlocked session on its own. Only F2 inside
 --- the grace period does that, and that is a person's deliberate act.
@@ -38,6 +42,8 @@
 ---   hs -c 'return blackoutLockActive()'
 ---   hs -c 'blackoutRestore()'         -- what hyper+shift+F2 does
 ---   hs -c 'blackoutRestore(true)'     -- lock the session first, always
+---   hs -c 'blackoutUpgrade()'         -- what hyper+shift+cmd+F1 does to a
+---                                        blackout that is already up
 ---
 --- Every failure points the same way, at keys coming back: a Hammerspoon crash
 --- or reload drops the tap, macOS disables a tap whose callback stalls, and the
@@ -57,6 +63,13 @@ if blackoutLockEnabled == nil then blackoutLockEnabled = true end
 --- never tapped: it is a firehose, and moving the pointer over a black screen
 --- does nothing.
 if blackoutLockMouse == nil then blackoutLockMouse = true end
+
+--- The cue hyper+shift+cmd+F1 plays when it marks a blackout that is already
+--- up. A name from /System/Library/Sounds, or false for silence. A sound at
+--- all, because by then the screen is black and no band can be seen; a name
+--- rather than a boolean, so the knob picks the cue instead of merely gating
+--- one buried in the code.
+if blackoutUpgradeSound == nil then blackoutUpgradeSound = "Submarine" end
 
 --- After this many seconds of blackout, restoring the display locks the
 --- session first. 0 locks first always; false never does. Measured from
@@ -89,6 +102,11 @@ blackoutLockState = blackoutLockState or {
     -- The chord dispatch tap; see ** Chord dispatch below. Lives here rather
     -- than in a local so a reload can find and stop the previous run's.
     chordTap = nil,
+    -- blackoutUpgradeSound, resolved, and the name it was resolved from. Here
+    -- rather than in a local because a sound collected mid-play stops. A
+    -- dofile keeps the previous table, so both may be absent; read defensively.
+    sound = nil,
+    soundName = nil,
 }
 
 --- How long the lock screen gets to come up before the display is restored
@@ -104,6 +122,9 @@ local kMinSeconds = 5
 local kF18KeyCode = hs.keycodes.map.f18 or 79
 --- The escape chord is hyper+shift+F2 -- the existing black-off binding.
 local kEscapeKeyCode = hs.keycodes.map.f2 or 120
+--- The black chord is hyper+shift+F1; with cmd it also marks a blackout that
+--- is already up, which is the one other thing the lock lets by.
+local kBlackKeyCode = hs.keycodes.map.f1 or 122
 
 local types = hs.eventtap.event.types
 
@@ -162,10 +183,26 @@ local function handleEvent(event)
             return false
         end
 
-        if keyCode == kEscapeKeyCode and hyperEntered() then
+        --- The two chords that may act while the lock is up: F2 with shift
+        --- ends the blackout, F1 with shift and cmd marks it lock-first.
+        --- Passed rather than acted on here -- the chord dispatch tap owns
+        --- both and swallows them itself, so neither ever reaches an app.
+        --- That tap runs exactly while hyper mode is entered, which is what
+        --- makes hyperEntered() the right guard: nothing is let by that has
+        --- no tap waiting to eat it. The release is covered by that tap while
+        --- F18 is still held, and by the deny below once the mode has exited
+        --- under it. Kept in step with chordFor by hand; the note on the gate
+        --- in handleChordEvent says why the rule is deliberately written out
+        --- in both places rather than shared.
+        if hyperEntered() then
             local flags = event:getFlags()
-            if flags.shift and not flags.cmd and not flags.alt and not flags.ctrl then
-                return false
+            if flags.shift and not flags.alt and not flags.ctrl then
+                if keyCode == kEscapeKeyCode and not flags.cmd then
+                    return false
+                end
+                if keyCode == kBlackKeyCode and flags.cmd then
+                    return false
+                end
             end
         end
 
@@ -236,11 +273,13 @@ function blackoutLockOn(seconds)
     -- Visible for the moment before the screen goes black: black-on is
     -- asynchronous through the garden, and this is synchronous.
     --
-    -- The lock-first mark shows up nowhere else: both chords go equally black,
-    -- and the mark cannot be revoked once set, so this band is the only chance
-    -- to confirm it. Hence its own sentence and its own colour -- blood, darker
-    -- than the amber the plain chord keeps and darker than the crimson `crit'
-    -- the Secure Input warning below may fire alongside it.
+    -- The lock-first mark has no other way to show itself: both chords go
+    -- equally black, and the mark cannot be revoked once set, so this band is
+    -- its one confirmation at the start. Hence its own sentence and its own
+    -- colour -- blood, darker than the amber the plain chord keeps and darker
+    -- than the crimson `crit' the Secure Input warning below may fire
+    -- alongside it. blackoutUpgrade reuses both for a mark set later, where
+    -- the screen is already black and a sound has to carry it instead.
     local lockFirst = st.lockFirst
 
     alert(lockFirst and "Input locked. Ending the blackout locks the screen."
@@ -291,8 +330,10 @@ end
 --- What hyper+shift+F1 calls, and hyper+shift+cmd+F1 with lockFirst=true.
 --- Records when the black began, whether or not the keyboard lock is on,
 --- because the lock-before-restore rule needs the age either way. A second F1
---- during a blackout keeps the original time; a cmd+F1 during one upgrades it
---- to lock-first, and nothing downgrades it short of ending the black.
+--- during a blackout keeps the original time, and nothing here can downgrade
+--- the mark: the parameter only ever raises it. Raising it on a blackout that
+--- is already up is blackoutUpgrade's job, which is what the chord reaches
+--- then, so that the garden is not sent to re-black an already black screen.
 function blackoutBegin(lockFirst)
     local st = blackoutLockState
     if not st.since then
@@ -305,6 +346,52 @@ function blackoutBegin(lockFirst)
     if blackoutLockEnabled then
         blackoutLockOn()
     end
+    return true
+end
+
+--- What hyper+shift+cmd+F1 does to a blackout that is already up: sets the
+--- mark, and nothing else. Not blackoutChordBegin, which would send the garden
+--- off to re-run brightness-off-all-loop and restart the keep-blank loop on a
+--- screen that is already black. Not blackoutLockOn either, which would
+--- rebuild the tap and restart the expiry from this press rather than from the
+--- start of the black -- handing a forgotten blackout another
+--- blackoutLockMaxSeconds is the opposite of what pressing cmd asks for. Only
+--- the mark moves, and it only ever moves toward locking.
+---
+--- Returns false when no blackout is up, which is the caller's cue to start
+--- one instead.
+function blackoutUpgrade()
+    local st = blackoutLockState
+    if not st.since then return false end
+
+    st.lockFirst = true
+    persist(st)
+
+    --: Shown even when the mark was already set. Re-flashing is the only way a
+    --: second press can look like anything other than a dropped one.
+    alert("Ending the blackout locks the screen.", {
+        id = kAlertId,
+        color = "blood",
+        seconds = 5,
+        screens = "all",
+    })
+
+    --- Behind a real blackout that band is invisible -- which is why
+    --- blackoutLockOn shows its own *before* the screen goes dark -- so the
+    --- sound is the confirmation that actually reaches a person here. The band
+    --- goes up regardless: it costs nothing, it is right in the moment before
+    --- the garden's black lands, and it is what a screen-lit test can see.
+    if blackoutUpgradeSound then
+        if st.soundName ~= blackoutUpgradeSound then
+            st.soundName = blackoutUpgradeSound
+            st.sound = hs.sound.getByName(blackoutUpgradeSound)
+            if not st.sound then
+                print("blackout-lock: no such sound: " .. tostring(blackoutUpgradeSound))
+            end
+        end
+        if st.sound then st.sound:play() end
+    end
+
     return true
 end
 
@@ -370,9 +457,11 @@ end
 --- reasons in core/fim.lua. hyper-mode.lua starts and stops it from the
 --- modality's entered/exited callbacks.
 
+--- The same two constants the lock tap matches on, so the taps cannot drift
+--- apart on a keycode.
 local kChordKeys = {
-    [hs.keycodes.map.f1 or 122] = "f1",
-    [hs.keycodes.map.f2 or 120] = "f2",
+    [kBlackKeyCode] = "f1",
+    [kEscapeKeyCode] = "f2",
 }
 
 --- Which chord this event is, or nil for anything the tap must not touch.
@@ -404,9 +493,10 @@ local function chordFor(keyName, flags)
 end
 
 --- The blackout chords are one-shot and leave the mode, exactly as an
---- auto-trigger hs.hotkey binding did. The brightness keys deliberately do
---- not: holding hyper and stepping the level repeatedly is the point, which
---- is why they were bound with auto_trigger_p=false.
+--- auto-trigger hs.hotkey binding did -- the cmd one included when it only
+--- marks a blackout already up rather than starting one. The brightness keys
+--- deliberately do not: holding hyper and stepping the level repeatedly is the
+--- point, which is why they were bound with auto_trigger_p=false.
 local kChordExitsMode = {
     ["black"] = true,
     ["black-lock-first"] = true,
@@ -416,6 +506,13 @@ local kChordExitsMode = {
 local function runChord(chord)
     if chord == "restore" then
         if blackoutChordRestore then blackoutChordRestore() end
+    elseif chord == "black-lock-first" and blackoutLockState.since then
+        --- A blackout is already up, so mark it rather than start a second
+        --- one. Keyed on `since' and not blackoutLockActive(), because that
+        --- one asks after the *tap*, and with blackoutLockEnabled false there
+        --- is no tap to ask while a blackout is very much up. `since' is the
+        --- one field that means "a blackout is up" in both configurations.
+        blackoutUpgrade()
     elseif kChordExitsMode[chord] then
         if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first") end
     elseif hyperBrightnessStep then
@@ -431,11 +528,18 @@ local function handleChordEvent(event)
     --: Bare F1/F2 are the brightness keys, and they stay on hs.hotkey.
     if not chord then return false end
 
-    --- While the lock is up the only chord that does anything is the one that
-    --- ends it -- the same rule handleEvent enforces above, repeated here so
-    --- the outcome does not depend on which of the two taps macOS happens to
-    --- call first.
-    if blackoutLockActive() and chord ~= "restore" then
+    --- While the lock is up two chords still do something: the one that ends
+    --- the blackout, and the one that tightens it -- hyper+shift+cmd+F1 marks
+    --- a blackout already up as lock-first. Nothing goes the other way, and
+    --- plain hyper+shift+F1 stays swallowed, since re-blacking a black screen
+    --- would only restart the garden's loop.
+    ---
+    --- The same rule handleEvent enforces above, repeated here so the outcome
+    --- does not depend on which of the two taps macOS happens to call first --
+    --- and it really does vary: hs.eventtap inserts at the head of the chain,
+    --- and this tap is rebuilt on every hyper entry while the lock's is built
+    --- once at black-on, so this one is almost always asked first. Almost.
+    if blackoutLockActive() and chord ~= "restore" and chord ~= "black-lock-first" then
         return true
     end
 
