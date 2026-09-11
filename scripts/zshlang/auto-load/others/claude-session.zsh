@@ -418,7 +418,7 @@ function h-claude-code-session-live-row-of {
 
     local row t
     for row in "${(f)claude_code_session_live_list_cache}" ; do
-        t="$(h-claude-code-session-row-transcript "${row}")" || continue
+        t="$(h-agent-session-row-transcript "${row}")" || continue
         if [[ "${t:a}" == "${transcript}" ]] ; then
             ec "${row}"
             return 0
