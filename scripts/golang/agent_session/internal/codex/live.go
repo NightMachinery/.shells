@@ -26,6 +26,13 @@ import (
 // keep the holder's pid: no terminal window's foreground process, so the
 // window resolver can never match them, while the picker still lists them.
 
+// The launcher wraps agents in a pty proxy (`decset-rewrite -map 1003=1002 --
+// codex ...', see zshlang/auto-load/others/agents.zsh and
+// docs/termux-mouse-decset-1003.md), and that command line matches this too,
+// so codexPids gains the wrapper's pid alongside the real one. Harmless: the
+// wrapper holds no thread lock, and the rows are built from lock holders.
+// Deliberately not excluded here -- a negative lookahead would cost more than
+// it saves.
 var codexCmdRe = regexp.MustCompile(`(^|[/ ])codex(\.js)?( |$)`)
 
 // Whether a command line is a Codex process: `codex ...`, `/path/codex.js
