@@ -151,20 +151,24 @@ function cat-rtl-streaming-if-tty {
     fi
 }
 
-function cat-streaming-copy-rtl-if-tty {
-    if isOutTty ; then
-        cat-copy | rtl-reshaper-streaming
-    else
-        cat
-    fi
-}
-
 function cat-copy-rtl-if-tty {
+    : "prints and copies, reshaping right-to-left text when stdout is a terminal"
     if isOutTty ; then
         cat-copy-newline | rtl-reshaper-streaming
     else
         cat
     fi
+}
+
+function cat-streaming-copy-rtl-if-tty {
+    : "the old name for [agfi:cat-copy-rtl-if-tty]"
+    #: The two differed in that this one left stdout byte-exact, back when the
+    #: other buffered; `streaming' stopped distinguishing them once everything
+    #: streamed. Worse, the reshaper emits by line, so the byte-exact spelling
+    #: printed nothing at all on a terminal whenever the input had no trailing
+    #: newline -- which is exactly what [agfi:cat-copy-newline] supplies.
+    ##
+    cat-copy-rtl-if-tty "$@"
 }
 
 function cat-copy-if-tty {
