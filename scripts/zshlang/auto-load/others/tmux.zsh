@@ -272,6 +272,45 @@ function tmux-capture {
 }
 
 aliasfn tcgar tmux-capture BrishGarden
+
+function tmux-pane-send-text {
+    : "types <2> into the tmux pane <1> and submits it with Enter"
+    #: A pane that is gone, or whose command has already exited, is refused
+    #: rather than typed into. `~/.tmux.conf' sets `remain-on-exit' globally,
+    #: so a finished pane is still a valid `-t' target and `send-keys' would
+    #: report success while the keystrokes went nowhere. The caller is told
+    #: instead, and can say so.
+    #:
+    #: Two `send-keys': the text goes with `-l', which sends it literally, so a
+    #: word like `Enter', `C-c' or `Space' inside it is typed rather than read
+    #: as a key name. The submit is therefore a call of its own, since `-l'
+    #: would type the five letters `Enter'.
+    #:
+    #: An id (`%12'), not a name: a pane index moves when panes are split or
+    #: closed, and the id never does. See [agfi:tmux-session-id].
+    ##
+    local pane="${1}" text="${2}"
+    assert-args pane text @RET
+
+    ensure-cmd tmux @RET
+
+    #: An empty answer, not a failure, is how tmux reports a pane id that
+    #: resolves to nothing: `display-message' exits 0 and prints nothing rather
+    #: than complaining, so the emptiness is the check.
+    local dead
+    dead="$(command tmux display-message -p -t "${pane}" '#{pane_dead}' 2>/dev/null)" || dead=''
+    if test -z "${dead}" ; then
+        ecerr "$0: no such tmux pane: ${pane}"
+        return 1
+    fi
+    if [[ "${dead}" != 0 ]] ; then
+        ecerr "$0: tmux pane has exited, not typing into it: ${pane}"
+        return 1
+    fi
+
+    command tmux send-keys -t "${pane}" -l -- "${text}" @RET
+    command tmux send-keys -t "${pane}" Enter @RET
+}
 ##
 alias t.hv='tmux new-session \; split-window -h \; split-window -v \; attach'
 
