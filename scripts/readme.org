@@ -48,7 +48,31 @@ one for single answers, and the standalone one for conversation exports.
 
 * Codex
 
-=codex_status.py= notes are tracked in =./docs/codex_status.md=.
+=codex_status.py= notes are tracked in =./docs/codex_status.md=, including the
+=codex-status-notify= / =codex-status-continue-fz= notifiers that wait for the
+first auth's rate limit to reset and queue =Continue.= into the threads you
+picked.
+
+* Antigravity
+
+=./docs/agy_status.md= covers =agy-status=, which reads the per-model-group
+quota that =agy -p /usage= prints without spending any of it, and the
+=agy-status-notify= / =agy-status-continue-*= notifiers that wait for the
+earliest exhausted group to reset and type =Continue.= into the Antigravity
+windows or panes you picked.
+
+* Agent usage limits
+
+=./docs/agent-usage-notif.md= covers the one-shot job shared by the Claude
+Code, Codex and Antigravity notifiers: it waits in a tmux session for a reset
+time and then either notifies or types =Continue.= into kitty windows, tmux
+panes or a Codex queue chosen at arm time, unless you are at the keyboard.
+Where each agent's reset time comes from, and the =cck= / =cct= / =ccfront=
+entry points, are in =./docs/claude_code_usage.md=, =./docs/codex_status.md=
+and =./docs/agy_status.md=; =agent-usage-continue-at= names the time by hand
+for any agent, when there is no reset source or you do not trust the one there
+is.
+=agent-status= (=agst=) prints all three usage reports at once, in parallel.
 
 * Global npm installs
 
