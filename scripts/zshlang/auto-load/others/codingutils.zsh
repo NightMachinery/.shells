@@ -94,7 +94,8 @@ whichm through bat; at top level on a tty, also copies the names given, one per 
     whichm "$@" | btz
 
     if (( $# )) && isOutTty && fn-isTop ; then
-        print -rl -- "$@" | pbcopy
+        #: Joined, not `print -l': no trailing newline on the clipboard.
+        pbcopy "${(pj:\n:)@}"
     fi
 }
 
