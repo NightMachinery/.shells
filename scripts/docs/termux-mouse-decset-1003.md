@@ -72,13 +72,16 @@ Measured as string atoms in the installed binaries (`strings` plus `grep` for
   comes last, so it is exactly the failing case.
 - Codex 0.153.4 has no mouse-tracking modes at all. It is unaffected; wrapping
   it is insurance rather than a fix.
-- Claude Code 2.1.268 shows `?1000h`, `?1006h` and `?1007h`, and no `1003`
-  atom. That is weaker evidence than it looks: the binary is a bun bundle that
-  builds many sequences from templates with numeric parameters, and it carries
-  42 bare `[?` atoms with the number supplied at runtime, so 1003 cannot be
-  ruled out statically. The author of PR 5281 reports that Claude's fullscreen
-  mode requests 1003. The trace recipe below is how to settle it from the
-  phone rather than from the binary.
+- Claude Code 2.1.268 shows `?1000h`, `?1006h` and `?1007h` as string atoms,
+  and no `1003`. That static reading was wrong, and it is worth recording
+  why: the binary is a bun bundle that builds many sequences from templates
+  with numeric parameters (42 bare `[?` atoms with the number supplied at
+  runtime), so a mode number never has to appear as a string. The trace
+  recipe below gave the real answer. On entering fullscreen (`?1049h`)
+  Claude sets, in order, `1000`, `1002`, `1003`, `1006`, so its last mouse
+  request is 1003 and it is the failing case too, as the author of PR 5281
+  said. Measured with the launcher's trace on a session started from the
+  phone; the proxy rewrote both the set and the reset, and the mouse worked.
 
 ## The fix
 
