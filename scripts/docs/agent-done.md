@@ -65,6 +65,11 @@ and arrange for the report to appear once it is gone.
 `--dry-run` does everything except the killing and prints what it resolved,
 which is how the whole path is testable without ending a session.
 
+A session ending this way is finished, so `agent-done` also forgets its
+`/auto-continue` registration ([agfi:agent-auto-continue-off]), if it has one:
+a finished session must not be typed into at the next usage-limit reset because
+it once asked to be. See `docs/agent-auto-continue.md`.
+
 ## Why the summary needs all this
 
 A TUI draws on the alternate screen. When it exits, the terminal restores what
