@@ -113,6 +113,13 @@ section is what is Codex's: the deadline, and the delivery.
 - `codex-status-armed-cancel` and `codex-status-armed-status` are wrappers
   over the shared `h-agent-usage-armed-cancel` / `-status` for Codex's one
   session, `codex-status-armed`.
+- `h-codex-status-arm-auth <session> <alias>` arms for *one* auth's reset,
+  reading that auth's own primary and secondary windows and taking the latest
+  reset among those at or above `codex_status_arm_full_pct`. It exists for the
+  `/auto-continue` watcher (`docs/agent-auto-continue.md`): a running thread
+  is signed in to one auth and cannot `swap`, so "every auth exhausted" is the
+  wrong question for it. `h-codex-status-active-alias` names the auth the
+  running Codex was started with, by the script's own byte-match rule.
 
 The deadline is `averageUsage.firstTimeToReset` from `codex-status --json`,
 read with ANSI stripped. That field is only present when *every* checked auth

@@ -74,6 +74,12 @@ for any agent, when there is no reset source or you do not trust the one there
 is.
 =agent-status= (=agst=) prints all three usage reports at once, in parallel.
 
+=./docs/agent-auto-continue.md= covers =/auto-continue=, the skill shared by
+all three agents that lets a session arm itself ahead of time: a watcher per
+account polls the usage and, once it is blocked, arms the same job with the
+registered sessions as targets, so they resume at the reset with nothing to
+pick.
+
 * Global npm installs
 
 pnpm cannot install any package whose tarball is larger than roughly 50MB: it

@@ -532,6 +532,11 @@ All of them go through the brish garden with `brishz_async=y`, so no agent ever
 waits on this, and `agents-md-doctor` checks that the symlinks are still
 symlinks and not files an app has replaced.
 
+The same files carry the `/auto-continue` kick, `agent-auto-continue-hook`
+(`docs/agent-auto-continue.md`): Claude Code on `StopFailure` with matcher
+`rate_limit`, Antigravity on `Stop` under its own group `auto-continue`, and
+nothing for Codex, whose hooks do not fire on a usage-limit turn.
+
 ## Knobs
 
 Dynamically scoped, so they go in front of a call. Every one of them also
