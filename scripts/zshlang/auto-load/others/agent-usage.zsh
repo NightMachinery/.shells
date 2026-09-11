@@ -613,6 +613,109 @@ function agent-usage-armed-cancel {
     h-agent-usage-armed-cancel "${sessions[@]}"
 }
 
+function agent-usage-armed-cancel-fz {
+    #: Cancels the armed jobs you pick, over every session
+    #: [agfi:agent-usage-armed-sessions] knows about, whichever agent armed
+    #: them.
+    #:
+    #: The middle ground between the two bulk commands: with several agents'
+    #: jobs armed at once, [agfi:agent-usage-armed-status] prints them all but
+    #: cancels nothing, and [agfi:agent-usage-armed-cancel] takes them all.
+    #: Multi-select, because "cancel these two and leave the rest" is the
+    #: actual request.
+    #:
+    #: Sessions that have already fired are offered too, for the reason
+    #: [agfi:h-agent-usage-armed-cancel] reaps them: with =remain-on-exit= on,
+    #: their sessions linger and clearing them out is part of the same job.
+    ##
+    bella_zsh_disable1
+
+    zmodload zsh/datetime 2>/dev/null
+
+    local -a sessions
+    sessions=("${(@f)$(agent-usage-armed-sessions)}") @TRET
+
+    #: Keyed on the deadline so the rows can be sorted before the key is
+    #: dropped again; a fired job sorts last, being bookkeeping rather than
+    #: something still pending.
+    local s deadline action targets suffix
+    integer remaining
+    local -a keyed
+    for s in "${sessions[@]}" ; do
+        test -n "${s}" || continue
+
+        #: The `=' exact-match prefix, so a session whose name merely starts
+        #: with this one cannot answer for it.
+        silent tmux has-session -t "=${s}" || continue
+
+        action="$(tmux show-options -qv -t "${s}" '@agent_usage_arm_action' 2>/dev/null)" || action=''
+        targets="$(tmux show-options -qv -t "${s}" '@agent_usage_arm_targets' 2>/dev/null)" || targets=''
+        suffix=''
+        if test -n "${action}" ; then
+            suffix="  [${action}"
+            if test -n "${targets}" ; then
+                suffix+=" -> ${targets}"
+            fi
+            suffix+=']'
+        fi
+
+        if ! tmux-alive-p "${s}" ; then
+            keyed+=( "9999999999"$'\t'"${s}"$'\t'"${s}  fired${suffix}" )
+            continue
+        fi
+
+        deadline="$(tmux show-options -qv -t "${s}" '@agent_usage_arm_deadline' 2>/dev/null)" || deadline=''
+        if test -z "${deadline}" ; then
+            keyed+=( "0"$'\t'"${s}"$'\t'"${s}  armed (no deadline recorded)${suffix}" )
+            continue
+        fi
+
+        remaining=$(( deadline - EPOCHSECONDS ))
+        if (( remaining > 0 )) ; then
+            keyed+=( "${deadline}"$'\t'"${s}"$'\t'"${s}  fires $(date-unix-to-3339 "${deadline}") (in $(seconds-fmt-short ${remaining}))${suffix}" )
+        else
+            keyed+=( "${deadline}"$'\t'"${s}"$'\t'"${s}  overdue by $(seconds-fmt-short $(( -remaining )))${suffix}" )
+        fi
+    done
+
+    if (( ${#keyed} == 0 )) ; then
+        ecgray "$0: nothing is armed"
+        return 0
+    fi
+
+    local -a rows
+    rows=( "${(@on)keyed}" )
+    #: The sort key was ours; what fzf gets is the session in column 1 and the
+    #: display after it.
+    rows=( "${(@)rows#*$'\t'}" )
+
+    #: `--exit-0' comes from [agfi:fz], so picking nothing is a 130 rather than
+    #: an empty selection we would have to cancel on.
+    local selected
+    selected="$(printf '%s\n' "${rows[@]}" |
+        fz_no_preview=y fz --multi --delimiter=$'\t' --with-nth='2..' \
+            --header 'enter cancels the selected jobs (tab marks several)')" || return 0
+    test -n "${selected}" || return 0
+
+    #: `(ps:\t:)' rather than `read': tab is IFS whitespace, so `read' would
+    #: collapse the columns rather than keep them lined up.
+    local line
+    local -a f picked
+    while IFS= read -r line ; do
+        test -n "${line}" || continue
+
+        f=( "${(@ps:\t:)line}" )
+        test -n "${f[1]}" || continue
+
+        picked+=( "${f[1]}" )
+    done <<< "${selected}"
+
+    (( ${#picked} )) || return 0
+
+    #: It narrates `cancelled'/`reaped' itself.
+    h-agent-usage-armed-cancel "${picked[@]}"
+}
+
 function h-agent-usage-armed-cancel {
     #: Usage: h-agent-usage-armed-cancel <tmux-session>...
     ##

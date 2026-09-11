@@ -262,6 +262,20 @@ function, so dropping one is a matter of commenting out a line; the array
 knob `agent_status_agents` overrides it without editing. A report that
 fails prints its error inside its own section, and the others still appear.
 
+`agent-usage-armed-cancel-fz` is the middle ground between the two bulk
+commands, for when several agents have jobs armed and only one or two of
+them should go -- `agent-usage-armed-status` prints every job but cancels
+nothing, and `agent-usage-armed-cancel` with no arguments takes them all.
+It walks the same `agent-usage-armed-sessions` list and opens an fzf picker
+with one row per session that still exists, armed ones first and soonest
+at the top, each showing the session name, when it fires (RFC-3339) and how
+long from now, plus the pending action and targets, with sessions whose job
+has already fired listed last as `fired` alongside the same action and
+targets so they can be reaped from the picker too. It is multi-select, and
+enter cancels everything selected through `h-agent-usage-armed-cancel`;
+if nothing is armed it says so and does nothing, and selecting nothing
+cancels nothing.
+
 ## The caveat
 
 The job trusts the reset timestamp it was armed with, plus the grace, and does
