@@ -132,8 +132,8 @@ function h-agent-status-one {
     fi
 
     #: The section separator. Trailing rather than leading so that the report
-    #: does not open with a blank line; [agfi:pager-if-overflow] drops it again
-    #: on a terminal.
+    #: does not open with a blank line; [agfi:pager-if-overflow-streaming] drops
+    #: it again on a terminal.
     ec ''
 
     #: Deliberately zero: `parallelm' should report the *run* as successful even
@@ -170,8 +170,11 @@ function agent-status {
     #: others, which is the opposite of [agfi:parallelm]'s default. Belt and
     #: braces with [agfi:h-agent-status-one]'s own `return 0', because a job
     #: can also die in ways the function never sees.
+    #: The *streaming* pager: =--keep-order= hands us the sections in order but
+    #: only as each finishes, so the plain [agfi:pager-if-overflow] would hold
+    #: the whole report back until the slowest agent answered.
     parallel_halt=never parallelm --keep-order h-agent-status-one '{}' "${color}" ::: "${agents[@]}" |
-        pager-if-overflow
+        pager-if-overflow-streaming
 }
 aliasfn agst agent-status
 ##

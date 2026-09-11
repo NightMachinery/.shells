@@ -64,4 +64,79 @@ function pager-if-overflow {
         ec "$content"
     fi
 }
+
+function pager-if-overflow-streaming {
+    #: [agfi:pager-if-overflow], but it does not wait for EOF to show anything. Same knob, same paging decision.
+    #: For producers that emit their output in sections over time -- [agfi:agent-status] runs three reports under =parallelm --keep-order=, so the first section is ready seconds before the last. The plain version slurps everything first, and so shows a blank screen for as long as the slowest section takes.
+    #: What it costs: when the content turns out *not* to fit, the lines already on the screen are erased before the pager opens. That is a redraw the plain version never does, and it assumes a terminal that honours cursor movement -- so this is the variant you ask for, not the default.
+    local margin="${pager_overflow_margin:-2}"
+
+    if ! isOutTty ; then
+        cat
+        return $?
+    fi
+
+    setopt localoptions extendedglob
+
+    local width height
+    width="$(terminal-width-get)" @TRET
+    height="$(terminal-height-get)" @TRET
+    local -i limit=$(( height - margin ))
+
+    local -a buf=() pending=()
+    local line item visible overflow_p=''
+    #: =count=: wrapped lines seen so far. =printed=: how many of them actually reached the screen, i.e. what we would have to erase. =blanks=: empty lines held back, see below.
+    local -i count=0 printed=0 blanks=0 i=0
+
+    #: =|| test -n "$line"=: a last line without a trailing newline leaves =read= failing with the content still in =$line=. It cannot loop forever, because the next =read= empties =$line= before failing again.
+    while IFS= read -r line || test -n "$line" ; do
+        if test -z "$line" ; then
+            #: Held back rather than emitted, so that *trailing* blank lines are dropped -- which is what [agfi:pager-if-overflow]'s =content="$(cat)"= does for free, and what [agfi:agent-status] relies on to end without a gap. A blank line in the middle is released by the next non-empty one.
+            blanks+=1
+            continue
+        fi
+
+        pending=()
+        for (( i = 0 ; i < blanks ; i++ )) ; do
+            pending+=('')
+        done
+        blanks=0
+        pending+=("$line")
+
+        for item in "${pending[@]}" ; do
+            buf+=("$item")
+
+            if test -n "$overflow_p" ; then
+                #: Past the threshold we only collect; the pager gets all of it.
+                continue
+            fi
+
+            #: Measured on the *visible* width, the way [agfi:text-wrap] would: CSI sequences (colours, and whatever else an =--color= producer emits) occupy no columns, and =${(m)#...}= counts a double-width character as the two columns it takes. OSC sequences (e.g. =delta --hyperlinks=) are not stripped, so a hyperlinked line over-counts -- erring towards paging, which is the safe side.
+            visible="${item//$'\e'\[[0-9;?]#[a-zA-Z]/}"
+            count+=$(( ${(m)#visible} == 0 ? 1 : (${(m)#visible} + width - 1) / width ))
+
+            if (( count > limit )) ; then
+                overflow_p=y
+            else
+                ec "$item"
+                printed=count
+            fi
+        done
+    done
+
+    if test -z "$overflow_p" ; then
+        #: It fit, and is already on the screen.
+        return 0
+    fi
+
+    if (( printed > 0 )) ; then
+        #: Erase what we streamed, so that the screen looks as though nothing had been printed: cursor up =printed= rows, then clear to the end of the screen. Guarded because =CUU 0= is not a no-op -- it moves one row, exactly like =CUU 1=.
+        #: Raw CSI rather than =tput cuu=/=tput ed=, to save two forks on an interactive path.
+        #: We stop printing at =limit=, so the erased region is always smaller than the screen. If the prompt sat near the bottom the printing will still have scrolled it, but the move is relative to the cursor, which is =printed= rows below the first line we wrote either way.
+        printf '\e[%dA\e[J' "$printed"
+    fi
+
+    #: =-+F= unsets =--quit-if-one-screen= from =$LESS=, as we have already decided to page.
+    ec "${(F)buf}" | pager -+F
+}
 ##
