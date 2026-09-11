@@ -249,6 +249,10 @@ function h-agent-done-pane-script {
     #: it, and any later run resumes the session instead. A state file next to
     #: the report is what tells the two apart.
     #:
+    #: The shape of that resume line is a consumed contract, not only
+    #: something the pane runs: [agfi:h-agent-session-tmux-dead-rows] reads the
+    #: transcript back out of it to list this pane in [agfi:fftmux-agent-all].
+    #:
     #: Resumed through [agfi:agent-session-resume], which resolves the agent
     #: from the transcript path and calls that agent's launcher -- so a work
     #: session comes back on the work seat, with its cues repainted, and this
