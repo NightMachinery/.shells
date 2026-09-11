@@ -242,6 +242,26 @@ instead of replacing one, and shows up in their status through
 `agent_usage_continue_via`, with `acat`, `acak` and `acafront` as their short
 aliases.
 
+## All three reports at once
+
+`agent-status` (alias `agst`) prints the Claude Code, Codex and Antigravity
+reports one after another, each under a header carrying the agent's glyph
+and name. The three commands run concurrently through the repo's GNU
+parallel wrapper, `para`, so the whole thing takes about as long as the
+slowest of them rather than the sum, and `--keep-order` keeps the sections
+in the configured order however the jobs happen to finish. The output goes
+through `pager-if-overflow`, so a report longer than the screen pages and a
+short one simply prints.
+
+The jobs run inside BrishGarden shells and therefore see a pipe, not your
+terminal, so colour is decided once, up front, by `agent_status_color`
+(`auto`, `always` or `never`, where `auto` means "when stdout is a
+terminal") and passed to each command explicitly rather than left to their
+own tty checks. The list of agents is written one per line inside the
+function, so dropping one is a matter of commenting out a line; the array
+knob `agent_status_agents` overrides it without editing. A report that
+fails prints its error inside its own section, and the others still appear.
+
 ## The caveat
 
 The job trusts the reset timestamp it was armed with, plus the grace, and does
