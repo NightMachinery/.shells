@@ -228,10 +228,21 @@ function fftmux-agent {
     #: [agfi:h-agent-session-annotate-rows]: `last' (the default) is the last
     #: message either way round, `user' the last one from you, and empty is the
     #: listing's own order. [agfi:fftmux-agent-sort-by-user] is the second.
+    #:
+    #: fftmux_agent_dead_p adds the sessions `/done' has ended, which are still
+    #: sitting in their tmux session as a dead pane showing their report. They
+    #: carry a 💀 ahead of the agent glyph and sort in among the live ones by
+    #: recency like everything else. [agfi:fftmux-agent-all] is that spelling.
+    #:
+    #: Picking one only goes to its session, the same as any other row: bringing
+    #: the conversation back is `prefix-r' in the dead pane, which is a decision
+    #: for whoever is reading the report, not for a picker.
     ##
     local query="$*"
 
     bella_zsh_disable1
+
+    local agent_session_tmux_dead_p="${fftmux_agent_dead_p:-n}"
 
     local rows
     rows="$(agent_session_rows_sort="${fftmux_agent_sort:-last}" h-agent-session-tmux-rows)" @RET
@@ -245,6 +256,8 @@ function fftmux-agent {
     h-fftmux-act "${picks}"
 }
 aliasfn ffta fftmux-agent
+aliasfn fftmux-agent-all fftmux_agent_dead_p=y fftmux-agent
+aliasfn fftaa fftmux-agent-all
 aliasfn fftmux-agent-sort-by-user fftmux_agent_sort=user fftmux-agent
 
 function tmux-pane-list {
