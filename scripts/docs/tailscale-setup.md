@@ -43,6 +43,36 @@ but it is an administrator-oriented path. The GUI app is friendlier and is
 Tailscale's normal recommendation for most macOS users; this repo chooses CLI
 mode because setup should be reproducible from shell.
 
+## Local firewalls silently drop tailnet traffic
+
+Tailscale SSH is a poor test of local firewall rules. `tailscaled` terminates it
+inside its own userspace netstack, so those packets never reach the host packet
+filter at all. Something that genuinely crosses the filter, such as mosh's UDP,
+can fail while `ssh` to the same node is fine. "SSH still works" proves nothing
+here, and neither does `tailscale ping`.
+
+On macOS two independent layers each have to allow it, and each fails by
+dropping rather than by reporting an error:
+
+- **The `com.user.publicnet` pf anchor** denies inbound traffic by source
+  address and trusts only RFC1918. Tailscale uses `100.64.0.0/10`, which is RFC
+  6598 carrier-grade NAT space and not RFC1918, so tailnet peers are dropped
+  unless the anchor is installed with `--tailscale`. See
+  `launchers/pf/install.org` for the safety argument and the caveats. Note it
+  governs IPv4 only: the anchor's `fc00::/7` rule already contains Tailscale's
+  ULA prefix, so tailnet IPv6 is trusted either way. A service can therefore
+  work over `-6` and time out over v4 on the same host.
+
+- **The macOS Application Firewall**, for any ad-hoc signed Homebrew binary that
+  accepts inbound connections. With stealth mode on it drops without a word, and
+  because such binaries are spawned over ssh there is no GUI session to show the
+  usual "allow incoming connections?" prompt, so it defaults to deny.
+  `mosh-server` is the usual casualty. Register it with
+  [agfi:firewall-allow-mosh-darwin], and re-run that after every
+  `brew upgrade mosh`: it registers the version-stamped Cellar path, so an
+  upgrade quietly invalidates it. `firewall-allow-mosh-darwin --check` reports
+  the current state and needs no root.
+
 References:
 
 - Tailscale macOS install docs: <https://tailscale.com/docs/install/mac>
