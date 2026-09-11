@@ -170,7 +170,7 @@ alias cs='codex-status'
 #: lifts. Only *when* the limit resets and *what to say* about it are Codex's;
 #: arming the one-shot job, waiting out the clock, the idle gate and the
 #: delivery are agent-neutral and live in =agent-usage.zsh=. See
-#: =docs/agent-usage-notif.md= and =docs/codex_status.md=.
+#: =docs/agent-usage-armed.md= and =docs/codex_status.md=.
 #:
 #: Two things are worth knowing before reading the code.
 #:
@@ -190,24 +190,22 @@ alias cs='codex-status'
 #: wait. Arming then would only tell you hours later what the report is
 #: telling you now, so we decline and say so.
 ##
-function codex-status-notif-sessions {
-    #: The tmux session Codex's notifier lives in, one per line. Named after
-    #: the scheduling function minus the =h-=, so that `tmux ls' and the
-    #: function you called line up. Plural, and a function rather than a
-    #: literal, so it stays interchangeable with
-    #: [agfi:claude-code-usage-notif-sessions] for anything gathering every
+function codex-status-armed-sessions {
+    #: The tmux session Codex's armed job lives in, one per line. Plural,
+    #: and a function rather than a literal, so it stays interchangeable with
+    #: [agfi:claude-code-usage-armed-sessions] for anything gathering every
     #: agent's sessions at once.
     ##
-    ec 'codex-status-notif-schedule'
+    ec 'codex-status-armed'
 }
 
-function h-codex-status-notif {
+function h-codex-status-arm {
     #: Arms, or re-arms, a one-shot job for when Codex's quota comes back.
     ##
     ensure-cmd jq @RET
 
     local session
-    session="$(codex-status-notif-sessions)" @TRET
+    session="$(codex-status-armed-sessions)" @TRET
 
     #: ANSI stripped, because the JSON is about to be parsed rather than read:
     #: [agfi:codex-status] passes our arguments before its own, so =--json=
@@ -262,7 +260,7 @@ function h-codex-status-notif {
     fi
 
     #: A reset time arrives as a float often enough to matter, and integer
-    #: arithmetic on one aborts rather than rounds. [agfi:h-agent-usage-notif-arm]
+    #: arithmetic on one aborts rather than rounds. [agfi:h-agent-usage-arm]
     #: strips it too; doing it here as well keeps what we hand over honest
     #: rather than relying on the callee to clean it up.
     deadline="${deadline%.*}"
@@ -282,15 +280,15 @@ function h-codex-status-notif {
     local agent_session_agents=codex
     local agent_session_live_rows_scope=all
 
-    h-agent-usage-notif-arm "${session}" "${deadline}" "${msg}"
+    h-agent-usage-arm "${session}" "${deadline}" "${msg}"
 }
 
-function h-codex-status-notif-schedule {
+function h-codex-status-arm-schedule {
     #: Arming without printing a report, for when the report is already in
     #: front of you. The =h-= says the =-notify= forms below are the intended
     #: way in, not that this is off limits.
     ##
-    h-codex-status-notif "$@"
+    h-codex-status-arm "$@"
 }
 
 function codex-status-notify {
@@ -304,7 +302,7 @@ function codex-status-notify {
         #: =>&2= because our stdout may be a JSON document a caller is about
         #: to parse; non-fatal because a failed schedule must not make a
         #: working report look broken.
-        h-codex-status-notif-schedule >&2 || true
+        h-codex-status-arm-schedule >&2 || true
     fi
 
     return "${retcode}"
@@ -314,7 +312,7 @@ function codex-status-notify {
 #: than merely to announce that it is possible. One entry point, not three:
 #: see the delivery note at the top of this block.
 aliasfnq codex-status-continue-fz \
-    agent_usage_notif_action=continue \
+    agent_usage_arm_action=continue \
     codex-status-notify
 
 aliasfn csc codex-status-continue-fz
@@ -322,22 +320,22 @@ aliasfn csc codex-status-continue-fz
 #: Cancelling and reporting are the same act whatever armed the job, so both
 #: are the shared helpers over the session Codex owns. Named arguments still
 #: narrow it, which is only useful when a caller knows the session by name.
-function codex-status-notif-cancel {
+function codex-status-armed-cancel {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(codex-status-notif-sessions)}")
+        sessions=("${(@f)$(codex-status-armed-sessions)}")
     fi
 
-    h-agent-usage-notif-cancel "${sessions[@]}"
+    h-agent-usage-armed-cancel "${sessions[@]}"
 }
 
-function codex-status-notif-status {
+function codex-status-armed-status {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(codex-status-notif-sessions)}")
+        sessions=("${(@f)$(codex-status-armed-sessions)}")
     fi
 
-    h-agent-usage-notif-status "${sessions[@]}"
+    h-agent-usage-armed-status "${sessions[@]}"
 }
 ##
 function image2remote {

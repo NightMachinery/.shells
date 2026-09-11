@@ -3,19 +3,19 @@
 #: up the moment it lifts -- for any agent, not just Claude Code.
 #:
 #: An agent-specific caller works out *when* the limits reset and what to say
-#: about it ([agfi:h-claude-code-usage-notif] reads Claude Code's usage
+#: about it ([agfi:h-claude-code-usage-arm] reads Claude Code's usage
 #: endpoint); everything after that is here: arming a one-shot job, waiting out
 #: the clock, deciding whether resuming is safe, and delivering the resume text
-#: to whatever was picked. See =docs/agent-usage-notif.md=.
+#: to whatever was picked. See =docs/agent-usage-armed.md=.
 ##
 #: How often the armed job re-checks the wall clock.
-typeset -g agent_usage_notif_poll_s="${agent_usage_notif_poll_s:-30}"
+typeset -g agent_usage_arm_poll_s="${agent_usage_arm_poll_s:-30}"
 #: Fire this many seconds after the reset, so the endpoint has actually flipped
 #: by the time we claim it has.
-typeset -g agent_usage_notif_grace_s="${agent_usage_notif_grace_s:-30}"
+typeset -g agent_usage_arm_grace_s="${agent_usage_arm_grace_s:-30}"
 #: What the armed job does once the limits reset: =notif= to tell you, or
 #: =continue= to resume the session that was blocked.
-typeset -g agent_usage_notif_action="${agent_usage_notif_action:-notif}"
+typeset -g agent_usage_arm_action="${agent_usage_arm_action:-notif}"
 #: How the resume reaches the session, and hence which picker arming opens:
 #: =kitty= types into a kitty window, =tmux= types into a tmux pane, and
 #: =frontmost= types wherever the keyboard focus happens to be, with no picker
@@ -32,9 +32,9 @@ typeset -g agent_usage_continue_idle_min_s="${agent_usage_continue_idle_min_s:-6
 #: What gets sent. A carriage return is appended to submit it.
 typeset -g agent_usage_continue_text="${agent_usage_continue_text:-Continue.}"
 #: One line per fire.
-typeset -g agent_usage_notif_log="${agent_usage_notif_log:-${HOME}/logs/agent-usage-notif.log}"
+typeset -g agent_usage_arm_log="${agent_usage_arm_log:-${HOME}/logs/agent-usage-arm.log}"
 ##
-function h-agent-usage-notif-arm {
+function h-agent-usage-arm {
     #: Arms, or re-arms, a one-shot job for a reset the caller has already
     #: worked out: $1 the tmux session it lives in, $2 the reset time as an
     #: epoch, $3 what to say when it fires.
@@ -47,15 +47,15 @@ function h-agent-usage-notif-arm {
     #:
     #: The session name doubles as the label the log and the notifications use,
     #: since it is the one string that identifies the job across agents.
-    #: Usage: h-agent-usage-notif-arm <session> <reset-epoch> <msg>
+    #: Usage: h-agent-usage-arm <session> <reset-epoch> <msg>
     ##
-    local poll_s="${agent_usage_notif_poll_s:-30}"
-    local action="${agent_usage_notif_action:-notif}"
+    local poll_s="${agent_usage_arm_poll_s:-30}"
+    local action="${agent_usage_arm_action:-notif}"
     local idle_min_s="${agent_usage_continue_idle_min_s:-600}"
     local text="${agent_usage_continue_text:-Continue.}"
 
     #: Resuming gets the longer grace of the two; see the knobs above.
-    local grace_s="${agent_usage_notif_grace_s:-30}"
+    local grace_s="${agent_usage_arm_grace_s:-30}"
     if [[ "${action}" == continue ]] ; then
         grace_s="${agent_usage_continue_grace_s:-60}"
     fi
@@ -81,7 +81,7 @@ function h-agent-usage-notif-arm {
     #: Only now that we know we are going to arm, so a report that changes
     #: nothing never puts a picker in your way. Presetting the variable skips
     #: it, which is what makes this callable from a script or a test.
-    local targets="${agent_usage_notif_targets}"
+    local targets="${agent_usage_arm_targets}"
     if [[ "${action}" == continue ]] && test -z "${targets}" ; then
         local -a target_list
         target_list=("${(@f)$(h-agent-usage-continue-targets)}") @TRET
@@ -105,32 +105,32 @@ function h-agent-usage-notif-arm {
     #: =silent= because [agfi:tmux-session-processes-kill] narrates every
     #: re-arm, which would otherwise land in the middle of a usage report.
     silent tmuxnewsh2 "${session}" \
-        agent_usage_notif_poll_s="${poll_s}" \
-        agent_usage_notif_action="${action}" \
-        agent_usage_notif_targets="${targets}" \
+        agent_usage_arm_poll_s="${poll_s}" \
+        agent_usage_arm_action="${action}" \
+        agent_usage_arm_targets="${targets}" \
         agent_usage_continue_idle_min_s="${idle_min_s}" \
         agent_usage_continue_text="${text}" \
-        h-agent-usage-notif-wait "${deadline}" "${session}" "${msg}" @RET
+        h-agent-usage-arm-wait "${deadline}" "${session}" "${msg}" @RET
 
     #: Recorded on the tmux session itself rather than in redis, so the
     #: bookkeeping cannot drift from whether the job actually exists.
     #:
     #: No `=' exact-match prefix on the target here: unlike =has-session=,
     #: =set-option= does not accept one and fails with "no such session".
-    silent tmux set-option -t "${session}" '@agent_usage_notif_deadline' "${deadline}" || true
-    silent tmux set-option -t "${session}" '@agent_usage_notif_action' "${action}" || true
-    silent tmux set-option -t "${session}" '@agent_usage_notif_targets' "${targets}" || true
+    silent tmux set-option -t "${session}" '@agent_usage_arm_deadline' "${deadline}" || true
+    silent tmux set-option -t "${session}" '@agent_usage_arm_action' "${action}" || true
+    silent tmux set-option -t "${session}" '@agent_usage_arm_targets' "${targets}" || true
     #: The name is how this job is found and re-armed; the agent it resumes
     #: must not rename it ([agfi:claude-code-session-tmux-autoname]).
     silent tmux set-option -t "${session}" "${agent_tmux_autoname_option}" off || true
 }
 
-function h-agent-usage-notif-wait {
+function h-agent-usage-arm-wait {
     #: The armed one-shot body, running inside the tmux session that
-    #: [agfi:h-agent-usage-notif-arm] creates. This has to be a function: a
+    #: [agfi:h-agent-usage-arm] creates. This has to be a function: a
     #: bare =sleep= does not keep the marked subshell alive (see =PE/Zsh.org=).
     ##
-    local poll_s="${agent_usage_notif_poll_s:-30}"
+    local poll_s="${agent_usage_arm_poll_s:-30}"
 
     local deadline="${1}" label="${2}" msg="${3}"
     assert-args deadline label msg @RET
@@ -144,10 +144,10 @@ function h-agent-usage-notif-wait {
         sleep "${poll_s}"
     done
 
-    h-agent-usage-notif-fire "${label}" "${msg}"
+    h-agent-usage-arm-fire "${label}" "${msg}"
 }
 
-function h-agent-usage-notif-notify {
+function h-agent-usage-arm-notify {
     #: A stable group, so a repeat replaces the previous notification instead
     #: of stacking up in Notification Center. See =docs/bell-auto.md=.
     ##
@@ -157,7 +157,7 @@ function h-agent-usage-notif-notify {
     notif_group='agent-usage' notif "${msg}"
 }
 
-function h-agent-usage-notif-log {
+function h-agent-usage-arm-log {
     #: One line per fire. The tmux pane a fired job leaves behind says the same
     #: thing, but only until the next reboot, and a job that types into your
     #: session while you are away should stay answerable for it afterwards.
@@ -167,7 +167,7 @@ function h-agent-usage-notif-log {
 
     zmodload zsh/datetime 2>/dev/null
 
-    local log="${agent_usage_notif_log:-${HOME}/logs/agent-usage-notif.log}"
+    local log="${agent_usage_arm_log:-${HOME}/logs/agent-usage-arm.log}"
     ensure-dir "${log:h}" || return 0
 
     print -r -- "$(strftime '%Y-%m-%d %H:%M:%S' "${EPOCHSECONDS}") ${msg}" >> "${log}"
@@ -279,28 +279,28 @@ function h-agent-usage-continue-send {
     kitty @ --to "${sock}" send-text --match "id:${id}" "${text}"$'\r' @RET
 }
 
-function h-agent-usage-notif-fire {
+function h-agent-usage-arm-fire {
     #: What the armed job does once the deadline has passed: tell you, or
     #: resume the sessions that were blocked.
     ##
-    local action="${agent_usage_notif_action:-notif}"
+    local action="${agent_usage_arm_action:-notif}"
     local idle_min_s="${agent_usage_continue_idle_min_s:-600}"
 
     local label="${1}" msg="${2}"
     assert-args label msg @RET
 
     if [[ "${action}" != continue ]] ; then
-        h-agent-usage-notif-notify "${msg}"
-        h-agent-usage-notif-log "${label}: notified"
+        h-agent-usage-arm-notify "${msg}"
+        h-agent-usage-arm-log "${label}: notified"
 
         return 0
     fi
 
     local -a targets
-    targets=(${=agent_usage_notif_targets})
+    targets=(${=agent_usage_arm_targets})
     if (( ${#targets} == 0 )) ; then
-        h-agent-usage-notif-notify "${msg} -- not resuming: no target was recorded"
-        h-agent-usage-notif-log "${label}: notified only, no target recorded"
+        h-agent-usage-arm-notify "${msg} -- not resuming: no target was recorded"
+        h-agent-usage-arm-log "${label}: notified only, no target recorded"
 
         return 0
     fi
@@ -318,8 +318,8 @@ function h-agent-usage-notif-fire {
     fi
 
     if test -n "${reason}" ; then
-        h-agent-usage-notif-notify "${msg} -- not resuming: ${reason}"
-        h-agent-usage-notif-log "${label}: notified only: ${reason}"
+        h-agent-usage-arm-notify "${msg} -- not resuming: ${reason}"
+        h-agent-usage-arm-log "${label}: notified only: ${reason}"
 
         return 0
     fi
@@ -342,8 +342,8 @@ function h-agent-usage-notif-fire {
         report+=" -- could not reach ${(j:, :)unreachable}"
     fi
 
-    h-agent-usage-notif-notify "${report}"
-    h-agent-usage-notif-log "${label}: ${report}"
+    h-agent-usage-arm-notify "${report}"
+    h-agent-usage-arm-log "${label}: ${report}"
 }
 ##
 #: Choosing what gets resumed
@@ -509,8 +509,8 @@ function agent-usage-continue-at {
     #: repository does not model at all -- an API tier, a team quota, a
     #: colleague saying "try again after lunch".
     #:
-    #: Its own tmux session, so it coexists with the per-agent notifiers rather
-    #: than replacing one; [agfi:agent-usage-notif-sessions] lists it with them.
+    #: Its own tmux session, so it coexists with the per-agent armed jobs rather
+    #: than replacing one; [agfi:agent-usage-armed-sessions] lists it with them.
     #: Usage: agent-usage-continue-at <when...>
     ##
     local when="${*}"
@@ -533,18 +533,18 @@ function agent-usage-continue-at {
     #: No grace, in either guise: grace exists because an endpoint's reset time
     #: is a claim we would rather not take at its word, and a time a person
     #: named is not a claim about anything. Fire when they said.
-    local agent_usage_notif_grace_s=0
+    local agent_usage_arm_grace_s=0
     local agent_usage_continue_grace_s=0
 
     #: Forced rather than defaulted: resuming is the entire point of this
     #: entry point, and a bare notification at a time you named is what
     #: [agfi:reminday] is for.
-    local agent_usage_notif_action=continue
+    local agent_usage_arm_action=continue
 
     #: No `agent_usage_continue_profile' and no `agent_session_agents': this
     #: belongs to no agent, so every live session is offered, an agy pane
     #: included.
-    h-agent-usage-notif-arm agent-usage-continue-at "${deadline}" \
+    h-agent-usage-arm agent-usage-continue-at "${deadline}" \
         "Manual resume at $(date-unix-to-3339 "${deadline}")"
 }
 
@@ -560,10 +560,10 @@ aliasfn acafront agent-usage-continue-at-frontmost
 ##
 #: Bookkeeping, over whatever sessions the caller's agent owns
 ##
-function agent-usage-notif-sessions {
-    #: Every tmux session any of these notifiers can live in, one per line.
-    #: What the no-argument [agfi:agent-usage-notif-status] and
-    #: [agfi:agent-usage-notif-cancel] work over, so "what am I waiting on?"
+function agent-usage-armed-sessions {
+    #: Every tmux session any of these armed jobs can live in, one per line.
+    #: What the no-argument [agfi:agent-usage-armed-status] and
+    #: [agfi:agent-usage-armed-cancel] work over, so "what am I waiting on?"
     #: is one question rather than one per agent.
     ##
     local out=()
@@ -571,15 +571,15 @@ function agent-usage-notif-sessions {
     #: Each agent's own list, asked for rather than repeated here: the sessions
     #: are named after the functions that arm them, so a rename should be a
     #: one-file change. Claude Code's is per profile and generated
-    #: ([agfi:claude-code-usage-notif-sessions]); Codex's and Antigravity's are
+    #: ([agfi:claude-code-usage-armed-sessions]); Codex's and Antigravity's are
     #: one name each today, and say so themselves.
     #:
     #: Guarded on the function existing, because these three files are
     #: independent: one absent, disabled or mid-edit must narrow this list
     #: rather than break `status' and `cancel' for the others.
     local fn
-    for fn in claude-code-usage-notif-sessions codex-status-notif-sessions \
-        agy-status-notif-sessions ; do
+    for fn in claude-code-usage-armed-sessions codex-status-armed-sessions \
+        agy-status-armed-sessions ; do
         (( ${+functions[${fn}]} )) || continue
 
         out+=( "${(@f)$("${fn}")}" )
@@ -592,29 +592,29 @@ function agent-usage-notif-sessions {
     ec "${(F)out}"
 }
 
-function agent-usage-notif-status {
-    #: Every armed notifier, whichever agent armed it. Named arguments narrow
+function agent-usage-armed-status {
+    #: Every armed job, whichever agent armed it. Named arguments narrow
     #: it to those sessions.
     ##
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(agent-usage-notif-sessions)}") @TRET
+        sessions=("${(@f)$(agent-usage-armed-sessions)}") @TRET
     fi
 
-    h-agent-usage-notif-status "${sessions[@]}"
+    h-agent-usage-armed-status "${sessions[@]}"
 }
 
-function agent-usage-notif-cancel {
+function agent-usage-armed-cancel {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
-        sessions=("${(@f)$(agent-usage-notif-sessions)}") @TRET
+        sessions=("${(@f)$(agent-usage-armed-sessions)}") @TRET
     fi
 
-    h-agent-usage-notif-cancel "${sessions[@]}"
+    h-agent-usage-armed-cancel "${sessions[@]}"
 }
 
-function h-agent-usage-notif-cancel {
-    #: Usage: h-agent-usage-notif-cancel <tmux-session>...
+function h-agent-usage-armed-cancel {
+    #: Usage: h-agent-usage-armed-cancel <tmux-session>...
     ##
     local sessions=("$@")
     assert-args sessions @RET
@@ -642,8 +642,8 @@ function h-agent-usage-notif-cancel {
     done
 }
 
-function h-agent-usage-notif-status {
-    #: Usage: h-agent-usage-notif-status <tmux-session>...
+function h-agent-usage-armed-status {
+    #: Usage: h-agent-usage-armed-status <tmux-session>...
     ##
     local sessions=("$@")
     assert-args sessions @RET
@@ -657,7 +657,7 @@ function h-agent-usage-notif-status {
             #: With =remain-on-exit= on a fired job leaves its session behind,
             #: which answers "did my notification actually go off?".
             if silent tmux has-session -t "=${s}" ; then
-                ecgray "${s}: not armed; a previous notifier has already fired"
+                ecgray "${s}: not armed; a previous armed job has already fired"
             else
                 ecgray "${s}: not armed"
             fi
@@ -665,14 +665,14 @@ function h-agent-usage-notif-status {
             continue
         fi
 
-        deadline="$(tmux show-options -qv -t "${s}" '@agent_usage_notif_deadline' 2>/dev/null)" || deadline=''
+        deadline="$(tmux show-options -qv -t "${s}" '@agent_usage_arm_deadline' 2>/dev/null)" || deadline=''
 
         #: Which action is pending matters as much as when: arming a resume
         #: replaces a plain notifier for that profile, and the reverse, so a
         #: downgrade should be visible rather than silent.
         local action targets suffix=''
-        action="$(tmux show-options -qv -t "${s}" '@agent_usage_notif_action' 2>/dev/null)" || action=''
-        targets="$(tmux show-options -qv -t "${s}" '@agent_usage_notif_targets' 2>/dev/null)" || targets=''
+        action="$(tmux show-options -qv -t "${s}" '@agent_usage_arm_action' 2>/dev/null)" || action=''
+        targets="$(tmux show-options -qv -t "${s}" '@agent_usage_arm_targets' 2>/dev/null)" || targets=''
         if test -n "${action}" ; then
             suffix=" [action: ${action}"
             if test -n "${targets}" ; then

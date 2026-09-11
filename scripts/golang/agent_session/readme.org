@@ -1502,7 +1502,7 @@ per-transcript keys there is one for every transcript ever opened.
 them, and =h-agent-view-launch= calls it first thing, so the thing that
 creates them clears them and nothing has to be scheduled. It is safe to run by
 hand. It needs to find them, and it cannot do so the way
-=claude-code-usage-notif-sessions= does, by regenerating a list of known names:
+=claude-code-usage-armed-sessions= does, by regenerating a list of known names:
 there is no finite set of transcript names to reconstruct. So
 =agent-view-sessions= scans =tmux list-sessions= for the shared prefix
 =agent_view_session_prefix= instead, the same shape as

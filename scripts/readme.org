@@ -63,7 +63,7 @@ windows or panes you picked.
 
 * Agent usage limits
 
-=./docs/agent-usage-notif.md= covers the one-shot job shared by the Claude
+=./docs/agent-usage-armed.md= covers the one-shot job shared by the Claude
 Code, Codex and Antigravity notifiers: it waits in a tmux session for a reset
 time and then either notifies or types =Continue.= into kitty windows, tmux
 panes or a Codex queue chosen at arm time, unless you are at the keyboard.
