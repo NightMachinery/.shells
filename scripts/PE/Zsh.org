@@ -161,6 +161,20 @@ aliasfn ffbi @opts e install search-engine search @ ffbrew
   Implementation: =h_@opts= and =h_@gather= in =zshlang/basic/macros.zsh=, with
   the runnable =opts-test1= / =opts-test2= pair in the same file.
 
+- =fn-isTop= tells a function whether a person called it from the command line rather than another function calling it, for behaviour that only makes sense interactively: copying a result to the clipboard, a pretty listing, a confirmation. It walks =funcstack= from the outside in, skipping wrapper frames such as =reval=, =assert= and =@opts= (=funcstack_excluded_names= and =funcstack_excluded_prefixes=, in =crash.zsh=), and succeeds when the first real frame is the caller itself.
+
+#+begin_src zsh :eval never
+function var-show {
+    if fn-isTop && isOutTty ; then
+        pbcopy "$*"
+    fi
+    typeset -p "$@"
+}
+alias typ='var-show'   #: an alias adds no frame; an aliasfn would, and hide the top
+#+end_src
+
+Name thin wrappers as extra callers so they count as the top too, e.g. =fn-isTop mv mv2= inside =h_mv=. =fn_isTop_x= and =fn_isTop_xp= exclude more frames, and =fn_isTop_r=y= asks the reverse: whether the nearest real caller is one of the given functions.
+
 - Do not use =~= in parameter-expansion defaults; it will not be expanded there. Prefer =${HOME}=:
 
 #+begin_src :eval never
