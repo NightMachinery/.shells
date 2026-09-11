@@ -392,9 +392,24 @@ The Keychain service name is derived exactly the way Claude Code derives it:
 service = "Claude Code-credentials" + suffix
 suffix  = ""                                     when no config dir is in play
         = "-" + sha256(configDir NFC).hex[0:8]   otherwise
-account = $USER   (falling back to the login name; anything outside
-                   [a-zA-Z0-9._-] becomes "claude-code-user")
+account = the passwd name of this uid, then $USER (anything outside
+          [a-zA-Z0-9._-] is skipped; with neither left, "claude-code-user")
 ```
+
+Both account candidates are tried, best first, and whichever yields a live
+credential wins. Claude Code writes the item under `$USER`, so that has to stay
+a candidate; the passwd entry for our own uid goes ahead of it because when the
+environment and the uid disagree, it is the environment that is wrong far more
+often than the uid.
+
+`getpass.getuser()` is deliberately **not** used, and must not be reintroduced.
+It consults `LOGNAME` first, then `USER`, `LNAME` and `USERNAME`, and only then
+the passwd database — so a shell carrying a stale `LOGNAME=root` while running
+as uid 501 derives the account `root`, which no item has. That failed silently
+and expensively: the default profile fell through to the unfiltered probe below
+and answered from an expired orphan credential (a 401, then hours-old cached
+numbers), while the work profile, which has no such probe, reported no token at
+all. Both looked like a Keychain that could not be reached, and neither was.
 
 The hash suffix goes at the **end**, after `-credentials`, and
 `CLAUDE_SECURESTORAGE_CONFIG_DIR` takes the place of the config dir when it is

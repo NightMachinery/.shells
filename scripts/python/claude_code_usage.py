@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
-import getpass
 import hashlib
 import json
 import os
+import pwd
 import re
 import shutil
 import subprocess
@@ -180,17 +180,53 @@ def keychain_service_for(config_dir: str | None) -> str:
     return f"{KEYCHAIN_SERVICE_BASE}-{digest}"
 
 
-def keychain_account_default() -> str:
-    """The Keychain account name Claude Code itself would use ($USER)."""
+def describe_accounts(accounts: list[str]) -> str:
+    """`account 'evar'`, or `accounts 'evar', 'root'` when several were tried."""
+    quoted = ", ".join(repr(name) for name in accounts)
+    return f"account {quoted}" if len(accounts) == 1 else f"accounts {quoted}"
+
+
+def keychain_account_passwd() -> str | None:
+    """This process's account name according to the passwd database."""
     try:
-        name = os.environ.get("USER") or getpass.getuser()
-    except OSError:
-        return KEYCHAIN_ACCOUNT_FALLBACK
+        name = pwd.getpwuid(os.getuid()).pw_name
+    except (KeyError, OSError):
+        return None
 
-    if not name or not KEYCHAIN_ACCOUNT_RE.match(name):
-        return KEYCHAIN_ACCOUNT_FALLBACK
+    return name if name and KEYCHAIN_ACCOUNT_RE.match(name) else None
 
-    return name
+
+def keychain_account_candidates() -> list[str]:
+    """The Keychain account names to try, best first.
+
+    Claude Code writes the item under ``$USER``, so that has to stay a
+    candidate. What must *not* be the fallback is ``getpass.getuser()``, which
+    was used here before: it consults ``LOGNAME`` first, then ``USER``,
+    ``LNAME`` and ``USERNAME``, and only then the passwd database. A shell
+    carrying a stale ``LOGNAME=root`` while running as uid 501 therefore
+    derived the account ``root``, which no item has -- and the failure was
+    silent, because the default profile then fell through to the unfiltered
+    probe below and answered from an expired orphan credential while the work
+    profile, which has no such probe, reported no token at all.
+
+    The passwd entry for our own uid comes first: when the environment and the
+    uid disagree, it is the environment that is wrong far more often than the
+    uid. ``$USER`` follows it rather than being dropped, because the account is
+    whatever Claude Code saw when it wrote the item, not whatever is true now.
+    """
+    names: list[str] = []
+    for name in (keychain_account_passwd(), os.environ.get("USER")):
+        if not name or not KEYCHAIN_ACCOUNT_RE.match(name) or name in names:
+            continue
+
+        names.append(name)
+
+    return names or [KEYCHAIN_ACCOUNT_FALLBACK]
+
+
+def keychain_account_default() -> str:
+    """The account tried first, and the one reported in `--json`."""
+    return keychain_account_candidates()[0]
 
 
 def profile_config_path(config_dir: str | None) -> Path:
@@ -459,11 +495,15 @@ def get_token(
             return TokenInfo(token=env_token, source=f"env:{name}")
 
     service = keychain_service or keychain_service_for(config_dir)
-    account = keychain_account or keychain_account_default()
+    accounts = [keychain_account] if keychain_account else keychain_account_candidates()
+    account = accounts[0]
 
     # The derived (service, account) pair is what current Claude Code writes,
     # so it is authoritative and unambiguous even with several profiles logged
-    # in. Older versions stored the *default* profile under other account names
+    # in. There is more than one candidate account because the environment can
+    # disagree with the uid -- see keychain_account_candidates -- and
+    # best_token_info picks the live credential from whatever they find.
+    # Older versions stored the *default* profile under other account names
     # ("unknown", or no filter at all), so probe those as a fallback -- but only
     # for the default profile and only when the account was not pinned: a
     # hashed service name can only have been written by a version that already
@@ -475,12 +515,12 @@ def get_token(
         keychain_timeout = timeout
 
     infos, errors = keychain_token_infos(
-        service=service, accounts=[account], timeout=keychain_timeout
+        service=service, accounts=accounts, timeout=keychain_timeout
     )
     if not infos and not errors and keychain_account is None and not config_dir:
         infos, errors = keychain_token_infos(
             service=service,
-            accounts=[None, account, "unknown"],
+            accounts=[None, *accounts, "unknown"],
             timeout=keychain_timeout,
         )
 
@@ -500,14 +540,14 @@ def get_token(
         # locked keychain masquerade as a profile that was never logged in and
         # silently drop to whatever stale cache is lying around.
         raise UsageError(
-            f"could not read the Keychain credential for account {account!r}: "
+            f"could not read the Keychain credential for {describe_accounts(accounts)}: "
             + "; ".join(errors)
         )
 
     tried = ", ".join(str(path) for path in credentials_file_paths(config_dir))
     raise UsageError(
         f"no OAuth token found (tried {', '.join(env_names)}, "
-        f"Keychain item {service!r} account {account!r}, and {tried}); "
+        f"Keychain item {service!r} {describe_accounts(accounts)}, and {tried}); "
         + LOGIN_HINT
     )
 
@@ -1322,7 +1362,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help=(
             "Override the derived Keychain account name; also disables the "
-            "legacy account probe (default: $USER)."
+            "legacy account probe (default: this uid's passwd name, then "
+            "$USER)."
         ),
     )
     parser.add_argument(
