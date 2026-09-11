@@ -1,0 +1,167 @@
+#+TITLE: decset-rewrite
+
+Runs a command on a pseudo-terminal and rewrites DECSET/DECRST *private mode*
+numbers in the child's output, so an application can keep asking for a mode the
+terminal at the far end does not implement. Nothing else in the stream is
+touched, and the input direction is never touched at all.
+
+* Why
+When you ask tmux for any-event mouse reporting it forwards the whole ladder to
+the outer terminal --- =?1000h=, =?1002h=, =?1003h= --- and Termux keeps 1002
+and drops 1003 outright, so the ladder still leaves it with a working mouse.
+mosh, though, remembers a *single* mouse mode, last one wins, and re-emits only
+that one, so what finally reaches Termux is =?1003h= alone and the mouse dies.
+Rewriting 1003 to 1002 inside the application's own output fixes every chain at
+once --- direct, through mosh, through tmux, or all three --- and it is the same
+aliasing that termux-app PR 5281 does inside the terminal emulator.
+
+* Install
+#+begin_src zsh :eval never
+go-install-local "${NIGHTDIR}/golang/decset-rewrite"
+#+end_src
+
+Built automatically on first use by =h-decset-rewrite-dep= in
+[[file:../../zshlang/auto-load/others/agents.zsh][agents.zsh]].
+
+* Use
+#+begin_src sh :eval never
+decset-rewrite [-map FROM=TO]... [-trace FILE] [-no-pty] [--] <command> [args...]
+#+end_src
+
+=-map= is repeatable and takes decimal private mode numbers; with no =-map= at
+all the tool is a pure pass-through proxy, which is the cheapest way to check
+that the proxying itself is not what broke something. A malformed flag exits 2
+with the usage on stderr.
+
+#+begin_src sh :eval never
+decset-rewrite -map 1003=1002 -- claude
+decset-rewrite -map 1003=1002 -map 1015=1006 -- htop
+#+end_src
+
+Filter mode reads stdin and writes stdout, runs no command and opens no pty. It
+is how the rewriting is checked by hand, and how a saved capture is piped
+through:
+#+begin_src sh :eval never
+printf '\033[?1003h ok \033[?1003$p' | decset-rewrite -no-pty -map 1003=1002 | od -c
+#+end_src
+#+begin_example
+0000000  033   [   ?   1   0   0   2   h       o   k     033   [   ?   1
+0000020    0   0   3   $   p
+#+end_example
+
+=-trace FILE= appends one line per private-mode sequence seen: an RFC3339
+timestamp, =set= or =reset=, the original mode list, and the rewritten list
+after =->= when the rewrite actually changed something. The file is created
+0600 if it does not exist.
+#+begin_example
+2026-09-11T18:40:28+02:00 set 1000;1003 -> 1000;1002
+2026-09-11T18:40:28+02:00 reset 1003 -> 1002
+2026-09-11T18:40:28+02:00 set 1002
+#+end_example
+
+*Only mode numbers are ever written to the trace.* No other byte of the child's
+output reaches it, because the child is an interactive session and its output is
+whatever you were doing. A trace that cannot be opened or written is a warning
+on stderr and nothing more; it never takes the child down.
+
+When stdin is not a terminal the tool =exec=s the command in place --- same pid,
+no pty, no proxy --- so =claude -p ... | jq= behaves exactly as it would without
+the wrapper. Exit status is 127 if the command is not found. Otherwise the
+child's status is passed through, or 128 plus the signal number if it died from
+one.
+
+* What is rewritten, and what is not
+Rewritten: the complete form =ESC [ ? <params> h= (DECSET) and =ESC [ ? <params>
+l= (DECRST). Multiple parameters are mapped position by position and rejoined,
+so =ESC[?1000;1003h= becomes =ESC[?1000;1002h=. An empty parameter is left
+exactly as it was found. A mapping that collapses two positions onto the same
+mode is harmless --- setting a mode twice is setting it once.
+
+Not rewritten:
+
+- *DECRQM and its replies*, =ESC[?1003$p= and =ESC[?1003;2$y=, on purpose. An
+  application that asks the terminal what is enabled deserves an honest answer;
+  faking one here would make it believe a mode is active that the far terminal
+  never agreed to. The consequence is that a careful application can notice the
+  disagreement, which is better than being lied to.
+- *Anything without the =?= private marker.* =ESC[1003h= is an ANSI mode, not a
+  DEC private one, and shares nothing but its spelling.
+- *Longer numbers that merely start the same way.* The parameter is parsed as a
+  whole, so =ESC[?10031h= is mode 10031 and not a match for 1003.
+- *The input direction.* Whatever you type goes to the child byte for byte.
+
+* The state machine
+A byte state machine, no regex, no lookahead buffer beyond the sequence itself:
+
+#+begin_example
+Ground --ESC--> Esc --'['--> Csi --'?'--> Priv --[0-9;]--> Priv
+Priv --'h'|'l'--> emit the rewritten sequence, trace it
+any other byte, in any state but Ground --> release the held bytes verbatim,
+                                            then re-examine that byte in Ground
+#+end_example
+
+Re-examining rather than dropping is what makes =ESC ESC[?1003h= work: the first
+ESC cannot introduce a CSI, so it goes out on its own and the machine restarts on
+the second one. The same rule is why DECRQM passes through --- =$= is not a final
+byte, so the whole thing is released as it was read.
+
+Only a read that ends *inside* a candidate sequence holds bytes over to the next
+call, and at most =ESC [ ?= plus =paramCap= parameter bytes; past that the run is
+released verbatim and the machine gives up on it, so a hostile or merely strange
+stream can never make the proxy buffer without bound. =Flush= releases whatever
+is still held, and is called at EOF so a stream ending mid-sequence does not lose
+its tail. Steady-state =Write= reuses its output buffer and does not allocate.
+
+* Process identity
+The wrapper is the foreground process of the outer tty; the child runs in its
+own session on the inner pty. Anything that identifies an agent by the
+foreground command line or pid of a terminal therefore has to look one level
+down --- the zsh side does this in
+[[file:../../zshlang/auto-load/others/agent-session.zsh][agent-session.zsh]].
+
+=ps= shows the proxy for what it is, which is the point. Installing per-agent
+symlinks so the wrapper would masquerade under the agent's own name was
+considered and rejected: the matchers would then see two processes both looking
+like the agent, which is a worse failure than seeing one process that is
+honestly a proxy.
+
+* Dependencies
+=github.com/creack/pty= for opening the pty and carrying window sizes, and
+=golang.org/x/term= (which brings =golang.org/x/sys=) for raw mode. Both are
+pinned, and the =go= line stays at 1.21 so =GOTOOLCHAIN= never goes looking for a
+newer toolchain --- current =x/term= would force it forward.
+
+Unlike [[file:../wifi-login-site/readme.org][wifi-login-site]], this tool never
+has to build with the network down, so having dependencies at all is affordable
+here. Re-implementing =forkpty= and =cfmakeraw= by hand would be a larger
+liability than two small, stable libraries.
+
+=x/term='s =State= is opaque, so copying the outer terminal's line discipline
+onto the pty slave --- so the child sees the same erase character and flags ---
+goes through =x/sys/unix= ioctls directly, with the per-OS request constants in
+build-tagged files.
+
+* Limitations
+- =kill -9= of the wrapper leaves the outer terminal in raw mode, as it does for
+  any pty proxy: the restore runs on every exit path the process is allowed to
+  reach, and SIGKILL is not one of them. =reset= puts it back.
+- The pty is a pty, not the real terminal. Everything the child asks the
+  terminal is answered by the terminal at the far end, which is what we want, but
+  it does mean one more hop of latency on those round trips.
+
+* Tests
+#+begin_src sh :eval never
+go test ./...
+#+end_src
+
+The rewriter is tested as a pure function: a table of inputs covering the
+sequences above, each one replayed under *every* two-way split and byte at a
+time, since a 64 KiB read from a pty lands wherever it lands and a sequence
+straddling two reads is the normal case rather than the exotic one. A random
+test builds streams out of complete single-parameter sequences and non-ESC
+filler --- the shape a whole-buffer =bytes.ReplaceAll= gets right --- chops them
+at random points and checks the incremental machine against that oracle.
+
+The pty tests run =sh= under =run= with a =bytes.Buffer= standing in for the
+terminal, and cover the rewrite end to end, exit status, death by signal, and
+that the child's window size is already correct the first time it asks.
