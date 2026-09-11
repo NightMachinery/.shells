@@ -18,14 +18,6 @@ function whichm() {
     do
         nextItems+="${item%%+}"
 
-        #: The names that resolve to something, for a caller that declared
-        #: the array ([agfi:wh] does, to copy them); a bare call leaves no
-        #: global behind.
-        if (( ${+whichm_found} )) && \
-            (( ${+functions[$item]} + ${+aliases[$item]} + ${+builtins[$item]} + ${+commands[$item]} + ${+parameters[$item]} )) ; then
-            whichm_found+=( "${item}" )
-        fi
-
         if ! (( ${+functions[$item]} )) && ! (( ${+aliases[$item]} )) ; then
             if (( ${+builtins[$item]} )) ; then
                 res="$(which -- $item)" && ec "## ${res}"
@@ -92,25 +84,17 @@ function whichm() {
 
 function wh {
     : "usage: wh <name>...
-whichm through bat; at top level on a tty, also copies the names it resolved, one per line."
-    #: whichm runs in this shell and bat reads a file rather than a pipe: the
-    #: left side of a pipe is a subshell, and the names whichm collected would
-    #: die with it.
-    ##
-    local -a whichm_found=()
-    local tmp
-    tmp="$(gmktemp)" @RET
-    {
-        whichm "$@" > "${tmp}"
-        btz < "${tmp}"
-    } always {
-        command rm -f -- "${tmp}"
-    }
-
+whichm through bat; at top level on a tty, also copies the names given, one per line."
+    #: The names as typed, not what they resolve to: `wh x' copies `x' even
+    #: when the listing follows x through three wrappers.
+    #:
     #: [agfi:fn-isTop]: `whh' and friends call this too, and they want the
     #: listing, not the clipboard.
-    if (( ${#whichm_found} )) && isOutTty && fn-isTop ; then
-        print -rl -- "${(u)whichm_found[@]}" | pbcopy
+    ##
+    whichm "$@" | btz
+
+    if (( $# )) && isOutTty && fn-isTop ; then
+        print -rl -- "$@" | pbcopy
     fi
 }
 
