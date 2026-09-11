@@ -351,7 +351,7 @@ fi
 
 Prefer =ensure-dep1= for things we build ourselves out of this repo (a local Go or Rust tool), and =ensure-cmd= for things the user is expected to install, since we should not silently install system packages on their behalf.
 
-- The Go helper binary pattern: when a function's real work is better done in Go, it lives in =golang/<name>/= as its own module (=go.mod= with =module <name>=), with a =readme.org= documenting install and use, and tests as =*_test.go=.
+- Work better done in Go lives in =golang/<name>/=, one module per tool (=module <name>= in =go.mod=), with =*_test.go= tests and a =readme.org= for install and use.
 
 zsh keeps the policy, Go does the work. The zsh side stays a thin wrapper that reuses the existing helpers, decides the fallbacks and formats the output; the binary is a pure computation/IO unit that emits JSON (or another parseable format) and takes no interactive decisions of its own.
 
