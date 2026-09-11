@@ -149,6 +149,13 @@ local kSourceHID = 1
 --- when whoever posted it created none of its own.
 local kSourceCombinedSession = 0
 
+--- There is deliberately no constant for the *private* ids these two are
+--- tested against. A private id is minted per event source and is different
+--- every time -- two Hammerspoon-made events measured on this machine came
+--- back 1364438702 and 841834532. So the test below can only ever be "neither
+--- well-known one". Never turn it into an equality check against a value
+--- somebody once observed; it would pass on one launch and deny on the next.
+
 local kKeyTypes = { types.keyDown, types.keyUp, types.systemDefined }
 local kMouseTypes = {
     types.leftMouseDown, types.leftMouseUp,
@@ -308,6 +315,13 @@ end
 --- per event: read it, post the event, read it again. Counts only that rule --
 --- F18 and the two chords are a hand at the keyboard, not automation. A
 --- Hammerspoon reload resets it, since it reloads this chunk.
+---
+--- Read it in a *separate* `hs -c` from the one that posts. The tap callback
+--- runs on the main thread's run loop, which has not turned yet when `post()`
+--- returns, so a before/post/after sequence inside one invocation always
+--- reports no change -- and `hs.timer.usleep` between them makes it worse, not
+--- better, since it blocks the very run loop the callback is waiting on. Two
+--- of us have now read that as a regression before spotting it.
 function blackoutLockPassed()
     return passedCount
 end

@@ -653,12 +653,18 @@ well-known values, and both are still dropped:
   must still catch. It costs local tools nothing, because a local tool posting
   events always has a source of its own.
 
-Anything else is a *private* source id, minted per event source and unique to
-it — two Hammerspoon-made events measured on different days came back
-`1364438702` and `841834532`, so do not match on a value, only on "neither
-well-known one". A private id can only come from a process running on this
-machine, so it passes: this config, an agent driving a test instance, and any
-other local tool that posts events.
+Anything else is a *private* source id. A private id can only come from a
+process running on this machine, so it passes: this config, an agent driving a
+test instance, and any other local tool that posts events.
+
+**The private id is not a constant, and must never be compared to a literal.**
+It is minted per event source, so it differs between launches and between
+tools: two Hammerspoon-made events measured on this machine came back
+`1364438702` and `841834532`. The only sound test is "neither well-known one",
+which is what the code does. An equality check against a value someone once
+observed would pass on one launch and deny on the next, and the failure would
+look like a flaky lock rather than a bug.
+
 `eventSourceUserData` is `0` throughout and carries nothing, so it is not used.
 An id that is not a number at all falls through to the key rules rather than
 passing — the read fails toward the lock, not away from it.
@@ -669,6 +675,22 @@ Instead the module counts what the rule let through, and
 posting a synthetic event and the difference answers "did it land". It counts
 only this rule, so F18 and the two chords — a hand at the keyboard — do not
 move it, and a Hammerspoon reload resets it along with the chunk.
+
+**Post and read in separate `hs -c` invocations.** The tap callback runs on the
+main thread's run loop, which has not turned yet when `post()` returns, so a
+before/post/after sequence inside a single invocation always reports no change
+— and putting `hs.timer.usleep` between them makes it worse rather than better,
+because that blocks the very run loop the callback is waiting on. Two people
+hit this independently and both read it as the change having failed:
+
+```sh
+before=$(hs -c 'return blackoutLockPassed()')
+hs -c 'hs.eventtap.event.newScrollEvent({0,0},{},"line"):post()'   # scrolls nothing
+after=$(hs -c 'return blackoutLockPassed()')
+```
+
+A zero-delta scroll is the safe probe: the lock taps `scrollWheel`, so it
+exercises the rule, but it moves no window and types into nothing.
 
 Two taps are in play during a blackout, and they do different jobs. The lock
 tap above only ever decides what to *drop*. The chord tap is separate: it runs
