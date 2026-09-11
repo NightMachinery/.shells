@@ -2,26 +2,48 @@
 #: Antigravity's remaining quota, and picking a conversation back up when it
 #: resets.
 #:
-#: The source is =agy -p /usage= (alias =/quota=), which prints one tab
-#: separated row per model group. Per the vendor's changelog it spends no
-#: quota and leaves no conversation behind, which is what makes it safe to
-#: call from a report you run all day. It is still a full CLI start-up, so it
-#: runs under a timeout and in a throwaway directory -- Antigravity reads the
-#: cwd's project context, and a report must not attach itself to whatever
-#: repository you happen to be standing in.
+#: Two implementations of the same report, chosen by [agfi:agy_status_method]:
+#:
+#: - =direct= ([agfi:h-agy-status-direct]) asks the backend endpoint behind
+#:   the numbers itself, with the OAuth token `agy' keeps in the login
+#:   Keychain. One or two HTTP round trips, no CLI start-up. The work is in
+#:   =python/agy_status.py=.
+#: - =slow= ([agfi:h-agy-status-slow]) runs =agy -p /usage= (alias =/quota=),
+#:   which prints one tab separated row per model group. Per the vendor's
+#:   changelog it spends no quota and leaves no conversation behind, which is
+#:   what makes it safe to call from a report you run all day. It is still a
+#:   full CLI start-up plus five sequential backend round trips, so it runs
+#:   under a timeout and in a throwaway directory -- Antigravity reads the
+#:   cwd's project context, and a report must not attach itself to whatever
+#:   repository you happen to be standing in.
+#:
+#: The fast path never falls back to the slow one on its own: a fallback that
+#: fires silently is a breakage nobody notices for months. It says what failed
+#: and names =agy-status-slow=, which is one word to type.
 #:
 #: Everything after "when does it reset" -- arming the job, waiting the clock
 #: out, deciding whether resuming is safe, delivering the resume text -- is
 #: agent-neutral and lives in =agent-usage.zsh=. See =docs/agy_status.md= and
 #: =docs/agent-usage-armed.md=.
 ##
-#: How long =agy -p= gets before we give up on it.
+#: Which implementation [agfi:agy-status] runs. An enum rather than a
+#: =_p= switch, because there is nothing boolean about "which of these two".
+typeset -g agy_status_method="${agy_status_method:-slow}"
+#: How long =agy -p= gets before we give up on it. The slow path's alone: it
+#: is sized for a cold CLI start-up, which is far too generous for one HTTP
+#: request.
 typeset -g agy_status_timeout_s="${agy_status_timeout_s:-60}"
+#: The direct path's per-request timeout.
+typeset -g agy_status_direct_timeout_s="${agy_status_direct_timeout_s:-20}"
+#: Whether the direct path delegates to the brish garden; see
+#: [agfi:h-agy-status-garden-p] for what =auto= decides and why.
+typeset -g agy_status_garden_p="${agy_status_garden_p:-auto}"
 #: Emit the report as a JSON array instead of prose, for a caller that parses
 #: it ([agfi:h-agy-status-arm-deadline] is one).
 typeset -g agy_status_json_p="${agy_status_json_p:-n}"
-#: Also show the pay-as-you-go credit balance, which is a second `agy' start-up
-#: and hence off by default.
+#: Also show the pay-as-you-go credit balance. There is no endpoint of ours
+#: for it, so it costs an `agy' start-up on either path -- hence off by
+#: default.
 typeset -g agy_status_credits_p="${agy_status_credits_p:-n}"
 #: Utilization at or above which a model group counts as blocking us. The only
 #: knob of the armed job that is Antigravity's own.
@@ -35,7 +57,8 @@ typeset -g agy_status_color="${agy_status_color:-auto}"
 ##
 function h-agy-status-run {
     #: Runs one of Antigravity's print-mode slash commands and prints its
-    #: output verbatim.
+    #: output verbatim. The slow path's engine, and the only way to the
+    #: credits, which have no endpoint of their own here.
     #: Usage: h-agy-status-run </usage|/credits>
     ##
     local timeout_s="${agy_status_timeout_s:-60}"
@@ -175,12 +198,20 @@ function h-agy-status-credits {
     done
 }
 
-function agy-status {
+function h-agy-status-slow {
     #: What is left of Antigravity's quota, per model group, and when it comes
-    #: back. See =docs/agy_status.md=.
+    #: back, by asking =agy= itself. Reachable as =agy-status-slow=.
+    #: See =docs/agy_status.md=.
     ##
     local json_p="${agy_status_json_p:-n}"
     local credits_p="${agy_status_credits_p:-n}"
+
+    if (( $# > 0 )) ; then
+        #: This path is driven entirely by knobs; only the direct one forwards
+        #: arguments, to =agy_status.py=. Said out loud rather than dropped, so
+        #: a =--host= aimed at the wrong implementation is visible.
+        ecgray "$0: ignoring arguments: $*"
+    fi
 
     local rows
     rows="$(h-agy-status-rows)" @TRET
@@ -254,7 +285,130 @@ function agy-status {
         h-agy-status-credits
     fi
 }
+##
+#: The direct path
+##
+function h-agy-status-garden-p {
+    #: Whether to run the direct report inside the brish garden rather than
+    #: here.
+    #:
+    #: The garden's worker shells are attached to the GUI session, so they can
+    #: read the login keychain, which is where the OAuth token lives. A
+    #: GUI-detached session cannot: its keychain search list collapses to the
+    #: System keychain alone, so the lookup finds nothing and =security=
+    #: reports the credential as simply absent. See =docs/agy_status.md=.
+    #:
+    #: Proactive rather than a retry, because over ssh the local read *cannot*
+    #: succeed -- attempting it first would only buy a round trip and a
+    #: misleading error. The same shape as
+    #: [agfi:h-claude-code-usage-garden-p], for the same reason.
+    ##
+    local mode="${agy_status_garden_p:-auto}"
+
+    case "${mode}" in
+        y) return 0 ;;
+        n) return 1 ;;
+        auto) isSSH ;;
+        *)
+            ecerr "$0: unknown agy_status_garden_p: ${mode} (auto, y, n)"
+            return 1
+            ;;
+    esac
+}
+
+function h-agy-status-run-direct {
+    #: The one place =agy_status.py= is invoked, so the garden delegation
+    #: cannot be forgotten by a caller.
+    #:
+    #: The whole invocation is delegated, not just the keychain read, so the
+    #: token never leaves the GUI-attached process: only the rendered report or
+    #: the JSON array comes back. See =docs/agy_status.md=.
+    ##
+    if h-agy-status-garden-p && brishz-alive-p ; then
+        local -a color_opts=()
+        #: The garden's stdout is a pipe, so =--color auto= would resolve to no
+        #: colour for the command run most often. Placed first, so the
+        #: =--color= our caller resolved still wins (argparse is last-wins).
+        [[ -t 1 ]] && color_opts=(--color always)
+
+        #: Non-ASCII survives the trip this way; the inline transport mangles
+        #: it.
+        brishz_out_file_p=y brishzq.zsh agy_status.py "${color_opts[@]}" "$@"
+        return $?
+    fi
+
+    $proxyenv revaldbg command agy_status.py "$@"
+}
+
+function h-agy-status-direct {
+    #: The same report as [agfi:h-agy-status-slow], read from the backend
+    #: rather than from =agy=. Reachable as =agy-status-direct=.
+    #: See =docs/agy_status.md=.
+    ##
+    local json_p="${agy_status_json_p:-n}"
+    local credits_p="${agy_status_credits_p:-n}"
+    local timeout_s="${agy_status_direct_timeout_s:-20}"
+
+    ensure-cmd agy_status.py @RET
+
+    #: Decided here rather than left to the script's own =auto=: the knob is
+    #: about *our* stdout, and the script may well be running in the garden,
+    #: where stdout is a pipe whatever the user is looking at. Note the call is
+    #: not in a command substitution -- see [agfi:h-color-mode-p] for why that
+    #: matters.
+    local color=never
+    h-color-mode-p "${agy_status_color:-auto}" && color=always
+
+    local -a script_args=(--timeout "${timeout_s}" --color "${color}")
+    if bool "${json_p}" ; then
+        script_args+=(--json)
+    fi
+
+    local retcode=0
+    #: Our own arguments come last, so anything the caller passes -- =--host=,
+    #: =--no-relogin= -- overrides what we decided.
+    h-agy-status-run-direct "${script_args[@]}" "$@" || retcode=$?
+
+    if (( retcode == 0 )) && bool "${credits_p}" && ! bool "${json_p}" ; then
+        #: Credits are the one number with no endpoint of ours, so this
+        #: addendum is still an =agy= start-up even on the fast path. It is off
+        #: by default, and asking for it is asking for that cost.
+        #:
+        #: Deliberately not in the JSON, exactly as on the slow path: they are
+        #: a different currency from the quota windows, and nothing parses them.
+        h-agy-status-credits
+    fi
+
+    return "${retcode}"
+}
+##
+function agy-status {
+    #: What is left of Antigravity's quota, per bucket, and when it comes back.
+    #: The gateway: [agfi:agy_status_method] picks the implementation.
+    #: See =docs/agy_status.md=.
+    ##
+    local method="${agy_status_method:-slow}"
+
+    case "${method}" in
+        direct)
+            h-agy-status-direct "$@"
+            ;;
+        slow)
+            h-agy-status-slow "$@"
+            ;;
+        *)
+            ecerr "$0: unknown agy_status_method: ${method} (direct, slow)"
+            return 1
+            ;;
+    esac
+}
 aliasfn agys agy-status
+
+#: Named implementations, so a caller can demand one without knowing the knob.
+#: The slow one is what a failing direct report names, and what to reach for
+#: when you need the number =agy= itself would print.
+aliasfnq agy-status-direct agy_status_method=direct agy-status
+aliasfnq agy-status-slow agy_status_method=slow agy-status
 ##
 #: Waiting the quota out
 ##
