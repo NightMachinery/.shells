@@ -5,26 +5,24 @@ Antigravity quota is left and when it comes back, and can arm the shared
 reset notifier on that. It is the Antigravity counterpart of the Claude Code
 report in `docs/claude_code_usage.md` and of `codex-status` in
 `docs/codex_status.md`. It began a good deal smaller than either, because
-Antigravity gave us less to work with; it has since grown two more
-implementations, and most of this document is about the three of them and why
-all three are kept.
+Antigravity gave us less to work with; it has since grown a second
+implementation, and a fair part of this document is about the two of them and
+why both are kept.
 
-## Three implementations, one report
+## Two implementations, one report
 
 `agy-status` (alias `agys`) is a gateway. The knob `agy_status_method`, an
-enum with the values `statusline`, `direct` and `slow`, picks which
-implementation runs, and the three named forms `agy-status-statusline`,
-`agy-status-direct` and `agy-status-slow` force one without the caller having
-to know the knob. It is an enum rather than a `_p` switch because there is
-nothing boolean about "which of these three": the third way in arrived as a
-third value, exactly as the shape predicted, rather than as a second switch.
+enum with the values `statusline` and `slow`, picks which implementation
+runs, and the two named forms `agy-status-statusline` and `agy-status-slow`
+force one without the caller having to know the knob. It is an enum rather
+than a `_p` switch because "which implementation" is not a yes/no question:
+a third value lived here for a while and was removed again, and neither its
+arrival nor its departure disturbed the shape.
 
-`statusline` is the one that answers by default. It is the only fast path
-that is built on something Antigravity documents -- a hook it invites you to
-configure -- rather than on something we inferred, and unlike `direct` it has
-been seen to work. `slow` is what it falls back to and what to reach for when
-you need the number `agy` itself would print; `direct` remains unproven
-against the live backend, so it answers only when asked for by name.
+`statusline` is the one that answers by default. It is built on something
+Antigravity documents -- a hook it invites you to configure -- rather than on
+anything we inferred about its backend. `slow` is what it falls back to, and
+what to reach for when you need the number `agy` itself would print.
 
 Whichever runs, the output is the same contract (see "The report"), so
 everything built on top -- the notifier's deadline, `agent-status` -- neither
@@ -102,7 +100,7 @@ Bucket ids are agy's own -- `gemini-5h`, `gemini-weekly`, `3p-5h`,
 `3p-weekly` -- and the slow path's rows are mapped onto them rather than the
 other way round, by `h-agy-status-bucket-id`; `h-agy-status-bucket-names` is
 the inverse, and is what gives the cache-backed report the same group and
-label text the other two paths print. A row that maps to no id we know gets a
+label text the slow path prints. A row that maps to no id we know gets a
 stable id derived from its own group and label instead of being dropped: a
 group upstream invents should show up in the report looking odd, not vanish
 between two writers.
@@ -120,13 +118,13 @@ because that is a different question: there is nothing to serve at any age.
 The note it prints names `agy-statusline-install`, since the usual cause is
 that the hook has never been installed.
 
-This is a fallback where the direct path deliberately has none, and the
-difference is worth stating. The direct path refuses to fall back because a
-silent fallback would hide a *breakage* -- a fast path that has been dead for
-months while the report kept appearing. Here there is nothing broken to hide:
-an empty cache means the hook has not run, which is a fact about whether you
-have been using agy, not about whether anything works. And it is not silent
-either way -- the reason is always printed.
+The fallback is loud on purpose. A fallback that fires silently hides a
+breakage: the report keeps appearing, only slower, and the fast path could
+have been dead for months. Here there is usually nothing broken to hide -- an
+empty cache means the hook has not run, which is a fact about whether you have
+been using agy, not about whether anything works -- but the reason is printed
+either way, so the two cases are told apart by reading rather than by
+guessing.
 
 `isDeus` forces the slow path and does not open the cache at all, the same
 "force, bypass the memo" convention the rest of zshlang uses. Asking under
@@ -211,17 +209,16 @@ It is called the slow path for a reason. Every call is a full CLI start-up
 followed by five sequential backend round trips, and measured end to end it
 takes anywhere from a couple of seconds to well over ten -- a live run while
 this was being written took thirteen. That is tolerable for a command you
-type once and intolerable for anything that polls, which is what prompted the
-direct path.
+type once and intolerable for anything that polls, which is what the
+statusline cache is for.
 
 The slow path is kept as `h-agy-status-slow` (reachable as
-`agy-status-slow`), and the reason it stays is the reason that once argued
-against having a direct path at all. The backend wants the OAuth token agy
-holds in the Keychain, and calling it ourselves means guessing at agy's login,
-its headers and its response shape, and then keeping pace with agy as those
-change. `agy -p /usage` makes none of those guesses. When the two disagree,
-agy is the one that is right by definition. It is what a failing direct
-report tells you to run, and what the statusline path falls back to when its
+`agy-status-slow`), and the reason it stays is that it guesses at nothing.
+Asking the backend ourselves would mean guessing at agy's login, its headers
+and its response shape, and then keeping pace with agy as those change; an
+attempt at exactly that was made here once and never worked. `agy -p /usage`
+makes none of those guesses, and when the two disagree agy is the one that is
+right by definition. It is what the statusline path falls back to when its
 cache has nothing to say.
 
 It gained one duty with the cache: after a successful run it merges its rows
@@ -235,184 +232,48 @@ happen to be. Antigravity pairs conversations to their working directory, and
 a status check should not be able to leave any trace against a real project,
 nor pick up that project's configuration. It runs under a timeout,
 `agy_status_timeout_s`, because the answer comes from a backend and a status
-check that hangs is worse than one that fails and says so. That timeout is
-the slow path's alone: it is sized for a cold CLI start-up, which would be
-far too generous for a single HTTP request.
-
-## The direct path: asking the backend
-
-`h-agy-status-direct` (reachable as `agy-status-direct`) hands the work to
-`python/agy_status.py`, which asks the one endpoint behind agy's numbers,
-`v1internal:retrieveUserQuotaSummary` on the internal Code Assist API, and
-renders the answer itself. One HTTP round trip in the common case, two at
-most, and no CLI start-up.
-
-The credential is the OAuth token agy keeps in the macOS login Keychain, as a
-generic password under service `gemini` and account `antigravity`. The CLI
-stores it through go-keyring, which base64-encodes any value that is not
-plain ASCII and marks it with a `go-keyring-base64:` prefix; the Keychain
-hands the marker back too, so the script strips it and decodes before parsing
-the JSON underneath. The script only ever *reads* this item. The token is
-agy's to manage, and the section on refreshing below is about how we stay out
-of that.
-
-The endpoint wants a project id. When the credential names one, that is used;
-when it does not, the script asks `v1internal:loadCodeAssist` for it first.
-That is a second round trip, so it is made only when needed -- the whole
-point of this path is to make as few as possible.
-
-Two hosts answer the API, and the order they are tried is a constant in the
-script: `cloudcode-pa.googleapis.com` first, then
-`daily-cloudcode-pa.googleapis.com`. agy is reported to talk to the `daily-`
-one, but the plain host has answered the same calls, so it leads; `--host`
-forces one when you need to know which is misbehaving. A 401 stops the walk
-rather than moving on to the next host, since that is the credential being
-refused, and asking a second host with the same token only turns one clear
-error into two.
-
-The request carries the same headers the CLI sends, including a User-Agent
-with a pinned Antigravity version string. Pinned rather than read from
-`agy --version`, because shelling out to `agy` is the very cost this path
-exists to avoid; if the backend ever starts caring about the version, the
-constant is bumped in the script. Each request runs under
-`agy_status_direct_timeout_s`, the direct path's own per-request timeout,
-kept separate from the slow path's for the reason given above.
-
-### Refreshing the token
-
-The script never refreshes the token itself. When the credential's own expiry
-says it is stale, or the backend answers 401 -- the expiry is only what the
-item claims -- and relogin is enabled (`--relogin` / `--no-relogin`), it runs
-`agy -p /usage` once, from a fresh temporary directory, under a timeout.
-Print mode `/usage` is a built-in agy answers without a model turn, but agy
-still does the OAuth refresh every start-up does and rewrites the Keychain
-item, so one such run costs nothing, leaves no conversation behind, and hands
-the next request a live credential. The script re-reads the item and retries
-the request once. At most one attempt, ever: the retry cannot become a loop.
-
-What it deliberately does *not* do is a refresh-token grant against
-`oauth2.googleapis.com`. That would need the client id and secret the CLI
-registers with, which we do not know, and a wrong one buys an
-`invalid_client` error rather than a token. Letting agy do the refresh also
-means we never see the refresh token at all, only the access token it leaves
-behind. This mirrors the relogin in `python/claude_code_usage.py`, for the
-same reasons.
-
-### No silent fallback
-
-The direct path never quietly becomes the slow one. When anything breaks --
-no Keychain item, a credential with no token in it, an unreachable host, a
-response with no buckets -- it prints what broke to stderr, names
-`agy-status-slow` as the way round it, and exits non-zero.
-
-This is deliberate and worth defending, because the reflex is to fall back. A
-fallback that fires silently is a breakage nobody notices for months: the
-report keeps appearing, only slower, and the fast path has been dead the
-whole time. The whole point of having a fast path is that you can tell
-whether it is working, and a failure that says so is how you tell.
-`agy-status-slow` is one word to type when you need the number now.
-
-### More rows than agy prints
-
-The direct path can return more rows than the slow one, because the backend
-reports every bucket and `/usage` prints only the weekly ones. Bucket ids
-seen upstream are `gemini-5h`, `gemini-weekly`, `3p-5h` and `3p-weekly`, so a
-direct report shows a five-hour window beside each weekly one. Buckets the
-backend marks `disabled` are skipped. During upstream's migration the
-response has carried buckets both grouped under a display name and as a
-legacy flat list, sometimes both at once, so the script reads the groups
-first and takes from the flat list only what the groups did not already
-carry: a bucket id shown twice is worse than a field read from the older
-shape.
-
-For the notifier this is a change in inputs, not in behaviour. The deadline
-is the earliest reset among the exhausted buckets (see below), and a spent
-five-hour window that rolls over before the weekly one is exactly the reset
-worth waking up for.
-
-### An absent remaining is a full bucket
-
-The API is proto3, and proto3 omits default values from the wire. A bucket at
-100% remaining can therefore arrive carrying neither `remainingFraction` nor
-`remainingAmount`. The script reads an absent remaining as "nothing spent",
-not as zero. Reading it as zero would report a full quota as exhausted and
-arm the reset notifier for a reset that changes nothing -- the worst kind of
-false alarm, one that wakes you up to tell you nothing happened.
-
-Where a bucket reports a `remainingAmount`, a count, and no fraction, the
-human report shows the count rather than inventing a percentage. No total
-comes with it to divide by, and a number the report cannot back up is worse
-than a number in a different unit. The JSON still carries a
-`remaining_percent` for such a row, at the assumed full value, because the
-contract requires one; the count sits beside it as `remaining_amount`.
+check that hangs is worse than one that fails and says so. The timeout is
+sized for a cold CLI start-up followed by five sequential round trips, which
+makes it far more generous than a status check would otherwise want.
 
 ### The brish garden guard
 
-Reading the login Keychain only works from a process attached to the GUI
-session. Over ssh the keychain search list collapses to the System keychain
-alone, so the lookup finds nothing and `security` reports the credential as
-simply absent -- not locked, not forbidden, absent, which is the wrong
-diagnosis and would send you off to log in again for nothing.
+The slow path's `agy -p` run wants a process attached to the GUI login
+session, for a reason that is easy to miss. `agy` refreshes its own access
+token whenever the one it holds has expired, and that refresh goes through
+the login Keychain, where the token lives. A
+GUI-detached process cannot touch it: the keychain search list collapses to
+the System keychain alone. Rather than failing, `agy` then falls through to
+its interactive browser login and sits there printing an OAuth URL until our
+timeout kills it. A report that hangs for a minute and then asks you to log in
+is a worse answer than a slow one.
 
-So `h-agy-status-run-direct`, the one place the script is invoked, delegates
-to the brish garden when `h-agy-status-garden-p` says so and the garden is
-alive. The garden's worker shells are attached to the GUI session and can
-read the login Keychain. It is proactive rather than a retry, because a
-detached local read *cannot* succeed; attempting it first would only buy a
-round trip and a misleading error.
-
-The slow path is delegated too, through `agy-status-run-garden`, which forces
-the guard off so a worker can never bounce the command on to another worker.
-It needs the guard for a reason that is easy to miss: `agy` reads the
-Keychain itself whenever the access token it holds has expired and has to be
-refreshed. Detached, that refresh cannot happen, and rather than failing
-`agy` falls back to its interactive browser login and sits there printing an
-OAuth URL until its own timeout expires. A report that hangs for a minute
-and then asks you to log in is a worse answer than a slow one.
+So `h-agy-status-run`, the one place `agy -p` is invoked, delegates to the
+brish garden when `h-agy-status-garden-p` says so and the garden is alive. The
+garden's worker shells are attached to the GUI session, so the refresh
+succeeds there. `agy-status-run-garden` is what the garden runs on our behalf,
+and it forces the guard off so a worker can never bounce the command on to
+another worker. The delegation is proactive rather than a retry, because a
+detached run *cannot* succeed; attempting it first would only buy a minute on
+a login prompt nobody is going to answer.
 
 The knob is `agy_status_garden_p`, an enum `auto|y|n`. Under `auto` the
 question asked is whether `launchctl managername` answers `Aqua`, which it
 does only in a session attached to the GUI login -- the very attachment the
 Keychain search list depends on. That names the real condition where an
 ssh test only guesses at it: an agent-spawned shell on this machine is
-`Background` and cannot read the Keychain either, despite no ssh being
+`Background` and cannot reach the Keychain either, despite no ssh being
 involved. Where there is no `launchctl`, the ssh test stands in.
 
-The *whole* invocation is delegated, not just the Keychain read. The token
-never leaves the GUI-attached process: only the rendered report or the JSON
-array comes back over the garden's transport. Fetching the token into the ssh
-session and making the HTTP request from there would work, and would put the
-credential in one more place than it needs to be. This is the same shape as
-the Claude Code usage report's garden guard, and `docs/claude_code_usage.md`
-has the longer version of the reasoning.
-
-One consequence: inside the garden, stdout is a pipe whatever you are looking
-at, so `agy_status_color` is resolved on our side before the delegation and
-passed to the script as an explicit `--color`, rather than left to the
-script's own `auto`, which would decide "no colour" for the command run most
-often.
-
-### What has been verified
-
-The direct path's mapping from response to rows, its JSON shape, its error
-handling and its rendering are covered by fixture tests that need neither a
-network nor a Keychain. What has *not* been done is an end-to-end run against
-the live backend. Reading the credential was blocked in the environment where
-the path was written, and the first live attempt got as far as reading the
-Keychain item and then reported that it carried no field named
-`access_token`. The extraction was made tolerant in response: it accepts
-several spellings of each field (snake_case and camelCase) and a credential
-nested one level inside a wrapper object, and when it still finds no token it
-names the fields that *were* present -- names only, never values -- so the
-shape can be corrected from the error message alone.
-
-So, plainly: until someone runs `agy-status-direct` and sees numbers, the
-direct path is unproven against the live backend. If it fails, the error says
-why, and `agy-status-slow` is there in the meantime.
+The *whole* command is delegated, not the credential handling alone: only the
+rows `agy` printed come back over the garden's transport, and the token never
+leaves the GUI-attached process. This is the same shape as the Claude Code
+usage report's garden guard, and `docs/claude_code_usage.md` has the longer
+version of the reasoning.
 
 ## The report
 
-All three paths emit the same thing. The human-readable report prints one
+Both paths emit the same thing. The human-readable report prints one
 line per bucket: the group name, the remaining percentage, and the reset as
 local time with how far off it is, since "resets at 03:00 UTC" is not a number
 anyone wants to convert in their head at the moment they have just been cut
@@ -427,18 +288,17 @@ seconds and `resets_at_iso` as the string upstream sent. The epoch is what
 the notifier and anything else scripted on top of this want, so the
 conversion is done once here rather than by every consumer; the original
 string is kept beside it so a disagreement between the two is something you
-can see. Every path now carries `bucket_id` beside those, and the direct one
-adds `remaining_amount`; existing consumers ignore both. That the three
-paths' JSON is interchangeable was checked the same way each time, by feeding
-the output through the jq in `h-agy-status-arm-deadline`.
+can see. Both paths also carry `bucket_id`, which older consumers ignore.
+That the two paths' JSON is interchangeable was checked the same way each
+time, by feeding the output through the jq in `h-agy-status-arm-deadline`.
 
 Credits are the one number with no endpoint of ours. `agy -p /credits` prints
 `Remaining credits` and a count on one row, then an upgrade URL. `agy-status`
 leaves credits out of the default report and out of the JSON, since they are
 a purchased pool with no reset to wait for; `agy_status_credits_p=y` appends
 them to the human report for when the question is whether to buy more. On
-the fast paths that addendum is still an `agy` start-up, so asking for it is
-asking for that cost.
+the statusline path that addendum is still an `agy` start-up, so asking for
+it is asking for that cost.
 
 ## Reset notifications
 
