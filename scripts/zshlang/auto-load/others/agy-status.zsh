@@ -1,0 +1,412 @@
+##
+#: Antigravity's remaining quota, and picking a conversation back up when it
+#: resets.
+#:
+#: The source is =agy -p /usage= (alias =/quota=), which prints one tab
+#: separated row per model group. Per the vendor's changelog it spends no
+#: quota and leaves no conversation behind, which is what makes it safe to
+#: call from a report you run all day. It is still a full CLI start-up, so it
+#: runs under a timeout and in a throwaway directory -- Antigravity reads the
+#: cwd's project context, and a report must not attach itself to whatever
+#: repository you happen to be standing in.
+#:
+#: Everything after "when does it reset" -- arming the job, waiting the clock
+#: out, deciding whether resuming is safe, delivering the resume text -- is
+#: agent-neutral and lives in =agent-usage.zsh=. See =docs/agy_status.md= and
+#: =docs/agent-usage-notif.md=.
+##
+#: How long =agy -p= gets before we give up on it.
+typeset -g agy_status_timeout_s="${agy_status_timeout_s:-60}"
+#: Emit the report as a JSON array instead of prose, for a caller that parses
+#: it ([agfi:h-agy-status-notif-deadline] is one).
+typeset -g agy_status_json_p="${agy_status_json_p:-n}"
+#: Also show the pay-as-you-go credit balance, which is a second `agy' start-up
+#: and hence off by default.
+typeset -g agy_status_credits_p="${agy_status_credits_p:-n}"
+#: Utilization at or above which a model group counts as blocking us. The only
+#: knob of the notifier that is Antigravity's own.
+typeset -g agy_status_notif_full_pct="${agy_status_notif_full_pct:-100}"
+#: Colour of the prose report: =auto= is "colour iff our stdout is a terminal",
+#: resolved by [agfi:h-color-mode-p]. An enum rather than a switch,
+#: because a caller that has already decided has to be able to say so:
+#: [agfi:agent-status] runs us inside the garden, where stdout is a pipe no
+#: matter what the user is looking at. The JSON never gets colour.
+typeset -g agy_status_color="${agy_status_color:-auto}"
+##
+function h-agy-status-run {
+    #: Runs one of Antigravity's print-mode slash commands and prints its
+    #: output verbatim.
+    #: Usage: h-agy-status-run </usage|/credits>
+    ##
+    local timeout_s="${agy_status_timeout_s:-60}"
+
+    local slash_cmd="${1}"
+    assert-args slash_cmd @RET
+
+    ensure-cmd agy @RET
+
+    #: GNU coreutils first, since that is what the rest of zshlang assumes;
+    #: plain =timeout= where the system ships it unprefixed. Running without
+    #: one is still better than refusing to report at all.
+    local -a runner=()
+    if isdefined-cmd gtimeout ; then
+        runner=(command gtimeout "${timeout_s}")
+    elif isdefined-cmd timeout ; then
+        runner=(command timeout "${timeout_s}")
+    fi
+
+    local tmp_dir
+    tmp_dir="$(gmktemp -d)" @TRET
+
+    #: `builtin cd' in the subshell only: the caller's directory is never
+    #: touched, and no wrapper of `cd' gets a say. There are no chpwd hooks in
+    #: zshlang, so nothing prints into the output we are capturing.
+    local out='' ret=0
+    out="$(builtin cd -- "${tmp_dir}" && "${runner[@]}" command agy -p "${slash_cmd}")" || ret=$?
+
+    silent command rm -rf -- "${tmp_dir}" || true
+
+    if (( ret != 0 )) ; then
+        if (( ret == 124 )) ; then
+            ecerr "$0: \`agy -p ${slash_cmd}' timed out after ${timeout_s}s"
+        else
+            ecerr "$0: \`agy -p ${slash_cmd}' failed (${ret})"
+        fi
+
+        return "${ret}"
+    fi
+
+    ec "${out}"
+}
+
+function h-agy-status-rows {
+    #: One normalized row per model group:
+    #:   group \t label \t remaining_percent \t reset_epoch \t reset_iso
+    #:
+    #: The upstream percent is what is LEFT, not what is spent -- the opposite
+    #: of Claude Code's =utilization_percent= -- and the name here says so, so
+    #: that nobody reads 98% as "nearly exhausted".
+    ##
+    ensure-cmd gdate @RET
+
+    local raw
+    raw="$(h-agy-status-run /usage)" @TRET
+
+    local line pct iso epoch
+    local -a f
+    for line in "${(@f)raw}" ; do
+        test -n "${line}" || continue
+
+        #: `(ps:\t:)' rather than `read': tab is IFS whitespace, so `read'
+        #: would collapse an empty field rather than keep the columns lined up.
+        f=( "${(@ps:\t:)line}" )
+        if (( ${#f} < 4 )) ; then
+            #: A banner, a warning, an upsell line: anything that is not a
+            #: quota row. Skipped rather than fatal, so one new line of chrome
+            #: upstream does not take the report down with it.
+            ecgray "$0: skipping unrecognized row: ${line}"
+            continue
+        fi
+
+        pct="${f[3]%\%}"
+        if [[ "${pct}" != <->(|.<->) ]] ; then
+            ecgray "$0: skipping row with a non-numeric percent: ${line}"
+            continue
+        fi
+
+        iso="${f[4]}"
+        #: `gdate' because BSD date cannot read an ISO-8601 string without
+        #: being told its format first.
+        epoch="$(gdate -d "${iso}" +%s)" @TRET
+
+        printf '%s\t%s\t%s\t%s\t%s\n' "${f[1]}" "${f[2]}" "${pct}" "${epoch}" "${iso}"
+    done
+}
+
+function h-agy-status-json {
+    #: Turns [agfi:h-agy-status-rows] on stdin into the JSON array
+    #: =agy_status_json_p= promises.
+    ##
+    ensure-cmd jq @RET
+
+    local line obj
+    local -a f objects=()
+    while IFS= read -r line ; do
+        test -n "${line}" || continue
+        f=( "${(@ps:\t:)line}" )
+
+        #: `--arg'/`--argjson' throughout: a group name is upstream's text and
+        #: must not be able to reach the jq program as syntax.
+        obj="$(jq -n \
+            --arg group "${f[1]}" \
+            --arg label "${f[2]}" \
+            --argjson remaining "${f[3]}" \
+            --argjson resets "${f[4]}" \
+            --arg iso "${f[5]}" \
+            '{group: $group, label: $label, remaining_percent: $remaining, resets_at: $resets, resets_at_iso: $iso}')" @TRET
+        objects+=("${obj}")
+    done
+
+    #: `-s' rather than building the array in zsh, so the result is jq's own
+    #: idea of well-formed rather than ours.
+    ec "${(F)objects}" | jq -s .
+}
+
+function h-agy-status-credits {
+    #: The pay-as-you-go balance, as `Label: value' lines. Its rows are
+    #: two-column (`Remaining credits', `Upgrade'), so they do not go through
+    #: [agfi:h-agy-status-rows].
+    ##
+    local raw
+    raw="$(h-agy-status-run /credits)" @TRET
+
+    local line
+    local -a f
+    for line in "${(@f)raw}" ; do
+        test -n "${line}" || continue
+
+        f=( "${(@ps:\t:)line}" )
+        if (( ${#f} < 2 )) ; then
+            ec "${line}"
+            continue
+        fi
+
+        ec "${f[1]}: ${f[2]}"
+    done
+}
+
+function agy-status {
+    #: What is left of Antigravity's quota, per model group, and when it comes
+    #: back. See =docs/agy_status.md=.
+    ##
+    local json_p="${agy_status_json_p:-n}"
+    local credits_p="${agy_status_credits_p:-n}"
+
+    local rows
+    rows="$(h-agy-status-rows)" @TRET
+    if test -z "${rows}" ; then
+        ecerr "$0: no quota rows in \`agy -p /usage'"
+        return 1
+    fi
+
+    if bool "${json_p}" ; then
+        #: Credits are deliberately not in the JSON: they are a different
+        #: currency from the quota windows, and nothing parses them.
+        ec "${rows}" | h-agy-status-json
+        return $?
+    fi
+
+    zmodload zsh/datetime 2>/dev/null
+
+    #: Decided once, here, rather than per line: `auto' has to test the stdout
+    #: of the report as a whole. Note the call is *not* in a command
+    #: substitution -- see [agfi:h-color-mode-p] for why that matters.
+    local color=never
+    h-color-mode-p "${agy_status_color:-auto}" && color=always
+
+    #: Raw SGR strings from zsh's own `colors', not [agfi:colorfg]: that one
+    #: re-decides for itself from the environment ([agfi:isColor],
+    #: [agfi:true-color-p]), which is the decision the knob above exists to
+    #: take away from it.
+    local c_group='' c_when='' c_off='' c_pct=''
+    local -A pct_colors=()
+    if [[ "${color}" == always ]] ; then
+        c_group="${fg_bold[white]}"
+        c_when="${fg[blue]}"
+        c_off="${reset_color}"
+        pct_colors=(
+            low "${fg_bold[red]}"
+            mid "${fg[yellow]}"
+            high "${fg[green]}"
+        )
+    fi
+
+    local line when
+    local -a f
+    integer remaining_s
+    for line in "${(@f)rows}" ; do
+        f=( "${(@ps:\t:)line}" )
+
+        remaining_s=$(( f[4] - EPOCHSECONDS ))
+        if (( remaining_s > 0 )) ; then
+            when="resets $(date-unix-to-3339 "${f[4]}") (in $(seconds-fmt-short ${remaining_s}))"
+        else
+            #: `agy' reports a window's end even after it has passed, until
+            #: the next call refreshes it.
+            when="reset $(seconds-fmt-short $(( -remaining_s ))) ago"
+        fi
+
+        #: Presentation only, so deliberately not knobs: nothing branches on
+        #: these but the escape codes, and [agfi:agy_status_notif_full_pct] is
+        #: the one threshold that actually decides anything.
+        if (( f[3] <= 10 )) ; then
+            c_pct="${pct_colors[low]}"
+        elif (( f[3] <= 33 )) ; then
+            c_pct="${pct_colors[mid]}"
+        else
+            c_pct="${pct_colors[high]}"
+        fi
+
+        ec "${c_group}${f[1]}${c_off} (${f[2]}): ${c_pct}${f[3]}% remaining${c_off}, ${c_when}${when}${c_off}"
+    done
+
+    if bool "${credits_p}" ; then
+        h-agy-status-credits
+    fi
+}
+aliasfn agys agy-status
+##
+#: Waiting the quota out
+##
+function h-agy-status-notif-deadline {
+    #: Prints "<reset-epoch>\t<msg>" for the reset worth waiting on, or
+    #: nothing at all when there is nothing to wait for.
+    #:
+    #: Split out from [agfi:h-agy-status-notif] because it is the only part
+    #: with a decision in it, and the only part that can be exercised without
+    #: arming a real job.
+    ##
+    local full_pct="${agy_status_notif_full_pct:-100}"
+
+    ensure-cmd jq @RET
+
+    local json
+    json="$(agy_status_json_p=y agy-status)" @TRET
+
+    #: The percent is what REMAINS, so a group is spent when at most
+    #: `100 - full_pct' of it is left: the default 100 means "nothing left".
+    integer max_remaining=$(( 100 - full_pct ))
+
+    #: The EARLIEST reset among the spent groups, unlike Claude Code's latest:
+    #: these are independent quotas rather than nested windows, so the first
+    #: one back is genuinely usable. Hence also naming the group in the
+    #: message -- which quota returned is the whole of what changed.
+    local out=''
+    out="$(ec "${json}" | jq -er --argjson max "${max_remaining}" '
+        [.[] | select(.remaining_percent <= $max)]
+        | select(length > 0)
+        | [(map(.resets_at) | min), (map(.group) | join(", "))]
+        | @tsv')" || out=''
+
+    if test -n "${out}" ; then
+        printf '%s\t%s\n' "${out%%$'\t'*}" \
+            "Antigravity: ${out#*$'\t'} quota reset, usage available again"
+        return 0
+    fi
+
+    if ! isDeus ; then
+        ecgray "$0: usage already possible, not arming (use \`deus\` to arm anyway)"
+        return 0
+    fi
+
+    #: deus: arm for whichever group rolls over first anyway, so the mechanism
+    #: can be exercised without having to be rate-limited first.
+    out="$(ec "${json}" | jq -er '
+        min_by(.resets_at) | [.resets_at, .group] | @tsv')" @TRET
+
+    printf '%s\t%s\n' "${out%%$'\t'*}" \
+        "Antigravity: ${out#*$'\t'} quota window rolled over"
+}
+
+function h-agy-status-notif {
+    #: Arms, or re-arms, a one-shot job for when Antigravity's quota comes
+    #: back. $1 is the tmux session it lives in.
+    ##
+    local session="${1}"
+    assert-args session @RET
+
+    local out
+    out="$(h-agy-status-notif-deadline)" @TRET
+    #: Nothing to wait for; the reason was already said on stderr.
+    test -n "${out}" || return 0
+
+    #: Only Antigravity sessions are offered, unlike Claude Code's kitty
+    #: picker: there is no cross-agent story here -- an Antigravity quota
+    #: reset unblocks Antigravity conversations and nothing else. `local' is
+    #: dynamically scoped in zsh, so the picker sees it without anything being
+    #: exported.
+    local agent_session_agents=agy
+
+    h-agent-usage-notif-arm "${session}" "${out%%$'\t'*}" "${out#*$'\t'}"
+}
+
+function h-agy-status-notif-schedule {
+    #: Arms without printing a report, matching Claude Code's
+    #: =h-...-notif-schedule= escape hatch. The tmux session is named after
+    #: this function minus the =h-=, so that `tmux ls` and the function you
+    #: called line up.
+    ##
+    h-agy-status-notif 'agy-status-notif-schedule'
+}
+
+function agy-status-notify {
+    #: The quota report, then an armed job for when it comes back -- the
+    #: intended way in, mirroring [agfi:claude-code-usage-fable-notify].
+    ##
+    local retcode=0
+    agy-status "$@" || retcode=$?
+
+    if (( retcode == 0 )) ; then
+        #: =>&2= because our stdout may be a JSON document a caller is about
+        #: to parse; non-fatal because a failed schedule must not make a
+        #: working report look broken.
+        h-agy-status-notif-schedule >&2 || true
+    fi
+
+    return "${retcode}"
+}
+##
+#: Resuming rather than merely announcing, named after the delivery mechanism
+#: exactly as Claude Code's are; see
+#: [agfi:h-agent-usage-continue-targets].
+##
+aliasfnq agy-status-continue-kitty-fz \
+    agent_usage_notif_action=continue agent_usage_continue_via=kitty \
+    agy-status-notify
+
+aliasfnq agy-status-continue-tmux-fz \
+    agent_usage_notif_action=continue agent_usage_continue_via=tmux \
+    agy-status-notify
+
+aliasfnq agy-status-continue-frontmost \
+    agent_usage_notif_action=continue agent_usage_continue_via=frontmost \
+    agy-status-notify
+
+aliasfn agyk agy-status-continue-kitty-fz
+aliasfn agyt agy-status-continue-tmux-fz
+aliasfn agyfront agy-status-continue-frontmost
+##
+function agy-status-notif-sessions {
+    #: Every tmux session an Antigravity notifier can live in, one per line.
+    #: One today; a function anyway, so the cancel/status wrappers below ask
+    #: rather than each spelling the name out.
+    #:
+    #: [agfi:agent-usage-notif-sessions] calls this when it is defined and
+    #: skips it otherwise, so the name lives here only and a renamed session
+    #: needs changing in one place.
+    ##
+    ec 'agy-status-notif-schedule'
+}
+
+#: Cancelling and reporting are the same act whatever armed the job, so both
+#: are [agfi:h-agent-usage-notif-cancel] and [agfi:h-agent-usage-notif-status]
+#: over the sessions this family owns. Named arguments still narrow it to one
+#: session.
+function agy-status-notif-cancel {
+    local sessions=("$@")
+    if (( ${#sessions} == 0 )) ; then
+        sessions=("${(@f)$(agy-status-notif-sessions)}")
+    fi
+
+    h-agent-usage-notif-cancel "${sessions[@]}"
+}
+
+function agy-status-notif-status {
+    local sessions=("$@")
+    if (( ${#sessions} == 0 )) ; then
+        sessions=("${(@f)$(agy-status-notif-sessions)}")
+    fi
+
+    h-agent-usage-notif-status "${sessions[@]}"
+}
+##
