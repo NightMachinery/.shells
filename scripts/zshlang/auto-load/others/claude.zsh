@@ -786,25 +786,11 @@ aliasfn claude-code-status-notify claude-code-usage-all-notify
 alias ccu-notify='claude-code-usage-all-notify'
 alias ccs-notify='claude-code-usage-all-notify'
 ##
-#: How often the armed job re-checks the wall clock.
-typeset -g claude_code_usage_notif_poll_s="${claude_code_usage_notif_poll_s:-30}"
-#: Fire this many seconds after the reset, so the endpoint has actually flipped
-#: by the time we claim it has.
-typeset -g claude_code_usage_notif_grace_s="${claude_code_usage_notif_grace_s:-30}"
-#: Utilization at or above which a window counts as blocking us.
+#: Utilization at or above which a window counts as blocking us. The only knob
+#: of the notifier that is Claude Code's own: everything about waiting the
+#: reset out and resuming afterwards is agent-neutral and lives in
+#: =agent-usage.zsh= under `agent_usage_*'. See =docs/agent-usage-notif.md=.
 typeset -g claude_code_usage_notif_full_pct="${claude_code_usage_notif_full_pct:-100}"
-#: What the armed job does once the limits reset: =notif= to tell you, or
-#: =type-continue= to type into the session that was blocked.
-typeset -g claude_code_usage_notif_action="${claude_code_usage_notif_action:-notif}"
-#: Only resume when the keyboard has been untouched at least this long. If you
-#: are at the machine you get a notification instead and can resume yourself.
-typeset -g claude_code_usage_type_continue_idle_min_s="${claude_code_usage_type_continue_idle_min_s:-600}"
-#: Typing waits longer after a reset than a notification does: an early
-#: notification is harmless, an early resume is spent on a session that is
-#: still blocked.
-typeset -g claude_code_usage_type_continue_grace_s="${claude_code_usage_type_continue_grace_s:-60}"
-#: What gets typed. A carriage return is appended to submit it.
-typeset -g claude_code_usage_type_continue_text="${claude_code_usage_type_continue_text:-Continue.}"
 
 function h-claude-code-usage-notif-window {
     #: Prints "<percent>\t<resets_at_epoch>\t<label>" for one window of a
@@ -864,258 +850,6 @@ function h-claude-code-usage-notif-session {
     ec "claude-code-usage-${profile}-notif-schedule"
 }
 
-function h-claude-code-usage-notif-wait {
-    #: The armed one-shot body, running inside the tmux session that
-    #: [agfi:h-claude-code-usage-notif] creates. This has to be a function: a
-    #: bare =sleep= does not keep the marked subshell alive (see =PE/Zsh.org=).
-    ##
-    local poll_s="${claude_code_usage_notif_poll_s:-30}"
-
-    local deadline="${1}" profile="${2}" msg="${3}"
-    assert-args deadline profile msg @RET
-
-    zmodload zsh/datetime 2>/dev/null
-
-    #: Poll the wall clock rather than issuing one long =sleep=: a suspend
-    #: would skew a single five-hour sleep, and on wake we want to fire
-    #: straight away instead of however long the machine slept later.
-    while (( EPOCHSECONDS < deadline )) ; do
-        sleep "${poll_s}"
-    done
-
-    h-claude-code-usage-notif-fire "${profile}" "${msg}"
-}
-
-function h-claude-code-usage-notif-notify {
-    #: A stable group, so a repeat replaces the previous notification instead
-    #: of stacking up in Notification Center. See =docs/bell-auto.md=.
-    ##
-    local msg="${1}"
-    assert-args msg @RET
-
-    notif_group='claude-code-usage' notif "${msg}"
-}
-
-function h-claude-code-usage-notif-log {
-    #: One line per fire. The tmux pane a fired job leaves behind says the same
-    #: thing, but only until the next reboot, and a job that types into your
-    #: session while you are away should stay answerable for it afterwards.
-    ##
-    local msg="${1}"
-    assert-args msg @RET
-
-    zmodload zsh/datetime 2>/dev/null
-
-    local log="${claude_code_usage_notif_log:-${HOME}/logs/claude-code-usage-notif.log}"
-    ensure-dir "${log:h}" || return 0
-
-    print -r -- "$(strftime '%Y-%m-%d %H:%M:%S' "${EPOCHSECONDS}") ${msg}" >> "${log}"
-}
-
-function h-claude-code-usage-idle-s {
-    #: How long the keyboard and mouse have been untouched, in whole seconds.
-    #:
-    #: Through [agfi:h-hammerspoon-eval], which strips the extension-loading
-    #: chatter that would otherwise turn a result into
-    #: `0-- Loading extension: host`. Hammerspoon exits 0 whether or not the Lua
-    #: found anything, so what gets checked is the RESULT: a non-number means
-    #: "cannot tell", and the caller declines to type on that.
-    ##
-    local out
-    out="$(h-hammerspoon-eval 'return hs.host.idleTime()')" || return 1
-
-    [[ "${out}" =~ '^[0-9]+(\.[0-9]+)?$' ]] || return 1
-
-    ec "${out%%.*}"
-}
-
-function h-claude-code-usage-screen-locked-p {
-    #: True when the screen is locked. The key is *absent* rather than false
-    #: when unlocked, so the Lua compares and we test the resulting string.
-    ##
-    local out
-    out="$(h-hammerspoon-eval 'return tostring(hs.caffeinate.sessionProperties()["CGSSessionScreenIsLocked"] == true)')" || return 1
-
-    [[ "${out}" == true ]]
-}
-
-function h-claude-code-usage-type-continue-send {
-    #: Delivers the resume text to one target: `kitty:<window-id>` types into
-    #: that window, `codex:<thread-id>` queues the message with Codex itself,
-    #: and `frontmost` types wherever the keyboard focus happens to be.
-    ##
-    local target="${1}"
-    assert-args target @RET
-
-    local text="${claude_code_usage_type_continue_text:-Continue.}"
-
-    if [[ "${target}" == codex:* ]] ; then
-        #: Codex takes a message for a thread by name, which beats typing: it
-        #: needs no window, no focus and no awake display, and it cannot land
-        #: in the wrong place. See [agfi:h-codex-session-live-list] for where
-        #: the thread id comes from.
-        ensure-cmd codex @RET
-        reval-ec command codex queue --thread "${target#codex:}" --message "${text}"
-        return $?
-    fi
-
-    if [[ "${target}" == frontmost ]] ; then
-        #: Wake the display first and give it a beat. `displaysleep` is ten
-        #: minutes here -- the same as the idle threshold -- so by the time this
-        #: fires the screen is asleep, and the first synthetic keypress would be
-        #: eaten waking it, typing `ontinue.`
-        silent h-hammerspoon-eval 'hs.caffeinate.declareUserActivity() ; return true' || true
-        sleep 1
-
-        #: Its sleep argument is mandatory, and 0 is right: the waiting was ours
-        #: to do, by polling, so that a suspend could not skew it.
-        hs-type-continue 0 @RET
-        return 0
-    fi
-
-    if [[ ! "${target}" =~ '^kitty:[0-9]+$' ]] ; then
-        ecerr "$0: unknown target: ${target}"
-        return 1
-    fi
-    local id="${target#kitty:}"
-
-    ensure-cmd kitty jq @RET
-
-    local sock
-    sock="$(h-claude-code-session-kitty-socket)" @RET
-
-    #: `send-text` documents that it "always succeeds, even if no text was sent
-    #: to any window", so its exit status proves nothing and the window has to
-    #: be checked for separately. Without this a tab closed during the wait
-    #: would swallow the resume while we reported success.
-    if ! kitty @ --to "${sock}" ls |
-            jq -e --argjson id "${id}" 'any(.[].tabs[].windows[] ; .id == $id)' >/dev/null ; then
-        ecerr "$0: kitty window ${id} is gone"
-        return 1
-    fi
-
-    kitty @ --to "${sock}" send-text --match "id:${id}" "${text}"$'\r' @RET
-}
-
-function h-claude-code-usage-notif-fire {
-    #: What the armed job does once the deadline has passed: tell you, or resume
-    #: the sessions that were blocked.
-    ##
-    local action="${claude_code_usage_notif_action:-notif}"
-    local idle_min_s="${claude_code_usage_type_continue_idle_min_s:-600}"
-
-    local profile="${1}" msg="${2}"
-    assert-args profile msg @RET
-
-    if [[ "${action}" != type-continue ]] ; then
-        h-claude-code-usage-notif-notify "${msg}"
-        h-claude-code-usage-notif-log "${profile}: notified"
-
-        return 0
-    fi
-
-    local -a targets
-    targets=(${=claude_code_usage_notif_targets})
-    if (( ${#targets} == 0 )) ; then
-        h-claude-code-usage-notif-notify "${msg} -- not resuming: no target was recorded"
-        h-claude-code-usage-notif-log "${profile}: notified only, no target recorded"
-
-        return 0
-    fi
-
-    #: Failing safe: anything we cannot establish means we do not type. The
-    #: notification goes out either way, so an unwanted resume is the worse
-    #: error of the two.
-    local idle_s reason=''
-    if ! idle_s="$(h-claude-code-usage-idle-s)" ; then
-        reason='could not read the idle time'
-    elif (( idle_s < idle_min_s )) ; then
-        reason="you were at the keyboard ($(seconds-fmt-short "${idle_s}") idle, needs $(seconds-fmt-short "${idle_min_s}"))"
-    elif h-claude-code-usage-screen-locked-p ; then
-        reason='the screen is locked'
-    fi
-
-    if test -n "${reason}" ; then
-        h-claude-code-usage-notif-notify "${msg} -- not resuming: ${reason}"
-        h-claude-code-usage-notif-log "${profile}: notified only: ${reason}"
-
-        return 0
-    fi
-
-    local target
-    local -a resumed unreachable
-    for target in "${targets[@]}" ; do
-        if h-claude-code-usage-type-continue-send "${target}" ; then
-            resumed+=("${target}")
-        else
-            unreachable+=("${target}")
-        fi
-    done
-
-    local report="${msg}"
-    if (( ${#resumed} )) ; then
-        report+=" -- resumed ${(j:, :)resumed}"
-    fi
-    if (( ${#unreachable} )) ; then
-        report+=" -- could not reach ${(j:, :)unreachable}"
-    fi
-
-    h-claude-code-usage-notif-notify "${report}"
-    h-claude-code-usage-notif-log "${profile}: ${report}"
-}
-
-function h-claude-code-usage-type-continue-target-fz {
-    #: Chooses what gets resumed, at ARM time, so the target is what you picked
-    #: rather than whatever happens to hold the keyboard hours later. Prints one
-    #: target per line: `kitty:<window-id>`, `codex:<thread-id>`, or
-    #: `frontmost`.
-    #:
-    #: Every agent's live sessions are offered, not only Claude Code's: what
-    #: the reset unblocks is often one conversation among several, and the
-    #: waiting one may be a Codex thread told to hold off.
-    ##
-    #: `local` is dynamically scoped in zsh, so the picker sees these without
-    #: anything being exported. The row layout is
-    #: [agfi:h-agent-session-live-rows]'s.
-    local -a agent_session_live_fz_extra_rows
-    agent_session_live_fz_extra_rows=(
-        $'frontmost\t-\t-\tfrontmost\t-\t-\t-\twhatever holds the keyboard when the limits reset'
-    )
-
-    #: No header: the picker's own advertises alt+enter, which converts a
-    #: transcript to org. This picker is choosing what to resume, and that is
-    #: noise here. The binding still works, it is just not announced.
-    local agent_session_fz_header=''
-
-    local selected
-    selected="$(agent-session-live-fz)" @RET
-
-    #: `(ps:\t:)' rather than `read': tab is IFS whitespace, so `read' would
-    #: collapse an empty field rather than keep the columns lined up.
-    local line agent
-    local -a f
-    while IFS= read -r line ; do
-        test -n "${line}" || continue
-        f=( "${(@ps:\t:)line}" )
-
-        if [[ "${f[1]}" == frontmost ]] ; then
-            ec frontmost
-            continue
-        fi
-
-        #: A Codex thread is reachable without a window at all, which is
-        #: strictly better; anything else is typed into its kitty window.
-        agent="$(h-agent-session-agent-of "${f[2]}" 2>/dev/null)" || agent=''
-        if [[ "${agent}" == codex ]] ; then
-            ec "codex:$(h-agent-session-call codex id-of "${f[2]}")"
-            continue
-        fi
-
-        test -n "${f[1]}" && [[ "${f[1]}" != '-' ]] || continue
-        ec "kitty:${f[1]}"
-    done <<< "${selected}"
-}
-
 function h-claude-code-usage-notif {
     #: Arms, or re-arms, a one-shot notification for when the limits that
     #: currently block us have reset.
@@ -1124,29 +858,20 @@ function h-claude-code-usage-notif {
     #: the roles this variant cares about (see
     #: [agfi:h-claude-code-usage-notif-window]).
     #:
-    #: Re-arming cannot stack: [agfi:tmuxnew] kills the previous session's
-    #: processes before creating the replacement, so the session name alone
-    #: guarantees a single pending notifier -- no lock, marker or redis key.
-    #: The tmux server is also independent of the brish garden, so
-    #: =brishz-restart= does not silently disarm it. A reboot does.
+    #: Only the *when* and the *what to say* are worked out here. Waiting the
+    #: reset out, deciding whether resuming is safe and delivering the resume
+    #: text are agent-neutral, and belong to
+    #: [agfi:h-agent-usage-notif-arm] -- grace, the picker, the tmux job and
+    #: its bookkeeping included. See =docs/agent-usage-notif.md=.
     ##
-    local poll_s="${claude_code_usage_notif_poll_s:-30}"
     local full_pct="${claude_code_usage_notif_full_pct:-100}"
-    local action="${claude_code_usage_notif_action:-notif}"
-
-    #: Typing gets the longer grace of the two; see the knobs above.
-    local grace_s="${claude_code_usage_notif_grace_s:-30}"
-    if [[ "${action}" == type-continue ]] ; then
-        grace_s="${claude_code_usage_type_continue_grace_s:-60}"
-    fi
 
     local session="${1}" profile="${2}"
     assert-args session profile @RET
     local roles=("${@[3,-1]}")
     assert-args roles @RET
 
-    ensure-cmd jq tmux @RET
-    zmodload zsh/datetime 2>/dev/null
+    ensure-cmd jq @RET
 
     #: =claude_code_usage_notif_p=n= is the recursion guard, and load-bearing:
     #: the report arms the notifier and the notifier reads the report.
@@ -1177,7 +902,7 @@ function h-claude-code-usage-notif {
         fi
     done
 
-    integer deadline=0
+    integer reset_at=0
     local msg=''
     if (( ${#blocked_labels} == 0 )) ; then
         if ! isDeus ; then
@@ -1188,58 +913,25 @@ function h-claude-code-usage-notif {
         #: deus: arm for the next 5h rollover anyway, so the mechanism can be
         #: exercised without having to be rate-limited first.
         out="$(h-claude-code-usage-notif-window "${json}" session)" @RET
-        deadline=${${${out#*$'\t'}%%$'\t'*}%.*}
+        reset_at=${${${out#*$'\t'}%%$'\t'*}%.*}
         msg="Claude Code (${profile}): ${out##*$'\t'} window rolled over"
     else
-        deadline=${blocked_at}
+        reset_at=${blocked_at}
         msg="Claude Code (${profile}): ${(j:, :)blocked_labels} reset, usage available again"
     fi
 
-    deadline=$(( deadline + grace_s ))
-
-    if (( deadline <= EPOCHSECONDS )) ; then
-        ecgray "$0: ${profile}: reset time is already past (stale data?), not arming"
-        return 0
-    fi
-
-    #: Only now that we know we are going to arm, so a report that changes
-    #: nothing never puts a picker in your way. Presetting the variable skips
-    #: it, which is what makes this callable from a script or a test.
-    local targets="${claude_code_usage_notif_targets}"
-    if [[ "${action}" == type-continue ]] && test -z "${targets}" ; then
-        local -a target_list
-        target_list=("${(@f)$(h-claude-code-usage-type-continue-target-fz)}") @TRET
-        #: Space separated, because that is what survives the trip into the
-        #: tmux session's environment intact.
-        targets="${(j: :)target_list}"
-
-        if test -z "${targets}" ; then
-            ecgray "$0: ${profile}: no resume target chosen, not arming"
-            return 0
-        fi
-    fi
-
-    ecgray "$0: arming ${session} for $(date-unix-to-3339 "${deadline}") (in $(seconds-fmt-short $(( deadline - EPOCHSECONDS ))))"
-
-    #: =silent= because [agfi:tmux-session-processes-kill] narrates every
-    #: re-arm, which would otherwise land in the middle of a usage report.
-    silent tmuxnewsh2 "${session}" \
-        claude_code_usage_notif_poll_s="${poll_s}" \
-        claude_code_usage_notif_action="${action}" \
-        claude_code_usage_notif_targets="${targets}" \
-        h-claude-code-usage-notif-wait "${deadline}" "${profile}" "${msg}" @RET
-
-    #: Recorded on the tmux session itself rather than in redis, so the
-    #: bookkeeping cannot drift from whether the job actually exists.
+    #: The seat whose limit we are waiting on, so the tmux picker offers only
+    #: sessions on that seat: a work reset must not resume a personal one.
+    #: `local' is dynamically scoped in zsh, so the picker sees it without
+    #: anything being exported.
     #:
-    #: No `=` exact-match prefix on the target here: unlike =has-session=,
-    #: =set-option= does not accept one and fails with "no such session".
-    silent tmux set-option -t "${session}" '@ccu_notif_deadline' "${deadline}" || true
-    silent tmux set-option -t "${session}" '@ccu_notif_action' "${action}" || true
-    silent tmux set-option -t "${session}" '@ccu_notif_targets' "${targets}" || true
-    #: The name is how this job is found and re-armed; the Claude Code it
-    #: resumes must not rename it ([agfi:claude-code-session-tmux-autoname]).
-    silent tmux set-option -t "${session}" "${agent_tmux_autoname_option}" off || true
+    #: `agent_session_agents' is deliberately left alone, so the kitty picker
+    #: keeps offering every agent: what the reset unblocks is often one
+    #: conversation among several. See
+    #: [agfi:h-agent-usage-continue-targets-kitty-fz].
+    local agent_usage_continue_profile="${profile}"
+
+    h-agent-usage-notif-arm "${session}" "${reset_at}" "${msg}"
 }
 
 function h-claude-code-usage-notif-for-profile {
@@ -1294,28 +986,65 @@ function claude-code-usage-fable-notify {
 
 ##
 #: Resuming rather than merely announcing: the profile's ordinary report, plus
-#: an arm whose action is to type into the session that was blocked. The target
-#: is picked interactively at arm time -- see
-#: [agfi:h-claude-code-usage-type-continue-target-fz] -- because
-#: [agfi:hs-type-continue] types wherever the keyboard focus is, and several
-#: Claude sessions are usually open at once.
-aliasfnq claude-code-usage-type-continue claude_code_usage_notif_p=y claude_code_usage_notif_action=type-continue claude-code-usage
-aliasfn cctc claude-code-usage-type-continue
+#: an arm whose action is to pick the conversation back up once the limits
+#: lift. Named after the *delivery mechanism*, because that is the whole of
+#: what distinguishes them and it is what decides whether a resume can reach
+#: you at all:
+#:
+#:   -continue-kitty-fz   pick kitty windows; typed into with `kitty @ send-text'
+#:   -continue-tmux-fz    pick tmux panes; typed into with `send-keys'
+#:   -continue-frontmost  no picker; typed wherever the focus is at the time
+#:
+#: A Codex thread picked in either picker is *queued* instead of typed into,
+#: which needs no window at all; see
+#: [agfi:h-agent-usage-continue-rows-to-targets].
+#:
+#: Generated rather than written out nine times: three mechanisms by the bare
+#: entry point plus the two named seats, and the only thing that varies is one
+#: knob and one function name.
+##
+() {
+    local via profile base name
+    for via in kitty-fz tmux-fz frontmost ; do
+        for profile in '' default work ; do
+            base="claude-code-usage${profile:+-${profile}}"
+            name="${base}-continue-${via}"
 
-aliasfnq claude-code-usage-default-type-continue claude_code_usage_notif_p=y claude_code_usage_notif_action=type-continue claude-code-usage-default
-aliasfn cctc-default claude-code-usage-default-type-continue
-
-aliasfnq claude-code-usage-work-type-continue claude_code_usage_notif_p=y claude_code_usage_notif_action=type-continue claude-code-usage-work
-aliasfn cctc-work claude-code-usage-work-type-continue
-
-#: Scheduling without a report, matching the =h-...-notif-schedule= escape
-#: hatches above.
-function h-claude-code-usage-type-continue-schedule {
-    claude_code_usage_notif_action=type-continue h-claude-code-usage-notif-for-profile default
+            #: `${via%-fz}' because the name advertises the picker and the knob
+            #: names the mechanism: `-continue-tmux-fz' arms
+            #: `agent_usage_continue_via=tmux'.
+            aliasfnq "${name}" \
+                claude_code_usage_notif_p=y \
+                agent_usage_notif_action=continue \
+                agent_usage_continue_via="${via%-fz}" \
+                "${base}"
+        done
+    done
 }
 
-function h-claude-code-usage-work-type-continue-schedule {
-    claude_code_usage_notif_action=type-continue h-claude-code-usage-notif-for-profile work
+#: The short names, mirroring the =ccu-default= block above.
+aliasfn cck claude-code-usage-continue-kitty-fz
+aliasfn cck-default claude-code-usage-default-continue-kitty-fz
+aliasfn cck-work claude-code-usage-work-continue-kitty-fz
+
+aliasfn cct claude-code-usage-continue-tmux-fz
+aliasfn cct-default claude-code-usage-default-continue-tmux-fz
+aliasfn cct-work claude-code-usage-work-continue-tmux-fz
+
+aliasfn ccfront claude-code-usage-continue-frontmost
+aliasfn ccfront-default claude-code-usage-default-continue-frontmost
+aliasfn ccfront-work claude-code-usage-work-continue-frontmost
+
+function h-claude-code-usage-continue-schedule {
+    #: Arming a resume without printing a report, matching the
+    #: =h-...-notif-schedule= escape hatches above. One hatch for all three
+    #: mechanisms, since `agent_usage_continue_via' already names them and a
+    #: function per mechanism would say nothing the knob does not.
+    #: Usage: h-claude-code-usage-continue-schedule [profile]
+    ##
+    local profile="${1:-default}"
+
+    agent_usage_notif_action=continue h-claude-code-usage-notif-for-profile "${profile}"
 }
 ##
 function claude-code-usage-notif-sessions {
@@ -1329,80 +1058,26 @@ function claude-code-usage-notif-sessions {
     ec "${(F)out}"
 }
 
+#: Cancelling and reporting are the same act whatever armed the job, so both
+#: are [agfi:h-agent-usage-notif-cancel] and [agfi:h-agent-usage-notif-status]
+#: over the sessions this profile family owns. Named arguments still narrow it
+#: to one session.
 function claude-code-usage-notif-cancel {
     local sessions=("$@")
     if (( ${#sessions} == 0 )) ; then
         sessions=("${(@f)$(claude-code-usage-notif-sessions)}")
     fi
 
-    local s alive_p
-    for s in "${sessions[@]}" ; do
-        if ! silent tmux has-session -t "=${s}" ; then
-            continue
-        fi
-
-        alive_p=n
-        if tmux-alive-p "${s}" ; then
-            alive_p=y
-        fi
-
-        #: Dead sessions get reaped too. With =remain-on-exit= on, a notifier
-        #: that has already fired leaves its session behind, and clearing those
-        #: out is what someone running a cancel actually wants.
-        silent tmux-session-processes-kill "${s}"
-        if bool "${alive_p}" ; then
-            ecgray "$0: cancelled ${s}"
-        else
-            ecgray "$0: reaped ${s}, which had already fired"
-        fi
-    done
+    h-agent-usage-notif-cancel "${sessions[@]}"
 }
 
 function claude-code-usage-notif-status {
-    zmodload zsh/datetime 2>/dev/null
+    local sessions=("$@")
+    if (( ${#sessions} == 0 )) ; then
+        sessions=("${(@f)$(claude-code-usage-notif-sessions)}")
+    fi
 
-    local s deadline
-    integer remaining
-    for s in "${(@f)$(claude-code-usage-notif-sessions)}" ; do
-        if ! tmux-alive-p "${s}" ; then
-            #: With =remain-on-exit= on a fired notifier leaves its session
-            #: behind, which answers "did my notification actually go off?".
-            if silent tmux has-session -t "=${s}" ; then
-                ecgray "${s}: not armed; a previous notifier has already fired"
-            else
-                ecgray "${s}: not armed"
-            fi
-
-            continue
-        fi
-
-        deadline="$(tmux show-options -qv -t "${s}" '@ccu_notif_deadline' 2>/dev/null)" || deadline=''
-
-        #: Which action is pending matters as much as when: arming a resume
-        #: replaces a plain notifier for that profile, and the reverse, so a
-        #: downgrade should be visible rather than silent.
-        local action targets suffix=''
-        action="$(tmux show-options -qv -t "${s}" '@ccu_notif_action' 2>/dev/null)" || action=''
-        targets="$(tmux show-options -qv -t "${s}" '@ccu_notif_targets' 2>/dev/null)" || targets=''
-        if test -n "${action}" ; then
-            suffix=" [action: ${action}"
-            if test -n "${targets}" ; then
-                suffix+=" -> ${targets}"
-            fi
-            suffix+=']'
-        fi
-        if test -z "${deadline}" ; then
-            ec "${s}: armed (no deadline recorded)${suffix}"
-            continue
-        fi
-
-        remaining=$(( deadline - EPOCHSECONDS ))
-        if (( remaining > 0 )) ; then
-            ec "${s}: armed for $(date-unix-to-3339 "${deadline}") (in $(seconds-fmt-short ${remaining}))${suffix}"
-        else
-            ec "${s}: armed, but its deadline passed $(seconds-fmt-short $(( -remaining ))) ago${suffix}"
-        fi
-    done
+    h-agent-usage-notif-status "${sessions[@]}"
 }
 ##
 function claude-work {

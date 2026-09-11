@@ -570,11 +570,27 @@ function hs-type {
 }
 
 function hs-type-continue {
-    local sleep_dur="${1}"
-    assert-args sleep_dur @RET
+    : "types <2> (default 'Continue.') wherever the focus is, after sleeping <1> seconds, then submits it"
+    #: The text is spliced in through [agfi:js-quote] rather than written into
+    #: the Lua literally, the same way [agfi:hs-type] does it: a quote or a
+    #: backslash in it would otherwise end the string early and the rest would
+    #: be run as Lua. The sleep is separate from [agfi:hs-type] because the
+    #: submit has to follow in the *same* Hammerspoon call -- two calls leave a
+    #: gap in which the focus can move, and the return would land elsewhere.
+    ##
+    local sleep_dur="${1}" text="${2:-Continue.}"
+    assert-args sleep_dur text @RET
 
     sleep "${sleep_dur}" @RET
-    hammerspoon -c 'hs.eventtap.keyStrokes("Continue."); hs.eventtap.keyStroke({}, "return");'
+
+    #: js-quote's default trim, unlike [agfi:hs-type]'s `_p=n'. Passed an
+    #: argument rather than stdin, `_p=n' keeps the newline `in-or-args' adds,
+    #: and `"Continue.\n"' would submit once by itself and once again with the
+    #: `return' below.
+    local quoted
+    quoted="$(js-quote "${text}")" @TRET
+
+    hammerspoon -c "hs.eventtap.keyStrokes(${quoted}); hs.eventtap.keyStroke({}, \"return\");"
 }
 ##
 function hs-focus-app {

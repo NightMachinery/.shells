@@ -2547,7 +2547,7 @@ function agent-session-live-fz {
     #: once; set agent_session_live_fz_no_multi_p=y for one.
     #: agent_session_live_fz_extra_rows prepends synthetic choices (in the row
     #: layout of [agfi:h-agent-session-live-rows]), which is how
-    #: [agfi:h-claude-code-usage-type-continue-target-fz] offers "frontmost"
+    #: [agfi:h-agent-usage-continue-targets-kitty-fz] offers "frontmost"
     #: alongside the real sessions.
     ##
     local rows

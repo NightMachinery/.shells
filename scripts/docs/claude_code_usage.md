@@ -783,7 +783,11 @@ and the fork would be stale at once; quit that session first, or set
 
 A report can also arm a one-shot background job that fires `notif` once the
 limits currently blocking that profile have reset, so you find out without
-having to keep re-running the report.
+having to keep re-running the report. The job itself — the tmux session it
+lives in, the polling, the grace, the idle gate, the delivery mechanisms and
+the log — is shared with the Codex notifier and documented once, in
+`docs/agent-usage-notif.md`. This section covers what is Claude's: where the
+deadline comes from, and the entry points.
 
 This is **off by default** — checking your usage is not the same act as asking
 to be told about it. Every report command has a `-notify` twin that turns it on,
@@ -806,9 +810,14 @@ or set `claude_code_usage_notif_p=y` on a plain one:
 
 Managing what is scheduled:
 
-- `claude-code-usage-notif-cancel [session...]` — cancels, defaulting to all of
-  them.
-- `claude-code-usage-notif-status` — what is scheduled, and for when.
+- `claude-code-usage-notif-cancel [session...]` — cancels, defaulting to all
+  of Claude's.
+- `claude-code-usage-notif-status` — what is scheduled, for when, and with
+  which action and targets.
+
+Both are thin wrappers over the shared `h-agent-usage-notif-cancel` and
+`-status`, handed `claude-code-usage-notif-sessions`, the list of every tmux
+session a Claude notifier can live in.
 
 To schedule without printing a report, call
 `h-claude-code-usage-notif-schedule`, `h-claude-code-usage-work-notif-schedule`
@@ -819,143 +828,76 @@ are off limits — reach for one when you already have a report in front of you.
 Each scheduled notifier lives in a tmux session named after the scheduling
 function minus the `h-`: `claude-code-usage-<profile>-notif-schedule`, plus
 `claude-code-usage-fable-notif-schedule`. So what `tmux ls` shows and the
-function you called line up.
+function you called line up, and the name doubles as the lock that keeps one
+job per profile.
 
-A window counts as blocking at or above `claude_code_usage_notif_full_pct`
-(default 100). The deadline is the **latest** reset among the blocked windows,
-because a 5-hour rollover buys nothing while the weekly limit is still spent.
-When nothing is blocking, arming is skipped with a note; running it under `deus`
-arms for the next 5-hour rollover anyway, which is how to exercise the whole
-mechanism without having to be rate-limited first. A window the profile does not
-have at all — a team seat has no weekly window — is skipped.
+### Where the deadline comes from
 
-The job lives in a tmux session made by `tmuxnewsh2`, one per variant. `tmuxnew`
-kills the previous session's processes before creating the replacement, so
-re-arming *replaces* the pending notifier rather than stacking another one, and
-needs no lock, marker or redis key of its own. The tmux server is also
-independent of BrishGarden, so `brishz-restart` does not silently disarm
-anything. A reboot does, and the next report re-arms.
+`h-claude-code-usage-notif` fetches the profile's report as JSON and reduces
+its windows to one deadline. A window counts as blocking at or above
+`claude_code_usage_notif_full_pct`. The deadline is the **latest** reset among
+the blocked windows, because a 5-hour rollover buys nothing while the weekly
+limit is still spent. A window the profile does not have at all — a team seat
+has no weekly window — is skipped. The result goes to
+`h-agent-usage-notif-arm`, which adds the grace and does the rest.
 
-The job polls the wall clock every `claude_code_usage_notif_poll_s` seconds
-(default 30) instead of issuing one long `sleep`, so suspending the laptop
-cannot skew a five-hour wait and it fires promptly on wake. It fires
-`claude_code_usage_notif_grace_s` seconds (default 30) after the reset so the
-endpoint has actually flipped by the time it says so, and notifies under a fixed
-`notif_group` so repeats replace each other instead of piling up.
+When nothing is blocking, arming is skipped with a note; running it under
+`deus` arms for the next 5-hour rollover anyway, which is how to exercise the
+whole mechanism without having to be rate-limited first.
 
-Since `remain-on-exit` is on here, a notifier that has fired leaves its tmux
-session behind holding a dead pane. `claude-code-usage-notif-status` reports
-that as already fired — which is also how to check whether a notification went
-off — and the next arm, or a cancel, clears it away.
+`claude_code_usage_notif_p=n` inside the fetch is the recursion guard, and
+load-bearing: the report arms the notifier and the notifier reads the report.
 
 ### Resuming instead of announcing
 
 Instead of only telling you the limits have reset, the armed job can type
-`Continue.` straight into the Claude Code session that was blocked. Each entry
-point is the profile's ordinary report plus an arm whose action is to resume
-rather than notify:
+`Continue.` into the sessions that were blocked. Each entry point is the
+profile's ordinary report plus an arm whose action is `continue`, and they are
+named by *how* the text is delivered, since that is what you are choosing:
 
-- `claude-code-usage-type-continue` (alias `cctc`) — the current profile.
-- `claude-code-usage-default-type-continue` (alias `cctc-default`).
-- `claude-code-usage-work-type-continue` (alias `cctc-work`).
-- `h-claude-code-usage-type-continue-schedule` and
-  `h-claude-code-usage-work-type-continue-schedule` arm without printing a
-  report, matching the existing `h-…-notif-schedule` escape hatches.
+- `claude-code-usage-continue-kitty-fz` (alias `cck`) — pick kitty windows;
+  the picker offers every agent's live sessions, plus a `frontmost` row.
+- `claude-code-usage-continue-tmux-fz` (alias `cct`) — pick tmux panes; the
+  picker offers only panes running Claude Code under the profile being armed.
+- `claude-code-usage-continue-frontmost` (alias `ccfront`) — no picker;
+  type wherever the keyboard focus is when the reset comes.
+
+Each has `-default-` and `-work-` forms naming the profile explicitly —
+`claude-code-usage-default-continue-tmux-fz`, and so on — with aliases in the
+`cck-default`, `cct-work` shape, matching `ccu-default`. The bare forms follow
+the current profile, like `ccu` itself. Under the hood they set
+`agent_usage_notif_action=continue` and `agent_usage_continue_via` on the
+matching `-notify` report and nothing else.
+
+`h-claude-code-usage-continue-schedule [profile]` arms without printing a
+report, matching the `h-…-notif-schedule` escape hatches above; it reads
+`agent_usage_continue_via` from the environment rather than having a hatch
+per mechanism.
 
 There is deliberately no `-all` variant: the action needs an interactively
 chosen target per profile, and prompting twice from one command is worse than
 just running the two commands.
 
-It is one job per profile: a resume reuses the profile's existing tmux
-session, so arming one *replaces* a plain notifier for that profile, and the
-reverse also holds — last arm wins, and exactly one thing happens per reset.
-`claude-code-usage-notif-status` now prints the pending action and target
-alongside the deadline, for example `[action: type-continue -> kitty:95]`, so
-a downgrade from resume back to notify (or the other way around) is visible
+It is one job per profile: a resume reuses the profile's tmux session, so
+arming one *replaces* a plain notifier for that profile, and the reverse also
+holds — last arm wins, and exactly one thing happens per reset.
+`claude-code-usage-notif-status` prints the pending action and targets
+alongside the deadline, for example `[action: continue -> tmux:%3]`, so a
+downgrade from resume back to notify, or the other way around, is visible
 rather than silent.
 
-**Choosing the target, and why it is not automatic.** `hs-type-continue` types
-through `hs.eventtap.keyStrokes`, a *global* synthetic keystroke with no
-window targeting: it types wherever the keyboard focus happens to be, then
-presses Return. In practice there are usually several Claude Code sessions
-open at once, plus chat apps and a browser, so firing that blind risks sending
-`Continue.` as a chat message, or into the wrong session entirely. All
-sessions on a profile share one rate limit, so "the session that was blocked"
-is ambiguous by construction, and the target has to be *chosen*, not guessed.
-
-So arming opens an fzf picker, `h-claude-code-usage-type-continue-target-fz`,
-built on `agent-session-live-fz`, over every agent session currently live in a
-kitty window — Claude Code, Codex and Antigravity alike, each row carrying its
-agent's glyph — with a preview showing the session's title, when it last moved,
-and the last prompt it was given. It is multi-select, so several tabs can be
-resumed at once. Above the sessions sits one synthetic
-choice, `frontmost`, which falls back to `hs-type-continue`. It stays in the
-list because a session outside kitty cannot be reached any other way, but it
-is never the default.
-
-The picker runs only once the job is actually going to be armed, so a report
-that changes nothing never puts a picker in your way. Presetting
-`claude_code_usage_notif_targets` (space separated, e.g. `kitty:95
-frontmost`) skips the picker entirely, which is what makes the whole thing
-callable from a script or a test.
-
-**Delivery.** A `kitty:<window-id>` target is delivered with `kitty @
-send-text --match id:<n>`, straight into that one window: no focus stealing,
-no global keystrokes, and it does not care which window is frontmost or
-whether the display is asleep. `send-text` documents that it always succeeds
-"even if no text was sent to any window", so its exit status proves nothing —
-the window is checked for separately first, otherwise a tab closed during the
-wait would swallow the resume while the job reported success. A vanished
-window degrades to a notification saying so.
-
-A Codex row becomes a `codex:<thread-id>` target instead, delivered with
-`codex queue --thread <id> --message <text>`. Codex accepts a message for a
-thread by name, so that path needs no window, no focus and no awake display,
-and it cannot land in the wrong place; the picker prefers it whenever the
-chosen session is a Codex one. Antigravity has no such command, so an agy
-session is typed into its kitty window like a Claude one.
-
-The `frontmost` target instead wakes the display via
-`hs.caffeinate.declareUserActivity()` and pauses a beat before typing, because
-`displaysleep` is ten minutes on this machine — the same as the idle
-threshold below — so by the time the job fires the screen is asleep, and the
-first synthetic keypress would otherwise be eaten waking it, typing
-`ontinue.` instead.
-
-**The idle gate, and failing safe.** It only types if the keyboard has been
-untouched for at least `claude_code_usage_type_continue_idle_min_s` (default
-600). If you are at the machine you get an ordinary notification instead and
-can resume yourself. It also declines if the screen is locked, or if the idle
-time cannot be read at all. The principle is the same in every case: the
-notification goes out either way, so an unwanted resume is the worse of the
-two errors, and anything that cannot be established counts against typing.
-The idle time itself comes from `hs.host.idleTime()` through
-`h-hammerspoon-eval`, and what gets checked is the returned string rather than
-the exit status, because Hammerspoon exits 0 whether or not the Lua found
-anything.
-
-**Knobs:**
-
-- `claude_code_usage_notif_action` — `notif` or `type-continue`.
-- `claude_code_usage_type_continue_idle_min_s` (default `600`) — how long the
-  keyboard must have been untouched before a resume is allowed.
-- `claude_code_usage_type_continue_grace_s` (default `60`) — deliberately
-  longer than the notifier's own `30`, because an early notification is
-  harmless while an early resume is spent on a session that is still blocked.
-- `claude_code_usage_type_continue_text` (default `Continue.`).
-- `claude_code_usage_notif_targets` — preset targets, skipping the picker.
-- `claude_code_usage_notif_log` (default `~/logs/claude-code-usage-notif.log`).
-
-**The log.** Every fire writes one line saying which target it tried and
-whether it typed or declined, and why. The tmux pane a fired job leaves
-behind says the same thing, but only until the next reboot, and a job that
-types into your session while you are away should stay answerable for it
-afterwards.
-
-One caveat worth stating plainly: the job trusts the reset timestamp plus the
-grace period, and does not re-check usage when it actually fires. If the
-endpoint lags behind its own `resets_at`, the resume is spent on a session
-that is still blocked, and nothing remains armed afterwards.
+The two pickers filter differently on purpose. The tmux picker is narrowed to
+the armed profile, through `agent_usage_continue_profile`, because a Claude
+reset frees exactly one profile's sessions and the other profile's panes would
+only be noise in a list you are scanning quickly. The kitty picker is left
+wide: what the reset unblocks is often one conversation among several, and
+the one waiting may be a Codex thread told to hold off until Claude is usable
+again, or an Antigravity tab. A Codex row is turned into a queue target rather
+than a window in either picker. The targets, the delivery per kind, the idle
+gate that keeps the job from typing while you are at the keyboard, and the
+knobs are all in `docs/agent-usage-notif.md`; the one caveat worth repeating
+here is that the job trusts `resets_at` and does not re-check usage when it
+fires.
 
 ## Color
 
