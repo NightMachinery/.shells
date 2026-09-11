@@ -118,6 +118,12 @@ pass in inet from $rfc1918 to $rfc1918
 # link-local source to a MULTICAST destination (ff02::1, ff02::1:ff00:0/104),
 # so a bare "to fe80::/10" would drop ND and break IPv6 -- minutes to hours
 # later, not at load time, exactly like the DHCP ordering trap above.
+#
+# Note fc00::/7 already contains Tailscale's ULA prefix fd7a:115c:a1e0::/48, so
+# tailnet IPv6 peers are trusted by this rule whether or not the optional
+# com.user.publicnet.tailscale fragment (which covers the v4 CGNAT range) is
+# installed. That asymmetry is the reason mosh over Tailscale can work on -6
+# while timing out on v4.
 pass in inet6 from fc00::/7 to fc00::/7
 pass in inet6 from fe80::/10 to { fe80::/10, ff02::/16 }
 

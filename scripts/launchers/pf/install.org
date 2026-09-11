@@ -22,6 +22,15 @@ only a packet filter can fix it without turning Internet Sharing off.
 : ~/scripts/launchers/pf/install-publicnet-pf.zsh --check      # report only
 : ~/scripts/launchers/pf/install-publicnet-pf.zsh --uninstall  # full rollback
 
+And, orthogonally, whether to let the Tailscale range in:
+
+: ~/scripts/launchers/pf/install-publicnet-pf.zsh --tailscale     # allow 100.64.0.0/10
+: ~/scripts/launchers/pf/install-publicnet-pf.zsh --no-tailscale  # do not
+
+=--tailscale= has *no default*. Left unset the script asks; with no terminal to
+ask on it answers *no* and says so loudly. Widening a firewall is not something
+to do silently on a machine nobody is watching. See the Tailscale section below.
+
 IPv6 is *left enabled by default*. The ruleset filters on source address and
 covers both address families, so a public v6 peer is denied either way.
 =--no-ipv6= only additionally covers the window where pf is not loaded at all:
@@ -100,6 +109,88 @@ hours or days later.
 If asymmetric routing is ever introduced -- multiple uplinks, some VPN setups
 -- the urpf line is the first thing to suspect, and deleting that one line
 reverts to the previous behaviour.
+
+* Tailscale
+
+Tailscale gives each node an address in =100.64.0.0/10= -- RFC 6598
+carrier-grade NAT space, which is *not* RFC1918. The rules above therefore do
+not match it, =block drop in all= takes it, and inbound tailnet traffic is
+dropped. Allowing it is opt-in:
+
+: ~/scripts/launchers/pf/install-publicnet-pf.zsh --tailscale
+
+The rule lives in its own file, =com.user.publicnet.tailscale=, which the
+installer appends to the base anchor and installs as a single file. There is no
+second anchor and nothing extra to load. The assembled copy also goes to
+=/usr/local/libexec/com.user.publicnet.anchor=, so the choice survives reboots
+and macOS updates without =publicnet-pf-boot.sh= knowing this option exists.
+
+** The failure this causes sends you looking in the wrong place
+
+With the tailnet blocked, Tailscale SSH *keeps working*: =tailscaled=
+terminates it inside its own userspace netstack, so those packets never reach
+pf at all. The first thing that genuinely crosses the filter is something like
+mosh's UDP, which hangs with
+
+: mosh: Nothing received from server on UDP port 60001.
+
+while =ssh= to the very same host is fine. So *"SSH still works" proves nothing
+about this ruleset*, and neither does =tailscale ping=. Reach for something that
+actually traverses pf before concluding the filter is innocent.
+
+** Why trusting the whole range is safe
+
+- *The range will not change meaning.* RFC 6598 is a permanent IANA allocation
+  for carrier-grade NAT, never routed on the public internet, and Tailscale
+  hardcodes it.
+- *The destination half carries the security*, exactly as it does for the
+  RFC1918 rule, and for the same reason it is not decoration. Both ends must be
+  tailnet addresses, and ours is reachable only from inside the tailnet. A
+  forged CGNAT source is aimed at our *public* address and does not match.
+- *=urpf-failed= closes the on-link forgery.* tailscaled installs a route for
+  =100.64/10= via its utun, so a packet claiming a CGNAT source that arrives on
+  the public interface has its return path resolve elsewhere and is dropped
+  before reaching the pass rule. Check with =route -n get 100.99.99.99=.
+- *Corner case.* If this machine's own uplink is ever behind carrier-grade NAT
+  -- some ISPs, some LTE modems -- other customers of that carrier hold
+  addresses in this range. While tailscaled runs, the tunnel route still makes
+  them fail urpf and the destination test still blocks them. If tailscaled is
+  stopped that route disappears, and the exposure degrades to exactly the
+  "hostile private LAN" case this ruleset already accepts for RFC1918. Narrow
+  service binds remain the control.
+
+** It governs IPv4 only, deliberately
+
+=--no-tailscale= does *not* block tailnet IPv6. The base rule
+=pass in inet6 from fc00::/7 to fc00::/7= already contains Tailscale's ULA
+prefix =fd7a:115c:a1e0::/48=, so v6 tailnet peers are trusted either way.
+
+That asymmetry is worth knowing when debugging: mosh can succeed over =-6= and
+time out over v4 on the same host, which looks baffling until you notice it is
+two different rules. Blocking tailnet v6 would mean narrowing the ULA rule for
+every unique-local peer, which is a decision about the base ruleset rather than
+about Tailscale, and is deliberately not what this flag does.
+
+* mosh over Tailscale
+
+Two independent layers must both pass, and each fails the same silent way:
+
+1. *This ruleset*, per the section above -- install with =--tailscale=.
+2. *The macOS Application Firewall.* Homebrew's =mosh-server= is ad-hoc signed,
+   so ALF's "automatically allow downloaded signed software" does not cover it,
+   and with stealth mode on its inbound UDP is dropped without a word. Register
+   it with [agfi:firewall-allow-mosh-darwin].
+
+: firewall-allow-mosh-darwin           # register
+: firewall-allow-mosh-darwin --check   # report only; no root, no changes
+
+*Re-run it after every =brew upgrade mosh=.* It registers the resolved Cellar
+path, which is version-stamped, so an upgrade silently invalidates the
+registration and mosh starts hanging again. =--check= is the cheap way to tell.
+
+Note ALF canonicalises symlinks on =--add=, so =--check= keeps reporting "The
+application is not part of the firewall" for =/opt/homebrew/bin/mosh-server=
+even on a healthy setup. The resolved Cellar path is the line that matters.
 
 * Install by hand
 
@@ -204,6 +295,14 @@ Or just =install-publicnet-pf.zsh --uninstall=.
 - *The bridge100/ap1 names are the one place interfaces still appear*, and only
   in allow rules. If Internet Sharing ever uses different names, hotspot
   clients get blocked -- a visible failure, not a silent one.
+- *Tailscale SSH never crosses pf*, so it cannot be used to test this ruleset;
+  see the Tailscale section. Ping cannot either, because inbound ICMP echo is
+  blocked regardless.
+- *A non-interactive re-run drops the Tailscale rule.* =--tailscale= has no
+  default and answers no when it cannot ask, so re-running the installer from a
+  script or over a connection with no tty quietly reverts to a blocked tailnet.
+  Pass the flag explicitly in any automation. Boots are unaffected: the
+  LaunchDaemon only reloads the already-assembled anchor, it never re-decides.
 - *Blocking inbound ICMP echo* means the host stops answering pings. That is
   intentional and matches stealth mode, but it will confuse you later when
   debugging connectivity.

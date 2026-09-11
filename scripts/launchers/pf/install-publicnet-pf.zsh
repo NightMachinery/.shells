@@ -3,11 +3,17 @@
 # source addresses, plus the self-healing LaunchDaemon that re-applies it at
 # boot and after macOS updates.
 #
-#   ./install-publicnet-pf.zsh             # install; leaves IPv6 alone
-#   ./install-publicnet-pf.zsh --no-ipv6   # also disable IPv6 on the wired service
-#   ./install-publicnet-pf.zsh --ipv6      # explicitly keep IPv6 (the default)
+#   ./install-publicnet-pf.zsh                # install; leaves IPv6 alone
+#   ./install-publicnet-pf.zsh --no-ipv6      # also disable IPv6 on the wired service
+#   ./install-publicnet-pf.zsh --ipv6         # explicitly keep IPv6 (the default)
+#   ./install-publicnet-pf.zsh --tailscale    # allow inbound from 100.64.0.0/10
+#   ./install-publicnet-pf.zsh --no-tailscale # do not
 #   ./install-publicnet-pf.zsh --uninstall
-#   ./install-publicnet-pf.zsh --check     # report state, change nothing
+#   ./install-publicnet-pf.zsh --check        # report state, change nothing
+#
+# --tailscale has NO DEFAULT. Left unset, the script asks; with no terminal to
+# ask on it answers no, because widening the filter is not something to do
+# silently. See com.user.publicnet.tailscale for what it allows and why.
 #
 # IPv6 is left enabled by default: the ruleset filters on source address and
 # covers both families, so a public v6 peer is already blocked. Disabling v6
@@ -35,7 +41,11 @@ ANCHOR_MASTER="/usr/local/libexec/${ANCHOR_NAME}.anchor"
 PF_CONF='/etc/pf.conf'
 V6_SERVICE='USB 10/100/1000 LAN'
 EXPECTED_IF='en10'
+TAILNET_SRC="${SRC_DIR}/${ANCHOR_NAME}.tailscale"
 DISABLE_V6=0   # default: leave IPv6 alone; --no-ipv6 turns it off
+TAILSCALE=''   # NO DEFAULT: '' means unresolved, so "not asked" stays
+               # distinguishable from "no". _resolve_tailscale settles it.
+ASSEMBLED=''   # temp file: base anchor + optionally the tailscale fragment
 
 # --- output helpers -----------------------------------------------------------
 _info() { print -r -- "  $*" }
@@ -52,7 +62,73 @@ _sudo_setup() {
     sudo -v || _die 'sudo authentication failed.'
     ( while true ; do sudo -n true 2>/dev/null; sleep 45; kill -0 $$ 2>/dev/null || exit; done ) &
     SUDO_KEEPALIVE_PID=$!
-    trap '[[ -n $SUDO_KEEPALIVE_PID ]] && kill $SUDO_KEEPALIVE_PID 2>/dev/null' EXIT INT TERM
+    # One trap, extended rather than duplicated: a second `trap ... EXIT'
+    # REPLACES this one instead of adding to it, which would leak $ASSEMBLED.
+    trap '[[ -n $SUDO_KEEPALIVE_PID ]] && kill $SUDO_KEEPALIVE_PID 2>/dev/null
+          [[ -n $ASSEMBLED ]] && rm -f $ASSEMBLED' EXIT INT TERM
+}
+
+# --- tailscale: an explicit choice, never an assumed one ----------------------
+# Tailscale addresses live in 100.64.0.0/10 (RFC 6598 CGNAT), which is not
+# RFC1918, so the base ruleset drops inbound tailnet traffic. Allowing it is
+# opt-in and has no default: unset means ask, and with no terminal the answer is
+# no. Widening a firewall is not something to do silently on a machine nobody is
+# watching.
+_resolve_tailscale() {
+    if [[ -n $TAILSCALE ]] ; then
+        if (( TAILSCALE )) ; then
+            _info 'allowed by --tailscale.'
+        else
+            _info 'blocked by --no-tailscale.'
+        fi
+        return 0
+    fi
+
+    if [[ ! -t 0 ]] ; then
+        TAILSCALE=0
+        _warn 'no terminal to ask on, so the Tailscale range stays BLOCKED.'
+        _warn 'inbound tailnet services will not reach this host -- mosh will hang'
+        _warn 'with "Nothing received from server on UDP port 600xx". Pass'
+        _warn '--tailscale (or --no-tailscale to silence this) when scripting.'
+        return 0
+    fi
+
+    _info 'Allow inbound traffic from the Tailscale range, 100.64.0.0/10?'
+    _info ''
+    _info '  Needed by anything that genuinely crosses pf, such as mosh.'
+    _info '  Tailscale SSH does NOT need it -- tailscaled terminates that inside'
+    _info '  its own netstack, so it works either way and proves nothing here.'
+    _info '  Both ends of the rule must be tailnet addresses, so a forged CGNAT'
+    _info '  source aimed at our public address still does not match.'
+    _info "  Full argument, and the CGNAT-uplink caveat: ${TAILNET_SRC:t}"
+    _info ''
+    _info '  Answer no if you do not use Tailscale on this machine.'
+    if read -q '?   allow the Tailscale range? [y/N] ' ; then
+        TAILSCALE=1
+    else
+        TAILSCALE=0
+    fi
+    print
+}
+
+# --- assembling the anchor ----------------------------------------------------
+# The installed anchor is the base file plus, if chosen, the tailscale fragment.
+# Everything downstream uses this assembled copy: the dry run, /etc/pf.anchors,
+# and the master copy under /usr/local/libexec that publicnet-pf-boot.sh heals
+# from. That last one is why the choice survives reboots and macOS updates
+# without the boot script needing to know this option exists.
+_assemble_anchor() {
+    ASSEMBLED="$(mktemp -t publicnet-anchor)" || _die 'mktemp failed.'
+    cat "$ANCHOR_SRC" > "$ASSEMBLED" || _die "could not read ${ANCHOR_SRC}"
+    if (( TAILSCALE )) ; then
+        [[ -f $TAILNET_SRC ]] || _die "missing ${TAILNET_SRC}"
+        print >> "$ASSEMBLED"
+        cat "$TAILNET_SRC" >> "$ASSEMBLED" || _die "could not read ${TAILNET_SRC}"
+        _info "base + ${TAILNET_SRC:t}"
+    else
+        _info 'base only; the Tailscale range is not allowed.'
+    fi
+    chmod 644 "$ASSEMBLED"
 }
 
 # --- ruleset validation -------------------------------------------------------
@@ -86,6 +162,17 @@ _report_state() {
     fi
     [[ -f $ANCHOR_DST ]] && _info "anchor file:   installed" || _info "anchor file:   absent"
     [[ -f $PLIST_DST  ]] && _info "launchdaemon:  installed" || _info "launchdaemon:  absent"
+
+    # Read this from the LOADED rules, not from the file on disk: what is
+    # installed and what pf is actually enforcing can differ.
+    local ts
+    ts="$(sudo pfctl -a "$ANCHOR_NAME" -s rules 2>/dev/null | grep -c '100\.64\.0\.0/10')"
+    if (( ${ts:-0} > 0 )) ; then
+        _info "tailnet v4:    allowed (100.64.0.0/10)"
+    else
+        _info "tailnet v4:    blocked"
+    fi
+    _info "tailnet v6:    allowed, via the base fc00::/7 rule; --no-tailscale does not change this"
 
     local v6
     v6="$(ifconfig "$EXPECTED_IF" 2>/dev/null | grep -c 'inet6 2001')"
@@ -130,16 +217,23 @@ _install() {
     [[ -f $ANCHOR_SRC ]] || _die "missing ${ANCHOR_SRC}"
     [[ -f $PLIST_SRC  ]] || _die "missing ${PLIST_SRC}"
 
+    # Asked before sudo, so all the interaction happens up front.
+    _step 'Tailscale'
+    _resolve_tailscale
+
     _sudo_setup
     _step 'sanity checks'
     _verify_interface
 
+    _step 'assembling the anchor'
+    _assemble_anchor
+
     _step 'parsing the ruleset before touching anything'
-    _pf_check "$ANCHOR_SRC" || _die 'the anchor does not parse.'
+    _pf_check "$ASSEMBLED" || _die 'the anchor does not parse.'
     _info 'anchor parses cleanly.'
 
     _step 'installing anchor file'
-    sudo cp "$ANCHOR_SRC" "$ANCHOR_DST" || _die 'copy failed.'
+    sudo cp "$ASSEMBLED" "$ANCHOR_DST" || _die 'copy failed.'
     sudo chown root:wheel "$ANCHOR_DST"
     sudo chmod 644 "$ANCHOR_DST"
     _info "$ANCHOR_DST"
@@ -180,7 +274,7 @@ _install() {
     sudo chmod 755 "$BOOT_DST"
     # Master copy of the anchor, so the boot script can restore it if
     # /etc/pf.anchors is ever cleared.
-    sudo cp "$ANCHOR_SRC" "$ANCHOR_MASTER" || _die 'copy failed.'
+    sudo cp "$ASSEMBLED" "$ANCHOR_MASTER" || _die 'copy failed.'
     sudo chown root:wheel "$ANCHOR_MASTER"
     sudo chmod 644 "$ANCHOR_MASTER"
     _info "$BOOT_DST (root:wheel 755)"
@@ -269,8 +363,10 @@ _uninstall() {
 # --- main ---------------------------------------------------------------------
 while (( $# )) ; do
     case "$1" in
-        --ipv6)      DISABLE_V6=0; shift ;;
-        --no-ipv6)   DISABLE_V6=1; shift ;;
+        --ipv6)          DISABLE_V6=0; shift ;;
+        --no-ipv6)       DISABLE_V6=1; shift ;;
+        --tailscale)     TAILSCALE=1;  shift ;;
+        --no-tailscale)  TAILSCALE=0;  shift ;;
         *) ACTION="$1"; shift ;;
     esac
 done
@@ -279,5 +375,5 @@ case "${ACTION:-install}" in
     install|'')  _install ;;
     --uninstall) _uninstall ;;
     --check)     _sudo_setup; _report_state ;;
-    *)           print -ru2 -- "usage: ${0:t} [install|--uninstall|--check] [--ipv6|--no-ipv6]"; exit 2 ;;
+    *)           print -ru2 -- "usage: ${0:t} [install|--uninstall|--check] [--ipv6|--no-ipv6] [--tailscale|--no-tailscale]"; exit 2 ;;
 esac

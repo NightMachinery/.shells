@@ -1,0 +1,71 @@
+# com.user.publicnet.tailscale -- optional: trust the Tailscale IPv4 range.
+#
+# NOT a standalone anchor. The installer appends this to com.user.publicnet and
+# installs the concatenation; see install-publicnet-pf.zsh (_assemble_anchor).
+# Whether it is appended is a prompted choice with no default -- pass
+# --tailscale / --no-tailscale, or answer the question.
+#
+# ---------------------------------------------------------------------------
+# WHY THIS IS NEEDED
+#
+# Tailscale hands each node an address in 100.64.0.0/10, which is NOT RFC1918,
+# so the base ruleset's `pass in inet from $rfc1918 to $rfc1918' does not match
+# it and `block drop in all' takes it. Inbound tailnet traffic is dropped.
+#
+# This is easy to miss, because Tailscale SSH keeps working: tailscaled
+# terminates it inside its own userspace netstack, so those packets never reach
+# pf at all. The first thing that actually crosses the filter is something like
+# mosh's UDP, which then hangs with "Nothing received from server on UDP port
+# 600xx" while ssh to the same host is fine.
+#
+# ---------------------------------------------------------------------------
+# WHY TRUSTING THE WHOLE RANGE IS SAFE
+#
+# 1. The range will not change meaning. 100.64.0.0/10 is RFC 6598 shared
+#    address space, a permanent IANA allocation for carrier-grade NAT, never
+#    routed on the public internet. Tailscale hardcodes it.
+#
+# 2. The destination half carries the security, exactly as it does for the
+#    RFC1918 rule above -- and for the same reason, it is not decoration. BOTH
+#    ends must be tailnet, and our tailnet address is reachable only from
+#    inside the tailnet:
+#
+#      phone over tailnet   100.74.12.9 -> 100.88.203.41      tailnet -> tailnet, passes
+#      CGNAT ISP neighbour  100.90.0.5  -> <our public addr>  tailnet -> PUBLIC,  blocked
+#
+# 3. `block drop in quick from urpf-failed' closes the on-link forgery.
+#    tailscaled installs a route for 100.64/10 via its utun, so a packet
+#    claiming a CGNAT source that arrives on the public interface has its
+#    return path resolve elsewhere and is dropped before reaching this rule.
+#    Verify with: route -n get 100.99.99.99   # interface: utunN
+#
+# 4. Corner case worth remembering: if this machine's own uplink is ever behind
+#    carrier-grade NAT (some ISPs, LTE modems), other customers of that carrier
+#    hold addresses in this range. While tailscaled runs, the tunnel route
+#    still makes them fail urpf and point 2 still blocks them. If tailscaled is
+#    stopped, that route disappears and the exposure degrades to exactly the
+#    "hostile private LAN" case install.org already accepts for RFC1918 -- the
+#    narrow service binds remain the control.
+#
+# ---------------------------------------------------------------------------
+# WHY APPENDING AT THE END IS CORRECT
+#
+# pf is last-match-wins unless a rule says `quick'. Every quick rule in the base
+# file -- the DHCP/ND bootstrap passes and the urpf block -- precedes this and
+# terminates evaluation where it matches, so appending cannot bypass them. The
+# non-quick `block drop in all' also precedes this, so a later pass wins. That
+# is the same relationship the base file's own allow rules have with it.
+#
+# ---------------------------------------------------------------------------
+# IPv4 ONLY, DELIBERATELY
+#
+# There is no v6 counterpart here because the base file's
+# `pass in inet6 from fc00::/7 to fc00::/7' already contains Tailscale's ULA
+# prefix (fd7a:115c:a1e0::/48). So tailnet IPv6 is trusted whether or not this
+# fragment is installed, and --no-tailscale does not change that. Blocking it
+# would mean narrowing the ULA rule for every unique-local peer, which is a
+# different decision about the base ruleset, not about Tailscale.
+
+tailnet = "100.64.0.0/10"
+
+pass in inet from $tailnet to $tailnet
