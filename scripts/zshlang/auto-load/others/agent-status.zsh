@@ -9,8 +9,8 @@
 #: hand the lot to a pager.
 #:
 #: The fan-out goes through the repository's GNU parallel wrapper
-#: ([agfi:parallelm], alias =para=) rather than shell job control. Job control
-#: would mean either interleaved output or a temporary file per agent; `para'
+#: ([agfi:parallelm]) rather than shell job control. Job control
+#: would mean either interleaved output or a temporary file per agent; `parallelm'
 #: with =--keep-order= already buffers each job and replays them in input
 #: order, which is exactly the "one section per agent, in the configured
 #: order" this wants. Its jobs run through =brishz_para.dash=, i.e. inside
@@ -124,7 +124,7 @@ function h-agent-status-one {
     esac
 
     if (( retcode != 0 )) ; then
-        #: On stdout rather than through [agfi:ecerr]: `para' collects each
+        #: On stdout rather than through [agfi:ecerr]: `parallelm' collects each
         #: job's stderr separately from its stdout, so a message written there
         #: would surface outside the section it belongs to -- and, with
         #: =--keep-order=, possibly before any section at all.
@@ -136,7 +136,7 @@ function h-agent-status-one {
     #: on a terminal.
     ec ''
 
-    #: Deliberately zero: `para' should report the *run* as successful even
+    #: Deliberately zero: `parallelm' should report the *run* as successful even
     #: when an agent could not be reached, since the combined report did come
     #: out. The failure is visible in the section.
     return 0
@@ -170,7 +170,7 @@ function agent-status {
     #: others, which is the opposite of [agfi:parallelm]'s default. Belt and
     #: braces with [agfi:h-agent-status-one]'s own `return 0', because a job
     #: can also die in ways the function never sees.
-    parallel_halt=never para --keep-order h-agent-status-one '{}' "${color}" ::: "${agents[@]}" |
+    parallel_halt=never parallelm --keep-order h-agent-status-one '{}' "${color}" ::: "${agents[@]}" |
         pager-if-overflow
 }
 aliasfn agst agent-status
