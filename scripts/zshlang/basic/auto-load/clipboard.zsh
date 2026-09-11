@@ -1,89 +1,93 @@
 
-# alias pc='pbcopy'
-function cat-copy {
-    : "prints stdin or the arguments, and copies it"
-    #: The buffered half of the pair: the whole input is read before anything
-    #: is printed, so a slow producer shows nothing until it finishes, and a
-    #: missing trailing newline is added on the way out. When you want output
-    #: as it streams, or stdout as byte-exact as the clipboard already is,
-    #: reach for [agfi:cat-copy-streaming].
+function cat-eol {
+    : "copies stdin to stdout, adding a final newline only when one is missing"
+    #: A chunk copier, not a line filter: nothing is split, so it is binary
+    #: safe, and the writes are unbuffered, so it streams. Measured over two
+    #: million lines (2026-09-11) it costs 2.45s against plain `cat''s 2.39s,
+    #: where `gawk "{print; fflush()}"' costs 3.09s for the same guarantee and
+    #: a bare `awk 1' does not stream at all.
     ##
-    local inargs
-    in_or_args_newline_p=n in-or-args2 "$@"
-
-    #: The newline works around functions that do not end their output with
-    #: one. Unconditionally it doubled the newline for every function that
-    #: does, so it is added only when the input actually lacks one; what goes
-    #: on the clipboard stays byte-exact either way.
-    if [[ "$inargs" == *$'\n' ]] ; then
-        ecn "$inargs"
-    else
-        ec "$inargs"
-    fi
-    ecn "$inargs" | pbcopy
+    command perl -e '
+my $last;
+while ((my $n = sysread(STDIN, my $buf, 65536)) > 0) {
+    syswrite(STDOUT, $buf);
+    $last = substr($buf, -1);
+}
+syswrite(STDOUT, "\n") if defined($last) && $last ne "\n";
+'
 }
 
-function cat-copy-streaming {
-    : "prints stdin or the arguments and copies it, byte-exact, as it streams"
-    #: The streaming half of the pair, and the one implementation of the
-    #: fan-out: one input copied to the terminal and to the clipboard at once,
-    #: nothing buffered and nothing rewritten. [agfi:cat-copy] is the buffered
-    #: half. `pc', [agfi:tee-copy] and [agfi:cat-copy-if-tty] all land here.
-    #:
-    #: `> >(pbcopy) | cat', not `>&1 > >(pbcopy)'. Both fan the stream out
+function h-cat-copy-fanout {
+    : "stdin to both stdout and the clipboard in one pass; <1> filters stdout"
+    #: `> >(pbcopy) | ...', not `>&1 > >(pbcopy)'. Both fan the stream out
     #: through zsh's MULTIOS, which forks a helper process to do the copying,
     #: but the second leaves the shell nothing in the foreground to wait on:
     #: the terminal copy can then land after the next prompt (four runs in
     #: five, with a second command following immediately), and in a shell that
     #: exits at once -- `zsh -ic ...' under a pty -- the clipboard write is
     #: lost outright (five runs in five). The pipe gives the shell a reader to
-    #: wait on and both problems go away. Measured 2026-09-11: it costs ~4ms a
-    #: call and ~38% on bulk (13.6s against 9.8s for 200MB), which is worth
-    #: paying. `command tee >(pbcopy)' is correct too and a shade faster on
-    #: bulk, but slower per call.
+    #: wait on and both problems go away, for ~4ms a call and ~38% on bulk.
+    #: `command tee >(pbcopy)' is correct too, and slower per call.
+    ##
+    > >(pbcopy) | "${1:-cat}"
+}
+
+function cat-copy-args {
+    : "prints its arguments, else stdin, and copies them; byte-exact"
+    #: The engine. Arguments are the text itself, newline separated, as
+    #: [agfi:pbcopy] has always taken them; [agfi:cat-copy] is the variant
+    #: whose arguments are paths, the way `cat' reads them.
+    #:
+    #: Through [agfi:in-or-args], so a call with neither arguments nor a pipe
+    #: reads the clipboard rather than hanging on a terminal.
+    ##
+    in_or_args_newline_p=n in-or-args "$@" | h-cat-copy-fanout
+}
+alias pc='\noglob cat-copy-args'
+
+function cat-copy-args-newline {
+    : "cat-copy-args, but stdout is guaranteed to end with a newline"
+    #: What a producer using `ecn' wants: the terminal gets its line ending so
+    #: the output does not run into the prompt, while the clipboard stays
+    #: byte-exact, so a value still pastes into a spreadsheet cell without
+    #: spilling into the next one. See [agfi:cat-eol].
+    ##
+    in_or_args_newline_p=n in-or-args "$@" | h-cat-copy-fanout cat-eol
+}
+
+function cat-copy {
+    : "prints the contents of its file arguments, else stdin, and copies them"
+    #: `cat'-shaped, which is what the name promises: arguments are paths.
+    #: [agfi:cat-copy-args] is the one whose arguments are the text.
+    #:
+    #: Files are printed as they are. A missing final newline is left alone,
+    #: unlike [agfi:cat-copy-args-newline]: a file is not a value being
+    #: prepared for a paste, and `cat' does not tidy one either.
     ##
     if (( $# )) ; then
-        ecn "$*" | > >(pbcopy) | cat
-    else
-        > >(pbcopy) | cat
-    fi
-}
-alias pc='\noglob cat-copy-streaming'
-
-function tee-copy {
-    : "the old name for [agfi:cat-copy-streaming]"
-    cat-copy-streaming "$@"
-}
-aliasfn teec tee-copy
-# alias pc='\noglob cat-copy'
-
-function cat-copy-v2 {
-    if (( $#@ > 0 )) ; then
-        cat "$@"
+        command cat "$@"
     else
         in-or-args
-    fi | cat-copy-streaming
+    fi | h-cat-copy-fanout
 }
-alias cf='cat-copy-v2'
+alias cf='cat-copy'
 
-function cat-copy-streaming-v1 {
-    local temp_file
-    temp_file="$(mktemp)" @TRET
-    {
-        if (( $#@ == 0 )) ; then
-            cat
-        else
-            # arrn "$@"
-            ecn "$*"
-        fi |
-            tee "$temp_file" | cat @RET
-
-        pbcopy < "$temp_file" @RET
-    } always {
-        silent trs-rm "$temp_file"
-    }
+#: The old names.
+function cat-copy-streaming {
+    : "the old name for [agfi:cat-copy-args]"
+    cat-copy-args "$@"
 }
 
+function tee-copy {
+    : "the old name for [agfi:cat-copy-args]"
+    cat-copy-args "$@"
+}
+aliasfn teec tee-copy
+
+function cat-copy-v2 {
+    : "the old name for [agfi:cat-copy]"
+    cat-copy "$@"
+}
 
 function cat-copy-as-file {
     local suffix="${1}"
@@ -91,7 +95,9 @@ function cat-copy-as-file {
     local tmp
     tmp="$(gmktemp --suffix="$suffix")" @TRET
 
-    cat-copy > "$tmp" @RET
+    #: Plain `cat': the clipboard is set from the file below, and copying the
+    #: text here first only left it holding the wrong thing for a moment.
+    command cat > "$tmp" @RET
 
     reval-ec pbadd "$tmp"
 }
@@ -115,7 +121,7 @@ function cat-rtl-streaming-if-tty {
 
 function cat-streaming-copy-rtl-if-tty {
     if isOutTty ; then
-        cat-copy-streaming | rtl-reshaper-streaming
+        cat-copy-args | rtl-reshaper-streaming
     else
         cat
     fi
@@ -123,7 +129,7 @@ function cat-streaming-copy-rtl-if-tty {
 
 function cat-copy-rtl-if-tty {
     if isOutTty ; then
-        cat-copy | rtl-reshaper-streaming
+        cat-copy-args-newline | rtl-reshaper-streaming
     else
         cat
     fi
@@ -131,8 +137,10 @@ function cat-copy-rtl-if-tty {
 
 function cat-copy-if-tty {
     if isOutTty ; then
-        # cat-copy
-        cat-copy-streaming
+        #: The newline variant, so a producer using `ecn' does not run into
+        #: the prompt. Swap in [agfi:cat-copy-args] if a caller ever needs
+        #: stdout as byte-exact as the clipboard already is.
+        cat-copy-args-newline
     else
         cat
     fi
@@ -140,7 +148,7 @@ function cat-copy-if-tty {
 
 function cat-copy-streaming-remote {
         if isLocal ; then
-            cat-copy-streaming
+            cat-copy-args
         else
             pbcopy-remote
         fi
