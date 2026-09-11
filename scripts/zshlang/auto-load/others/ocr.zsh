@@ -14,6 +14,6 @@ function ocr {
 
 function ocr-fa {
     ocr "fas" |
-        reval-rtl cat-copy-args-newline
+        reval-rtl cat-copy-newline
 }
 ##

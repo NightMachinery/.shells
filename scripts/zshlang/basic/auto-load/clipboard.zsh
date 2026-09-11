@@ -42,14 +42,55 @@ function h-cat-copy-fanout {
     > >(pbcopy) | "${1:-cat}"
 }
 
+#: The copy family, on two axes: what the arguments are, and whether stdout is
+#: left exactly as it came. The clipboard is byte-exact in all four.
+#:
+#:                  byte-exact stdout   trailing newline on stdout
+#:    paths/stdin   cat-copy            cat-copy-newline
+#:    text/stdin    cat-copy-args       cat-copy-args-newline
+#:
+#: With no arguments every one of them reads stdin, or the clipboard when stdin
+#: is a terminal, through [agfi:in-or-args] -- which is why a pipe filter may
+#: use any of them, and why the choice between them is about names, not
+#: behaviour.
+##
+function h-cat-copy-paths {
+    : "the input half of [agfi:cat-copy]: the contents of its file arguments, else stdin"
+    if (( $# )) ; then
+        command cat "$@"
+    else
+        in-or-args
+    fi
+}
+
+function cat-copy {
+    : "prints the contents of its file arguments, else stdin, and copies them"
+    #: `cat'-shaped, which is what the name promises: arguments are paths.
+    #: [agfi:cat-copy-args] is the one whose arguments are the text itself.
+    #:
+    #: A file's missing final newline is left alone, unlike
+    #: [agfi:cat-copy-newline]: a file is not a value being prepared for a
+    #: paste, and `cat' does not tidy one either.
+    ##
+    h-cat-copy-paths "$@" | h-cat-copy-fanout
+}
+alias cf='cat-copy'
+
+function cat-copy-newline {
+    : "cat-copy, but stdout is guaranteed to end with a newline"
+    #: What the terminal wants from a producer using `ecn': a line ending, so
+    #: the output does not run into the prompt, while the clipboard stays
+    #: byte-exact and a value still pastes into a spreadsheet cell without
+    #: spilling into the next one. See [agfi:cat-eol].
+    ##
+    h-cat-copy-paths "$@" | h-cat-copy-fanout cat-eol
+}
+
 function cat-copy-args {
     : "prints its arguments, else stdin, and copies them; byte-exact"
-    #: The engine. Arguments are the text itself, newline separated, as
-    #: [agfi:pbcopy] has always taken them; [agfi:cat-copy] is the variant
-    #: whose arguments are paths, the way `cat' reads them.
-    #:
-    #: Through [agfi:in-or-args], so a call with neither arguments nor a pipe
-    #: reads the clipboard rather than hanging on a terminal.
+    #: Arguments are the text itself, newline separated, as [agfi:pbcopy] has
+    #: always taken them; [agfi:cat-copy] is the variant whose arguments are
+    #: paths, the way `cat' reads them.
     ##
     in_or_args_newline_p=n in-or-args "$@" | h-cat-copy-fanout
 }
@@ -57,40 +98,21 @@ alias pc='\noglob cat-copy-args'
 
 function cat-copy-args-newline {
     : "cat-copy-args, but stdout is guaranteed to end with a newline"
-    #: What a producer using `ecn' wants: the terminal gets its line ending so
-    #: the output does not run into the prompt, while the clipboard stays
-    #: byte-exact, so a value still pastes into a spreadsheet cell without
-    #: spilling into the next one. See [agfi:cat-eol].
+    #: [agfi:cat-copy-newline] is the same guarantee for the paths variant.
     ##
     in_or_args_newline_p=n in-or-args "$@" | h-cat-copy-fanout cat-eol
 }
 
-function cat-copy {
-    : "prints the contents of its file arguments, else stdin, and copies them"
-    #: `cat'-shaped, which is what the name promises: arguments are paths.
-    #: [agfi:cat-copy-args] is the one whose arguments are the text.
-    #:
-    #: Files are printed as they are. A missing final newline is left alone,
-    #: unlike [agfi:cat-copy-args-newline]: a file is not a value being
-    #: prepared for a paste, and `cat' does not tidy one either.
-    ##
-    if (( $# )) ; then
-        command cat "$@"
-    else
-        in-or-args
-    fi | h-cat-copy-fanout
-}
-alias cf='cat-copy'
-
-#: The old names.
+#: The old names. Every one of them was only ever used as a pipe filter, where
+#: the whole grid behaves alike, so they point at the `cat'-shaped member.
 function cat-copy-streaming {
-    : "the old name for [agfi:cat-copy-args]"
-    cat-copy-args "$@"
+    : "the old name for [agfi:cat-copy]"
+    cat-copy "$@"
 }
 
 function tee-copy {
-    : "the old name for [agfi:cat-copy-args]"
-    cat-copy-args "$@"
+    : "the old name for [agfi:cat-copy]"
+    cat-copy "$@"
 }
 aliasfn teec tee-copy
 
@@ -131,7 +153,7 @@ function cat-rtl-streaming-if-tty {
 
 function cat-streaming-copy-rtl-if-tty {
     if isOutTty ; then
-        cat-copy-args | rtl-reshaper-streaming
+        cat-copy | rtl-reshaper-streaming
     else
         cat
     fi
@@ -139,7 +161,7 @@ function cat-streaming-copy-rtl-if-tty {
 
 function cat-copy-rtl-if-tty {
     if isOutTty ; then
-        cat-copy-args-newline | rtl-reshaper-streaming
+        cat-copy-newline | rtl-reshaper-streaming
     else
         cat
     fi
@@ -148,9 +170,9 @@ function cat-copy-rtl-if-tty {
 function cat-copy-if-tty {
     if isOutTty ; then
         #: The newline variant, so a producer using `ecn' does not run into
-        #: the prompt. Swap in [agfi:cat-copy-args] if a caller ever needs
-        #: stdout as byte-exact as the clipboard already is.
-        cat-copy-args-newline
+        #: the prompt. Swap in [agfi:cat-copy] if a caller ever needs stdout
+        #: as byte-exact as the clipboard already is.
+        cat-copy-newline
     else
         cat
     fi
@@ -158,7 +180,7 @@ function cat-copy-if-tty {
 
 function cat-copy-streaming-remote {
         if isLocal ; then
-            cat-copy-args
+            cat-copy
         else
             pbcopy-remote
         fi
