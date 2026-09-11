@@ -508,11 +508,14 @@ def get_token(
     # disagree with the uid -- see keychain_account_candidates -- and
     # best_token_info picks the live credential from whatever they find.
     # Older versions stored the *default* profile under other account names
-    # ("unknown", or no filter at all), so probe those as a fallback -- but only
-    # for the default profile and only when the account was not pinned: a
-    # hashed service name can only have been written by a version that already
-    # used $USER, and probing without a filter there would just pick whichever
-    # orphan `security` returns first.
+    # ("unknown", or no filter at all), so probe those as a fallback when the
+    # account was not pinned. A hashed service name cannot have been written by
+    # one of those versions, but it gets the unfiltered read all the same: the
+    # hash already pins the service to exactly one profile, so an unfiltered
+    # match there cannot be another profile's token, and best_token_info
+    # prefers a live credential over an expired one. Withholding it bought
+    # nothing and cost the work profile its only fallback -- it was the one
+    # seat that reported no token at all when the derived account was wrong.
     # Read with its own budget: this one can block on an authorization dialog,
     # which has nothing to do with how long an HTTP request may take.
     if keychain_timeout is None:
@@ -521,11 +524,12 @@ def get_token(
     infos, errors = keychain_token_infos(
         service=service, accounts=accounts, timeout=keychain_timeout
     )
-    if not infos and not errors and keychain_account is None and not config_dir:
+    if not infos and not errors and keychain_account is None:
+        #: "unknown" is a default-profile relic, so it is only worth the extra
+        #: `security` call on the service that version could have written.
+        legacy = [None, *accounts] if config_dir else [None, *accounts, "unknown"]
         infos, errors = keychain_token_infos(
-            service=service,
-            accounts=[None, *accounts, "unknown"],
-            timeout=keychain_timeout,
+            service=service, accounts=legacy, timeout=keychain_timeout
         )
 
     keychain_info = best_token_info(infos)
