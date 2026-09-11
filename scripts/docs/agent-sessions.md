@@ -16,7 +16,8 @@ Start here:
 - `agent-session-resume-fz` resumes one, handing off to that agent's own resume
   command.
 - `ffta` picks among the tmux sessions that are running an agent, the one you
-  spoke to last at the top, and goes to it.
+  spoke to last at the top, and goes to it. `fftaa` adds the ones `/done` has
+  ended, which are still sitting there as a dead pane showing their report.
 
 Everything below is why those five work, and what to change when they do not.
 
@@ -317,6 +318,60 @@ and the binary reads them, since a zsh knob cannot reach a process fzf spawns
 on its own. `agent_session_preview_compact_p` overrides the guess, `y` or `n`,
 and its default `auto` is what leaves the decision to the binary.
 
+### The sessions `/done` has ended
+
+[agfi:fftmux-agent-all] (`fftaa`) is the same picker with one more kind of row:
+the tmux sessions whose pane the `/done` skill killed, each marked with a
+💀 ahead of the agent glyph. Plain `ffta` is unchanged and still means
+"sessions running an agent"; the skulls live only in the `-all` spelling, the
+way [agfi:agent-clean-all-fz] stands beside [agfi:agent-clean-fz].
+
+They belong in a picker because `/done` does not take the session away. It
+leaves the pane dead with the report on screen and a generated
+`<report>.pane.sh` in the pane's one command slot, so `prefix-r` brings the
+whole conversation back -- see `agent-done.md`. That is a handle to a finished
+session, and before this the only way to find it was to remember which tmux
+session it had been.
+
+**Picking one only attaches.** It goes through [agfi:tmux-session-goto] like
+every other row, and resuming stays `prefix-r` in the dead pane. The split is
+deliberate: the report you would be deciding from is on that pane's screen, and
+a picker that resumed on your behalf would replace it with a running agent
+before you had read it.
+
+The rows cannot come from [agfi:h-agent-session-live-list], because there is no
+process left to trace. [agfi:h-agent-session-tmux-dead-rows] asks tmux instead,
+with one `list-panes -a -f '#{pane_dead}'`, and keeps only the panes holding an
+`sh <report>.pane.sh` under [agfi:h-agent-done-dir]. Being dead is not enough on
+its own: `~/.tmux.conf` sets `remain-on-exit` globally, so every pane whose
+command exits stays around, and on a working machine most of them are finished
+`agent-view` conversions and abandoned shells.
+
+The transcript is read back out of that generated script's resume line, and not
+off the report's filename or the tmux session's `@agent_session` option. Both of
+those outlive the agent and both are easy to reach, but they record what *was*
+in the session rather than what this pane will do, so either could offer a row
+whose `prefix-r` resumes something else or nothing at all. The script is what
+`respawn-pane` runs, so a session `agent_done_resume_cmd` redirected elsewhere
+is simply not offered, and neither is one whose script found no transcript to
+resume -- which is the "that can be resumed" filter, arrived at for free.
+
+Undoing the quoting is zsh's own lexer rather than a regex: the path was written
+through `${(q)}` inside a `${(qq)}`, so `${(z)}` and `${(Q)}` twice over are the
+exact inverse, and a transcript path holding a space or a quote survives it.
+
+Two smaller rules. The 💀 rows are annotated in the same pass as the live ones,
+so `agent_session_rows_sort` orders the two against each other and a session you
+ended ten minutes ago sits where its last message puts it rather than in a block
+at the bottom. And a conversation that was ended here and then resumed by hand
+somewhere else is both live and holding a dead pane; it appears once, as the
+live row, which is the one you can still talk to.
+
+`tzkill` ([agfi:tmuxzombie-kill]) clears every dead pane on the machine without
+looking at what it was, so it throws these away along with the real zombies.
+That is not a bug in either -- it is the reason being able to find them first is
+worth something.
+
 ## Closing the subagents a skill launched
 
 The `tmux-subagents` skill (`~/code/skills/tmux-subagents`) starts child agents
@@ -502,6 +557,13 @@ These are new and belong to this design rather than to Claude:
   what it emits: empty for the caller's order, `last` for the newest message
   first, `user` for the newest message of yours. `fftmux_agent_sort` is the
   same value in `ffta`'s spelling, and defaults to `last` there.
+- `agent_session_tmux_dead_p` -- whether
+  [agfi:h-agent-session-tmux-rows] also emits the sessions `/done` has ended.
+  `fftmux_agent_dead_p` is the same value in `ffta`'s spelling, and
+  [agfi:fftmux-agent-all] is that spelling with it on.
+- `agent_session_dead_badge` -- the marker those rows carry, `💀`. It goes ahead
+  of the agent glyph rather than inside the label, through the optional fifth
+  input column of [agfi:h-agent-session-annotate-rows].
 - `agent_session_preview_compact_p` -- `y` or `n` to force the preview's
   compact layout, `auto` (the default) to let the binary read the preview size
   fzf gives it.
