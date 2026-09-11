@@ -139,6 +139,17 @@ back to.
 `remain-on-exit` stays on for that pane afterwards, so the loop holds: quit the
 resumed session and the pane dies visibly again, and `prefix-r` brings it back.
 
+These panes are findable rather than only stumbled upon:
+[agfi:fftmux-agent-all] (`fftaa`) lists them beside the live sessions with a
+💀, and picking one puts you in the session with the report still on screen,
+from where `prefix-r` is unchanged. It recognises such a pane by the command it
+is left holding and reads the transcript back out of the script's resume line,
+so the shape of that line is now a consumed contract and not only something the
+pane runs. See "The sessions `/done` has ended" in `agent-sessions.md`.
+
+The one thing that destroys them is `tzkill` ([agfi:tmuxzombie-kill]), which
+clears every dead pane on the machine without asking what it was.
+
 Outside tmux there is no pane to respawn, so the watcher writes the report to
 the terminal directly. Two details make that work. The terminal is found from
 the *agent's* process (`ps -o tty=`), not from the calling shell: the shell an
