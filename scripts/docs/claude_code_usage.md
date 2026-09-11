@@ -514,6 +514,14 @@ If a fetch fails (401, 429, network) and any cache exists — even an expired
 one — the cached data is shown with a red `[stale cache: ...]` annotation and
 the script exits 0.
 
+That annotation is never truncated. It rides on the `Fetched:` line when it
+fits the terminal and wraps onto its own indented lines when it does not,
+because what identifies the credential — which Keychain item, which account —
+sits at the *end* of the sentence, so clipping it removes exactly the half
+worth reading. It used to be cut at 77 characters, and a report reading
+`Keychain item 'Clau...` hid `account 'root'`, which was the entire
+explanation.
+
 If no token resolves at all, the script reads that same response cache before
 looking any further, and `--cache-ttl` is deliberately not applied to it: the
 TTL governs when to skip the network, and here there is no network to skip, so
