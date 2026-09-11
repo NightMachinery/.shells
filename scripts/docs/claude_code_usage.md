@@ -481,9 +481,33 @@ still on screen.
 
 The Keychain/file credential also provides the plan name (`subscriptionType`)
 and token expiry. An expired token only produces a warning — the request is
-still attempted, since Claude Code may have refreshed the Keychain entry. The
-script never refreshes the token itself; open `claude` (or run `/login` inside
-it) to refresh.
+still attempted, since Claude Code may have refreshed the Keychain entry
+without the expiry we read having caught up.
+
+The script does not refresh a token itself, but it can get Claude Code to.
+When the Keychain token is past its expiry, or the endpoint answers 401
+anyway, and `claude` is on `PATH` and relogin is enabled, it runs
+`claude -p /usage` once under the profile's `CLAUDE_CONFIG_DIR`, then re-reads
+the credential and retries the request once. Claude Code refreshes its own
+Keychain entry whenever it starts, and `/usage` is a built-in that print mode
+answers without a model turn, so the run spends no quota; the headless docs
+list only a handful of built-ins and this is not among them, but it works,
+verified by running it. The child gets a fresh temporary directory as its
+cwd, so it can neither pick up a project's settings nor leave a session record
+among your real ones, and `TMUX` and `TMUX_PANE` are stripped from its
+environment: the SessionStart autoname hook would otherwise rename the tmux
+session of whoever asked for the report, after a conversation that never
+happened. It has its own timeout, longer than the HTTP one, because a login
+round-trip is not an HTTP request; that one is a constant in the script, not
+a knob, since nothing sensible varies it. Nothing is attempted when the token came
+from an environment variable or a `.credentials.json` file — those are not
+the Keychain item Claude Code refreshes, so a relogin would leave what the
+script read exactly as it was. The outcome is not silent in either direction:
+`--json` carries a `relogin` field, `refreshed` or `failed`, and the report
+prints a line saying the same, so a report that answers from a freshly
+refreshed token says so rather than looking like one that never needed to.
+The flag is `--relogin` / `--no-relogin`; from zsh, the wrapper knob
+`claude_code_usage_relogin_p` sets it.
 
 ## GUI-less sessions
 
@@ -616,6 +640,12 @@ the default.
   `CLAUDE_CODE_USAGE_PROFILE_LABEL`; empty.
 - `--keychain-service`, `--keychain-account` — no env fallback; both derived as
   described under Credentials.
+- `--relogin` / `--no-relogin` — driven from zsh by the wrapper knob
+  `claude_code_usage_relogin_p`. Whether an expired or rejected Keychain token
+  is refreshed by running `claude -p /usage` once; see Credentials.
+- `--force-relogin` — debugging aid: relogin even though the token is live. It
+  implies `--refresh`, because the relogin rides on the network path and a
+  warm cache would otherwise turn the flag into a silent no-op.
 
 `--json` output contains normalized `windows` (percent, epoch and ISO reset
 times, severity, is_active) plus the `raw` payload for forward compatibility. It
