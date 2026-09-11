@@ -16,9 +16,11 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 import unicodedata
 import urllib.error
@@ -993,6 +995,21 @@ def render_extra_usage(style: Style, extra: object) -> str | None:
     return f"{style.bold('Extra usage')}: " + ", ".join(bits)
 
 
+def terminal_width(default: int = 100) -> int:
+    """Columns to lay the report out in.
+
+    ``shutil.get_terminal_size`` reads ``$COLUMNS`` first and falls back to the
+    ioctl, so a piped or captured run gets ``default`` rather than nothing. The
+    floor keeps a very narrow pane from wrapping every word onto its own line.
+    """
+    try:
+        columns = shutil.get_terminal_size(fallback=(default, 24)).columns
+    except (OSError, ValueError):
+        return default
+
+    return max(columns, 40)
+
+
 def render_human(style: Style, report: ProfileReport) -> str:
     heading = "Claude Code plan usage"
     if report.profile.label:
@@ -1035,6 +1052,9 @@ def render_human(style: Style, report: ProfileReport) -> str:
     lines.extend(style.yellow(warning) for warning in warnings or ())
 
     fetched = f"Fetched: {format_timestamp(result.fetched_at_s)}"
+    #: Tracked alongside, because `fetched` carries escape codes by then and
+    #: their length is not what has to fit on the line.
+    fetched_plain = fetched
     annotated = False
 
     if result.source == "config-cache":
@@ -1044,19 +1064,38 @@ def render_human(style: Style, report: ProfileReport) -> str:
             else "age unknown"
         )
         fetched += " " + style.yellow(f"[local cache: {age}]")
+        fetched_plain += f" [local cache: {age}]"
         annotated = True
     elif result.from_cache and result.stale_reason is None:
         fetched += " " + style.dim("(cached)")
+        fetched_plain += " (cached)"
 
+    #: Wrapped onto its own lines rather than truncated. The annotation exists
+    #: to explain the fallback, and what identifies the credential -- which
+    #: Keychain item, which account -- sits at the *end* of the sentence, so a
+    #: clip removes precisely the half worth reading. One such clip cost a long
+    #: investigation: `Keychain item 'Clau...` hid `account 'root'`, which was
+    #: the whole answer.
+    continuation: list[str] = []
     if result.stale_reason is not None:
-        reason = result.stale_reason
-        if len(reason) > 80:
-            reason = reason[:77] + "..."
         label = "no live data" if result.source == "config-cache" else "stale cache"
-        fetched += " " + style.red(f"[{label}: {reason}]")
+        annotation = f"[{label}: {result.stale_reason}]"
+        width = terminal_width()
+        if len(fetched_plain) + 1 + len(annotation) <= width:
+            fetched += " " + style.red(annotation)
+        else:
+            continuation = textwrap.wrap(
+                annotation,
+                width=width,
+                initial_indent="  ",
+                subsequent_indent="  ",
+                break_long_words=False,
+                break_on_hyphens=False,
+            )
         annotated = True
 
     lines.append(fetched if annotated else style.dim(fetched))
+    lines.extend(style.red(line) for line in continuation)
 
     return "\n".join(lines)
 
