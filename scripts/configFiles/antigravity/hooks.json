@@ -30,5 +30,14 @@
         "timeout": 5
       }
     ]
+  },
+  "auto-continue": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash agent-auto-continue-hook agy \"$TMUX_PANE\" >/dev/null 2>&1; echo '{}'",
+        "timeout": 5
+      }
+    ]
   }
 }
