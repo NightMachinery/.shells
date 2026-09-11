@@ -30,7 +30,14 @@ local function onPowerEvent(event)
         -- it (core/blackout-lock.lua). Done here as well as from
         -- display-black-off, so the keys come back even if the garden is slow
         -- or down. Guarded: that module loads after this one.
+        --
+        -- Two calls, because they are two different events. blackoutLockOff
+        -- gives the keyboard back; blackoutEnded forgets the blackout, and is
+        -- the only thing that may clear the lock-first mark. A wake really is
+        -- the blackout ending -- it lands on a login screen anyway -- so both
+        -- are right here.
         if blackoutLockOff then blackoutLockOff(true) end
+        if blackoutEnded then blackoutEnded() end
     end
 end
 

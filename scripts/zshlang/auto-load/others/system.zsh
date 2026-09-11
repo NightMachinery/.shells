@@ -1267,7 +1267,14 @@ displays it matches. Selectors: see [agfi:h-brightness-select]."
     #: another machine -- so the lock can never outlive the black. Guarded,
     #: because the function is missing on a Hammerspoon whose config failed to
     #: load, and `hs -c` of a nil call would only print an error.
-    silent hammerspoon -c 'if blackoutLockOff then blackoutLockOff() end'
+    #:
+    #: Two calls, because they are two different events. `blackoutLockOff'
+    #: gives the keyboard back; `blackoutEnded' forgets the blackout and is the
+    #: only thing that may clear the lock-first mark, which is why merely
+    #: unlocking the keyboard no longer cancels it. This function *is* the
+    #: black ending, so both belong here. One `hs -c', so a slow garden costs
+    #: one round trip rather than two.
+    silent hammerspoon -c 'if blackoutLockOff then blackoutLockOff() end; if blackoutEnded then blackoutEnded() end'
 
     local saved
     saved="$(display_black_saved_get)" || saved=''
