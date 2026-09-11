@@ -1913,6 +1913,13 @@ function h-agent-session-annotate-rows {
     #: (Claude's config home; `-' otherwise), the last activity, the relative
     #: path and the snippet.
     #:
+    #: An optional fifth input column is a badge, and it is placed *ahead* of
+    #: the agent glyph rather than inside the label. The glyph is prepended
+    #: here, so a caller that put its badge in the label would get
+    #: `🍼 💀 name' when what it meant was `💀 🍼 name'.
+    #: [agfi:h-agent-session-tmux-dead-rows] is the one caller that sets it;
+    #: everything else emits four columns and is untouched.
+    #:
     #: Shared by [agfi:h-agent-session-live-rows] and
     #: [agfi:h-agent-session-tmux-rows]: what a picker knows on its own is the
     #: first column and the label, and everything else is read out of the
@@ -1998,9 +2005,22 @@ function h-agent-session-annotate-rows {
                 label = $4
                 if (nm[path] != "") {
                     if (label == "-") label = nm[path]
-                    else if (label ~ /  -$/) label = substr(label, 1, length(label) - 1) nm[path]
+                    else if (label ~ /  -$/) {
+                        #: The caller left the name position open. When its own
+                        #: label already spells the name -- the autoname hooks
+                        #: name a tmux session after the agent session in it --
+                        #: the dash is dropped rather than the name said twice.
+                        #: This is the rule [agfi:h-agent-session-tmux-rows]
+                        #: applies to its live rows, where it can see the name
+                        #: for itself; a filled-in row cannot, so it is applied
+                        #: here. The other branch is byte for byte what it was.
+                        base = substr(label, 1, length(label) - 3)
+                        label = (index(base, nm[path]) ? base : base "  " nm[path])
+                    }
                 }
                 if (glyph[agent] != "") label = glyph[agent] " " label
+                #: Outside the glyph, so the badge is the first thing read.
+                if ($5 != "") label = $5 " " label
 
                 #: A transcript the join missed sorts last rather than first.
                 if (sort_p != "") printf "%s\t", (ep[path] ? ep[path] : 0)
@@ -2016,6 +2036,128 @@ function h-agent-session-annotate-rows {
         else
             command cat
         fi
+}
+
+#: The badge [agfi:h-agent-session-tmux-dead-rows] puts on a session `/done'
+#: has ended. `🪦' is taken: [agfi:h-agent-subagents-state-rank] uses it for a
+#: subagent that is `stuck', which is a live thing, and these are not.
+typeset -g agent_session_dead_badge="${agent_session_dead_badge:-💀}"
+
+function h-agent-session-tmux-dead-rows {
+    #: One row per pane [agfi:agent-done] left dead: a session `/done' ended,
+    #: still sitting in its tmux session with the report on screen, which
+    #: `prefix-r' brings back. The four columns
+    #: [agfi:h-agent-session-tmux-rows] emits, plus a fifth carrying the badge
+    #: that [agfi:h-agent-session-annotate-rows] puts ahead of the agent glyph.
+    #:
+    #: Being dead is not the filter on its own. `~/.tmux.conf' sets
+    #: `remain-on-exit' globally, so *every* pane whose command exits stays
+    #: around -- a finished `agent-view' conversion and a plain shell look
+    #: exactly like this. What identifies a `/done' pane is the command it was
+    #: left holding, `sh <report>.pane.sh' under [agfi:h-agent-done-dir].
+    #:
+    #: The transcript comes out of that script rather than off the report's
+    #: filename or the tmux session's `@agent_session' option. Both of those
+    #: outlive the agent, and both can name a session this pane will not
+    #: actually bring back; the script is what `respawn-pane' runs. A script
+    #: with no resume branch is one [agfi:h-agent-done-pane-script] could find
+    #: no transcript for, so it cannot be resumed and gets no row -- which is
+    #: the filter asked for, not a gap in it.
+    #:
+    #: Deliberately not also filtered on `${report}.shown', which would be an
+    #: exact test of "the next `prefix-r' resumes rather than re-prints". A pane
+    #: that died before printing is still a session worth attaching to, and
+    #: picking a row never resumes anything, so that condition would only hide
+    #: rows over a distinction this picker does not make.
+    #:
+    #: Prints nothing and fails when there are none. A machine with nothing
+    #: finished is the ordinary case, not an error, so no `ecerr'.
+    ##
+    local done_dir
+    done_dir="$(h-agent-done-dir)" || return 1
+    done_dir="${done_dir%/}"
+    test -d "${done_dir}" || return 1
+
+    #: One listing for every pane, and the session id comes straight off the
+    #: pane -- so unlike the live rows this needs no name to id map at all.
+    local panes
+    panes="$(command tmux list-panes -a -f '#{pane_dead}' \
+        -F '#{session_id}'$'\t''#{session_name}'$'\t''#{pane_start_command}' 2>/dev/null)" || return 1
+    test -n "${panes}" || return 1
+
+    local -a root_agents
+    root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
+
+    local row id tname script line transcript rows=''
+    local -a f w inner
+    local -A seen
+    for row in ${(f)panes} ; do
+        test -n "${row}" || continue
+
+        f=( "${(@ps:\t:)row}" )
+        id="${f[1]}"
+        tname="${f[2]}"
+        test -n "${id}" && test -n "${f[3]}" || continue
+
+        #: tmux quotes a start command that holds a space, and zsh's own lexer
+        #: is what takes the quoting back off -- symmetric with the `${(q)}'
+        #: [agfi:h-agent-done-watch] used to put it on, so a path carrying a
+        #: space or a quote survives the round trip where a regex would not.
+        w=( ${(z)f[3]} )
+        (( ${#w} == 1 )) && w=( ${(z)${(Q)w[1]}} )
+        (( ${#w} == 2 )) && [[ "${w[1]}" == sh ]] || continue
+
+        script="${(Q)w[2]}"
+        [[ "${script}" == "${done_dir}"/*.pane.sh ]] || continue
+        test -e "${script}" || continue
+
+        #: Only the tmux name is available to match on: a finished session has
+        #: no live-listing row to carry its own. See
+        #: [agfi:h-agent-session-excluded-p].
+        h-agent-session-excluded-p "${tname}" && continue
+
+        #: The script's second-run branch,
+        #: `exec <zsh> -ic 'agent-session-resume <transcript>''. Read with
+        #: `$(<...)', which zsh answers without a fork; these are a dozen lines.
+        line=''
+        for w in ${(f)"$(<${script})"} ; do
+            [[ "${w}" == *agent-session-resume* ]] && { line="${w}" ; break }
+        done
+        test -n "${line}" || continue
+
+        w=( ${(z)line} )
+        (( ${#w} )) || continue
+        inner=( ${(z)${(Q)w[-1]}} )
+        #: Anything else is an `agent_done_resume_cmd' override, which names no
+        #: transcript, so there is nothing to preview and nothing to offer.
+        (( ${#inner} >= 2 )) && [[ "${inner[1]}" == agent-session-resume ]] || continue
+
+        #: Unquoted twice, because it was quoted twice: `${(q)}' escaped the
+        #: path and `${(qq)}' then wrapped the whole `-ic' argument. The first
+        #: `${(Q)}' above took the wrapper off, this one takes the escaping off,
+        #: and a path holding a space or a quote comes back byte for byte.
+        transcript="${(Q)inner[2]}"
+        test -n "${transcript}" && test -e "${transcript}" || continue
+
+        #: Two `/done' reports for one conversation -- ended, resumed
+        #: elsewhere, ended again -- leave two dead panes naming it.
+        (( ${+seen[${transcript}]} )) && continue
+        seen[${transcript}]=y
+
+        #: A transcript under no agent's store has no previewer to name in
+        #: `{3}'. This is also how `agent_session_agents' narrows these rows:
+        #: it narrows [agfi:h-agents], and so the roots.
+        h-agent-session-agent-in-roots "${transcript}" "${root_agents[@]}" || continue
+
+        #: The trailing `  -' is the annotator's placeholder for a name this
+        #: cannot know: with no live-listing row, the name is read back out of
+        #: the transcript. Same trick as [agfi:h-agent-session-live-pairs].
+        rows+="${id}"$'\t'"${transcript}"$'\t'"${REPLY}"$'\t'"${tname}  -"$'\t'"${agent_session_dead_badge}"$'\n'
+    done
+
+    test -n "${rows}" || return 1
+
+    ec "${rows%$'\n'}"
 }
 
 function h-agent-session-tmux-rows {
@@ -2034,70 +2176,105 @@ function h-agent-session-tmux-rows {
     #:
     #: Two agents sharing one tmux session give two rows, which is honest: they
     #: are two conversations, and the engine lands in the same place either way.
+    #:
+    #: agent_session_tmux_dead_p adds the sessions `/done' has finished, from
+    #: [agfi:h-agent-session-tmux-dead-rows]. Both halves go through one
+    #: [agfi:h-agent-session-annotate-rows], so they share its `list' batch and
+    #: interleave by recency on their own, rather than being sorted apart and
+    #: merged back. [agfi:fftmux-agent-all] is the picker that sets it.
     ##
+    local dead_p="${agent_session_tmux_dead_p:-n}"
+
     #: See [agfi:h-agent-session-live-rows] for why this is built under another
-    #: name before the cache is set.
-    local live_kept
-    if ! live_kept="$(h-agent-session-live-list-offerable)" ; then
-        ecerr "$0: no live agent session to show"
-        return 1
+    #: name before the cache is set. An empty live half is no longer fatal: with
+    #: the dead half asked for, a machine whose every session has finished still
+    #: has a picker to show.
+    local live_kept=''
+    live_kept="$(h-agent-session-live-list-offerable)" || live_kept=''
+
+    local rows=''
+    local -A live_transcripts
+    local -a f
+    if test -n "${live_kept}" ; then
+        local agent_session_live_list_cache="${live_kept}"
+
+        #: One listing for every row. [agfi:tmux-session-id] would fork per row.
+        local -A ids tnames
+        local line
+        for line in ${(f)"$(command tmux list-sessions -F '#{session_id}'$'\t''#{session_name}' 2>/dev/null)"} ; do
+            test -n "${line}" || continue
+            ids[${line#*$'\t'}]="${line%%$'\t'*}"
+            tnames[${line%%$'\t'*}]="${line#*$'\t'}"
+        done
+
+        local -a root_agents
+        root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
+
+        local -a live
+        live=( ${(f)agent_session_live_list_cache} )
+
+        local row t tname id name label
+        for row in "${live[@]}" ; do
+            f=( "${(@ps:\t:)row}" )
+
+            tname="${f[6]}"
+            test -n "${tname}" && [[ "${tname}" != '-' ]] || continue
+
+            #: A session that has written nothing has nothing to preview.
+            t="${f[5]}"
+            test -n "${t}" && test -e "${t}" || continue
+
+            #: The live listing names the tmux session the agent *sits in*, not
+            #: the one it was launched in: every adapter walks the process up to
+            #: the pane holding it, so this name is current however often the
+            #: autoname hooks have renamed the session. A name that still matches
+            #: nothing -- a session gone between the two calls -- is skipped. See
+            #: [agfi:h-agent-session-live-list] and `tmuxOf' in the Go adapter,
+            #: =golang/agent_session/internal/claude/live.go=.
+            id="${ids[${tname}]}"
+            test -n "${id}" || continue
+
+            #: The name is taken back off the id rather than kept from the row, so
+            #: the label is what tmux calls the session at this instant.
+            #: The agent's own name goes after it when it adds anything -- the
+            #: hooks name a session after its agent session, so usually it does
+            #: not.
+            tname="${tnames[${id}]:-${tname}}"
+            label="${tname}"
+            name="${f[3]}"
+            if test -n "${name}" && [[ "${name}" != '-' && "${label}" != *"${name}"* ]] ; then
+                label+="  ${name}"
+            fi
+
+            live_transcripts[${t}]=y
+            h-agent-session-agent-in-roots "${t}" "${root_agents[@]}"
+            rows+="${id}"$'\t'"${t}"$'\t'"${REPLY}"$'\t'"${label}"$'\n'
+        done
     fi
-    local agent_session_live_list_cache="${live_kept}"
 
-    #: One listing for every row. [agfi:tmux-session-id] would fork per row.
-    local -A ids tnames
-    local line
-    for line in ${(f)"$(command tmux list-sessions -F '#{session_id}'$'\t''#{session_name}' 2>/dev/null)"} ; do
-        test -n "${line}" || continue
-        ids[${line#*$'\t'}]="${line%%$'\t'*}"
-        tnames[${line%%$'\t'*}]="${line#*$'\t'}"
-    done
+    if bool "${dead_p}" ; then
+        local dead drow
+        dead="$(h-agent-session-tmux-dead-rows)" || dead=''
 
-    local -a root_agents
-    root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
+        for drow in ${(f)dead} ; do
+            test -n "${drow}" || continue
 
-    local -a live f
-    live=( ${(f)agent_session_live_list_cache} )
+            #: A transcript that is live again was resumed by hand after `/done'
+            #: ended it: the old pane is still dead, but the conversation is
+            #: running and the live row is the one worth going to.
+            f=( "${(@ps:\t:)drow}" )
+            test -z "${live_transcripts[${f[2]}]}" || continue
 
-    local row t tname id name label rows=''
-    for row in "${live[@]}" ; do
-        f=( "${(@ps:\t:)row}" )
-
-        tname="${f[6]}"
-        test -n "${tname}" && [[ "${tname}" != '-' ]] || continue
-
-        #: A session that has written nothing has nothing to preview.
-        t="${f[5]}"
-        test -n "${t}" && test -e "${t}" || continue
-
-        #: The live listing names the tmux session the agent *sits in*, not
-        #: the one it was launched in: every adapter walks the process up to
-        #: the pane holding it, so this name is current however often the
-        #: autoname hooks have renamed the session. A name that still matches
-        #: nothing -- a session gone between the two calls -- is skipped. See
-        #: [agfi:h-agent-session-live-list] and `tmuxOf' in the Go adapter,
-        #: =golang/agent_session/internal/claude/live.go=.
-        id="${ids[${tname}]}"
-        test -n "${id}" || continue
-
-        #: The name is taken back off the id rather than kept from the row, so
-        #: the label is what tmux calls the session at this instant.
-        #: The agent's own name goes after it when it adds anything -- the
-        #: hooks name a session after its agent session, so usually it does
-        #: not.
-        tname="${tnames[${id}]:-${tname}}"
-        label="${tname}"
-        name="${f[3]}"
-        if test -n "${name}" && [[ "${name}" != '-' && "${label}" != *"${name}"* ]] ; then
-            label+="  ${name}"
-        fi
-
-        h-agent-session-agent-in-roots "${t}" "${root_agents[@]}"
-        rows+="${id}"$'\t'"${t}"$'\t'"${REPLY}"$'\t'"${label}"$'\n'
-    done
+            rows+="${drow}"$'\n'
+        done
+    fi
 
     if test -z "${rows}" ; then
-        ecerr "$0: no live agent session in a tmux session"
+        if bool "${dead_p}" ; then
+            ecerr "$0: no agent session, live or finished, in a tmux session"
+        else
+            ecerr "$0: no live agent session in a tmux session"
+        fi
         return 1
     fi
 
