@@ -183,8 +183,12 @@ All are `typeset -g` in `agent-usage.zsh`, which is the one place their
 defaults live.
 
 - `agent_usage_arm_action` -- `notif` or `continue`.
-- `agent_usage_continue_via` -- `kitty`, `tmux` or `frontmost`; which picker
-  runs at arm time and, for `frontmost`, that none does.
+- `agent_usage_continue_via` -- `kitty`, `tmux`, `frontmost` or `fn`; which
+  picker runs at arm time and, for `frontmost`, that none does. `fn` calls the
+  function named in `agent_usage_continue_targets_fn` instead of a picker,
+  for a caller that chooses by rule; like a picker it runs only once arming
+  is certain, which is how `/auto-continue` learns that the limit is really
+  blocking (`docs/agent-auto-continue.md`).
 - `agent_usage_arm_poll_s` -- how often the waiting job re-reads the clock.
 - `agent_usage_arm_grace_s` -- how long after the reset a notification
   fires.

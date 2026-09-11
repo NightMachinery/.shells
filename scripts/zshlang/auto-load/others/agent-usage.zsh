@@ -20,8 +20,13 @@ typeset -g agent_usage_arm_action="${agent_usage_arm_action:-notif}"
 #: =kitty= types into a kitty window, =tmux= types into a tmux pane, and
 #: =frontmost= types wherever the keyboard focus happens to be, with no picker
 #: at all. A Codex thread is queued rather than typed into whichever is chosen;
-#: see [agfi:h-agent-usage-continue-rows-to-targets].
+#: see [agfi:h-agent-usage-continue-rows-to-targets]. =fn= is for a caller
+#: that picks by rule rather than by hand: the function named in
+#: `agent_usage_continue_targets_fn' prints the targets, and is called only
+#: once arming has been decided, which is what lets that caller learn that the
+#: limit is in fact blocking ([agfi:agent-auto-continue-check]).
 typeset -g agent_usage_continue_via="${agent_usage_continue_via:-kitty}"
+typeset -g agent_usage_continue_targets_fn="${agent_usage_continue_targets_fn}"
 #: Resuming waits longer after a reset than a notification does: an early
 #: notification is harmless, an early resume is spent on a session that is
 #: still blocked.
@@ -364,8 +369,19 @@ function h-agent-usage-continue-targets {
             #: will be is not knowable now anyway.
             ec frontmost
             ;;
+        fn)
+            #: The caller's own rule, run only now that arming is certain --
+            #: a report that changes nothing must not run it, for the same
+            #: reason it does not open a picker.
+            local fn="${agent_usage_continue_targets_fn}"
+            if test -z "${fn}" ; then
+                ecerr "$0: agent_usage_continue_via=fn needs agent_usage_continue_targets_fn"
+                return 1
+            fi
+            "${fn}"
+            ;;
         *)
-            ecerr "$0: unknown agent_usage_continue_via: ${via} (kitty, tmux, frontmost)"
+            ecerr "$0: unknown agent_usage_continue_via: ${via} (kitty, tmux, frontmost, fn)"
             return 1
             ;;
     esac
