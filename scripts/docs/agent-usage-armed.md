@@ -17,6 +17,11 @@ deadline over:
   `agy-status-continue-*` variants.
 - Anything else, and any agent whose own reset time you do not trust, goes
   through `agent-usage-continue-at <when>`, where you name the time yourself.
+- A session can also arm itself ahead of time with the shared `/auto-continue`
+  skill: a watcher per account polls the usage and, once it is blocked, arms
+  this job with the registered sessions' own targets preset, no picker.
+  `docs/agent-auto-continue.md` covers the registry, the watcher and the hooks
+  that make it check sooner.
 
 That list is where the per-agent deadline sources are enumerated; the linked
 docs say how each one is read and reduced to a single time.
