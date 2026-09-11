@@ -574,12 +574,16 @@ function agent-usage-armed-sessions {
     #: ([agfi:claude-code-usage-armed-sessions]); Codex's and Antigravity's are
     #: one name each today, and say so themselves.
     #:
-    #: Guarded on the function existing, because these three files are
+    #: The auto-continue watchers' jobs ([agfi:agent-auto-continue-armed-sessions])
+    #: are listed from tmux, one per registered scope, since their set depends
+    #: on what is registered rather than on a table.
+    #:
+    #: Guarded on the function existing, because these files are
     #: independent: one absent, disabled or mid-edit must narrow this list
     #: rather than break `status' and `cancel' for the others.
     local fn
     for fn in claude-code-usage-armed-sessions codex-status-armed-sessions \
-        agy-status-armed-sessions ; do
+        agy-status-armed-sessions agent-auto-continue-armed-sessions ; do
         (( ${+functions[${fn}]} )) || continue
 
         out+=( "${(@f)$("${fn}")}" )
