@@ -636,10 +636,16 @@ The Claude-only spellings all still work, as `aliasfn`s that set
 `claude-resume*` family) stayed Claude-only on purpose: profiles are a Claude
 Code idea, and Codex and Antigravity have nothing to map them onto.
 
-`docs/claude_code_usage.md` covers the usage limit notifier, whose resume
-target picker now spans all three agents, and `docs/tmux-session-rename.md`
-covers the autoname hooks that write the `@agent_session` option this family
-reads.
+`docs/agent-usage-notif.md` covers the usage limit notifier, whose resume
+target pickers are built on this family:
+`h-agent-usage-continue-targets-kitty-fz` over `agent-session-live-fz`,
+spanning all three agents, and `h-agent-usage-continue-targets-tmux-fz` over
+`h-agent-session-tmux-panes`, the pane-id sibling of
+`h-agent-session-tmux-rows` that walks each live agent pid to the pane holding
+it. Where each agent's reset time comes from is in
+`docs/claude_code_usage.md` and `docs/codex_status.md`.
+`docs/tmux-session-rename.md` covers the autoname hooks that write the
+`@agent_session` option this family reads.
 
 ## Checking it by hand
 
