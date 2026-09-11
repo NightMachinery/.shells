@@ -1,0 +1,144 @@
+#!/usr/bin/env dash
+##
+# agy's statusLine hook. `agy' pipes one JSON render payload in on stdin; we
+# merge the quota buckets it carries into the shared cache that `agy-status'
+# reads, and print one terse line back for agy to show.
+#
+# Installed by `agy-statusline-install'; see =docs/agy_status.md= for the whole
+# story, and =zshlang/auto-load/others/agy-status.zsh= for the reader.
+#
+# Two properties this file exists to keep:
+#
+# - It runs on EVERY render. So: one `jq', no fork we can avoid, and no
+#   interpreter start-up worth the name -- which is why this is sh rather than
+#   the python the rest of the family uses.
+# - It must never fail. agy counts consecutive failures and turns the custom
+#   statusline off ("Statusline disabled after N consecutive failures"), so a
+#   malformed payload, a broken `jq', or an unwritable cache has to end as a
+#   quiet `exit 0' with nothing printed, not as an error.
+##
+cache_file="${agy_status_cache_file:-${HOME}/tmp/.agy-status/quota-cache.json}"
+
+# `command' throughout: this is library code, and it has to get the real
+# binaries whatever the environment has bound those names to.
+command -v jq >/dev/null 2>&1 || exit 0
+
+now="$(command date +%s 2>/dev/null)" || exit 0
+[ -n "${now}" ] || exit 0
+
+# The cache is read here rather than with `--slurpfile' so that a truncated or
+# half-written file is survivable: it reaches jq as a string, and `fromjson?'
+# inside turns a parse failure into an empty object instead of taking the whole
+# invocation down with it.
+old=''
+if [ -r "${cache_file}" ] ; then
+    old="$(command cat -- "${cache_file}" 2>/dev/null)" || old=''
+fi
+
+# -R -s: stdin arrives as one raw string, so malformed JSON is `fromjson?'
+# returning nothing rather than jq exiting 5. -r: the first output line is our
+# status line, and it is text, not a JSON string.
+#
+# Two outputs, in this order: the line to print, then the merged cache as one
+# compact JSON line (empty when the payload carried no quota at all, which is
+# how the shell below knows not to rewrite the file).
+#
+# `reset_in_seconds' is RELATIVE to this render, so it is turned into an
+# absolute epoch here, at capture time. Storing the relative number would make
+# every reader's answer depend on how old the cache is.
+out="$(jq -Rsr \
+    --arg now "${now}" \
+    --arg old "${old}" \
+    '
+def durfmt:
+  if . == null or . <= 0 then null
+  else
+    (. | floor) as $s
+    | ($s / 86400 | floor) as $d
+    | (($s % 86400) / 3600 | floor) as $h
+    | (($s % 3600) / 60 | floor) as $m
+    | if $d > 0 then "\($d)d\($h)h"
+      elif $h > 0 then "\($h)h\($m)m"
+      else "\($m)m"
+      end
+  end;
+
+def resetstr($t):
+  ( if (.resets_at // null) == null then null else (.resets_at - $t) end | durfmt ) as $d
+  | if $d == null then "" else " (\($d))" end;
+
+($now | tonumber) as $t
+| ( ($old | fromjson?) // {} ) as $prevraw
+| ( if ($prevraw | type) == "object" then $prevraw else {} end ) as $prev
+| ( (fromjson?) // {} ) as $inraw
+| ( if ($inraw | type) == "object" then $inraw else {} end ) as $in
+| ( ($in.quota // {}) | if type == "object" then . else {} end ) as $q
+| ( ["gemini-5h", "gemini-weekly", "3p-5h", "3p-weekly"]
+    | map( . as $k
+           | ($q[$k] // null) as $b
+           | if ($b | type) == "object"
+                and (($b.remaining_fraction | type) == "number")
+             then { key: $k,
+                    value: { remaining_percent: (($b.remaining_fraction * 1000 | round) / 10),
+                             resets_at: (if ($b.reset_in_seconds | type) == "number"
+                                         then ($t + ($b.reset_in_seconds | round))
+                                         else null
+                                         end),
+                             captured_at: $t,
+                             source: "statusline" } }
+             else empty
+             end )
+    | from_entries ) as $fresh
+| ( ($in.model.id // "") | tostring | ascii_downcase ) as $mid
+| ( if ($mid | test("claude|gpt|openai|anthropic")) then "3p" else "gemini" end ) as $want
+| ( if ( $fresh["\($want)-5h"] // $fresh["\($want)-weekly"] // null ) != null
+    then $want
+    elif $want == "3p" then "gemini"
+    else "3p"
+    end ) as $fam
+| [ ( $fresh["\($fam)-5h"]
+      | if . == null then empty else "5h \(.remaining_percent)%\(resetstr($t))" end ),
+    ( $fresh["\($fam)-weekly"]
+      | if . == null then empty else "wk \(.remaining_percent)%\(resetstr($t))" end ) ] as $cells
+| ( ($in.model.display_name // "") | tostring ) as $name
+| ( ($cells + (if $name == "" then [] else [$name] end)) | join(" · ") ) as $line
+| $line,
+  ( if ($fresh | length) > 0
+    then ( { buckets: (($prev.buckets // {}) + $fresh) } | tojson )
+    else ""
+    end )
+' 2>/dev/null)" || exit 0
+
+# The heredoc rather than two `sed -n` calls: this is the hot path, and
+# `read' is a builtin.
+status_line=''
+cache_json=''
+{
+    IFS= read -r status_line || :
+    IFS= read -r cache_json || :
+} <<EOF
+${out}
+EOF
+
+if [ -n "${cache_json}" ] ; then
+    # Temp file plus `mv' because the TUI renders often and `agy-status' may be
+    # reading at any moment: a reader must never see a half-written cache.
+    # Every step is allowed to fail; the whole block is best-effort.
+    cache_dir="${cache_file%/*}"
+    cache_tmp="${cache_file}.tmp.$$"
+
+    # The `2>/dev/null' is on the group, not on each command: a redirection
+    # that cannot be opened is reported by the *shell*, before the redirected
+    # command exists to have its stderr silenced. Without this, a read-only
+    # cache directory writes "cannot create ...: Permission denied" onto agy's
+    # stderr on every single render.
+    { { command mkdir -p -- "${cache_dir}" \
+        && printf '%s\n' "${cache_json}" > "${cache_tmp}" \
+        && command mv -f -- "${cache_tmp}" "${cache_file}" ; } \
+        || command rm -f -- "${cache_tmp}" || : ; } 2>/dev/null
+fi
+
+[ -n "${status_line}" ] && printf '%s\n' "${status_line}"
+
+# Unconditional, and the last word in the file: see the header.
+exit 0
