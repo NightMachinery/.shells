@@ -1,5 +1,13 @@
+
 # alias pc='pbcopy'
 function cat-copy {
+    : "prints stdin or the arguments, and copies it"
+    #: The buffered half of the pair: the whole input is read before anything
+    #: is printed, so a slow producer shows nothing until it finishes, and a
+    #: missing trailing newline is added on the way out. When you want output
+    #: as it streams, or stdout as byte-exact as the clipboard already is,
+    #: reach for [agfi:tee-copy].
+    ##
     local inargs
     in_or_args_newline_p=n in-or-args2 "$@"
 
@@ -14,6 +22,34 @@ function cat-copy {
     fi
     ecn "$inargs" | pbcopy
 }
+
+function tee-copy {
+    : "prints stdin or the arguments and copies it, byte-exact, as it streams"
+    #: The streaming half of the pair, and the one implementation of the
+    #: fan-out: one input copied to the terminal and to the clipboard at once,
+    #: nothing buffered and nothing rewritten. [agfi:cat-copy] is the buffered
+    #: half. `pc' and [agfi:cat-copy-if-tty] both land here.
+    #:
+    #: `> >(pbcopy) | cat', not `>&1 > >(pbcopy)'. Both fan the stream out
+    #: through zsh's MULTIOS, which forks a helper process to do the copying,
+    #: but the second leaves the shell nothing in the foreground to wait on:
+    #: the terminal copy can then land after the next prompt (four runs in
+    #: five, with a second command following immediately), and in a shell that
+    #: exits at once -- `zsh -ic ...' under a pty -- the clipboard write is
+    #: lost outright (five runs in five). The pipe gives the shell a reader to
+    #: wait on and both problems go away. Measured 2026-09-11: it costs ~4ms a
+    #: call and ~38% on bulk (13.6s against 9.8s for 200MB), which is worth
+    #: paying. `command tee >(pbcopy)' is correct too and a shade faster on
+    #: bulk, but slower per call.
+    ##
+    if (( $# )) ; then
+        ecn "$*" | > >(pbcopy) | cat
+    else
+        > >(pbcopy) | cat
+    fi
+}
+aliasfn teec tee-copy
+alias pc='\noglob tee-copy'
 # alias pc='\noglob cat-copy'
 
 function cat-copy-v2 {
@@ -21,7 +57,7 @@ function cat-copy-v2 {
         cat "$@"
     else
         in-or-args
-    fi | cat-copy-streaming
+    fi | tee-copy
 }
 alias cf='cat-copy-v2'
 
@@ -42,16 +78,11 @@ function cat-copy-streaming-v1 {
         silent trs-rm "$temp_file"
     }
 }
+
 function cat-copy-streaming {
-    if (( $#@ >= 1 )) ; then
-        # arrN "$@" |
-        ecn "$*" |
-            >&1 > >(pbcopy)
-    else
-        >&1 > >(pbcopy)
-    fi
+    : "the old name for [agfi:tee-copy]"
+    tee-copy "$@"
 }
-alias pc='\noglob cat-copy-streaming'
 
 function cat-copy-as-file {
     local suffix="${1}"
@@ -83,7 +114,7 @@ function cat-rtl-streaming-if-tty {
 
 function cat-streaming-copy-rtl-if-tty {
     if isOutTty ; then
-        cat-copy-streaming | rtl-reshaper-streaming
+        tee-copy | rtl-reshaper-streaming
     else
         cat
     fi
@@ -100,7 +131,7 @@ function cat-copy-rtl-if-tty {
 function cat-copy-if-tty {
     if isOutTty ; then
         # cat-copy
-        cat-copy-streaming
+        tee-copy
     else
         cat
     fi
@@ -108,7 +139,7 @@ function cat-copy-if-tty {
 
 function cat-copy-streaming-remote {
         if isLocal ; then
-            cat-copy-streaming
+            tee-copy
         else
             pbcopy-remote
         fi
@@ -142,14 +173,6 @@ function cat-paste-if-tty {
 
 alias pop='pbpaste'
 ##
-function tee-copy() {
-    doc "teec; ec-and-copy; tee-copy;
-Prints and copies its stdin.
-See also: 'etee'."
-
-    > >(pbcopy) | cat
-}
-aliasfn teec tee-copy
 function reval-copy() {
     doc 'revals and also copies the stdout to the clipboard.'
 
