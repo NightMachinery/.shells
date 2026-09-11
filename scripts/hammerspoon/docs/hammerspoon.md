@@ -729,6 +729,38 @@ to a relaxed one; the only thing that clears the mark is the blackout ending.
 A reload used to lose the start time, so F2 restored without locking; now it
 does not, while redis is up.
 
+### Releasing the keyboard is not ending the blackout
+
+Those are two events, and they are two functions. `blackoutLockOff` gives the
+keyboard back and touches nothing else. `blackoutEnded` forgets the blackout —
+the start time and the lock-first mark, and the saved copy in redis with them —
+and it is the *only* place the mark is ever cleared.
+
+They used to be one. `blackoutLockOff` cleared `since` and `lockFirst` on its
+way out, so anything that merely wanted its keyboard back cancelled the
+screen-lock decision on the way past — `hs -c 'blackoutLockOff()'` most of all,
+which is the documented way to do exactly that. F2 afterwards restored straight
+onto a live desktop. The mark is supposed to move only toward locking; that
+path moved it the other way, and did it silently.
+
+In practice the two do go together, because the lock is armed with the mark and
+released when the black ends, and that stays the normal case: every caller that
+really is ending the blackout now calls both. `blackoutRestore` does, in that
+order — the keyboard comes back first, as before, and `shouldLockScreen` has
+already read the mark by then, so nothing it decides can be undone underneath
+it. So does the wake watcher, a wake being a login screen anyway. So does
+zsh's `display-black-off`, in one `hs -c` so a slow garden still costs one
+round trip.
+
+Forgetting to call `blackoutEnded` somewhere is not dangerous the way the old
+clobber was. A stale `since` makes `shouldLockScreen` say yes, so the failure
+is an extra login screen rather than a skipped one — the direction this module
+errs in everywhere else. A stale redis key is handled already: recovery deletes
+it when `display_black_saved` is gone.
+
+The persistence format did not change, so no migration: the same two fields,
+read by the same loader.
+
 Start time and mark are kept in redis under `blackout_lock` — epoch seconds, a
 space, `0` or `1` — whenever redis is available. On load the module reads the
 key back, but trusts it only if the zsh side's `display_black_saved`, the "is
@@ -765,7 +797,9 @@ It is driven from the shell too:
 
 ```sh
 hs -c 'blackoutLockOn(seconds)'       # seconds optional; a short value is for testing
-hs -c 'blackoutLockOff()'
+hs -c 'blackoutLockOff()'             # keyboard back; leaves the blackout's
+                                      # own state, lock-first mark included
+hs -c 'blackoutEnded()'               # the black is over: forget it, mark too
 hs -c 'return blackoutLockActive()'
 hs -c 'return blackoutLockPassed()'   # automated events let through since load
 hs -c 'blackoutRestore()'             # what hyper+shift+F2 does
@@ -775,10 +809,11 @@ hs -c 'blackoutUpgrade()'             # mark a blackout already up as lock-first
 
 There are four ways out, and every path that ends a blackout takes one of them.
 F2, through `blackoutRestore`. The wake watcher in `core/power-watcher.lua`,
-which calls `blackoutLockOff` on `systemDidWake` and `screensDidWake`, since a
-wake lands on a login screen anyway. The zsh `display-black-off`, which calls
-`blackoutLockOff` over `hammerspoon -c` right after its unconditional gamma
-restore — the one point every unblack path reaches, whether F2, `h-hook-wake`,
+which calls `blackoutLockOff` and `blackoutEnded` on `systemDidWake` and
+`screensDidWake`, since a wake lands on a login screen anyway. The zsh
+`display-black-off`, which calls both over `hammerspoon -c` right after its
+unconditional gamma restore — the one point every unblack path reaches, whether
+F2, `h-hook-wake`,
 `h-hook-unlock` from the Swift lock-watcher or the function run bare from
 another machine, so the lock can never outlive the black. And the expiry.
 

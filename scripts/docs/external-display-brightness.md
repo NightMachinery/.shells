@@ -291,9 +291,12 @@ display without locking the session, because a shell restore is the owner
 acting from ssh, not a hand at the keyboard.
 
 The lock can never outlive the black. `display-black-off` calls `blackoutLockOff`
-over `hammerspoon -c` immediately after its unconditional gamma restore, and it
-is the single point every unblack path reaches — F2, `h-hook-wake`, `h-hook-unlock`
-from the Swift lock-watcher, or the function run bare from another machine. The
+and `blackoutEnded` over `hammerspoon -c` immediately after its unconditional
+gamma restore, and it is the single point every unblack path reaches — F2,
+`h-hook-wake`, `h-hook-unlock` from the Swift lock-watcher, or the function run
+bare from another machine. Two calls because they are two events: the first
+gives the keyboard back, the second forgets the blackout, and only the second
+may clear the lock-first mark. The
 wake watcher releases it independently as well, and past
 `blackoutLockMaxSeconds` it ends on its own as a last resort — locking the
 session first, then restoring, so the worst case is a login screen and never a

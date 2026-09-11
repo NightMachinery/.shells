@@ -41,6 +41,15 @@
 --- lock never releases into an unlocked session on its own. Only F2 inside
 --- the grace period does that, and that is a person's deliberate act.
 ---
+--- Which is why releasing the input lock and ending the blackout are two
+--- functions and not one. blackoutLockOff gives the keyboard back and touches
+--- nothing else; blackoutEnded forgets the blackout, and is the only thing
+--- that clears the lock-first mark. They are almost always called together,
+--- because in practice the lock is armed with the mark and released when the
+--- black ends -- but "almost always" was doing real damage while it was
+--- assumed: anything that just wanted its keyboard back cancelled the mark on
+--- the way past, and F2 then restored onto a live desktop.
+---
 --- The start time and the lock-first mark are saved in redis (key
 --- blackout_lock) when redis is up, so a Hammerspoon reload loses neither:
 --- on load, the module reads them back, re-installs the tap with the expiry
@@ -49,7 +58,11 @@
 ---
 --- Shell interface:
 ---   hs -c 'blackoutLockOn()'          -- or blackoutLockOn(30), for a test
----   hs -c 'blackoutLockOff()'
+---   hs -c 'blackoutLockOff()'         -- keyboard back; the blackout's own
+---                                        state, lock-first mark included, is
+---                                        left exactly as it was
+---   hs -c 'blackoutEnded()'           -- the black is over: forget it, and
+---                                        with it the lock-first mark
 ---   hs -c 'return blackoutLockActive()'
 ---   hs -c 'return blackoutLockPassed()' -- automated events let through
 ---   hs -c 'blackoutRestore()'         -- what hyper+shift+F2 does
@@ -382,6 +395,21 @@ function blackoutLockOn(seconds)
     return true
 end
 
+--- Gives the keyboard back, and does nothing else. In particular it does not
+--- touch `since' or `lockFirst': ending the *input lock* is not the same event
+--- as the *blackout* ending, and only the second one may revise the decision
+--- that ending the blackout locks the screen. It used to clear both here, so
+--- anything that merely wanted its keyboard back -- `hs -c blackoutLockOff()'
+--- most of all -- silently cancelled a lock-first mark, and F2 afterwards
+--- restored straight onto a live desktop. The mark is supposed to move only
+--- toward locking; that path moved it the other way, and did it invisibly.
+---
+--- In practice the two do go together, because the lock is armed with the mark
+--- and released when the black ends. That stays the normal case: every caller
+--- that really is ending the blackout calls blackoutEnded below as well, and
+--- blackoutRestore does both in the right order. What changed is only that
+--- this function no longer assumes it.
+---
 --- silent skips the release flash, for the wake and expiry paths where nobody
 --- is watching the screen come back.
 function blackoutLockOff(silent)
@@ -389,9 +417,6 @@ function blackoutLockOff(silent)
     local wasActive = blackoutLockActive()
 
     stopTap(st)
-    st.since = nil
-    st.lockFirst = false
-    persist(st)
     dismiss(kAlertId)
     dismiss(kSecureInputAlertId)
 
@@ -403,6 +428,34 @@ function blackoutLockOff(silent)
             screens = "all",
         })
     end
+
+    return true
+end
+
+--- The blackout itself is over: forget when it began and whether ending it
+--- locks the screen, and drop the saved copy. The other half of the split
+--- above, and the *only* place the lock-first mark is ever cleared -- so the
+--- one way to lose it is the black actually ending, which is what the module
+--- has always claimed and now does.
+---
+--- Every path that ends a blackout calls this: blackoutRestore below, the wake
+--- watcher in core/power-watcher.lua, and zsh's display-black-off, which is
+--- the point every unblack route reaches. Missing one is not dangerous in the
+--- way the old clobber was -- a stale `since' makes shouldLockScreen say yes,
+--- so the failure is an extra lock screen rather than a skipped one, which is
+--- the direction this module errs in everywhere else.
+---
+--- Clearing `since' also makes the saved key go away, since persist() deletes
+--- it when there is nothing black. The reload path is unchanged and needs no
+--- migration: the format is the same two fields, and a key left behind by a
+--- caller that forgot to call this is already handled -- blackoutLockRecover
+--- deletes it as stale when zsh's display_black_saved is gone.
+function blackoutEnded()
+    local st = blackoutLockState
+
+    st.since = nil
+    st.lockFirst = false
+    persist(st)
 
     return true
 end
@@ -496,7 +549,13 @@ function blackoutRestore(forceLock)
 
     local function restore()
         st.restoreTimer = nil
+        --- Both halves, and this is the path that proves the split is safe:
+        --- shouldLockScreen has already read the mark, above, before either
+        --- call can clear it. Order within restore() is therefore free, but
+        --- the lock comes off first so the keyboard is back at the earliest
+        --- moment, exactly as before.
         blackoutLockOff(lockFirst)
+        blackoutEnded()
         brishz_eval_hs('awaysh-fast brightness-on-all-loop', 'blackout-restore')
     end
 
