@@ -435,10 +435,22 @@ deterministically even with several accounts logged in. Previously the script
 probed the account names Claude Code has used over time (no filter, the login
 username, `unknown`) and took whichever token had the freshest expiry, which on
 a machine with two profiles picked one of them arbitrarily and did not say
-which. That probe survives as a fallback, but only for the default profile and
-only when the derived account yields nothing, so an install from an older
-Claude Code still resolves. `--keychain-service` and `--keychain-account`
-override the derivation should a future build change it.
+which. That probe survives as a fallback, taken only when the derived accounts
+yield nothing and nothing went wrong reading them, so an install from an older
+Claude Code still resolves.
+
+Every profile gets the unfiltered read, not only the default one. A hashed
+service name already pins the service to exactly one profile, so an unfiltered
+match on it cannot be another profile's token, and the freshest-credential rule
+above prefers a live one to an expired one. Withholding it bought nothing and
+cost the work profile its only fallback: it was the one seat that reported no
+token at all when the derived account was wrong, while the default profile at
+least answered from something. The `unknown` account is probed only on the bare
+service, being a relic of the versions that wrote it.
+
+`--keychain-service` and `--keychain-account` override the derivation should a
+future build change it; pinning an account also disables the probe, since an
+override that quietly searched elsewhere would not be one.
 
 A Keychain item cannot be attributed to a profile from its contents: the usage
 payload carries no account id, and the access tokens are opaque rather than
