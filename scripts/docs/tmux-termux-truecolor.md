@@ -7,6 +7,10 @@ Termux over SSH, while the same command was correct in the plain SSH shell:
 2:0:255:0m2:0:0:255mHELLO 2:255:100:0mBRAVE2:0:255:0m 2:100:0:255mNEW2:0:0:255m WORLD!
 ```
 
+The same client is behind `./termux-mouse-decset-1003.md`: another capability
+Termux does not implement (DECSET 1003 mouse tracking) and the same class of
+failure, a mismatch that only bites at the end of a chain of terminals.
+
 ## Why
 
 tmux repaints a pane using the *attached client's* terminfo, not the pane's. It

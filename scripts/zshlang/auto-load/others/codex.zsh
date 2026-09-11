@@ -53,7 +53,7 @@ function codex-ask-med {
 function codex {
     #: The bare launcher: no instruction sync, which [agfi:codex-m] does.
     ##
-    agent_launch_sync_p=n h-agent-launch codex command codex "$@"
+    agent_launch_sync_p=n h-agent-launch codex codex "$@"
 }
 
 function codex-m {

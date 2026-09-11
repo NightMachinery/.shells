@@ -105,7 +105,7 @@ function claude {
         #: the tty title and in every other cue. `local` is dynamically scoped
         #: in zsh, so a caller can override it without exporting anything.
         agent_launch_glyph="${claude_tty_title_marker:-${claude_code_profile_markers[$profile]:-$(h-agent-field claude glyph)}}" \
-            h-agent-launch claude command claude "${claude_args[@]}" "$@"
+            h-agent-launch claude claude "${claude_args[@]}" "$@"
     } always {
         #: Runs on a normal quit and on Ctrl-C alike; only a `kill -9` escapes
         #: it. Never allowed to change the session's own exit status.

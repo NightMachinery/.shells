@@ -9,7 +9,7 @@ function antigravity {
     local cmd=("${antigravity_cmd[@]:-agy}")
     ensure-cmd "${cmd[1]}" @RET
 
-    h-agent-launch agy reval-ec "${cmd[@]}" "$@"
+    agent_launch_echo_p=y h-agent-launch agy "${cmd[@]}" "$@"
 }
 aliasfn antigravity-m antigravity
 ##
