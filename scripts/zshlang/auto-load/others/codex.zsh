@@ -283,6 +283,123 @@ function h-codex-status-arm {
     h-agent-usage-arm "${session}" "${deadline}" "${msg}"
 }
 
+#: Utilization at or above which one auth's window counts as blocking it. The
+#: per-auth twin of =claude_code_usage_arm_full_pct=; only
+#: [agfi:h-codex-status-arm-auth] reads it, since the all-auths arm above
+#: leaves "exhausted" to the script.
+typeset -g codex_status_arm_full_pct="${codex_status_arm_full_pct:-100}"
+
+function h-codex-status-active-alias {
+    #: The alias of the auth the running Codex was started with: the
+    #: `auth_<alias>.json' snapshot whose bytes match `auth.json', else `auth',
+    #: which is the label =codex_status.py= gives the bare file
+    #: (`alias_from_auth_path'). The same rule as its
+    #: `workspace_name_from_matching_auth_alias', so the scope
+    #: [agfi:h-agent-auto-continue-scope] derives here names the same
+    #: `.authFiles[].alias' the report prints.
+    ##
+    setopt localoptions bareglobqual
+
+    local home
+    home="$(h-codex-session-home)" @RET
+    local bare="${home}/auth.json"
+    test -e "${bare}" || return 1
+
+    local f
+    for f in "${home}"/auth[._-]*.json(N.) ; do
+        if command cmp -s -- "${bare}" "${f}" ; then
+            ec "${${f:t:r}#auth[._-]}"
+            return 0
+        fi
+    done
+
+    ec auth
+}
+
+function h-codex-status-arm-auth {
+    #: Arms, or re-arms, a one-shot job for when ONE auth's quota comes back,
+    #: unlike [agfi:h-codex-status-arm], which waits for every auth to be
+    #: exhausted because a person can `swap'. A running thread cannot: it is
+    #: signed in to one auth and stays blocked until that one resets, which is
+    #: what [agfi:agent-auto-continue-check] is waiting on. So this reads that
+    #: auth's own windows and, like Claude's arm, takes the LATEST reset among
+    #: the blocked ones -- a primary rollover buys nothing while the weekly
+    #: window is spent.
+    #: Usage: h-codex-status-arm-auth <session> <alias>
+    ##
+    local full_pct="${codex_status_arm_full_pct:-100}"
+
+    local session="${1}" auth_alias="${2}"
+    assert-args session auth_alias @RET
+
+    ensure-cmd jq @RET
+
+    local json
+    json="$(codex_status_strip_ansi_p=y codex-status --json)" @TRET
+
+    local auth
+    auth="$(ec "${json}" | jq -c --arg alias "${auth_alias}" \
+        '[.authFiles[]? | select(.alias == $alias)] | first | select(. != null)')" || auth=''
+    if test -z "${auth}" ; then
+        ecerr "$0: no auth named ${auth_alias} in the report"
+        return 1
+    fi
+    if ! ec "${auth}" | jq -e '.ok' >/dev/null ; then
+        ecerr "$0: ${auth_alias}: $(ec "${auth}" | jq -r '.error // "status check failed"')"
+        return 1
+    fi
+
+    #: One row per window: label, percent used, reset epoch. `numbers' drops
+    #: a null or missing value rather than letting it read as zero.
+    local windows
+    windows="$(ec "${auth}" | jq -r '
+        [ (.rateLimits.primary // {} | {label: "primary", pct: (.usedPercent | numbers), at: (.resetsAt | numbers)}),
+          (.rateLimits.secondary // {} | {label: "secondary", pct: (.usedPercent | numbers), at: (.resetsAt | numbers)}) ]
+        | map(select(.pct != null and .at != null))
+        | .[] | [.label, (.pct | tostring), (.at | tostring)] | @tsv')" || windows=''
+
+    local line label pct at
+    local -a f blocked_labels
+    integer blocked_at=0
+    for line in ${(f)windows} ; do
+        f=( "${(@ps:\t:)line}" )
+        label="${f[1]}" pct="${f[2]%.*}" at="${f[3]%.*}"
+        if (( pct >= full_pct )) && (( at > 0 )) ; then
+            blocked_labels+=( "${label}" )
+            (( at > blocked_at )) && blocked_at=${at}
+        fi
+    done
+
+    integer deadline=0
+    local msg=''
+    if (( ${#blocked_labels} == 0 )) ; then
+        if ! isDeus ; then
+            ecgray "$0: ${auth_alias}: usage already possible, not arming (use \`deus\` to arm anyway)"
+            return 0
+        fi
+
+        #: deus: the primary rollover, so the mechanism can be exercised
+        #: without running the account dry.
+        deadline="$(ec "${windows}" | gawk -F'\t' '$1 == "primary" { print $3 }')"
+        deadline=${deadline%.*}
+        if (( deadline == 0 )) ; then
+            ecgray "$0: ${auth_alias}: no primary reset time in the report, not arming"
+            return 0
+        fi
+        msg="Codex (${auth_alias}): primary window rolled over"
+    else
+        deadline=${blocked_at}
+        msg="Codex (${auth_alias}): ${(j:, :)blocked_labels} reset, usage available again"
+    fi
+
+    #: Same picker narrowing as [agfi:h-codex-status-arm], for a caller that
+    #: presets no targets.
+    local agent_session_agents=codex
+    local agent_session_live_rows_scope=all
+
+    h-agent-usage-arm "${session}" "${deadline}" "${msg}"
+}
+
 function h-codex-status-arm-schedule {
     #: Arming without printing a report, for when the report is already in
     #: front of you. The =h-= says the =-notify= forms below are the intended
