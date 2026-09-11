@@ -45,7 +45,7 @@ function pager-if-overflow {
     #: Pages only when the content would not fit on the screen with =pager_overflow_margin= lines to spare (for the shell prompt drawn afterwards); otherwise prints it directly.
     #: Unlike =less --quit-if-one-screen=, which tests against the full screen height and so lets the prompt push the top of an almost-screenful out of view.
     #: (No mainstream pager supports such a margin; apps solve this client-side, e.g., psql's =pager_min_lines=.)
-    local margin="${pager_overflow_margin:-5}"
+    local margin="${pager_overflow_margin:-2}"
 
     if ! isOutTty ; then
         cat
