@@ -2213,7 +2213,7 @@ function h-agent-session-tmux-rows {
         local -a live
         live=( ${(f)agent_session_live_list_cache} )
 
-        local row t tname id name label
+        local row t tname id label
         for row in "${live[@]}" ; do
             f=( "${(@ps:\t:)row}" )
 
@@ -2236,15 +2236,9 @@ function h-agent-session-tmux-rows {
 
             #: The name is taken back off the id rather than kept from the row, so
             #: the label is what tmux calls the session at this instant.
-            #: The agent's own name goes after it when it adds anything -- the
-            #: hooks name a session after its agent session, so usually it does
-            #: not.
             tname="${tnames[${id}]:-${tname}}"
-            label="${tname}"
-            name="${f[3]}"
-            if test -n "${name}" && [[ "${name}" != '-' && "${label}" != *"${name}"* ]] ; then
-                label+="  ${name}"
-            fi
+            h-agent-session-tmux-label "${tname}" "${f[3]}"
+            label="${REPLY}"
 
             live_transcripts[${t}]=y
             h-agent-session-agent-in-roots "${t}" "${root_agents[@]}"
@@ -2279,6 +2273,131 @@ function h-agent-session-tmux-rows {
     fi
 
     ec "${rows%$'\n'}" | h-agent-session-annotate-rows
+}
+
+function h-agent-session-tmux-label {
+    #: Sets `REPLY' to the label a tmux row shows: what tmux calls the session,
+    #: and the agent session's own name after it when it adds anything -- the
+    #: autoname hooks name a tmux session after the agent session in it, so
+    #: usually it does not.
+    #:
+    #: `REPLY' rather than a printed value, because both callers are in a loop
+    #: over live sessions and a command substitution would fork per row; see
+    #: [agfi:h-agent-session-agent-in-roots], which hands its answer back the
+    #: same way.
+    #: Usage: h-agent-session-tmux-label <tmux-session-name> <session-name>
+    ##
+    local tname="${1}" name="${2}"
+
+    REPLY="${tname}"
+    if test -n "${name}" && [[ "${name}" != '-' && "${REPLY}" != *"${name}"* ]] ; then
+        REPLY+="  ${name}"
+    fi
+}
+
+function h-agent-session-tmux-panes {
+    #: One row per live agent session sitting in a tmux *pane*, in the four
+    #: column layout [agfi:h-agent-session-annotate-rows] reads, with the pane
+    #: *id* in the caller column: `<pane-id><TAB><transcript><TAB><agent><TAB><label>'.
+    #:
+    #: [agfi:h-agent-session-tmux-rows] answers "which tmux session is this
+    #: conversation in", which is all a goto needs. This answers "which pane",
+    #: which is what anything typing into the session needs: a session can hold
+    #: several panes and only one of them is the agent.
+    #:
+    #: The live listing gives the agent's *pid*, and no adapter reports a pane,
+    #: so the pane is found the way `proc.TmuxOf' finds it in
+    #: =golang/agent_session/internal/proc/proc.go=: walk the process up
+    #: through its parents until one of them is some pane's own process. One
+    #: `ps' and one `tmux list-panes' for the whole listing rather than a pair
+    #: per row; the same reconciliation [agfi:agent-subagents-list] does.
+    #:
+    #: A dead pane is skipped rather than reported. `~/.tmux.conf' sets
+    #: `remain-on-exit' globally, so panes outlive their commands, and a pane
+    #: whose shell has exited is not somewhere an agent is running.
+    #:
+    #: Prints nothing and fails when there is none. `agent_session_agents'
+    #: narrows this to one agent, by narrowing [agfi:h-agents] and so the roots.
+    ##
+    local live_kept
+    live_kept="$(h-agent-session-live-list-offerable)" || return 1
+    test -n "${live_kept}" || return 1
+
+    ensure-cmd tmux @RET
+
+    local agent_session_live_list_cache="${live_kept}"
+
+    #: `pid=,ppid=' with the empty headers, so there is no header line to skip
+    #: and the two columns are whitespace separated whatever the pid widths.
+    local line
+    local -a f
+    local -A ppid_of
+    for line in ${(f)"$(command ps -axo pid=,ppid= 2>/dev/null)"} ; do
+        f=( ${=line} )
+        (( ${#f} >= 2 )) || continue
+        ppid_of[${f[1]}]="${f[2]}"
+    done
+
+    local -A pane_of
+    for line in ${(f)"$(command tmux list-panes -a -F '#{pane_id}'$'\t''#{pane_pid}'$'\t''#{pane_dead}' 2>/dev/null)"} ; do
+        test -n "${line}" || continue
+        f=( "${(@ps:\t:)line}" )
+        test -n "${f[1]}" && test -n "${f[2]}" || continue
+        [[ "${f[3]}" == 0 ]] || continue
+
+        pane_of[${f[2]}]="${f[1]}"
+    done
+    (( ${#pane_of} )) || return 1
+
+    local -a root_agents
+    root_agents=( ${(f)"$(h-agent-session-root-agents)"} )
+
+    local row t agent pane cur label rows=''
+    integer hops
+    for row in ${(f)live_kept} ; do
+        test -n "${row}" || continue
+
+        f=( "${(@ps:\t:)row}" )
+
+        #: A session that has written nothing has nothing to preview.
+        t="${f[5]}"
+        test -n "${t}" && test -e "${t}" || continue
+
+        #: A transcript under no agent's store has no previewer to name in
+        #: `{3}', and this is also how `agent_session_agents' narrows the rows.
+        h-agent-session-agent-in-roots "${t}" "${root_agents[@]}" || continue
+        agent="${REPLY}"
+
+        #: The walk is bounded rather than trusting the process tree to be
+        #: acyclic: `ps' is a snapshot, a pid can be reused between the two
+        #: calls, and a loop here would hang the picker rather than fail it.
+        #: The digit test is the other half of that: a `-' or an empty field
+        #: must end the walk, not reach the arithmetic and abort the listing.
+        pane=''
+        cur="${f[1]}"
+        hops=0
+        while [[ "${cur}" == [0-9]## ]] && (( cur > 1 )) && (( hops < 64 )) ; do
+            if test -n "${pane_of[${cur}]}" ; then
+                pane="${pane_of[${cur}]}"
+                break
+            fi
+
+            cur="${ppid_of[${cur}]}"
+            (( hops++ ))
+        done
+        test -n "${pane}" || continue
+
+        #: Column 6 is the tmux session the adapter says the agent sits in, and
+        #: it is the same walk that found the pane, so the two agree.
+        h-agent-session-tmux-label "${f[6]}" "${f[3]}"
+        label="${REPLY}"
+
+        rows+="${pane}"$'\t'"${t}"$'\t'"${agent}"$'\t'"${label}"$'\n'
+    done
+
+    test -n "${rows}" || return 1
+
+    ec "${rows%$'\n'}"
 }
 
 function h-agent-session-preview-cmd {
