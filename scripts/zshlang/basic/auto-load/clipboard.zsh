@@ -6,7 +6,7 @@ function cat-copy {
     #: is printed, so a slow producer shows nothing until it finishes, and a
     #: missing trailing newline is added on the way out. When you want output
     #: as it streams, or stdout as byte-exact as the clipboard already is,
-    #: reach for [agfi:tee-copy].
+    #: reach for [agfi:cat-copy-streaming].
     ##
     local inargs
     in_or_args_newline_p=n in-or-args2 "$@"
@@ -23,12 +23,12 @@ function cat-copy {
     ecn "$inargs" | pbcopy
 }
 
-function tee-copy {
+function cat-copy-streaming {
     : "prints stdin or the arguments and copies it, byte-exact, as it streams"
     #: The streaming half of the pair, and the one implementation of the
     #: fan-out: one input copied to the terminal and to the clipboard at once,
     #: nothing buffered and nothing rewritten. [agfi:cat-copy] is the buffered
-    #: half. `pc' and [agfi:cat-copy-if-tty] both land here.
+    #: half. `pc', [agfi:tee-copy] and [agfi:cat-copy-if-tty] all land here.
     #:
     #: `> >(pbcopy) | cat', not `>&1 > >(pbcopy)'. Both fan the stream out
     #: through zsh's MULTIOS, which forks a helper process to do the copying,
@@ -48,8 +48,13 @@ function tee-copy {
         > >(pbcopy) | cat
     fi
 }
+alias pc='\noglob cat-copy-streaming'
+
+function tee-copy {
+    : "the old name for [agfi:cat-copy-streaming]"
+    cat-copy-streaming "$@"
+}
 aliasfn teec tee-copy
-alias pc='\noglob tee-copy'
 # alias pc='\noglob cat-copy'
 
 function cat-copy-v2 {
@@ -57,7 +62,7 @@ function cat-copy-v2 {
         cat "$@"
     else
         in-or-args
-    fi | tee-copy
+    fi | cat-copy-streaming
 }
 alias cf='cat-copy-v2'
 
@@ -79,10 +84,6 @@ function cat-copy-streaming-v1 {
     }
 }
 
-function cat-copy-streaming {
-    : "the old name for [agfi:tee-copy]"
-    tee-copy "$@"
-}
 
 function cat-copy-as-file {
     local suffix="${1}"
@@ -114,7 +115,7 @@ function cat-rtl-streaming-if-tty {
 
 function cat-streaming-copy-rtl-if-tty {
     if isOutTty ; then
-        tee-copy | rtl-reshaper-streaming
+        cat-copy-streaming | rtl-reshaper-streaming
     else
         cat
     fi
@@ -131,7 +132,7 @@ function cat-copy-rtl-if-tty {
 function cat-copy-if-tty {
     if isOutTty ; then
         # cat-copy
-        tee-copy
+        cat-copy-streaming
     else
         cat
     fi
@@ -139,7 +140,7 @@ function cat-copy-if-tty {
 
 function cat-copy-streaming-remote {
         if isLocal ; then
-            tee-copy
+            cat-copy-streaming
         else
             pbcopy-remote
         fi
