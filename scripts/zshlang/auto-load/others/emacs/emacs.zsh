@@ -162,6 +162,64 @@ function emc-mobile {
     TERM=xterm-emacs emc-gateway --frame-parameters '((night/mobile . t))' "$@"
 }
 
+function emc-mobile-tmux {
+    : "runs [agfi:emc-mobile] in a tmux session named emacs-mobile, attaching to it if it already exists"
+    #: WHY tmux, when mosh already survives a roaming connection: with
+    #: `emacsclient -t' the frame's controlling tty IS the ssh session, so a
+    #: dropped link leaves the daemon holding a frame on a terminal that no
+    #: longer exists -- the class of state behind
+    #: =docs/emacs-minibuffer-wedge.md=. Hosting the frame in a tmux pane puts
+    #: a tty in front of it that outlives the network, so the connection can
+    #: come and go under a frame that stays valid, and the same frame can be
+    #: picked up again from another device.
+    #:
+    #: Quitting the frame lets the pane exit. Because =~/.tmux.conf= sets
+    #: `remain-on-exit on' globally the session then lingers holding a DEAD
+    #: pane, which [agfi:tmux-alive-p] reports as not alive, so the next call
+    #: tears it down and opens a fresh Emacs rather than attaching you to a
+    #: corpse. Verified, since the alternative -- `duplicate session' from
+    #: [agfi:tmuxnew] -- is what happens if that teardown ever stops working.
+    #:
+    #: A *failing* launch is the case worth keeping a pane for: a session that
+    #: died instantly would otherwise surface only as `no tmux session named:
+    #: ...' from [agfi:tmux-session-goto], with the real error already gone
+    #: with the session.
+    #:
+    #: End it by quitting the frame from inside Emacs (`SPC q f'), not with
+    #: `tmux kill-session': killing the session leaves the daemon holding a
+    #: live frame on a pty that no longer exists, which is the very state this
+    #: function exists to avoid. Recover from one with
+    #: =(delete-frame F t)= via [agfi:emc-eval].
+    #:
+    #: @usage emc-mobile-tmux            #: attach, creating the session if needed
+    #: @usage emc-mobile-tmux file.org   #: file args are honoured only on creation
+    ##
+    ensure-cmd tmux @RET
+
+    local session="${emc_mobile_tmux_session:-emacs-mobile}"
+
+    #: [agfi:tmux-ensure-attach] ignores the command when the session is
+    #: already alive, so file arguments would otherwise vanish silently.
+    if (( $# )) && tmux-alive-p "${session}" ; then
+        ecerr "$0: ${session} is already running; NOT opening: $*"
+        ecerr "$0: open them from inside Emacs, or quit the frame first."
+    fi
+
+    #: Only a launch that fails FAST keeps its pane. Emacs quitting normally
+    #: must let the pane exit, or the next call would attach to a stale shell
+    #: instead of opening a frame. And `tmux kill-session' on a running
+    #: session counts as a failure too, so without the elapsed-time test that
+    #: shell would survive its own destroyed pty as an orphan -- measured,
+    #: not hypothetical.
+    local grace="${emc_mobile_tmux_grace_seconds:-10}"
+
+    #: `emc-mobile' is a zsh function, and tmux execs a multi-argument
+    #: shell-command directly rather than through a shell, so it has to be
+    #: wrapped -- the same shape [agfi:tma-z] and [agfi:tmuxnewsh] use.
+    tmux-ensure-attach "${session}" \
+        zsh -c "start=\$SECONDS ; FORCE_INTERACTIVE=y emc-mobile $(gq "$@") ; rc=\$? ; (( rc == 0 || SECONDS - start >= ${grace} )) && exit \$rc ; ecerr 'emc-mobile-tmux: emc-mobile failed in under ${grace}s; keeping this pane so the error stays readable' ; exec zsh"
+}
+
 function emc-open-no-server {
     emc_gateway_engine=(emacs) emc-gateway "$@"
 }
