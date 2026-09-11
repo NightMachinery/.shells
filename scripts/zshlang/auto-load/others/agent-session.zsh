@@ -790,6 +790,54 @@ function h-agent-session-focused-window {
     ec "${win}"
 }
 
+function h-agent-session-cmd-unwrap {
+    #: A command line with the launcher's DECSET proxy taken off the front, or
+    #: the line unchanged when there is none.
+    #:
+    #: [agfi:h-agent-launch] runs every agent behind `decset-rewrite' on a pty,
+    #: to downgrade DECSET 1003 for Termux (=docs/termux-mouse-decset-1003.md=).
+    #: So the foreground process kitty reports for the window is the proxy, and
+    #: anything matching a command line by its first word sees
+    #: `decset-rewrite -map 1003=1002 -- claude ...' rather than the agent.
+    #: Usage: h-agent-session-cmd-unwrap <cmdline>
+    ##
+    local cmd="${1}"
+
+    local -a w
+    w=( ${(z)cmd} )
+    if [[ "${w[1]:t}" != decset-rewrite ]] ; then
+        print -r -- "${cmd}"
+        return 0
+    fi
+
+    local -a rest
+    rest=( "${w[@]:1}" )
+
+    #: Everything up to and including the first `--' is the proxy's. Without
+    #: one -- an older build, or a hand-written invocation -- its options are
+    #: dropped by shape instead, `-map' and `-trace' taking a value.
+    local dd="${rest[(ie)--]}"
+    if (( dd <= ${#rest} )) ; then
+        rest=( "${rest[@]:${dd}}" )
+    else
+        while (( ${#rest} )) ; do
+            case "${rest[1]}" in
+                -map|-trace)
+                    rest=( "${rest[@]:2}" )
+                    ;;
+                -*)
+                    rest=( "${rest[@]:1}" )
+                    ;;
+                *)
+                    break
+                    ;;
+            esac
+        done
+    fi
+
+    print -r -- "${(j: :)rest}"
+}
+
 function h-agent-session-cmds-agent-p {
     #: Whether any of the given command lines runs an agent: its own binary, or
     #: a shell that was handed one. The binary names come from
@@ -799,9 +847,16 @@ function h-agent-session-cmds-agent-p {
     local -a bins
     bins=( ${=$(h-agents-table | command cut -f4)} )
 
-    local cmd
+    local cmd raw
     local -a w
-    for cmd in "$@" ; do
+    for raw in "$@" ; do
+        #: Only a wrapped line pays for the subshell; the first word is what
+        #: [agfi:h-agent-session-cmd-unwrap] keys on anyway.
+        cmd="${raw}"
+        if [[ "${${(z)raw}[1]:t}" == decset-rewrite ]] ; then
+            cmd="$(h-agent-session-cmd-unwrap "${raw}")"
+        fi
+
         w=( ${(z)cmd} )
         if (( ${bins[(Ie)${w[1]:t}]} )) ; then
             return 0
@@ -1031,6 +1086,22 @@ function h-agent-session-of-kitty-window {
 
     local row
     #: 1. The agent in the window itself.
+    #:
+    #: A wrapped agent ([agfi:h-agent-session-cmd-unwrap]) is a *child* of the
+    #: proxy kitty reports, so its own pid is in no foreground list: add the
+    #: children of each wrapper pid as candidates. Only wrapper pids pay for
+    #: the `pgrep', which is why this tests the first word rather than
+    #: unwrapping every line in a subshell.
+    local i kid
+    for (( i = 1 ; i <= ${#fg_pids} ; i++ )) ; do
+        (( i <= ${#fg_cmds} )) || break
+        [[ "${${(z)fg_cmds[i]}[1]:t}" == decset-rewrite ]] || continue
+
+        for kid in ${(f)"$(command pgrep -P "${fg_pids[i]}" 2>/dev/null)"} ; do
+            test -n "${kid}" && fg_pids+=( "${kid}" )
+        done
+    done
+
     for row in "${live[@]}" ; do
         if (( ${fg_pids[(Ie)${row%%$'\t'*}]} )) ; then
             h-agent-session-row-transcript "${row}" && return 0
