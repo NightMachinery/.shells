@@ -484,8 +484,9 @@ function datenat {
     local out
     out="$(datenat.js "$text")" @RET
 
+    #: [agfi:cat-copy-if-tty] adds the newline on stdout but copies without
+    #: one, so this pastes into an Excel cell without spilling into the next.
     ecn "${out}" | cat-copy-if-tty
-    #: cat-copy will add a newline itself, but it will copy without newline so we can paste it in Excel without overwriting the next cell.
 }
 aliasfn datenat-future datenat_nopast=y datenat
 aliasfn datenat-unix datenat_unix=y datenat
