@@ -179,6 +179,40 @@ function h-agent-session-account {
     h-agent-session-call "${agent}" account "${transcript}" 2>/dev/null
 }
 
+#: Whether the launcher runs agents behind [agfi:h-decset-rewrite-dep]'s pty
+#: proxy, which downgrades the DECSET mouse modes below. On for now; set it to
+#: `n' once Termux ships termux-app PR 5281, which teaches the emulator 1003
+#: itself and makes the whole detour unnecessary. A per-agent
+#: `<agent>_decset_rewrite_p' overrides it; see [agfi:h-agent-launch] and
+#: =docs/termux-mouse-decset-1003.md=.
+typeset -g agent_launch_decset_rewrite_p="${agent_launch_decset_rewrite_p:-y}"
+
+#: The rewrites themselves, `FROM=TO' each, passed on as `-map' arguments. Only
+#: private modes are touched: `ESC [ ? <from> h' and its `l'. The default
+#: downgrades any-event mouse tracking (1003) to button-event tracking (1002),
+#: which is what Termux understands and what the PR above aliases it to anyway.
+typeset -ga agent_launch_decset_map
+(( ${#agent_launch_decset_map} )) || agent_launch_decset_map=(1003=1002)
+
+#: A path here turns tracing on: the proxy appends one line per private-mode
+#: sequence the agent emits -- mode numbers only, never content -- which is how
+#: to find out what an agent actually asks for. Empty, the default, is off.
+typeset -g agent_launch_decset_trace="${agent_launch_decset_trace:-}"
+
+function h-decset-rewrite-dep {
+    #: Ensures the DECSET proxy is built and on PATH, building it on first use.
+    #: Same shape, and the same `whence -p' reasoning, as
+    #: [agfi:h-agent-session-dep]: this sits on every agent launch, and reading
+    #: `$commands' would hash all of PATH for it.
+    ##
+    if whence -p decset-rewrite > /dev/null 2>&1 ; then
+        return 0
+    fi
+
+    ensure-cmd go @RET
+    ensure-dep1 decset-rewrite go-install-local "${NIGHTDIR}/golang/decset-rewrite" @RET
+}
+
 function h-agent-launch {
     #: The preamble every agent launcher shares, then the agent: `nvim' as the
     #: editor, the instruction files synced ([agfi:h-agents-md-sync-ask];
@@ -187,7 +221,20 @@ function h-agent-launch {
     #: table's glyph; [agfi:claude-work] uses that), and the proxy environment.
     #: Anything agent-specific -- Claude's watchdog variables, say -- is set by
     #: the caller before this runs; `local -x' reaches the child from there.
-    #: Usage: h-agent-launch <agent> <command...>
+    #:
+    #: It also runs the agent on a pty behind [agfi:h-decset-rewrite-dep]'s
+    #: proxy, which rewrites `ESC [ ? 1003 h/l' to 1002 on the way out. Termux
+    #: drops 1003 and gates touch forwarding on some mouse mode being active,
+    #: and mosh keeps only the last mode an app asked for, so an agent whose
+    #: last request is 1003 has no mouse at all on the phone;
+    #: =docs/termux-mouse-decset-1003.md= has the whole chain. Gated on
+    #: `agent_launch_decset_rewrite_p', which `<agent>_decset_rewrite_p'
+    #: overrides per agent (`claude_decset_rewrite_p', `codex_decset_rewrite_p',
+    #: `agy_decset_rewrite_p'), on `agent_launch_decset_map' for the rewrites
+    #: and `agent_launch_decset_trace' for the log; a missing proxy is reported
+    #: and the agent launched unwrapped, never blocked. `agent_launch_echo_p=y'
+    #: prints the final command line before running it.
+    #: Usage: h-agent-launch <agent> <binary> [args...]
     ##
     local agent="${1}"
     shift
@@ -212,5 +259,36 @@ function h-agent-launch {
     fi
     tty-title "${glyph}${PWD:t}"
 
-    $proxyenv "$@"
+    #: The per-agent flag falls back to the global one, so
+    #: `claude_decset_rewrite_p=n claude' works without touching the launchers.
+    local rewrite_p="${(P)${:-${agent}_decset_rewrite_p}:-${agent_launch_decset_rewrite_p}}"
+
+    local -a cmd
+    cmd=( "$@" )
+    if bool "${rewrite_p}" && isTty ; then
+        if h-decset-rewrite-dep ; then
+            cmd=( decset-rewrite )
+
+            local m
+            for m in "${agent_launch_decset_map[@]}" ; do
+                cmd+=( -map "${m}" )
+            done
+            if test -n "${agent_launch_decset_trace}" ; then
+                cmd+=( -trace "${agent_launch_decset_trace}" )
+            fi
+
+            cmd+=( -- "$@" )
+        else
+            #: A launch is never worth blocking on a mouse-mode workaround.
+            ecerr "$0: decset-rewrite unavailable, launching ${agent} unwrapped"
+        fi
+    fi
+
+    #: `command' here rather than in every caller: it has to sit inside the
+    #: wrapper's argv, not in front of it.
+    if bool "${agent_launch_echo_p}" ; then
+        $proxyenv reval-ec command "${cmd[@]}"
+    else
+        $proxyenv command "${cmd[@]}"
+    fi
 }

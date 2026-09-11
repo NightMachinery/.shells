@@ -588,6 +588,12 @@ These are new and belong to this design rather than to Claude:
   whether to sync the instruction files, for the shared launcher preamble
   [agfi:h-agent-launch] that the three launchers now share instead of each
   carrying its own copy.
+- `agent_launch_decset_rewrite_p`, `<agent>_decset_rewrite_p`,
+  `agent_launch_decset_map`, `agent_launch_decset_trace` and
+  `agent_launch_echo_p` -- the same preamble's DECSET 1003 downgrade, which
+  runs the agent behind a pty proxy so the mouse works on the phone, and
+  whether it echoes the command line it runs. See
+  `./termux-mouse-decset-1003.md`.
 
 ## Sessions the pickers should not offer
 
