@@ -91,11 +91,14 @@ PR 5281 does inside the emulator, done one layer earlier, so it needs nothing
 installed on the phone and works with or without tmux and with or without mosh.
 
 It lives in [agfi:h-agent-launch], the preamble every agent launcher shares
-(`zshlang/auto-load/others/agents.zsh`), which runs the agent behind a pty proxy
-built from `golang/decset-rewrite/` -- see `golang/decset-rewrite/readme.org`
-for the tool itself. [agfi:h-decset-rewrite-dep] builds it on first use. A
-launch is never blocked on this: if the proxy cannot be built, the launcher
-says so once and starts the agent unwrapped.
+(`zshlang/auto-load/others/agents.zsh`), which runs the agent behind a pty
+proxy. The proxy is `decset-rewrite`, which is not part of this repository: it
+is generic enough to be useful to anyone hitting the same bug, so it lives at
+<https://github.com/NightMachinery/decset-rewrite> and that repository is the
+only copy. [agfi:h-decset-rewrite-dep] installs it from there on first use, so
+that first launch needs the network. A launch is never blocked on this: if the
+proxy cannot be installed, the launcher says so once and starts the agent
+unwrapped.
 
 Wrapping is skipped when stdout is not a terminal, and the tool additionally
 execs the command directly when stdin is not one, so `claude -p` in a pipe and
