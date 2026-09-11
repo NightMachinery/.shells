@@ -71,6 +71,8 @@ tailnet, account, hostname, or auth-key material in this public repo. See
 =setup/terminfo-24bit.src= provides one truecolor definition for Kitty and
 Termux. Installation and verification: =./docs/emacs-truecolor.md=.
 =emc-mobile= opens a truecolor terminal frame with mobile line-number suppression.
+=emc-mobile-tmux= hosts that frame in a tmux session named =emacs-mobile=, so its
+tty outlives the connection instead of dying with it, and reattaches to it later.
 
 Under tmux the colors are re-encoded through the attached client's terminfo, so a
 Termux client reporting =xterm-kitty= received a spelling it cannot parse and
