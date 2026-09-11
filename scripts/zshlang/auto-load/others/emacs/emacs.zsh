@@ -180,10 +180,12 @@ function emc-mobile-tmux {
     #: corpse. Verified, since the alternative -- `duplicate session' from
     #: [agfi:tmuxnew] -- is what happens if that teardown ever stops working.
     #:
-    #: A *failing* launch is the case worth keeping a pane for: a session that
-    #: died instantly would otherwise surface only as `no tmux session named:
-    #: ...' from [agfi:tmux-session-goto], with the real error already gone
-    #: with the session.
+    #: A launch that fails needs nothing special either, because
+    #: `remain-on-exit on' keeps the dead pane and everything it printed: you
+    #: attach onto the error text with `Pane is dead (status N)' under it.
+    #: Turn that option off and a failure becomes `no tmux session named: ...'
+    #: from [agfi:tmux-session-goto] instead, with the real error gone -- that
+    #: is the only thing this function relies on it for.
     #:
     #: End it by quitting the frame from inside Emacs (`SPC q f'), not with
     #: `tmux kill-session': killing the session leaves the daemon holding a
@@ -205,19 +207,11 @@ function emc-mobile-tmux {
         ecerr "$0: open them from inside Emacs, or quit the frame first."
     fi
 
-    #: Only a launch that fails FAST keeps its pane. Emacs quitting normally
-    #: must let the pane exit, or the next call would attach to a stale shell
-    #: instead of opening a frame. And `tmux kill-session' on a running
-    #: session counts as a failure too, so without the elapsed-time test that
-    #: shell would survive its own destroyed pty as an orphan -- measured,
-    #: not hypothetical.
-    local grace="${emc_mobile_tmux_grace_seconds:-10}"
-
     #: `emc-mobile' is a zsh function, and tmux execs a multi-argument
     #: shell-command directly rather than through a shell, so it has to be
     #: wrapped -- the same shape [agfi:tma-z] and [agfi:tmuxnewsh] use.
     tmux-ensure-attach "${session}" \
-        zsh -c "start=\$SECONDS ; FORCE_INTERACTIVE=y emc-mobile $(gq "$@") ; rc=\$? ; (( rc == 0 || SECONDS - start >= ${grace} )) && exit \$rc ; ecerr 'emc-mobile-tmux: emc-mobile failed in under ${grace}s; keeping this pane so the error stays readable' ; exec zsh"
+        zsh -c "FORCE_INTERACTIVE=y emc-mobile $(gq "$@")"
 }
 
 function emc-open-no-server {
