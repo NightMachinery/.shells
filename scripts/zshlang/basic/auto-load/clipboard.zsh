@@ -38,8 +38,14 @@ function h-cat-copy-fanout {
     #: lost outright (five runs in five). The pipe gives the shell a reader to
     #: wait on and both problems go away, for ~4ms a call and ~38% on bulk.
     #: `command tee >(pbcopy)' is correct too, and slower per call.
+    #:
+    #: cat_copy_sink names the command the clipboard half goes to, so
+    #: [agfi:cat-copy-streaming-remote] can tee to a remote clipboard rather
+    #: than swapping the whole fan-out for a plain sink and losing stdout.
     ##
-    > >(pbcopy) | "${1:-cat}"
+    local sink="${cat_copy_sink:-pbcopy}"
+
+    > >("${sink}") | "${1:-cat}"
 }
 
 #: The copy family, on two axes: what the arguments are, and whether stdout is
@@ -183,11 +189,18 @@ function cat-copy-if-tty {
 }
 
 function cat-copy-streaming-remote {
-        if isLocal ; then
-            cat-copy
-        else
-            pbcopy-remote
-        fi
+    : "cat-copy, to whichever clipboard this machine has"
+    #: Both branches tee now. The old `else' handed stdin to
+    #: [agfi:pbcopy-remote] and nothing else: that is `socat -', and the
+    #: listener answers on its own stderr rather than back down the socket, so
+    #: on a remote machine this printed nothing at all while the local branch
+    #: printed everything. Callers like the prompt builders want their text on
+    #: screen either way.
+    ##
+    local sink=pbcopy
+    isLocal || sink=pbcopy-remote
+
+    cat_copy_sink="${sink}" cat-copy "$@"
 }
 
 function cat-copy-streaming-remote-if-tty {
