@@ -75,6 +75,17 @@ function fn-name {
 }
 #+end_src
 
+- A function may open with a docstring: a =:= (no-op) command whose argument is the doc, so it costs nothing at runtime and shows up in =functions fn-name= and =which fn-name=. It is the place for the usage line and what the function is *for*; use it sparingly and keep it to a line or two. Everything longer, and every *why*, goes in =#:= comments below it, not in the string. A variant made with =aliasfn= cannot carry one, so a variant that needs a docstring is written as a real function instead.
+
+#+begin_src zsh :eval never
+function agent-clean-all-fz {
+    : "usage: agent-clean-all-fz [<query>]
+Like agent-clean-fz, but offers busy children too."
+
+    agent_clean_fz_all_p=y agent-clean-fz "$@"
+}
+#+end_src
+
 - All variables must be declared local unless global access is needed. Even for dependency injection, prefer:
 
 #+begin_src :eval never
