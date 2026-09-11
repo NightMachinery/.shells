@@ -199,18 +199,27 @@ typeset -ga agent_launch_decset_map
 #: to find out what an agent actually asks for. Empty, the default, is off.
 typeset -g agent_launch_decset_trace="${agent_launch_decset_trace:-}"
 
+typeset -g agent_launch_decset_module="${agent_launch_decset_module:-github.com/NightMachinery/decset-rewrite}"
+
 function h-decset-rewrite-dep {
-    #: Ensures the DECSET proxy is built and on PATH, building it on first use.
+    #: Ensures the DECSET proxy is on PATH, installing it on first use.
     #: Same shape, and the same `whence -p' reasoning, as
     #: [agfi:h-agent-session-dep]: this sits on every agent launch, and reading
     #: `$commands' would hash all of PATH for it.
+    #:
+    #: The tool is *not* in this repository. It is useful to anyone whose
+    #: terminal ignores DECSET 1003, so it has its own public repository and
+    #: that is the only copy; keeping a second one here would be a fork waiting
+    #: to happen. [agfi:go-install] takes the latest tag, so the first install
+    #: needs the network -- which an agent launch does anyway -- and every
+    #: later launch is one `whence -p' and no more.
     ##
     if whence -p decset-rewrite > /dev/null 2>&1 ; then
         return 0
     fi
 
     ensure-cmd go @RET
-    ensure-dep1 decset-rewrite go-install-local "${NIGHTDIR}/golang/decset-rewrite" @RET
+    ensure-dep1 decset-rewrite go-install "${agent_launch_decset_module}" @RET
 }
 
 function h-agent-launch {
