@@ -280,12 +280,16 @@ end
 --
 -- F1 also locks the keyboard and mouse for the life of the blackout (see
 -- core/blackout-lock.lua), unless blackoutLockEnabled is false. The lock lets
--- exactly the F2 chord through. F2 goes through blackoutRestore, which
--- releases the lock synchronously and, once the blackout is older than
--- blackoutLockScreenAfterSeconds, locks the session before restoring, so a
--- long-unwatched screen comes back as a login window. shift+cmd+F1 starts a
--- blackout that locks first regardless of age: the person starting the black
--- decides, since whoever presses F2 later may be a stranger.
+-- exactly two chords through: F2, and shift+cmd+F1. F2 goes through
+-- blackoutRestore, which releases the lock synchronously and, once the
+-- blackout is older than blackoutLockScreenAfterSeconds, locks the session
+-- before restoring, so a long-unwatched screen comes back as a login window.
+-- shift+cmd+F1 starts a blackout that locks first regardless of age, and
+-- pressed during one already up it marks that one instead, through
+-- blackoutUpgrade rather than through this file -- the screen is already
+-- black, so there is nothing for the garden to do. The mark only ever moves
+-- toward locking: the person starting the black decides, since whoever
+-- presses F2 later may be a stranger.
 --
 -- These three chords are not hs.hotkey bindings, which is why only their
 -- actions live here. Carbon drops roughly one press in five -- a shrug for a

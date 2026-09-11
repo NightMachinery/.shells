@@ -604,7 +604,8 @@ hyper+shift+F1 blanks every display, but on its own that changes nothing about
 input: whatever had focus still has it, so a brushed key types into a window
 you cannot see, a hardware brightness key raises the level you just cut, and
 any other hyper chord fires blind. While the blackout is up, the lock swallows
-all of that, and the only input that does anything is the one that ends it.
+all of that. Two chords still do something: the one that ends the blackout, and
+the one that tightens it.
 
 It is an `hs.eventtap`, which runs before Carbon hotkeys and before any app, so
 returning `true` from its callback drops an event for everyone at once — every
@@ -614,11 +615,20 @@ and `systemDefined` (the hardware brightness and media keys), and with
 are left alone: a lone modifier is harmless, and the escape chord's modifiers
 are read off the F2 event itself.
 
-Exactly two things pass through. F18, the physical hyper key, so the hyper
-modal can still be entered; and F2 with shift only while hyper mode is entered
-— cmd, alt or ctrl on the same event block it. The chord goes through
-`blackoutRestore`, which releases the lock synchronously before asking the
-garden to run `brightness-on-all-loop`, so the keyboard is back at once.
+Exactly three things pass through. F18, the physical hyper key, so the hyper
+modal can still be entered; F2 with shift only while hyper mode is entered —
+cmd, alt or ctrl on the same event block it — which goes through
+`blackoutRestore`, releasing the lock synchronously before asking the garden to
+run `brightness-on-all-loop`, so the keyboard is back at once; and F1 with
+shift *and* cmd while hyper mode is entered, which marks the blackout
+lock-first and leaves it up. That last one is the only input the lock passes
+that does not end the blackout, and it can only make the way out stricter.
+
+Passed is not the same as delivered. The lock tap merely declines to drop those
+three; the chord tap below swallows the two chords itself, so neither ever
+reaches an app. The `hyperEntered()` guard is what makes that safe — the chord
+tap runs exactly while hyper mode is entered, so nothing is let by that has no
+tap waiting to eat it.
 
 Two taps are in play during a blackout, and they do different jobs. The lock
 tap above only ever decides what to *drop*. The chord tap is separate: it runs
@@ -628,8 +638,12 @@ hyper+F1/F2 brightness keys, because Carbon drops those presses — see "When a
 hyper chord does nothing" below. Since a tap that deletes an event hides it
 from every tap after it, the order macOS calls them in must not change the
 outcome, so the chord tap repeats the lock's own rule rather than relying on
-it: while the lock is up, the only chord that does anything is the one that
-ends it.
+it: while the lock is up, the only chords that do anything are the one that
+ends the blackout and the one that marks it lock-first. The ordering really
+does vary — `hs.eventtap` inserts at the head of the chain, and the chord tap
+is rebuilt on every hyper entry while the lock tap is built once at black-on,
+so the chord tap is almost always asked first. Almost is the whole reason the
+rule is written twice.
 
 What F2 leaves on screen is decided when the blackout starts, not when it
 ends. After hyper+shift+F1, F2 within the grace period restores straight to
@@ -637,10 +651,21 @@ the desktop; past it, the session is locked with `hs.caffeinate.lockScreen()`
 first and the display restored a moment later — a blackout up for an hour is
 one nobody is watching, so whoever ends it meets the login screen.
 hyper+shift+cmd+F1 starts a blackout marked lock-first, via
-`blackoutBegin(true)`, and F2 then locks first at any age. The mark belongs to
-whoever *starts* the black, because the person who presses F2 might be an
-adversary; that is why there is no cmd chord on F2. A reload used to lose the
-start time, so F2 restored without locking; now it does not, while redis is up.
+`blackoutBegin(true)`, and F2 then locks first at any age. Pressed during a
+blackout that is already up it marks *that* one, through `blackoutUpgrade` —
+which sets the mark and touches nothing else. Not the garden, which would
+restart the keep-blank loop on a screen that is already black; not
+`blackoutLockOn`, which would rebuild the tap and restart the expiry from the
+press rather than from the start of the black.
+
+The mark belongs to whoever *starts* the black, because the person who presses
+F2 might be an adversary; that is why there is no cmd chord on F2. The upgrade
+does not weaken that rule, it is the same rule read the other way round: the
+mark only ever moves toward locking, so a later press can make the way out
+harder and nothing can make it easier. A blackout cannot be talked back down
+to a relaxed one; the only thing that clears the mark is the blackout ending.
+A reload used to lose the start time, so F2 restored without locking; now it
+does not, while redis is up.
 
 Start time and mark are kept in redis under `blackout_lock` — epoch seconds, a
 space, `0` or `1` — whenever redis is available. On load the module reads the
@@ -661,6 +686,9 @@ for a while after the code had moved on.
   always did and install no tap; they still call `blackoutBegin`, so the age
   rule above holds regardless.
 - `blackoutLockMouse`. Whether clicks and scroll are swallowed.
+- `blackoutUpgradeSound`. The cue an upgrade plays, as a name from
+  `/System/Library/Sounds`, or false for silence. A name rather than an on/off,
+  so the knob picks the sound instead of gating one written into the code.
 - `blackoutLockScreenAfterSeconds`. A blackout older than this locks the
   session before the display is restored. 0 locks first every time; false
   never does. A lock-first blackout ignores it and always locks.
@@ -679,6 +707,7 @@ hs -c 'blackoutLockOff()'
 hs -c 'return blackoutLockActive()'
 hs -c 'blackoutRestore()'             # what hyper+shift+F2 does
 hs -c 'blackoutRestore(true)'         # lock the session first, always; shell only
+hs -c 'blackoutUpgrade()'             # mark a blackout already up as lock-first
 ```
 
 There are four ways out, and every path that ends a blackout takes one of them.
@@ -710,10 +739,18 @@ plain blackout says "Input locked." in the amber `warn` band, and a lock-first
 one says "Input locked. Ending the blackout locks the screen." in `blood`, a
 far darker red. The colour carries that difference because nothing else can —
 both chords leave a screen equally black, and the mark cannot be revoked once
-it is set, so this band is the only moment it is ever confirmed, and it has to
-be legible at a glance rather than by reading. `blood` is darker than the
-crimson `crit` of the Secure Input warning above as well, which can land in the
-very same instant.
+it is set, so it has to be legible at a glance rather than by reading. `blood`
+is darker than the crimson `crit` of the Secure Input warning above as well,
+which can land in the very same instant.
+
+An upgrade reuses that band and that colour, but by then the band is the wrong
+instrument: the screen is already black, so nothing drawn on it can be seen.
+It is shown anyway — it costs nothing, and it is right in the moment before the
+garden's black lands, on a display the selector missed, or with the keyboard
+lock disabled — and a short system sound carries the confirmation that actually
+reaches a person in the dark. That is `blackoutUpgradeSound`. It is the only
+place in this module where sound is used at all, for the one signal that has no
+screen left to use.
 
 ## When a hyper chord does nothing
 
