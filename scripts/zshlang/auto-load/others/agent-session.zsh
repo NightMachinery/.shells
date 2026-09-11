@@ -590,6 +590,132 @@ function h-agent-session-live-list {
     ec "${rows%$'\n'}"
 }
 
+#: Sessions no picker should offer: throwaway ones started for a side effect
+#: and then abandoned, such as one opened purely to refresh an OAuth token.
+#:
+#: PCREs, matched against a live session's own name *and* the tmux session it
+#: sits in; a match on either drops it. Both, because the two can disagree
+#: completely: the autoname hooks name a tmux session after its agent session,
+#: but a session started by hand for a side effect keeps whatever name the
+#: agent gave it -- `tmp-2e' against a tmux session called
+#: `claude-work-refresh-token' -- and the recognisable string is the tmux one.
+typeset -ga agent_session_exclude_pcres
+(( ${#agent_session_exclude_pcres} )) || agent_session_exclude_pcres=(
+    '(?:^|-)refresh-token$'
+)
+#: `n' offers every live session again, without having to empty the list.
+typeset -g agent_session_exclude_p="${agent_session_exclude_p:-y}"
+
+function h-agent-session-excluded-p {
+    #: Whether a session going by these names is one the pickers should not
+    #: offer. Any argument matching any pattern is enough.
+    #: Usage: h-agent-session-excluded-p <name>...
+    ##
+    bool "${agent_session_exclude_p}" || return 1
+    (( ${#agent_session_exclude_pcres} )) || return 1
+
+    #: PCRE rather than zsh globbing, so the patterns can be written the way
+    #: they are everywhere else. `local_options' keeps the option change from
+    #: leaking into the caller.
+    zmodload zsh/pcre 2>/dev/null || return 1
+    setopt local_options rematchpcre
+
+    local pat field
+    for field in "$@" ; do
+        #: `-' is the listing's placeholder for "not known", not a name.
+        test -n "${field}" && [[ "${field}" != '-' ]] || continue
+
+        for pat in "${agent_session_exclude_pcres[@]}" ; do
+            test -n "${pat}" || continue
+
+            [[ "${field}" =~ "${pat}" ]] && return 0
+        done
+    done
+
+    return 1
+}
+
+function h-agent-session-exclude-filter {
+    #: Drops the [agfi:h-agent-session-live-list] rows
+    #: [agfi:h-agent-session-excluded-p] rejects, reading the listing on stdin.
+    ##
+    local row
+    local -a f
+    while IFS= read -r row ; do
+        test -n "${row}" || continue
+
+        #: Fields 3 and 6 of a live-list row: the session's name, and the tmux
+        #: session it sits in.
+        f=( "${(@ps:	:)row}" )
+        h-agent-session-excluded-p "${f[3]}" "${f[6]}" && continue
+
+        ec "${row}"
+    done
+}
+
+function h-agent-session-exclude-pairs {
+    #: Drops the excluded sessions from
+    #: `<caller><TAB><transcript><TAB><agent><TAB><name>' pairs on stdin.
+    #:
+    #: Filtering the pairs, and not the live listing they were built from, is
+    #: the whole point: [agfi:h-agent-session-live-pairs] resolves each kitty
+    #: window on its own and consults that listing only as a cache, so a row
+    #: taken out of the cache still resolves by the slower route and still
+    #: reaches the picker.
+    #:
+    #: A pair carries the session's own name but not the tmux session it sits
+    #: in, and the two routinely disagree, so the tmux name is looked up by
+    #: transcript.
+    ##
+    if ! bool "${agent_session_exclude_p}" || (( ${#agent_session_exclude_pcres} == 0 )) ; then
+        command cat
+        return 0
+    fi
+
+    local row
+    local -a f
+    local -A tmux_of
+    for row in ${(f)"$(h-agent-session-live-list)"} ; do
+        test -n "${row}" || continue
+
+        f=( "${(@ps:\t:)row}" )
+        test -n "${f[5]}" || continue
+        tmux_of[${f[5]}]="${f[6]}"
+    done
+
+    while IFS= read -r row ; do
+        test -n "${row}" || continue
+
+        f=( "${(@ps:\t:)row}" )
+        h-agent-session-excluded-p "${f[4]}" "${tmux_of[${f[2]}]}" && continue
+
+        ec "${row}"
+    done
+}
+
+function h-agent-session-live-list-offerable {
+    #: The live listing minus the sessions no picker should offer, for callers
+    #: building a menu.
+    #:
+    #: Filtered here rather than inside [agfi:h-agent-session-live-list],
+    #: deliberately: a session hidden from a menu must still count as live
+    #: everywhere else, or [agfi:claude-code-session-import] would fork a
+    #: running session believing it had quit.
+    #:
+    #: Fails when nothing is left, so a listing whose every row was excluded
+    #: cannot be mistaken for "no cache yet" and silently refetched unfiltered
+    #: by the next caller down.
+    ##
+    local all kept
+    all="$(h-agent-session-live-list)" || return $?
+    test -n "${all}" || return 1
+
+    kept="$(ec "${all}" | h-agent-session-exclude-filter)"
+    test -n "${kept}" || return 1
+
+    ec "${kept}"
+}
+
 function h-agent-session-row-transcript {
     #: The transcript of a [agfi:h-agent-session-live-list] row, if the file
     #: exists yet. A session that has written nothing is not a target: there is
@@ -1764,6 +1890,12 @@ function h-agent-session-live-rows {
         return 1
     fi
 
+    pairs="$(ec "${pairs}" | h-agent-session-exclude-pairs)"
+    if test -z "${pairs}" ; then
+        ecerr "$0: every live agent session is excluded (agent_session_exclude_pcres)"
+        return 1
+    fi
+
     #: The kitty label is this picker's own, so it is built here and the
     #: annotator is left generic. A name still unknown at this point is left as
     #: `-' for [agfi:h-agent-session-annotate-rows] to fill in from the
@@ -1903,7 +2035,14 @@ function h-agent-session-tmux-rows {
     #: Two agents sharing one tmux session give two rows, which is honest: they
     #: are two conversations, and the engine lands in the same place either way.
     ##
-    local agent_session_live_list_cache="${agent_session_live_list_cache:-$(h-agent-session-live-list)}"
+    #: See [agfi:h-agent-session-live-rows] for why this is built under another
+    #: name before the cache is set.
+    local live_kept
+    if ! live_kept="$(h-agent-session-live-list-offerable)" ; then
+        ecerr "$0: no live agent session to show"
+        return 1
+    fi
+    local agent_session_live_list_cache="${live_kept}"
 
     #: One listing for every row. [agfi:tmux-session-id] would fork per row.
     local -A ids tnames
