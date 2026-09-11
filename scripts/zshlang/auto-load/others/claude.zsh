@@ -561,6 +561,11 @@ function h-claude-code-usage-argv-common {
     local refresh_p="${claude_code_usage_refresh_p:-n}"
     local json_p="${claude_code_usage_json_p:-n}"
     local strip_ansi_p="${claude_code_usage_strip_ansi_p:-n}"
+    #: Whether an expired keychain credential (or a 401) may be refreshed by
+    #: running Claude Code's own print-mode =/usage= once for that profile. On
+    #: by default: it is a built-in, so it spends no tokens and starts no
+    #: conversation. Turn it off where spawning =claude= is unwelcome.
+    local relogin_p="${claude_code_usage_relogin_p:-y}"
 
     local args=(
         --timeout "${timeout_s}"
@@ -574,6 +579,11 @@ function h-claude-code-usage-argv-common {
     fi
     if bool "${strip_ansi_p}" ; then
         args+=(--color never)
+    fi
+    #: Only the off switch is passed: the script's own default is on, and
+    #: saying so twice is how the two drift apart.
+    if ! bool "${relogin_p}" ; then
+        args+=(--no-relogin)
     fi
 
     ec "${(F)args}"

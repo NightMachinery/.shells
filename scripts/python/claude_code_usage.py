@@ -28,6 +28,7 @@ import urllib.request
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 
 from libs.common_sub_status import (
     DARK_THEME_DEFAULT,
@@ -73,6 +74,15 @@ CREDENTIALS_FILE = Path(os.path.expanduser("~/.claude/.credentials.json"))
 DEFAULT_PROFILE_CONFIG = Path(os.path.expanduser("~/.claude.json"))
 CACHE_FILE_NAME = "usage.json"
 LOGIN_HINT = "open `claude` (or run `/login` inside it) to refresh the token"
+#: How an expired Keychain credential is refreshed without a human: print-mode
+#: `/usage` is a built-in, answered locally without a model turn, so it spends
+#: no tokens and leaves no conversation behind -- while still performing the
+#: OAuth refresh every Claude Code startup does, which is the whole point. The
+#: script itself still never touches the refresh token.
+RELOGIN_COMMAND = "claude"
+RELOGIN_ARGV = ("-p", "/usage")
+#: Generous: a cold start has to load the whole bundle before it refreshes.
+RELOGIN_TIMEOUT_S = 90.0
 
 WINDOW_LABELS = {
     "five_hour": "5h session",
@@ -97,6 +107,8 @@ class ProfileReport:
     #: succeeded, which is a degraded report rather than a failed one.
     error: str | None = None
     warnings: list[str] = field(default_factory=list)
+    #: None when no refresh was attempted, else "refreshed" or "failed: why".
+    relogin: str | None = None
 
 
 class UsageError(RuntimeError):
@@ -584,6 +596,153 @@ def get_token(
     )
 
 
+class Relogin:
+    """Refreshes an expired Keychain credential by running `claude -p /usage`.
+
+    The script cannot refresh an OAuth token itself -- it never sees the
+    refresh token -- but Claude Code does it on every startup, and print-mode
+    ``/usage`` is a built-in it answers locally, without a model turn. So one
+    such run costs nothing, leaves no conversation, and hands the next request
+    a live credential.
+
+    At most one attempt per profile, ever: `run` is a no-op after the first
+    call, so the 401 retry in `get_usage` cannot become a loop.
+    """
+
+    def __init__(
+        self,
+        *,
+        config_dir: str | None,
+        enabled: bool,
+        force: bool,
+        reread: Callable[[], TokenInfo],
+        timeout_s: float = RELOGIN_TIMEOUT_S,
+    ) -> None:
+        self.config_dir = config_dir
+        self.enabled = enabled
+        #: Debugging hatch: attempt the refresh even on a live credential.
+        self.force = force
+        self.timeout_s = timeout_s
+        self._reread = reread
+        self.attempted = False
+        #: None, "refreshed" or "failed: <reason>"; reported as `relogin`.
+        self.status: str | None = None
+        #: The credential read back after a successful refresh, so the report
+        #: names what actually answered rather than the stale one.
+        self.token_info: TokenInfo | None = None
+
+    def refresh_if_expired(self, token_info: TokenInfo) -> TokenInfo | None:
+        """Called before a fetch: spend the refresh rather than a certain 401."""
+        if not self.force and token_info.expired is not True:
+            return None
+
+        return self.run(token_info)
+
+    def run(self, token_info: TokenInfo) -> TokenInfo | None:
+        if self.attempted:
+            return None
+        self.attempted = True
+
+        if not self.enabled:
+            #: Nothing was tried, so there is nothing to report: LOGIN_HINT
+            #: already says what to do by hand.
+            return None
+
+        if token_info.source.split(":", 1)[0] != "keychain":
+            #: A token from a variable is long-lived and minted by hand, and a
+            #: `.credentials.json` is not what a macOS Claude Code writes. In
+            #: neither case would a relogin refresh the thing we just read, so
+            #: this is skipped silently rather than reported as a failure.
+            return None
+
+        binary = shutil.which(RELOGIN_COMMAND)
+        if binary is None:
+            self.status = f"failed: {RELOGIN_COMMAND!r} is not on PATH"
+            return None
+
+        ok, reason = self._invoke(binary)
+        if not ok:
+            self.status = f"failed: {reason}"
+            return None
+
+        try:
+            info = self._reread()
+        except UsageError as exc:
+            self.status = f"failed: no credential after the refresh ({exc})"
+            return None
+
+        if info.expired is True:
+            #: The command ran and the credential is still stale, which is a
+            #: different problem from the command failing -- say which.
+            self.status = "failed: the credential is still expired afterwards"
+            return None
+
+        self.status = "refreshed"
+        self.token_info = info
+        return info
+
+    def _invoke(self, binary: str) -> tuple[bool, str]:
+        env = os.environ.copy()
+        if self.config_dir:
+            env["CLAUDE_CONFIG_DIR"] = self.config_dir
+        else:
+            #: The default seat is the one that exports nothing at all, so it
+            #: is selected by *removing* the variable, exactly as the launcher
+            #: does. Inheriting ours would refresh some other profile.
+            env.pop("CLAUDE_CONFIG_DIR", None)
+
+        #: Claude Code's SessionStart hooks rename the tmux session they find
+        #: themselves in, and this child is not the caller's session -- left in
+        #: place, these would rename the caller's session out from under them.
+        env.pop("TMUX", None)
+        env.pop("TMUX_PANE", None)
+
+        #: A fresh directory: the child then neither picks up the settings of
+        #: whatever project we are standing in nor writes anything into it.
+        workdir = tempfile.mkdtemp(prefix="claude-code-usage-relogin-")
+        command = f"{RELOGIN_COMMAND} {' '.join(RELOGIN_ARGV)}"
+        try:
+            proc = subprocess.run(
+                [binary, *RELOGIN_ARGV],
+                cwd=workdir,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=self.timeout_s,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return False, f"`{command}` timed out after {self.timeout_s:g}s"
+        except OSError as exc:
+            return False, f"could not run {RELOGIN_COMMAND!r}: {exc}"
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+
+        #: Captured rather than shown: the report *is* the output here, and a
+        #: second rendering of `/usage` in the middle of it is noise. DEBUGME
+        #: is how the rest of this repo asks to see the details anyway.
+        if os.environ.get("DEBUGME"):
+            for stream, text in (("stdout", proc.stdout), ("stderr", proc.stderr)):
+                for line in (text or "").splitlines():
+                    print(
+                        f"claude_code_usage: relogin {stream}: {line}",
+                        file=sys.stderr,
+                    )
+
+        if proc.returncode != 0:
+            lines = [ln.strip() for ln in (proc.stderr or "").splitlines() if ln.strip()]
+            if not lines:
+                lines = [
+                    ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()
+                ]
+            detail = f": {lines[-1][:200]}" if lines else ""
+            return False, f"`{command}` exited {proc.returncode}{detail}"
+
+        return True, ""
+
+
 def cache_path(cache_dir: str, label: str) -> Path:
     # Keyed by profile: profiles share the endpoint but not the account, so one
     # shared cache file would have them overwrite each other's response.
@@ -683,30 +842,57 @@ def get_usage(
     refresh: bool,
     timeout: float,
     user_agent: str,
+    relogin: Relogin | None = None,
 ) -> FetchResult:
     cached = read_cache(cache_file)
 
     if not refresh and cached is not None and ttl_s > 0:
         age = time.time() - cached.fetched_at_s
         if age < ttl_s:
+            #: Answered without touching the network, so no credential was
+            #: used and none needs refreshing. A relogin here would spawn a
+            #: `claude` on every cached report.
             return cached
 
-    try:
-        payload = fetch_usage(token_info.token, timeout=timeout, user_agent=user_agent)
-    except UsageError as exc:
-        if cached is not None:
-            print(
-                f"claude_code_usage: fetch failed ({exc}); showing cached data",
-                file=sys.stderr,
+    #: A request is about to go out, so a credential we already know to be
+    #: expired is worth refreshing rather than spending the round trip on a
+    #: certain 401.
+    if relogin is not None:
+        refreshed = relogin.refresh_if_expired(token_info)
+        if refreshed is not None:
+            token_info = refreshed
+
+    while True:
+        try:
+            payload = fetch_usage(
+                token_info.token, timeout=timeout, user_agent=user_agent
             )
-            return FetchResult(
-                payload=cached.payload,
-                fetched_at_s=cached.fetched_at_s,
-                from_cache=True,
-                stale_reason=str(exc),
-                source="api-cache",
-            )
-        raise
+        except UsageError as exc:
+            #: A 401 on a credential that looked live is the other way a stale
+            #: token shows up -- the expiry is only what the item claims. The
+            #: runner attempts once per profile and then refuses, so this
+            #: retries at most once and cannot loop.
+            if exc.http_status == 401 and relogin is not None:
+                refreshed = relogin.run(token_info)
+                if refreshed is not None:
+                    token_info = refreshed
+                    continue
+
+            if cached is not None:
+                print(
+                    f"claude_code_usage: fetch failed ({exc}); showing cached data",
+                    file=sys.stderr,
+                )
+                return FetchResult(
+                    payload=cached.payload,
+                    fetched_at_s=cached.fetched_at_s,
+                    from_cache=True,
+                    stale_reason=str(exc),
+                    source="api-cache",
+                )
+            raise
+
+        break
 
     write_cache(cache_file, payload)
     return FetchResult(payload=payload, fetched_at_s=time.time(), source="api")
@@ -754,19 +940,22 @@ def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileRepor
     config_path = profile_config_path(profile.config_dir)
 
     failure: str | None = None
+    #: Kept, so the credential can be read again after a relogin with exactly
+    #: the derivation that produced the stale one.
+    token_kwargs = dict(
+        timeout=args.timeout,
+        profile_label=profile.label,
+        config_dir=profile.config_dir,
+        keychain_service=args.keychain_service,
+        keychain_account=args.keychain_account,
+        keychain_timeout=args.keychain_timeout,
+        token_env=getattr(args, "token_env_map", {}).get(profile.label),
+        #: See get_token: the bare global variable cannot serve two
+        #: profiles, so --all ignores it and says so.
+        allow_global_env=not args.all,
+    )
     try:
-        report.token_info = get_token(
-            timeout=args.timeout,
-            profile_label=profile.label,
-            config_dir=profile.config_dir,
-            keychain_service=args.keychain_service,
-            keychain_account=args.keychain_account,
-            keychain_timeout=args.keychain_timeout,
-            token_env=getattr(args, "token_env_map", {}).get(profile.label),
-            #: See get_token: the bare global variable cannot serve two
-            #: profiles, so --all ignores it and says so.
-            allow_global_env=not args.all,
-        )
+        report.token_info = get_token(**token_kwargs)
     except UsageError as exc:
         failure = str(exc)
 
@@ -783,6 +972,16 @@ def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileRepor
         )
 
     if report.token_info is not None:
+        #: One runner per profile, so `--all` can refresh at most one seat's
+        #: credential each -- the report as a whole never spawns more than one
+        #: `claude` per profile.
+        relogin = Relogin(
+            config_dir=profile.config_dir,
+            enabled=args.relogin,
+            force=args.force_relogin,
+            reread=lambda: get_token(**token_kwargs),
+        )
+
         try:
             report.result = get_usage(
                 report.token_info,
@@ -791,9 +990,16 @@ def gather_report(profile: Profile, *, args: argparse.Namespace) -> ProfileRepor
                 refresh=args.refresh,
                 timeout=args.timeout,
                 user_agent=args.user_agent,
+                relogin=relogin,
             )
         except UsageError as exc:
             failure = str(exc)
+
+        report.relogin = relogin.status
+        if relogin.token_info is not None:
+            #: So the report names the credential that actually answered, and
+            #: stops warning about an expiry that has just been dealt with.
+            report.token_info = relogin.token_info
 
     if report.result is None:
         # No token at all, or a fetch failure with no response cache to fall
@@ -1114,6 +1320,11 @@ def render_human(style: Style, report: ProfileReport) -> str:
             )
         )
 
+    if report.relogin is not None:
+        #: Dim: on the happy path this is bookkeeping, and the failure path
+        #: already carries LOGIN_HINT in the line above or in the fetch error.
+        lines.append(style.dim(f"Relogin: {report.relogin}"))
+
     windows = extract_windows(result.payload)
     if windows:
         lines.extend(render_window(style, window) for window in windows)
@@ -1183,6 +1394,7 @@ def build_json(report: ProfileReport, *, keychain: dict | None = None) -> dict:
             "profile": report.profile.label or None,
             "error": report.error,
             "keychain": keychain,
+            "relogin": report.relogin,
         }
 
     token_info = report.token_info
@@ -1217,6 +1429,7 @@ def build_json(report: ProfileReport, *, keychain: dict | None = None) -> dict:
         "plan": token_info.subscription_type if token_info else None,
         "token_source": token_info.source if token_info else None,
         "token_expired": token_info.expired if token_info else None,
+        "relogin": report.relogin,
         "windows": windows,
         "extra_usage": result.payload.get("extra_usage"),
         "cache": {
@@ -1286,6 +1499,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=(
             "Skip the cache and fetch fresh data; the cache is still "
             "updated afterwards (default: %(default)s)."
+        ),
+    )
+    parser.add_argument(
+        "--relogin",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "When the Keychain credential is expired or the endpoint answers "
+            "401, run `claude -p /usage` once for that profile -- a built-in "
+            "that costs no tokens -- to refresh it, then retry once "
+            "(default: %(default)s)."
+        ),
+    )
+    parser.add_argument(
+        "--force-relogin",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Debugging aid: run the relogin even on a live credential. "
+            "Implies --refresh, since a cached report makes no request and "
+            "would skip the refresh entirely (default: %(default)s)."
         ),
     )
     parser.add_argument(
@@ -1432,7 +1666,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Light true-color theme name (default: %(default)s).",
     )
 
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+
+    if args.force_relogin:
+        #: The relogin rides on the network path, so with a warm cache the
+        #: debugging flag would otherwise silently do nothing.
+        args.refresh = True
+
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
