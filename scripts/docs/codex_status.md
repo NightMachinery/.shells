@@ -95,3 +95,44 @@ adds `Previously active: <alias>` with the alias styled like the `Workspace:`
 value. It also prints the same `Average usage` block as status output. If no
 auth can be selected, the failure summary uses the heading `Swap Failed` after
 the checked auth blocks and average usage.
+
+## Reset notifications
+
+`codex-status` can also arm a one-shot background job for when the rate limit
+resets, the same job the Claude Code notifier uses; `docs/agent-usage-notif.md`
+covers the job itself, its idle gate, its knobs and how to cancel it. This
+section is what is Codex's: the deadline, and the delivery.
+
+- `codex-status-notify` prints the ordinary report and arms a notification.
+- `codex-status-continue-fz` prints the report and arms a resume: an fzf
+  picker over every live Codex thread, multi-select, and at reset time the
+  job queues `Continue.` into each one you chose.
+- `h-codex-status-notif-schedule` arms without printing a report, for when
+  the report is already in front of you. The `h-` says the `-notify` forms are
+  the intended way in, not that it is off limits.
+- `codex-status-notif-cancel` and `codex-status-notif-status` are wrappers
+  over the shared `h-agent-usage-notif-cancel` / `-status` for Codex's one
+  session, `codex-status-notif-schedule`.
+
+The deadline is `averageUsage.firstTimeToReset` from `codex-status --json`,
+read with ANSI stripped. That field is only present when *every* checked auth
+file is exhausted, and its absence is treated as "usage possible, not
+arming": if another auth still has room, the right move is `swap`, not
+waiting, and arming a notifier would only tell you hours later what the report
+is telling you now. The report's `First Time to Reset` line already names the
+alias that frees up first, and the notification repeats it, so when the job
+fires you know which auth to swap to. Under `deus` the job arms for the
+earliest primary (5-hour) reset across the auth files instead, whether or not
+anything is exhausted, which is how to exercise the mechanism without first
+running every account dry.
+
+Delivery is `codex queue --thread <id> --message`, and only that: Codex
+accepts a message for a thread by name, so the resume needs no kitty window,
+no tmux pane, no focus and no awake display, and it cannot land in the wrong
+place. That is why there are no kitty or tmux variants on the Codex side, where
+Claude has three; queueing dominates both. The picker lists every live thread,
+not only those showing in a window, because a window is not needed to reach
+one. The thread id is `agent_session codex id-of <transcript>`.
+
+The caveat from the shared doc applies unchanged: the job trusts the reset
+time it was armed with and does not re-run `codex-status` when it fires.

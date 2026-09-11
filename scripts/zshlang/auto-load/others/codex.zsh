@@ -166,6 +166,180 @@ function codex-status {
 }
 alias cs='codex-status'
 ##
+#: Waiting out a Codex rate limit, and picking the threads back up once it
+#: lifts. Only *when* the limit resets and *what to say* about it are Codex's;
+#: arming the one-shot job, waiting out the clock, the idle gate and the
+#: delivery are agent-neutral and live in =agent-usage.zsh=. See
+#: =docs/agent-usage-notif.md= and =docs/codex_status.md=.
+#:
+#: Two things are worth knowing before reading the code.
+#:
+#: There are no =-continue-kitty-fz= / =-continue-tmux-fz= / =-continue-frontmost=
+#: variants here, where Claude Code has three. Codex accepts a message for a
+#: thread by *name* (`codex queue --thread'), so a resume needs no kitty
+#: window, no tmux pane, no keyboard focus and no awake display, and it cannot
+#: land in the wrong place. Queueing dominates typing, so it is the only
+#: delivery, and every Codex row either picker offers is mapped to a
+#: `codex:<thread>' target by [agfi:h-agent-usage-continue-rows-to-targets]
+#: rather than to a window or a pane. That is also why the rows are widened to
+#: every live thread, not only those showing in a window.
+#:
+#: =averageUsage.firstTimeToReset= is present only when EVERY checked auth
+#: file is exhausted, so its absence does not mean "no reset is coming" -- it
+#: means another auth still has room, and the move is to `swap' rather than to
+#: wait. Arming then would only tell you hours later what the report is
+#: telling you now, so we decline and say so.
+##
+function codex-status-notif-sessions {
+    #: The tmux session Codex's notifier lives in, one per line. Named after
+    #: the scheduling function minus the =h-=, so that `tmux ls' and the
+    #: function you called line up. Plural, and a function rather than a
+    #: literal, so it stays interchangeable with
+    #: [agfi:claude-code-usage-notif-sessions] for anything gathering every
+    #: agent's sessions at once.
+    ##
+    ec 'codex-status-notif-schedule'
+}
+
+function h-codex-status-notif {
+    #: Arms, or re-arms, a one-shot job for when Codex's quota comes back.
+    ##
+    ensure-cmd jq @RET
+
+    local session
+    session="$(codex-status-notif-sessions)" @TRET
+
+    #: ANSI stripped, because the JSON is about to be parsed rather than read:
+    #: [agfi:codex-status] passes our arguments before its own, so =--json=
+    #: reaches the script cleanly.
+    local json
+    json="$(codex_status_strip_ansi_p=y codex-status --json)" @TRET
+
+    #: `select' rather than a `// ""' default on each field, so the two
+    #: columns are either both there or the output is empty: a defaulted alias
+    #: beside an absent deadline would collapse to one field and be read as
+    #: the deadline.
+    local out
+    out="$(ec "${json}" |
+        jq -r '.averageUsage
+            | select(.firstTimeToReset != null)
+            | [(.firstTimeToReset | tostring), (.firstTimeToResetAlias // "?")]
+            | @tsv')" @TRET
+
+    local deadline="${out%%$'\t'*}" auth_alias="${out#*$'\t'}" msg=''
+    if test -n "${deadline}" ; then
+        msg="Codex (${auth_alias}): quota reset, usage available again"
+    else
+        if ! isDeus ; then
+            ecgray "$0: usage already possible (some auth has quota), not arming (use \`deus\` to arm anyway)"
+            return 0
+        fi
+
+        #: deus: arm for the earliest primary (5h) rollover among the auth
+        #: files that answered, whether or not anything is exhausted, so the
+        #: mechanism can be exercised without first running every account dry.
+        #:
+        #: `numbers' drops a null or a missing reset time rather than letting
+        #: it sort to the front and arm us for the epoch.
+        out="$(ec "${json}" |
+            jq -r '[.authFiles[]
+                    | select(.ok)
+                    | {at: (.rateLimits.primary.resetsAt | numbers), alias: (.alias // "?")}
+                    | select(.at != null)]
+                | sort_by(.at) | first
+                | select(. != null)
+                | [(.at | tostring), .alias]
+                | @tsv')" @TRET
+
+        deadline="${out%%$'\t'*}"
+        auth_alias="${out#*$'\t'}"
+        if test -z "${deadline}" ; then
+            ecgray "$0: no primary reset time in the report, not arming"
+            return 0
+        fi
+
+        msg="Codex (${auth_alias}): primary window rolled over"
+    fi
+
+    #: A reset time arrives as a float often enough to matter, and integer
+    #: arithmetic on one aborts rather than rounds. [agfi:h-agent-usage-notif-arm]
+    #: strips it too; doing it here as well keeps what we hand over honest
+    #: rather than relying on the callee to clean it up.
+    deadline="${deadline%.*}"
+
+    #: `local' is dynamically scoped in zsh, so the picker inside the arm sees
+    #: these without anything being exported. Only Codex rows, because only a
+    #: Codex thread is unblocked by a Codex quota reset -- unlike Claude's
+    #: kitty picker, which deliberately offers every agent.
+    #:
+    #: `all' rather than the default `windows': a thread is queueable whether
+    #: or not anything happens to be showing it.
+    #:
+    #: `agent_usage_continue_via' is deliberately left alone. The kitty picker
+    #: is the one that lists threads with no pane, and the tmux picker maps
+    #: Codex rows to the same queue targets, so either choice works and the
+    #: user's stays honoured.
+    local agent_session_agents=codex
+    local agent_session_live_rows_scope=all
+
+    h-agent-usage-notif-arm "${session}" "${deadline}" "${msg}"
+}
+
+function h-codex-status-notif-schedule {
+    #: Arming without printing a report, for when the report is already in
+    #: front of you. The =h-= says the =-notify= forms below are the intended
+    #: way in, not that this is off limits.
+    ##
+    h-codex-status-notif "$@"
+}
+
+function codex-status-notify {
+    #: The ordinary report, then a notification armed for the reset. Mirrors
+    #: [agfi:claude-code-usage-fable-notify].
+    ##
+    local retcode=0
+    codex-status "$@" || retcode=$?
+
+    if (( retcode == 0 )) ; then
+        #: =>&2= because our stdout may be a JSON document a caller is about
+        #: to parse; non-fatal because a failed schedule must not make a
+        #: working report look broken.
+        h-codex-status-notif-schedule >&2 || true
+    fi
+
+    return "${retcode}"
+}
+
+#: The report plus an arm whose action is to pick the threads back up, rather
+#: than merely to announce that it is possible. One entry point, not three:
+#: see the delivery note at the top of this block.
+aliasfnq codex-status-continue-fz \
+    agent_usage_notif_action=continue \
+    codex-status-notify
+
+aliasfn csc codex-status-continue-fz
+
+#: Cancelling and reporting are the same act whatever armed the job, so both
+#: are the shared helpers over the session Codex owns. Named arguments still
+#: narrow it, which is only useful when a caller knows the session by name.
+function codex-status-notif-cancel {
+    local sessions=("$@")
+    if (( ${#sessions} == 0 )) ; then
+        sessions=("${(@f)$(codex-status-notif-sessions)}")
+    fi
+
+    h-agent-usage-notif-cancel "${sessions[@]}"
+}
+
+function codex-status-notif-status {
+    local sessions=("$@")
+    if (( ${#sessions} == 0 )) ; then
+        sessions=("${(@f)$(codex-status-notif-sessions)}")
+    fi
+
+    h-agent-usage-notif-status "${sessions[@]}"
+}
+##
 function image2remote {
     local input="${1}"
     if test -e "${input}" ; then
