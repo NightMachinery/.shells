@@ -302,21 +302,25 @@ function h-claude-code-session-live-list-sh {
             agents="$(CLAUDE_CONFIG_DIR="${home}" command claude agents --json 2>/dev/null)" || continue
         fi
 
-        rows=( ${(f)"$(ec "${agents}" | jq -r '.[] | select(.pid and .sessionId) | [.pid, .sessionId, (.name // "-"), .cwd, (.status // "-")] | @tsv' 2>/dev/null)"} )
+        rows=( ${(f)"$(ec "${agents}" | jq -r '.[] | select(.pid and .sessionId) | [.pid, .sessionId, (.name // "-"), .cwd, (.status // "-"), (.kind // "-")] | @tsv' 2>/dev/null)"} )
 
+        local kind
         for row in "${rows[@]}" ; do
-            IFS=$'\t' read -r pid sid name cwd st <<< "${row}"
+            IFS=$'\t' read -r pid sid name cwd st kind <<< "${row}"
             test -n "${pid}" || continue
 
+            #: A background session runs under the pty host, and the record's
+            #: tmux location is only where `claude --bg' was typed; the Go
+            #: adapter leaves the column empty for the same reason (`tmuxOf').
             tmux_session='-'
             rec="${home}/sessions/${pid}.json"
-            if test -e "${rec}" ; then
+            if [[ "${kind}" != background ]] && test -e "${rec}" ; then
                 tmux_session="$(jq -r '(.tmux // "-") | split(":")[0]' "${rec}" 2>/dev/null)" || tmux_session='-'
             fi
 
             transcript="${home}/projects/${cwd//[^[:alnum:]]/-}/${sid}.jsonl"
 
-            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "${pid}" "${sid}" "${name}" "${cwd}" "${transcript}" "${tmux_session:--}" "${st}"
+            printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "${pid}" "${sid}" "${name}" "${cwd}" "${transcript}" "${tmux_session:--}" "${st}" "${kind:--}"
         done
     done
 }
@@ -749,24 +753,20 @@ aliasfn claude-session-selftest agent-session-selftest
 #: before giving up on typing into it.
 typeset -g claude_code_bg_attach_wait_s="${claude_code_bg_attach_wait_s:-20}"
 
-function h-claude-code-bg-find {
-    #: Finds a *running* background session by its full session id across
-    #: every config home. Prints `<config home>\t<short id>\t<state>', or fails.
-    #: `claude agents --json' is scoped to one home, so each is asked in turn,
-    #: the personal one with CLAUDE_CONFIG_DIR unset
-    #: ([agfi:h-claude-code-session-live-list-sh] says why). A finished
-    #: background session comes back with a null pid and does not count.
-    #: Usage: h-claude-code-bg-find <session-id>
+function h-claude-code-bg-list {
+    #: Every *running* background session across every config home, one per
+    #: line: `<config home>\t<short id>\t<state>\t<session id>'. `claude agents
+    #: --json' is scoped to one home, so each is asked in turn, the personal
+    #: one with CLAUDE_CONFIG_DIR unset ([agfi:h-claude-code-session-live-list-sh]
+    #: says why). A finished background session comes back with a null pid and
+    #: does not count. Prints nothing when there is none.
     ##
-    local id="${1}"
-    assert-args id @RET
-
     ensure-cmd claude jq @RET
 
     local -a projects_dirs
     projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
 
-    local home agents out
+    local home agents rows
     for home in "${projects_dirs[@]}" ; do
         home="${home:h}"
 
@@ -776,15 +776,65 @@ function h-claude-code-bg-find {
             agents="$(CLAUDE_CONFIG_DIR="${home}" command claude agents --json 2>/dev/null)" || continue
         fi
 
-        out="$(ec "${agents}" | jq -r --arg id "${id}" \
-            '[.[] | select(.kind == "background" and .sessionId == $id and .pid != null)] | first | select(. != null) | [.id, (.state // "-")] | @tsv' 2>/dev/null)" || out=''
-        if test -n "${out}" ; then
-            printf '%s\t%s\n' "${home}" "${out}"
-            return 0
-        fi
+        rows="$(ec "${agents}" | jq -r --arg home "${home}" \
+            '.[] | select(.kind == "background" and .pid != null and .sessionId != null) | [$home, .id, (.state // "-"), .sessionId] | @tsv' 2>/dev/null)" || rows=''
+        test -n "${rows}" && ec "${rows}"
     done
 
-    return 1
+    return 0
+}
+
+function h-claude-code-bg-find {
+    #: One running background session by its full session id: prints
+    #: `<config home>\t<short id>\t<state>', or fails.
+    #: Usage: h-claude-code-bg-find <session-id>
+    ##
+    local id="${1}"
+    assert-args id @RET
+
+    local row
+    row="$(h-claude-code-bg-list | gawk -F'\t' -v id="${id}" '$4 == id { print $1 "\t" $2 "\t" $3 ; exit }')" || row=''
+    test -n "${row}" || return 1
+
+    ec "${row}"
+}
+
+function h-claude-code-bg-home-run {
+    #: Runs `claude <args>' under a config home, the way `attach', `stop' and
+    #: `logs' need: they look the id up in that home's daemon. The personal
+    #: home means CLAUDE_CONFIG_DIR *unset*, not empty.
+    #: Usage: h-claude-code-bg-home-run <config home> <claude args...>
+    ##
+    local home="${1}"
+    shift
+    assert-args home @RET
+
+    if [[ "${home}" == "${HOME}/.claude" ]] ; then
+        ( unset CLAUDE_CONFIG_DIR ; command claude "$@" )
+    else
+        CLAUDE_CONFIG_DIR="${home}" command claude "$@"
+    fi
+}
+
+function h-claude-code-bg-attach {
+    #: Attaches this terminal to a running background session, by full session
+    #: id or by the short id `claude agents' shows. Foreground: this is the
+    #: "goto" for a session that lives in no tmux session and no window.
+    #: Usage: h-claude-code-bg-attach <session-id|short-id>
+    ##
+    local id="${1}"
+    assert-args id @RET
+
+    local row
+    row="$(h-claude-code-bg-list | gawk -F'\t' -v id="${id}" '$4 == id || $2 == id { print ; exit }')" || row=''
+    if test -z "${row}" ; then
+        ecerr "$0: no running background session ${id}"
+        return 1
+    fi
+    local -a f
+    f=( "${(@ps:\t:)row}" )
+
+    h-claude-code-bg-home-run "${f[1]}" attach "${f[2]}"
 }
 
 function h-claude-code-bg-send-text {

@@ -152,8 +152,8 @@ has fields:
   agents and complains about none or several.
 - `current-id` -- the id of the session this shell is inside, from the agent's
   environment.
-- `live-list` -- seven columns: pid, id, name, cwd, transcript, tmux session or
-  `-`, status.
+- `live-list` -- eight columns: pid, id, name, cwd, transcript, tmux session or
+  `-`, status, kind (`interactive`, `background`, or `-`).
 - `resume <transcript> [args]` -- executes the agent's resume.
 - `hook-transcript [payload]` -- the transcript a hook payload is about, with
   the payload in `$1` or on stdin.
@@ -495,6 +495,60 @@ busy child and a parent with live descendants are both refused with the list of
 what is in the way. Neither is on by default because the whole value of the
 check is that it happens after the list you were looking at went stale. A child
 that is `gone`, `exited` or `done` is not a live descendant and blocks nothing.
+
+## Background sessions
+
+Claude Code can run a session with no terminal: `claude --bg "task"` starts
+one, `←` in an interactive session backgrounds the current one, and the agent
+view (`claude agents`) lists and attaches them (`claude attach <short-id>`,
+`claude logs`, `claude stop`, `claude rm`). Such a session's process runs under
+the daemon's pty host, parented to init. Its Bash tool still gets
+`CLAUDE_CODE_SESSION_ID` and `CLAUDE_PID`, but no `TMUX_PANE`, and no kitty
+window shows it -- only an agent-view TUI that happens to be attached, whose
+foreground process is `claude agents`, not the session.
+
+What that means here, and what was done about it:
+
+- **The live list knows them.** The Go adapter reads the session record like
+  any other, so a running background session is a live row; a finished one
+  has no pid and is dropped. The eighth column, `kind`, says `background`.
+  The record's `tmux` field only names where `claude --bg` was *typed*, which
+  is not where the conversation lives, so `tmuxOf` leaves the tmux column `-`
+  for a background session rather than falling back to it (`live.go`); the
+  shell fallback `h-claude-code-session-live-list-sh` does the same. Before
+  this, a session backgrounded from inside tmux was listed under a tmux
+  session it was not in, and `ffta` and the window resolver acted on it.
+- **`ffta` offers them with a 🔌 badge**, `bg:<session id>` in the caller
+  column instead of a tmux id, and picking one runs `claude attach` in the
+  current terminal through [agfi:h-claude-code-bg-attach], under the session's
+  own config home (the personal one means `CLAUDE_CONFIG_DIR` unset, which
+  `claude attach` needs to find the id). `agent_session_tmux_bg_p=n` hides
+  them. Pane discovery ([agfi:h-agent-session-tmux-panes]) still correctly
+  excludes them: there is no pane to type into.
+- **Resume refuses a running session.** [agfi:h-agent-session-resume-run]
+  now checks the live list and refuses to `--resume` a transcript whose
+  session is still running -- two writers on one file, and for a background
+  session a second, interactive copy in your pane while the original runs on
+  under the daemon. It names the attach command or the tmux session instead;
+  `agent_session_resume_force_p=y` goes ahead anyway. The import path had this
+  guard already ([agfi:h-agent-session-live-list-offerable]); resume did not.
+- **`/done` stops them properly.** [agfi:agent-done] recognises a background
+  session through [agfi:h-claude-code-bg-find] and ends it with `claude stop`,
+  which keeps the conversation attachable and resumable, rather than by
+  signal; and since there is no screen to leave the report on, it sends a
+  notification naming the report file. `agent-done-reports` lists it as usual.
+- **`claude-daemon-reap` counts them.** Its guard counted sessions by tty, and
+  a background session's is `??`; it now asks [agfi:h-claude-code-bg-list] too,
+  since `claude daemon stop` takes background sessions down for certain.
+- **Reaching one from outside** -- typing `Continue.` into it when a usage
+  limit resets -- is the `claude-bg:<id>` target in `agent-usage-armed.md`,
+  which attaches a scratch tmux session for the duration.
+
+Still open: kitty-window resolution for an agent-view window works only by
+title (strategy 3 above), which `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` defeats;
+and [agfi:agent-session-register] can record a background session's transcript
+against an agent-view window that lists several sessions, since the viewer
+counts as an agent process for its guard.
 
 ## Hooks, the registry, and trust
 

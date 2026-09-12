@@ -166,6 +166,21 @@ function h-fftmux-act {
         test -n "$i" || continue
 
         id="${i%%$'\t'*}"
+
+        #: A background session row ([agfi:h-agent-session-tmux-rows]) names
+        #: no tmux session: there is nothing to go to, only something to attach
+        #: to. The default engine attaches in this terminal; a caller's own
+        #: engine gets the `bg:<id>' token as is, and decides for itself.
+        if [[ "${id}" == bg:* ]] ; then
+            if test -n "$ftE[*]" ; then
+                reval-ec "${engine[@]}" "${id}"
+            else
+                ecgray "attaching to background session ${id#bg:}"
+                reval-ec h-claude-code-bg-attach "${id#bg:}"
+            fi
+            continue
+        fi
+
         name="$(tmux-session-name-of "${id}" 2>/dev/null)" || name="${id}"
 
         ecgray "acting on session ${name} (${id})"
