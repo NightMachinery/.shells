@@ -27,6 +27,14 @@
 ## `~/scripts`
 - If you ever need to edit anything here, read `~/scripts/AGENTS.md` first.
 
+## Skill Sources
+
+- `${NIGHTDIR}/configFiles/agent-skills/` — shared public skills.
+- `${nightNotes}/skills/` — private skills in the `notes-skills` repo.
+- `${HOME}/code/skills/` — standalone skill repositories.
+
+Edit these sources, not installed skill links.
+
 ## Svelte Guidelines
 
 - Skip running `npx @sveltejs/mcp svelte-autofixer`. It often hangs and gives useless output.

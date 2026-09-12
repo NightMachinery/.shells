@@ -34,6 +34,7 @@ and re-run the sync after changing a source. The launchers do that for you.
 Git-tracked, here:
 
 - =AGENTS.md= --- the shared spine. Every agent, every host.
+  Includes the three canonical skill-source locations (public, private, standalone).
 - =agent-claude.md=, =agent-codex.md=, =agent-antigravity.md=,
   =agent-claude-work.md= --- one agent, every
   host. The prefix is load-bearing: a bare =claude.md= is the same file as
