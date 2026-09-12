@@ -913,7 +913,23 @@ registered session's target; cancels it when nothing is registered."
         group_targets[${family:-_}]+=" ${f[4]}"
     done
 
-    local group targets
+    #: A job whose group has no member any more -- the one Fable session
+    #: switched to Opus, or was pruned -- would otherwise stay armed under the
+    #: old name and fire into a session that is not blocked by that window.
+    local -a expected stale
+    local job group
+    for group in "${(@k)group_targets}" ; do
+        [[ "${group}" == '_' ]] && group=''
+        expected+=( "$(h-agent-auto-continue-job-session "${scope}" "${group}")" )
+    done
+    for job in ${(f)"$(h-agent-auto-continue-tmux-sessions jobs "${scope}")"} ; do
+        (( ${expected[(Ie)${job}]} )) || stale+=( "${job}" )
+    done
+    if (( ${#stale} )) ; then
+        h-agent-usage-armed-cancel "${stale[@]}"
+    fi
+
+    local targets
     local -a words roles
     for group in "${(@k)group_targets}" ; do
         words=( ${=group_targets[${group}]} )
