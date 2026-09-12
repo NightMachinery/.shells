@@ -32,6 +32,9 @@ the linker preserves conflicting Codex links. Verify the old link target,
 replace only that known managed link, and run the linker again. Unrelated
 links and real files must be preserved.
 
+Standalone skill repositories live under `${HOME}/code/skills/`; this is a
+source location, not an additional automatic search root for this linker.
+
 All three agents converged on the same format — `<dir>/<name>/SKILL.md` with
 YAML frontmatter carrying `name` and `description`. In Codex CLI, invoke it as
 `$done` or select it through `/skills`; Claude Code uses `/done`.
