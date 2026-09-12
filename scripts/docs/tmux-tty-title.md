@@ -237,24 +237,26 @@ session name before trying it as a prefix.
 
 ## Codex titles and Termux toasts
 
-[agfi:codex-m] passes `-c 'tui.terminal_title=[]'` to preserve the static
-`⚡<directory>` title set by [agfi:h-agent-launch], while retaining animations
-inside the TUI. Codex accepts predefined title item identifiers, not literal
-emoji text; disabling its own title management retains the existing marker.
+[agfi:codex-m] passes `-c 'tui.terminal_title=["app-name","project-name"]'`
+to keep its terminal title static while retaining animations inside the TUI.
 Codex 0.154.0 otherwise animates its activity title every 100 ms, and its
 thread-name component can animate during name generation too. Termux 0.118.1
 shows a toast when a background session's title changes while the app is
 visible. Its `disable-terminal-session-change-toast` property only suppresses
 session-switch toasts, not these title-change toasts.
 
-The title uses the launch directory's basename, rather than Codex's project-name
-component, and preserves title-based kitty matching for the `⚡` marker.
-Activity and thread names remain available inside Codex. The bare [agfi:codex]
-wrapper is unchanged. User arguments follow this default, so another explicit
-`tui.terminal_title` list can restore native title components. On a fresh launch,
-`[]` leaves the inherited title alone; if selected after Codex has already
-managed the title, it clears that title without restoring the previous one.
+The resulting title identifies Codex and the project, replacing the launcher's
+`⚡<directory>` marker; title-based kitty matching for that marker therefore
+does not apply. Activity and thread names remain available inside Codex.
+The bare [agfi:codex] wrapper is unchanged. User arguments follow this default,
+so another explicit list can restore dynamic items.
 Already-running sessions are unaffected by this launcher change.
+
+Replacing only `app-name` with `⚡` is not supported by this setting in Codex
+0.154.0: `app-name` renders the hardcoded text `codex`, and the list accepts
+predefined item identifiers rather than literal text. `terminal_title=[]`
+preserves the launcher's emoji title, but also loses the native `project-name`
+component, so it is not an equivalent replacement and is not the default.
 
 Verified against the installed CLI's configuration parser and versioned source:
 [Codex title rendering](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/tui/src/chatwidget/status_surfaces.rs),
