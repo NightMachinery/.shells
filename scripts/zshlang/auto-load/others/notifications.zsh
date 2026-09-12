@@ -10,6 +10,29 @@ function notif-os-dismiss-all {
     fi
 }
 
+function notif-os-remove {
+    : "removes the undismissed desktop notification posted with notif_group=<group>"
+    #: The counterpart of the `-group' option [agfi:notif-os] passes: a source that
+    #: restates one fact (an agent waiting) can take the notification back once the
+    #: fact stops holding, instead of leaving it for the user to close by hand.
+    ##
+    local group="${1}"
+    test -n "$group" || return 1
+
+    if isServer ; then
+        return 0
+    fi
+
+    if isDarwin ; then
+        ensure-cmd terminal-notifier @RET
+        #: Exits 0 whether or not anything was showing, which is what a "make sure
+        #: it is gone" caller wants.
+        terminal-notifier -remove "$group" >/dev/null
+    else
+        @NA
+    fi
+}
+
 function notif-os {
     local title="$1" msg="$2"
     #: On by default: a notification raised by our own code is almost always worth

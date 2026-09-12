@@ -510,10 +510,16 @@ typeset -g bell_notif_queue_key='bell_notif_pending'
 typeset -g bell_notif_since_key='bell_notif_since'
 
 function h-bell-notif-enqueue {
-    local msg="${1}"
+    : "queues <msg> for the Telegram escalation, tagged with [group]
+
+Entries are stored as '<group>TAB<msg>' so that [agfi:h-bell-notif-remove] can take
+back one session's line once that session has been answered; an empty group is a
+leading tab. [agfi:h-bell-notif-drain] strips the tag again."
+    ##
+    local msg="${1}" group="${2}"
     test -z "$msg" && return 1
 
-    silent redism rpush "$bell_notif_queue_key" "$msg" || return 1
+    silent redism rpush "$bell_notif_queue_key" "${group}"$'\t'"${msg}" || return 1
     #: setnx, so the anchor stays on the OLDEST unsent message.
     silent redism setnx "$bell_notif_since_key" "$EPOCHSECONDS" || true
 }
@@ -524,12 +530,42 @@ function h-bell-notif-since {
 }
 
 function h-bell-notif-drain {
-    : "outputs every queued message, oldest first, and empties the queue"
+    : "outputs every queued message, oldest first, without its group tag, and empties the queue"
     local out
     out="$(redism lrange "$bell_notif_queue_key" 0 -1)" || return 1
 
     h-bell-notif-clear
-    ec "$out"
+
+    local -a lines
+    lines=( "${(@f)out}" )
+    #: Everything up to the first tab is the tag. Entries queued before tagging
+    #: existed have no tab and pass through whole.
+    ec "${(F)lines[@]#*$'\t'}"
+}
+
+function h-bell-notif-remove {
+    : "drops every queued message tagged with <group>; see [agfi:h-bell-notif-enqueue]"
+    ##
+    local group="${1}"
+    test -n "$group" || return 1
+
+    local out
+    out="$(redism lrange "$bell_notif_queue_key" 0 -1)" || return 1
+    test -n "$out" || return 0
+
+    local entry
+    for entry in "${(@f)out}" ; do
+        if [[ "${entry%%$'\t'*}" == "$group" ]] ; then
+            #: count 0: every copy of this exact entry, not just the first.
+            silent redism lrem "$bell_notif_queue_key" 0 "$entry" || true
+        fi
+    done
+
+    #: With the queue empty, the anchor must go too, so the next message
+    #: re-anchors the deadline on itself rather than on a line that was taken back.
+    if (( $(redism llen "$bell_notif_queue_key" 2>/dev/null || ec 0) == 0 )) ; then
+        h-bell-notif-clear
+    fi
 }
 
 function h-bell-notif-clear {
@@ -578,7 +614,10 @@ back, and stage 4 escalates to Telegram if they never do."
     fi
     bool "$tlg" || return 0
 
-    h-bell-notif-enqueue "$msg" || return 0
+    #: Tagged with the caller's `bell_auto_notif_group' so that answering the
+    #: session takes its line back before the batch goes out
+    #: ([agfi:h-bell-agent-ack]). Empty for callers that have no such fact.
+    h-bell-notif-enqueue "$msg" "${bell_auto_notif_group}" || return 0
 
     #: Stage 3. Silent watch: did they come back after we gave up ringing?
     #:
@@ -1418,10 +1457,11 @@ Code's Notification but not its Stop), hence the fallback."
         input="$(gtimeout 2 cat)" || input=''
     fi
 
-    local msg='' cwd=''
+    local msg='' cwd='' id=''
     if test -n "$input" ; then
         msg="$(ec "$input" | jq -r '.message // empty' 2>/dev/null)" || msg=''
         cwd="$(ec "$input" | jq -r '.cwd // empty' 2>/dev/null)" || cwd=''
+        id="$(h-bell-agent-payload-id "$input")" || id=''
     fi
 
     #: The project name matters when several sessions are waiting at once, so it goes
@@ -1440,18 +1480,78 @@ Code's Notification but not its Stop), hence the fallback."
     local icon
     icon="$(silence app-icon-get "$app")" || icon=''
 
-    #: "This session is waiting" is one fact per session, so repeats replace the
-    #: previous undismissed notification rather than piling up. Keyed per
-    #: app+project: coarser (per app) and a new project's wait would overwrite
-    #: another project's still-pending one, losing exactly the information the
-    #: tag above exists to carry. Sessions without a cwd share the app's key.
-    #: See the Notifications section of ./docs/bell-auto.md.
-    local group="agent-${app}"
-    test -n "$cwd" && group+="-${cwd:t}"
+    local group
+    group="$(h-bell-agent-group "$app" "$cwd" "$id")"
 
-    bell_auto_sleep=10 bell_auto_notif_msg="$msg" notif_ignore_dnd_p=y notif_image="$icon" \
-        notif_group="$group" \
+    bell_auto_sleep=10 bell_auto_notif_msg="$msg" bell_auto_notif_group="$group" \
+        notif_ignore_dnd_p=y notif_image="$icon" notif_group="$group" \
         awaysh bell-auto "$engine"
+}
+
+function h-bell-agent-payload-id {
+    : "the session id an agent's hook payload is about, whichever agent wrote it"
+    #: Claude Code and Codex say `session_id', Antigravity `conversationId'.
+    ##
+    local input="${1}"
+    test -n "$input" || return 1
+
+    ec "$input" | jq -r '.session_id // .thread_id // .conversationId // empty' 2>/dev/null
+}
+
+function h-bell-agent-group {
+    : "the notif_group key for one waiting agent session: h-bell-agent-group <app> <cwd> <id>"
+    #: "This session is waiting" is one fact per session, so repeats replace the
+    #: previous undismissed notification rather than piling up, and answering the
+    #: session takes it back ([agfi:h-bell-agent-ack]). Keyed per session when the
+    #: payload names one; a coarser key would make a prompt in one session dismiss
+    #: another's still-valid notification. Without an id, per app+project: per app
+    #: alone, a new project's wait would overwrite another project's still-pending
+    #: one, losing exactly the information the [project] tag exists to carry.
+    #: See the Notifications section of ./docs/bell-auto.md.
+    ##
+    local app="${1}" cwd="${2}" id="${3}"
+
+    local group="agent-${app}"
+    if test -n "$id" ; then
+        group+="-${id}"
+    elif test -n "$cwd" ; then
+        group+="-${cwd:t}"
+    fi
+
+    ec "$group"
+}
+
+function h-bell-agent-ack {
+    : "hook body for the agent's prompt-submitted event: takes back this session's stored notifications
+
+The user answering the session is proof they saw it, so the desktop notification and
+the not-yet-sent Telegram line both go. A Telegram batch that already went out stays.
+Payload in \$2 or on stdin, as with [agfi:h-bell-agent-hook]. Silent throughout."
+    ##
+    local app="${1}"
+    test -n "$app" || return 0
+
+    local input
+    input="$(h-agent-hook-payload "${2}")"
+    test -n "$input" || return 0
+
+    local cwd id
+    cwd="$(ec "$input" | jq -r '.cwd // empty' 2>/dev/null)" || cwd=''
+    id="$(h-bell-agent-payload-id "$input")" || id=''
+
+    local group
+    group="$(h-bell-agent-group "$app" "$cwd" "$id")"
+
+    silent notif-os-remove "$group" || true
+    silent h-bell-notif-remove "$group" || true
+}
+##
+function bell-claude-ack {
+    h-bell-agent-ack Claude "$@"
+}
+
+function bell-codex-ack {
+    h-bell-agent-ack Codex "$@"
 }
 ##
 function h-bell-codex {

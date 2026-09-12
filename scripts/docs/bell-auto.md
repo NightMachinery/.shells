@@ -89,7 +89,13 @@ drip of bells cannot postpone the batch forever.
 `bellaok` (`bell-auto-stop`) resets both nonces and clears the queue: telling the
 machine to be quiet should not resurface later as a phone notification.
 
-Inspect the queue with `bell-notif-pending`.
+Each entry is stored as `<group>TAB<message>`, the group being the caller's
+`bell_auto_notif_group` (empty for callers that have none, so a leading tab). The tag
+is what lets one session's line be taken back before the batch goes out
+(`h-bell-notif-remove`, see "Answering the session" below); the drain strips it, so
+the Telegram text and the duplicate-collapsing are unchanged.
+
+Inspect the queue with `bell-notif-pending`, which shows the raw tagged entries.
 
 ## Agent hooks
 
@@ -115,17 +121,50 @@ cannot wedge the agent's hook.
 ### One notification per waiting session
 
 Agent hooks fire repeatedly — every permission prompt, every stop — and each firing
-used to leave another notification behind. They now pass a `notif_group` of
-`agent-<app>-<project>`, and `notif-os` forwards it as `terminal-notifier -group`:
+used to leave another notification behind. They now pass a `notif_group` built by
+`h-bell-agent-group`, and `notif-os` forwards it as `terminal-notifier -group`:
 posting removes the previous undismissed notification of the same group first, so
 repeats *update* the one notification instead of piling up.
 
-The key is per app+project, not per app, because a new project's wait would
-otherwise overwrite another project's still-pending one — exactly the information
-the `[project]` tag exists to carry. Sessions without a `cwd` share the app's key.
+The key is `agent-<app>-<session id>` when the payload names a session (every
+Claude Code payload does), so that answering one session cannot dismiss another's
+still-valid notification — two waiting sessions of the same project are two facts
+and get two notifications. Without an id it falls back to `agent-<app>-<project>`,
+not just `agent-<app>`, because a new project's wait would otherwise overwrite
+another project's still-pending one — exactly the information the `[project]` tag
+exists to carry. Payloads with neither share the app's key.
 
 `notif_group` is a general `notif-os` knob; anything else that restates one fact can
 set it. Empty (the default) posts an ordinary ungrouped notification.
+
+### Answering the session cancels its notifications
+
+A prompt submitted to a session is proof that you saw its notification, so Claude
+Code's `UserPromptSubmit` hook runs `bell-claude-ack` (`h-bell-agent-ack`), which
+rebuilds the same group key from the payload and takes back what that session left
+behind:
+
+- the desktop notification, via `notif-os-remove` (`terminal-notifier -remove`);
+- its line in the Telegram queue, via `h-bell-notif-remove`. If that empties the
+  queue the deadline anchor goes too, so the next message re-anchors on itself
+  rather than on a line that was taken back.
+
+What it does not do:
+
+- Retract a Telegram batch that already went out. `tsend` returns no message id
+  and the batch mixes several sessions' lines; if this ever matters, `tsend` needs
+  id output and an edit command first.
+- Stop the bell. Stage 1 already exits on any user activity, and a prompt is one.
+- Fire on a permission *approval*. Answering a permission prompt is not a prompt
+  submission, so a "needs your permission" notification stays until the next `Stop`
+  replaces it (same group) or the next prompt removes it.
+
+The text typed by the armed `Continue.` engine (`docs/agent-usage-armed.md`) is a
+prompt submission too, which is right: the session is being worked on either way.
+
+Codex's bell is not wired in the tracked configs, so it has no ack line either;
+`bell-codex-ack` exists for when it is, and `h-bell-agent-ack` reads whichever id
+field the agent's payload carries.
 
 ### Making them persist until dismissed
 
