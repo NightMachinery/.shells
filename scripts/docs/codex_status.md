@@ -34,16 +34,75 @@ the section header, marks the snapshot matching `~/.codex/auth.json` with an
 bytes do not already match one of the `auth_<alias>.json` snapshots; when it is
 byte-identical to an alias snapshot, that alias source already represents it and
 the bare file is skipped to avoid a duplicate check. After the per-auth
-details, it prints average primary and secondary usage across successful auths
-that returned numeric usage values. The active auth is printed last in
-human-readable status lists. JSON `--all` output includes the same aggregate
-under `averageUsage`. When no checked auth has usable quota available, the
-aggregate also includes `First Time to Reset`: the earliest 5-hour reset for
-auths with weekly credit remaining, or the earliest weekly reset for auths
-without weekly credit remaining. Human-readable output shows the auth alias
-that will reset first, for example:
+details, it prints average usage per window duration across successful auths
+that returned numeric usage values, plus a `Usable auths: N/M` count. The
+active auth is printed last in human-readable status lists. JSON `--all`
+output includes the same aggregate under `averageUsage`. When no checked auth
+has usable quota available, the aggregate also includes `First Time to Reset`:
+the earliest such auth's own deadline, which is the latest reset among the
+windows blocking it. Human-readable output shows the auth alias that will reset
+first, for example:
 
 `First Time to Reset: some_alias in 2h 20m (2026-05-07 19:41:54 +0330)`
+
+## Usage windows
+
+How many usage windows a plan reports is not fixed, and neither is which slot
+holds which. The response has a `primary` and a `secondary` slot per limit, but
+on the `prolite` plan -- the $100 tier, whose plan string is reported and passed
+through verbatim, never remapped -- `primary` is the *weekly* window and
+`secondary` is `null`. Older plans report a 5-hour `primary` and a weekly
+`secondary`.
+
+So nothing keys off the slot names. Each window is labelled by its own
+`windowDurationMins` (`5h`, `Weekly`, `Daily`, `30m`), only the windows a plan
+actually reports are printed, and an auth reporting no windows at all is treated
+as unconstrained rather than exhausted.
+
+An auth counts as blocked when a window it reports is at or above `--full-pct`
+(default 100), or when the response sets one of the explicit signals:
+`ordinaryUsageAllowed: false`, `spendControlReached: true`, or a non-null
+`rateLimitReachedType`. The signals are trusted over the percentages, which can
+be absent or round below 100.
+
+A blocked auth's deadline is the **latest** reset among its blocked windows, not
+the earliest: a 5-hour window rolling over buys nothing while the weekly window
+is still spent.
+
+`--full-pct` lowers the threshold at which a window counts as spent. It is the
+supported way to exercise the blocked/exhausted paths without running an account
+dry, and it shares the `codex_status_arm_full_pct` environment variable with the
+zsh arms so both agree on what "spent" means.
+
+The interpretation lives in `python/libs/codex_rate_limits.py`, shared with
+`python/codex_loop.py` so the two cannot drift apart.
+
+## Per-model-family limits
+
+`rateLimitsByLimitId` reports a limit per model family, each with its own
+windows -- for example `codex` (the default) alongside `codex_bengalfox`
+(GPT-5.3-Codex-Spark). Only the default `codex` limit decides whether an auth is
+usable: exhausting a per-model budget blocks that model, not ordinary work, so
+letting it gate `swap` would strand a perfectly usable account.
+
+Extra families are printed only when they are not idle -- any window above 0%,
+or blocked -- so the common single-account report stays short. `--limits REGEX`
+matches a family by id or name (case-insensitive) and shows it regardless;
+`--no-show-limits` hides the non-idle ones too.
+
+## Reset credits
+
+`rateLimitResetCredits` carries one-off "Full reset" grants that end a wait
+early. The report prints the available count, the grant titles and the soonest
+expiry; `--no-reset-credits` hides the line. Nothing here redeems one -- spending
+a one-off grant is the user's call.
+
+## Replaying a saved report
+
+`--from-json FILE` (or `-` for stdin) rebuilds the report from a saved `--json`
+document instead of starting `codex app-server`. Combined with `--full-pct`, or
+with a hand-edited payload, it is how the blocked, signal-only and
+multiple-window paths get exercised offline and deterministically.
 
 ## Progress
 
@@ -60,7 +119,8 @@ so piped/redirected output stays clean.
 
 The color/theme layer (and a few generic env/format helpers) lives in
 `python/libs/common_sub_status.py`, shared with `claude_code_usage.py` (see
-`docs/claude_code_usage.md`).
+`docs/claude_code_usage.md`). The rate-limit *data* helpers live separately in
+`python/libs/codex_rate_limits.py`, shared with `python/codex_loop.py`.
 
 Human-readable output supports `--color {auto,always,never}`. When color is
 enabled, `--true-color {on,off,auto}` controls RGB color output; `auto` detects
@@ -77,11 +137,11 @@ Select them with `--dark-theme NAME` and `--light-theme NAME`.
 `python/codex_status.py swap` checks every `~/.codex/auth*.json` snapshot and
 replaces `~/.codex/auth.json` with the best eligible auth.
 
-Selection prioritizes the auth with the lowest weekly usage
-(`secondary.usedPercent`). Auths with exhausted 5-hour usage
-(`primary.usedPercent >= 100`) or exhausted weekly usage
-(`secondary.usedPercent >= 100`) are not eligible. If no auth has usable quota
-remaining, `swap` exits nonzero and leaves `auth.json` unchanged.
+Selection prioritizes the auth with the lowest usage in its **longest** window
+-- the budget that takes longest to come back -- breaking ties on the shortest
+window. Auths that are blocked, by the rule in "Usage windows" above, are not
+eligible. If no auth has usable quota remaining, `swap` exits nonzero and leaves
+`auth.json` unchanged.
 
 Use `--dry-run` to inspect the selected auth without replacing `auth.json`.
 Use `--json` to print the selected alias/path, previous active alias when
@@ -113,9 +173,10 @@ section is what is Codex's: the deadline, and the delivery.
 - `codex-status-armed-cancel` and `codex-status-armed-status` are wrappers
   over the shared `h-agent-usage-armed-cancel` / `-status` for Codex's one
   session, `codex-status-armed`.
-- `h-codex-status-arm-auth <session> <alias>` arms for *one* auth's reset,
-  reading that auth's own primary and secondary windows and taking the latest
-  reset among those at or above `codex_status_arm_full_pct`. It exists for the
+- `h-codex-status-arm-auth <session> <alias>` arms for *one* auth's reset. It
+  reads the script's own `.quota` verdict -- passing `codex_status_arm_full_pct`
+  through as `--full-pct` -- rather than re-deriving which windows are spent in
+  jq, so that rule lives in one place. It exists for the
   `/auto-continue` watcher (`docs/agent-auto-continue.md`): a running thread
   is signed in to one auth and cannot `swap`, so "every auth exhausted" is the
   wrong question for it. `h-codex-status-active-alias` names the auth the
@@ -128,10 +189,18 @@ arming": if another auth still has room, the right move is `swap`, not
 waiting, and arming a notifier would only tell you hours later what the report
 is telling you now. The report's `First Time to Reset` line already names the
 alias that frees up first, and the notification repeats it, so when the job
-fires you know which auth to swap to. Under `deus` the job arms for the
-earliest primary (5-hour) reset across the auth files instead, whether or not
-anything is exhausted, which is how to exercise the mechanism without first
-running every account dry.
+fires you know which auth to swap to.
+
+Under `deus` the job arms for the earliest reset the auth files report anywhere
+instead, whether or not anything is exhausted. Per-model families count towards
+that earliest reset, and only there: the real arm ignores them, but an idle
+family is exactly the one with a rollover soon, which is what makes `deus`
+useful for exercising the mechanism. Setting `codex_status_arm_full_pct` low is
+the other way in, and the more direct one -- it makes a healthy auth read as
+blocked, so the ordinary path arms for the real deadline.
+
+Both arms also note when a reset credit is available, so a multi-day wait comes
+with the reminder that it can be skipped.
 
 Delivery is `codex queue --thread <id> --message`, and only that: Codex
 accepts a message for a thread by name, so the resume needs no kitty window,

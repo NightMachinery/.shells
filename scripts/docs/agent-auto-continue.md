@@ -152,9 +152,11 @@ the scope's own deadline source:
   `weekly_all` window arms every group; a blocked Fable window arms only the
   Fable sessions. A family with no such window is skipped by the role lookup
   and costs a gray line.
-- Codex: [agfi:h-codex-status-arm-auth], which reads *that auth's* primary
-  and secondary windows from `codex-status --json` and takes the latest reset
-  among those at or above `codex_status_arm_full_pct`. This is not
+- Codex: [agfi:h-codex-status-arm-auth], which reads *that auth's* `.quota`
+  verdict from `codex-status --json`, run with `codex_status_arm_full_pct`
+  passed through as `--full-pct`. The deadline is the latest reset among the
+  windows blocking that auth, whatever windows its plan reports -- see
+  `docs/codex_status.md`. This is not
   [agfi:h-codex-status-arm], which waits for *every* auth to be exhausted
   because a person can `swap`; a running thread cannot, and is blocked until
   the auth it holds resets.
