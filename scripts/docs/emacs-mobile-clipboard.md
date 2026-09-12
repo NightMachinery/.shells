@@ -43,6 +43,36 @@ clipboard over SSH; see [remote Termux clipboard reads](remote-termux-clipboard.
 SSH avoids the OSC transport limit but still depends on Termux:API and Android
 clipboard access. It is independent of the Emacs copy reachability cache.
 
+`emc-tealy` and `emc-tealy-tmux` also read the phone clipboard over SSH for
+ordinary Emacs yanks and paste commands that use `current-kill`. Each paste
+fetches fresh UTF-8 text using `termux-clipboard-get`; clipboard contents are
+not cached. This is selected per frame, so desktop and plain `emc-mobile`
+frames keep their existing paste behavior. Kill-ring rotation still uses the
+Emacs kill ring.
+
+Automatic SSH paste also requires `night/ssh-paste-enabled-p` (default `t`).
+`M-x night/ssh-paste-toggle` enables or disables it across the current daemon,
+independently of frame markers. Disabling it restores the frame's previous
+paste behavior; it does not change copy routing. Set the variable to `nil` in
+your configuration to start with automatic reads disabled.
+
+For a deliberate one-off read, `M-x night/ssh-paste` inserts the clipboard from
+the selected frame's `night/clipboard-ssh-host`; `M-x night/tealy-paste` explicitly
+reads from the `tealy` SSH alias in any frame. Both bypass the automatic-paste
+toggle. The frame parameter `night/clipboard-ssh-paste-command` optionally
+overrides the remote command used by frame-based reads, defaulting to
+`termux-clipboard-get`. This is trusted shell-command configuration, not
+clipboard data; no address or credentials need to be embedded in it.
+
+Pasting waits for the SSH read (and any queued copy to that host), with the
+overall `night/mobile-clipboard-ssh-timeout` deadline, 15 seconds by default.
+`C-g` cancels the wait. SSH authentication and host trust must already work
+non-interactively. An unavailable phone or failed read reports an error rather
+than falling back to the daemon host's clipboard. The read does not consult or
+update the copy-readiness cache; a working clipboard setter does not prove that
+Android permits clipboard reads. Keep Termux foregrounded if Android restricts
+background access. Termux's Paste action remains the lowest-latency option.
+
 `emc-tealy` is the large-copy variant. Copies up to the OSC limit still use OSC
 52. Larger copies are piped over authenticated SSH to the host alias `tealy` and
 into `termux-clipboard-set`; the text is not placed in command-line arguments.
