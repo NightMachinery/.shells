@@ -418,6 +418,22 @@ work is actually finished. --dry-run writes the report and kills nothing."
     local pid=''
     pid="$(h-agent-done-pid "${agent}" 2>/dev/null)" || pid=''
 
+    #: A background Claude Code session (`claude --bg', or one backgrounded
+    #: from the agent view) runs under the daemon's pty host: no pane, no tty,
+    #: and a pid that belongs to the daemon's bookkeeping. It is ended with
+    #: `claude stop', which keeps the conversation resumable, rather than by
+    #: signal; and since there is no screen to leave the report on, the report
+    #: is announced with a notification instead. See =docs/agent-sessions.md=,
+    #: "Background sessions".
+    local bg_home='' bg_short=''
+    if [[ "${agent}" == claude ]] && test -n "${id}" && (( ${+functions[h-claude-code-bg-find]} )) ; then
+        local bg_row
+        if bg_row="$(h-claude-code-bg-find "${id}" 2>/dev/null)" && test -n "${bg_row}" ; then
+            bg_home="${bg_row%%$'\t'*}"
+            bg_short="${${bg_row#*$'\t'}%%$'\t'*}"
+        fi
+    fi
+
     local pane="${TMUX_PANE}" tty="${agent_done_tty}" cwd="${agent_done_cwd}"
     if test -n "${pane}" ; then
         #: The pane's own tty and directory, not this shell's. The shell an
@@ -471,7 +487,11 @@ work is actually finished. --dry-run writes the report and kills nothing."
 
     if bool "${dry_p}" ; then
         ec "would end: ${agent}${name:+ (${name})}${id:+ ${id}}"
-        ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>}"
+        if test -n "${bg_short}" ; then
+            ec "would stop the background session ${bg_short} with \`claude stop' and notify; report: ${report}"
+        else
+            ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>}"
+        fi
         ec "would forget this session's /auto-continue registration, if it has one"
         ec "report: ${report}"
         ec "pane script (prefix-r resumes): ${script}"
@@ -488,6 +508,18 @@ work is actually finished. --dry-run writes the report and kills nothing."
         if [[ "${forgot}" == 'auto-continue off'* ]] ; then
             ecgray "$0: ${forgot}"
         fi
+    fi
+
+    if test -n "${bg_short}" ; then
+        #: Announced first, then stopped: the stop takes this shell with it.
+        local glyph label
+        glyph="$(h-agent-field "${agent}" glyph 2>/dev/null)" || glyph=''
+        label="$(h-agent-field "${agent}" label 2>/dev/null)" || label="${agent}"
+        notif_group='agent-done' notif "${glyph} ${label} background session finished${name:+: ${name}} -- report: ${report/#${HOME}/~}" >/dev/null 2>&1 || true
+
+        ec "ending background ${agent}${name:+ (${name})} ${bg_short}; report: ${report}"
+        h-claude-code-bg-home-run "${bg_home}" stop "${bg_short}" >/dev/null 2>&1 || true
+        return 0
     fi
 
     if test -z "${pid}" && test -z "${pane}" ; then

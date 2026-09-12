@@ -65,6 +65,14 @@ and arrange for the report to appear once it is gone.
 `--dry-run` does everything except the killing and prints what it resolved,
 which is how the whole path is testable without ending a session.
 
+A background Claude Code session -- `claude --bg`, or one backgrounded from the
+agent view -- has no pane and no tty to leave the report on, and its pid belongs
+to the daemon's pty host. `agent-done` recognises one through
+[agfi:h-claude-code-bg-find], ends it with `claude stop` (which keeps the
+conversation attachable and resumable) instead of a signal, and announces the
+report file with a notification; `agent-done-reports` lists it as usual. See
+"Background sessions" in `agent-sessions.md`.
+
 A session ending this way is finished, so `agent-done` also forgets its
 `/auto-continue` registration ([agfi:agent-auto-continue-off]), if it has one:
 a finished session must not be typed into at the next usage-limit reset because
