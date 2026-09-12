@@ -112,6 +112,17 @@ A target is one of four kinds, and the kind decides how the text is delivered:
   Codex accepts a message for a thread by name, so this path needs no window,
   no focus and no awake display, and it cannot land in the wrong place. Both
   pickers prefer it whenever the chosen session is a Codex one.
+- `claude-bg:<session-id>` -- a Claude Code session started with `claude
+  --bg`, or backgrounded from the agent view (`claude agents`). It runs under
+  a pty host with no terminal of its own, so there is no pane or window to
+  type into, and Claude Code offers nothing that delivers a message by id.
+  What it does offer is `claude attach <id>`, which opens the session's
+  prompt in whatever terminal runs it. `h-claude-code-bg-send-text` makes
+  that terminal a scratch tmux session under the session's own config home,
+  waits for the prompt marker, types through `tmux-pane-send-text`, sends
+  Ctrl+Z (attach's own way back to the shell) and kills the scratch session;
+  the background session runs on regardless. It refuses when `claude agents
+  --json` no longer lists the session as a running background one.
 - `frontmost` -- typed wherever the keyboard focus happens to be, through
   `hs-type-continue`, a global synthetic keystroke with no window targeting.
   It first wakes the display via `hs.caffeinate.declareUserActivity()` and

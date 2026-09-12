@@ -96,6 +96,15 @@ order of how little each needs:
   [agfi:h-agent-session-tmux-panes] lists that pane as holding a live agent
   session. The pane *id*, not the session name, because the autoname hooks
   rename sessions and a pane is not renamed. Needs no window manager.
+- A background Claude Code session: `claude-bg:<session-id>`, when
+  [agfi:h-claude-code-bg-find] lists the id as a running background session in
+  some config home. Such a session -- `claude --bg`, or one backgrounded from
+  the agent view that `claude agents` opens -- has no terminal of its own, so
+  its shell has no `TMUX_PANE` and no kitty window shows it, only the agent
+  view that happens to be attached. Delivery attaches a scratch terminal for
+  the duration; see `claude-bg` under "Targets" in `agent-usage-armed.md`.
+  This is the case that first failed: a session driven from the agent view in
+  a tmux pane reported "not inside tmux; no kitty window shows this session".
 - A kitty window: `kitty:<window-id>`, the row in
   [agfi:h-agent-session-live-pairs] whose transcript is this session's. Needs
   kitty's remote control socket.

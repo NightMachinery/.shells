@@ -433,6 +433,16 @@ function h-agent-auto-continue-targets {
 
     local -a tried
     local rows
+
+    #: A Claude Code session started with `claude --bg', or backgrounded from
+    #: the agent view, runs under a pty host with no terminal of its own: its
+    #: shell has no TMUX_PANE and no kitty window shows it, only the agent view
+    #: that happens to be attached. It is reached by attaching one
+    #: ([agfi:h-claude-code-bg-send-text]).
+    if [[ "${agent}" == claude ]] && h-claude-code-bg-find "${id}" >/dev/null 2>&1 ; then
+        ec "claude-bg:${id}"
+        return 0
+    fi
     if test -n "${TMUX_PANE}" ; then
         #: The pane is ours by construction -- this shell runs inside it --
         #: but it must hold a *live agent* for the engine to type into it
