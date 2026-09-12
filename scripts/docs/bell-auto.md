@@ -103,13 +103,44 @@ Inspect the queue with `bell-notif-pending`, which shows the raw tagged entries.
 hook payload as JSON — from `$1`, or from stdin — and builds the message from it.
 
 Claude Code's `Notification` event carries a real `message`; its `Stop` event does
-not, so that falls back to `Claude awaits!`. The `cwd` becomes a `[project]` tag,
-which is what tells two waiting sessions apart.
+not, so that falls back to `Claude awaits!`. The `cwd` becomes a `[project]` tag.
+When a thread name is available, the tag becomes `[project · thread name]`, so
+two named sessions in the same project remain distinguishable. With a name but
+no project, it is `[thread name]`.
 
 Both the agent name and the tag go in the prefix — `Claude [scripts]: needs your
 permission to use Bash` — so a batched Telegram is scannable down its left edge. The
 fallback already starts with the agent name, so it takes only the tag:
 `Claude awaits! [scripts]`.
+
+Named examples:
+
+- `Claude [scripts · Fix terminal titles]: needs your permission`
+- `Claude awaits! [scripts · Fix terminal titles]`
+- `Codex awaits! [scripts · Fix terminal titles]`
+
+[agfi:h-bell-agent-name] reads Claude's exact `transcript_path` through
+`agent_session claude name`, preserving display text instead of sanitizing it as a
+filename. Codex uses [agfi:codex-thread-name] for the payload's ID in
+`$CODEX_HOME/session_index.jsonl` (default `~/.codex`). The last matching index
+record wins, including an empty, null, or missing name that clears an older name.
+No other profiles or active sessions are searched. When forwarding through a
+persistent shell, callers using another Codex profile must also forward its
+`CODEX_HOME`; the thread ID alone does not identify a configuration home.
+
+The entire name lookup has a separate two-second `gtimeout` budget. Missing
+tools, unreadable data, lookup failures, or timeouts leave the original message
+format intact; hooks never install dependencies. Invalid JSON falls back to the
+agent's default message. Names are collapsed to one line, stripped of control
+characters, and limited to 120 Unicode characters including a final `…` when cut.
+Spaces, punctuation, emoji, and shell metacharacters remain display text.
+
+The enriched message is built once before `bell-auto`, so desktop and Telegram
+use the same text (Telegram retains its existing batch/hostname wrapper). Names
+do not affect sounds, escalation timing, or grouping. Already queued messages
+retain the text captured when queued. Reload BrishGarden with `brishz-restart`
+after updating the hooks; subsequent events use the new format. No Antigravity
+notification hooks are added.
 
 For the payload to arrive, the hook in `~/.claude/settings.json` must forward stdin:
 
@@ -127,8 +158,11 @@ posting removes the previous undismissed notification of the same group first, s
 repeats *update* the one notification instead of piling up.
 
 The key is `agent-<app>-<session id>` when the payload names a session (every
-Claude Code payload does), so that answering one session cannot dismiss another's
-still-valid notification — two waiting sessions of the same project are two facts
+Claude Code payload does). Accepted ID fields are `session_id`, `thread_id`,
+`thread-id`, and `conversationId`, in that order. Names never enter the key, so
+renaming a session does not change what acknowledgement removes. Answering one
+session cannot dismiss another's still-valid notification — two waiting sessions
+of the same project are two facts
 and get two notifications. Without an id it falls back to `agent-<app>-<project>`,
 not just `agent-<app>`, because a new project's wait would otherwise overwrite
 another project's still-pending one — exactly the information the `[project]` tag
@@ -278,3 +312,14 @@ nothing about what the garden is running.
 
 The Telegram escalation is time-bounded with `reval-timeout` rather than `gtimeout`,
 because `tnotif` is a zsh function and an external timeout binary cannot run one.
+
+## Verification
+
+Run `zsh -ic 'source "$NIGHTDIR/zshlang/tests/bell-agent-names.zsh"'` for synthetic
+transcripts and session indexes. The regression test stubs sound, desktop,
+Telegram, queue storage, and acknowledgement transports inside a subshell; it
+sends no real notifications and does not touch the live queue. It covers name
+updates/clears, profile isolation, malformed payloads, Unicode and metacharacters,
+missing tools, lookup failures/timeouts, matching transport text, and stable
+acknowledgement groups. After reloading BrishGarden, the same file can be sourced
+through `brishz` to check the definitions held by its persistent shell.
