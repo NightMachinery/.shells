@@ -88,9 +88,12 @@ function claude-code-p {
 
 function codex-p {
     #: Codex CLI exports CODEX_SANDBOX (e.g., "seatbelt") in its sandboxed shells.
-    #: @warn possibly not set when running with full access (no sandbox).
+    #: Unsandboxed shells still carry CODEX_THREAD_ID (or the older
+    #: CODEX_SESSION_ID). Like the other agent markers, these are inherited.
     ##
     test -n "${CODEX_SANDBOX}" ||
+        test -n "${CODEX_THREAD_ID}" ||
+        test -n "${CODEX_SESSION_ID}" ||
         [[ "${AI_AGENT}" == codex* ]]
 }
 
