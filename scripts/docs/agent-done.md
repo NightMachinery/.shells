@@ -19,6 +19,19 @@ symlinked into each agent's skills directory by [agfi:agent-skills-link]:
     ~/.agents/skills/done/SKILL.md
     ~/.gemini/config/skills/done/SKILL.md
 
+The linker also reads `<name>/SKILL.md` from `~/notes/skills`, the separate
+private `notes-skills` checkout. `note` lives there. A missing private checkout
+is skipped; public skills keep working. Set `agent_skills_notes_dir` to override
+that source, or to an empty string to disable it. `agent_skills_src_dir` still
+selects the public source. Link creation, the doctor, and legacy Codex pruning
+all use the same source discovery. Duplicate names across different sources
+are reported before linking anything, rather than silently overriding a skill.
+
+Moving a skill between sources requires updating its existing managed links:
+the linker preserves conflicting Codex links. Verify the old link target,
+replace only that known managed link, and run the linker again. Unrelated
+links and real files must be preserved.
+
 All three agents converged on the same format — `<dir>/<name>/SKILL.md` with
 YAML frontmatter carrying `name` and `description`. In Codex CLI, invoke it as
 `$done` or select it through `/skills`; Claude Code uses `/done`.
@@ -322,5 +335,7 @@ All dynamically scoped, all read with [agfi:bool] where they are boolean:
 - `agent_skills_link_verbose_p` — say which links were made.
 - `agent_skills_src_dir`, `agy_config_dir` — where the tracked skills are, and
   where Antigravity's configuration is.
+- `agent_skills_notes_dir` — private skills source; defaults to `~/notes/skills`.
+  An explicitly empty value disables it.
 - `agent_skills_codex_dir` — override the shared Codex user-skills directory;
   defaults to `~/.agents/skills`, not `CODEX_HOME/skills`.
