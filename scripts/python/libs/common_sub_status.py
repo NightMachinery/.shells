@@ -149,6 +149,10 @@ class Style:
             return self._wrap(text, "31")
         return self._rgb(text, self.theme.error, "31")
 
+    def inverse(self, text: str) -> str:
+        #: Reverse video, for the one state that has to beat red.
+        return self._wrap(text, "7")
+
     def dim(self, text: str) -> str:
         if self.theme is None or not self.true_color:
             return self._wrap(text, "2")

@@ -35,7 +35,10 @@ bytes do not already match one of the `auth_<alias>.json` snapshots; when it is
 byte-identical to an alias snapshot, that alias source already represents it and
 the bare file is skipped to avoid a duplicate check. After the per-auth
 details, it prints average usage per window duration across successful auths
-that returned numeric usage values, plus a `Usable auths: N/M` count. The
+that returned numeric usage values, plus a `Usable auths: N/M` count. That block
+is skipped when only one auth was checked, where an average would just be that
+auth's own numbers a second time; JSON keeps `averageUsage` either way, since
+the arms read `firstTimeToReset` out of it whether there is one auth or ten. The
 active auth is printed last in human-readable status lists. JSON `--all`
 output includes the same aggregate under `averageUsage`. When no checked auth
 has usable quota available, the aggregate also includes `First Time to Reset`:
@@ -96,6 +99,15 @@ matches a family by id or name (case-insensitive) and shows it regardless;
 early. The report prints the available count, the grant titles and the soonest
 expiry; `--no-reset-credits` hides the line. Nothing here redeems one -- spending
 a one-off grant is the user's call.
+
+The expiry is left uncoloured until a fortnight out, then escalates, bold at
+every coloured step: warn/orange from 14 days, error/red from 7, and reverse
+video over red from 3 -- including anything already expired. The last step is an
+attribute rather than another hue because the palette is spent by then (green
+means available, the two tiers above hold warn and error, and identity is
+already carrying `Plan:` and `Workspace:`), and an attribute outranks any colour
+it is layered on. Day counts are floored, so 7.9 days left counts as 7 and lands
+in the red band.
 
 ## Replaying a saved report
 
