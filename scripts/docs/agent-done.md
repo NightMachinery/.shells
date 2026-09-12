@@ -1,4 +1,4 @@
-# `/done`: ending a session on purpose
+# `done`: ending a session on purpose
 
 `/done` is one skill, shared by Claude Code, Codex and Antigravity. It asks the
 agent to check that the work is actually finished, write an executive summary,
@@ -16,16 +16,48 @@ symlinked into each agent's skills directory by [agfi:agent-skills-link]:
 
     ~/.claude/skills/done/SKILL.md
     ~/.claude-work/skills/done/SKILL.md
-    ~/.codex/skills/done/SKILL.md
+    ~/.agents/skills/done/SKILL.md
     ~/.gemini/config/skills/done/SKILL.md
 
 All three agents converged on the same format — `<dir>/<name>/SKILL.md` with
-YAML frontmatter carrying `name` and `description` — and all three expose such
-a skill as `/<name>` typed at the prompt. Antigravity says so in its own
+YAML frontmatter carrying `name` and `description`. In Codex CLI, invoke it as
+`$done` or select it through `/skills`; Claude Code uses `/done`.
+Antigravity describes `/<name>` invocation in its own
 migrate-workflows skill, which exists to move people off its older
 `~/.gemini/config/global_workflows/*.md` and onto skills, listing "first-class
 slash command support" as the reason. So one file can serve every agent, and
 the prose in it is the part worth getting right once.
+
+Codex user skills live under `~/.agents/skills`, independent of `CODEX_HOME`.
+The linker creates a whole-directory symlink there, so sibling scripts,
+references and assets accompany `SKILL.md`. Other agents retain their existing
+file-link layout. A conflicting Codex directory or unrelated symlink is
+reported and preserved, not overwritten. This uses the documented
+[Codex discovery paths and directory-link support](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
+
+To migrate an older installation:
+
+```zsh
+agent-skills-link
+h-agent-skills-doctor
+agent-skills-prune-legacy-codex
+```
+
+The last command removes only our exact old `CODEX_HOME/skills/<name>/SKILL.md`
+symlinks after verifying their new directory-link replacements. It removes
+empty per-skill directories, never recursively deletes anything, and preserves
+`.system`, unknown skills, real files, unrelated symlinks and extra files in
+old skill directories. The tracked sources remain intact. Normal launches
+do not perform cleanup. A legacy client that only scans `CODEX_HOME/skills`
+will no longer discover these skills after cleanup; use a current client.
+
+Codex normally detects skill changes automatically. Restart the client if its
+picker remains stale; an already-running conversation's advertised skill list
+may not refresh immediately. Directory links avoid duplicate copies, but the
+tracked source must remain available at its linked location.
+
+Regression checks: `zsh -f zshlang/tests/agent-skills.zsh` (isolated fixtures;
+no real skill directories or agent sessions are changed).
 
 The alternative was one file per agent in each agent's own preferred shape —
 `commands/done.md` for Claude Code, `prompts/done.md` for Codex, a workflow for
@@ -245,3 +277,5 @@ All dynamically scoped, all read with [agfi:bool] where they are boolean:
 - `agent_skills_link_verbose_p` — say which links were made.
 - `agent_skills_src_dir`, `agy_config_dir` — where the tracked skills are, and
   where Antigravity's configuration is.
+- `agent_skills_codex_dir` — override the shared Codex user-skills directory;
+  defaults to `~/.agents/skills`, not `CODEX_HOME/skills`.

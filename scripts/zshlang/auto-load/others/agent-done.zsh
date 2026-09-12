@@ -5,7 +5,7 @@
 #: The skill itself is one tracked file, =configFiles/agent-skills/done/=,
 #: symlinked into each agent's skills directory by [agfi:agent-skills-link].
 #: Claude Code, Codex and Antigravity all read `<dir>/<name>/SKILL.md' with
-#: `name'/`description' frontmatter and all offer it as `/<name>', so one file
+#: `name'/`description' frontmatter (Codex uses `$done'), so one file
 #: serves the three of them; three near-copies would drift, and the prose in it
 #: is the part worth getting right once.
 #:
@@ -18,6 +18,11 @@
 #: on the screen the session was using, after the session is gone.
 ##
 typeset -g agent_skills_src_dir="${agent_skills_src_dir:-${NIGHTDIR}/configFiles/agent-skills}"
+
+function h-agent-skills-codex-dir {
+    #: User skills are shared across Codex seats, independent of CODEX_HOME.
+    print -r -- "${agent_skills_codex_dir:-${HOME}/.agents/skills}"
+}
 
 function h-agent-skills-dirs {
     #: Where each agent installed on this host looks for user skills, as
@@ -37,7 +42,9 @@ function h-agent-skills-dirs {
     done
 
     dir="$(h-codex-session-home)"
-    test -d "${dir}" && print -r -- "codex"$'\t'"${dir}/skills"
+    if test -d "${dir}" ; then
+        print -r -- "codex"$'\t'"$(h-agent-skills-codex-dir)"
+    fi
 
     #: Deliberately not [agfi:h-agy-session-home]: that is where agy keeps its
     #: conversations (~/.gemini/antigravity-cli). Its *configuration* -- hooks,
@@ -71,7 +78,7 @@ function agent-skills-link {
     ##
     local verbose_p="${agent_skills_link_verbose_p:-n}"
 
-    local line agent dir name src target
+    local line agent dir name src target ret=0
     local -a names
     names=( ${(f)"$(h-agent-skills-names)"} )
     (( ${#names} )) || return 0
@@ -83,6 +90,27 @@ function agent-skills-link {
         for name in "${names[@]}" ; do
             src="${agent_skills_src_dir}/${name}/SKILL.md"
             target="${dir}/${name}/SKILL.md"
+
+            if [[ "${agent}" == codex ]] ; then
+                #: Codex follows skill-directory links. Linking just SKILL.md
+                #: also loses sibling scripts/references. Never replace a
+                #: user-owned directory or an unrelated (even broken) link.
+                src="${src:h}"
+                target="${target:h}"
+                if test -L "${target}" && [[ "${target:A}" == "${src:A}" ]] ; then
+                    continue
+                elif test -e "${target}" || test -L "${target}" ; then
+                    ecerr "$0: ${target/#${HOME}/~} is not our directory link; leaving it alone"
+                    ret=1
+                    continue
+                fi
+                command mkdir -p -- "${dir}" @RET
+                command ln -s -- "${src:A}" "${target}" @RET
+                if bool "${verbose_p}" ; then
+                    ecgray "$0: linked ${target/#${HOME}/~} (${agent})"
+                fi
+                continue
+            fi
 
             #: Already pointing at the tracked file: the common case, and the
             #: reason this costs one stat rather than a write.
@@ -105,6 +133,45 @@ function agent-skills-link {
             fi
         done
     done
+    return ${ret}
+}
+
+function agent-skills-prune-legacy-codex {
+    : "removes our obsolete CODEX_HOME/skills file links after verifying their replacements"
+    #: Explicit migration only, never part of the agent launch path. No
+    #: recursive deletion: .system, unknown skills and user files stay put.
+    local legacy="$(h-codex-session-home)/skills"
+    local current="$(h-agent-skills-codex-dir)"
+    local name src old replacement skill_file
+
+    if [[ "${legacy:A}" == "${current:A}" ]] ; then
+        ecerr "$0: legacy and current skill roots coincide; refusing cleanup"
+        return 1
+    fi
+
+    for name in ${(f)"$(h-agent-skills-names)"} ; do
+        src="${agent_skills_src_dir}/${name}"
+        old="${legacy}/${name}"
+        replacement="${current}/${name}"
+        skill_file="${old}/SKILL.md"
+
+        test -e "${old}" || test -L "${old}" || continue
+        if ! test -L "${replacement}" || [[ "${replacement:A}" != "${src:A}" ]] ||
+            ! test -r "${replacement}/SKILL.md" ; then
+            ecerr "$0: no verified replacement for ${name}; keeping legacy entry"
+            continue
+        fi
+        if test -L "${old}" || ! test -d "${old}" ||
+            ! test -L "${skill_file}" || [[ "${skill_file:A}" != "${src:A}/SKILL.md" ]] ; then
+            ecerr "$0: ${old/#${HOME}/~} is not our legacy file-link layout; leaving it alone"
+            continue
+        fi
+        command unlink "${skill_file}" @RET
+        #: rmdir cannot remove extra contents, including hidden files.
+        command rmdir "${old}" 2>/dev/null || true
+        ecgray "$0: removed obsolete link ${skill_file/#${HOME}/~}; tracked source preserved"
+    done
+    return 0
 }
 
 function h-agent-skills-doctor {
@@ -130,11 +197,16 @@ function h-agent-skills-doctor {
             src="${agent_skills_src_dir}/${name}/SKILL.md"
             target="${dir}/${name}/SKILL.md"
 
+            if [[ "${agent}" == codex ]] ; then
+                src="${src:h}"
+                target="${target:h}"
+            fi
+
             ecbold "skill ${name}: ${target/#${HOME}/~} (${agent})"
             if ! test -e "${target}" && ! test -L "${target}" ; then
                 ecerr "  MISSING: run agent-skills-link"
             elif ! test -L "${target}" ; then
-                ecerr "  UNTRACKED: a plain file. Diff it against ${src/#${NIGHTDIR}/.}, keep what you want, and re-link."
+                ecerr "  UNTRACKED: not the expected symlink. Compare with ${src/#${NIGHTDIR}/.} before re-linking."
             elif [[ "${target:A}" == "${src:A}" ]] ; then
                 ec "  = symlinked to ${src/#${NIGHTDIR}/.}"
             else
