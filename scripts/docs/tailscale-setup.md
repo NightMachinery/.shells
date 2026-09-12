@@ -73,6 +73,51 @@ dropping rather than by reporting an error:
   upgrade quietly invalidates it. `firewall-allow-mosh-darwin --check` reports
   the current state and needs no root.
 
+## Android internet failures: separate DNS from connectivity
+
+An SSH connection into Termux over Tailscale can keep working while Android's
+hostname resolution fails. Test from the phone while the fault is present:
+
+```sh
+command curl --noproxy '*' --head --connect-timeout 5 --max-time 10 https://example.com
+command curl --noproxy '*' --head --connect-timeout 5 --max-time 10 https://1.1.1.1
+command dig +time=3 +tries=1 @1.1.1.1 example.com
+command dig +time=3 +tries=1 @8.8.8.8 example.com
+command dig +time=3 +tries=1 @100.100.100.100 example.com
+command dig +tcp +time=3 +tries=1 @100.100.100.100 example.com
+```
+
+For a stronger comparison, use an address from the successful public DNS lookup
+with `curl --resolve example.com:443:ADDRESS https://example.com`, keeping the
+same timeout and proxy options. This bypasses DNS while preserving the hostname
+and TLS certificate verification; do not use `--insecure`.
+
+If normal curl reports a resolution timeout, the hostname-preserving bypass
+works, public DNS responds, and Quad100 times out, DNS is demonstrably failing
+while the tested internet path remains usable. This pattern was reproduced on
+Android 14; force-closing and reopening Tailscale restored internet access,
+as confirmed by the user. It does not establish whether the cause is Private DNS, app routing,
+or a stuck Tailscale resolver. Test a known MagicDNS name too: it should resolve
+locally, so its failure is evidence beyond a public upstream DNS failure.
+
+Quad100 (`100.100.100.100`) is a service inside the local Tailscale client, not a
+remote public resolver. See [Tailscale's Quad100 documentation](https://tailscale.com/docs/reference/quad100).
+Termux's `$PREFIX/etc/resolv.conf` alone does not establish which resolver
+Android's system hostname lookups use.
+
+An ordinary Termux SSH account may be unable to read Android's Private DNS,
+VPN settings, routes, or connectivity diagnostics. `settings`, `ip route`, and
+`dumpsys connectivity` can return permission errors; an installed `sudo` wrapper
+does not mean the phone is rooted. Inspect the settings in the phone UI when
+shell permissions are insufficient.
+
+Record Private DNS, Use Tailscale DNS, exit-node selection, and app exclusions
+before changing anything. Restarting Tailscale tests for stale client state
+while retaining DNS preferences. Temporarily disabling Use Tailscale DNS tests
+the DNS override, but can lose MagicDNS and split-DNS name resolution. Compare
+before and after, change one setting at a time, and do not claim a fix until
+normal hostname-based requests work again. See [client DNS preferences](https://tailscale.com/docs/features/client/manage-preferences).
+
 References:
 
 - Tailscale macOS install docs: <https://tailscale.com/docs/install/mac>
