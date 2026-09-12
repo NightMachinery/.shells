@@ -17,7 +17,8 @@ function autosuggestions-gateway() {
     autosuggestions-goo "$@"
 }
 aliasfn asg autosuggestions-gateway
-aliasfn as autosuggestions-gateway # @nameconfilct (macOS)
+# aliasfn as autosuggestions-gateway #: @nameconfilct (macOS)
+
 function jias() {
     # autosuggestions-gateway "$@" | jiarr
     local i results=() url
