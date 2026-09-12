@@ -5,9 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"agent_session/internal/proc"
+	"agent_session/internal/session"
 )
 
 // The record's tmux name is what the session launched in, and the autoname
@@ -150,6 +152,9 @@ func TestLiveReadsTheSessionRecords(t *testing.T) {
 	if got.Tmux != "+Claude/work still-here" {
 		t.Errorf("tmux: got %q, want the recorded session name", got.Tmux)
 	}
+	if got.Kind != session.KindInteractive {
+		t.Errorf("kind: got %q, want %q", got.Kind, session.KindInteractive)
+	}
 	want := filepath.Join(home, "projects", projectSlug(live.Cwd), live.SessionID+".jsonl")
 	if got.Transcript != want {
 		t.Errorf("transcript: got %q, want %q", got.Transcript, want)
@@ -173,5 +178,55 @@ func writeSessionFile(t *testing.T, home, name, body string) {
 	}
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLiveBackgroundSessionHasNoTmuxAndSaysSo(t *testing.T) {
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, "sessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// A `claude --bg` typed from inside a tmux pane records that pane as its
+	// launch location, but the session runs under the pty host, not there.
+	bg := sessionRecord{
+		PID:       os.Getpid(),
+		SessionID: "33333333-3333-3333-3333-333333333333",
+		Name:      "in-the-background",
+		Cwd:       "/Users/evar/tmp/z",
+		Kind:      "bg",
+		Status:    "idle",
+		Tmux:      "typed-here:@9.%9",
+	}
+	writeRecord(t, home, bg)
+
+	proc.ResetShared()
+	defer proc.ResetShared()
+	oldRun := proc.Run
+	proc.Run = func(name string, args ...string) ([]byte, error) {
+		if name == "ps" {
+			return []byte("  " + strconv.Itoa(bg.PID) + "     1 claude\n"), nil
+		}
+		return nil, os.ErrNotExist
+	}
+	defer func() { proc.Run = oldRun }()
+
+	rows, err := Adapter{}.Live([]string{filepath.Join(home, "projects")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("got %d rows, want one: %+v", len(rows), rows)
+	}
+	got := rows[0]
+	if got.Kind != session.KindBackground {
+		t.Errorf("kind: got %q, want %q (record says bg)", got.Kind, session.KindBackground)
+	}
+	if got.Tmux != "" {
+		t.Errorf("tmux: got %q, want none: the launch location is not where a background session lives", got.Tmux)
+	}
+	cols := strings.Split(got.Row(), "\t")
+	if len(cols) != 8 || cols[5] != "-" || cols[7] != session.KindBackground {
+		t.Errorf("row: got %q, want eight columns with tmux %q and kind %q", got.Row(), "-", session.KindBackground)
 	}
 }

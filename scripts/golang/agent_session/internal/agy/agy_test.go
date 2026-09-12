@@ -445,7 +445,7 @@ func TestLivePairsByWorkspace(t *testing.T) {
 		r.Tmux != "agy-work" || r.Name != "Listing the files" || r.Status != "running" {
 		t.Errorf("row = %+v", r)
 	}
-	if strings.Count(r.Row(), "\t") != 6 {
+	if strings.Count(r.Row(), "\t") != 7 {
 		t.Errorf("row has the wrong shape: %q", r.Row())
 	}
 }

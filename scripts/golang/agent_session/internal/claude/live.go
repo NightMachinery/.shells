@@ -50,9 +50,11 @@ type sessionRecord struct {
 	SessionID string `json:"sessionId"`
 	Name      string `json:"name"`
 	Cwd       string `json:"cwd"`
-	// "interactive" or "bg". Nothing filters on it: both kinds are sessions
-	// the resolver may be asked to open, and `claude agents --json` listed
-	// both. It is parsed because the record is the only place that says so.
+	// "interactive" or "bg" (the CLI's `--json` says "background" for the
+	// same thing; [normalizeKind] settles on the CLI's word). Nothing filters
+	// on it: both kinds are sessions the resolver may be asked to open. It
+	// decides the tmux column, though -- see [tmuxOf] -- and is passed on so
+	// a consumer that needs a route to the session knows a pane will not do.
 	Kind string `json:"kind"`
 	// "busy" or "idle", empty in a record too old to carry it.
 	Status string `json:"status"`
@@ -132,6 +134,7 @@ func (Adapter) Live(roots []string) ([]session.Live, error) {
 				Transcript: filepath.Join(home, "projects", projectSlug(rec.Cwd), rec.SessionID+".jsonl"),
 				Tmux:       tmuxOf(rec, byPID, panes),
 				Status:     rec.Status,
+				Kind:       normalizeKind(rec.Kind),
 			})
 		}
 	}
@@ -197,11 +200,33 @@ func recordAlive(rec sessionRecord, byPID map[int]proc.Process) bool {
 // The record is still the answer for a process the table no longer has, and
 // for one whose pane cannot be found -- and it is the only answer when tmux is
 // not running at all.
+//
+// A background session is the exception: it runs under a pty host that is
+// parented to init, so the walk never finds a pane, and the record's location
+// is where `claude --bg` was *typed* -- a tmux session the conversation does
+// not live in. Publishing that would send every consumer that trusts this
+// column (the tmux picker, the window resolver, anything typing into a pane)
+// to the wrong place, so a background session gets no tmux location at all.
 func tmuxOf(rec sessionRecord, byPID map[int]proc.Process, panes map[int]string) string {
 	if name := proc.TmuxOf(rec.PID, byPID, panes); name != "" {
 		return name
 	}
+	if normalizeKind(rec.Kind) == session.KindBackground {
+		return ""
+	}
 	return recordedTmux(rec)
+}
+
+// normalizeKind maps the record's spelling onto [session.KindInteractive] /
+// [session.KindBackground], and leaves anything else (including "") as is.
+func normalizeKind(kind string) string {
+	switch kind {
+	case "bg", session.KindBackground:
+		return session.KindBackground
+	case session.KindInteractive:
+		return session.KindInteractive
+	}
+	return kind
 }
 
 // recordedTmux is the tmux session named in the record. The field looks like

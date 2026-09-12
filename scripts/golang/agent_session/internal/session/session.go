@@ -61,19 +61,35 @@ type Live struct {
 	// The tmux session it runs in, or "" for none.
 	Tmux   string
 	Status string
+	// KindInteractive or KindBackground for an agent that has the notion,
+	// "" for one that does not. A background session runs under a pty host
+	// with no terminal of its own, so nothing that types into a pane or a
+	// window can reach it; consumers that pick a delivery route need to know.
+	Kind string
 }
 
+// The two kinds of Claude Code session. The CLI's `claude agents --json`
+// spells them "interactive" and "background"; the session record spells the
+// second "bg", and the adapter normalizes to these so no consumer has to know.
+const (
+	KindInteractive = "interactive"
+	KindBackground  = "background"
+)
+
 // Row is the TSV line `live` prints: pid, id, name, cwd, transcript, tmux
-// session or `-`, status or `-`.
+// session or `-`, status or `-`, kind or `-`.
 func (l Live) Row() string {
-	tmux, status := l.Tmux, l.Status
+	tmux, status, kind := l.Tmux, l.Status, l.Kind
 	if tmux == "" {
 		tmux = "-"
 	}
 	if status == "" {
 		status = "-"
 	}
-	return fmt.Sprintf("%d\t%s\t%s\t%s\t%s\t%s\t%s", l.PID, l.ID, l.Name, l.Cwd, l.Transcript, tmux, status)
+	if kind == "" {
+		kind = "-"
+	}
+	return fmt.Sprintf("%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s", l.PID, l.ID, l.Name, l.Cwd, l.Transcript, tmux, status, kind)
 }
 
 // Meta is what `meta` says about one transcript.

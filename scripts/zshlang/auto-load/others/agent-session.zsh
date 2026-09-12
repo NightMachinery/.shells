@@ -544,8 +544,11 @@ function agent-session-register {
 function h-agent-session-live-list {
     #: Every live session of every agent in [agfi:h-agents], one per line, tab
     #: separated: pid, session id, name, cwd, transcript, tmux session (or `-'),
-    #: status. Each adapter's `live-list' verb supplies its rows; an agent
-    #: without one contributes nothing.
+    #: status, kind (`interactive', `background', or `-' for an agent without
+    #: the notion). Each adapter's `live-list' verb supplies its rows; an agent
+    #: without one contributes nothing. A background session -- `claude --bg',
+    #: or one backgrounded from the agent view -- has no tmux session and no
+    #: window of its own; see "Background sessions" in =docs/agent-sessions.md=.
     #:
     #: Set agent_session_live_list_cache to reuse one listing across several
     #: lookups; `local' is dynamically scoped, so a caller's assignment is
@@ -2253,8 +2256,16 @@ function h-agent-session-tmux-rows {
     #: [agfi:h-agent-session-annotate-rows], so they share its `list' batch and
     #: interleave by recency on their own, rather than being sorted apart and
     #: merged back. [agfi:fftmux-agent-all] is the picker that sets it.
+    #:
+    #: Background sessions (`claude --bg', or backgrounded from the agent view)
+    #: sit in no tmux session at all, yet they are live conversations you may
+    #: want to get to, so they are offered too, with `bg:<session id>' in the
+    #: caller column instead of a tmux id and a 🔌 badge; the engine attaches
+    #: to them ([agfi:h-claude-code-bg-attach]). `agent_session_tmux_bg_p=n'
+    #: leaves them out.
     ##
     local dead_p="${agent_session_tmux_dead_p:-n}"
+    local bg_p="${agent_session_tmux_bg_p:-y}"
 
     #: See [agfi:h-agent-session-live-rows] for why this is built under another
     #: name before the cache is set. An empty live half is no longer fatal: with
@@ -2315,6 +2326,23 @@ function h-agent-session-tmux-rows {
             h-agent-session-agent-in-roots "${t}" "${root_agents[@]}"
             rows+="${id}"$'\t'"${t}"$'\t'"${REPLY}"$'\t'"${label}"$'\n'
         done
+
+        if bool "${bg_p}" ; then
+            #: Column 8 of the live row is the kind; only Claude Code has
+            #: background sessions today. The badge goes in the fifth column,
+            #: which the annotator puts ahead of the agent glyph.
+            for row in "${live[@]}" ; do
+                f=( "${(@ps:\t:)row}" )
+                [[ "${f[8]}" == background ]] || continue
+
+                t="${f[5]}"
+                test -n "${t}" && test -e "${t}" || continue
+
+                live_transcripts[${t}]=y
+                h-agent-session-agent-in-roots "${t}" "${root_agents[@]}"
+                rows+="bg:${f[2]}"$'\t'"${t}"$'\t'"${REPLY}"$'\t'"${f[3]:--}"$'\t'"🔌"$'\n'
+            done
+        fi
     fi
 
     if bool "${dead_p}" ; then
@@ -2810,10 +2838,36 @@ function h-agent-session-resume-run {
     #: directory once the session exits.
     #: Usage: h-agent-session-resume-run <transcript> <command...>
     ##
+    local force_p="${agent_session_resume_force_p:-n}"
+
     local transcript="${1}"
     shift
     assert-args transcript @RET
     (( $# )) || return 1
+
+    #: Never a second copy of a session that is still running: `--resume' on
+    #: a live transcript means two writers on one file, and for a background
+    #: session -- the case that found this -- a duplicate interactive one in
+    #: your pane while the original runs on under the daemon. The import path
+    #: was hardened against exactly this ([agfi:h-agent-session-live-list-offerable]);
+    #: resume was not. `agent_session_resume_force_p=y' goes ahead anyway.
+    if ! bool "${force_p}" ; then
+        local live
+        live="$(h-agent-session-live-list 2>/dev/null | gawk -F'\t' -v t="${transcript}" '$5 == t { print ; exit }')" || live=''
+        if test -n "${live}" ; then
+            local -a lf
+            lf=( "${(@ps:\t:)live}" )
+            if [[ "${lf[8]}" == background ]] ; then
+                ecerr "$0: this session is running as a background session (pid ${lf[1]}); attach to it instead: h-claude-code-bg-attach ${lf[2][1,8]}"
+            elif test -n "${lf[6]}" && [[ "${lf[6]}" != '-' ]] ; then
+                ecerr "$0: this session is already running in tmux session ${lf[6]} (pid ${lf[1]}); go there instead of resuming a second copy"
+            else
+                ecerr "$0: this session is already running (pid ${lf[1]}); not resuming a second copy"
+            fi
+            ecerr "$0: agent_session_resume_force_p=y resumes anyway"
+            return 1
+        fi
+    fi
 
     local dir=''
     dir="$(h-agent-session-dir "${transcript}" 2>/dev/null)" || dir=''

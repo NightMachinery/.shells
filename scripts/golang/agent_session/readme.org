@@ -400,8 +400,13 @@ as before, with no label.
 
 =agent_session claude live <sessions-dir>...= prints one TSV row per session
 currently running: pid, id, name, cwd, transcript path, the tmux session it runs
-in or =-=, and its status. The section on reading the session you are in says
-what it is for and why it lives here.
+in or =-=, its status, and its kind: =interactive=, =background= for a session
+started with =claude --bg= or backgrounded from the agent view, or =-= for an
+agent without the notion. A background session runs under Claude Code's pty
+host rather than in any pane, so its tmux column is always =-=: the record's
+=tmux= field only says where =claude --bg= was typed, and publishing that would
+send anything that trusts the column to the wrong session. The section on
+reading the session you are in says what the row is for and why it lives here.
 
 =agent_session live-all <agent>=<sessions-dir>...= is the same thing for every
 agent at once, and is the only subcommand that does not start with an agent

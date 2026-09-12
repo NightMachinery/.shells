@@ -460,7 +460,7 @@ func TestLivePairsLockHolders(t *testing.T) {
 	if r.Tmux != "codex-work" || r.Transcript != main || r.Name != "Listing and patching" || r.Cwd != "/tmp/proj" || r.Status != "running" {
 		t.Errorf("row = %+v", r)
 	}
-	if got := r.Row(); strings.Count(got, "\t") != 6 {
+	if got := r.Row(); strings.Count(got, "\t") != 7 {
 		t.Errorf("row has %d tabs: %q", strings.Count(got, "\t"), got)
 	}
 }
