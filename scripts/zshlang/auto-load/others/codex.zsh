@@ -267,21 +267,29 @@ function h-codex-status-arm {
         #: answered, whether or not anything is exhausted, so the mechanism can
         #: be exercised without first running every account dry.
         #:
-        #: The SHORTEST window per auth, not `.rateLimits.primary': which slot
-        #: holds the short window is plan-dependent, and on plans reporting a
-        #: single weekly window `primary' is that weekly one -- a week away,
-        #: which is useless for exercising anything. `.quota.windows' is
-        #: duration-labelled, so `min_by' picks the soonest genuinely short
-        #: window; the `.rateLimits' path stays as a fallback for a report
-        #: predating `.quota'.
+        #: The EARLIEST reset the auth reports anywhere, not
+        #: `.rateLimits.primary': which slot holds the short window is
+        #: plan-dependent, and on plans reporting a single weekly window
+        #: `primary' IS that weekly one -- a week away, which exercises
+        #: nothing. Per-model families are included here, and only here,
+        #: because deus wants the soonest thing that will visibly roll over;
+        #: the real arm above deliberately ignores them, since a spent
+        #: per-model budget does not block ordinary usage.
+        #:
+        #: Read from the raw `.rateLimitsByLimitId' rather than `.quota.limits',
+        #: which hides idle families -- and an idle family is exactly the one
+        #: with a rollover soon. `.rateLimits.primary' stays as a fallback for
+        #: a report predating `.quota'.
         #:
         #: `numbers' drops a null or a missing reset time rather than letting
         #: it sort to the front and arm us for the epoch.
         out="$(ec "${json}" |
             jq -r '[.authFiles[]
                     | select(.ok)
-                    | {at: (((.quota.windows // [] | min_by(.windowDurationMins) | .resetsAt)
-                            // .rateLimits.primary.resetsAt) | numbers),
+                    | {at: ([ (.quota.windows // [])[]?.resetsAt,
+                              (.rateLimitsByLimitId // {} | .[]? | (.primary.resetsAt, .secondary.resetsAt)),
+                              .rateLimits.primary.resetsAt ]
+                            | map(numbers) | min),
                        alias: (.alias // "?")}
                     | select(.at != null)]
                 | sort_by(.at) | first
@@ -296,7 +304,7 @@ function h-codex-status-arm {
             return 0
         fi
 
-        msg="Codex (${auth_alias}): shortest window rolled over"
+        msg="Codex (${auth_alias}): earliest window rolled over"
     fi
 
     h-codex-status-reset-credit-note "${json}"
@@ -414,20 +422,23 @@ function h-codex-status-arm-auth {
             return 0
         fi
 
-        #: deus: the shortest window's rollover, so the mechanism can be
-        #: exercised without running the account dry. Shortest rather than
+        #: deus: the earliest rollover this auth reports anywhere, so the
+        #: mechanism can be exercised without running the account dry. Not
         #: `primary', because which slot holds the short window is
         #: plan-dependent and on a single-window plan `primary' is the weekly
-        #: one.
+        #: one. Per-model families count here, and only here -- see the twin
+        #: branch in [agfi:h-codex-status-arm].
         deadline="$(ec "${auth}" | jq -r '
-            ((.quota.windows // [] | min_by(.windowDurationMins) | .resetsAt)
-             // .rateLimits.primary.resetsAt | numbers) // 0')" || deadline=0
+            [ (.quota.windows // [])[]?.resetsAt,
+              (.rateLimitsByLimitId // {} | .[]? | (.primary.resetsAt, .secondary.resetsAt)),
+              .rateLimits.primary.resetsAt ]
+            | map(numbers) | min // 0')" || deadline=0
         deadline=${deadline%.*}
         if (( deadline == 0 )) ; then
             ecgray "$0: ${auth_alias}: no reset time in the report, not arming"
             return 0
         fi
-        msg="Codex (${auth_alias}): shortest window rolled over"
+        msg="Codex (${auth_alias}): earliest window rolled over"
     else
         deadline=${blocked_at}
         msg="Codex (${auth_alias}): ${reasons:-quota} reset, usage available again"
