@@ -32,6 +32,10 @@ The shared =zsh-plugin-authoring= skill in
 =./configFiles/agent-skills/zsh-plugin-authoring/SKILL.md= guides plugin extraction
 and standalone verification.
 
+The =agent-session= plugin shares exact-conversation resume and tmux identity
+with tmux-subagents. See =./zshlang/plugins/agent-session/README.md= for its
+standalone API and subdirectory installation.
+
 * Pandoc conversion
 
 [[agfi:pandoc-convert]] (=./zshlang/auto-load/others/pandoc.zsh=) is the single

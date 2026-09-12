@@ -266,9 +266,12 @@ function h-agent-done-pane-script {
     #: `agent_done_resume_cmd' replaces the resume outright, which is both the
     #: escape hatch for resuming with extra flags and how the respawn branch is
     #: testable without starting a real session.
-    local resume="${agent_done_resume_cmd}"
+    local resume="${agent_done_resume_cmd}" managed_state=''
     if test -z "${resume}" && test -n "${transcript}" ; then
         resume="agent-session-resume ${(q)transcript}"
+        if test -n "${TMUX_PANE}" ; then
+            managed_state="$(command tmux show-option -pqv -t "${TMUX_PANE}" @agent_session_state 2>/dev/null)"
+        fi
     fi
 
     {
@@ -279,6 +282,9 @@ function h-agent-done-pane-script {
         print -r -- 'if [ -e "$shown" ] ; then'
         if test -n "${resume}" ; then
             test -n "${cwd}" && print -r -- "    cd ${(qq)cwd} 2>/dev/null || true"
+            #: Keep the resume line's consumed shape for the dead-pane picker.
+            #: The managed runtime restores its original flags and hooks.
+            test -n "${managed_state}" && print -r -- "    export AGENT_SESSION_REUSE_PANE=${(qq)managed_state}"
             print -r -- "    exec ${(qq)zsh_path} -ic ${(qq)resume}"
         else
             #: No transcript, so nothing to resume; a shell is still better

@@ -144,6 +144,13 @@ report twice. `agent_done_resume_cmd` replaces the resume outright — the escap
 hatch for resuming with extra flags, and how the branch is tested without
 starting a real session.
 
+For a pane managed by tmux-subagents, the generated script also exports
+`AGENT_SESSION_REUSE_PANE`, pointing at its private launch state. The local
+resume wrapper verifies that the transcript ID matches before delegating to the
+portable pane runner, preserving the original profile, flags and notification
+hooks. The transcript resume line stays unchanged for dead-pane picker parsing.
+An explicit `agent_done_resume_cmd` bypasses this managed-state behavior.
+
 Since the resume helpers now `cd` on their own
 ([agfi:h-agent-session-resume-run]), the script's own `cd` is belt and braces:
 it also covers the shell that a session with no resolvable transcript falls

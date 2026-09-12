@@ -632,8 +632,9 @@ function claude-code-session-resume {
 
     #: In the session's own directory, which this used to only warn about; see
     #: [agfi:h-agent-session-resume-run] and `agent_session_resume_cd_p'.
-    h-agent-session-resume-run "${transcript}" \
-        "${launcher}" --resume "${transcript:t:r}" "${extra[@]}"
+    local -a reply
+    h-agent-session-resume-argv claude "${transcript:t:r}" "${launcher}" "${extra[@]}" @RET
+    h-agent-session-resume-run "${transcript}" "${reply[@]}"
 }
 aliasfn claude-resume claude-code-session-resume
 

@@ -7,6 +7,7 @@ test -z "$NIGHT_PERSONAL" || re source "$NIGHTDIR"/zshlang/personal/**/*.zsh(.)
 run-on-each source "$NIGHTDIR"/zshlang/auto-load/**/*.zsh(.) #I have disabled dotfiles because vim and others create them for swap.
 
 run-on-each source \
+    "$NIGHTDIR"/zshlang/plugins/agent-session/agent-session.plugin.zsh \
     "$NIGHTDIR"/zshlang/plugins/psiphon/psiphon.plugin.zsh \
     "$NIGHTDIR"/zshlang/plugins/paqet/paqet.plugin.zsh
 

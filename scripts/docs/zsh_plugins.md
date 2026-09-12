@@ -33,3 +33,12 @@ The local loader sources `scripts/zshlang/basic/basic-full.zsh` from `scripts/zs
 Use the shared [zsh-plugin-authoring skill](../configFiles/agent-skills/zsh-plugin-authoring/SKILL.md)
 to create or extract a plugin using these conventions. [agfi:agent-skills-link]
 exposes it to the configured agents through the existing shared-skill mechanism.
+
+## Agent session plugin
+
+`zshlang/plugins/agent-session` is the portable exact-ID resume and tmux identity
+layer shared with tmux-subagents. It loads without the personal basic stack;
+local transcript discovery, profile lookup and pickers remain in auto-loaded
+modules. Its README covers direct and subdirectory installation and private pane
+state. [agfi:h-agent-session-resume-argv] is shared by the local provider adapters
+and [agfi:agent-session-resume-exact].

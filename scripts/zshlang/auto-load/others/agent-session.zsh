@@ -2869,6 +2869,17 @@ function h-agent-session-resume-run {
         fi
     fi
 
+    #: /done keeps its discoverable resume line but restores the managed
+    #: pane's saved launch settings. Never redirect an unrelated transcript.
+    local managed_state="${AGENT_SESSION_REUSE_PANE:-}" managed_agent managed_id
+    if test -n "${managed_state}" ; then
+        managed_agent="$(h-agent-session-agent-of "${transcript}")" @RET
+        managed_id="$(h-agent-session-call "${managed_agent}" id-of "${transcript}")" @RET
+        command python3 "${agent_session_runtime}" matches "${managed_state}" "${managed_id}" @RET
+        command python3 "${agent_session_runtime}" run "${managed_state}" "${agent_session_runtime:h}/agent-session.plugin.zsh"
+        return $?
+    fi
+
     local dir=''
     dir="$(h-agent-session-dir "${transcript}" 2>/dev/null)" || dir=''
 

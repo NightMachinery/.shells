@@ -50,31 +50,7 @@ function h-tmux-session-name-sanitize {
     ec "${name[1,${max}]}"
 }
 
-function h-agent-tmux-identity-set {
-    : "records <agent> <id> <transcript> on the tmux session containing <pane>"
-    local pane="${1}" agent="${2}" id="${3}" transcript="${4}"
-
-    command tmux set-option -t "${pane}" "${agent_tmux_identity_option}" \
-        "${agent}"$'\t'"${id}"$'\t'"${transcript}" 2>/dev/null
-}
-
-function agent-tmux-identity-get {
-    : "prints agent, id and transcript of the agent session recorded on this tmux session, tab-separated"
-    local pane="${1:-${TMUX_PANE}}"
-    if test -z "${pane}" ; then
-        ecerr "$0: not inside tmux"
-        return 1
-    fi
-
-    local v
-    v="$(command tmux show-option -qv -t "${pane}" "${agent_tmux_identity_option}" 2>/dev/null)"
-    if test -z "${v}" ; then
-        ecerr "$0: no agent session recorded on this tmux session yet"
-        return 1
-    fi
-
-    ec "${v}"
-}
+#: Identity recording is shared with the portable agent-session plugin.
 
 function h-agent-session-tmux-name {
     : "<agent> <id> <transcript>: the tmux session name for that agent session"
@@ -98,8 +74,8 @@ function h-agent-tmux-autoname {
     #: already right. Silent throughout; the hook lines discard output anyway.
     #:
     #: Sessions named `ag--*' are never touched, whatever the option says.
-    #: They belong to the tmux-subagents skill, which encodes lineage and
-    #: model in the name and would lose that identity to a rename.
+    #: They belong to the tmux-subagents skill, which keeps readable task and
+    #: model labels in the name and would lose that identity to a rename.
     ##
     local agent="${1}" pane="${2}" id="${3}" transcript="${4}"
     test -n "${pane}" || return 0
