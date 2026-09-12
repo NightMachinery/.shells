@@ -14,7 +14,7 @@ Apply this within the session's delegation permissions and the user's task scope
 
 - **Fable / Claude:** use **Opus**, selecting the available Opus model through
   the runtime's model selector rather than inheriting Fable.
-- **Astra / Codex:** use **GPT 5.6 Luna** (`gpt-5.6-luna`) for straightforward
+- **Astra / Codex:** use **GPT 5.6 Terra** (`gpt-5.6-terra`) for straightforward
   extraction, repetitive transformations, and routine checks. Use **GPT 5.6 Sol**
   (`gpt-5.6-sol`) for bounded implementation or edits needing more local reasoning.
 
@@ -59,7 +59,7 @@ workers must not sweep in unrelated changes or recursively delegate by default.
 
 Inspect the returned evidence and relevant diff, then run any missing acceptance
 checks. Do not redo every mechanical step or accept a success claim as proof.
-Give a focused correction when the defect is clear. If a Luna task needs more
+Give a focused correction when the defect is clear. If a Terra task needs more
 reasoning, move it to Sol; return unresolved ambiguity or repeated failure to the
 parent instead of spending quota on an open-ended retry chain. The parent remains
 responsible for the completed result and its accuracy.
