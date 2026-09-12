@@ -71,7 +71,10 @@ function codex-m {
     fi
 
     # -c model_reasoning_effort="high"
-    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" --search --approve-for-me "$@"
+    #: Termux toasts background-session title changes, so keep the title static
+    #: while retaining animations inside Codex. Put this before user arguments
+    #: so an explicit override wins; see =docs/tmux-tty-title.md=.
+    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=["app-name","project-name"]' --search --approve-for-me "$@"
     # -c web_search="true"
     # -c model_verbosity="high"
     #

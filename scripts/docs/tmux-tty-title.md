@@ -128,8 +128,9 @@ Off by default, because strategy 3 of
 [agfi:h-claude-code-session-of-kitty-window] maps a kitty window to a session
 *by* that `✳ <name>` title. Strategies 1, 2 and 4 -- foreground PID, tmux
 client, registry -- are unaffected, and under tmux it is strategy 2 that
-fires. So the flag is cheap inside tmux and costly outside. Codex and
-Antigravity do not overwrite the title and need no equivalent.
+fires. So the flag is cheap inside tmux and costly outside. Codex now has its
+own native title updates; see "Codex titles and Termux toasts" below for the
+static title selected by [agfi:codex-m].
 
 ## A separate bug: the title text was executed
 
@@ -233,6 +234,29 @@ no such session: =ivy
 
 The bare name is safe after the exact check, because tmux resolves an exact
 session name before trying it as a prefix.
+
+## Codex titles and Termux toasts
+
+[agfi:codex-m] passes `-c 'tui.terminal_title=["app-name","project-name"]'`
+to keep its terminal title static while retaining animations inside the TUI.
+Codex 0.154.0 otherwise animates its activity title every 100 ms, and its
+thread-name component can animate during name generation too. Termux 0.118.1
+shows a toast when a background session's title changes while the app is
+visible. Its `disable-terminal-session-change-toast` property only suppresses
+session-switch toasts, not these title-change toasts.
+
+The resulting title identifies Codex and the project, replacing the launcher's
+`⚡<directory>` marker; title-based kitty matching for that marker therefore
+does not apply. Activity and thread names remain available inside Codex.
+The bare [agfi:codex] wrapper is unchanged. User arguments follow this default,
+so `codex-m -c 'tui.terminal_title=[]'` leaves the inherited launcher title
+alone on a fresh launch, while another explicit list can restore dynamic items.
+Already-running sessions are unaffected by this launcher change.
+
+Verified against the installed CLI's configuration parser and versioned source:
+[Codex title rendering](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/tui/src/chatwidget/status_surfaces.rs),
+[title item identifiers](https://github.com/openai/codex/blob/rust-v0.154.0/codex-rs/tui/src/bottom_pane/title_setup.rs),
+and [Termux title-change handling](https://github.com/termux/termux-app/blob/v0.118.1/app/src/main/java/com/termux/app/terminal/TermuxTerminalSessionClient.java).
 
 ## Testing
 
