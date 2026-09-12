@@ -94,14 +94,52 @@ plus a header — name, seat, id, transcript, directory, timestamp — to a file
 under `$(h-agent-done-dir)`; find the agent's own process; send it `SIGTERM`;
 and arrange for the report to appear once it is gone.
 
-`--dry-run` does everything except the killing and prints what it resolved,
-which is how the whole path is testable without ending a session.
+`--dry-run` resolves the target, saves a report, and prints what it resolved.
+It does not arm a watcher, change tmux options, unregister auto-continue, or
+terminate anything.
 
 Codex detection accepts `CODEX_THREAD_ID` and the older `CODEX_SESSION_ID`,
 as well as `CODEX_SANDBOX` and `AI_AGENT=codex*`. An elevated/full-access tool
 shell can lack the sandbox marker while still belonging to a conversation.
 These inherited markers identify agent context, not process ownership or a
 security boundary. Test with `zsh -f zshlang/tests/agent-detection.zsh`.
+
+Pane ownership is checked by [agfi:h-tmux-pane-of-pid]: walk the agent PID's
+ancestors and match them against tmux's live `pane_pid` values. This recovers
+the owning pane even when `TMUX` and `TMUX_PANE` are missing. It also crosses
+terminal proxies: the pane's outer TTY, not the proxy's inner TTY attached to
+the agent, is where the closing report belongs. No active-pane, session-name,
+or working-directory guess is used. The resolved socket path is passed to the
+detached watcher explicitly, since pane IDs are unique only within a server.
+
+An inherited `TMUX_PANE` must agree with the ancestry match. Conflicts,
+multiple matches, incomplete process inspection, and a tmux ancestor whose
+pane cannot be queried are errors, not evidence of being outside tmux. Missing
+pane TTY/socket metadata is also an error. The summary is still saved, but
+`agent-done` returns 2 without unregistering
+auto-continue, scheduling a watcher, or terminating anything. Ownership is
+checked again after writing the report and before the shutdown steps.
+
+The tradeoff is a few process queries and conservative refusal when inspection
+is unavailable. The helper queries the server selected by `TMUX`, or tmux's
+default socket when it is absent. A non-default socket with lost environment
+markers is not searched for automatically: restore the correct `TMUX` value
+before retrying. It never scans other users' sockets. Detached/reparented jobs
+cannot be associated with a historical pane through ancestry alone.
+
+For a read-only check inside an agent shell:
+
+```zsh
+ai-agent-name
+h-tmux-pane-of-pid "$(h-agent-done-pid "$(ai-agent-name)")"
+```
+
+The pane helper prints a pane and returns 0 on success, returns 1 when complete
+ancestry has no tmux context or matching pane, and returns 2 on uncertainty.
+For the full resolver, `agent-done --dry-run 'test summary'` additionally saves
+a report and prints the PID, pane, TTY and socket without ending anything.
+Regression checks use isolated fake process/tmux commands:
+`zsh -f zshlang/tests/agent-done-detection.zsh`.
 
 A background Claude Code session -- `claude --bg`, or one backgrounded from the
 agent view -- has no pane and no tty to leave the report on, and its pid belongs
@@ -277,7 +315,8 @@ All dynamically scoped, all read with [agfi:bool] where they are boolean:
 - `agent_done_agent`, `agent_done_pid`, `agent_done_tty`, `agent_done_cwd` —
   override what would otherwise be detected. These exist for testing, and are
   what let a probe run the whole path against a `sleep` standing in for an
-  agent.
+  agent. The PID must still have inspectable ancestry; a TTY override does not
+  bypass pane-ownership checks.
 - `agent_done_resume_cmd` — what `prefix-r` runs in the dead pane instead of
   the default resume.
 - `agent_skills_link_verbose_p` — say which links were made.

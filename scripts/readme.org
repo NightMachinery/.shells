@@ -29,6 +29,11 @@ links under =~/.agents/skills=; =agent-skills-prune-legacy-codex= safely removes
 our obsolete =~/.codex/skills= links after migration. Bundled =.system= skills
 are preserved. See =./docs/agent-done.md=.
 
+[agfi:agent-done] recognizes unsandboxed Codex conversation IDs and recovers
+tmux pane ownership through process ancestry, including terminal proxies.
+Ambiguous ownership saves the report but refuses automatic termination;
+=--dry-run= verifies the target without ending the session.
+
 Selected Zsh directories under =./zshlang/= can be structured as public plugins while remaining the local source of truth. Plugin entrypoint files named =*.plugin.zsh= should stay thin loaders; implementation should live in modular =*.zsh= files.
 
 See =./docs/zsh_plugins.md= for layout conventions and generic plugin-manager notes.

@@ -379,9 +379,11 @@ function h-agent-done-watch {
     #: the agent's process tree -- under the tmux server, or disowned -- because
     #: an agent commonly takes its shell tool's children with it when it exits,
     #: and this must outlive exactly that.
-    #: Usage: h-agent-done-watch <pid> <pane> <report> <tty> [pane-script]
+    #: Usage: h-agent-done-watch <pid> <pane> <report> <tty> [pane-script] [socket]
     ##
-    local pid="${1}" pane="${2}" report="${3}" tty="${4}" script="${5}"
+    local pid="${1}" pane="${2}" report="${3}" tty="${4}" script="${5}" socket="${6:-}"
+    local -a tmux_args
+    test -z "${socket}" || tmux_args=(-S "${socket}")
     assert-args report @RET
 
     #: Politeness with a deadline: the agent gets `agent_done_wait_s' to write
@@ -423,7 +425,7 @@ function h-agent-done-watch {
         else
             display="printf '\033[H\033[2J\n' ; command cat -- ${(q)report}"
         fi
-        command tmux respawn-pane -k -t "${pane}" "${display}" 2>/dev/null && return 0
+        command tmux "${tmux_args[@]}" respawn-pane -k -t "${pane}" "${display}" 2>/dev/null && return 0
     fi
 
     #: No pane, or tmux would not have it: write to the terminal the session
@@ -512,7 +514,15 @@ work is actually finished. --dry-run writes the report and kills nothing."
         fi
     fi
 
-    local pane="${TMUX_PANE}" tty="${agent_done_tty}" cwd="${agent_done_cwd}"
+    local pane='' socket='' tty="${agent_done_tty}" cwd="${agent_done_cwd}"
+    local -i pane_status=0
+    if test -z "${bg_short}" ; then
+        pane="$(h-tmux-pane-of-pid "${pid}")" || pane_status=$?
+        (( pane_status <= 1 )) || pane_status=2
+    fi
+    #: Also give managed-resume and cue helpers the recovered pane. This is
+    #: scoped to this invocation, not a repair of the caller's environment.
+    local -x TMUX_PANE="${pane}"
     if test -n "${pane}" ; then
         #: The pane's own tty and directory, not this shell's. The shell an
         #: agent runs its tools in usually has no controlling terminal, and it
@@ -521,6 +531,11 @@ work is actually finished. --dry-run writes the report and kills nothing."
         #: it. The pane is where the session actually lives.
         test -n "${tty}" || tty="$(command tmux display-message -p -t "${pane}" '#{pane_tty}' 2>/dev/null)" || tty=''
         test -n "${cwd}" || cwd="$(command tmux display-message -p -t "${pane}" '#{pane_current_path}' 2>/dev/null)" || cwd=''
+        socket="$(command tmux display-message -p -t "${pane}" '#{socket_path}' 2>/dev/null)" || socket=''
+        if [[ -z "${tty}" || -z "${socket}" ]] ; then
+            ecerr "$0: cannot read the owning pane's tty/socket"
+            pane_status=2
+        fi
     fi
     test -n "${cwd}" || cwd="${PWD}"
     #: The session's own directory in preference to the pane's: they are the
@@ -532,7 +547,7 @@ work is actually finished. --dry-run writes the report and kills nothing."
     #: shell an agent runs its tools in has no controlling terminal, so it
     #: cannot name the terminal the *session* is attached to. The agent process
     #: can -- it is the one holding it.
-    if test -z "${tty}" && test -n "${pid}" ; then
+    if (( pane_status != 2 )) && test -z "${tty}" && test -n "${pid}" ; then
         local pts
         pts="$(command ps -o tty= -p "${pid}" 2>/dev/null)"
         pts="${pts//[[:space:]]/}"
@@ -563,17 +578,33 @@ work is actually finished. --dry-run writes the report and kills nothing."
     h-agent-done-report "${agent}" "${id}" "${name}" "${transcript}" "${cwd}" "${seat}" "${report}" @RET
     h-agent-done-pane-script "${report}" "${transcript}" "${cwd}" "${script}" @RET
 
+    if (( pane_status == 2 )) ; then
+        ecerr "$0: cannot safely determine pane ownership; nothing ended; report: ${report}"
+        return 2
+    fi
+
     if bool "${dry_p}" ; then
         ec "would end: ${agent}${name:+ (${name})}${id:+ ${id}}"
         if test -n "${bg_short}" ; then
             ec "would stop the background session ${bg_short} with \`claude stop' and notify; report: ${report}"
         else
-            ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>}"
+            ec "would kill: pid=${pid:-<unknown>} pane=${pane:-<none>} tty=${tty:-<none>} socket=${socket:-<none>}"
         fi
         ec "would forget this session's /auto-continue registration, if it has one"
         ec "report: ${report}"
         ec "pane script (prefix-r resumes): ${script}"
         return 0
+    fi
+
+    #: Resolving transcripts/writing a report takes time. Recheck ownership
+    #: before unregistering or scheduling any destructive action.
+    if test -z "${bg_short}" ; then
+        local current_pane='' current_status=0
+        current_pane="$(h-tmux-pane-of-pid "${pid}")" || current_status=$?
+        if (( current_status != pane_status )) || [[ "${current_pane}" != "${pane}" ]] ; then
+            ecerr "$0: pane ownership changed; nothing ended; report: ${report}"
+            return 2
+        fi
     fi
 
     #: A session ending on purpose is finished, and must not be typed into at
@@ -618,7 +649,7 @@ work is actually finished. --dry-run writes the report and kills nothing."
     if test -n "${pane}" ; then
         #: Set before anything is killed: tmux only keeps a dead pane on
         #: screen if the option was already on when it died.
-        command tmux set-option -p -t "${pane}" remain-on-exit on 2>/dev/null || true
+        command tmux -S "${socket}" set-option -p -t "${pane}" remain-on-exit on 2>/dev/null @RET
         #: Under the tmux server, so it survives this pane by construction.
         #: An absolute zsh, because `run-shell' inherits the server's
         #: environment, which is whatever the first client happened to have.
@@ -626,9 +657,11 @@ work is actually finished. --dry-run writes the report and kills nothing."
         #: too, so the function is there without paying for an interactive
         #: startup.
         local watch_cmd
-        watch_cmd="h-agent-done-watch ${(q)pid} ${(q)pane} ${(q)report} ${(q)tty} ${(q)script}"
-        command tmux run-shell -b \
-            "${commands[zsh]:-zsh} -c ${(qq)watch_cmd}" 2>/dev/null || true
+        #: Carry the socket explicitly: the detached watcher's environment
+        #: need not select this server, and pane IDs are only server-local.
+        watch_cmd="h-agent-done-watch ${(q)pid} ${(q)pane} ${(q)report} ${(q)tty} ${(q)script} ${(q)socket}"
+        command tmux -S "${socket}" run-shell -b \
+            "${commands[zsh]:-zsh} -c ${(qq)watch_cmd}" 2>/dev/null @RET
     else
         #: No tmux server to hide behind, so the watcher has to become a
         #: session leader in its own right ([agfi:awaysh-sure], which is
