@@ -97,6 +97,12 @@ and arrange for the report to appear once it is gone.
 `--dry-run` does everything except the killing and prints what it resolved,
 which is how the whole path is testable without ending a session.
 
+Codex detection accepts `CODEX_THREAD_ID` and the older `CODEX_SESSION_ID`,
+as well as `CODEX_SANDBOX` and `AI_AGENT=codex*`. An elevated/full-access tool
+shell can lack the sandbox marker while still belonging to a conversation.
+These inherited markers identify agent context, not process ownership or a
+security boundary. Test with `zsh -f zshlang/tests/agent-detection.zsh`.
+
 A background Claude Code session -- `claude --bg`, or one backgrounded from the
 agent view -- has no pane and no tty to leave the report on, and its pid belongs
 to the daemon's pty host. `agent-done` recognises one through
