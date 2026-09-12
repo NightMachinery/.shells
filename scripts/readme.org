@@ -24,6 +24,10 @@ the chord behavior and qView examples.
 
 * Zsh plugins
 
+The shared =note= skill drafts concise notes under =~/notes=, uses Luna in
+Codex or Sonnet in Claude to find a suitable destination, and waits for approval
+of the exact path and draft before saving. See =./docs/note-skill.md=.
+
 Shared agent skills are installed by =agent-skills-link=. Codex uses directory
 links under =~/.agents/skills=; =agent-skills-prune-legacy-codex= safely removes
 our obsolete =~/.codex/skills= links after migration. Bundled =.system= skills
