@@ -131,8 +131,8 @@ function emc-gateway {
         reval "${emc_engine[@]}" "$@"
 }
 
-function emc-mobile {
-    #: Shares the ordinary daemon by default.
+function h-emc-mobile-in-daemon {
+    #: Runs a command with the daemon selection shared by the mobile launchers.
     #:
     #: Emacs 29.2 -- and master, checked against the source -- leaks minibuffer
     #: depth when one terminal tries to prompt while another holds a minibuffer
@@ -159,7 +159,25 @@ function emc-mobile {
         local -x ALTERNATE_EDITOR=""
     fi
 
-    TERM=xterm-emacs emc-gateway --frame-parameters '((night/mobile . t))' "$@"
+    "$@"
+}
+
+function emc-mobile {
+    local clipboard_ssh_host="${emc_mobile_clipboard_ssh_host}"
+    local frame_parameters='((night/mobile . t))'
+    if test -n "${clipboard_ssh_host}" ; then
+        frame_parameters="((night/mobile . t) (night/clipboard-ssh-host . $(emc-quote "${clipboard_ssh_host}")))"
+    fi
+
+    TERM=xterm-emacs h-emc-mobile-in-daemon \
+        emc-gateway --frame-parameters "${frame_parameters}" "$@"
+}
+
+function emc-tealy {
+    : "runs [agfi:emc-mobile] with oversized clipboard copies sent to the SSH host tealy"
+
+    local emc_mobile_clipboard_ssh_host=tealy
+    emc-mobile "$@"
 }
 
 function emc-mobile-tmux {
@@ -199,6 +217,7 @@ function emc-mobile-tmux {
     ensure-cmd tmux @RET
 
     local session="${emc_mobile_tmux_session:-emacs-mobile}"
+    local engine="${emc_mobile_tmux_engine:-emc-mobile}"
 
     #: [agfi:tmux-ensure-attach] ignores the command when the session is
     #: already alive, so file arguments would otherwise vanish silently.
@@ -207,11 +226,26 @@ function emc-mobile-tmux {
         ecerr "$0: open them from inside Emacs, or quit the frame first."
     fi
 
-    #: `emc-mobile' is a zsh function, and tmux execs a multi-argument
+    #: The engine is a zsh function, and tmux execs a multi-argument
     #: shell-command directly rather than through a shell, so it has to be
     #: wrapped -- the same shape [agfi:tma-z] and [agfi:tmuxnewsh] use.
     tmux-ensure-attach "${session}" \
-        zsh -c "FORCE_INTERACTIVE=y emc-mobile $(gq "$@")"
+        zsh -c "FORCE_INTERACTIVE=y $(gq "${engine}" "$@")"
+}
+
+function emc-tealy-tmux {
+    : "runs [agfi:emc-tealy] in a tmux session named emacs-tealy"
+
+    local emc_mobile_tmux_engine=emc-tealy
+    local emc_mobile_tmux_session=emacs-tealy
+    emc-mobile-tmux "$@"
+}
+
+function emc-tealy-cache-clear {
+    : "forgets the current Emacs daemon's cached SSH readiness for tealy"
+
+    h-emc-mobile-in-daemon \
+        emc-eval '(night/mobile-clipboard-cache-clear "tealy")'
 }
 
 function emc-open-no-server {
