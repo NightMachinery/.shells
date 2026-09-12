@@ -41,6 +41,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from libs.codex_rate_limits import block_state, get_codex_limit
+
 
 DEFAULT_STATUS_CMD = ["codex_status.py", "--json"]
 
@@ -116,103 +118,35 @@ def run_json(cmd: list[str]) -> dict[str, Any]:
         ) from exc
 
 
-def get_codex_limit(status: dict[str, Any]) -> dict[str, Any] | None:
-    """
-    Prefer rateLimitsByLimitId.codex, then fallback to top-level rateLimits.
-    """
-    by_id = status.get("rateLimitsByLimitId")
-    if isinstance(by_id, dict):
-        codex = by_id.get("codex")
-        if isinstance(codex, dict):
-            return codex
-
-    top = status.get("rateLimits")
-    if isinstance(top, dict):
-        return top
-
-    return None
-
-
-def reset_time_for_window(window: Any) -> int | None:
-    if not isinstance(window, dict):
-        return None
-
-    resets_at = window.get("resetsAt")
-    if isinstance(resets_at, (int, float)):
-        return int(resets_at)
-
-    return None
-
-
-def used_percent(window: Any) -> float | None:
-    if not isinstance(window, dict):
-        return None
-
-    pct = window.get("usedPercent")
-    if isinstance(pct, (int, float)):
-        return float(pct)
-
-    return None
-
-
 def decide_wait(status: dict[str, Any]) -> WaitDecision:
     limit = get_codex_limit(status)
-    if not limit:
+    if limit is None:
         return WaitDecision(False, None, "No codex rate-limit object found.")
 
-    reached_type = limit.get("rateLimitReachedType")
-    exhausted_windows: list[tuple[str, int]] = []
+    #: Window-count agnostic, and a missing window means "unconstrained", not
+    #: "spent" -- plans differ in how many windows they report, and the prolite
+    #: plan reports only a weekly one. `block_state` also trusts the explicit
+    #: signals (rateLimitReachedType, ordinaryUsageAllowed, spendControlReached)
+    #: over the percentages, which can be missing or round below 100.
+    #:
+    #: Its reset time is the LATEST among the blocked windows: a short window
+    #: rolling over buys nothing while a longer one is still spent. We re-poll
+    #: after waking, so erring long is safe and erring short spins.
+    state = block_state(limit, envelope=status)
+    if not state.blocked:
+        # Important: credits.hasCredits=false does not necessarily mean the
+        # account cannot run Codex. In the sample status, the windows are not
+        # exhausted and rateLimitReachedType is null, so we should continue.
+        return WaitDecision(False, None, "Codex usage available.")
 
-    for name in ("primary", "secondary"):
-        window = limit.get(name)
-        pct = used_percent(window)
-        resets_at = reset_time_for_window(window)
+    reason = "Codex blocked: " + "; ".join(state.reasons) + "."
 
-        if pct is not None and pct >= 100 and resets_at is not None:
-            exhausted_windows.append((name, resets_at))
+    if state.resets_at is not None and state.resets_at > now():
+        return WaitDecision(True, int(state.resets_at), f"{reason} Waiting for reset.")
 
-    # If the status command explicitly reports a reached limit, trust it even
-    # if usedPercent is missing or rounded below 100.
-    if reached_type:
-        resets: list[tuple[str, int]] = []
-
-        for name in ("primary", "secondary"):
-            resets_at = reset_time_for_window(limit.get(name))
-            if resets_at is not None:
-                resets.append((name, resets_at))
-
-        if resets:
-            # Conservative choice: wait until the soonest reset that is still
-            # in the future. If both are past, fall back to a short wait.
-            future = [(name, ts) for name, ts in resets if ts > now()]
-            if future:
-                name, ts = min(future, key=lambda item: item[1])
-                return WaitDecision(
-                    True,
-                    ts,
-                    f"Codex rate limit reached ({reached_type}); waiting for {name} window reset.",
-                )
-
-        return WaitDecision(
-            True,
-            now() + 300,
-            f"Codex rate limit reached ({reached_type}); no reset timestamp found, waiting 5 minutes.",
-        )
-
-    if exhausted_windows:
-        future = [(name, ts) for name, ts in exhausted_windows if ts > now()]
-        if future:
-            name, ts = min(future, key=lambda item: item[1])
-            return WaitDecision(
-                True,
-                ts,
-                f"Codex {name} usage window is exhausted.",
-            )
-
-    # Important: credits.hasCredits=false does not necessarily mean the account
-    # cannot run Codex. In the sample status, primary/secondary are not exhausted
-    # and rateLimitReachedType is null, so we should continue.
-    return WaitDecision(False, None, "Codex usage available.")
+    return WaitDecision(
+        True, now() + 300, f"{reason} No future reset timestamp found, waiting 5 minutes."
+    )
 
 
 def wait_until_available(status_cmd: list[str], poll_after_sleep: bool = True) -> None:
