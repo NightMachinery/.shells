@@ -107,9 +107,13 @@ Termux. Installation and verification: =./docs/emacs-truecolor.md=.
 =emc-mobile= opens a truecolor terminal frame with mobile line-number suppression.
 Copies from these frames use Emacs's native OSC 52 support to reach the terminal
 client's clipboard; limits and tmux setup are in =./docs/emacs-mobile-clipboard.md=.
+=emc-tealy= adds an authenticated SSH fallback for copies larger than the OSC 52
+limit, caching phone reachability for 15 minutes; =emc-tealy-cache-clear= expires
+that cache explicitly.
 The deferred receiver design is in =./.docs/plans/clipboard-listener.md=.
 =emc-mobile-tmux= hosts that frame in a tmux session named =emacs-mobile=, so its
 tty outlives the connection instead of dying with it, and reattaches to it later.
+=emc-tealy-tmux= does the same in a separate =emacs-tealy= session.
 
 Under tmux the colors are re-encoded through the attached client's terminfo, so a
 Termux client reporting =xterm-kitty= received a spelling it cannot parse and
