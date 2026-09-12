@@ -91,12 +91,12 @@ whichm through bat; at top level on a tty, also copies the names given, one per 
     #: [agfi:fn-isTop]: `whh' and friends call this too, and they want the
     #: listing, not the clipboard.
     ##
-    whichm "$@" | btz
-
     if (( $# )) && isOutTty && fn-isTop ; then
-        #: Joined, not `print -l': no trailing newline on the clipboard.
-        pbcopy "${(pj:\n:)@}"
+        #: Joined: no trailing newline on the clipboard.
+        pbcopy "${(pj:\n:)@}" || true
     fi
+
+    whichm "$@" | btz
 }
 
 function whh() {
