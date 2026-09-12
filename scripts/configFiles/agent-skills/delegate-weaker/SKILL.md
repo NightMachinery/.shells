@@ -1,9 +1,9 @@
 ---
-name: delegate-mechanical-work
+name: delegate-weaker
 description: Preserve Fable and Astra token quota by delegating substantial mechanical work to cheaper subagents. Use when Fable (Claude) or Astra (Codex) has repetitive edits, bounded implementation, extraction, or routine validation that can be specified and checked cheaply.
 ---
 
-# Delegate mechanical work
+# Delegate to weaker models
 
 When acting as Fable or Astra, proactively delegate substantial mechanical work
 to the user's preferred cheaper models. Keep problem framing, consequential
