@@ -100,7 +100,9 @@ function h-codex-session-resume {
     id="$(h-codex-session-id-of "${transcript}")" @RET
 
     #: In the session's own directory ([agfi:h-agent-session-resume-run]).
-    h-agent-session-resume-run "${transcript}" codex resume "${id}" "$@"
+    local -a reply
+    h-agent-session-resume-argv codex "${id}" codex "$@" @RET
+    h-agent-session-resume-run "${transcript}" "${reply[@]}"
 }
 
 function h-codex-session-account {
