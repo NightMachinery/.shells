@@ -65,10 +65,13 @@ kitty's `ls` JSON and a window id, and tries five things:
    Matching the spelled name looks right and silently never matches.
 2. **The agent runs in the window.** A foreground pid of the window equals a
    live session's pid. Nothing to go stale here.
-3. **A tmux client whose session the hooks never recorded.** The session name is
-   matched against the live rows' tmux column, and only an unambiguous single
+3. **A tmux client whose session the hooks never recorded.** The actual session
+   name from the same client-pid lookup is matched against the live rows' tmux
+   column, and only an unambiguous single
    hit counts: one tmux session can host several agents in several panes. This
    is what covers an agent whose hooks are not trusted yet.
+   The original attach argument is never used here: it may be a numeric `$id`,
+   a name changed by a hook, or the session the client showed before switching.
 4. **The window shows an agent's own view** (`claude agents`, `claude attach`).
    Those set the window title to the attached session's name, sometimes behind
    a status glyph. That is observed rather than documented, so it counts only
@@ -83,6 +86,12 @@ it comes last. When all five come up empty the hotkey does not guess: it opens
 the picker as a kitty overlay over the window
 ([agfi:h-agent-session-pick-overlay]), and `enter` there opens the choice in
 the background under the same band.
+
+Multiple live transcripts for a foreground process or attached tmux session
+also go to the picker. A thread switch can briefly leave both parent and fork
+live; the historical registry must not override that ambiguity. Duplicate rows
+for the same transcript count as one candidate. Run the isolated regression
+checks with `zsh -f zshlang/tests/agent-session-kitty.zsh`.
 
 ## Why the lookup is fast
 

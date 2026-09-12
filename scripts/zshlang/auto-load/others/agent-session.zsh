@@ -1037,8 +1037,8 @@ function h-agent-session-of-kitty-window {
     #:    processes in the foreground, so the pid test would not have fired.
     #: 1. The agent runs in the window itself: a foreground pid of the window
     #:    is a live session's pid.
-    #: 2. The window shows a tmux client whose NAME matches the live rows' tmux
-    #:    column, for a session whose hooks have not written the option.
+    #: 2. The window shows a tmux client whose current session matches the live
+    #:    rows' tmux column, even when the hooks have not written the option.
     #: 3. The window shows an agent's own view (`claude agents', `claude
     #:    attach'): the view sets the window title to the attached session's
     #:    name, at times with a status glyph in front. Observed rather than
@@ -1065,8 +1065,8 @@ function h-agent-session-of-kitty-window {
     fg_pids=( ${=row[3]} )
     fg_cmds=( "${(@ps:\037:)row[4]}" )
 
-    local -a f
-    local cmd tname identity
+    local -a f tmux_sessions
+    local tname identity transcript
 
     #: 0. The hooks' record on the tmux session this window's client is
     #: attached to: `agent<TAB>id<TAB>transcript'. Before the live listing,
@@ -1074,6 +1074,7 @@ function h-agent-session-of-kitty-window {
     local pid
     for pid in "${fg_pids[@]}" ; do
         tname="$(h-agent-session-tmux-client-session "${pid}")" || continue
+        tmux_sessions+=( "${tname}" )
         identity="$(h-agent-session-tmux-identity "${tname}")" || continue
 
         f=( "${(@ps:\t:)identity}" )
@@ -1105,27 +1106,41 @@ function h-agent-session-of-kitty-window {
         done
     done
 
+    hits=()
     for row in "${live[@]}" ; do
         if (( ${fg_pids[(Ie)${row%%$'\t'*}]} )) ; then
-            h-agent-session-row-transcript "${row}" && return 0
+            transcript="$(h-agent-session-row-transcript "${row}")" && hits+=( "${transcript}" )
         fi
     done
+    hits=( "${(@u)hits}" )
+    if (( ${#hits} == 1 )) ; then
+        ec "${hits[1]}"
+        return 0
+    elif (( ${#hits} > 1 )) ; then
+        #: A thread switch can briefly leave both rollouts live. A historical
+        #: registry entry must not turn this ambiguity into the wrong answer.
+        return 1
+    fi
 
     #: 2. A tmux client whose session the hooks never recorded.
-    for cmd in "${fg_cmds[@]}" ; do
-        tname="$(h-agent-session-tmux-target "${cmd}")" || continue
-
-        hits=()
+    #: Reuse the PID lookup above: an attach argument may be a numeric `$id',
+    #: an old name, or a different session since the client switched.
+    hits=()
+    for tname in "${(@u)tmux_sessions}" ; do
         for row in "${live[@]}" ; do
             f=( "${(@ps:\t:)row}" )
-            [[ "${f[6]}" == "${tname}" ]] && hits+=("${row}")
+            if [[ "${f[6]}" == "${tname}" ]] ; then
+                transcript="$(h-agent-session-row-transcript "${row}")" && hits+=( "${transcript}" )
+            fi
         done
-        #: One tmux session can host several agents in several panes; then
-        #: the window alone does not say which is meant.
-        if (( ${#hits} == 1 )) ; then
-            h-agent-session-row-transcript "${hits[1]}" && return 0
-        fi
     done
+    hits=( "${(@u)hits}" )
+    if (( ${#hits} == 1 )) ; then
+        ec "${hits[1]}"
+        return 0
+    elif (( ${#hits} > 1 )) ; then
+        return 1
+    fi
 
     #: 3. An agent's view, by title.
     local attach_p=n
@@ -1149,6 +1164,8 @@ function h-agent-session-of-kitty-window {
         done
         if (( ${#hits} == 1 )) ; then
             h-agent-session-row-transcript "${hits[1]}" && return 0
+        elif (( ${#hits} > 1 )) ; then
+            return 1
         fi
     fi
 
