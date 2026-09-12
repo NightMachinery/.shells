@@ -742,3 +742,124 @@ aliasfn claude-code-view-reap agent-view-reap
 aliasfn claude-code-session-live-fz agent_session_agents=claude agent-session-live-fz
 aliasfn claude-session-selftest agent-session-selftest
 ##
+##
+#: Background sessions: reaching one that has no terminal
+##
+#: How long to wait for an attached background session to show its prompt
+#: before giving up on typing into it.
+typeset -g claude_code_bg_attach_wait_s="${claude_code_bg_attach_wait_s:-20}"
+
+function h-claude-code-bg-find {
+    #: Finds a *running* background session by its full session id across
+    #: every config home. Prints `<config home>\t<short id>\t<state>', or fails.
+    #: `claude agents --json' is scoped to one home, so each is asked in turn,
+    #: the personal one with CLAUDE_CONFIG_DIR unset
+    #: ([agfi:h-claude-code-session-live-list-sh] says why). A finished
+    #: background session comes back with a null pid and does not count.
+    #: Usage: h-claude-code-bg-find <session-id>
+    ##
+    local id="${1}"
+    assert-args id @RET
+
+    ensure-cmd claude jq @RET
+
+    local -a projects_dirs
+    projects_dirs=("${(@f)$(h-claude-code-session-projects-dirs)}") @TRET
+
+    local home agents out
+    for home in "${projects_dirs[@]}" ; do
+        home="${home:h}"
+
+        if [[ "${home}" == "${HOME}/.claude" ]] ; then
+            agents="$( (unset CLAUDE_CONFIG_DIR ; command claude agents --json) 2>/dev/null )" || continue
+        else
+            agents="$(CLAUDE_CONFIG_DIR="${home}" command claude agents --json 2>/dev/null)" || continue
+        fi
+
+        out="$(ec "${agents}" | jq -r --arg id "${id}" \
+            '[.[] | select(.kind == "background" and .sessionId == $id and .pid != null)] | first | select(. != null) | [.id, (.state // "-")] | @tsv' 2>/dev/null)" || out=''
+        if test -n "${out}" ; then
+            printf '%s\t%s\n' "${home}" "${out}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+function h-claude-code-bg-send-text {
+    #: Types a line into a background Claude Code session -- one that runs
+    #: under `claude --bg' with no terminal of its own, which is what the agent
+    #: view attaches to. Nothing delivers a message to a session by id, so
+    #: the delivery is the one the docs give a person: `claude attach <id>'
+    #: opens the session's prompt in a terminal and keystrokes go to it. That
+    #: terminal is a scratch tmux session made here, the text is typed with
+    #: [agfi:tmux-pane-send-text] once the prompt shows, Ctrl+Z drops the
+    #: attach back to the shell, and the scratch session is killed. The
+    #: background session keeps running through all of it -- measured on a
+    #: throwaway one: prompt within two seconds, reply in its `claude logs',
+    #: state unchanged after the detach.
+    #:
+    #: Under the session's own config home, since `attach' looks the id up in
+    #: that home's daemon; the personal home means CLAUDE_CONFIG_DIR unset.
+    #: Usage: h-claude-code-bg-send-text <session-id> <text>
+    ##
+    local wait_s="${claude_code_bg_attach_wait_s:-20}"
+
+    local id="${1}" text="${2}"
+    assert-args id text @RET
+
+    ensure-cmd claude tmux @RET
+
+    local found
+    found="$(h-claude-code-bg-find "${id}")" || {
+        ecerr "$0: no running background session ${id}"
+        return 1
+    }
+    local -a f
+    f=( "${(@ps:\t:)found}" )
+    local home="${f[1]}" short="${f[2]}"
+
+    local attach_cmd
+    if [[ "${home}" == "${HOME}/.claude" ]] ; then
+        attach_cmd="unset CLAUDE_CONFIG_DIR ; exec claude attach ${(q)short}"
+    else
+        attach_cmd="CLAUDE_CONFIG_DIR=${(q)home} exec claude attach ${(q)short}"
+    fi
+
+    #: Per session, so two resumes firing at once do not share a terminal.
+    local scratch="agent-usage-attach-${short}"
+    silent tmuxnew "${scratch}" -x 120 -y 30 "${attach_cmd}" @RET
+
+    local sid pane
+    sid="$(tmux-session-id "${scratch}")" @TRET
+    pane="$(command tmux list-panes -t "${sid}" -F '#{pane_id}' 2>/dev/null | command head -n1)"
+
+    #: The prompt marker, not a fixed sleep: attaching is usually a second or
+    #: two, and typing before it is there is typing into nothing.
+    local -i waited=0
+    local retcode=0
+    while (( waited < wait_s )) ; do
+        if command tmux capture-pane -p -t "${pane}" 2>/dev/null | command grep -q '❯' ; then
+            break
+        fi
+        sleep 1
+        (( waited++ ))
+    done
+
+    if (( waited >= wait_s )) ; then
+        ecerr "$0: ${short}: no prompt after ${wait_s}s of attaching, not typing"
+        retcode=1
+    else
+        tmux-pane-send-text "${pane}" "${text}" || retcode=$?
+        sleep 1
+    fi
+
+    #: Ctrl+Z is attach's own "back to the shell"; the kill is for the pane
+    #: it leaves behind, and for an attach that never got that far.
+    command tmux send-keys -t "${pane}" C-z 2>/dev/null || true
+    sleep 1
+    silent tmux-session-processes-kill "${scratch}" || true
+
+    return "${retcode}"
+}

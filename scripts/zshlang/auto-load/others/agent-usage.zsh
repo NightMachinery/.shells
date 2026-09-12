@@ -208,8 +208,10 @@ function h-agent-usage-screen-locked-p {
 function h-agent-usage-continue-send {
     #: Delivers the resume text to one target: `kitty:<window-id>` types into
     #: that window, `tmux:<pane-id>` types into that pane,
-    #: `codex:<thread-id>` queues the message with Codex itself, and
-    #: `frontmost` types wherever the keyboard focus happens to be.
+    #: `codex:<thread-id>` queues the message with Codex itself,
+    #: `claude-bg:<session-id>` attaches a scratch terminal to a background
+    #: Claude Code session and types there, and `frontmost` types wherever
+    #: the keyboard focus happens to be.
     ##
     local target="${1}"
     assert-args target @RET
@@ -223,6 +225,13 @@ function h-agent-usage-continue-send {
         #: the thread id comes from.
         ensure-cmd codex @RET
         reval-ec command codex queue --thread "${target#codex:}" --message "${text}"
+        return $?
+    fi
+
+    if [[ "${target}" == claude-bg:* ]] ; then
+        #: A background Claude Code session has no terminal to type into;
+        #: [agfi:h-claude-code-bg-send-text] attaches one for the duration.
+        h-claude-code-bg-send-text "${target#claude-bg:}" "${text}"
         return $?
     fi
 
