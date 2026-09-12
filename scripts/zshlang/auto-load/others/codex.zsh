@@ -71,10 +71,11 @@ function codex-m {
     fi
 
     # -c model_reasoning_effort="high"
-    #: Termux toasts background-session title changes, so keep the title static
-    #: while retaining animations inside Codex. Put this before user arguments
-    #: so an explicit override wins; see =docs/tmux-tty-title.md=.
-    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=["app-name","project-name"]' --search --approve-for-me "$@"
+    #: Show the project and task name without the working spinner that triggers
+    #: repeated Termux toasts. Thread-name generation can still briefly animate;
+    #: TUI animations stay enabled. User arguments can override this default.
+    #: See =docs/tmux-tty-title.md=.
+    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=["project-name","thread-name"]' --search --approve-for-me "$@"
     # -c web_search="true"
     # -c model_verbosity="high"
     #

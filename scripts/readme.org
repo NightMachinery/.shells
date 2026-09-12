@@ -130,8 +130,9 @@ reached only the pane title: =set-titles= is off by default, so tmux never
 forwarded it to the attached client. Cause and fix, along with a command
 injection found in the same function: =./docs/tmux-tty-title.md=.
 
-[agfi:codex-m] preserves the launcher's static =⚡<directory>= title to avoid repeated
-Termux toasts from background sessions, while keeping animations inside Codex.
+[agfi:codex-m] shows =project | task name= in the terminal title without the
+working spinner, reducing Termux toasts while keeping animations inside Codex.
+Thread-name generation can still briefly animate the title.
 Explicit =-c tui.terminal_title= arguments override that launcher default; the
 tradeoffs and Termux behavior are documented in =./docs/tmux-tty-title.md=.
 

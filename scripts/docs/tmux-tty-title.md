@@ -237,17 +237,21 @@ session name before trying it as a prefix.
 
 ## Codex titles and Termux toasts
 
-[agfi:codex-m] passes `-c 'tui.terminal_title=["app-name","project-name"]'`
-to keep its terminal title static while retaining animations inside the TUI.
-Codex 0.154.0 otherwise animates its activity title every 100 ms, and its
-thread-name component can animate during name generation too. Termux 0.118.1
+[agfi:codex-m] passes `-c 'tui.terminal_title=["project-name","thread-name"]'`
+to show `project | task name` without the working activity spinner, while
+retaining animations inside the TUI. The task name is Codex's thread name,
+not the current tool operation or checklist step; it is omitted while unnamed.
+Codex 0.154.0 otherwise animates its activity title every 100 ms. The selected
+thread-name component can still animate briefly during name generation, and
+renaming the thread changes the title, so this reduces rather than eliminates
+title-change toasts. Termux 0.118.1
 shows a toast when a background session's title changes while the app is
 visible. Its `disable-terminal-session-change-toast` property only suppresses
 session-switch toasts, not these title-change toasts.
 
-The resulting title identifies Codex and the project, replacing the launcher's
+The resulting title identifies the project and task, replacing the launcher's
 `⚡<directory>` marker; title-based kitty matching for that marker therefore
-does not apply. Activity and thread names remain available inside Codex.
+does not apply. Activity remains visible inside Codex.
 The bare [agfi:codex] wrapper is unchanged. User arguments follow this default,
 so another explicit list can restore dynamic items.
 Already-running sessions are unaffected by this launcher change.
