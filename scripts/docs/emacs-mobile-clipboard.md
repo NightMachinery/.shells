@@ -21,6 +21,28 @@ Newer Termux versions may support larger messages; increase the Emacs option
 it. OSC 52 does not acknowledge clipboard writes. Paste via the terminal's
 Paste action; no clipboard-read feature is enabled.
 
+Clipboard reads are a separate terminal capability. Emacs has a native OSC 52
+query backend (`getSelection` / `xterm--get-selection`), but Termux's current
+[OSC 52 handler](https://github.com/termux/termux-app/blob/master/terminal-emulator/src/main/java/com/termux/terminal/TerminalEmulator.java)
+only decodes incoming data and copies it; it does not answer `OSC 52 ; c ; ? ST`
+queries. Enabling queries in `emc-mobile` therefore cannot retrieve the Termux
+clipboard and can introduce timeouts. No automatic query is enabled, and no
+probe is sent to the phone. A third-party Emacs package cannot supply a missing
+terminal response.
+
+For interactive use, Termux's Paste action sends the clipboard through the
+existing terminal connection; Emacs already supports bracketed paste. This
+avoids the outgoing OSC 52 copy limit and needs no reverse SSH connection, but
+it requires a user paste action. On terminals that implement clipboard queries,
+OSC 52 reads can work without reverse SSH, subject to terminal permissions,
+response sizes, and multiplexer support; they are not inherently unlimited.
+
+For scripted reads, use [agfi:tealy-paste], or
+`h-paste-from-remote-termux phone-alias`. These print the phone's current
+clipboard over SSH; see [remote Termux clipboard reads](remote-termux-clipboard.md).
+SSH avoids the OSC transport limit but still depends on Termux:API and Android
+clipboard access. It is independent of the Emacs copy reachability cache.
+
 `emc-tealy` is the large-copy variant. Copies up to the OSC limit still use OSC
 52. Larger copies are piped over authenticated SSH to the host alias `tealy` and
 into `termux-clipboard-set`; the text is not placed in command-line arguments.

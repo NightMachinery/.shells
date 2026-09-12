@@ -1,4 +1,25 @@
 ##
+function h-paste-from-remote-termux {
+    : "usage: h-paste-from-remote-termux HOST
+Print HOST's Termux clipboard to stdout over SSH."
+
+    ensure-cmd ssh @RET
+
+    if (( $# != 1 )) || [[ -z "$1" || "$1" == -* || "$1" == *[[:space:]]* ]] ; then
+        ecerr "usage: h-paste-from-remote-termux HOST"
+        return 2
+    fi
+
+    local host="$1"
+    command ssh -n -T "$host" termux-clipboard-get
+}
+
+function tealy-paste {
+    : "print the tealy Termux clipboard to stdout"
+
+    h-paste-from-remote-termux tealy "$@"
+}
+##
 function pbcopy-lilf {
     local inargs=''
     in-or-args2 "$@"
