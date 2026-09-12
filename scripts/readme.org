@@ -28,6 +28,10 @@ Selected Zsh directories under =./zshlang/= can be structured as public plugins 
 
 See =./docs/zsh_plugins.md= for layout conventions and generic plugin-manager notes.
 
+The shared =zsh-plugin-authoring= skill in
+=./configFiles/agent-skills/zsh-plugin-authoring/SKILL.md= guides plugin extraction
+and standalone verification.
+
 * Pandoc conversion
 
 [[agfi:pandoc-convert]] (=./zshlang/auto-load/others/pandoc.zsh=) is the single
