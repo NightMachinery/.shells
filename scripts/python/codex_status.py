@@ -5,6 +5,7 @@ import argparse
 import base64
 import concurrent.futures
 import json
+import math
 import os
 import re
 import select
@@ -649,6 +650,39 @@ def reportable_limits(status: AuthStatus, display: Display) -> list[LimitView]:
     return views
 
 
+#: Days remaining at which a grant's expiry starts shouting, and how loudly.
+#: Ordered most urgent first; the first threshold a grant is at or under wins,
+#: and anything past the last one is left uncoloured -- a credit two months out
+#: is not news.
+#:
+#: The last tier is reverse video over red rather than another hue: the palette
+#: is spent by then (green means available, warn and error are the two tiers
+#: above, identity is already Plan/Workspace), and an attribute outranks any
+#: colour it is layered on.
+RESET_CREDIT_URGENCY = (
+    (3, lambda style, text: style.inverse(style.red(text))),
+    (7, lambda style, text: style.red(text)),
+    (14, lambda style, text: style.yellow(text)),
+)
+
+
+def format_expiry(style: Style, expires_at: float, *, now: float | None = None) -> str:
+    """An expiry, coloured by how little time is left.
+
+    Uncoloured until a fortnight out. Bold once coloured, because the point is
+    to catch the eye of someone skimming for the usage numbers.
+    """
+    seconds_left = expires_at - (time.time() if now is None else now)
+    days_left = math.floor(seconds_left / 86400)
+    text = format_relative(expires_at)
+
+    for threshold, paint in RESET_CREDIT_URGENCY:
+        if days_left <= threshold:
+            return paint(style, style.bold(text))
+
+    return text
+
+
 def format_reset_credits(style: Style, credits: ResetCredits) -> str:
     titles = [c.title for c in credits.available_credits if c.title]
     detail = ", ".join(dict.fromkeys(titles))
@@ -658,7 +692,7 @@ def format_reset_credits(style: Style, credits: ResetCredits) -> str:
     if detail:
         text = f"{text} ({detail}"
         if expiry:
-            text = f"{text}, expires {format_relative(min(expiry))}"
+            text = f"{text}, expires {format_expiry(style, min(expiry))}"
         text = f"{text})"
     return text
 
@@ -1750,7 +1784,11 @@ def print_human_statuses(
             print()
         print_human_status(status, style, display=display, show_auth_header=show_auth_header)
 
-    if show_auth_header and statuses and display.average:
+    #: An average over one auth is that auth's own numbers a second time, so
+    #: the block only earns its lines when there is something to average.
+    #: JSON keeps `averageUsage' unconditionally -- the arms read
+    #: `firstTimeToReset' from it, single auth or not.
+    if show_auth_header and len(statuses) > 1 and display.average:
         print()
         print_average_usage(statuses, style, display)
 
@@ -2081,7 +2119,7 @@ def print_human_swap_result(result: SwapResult, *, args: argparse.Namespace) -> 
             extra_lines=extra_lines,
         )
 
-    if result.statuses and display.average:
+    if len(result.statuses) > 1 and display.average:
         print()
         print_average_usage(result.statuses, style, display)
 
