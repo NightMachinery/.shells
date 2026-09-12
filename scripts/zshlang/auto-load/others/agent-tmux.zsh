@@ -69,9 +69,9 @@ function h-agent-session-tmux-name {
 
 function h-agent-tmux-autoname {
     #: The hook core: <agent> <pane> <id> <transcript>. Records the identity,
-    #: then renames the tmux session when allowed. Every early return is an
-    #: ordinary outcome, not an error: no tmux, the option off, a name that is
-    #: already right. Silent throughout; the hook lines discard output anyway.
+    #: then renames the tmux session when allowed. Identity-write failures
+    #: propagate for diagnostics; skipped or failed renames are ordinary
+    #: outcomes. Silent throughout; the hook lines discard output anyway.
     #:
     #: Sessions named `ag--*' are never touched, whatever the option says.
     #: They belong to the tmux-subagents skill, which keeps readable task and
@@ -81,7 +81,7 @@ function h-agent-tmux-autoname {
     test -n "${pane}" || return 0
     test -n "${id}${transcript}" || return 0
 
-    h-agent-tmux-identity-set "${pane}" "${agent}" "${id}" "${transcript}" || return 0
+    h-agent-tmux-identity-set "${pane}" "${agent}" "${id}" "${transcript}" || return $?
 
     local current
     current="$(command tmux display-message -p -t "${pane}" '#S' 2>/dev/null)" || return 0
@@ -149,18 +149,63 @@ function h-codex-session-tmux-name {
     ec "${agent_tmux_name_marker}Codex ${name:-${id[1,8]}}"
 }
 
+function h-agent-hook-status {
+    #: Latest identity-hook outcome per agent/pane, never the prompt or payload.
+    #: Atomic replacement bounds each record and keeps concurrent readers from
+    #: seeing half a JSON object. Diagnostic failures must not break a hook.
+    ##
+    local agent="${1}" pane="${2}" id="${3}" outcome="${4}"
+    local state_home="${XDG_STATE_HOME:-${HOME}/.local/state}"
+    [[ "${agent}" == (claude|codex|agy) ]] || return 0
+    local key=no-pane
+    [[ "${pane}" == %<-> ]] && key="${pane#%}"
+    local dir="${state_home}/agent-sessions/hooks" tmp
+    (
+        umask 077
+        command mkdir -p -- "${dir}" || return 0
+        tmp="$(command mktemp "${dir}/.${agent}-${key}.XXXXXX")" || return 0
+        if command jq --null-input --compact-output \
+            --arg agent "${agent}" --arg pane "${pane}" --arg id "${id}" \
+            --arg outcome "${outcome}" \
+            '{agent:$agent,pane:$pane,id:$id,outcome:$outcome,timestamp:(now|todateiso8601)}' > "${tmp}" ; then
+            command mv -f -- "${tmp}" "${dir}/${agent}-${key}.json" || command rm -f -- "${tmp}"
+        else
+            command rm -f -- "${tmp}"
+        fi
+    ) 2>/dev/null || true
+}
+
 function codex-session-tmux-autoname {
     : "hook body for Codex's SessionStart and UserPromptSubmit: <tmux-pane> [payload]"
     local pane="${1}"
     local input
     input="$(h-agent-hook-payload "${2}")"
-    test -n "${input}" || return 0
-
     local id transcript
-    id="$(ec "${input}" | jq -r '.session_id // empty' 2>/dev/null)"
-    transcript="$(ec "${input}" | jq -r '.transcript_path // empty' 2>/dev/null)"
-
-    h-agent-tmux-autoname codex "${pane}" "${id}" "${transcript}"
+    if ! id="$(ec "${input}" | command jq --exit-status --raw-output \
+        '.session_id | select(type == "string" and length > 0)' 2>/dev/null)" ; then
+        h-agent-hook-status codex "${pane}" '' invalid-payload
+        return 0
+    fi
+    #: Subagents report their parent's session_id. Their inherited pane does
+    #: not prove that this event describes what the terminal currently shows.
+    if ec "${input}" | command jq --exit-status '.agent_id != null and .agent_id != ""' >/dev/null 2>&1 ; then
+        return 0
+    fi
+    if [[ "${pane}" != %<-> ]] ; then
+        h-agent-hook-status codex "${pane}" "${id}" no-pane
+        return 0
+    fi
+    h-agent-hook-status codex "${pane}" "${id}" received
+    #: SessionStart may have no transcript_path yet. Reuse the adapter's exact
+    #: ID fallback rather than leaving an already-existing transcript unknown.
+    transcript="$(h-codex-session-hook-transcript "${input}")" || transcript=''
+    if ! h-agent-tmux-autoname codex "${pane}" "${id}" "${transcript}" ; then
+        h-agent-hook-status codex "${pane}" "${id}" identity-failed
+        return 0
+    fi
+    local outcome=recorded-id
+    test -n "${transcript}" && outcome=recorded
+    h-agent-hook-status codex "${pane}" "${id}" "${outcome}"
 }
 ##
 #: Antigravity. Conversations are summarised in a sqlite database: `title'
