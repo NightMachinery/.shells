@@ -5,7 +5,7 @@ asks Fable and Astra to preserve their token quota by assigning substantial,
 well-specified mechanical work to cheaper workers:
 
 - Fable / Claude routes to Opus.
-- Astra / Codex routes straightforward tasks to GPT 5.6 Luna and bounded
+- Astra / Codex routes straightforward tasks to GPT 5.6 Terra and bounded
   implementation needing more reasoning to GPT 5.6 Sol.
 
 The parent keeps decisions, integration, and review. Explicit worker selection,

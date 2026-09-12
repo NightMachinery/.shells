@@ -30,7 +30,7 @@ our obsolete =~/.codex/skills= links after migration. Bundled =.system= skills
 are preserved. See =./docs/agent-done.md=.
 
 The shared =delegate-mechanical-work= skill routes Fable's mechanical work to
-Opus and Astra's to GPT 5.6 Sol or Luna, keeping decisions and review with the
+Opus and Astra's to GPT 5.6 Sol or Terra, keeping decisions and review with the
 parent. See =./docs/delegate-mechanical-work.md= for scope and activation.
 
 [agfi:agent-done] recognizes unsandboxed Codex conversation IDs and recovers
