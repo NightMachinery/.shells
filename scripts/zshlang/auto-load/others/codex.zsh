@@ -71,11 +71,10 @@ function codex-m {
     fi
 
     # -c model_reasoning_effort="high"
-    #: Preserve the static ⚡<directory> title from [agfi:h-agent-launch]: Codex's
-    #: title items cannot contain a literal emoji, and animated title changes
-    #: trigger Termux toasts. TUI animations stay enabled; user arguments can
-    #: override this default. See =docs/tmux-tty-title.md=.
-    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=[]' --search --approve-for-me "$@"
+    #: Termux toasts background-session title changes, so keep the title static
+    #: while retaining animations inside Codex. Put this before user arguments
+    #: so an explicit override wins; see =docs/tmux-tty-title.md=.
+    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=["app-name","project-name"]' --search --approve-for-me "$@"
     # -c web_search="true"
     # -c model_verbosity="high"
     #
