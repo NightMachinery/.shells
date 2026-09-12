@@ -87,6 +87,14 @@
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-tmux-autoname \"$TMUX_PANE\" >/dev/null 2>&1"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash bell-claude-ack >/dev/null 2>&1"
+          }
+        ]
       }
     ]
   },
