@@ -142,6 +142,10 @@ client's clipboard; limits and tmux setup are in =./docs/emacs-mobile-clipboard.
 =emc-tealy= adds an authenticated SSH fallback for copies larger than the OSC 52
 limit, caching phone reachability for 15 minutes; =emc-tealy-cache-clear= expires
 that cache explicitly.
+=tealy-paste= prints the phone clipboard over SSH; the generic helper is
+=h-paste-from-remote-termux HOST=. See =./docs/remote-termux-clipboard.md=.
+Termux does not answer OSC 52 clipboard queries; its Paste action works through
+the existing terminal connection without a reverse SSH connection.
 The deferred receiver design is in =./.docs/plans/clipboard-listener.md=.
 =emc-mobile-tmux= hosts that frame in a tmux session named =emacs-mobile=, so its
 tty outlives the connection instead of dying with it, and reattaches to it later.
