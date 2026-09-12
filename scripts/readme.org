@@ -24,6 +24,11 @@ the chord behavior and qView examples.
 
 * Zsh plugins
 
+Shared agent skills are installed by =agent-skills-link=. Codex uses directory
+links under =~/.agents/skills=; =agent-skills-prune-legacy-codex= safely removes
+our obsolete =~/.codex/skills= links after migration. Bundled =.system= skills
+are preserved. See =./docs/agent-done.md=.
+
 Selected Zsh directories under =./zshlang/= can be structured as public plugins while remaining the local source of truth. Plugin entrypoint files named =*.plugin.zsh= should stay thin loaders; implementation should live in modular =*.zsh= files.
 
 See =./docs/zsh_plugins.md= for layout conventions and generic plugin-manager notes.
