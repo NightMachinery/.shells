@@ -118,7 +118,7 @@ reached only the pane title: =set-titles= is off by default, so tmux never
 forwarded it to the attached client. Cause and fix, along with a command
 injection found in the same function: =./docs/tmux-tty-title.md=.
 
-[agfi:codex-m] uses a static Codex/project terminal title to avoid repeated
+[agfi:codex-m] preserves the launcher's static =⚡<directory>= title to avoid repeated
 Termux toasts from background sessions, while keeping animations inside Codex.
 Explicit =-c tui.terminal_title= arguments override that launcher default; the
 tradeoffs and Termux behavior are documented in =./docs/tmux-tty-title.md=.

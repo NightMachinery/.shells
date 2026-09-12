@@ -71,10 +71,11 @@ function codex-m {
     fi
 
     # -c model_reasoning_effort="high"
-    #: Termux toasts background-session title changes, so keep the title static
-    #: while retaining animations inside Codex. Put this before user arguments
-    #: so an explicit override wins; see =docs/tmux-tty-title.md=.
-    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=["app-name","project-name"]' --search --approve-for-me "$@"
+    #: Preserve the static ⚡<directory> title from [agfi:h-agent-launch]: Codex's
+    #: title items cannot contain a literal emoji, and animated title changes
+    #: trigger Termux toasts. TUI animations stay enabled; user arguments can
+    #: override this default. See =docs/tmux-tty-title.md=.
+    $proxyenv reval-ec codex "${security_opts[@]}" -c model_reasoning_summary="detailed" -c 'tui.terminal_title=[]' --search --approve-for-me "$@"
     # -c web_search="true"
     # -c model_verbosity="high"
     #
@@ -202,6 +203,32 @@ function codex-status-armed-sessions {
     ec 'codex-status-armed'
 }
 
+function h-codex-status-reset-credit-note {
+    #: A free "Full reset" grant ends a wait early, so say so at arm time:
+    #: being told to come back in six days is the moment you want to know the
+    #: wait is skippable. Reported, never redeemed -- spending a one-off grant
+    #: is the user's call.
+    #: Usage: h-codex-status-reset-credit-note <json>
+    ##
+    local json="${1}"
+    test -n "${json}" || return 0
+
+    local count
+    count="$(ec "${json}" | jq -r '
+        [.authFiles[]? // .
+         | .quota.resetCredits.availableCount // 0] | add // 0')" || return 0
+
+    if test -n "${count}" && (( count > 0 )) ; then
+        local titles
+        titles="$(ec "${json}" | jq -r '
+            [.authFiles[]? // .
+             | .quota.resetCredits.credits[]?
+             | select(.status == "available") | .title]
+            | unique | join(", ")')" || titles=''
+        ecgray "$0: ${count} reset credit(s) available${titles:+ (${titles})} -- the wait can be skipped"
+    fi
+}
+
 function h-codex-status-arm {
     #: Arms, or re-arms, a one-shot job for when Codex's quota comes back.
     ##
@@ -236,16 +263,26 @@ function h-codex-status-arm {
             return 0
         fi
 
-        #: deus: arm for the earliest primary (5h) rollover among the auth
-        #: files that answered, whether or not anything is exhausted, so the
-        #: mechanism can be exercised without first running every account dry.
+        #: deus: arm for the earliest rollover among the auth files that
+        #: answered, whether or not anything is exhausted, so the mechanism can
+        #: be exercised without first running every account dry.
+        #:
+        #: The SHORTEST window per auth, not `.rateLimits.primary': which slot
+        #: holds the short window is plan-dependent, and on plans reporting a
+        #: single weekly window `primary' is that weekly one -- a week away,
+        #: which is useless for exercising anything. `.quota.windows' is
+        #: duration-labelled, so `min_by' picks the soonest genuinely short
+        #: window; the `.rateLimits' path stays as a fallback for a report
+        #: predating `.quota'.
         #:
         #: `numbers' drops a null or a missing reset time rather than letting
         #: it sort to the front and arm us for the epoch.
         out="$(ec "${json}" |
             jq -r '[.authFiles[]
                     | select(.ok)
-                    | {at: (.rateLimits.primary.resetsAt | numbers), alias: (.alias // "?")}
+                    | {at: (((.quota.windows // [] | min_by(.windowDurationMins) | .resetsAt)
+                            // .rateLimits.primary.resetsAt) | numbers),
+                       alias: (.alias // "?")}
                     | select(.at != null)]
                 | sort_by(.at) | first
                 | select(. != null)
@@ -259,8 +296,10 @@ function h-codex-status-arm {
             return 0
         fi
 
-        msg="Codex (${auth_alias}): primary window rolled over"
+        msg="Codex (${auth_alias}): shortest window rolled over"
     fi
+
+    h-codex-status-reset-credit-note "${json}"
 
     #: A reset time arrives as a float often enough to matter, and integer
     #: arithmetic on one aborts rather than rounds. [agfi:h-agent-usage-arm]
@@ -324,10 +363,15 @@ function h-codex-status-arm-auth {
     #: unlike [agfi:h-codex-status-arm], which waits for every auth to be
     #: exhausted because a person can `swap'. A running thread cannot: it is
     #: signed in to one auth and stays blocked until that one resets, which is
-    #: what [agfi:agent-auto-continue-check] is waiting on. So this reads that
-    #: auth's own windows and, like Claude's arm, takes the LATEST reset among
-    #: the blocked ones -- a primary rollover buys nothing while the weekly
-    #: window is spent.
+    #: what [agfi:agent-auto-continue-check] is waiting on.
+    #:
+    #: The verdict comes from =codex_status.py='s `.quota' rather than being
+    #: re-derived here: which windows a plan reports is not fixed (prolite
+    #: reports one weekly window and no secondary), and a second copy of that
+    #: rule in jq is a second copy to get wrong. `.quota.resetsAt' is already
+    #: the LATEST reset among the blocked windows -- a short rollover buys
+    #: nothing while a longer window is spent -- and `--full-pct' hands our
+    #: threshold to the script so both agree on what "spent" means.
     #: Usage: h-codex-status-arm-auth <session> <alias>
     ##
     local full_pct="${codex_status_arm_full_pct:-100}"
@@ -338,7 +382,7 @@ function h-codex-status-arm-auth {
     ensure-cmd jq @RET
 
     local json
-    json="$(codex_status_strip_ansi_p=y codex-status --json)" @TRET
+    json="$(codex_status_strip_ansi_p=y codex-status --json --full-pct "${full_pct}")" @TRET
 
     local auth
     auth="$(ec "${json}" | jq -c --arg alias "${auth_alias}" \
@@ -352,48 +396,44 @@ function h-codex-status-arm-auth {
         return 1
     fi
 
-    #: One row per window: label, percent used, reset epoch. `numbers' drops
-    #: a null or missing value rather than letting it read as zero.
-    local windows
-    windows="$(ec "${auth}" | jq -r '
-        [ (.rateLimits.primary // {} | {label: "primary", pct: (.usedPercent | numbers), at: (.resetsAt | numbers)}),
-          (.rateLimits.secondary // {} | {label: "secondary", pct: (.usedPercent | numbers), at: (.resetsAt | numbers)}) ]
-        | map(select(.pct != null and .at != null))
-        | .[] | [.label, (.pct | tostring), (.at | tostring)] | @tsv')" || windows=''
-
-    local line label pct at
-    local -a f blocked_labels
+    #: `.quota' carries the verdict, the deadline and the human reasons. The
+    #: `numbers' guard stays: a blocked auth whose windows report no reset time
+    #: must not arm us for the epoch.
+    local blocked_p reasons
+    blocked_p="$(ec "${auth}" | jq -r '.quota.blocked // false')" || blocked_p=false
     integer blocked_at=0
-    for line in ${(f)windows} ; do
-        f=( "${(@ps:\t:)line}" )
-        label="${f[1]}" pct="${f[2]%.*}" at="${f[3]%.*}"
-        if (( pct >= full_pct )) && (( at > 0 )) ; then
-            blocked_labels+=( "${label}" )
-            (( at > blocked_at )) && blocked_at=${at}
-        fi
-    done
+    blocked_at="$(ec "${auth}" | jq -r '(.quota.resetsAt | numbers) // 0')" || blocked_at=0
+    blocked_at=${blocked_at%.*}
+    reasons="$(ec "${auth}" | jq -r '[.quota.reasons[]?] | join(", ")')" || reasons=''
 
     integer deadline=0
     local msg=''
-    if (( ${#blocked_labels} == 0 )) ; then
+    if ! bool "${blocked_p}" || (( blocked_at == 0 )) ; then
         if ! isDeus ; then
             ecgray "$0: ${auth_alias}: usage already possible, not arming (use \`deus\` to arm anyway)"
             return 0
         fi
 
-        #: deus: the primary rollover, so the mechanism can be exercised
-        #: without running the account dry.
-        deadline="$(ec "${windows}" | gawk -F'\t' '$1 == "primary" { print $3 }')"
+        #: deus: the shortest window's rollover, so the mechanism can be
+        #: exercised without running the account dry. Shortest rather than
+        #: `primary', because which slot holds the short window is
+        #: plan-dependent and on a single-window plan `primary' is the weekly
+        #: one.
+        deadline="$(ec "${auth}" | jq -r '
+            ((.quota.windows // [] | min_by(.windowDurationMins) | .resetsAt)
+             // .rateLimits.primary.resetsAt | numbers) // 0')" || deadline=0
         deadline=${deadline%.*}
         if (( deadline == 0 )) ; then
-            ecgray "$0: ${auth_alias}: no primary reset time in the report, not arming"
+            ecgray "$0: ${auth_alias}: no reset time in the report, not arming"
             return 0
         fi
-        msg="Codex (${auth_alias}): primary window rolled over"
+        msg="Codex (${auth_alias}): shortest window rolled over"
     else
         deadline=${blocked_at}
-        msg="Codex (${auth_alias}): ${(j:, :)blocked_labels} reset, usage available again"
+        msg="Codex (${auth_alias}): ${reasons:-quota} reset, usage available again"
     fi
+
+    h-codex-status-reset-credit-note "${auth}"
 
     #: Same picker narrowing as [agfi:h-codex-status-arm], for a caller that
     #: presets no targets.
