@@ -177,4 +177,5 @@ function agent-status {
         pager-if-overflow-streaming
 }
 aliasfn agst agent-status
+aliasfn as agent-status #: @nameconfilct (macOS)
 ##
