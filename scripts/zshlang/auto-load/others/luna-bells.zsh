@@ -1443,6 +1443,58 @@ function bell-gpt {
     #: remove `awaysh` if you want to run using `bell-auto`
 }
 
+function h-bell-agent-name {
+    : "bounded display-name lookup for <app> <payload> <id>"
+    local app="${1}" input="${2}" id="${3}"
+    local config_home="${CODEX_HOME:-${HOME}/.codex}"
+    whence -p jq >/dev/null 2>&1 || return 1
+    if [[ "$app" == Claude ]] ; then
+        whence -p agent_session >/dev/null 2>&1 || return 1
+    fi
+
+    #: A separate process group lets gtimeout kill the lookup and its children
+    #: without process enumeration. Pass function bodies and payload as data;
+    #: zsh -f avoids profile startup, dependency installation, and live sessions.
+    CODEX_HOME="$config_home" command gtimeout --signal=KILL 2 zsh -f -c '
+        function ec { print -r -- "$@"; }
+        functions[codex-thread-name]="$1"
+        functions[h-bell-agent-name-read]="$2"
+        h-bell-agent-name-read "$3" "$4" "$5"
+    ' agent-notification-name "${functions[codex-thread-name]}" \
+        "${functions[h-bell-agent-name-read]}" "$app" "$input" "$id"
+}
+
+function h-bell-agent-name-read {
+    : "display name for precisely the session in <app> <payload> <id>"
+    #: [agfi:h-bell-agent-name] bounds this whole lookup with gtimeout.
+    #: No dependency installer or active-session/profile discovery on this path.
+    local app="${1}" input="${2}" id="${3}"
+    whence -p jq >/dev/null 2>&1 || return 1
+
+    local name='' transcript=''
+    case "$app" in
+        Claude)
+            whence -p agent_session >/dev/null 2>&1 || return 1
+            transcript="$(ec "$input" | command jq --raw-output '.transcript_path | strings')" || return 1
+            [[ -n "$transcript" && -f "$transcript" && -r "$transcript" ]] || return 1
+            #: The filename wrapper discards readable punctuation and spaces.
+            name="$(command agent_session claude name "$transcript")" || return 1
+            ;;
+        Codex)
+            test -n "$id" || return 1
+            name="$(codex-thread-name "$id")" || return 1
+            ;;
+        *) return 1 ;;
+    esac
+
+    ec "$name" | command jq --raw-input --slurp --raw-output '
+        gsub("[\\s\u0085\u2028\u2029]+"; " ")
+        | gsub("[\u0000-\u001f\u007f-\u009f]"; "")
+        | sub("^ +"; "") | sub(" +$"; "")
+        | if length > 120 then .[:119] + "…" else . end
+    '
+}
+
 function h-bell-agent-hook {
     : "shared entry point for the coding-agent hooks
 
@@ -1457,18 +1509,24 @@ Code's Notification but not its Stop), hence the fallback."
         input="$(gtimeout 2 cat)" || input=''
     fi
 
-    local msg='' cwd='' id=''
-    if test -n "$input" ; then
-        msg="$(ec "$input" | jq -r '.message // empty' 2>/dev/null)" || msg=''
-        cwd="$(ec "$input" | jq -r '.cwd // empty' 2>/dev/null)" || cwd=''
+    local msg='' cwd='' id='' name=''
+    if test -n "$input" && ec "$input" | command jq --exit-status --slurp \
+        'length == 1 and (.[0] | type == "object")' >/dev/null 2>&1 ; then
+        msg="$(ec "$input" | command jq --raw-output '.message | strings' 2>/dev/null)" || msg=''
+        cwd="$(ec "$input" | command jq --raw-output '.cwd | strings' 2>/dev/null)" || cwd=''
         id="$(h-bell-agent-payload-id "$input")" || id=''
+        name="$(h-bell-agent-name "$app" "$input" "$id" 2>/dev/null)" || name=''
     fi
 
     #: The project name matters when several sessions are waiting at once, so it goes
     #: in the prefix rather than trailing the message: a batched Telegram is then
     #: scannable down its left edge.
-    local tag=''
-    test -n "$cwd" && tag=" [${cwd:t}]"
+    local tag="${cwd:t}"
+    if test -n "$name" ; then
+        test -n "$tag" && tag+=' · '
+        tag+="$name"
+    fi
+    test -n "$tag" && tag=" [${tag}]"
 
     if test -n "$msg" ; then
         msg="${app}${tag}: ${msg}"
@@ -1490,12 +1548,16 @@ Code's Notification but not its Stop), hence the fallback."
 
 function h-bell-agent-payload-id {
     : "the session id an agent's hook payload is about, whichever agent wrote it"
-    #: Claude Code and Codex say `session_id', Antigravity `conversationId'.
+    #: Codex notify also uses `thread-id'; ack must read the same identity.
     ##
     local input="${1}"
     test -n "$input" || return 1
 
-    ec "$input" | jq -r '.session_id // .thread_id // .conversationId // empty' 2>/dev/null
+    ec "$input" | command jq --slurp --raw-output '
+        if length == 1 and (.[0] | type == "object") then
+            .[0] | (.session_id // .thread_id // .["thread-id"] // .conversationId) | strings
+        else empty end
+    ' 2>/dev/null
 }
 
 function h-bell-agent-group {
@@ -1536,7 +1598,10 @@ Payload in \$2 or on stdin, as with [agfi:h-bell-agent-hook]. Silent throughout.
     test -n "$input" || return 0
 
     local cwd id
-    cwd="$(ec "$input" | jq -r '.cwd // empty' 2>/dev/null)" || cwd=''
+    cwd="$(ec "$input" | command jq --slurp --raw-output '
+        if length == 1 and (.[0] | type == "object") then .[0].cwd | strings
+        else empty end
+    ' 2>/dev/null)" || cwd=''
     id="$(h-bell-agent-payload-id "$input")" || id=''
 
     local group

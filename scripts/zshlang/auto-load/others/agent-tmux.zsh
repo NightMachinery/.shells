@@ -124,12 +124,19 @@ function claude-code-session-tmux-autoname {
 function codex-thread-name {
     : "prints the current name of a Codex thread, or nothing if it has none"
     local id="${1}"
-    assert-args id @RET
-    local index="${CODEX_HOME:-${HOME}/.codex}/session_index.jsonl"
+    test -n "$id" || return 1
+    local config_home="${CODEX_HOME:-${HOME}/.codex}"
+    local index="${config_home}/session_index.jsonl"
 
     test -r "${index}" || return 0
-    jq -r --arg id "${id}" 'select(.id == $id) | .thread_name // empty' "${index}" 2>/dev/null |
-        tail -n 1
+    #: Reduce records before printing: tail would lose multiline names, and
+    #: skipping an empty/null/missing name would resurrect an earlier title.
+    command jq --null-input --raw-output --arg id "${id}" '
+        reduce inputs as $entry ("";
+            if ($entry | type) == "object" and $entry.id == $id then
+                ($entry.thread_name | if type == "string" then . else "" end)
+            else . end)
+    ' "${index}" 2>/dev/null
 }
 
 function h-codex-session-tmux-name {

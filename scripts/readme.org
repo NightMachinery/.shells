@@ -161,7 +161,14 @@ ntag notes are tracked in =./docs/ntag/=.
 * Bells
 
 =bell-auto= escalates from sound to a desktop notification to Telegram, and picks
-its behaviour from whether we are at the office. See =./docs/bell-auto.md=.
+its behaviour from whether we are at the office. Claude and Codex notifications
+include the thread name when available, e.g. =Claude [scripts · Fix terminal titles]:
+needs your permission= or =Codex awaits! [scripts · Fix terminal titles]=. Lookup
+uses only the supplied Claude transcript or the Codex ID in the current
+=CODEX_HOME= index, with a two-second limit and the original format on failure.
+Names are limited to one line and 120 characters; acknowledgement groups stay
+keyed by session ID. Run =brishz-restart= after updating the hooks; queued text
+stays as captured. See =./docs/bell-auto.md= for lookup and fallback details.
 
 * CIS thesis applications
 
