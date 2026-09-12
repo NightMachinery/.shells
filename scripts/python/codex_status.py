@@ -16,6 +16,29 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from libs.codex_rate_limits import (
+    DEFAULT_FULL_PCT,
+    BlockState,
+    LimitView,
+    ResetCredits,
+    Window,
+    block_state,
+    get_codex_limit,
+    json_number,
+    longest_window,
+    iter_windows,
+    limit_json,
+    limit_source,
+    limits_by_id,
+    limit_view,
+    reset_credits,
+    reset_credits_json,
+    signals_json,
+    usage_sort_key,
+    used_percent,
+    reset_time_for_window,
+    window_json,
+)
 from libs.common_sub_status import (
     DARK_THEME_DEFAULT,
     DARK_THEMES,
@@ -88,6 +111,33 @@ class AuthStatus:
 
 
 @dataclass(frozen=True)
+class Display:
+    """What the human/JSON report includes, and where "full" sits.
+
+    Bundled rather than passed field by field, because every print_* helper
+    needs most of it and their signatures were already long.
+    """
+
+    limits: re.Pattern[str] | None = None
+    show_limits: bool = True
+    reset_credits: bool = True
+    signals: bool = True
+    average: bool = True
+    full_pct: float = DEFAULT_FULL_PCT
+
+
+def build_display(args: argparse.Namespace) -> Display:
+    return Display(
+        limits=getattr(args, "limits", None),
+        show_limits=getattr(args, "show_limits", True),
+        reset_credits=getattr(args, "reset_credits", True),
+        signals=getattr(args, "signals", True),
+        average=getattr(args, "average", True),
+        full_pct=getattr(args, "full_pct", DEFAULT_FULL_PCT),
+    )
+
+
+@dataclass(frozen=True)
 class SwapResult:
     selected: AuthStatus | None
     previously_active: AuthStatus | None
@@ -108,6 +158,34 @@ def parse_timeout() -> float:
         return float(raw)
     except ValueError:
         return 20.0
+
+
+def compiled_regex(raw: str) -> re.Pattern[str] | None:
+    if not raw:
+        return None
+
+    try:
+        return re.compile(raw, re.IGNORECASE)
+    except re.error as exc:
+        raise argparse.ArgumentTypeError(f"invalid regex {raw!r}: {exc}") from exc
+
+
+def parse_full_pct() -> float:
+    #: `codex_status_arm_full_pct` is the zsh side's name for the same knob
+    #: ([agfi:h-codex-status-arm-auth]); reading it here keeps Python and the
+    #: arms from disagreeing about what counts as spent.
+    raw = env_first(
+        "codex_status_full_pct",
+        "CODEX_STATUS_FULL_PCT",
+        "codex_status_arm_full_pct",
+        default=str(DEFAULT_FULL_PCT),
+    )
+    assert raw is not None
+
+    try:
+        return float(raw)
+    except ValueError:
+        return DEFAULT_FULL_PCT
 
 
 def parse_worker_default() -> int:
@@ -225,6 +303,63 @@ def parse_args(argv: list[str] | None = None) -> ParsedArgs:
         action=argparse.BooleanOptionalAction,
         default=False,
         help="For swap, select an auth without replacing auth.json.",
+    )
+    parser.add_argument(
+        "--limits",
+        type=compiled_regex,
+        default=compiled_regex(env_first("codex_status_limits", "CODEX_STATUS_LIMITS", default="")),
+        metavar="REGEX",
+        help=(
+            "Also show per-model-family limits whose id or name matches this regex. "
+            "Idle families are hidden unless matched."
+        ),
+    )
+    parser.add_argument(
+        "--show-limits",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Show non-idle per-model-family limits (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--reset-credits",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Show available rate-limit reset credits (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--signals",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Show blocking signals and upsells. Display only: they still decide "
+            "whether an auth is usable (default: %(default)s)."
+        ),
+    )
+    parser.add_argument(
+        "--average",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Show the average-usage summary (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--full-pct",
+        type=float,
+        default=parse_full_pct(),
+        metavar="PCT",
+        help=(
+            "Utilization at which a window counts as spent. Lower it to exercise "
+            "the exhausted path without running an account dry (default: %(default)s)."
+        ),
+    )
+    parser.add_argument(
+        "--from-json",
+        dest="from_json",
+        default="",
+        metavar="FILE",
+        help=(
+            "Replay a saved --json report instead of running codex app-server. "
+            "Use '-' for stdin."
+        ),
     )
 
     args, unknown = parser.parse_known_args(raw_argv)
@@ -455,45 +590,77 @@ def run_codex_session(
     return session
 
 
-def numeric_used_percent(window: object) -> float | None:
-    if not isinstance(window, dict):
-        return None
+def format_window_line(style: Style, window: Window) -> str:
+    """One usage window, labelled by its duration rather than its slot.
 
-    value = window.get("usedPercent")
-    if not isinstance(value, (int, float)):
-        return None
-
-    return float(value)
-
-
-def numeric_reset_time(window: object) -> float | None:
-    if not isinstance(window, dict):
-        return None
-
-    value = window.get("resetsAt")
-    if not isinstance(value, (int, float)):
-        return None
-
-    return float(value)
-
-
-def format_window(style: Style, label: str, *, window: dict | None) -> str:
-    if not isinstance(window, dict):
-        return f"{label}: {style.dim('n/a')}"
-
-    used = window.get("usedPercent")
-    resets_at = window.get("resetsAt")
-    duration_mins = window.get("windowDurationMins")
-
-    bits = [f"{label}: {format_used_percent(style, used)} used"]
-    if resets_at is None:
+    The slot name is no longer informative: on the prolite plan `primary` *is*
+    the weekly window, so "Primary ... window 10080m" invites a 7-day budget to
+    be read as a 5-hour one.
+    """
+    bits = [f"{window.label}: {format_used_percent(style, window.used_percent)} used"]
+    if window.resets_at is None:
         bits.append(f"resets {style.dim('n/a')}")
     else:
-        bits.append(f"resets {format_relative(resets_at)} ({format_timestamp(resets_at)})")
-    if duration_mins is not None:
-        bits.append(f"window {duration_mins}m")
+        bits.append(
+            f"resets {format_relative(window.resets_at)} "
+            f"({format_timestamp(window.resets_at)})"
+        )
+    if window.duration_mins is not None:
+        bits.append(f"window {window.duration_mins:g}m")
 
     return " | ".join(bits)
+
+
+def format_limit_line(style: Style, view: LimitView) -> str:
+    """A per-model-family limit, compressed onto one line."""
+    windows = " | ".join(
+        f"{w.label} {format_used_percent(style, w.used_percent)}"
+        + (f" (resets {format_relative(w.resets_at)})" if w.resets_at is not None else "")
+        for w in view.windows
+    )
+    return f"{style.magenta(view.display_name)}: {windows or style.dim('no windows reported')}"
+
+
+def limit_is_interesting(view: LimitView, display: Display) -> bool:
+    """Whether a non-default limit earns its line in the report.
+
+    Idle families are noise for the common single-account case, so they stay
+    hidden until they are actually being consumed, are blocked, or the user
+    asks for them by name.
+    """
+    if display.limits is not None and display.limits.search(
+        f"{view.limit_id or ''} {view.limit_name or ''}"
+    ):
+        return True
+    if not display.show_limits:
+        return False
+    if block_state(view.raw, full_pct=display.full_pct).blocked:
+        return True
+    return any(w.used_percent is not None and w.used_percent > 0 for w in view.windows)
+
+
+def reportable_limits(status: AuthStatus, display: Display) -> list[LimitView]:
+    effective = status_codex_limit(status)
+    views = [
+        view
+        for view in limits_by_id(status.rate_result)
+        if view.raw is not effective and limit_is_interesting(view, display)
+    ]
+    return views
+
+
+def format_reset_credits(style: Style, credits: ResetCredits) -> str:
+    titles = [c.title for c in credits.available_credits if c.title]
+    detail = ", ".join(dict.fromkeys(titles))
+    expiry = [c.expires_at for c in credits.available_credits if c.expires_at is not None]
+
+    text = style.green(f"{credits.available_count} available")
+    if detail:
+        text = f"{text} ({detail}"
+        if expiry:
+            text = f"{text}, expires {format_relative(min(expiry))}"
+        text = f"{text})"
+    return text
 
 
 def format_credits(style: Style, *, credits: dict | None) -> str:
@@ -1239,22 +1406,75 @@ def gather_statuses(parsed: ParsedArgs, sources: list[AuthSource]) -> list[AuthS
     return [status for status in statuses if status is not None]
 
 
+def statuses_from_report(raw: object) -> list[AuthStatus]:
+    """Rebuild statuses from a saved `--json` report.
+
+    Lets the blocked/exhausted paths be exercised against a hand-edited payload
+    rather than by running an account dry, which is the only honest way to test
+    the code that only runs when quota is gone.
+    """
+    entries: list[dict]
+    if isinstance(raw, dict) and isinstance(raw.get("authFiles"), list):
+        entries = [e for e in raw["authFiles"] if isinstance(e, dict)]
+    elif isinstance(raw, dict):
+        entries = [raw]
+    elif isinstance(raw, list):
+        entries = [e for e in raw if isinstance(e, dict)]
+    else:
+        entries = []
+
+    statuses: list[AuthStatus] = []
+    for entry in entries:
+        display_path = entry.get("authFile")
+        source = AuthSource(
+            path=Path(os.path.expanduser(display_path)) if isinstance(display_path, str) else None,
+            label=entry.get("alias") or "auth",
+            display_path=display_path if isinstance(display_path, str) else None,
+        )
+        rate_result = {k: v for k, v in entry.items() if k not in {"ok", "alias", "authFile", "identity", "account", "error", "stderr", "recoveredFrom", "quota"}}
+        rate_limits = rate_result.get("rateLimits")
+        statuses.append(
+            AuthStatus(
+                source=source,
+                ok=bool(entry.get("ok")),
+                rate_result=rate_result,
+                account_result={"account": entry.get("account")} if entry.get("account") else {},
+                rate_limits=rate_limits if isinstance(rate_limits, dict) else {},
+                identity=entry.get("identity") if isinstance(entry.get("identity"), dict) else {},
+                error=entry.get("error"),
+                stderr=entry.get("stderr") or "",
+            )
+        )
+
+    return statuses
+
+
+def load_report(path: str) -> list[AuthStatus]:
+    text = sys.stdin.read() if path == "-" else Path(os.path.expanduser(path)).read_text()
+    return statuses_from_report(json.loads(text))
+
+
+def gather_statuses_or_replay(parsed: ParsedArgs, sources: list[AuthSource]) -> list[AuthStatus]:
+    from_json = getattr(parsed.args, "from_json", "")
+    if from_json:
+        return load_report(from_json)
+
+    return gather_statuses(parsed, sources)
+
+
 def print_rate_details(
-    rate_limits: dict,
+    status: AuthStatus,
     style: Style,
     *,
-    identity: dict[str, str],
+    display: Display,
 ) -> None:
+    identity = status.identity
     plan = identity.get("planType") or "unknown"
     plan_owner_email = identity.get("planOwnerEmail")
     workspace_name = identity.get("workspaceName")
 
-    primary_obj = rate_limits.get("primary")
-    secondary_obj = rate_limits.get("secondary")
-    credits_obj = rate_limits.get("credits")
-
-    primary = primary_obj if isinstance(primary_obj, dict) else None
-    secondary = secondary_obj if isinstance(secondary_obj, dict) else None
+    limit = status_codex_limit(status)
+    credits_obj = limit.get("credits")
     credits = credits_obj if isinstance(credits_obj, dict) else None
 
     print(f"Plan: {style.magenta(str(plan)) if plan != 'unknown' else plan}")
@@ -1262,15 +1482,42 @@ def print_rate_details(
     print(
         f"Workspace: {style.magenta(workspace_name) if workspace_name else style.dim('n/a')}"
     )
-    print(format_window(style, "Primary", window=primary))
-    print(format_window(style, "Secondary", window=secondary))
+
+    #: Only the windows this plan actually reports. An absent one used to print
+    #: as "Secondary: n/a", which was noise at best and, in the logic below,
+    #: used to mean "exhausted".
+    windows = iter_windows(limit)
+    if windows:
+        for window in windows:
+            print(format_window_line(style, window))
+    else:
+        print(f"Windows: {style.dim('none reported')}")
+
     print(f"Credits: {format_credits(style, credits=credits)}")
+
+    if display.reset_credits:
+        credit_grants = reset_credits(status.rate_result)
+        if credit_grants.available_count > 0:
+            print(f"Reset credits: {format_reset_credits(style, credit_grants)}")
+
+    if display.signals:
+        state = status_block_state(status, display)
+        if state.blocked:
+            print(f"Blocked: {style.red('; '.join(state.reasons))}")
+
+        upsell = status.rate_result.get("rateLimitUpsell") or limit.get("rateLimitUpsell")
+        if upsell:
+            print(style.dim(f"Upsell: {upsell}"))
+
+    for view in reportable_limits(status, display):
+        print(format_limit_line(style, view))
 
 
 def print_human_status(
     status: AuthStatus,
     style: Style,
     *,
+    display: Display,
     show_auth_header: bool,
     heading_tags: list[str] | None = None,
     extra_lines: list[str] | None = None,
@@ -1293,7 +1540,7 @@ def print_human_status(
             print(style.dim(status.stderr.strip()))
         return
 
-    print_rate_details(status.rate_limits, style, identity=status.identity)
+    print_rate_details(status, style, display=display)
     if status.recovered_from is not None and status.recovered_from.display_path:
         print(f"Recovered auth: {style.dim(status.recovered_from.display_path)}")
     for line in extra_lines or []:
@@ -1306,7 +1553,7 @@ def average_used_percent(statuses: list[AuthStatus], window_name: str) -> float 
         if not status.ok:
             continue
 
-        pct = numeric_used_percent(status.rate_limits.get(window_name))
+        pct = used_percent(status.rate_limits.get(window_name))
         if pct is not None:
             values.append(pct)
 
@@ -1347,23 +1594,39 @@ def active_last_statuses(statuses: list[AuthStatus]) -> list[AuthStatus]:
     return sorted(statuses, key=lambda status: status_is_active(status))
 
 
-def has_usable_quota(status: AuthStatus) -> bool:
-    primary = numeric_used_percent(status.rate_limits.get("primary"))
-    secondary = numeric_used_percent(status.rate_limits.get("secondary"))
-    return (
-        primary is not None
-        and primary < 100
-        and secondary is not None
-        and secondary < 100
+def status_codex_limit(status: AuthStatus) -> dict:
+    """The limit governing ordinary usage for this auth.
+
+    Per-model-family limits in `rateLimitsByLimitId` are reported but never
+    consulted here: a spent GPT-5.3-Codex-Spark budget must not strand an
+    otherwise usable account in `swap`, nor arm a notification for a window
+    that is not blocking ordinary work.
+    """
+    return get_codex_limit(status.rate_result) or status.rate_limits or {}
+
+
+def status_block_state(status: AuthStatus, display: Display) -> BlockState:
+    return block_state(
+        status_codex_limit(status),
+        envelope=status.rate_result,
+        full_pct=display.full_pct,
     )
 
 
-def reset_time_for_exhausted_auth(status: AuthStatus) -> float | None:
-    secondary = numeric_used_percent(status.rate_limits.get("secondary"))
-    if secondary is not None and secondary < 100:
-        return numeric_reset_time(status.rate_limits.get("primary"))
+def has_usable_quota(status: AuthStatus, display: Display) -> bool:
+    """Whether this auth can still be used.
 
-    return numeric_reset_time(status.rate_limits.get("secondary"))
+    Window-count agnostic: whatever windows the plan reports are checked, and
+    an auth reporting none is unconstrained rather than exhausted. The previous
+    version demanded both a `primary` and a `secondary`, so the prolite plan
+    -- which reports only a weekly window -- read as permanently spent, which
+    killed `swap` outright and stopped the arms firing.
+    """
+    return not status_block_state(status, display).blocked
+
+
+def reset_time_for_exhausted_auth(status: AuthStatus, display: Display) -> float | None:
+    return status_block_state(status, display).resets_at
 
 
 @dataclass(frozen=True)
@@ -1372,15 +1635,15 @@ class ResetCandidate:
     reset_time: float
 
 
-def first_quota_reset(statuses: list[AuthStatus]) -> ResetCandidate | None:
+def first_quota_reset(statuses: list[AuthStatus], display: Display) -> ResetCandidate | None:
     ok_statuses = [status for status in statuses if status.ok]
-    if not ok_statuses or any(has_usable_quota(status) for status in ok_statuses):
+    if not ok_statuses or any(has_usable_quota(status, display) for status in ok_statuses):
         return None
 
     reset_candidates = [
         ResetCandidate(status=status, reset_time=reset_time)
         for status in ok_statuses
-        if (reset_time := reset_time_for_exhausted_auth(status)) is not None
+        if (reset_time := reset_time_for_exhausted_auth(status, display)) is not None
     ]
     if not reset_candidates:
         return None
@@ -1395,32 +1658,75 @@ def first_quota_reset(statuses: list[AuthStatus]) -> ResetCandidate | None:
     )
 
 
-def first_quota_reset_time(statuses: list[AuthStatus]) -> float | None:
-    first_reset = first_quota_reset(statuses)
-    return first_reset.reset_time if first_reset is not None else None
+def average_windows_by_duration(statuses: list[AuthStatus], display: Display) -> list[dict]:
+    """Average usage per window *duration* across auths.
+
+    Keyed on duration rather than slot, so auths on different plans still
+    aggregate sensibly: one account's weekly window belongs with another's
+    however each happens to be slotted.
+    """
+    buckets: dict[float, list[Window]] = {}
+    for status in statuses:
+        if not status.ok:
+            continue
+        for window in iter_windows(status_codex_limit(status)):
+            if window.used_percent is None:
+                continue
+            buckets.setdefault(window.duration_mins if window.duration_mins is not None else -1.0, []).append(window)
+
+    rows = []
+    for duration in sorted(buckets):
+        windows = buckets[duration]
+        values = [w.used_percent for w in windows if w.used_percent is not None]
+        rows.append(
+            {
+                "label": windows[0].label,
+                "windowDurationMins": json_number(duration) if duration >= 0 else None,
+                "usedPercent": sum(values) / len(values),
+                "authCount": len(values),
+            }
+        )
+    return rows
 
 
-def average_usage_json(statuses: list[AuthStatus]) -> dict[str, object]:
-    payload = {
+def average_usage_json(statuses: list[AuthStatus], display: Display) -> dict[str, object]:
+    #: primaryUsedPercent/secondaryUsedPercent keep their literal slot-based
+    #: definitions: jq consumers in codex.zsh read them by name.
+    payload: dict[str, object] = {
         "primaryUsedPercent": average_used_percent(statuses, "primary"),
         "secondaryUsedPercent": average_used_percent(statuses, "secondary"),
     }
 
-    first_reset = first_quota_reset(statuses)
+    rows = average_windows_by_duration(statuses, display)
+    payload["windows"] = rows
+    payload["maxUsedPercent"] = max((r["usedPercent"] for r in rows), default=None)
+
+    ok_statuses = [s for s in statuses if s.ok]
+    usable = [s for s in ok_statuses if has_usable_quota(s, display)]
+    payload["usableCount"] = len(usable)
+    payload["blockedCount"] = len(ok_statuses) - len(usable)
+
+    first_reset = first_quota_reset(statuses, display)
     if first_reset is not None:
-        payload["firstTimeToReset"] = first_reset.reset_time
+        payload["firstTimeToReset"] = json_number(first_reset.reset_time)
         payload["firstTimeToResetAlias"] = first_reset.status.source.label
 
     return payload
 
 
-def print_average_usage(statuses: list[AuthStatus], style: Style) -> None:
-    primary = average_used_percent(statuses, "primary")
-    secondary = average_used_percent(statuses, "secondary")
-    first_reset = first_quota_reset(statuses)
+def print_average_usage(statuses: list[AuthStatus], style: Style, display: Display) -> None:
+    rows = average_windows_by_duration(statuses, display)
+    first_reset = first_quota_reset(statuses, display)
     print(style.bold(style.cyan("Average usage")))
-    print(f"Primary: {format_average_percent(style, primary)} used")
-    print(f"Secondary: {format_average_percent(style, secondary)} used")
+    for row in rows:
+        print(f"{row['label']}: {format_average_percent(style, row['usedPercent'])} used")
+    if not rows:
+        print(f"Windows: {style.dim('none reported')}")
+
+    ok_statuses = [s for s in statuses if s.ok]
+    usable = [s for s in ok_statuses if has_usable_quota(s, display)]
+    print(f"Usable auths: {len(usable)}/{len(ok_statuses)}")
+
     if first_reset is not None:
         alias = format_status_alias(first_reset.status, style)
         print(
@@ -1437,26 +1743,62 @@ def print_human_statuses(
     show_auth_header: bool,
 ) -> None:
     style = build_style(args)
+    display = build_display(args)
 
     for index, status in enumerate(active_last_statuses(statuses)):
         if index:
             print()
-        print_human_status(status, style, show_auth_header=show_auth_header)
+        print_human_status(status, style, display=display, show_auth_header=show_auth_header)
 
-    if show_auth_header and statuses:
+    if show_auth_header and statuses and display.average:
         print()
-        print_average_usage(statuses, style)
+        print_average_usage(statuses, style, display)
 
 
-def status_json(status: AuthStatus) -> dict:
+def quota_json(status: AuthStatus, display: Display) -> dict:
+    """The interpreted view, beside the raw spread rather than replacing it."""
+    limit = status_codex_limit(status)
+    state = status_block_state(status, display)
+    view = limit_view(limit)
+
+    payload: dict[str, object] = {
+        "source": limit_source(status.rate_result),
+        "limitId": view.limit_id,
+        "limitName": view.limit_name,
+        "normalModelSlug": view.normal_model_slug,
+        "fullPct": display.full_pct,
+        "blocked": state.blocked,
+        "reasons": state.reasons,
+        "resetsAt": json_number(state.resets_at),
+        "windows": [window_json(w, full_pct=display.full_pct) for w in view.windows],
+    }
+
+    if display.signals:
+        payload["signals"] = signals_json(limit, status.rate_result)
+    if display.reset_credits:
+        payload["resetCredits"] = reset_credits_json(reset_credits(status.rate_result))
+    if display.show_limits or display.limits is not None:
+        payload["limits"] = [
+            limit_json(view, full_pct=display.full_pct)
+            for view in reportable_limits(status, display)
+        ]
+
+    return payload
+
+
+def status_json(status: AuthStatus, display: Display) -> dict:
     payload: dict[str, object] = {}
 
     if status.ok:
+        #: The raw response is spread verbatim, so `rateLimits`,
+        #: `rateLimitsByLimitId`, `rateLimitResetCredits` and
+        #: `ordinaryUsageAllowed` stay exactly where existing jq expects them.
         payload.update(status.rate_result)
         if status.account_result.get("account") is not None:
             payload["account"] = status.account_result.get("account")
         if status.identity:
             payload["identity"] = status.identity
+        payload["quota"] = quota_json(status, display)
     else:
         payload["error"] = status.error or "unknown error"
         if status.stderr.strip():
@@ -1475,14 +1817,17 @@ def status_json(status: AuthStatus) -> dict:
     return payload
 
 
-def print_json_statuses(statuses: list[AuthStatus], *, all_mode: bool) -> None:
+def print_json_statuses(
+    statuses: list[AuthStatus], *, all_mode: bool, display: Display
+) -> None:
     if all_mode:
         output: object = {
-            "authFiles": [status_json(status) for status in statuses],
-            "averageUsage": average_usage_json(statuses),
+            "authFiles": [status_json(status, display) for status in statuses],
         }
+        if display.average:
+            output["averageUsage"] = average_usage_json(statuses, display)
     else:
-        output = status_json(statuses[0]) if statuses else {}
+        output = status_json(statuses[0], display) if statuses else {}
 
     print(json.dumps(output, indent=2, ensure_ascii=False))
 
@@ -1497,42 +1842,39 @@ def auth_bytes_equal(left: Path, right: Path) -> bool:
     return left_bytes is not None and right_bytes is not None and left_bytes == right_bytes
 
 
-def status_weekly_used(status: AuthStatus) -> float:
-    pct = numeric_used_percent(status.rate_limits.get("secondary"))
-    return pct if pct is not None else float("inf")
-
-
 def status_weekly_used_value(status: AuthStatus) -> float | None:
-    return numeric_used_percent(status.rate_limits.get("secondary"))
+    """The longest window's usage: the budget that takes longest to come back.
 
-
-def status_primary_used(status: AuthStatus) -> float:
-    pct = numeric_used_percent(status.rate_limits.get("primary"))
-    return pct if pct is not None else float("inf")
+    Was literally `secondary.usedPercent`, which is `null` on plans that report
+    a single weekly window in the `primary` slot.
+    """
+    window = longest_window(status_codex_limit(status))
+    if window is not None:
+        return window.used_percent
+    return used_percent(status.rate_limits.get("secondary"))
 
 
 def status_primary_used_value(status: AuthStatus) -> float | None:
-    return numeric_used_percent(status.rate_limits.get("primary"))
+    return used_percent(status.rate_limits.get("primary"))
 
 
-def eligible_swap_statuses(statuses: list[AuthStatus]) -> list[AuthStatus]:
+def eligible_swap_statuses(statuses: list[AuthStatus], display: Display) -> list[AuthStatus]:
     return [
         status
         for status in statuses
-        if status.ok and status.source.path is not None and has_usable_quota(status)
+        if status.ok and status.source.path is not None and has_usable_quota(status, display)
     ]
 
 
-def select_swap_status(statuses: list[AuthStatus]) -> AuthStatus | None:
-    eligible = eligible_swap_statuses(statuses)
+def select_swap_status(statuses: list[AuthStatus], display: Display) -> AuthStatus | None:
+    eligible = eligible_swap_statuses(statuses, display)
     if not eligible:
         return None
 
     return min(
         eligible,
         key=lambda status: (
-            status_weekly_used(status),
-            status_primary_used(status),
+            *usage_sort_key(status_codex_limit(status)),
             status.source.label,
             status.source.display_path or "",
         ),
@@ -1583,6 +1925,7 @@ def replace_auth_file(*, source_path: Path, target_path: Path) -> bool:
 
 
 def run_swap(parsed: ParsedArgs) -> SwapResult:
+    display = build_display(parsed.args)
     sources = all_auth_sources()
     active_path = active_auth_json_path()
     active_alias = workspace_name_from_matching_auth_alias(None)
@@ -1600,9 +1943,9 @@ def run_swap(parsed: ParsedArgs) -> SwapResult:
             reason="no auth snapshots found",
         )
 
-    statuses = gather_statuses(parsed, sources)
-    eligible = eligible_swap_statuses(statuses)
-    selected = select_swap_status(statuses)
+    statuses = gather_statuses_or_replay(parsed, sources)
+    eligible = eligible_swap_statuses(statuses, display)
+    selected = select_swap_status(statuses, display)
     previously_active = find_status_matching_auth_path(statuses, active_path)
 
     if selected is None:
@@ -1637,7 +1980,7 @@ def run_swap(parsed: ParsedArgs) -> SwapResult:
     )
 
 
-def swap_result_json(result: SwapResult) -> dict:
+def swap_result_json(result: SwapResult, display: Display) -> dict:
     selected = result.selected
     payload: dict[str, object] = {
         "ok": selected is not None,
@@ -1647,7 +1990,7 @@ def swap_result_json(result: SwapResult) -> dict:
         "activeAuthFile": home_relative(result.active_auth_file),
         "eligibleCount": len(result.eligible),
         "checkedCount": len(result.statuses),
-        "authFiles": [status_json(status) for status in result.statuses],
+        "authFiles": [status_json(status, display) for status in result.statuses],
     }
 
     if result.active_alias:
@@ -1664,17 +2007,22 @@ def swap_result_json(result: SwapResult) -> dict:
             "rateLimits": selected.rate_limits,
             "weeklyUsedPercent": status_weekly_used_value(selected),
             "primaryUsedPercent": status_primary_used_value(selected),
+            "blocked": status_block_state(selected, display).blocked,
+            "windows": [
+                window_json(w, full_pct=display.full_pct)
+                for w in iter_windows(status_codex_limit(selected))
+            ],
         }
 
-    failures = [status_json(status) for status in result.statuses if not status.ok]
+    failures = [status_json(status, display) for status in result.statuses if not status.ok]
     if failures:
         payload["failures"] = failures
 
     return payload
 
 
-def print_json_swap_result(result: SwapResult) -> None:
-    print(json.dumps(swap_result_json(result), indent=2, ensure_ascii=False))
+def print_json_swap_result(result: SwapResult, display: Display) -> None:
+    print(json.dumps(swap_result_json(result, display), indent=2, ensure_ascii=False))
 
 
 def same_auth_source(left: AuthStatus, right: AuthStatus | None) -> bool:
@@ -1708,6 +2056,7 @@ def swap_heading_tags(status: AuthStatus, result: SwapResult) -> list[str]:
 
 def print_human_swap_result(result: SwapResult, *, args: argparse.Namespace) -> None:
     style = build_style(args)
+    display = build_display(args)
     previously_active = format_status_alias(
         result.previously_active,
         style,
@@ -1726,14 +2075,15 @@ def print_human_swap_result(result: SwapResult, *, args: argparse.Namespace) -> 
         print_human_status(
             status,
             style,
+            display=display,
             show_auth_header=True,
             heading_tags=swap_heading_tags(status, result),
             extra_lines=extra_lines,
         )
 
-    if result.statuses:
+    if result.statuses and display.average:
         print()
-        print_average_usage(result.statuses, style)
+        print_average_usage(result.statuses, style, display)
 
     if result.selected is None:
         if result.statuses:
@@ -1748,13 +2098,15 @@ def run() -> int:
     if parsed.args.command == "swap":
         result = run_swap(parsed)
         if parsed.args.json:
-            print_json_swap_result(result)
+            print_json_swap_result(result, build_display(parsed.args))
         else:
             print_human_swap_result(result, args=parsed.args)
 
         return 0 if result.selected is not None else 1
 
-    if parsed.args.all:
+    if parsed.args.from_json:
+        sources = []
+    elif parsed.args.all:
         sources = all_auth_sources()
         if not sources:
             pattern = os.path.join(os.path.expanduser("~"), ".codex", AUTH_FILE_RE.pattern)
@@ -1763,10 +2115,12 @@ def run() -> int:
     else:
         sources = [active_auth_source()]
 
-    statuses = gather_statuses(parsed, sources)
+    statuses = gather_statuses_or_replay(parsed, sources)
 
     if parsed.args.json:
-        print_json_statuses(statuses, all_mode=parsed.args.all)
+        print_json_statuses(
+            statuses, all_mode=parsed.args.all, display=build_display(parsed.args)
+        )
     else:
         print_human_statuses(
             statuses,
