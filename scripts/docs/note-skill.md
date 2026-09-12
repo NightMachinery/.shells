@@ -5,7 +5,7 @@ Invoke it as `$note` in Codex or `/note` in Claude, or ask to save a concise
 note under `~/notes`.
 
 The parent drafts the note while a read-only worker searches the existing
-notes organization: Luna (`gpt-5.6-luna`) for Codex, Sonnet for Claude. The
+notes organization: Terra (`gpt-5.6-terra`) for Codex, Sonnet for Claude. The
 worker returns ranked paths and evidence; the parent checks the best fit,
 matches the local format, and shows the exact destination and full draft.
 Nothing is written to the notes tree until the user confirms that proposal.

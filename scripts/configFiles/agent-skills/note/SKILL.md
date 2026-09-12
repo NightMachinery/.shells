@@ -21,7 +21,7 @@ transcript, failed permission attempts, and incidental personal details.
 
 When destination discovery is needed, delegate it explicitly:
 
-- **Codex:** use **Luna**, model `gpt-5.6-luna`, with fresh context
+- **Codex:** use **Terra**, model `gpt-5.6-terra`, with fresh context
   (`fork_turns="none"` when using `spawn_agent`).
 - **Claude:** select **Sonnet** through the runtime's available subagent model
   selector; do not inherit the parent's model or guess an unsupported model ID.
