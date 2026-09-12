@@ -56,6 +56,11 @@ The =agent-session= plugin shares exact-conversation resume and tmux identity
 with tmux-subagents. See =./zshlang/plugins/agent-session/README.md= for its
 standalone API and subdirectory installation.
 
+Kitty's =cmd+shift+o= resolves attached tmux clients by PID, including numeric
+session targets and clients that have switched sessions. Ambiguous live
+transcripts open the picker. See =./docs/agent-sessions.md= for lookup order
+and regression checks.
+
 * Pandoc conversion
 
 [[agfi:pandoc-convert]] (=./zshlang/auto-load/others/pandoc.zsh=) is the single
