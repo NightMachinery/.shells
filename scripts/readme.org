@@ -51,7 +51,11 @@ one for single answers, and the standalone one for conversation exports.
 =codex_status.py= notes are tracked in =./docs/codex_status.md=, including the
 =codex-status-notify= / =codex-status-continue-fz= notifiers that wait for the
 first auth's rate limit to reset and queue =Continue.= into the threads you
-picked.
+picked, and how usage windows are read now that how many of them a plan reports
+varies.
+
+=./docs/codex_loop.md= covers =codex_loop.py=, which runs a prompt repeatedly
+and sleeps out the rate limit between runs, sharing that reading.
 
 * Antigravity
 
