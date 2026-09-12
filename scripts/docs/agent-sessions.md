@@ -570,6 +570,8 @@ The wiring, per agent:
 
 - **Claude Code**: `configFiles/claude-code/settings.json`, `SessionStart` and
   `UserPromptSubmit`, still calling the `claude-code-session-register` shim.
+  `UserPromptSubmit` also runs `bell-claude-ack`, which takes back the
+  session's stored bell notifications; see `docs/bell-auto.md`.
 - **Codex**: `configFiles/codex/hooks.json`, the same two events, as a second
   handler object beside the autoname one. Codex trusts handlers *by hash*, so
   every edit to that file makes its handlers untrusted until you accept them
