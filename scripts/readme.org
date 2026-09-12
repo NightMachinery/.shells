@@ -24,7 +24,7 @@ the chord behavior and qView examples.
 
 * Zsh plugins
 
-The shared =note= skill drafts concise notes under =~/notes=, uses Luna in
+The shared =note= skill drafts concise notes under =~/notes=, uses Terra in
 Codex or Sonnet in Claude to find a suitable destination, and waits for approval
 of the exact path and draft before saving. See =./docs/note-skill.md=.
 
