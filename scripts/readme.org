@@ -122,6 +122,10 @@ reinstalls for eight months.
 tailnet, account, hostname, or auth-key material in this public repo. See
 =./docs/tailscale-setup.md=.
 
+The same document covers Android DNS diagnostics: compare normal HTTPS with a
+hostname-preserving DNS bypass, then test public resolvers and Tailscale's local
+Quad100 resolver separately.
+
 * Emacs terminal colors
 
 =setup/terminfo-24bit.src= provides one truecolor definition for Kitty and
