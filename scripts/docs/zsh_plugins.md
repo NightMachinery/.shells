@@ -27,3 +27,9 @@ source /path/to/repo/scripts/zshlang/plugins/<plugin>/<plugin>.plugin.zsh
 ```
 
 The local loader sources `scripts/zshlang/basic/basic-full.zsh` from `scripts/zshlang/load-first.zsh`; full basic sets the minimal basic guard so later plugin loads do not replace local definitions.
+
+## Authoring skill
+
+Use the shared [zsh-plugin-authoring skill](../configFiles/agent-skills/zsh-plugin-authoring/SKILL.md)
+to create or extract a plugin using these conventions. [agfi:agent-skills-link]
+exposes it to the configured agents through the existing shared-skill mechanism.
