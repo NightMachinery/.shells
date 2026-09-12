@@ -56,14 +56,38 @@ function h-agent-skills-dirs {
     return 0
 }
 
-function h-agent-skills-names {
-    #: The tracked skills: one directory each, named after the skill.
+function h-agent-skills-sources {
+    #: Emit full SKILL.md paths from both checkouts. Validate all names before
+    #: emitting anything so callers cannot partially link an ambiguous set.
     setopt localoptions bareglobqual
-
-    local d
-    for d in "${agent_skills_src_dir}"/*/SKILL.md(N) ; do
-        print -r -- "${${d:h}:t}"
+    local notes_dir="${agent_skills_notes_dir-${HOME}/notes/skills}"
+    local root skill name
+    local -a roots=("${agent_skills_src_dir}" "${notes_dir}") sources=()
+    local -A seen=()
+    for root in "${roots[@]}" ; do
+        test -n "${root}" || continue
+        for skill in "${root}"/*/SKILL.md(N) ; do
+            name="${${skill:h}:t}"
+            if (( ${+seen[$name]} )) ; then
+                [[ "${seen[$name]}" == "${skill}" ]] && continue
+                ecerr "$0: duplicate skill ${name}: ${seen[$name]} and ${skill}"
+                return 1
+            fi
+            seen[$name]="${skill}"
+            sources+=("${skill}")
+        done
     done
+    (( ${#sources} )) && print -rl -- "${sources[@]}"
+    return 0
+}
+
+function h-agent-skills-names {
+    local sources skill
+    sources="$(h-agent-skills-sources)" || return $?
+    for skill in "${(@f)sources}" ; do
+        test -n "${skill}" && print -r -- "${${skill:h}:t}"
+    done
+    return 0
 }
 
 function agent-skills-link {
@@ -78,17 +102,16 @@ function agent-skills-link {
     ##
     local verbose_p="${agent_skills_link_verbose_p:-n}"
 
-    local line agent dir name src target ret=0
-    local -a names
-    names=( ${(f)"$(h-agent-skills-names)"} )
-    (( ${#names} )) || return 0
+    local line agent dir name src target source_list ret=0
+    source_list="$(h-agent-skills-sources)" || return $?
+    test -n "${source_list}" || return 0
 
     for line in ${(f)"$(h-agent-skills-dirs)"} ; do
         agent="${line%%$'\t'*}"
         dir="${line#*$'\t'}"
 
-        for name in "${names[@]}" ; do
-            src="${agent_skills_src_dir}/${name}/SKILL.md"
+        for src in "${(@f)source_list}" ; do
+            name="${${src:h}:t}"
             target="${dir}/${name}/SKILL.md"
 
             if [[ "${agent}" == codex ]] ; then
@@ -142,15 +165,18 @@ function agent-skills-prune-legacy-codex {
     #: recursive deletion: .system, unknown skills and user files stay put.
     local legacy="$(h-codex-session-home)/skills"
     local current="$(h-agent-skills-codex-dir)"
-    local name src old replacement skill_file
+    local name src old replacement skill_file source_list
 
     if [[ "${legacy:A}" == "${current:A}" ]] ; then
         ecerr "$0: legacy and current skill roots coincide; refusing cleanup"
         return 1
     fi
 
-    for name in ${(f)"$(h-agent-skills-names)"} ; do
-        src="${agent_skills_src_dir}/${name}"
+    source_list="$(h-agent-skills-sources)" || return $?
+    test -n "${source_list}" || return 0
+    for src in "${(@f)source_list}" ; do
+        src="${src:h}"
+        name="${src:t}"
         old="${legacy}/${name}"
         replacement="${current}/${name}"
         skill_file="${old}/SKILL.md"
@@ -180,12 +206,11 @@ function h-agent-skills-doctor {
     #: its own skills directory turns a symlink into a file, and the skill
     #: quietly stops being the tracked one.
     ##
-    local line agent dir name src target
-    local -a names
-    names=( ${(f)"$(h-agent-skills-names)"} )
+    local line agent dir name src target source_list
+    source_list="$(h-agent-skills-sources)" || return $?
 
-    if (( ! ${#names} )) ; then
-        ecgray "skills: nothing tracked in ${agent_skills_src_dir/#${NIGHTDIR}/.}"
+    if test -z "${source_list}" ; then
+        ecgray "skills: no skills in configured source directories"
         return 0
     fi
 
@@ -193,8 +218,8 @@ function h-agent-skills-doctor {
         agent="${line%%$'\t'*}"
         dir="${line#*$'\t'}"
 
-        for name in "${names[@]}" ; do
-            src="${agent_skills_src_dir}/${name}/SKILL.md"
+        for src in "${(@f)source_list}" ; do
+            name="${${src:h}:t}"
             target="${dir}/${name}/SKILL.md"
 
             if [[ "${agent}" == codex ]] ; then

@@ -27,6 +27,8 @@ the chord behavior and qView examples.
 The shared =note= skill drafts concise notes under =~/notes=, uses Terra in
 Codex or Sonnet in Claude to find a suitable destination, and waits for approval
 of the exact path and draft before saving. See =./docs/note-skill.md=.
+Its source is =~/notes/skills/note/SKILL.md= in the private =notes-skills=
+repository. The linker discovers both that checkout and the public skills.
 
 Shared agent skills are installed by =agent-skills-link=. Codex uses directory
 links under =~/.agents/skills=; =agent-skills-prune-legacy-codex= safely removes

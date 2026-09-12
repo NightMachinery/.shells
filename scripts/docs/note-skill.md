@@ -1,6 +1,8 @@
 # Concise notes with destination confirmation
 
-The shared `note` skill lives at `configFiles/agent-skills/note/SKILL.md`.
+The shared `note` skill lives at `~/notes/skills/note/SKILL.md`, in the private
+`notes-skills` repository. Clone that repository to `~/notes/skills` on a new
+machine before running the shared linker.
 Invoke it as `$note` in Codex or `/note` in Claude, or ask to save a concise
 note under `~/notes`.
 

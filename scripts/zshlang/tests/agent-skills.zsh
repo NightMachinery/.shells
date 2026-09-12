@@ -30,6 +30,7 @@ function agent-skills-test-assert {
 function aliasfn { :; }
 typeset -g NIGHTDIR="${agent_skills_test_root}"
 typeset -g agent_skills_src_dir="${agent_skills_test_tmp}/source"
+typeset -g agent_skills_notes_dir="${agent_skills_test_tmp}/notes skills"
 source "${agent_skills_test_root}/zshlang/basic/basic.plugin.zsh"
 # The minimal plugin deliberately excludes presentation helpers used only for
 # diagnostics by agent-done.zsh.
@@ -141,6 +142,41 @@ agent-skills-test-assert "legacy directory symlink should be preserved" test -L 
 agent-skills-test-assert "legacy link without a verified new link should be preserved" test -L "${legacy}/absent/SKILL.md"
 agent-skills-test-assert ".system should be preserved" test -e "${legacy}/.system/keep.txt"
 agent-skills-test-assert "unknown skills should be preserved" test -e "${legacy}/unknown/keep.txt"
+
+# A private checkout is optional; when present its skills reach both clients.
+command mkdir -p -- "${agent_skills_notes_dir}/note" "${agent_skills_test_tmp}/claude"
+command cp -- "${agent_skills_src_dir}/clean/SKILL.md" "${agent_skills_notes_dir}/note/SKILL.md"
+claude_code_profile_order=(test)
+claude_code_profiles[test]="${agent_skills_test_tmp}/claude"
+agent-skills-link
+linked_path="${agent_skills_codex_dir}/note"
+expected_path="${agent_skills_notes_dir}/note"
+[[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
+    agent-skills-test-fail "Codex should link the private skill directory"
+linked_path="${agent_skills_test_tmp}/claude/skills/note/SKILL.md"
+expected_path="${agent_skills_notes_dir}/note/SKILL.md"
+[[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
+    agent-skills-test-fail "Claude should link the private skill file"
+doctor_output="$(h-agent-skills-doctor 2>&1)"
+[[ ${doctor_output} == *'skill note:'* && ${doctor_output} != *'WRONG TARGET'* ]] || \
+    agent-skills-test-fail "doctor should resolve private sources"
+command mkdir -p -- "${legacy}/note"
+command ln -s -- "${expected_path}" "${legacy}/note/SKILL.md"
+agent-skills-prune-legacy-codex
+[[ ! -e ${legacy}/note ]] || agent-skills-test-fail "private legacy link should be pruned"
+
+# Duplicate names must fail before any target mutation, rather than picking a root.
+command mkdir -p -- "${agent_skills_notes_dir}/clean"
+command cp -- "${agent_skills_src_dir}/clean/SKILL.md" "${agent_skills_notes_dir}/clean/SKILL.md"
+agent_skills_codex_dir="${agent_skills_test_tmp}/duplicate-target"
+if agent-skills-link >/dev/null 2>&1 ; then
+    agent-skills-test-fail "duplicate names must fail"
+fi
+[[ ! -e ${agent_skills_codex_dir} ]] || agent-skills-test-fail "duplicates must not partially link"
+if h-agent-skills-doctor >/dev/null 2>&1 ; then
+    agent-skills-test-fail "doctor must report duplicate names"
+fi
+command rm -- "${agent_skills_notes_dir}/clean/SKILL.md"
 
 typeset -g agent_skills_codex_dir="${legacy}"
 if agent-skills-prune-legacy-codex >/dev/null 2>&1 ; then
