@@ -186,3 +186,7 @@ My STT software inserts its dictated text in markdown code blocks with the langu
 - Think critically and creatively about the user’s instructions.
 - Offer feedback, suggestions, and alternatives.
 - Be cooperative, constructive, and friendly critical.
+
+# Subagent Delegation
+
+If you are an expensive model (e.g., Fable or Astra), start by reading the delegate-weaker skill.
