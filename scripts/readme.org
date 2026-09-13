@@ -205,8 +205,11 @@ needs your permission= or =Codex awaits! [scripts · Fix terminal titles]=. Look
 uses only the supplied Claude transcript or the Codex ID in the current
 =CODEX_HOME= index, with a two-second limit and the original format on failure.
 Names are limited to one line and 120 characters; acknowledgement groups stay
-keyed by session ID. Run =brishz-restart= after updating the hooks; queued text
-stays as captured. See =./docs/bell-auto.md= for lookup and fallback details.
+keyed by session ID. Codex realtime voice-chat tasks are suppressed before any
+sound, desktop, or Telegram transport, using their stable =thread_source= metadata
+rather than their mutable title. Run =brishz-restart= after updating the hooks;
+queued text stays as captured. See =./docs/bell-auto.md= for lookup, suppression,
+and fallback details.
 
 * CIS thesis applications
 

@@ -9,6 +9,7 @@
     trap 'command rm -rf -- "$fixture"' EXIT
     local original_search_path="$PATH"
     whence -p agent_session >/dev/null || exit 1
+    whence -p sqlite3 >/dev/null || exit 1
     zmodload zsh/datetime || exit 1
     local -x CODEX_HOME="${fixture}/codex"
     command mkdir -p "$CODEX_HOME" "${fixture}/other" "${fixture}/bin"
@@ -60,6 +61,42 @@
         command jq --null-input --compact-output --arg id "$1" --arg name "$2" \
             '{id:$id,thread_name:$name}' >> "${CODEX_HOME}/session_index.jsonl"
     }
+
+    # Codex's mutable title is not a task-kind signal. Its app state records the
+    # stable source, which lets h-codex-notify discard realtime voice turns before
+    # they reach the sound, desktop, or Telegram transports.
+    local voice_id='11111111-1111-4111-8111-111111111111'
+    local ordinary_id='22222222-2222-4222-8222-222222222222'
+    command sqlite3 "${CODEX_HOME}/state_5.sqlite" \
+        'CREATE TABLE threads (id TEXT PRIMARY KEY, thread_source TEXT);' || exit 1
+    command sqlite3 "${CODEX_HOME}/state_5.sqlite" \
+        "INSERT INTO threads VALUES ('${voice_id}', 'voice_chat'), ('${ordinary_id}', 'agent_created_thread');" || exit 1
+    index-name "${voice_id}" 'Renamed ordinary-looking task'
+    index-name "${ordinary_id}" 'New voice chat'
+
+    command rm -f -- "${fixture}/desktop" "${fixture}/telegram" "${fixture}/queue" "${fixture}/sound"
+    h-codex-notify "{\"thread-id\":\"${voice_id}\",\"cwd\":\"/work/scripts\"}" </dev/null >/dev/null || exit 1
+    local transport_file
+    for transport_file in desktop telegram queue sound ; do
+        if test -e "${fixture}/${transport_file}" ; then
+            print -ru2 -- "FAIL: voice-chat notification reached ${transport_file}"
+            exit 1
+        fi
+    done
+    check voice-desktop-ack "$(<"${fixture}/desktop-ack")" "agent-Codex-${voice_id}"
+    check voice-queue-ack "$(<"${fixture}/queue-ack")" "agent-Codex-${voice_id}"
+
+    h-codex-notify "{\"thread-id\":\"${ordinary_id}\",\"cwd\":\"/work/scripts\"}" </dev/null >/dev/null || exit 1
+    check ordinary-source-title "$(<"${fixture}/desktop")" \
+        'Codex awaits! [scripts · New voice chat]'
+
+    # Missing state, malformed input, and unfamiliar ids fail open rather than
+    # silently discarding an ordinary task's notification.
+    CODEX_HOME="${fixture}/other" h-codex-notify \
+        "{\"thread-id\":\"${ordinary_id}\",\"cwd\":\"/work/scripts\"}" </dev/null >/dev/null || exit 1
+    check missing-state "$(<"${fixture}/desktop")" 'Codex awaits! [scripts]'
+    h-codex-notify '{broken' </dev/null >/dev/null || exit 1
+    check malformed-filter "$(<"${fixture}/desktop")" 'Codex awaits!'
 
     local codex_a='{"thread-id":"one","cwd":"/work/scripts"}'
     local codex_b='{"thread-id":"two","cwd":"/work/scripts"}'
@@ -159,5 +196,5 @@
     command chmod +x "${fixture}/bin/jq"
     rehash
     expect-hook Codex "$codex_b" 'Codex awaits!' agent-Codex
-    print -r -- 'PASS: agent notification names, fallbacks, transports, and acknowledgement'
+    print -r -- 'PASS: agent notification names, voice suppression, fallbacks, transports, and acknowledgement'
 )
