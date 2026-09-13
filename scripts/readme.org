@@ -184,9 +184,12 @@ Explicit =-c tui.terminal_title= arguments override that launcher default; the
 tradeoffs and Termux behavior are documented in =./docs/tmux-tty-title.md=.
 
 [agfi:codex-long] calls [agfi:codex-m] with the model-neutral =long= profile.
-That profile makes the Codex client budget for an 872,000-token context and
-compact at 828,400 tokens; pass =--model= when a model other than the normal
-default is wanted.  The server still enforces its own context limit.
+It regenerates =$CODEX_HOME/long.config.toml= (default
+=~/.codex/long.config.toml=) on every launch, keeping the profile's source of
+truth in the function.  The profile makes the Codex client budget for an
+872,000-token context and compact at 828,400 tokens; pass =--model= when a
+model other than the normal default is wanted.  The server still enforces its
+own context limit.
 
 * UNIX sockets
 
