@@ -10,8 +10,8 @@ Start here:
 
 - `cmd+shift+o` in kitty opens the session showing in the focused window as an
   org file in emacs. It works out which agent that is by itself.
-- `agent-view-session-fz` picks a session from disk and opens it; add `-all-fz`
-  for every project rather than this one.
+- `agent-view-session-transcript-fz` picks a session from disk and opens it;
+  add `-all-fz` for every project rather than this one.
 - `agent-session-live-fz` picks from the sessions running right now.
 - `agent-session-resume-fz` resumes one, handing off to that agent's own resume
   command.
@@ -698,16 +698,42 @@ filtering the cache there looks like it works and does nothing. The tmux picker
 builds its rows straight from the listing, so it filters the listing. Because a
 pair carries no tmux name, the kitty path looks that name up by transcript.
 
-## The names that were kept
+## The names that changed, and the ones that were kept
 
-The Claude-only spellings all still work, as `aliasfn`s that set
-`agent_session_agents=claude` where the old name meant Claude alone:
-`claude-code-view-session` and its `-fz`, `-all-fz`, `-md-fz`, `-md-all-fz`,
-`-raw-fz`, `-raw-all-fz`, `-focused`, `-bg` and `-toggle` variants,
-`claude-code-view-sessions`, `claude-code-view-reap`,
-`claude-code-session-live-fz`, `claude-code-session-register`,
-`claude-session-selftest`, the `h-claude-code-session-*` helpers, and
-`claude_session` for `agent_session claude`. The profile machinery
+The viewer family was renamed. It is `agent-view-session-transcript*` now,
+with the per-agent forms `claude-code-view-session-transcript*`,
+`codex-view-session-transcript*` and `agy-view-session-transcript*`, each of
+them carrying the full set of suffixes: `-fz`, `-all-fz`, `-md-fz`,
+`-md-all-fz`, `-raw-fz` and `-raw-all-fz` (Claude also has the bare
+`claude-code-view-session-transcript`, which takes a transcript path rather
+than picking one). The infix is there because the name should say what the
+command opens: the transcript on disk. "View session" read as though it
+attached to the live session, which is what the `*-resume*` family does.
+
+The old spellings were **removed**, not kept as aliases, so that a stale
+caller fails loudly rather than quietly doing something else. If one of these
+turns up in a config, a hook or your own notes, that is why it no longer
+resolves: `claude-code-view-session`, `claude-code-view-session-fz`,
+`claude-code-view-session-all-fz`, `claude-code-view-session-md-fz`,
+`claude-code-view-session-md-all-fz`, `claude-code-view-session-raw-fz`,
+`claude-code-view-session-raw-all-fz`, `codex-view-session-fz`,
+`codex-view-session-all-fz`, `agy-view-session-fz`,
+`agy-view-session-all-fz`, `agent-view-session`, `agent-view-session-fz`,
+`agent-view-session-all-fz`, `agent-view-session-md-fz`,
+`agent-view-session-md-all-fz`, `agent-view-session-raw-fz` and
+`agent-view-session-raw-all-fz`.
+
+Everything else kept its name. The window actions are named for the window,
+not the document, and they are wired into the kitty binding and the hooks:
+`claude-code-view-session-focused`, `claude-code-view-session-bg`,
+`claude-code-view-session-toggle`, `claude-code-view-sessions` and
+`claude-code-view-reap`. So did `claude-code-session-live-fz`,
+`claude-code-session-register`, `claude-session-selftest`, the
+`h-claude-code-session-*` helpers, and `claude_session` for
+`agent_session claude` -- all still `aliasfn`s that set
+`agent_session_agents=claude` where the old name meant Claude alone.
+
+The profile machinery
 (`claude-code-session-import`, `claude-code-session-resume`, the
 `claude-resume*` family) stayed Claude-only on purpose: profiles are a Claude
 Code idea, and Codex and Antigravity have nothing to map them onto.
@@ -760,6 +786,18 @@ and nothing goes to the network: a document header must not wait on an API.
 
 Each agent answers that through an optional `account` adapter verb, so an agent
 that cannot say who is signed in simply contributes no line.
+
+The body then opens with a `Context window: N / M tokens (P%)` line: the state
+the context was in after the last model response, not a total of everything the
+session ever sent. Every subagent heading in the `* Subagents` section is
+followed by its own, since a subagent has a context of its own. Claude counts
+the input tokens plus both cache halves of the last assistant message -- the
+same sum its statusline shows -- and Codex takes the last `token_count` event's
+total minus its reasoning tokens, against the window that event reports. The
+window itself is inferred from the model id. Antigravity's transcript carries
+no token counts at all, so its documents have no such line. The arithmetic, and
+what each agent's transcript actually records, is in
+`golang/agent_session/readme.org`.
 
 ## When a converted transcript opens as octal escapes
 

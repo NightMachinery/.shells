@@ -343,10 +343,25 @@ function h-agent-session-select-fz {
     ec "${session_file}"
 }
 
-function h-agent-view-session {
+##
+#: Viewing a transcript
+#:
+#: The `-transcript-' infix says what these open: the rendered document on
+#: disk, not the session itself. `agent-view-session' used to read as "attach
+#: to that session", which is what the resume family
+#: ([agfi:agent-session-resume-fz]) actually does; these only ever read what a
+#: session has already written, so the name now says so.
+#:
+#: The hotkey trio -- [agfi:agent-view-session-focused],
+#: [agfi:agent-view-session-bg], [agfi:agent-view-session-toggle] -- kept its
+#: names deliberately: those name a *window* action ("show me the session in
+#: this window"), not the document, and they are wired into kitty, the hooks
+#: and muscle memory.
+##
+function h-agent-view-session-transcript {
     #: Converts the given transcript using the given converter function, and
     #: opens the result in emacs.
-    #: Usage: h-agent-view-session <converter> <ext> <session-file>
+    #: Usage: h-agent-view-session-transcript <converter> <ext> <session-file>
     ##
     local converter="${1}"
     local ext="${2}"
@@ -374,9 +389,9 @@ function h-agent-view-session {
     emc-open "${out_file}" @RET
 }
 
-function h-agent-view-session-fz {
-    #: Interactively selects a session, converts it using the given converter
-    #: function, and opens the result in emacs.
+function h-agent-view-session-transcript-fz {
+    #: Interactively selects a session, converts its transcript using the given
+    #: converter function, and opens the result in emacs.
     ##
     local converter="${1}"
     local ext="${2}"
@@ -384,35 +399,35 @@ function h-agent-view-session-fz {
     local session_file
     session_file="$(h-agent-session-select-fz)" @RET
 
-    h-agent-view-session "${converter}" "${ext}" "${session_file}"
+    h-agent-view-session-transcript "${converter}" "${ext}" "${session_file}"
 }
 
-function agent-view-session {
+function agent-view-session-transcript {
     #: Converts the given session transcript to org-mode and opens it in emacs.
-    #: The non-interactive counterpart of [agfi:agent-view-session-fz].
+    #: The non-interactive counterpart of [agfi:agent-view-session-transcript-fz].
     ##
-    h-agent-view-session h-agent-session-to-org org "${1}"
+    h-agent-view-session-transcript h-agent-session-to-org org "${1}"
 }
 
-function agent-view-session-fz {
-    #: Interactively selects a session, converts it to org-mode, and opens it
-    #: in emacs.
+function agent-view-session-transcript-fz {
+    #: Interactively selects a session, converts its transcript to org-mode,
+    #: and opens it in emacs.
     ##
-    h-agent-view-session-fz h-agent-session-to-org org @RET
-}
-#: Same, but selects from the sessions of all projects.
-aliasfn agent-view-session-all-fz agent_session_fz_scope=all agent-view-session-fz
-
-function agent-view-session-md-fz {
-    #: Interactively selects a session, converts it to markdown, and opens it
-    #: in emacs.
-    ##
-    h-agent-view-session-fz h-agent-session-to-md md @RET
+    h-agent-view-session-transcript-fz h-agent-session-to-org org @RET
 }
 #: Same, but selects from the sessions of all projects.
-aliasfn agent-view-session-md-all-fz agent_session_fz_scope=all agent-view-session-md-fz
+aliasfn agent-view-session-transcript-all-fz agent_session_fz_scope=all agent-view-session-transcript-fz
 
-function agent-view-session-raw-fz {
+function agent-view-session-transcript-md-fz {
+    #: Interactively selects a session, converts its transcript to markdown,
+    #: and opens it in emacs.
+    ##
+    h-agent-view-session-transcript-fz h-agent-session-to-md md @RET
+}
+#: Same, but selects from the sessions of all projects.
+aliasfn agent-view-session-transcript-md-all-fz agent_session_fz_scope=all agent-view-session-transcript-md-fz
+
+function agent-view-session-transcript-raw-fz {
     #: Interactively selects a session and opens the original transcript in
     #: emacs.
     ##
@@ -422,7 +437,7 @@ function agent-view-session-raw-fz {
     emc-open "${session_file}" @RET
 }
 #: Same, but selects from the sessions of all projects.
-aliasfn agent-view-session-raw-all-fz agent_session_fz_scope=all agent-view-session-raw-fz
+aliasfn agent-view-session-transcript-raw-all-fz agent_session_fz_scope=all agent-view-session-transcript-raw-fz
 ##
 #: Reading the session you are *sitting in* should not need a picker: several
 #: sessions often share a project directory, so "the newest one for this cwd"

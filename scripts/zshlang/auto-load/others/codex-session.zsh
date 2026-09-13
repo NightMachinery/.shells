@@ -165,7 +165,11 @@ function h-codex-session-hook-transcript {
 aliasfn codex-resume agent_session_agents=codex agent-session-resume
 aliasfn codex-resume-fz agent_session_agents=codex agent-session-resume-fz
 aliasfn codex-resume-all-fz agent_session_agents=codex agent_session_resume_scope=all agent-session-resume-fz
-aliasfn codex-view-session-fz agent_session_agents=codex agent-view-session-fz
-aliasfn codex-view-session-all-fz agent_session_agents=codex agent_session_fz_scope=all agent-view-session-fz
+aliasfn codex-view-session-transcript-fz agent_session_agents=codex agent-view-session-transcript-fz
+aliasfn codex-view-session-transcript-all-fz agent_session_agents=codex agent_session_fz_scope=all agent-view-session-transcript-fz
+aliasfn codex-view-session-transcript-md-fz agent_session_agents=codex agent-view-session-transcript-md-fz
+aliasfn codex-view-session-transcript-md-all-fz agent_session_agents=codex agent_session_fz_scope=all agent-view-session-transcript-md-fz
+aliasfn codex-view-session-transcript-raw-fz agent_session_agents=codex agent-view-session-transcript-raw-fz
+aliasfn codex-view-session-transcript-raw-all-fz agent_session_agents=codex agent_session_fz_scope=all agent-view-session-transcript-raw-fz
 aliasfn codex-session-live-fz agent_session_agents=codex agent-session-live-fz
 ##

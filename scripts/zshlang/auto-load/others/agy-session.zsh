@@ -206,7 +206,11 @@ function h-agy-session-hook-transcript {
 aliasfn agy-resume agent_session_agents=agy agent-session-resume
 aliasfn agy-resume-fz agent_session_agents=agy agent-session-resume-fz
 aliasfn agy-resume-all-fz agent_session_agents=agy agent_session_resume_scope=all agent-session-resume-fz
-aliasfn agy-view-session-fz agent_session_agents=agy agent-view-session-fz
-aliasfn agy-view-session-all-fz agent_session_agents=agy agent_session_fz_scope=all agent-view-session-fz
+aliasfn agy-view-session-transcript-fz agent_session_agents=agy agent-view-session-transcript-fz
+aliasfn agy-view-session-transcript-all-fz agent_session_agents=agy agent_session_fz_scope=all agent-view-session-transcript-fz
+aliasfn agy-view-session-transcript-md-fz agent_session_agents=agy agent-view-session-transcript-md-fz
+aliasfn agy-view-session-transcript-md-all-fz agent_session_agents=agy agent_session_fz_scope=all agent-view-session-transcript-md-fz
+aliasfn agy-view-session-transcript-raw-fz agent_session_agents=agy agent-view-session-transcript-raw-fz
+aliasfn agy-view-session-transcript-raw-all-fz agent_session_agents=agy agent_session_fz_scope=all agent-view-session-transcript-raw-fz
 aliasfn agy-session-live-fz agent_session_agents=agy agent-session-live-fz
 ##
