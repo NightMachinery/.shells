@@ -35,6 +35,14 @@
 
 Edit these sources, not installed skill links.
 
+## Research Work Profile
+
+My work profile is for research. Sharing relevant research drafts, code, data,
+findings and artifact paths, including private or unpublished research, with my
+work-profile agents and research tasks is pre-authorized. Exclude unrelated
+personal information and credentials; ask only when the purpose, recipient or
+data falls outside this research scope.
+
 ## Svelte Guidelines
 
 - Skip running `npx @sveltejs/mcp svelte-autofixer`. It often hangs and gives useless output.
