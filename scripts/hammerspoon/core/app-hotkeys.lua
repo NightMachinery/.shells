@@ -108,37 +108,47 @@ function focusApp(appName)
     end
 end
 
-function toggleFocus(appName)
-    local launch_p = false
-
-    local app = nil
-    app = getApp(appName)
-
-    if app then
-        if app:isFrontmost() then
-            app:hide()
-        else
-            app:activate()
-            -- focusAppYabai(appName)
-        end
+local function toggleFocusApp(app)
+    if app:isFrontmost() then
+        app:hide()
     else
-        if launch_p then
-            hs.application.launchOrFocus(appName)
-            app = getApp(appName)
-        end
+        app:activate()
+    end
+end
+
+function toggleFocus(appName)
+    local app = getApp(appName)
+    if app then
+        toggleFocusApp(app)
     end
 end
 
 function appHotkey(o)
-    -- This function now acts as a wrapper for hyper_bind_v2,
-    -- making it easy to create app-toggling hotkeys.
-    -- It accepts an 'o.mods' table for additional modifiers.
+    -- Specialise once when the binding is registered so scalar hotkeys retain
+    -- their direct path. Only an ordered candidate list pays for the search.
+    local pressedfn
+    if type(o.appName) == "table" then
+        local appNames = o.appName
+        pressedfn = function()
+            for i = 1, #appNames do
+                local app = getApp(appNames[i])
+                if app then
+                    toggleFocusApp(app)
+                    return
+                end
+            end
+        end
+    else
+        local appName = o.appName
+        pressedfn = function()
+            toggleFocus(appName)
+        end
+    end
+
     hyper_bind_v2{
         key = o.key,
         mods = o.mods or {}, -- Use provided mods, or default to an empty table
-        pressedfn = function()
-            toggleFocus(o.appName)
-        end
+        pressedfn = pressedfn
     }
 end
 -- function appHotkey(o)
@@ -196,8 +206,10 @@ emacsAppName = 'org.gnu.Emacs'
 appHotkey{ key='x', appName=emacsAppName }
 
 appHotkey{ key='l',
-           appName='com.tdesktop.PurpleTelegram'
-           -- appName='com.tdesktop.Telegram'
+           appName={
+               'com.tdesktop.PurpleTelegram',
+               'com.tdesktop.Telegram',
+           }
 }
 
 appHotkey{ key='\\', appName='com.anthropic.claudefordesktop' }
