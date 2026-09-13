@@ -1,9 +1,55 @@
 ##
+function h-codex-notify-suppressed-p {
+    : "whether a Codex notify payload belongs to a task whose notifications are disabled"
+    #: Realtime voice chat already has the user's attention; its successful-turn
+    #: notify would only echo the conversation through the ordinary agent bell.
+    #: The title is mutable (and user-controlled), while Codex records the stable
+    #: source as `voice_chat' in its state database, so classify by that metadata.
+    #:
+    #: Fail open throughout: an unfamiliar payload, missing sqlite, a migration,
+    #: or a locked database must not silence an ordinary Codex task.
+    ##
+    setopt localoptions extendedglob
+    local info="${1}"
+    local config_home="${CODEX_HOME:-${HOME}/.codex}"
+
+    whence -p sqlite3 >/dev/null 2>&1 || return 1
+
+    local id
+    id="$(h-bell-agent-payload-id "${info}" 2>/dev/null)" || return 1
+    #: Codex thread ids are UUIDs. Restricting the interpolation to their safe
+    #: alphabet also keeps the read-only SQL query data-only.
+    [[ "${id}" == [0-9a-fA-F-]## && ${#id} == 36 ]] || return 1
+
+    local db thread_source
+    local -a state_dbs=( "${config_home}"/state_*.sqlite(Nom) )
+    for db in "${state_dbs[@]}" ; do
+        thread_source="$(command sqlite3 -readonly -batch -noheader \
+            -cmd '.timeout 100' "${db}" \
+            "SELECT thread_source FROM threads WHERE id = '${id}' LIMIT 1;" \
+            2>/dev/null)" || continue
+        test -n "${thread_source}" || continue
+
+        [[ "${thread_source}" == voice_chat ]]
+        return $?
+    done
+
+    return 1
+}
+
 function h-codex-notify {
     local info="$1"
 
     # ec "${info}" | jq . >> ~/logs/codex_notifs|| true
     #: These might leak private data, so only enable it if you need it for debugging.
+
+    if h-codex-notify-suppressed-p "${info}" ; then
+        #: Also take back an older notification from before this filter was
+        #: loaded. Acknowledgement only removes this thread's grouped desktop
+        #: notification and queued Telegram line; it never rings or posts.
+        bell-codex-ack "${info}" || true
+        return 0
+    fi
 
     bell-codex "${info}"
 }

@@ -102,6 +102,17 @@ Inspect the queue with `bell-notif-pending`, which shows the raw tagged entries.
 `bell-claude` and `bell-codex` go through `h-bell-agent-hook`, which reads the agent's
 hook payload as JSON — from `$1`, or from stdin — and builds the message from it.
 
+`h-codex-notify` completely suppresses notifications from realtime voice-chat
+tasks. It extracts the payload's thread ID and checks the current `CODEX_HOME` state
+database for `threads.thread_source = 'voice_chat'` before calling `bell-codex`.
+Titles are deliberately ignored: they are mutable and a normal task may legitimately
+be named “New voice chat.” A confirmed voice task reaches none of the sound, desktop,
+or Telegram transports; the filter also removes that thread's older grouped desktop
+notification and queued Telegram line if present. Missing tools or state, malformed
+payloads, database errors, and unknown thread sources fail open so they cannot silence
+an ordinary Codex task. State database filenames are discovered rather than pinned to
+one schema-version number.
+
 Claude Code's `Notification` event carries a real `message`; its `Stop` event does
 not, so that falls back to `Claude awaits!`. The `cwd` becomes a `[project]` tag.
 When a thread name is available, the tag becomes `[project · thread name]`, so
