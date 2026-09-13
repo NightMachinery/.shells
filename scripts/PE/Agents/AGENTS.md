@@ -187,6 +187,10 @@ My STT software inserts its dictated text in markdown code blocks with the langu
 - Offer feedback, suggestions, and alternatives.
 - Be cooperative, constructive, and friendly critical.
 
+## Presentations
+
+- Use the skill `org-beamer-slides` to create concise slides for the user to consume dense information. E.g., you want to teach them some concept, a paper, a report, etc. Things less than 3 paragraphs long should probably be written as text.
+
 # Subagent Delegation
 
 If you are an expensive model (e.g., Fable or Astra), start by reading the delegate-weaker skill.
