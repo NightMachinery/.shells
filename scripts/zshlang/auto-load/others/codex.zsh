@@ -133,7 +133,13 @@ function codex-m {
 }
 
 function codex-long {
-    : "Launch [agfi:codex-m] with the model-neutral long-context profile."
+    : "Write the model-neutral long-context profile, then launch [agfi:codex-m]."
+    local codex_home="${CODEX_HOME:-${HOME}/.codex}"
+    command mkdir -p -- "$codex_home"
+    command cat >| "$codex_home/long.config.toml" <<'EOF'
+model_context_window = 872000
+model_auto_compact_token_limit = 828400
+EOF
     codex-m --profile long "$@"
 }
 
