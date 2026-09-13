@@ -717,9 +717,20 @@ function h-claude-session-resume {
     claude-code-session-resume "${transcript}" '' "$@"
 }
 ##
-#: The names these had before the helpers served every agent. Kept as aliases:
-#: the kitty binding, the hooks, =claude.zsh= and muscle memory use them.
-#: Where the old name meant "Claude only", `agent_session_agents=claude' says so.
+#: The names these had before the helpers served every agent. Where the old
+#: name meant "Claude only", `agent_session_agents=claude' says so.
+#:
+#: The `h-claude-code-session-*' helpers and the window-action names
+#: (`-focused', `-bg', `-toggle', `claude-code-view-sessions',
+#: `claude-code-view-reap') are kept as aliases: the kitty binding, the hooks,
+#: =claude.zsh= and muscle memory use them.
+#:
+#: The viewer family was *renamed* to `claude-code-view-session-transcript*',
+#: because it opens the transcript on disk rather than attaching to the live
+#: session; see the block above [agfi:h-agent-view-session-transcript] in
+#: =agent-session.zsh=. The old spellings
+#: (`claude-code-view-session[-fz|-all-fz|-md-fz|-md-all-fz|-raw-fz|-raw-all-fz]')
+#: were removed rather than kept, so a stale caller fails loudly.
 ##
 aliasfn h-claude-code-session-name h-agent-session-name
 aliasfn h-claude-code-session-render h-agent-session-render
@@ -732,13 +743,13 @@ aliasfn h-claude-code-session-live-list agent_session_agents=claude h-agent-sess
 aliasfn h-claude-code-session-kitty-socket h-agent-session-kitty-socket
 aliasfn h-claude-code-session-of-kitty-window h-agent-session-of-kitty-window
 aliasfn h-claude-code-session-preview h-agent-session-preview
-aliasfn claude-code-view-session agent-view-session
-aliasfn claude-code-view-session-fz agent_session_agents=claude agent-view-session-fz
-aliasfn claude-code-view-session-all-fz agent_session_agents=claude agent_session_fz_scope=all agent-view-session-fz
-aliasfn claude-code-view-session-md-fz agent_session_agents=claude agent-view-session-md-fz
-aliasfn claude-code-view-session-md-all-fz agent_session_agents=claude agent_session_fz_scope=all agent-view-session-md-fz
-aliasfn claude-code-view-session-raw-fz agent_session_agents=claude agent-view-session-raw-fz
-aliasfn claude-code-view-session-raw-all-fz agent_session_agents=claude agent_session_fz_scope=all agent-view-session-raw-fz
+aliasfn claude-code-view-session-transcript agent-view-session-transcript
+aliasfn claude-code-view-session-transcript-fz agent_session_agents=claude agent-view-session-transcript-fz
+aliasfn claude-code-view-session-transcript-all-fz agent_session_agents=claude agent_session_fz_scope=all agent-view-session-transcript-fz
+aliasfn claude-code-view-session-transcript-md-fz agent_session_agents=claude agent-view-session-transcript-md-fz
+aliasfn claude-code-view-session-transcript-md-all-fz agent_session_agents=claude agent_session_fz_scope=all agent-view-session-transcript-md-fz
+aliasfn claude-code-view-session-transcript-raw-fz agent_session_agents=claude agent-view-session-transcript-raw-fz
+aliasfn claude-code-view-session-transcript-raw-all-fz agent_session_agents=claude agent_session_fz_scope=all agent-view-session-transcript-raw-fz
 aliasfn claude-code-view-session-focused agent-view-session-focused
 aliasfn claude-code-view-session-bg agent-view-session-bg
 aliasfn claude-code-view-session-toggle agent-view-session-toggle

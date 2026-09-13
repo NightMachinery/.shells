@@ -10,9 +10,9 @@
 #: [agfi:agent-view-session-bg] when the hotkey opened us -- it passes
 #: the tab's key as AGENT_VIEW_TAB_KEY, so the conversion runs in the
 #: background under that tab's band and a second cmd+shift+o cancels it -- or
-#: to the plain [agfi:agent-view-session] otherwise. `brishzq.zsh' rather
-#: than `brishz.dash' because it quotes its arguments, so a path is never
-#: pasted into a command line raw.
+#: to the plain [agfi:agent-view-session-transcript] otherwise.
+#: `brishzq.zsh' rather than `brishz.dash' because it quotes its arguments,
+#: so a path is never pasted into a command line raw.
 #:
 #: Plain `zsh -f' via zshplain.dash: loading zshlang here would cost seconds on
 #: every miss, and everything heavy already lives in the garden.
@@ -71,4 +71,4 @@ transcript="${fields[2]}"
 if [[ -n "${AGENT_VIEW_TAB_KEY}" ]] ; then
     exec "${brishzq}" agent-view-session-bg "${transcript}" "${AGENT_VIEW_TAB_KEY}"
 fi
-exec "${brishzq}" agent-view-session "${transcript}"
+exec "${brishzq}" agent-view-session-transcript "${transcript}"

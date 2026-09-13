@@ -1157,17 +1157,25 @@ than mistaking =* Subagents= for something a message wrote.
 
 * zsh entry points
 
-The names are =agent-*= and mean every agent. Each one's old =claude-code-*=
-spelling survives as an =aliasfn= that narrows the same function to Claude with
-=agent_session_agents=claude=, so nothing that used to work stopped, and
-=agent_session_agents= is equally how the per-agent names are built:
-=codex-view-session-fz= is this list's first entry with =codex= in front.
+The names are =agent-*= and mean every agent. Most of the old =claude-code-*=
+spellings survive as =aliasfn=s that narrow the same function to Claude with
+=agent_session_agents=claude=, and =agent_session_agents= is equally how the
+per-agent names are built: =codex-view-session-transcript-fz= is this list's
+first entry with =codex= in front.
 
-- =agent-view-session-fz= --- pick a session, convert to org, open in emacs.
-- =agent-view-session-md-fz= --- same, as markdown.
-- =agent-view-session-raw-fz= --- open the original transcript.
-- =agent-view-session= --- the same as the first, for a session path you
-  already have. No picker.
+The viewers carry a =-transcript-= infix because that is what they open: the
+rendered document on disk, where the bare =agent-view-session= read as though
+it attached to the live session, which is what the resume family does. Those
+older spellings were removed rather than aliased, so a stale caller fails
+loudly; =docs/agent-sessions.md= lists them. The window actions below kept
+their names, since they name the window rather than the document.
+
+- =agent-view-session-transcript-fz= --- pick a session, convert to org, open
+  in emacs.
+- =agent-view-session-transcript-md-fz= --- same, as markdown.
+- =agent-view-session-transcript-raw-fz= --- open the original transcript.
+- =agent-view-session-transcript= --- the same as the first, for a session path
+  you already have. No picker.
 - =agent-view-session-toggle= --- convert a session path to org and open
   it in emacs in the background, or cancel that transcript's running
   conversion. What =alt+enter= in the pickers runs. See the section on reading
@@ -1196,7 +1204,7 @@ spelling survives as an =aliasfn= that narrows the same function to Claude with
 
 Each viewer and each resume picker has a =-all-fz= variant that selects from
 every project's sessions instead of the current directory's:
-=agent-view-session-all-fz=, =claude-code-session-resume-all-fz=,
+=agent-view-session-transcript-all-fz=, =claude-code-session-resume-all-fz=,
 =claude-resume-all-fz=, =claude-resume-personal-all-fz=,
 =claude-resume-work-all-fz=, and so on. The viewers set the picker's
 =agent_session_fz_scope= directly; the resume family sets its own
@@ -1514,7 +1522,7 @@ picker stays open, so you can keep looking, or open several; pressing
 behind the key is =agent-view-session-toggle=.
 
 Before this, a picker's only exit was Enter, which handed the path back to the
-caller. For =agent-view-session-fz= that meant converting in the
+caller. For =agent-view-session-transcript-fz= that meant converting in the
 foreground, and the terminal was blocked for seconds on a large transcript.
 
 The job is keyed on the transcript, not on the kitty window. The hotkey's key is
