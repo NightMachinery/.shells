@@ -37,6 +37,16 @@ alphabetical order after the core modules are ready.
 Put core features in `core/` and add them to the explicit list in `boot.lua`.
 Put app-specific add-ons that can run after all core modules in `auto-load/`.
 
+## App hotkeys
+
+`appHotkey` accepts either one app name/bundle ID or a dense ordered array of
+them. On each press it uses `getApp` to try the candidates in order and toggles
+the first one already running: frontmost apps hide, while other running apps
+activate. If none are running, the key does nothing and never launches one.
+Bundle IDs keep `getApp`'s direct `applicationsForBundleID` lookup, avoiding a
+walk through every running process. The Telegram binding prefers Purple
+Telegram and falls back to standard Telegram.
+
 ## The ipc print recursion fix
 
 `hs -c` used to wedge whenever anything printed to the Hammerspoon console

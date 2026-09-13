@@ -22,6 +22,10 @@ Hammerspoon modal helpers support single-key bindings with =bind_v2= and
 multi-key chords with =bind_v3=. See =./hammerspoon/docs/hammerspoon.md= for
 the chord behavior and qView examples.
 
+App-toggle hotkeys can name one app or an ordered list of running-app
+fallbacks; they toggle the first running candidate and never launch one. The
+Telegram hotkey prefers Purple Telegram, then standard Telegram.
+
 * Zsh plugins
 
 The shared =note= skill drafts concise notes under =~/notes=, uses Terra in
