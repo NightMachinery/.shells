@@ -132,6 +132,11 @@ function codex-m {
     # - never: Never ask for user approval Execution failures are immediately returned to the model
 }
 
+function codex-long {
+    : "Launch [agfi:codex-m] with the model-neutral long-context profile."
+    codex-m --profile long "$@"
+}
+
 function codex-yolo {
     codex_security_opts=(--dangerously-bypass-approvals-and-sandbox) codex-m "$@"
 }
