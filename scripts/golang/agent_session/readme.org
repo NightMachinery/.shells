@@ -102,9 +102,10 @@ whether a seam is in the right place.
 - =internal/turns= --- the agent-neutral half of the renderer: the
   =Document=/=Subdoc=/=Turn=/=Block=/=TimedBlock=/=ToolResult= model,
   =Render(doc, Options)= and =RenderTurns=, =Style=, the org and markdown
-  writer, fence repair, the heading tags, pandoc chunking, the unified diff, and
-  the text helpers (=ShortModel=, =ModelLabel=, =ModelTag=, =ScrubText=,
-  =AbbrevHome=, =Truncate= …).
+  writer, fence repair, the heading tags, pandoc chunking, the unified diff,
+  =context.go= with the =ContextUsage= a document and each subagent carry and
+  the =Commas= that formats it, and the text helpers (=ShortModel=,
+  =ModelLabel=, =ModelTag=, =ScrubText=, =AbbrevHome=, =Truncate= …).
   Nothing in it knows how any agent stores a session.
 - =internal/preview= --- what the fzf previews of different agents are built
   from, so they line up and read alike: =Painter=, =Row=, =JoinParts=,
@@ -503,6 +504,73 @@ turns would otherwise have spanned two. Annotating sub-headings instead was the
 alternative, but a plain text block has no heading to annotate, so a switch
 landing there would go unrecorded.
 
+** The context window
+
+A rendered document opens with what the session was holding when the model last
+answered, and each inlined subagent's heading is followed by the same line for
+its own window:
+
+#+begin_example
+Context window: 120,900 / 272,000 tokens (44%)
+#+end_example
+
+It is the state *after the last model response*, which is the only state either
+agent writes down. Anything that happened since --- a tool result that came back
+but has not been sent yet, a prompt typed into a session that is still thinking
+--- is not in it. That is a feature rather than a limitation: the figure means
+"this is what the next request will carry", which is the question anybody
+reading it is actually asking.
+
+The two agents count differently, and neither count is the one a naive reader
+would assemble.
+
+Claude Code reports a =usage= object on every assistant message, and what
+occupies the window is =input_tokens + cache_creation_input_tokens +
+cache_read_input_tokens=. The output tokens are deliberately left out: they came
+*back* from the model, and they are in the window of the request *after* this
+one, which reports its own figure anyway. That is the same sum Claude Code's own
+statusline derives =context_window.used_percentage= from, so the transcript and
+the status line agree.
+
+Codex reports a =token_count= event, and there the answer is =total_tokens -
+reasoning_output_tokens= --- what Codex itself calls =tokens_in_context_window=.
+Reasoning tokens are produced and then dropped: they are not carried into the
+next request, so counting them would inflate the figure by however hard the
+model happened to think on that one turn.
+
+Codex states its capacity in the event (=model_context_window=), so nothing has
+to be guessed. Claude Code does not, so the window is inferred from the model
+id: =contextWindow= in =internal/claude/record.go= picks between the two
+constants =windowDefault= and =windowLarge=, the ordinary seat and the
+long-context one, on a =[1m]= in the id. A session already holding more than the
+default is taken as the long-context seat too, whatever its id says, and that
+ordering is deliberate: a figure exceeding its own window is *certainly* the
+wrong window and only *probably* the wrong count, so the count is believed.
+
+The percentage is rounded half up in integer arithmetic and is never clamped.
+Over 100% means the inference above was wrong for this session, and a line
+saying 125% is a fault somebody will notice and report, where one quietly pinned
+at 100% would hide the same fault forever. No float touches the output either,
+because the line is part of a document =TestPandocPathParity= compares byte for
+byte between a single pandoc run and the chunked parallel one.
+
+For the same reason the line is *skeleton*: Go emits it already in the output
+syntax, before pandoc, so no chunk carries a byte pandoc would have to make a
+decision about. The document's line is prepended in =Render= and the subagent's
+is glued to its own heading in =subagentSegments= --- one segment, so a chunk
+seam can never fall between an agent's heading and its window.
+
+A transcript that never said gets *no line at all*, not a zero:
+=turns.ContextUsage= is a value type whose zero =Used= means "unreported", and
+=Line()= returns the empty string for it. An old transcript, an interrupted
+turn, or a resumed session whose counters came back empty simply says nothing,
+which is honest; a =0 tokens= line would be a claim.
+
+Antigravity says nothing at all here, and its documents carry no context line.
+The step JSONL the adapter reads has no token counts in it; the =agy= binary
+keeps them as protobuf =ContextWindowMetadata= and =UsageMetadata= inside the
+=.pb= trajectory store, which this renderer, being stdlib-only, does not decode.
+
 * Events
 
 A transcript is not only messages. These record types are rendered too, each
@@ -596,7 +664,10 @@ would read as a number. The model comes out of the one read
 the adapter's =subdoc= already does: it reads the agent's transcript once and
 hands back a =turns.Subdoc= whose title carries the vote, so =subagentSegments=
 in =internal/turns= only has to write the skeleton around it. Reading the
-transcript a second time for a field already in hand would be waste. Checked
+transcript a second time for a field already in hand would be waste, and that
+thought is what the context line rides on too: =subdoc= scans the same records
+back for the agent's own last usage and returns it on the same =Subdoc=, at no
+extra read. Checked
 against the local corpus on a session with eleven subagents, the six whose
 assistant records are mostly =claude-opus-5= render as =@Opus5= and the five
 mostly =claude-fable-5-1= as =@Fable5.1=, matching a =jq= count of the raw
@@ -605,6 +676,12 @@ records exactly.
 The section itself stays unfolded so the roster of agents is visible at a
 glance; each agent's own heading carries =:VISIBILITY: folded= so its
 transcript stays out of the way until wanted.
+
+Under each heading, above the folded transcript, sits that agent's own context
+line --- the window it was holding when it last answered, which is a window of
+its own and not a slice of its parent's. See [[*The context window]] for how it
+is counted. The heading and the line are written as a *single* segment, so no
+pandoc chunk seam can ever fall between an agent and its figure.
 
 * How tool calls are rendered
 
@@ -778,11 +855,19 @@ into their parent, found by =subRollouts= grouping the day directories by
 parent id, so listing them separately would show the same work twice. Then
 =turn_context= lines carry the cwd, the model and the reasoning effort in force
 for the turn that follows, which is where the model label on an assistant turn
-comes from. Everything else is a =response_item=, whose payload type is one of
-=message=, =reasoning=, =function_call=, =function_call_output=,
-=custom_tool_call= and its output, or =local_shell_call=; a =compacted= line
-marks a compaction and becomes its own =Context compacted= turn, as Claude's
-does.
+comes from. The conversation itself is in the =response_item= lines, whose
+payload type is one of =message=, =reasoning=, =function_call=,
+=function_call_output=, =custom_tool_call= and its output, or
+=local_shell_call=; a =compacted= line marks a compaction and becomes its own
+=Context compacted= turn, as Claude's does.
+
+One more type is read, for one number. Codex also writes =event_msg= lines ---
+what it reports to its own UI --- and of those only =token_count= is decoded,
+only for the usage the document's context line shows. None of them becomes a
+turn: the =buildTurns= switch never sees them, because an event the UI drew is
+not something anybody said. Its =info= is null on a reset, and Codex writes a
+reset *after* real measurements, so =lastContextUsage= scans backwards and
+skips nulls rather than stopping at one: the newest populated event wins.
 
 Consecutive records of one role merge into a turn, exactly as they do for
 Claude, because Codex also writes the reasoning, each tool call and the final

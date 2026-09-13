@@ -30,6 +30,9 @@ type Document struct {
 	// The `* Subagents` section at the top of the document, in the order the
 	// agents were launched.
 	Subagents []Subdoc
+	// How much of the context window the session was holding when the model
+	// last answered; the zero value renders nothing.
+	Context ContextUsage
 }
 
 // A Subdoc is a subagent's transcript, nested under its own heading.
@@ -37,6 +40,9 @@ type Subdoc struct {
 	Title   string
 	Turns   []Turn
 	Results map[string]ToolResult
+	// The agent's own usage, not its parent's: a subagent runs in a window of
+	// its own, which is half the reason to spawn one.
+	Context ContextUsage
 }
 
 // One conversational turn: the consecutive records that share a role, flattened
@@ -168,7 +174,17 @@ func Render(doc *Document, o Options) (string, error) {
 	// org even though the bodies it wraps are still markdown.
 	orgOut := o.Format != "md"
 
-	segs := subagentSegments(doc.Subagents, st, orgOut, jobs)
+	var segs []segment
+	// Skeleton, not body: it is already in the output syntax and has no
+	// business meeting pandoc, which would only reflow it. The trailing blank
+	// line is load-bearing --- without it the `* Subagents` heading, or the
+	// first turn's, would be glued to this line and stop being a heading on the
+	// markdown path.
+	if line := doc.Context.Line(); line != "" {
+		segs = append(segs, segment{text: line + "\n\n"})
+	}
+
+	segs = append(segs, subagentSegments(doc.Subagents, st, orgOut, jobs)...)
 	for _, p := range RenderTurns(doc.Turns, doc.Results, st, jobs) {
 		segs = append(segs, segment{text: p, body: true})
 	}
@@ -248,7 +264,14 @@ func subagentSegments(subs []Subdoc, st Style, orgOut bool, jobs int) []segment 
 			// VISIBILITY is honoured at startup, so each agent opens folded.
 			trailer = ":PROPERTIES:\n:VISIBILITY: folded\n:END:\n"
 		}
-		segs = append(segs, segment{text: head(2, s.Title, trailer)})
+		// Heading and usage line in one segment, never two: a seam between
+		// them would let the two land in different pandoc chunks, and the line
+		// belongs to the agent above it rather than to the turns below.
+		text := head(2, s.Title, trailer)
+		if line := s.Context.Line(); line != "" {
+			text += line + "\n\n"
+		}
+		segs = append(segs, segment{text: text})
 		for _, p := range RenderTurns(s.Turns, s.Results, sub, jobs) {
 			segs = append(segs, segment{text: p, body: true})
 		}

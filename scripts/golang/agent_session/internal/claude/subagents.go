@@ -138,9 +138,9 @@ func loadSubagents(sessionPath string, callOrder map[string]int) []subagent {
 }
 
 // Reads a subagent transcript into its own document. The model in the heading
-// comes out of the same read: reading the file twice for a field that is
-// already in hand would be silly. An unreadable transcript still gets its
-// heading, with nothing under it.
+// and the context line under it both come out of the same read: reading the
+// file twice for fields that are already in hand would be silly. An unreadable
+// transcript still gets its heading, with nothing under it.
 func (s subagent) subdoc() turns.Subdoc {
 	fh, err := os.Open(s.path)
 	if err != nil {
@@ -169,5 +169,6 @@ func (s subagent) subdoc() turns.Subdoc {
 		Title:   s.title(modelMode(records)),
 		Turns:   buildTurns(records, blocks, results),
 		Results: results,
+		Context: lastContextUsage(records),
 	}
 }

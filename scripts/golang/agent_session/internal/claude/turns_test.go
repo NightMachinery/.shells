@@ -370,3 +370,111 @@ func TestSessionNamePrecedence(t *testing.T) {
 		})
 	}
 }
+
+func mkUsage(model string, in, cacheCreate, cacheRead, out int) record {
+	return record{Type: "assistant", Message: &message{Model: model, Usage: &usage{
+		InputTokens:         in,
+		CacheCreationTokens: cacheCreate,
+		CacheReadTokens:     cacheRead,
+		OutputTokens:        out,
+	}}}
+}
+
+// The line shows the state after the last model response, so the newest record
+// that actually reported a figure wins, and nothing that never held the window
+// may displace it.
+func TestLastContextUsage(t *testing.T) {
+	last := mkUsage("claude-opus-5", 1000, 2000, 139310, 50000)
+
+	cases := []struct {
+		name string
+		in   []record
+		want turns.ContextUsage
+	}{
+		{"nothing said", nil, turns.ContextUsage{}},
+		{
+			// The output tokens came back and are in the *next* request's
+			// window, not this one's: 1000 + 2000 + 139310, and not a token of
+			// the 50000.
+			name: "the last reporting record wins, output excluded",
+			in:   []record{mkUsage("claude-opus-5", 9, 9, 9, 9), last},
+			want: turns.ContextUsage{Used: 142310, Window: 200000},
+		},
+		{
+			// A message Claude Code wrote itself never made a request.
+			name: "a trailing synthetic record does not win",
+			in:   []record{last, mkUsage("<synthetic>", 1, 1, 1, 1)},
+			want: turns.ContextUsage{Used: 142310, Window: 200000},
+		},
+		{
+			// A resumed or interrupted turn leaves the counters behind at zero.
+			name: "an all-zero usage does not win",
+			in:   []record{last, mkUsage("claude-opus-5", 0, 0, 0, 0)},
+			want: turns.ContextUsage{Used: 142310, Window: 200000},
+		},
+		{
+			name: "a meta assistant record does not win",
+			in: func() []record {
+				meta := mkUsage("claude-opus-5", 5, 5, 5, 5)
+				meta.IsMeta = true
+				return []record{last, meta}
+			}(),
+			want: turns.ContextUsage{Used: 142310, Window: 200000},
+		},
+		{
+			name: "a user record does not win",
+			in: func() []record {
+				u := mkUsage("claude-opus-5", 5, 5, 5, 5)
+				u.Type = "user"
+				return []record{last, u}
+			}(),
+			want: turns.ContextUsage{Used: 142310, Window: 200000},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := lastContextUsage(c.in); got != c.want {
+				t.Errorf("got %+v, want %+v", got, c.want)
+			}
+		})
+	}
+}
+
+// Claude Code writes the usage but never the capacity, so the window is
+// inferred.
+func TestContextWindowInference(t *testing.T) {
+	for _, c := range []struct {
+		model string
+		used  int
+		want  int
+	}{
+		{"claude-opus-5", 1000, 200_000},
+		{"claude-opus-5[1m]", 1000, 1_000_000},
+		// No suffix, but a session holding this much proves the seat anyway.
+		{"claude-opus-5", 240_000, 1_000_000},
+		{"", 1000, 200_000},
+	} {
+		if got := contextWindow(c.model, c.used); got != c.want {
+			t.Errorf("contextWindow(%q, %d) = %d, want %d", c.model, c.used, got, c.want)
+		}
+	}
+}
+
+// The usage field rides on the same narrow struct both tail scans decode, so a
+// record without one must still decode rather than fail the line.
+func TestMsgRecordStillDecodesWithoutUsage(t *testing.T) {
+	rec := mkRaw(t, map[string]any{
+		"type": "assistant", "timestamp": "2026-08-10T10:00:00.000Z",
+		"message": map[string]any{
+			"model":   "claude-opus-5",
+			"content": []map[string]any{{"type": "text", "text": "hi"}},
+		},
+	})
+	if rec.Message == nil || rec.Message.Usage != nil {
+		t.Fatalf("message = %+v", rec.Message)
+	}
+	if got := lastContextUsage([]record{rec}); got != (turns.ContextUsage{}) {
+		t.Errorf("got %+v, want the zero value", got)
+	}
+}

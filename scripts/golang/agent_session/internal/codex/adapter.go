@@ -51,6 +51,7 @@ func (a Adapter) Document(path string, o session.DocOpts) (*turns.Document, erro
 	lines := readLines(fh)
 	doc := &turns.Document{}
 	doc.Turns, doc.Results = buildTurns(lines)
+	doc.Context = lastContextUsage(lines)
 
 	if o.Subagents {
 		var meta sessionMeta
@@ -298,7 +299,7 @@ func subdoc(path string) turns.Subdoc {
 		title += " · " + name
 	}
 
-	return turns.Subdoc{Title: title, Turns: ts, Results: results}
+	return turns.Subdoc{Title: title, Turns: ts, Results: results, Context: lastContextUsage(lines)}
 }
 
 // The newest timestamp among the rollout's records, from its tail. With

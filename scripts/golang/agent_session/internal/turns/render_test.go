@@ -123,6 +123,21 @@ func TestNormalizeOrgLevels(t *testing.T) {
 			want: "* Assistant\n\n#+begin_quote\n#+begin_example\n* no\n#+end_example\n* still no\n#+end_quote\n\n*** mine\n",
 		},
 		{
+			// A context line starts with no star, so it is not a heading and
+			// must come back byte for byte, with the headings around it still
+			// normalized.
+			name: "a context line is left exactly as it was",
+			in: "Context window: 142,310 / 200,000 tokens (71%)\n\n" +
+				org(tagSub, 1, "Subagents") + "\n\n" +
+				org(tagSub, 2, "general-purpose · x") + "\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n" +
+				"Context window: 8,000 / 200,000 tokens (4%)\n\n" +
+				org(tagTurn, 3, "User") + "\n",
+			want: "Context window: 142,310 / 200,000 tokens (71%)\n\n" +
+				"* Subagents\n\n** general-purpose · x\n" +
+				":PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n" +
+				"Context window: 8,000 / 200,000 tokens (4%)\n\n*** User\n",
+		},
+		{
 			name: "the subagents skeleton is structure, not a message",
 			in: org(tagSub, 1, "Subagents") + "\n\n" +
 				org(tagSub, 2, "general-purpose · x") + "\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n" +
@@ -481,4 +496,132 @@ func TestScrubText(t *testing.T) {
 			t.Errorf("ScrubText(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
+}
+
+func TestCommas(t *testing.T) {
+	for _, c := range []struct {
+		in   int
+		want string
+	}{
+		{0, "0"},
+		{999, "999"},
+		{1000, "1,000"},
+		{12345, "12,345"},
+		{142310, "142,310"},
+		{1000000, "1,000,000"},
+		{-1234, "-1,234"},
+	} {
+		if got := Commas(c.in); got != c.want {
+			t.Errorf("Commas(%d) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestContextUsageLine(t *testing.T) {
+	for _, c := range []struct {
+		in   ContextUsage
+		want string
+	}{
+		{ContextUsage{142310, 200000}, "Context window: 142,310 / 200,000 tokens (71%)"},
+		// Half up, in integer arithmetic: 62.5% is 63%, not 62%.
+		{ContextUsage{5, 8}, "Context window: 5 / 8 tokens (63%)"},
+		// No window to compare against, but the total still says something.
+		{ContextUsage{87654, 0}, "Context window: 87,654 tokens"},
+		// The transcript never said, which is not the same as zero.
+		{ContextUsage{}, ""},
+		// Never clamped: over 100% means the inferred window was too small,
+		// and that is worth seeing.
+		{ContextUsage{250000, 200000}, "Context window: 250,000 / 200,000 tokens (125%)"},
+	} {
+		if got := c.in.Line(); got != c.want {
+			t.Errorf("%+v.Line() = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// The document's own usage opens the body; each subagent's sits under its own
+// heading. Two lines in a document with one subagent, never one repeated and
+// never one swallowed by the heading above it.
+func TestRenderContextLinePlacement(t *testing.T) {
+	doc := &Document{
+		Context: ContextUsage{Used: 142310, Window: 200000},
+		Turns: []Turn{{
+			Role: "user", TS: "2026-08-10T10:00:00.000Z",
+			Blocks: []TimedBlock{{B: Block{Type: "text", Text: "hi"}}},
+		}},
+		Subagents: []Subdoc{{
+			Title:   "Explore · Find the thing",
+			Context: ContextUsage{Used: 8000, Window: 200000},
+			Turns: []Turn{{
+				Role:   "assistant",
+				Blocks: []TimedBlock{{B: Block{Type: "text", Text: "found it"}}},
+			}},
+		}},
+	}
+
+	for _, c := range []struct{ format, section, heading string }{
+		{"org", "* Subagents", "** Explore · Find the thing\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n"},
+		{"md", "# Subagents", "## Explore · Find the thing\n\n"},
+	} {
+		t.Run(c.format, func(t *testing.T) {
+			out, err := Render(doc, Options{Format: c.format, Jobs: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(out, "Context window: 142,310 / 200,000 tokens (71%)\n") {
+				t.Errorf("the document's own line should open the body:\n%s", out)
+			}
+			if got := nextNonBlank(out); got != c.section {
+				t.Errorf("next non-blank line = %q, want %q", got, c.section)
+			}
+			if want := c.heading + "Context window: 8,000 / 200,000 tokens (4%)"; !strings.Contains(out, want) {
+				t.Errorf("the agent's line should sit right under its heading:\n%s", out)
+			}
+			if n := strings.Count(out, "Context window:"); n != 2 {
+				t.Errorf("want exactly 2 context lines, got %d:\n%s", n, out)
+			}
+		})
+	}
+}
+
+// A transcript that never reported its usage gets no line at all, rather than a
+// confident zero.
+func TestRenderOmitsUnknownContext(t *testing.T) {
+	doc := &Document{
+		Turns: []Turn{{
+			Role:   "user",
+			Blocks: []TimedBlock{{B: Block{Type: "text", Text: "hi"}}},
+		}},
+		Subagents: []Subdoc{{
+			Title: "Explore · Find the thing",
+			Turns: []Turn{{
+				Role:   "assistant",
+				Blocks: []TimedBlock{{B: Block{Type: "text", Text: "found it"}}},
+			}},
+		}},
+	}
+
+	for _, format := range []string{"org", "md"} {
+		out, err := Render(doc, Options{Format: format, Jobs: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(out, "Context window:") {
+			t.Errorf("%s: a zero usage should render nothing:\n%s", format, out)
+		}
+	}
+}
+
+// The first non-blank line after the document's opening one, which is what
+// says whether the context line got its own block or glued itself to the
+// heading below.
+func nextNonBlank(s string) string {
+	lines := strings.Split(s, "\n")
+	for _, ln := range lines[1:] {
+		if strings.TrimSpace(ln) == "" {
+			continue
+		}
+		return ln
+	}
+	return ""
 }
