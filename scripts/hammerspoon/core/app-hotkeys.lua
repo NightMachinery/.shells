@@ -161,8 +161,8 @@ end
 -- appHotkey{ key='/', appName='company.thebrowser.Browser' } -- Arc
 appHotkey{ key='/', appName='com.brave.Browser' }
 -- appHotkey{ key='/', appName='com.vivaldi.Vivaldi' }
-appHotkey{ key='/', mods={'shift'}, appName='company.thebrowser.Browser' }
--- appHotkey{ key='/', mods={'shift'}, appName='com.interversehq.qView' }
+-- appHotkey{ key='/', mods={'shift'}, appName='company.thebrowser.Browser' }
+appHotkey{ key='/', mods={'shift'}, appName='com.interversehq.qView' }
 
 appHotkey{
     key="'",
