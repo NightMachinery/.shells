@@ -62,6 +62,15 @@ func writeStore(t *testing.T) (home string, main string, sub string) {
 			"call_id": "call_2", "output": map[string]any{"output": "Success. Updated the following files:\nM foo.go", "metadata": map[string]any{"exit_code": 0}}}),
 		rec("2026-09-08T10:00:10.000Z", "response_item", msg("assistant", "output_text", "Done: two files.")),
 		rec("2026-09-08T10:00:11.000Z", "event_msg", map[string]any{"type": "token_count", "info": nil}),
+		rec("2026-09-08T10:00:12.000Z", "event_msg", map[string]any{"type": "token_count", "info": map[string]any{
+			"total_token_usage": map[string]any{"input_tokens": 240000, "cached_input_tokens": 200000,
+				"output_tokens": 1800, "reasoning_output_tokens": 800, "total_tokens": 241800},
+			"last_token_usage": map[string]any{"input_tokens": 120000, "cached_input_tokens": 100000,
+				"output_tokens": 900, "reasoning_output_tokens": 400, "total_tokens": 121300},
+			"model_context_window": 272000}}),
+		// A reset event follows a real measurement, which is why the scan runs
+		// backwards and skips nulls rather than stopping at one.
+		rec("2026-09-08T10:00:13.000Z", "event_msg", map[string]any{"type": "token_count", "info": nil}),
 		rec("2026-09-08T10:01:00.000Z", "compacted", map[string]any{"message": "Earlier: listed and patched."}),
 		rec("2026-09-08T10:02:00.000Z", "response_item", msg("user", "input_text", "thanks")),
 	}
@@ -75,6 +84,12 @@ func writeStore(t *testing.T) (home string, main string, sub string) {
 		rec("2026-09-08T10:05:00.100Z", "turn_context", map[string]any{"cwd": "/tmp/proj", "model": "gpt-5.3-codex-mini"}),
 		rec("2026-09-08T10:05:01.000Z", "response_item", msg("user", "input_text", "explore the repo")),
 		rec("2026-09-08T10:05:02.000Z", "response_item", msg("assistant", "output_text", "It has two files.")),
+		rec("2026-09-08T10:05:03.000Z", "event_msg", map[string]any{"type": "token_count", "info": map[string]any{
+			"total_token_usage": map[string]any{"input_tokens": 30000, "cached_input_tokens": 20000,
+				"output_tokens": 400, "reasoning_output_tokens": 200, "total_tokens": 30200},
+			"last_token_usage": map[string]any{"input_tokens": 30000, "cached_input_tokens": 20000,
+				"output_tokens": 400, "reasoning_output_tokens": 200, "total_tokens": 30200},
+			"model_context_window": 272000}}),
 	}
 	if err := os.WriteFile(sub, []byte(strings.Join(subLines, "\n")+"\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -227,9 +242,14 @@ func TestDocumentTurns(t *testing.T) {
 		}
 		roles = append(roles, tu.Role)
 	}
+	// The token_count events are usage, not conversation: they add no turn.
 	want := []string{"Session instructions", "user", "assistant", "Context compacted", "user"}
 	if strings.Join(roles, ",") != strings.Join(want, ",") {
 		t.Errorf("turns = %v, want %v", roles, want)
+	}
+
+	if got, w := doc.Context, (turns.ContextUsage{Used: 120900, Window: 272000}); got != w {
+		t.Errorf("document context = %+v, want %+v", got, w)
 	}
 
 	// The launch scaffold is its own folded turn, kept verbatim because it is
@@ -296,10 +316,92 @@ func TestDocumentTurns(t *testing.T) {
 		"#+begin_src diff",
 		"* Context compacted",
 		"* Subagents",
+		"Context window: 120,900 / 272,000 tokens (44%)",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("rendered document lacks %q:\n%s", want, out)
 		}
+	}
+	// The agent's own window, under its own heading.
+	head := "** " + doc.Subagents[0].Title + "\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n"
+	if !strings.Contains(out, head+"Context window: 30,000 / 272,000 tokens (11%)") {
+		t.Errorf("the agent's line should sit right under its heading:\n%s", out)
+	}
+}
+
+// Codex writes a token_count with a null `info` on a reset, and writes one
+// after real measurements, so the newest *populated* event is the answer.
+func TestLastContextUsage(t *testing.T) {
+	payload := func(v any) json.RawMessage {
+		raw, err := json.Marshal(v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
+	count := func(total, reasoning, window int) line {
+		return line{Type: "event_msg", Payload: payload(map[string]any{
+			"type": "token_count",
+			"info": map[string]any{
+				"last_token_usage": map[string]any{
+					"total_tokens": total, "reasoning_output_tokens": reasoning},
+				"model_context_window": window,
+			}})}
+	}
+	null := line{Type: "event_msg", Payload: payload(map[string]any{"type": "token_count", "info": nil})}
+
+	cases := []struct {
+		name string
+		in   []line
+		want turns.ContextUsage
+	}{
+		{"nothing said", nil, turns.ContextUsage{}},
+		{"only resets", []line{null, null}, turns.ContextUsage{}},
+		{
+			// Reasoning is not carried into the next request, so it is not in
+			// the window: 121300 - 400.
+			name: "reasoning is subtracted",
+			in:   []line{count(121300, 400, 272000)},
+			want: turns.ContextUsage{Used: 120900, Window: 272000},
+		},
+		{
+			name: "the newest populated event wins, a null after it is skipped",
+			in:   []line{count(50000, 0, 272000), count(121300, 400, 272000), null},
+			want: turns.ContextUsage{Used: 120900, Window: 272000},
+		},
+		{
+			name: "other event_msg kinds and other line types are skipped",
+			in: []line{
+				count(121300, 400, 272000),
+				{Type: "event_msg", Payload: payload(map[string]any{"type": "agent_message", "message": "hi"})},
+				{Type: "response_item", Payload: payload(map[string]any{"type": "message", "role": "assistant"})},
+			},
+			want: turns.ContextUsage{Used: 120900, Window: 272000},
+		},
+		{
+			// The capacity is the one thing Codex may leave out; the total
+			// still says how big the thread got.
+			name: "a missing model_context_window leaves the window unknown",
+			in:   []line{count(121300, 400, 0)},
+			want: turns.ContextUsage{Used: 120900, Window: 0},
+		},
+		{
+			name: "a malformed payload is a skipped line, not a panic",
+			in: []line{
+				count(121300, 400, 272000),
+				{Type: "event_msg", Payload: json.RawMessage(`{"type":"token_count","info":"nope"`)},
+				{Type: "event_msg", Payload: json.RawMessage(`{"type":"token_count","info":[1,2]}`)},
+			},
+			want: turns.ContextUsage{Used: 120900, Window: 272000},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := lastContextUsage(c.in); got != c.want {
+				t.Errorf("got %+v, want %+v", got, c.want)
+			}
+		})
 	}
 }
 

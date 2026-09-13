@@ -51,9 +51,74 @@ type nameFields struct {
 	AgentName   string `json:"agentName"`
 }
 
+// A message, as narrow as everything that reads one allows. [msgRecord]
+// embeds a pointer to this and is what both tail scans decode per line, so
+// every field added here is paid for in every scanned record; the four ints of
+// `usage` are worth it, because the alternative is a second pass over the tail
+// for the one number the context line needs.
 type message struct {
 	Content json.RawMessage `json:"content"`
 	Model   string          `json:"model"`
+	Usage   *usage          `json:"usage"`
+}
+
+// What an assistant message reports about the request that produced it.
+type usage struct {
+	InputTokens         int `json:"input_tokens"`
+	CacheCreationTokens int `json:"cache_creation_input_tokens"`
+	CacheReadTokens     int `json:"cache_read_input_tokens"`
+	OutputTokens        int `json:"output_tokens"`
+}
+
+// How much of the context window this request was holding: everything that
+// went *into* it, cached or not. The output tokens are not in it --- they came
+// back, and are only in the window of the request after this one, which reports
+// its own figure. This is the same sum Claude Code's own statusline derives
+// `context_window.used_percentage` from.
+func (u usage) inWindow() int {
+	return u.InputTokens + u.CacheCreationTokens + u.CacheReadTokens
+}
+
+// How large a window a model has, when the transcript does not say. Claude Code
+// writes the usage but not the capacity, so it is inferred from the model id.
+const (
+	windowDefault = 200_000
+	windowLarge   = 1_000_000
+)
+
+// The window the session was running in. The `[1m]` suffix is how a long-context
+// seat spells itself in the model id; a session already holding more than the
+// default proves the point without the suffix, and is believed over the id,
+// since a figure that exceeds its own window is certainly the wrong window and
+// only probably the wrong count.
+func contextWindow(model string, used int) int {
+	if strings.Contains(model, "[1m]") || used > windowDefault {
+		return windowLarge
+	}
+	return windowDefault
+}
+
+// The usage the session last reported, scanning back from the end: the newest
+// assistant message that actually carried one. Everything skipped here is
+// something that never held the window --- the harness's own meta records, the
+// `<synthetic>` messages Claude Code writes itself, and the records whose usage
+// is present but empty, which a resumed or interrupted turn leaves behind.
+func lastContextUsage(records []record) turns.ContextUsage {
+	for i := len(records) - 1; i >= 0; i-- {
+		rec := records[i]
+		if rec.Type != "assistant" || rec.IsMeta || rec.Message == nil || rec.Message.Usage == nil {
+			continue
+		}
+		if rec.Message.Model == "<synthetic>" {
+			continue
+		}
+		used := rec.Message.Usage.inWindow()
+		if used <= 0 {
+			continue
+		}
+		return turns.ContextUsage{Used: used, Window: contextWindow(rec.Message.Model, used)}
+	}
+	return turns.ContextUsage{}
 }
 
 // The message fields the two tail scans -- `list`'s and `preview`'s -- both

@@ -74,6 +74,7 @@ func (Adapter) Document(path string, o session.DocOpts) (*turns.Document, error)
 	doc := &turns.Document{
 		Turns:   buildTurns(records, blocks, results),
 		Results: results,
+		Context: lastContextUsage(records),
 	}
 	if o.Subagents {
 		for _, s := range loadSubagents(path, toolCallOrder(blocks)) {

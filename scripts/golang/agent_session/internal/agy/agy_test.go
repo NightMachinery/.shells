@@ -500,3 +500,25 @@ func TestProseStep(t *testing.T) {
 		}
 	}
 }
+
+// Antigravity's step JSONL carries no token counts at all, so its documents get
+// no context line rather than a made-up one.
+func TestDocumentHasNoContextWindow(t *testing.T) {
+	_, _, main := writeStore(t)
+
+	doc, err := ad.Document(main, session.DocOpts{Subagents: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := doc.Context.Line(); got != "" {
+		t.Errorf("context line = %q, want nothing", got)
+	}
+
+	out, err := turns.Render(doc, turns.Options{Format: "org", Jobs: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "Context window:") {
+		t.Errorf("rendered document should carry no context line:\n%s", out)
+	}
+}

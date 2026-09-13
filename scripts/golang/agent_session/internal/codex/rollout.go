@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"agent_session/internal/session"
+	"agent_session/internal/turns"
 )
 
 // ** the record model
@@ -75,6 +76,65 @@ type contentPart struct {
 // A `compacted` record: the summary that replaced the history before it.
 type compacted struct {
 	Message string `json:"message"`
+}
+
+// An `event_msg` line, decoded only far enough to tell a `token_count` from
+// everything else Codex reports to its own UI. The info is null on the events
+// that announce a reset rather than a measurement.
+type tokenCountEvent struct {
+	Type string     `json:"type"`
+	Info *tokenInfo `json:"info"`
+}
+
+type tokenInfo struct {
+	TotalTokenUsage    *tokenUsage `json:"total_token_usage"`
+	LastTokenUsage     *tokenUsage `json:"last_token_usage"`
+	ModelContextWindow int         `json:"model_context_window"`
+}
+
+type tokenUsage struct {
+	InputTokens           int `json:"input_tokens"`
+	CachedInputTokens     int `json:"cached_input_tokens"`
+	OutputTokens          int `json:"output_tokens"`
+	ReasoningOutputTokens int `json:"reasoning_output_tokens"`
+	TotalTokens           int `json:"total_tokens"`
+}
+
+// What Codex itself calls `tokens_in_context_window`: the request's total less
+// the reasoning it produced, because reasoning tokens are not carried into the
+// next request and so are not occupying the window the way the rest is.
+func (u tokenUsage) inWindow() int {
+	if n := u.TotalTokens - u.ReasoningOutputTokens; n > 0 {
+		return n
+	}
+	return 0
+}
+
+// The usage the thread last reported, scanning back from the end. Backwards
+// rather than forwards because `info` is null on a reset event and Codex writes
+// one of those *after* real measurements: taking the last token_count outright
+// would report nothing, and stopping the scan at the first null would report
+// nothing too. So a null is skipped like any other line and the newest
+// populated event wins.
+func lastContextUsage(lines []line) turns.ContextUsage {
+	for i := len(lines) - 1; i >= 0; i-- {
+		if lines[i].Type != "event_msg" {
+			continue
+		}
+		var ev tokenCountEvent
+		if err := json.Unmarshal(lines[i].Payload, &ev); err != nil {
+			continue
+		}
+		if ev.Type != "token_count" || ev.Info == nil || ev.Info.LastTokenUsage == nil {
+			continue
+		}
+		used := ev.Info.LastTokenUsage.inWindow()
+		if used <= 0 {
+			continue
+		}
+		return turns.ContextUsage{Used: used, Window: ev.Info.ModelContextWindow}
+	}
+	return turns.ContextUsage{}
 }
 
 func readLines(fh *os.File) []line {

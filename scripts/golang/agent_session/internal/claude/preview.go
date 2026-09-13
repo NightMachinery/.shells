@@ -58,8 +58,9 @@ const previewWindow = 400 << 10
 // cannot reach it, and only 5 of 123 local sessions have one at all.
 
 // Only the fields the preview shows. A narrow struct on purpose: decoding the
-// full record would copy every message body in the window, and the only thing
-// wanted out of `message` is the model.
+// full record would copy every message body in the window, and all that is
+// wanted out of `message` is the model and the four usage counters the context
+// line is summed from.
 //
 // No `type` field, because none of these needs gating on one: each rides only
 // on the records that mean it. That is not merely equivalent to keying on the

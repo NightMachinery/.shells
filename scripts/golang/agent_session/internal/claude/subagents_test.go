@@ -1,8 +1,13 @@
 package claude
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"agent_session/internal/session"
 	"agent_session/internal/turns"
 )
 
@@ -120,5 +125,94 @@ func TestSubagentTitle(t *testing.T) {
 	}
 	if got, want := bare.title(""), "Subagent abc"; got != want {
 		t.Errorf("no meta, no model: got %q, want %q", got, want)
+	}
+}
+
+// A parent and an inlined agent each report their own window: the agent runs
+// in one of its own, which is half the reason to spawn it. Synthetic store,
+// written from the documented record shape; no real transcript is read.
+func TestDocumentAndSubagentContextWindow(t *testing.T) {
+	dir := t.TempDir()
+	id := "11111111-1111-4111-8111-111111111111"
+
+	line := func(obj map[string]any) string {
+		b, err := json.Marshal(obj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b) + "\n"
+	}
+	assistant := func(ts string, in, cacheCreate, cacheRead, out int, blocks ...map[string]any) string {
+		return line(map[string]any{
+			"type": "assistant", "timestamp": ts,
+			"message": map[string]any{
+				"model": "claude-opus-5", "content": blocks,
+				"usage": map[string]any{
+					"input_tokens": in, "cache_creation_input_tokens": cacheCreate,
+					"cache_read_input_tokens": cacheRead, "output_tokens": out,
+				},
+			},
+		})
+	}
+
+	parent := filepath.Join(dir, id+".jsonl")
+	body := line(map[string]any{
+		"type": "user", "timestamp": "2026-08-10T10:00:00.000Z",
+		"message": map[string]any{"content": []map[string]any{{"type": "text", "text": "go and look"}}},
+	}) +
+		assistant("2026-08-10T10:00:10.000Z", 500, 1000, 20000, 300,
+			map[string]any{"type": "tool_use", "id": "tu_1", "name": "Agent",
+				"input": map[string]any{"description": "Find the thing"}}) +
+		assistant("2026-08-10T10:05:00.000Z", 1000, 2000, 139310, 50000,
+			map[string]any{"type": "text", "text": "found it"})
+	if err := os.WriteFile(parent, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	subDir := filepath.Join(dir, id, "subagents")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	subBody := line(map[string]any{
+		"type": "user", "timestamp": "2026-08-10T10:00:11.000Z",
+		"message": map[string]any{"content": []map[string]any{{"type": "text", "text": "find the thing"}}},
+	}) +
+		assistant("2026-08-10T10:00:20.000Z", 500, 500, 7000, 200,
+			map[string]any{"type": "text", "text": "here it is"})
+	if err := os.WriteFile(filepath.Join(subDir, "agent-1.jsonl"), []byte(subBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	meta := line(map[string]any{
+		"agentType": "Explore", "description": "Find the thing", "toolUseId": "tu_1",
+	})
+	if err := os.WriteFile(filepath.Join(subDir, "agent-1.meta.json"), []byte(meta), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	doc, err := Adapter{}.Document(parent, session.DocOpts{Subagents: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (turns.ContextUsage{Used: 142310, Window: 200000}); doc.Context != want {
+		t.Errorf("document context = %+v, want %+v", doc.Context, want)
+	}
+	if len(doc.Subagents) != 1 {
+		t.Fatalf("subagents = %+v", doc.Subagents)
+	}
+	if want := (turns.ContextUsage{Used: 8000, Window: 200000}); doc.Subagents[0].Context != want {
+		t.Errorf("subagent context = %+v, want %+v", doc.Subagents[0].Context, want)
+	}
+
+	out, err := turns.Render(doc, turns.Options{Format: "org", Jobs: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out, "Context window: 142,310 / 200,000 tokens (71%)\n") {
+		t.Errorf("the session's own line should open the document:\n%s", out)
+	}
+	want := "** @Opus5 Explore · Find the thing\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n" +
+		"Context window: 8,000 / 200,000 tokens (4%)"
+	if !strings.Contains(out, want) {
+		t.Errorf("the agent's line should sit right under its heading:\n%s", out)
 	}
 }
