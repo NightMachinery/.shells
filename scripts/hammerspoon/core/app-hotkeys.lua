@@ -168,11 +168,25 @@ end
 -- end
 -- @upstreamBug https://github.com/Hammerspoon/hammerspoon/issues/2879 hs.hotkey.bind cannot bind punctuation keys such as /
 
--- appHotkey{ key='/', appName='company.thebrowser.Browser' } -- Arc
-appHotkey{ key='/', appName='com.brave.Browser' }
--- appHotkey{ key='/', appName='com.vivaldi.Vivaldi' }
--- appHotkey{ key='/', mods={'shift'}, appName='company.thebrowser.Browser' }
-appHotkey{ key='/', mods={'shift'}, appName='com.interversehq.qView' }
+appHotkey{
+    key='/',
+    appName={
+        'com.brave.Browser',
+        'company.thebrowser.Browser',
+        'com.vivaldi.Vivaldi',
+        'com.microsoft.edgemac',
+        'com.google.Chrome',
+        'com.apple.Safari',
+    }
+}
+appHotkey{
+    key='/',
+    mods={'shift'},
+    appName={
+        'company.thebrowser.Browser',
+        'com.interversehq.qView',
+    }
+}
 
 appHotkey{
     key="'",
@@ -193,12 +207,16 @@ appHotkey{
 -- appHotkey{ key='.', appName='com.openai.atlas' }
 -- appHotkey{ key='m', appName='com.google.Chrome.app.ahiigpfcghkbjfcibpojancebdfjmoop' } -- https://devdocs.io/offline ; 'm' is also set as a search engine in Chrome
 -- appHotkey{ key='m', appName='com.kapeli.dashdoc' } -- dash can bind itself in its pref
--- appHotkey{ key=';', appName='com.microsoft.Excel' }
-appHotkey{ key=';', appName='chat.delta.desktop.electron' }
+appHotkey{
+    key=';',
+    appName={
+        'chat.delta.desktop.electron',
+        'com.microsoft.Excel',
+    }
+}
 
 -- appHotkey{ key='c', appName='com.microsoft.VSCodeInsiders' }
 -- appHotkey{ key='c', appName='com.apple.Terminal' }
--- appHotkey{ key='b', appName='com.openai.codex' }
 appHotkey{ key='c', appName='com.apple.iCal' }
 -- appHotkey{ key='c', appName='com.todesktop.230313mzl4w4u92' } -- Cursor VSCode App
 
@@ -226,8 +244,14 @@ appHotkey{
 
 -- appHotkey{ key=']', appName='org.jdownloader.launcher' }
 
-appHotkey{ key='k', appName='info.sioyek.sioyek' }
--- appHotkey{ key='k', appName='net.sourceforge.skim-app.skim' }
+appHotkey{
+    key='k',
+    appName={
+        'info.sioyek.sioyek',
+        'net.sourceforge.skim-app.skim',
+        'com.apple.Preview',
+    }
+}
 -- appHotkey{ key='n', appName='net.sourceforge.skim-app.skim' }
 -- appHotkey{ key='[', appName='info.sioyek.sioyek' }
 -- appHotkey{ key=']', appName='net.sourceforge.skim-app.skim' }
@@ -236,7 +260,13 @@ appHotkey{ key='f', appName='com.apple.finder' }
 -- appHotkey{ key='o', appName='com.operasoftware.Opera' }
 -- appHotkey{ key='l', appName='notion.id' }
 
-appHotkey{ key='m', appName='io.mpv' }
+appHotkey{
+    key='m',
+    appName={
+        'io.mpv',
+        'com.openai.codex',
+    }
+}
 -- appHotkey{ key='m', appName='com.adobe.Reader' }
 
 appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
@@ -244,10 +274,21 @@ appHotkey{ key='n', appName='com.apple.MobileSMS' } -- Apple Messages
 -- appHotkey{ key='/', appName='com.quora.app.Experts' }
 appHotkey{ key='b', appName='com.parallels.desktop.console' }
 
--- appHotkey{ key='p', appName='com.jetbrains.pycharm' }
-appHotkey{ key='p', appName='com.apple.Preview' }
--- appHotkey{ key='p', appName='com.apple.iWork.Keynote' }
--- appHotkey{ key='w', appName='com.microsoft.Powerpoint' }
+appHotkey{
+    key='p',
+    appName={
+        'com.jetbrains.pycharm',
+        'com.apple.Preview',
+    }
+}
+appHotkey{
+    key='p',
+    mods={'shift'},
+    appName={
+        'com.microsoft.Powerpoint',
+        'com.apple.iWork.Keynote',
+    }
+}
 -- appHotkey{ key='w', appName='com.microsoft.Word' }
 
 appHotkey{ key='=', appName='com.fortinet.FortiClient' }
