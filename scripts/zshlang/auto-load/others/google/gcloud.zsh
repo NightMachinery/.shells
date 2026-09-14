@@ -174,11 +174,26 @@ typeset -gA gcp_gpu_price_ondemand=(
     a2-highgpu-1g    3.74
     a2-highgpu-2g    7.48
     a2-ultragpu-1g   5.12
+    #: The multi-GPU A2-ultra shapes. A2 ultra scales EXACTLY linearly in vCPU,
+    #: RAM, GPU and local SSD (1g is 12 vCPU / 170 GB / 1 GPU / 375 GB lSSD, 8g
+    #: is 8x each), so these are the 1g rate times the multiple rather than a
+    #: separate catalog query. Added <2026-09-14 Mon> because a 4-rank training
+    #: lane needs four 80 GB cards on ONE machine, and without a row
+    #: `h-gcp-gpu-price` counts the whole machine as 0 and silently
+    #: UNDER-reports the spend cap -- see its own warning.
+    #: @warn On-demand is the ONLY way to reach an A100-80GB in this project:
+    #: `PREEMPTIBLE_NVIDIA_A100_80GB_GPUS` is 0 in every region checked
+    #: (europe-west9/4/3/1, us-central1, us-east4, us-east5), so the spot rows
+    #: below are unreachable without a quota grant.
+    a2-ultragpu-2g  10.24
+    a2-ultragpu-4g  20.48
+    a2-ultragpu-8g  40.96
     #: @warn a3-highgpu-1g/2g/4g CANNOT be created on demand at all -- they
     #: exist only as Spot or Flex-start, which is also why there is no
     #: NVIDIA-H100-GPUS quota metric. Kept for comparison only.
     a3-highgpu-1g   11.26
     a3-highgpu-2g   22.53
+    a3-highgpu-4g   45.05
     a3-highgpu-8g   90.10
 )
 typeset -gA gcp_gpu_price_spot=(
@@ -192,8 +207,19 @@ typeset -gA gcp_gpu_price_spot=(
     #: SKU exists but PREEMPTIBLE_NVIDIA_A100_80GB quota is 0 everywhere; kept
     #: so estimates are honest if quota is ever granted.
     a2-ultragpu-1g   0.58
+    #: Same linear scaling as the on-demand block, and the same caveat: priced,
+    #: catalogued, and UNREACHABLE while PREEMPTIBLE_NVIDIA_A100_80GB_GPUS is 0.
+    #: Kept so an estimate is honest if that quota is ever granted.
+    a2-ultragpu-2g   1.16
+    a2-ultragpu-4g   2.32
+    a2-ultragpu-8g   4.64
     a3-highgpu-1g    2.33
     a3-highgpu-2g    4.65
+    #: Half the 8g rate; H100 spot IS reachable -- PREEMPTIBLE_NVIDIA_H100_GPUS
+    #: is 64 per project-region in every candidate region. The binding limit is
+    #: instead GPUS-ALL-REGIONS-per-project, which is 8: the whole fleet is at
+    #: most eight GPUs, i.e. two 4-rank lanes, however much budget there is.
+    a3-highgpu-4g    9.31
     a3-highgpu-8g   18.62
 )
 #: Flex-start (Dynamic Workload Scheduler, `--provisioning-model=FLEX_START`).
@@ -207,6 +233,7 @@ typeset -gA gcp_gpu_price_spot=(
 typeset -gA gcp_gpu_price_flexstart=(
     a3-highgpu-1g    4.22
     a3-highgpu-2g    8.43
+    a3-highgpu-4g   16.87
     a3-highgpu-8g   33.73
 )
 #: EUR per GB-month, europe-west9.
