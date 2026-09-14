@@ -235,6 +235,116 @@ project. Leave them alone.
 
 ---
 
+## 7b. More than one GPU: multi-GPU lanes on one node
+
+Verified end to end on 2026-09-14 by running a real two-lane training fleet
+(`REDACTED-INSTANCE-8X`, `a3-highgpu-8g`, spot, europe-west9-c).
+
+**One instance is not one GPU.** `gcp-gpu-up --machine a3-highgpu-8g` gives you
+eight H100s on one node; `gcp_gpu_instance=<name>` puts it beside `REDACTED-INSTANCE`
+instead of replacing it. Every guard still applies — the labels, the
+`--max-run-duration`, the idle timer, the spend estimate:
+
+```zsh
+gcp_gpu_instance=REDACTED-INSTANCE-8X gcp_gpu_boot_gb=500 \
+  gcp-gpu-up --machine a3-highgpu-8g --max-run 24h
+gcp_gpu_instance=REDACTED-INSTANCE-8X gcp-gpu-status
+```
+
+Two 4-rank jobs then share the node via `CUDA_VISIBLE_DEVICES=0,1,2,3` and
+`4,5,6,7`.
+
+### The three ceilings, cheapest to discover first
+
+- **`GPUS-ALL-REGIONS-per-project` is 8.** This is the one that actually binds:
+  at most eight GPUs across all regions, whatever the budget says. Two 4-GPU
+  lanes, or one 8-GPU node, and nothing more.
+- **`PREEMPTIBLE_NVIDIA_A100_80GB_GPUS` is 0 in every region.** There is no spot
+  path to an A100-80GB at all. On-demand quota exists only in `europe-west4` (8)
+  and `us-central1` (12, of which 4 were already in use by another member of
+  this shared project). So a 4x A100-80GB lane costs ~EUR 20.5/hr on-demand, not
+  ~EUR 2.3/hr on spot, and `gcp-gpu-advice` happily reporting 0.9 obtainability
+  for `a2-ultragpu-4g` is about capacity, not permission.
+- **`PREEMPTIBLE_NVIDIA_H100_GPUS` is 64 per project-region**, in every
+  candidate region. The legacy `compute regions describe` view — which is what
+  `gcp-gpu-quota` reads — does not list A3-family metrics at all, so H100 quota
+  looks *absent* there. Use the Cloud Quotas API instead:
+
+```zsh
+gcloud beta quotas info describe PREEMPTIBLE-NVIDIA-H100-GPUS-per-project-region \
+  --service=compute.googleapis.com --project=REDACTED-PROJECT --format=json
+```
+
+### Two traps specific to the multi-GPU image
+
+**NCCL dies under a login shell.** The image ships
+`/etc/profile.d/nccl_env.sh`, which sets `NCCL_NET=gIB` and puts
+`/usr/local/gib/lib64` on `LD_LIBRARY_PATH` — the GPUDirect fabric plugin for
+multi-node A3-Ultra clusters, which a single-node VM does not have. Anything
+launched through `bash -lc` then dies at the first collective with
+
+```
+ncclInvalidUsage ... Last error: Failed to initialize any NET plugin
+```
+
+while the same command under a plain `bash script` works. Single-node NCCL needs
+no fabric plugin: set **`NCCL_NET=Socket`**. This is a nasty one because the
+symptom looks like a hardware or driver fault and the smoke test that passed
+used a different shell.
+
+**Two `torchrun` jobs on one host collide** on the default rendezvous port
+29500. Give each lane its own `--master_port` and `--rdzv-id`.
+
+### Storage: use the local SSD, and treat GCS as the only tier that exists
+
+`a3-highgpu-8g` comes with **16 local NVMe SSDs, 6 TB**, included in the machine
+price. The 150-500 GB boot disk is nowhere near enough for real training output.
+
+```zsh
+sudo mdadm --create /dev/md0 --level=0 --raid-devices=16 \
+  /dev/disk/by-id/google-local-nvme-ssd-* --force
+sudo mkfs.ext4 -F -m 0 -E lazy_itable_init=0,lazy_journal_init=0,discard /dev/md0
+sudo mount -o discard,defaults,nobarrier /dev/md0 /mnt/scratch
+```
+
+**Local SSD is DISCARDED on stop** — which includes preemption *and* the
+`--max-run-duration` STOP, since `gcp-gpu-up` passes
+`--discard-local-ssds-at-termination-timestamp=true` (GCE refuses
+`instance-termination-action=STOP` on a local-SSD machine otherwise). So:
+
+- push every finished unit of work to GCS and **verify it** (`rsync` exit code
+  *and* an object count), before starting the next one;
+- make the job stop launching new work well before the `--max-run-duration`
+  deadline, or the deadline will stop the VM on top of unsynced results. The
+  deadline is `lastStartTimestamp + maxRunDuration`, and **`lastStartTimestamp`
+  changes after every preemption restart**, so recompute it each time.
+
+### The idle timer will shut down a CPU-only phase
+
+The on-VM timer shuts the box down after 30 minutes with GPU utilisation at 0
+and no attached tmux client. A long CPU-only stage — evaluation, probing,
+post-processing — looks exactly like that. Raise the threshold rather than
+disabling the guard:
+
+```zsh
+sudo mkdir -p /etc/systemd/system/gcp-gpu-idle.service.d
+printf '[Service]\nEnvironment=IDLE_THRESHOLD_MIN=90\n' \
+  | sudo tee /etc/systemd/system/gcp-gpu-idle.service.d/override.conf
+sudo systemctl daemon-reload
+```
+
+Note that `gcp-gpu-status` prints the *default* threshold, not the effective
+one; check with `systemctl show gcp-gpu-idle.service -p Environment`.
+
+### More GPUs is not more VRAM — but it is more headroom
+
+Worth internalising, because it decides machine choice. An H100 80GB is not a
+"bigger card" than an A100 80GB: a model that will not fit in 80 GB still will
+not fit. What more GPUs buys is a *smaller resident footprint per rank*. A
+9B-parameter FSDP job whose checkpoint load died all-gathering 3.79 GiB with
+1.38 GiB free on 4 cards loaded fine on 8 cards of the same size, with ~7 GiB to
+spare. If you are memory-bound at the margin, add ranks, not newer silicon.
+
 ## 8. Reporting back
 
 When you finish, state plainly:
