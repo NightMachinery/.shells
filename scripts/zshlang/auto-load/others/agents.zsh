@@ -301,3 +301,20 @@ function h-agent-launch {
         $proxyenv command "${cmd[@]}"
     fi
 }
+##
+#: Open an agent in a tmux session sitting in the directory `z' finds:
+#: `codex-t scripts --resume' is `z scripts && codex-m --resume'. See
+#: [agfi:tmuxnewsh2-attach-z] and =docs/tmux-z-launchers.md=.
+#:
+#: These stay out of the tmux-z plugin because they name launchers that only
+#: the full local stack has; a minimal server gets `tz' and `tma-z' instead.
+#:
+#: Written out rather than generated from [agfi:h-agents-table]: that table's
+#: `launcher' column holds the *bare* launchers, and `codex' deliberately skips
+#: the instruction sync that [agfi:codex-m] does. [agfi:claude-work] is not in
+#: the table at all -- it is a profile, in `claude_code_profile_launchers'.
+aliasfn claude-t      h-tmuxnewsh2-attach-z-with-cmd claude-m
+aliasfn claude-work-t h-tmuxnewsh2-attach-z-with-cmd claude-work
+aliasfn codex-t       h-tmuxnewsh2-attach-z-with-cmd codex-m
+aliasfn agy-t         h-tmuxnewsh2-attach-z-with-cmd antigravity-m
+##
