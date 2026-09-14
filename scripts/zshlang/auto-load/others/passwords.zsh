@@ -48,6 +48,11 @@ function passgen-words {
 
     ec "${(j.-.)words[@]}" | cat-copy-if-tty
 }
+#: A curated wordlist of short, typeable nature words, as opposed to
+#: =/usr/share/dict/words= which yields things like `paryphodrome-Songo'. It
+#: ships with the tmux-z plugin because [agfi:h-tmux-z-tag] is its hot consumer,
+#: but it is a general-purpose list and worth having here too.
+aliasfn passgen-words-pretty num2words_l="${NIGHTDIR}/zshlang/plugins/tmux-z/words-pretty.txt" passgen-words
 ##
 function with-dice-i {
     fnswap passgen-numerical passgen-numerical-dice-i "$@"
