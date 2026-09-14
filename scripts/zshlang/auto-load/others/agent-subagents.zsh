@@ -313,7 +313,13 @@ function agent-subagents-list {
         #: session itself; a session they have not reached yet is still in the
         #: live listing, which knows the transcript but not which agent's
         #: store it came out of -- hence the fallback.
-        if [[ "${st}" != (gone|exited) ]] ; then
+        #:
+        #: `exited' is included for the same reason, even though nothing is
+        #: running in it: the identity option sits on the *session*, which
+        #: `remain-on-exit' keeps alive along with the child's last screen, so
+        #: it is readable exactly as long as there is somewhere to go. Only
+        #: `gone' has nothing left to ask.
+        if [[ "${st}" != gone ]] ; then
             idf=( "${(@ps:\t:)${ident_of[$sid]}}" )
             if test -n "${idf[1]}" ; then
                 agent="${idf[1]}"
@@ -784,6 +790,73 @@ Plain-text summary of one subagent, for an fzf preview."
     fi
 
     return 0
+}
+
+function h-agent-session-subagent-rows {
+    #: One row per registered tmux subagent, in the five column layout
+    #: [agfi:h-agent-session-annotate-rows] reads -- the same shape
+    #: [agfi:h-agent-session-tmux-dead-rows] emits -- so that
+    #: [agfi:h-agent-session-tmux-rows] can offer the skill's children beside
+    #: your own sessions. [agfi:fftmux-agent-subagents] is the picker.
+    #:
+    #: The rows come from [agfi:agent-subagents-list] and never from
+    #: [agfi:h-agent-session-live-list], even though a running child *is* a
+    #: live agent sitting in a tmux session. Two reasons, and both are the
+    #: point of the family: the registry still knows a child whose agent lost
+    #: its own liveness record -- one stayed invisible for fifteen hours behind
+    #: a mangled `sessions/<pid>.json', see
+    #: [agfi:h-agent-session-records-unreadable] -- and it knows what the child
+    #: is *doing*, which no live row can say: whether it published a result,
+    #: whether it is waiting on a person, whether it has gone quiet.
+    #:
+    #: That derived state is the badge, from
+    #: [agfi:h-agent-subagents-state-rank], and it doubles as the mark saying
+    #: this row is a child: no other row kind in this family carries one of
+    #: those glyphs.
+    #:
+    #: `gone' is skipped -- there is no session left to go to. `exited' is
+    #: kept, unlike in [agfi:agent-clean-fz], which drops it because clearing a
+    #: dead pane is [agfi:tmuxzombie-kill]'s job in one pass. Here the opposite
+    #: holds: `remain-on-exit' left that child's last screen readable, and
+    #: going there to read it is the whole of what a goto picker does.
+    #:
+    #: A child with no transcript yet has nothing to preview and gets no row,
+    #: which is the rule [agfi:h-agent-session-tmux-rows] already applies to
+    #: its live half.
+    #:
+    #: Prints nothing and fails when there are none, like the dead rows, so a
+    #: caller can add this half without having to test for emptiness first.
+    ##
+    local -a rows
+    rows=( ${(f)"$(agent-subagents-list 2>/dev/null)"} )
+    (( ${#rows} )) || return 1
+
+    local out='' row state sid transcript agent
+    local -a f
+    for row in "${rows[@]}" ; do
+        test -n "${row}" || continue
+
+        f=( "${(@ps:\t:)row}" )
+        state="${f[2]}" ; sid="${f[4]}" ; transcript="${f[12]}" ; agent="${f[13]}"
+
+        [[ "${state}" == gone ]] && continue
+        test -n "${sid}" && [[ "${sid}" != '-' ]] || continue
+        test -n "${transcript}" && [[ "${transcript}" != '-' ]] && test -e "${transcript}" || continue
+
+        h-agent-subagents-state-rank "${state}"
+
+        #: The label ends `  -', which is how a caller tells
+        #: [agfi:h-agent-session-annotate-rows] that the name position is open:
+        #: the node id is the tmux session name, and the child's own name for
+        #: the conversation is read out of the transcript and put after it. The
+        #: full task id is deliberately not here -- the node id already spells
+        #: its slug, and [agfi:agent-subagents-preview] has the rest.
+        out+="${sid}"$'\t'"${transcript}"$'\t'"${agent}"$'\t'"${f[1]}  -"$'\t'"${REPLY#*$'\t'}"$'\n'
+    done
+
+    test -n "${out}" || return 1
+
+    ec "${out%$'\n'}"
 }
 
 function h-agent-subagents-state-rank {
