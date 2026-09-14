@@ -264,67 +264,13 @@ alias pxa89='ALL_PROXY=http://127.0.0.1:2089 all_proxy=http://127.0.0.1:2089 htt
 alias pxa2096='ALL_PROXY=http://127.0.0.1:2096 all_proxy=http://127.0.0.1:2096 http_proxy=http://127.0.0.1:2096 https_proxy=http://127.0.0.1:2096 HTTP_PROXY=http://127.0.0.1:2096 HTTPS_PROXY=http://127.0.0.1:2096 npm_config_proxy=http://127.0.0.1:2096 npm_config_https_proxy=http://127.0.0.1:2096'
 alias pxa='pxa87'
 ##
-#: @duplicateCode/0c8b9d0226cdfb4f5bc0a9ea735089df
-tmuxnew () {
-    tmux kill-session -t "$1" &> /dev/null
-    tmux new -d -s "$@"
-}
-
-tmux-alive-p () {
-    local session="${1}"
-    assert-args session @RET
-
-    local tmux_target="=${session}"
-    local pane_dead_values
-
-    if ! tmux has-session -t "${tmux_target}" &>/dev/null ; then
-        return 1
-    fi
-
-    pane_dead_values=("${(@f)$(tmux list-panes -t "${tmux_target}" -F '#{pane_dead}')}" ) @RET
-
-    local pane_dead
-    for pane_dead in "${pane_dead_values[@]}" ; do
-        if [[ "${pane_dead}" == "0" ]] ; then
-            #: at least one pane is not dead
-            return 0
-        fi
-    done
-
-    return 1
-}
-
-tmuxnew-ensure () {
-    local session="${1}"
-
-    if tmux-alive-p "${session}" ; then
-        ecgray "$0: tmux session ${session} already exists"
-
-        return 0
-    else
-        tmuxnew "$@"
-    fi
-}
-
-tmux-ensure-attach () {
-    local session="${1}"
-    assert-args session @RET
-    shift
-    local command=("${@:-zsh}")
-
-    tmuxnew-ensure "${session}" "${command[@]}"
-    tmux attach -t "${session}"
-}
-alias tma='tmux-ensure-attach'
-
-
-tma-z () {
-    local name="${*}"
-    assert-args name @RET
-
-    tmux-ensure-attach "${name}" zsh -c "cd ~/ && FORCE_INTERACTIVE=${TMA_Z_FORCE_INTERACTIVE:-y} z $(gq ${name%-*}) && ZSH_PWD=MAGIC_KEEP_CURRENT exec zsh"
-    #: `%-*`: remove last dash and everything after it
-}
+#: The tmux helpers that used to be copied here -- tmuxnew, tmux-alive-p,
+#: tmuxnew-ensure, tmux-ensure-attach, tma and tma-z -- now come from the
+#: tmux-z plugin, loaded by zinit from .zshrc alongside the basic plugin.
+#: They had drifted: this copy's tmux-ensure-attach used `tmux attach -t',
+#: which refuses to nest inside an existing client.
+#: This file is sourced by bash as well as zsh, so zsh-only tmux code has no
+#: business here in the first place.
 ###
 http-static-py () {
     python -m http.server "${1:-8000}"

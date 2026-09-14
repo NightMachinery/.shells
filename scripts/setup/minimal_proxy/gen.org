@@ -555,7 +555,7 @@ Zinit needs =aliases= because the plugins use global aliases such as =@RET=.
 zinit ice id-as"nightsh" \
     aliases \
     pick"scripts/zshlang/basic/basic.plugin.zsh" \
-    multisrc"scripts/zshlang/plugins/psiphon/psiphon.plugin.zsh scripts/zshlang/plugins/paqet/paqet.plugin.zsh"
+    multisrc"scripts/zshlang/plugins/tmux-z/tmux-z.plugin.zsh scripts/zshlang/plugins/psiphon/psiphon.plugin.zsh scripts/zshlang/plugins/paqet/paqet.plugin.zsh"
 zinit light NightMachinery/.shells
 #+end_src
 
