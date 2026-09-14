@@ -8,6 +8,7 @@ run-on-each source "$NIGHTDIR"/zshlang/auto-load/**/*.zsh(.) #I have disabled do
 
 run-on-each source \
     "$NIGHTDIR"/zshlang/plugins/agent-session/agent-session.plugin.zsh \
+    "$NIGHTDIR"/zshlang/plugins/tmux-z/tmux-z.plugin.zsh \
     "$NIGHTDIR"/zshlang/plugins/psiphon/psiphon.plugin.zsh \
     "$NIGHTDIR"/zshlang/plugins/paqet/paqet.plugin.zsh
 
