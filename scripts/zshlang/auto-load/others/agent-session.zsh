@@ -2971,11 +2971,73 @@ function agent-session-resume-fz {
 #: Same, but selects from the sessions of all projects.
 aliasfn agent-session-resume-all-fz agent_session_resume_scope=all agent-session-resume-fz
 ##
+function h-agent-session-records-unreadable {
+    #: Every Claude Code session record that [agfi:h-agent-session-live-list]
+    #: cannot decode, one `<path><TAB><error>' per line. Fails when it found
+    #: any, so a caller can say nothing at all when they all parse.
+    #:
+    #: Claude Code rewrites `<config home>/sessions/<pid>.json' in place on
+    #: every status change and does not truncate, so a record that gets shorter
+    #: -- dropping a `waitingFor' field, say -- keeps the tail of the longer
+    #: previous write. `readSessionRecords' in
+    #: =golang/agent_session/internal/claude/live.go= therefore decodes the
+    #: *first* JSON value of the file and ignores whatever follows, and this
+    #: check has to mirror that exactly or it names files the pickers read
+    #: perfectly well. python's `raw_decode' is that same rule.
+    #:
+    #: A record too broken even for that takes its session out of every picker
+    #: and out of the kitty window resolver, and the reader skips it in silence
+    #: because it sits on the resolver's hot path -- one live subagent stayed
+    #: invisible that way for fifteen hours. This is where that becomes
+    #: visible; [agfi:agent-session-selftest] runs it.
+    ##
+    ensure-cmd python3 @RET
+
+    local -a roots
+    roots=( ${(f)"$(h-agent-session-call claude roots 2>/dev/null)"} )
+    (( ${#roots} )) || return 0
+
+    #: `<home>/projects' -> `<home>/sessions'. (N) so a profile with no live
+    #: session contributes nothing instead of an unmatched-glob error.
+    local -a records
+    local root
+    for root in "${roots[@]}" ; do
+        records+=( "${root:h}"/sessions/*.json(N) )
+    done
+    (( ${#records} )) || return 0
+
+    python3 -c '
+import json, sys
+dec = json.JSONDecoder()
+bad = 0
+for p in sys.argv[1:]:
+    try:
+        with open(p) as f:
+            s = f.read()
+        dec.raw_decode(s.lstrip())
+    except Exception as e:
+        bad += 1
+        print("%s\t%s" % (p, e))
+sys.exit(1 if bad else 0)
+' "${records[@]}"
+}
+
 function agent-session-selftest {
     #: Runs the renderer's Go tests, then checks its parallel pandoc path
     #: against a single pandoc run over every local Claude Code transcript.
     ##
     ensure-cmd go pandoc @RET
+
+    #: First because it costs nothing and because what it finds is invisible
+    #: everywhere else: a session record the reader cannot decode takes its
+    #: session out of every picker without a word. Not an `assert' -- a record
+    #: Claude Code mangled is not a regression in this code, and it must not
+    #: stop the tests below from running.
+    local unreadable
+    if ! unreadable="$(h-agent-session-records-unreadable)" ; then
+        ecerr "$0: session records that cannot be read; their sessions are invisible to every picker:"
+        ecerr "${unreadable}"
+    fi
 
     local dir="${NIGHTDIR}/golang/agent_session"
     #: Every profile's transcripts, one run each: the parity check takes a
