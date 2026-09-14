@@ -32,6 +32,7 @@ package claude
 // spares -- it only discards records whose process is gone.
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -148,6 +149,22 @@ func (Adapter) Live(roots []string) ([]session.Live, error) {
 // A record that cannot be read or parsed is skipped rather than failing the
 // home: the file is rewritten in place on every status change, so a read can
 // land mid-write, and one such file should not take the other rows down.
+//
+// It is decoded as the *first* JSON value of the file rather than with
+// [json.Unmarshal], which rejects trailing bytes. The rewrite is in place and
+// does not truncate, so a status change that shortens the record -- dropping a
+// `waitingFor` field, say -- leaves the tail of the longer previous write
+// behind, and the file stays that way. Measured on 2026-09-14: a live
+// session's record carried one stray `}` for fifteen hours, and skipping it
+// took that session out of `live`, out of `ffta`, and out of the kitty window
+// resolver, silently. A *truncated* record still fails, which is right: half a
+// value is not a record, and the next read will get the whole one.
+//
+// Staying silent about a skip is deliberate -- this is the resolver's hot path
+// and it runs behind every picker. [agfi:h-agent-session-records-unreadable] is
+// the shell-side check that says what is unreadable, and it mirrors this
+// tolerance with python's `raw_decode`; the two have to agree, or it reports
+// files this function reads perfectly well.
 func readSessionRecords(home string) []sessionRecord {
 	paths, err := filepath.Glob(filepath.Join(home, "sessions", "*.json"))
 	if err != nil {
@@ -160,7 +177,7 @@ func readSessionRecords(home string) []sessionRecord {
 			continue
 		}
 		var rec sessionRecord
-		if err := json.Unmarshal(data, &rec); err != nil {
+		if err := json.NewDecoder(bytes.NewReader(data)).Decode(&rec); err != nil {
 			continue
 		}
 		recs = append(recs, rec)
