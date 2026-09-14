@@ -20,3 +20,9 @@ source "${night_basic_plugin_dir}/eval.zsh" || return $?
 source "${night_basic_plugin_dir}/files.zsh" || return $?
 source "${night_basic_plugin_dir}/tmux.zsh" || return $?
 source "${night_basic_plugin_dir}/assert.zsh" || return $?
+#: `debug.zsh' carries `assert-args' and `revaldbg'; `macros.zsh' carries
+#: `aliasfn', which plugins use to define their short names. `macros.zsh'
+#: needs `enh-savename' from `enhancers.zsh', so that one comes between.
+source "${night_basic_plugin_dir}/debug.zsh" || return $?
+source "${night_basic_plugin_dir}/enhancers.zsh" || return $?
+source "${night_basic_plugin_dir}/macros.zsh" || return $?
