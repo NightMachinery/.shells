@@ -141,10 +141,15 @@ function tmuxnewsh {
         )
     fi
 
-    local tmux_pwd="$PWD"
+    #: `tmuxnewsh_pwd' is what lets a caller put the session somewhere other
+    #: than its own cwd; [agfi:tmuxnewsh2-attach-z] uses it to hand over the
+    #: directory `z' resolved.
+    local tmux_pwd="${tmuxnewsh_pwd:-$PWD}"
+    #: An explicit directory wins over the Borg override, which only exists to
+    #: keep a session out of a cwd that is about to be deleted.
     #: `isBorg' lives in =conditions-personal.zsh=, which no plugin loads; a
     #: plugin-only shell is by definition not Borg.
-    if (( ${+functions[isBorg]} )) && isBorg ; then
+    if test -z "${tmuxnewsh_pwd}" && (( ${+functions[isBorg]} )) && isBorg ; then
         tmux_pwd="${HOME}/tmp"
         mkdir-m "${tmux_pwd}"
 
