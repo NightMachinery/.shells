@@ -249,6 +249,15 @@ function fftmux-agent {
     #: carry a 💀 ahead of the agent glyph and sort in among the live ones by
     #: recency like everything else. [agfi:fftmux-agent-all] is that spelling.
     #:
+    #: fftmux_agent_subagents_p adds the children the `tmux-subagents' skill
+    #: launched, from [agfi:h-agent-session-subagent-rows], each badged with
+    #: what the registry says it is doing (✅ ❌ ❓ 🪦 💤 ⏳). `y' shows them
+    #: beside your own sessions and `only' shows them alone;
+    #: [agfi:fftmux-agent-all] sets the first and
+    #: [agfi:fftmux-agent-subagents] the second. A registered child is kept out
+    #: of the plain listing whichever way the knob is set, so `ffta' stays the
+    #: conversations you are having rather than the ones a fan-out is having.
+    #:
     #: Picking one only goes to its session, the same as any other row: bringing
     #: the conversation back is `prefix-r' in the dead pane, which is a decision
     #: for whoever is reading the report, not for a picker.
@@ -258,6 +267,7 @@ function fftmux-agent {
     bella_zsh_disable1
 
     local agent_session_tmux_dead_p="${fftmux_agent_dead_p:-n}"
+    local agent_session_tmux_subagents_p="${fftmux_agent_subagents_p:-n}"
 
     local rows
     rows="$(agent_session_rows_sort="${fftmux_agent_sort:-last}" h-agent-session-tmux-rows)" @RET
@@ -271,8 +281,10 @@ function fftmux-agent {
     h-fftmux-act "${picks}"
 }
 aliasfn ffta fftmux-agent
-aliasfn fftmux-agent-all fftmux_agent_dead_p=y fftmux-agent
+aliasfn fftmux-agent-all fftmux_agent_dead_p=y fftmux_agent_subagents_p=y fftmux-agent
 aliasfn fftaa fftmux-agent-all
+aliasfn fftmux-agent-subagents fftmux_agent_subagents_p=only fftmux-agent
+aliasfn fftas fftmux-agent-subagents
 aliasfn fftmux-agent-sort-by-user fftmux_agent_sort=user fftmux-agent
 
 function tmux-pane-list {

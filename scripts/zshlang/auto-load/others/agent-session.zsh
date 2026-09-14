@@ -2295,16 +2295,47 @@ function h-agent-session-tmux-rows {
     #: caller column instead of a tmux id and a 🔌 badge; the engine attaches
     #: to them ([agfi:h-claude-code-bg-attach]). `agent_session_tmux_bg_p=n'
     #: leaves them out.
+    #:
+    #: agent_session_tmux_subagents_p adds the children the `tmux-subagents'
+    #: skill launched, from [agfi:h-agent-session-subagent-rows]. Three valued
+    #: like `agent_session_preview_compact_p': `n' (the default) is the live
+    #: half alone, `y' adds the children, and `only' drops the live half and
+    #: leaves them. [agfi:fftmux-agent-all] sets the second and
+    #: [agfi:fftmux-agent-subagents] the third; `only' says nothing about the
+    #: `/done' rows, which are the other knob's business.
+    #:
+    #: A *registered* child is taken out of the live half whatever the knob
+    #: says, so it can never appear twice and its row always carries the state
+    #: the registry derived. Membership in the registry is the test, and
+    #: deliberately not the `ag--' name prefix that the autoname hooks use to
+    #: leave these sessions alone (=zshlang/auto-load/others/agent-tmux.zsh=):
+    #: a child the registry has since forgotten then shows up as a plain live
+    #: row, which is worse than a badged one and far better than none.
     ##
     local dead_p="${agent_session_tmux_dead_p:-n}"
     local bg_p="${agent_session_tmux_bg_p:-y}"
+    local subagents_p="${agent_session_tmux_subagents_p:-n}"
 
     #: See [agfi:h-agent-session-live-rows] for why this is built under another
     #: name before the cache is set. An empty live half is no longer fatal: with
     #: the dead half asked for, a machine whose every session has finished still
     #: has a picker to show.
+    #: One `jq' for the whole call, and none at all on a machine that has
+    #: never launched a child.
+    local -A subagent_of
+    local reg node
+    reg="$(h-agent-subagents-registry 2>/dev/null)" || reg=''
+    if test -n "${reg}" && test -e "${reg}" ; then
+        for node in ${(f)"$(jq -r 'keys[]' "${reg}" 2>/dev/null)"} ; do
+            test -n "${node}" || continue
+            subagent_of[${node}]=y
+        done
+    fi
+
     local live_kept=''
-    live_kept="$(h-agent-session-live-list-offerable)" || live_kept=''
+    if [[ "${subagents_p}" != only ]] ; then
+        live_kept="$(h-agent-session-live-list-offerable)" || live_kept=''
+    fi
 
     local rows=''
     local -A live_transcripts
@@ -2333,6 +2364,9 @@ function h-agent-session-tmux-rows {
 
             tname="${f[6]}"
             test -n "${tname}" && [[ "${tname}" != '-' ]] || continue
+
+            #: A registered child's row comes from the subagent half instead.
+            test -z "${subagent_of[${tname}]}" || continue
 
             #: A session that has written nothing has nothing to preview.
             t="${f[5]}"
@@ -2377,6 +2411,24 @@ function h-agent-session-tmux-rows {
         fi
     fi
 
+    if [[ "${subagents_p}" == (y|only) ]] ; then
+        local kids krow
+        kids="$(h-agent-session-subagent-rows)" || kids=''
+
+        for krow in ${(f)kids} ; do
+            test -n "${krow}" || continue
+
+            #: Noted so the dead half below skips a child that ended with
+            #: `/done': its pane is one of those, and this row is the better
+            #: one -- same session to go to, and it carries the registry's
+            #: state rather than a skull.
+            f=( "${(@ps:\t:)krow}" )
+            live_transcripts[${f[2]}]=y
+
+            rows+="${krow}"$'\n'
+        done
+    fi
+
     if bool "${dead_p}" ; then
         local dead drow
         dead="$(h-agent-session-tmux-dead-rows)" || dead=''
@@ -2395,7 +2447,9 @@ function h-agent-session-tmux-rows {
     fi
 
     if test -z "${rows}" ; then
-        if bool "${dead_p}" ; then
+        if [[ "${subagents_p}" == only ]] ; then
+            ecerr "$0: no tmux subagent with a session to go to"
+        elif bool "${dead_p}" ; then
             ecerr "$0: no agent session, live or finished, in a tmux session"
         else
             ecerr "$0: no live agent session in a tmux session"
