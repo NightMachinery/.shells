@@ -60,6 +60,18 @@ The =agent-session= plugin shares exact-conversation resume and tmux identity
 with tmux-subagents. See =./zshlang/plugins/agent-session/README.md= for its
 standalone API and subdirectory installation.
 
+The =tmux-z= plugin holds the tmux session primitives, the =tmuxnewsh2=
+launchers, and =tmuxnewsh2-attach-z=, which opens a session in whatever
+directory =z= finds: =codex-t scripts --resume= is =z scripts && codex-m
+--resume=. It is a plugin because =./setup/minimal_proxy/.shared.sh= used to
+carry a second, drifted copy of those helpers. See
+=./zshlang/plugins/tmux-z/README.md= and =./docs/tmux-z-launchers.md=.
+
+=./zshlang/basic/conditions.zsh= keeps only the general predicates, so the
+public =basic.plugin.zsh= can expose them; host identity and personal
+infrastructure live in =./zshlang/basic/conditions-personal.zsh=, which only
+=basic-full.zsh= loads.
+
 Kitty's =cmd+shift+o= resolves attached tmux clients by PID, including numeric
 session targets and clients that have switched sessions. Ambiguous live
 transcripts open the picker. See =./docs/agent-sessions.md= for lookup order
