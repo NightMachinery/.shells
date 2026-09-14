@@ -17,7 +17,8 @@ Start here:
   command.
 - `ffta` picks among the tmux sessions that are running an agent, the one you
   spoke to last at the top, and goes to it. `fftaa` adds the ones `/done` has
-  ended, which are still sitting there as a dead pane showing their report.
+  ended, which are still sitting there as a dead pane showing their report, and
+  the children a fan-out launched; `fftas` is those children alone.
 
 Everything below is why those five work, and what to change when they do not.
 
@@ -226,6 +227,24 @@ alive, which is the one thing the file cannot say for itself after a crash.
 Measured against `claude agents --json`, the two agree exactly, minus the
 CLI's finished background agents that carry no pid.
 
+A record is read as the *first* JSON value of the file rather than by
+unmarshalling the whole of it, because Claude Code rewrites it in place on every
+status change and does not truncate. A record that gets shorter -- dropping a
+`waitingFor` field, say -- keeps the tail of the longer previous write, and
+stays that way. This is not hypothetical: one live subagent's record carried a
+single stray `}` for fifteen hours, which took that session out of the live
+listing, out of `ffta`, out of `fftaa` and out of the window resolver, and
+`claude agents --json` did not list it either, so the shell fallback was no
+safety net. A *truncated* record is still skipped, which is right -- half a
+value is not a record, and the next read gets the whole one.
+
+The skip is silent, deliberately: this runs on the resolver's hot path and
+behind every picker. [agfi:h-agent-session-records-unreadable] is where it
+stops being silent, and [agfi:agent-session-selftest] runs it first, before the
+slow checks. It mirrors the Go reader's tolerance with python's `raw_decode`,
+because a check stricter than the reader would report files the pickers read
+perfectly well.
+
 **Codex** writes a rollout per thread at
 `~/.codex/sessions/YYYY/MM/DD/rollout-<local-timestamp>-<uuid>.jsonl`. Names
 live in `~/.codex/session_index.jsonl`, which is append-only, so the last line
@@ -381,12 +400,66 @@ looking at what it was, so it throws these away along with the real zombies.
 That is not a bug in either -- it is the reason being able to find them first is
 worth something.
 
+### The children a fan-out launched
+
+[agfi:fftmux-agent-subagents] (`fftas`) is the same picker over the tmux
+subagents the `tmux-subagents` skill started, and `fftaa` shows them beside
+everything else. Plain `ffta` does not, which is the point: a run that fans out
+ten children would otherwise bury the conversations you are actually having.
+`fftmux_agent_subagents_p` is the knob, `y` for "and the children" and `only`
+for "the children alone".
+
+Nothing ever excluded these sessions. A running child *is* an ordinary live
+agent sitting in a tmux pane, and there is no `ag--` test anywhere on that path;
+the reason one was never offered is that its agent had lost the record saying it
+was alive, which is the section above. Fixing that alone would have put the
+children in plain `ffta` as unremarkable rows.
+
+The rows come from [agfi:agent-subagents-list] instead, through
+[agfi:h-agent-session-subagent-rows], and that detour is worth it twice over.
+The registry still knows a child whose agent lost its own record. And it knows
+what the child is *doing* -- whether it published a result, whether it is
+waiting on a person, whether it has gone quiet -- which no live row can say,
+because that answer is derived from the result files and the status log rather
+than from any process. That derived state is the badge, the same glyphs
+[agfi:agent-clean-fz] offers (✅ ❌ ❓ 🪦 💤 ⏳), and it doubles as the mark
+saying the row is a child: no other row kind here carries one of those.
+
+**A registered child is taken out of the live half whatever the knob says.** So
+it can never appear twice, and its row always carries the derived state rather
+than a bare `busy`. The test is membership in the registry, deliberately *not*
+the `ag--` name prefix the autoname hooks use to leave these sessions alone
+(`docs/tmux-session-rename.md`). A child the registry has since forgotten then
+turns up as a plain live row -- unbadged and out of place, which is a great deal
+better than invisible. The same dedup runs against the 💀 half, so a child that
+ended with `/done` appears once, as the child.
+
+`exited` children *are* offered here, where [agfi:agent-clean-fz] skips them.
+That is the same division of labour as everywhere else rather than an
+inconsistency: `remain-on-exit` left the child's last screen readable, going
+there to read it is the whole of what a goto picker does, and clearing the pane
+afterwards is `tzkill`'s single pass. Only `gone` is dropped -- there is no
+session left to go to.
+
+Making that work needed one change in [agfi:agent-subagents-list]: an `exited`
+child now gets its identity and transcript filled in like any other. The
+`@agent_session` option sits on the tmux *session*, which outlives the pane, so
+it is readable exactly as long as there is somewhere to go.
+
+The preview is the fftmux family's -- the Go transcript previewer. The
+subagent-shaped preview, with the result front matter and the tail of the pane,
+belongs to [agfi:agent-clean-fz], whose question is whether to close the thing.
+
 ## Closing the subagents a skill launched
 
 The `tmux-subagents` skill (`~/code/skills/tmux-subagents`) starts child agents
-in detached tmux sessions named `ag--<project>--<run>--<lineage>--<model>--<role>`
-and registers each one in a JSON file keyed by node id, which is also the
-session name. Cleaning them up afterwards is
+in detached tmux sessions named
+`ag--<project>--<task>--<provider-model>--<suffix>` -- five fields, the last a
+random hex triple, each slug capped by the generator
+(`scripts/tmux-subagent-name.sh`) -- and registers each one in a JSON file keyed
+by node id, which is also the session name. The run and the lineage are *not* in
+the name; they are fields of the registry entry, which is why closing a subtree
+reads the registry rather than parsing session names. Cleaning them up afterwards is
 `zshlang/auto-load/others/agent-subagents.zsh`: [agfi:agent-subagents-list],
 [agfi:agent-subagents-reconcile], [agfi:agent-subagents-close],
 [agfi:agent-subagents-preview] and the picker [agfi:agent-clean-fz], with
@@ -631,6 +704,14 @@ These are new and belong to this design rather than to Claude:
   [agfi:h-agent-session-tmux-rows] also emits the sessions `/done` has ended.
   `fftmux_agent_dead_p` is the same value in `ffta`'s spelling, and
   [agfi:fftmux-agent-all] is that spelling with it on.
+- `agent_session_tmux_subagents_p` -- whether that same function also emits the
+  children the `tmux-subagents` skill launched. Three valued like
+  `agent_session_preview_compact_p`: `n` (the default) is the live half alone,
+  `y` adds the children, `only` drops the live half and leaves them.
+  `fftmux_agent_subagents_p` is the same value in `ffta`'s spelling;
+  [agfi:fftmux-agent-all] sets `y` and [agfi:fftmux-agent-subagents] sets
+  `only`. A registered child is kept out of the live half whichever way it is
+  set.
 - `agent_session_dead_badge` -- the marker those rows carry, `💀`. It goes ahead
   of the agent glyph rather than inside the label, through the optional fifth
   input column of [agfi:h-agent-session-annotate-rows].

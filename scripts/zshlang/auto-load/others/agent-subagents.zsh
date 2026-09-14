@@ -2,9 +2,11 @@
 #: Cleaning up the tmux subagents the `tmux-subagents' skill launches.
 #:
 #: The skill (=~/code/skills/tmux-subagents=) starts child agents in detached
-#: tmux sessions named `ag--<project>--<run>--<lineage>--<model>--<role>' and
-#: registers each in a JSON file keyed by node id, which is also the tmux
-#: session name. Its `process_state' and `task_outcome' fields are written once
+#: tmux sessions named `ag--<project>--<task>--<provider-model>--<suffix>' --
+#: five fields, the last a random hex triple -- and registers each in a JSON
+#: file keyed by node id, which is also the tmux session name. The run and the
+#: lineage are fields of that entry and not of the name, which is why closing a
+#: subtree reads the registry rather than parsing session names. Its `process_state' and `task_outcome' fields are written once
 #: at launch and never updated -- two finished Codex children still read
 #: `running' on 2026-09-09 -- so nothing here trusts them.
 #:
