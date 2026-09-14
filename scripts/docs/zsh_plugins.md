@@ -42,3 +42,14 @@ local transcript discovery, profile lookup and pickers remain in auto-loaded
 modules. Its README covers direct and subdirectory installation and private pane
 state. [agfi:h-agent-session-resume-argv] is shared by the local provider adapters
 and [agfi:agent-session-resume-exact].
+
+## tmux-z plugin
+
+`zshlang/plugins/tmux-z` holds the tmux session primitives
+([agfi:tmux-session-id], [agfi:tmux-session-goto], [agfi:tmux-alive-p],
+[agfi:tmux-ensure-attach]), the [agfi:tmuxnewsh2] launchers, and
+[agfi:tmuxnewsh2-attach-z], which opens a session in whatever directory `z`
+finds. It exists as a plugin because `setup/minimal_proxy/.shared.sh` used to
+carry a second copy of those helpers, which had drifted. Its README covers
+direct and plugin-manager installation; `docs/tmux-z-launchers.md` covers the
+launchers themselves.
