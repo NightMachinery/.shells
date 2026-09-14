@@ -79,8 +79,15 @@ function tmuxnew {
     #: @todo0 integrate =str2tmuxname=
     ##
 
-    # command tmux kill-session -t "$1" &> /dev/null || true
-    tmux-session-processes-kill "$1"
+    #: The rich kill needs `kill-withchildren' and the pane listers, which live
+    #: in auto-load and are not part of any plugin. Without them, fall back to
+    #: tmux's own kill rather than failing: a plugin-only load still has to be
+    #: able to replace a session.
+    if (( ${+functions[tmux-session-processes-kill]} )) ; then
+        tmux-session-processes-kill "$1"
+    else
+        command tmux kill-session -t "$1" &> /dev/null || true
+    fi
 
     command tmux new -d -s "$@"
 }
