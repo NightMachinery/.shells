@@ -868,16 +868,24 @@ Sets REPLY to the picker's sort rank for that state, and to its emoji."
     #: finished and safe to close first, what is broken next, then what is
     #: waiting on a person, then the live ones from most abandoned to least.
     #: `busy' comes last and is normally not shown at all.
+    #:
+    #: `exited' is in the table for [agfi:h-agent-session-subagent-rows], which
+    #: offers those rows where [agfi:agent-clean-fz] skips them. `🏁' rather
+    #: than the `💀' of [agfi:h-agent-session-tmux-dead-rows]: that one means a
+    #: `/done' report is sitting on the screen, and a child's pane can die any
+    #: number of other ways. `gone' stays with the default -- neither picker
+    #: ever sees one.
     ##
     case "${1}" in
         done)        REPLY=$'1\t✅' ;;
-        mismatch)    REPLY=$'2\t❌' ;;
-        needs-input) REPLY=$'3\t❓' ;;
-        stuck)       REPLY=$'4\t🪦' ;;
-        idle)        REPLY=$'5\t💤' ;;
-        unknown)     REPLY=$'6\t❔' ;;
-        busy)        REPLY=$'7\t⏳' ;;
-        *)           REPLY=$'8\t❔' ;;
+        exited)      REPLY=$'2\t🏁' ;;
+        mismatch)    REPLY=$'3\t❌' ;;
+        needs-input) REPLY=$'4\t❓' ;;
+        stuck)       REPLY=$'5\t🪦' ;;
+        idle)        REPLY=$'6\t💤' ;;
+        unknown)     REPLY=$'7\t❔' ;;
+        busy)        REPLY=$'8\t⏳' ;;
+        *)           REPLY=$'9\t❔' ;;
     esac
 }
 

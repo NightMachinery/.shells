@@ -422,8 +422,9 @@ what the child is *doing* -- whether it published a result, whether it is
 waiting on a person, whether it has gone quiet -- which no live row can say,
 because that answer is derived from the result files and the status log rather
 than from any process. That derived state is the badge, the same glyphs
-[agfi:agent-clean-fz] offers (✅ ❌ ❓ 🪦 💤 ⏳), and it doubles as the mark
-saying the row is a child: no other row kind here carries one of those.
+[agfi:agent-clean-fz] offers (✅ ❌ ❓ 🪦 💤 ⏳), plus a 🏁 for the `exited`
+children that picker never shows; it doubles as the mark saying the row is a
+child, since no other row kind here carries one of those.
 
 **A registered child is taken out of the live half whatever the knob says.** So
 it can never appear twice, and its row always carries the derived state rather
