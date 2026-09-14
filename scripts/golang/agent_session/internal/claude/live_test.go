@@ -161,6 +161,44 @@ func TestLiveReadsTheSessionRecords(t *testing.T) {
 	}
 }
 
+// A record is rewritten in place on every status change and the write does not
+// truncate, so one that gets shorter leaves the tail of the longer previous
+// write behind it. On 2026-09-14 a live session's record carried a single
+// stray `}` for fifteen hours, and `json.Unmarshal` -- which rejects trailing
+// bytes -- took that session out of `live`, out of `ffta` and out of the kitty
+// window resolver. The valid prefix has to win.
+func TestReadSessionRecordsToleratesTrailingBytes(t *testing.T) {
+	home := t.TempDir()
+
+	rec := sessionRecord{
+		PID:       4242,
+		SessionID: "33333333-3333-3333-3333-333333333333",
+		Name:      "linroute-be",
+		Cwd:       "/Users/evar/tmp/z",
+		Kind:      "interactive",
+		Status:    "busy",
+	}
+	data, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeSessionFile(t, home, "4242.json", string(data)+"}")
+	// A *truncated* record is still skipped, and should be: half a value is
+	// not a record, and the next read will get the whole one.
+	writeSessionFile(t, home, "4343.json", string(data)[:len(data)/2])
+
+	recs := readSessionRecords(home)
+	if len(recs) != 1 {
+		t.Fatalf("got %d records, want only the one with trailing bytes: %+v", len(recs), recs)
+	}
+	if recs[0].SessionID != rec.SessionID {
+		t.Errorf("id: got %q, want %q", recs[0].SessionID, rec.SessionID)
+	}
+	if recs[0].Status != rec.Status {
+		t.Errorf("status: got %q, want %q", recs[0].Status, rec.Status)
+	}
+}
+
 func writeRecord(t *testing.T, home string, rec sessionRecord) {
 	t.Helper()
 	data, err := json.Marshal(rec)
