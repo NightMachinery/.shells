@@ -72,5 +72,13 @@ zplug "NightMachinery/.shells", use:"scripts/zshlang/basic/basic.plugin.zsh"
 - `bool`, `ensure-array`, `ensure-cmd`
 - `gquote`, `reval`, `reval-ec`, `reval-ecgray`, `assert`
 - `mkdir-m`, `trs-rm`, `tmuxnew`
+- predicates: `isZsh`, `isBash`, `isDarwin`, `isLinux`, `isArm`, `isTmux`,
+  `isI`, `isOutTty`, `isErrTty`, `isInTty`, `isDbg`, `isSudo`, `isNet`
+- agent detection: `ai-agent-p`, `ai-agent-name`, `claude-code-p`, `codex-p`,
+  `antigravity-p`
 - global aliases `@RET`, `@TRET`, `@STRUE`
+
+Predicates come from `conditions.zsh`. Host identity and personal
+infrastructure (`isMe`, `isLocal`, `isKitty`, `isColor`, `isBorg`, ...) live in
+`conditions-personal.zsh`, which only `basic-full.zsh` loads.
 

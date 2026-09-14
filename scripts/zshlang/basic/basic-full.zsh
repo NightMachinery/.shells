@@ -20,7 +20,7 @@ function source-basic {
 
 source-basic return-aliases basic arrays variables compatibility magicmacros eval files tmux assert || return $?
 # malice is the alias module. :D
-source-basic deps cached conditions crossplatform args colors debug text-manipulation ssh malice history enhancers redirections functional macros redis || return $?
+source-basic deps cached conditions conditions-personal crossplatform args colors debug text-manipulation ssh malice history enhancers redirections functional macros redis || return $?
 
 local i
 for i in "${night_basic_full_dir}"/auto-load/**/*.zsh(.) ; do
