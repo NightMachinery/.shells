@@ -48,6 +48,12 @@ hook body is a thin parser that ends in one call,
 Skipped or failed renames are ordinary outcomes. Identity-write failures
 propagate to the caller for diagnostics; a broken rename must not cost a prompt.
 
+The rename is also why [agfi:tmuxnewsh2-attach-z] cannot key on a session
+name. It records its own `@tz_key` option at launch and looks sessions up by
+that, so `codex-t scripts@main` reattaches to a session this has already
+renamed instead of starting a second agent beside it. See
+`docs/tmux-z-launchers.md`.
+
 The `@agent_session` option has a second reader: the resolver behind
 `cmd+shift+o`, which jumps to the kitty window showing an agent session. When
 that window holds a tmux client the option answers directly, for any agent,
