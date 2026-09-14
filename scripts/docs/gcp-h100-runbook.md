@@ -256,9 +256,14 @@ Two 4-rank jobs then share the node via `CUDA_VISIBLE_DEVICES=0,1,2,3` and
 
 ### The three ceilings, cheapest to discover first
 
-- **`GPUS-ALL-REGIONS-per-project` is 8.** This is the one that actually binds:
-  at most eight GPUs across all regions, whatever the budget says. Two 4-GPU
-  lanes, or one 8-GPU node, and nothing more.
+- **`GPUS-ALL-REGIONS-per-project` is 8 — and it did NOT bind.** Read this as a
+  worked example of the evidence hierarchy in §7 rather than as a limit. Seeing
+  the value 8, I predicted the fleet could hold at most eight GPUs. Then a
+  *second* `a3-highgpu-8g` created without complaint, putting sixteen H100s in
+  the project at once. The quota evidently does not apply to preemptible/Spot
+  GPUs on this path. A quota *number* is no more proof of a limit than a price
+  is proof of availability: `instances create` remains the only definitive test,
+  in both directions.
 - **`PREEMPTIBLE_NVIDIA_A100_80GB_GPUS` is 0 in every region.** There is no spot
   path to an A100-80GB at all. On-demand quota exists only in `europe-west4` (8)
   and `us-central1` (12, of which 4 were already in use by another member of
