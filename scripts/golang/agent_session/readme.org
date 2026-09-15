@@ -539,16 +539,57 @@ next request, so counting them would inflate the figure by however hard the
 model happened to think on that one turn.
 
 Codex states its capacity in the event (=model_context_window=), so nothing has
-to be guessed. Claude Code does not, so the window is inferred from the model
-id: =contextWindow= in =internal/claude/record.go= picks between the two
-constants =windowDefault= and =windowLarge=, the ordinary seat and the
-long-context one, on a =[1m]= in the id. A session already holding more than the
-default is taken as the long-context seat too, whatever its id says, and that
-ordering is deliberate: a figure exceeding its own window is *certainly* the
-wrong window and only *probably* the wrong count, so the count is believed.
+to be guessed. Claude Code never writes it, and the obvious place to look for it
+is a trap.
+
+=message.model= carries the model that answered and nothing about the seat: it
+is always the bare id, =claude-opus-5=, never =claude-opus-5[1m]=. Reading the
+suffix there --- which is what this used to do --- therefore found it in none of
+the 125k assistant records on this machine, so every session was measured
+against 200,000 and a line that should have read 5% read 24%.
+
+The seat is named in a record of its own, which =conversationRecords= drops
+along with the rest of the attachments:
+
+#+begin_src js
+{"type":"attachment","attachment":{"type":"model","identity":{
+  "modelId":"claude-opus-5[1m]",
+  "marketingName":"Opus 5 (1M context)"}}}
+#+end_src
+
+Claude Code writes one when the session starts and another whenever =/model=
+changes the seat, so =seatModelNear= takes the record nearest the figure,
+*backwards* first: the last one in the file would attribute every earlier
+message to whatever the session ended up switched to. It falls forward only when
+there is nothing behind, which a resumed session needs --- one local transcript
+has its only seat record thirteen lines *past* the figure the line is drawn from.
+
+=contextWindow= then decides, and it only ever awards the long window:
+
+- =[1m]= in the seat is proof, and is the only thing that spells the
+  long-context seat anywhere in a transcript.
+- More than =windowDefault= held is proof too, whatever the id says: a figure
+  exceeding its own window is *certainly* the wrong window and only *probably*
+  the wrong count, so the count is believed.
+- Anything else is =windowUnknown=, and the line prints the total with no
+  denominator.
+
+That last rule is the surprising one, and it is there because the *absence* of
+the suffix means nothing. Five local transcripts carry a single seat record
+reading =claude-opus-5= / "Opus 5", with no =/model= switch anywhere, and peak
+between 310k and 528k tokens --- figures no 200,000 window can hold.
+=claude-fable-5-1= reaches 564k the same way. So =windowDefault= is no longer a
+fallback anybody is measured against; it survives only as the threshold in the
+second rule. Haiku 4.5 really is a single-window model and loses its correct
+percentage under this, which is the price of not keeping a table of model names
+that would go stale between releases.
+
+A seat whose base id disagrees with the model that answered is dropped rather
+than believed. Nothing in a main transcript hits that, and it is what stops a
+subagent on a model of its own from inheriting its parent's =[1m]=.
 
 The percentage is rounded half up in integer arithmetic and is never clamped.
-Over 100% means the inference above was wrong for this session, and a line
+Over 100% means even the long window was too small for this session, and a line
 saying 125% is a fault somebody will notice and report, where one quietly pinned
 at 100% would hide the same fault forever. No float touches the output either,
 because the line is part of a document =TestPandocPathParity= compares byte for
@@ -679,8 +720,11 @@ transcript stays out of the way until wanted.
 
 Under each heading, above the folded transcript, sits that agent's own context
 line --- the window it was holding when it last answered, which is a window of
-its own and not a slice of its parent's. See [[*The context window]] for how it
-is counted. The heading and the line are written as a *single* segment, so no
+its own and not a slice of its parent's. The *size* of that window is the one
+thing it does take from the parent: no subagent transcript carries a seat record
+of its own, not one of them locally, so =subdoc= is handed the parent's and uses
+it unless the agent was put on another model. See [[*The context window]] for how
+it is counted. The heading and the line are written as a *single* segment, so no
 pandoc chunk seam can ever fall between an agent and its figure.
 
 * How tool calls are rendered

@@ -875,11 +875,23 @@ session ever sent. Every subagent heading in the `* Subagents` section is
 followed by its own, since a subagent has a context of its own. Claude counts
 the input tokens plus both cache halves of the last assistant message -- the
 same sum its statusline shows -- and Codex takes the last `token_count` event's
-total minus its reasoning tokens, against the window that event reports. The
-window itself is inferred from the model id. Antigravity's transcript carries
-no token counts at all, so its documents have no such line. The arithmetic, and
-what each agent's transcript actually records, is in
-`golang/agent_session/readme.org`.
+total minus its reasoning tokens, against the window that event reports.
+
+The denominator is the awkward half. Codex states its capacity outright; Claude
+Code never does, and `message.model` says nothing about the seat -- it is always
+the bare id, never the `claude-opus-5[1m]` of a long-context one. The seat is
+read instead from the `model` attachment Claude Code writes when a session
+starts and again on every `/model` switch. A `[1m]` there, or a figure already
+past 200,000, means the long window; anything else means the transcript does not
+say, and the line prints the total with no denominator and no percentage. A bare
+id is *not* read as the ordinary seat: local transcripts naming a plain
+`claude-opus-5` peak well past 200,000 tokens, so its absence proves nothing.
+Transcripts older than the record, and there are many, get no denominator
+either. A subagent has no seat record of its own and inherits its parent's.
+
+Antigravity's transcript carries no token counts at all, so its documents have
+no such line. The arithmetic, and what each agent's transcript actually records,
+is in `golang/agent_session/readme.org`.
 
 ## When a converted transcript opens as octal escapes
 
