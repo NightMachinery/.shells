@@ -61,7 +61,11 @@ func (Adapter) Document(path string, o session.DocOpts) (*turns.Document, error)
 	}
 	defer fh.Close()
 
-	records := conversationRecords(readRecords(fh))
+	// The unfiltered list is kept: the `model` attachment that names the seat
+	// is one of the types `conversationRecords` drops, and the context line
+	// needs it.
+	all := readRecords(fh)
+	records := conversationRecords(all)
 
 	// Decoded once: the result index, the turn grouping and the subagent
 	// ordering all need the blocks.
@@ -74,11 +78,12 @@ func (Adapter) Document(path string, o session.DocOpts) (*turns.Document, error)
 	doc := &turns.Document{
 		Turns:   buildTurns(records, blocks, results),
 		Results: results,
-		Context: lastContextUsage(records),
+		Context: lastContextUsage(all, ""),
 	}
 	if o.Subagents {
+		seat := seatModel(all)
 		for _, s := range loadSubagents(path, toolCallOrder(blocks)) {
-			doc.Subagents = append(doc.Subagents, s.subdoc())
+			doc.Subagents = append(doc.Subagents, s.subdoc(seat))
 		}
 	}
 	return doc, nil

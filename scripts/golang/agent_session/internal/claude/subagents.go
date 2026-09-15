@@ -141,15 +141,20 @@ func loadSubagents(sessionPath string, callOrder map[string]int) []subagent {
 // and the context line under it both come out of the same read: reading the
 // file twice for fields that are already in hand would be silly. An unreadable
 // transcript still gets its heading, with nothing under it.
-func (s subagent) subdoc() turns.Subdoc {
+//
+// `seat` is the parent's, since a subagent transcript never carries a `model`
+// attachment of its own. It only applies when the subagent stayed on the
+// inherited model; [contextWindow] drops it otherwise.
+func (s subagent) subdoc(seat string) turns.Subdoc {
 	fh, err := os.Open(s.path)
 	if err != nil {
 		return turns.Subdoc{Title: s.title("")}
 	}
 	defer fh.Close()
 
+	all := readRecords(fh)
 	var records []record
-	for _, rec := range readRecords(fh) {
+	for _, rec := range all {
 		if rec.Type != "user" && rec.Type != "assistant" {
 			continue
 		}
@@ -169,6 +174,6 @@ func (s subagent) subdoc() turns.Subdoc {
 		Title:   s.title(modelMode(records)),
 		Turns:   buildTurns(records, blocks, results),
 		Results: results,
-		Context: lastContextUsage(records),
+		Context: lastContextUsage(all, seat),
 	}
 }

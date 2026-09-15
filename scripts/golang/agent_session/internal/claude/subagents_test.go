@@ -129,9 +129,29 @@ func TestSubagentTitle(t *testing.T) {
 }
 
 // A parent and an inlined agent each report their own window: the agent runs
-// in one of its own, which is half the reason to spawn it. Synthetic store,
-// written from the documented record shape; no real transcript is read.
+// in one of its own, which is half the reason to spawn it. Both windows come
+// from the parent's seat record, since `message.model` never spells the `[1m]`
+// of a long-context seat and a subagent transcript names no seat at all.
+// Synthetic store, written from the documented record shape; no real transcript
+// is read.
 func TestDocumentAndSubagentContextWindow(t *testing.T) {
+	for _, c := range []struct {
+		seatID string
+		window int
+		docPct string
+		subPct string
+	}{
+		{"claude-opus-5", windowUnknown, "142,310 tokens", "8,000 tokens"},
+		{"claude-opus-5[1m]", 1_000_000, "142,310 / 1,000,000 tokens (14%)", "8,000 / 1,000,000 tokens (1%)"},
+	} {
+		t.Run(c.seatID, func(t *testing.T) {
+			documentAndSubagentContextWindow(t, c.seatID, c.window, c.docPct, c.subPct)
+		})
+	}
+}
+
+func documentAndSubagentContextWindow(t *testing.T, seatID string, window int, docLine, subLine string) {
+	t.Helper()
 	dir := t.TempDir()
 	id := "11111111-1111-4111-8111-111111111111"
 
@@ -156,7 +176,15 @@ func TestDocumentAndSubagentContextWindow(t *testing.T) {
 	}
 
 	parent := filepath.Join(dir, id+".jsonl")
+	// The seat record. Only the parent gets one: no subagent transcript carries
+	// one, so the agent's own line can only come from inheriting this.
 	body := line(map[string]any{
+		"type": "attachment", "timestamp": "2026-08-10T10:00:00.000Z",
+		"attachment": map[string]any{
+			"type":     "model",
+			"identity": map[string]any{"modelId": seatID},
+		},
+	}) + line(map[string]any{
 		"type": "user", "timestamp": "2026-08-10T10:00:00.000Z",
 		"message": map[string]any{"content": []map[string]any{{"type": "text", "text": "go and look"}}},
 	}) +
@@ -193,13 +221,13 @@ func TestDocumentAndSubagentContextWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (turns.ContextUsage{Used: 142310, Window: 200000}); doc.Context != want {
+	if want := (turns.ContextUsage{Used: 142310, Window: window}); doc.Context != want {
 		t.Errorf("document context = %+v, want %+v", doc.Context, want)
 	}
 	if len(doc.Subagents) != 1 {
 		t.Fatalf("subagents = %+v", doc.Subagents)
 	}
-	if want := (turns.ContextUsage{Used: 8000, Window: 200000}); doc.Subagents[0].Context != want {
+	if want := (turns.ContextUsage{Used: 8000, Window: window}); doc.Subagents[0].Context != want {
 		t.Errorf("subagent context = %+v, want %+v", doc.Subagents[0].Context, want)
 	}
 
@@ -207,11 +235,11 @@ func TestDocumentAndSubagentContextWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(out, "Context window: 142,310 / 200,000 tokens (71%)\n") {
+	if !strings.HasPrefix(out, "Context window: "+docLine+"\n") {
 		t.Errorf("the session's own line should open the document:\n%s", out)
 	}
 	want := "** @Opus5 Explore · Find the thing\n:PROPERTIES:\n:VISIBILITY: folded\n:END:\n\n" +
-		"Context window: 8,000 / 200,000 tokens (4%)"
+		"Context window: " + subLine
 	if !strings.Contains(out, want) {
 		t.Errorf("the agent's line should sit right under its heading:\n%s", out)
 	}

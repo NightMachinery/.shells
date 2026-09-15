@@ -371,6 +371,14 @@ func TestSessionNamePrecedence(t *testing.T) {
 	}
 }
 
+// The record Claude Code writes to name the seat the session is running on. The
+// `[1m]` suffix of a long-context seat appears here and nowhere else.
+func mkSeat(id string) record {
+	return record{Type: "attachment", Attachment: &attachment{
+		Type: "model", Identity: &modelIdentity{ModelID: id},
+	}}
+}
+
 func mkUsage(model string, in, cacheCreate, cacheRead, out int) record {
 	return record{Type: "assistant", Message: &message{Model: model, Usage: &usage{
 		InputTokens:         in,
@@ -384,79 +392,138 @@ func mkUsage(model string, in, cacheCreate, cacheRead, out int) record {
 // that actually reported a figure wins, and nothing that never held the window
 // may displace it.
 func TestLastContextUsage(t *testing.T) {
+	seat := mkSeat("claude-opus-5")
 	last := mkUsage("claude-opus-5", 1000, 2000, 139310, 50000)
 
 	cases := []struct {
-		name string
-		in   []record
-		want turns.ContextUsage
+		name      string
+		in        []record
+		inherited string
+		want      turns.ContextUsage
 	}{
-		{"nothing said", nil, turns.ContextUsage{}},
+		{name: "nothing said", want: turns.ContextUsage{}},
 		{
 			// The output tokens came back and are in the *next* request's
 			// window, not this one's: 1000 + 2000 + 139310, and not a token of
 			// the 50000.
 			name: "the last reporting record wins, output excluded",
-			in:   []record{mkUsage("claude-opus-5", 9, 9, 9, 9), last},
-			want: turns.ContextUsage{Used: 142310, Window: 200000},
+			in:   []record{seat, mkUsage("claude-opus-5", 9, 9, 9, 9), last},
+			want: turns.ContextUsage{Used: 142310},
 		},
 		{
 			// A message Claude Code wrote itself never made a request.
 			name: "a trailing synthetic record does not win",
-			in:   []record{last, mkUsage("<synthetic>", 1, 1, 1, 1)},
-			want: turns.ContextUsage{Used: 142310, Window: 200000},
+			in:   []record{seat, last, mkUsage("<synthetic>", 1, 1, 1, 1)},
+			want: turns.ContextUsage{Used: 142310},
 		},
 		{
 			// A resumed or interrupted turn leaves the counters behind at zero.
 			name: "an all-zero usage does not win",
-			in:   []record{last, mkUsage("claude-opus-5", 0, 0, 0, 0)},
-			want: turns.ContextUsage{Used: 142310, Window: 200000},
+			in:   []record{seat, last, mkUsage("claude-opus-5", 0, 0, 0, 0)},
+			want: turns.ContextUsage{Used: 142310},
 		},
 		{
 			name: "a meta assistant record does not win",
 			in: func() []record {
 				meta := mkUsage("claude-opus-5", 5, 5, 5, 5)
 				meta.IsMeta = true
-				return []record{last, meta}
+				return []record{seat, last, meta}
 			}(),
-			want: turns.ContextUsage{Used: 142310, Window: 200000},
+			want: turns.ContextUsage{Used: 142310},
 		},
 		{
 			name: "a user record does not win",
 			in: func() []record {
 				u := mkUsage("claude-opus-5", 5, 5, 5, 5)
 				u.Type = "user"
-				return []record{last, u}
+				return []record{seat, last, u}
 			}(),
-			want: turns.ContextUsage{Used: 142310, Window: 200000},
+			want: turns.ContextUsage{Used: 142310},
+		},
+		{
+			// The seat, not the message, is where `[1m]` is written.
+			name: "a long-context seat widens the window",
+			in:   []record{mkSeat("claude-opus-5[1m]"), last},
+			want: turns.ContextUsage{Used: 142310, Window: 1000000},
+		},
+		{
+			// A transcript from before Claude Code wrote the record. No
+			// denominator is better than a wrong one.
+			name: "no seat leaves the window unknown",
+			in:   []record{last},
+			want: turns.ContextUsage{Used: 142310},
+		},
+		{
+			// A bare id does not say which seat: locally, transcripts naming
+			// a plain `claude-opus-5` peak well past 200,000.
+			name: "a bare seat leaves the window unknown too",
+			in:   []record{mkSeat("claude-opus-5"), last},
+			want: turns.ContextUsage{Used: 142310},
+		},
+		{
+			// A subagent, which never carries a seat of its own.
+			name:      "an inherited seat fills in for a file that names none",
+			in:        []record{last},
+			inherited: "claude-opus-5[1m]",
+			want:      turns.ContextUsage{Used: 142310, Window: 1000000},
+		},
+		{
+			// A subagent that was put on another model does not inherit.
+			name:      "an inherited seat for another model is dropped",
+			in:        []record{mkUsage("claude-haiku-4-5-20251001", 1000, 2000, 139310, 0)},
+			inherited: "claude-opus-5[1m]",
+			want:      turns.ContextUsage{Used: 142310},
+		},
+		{
+			// A resumed session writes its seat record at the resume, which
+			// can land after the last message that reported usage.
+			name: "a seat after the last figure still counts",
+			in:   []record{last, mkSeat("claude-opus-5[1m]")},
+			want: turns.ContextUsage{Used: 142310, Window: 1000000},
+		},
+		{
+			// `/model` mid-session: the nearest seat *behind* the message is
+			// the one it ran on, not the last one in the file.
+			name: "the nearest preceding seat wins over a later one",
+			in: []record{
+				mkSeat("claude-opus-5[1m]"), last,
+				mkSeat("claude-fable-5-1"), mkUsage("claude-fable-5-1", 0, 0, 0, 0),
+			},
+			want: turns.ContextUsage{Used: 142310, Window: 1000000},
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := lastContextUsage(c.in); got != c.want {
+			if got := lastContextUsage(c.in, c.inherited); got != c.want {
 				t.Errorf("got %+v, want %+v", got, c.want)
 			}
 		})
 	}
 }
 
-// Claude Code writes the usage but never the capacity, so the window is
-// inferred.
+// Claude Code writes the usage but never the capacity, so the window comes from
+// the seat.
 func TestContextWindowInference(t *testing.T) {
 	for _, c := range []struct {
+		seat  string
 		model string
 		used  int
 		want  int
 	}{
-		{"claude-opus-5", 1000, 200_000},
-		{"claude-opus-5[1m]", 1000, 1_000_000},
-		// No suffix, but a session holding this much proves the seat anyway.
-		{"claude-opus-5", 240_000, 1_000_000},
-		{"", 1000, 200_000},
+		{"claude-opus-5[1m]", "claude-opus-5", 1000, 1_000_000},
+		// A bare id does not say which seat, so it earns no denominator.
+		{"claude-opus-5", "claude-opus-5", 1000, windowUnknown},
+		{"", "claude-opus-5", 1000, windowUnknown},
+		// A session holding this much proves the large seat by itself.
+		{"claude-opus-5", "claude-opus-5", 240_000, 1_000_000},
+		{"", "claude-opus-5", 240_000, 1_000_000},
+		// A seat that does not describe this message is not believed: a
+		// subagent on its own model keeps none of its parent's `[1m]`.
+		{"claude-opus-5[1m]", "claude-haiku-4-5-20251001", 1000, windowUnknown},
 	} {
-		if got := contextWindow(c.model, c.used); got != c.want {
-			t.Errorf("contextWindow(%q, %d) = %d, want %d", c.model, c.used, got, c.want)
+		if got := contextWindow(c.seat, c.model, c.used); got != c.want {
+			t.Errorf("contextWindow(%q, %q, %d) = %d, want %d", c.seat, c.model, c.used, got, c.want)
 		}
 	}
 }
@@ -474,7 +541,7 @@ func TestMsgRecordStillDecodesWithoutUsage(t *testing.T) {
 	if rec.Message == nil || rec.Message.Usage != nil {
 		t.Fatalf("message = %+v", rec.Message)
 	}
-	if got := lastContextUsage([]record{rec}); got != (turns.ContextUsage{}) {
+	if got := lastContextUsage([]record{rec}, ""); got != (turns.ContextUsage{}) {
 		t.Errorf("got %+v, want the zero value", got)
 	}
 }
