@@ -79,23 +79,97 @@ func (u usage) inWindow() int {
 	return u.InputTokens + u.CacheCreationTokens + u.CacheReadTokens
 }
 
-// How large a window a model has, when the transcript does not say. Claude Code
-// writes the usage but not the capacity, so it is inferred from the model id.
+// The two windows a session can be shown against, and the figure that separates
+// them. `windowDefault` is no longer a fallback --- nothing is measured against
+// it unless the transcript earns it --- but it is still the line above which a
+// session has proved the large seat.
 const (
+	windowUnknown = 0
 	windowDefault = 200_000
 	windowLarge   = 1_000_000
 )
 
-// The window the session was running in. The `[1m]` suffix is how a long-context
-// seat spells itself in the model id; a session already holding more than the
-// default proves the point without the suffix, and is believed over the id,
-// since a figure that exceeds its own window is certainly the wrong window and
-// only probably the wrong count.
-func contextWindow(model string, used int) int {
-	if strings.Contains(model, "[1m]") || used > windowDefault {
+// The window the session was running in, given the seat it ran on and the model
+// that answered. `windowUnknown` means the transcript does not say, and
+// [turns.ContextUsage.Line] then prints the total with no denominator.
+//
+// `seat` is the `modelId` of a `model` attachment, which is the only place the
+// `[1m]` suffix of a long-context seat is ever written. `message.model` never
+// carries it: across every transcript on this machine it is the bare id, so
+// looking for the suffix there found nothing and every session was measured
+// against 200,000, which is how a 5% line came out as 24%.
+//
+// The suffix proves the large seat; its *absence* proves nothing. Five local
+// transcripts carry a single seat record reading `claude-opus-5` / "Opus 5",
+// with no `/model` switch anywhere, and peak at 310k to 528k tokens --- figures
+// no 200,000 window can hold. `claude-fable-5-1` reaches 564k the same way. So a
+// bare id earns no denominator at all: a missing percentage is a gap somebody
+// can act on, where a wrong one reads as fact. Only haiku is genuinely a
+// single-window model, and nine transcripts of it are not worth a table of model
+// names that would go stale.
+//
+// A seat whose base id disagrees with the model that actually answered does not
+// describe this message and is dropped. That is what stops a subagent running on
+// a model of its own from inheriting its parent's `[1m]`.
+//
+// A session already holding more than `windowDefault` proves the large seat
+// whatever its id says, and is believed over the id, since a figure that exceeds
+// its own window is certainly the wrong window and only probably the wrong
+// count.
+func contextWindow(seat, model string, used int) int {
+	base := strings.ReplaceAll(seat, "[1m]", "")
+	if base != "" && model != "" && base != model {
+		seat = ""
+	}
+	if strings.Contains(seat, "[1m]") || used > windowDefault {
 		return windowLarge
 	}
-	return windowDefault
+	return windowUnknown
+}
+
+// The seat named by the `model` attachment nearest to `at`, searching backwards
+// first and only then forwards, or the empty string when the file names none.
+//
+// Backwards first because Claude Code writes one when the session starts and
+// another whenever `/model` changes the seat, so the nearest record *behind* a
+// message is the seat that message ran on; taking the last in the file would
+// attribute every earlier message to whatever it ended up switched to.
+//
+// Forwards as a fallback because a resumed session writes its record at the
+// resume, which can land after the last message that reported usage --- one
+// local transcript has its only seat record 13 lines past the figure the context
+// line is drawn from. A seat from later in the same file is weaker evidence than
+// one from before, and far better than none.
+func seatModelNear(all []record, at int) string {
+	seatAt := func(i int) string {
+		rec := all[i]
+		if rec.Type != "attachment" || rec.Attachment == nil {
+			return ""
+		}
+		if rec.Attachment.Type != "model" || rec.Attachment.Identity == nil {
+			return ""
+		}
+		return rec.Attachment.Identity.ModelID
+	}
+	for i := at; i >= 0; i-- {
+		if id := seatAt(i); id != "" {
+			return id
+		}
+	}
+	for i := at + 1; i < len(all); i++ {
+		if id := seatAt(i); id != "" {
+			return id
+		}
+	}
+	return ""
+}
+
+// The seat a whole file was last running on. This is what a parent document
+// hands its subagents: a subagent transcript carries no `model` attachment of
+// its own --- not one of them does, locally --- so a subagent left on the
+// inherited model is running in the inherited window.
+func seatModel(all []record) string {
+	return seatModelNear(all, len(all)-1)
 }
 
 // The usage the session last reported, scanning back from the end: the newest
@@ -103,9 +177,14 @@ func contextWindow(model string, used int) int {
 // something that never held the window --- the harness's own meta records, the
 // `<synthetic>` messages Claude Code writes itself, and the records whose usage
 // is present but empty, which a resumed or interrupted turn leaves behind.
-func lastContextUsage(records []record) turns.ContextUsage {
-	for i := len(records) - 1; i >= 0; i-- {
-		rec := records[i]
+//
+// `all` is the *unfiltered* record list, because the `model` attachment naming
+// the seat is one of the types [conversationRecords] drops. `inherited` is the
+// seat to assume when the file names none of its own, which is how a subagent
+// gets its parent's; empty for a document that stands alone.
+func lastContextUsage(all []record, inherited string) turns.ContextUsage {
+	for i := len(all) - 1; i >= 0; i-- {
+		rec := all[i]
 		if rec.Type != "assistant" || rec.IsMeta || rec.Message == nil || rec.Message.Usage == nil {
 			continue
 		}
@@ -116,7 +195,11 @@ func lastContextUsage(records []record) turns.ContextUsage {
 		if used <= 0 {
 			continue
 		}
-		return turns.ContextUsage{Used: used, Window: contextWindow(rec.Message.Model, used)}
+		seat := seatModelNear(all, i)
+		if seat == "" {
+			seat = inherited
+		}
+		return turns.ContextUsage{Used: used, Window: contextWindow(seat, rec.Message.Model, used)}
 	}
 	return turns.ContextUsage{}
 }
@@ -202,6 +285,17 @@ type attachment struct {
 	// but a populated one is worth reading rather than dropping.
 	Content   json.RawMessage `json:"content"`
 	ItemCount int             `json:"itemCount"`
+
+	// model: the seat the session is running on. Written when the session
+	// starts and again whenever `/model` changes it.
+	Identity *modelIdentity `json:"identity"`
+}
+
+// What a `model` attachment says the session is running on. Only the id is kept:
+// the `marketingName` beside it ("Opus 5 (1M context)") says the same thing in
+// prose, and one field to parse is one field to get wrong.
+type modelIdentity struct {
+	ModelID string `json:"modelId"`
 }
 
 type compactMetadata struct {
