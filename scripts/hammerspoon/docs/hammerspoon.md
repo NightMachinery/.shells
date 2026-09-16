@@ -154,11 +154,10 @@ Set `hammerspoonReloadCoalesce` to false to reload on every event instead.
 
 ### Holds
 
-Any file in `~/.night-holds/service-hs-reload/` whose mtime is in the
-**future** is a live claim on the reloader, and while one exists nothing
-reloads by itself. That is what `hs-reload-hold` writes and what
-`hammerspoonReloadHeldBy()` reads; `hs -c 'return hammerspoonReloadHeldBy()'`
-answers "why did my save not do anything".
+While anyone holds `service:hs-reload`, nothing reloads by itself. That is what
+`hs-reload-hold` takes and what `hammerspoonReloadHeldBy()` reports;
+`hs -c 'return hammerspoonReloadHeldBy()'` answers "why did my save not do
+anything".
 
 These used to be their own implementation under `~/.hs-no-reload/`. They are
 now the *shared* mode of the general hold mechanism — `service:hs-reload`, held
@@ -176,21 +175,32 @@ reloading under someone still typing; a counter would be worse still, since the
 first agent to be killed would leave it stuck above zero and auto-reload dead
 for good, silently. One file per holder has no shared mutable state to race on.
 
-The deadline lives in the mtime as well as in the contents, so this check stays
-one `hs.fs.attributes` stat per entry with no parsing and no file reads — it
-runs on Hammerspoon's main thread, where blocking freezes every keystroke on
-the machine. Every other reader parses the contents, where the deadline is
-authoritative. Dotfiles are skipped: `.lock` is the file the binary flocks for
-the duration of an acquire, and its mtime means nothing here. Redis would have
-fit the house style for flags, but reading it there
-means a blocking socket round-trip on that same thread, and an outage would
-force a choice between suppression silently failing and auto-reload never
-running again. A missing directory simply means nothing is holding.
+The check runs `night_hold holders service:hs-reload` rather than reading those
+files directly, and that indirection is the point. A hold now ends when its
+holder *dies*, and only night_hold can tell whether a pid is still alive —
+anything written in Lua would keep auto-reload suppressed by a crashed agent's
+leftover file until something else happened to clear it, which is exactly the
+failure this is meant to rule out.
 
-Holds expire on their own, and that is the point rather than a limitation: an
-agent that crashes, is killed, or just forgets must not be able to leave
-auto-reload off permanently. A hold that ends early is a far smaller problem
-than one that never ends.
+It goes through `taskWithPath` in `core/helpers.lua`, so it is asynchronous
+(~7.5 ms, measured) and never blocks Hammerspoon's main thread, where blocking
+freezes every keystroke on the machine. That helper also repairs the PATH, which
+`hs.task` otherwise inherits bare from launchd. `hammerspoonReloadHeldBy()` is
+the one synchronous caller, via `hs.execute`, because it exists to be typed at
+and an answer arriving in a callback is no answer at all.
+
+**It fails open.** A missing binary, a broken one, a non-zero exit — all reload.
+A hold that ends early is a far smaller problem than one that never ends, and
+`hs-reload` and Hyper+Cmd+R always work regardless.
+
+Holds end when their holder releases them or dies. What is *not* covered any
+more is an agent that is alive and has simply forgotten: with no deadline
+running underneath it, that hold stands until someone releases it. `hold-status`
+names it, and `hold-release service:hs-reload --holder <id>` clears it.
+
+Redis would have fit the house style for flags, but reading it from this thread
+means a blocking socket round-trip, and an outage would force a choice between
+suppression silently failing and auto-reload never running again.
 
 Setting `hammerspoonReloadHeldAlert` to true puts a grey band on screen naming
 the holder whenever a reload is suppressed. It is off by default because that is

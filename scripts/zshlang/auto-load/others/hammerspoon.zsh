@@ -174,18 +174,20 @@ alias hhh='hs-reload'
 #:
 #: A lock is the wrong word for it. Every holder wants the same outcome --
 #: suppression -- so a second one costs nothing and refusing it would be
-#: perverse. What it needs from a hold is only the expiry: an agent that
+#: perverse. What it needs from a hold is only the ending: an agent that
 #: crashes or is killed must not be able to leave auto-reload off for good.
 typeset -g hs_reload_resource='service:hs-reload'
-#: Same default as the agent banner, and for the same reason: long enough to be
-#: useful, short enough that forgetting it is not a lasting problem.
-typeset -g hs_reload_hold_default="${hs_reload_hold_default:-30m}"
+#: until-live, like every other hold: it ends when you release it or when the
+#: agent holding it dies, which is a better answer to "is this still needed"
+#: than any duration guessed up front. Set this to a duration for a hard
+#: deadline instead.
+typeset -g hs_reload_hold_default="${hs_reload_hold_default:-until-live}"
 
 function hs-reload-hold {
     : "hold off the auto-reloader for <dur>, default ${hs_reload_hold_default}
 
 Renews rather than stacks: calling it again while you already hold one just
-pushes your own deadline out."
+re-takes your own."
     @darwinOnly
 
     local reason="${1:-editing}" dur="${2:-${hs_reload_hold_default}}"

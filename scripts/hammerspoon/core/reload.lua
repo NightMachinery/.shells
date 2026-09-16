@@ -34,28 +34,33 @@ if hammerspoonReloadCoalesce == nil then
 end
 
 --- ** Holds
---- Any file in this directory whose mtime is in the *future* is a live claim on
---- the reloader, and while one exists nothing here reloads by itself. It is a
---- directory rather than a single flag because several agents edit this repo at
---- once: one file each means they cannot clobber each other, and whoever
---- finishes first does not re-enable reloading under someone still typing.
+--- While anyone holds `service:hs-reload', nothing here reloads by itself. It
+--- is a hold per holder rather than one flag because several agents edit this
+--- repo at once: whoever finishes first must not re-enable reloading under
+--- someone still typing. That shape - many holders, all wanting the same
+--- outcome - is a *suppression registry* rather than a lock, and it is the
+--- shared mode of the general hold mechanism. See =scripts/docs/holds.md=.
 ---
---- That shape - one file per holder, all of them wanting the same outcome - is
---- a *suppression registry* rather than a lock, and it is one of the two modes
---- of the general hold mechanism. So this is now `service:hs-reload' held
---- `--shared' by [agfi:hs-reload-hold], and the directory below is where
---- night_hold keeps that resource. See =scripts/docs/holds.md=.
+--- This asks night_hold rather than reading the hold files itself, and that is
+--- the whole point: a hold now ends when its holder *dies*, and only night_hold
+--- can tell whether a pid is still alive. A check written here would keep
+--- auto-reload suppressed by a crashed agent's leftover file until something
+--- else happened to clear it, which is exactly the failure this is supposed to
+--- rule out.
 ---
---- The deadline is in the mtime as well as in the file, so that this check
---- stays a stat per entry and no parsing - it runs on Hammerspoon's main
---- thread. Everything else reads the contents, where the deadline is
---- authoritative.
+--- It costs one hs.task, ~7.5 ms and off the main thread; see taskWithPath in
+--- core/helpers.lua, which also repairs the PATH so ~/go/bin is reachable.
 ---
---- A claim expiring on its own is the point. An agent that crashes, is killed,
---- or simply forgets must not be able to leave auto-reload off for good; a hold
---- that ends early is a much smaller problem than one that never ends.
-hammerspoonNoReloadDir = hammerspoonNoReloadDir
-    or (os.getenv("HOME") .. "/.night-holds/service-hs-reload")
+--- **It fails open.** A missing or broken binary reloads rather than refusing
+--- to, because a hold that ends early is a much smaller problem than one that
+--- never ends. You can always reload by hand - `hs-reload', or Hyper+Cmd+R.
+
+--- The resource night_hold keeps this under, and the binary that answers for
+--- it. An absolute path because hs.task needs one, and because Hammerspoon's
+--- PATH is the bare launchd one.
+hammerspoonReloadResource = hammerspoonReloadResource or "service:hs-reload"
+hammerspoonNightHoldBin = hammerspoonNightHoldBin
+    or (os.getenv("HOME") .. "/go/bin/night_hold")
 
 --- Off by default: a band on every suppressed save is a lot of banding. Turn it
 --- on while you are working on the holds themselves, or if you keep forgetting
@@ -67,46 +72,47 @@ end
 --- Who is holding the reloader, or nil. Global so that "why did my save not do
 --- anything" is one command away:
 ---   hs -c 'return hammerspoonReloadHeldBy()'
+---
+--- Synchronous, unlike the check on the save path: this one exists to be typed
+--- at, and an answer that arrives in a callback is no answer at all.
 function hammerspoonReloadHeldBy()
-    -- hs.fs.dir raises rather than returning nil when the directory is missing,
-    -- and missing is the normal case: nothing has ever held the reloader.
-    local ok, iter, dirObj = pcall(hs.fs.dir, hammerspoonNoReloadDir)
-    if not ok then
+    local out, ok = hs.execute(
+        hammerspoonNightHoldBin .. " holders " .. hammerspoonReloadResource .. " 2>/dev/null")
+    if not ok or not out then
         return nil
     end
-
-    local now = os.time()
-    local holder = nil
-    -- Runs to the end rather than breaking out, so the directory handle is
-    -- closed by the iterator itself. It holds one small file per agent.
-    for entry in iter, dirObj do
-        -- Dotfiles are night_hold's own; `.lock' in particular is the file it
-        -- flocks for the duration of an acquire, and its mtime means nothing.
-        if entry:sub(1, 1) ~= "." then
-            local attrs = hs.fs.attributes(hammerspoonNoReloadDir .. "/" .. entry)
-            if attrs and attrs.modification > now then
-                holder = holder or entry
-            end
-        end
-    end
-    return holder
+    -- One holder id per line; the first is enough to answer "who".
+    return out:match("^[^\n]+")
 end
 
+--- Reloads unless someone holds the reloader. Asynchronous, so a save never
+--- blocks Hammerspoon's main thread waiting on a subprocess.
 local function reloadUnlessHeld()
-    local holder = hammerspoonReloadHeldBy()
-    if not holder then
+    local task = taskWithPath(hammerspoonNightHoldBin, function(exitCode, stdOut, _)
+        -- Anything other than a clean run with a holder on stdout means
+        -- reload: no holders, a missing binary, a broken one. Fail open.
+        local holder = nil
+        if exitCode == 0 and stdOut then
+            holder = stdOut:match("^[^\n]+")
+        end
+        if not holder then
+            hs.reload()
+            return
+        end
+        if hammerspoonReloadHeldAlert then
+            -- One id, so a burst of saves refreshes a single band instead of
+            -- stacking a wall of them; the engine's same-id rule also keeps an
+            -- unchanged message from re-flashing.
+            alert_gateway("auto-reload held by " .. holder, {
+                id = "hs-reload-held",
+                color = "notice",
+                seconds = 4,
+            })
+        end
+    end, {"holders", hammerspoonReloadResource})
+
+    if not task or not task:start() then
         hs.reload()
-        return
-    end
-    if hammerspoonReloadHeldAlert then
-        -- One id, so a burst of saves refreshes a single band instead of
-        -- stacking a wall of them; the engine's same-id rule also keeps an
-        -- unchanged message from re-flashing.
-        alert_gateway("auto-reload held by " .. holder, {
-            id = "hs-reload-held",
-            color = "notice",
-            seconds = 4,
-        })
     end
 end
 

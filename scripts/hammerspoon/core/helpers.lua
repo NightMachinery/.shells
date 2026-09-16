@@ -161,7 +161,10 @@ end
 -- "brishz.dash: 41: jq: not found" and, because a nil callback discards both
 -- streams, fails completely silently. Same class of bug as the PATH in
 -- launchers/audio-guard/com.user.audio-guard.plist.
-local BREW_PATHS = "/opt/homebrew/bin:/usr/local/bin"
+--
+-- Not only brew: ~/go/bin is where go-install-local puts our own binaries, and
+-- core/reload.lua now runs one of them (night_hold) on every save.
+local EXTRA_PATHS = "/opt/homebrew/bin:/usr/local/bin:" .. os.getenv("HOME") .. "/go/bin"
 
 function taskWithPath(bin, callback, args)
     local task = hs.task.new(bin, callback, args)
@@ -170,7 +173,7 @@ function taskWithPath(bin, callback, args)
     -- Repair PATH rather than replacing the environment wholesale: brishz needs
     -- HOME, and setEnvironment replaces the table entirely.
     local env = task:environment() or {}
-    env.PATH = BREW_PATHS .. ":" .. (env.PATH or "/usr/bin:/bin:/usr/sbin:/sbin")
+    env.PATH = EXTRA_PATHS .. ":" .. (env.PATH or "/usr/bin:/bin:/usr/sbin:/sbin")
     task:setEnvironment(env)
 
     return task
