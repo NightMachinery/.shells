@@ -44,7 +44,40 @@ func guardStore(t *testing.T) (Store, string) {
 	return s, held
 }
 
-// The fifteen cases the shell guard was held to, so the port cannot regress.
+// verdict is the three-way contract: a structured write to a held path is
+// denied, a textual `Bash' signal warns and lets the call through, everything
+// else is silent.
+type verdict int
+
+const (
+	allow verdict = iota
+	warn
+	deny
+)
+
+func (v verdict) String() string {
+	switch v {
+	case deny:
+		return "deny"
+	case warn:
+		return "warn"
+	}
+	return "allow"
+}
+
+func got(d Decision) verdict {
+	switch {
+	case d.Deny:
+		return deny
+	case d.Warn:
+		return warn
+	}
+	return allow
+}
+
+// The fifteen cases the shell guard was held to, so the port cannot regress --
+// with the four `Bash' ones downgraded from deny to warn, which is the point of
+// the split: only an edit tool's `file_path' proves a write.
 func TestGuardVerdicts(t *testing.T) {
 	s, held := guardStore(t)
 	home := filepath.Dir(held)
@@ -52,32 +85,71 @@ func TestGuardVerdicts(t *testing.T) {
 	cases := []struct {
 		name string
 		in   string
-		deny bool
+		want verdict
 	}{
-		{"foreign Edit inside held path", payload("holder-B", "Edit", "/x", held+"/x", ""), true},
-		{"holder's own Edit", payload("holder-A", "Edit", "/x", held+"/x", ""), false},
-		{"Edit outside held path", payload("holder-B", "Edit", "/x", home+"/elsewhere/init.el", ""), false},
-		{"Bash naming the path", payload("holder-B", "Bash", "/x", "", "ls "+held), true},
-		{"Bash matching --match literal", payload("holder-B", "Bash", "/x", "", "vcsh holdtest.sh status"), true},
-		{"Bash cwd inside held path", payload("holder-B", "Bash", held+"/sub", "", "echo hi"), true},
-		{"unrelated Bash", payload("holder-B", "Bash", home, "", "echo hello"), false},
-		{"hold-release naming it", payload("holder-B", "Bash", "/x", "", "hold-release repo:"+held), false},
-		{"hold-status from inside held cwd", payload("holder-B", "Bash", held, "", "hold-status"), false},
-		{"empty file_path does not shift fields", payload("holder-B", "Bash", "/x", "", "echo safe"), false},
-		{"multiline command", payload("holder-B", "Bash", "/x", "", "echo one\nls "+held), true},
-		{"Read is not a matched tool", payload("holder-B", "Read", "/x", held+"/x", ""), false},
-		{"sibling dir in Bash", payload("holder-B", "Bash", "/x", "", "ls "+held+"-backup"), false},
-		{"sibling dir in Edit", payload("holder-B", "Edit", "/x", held+"-backup/x", ""), false},
-		{"malformed payload fails open", "not json at all", false},
+		{"foreign Edit inside held path", payload("holder-B", "Edit", "/x", held+"/x", ""), deny},
+		{"holder's own Edit", payload("holder-A", "Edit", "/x", held+"/x", ""), allow},
+		{"Edit outside held path", payload("holder-B", "Edit", "/x", home+"/elsewhere/init.el", ""), allow},
+		{"Bash naming the path", payload("holder-B", "Bash", "/x", "", "ls "+held), warn},
+		{"Bash matching --match literal", payload("holder-B", "Bash", "/x", "", "vcsh holdtest.sh status"), warn},
+		{"Bash cwd inside held path", payload("holder-B", "Bash", held+"/sub", "", "echo hi"), warn},
+		{"unrelated Bash", payload("holder-B", "Bash", home, "", "echo hello"), allow},
+		{"hold-release naming it", payload("holder-B", "Bash", "/x", "", "hold-release repo:"+held), allow},
+		{"hold-status from inside held cwd", payload("holder-B", "Bash", held, "", "hold-status"), allow},
+		{"empty file_path does not shift fields", payload("holder-B", "Bash", "/x", "", "echo safe"), allow},
+		{"multiline command", payload("holder-B", "Bash", "/x", "", "echo one\nls "+held), warn},
+		{"Read is not a matched tool", payload("holder-B", "Read", "/x", held+"/x", ""), allow},
+		{"sibling dir in Bash", payload("holder-B", "Bash", "/x", "", "ls "+held+"-backup"), allow},
+		{"sibling dir in Edit", payload("holder-B", "Edit", "/x", held+"-backup/x", ""), allow},
+		{"malformed payload fails open", "not json at all", allow},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			d := s.Guard(strings.NewReader(c.in), time.Now())
-			if d.Deny != c.deny {
-				t.Errorf("deny = %v, want %v (reason: %s)", d.Deny, c.deny, d.Reason)
+			if g := got(d); g != c.want {
+				t.Errorf("verdict = %s, want %s (reason: %s)", g, c.want, d.Reason)
 			}
 		})
+	}
+}
+
+// The case that started this: an agent could not even read under a hold. A
+// read names the path exactly as a write does, so the guard must not deny it.
+func TestReadUnderHoldIsNotDenied(t *testing.T) {
+	s, held := guardStore(t)
+
+	reads := []string{
+		"grep -rn 'foo' " + held + "/zshlang",
+		"cat " + held + "/readme.org",
+		"vcsh holdtest.sh log --oneline -5",
+		"python3 - <<'EOF'\nprint('mentions vcsh holdtest.sh as data')\nEOF",
+	}
+	for _, cmd := range reads {
+		d := s.Guard(strings.NewReader(payload("holder-B", "Bash", "/x", "", cmd)), time.Now())
+		if d.Deny {
+			t.Errorf("denied a Bash call it cannot prove writes: %q", cmd)
+		}
+		if !d.Warn {
+			t.Errorf("no warning for a command naming the held resource: %q", cmd)
+		}
+	}
+}
+
+// A warning must never carry a permissionDecision. "allow" would not merely
+// un-block the call, it would bypass the normal permission prompt for it.
+func TestWarnJSONGrantsNothing(t *testing.T) {
+	out := WarnJSON("careful")
+	if strings.Contains(out, "permissionDecision") {
+		t.Fatalf("WarnJSON must not decide permission: %s", out)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("WarnJSON is not valid JSON: %v", err)
+	}
+	h, _ := parsed["hookSpecificOutput"].(map[string]any)
+	if h["additionalContext"] != "careful" || h["hookEventName"] != "PreToolUse" {
+		t.Errorf("warning does not reach the agent: %s", out)
 	}
 }
 

@@ -133,12 +133,44 @@ unusable from the one machine it is ever used from.
 ## What the guard actually stops
 
 `night_hold guard` runs before every `Bash`, `Edit`, `Write`, `MultiEdit` and
-`NotebookEdit`, and denies the call when:
+`NotebookEdit`, and answers at one of two strengths.
 
-- the tool's `file_path` is inside a held path;
-- a `Bash` call's working directory is inside a held path;
-- a `Bash` command names the held path, or contains one of the hold's explicit
-  `--match` literals.
+It **denies** — exit 2, `permissionDecision: "deny"` — when the tool's
+`file_path` or `notebook_path` is inside a held path. That path arrives as
+structured data, so there is no guessing: the call is a write to the held
+resource.
+
+It **warns** — exit 0, `hookSpecificOutput.additionalContext`, so the call goes
+ahead — when a `Bash` call's working directory is inside a held path, or its
+command names the held path or contains one of the hold's `--match` literals.
+
+### Why `Bash` only warns
+
+Because the `Bash` signals are textual, and text does not distinguish a read
+from a write. `grep -rn foo ~/scripts` names the held path exactly as `rm -rf
+~/scripts` does. Denying both was the original behaviour and it was too broad in
+a way that showed up immediately in use: a subagent could not so much as grep a
+file in a held repository, and a heredoc that merely *quoted* `vcsh night.sh` as
+data was refused. It routed around the guard with the `Read` and `Grep` tools,
+which the hook does not intercept at all — which is the failure mode the guard
+is supposed to avoid, an obstacle that teaches everyone a detour.
+
+Classifying the command instead was considered and rejected: an allowlist of
+read-only programs (`grep`, `cat`, `sed` without `-i`, `git log`…) can be
+written, but it has to parse shell, it drifts, and every mistake it makes is in
+the permissive direction and silent. A warning gives up the guarantee honestly
+rather than pretending to one it cannot keep.
+
+So the contract is now: **the guard blocks what it can prove, and tells the
+agent about what it cannot.** An agent that gets a warning is expected to run
+`hold-status`, read the resource and reason, and keep off it — reading freely,
+writing nothing — until it is released.
+
+A warning deliberately sets **no** `permissionDecision`. `"allow"` would not
+merely un-block the call, it would bypass the normal permission prompt for it,
+which is a much larger grant than a warning wants to make; omitting the field
+lets the call take its usual route. The reason also goes out as `systemMessage`
+and on stderr, so the human sees it too.
 
 ### Two kinds of match, on purpose
 
@@ -169,7 +201,8 @@ would be locked out of a repository by its own hold with no way to release it.
 It stops accidents, not a determined process. Nothing prevents an agent from
 spelling a path in a way no literal catches, and the `Bash` tests are textual
 by necessity: there is no general way to read the filesystem effects out of an
-arbitrary shell command. Treat it as a seatbelt.
+arbitrary shell command. That is exactly why those tests warn rather than deny.
+Treat it as a seatbelt.
 
 It also **fails open**, deliberately: an unparseable payload, a corrupt hold
 file, a missing binary all allow the call. A guard that bricks every agent in

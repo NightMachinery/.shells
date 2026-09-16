@@ -321,10 +321,17 @@ func cmdHolders(args []string) error {
 // when it parses, so both are printed.
 func cmdGuard() {
 	d := hold.New().Guard(os.Stdin, time.Now())
-	if !d.Deny {
+	switch {
+	case d.Deny:
+		fmt.Println(hold.DenyJSON(d.Reason))
+		fmt.Fprintln(os.Stderr, d.Reason)
+		os.Exit(2)
+	case d.Warn:
+		// Exit 0, so the call proceeds; the agent is told and is expected to
+		// honour the hold itself.
+		fmt.Println(hold.WarnJSON(d.Reason))
+		fmt.Fprintln(os.Stderr, d.Reason)
 		os.Exit(0)
 	}
-	fmt.Println(hold.DenyJSON(d.Reason))
-	fmt.Fprintln(os.Stderr, d.Reason)
-	os.Exit(2)
+	os.Exit(0)
 }
