@@ -43,6 +43,13 @@ The shared =delegate-weaker= skill (alias =weaker=) routes Fable's mechanical wo
 Opus and Astra's to GPT 5.6 Sol or Terra, keeping decisions and review with the
 parent. See =./docs/delegate-weaker.md= for scope and activation.
 
+[agfi:hold-acquire] takes a self-expiring exclusive hold on any resource --
+=repo:~/scripts=, =gpu:0=, =service:garden= -- so one agent can do something
+atomic without a parallel session walking into it. A Claude Code =PreToolUse=
+hook denies edits and commands touching a held resource, and a hold always
+expires on its own, so a crashed or compacted session cannot lock a repository
+forever. See =./docs/holds.md=.
+
 [agfi:agent-done] recognizes unsandboxed Codex conversation IDs and recovers
 tmux pane ownership through process ancestry, including terminal proxies.
 Ambiguous ownership saves the report but refuses automatic termination;
