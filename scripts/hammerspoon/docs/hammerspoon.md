@@ -1006,7 +1006,7 @@ When a blackout starts, the note goes up as a centred, pinned Markdown alert for
 `blackoutNoteSeconds`; then the file is moved to `<file>.last`, and then the
 screen blacks. Centred rather than in the top strip, where the agent banner and
 the "Input locked" band live, because this one is meant to be *read*. It is
-large (`blackoutNoteTextSize`, 28 points, the band's own size and nobody
+large (`blackoutNoteTextSize`, 40 points, the band's own size and nobody
 else's) because it is read from across a desk in the seconds before the screen
 goes, and gold (`blackoutNoteColor`) because a note to yourself is a sticky
 note and because gold is nowhere near the warn/blood/midnight ladder, which
@@ -1014,6 +1014,15 @@ means something else entirely. The bullets are block-aligned (see `align` under
 Alerts): one left edge, and the block centred on its longest line. There is no
 countdown on it — appended to the last bullet it would read as part of the
 note, and the band's own lifetime is the countdown anyway.
+
+While the note is up, the lock band goes up too, at the top, in the future
+tense for the rung that is waiting: "Input will lock.", "Input will lock.
+Ending the blackout will lock the screen.", or "Screen will lock. Input will
+lock. Unlock to restore." So the top of the screen says what is about to
+happen while the middle says what to remember. It is the same band, under the
+same id, that `blackoutLockOn` draws in the present tense when the blackout
+fires, which then replaces the promise in place. Shown only when the keyboard
+lock is enabled, since that is the only case in which the promise is true.
 
 The rename happens when the blackout actually fires, not when the note is shown.
 A reload or a crash mid-countdown therefore loses the blackout and keeps the

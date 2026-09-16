@@ -177,7 +177,7 @@ blackoutNoteSeconds = blackoutNoteSeconds or 5
 --- across a desk in the seconds before the screen goes, not from a chair in
 --- front of it; the size is the band's own and moves no other alert.
 blackoutNoteColor = blackoutNoteColor or "gold"
-blackoutNoteTextSize = blackoutNoteTextSize or 28
+blackoutNoteTextSize = blackoutNoteTextSize or 40
 
 --- After this many seconds of blackout, restoring the display locks the
 --- session first. 0 locks first always; false never does. Measured from
@@ -324,6 +324,24 @@ local function lockSession()
     end
     hs.caffeinate.lockScreen()
     return true
+end
+
+--- The lock band's words and colour for a rung: present tense as the lock
+--- goes on, future tense while a note is holding the blackout back. One band
+--- and one id either way, so the present-tense one replaces the promise in
+--- place when the note's time is up. Colours are a ladder, warn -> blood ->
+--- midnight, each darker than the last; blackoutLockOn says why.
+local function lockBand(rung, future)
+    if rung >= 3 then
+        return future and "Screen will lock. Input will lock. Unlock to restore."
+                      or "Locking now. Input locked. Unlock to restore.",
+               "midnight"
+    elseif rung == 2 then
+        return future and "Input will lock. Ending the blackout will lock the screen."
+                      or "Input locked. Ending the blackout locks the screen.",
+               "blood"
+    end
+    return future and "Input will lock." or "Input locked.", "warn"
 end
 
 --- ** Persistence
@@ -534,12 +552,11 @@ function blackoutLockOn(seconds)
     -- rung reached later, where the screen is already black and a sound has
     -- to carry it instead.
     local rung = st.rung or (st.lockFirst and 2 or 1)
+    local text, color = lockBand(rung, false)
 
-    alert(rung >= 3 and "Locking now. Input locked. Unlock to restore."
-              or rung == 2 and "Input locked. Ending the blackout locks the screen."
-              or "Input locked.", {
+    alert(text, {
         id = kAlertId,
-        color = rung >= 3 and "midnight" or rung == 2 and "blood" or "warn",
+        color = color,
         seconds = rung >= 2 and 5 or 4,
         screens = "all",
     })
@@ -1036,6 +1053,23 @@ local function noteGate(chord)
 
     stopNoteTimer(st)
     st.pendingChord = chord
+
+    --- The lock band goes up now as well, in the future tense, so the top of
+    --- the screen says what is about to happen while the middle says what to
+    --- remember. Same id as the band blackoutLockOn will draw, which then
+    --- replaces the promise in place. Only when the lock is enabled, since
+    --- that is the only case in which the promise is true; a skip press that
+    --- raises the rung is answered by blackoutLockOn's own band, so this one
+    --- need not follow it.
+    if blackoutLockEnabled then
+        local text, color = lockBand(kChordRung[chord] or 1, true)
+        alert(text, {
+            id = kAlertId,
+            color = color,
+            seconds = math.max(1, tonumber(blackoutNoteSeconds) or 1) + 1,
+            screens = "all",
+        })
+    end
     --: The same floor blackoutNoteShow applies, so the band and the timer
     --: cannot disagree about how long the note has.
     st.noteTimer = hs.timer.doAfter(math.max(1, tonumber(blackoutNoteSeconds) or 1), function()
