@@ -19,6 +19,8 @@ from pathlib import Path
 
 from libs.codex_rate_limits import (
     DEFAULT_FULL_PCT,
+    LUNA_RESERVE_LABEL,
+    LUNA_RESERVE_MODEL,
     BlockState,
     LimitView,
     ResetCredits,
@@ -32,6 +34,9 @@ from libs.codex_rate_limits import (
     limit_source,
     limits_by_id,
     limit_view,
+    luna_reserve_json,
+    luna_reserve_limit,
+    luna_reserve_view,
     reset_credits,
     reset_credits_json,
     signals_json,
@@ -622,6 +627,31 @@ def format_limit_line(style: Style, view: LimitView) -> str:
     return f"{style.magenta(view.display_name)}: {windows or style.dim('no windows reported')}"
 
 
+def luna_reserve_is_available(status: AuthStatus, display: Display) -> bool:
+    view = luna_reserve_view(status.rate_result)
+    if view is None:
+        return False
+    return not block_state(view.raw, full_pct=display.full_pct).blocked
+
+
+def format_luna_reserve_line(style: Style, view: LimitView, *, full_pct: float) -> str:
+    """The Luna Reserve, printed beside the plan's own windows.
+
+    Not in the per-model family list at the bottom, where the payload's shape
+    would put it: those are one model's budget, while this is a second
+    allowance for ordinary work. It is the line that says whether an account
+    the next line calls `Blocked` can still answer, so it is worth the space --
+    and the windows are formatted exactly like the plan's own, because that is
+    what it is being compared against.
+    """
+    state = block_state(view.raw, full_pct=full_pct)
+    verdict = style.red("spent") if state.blocked else style.green("available")
+    windows = " | ".join(format_window_line(style, w) for w in view.windows)
+
+    head = f"{style.magenta(LUNA_RESERVE_LABEL)} [{LUNA_RESERVE_MODEL}] ({verdict})"
+    return f"{head}: {windows or style.dim('no windows reported')}"
+
+
 def limit_is_interesting(view: LimitView, display: Display) -> bool:
     """Whether a non-default limit earns its line in the report.
 
@@ -641,11 +671,17 @@ def limit_is_interesting(view: LimitView, display: Display) -> bool:
 
 
 def reportable_limits(status: AuthStatus, display: Display) -> list[LimitView]:
+    #: The Reserve is dropped here because it has its own line above, not
+    #: because it is uninteresting -- printing it twice under two different
+    #: names is how it got mistaken for a per-model budget in the first place.
     effective = status_codex_limit(status)
+    reserve = luna_reserve_limit(status.rate_result)
     views = [
         view
         for view in limits_by_id(status.rate_result)
-        if view.raw is not effective and limit_is_interesting(view, display)
+        if view.raw is not effective
+        and view.raw is not reserve
+        and limit_is_interesting(view, display)
     ]
     return views
 
@@ -1529,6 +1565,10 @@ def print_rate_details(
 
     print(f"Credits: {format_credits(style, credits=credits)}")
 
+    reserve = luna_reserve_view(status.rate_result)
+    if reserve is not None:
+        print(format_luna_reserve_line(style, reserve, full_pct=display.full_pct))
+
     if display.reset_credits:
         credit_grants = reset_credits(status.rate_result)
         if credit_grants.available_count > 0:
@@ -1537,7 +1577,12 @@ def print_rate_details(
     if display.signals:
         state = status_block_state(status, display)
         if state.blocked:
-            print(f"Blocked: {style.red('; '.join(state.reasons))}")
+            #: `Blocked` is about the regular allowance alone, which reads as
+            #: "nothing works" unless the Reserve is named right there.
+            note = ""
+            if luna_reserve_is_available(status, display):
+                note = style.green(f" ({LUNA_RESERVE_LABEL} still available)")
+            print(f"Blocked: {style.red('; '.join(state.reasons))}{note}")
 
         upsell = status.rate_result.get("rateLimitUpsell") or limit.get("rateLimitUpsell")
         if upsell:
@@ -1810,6 +1855,10 @@ def quota_json(status: AuthStatus, display: Display) -> dict:
         "resetsAt": json_number(state.resets_at),
         "windows": [window_json(w, full_pct=display.full_pct) for w in view.windows],
     }
+
+    reserve = luna_reserve_json(status.rate_result, full_pct=display.full_pct)
+    if reserve is not None:
+        payload["lunaReserve"] = reserve
 
     if display.signals:
         payload["signals"] = signals_json(limit, status.rate_result)

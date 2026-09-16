@@ -44,6 +44,24 @@ LEGACY_WINDOW_ORDER = ("primary", "secondary")
 #: never allowed to decide whether an account is usable.
 DEFAULT_LIMIT_ID = "codex"
 
+#: The Luna Reserve: a second allowance, on its own meter, that stays usable
+#: after the regular one is spent. The payload reports it as just another
+#: per-model family -- ``limitId: base_model_inference``, ``limitName:
+#: gpt-reserve`` -- but it is not one. A per-model budget constrains a single
+#: model; this is a second budget for ordinary work, and ``gpt-reserve`` is
+#: also the slug a request must name to reach it.
+#:
+#: ``normalModelSlug`` reports ``gpt-5.6-luna``, the model the Reserve
+#: *presents* as. Requesting that slug bills the regular allowance and fails
+#: once it is spent, however much Reserve is left, so it is shown but never
+#: offered as the way in.
+#:
+#: Reserves are limited to selected accounts. Absence is ordinary, and callers
+#: must read "no Reserve" as exactly that, never as "Reserve spent".
+LUNA_RESERVE_LIMIT_ID = "base_model_inference"
+LUNA_RESERVE_MODEL = "gpt-reserve"
+LUNA_RESERVE_LABEL = "Luna Reserve"
+
 DEFAULT_FULL_PCT = 100.0
 
 
@@ -233,6 +251,67 @@ def limit_source(status: object) -> str | None:
     if unwrap_auth_envelope(data):
         return "authFiles"
     return None
+
+
+def is_luna_reserve(limit: object) -> bool:
+    """Whether a limit object is the Luna Reserve meter.
+
+    Matched on the limit *name* first, because ``gpt-reserve`` is the slug that
+    actually reaches the Reserve and so is the field least likely to be
+    renamed underneath us. ``base_model_inference`` is accepted as well, but
+    only as the id: it is generic enough that matching it against a name would
+    invite a false positive.
+    """
+    data = as_dict(limit)
+    name = data.get("limitName")
+    if isinstance(name, str) and name.strip().lower() == LUNA_RESERVE_MODEL:
+        return True
+    return data.get("limitId") == LUNA_RESERVE_LIMIT_ID
+
+
+def luna_reserve_limit(status: object) -> dict | None:
+    """The account's Luna Reserve meter, or ``None`` when it has none.
+
+    The default ``codex`` entry is skipped outright: whatever it reports, the
+    limit governing ordinary usage is not the Reserve, and letting it match
+    would turn the regular allowance into its own fallback.
+    """
+    by_id = as_dict(as_dict(status).get("rateLimitsByLimitId"))
+    for key in sorted(by_id):
+        limit = by_id[key]
+        if key == DEFAULT_LIMIT_ID or not isinstance(limit, dict):
+            continue
+        if is_luna_reserve(limit):
+            return limit
+    return None
+
+
+def luna_reserve_view(status: object) -> LimitView | None:
+    limit = luna_reserve_limit(status)
+    return None if limit is None else limit_view(limit)
+
+
+def luna_reserve_json(
+    status: object,
+    *,
+    full_pct: float = DEFAULT_FULL_PCT,
+) -> dict | None:
+    """The Reserve as a limit, plus the two things a consumer needs from it.
+
+    ``available`` is the whole point: an account whose ``quota.blocked`` is
+    true can still answer on the Reserve, and that is the flag that says so.
+    ``model`` carries the routing slug, since reaching the Reserve means
+    naming it rather than the model it presents as.
+    """
+    view = luna_reserve_view(status)
+    if view is None:
+        return None
+
+    payload = limit_json(view, full_pct=full_pct)
+    payload["label"] = LUNA_RESERVE_LABEL
+    payload["model"] = LUNA_RESERVE_MODEL
+    payload["available"] = not payload["blocked"]
+    return payload
 
 
 def limits_by_id(status: object) -> list[LimitView]:

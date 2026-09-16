@@ -93,6 +93,54 @@ or blocked -- so the common single-account report stays short. `--limits REGEX`
 matches a family by id or name (case-insensitive) and shows it regardless;
 `--no-show-limits` hides the non-idle ones too.
 
+One entry in there is not a per-model family at all and is reported separately;
+see "Luna Reserve" below.
+
+## Luna Reserve
+
+Some accounts carry a second allowance on its own weekly meter, the **Luna
+Reserve**, which stays usable after the regular one is spent. The payload
+reports it inside `rateLimitsByLimitId` like any per-model family -- `limitId:
+base_model_inference`, `limitName: gpt-reserve` -- but it is not one. A
+per-model budget constrains a single model; this is a second budget for
+ordinary work, and it is the answer to "the account says Blocked, now what".
+
+So it is lifted out of the family list at the bottom and printed beside the
+plan's own windows, with its windows formatted the same way, because that is
+what it is being compared against:
+
+`Luna Reserve [gpt-reserve] (available): Weekly: 1% used | resets in 6d 22h 40m (2026-09-23 16:47:31 +0200) | window 10080m`
+
+The verdict in parentheses is `available` or `spent`, by the same
+`--full-pct` rule as everything else. When the regular allowance is blocked and
+the Reserve is not, the `Blocked:` line says so rather than leaving the reader
+to reconcile two lines that appear to contradict each other.
+
+`gpt-reserve` in brackets is the **routing slug**, and the reason it is printed
+rather than the `normalModelSlug` the payload reports. `normalModelSlug` is
+`gpt-5.6-luna`, the model the Reserve *presents* as; requesting that slug bills
+the regular allowance and fails once it is spent, however much Reserve is left.
+Only `gpt-reserve` reaches the Reserve.
+
+The Reserve is limited to selected accounts. An account without one prints no
+line and carries no `lunaReserve` key, so consumers must read absence as "no
+Reserve", never as "Reserve spent".
+
+In JSON it is `quota.lunaReserve`: a limit object as under `quota.limits`, plus
+`label`, `model` (the routing slug) and `available`.
+
+**It does not make a blocked auth count as usable.** `quota.blocked`, `swap`
+eligibility and the reset arms all still speak for the regular allowance alone,
+because an ordinary request keeps failing while that is spent -- reaching the
+Reserve means naming `gpt-reserve`, which is the caller's decision and not
+something a status report can make on its behalf. The Reserve is reported here;
+acting on it is elsewhere.
+
+Identification matches `limitName` first, falling back to the
+`base_model_inference` id. The name is the slug that actually reaches the
+Reserve, so it is the field least likely to be renamed underneath us; the id is
+generic enough that matching it against a name would invite a false positive.
+
 ## Reset credits
 
 `rateLimitResetCredits` carries one-off "Full reset" grants that end a wait
