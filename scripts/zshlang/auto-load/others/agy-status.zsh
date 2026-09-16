@@ -609,14 +609,24 @@ function h-agy-status-source-line {
     local label="${1}" detail="${2:-}"
     assert-args label @RET
 
-    local c_label='' c_detail='' c_off=''
+    #: Dim, and deliberately not bold. It is provenance, not a finding: it
+    #: should be legible when looked for and invisible when the rows are what
+    #: you came for. Bold white put it *above* the numbers it annotates.
+    #:
+    #: `\e[2m' rather than a grey foreground, because dim is an attribute:
+    #: it composes with the blue below, and it recedes against whatever the
+    #: terminal's own background and palette happen to be -- a fixed grey only
+    #: recedes against the themes it was picked for.
+    local c_dim='' c_detail='' c_off=''
     if h-color-mode-p "${agy_status_color:-auto}" ; then
-        c_label="${fg_bold[white]}"
+        c_dim=$'\e[2m'
+        #: No attribute reset in `$fg[blue]' (it is a bare `\e[34m'), so the
+        #: dim above survives into the detail and one reset closes both.
         c_detail="${fg[blue]}"
         c_off="${reset_color}"
     fi
 
-    ec "${c_label}${label}${c_off}${detail:+ ${c_detail}(${detail})${c_off}}"
+    ec "${c_dim}${label}${detail:+ ${c_detail}(${detail})}${c_off}"
 }
 
 function h-agy-status-statusline {

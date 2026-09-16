@@ -144,11 +144,18 @@ agy (cache not valid JSON: /path/to/quota-cache.json)
 agy (deus)
 ```
 
-It is styled like the rows it introduces, and carries no function name. It
-used to be an `ecgray` line reading `h-agy-status-statusline: nothing in the
-cache is newer than 3600s; falling back to the slow path`, which read as a
-stray debug line above the answer rather than part of it -- and said in
-thirteen words what the second line above says in five.
+It is **dim**, and deliberately not bold: it is provenance, not a finding, so
+it should be legible when looked for and invisible when the rows are what you
+came for. Dim is applied as the SGR attribute `\e[2m` rather than as a grey
+foreground, so it composes with the blue detail beside it and recedes against
+whatever palette the terminal actually has -- a fixed grey only recedes
+against the themes it was chosen for.
+
+It carries no function name. It used to be an `ecgray` line reading
+`h-agy-status-statusline: nothing in the cache is newer than 3600s; falling
+back to the slow path`, which read as a stray debug line above the answer
+rather than part of it -- and said in thirteen words what the second line
+above says in five.
 
 The age is printed at one unit of precision by `h-agy-status-age-fmt` rather
 than through `seconds-fmt-short`: three units (`0h:1m:37s`) is right for a
