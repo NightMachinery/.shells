@@ -199,6 +199,13 @@ My STT software inserts its dictated text in markdown code blocks with the langu
 
 - Use the skill `org-beamer-slides` to create concise slides for the user to consume dense information. E.g., you want to teach them some concept, a paper, a report, etc. Things less than 3 paragraphs long should probably be written as text.
 
+## Clear Writing
+
+Whenever you encounter a concept that will be repeated, you should NAME it. Either use previously known jargon and introduce the definition at first use, or invent a new term and define it. 
+This keeps the writing concise and clear.
+Avoid using implicitly-defined English as jargon!
+If in doubt, always briefly say what you mean by that term first.
+
 # Subagent Delegation
 
 If you are an expensive model (e.g., Fable or Astra), start by reading the delegate-weaker skill.
