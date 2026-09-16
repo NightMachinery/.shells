@@ -702,6 +702,41 @@ RESET_CREDIT_URGENCY = (
 )
 
 
+def format_upsell(style: Style, upsell: object) -> str | None:
+    """The upsell banner as one line, rather than a raw dict repr.
+
+    The payload is a UI banner -- title, description, buttons, presentation --
+    and printing it verbatim put a nested Python dict in the middle of the
+    report for the sake of one sentence.
+
+    The description is dropped outright. Its `{time}` placeholder is never
+    substituted, and the only fact under it is the reset the report has
+    already printed, in local time, two lines up.
+    """
+    data = upsell if isinstance(upsell, dict) else {}
+    if not data:
+        return None
+
+    title = data.get("title")
+    text = title.strip() if isinstance(title, str) and title.strip() else None
+    if text is None:
+        kind = data.get("banner_type")
+        text = str(kind).strip() if kind else None
+    if not text:
+        return None
+
+    raw_ctas = data.get("ctas")
+    actions = [
+        cta["label"].strip()
+        for cta in (raw_ctas if isinstance(raw_ctas, list) else [])
+        if isinstance(cta, dict)
+        and isinstance(cta.get("label"), str)
+        and cta["label"].strip()
+    ]
+    suffix = f" [{' / '.join(actions)}]" if actions else ""
+    return style.dim(f"Upsell: {text}{suffix}")
+
+
 def format_expiry(style: Style, expires_at: float, *, now: float | None = None) -> str:
     """An expiry, coloured by how little time is left.
 
@@ -1584,9 +1619,12 @@ def print_rate_details(
                 note = style.green(f" ({LUNA_RESERVE_LABEL} still available)")
             print(f"Blocked: {style.red('; '.join(state.reasons))}{note}")
 
-        upsell = status.rate_result.get("rateLimitUpsell") or limit.get("rateLimitUpsell")
+        upsell = format_upsell(
+            style,
+            status.rate_result.get("rateLimitUpsell") or limit.get("rateLimitUpsell"),
+        )
         if upsell:
-            print(style.dim(f"Upsell: {upsell}"))
+            print(upsell)
 
     for view in reportable_limits(status, display):
         print(format_limit_line(style, view))

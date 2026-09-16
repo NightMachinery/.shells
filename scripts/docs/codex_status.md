@@ -72,6 +72,13 @@ A blocked auth's deadline is the **latest** reset among its blocked windows, not
 the earliest: a 5-hour window rolling over buys nothing while the weekly window
 is still spent.
 
+`rateLimitUpsell` is a UI banner rather than usage data, so it prints as its
+title and button labels on one dim line, not as the raw object -- a nested dict
+repr in the middle of the report cost far more room than its one sentence was
+worth. The description is dropped: its `{time}` placeholder is never
+substituted, and the only fact under it is the reset already printed above, in
+local time. The banner survives verbatim in JSON under `quota.signals`.
+
 `--full-pct` lowers the threshold at which a window counts as spent. It is the
 supported way to exercise the blocked/exhausted paths without running an account
 dry, and it shares the `codex_status_arm_full_pct` environment variable with the
