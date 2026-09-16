@@ -116,10 +116,13 @@ what it is being compared against:
 
 `Luna Reserve [gpt-reserve] (available): Weekly: 1% used | resets in 6d 22h 40m (2026-09-23 16:47:31 +0200) | window 10080m`
 
-The verdict in parentheses is `available` or `spent`, by the same
-`--full-pct` rule as everything else. When the regular allowance is blocked and
-the Reserve is not, the `Blocked:` line says so rather than leaving the reader
-to reconcile two lines that appear to contradict each other.
+Only the bad news is tagged: a spent Reserve gets `(spent)`, by the same
+`--full-pct` rule as everything else, and an available one gets nothing.
+`available` beside `1% used` says nothing the percentage has not already said,
+and tagging both states trains the eye to skip the tag -- which is the one that
+matters. The `Blocked:` line is the exception and does say "Luna Reserve still
+available", because there it contradicts the verdict beside it rather than
+repeating a number.
 
 `gpt-reserve` in brackets is the **routing slug**, and the reason it is printed
 rather than the `normalModelSlug` the payload reports. `normalModelSlug` is
@@ -145,6 +148,13 @@ Identification matches `limitName` first, falling back to the
 `base_model_inference` id. The name is the slug that actually reaches the
 Reserve, so it is the field least likely to be renamed underneath us; the id is
 generic enough that matching it against a name would invite a false positive.
+
+## Credits
+
+`Credits:` is printed only when there are credits: `available (balance: 42)`,
+or `unlimited`. An account with none is the ordinary case, and `none (balance:
+0)` spent a line on every report saying so. Same rule as the reset-credit
+grants and the per-model families -- absent unless there is something there.
 
 ## Reset credits
 

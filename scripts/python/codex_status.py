@@ -644,11 +644,14 @@ def format_luna_reserve_line(style: Style, view: LimitView, *, full_pct: float) 
     and the windows are formatted exactly like the plan's own, because that is
     what it is being compared against.
     """
+    #: Only the bad news is tagged. "available" beside "1% used" says nothing
+    #: the percentage has not already said, and a line that tags both states
+    #: trains the eye to skip the tag -- which is the one that matters.
     state = block_state(view.raw, full_pct=full_pct)
-    verdict = style.red("spent") if state.blocked else style.green("available")
+    verdict = f" ({style.red('spent')})" if state.blocked else ""
     windows = " | ".join(format_window_line(style, w) for w in view.windows)
 
-    head = f"{style.magenta(LUNA_RESERVE_LABEL)} [{LUNA_RESERVE_MODEL}] ({verdict})"
+    head = f"{style.magenta(LUNA_RESERVE_LABEL)} [{LUNA_RESERVE_MODEL}]{verdict}"
     return f"{head}: {windows or style.dim('no windows reported')}"
 
 
@@ -733,9 +736,16 @@ def format_reset_credits(style: Style, credits: ResetCredits) -> str:
     return text
 
 
-def format_credits(style: Style, *, credits: dict | None) -> str:
+def format_credits(style: Style, *, credits: dict | None) -> str | None:
+    """The credits line, or ``None`` when there are none to report.
+
+    An account with no credits is the ordinary case, and `Credits: none
+    (balance: 0)` spent a line saying so on every report. Same rule as the
+    reset-credit grants and the per-model families: absent unless there is
+    something there.
+    """
     if not isinstance(credits, dict):
-        return style.dim("n/a")
+        return None
 
     unlimited = credits.get("unlimited")
     has_credits = credits.get("hasCredits")
@@ -746,7 +756,7 @@ def format_credits(style: Style, *, credits: dict | None) -> str:
     elif has_credits:
         base = style.green("available")
     else:
-        base = style.red("none")
+        return None
 
     if balance not in (None, ""):
         return f"{base} (balance: {balance})"
@@ -1563,7 +1573,9 @@ def print_rate_details(
     else:
         print(f"Windows: {style.dim('none reported')}")
 
-    print(f"Credits: {format_credits(style, credits=credits)}")
+    credits_line = format_credits(style, credits=credits)
+    if credits_line is not None:
+        print(f"Credits: {credits_line}")
 
     reserve = luna_reserve_view(status.rate_result)
     if reserve is not None:
