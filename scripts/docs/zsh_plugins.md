@@ -10,13 +10,22 @@ Selected directories under `scripts/zshlang/` are structured as installable Zsh 
 - Public plugin dependencies should be documented in each plugin README.
 - Local loading should use an explicit list of desired plugins, not a broad glob over every public plugin.
 
-## Bash compatibility
+## Bash compatibility, and why it is an exception
 
-A few files under `zshlang/` are sourced by bash as well as zsh: `~/.bashrc`
-bootstraps itself from `zshlang/basic/conditions.zsh`, so a bash shell gets the
-same predicates ([agfi:isI], [agfi:isBash], [agfi:isDarwin]) as a zsh one. Such
-a file declares the contract in its own header, as a `### BASH COMPATIBLE`
-comment. `conditions.zsh` and `conditions-personal.zsh` carry it today.
+Nearly nothing here is bash-compatible, and nothing here should be. Two files
+out of some 450 under `zshlang/` carry the contract below; everywhere else,
+write whatever zsh you like -- globs, `(N)` qualifiers, `${x:h}`, anonymous
+functions -- and do not think about bash at all. Adding the marker to a file
+bash does not source buys nothing and forfeits half the language.
+
+The exception exists because `~/.bashrc` bootstraps itself from
+`zshlang/basic/conditions.zsh`, so a bash shell gets the same predicates
+([agfi:isI], [agfi:isBash], [agfi:isDarwin]) as a zsh one, and the
+predicates are defined once rather than reimplemented in bash. A file under
+the contract declares it in its own header, as a `### BASH COMPATIBLE`
+comment. `conditions.zsh` and `conditions-personal.zsh` carry it today. Add
+the marker only when bash genuinely sources the file -- it is a statement of
+fact about how the file is loaded, not a quality to aim for.
 
 Inside one, write only syntax both shells accept. Glob alternation is the easy
 mistake: `[[ "$x" == (a|b)* ]]` is zsh-only and bash rejects it, where two
