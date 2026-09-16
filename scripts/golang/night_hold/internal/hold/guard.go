@@ -120,13 +120,14 @@ func (s Store) keepalive(h Hold, now time.Time) {
 		return
 	}
 	_, _ = s.Acquire(AcquireOpts{
-		Resource: h.Resource,
-		Holder:   h.Holder,
-		TTL:      h.TTL,
-		Reason:   h.Reason,
-		Matches:  h.Matches,
-		Shared:   h.Mode == ModeShared,
-		Now:      now,
+		BestEffort: true,
+		Resource:   h.Resource,
+		Holder:     h.Holder,
+		TTL:        h.TTL,
+		Reason:     h.Reason,
+		Matches:    h.Matches,
+		Shared:     h.Mode == ModeShared,
+		Now:        now,
 	})
 }
 

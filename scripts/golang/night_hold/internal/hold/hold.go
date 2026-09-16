@@ -295,7 +295,15 @@ type AcquireOpts struct {
 	Matches  []string
 	Shared   bool
 	Now      time.Time
+	// BestEffort marks a caller that would rather skip than wait: the guard
+	// refreshing its own deadline, and the idle refresh. They run on paths
+	// where blocking would be felt, and there is always a next chance.
+	BestEffort bool
 }
+
+// errBusy means another process is mid-acquire on this resource. Only a
+// best-effort caller ever sees it, and the right response is to do nothing.
+var errBusy = errors.New("another acquire is in progress")
 
 // ErrHeld is returned when an exclusive resource is already held by someone
 // else. It carries the blocking hold so the caller can say who and for how long.
@@ -369,7 +377,7 @@ func (s Store) Acquire(o AcquireOpts) (Hold, error) {
 	}
 
 	var h Hold
-	err := withResourceLock(s.dirFor(canonical), func() error {
+	err := withResourceLock(s.dirFor(canonical), !o.BestEffort, func() error {
 		var err error
 		h, err = s.acquireLocked(canonical, mode, o, now)
 		return err
@@ -575,13 +583,14 @@ func (s Store) Refresh(c Caller, now time.Time) ([]Hold, error) {
 			continue
 		}
 		refreshed, err := s.Acquire(AcquireOpts{
-			Resource: h.Resource,
-			Holder:   h.Holder,
-			TTL:      h.TTL,
-			Reason:   h.Reason,
-			Matches:  h.Matches,
-			Shared:   h.Mode == ModeShared,
-			Now:      now,
+			BestEffort: true,
+			Resource:   h.Resource,
+			Holder:     h.Holder,
+			TTL:        h.TTL,
+			Reason:     h.Reason,
+			Matches:    h.Matches,
+			Shared:     h.Mode == ModeShared,
+			Now:        now,
 		})
 		if err != nil {
 			continue // best effort; a hook must never fail over this
