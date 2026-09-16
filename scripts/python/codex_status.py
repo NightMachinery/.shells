@@ -337,8 +337,8 @@ def parse_args(argv: list[str] | None = None) -> ParsedArgs:
         action=argparse.BooleanOptionalAction,
         default=True,
         help=(
-            "Show blocking signals and upsells. Display only: they still decide "
-            "whether an auth is usable (default: %(default)s)."
+            "Show blocking signals. Display only: they still decide whether an "
+            "auth is usable (default: %(default)s)."
         ),
     )
     parser.add_argument(
@@ -700,41 +700,6 @@ RESET_CREDIT_URGENCY = (
     (7, lambda style, text: style.red(text)),
     (14, lambda style, text: style.yellow(text)),
 )
-
-
-def format_upsell(style: Style, upsell: object) -> str | None:
-    """The upsell banner as one line, rather than a raw dict repr.
-
-    The payload is a UI banner -- title, description, buttons, presentation --
-    and printing it verbatim put a nested Python dict in the middle of the
-    report for the sake of one sentence.
-
-    The description is dropped outright. Its `{time}` placeholder is never
-    substituted, and the only fact under it is the reset the report has
-    already printed, in local time, two lines up.
-    """
-    data = upsell if isinstance(upsell, dict) else {}
-    if not data:
-        return None
-
-    title = data.get("title")
-    text = title.strip() if isinstance(title, str) and title.strip() else None
-    if text is None:
-        kind = data.get("banner_type")
-        text = str(kind).strip() if kind else None
-    if not text:
-        return None
-
-    raw_ctas = data.get("ctas")
-    actions = [
-        cta["label"].strip()
-        for cta in (raw_ctas if isinstance(raw_ctas, list) else [])
-        if isinstance(cta, dict)
-        and isinstance(cta.get("label"), str)
-        and cta["label"].strip()
-    ]
-    suffix = f" [{' / '.join(actions)}]" if actions else ""
-    return style.dim(f"Upsell: {text}{suffix}")
 
 
 def format_expiry(style: Style, expires_at: float, *, now: float | None = None) -> str:
@@ -1618,13 +1583,6 @@ def print_rate_details(
             if luna_reserve_is_available(status, display):
                 note = style.green(f" ({LUNA_RESERVE_LABEL} still available)")
             print(f"Blocked: {style.red('; '.join(state.reasons))}{note}")
-
-        upsell = format_upsell(
-            style,
-            status.rate_result.get("rateLimitUpsell") or limit.get("rateLimitUpsell"),
-        )
-        if upsell:
-            print(upsell)
 
     for view in reportable_limits(status, display):
         print(format_limit_line(style, view))
