@@ -1,0 +1,68 @@
+#+TITLE: night_hold — deferred work
+
+Both items are deliberate deferrals, not oversights. Recorded here so the
+reasoning survives; see [[zf:~\[scripts\]/docs/holds.md][docs/holds.md]] for
+how the thing works today.
+
+* Extract into a standalone, shareable repository
+
+Nothing in the binary or in the =hold-*= commands is personal, so they could
+live in their own GitHub repository and be usable by anyone. The precedent is
+=zshlang/plugins/agent-session/=, already a zsh plugin backed by a =golang/=
+binary; the =zsh-plugin-authoring= skill describes the shape.
+
+The split falls out cleanly, which is the main argument for doing it:
+
+- *Portable*: the =night_hold= binary, the =hold-*= commands, the PreToolUse
+  guard, =docs/holds.md=. =Canonical= already handles =~/= and =$HOME= in Go,
+  and the only personal thing is the =hold_dir= default, already overridable.
+- *Stays in this repository*: the =hs-reload-*= wrappers,
+  =hammerspoon/core/reload.lua=, and the =--match "vcsh night.sh"= advice for
+  this vcsh checkout. These layer on top, loaded after the shared plugin.
+
+The one real seam is [[agfi:path-unabbrev]]: =~[nt]= resolution goes through
+[[agfi:aliasdir]], which is personal. That is already on the right side of the
+line — the shared wrapper should degrade to plain =~= and absolute paths when
+=path-unabbrev= is undefined, and this repository keeps the richer behaviour by
+having it defined.
+
+Costs to weigh when the time comes: a second repository to version, a
+submodule-or-vendor decision for the Go source, and =go install= as a real
+barrier for anyone else. The =zsh-plugin-authoring= skill's own warning applies
+— subdirectory distribution keeps one source of truth but is an explicit
+installation dependency, not something to fetch at launch.
+
+*Deferred because* extraction is a move rather than a design change, and the
+boundary is easier to draw correctly once the one non-portable consumer (the
+Hammerspoon fold) exists to draw it against.
+
+* Enforce holds for Codex and Antigravity, not only Claude Code
+
+Partly already true. [[agfi:h-hold-holder]] and =Holder()= read
+=CODEX_THREAD_ID= and =ANTIGRAVITY_CONVERSATION_ID= alongside
+=CLAUDE_CODE_SESSION_ID=, so a hold taken from any of the three is already
+attributed to the right session and released by it.
+
+Two gaps:
+
+- *Enforcement.* The guard is wired as a Claude Code =PreToolUse= hook. Codex
+  and =agy= have their own hook mechanisms, or none; each needs its own
+  adapter, and =night_hold guard= would need to accept their payload shapes
+  rather than only Claude's. That is the real work.
+- *Liveness.* [[agfi:agentPID]] trusts =CLAUDE_PID=, which Claude Code exports
+  and the other two do not appear to. They degrade to the deadline, which is
+  safe and is simply the behaviour everything had before liveness existed. The
+  generic escape hatch is =hold_agent_pid=: any launcher that knows a
+  long-lived pid can export it and get early reaping for free.
+
+*Deferred because* the useful ordering is one agent working end to end before
+generalizing, and because the payload shapes should be read from those tools
+rather than guessed.
+
+* Offered and not taken: an audit log
+
+An append-only log of acquires and releases under =${hold_dir}/.log= would
+answer "why was I blocked at 14:32" and "who has been sitting on this all day".
+Cheap, but it needs trimming, and denials must stay off it: the guard runs
+before every tool call and should not be writing there. Revisit if a hold ever
+goes missing and nobody can say why.

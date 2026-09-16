@@ -1,0 +1,291 @@
+package hold
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+func testStore(t *testing.T) Store {
+	t.Helper()
+	return Store{Root: t.TempDir()}
+}
+
+func mustAcquire(t *testing.T, s Store, o AcquireOpts) Hold {
+	t.Helper()
+	h, err := s.Acquire(o)
+	if err != nil {
+		t.Fatalf("acquire %+v: %v", o, err)
+	}
+	return h
+}
+
+func TestCanonicalCollapsesSpellings(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	target := filepath.Join(home, "scripts")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	want := Canonical("repo:" + target)
+	for _, spelling := range []string{
+		"repo:~/scripts",
+		"repo:" + target,
+		"repo:" + target + "/",
+		"repo:" + filepath.Join(target, "sub", ".."),
+		"repo:$HOME/scripts",
+	} {
+		if got := Canonical(spelling); got != want {
+			t.Errorf("Canonical(%q) = %q, want %q", spelling, got, want)
+		}
+	}
+}
+
+func TestCanonicalLeavesNonPathsAlone(t *testing.T) {
+	for _, r := range []string{"gpu:0", "service:garden", "plain"} {
+		if got := Canonical(r); got != r {
+			t.Errorf("Canonical(%q) = %q, want it untouched", r, got)
+		}
+	}
+	if p := PathPart("gpu:0"); p != "" {
+		t.Errorf("PathPart(gpu:0) = %q, want empty: 0 is not a filesystem extent", p)
+	}
+}
+
+func TestExclusiveRefusesSecondHolder(t *testing.T) {
+	s := testStore(t)
+	mustAcquire(t, s, AcquireOpts{Resource: "repo:/tmp/x", Holder: "a", Reason: "first"})
+
+	_, err := s.Acquire(AcquireOpts{Resource: "repo:/tmp/x", Holder: "b"})
+	var held ErrHeld
+	if !asErrHeld(err, &held) {
+		t.Fatalf("second holder got %v, want ErrHeld", err)
+	}
+	if held.By.Holder != "a" || held.By.Reason != "first" {
+		t.Errorf("ErrHeld names %q/%q, want a/first", held.By.Holder, held.By.Reason)
+	}
+}
+
+func TestExclusiveReacquireByOwnerRenews(t *testing.T) {
+	s := testStore(t)
+	now := time.Now()
+	first := mustAcquire(t, s, AcquireOpts{Resource: "gpu:0", Holder: "a", TTL: time.Minute, Now: now})
+	second := mustAcquire(t, s, AcquireOpts{Resource: "gpu:0", Holder: "a", TTL: time.Hour, Now: now})
+
+	if !second.Until.After(first.Until) {
+		t.Error("re-acquiring my own hold should push the deadline out")
+	}
+	if !second.Acquired.Equal(first.Acquired) {
+		t.Error("a renewal should keep the original start time")
+	}
+}
+
+func TestSharedWelcomesOtherHolders(t *testing.T) {
+	s := testStore(t)
+	mustAcquire(t, s, AcquireOpts{Resource: "service:hs-reload", Holder: "a", Shared: true})
+	mustAcquire(t, s, AcquireOpts{Resource: "service:hs-reload", Holder: "b", Shared: true})
+
+	live, err := s.Live(Canonical("service:hs-reload"), time.Now(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(live) != 2 {
+		t.Fatalf("got %d holders, want 2: a shared hold is what several agents suppressing one reloader needs", len(live))
+	}
+}
+
+func TestModesMayNotBeMixed(t *testing.T) {
+	s := testStore(t)
+	mustAcquire(t, s, AcquireOpts{Resource: "service:x", Holder: "a", Shared: true})
+
+	if _, err := s.Acquire(AcquireOpts{Resource: "service:x", Holder: "b"}); err == nil {
+		t.Error("an exclusive acquire over a shared hold should be refused, not guessed at")
+	}
+}
+
+func TestExpiredHoldIsIgnoredAndReaped(t *testing.T) {
+	s := testStore(t)
+	past := time.Now().Add(-2 * time.Hour)
+	h := mustAcquire(t, s, AcquireOpts{Resource: "repo:/tmp/x", Holder: "dead", TTL: time.Minute, Now: past})
+
+	if _, err := s.Acquire(AcquireOpts{Resource: "repo:/tmp/x", Holder: "live"}); err != nil {
+		t.Fatalf("an expired hold must not block: %v", err)
+	}
+	if _, err := os.Stat(h.file); !os.IsNotExist(err) {
+		t.Error("the expired holder file should have been reaped")
+	}
+}
+
+func TestCorruptHoldIsNotAnEternalHold(t *testing.T) {
+	s := testStore(t)
+	dir := s.dirFor(Canonical("repo:/tmp/x"))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "garbage"), []byte("nonsense\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.Acquire(AcquireOpts{Resource: "repo:/tmp/x", Holder: "live"}); err != nil {
+		t.Fatalf("a file with no readable deadline is a corpse, not a hold: %v", err)
+	}
+}
+
+func TestReleaseOfSomeoneElsesIsRefused(t *testing.T) {
+	s := testStore(t)
+	mustAcquire(t, s, AcquireOpts{Resource: "repo:/tmp/x", Holder: "a"})
+
+	if _, err := s.Release("repo:/tmp/x", "b", time.Time{}); err == nil {
+		t.Error("releasing another session's hold would open the resource under whoever is still working")
+	}
+	if _, err := s.Release("repo:/tmp/x", "a", time.Time{}); err != nil {
+		t.Errorf("the holder must be able to release: %v", err)
+	}
+}
+
+func TestRenewCarriesMatchesAndDoesNotDuplicatePathMatches(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	s := testStore(t)
+	target := filepath.Join(home, "scripts")
+
+	mustAcquire(t, s, AcquireOpts{
+		Resource: "repo:" + target, Holder: "a", Reason: "rewrite",
+		Matches: []string{"vcsh night.sh"},
+	})
+	for i := 0; i < 3; i++ {
+		if _, err := s.Renew("repo:"+target, "a", time.Hour, time.Time{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	live, _ := s.Live(Canonical("repo:"+target), time.Now(), false)
+	if len(live) != 1 {
+		t.Fatalf("got %d holds, want 1", len(live))
+	}
+	h := live[0]
+	if h.Reason != "rewrite" {
+		t.Errorf("renew dropped the reason: %q", h.Reason)
+	}
+	if len(h.Matches) != 1 || h.Matches[0] != "vcsh night.sh" {
+		t.Errorf("renew must not narrow what is protected: %v", h.Matches)
+	}
+	if len(h.PathMatches) != 2 {
+		t.Errorf("path matches accumulated across renewals: %v", h.PathMatches)
+	}
+}
+
+func TestCheckSemantics(t *testing.T) {
+	s := testStore(t)
+	mustAcquire(t, s, AcquireOpts{Resource: "repo:/tmp/x", Holder: "a"})
+
+	if ok, _ := s.Check("repo:/tmp/x", "a", false, time.Time{}); !ok {
+		t.Error("my own hold should not block me")
+	}
+	if ok, _ := s.Check("repo:/tmp/x", "b", false, time.Time{}); ok {
+		t.Error("another session's exclusive hold should block me")
+	}
+	if ok, _ := s.Check("repo:/tmp/free", "b", false, time.Time{}); !ok {
+		t.Error("a free resource should not block me")
+	}
+}
+
+// Two processes both reading "free" and both writing is the bug flock exists to
+// stop. Goroutines are a weaker test than processes -- they share the lock file
+// descriptor table -- but they still catch a missing critical section.
+func TestConcurrentAcquireProducesOneHolder(t *testing.T) {
+	s := testStore(t)
+	const n = 16
+
+	var wg sync.WaitGroup
+	won := make([]bool, n)
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			_, err := s.Acquire(AcquireOpts{
+				Resource: "repo:/tmp/race",
+				Holder:   string(rune('a' + i)),
+			})
+			won[i] = err == nil
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	count := 0
+	for _, w := range won {
+		if w {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("%d of %d concurrent acquires succeeded; an exclusive hold must have exactly one holder", count, n)
+	}
+}
+
+func TestDeadlineIsAlsoInTheMtimeForLua(t *testing.T) {
+	s := testStore(t)
+	h := mustAcquire(t, s, AcquireOpts{Resource: "service:hs-reload", Holder: "a", TTL: time.Hour, Shared: true})
+
+	fi, err := os.Stat(h.file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// hammerspoonReloadHeldBy() answers by statting, never by parsing.
+	if !fi.ModTime().Equal(h.Until.Truncate(time.Second)) && fi.ModTime().Unix() != h.Until.Unix() {
+		t.Errorf("mtime %v does not carry the deadline %v", fi.ModTime(), h.Until)
+	}
+	if !fi.ModTime().After(time.Now()) {
+		t.Error("a live hold's mtime must be in the future: that is the whole test Lua does")
+	}
+}
+
+func TestParseDuration(t *testing.T) {
+	cases := map[string]time.Duration{
+		"90s": 90 * time.Second,
+		"30m": 30 * time.Minute,
+		"2h":  2 * time.Hour,
+		"3d":  72 * time.Hour,
+		"45":  45 * time.Second,
+	}
+	for in, want := range cases {
+		got, err := ParseDuration(in)
+		if err != nil || got != want {
+			t.Errorf("ParseDuration(%q) = %v, %v; want %v", in, got, err, want)
+		}
+	}
+	if _, err := ParseDuration("banana"); err == nil {
+		t.Error("ParseDuration should reject nonsense")
+	}
+}
+
+func TestStatusIsQuietWhenNothingIsHeld(t *testing.T) {
+	s := testStore(t)
+	all, err := s.All(time.Now(), true)
+	if err != nil || len(all) != 0 {
+		t.Errorf("All on an empty store = %v, %v", all, err)
+	}
+}
+
+func TestSlugCannotEscapeTheStore(t *testing.T) {
+	for _, r := range []string{"repo:/a/../../etc", "x/../../y", "../../z"} {
+		if strings.Contains(Slug(r), "/") {
+			t.Errorf("Slug(%q) = %q contains a separator", r, Slug(r))
+		}
+	}
+}
+
+func asErrHeld(err error, target *ErrHeld) bool {
+	if e, ok := err.(ErrHeld); ok {
+		*target = e
+		return true
+	}
+	return false
+}
