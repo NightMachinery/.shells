@@ -83,6 +83,26 @@ declare a hold dead. Claude Code exports `CLAUDE_PID`; anything else can export
 exactly the behaviour this had before liveness existed. PID reuse can make a
 dead holder look alive, which fails in the safe direction.
 
+### Who "you" are
+
+The holder is the agent session id, and that is **not stable**: a compaction or
+a resume starts a new one while the process, the working directory and the
+intent all stay the same. Left there, an agent gets denied its own repository
+by its own hold and cannot even release it. This is not theoretical — the
+session that built this watched its own id change underneath it and was told to
+pass `--holder`.
+
+So a hold is yours if the holder id matches *or* if it records the same agent
+pid on the same host. The pid survives what the session id does not, and the
+guard inherits `CLAUDE_PID` from the agent that spawns it, so this works at the
+point it matters most.
+
+Naming a holder explicitly — `--holder`, or `$hold_holder` — deliberately turns
+the pid half off. Naming one means "act as exactly this holder", which is how a
+shell impersonates another session, in tests and when deliberately clearing
+someone else's hold; letting the pid override that would make the override
+unusable from the one machine it is ever used from.
+
 **Keepalive** extends a hold while its holder is working. The guard runs before
 every tool call, and when the caller owns a hold it pushes the deadline out —
 only once less than half the window remains, so this costs a handful of writes

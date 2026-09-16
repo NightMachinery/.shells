@@ -79,9 +79,13 @@ func (s Store) Guard(r io.Reader, now time.Time) Decision {
 		return Decision{}
 	}
 
-	me := sanitizeHolder(p.SessionID)
+	// The guard inherits the agent's environment, so it can use the pid
+	// identity too -- which matters most here: after a compaction the payload
+	// carries a session id the hold has never seen, and without this the agent
+	// is denied its own repository by its own hold.
+	c := GuardCaller(sanitizeHolder(p.SessionID))
 	for _, h := range holds {
-		if h.Holder == me {
+		if h.Mine(c) {
 			// This caller is alive and working, which is the only evidence a
 			// hold's deadline ever really wanted.
 			s.keepalive(h, now)

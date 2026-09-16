@@ -27,6 +27,8 @@ func guardStore(t *testing.T) (Store, string) {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
 	s := Store{Root: filepath.Join(home, ".night-holds")}
 	held := filepath.Join(home, "tmp-holdtest")
 
@@ -141,6 +143,8 @@ func TestUnderPathIsNotAPrefixTest(t *testing.T) {
 func TestNonPathResourceBlocksNothingByDefault(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
 	s := Store{Root: filepath.Join(home, ".night-holds")}
 	if _, err := s.Acquire(AcquireOpts{Resource: "gpu:0", Holder: "a", Reason: "training"}); err != nil {
 		t.Fatal(err)

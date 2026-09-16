@@ -66,3 +66,61 @@ func thisHost() string {
 	n, _ := os.Hostname()
 	return n
 }
+
+// Caller is who is asking, for Mine.
+type Caller struct {
+	Holder  string
+	PID     int
+	PIDKind string
+	Host    string
+}
+
+// Mine reports whether a hold belongs to the caller.
+//
+// The holder id is the agent *session* id, and that is not stable: a
+// compaction or a resume starts a new one while the process, the working
+// directory and the intent all stay the same. Observed, not theorised -- the
+// session that built this watched its own id change underneath it, and was
+// then refused a release of its own hold and told to pass --holder.
+//
+// The agent pid survives what the session id does not, so it is the stronger
+// identity and is checked as well. Both sides must be a pid worth trusting and
+// on the same host, for the same reasons Dead insists on.
+func (h Hold) Mine(c Caller) bool {
+	if c.Holder != "" && h.Holder == c.Holder {
+		return true
+	}
+	return c.PIDKind == pidAgent && h.PIDKind == pidAgent &&
+		c.PID > 0 && h.PID == c.PID &&
+		h.Host != "" && h.Host == c.Host
+}
+
+// callerFor is the identity of a command-line caller.
+//
+// An explicit holder -- from --holder or $hold_holder -- deliberately drops the
+// pid identity. Naming a holder means "act as exactly this one", which is how a
+// shell impersonates another session: in tests, and when deliberately clearing
+// a hold that is not yours. Letting the pid override that would make the
+// override unusable from the machine that owns the hold, which is the only
+// machine it is ever used from.
+func callerFor(explicit string) Caller {
+	if explicit != "" || os.Getenv("hold_holder") != "" {
+		if explicit == "" {
+			explicit = Holder()
+		}
+		return Caller{Holder: explicit}
+	}
+	pid, kind := agentPID()
+	return Caller{Holder: Holder(), PID: pid, PIDKind: kind, Host: thisHost()}
+}
+
+// GuardCaller is the identity of the PreToolUse guard.
+//
+// Unlike callerFor, the session id here is never an impersonation -- it is the
+// current, fickle name for this very process -- so the pid identity is kept.
+// It is what stops an agent being denied its own repository by its own hold
+// after a compaction.
+func GuardCaller(sessionHolder string) Caller {
+	pid, kind := agentPID()
+	return Caller{Holder: sessionHolder, PID: pid, PIDKind: kind, Host: thisHost()}
+}

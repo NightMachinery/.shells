@@ -11,6 +11,12 @@ import (
 
 func testStore(t *testing.T) Store {
 	t.Helper()
+	// These tests run inside an agent, which exports its own pid. Left set,
+	// every hold a test writes carries *this* process's pid and so is "mine"
+	// to every other test, and impersonating a second session becomes
+	// impossible. Liveness tests opt back in explicitly.
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
 	return Store{Root: t.TempDir()}
 }
 

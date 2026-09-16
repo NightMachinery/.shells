@@ -1,6 +1,7 @@
 package hold
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -17,9 +18,9 @@ func TestDeadAgentIsReapedBeforeItsDeadline(t *testing.T) {
 		t.Skipf("cannot start a helper process: %v", err)
 	}
 	pid := cmd.Process.Pid
-	t.Setenv("hold_agent_pid", strconv.Itoa(pid))
-
 	s := testStore(t)
+	// After testStore, which clears these so the rest of the suite is hermetic.
+	t.Setenv("hold_agent_pid", strconv.Itoa(pid))
 	h := mustAcquire(t, s, AcquireOpts{
 		Resource: "repo:/tmp/x", Holder: "agent", TTL: time.Hour, Reason: "long job",
 	})
@@ -74,6 +75,8 @@ func TestHoldFromAnotherHostIsNeverDeclaredDead(t *testing.T) {
 func TestKeepaliveExtendsAnActiveHoldersDeadline(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
 	s := Store{Root: filepath.Join(home, ".night-holds")}
 	held := filepath.Join(home, "repo")
 
@@ -102,6 +105,8 @@ func TestKeepaliveExtendsAnActiveHoldersDeadline(t *testing.T) {
 func TestKeepaliveDoesNotReviveSomeoneElsesHold(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
 	s := Store{Root: filepath.Join(home, ".night-holds")}
 	held := filepath.Join(home, "repo")
 
@@ -161,5 +166,63 @@ func TestAcquireWaitGivesUpAtTheBudget(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > 2*time.Second {
 		t.Errorf("waited %v, well past the budget", elapsed)
+	}
+}
+
+// A compaction gives the session a new id while the process, the working
+// directory and the intent stay the same. Without the pid identity the agent is
+// denied its own repository by its own hold, and cannot release it either --
+// which is exactly what happened to the session that wrote this.
+func TestCompactionDoesNotLockAnAgentOutOfItsOwnHold(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("hold_agent_pid", strconv.Itoa(os.Getpid()))
+	s := Store{Root: filepath.Join(home, ".night-holds")}
+	held := filepath.Join(home, "repo")
+
+	if _, err := s.Acquire(AcquireOpts{
+		Resource: "repo:" + held, Holder: "session-before-compaction", TTL: time.Hour,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// The guard, now told a different session id for the same process.
+	d := s.Guard(strings.NewReader(
+		payload("session-after-compaction", "Edit", "/x", held+"/x.zsh", "")), time.Now())
+	if d.Deny {
+		t.Errorf("the agent was denied its own held repository after a new session id: %s", d.Reason)
+	}
+
+	// And it can still release, without being told to pass --holder.
+	if _, err := s.Release("repo:"+held, "", time.Time{}); err != nil {
+		t.Errorf("release after a new session id: %v", err)
+	}
+}
+
+// A genuinely different agent is a genuinely different pid, so the pid identity
+// must not hand it someone else's hold.
+func TestPIDIdentityDoesNotLeakBetweenAgents(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	// Real, live pids on both sides: an unused pid would be reaped as dead
+	// before the identity check ever ran.
+	t.Setenv("hold_agent_pid", strconv.Itoa(os.Getpid()))
+	s := Store{Root: filepath.Join(home, ".night-holds")}
+	held := filepath.Join(home, "repo")
+
+	if _, err := s.Acquire(AcquireOpts{
+		Resource: "repo:" + held, Holder: "agent-one", TTL: time.Hour, Reason: "mine",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("hold_agent_pid", strconv.Itoa(os.Getppid()))
+	d := s.Guard(strings.NewReader(
+		payload("agent-two", "Edit", "/x", held+"/x.zsh", "")), time.Now())
+	if !d.Deny {
+		t.Error("another agent's hold must still block, pid identity or not")
+	}
+	if _, err := s.Release("repo:"+held, "", time.Time{}); err == nil {
+		t.Error("another agent must not be able to release it")
 	}
 }

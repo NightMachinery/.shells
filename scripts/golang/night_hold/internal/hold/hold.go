@@ -376,6 +376,8 @@ func (s Store) Acquire(o AcquireOpts) (Hold, error) {
 // acquireLocked is the critical section: everything between reading who holds
 // the resource and writing that we do.
 func (s Store) acquireLocked(canonical, mode string, o AcquireOpts, now time.Time) (Hold, error) {
+	c := callerFor(o.Holder)
+
 	live, err := s.Live(canonical, now, true)
 	if err != nil {
 		return Hold{}, err
@@ -391,15 +393,21 @@ func (s Store) acquireLocked(canonical, mode string, o AcquireOpts, now time.Tim
 		if h.Mode != mode {
 			return Hold{}, fmt.Errorf("%s is already held as %s; refusing to also hold it as %s", canonical, h.Mode, mode)
 		}
-		if mode == ModeExclusive && h.Holder != o.Holder {
+		if mode == ModeExclusive && !h.Mine(c) {
 			return Hold{}, ErrHeld{By: h}
 		}
 	}
 
 	acquired := now
 	for _, h := range live {
-		if h.Holder == o.Holder {
-			acquired = h.Acquired // a renewal keeps the original start
+		if !h.Mine(c) {
+			continue
+		}
+		acquired = h.Acquired // a renewal keeps the original start
+		// Ours, but filed under a session id we no longer answer to. Take it
+		// over rather than leaving a second file behind for the same agent.
+		if h.Holder != o.Holder {
+			os.Remove(h.file)
 		}
 	}
 
@@ -476,9 +484,8 @@ func (s Store) Release(resource, holder string, now time.Time) (Hold, error) {
 	if now.IsZero() {
 		now = time.Now()
 	}
-	if holder == "" {
-		holder = Holder()
-	}
+	c := callerFor(holder)
+	holder = c.Holder
 	canonical := Canonical(resource)
 
 	live, err := s.Live(canonical, now, true)
@@ -489,7 +496,7 @@ func (s Store) Release(resource, holder string, now time.Time) (Hold, error) {
 		return Hold{}, ErrNotHeld
 	}
 	for _, h := range live {
-		if h.Holder == holder {
+		if h.Mine(c) {
 			if err := os.Remove(h.file); err != nil {
 				return Hold{}, err
 			}
@@ -506,9 +513,8 @@ func (s Store) Renew(resource, holder string, ttl time.Duration, now time.Time) 
 	if now.IsZero() {
 		now = time.Now()
 	}
-	if holder == "" {
-		holder = Holder()
-	}
+	c := callerFor(holder)
+	holder = c.Holder
 	canonical := Canonical(resource)
 
 	live, err := s.Live(canonical, now, true)
@@ -516,7 +522,7 @@ func (s Store) Renew(resource, holder string, ttl time.Duration, now time.Time) 
 		return Hold{}, err
 	}
 	for _, h := range live {
-		if h.Holder == holder {
+		if h.Mine(c) {
 			return s.Acquire(AcquireOpts{
 				Resource: canonical,
 				Holder:   holder,
@@ -538,9 +544,8 @@ func (s Store) Check(resource, holder string, shared bool, now time.Time) (bool,
 	if now.IsZero() {
 		now = time.Now()
 	}
-	if holder == "" {
-		holder = Holder()
-	}
+	c := callerFor(holder)
+	holder = c.Holder
 	canonical := Canonical(resource)
 
 	live, err := s.Live(canonical, now, true)
@@ -551,7 +556,7 @@ func (s Store) Check(resource, holder string, shared bool, now time.Time) (bool,
 		return true, nil
 	}
 	for _, h := range live {
-		if h.Holder != holder {
+		if !h.Mine(c) {
 			return false, nil
 		}
 	}
