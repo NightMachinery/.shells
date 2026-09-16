@@ -76,6 +76,12 @@ resolved to an absolute path first, so \`repo:~/scripts' and
 Re-acquiring your own live hold renews it rather than failing, so a long job can
 just call this again instead of tracking whether it already holds one.
 
+--ttl is usually wrong to pass. By default a hold lasts until you release it or
+until the agent holding it dies, which is a better answer than any duration
+guessed up front; give one only when you want a hard deadline. Taken without an
+agent pid to check -- from a plain shell, or a script -- liveness cannot work
+and 30m is imposed instead; [agfi:hold-status] says so when it happens.
+
 --shared lets others hold it at the same time. That is not a weaker lock, it is
 a different thing: a suppression registry, where every holder wants the same
 outcome and a second costs nothing. [agfi:hs-reload-hold] is the one user.
