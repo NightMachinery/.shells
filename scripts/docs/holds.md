@@ -79,6 +79,12 @@ not optional — `vcsh night.sh commit` names the path nowhere, so the path test
 alone would let it straight through. That is exactly the command you most want
 stopped.
 
+The `hold-*` commands themselves are always allowed, even when the command
+names a held resource. Without that, the guard would deny the very command that
+clears a hold — and that is not hypothetical: the holder id is the agent session
+id, a compaction starts a new one, and an agent would then be locked out of a
+repository by its own stale hold with no way to release it before the deadline.
+
 ### Not a security boundary
 
 It stops accidents, not a determined process. Nothing prevents an agent from

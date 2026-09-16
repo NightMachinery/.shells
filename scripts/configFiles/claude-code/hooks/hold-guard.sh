@@ -66,6 +66,21 @@ bash_command="$5"
 me="$(printf '%s' "$session" | tr -c 'A-Za-z0-9_@.-' '-')"
 [ -n "$me" ] || me='-'
 
+#: Managing a hold necessarily names the resource, so without this the guard
+#: would deny the very command that clears it. That is not hypothetical: the
+#: holder id is the agent session id, a compaction starts a new one, and the
+#: agent would then be locked out of a repository by its own stale hold with no
+#: way to release it short of the deadline. Hold management is never the
+#: dangerous operation, so it is always allowed.
+case "$tool" in
+    Bash)
+        case "$bash_command" in
+            *hold-acquire*|*hold-release*|*hold-renew*|*hold-check*|*hold-status*)
+                exit 0 ;;
+        esac
+        ;;
+esac
+
 now="$(date +%s)"
 
 #: `case' rather than a substring test: this is POSIX, fast, and the pattern
