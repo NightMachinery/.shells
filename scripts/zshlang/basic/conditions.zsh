@@ -90,7 +90,11 @@ function antigravity-p {
     test -n "${ANTIGRAVITY_AGENT}" ||
         test -n "${ANTIGRAVITY_TRAJECTORY_ID}" ||
         test -n "${ANTIGRAVITY_CONVERSATION_ID}" ||
-        [[ "${AI_AGENT}" == (antigravity|agy)* ]]
+        #: Two patterns, not `(antigravity|agy)*': glob alternation is
+        #: zsh-only, and this file is under the BASH COMPATIBLE contract
+        #: declared at its top. See =docs/zsh_plugins.md=.
+        [[ "${AI_AGENT}" == antigravity* ]] ||
+        [[ "${AI_AGENT}" == agy* ]]
 }
 
 function ai-agent-p {
