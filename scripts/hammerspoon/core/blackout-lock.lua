@@ -424,11 +424,13 @@ local function handleEvent(event)
         --- rather than shared.
         if hyperEntered() then
             local flags = event:getFlags()
+            --- The escape, whatever else is stuck down with it; chordFor
+            --- says why it alone is read this loosely.
+            if keyCode == kEscapeKeyCode and flags.shift then
+                return false
+            end
             if not flags.alt and not flags.ctrl then
                 if flags.shift then
-                    if keyCode == kEscapeKeyCode and not flags.cmd then
-                        return false
-                    end
                     if keyCode == kBlackKeyCode and flags.cmd then
                         return false
                     end
@@ -852,14 +854,21 @@ local kChordKeys = {
 --- successes included, so Carbon ignores it too and matching on it would
 --- reject every real press.
 local function chordFor(keyName, flags)
+    --- The way out first, and leniently: F2 with shift is the escape whatever
+    --- else is down. Sticky Keys is on, and a modifier left stuck by the last
+    --- thing typed must not turn the one chord that ends a blackout into a
+    --- dropped press -- in front of a locked keyboard that is the failure
+    --- this whole module exists to prevent. Nothing is given away: restore
+    --- is the way out already, and a stray cmd cannot make F2 mean anything
+    --- else, because F2 has no other meaning here. The F1 rungs stay strict,
+    --- since there the modifiers are what tells the rungs apart.
+    if keyName == "f2" and flags.shift then return "restore" end
+
     if flags.alt or flags.ctrl then return nil end
 
     if flags.shift then
         if keyName == "f1" then
             return flags.cmd and "black-lock-first" or "black"
-        end
-        if keyName == "f2" and not flags.cmd then
-            return "restore"
         end
         return nil
     end

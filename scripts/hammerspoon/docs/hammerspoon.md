@@ -665,8 +665,9 @@ are left alone: a lone modifier is harmless, and the escape chord's modifiers
 are read off the F2 event itself.
 
 Exactly four things pass through from a keyboard. F18, the physical hyper key,
-so the hyper modal can still be entered; F2 with shift only while hyper mode is
-entered — cmd, alt or ctrl on the same event block it — which goes through
+so the hyper modal can still be entered; F2 with shift while hyper mode is entered —
+whatever else is down with it, since Sticky Keys is on and a modifier left
+stuck must not turn the one way out into a dropped press — which goes through
 `blackoutRestore`, releasing the lock synchronously before asking the garden to
 run `brightness-on-all-loop`, so the keyboard is back at once; F1 with shift
 *and* cmd while hyper mode is entered, which marks the blackout lock-first and
