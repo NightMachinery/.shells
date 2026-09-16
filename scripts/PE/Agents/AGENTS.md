@@ -154,22 +154,27 @@ history rewrite, a large refactor across a whole repo, an interactive migration
 done:
 
 ```
-hold-acquire repo:~/scripts --ttl 45m --reason "what you are doing"
-hold-status                        #: who holds what, and for how long
+hold-acquire repo:~/scripts --reason "what you are doing"
+hold-status                        #: who holds what, and why
 hold-release repo:~/scripts
 ```
 
 A `PreToolUse` hook denies edits and shell commands touching a resource someone
-else holds, so this is enforced rather than merely agreed. It always expires on
-its own, so forgetting is not a lasting problem — but release it anyway,
-including when you stop early or hand back unfinished.
+else holds, so this is enforced rather than merely agreed.
+
+**Releasing is your job.** A hold lasts until you release it or until your
+process dies — there is no clock running underneath it, so forgetting one leaves
+it standing. Release it the moment you are done, including when you stop early
+or hand back unfinished. Do not pass `--ttl` unless you specifically want a hard
+deadline; the default is the right answer almost always.
 
 For a vcsh repository, add `--match "vcsh night.sh"`: the guard matches text,
 and that command names the path nowhere. See `~/scripts/docs/holds.md`.
 
-If a hold blocks you, do not delete the file to get past it. Ask me. The
-`hold-*` commands themselves are never blocked, so you can always inspect or
-release one.
+If a hold blocks you, do not delete the file to get past it, and do not wait for
+it to lapse — it may not. Tell me who holds it and what you needed, and I will
+release it or tell you to work elsewhere. The `hold-*` commands themselves are
+never blocked, so you can always inspect one.
 
 # Private Information
 

@@ -95,7 +95,7 @@ So take a hold before editing any `.lua` there, and reload by hand when you
 actually want to see your changes:
 
 ```
-hs-reload-hold "what you are editing" 30m   #: duration optional, default 30m
+hs-reload-hold "what you are editing"       #: lasts until you release it
 hs-reload                                   #: load your changes, when ready
 hs-reload-release                           #: as soon as you are done
 hs-reload-holds                             #: who is holding, and why
@@ -106,9 +106,9 @@ Source: `./hammerspoon/core/reload.lua` and [agfi:hs-reload-hold].
 - Release as soon as you are done, including when you stop early or hand back
   unfinished. Releasing reloads for you — but only if nobody else still holds
   one, so you cannot yank the config out from under a parallel session.
-- It expires on its own, so a crash cannot leave auto-reload off for good. Call
-  `hs-reload-hold` again to push your deadline out during a long stretch; it
-  renews rather than stacking.
+- A crash cannot leave auto-reload off for good: the hold ends when your process
+  does. Forgetting to release *can*, though, since nothing expires underneath
+  you — so release it. `hs-reload-holds` says who is holding and why.
 - Holds are per-session, keyed on `$CLAUDE_CODE_SESSION_ID`, so several agents
   can hold at once without interfering. They are the shared mode of the general
   hold mechanism — `service:hs-reload`, listed by `hold-status` alongside
