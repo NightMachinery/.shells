@@ -172,4 +172,5 @@ Multiple agent sessions often work in this worktree at the same time. Follow thi
 - Immediately before committing, re-check `vcsh night.sh diff -- <files>`: if a file contains changes you did not make mixed with yours, stop and ask the user instead of committing.
 - If your commit fails with "nothing to commit", a parallel session likely committed your files already. Verify via `vcsh night.sh log -p` that the committed content matches what you wrote, then continue; do not redo the work.
 - If a file you need to edit already has uncommitted changes from another session, ask the user before touching it.
+- Some installers edit the dotfiles like `~/.profile` etc. automatically. If you detect such automatic insertions, ask the user to for confirmation to either revert or commit the modifications atomically.
 
