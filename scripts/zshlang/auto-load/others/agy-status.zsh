@@ -556,6 +556,58 @@ function h-agy-status-statusline-raw {
         | @tsv' "${cache_file}" 2>/dev/null
 }
 
+function h-agy-status-age-fmt {
+    #: A duration at one unit of precision, for the source note.
+    #:
+    #: [agfi:seconds-fmt-short] always prints all three units (=0h:1m:37s=),
+    #: which is what a reset the reader is waiting on deserves and far more
+    #: than a staleness note nobody acts on to the second.
+    #: Usage: h-agy-status-age-fmt <seconds>
+    ##
+    integer s="${1:-0}"
+    (( s < 0 )) && s=0
+
+    if (( s < 60 )) ; then
+        ec "${s}s"
+    elif (( s < 3600 )) ; then
+        ec "$(( s / 60 ))m"
+    elif (( s < 86400 )) ; then
+        ec "$(( s / 3600 ))h"
+    else
+        ec "$(( s / 86400 ))d"
+    fi
+}
+
+function h-agy-status-source-line {
+    #: Where the numbers below came from, in the report's own colours.
+    #:
+    #: Not [agfi:ecgray] with a function name in front of it. That put
+    #: =h-agy-status-statusline: nothing in the cache is newer than 3600s;
+    #: falling back to the slow path= above the report, which reads as a stray
+    #: debug line rather than part of the answer. The claim has to be made --
+    #: a cached number that does not say so reads as a live one -- so it is
+    #: made briefly, styled like the rows it introduces.
+    #:
+    #: Stays on stderr, as the gray line did: the prose report is stdout, and
+    #: a caller redirecting it should not collect the provenance note too.
+    #: The colour decision still reads *stdout*, deliberately -- one report,
+    #: one decision, same as [agfi:h-agy-status-render].
+    #:
+    #: Usage: h-agy-status-source-line <label> [detail]
+    ##
+    local label="${1}" detail="${2:-}"
+    assert-args label @RET
+
+    local c_label='' c_detail='' c_off=''
+    if h-color-mode-p "${agy_status_color:-auto}" ; then
+        c_label="${fg_bold[white]}"
+        c_detail="${fg[blue]}"
+        c_off="${reset_color}"
+    fi
+
+    ec "${c_label}${label}${c_off}${detail:+ ${c_detail}(${detail})${c_off}}" >&2
+}
+
 function h-agy-status-statusline {
     #: The same report as [agfi:h-agy-status-slow], read from the cache agy's
     #: own statusline hook keeps up to date. Reachable as
@@ -576,7 +628,7 @@ function h-agy-status-statusline {
         #: The established "force, bypass the memo" convention: asking under
         #: `deus' is asking to distrust what we have lying around, so the cache
         #: is not even opened.
-        ecgray "$0: deus: bypassing the cache and asking agy itself"
+        h-agy-status-source-line agy deus
         h-agy-status-slow
         return $?
     fi
@@ -586,7 +638,7 @@ function h-agy-status-statusline {
         #: serve however generous [agfi:agy_status_statusline_max_age_s] is, so
         #: this fallback ignores the knob entirely. It is not a breakage being
         #: hidden either -- nothing is broken, the hook has simply never run.
-        ecgray "$0: no statusline cache at ${cache_file}; falling back to the slow path (see \`agy-statusline-install')"
+        h-agy-status-source-line agy "no cache; run \`agy-statusline-install'"
         h-agy-status-slow
         return $?
     fi
@@ -599,9 +651,10 @@ function h-agy-status-statusline {
         #: front of every successful read: it exists only to pick the right
         #: sentence, and the happy path should not pay a second jq for it.
         if ! silent jq -e . "${cache_file}" ; then
-            ecgray "$0: the cache is not valid JSON (${cache_file}); falling back to the slow path"
+            h-agy-status-source-line agy "cache not valid JSON: ${cache_file}"
         else
-            ecgray "$0: nothing in the cache is newer than ${max_age_s}s; falling back to the slow path"
+            h-agy-status-source-line agy \
+                "cache older than $(h-agy-status-age-fmt ${max_age_s})"
         fi
 
         h-agy-status-slow
@@ -642,22 +695,23 @@ function h-agy-status-statusline {
     #: The worst age rather than the best, and the writers named: a number that
     #: came out of the cache has to say so, or the report reads as live when it
     #: is not.
-    local note
-    note="$0: from the cache, up to $(seconds-fmt-short ${oldest_age}) old, written by ${(j:, :)${(@u)sources}}" @TRET
+    local label detail
+    label="cache $(h-agy-status-age-fmt ${oldest_age}) old" @TRET
+    detail="${(j:, :)${(@u)sources}}"
     if (( unknown_age_seen )) ; then
-        note+=' (and some rows carry no capture time)'
+        detail+="; some rows undated"
     fi
 
     if bool "${json_p}" ; then
-        #: The note goes to stderr, because stdout is a JSON document somebody
-        #: is about to parse.
-        ecgray "${note}"
+        #: The note is on stderr either way, but it matters here: stdout is a
+        #: JSON document somebody is about to parse.
+        h-agy-status-source-line "${label}" "${detail}"
 
         ec "${(F)rows}" | h-agy-status-json
         return $?
     fi
 
-    ecgray "${note}"
+    h-agy-status-source-line "${label}" "${detail}"
     h-agy-status-render "${(F)rows}" @RET
 
     if bool "${credits_p}" ; then

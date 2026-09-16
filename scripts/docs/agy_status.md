@@ -130,12 +130,41 @@ guessing.
 "force, bypass the memo" convention the rest of zshlang uses. Asking under
 `deus` is asking to distrust what is lying around.
 
-The human report says, once, how old the oldest row it is serving is and
-which writers produced the set. In JSON mode that note goes to stderr, so
-stdout stays the bare array the notifier parses. A bucket carrying no
-`captured_at` at all is reported as such rather than folded into the age:
-"unknown" and "captured at the epoch" are different claims, and treating them
-alike renders an age of half a million hours.
+### The source note
+
+Every read says, in one line above the rows, where the numbers came from --
+the worst age rather than the best, and the writers named, because a number
+that came out of the cache has to say so or the report reads as live:
+
+```
+cache 2m old (slow)
+agy (cache older than 1h)
+agy (no cache; run `agy-statusline-install')
+agy (cache not valid JSON: /path/to/quota-cache.json)
+agy (deus)
+```
+
+It is styled like the rows it introduces, and carries no function name. It
+used to be an `ecgray` line reading `h-agy-status-statusline: nothing in the
+cache is newer than 3600s; falling back to the slow path`, which read as a
+stray debug line above the answer rather than part of it -- and said in
+thirteen words what the second line above says in five.
+
+The age is printed at one unit of precision by `h-agy-status-age-fmt` rather
+than through `seconds-fmt-short`: three units (`0h:1m:37s`) is right for a
+reset the reader is waiting on and too much for a staleness note nobody acts
+on to the second.
+
+It stays on stderr, where the gray line was. That matters most in JSON mode,
+where stdout is the bare array the notifier parses, but it holds either way:
+a caller redirecting the report should not collect the provenance note with
+it. The colour decision still reads *stdout*, deliberately -- one report, one
+decision, the same call `h-agy-status-render` makes.
+
+A bucket carrying no `captured_at` at all is reported as such -- `some rows
+undated` in the detail -- rather than folded into the age: "unknown" and
+"captured at the epoch" are different claims, and treating them alike renders
+an age of half a million hours.
 
 ### Installing the hook
 
