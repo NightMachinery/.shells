@@ -110,8 +110,10 @@ Source: `./hammerspoon/core/reload.lua` and [agfi:hs-reload-hold].
   `hs-reload-hold` again to push your deadline out during a long stretch; it
   renews rather than stacking.
 - Holds are per-session, keyed on `$CLAUDE_CODE_SESSION_ID`, so several agents
-  can hold at once without interfering. Do not delete `~/.hs-no-reload/` files
-  you did not create.
+  can hold at once without interfering. They are the shared mode of the general
+  hold mechanism — `service:hs-reload`, listed by `hold-status` alongside
+  everything else — so do not delete files under `~/.night-holds/` that you did
+  not create.
 - A hold suppresses only the *automatic* reload. `hs-reload` and Hyper+Cmd+R
   always work, so this never stops you testing.
 - `hs -c 'return hammerspoonReloadHeldBy()'` answers "why did my save not do
