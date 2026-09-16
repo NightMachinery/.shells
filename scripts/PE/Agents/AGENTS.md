@@ -162,8 +162,20 @@ hold-status                        #: who holds what, and why
 hold-release repo:~/scripts
 ```
 
-A `PreToolUse` hook denies edits and shell commands touching a resource someone
-else holds, so this is enforced rather than merely agreed.
+A `PreToolUse` hook watches for this, and it answers at two strengths, because
+only one of the two signals is reliable:
+
+- An `Edit`, `Write`, `MultiEdit` or `NotebookEdit` whose path is inside a held
+  path is **denied**. That path is structured data, so it proves a write.
+- A `Bash` call that names the resource — in the command text, in a `--match`
+  literal, or by running inside the held directory — is **warned about, and
+  then runs**. The guard only sees text, so it cannot tell a `grep` from a
+  `rm`, and denying both meant an agent could not read a file it was asked
+  about.
+
+**A warning is yours to act on.** Nothing stops the next command, so when one
+arrives, run `hold-status`, read the resource and reason, and keep off it:
+read freely, but create, modify and delete nothing there until it is released.
 
 **Releasing is your job.** A hold lasts until you release it or until your
 process dies — there is no clock running underneath it, so forgetting one leaves
@@ -174,10 +186,10 @@ deadline; the default is the right answer almost always.
 For a vcsh repository, add `--match "vcsh night.sh"`: the guard matches text,
 and that command names the path nowhere. See `~/scripts/docs/holds.md`.
 
-If a hold blocks you, do not delete the file to get past it, and do not wait for
-it to lapse — it may not. Tell me who holds it and what you needed, and I will
-release it or tell you to work elsewhere. The `hold-*` commands themselves are
-never blocked, so you can always inspect one.
+If a hold blocks or warns you, do not delete the file to get past it, and do not
+wait for it to lapse — it may not. Tell me who holds it and what you needed, and
+I will release it or tell you to work elsewhere. The `hold-*` commands
+themselves are never blocked, so you can always inspect one.
 
 # Private Information
 
