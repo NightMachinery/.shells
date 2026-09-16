@@ -2,8 +2,8 @@
 # -*- mode: sh; sh-shell: sh; -*-
 #: Profile: CIS LMU servers (beta, rho{1,2}, zeta{1,2}, epsilon{1..7}).
 #:
-#: Facts this profile encodes (probed [2026-08-09], see
-#: nightNotesPrivate/research/REDACTED-NAME/servers/bootstrap/plan.org):
+#: Facts this profile encodes (probed [2026-08-09]; the survey they came from
+#: is in the private notes tree, under the CIS servers' bootstrap plan):
 #:   - $HOME is ONE NFS mount shared by every host, quota ~48 GB.
 #:   - /mounts/work and /nfs/gdata are shared NFS, writable, NO quota.
 #:   - /var/tmp is local ext4, ~10x faster for small files, per host,
