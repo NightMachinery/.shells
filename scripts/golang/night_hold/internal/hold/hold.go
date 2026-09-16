@@ -219,10 +219,11 @@ func Slug(canonical string) string {
 // Holder names whoever is asking: stable across calls, distinct between
 // concurrent sessions.
 //
-// The agent ids are per *session*, so a compaction or a resume changes the
-// answer mid-task and a hold becomes unreleasable by name. The deadline is the
-// real backstop; $hold_holder overrides for the rare caller that has to release
-// someone else's.
+// The agent ids are per *session*, and a session id can change mid-task --
+// moving into `claude agents', or a resume -- which makes a hold unreleasable
+// by name. Mine() covers that by also matching on the agent pid; liveness is
+// the backstop that ends the hold regardless. $hold_holder overrides for the
+// rare caller that has to release someone else's.
 func Holder() string {
 	for _, env := range []string{
 		"hold_holder",

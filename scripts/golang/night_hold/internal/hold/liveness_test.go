@@ -115,11 +115,12 @@ func TestAcquireWaitGivesUpAtTheBudget(t *testing.T) {
 	}
 }
 
-// A compaction gives the session a new id while the process, the working
-// directory and the intent stay the same. Without the pid identity the agent is
-// denied its own repository by its own hold, and cannot release it either --
-// which is exactly what happened to the session that wrote this.
-func TestCompactionDoesNotLockAnAgentOutOfItsOwnHold(t *testing.T) {
+// A session id can change mid-task -- moving the session into `claude agents'
+// does it, and so does a resume -- while the process, the working directory and
+// the intent stay the same. Without the pid identity the agent is denied its
+// own repository by its own hold, and cannot release it either, which is
+// exactly what happened to the session that wrote this.
+func TestANewSessionIDDoesNotLockAnAgentOutOfItsOwnHold(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("hold_agent_pid", strconv.Itoa(os.Getpid()))
@@ -127,14 +128,14 @@ func TestCompactionDoesNotLockAnAgentOutOfItsOwnHold(t *testing.T) {
 	held := filepath.Join(home, "repo")
 
 	if _, err := s.Acquire(AcquireOpts{
-		Resource: "repo:" + held, Holder: "session-before-compaction", TTL: time.Hour,
+		Resource: "repo:" + held, Holder: "session-before", TTL: time.Hour,
 	}); err != nil {
 		t.Fatal(err)
 	}
 
 	// The guard, now told a different session id for the same process.
 	d := s.Guard(strings.NewReader(
-		payload("session-after-compaction", "Edit", "/x", held+"/x.zsh", "")), time.Now())
+		payload("session-after", "Edit", "/x", held+"/x.zsh", "")), time.Now())
 	if d.Deny {
 		t.Errorf("the agent was denied its own held repository after a new session id: %s", d.Reason)
 	}

@@ -35,10 +35,9 @@ type Decision struct {
 
 // holdCommands are never blocked. Managing a hold necessarily names the
 // resource, so without this the guard would deny the very command that clears
-// one -- and that is not hypothetical: the holder id is the agent session id, a
-// compaction starts a new one, and the agent would be locked out of a
-// repository by its own stale hold with no way to release it before the
-// deadline.
+// one -- and that is not hypothetical: the holder id is the agent session id
+// and that can change mid-task, leaving an agent locked out of a repository by
+// its own hold with no way to release it.
 var holdCommands = []string{
 	"hold-acquire", "hold-release", "hold-renew", "hold-check", "hold-status",
 	"night_hold",
@@ -80,8 +79,8 @@ func (s Store) Guard(r io.Reader, now time.Time) Decision {
 	}
 
 	// The guard inherits the agent's environment, so it can use the pid
-	// identity too -- which matters most here: after a compaction the payload
-	// carries a session id the hold has never seen, and without this the agent
+	// identity too -- which matters most here: once the session id changes the
+	// payload carries one the hold has never seen, and without this the agent
 	// is denied its own repository by its own hold.
 	c := GuardCaller(sanitizeHolder(p.SessionID))
 	for _, h := range holds {

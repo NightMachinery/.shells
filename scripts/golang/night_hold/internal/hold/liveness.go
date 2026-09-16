@@ -77,11 +77,15 @@ type Caller struct {
 
 // Mine reports whether a hold belongs to the caller.
 //
-// The holder id is the agent *session* id, and that is not stable: a
-// compaction or a resume starts a new one while the process, the working
-// directory and the intent all stay the same. Observed, not theorised -- the
-// session that built this watched its own id change underneath it, and was
-// then refused a release of its own hold and told to pass --holder.
+// The holder id is the agent *session* id, and that is not stable: moving a
+// session into `claude agents' gives it a new one while the process, the
+// working directory and the intent all stay the same. Observed, not theorised
+// -- the session that built this watched its own id change underneath it, and
+// was then refused a release of its own hold and told to pass --holder. A
+// resume is the other way it happens.
+//
+// Do not assume a compaction does it. That was this session's first guess and
+// it was wrong; chasing the wrong cause is worse than having no explanation.
 //
 // The agent pid survives what the session id does not, so it is the stronger
 // identity and is checked as well. Both sides must be a pid worth trusting and
@@ -119,7 +123,7 @@ func callerFor(explicit string) Caller {
 // Unlike callerFor, the session id here is never an impersonation -- it is the
 // current, fickle name for this very process -- so the pid identity is kept.
 // It is what stops an agent being denied its own repository by its own hold
-// after a compaction.
+// when the session id changes under it.
 func GuardCaller(sessionHolder string) Caller {
 	pid, kind := agentPID()
 	return Caller{Holder: sessionHolder, PID: pid, PIDKind: kind, Host: thisHost()}
