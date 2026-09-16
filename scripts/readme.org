@@ -48,10 +48,11 @@ parent. See =./docs/delegate-weaker.md= for scope and activation.
 atomic without a parallel session walking into it. Exclusive by default;
 =--shared= gives the suppression registry the Hammerspoon auto-reloader uses,
 which [agfi:hs-reload-hold] is now built on. A Claude Code =PreToolUse= hook
-denies edits and commands touching a held resource. A hold ends three ways: its
-deadline, early when its agent is provably dead, or extended for as long as its
-holder keeps working. The implementation is =golang/night_hold=; see
-=./docs/holds.md=.
+denies edits and commands touching a held resource. A hold ends when you release
+it or when the agent holding it dies; =--ttl= adds a hard deadline for the cases
+that want one. The implementation is =golang/night_hold=; see =./docs/holds.md=,
+and =./docs/disabled/holds-ttl-extension.md= for the hook-driven TTL extension
+that was built and then removed.
 
 [agfi:agent-done] recognizes unsandboxed Codex conversation IDs and recovers
 tmux pane ownership through process ancestry, including terminal proxies.

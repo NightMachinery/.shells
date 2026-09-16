@@ -6,7 +6,7 @@ does not walk into the middle of something atomic. It was built for a history
 rewrite in `~/scripts`, where a second agent committing halfway through would
 have been expensive to unpick.
 
-    hold-acquire repo:~/scripts --ttl 45m --reason "history rewrite" --match "vcsh night.sh"
+    hold-acquire repo:~/scripts --reason "history rewrite" --match "vcsh night.sh"
     hold-status
     hold-release repo:~/scripts
 
@@ -19,7 +19,10 @@ mode.
 ## The commands
 
 `hold-acquire <resource> [--ttl D] [--reason S] [--match S]... [--shared]
-[--wait D] [--holder ID]` takes the hold. Re-acquiring your own live hold
+[--wait D] [--holder ID]` takes the hold. `--ttl` is optional and usually
+wrong to pass: by default a hold lasts until you release it or until the agent
+holding it dies. Pass one only when you want a hard deadline. Re-acquiring your
+own live hold
 renews it rather than failing, so a long job can call it again without tracking
 whether it already holds one. Against someone else's live exclusive hold it
 fails, non-zero and loudly — unless `--wait` is given, in which case it retries
@@ -34,8 +37,9 @@ where you genuinely have to.
 `hold-check <resource>` is the silent one, for use in a condition: it succeeds
 when acquiring would succeed.
 
-`hold-renew <resource> [--ttl D]` pushes your deadline out. Rarely needed by an
-agent, because the guard already refreshes a hold while its holder is working.
+`hold-renew <resource> [--ttl D]` changes the deadline on a hold you already
+have — out, in, or away entirely, since `--ttl until-live` removes it. Only
+meaningful for a hold that has one.
 
 `hold-status [<resource>]` prints who holds what, why, and for how long.
 `hold-holders <resource>` prints just the live holder ids.
@@ -48,7 +52,7 @@ repository wants this.
 **Shared** (`--shared`) is not a weaker lock, it is a different thing — a
 **suppression registry**. Every holder wants the same outcome, so a second
 costs nothing and refusing it would be perverse; what they need from a hold is
-only the expiry. The Hammerspoon auto-reloader is the one user: several agents
+only the *ending*. The Hammerspoon auto-reloader is the one user: several agents
 editing `.lua` files at once each hold off the reloader, and whoever finishes
 first must not re-enable it under someone still typing.
 
@@ -61,36 +65,59 @@ one shape carries both semantics.
 
 They are independent, and each answers a question the others cannot.
 
-**The deadline (TTL)** is the backstop, and it is never obsolete. It is the
-only thing that works when there is no trustworthy pid — a hold taken by a
-script, by a shell shared between sessions, or by an agent that exports no pid
-— and the only thing that works across hosts, since a pid means nothing on
-another machine and `$HOME` is shared between them in some setups. It also
-covers the most common real failure, which is not a crash at all: an agent that
-is perfectly alive, has moved on to something else, and forgot to release.
+**Release** is the normal one. Say so when you are done, including when you
+stop early or hand back unfinished.
 
-**Liveness** ends a hold *early*. The hold records the agent session's
-long-lived pid and its host, and is reaped the moment that process is provably
-gone. A killed agent frees the repository at once instead of blocking everyone
-for half an hour.
+**Death** is the automatic one, and since holds became `until-live` by default
+it is the primary one. A hold records the agent session's long-lived pid and
+its host, and is reaped the moment that process is provably gone. A killed
+agent frees the repository at once rather than blocking everyone until a clock
+runs out.
 
 Which pid matters enormously. The obvious one, the pid of the shell that ran
 `hold-acquire`, is useless — it exits a millisecond later, and trusting it
 would reap every hold the instant it was taken. So a pid is recorded together
 with the kind of pid it is, and only a long-lived one is ever allowed to
 declare a hold dead. Claude Code exports `CLAUDE_PID`; anything else can export
-`hold_agent_pid`. With neither, the deadline is the only backstop, which is
-exactly the behaviour this had before liveness existed. PID reuse can make a
-dead holder look alive, which fails in the safe direction.
+`hold_agent_pid`. PID reuse can make a dead holder look alive, which fails in
+the safe direction.
+
+**The deadline (TTL)** is now opt-in, and means exactly what it says: the hold
+is gone when it runs out, and nothing renews it behind your back. Reach for it
+when you want a hard bound — "this must definitely not still be here at 4pm" —
+rather than as a guess at how long a job will take, which is a question nobody
+can answer up front.
+
+It also comes back uninvited in one case. `until-live` is only meaningful when
+something can declare the holder dead, so a hold taken **without an agent pid**
+— from a plain terminal, a script, a BrishGarden shell — would otherwise expire
+by no mechanism at all. Those silently get 30 minutes instead, and record why,
+so `hold-status` can explain a deadline you did not ask for.
+
+### What is no longer covered
+
+An agent that is **alive and has simply forgotten**. With no deadline running
+underneath it, that hold stands until somebody ends it. This is deliberate: a
+hold only ever blocks someone when another agent is running, and another agent
+is running because a person started it — so there is a person present at
+exactly the moment it matters. The blocked agent says who holds what and asks;
+`hold-status` names it and `hold-release <resource> --holder <id>` clears it.
+
+The same goes for a hold taken on **another host**. A pid means nothing on a
+different machine, so liveness cannot reap it from here, and some hosts share a
+home directory — the CIS servers do — which makes that reachable in practice
+rather than theoretical. `hold-status` flags such a hold rather than leaving
+you to wait for a clock that may not exist.
 
 ### Who "you" are
 
-The holder is the agent session id, and that is **not stable**: a compaction or
-a resume starts a new one while the process, the working directory and the
-intent all stay the same. Left there, an agent gets denied its own repository
-by its own hold and cannot even release it. This is not theoretical — the
-session that built this watched its own id change underneath it and was told to
-pass `--holder`.
+The holder is the agent session id, and that is **not stable**: moving a session
+into `claude agents` gives it a new one while the process, the working directory
+and the intent all stay the same, and a resume does it too. Left there, an agent
+gets denied its own repository by its own hold and cannot even release it. This
+is not theoretical — the session that built this watched its own id change
+underneath it and was told to pass `--holder`. (Do not assume a compaction does
+it. That was the first guess here and it was wrong.)
 
 So a hold is yours if the holder id matches *or* if it records the same agent
 pid on the same host. The pid survives what the session id does not, and the
@@ -102,27 +129,6 @@ the pid half off. Naming one means "act as exactly this holder", which is how a
 shell impersonates another session, in tests and when deliberately clearing
 someone else's hold; letting the pid override that would make the override
 unusable from the one machine it is ever used from.
-
-**Keepalive** extends a hold while its holder is working. The guard runs before
-every tool call, and when the caller owns a hold it pushes the deadline out —
-only once less than half the window remains, so this costs a handful of writes
-per window rather than one per tool call.
-
-Tool calls alone are not enough, though, and getting this wrong is subtle. An
-agent that is alive, holds a repository, and is sitting waiting for the user to
-answer a question makes **no tool calls at all**, so keepalive never fires and
-its hold lapses underneath it while it waits. Liveness does not save it, because
-liveness only ever ends a hold early. So `night_hold refresh` also runs on the
-`Stop` hook — the moment the agent goes quiet — which restarts the clock at
-exactly the event the deadline is supposed to be measured from.
-
-That is not a way to hold something forever: it takes a live agent still in a
-conversation. One that is killed is reaped by liveness, and one abandoned
-mid-conversation stops emitting these and lapses on schedule.
-
-Together these change what the TTL *means*. It stops being "how long I guess
-this will take", which nobody can answer up front, and becomes "how long after
-I go quiet" — a question with an obvious answer.
 
 ## What the guard actually stops
 
@@ -155,9 +161,8 @@ all, so the guard can only block on `--match` literals you supply and a bare
 
 The `hold-*` commands themselves are never blocked. Without that, the guard
 would deny the very command that clears a hold — and that is not hypothetical:
-the holder is the agent session id, a compaction starts a new one, and an agent
-would be locked out of a repository by its own stale hold with no way to
-release it before the deadline.
+the holder is the agent session id, that id can change mid-task, and an agent
+would be locked out of a repository by its own hold with no way to release it.
 
 ### Not a security boundary
 
@@ -205,14 +210,15 @@ flock over redis elsewhere ([agfi:lock-acquire]): a flock is released when the
 process holding the descriptor dies, and every agent tool call is a *new*
 process.
 
-**The deadline is written twice.** The contents are authoritative for everyone
-who parses. The mtime exists for one reader that must not parse:
-`hammerspoonReloadHeldBy()` in `hammerspoon/core/reload.lua` runs on
-Hammerspoon's main thread and answers by iterating the directory and statting
-each entry. (An earlier version of this document claimed it answered from a
-single stat. It never did — but it has always done no parsing, and that is the
-constraint worth keeping.) Contents are written first and the mtime last, so
-the mtime is never ahead of the file.
+**Hammerspoon asks the binary rather than reading the files.** The deadline
+used to be mirrored into each hold's mtime so that `reload.lua` could answer
+from a stat per entry, with no parsing, on Hammerspoon's main thread. That
+stopped being possible when holds started ending on *death*: whether a pid is
+alive is not a question a stat can answer, and a check written in Lua would
+keep auto-reload suppressed by a crashed agent's leftover file. So it runs
+`night_hold holders service:hs-reload` through `taskWithPath`, asynchronously,
+and fails open. The mtime is still written for a hold that has a deadline, but
+only so that `ls -l` is informative; nothing reads it.
 
 ## State directory
 
@@ -229,3 +235,8 @@ work tree, which is harmless: that repository is always read with `status
 `golang/night_hold/todo.org` records two deliberate deferrals: extracting the
 portable half into a standalone shareable repository, and enforcing holds for
 Codex and Antigravity as well as Claude Code.
+
+`docs/disabled/holds-ttl-extension.md` records a third, which was built and
+then removed: the hooks that used to extend a hold while its holder was
+working. It is written up in enough detail to wire again, including what would
+have to come back.
