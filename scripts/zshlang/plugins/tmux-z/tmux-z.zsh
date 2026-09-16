@@ -258,7 +258,19 @@ function tmuxnewsh2-attach-z {
     #: servers, which never matches the current directory at all. Reading $PWD
     #: back out of a subshell is the one form both spell the same way.
     local dir
-    dir="$(cd "${HOME}" && FORCE_INTERACTIVE="${force_i}" z "${query}" >/dev/null && print -r -- "${PWD}")" @TRET
+    if ! dir="$(cd "${HOME}" && FORCE_INTERACTIVE="${force_i}" z "${query}" >/dev/null && print -r -- "${PWD}")" || test -z "${dir}" ; then
+        ecerr "$0: no directory matched: ${query}"
+        #: The old `tma-z' took the query from everything before the *last*
+        #: dash, so every `<dir>-<tag>' name people already have now misses.
+        #: A miss is not cheap either -- [agfi:ffz-get] rebuilds its corpus and
+        #: retries once before giving up -- so say what to type instead rather
+        #: than leaving a long silent stall and a stack trace.
+        if [[ "${query}" == *-* ]] ; then
+            ecerr "$0: the tag is separated by '@' now, not '-'. Did you mean: ${query%-*}@${query##*-}"
+        fi
+
+        return 1
+    fi
     assert test -d "${dir}" @RET
 
     tmuxnewsh_pwd="${dir}" tmuxnewsh2 "${name}" "${wanted[@]}" @RET
