@@ -20,7 +20,7 @@
     ],
     "defaultMode": "plan"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5-1[1m]",
   "hooks": {
     "Notification": [
       {
@@ -108,7 +108,7 @@
   "feedbackSurveyRate": 0,
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
-  "autoCompactWindow": 600000,
+  "autoCompactWindow": 400000,
   "voice": {
     "enabled": true,
     "mode": "tap"
