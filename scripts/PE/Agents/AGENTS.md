@@ -22,7 +22,7 @@
 
 - Always analyze and discuss trade-offs of different solutions.
 
-- We are usually pushing to public git remotes. Be deliberate about what personal information we put into commits. Ask the user if in doubt.
+- We are usually pushing to public git remotes. Be deliberate about what personal information we put into commits. Ask the user if in doubt. See **Private Information** below.
 
 ## `~/scripts`
 - If you ever need to edit anything here, read `~/scripts/AGENTS.md` first.
@@ -170,6 +170,44 @@ and that command names the path nowhere. See `~/scripts/docs/holds.md`.
 If a hold blocks you, do not delete the file to get past it. Ask me. The
 `hold-*` commands themselves are never blocked, so you can always inspect or
 release one.
+
+# Private Information
+
+Most of my repositories are **public**, including `~/scripts`. Do not assume
+otherwise; check with `gh repo view --json isPrivate` when it matters.
+
+Before writing something into a repository, ask whether it is private:
+
+- credentials, tokens, keys;
+- **other people's** names, email addresses and affiliations;
+- project ids, bucket names, instance names, hostnames;
+- quota, cost and billing figures;
+- any description of a system's security posture — who has which role, what is
+  unmonitored, what has no admin. That is a social-engineering aid, and it is
+  worse when published next to a named owner.
+
+When something private is genuinely needed for the code to work, **stop and
+ask** where it should go. The options, roughly in order of preference:
+
+- read it from the environment, and keep it out of the repository entirely;
+- append it to `~/.privateShell`;
+- create a new private repository dedicated to that subject, as `~/.night-gcp`
+  is for GCP, and have the public code source it when present.
+
+Never publish a third party's identifying details without asking me first.
+They did not consent, and I cannot consent for them.
+
+## `~/.privateShell` is Append-Only
+
+You may **append** to it. Do not **read** it without my explicit permission for
+that specific read — and that includes indirect reads: `agsi` and the other
+note searches cover it, so do not grep it for context.
+
+It is the designated sink for secrets, so an agent that reads it freely can
+leak everything in it into a transcript. Appending needs no knowledge of the
+contents. This already has machine-enforced precedent: `night/llm-path-policy`
+in `~/doom.d/autoload/night-llm-context.el` refuses to send that file to any
+model.
 
 # Sharing the Screen (macOS)
 
