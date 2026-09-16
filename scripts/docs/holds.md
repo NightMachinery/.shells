@@ -113,9 +113,8 @@ agent that is alive, holds a repository, and is sitting waiting for the user to
 answer a question makes **no tool calls at all**, so keepalive never fires and
 its hold lapses underneath it while it waits. Liveness does not save it, because
 liveness only ever ends a hold early. So `night_hold refresh` also runs on the
-`Stop` and `UserPromptSubmit` hooks — the moments the agent goes quiet and comes
-back — which restarts the clock at exactly the event the deadline is supposed to
-be measured from.
+`Stop` hook — the moment the agent goes quiet — which restarts the clock at
+exactly the event the deadline is supposed to be measured from.
 
 That is not a way to hold something forever: it takes a live agent still in a
 conversation. One that is killed is reaped by liveness, and one abandoned

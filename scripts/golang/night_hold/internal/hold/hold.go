@@ -558,8 +558,8 @@ func (s Store) Renew(resource, holder string, ttl time.Duration, now time.Time) 
 // makes no tool calls at all, so its hold lapses underneath it while it sits
 // there. Liveness does not save it: liveness only ever ends a hold early.
 //
-// So the agent's own idle moments are the signal. Called from the Stop and
-// UserPromptSubmit hooks, this restarts the clock at the instant the agent
+// So the agent's own idle moments are the signal. Called from the Stop hook,
+// this restarts the clock at the instant the agent
 // stops working, which is exactly the event "how long after I go quiet" is
 // measured from.
 //

@@ -69,7 +69,7 @@ func usage(code int) {
   holders <resource>                            live holder ids, one per line
   guard                                         PreToolUse hook payload on stdin
   refresh                                       restart the clock on your holds;
-                                                Stop/UserPromptSubmit payload on stdin
+                                                Stop hook payload on stdin
 
 A resource is any string. repo:, path:, dir: and file: are resolved to an
 absolute path first, so repo:~/scripts and repo:/Users/evar/scripts are one
@@ -324,7 +324,7 @@ func cmdGuard() {
 }
 
 // cmdRefresh restarts the deadline on this session's holds. Wired to the Stop
-// and UserPromptSubmit hooks, so the TTL measures idle time from when the agent
+// hook, so the TTL measures idle time from when the agent
 // actually went quiet rather than from its last tool call -- an agent waiting
 // on the user makes no tool calls, and used to lose its hold while sitting
 // there. Silent and always successful: a hook must never fail over this.
