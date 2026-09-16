@@ -49,6 +49,10 @@ the key `legacy` and released by `caffeinate-off-all`.
 `brightness-on` / `brightness-on-loop` release it; see
 `external-display-brightness.md`. The point of blanking is a dark screen on a
 machine that keeps working, which is exactly an idle-sleep problem.
+hyper+cmd+F1, which blacks the screen and locks the macOS session on the spot,
+does not release the key by locking: locking the session is not ending the
+blackout, so the `blackout` key is given up by `h-blackout-release` when you
+unlock, exactly as for every other way out.
 
 Before keys existed, `caffeinate-off` was never called at all, so every
 hyper+shift+F1 leaked an assertion: one was found still running 19 hours later.

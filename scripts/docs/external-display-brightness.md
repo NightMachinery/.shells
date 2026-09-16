@@ -40,6 +40,9 @@ the CGDirectDisplayID, which both print (`ID 0x2` and `Display ID: 2`).
 `brightness-off` and `brightness-on` (`zshlang/auto-load/others/power.zsh`) sit
 on top of these and needed no changes, as do the hyper+F1/F2 and
 hyper+shift+F1/F2 bindings in `hammerspoon/core/window-media-bindings.lua`.
+The blackout chord has since grown a third rung, hyper+cmd+F1, which blacks the
+screen and locks the macOS session on the spot — the way back is unlocking the
+session, not a chord — and that changes nothing down here either.
 
 `brightness-displays` prints TSV — index, backend, backend-local id, `main`,
 built-in/external, name, CGDirectDisplayID:
@@ -106,9 +109,22 @@ Each of those, plus `brightness-off` / `brightness-on`, has `-main`, `-all`,
 Every one of those also has a `-loop` version, suffixed last
 (`display-black-on-all-loop`); see "Keeping it blank" below.
 
-These names are generated rather than written out, so grepping the source for
-`brightness-off-all-loop` finds only its callers and never a definition. Two
-nested `h_aliasfn` loops build them from the base name and the selector — one
+A blackout started from a hyper chord can be held back for a few seconds first,
+to show a note you left for yourself on the way into the dark:
+
+    alert-at-next-blackout <text ...>   # append lines; reads stdin with no args
+    alert-at-next-blackout-show         # what the next blackout will show
+    alert-at-next-blackout-last         # what the last one showed
+    alert-at-next-blackout-clear        # drop it, moved aside rather than deleted
+
+Those four are in `power.zsh`, but nothing in the shell reads the note: the
+blackout side is Hammerspoon's, which shows the file and moves it aside on its
+own. See "The blackout note" in `hammerspoon/docs/hammerspoon.md`.
+
+The suffixed names above are generated rather than written out, so grepping the
+source for `brightness-off-all-loop` finds only its callers and never a
+definition. Two nested `h_aliasfn` loops build them from the base name and the
+selector — one
 in `system.zsh` for the `display-black-*` family, one in `power.zsh` for
 `brightness-off` / `brightness-on` — which means the assembled string appears
 nowhere in the repository. Ask the shell instead of grep:
@@ -265,10 +281,11 @@ F1 also locks the keyboard. A black screen on its own is not a safe one: the
 focused window still has focus, so a brushed key types into it unseen, and the
 hardware brightness keys undo the blackout from the inside. So while the screen
 is black, `hammerspoon/core/blackout-lock.lua` swallows every key, and by default
-every click and scroll, with three exceptions — the hyper key itself, F2 with
+every click and scroll, with four exceptions — the hyper key itself, F2 with
 shift under hyper, so the way out is exactly the way out it was, and
-shift+cmd+F1 under hyper, which only makes that way out stricter. The knobs
-(`blackoutLockEnabled`, `blackoutLockMouse`, `blackoutLockScreenAfterSeconds`),
+shift+cmd+F1 and cmd+F1 under hyper, which only make that way out stricter. The
+knobs (`blackoutLockEnabled`, `blackoutLockMouse`,
+`blackoutLockScreenAfterSeconds`),
 the shell interface and the limits are in `hammerspoon/docs/hammerspoon.md`
 under "Blackout keyboard lock". The one worth repeating here is Secure Input: a
 password field or the login screen hides keystrokes from event taps, so the lock

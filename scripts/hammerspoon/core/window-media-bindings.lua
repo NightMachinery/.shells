@@ -280,7 +280,7 @@ end
 --
 -- F1 also locks the keyboard and mouse for the life of the blackout (see
 -- core/blackout-lock.lua), unless blackoutLockEnabled is false. The lock lets
--- exactly two chords through: F2, and shift+cmd+F1. F2 goes through
+-- exactly three chords through: F2, shift+cmd+F1, and cmd+F1. F2 goes through
 -- blackoutRestore, which releases the lock synchronously and, once the
 -- blackout is older than blackoutLockScreenAfterSeconds, locks the session
 -- before restoring, so a long-unwatched screen comes back as a login window.
@@ -291,16 +291,32 @@ end
 -- toward locking: the person starting the black decides, since whoever
 -- presses F2 later may be a stranger.
 --
--- These three chords are not hs.hotkey bindings, which is why only their
+-- hyper+cmd+F1 is the rung above that: it stops waiting for the ending and
+-- locks the session now, through blackoutLockNow in core/blackout-lock.lua.
+-- Fresh, it calls back into blackoutChordBegin below for the garden's half and
+-- locks a fraction of a millisecond later, in the same run-loop turn; on a
+-- blackout already up it locks and marks and leaves the garden alone. There is
+-- no chord back from it -- chords cannot reach the login screen, where Secure
+-- Input hides keystrokes from every tap -- so the way back is unlocking the
+-- session, which runs h-hook-unlock -> h-blackout-release in the garden.
+--
+-- A blackout that starts may first be held back by a note for a few seconds;
+-- see "The blackout note" in core/blackout-lock.lua and alert-at-next-blackout
+-- in zsh. That gate sits in front of this function, not inside it.
+--
+-- These four chords are not hs.hotkey bindings, which is why only their
 -- actions live here. Carbon drops roughly one press in five -- a shrug for a
 -- brightness step, unacceptable for a chord that blanks the screen and for the
 -- only way back from a locked keyboard -- so core/blackout-lock.lua dispatches
 -- them from an eventtap and owns their delivery. The bare F1/F2 brightness
 -- keys above stay on hs.hotkey. See "When a hyper chord does nothing" in
 -- docs/hammerspoon.md.
-function blackoutChordBegin(lockFirst)
+--
+-- lockNow only names the rung for the band; the lock itself is placed by
+-- blackoutLockNow after this returns.
+function blackoutChordBegin(lockFirst, lockNow)
     brishz_eval_hs('awaysh-fast brightness-off-all-loop')
-    if blackoutBegin then blackoutBegin(lockFirst) end
+    if blackoutBegin then blackoutBegin(lockFirst, lockNow) end
 end
 
 function blackoutChordRestore()
@@ -314,8 +330,8 @@ end
 -- Nothing dispatches the chords if that module failed to load, since the tap
 -- is its. Fall back to hs.hotkey for the way *out*, which is the one that has
 -- to exist even on a half-loaded config -- a flaky F2 beats no F2 at all. The
--- blackout chords themselves are deliberately not restored here: without
--- blackout-lock there is no keyboard lock to escape from either.
+-- blackout chords themselves, all three rungs, are deliberately not restored
+-- here: without blackout-lock there is no keyboard lock to escape from either.
 if not blackoutChordTapStart then
     hyper_bind_v2{
         mods={"shift"},

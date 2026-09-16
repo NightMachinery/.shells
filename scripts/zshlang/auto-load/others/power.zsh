@@ -88,6 +88,93 @@ done
 unset h_db_fn h_db_sel
 
 ##
+#: A note to yourself, read on the way into the dark.
+#:
+#: The blackout chords are the last thing this machine shows before the screen
+#: goes, which makes them the one moment a reminder is guaranteed to be read:
+#: "the render is still going", "unplug the drive", "the lock is held".
+#: Hammerspoon checks this file when a blackout *starts* -- any of the three
+#: rungs, and only a fresh one -- shows it for a few seconds with a countdown,
+#: moves it to <file>.last, and then blacks. A second blackout chord during the
+#: countdown skips the rest of the wait. The reading side is
+#: hammerspoon/core/blackout-lock.lua, whose `blackoutNoteFile' knob holds this
+#: same default; see "The blackout note" in hammerspoon/docs/hammerspoon.md.
+#: The path is written out in both languages on purpose -- a blackout must not
+#: wait on a garden round trip to find out where to look.
+#:
+#: ~/tmp is swept periodically, which is the right lifetime for this: a note
+#: nobody blacked the screen on for weeks is a note that has expired.
+typeset -g alert_at_next_blackout_file="${alert_at_next_blackout_file:-${HOME}/tmp/alert_at_next_blackout.md}"
+
+function alert-at-next-blackout {
+    : "usage: alert-at-next-blackout <text ...>
+Adds a note for the next blackout to show. Reads stdin when given no arguments."
+    #: One bullet per non-empty line, so a pasted paragraph reads as a list
+    #: rather than as one run-on band. Markdown, because the alert engine is
+    #: asked to render it as Markdown.
+    ##
+    local file="${alert_at_next_blackout_file}"
+
+    local -a inargs
+    in-or-args3 "$@" @RET
+
+    local -a bullets=()
+    local line
+    for line in "${inargs[@]}" ; do
+        #: extendedglob is on globally, so `[[:space:]]#' is "zero or more".
+        line="${${line##[[:space:]]#}%%[[:space:]]#}"
+        if test -z "$line" ; then
+            continue
+        fi
+
+        bullets+=("- ${line}")
+    done
+
+    if (( ${#bullets} == 0 )) ; then
+        ecerr "$0: nothing to add"
+        return 1
+    fi
+
+    assert gmkdir -p "${file:h}" @RET
+    print -r -- "${(pj:\n:)bullets}" >> "$file" @RET
+
+    ecgray "$0: ${#bullets} line(s) -> ${file}"
+}
+
+function alert-at-next-blackout-show {
+    : "Prints the note the next blackout will show, if any."
+    ##
+    local file="${alert_at_next_blackout_file}"
+
+    if test -e "$file" ; then
+        cat -- "$file"
+    fi
+}
+
+function alert-at-next-blackout-last {
+    : "Prints the note the last blackout showed."
+    ##
+    local file="${alert_at_next_blackout_file}.last"
+
+    if test -e "$file" ; then
+        cat -- "$file"
+    fi
+}
+
+function alert-at-next-blackout-clear {
+    : "Drops the pending note without a blackout having shown it."
+    #: Moved aside rather than deleted, and to the same place a blackout would
+    #: have moved it, so [agfi:alert-at-next-blackout-last] can still show what
+    #: was thrown away.
+    ##
+    local file="${alert_at_next_blackout_file}"
+
+    if test -e "$file" ; then
+        assert gmv -f -- "$file" "${file}.last" @RET
+    fi
+}
+
+##
 #: Display sleep is held per key: one `caffeinate -d' per key, each in its own
 #: tmux session. Nothing counts the holders -- "every key has released" is
 #: exactly "no such process is left", which the kernel already tracks, so there

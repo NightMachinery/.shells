@@ -102,6 +102,16 @@ Scripted callers should still pass `-q` — [agfi:hammerspoon] does it for you �
 since a mirrored console line lands in the middle of the output a caller is
 parsing. It is no longer a hazard, just noise.
 
+A separate trap, unrelated to the recursion: a function *defined* inside one
+`hs -c` and *called* from a later one must not `print`. Each `hs -c` runs its
+chunk in a per-instance environment whose `print` is bound to that CLI
+instance (`ipc.lua:401`), and the instance is unregistered when the call
+returns. A closure defined there keeps that `print`, so the next call that
+reaches it fails with `ipc.lua:402: attempt to index a nil value` and aborts
+whatever was running — which reads as a bug in the callee. Seen while stubbing
+`blackoutChordBegin` from the shell for a test. Define such stubs without
+`print`, or write to the console through `hs.printf`.
+
 ## Running zsh in the garden
 
 `lua/pipe.lua` holds the clients, named `brishz_eval[_q][_bg]`. `_q` takes an
@@ -633,8 +643,8 @@ hyper+shift+F1 blanks every display, but on its own that changes nothing about
 input: whatever had focus still has it, so a brushed key types into a window
 you cannot see, a hardware brightness key raises the level you just cut, and
 any other hyper chord fires blind. While the blackout is up, the lock swallows
-all of that. Two chords still do something: the one that ends the blackout, and
-the one that tightens it.
+all of that. Three chords still do something: the one that ends the blackout,
+and the two that tighten it.
 
 It is an `hs.eventtap`, which runs before Carbon hotkeys and before any app, so
 returning `true` from its callback drops an event for everyone at once — every
@@ -644,20 +654,22 @@ and `systemDefined` (the hardware brightness and media keys), and with
 are left alone: a lone modifier is harmless, and the escape chord's modifiers
 are read off the F2 event itself.
 
-Exactly three things pass through from a keyboard. F18, the physical hyper key,
+Exactly four things pass through from a keyboard. F18, the physical hyper key,
 so the hyper modal can still be entered; F2 with shift only while hyper mode is
 entered — cmd, alt or ctrl on the same event block it — which goes through
 `blackoutRestore`, releasing the lock synchronously before asking the garden to
-run `brightness-on-all-loop`, so the keyboard is back at once; and F1 with
-shift *and* cmd while hyper mode is entered, which marks the blackout
-lock-first and leaves it up. That last one is the only input the lock passes
-that does not end the blackout, and it can only make the way out stricter.
+run `brightness-on-all-loop`, so the keyboard is back at once; F1 with shift
+*and* cmd while hyper mode is entered, which marks the blackout lock-first and
+leaves it up; and F1 with cmd *alone* while hyper mode is entered, which locks
+the macOS session on the spot and leaves the blackout up as well. Those last
+two are the inputs the lock passes that do not end the blackout, and neither
+can do anything but make the way out stricter.
 
 Passed is not the same as delivered. The lock tap merely declines to drop those
-three; the chord tap below swallows the two chords itself, so neither ever
-reaches an app. The `hyperEntered()` guard is what makes that safe — the chord
-tap runs exactly while hyper mode is entered, so nothing is let by that has no
-tap waiting to eat it.
+four; the chord tap below swallows the three chords itself, so none of them
+ever reaches an app. The `hyperEntered()` guard is what makes that safe — the
+chord tap runs exactly while hyper mode is entered, so nothing is let by that
+has no tap waiting to eat it.
 
 ### Automation is not what the lock is for
 
@@ -702,7 +714,7 @@ Nothing is logged per event, which at keystroke rates would be its own problem.
 Instead the module counts what the rule let through, and
 `hs -c 'return blackoutLockPassed()'` reads the count: take it before and after
 posting a synthetic event and the difference answers "did it land". It counts
-only this rule, so F18 and the two chords — a hand at the keyboard — do not
+only this rule, so F18 and the three chords — a hand at the keyboard — do not
 move it, and a Hammerspoon reload resets it along with the chunk.
 
 **Post and read in separate `hs -c` invocations.** The tap callback runs on the
@@ -724,30 +736,64 @@ exercises the rule, but it moves no window and types into nothing.
 Two taps are in play during a blackout, and they do different jobs. The lock
 tap above only ever decides what to *drop*. The chord tap is separate: it runs
 whenever hyper mode is entered, black screen or not, and it is what actually
-dispatches hyper+shift+F1, hyper+cmd+shift+F1, hyper+shift+F2 and the bare
-hyper+F1/F2 brightness keys, because Carbon drops those presses — see "When a
-hyper chord does nothing" below. Since a tap that deletes an event hides it
-from every tap after it, the order macOS calls them in must not change the
+dispatches hyper+shift+F1, hyper+cmd+shift+F1, hyper+cmd+F1, hyper+shift+F2 and
+the bare hyper+F1/F2 brightness keys, because Carbon drops those presses — see
+"When a hyper chord does nothing" below. Since a tap that deletes an event hides
+it from every tap after it, the order macOS calls them in must not change the
 outcome, so the chord tap repeats the lock's own rule rather than relying on
 it: while the lock is up, the only chords that do anything are the one that
-ends the blackout and the one that marks it lock-first. The ordering really
+ends the blackout and the two that tighten it. The ordering really
 does vary — `hs.eventtap` inserts at the head of the chain, and the chord tap
 is rebuilt on every hyper entry while the lock tap is built once at black-on,
 so the chord tap is almost always asked first. Almost is the whole reason the
 rule is written twice.
 
-What F2 leaves on screen is decided when the blackout starts, not when it
-ends. After hyper+shift+F1, F2 within the grace period restores straight to
-the desktop; past it, the session is locked with `hs.caffeinate.lockScreen()`
-first and the display restored a moment later — a blackout up for an hour is
-one nobody is watching, so whoever ends it meets the login screen.
-hyper+shift+cmd+F1 starts a blackout marked lock-first, via
-`blackoutBegin(true)`, and F2 then locks first at any age. Pressed during a
+What F2 leaves on screen is decided when the blackout starts, not when it ends,
+and there is a ladder of three rungs deciding it. Each rung is reachable from
+the one below, a blackout climbs it and never descends, and the only way off it
+is the blackout ending.
+
+Rung one, hyper+shift+F1, is the plain blackout. F2 within the grace period
+restores straight to the desktop; past it, the session is locked with
+`hs.caffeinate.lockScreen()` first and the display restored a moment later — a
+blackout up for an hour is one nobody is watching, so whoever ends it meets the
+login screen.
+
+Rung two, hyper+shift+cmd+F1, starts a blackout marked lock-first, via
+`blackoutBegin(true, false)`, and F2 then locks first at any age. Pressed during a
 blackout that is already up it marks *that* one, through `blackoutUpgrade` —
 which sets the mark and touches nothing else. Not the garden, which would
 restart the keep-blank loop on a screen that is already black; not
 `blackoutLockOn`, which would rebuild the tap and restart the expiry from the
 press rather than from the start of the black.
+
+Rung three, hyper+cmd+F1, stops waiting for the ending and locks the session
+now. Fresh, `blackoutLockNow` blacks and locks in the same run-loop turn, black
+first: everything `blackoutChordBegin` does is non-blocking, so the lock is
+requested a fraction of a millisecond later and the band gets its turn to draw
+before the login window covers it, where the other order would draw it behind
+the lock screen and it would never be seen at all. Nothing is lost by blacking
+first — the garden does not care what the session is doing, and
+`display-black-on-loop` re-asserts gamma at the login screen just as happily.
+On a blackout already up, the mark is set *before* the lock, so a `lockScreen`
+that somehow never arrives still leaves a blackout that locks on the way out.
+
+There is no chord back from rung three, and there is not meant to be: chords
+cannot reach the login screen, where Secure Input hides every keystroke from
+every tap. The way back is unlocking the session — Touch ID, or a password
+typed blind at a screen you cannot see. The Swift lock watcher turns that into
+`h-hook-unlock`, which runs `h-blackout-release`, which reaches
+`display-black-off`, which calls `blackoutLockOff` and `blackoutEnded` here over
+ipc. The display comes back on its own.
+
+Which rung a blackout is at lives in `rung`, and like the mark it is only ever
+raised. It is deliberately not persisted: the one fact it adds over the mark —
+"the session is already locked" — is macOS's own state, and would be stale the
+moment it was read back. A recovered rung-three blackout therefore comes back as
+rung two, and nothing downstream can tell the difference, because the session is
+either still locked, which the login screen says for itself, or has been
+unlocked, in which case `h-hook-unlock` ended the blackout already and there was
+nothing left to recover.
 
 The mark belongs to whoever *starts* the black, because the person who presses
 F2 might be an adversary; that is why there is no cmd chord on F2. The upgrade
@@ -812,6 +858,22 @@ for a while after the code had moved on.
 - `blackoutUpgradeSound`. The cue an upgrade plays, as a name from
   `/System/Library/Sounds`, or false for silence. A name rather than an on/off,
   so the knob picks the sound instead of gating one written into the code.
+- `blackoutLockNowSound`. The same, for rung three reached on a blackout
+  already up. Distinct from the one above on purpose: by then there is no
+  screen left to tell the two rungs apart on, so they are told apart by ear and
+  by nothing else.
+- `blackoutLockScreenEnabled`. Whether `hs.caffeinate.lockScreen()` is really
+  called. Every lock in the module goes through one `lockSession` helper, so
+  setting this false turns them all into a console line for the length of a
+  test — locking the session is the one thing here a test cannot undo, since it
+  lands the tester on the login screen where Secure Input hides the very chords
+  that would get them back. Deliberately *not* written in the `x = x or default`
+  style of the others: a reload re-arms it, because an override that outlived
+  its test would quietly break the invariant this module exists for, and the
+  cost of re-arming is typing it again.
+- `blackoutNoteFile`, `blackoutNoteSeconds`. The blackout note: where it is read
+  from, and how long it holds a starting blackout back. See "The blackout note"
+  below.
 - `blackoutLockScreenAfterSeconds`. A blackout older than this locks the
   session before the display is restored. 0 locks first every time; false
   never does. A lock-first blackout ignores it and always locks.
@@ -834,6 +896,16 @@ hs -c 'return blackoutLockPassed()'   # automated events let through since load
 hs -c 'blackoutRestore()'             # what hyper+shift+F2 does
 hs -c 'blackoutRestore(true)'         # lock the session first, always; shell only
 hs -c 'blackoutUpgrade()'             # mark a blackout already up as lock-first
+hs -c 'blackoutLockNow()'             # what hyper+cmd+F1 does, fresh or not
+hs -c 'blackoutChordRun("black")'     # the whole chord path, note gate and all;
+                                      # also "black-lock-first", "black-lock-now",
+                                      # "restore"
+hs -c 'blackoutLockScreenEnabled = false'   # stand the session lock down for a
+                                            # test; a reload re-arms it
+hs -c 'return blackoutNoteText()'     # the pending note, or nil
+hs -c 'blackoutNoteShow()'            # show it and nothing else
+hs -c 'return blackoutNotePending()'  # is a note holding a blackout back?
+hs -c 'blackoutNoteFire()'            # stop waiting; black now
 ```
 
 There are four ways out, and every path that ends a blackout takes one of them.
@@ -844,14 +916,17 @@ which calls `blackoutLockOff` and `blackoutEnded` on `systemDidWake` and
 unconditional gamma restore — the one point every unblack path reaches, whether
 F2, `h-hook-wake`,
 `h-hook-unlock` from the Swift lock-watcher or the function run bare from
-another machine, so the lock can never outlive the black. And the expiry.
+another machine, so the lock can never outlive the black. And the expiry. Rung
+three has no way out of its own; it takes the third of those, since unlocking
+the session is what fires `h-hook-unlock`.
 
 Only the Hammerspoon side locks the session; a shell restore releases the lock
 and brings the display back, nothing more, because it is the owner acting from
 ssh, not a hand at the keyboard. The invariant that falls out of all this: the
 keyboard lock never releases into an unlocked session on its own. The expiry
-locks first, a wake is a login screen already, and the only path onto a live
-desktop is F2 inside the grace period of an unmarked blackout — a person's act.
+locks first, a wake is a login screen already, and the only paths onto a live
+desktop are F2 inside the grace period of an unmarked blackout and unlocking
+the session yourself — a person's deliberate act either way.
 
 The tap is installed only for the life of a blackout, for the privacy and
 latency reasons given in `core/fim.lua`. Its limits all fail toward "the keys
@@ -861,23 +936,96 @@ block typing there; engaging while it is on shows a warning alert saying so. A
 Hammerspoon crash drops the tap silently while the screen stays black, until
 the next load recovers it from redis, and macOS disables a tap whose callback
 stalls. The engage alert shows before the screen goes black, since black-on is
-asynchronous through the garden and the alert is not. There are two of them: a
-plain blackout says "Input locked." in the amber `warn` band, and a lock-first
-one says "Input locked. Ending the blackout locks the screen." in `blood`, a
-far darker red. The colour carries that difference because nothing else can —
-both chords leave a screen equally black, and the mark cannot be revoked once
-it is set, so it has to be legible at a glance rather than by reading. `blood`
-is darker than the crimson `crit` of the Secure Input warning above as well,
-which can land in the very same instant.
+asynchronous through the garden and the alert is not. There is one band per
+rung, and they make a ladder of their own: a plain blackout says "Input
+locked." in the amber `warn` band, a lock-first one says "Input locked. Ending
+the blackout locks the screen." in `blood`, a far darker red, and a lock-now one
+says "Locking now. Input locked. Unlock to restore." in `midnight`, darker
+again. The colour carries the difference because nothing else can — every rung
+leaves a screen equally black, and the mark cannot be revoked once it is set, so
+it has to be legible at a glance rather than by reading. `blood` and `midnight`
+are both darker than the crimson `crit` of the Secure Input warning above,
+which can land in the very same instant. The `midnight` band is up only for
+about as long as it takes the login window to cover it, which is still the
+moment before the screen goes with the person looking at it, and that is what
+makes it worth drawing at all.
 
-An upgrade reuses that band and that colour, but by then the band is the wrong
-instrument: the screen is already black, so nothing drawn on it can be seen.
-It is shown anyway — it costs nothing, and it is right in the moment before the
-garden's black lands, on a display the selector missed, or with the keyboard
-lock disabled — and a short system sound carries the confirmation that actually
-reaches a person in the dark. That is `blackoutUpgradeSound`. It is the only
-place in this module where sound is used at all, for the one signal that has no
-screen left to use.
+A rung reached *later*, on a blackout already up, says a shorter version of the
+same thing in the same colour, but by then the band is the wrong instrument: the
+screen is already black, so nothing drawn on it can be seen. It is shown anyway
+— it costs nothing, and it is right in the moment before the garden's black
+lands, on a display the selector missed, or with the keyboard lock disabled —
+and a short system sound carries the confirmation that actually reaches a person
+in the dark. That is `blackoutUpgradeSound` for rung two and
+`blackoutLockNowSound` for rung three. The cues are keyed to the rung *reached*
+rather than to the step taken, so climbing to rung three plays the lock-now cue
+whether it was reached from rung one or from rung two, while rung two keeps its
+own. A *fresh* rung-three start plays nothing, because there is still a lit
+screen and the band is the confirmation, for the moment it lasts. A repeat press
+at either rung replays its cue, for the same reason the band is re-flashed: a
+second press has to look like something other than a dropped one. Sound is the
+only signal this module has for the case with no screen left to use.
+
+### The blackout note
+
+A blackout chord is the last thing this machine shows before the screen goes,
+which makes it the one moment a reminder is guaranteed to be read: you are
+looking at the screen, and you are about to stop. So a blackout that *starts*
+can be held back for a few seconds to show you a note you left yourself — "the
+render is still going", "unplug the drive".
+
+The writing side is zsh, in `zshlang/auto-load/others/power.zsh`:
+`alert-at-next-blackout <text ...>` appends one Markdown bullet per non-empty
+line (reading stdin when given no arguments), `alert-at-next-blackout-show`
+prints what the next blackout will show, `alert-at-next-blackout-last` what the
+last one showed, and `alert-at-next-blackout-clear` drops a pending note —
+moved aside rather than deleted, and to the same place a blackout would have
+moved it, so the `-last` reader can still show what was thrown away. The file is
+`~/tmp/alert_at_next_blackout.md`, under the zsh knob
+`alert_at_next_blackout_file` and the Lua knob `blackoutNoteFile`. `~/tmp` is
+swept periodically, which is the right lifetime for this: a note nobody blacked
+the screen on for weeks is a note that has expired.
+
+That one path is written out in both languages on purpose, rather than asked for
+over the garden. A blackout must not wait on a `brishz` round trip, and a path
+fetched from a shell that may be wedged is a path that fails exactly when the
+screen is about to go black. The two defaults have to agree, and each side's
+comment names the other.
+
+When a blackout starts, the note goes up as a centred, pinned Markdown alert in
+the grey `notice` colour, with a countdown running for `blackoutNoteSeconds`;
+then the file is moved to `<file>.last`, and then the screen blacks. Centred
+rather than in the top strip, where the agent banner and the "Input locked" band
+live, because this one is meant to be *read*; `notice` rather than any of the
+warn/blood/midnight ladder, which means something else entirely; and the
+countdown does double duty, since how long the note has left is how long the
+screen has left.
+
+The rename happens when the blackout actually fires, not when the note is shown.
+A reload or a crash mid-countdown therefore loses the blackout and keeps the
+note, which is the right way round: a note nobody has read yet is worth more
+than a blackout nobody asked for twice.
+
+A second blackout chord during the countdown skips the rest of the wait.
+Nothing cancels a pending blackout — the note is a warning, not a confirmation
+prompt — so the only question is which rung fires, and the answer is the
+*higher* of the pending one and the pressed one, never the later one. A rung-one
+press arriving after a rung-three one would otherwise unlock what the rung-three
+press had already decided, and in this module the mark only ever moves toward
+locking. Chords with no rung of their own — the way out, a brightness step from
+a second hyper entry — run as usual and leave the countdown alone.
+
+Only a blackout that is *starting* shows a note. An escalation of one already up
+does not: the screen is black, nobody can read anything, and the person pressing
+is asking for the lock, not for a delay before it.
+
+For looking at the rendering and for tests, without blacking anything:
+`blackoutNoteShow()` puts the note on screen and touches nothing else,
+`blackoutNoteText()` returns it, `blackoutNotePending()` says whether one is
+holding a blackout back, and `blackoutNoteFire()` ends the wait early.
+`blackoutChordRun("black")` — or `"black-lock-first"`, `"black-lock-now"`,
+`"restore"` — runs the whole chord path from the shell, note gate included,
+which is the only way to exercise the gate without a keyboard.
 
 ## When a hyper chord does nothing
 

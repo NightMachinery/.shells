@@ -3,18 +3,22 @@
 --- types into whatever window has focus, a click still lands on whatever is
 --- under the pointer, and the hardware brightness keys quietly undo the black.
 --- This module locks all of that out for the life of the blackout, leaving
---- exactly one way back in: the black-off chord, hyper+shift+F2.
+--- exactly one way back in from the keyboard: the black-off chord,
+--- hyper+shift+F2 -- and, once the top rung has locked the session, only
+--- unlocking it again.
 ---
 --- It is an hs.eventtap. Taps run before Carbon hotkeys and before any app, so
 --- a callback returning true drops the event for everyone -- every other hyper
---- binding included. The allowlist is three things: F18, the physical hyper
+--- binding included. The allowlist is four things: F18, the physical hyper
 --- key, so the hyper modal can still be entered; F2 with shift while hyper
---- mode is entered, which ends the blackout; and F1 with shift and cmd while
---- hyper mode is entered, the one chord that may act *without* ending it --
---- it marks the blackout lock-first. Neither of those two reaches an app: the
---- lock tap only passes them, and the chord tap below swallows them itself.
+--- mode is entered, which ends the blackout; F1 with shift and cmd while hyper
+--- mode is entered, which marks the blackout lock-first; and F1 with cmd alone
+--- while hyper mode is entered, which locks the session on the spot. The last
+--- two act *without* ending the blackout, and can only make the way out
+--- stricter. None of the three chords reaches an app: the lock tap only passes
+--- them, and the chord tap below swallows them itself.
 ---
---- Those three are the allowlist for a *person*. Software is not held to it:
+--- Those four are the allowlist for a *person*. Software is not held to it:
 --- this lock is here to stop another person physically using the machine, and
 --- it was never meant to stop local tools. Every event carries the state id of
 --- the source that made it, and anything that made a source of its own -- this
@@ -40,6 +44,22 @@
 --- whoever presses F2 later may be a stranger. The invariant: the keyboard
 --- lock never releases into an unlocked session on its own. Only F2 inside
 --- the grace period does that, and that is a person's deliberate act.
+---
+--- That makes a ladder of three rungs, and hyper+cmd+F1 is the top one: it
+--- stops waiting for the ending and locks the session now, black as well.
+--- Fresh, it blacks and locks; on a blackout already up, it marks it
+--- lock-first and locks on the spot, with a cue of its own so the rung reached
+--- can be told by ear once there is no screen left to tell it on. There is no
+--- chord back from it, and there is not meant to be: chords cannot reach the
+--- login screen, where Secure Input hides every keystroke from every tap. The
+--- way back is unlocking the session -- Touch ID, or a password typed at a
+--- screen you cannot see. The Swift lock watcher turns that into h-hook-unlock,
+--- which runs h-blackout-release, which reaches display-black-off, which calls
+--- blackoutLockOff and blackoutEnded here over ipc. The display comes back on
+--- its own.
+---
+--- A blackout that *starts* may be held back by a note first: see ** The
+--- blackout note below, and alert-at-next-blackout in zsh.
 ---
 --- Which is why releasing the input lock and ending the blackout are two
 --- functions and not one. blackoutLockOff gives the keyboard back and touches
@@ -69,6 +89,17 @@
 ---   hs -c 'blackoutRestore(true)'     -- lock the session first, always
 ---   hs -c 'blackoutUpgrade()'         -- what hyper+shift+cmd+F1 does to a
 ---                                        blackout that is already up
+---   hs -c 'blackoutLockNow()'         -- what hyper+cmd+F1 does, fresh or not
+---   hs -c 'blackoutChordRun("black")' -- the whole chord path, note gate and
+---                                        all; also "black-lock-first",
+---                                        "black-lock-now", "restore"
+---   hs -c 'blackoutLockScreenEnabled = false'
+---                                     -- stand the session lock down for a
+---                                        test; a reload re-arms it
+---   hs -c 'return blackoutNoteText()' -- the pending note, or nil
+---   hs -c 'blackoutNoteShow()'        -- show it and nothing else
+---   hs -c 'return blackoutNotePending()'
+---   hs -c 'blackoutNoteFire()'        -- stop waiting; black now
 ---
 --- Every failure points the same way, at keys coming back: a Hammerspoon crash
 --- or reload drops the tap, macOS disables a tap whose callback stalls, and the
@@ -96,6 +127,50 @@ if blackoutLockMouse == nil then blackoutLockMouse = true end
 --- one buried in the code.
 if blackoutUpgradeSound == nil then blackoutUpgradeSound = "Submarine" end
 
+--- The cue hyper+cmd+F1 plays when it locks the session on a blackout that is
+--- already up. Distinct from blackoutUpgradeSound on purpose: by then there is
+--- no screen left to tell the two rungs apart on, so they are told apart by
+--- ear and by nothing else. Glass is short and bright where Submarine is low
+--- and slow, which is about as far apart as /System/Library/Sounds gets.
+---
+--- Keyed to the rung *reached*, not to the step taken: 1 -> 3 and 2 -> 3 both
+--- play this one. A fresh rung-three start plays nothing -- the screen is
+--- still lit and the band is the confirmation, for the moment it lasts.
+if blackoutLockNowSound == nil then blackoutLockNowSound = "Glass" end
+
+--- Whether hs.caffeinate.lockScreen() is really called. Locking the session is
+--- the one thing this module does that a test cannot undo -- it lands the
+--- tester on the login screen, where Secure Input hides the very chords that
+--- would get them back -- so every lock in this file goes through lockSession
+--- below, and this turns that into a console line for the length of a test:
+---   hs -c 'blackoutLockScreenEnabled = false'
+---
+--- Deliberately *not* `== nil'-guarded like the knobs above: a reload re-arms
+--- it. An override that outlived the test would quietly break the invariant
+--- this module exists for, and the cost of re-arming is typing it again.
+blackoutLockScreenEnabled = true
+
+--- ** Configuration: the blackout note
+--- A note to yourself, read on the way into the dark. `alert-at-next-blackout'
+--- in zshlang/auto-load/others/power.zsh appends a Markdown bullet to this
+--- file; the next blackout that *starts* puts the file on screen for
+--- blackoutNoteSeconds, moves it aside to "<file>.last", and then blacks. The
+--- point is the one moment you are guaranteed to be looking at the screen and
+--- about to stop: "the render is still going", "unplug the drive".
+---
+--- The path is written out in both languages rather than asked for over the
+--- garden. A blackout must not wait on a brishz round trip, and a path fetched
+--- from a shell that may be wedged is a path that fails exactly when the
+--- screen is about to go black. The two defaults must agree; the zsh side
+--- (alert_at_next_blackout_file) names this file in its comment for the same
+--- reason.
+blackoutNoteFile = blackoutNoteFile
+    or ((os.getenv("HOME") or "") .. "/tmp/alert_at_next_blackout.md")
+
+--- How long the note holds the blackout back. Any blackout chord pressed
+--- during it skips the rest of the wait; nothing cancels the blackout.
+blackoutNoteSeconds = blackoutNoteSeconds or 5
+
 --- After this many seconds of blackout, restoring the display locks the
 --- session first. 0 locks first always; false never does. Measured from
 --- blackoutBegin, so it works with the keyboard lock disabled too.
@@ -122,16 +197,29 @@ blackoutLockState = blackoutLockState or {
     -- Started with hyper+shift+cmd+F1: lock the session before restoring,
     -- whatever the age.
     lockFirst = false,
+    -- Which rung of the ladder this blackout is at, 1 to 3, or nil when none
+    -- is up. What the band in blackoutLockOn reads. Only ever raised while a
+    -- blackout is up, and not persisted: the one fact it adds over lockFirst,
+    -- "the session is already locked", is macOS's own state and would be
+    -- stale the moment it was read back. Recovery sets it from the mark.
+    rung = nil,
     restoreTimer = nil,
     recoverTimer = nil,
     -- The chord dispatch tap; see ** Chord dispatch below. Lives here rather
     -- than in a local so a reload can find and stop the previous run's.
     chordTap = nil,
-    -- blackoutUpgradeSound, resolved, and the name it was resolved from. Here
-    -- rather than in a local because a sound collected mid-play stops. A
-    -- dofile keeps the previous table, so both may be absent; read defensively.
-    sound = nil,
-    soundName = nil,
+    -- Resolved hs.sound handles and the names they were resolved from, one
+    -- entry per cue -- "upgrade" and "lock-now". Here rather than in a local
+    -- because a sound collected mid-play stops, and one slot per cue so the
+    -- two rungs do not evict each other between presses. A dofile keeps the
+    -- previous table, which may predate these fields, so playCue reads them
+    -- defensively.
+    sounds = nil,
+    soundNames = nil,
+    -- A note is on screen and the blackout it delays is waiting on this timer;
+    -- pendingChord is which chord is waiting. See ** The blackout note.
+    noteTimer = nil,
+    pendingChord = nil,
 }
 
 --- How long the lock screen gets to come up before the display is restored
@@ -141,6 +229,7 @@ local kLockSettleSeconds = 0.7
 local kAlertId = "blackout-lock"
 local kReleaseAlertId = "blackout-lock-release"
 local kSecureInputAlertId = "blackout-lock-secure-input"
+local kNoteAlertId = "blackout-note"
 local kMinSeconds = 5
 
 --- The hyper toggle, by keycode: it arrives with no flags of its own.
@@ -148,7 +237,8 @@ local kF18KeyCode = hs.keycodes.map.f18 or 79
 --- The escape chord is hyper+shift+F2 -- the existing black-off binding.
 local kEscapeKeyCode = hs.keycodes.map.f2 or 120
 --- The black chord is hyper+shift+F1; with cmd it also marks a blackout that
---- is already up, which is the one other thing the lock lets by.
+--- is already up, and with cmd alone it locks the session now -- the two
+--- other things the lock lets by.
 local kBlackKeyCode = hs.keycodes.map.f1 or 122
 
 local types = hs.eventtap.event.types
@@ -192,6 +282,40 @@ end
 
 local function hyperEntered()
     return hyper_modality ~= nil and hyper_modality.entered_p == true
+end
+
+--- Plays a named cue, caching the handle per key. Cached because a sound
+--- object collected mid-play stops; keyed by name as well, so a knob changed
+--- from the console takes effect on the next press rather than on the next
+--- reload. Returns whether a sound was there to play.
+local function playCue(key, name)
+    if not name then return false end
+
+    local st = blackoutLockState
+    st.sounds = st.sounds or {}
+    st.soundNames = st.soundNames or {}
+
+    if st.soundNames[key] ~= name then
+        st.soundNames[key] = name
+        st.sounds[key] = hs.sound.getByName(name)
+        if not st.sounds[key] then
+            print("blackout-lock: no such sound: " .. tostring(name))
+        end
+    end
+
+    if st.sounds[key] then st.sounds[key]:play() end
+    return st.sounds[key] ~= nil
+end
+
+--- The one place this module locks the session, so that one knob can stand
+--- them all down for a test. Returns whether it really locked.
+local function lockSession()
+    if not blackoutLockScreenEnabled then
+        print("blackout-lock: lockScreen suppressed (blackoutLockScreenEnabled = false)")
+        return false
+    end
+    hs.caffeinate.lockScreen()
+    return true
 end
 
 --- ** Persistence
@@ -260,24 +384,32 @@ local function handleEvent(event)
             return false
         end
 
-        --- The two chords that may act while the lock is up: F2 with shift
-        --- ends the blackout, F1 with shift and cmd marks it lock-first.
-        --- Passed rather than acted on here -- the chord dispatch tap owns
-        --- both and swallows them itself, so neither ever reaches an app.
-        --- That tap runs exactly while hyper mode is entered, which is what
-        --- makes hyperEntered() the right guard: nothing is let by that has
-        --- no tap waiting to eat it. The release is covered by that tap while
-        --- F18 is still held, and by the deny below once the mode has exited
-        --- under it. Kept in step with chordFor by hand; the note on the gate
-        --- in handleChordEvent says why the rule is deliberately written out
-        --- in both places rather than shared.
+        --- The three chords that may act while the lock is up: F2 with shift
+        --- ends the blackout, F1 with shift and cmd marks it lock-first, and
+        --- F1 with cmd alone locks the session now. Passed rather than acted
+        --- on here -- the chord dispatch tap owns all three and swallows them
+        --- itself, so none ever reaches an app. That tap runs exactly while
+        --- hyper mode is entered, which is what makes hyperEntered() the
+        --- right guard: nothing is let by that has no tap waiting to eat it.
+        --- The release is covered by that tap while F18 is still held, and by
+        --- the deny below once the mode has exited under it. Kept in step
+        --- with chordFor by hand; the note on the gate in handleChordEvent
+        --- says why the rule is deliberately written out in both places
+        --- rather than shared.
         if hyperEntered() then
             local flags = event:getFlags()
-            if flags.shift and not flags.alt and not flags.ctrl then
-                if keyCode == kEscapeKeyCode and not flags.cmd then
-                    return false
-                end
-                if keyCode == kBlackKeyCode and flags.cmd then
+            if not flags.alt and not flags.ctrl then
+                if flags.shift then
+                    if keyCode == kEscapeKeyCode and not flags.cmd then
+                        return false
+                    end
+                    if keyCode == kBlackKeyCode and flags.cmd then
+                        return false
+                    end
+                elseif flags.cmd and keyCode == kBlackKeyCode then
+                    --- Rung three. Like rung two it does not end the
+                    --- blackout, and like rung two it can only make the way
+                    --- out stricter.
                     return false
                 end
             end
@@ -311,9 +443,24 @@ local function stopRestoreTimer(st)
     end
 end
 
+local function stopNoteTimer(st)
+    if st.noteTimer then
+        st.noteTimer:stop()
+        st.noteTimer = nil
+    end
+    st.pendingChord = nil
+end
+
+--- Only a dofile into a live Hammerspoon gets here with a previous state; the
+--- ordinary reload is hs.reload(), a fresh Lua state, and every timer dies
+--- with the old one. A note countdown caught by a dofile is stopped with the
+--- rest, and the blackout it was holding back goes with it, deliberately: the
+--- note file is not moved aside until the blackout actually fires, so the
+--- next one shows the same note again and nothing is lost.
 if previousState and previousState ~= blackoutLockState then
     stopTap(previousState)
     stopRestoreTimer(previousState)
+    stopNoteTimer(previousState)
     if previousState.chordTap then previousState.chordTap:stop() end
 end
 
@@ -366,20 +513,26 @@ function blackoutLockOn(seconds)
     -- Visible for the moment before the screen goes black: black-on is
     -- asynchronous through the garden, and this is synchronous.
     --
-    -- The lock-first mark has no other way to show itself: both chords go
-    -- equally black, and the mark cannot be revoked once set, so this band is
-    -- its one confirmation at the start. Hence its own sentence and its own
-    -- colour -- blood, darker than the amber the plain chord keeps and darker
-    -- than the crimson `crit' the Secure Input warning below may fire
-    -- alongside it. blackoutUpgrade reuses both for a mark set later, where
-    -- the screen is already black and a sound has to carry it instead.
-    local lockFirst = st.lockFirst
+    -- The lock-first mark has no other way to show itself: all three chords
+    -- go equally black, and the mark cannot be revoked once set, so this band
+    -- is its one confirmation at the start. Hence its own sentence and its
+    -- own colour, and a ladder of them: warn for the plain chord, blood for
+    -- lock-first, midnight for lock-now, each darker than the last and all
+    -- darker than the crimson `crit' the Secure Input warning below may fire
+    -- alongside. The rung-three band is up for about as long as it takes the
+    -- login window to cover it; that is still the moment before the screen
+    -- goes, with the person looking at it, which is what makes it worth
+    -- drawing. blackoutUpgrade and blackoutLockNow reuse the colours for a
+    -- rung reached later, where the screen is already black and a sound has
+    -- to carry it instead.
+    local rung = st.rung or (st.lockFirst and 2 or 1)
 
-    alert(lockFirst and "Input locked. Ending the blackout locks the screen."
-                     or "Input locked.", {
+    alert(rung >= 3 and "Locking now. Input locked. Unlock to restore."
+              or rung == 2 and "Input locked. Ending the blackout locks the screen."
+              or "Input locked.", {
         id = kAlertId,
-        color = lockFirst and "blood" or "warn",
-        seconds = lockFirst and 5 or 4,
+        color = rung >= 3 and "midnight" or rung == 2 and "blood" or "warn",
+        seconds = rung >= 2 and 5 or 4,
         screens = "all",
     })
 
@@ -455,26 +608,34 @@ function blackoutEnded()
 
     st.since = nil
     st.lockFirst = false
+    st.rung = nil
     persist(st)
 
     return true
 end
 
---- What hyper+shift+F1 calls, and hyper+shift+cmd+F1 with lockFirst=true.
---- Records when the black began, whether or not the keyboard lock is on,
---- because the lock-before-restore rule needs the age either way. A second F1
---- during a blackout keeps the original time, and nothing here can downgrade
---- the mark: the parameter only ever raises it. Raising it on a blackout that
---- is already up is blackoutUpgrade's job, which is what the chord reaches
---- then, so that the garden is not sent to re-black an already black screen.
-function blackoutBegin(lockFirst)
+--- What hyper+shift+F1 calls, hyper+shift+cmd+F1 with lockFirst=true, and
+--- hyper+cmd+F1 with lockNow=true as well. Records when the black began,
+--- whether or not the keyboard lock is on, because the lock-before-restore
+--- rule needs the age either way. A second F1 during a blackout keeps the
+--- original time, and nothing here can downgrade the mark or the rung: the
+--- parameters only ever raise them. Raising them on a blackout that is
+--- already up is blackoutUpgrade's and blackoutLockNow's job, which is what
+--- the chords reach then, so that the garden is not sent to re-black an
+--- already black screen.
+---
+--- lockNow does not lock anything here. It only names the rung, so the band
+--- blackoutLockOn is about to draw can say which chord asked for it; the lock
+--- itself is blackoutLockNow's, placed after this returns.
+function blackoutBegin(lockFirst, lockNow)
     local st = blackoutLockState
     if not st.since then
         st.since = hs.timer.secondsSinceEpoch()
     end
-    if lockFirst then
+    if lockFirst or lockNow then
         st.lockFirst = true
     end
+    st.rung = math.max(st.rung or 0, lockNow and 3 or lockFirst and 2 or 1)
     persist(st)
     if blackoutLockEnabled then
         blackoutLockOn()
@@ -498,6 +659,7 @@ function blackoutUpgrade()
     if not st.since then return false end
 
     st.lockFirst = true
+    st.rung = math.max(st.rung or 0, 2)
     persist(st)
 
     --: Shown even when the mark was already set. Re-flashing is the only way a
@@ -514,18 +676,75 @@ function blackoutUpgrade()
     --- sound is the confirmation that actually reaches a person here. The band
     --- goes up regardless: it costs nothing, it is right in the moment before
     --- the garden's black lands, and it is what a screen-lit test can see.
-    if blackoutUpgradeSound then
-        if st.soundName ~= blackoutUpgradeSound then
-            st.soundName = blackoutUpgradeSound
-            st.sound = hs.sound.getByName(blackoutUpgradeSound)
-            if not st.sound then
-                print("blackout-lock: no such sound: " .. tostring(blackoutUpgradeSound))
-            end
-        end
-        if st.sound then st.sound:play() end
-    end
+    playCue("upgrade", blackoutUpgradeSound)
 
     return true
+end
+
+--- Rung three, hyper+cmd+F1. Rung two marks a blackout so that *ending* it
+--- locks the screen; this one stops waiting for the ending and locks the
+--- session now.
+---
+--- Both cases live here rather than split across this file and
+--- window-media-bindings.lua, because they are one act reached from two
+--- places: the mark, the lock, and -- only when nothing is black yet -- the
+--- garden. The one thing it borrows from that file is blackoutChordBegin,
+--- which is exactly what runChordNow below borrows for the other two rungs.
+---
+--- Ordering, fresh: black first, lock second, both inside one run-loop turn.
+--- Everything blackoutChordBegin does is non-blocking -- the garden call goes
+--- out over hs.task, the tap is installed, the band is queued -- so the lock
+--- is requested a fraction of a millisecond later, and the band gets its turn
+--- to draw before the login window covers it. The other way round it would be
+--- drawn behind the lock screen and never seen at all. Nothing is lost by
+--- blacking first: brightness-off-all-loop runs in the garden, which does not
+--- care what the session is doing, and display-black-on-loop re-asserts gamma
+--- at the login screen just as happily.
+---
+--- Ordering, on a blackout already up: the mark is set before the lock, so a
+--- lockScreen that somehow never arrives still leaves a blackout that locks on
+--- the way out.
+---
+--- No sound on a fresh start, a sound on an escalation. Sound is what this
+--- module reaches for when there is no screen left to say anything on; on a
+--- fresh start there is one, still lit, with the person looking at it. A
+--- repeat press at this rung replays the cue, for the same reason
+--- blackoutUpgrade re-flashes: a second press has to look like something.
+---
+--- The way back is unlocking the session; the header says how that reaches
+--- this module. Returns whether it started a blackout, as opposed to locking
+--- one already up.
+function blackoutLockNow()
+    local st = blackoutLockState
+
+    if not st.since then
+        if blackoutChordBegin then
+            blackoutChordBegin(true, true)
+        else
+            --- window-media-bindings.lua failed to load, so there is no garden
+            --- call to make. Arm and lock anyway: a lit screen on a locked
+            --- session beats a chord that did nothing.
+            blackoutBegin(true, true)
+        end
+        lockSession()
+        return true
+    end
+
+    st.lockFirst = true
+    st.rung = 3
+    persist(st)
+
+    alert("Locking the session now.", {
+        id = kAlertId,
+        color = "midnight",
+        seconds = 5,
+        screens = "all",
+    })
+
+    playCue("lock-now", blackoutLockNowSound)
+    lockSession()
+
+    return false
 end
 
 local function shouldLockScreen(force)
@@ -560,7 +779,7 @@ function blackoutRestore(forceLock)
     end
 
     if lockFirst then
-        hs.caffeinate.lockScreen()
+        lockSession()
         stopRestoreTimer(st)
         st.restoreTimer = hs.timer.doAfter(kLockSettleSeconds, restore)
     else
@@ -620,43 +839,235 @@ local function chordFor(keyName, flags)
         return nil
     end
 
-    --- No shift: the brightness keys, dispatched here for the same reason --
-    --- they get dropped too. Swallowed rather than passed on, so that nothing
-    --- downstream can claim them: hyper+F1 meant dictation for as long as STT
-    --- bound the bare keys globally, and the next binder would collide the
-    --- same way.
-    if flags.cmd then return nil end
+    --- No shift. cmd on F1 is rung three, "lock the session now and black";
+    --- cmd on F2 stays nil, because the way *out* never grows a cmd variant.
+    --- The mark belongs to whoever starts the black, and whoever presses F2
+    --- later may be a stranger.
+    ---
+    --- Without cmd: the brightness keys, dispatched here for the same reason
+    --- -- they get dropped too. Swallowed rather than passed on, so that
+    --- nothing downstream can claim them: hyper+F1 meant dictation for as long
+    --- as STT bound the bare keys globally, and the next binder would collide
+    --- the same way.
+    if flags.cmd then
+        if keyName == "f1" then return "black-lock-now" end
+        return nil
+    end
     if keyName == "f1" then return "brightness-dec" end
     if keyName == "f2" then return "brightness-inc" end
     return nil
 end
 
+--- Which rung a chord asks for. Doubles as the "does this chord start a
+--- blackout" test, which is what the note gate below needs -- `restore' exits
+--- the mode too but starts nothing. Used to resolve a press that lands during
+--- a note countdown: the higher of the two wins, never the later one.
+local kChordRung = {
+    ["black"] = 1,
+    ["black-lock-first"] = 2,
+    ["black-lock-now"] = 3,
+}
+
 --- The blackout chords are one-shot and leave the mode, exactly as an
---- auto-trigger hs.hotkey binding did -- the cmd one included when it only
---- marks a blackout already up rather than starting one. The brightness keys
---- deliberately do not: holding hyper and stepping the level repeatedly is the
---- point, which is why they were bound with auto_trigger_p=false.
+--- auto-trigger hs.hotkey binding did -- the two cmd ones included when they
+--- only act on a blackout already up rather than starting one. The brightness
+--- keys deliberately do not: holding hyper and stepping the level repeatedly
+--- is the point, which is why they were bound with auto_trigger_p=false.
 local kChordExitsMode = {
     ["black"] = true,
     ["black-lock-first"] = true,
+    ["black-lock-now"] = true,
     ["restore"] = true,
 }
 
-local function runChord(chord)
+--- What a chord actually does, once the note gate in blackoutChordRun below
+--- has had its turn.
+local function runChordNow(chord)
     if chord == "restore" then
         if blackoutChordRestore then blackoutChordRestore() end
-    elseif chord == "black-lock-first" and blackoutLockState.since then
-        --- A blackout is already up, so mark it rather than start a second
-        --- one. Keyed on `since' and not blackoutLockActive(), because that
-        --- one asks after the *tap*, and with blackoutLockEnabled false there
-        --- is no tap to ask while a blackout is very much up. `since' is the
-        --- one field that means "a blackout is up" in both configurations.
-        blackoutUpgrade()
-    elseif kChordExitsMode[chord] then
-        if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first") end
+    elseif kChordRung[chord] and blackoutLockState.since then
+        --- A blackout is already up, so climb the ladder rather than start a
+        --- second one. Keyed on `since' and not blackoutLockActive(), because
+        --- that one asks after the *tap*, and with blackoutLockEnabled false
+        --- there is no tap to ask while a blackout is very much up. `since' is
+        --- the one field that means "a blackout is up" in both configurations.
+        ---
+        --- Rung one falls through to blackoutChordBegin on purpose, as it
+        --- always did: with the keyboard lock on it never gets here (the gate
+        --- in handleChordEvent swallows it), and with the lock off, re-running
+        --- the garden is the old behaviour and harmless.
+        if chord == "black-lock-now" then
+            blackoutLockNow()
+        elseif chord == "black-lock-first" then
+            blackoutUpgrade()
+        elseif blackoutChordBegin then
+            blackoutChordBegin(false, false)
+        end
+    elseif chord == "black-lock-now" then
+        blackoutLockNow()
+    elseif kChordRung[chord] then
+        if blackoutChordBegin then blackoutChordBegin(chord == "black-lock-first", false) end
     elseif hyperBrightnessStep then
         hyperBrightnessStep(chord == "brightness-dec" and "dec" or "inc")
     end
+end
+
+--- ** The blackout note
+--- Read at chord time, moved aside when the blackout it delayed actually
+--- fires -- not when it is shown. A reload, or a Hammerspoon killed
+--- mid-countdown, therefore loses the blackout and keeps the note, which is
+--- the right way round: a note nobody has read yet is worth more than a
+--- blackout nobody asked for twice. The knobs are under ** Configuration.
+
+local function noteFilePath()
+    local file = tostring(blackoutNoteFile or "")
+    if file == "" then return nil end
+    --- `~' is the shell's, not the filesystem's. Expanded here so the knob may
+    --- be written either way and still match the zsh side's default.
+    local home = os.getenv("HOME")
+    if home and file:sub(1, 1) == "~" then
+        file = home .. file:sub(2)
+    end
+    return file
+end
+
+--- The pending note's text, or nil when there is none. Read-only, so a caller
+--- may ask as often as it likes. The same io.open/read("a") the alert engine's
+--- alertV2FromFile uses, and for the same reason: a path is cheap to carry and
+--- a payload is not.
+function blackoutNoteText()
+    local file = noteFilePath()
+    if not file then return nil end
+
+    local handle = io.open(file, "r")
+    if not handle then return nil end
+    local text = handle:read("a")
+    handle:close()
+
+    text = (text or ""):gsub("%s+$", "")
+    if text == "" then return nil end
+    return text
+end
+
+--- Moves the note aside so the next blackout does not show it again.
+--- os.rename over the destination, because POSIX rename(2) replaces it: one
+--- syscall, and ".last" is always either the whole previous note or the whole
+--- one before it, never half of either. If it fails -- a read-only home, a
+--- path that has become a directory -- the note is deleted instead, because a
+--- note that cannot be moved aside would otherwise reappear at every blackout
+--- for ever.
+local function noteArchive()
+    local file = noteFilePath()
+    if not file then return false end
+
+    local ok = os.rename(file, file .. ".last")
+    if not ok then
+        os.remove(file)
+        return false
+    end
+    return true
+end
+
+--- Whether a note is on screen holding a blackout back. For tests, and for
+--- the skip in blackoutChordRun.
+function blackoutNotePending()
+    return blackoutLockState.noteTimer ~= nil
+end
+
+--- Puts the note on screen and touches nothing else -- no blackout, no rename
+--- -- for looking at the rendering:  hs -c 'blackoutNoteShow()'
+--- Returns the text it showed, or nil when there is no note.
+---
+--- Centre rather than top: the top strip is where the agent banner and the
+--- "Input locked" band live, and this one is meant to be *read* in the few
+--- seconds before the screen goes, not noticed out of the corner of an eye.
+--- Pinned for the same reason -- a wall of command output elsewhere must not
+--- push it off. `notice' grey keeps it out of the warn/blood/midnight ladder,
+--- which means something else entirely. The countdown does double duty: how
+--- long the note has left is how long the screen has left.
+function blackoutNoteShow(seconds)
+    local text = blackoutNoteText()
+    if not text then return nil end
+
+    alert(text, {
+        id = kNoteAlertId,
+        markup = "md",
+        color = "notice",
+        seconds = math.max(1, tonumber(seconds) or blackoutNoteSeconds),
+        countdown = true,
+        pinned = true,
+        position = "center",
+        screens = "all",
+    })
+    return text
+end
+
+--- Fires the blackout the note was holding back: the wait ends here, whether
+--- it ran out or a second press cut it short. `chord' overrides what was
+--- pending; blackoutChordRun passes the *higher* of the two rungs.
+function blackoutNoteFire(chord)
+    local st = blackoutLockState
+
+    chord = chord or st.pendingChord or "black"
+    stopNoteTimer(st)
+    dismiss(kNoteAlertId)
+    noteArchive()
+    runChordNow(chord)
+
+    return chord
+end
+
+--- The note gate. True means it has taken the chord: the note is up, and the
+--- blackout will fire when the timer does. False means there was no note and
+--- the caller should get on with it.
+local function noteGate(chord)
+    local st = blackoutLockState
+    if not blackoutNoteShow() then return false end
+
+    stopNoteTimer(st)
+    st.pendingChord = chord
+    --: The same floor blackoutNoteShow applies, so the band and the timer
+    --: cannot disagree about how long the note has.
+    st.noteTimer = hs.timer.doAfter(math.max(1, tonumber(blackoutNoteSeconds) or 1), function()
+        blackoutNoteFire()
+    end)
+    return true
+end
+
+--- The chord dispatcher, and the shell's way into the whole sequence:
+---   hs -c 'blackoutChordRun("black")'
+--- Global for that reason; handleChordEvent below is the only other caller.
+function blackoutChordRun(chord)
+    local st = blackoutLockState
+
+    --- A press landing during a note countdown skips the rest of the wait.
+    --- Nothing cancels the blackout -- the note is a warning, not a
+    --- confirmation prompt -- so the only question is which rung fires, and
+    --- the answer is the higher of the two, never the later one. A rung-one
+    --- press arriving after a rung-three one would otherwise unlock what the
+    --- rung-three press had already decided, and in this module the mark only
+    --- ever moves toward locking.
+    ---
+    --- Anything without a rung -- the way out, a brightness step from a second
+    --- hyper entry -- runs as usual and leaves the countdown alone.
+    if blackoutNotePending() and kChordRung[chord] then
+        local pending = st.pendingChord
+        if (kChordRung[pending] or 0) > kChordRung[chord] then
+            chord = pending
+        end
+        return blackoutNoteFire(chord)
+    end
+
+    --- A blackout only now starting is what a note is for. An escalation of
+    --- one already up is not: the screen is black, nobody can read anything,
+    --- and the person pressing it is asking for the lock, not for a delay
+    --- before it.
+    if kChordRung[chord] and not st.since then
+        if noteGate(chord) then return chord end
+    end
+
+    runChordNow(chord)
+    return chord
 end
 
 local function handleChordEvent(event)
@@ -667,18 +1078,24 @@ local function handleChordEvent(event)
     --: Bare F1/F2 are the brightness keys, and they stay on hs.hotkey.
     if not chord then return false end
 
-    --- While the lock is up two chords still do something: the one that ends
-    --- the blackout, and the one that tightens it -- hyper+shift+cmd+F1 marks
-    --- a blackout already up as lock-first. Nothing goes the other way, and
-    --- plain hyper+shift+F1 stays swallowed, since re-blacking a black screen
-    --- would only restart the garden's loop.
+    --- While the lock is up three chords still do something: the one that
+    --- ends the blackout, and the two that tighten it -- hyper+shift+cmd+F1
+    --- marks a blackout already up as lock-first, and hyper+cmd+F1 locks the
+    --- session outright. Nothing goes the other way, and plain hyper+shift+F1
+    --- stays swallowed, since re-blacking a black screen would only restart
+    --- the garden's loop.
     ---
     --- The same rule handleEvent enforces above, repeated here so the outcome
     --- does not depend on which of the two taps macOS happens to call first --
     --- and it really does vary: hs.eventtap inserts at the head of the chain,
     --- and this tap is rebuilt on every hyper entry while the lock's is built
     --- once at black-on, so this one is almost always asked first. Almost.
-    if blackoutLockActive() and chord ~= "restore" and chord ~= "black-lock-first" then
+    --- Edit the two together, or the ladder acquires a rung that works only
+    --- when nothing is black.
+    if blackoutLockActive()
+        and chord ~= "restore"
+        and chord ~= "black-lock-first"
+        and chord ~= "black-lock-now" then
         return true
     end
 
@@ -695,7 +1112,7 @@ local function handleChordEvent(event)
             --- done, in the same order: leaving the mode entered would make
             --- the next F18 press toggle it off rather than on.
             if kChordExitsMode[chord] and hyper_triggered then hyper_triggered() end
-            runChord(chord)
+            blackoutChordRun(chord)
         end)
     end
 
@@ -745,6 +1162,12 @@ function blackoutLockRecover()
 
     st.since = tonumber(since)
     st.lockFirst = (first == "1")
+    --- Rung three is not saved (see the state table), so a recovered rung-three
+    --- blackout comes back as rung two. Nothing downstream can tell: the
+    --- session is either still locked, which the login screen says for
+    --- itself, or was unlocked, in which case h-hook-unlock has ended the
+    --- blackout already and there is nothing to recover.
+    st.rung = st.lockFirst and 2 or 1
 
     if blackoutLockEnabled then
         local remaining = blackoutLockMaxSeconds - (hs.timer.secondsSinceEpoch() - st.since)
