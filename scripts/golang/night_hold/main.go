@@ -8,9 +8,11 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -41,6 +43,9 @@ func main() {
 	case "guard":
 		cmdGuard()
 		return
+	case "refresh":
+		cmdRefresh()
+		return
 	default:
 		fmt.Fprintf(os.Stderr, "night_hold: unknown subcommand %q\n", os.Args[1])
 		usage(1)
@@ -63,6 +68,8 @@ func usage(code int) {
   status  [<resource>]
   holders <resource>                            live holder ids, one per line
   guard                                         PreToolUse hook payload on stdin
+  refresh                                       restart the clock on your holds;
+                                                Stop/UserPromptSubmit payload on stdin
 
 A resource is any string. repo:, path:, dir: and file: are resolved to an
 absolute path first, so repo:~/scripts and repo:/Users/evar/scripts are one
@@ -314,4 +321,20 @@ func cmdGuard() {
 	fmt.Println(hold.DenyJSON(d.Reason))
 	fmt.Fprintln(os.Stderr, d.Reason)
 	os.Exit(2)
+}
+
+// cmdRefresh restarts the deadline on this session's holds. Wired to the Stop
+// and UserPromptSubmit hooks, so the TTL measures idle time from when the agent
+// actually went quiet rather than from its last tool call -- an agent waiting
+// on the user makes no tool calls, and used to lose its hold while sitting
+// there. Silent and always successful: a hook must never fail over this.
+func cmdRefresh() {
+	raw, err := io.ReadAll(io.LimitReader(os.Stdin, 8<<20))
+	if err != nil {
+		return
+	}
+	var p hold.Payload
+	_ = json.Unmarshal(raw, &p)
+
+	_, _ = hold.New().Refresh(hold.GuardCaller(hold.SanitizeHolder(p.SessionID)), time.Now())
 }

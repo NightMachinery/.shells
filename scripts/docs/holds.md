@@ -108,6 +108,19 @@ every tool call, and when the caller owns a hold it pushes the deadline out —
 only once less than half the window remains, so this costs a handful of writes
 per window rather than one per tool call.
 
+Tool calls alone are not enough, though, and getting this wrong is subtle. An
+agent that is alive, holds a repository, and is sitting waiting for the user to
+answer a question makes **no tool calls at all**, so keepalive never fires and
+its hold lapses underneath it while it waits. Liveness does not save it, because
+liveness only ever ends a hold early. So `night_hold refresh` also runs on the
+`Stop` and `UserPromptSubmit` hooks — the moments the agent goes quiet and comes
+back — which restarts the clock at exactly the event the deadline is supposed to
+be measured from.
+
+That is not a way to hold something forever: it takes a live agent still in a
+conversation. One that is killed is reaped by liveness, and one abandoned
+mid-conversation stops emitting these and lapses on schedule.
+
 Together these change what the TTL *means*. It stops being "how long I guess
 this will take", which nobody can answer up front, and becomes "how long after
 I go quiet" — a question with an obvious answer.

@@ -226,3 +226,90 @@ func TestPIDIdentityDoesNotLeakBetweenAgents(t *testing.T) {
 		t.Error("another agent must not be able to release it")
 	}
 }
+
+// An agent that is alive but waiting for the user to answer a question makes no
+// tool calls, so keepalive never fires and its hold used to lapse underneath it
+// while it sat there. Liveness does not save it: liveness only ends a hold
+// early, it never extends one.
+func TestHoldSurvivesAnAgentWaitingOnTheUser(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
+	s := Store{Root: filepath.Join(home, ".night-holds")}
+	held := filepath.Join(home, "repo")
+
+	start := time.Now()
+	h := mustAcquire(t, s, AcquireOpts{
+		Resource: "repo:" + held, Holder: "waiting", TTL: 10 * time.Minute,
+		Reason: "mid task", Matches: []string{"vcsh night.sh"}, Now: start,
+	})
+
+	// The agent finishes a turn and goes quiet. That is the moment the clock
+	// should start from.
+	quiet := start.Add(9 * time.Minute)
+	got, err := s.Refresh(Caller{Holder: "waiting"}, quiet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("refreshed %d holds, want 1", len(got))
+	}
+
+	// Nine minutes of the user thinking, well past the original deadline.
+	later := quiet.Add(9 * time.Minute)
+	live, _ := s.Live(h.Resource, later, false)
+	if len(live) != 1 {
+		t.Fatal("the hold lapsed while its agent was alive and waiting for the user")
+	}
+	if live[0].Reason != "mid task" || len(live[0].Matches) != 1 {
+		t.Errorf("refresh narrowed what is protected: %+v", live[0])
+	}
+}
+
+func TestRefreshOnlyTouchesYourOwnHolds(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
+	s := Store{Root: filepath.Join(home, ".night-holds")}
+
+	start := time.Now()
+	mine := mustAcquire(t, s, AcquireOpts{Resource: "gpu:0", Holder: "me", TTL: time.Hour, Now: start})
+	theirs := mustAcquire(t, s, AcquireOpts{Resource: "gpu:1", Holder: "them", TTL: time.Hour, Now: start})
+
+	later := start.Add(time.Minute)
+	if _, err := s.Refresh(Caller{Holder: "me"}, later); err != nil {
+		t.Fatal(err)
+	}
+
+	liveMine, _ := s.Live(mine.Resource, later, false)
+	liveTheirs, _ := s.Live(theirs.Resource, later, false)
+	if !liveMine[0].Until.After(mine.Until) {
+		t.Error("my own hold was not refreshed")
+	}
+	if !liveTheirs[0].Until.Equal(theirs.Until) {
+		t.Error("refresh extended a hold belonging to someone else")
+	}
+}
+
+// Refresh must not be a way to hold something forever without being in a
+// conversation: an abandoned agent emits no Stop events and lapses on schedule.
+func TestRefreshDoesNotResurrectAnExpiredHold(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PID", "")
+	t.Setenv("hold_agent_pid", "")
+	s := Store{Root: filepath.Join(home, ".night-holds")}
+
+	start := time.Now().Add(-2 * time.Hour)
+	mustAcquire(t, s, AcquireOpts{Resource: "gpu:0", Holder: "gone", TTL: time.Minute, Now: start})
+
+	got, err := s.Refresh(Caller{Holder: "gone"}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Error("refresh revived a hold that had already expired")
+	}
+}
