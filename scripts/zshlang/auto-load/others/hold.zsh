@@ -148,8 +148,13 @@ Re-acquiring your own live hold renews it rather than failing, so a long job
 can just call this again instead of tracking whether it already holds one.
 
 --match adds a literal string that the PreToolUse guard should treat as
-touching this resource, beyond the path itself. For a vcsh repository that is
-worth doing: a command like \`vcsh night.sh commit' names the repo nowhere."
+touching this resource, beyond the path itself, and is tested as a plain
+substring -- you asked for that exact text. For a vcsh repository it is worth
+doing: a command like \`vcsh night.sh commit' names the repo nowhere.
+
+A path resource also gets its own path matched, absolute and \`~'-abbreviated,
+but only where a path boundary follows it, so a hold on \`path:~/tmp' does not
+block \`ls ~/tmpfoo'."
 
     local resource="${1}"
     assert-args resource @RET
@@ -191,19 +196,24 @@ worth doing: a command like \`vcsh night.sh commit' names the repo nowhere."
         #: Ours. Fall through and rewrite it, which is the renew.
     fi
 
-    #: Defaults worth having for a path kind: the guard can only match text it
-    #: is given, and an agent writes the abbreviated form at least as often as
-    #: the real one.
     local -a matches=()
     local i
     for (( i = 2 ; i <= ${#o_match} ; i += 2 )) ; do
         matches+=("${o_match[i]}")
     done
+
+    #: Written as `path-match:', which the guard tests differently: an
+    #: occurrence only counts when a path boundary follows it. A plain
+    #: substring test here was wrong -- a hold on `path:~/tmp' denied
+    #: `ls ~/tmpfoo', because the held path is a prefix of an unrelated one.
+    #: The abbreviated form is derived too, because an agent writes `~/x' at
+    #: least as often as the real path.
+    local -a path_matches=()
     case "${canonical}" in
         (repo:*|path:*|dir:*|file:*)
             local p="${canonical#*:}"
-            matches+=("$p")
-            matches+=("${p/#${HOME}/~}")
+            path_matches+=("$p")
+            path_matches+=("${p/#${HOME}/~}")
             ;;
     esac
 
@@ -217,11 +227,11 @@ worth doing: a command like \`vcsh night.sh commit' names the repo nowhere."
         ec "pid:      $$"
         ec "host:     ${HOST}"
         ec "reason:   ${reason}"
-        #: `(u)' because [agfi:hold-renew] feeds the stored matches back in
-        #: while the path defaults below are added afresh, so without it every
-        #: renewal would append another copy of them.
         for i in "${(@u)matches}" ; do
             ec "match:    ${i}"
+        done
+        for i in "${(@u)path_matches}" ; do
+            ec "path-match: ${i}"
         done
     } > "$f" @TRET
 
@@ -279,8 +289,10 @@ function hold-renew {
         return 1
     fi
 
-    #: Carry the existing reason and match lines forward, so renewing does not
-    #: quietly narrow what the guard protects.
+    #: Carry the reason and the explicit `--match' literals forward, so renewing
+    #: does not quietly narrow what the guard protects. The `path-match:' lines
+    #: are not carried: [agfi:hold-acquire] re-derives them from the resource,
+    #: and `^match:' does not match `path-match:' anyway.
     reason="$(h-hold-field "$f" reason)"
     local -a matches=("${(@f)$(command sed -n -E 's/^match:[[:space:]]*//p' "$f" 2>/dev/null)}")
 

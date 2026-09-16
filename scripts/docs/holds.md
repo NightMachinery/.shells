@@ -73,11 +73,27 @@ override.
 - a `Bash` call's working directory is inside a held path;
 - a `Bash` command contains one of the hold's `match:` literals.
 
-A path hold gets two match literals for free: the absolute path and its
-`~`-abbreviated form. `--match` adds more, and for a vcsh repository that is
-not optional — `vcsh night.sh commit` names the path nowhere, so the path tests
-alone would let it straight through. That is exactly the command you most want
+### Two kinds of match, on purpose
+
+A path resource gets its own path matched for free, absolute and
+`~`-abbreviated, and those are tested **with path boundaries**: an occurrence
+only counts when what precedes and follows it could not be part of a longer
+word. A plain substring test here was wrong, and obviously so once tried — a
+hold on `path:~/tmp` denied `ls ~/tmpfoo`, because the held path is a prefix of
+an unrelated one. A guard that cries wolf before every tool call teaches
+everyone to route around it, so a false positive costs more than a miss.
+
+`--match` literals are different: they are tested as **plain substrings**,
+because the caller asked for that exact text. For a vcsh repository this is not
+optional — `vcsh night.sh commit` names the path nowhere, so the path tests
+alone would let it straight through, and that is the command you most want
 stopped.
+
+Resources that are not paths — `gpu:0`, `service:garden` — get no automatic
+matches at all. Nothing textual is derived from them, so the guard can only
+block on `--match` literals you supply, and a bare `gpu:0` hold is purely
+advisory: [agfi:hold-check] answers, and nothing is denied. Deriving text from
+`0` would have been noise.
 
 The `hold-*` commands themselves are always allowed, even when the command
 names a held resource. Without that, the guard would deny the very command that

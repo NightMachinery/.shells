@@ -95,6 +95,50 @@ under_path() {
     return 1
 }
 
+#: A path occurs in a command only when a path boundary sits on each side of
+#: it. A plain substring test denied `ls ~/tmpfoo' under a hold on `path:~/tmp',
+#: because the held path is a prefix of an unrelated one -- and a guard that
+#: cries wolf before every tool call teaches everyone to route around it.
+#:
+#: Boundary here means: the string end, a `/' (so a file inside the directory
+#: still counts), or one of the characters that can end a word in a shell
+#: command. Explicit --match literals do NOT go through this: the caller asked
+#: for that exact text.
+path_named() {
+    #: $1 the command, $2 the path
+    [ -n "$1" ] && [ -n "$2" ] || return 1
+
+    __rest="$1"
+    while : ; do
+        case "$__rest" in
+            *"$2"*) ;;
+            *) return 1 ;;
+        esac
+
+        __before="${__rest%%"$2"*}"
+        __after="${__rest#*"$2"}"
+
+        #: The character in front, if any, must not be part of a longer word.
+        __ok_before=1
+        if [ -z "$__before" ] ; then
+            __ok_before=0
+        else
+            case "${__before#"${__before%?}"}" in
+                [\ \"\'\(\=\:\,\|\&\;\`\<\>]|'	') __ok_before=0 ;;
+            esac
+        fi
+
+        if [ "$__ok_before" -eq 0 ] ; then
+            case "$__after" in
+                '') return 0 ;;
+                /*|[\ \"\'\)\:\,\|\&\;\`\<\>]*|'	'*) return 0 ;;
+            esac
+        fi
+
+        __rest="$__after"
+    done
+}
+
 contains() {
     #: $1 the haystack, $2 the needle
     [ -n "$1" ] && [ -n "$2" ] || return 1
@@ -133,6 +177,7 @@ for f in "$hold_dir"/* ; do
     resource=''
     reason=''
     matches=''
+    path_matches=''
 
     #: One pass over the file, no forks.
     while IFS= read -r line || [ -n "$line" ] ; do
@@ -141,7 +186,8 @@ for f in "$hold_dir"/* ; do
             'holder:'*)   trim "${line#holder:}"   ; holder="$__t" ;;
             'resource:'*) trim "${line#resource:}" ; resource="$__t" ;;
             'reason:'*)   trim "${line#reason:}"   ; reason="$__t" ;;
-            'match:'*)    trim "${line#match:}"    ; matches="${matches}${nl}${__t}" ;;
+            'match:'*)      trim "${line#match:}"      ; matches="${matches}${nl}${__t}" ;;
+            'path-match:'*) trim "${line#path-match:}" ; path_matches="${path_matches}${nl}${__t}" ;;
         esac
     done < "$f"
 
@@ -177,6 +223,13 @@ for f in "$hold_dir"/* ; do
             set -f
             for m in $matches ; do
                 if [ -n "$m" ] && contains "$bash_command" "$m" ; then
+                    IFS="$default_ifs"
+                    set +f
+                    deny "Blocked by a hold: the command names '${m}', which belongs to ${resource} — ${held} ${advice}"
+                fi
+            done
+            for m in $path_matches ; do
+                if [ -n "$m" ] && path_named "$bash_command" "$m" ; then
                     IFS="$default_ifs"
                     set +f
                     deny "Blocked by a hold: the command names '${m}', which belongs to ${resource} — ${held} ${advice}"
