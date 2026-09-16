@@ -59,6 +59,46 @@ Two gaps:
 generalizing, and because the payload shapes should be read from those tools
 rather than guessed.
 
+* From the prior-art survey
+
+A search for existing tools (2026-09-16) concluded the combination here is not
+available off the shelf: property one — a claim that outlives the process that
+took it — exists only in network lock services needing a daemon, and in the
+1990s mail-lockfile lineage (=dotlockfile=, procmail =lockfile -l=), neither of
+which ships on macOS and neither of which has a shared mode. Three findings are
+worth acting on.
+
+** Evaluate =permissions.deny= as a second enforcement layer
+
+Claude Code's own permission system does path-based denial, and unlike a hook
+it intercepts recognized file commands *inside* =Bash= — =cat=, =head=, =sed=,
+=tee= — and shell redirection targets. Its own hooks documentation says to use
+permissions rather than a hook for a hard deny. Our literal-match strings sit
+exactly in the fragile zone it warns about.
+
+Deny rules are static, so they cannot replace a dynamic guard, but writing the
+current holds into deny rules as a *second* layer may be worth it. Unverified:
+whether Claude Code re-reads =settings.local.json= mid-session. Also reported,
+and worth checking before relying on either: =Write(...)=, =MultiEdit(...)= and
+=Glob(...)= path rules are accepted but never checked — only =Edit(...)= and
+=Read(...)=.
+
+** A cooldown after a liveness reap
+
+Consul's =lock-delay= (15s, from Chubby) blocks re-acquisition for a moment
+after a lease is *invalidated* rather than released, so a reaped-but-actually-
+alive holder cannot race its successor. procmail's =lockfile -s= is the same
+trick. Cheap, and directly relevant now that [[agfi:hold-acquire]] reaps on
+liveness.
+
+** Clock, not concurrency
+
+A wall-clock deadline mirrored in an mtime is vulnerable to laptop sleep and
+NTP steps in a way a lock is not, and =cp -p= / =rsync= / backup tools rewrite
+mtimes. The file body is already authoritative for everyone except the Lua
+reader; if this ever misbehaves, make that reader's stat a fast-path hint that a
+full read can override, and consider anchoring to a boot id.
+
 * Offered and not taken: an audit log
 
 An append-only log of acquires and releases under =${hold_dir}/.log= would
