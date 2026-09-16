@@ -17,7 +17,7 @@ import (
 // process's lifetime. It is not a contradiction of holds not being flocks --
 // that objection is about the *hold*, which has to outlive the shell that took
 // it, and a descriptor-scoped lock cannot. This lock lives for microseconds.
-func withResourceLock(dir string, block bool, fn func() error) error {
+func withResourceLock(dir string, fn func() error) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -29,19 +29,8 @@ func withResourceLock(dir string, block bool, fn func() error) error {
 	}
 	defer f.Close()
 
-	how := syscall.LOCK_EX
-	if !block {
-		how |= syscall.LOCK_NB
-	}
-	if err := syscall.Flock(int(f.Fd()), how); err != nil {
-		if !block {
-			// Someone else is mid-acquire. A best-effort caller -- the guard
-			// refreshing its own deadline before a tool call -- must not wait
-			// for them: a process wedged while holding this would otherwise
-			// hang every tool call in the session. Skipping costs nothing,
-			// because the next tool call tries again.
-			return errBusy
-		}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		// Fail open for the same reason as above: a racy hold beats none.
 		return fn()
 	}
 	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)

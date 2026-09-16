@@ -86,9 +86,6 @@ func (s Store) Guard(r io.Reader, now time.Time) Decision {
 	c := GuardCaller(sanitizeHolder(p.SessionID))
 	for _, h := range holds {
 		if h.Mine(c) {
-			// This caller is alive and working, which is the only evidence a
-			// hold's deadline ever really wanted.
-			s.keepalive(h, now)
 			continue
 		}
 		if d := h.blocks(p); d.Deny {
@@ -96,39 +93,6 @@ func (s Store) Guard(r io.Reader, now time.Time) Decision {
 		}
 	}
 	return Decision{}
-}
-
-// keepaliveFloor is how much of a hold's window must have elapsed before a tool
-// call refreshes it. Without a floor this would write on every single tool
-// call; with one it writes a handful of times per window.
-const keepaliveFloor = 0.5
-
-// keepalive pushes a hold's deadline out because its holder just did something.
-//
-// This is what turns the TTL from "how long I guess this will take", which
-// nobody can answer up front, into "how long after I go quiet", which is a
-// question with an obvious answer. An agent that is working never loses its
-// hold; one that has wandered off loses it on schedule.
-//
-// Best effort in every direction: a failure here must never turn into a denied
-// tool call, and the guard is the wrong place to be strict.
-func (s Store) keepalive(h Hold, now time.Time) {
-	if h.TTL <= 0 {
-		return
-	}
-	if remaining := h.Until.Sub(now); remaining > time.Duration(float64(h.TTL)*keepaliveFloor) {
-		return
-	}
-	_, _ = s.Acquire(AcquireOpts{
-		BestEffort: true,
-		Resource:   h.Resource,
-		Holder:     h.Holder,
-		TTL:        h.TTL,
-		Reason:     h.Reason,
-		Matches:    h.Matches,
-		Shared:     h.Mode == ModeShared,
-		Now:        now,
-	})
 }
 
 func (h Hold) blocks(p Payload) Decision {

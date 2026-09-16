@@ -239,10 +239,6 @@ func Holder() string {
 	return sanitizeHolder(fmt.Sprintf("%d@%s", os.Getpid(), host))
 }
 
-// SanitizeHolder exposes the holder-name normalization to the CLI, so an id
-// from a hook payload compares equal to one written by a shell.
-func SanitizeHolder(id string) string { return sanitizeHolder(id) }
-
 func sanitizeHolder(id string) string {
 	var b strings.Builder
 	for _, r := range id {
@@ -362,15 +358,7 @@ type AcquireOpts struct {
 	Matches  []string
 	Shared   bool
 	Now      time.Time
-	// BestEffort marks a caller that would rather skip than wait: the guard
-	// refreshing its own deadline, and the idle refresh. They run on paths
-	// where blocking would be felt, and there is always a next chance.
-	BestEffort bool
 }
-
-// errBusy means another process is mid-acquire on this resource. Only a
-// best-effort caller ever sees it, and the right response is to do nothing.
-var errBusy = errors.New("another acquire is in progress")
 
 // ErrHeld is returned when an exclusive resource is already held by someone
 // else. It carries the blocking hold so the caller can say who and for how long.
@@ -444,7 +432,7 @@ func (s Store) Acquire(o AcquireOpts) (Hold, error) {
 	}
 
 	var h Hold
-	err := withResourceLock(s.dirFor(canonical), !o.BestEffort, func() error {
+	err := withResourceLock(s.dirFor(canonical), func() error {
 		var err error
 		h, err = s.acquireLocked(canonical, mode, o, now)
 		return err
@@ -620,57 +608,6 @@ func (s Store) Renew(resource, holder string, ttl time.Duration, now time.Time) 
 		}
 	}
 	return Hold{}, ErrNotHeld
-}
-
-// Refresh restarts the deadline on every hold the caller owns, and is how the
-// TTL comes to mean what it claims.
-//
-// Keepalive fires on tool calls, so without this a hold's clock starts at the
-// *last tool call* rather than when the agent actually went quiet -- and an
-// agent that is alive and simply waiting for the user to answer a question
-// makes no tool calls at all, so its hold lapses underneath it while it sits
-// there. Liveness does not save it: liveness only ever ends a hold early.
-//
-// So the agent's own idle moments are the signal. Called from the Stop hook,
-// this restarts the clock at the instant the agent
-// stops working, which is exactly the event "how long after I go quiet" is
-// measured from.
-//
-// It is deliberately not a way to hold something forever: it needs a live
-// agent that is still in a conversation. One that is killed is reaped by
-// liveness, and one that is abandoned mid-conversation stops emitting these
-// and lapses on schedule.
-func (s Store) Refresh(c Caller, now time.Time) ([]Hold, error) {
-	if now.IsZero() {
-		now = time.Now()
-	}
-
-	holds, err := s.All(now, false)
-	if err != nil {
-		return nil, err
-	}
-
-	var out []Hold
-	for _, h := range holds {
-		if !h.Mine(c) {
-			continue
-		}
-		refreshed, err := s.Acquire(AcquireOpts{
-			BestEffort: true,
-			Resource:   h.Resource,
-			Holder:     h.Holder,
-			TTL:        h.TTL,
-			Reason:     h.Reason,
-			Matches:    h.Matches,
-			Shared:     h.Mode == ModeShared,
-			Now:        now,
-		})
-		if err != nil {
-			continue // best effort; a hook must never fail over this
-		}
-		out = append(out, refreshed)
-	}
-	return out, nil
 }
 
 // Check reports whether Acquire would succeed: true when the resource is free,
