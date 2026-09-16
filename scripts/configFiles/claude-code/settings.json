@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh ~/scripts/configFiles/claude-code/hooks/hold-guard.sh"
+            "command": "sh -c 'PATH=\"$PATH:$HOME/go/bin\"; command -v night_hold >/dev/null || exit 0; exec night_hold guard'"
           }
         ]
       }
