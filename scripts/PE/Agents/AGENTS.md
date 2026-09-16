@@ -146,6 +146,31 @@ whatever *they* staged, even when you only ever `git add`ed your own paths.
   force-push to fix it. They may already be working from that history. Report
   it and let me decide.
 
+## Holds: Claiming a Resource Exclusively
+
+When you are doing something atomic that a parallel session would ruin — a
+history rewrite, a large refactor across a whole repo, an interactive migration
+— take a **hold** on the resource first, and release it the moment you are
+done:
+
+```
+hold-acquire repo:~/scripts --ttl 45m --reason "what you are doing"
+hold-status                        #: who holds what, and for how long
+hold-release repo:~/scripts
+```
+
+A `PreToolUse` hook denies edits and shell commands touching a resource someone
+else holds, so this is enforced rather than merely agreed. It always expires on
+its own, so forgetting is not a lasting problem — but release it anyway,
+including when you stop early or hand back unfinished.
+
+For a vcsh repository, add `--match "vcsh night.sh"`: the guard matches text,
+and that command names the path nowhere. See `~/scripts/docs/holds.md`.
+
+If a hold blocks you, do not delete the file to get past it. Ask me. The
+`hold-*` commands themselves are never blocked, so you can always inspect or
+release one.
+
 # Sharing the Screen (macOS)
 
 We often work on the same machine at the same time. When you need to drive the
