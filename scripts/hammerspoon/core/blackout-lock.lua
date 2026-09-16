@@ -171,6 +171,14 @@ blackoutNoteFile = blackoutNoteFile
 --- during it skips the rest of the wait; nothing cancels the blackout.
 blackoutNoteSeconds = blackoutNoteSeconds or 5
 
+--- How the note looks. Gold, because a note to yourself is a sticky note, and
+--- because it is nowhere near the warn/blood/midnight ladder the lock bands
+--- use, which means something else entirely. Large, because it is read from
+--- across a desk in the seconds before the screen goes, not from a chair in
+--- front of it; the size is the band's own and moves no other alert.
+blackoutNoteColor = blackoutNoteColor or "gold"
+blackoutNoteTextSize = blackoutNoteTextSize or 28
+
 --- After this many seconds of blackout, restoring the display locks the
 --- session first. 0 locks first always; false never does. Measured from
 --- blackoutBegin, so it works with the keyboard lock disabled too.
@@ -982,9 +990,10 @@ end
 --- "Input locked" band live, and this one is meant to be *read* in the few
 --- seconds before the screen goes, not noticed out of the corner of an eye.
 --- Pinned for the same reason -- a wall of command output elsewhere must not
---- push it off. `notice' grey keeps it out of the warn/blood/midnight ladder,
---- which means something else entirely. The countdown does double duty: how
---- long the note has left is how long the screen has left.
+--- push it off. Block-aligned, so a list of bullets keeps one left edge and
+--- still sits in the middle of the screen. No countdown: it would be appended
+--- to the last bullet and read as part of it, and the band's own lifetime is
+--- the countdown anyway.
 function blackoutNoteShow(seconds)
     local text = blackoutNoteText()
     if not text then return nil end
@@ -992,9 +1001,10 @@ function blackoutNoteShow(seconds)
     alert(text, {
         id = kNoteAlertId,
         markup = "md",
-        color = "notice",
+        color = blackoutNoteColor,
+        textSize = blackoutNoteTextSize,
+        align = "block",
         seconds = math.max(1, tonumber(seconds) or blackoutNoteSeconds),
-        countdown = true,
         pinned = true,
         position = "center",
         screens = "all",

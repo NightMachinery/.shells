@@ -109,14 +109,20 @@ typeset -g alert_at_next_blackout_file="${alert_at_next_blackout_file:-${HOME}/t
 function alert-at-next-blackout {
     : "usage: alert-at-next-blackout <text ...>
 Adds a note for the next blackout to show. Reads stdin when given no arguments."
-    #: One bullet per non-empty line, so a pasted paragraph reads as a list
-    #: rather than as one run-on band. Markdown, because the alert engine is
-    #: asked to render it as Markdown.
+    #: Arguments are one note, joined by spaces, so `alert-at-next-blackout
+    #: iced hi' is the bullet "iced hi" and not two. Stdin is one bullet per
+    #: non-empty line, so a pasted paragraph reads as a list rather than as
+    #: one run-on band. Markdown, because the alert engine is asked to render
+    #: it as Markdown.
     ##
     local file="${alert_at_next_blackout_file}"
 
     local -a inargs
-    in-or-args3 "$@" @RET
+    if (( $# > 0 )) ; then
+        inargs=("$*")
+    else
+        in-or-args3 @RET
+    fi
 
     local -a bullets=()
     local line
