@@ -351,9 +351,19 @@ gateway of their own: `alertV2FromFile` is what the shell wrapper calls, and
 indirection that nothing would use.
 
 Options: `id` (re-showing the same id updates that alert in place), `seconds`,
-`color`, `position`, `flashSeconds`, `floodFade`, `countdown`, `pinned`, and
-`screens` (a `ModalMode.targetScreens` spec). Everything expires on its own, so
-a caller that crashes cannot leave the screen branded.
+`color`, `position`, `flashSeconds`, `floodFade`, `countdown`, `pinned`,
+`screens` (a `ModalMode.targetScreens` spec), `textSize` and `align`.
+Everything expires on its own, so a caller that crashes cannot leave the
+screen branded.
+
+`textSize` is a point size for that band alone; the default is 15. Wrapping,
+band height and the drawn text all follow it, so a large band costs more of the
+stack's budget and is truncated sooner, and no other band moves. `align` is
+`auto` by default — one short line is centred, anything longer or truncated is
+left-aligned — or `left`, `center`, or `block`. `block` keeps a common left
+edge across the lines and centres the block as a whole on its longest line,
+which is what a list wants in the middle of the screen: `center` would stagger
+the bullets, `left` would pin them to the screen edge.
 
 `alertV2FromFile` is the entry point the shell uses: it reads the message from
 the file and deletes it. `hammerspoon -c` hangs on payloads of a few hundred
@@ -992,14 +1002,18 @@ fetched from a shell that may be wedged is a path that fails exactly when the
 screen is about to go black. The two defaults have to agree, and each side's
 comment names the other.
 
-When a blackout starts, the note goes up as a centred, pinned Markdown alert in
-the grey `notice` colour, with a countdown running for `blackoutNoteSeconds`;
-then the file is moved to `<file>.last`, and then the screen blacks. Centred
-rather than in the top strip, where the agent banner and the "Input locked" band
-live, because this one is meant to be *read*; `notice` rather than any of the
-warn/blood/midnight ladder, which means something else entirely; and the
-countdown does double duty, since how long the note has left is how long the
-screen has left.
+When a blackout starts, the note goes up as a centred, pinned Markdown alert for
+`blackoutNoteSeconds`; then the file is moved to `<file>.last`, and then the
+screen blacks. Centred rather than in the top strip, where the agent banner and
+the "Input locked" band live, because this one is meant to be *read*. It is
+large (`blackoutNoteTextSize`, 28 points, the band's own size and nobody
+else's) because it is read from across a desk in the seconds before the screen
+goes, and gold (`blackoutNoteColor`) because a note to yourself is a sticky
+note and because gold is nowhere near the warn/blood/midnight ladder, which
+means something else entirely. The bullets are block-aligned (see `align` under
+Alerts): one left edge, and the block centred on its longest line. There is no
+countdown on it — appended to the last bullet it would read as part of the
+note, and the band's own lifetime is the countdown anyway.
 
 The rename happens when the blackout actually fires, not when the note is shown.
 A reload or a crash mid-countdown therefore loses the blackout and keeps the

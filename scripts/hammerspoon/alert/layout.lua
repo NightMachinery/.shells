@@ -4,25 +4,44 @@
 
 --- ** Text measuring and wrapping
 --- Menlo is monospaced, so wrapping is arithmetic on character counts rather
---- than a measuring call per candidate word. Measured once because point size
---- to advance width is not exactly 0.6 on every macOS release.
-local cachedCharWidth = nil
+--- than a measuring call per candidate word. Measured once per point size,
+--- because point size to advance width is not exactly 0.6 on every macOS
+--- release.
+local cachedCharWidth = {}
 
-function AlertEngine.charWidth()
-    if cachedCharWidth then
-        return cachedCharWidth
+--- An alert's point size: its own `textSize' when it asked for one, else the
+--- engine default. Everything that sizes a band -- wrapping, height, the
+--- drawn text -- goes through this and lineHeightFor, so one alert can be
+--- large without the rest following.
+function AlertEngine.textSizeOf(alert)
+    return (alert and tonumber(alert.textSize)) or AlertEngine.kTextSize
+end
+
+function AlertEngine.lineHeightFor(size)
+    return size * 1.4
+end
+
+function AlertEngine.charWidth(size)
+    size = size or AlertEngine.kTextSize
+    if cachedCharWidth[size] then
+        return cachedCharWidth[size]
     end
-    local ok, size = pcall(function()
+    local ok, measured = pcall(function()
         return hs.drawing.getTextDrawingSize(hs.styledtext.new(
             "MMMMMMMMMM",
-            { font = { name = AlertEngine.kFont, size = AlertEngine.kTextSize } }))
+            { font = { name = AlertEngine.kFont, size = size } }))
     end)
-    if ok and size and size.w and size.w > 0 then
-        cachedCharWidth = size.w / 10
+    if ok and measured and measured.w and measured.w > 0 then
+        cachedCharWidth[size] = measured.w / 10
     else
-        cachedCharWidth = AlertEngine.kTextSize * 0.6
+        cachedCharWidth[size] = size * 0.6
     end
-    return cachedCharWidth
+    return cachedCharWidth[size]
+end
+
+--- How many characters fit across a stack this wide at this size.
+function AlertEngine.maxCharsFor(width, size)
+    return math.max(1, math.floor((width - 2 * AlertEngine.kPaddingX) / AlertEngine.charWidth(size)))
 end
 
 local function charLen(s)
@@ -164,7 +183,6 @@ end
 --- newest ends up on top.
 function AlertEngine.layoutStack(screen, position)
     local work = screen:frame()
-    local maxChars = math.max(1, math.floor((work.w - 2 * AlertEngine.kPaddingX) / AlertEngine.charWidth()))
     local budget = work.h * alertV2MaxStackFraction
 
     local list = {}
@@ -200,7 +218,7 @@ function AlertEngine.layoutStack(screen, position)
     --- Source spans travel alongside so markup survives truncation. The
     --- synthetic marker line gets a zero-length span: it is text this file
     --- invented, so no run can possibly refer to it.
-    local function truncate(lines, spans, fits)
+    local function truncate(lines, spans, fits, maxChars)
         if fits >= #lines then
             return lines, spans
         end
@@ -227,7 +245,12 @@ function AlertEngine.layoutStack(screen, position)
         return { head .. marker }, { { at = spans[1].at, len = #head } }
     end
 
-    local oneLine = AlertEngine.kLineHeight + 2 * AlertEngine.kPaddingY
+    -- One line of this alert, at its own size. The line-by-line arithmetic
+    -- below is per alert for the same reason: a band that asked to be large
+    -- must be measured large, or its text overflows the band it was granted.
+    local function oneLineFor(alert)
+        return AlertEngine.lineHeightFor(AlertEngine.textSizeOf(alert)) + 2 * AlertEngine.kPaddingY
+    end
 
     local function allocate(remaining)
         -- Everyone visible gets one line before anyone gets two. Otherwise the
@@ -236,6 +259,7 @@ function AlertEngine.layoutStack(screen, position)
         -- still tells you it happened, which a hidden one does not.
         local chosen, hidden = {}, 0
         for _, index in ipairs(order) do
+            local oneLine = oneLineFor(list[index])
             if remaining >= oneLine then
                 remaining = remaining - oneLine
                 table.insert(chosen, index)
@@ -249,14 +273,18 @@ function AlertEngine.layoutStack(screen, position)
         local bands = {}
         for _, index in ipairs(chosen) do
             local alert = list[index]
+            local size = AlertEngine.textSizeOf(alert)
+            local lineHeight = AlertEngine.lineHeightFor(size)
+            local oneLine = oneLineFor(alert)
+            local maxChars = AlertEngine.maxCharsFor(work.w, size)
             local lines, spans = AlertEngine.wrapText(AlertEngine.alertDisplayText(alert), maxChars)
             local full = math.max(AlertEngine.kMinBandHeight,
-                                  #lines * AlertEngine.kLineHeight + 2 * AlertEngine.kPaddingY)
+                                  #lines * lineHeight + 2 * AlertEngine.kPaddingY)
             local grant = math.max(0, math.min(full - oneLine, remaining))
             remaining = remaining - grant
             local height = oneLine + grant
-            local fits = math.floor((height - 2 * AlertEngine.kPaddingY) / AlertEngine.kLineHeight)
-            local kept, keptSpans = truncate(lines, spans, fits)
+            local fits = math.floor((height - 2 * AlertEngine.kPaddingY) / lineHeight)
+            local kept, keptSpans = truncate(lines, spans, fits, maxChars)
             bands[index] = {
                 alert = alert,
                 lines = kept,
@@ -268,6 +296,9 @@ function AlertEngine.layoutStack(screen, position)
                 truncated = (fits < #lines),
                 height = height,
                 color = alert.color,
+                textSize = size,
+                lineHeight = lineHeight,
+                align = alert.align,
             }
         end
 

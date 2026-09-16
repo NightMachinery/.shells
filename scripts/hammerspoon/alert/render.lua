@@ -10,13 +10,21 @@ local kFloodFadeMaxFraction = 0.4
 
 --- ** Rendering
 local function bandAlignment(band)
-    -- Centring is for a short message that fits on its line. A truncated one
-    -- reads as a fragment of something longer, so it lines up with the
-    -- multi-line bands instead.
+    -- An explicit ask wins. "block" is left within the block; the block itself
+    -- is placed by canvasElements below.
+    if band.align == "left" or band.align == "block" then return "left" end
+    if band.align == "center" then return "center" end
+    -- Otherwise, centring is for a short message that fits on its line. A
+    -- truncated one reads as a fragment of something longer, so it lines up
+    -- with the multi-line bands instead.
     return (#band.lines == 1 and not band.truncated) and "center" or "left"
 end
 
-local function runAttributes(attrs)
+local function bandTextSize(band)
+    return band.textSize or AlertEngine.kTextSize
+end
+
+local function runAttributes(attrs, size)
     local face = AlertEngine.kFont
     if attrs.bold and attrs.italic then
         face = AlertEngine.kFont .. "-BoldItalic"
@@ -25,7 +33,7 @@ local function runAttributes(attrs)
     elseif attrs.italic then
         face = AlertEngine.kFont .. "-Italic"
     end
-    local out = { font = { name = face, size = AlertEngine.kTextSize } }
+    local out = { font = { name = face, size = size } }
     if attrs.color then
         out.color = alertV2MarkupColors[attrs.color]
     end
@@ -51,8 +59,9 @@ local function bandText(band)
         return plain
     end
 
+    local size = bandTextSize(band)
     local styled = hs.styledtext.new(plain, {
-        font = { name = AlertEngine.kFont, size = AlertEngine.kTextSize },
+        font = { name = AlertEngine.kFont, size = size },
         color = AlertEngine.textColorFor(band.color),
         paragraphStyle = { alignment = bandAlignment(band) },
     })
@@ -69,7 +78,7 @@ local function bandText(band)
             local from = math.max(run.from, span.at)
             local to = math.min(run.to, span.at + span.len - 1)
             if to >= from then
-                styled = styled:setStyle(runAttributes(run.attrs),
+                styled = styled:setStyle(runAttributes(run.attrs, size),
                                          placed[index] + (from - span.at),
                                          placed[index] + (to - span.at))
             end
@@ -100,18 +109,35 @@ local function canvasElements(stack, origin)
         end
         -- hs.canvas has no vertical alignment for text, so the block is centred
         -- in the band by placing its own frame.
-        local textHeight = #band.lines * AlertEngine.kLineHeight
+        local size = bandTextSize(band)
+        local textHeight = #band.lines * (band.lineHeight or AlertEngine.kLineHeight)
+        local frameX = x + AlertEngine.kPaddingX
+        local frameW = stack.w - 2 * AlertEngine.kPaddingX
+        -- "block": the lines keep a common left edge and the block as a whole
+        -- is centred on its longest line, by narrowing the frame to that line
+        -- and placing it. Menlo is monospaced, so the width is arithmetic; the
+        -- few pixels of slack keep the last character from wrapping on a
+        -- rounding difference between our measure and the canvas's own.
+        if band.align == "block" then
+            local longest = 0
+            for _, line in ipairs(band.lines) do
+                longest = math.max(longest, utf8.len(line) or #line)
+            end
+            local blockW = math.min(frameW, math.ceil(longest * AlertEngine.charWidth(size)) + 4)
+            frameX = frameX + (frameW - blockW) / 2
+            frameW = blockW
+        end
         table.insert(elements, {
             type = "text",
             text = bandText(band),
             textColor = AlertEngine.textColorFor(band.color),
             textFont = AlertEngine.kFont,
-            textSize = AlertEngine.kTextSize,
+            textSize = size,
             textAlignment = bandAlignment(band),
             frame = {
-                x = x + AlertEngine.kPaddingX,
+                x = frameX,
                 y = y + (band.height - textHeight) / 2,
-                w = stack.w - 2 * AlertEngine.kPaddingX,
+                w = frameW,
                 h = textHeight,
             },
         })
@@ -454,10 +480,9 @@ end
 local function tick()
     for _, record in ipairs(alertEngineState.canvases) do
         local work = record.screen:frame()
-        local maxChars = math.max(1,
-            math.floor((work.w - 2 * AlertEngine.kPaddingX) / AlertEngine.charWidth()))
         for index, band in ipairs(record.stack.bands) do
             if band.alert and band.alert.countdown then
+                local maxChars = AlertEngine.maxCharsFor(work.w, bandTextSize(band))
                 local lines, spans = AlertEngine.wrapText(AlertEngine.alertDisplayText(band.alert), maxChars)
                 if #lines ~= #band.lines then
                     AlertEngine.render()

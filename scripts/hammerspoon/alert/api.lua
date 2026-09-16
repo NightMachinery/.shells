@@ -60,7 +60,17 @@ end
 ---                holds the peek off for every band on screen, not just this
 ---                one; see AlertEngine.peekAlpha
 ---   screens      a ModalMode.targetScreens spec, default "all"
+---   textSize     point size for this band alone, default AlertEngine.kTextSize
+---                (15). Wrapping and band height follow it, so a large band
+---                costs more of the stack's budget and is truncated sooner
+---   align        "auto" (default: one short line centred, anything longer
+---                left), "left", "center", or "block" -- the lines keep a
+---                common left edge and the block as a whole is centred on its
+---                longest line, for a list that should read as a list in the
+---                middle of the screen
 --- Returns the alert's id.
+local kAligns = { left = true, center = true, block = true }
+
 function alertV2(text, opts)
     opts = opts or {}
     text = tostring(text or "")
@@ -102,6 +112,11 @@ function alertV2(text, opts)
     -- Only an explicit false opts out; nil means the ordinary peeking band.
     alert.peek = opts.peek ~= false
     alert.screens = opts.screens
+    -- nil for either means the engine default; a bad name is the default too
+    -- rather than an error, since a band that shows up oddly aligned is a
+    -- better report than no band at all.
+    alert.textSize = tonumber(opts.textSize)
+    alert.align = kAligns[opts.align] and opts.align or nil
     alert.expiry = hs.timer.secondsSinceEpoch() + seconds
 
     if alert.timer then
