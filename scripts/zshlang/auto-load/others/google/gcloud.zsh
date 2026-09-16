@@ -815,6 +815,35 @@ function gcp-gpu-shapes {
     gcp-gpu-advice --list-shapes
 }
 
+#: Regions to sweep when the candidate set has nothing and you are willing to
+#: leave the EU. Wider than `$gcp_gpu_zone_candidates` on purpose: this list is
+#: for finding out WHERE capacity is, not for deciding where to run, so it
+#: includes regions we would reject on latency or data residency.
+typeset -ga gcp_gpu_region_candidates_world
+gcp_gpu_region_candidates_world=(
+    ${=gcp_gpu_region_candidates_world:-asia-east1 asia-northeast1 asia-southeast1 australia-southeast1 europe-west1 europe-west3 europe-west4 europe-west9 us-central1 us-east4 us-east5 us-west1 us-west4}
+)
+
+function gcp-gpu-advice-all {
+    #: `gcp-gpu-advice` over a WORLDWIDE region set instead of our candidate
+    #: zones. Slower and much louder; this is the one to run when Europe has
+    #: nothing and moving is on the table.
+    #:
+    #: Still free -- `advice capacity` creates nothing -- so there is no reason
+    #: not to run it before concluding that a shape is unobtainable.
+    #:
+    #: @AliM contributed the sweep-before-you-create discipline this and
+    #: [agfi:gcp-gpu-advice] are built on, and the region list it started from.
+    #: His `advice capacity` recipe is what surfaced the Finland trap: a shape
+    #: can be catalogued, quota'd and priced in a zone and still be impossible
+    #: to create there. See "Known traps" in ~/.night-gcp/notes/usage.org.
+    #:
+    #: `--regions` is passed explicitly, which suppresses the candidate-set
+    #: default inside [agfi:gcp-gpu-advice]; an explicit one from the caller
+    #: still wins over both.
+    gcp-gpu-advice --regions="${(j:,:)gcp_gpu_region_candidates_world}" "$@"
+}
+
 
 function h-gcp-gpu-stockout-p {
     #: Spot VMs do not queue. Creation fails immediately, and "waiting for a
