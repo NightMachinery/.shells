@@ -91,14 +91,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'PATH=\"$PATH:$HOME/go/bin\"; command -v night_hold >/dev/null || exit 0; exec night_hold refresh'"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "brishz_async=y brishz_in=MAGIC_READ_STDIN brishz2.dash claude-code-session-register \"$$\" >/dev/null 2>&1"
           }
         ]
