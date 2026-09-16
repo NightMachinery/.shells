@@ -32,8 +32,14 @@ the linker preserves conflicting Codex links. Verify the old link target,
 replace only that known managed link, and run the linker again. Unrelated
 links and real files must be preserved.
 
-Standalone skill repositories live under `${HOME}/code/skills/`; this is a
-source location, not an additional automatic search root for this linker.
+Standalone skill repositories live under `${HOME}/code/skills/`, and the linker
+does search it, through `agent_skills_repo_roots`. That needs to be a separate
+mechanism from the roots below because its members are *repositories* rather
+than skills: each keeps its own skills in a `skills/` subdirectory, so
+`<root>/<name>/SKILL.md` does not match them and `<root>/*/skills` is globbed
+instead. Every such repository follows that layout, which is why one glob
+serves the convention rather than each repository being wired in by hand --- as
+`agent-subagents.zsh` still does for its own path.
 
 `agent_skills_extra_roots` is how a skill that cannot live in the public tree
 gets linked anyway. It is an array of roots in the same

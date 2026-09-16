@@ -40,6 +40,22 @@ if (( ! ${+agent_skills_extra_roots} )) ; then
     agent_skills_extra_roots=( "${HOME}/.night-gcp/skills" )
 fi
 
+#: Directories holding standalone skill REPOSITORIES, as opposed to skills.
+#: That one level of nesting is the whole reason `~/code/skills' was not simply
+#: added to the list above: its members are repositories -- `tmux-subagents',
+#: `research-agent-ops' -- each of which keeps its skills in its own `skills/'
+#: subdirectory, so `<root>/<name>/SKILL.md' does not match them. Every such
+#: repository here follows that layout, so one glob covers the convention
+#: rather than each repository being wired in by hand.
+#:
+#: Expanded inside [agfi:h-agent-skills-sources] and not here: the glob needs
+#: `bareglobqual', which that function sets and which an agent shell does not
+#: necessarily have on.
+if (( ! ${+agent_skills_repo_roots} )) ; then
+    typeset -ga agent_skills_repo_roots
+    agent_skills_repo_roots=( "${HOME}/code/skills" )
+fi
+
 function h-agent-skills-codex-dir {
     #: User skills are shared across Codex seats, independent of CODEX_HOME.
     print -r -- "${agent_skills_codex_dir:-${HOME}/.agents/skills}"
@@ -83,8 +99,12 @@ function h-agent-skills-sources {
     #: set. See `$agent_skills_extra_roots' for roots beyond the two checkouts.
     setopt localoptions bareglobqual
     local notes_dir="${agent_skills_notes_dir-${HOME}/notes/skills}"
-    local root skill name
+    local root skill name repo_root
     local -a roots=("${agent_skills_src_dir}" "${notes_dir}" "${agent_skills_extra_roots[@]}") sources=()
+    for repo_root in "${agent_skills_repo_roots[@]}" ; do
+        test -n "${repo_root}" || continue
+        roots+=( "${repo_root}"/*/skills(N/) )
+    done
     local -A seen=()
     for root in "${roots[@]}" ; do
         test -n "${root}" || continue
