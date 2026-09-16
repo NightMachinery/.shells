@@ -578,6 +578,30 @@ function h-agy-status-age-fmt {
     fi
 }
 
+function h-agy-status-writer-desc {
+    #: What a cache writer *is*, rather than the id it files itself under.
+    #: =slow= and =statusline= name our two implementations to each other; to
+    #: somebody reading a status report they say nothing at all, and =slow= in
+    #: particular reads as a complaint about the numbers rather than as their
+    #: provenance.
+    #:
+    #: The command is spelled the way [agfi:h-agy-status-run]'s own error
+    #: messages spell it, so the line names something you can actually run.
+    #: Usage: h-agy-status-writer-desc <source>
+    ##
+    case "${1}" in
+        slow)
+            ec "\`agy -p /usage'"
+            ;;
+        statusline)
+            ec "agy's statusline hook"
+            ;;
+        *)
+            ec "${1:-unknown}"
+            ;;
+    esac
+}
+
 function h-agy-status-source-line {
     #: Where the numbers below came from, in the report's own colours.
     #:
@@ -716,9 +740,14 @@ function h-agy-status-statusline {
     #: The worst age rather than the best, and the writers named: a number that
     #: came out of the cache has to say so, or the report reads as live when it
     #: is not.
-    local label detail
-    label="cache $(h-agy-status-age-fmt ${oldest_age}) old" @TRET
-    detail="${(j:, :)${(@u)sources}}"
+    local label detail source
+    label="Cache $(h-agy-status-age-fmt ${oldest_age}) old" @TRET
+
+    local -a descs=()
+    for source in "${(@u)sources}" ; do
+        descs+=( "$(h-agy-status-writer-desc "${source}")" ) @TRET
+    done
+    detail="via ${(j:, :)descs}"
     if (( unknown_age_seen )) ; then
         detail+="; some rows undated"
     fi

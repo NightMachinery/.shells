@@ -137,12 +137,20 @@ the worst age rather than the best, and the writers named, because a number
 that came out of the cache has to say so or the report reads as live:
 
 ```
-cache 2m old (slow)
+Cache 2m old (via `agy -p /usage')
+Cache 2m old (via agy's statusline hook)
 agy (cache older than 1h)
 agy (no cache; run `agy-statusline-install')
 agy (cache not valid JSON: /path/to/quota-cache.json)
 agy (deus)
 ```
+
+The writer is described rather than named. `slow` and `statusline` are what
+the two implementations call each other; to a reader they say nothing, and
+`slow` in particular reads as a complaint about the numbers rather than as
+their provenance. `h-agy-status-writer-desc` maps each id to something you
+could go and run, spelled the way `h-agy-status-run`'s own error messages
+spell it. An id it does not know is printed as-is.
 
 It is **dim**, and deliberately not bold: it is provenance, not a finding, so
 it should be legible when looked for and invisible when the rows are what you
