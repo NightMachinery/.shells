@@ -154,10 +154,16 @@ Set `hammerspoonReloadCoalesce` to false to reload on every event instead.
 
 ### Holds
 
-Any file in `~/.hs-no-reload/` whose mtime is in the **future** is a live claim
-on the reloader, and while one exists nothing reloads by itself. That is what
-`hs-reload-hold` writes and what `hammerspoonReloadHeldBy()` reads; `hs -c
-'return hammerspoonReloadHeldBy()'` answers "why did my save not do anything".
+Any file in `~/.night-holds/service-hs-reload/` whose mtime is in the
+**future** is a live claim on the reloader, and while one exists nothing
+reloads by itself. That is what `hs-reload-hold` writes and what
+`hammerspoonReloadHeldBy()` reads; `hs -c 'return hammerspoonReloadHeldBy()'`
+answers "why did my save not do anything".
+
+These used to be their own implementation under `~/.hs-no-reload/`. They are
+now the *shared* mode of the general hold mechanism — `service:hs-reload`, held
+`--shared` — so `hold-status` lists them alongside every other hold. See
+`scripts/docs/holds.md`. The `hs-reload-*` commands are unchanged.
 
 It exists for agentic editing. Reloading mid-edit loads a half-written module,
 and worse, leaves the previous code's canvases and timers behind — a state that
@@ -170,10 +176,13 @@ reloading under someone still typing; a counter would be worse still, since the
 first agent to be killed would leave it stuck above zero and auto-reload dead
 for good, silently. One file per holder has no shared mutable state to race on.
 
-The deadline lives in the mtime rather than the contents so the check is one
-`hs.fs.attributes` stat with no parsing and no file reads — it runs on
-Hammerspoon's main thread, where blocking freezes every keystroke on the
-machine. Redis would have fit the house style for flags, but reading it there
+The deadline lives in the mtime as well as in the contents, so this check stays
+one `hs.fs.attributes` stat per entry with no parsing and no file reads — it
+runs on Hammerspoon's main thread, where blocking freezes every keystroke on
+the machine. Every other reader parses the contents, where the deadline is
+authoritative. Dotfiles are skipped: `.lock` is the file the binary flocks for
+the duration of an acquire, and its mtime means nothing here. Redis would have
+fit the house style for flags, but reading it there
 means a blocking socket round-trip on that same thread, and an outage would
 force a choice between suppression silently failing and auto-reload never
 running again. A missing directory simply means nothing is holding.
