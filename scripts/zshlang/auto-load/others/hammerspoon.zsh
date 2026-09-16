@@ -263,6 +263,12 @@ function hs-reload-release {
 function h-hs-reload-holds-live {
     : "names of the holders whose deadline has not passed, one per line"
 
+    #: The shell snapshot Claude Code hands its agents runs with
+    #: `nobareglobqual', where `(N)' is not a qualifier and the glob below
+    #: fails outright with `no matches found'. Every agent calling
+    #: [agfi:hs-reload-holds] saw that error.
+    setopt localoptions null_glob
+
     test -d "$hs_no_reload_dir" || return 0
 
     #: zstat, not `stat': the binary is BSD on this machine and GNU on others,
@@ -270,7 +276,7 @@ function h-hs-reload-holds-live {
     zmodload -F zsh/stat b:zstat 2>/dev/null
 
     local f
-    for f in "${hs_no_reload_dir}"/*(N) ; do
+    for f in "${hs_no_reload_dir}"/* ; do
         if [[ "$(zstat +mtime "$f")" -gt "$EPOCHSECONDS" ]] ; then
             ec "${f:t}"
         else
