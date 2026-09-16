@@ -1,5 +1,5 @@
 ##
-#: GPU workstation on GCP, project `REDACTED-PROJECT`.
+#: GPU workstation tooling for GCP.
 #:
 #: The prefix is two-level on purpose. `gcp-` names the *platform*, not the
 #: CLI: much of what is below is not gcloud at all (BigQuery, bucket syncs,
@@ -7,13 +7,24 @@
 #: `gpu-` level reserves room for the `gcp-quota-*`, `gcp-iam-*` and
 #: `gcp-keys-*` helpers that will land in this same file later.
 #:
-#: `REDACTED-PROJECT` is a *shared* lab project: seven personal gmail
-#: accounts hold `roles/editor`, there is no organization parent, and there is
-#: no central admin. Everything here therefore filters on
-#: `owner=${gcp_gpu_owner}` and refuses to touch anything else. See
-#: `~[nt]/private/research/REDACTED-NAME/GCloud/GPU/usage.org`.
+#: This was written against a *shared* project, so everything here filters on
+#: `owner=${gcp_gpu_owner}` and refuses to touch anything it did not label.
+#: That is the right default on any shared project and is not a per-site knob.
+#:
+#: The *names* -- project id, zone, instance, disk, image, bucket -- are
+#: deliberately not in this file. They identify one particular deployment, and
+#: this repository is public, so they live in `~/.night-gcp/config.zsh`, which
+#: is sourced below when it exists. With it absent the `gcp-gpu-*` commands
+#: refuse to run rather than guessing at somebody else's project; see
+#: [agfi:h-gcp-gpu-conf-assert].
 ##
-typeset -g gcp_gpu_project="${gcp_gpu_project:-REDACTED-PROJECT}"
+typeset -g gcp_conf_file="${gcp_conf_file:-${HOME}/.night-gcp/config.zsh}"
+if [[ -r "${gcp_conf_file}" ]] ; then
+    source "${gcp_conf_file}"
+fi
+
+#: No default, on purpose. See the note above.
+typeset -g gcp_gpu_project="${gcp_gpu_project:-}"
 #: @warn Retargeted <2026-08-14 Fri> from `europe-west4-a`, which has NO H100
 #: in any form -- the old default could not reach the one GPU worth reaching.
 #: `europe-west9-c` (Paris) is the cheapest *obtainable* single H100 in the EU
@@ -23,9 +34,9 @@ typeset -g gcp_gpu_project="${gcp_gpu_project:-REDACTED-PROJECT}"
 #: trap: `a3-highgpu-1g` is catalogued and priced there but every create
 #: returns `reason: stockout` with `zonesAvailable: ''`. Price and catalogue
 #: presence prove nothing; see `gcp-gpu-advice`.
-typeset -g gcp_gpu_zone="${gcp_gpu_zone:-europe-west9-c}"
-typeset -g gcp_gpu_region="${gcp_gpu_region:-europe-west9}"
-typeset -g gcp_gpu_instance="${gcp_gpu_instance:-REDACTED-INSTANCE}"
+typeset -g gcp_gpu_zone="${gcp_gpu_zone:-}"
+typeset -g gcp_gpu_region="${gcp_gpu_region:-}"
+typeset -g gcp_gpu_instance="${gcp_gpu_instance:-}"
 #: @warn `europe-west9` has NO G2 and NO A2 in any zone -- only A3. So the
 #: cheap L4/A100 spot rates in the Paris column of the price table below are
 #: unreachable *here*, and a small-model tier needs a different zone (and the
@@ -38,10 +49,11 @@ typeset -g gcp_gpu_boot_type="${gcp_gpu_boot_type:-pd-balanced}"
 #: Our own image: Ubuntu 24.04 + driver 580 + CUDA 12.9 + PyTorch 2.9, with
 #: setup/bootstrap already applied (zsh, mise, micromamba, emacs+doom).
 #: Images are GLOBAL, which is what makes hunting capacity across zones
-#: practical. Built from `REDACTED-BOOT` in europe-west9-c; see report.org.
+#: practical. Built from a throwaway boot instance in the deployment's own
+#: zone; see `notes/report.org` in ~/.night-gcp.
 #: For a bare base instead: ubuntu-2404-lts-amd64 / ubuntu-os-cloud, or
 #: pytorch-2-9-cu129-ubuntu-2404-nvidia-580 / deeplearning-platform-release.
-typeset -g gcp_gpu_image_family="${gcp_gpu_image_family:-REDACTED-IMAGE}"
+typeset -g gcp_gpu_image_family="${gcp_gpu_image_family:-}"
 typeset -g gcp_gpu_image_project="${gcp_gpu_image_project:-${gcp_gpu_project}}"
 #: Persistent disks are zonal, so a data disk pins the instance to
 #: `$gcp_gpu_zone` -- exactly the lock-in the global image exists to avoid.
@@ -50,7 +62,7 @@ typeset -g gcp_gpu_image_project="${gcp_gpu_image_project:-${gcp_gpu_project}}"
 #: billed whether or not anything runs). Turn it on only for scratch that a
 #: job genuinely needs on fast local storage.
 typeset -g gcp_gpu_data_disk_p="${gcp_gpu_data_disk_p:-n}"
-typeset -g gcp_gpu_data_disk="${gcp_gpu_data_disk:-REDACTED-DISK}"
+typeset -g gcp_gpu_data_disk="${gcp_gpu_data_disk:-}"
 typeset -g gcp_gpu_data_gb="${gcp_gpu_data_gb:-300}"
 typeset -g gcp_gpu_data_type="${gcp_gpu_data_type:-pd-balanced}"
 #: Hyperdisk sells capacity and performance as separate line items, so a create
@@ -77,7 +89,7 @@ typeset -g gcp_gpu_owner="${gcp_gpu_owner:-${USERNAME:-${USER}}}"
 #: Never the default compute SA: it holds `roles/editor`, and anything on the
 #: box could mint an editor token from the metadata server.
 typeset -g gcp_gpu_sa="${gcp_gpu_sa:-gpu-runner@${gcp_gpu_project}.iam.gserviceaccount.com}"
-typeset -g gcp_gpu_bucket="${gcp_gpu_bucket:-gs://REDACTED-BUCKET-${gcp_gpu_owner}}"
+typeset -g gcp_gpu_bucket="${gcp_gpu_bucket:-}"
 typeset -g gcp_gpu_max_run="${gcp_gpu_max_run:-8h}"
 typeset -g gcp_gpu_idle_min="${gcp_gpu_idle_min:-30}"
 typeset -g gcp_gpu_budget_config="${gcp_gpu_budget_config:-${HOME}/.config/gcp-gpu-budget}"
@@ -244,7 +256,45 @@ typeset -gA gcp_gpu_price_disk=(
     hyperdisk-balanced   0.0816
 )
 ##
+function h-gcp-gpu-conf-assert {
+    #: `h-gcp-gpu-conf-assert [VAR...]` -- refuse to run against no deployment.
+    #:
+    #: Defaults to `gcp_gpu_project` alone, which is what makes every other
+    #: name mean anything. Callers that need more say so.
+    #:
+    #: This file is public and names no project, so an unconfigured machine has
+    #: these EMPTY rather than pointing at somebody else's project. Empty is
+    #: much the better failure of the two -- but only if it explains itself,
+    #: which is the whole job here.
+    #:
+    #: Two choke points cover every command between them: this function is
+    #: called by [agfi:h-gcp-gpu-gcloud], through which every API call goes,
+    #: and by [agfi:h-gcp-gpu-deps], which the heavyweight entry points call
+    #: already and which asks for the full set.
+    local -a required missing
+    required=( "$@" )
+    (( ${#required} )) || required=( gcp_gpu_project )
+
+    local v
+    for v in "${required[@]}" ; do
+        test -n "${(P)v}" || missing+=( "$v" )
+    done
+    (( ${#missing} )) || return 0
+
+    ecerr "$0: no GCP deployment configured; unset: ${(j:, :)missing}"
+    ecerr ""
+    ecerr "  These name one particular project, so they are not in this public"
+    ecerr "  repository. They live in \`${gcp_conf_file}\`:"
+    ecerr ""
+    ecerr "      git clone git@github.com:NightMachinery/night-gcp.git ~/.night-gcp"
+    ecerr ""
+    ecerr "  Or set them in the environment for a single call."
+    return 1
+}
+
 function h-gcp-gpu-gcloud {
+    h-gcp-gpu-conf-assert @RET
+
     command gcloud --project="${gcp_gpu_project}" "$@"
 }
 
@@ -271,7 +321,8 @@ function h-gcp-gpu-reap-filter {
 }
 
 function h-gcp-gpu-deps {
-    ensure-cmd gcloud jq
+    ensure-cmd gcloud jq @RET
+    h-gcp-gpu-conf-assert gcp_gpu_project gcp_gpu_zone gcp_gpu_region gcp_gpu_instance gcp_gpu_bucket @RET
 }
 
 function h-gcp-gpu-dry-run-p {
@@ -740,6 +791,7 @@ function gcp-gpu-advice {
         ecerr "$0: binary missing. Install: go-install-local \"\${NIGHTDIR}/golang/gcp-gpu-advice\""
         return 1
     fi
+    h-gcp-gpu-conf-assert @RET
 
     local -a extra
     extra=( --project="${gcp_gpu_project}" )
@@ -931,10 +983,11 @@ mkdir -p /mnt/data/runs /mnt/data/venvs
 ## /mnt/data ownership ---------------------------------------------------
 #: @warn This was `for u in $(ls /home) ; do chown -R "$u:$u" /mnt/data ; done`,
 #: which hands the disk to whichever name sorts LAST -- and that is not the
-#: login user. `REDACTED-PROJECT` carries ~22 project-level ssh-keys
-#: entries for the whole lab, and the guest agent makes a home directory for
-#: every one of them, so `someone-else` won every boot and the login user lost
-#: /mnt/data (and any batch running out of it) at each resume. Three reboots
+#: login user. A shared project carries project-level ssh-keys entries for the
+#: whole lab -- ours has about 22 -- and the guest agent makes a home directory
+#: for every one of them, so whichever lab member sorts last won every boot and
+#: the login user lost /mnt/data (and any batch running out of it) at each
+#: resume. Three reboots
 #: went into this during the E2 batch; see LineFine gcp/README.md, "What the
 #: machine got wrong".
 #:
@@ -2217,9 +2270,9 @@ function gcp-gpu-babysit {
 #:
 #: And one refusal that is not a guard but a rule: it re-reads
 #: `labels.owner` on every tick and stops if the instance it is about to start
-#: is not mine. `REDACTED-PROJECT` is shared with six other people.
+#: is not mine. The project is shared with six other people.
 #: ===========================================================================
-typeset -g gcp_gpu_controller_instance="${gcp_gpu_controller_instance:-REDACTED-CONTROLLER}"
+typeset -g gcp_gpu_controller_instance="${gcp_gpu_controller_instance:-}"
 #: Same zone as the GPU by default -- not required (the API is global), but it
 #: keeps `gcp-gpu-ps` output readable and the two lifetimes visibly linked.
 typeset -g gcp_gpu_controller_zone="${gcp_gpu_controller_zone:-${gcp_gpu_zone}}"
@@ -2524,7 +2577,7 @@ fi
 #: Activity audit log and multiplying by the price table.
 #:
 #: This SA has neither. The export was never enabled into
-#: REDACTED-PROJECT:cloud_billing, and reading the audit log needs
+#: `${gcp_gpu_project}:cloud_billing`, and reading the audit log needs
 #: roles/logging.viewer, which is a PROJECT-level grant we cannot make -- the
 #: same wall that parked gcp-gpu-reaper-deploy. So this is best-effort: if the
 #: read works the answer is used, and if it does not, the two ceilings above
@@ -2668,9 +2721,10 @@ function gcp-gpu-controller-iam-cmds {
     #: neither `iam.roles.create` nor `resourcemanager.projects.setIamPolicy`.
     #: Verified against the live policy on 2026-09-04.
     ##
-    ec "# The project Owner is user:REDACTED-OWNER-EMAIL; the seven of us hold"
-    ec "# roles/editor, which cannot create a role or bind one. Steps 1 and 2 are"
-    ec "# therefore a request, not a command you can run. Step 3 you CAN run."
+    ec "# Only the project Owner can do steps 1 and 2. The rest of us hold"
+    ec "# roles/editor, which can neither create a role nor bind one, so those"
+    ec "# two are a request to send rather than a command you can run."
+    ec "# Step 3 you CAN run."
     ec ""
     ec "# 1. A custom role with exactly the three permissions the controller needs."
     ec "#    Deliberately NOT roles/compute.instanceAdmin.v1, which would let a"
