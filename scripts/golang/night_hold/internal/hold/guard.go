@@ -132,8 +132,8 @@ func (s Store) keepalive(h Hold, now time.Time) {
 }
 
 func (h Hold) blocks(p Payload) Decision {
-	held := fmt.Sprintf("held by another session (%s) for another ~%d min. Reason: %s.",
-		h.Holder, minutesLeft(h), h.Reason)
+	held := fmt.Sprintf("held by another session (%s), %s. Reason: %s.",
+		h.Holder, h.blockWindow(), h.Reason)
 	advice := "Run 'hold-status' to see it. Do not work in that resource until the holder releases it; " +
 		"if you believe the hold is stale or wrong, ask the user rather than removing it."
 
@@ -179,12 +179,20 @@ func (h Hold) blocks(p Payload) Decision {
 	return Decision{}
 }
 
-func minutesLeft(h Hold) int {
+// blockWindow tells a denied agent how long this is likely to last, which is
+// the difference between waiting and going to do something else.
+func (h Hold) blockWindow() string {
+	if !h.HasDeadline() {
+		if h.Foreign() {
+			return "for as long as its holder lives, which cannot be checked from this host"
+		}
+		return "for as long as its holder lives"
+	}
 	s := int(h.Until.Sub(time.Now()).Seconds())
 	if s < 0 {
 		s = 0
 	}
-	return (s + 59) / 60
+	return fmt.Sprintf("for another ~%d min", (s+59)/60)
 }
 
 // underPath is the exact test: equal, or inside. `/x/tmp-backup` is not inside

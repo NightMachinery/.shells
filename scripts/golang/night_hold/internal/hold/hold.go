@@ -28,6 +28,27 @@ const (
 // lasting problem.
 const DefaultTTL = 30 * time.Minute
 
+// ttlFor decides whether a hold gets a deadline.
+//
+// A TTL of zero means until-live, and until-live is only meaningful when
+// something can declare the holder dead. Dead() will only ever trust an agent
+// pid, so a hold taken from a plain shell, a script, or a BrishGarden shell
+// would otherwise expire by no mechanism at all -- an immortal lock, taken by
+// default, every time someone typed hold-acquire in a terminal.
+//
+// So without an agent pid the deadline comes back, and the hold records why,
+// because "why does this one have a TTL when I did not ask for one" is
+// otherwise an unanswerable question.
+func ttlFor(requested time.Duration, pidKind string) (time.Duration, string) {
+	if requested > 0 {
+		return requested, ""
+	}
+	if pidKind != pidAgent {
+		return DefaultTTL, "no-agent-pid"
+	}
+	return 0, ""
+}
+
 // Hold is one holder's claim on one resource.
 type Hold struct {
 	Resource    string
@@ -39,6 +60,7 @@ type Hold struct {
 	PIDKind     string
 	Host        string
 	TTL         time.Duration
+	TTLFallback string // why a deadline was imposed on an until-live request
 	Reason      string
 	Matches     []string // tested as plain substrings; the caller asked for this text
 	PathMatches []string // tested only where a path boundary sits on each side
@@ -46,8 +68,51 @@ type Hold struct {
 	file string
 }
 
-// Left is how long this hold has to run.
+// HasDeadline distinguishes the two kinds of hold. A hold with no deadline
+// ends when its holder dies or releases it, and `until-live` is the default
+// because a deadline only ever guessed at that.
+func (h Hold) HasDeadline() bool { return !h.Until.IsZero() }
+
+// Expired reports that a deadline has passed. A hold with no deadline never
+// expires -- only death or a release ends it.
+func (h Hold) Expired(now time.Time) bool { return h.HasDeadline() && !h.Until.After(now) }
+
+// Left is how long this hold has to run. Meaningless without a deadline, so
+// callers print Remaining instead.
 func (h Hold) Left(now time.Time) time.Duration { return h.Until.Sub(now) }
+
+// Remaining is Left for humans, and the one spelling of "no deadline" that
+// every message uses.
+func (h Hold) Remaining(now time.Time) string {
+	if !h.HasDeadline() {
+		return "until-live"
+	}
+	return FormatDuration(h.Left(now))
+}
+
+// Foreign reports that this hold was taken on another machine, which matters
+// because Dead() will not trust a pid from one. Some hosts share a home
+// directory -- the CIS servers do -- so a hold can be perfectly visible here
+// and still be un-reapable here. Such a hold needs a human to release it
+// rather than someone waiting for a clock that may not exist.
+func (h Hold) Foreign() bool { return h.Host != "" && h.Host != thisHost() }
+
+// Window is how a hold's remaining life is put to a human: a duration, or the
+// reason it does not have one. Every message that names a hold uses this, so
+// they cannot drift apart.
+func (h Hold) Window(now time.Time) string {
+	s := h.Remaining(now)
+	if h.HasDeadline() {
+		s += " left"
+	}
+	if h.TTLFallback == "no-agent-pid" {
+		s += ", imposed because there is no agent pid to check for liveness"
+	}
+	if h.Foreign() {
+		s += ", taken on " + h.Host + " so liveness cannot be checked here"
+	}
+	return s
+}
 
 // Store is a hold directory.
 type Store struct{ Root string }
@@ -224,9 +289,11 @@ func (s Store) Live(canonical string, now time.Time, reap bool) ([]Hold, error) 
 		p := filepath.Join(dir, e.Name())
 		h, err := readHold(p)
 		// A file with no readable deadline is a corpse from a half-written
-		// acquire, not an eternal hold. A hold whose agent is provably gone is
-		// a corpse too, and waiting out its deadline helps nobody.
-		if err != nil || !h.Until.After(now) || h.Dead(host) {
+		// acquire, not an eternal hold -- note that is *unreadable*, not
+		// absent: `until: 0` is a deliberate until-live hold and never expires
+		// on a clock. A hold whose agent is provably gone is a corpse too, and
+		// waiting out its deadline helps nobody.
+		if err != nil || h.Expired(now) || h.Dead(host) {
 			if reap {
 				os.Remove(p)
 			}
@@ -268,7 +335,7 @@ func (s Store) All(now time.Time, reap bool) ([]Hold, error) {
 			}
 			p := filepath.Join(dir, f.Name())
 			h, err := readHold(p)
-			if err != nil || !h.Until.After(now) || h.Dead(host) {
+			if err != nil || h.Expired(now) || h.Dead(host) {
 				if reap {
 					os.Remove(p)
 				}
@@ -310,8 +377,8 @@ var errBusy = errors.New("another acquire is in progress")
 type ErrHeld struct{ By Hold }
 
 func (e ErrHeld) Error() string {
-	return fmt.Sprintf("%s is held by %s for another %s: %s",
-		e.By.Resource, e.By.Holder, FormatDuration(e.By.Left(time.Now())), e.By.Reason)
+	return fmt.Sprintf("%s is held by %s, %s: %s",
+		e.By.Resource, e.By.Holder, e.By.Window(time.Now()), e.By.Reason)
 }
 
 // AcquireWait retries Acquire until it succeeds or the budget runs out.
@@ -360,8 +427,8 @@ func (s Store) Acquire(o AcquireOpts) (Hold, error) {
 	// this the Hold returned by Acquire is not equal to the one read back, and
 	// every comparison against stored state is subtly off.
 	now = now.Truncate(time.Second)
-	if o.TTL <= 0 {
-		o.TTL = DefaultTTL
+	if o.TTL < 0 {
+		o.TTL = 0
 	}
 	if o.Holder == "" {
 		o.Holder = Holder()
@@ -424,16 +491,22 @@ func (s Store) acquireLocked(canonical, mode string, o AcquireOpts, now time.Tim
 	}
 
 	pid, pidKind := agentPID()
+	ttl, fallback := ttlFor(o.TTL, pidKind)
+	var until time.Time
+	if ttl > 0 {
+		until = now.Add(ttl)
+	}
 	h := Hold{
 		Resource:    canonical,
 		Holder:      o.Holder,
 		Mode:        mode,
-		Until:       now.Add(o.TTL),
+		Until:       until,
 		Acquired:    acquired,
 		PID:         pid,
 		PIDKind:     pidKind,
 		Host:        thisHost(),
-		TTL:         o.TTL,
+		TTL:         ttl,
+		TTLFallback: fallback,
 		Reason:      o.Reason,
 		Matches:     dedupe(o.Matches),
 		PathMatches: derivePathMatches(canonical),

@@ -74,6 +74,11 @@ func usage(code int) {
 A resource is any string. repo:, path:, dir: and file: are resolved to an
 absolute path first, so repo:~/scripts and repo:/Users/evar/scripts are one
 resource. Everything else passes through, so gpu:0 means what its callers agree.
+
+--ttl defaults to until-live: the hold ends when you release it or when the
+agent that took it dies, not on a clock. Pass a duration for a hard deadline.
+Without an agent pid to check -- a plain shell, a script -- until-live cannot
+work and 30m is imposed instead; status says so when it happens.
 `)
 	os.Exit(code)
 }
@@ -126,8 +131,11 @@ func requirePositional(fs *flag.FlagSet, args []string, what string) (string, er
 	return v, nil
 }
 
+// ttlOf reads --ttl. Empty is until-live, and so are the spellings someone
+// reaches for when they want to say that out loud.
 func ttlOf(s string) (time.Duration, error) {
-	if s == "" {
+	switch s {
+	case "", "until-live", "none", "0":
 		return 0, nil
 	}
 	return hold.ParseDuration(s)
@@ -135,7 +143,7 @@ func ttlOf(s string) (time.Duration, error) {
 
 func cmdAcquire(args []string) error {
 	fs := flagsFor("acquire")
-	ttl := fs.String("ttl", "", "how long to hold it (90s, 30m, 2h, 3d)")
+	ttl := fs.String("ttl", "", "hard deadline (90s, 30m, 2h, 3d); default until-live")
 	reason := fs.String("reason", "", "why")
 	holder := fs.String("holder", "", "override the holder id")
 	shared := fs.Bool("shared", false, "let others hold it at the same time")
@@ -173,17 +181,23 @@ func cmdAcquire(args []string) error {
 	if err != nil {
 		var held hold.ErrHeld
 		if errors.As(err, &held) {
-			fmt.Fprintf(os.Stderr, "night_hold: %s is held by %s for another %s\n",
-				held.By.Resource, held.By.Holder, hold.FormatDuration(held.By.Left(time.Now())))
+			fmt.Fprintf(os.Stderr, "night_hold: %s is held by %s, %s\n",
+				held.By.Resource, held.By.Holder, held.By.Window(time.Now()))
 			fmt.Fprintf(os.Stderr, "  reason: %s\n", held.By.Reason)
 			os.Exit(1)
 		}
 		return err
 	}
 
-	fmt.Fprintf(os.Stderr, "night_hold: holding %s for %s (%s); release with hold-release\n",
-		h.Resource, hold.FormatDuration(h.Left(time.Now())), h.Reason)
+	announceHeld(h)
 	return nil
+}
+
+// announceHeld is the one line acquire and renew both print, so the two cannot
+// describe the same hold differently.
+func announceHeld(h hold.Hold) {
+	fmt.Fprintf(os.Stderr, "night_hold: holding %s, %s; reason: %s; release with hold-release\n",
+		h.Resource, h.Window(time.Now()), h.Reason)
 }
 
 func cmdRelease(args []string) error {
@@ -236,8 +250,7 @@ func cmdRenew(args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "night_hold: holding %s for %s (%s); release with hold-release\n",
-		h.Resource, hold.FormatDuration(h.Left(time.Now())), h.Reason)
+	announceHeld(h)
 	return nil
 }
 
@@ -287,8 +300,8 @@ func cmdStatus(args []string) error {
 		if h.Mode == hold.ModeShared {
 			shared = " [shared]"
 		}
-		fmt.Printf("%s held by %s%s, %s left, %s\n",
-			h.Resource, h.Holder, shared, hold.FormatDuration(h.Left(now)), h.Reason)
+		fmt.Printf("%s held by %s%s, %s, %s\n",
+			h.Resource, h.Holder, shared, h.Window(now), h.Reason)
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package hold
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -373,5 +374,88 @@ func TestOrdinaryAcquireStillWaitsForTheLock(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("acquire never completed after the lock was released")
+	}
+}
+
+// An until-live hold has no deadline at all: it ends when its holder releases
+// it or dies, and no amount of elapsed time touches it. This is the default,
+// so it is the case that matters most.
+func TestUntilLiveHoldOutlivesAnyDeadline(t *testing.T) {
+	s := testStore(t)
+	// testStore clears these; until-live needs an agent pid to be meaningful,
+	// so opt back in with a pid that is certainly alive.
+	t.Setenv("hold_agent_pid", strconv.Itoa(os.Getpid()))
+
+	h := mustAcquire(t, s, AcquireOpts{Resource: "repo:/tmp/x", Holder: "agent", Reason: "refactor"})
+	if h.HasDeadline() {
+		t.Fatalf("default acquire got a deadline of %v, want until-live", h.Until)
+	}
+	if h.TTLFallback != "" {
+		t.Errorf("ttl-fallback = %q, want none with a real agent pid", h.TTLFallback)
+	}
+
+	// Round-trips through the file, rather than only living in the returned
+	// struct: `until: 0` must read back as no deadline, not as 1970.
+	live, err := s.Live(Canonical("repo:/tmp/x"), time.Now(), false)
+	if err != nil || len(live) != 1 {
+		t.Fatalf("Live = %v, %v; want one hold", live, err)
+	}
+	if live[0].HasDeadline() {
+		t.Errorf("re-read hold has deadline %v, want until-live", live[0].Until)
+	}
+
+	// A year on, still held.
+	far := time.Now().Add(365 * 24 * time.Hour)
+	live, err = s.Live(Canonical("repo:/tmp/x"), far, true)
+	if err != nil || len(live) != 1 {
+		t.Fatalf("a year later Live = %v, %v; want the hold to stand", live, err)
+	}
+	if _, err := s.Acquire(AcquireOpts{Resource: "repo:/tmp/x", Holder: "other", Now: far}); err == nil {
+		t.Error("an until-live hold must still block a year later")
+	}
+}
+
+// Without an agent pid nothing can ever declare the holder dead, so until-live
+// would be a lock that expires by no mechanism at all. A deadline comes back,
+// and the hold records why so status can explain itself.
+func TestWithoutAnAgentPidUntilLiveBecomesADeadline(t *testing.T) {
+	s := testStore(t) // clears the agent pid; the caller is a bare shell
+
+	h := mustAcquire(t, s, AcquireOpts{Resource: "repo:/tmp/x", Holder: "shell", Reason: "by hand"})
+	if !h.HasDeadline() {
+		t.Fatal("a shell-pid hold must get a deadline; until-live cannot work for it")
+	}
+	if h.TTL != DefaultTTL {
+		t.Errorf("ttl = %v, want the default %v", h.TTL, DefaultTTL)
+	}
+	if h.TTLFallback != "no-agent-pid" {
+		t.Errorf("ttl-fallback = %q, want no-agent-pid", h.TTLFallback)
+	}
+	if !strings.Contains(h.Window(time.Now()), "no agent pid") {
+		t.Errorf("status line %q does not explain the imposed deadline", h.Window(time.Now()))
+	}
+}
+
+// An explicit --ttl is now a hard deadline: nothing renews it behind the
+// caller's back, which is the whole reason the keepalive went.
+func TestExplicitTTLExpiresUnextended(t *testing.T) {
+	s := testStore(t)
+	t.Setenv("hold_agent_pid", strconv.Itoa(os.Getpid()))
+
+	now := time.Now()
+	h := mustAcquire(t, s, AcquireOpts{
+		Resource: "repo:/tmp/x", Holder: "agent", TTL: 10 * time.Minute, Now: now,
+	})
+	if !h.HasDeadline() {
+		t.Fatal("an explicit ttl must produce a deadline")
+	}
+
+	// Still alive as a process, and still held before the deadline.
+	if live, _ := s.Live(Canonical("repo:/tmp/x"), now.Add(9*time.Minute), false); len(live) != 1 {
+		t.Error("the hold should stand before its deadline")
+	}
+	// Past it, gone -- liveness does not keep a dated hold alive.
+	if live, _ := s.Live(Canonical("repo:/tmp/x"), now.Add(11*time.Minute), true); len(live) != 0 {
+		t.Error("an explicit ttl must expire even though its holder is alive")
 	}
 }

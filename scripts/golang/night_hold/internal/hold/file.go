@@ -12,12 +12,12 @@ import (
 // The on-disk form is `key: value` lines, deliberately human-readable: the
 // first thing anyone does with a hold that will not go away is cat it.
 //
-// The deadline is written twice, and that is not two sources of truth. The
-// contents are authoritative for everyone who parses. The mtime exists for one
-// reader that must not parse: hammerspoonReloadHeldBy() in
-// hammerspoon/core/reload.lua runs on Hammerspoon's main thread and answers by
-// iterating the directory and statting each entry. Contents are written first
-// and the mtime last, so the mtime is never ahead of the file.
+// A deadline is also mirrored into the mtime, but nothing reads it any more:
+// reload.lua used to, and now asks this binary instead, because only this
+// binary knows whether the holder is still alive. It is kept because `ls -l`
+// on a stuck hold is the first thing anyone tries, and it costs one syscall.
+// An until-live hold has no deadline to mirror and keeps its natural write
+// time.
 
 func readHold(path string) (Hold, error) {
 	f, err := os.Open(path)
@@ -51,7 +51,12 @@ func readHold(path string) (Hold, error) {
 			if err != nil {
 				return Hold{}, fmt.Errorf("unreadable deadline in %s", path)
 			}
-			h.Until = time.Unix(n, 0)
+			// Zero is until-live, not 1970: a hold that ends when its holder
+			// does. Distinct from the line being absent, which is a corpse
+			// from a half-written acquire.
+			if n != 0 {
+				h.Until = time.Unix(n, 0)
+			}
 			sawUntil = true
 		case "acquired":
 			if n, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -67,6 +72,8 @@ func readHold(path string) (Hold, error) {
 			}
 		case "host":
 			h.Host = value
+		case "ttl-fallback":
+			h.TTLFallback = value
 		case "reason":
 			h.Reason = value
 		case "match":
@@ -81,11 +88,8 @@ func readHold(path string) (Hold, error) {
 	if !sawUntil {
 		return Hold{}, fmt.Errorf("no deadline in %s", path)
 	}
-	if h.Acquired.IsZero() {
+	if h.Acquired.IsZero() && h.HasDeadline() {
 		h.Acquired = h.Until
-	}
-	if h.TTL <= 0 {
-		h.TTL = DefaultTTL
 	}
 	return h, nil
 }
@@ -95,12 +99,15 @@ func writeHold(h Hold) error {
 	fmt.Fprintf(&b, "resource: %s\n", h.Resource)
 	fmt.Fprintf(&b, "holder:   %s\n", h.Holder)
 	fmt.Fprintf(&b, "mode:     %s\n", h.Mode)
-	fmt.Fprintf(&b, "until:    %d\n", h.Until.Unix())
+	fmt.Fprintf(&b, "until:    %d\n", untilField(h))
 	fmt.Fprintf(&b, "acquired: %d\n", h.Acquired.Unix())
 	fmt.Fprintf(&b, "pid:      %d\n", h.PID)
 	fmt.Fprintf(&b, "pid-kind: %s\n", h.PIDKind)
 	fmt.Fprintf(&b, "ttl:      %d\n", int64(h.TTL.Seconds()))
 	fmt.Fprintf(&b, "host:     %s\n", h.Host)
+	if h.TTLFallback != "" {
+		fmt.Fprintf(&b, "ttl-fallback: %s\n", h.TTLFallback)
+	}
 	fmt.Fprintf(&b, "reason:   %s\n", h.Reason)
 	for _, m := range h.Matches {
 		fmt.Fprintf(&b, "match:    %s\n", m)
@@ -112,8 +119,20 @@ func writeHold(h Hold) error {
 	if err := os.WriteFile(h.file, []byte(b.String()), 0o644); err != nil {
 		return err
 	}
+	if !h.HasDeadline() {
+		return nil
+	}
 	// Last, so it is never ahead of the contents.
 	return os.Chtimes(h.file, h.Until, h.Until)
+}
+
+// untilField is the deadline as the file carries it: seconds, or 0 for a hold
+// that has none.
+func untilField(h Hold) int64 {
+	if !h.HasDeadline() {
+		return 0
+	}
+	return h.Until.Unix()
 }
 
 // FormatDuration prints a span the way seconds-fmt-short does, so the binary
