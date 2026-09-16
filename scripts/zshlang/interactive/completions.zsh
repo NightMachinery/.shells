@@ -57,12 +57,21 @@ comp-set '=eval' ruu reval reval-to llm-run reval-to-llm reval-to-flash reval-to
 #: `xz' is ours (an alias for `\noglob llm-run'), but the name collides with the
 #: xz COMPRESSOR, and zsh ships `_xz' for that. The alias shadows the binary when
 #: you run it, but not when you complete it: `_comps[xz]' stayed `_xz', so
-#: `xz <TAB>' offered files to compress and `with-lab-gemini xz <TAB>' never
-#: reached llm-run's completion at all. Listing it here overrides that.
+#: `xz <TAB>' offered files to compress rather than llm-run's prompt functions.
+#: Listing it here overrides that.
+#:
+#: That fixes the BARE form only. Zsh expands an alias before completing it just
+#: in COMMAND POSITION -- the first word of the line -- so `xz <TAB>' is completed
+#: as its expansion, while in `reval xz <TAB>' or `with-lab-gemini xz <TAB>' the
+#: word is never expanded and the alias contributes nothing. Nothing in this file
+#: can change that; it is where the completion system expands, not which completer
+#: a name is bound to. Write the bare form when you want completion.
 #:
 #: The general trap: `comp-set' keys on the NAME, so an alias whose name matches
 #: a real command silently keeps the real command's completion. Shadowing at
 #: execution time does not shadow at completion time.
+#:
+#: See `docs/zsh-completion-aliases.md'.
 # @todo8 '@opts' needs a custom completor that feeds the items after '@' to the evil completor
 ##
 comp-set '=rsync' rsp-safe rsp-safe2 rsp-dl
