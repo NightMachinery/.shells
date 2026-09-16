@@ -53,7 +53,16 @@ comp-wh-set cee ceer whichm whdeep whdeep-words wh whh whz lesh emn ffman ffcomm
 
 comp-set '=typeset' var-show
 
-comp-set '=eval' ruu reval reval-to llm-run reval-to-llm reval-to-flash reval-to-gpt3t reval-to-gpt4t reval-to-gpt4 reval-to-gpt4o reval-to-gpt4om reval-to-c3o reval-to-s3 reval-to-l3 reval-to-g25 reval-to-f25 rgeval revaldbg loop reval-ec reval-copy seval geval eval-memoi memoi-eval eval-timeout reval-timeout reval-2json reval-retcode fi-rec assert hyperfine hfd hfz para parad brishz bsh onlc onlm run-on-each re-async redo inargs-gen inargsE-gen filterE-gen filter filter0 p enh-addfinder pf pope clipboard-add-quoted pcz printz-quoted pf px proxychains4 bell-auto bell-repeat time2 silence serr sout sdbgerr soutdbg soutdbg serrdbg mn lesh inplace-io jcolor jah jahun ansi2img withemc1 withemcgui openai-complete-with-prompt with-lab-gemini
+comp-set '=eval' ruu reval reval-to llm-run reval-to-llm reval-to-flash reval-to-gpt3t reval-to-gpt4t reval-to-gpt4 reval-to-gpt4o reval-to-gpt4om reval-to-c3o reval-to-s3 reval-to-l3 reval-to-g25 reval-to-f25 rgeval revaldbg loop reval-ec reval-copy seval geval eval-memoi memoi-eval eval-timeout reval-timeout reval-2json reval-retcode fi-rec assert hyperfine hfd hfz para parad brishz bsh onlc onlm run-on-each re-async redo inargs-gen inargsE-gen filterE-gen filter filter0 p enh-addfinder pf pope clipboard-add-quoted pcz printz-quoted pf px proxychains4 bell-auto bell-repeat time2 silence serr sout sdbgerr soutdbg soutdbg serrdbg mn lesh inplace-io jcolor jah jahun ansi2img withemc1 withemcgui openai-complete-with-prompt with-lab-gemini xz
+#: `xz' is ours (an alias for `\noglob llm-run'), but the name collides with the
+#: xz COMPRESSOR, and zsh ships `_xz' for that. The alias shadows the binary when
+#: you run it, but not when you complete it: `_comps[xz]' stayed `_xz', so
+#: `xz <TAB>' offered files to compress and `with-lab-gemini xz <TAB>' never
+#: reached llm-run's completion at all. Listing it here overrides that.
+#:
+#: The general trap: `comp-set' keys on the NAME, so an alias whose name matches
+#: a real command silently keeps the real command's completion. Shadowing at
+#: execution time does not shadow at completion time.
 # @todo8 '@opts' needs a custom completor that feeds the items after '@' to the evil completor
 ##
 comp-set '=rsync' rsp-safe rsp-safe2 rsp-dl
