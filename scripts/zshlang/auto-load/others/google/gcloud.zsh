@@ -228,9 +228,16 @@ typeset -gA gcp_gpu_price_spot=(
     a3-highgpu-1g    2.33
     a3-highgpu-2g    4.65
     #: Half the 8g rate; H100 spot IS reachable -- PREEMPTIBLE_NVIDIA_H100_GPUS
-    #: is 64 per project-region in every candidate region. The binding limit is
-    #: instead GPUS-ALL-REGIONS-per-project, which is 8: the whole fleet is at
-    #: most eight GPUs, i.e. two 4-rank lanes, however much budget there is.
+    #: is 64 per project-region in every candidate region.
+    #:
+    #: @warn This used to claim GPUS-ALL-REGIONS-per-project, which reads 8, as
+    #: a hard fleet ceiling of two 4-rank lanes. It is not one. A second
+    #: `a3-highgpu-8g` created without complaint, putting sixteen H100s in the
+    #: project at once, so that quota does not apply to Spot on this path. The
+    #: claim mattered because it told an agent not to parallelise, which is the
+    #: opposite of what expiring credits want. A quota NUMBER is no more proof
+    #: of a limit than a price is proof of availability; `instances create` is
+    #: the only test, in both directions. See runbook section 7b.
     a3-highgpu-4g    9.31
     a3-highgpu-8g   18.62
 )
