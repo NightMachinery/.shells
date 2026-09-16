@@ -588,10 +588,21 @@ function h-agy-status-source-line {
     #: a cached number that does not say so reads as a live one -- so it is
     #: made briefly, styled like the rows it introduces.
     #:
-    #: Stays on stderr, as the gray line did: the prose report is stdout, and
-    #: a caller redirecting it should not collect the provenance note too.
-    #: The colour decision still reads *stdout*, deliberately -- one report,
-    #: one decision, same as [agfi:h-agy-status-render].
+    #: On **stdout**, with the rows, and not on stderr where the gray line
+    #: was. The note is part of the prose report, and two streams cannot be
+    #: ordered against each other: [agfi:agent-status] runs us under
+    #: [agfi:parallelm], which collects each job's stderr separately from its
+    #: stdout, so a note written there surfaces outside the section it belongs
+    #: to -- and under =--keep-order=, possibly before any section at all.
+    #: That function's own error line carries the same reasoning.
+    #:
+    #: Machine-readable output is =agy_status_json_p=, which is asked for
+    #: explicitly; that caller redirects this note to stderr itself, because
+    #: there stdout is a document. Keeping the prose stream clean for a parser
+    #: that should have asked for JSON buys nothing and costs the ordering.
+    #:
+    #: The colour decision reads whichever stream we are actually writing to,
+    #: since a redirect moves fd 1 with us.
     #:
     #: Usage: h-agy-status-source-line <label> [detail]
     ##
@@ -605,7 +616,7 @@ function h-agy-status-source-line {
         c_off="${reset_color}"
     fi
 
-    ec "${c_label}${label}${c_off}${detail:+ ${c_detail}(${detail})${c_off}}" >&2
+    ec "${c_label}${label}${c_off}${detail:+ ${c_detail}(${detail})${c_off}}"
 }
 
 function h-agy-status-statusline {
@@ -703,9 +714,9 @@ function h-agy-status-statusline {
     fi
 
     if bool "${json_p}" ; then
-        #: The note is on stderr either way, but it matters here: stdout is a
-        #: JSON document somebody is about to parse.
-        h-agy-status-source-line "${label}" "${detail}"
+        #: The one place the note does *not* belong on stdout: that is a JSON
+        #: document somebody is about to parse.
+        h-agy-status-source-line "${label}" "${detail}" >&2
 
         ec "${(F)rows}" | h-agy-status-json
         return $?

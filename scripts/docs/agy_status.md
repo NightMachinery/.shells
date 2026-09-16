@@ -155,11 +155,19 @@ than through `seconds-fmt-short`: three units (`0h:1m:37s`) is right for a
 reset the reader is waiting on and too much for a staleness note nobody acts
 on to the second.
 
-It stays on stderr, where the gray line was. That matters most in JSON mode,
-where stdout is the bare array the notifier parses, but it holds either way:
-a caller redirecting the report should not collect the provenance note with
-it. The colour decision still reads *stdout*, deliberately -- one report, one
-decision, the same call `h-agy-status-render` makes.
+It goes to **stdout**, with the rows, and not to stderr where the gray line
+was. It is part of the report, and two streams cannot be ordered against each
+other. That is not theoretical here: `agent-status` runs this under
+`parallelm`, which collects each job's stderr separately from its stdout, so a
+note written there surfaces outside the agy section entirely -- and under
+`--keep-order`, possibly before any section at all. That function's own error
+line already carries this reasoning, for the same reason.
+
+The one exception is JSON mode, where stdout is a document somebody is about
+to parse; that caller redirects the note to stderr itself. Machine-readable
+output is `agy_status_json_p`, and it is asked for explicitly -- keeping the
+prose stream parseable for something that should have asked for JSON buys
+nothing and costs the ordering.
 
 A bucket carrying no `captured_at` at all is reported as such -- `some rows
 undated` in the detail -- rather than folded into the age: "unknown" and
