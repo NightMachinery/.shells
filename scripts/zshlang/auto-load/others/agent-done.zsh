@@ -19,6 +19,27 @@
 ##
 typeset -g agent_skills_src_dir="${agent_skills_src_dir:-${NIGHTDIR}/configFiles/agent-skills}"
 
+#: Skill roots outside the two standard checkouts, in the same
+#: `<root>/<name>/SKILL.md' shape as those. For skills that have to travel with
+#: something else -- a private config repository, a standalone tool -- and so
+#: cannot live in the public tree.
+#:
+#: A root that does not exist contributes nothing, which is what lets one
+#: default serve every machine: the entry below is only real on a host that has
+#: cloned `night-gcp', and everywhere else it is silently skipped.
+#:
+#: Without this, a standalone repository has to be wired in by hand, which is
+#: what [agfi:agent-subagents-start] still does for `tmux-subagents'.
+#:
+#: `${+name}' rather than `${name:-default}': an empty array is
+#: indistinguishable from an unset one under `:-', so the default would come
+#: back and there would be no way to turn this off. Setting the array to `()'
+#: before this file loads disables it, which is what the tests do.
+if (( ! ${+agent_skills_extra_roots} )) ; then
+    typeset -ga agent_skills_extra_roots
+    agent_skills_extra_roots=( "${HOME}/.night-gcp/skills" )
+fi
+
 function h-agent-skills-codex-dir {
     #: User skills are shared across Codex seats, independent of CODEX_HOME.
     print -r -- "${agent_skills_codex_dir:-${HOME}/.agents/skills}"
@@ -57,12 +78,13 @@ function h-agent-skills-dirs {
 }
 
 function h-agent-skills-sources {
-    #: Emit full SKILL.md paths from both checkouts. Validate all names before
-    #: emitting anything so callers cannot partially link an ambiguous set.
+    #: Emit full SKILL.md paths from every configured root. Validate all names
+    #: before emitting anything so callers cannot partially link an ambiguous
+    #: set. See `$agent_skills_extra_roots' for roots beyond the two checkouts.
     setopt localoptions bareglobqual
     local notes_dir="${agent_skills_notes_dir-${HOME}/notes/skills}"
     local root skill name
-    local -a roots=("${agent_skills_src_dir}" "${notes_dir}") sources=()
+    local -a roots=("${agent_skills_src_dir}" "${notes_dir}" "${agent_skills_extra_roots[@]}") sources=()
     local -A seen=()
     for root in "${roots[@]}" ; do
         test -n "${root}" || continue

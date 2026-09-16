@@ -35,6 +35,21 @@ links and real files must be preserved.
 Standalone skill repositories live under `${HOME}/code/skills/`; this is a
 source location, not an additional automatic search root for this linker.
 
+`agent_skills_extra_roots` is how a skill that cannot live in the public tree
+gets linked anyway. It is an array of roots in the same
+`<root>/<name>/SKILL.md` shape as the two checkouts, searched after them, and
+it defaults to `~/.night-gcp/skills` --- the agent-facing half of the private
+GCP configuration repository, whose runbook names the project, bucket and
+instance and so cannot be published. A root that does not exist contributes
+nothing, which is what lets one default serve every machine: on a host without
+that repository the entry is silently skipped.
+
+The array is guarded with `${+name}` rather than `${name:-default}`, because an
+empty array and an unset one are indistinguishable under `:-` --- the default
+would come back and there would be no way to turn the mechanism off. Set it to
+`()` before the file loads to disable it, which is what the tests do so that a
+host's own skills cannot leak into their fixture.
+
 All three agents converged on the same format — `<dir>/<name>/SKILL.md` with
 YAML frontmatter carrying `name` and `description`. In Codex CLI, invoke it as
 `$done` or select it through `/skills`; Claude Code uses `/done`.

@@ -31,6 +31,10 @@ function aliasfn { :; }
 typeset -g NIGHTDIR="${agent_skills_test_root}"
 typeset -g agent_skills_src_dir="${agent_skills_test_tmp}/source"
 typeset -g agent_skills_notes_dir="${agent_skills_test_tmp}/notes skills"
+# Real machines default this to ~/.night-gcp/skills, which exists on some of
+# them. The fixture below is the whole world as far as these assertions are
+# concerned, so opt out rather than let a host's own skills leak into it.
+typeset -ga agent_skills_extra_roots=()
 source "${agent_skills_test_root}/zshlang/basic/basic.plugin.zsh"
 # The minimal plugin deliberately excludes presentation helpers used only for
 # diagnostics by agent-done.zsh.
