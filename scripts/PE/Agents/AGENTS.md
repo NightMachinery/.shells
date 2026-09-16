@@ -32,6 +32,9 @@
 - `${NIGHTDIR}/configFiles/agent-skills/` — shared public skills.
 - `${nightNotes}/skills/` — private skills in the `notes-skills` repo.
 - `${HOME}/code/skills/` — standalone skill repositories.
+- `~/.night-gcp/skills/` — the GCP runbook skill, which names a real project
+  and so cannot live in the public tree. Any root listed in
+  `$agent_skills_extra_roots` works the same way.
 
 Edit these sources, not installed skill links.
 
