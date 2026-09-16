@@ -160,36 +160,26 @@ alias hhh='hs-reload'
 #: a real bug and is not one. So take a hold while editing, and reload by hand
 #: with [agfi:hs-reload] when you actually want to see your changes.
 #:
-#: One file per holder in ${hs_no_reload_dir}, its mtime the deadline. Several
-#: agents edit this repo at once; a single flag would let whoever finished first
-#: re-enable reloading under someone still typing, and a counter would stay
-#: stuck forever the first time one of them was killed. See the "** Holds"
-#: section of hammerspoon/core/reload.lua for the reading side.
-typeset -g hs_no_reload_dir="${HOME}/.hs-no-reload"
+#: One file per holder. Several agents edit this repo at once; a single flag
+#: would let whoever finished first re-enable reloading under someone still
+#: typing, and a counter would stay stuck forever the first time one of them
+#: was killed.
+#:
+#: These are the shared mode of the general hold mechanism
+#: ([agfi:hold-acquire]): one resource, `service:hs-reload', any number of
+#: holders, and while any of them is live nothing reloads by itself. They were
+#: a separate implementation under ~/.hs-no-reload until they were folded in;
+#: the reading side is the "** Holds" section of hammerspoon/core/reload.lua,
+#: and the whole story is in =docs/holds.md=.
+#:
+#: A lock is the wrong word for it. Every holder wants the same outcome --
+#: suppression -- so a second one costs nothing and refusing it would be
+#: perverse. What it needs from a hold is only the expiry: an agent that
+#: crashes or is killed must not be able to leave auto-reload off for good.
+typeset -g hs_reload_resource='service:hs-reload'
 #: Same default as the agent banner, and for the same reason: long enough to be
 #: useful, short enough that forgetting it is not a lasting problem.
 typeset -g hs_reload_hold_default="${hs_reload_hold_default:-30m}"
-
-function h-hs-reload-holder {
-    : "a name for whoever is asking, stable across calls, distinct between concurrent sessions"
-
-    local id="${hs_reload_holder:-}"
-    #: Exported into every shell Claude Code spawns (see [agfi:claude-code-p]),
-    #: and unlike \$PPID it is the same in the shell that takes the hold and the
-    #: one that releases it minutes later -- within one session. It is per
-    #: session, not per conversation, so a compaction or a resume changes it
-    #: mid-task and the hold becomes unreleasable by name. Nothing available
-    #: here is stable across that (the job directory is named after the same
-    #: id), so [agfi:hs-reload-release] reports it instead, and the deadline in
-    #: the mtime remains the real backstop.
-    test -n "$id" || id="${CLAUDE_CODE_SESSION_ID:-}"
-    test -n "$id" || id="${TERM_SESSION_ID:-}"
-    test -n "$id" || id=default
-
-    #: It becomes a filename, so keep it to something that cannot escape the
-    #: directory or need quoting.
-    ec "${id//[^A-Za-z0-9_-]/-}"
-}
 
 function hs-reload-hold {
     : "hold off the auto-reloader for <dur>, default ${hs_reload_hold_default}
@@ -200,59 +190,28 @@ pushes your own deadline out."
 
     local reason="${1:-editing}" dur="${2:-${hs_reload_hold_default}}"
 
-    local secs
-    secs="$(dur2sec "$dur")" @RET
-
-    local holder
-    holder="$(h-hs-reload-holder)" @RET
-
-    #: strftime and EPOCHSECONDS rather than `date': GNU and BSD date disagree
-    #: about how to add an offset, and both are on the PATH here. `touch -t'
-    #: takes the same format either way, so it is safe unqualified.
-    local until=$(( EPOCHSECONDS + secs ))
-
-    mkdir -p "$hs_no_reload_dir" @TRET
-    #: Contents are for humans only; nothing reads them to decide anything.
-    local body
-    body="reason: ${reason}"$'\n'"holder: ${holder}"$'\n'"until:  $(strftime '%Y-%m-%d %H:%M:%S' "$until")"
-    ec "$body" > "${hs_no_reload_dir}/${holder}" @TRET
-    #: A deadline in the mtime keeps the reading side to a single stat with no
-    #: parsing, which matters because it runs on Hammerspoon's main thread.
-    #: Written last, because writing the contents would otherwise reset it.
-    touch -t "$(strftime '%Y%m%d%H%M.%S' "$until")" \
-        "${hs_no_reload_dir}/${holder}" @TRET
-
-    ecgray "$0: held for $(seconds-fmt-short "$secs") (${reason}); release with hs-reload-release"
+    hold-acquire "${hs_reload_resource}" --shared --ttl "${dur}" --reason "${reason}" @RET
+    ecgray "$0: release with hs-reload-release"
 }
 
 function hs-reload-release {
     : "drop this session's hold; reloads if it was the last one"
     @darwinOnly
 
-    local holder
-    holder="$(h-hs-reload-holder)" @RET
-
     #: A hold taken before a Claude Code compaction cannot be released by name
-    #: afterwards: the session id is per *session*, and resuming a conversation
-    #: starts a new one. Say so and show what is actually held, rather than
-    #: reporting success for a file we never removed. Releasing someone else's
-    #: hold is not ours to guess at -- with concurrent agents it would re-enable
-    #: the reloader under whoever is still typing -- so the caller picks:
-    #:   hs_reload_holder=<name> hs-reload-release
-    if ! test -e "${hs_no_reload_dir}/${holder}" ; then
-        ecgray "$0: no hold named ${holder}"
-        hs-reload-holds
-        return 0
-    fi
-
-    command rm -f "${hs_no_reload_dir}/${holder}"
+    #: afterwards: the holder is the session id, and resuming a conversation
+    #: starts a new one. [agfi:hold-release] says so and shows the override
+    #: rather than reporting a success it did not achieve.
+    hold-release "${hs_reload_resource}" @RET
 
     #: Only when nobody else is still editing. Reloading here is the point of
-    #: releasing: everything changed while the hold was up is still unloaded.
+    #: releasing: everything changed while the hold was up is still unloaded,
+    #: and re-enabling the reloader under a parallel session still typing would
+    #: be exactly the clobbering the per-holder files exist to prevent.
     local remaining
-    remaining="$(h-hs-reload-holds-live)"
+    remaining="$(hold-holders "${hs_reload_resource}")"
     if test -n "$remaining" ; then
-        ecgray "$0: released, but still held by: ${remaining}"
+        ecgray "$0: released, but still held by: ${(j:, :)${(f)remaining}}"
         return 0
     fi
 
@@ -260,54 +219,18 @@ function hs-reload-release {
     hs-reload
 }
 
-function h-hs-reload-holds-live {
-    : "names of the holders whose deadline has not passed, one per line"
-
-    #: The shell snapshot Claude Code hands its agents runs with
-    #: `nobareglobqual', where `(N)' is not a qualifier and the glob below
-    #: fails outright with `no matches found'. Every agent calling
-    #: [agfi:hs-reload-holds] saw that error.
-    setopt localoptions null_glob
-
-    test -d "$hs_no_reload_dir" || return 0
-
-    #: zstat, not `stat': the binary is BSD on this machine and GNU on others,
-    #: and they spell mtime differently. This is a zsh builtin, so neither.
-    zmodload -F zsh/stat b:zstat 2>/dev/null
-
-    local f
-    for f in "${hs_no_reload_dir}"/* ; do
-        if [[ "$(zstat +mtime "$f")" -gt "$EPOCHSECONDS" ]] ; then
-            ec "${f:t}"
-        else
-            #: Expired. Nothing depends on the cleanup - the reader ignores it
-            #: either way - but leaving corpses around makes `hs-reload-holds'
-            #: harder to read.
-            command rm -f "$f"
-        fi
-    done
-}
-
 function hs-reload-holds {
     : "who is holding the auto-reloader, why, and for how much longer"
     @darwinOnly
 
-    local live
-    live="$(h-hs-reload-holds-live)"
-    if test -z "$live" ; then
+    local out
+    out="$(hold-status "${hs_reload_resource}")" @RET
+
+    if [[ "$out" == 'holds: none' ]] ; then
         ec "auto-reload: not held"
         return 0
     fi
-
-    zmodload -F zsh/stat b:zstat 2>/dev/null
-
-    local holder f left reason
-    ec "$live" | while read -r holder ; do
-        f="${hs_no_reload_dir}/${holder}"
-        left=$(( $(zstat +mtime "$f") - EPOCHSECONDS ))
-        reason="$(command grep -m1 '^reason: ' "$f" 2>/dev/null)"
-        ec "auto-reload held by ${holder}, $(seconds-fmt-short "$left") left, ${reason#reason: }"
-    done
+    ec "$out"
 }
 ##
 function hs-popclickBttToggle() {

@@ -40,14 +40,22 @@ end
 --- once: one file each means they cannot clobber each other, and whoever
 --- finishes first does not re-enable reloading under someone still typing.
 ---
---- The deadline is the mtime rather than the contents so that this check is one
---- stat and no parsing. The contents are for humans - see [agfi:hs-reload-holds].
+--- That shape - one file per holder, all of them wanting the same outcome - is
+--- a *suppression registry* rather than a lock, and it is one of the two modes
+--- of the general hold mechanism. So this is now `service:hs-reload' held
+--- `--shared' by [agfi:hs-reload-hold], and the directory below is where
+--- night_hold keeps that resource. See =scripts/docs/holds.md=.
+---
+--- The deadline is in the mtime as well as in the file, so that this check
+--- stays a stat per entry and no parsing - it runs on Hammerspoon's main
+--- thread. Everything else reads the contents, where the deadline is
+--- authoritative.
 ---
 --- A claim expiring on its own is the point. An agent that crashes, is killed,
 --- or simply forgets must not be able to leave auto-reload off for good; a hold
 --- that ends early is a much smaller problem than one that never ends.
 hammerspoonNoReloadDir = hammerspoonNoReloadDir
-    or (os.getenv("HOME") .. "/.hs-no-reload")
+    or (os.getenv("HOME") .. "/.night-holds/service-hs-reload")
 
 --- Off by default: a band on every suppressed save is a lot of banding. Turn it
 --- on while you are working on the holds themselves, or if you keep forgetting
@@ -72,7 +80,9 @@ function hammerspoonReloadHeldBy()
     -- Runs to the end rather than breaking out, so the directory handle is
     -- closed by the iterator itself. It holds one small file per agent.
     for entry in iter, dirObj do
-        if entry ~= "." and entry ~= ".." then
+        -- Dotfiles are night_hold's own; `.lock' in particular is the file it
+        -- flocks for the duration of an acquire, and its mtime means nothing.
+        if entry:sub(1, 1) ~= "." then
             local attrs = hs.fs.attributes(hammerspoonNoReloadDir .. "/" .. entry)
             if attrs and attrs.modification > now then
                 holder = holder or entry
