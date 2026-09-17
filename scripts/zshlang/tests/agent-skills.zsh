@@ -170,6 +170,51 @@ command ln -s -- "${expected_path}" "${legacy}/note/SKILL.md"
 agent-skills-prune-legacy-codex
 [[ ! -e ${legacy}/note ]] || agent-skills-test-fail "private legacy link should be pruned"
 
+# The Claude seat refuses a target it does not own, exactly as Codex does above.
+# Each case gets its own profile directory, so a refusal cannot be a leftover
+# from the assertions before it.
+typeset claude_case foreign
+claude_case="${agent_skills_test_tmp}/claude-wrong-link"
+command mkdir -p -- "${claude_case}/skills/clean"
+command ln -s -- "${agent_skills_src_dir}/extra/SKILL.md" "${claude_case}/skills/clean/SKILL.md"
+claude_code_profiles[test]="${claude_case}"
+if agent-skills-link >/dev/null 2>&1 ; then
+    agent-skills-test-fail "a wrong Claude symlink should make linking fail"
+fi
+linked_path="${claude_case}/skills/clean/SKILL.md"
+expected_path="${agent_skills_src_dir}/extra/SKILL.md"
+[[ -L ${linked_path} && ${linked_path:A} == ${expected_path:A} ]] || \
+    agent-skills-test-fail "wrong Claude symlink should be preserved"
+
+claude_case="${agent_skills_test_tmp}/claude-plain-file"
+command mkdir -p -- "${claude_case}/skills/clean"
+print -r -- 'mine' > "${claude_case}/skills/clean/SKILL.md"
+claude_code_profiles[test]="${claude_case}"
+if agent-skills-link >/dev/null 2>&1 ; then
+    agent-skills-test-fail "a plain Claude file should make linking fail"
+fi
+[[ -f ${claude_case}/skills/clean/SKILL.md && ! -L ${claude_case}/skills/clean/SKILL.md ]] || \
+    agent-skills-test-fail "plain Claude file should be preserved"
+[[ "$(<${claude_case}/skills/clean/SKILL.md)" == mine ]] || \
+    agent-skills-test-fail "plain Claude file should keep its contents"
+
+# A symlinked skill directory must never be written through: `mkdir -p' succeeds
+# on it and `ln -s' would then drop SKILL.md inside whatever it points at.
+claude_case="${agent_skills_test_tmp}/claude-dir-link"
+foreign="${agent_skills_test_tmp}/claude-foreign"
+command mkdir -p -- "${claude_case}/skills" "${foreign}"
+command ln -s -- "${foreign}" "${claude_case}/skills/clean"
+claude_code_profiles[test]="${claude_case}"
+if agent-skills-link >/dev/null 2>&1 ; then
+    agent-skills-test-fail "a symlinked Claude skill directory should make linking fail"
+fi
+agent-skills-test-assert "symlinked Claude skill directory should be preserved" \
+    test -L "${claude_case}/skills/clean"
+[[ ! -e ${foreign}/SKILL.md ]] || \
+    agent-skills-test-fail "nothing should be written inside the foreign directory"
+
+claude_code_profiles[test]="${agent_skills_test_tmp}/claude"
+
 # Duplicate names must fail before any target mutation, rather than picking a root.
 command mkdir -p -- "${agent_skills_notes_dir}/clean"
 command cp -- "${agent_skills_src_dir}/clean/SKILL.md" "${agent_skills_notes_dir}/clean/SKILL.md"

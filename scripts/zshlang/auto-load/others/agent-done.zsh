@@ -165,7 +165,7 @@ function agent-skills-link {
                 if test -L "${target}" && [[ "${target:A}" == "${src:A}" ]] ; then
                     continue
                 elif test -e "${target}" || test -L "${target}" ; then
-                    ecerr "$0: ${target/#${HOME}/~} is not our directory link; leaving it alone"
+                    ecerr "$0: ${target/#${HOME}/~} is not our directory link (expected ${${src:A}/#${HOME}/~}); leaving it alone. Remove it and re-run $0."
                     ret=1
                     continue
                 fi
@@ -183,16 +183,35 @@ function agent-skills-link {
                 continue
             fi
 
-            #: A plain file here is somebody's own skill of the same name, or
-            #: one an agent wrote itself. Replacing it silently would lose it,
-            #: so say so and leave it.
-            if test -e "${target}" && ! test -L "${target}" ; then
-                ecerr "$0: ${target/#${HOME}/~} is a plain file, not our link; leaving it alone"
+            #: A symlinked `<dir>/<name>' is never ours: we always create that
+            #: directory with `mkdir -p'. Resolving through it would be worse
+            #: than useless -- `mkdir -p' succeeds on a link to an existing
+            #: directory, and `ln -s' would then write SKILL.md *inside*
+            #: whatever it points at, outside the agent's own skills tree.
+            #: Checked before the target itself so the message names the real
+            #: problem when that foreign directory holds a SKILL.md of its own.
+            if test -L "${target:h}" ; then
+                ecerr "$0: ${${target:h}/#${HOME}/~} is a symlink, not our skill directory; leaving it alone"
+                ret=1
                 continue
             fi
 
-            mkdir -p -- "${target:h}" @RET
-            command ln -sf -- "${src}" "${target}" @RET
+            #: Anything else still here is somebody's own skill of the same
+            #: name -- a file an agent wrote itself, or a link of their own --
+            #: or one of ours left behind by a skill that moved between roots.
+            #: Replacing either silently would lose it, so name what we expected
+            #: and leave it. Same policy as the Codex branch above, and manual
+            #: for the same reason: only you can tell those two apart.
+            if test -e "${target}" || test -L "${target}" ; then
+                ecerr "$0: ${target/#${HOME}/~} is not our link (expected ${${src:A}/#${HOME}/~}); leaving it alone. Remove it and re-run $0."
+                ret=1
+                continue
+            fi
+
+            command mkdir -p -- "${target:h}" @RET
+            #: `-s' rather than `-sf': the guards above leave nothing to
+            #: clobber, so a collision here is a race, and belongs in an error.
+            command ln -s -- "${src}" "${target}" @RET
             if bool "${verbose_p}" ; then
                 ecgray "$0: linked ${target/#${HOME}/~} (${agent})"
             fi
@@ -277,7 +296,7 @@ function h-agent-skills-doctor {
             elif [[ "${target:A}" == "${src:A}" ]] ; then
                 ec "  = symlinked to ${src/#${NIGHTDIR}/.}"
             else
-                ecerr "  WRONG TARGET: points at ${${target:A}/#${HOME}/~}"
+                ecerr "  WRONG TARGET: points at ${${target:A}/#${HOME}/~}. Remove it and re-run agent-skills-link."
             fi
         done
     done
