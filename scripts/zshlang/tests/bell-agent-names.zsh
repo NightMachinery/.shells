@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Run: zsh -ic 'source "$NIGHTDIR/zshlang/tests/bell-agent-names.zsh"'
+# Run: zsh -c 'source "$NIGHTDIR/zshlang/tests/bell-agent-names.zsh"'
 # Also safe to source through BrishGarden after brishz-restart.
 (
     setopt localoptions pipefail

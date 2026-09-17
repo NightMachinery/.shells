@@ -54,7 +54,7 @@ typeset -g agent_auto_continue_activity_slack_s="${agent_auto_continue_activity_
 #: What gets typed. Self-limiting: a session that was resumed although its task
 #: was already finished is asked to take itself off the list, so a wrong resume
 #: happens once rather than at every reset.
-typeset -g agent_auto_continue_text="${agent_auto_continue_text:-Continue. If the task is already finished, say so briefly and run: zsh -ic agent-auto-continue-off}"
+typeset -g agent_auto_continue_text="${agent_auto_continue_text:-Continue. If the task is already finished, say so briefly and run: zsh -c agent-auto-continue-off}"
 ##
 #: Naming
 ##

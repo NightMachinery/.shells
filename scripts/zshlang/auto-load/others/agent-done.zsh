@@ -613,7 +613,7 @@ work is actually finished. --dry-run writes the report and kills nothing."
         #: The pane's own tty and directory, not this shell's. The shell an
         #: agent runs its tools in usually has no controlling terminal, and it
         #: is commonly not even in the project directory -- this function is
-        #: reached through `zsh -ic', which starts wherever the rc files leave
+        #: reached through `zsh -c', which starts wherever the rc files leave
         #: it. The pane is where the session actually lives.
         test -n "${tty}" || tty="$(command tmux display-message -p -t "${pane}" '#{pane_tty}' 2>/dev/null)" || tty=''
         test -n "${cwd}" || cwd="$(command tmux display-message -p -t "${pane}" '#{pane_current_path}' 2>/dev/null)" || cwd=''
