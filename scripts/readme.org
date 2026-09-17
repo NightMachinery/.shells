@@ -287,13 +287,18 @@ uv tool install 'git+https://github.com/NightMachinery/cis-applications2org.git'
 at the office and nobody is at the desk, and unmutes when you unlock. Installed
 as a LaunchAgent from =./launchers/audio-guard/=. See =./docs/audio-guard.md=.
 
-* External display brightness
+* External display brightness and contrast
 
 =brightness-get= / =-set= / =-inc= / =-dec= drive external monitors over DDC/CI,
 not just the built-in panel, because IOKit cannot reach an external one at all.
 Each display is routed to whichever backend can talk to it —
 [[agfi:brightness-displays]] shows which — and a selector picks the display when
 several are attached, defaulting to the main one.
+
+=contrast-get= / =-set= / =-inc= / =-dec= are the same four over the same
+selectors, DDC-only since IOKit exposes no contrast. hyper+F1/F2 steps
+brightness and hyper+ctrl+F1/F2 steps contrast, both coalescing their presses so
+a key hold cannot outrun the DDC bus.
 
 =display-black-on= / =-off= / =-toggle= blank a display outright. That is not the
 same as brightness 0: on a built-in panel IOKit really does cut the backlight,
@@ -303,6 +308,14 @@ F1 also locks the keyboard and mouse for as long as the screen is black, so a
 brushed key cannot type into an unseen window or turn the brightness back up;
 hyper+shift+F2 releases both, and so does [[agfi:display-black-off]], which
 every unblack path runs through.
+
+The levels are remembered per display and put back per display. Restoring
+re-resolves each row by CGDirectDisplayID rather than by the positional
+backend-local id it was saved with, so a monitor unplugged or docked mid-blackout
+cannot have another one's level written to it; a display that is gone at that
+moment has its levels parked until it is back. A level that was lost rather than
+read lands on a configured fallback, because a row exists only where something
+was floored, and leaving it alone leaves the panel dark.
 
 See =./docs/external-display-brightness.md=, which also records how often DDC
 reads come back corrupt and what is done about it.
