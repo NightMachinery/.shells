@@ -151,7 +151,7 @@ say `UNTRACKED` if an agent has replaced one with a file of its own.
 
 ## What `agent-done` does
 
-    zsh -ic 'agent-done' <<'SUMMARY'
+    zsh -c 'agent-done' <<'SUMMARY'
     ...
     SUMMARY
 

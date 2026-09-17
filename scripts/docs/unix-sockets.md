@@ -112,5 +112,5 @@ bridge converges rather than lingering.
 ## After changing any of this
 
 BrishGarden keeps persistent shells, so run `brishz-restart`. Testing in a
-fresh `zsh -ic` proves nothing about what the garden — and therefore the kitty
+fresh `zsh -c` proves nothing about what the garden — and therefore the kitty
 hotkey and the Claude Code hooks — is actually running.

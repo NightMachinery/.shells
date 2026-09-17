@@ -310,6 +310,28 @@ as external.
 `displays-get` lists attached displays, via Hammerspoon (~8ms) with a
 `system_profiler` fallback (~400ms).
 
+## The startup bell
+
+`bell-zsh-start` is a separate bell from `bell-auto`: it rings once when a shell
+starts, from the last line of `nightsh-load-zshrc` in `~/.zshrc`. zsh sources
+`.zshrc` for every interactive shell, so anything running `zsh -ic '<cmd>'` used
+to ring it too.
+
+The gate is `human-interactive-p`, in `zshlang/basic/conditions.zsh`. It is
+stricter than `isI` because `zsh -ic` is interactive by every flag zsh sets and
+is still a script runner. Three things must hold: no AI agent spawned the shell,
+it writes to a terminal, and `ZSH_EXECUTION_STRING` is empty, which zsh sets
+exactly when `-c` was used and never for a shell a person typed into.
+
+A shell that fails the gate is still recorded in `~/logs/bell-zsh-start`, with a
+`skip:` line saying why. That log is what makes a stray bell diagnosable, which
+is why the skip is logged rather than returned silently. Agent shells are the
+exception and return before the log, since they would otherwise swamp it.
+
+Prefer `zsh -c` over `zsh -ic` regardless: it never sources `.zshrc`, so it
+cannot reach the bell at all, and it starts in roughly a third of the time. See
+`PE/Zsh.org`.
+
 ## Gotchas
 
 Keep backticks out of `:` docstrings. They are double-quoted, so zsh runs command
@@ -318,7 +340,7 @@ that function recurse on every invocation. This cost `app-icon-get` 1.2s and
 `h-ipv4-in-subnet-p` 2.6s per call before it was spotted.
 
 BrishGarden holds persistent shells, so run `brishz-restart` after changing zsh code
-you intend to exercise through the agent hooks. Testing in a fresh `zsh -ic` says
+you intend to exercise through the agent hooks. Testing in a fresh `zsh -c` says
 nothing about what the garden is running.
 
 The Telegram escalation is time-bounded with `reval-timeout` rather than `gtimeout`,
@@ -326,7 +348,7 @@ because `tnotif` is a zsh function and an external timeout binary cannot run one
 
 ## Verification
 
-Run `zsh -ic 'source "$NIGHTDIR/zshlang/tests/bell-agent-names.zsh"'` for synthetic
+Run `zsh -c 'source "$NIGHTDIR/zshlang/tests/bell-agent-names.zsh"'` for synthetic
 transcripts and session indexes. The regression test stubs sound, desktop,
 Telegram, queue storage, and acknowledgement transports inside a subshell; it
 sends no real notifications and does not touch the live queue. It covers name

@@ -255,7 +255,7 @@ reads as `true-- Loading extension: task` and is treated as a failure. This cost
 
 **BrishGarden caches shells.** Run `brishz-restart` after editing
 `audio-guard.zsh`, or the LaunchAgent keeps executing whatever the garden loaded
-at startup. Testing in a fresh `zsh -ic` says nothing about what the job runs.
+at startup. Testing in a fresh `zsh -c` says nothing about what the job runs.
 
 **No backticks in `:` docstrings.** They are double-quoted, so zsh runs command
 substitution on them.

@@ -59,7 +59,7 @@ command name is what fails, not the flag.
 
 ```zsh
 hs -q -c 'return hs.application.frontmostApplication():bundleID()'
-zsh -ic 'sioyek-reload' ; sleep 1
+zsh -c 'sioyek-reload' ; sleep 1
 hs -q -c 'return hs.application.frontmostApplication():bundleID()'
 ```
 

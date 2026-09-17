@@ -40,7 +40,7 @@ this itself on every tick). The armed jobs also appear in
 [agfi:agent-usage-armed-cancel], like every other armed job.
 
 The skill runs [agfi:agent-auto-continue-on] (or `-off`, `-status`) through
-`zsh -ic` from the agent's own shell tool, for the same reason `/done` does: that
+`zsh -c` from the agent's own shell tool, for the same reason `/done` does: that
 shell inherits the environment that names the session — `CLAUDE_CODE_SESSION_ID`
 and `CLAUDE_CONFIG_DIR`, `CODEX_THREAD_ID`, `ANTIGRAVITY_CONVERSATION_ID`, and
 `TMUX_PANE` — which a garden shell does not have.
@@ -271,13 +271,13 @@ in `agent-usage-armed.md` and apply unchanged.
 
 ## Checking it by hand
 
-    zsh -ic 'agent-auto-continue-on'          # from an agent's shell tool
+    zsh -c 'agent-auto-continue-on'          # from an agent's shell tool
     agent-auto-continue-list
     deus agent-auto-continue-check claude-work  # arm for the next rollover, no limit needed
     agent-usage-armed-status
     agent-auto-continue-check claude-work       # "already armed for these targets"
     printf '{"session_id":"<id>"}' | agent-auto-continue-hook claude "%3"
-    zsh -ic 'agent-auto-continue-off'
+    zsh -c 'agent-auto-continue-off'
 
 The watcher's own pane (`agent-auto-continue-watch-<scope>`) shows what each
 tick decided, and every fire is a line in `agent_usage_arm_log`.
