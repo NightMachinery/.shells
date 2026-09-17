@@ -6,6 +6,11 @@ Zsh Coding Guidelines:
 
 - Always use =typeset -g= for variables that are global. Most variables outside functions are meant to be global.
 
+- Always use =zsh -c= instead of =zsh -ic= for non-interactive commands. =zsh -c= is the standard command and already loads our custom configuration. Only use =zsh -ic= if you are specifically testing an interactive shell.
+  - =~/.zshenv= loads the whole zshlang library unconditionally, with no interactivity guard, so every function is already defined under =zsh -c=. All =-i= adds is =.zshrc=: zle, compinit, plugins, prompt hooks and the startup bell.
+  - Under =zsh -c=, [agfi:isI] is false, so a function whose output branches on it (colorization, [agfi:cat-copy-if-tty]) formats differently. When you need it true, set =FORCE_INTERACTIVE=y= on a =zsh -c= call; that still skips =.zshrc=.
+  - [agfi:isI] does not identify a human either: =zsh -ic= is interactive by every flag zsh sets. [agfi:human-interactive-p] is the test for "a person is actually at the other end", and it is what gates the startup bell =bell-zsh-start=.
+
 - Use =gmv=, =gmkdir=, etc. when you want to use a GNU-specific feature, as the code must run on both macOS and Linux.
 
 - Some basic functions/aliases are already defined, and should be used if needed:
