@@ -322,6 +322,27 @@ function sudo-usable-p {
     ##
     isSudoNopass || { isSudoer && isI }
 }
+
+function h-sudo-cmd {
+    #: Prints the sudo argv appropriate *here*, one word per line, for
+    #: `local sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )'.
+    #:
+    #: Plain sudo reads the password from /dev/tty, so with no controlling
+    #: terminal it does not fail -- it HANGS until something times it out.
+    #: Test for the tty itself rather than for an interactive shell: `zsh -ic'
+    #: from an agent is interactive by every other measure and still has no
+    #: tty. -A falls back to SUDO_ASKPASS there; -k so a warm timestamp cannot
+    #: make a broken askpass setup look like it worked.
+    #:
+    #: This says *how* to invoke sudo, not *whether* to. Ask
+    #: [agfi:sudo-usable-p] first where a refusal is recoverable.
+    ##
+    if { : < /dev/tty } 2>/dev/null ; then
+        print -rl -- sudo
+    else
+        print -rl -- sudo -k -A
+    fi
+}
 ##
 function sudo-patch-touchid-darwin {
     if [[ "$(uname)" == 'Darwin' ]] ; then

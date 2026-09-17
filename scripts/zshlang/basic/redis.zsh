@@ -105,6 +105,66 @@ function h-redis-auth-generate {
     test -n "${REDISCLI_AUTH}"
 }
 
+function h-redis-enforcement-assert {
+    #: Does the running server actually require our secret?
+    #:
+    #: Two probes, because either alone is ambiguous. With the secret we must
+    #: get PONG, or we have locked ourselves out. Without any secret we must
+    #: NOT get PONG, or the server is still serving anonymous clients.
+    ##
+    local with without
+
+    with="$(command redis-cli --no-auth-warning --raw PING 2>/dev/null)"
+    if [[ "${with:l}" != pong ]] ; then
+        ecerr "$0: authenticated PING failed after setting requirepass. Redis said: ${with:-<nothing>}"
+        return 1
+    fi
+
+    #: `env -u' rather than unsetting our own: redis-cli reads REDISCLI_AUTH
+    #: from its environment, so it has to be absent in the *child*. env also
+    #: resolves redis-cli from PATH, so no alias or function can intercept it.
+    without="$(command env -u REDISCLI_AUTH redis-cli --no-auth-warning --raw PING 2>&1)"
+    if [[ "${without:l}" == pong ]] ; then
+        ecerr "$0: the server still answers unauthenticated clients; requirepass did not take effect."
+        return 1
+    fi
+
+    return 0
+}
+
+function h-redis-conf-protect {
+    #: CONFIG REWRITE writes the password *in plaintext* into the config file
+    #: and leaves its mode alone, so on a host that ships it world-readable -
+    #: Homebrew's redis.conf is 644 - the rewrite hands the secret to every
+    #: local user. Take that away.
+    #:
+    #: `o-rwx', not `600'. The threat here is the other *users* of this
+    #: machine, which is exactly the `o' bits; owner and group access must
+    #: survive, because the daemon reads this file as itself. Debian ships it
+    #: redis:redis 640 and runs the daemon as redis, so a blanket 600 would
+    #: strip the group and the daemon would lose its own config on the next
+    #: restart - trading a disclosure bug for an outage.
+    ##
+    local conf="$1"
+
+    command chmod o-rwx "${conf}" 2>/dev/null && return 0
+
+    #: Escalate only after the unprivileged attempt has failed, and only where
+    #: root is actually reachable: a password-prompting sudo on a headless host
+    #: is a hang, not a question. [agfi:h-sudo-cmd] picks the safe argv.
+    if sudo-usable-p ; then
+        local sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )
+
+        if silent "${sudo_cmd[@]}" chmod o-rwx "${conf}" ; then
+            ecgray "$0: tightened ${conf} (needed root)"
+            return 0
+        fi
+    fi
+
+    ecerr "$0: WARNING: could not tighten ${conf}. The running server IS protected, but that file now holds the password in plaintext and its mode is unverified. Fix it by hand: chmod o-rwx ${conf}"
+    return 1
+}
+
 function redis-harden {
     #: Makes the *running* server require our secret, which is the half that
     #: [agfi:h-redis-auth-ensure] cannot do on its own.
@@ -160,27 +220,44 @@ function redis-harden {
         return 1
     }
 
+    #: Prove the server now *demands* it, rather than trusting that CONFIG SET
+    #: did what it said. A renamed or ACL-restricted CONFIG command can accept
+    #: the call and change nothing, and we would then report success over a
+    #: still-open server - which is the precise failure ./docs/redis-hardening.md
+    #: exists to warn about.
+    h-redis-enforcement-assert || return 1
+
+    local rc=0
+
     #: Persists it across restarts, but only where redis was started from a
     #: config file. Our own [agfi:night-startup-redis] passes everything on
     #: the command line and has none, so REWRITE fails there - harmlessly,
     #: because that path re-reads ${redis_auth_file} on every start anyway.
+    #:
+    #: Unprivileged on purpose, and sudo could not help: CONFIG REWRITE is
+    #: performed by the redis *daemon*, so it turns on the daemon's rights over
+    #: its own config file, never on ours. Under a distro package the daemon
+    #: usually owns that file, and the rewrite succeeds even on a host where we
+    #: cannot so much as stat it.
     if silent command redis-cli --no-auth-warning CONFIG REWRITE ; then
-        #: CONFIG REWRITE writes the password *in plaintext* into the config
-        #: file, and leaves its mode alone. Homebrew ships redis.conf as 644,
-        #: so on the very hosts this is meant to protect the rewrite would
-        #: hand the secret to every local user. Lock it down.
         local conf
         conf="$(command redis-cli --no-auth-warning --raw INFO server 2>/dev/null | command grep -m1 '^config_file:')"
         conf="${${conf#config_file:}%$'\r'}"
-        if test -n "${conf}" && test -f "${conf}" ; then
-            command chmod 600 "${conf}" 2>/dev/null ||
-                ecerr "$0: WARNING: could not chmod 600 ${conf}; it now contains the password in plaintext"
+
+        #: Deliberately no `test -f': where the config lives in a directory we
+        #: may not traverse - /etc/redis is 750 root:redis on Debian - the test
+        #: is false for a file that is certainly there, and we would skip
+        #: protecting it without saying so.
+        if test -n "${conf}" ; then
+            h-redis-conf-protect "${conf}" || rc=1
         fi
 
-        ecgray "$0: requirepass set, written to ${conf:-the config file} (mode 600)"
+        ecgray "$0: requirepass set and written to ${conf:-the config file}"
     else
         ecgray "$0: requirepass set for the running server, but NOT persisted (redis has no config file). It must be restarted with --requirepass."
     fi
+
+    return "${rc}"
 }
 
 function ensure-redis {

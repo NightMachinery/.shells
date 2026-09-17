@@ -98,16 +98,9 @@ function firewall-allow-mosh-darwin() {
     fi
   fi
 
-  #: Plain sudo reads the password from /dev/tty, so with no controlling
-  #: terminal it does not fail -- it HANGS until something times it out. Test
-  #: for the tty itself rather than for an interactive shell: `zsh -ic' from an
-  #: agent is interactive by every other measure and still has no tty. -A falls
-  #: back to SUDO_ASKPASS there; -k so a warm timestamp cannot make a broken
-  #: askpass setup look like it worked.
-  local sudo_cmd=(sudo)
-  if ! { : < /dev/tty } 2>/dev/null ; then
-    sudo_cmd=(sudo -kA)
-  fi
+  #: [agfi:h-sudo-cmd] explains why this is not just `sudo': a bare sudo with
+  #: no controlling terminal hangs rather than failing.
+  local sudo_cmd=( ${(@f)"$(h-sudo-cmd)"} )
 
   reval-ec "$sudo_cmd[@]" "$fw" --setglobalstate off
 

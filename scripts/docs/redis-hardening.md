@@ -97,16 +97,55 @@ Applies the secret to the running server:
 - `CONFIG SET requirepass`, which takes effect at once and does **not** drop
   existing connections. Already-connected clients keep working; every *new*
   connection without the secret gets NOAUTH;
-- `CONFIG REWRITE`, then **`chmod 600` on the config file**. This last step is
-  not optional. `CONFIG REWRITE` writes the password in plaintext and leaves the
-  file's mode alone, and Homebrew ships `redis.conf` as `644` — so on exactly
-  the multi-user hosts this is meant to protect, the naive rewrite hands the
-  secret to every local user through a world-readable file.
+- proves the server now actually *demands* it, rather than trusting the write.
+  `h-redis-enforcement-assert` pings twice: with the secret it must get `PONG`,
+  and with `env -u REDISCLI_AUTH` it must *not*. Either probe alone is
+  ambiguous. Without this check, a renamed or ACL-restricted `CONFIG` command
+  can accept the call, change nothing, and let `redis-harden` report success
+  over a server that is still wide open — which is this document's whole
+  subject;
+- `CONFIG REWRITE`, then **tightens the config file's permissions**. This last
+  step is not optional. `CONFIG REWRITE` writes the password in plaintext and
+  leaves the file's mode alone, and Homebrew ships `redis.conf` as `644` — so
+  on exactly the multi-user hosts this is meant to protect, the naive rewrite
+  hands the secret to every local user through a world-readable file.
 
 `CONFIG REWRITE` fails when redis was started without a config file. That is the
 case for `night-startup-redis` in `setup/bootstrap/stages/70-services.sh`,
 which passes everything on the command line — harmlessly, because that path
 re-reads `~/.redis-auth` and passes `--requirepass` on every start anyway.
+
+### Who may write what
+
+Two different principals act here, and conflating them produces bugs that only
+show up on a distro-packaged host:
+
+`CONFIG REWRITE` is performed by the redis **daemon**, not by our client. It
+therefore turns on the daemon's rights over its own config file, never on ours.
+Under a distro package the daemon usually owns that file, so the rewrite
+succeeds even where our shell user cannot so much as `stat` it. Running it
+under `sudo` would accomplish nothing, so `redis-harden` never tries.
+
+The `chmod` afterwards *is* ours, and it is the step that may need root.
+`h-redis-conf-protect` attempts it unprivileged first and escalates only on
+failure, and only when `sudo-usable-p` says root is reachable at all — a
+password-prompting sudo on a headless host is a hang, not a question. The argv
+comes from `h-sudo-cmd`, which is why it is `sudo -k -A` wherever there is no
+controlling terminal. If both attempts fail, the function says so loudly and
+returns non-zero: the running server is protected, but that file now holds the
+password in plaintext at an unverified mode, and quietly returning success
+there would be the same class of half-done as having no `requirepass` at all.
+
+It chmods **`o-rwx`, not `600`.** The threat is the other *users* of this
+machine, which is exactly the `o` bits. Owner and group access has to survive,
+because the daemon reads the file as itself: Debian ships `/etc/redis/redis.conf`
+as `redis:redis 640` and runs the daemon as `redis`, so a blanket `600` strips
+the group and the daemon loses its own config on the next restart. That trades a
+disclosure bug for an outage.
+
+For the same reason there is no `test -f` before the chmod. On Debian
+`/etc/redis` is `750 root:redis`, so the test is false for a file that is
+certainly there, and guarding on it would silently skip protecting it.
 
 ## The other clients
 
@@ -196,3 +235,22 @@ On a host bootstrapped by `setup/bootstrap`, stage 45 already generates
 and stage 70 starts redis with it, so both halves are covered on the next start.
 Anywhere redis is started by brew, systemd or the distro, `redis-harden` is the
 step that actually protects it.
+
+### A worked example of getting half of it
+
+A VPS of ours sat in exactly the half-1 state for a day, and announced it on
+every login with the error quoted at the top of this file, twice per shell.
+
+`~/.redis-auth` had been generated the day before, so every `redis-cli` call
+authenticated. But the running redis was the distro's systemd unit — its own
+user, its own `/etc/redis/redis.conf`, an uptime of 209 days. `night-startup-redis`
+only passes `--requirepass` to a server *it* starts, and it returns early on
+"already up", so a daemon that predates the secret by seven months is never
+touched by it. Nothing in the bootstrap path was broken; it simply does not
+apply to a server it did not start.
+
+The tell is worth memorising, because it is the opposite of what it looks like:
+a noisy `AUTH failed` on every command means the **server is unprotected**, not
+that your password is wrong. A wrong password says `WRONGPASS`, and a missing
+one says `NOAUTH`. `redis-harden` is the fix, and it needed to learn to
+escalate before it could finish the job on a host like that.
