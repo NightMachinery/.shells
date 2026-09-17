@@ -10,6 +10,7 @@ Zsh Coding Guidelines:
   - =~/.zshenv= loads the whole zshlang library unconditionally, with no interactivity guard, so every function is already defined under =zsh -c=. All =-i= adds is =.zshrc=: zle, compinit, plugins, prompt hooks and the startup bell.
   - Under =zsh -c=, [agfi:isI] is false, so a function whose output branches on it (colorization, [agfi:cat-copy-if-tty]) formats differently. When you need it true, set =FORCE_INTERACTIVE=y= on a =zsh -c= call; that still skips =.zshrc=.
   - [agfi:isI] does not identify a human either: =zsh -ic= is interactive by every flag zsh sets. [agfi:human-interactive-p] is the test for "a person is actually at the other end", and it is what gates the startup bell =bell-zsh-start=.
+  - An interactive zsh =cd=s to the last-used directory on startup ([agfi:zsh-pwd-load]), so =zsh -ic= does not stay where you called it while =zsh -c= does. When a shell genuinely must be interactive, =ZSH_PWD=MAGIC_KEEP_CURRENT= keeps the inherited directory, and =ZSH_PWD=<path>= starts it at a specific one. [agfi:tmuxnewsh2-attach-z] uses the former; the =zsh-restart= alias uses the latter.
 
 - Use =gmv=, =gmkdir=, etc. when you want to use a GNU-specific feature, as the code must run on both macOS and Linux.
 
