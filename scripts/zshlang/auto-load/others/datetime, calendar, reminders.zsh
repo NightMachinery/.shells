@@ -531,8 +531,32 @@ minutes. So durations must be claimed before chrono ever sees them."
     dur2sec "$c"
 }
 
-function datenat-v2 {
-    : "usage: datenat-v2 SPEC...
+function unix2human {
+    : "usage: unix2human EPOCH
+
+Print EPOCH the way [agfi:now] prints the current moment, dropping the date when
+EPOCH falls on today. A time later the same day is then just a clock time, while
+anything further out carries its full jalali and gregorian date."
+
+    local u="${1}"
+    assert-args u @RET
+
+    local t
+    t="$(gdate -d "@${u}" +'%H:%M:%S')" @RET
+
+    if [[ "$(gdate -d "@${u}" +'%F')" == "$(gdate +'%F')" ]] ; then
+        ec "$t"
+        return 0
+    fi
+
+    local datej
+    datej="$(jalalicli tojalali "$u" -g 'unix')" @RET
+
+    ec "$(datej-all-long "$datej") $t"
+}
+
+function datenat-unix-v2 {
+    : "usage: datenat-unix-v2 SPEC...
 
 Print the unix timestamp for SPEC. Handles compact durations (1h30m, 90m, 3h,
 '1h:30m later', 1w2d3h) and everything [agfi:datenat] handles (tomorrow 8am,
@@ -542,26 +566,48 @@ Durations are tried first and deliberately so: chrono silently misreads
 '1h:30m later' as 30 minutes, and a plausible wrong time is worse than an
 error. Chrono also invents 12:00 for a spec naming no time of day, so this runs
 it with datenat_strict, which rejects both. Pass datenat_strict= to opt out.
-Fails loudly when neither parser claims the input."
+Fails loudly when neither parser claims the input.
+
+Interactively prints [agfi:unix2human] rather than the epoch, because a bare
+number cannot be eyeballed for correctness and these specs are easy to mistype."
 
     local inargs
     in-or-args2 "$@" @RET
     local text="${inargs[*]}"
 
-    local secs
+    local u secs
     if secs="$(h-dur-nat2sec "$text")" ; then
-        ec $(( EPOCHSECONDS + secs ))
-        return 0
+        u=$(( EPOCHSECONDS + secs ))
+    else
+        #: strict by default here: this feeds alarms, where a partial parse or
+        #: an invented hour is worse than an error. See [agfi:datenat].
+        u="$(datenat_strict="${datenat_strict-y}" datenat_unix=y datenat "$text")" @RET
     fi
 
-    #: strict by default here: this feeds alarms, where a partial parse or an
-    #: invented hour is worse than an error. See [agfi:datenat].
-    datenat_strict="${datenat_strict-y}" datenat_unix=y datenat "$text"
+    if fn-isTop ; then
+        unix2human "$u"
+    else
+        ec "$u"
+    fi
 }
-aliasfn datenat-v2-future datenat_nopast=y datenat-v2
+aliasfn datenat-unix-v2-future datenat_nopast=y datenat-unix-v2
 ##
 aliasfn datenat-future datenat_nopast=y datenat
-aliasfn datenat-unix datenat_unix=y datenat
+function datenat-unix {
+    : "usage: datenat-unix SPEC...
+
+Print the unix timestamp for SPEC via [agfi:datenat]. Interactively prints
+[agfi:unix2human] instead, for the same reason as [agfi:datenat-unix-v2]."
+
+    local u
+    u="$(datenat_unix=y datenat "$@")" @RET
+
+    if fn-isTop ; then
+        unix2human "$u"
+    else
+        ec "$u"
+    fi
+}
 aliasfn datenat-future-unix datenat_nopast=y datenat_unix=y datenat
 
 function datenat-formatted {
