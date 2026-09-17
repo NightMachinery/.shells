@@ -34,37 +34,44 @@ request and 2 MiB on the next — so a single successful download proves nothing
 
 ## Fix
 
-`h-arxiv-pdf-dl` (`zshlang/auto-load/others/scraping/arxiv.zsh`) takes a list of
-URLs plus a destination, appends the `arxiv.org` mirror of each via
-`arxiv-unexportify`, and tries them in order. `export` stays first, so the
-politeness convention survives and the mirror is only touched when export fails.
+Two layers, so the generic part is not arXiv-specific.
 
-Each attempt downloads to `${dest}.part`, which is moved onto `$dest` only on
-success, so a failed run leaves an existing file alone.
+`curl-2dest <url> ... <dest>`
+(`zshlang/auto-load/others/scraping/scraping.zsh`) is the downloader: it takes a
+list of URLs, tries them in order until one succeeds, and drops duplicates so
+callers can pass mirrors unconditionally. Each attempt writes to `${dest}.part`,
+moved into place only on success, so a failed run leaves an existing file alone.
+`aa-2dest` is now an alias for it.
 
-Two details are load-bearing:
+`h-arxiv-pdf-dl` (`zshlang/auto-load/others/scraping/arxiv.zsh`) supplies the
+arXiv knowledge and nothing else: it expands each URL through
+`arxiv-url-alternatives`, which appends the `arxiv.org` twin of anything on
+`export.arxiv.org` (via `arxiv-unexportify`) and leaves every other URL alone.
+`export` therefore stays first and the mirror is only touched when it fails.
+Both `arxiv-dl` and `ss-dl` call it; because the expansion is a no-op off
+`export.arxiv.org`, neither needs to test whether a URL is an arXiv one.
+
+Two details inside `curl-2dest` are load-bearing:
 
 - **`curlm_continue_p=n`.** `curlm` defaults to `--continue-at -`. When the
   destination is already complete, curl sends a `Range` header past the end of
   the file, the server answers **416**, and `--fail` turns that into *the same
   exit 22*. A truncated `export` response must not be resumed as valid either.
-  `ss-dl` (`zshlang/auto-load/others/scraping/semantic_scholar.zsh`) had this
-  bug: re-running it over a finished download failed.
+  `ss-dl` had this bug: re-running it over a finished download failed.
 - **`retry-limited`, not `retry`.** `retry` is `retry-limited 0`
   (`zshlang/auto-load/others/error-handling.zsh`), i.e. *unlimited* retries, so
-  a 406 loops forever and a fallback URL is never reached. The retry budget is
-  1 for every URL but the last and 3 for the last: a failed attempt can pull
-  megabytes before dying, so the retries are spent on the URL expected to work.
+  a 406 loops forever and the remaining URLs are never reached. The budget is 1
+  for every URL but the last and `curl_2dest_retries` (default 3) for the last:
+  a failed attempt can pull megabytes before dying, so the retries are spent on
+  the URL expected to work.
 
-`aa-2dest` is no longer on this path. It routed the PDF through
-`full-html`/`full-html2`, which buffers the whole response in a shell variable
-and offers no retry. (That buffering was *not* corrupting PDFs — zsh command
-substitution preserves NUL bytes — but it gives no progress meter and no
-fallback.)
+## Why not the old aa-2dest
 
-## Not fixed
+It was `fhMode=curl full-html "$@"`, which buffers the whole response in a shell
+variable. That gives no retry, no fallback and no progress meter, and it is
+lossy for binaries: command substitution strips *all* trailing newlines and `ec`
+(`print -r --`) adds back exactly one. A PDF ending in `%%EOF\n` round-trips by
+luck; a file ending in no newline, or in several, does not.
 
-`ss-dl` still rewrites arXiv PDF links onto `export` (`arxiv-exportify`, and a
-hardcoded URL in the `api.semanticscholar.org/arXiv:` branch) without the
-fallback. Routing those through `h-arxiv-pdf-dl` would also touch non-arXiv
-publisher URLs, so it was left for a follow-up.
+It survives as `aa-2dest-v1` for the HTML case it was really written for, where
+`full-html2`'s link absolutification is the point. Nothing calls it.

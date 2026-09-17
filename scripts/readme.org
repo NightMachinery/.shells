@@ -112,10 +112,18 @@ one for single answers, and the standalone one for conversation exports.
 
 [[agfi:arxiv-dl]] fetches PDFs from =export.arxiv.org= first and falls back to
 the =arxiv.org= mirror, because export currently answers 406 on a cache miss and
-truncates the PDFs it does serve. =./docs/arxiv-export-pdf.md= has the
-measurements, and the two curl traps behind the same exit code 22: a default
-=--continue-at -= getting a 416 on an already complete file, and =retry= being
-unlimited where a bounded =retry-limited= is wanted.
+truncates the PDFs it does serve.
+
+The general half is [[agfi:curl-2dest]] (aliased as =aa-2dest=): download to a
+destination, trying a list of URLs in turn, via a =.part= file so a failure
+leaves the old file alone. The arXiv half is [[agfi:arxiv-url-alternatives]],
+which appends the =arxiv.org= twin of an =export.arxiv.org= URL and is a no-op
+for everything else, so callers need no =is this arXiv?= test.
+
+=./docs/arxiv-export-pdf.md= has the measurements, and the two curl traps behind
+the same exit code 22: a default =--continue-at -= getting a 416 on an already
+complete file, and =retry= being unlimited where a bounded =retry-limited= is
+wanted.
 
 * Codex
 
